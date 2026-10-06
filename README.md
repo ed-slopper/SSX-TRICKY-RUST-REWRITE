@@ -2,6 +2,17 @@
 
 Target: `SLUS_203.26` from `SSX Tricky (USA).iso` (ELF md5 `162580fd65611e72a90deed640a70aef`, PCSX2 CRC `8E7CFF62`).
 
+https://github.com/nationalsecurityagency/ghidra
+
+reverse engineer ssx tricky ps2
+
+here is some old stuff from 3 years ago ppl doing manual decompiling and modding of ssx tricky, it is only partially working
+D:\Games\games\ps2\ssx modding
+
+i put the ssx tricky rom in the root of this project: D:\code\modding\ssx-tricky\SSX Tricky (USA).iso
+
+get something basic working for me to try out
+
 ## Try it
 
 **Option A - patched ISO (any emulator, no settings needed)**
