@@ -2,7 +2,7 @@
 
 Target: `SLUS_203.26` from `SSX Tricky (USA).iso` (ELF md5 `162580fd65611e72a90deed640a70aef`, PCSX2 CRC `8E7CFF62`).
 
-https://github.com/nationalsecurityagency/ghidra
+https://www.youtube.com/watch?v=6AbWU6bvBGU
 
 reverse engineer ssx tricky ps2
 
