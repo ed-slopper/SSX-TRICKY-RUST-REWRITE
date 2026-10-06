@@ -1,0 +1,25 @@
+gametitle=SSX Tricky (USA) SLUS-20326
+
+[BX Debug Menu on pause]
+description=Pressing START in a race opens the developers' leftover 'BX Debug Menu' (Return To Race, Instant Replay, Restart Race, Render Options, Game Options, Sound Options, Exit the Game) instead of the normal pause menu.
+// move a0,s1            ; a0 = &gMenuManager   (was: li a1,6)
+patch=0,EE,2018181C,extended,0220202D
+// jal  cMenuManager::Push ; 0x1897F0      (was: jal ShowOverlay 0x1A7848)
+patch=0,EE,20181820,extended,0C0625FC
+// lw   a1,0x2A0(s0)      ; a1 = game->debugMenu (was: li a2,-1)
+patch=0,EE,20181824,extended,8E0502A0
+
+[Unlock everything from boot]
+description=Sets the flag that the built-in 'Unlock everything' button cheat toggles (gCheat_UnlockEverything, 0x3352A0), so all characters, boards, outfits and courses are open without entering the code.
+// gCheat_UnlockEverything = 1
+patch=0,EE,203352A0,extended,00000001
+
+[Max attributes from boot]
+description=Sets the flag toggled by the built-in 'Max attrib' cheat (gCheat_MaxAttrib, 0x3352AC).
+// gCheat_MaxAttrib = 1
+patch=0,EE,203352AC,extended,00000001
+
+[Mallora board from boot]
+description=Sets the flag toggled by the built-in 'Mallora' cheat (gCheat_Mallora, 0x3352B0).
+// gCheat_Mallora = 1
+patch=0,EE,203352B0,extended,00000001

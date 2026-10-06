@@ -1,0 +1,21 @@
+gametitle=SSX Tricky (USA) SLUS-20326
+
+// BX Debug Menu on pause
+// move a0,s1            ; a0 = &gMenuManager   (was: li a1,6)
+patch=0,EE,2018181C,extended,0220202D
+// jal  cMenuManager::Push ; 0x1897F0      (was: jal ShowOverlay 0x1A7848)
+patch=0,EE,20181820,extended,0C0625FC
+// lw   a1,0x2A0(s0)      ; a1 = game->debugMenu (was: li a2,-1)
+patch=0,EE,20181824,extended,8E0502A0
+
+// Unlock everything from boot
+// gCheat_UnlockEverything = 1
+patch=0,EE,203352A0,extended,00000001
+
+// Max attributes from boot
+// gCheat_MaxAttrib = 1
+patch=0,EE,203352AC,extended,00000001
+
+// Mallora board from boot
+// gCheat_Mallora = 1
+patch=0,EE,203352B0,extended,00000001

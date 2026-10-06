@@ -1,0 +1,9816 @@
+{
+ "classes": {
+  "cPostAI": {
+   "tf": 1133240,
+   "typeinfo": 4239112,
+   "base": "cBxObjNode",
+   "vtables": [
+    {
+     "addr": 3557016,
+     "funcs": [
+      1133160,
+      1132336,
+      1564416,
+      1564408,
+      1564400,
+      1564392,
+      1564384,
+      1564376,
+      1564368
+     ]
+    }
+   ]
+  },
+  "cPreAI": {
+   "tf": 1133400,
+   "typeinfo": 4239128,
+   "base": "cBxObjNode",
+   "vtables": [
+    {
+     "addr": 3557096,
+     "funcs": [
+      1133320,
+      1132208,
+      1564416,
+      1564408,
+      1564400,
+      1564392,
+      1564384,
+      1564376,
+      1564368
+     ]
+    }
+   ]
+  },
+  "cAI": {
+   "tf": 1133776,
+   "typeinfo": 4239048,
+   "base": null,
+   "vtables": [
+    {
+     "addr": 3557176,
+     "funcs": [
+      1133872,
+      1124080,
+      1564416,
+      1564408,
+      1564400,
+      1564392,
+      1564384,
+      1124240,
+      1124320,
+      1123744,
+      1116400,
+      1117176,
+      1123664,
+      1118112,
+      1118472,
+      1119440,
+      1119584,
+      1120288,
+      1120008,
+      1120056
+     ]
+    }
+   ]
+  },
+  "cReplayEndRaceHandler": {
+   "tf": 1579624,
+   "typeinfo": 4238600,
+   "base": "cAIStateHandler",
+   "vtables": [
+    {
+     "addr": 3558952,
+     "funcs": [
+      1134656,
+      1134376,
+      1134648
+     ]
+    },
+    {
+     "addr": 3696960,
+     "funcs": [
+      1134656,
+      1134376,
+      1134648
+     ]
+    }
+   ]
+  },
+  "cEndRaceHandler": {
+   "tf": 1133976,
+   "typeinfo": 4239080,
+   "base": "cAIStateHandler",
+   "vtables": [
+    {
+     "addr": 3557344,
+     "funcs": [
+      1130000,
+      1132200,
+      1130976
+     ]
+    }
+   ]
+  },
+  "cRaceHandler": {
+   "tf": 1134056,
+   "typeinfo": 4239016,
+   "base": "cAIStateHandler",
+   "vtables": [
+    {
+     "addr": 3557376,
+     "funcs": [
+      1128256,
+      1134376,
+      1128480
+     ]
+    }
+   ]
+  },
+  "cStartRaceHandler": {
+   "tf": 1134136,
+   "typeinfo": 4239032,
+   "base": "cAIStateHandler",
+   "vtables": [
+    {
+     "addr": 3557408,
+     "funcs": [
+      1127544,
+      1127632,
+      1127584
+     ]
+    }
+   ]
+  },
+  "cCountdownHandler": {
+   "tf": 1134216,
+   "typeinfo": 4239064,
+   "base": "cAIStateHandler",
+   "vtables": [
+    {
+     "addr": 3557440,
+     "funcs": [
+      1127712,
+      1128248,
+      1127936
+     ]
+    }
+   ]
+  },
+  "cSelectLessonHandler": {
+   "tf": 1579728,
+   "typeinfo": 4238504,
+   "base": "cAIStateHandler",
+   "vtables": [
+    {
+     "addr": 3558984,
+     "funcs": [
+      1134760,
+      1134752,
+      1134744
+     ]
+    },
+    {
+     "addr": 3696992,
+     "funcs": [
+      1134760,
+      1134752,
+      1134744
+     ]
+    }
+   ]
+  },
+  "cPreRaceHandler": {
+   "tf": 1134296,
+   "typeinfo": 4239144,
+   "base": "cAIStateHandler",
+   "vtables": [
+    {
+     "addr": 3557472,
+     "funcs": [
+      1125256,
+      1127528,
+      1125648
+     ]
+    }
+   ]
+  },
+  "cAIStateHandler": {
+   "tf": 1579816,
+   "typeinfo": 3914552,
+   "base": null,
+   "vtables": []
+  },
+  "cAIState": {
+   "tf": 1134528,
+   "typeinfo": null,
+   "base": null,
+   "vtables": []
+  },
+  "cAIWorld": {
+   "tf": 1140384,
+   "typeinfo": 4239160,
+   "base": "cBxObjNode",
+   "vtables": [
+    {
+     "addr": 3561368,
+     "funcs": [
+      1140304,
+      1138216,
+      1564416,
+      1564408,
+      1564400,
+      1564392,
+      1564384,
+      1139904,
+      1139928
+     ]
+    }
+   ]
+  },
+  "cWipeOutRecoverControl": {
+   "tf": 1182104,
+   "typeinfo": 4238744,
+   "base": null,
+   "vtables": []
+  },
+  "cWipeOutControl": {
+   "tf": 1182416,
+   "typeinfo": 4238856,
+   "base": null,
+   "vtables": []
+  },
+  "cGetupFromSitControl": {
+   "tf": 1182728,
+   "typeinfo": 4238904,
+   "base": null,
+   "vtables": []
+  },
+  "cSitAndWaitControl": {
+   "tf": 1183040,
+   "typeinfo": 4238616,
+   "base": null,
+   "vtables": []
+  },
+  "cSpinControl": {
+   "tf": 1183352,
+   "typeinfo": 4238328,
+   "base": null,
+   "vtables": []
+  },
+  "cRailSlideControl": {
+   "tf": 1183672,
+   "typeinfo": 4238456,
+   "base": null,
+   "vtables": []
+  },
+  "cPrewindControl": {
+   "tf": 1183992,
+   "typeinfo": 4238808,
+   "base": null,
+   "vtables": []
+  },
+  "cNaturalAirControl": {
+   "tf": 1184312,
+   "typeinfo": 4238552,
+   "base": null,
+   "vtables": []
+  },
+  "cLandNormalControl": {
+   "tf": 1184632,
+   "typeinfo": 4238216,
+   "base": null,
+   "vtables": []
+  },
+  "cLandHardControl": {
+   "tf": 1184952,
+   "typeinfo": 4238280,
+   "base": null,
+   "vtables": []
+  },
+  "cJumpControl": {
+   "tf": 1185264,
+   "typeinfo": 4238488,
+   "base": null,
+   "vtables": []
+  },
+  "cGateLaunchControl": {
+   "tf": 1185576,
+   "typeinfo": 4238568,
+   "base": null,
+   "vtables": []
+  },
+  "cGateAnticipateControl": {
+   "tf": 1185888,
+   "typeinfo": 4238872,
+   "base": null,
+   "vtables": []
+  },
+  "cLessonWaitControl": {
+   "tf": 1186208,
+   "typeinfo": 4238664,
+   "base": null,
+   "vtables": []
+  },
+  "cGate2BaseControl": {
+   "tf": 1186528,
+   "typeinfo": 4238712,
+   "base": null,
+   "vtables": []
+  },
+  "cResetWaitControl": {
+   "tf": 1186840,
+   "typeinfo": 4238264,
+   "base": null,
+   "vtables": []
+  },
+  "cFinishLineControl": {
+   "tf": 1187160,
+   "typeinfo": 4238312,
+   "base": null,
+   "vtables": []
+  },
+  "cFakieCruiseControl": {
+   "tf": 1187480,
+   "typeinfo": 4238232,
+   "base": null,
+   "vtables": []
+  },
+  "cChangeFakieControl": {
+   "tf": 1187792,
+   "typeinfo": 4238696,
+   "base": null,
+   "vtables": []
+  },
+  "cCruiseControl": {
+   "tf": 1188104,
+   "typeinfo": 4238824,
+   "base": null,
+   "vtables": []
+  },
+  "cBumpControl": {
+   "tf": 1188424,
+   "typeinfo": 4238920,
+   "base": null,
+   "vtables": []
+  },
+  "cVoidControl": {
+   "tf": 1188744,
+   "typeinfo": 4238792,
+   "base": null,
+   "vtables": []
+  },
+  "cWipeOutRecoverMotion": {
+   "tf": 1189056,
+   "typeinfo": 4238392,
+   "base": null,
+   "vtables": []
+  },
+  "cWipeOutMotion": {
+   "tf": 1189376,
+   "typeinfo": 4238248,
+   "base": null,
+   "vtables": []
+  },
+  "cStaticMotion": {
+   "tf": 1189696,
+   "typeinfo": 4238728,
+   "base": null,
+   "vtables": []
+  },
+  "cRailSlideMotion": {
+   "tf": 1190008,
+   "typeinfo": 4238680,
+   "base": null,
+   "vtables": []
+  },
+  "cGroundMotion": {
+   "tf": 1190328,
+   "typeinfo": 4238888,
+   "base": null,
+   "vtables": []
+  },
+  "cAirMotion": {
+   "tf": 1190648,
+   "typeinfo": 4238360,
+   "base": null,
+   "vtables": []
+  },
+  "cBoarder": {
+   "tf": 1191600,
+   "typeinfo": 4239176,
+   "base": null,
+   "vtables": [
+    {
+     "addr": 3569216,
+     "funcs": [
+      1141136,
+      1191920,
+      1191912,
+      1191904,
+      1191896,
+      1191888,
+      1191880,
+      1143192,
+      1141432,
+      1191504,
+      1155912,
+      1157016,
+      1157024,
+      1191456,
+      1191312,
+      1191304,
+      1191296,
+      1191288,
+      1191280,
+      1191272,
+      1191264
+     ]
+    }
+   ]
+  },
+  "cBoarderCache": {
+   "tf": 1191968,
+   "typeinfo": 3914608,
+   "base": null,
+   "vtables": [
+    {
+     "addr": 3569392,
+     "funcs": [
+      1191928,
+      1191920,
+      1191912,
+      1191904,
+      1191896,
+      1191888,
+      1191880
+     ]
+    }
+   ]
+  },
+  "cBoarderState": {
+   "tf": 1192568,
+   "typeinfo": 4239192,
+   "base": "cReplayRecordHeader",
+   "vtables": []
+  },
+  "cAirMotionState": {
+   "tf": 1192648,
+   "typeinfo": null,
+   "base": null,
+   "vtables": []
+  },
+  "cGroundMotionState": {
+   "tf": 1192768,
+   "typeinfo": null,
+   "base": null,
+   "vtables": []
+  },
+  "cRailSlideMotionState": {
+   "tf": 1192888,
+   "typeinfo": null,
+   "base": null,
+   "vtables": []
+  },
+  "cWipeoutMotionState": {
+   "tf": 1193008,
+   "typeinfo": null,
+   "base": null,
+   "vtables": []
+  },
+  "cWipeOutRecoverMotionState": {
+   "tf": 1193128,
+   "typeinfo": null,
+   "base": null,
+   "vtables": []
+  },
+  "cBumpControlState": {
+   "tf": 1193248,
+   "typeinfo": null,
+   "base": null,
+   "vtables": []
+  },
+  "cCruiseControlState": {
+   "tf": 1193368,
+   "typeinfo": null,
+   "base": null,
+   "vtables": []
+  },
+  "cFinishLineControlState": {
+   "tf": 1193488,
+   "typeinfo": null,
+   "base": null,
+   "vtables": []
+  },
+  "cResetWaitControlState": {
+   "tf": 1193608,
+   "typeinfo": null,
+   "base": null,
+   "vtables": []
+  },
+  "cLessonWaitControlState": {
+   "tf": 1193728,
+   "typeinfo": null,
+   "base": null,
+   "vtables": []
+  },
+  "cGateAnticipateControlState": {
+   "tf": 1193848,
+   "typeinfo": null,
+   "base": null,
+   "vtables": []
+  },
+  "cLandNormalControlState": {
+   "tf": 1193968,
+   "typeinfo": null,
+   "base": null,
+   "vtables": []
+  },
+  "cNaturalAirControlState": {
+   "tf": 1194088,
+   "typeinfo": null,
+   "base": null,
+   "vtables": []
+  },
+  "cPrewindControlState": {
+   "tf": 1194208,
+   "typeinfo": null,
+   "base": null,
+   "vtables": []
+  },
+  "cRailSlideControlState": {
+   "tf": 1194328,
+   "typeinfo": null,
+   "base": null,
+   "vtables": []
+  },
+  "cSpinControlState": {
+   "tf": 1194448,
+   "typeinfo": null,
+   "base": null,
+   "vtables": []
+  },
+  "cReplayRecordHeader": {
+   "tf": 2113096,
+   "typeinfo": 3914616,
+   "base": null,
+   "vtables": []
+  },
+  "cBoarderRender": {
+   "tf": 1273920,
+   "typeinfo": 4239224,
+   "base": null,
+   "vtables": []
+  },
+  "cComputer": {
+   "tf": 1287624,
+   "typeinfo": 4239240,
+   "base": null,
+   "vtables": []
+  },
+  "cComputerState": {
+   "tf": 1288136,
+   "typeinfo": null,
+   "base": null,
+   "vtables": []
+  },
+  "cCounterNode": {
+   "tf": 1291792,
+   "typeinfo": 4239288,
+   "base": null,
+   "vtables": [
+    {
+     "addr": 3584232,
+     "funcs": [
+      1291768,
+      1290616,
+      1563888,
+      1563824,
+      1563760,
+      1563752,
+      1563744,
+      1291552,
+      1564368,
+      1564064,
+      1292200,
+      1292240,
+      1292232,
+      1292224,
+      1292216,
+      1292208,
+      1292192,
+      1292184,
+      1292144,
+      1292136,
+      1292128,
+      1290872,
+      1290776,
+      1290992,
+      1292120,
+      1292112,
+      1292104
+     ]
+    }
+   ]
+  },
+  "cRestoreNode": {
+   "tf": 1291904,
+   "typeinfo": 4239336,
+   "base": null,
+   "vtables": [
+    {
+     "addr": 3584456,
+     "funcs": [
+      1290336,
+      1563896,
+      1563888,
+      1563824,
+      1563760,
+      1563752,
+      1563744,
+      1290416,
+      1564368,
+      1564064,
+      1292200,
+      1292240,
+      1292232,
+      1292224,
+      1292216,
+      1292208,
+      1292192,
+      1292184,
+      1292144,
+      1292136,
+      1292128,
+      1291896,
+      1288488,
+      1291888,
+      1292120,
+      1292112,
+      1292104
+     ]
+    }
+   ]
+  },
+  "cDeadNode": {
+   "tf": 1292016,
+   "typeinfo": 4239320,
+   "base": null,
+   "vtables": [
+    {
+     "addr": 3584680,
+     "funcs": [
+      1290168,
+      1563896,
+      1563888,
+      1563824,
+      1563760,
+      1563752,
+      1563744,
+      1289976,
+      1564368,
+      1564064,
+      1292200,
+      1292240,
+      1292232,
+      1292224,
+      1292216,
+      1292208,
+      1292192,
+      1292184,
+      1292144,
+      1292136,
+      1292128,
+      1292008,
+      1292000,
+      1291992,
+      1292120,
+      1292112,
+      1292104
+     ]
+    }
+   ]
+  },
+  "cControllerNode": {
+   "tf": 1292248,
+   "typeinfo": 4239304,
+   "base": null,
+   "vtables": [
+    {
+     "addr": 3584904,
+     "funcs": [
+      1288416,
+      1563896,
+      1563888,
+      1563824,
+      1563760,
+      1563752,
+      1563744,
+      1289976,
+      1564368,
+      1564064,
+      1292200,
+      1292240,
+      1292232,
+      1292224,
+      1292216,
+      1292208,
+      1292192,
+      1292184,
+      1292144,
+      1292136,
+      1292128,
+      1288576,
+      1288488,
+      1288776,
+      1292120,
+      1292112,
+      1292104
+     ]
+    }
+   ]
+  },
+  "cCounterNodeState": {
+   "tf": 1292336,
+   "typeinfo": 4239272,
+   "base": "cReplayRecordHeader",
+   "vtables": []
+  },
+  "cScriptNode": {
+   "tf": 1299920,
+   "typeinfo": 4239368,
+   "base": null,
+   "vtables": [
+    {
+     "addr": 3587104,
+     "funcs": [
+      1293600,
+      1293624,
+      1563888,
+      1563824,
+      1563760,
+      1563752,
+      1563744,
+      1299416,
+      1564368,
+      1564064,
+      1564056
+     ]
+    }
+   ]
+  },
+  "cScriptNodeState": {
+   "tf": 1300016,
+   "typeinfo": 4239352,
+   "base": "cReplayRecordHeader",
+   "vtables": []
+  },
+  "cRailManNode": {
+   "tf": 1348120,
+   "typeinfo": 4239656,
+   "base": null,
+   "vtables": [
+    {
+     "addr": 3589392,
+     "funcs": [
+      1347440,
+      1563896,
+      1563888,
+      1563824,
+      1563760,
+      1563752,
+      1563744,
+      1347928,
+      1564368,
+      1564064,
+      1564056
+     ]
+    }
+   ]
+  },
+  "cMovieNode": {
+   "tf": 1348208,
+   "typeinfo": 4239832,
+   "base": null,
+   "vtables": [
+    {
+     "addr": 3589488,
+     "funcs": [
+      1346760,
+      1346848,
+      1346856,
+      1563824,
+      1563760,
+      1563752,
+      1563744,
+      1347008,
+      1564368,
+      1564064,
+      1292200,
+      1292240,
+      1292232,
+      1292224,
+      1292216,
+      1292208,
+      1292192,
+      1292184,
+      1292144,
+      1292136,
+      1292128,
+      1288576,
+      1288488,
+      1288776,
+      1292120,
+      1292112,
+      1292104
+     ]
+    }
+   ]
+  },
+  "cCollideEmitterNode": {
+   "tf": 1348296,
+   "typeinfo": 4239480,
+   "base": null,
+   "vtables": [
+    {
+     "addr": 3589712,
+     "funcs": [
+      1345680,
+      1345864,
+      1346024,
+      1564408,
+      1564400,
+      1564392,
+      1564384,
+      1346032,
+      1564368,
+      1564064,
+      1564056
+     ]
+    }
+   ]
+  },
+  "cCameraNode": {
+   "tf": 1348584,
+   "typeinfo": 4239528,
+   "base": null,
+   "vtables": []
+  },
+  "cParticleNode": {
+   "tf": 1348768,
+   "typeinfo": 4239752,
+   "base": null,
+   "vtables": [
+    {
+     "addr": 3589912,
+     "funcs": [
+      1343664,
+      1343744,
+      1343944,
+      1563824,
+      1563760,
+      1563752,
+      1563744,
+      1343952,
+      1564368,
+      1564064,
+      1292200,
+      1292240,
+      1292232,
+      1292224,
+      1292216,
+      1292208,
+      1292192,
+      1292184,
+      1292144,
+      1292136,
+      1292128,
+      1288576,
+      1288488,
+      1343880,
+      1292120,
+      1292112,
+      1292104
+     ]
+    }
+   ]
+  },
+  "cEmitterNode": {
+   "tf": 1348856,
+   "typeinfo": 4239512,
+   "base": null,
+   "vtables": [
+    {
+     "addr": 3590136,
+     "funcs": [
+      1342992,
+      1343072,
+      1343272,
+      1564408,
+      1564400,
+      1564392,
+      1564384,
+      1343280,
+      1564368,
+      1564064,
+      1564056
+     ]
+    }
+   ]
+  },
+  "cTrickTriggerNode": {
+   "tf": 1348944,
+   "typeinfo": 4239624,
+   "base": null,
+   "vtables": [
+    {
+     "addr": 3590232,
+     "funcs": [
+      1342080,
+      1342168,
+      1563888,
+      1563824,
+      1563760,
+      1563752,
+      1563744,
+      1342624,
+      1564368,
+      1564064,
+      1292200,
+      1292240,
+      1292232,
+      1292224,
+      1292216,
+      1292208,
+      1292192,
+      1292184,
+      1292144,
+      1292136,
+      1292128,
+      1288576,
+      1288488,
+      1288776,
+      1292120,
+      1292112,
+      1292104
+     ]
+    }
+   ]
+  },
+  "cMeshAnimNode": {
+   "tf": 1349040,
+   "typeinfo": 4239816,
+   "base": null,
+   "vtables": [
+    {
+     "addr": 3590456,
+     "funcs": [
+      1339120,
+      1339952,
+      1340696,
+      1563824,
+      1563760,
+      1563752,
+      1563744,
+      1341592,
+      1564368,
+      1564064,
+      1292200,
+      1292240,
+      1292232,
+      1292224,
+      1292216,
+      1292208,
+      1292192,
+      1292184,
+      1292144,
+      1292136,
+      1292128,
+      1288576,
+      1340576,
+      1288776,
+      1292120,
+      1292112,
+      1292104
+     ]
+    }
+   ]
+  },
+  "cCrowdBoxNode": {
+   "tf": 1349160,
+   "typeinfo": 4239432,
+   "base": null,
+   "vtables": [
+    {
+     "addr": 3590680,
+     "funcs": [
+      1349136,
+      1334408,
+      1335232,
+      1563824,
+      1563760,
+      1563752,
+      1563744,
+      1335448,
+      1564368,
+      1564064,
+      1292200,
+      1292240,
+      1292232,
+      1292224,
+      1292216,
+      1292208,
+      1292192,
+      1292184,
+      1292144,
+      1292136,
+      1292128,
+      1288576,
+      1288488,
+      1288776,
+      1292120,
+      1292112,
+      1292104
+     ]
+    }
+   ]
+  },
+  "cDebounceNode": {
+   "tf": 1349280,
+   "typeinfo": 4239928,
+   "base": null,
+   "vtables": [
+    {
+     "addr": 3590904,
+     "funcs": [
+      1349256,
+      1309864,
+      1563888,
+      1563824,
+      1563760,
+      1563752,
+      1563744,
+      1310096,
+      1564368,
+      1564064,
+      1292200,
+      1292240,
+      1292232,
+      1292224,
+      1292216,
+      1292208,
+      1292192,
+      1292184,
+      1292144,
+      1292136,
+      1292128,
+      1310000,
+      1309936,
+      1288776,
+      1292120,
+      1292112,
+      1292104
+     ]
+    }
+   ]
+  },
+  "cCrackedNode": {
+   "tf": 1349448,
+   "typeinfo": 4240088,
+   "base": null,
+   "vtables": [
+    {
+     "addr": 3591128,
+     "funcs": [
+      1349368,
+      1332640,
+      1333152,
+      1563824,
+      1563760,
+      1563752,
+      1563744,
+      1333384,
+      1564368,
+      1564064,
+      1292200,
+      1292240,
+      1292232,
+      1292224,
+      1292216,
+      1292208,
+      1292192,
+      1333224,
+      1292144,
+      1292136,
+      1292128,
+      1332928,
+      1333056,
+      1333160,
+      1292120,
+      1292112,
+      1292104
+     ]
+    }
+   ]
+  },
+  "cFlagNode": {
+   "tf": 1349544,
+   "typeinfo": 4239736,
+   "base": null,
+   "vtables": [
+    {
+     "addr": 3591352,
+     "funcs": [
+      1329352,
+      1330760,
+      1331800,
+      1563824,
+      1563760,
+      1563752,
+      1563744,
+      1332208,
+      1564368,
+      1564064,
+      1292200,
+      1292240,
+      1292232,
+      1292224,
+      1292216,
+      1292208,
+      1292192,
+      1292184,
+      1292144,
+      1292136,
+      1292128,
+      1288576,
+      1288488,
+      1288776,
+      1292120,
+      1292112,
+      1292104
+     ]
+    }
+   ]
+  },
+  "cFenceNode": {
+   "tf": 1349640,
+   "typeinfo": 4239416,
+   "base": null,
+   "vtables": [
+    {
+     "addr": 3591576,
+     "funcs": [
+      1325056,
+      1325928,
+      1328504,
+      1563824,
+      1563760,
+      1563752,
+      1563744,
+      1328912,
+      1564368,
+      1564064,
+      1292200,
+      1292240,
+      1292232,
+      1292224,
+      1292216,
+      1292208,
+      1292192,
+      1328168,
+      1292144,
+      1292136,
+      1292128,
+      1288576,
+      1288488,
+      1288776,
+      1292120,
+      1292112,
+      1292104
+     ]
+    }
+   ]
+  },
+  "cUVScrollTexFlipNode": {
+   "tf": 1349848,
+   "typeinfo": 4239704,
+   "base": null,
+   "vtables": []
+  },
+  "cTexFlipNode": {
+   "tf": 1350024,
+   "typeinfo": 4240024,
+   "base": null,
+   "vtables": [
+    {
+     "addr": 3592024,
+     "funcs": [
+      1349944,
+      1323192,
+      1323960,
+      1563824,
+      1563760,
+      1563752,
+      1563744,
+      1324280,
+      1564368,
+      1564064,
+      1292200,
+      1292240,
+      1292232,
+      1292224,
+      1292216,
+      1292208,
+      1292192,
+      1323896,
+      1292144,
+      1292136,
+      1292128,
+      1288576,
+      1288488,
+      1323992,
+      1292120,
+      1292112,
+      1292104
+     ]
+    }
+   ]
+  },
+  "cTexFlip": {
+   "tf": 1683536,
+   "typeinfo": 3914656,
+   "base": null,
+   "vtables": [
+    {
+     "addr": 3592248,
+     "funcs": [
+      1350120
+     ]
+    },
+    {
+     "addr": 3721448,
+     "funcs": [
+      1350120
+     ]
+    }
+   ]
+  },
+  "cUVScrollNode": {
+   "tf": 1350304,
+   "typeinfo": 4239672,
+   "base": null,
+   "vtables": [
+    {
+     "addr": 3592264,
+     "funcs": [
+      1319208,
+      1319648,
+      1320656,
+      1563824,
+      1563760,
+      1563752,
+      1563744,
+      1321568,
+      1564368,
+      1564064,
+      1292200,
+      1292240,
+      1292232,
+      1292224,
+      1292216,
+      1292208,
+      1292192,
+      1320592,
+      1292144,
+      1292136,
+      1292128,
+      1288576,
+      1288488,
+      1321288,
+      1292120,
+      1292112,
+      1292104
+     ]
+    }
+   ]
+  },
+  "cZBoostNode": {
+   "tf": 1350400,
+   "typeinfo": 4239864,
+   "base": null,
+   "vtables": [
+    {
+     "addr": 3592488,
+     "funcs": [
+      1318016,
+      1318104,
+      1563888,
+      1563824,
+      1563760,
+      1563752,
+      1563744,
+      1318808,
+      1564368,
+      1564064,
+      1292200,
+      1292240,
+      1292232,
+      1292224,
+      1292216,
+      1292208,
+      1292192,
+      1292184,
+      1292144,
+      1292136,
+      1292128,
+      1288576,
+      1288488,
+      1288776,
+      1292120,
+      1292112,
+      1292104
+     ]
+    }
+   ]
+  },
+  "cTubeEndBoostNode": {
+   "tf": 1350544,
+   "typeinfo": 4239688,
+   "base": null,
+   "vtables": [
+    {
+     "addr": 3592712,
+     "funcs": [
+      1350520,
+      1312392,
+      1563888,
+      1563824,
+      1563760,
+      1563752,
+      1563744,
+      1317512,
+      1564368,
+      1564064,
+      1292200,
+      1292240,
+      1292232,
+      1292224,
+      1292216,
+      1292208,
+      1292192,
+      1292184,
+      1292144,
+      1292136,
+      1292128,
+      1288576,
+      1288488,
+      1312976,
+      1292120,
+      1292112,
+      1292104,
+      1317032,
+      1317368,
+      1317384
+     ]
+    }
+   ]
+  },
+  "cRandomBoostNode": {
+   "tf": 1350664,
+   "typeinfo": 4240008,
+   "base": null,
+   "vtables": [
+    {
+     "addr": 3592960,
+     "funcs": [
+      1350640,
+      1312392,
+      1563888,
+      1563824,
+      1563760,
+      1563752,
+      1563744,
+      1316400,
+      1564368,
+      1564064,
+      1292200,
+      1292240,
+      1292232,
+      1292224,
+      1292216,
+      1292208,
+      1292192,
+      1292184,
+      1292144,
+      1292136,
+      1292128,
+      1288576,
+      1288488,
+      1312976,
+      1292120,
+      1292112,
+      1292104,
+      1315680,
+      1316256,
+      1316272
+     ]
+    }
+   ]
+  },
+  "cLapBoostNode": {
+   "tf": 1350760,
+   "typeinfo": 4239800,
+   "base": null,
+   "vtables": [
+    {
+     "addr": 3593208,
+     "funcs": [
+      1313592,
+      1313680,
+      1315208,
+      1563824,
+      1563760,
+      1563752,
+      1563744,
+      1315248,
+      1564368,
+      1564064,
+      1292200,
+      1292240,
+      1292232,
+      1292224,
+      1292216,
+      1292208,
+      1292192,
+      1292184,
+      1292144,
+      1292136,
+      1292128,
+      1315224,
+      1315216,
+      1288776,
+      1292120,
+      1292112,
+      1292104
+     ]
+    }
+   ]
+  },
+  "cBoostNode": {
+   "tf": 1350872,
+   "typeinfo": 4239560,
+   "base": null,
+   "vtables": [
+    {
+     "addr": 3593432,
+     "funcs": [
+      1312304,
+      1312392,
+      1563888,
+      1563824,
+      1563760,
+      1563752,
+      1563744,
+      1313008,
+      1564368,
+      1564064,
+      1292200,
+      1292240,
+      1292232,
+      1292224,
+      1292216,
+      1292208,
+      1292192,
+      1292184,
+      1292144,
+      1292136,
+      1292128,
+      1288576,
+      1288488,
+      1312976,
+      1292120,
+      1292112,
+      1292104,
+      1312824,
+      1350864,
+      1350856
+     ]
+    }
+   ]
+  },
+  "cRailNode": {
+   "tf": 1350968,
+   "typeinfo": 4239592,
+   "base": null,
+   "vtables": [
+    {
+     "addr": 3593680,
+     "funcs": [
+      1311256,
+      1311408,
+      1563888,
+      1563824,
+      1563760,
+      1563752,
+      1563744,
+      1311808,
+      1564368,
+      1564064,
+      1292200,
+      1292240,
+      1292232,
+      1292224,
+      1292216,
+      1292208,
+      1292192,
+      1292184,
+      1292144,
+      1292136,
+      1292128,
+      1311544,
+      1311480,
+      1311640,
+      1292120,
+      1292112,
+      1292104
+     ]
+    }
+   ]
+  },
+  "cTimerNode": {
+   "tf": 1351088,
+   "typeinfo": 4239848,
+   "base": null,
+   "vtables": [
+    {
+     "addr": 3593904,
+     "funcs": [
+      1351064,
+      1310368,
+      1563888,
+      1563824,
+      1563760,
+      1563752,
+      1563744,
+      1310848,
+      1564368,
+      1564064,
+      1292200,
+      1292240,
+      1292232,
+      1292224,
+      1292216,
+      1292208,
+      1292192,
+      1292184,
+      1292144,
+      1292136,
+      1292128,
+      1310696,
+      1310632,
+      1310792,
+      1292120,
+      1292112,
+      1292104
+     ]
+    }
+   ]
+  },
+  "cRollerNode": {
+   "tf": 1351296,
+   "typeinfo": 4239608,
+   "base": null,
+   "vtables": [
+    {
+     "addr": 3594128,
+     "funcs": [
+      1302712,
+      1304744,
+      1309176,
+      1563824,
+      1563760,
+      1563752,
+      1563744,
+      1309584,
+      1564368,
+      1564064,
+      1292200,
+      1351208,
+      1351192,
+      1351184,
+      1292216,
+      1292208,
+      1292192,
+      1292184,
+      1292144,
+      1292136,
+      1292128,
+      1304672,
+      1351240,
+      1288776,
+      1292120,
+      1292112,
+      1292104
+     ]
+    }
+   ]
+  },
+  "cRigidBody": {
+   "tf": 1351872,
+   "typeinfo": 4239544,
+   "base": "cRigidBodyState",
+   "vtables": []
+  },
+  "cRigidBodyState": {
+   "tf": 1354256,
+   "typeinfo": 4239640,
+   "base": "cReplayRecordHeader",
+   "vtables": []
+  },
+  "cRollerNodeState": {
+   "tf": 1351952,
+   "typeinfo": null,
+   "base": null,
+   "vtables": []
+  },
+  "cTimerNodeState": {
+   "tf": 1352072,
+   "typeinfo": null,
+   "base": null,
+   "vtables": []
+  },
+  "cRailNodeState": {
+   "tf": 1352192,
+   "typeinfo": null,
+   "base": null,
+   "vtables": []
+  },
+  "cBoostNodeState": {
+   "tf": 1352312,
+   "typeinfo": null,
+   "base": null,
+   "vtables": []
+  },
+  "cLapBoostNodeState": {
+   "tf": 1352432,
+   "typeinfo": null,
+   "base": null,
+   "vtables": []
+  },
+  "cRandomBoostNodeState": {
+   "tf": 1352552,
+   "typeinfo": null,
+   "base": null,
+   "vtables": []
+  },
+  "cTubeEndBoostNodeState": {
+   "tf": 1352672,
+   "typeinfo": null,
+   "base": null,
+   "vtables": []
+  },
+  "cZBoostNodeState": {
+   "tf": 1352792,
+   "typeinfo": null,
+   "base": null,
+   "vtables": []
+  },
+  "cUVScrollNodeState": {
+   "tf": 1352912,
+   "typeinfo": null,
+   "base": null,
+   "vtables": []
+  },
+  "cTexFlipNodeState": {
+   "tf": 1353032,
+   "typeinfo": null,
+   "base": null,
+   "vtables": []
+  },
+  "cUVScrollTexFlipNodeState": {
+   "tf": 1353152,
+   "typeinfo": null,
+   "base": null,
+   "vtables": []
+  },
+  "cFenceNodeState": {
+   "tf": 1353272,
+   "typeinfo": null,
+   "base": null,
+   "vtables": []
+  },
+  "cFlagNodeState": {
+   "tf": 1353392,
+   "typeinfo": null,
+   "base": null,
+   "vtables": []
+  },
+  "cCrackedNodeState": {
+   "tf": 1353512,
+   "typeinfo": null,
+   "base": null,
+   "vtables": []
+  },
+  "cCrowdBoxNodeState": {
+   "tf": 1353632,
+   "typeinfo": null,
+   "base": null,
+   "vtables": []
+  },
+  "cMeshAnimNodeState": {
+   "tf": 1353752,
+   "typeinfo": null,
+   "base": null,
+   "vtables": []
+  },
+  "cTrickTriggerNodeState": {
+   "tf": 1353872,
+   "typeinfo": null,
+   "base": null,
+   "vtables": []
+  },
+  "cCameraNodeState": {
+   "tf": 1353992,
+   "typeinfo": null,
+   "base": null,
+   "vtables": []
+  },
+  "cCollideEmitterNodeState": {
+   "tf": 1354112,
+   "typeinfo": null,
+   "base": null,
+   "vtables": []
+  },
+  "cLessonMan": {
+   "tf": 1372016,
+   "typeinfo": 4240216,
+   "base": null,
+   "vtables": [
+    {
+     "addr": 3597680,
+     "funcs": [
+      1357088,
+      1358264,
+      1358824,
+      1564408,
+      1564400,
+      1564392,
+      1564384,
+      1564376,
+      1564368
+     ]
+    }
+   ]
+  },
+  "cLessonExitHandler": {
+   "tf": 1372112,
+   "typeinfo": 4240264,
+   "base": "cLessonStateHandler",
+   "vtables": [
+    {
+     "addr": 3597760,
+     "funcs": [
+      1371112,
+      1373000,
+      1371120
+     ]
+    }
+   ]
+  },
+  "cLessonEndHandler": {
+   "tf": 1372192,
+   "typeinfo": 4240248,
+   "base": "cLessonStateHandler",
+   "vtables": [
+    {
+     "addr": 3597792,
+     "funcs": [
+      1370656,
+      1373000,
+      1370824
+     ]
+    }
+   ]
+  },
+  "cLessonPracticeEndHandler": {
+   "tf": 1372272,
+   "typeinfo": 4240280,
+   "base": "cLessonStateHandler",
+   "vtables": [
+    {
+     "addr": 3597824,
+     "funcs": [
+      1370168,
+      1373000,
+      1370368
+     ]
+    }
+   ]
+  },
+  "cLessonPracticeHandler": {
+   "tf": 1372352,
+   "typeinfo": 4240344,
+   "base": "cLessonStateHandler",
+   "vtables": [
+    {
+     "addr": 3597856,
+     "funcs": [
+      1369808,
+      1370160,
+      1370048
+     ]
+    }
+   ]
+  },
+  "cLessonPerformHandler": {
+   "tf": 1372432,
+   "typeinfo": 4240328,
+   "base": "cLessonStateHandler",
+   "vtables": [
+    {
+     "addr": 3597888,
+     "funcs": [
+      1369432,
+      1369768,
+      1369736
+     ]
+    }
+   ]
+  },
+  "cLessonPreviewEndHandler": {
+   "tf": 1372512,
+   "typeinfo": 4240120,
+   "base": "cLessonStateHandler",
+   "vtables": [
+    {
+     "addr": 3597920,
+     "funcs": [
+      1368800,
+      1373000,
+      1368968
+     ]
+    }
+   ]
+  },
+  "cLessonPreviewHandler": {
+   "tf": 1372592,
+   "typeinfo": 4240200,
+   "base": "cLessonStateHandler",
+   "vtables": [
+    {
+     "addr": 3597952,
+     "funcs": [
+      1368376,
+      1368752,
+      1368688
+     ]
+    }
+   ]
+  },
+  "cLessonWaitHandler": {
+   "tf": 1372672,
+   "typeinfo": 4240168,
+   "base": "cLessonStateHandler",
+   "vtables": [
+    {
+     "addr": 3597984,
+     "funcs": [
+      1367176,
+      1373000,
+      1367232
+     ]
+    }
+   ]
+  },
+  "cLessonStartHandler": {
+   "tf": 1372752,
+   "typeinfo": 4240296,
+   "base": "cLessonStateHandler",
+   "vtables": [
+    {
+     "addr": 3598016,
+     "funcs": [
+      1367088,
+      1373000,
+      1367096
+     ]
+    }
+   ]
+  },
+  "cLessonIntroHandler": {
+   "tf": 1372832,
+   "typeinfo": 4240184,
+   "base": "cLessonStateHandler",
+   "vtables": [
+    {
+     "addr": 3598048,
+     "funcs": [
+      1366952,
+      1373000,
+      1367072
+     ]
+    }
+   ]
+  },
+  "cLessonInitHandler": {
+   "tf": 1372920,
+   "typeinfo": 4240104,
+   "base": "cLessonStateHandler",
+   "vtables": [
+    {
+     "addr": 3598080,
+     "funcs": [
+      1366944,
+      1373000,
+      1372912
+     ]
+    }
+   ]
+  },
+  "cLessonStateHandler": {
+   "tf": 1373008,
+   "typeinfo": 3914624,
+   "base": null,
+   "vtables": []
+  },
+  "cEndLessonHandler": {
+   "tf": 1373104,
+   "typeinfo": 4240232,
+   "base": "cAIStateHandler",
+   "vtables": [
+    {
+     "addr": 3598112,
+     "funcs": [
+      1371456,
+      1134376,
+      1371496
+     ]
+    }
+   ]
+  },
+  "cRestartLessonHandler": {
+   "tf": 1373192,
+   "typeinfo": 4240136,
+   "base": "cAIStateHandler",
+   "vtables": [
+    {
+     "addr": 3598144,
+     "funcs": [
+      1371208,
+      1373184,
+      1371232
+     ]
+    }
+   ]
+  },
+  "cPreLessonHandler": {
+   "tf": 1373280,
+   "typeinfo": 4240312,
+   "base": "cAIStateHandler",
+   "vtables": [
+    {
+     "addr": 3598176,
+     "funcs": [
+      1371440,
+      1373272,
+      1371448
+     ]
+    }
+   ]
+  },
+  "cLoadLessonHandler": {
+   "tf": 1373368,
+   "typeinfo": 4240152,
+   "base": "cAIStateHandler",
+   "vtables": [
+    {
+     "addr": 3598208,
+     "funcs": [
+      1371296,
+      1373360,
+      1371312
+     ]
+    }
+   ]
+  },
+  "cLessonManState": {
+   "tf": 1373616,
+   "typeinfo": 3914664,
+   "base": null,
+   "vtables": []
+  },
+  "cPlayer": {
+   "tf": 1390184,
+   "typeinfo": 4240360,
+   "base": null,
+   "vtables": []
+  },
+  "cPlayerState": {
+   "tf": 1390424,
+   "typeinfo": null,
+   "base": null,
+   "vtables": []
+  },
+  "cGameTrickInfo": {
+   "tf": 1396848,
+   "typeinfo": 4240392,
+   "base": "cTrickInfo",
+   "vtables": [
+    {
+     "addr": 3603096,
+     "funcs": [
+      1396824,
+      1396968,
+      1394312,
+      1396064,
+      1396256,
+      1395480
+     ]
+    }
+   ]
+  },
+  "cTrickInfo": {
+   "tf": 1397056,
+   "typeinfo": 3914672,
+   "base": null,
+   "vtables": [
+    {
+     "addr": 3603152,
+     "funcs": [
+      1396984,
+      1396968,
+      1394312,
+      1396960,
+      1396944,
+      1396936
+     ]
+    }
+   ]
+  },
+  "cBoarderSequence": {
+   "tf": 1420264,
+   "typeinfo": 4240424,
+   "base": null,
+   "vtables": [
+    {
+     "addr": 3641376,
+     "funcs": [
+      1417208,
+      1416936,
+      1418152,
+      1418200,
+      1418416
+     ]
+    }
+   ]
+  },
+  "cBoarderSequenceState": {
+   "tf": 1420568,
+   "typeinfo": 4240408,
+   "base": "cReplayRecordHeader",
+   "vtables": []
+  },
+  "CamAnimation": {
+   "tf": 1544096,
+   "typeinfo": 4239000,
+   "base": "cOfflineObject",
+   "vtables": [
+    {
+     "addr": 3665520,
+     "funcs": [
+      1498296
+     ]
+    },
+    {
+     "addr": 3682528,
+     "funcs": [
+      1498296
+     ]
+    },
+    {
+     "addr": 3684776,
+     "funcs": [
+      1498296
+     ]
+    }
+   ]
+  },
+  "cOfflineObject": {
+   "tf": 1544232,
+   "typeinfo": 3914648,
+   "base": null,
+   "vtables": [
+    {
+     "addr": 3666768,
+     "funcs": [
+      1498304
+     ]
+    },
+    {
+     "addr": 3668384,
+     "funcs": [
+      1498304
+     ]
+    },
+    {
+     "addr": 3671640,
+     "funcs": [
+      1498304
+     ]
+    },
+    {
+     "addr": 3676440,
+     "funcs": [
+      1498304
+     ]
+    },
+    {
+     "addr": 3678072,
+     "funcs": [
+      1498304
+     ]
+    },
+    {
+     "addr": 3679688,
+     "funcs": [
+      1498304
+     ]
+    },
+    {
+     "addr": 3683840,
+     "funcs": [
+      1498304
+     ]
+    },
+    {
+     "addr": 3686072,
+     "funcs": [
+      1498304
+     ]
+    }
+   ]
+  },
+  "CamCamera": {
+   "tf": 1498752,
+   "typeinfo": 4238984,
+   "base": "cOfflineObject",
+   "vtables": [
+    {
+     "addr": 3667288,
+     "funcs": [
+      1498832
+     ]
+    }
+   ]
+  },
+  "CamDirector": {
+   "tf": 1501040,
+   "typeinfo": 4240440,
+   "base": "cOfflineObject",
+   "vtables": [
+    {
+     "addr": 3670528,
+     "funcs": [
+      1501120
+     ]
+    }
+   ]
+  },
+  "CamPath": {
+   "tf": 1539928,
+   "typeinfo": 4238952,
+   "base": "cOfflineObject",
+   "vtables": [
+    {
+     "addr": 3675328,
+     "funcs": [
+      1512408
+     ]
+    },
+    {
+     "addr": 3682512,
+     "funcs": [
+      1512408
+     ]
+    }
+   ]
+  },
+  "CamRegion": {
+   "tf": 1539400,
+   "typeinfo": 4240456,
+   "base": "cOfflineObject",
+   "vtables": [
+    {
+     "addr": 3676960,
+     "funcs": [
+      1515440
+     ]
+    },
+    {
+     "addr": 3682456,
+     "funcs": [
+      1515440
+     ]
+    }
+   ]
+  },
+  "CamScene": {
+   "tf": 1539840,
+   "typeinfo": 4238968,
+   "base": "cOfflineObject",
+   "vtables": [
+    {
+     "addr": 3678592,
+     "funcs": [
+      1516088
+     ]
+    },
+    {
+     "addr": 3682496,
+     "funcs": [
+      1516088
+     ]
+    }
+   ]
+  },
+  "cBxCamera": {
+   "tf": 1539776,
+   "typeinfo": 3914680,
+   "base": null,
+   "vtables": [
+    {
+     "addr": 3682472,
+     "funcs": [
+      1539544,
+      1536120
+     ]
+    }
+   ]
+  },
+  "cCamControl": {
+   "tf": 1544016,
+   "typeinfo": 4240472,
+   "base": "cBxObjNode",
+   "vtables": [
+    {
+     "addr": 3684696,
+     "funcs": [
+      1540672,
+      1541328,
+      1543616,
+      1564408,
+      1564400,
+      1564392,
+      1564384,
+      1564376,
+      1564368
+     ]
+    }
+   ]
+  },
+  "cInput": {
+   "tf": 1549216,
+   "typeinfo": 3914688,
+   "base": null,
+   "vtables": [
+    {
+     "addr": 3692368,
+     "funcs": [
+      1546336,
+      1546384,
+      1546440,
+      1546496
+     ]
+    }
+   ]
+  },
+  "cPadDevice": {
+   "tf": 1551232,
+   "typeinfo": 3914696,
+   "base": null,
+   "vtables": [
+    {
+     "addr": 3692648,
+     "funcs": [
+      1551192,
+      1550952,
+      1550960,
+      1550936,
+      1550944,
+      1550992,
+      1550984,
+      1550976,
+      3101920,
+      3101920,
+      3101920
+     ]
+    }
+   ]
+  },
+  "cPS2Device": {
+   "tf": 1554168,
+   "typeinfo": 4240488,
+   "base": "cPadDevice",
+   "vtables": [
+    {
+     "addr": 3692808,
+     "funcs": [
+      1551632,
+      1553936,
+      1553984,
+      1553808,
+      1553840,
+      1553896,
+      1554024,
+      1554096,
+      1551712,
+      1553008,
+      1553016
+     ]
+    }
+   ]
+  },
+  "cApplication": {
+   "tf": 1557448,
+   "typeinfo": 4240744,
+   "base": "cAppMan",
+   "vtables": [
+    {
+     "addr": 3693328,
+     "funcs": [
+      1557528,
+      1555024,
+      1556296,
+      1555416
+     ]
+    }
+   ]
+  },
+  "cAppMan": {
+   "tf": 1559496,
+   "typeinfo": 3914560,
+   "base": null,
+   "vtables": [
+    {
+     "addr": 3694952,
+     "funcs": [
+      1557640,
+      3101920,
+      3101920,
+      3101920
+     ]
+    },
+    {
+     "addr": 3695528,
+     "funcs": [
+      1557640,
+      3101920,
+      3101920,
+      3101920
+     ]
+    }
+   ]
+  },
+  "cBxSortObjNode": {
+   "tf": 1563928,
+   "typeinfo": 4240808,
+   "base": null,
+   "vtables": [
+    {
+     "addr": 3695712,
+     "funcs": [
+      1563904,
+      1563896,
+      1563888,
+      1563824,
+      1563760,
+      1563752,
+      1563744,
+      1561096,
+      1564368,
+      1564064,
+      1564056
+     ]
+    }
+   ]
+  },
+  "cBxTypeObjNode": {
+   "tf": 1564152,
+   "typeinfo": 4240760,
+   "base": null,
+   "vtables": [
+    {
+     "addr": 3695808,
+     "funcs": [
+      1564096,
+      1564088,
+      1564080,
+      1564408,
+      1564400,
+      1564392,
+      1564384,
+      1561048,
+      1564368,
+      1564064,
+      1564056
+     ]
+    }
+   ]
+  },
+  "cBxObjNode": {
+   "tf": 1564464,
+   "typeinfo": 3914728,
+   "base": null,
+   "vtables": [
+    {
+     "addr": 3695904,
+     "funcs": [
+      1560544,
+      1564424,
+      1564416,
+      1564408,
+      1564400,
+      1564392,
+      1564384,
+      1564376,
+      1564368
+     ]
+    }
+   ]
+  },
+  "cBxTypeObjNodeState": {
+   "tf": 1564656,
+   "typeinfo": 4240792,
+   "base": "cReplayRecordHeader",
+   "vtables": []
+  },
+  "cBxSortObjNodeState": {
+   "tf": 1564736,
+   "typeinfo": null,
+   "base": null,
+   "vtables": []
+  },
+  "cVideoLoadModule": {
+   "tf": 1579512,
+   "typeinfo": 4240536,
+   "base": "cLoadModule",
+   "vtables": [
+    {
+     "addr": 3696896,
+     "funcs": [
+      1579488,
+      1579480,
+      1579472,
+      1579464,
+      1579456,
+      1579448,
+      1579440
+     ]
+    }
+   ]
+  },
+  "cGame": {
+   "tf": 1580520,
+   "typeinfo": 4240824,
+   "base": null,
+   "vtables": []
+  },
+  "cLoadModule": {
+   "tf": 2425640,
+   "typeinfo": 3914592,
+   "base": null,
+   "vtables": [
+    {
+     "addr": 3698496,
+     "funcs": [
+      1580616,
+      3101920,
+      3101920,
+      3101920,
+      1581152,
+      3101920,
+      3101920
+     ]
+    },
+    {
+     "addr": 3824328,
+     "funcs": [
+      1580616,
+      3101920,
+      3101920,
+      3101920,
+      1581152,
+      3101920,
+      3101920
+     ]
+    }
+   ]
+  },
+  "cGameModule": {
+   "tf": 2514512,
+   "typeinfo": 3914584,
+   "base": null,
+   "vtables": [
+    {
+     "addr": 3698560,
+     "funcs": [
+      1580720,
+      3101920,
+      3101920,
+      3101920,
+      1581160,
+      3101920,
+      3101920
+     ]
+    },
+    {
+     "addr": 3700600,
+     "funcs": [
+      1580720,
+      3101920,
+      3101920,
+      3101920,
+      1581160,
+      3101920,
+      3101920
+     ]
+    },
+    {
+     "addr": 3705352,
+     "funcs": [
+      1580720,
+      3101920,
+      3101920,
+      3101920,
+      1581160,
+      3101920,
+      3101920
+     ]
+    },
+    {
+     "addr": 3839936,
+     "funcs": [
+      1580720,
+      3101920,
+      3101920,
+      3101920,
+      1581160,
+      3101920,
+      3101920
+     ]
+    }
+   ]
+  },
+  "cGameState": {
+   "tf": 1581040,
+   "typeinfo": 4240840,
+   "base": "cReplayRecordHeader",
+   "vtables": []
+  },
+  "cPS2ExecutionMan": {
+   "tf": 1584144,
+   "typeinfo": 4240856,
+   "base": "cExecutionMan",
+   "vtables": [
+    {
+     "addr": 3699840,
+     "funcs": [
+      1582104,
+      1582128,
+      1582456,
+      1582616,
+      1582688
+     ]
+    }
+   ]
+  },
+  "cExecutionMan": {
+   "tf": 1584264,
+   "typeinfo": 3914632,
+   "base": null,
+   "vtables": [
+    {
+     "addr": 3699976,
+     "funcs": [
+      1584224,
+      3101920,
+      3101920,
+      3101920,
+      3101920
+     ]
+    }
+   ]
+  },
+  "cStartScreen": {
+   "tf": 1590272,
+   "typeinfo": 4240872,
+   "base": "cGameModule",
+   "vtables": [
+    {
+     "addr": 3700360,
+     "funcs": [
+      1590352,
+      1584392,
+      1584848,
+      1590264,
+      1584600,
+      3101920,
+      1585624,
+      3101920
+     ]
+    }
+   ]
+  },
+  "cStartScreenSingle": {
+   "tf": 1595752,
+   "typeinfo": 4240888,
+   "base": "cStartScreen",
+   "vtables": [
+    {
+     "addr": 3701072,
+     "funcs": [
+      1595832,
+      1584392,
+      1584848,
+      1590264,
+      1590688,
+      1590752,
+      1594384,
+      1594416
+     ]
+    }
+   ]
+  },
+  "cCourseResolve": {
+   "tf": 2494432,
+   "typeinfo": 4238760,
+   "base": "cCourseResolve_PS2",
+   "vtables": [
+    {
+     "addr": 3703632,
+     "funcs": [
+      1597800,
+      2433656,
+      2433696,
+      2433720,
+      2433872,
+      2434056,
+      2434160,
+      2434888,
+      2435040,
+      2435976,
+      2446896,
+      2438144,
+      2438464,
+      2438576,
+      2438704,
+      2439128,
+      2439600,
+      2448416,
+      2441136,
+      2441336,
+      2441504,
+      2438344,
+      2440032,
+      2440144,
+      2440272,
+      2440496,
+      2448576,
+      2441568,
+      2441704,
+      2441896,
+      2442008,
+      2442136,
+      2442752,
+      2442872,
+      2442920
+     ]
+    },
+    {
+     "addr": 3833168,
+     "funcs": [
+      1597800,
+      2433656,
+      2433696,
+      2433720,
+      2433872,
+      2434056,
+      2434160,
+      2434888,
+      2435040,
+      2435976,
+      2446896,
+      2438144,
+      2438464,
+      2438576,
+      2438704,
+      2439128,
+      2439600,
+      2448416,
+      2441136,
+      2441336,
+      2441504,
+      2438344,
+      2440032,
+      2440144,
+      2440272,
+      2440496,
+      2448576,
+      2441568,
+      2441704,
+      2441896,
+      2442008,
+      2442136,
+      2442752,
+      2442872,
+      2442920
+     ]
+    }
+   ]
+  },
+  "cVideoModule": {
+   "tf": 1600176,
+   "typeinfo": 4240904,
+   "base": "cGameModule",
+   "vtables": [
+    {
+     "addr": 3704176,
+     "funcs": [
+      1598712,
+      1598808,
+      1598848,
+      1600168,
+      1598936,
+      1599008,
+      1599856
+     ]
+    }
+   ]
+  },
+  "cDebugMenu": {
+   "tf": 1606592,
+   "typeinfo": 4241000,
+   "base": "cMenu",
+   "vtables": [
+    {
+     "addr": 3706992,
+     "funcs": [
+      1606672,
+      1609200,
+      1604312,
+      1609344,
+      1609352,
+      1604560,
+      1604640
+     ]
+    }
+   ]
+  },
+  "cSoundVolumeMenu": {
+   "tf": 1606880,
+   "typeinfo": 4240952,
+   "base": "cMenu",
+   "vtables": [
+    {
+     "addr": 3707056,
+     "funcs": [
+      1606960,
+      1605728,
+      1609336,
+      1605760,
+      1609352,
+      1610920,
+      1611032
+     ]
+    }
+   ]
+  },
+  "cGameOptionsMenu": {
+   "tf": 1607144,
+   "typeinfo": 4240936,
+   "base": "cMenu",
+   "vtables": [
+    {
+     "addr": 3707120,
+     "funcs": [
+      1607224,
+      1609200,
+      1603408,
+      1603624,
+      1609352,
+      1610920,
+      1611032
+     ]
+    }
+   ]
+  },
+  "cRenderOptionsMenu": {
+   "tf": 1607336,
+   "typeinfo": 4240968,
+   "base": "cMenu",
+   "vtables": [
+    {
+     "addr": 3707184,
+     "funcs": [
+      1607416,
+      1609200,
+      1609336,
+      1601696,
+      1609352,
+      1610920,
+      1611032
+     ]
+    }
+   ]
+  },
+  "cResolutionMenu": {
+   "tf": 1607592,
+   "typeinfo": 4240984,
+   "base": "cMenu",
+   "vtables": [
+    {
+     "addr": 3707248,
+     "funcs": [
+      1607672,
+      1609200,
+      1600976,
+      1609344,
+      1609352,
+      1600760,
+      1611032
+     ]
+    }
+   ]
+  },
+  "cBezierOptionsMenu": {
+   "tf": 1607864,
+   "typeinfo": 4240920,
+   "base": "cMenu",
+   "vtables": [
+    {
+     "addr": 3707312,
+     "funcs": [
+      1607944,
+      1609200,
+      1609336,
+      1602664,
+      1609352,
+      1610920,
+      1611032
+     ]
+    }
+   ]
+  },
+  "cErrorMenu": {
+   "tf": 1630080,
+   "typeinfo": 4238472,
+   "base": "cMenu",
+   "vtables": [
+    {
+     "addr": 3709408,
+     "funcs": [
+      1630160,
+      1609200,
+      1609336,
+      1609344,
+      1609352,
+      1610920,
+      1611032
+     ]
+    }
+   ]
+  },
+  "cRGBMenuItem": {
+   "tf": 1630256,
+   "typeinfo": 4241096,
+   "base": "cExpandMenuItem",
+   "vtables": [
+    {
+     "addr": 3709472,
+     "funcs": [
+      1630336,
+      1622184,
+      1608320,
+      1620920,
+      1621368,
+      1621680,
+      1621800,
+      1620824,
+      1620872
+     ]
+    }
+   ]
+  },
+  "cRGBTitleMenuItem": {
+   "tf": 1630448,
+   "typeinfo": 4241160,
+   "base": "cMenuItem",
+   "vtables": [
+    {
+     "addr": 3709552,
+     "funcs": [
+      1630528,
+      1608192,
+      1621928,
+      1629408,
+      1629528,
+      1608392,
+      1608400
+     ]
+    }
+   ]
+  },
+  "cExpandMenuItem": {
+   "tf": 1630536,
+   "typeinfo": 4241016,
+   "base": "cMenuItem",
+   "vtables": [
+    {
+     "addr": 3709616,
+     "funcs": [
+      1630616,
+      1620584,
+      1608320,
+      1620920,
+      1621368,
+      1621680,
+      1621800,
+      1620824,
+      1620872
+     ]
+    }
+   ]
+  },
+  "cExpandMenuItemMenu": {
+   "tf": 1630680,
+   "typeinfo": 4241080,
+   "base": "cMenu",
+   "vtables": [
+    {
+     "addr": 3709696,
+     "funcs": [
+      1630760,
+      1609200,
+      1619984,
+      1620032,
+      1609352,
+      1610920,
+      1611032
+     ]
+    }
+   ]
+  },
+  "cColorMenuItem": {
+   "tf": 1630768,
+   "typeinfo": 4241112,
+   "base": "cMenuItem",
+   "vtables": [
+    {
+     "addr": 3709760,
+     "funcs": [
+      1630848,
+      1619640,
+      1608320,
+      1627808,
+      1628376,
+      1608392,
+      1608400
+     ]
+    }
+   ]
+  },
+  "cStringMenuItem": {
+   "tf": 1630856,
+   "typeinfo": 4241240,
+   "base": "cMenuItem",
+   "vtables": [
+    {
+     "addr": 3709824,
+     "funcs": [
+      1630936,
+      1618520,
+      1608320,
+      1626752,
+      1626976,
+      1608392,
+      1608400
+     ]
+    }
+   ]
+  },
+  "cAngleMenuItem": {
+   "tf": 1630992,
+   "typeinfo": 4241032,
+   "base": "cMenuItem",
+   "vtables": [
+    {
+     "addr": 3709888,
+     "funcs": [
+      1631072,
+      1617680,
+      1608320,
+      1618112,
+      1618168,
+      1608392,
+      1608400
+     ]
+    }
+   ]
+  },
+  "cFloatMenuItem": {
+   "tf": 1631128,
+   "typeinfo": 4241192,
+   "base": "cMenuItem",
+   "vtables": [
+    {
+     "addr": 3709952,
+     "funcs": [
+      1631208,
+      1616888,
+      1608320,
+      1617320,
+      1617376,
+      1608392,
+      1608400
+     ]
+    }
+   ]
+  },
+  "cIntMenuItem": {
+   "tf": 1631232,
+   "typeinfo": 4241208,
+   "base": "cMenuItem",
+   "vtables": [
+    {
+     "addr": 3710016,
+     "funcs": [
+      1631312,
+      1616192,
+      1608320,
+      1616560,
+      1616616,
+      1608392,
+      1608400
+     ]
+    }
+   ]
+  },
+  "cSpaceMenuItem": {
+   "tf": 1631320,
+   "typeinfo": 4241048,
+   "base": "cMenuItem",
+   "vtables": [
+    {
+     "addr": 3710080,
+     "funcs": [
+      1631400,
+      1608192,
+      1615832,
+      1615840,
+      1615896,
+      1608392,
+      1608400
+     ]
+    }
+   ]
+  },
+  "cNullMenuItem": {
+   "tf": 1631424,
+   "typeinfo": 4241176,
+   "base": "cMenuItem",
+   "vtables": [
+    {
+     "addr": 3710144,
+     "funcs": [
+      1631504,
+      1608192,
+      1615616,
+      1615624,
+      1615680,
+      1608392,
+      1608400
+     ]
+    }
+   ]
+  },
+  "cCommandMenuItem": {
+   "tf": 1631528,
+   "typeinfo": 4241256,
+   "base": "cMenuItem",
+   "vtables": [
+    {
+     "addr": 3710208,
+     "funcs": [
+      1631608,
+      1615176,
+      1608320,
+      1615312,
+      1615400,
+      1608392,
+      1608400
+     ]
+    }
+   ]
+  },
+  "cPopMenuItem": {
+   "tf": 1631624,
+   "typeinfo": 4241144,
+   "base": "cMenuItem",
+   "vtables": [
+    {
+     "addr": 3710272,
+     "funcs": [
+      1631704,
+      1614696,
+      1608320,
+      1614808,
+      1614864,
+      1608392,
+      1608400
+     ]
+    }
+   ]
+  },
+  "cSubMenuItem": {
+   "tf": 1631720,
+   "typeinfo": 4241064,
+   "base": "cMenuItem",
+   "vtables": [
+    {
+     "addr": 3710336,
+     "funcs": [
+      1631800,
+      1614376,
+      1608320,
+      1614488,
+      1614544,
+      1608392,
+      1608400
+     ]
+    }
+   ]
+  },
+  "cEnumMenuItem": {
+   "tf": 1631840,
+   "typeinfo": 4241128,
+   "base": "cMenuItem",
+   "vtables": [
+    {
+     "addr": 3710400,
+     "funcs": [
+      1631920,
+      1613176,
+      1608320,
+      1613824,
+      1614104,
+      1608392,
+      1608400
+     ]
+    }
+   ]
+  },
+  "cBoolMenuItem": {
+   "tf": 1631944,
+   "typeinfo": 4241224,
+   "base": "cMenuItem",
+   "vtables": [
+    {
+     "addr": 3710464,
+     "funcs": [
+      1632024,
+      1612224,
+      1608320,
+      1612432,
+      1612696,
+      1608392,
+      1608400
+     ]
+    }
+   ]
+  },
+  "cMenu": {
+   "tf": 1632072,
+   "typeinfo": 3914744,
+   "base": null,
+   "vtables": [
+    {
+     "addr": 3710528,
+     "funcs": [
+      1608656,
+      1609200,
+      1609336,
+      1609344,
+      1609352,
+      1610920,
+      1611032
+     ]
+    }
+   ]
+  },
+  "cMenuItem": {
+   "tf": 1632152,
+   "typeinfo": 3914752,
+   "base": null,
+   "vtables": [
+    {
+     "addr": 3710592,
+     "funcs": [
+      1608152,
+      1608192,
+      1608320,
+      3101920,
+      3101920,
+      1608392,
+      1608400
+     ]
+    }
+   ]
+  },
+  "cAIPath": {
+   "tf": 1665344,
+   "typeinfo": 4241272,
+   "base": "cPath",
+   "vtables": [
+    {
+     "addr": 3714008,
+     "funcs": [
+      1669392,
+      1670032,
+      1664768,
+      1664792
+     ]
+    }
+   ]
+  },
+  "cEventPath": {
+   "tf": 1665736,
+   "typeinfo": 4241288,
+   "base": "cPath",
+   "vtables": [
+    {
+     "addr": 3714064,
+     "funcs": [
+      1665456,
+      1665496,
+      1665424,
+      1665432
+     ]
+    }
+   ]
+  },
+  "cPath": {
+   "tf": 1670448,
+   "typeinfo": 3914760,
+   "base": null,
+   "vtables": [
+    {
+     "addr": 3719656,
+     "funcs": [
+      1669392,
+      1670032,
+      1670376,
+      1670368
+     ]
+    }
+   ]
+  },
+  "cAnimTexFlipNode": {
+   "tf": 1682616,
+   "typeinfo": 4241320,
+   "base": null,
+   "vtables": []
+  },
+  "cAnimComboNode": {
+   "tf": 1682712,
+   "typeinfo": 4241400,
+   "base": null,
+   "vtables": []
+  },
+  "cAnimDeltaNode": {
+   "tf": 1682832,
+   "typeinfo": 4241368,
+   "base": null,
+   "vtables": []
+  },
+  "cAnimObjectNode": {
+   "tf": 1682952,
+   "typeinfo": 4241304,
+   "base": null,
+   "vtables": []
+  },
+  "cAnimObjectNodeState": {
+   "tf": 1683216,
+   "typeinfo": 4241352,
+   "base": "cReplayRecordHeader",
+   "vtables": []
+  },
+  "cAnimComboNodeState": {
+   "tf": 1683296,
+   "typeinfo": null,
+   "base": null,
+   "vtables": []
+  },
+  "cAnimTexFlipNodeState": {
+   "tf": 1683416,
+   "typeinfo": null,
+   "base": null,
+   "vtables": []
+  },
+  "cHUDOverlay": {
+   "tf": 1731384,
+   "typeinfo": 4241416,
+   "base": "cScreenOverlay",
+   "vtables": [
+    {
+     "addr": 3725952,
+     "funcs": [
+      1731360,
+      1835488,
+      1835480,
+      1835472,
+      1835464,
+      1835456,
+      1835448,
+      1835440,
+      1835432,
+      1835424,
+      1835408,
+      1835392,
+      1714128,
+      1714688,
+      1711896,
+      1710424,
+      1710432,
+      1835072
+     ]
+    }
+   ]
+  },
+  "cSelectNextEventOverlay": {
+   "tf": 1826096,
+   "typeinfo": 4241672,
+   "base": null,
+   "vtables": [
+    {
+     "addr": 3729072,
+     "funcs": [
+      1825344,
+      1904328,
+      1834440,
+      1823112,
+      1915632,
+      1915624,
+      1915616,
+      1915608,
+      1915600,
+      1915592,
+      1915584,
+      1915576,
+      1905072,
+      1807664,
+      1912048,
+      1808744,
+      1805576,
+      1804056,
+      1909536,
+      1909680,
+      1909800,
+      1915544,
+      1909920,
+      1809280,
+      1910008,
+      1910152,
+      1805240,
+      1910272,
+      1910344,
+      1910416,
+      1910488,
+      1910640,
+      1910792,
+      1910944,
+      1911096,
+      1911248,
+      1911336,
+      1911456,
+      1911608,
+      1911696,
+      1911784,
+      1911928,
+      1915520,
+      1915512,
+      1915504,
+      1915496,
+      1915488,
+      1810672,
+      1810744,
+      1810800,
+      1810808,
+      1810880,
+      1810936,
+      1810944,
+      1894904,
+      1895976
+     ]
+    }
+   ]
+  },
+  "cSelectNextVenueOverlay": {
+   "tf": 1826952,
+   "typeinfo": 4241640,
+   "base": null,
+   "vtables": [
+    {
+     "addr": 3729680,
+     "funcs": [
+      1826200,
+      1904328,
+      1834440,
+      1820320,
+      1915632,
+      1915624,
+      1915616,
+      1915608,
+      1915600,
+      1915592,
+      1915584,
+      1915576,
+      1905072,
+      1807664,
+      1912048,
+      1808744,
+      1805576,
+      1804056,
+      1909536,
+      1909680,
+      1909800,
+      1915544,
+      1909920,
+      1809280,
+      1910008,
+      1910152,
+      1805240,
+      1910272,
+      1910344,
+      1910416,
+      1910488,
+      1910640,
+      1910792,
+      1910944,
+      1911096,
+      1911248,
+      1911336,
+      1911456,
+      1911608,
+      1911696,
+      1911784,
+      1911928,
+      1915520,
+      1915512,
+      1915504,
+      1915496,
+      1915488,
+      1810672,
+      1810744,
+      1810800,
+      1810808,
+      1810880,
+      1810936,
+      1810944,
+      1894904,
+      1895976
+     ]
+    }
+   ]
+  },
+  "cPointDistributionOverlay": {
+   "tf": 1827832,
+   "typeinfo": 4241480,
+   "base": null,
+   "vtables": [
+    {
+     "addr": 3730288,
+     "funcs": [
+      1827048,
+      1904328,
+      1834440,
+      1816176,
+      1915632,
+      1915624,
+      1915616,
+      1915608,
+      1915600,
+      1915592,
+      1915584,
+      1915576,
+      1905072,
+      1807664,
+      1912048,
+      1808744,
+      1805576,
+      1804056,
+      1909536,
+      1909680,
+      1909800,
+      1915544,
+      1909920,
+      1809280,
+      1910008,
+      1910152,
+      1805240,
+      1910272,
+      1910344,
+      1910416,
+      1910488,
+      1910640,
+      1910792,
+      1910944,
+      1911096,
+      1911248,
+      1911336,
+      1911456,
+      1911608,
+      1911696,
+      1911784,
+      1911928,
+      1915520,
+      1915512,
+      1915504,
+      1915496,
+      1915488,
+      1810672,
+      1810744,
+      1810800,
+      1810808,
+      1810880,
+      1810936,
+      1810944,
+      1894904,
+      1895976
+     ]
+    }
+   ]
+  },
+  "cLessonControllerOverlay": {
+   "tf": 1828000,
+   "typeinfo": 4241704,
+   "base": "cBackdropOverlay",
+   "vtables": [
+    {
+     "addr": 3730744,
+     "funcs": [
+      1827920,
+      1835488,
+      1835480,
+      1835472,
+      1835464,
+      1835456,
+      1835448,
+      1835440,
+      1835432,
+      1835424,
+      1835408,
+      1835392,
+      1803616,
+      1835096,
+      1739736,
+      1746472,
+      1835080,
+      1835072
+     ]
+    }
+   ]
+  },
+  "cLessonOverlay": {
+   "tf": 1828160,
+   "typeinfo": 4241592,
+   "base": "cBackdropOverlay",
+   "vtables": [
+    {
+     "addr": 3730896,
+     "funcs": [
+      1828080,
+      1835488,
+      1835480,
+      1835472,
+      1835464,
+      1835456,
+      1835448,
+      1835440,
+      1835432,
+      1835424,
+      1835408,
+      1835392,
+      1803592,
+      1835096,
+      1739736,
+      1746472,
+      1835080,
+      1835072
+     ]
+    }
+   ]
+  },
+  "cBlackFadeOverlay": {
+   "tf": 1828320,
+   "typeinfo": 4241576,
+   "base": "cScreenOverlay",
+   "vtables": [
+    {
+     "addr": 3731048,
+     "funcs": [
+      1828240,
+      1835488,
+      1835480,
+      1835472,
+      1835464,
+      1835456,
+      1835448,
+      1835440,
+      1835432,
+      1835424,
+      1835408,
+      1835392,
+      1766176,
+      1835096,
+      1739000,
+      1835088,
+      1835080,
+      1835072
+     ]
+    }
+   ]
+  },
+  "cPopAsyncLoadOverlay": {
+   "tf": 1828488,
+   "typeinfo": 4241528,
+   "base": "cScreenOverlay",
+   "vtables": [
+    {
+     "addr": 3731200,
+     "funcs": [
+      1828408,
+      1835488,
+      1835480,
+      1835472,
+      1835464,
+      1835456,
+      1835448,
+      1835440,
+      1835432,
+      1835424,
+      1835408,
+      1835392,
+      1762912,
+      1763232,
+      1762896,
+      1828400,
+      1835080,
+      1835072
+     ]
+    }
+   ]
+  },
+  "cPopFinishOverlay": {
+   "tf": 1828664,
+   "typeinfo": 4241624,
+   "base": "cScreenOverlay",
+   "vtables": [
+    {
+     "addr": 3731352,
+     "funcs": [
+      1828584,
+      1835488,
+      1835480,
+      1835472,
+      1828576,
+      1835456,
+      1835448,
+      1835440,
+      1835432,
+      1835424,
+      1835408,
+      1835392,
+      1764232,
+      1764688,
+      1763312,
+      1763240,
+      1763296,
+      1828568
+     ]
+    }
+   ]
+  },
+  "cCountdownOverlay": {
+   "tf": 1828824,
+   "typeinfo": 4241848,
+   "base": "cScreenOverlay",
+   "vtables": [
+    {
+     "addr": 3731504,
+     "funcs": [
+      1828744,
+      1835488,
+      1835480,
+      1835472,
+      1835464,
+      1835456,
+      1835448,
+      1835440,
+      1835432,
+      1835424,
+      1835408,
+      1835392,
+      1762480,
+      1835096,
+      1762232,
+      1762128,
+      1835080,
+      1835072
+     ]
+    }
+   ]
+  },
+  "cPauseMenuOverlay": {
+   "tf": 1829472,
+   "typeinfo": 4241496,
+   "base": null,
+   "vtables": [
+    {
+     "addr": 3731808,
+     "funcs": [
+      1828952,
+      1904328,
+      1834440,
+      1828928,
+      1828920,
+      1828912,
+      1828904,
+      1915608,
+      1915600,
+      1915592,
+      1915584,
+      1915576,
+      1905072,
+      1807664,
+      1912048,
+      1808744,
+      1805576,
+      1804056,
+      1909536,
+      1909680,
+      1909800,
+      1915544,
+      1909920,
+      1809280,
+      1910008,
+      1910152,
+      1805240,
+      1910272,
+      1910344,
+      1910416,
+      1910488,
+      1910640,
+      1910792,
+      1910944,
+      1911096,
+      1911248,
+      1911336,
+      1911456,
+      1911608,
+      1911696,
+      1911784,
+      1911928,
+      1915520,
+      1915512,
+      1915504,
+      1915496,
+      1915488,
+      1810672,
+      1810744,
+      1810800,
+      1810808,
+      1810880,
+      1810936,
+      1810944,
+      1894904,
+      1895976
+     ]
+    }
+   ]
+  },
+  "cUnlockedOverlay": {
+   "tf": 1830008,
+   "typeinfo": 4241752,
+   "base": null,
+   "vtables": []
+  },
+  "cHelpRaceOverlay": {
+   "tf": 1830568,
+   "typeinfo": 4241688,
+   "base": null,
+   "vtables": []
+  },
+  "cNextRaceOverlay": {
+   "tf": 1831128,
+   "typeinfo": 4241800,
+   "base": null,
+   "vtables": []
+  },
+  "cHiScoreRecordOverlay": {
+   "tf": 1831664,
+   "typeinfo": 4241448,
+   "base": null,
+   "vtables": []
+  },
+  "cViewHiScoresOverlay": {
+   "tf": 1832192,
+   "typeinfo": 4241432,
+   "base": null,
+   "vtables": []
+  },
+  "cRaceResultsOverlay": {
+   "tf": 1833144,
+   "typeinfo": 4241720,
+   "base": null,
+   "vtables": []
+  },
+  "cResultsOverlay": {
+   "tf": 1834352,
+   "typeinfo": 4241768,
+   "base": null,
+   "vtables": []
+  },
+  "cSaveOverlay": {
+   "tf": 1834760,
+   "typeinfo": 4241832,
+   "base": null,
+   "vtables": [
+    {
+     "addr": 3733936,
+     "funcs": [
+      1834496,
+      1904328,
+      1834440,
+      1915640,
+      1915632,
+      1915624,
+      1915616,
+      1915608,
+      1915600,
+      1915592,
+      1915584,
+      1915576,
+      1905072,
+      1807664,
+      1912048,
+      1808744,
+      1805576,
+      1804056,
+      1909536,
+      1909680,
+      1909800,
+      1915544,
+      1909920,
+      1809280,
+      1910008,
+      1910152,
+      1805240,
+      1910272,
+      1910344,
+      1910416,
+      1910488,
+      1910640,
+      1910792,
+      1910944,
+      1911096,
+      1911248,
+      1911336,
+      1911456,
+      1911608,
+      1911696,
+      1911784,
+      1911928,
+      1915520,
+      1915512,
+      1915504,
+      1915496,
+      1915488,
+      1810672,
+      1810744,
+      1810800,
+      1810808,
+      1810880,
+      1810936,
+      1810944,
+      1894904,
+      1895976
+     ]
+    }
+   ]
+  },
+  "cBackdropOverlay": {
+   "tf": 1834952,
+   "typeinfo": 4241544,
+   "base": "cScreenOverlay",
+   "vtables": [
+    {
+     "addr": 3734392,
+     "funcs": [
+      1834872,
+      1835488,
+      1835480,
+      1835472,
+      1835464,
+      1835456,
+      1835448,
+      1835440,
+      1835432,
+      1835424,
+      1835408,
+      1835392,
+      1835104,
+      1835096,
+      1739736,
+      1746472,
+      1835080,
+      1835072
+     ]
+    }
+   ]
+  },
+  "cScreenOverlay": {
+   "tf": 1835536,
+   "typeinfo": 3914768,
+   "base": null,
+   "vtables": [
+    {
+     "addr": 3734544,
+     "funcs": [
+      1835496,
+      1835488,
+      1835480,
+      1835472,
+      1835464,
+      1835456,
+      1835448,
+      1835440,
+      1835432,
+      1835424,
+      1835408,
+      1835392,
+      1835104,
+      1835096,
+      1739000,
+      1835088,
+      1835080,
+      1835072
+     ]
+    }
+   ]
+  },
+  "cOverlayMan": {
+   "tf": 1835616,
+   "typeinfo": 4241560,
+   "base": "cBxObjNode",
+   "vtables": [
+    {
+     "addr": 3734696,
+     "funcs": [
+      1734328,
+      1735376,
+      1734848,
+      1564408,
+      1564400,
+      1564392,
+      1564384,
+      1564376,
+      1564368
+     ]
+    }
+   ]
+  },
+  "tPS2DrawState": {
+   "tf": 2007448,
+   "typeinfo": 3914712,
+   "base": null,
+   "vtables": [
+    {
+     "addr": 3738320,
+     "funcs": [
+      1864112
+     ]
+    },
+    {
+     "addr": 3750216,
+     "funcs": [
+      1864112
+     ]
+    }
+   ]
+  },
+  "cSkyBoxObjNode": {
+   "tf": 1867008,
+   "typeinfo": 4241912,
+   "base": "cBxObjNode",
+   "vtables": [
+    {
+     "addr": 3738616,
+     "funcs": [
+      1866192,
+      1564424,
+      1866216,
+      1564408,
+      1564400,
+      1564392,
+      1564384,
+      1564376,
+      1564368
+     ]
+    }
+   ]
+  },
+  "cModelsObjNode": {
+   "tf": 1867168,
+   "typeinfo": 4241880,
+   "base": "cBxObjNode",
+   "vtables": [
+    {
+     "addr": 3738696,
+     "funcs": [
+      1867088,
+      1564424,
+      1865968,
+      1564408,
+      1564400,
+      1564392,
+      1564384,
+      1564376,
+      1564368
+     ]
+    }
+   ]
+  },
+  "cTerrainObjNode": {
+   "tf": 1867328,
+   "typeinfo": 4241896,
+   "base": "cBxObjNode",
+   "vtables": [
+    {
+     "addr": 3738776,
+     "funcs": [
+      1867248,
+      1564424,
+      1865744,
+      1564408,
+      1564400,
+      1564392,
+      1564384,
+      1564376,
+      1564368
+     ]
+    }
+   ]
+  },
+  "cSnowFallMan": {
+   "tf": 1874584,
+   "typeinfo": 4241928,
+   "base": "cBxObjNode",
+   "vtables": [
+    {
+     "addr": 3741112,
+     "funcs": [
+      1874664,
+      1872568,
+      1873728,
+      1564408,
+      1564400,
+      1564392,
+      1564384,
+      1564376,
+      1564368
+     ]
+    }
+   ]
+  },
+  "cPS2FogVolume": {
+   "tf": 1879400,
+   "typeinfo": 4241960,
+   "base": "cFogVolume",
+   "vtables": [
+    {
+     "addr": 3741384,
+     "funcs": [
+      1876824,
+      1876904,
+      1877400,
+      1877408
+     ]
+    }
+   ]
+  },
+  "cFogObjMan": {
+   "tf": 1879480,
+   "typeinfo": 4241944,
+   "base": "cBxObjNode",
+   "vtables": [
+    {
+     "addr": 3741424,
+     "funcs": [
+      1874784,
+      1875280,
+      1875288,
+      1564408,
+      1564400,
+      1564392,
+      1564384,
+      1564376,
+      1564368
+     ]
+    }
+   ]
+  },
+  "cFogVolume": {
+   "tf": 1879560,
+   "typeinfo": 3914784,
+   "base": null,
+   "vtables": [
+    {
+     "addr": 3741504,
+     "funcs": [
+      1876704,
+      1876744,
+      1876752,
+      1876760
+     ]
+    }
+   ]
+  },
+  "cCamAnimFrame": {
+   "tf": 1882376,
+   "typeinfo": 4241976,
+   "base": "cAnimFrame",
+   "vtables": [
+    {
+     "addr": 3742432,
+     "funcs": [
+      1882288,
+      1881960
+     ]
+    }
+   ]
+  },
+  "cMeshAnimFrame": {
+   "tf": 1882608,
+   "typeinfo": 4241992,
+   "base": "cAnimFrame",
+   "vtables": [
+    {
+     "addr": 3742456,
+     "funcs": [
+      1882512,
+      1881240
+     ]
+    }
+   ]
+  },
+  "cAnimFrame": {
+   "tf": 1882784,
+   "typeinfo": 4242024,
+   "base": null,
+   "vtables": [
+    {
+     "addr": 3742480,
+     "funcs": [
+      1882688,
+      1880832
+     ]
+    }
+   ]
+  },
+  "cAnimFrameState": {
+   "tf": 1882936,
+   "typeinfo": 4242008,
+   "base": "cReplayRecordHeader",
+   "vtables": []
+  },
+  "cLensFXObjNode": {
+   "tf": 1892360,
+   "typeinfo": 4242040,
+   "base": "cBxObjNode",
+   "vtables": [
+    {
+     "addr": 3742680,
+     "funcs": [
+      1883576,
+      1564424,
+      1883680,
+      1564408,
+      1564400,
+      1564392,
+      1564384,
+      1564376,
+      1564368,
+      3101920,
+      3101920,
+      3101920,
+      3101920,
+      3101920,
+      3101920,
+      3101920
+     ]
+    }
+   ]
+  },
+  "cLightMan": {
+   "tf": 1893392,
+   "typeinfo": 3914792,
+   "base": null,
+   "vtables": [
+    {
+     "addr": 3743264,
+     "funcs": [
+      1892624,
+      3101920,
+      3101920,
+      3101920,
+      3101920,
+      3101920,
+      3101920,
+      3101920,
+      1893368,
+      3101920,
+      3101920,
+      3101920,
+      1893360,
+      1893352,
+      1893344
+     ]
+    }
+   ]
+  },
+  "cMCOverlayManager": {
+   "tf": 1915656,
+   "typeinfo": 3914800,
+   "base": null,
+   "vtables": [
+    {
+     "addr": 3744312,
+     "funcs": [
+      1893760,
+      1904328,
+      1915648,
+      1915640,
+      1915632,
+      1915624,
+      1915616,
+      1915608,
+      1915600,
+      1915592,
+      1915584,
+      1915576,
+      1905072,
+      1915568,
+      1912048,
+      1915560,
+      1915552,
+      1909448,
+      1909536,
+      1909680,
+      1909800,
+      1915544,
+      1909920,
+      1915536,
+      1910008,
+      1910152,
+      1915528,
+      1910272,
+      1910344,
+      1910416,
+      1910488,
+      1910640,
+      1910792,
+      1910944,
+      1911096,
+      1911248,
+      1911336,
+      1911456,
+      1911608,
+      1911696,
+      1911784,
+      1911928,
+      1915520,
+      1915512,
+      1915504,
+      1915496,
+      1915488,
+      1909192,
+      1909248,
+      1915480,
+      1909368,
+      1909296,
+      1915472,
+      1915464,
+      1894904,
+      1895976
+     ]
+    }
+   ]
+  },
+  "cParticleMan": {
+   "tf": 1940200,
+   "typeinfo": 4242056,
+   "base": "cBxObjNode",
+   "vtables": [
+    {
+     "addr": 3747120,
+     "funcs": [
+      1937232,
+      1939704,
+      1939712,
+      1564408,
+      1564400,
+      1564392,
+      1564384,
+      1564376,
+      1564368
+     ]
+    }
+   ]
+  },
+  "cPS2BezierMan": {
+   "tf": 1947832,
+   "typeinfo": 4242072,
+   "base": "cBezierMan",
+   "vtables": [
+    {
+     "addr": 3747800,
+     "funcs": [
+      1940544,
+      1940616,
+      1940728,
+      1947792,
+      1947784,
+      1947776,
+      1947768,
+      1947760,
+      1947752,
+      1947744,
+      1947736,
+      1947728,
+      1947720,
+      1947712,
+      1940768,
+      1941336,
+      1940816,
+      1941176
+     ]
+    }
+   ]
+  },
+  "cBezierMan": {
+   "tf": 1947952,
+   "typeinfo": 3914720,
+   "base": null,
+   "vtables": [
+    {
+     "addr": 3748056,
+     "funcs": [
+      1947912,
+      3101920,
+      3101920,
+      3101920,
+      3101920,
+      3101920,
+      3101920,
+      3101920,
+      3101920,
+      3101920,
+      3101920,
+      3101920,
+      3101920,
+      3101920,
+      3101920,
+      3101920,
+      3101920,
+      3101920
+     ]
+    }
+   ]
+  },
+  "cPS2GridMesh": {
+   "tf": 2002384,
+   "typeinfo": 4242104,
+   "base": "cGridMesh",
+   "vtables": [
+    {
+     "addr": 3749320,
+     "funcs": [
+      1992344,
+      2002376,
+      1992424,
+      1992736,
+      1993040,
+      1993432,
+      1994232,
+      1994280
+     ]
+    }
+   ]
+  },
+  "cPS2GraphicsMan": {
+   "tf": 2007152,
+   "typeinfo": 4242088,
+   "base": "cGraphicsMan",
+   "vtables": [
+    {
+     "addr": 3749392,
+     "funcs": [
+      2007344,
+      1948376,
+      1950056,
+      2007144,
+      1950504,
+      1950408,
+      1950224,
+      2002336,
+      2002344,
+      2002368,
+      2002304,
+      2002272,
+      2002464,
+      2003208,
+      2003176,
+      1955056,
+      2002136,
+      2001944,
+      2001344,
+      2007072,
+      1950688,
+      1953288,
+      1952784,
+      2001264,
+      2001240,
+      1950640,
+      2006696,
+      2006664,
+      2005416,
+      2005368,
+      2005360,
+      2005232,
+      2005176,
+      2005120,
+      2004744,
+      1954896,
+      2001192,
+      2007064,
+      1970312,
+      1970320,
+      1970352,
+      1970360,
+      1970568,
+      1970640,
+      1971032,
+      1971784,
+      1971384,
+      1971472,
+      1971816,
+      1971952,
+      1971984,
+      2004632,
+      2004592,
+      2004520,
+      2004232,
+      2004200,
+      2004088,
+      2004056,
+      2004040,
+      2003992,
+      2003944,
+      2003832,
+      2003768,
+      2003432,
+      2007048,
+      2007032,
+      2003096,
+      1959880,
+      1961200,
+      1961560,
+      1978976,
+      1955272,
+      1956344,
+      1958112,
+      1976928,
+      1977952,
+      1981080,
+      1999376,
+      1972016,
+      1973008,
+      1973776,
+      1973864,
+      2007808,
+      2007800,
+      1974128,
+      1976648,
+      2006768,
+      2003048,
+      2003000,
+      2002952,
+      2002904,
+      1963128,
+      2007784,
+      1965616,
+      1965960,
+      2007776,
+      2007024,
+      1997504,
+      1997488,
+      1961600,
+      1962712,
+      1962272
+     ]
+    }
+   ]
+  },
+  "cPS2LightMan": {
+   "tf": 2007616,
+   "typeinfo": 4240680,
+   "base": "cLightMan",
+   "vtables": [
+    {
+     "addr": 3750232,
+     "funcs": [
+      2007696,
+      2007608,
+      2007600,
+      2007592,
+      2007584,
+      2007576,
+      2007568,
+      2007560,
+      1893368,
+      2007552,
+      2007544,
+      2007536,
+      2007528,
+      2007520,
+      2007512
+     ]
+    }
+   ]
+  },
+  "cGridMesh": {
+   "tf": 2007704,
+   "typeinfo": 3914816,
+   "base": null,
+   "vtables": [
+    {
+     "addr": 3750360,
+     "funcs": [
+      1992304,
+      3101920,
+      3101920,
+      3101920,
+      3101920,
+      3101920,
+      3101920,
+      3101920
+     ]
+    }
+   ]
+  },
+  "cGraphicsMan": {
+   "tf": 2007832,
+   "typeinfo": 3914808,
+   "base": null,
+   "vtables": [
+    {
+     "addr": 3750432,
+     "funcs": [
+      1948336,
+      3101920,
+      3101920,
+      3101920,
+      3101920,
+      3101920,
+      3101920,
+      3101920,
+      3101920,
+      3101920,
+      3101920,
+      3101920,
+      3101920,
+      2007824,
+      2007816,
+      3101920,
+      3101920,
+      3101920,
+      3101920,
+      3101920,
+      3101920,
+      3101920,
+      3101920,
+      3101920,
+      3101920,
+      3101920,
+      3101920,
+      3101920,
+      3101920,
+      3101920,
+      3101920,
+      3101920,
+      3101920,
+      3101920,
+      3101920,
+      3101920,
+      3101920,
+      3101920,
+      3101920,
+      3101920,
+      3101920,
+      3101920,
+      3101920,
+      3101920,
+      3101920,
+      3101920,
+      3101920,
+      3101920,
+      3101920,
+      3101920,
+      3101920,
+      3101920,
+      3101920,
+      3101920,
+      3101920,
+      3101920,
+      3101920,
+      3101920,
+      3101920,
+      3101920,
+      3101920,
+      3101920,
+      3101920,
+      3101920,
+      3101920,
+      3101920,
+      3101920,
+      3101920,
+      3101920,
+      3101920,
+      3101920,
+      3101920,
+      3101920,
+      3101920,
+      3101920,
+      3101920,
+      3101920,
+      3101920,
+      3101920,
+      3101920,
+      3101920,
+      3101920,
+      2007808,
+      2007800,
+      3101920,
+      3101920,
+      2007792,
+      3101920,
+      3101920,
+      3101920,
+      3101920,
+      3101920,
+      2007784,
+      3101920,
+      3101920,
+      2007776,
+      2007768,
+      3101920,
+      3101920
+     ]
+    }
+   ]
+  },
+  "cPS2LensFXObjNode": {
+   "tf": 2012544,
+   "typeinfo": 4242120,
+   "base": "cLensFXObjNode",
+   "vtables": [
+    {
+     "addr": 3751592,
+     "funcs": [
+      2008328,
+      1564424,
+      1883680,
+      1564408,
+      1564400,
+      1564392,
+      1564384,
+      1564376,
+      1564368,
+      2008352,
+      2009488,
+      2009704,
+      2010000,
+      2011304,
+      2009992,
+      2009664
+     ]
+    }
+   ]
+  },
+  "cReplayOverlay": {
+   "tf": 2033536,
+   "typeinfo": 4242136,
+   "base": null,
+   "vtables": [
+    {
+     "addr": 3752304,
+     "funcs": [
+      2033056,
+      1904328,
+      2032792,
+      2032392,
+      2032640,
+      2032768,
+      2032744,
+      1915608,
+      1915600,
+      1915592,
+      1915584,
+      1915576,
+      1905072,
+      1807664,
+      1912048,
+      1808744,
+      1805576,
+      1804056,
+      1909536,
+      1909680,
+      1909800,
+      1915544,
+      1909920,
+      1809280,
+      1910008,
+      1910152,
+      1805240,
+      1910272,
+      1910344,
+      1910416,
+      1910488,
+      1910640,
+      1910792,
+      1910944,
+      1911096,
+      1911248,
+      1911336,
+      1911456,
+      1911608,
+      1911696,
+      1911784,
+      1911928,
+      1915520,
+      1915512,
+      1915504,
+      1915496,
+      1915488,
+      1810672,
+      1810744,
+      1810800,
+      1810808,
+      1810880,
+      1810936,
+      1810944,
+      1894904,
+      1895976
+     ]
+    }
+   ]
+  },
+  "cReplayControlOverlay": {
+   "tf": 2033672,
+   "typeinfo": 4242152,
+   "base": "cBackdropOverlay",
+   "vtables": [
+    {
+     "addr": 3752760,
+     "funcs": [
+      2012856,
+      1835488,
+      1835480,
+      1835472,
+      1835464,
+      1835456,
+      1835448,
+      1835440,
+      1835432,
+      1835424,
+      1835408,
+      1835392,
+      2017288,
+      1835096,
+      2012880,
+      2016584,
+      2017240,
+      1835072
+     ]
+    }
+   ]
+  },
+  "cSplinePathNode": {
+   "tf": 2077544,
+   "typeinfo": 4242184,
+   "base": null,
+   "vtables": [
+    {
+     "addr": 3778320,
+     "funcs": [
+      2074176,
+      2074272,
+      2075592,
+      1563824,
+      1563760,
+      1563752,
+      1563744,
+      2077096,
+      1564368,
+      1564064,
+      1564056
+     ]
+    }
+   ]
+  },
+  "cSplinePathNodeState": {
+   "tf": 2077800,
+   "typeinfo": null,
+   "base": null,
+   "vtables": []
+  },
+  "cVideoStreamMan": {
+   "tf": 2097920,
+   "typeinfo": 4242200,
+   "base": "cBxObjNode",
+   "vtables": [
+    {
+     "addr": 3780360,
+     "funcs": [
+      2096608,
+      2097656,
+      2097776,
+      1564408,
+      1564400,
+      1564392,
+      1564384,
+      1564376,
+      1564368
+     ]
+    }
+   ]
+  },
+  "cAsyncBdrLoad": {
+   "tf": 2106408,
+   "typeinfo": 4242216,
+   "base": "cBdrLoad",
+   "vtables": [
+    {
+     "addr": 3792448,
+     "funcs": [
+      2104208
+     ]
+    }
+   ]
+  },
+  "cBdrLoad": {
+   "tf": 2522824,
+   "typeinfo": 3914600,
+   "base": null,
+   "vtables": [
+    {
+     "addr": 3793536,
+     "funcs": [
+      2106488
+     ]
+    },
+    {
+     "addr": 3840736,
+     "funcs": [
+      2106488
+     ]
+    }
+   ]
+  },
+  "cSkelSequence": {
+   "tf": 2112888,
+   "typeinfo": 4242248,
+   "base": "cSkelSequenceState",
+   "vtables": [
+    {
+     "addr": 3794032,
+     "funcs": [
+      2112824,
+      2112760,
+      2112064,
+      2112160,
+      2112200
+     ]
+    }
+   ]
+  },
+  "cSkelSequenceState": {
+   "tf": 2113016,
+   "typeinfo": 4242232,
+   "base": "cReplayRecordHeader",
+   "vtables": []
+  },
+  "cAsyncSys": {
+   "tf": 2136816,
+   "typeinfo": 4242264,
+   "base": "cBankMonitor",
+   "vtables": [
+    {
+     "addr": 3794480,
+     "funcs": [
+      2132728,
+      2259528,
+      3101920,
+      3101920,
+      2239536,
+      2146552,
+      2146632,
+      3101920,
+      3101920,
+      3101920,
+      3101920,
+      3101920
+     ]
+    }
+   ]
+  },
+  "cBankManager": {
+   "tf": 2140088,
+   "typeinfo": 4242280,
+   "base": "cAsyncSys",
+   "vtables": [
+    {
+     "addr": 3794680,
+     "funcs": [
+      2139088,
+      2259528,
+      3101920,
+      3101920,
+      2239536,
+      2146552,
+      2146632,
+      3101920,
+      3101920,
+      2139712,
+      2139736,
+      2139784
+     ]
+    }
+   ]
+  },
+  "cBankMonitor": {
+   "tf": 2147432,
+   "typeinfo": 4242296,
+   "base": "cMonitor",
+   "vtables": [
+    {
+     "addr": 3794912,
+     "funcs": [
+      2145376,
+      2259528,
+      3101920,
+      3101920,
+      2239536,
+      2146552,
+      2146632,
+      3101920,
+      3101920
+     ]
+    }
+   ]
+  },
+  "cBankSys": {
+   "tf": 2152600,
+   "typeinfo": 4242312,
+   "base": "cBankManager",
+   "vtables": [
+    {
+     "addr": 3795064,
+     "funcs": [
+      2147856,
+      2259528,
+      3101920,
+      3101920,
+      2239536,
+      2146552,
+      2146632,
+      3101920,
+      3101920,
+      2139712,
+      2139736,
+      2139784,
+      2150608
+     ]
+    }
+   ]
+  },
+  "cBXAudio": {
+   "tf": 2221800,
+   "typeinfo": 4242328,
+   "base": "cController",
+   "vtables": [
+    {
+     "addr": 3797504,
+     "funcs": [
+      2153904,
+      2171520,
+      2210912,
+      2221760,
+      2222864,
+      2233288,
+      2233512,
+      2222544,
+      2156336,
+      2139712,
+      2139736,
+      2139784,
+      2157296,
+      2154248,
+      2155568,
+      2157112
+     ]
+    }
+   ]
+  },
+  "cController": {
+   "tf": 2223192,
+   "typeinfo": 4242344,
+   "base": "cCrowdSys",
+   "vtables": [
+    {
+     "addr": 3799760,
+     "funcs": [
+      2222296,
+      2259528,
+      3101920,
+      3101920,
+      2222864,
+      2233288,
+      2233512,
+      2222544,
+      3101920,
+      2139712,
+      2139736,
+      2139784,
+      2150608,
+      3101920,
+      3101920,
+      3101920
+     ]
+    }
+   ]
+  },
+  "cCrowdSys": {
+   "tf": 2233576,
+   "typeinfo": 4242360,
+   "base": "cSpeechSys",
+   "vtables": [
+    {
+     "addr": 3800128,
+     "funcs": [
+      2230496,
+      2259528,
+      3101920,
+      3101920,
+      2239536,
+      2233288,
+      2233512,
+      3101920,
+      3101920,
+      2139712,
+      2139736,
+      2139784,
+      2150608,
+      3101920,
+      3101920,
+      3101920
+     ]
+    }
+   ]
+  },
+  "cMidiSys": {
+   "tf": 2238728,
+   "typeinfo": 4242376,
+   "base": "cBankSys",
+   "vtables": [
+    {
+     "addr": 3800456,
+     "funcs": [
+      2236672,
+      2259528,
+      3101920,
+      3101920,
+      2239536,
+      2146552,
+      2146632,
+      3101920,
+      3101920,
+      2139712,
+      2139736,
+      2139784,
+      2150608
+     ]
+    }
+   ]
+  },
+  "cMonitor": {
+   "tf": 2240248,
+   "typeinfo": 4242392,
+   "base": "cSndPlayOpts",
+   "vtables": [
+    {
+     "addr": 3800680,
+     "funcs": [
+      2239392,
+      2259528,
+      3101920,
+      3101920,
+      2239536
+     ]
+    }
+   ]
+  },
+  "cMusicSys": {
+   "tf": 2252496,
+   "typeinfo": 4242408,
+   "base": "cStreamSys",
+   "vtables": [
+    {
+     "addr": 3801264,
+     "funcs": [
+      2247824,
+      2259528,
+      3101920,
+      3101920,
+      2239536,
+      2146552,
+      2146632,
+      3101920,
+      3101920,
+      2139712,
+      2139736,
+      2139784,
+      2150608,
+      3101920
+     ]
+    }
+   ]
+  },
+  "cPS2SoundManager": {
+   "tf": 2254648,
+   "typeinfo": 4242424,
+   "base": "cSoundManager",
+   "vtables": [
+    {
+     "addr": 3801592,
+     "funcs": [
+      2252864,
+      2253160,
+      2253600,
+      2253768,
+      2254112,
+      2254416,
+      2254456,
+      2252760
+     ]
+    }
+   ]
+  },
+  "cSoundManager": {
+   "tf": 2254728,
+   "typeinfo": 3914576,
+   "base": null,
+   "vtables": []
+  },
+  "cSndPlayOpts": {
+   "tf": 2259152,
+   "typeinfo": 4242440,
+   "base": "cSoundSys",
+   "vtables": [
+    {
+     "addr": 3801848,
+     "funcs": [
+      2256064,
+      2259528,
+      3101920,
+      3101920
+     ]
+    }
+   ]
+  },
+  "cSoundSys": {
+   "tf": 2259584,
+   "typeinfo": 3914824,
+   "base": null,
+   "vtables": [
+    {
+     "addr": 3801920,
+     "funcs": [
+      2259400,
+      2259528,
+      3101920,
+      3101920
+     ]
+    }
+   ]
+  },
+  "cSpeechSys": {
+   "tf": 2264760,
+   "typeinfo": 4242456,
+   "base": "cMusicSys",
+   "vtables": [
+    {
+     "addr": 3802224,
+     "funcs": [
+      2263000,
+      2259528,
+      3101920,
+      3101920,
+      2239536,
+      2146552,
+      2146632,
+      3101920,
+      3101920,
+      2139712,
+      2139736,
+      2139784,
+      2150608,
+      3101920,
+      3101920
+     ]
+    }
+   ]
+  },
+  "cStreamSys": {
+   "tf": 2269944,
+   "typeinfo": 4242472,
+   "base": "cMidiSys",
+   "vtables": [
+    {
+     "addr": 3802520,
+     "funcs": [
+      2267464,
+      2259528,
+      3101920,
+      3101920,
+      2239536,
+      2146552,
+      2146632,
+      3101920,
+      3101920,
+      2139712,
+      2139736,
+      2139784,
+      2150608
+     ]
+    }
+   ]
+  },
+  "bxSphereTree": {
+   "tf": 2332896,
+   "typeinfo": 4242488,
+   "base": "SphereTree",
+   "vtables": [
+    {
+     "addr": 3817496,
+     "funcs": [
+      2331088
+     ]
+    }
+   ]
+  },
+  "SphereTree": {
+   "tf": 2340040,
+   "typeinfo": 4242504,
+   "base": null,
+   "vtables": [
+    {
+     "addr": 3817656,
+     "funcs": [
+      2333752
+     ]
+    }
+   ]
+  },
+  "SphereTreeBufCache": {
+   "tf": 2494560,
+   "typeinfo": 3914568,
+   "base": null,
+   "vtables": [
+    {
+     "addr": 3817720,
+     "funcs": [
+      2340128
+     ]
+    },
+    {
+     "addr": 3833456,
+     "funcs": [
+      2340128
+     ]
+    }
+   ]
+  },
+  "cMemoryBigFile": {
+   "tf": 2346992,
+   "typeinfo": 4242520,
+   "base": "cAsyncBigFile",
+   "vtables": [
+    {
+     "addr": 3817760,
+     "funcs": [
+      2345480,
+      2345584,
+      2345632,
+      2342552,
+      2342568,
+      2347136,
+      2345840,
+      2345552,
+      2342928,
+      2342992,
+      2345688,
+      2345848,
+      2345856,
+      2346424,
+      2343376,
+      2343440
+     ]
+    }
+   ]
+  },
+  "cAsyncBigFile": {
+   "tf": 2347144,
+   "typeinfo": 3914832,
+   "base": null,
+   "vtables": [
+    {
+     "addr": 3817896,
+     "funcs": [
+      2342288,
+      2342544,
+      2342560,
+      2342552,
+      2342568,
+      2347136,
+      2343048,
+      2343312,
+      2342928,
+      2342992,
+      2345168,
+      2343792,
+      2343832,
+      2344384,
+      2343376,
+      2343440
+     ]
+    }
+   ]
+  },
+  "cPS2MemCard": {
+   "tf": 2359464,
+   "typeinfo": 4242536,
+   "base": "cMemCard",
+   "vtables": [
+    {
+     "addr": 3818904,
+     "funcs": [
+      2349376,
+      2349464,
+      2354632,
+      2359456,
+      2350584,
+      2349840,
+      2349832,
+      2350352,
+      2353584,
+      2350448,
+      2353544,
+      2358696,
+      2350024,
+      2358112,
+      2350464,
+      2350472,
+      2354016,
+      2359056,
+      2359064,
+      2359096,
+      2359048,
+      2359200,
+      2351160,
+      2351248,
+      2351272,
+      2351304,
+      2351288,
+      2350664,
+      2350744,
+      2350760,
+      2350752,
+      2350880,
+      2358952,
+      2350976,
+      2351000,
+      2351032,
+      2351016,
+      2354440,
+      2354448,
+      2350600,
+      2353960,
+      2359408,
+      2359144,
+      2359152,
+      2354048,
+      2359360,
+      2359312,
+      2354136,
+      2358976,
+      2358984,
+      2358992,
+      2359000,
+      2359280,
+      2359264,
+      2354552,
+      2354608,
+      2354456,
+      2359256,
+      2359248,
+      2358856,
+      2353784,
+      2350144
+     ]
+    }
+   ]
+  },
+  "cMemCard": {
+   "tf": 2359584,
+   "typeinfo": 3914640,
+   "base": null,
+   "vtables": [
+    {
+     "addr": 3819504,
+     "funcs": [
+      2359544,
+      3101920,
+      3101920,
+      3101920,
+      3101920,
+      3101920,
+      3101920,
+      3101920,
+      3101920,
+      3101920,
+      3101920,
+      3101920,
+      3101920,
+      3101920,
+      3101920,
+      3101920,
+      3101920,
+      3101920,
+      3101920,
+      3101920,
+      3101920,
+      3101920,
+      3101920,
+      3101920,
+      3101920,
+      3101920,
+      3101920,
+      3101920,
+      3101920,
+      3101920,
+      3101920,
+      3101920,
+      3101920,
+      3101920,
+      3101920,
+      3101920,
+      3101920,
+      3101920,
+      3101920,
+      3101920,
+      3101920,
+      3101920,
+      3101920,
+      3101920,
+      3101920,
+      3101920,
+      3101920,
+      3101920,
+      3101920,
+      3101920,
+      3101920,
+      3101920,
+      3101920,
+      3101920,
+      3101920,
+      3101920,
+      3101920,
+      3101920,
+      3101920,
+      3101920,
+      3101920
+     ]
+    }
+   ]
+  },
+  "cRiderRankingLoad": {
+   "tf": 2424856,
+   "typeinfo": 4242584,
+   "base": "cFlakeSpinnerLoad",
+   "vtables": [
+    {
+     "addr": 3821624,
+     "funcs": [
+      2419512,
+      2375328,
+      2375424,
+      2376848,
+      2421992,
+      2422976,
+      2378528,
+      2423064,
+      2423368,
+      2419600,
+      2419880
+     ]
+    }
+   ]
+  },
+  "cTrickTutorialLoad": {
+   "tf": 2424936,
+   "typeinfo": 4242664,
+   "base": "cFlakeSpinnerLoad",
+   "vtables": [
+    {
+     "addr": 3821720,
+     "funcs": [
+      2414864,
+      2375328,
+      2375424,
+      2376848,
+      2417136,
+      2417256,
+      2378528,
+      2417344,
+      2417576,
+      2414952,
+      2415024
+     ]
+    }
+   ]
+  },
+  "cFELoadFromQuit": {
+   "tf": 2425016,
+   "typeinfo": 4242680,
+   "base": "cFlakeSpinnerLoad",
+   "vtables": [
+    {
+     "addr": 3821816,
+     "funcs": [
+      2410616,
+      2375328,
+      2375424,
+      2376848,
+      2412904,
+      2413456,
+      2378528,
+      2413544,
+      2413776,
+      2410720,
+      2410792
+     ]
+    }
+   ]
+  },
+  "c2PFELoad": {
+   "tf": 2425096,
+   "typeinfo": 4242600,
+   "base": "cFlakeSpinnerLoad",
+   "vtables": [
+    {
+     "addr": 3821912,
+     "funcs": [
+      2404672,
+      2375328,
+      2375424,
+      2407320,
+      2407264,
+      2409080,
+      2378528,
+      2409168,
+      2409512,
+      2404760,
+      2405152
+     ]
+    }
+   ]
+  },
+  "c1PFELoad": {
+   "tf": 2425176,
+   "typeinfo": 4242616,
+   "base": "cFlakeSpinnerLoad",
+   "vtables": [
+    {
+     "addr": 3822008,
+     "funcs": [
+      2398320,
+      2375328,
+      2375424,
+      2376848,
+      2398408,
+      2402608,
+      2378528,
+      2402696,
+      2402928,
+      2398464,
+      2398536
+     ]
+    }
+   ]
+  },
+  "c2PTrackLoad": {
+   "tf": 2425256,
+   "typeinfo": 4242552,
+   "base": "cFlakeSpinnerLoad",
+   "vtables": [
+    {
+     "addr": 3822104,
+     "funcs": [
+      2390904,
+      2375328,
+      2375424,
+      2394776,
+      2394720,
+      2394832,
+      2378528,
+      2394904,
+      2397152,
+      2390992,
+      2391384
+     ]
+    }
+   ]
+  },
+  "c1PTrackLoad": {
+   "tf": 2425336,
+   "typeinfo": 4242568,
+   "base": "cFlakeSpinnerLoad",
+   "vtables": [
+    {
+     "addr": 3822200,
+     "funcs": [
+      2382168,
+      2375328,
+      2375424,
+      2387792,
+      2387736,
+      2387848,
+      2378528,
+      2387936,
+      2388952,
+      2383032,
+      2383552
+     ]
+    }
+   ]
+  },
+  "cFirstLoad": {
+   "tf": 2425416,
+   "typeinfo": 4242648,
+   "base": "cFlakeSpinnerLoad",
+   "vtables": [
+    {
+     "addr": 3822296,
+     "funcs": [
+      2381416,
+      2375328,
+      2375424,
+      2376848,
+      2376624,
+      2376896,
+      2378528,
+      2381664,
+      2381880,
+      2381440,
+      2381496
+     ]
+    }
+   ]
+  },
+  "cFlakeSpinnerLoad": {
+   "tf": 2425496,
+   "typeinfo": 4242632,
+   "base": "cLoadModule",
+   "vtables": [
+    {
+     "addr": 3822392,
+     "funcs": [
+      2375144,
+      2375328,
+      2375424,
+      2376848,
+      2376624,
+      2376896,
+      2378528,
+      3101920,
+      3101920,
+      3101920,
+      3101920
+     ]
+    }
+   ]
+  },
+  "cAIFwdDiffCache": {
+   "tf": 2433224,
+   "typeinfo": 4242696,
+   "base": "cBxCache",
+   "vtables": [
+    {
+     "addr": 3826952,
+     "funcs": [
+      2432736
+     ]
+    }
+   ]
+  },
+  "cBxCache": {
+   "tf": 2433320,
+   "typeinfo": 3914840,
+   "base": null,
+   "vtables": [
+    {
+     "addr": 3826968,
+     "funcs": [
+      2431944
+     ]
+    }
+   ]
+  },
+  "cCourseResolve_Common": {
+   "tf": 2446696,
+   "typeinfo": 3914848,
+   "base": null,
+   "vtables": [
+    {
+     "addr": 3829848,
+     "funcs": [
+      2433568,
+      2433656,
+      2433696,
+      2433720,
+      2433872,
+      2434056,
+      2434160,
+      2434888,
+      2435040,
+      2435976,
+      2436632,
+      2438144,
+      2438464,
+      2438576,
+      2438704,
+      2439128,
+      2439600,
+      2440024,
+      2441136,
+      2441336,
+      2441504,
+      2438344,
+      2440032,
+      2440144,
+      2440272,
+      2440496,
+      2440832,
+      2441568,
+      2441704,
+      2441896,
+      2442008,
+      2442136,
+      2442752,
+      2442872,
+      2442920
+     ]
+    }
+   ]
+  },
+  "cCourseResolve_PS2": {
+   "tf": 2449720,
+   "typeinfo": 4242712,
+   "base": "cCourseResolve_Common",
+   "vtables": [
+    {
+     "addr": 3831352,
+     "funcs": [
+      2446824,
+      2433656,
+      2433696,
+      2433720,
+      2433872,
+      2434056,
+      2434160,
+      2434888,
+      2435040,
+      2435976,
+      2446896,
+      2438144,
+      2438464,
+      2438576,
+      2438704,
+      2439128,
+      2439600,
+      2448416,
+      2441136,
+      2441336,
+      2441504,
+      2438344,
+      2440032,
+      2440144,
+      2440272,
+      2440496,
+      2448576,
+      2441568,
+      2441704,
+      2441896,
+      2442008,
+      2442136,
+      2442752,
+      2442872,
+      2442920
+     ]
+    }
+   ]
+  },
+  "cWorldBoarder": {
+   "tf": 2456832,
+   "typeinfo": 4242728,
+   "base": "cWorldIntersectType",
+   "vtables": [
+    {
+     "addr": 3831768,
+     "funcs": [
+      2455832,
+      2455928,
+      2456656,
+      2455744,
+      2455944,
+      2456144,
+      2456312,
+      2456488,
+      2475976,
+      2480032,
+      2456736
+     ]
+    }
+   ]
+  },
+  "cWorldIntersectType": {
+   "tf": 2480048,
+   "typeinfo": 3914856,
+   "base": null,
+   "vtables": [
+    {
+     "addr": 3832312,
+     "funcs": [
+      3101920,
+      3101920,
+      3101920,
+      2480040,
+      3101920,
+      3101920,
+      3101920,
+      3101920,
+      2475976,
+      2480032
+     ]
+    }
+   ]
+  },
+  "cWorldLine": {
+   "tf": 2485216,
+   "typeinfo": 4242744,
+   "base": "cWorldIntersectType",
+   "vtables": [
+    {
+     "addr": 3832488,
+     "funcs": [
+      2480456,
+      2480584,
+      2485208,
+      2480040,
+      2480608,
+      2480920,
+      2481216,
+      2481224,
+      2475976,
+      2482000
+     ]
+    }
+   ]
+  },
+  "cWorldSphere": {
+   "tf": 2495928,
+   "typeinfo": 4242760,
+   "base": "cWorldIntersectType",
+   "vtables": [
+    {
+     "addr": 3835216,
+     "funcs": [
+      2494896,
+      2494968,
+      2495888,
+      2480040,
+      2494984,
+      2495272,
+      2495656,
+      2495840,
+      2475976,
+      2480032
+     ]
+    }
+   ]
+  },
+  "cWorldSphTree": {
+   "tf": 2497192,
+   "typeinfo": 4242776,
+   "base": "cWorldIntersectType",
+   "vtables": [
+    {
+     "addr": 3835384,
+     "funcs": [
+      2496256,
+      2496352,
+      2497040,
+      2480040,
+      2496368,
+      2496536,
+      2496704,
+      2496872,
+      2475976,
+      2480032,
+      2497096
+     ]
+    }
+   ]
+  },
+  "cFE3D": {
+   "tf": 2514256,
+   "typeinfo": 4242792,
+   "base": "cGameModule",
+   "vtables": [
+    {
+     "addr": 3838144,
+     "funcs": [
+      2503632,
+      2505520,
+      2504528,
+      2514024,
+      2504608,
+      2511768,
+      2510808
+     ]
+    }
+   ]
+  },
+  "cFE3DScene": {
+   "tf": 2514392,
+   "typeinfo": 4240584,
+   "base": "cList",
+   "vtables": [
+    {
+     "addr": 3838208,
+     "funcs": [
+      2514368,
+      2802208
+     ]
+    }
+   ]
+  },
+  "cFE3DCharacter": {
+   "tf": 2522704,
+   "typeinfo": 4242808,
+   "base": "cFE3DThing",
+   "vtables": [
+    {
+     "addr": 3840504,
+     "funcs": [
+      2515216,
+      2805544,
+      2801536,
+      2804984,
+      2804976,
+      2802312,
+      2802728,
+      2802808,
+      2804904,
+      2804864,
+      2515960,
+      2804704,
+      2518520,
+      2804472,
+      2804352,
+      2804344,
+      2804336,
+      2804328,
+      2804320,
+      2804312,
+      2804304,
+      2804296,
+      2804288,
+      2804280,
+      2804272,
+      2804264,
+      2804256,
+      2804248
+     ]
+    }
+   ]
+  },
+  "cFE3DDialog": {
+   "tf": 2526696,
+   "typeinfo": 4242824,
+   "base": "cFE3DWGroup",
+   "vtables": [
+    {
+     "addr": 3841360,
+     "funcs": [
+      2526672,
+      2527688,
+      2801536,
+      2804984,
+      2804976,
+      2806352,
+      2526944,
+      2526864,
+      2526784,
+      2804864,
+      2525504,
+      2525824,
+      2526160,
+      2527856,
+      2804352,
+      2807768,
+      2526456,
+      2804328,
+      2804320,
+      2804312,
+      2804304,
+      2526776,
+      2804288,
+      2804280,
+      2804272,
+      2804264,
+      2804256,
+      2804248,
+      2527024,
+      2808368,
+      2808360,
+      2808352,
+      2808160,
+      2808120,
+      2808080,
+      2808040,
+      2527736,
+      2807864,
+      2807848,
+      2527632
+     ]
+    }
+   ]
+  },
+  "cFE3DWGroup": {
+   "tf": 2797888,
+   "typeinfo": 4241464,
+   "base": "cFE3DWidget",
+   "vtables": [
+    {
+     "addr": 3841688,
+     "funcs": [
+      2527976,
+      2527688,
+      2801536,
+      2804984,
+      2804976,
+      2806352,
+      2526944,
+      2526864,
+      2526784,
+      2804864,
+      2527416,
+      2527216,
+      2527120,
+      2527856,
+      2804352,
+      2807768,
+      2804336,
+      2804328,
+      2804320,
+      2804312,
+      2804304,
+      2526776,
+      2804288,
+      2804280,
+      2804272,
+      2804264,
+      2804256,
+      2804248,
+      2527024,
+      2808368,
+      2808360,
+      2808352,
+      2808160,
+      2808120,
+      2808080,
+      2808040,
+      2527736,
+      2807864,
+      2807848,
+      2527632
+     ]
+    },
+    {
+     "addr": 3860808,
+     "funcs": [
+      2527976,
+      2527688,
+      2801536,
+      2804984,
+      2804976,
+      2806352,
+      2526944,
+      2526864,
+      2526784,
+      2804864,
+      2527416,
+      2527216,
+      2527120,
+      2527856,
+      2804352,
+      2807768,
+      2804336,
+      2804328,
+      2804320,
+      2804312,
+      2804304,
+      2526776,
+      2804288,
+      2804280,
+      2804272,
+      2804264,
+      2804256,
+      2804248,
+      2527024,
+      2808368,
+      2808360,
+      2808352,
+      2808160,
+      2808120,
+      2808080,
+      2808040,
+      2527736,
+      2807864,
+      2807848,
+      2527632
+     ]
+    },
+    {
+     "addr": 3868016,
+     "funcs": [
+      2527976,
+      2527688,
+      2801536,
+      2804984,
+      2804976,
+      2806352,
+      2526944,
+      2526864,
+      2526784,
+      2804864,
+      2527416,
+      2527216,
+      2527120,
+      2527856,
+      2804352,
+      2807768,
+      2804336,
+      2804328,
+      2804320,
+      2804312,
+      2804304,
+      2526776,
+      2804288,
+      2804280,
+      2804272,
+      2804264,
+      2804256,
+      2804248,
+      2527024,
+      2808368,
+      2808360,
+      2808352,
+      2808160,
+      2808120,
+      2808080,
+      2808040,
+      2527736,
+      2807864,
+      2807848,
+      2527632
+     ]
+    },
+    {
+     "addr": 3879984,
+     "funcs": [
+      2527976,
+      2527688,
+      2801536,
+      2804984,
+      2804976,
+      2806352,
+      2526944,
+      2526864,
+      2526784,
+      2804864,
+      2527416,
+      2527216,
+      2527120,
+      2527856,
+      2804352,
+      2807768,
+      2804336,
+      2804328,
+      2804320,
+      2804312,
+      2804304,
+      2526776,
+      2804288,
+      2804280,
+      2804272,
+      2804264,
+      2804256,
+      2804248,
+      2527024,
+      2808368,
+      2808360,
+      2808352,
+      2808160,
+      2808120,
+      2808080,
+      2808040,
+      2527736,
+      2807864,
+      2807848,
+      2527632
+     ]
+    },
+    {
+     "addr": 3884320,
+     "funcs": [
+      2527976,
+      2527688,
+      2801536,
+      2804984,
+      2804976,
+      2806352,
+      2526944,
+      2526864,
+      2526784,
+      2804864,
+      2527416,
+      2527216,
+      2527120,
+      2527856,
+      2804352,
+      2807768,
+      2804336,
+      2804328,
+      2804320,
+      2804312,
+      2804304,
+      2526776,
+      2804288,
+      2804280,
+      2804272,
+      2804264,
+      2804256,
+      2804248,
+      2527024,
+      2808368,
+      2808360,
+      2808352,
+      2808160,
+      2808120,
+      2808080,
+      2808040,
+      2527736,
+      2807864,
+      2807848,
+      2527632
+     ]
+    }
+   ]
+  },
+  "cListFE3DGetExtentOp": {
+   "tf": 2798384,
+   "typeinfo": 4241784,
+   "base": "cListOperator",
+   "vtables": [
+    {
+     "addr": 3843680,
+     "funcs": [
+      2528136,
+      2528800
+     ]
+    },
+    {
+     "addr": 3862984,
+     "funcs": [
+      2528136,
+      2528800
+     ]
+    },
+    {
+     "addr": 3870176,
+     "funcs": [
+      2528136,
+      2528800
+     ]
+    },
+    {
+     "addr": 3882120,
+     "funcs": [
+      2528136,
+      2528800
+     ]
+    },
+    {
+     "addr": 3886368,
+     "funcs": [
+      2528136,
+      2528800
+     ]
+    }
+   ]
+  },
+  "cListFE3DOnInputOp": {
+   "tf": 2798528,
+   "typeinfo": 4241816,
+   "base": "cListOperator",
+   "vtables": [
+    {
+     "addr": 3843704,
+     "funcs": [
+      2528144,
+      2529112
+     ]
+    },
+    {
+     "addr": 3863008,
+     "funcs": [
+      2528144,
+      2529112
+     ]
+    },
+    {
+     "addr": 3870200,
+     "funcs": [
+      2528144,
+      2529112
+     ]
+    },
+    {
+     "addr": 3882144,
+     "funcs": [
+      2528144,
+      2529112
+     ]
+    },
+    {
+     "addr": 3886392,
+     "funcs": [
+      2528144,
+      2529112
+     ]
+    }
+   ]
+  },
+  "cListFE3DFormatOp": {
+   "tf": 2798656,
+   "typeinfo": 4241656,
+   "base": "cListOperator",
+   "vtables": [
+    {
+     "addr": 3843728,
+     "funcs": [
+      2528152,
+      2529256
+     ]
+    },
+    {
+     "addr": 3853976,
+     "funcs": [
+      2528152,
+      2529256
+     ]
+    },
+    {
+     "addr": 3863032,
+     "funcs": [
+      2528152,
+      2529256
+     ]
+    },
+    {
+     "addr": 3870224,
+     "funcs": [
+      2528152,
+      2529256
+     ]
+    },
+    {
+     "addr": 3882168,
+     "funcs": [
+      2528152,
+      2529256
+     ]
+    },
+    {
+     "addr": 3886416,
+     "funcs": [
+      2528152,
+      2529256
+     ]
+    }
+   ]
+  },
+  "cListFE3DUpdateActivityOp": {
+   "tf": 2798784,
+   "typeinfo": 4240600,
+   "base": "cListOperator",
+   "vtables": [
+    {
+     "addr": 3843752,
+     "funcs": [
+      2528160,
+      2529384
+     ]
+    },
+    {
+     "addr": 3863056,
+     "funcs": [
+      2528160,
+      2529384
+     ]
+    },
+    {
+     "addr": 3870248,
+     "funcs": [
+      2528160,
+      2529384
+     ]
+    },
+    {
+     "addr": 3882192,
+     "funcs": [
+      2528160,
+      2529384
+     ]
+    },
+    {
+     "addr": 3886440,
+     "funcs": [
+      2528160,
+      2529384
+     ]
+    }
+   ]
+  },
+  "cListFE3DResetActivityOp": {
+   "tf": 2806008,
+   "typeinfo": 4240504,
+   "base": "cListOperator",
+   "vtables": [
+    {
+     "addr": 3843776,
+     "funcs": [
+      2528168,
+      2529512
+     ]
+    },
+    {
+     "addr": 3854024,
+     "funcs": [
+      2528168,
+      2529512
+     ]
+    },
+    {
+     "addr": 3863080,
+     "funcs": [
+      2528168,
+      2529512
+     ]
+    },
+    {
+     "addr": 3870272,
+     "funcs": [
+      2528168,
+      2529512
+     ]
+    },
+    {
+     "addr": 3882216,
+     "funcs": [
+      2528168,
+      2529512
+     ]
+    },
+    {
+     "addr": 3886464,
+     "funcs": [
+      2528168,
+      2529512
+     ]
+    },
+    {
+     "addr": 3890512,
+     "funcs": [
+      2528168,
+      2529512
+     ]
+    }
+   ]
+  },
+  "cListFE3DSkipActivityOp": {
+   "tf": 2806136,
+   "typeinfo": 4240648,
+   "base": "cListOperator",
+   "vtables": [
+    {
+     "addr": 3843800,
+     "funcs": [
+      2528176,
+      2529640
+     ]
+    },
+    {
+     "addr": 3863104,
+     "funcs": [
+      2528176,
+      2529640
+     ]
+    },
+    {
+     "addr": 3870296,
+     "funcs": [
+      2528176,
+      2529640
+     ]
+    },
+    {
+     "addr": 3882240,
+     "funcs": [
+      2528176,
+      2529640
+     ]
+    },
+    {
+     "addr": 3886488,
+     "funcs": [
+      2528176,
+      2529640
+     ]
+    },
+    {
+     "addr": 3890536,
+     "funcs": [
+      2528176,
+      2529640
+     ]
+    }
+   ]
+  },
+  "cListFE3DOffsetOp": {
+   "tf": 2845104,
+   "typeinfo": 4240568,
+   "base": "cListOperator",
+   "vtables": [
+    {
+     "addr": 3843824,
+     "funcs": [
+      2528184,
+      2529768
+     ]
+    },
+    {
+     "addr": 3855656,
+     "funcs": [
+      2528184,
+      2529768
+     ]
+    },
+    {
+     "addr": 3863128,
+     "funcs": [
+      2528184,
+      2529768
+     ]
+    },
+    {
+     "addr": 3870320,
+     "funcs": [
+      2528184,
+      2529768
+     ]
+    },
+    {
+     "addr": 3882264,
+     "funcs": [
+      2528184,
+      2529768
+     ]
+    },
+    {
+     "addr": 3886512,
+     "funcs": [
+      2528184,
+      2529768
+     ]
+    },
+    {
+     "addr": 3890560,
+     "funcs": [
+      2528184,
+      2529768
+     ]
+    },
+    {
+     "addr": 3899728,
+     "funcs": [
+      2528184,
+      2529768
+     ]
+    }
+   ]
+  },
+  "cListFE3DUpdateOp": {
+   "tf": 2803880,
+   "typeinfo": 4240520,
+   "base": "cListOperator",
+   "vtables": [
+    {
+     "addr": 3842016,
+     "funcs": [
+      2528320,
+      2528192
+     ]
+    },
+    {
+     "addr": 3854048,
+     "funcs": [
+      2528320,
+      2528192
+     ]
+    },
+    {
+     "addr": 3856176,
+     "funcs": [
+      2528320,
+      2528192
+     ]
+    },
+    {
+     "addr": 3863152,
+     "funcs": [
+      2528320,
+      2528192
+     ]
+    },
+    {
+     "addr": 3870344,
+     "funcs": [
+      2528320,
+      2528192
+     ]
+    },
+    {
+     "addr": 3882288,
+     "funcs": [
+      2528320,
+      2528192
+     ]
+    },
+    {
+     "addr": 3886536,
+     "funcs": [
+      2528320,
+      2528192
+     ]
+    },
+    {
+     "addr": 3889592,
+     "funcs": [
+      2528320,
+      2528192
+     ]
+    }
+   ]
+  },
+  "cListFE3DRenderTextOp": {
+   "tf": 2804016,
+   "typeinfo": 4240696,
+   "base": "cListOperator",
+   "vtables": [
+    {
+     "addr": 3842040,
+     "funcs": [
+      2528456,
+      2528328
+     ]
+    },
+    {
+     "addr": 3854072,
+     "funcs": [
+      2528456,
+      2528328
+     ]
+    },
+    {
+     "addr": 3856200,
+     "funcs": [
+      2528456,
+      2528328
+     ]
+    },
+    {
+     "addr": 3863176,
+     "funcs": [
+      2528456,
+      2528328
+     ]
+    },
+    {
+     "addr": 3870368,
+     "funcs": [
+      2528456,
+      2528328
+     ]
+    },
+    {
+     "addr": 3882312,
+     "funcs": [
+      2528456,
+      2528328
+     ]
+    },
+    {
+     "addr": 3886560,
+     "funcs": [
+      2528456,
+      2528328
+     ]
+    },
+    {
+     "addr": 3889616,
+     "funcs": [
+      2528456,
+      2528328
+     ]
+    }
+   ]
+  },
+  "cListFE3DRenderOp": {
+   "tf": 2804160,
+   "typeinfo": 4240616,
+   "base": "cListOperator",
+   "vtables": [
+    {
+     "addr": 3842064,
+     "funcs": [
+      2528600,
+      2528464
+     ]
+    },
+    {
+     "addr": 3856224,
+     "funcs": [
+      2528600,
+      2528464
+     ]
+    },
+    {
+     "addr": 3863200,
+     "funcs": [
+      2528600,
+      2528464
+     ]
+    },
+    {
+     "addr": 3870392,
+     "funcs": [
+      2528600,
+      2528464
+     ]
+    },
+    {
+     "addr": 3882336,
+     "funcs": [
+      2528600,
+      2528464
+     ]
+    },
+    {
+     "addr": 3886584,
+     "funcs": [
+      2528600,
+      2528464
+     ]
+    },
+    {
+     "addr": 3889640,
+     "funcs": [
+      2528600,
+      2528464
+     ]
+    }
+   ]
+  },
+  "cListOperator": {
+   "tf": 2845232,
+   "typeinfo": 3914704,
+   "base": null,
+   "vtables": [
+    {
+     "addr": 3843848,
+     "funcs": [
+      2528608,
+      3101920
+     ]
+    },
+    {
+     "addr": 3855680,
+     "funcs": [
+      2528608,
+      3101920
+     ]
+    },
+    {
+     "addr": 3856616,
+     "funcs": [
+      2528608,
+      3101920
+     ]
+    },
+    {
+     "addr": 3863224,
+     "funcs": [
+      2528608,
+      3101920
+     ]
+    },
+    {
+     "addr": 3870416,
+     "funcs": [
+      2528608,
+      3101920
+     ]
+    },
+    {
+     "addr": 3882360,
+     "funcs": [
+      2528608,
+      3101920
+     ]
+    },
+    {
+     "addr": 3886608,
+     "funcs": [
+      2528608,
+      3101920
+     ]
+    },
+    {
+     "addr": 3890584,
+     "funcs": [
+      2528608,
+      3101920
+     ]
+    },
+    {
+     "addr": 3901360,
+     "funcs": [
+      2528608,
+      3101920
+     ]
+    }
+   ]
+  },
+  "cFE3DCameraCombined": {
+   "tf": 2540704,
+   "typeinfo": 4242840,
+   "base": "cFE3DCamera",
+   "vtables": [
+    {
+     "addr": 3847512,
+     "funcs": [
+      2540624,
+      2805544,
+      2801536,
+      2804984,
+      2804976,
+      2802312,
+      2802728,
+      2802808,
+      2804904,
+      2804864,
+      2536576,
+      2804704,
+      2536528,
+      2804472,
+      2804352,
+      2804344,
+      2804336,
+      2804328,
+      2804320,
+      2804312,
+      2804304,
+      2804296,
+      2804288,
+      2804280,
+      2804272,
+      2804264,
+      2804256,
+      2804248,
+      2536632
+     ]
+    }
+   ]
+  },
+  "cFE3DCameraScripted": {
+   "tf": 2540872,
+   "typeinfo": 4242936,
+   "base": "cFE3DCamera",
+   "vtables": [
+    {
+     "addr": 3847752,
+     "funcs": [
+      2540800,
+      2534480,
+      2801536,
+      2804984,
+      2804976,
+      2802312,
+      2802728,
+      2802808,
+      2804904,
+      2804864,
+      2534552,
+      2804704,
+      2536112,
+      2804472,
+      2804352,
+      2804344,
+      2804336,
+      2804328,
+      2804320,
+      2804312,
+      2804304,
+      2804296,
+      2804288,
+      2804280,
+      2804272,
+      2804264,
+      2804256,
+      2804248,
+      2540784
+     ]
+    }
+   ]
+  },
+  "cFE3DCamera": {
+   "tf": 2541080,
+   "typeinfo": 4242872,
+   "base": "cFE3DThing",
+   "vtables": [
+    {
+     "addr": 3847992,
+     "funcs": [
+      2541008,
+      2805544,
+      2801536,
+      2804984,
+      2804976,
+      2802312,
+      2802728,
+      2802808,
+      2804904,
+      2804864,
+      2532952,
+      2804704,
+      2804664,
+      2804472,
+      2804352,
+      2804344,
+      2804336,
+      2804328,
+      2804320,
+      2804312,
+      2804304,
+      2804296,
+      2804288,
+      2804280,
+      2804272,
+      2804264,
+      2804256,
+      2804248,
+      2540952
+     ]
+    }
+   ]
+  },
+  "cFE3DAnimTranslate": {
+   "tf": 2541456,
+   "typeinfo": 4242856,
+   "base": "cFE3DAnim",
+   "vtables": [
+    {
+     "addr": 3848232,
+     "funcs": [
+      2541184,
+      2805544,
+      2801536,
+      2804984,
+      2804976,
+      2802312,
+      2802728,
+      2802808,
+      2804904,
+      2804864,
+      2532400,
+      2804704,
+      2531024,
+      2804472,
+      2804352,
+      2804344,
+      2804336,
+      2804328,
+      2804320,
+      2804312,
+      2804304,
+      2804296,
+      2804288,
+      2804280,
+      2804272,
+      2804264,
+      2804256,
+      2804248
+     ]
+    }
+   ]
+  },
+  "cFE3DAnimRotate": {
+   "tf": 2541872,
+   "typeinfo": 4242952,
+   "base": "cFE3DAnim",
+   "vtables": [
+    {
+     "addr": 3848464,
+     "funcs": [
+      2541600,
+      2805544,
+      2801536,
+      2804984,
+      2804976,
+      2802312,
+      2802728,
+      2802808,
+      2804904,
+      2804864,
+      2531048,
+      2804704,
+      2532208,
+      2804472,
+      2804352,
+      2804344,
+      2804336,
+      2804328,
+      2804320,
+      2804312,
+      2804304,
+      2804296,
+      2804288,
+      2804280,
+      2804272,
+      2804264,
+      2804256,
+      2804248
+     ]
+    }
+   ]
+  },
+  "cFE3DAnim": {
+   "tf": 2542256,
+   "typeinfo": 4242904,
+   "base": "cFE3DThing",
+   "vtables": [
+    {
+     "addr": 3848696,
+     "funcs": [
+      2541984,
+      2805544,
+      2801536,
+      2804984,
+      2804976,
+      2802312,
+      2802728,
+      2802808,
+      2804904,
+      2804864,
+      2804712,
+      2804704,
+      2531024,
+      2804472,
+      2804352,
+      2804344,
+      2804336,
+      2804328,
+      2804320,
+      2804312,
+      2804304,
+      2804296,
+      2804288,
+      2804280,
+      2804272,
+      2804264,
+      2804256,
+      2804248
+     ]
+    }
+   ]
+  },
+  "cFE3DMovieGeometry": {
+   "tf": 2542576,
+   "typeinfo": 4242920,
+   "base": "cFE3DGeometry",
+   "vtables": [
+    {
+     "addr": 3848928,
+     "funcs": [
+      2530344,
+      2805544,
+      2801536,
+      2804984,
+      2804976,
+      2802312,
+      2802728,
+      2802808,
+      2804904,
+      2804864,
+      2530576,
+      2804704,
+      2804664,
+      2804472,
+      2804352,
+      2804344,
+      2804336,
+      2804328,
+      2804320,
+      2804312,
+      2804304,
+      2804296,
+      2804288,
+      2804280,
+      2804272,
+      2804264,
+      2804256,
+      2804248
+     ]
+    }
+   ]
+  },
+  "cFE3DGeometry": {
+   "tf": 2542920,
+   "typeinfo": 4242888,
+   "base": "cFE3DThing",
+   "vtables": [
+    {
+     "addr": 3849160,
+     "funcs": [
+      2542656,
+      2805544,
+      2801536,
+      2804984,
+      2804976,
+      2802312,
+      2802728,
+      2802808,
+      2804904,
+      2804864,
+      2530056,
+      2804704,
+      2804664,
+      2804472,
+      2804352,
+      2804344,
+      2804336,
+      2804328,
+      2804320,
+      2804312,
+      2804304,
+      2804296,
+      2804288,
+      2804280,
+      2804272,
+      2804264,
+      2804256,
+      2804248
+     ]
+    }
+   ]
+  },
+  "cListFE3DWMenuFormatOp": {
+   "tf": 2552944,
+   "typeinfo": 4242984,
+   "base": "cListOperator",
+   "vtables": [
+    {
+     "addr": 3853592,
+     "funcs": [
+      2553024,
+      2552480
+     ]
+    }
+   ]
+  },
+  "cFE3DMenu": {
+   "tf": 2554400,
+   "typeinfo": 4242968,
+   "base": "cFE3DWidget",
+   "vtables": [
+    {
+     "addr": 3853616,
+     "funcs": [
+      2554320,
+      2550264,
+      2801536,
+      2804984,
+      2804976,
+      2550040,
+      2802728,
+      2550184,
+      2806656,
+      2804864,
+      2804712,
+      2550424,
+      2550680,
+      2553280,
+      2804352,
+      2807768,
+      2804336,
+      2804328,
+      2553032,
+      2804312,
+      2804304,
+      2804296,
+      2804288,
+      2804280,
+      2804272,
+      2804264,
+      2804256,
+      2804248,
+      2548048,
+      2553040,
+      2808360,
+      2808352,
+      2808160,
+      2808120,
+      2808080,
+      2808040,
+      2550848,
+      2551768,
+      2807848,
+      2545248,
+      2545240,
+      2549336,
+      2549688,
+      2554072
+     ]
+    }
+   ]
+  },
+  "cListFE3DSetActiveDefaultStartDataOp": {
+   "tf": 2554664,
+   "typeinfo": 4240552,
+   "base": "cListOperator",
+   "vtables": [
+    {
+     "addr": 3854000,
+     "funcs": [
+      2554744,
+      2554616
+     ]
+    }
+   ]
+  },
+  "cListFE3DFindHashNameOp": {
+   "tf": 2556352,
+   "typeinfo": 4240728,
+   "base": "cListOperator",
+   "vtables": [
+    {
+     "addr": 3856248,
+     "funcs": [
+      2556432,
+      2556328
+     ]
+    }
+   ]
+  },
+  "cFE3DSound": {
+   "tf": 2560488,
+   "typeinfo": 4243000,
+   "base": "cFE3DSoundBase",
+   "vtables": [
+    {
+     "addr": 3856856,
+     "funcs": [
+      2556712,
+      2556792,
+      2556880,
+      2557128,
+      2557168,
+      2557392,
+      2557408,
+      2557424,
+      2557440,
+      2557456,
+      2557808,
+      2557824,
+      2557840,
+      2557920,
+      2558048,
+      2558136,
+      2558264,
+      2558280,
+      2558296,
+      2558344,
+      2558360,
+      2558376,
+      2558392,
+      2558440,
+      2558456,
+      2558528,
+      2558544,
+      2558560,
+      2558576,
+      2558640,
+      2558656,
+      2558696,
+      2558712,
+      2558728,
+      2558744,
+      2558952,
+      2558968,
+      2559008,
+      2559024,
+      2559920,
+      2559936,
+      2559952,
+      2559992,
+      2560008,
+      2560048,
+      2560064,
+      2560104,
+      2560120,
+      2560136,
+      2560152,
+      2560192,
+      2560208,
+      2560248,
+      2560264,
+      2560304
+     ]
+    }
+   ]
+  },
+  "cFE3DSoundBase": {
+   "tf": 2560608,
+   "typeinfo": 3914776,
+   "base": null,
+   "vtables": [
+    {
+     "addr": 3858744,
+     "funcs": [
+      2560568,
+      2561208,
+      2561200,
+      2561192,
+      2561184,
+      2561176,
+      2561168,
+      2561160,
+      2561152,
+      2561144,
+      2561136,
+      2561128,
+      2561120,
+      2561112,
+      2561104,
+      2561096,
+      2561088,
+      2561080,
+      2561072,
+      2561064,
+      2561056,
+      2561048,
+      2561040,
+      2561032,
+      2561024,
+      2561016,
+      2561008,
+      2561000,
+      2560992,
+      2560984,
+      2560976,
+      2560968,
+      2560960,
+      2560952,
+      2560944,
+      2560936,
+      2560928,
+      2560920,
+      2560912,
+      2560904,
+      2560896,
+      2560880,
+      2560872,
+      2560856,
+      2560848,
+      2560832,
+      2560824,
+      2560808,
+      2560800,
+      2560784,
+      2560776,
+      2560760,
+      2560752,
+      2560744,
+      2560736
+     ]
+    }
+   ]
+  },
+  "cFE3DTextIcon": {
+   "tf": 2678848,
+   "typeinfo": 4241512,
+   "base": "cFE3DWTextEntry",
+   "vtables": [
+    {
+     "addr": 3860112,
+     "funcs": [
+      2579792,
+      2815312,
+      2801536,
+      2815032,
+      2814816,
+      2806352,
+      2802728,
+      2806464,
+      2806656,
+      2814136,
+      2804712,
+      2817736,
+      2830552,
+      2817608,
+      2804352,
+      2807768,
+      2804336,
+      2804328,
+      2804320,
+      2579784,
+      2804304,
+      2804296,
+      2579760,
+      2804280,
+      2804272,
+      2804264,
+      2804256,
+      2804248,
+      2815248,
+      2814920,
+      2808360,
+      2815136,
+      2814272,
+      2814408,
+      2814544,
+      2814680,
+      2815424,
+      2816192,
+      2807848,
+      2816816,
+      2579776,
+      2579896,
+      2579768
+     ]
+    },
+    {
+     "addr": 3865528,
+     "funcs": [
+      2579792,
+      2815312,
+      2801536,
+      2815032,
+      2814816,
+      2806352,
+      2802728,
+      2806464,
+      2806656,
+      2814136,
+      2804712,
+      2817736,
+      2830552,
+      2817608,
+      2804352,
+      2807768,
+      2804336,
+      2804328,
+      2804320,
+      2579784,
+      2804304,
+      2804296,
+      2579760,
+      2804280,
+      2804272,
+      2804264,
+      2804256,
+      2804248,
+      2815248,
+      2814920,
+      2808360,
+      2815136,
+      2814272,
+      2814408,
+      2814544,
+      2814680,
+      2815424,
+      2816192,
+      2807848,
+      2816816,
+      2579776,
+      2579896,
+      2579768
+     ]
+    }
+   ]
+  },
+  "cFE3DWTextEntry": {
+   "tf": 2796520,
+   "typeinfo": 4241608,
+   "base": "cFE3DWEntry",
+   "vtables": [
+    {
+     "addr": 3860464,
+     "funcs": [
+      2579912,
+      2815312,
+      2801536,
+      2815032,
+      2814816,
+      2806352,
+      2802728,
+      2806464,
+      2806656,
+      2814136,
+      2804712,
+      2817736,
+      2830552,
+      2817608,
+      2804352,
+      2807768,
+      2804336,
+      2804328,
+      2804320,
+      2804312,
+      2804304,
+      2804296,
+      2830544,
+      2804280,
+      2804272,
+      2804264,
+      2804256,
+      2804248,
+      2815248,
+      2814920,
+      2808360,
+      2815136,
+      2814272,
+      2814408,
+      2814544,
+      2814680,
+      2815424,
+      2816192,
+      2807848,
+      2816816,
+      2579904,
+      2579896
+     ]
+    },
+    {
+     "addr": 3865880,
+     "funcs": [
+      2579912,
+      2815312,
+      2801536,
+      2815032,
+      2814816,
+      2806352,
+      2802728,
+      2806464,
+      2806656,
+      2814136,
+      2804712,
+      2817736,
+      2830552,
+      2817608,
+      2804352,
+      2807768,
+      2804336,
+      2804328,
+      2804320,
+      2804312,
+      2804304,
+      2804296,
+      2830544,
+      2804280,
+      2804272,
+      2804264,
+      2804256,
+      2804248,
+      2815248,
+      2814920,
+      2808360,
+      2815136,
+      2814272,
+      2814408,
+      2814544,
+      2814680,
+      2815424,
+      2816192,
+      2807848,
+      2816816,
+      2579904,
+      2579896
+     ]
+    },
+    {
+     "addr": 3877848,
+     "funcs": [
+      2579912,
+      2815312,
+      2801536,
+      2815032,
+      2814816,
+      2806352,
+      2802728,
+      2806464,
+      2806656,
+      2814136,
+      2804712,
+      2817736,
+      2830552,
+      2817608,
+      2804352,
+      2807768,
+      2804336,
+      2804328,
+      2804320,
+      2804312,
+      2804304,
+      2804296,
+      2830544,
+      2804280,
+      2804272,
+      2804264,
+      2804256,
+      2804248,
+      2815248,
+      2814920,
+      2808360,
+      2815136,
+      2814272,
+      2814408,
+      2814544,
+      2814680,
+      2815424,
+      2816192,
+      2807848,
+      2816816,
+      2579904,
+      2579896
+     ]
+    },
+    {
+     "addr": 3883976,
+     "funcs": [
+      2579912,
+      2815312,
+      2801536,
+      2815032,
+      2814816,
+      2806352,
+      2802728,
+      2806464,
+      2806656,
+      2814136,
+      2804712,
+      2817736,
+      2830552,
+      2817608,
+      2804352,
+      2807768,
+      2804336,
+      2804328,
+      2804320,
+      2804312,
+      2804304,
+      2804296,
+      2830544,
+      2804280,
+      2804272,
+      2804264,
+      2804256,
+      2804248,
+      2815248,
+      2814920,
+      2808360,
+      2815136,
+      2814272,
+      2814408,
+      2814544,
+      2814680,
+      2815424,
+      2816192,
+      2807848,
+      2816816,
+      2579904,
+      2579896
+     ]
+    }
+   ]
+  },
+  "cFE3DState": {
+   "tf": 2581728,
+   "typeinfo": 4243016,
+   "base": "cListNode",
+   "vtables": [
+    {
+     "addr": 3861136,
+     "funcs": [
+      2561952,
+      2805544,
+      2801536,
+      2574256,
+      2574456,
+      2574832,
+      2581672,
+      2575176,
+      2575328,
+      2575480,
+      2581664,
+      2581600,
+      2562024,
+      2581552,
+      2575856,
+      2576064,
+      2576152,
+      2576712,
+      2581544,
+      2581536,
+      2581528,
+      2578568,
+      2578624,
+      2581424,
+      2581416,
+      2581408,
+      2578848
+     ]
+    }
+   ]
+  },
+  "cFE3DStateCustomBody": {
+   "tf": 2679128,
+   "typeinfo": 4243096,
+   "base": "cFE3DState",
+   "vtables": [
+    {
+     "addr": 3866224,
+     "funcs": [
+      2679048,
+      2805544,
+      2801536,
+      2574256,
+      2574456,
+      2574832,
+      2581672,
+      2575176,
+      2575328,
+      2575480,
+      2581664,
+      2677184,
+      2562024,
+      2581552,
+      2677688,
+      2576064,
+      2576152,
+      2576712,
+      2677920,
+      2581536,
+      2581528,
+      2677944,
+      2678096,
+      2581424,
+      2581416,
+      2581408,
+      2678264
+     ]
+    }
+   ]
+  },
+  "cFE3DStateCustomBoard": {
+   "tf": 2679232,
+   "typeinfo": 4243048,
+   "base": "cFE3DState",
+   "vtables": [
+    {
+     "addr": 3866448,
+     "funcs": [
+      2679208,
+      2805544,
+      2801536,
+      2574256,
+      2574456,
+      2574832,
+      2581672,
+      2575176,
+      2575328,
+      2575480,
+      2581664,
+      2672408,
+      2562024,
+      2581552,
+      2675800,
+      2576064,
+      2576152,
+      2576712,
+      2675904,
+      2581536,
+      2581528,
+      2675928,
+      2676080,
+      2581424,
+      2581416,
+      2581408,
+      2676176
+     ]
+    }
+   ]
+  },
+  "cFE3DStateHintBook": {
+   "tf": 2679392,
+   "typeinfo": 4243080,
+   "base": "cFE3DState",
+   "vtables": [
+    {
+     "addr": 3866672,
+     "funcs": [
+      2679312,
+      2805544,
+      2801536,
+      2574256,
+      2574456,
+      2574832,
+      2581672,
+      2575176,
+      2575328,
+      2575480,
+      2581664,
+      2671968,
+      2562024,
+      2581552,
+      2575856,
+      2576064,
+      2576152,
+      2576712,
+      2581544,
+      2581536,
+      2581528,
+      2578568,
+      2578624,
+      2581424,
+      2581416,
+      2581408,
+      2672264
+     ]
+    }
+   ]
+  },
+  "cFE3DStateRiderProfile": {
+   "tf": 2679560,
+   "typeinfo": 4243064,
+   "base": "cFE3DState",
+   "vtables": [
+    {
+     "addr": 3866896,
+     "funcs": [
+      2679472,
+      2805544,
+      2801536,
+      2574256,
+      2574456,
+      2574832,
+      2581672,
+      2575176,
+      2575328,
+      2575480,
+      2670112,
+      2668904,
+      2562024,
+      2581552,
+      2670344,
+      2576064,
+      2576152,
+      2670032,
+      2581544,
+      2581536,
+      2581528,
+      2671000,
+      2671032,
+      2581424,
+      2581416,
+      2581408,
+      2670888
+     ]
+    }
+   ]
+  },
+  "cFE3DStateTrickBook": {
+   "tf": 2679848,
+   "typeinfo": 4243112,
+   "base": "cFE3DState",
+   "vtables": [
+    {
+     "addr": 3867120,
+     "funcs": [
+      2679648,
+      2805544,
+      2801536,
+      2574256,
+      2574456,
+      2574832,
+      2581672,
+      2575176,
+      2575328,
+      2575480,
+      2581664,
+      2598328,
+      2562024,
+      2679840,
+      2613256,
+      2613928,
+      2576152,
+      2612312,
+      2581544,
+      2581536,
+      2581528,
+      2614072,
+      2614736,
+      2581424,
+      2615288,
+      2581408,
+      2614208
+     ]
+    }
+   ]
+  },
+  "cFE3DStateCharacterAccept": {
+   "tf": 2680016,
+   "typeinfo": 4243032,
+   "base": "cFE3DState",
+   "vtables": [
+    {
+     "addr": 3867344,
+     "funcs": [
+      2679928,
+      2805544,
+      2801536,
+      2574256,
+      2574456,
+      2574832,
+      2581672,
+      2575176,
+      2575328,
+      2575480,
+      2596400,
+      2596544,
+      2562024,
+      2680008,
+      2596864,
+      2597024,
+      2576152,
+      2576712,
+      2581544,
+      2581536,
+      2581528,
+      2578568,
+      2597208,
+      2581424,
+      2581416,
+      2581408,
+      2597288
+     ]
+    }
+   ]
+  },
+  "cFE3DStateCharacterModify": {
+   "tf": 2680184,
+   "typeinfo": 4243128,
+   "base": "cFE3DState",
+   "vtables": [
+    {
+     "addr": 3867568,
+     "funcs": [
+      2680096,
+      2805544,
+      2801536,
+      2574256,
+      2574456,
+      2574832,
+      2581672,
+      2575176,
+      2575328,
+      2575480,
+      2593896,
+      2595080,
+      2562024,
+      2680176,
+      2595456,
+      2576064,
+      2576152,
+      2576712,
+      2581544,
+      2581536,
+      2595856,
+      2578568,
+      2596008,
+      2581424,
+      2581416,
+      2581408,
+      2596376
+     ]
+    }
+   ]
+  },
+  "cFE3DStateCharacterSelect": {
+   "tf": 2680296,
+   "typeinfo": 4243144,
+   "base": "cFE3DState",
+   "vtables": [
+    {
+     "addr": 3867792,
+     "funcs": [
+      2680264,
+      2805544,
+      2801536,
+      2574256,
+      2574456,
+      2574832,
+      2581672,
+      2575176,
+      2575328,
+      2575480,
+      2583664,
+      2584104,
+      2562024,
+      2680288,
+      2590104,
+      2576064,
+      2590736,
+      2592608,
+      2593224,
+      2581536,
+      2581528,
+      2578568,
+      2593264,
+      2581424,
+      2581416,
+      2581408,
+      2593560
+     ]
+    }
+   ]
+  },
+  "cFEStateMCOverlay": {
+   "tf": 2699824,
+   "typeinfo": 4243160,
+   "base": null,
+   "vtables": [
+    {
+     "addr": 3871640,
+     "funcs": [
+      2683776,
+      2698352,
+      2690528,
+      2692208,
+      2692248,
+      2692264,
+      2692256,
+      2691448,
+      2691480,
+      2691648,
+      2691816,
+      2692176,
+      2691024,
+      1915568,
+      1912048,
+      1915560,
+      1915552,
+      1909448,
+      1909536,
+      1909680,
+      1909800,
+      1915544,
+      1909920,
+      2699792,
+      1910008,
+      1910152,
+      2699800,
+      1910272,
+      1910344,
+      1910416,
+      1910488,
+      1910640,
+      1910792,
+      1910944,
+      1911096,
+      1911248,
+      1911336,
+      1911456,
+      1911608,
+      1911696,
+      1911784,
+      1911928,
+      1915520,
+      1915512,
+      2692304,
+      1915496,
+      1915488,
+      2692680,
+      2692744,
+      2692808,
+      2697496,
+      2697536,
+      1915472,
+      1915464,
+      2693040,
+      2698560
+     ]
+    }
+   ]
+  },
+  "cFE3DIconText": {
+   "tf": 2699968,
+   "typeinfo": 4241736,
+   "base": "cFE3DIconEntry",
+   "vtables": [
+    {
+     "addr": 3872096,
+     "funcs": [
+      2699944,
+      2815312,
+      2801536,
+      2815032,
+      2814816,
+      2806352,
+      2802728,
+      2806464,
+      2806656,
+      2814136,
+      2804712,
+      2817736,
+      2830552,
+      2817608,
+      2804352,
+      2807768,
+      2804336,
+      2804328,
+      2804320,
+      2699936,
+      2804304,
+      2804296,
+      2699920,
+      2804280,
+      2804272,
+      2804264,
+      2804256,
+      2804248,
+      2815248,
+      2814920,
+      2808360,
+      2815136,
+      2814272,
+      2814408,
+      2814544,
+      2814680,
+      2815424,
+      2816192,
+      2807848,
+      2816816,
+      2700048,
+      2699928
+     ]
+    }
+   ]
+  },
+  "cFE3DIconEntry": {
+   "tf": 2700088,
+   "typeinfo": 4241864,
+   "base": "cFE3DWEntry",
+   "vtables": [
+    {
+     "addr": 3872440,
+     "funcs": [
+      2700064,
+      2815312,
+      2801536,
+      2815032,
+      2814816,
+      2806352,
+      2802728,
+      2806464,
+      2806656,
+      2814136,
+      2804712,
+      2817736,
+      2830552,
+      2817608,
+      2804352,
+      2807768,
+      2804336,
+      2804328,
+      2804320,
+      2700056,
+      2804304,
+      2804296,
+      2830544,
+      2804280,
+      2804272,
+      2804264,
+      2804256,
+      2804248,
+      2815248,
+      2814920,
+      2808360,
+      2815136,
+      2814272,
+      2814408,
+      2814544,
+      2814680,
+      2815424,
+      2816192,
+      2807848,
+      2816816,
+      2700048
+     ]
+    }
+   ]
+  },
+  "cFE3DStateUserName": {
+   "tf": 2742296,
+   "typeinfo": 4243192,
+   "base": "cFE3DState",
+   "vtables": [
+    {
+     "addr": 3878192,
+     "funcs": [
+      2742192,
+      2805544,
+      2801536,
+      2574256,
+      2574456,
+      2574832,
+      2581672,
+      2575176,
+      2575328,
+      2575480,
+      2736856,
+      2737008,
+      2562024,
+      2742288,
+      2740944,
+      2576064,
+      2576152,
+      2576712,
+      2581544,
+      2581536,
+      2581528,
+      2741224,
+      2578624,
+      2581424,
+      2581416,
+      2581408,
+      2741448
+     ]
+    }
+   ]
+  },
+  "cFE3DStateVenueSel": {
+   "tf": 2742464,
+   "typeinfo": 4243208,
+   "base": "cFE3DState",
+   "vtables": [
+    {
+     "addr": 3878416,
+     "funcs": [
+      2742376,
+      2805544,
+      2801536,
+      2574256,
+      2574456,
+      2574832,
+      2581672,
+      2575176,
+      2575328,
+      2575480,
+      2734672,
+      2734992,
+      2562024,
+      2742456,
+      2735496,
+      2735704,
+      2735888,
+      2576712,
+      2735840,
+      2581536,
+      2581528,
+      2578568,
+      2735936,
+      2581424,
+      2581416,
+      2581408,
+      2736696
+     ]
+    }
+   ]
+  },
+  "cFE3DStateDifficultSel": {
+   "tf": 2742632,
+   "typeinfo": 4243272,
+   "base": "cFE3DState",
+   "vtables": [
+    {
+     "addr": 3878640,
+     "funcs": [
+      2742544,
+      2805544,
+      2801536,
+      2574256,
+      2574456,
+      2574832,
+      2581672,
+      2575176,
+      2575328,
+      2575480,
+      2733632,
+      2733736,
+      2562024,
+      2742624,
+      2734280,
+      2576064,
+      2576152,
+      2576712,
+      2581544,
+      2581536,
+      2581528,
+      2578568,
+      2734368,
+      2581424,
+      2581416,
+      2581408,
+      2578848
+     ]
+    }
+   ]
+  },
+  "cFE3DStateEventSel": {
+   "tf": 2742800,
+   "typeinfo": 4243240,
+   "base": "cFE3DState",
+   "vtables": [
+    {
+     "addr": 3878864,
+     "funcs": [
+      2742712,
+      2805544,
+      2801536,
+      2574256,
+      2574456,
+      2574832,
+      2581672,
+      2575176,
+      2575328,
+      2575480,
+      2731336,
+      2732032,
+      2562024,
+      2742792,
+      2732744,
+      2576064,
+      2576152,
+      2576712,
+      2732968,
+      2581536,
+      2733016,
+      2578568,
+      2733144,
+      2581424,
+      2581416,
+      2581408,
+      2733392
+     ]
+    }
+   ]
+  },
+  "cFE3DStateNumPlayers": {
+   "tf": 2742968,
+   "typeinfo": 4243288,
+   "base": "cFE3DState",
+   "vtables": [
+    {
+     "addr": 3879088,
+     "funcs": [
+      2742880,
+      2805544,
+      2801536,
+      2574256,
+      2574456,
+      2574832,
+      2581672,
+      2575176,
+      2575328,
+      2575480,
+      2730184,
+      2730280,
+      2562024,
+      2742960,
+      2730824,
+      2576064,
+      2576152,
+      2576712,
+      2581544,
+      2731088,
+      2731112,
+      2578568,
+      2731136,
+      2581424,
+      2581416,
+      2581408,
+      2731264
+     ]
+    }
+   ]
+  },
+  "cFE3DStateModeSelect": {
+   "tf": 2743136,
+   "typeinfo": 4243176,
+   "base": "cFE3DState",
+   "vtables": [
+    {
+     "addr": 3879312,
+     "funcs": [
+      2743048,
+      2805544,
+      2801536,
+      2574256,
+      2574456,
+      2574832,
+      2581672,
+      2575176,
+      2575328,
+      2575480,
+      2728536,
+      2728752,
+      2562024,
+      2743128,
+      2729184,
+      2576064,
+      2576152,
+      2576712,
+      2729472,
+      2729496,
+      2729520,
+      2578568,
+      2729648,
+      2581424,
+      2581416,
+      2581408,
+      2729984
+     ]
+    }
+   ]
+  },
+  "cFE3DStateDVDContent": {
+   "tf": 2743352,
+   "typeinfo": 4243224,
+   "base": "cFE3DState",
+   "vtables": [
+    {
+     "addr": 3879536,
+     "funcs": [
+      2743216,
+      2805544,
+      2801536,
+      2574256,
+      2574456,
+      2574832,
+      2581672,
+      2575176,
+      2575328,
+      2575480,
+      2702368,
+      2702864,
+      2562024,
+      2743344,
+      2724464,
+      2724592,
+      2576152,
+      2721472,
+      2581544,
+      2581536,
+      2581528,
+      2727920,
+      2725632,
+      2581424,
+      2728528,
+      2728520,
+      2727440
+     ]
+    }
+   ]
+  },
+  "cFE3DStateTitle": {
+   "tf": 2743464,
+   "typeinfo": 4243256,
+   "base": "cFE3DState",
+   "vtables": [
+    {
+     "addr": 3879760,
+     "funcs": [
+      2743432,
+      2805544,
+      2801536,
+      2574256,
+      2574456,
+      2574832,
+      2581672,
+      2575176,
+      2575328,
+      2575480,
+      2700240,
+      2700584,
+      2562024,
+      2743456,
+      2701624,
+      2701912,
+      2702240,
+      2576712,
+      2581544,
+      2702040,
+      2702104,
+      2578568,
+      2578624,
+      2581424,
+      2581416,
+      2581408,
+      2702208
+     ]
+    }
+   ]
+  },
+  "cFE3DStateOptions": {
+   "tf": 2796400,
+   "typeinfo": 4243304,
+   "base": "cFE3DState",
+   "vtables": [
+    {
+     "addr": 3883752,
+     "funcs": [
+      2796376,
+      2805544,
+      2801536,
+      2574256,
+      2574456,
+      2574832,
+      2581672,
+      2575176,
+      2575328,
+      2575480,
+      2792536,
+      2787888,
+      2789896,
+      2581552,
+      2789976,
+      2576064,
+      2795552,
+      2576712,
+      2581544,
+      2581536,
+      2581528,
+      2794944,
+      2792760,
+      2793624,
+      2581416,
+      2581408,
+      2793976
+     ]
+    }
+   ]
+  },
+  "cFE3DStateVideo": {
+   "tf": 2800584,
+   "typeinfo": 4243320,
+   "base": "cFE3DState",
+   "vtables": [
+    {
+     "addr": 3887120,
+     "funcs": [
+      2800480,
+      2805544,
+      2801536,
+      2574256,
+      2574456,
+      2574832,
+      2581672,
+      2575176,
+      2575328,
+      2575480,
+      2581664,
+      2799888,
+      2799896,
+      2800576,
+      2800120,
+      2800176,
+      2576152,
+      2799712,
+      2581544,
+      2581536,
+      2581528,
+      2578568,
+      2578624,
+      2581424,
+      2581416,
+      2581408,
+      2578848,
+      2800416
+     ]
+    }
+   ]
+  },
+  "cFE3DGroup": {
+   "tf": 2803728,
+   "typeinfo": 4243352,
+   "base": "cFE3DThing",
+   "vtables": [
+    {
+     "addr": 3889360,
+     "funcs": [
+      2803384,
+      2800752,
+      2801536,
+      2804984,
+      2804976,
+      2802312,
+      2803152,
+      2803072,
+      2804904,
+      2804864,
+      2800800,
+      2801064,
+      2801248,
+      2803232,
+      2804352,
+      2804344,
+      2804336,
+      2804328,
+      2804320,
+      2804312,
+      2804304,
+      2804296,
+      2804288,
+      2804280,
+      2804272,
+      2804264,
+      2804256,
+      2804248
+     ]
+    }
+   ]
+  },
+  "cFE3DThing": {
+   "tf": 2805256,
+   "typeinfo": 4243336,
+   "base": "cListNode",
+   "vtables": [
+    {
+     "addr": 3889664,
+     "funcs": [
+      2805008,
+      2805544,
+      2801536,
+      2804984,
+      2804976,
+      2802312,
+      2802728,
+      2802808,
+      2804904,
+      2804864,
+      2804712,
+      2804704,
+      2804664,
+      2804472,
+      2804352,
+      2804344,
+      2804336,
+      2804328,
+      2804320,
+      2804312,
+      2804304,
+      2804296,
+      2804288,
+      2804280,
+      2804272,
+      2804264,
+      2804256,
+      2804248
+     ]
+    }
+   ]
+  },
+  "cList": {
+   "tf": 2805480,
+   "typeinfo": 3914872,
+   "base": null,
+   "vtables": [
+    {
+     "addr": 3889896,
+     "funcs": [
+      2805368,
+      2802208
+     ]
+    }
+   ]
+  },
+  "cListNode": {
+   "tf": 2805728,
+   "typeinfo": 3914864,
+   "base": null,
+   "vtables": [
+    {
+     "addr": 3889920,
+     "funcs": [
+      2805600,
+      2805544,
+      2801536
+     ]
+    }
+   ]
+  },
+  "cFE3DWidget": {
+   "tf": 2808936,
+   "typeinfo": 4243368,
+   "base": "cFE3DThing",
+   "vtables": [
+    {
+     "addr": 3890712,
+     "funcs": [
+      2808488,
+      2805544,
+      2801536,
+      2804984,
+      2804976,
+      2806352,
+      2802728,
+      2806464,
+      2806656,
+      2804864,
+      2804712,
+      2804704,
+      2804664,
+      2804472,
+      2804352,
+      2807768,
+      2804336,
+      2804328,
+      2804320,
+      2804312,
+      2804304,
+      2804296,
+      2804288,
+      2804280,
+      2804272,
+      2804264,
+      2804256,
+      2804248,
+      2808480,
+      2808368,
+      2808360,
+      2808352,
+      2808160,
+      2808120,
+      2808080,
+      2808040,
+      2807880,
+      2807864,
+      2807848,
+      2807760
+     ]
+    }
+   ]
+  },
+  "cFE3DScrollingText": {
+   "tf": 2828576,
+   "typeinfo": 4243432,
+   "base": "cFE3DWidget",
+   "vtables": [
+    {
+     "addr": 3893208,
+     "funcs": [
+      2828112,
+      2805544,
+      2801536,
+      2804984,
+      2804976,
+      2806352,
+      2802728,
+      2806464,
+      2806656,
+      2804864,
+      2804712,
+      2826368,
+      2827296,
+      2804472,
+      2804352,
+      2807768,
+      2804336,
+      2804328,
+      2804320,
+      2804312,
+      2804304,
+      2804296,
+      2804288,
+      2804280,
+      2804272,
+      2804264,
+      2804256,
+      2804248,
+      2827536,
+      2808368,
+      2808360,
+      2808352,
+      2808160,
+      2808120,
+      2808080,
+      2808040,
+      2807880,
+      2827976,
+      2826312,
+      2825568
+     ]
+    }
+   ]
+  },
+  "cFE3DWNameEntry": {
+   "tf": 2829400,
+   "typeinfo": 4243496,
+   "base": "cFE3DWidget",
+   "vtables": [
+    {
+     "addr": 3893536,
+     "funcs": [
+      2828848,
+      2819296,
+      2801536,
+      2804984,
+      2804976,
+      2806352,
+      2802728,
+      2806464,
+      2806656,
+      2804864,
+      2804712,
+      2819368,
+      2828696,
+      2804472,
+      2804352,
+      2807768,
+      2804336,
+      2804328,
+      2804320,
+      2804312,
+      2804304,
+      2804296,
+      2804288,
+      2804280,
+      2804272,
+      2804264,
+      2828688,
+      2804248,
+      2820176,
+      2808368,
+      2808360,
+      2808352,
+      2808160,
+      2808120,
+      2808080,
+      2808040,
+      2807880,
+      2819176,
+      2807848,
+      2807760
+     ]
+    }
+   ]
+  },
+  "cFE3DWListBox": {
+   "tf": 2830464,
+   "typeinfo": 4243464,
+   "base": "cFE3DWidget",
+   "vtables": [
+    {
+     "addr": 3893864,
+     "funcs": [
+      2829488,
+      2818336,
+      2801536,
+      2804984,
+      2804976,
+      2806352,
+      2802728,
+      2806464,
+      2806656,
+      2804864,
+      2804712,
+      2818384,
+      2804664,
+      2804472,
+      2804352,
+      2807768,
+      2804336,
+      2804328,
+      2804320,
+      2804312,
+      2804304,
+      2804296,
+      2804288,
+      2804280,
+      2804272,
+      2804264,
+      2804256,
+      2804248,
+      2818048,
+      2808368,
+      2808360,
+      2808352,
+      2808160,
+      2808120,
+      2808080,
+      2808040,
+      2807880,
+      2818552,
+      2807848,
+      2807760
+     ]
+    }
+   ]
+  },
+  "cFE3DWEntry": {
+   "tf": 2832264,
+   "typeinfo": 4243544,
+   "base": "cFE3DWidget",
+   "vtables": [
+    {
+     "addr": 3894192,
+     "funcs": [
+      2831192,
+      2815312,
+      2801536,
+      2815032,
+      2814816,
+      2806352,
+      2802728,
+      2806464,
+      2806656,
+      2814136,
+      2804712,
+      2817736,
+      2830552,
+      2817608,
+      2804352,
+      2807768,
+      2804336,
+      2804328,
+      2804320,
+      2804312,
+      2804304,
+      2804296,
+      2830544,
+      2804280,
+      2804272,
+      2804264,
+      2804256,
+      2804248,
+      2815248,
+      2814920,
+      2808360,
+      2815136,
+      2814272,
+      2814408,
+      2814544,
+      2814680,
+      2815424,
+      2816192,
+      2807848,
+      2816816
+     ]
+    }
+   ]
+  },
+  "cFE3DProgressBar": {
+   "tf": 2834152,
+   "typeinfo": 4243448,
+   "base": "cFE3DWidget",
+   "vtables": [
+    {
+     "addr": 3894520,
+     "funcs": [
+      2832928,
+      2832824,
+      2801536,
+      2804984,
+      2804976,
+      2806352,
+      2802728,
+      2806464,
+      2806656,
+      2804864,
+      2804712,
+      2812032,
+      2804664,
+      2804472,
+      2804352,
+      2807768,
+      2804336,
+      2804328,
+      2804320,
+      2804312,
+      2804304,
+      2804296,
+      2804288,
+      2832344,
+      2804272,
+      2804264,
+      2804256,
+      2804248,
+      2813736,
+      2808368,
+      2808360,
+      2808352,
+      2808160,
+      2808120,
+      2808080,
+      2808040,
+      2807880,
+      2807864,
+      2807848,
+      2832352
+     ]
+    }
+   ]
+  },
+  "cFE3DTiledIcon": {
+   "tf": 2835352,
+   "typeinfo": 4243416,
+   "base": "cFE3DIcon",
+   "vtables": [
+    {
+     "addr": 3894848,
+     "funcs": [
+      2834272,
+      2805544,
+      2801536,
+      2804984,
+      2804976,
+      2806352,
+      2802728,
+      2806464,
+      2806656,
+      2804864,
+      2804712,
+      2809800,
+      2804664,
+      2804472,
+      2804352,
+      2807768,
+      2804336,
+      2804328,
+      2804320,
+      2835432,
+      2834232,
+      2804296,
+      2804288,
+      2804280,
+      2804272,
+      2804264,
+      2804256,
+      2804248,
+      2808480,
+      2808368,
+      2808360,
+      2808352,
+      2808160,
+      2808120,
+      2808080,
+      2808040,
+      2807880,
+      2807864,
+      2807848,
+      2807760
+     ]
+    }
+   ]
+  },
+  "cFE3DIcon": {
+   "tf": 2836440,
+   "typeinfo": 4243480,
+   "base": "cFE3DWidget",
+   "vtables": [
+    {
+     "addr": 3895176,
+     "funcs": [
+      2835464,
+      2805544,
+      2801536,
+      2804984,
+      2804976,
+      2806352,
+      2802728,
+      2806464,
+      2806656,
+      2804864,
+      2804712,
+      2809064,
+      2804664,
+      2804472,
+      2804352,
+      2807768,
+      2804336,
+      2804328,
+      2804320,
+      2835432,
+      2804304,
+      2804296,
+      2804288,
+      2804280,
+      2804272,
+      2804264,
+      2804256,
+      2804248,
+      2808480,
+      2808368,
+      2808360,
+      2808352,
+      2808160,
+      2808120,
+      2808080,
+      2808040,
+      2807880,
+      2807864,
+      2807848,
+      2807760
+     ]
+    }
+   ]
+  },
+  "cFE3DWColouredText": {
+   "tf": 2836720,
+   "typeinfo": 4243384,
+   "base": "cFE3DWSingleLineText",
+   "vtables": [
+    {
+     "addr": 3895504,
+     "funcs": [
+      2824024,
+      2805544,
+      2801536,
+      2804984,
+      2804976,
+      2806352,
+      2802728,
+      2806464,
+      2806656,
+      2804864,
+      2804712,
+      2824048,
+      2824696,
+      2804472,
+      2804352,
+      2807768,
+      2804336,
+      2804328,
+      2804320,
+      2804312,
+      2804304,
+      2804296,
+      2804288,
+      2804280,
+      2804272,
+      2836520,
+      2804256,
+      2804248,
+      2808480,
+      2808368,
+      2808360,
+      2808352,
+      2808160,
+      2808120,
+      2808080,
+      2808040,
+      2807880,
+      2824704,
+      2807848,
+      2836528,
+      2823632,
+      2823656,
+      2823736,
+      2837032
+     ]
+    }
+   ]
+  },
+  "cFE3DWBufferedSingleLineText": {
+   "tf": 2836952,
+   "typeinfo": 4243528,
+   "base": "cFE3DWSingleLineText",
+   "vtables": [
+    {
+     "addr": 3895864,
+     "funcs": [
+      2836808,
+      2805544,
+      2801536,
+      2804984,
+      2804976,
+      2806352,
+      2802728,
+      2806464,
+      2806656,
+      2804864,
+      2804712,
+      2823048,
+      2823352,
+      2804472,
+      2804352,
+      2807768,
+      2804336,
+      2804328,
+      2804320,
+      2804312,
+      2804304,
+      2804296,
+      2804288,
+      2804280,
+      2804272,
+      2804264,
+      2804256,
+      2804248,
+      2808480,
+      2808368,
+      2808360,
+      2808352,
+      2808160,
+      2808120,
+      2808080,
+      2808040,
+      2807880,
+      2823392,
+      2807848,
+      2822976,
+      2823760,
+      2823824,
+      2823840,
+      2837032,
+      2836800
+     ]
+    }
+   ]
+  },
+  "cFE3DWSingleLineText": {
+   "tf": 2837608,
+   "typeinfo": 4243512,
+   "base": "cFE3DWidget",
+   "vtables": [
+    {
+     "addr": 3896232,
+     "funcs": [
+      2822952,
+      2805544,
+      2801536,
+      2804984,
+      2804976,
+      2806352,
+      2802728,
+      2806464,
+      2806656,
+      2804864,
+      2804712,
+      2823048,
+      2823352,
+      2804472,
+      2804352,
+      2807768,
+      2804336,
+      2804328,
+      2804320,
+      2804312,
+      2804304,
+      2804296,
+      2804288,
+      2804280,
+      2804272,
+      2804264,
+      2804256,
+      2804248,
+      2808480,
+      2808368,
+      2808360,
+      2808352,
+      2808160,
+      2808120,
+      2808080,
+      2808040,
+      2807880,
+      2823392,
+      2807848,
+      2822976,
+      2823632,
+      2823656,
+      2823736,
+      2837032
+     ]
+    }
+   ]
+  },
+  "cFE3DWText": {
+   "tf": 2838752,
+   "typeinfo": 4243400,
+   "base": "cFE3DWidget",
+   "vtables": [
+    {
+     "addr": 3896592,
+     "funcs": [
+      2838224,
+      2805544,
+      2801536,
+      2804984,
+      2804976,
+      2806352,
+      2802728,
+      2806464,
+      2806656,
+      2838000,
+      2804712,
+      2821592,
+      2821752,
+      2837736,
+      2804352,
+      2807768,
+      2804336,
+      2804328,
+      2804320,
+      2804312,
+      2804304,
+      2804296,
+      2804288,
+      2804280,
+      2837688,
+      2804264,
+      2804256,
+      2804248,
+      2808480,
+      2808368,
+      2808360,
+      2808352,
+      2808160,
+      2808120,
+      2808080,
+      2808040,
+      2807880,
+      2821792,
+      2837816,
+      2837904
+     ]
+    }
+   ]
+  },
+  "cFE3DWList": {
+   "tf": 2844968,
+   "typeinfo": 4243560,
+   "base": "cFE3DMenu",
+   "vtables": [
+    {
+     "addr": 3899360,
+     "funcs": [
+      2844728,
+      2844288,
+      2801536,
+      2804984,
+      2804976,
+      2844376,
+      2802728,
+      2550184,
+      2806656,
+      2804864,
+      2841208,
+      2841728,
+      2841136,
+      2844448,
+      2804352,
+      2807768,
+      2804336,
+      2844000,
+      2553032,
+      2804312,
+      2804304,
+      2804296,
+      2804288,
+      2804280,
+      2804272,
+      2804264,
+      2804256,
+      2804248,
+      2548048,
+      2553040,
+      2808360,
+      2808352,
+      2808160,
+      2808120,
+      2808080,
+      2808040,
+      2842864,
+      2843152,
+      2807848,
+      2842352,
+      2545240,
+      2842176,
+      2842264,
+      2844008,
+      2839000
+     ]
+    }
+   ]
+  },
+  "CCommDriver": {
+   "tf": 2846848,
+   "typeinfo": 3914880,
+   "base": null,
+   "vtables": [
+    {
+     "addr": 3901856,
+     "funcs": [
+      2846408,
+      2846400,
+      3101920,
+      2845792,
+      2845408,
+      3101920,
+      2845552,
+      3101920,
+      2846392,
+      2846376,
+      2846368,
+      2846336,
+      2846320,
+      2846128,
+      2845840,
+      2846032
+     ]
+    }
+   ]
+  },
+  "CDeci2CopydataCommDriver": {
+   "tf": 2849104,
+   "typeinfo": 4243576,
+   "base": "CCommDriver",
+   "vtables": [
+    {
+     "addr": 3902128,
+     "funcs": [
+      2848880,
+      2847184,
+      2847376,
+      2845792,
+      2845408,
+      2847632,
+      2847880,
+      2848040,
+      2848872,
+      2846376,
+      2846368,
+      2846336,
+      2846320,
+      2846128,
+      2845840,
+      2846032
+     ]
+    }
+   ]
+  },
+  "C8bitBuffer": {
+   "tf": 2858904,
+   "typeinfo": 3914888,
+   "base": null,
+   "vtables": [
+    {
+     "addr": 3902536,
+     "funcs": [
+      2858616,
+      2858560,
+      2858608,
+      2858720
+     ]
+    }
+   ]
+  },
+  "cPS2VideoPlayer": {
+   "tf": 2861832,
+   "typeinfo": 4243592,
+   "base": "cVideoPlayer",
+   "vtables": [
+    {
+     "addr": 3902720,
+     "funcs": [
+      2859408,
+      2860384,
+      2861560,
+      2861072,
+      2861816,
+      2861824
+     ]
+    }
+   ]
+  },
+  "cVideoPlayer": {
+   "tf": 2861952,
+   "typeinfo": 3914736,
+   "base": null,
+   "vtables": [
+    {
+     "addr": 3902952,
+     "funcs": [
+      2861912,
+      3101920,
+      3101920,
+      3101920,
+      3101920,
+      3101920
+     ]
+    }
+   ]
+  },
+  "bad_exception": {
+   "tf": 3108400,
+   "typeinfo": 4243608,
+   "base": "exception",
+   "vtables": [
+    {
+     "addr": 3907760,
+     "funcs": [
+      3108328,
+      3108288
+     ]
+    }
+   ]
+  },
+  "exception": {
+   "tf": 3108552,
+   "typeinfo": 3914896,
+   "base": null,
+   "vtables": [
+    {
+     "addr": 3907784,
+     "funcs": [
+      3108480,
+      3108288
+     ]
+    }
+   ]
+  },
+  "bad_alloc": {
+   "tf": 3115848,
+   "typeinfo": 4243624,
+   "base": "exception",
+   "vtables": [
+    {
+     "addr": 3908072,
+     "funcs": [
+      3115928,
+      3115832
+     ]
+    }
+   ]
+  },
+  "__class_type_info": {
+   "tf": 3117312,
+   "typeinfo": 4243704,
+   "base": "__user_type_info",
+   "vtables": [
+    {
+     "addr": 3908160,
+     "funcs": [
+      3117392,
+      3116808
+     ]
+    }
+   ]
+  },
+  "__si_type_info": {
+   "tf": 3117456,
+   "typeinfo": 4243688,
+   "base": "__user_type_info",
+   "vtables": [
+    {
+     "addr": 3908184,
+     "funcs": [
+      3117536,
+      3116656
+     ]
+    }
+   ]
+  },
+  "__user_type_info": {
+   "tf": 3117592,
+   "typeinfo": 4243672,
+   "base": "type_info",
+   "vtables": [
+    {
+     "addr": 3908208,
+     "funcs": [
+      3117672,
+      3116608
+     ]
+    }
+   ]
+  },
+  "bad_typeid": {
+   "tf": 3117776,
+   "typeinfo": 4243640,
+   "base": "exception",
+   "vtables": [
+    {
+     "addr": 3908232,
+     "funcs": [
+      3117704,
+      3108288
+     ]
+    }
+   ]
+  },
+  "bad_cast": {
+   "tf": 3117928,
+   "typeinfo": 4243656,
+   "base": "exception",
+   "vtables": [
+    {
+     "addr": 3908256,
+     "funcs": [
+      3117856,
+      3108288
+     ]
+    }
+   ]
+  },
+  "type_info": {
+   "tf": 3118072,
+   "typeinfo": 3914904,
+   "base": null,
+   "vtables": [
+    {
+     "addr": 3908280,
+     "funcs": [
+      3116392
+     ]
+    }
+   ]
+  },
+  "__array_type_info": {
+   "tf": 3120808,
+   "typeinfo": 4243768,
+   "base": "type_info",
+   "vtables": [
+    {
+     "addr": 3908568,
+     "funcs": [
+      3120888
+     ]
+    }
+   ]
+  },
+  "__ptmd_type_info": {
+   "tf": 3120920,
+   "typeinfo": 4243800,
+   "base": "type_info",
+   "vtables": [
+    {
+     "addr": 3908584,
+     "funcs": [
+      3121000
+     ]
+    }
+   ]
+  },
+  "__ptmf_type_info": {
+   "tf": 3121032,
+   "typeinfo": 4243752,
+   "base": "type_info",
+   "vtables": [
+    {
+     "addr": 3908600,
+     "funcs": [
+      3121112
+     ]
+    }
+   ]
+  },
+  "__func_type_info": {
+   "tf": 3121144,
+   "typeinfo": 4243720,
+   "base": "type_info",
+   "vtables": [
+    {
+     "addr": 3908616,
+     "funcs": [
+      3121224
+     ]
+    }
+   ]
+  },
+  "__builtin_type_info": {
+   "tf": 3121256,
+   "typeinfo": 4243816,
+   "base": "type_info",
+   "vtables": [
+    {
+     "addr": 3908632,
+     "funcs": [
+      3121336
+     ]
+    }
+   ]
+  },
+  "__attr_type_info": {
+   "tf": 3121368,
+   "typeinfo": 4243736,
+   "base": "type_info",
+   "vtables": [
+    {
+     "addr": 3908648,
+     "funcs": [
+      3121448
+     ]
+    }
+   ]
+  },
+  "__pointer_type_info": {
+   "tf": 3121480,
+   "typeinfo": 4243784,
+   "base": "type_info",
+   "vtables": [
+    {
+     "addr": 3908664,
+     "funcs": [
+      3121560
+     ]
+    }
+   ]
+  }
+ }
+}

@@ -1,0 +1,397 @@
+SSX Tricky (USA) class hierarchy recovered from RTTI - 394 classes
+(single-inheritance links only; indent = derives from)
+
+C8bitBuffer   vtable 0x3B8C48 (4 virtuals)
+CCommDriver   vtable 0x3B89A0 (16 virtuals)
+  CDeci2CopydataCommDriver   vtable 0x3B8AB0 (16 virtuals)
+SphereTree   vtable 0x3A40B8 (1 virtuals)
+  bxSphereTree   vtable 0x3A4018 (1 virtuals)
+SphereTreeBufCache   vtable 0x3A40F8 (1 virtuals)
+cAI   vtable 0x364738 (20 virtuals)
+cAIState
+cAIStateHandler
+  cCountdownHandler   vtable 0x364840 (3 virtuals)
+  cEndLessonHandler   vtable 0x36E720 (3 virtuals)
+  cEndRaceHandler   vtable 0x3647E0 (3 virtuals)
+  cLoadLessonHandler   vtable 0x36E780 (3 virtuals)
+  cPreLessonHandler   vtable 0x36E760 (3 virtuals)
+  cPreRaceHandler   vtable 0x364860 (3 virtuals)
+  cRaceHandler   vtable 0x364800 (3 virtuals)
+  cReplayEndRaceHandler   vtable 0x364E28 (3 virtuals)
+  cRestartLessonHandler   vtable 0x36E740 (3 virtuals)
+  cSelectLessonHandler   vtable 0x364E48 (3 virtuals)
+  cStartRaceHandler   vtable 0x364820 (3 virtuals)
+cAirMotion
+cAirMotionState
+cAnimComboNode
+cAnimComboNodeState
+cAnimDeltaNode
+cAnimFrame   vtable 0x391B10 (2 virtuals)
+  cCamAnimFrame   vtable 0x391AE0 (2 virtuals)
+  cMeshAnimFrame   vtable 0x391AF8 (2 virtuals)
+cAnimObjectNode
+cAnimTexFlipNode
+cAnimTexFlipNodeState
+cAppMan   vtable 0x386168 (4 virtuals)
+  cApplication   vtable 0x385B10 (4 virtuals)
+cAsyncBigFile   vtable 0x3A41A8 (16 virtuals)
+  cMemoryBigFile   vtable 0x3A4120 (16 virtuals)
+cBdrLoad   vtable 0x39E280 (1 virtuals)
+  cAsyncBdrLoad   vtable 0x39DE40 (1 virtuals)
+cBezierMan   vtable 0x3930D8 (18 virtuals)
+  cPS2BezierMan   vtable 0x392FD8 (18 virtuals)
+cBoarder   vtable 0x367640 (21 virtuals)
+cBoarderCache   vtable 0x3676F0 (7 virtuals)
+cBoarderRender
+cBoarderSequence   vtable 0x379020 (5 virtuals)
+cBoostNode   vtable 0x36D4D8 (30 virtuals)
+cBoostNodeState
+cBumpControl
+cBumpControlState
+cBxCache   vtable 0x3A6518 (1 virtuals)
+  cAIFwdDiffCache   vtable 0x3A6508 (1 virtuals)
+cBxCamera   vtable 0x3830A8 (2 virtuals)
+cBxObjNode   vtable 0x386520 (9 virtuals)
+  cAIWorld   vtable 0x365798 (9 virtuals)
+  cCamControl   vtable 0x383958 (9 virtuals)
+  cFogObjMan   vtable 0x3916F0 (9 virtuals)
+  cLensFXObjNode   vtable 0x391BD8 (16 virtuals)
+    cPS2LensFXObjNode   vtable 0x393EA8 (16 virtuals)
+  cModelsObjNode   vtable 0x390C48 (9 virtuals)
+  cOverlayMan   vtable 0x38FCA8 (9 virtuals)
+  cParticleMan   vtable 0x392D30 (9 virtuals)
+  cPostAI   vtable 0x364698 (9 virtuals)
+  cPreAI   vtable 0x3646E8 (9 virtuals)
+  cSkyBoxObjNode   vtable 0x390BF8 (9 virtuals)
+  cSnowFallMan   vtable 0x3915B8 (9 virtuals)
+  cTerrainObjNode   vtable 0x390C98 (9 virtuals)
+  cVideoStreamMan   vtable 0x39AF08 (9 virtuals)
+cBxSortObjNode   vtable 0x386460 (11 virtuals)
+cBxSortObjNodeState
+cBxTypeObjNode   vtable 0x3864C0 (11 virtuals)
+cCameraNode
+cCameraNodeState
+cChangeFakieControl
+cCollideEmitterNode   vtable 0x36C650 (11 virtuals)
+cCollideEmitterNodeState
+cComputer
+cComputerState
+cControllerNode   vtable 0x36B388 (27 virtuals)
+cCounterNode   vtable 0x36B0E8 (27 virtuals)
+cCourseResolve_Common   vtable 0x3A7058 (35 virtuals)
+  cCourseResolve_PS2   vtable 0x3A7638 (35 virtuals)
+    cCourseResolve   vtable 0x388350 (35 virtuals)
+cCrackedNode   vtable 0x36CBD8 (27 virtuals)
+cCrackedNodeState
+cCrowdBoxNode   vtable 0x36CA18 (27 virtuals)
+cCrowdBoxNodeState
+cCruiseControl
+cCruiseControlState
+cDeadNode   vtable 0x36B2A8 (27 virtuals)
+cDebounceNode   vtable 0x36CAF8 (27 virtuals)
+cEmitterNode   vtable 0x36C7F8 (11 virtuals)
+cExecutionMan   vtable 0x387508 (5 virtuals)
+  cPS2ExecutionMan   vtable 0x387480 (5 virtuals)
+cFE3DSoundBase   vtable 0x3AE138 (55 virtuals)
+  cFE3DSound   vtable 0x3AD9D8 (55 virtuals)
+cFEStateMCOverlay   vtable 0x3B1398 (56 virtuals)
+cFakieCruiseControl
+cFenceNode   vtable 0x36CD98 (27 virtuals)
+cFenceNodeState
+cFinishLineControl
+cFinishLineControlState
+cFlagNode   vtable 0x36CCB8 (27 virtuals)
+cFlagNodeState
+cFogVolume   vtable 0x391740 (4 virtuals)
+  cPS2FogVolume   vtable 0x3916C8 (4 virtuals)
+cGame
+cGameModule   vtable 0x386F80 (7 virtuals)
+  cFE3D   vtable 0x3A90C0 (7 virtuals)
+  cStartScreen   vtable 0x387688 (8 virtuals)
+    cStartScreenSingle   vtable 0x387950 (8 virtuals)
+  cVideoModule   vtable 0x388570 (7 virtuals)
+cGate2BaseControl
+cGateAnticipateControl
+cGateAnticipateControlState
+cGateLaunchControl
+cGetupFromSitControl
+cGraphicsMan   vtable 0x393A20 (99 virtuals)
+  cPS2GraphicsMan   vtable 0x393610 (102 virtuals)
+cGridMesh   vtable 0x3939D8 (8 virtuals)
+  cPS2GridMesh   vtable 0x3935C8 (8 virtuals)
+cGroundMotion
+cGroundMotionState
+cHelpRaceOverlay
+cHiScoreRecordOverlay
+cInput   vtable 0x385750 (4 virtuals)
+cJumpControl
+cLandHardControl
+cLandNormalControl
+cLandNormalControlState
+cLapBoostNode   vtable 0x36D3F8 (27 virtuals)
+cLapBoostNodeState
+cLessonMan   vtable 0x36E570 (9 virtuals)
+cLessonManState
+cLessonStateHandler
+  cLessonEndHandler   vtable 0x36E5E0 (3 virtuals)
+  cLessonExitHandler   vtable 0x36E5C0 (3 virtuals)
+  cLessonInitHandler   vtable 0x36E700 (3 virtuals)
+  cLessonIntroHandler   vtable 0x36E6E0 (3 virtuals)
+  cLessonPerformHandler   vtable 0x36E640 (3 virtuals)
+  cLessonPracticeEndHandler   vtable 0x36E600 (3 virtuals)
+  cLessonPracticeHandler   vtable 0x36E620 (3 virtuals)
+  cLessonPreviewEndHandler   vtable 0x36E660 (3 virtuals)
+  cLessonPreviewHandler   vtable 0x36E680 (3 virtuals)
+  cLessonStartHandler   vtable 0x36E6C0 (3 virtuals)
+  cLessonWaitHandler   vtable 0x36E6A0 (3 virtuals)
+cLessonWaitControl
+cLessonWaitControlState
+cLightMan   vtable 0x391E20 (15 virtuals)
+  cPS2LightMan   vtable 0x393958 (15 virtuals)
+cList   vtable 0x3B5AE8 (2 virtuals)
+  cFE3DScene   vtable 0x3A9100 (2 virtuals)
+cListNode   vtable 0x3B5B00 (3 virtuals)
+  cFE3DState   vtable 0x3AEA90 (27 virtuals)
+    cFE3DStateCharacterAccept   vtable 0x3B02D0 (27 virtuals)
+    cFE3DStateCharacterModify   vtable 0x3B03B0 (27 virtuals)
+    cFE3DStateCharacterSelect   vtable 0x3B0490 (27 virtuals)
+    cFE3DStateCustomBoard   vtable 0x3AFF50 (27 virtuals)
+    cFE3DStateCustomBody   vtable 0x3AFE70 (27 virtuals)
+    cFE3DStateDVDContent   vtable 0x3B3270 (27 virtuals)
+    cFE3DStateDifficultSel   vtable 0x3B2EF0 (27 virtuals)
+    cFE3DStateEventSel   vtable 0x3B2FD0 (27 virtuals)
+    cFE3DStateHintBook   vtable 0x3B0030 (27 virtuals)
+    cFE3DStateModeSelect   vtable 0x3B3190 (27 virtuals)
+    cFE3DStateNumPlayers   vtable 0x3B30B0 (27 virtuals)
+    cFE3DStateOptions   vtable 0x3B42E8 (27 virtuals)
+    cFE3DStateRiderProfile   vtable 0x3B0110 (27 virtuals)
+    cFE3DStateTitle   vtable 0x3B3350 (27 virtuals)
+    cFE3DStateTrickBook   vtable 0x3B01F0 (27 virtuals)
+    cFE3DStateUserName   vtable 0x3B2D30 (27 virtuals)
+    cFE3DStateVenueSel   vtable 0x3B2E10 (27 virtuals)
+    cFE3DStateVideo   vtable 0x3B5010 (28 virtuals)
+  cFE3DThing   vtable 0x3B5A00 (28 virtuals)
+    cFE3DAnim   vtable 0x3AB9F8 (28 virtuals)
+      cFE3DAnimRotate   vtable 0x3AB910 (28 virtuals)
+      cFE3DAnimTranslate   vtable 0x3AB828 (28 virtuals)
+    cFE3DCamera   vtable 0x3AB738 (29 virtuals)
+      cFE3DCameraCombined   vtable 0x3AB558 (29 virtuals)
+      cFE3DCameraScripted   vtable 0x3AB648 (29 virtuals)
+    cFE3DCharacter   vtable 0x3A99F8 (28 virtuals)
+    cFE3DGeometry   vtable 0x3ABBC8 (28 virtuals)
+      cFE3DMovieGeometry   vtable 0x3ABAE0 (28 virtuals)
+    cFE3DGroup   vtable 0x3B58D0 (28 virtuals)
+    cFE3DWidget   vtable 0x3B5E18 (40 virtuals)
+      cFE3DIcon   vtable 0x3B6F88 (40 virtuals)
+        cFE3DTiledIcon   vtable 0x3B6E40 (40 virtuals)
+      cFE3DMenu   vtable 0x3ACD30 (44 virtuals)
+        cFE3DWList   vtable 0x3B7FE0 (45 virtuals)
+      cFE3DProgressBar   vtable 0x3B6CF8 (40 virtuals)
+      cFE3DScrollingText   vtable 0x3B67D8 (40 virtuals)
+      cFE3DWEntry   vtable 0x3B6BB0 (40 virtuals)
+        cFE3DIconEntry   vtable 0x3B16B8 (41 virtuals)
+          cFE3DIconText   vtable 0x3B1560 (42 virtuals)
+        cFE3DWTextEntry   vtable 0x3AE7F0 (42 virtuals)
+          cFE3DTextIcon   vtable 0x3AE690 (43 virtuals)
+      cFE3DWGroup   vtable 0x3A9E98 (40 virtuals)
+        cFE3DDialog   vtable 0x3A9D50 (40 virtuals)
+      cFE3DWListBox   vtable 0x3B6A68 (40 virtuals)
+      cFE3DWNameEntry   vtable 0x3B6920 (40 virtuals)
+      cFE3DWSingleLineText   vtable 0x3B73A8 (44 virtuals)
+        cFE3DWBufferedSingleLineText   vtable 0x3B7238 (45 virtuals)
+        cFE3DWColouredText   vtable 0x3B70D0 (44 virtuals)
+      cFE3DWText   vtable 0x3B7510 (40 virtuals)
+cListOperator   vtable 0x3AA708 (2 virtuals)
+  cListFE3DFindHashNameOp   vtable 0x3AD778 (2 virtuals)
+  cListFE3DFormatOp   vtable 0x3AA690 (2 virtuals)
+  cListFE3DGetExtentOp   vtable 0x3AA660 (2 virtuals)
+  cListFE3DOffsetOp   vtable 0x3AA6F0 (2 virtuals)
+  cListFE3DOnInputOp   vtable 0x3AA678 (2 virtuals)
+  cListFE3DRenderOp   vtable 0x3AA010 (2 virtuals)
+  cListFE3DRenderTextOp   vtable 0x3A9FF8 (2 virtuals)
+  cListFE3DResetActivityOp   vtable 0x3AA6C0 (2 virtuals)
+  cListFE3DSetActiveDefaultStartDataOp   vtable 0x3ACEB0 (2 virtuals)
+  cListFE3DSkipActivityOp   vtable 0x3AA6D8 (2 virtuals)
+  cListFE3DUpdateActivityOp   vtable 0x3AA6A8 (2 virtuals)
+  cListFE3DUpdateOp   vtable 0x3A9FE0 (2 virtuals)
+  cListFE3DWMenuFormatOp   vtable 0x3ACD18 (2 virtuals)
+cLoadModule   vtable 0x386F40 (7 virtuals)
+  cFlakeSpinnerLoad   vtable 0x3A5338 (11 virtuals)
+    c1PFELoad   vtable 0x3A51B8 (11 virtuals)
+    c1PTrackLoad   vtable 0x3A5278 (11 virtuals)
+    c2PFELoad   vtable 0x3A5158 (11 virtuals)
+    c2PTrackLoad   vtable 0x3A5218 (11 virtuals)
+    cFELoadFromQuit   vtable 0x3A50F8 (11 virtuals)
+    cFirstLoad   vtable 0x3A52D8 (11 virtuals)
+    cRiderRankingLoad   vtable 0x3A5038 (11 virtuals)
+    cTrickTutorialLoad   vtable 0x3A5098 (11 virtuals)
+  cVideoLoadModule   vtable 0x386900 (7 virtuals)
+cMCOverlayManager   vtable 0x392238 (56 virtuals)
+cMemCard   vtable 0x3A47F0 (61 virtuals)
+  cPS2MemCard   vtable 0x3A4598 (62 virtuals)
+cMenu   vtable 0x389E40 (7 virtuals)
+  cBezierOptionsMenu   vtable 0x3891B0 (7 virtuals)
+  cDebugMenu   vtable 0x389070 (7 virtuals)
+  cErrorMenu   vtable 0x3899E0 (7 virtuals)
+  cExpandMenuItemMenu   vtable 0x389B00 (7 virtuals)
+  cGameOptionsMenu   vtable 0x3890F0 (7 virtuals)
+  cRenderOptionsMenu   vtable 0x389130 (7 virtuals)
+  cResolutionMenu   vtable 0x389170 (7 virtuals)
+  cSoundVolumeMenu   vtable 0x3890B0 (7 virtuals)
+cMenuItem   vtable 0x389E80 (7 virtuals)
+  cAngleMenuItem   vtable 0x389BC0 (7 virtuals)
+  cBoolMenuItem   vtable 0x389E00 (7 virtuals)
+  cColorMenuItem   vtable 0x389B40 (7 virtuals)
+  cCommandMenuItem   vtable 0x389D00 (7 virtuals)
+  cEnumMenuItem   vtable 0x389DC0 (7 virtuals)
+  cExpandMenuItem   vtable 0x389AB0 (9 virtuals)
+    cRGBMenuItem   vtable 0x389A20 (9 virtuals)
+  cFloatMenuItem   vtable 0x389C00 (7 virtuals)
+  cIntMenuItem   vtable 0x389C40 (7 virtuals)
+  cNullMenuItem   vtable 0x389CC0 (7 virtuals)
+  cPopMenuItem   vtable 0x389D40 (7 virtuals)
+  cRGBTitleMenuItem   vtable 0x389A70 (7 virtuals)
+  cSpaceMenuItem   vtable 0x389C80 (7 virtuals)
+  cStringMenuItem   vtable 0x389B80 (7 virtuals)
+  cSubMenuItem   vtable 0x389D80 (7 virtuals)
+cMeshAnimNode   vtable 0x36C938 (27 virtuals)
+cMeshAnimNodeState
+cMovieNode   vtable 0x36C570 (27 virtuals)
+cNaturalAirControl
+cNaturalAirControlState
+cNextRaceOverlay
+cOfflineObject   vtable 0x37F350 (1 virtuals)
+  CamAnimation   vtable 0x37EE70 (1 virtuals)
+  CamCamera   vtable 0x37F558 (1 virtuals)
+  CamDirector   vtable 0x380200 (1 virtuals)
+  CamPath   vtable 0x3814C0 (1 virtuals)
+  CamRegion   vtable 0x381B20 (1 virtuals)
+  CamScene   vtable 0x382180 (1 virtuals)
+cPadDevice   vtable 0x385868 (11 virtuals)
+  cPS2Device   vtable 0x385908 (11 virtuals)
+cParticleNode   vtable 0x36C718 (27 virtuals)
+cPath   vtable 0x38C1E8 (4 virtuals)
+  cAIPath   vtable 0x38ABD8 (4 virtuals)
+  cEventPath   vtable 0x38AC10 (4 virtuals)
+cPauseMenuOverlay   vtable 0x38F160 (56 virtuals)
+cPlayer
+cPlayerState
+cPointDistributionOverlay   vtable 0x38EB70 (56 virtuals)
+cPrewindControl
+cPrewindControlState
+cRaceResultsOverlay
+cRailManNode   vtable 0x36C510 (11 virtuals)
+cRailNode   vtable 0x36D5D0 (27 virtuals)
+cRailNodeState
+cRailSlideControl
+cRailSlideControlState
+cRailSlideMotion
+cRailSlideMotionState
+cRandomBoostNode   vtable 0x36D300 (30 virtuals)
+cRandomBoostNodeState
+cReplayOverlay   vtable 0x394170 (56 virtuals)
+cReplayRecordHeader
+  cAnimFrameState
+  cAnimObjectNodeState
+  cBoarderSequenceState
+  cBoarderState
+  cBxTypeObjNodeState
+  cCounterNodeState
+  cGameState
+  cRigidBodyState
+    cRigidBody
+  cScriptNodeState
+  cSkelSequenceState
+    cSkelSequence   vtable 0x39E470 (5 virtuals)
+cResetWaitControl
+cResetWaitControlState
+cRestoreNode   vtable 0x36B1C8 (27 virtuals)
+cResultsOverlay
+cRollerNode   vtable 0x36D790 (27 virtuals)
+cRollerNodeState
+cSaveOverlay   vtable 0x38F9B0 (56 virtuals)
+cScreenOverlay   vtable 0x38FC10 (18 virtuals)
+  cBackdropOverlay   vtable 0x38FB78 (18 virtuals)
+    cLessonControllerOverlay   vtable 0x38ED38 (18 virtuals)
+    cLessonOverlay   vtable 0x38EDD0 (18 virtuals)
+    cReplayControlOverlay   vtable 0x394338 (18 virtuals)
+  cBlackFadeOverlay   vtable 0x38EE68 (18 virtuals)
+  cCountdownOverlay   vtable 0x38F030 (18 virtuals)
+  cHUDOverlay   vtable 0x38DA80 (18 virtuals)
+  cPopAsyncLoadOverlay   vtable 0x38EF00 (18 virtuals)
+  cPopFinishOverlay   vtable 0x38EF98 (18 virtuals)
+cScriptNode   vtable 0x36BC20 (11 virtuals)
+cSelectNextEventOverlay   vtable 0x38E6B0 (56 virtuals)
+cSelectNextVenueOverlay   vtable 0x38E910 (56 virtuals)
+cSitAndWaitControl
+cSoundManager
+  cPS2SoundManager   vtable 0x3A01F8 (8 virtuals)
+cSoundSys   vtable 0x3A0340 (4 virtuals)
+  cSndPlayOpts   vtable 0x3A02F8 (4 virtuals)
+    cMonitor   vtable 0x39FE68 (5 virtuals)
+      cBankMonitor   vtable 0x39E7E0 (9 virtuals)
+        cAsyncSys   vtable 0x39E630 (12 virtuals)
+          cBankManager   vtable 0x39E6F8 (12 virtuals)
+            cBankSys   vtable 0x39E878 (13 virtuals)
+              cMidiSys   vtable 0x39FD88 (13 virtuals)
+                cStreamSys   vtable 0x3A0598 (13 virtuals)
+                  cMusicSys   vtable 0x3A00B0 (14 virtuals)
+                    cSpeechSys   vtable 0x3A0470 (15 virtuals)
+                      cCrowdSys   vtable 0x39FC40 (16 virtuals)
+                        cController   vtable 0x39FAD0 (16 virtuals)
+                          cBXAudio   vtable 0x39F200 (16 virtuals)
+cSpinControl
+cSpinControlState
+cSplinePathNode   vtable 0x39A710 (11 virtuals)
+cSplinePathNodeState
+cStaticMotion
+cTexFlip   vtable 0x36D038 (1 virtuals)
+cTexFlipNode   vtable 0x36CF58 (27 virtuals)
+cTexFlipNodeState
+cTimerNode   vtable 0x36D6B0 (27 virtuals)
+cTimerNodeState
+cTrickInfo   vtable 0x36FAD0 (6 virtuals)
+  cGameTrickInfo   vtable 0x36FA98 (6 virtuals)
+cTrickTriggerNode   vtable 0x36C858 (27 virtuals)
+cTrickTriggerNodeState
+cTubeEndBoostNode   vtable 0x36D208 (30 virtuals)
+cTubeEndBoostNodeState
+cUVScrollNode   vtable 0x36D048 (27 virtuals)
+cUVScrollNodeState
+cUVScrollTexFlipNode
+cUVScrollTexFlipNodeState
+cUnlockedOverlay
+cVideoPlayer   vtable 0x3B8DE8 (6 virtuals)
+  cPS2VideoPlayer   vtable 0x3B8D00 (6 virtuals)
+cViewHiScoresOverlay
+cVoidControl
+cWipeOutControl
+cWipeOutMotion
+cWipeOutRecoverControl
+cWipeOutRecoverMotion
+cWipeOutRecoverMotionState
+cWipeoutMotionState
+cWorldIntersectType   vtable 0x3A79F8 (10 virtuals)
+  cWorldBoarder   vtable 0x3A77D8 (11 virtuals)
+  cWorldLine   vtable 0x3A7AA8 (10 virtuals)
+  cWorldSphTree   vtable 0x3A85F8 (11 virtuals)
+  cWorldSphere   vtable 0x3A8550 (10 virtuals)
+cZBoostNode   vtable 0x36D128 (27 virtuals)
+cZBoostNodeState
+exception   vtable 0x3BA0C8 (2 virtuals)
+  bad_alloc   vtable 0x3BA1E8 (2 virtuals)
+  bad_cast   vtable 0x3BA2A0 (2 virtuals)
+  bad_exception   vtable 0x3BA0B0 (2 virtuals)
+  bad_typeid   vtable 0x3BA288 (2 virtuals)
+tPS2DrawState   vtable 0x390AD0 (1 virtuals)
+type_info   vtable 0x3BA2B8 (1 virtuals)
+  __array_type_info   vtable 0x3BA3D8 (1 virtuals)
+  __attr_type_info   vtable 0x3BA428 (1 virtuals)
+  __builtin_type_info   vtable 0x3BA418 (1 virtuals)
+  __func_type_info   vtable 0x3BA408 (1 virtuals)
+  __pointer_type_info   vtable 0x3BA438 (1 virtuals)
+  __ptmd_type_info   vtable 0x3BA3E8 (1 virtuals)
+  __ptmf_type_info   vtable 0x3BA3F8 (1 virtuals)
+  __user_type_info   vtable 0x3BA270 (2 virtuals)
+    __class_type_info   vtable 0x3BA240 (2 virtuals)
+    __si_type_info   vtable 0x3BA258 (2 virtuals)

@@ -1,0 +1,211 @@
+diff --git a/SSX-Library/FileHandlers/LevelFiles/Tricky/PS2/PBDHandler.cs b/SSX-Library/FileHandlers/LevelFiles/Tricky/PS2/PBDHandler.cs
+index cce4876..1b227f2 100644
+--- a/SSX-Library/FileHandlers/LevelFiles/Tricky/PS2/PBDHandler.cs
++++ b/SSX-Library/FileHandlers/LevelFiles/Tricky/PS2/PBDHandler.cs
+@@ -1790,9 +1790,9 @@ namespace SSX_Library.FileHandlers.LevelFiles.Tricky.PS2
+                         for (int bz = 0; bz < TempObject.objectData.MeshOffsets.Count; bz++)
+                         {
+                             var TempMeshOffset = TempObject.objectData.MeshOffsets[bz];
+-                            if (File.Exists(FolderPath + "\\" + TempMeshOffset.MeshPath))
++                            if (File.Exists(FolderPath + "/" + TempMeshOffset.MeshPath))
+                             {
+-                                ModelObject modelObject = objTriPBDHandler.LoadFile(FolderPath + "\\" + TempMeshOffset.MeshPath);
++                                ModelObject modelObject = objTriPBDHandler.LoadFile(FolderPath + "/" + TempMeshOffset.MeshPath);
+                                 TempMeshOffset.FullMesh = objTriPBDHandler.GenerateTristripDataOneNew(modelObject.Meshs[0]);
+                             }
+                             else
+diff --git a/SSX-Library/JsonFiles/SSXOGLevelInterface.cs b/SSX-Library/JsonFiles/SSXOGLevelInterface.cs
+index 21a03d7..dbf86e4 100644
+--- a/SSX-Library/JsonFiles/SSXOGLevelInterface.cs
++++ b/SSX-Library/JsonFiles/SSXOGLevelInterface.cs
+@@ -49,16 +49,16 @@ namespace SSXLibrary.JsonFiles
+                 AIPExists = true;
+             }
+ 
+-            Directory.CreateDirectory(ExtractPath + "\\Textures");
+-            Directory.CreateDirectory(ExtractPath + "\\Models");
+-            Directory.CreateDirectory(ExtractPath + "\\Lightmaps");
+-            Directory.CreateDirectory(ExtractPath + "\\Skybox");
+-            Directory.CreateDirectory(ExtractPath + "\\Collision");
+-            Directory.CreateDirectory(ExtractPath + "\\Skybox\\Textures");
+-            Directory.CreateDirectory(ExtractPath + "\\Skybox\\Models");
++            Directory.CreateDirectory(ExtractPath + "/Textures");
++            Directory.CreateDirectory(ExtractPath + "/Models");
++            Directory.CreateDirectory(ExtractPath + "/Lightmaps");
++            Directory.CreateDirectory(ExtractPath + "/Skybox");
++            Directory.CreateDirectory(ExtractPath + "/Collision");
++            Directory.CreateDirectory(ExtractPath + "/Skybox/Textures");
++            Directory.CreateDirectory(ExtractPath + "/Skybox/Models");
+ 
+-            wdrHandler.ExportModels(ExtractPath + "\\Models");
+-            wfxHandler.SaveModels(ExtractPath + "\\Collision");
++            wdrHandler.ExportModels(ExtractPath + "/Models");
++            wfxHandler.SaveModels(ExtractPath + "/Collision");
+ 
+             MaterialsJsonHandler materialsJsonHandler = new MaterialsJsonHandler();
+             materialsJsonHandler.Materials = new List<MaterialsJsonHandler.MaterialJson>();
+@@ -76,7 +76,7 @@ namespace SSXLibrary.JsonFiles
+                 materialsJsonHandler.Materials.Add(TempMaterialJson);
+             }
+ 
+-            materialsJsonHandler.CreateJson(ExtractPath + "\\Materials.json", true);
++            materialsJsonHandler.CreateJson(ExtractPath + "/Materials.json", true);
+ 
+             PrefabJsonHandler prefabJsonHandler = new PrefabJsonHandler();
+             prefabJsonHandler.Prefabs = new List<PrefabJsonHandler.PrefabJson>();
+@@ -160,7 +160,7 @@ namespace SSXLibrary.JsonFiles
+                 prefabJsonHandler.Prefabs.Add(TempPrefab);
+             }
+ 
+-            prefabJsonHandler.CreateJson(ExtractPath + "\\Prefabs.json", true);
++            prefabJsonHandler.CreateJson(ExtractPath + "/Prefabs.json", true);
+ 
+             PatchesJsonHandler patchesJsonHandler = new PatchesJsonHandler();
+             patchesJsonHandler.Patches = new List<PatchesJsonHandler.PatchJson>();
+@@ -312,8 +312,8 @@ namespace SSXLibrary.JsonFiles
+                     }
+                 }
+             }
+-            instanceJsonHandler.CreateJson(ExtractPath + "\\Instances.json", true);
+-            patchesJsonHandler.CreateJson(ExtractPath + "\\Patches.json", true);
++            instanceJsonHandler.CreateJson(ExtractPath + "/Instances.json", true);
++            patchesJsonHandler.CreateJson(ExtractPath + "/Patches.json", true);
+ 
+             SplinesJsonHandler splinesJsonHandler = new SplinesJsonHandler();
+             splinesJsonHandler.Splines = new List<SplinesJsonHandler.SplineJson>();
+@@ -429,7 +429,7 @@ namespace SSXLibrary.JsonFiles
+             }
+ 
+ 
+-            splinesJsonHandler.CreateJson(ExtractPath + "\\Splines.json", true);
++            splinesJsonHandler.CreateJson(ExtractPath + "/Splines.json", true);
+ 
+             #region AIP
+             AIPJsonHandler aipJsonHandler = new AIPJsonHandler();
+@@ -513,7 +513,7 @@ namespace SSXLibrary.JsonFiles
+                 }
+ 
+             }
+-            aipJsonHandler.CreateJson(ExtractPath + "\\AIP.json", true);
++            aipJsonHandler.CreateJson(ExtractPath + "/AIP.json", true);
+             #endregion
+ 
+             #region Textures
+@@ -523,7 +523,7 @@ namespace SSXLibrary.JsonFiles
+             for (int i = 0; i < sshTexture.ShapeImages.Count; i++)
+             {
+                 sshTexture.BrightenImage(i);
+-                sshTexture.ExtractSingleImage(ExtractPath + "\\Textures\\" + i.ToString("0000") + ".png", i);
++                sshTexture.ExtractSingleImage(ExtractPath + "/Textures/" + i.ToString("0000") + ".png", i);
+             }
+ 
+             if (MapExists)
+@@ -534,7 +534,7 @@ namespace SSXLibrary.JsonFiles
+                 for (int i = 0; i < sshTextureSky.ShapeImages.Count; i++)
+                 {
+                     sshTextureSky.BrightenImage(i);
+-                    sshTextureSky.ExtractSingleImage(ExtractPath + "\\Skybox\\Textures\\" + i.ToString("0000") + ".png", i);
++                    sshTextureSky.ExtractSingleImage(ExtractPath + "/Skybox/Textures/" + i.ToString("0000") + ".png", i);
+                 }
+ 
+                 OldShapeHandler sshTextureLight = new OldShapeHandler();
+@@ -543,7 +543,7 @@ namespace SSXLibrary.JsonFiles
+                 for (int i = 0; i < sshTextureLight.ShapeImages.Count; i++)
+                 {
+                     sshTextureLight.BrightenImage(i);
+-                    sshTextureLight.ExtractSingleImage(ExtractPath + "\\Lightmaps\\" + i.ToString("0000") + ".png", i);
++                    sshTextureLight.ExtractSingleImage(ExtractPath + "/Lightmaps/" + i.ToString("0000") + ".png", i);
+                 }
+             }
+             #endregion
+@@ -552,7 +552,7 @@ namespace SSXLibrary.JsonFiles
+ 
+             WDRHandler SkyWDRHandler = new WDRHandler();
+             SkyWDRHandler.Load(LoadPath + "_sky.mdr");
+-            SkyWDRHandler.ExportModels(ExtractPath + "\\Skybox\\Models");
++            SkyWDRHandler.ExportModels(ExtractPath + "/Skybox/Models");
+ 
+             PrefabJsonHandler skyboxPrefabJsonHandler = new PrefabJsonHandler();
+             skyboxPrefabJsonHandler.Prefabs = new List<PrefabJsonHandler.PrefabJson>();
+@@ -636,12 +636,12 @@ namespace SSXLibrary.JsonFiles
+                 skyboxPrefabJsonHandler.Prefabs.Add(TempPrefab);
+             }
+ 
+-            skyboxPrefabJsonHandler.CreateJson(ExtractPath + "\\Skybox\\Prefabs.json", true);
++            skyboxPrefabJsonHandler.CreateJson(ExtractPath + "/Skybox/Prefabs.json", true);
+ 
+             #endregion
+ 
+             SSXOGConfig ssxOGConfig = new SSXOGConfig();
+-            ssxOGConfig.CreateJson(ExtractPath + "\\ConfigOG.ssx");
++            ssxOGConfig.CreateJson(ExtractPath + "/ConfigOG.ssx");
+         }
+ 
+     }
+diff --git a/SSX-Library/JsonFiles/TrickyLevelInterface.cs b/SSX-Library/JsonFiles/TrickyLevelInterface.cs
+index 40740ef..ab74759 100644
+--- a/SSX-Library/JsonFiles/TrickyLevelInterface.cs
++++ b/SSX-Library/JsonFiles/TrickyLevelInterface.cs
+@@ -1098,7 +1098,7 @@ namespace SSXLibrary
+             {
+                 Console.WriteLine("Textures: " + (i + 1) + "/" + TextureHandler.ShapeImages.Count);
+                 TextureHandler.BrightenImage(i);
+-                TextureHandler.ExtractSingleImage(ExportPath + "\\Textures\\" + TextureHandler.ShapeImages[i].Shortname + ".png", i);
++                TextureHandler.ExtractSingleImage(ExportPath + "/Textures/" + TextureHandler.ShapeImages[i].Shortname + ".png", i);
+             }
+ 
+ 
+@@ -1251,7 +1251,7 @@ namespace SSXLibrary
+                 {
+                     Console.WriteLine("Skybox Textures: " + (i + 1) + "/" + SkyboxHandler.ShapeImages.Count);
+                     SkyboxHandler.BrightenImage(i);
+-                    SkyboxHandler.ExtractSingleImage(ExportPath + "\\Skybox\\Textures\\" + SkyboxHandler.ShapeImages[i].Shortname + ".png", i);
++                    SkyboxHandler.ExtractSingleImage(ExportPath + "/Skybox/Textures/" + SkyboxHandler.ShapeImages[i].Shortname + ".png", i);
+                 }
+             }
+ 
+@@ -1263,7 +1263,7 @@ namespace SSXLibrary
+                 {
+                     Console.WriteLine("Lightmap Textures: " + (i + 1) + "/" + LightmapHandler.ShapeImages.Count);
+                     LightmapHandler.BrightenImage(i);
+-                    LightmapHandler.ExtractSingleImage(ExportPath + "\\Lightmaps\\" + LightmapHandler.ShapeImages[i].Shortname + ".png", i);
++                    LightmapHandler.ExtractSingleImage(ExportPath + "/Lightmaps/" + LightmapHandler.ShapeImages[i].Shortname + ".png", i);
+                 }
+             }
+             else
+@@ -1273,7 +1273,7 @@ namespace SSXLibrary
+                 {
+                     Console.WriteLine("Lightmap Textures: " + (i+1) + "/" + LightmapHandler.ShapeImages.Count);
+                     LightmapHandler.BrightenImage(i);
+-                    LightmapHandler.ExtractSingleImage(ExportPath + "\\Lightmaps\\" + LightmapHandler.ShapeImages[i].Shortname + ".png", i);
++                    LightmapHandler.ExtractSingleImage(ExportPath + "/Lightmaps/" + LightmapHandler.ShapeImages[i].Shortname + ".png", i);
+                 }
+             }
+ 
+@@ -1303,7 +1303,7 @@ namespace SSXLibrary
+             ExportPath = ExportPath.Substring(0, ExportPath.Length - 4);
+ 
+             #region Rebuild PBD
+-            SSXTrickyConfig trickyConfig = SSXTrickyConfig.Load(LoadPath + "/trickyconfig.ssx");
++            SSXTrickyConfig trickyConfig = SSXTrickyConfig.Load(LoadPath + "/ConfigTricky.ssx");
+ 
+             MapHandler mapHandler = new MapHandler();
+ 
+@@ -2225,7 +2225,7 @@ namespace SSXLibrary
+             {
+                 //ErrorManager.ErrorMessage = "Error with Importing Meshes";
+                 Console.WriteLine("Importing Meshes");
+-                pbdHandler.ImportMeshes(LoadPath + "\\Meshes");
++                pbdHandler.ImportMeshes(LoadPath + "/Meshes");
+                 //ErrorManager.ErrorMessage = "Error Generating PDB BBoxes";
+                 Console.WriteLine("Generating PDB BBoxes");
+                 pbdHandler.RegenerateLowestAndHighest();
+@@ -2868,7 +2868,7 @@ namespace SSXLibrary
+                 {
+                     LightmapHandler.Format = "G278";
+ 
+-                    string[] LightmapFiles = Directory.GetFiles(LoadPath + "/Lightmaps", "*.png");
++                    string[] LightmapFiles = Directory.GetFiles(LoadPath + "/Lightmaps", "*.png"); Array.Sort(LightmapFiles, StringComparer.Ordinal);
+                     for (int i = 0; i < LightmapFiles.Length; i++)
+                     {
+                         Console.WriteLine("Lightmap Textures: " +(i+1)+ "/" + LightmapFiles.Length);
