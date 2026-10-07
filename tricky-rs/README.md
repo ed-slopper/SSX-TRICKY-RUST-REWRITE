@@ -144,3 +144,126 @@ The game opens on a menu (Up / Down event, Left / Right rider, Enter start, Esc 
 
 **Rails:** A / D turns the board on the rail. Let go and it settles square (50-50) or sideways (boardslide,
 which pays more); every half turn on the rail adds points, and landing on a rail sideways keeps the board sideways.
+
+**More from the original's rules:** land a half spin and you ride away switch (tail first) instead of being
+turned round; landing crooked or tilted costs up to a quarter of your speed; letting go of a flip levels you to
+the nearest upright (so hold it past half way); hitting a wall at over 70 km/h is a wipe-out; F shoves a rival
+alongside you over, for boost. While crouched for a jump the display shows what you are winding up.
+
+## Riders, tricks and scoring from the original
+
+Read out of the game's executable:
+
+- **Rider stats.** Each of the twelve riders has the game's own edging, speed, stability and tricks numbers,
+  jump and wind-up strength, weight and board type; they feed the same formulas the game uses (drag, braking,
+  spin and flip speed, jump height, how crooked a landing can be, how fast the meter fills). In the menu, L
+  switches between **rookie** (as a new game starts) and **master** (fully trained, best board).
+- **Tricks.** The four grab keys J, L, U, O stand for L1, R1, L2, R2. Alone and together they give each rider's
+  own fifteen grabs. K (or Shift) while holding a grab tweaks it for double points, and when uber tricks are
+  available it starts that grab's uber trick instead (only the first four or five grabs have one).
+- **Uber tricks** become available for 20 seconds each time the meter fills. Six landed spell TRICKY.
+- **Points.** 475 per half spin, 1,700 per flip, 288 for the first grab of a jump (more for each further
+  different one), 305 a second for holding it times the grab's rate (1 to 2.5), ubers at 18 to 20 times that
+  rate, rails about 1,000 a second plus 1,220 for getting on and 1,360 for tricking off. A trick repeated among
+  your last five pays a half, then a third. 10,000 points fill the meter; a wipe-out takes a tenth of it.
+- **Snow types.** The course's own surface types now use the game's table (grip, drag, gravity), so ice,
+  powder and the groomed runs ride differently.
+
+The show-off medal scores (150,000 / 80,000 / 40,000) are still mine.
+
+## Sound and snow
+
+**Sound** comes from the game's own files, decoded into an `audio` folder next to `levels` (it is not part of
+this repository; it is made from your disc). With the folder missing the game is simply silent. M turns the
+music off and on, N the effects.
+
+- `ride.wav`, `air.wav`, `land.wav`, `jump.wav`, `grind.wav`, `rail_on.wav` from `zboard.bnk` (the board bank:
+  streams 4, 1, 2, 3, 54, 53), `boost.wav`, `crash.wav`, `glass.wav`, `menu_move.wav`, `menu_ok.wav`,
+  `pickup.wav` from `zBxsfx.bnk` (streams 5, 8, 25, 10, 11, 23), `crowd.wav` from `Crowd.bnk`, `tricky.wav`
+  from `tricky.bnk`, all inside `DATA/AUDIO/AUDIO.BIG`. The banks carry no names, so which stream is which
+  sound was picked by length, looping and tone, not read from the game: some may be the wrong sound.
+- `music.ogg` is "Smartbomb" (one of Garibaldi's three songs): the 317 one-bar pieces of `smartbomb.mus` in
+  `DATA/AUDIO/MUSIC.BIG`, in file order. The game stitches the bars together as you ride; this is one fixed
+  nine-minute pass through them.
+- Decoded with vgmstream (`vgmstream-cli -i -s <stream> -o out.wav file.bnk`), music joined with ffmpeg.
+
+The ride sound follows speed and how hard you carve or brake; the air, rail and boost loops fade in and out.
+
+**Snow spray** comes off the board's digging edge when carving, forward when braking, and in a ring on landing.
+
+**Rails, as the game animates them:** A / D turns the board a quarter turn at a time (regular, sideways,
+tail-first), and the body uses the game's own frontside and backside rail stances. Grinds are named as in the
+game: 50/50 Rail, BS Rail, FS Rail, Switch 50/50 Rail.
+
+**More of the game's animation clips** are in use: leaning into the wind-up while crouched, tucking into a spin
+or flip before its cycle, the tweak of each grab, a shove (F), and standing up over the finish line.
+
+**Rivals shove back.** In a race, a rival who has been alongside you for a moment gives you a shove; the heavier
+and steadier rider stays up (the game's own weight and stability numbers decide), so shove first (F) or keep
+clear. They do it more often in the later heats.
+
+Wipe-outs and landings now pick from the game's set of clips: falling forwards, backwards or to either side with
+the matching get-up, and a recovery wobble after a crooked or tilted landing. With `music2.ogg` and `music3.ogg`
+in the `audio` folder (Garibaldi's other two songs, `systemover` and `adamsrev` on the disc, made the same way
+as `music.ogg`) each new run moves on to the next song.
+
+**Tracks and their music.** `[` and `]` change track, in the menu too. Each track plays the songs `DATA/CONFIG/MUSICMAP.INF`
+lists for it, kept once each as `audio/music/<name on the disc>.ogg` (all nineteen are decoded: `smartbomb`,
+`systemover`, `adamsrev`, `ginandsin`, ...). `go.wav` (stream 39 of
+`zBxsfx.bnk`) plays on GO; `menu_ok.wav` is the countdown beep.
+
+**Out of bounds.** The course's invisible reset zones (`ResetZone`, `..._Reset_...`, `CrowdTrap` objects) are no
+longer walls: touching one puts you back at your last good spot, as the game does, with `reset.wav`. Trigger and
+emitter objects (fireworks triggers and so on) are not solid any more; one of them was blocking Snowdream's gate.
+
+**Sound files as now used** (in `audio/`): `ride`, `air`, `grind`, `slide` (loops; `slide` plays while braking),
+`land`, `jump`, `rail_on`, `boost` (once, when a boost starts), `levelup` (the boost meter passing a third, two
+thirds, full), `reset`, `countdown` (3, 2, 1; GO is the same beep an octave up until a `go.wav` exists),
+`pickup`, `tricky`, `menu_move`, `crowd`, and optional `crash.wav`, `glass.wav`, `go.wav`. `audio/unlabeled/`
+holds every distinct sound of the board, effects, Garibaldi, crowd and TRICKY banks, numbered, for identifying.
+
+**Best results** (best time, best score, race and show-off medals per track) are kept in `tricky-save.json` next
+to the program and shown in the menu.
+
+**Opponents** now aim further ahead the faster they go, brake for bends they cannot make, and rejoin on the
+racing line after an out-of-bounds reset.
+
+**Pause.** Esc during a run pauses it (Resume / Restart / Quit to menu) instead of dropping straight to the menu.
+Letting go of a grab now drops it at once.
+
+## Track editor (first version)
+
+In the free camera (Tab), F4 turns the editor on. A small white cross marks where the centre of the view meets
+the world.
+
+| | |
+|---|---|
+| Pick the object nearest the cross | F |
+| Move it to the cross | T |
+| Slide it / raise and lower it (Shift = faster) | arrow keys / Y and H |
+| Turn it (a twelfth of a turn) | Z, X |
+| Smaller / bigger | , and . |
+| Copy it to the cross | C |
+| Remove it | Delete |
+| Save and reload the track | Enter |
+
+Saving rewrites the level project's `Instances.json` (the first save keeps the original beside it as
+`Instances.json.bak`; put that back to undo everything) and reloads the track, so Tab takes you straight back to
+riding the changed course. Objects only so far: the snow itself (`Patches.json`), rails and the racing line are
+not editable yet. Picking goes by each object's origin, so aim at the base of a tree or sign, not its top.
+`tools/ssxlevel build` turns the same project folder back into a `.BIG` for the real game.
+
+## Boards
+
+Every rider's twelve boards are in, with their real names, graphics, shapes and stat bonuses. In the menu, Up /
+Down picks a row (Event, Rider, Board, Track, Training) and Left / Right changes it. The board row shows the
+board's name and kind; the stats line under it changes with the board (the game mixes 80% rider with 20% board).
+
+- **Shapes:** BX, freestyle and alpine boards are three different models (2.0 m, 1.7 m and 2.6 m long), from
+  `board.mpf` in `DATA/CHAR/BRDPS2.BIG`: `chars/board_bx.json`, `board_fr.json`, `board_al.json` (and the goofy
+  versions, exported but not used yet).
+- **Graphics:** `chars/<rider>/bord1.png` to `bord12.png`, from `<rider>N_bord.ssh` in `TEXPS2.BIG`.
+- **Names, kinds and bonuses** come from the board table in the executable (0x332148) and are in
+  `src/trickdata.rs`. Alpine boards also use the game's lower-drag, stronger-push formulas.
+- All twelve are available from the start (the game unlocks them as you earn experience). Rivals ride their first
+  board as rookies and their UBERBOARD as masters.

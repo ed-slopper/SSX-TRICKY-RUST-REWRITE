@@ -2,17 +2,6 @@
 
 Target: `SLUS_203.26` from `SSX Tricky (USA).iso` (ELF md5 `162580fd65611e72a90deed640a70aef`, PCSX2 CRC `8E7CFF62`).
 
-https://www.youtube.com/watch?v=6AbWU6bvBGU
-
-reverse engineer ssx tricky ps2
-
-here is some old stuff from 3 years ago ppl doing manual decompiling and modding of ssx tricky, it is only partially working
-D:\Games\games\ps2\ssx modding
-
-i put the ssx tricky rom in the root of this project: D:\code\modding\ssx-tricky\SSX Tricky (USA).iso
-
-get something basic working for me to try out
-
 ## Try it
 
 **Option A - patched ISO (any emulator, no settings needed)**
@@ -62,3 +51,11 @@ python tools/ssxpatch.py verify "build/<name>.iso"
 3. File > Open Project > `ghidra/project/ssxtricky.gpr`.
 
 To rebuild from scratch: import `SLUS_203.26` (language `r5900:LE:32:default`), auto-analyze, then run `ApplySsxSymbols.java` with `ghidra/symbols.txt`.
+
+## Legal
+
+Unofficial fan project, not affiliated with or endorsed by Electronic Arts. "SSX" and "SSX Tricky" are
+trademarks of Electronic Arts Inc. This repository contains no game code, models, textures, animations, music
+or sound: you need your own copy of SSX Tricky (PS2, USA, SLUS-20326) and the tools here extract what the
+programs need from your disc. Some numbers and names in the source (rider and board stats, trick names, physics
+constants) were read from the game's executable so that the rewrite behaves like the original.

@@ -7,7 +7,7 @@ edition = "2021"
 bevy = { version = "0.16.1", default-features = false, features = [
     "bevy_asset", "bevy_color", "bevy_core_pipeline", "bevy_pbr", "bevy_render",
     "bevy_winit", "bevy_window", "bevy_gizmos", "bevy_text", "bevy_ui", "default_font",
-    "multi_threaded", "std", "x11", "bevy_gilrs",
+    "multi_threaded", "std", "x11", "bevy_gilrs", "bevy_audio", "vorbis", "wav",
 ] }
 image = { version = "0.25", default-features = false, features = ["png"] }
 serde = { version = "1", features = ["derive"] }

@@ -12,7 +12,11 @@ mod character;
 mod collide;
 mod level;
 mod props;
+mod trickdata;
 mod ui;
+mod sound;
+mod spray;
+mod editor;
 mod rails;
 mod rider;
 
@@ -120,16 +124,20 @@ fn standings(race: &Race, opponents: &[Opponent], lib: &CharLib, me: &str) -> Ve
 #[derive(Clone, Copy, PartialEq, Debug)]
 enum Who { Player, Ai(usize) }
 /// One character: model plus a material per texture.
-struct CharEntry { name: String, model: CharModel, mats: HashMap<String, Handle<StandardMaterial>>, ubers: Option<AnimSet> }
+struct CharEntry { name: String, model: CharModel, mats: HashMap<String, Handle<StandardMaterial>>, ubers: Option<AnimSet>,
+    /// the twelve board graphics, and this rider's row in the game's tables
+    boards: Vec<Handle<StandardMaterial>>, data: usize }
 /// Every character found in the `chars` folder, and the board they all share.
 #[derive(Resource, Default)]
-struct CharLib { chars: Vec<CharEntry>, board: Option<CharModel>, player: usize, anims: Option<AnimSet> }
+struct CharLib { chars: Vec<CharEntry>, board: Option<CharModel>,
+    /// board shapes: BX, freestyle, alpine, each regular then goofy
+    shapes: Vec<Option<CharModel>>, player: usize, anims: Option<AnimSet> }
 /// Root of a rider's body. Holds the smoothed pose so it moves fluidly.
 #[derive(Component)]
-struct RiderVisual { who: Who, character: usize, pose: Pose, roll: f32, base: Quat, anim: AnimState }
+struct RiderVisual { who: Who, character: usize, board: usize, shape: usize, pose: Pose, roll: f32, base: Quat, anim: AnimState }
 /// Where a rider's body is in its animations.
 #[derive(Default)]
-struct AnimState { cur: Option<Sample>, cycle: f32, was_on_snow: bool, land: f32, air: f32, grab: u8, grab_frame: f32 }
+struct AnimState { cur: Option<Sample>, cycle: f32, was_on_snow: bool, land: f32, air: f32, grab: u8, grab_frame: f32, rot: f32, tweak: f32, done: f32 }
 /// One textured piece of a body, re-skinned every frame.
 #[derive(Component)]
 struct BodyPart { part: usize, board: bool }
@@ -245,6 +253,26 @@ fn main() {
         }
         return;
     }
+    if std::env::var("TRICKY_GATETEST").is_ok() {
+        // line six riders up as a race does and see who gets away
+        let mut field = make_opponents(loaded.start, loaded.yaw, 0, 12, 5, 0);
+        field.0.push(Opponent { rider: Rider::new(loaded.start + Vec3::Y * 0.5, loaded.yaw), driver: AiDriver::new(0.0, 0.9), character: 0 });
+        println!("start {:.1?} yaw {:.2} line[0] {:.1?} line[1] {:.1?}", loaded.start, loaded.yaw, loaded.line[0], loaded.line[1]);
+        let from: Vec<Vec3> = field.0.iter().map(|o| o.rider.pos).collect();
+        let (mut t, dt) = (0.0f32, 1.0 / 120.0);
+        while t < 8.0 {
+            for o in field.0.iter_mut() {
+                let input = o.driver.drive(&mut o.rider, &loaded.line, 0.0, dt);
+                o.rider.step(&loaded.world, &loaded.rails, input, dt);
+            }
+            t += dt;
+        }
+        for (o, f) in field.0.iter().zip(&from) {
+            println!("lane {:5.1}: went {:5.1} m, now at {:.1?}, speed {:.1}, grounded {}", o.driver.offset, (o.rider.pos - *f).length(), o.rider.pos, o.rider.vel.length(), o.rider.grounded);
+            if (o.rider.pos - *f).length() < 20.0 { loaded.world.explain(o.rider.pos + Vec3::Y * 0.8, 0.6); }
+        }
+        return;
+    }
     if let Ok(secs) = std::env::var("TRICKY_SIM") {
         rider::self_test(&loaded.world, &loaded.rails, &loaded.line, loaded.yaw, secs.parse().unwrap_or(300.0));
         return;
@@ -274,6 +302,9 @@ fn main() {
     .insert_resource(RaceRes(Race::new(line)))
     .insert_resource(LevelList { dirs, current })
     .init_resource::<CamRes>()
+    .init_resource::<editor::Editor>()
+    .init_resource::<editor::Reload>()
+    .insert_resource(ui::Records::load())
     .insert_resource(match std::env::var("TRICKY_SCREEN").as_deref() {
         Ok("play") => ui::Game { screen: ui::Screen::Playing, ..default() },
         Ok("free") => ui::Game { screen: ui::Screen::Playing, event: ui::Event::FreeRide, ..default() },
@@ -281,13 +312,13 @@ fn main() {
         _ => ui::Game::default(),
     })
     .init_resource::<SmoothDt>()
-    .add_systems(Startup, (setup, ui::setup_ui))
+    .add_systems(Startup, (setup, ui::setup_ui, sound::setup_sound, spray::setup_spray, editor::setup_editor))
     .add_systems(Update, (
         smooth_dt,
         ui::menus,
         (ride, rider_model, sync_visuals, animate_visuals, chase_camera).chain().run_if(|m: Res<Mode>| *m == Mode::Ride),
         fly_camera.run_if(|m: Res<Mode>| *m == Mode::Fly),
-        (switch_level, move_props, sky_follow, draw_rails, toggles, ui::hud, screenshot),
+        (switch_level, move_props, sky_follow, draw_rails, toggles, ui::records, ui::hud, sound::course_music, sound::sound, spray::spray, editor::editor, screenshot),
     ).chain());
     if let Ok(path) = std::env::var("TRICKY_SHOT") {
         app.insert_resource(Shot { path, frame: 0 });
@@ -456,9 +487,9 @@ fn setup(
     });
     }
     commands.spawn((
-        Text::new("A/D steer   W crouch   S brake   Space (hold, release) jump   Shift boost   on a rail: A/D turn the board\nHold A/D or Q/E while crouched on Space to wind up; in the air: A/D spin   Q/E flip   J K L grabs   U uber trick (full meter)\nEnter restart   Esc menu   Backspace unstick   [ ] track   Tab free camera   R rails   F2 smooth edges   F1 hide this"),
+        Text::new("A/D steer   W crouch   S brake   Shift boost\nSpace: hold to crouch, release to jump\nwind up: hold A/D or Q/E while crouched\nair: A/D spin   Q/E flip   J L U O grabs   K tweak / uber\nrail: A/D turn the board   F shove a rival\nEnter restart   Esc menu   Backspace unstick\nM music   N sound   Tab free camera   F1 hide this"),
         TextFont { font_size: 13.0, ..default() },
-        Node { position_type: PositionType::Absolute, bottom: Val::Px(22.0), left: Val::Px(10.0), ..default() },
+        Node { position_type: PositionType::Absolute, top: Val::Px(8.0), left: Val::Px(10.0), ..default() },
         HelpText,
     ));
 }
@@ -578,11 +609,13 @@ fn switch_level(
     mut commands: Commands, keys: Res<ButtonInput<KeyCode>>, mut list: ResMut<LevelList>,
     old: Query<Entity, With<LevelEntity>>,
     mut meshes: ResMut<Assets<Mesh>>, mut images: ResMut<Assets<Image>>, mut materials: ResMut<Assets<StandardMaterial>>,
-    mut cam: ResMut<CamRes>, lib: Res<CharLib>,
+    mut cam: ResMut<CamRes>, lib: Res<CharLib>, mut game: ResMut<ui::Game>, mut reload: ResMut<editor::Reload>,
 ) {
     let step = (keys.just_pressed(KeyCode::BracketRight) || keys.just_pressed(KeyCode::PageDown)) as i32
-        - (keys.just_pressed(KeyCode::BracketLeft) || keys.just_pressed(KeyCode::PageUp)) as i32;
-    if step == 0 || list.dirs.len() < 2 { return; }
+        - (keys.just_pressed(KeyCode::BracketLeft) || keys.just_pressed(KeyCode::PageUp)) as i32 + std::mem::take(&mut game.track_step);
+    // the editor asks for the same track again after saving
+    let again = std::mem::take(&mut reload.0);
+    if !again && (step == 0 || list.dirs.len() < 2) { return; }
     let n = list.dirs.len() as i32;
     let next = ((list.current as i32 + step) % n + n) % n;
     let loaded = match open_level(&list.dirs[next as usize]) {
@@ -599,6 +632,7 @@ fn switch_level(
     commands.insert_resource(RaceRes(Race::new(loaded.line)));
     commands.insert_resource(LevelRes(loaded.level));
     cam.0 = ChaseCam::default();
+    game.lineup = true;
 }
 
 fn spawn_terrain(
@@ -863,7 +897,7 @@ fn build_collision(level: &Level) -> CollisionWorld {
             for i in 0..n {
                 let a = j * row + i;
                 for t in [[a, a + row, a + 1], [a + 1, a + row, a + row + 1]] {
-                    world.add([grid[t[0]].0, grid[t[1]].0, grid[t[2]].0], Some([grid[t[0]].1, grid[t[1]].1, grid[t[2]].1]), true);
+                    world.add([grid[t[0]].0, grid[t[1]].0, grid[t[2]].0], Some([grid[t[0]].1, grid[t[1]].1, grid[t[2]].1]), true, p.surface_type.clamp(0, 19) as u8);
                 }
             }
         }
@@ -872,16 +906,32 @@ fn build_collision(level: &Level) -> CollisionWorld {
     // bags, signs, snow cats) collides with the mesh that is drawn. Mode 2 (stands, billboards,
     // pickups) is a bounding-box test in the game and is not solid here yet. Water is not solid.
     let mut cache: HashMap<String, ObjMesh> = HashMap::new();
+    let who = std::env::var("TRICKY_WHO").ok().map(|v| v.split(',').filter_map(|x| x.parse::<f32>().ok()).collect::<Vec<_>>()).filter(|v| v.len() == 3).map(|v| Vec3::new(v[0], v[1], v[2]));
     for (index, inst) in level.instances.iter().enumerate() {
         // the start gate's cover is the barrier that holds riders until "GO"; we start with it open
-        if !inst.player_collision || inst.instance_name.contains("StartGate") || level.is_dynamic(index) { continue; }
+        // triggers and emitters are not obstacles; reset zones put the rider back instead of stopping him
+        let name = inst.instance_name.to_lowercase();
+        if !inst.player_collision || name.contains("startgate") || name.contains("trigger") || name.contains("emitter") || level.is_dynamic(index) { continue; }
         let inst_m = Mat4::from_scale_rotation_translation(inst.scale.into(), quat4(inst.rotation), inst.location.into());
+        if name.contains("resetzone") || name.contains("_reset_") || name.contains("crowdtrap") {
+            for path in inst.collsion_model_paths.iter().flatten() {
+                let key = level.dir.join("Collision").join(path);
+                let mesh = cache.entry(key.to_string_lossy().to_string()).or_insert_with(|| load_obj(&key));
+                for t in mesh.positions.chunks_exact(3) {
+                    let v = |i: usize| g2b(inst_m.transform_point3(Vec3::from(t[i])));
+                    world.add_reset([v(0), v(1), v(2)]);
+                }
+            }
+            continue;
+        }
+        let mut bounds = (Vec3::MAX, Vec3::MIN);
         let mut add = |world: &mut CollisionWorld, path: PathBuf, m: Mat4| {
             let key = path.to_string_lossy().to_string();
             let mesh = cache.entry(key).or_insert_with(|| load_obj(&path));
             for t in mesh.positions.chunks_exact(3) {
                 let v = |i: usize| g2b(m.transform_point3(Vec3::from(t[i])));
-                world.add([v(0), v(1), v(2)], None, false);
+                for k in 0..3 { bounds.0 = bounds.0.min(v(k)); bounds.1 = bounds.1.max(v(k)); }
+                world.add([v(0), v(1), v(2)], None, false, 6);
             }
         };
         match inst.collsion_mode {
@@ -898,6 +948,8 @@ fn build_collision(level: &Level) -> CollisionWorld {
             }
             _ => {}
         }
+        // TRICKY_WHO=x,y,z names every solid object whose box contains that point
+        if let Some(p) = who { if p.cmpge(bounds.0 - 0.6).all() && p.cmple(bounds.1 + 0.6).all() { println!("solid here: {} (mode {}, model {}) box {:?} .. {:?}", inst.instance_name, inst.collsion_mode, inst.model_id, bounds.0, bounds.1); } }
     }
     world
 }
@@ -917,9 +969,10 @@ fn ride(
         brake: down,
         jump: keys.pressed(KeyCode::Space),
         flip: keys.pressed(KeyCode::KeyE) as i32 as f32 - keys.pressed(KeyCode::KeyQ) as i32 as f32,
-        grab: if keys.pressed(KeyCode::KeyJ) { 1 } else if keys.pressed(KeyCode::KeyK) { 2 } else if keys.pressed(KeyCode::KeyL) { 3 } else { 0 },
+        // the four shoulder buttons: J = L1, L = R1, U = L2, O = R2
+        grab: keys.pressed(KeyCode::KeyJ) as u8 | (keys.pressed(KeyCode::KeyL) as u8) << 1 | (keys.pressed(KeyCode::KeyU) as u8) << 2 | (keys.pressed(KeyCode::KeyO) as u8) << 3,
+        tweak: keys.pressed(KeyCode::KeyK) || key(KeyCode::ShiftLeft, KeyCode::ShiftRight),
         boost: key(KeyCode::ShiftLeft, KeyCode::ShiftRight),
-        uber: keys.pressed(KeyCode::KeyU),
     };
     let playing = game.screen == ui::Screen::Playing;
     let mut restart = keys.just_pressed(KeyCode::Enter) && playing && game.since > 0.3;
@@ -935,10 +988,9 @@ fn ride(
         if ry.abs() > 0.5 { input.flip = ry.signum(); }
         input.jump |= pad.pressed(GamepadButton::South);
         input.boost |= pad.pressed(GamepadButton::West);
-        input.uber |= pad.pressed(GamepadButton::North);
-        if pad.pressed(GamepadButton::LeftTrigger) || pad.pressed(GamepadButton::LeftTrigger2) { input.grab = 1; }
-        if pad.pressed(GamepadButton::RightTrigger) || pad.pressed(GamepadButton::RightTrigger2) { input.grab = 2; }
-        if pad.pressed(GamepadButton::East) { input.grab = 3; }
+        input.tweak |= pad.pressed(GamepadButton::West);
+        input.grab |= pad.pressed(GamepadButton::LeftTrigger) as u8 | (pad.pressed(GamepadButton::RightTrigger) as u8) << 1
+            | (pad.pressed(GamepadButton::LeftTrigger2) as u8) << 2 | (pad.pressed(GamepadButton::RightTrigger2) as u8) << 3;
         restart |= pad.just_pressed(GamepadButton::Start) && playing && game.since > 0.3;
         unstick |= pad.just_pressed(GamepadButton::Select);
     }
@@ -958,11 +1010,47 @@ fn ride(
         for p in props.0.iter_mut() { p.reset(); }
     }
     if unstick { let at = r.safe; r.respawn(at); }
+    // F: shove whoever is alongside. Knocking a rival down is worth boost, as in the original.
+    let shove = keys.just_pressed(KeyCode::KeyF) || pads.iter().any(|p| p.just_pressed(GamepadButton::RightThumb) || p.just_pressed(GamepadButton::LeftThumb));
+    if shove && playing && r.crashed <= 0.0 && race.0.state == RaceState::Running {
+        let mut hit = false;
+        r.shove = 0.7;
+        let right = Vec3::new(r.yaw.cos(), 0.0, -r.yaw.sin());
+        let nearest = opponents.0.iter().map(|o| o.rider.pos - r.pos).min_by(|a, b| a.length().total_cmp(&b.length()));
+        r.shove_side = nearest.map_or(1.0, |d| if d.dot(right) >= 0.0 { 1.0 } else { -1.0 });
+        for o in opponents.0.iter_mut() {
+            let d = o.rider.pos - r.pos;
+            if d.length() < 2.2 && o.rider.crashed <= 0.0 {
+                o.rider.knock_down(Vec3::new(d.x, 0.0, d.z).normalize_or_zero() * 4.0);
+                hit = true;
+            }
+        }
+        if hit {
+            // a knockdown fills the meter, as in the original
+            r.add_meter(1.0);
+            r.last_trick = "Knockdown!".into();
+            r.trick_timer = 2.5;
+        }
+    }
     // the player's signature moves come with the character
     if let Some(list) = lib.chars.get(lib.player).and_then(|c| c.ubers.as_ref()).map(|u| u.list()) {
         if r.ubers.len() != list.len() || r.ubers.first().map(|u| &u.0) != list.first().map(|u| &u.0) { r.ubers = list; r.uber_id = 0; }
     }
+    // each rider's own attributes and trick set, from the game's tables
+    let data_of = |c: usize| lib.chars.get(c).and_then(|e| trickdata::RIDERS.iter().find(|d| d.name.eq_ignore_ascii_case(&e.name))).unwrap_or(&trickdata::RIDERS[0]);
+    let mine = data_of(lib.player);
+    r.data = mine;
+    let row_of = |d: &trickdata::RiderData| trickdata::RIDERS.iter().position(|x| std::ptr::eq(x, d)).unwrap_or(0);
+    r.stats = rider::Stats::of(mine, game.master, &trickdata::BOARDS[row_of(mine)][game.board.min(11)]);
+    for o in opponents.0.iter_mut() {
+        let d = data_of(o.character);
+        o.rider.data = d;
+        // rivals ride their first board as rookies and the best one as masters
+        o.rider.stats = rider::Stats::of(d, game.master, &trickdata::BOARDS[row_of(d)][if game.master { 11 } else { 0 }]);
+    }
     if game.screen == ui::Screen::Menu { race.0.restart(); }
+    // paused: nothing moves
+    if game.screen == ui::Screen::Paused { return; }
     let waiting = race.0.state == RaceState::Countdown;
     if waiting { input = Input::default(); }
     if game.screen == ui::Screen::Results { input = Input { brake: true, ..Input::default() }; }
@@ -976,6 +1064,7 @@ fn ride(
         for o in opponents.0.iter_mut() {
             let ai = if waiting { Input::default() } else { {
                 let clear = if o.rider.grounded { 0.0 } else { world.0.ground(o.rider.pos, 0.0, 40.0).map_or(40.0, |h| o.rider.pos.y - h.y) };
+                o.driver.learn(&world.0, &race.0.line);
                 o.driver.drive(&mut o.rider, &race.0.line, clear, dt)
             } };
             o.rider.step(&world.0, &rails.0, ai, dt);
@@ -984,6 +1073,21 @@ fn ride(
         if !waiting {
             // riders shove each other, and anyone can send a marker or crash bag flying
             for i in 0..opponents.0.len() {
+                // a rival who has been alongside for a moment shoves; the heavier rider stays up
+                let o = &mut opponents.0[i];
+                o.driver.shove_wait -= dt;
+                let gap = r.pos - o.rider.pos;
+                let close = gap.length() < 1.7 && r.grounded && o.rider.grounded && r.crashed <= 0.0 && o.rider.crashed <= 0.0 && race.0.time > 6.0;
+                o.driver.beside = if close { o.driver.beside + dt } else { 0.0 };
+                if o.driver.beside > 0.7 && o.driver.shove_wait <= 0.0 && game.event == ui::Event::Race {
+                    o.driver.shove_wait = 9.0 - game.round as f32 * 2.0;
+                    o.rider.shove = 0.7;
+                    let right = Vec3::new(o.rider.yaw.cos(), 0.0, -o.rider.yaw.sin());
+                    o.rider.shove_side = if gap.dot(right) >= 0.0 { 1.0 } else { -1.0 };
+                    let push = Vec3::new(gap.x, 0.0, gap.z).normalize_or_zero();
+                    if o.rider.stats.mass() * 1.15 >= r.stats.mass() && r.shove <= 0.0 { r.knock_down(push * 4.0); r.last_trick = "Shoved!".into(); r.trick_timer = 2.0; }
+                    else { r.vel += push * 3.0; }
+                }
                 props::bump(r, &mut opponents.0[i].rider);
                 let (head, tail) = opponents.0.split_at_mut(i + 1);
                 for other in tail { props::bump(&mut head[i].rider, &mut other.rider); }
@@ -1020,7 +1124,9 @@ fn ride(
         r.grab = v.first().copied().unwrap_or(0.0) as u8;
         r.flip = v.get(1).copied().unwrap_or(0.0);
         r.crashed = v.get(2).copied().unwrap_or(0.0);
-        if let Some(u) = v.get(3) { r.uber = *u; r.uber_id = 1; }
+        if let Some(u) = v.get(3) { if *u > 0.0 { r.uber = *u; r.uber_id = 0; } }
+        if let Some(sp) = v.get(5) { r.spin = *sp; }
+        if let Some(t) = v.get(4).filter(|t| **t > -900.0) { r.rail = Some((0, 3.0, 0.0)); r.rail_twist = t.to_radians(); r.yaw = r.spawn.1 - r.rail_twist; r.normal = Vec3::Y; }
         race.0.state = RaceState::Running;
         race.0.time = 10.0;
     }
@@ -1028,19 +1134,20 @@ fn ride(
 
 /// Keep exactly one body per rider, of the right character.
 fn sync_visuals(
-    mut commands: Commands, lib: Res<CharLib>, opponents: Res<Opponents>,
+    mut commands: Commands, lib: Res<CharLib>, opponents: Res<Opponents>, game: Res<ui::Game>,
     existing: Query<(Entity, &RiderVisual)>, mut meshes: ResMut<Assets<Mesh>>,
 ) {
     if lib.chars.is_empty() { return; }
-    let mut want: Vec<(Who, usize)> = vec![(Who::Player, lib.player)];
-    want.extend(opponents.0.iter().enumerate().map(|(i, o)| (Who::Ai(i), o.character)));
-    let mut have: Vec<(Who, usize)> = existing.iter().map(|(_, v)| (v.who, v.character)).collect();
-    let key = |w: &(Who, usize)| (match w.0 { Who::Player => 0, Who::Ai(i) => i + 1 }, w.1);
+    // (who, which rider, which of that rider's boards)
+    let mut want: Vec<(Who, usize, usize)> = vec![(Who::Player, lib.player, game.board.min(11))];
+    want.extend(opponents.0.iter().enumerate().map(|(i, o)| (Who::Ai(i), o.character, if game.master { 11 } else { 0 })));
+    let mut have: Vec<(Who, usize, usize)> = existing.iter().map(|(_, v)| (v.who, v.character, v.board)).collect();
+    let key = |w: &(Who, usize, usize)| (match w.0 { Who::Player => 0, Who::Ai(i) => i + 1 }, w.1, w.2);
     want.sort_by_key(key);
     have.sort_by_key(key);
     if want == have { return; }
     for (e, _) in &existing { commands.entity(e).despawn(); }
-    for (who, character) in want { spawn_visual(&mut commands, who, character, &lib, &mut meshes); }
+    for (who, character, board) in want { spawn_visual(&mut commands, who, character, board, &lib, &mut meshes); }
 }
 
 fn load_chars(level_dir: &Path, images: &mut Assets<Image>, materials: &mut Assets<StandardMaterial>) -> CharLib {
@@ -1048,6 +1155,7 @@ fn load_chars(level_dir: &Path, images: &mut Assets<Image>, materials: &mut Asse
     let Some(dir) = [level_dir.join("../../chars"), exe.join("../chars"), exe.join("chars"), PathBuf::from("chars")]
         .into_iter().find(|d| d.join("board.json").exists() || d.join("mac/model.json").exists()) else { return CharLib::default() };
     let mut lib = CharLib { board: CharModel::load(&dir.join("board.json")).ok(), ..default() };
+    lib.shapes = ["bx", "bx_goofy", "fr", "fr_goofy", "al", "al_goofy"].iter().map(|n| CharModel::load(&dir.join(format!("board_{n}.json"))).ok()).collect();
     let mut dirs: Vec<PathBuf> = std::fs::read_dir(&dir).into_iter().flatten().flatten().map(|e| e.path())
         .filter(|p| p.join("model.json").exists()).collect();
     dirs.sort();
@@ -1062,7 +1170,14 @@ fn load_chars(level_dir: &Path, images: &mut Assets<Image>, materials: &mut Asse
             }));
         }
         let ubers = AnimSet::load(&d.join("uber.json")).ok().filter(|a| a.len() > 0);
-        lib.chars.push(CharEntry { name: d.file_name().unwrap().to_string_lossy().to_string(), model, mats, ubers });
+        let name = d.file_name().unwrap().to_string_lossy().to_string();
+        // bord1.png .. bord12.png, the rider's twelve boards (the plain bord.png if they are missing)
+        let boards = (1..=12).map(|n| match image::open(d.join(format!("bord{n}.png"))) {
+            Ok(i) => materials.add(StandardMaterial { base_color_texture: Some(images.add(make_image(i.to_rgba8(), true))), unlit: true, cull_mode: None, double_sided: true, ..default() }),
+            Err(_) => mats.get("bord").cloned().unwrap_or_default(),
+        }).collect();
+        let data = trickdata::RIDERS.iter().position(|r| r.name.eq_ignore_ascii_case(&name)).unwrap_or(0);
+        lib.chars.push(CharEntry { name, model, mats, ubers, boards, data });
     }
     lib.player = lib.chars.iter().position(|c| c.name == "mac").unwrap_or(0);
     lib.anims = AnimSet::load(&dir.join("anims/bx.json")).ok().filter(|a| a.len() > 0);
@@ -1071,9 +1186,14 @@ fn load_chars(level_dir: &Path, images: &mut Assets<Image>, materials: &mut Asse
     lib
 }
 
-fn spawn_visual(commands: &mut Commands, who: Who, character: usize, lib: &CharLib, meshes: &mut Assets<Mesh>) -> Entity {
+fn spawn_visual(commands: &mut Commands, who: Who, character: usize, board: usize, lib: &CharLib, meshes: &mut Assets<Mesh>) -> Entity {
     let entry = &lib.chars[character];
-    let mut root = commands.spawn((Name::new(format!("Rider {}", entry.name)), RiderVisual { who, character, pose: Pose::default(), roll: 0.0, base: Quat::IDENTITY, anim: AnimState::default() },
+    // the board's shape goes with its kind (and the rider's stance), its graphic with its number
+    let info = &trickdata::BOARDS[entry.data][board.min(11)];
+    // (the goofy shapes are not used: the riding animations here are not mirrored for goofy riders)
+    let shape = (info.kind as usize).min(2) * 2;
+    let board_model = lib.shapes.get(shape).and_then(|s| s.as_ref()).or(lib.board.as_ref());
+    let mut root = commands.spawn((Name::new(format!("Rider {}", entry.name)), RiderVisual { who, character, board, shape, pose: Pose::default(), roll: 0.0, base: Quat::IDENTITY, anim: AnimState::default() },
         Transform::default(), Visibility::default()));
     if who == Who::Player { root.insert(RiderModel); }
     root.with_children(|p| {
@@ -1089,8 +1209,8 @@ fn spawn_visual(commands: &mut Commands, who: Who, character: usize, lib: &CharL
             }
         };
         for (i, part) in entry.model.parts.iter().enumerate() { piece(&part.verts, entry.mats.get(&part.texture), i, false); }
-        if let Some(board) = &lib.board {
-            for (i, part) in board.parts.iter().enumerate() { piece(&part.verts, entry.mats.get("bord"), i, true); }
+        if let Some(model) = board_model {
+            for (i, part) in model.parts.iter().enumerate() { piece(&part.verts, entry.boards.get(board).or(entry.mats.get("bord")), i, true); }
         }
     });
     root.id()
@@ -1098,11 +1218,13 @@ fn spawn_visual(commands: &mut Commands, who: Who, character: usize, lib: &CharL
 
 /// Move every rider's body to its rider, pose it, and re-skin the meshes.
 fn animate_visuals(
-    time: Res<SmoothDt>, rider: Res<RiderRes>, opponents: Res<Opponents>, lib: Res<CharLib>, race: Res<RaceRes>,
+    time: Res<SmoothDt>, rider: Res<RiderRes>, opponents: Res<Opponents>, lib: Res<CharLib>, race: Res<RaceRes>, game: Res<ui::Game>,
     mut roots: Query<(&mut RiderVisual, &mut Transform, &Children)>,
     parts: Query<(&BodyPart, &Mesh3d)>, mut meshes: ResMut<Assets<Mesh>>,
     mut scratch: Local<(Vec<[f32; 3]>, Vec<[f32; 3]>)>,
 ) {
+    // paused: hold every body as it is
+    if game.screen == ui::Screen::Paused { return; }
     let dt = time.dt;
     for (mut vis, mut tf, children) in &mut roots {
         let r: &Rider = match vis.who { Who::Player => &rider.0, Who::Ai(i) => match opponents.0.get(i) { Some(o) => &o.rider, None => continue } };
@@ -1110,10 +1232,10 @@ fn animate_visuals(
         // where the body is and which way it faces
         let on_snow = r.grounded || r.air_time < 0.15 || r.rail.is_some();
         let up = if on_snow { r.normal } else { Vec3::Y };
-        let h = heading(r.yaw);
+        let h = heading(r.facing());
         let fwd = (h - up * h.dot(up)).normalize_or(h);
         let k = |rate: f32| 1.0 - (-rate * dt).exp();
-        let want_roll = if r.grounded { -r.input.steer * 0.32 * (r.vel.length() / 12.0).min(1.0) } else { 0.0 };
+        let want_roll = if r.grounded { (if r.switch { 1.0 } else { -1.0 }) * r.input.steer * 0.32 * (r.vel.length() / 12.0).min(1.0) } else { 0.0 };
         vis.roll += (want_roll - vis.roll) * k(8.0);
         let base = Transform::from_translation(r.pos).looking_to(fwd, up).rotation * Quat::from_rotation_z(vis.roll);
         tf.translation = r.pos;
@@ -1141,17 +1263,19 @@ fn animate_visuals(
             RaceState::Running if race.0.time < 31.0 / character::ANIM_FPS => Some(race.0.time * character::ANIM_FPS),
             _ => None,
         };
+        let finished = match vis.who { Who::Player => race.0.state == RaceState::Finished, Who::Ai(i) => opponents.0.get(i).is_some_and(|o| o.driver.finished.is_some()) };
         // the game's own animation if we have it, the code-built pose otherwise
-        let sample = lib.anims.as_ref().and_then(|set| animate(set, entry.ubers.as_ref(), gate, r, &mut *vis, on_snow, dt));
+        let sample = lib.anims.as_ref().and_then(|set| animate(set, entry.ubers.as_ref(), gate, finished, r, &mut *vis, on_snow, dt));
         let (mats, lift) = match &sample { Some(sm) => (entry.model.skin_sample(sm), 0.0), None => entry.model.skin(&vis.pose) };
-        let board_mats = match (&sample, &lib.board) { (Some(sm), Some(b)) => b.skin_board(sm), _ => vec![Mat4::IDENTITY] };
+        let board_model = lib.shapes.get(vis.shape).and_then(|s| s.as_ref()).or(lib.board.as_ref());
+        let board_mats = match (&sample, board_model) { (Some(sm), Some(b)) => b.skin_board(sm), _ => vec![Mat4::IDENTITY] };
         let sun = (tf.rotation.inverse() * Vec3::new(0.35, 0.8, 0.45)).normalize();
         for child in children.iter() {
             let Ok((part, mesh)) = parts.get(child) else { continue };
             let Some(mesh) = meshes.get_mut(&mesh.0) else { continue };
             let s = &mut *scratch;
             let (pos, nrm) = (&mut s.0, &mut s.1);
-            let (model, mats) = if part.board { (lib.board.as_ref(), &board_mats) } else { (Some(&entry.model), &mats) };
+            let (model, mats) = if part.board { (board_model, &board_mats) } else { (Some(&entry.model), &mats) };
             let Some(p) = model.and_then(|m| m.parts.get(part.part)) else { continue };
             if sample.is_some() { character::skin_part_anim(p, mats, pos, nrm); }
             else { character::skin_part(p, mats, if part.board { 0.0 } else { lift }, pos, nrm); }
@@ -1166,7 +1290,7 @@ fn animate_visuals(
 }
 
 /// Pick and blend the animation clips that match what the rider is doing.
-fn animate(set: &AnimSet, ubers: Option<&AnimSet>, gate: Option<f32>, r: &Rider, vis: &mut RiderVisual, on_snow: bool, dt: f32) -> Option<Sample> {
+fn animate(set: &AnimSet, ubers: Option<&AnimSet>, gate: Option<f32>, finished: bool, r: &Rider, vis: &mut RiderVisual, on_snow: bool, dt: f32) -> Option<Sample> {
     let fps = character::ANIM_FPS;
     let crouch = vis.pose.crouch;
     let lean = vis.pose.lean;
@@ -1183,31 +1307,76 @@ fn animate(set: &AnimSet, ubers: Option<&AnimSet>, gate: Option<f32>, r: &Rider,
         clip("bxG_GATESTART")?.at(g.max(0.0), false)
     } else if r.crashed > 0.0 {
         // wipe out, then get back up
-        let (bail, up) = (clip("bxB_FWD")?, clip("bxGU_FROMFACEFWD")?);
-        let f = (rider::CRASH_SECONDS - r.crashed) * fps;
+        let (b, u) = match r.crash_kind { 1 => ("bxB_BWD", "bxGU_FROMBUTTFWD"), 2 => ("bxB_HS", "bxGU_FROMFACERIGHT"), 3 => ("bxB_TS", "bxGU_FROMBUTTRIGHT"), _ => ("bxB_FWD", "bxGU_FROMFACEFWD") };
+        let (bail, up) = match (clip(b), clip(u)) { (Some(b), Some(u)) => (b, u), _ => (clip("bxB_FWD")?, clip("bxGU_FROMFACEFWD")?) };
+        // the pair is fitted to the time a wipe-out takes
+        let f = (1.0 - r.crashed / rider::CRASH_SECONDS) * (bail.len() + up.len());
         if f < bail.len() { bail.at(f, false) } else { up.at(f - bail.len(), false) }
     } else if r.uber > 0.0 && ubers.and_then(|u| u.nth(r.uber_id)).is_some() {
         ubers?.nth(r.uber_id)?.at(r.uber, false)
     } else if r.rail.is_some() {
-        clip("bxRS_CYCLEBASE")?.at(a.cycle, true)
+        // square on the rail, or sideways with the chest (frontside) or the back (backside) leading
+        let side = r.rail_twist.sin();
+        let base = clip("bxRS_CYCLEBASE")?.at(a.cycle, true);
+        match clip(if side > 0.0 { "bxRS_CYCLEBS" } else { "bxRS_CYCLEFS" }) {
+            Some(c) if side.abs() > 0.05 => base.blend(&c.at(a.cycle, true), ((side.abs() - 0.2) / 0.6).clamp(0.0, 1.0)),
+            _ => base,
+        }
     } else if !on_snow {
-        let grab = match if r.grab != 0 { r.grab } else if a.grab_frame > 0.0 { a.grab } else { 0 } { 1 => "bxT_NOSEGRAB", 2 => "bxT_TAILGRAB", 3 => "bxT_METHOD", _ => "" };
+        let shown = if r.grab != 0 { r.grab } else if a.grab_frame > 0.0 { a.grab } else { 0 };
+        let grab = (shown as usize).checked_sub(1).and_then(|i| r.data.rows.get(i)).map_or("", |row| row.clip);
         if let Some(c) = clip(grab) {
-            // reach in while the button is held, hold at the peak, play out on release
+            // reach in while the button is held and hold at the peak
             let peak = c.len() * 0.5;
             if r.grab != 0 { a.grab_frame = (a.grab_frame + dt * fps).min(peak); }
-            else { a.grab_frame += dt * fps; if a.grab_frame >= c.len() - 1.0 { a.grab_frame = 0.0; a.grab = 0; } }
-            c.at(a.grab_frame.max(0.01), false)
-        } else if r.flip.abs() > 0.3 {
-            clip(if r.flip > 0.0 { "bxA_FLIPCYCLEFWD" } else { "bxA_FLIPCYCLEBWD" })?.at(a.cycle, true)
-        } else if r.spin.abs() > 0.6 {
-            clip(if r.spin > 0.0 { "bxA_SPINCYCLEFS" } else { "bxA_SPINCYCLEBS" })?.at(a.cycle, true)
+            // letting go drops the grab at once; the pose eases back by the usual blend
+            else { a.grab_frame = 0.0; a.grab = 0; }
+            let held = c.at(a.grab_frame.max(0.01), false);
+            // the tweak has its own clip, played out from the held grab
+            let tw = grab.strip_prefix("bxT_").and_then(|n| set.get(&format!("bxTW_{n}")));
+            a.tweak = if r.grab != 0 && r.input.tweak && a.grab_frame >= peak - 0.5 { a.tweak + dt * fps } else { (a.tweak - dt * fps * 2.0).max(0.0) };
+            match tw { Some(t) if a.tweak > 0.0 => held.blend(&t.at(a.tweak.min(t.len() * 0.5), false), (a.tweak / 4.0).min(1.0)), _ => held }
+        } else if {
+            // only while actually turning: the stick is held, or a flip is still coming round to level
+            let tau = std::f32::consts::TAU;
+            let tilt = r.flip.rem_euclid(tau).min(tau - r.flip.rem_euclid(tau));
+            let turning = r.input.steer.abs() > 0.1 || r.input.flip != 0.0 || tilt > 0.35;
+            if !turning { a.rot = 0.0; }
+            turning
+        } {
+            // tuck into the rotation, then hold its cycle
+            a.rot += dt * fps;
+            let tau = std::f32::consts::TAU;
+            let flipping = r.input.flip != 0.0 || r.flip.rem_euclid(tau).min(tau - r.flip.rem_euclid(tau)) > 0.35;
+            let (into, cycle) = if flipping {
+                if r.flip > 0.0 { ("bxA_INTOFLIPFWD", "bxA_FLIPCYCLEFWD") } else { ("bxA_INTOFLIPBWD", "bxA_FLIPCYCLEBWD") }
+            } else if r.input.steer > 0.0 { ("bxA_INTOSPINFS", "bxA_SPINCYCLEFS") } else { ("bxA_INTOSPINBS", "bxA_SPINCYCLEBS") };
+            match clip(into) {
+                Some(c) if a.rot < c.len() - 1.0 => c.at(a.rot, false),
+                _ => clip(cycle)?.at(a.cycle, true),
+            }
         } else {
             let c = clip("bxJ_TAKEOFF")?;
             c.at(a.air * fps, false)
         }
     } else if a.land < clip("bxL_NORMAL")?.len() - 1.0 {
-        clip("bxL_NORMAL")?.at(a.land, false)
+        // a crooked or tilted landing has its own recovery
+        let c = clip(match r.land_kind { 1 => "bxL_HS", 2 => "bxL_TS", 3 => "bxL_ARMS", _ => "bxL_NORMAL" }).or(clip("bxL_NORMAL"))?;
+        c.at(a.land * c.len() / clip("bxL_NORMAL")?.len(), false)
+    } else if finished && clip("bxR_CRUISE2FINISH").is_some() {
+        // over the line: stand up out of the ride
+        a.done += dt * fps;
+        let c = clip("bxR_CRUISE2FINISH")?;
+        c.at(a.done.min(c.len() - 1.0), false)
+    } else if r.shove > 0.0 && clip("bxR_PUSHTS").is_some() {
+        let c = clip(if r.shove_side > 0.0 { "bxR_PUSHTS" } else { "bxR_ELBOWHS" })?;
+        c.at(((0.7 - r.shove) * fps).clamp(0.0, c.len() - 1.0), false)
+    } else if r.charge > 0.05 && (r.wind.abs() > 0.1 || r.wind_flip.abs() > 0.1) {
+        // crouched and winding up: lean into the spin or the flip that is coming
+        let down = clip("bxRL_CROUCHCYCLE")?.at(a.cycle, true);
+        let (name, w) = if r.wind.abs() >= r.wind_flip.abs() { (if r.wind > 0.0 { "bxJ_PWDRIGHT" } else { "bxJ_PWDLEFT" }, r.wind.abs()) }
+            else { (if r.wind_flip > 0.0 { "bxJ_PWDFWD" } else { "bxJ_PWDBWD" }, r.wind_flip.abs()) };
+        match clip(name) { Some(c) => down.blend(&c.at(w.min(1.0) * (c.len() - 1.0), false), (w * 2.0).min(1.0)), None => down }
     } else {
         // riding: stand / crouch cycles, replaced by the turn clips as the rider leans
         let up = clip("bxRL_BASECYCLEFAST")?.at(a.cycle, true);
@@ -1222,7 +1391,8 @@ fn animate(set: &AnimSet, ubers: Option<&AnimSet>, gate: Option<f32>, r: &Rider,
             base.blend(&turn, (lean.abs() * 4.0).min(1.0))
         } else { base }
     };
-    if on_snow { a.grab = 0; a.grab_frame = 0.0; }
+    if on_snow { a.grab = 0; a.grab_frame = 0.0; a.rot = 0.0; a.tweak = 0.0; }
+    if !finished { a.done = 0.0; }
     // ease from whatever the body was doing into the new pose
     let out = match &a.cur { Some(cur) => cur.blend(&target, 1.0 - (-14.0 * dt).exp()), None => target };
     a.cur = Some(out);

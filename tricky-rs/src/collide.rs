@@ -18,16 +18,21 @@ pub struct Tri {
     pub face: Vec3,
     /// can be ridden on (otherwise it is a wall)
     pub rideable: bool,
+    /// row of the game's surface table (1 groomed snow, 3/4 powder, 5 ice, ...)
+    pub surface: u8,
 }
 
 #[derive(Clone, Copy, Debug)]
-pub struct GroundHit { pub y: f32, pub normal: Vec3 }
+pub struct GroundHit { pub y: f32, pub normal: Vec3, pub surface: u8 }
 
 #[derive(Default)]
 pub struct CollisionWorld {
     tris: Vec<Tri>,
     grid: HashMap<(i32, i32), Vec<u32>>,
     pub min_y: f32,
+    /// the course's out-of-bounds surfaces: touching one puts the rider back on the course
+    resets: Vec<[Vec3; 3]>,
+    reset_grid: HashMap<(i32, i32), Vec<u32>>,
 }
 
 fn cell(v: f32) -> i32 { (v / CELL).floor() as i32 }
@@ -37,7 +42,7 @@ impl CollisionWorld {
 
     /// `normals`: smooth vertex normals, or None to use the face normal. `terrain` faces are
     /// flipped to point up if needed (patch winding is not consistent).
-    pub fn add(&mut self, p: [Vec3; 3], normals: Option<[Vec3; 3]>, terrain: bool) {
+    pub fn add(&mut self, p: [Vec3; 3], normals: Option<[Vec3; 3]>, terrain: bool, surface: u8) {
         let mut face = (p[1] - p[0]).cross(p[2] - p[0]);
         if face.length_squared() < 1e-10 { return; }
         face = face.normalize();
@@ -54,7 +59,7 @@ impl CollisionWorld {
             }
         }
         let rideable = face.y >= if terrain { GROUND_MIN_Y } else { OBJECT_GROUND_MIN_Y };
-        self.tris.push(Tri { p, n, face, rideable });
+        self.tris.push(Tri { p, n, face, rideable, surface });
     }
 
     /// Highest rideable surface under/around `pos` whose height lies in [pos.y - down, pos.y + up].
@@ -78,7 +83,7 @@ impl CollisionWorld {
             if best.is_none_or(|h| y > h.y) {
                 let mut n = (t.n[0] * w0 + t.n[1] * w1 + t.n[2] * w2).normalize_or(t.face);
                 if n.y < 0.0 { n = -n; }
-                best = Some(GroundHit { y, normal: n });
+                best = Some(GroundHit { y, normal: n, surface: t.surface });
             }
         }
         best
@@ -125,6 +130,39 @@ impl CollisionWorld {
 
     /// Push a sphere out of every wall it overlaps. Returns the corrected centre and the
     /// normals of the walls that were touched.
+    /// Debug: describe every wall triangle within `radius` of a point.
+    pub fn explain(&self, center: Vec3, radius: f32) {
+        for cx in cell(center.x - radius)..=cell(center.x + radius) {
+            for cz in cell(center.z - radius)..=cell(center.z + radius) {
+                let Some(ids) = self.grid.get(&(cx, cz)) else { continue };
+                for &id in ids {
+                    let t = &self.tris[id as usize];
+                    if t.rideable || t.face.y < -0.6 { continue; }
+                    let q = closest_point(center, t.p[0], t.p[1], t.p[2]);
+                    if (center - q).length() < radius { println!("  wall tri #{id}: {:.1?} face {:.2?} surface {}", t.p, t.face, t.surface); }
+                }
+            }
+        }
+    }
+    pub fn add_reset(&mut self, p: [Vec3; 3]) {
+        let id = self.resets.len() as u32;
+        let lo = p[0].min(p[1]).min(p[2]);
+        let hi = p[0].max(p[1]).max(p[2]);
+        for cx in cell(lo.x)..=cell(hi.x) { for cz in cell(lo.z)..=cell(hi.z) { self.reset_grid.entry((cx, cz)).or_default().push(id); } }
+        self.resets.push(p);
+    }
+    pub fn in_reset(&self, c: Vec3, radius: f32) -> bool {
+        for cx in cell(c.x - radius)..=cell(c.x + radius) {
+            for cz in cell(c.z - radius)..=cell(c.z + radius) {
+                let Some(ids) = self.reset_grid.get(&(cx, cz)) else { continue };
+                for &id in ids {
+                    let t = &self.resets[id as usize];
+                    if (c - closest_point(c, t[0], t[1], t[2])).length_squared() < radius * radius { return true; }
+                }
+            }
+        }
+        false
+    }
     pub fn push_out(&self, mut center: Vec3, radius: f32) -> (Vec3, Vec<Vec3>) {
         let mut contacts = Vec::new();
         for _ in 0..2 {
