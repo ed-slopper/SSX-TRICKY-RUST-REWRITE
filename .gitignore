@@ -4,6 +4,10 @@
 /*
 !/.gitignore
 !/README.md
+!/AGENTS.md
+!/WORK.md
+!/CLAUDE.md
+!/.gitattributes
 !/notes/
 !/mods/
 !/tools/
@@ -47,3 +51,11 @@ SLUS_*
 
 # camera files copied from the disc
 /notes/cam_raw/
+
+# Ghidra projects and exports, decompiler output (they contain the game's code)
+/decomp/
+*.gpr
+*.rep/
+*.gzf
+*.gdt
+ghidra_exports/
