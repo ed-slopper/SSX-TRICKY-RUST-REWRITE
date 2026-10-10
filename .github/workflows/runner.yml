@@ -15,6 +15,10 @@ on:
 permissions:
   contents: read
 
+# Plain text, so the annotation patterns below match (cargo colours its output on CI otherwise).
+env:
+  CARGO_TERM_COLOR: never
+
 # A newer push stops the older run of this workflow on the same branch.
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}

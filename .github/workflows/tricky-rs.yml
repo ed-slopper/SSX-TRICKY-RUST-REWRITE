@@ -15,6 +15,10 @@ on:
 permissions:
   contents: read
 
+# Plain text, so the annotation patterns below match (cargo colours its output on CI otherwise).
+env:
+  CARGO_TERM_COLOR: never
+
 # A newer push stops the older run of this workflow on the same branch.
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -60,6 +64,6 @@ jobs:
           done
           # errors without a file location (cargo's own, build failures), and what came just before cargo gave up
           grep -E '^error' clippy.txt | sort -u | head -10 | sed -E 's#^error(\[[^]]*\])?: (.*)#::error::\2 \1#'
-          grep -B25 -m1 'could not compile' clippy.txt | tail -25 | sed 's#^#::notice::#'
+          grep -B25 -m1 'could not compile' clippy.txt | grep -v ': warning' | tail -10 | sed 's#^#::notice::#'
           echo "$(grep -cE ': error' clippy.txt) errors, $(grep -cE ': warning' clippy.txt) warnings"
           exit $status
