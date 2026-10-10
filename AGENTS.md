@@ -204,7 +204,9 @@ New people: add your own line (in a `board-` commit) before you claim a row, and
   `pcsx2_disassemble`, `pcsx2_continue`, `pcsx2_step`, `pcsx2_get_backtrace`, plus breakpoint and watchpoint tools;
   call `pcsx2_connect` first and check `pcsx2_game_info` says SLUS-20326 before trusting an address. If its tools
   are not in your list, tell the human once (row F3b) and go on without it. For thousands of reads (a whole
-  race), drive its DebugServer (TCP 21512) from a script rather than calling a tool per tick. Nothing it shows
+  race), drive its DebugServer (TCP 21512) from a script rather than calling a tool per tick
+  (`tools/pcsx2_debug.py`). Keep breakpoints few: dozens at once wedged the DebugServer, and breakpoints survive
+  a game reboot; only restarting PCSX2 clears them. Nothing it shows
   goes into the repo but addresses, names and numbers, as with Ghidra.
 
 **Installing ghidra-mcp** (for the human): install Ghidra 12.x and JDK 21; install the Emotion Engine extension

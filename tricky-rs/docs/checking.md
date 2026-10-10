@@ -173,11 +173,30 @@ The runner checks functions one at a time; the trace checks that our tick does t
 
 ## F4f: the runner against the running game
 
-The worked example compares the runner with a formula read from the decompiler. Row F4f compares it with the game
-itself: break on `Boarder_ForwardDrag` 0x109cb8 during a race, read `$f12`, `$f13`, `$a0`, `$a1` and the structs
-they point to, step to the `jr $ra` and read `$f0`; then build the same inputs in `tools/r5900` and compare. A
-difference is a runner bug, or PCSX2 approximating the EE's floats (it is very close, not perfect); write which,
-for F4c.
+**Done 2026-10-10.** `tools/pcsx2_debug.py capture` stops the game (PCSX2-MCP's DebugServer) at a function's entry
+during a race, records the argument registers and the memory blocks the function reads at their real addresses,
+runs to the return and records `$f0`. `tools/r5900/tests/captured.rs` writes that memory back into the runner,
+calls the same function and compares the result bit for bit (`TRICKY_ELF`, `TRICKY_CAPTURES`; the capture file is
+made from the game and stays on your PC). Struct layouts are not needed: the memory is replayed as it was.
+
+24 calls in a race (12 of `Boarder_ForwardDrag` 0x109cb8, 12 of `Boarder_SideFriction` 0x109ef8, three riders):
+
+| Runner float rules | Bit-exact | Largest difference |
+|---|---|---|
+| everything toward zero (the EE manual) | 3 of 24 | 6 ulp |
+| add/sub to nearest, multiply toward zero | 6 | 4 |
+| add/sub toward zero, multiply to nearest | 10 | 2 |
+| add/sub and multiply to nearest (divide, int-to-float either way) | **18** | **1** |
+| as above, with an EE adder that drops the shifted-out bits | 17 | 1 |
+
+So in PCSX2 the game's add, subtract and multiply round to nearest; the runner now does that by default
+(`ps2float::Rules::Measured`, `Rules::Manual` keeps the manual's rule). Six calls still differ by one unit in the
+last place, always in the last few operations; the cause is not found yet (row F4g, with `pcsx2_debug.py probe`,
+which stops each call at one more point to show where the runner and the game first part). What a real console
+does, PCSX2 aside, is for F4c.
+
+The game's `$gp` at the breakpoint was 0x3C38F0, the value the runner works out from the entry code, and the code
+in memory was byte-identical to `SLUS_203.26`.
 
 ## How a row gets to `checked`
 

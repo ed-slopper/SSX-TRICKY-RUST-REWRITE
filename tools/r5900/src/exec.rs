@@ -22,7 +22,7 @@ enum Next {
     SkipSlot,
 }
 
-pub(crate) fn run(r: &mut Runner) -> Result<(), Error> {
+pub(crate) fn run(r: &mut Runner, on_step: &mut dyn FnMut(u32, &crate::Cpu)) -> Result<(), Error> {
     let mut pending: Option<u32> = None;
     while r.cpu.pc != RETURN_SENTINEL {
         r.steps += 1;
@@ -31,6 +31,7 @@ pub(crate) fn run(r: &mut Runner) -> Result<(), Error> {
         }
         let pc = r.cpu.pc;
         let next = step(r, pc)?;
+        on_step(pc, &r.cpu);
         match (pending.take(), next) {
             (Some(target), _) => r.cpu.pc = enter(r, pc, target)?, // that was the delay slot
             (None, Next::Seq) => r.cpu.pc = pc.wrapping_add(4),

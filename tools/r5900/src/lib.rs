@@ -182,6 +182,8 @@ pub struct Runner {
     names: HashMap<u32, String>,
     /// Instructions run by the last `call`.
     pub steps: u64,
+    /// How floats are rounded (`ps2float::Rules`); the default is what matched the game in PCSX2.
+    pub float_rules: ps2float::Rules,
 }
 
 impl Runner {
@@ -242,6 +244,7 @@ impl Runner {
             allowed: HashSet::new(),
             names: HashMap::new(),
             steps: 0,
+            float_rules: ps2float::Rules::default(),
         }
     }
 
@@ -302,6 +305,20 @@ impl Runner {
         self.cpu.pc = addr;
         self.steps = 0;
         self.allowed.insert(addr);
-        exec::run(self)
+        ps2float::set_rules(self.float_rules);
+        exec::run(self, &mut |_, _| {})
+    }
+
+    /// `call`, with `on_step(pc, cpu)` after every instruction (`pc` is the instruction just run): for finding
+    /// the first instruction where the runner and the game part.
+    pub fn call_traced(&mut self, addr: u32, mut on_step: impl FnMut(u32, &Cpu)) -> Result<(), Error> {
+        self.cpu.set_gpr(28, self.gp as i32 as i64 as u64);
+        self.cpu.set_gpr(29, STACK_TOP as u64);
+        self.cpu.set_gpr(31, RETURN_SENTINEL as i32 as i64 as u64);
+        self.cpu.pc = addr;
+        self.steps = 0;
+        self.allowed.insert(addr);
+        ps2float::set_rules(self.float_rules);
+        exec::run(self, &mut on_step)
     }
 }
