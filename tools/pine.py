@@ -12,7 +12,8 @@ PINE reads and writes memory and saves and loads states; it has no breakpoints o
     python tools/pine.py watch <addr> <bytes> <seconds> <out.txt>
                                                         poll a block, write every distinct copy with a timestamp
 
-The game must be running: PCSX2 refuses PINE commands while no game is booted. Anything read from the game is
+A game must be booted: PCSX2 refuses PINE commands while none is (reads work while it is paused). PCSX2 serves
+one PINE client at a time: if every command times out, another program is holding the connection. Anything read from the game is
 the game's data: keep dumps and watch files on your own PC, never in the repo. Board rows F4b, F4h.
 """
 import socket

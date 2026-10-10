@@ -201,7 +201,8 @@ New people: add your own line (in a `board-` commit) before you claim a row, and
   tell you: what a field holds during a race, which addresses change on a tick, the state before and after a
   tick to replay through our code (F4b). `tools/pine.py` is our client (`status`, `read`, `floats`, `dump`,
   `save`, `load`, `watch`); run `status` first and check the id is SLUS-20326 before trusting an address. PCSX2
-  refuses PINE while no game runs or while it is paused. PINE has no breakpoints and no register access, so
+  refuses PINE while no game runs (reads work while paused), and serves one PINE client at a time: a
+  connection left open (another tool, a stuck script) makes every other client time out. PINE has no breakpoints and no register access, so
   checks are per tick (state before, state after), not per function call. Dumps and traces are the game's data:
   keep them on your PC. Only addresses, names and numbers go into the repo, as with Ghidra.
 - PCSX2-MCP (a patched PCSX2 with a debug server: breakpoints, registers) was tried for F4f and F4g and is **not

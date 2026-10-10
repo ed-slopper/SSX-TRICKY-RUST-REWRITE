@@ -161,8 +161,8 @@ constants rounded to four places (0.7076 for 0.70764244), and the state 3/4 fact
 The runner checks functions one at a time; the trace checks that our tick does the same things in the same order.
 It uses PINE, PCSX2's own IPC (stock PCSX2, Settings > Advanced > PINE), through `tools/pine.py`.
 
-- **Read the game while it runs.** `pine.py` reads blocks of EE memory in batches (a 0x6000-byte rider struct
-  in one round trip), dumps them, and `watch` polls a block and keeps every distinct copy with a timestamp.
+- **Read the game while it runs.** `pine.py` reads blocks of EE memory in batches (a 0x6000-byte block in
+  about a millisecond, checked against word-by-word reads and the ELF on 2026-10-10), dumps them, and `watch` polls a block and keeps every distinct copy with a timestamp.
 - **Know which tick it is.** PINE is not tied to the game's frames and cannot stop the game, so each sample also
   reads the game's own tick counter, and only pairs of consecutive ticks are kept. Finding that counter, the
   boarder array and the pad state (`watch` on candidates, compare dumps a tick apart) is F4b's first job; write
