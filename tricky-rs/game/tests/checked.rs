@@ -8,7 +8,7 @@
 
 use r5900::ps2float::Rules;
 use r5900::Runner;
-use tricky_game::ground::{forward_drag, side_friction, spring_force, DragState, FrictionState};
+use tricky_game::ground::{forward_drag, ground_thrust, side_friction, spring_force, DragState, FrictionState, ThrustState};
 
 /// The surface table's drag and grip terms of a few real rows (SURFACES in rider.rs: +4, +8, +0xc, +0x10).
 const ROWS: [[f32; 4]; 4] = [
@@ -44,7 +44,7 @@ struct Layout {
 
 fn layout(r: &mut Runner) -> Layout {
     let stats = r.mem.alloc(0x50);
-    let rider = r.mem.alloc(0x480);
+    let rider = r.mem.alloc(0x5000); // up to the clip queue at +0x46c0
     let boarder = r.mem.alloc(0x10);
     let row = r.mem.alloc(0x64);
     r.mem.write_u32(boarder + 0xc, rider);
@@ -190,4 +190,55 @@ fn spring_force_is_the_originals() {
         checked += 1;
     }
     eprintln!("Boarder_GroundSpringForce: {checked} cases, all bit-identical");
+}
+
+#[test]
+fn ground_thrust_is_the_originals() {
+    let Some(mut r) = runner() else { return };
+    r.allow(0x15fdd0); // the clip getter runs as the original
+    let m = layout(&mut r);
+    let mut rng = Rng(0x7a7e_5ee0);
+    let mut checked = 0;
+    for case in 0..3000 {
+        let speed_byte = rng.byte();
+        let s = ThrustState {
+            brake: if case % 10 == 0 { rng.f(0.01, 1.0) } else { 0.0 },
+            board_yaw: rng.f(-12.0, 12.0),
+            course_yaw: rng.f(-12.0, 12.0),
+            boost_level: [0.0, 0.25, 0.6013, 1.0][(rng.next() % 4) as usize],
+            speed_timer: if case % 4 == 0 { rng.f(0.0, 3.0) } else { 0.0 },
+            steer: if case % 2 == 0 { rng.f(-0.1, 0.1) } else { rng.f(-1.0, 1.0) },
+            forward_up: rng.f(-1.0, 1.0),
+            vel: [rng.f(-2000.0, 2000.0), rng.f(-2000.0, 2000.0), rng.f(-600.0, 600.0), 0.0],
+            class: rng.next() % 3,
+            speed: speed_byte as f32,
+            skating: case % 3 == 0,
+        };
+        let (push_target, thrust_scale) = [(51.8501, 2.00119), (45.6771, 1.81067), (0.0, 0.0), (140.0, 1.0)][case % 4];
+
+        r.mem.write_u8(m.stats + 0x0e, speed_byte);
+        r.mem.write_f32(m.rider + 0x1fc, s.brake);
+        r.mem.write_f32(m.rider + 0x1b0, s.board_yaw);
+        r.mem.write_f32(m.rider + 0x370, s.course_yaw);
+        r.mem.write_f32(m.rider + 0x130, s.boost_level);
+        r.mem.write_f32(m.rider + 0x134, s.speed_timer);
+        r.mem.write_f32(m.rider + 0x214, s.steer);
+        r.mem.write_f32(m.rider + 0x328, s.forward_up);
+        for (i, v) in s.vel.iter().enumerate() {
+            r.mem.write_f32(m.rider + 0x150 + 4 * i as u32, *v);
+        }
+        r.mem.write_u32(m.rider + 0x420, s.class);
+        r.mem.write_u32(m.rider + 0x46c0 + 8, if s.skating { 0x221 } else { 0x200 });
+        r.mem.write_f32(m.row + 0x2c, push_target);
+        r.mem.write_f32(m.row + 0x30, thrust_scale);
+        r.cpu.set_gpr(4, m.boarder as u64);
+        r.cpu.set_gpr(5, m.row as u64);
+        r.call(0x109950).unwrap_or_else(|e| panic!("case {case}: {e}"));
+
+        let ours = ground_thrust(&s, push_target, thrust_scale);
+        assert_eq!(ours.to_bits(), r.cpu.f(0).to_bits(),
+            "case {case}: ours {ours} vs the game's {} for {s:?} target {push_target} scale {thrust_scale}", r.cpu.f(0));
+        checked += 1;
+    }
+    eprintln!("Boarder_GroundThrust: {checked} cases, all bit-identical");
 }

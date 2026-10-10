@@ -113,3 +113,75 @@ pub fn spring_force(h: f32, vn: f32, d1: f32, d2: f32, g: f32, damping: f32) -> 
         g * (1.0 - (t + t) / (d2 - d1)) + -damping * vn
     }
 }
+
+/// What `Boarder_GroundThrust` reads (rider fields, a stat byte and the playing clip).
+#[derive(Clone, Copy, Debug, Default)]
+pub struct ThrustState {
+    /// brake (rider+0x1fc): any braking means no thrust at all, boost included
+    pub brake: f32,
+    /// the board's yaw (rider+0x1b0) and the course's direction 8 m ahead (rider+0x370), radians
+    pub board_yaw: f32,
+    pub course_yaw: f32,
+    /// boost level (rider+0x130, 0 when not boosting), speed-boost timer (rider+0x134), steer (rider+0x214)
+    pub boost_level: f32,
+    pub speed_timer: f32,
+    pub steer: f32,
+    /// the board forward's up component (rider+0x328)
+    pub forward_up: f32,
+    /// velocity (rider+0x150, cm/s, four floats as the vector unit reads them)
+    pub vel: [f32; 4],
+    /// board class (rider+0x420) and speed stat byte (stats+0x0e)
+    pub class: u32,
+    pub speed: f32,
+    /// the playing clip is the skate push (clip 0x221, rider+0x46c0)
+    pub skating: bool,
+}
+
+/// `Boarder_GroundThrust` 0x109950: self-push toward the course and boost, cm/s², with the surface row's
+/// push target (+0x2c, km/h) and thrust scale (+0x30).
+pub fn ground_thrust(s: &ThrustState, push_target: f32, thrust_scale: f32) -> f32 {
+    if 0.0 < s.brake {
+        return 0.0;
+    }
+    let mut thrust = 0.0;
+    // the board's angle off the course, wrapped by a floor (cvt.w.s truncates; one less when that rounded up)
+    let d = s.board_yaw - s.course_yaw;
+    let t = d * 0.15915494 + 0.5;
+    let mut whole = (t as i32) as f32;
+    if t < whole {
+        whole = whole - 1.0;
+    }
+    let mut ang = (1.0471976 - (d - whole * 6.2831855).abs()) / 0.5235988;
+    if 1.0 <= ang {
+        ang = 1.0;
+    }
+    let mut lvl = s.boost_level;
+    if 0.0 < s.speed_timer && lvl < ang * 5.5 {
+        lvl = ang * 5.5;
+    }
+    if 0.0 < lvl {
+        let straight = 0.07983315 - s.steer.abs();
+        if 0.0 < straight {
+            let k = if 0.0 <= s.forward_up { s.forward_up * 1053.4484 + 2350.3096 } else { 2350.3096 };
+            thrust = lvl * straight * k + 0.0;
+        }
+    }
+    // speed on the vector unit (0x109b1c-0x109b3c): sqrt(((x² + y²) + z²) + w²)
+    let sq = [s.vel[0] * s.vel[0], s.vel[1] * s.vel[1], s.vel[2] * s.vel[2], s.vel[3] * s.vel[3]];
+    let speed = (((sq[0] + sq[1]) + 1.0 * sq[2]) + 1.0 * sq[3]).sqrt();
+    let mut deficit = push_target * 27.777777 - speed;
+    if 1111.1111 <= deficit {
+        deficit = 1111.1111;
+    }
+    if 0.0 < deficit {
+        let k = if s.class == 2 {
+            s.speed * 0.3049984 * 0.003921569 + 1.2049915
+        } else {
+            s.speed * 0.27690744 * 0.003921569 + 0.7380923
+        };
+        let push = if 0.0 <= ang { ang * k * deficit + 0.0 } else { 0.0 };
+        let skate = if s.skating { k * 0.2 * deficit + 0.0 } else { 0.0 };
+        thrust = thrust + if skate < push { push } else { skate };
+    }
+    thrust_scale * thrust
+}

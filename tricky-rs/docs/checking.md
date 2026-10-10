@@ -266,6 +266,9 @@ in memory was byte-identical to `SLUS_203.26`.
 `Rider::step` calls them. `tricky-rs/game/tests/checked.rs` runs the game's own functions in the runner and ours
 on 3,000 random inputs each (speeds, loads, every board class, switch, powder, crouch, boost, brake, full-lock
 steer) and asks for the same bits: **all 6,000 identical.** Both are `checked` in the function index.
+F4d2 added `spring_force` (`Boarder_GroundSpringForce` 0x109878) and `ground_thrust` (`Boarder_GroundThrust`
+0x109950, including its vector-unit speed, sqrt(((x² + y²) + z²) + w²)): 3,000 cases each, all identical,
+first try. Four functions `checked`.
 
 - The decompiler's expression is not always the machine code's order: the first try differed by one ulp until
   the cubic term was grouped as the instructions do it, `(|vF|·0.001)·((L·row₂)·cubic)` (0x109e70, 0x109ea4,

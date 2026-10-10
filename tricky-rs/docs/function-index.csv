@@ -95,7 +95,7 @@ address,size,name,system,status
 0x1097f8,44,FUN_001097f8,boarder?,not started
 0x109858,32,FUN_00109858,wipeout?,not started
 0x109878,212,Boarder_GroundSpringForce,boarder,checked
-0x109950,872,Boarder_GroundThrust,boarder,not started
+0x109950,872,Boarder_GroundThrust,boarder,checked
 0x109cb8,576,Boarder_ForwardDrag,boarder,checked
 0x109ef8,476,Boarder_SideFriction,boarder,checked
 0x10a0d8,3568,GroundMotion_Update,boarder,ported

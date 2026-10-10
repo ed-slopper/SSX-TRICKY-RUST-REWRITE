@@ -853,26 +853,19 @@ impl Rider {
             };
             let drag = crate::ground::forward_drag(vf * 100.0, load, [surf[1], surf[2], surf[3]], &drag_state) / 100.0;
             // pushing along: toward the course direction only, harder the slower he goes
-            let mut thrust = 0.0;
-            if self.brake_v <= 0.0 {
-                let deficit = (surf[6] / 3.6 - speed0).min(11.11);
-                if deficit > 0.0 {
-                    let ang = match self.course_dir {
-                        Some(c) => {
-                            let a = f32::atan2(-c.x, -c.z) - self.yaw;
-                            let a = (a + std::f32::consts::PI).rem_euclid(std::f32::consts::TAU) - std::f32::consts::PI;
-                            ((60f32.to_radians() - a.abs()) / 30f32.to_radians()).clamp(0.0, 1.0)
-                        }
-                        None => 1.0,
-                    };
-                    let mut push = surf[7] * st.push() * ang * deficit;
-                    if self.crouch_v > 0.5 && self.steer.abs() < 0.2 && speed0 < 8.33 { push = push.max(0.2 * st.push() * deficit); }
-                    thrust += push;
-                }
-            }
-            // boost: only when going (nearly) straight
+            // `Boarder_GroundThrust` 0x109950, exactly (crate::ground), in cm: self-push toward the course and boost
+            let course_yaw = self.course_dir.map_or(self.yaw, |c| f32::atan2(-c.x, -c.z));
+            let thrust_state = crate::ground::ThrustState {
+                brake: self.brake_v, board_yaw: self.yaw, course_yaw,
+                boost_level: if boosting_input { self.boost_level() } else { 0.0 }, speed_timer: self.speed_timer,
+                steer: self.steer, forward_up: f.y, vel: [v.x * 100.0, v.y * 100.0, v.z * 100.0, 0.0],
+                class: st.kind as u32, speed: st.speed * 255.0,
+                // STANDIN: our crouch/steer/speed test, for the game's "skate push clip (0x221) playing" (G5)
+                skating: self.crouch_v > 0.5 && self.steer.abs() < 0.2 && speed0 < 8.33,
+            };
+            let thrust = crate::ground::ground_thrust(&thrust_state, surf[6], surf[7]) / 100.0;
+            // the boost meter drains while boosting (the thrust itself is in ground_thrust)
             if boosting_input {
-                thrust += lvl * (0.07983 - self.steer.abs()).max(0.0) * (23.50 + 10.53 * f.y.max(0.0)) * surf[7];
                 if !self.tricky() && !sped { self.boost = (self.boost - dt / BOOST_SECONDS).max(0.0); }
                 self.boosting = true;
             }
