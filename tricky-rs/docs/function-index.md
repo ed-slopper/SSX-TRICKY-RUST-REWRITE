@@ -92,7 +92,7 @@ They live in `LIB_BANDS` in `tools/function_systems.py`.
 | 0x2e4c00–0x2f2800 | sdk | called by `cPS2Device`, `cPS2GraphicsMan`, `cPS2VideoPlayer`, `cApplication` and by the memory-card code (0x23d000–0x23f000 → 0x2f1000) | host |
 | 0x2f2800–0x2f6000 | libc | `fmodf`, start-up helpers called from `main` and the runtime | host |
 | 0x2f6000–0x2fa800 | runtime | gcc's exceptions and type info (`__rtti_si`, `__class_type_info`, ...) | host |
-| 0x2fa800–0x3063e0 | libc | `memcpy`, `memset`, `sprintf` over `libc_vfprintf` ("bug in vfprintf: bad base"), `strcpy`, `strlen`, strtod ("Infinity") | host |
+| 0x2fa800–0x3063e0 | libc | `memcpy`, `memset`, `sprintf` over `vfprintf` ("bug in vfprintf: bad base"), `strcpy`, `strlen`, strtod ("Infinity") | host |
 | 0x3063e0–0x307830 | kernel | syscall stubs (`CreateThread`, `WaitSema`, `SetGsCrt`, ...) | host |
 | 0x307830–0x30F960 | sdk | SIF and IOP (`rom0:UDNL` reboot), called by the sdk band above and the dev-kit link | host |
 
