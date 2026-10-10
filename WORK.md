@@ -162,7 +162,7 @@ matches the original.
 | F1 | Function index `tricky-rs/docs/function-index.csv` (7,425 functions, 2,320 named, 109 ported, 0 checked), `tools/function_index.py` to refresh it | P0 | ed-slopper/puffin | 2026-10-10 | 22a443f |
 | F1a | Systems for the unplaced functions: `tools/function_systems.py` (call graph, shared globals, neighbours, proven address ranges, the library spans) writes `tricky-rs/docs/function-systems.csv`; 3,959 without a system down to 150 | P0 | ed-slopper/puffin | 2026-10-10 | f0c7b2d |
 | F1b | Linked libraries split into bands (`LIB_BANDS` in `tools/function_systems.py`): EA sound and middleware (port), EA memory, Sony SDK, libc, C++ runtime, kernel stubs (host); `host` status in the index (1,181 functions); 13 library functions read and named in `ghidra/symbols.txt`, which the index now reads | P0 | ed-slopper/puffin | 2026-10-10 | 45ffac7 |
-| F1d | `lib-ea` split into EA's shape files, compression (RefPack, Huffman, BTree), wide text and the `.loc` string table, BIG archives (port) and the async file system and streams (host); `comm` (DECI2 dev-kit link) is host; 24 functions named in `ghidra/symbols.txt` | P0 | ed-slopper/puffin | 2026-10-10 | a548ace |
+| F1d | `lib-ea` split into EA's shape files, compression (RefPack, Huffman, BTree), wide text and the `.loc` string table, BIG archives (port) and the async file system and streams (host); `comm` (DECI2 dev-kit link) is host; 24 functions named in `ghidra/symbols.txt` | P0 | ed-slopper/puffin | 2026-10-10 | 1ada4af |
 
 ## Changes to the board
 
@@ -171,3 +171,4 @@ matches the original.
 - 2026-10-10 ed-slopper/puffin: F1a done; F1b rewritten with the library spans found; added F1c (gap of F1a).
 - 2026-10-10 ed-slopper/puffin: F1b done; added F1d (gap of F1b); G10 notes the EA sound library; AGENTS.md §14 had the symbols.txt line format wrong, fixed.
 - 2026-10-10 ed-slopper/puffin: F1d done; E2a, E2b, E3b, E5 notes get the game's own functions for them.
+- 2026-10-10 ed-slopper/puffin: F1d's Done row pointed at the claim commit; the work is 1ada4af (committed with the message "done F1d: commit hash on the board" after a broken command chain).
