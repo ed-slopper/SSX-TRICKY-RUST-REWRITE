@@ -156,31 +156,32 @@ It would fail today, which is the point of building it. Our `drag_linear` and `d
 constants rounded to four places (0.7076 for 0.70764244), and the state 3/4 factor above is not in
 `original-rules.md`. Both are gaps for the port, not for this row.
 
-## F4b: race traces from PCSX2
+## F4b: race traces from PCSX2, over PINE
 
 The runner checks functions one at a time; the trace checks that our tick does the same things in the same order.
+It uses PINE, PCSX2's own IPC (stock PCSX2, Settings > Advanced > PINE), through `tools/pine.py`.
 
-- **Stop the game on every tick.** PCSX2-MCP (row F3b) adds a debug server to PCSX2 (TCP port 21512) with
-  breakpoints, register and memory reads. A trace script sets a breakpoint on the boarder's per-tick update, and
-  at each hit reads what it needs and continues, so every tick is recorded and nothing moves while it reads. A
-  script talks to the debug server directly; calling an MCP tool per tick would take far too long for a race.
-  Without F3b, PCSX2's own PINE interface (Settings > Advanced; slot 28011) can read memory but is not tied to
-  the game's frames: then each sample also reads the game's tick counter and only pairs of consecutive ticks are
-  kept.
-- **Find the addresses first.** The per-tick update to break on, the boarder array, the pad state and the tick
-  counter, with PCSX2-MCP's memory search and diff (`pcsx2_find_pattern`, `pcsx2_memory_diff`) during a race.
-  Write them into the port notes.
+- **Read the game while it runs.** `pine.py` reads blocks of EE memory in batches (a 0x6000-byte rider struct
+  in one round trip), dumps them, and `watch` polls a block and keeps every distinct copy with a timestamp.
+- **Know which tick it is.** PINE is not tied to the game's frames and cannot stop the game, so each sample also
+  reads the game's own tick counter, and only pairs of consecutive ticks are kept. Finding that counter, the
+  boarder array and the pad state (`watch` on candidates, compare dumps a tick apart) is F4b's first job; write
+  the addresses into the port notes.
+- **Same moment, every time.** `pine.py save <slot>` / `load <slot>` puts the game back to the same instant, so a
+  tick can be recorded again with different inputs or replayed after a change to our code.
 - **What to record per tick, per rider:** the boarder struct (position, velocity, orientation, motion state and
   state timer, meter, trick state), the pad state the game read that tick, and the random seed state.
 - **Replay.** Load the recorded state at tick t into our structs, feed the recorded pad, step our code one tick and
   compare with tick t+1, field by field, within the tolerance F4c sets. Report the first field and tick that
-  differ.
+  differ. The function runner can replay the game's own tick the same way (its memory from a dump), which makes
+  per-tick checks of the original code possible without breakpoints.
 - **Files.** Traces are made from the game, so they stay on the player's PC (`traces/`, ignored by git); the repo
   holds the tools and the list of fields.
 
 ## F4f: the runner against the running game
 
-**Done 2026-10-10.** `tools/pcsx2_debug.py capture` stops the game (PCSX2-MCP's DebugServer) at a function's entry
+**Done 2026-10-10**, with PCSX2-MCP's DebugServer, which the project no longer relies on (AGENTS.md §14):
+the captures below stay valid test data, new checks go per tick over PINE (F4b). `tools/pcsx2_debug.py capture` stopped the game at a function's entry
 during a race, records the argument registers and the memory blocks the function reads at their real addresses,
 runs to the return and records `$f0`. `tools/r5900/tests/captured.rs` writes that memory back into the runner,
 calls the same function and compares the result bit for bit (`TRICKY_ELF`, `TRICKY_CAPTURES`; the capture file is

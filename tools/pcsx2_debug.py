@@ -1,6 +1,9 @@
 #!/usr/bin/env python3
 """Capture calls of original functions in a running PCSX2, through PCSX2-MCP's DebugServer (TCP 21512).
 
+Not recommended any more (AGENTS.md §14): it needs PCSX2-MCP's patched PCSX2, whose debug server wedged with many
+breakpoints. Use PINE (`tools/pine.py`) for new work; this stays because it made the F4f and F4g captures.
+
     python tools/pcsx2_debug.py capture <function> <count> <out.txt>
     python tools/pcsx2_debug.py probe <function> <size> <every> <out.txt>
 

@@ -195,19 +195,18 @@ New people: add your own line (in a `board-` commit) before you claim a row, and
 - Port notes, one file per system, live in `tricky-rs/docs/` (today mostly in `original-rules.md`; row F6
   splits it). Write proven facts and interpretations apart: "proven" = read from code, "inferred" = a guess.
 
-- **The running game: PCSX2-MCP** (<https://github.com/hkmodd/PCSX2-MCP>, board row F3b). Ghidra shows the code;
-  PCSX2-MCP shows the game while it runs, in a patched PCSX2 with the player's own disc: memory read, search and
-  diff, registers (GPR, FPU, VU), disassembly, breakpoints with conditions, watchpoints, stepping, backtraces,
-  savestates. Use it for what the code alone can't tell you: where an indirect call really goes, what a field
-  holds during a race, which function runs on which tick, and to check the function runner (F4f). Its tools are
-  `pcsx2_connect`, `pcsx2_read_memory`, `pcsx2_find_pattern`, `pcsx2_memory_diff`, `pcsx2_read_registers`,
-  `pcsx2_disassemble`, `pcsx2_continue`, `pcsx2_step`, `pcsx2_get_backtrace`, plus breakpoint and watchpoint tools;
-  call `pcsx2_connect` first and check `pcsx2_game_info` says SLUS-20326 before trusting an address. If its tools
-  are not in your list, tell the human once (row F3b) and go on without it. For thousands of reads (a whole
-  race), drive its DebugServer (TCP 21512) from a script rather than calling a tool per tick
-  (`tools/pcsx2_debug.py`). Keep breakpoints few: dozens at once wedged the DebugServer, and breakpoints survive
-  a game reboot; only restarting PCSX2 clears them. Nothing it shows
-  goes into the repo but addresses, names and numbers, as with Ghidra.
+- **The running game: PINE** (PCSX2's own IPC: Settings > Advanced > PINE, slot 28011, stock PCSX2). Ghidra
+  shows the code; PINE shows the game while it runs, with the player's own disc: read and write any EE address
+  (batched, so a whole struct is one round trip) and save or load states. Use it for what the code alone can't
+  tell you: what a field holds during a race, which addresses change on a tick, the state before and after a
+  tick to replay through our code (F4b). `tools/pine.py` is our client (`status`, `read`, `floats`, `dump`,
+  `save`, `load`, `watch`); run `status` first and check the id is SLUS-20326 before trusting an address. PCSX2
+  refuses PINE while no game runs or while it is paused. PINE has no breakpoints and no register access, so
+  checks are per tick (state before, state after), not per function call. Dumps and traces are the game's data:
+  keep them on your PC. Only addresses, names and numbers go into the repo, as with Ghidra.
+- PCSX2-MCP (a patched PCSX2 with a debug server: breakpoints, registers) was tried for F4f and F4g and is **not
+  recommended**: dozens of breakpoints wedged it, breakpoints survive a game reboot, and it hangs while PCSX2 is
+  paused. `tools/pcsx2_debug.py` (needs that build) made the captures F4f and F4g describe; don't depend on it.
 
 **Installing ghidra-mcp** (for the human): install Ghidra 12.x and JDK 21; install the Emotion Engine extension
 (`ghidra-emotionengine-reloaded`) through File > Install Extensions; import `SLUS_203.26` (language
