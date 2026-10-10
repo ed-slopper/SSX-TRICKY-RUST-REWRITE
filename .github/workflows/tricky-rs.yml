@@ -1,14 +1,18 @@
-# Board row F5. Slow (Bevy, about 20 minutes cold): runs only when tricky-rs/ changes, or by hand (Actions > tricky-rs > Run workflow).
+# Board row F5. Slow (Bevy, about 20 minutes cold): runs only when tricky-rs's code (src/, Cargo.toml, Cargo.lock) changes, or by hand (Actions > tricky-rs > Run workflow).
 name: tricky-rs
 
 on:
   push:
     paths:
-      - 'tricky-rs/**'
+      - 'tricky-rs/src/**'
+      - 'tricky-rs/Cargo.toml'
+      - 'tricky-rs/Cargo.lock'
       - '.github/workflows/tricky-rs.yml'
   pull_request:
     paths:
-      - 'tricky-rs/**'
+      - 'tricky-rs/src/**'
+      - 'tricky-rs/Cargo.toml'
+      - 'tricky-rs/Cargo.lock'
       - '.github/workflows/tricky-rs.yml'
   workflow_dispatch:
 

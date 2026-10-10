@@ -225,8 +225,8 @@ Restart Claude and check that `decompile_function` is in the tool list.
   harness exists (row F4), a ported function is **checked** only when it matches the original on it.
 
 - CI (`.github/workflows/`): `Guard` runs on every push (no game files, our Python tools, names), `Function
-  runner` when `tools/r5900/` changes, `tricky-rs` (Bevy, about 20 minutes) only when `tricky-rs/` changes or
-  by hand. Don't build tricky-rs, locally or by pushing to it, unless a change needs testing or the human asks.
+  runner` when `tools/r5900/` changes, `tricky-rs` (Bevy, about 20 minutes cold) only when `tricky-rs/src/`,
+  `Cargo.toml` or `Cargo.lock` change, or by hand (docs in `tricky-rs/docs/` don't build). Don't build tricky-rs, locally or by pushing to it, unless a change needs testing or the human asks.
 
 ## 16. End of every session
 
