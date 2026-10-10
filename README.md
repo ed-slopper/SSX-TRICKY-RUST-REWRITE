@@ -1,3 +1,16 @@
+TUTORIAL TO CONTRIBUTE TO PROJECT: 
+
+1 Get added to the repo dm me ur github 
+
+2 put the rom in a folder and place these files in a folder on ur pc
+
+3 link claude to github and add the private repo (settings > connectors > github login and connect the repo)
+
+4 link the folder u made with the rom and update to claude
+
+5 point this link to claude and it will automattically start working on something > https://github.com/ed-slopper/SSX-TRICKY-RUST-REWRITE/blob/main/AGENTS.md
+
+
 # SSX Tricky (PS2, USA) reverse engineering
 
 Target: `SLUS_203.26` from `SSX Tricky (USA).iso` (ELF md5 `162580fd65611e72a90deed640a70aef`, PCSX2 CRC `8E7CFF62`).
