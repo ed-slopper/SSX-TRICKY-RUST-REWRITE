@@ -22,7 +22,7 @@ state machine and the renderer are ours. Nothing has been checked against the or
 
 | ID | Task | Area | Needs | Who | Notes |
 |---|---|---|---|---|---|
-| F1a | Give a system to the 3,959 functions the index can't place yet (half the code, about 1 MB): by call graph and by the source-file order of neighbours, then name them | any | | | Gap of F1. `system` column of `tricky-rs/docs/function-index.csv` |
+| F1a | Give a system to the 3,959 functions the index can't place yet (half the code, about 1 MB): by call graph and by the source-file order of neighbours, then name them | any | | ed-slopper/puffin (2026-10-10) | Gap of F1. `system` column of `tricky-rs/docs/function-index.csv` |
 | F1b | Find the libraries linked into the exe (PS2 `sce*` libraries, libc, the C++ runtime, EA's sound and Pathfinder libs) and mark their functions in the index as `host` (not ported: Rust and Bevy stand in for them) or `port` | any | | | Gap of F1. Needs ghidra-mcp or the decompiler export. Changes `tools/function_index.py` (add a `host` status) |
 | F2 | Shared Ghidra names: harvest every name the earlier sessions gave in Ghidra (they live in `tricky-rs/docs/original-rules.md`, the source comments and the ghidra-mcp project, not in `ghidra/symbols.txt`, which stops at the 2,884 RTTI names of 2026-10-04) into `ghidra/symbols.txt`, so a fresh project gets them | any | | | [est] The project on ed-slopper's PC (`ghidra/project`, 2026-10-04) has only the RTTI names; the later ones were made elsewhere. If ed-slopper still has the renamed project, export it instead |
 | F2a | Naming rules written down (AGENTS.md §14) and checked against the names already used | any | F2 | | [est] |
