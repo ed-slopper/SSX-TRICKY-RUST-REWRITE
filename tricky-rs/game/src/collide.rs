@@ -1,7 +1,7 @@
 //! Triangle-soup collision in Bevy space (metres, Y up): a uniform XZ grid of triangles with
 //! "what is the ground under this point" and "push this sphere out of walls" queries.
 
-use bevy::math::{Mat4, Vec3, Vec4};
+use glam::{Mat4, Vec3, Vec4};
 use std::collections::HashMap;
 
 /// Faces at least this upright (normal.y) can be ridden; anything steeper is a wall. The same for
@@ -51,7 +51,7 @@ fn make_tri(p: [Vec3; 3], normals: Option<[Vec3; 3]>, terrain: bool, surface: u8
 }
 
 /// A model part of a keyframed object: its parent, its rest matrix and its curves (game space).
-pub struct MoverObj { pub parent: i32, pub rest: Mat4, pub anim: Option<crate::level::ObjAnim> }
+pub struct MoverObj { pub parent: i32, pub rest: Mat4, pub anim: Option<crate::anim::ObjAnim> }
 /// A keyframed object's own clock (`cAnimObjectNode`): mode 0 once, 2 back and forth, else loop;
 /// seconds. A clip a touch script plays waits (not running) until it is played.
 #[derive(Clone, Copy, Debug)]

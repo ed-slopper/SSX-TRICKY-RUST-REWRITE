@@ -9,10 +9,9 @@
 //! R rails overlay, F1 help.
 
 mod character;
-mod collide;
+use tricky_game::{collide, rails, trickdata};
 mod level;
 mod props;
-mod trickdata;
 mod ui;
 mod sound;
 mod spray;
@@ -27,7 +26,6 @@ mod sfnfont;
 mod coursemusic;
 mod pathmusic;
 mod editor;
-mod rails;
 mod course;
 mod intro;
 mod rivals;

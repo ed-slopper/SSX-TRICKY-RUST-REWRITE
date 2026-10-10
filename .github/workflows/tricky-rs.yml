@@ -7,12 +7,14 @@ on:
       - 'tricky-rs/src/**'
       - 'tricky-rs/Cargo.toml'
       - 'tricky-rs/Cargo.lock'
+      - 'tricky-rs/game/**'
       - '.github/workflows/tricky-rs.yml'
   pull_request:
     paths:
       - 'tricky-rs/src/**'
       - 'tricky-rs/Cargo.toml'
       - 'tricky-rs/Cargo.lock'
+      - 'tricky-rs/game/**'
       - '.github/workflows/tricky-rs.yml'
   workflow_dispatch:
 
@@ -45,10 +47,15 @@ jobs:
           components: clippy
       - uses: Swatinem/rust-cache@v2
         with:
-          workspaces: tricky-rs
+          workspaces: |
+            tricky-rs
+            tricky-rs/game
           cache-on-failure: true
       # cargo test builds the game too, so no separate cargo build
       - run: cargo test --locked
+      - name: cargo test (tricky-game, the Bevy-free physics)
+        working-directory: tricky-rs/game
+        run: cargo test --locked
       # Warnings are reported, not yet fatal: the code predates CI. Row F5a makes this -D warnings.
       # Each finding also becomes an annotation (file, line, message), which can be read without signing in
       # to GitHub; GitHub shows up to 10 errors and 10 warnings per step.

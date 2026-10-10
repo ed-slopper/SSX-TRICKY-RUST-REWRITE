@@ -1,6 +1,6 @@
 //! Grindable rails: the level's splines, flattened to polylines in Bevy space.
 
-use bevy::math::Vec3;
+use glam::Vec3;
 
 pub struct Rail {
     pub pts: Vec<Vec3>,

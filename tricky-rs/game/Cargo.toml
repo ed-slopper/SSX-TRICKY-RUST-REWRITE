@@ -1,0 +1,11 @@
+[package]
+name = "tricky-game"
+version = "0.1.0"
+edition = "2021"
+description = "SSX Tricky's riding physics, wipe-outs, collision and trick data, without Bevy (row F11a)"
+publish = false
+
+[dependencies]
+# the same glam as Bevy 0.16, so tricky-rs and this crate share one Vec3
+glam = "0.29.3"
+serde = { version = "1", features = ["derive"] }

@@ -13,7 +13,7 @@
 //! Z up (local +Y). Units here are metres; the original's cm constants are divided by 100 (and
 //! torques, which are angular momentum per mass, by 100^2).
 use super::*;
-use bevy::math::{Mat3, Quat};
+use glam::{Mat3, Quat};
 use std::sync::OnceLock;
 
 /// A stand-in for the rider's collision spheres. `CollBody_PointMassInertia` 0x236530 weighs the
