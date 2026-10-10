@@ -20,6 +20,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 INDEX = ROOT / "tricky-rs" / "docs" / "function-index.csv"
+GUESSES = ROOT / "tricky-rs" / "docs" / "function-systems.csv"
 SRC = ROOT / "tricky-rs" / "src"
 NOTES = [ROOT / "tricky-rs" / "docs", ROOT / "notes"]
 
@@ -122,6 +123,14 @@ def names_in_src():
     return found
 
 
+def guessed_systems():
+    """Systems from the call graph and neighbours, made by tools/function_systems.py (row F1a)."""
+    if not GUESSES.exists():
+        return {}
+    with open(GUESSES, newline="", encoding="utf-8") as f:
+        return {int(r["address"], 16): r["system"] for r in csv.DictReader(f)}
+
+
 def refresh(rows):
     starts = {int(r["address"], 16) for r in rows}
     names, ported = harvest(starts)
@@ -130,9 +139,12 @@ def refresh(rows):
         if a in names and r["name"].startswith("FUN_"):
             r["name"] = names[a]
     in_src = names_in_src()
+    guessed = guessed_systems()
     for r in rows:
         a = int(r["address"], 16)
         r["system"] = system_of(r["name"])
+        if r["system"] in ("", "other") and a in guessed:
+            r["system"] = guessed[a] + "?"
         named_in_src = LOOKS_NAMED.search(r["name"]) and r["name"] in in_src
         if r["status"] != "checked":
             r["status"] = "ported" if a in ported or named_in_src else "not started"
