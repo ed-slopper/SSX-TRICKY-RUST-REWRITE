@@ -1,0 +1,72 @@
+# Board row F5. Nothing here has the game: tests that need it (TRICKY_ELF) skip.
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  guard:
+    name: No game files, tools, names
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: No game files or decompiler output committed (AGENTS.md §13)
+        run: python tools/check_no_game_files.py
+      - name: Our Python tools compile
+        run: python -m compileall -q tools
+      - name: Names in ghidra/symbols.txt follow AGENTS.md §14
+        run: python tools/function_index.py names
+
+  runner:
+    name: Function runner (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        working-directory: tools/r5900
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: tools/r5900
+      - run: cargo test --locked
+      - run: cargo clippy --locked --all-targets -- -D warnings
+
+  tricky-rs:
+    name: tricky-rs (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        working-directory: tricky-rs
+    steps:
+      - uses: actions/checkout@v4
+      - name: Linux libraries Bevy needs (audio, gamepads, X11)
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends pkg-config libasound2-dev libudev-dev libx11-dev libxcursor-dev libxi-dev libxrandr-dev libxkbcommon-dev
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: tricky-rs
+      - run: cargo build --locked
+      - run: cargo test --locked
+      # Warnings are reported, not yet fatal: the code predates CI. Row F5a makes this -D warnings.
+      - run: cargo clippy --locked --all-targets
