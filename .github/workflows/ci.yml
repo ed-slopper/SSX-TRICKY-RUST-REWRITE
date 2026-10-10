@@ -69,4 +69,17 @@ jobs:
       - run: cargo build --locked
       - run: cargo test --locked
       # Warnings are reported, not yet fatal: the code predates CI. Row F5a makes this -D warnings.
-      - run: cargo clippy --locked --all-targets
+      # Errors and warnings also go to the job summary, which can be read without signing in to GitHub.
+      - name: cargo clippy
+        shell: bash
+        run: |
+          set +e
+          cargo clippy --locked --all-targets --message-format=short 2>&1 | tee clippy.txt
+          status=${PIPESTATUS[0]}
+          {
+            echo "### clippy on ${{ runner.os }}: exit $status"
+            echo '```'
+            grep -E '^(error|warning)|: (error|warning)' clippy.txt | sort | uniq -c | sort -rn | head -150
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          exit $status
