@@ -163,7 +163,7 @@ matches the original.
 | F1a | Systems for the unplaced functions: `tools/function_systems.py` (call graph, shared globals, neighbours, proven address ranges, the library spans) writes `tricky-rs/docs/function-systems.csv`; 3,959 without a system down to 150 | P0 | ed-slopper/puffin | 2026-10-10 | f0c7b2d |
 | F1b | Linked libraries split into bands (`LIB_BANDS` in `tools/function_systems.py`): EA sound and middleware (port), EA memory, Sony SDK, libc, C++ runtime, kernel stubs (host); `host` status in the index (1,181 functions); 13 library functions read and named in `ghidra/symbols.txt`, which the index now reads | P0 | ed-slopper/puffin | 2026-10-10 | 45ffac7 |
 | F1d | `lib-ea` split into EA's shape files, compression (RefPack, Huffman, BTree), wide text and the `.loc` string table, BIG archives (port) and the async file system and streams (host); `comm` (DECI2 dev-kit link) is host; 24 functions named in `ghidra/symbols.txt` | P0 | ed-slopper/puffin | 2026-10-10 | 1ada4af |
-| F2 | 107 names from `original-rules.md`, the notes and the source comments into `ghidra/symbols.txt` (97 global, 10 class methods incl. 2 constructors), 3 RTTI placeholders renamed (`cEndRaceHandler::Update`, `cLapBoostNode::Update`, `cZBoostNode::Update`); the index now takes every name from symbols.txt first | P0 | ed-slopper/puffin | 2026-10-10 | COMMIT |
+| F2 | 107 names from `original-rules.md`, the notes and the source comments into `ghidra/symbols.txt` (97 global, 10 class methods incl. 2 constructors), 3 RTTI placeholders renamed (`cEndRaceHandler::Update`, `cLapBoostNode::Update`, `cZBoostNode::Update`); the index now takes every name from symbols.txt first | P0 | ed-slopper/puffin | 2026-10-10 | 4f78122 |
 
 ## Changes to the board
 
