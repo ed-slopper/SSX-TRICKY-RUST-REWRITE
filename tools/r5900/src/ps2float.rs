@@ -3,30 +3,76 @@
 //! clamped to ±0x7F7FFFFF, division by zero gives ±0x7F7FFFFF, and the square root of a negative number is the
 //! root of its absolute value.
 //!
-//! How results are rounded is the open question (board rows F4c, F4f), so it is a setting, [`Rules`]:
-//! - [`Rules::Measured`] (the default): add, subtract and multiply round to nearest, divide, square root and
-//!   int-to-float round toward zero. This is what matched the game best in PCSX2 (2026-10-10, 24 calls of
-//!   `Boarder_ForwardDrag` and `Boarder_SideFriction` captured in a race: 18 bit-exact, 6 one unit in the last
-//!   place apart). Rounding add or multiply toward zero matched far worse (3 to 10 exact); divide and int-to-float
-//!   made no difference on those calls, so they keep the manual's rule.
-//! - [`Rules::Manual`]: everything toward zero, as the manual describes the hardware (3 of the 24 exact).
+//! How results are rounded is the open question (board rows F4c, F4f, F4g), so it is a setting, [`Rules`], one
+//! rule per kind of operation:
+//! - `Nearest`: IEEE round to nearest.
+//! - `Chop`: toward zero, as the manual says the EE rounds.
+//! - `EeAdder` (add and subtract only): the adder as the manual describes it: the smaller operand's mantissa is
+//!   shifted right to line the exponents up and the bits shifted out are dropped (there is no guard bit), then the
+//!   sum is normalised and cut toward zero.
 //!
-//! The exact result is formed in f64 and then cut to f32: products and quotients of two floats, and sums of
+//! [`Rules::default`] is the best match to the game in PCSX2 so far (`tricky-rs/docs/checking.md`, F4f, F4g).
+//! `TRICKY_FLOAT_RULES=add=ee,mul=chop` style strings parse with [`Rules::parse`].
+//!
+//! Exact results are formed in f64 and then cut to f32: products and quotients of two floats, and sums of
 //! floats within 29 binary orders of each other, are exact or rounded once that way.
 
 use std::cell::Cell;
 
 const MAX: f32 = f32::MAX; // 0x7F7FFFFF
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
-pub enum Rules {
-    #[default]
-    Measured,
-    Manual,
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Round {
+    Nearest,
+    Chop,
+    /// Add and subtract only.
+    EeAdder,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Rules {
+    pub add: Round,
+    pub mul: Round,
+    pub div: Round,
+    pub cvt: Round,
+}
+
+impl Rules {
+    /// Everything toward zero, as the manual describes the hardware.
+    pub const MANUAL: Rules = Rules { add: Round::Chop, mul: Round::Chop, div: Round::Chop, cvt: Round::Chop };
+
+    /// `add=ee,mul=chop,div=nearest,cvt=chop`; parts left out keep the default.
+    pub fn parse(s: &str) -> Result<Rules, String> {
+        let mut r = Rules::default();
+        for part in s.split(',').map(str::trim).filter(|p| !p.is_empty()) {
+            let (k, v) = part.split_once('=').ok_or_else(|| format!("{part}: expected op=rule"))?;
+            let v = match v {
+                "n" | "nearest" => Round::Nearest,
+                "c" | "chop" => Round::Chop,
+                "ee" if k == "add" => Round::EeAdder,
+                _ => return Err(format!("{part}: rule is nearest, chop or (add only) ee")),
+            };
+            match k {
+                "add" => r.add = v,
+                "mul" => r.mul = v,
+                "div" => r.div = v,
+                "cvt" => r.cvt = v,
+                _ => return Err(format!("{part}: op is add, mul, div or cvt")),
+            }
+        }
+        Ok(r)
+    }
+}
+
+impl Default for Rules {
+    /// The best match to the game in PCSX2 so far.
+    fn default() -> Rules {
+        Rules { add: Round::Nearest, mul: Round::Nearest, div: Round::Chop, cvt: Round::Chop }
+    }
 }
 
 thread_local! {
-    static RULES: Cell<Rules> = const { Cell::new(Rules::Measured) };
+    static RULES: Cell<Rules> = Cell::new(Rules::default());
 }
 
 /// Set by `Runner::call` from `Runner::float_rules`.
@@ -34,14 +80,8 @@ pub(crate) fn set_rules(r: Rules) {
     RULES.with(|c| c.set(r));
 }
 
-#[derive(Clone, Copy)]
-enum Op {
-    AddMul,
-    Other,
-}
-
-fn to_nearest(op: Op) -> bool {
-    matches!((RULES.with(|c| c.get()), op), (Rules::Measured, Op::AddMul))
+fn rules() -> Rules {
+    RULES.with(|c| c.get())
 }
 
 /// A register or memory value as the EE sees it: an exponent of 0 is zero, an exponent of 255 is a large
@@ -55,8 +95,8 @@ pub fn load(x: f32) -> f32 {
     }
 }
 
-/// Cut an exact result to the EE's float: clamped, denormals to zero, rounded as `op` is under the current rules.
-fn round(r: f64, op: Op) -> f32 {
+/// Cut an exact result to the EE's float: clamped, denormals to zero, rounded by `how`.
+fn round(r: f64, how: Round) -> f32 {
     let neg = r.is_sign_negative();
     let a = r.abs();
     let mag = if a == 0.0 || a < f32::MIN_POSITIVE as f64 {
@@ -65,7 +105,7 @@ fn round(r: f64, op: Op) -> f32 {
         MAX
     } else {
         let mut f = a as f32; // nearest
-        if !to_nearest(op) && f as f64 > a {
+        if how != Round::Nearest && f as f64 > a {
             f = f32::from_bits(f.to_bits() - 1); // one step toward zero
         }
         f
@@ -73,16 +113,60 @@ fn round(r: f64, op: Op) -> f32 {
     if neg { -mag } else { mag }
 }
 
+fn add_ee(a: f32, b: f32) -> f32 {
+    if a == 0.0 {
+        return b;
+    }
+    if b == 0.0 {
+        return a;
+    }
+    let (ba, bb) = (a.to_bits(), b.to_bits());
+    let (mut ea, mut eb) = (((ba >> 23) & 0xff) as i32, ((bb >> 23) & 0xff) as i32);
+    let (mut ma, mut mb) = (((ba & 0x7f_ffff) | 0x80_0000) as i64, ((bb & 0x7f_ffff) | 0x80_0000) as i64);
+    let (mut sa, mut sb) = (ba >> 31, bb >> 31);
+    if (eb, mb) > (ea, ma) {
+        std::mem::swap(&mut ea, &mut eb);
+        std::mem::swap(&mut ma, &mut mb);
+        std::mem::swap(&mut sa, &mut sb);
+    }
+    let shift = ea - eb;
+    mb = if shift > 24 { 0 } else { mb >> shift };
+    let mut m = if sa == sb { ma + mb } else { ma - mb };
+    if m == 0 {
+        return 0.0;
+    }
+    let mut e = ea;
+    while m >= 0x100_0000 {
+        m >>= 1;
+        e += 1;
+    }
+    while m < 0x80_0000 {
+        m <<= 1;
+        e -= 1;
+    }
+    if e >= 255 {
+        return if sa == 1 { -MAX } else { MAX };
+    }
+    if e <= 0 {
+        return if sa == 1 { -0.0 } else { 0.0 };
+    }
+    f32::from_bits((sa << 31) | ((e as u32) << 23) | (m as u32 & 0x7f_ffff))
+}
+
 pub fn add(a: f32, b: f32) -> f32 {
-    round(load(a) as f64 + load(b) as f64, Op::AddMul)
+    let (a, b) = (load(a), load(b));
+    match rules().add {
+        Round::EeAdder => add_ee(a, b),
+        how => round(a as f64 + b as f64, how),
+    }
 }
 
 pub fn sub(a: f32, b: f32) -> f32 {
-    round(load(a) as f64 - load(b) as f64, Op::AddMul)
+    add(a, -b)
 }
 
 pub fn mul(a: f32, b: f32) -> f32 {
-    round(load(a) as f64 * load(b) as f64, Op::AddMul)
+    round(load(a) as f64 * load(b) as f64, rules().mul)
 }
 
 pub fn div(a: f32, b: f32) -> f32 {
@@ -91,16 +175,16 @@ pub fn div(a: f32, b: f32) -> f32 {
         let neg = a.is_sign_negative() != b.is_sign_negative();
         return if neg { -MAX } else { MAX };
     }
-    round(a as f64 / b as f64, Op::Other)
+    round(a as f64 / b as f64, rules().div)
 }
 
 pub fn sqrt(a: f32) -> f32 {
-    round((load(a).abs() as f64).sqrt(), Op::Other)
+    round((load(a).abs() as f64).sqrt(), rules().div)
 }
 
 /// cvt.s.w
 pub fn from_int(i: i32) -> f32 {
-    round(i as f64, Op::Other)
+    round(i as f64, rules().cvt)
 }
 
 /// cvt.w.s: toward zero, clamped to the int range.
@@ -127,16 +211,18 @@ mod tests {
     }
 
     #[test]
-    fn add_and_multiply_follow_the_rules() {
-        // 1 + 2^-24 lies halfway between two floats; 1.1 * 1.1 is not exact either
+    fn rules_switch_rounding() {
         let x = 1.1f32;
-        set_rules(Rules::Measured);
+        set_rules(Rules::default());
         assert_eq!(mul(x, x).to_bits(), (x * x).to_bits(), "to nearest, as IEEE");
-        set_rules(Rules::Manual);
-        let chopped = mul(x, x).to_bits();
-        assert!(chopped == (x * x).to_bits() || chopped == (x * x).to_bits() - 1, "toward zero");
-        assert!(((x as f64) * (x as f64)) >= f32::from_bits(chopped) as f64);
-        set_rules(Rules::Measured);
+        set_rules(Rules::MANUAL);
+        assert!((x as f64) * (x as f64) >= mul(x, x) as f64, "toward zero");
+        // the EE adder drops the bits of the smaller operand: 1 + 2^-24 + 2^-24 stays 1
+        set_rules(Rules::parse("add=ee").unwrap());
+        assert_eq!(add(add(1.0, 2f32.powi(-24)), 2f32.powi(-24)), 1.0);
+        assert_eq!(add(1.5, -0.25), 1.25);
+        set_rules(Rules::default());
+        assert!(Rules::parse("mul=ee").is_err());
     }
 
     #[test]

@@ -196,11 +196,30 @@ made from the game and stays on your PC). Struct layouts are not needed: the mem
 | add/sub and multiply to nearest (divide, int-to-float either way) | **18** | **1** |
 | as above, with an EE adder that drops the shifted-out bits | 17 | 1 |
 
-So in PCSX2 the game's add, subtract and multiply round to nearest; the runner now does that by default
-(`ps2float::Rules::Measured`, `Rules::Manual` keeps the manual's rule). Six calls still differ by one unit in the
-last place, always in the last few operations; the cause is not found yet (row F4g, with `pcsx2_debug.py probe`,
-which stops each call at one more point to show where the runner and the game first part). What a real console
-does, PCSX2 aside, is for F4c.
+So in PCSX2 the game's add, subtract and multiply round to nearest; the runner does that by default
+(`ps2float::Rules::default()`; `Rules::MANUAL` is the manual's rule, `TRICKY_FLOAT_RULES=add=ee,mul=chop` and the
+like try others, including an EE adder that drops the bits it shifts out).
+
+**F4g, 2026-10-10: the remaining differences.** `tools/pcsx2_debug.py probe 109cb8 240 1` stopped 135 more calls
+of `Boarder_ForwardDrag` each at one point inside (every instruction outside delay slots, one per call). Over all
+159 calls, final results:
+
+| add/sub | multiply | Bit-exact | Largest difference |
+|---|---|---|---|
+| nearest | nearest (default) | 111 of 159 | 2 ulp |
+| EE adder | nearest | 110 | 2 |
+| toward zero | nearest | 97 | 2 |
+| nearest | toward zero | 80 | 4 |
+| EE adder | toward zero | 35 | 5 |
+| toward zero | toward zero (manual) | 28 | 6 |
+
+Divide and int-to-float rounding change nothing on these calls. The first instruction where runner and game part
+is `add.s $f9, $f1, $f4` at 0x109d6c, the drag's `cub = S2·(−0.29035342)·(1/255) + 1.2848105` (stat byte
+rider stats+0x19). Brute force over all 256 stat values: the game's results there (0x3f99610a for byte 76,
+0x3f98a67c for byte 81) come out only with both multiplies toward zero and the add to nearest, or with the EE
+adder (any multiply rounding), never with IEEE rounding throughout. Neither rule holds for the whole function,
+so PCSX2 most likely emulates the EE's multiplier and adder bit by bit (its accurate FPU), which is neither IEEE
+rule; reproducing that is what is left of F4g. Whether to follow PCSX2 or the console is F4c.
 
 The game's `$gp` at the breakpoint was 0x3C38F0, the value the runner works out from the entry code, and the code
 in memory was byte-identical to `SLUS_203.26`.
