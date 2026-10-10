@@ -166,7 +166,7 @@ New people: add your own line (in a `board-` commit) before you claim a row, and
 - **Check which program is open** in Ghidra before trusting an address: it must be `SLUS_203.26` with the md5 in
   section 2.
 - **Rename functions and fields in Ghidra as you work them out**, so the next agent sees them. Then add the same
-  names to `ghidra/symbols.txt` (`F <addr> <name>` for functions, `L <addr> <name>` for data) in the same commit
+  names to `ghidra/symbols.txt` (`G <addr> <name>` for a global function, `F <addr> <class> <method>` for a class's, `D <addr> <name>` for global data, `L <addr> <class> <name>` for a class's data) in the same commit
   as your code, because the Ghidra project is not in the repo and this file is how everyone else gets your
   names (`ghidra/scripts/ApplySsxSymbols.java` applies it).
 - Naming: free functions `System_VerbThing` (`Boarder_Wipeout`, `Score_Crash`, `TriggerScript_ExecOp`); class

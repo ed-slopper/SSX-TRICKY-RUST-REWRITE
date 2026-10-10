@@ -2882,3 +2882,16 @@ D 337c58 gApp
 D 3352a0 gCheat_UnlockEverything
 D 3352ac gCheat_MaxAttrib
 D 3352b0 gCheat_Mallora
+G 2fb2b4 memcpy
+G 2fb468 memset
+G 2fca28 sprintf
+G 2ff870 libc_vfprintf
+G 2fd14c strcpy
+G 2fd260 strlen
+G 2cc808 EAMem_Set
+G 2ce114 EAMem_Copy
+G 2cca00 EAMem_AllocEx
+G 2ccf70 EAMem_Alloc
+G 2ccfc0 EAMem_Free
+G 2d0908 SND_Lock
+G 2d0938 SND_Unlock

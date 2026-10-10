@@ -14,7 +14,7 @@ How a system is guessed, repeated until nothing changes:
   neighbour  the nearest placed functions before and after it agree (functions of one source file sit together)
   loose      after the above: the best score wins if it is at least 1 and ahead of the runner-up
   range      inside an address range whose system the notes prove (RANGES below)
-  lib        inside the linked libraries (LIBS below); 'lib' is never spread to game code by the graph
+  lib        inside a band of the linked libraries (LIB_BANDS below); never spread to game code
 
 Then `python tools/function_index.py status` puts them in the index, marked with '?'.
 """
@@ -40,18 +40,38 @@ RANGES = [
     (0x16b000, 0x16d400, "race"),         # Circuit_*
     (0x2bec00, 0x2c2040 + 4, "audio"),    # PF_*: EA Pathfinder interactive music, and its glue to the game
 ]
-# Linked libraries: nothing in these spans calls game code (the PS2 SDK and kernel stubs, libc, EA's sound
-# library). Row F1b splits them further and decides what is host and what is ported.
-LIBS = [(0x2bb000, 0x2bec00), (0x2c2040 + 4, 0x30F960)]
+# Linked libraries (row F1b). Nothing from 0x2c2044 on calls game code. The bands were placed by who calls
+# them and a few functions read by hand (tricky-rs/docs/function-index.md, "The libraries"):
+#   lib-snd    EA's sound library: the effect player the game's audio calls, SND_* and their internals  (port)
+#   lib-ea     EA's other middleware the game's renderer, front end and file code call                  (port)
+#   lib-eamem  EA's memory manager: alloc, free, its own memset and memcpy                              (host)
+#   sdk        Sony's libraries: device and graphics set-up, memory card, SIF/IOP                       (host)
+#   libc       newlib: strings, printf, maths, start-up                                                 (host)
+#   runtime    the gcc C++ runtime: exceptions, type info                                               (host)
+#   kernel     the EE kernel's syscall stubs                                                            (host)
+LIB_BANDS = [
+    (0x2bb000, 0x2bec00, "lib-snd"),
+    (0x2c2044, 0x2cc800, "lib-ea"),
+    (0x2cc800, 0x2cf800, "lib-eamem"),
+    (0x2cf800, 0x2e4c00, "lib-snd"),
+    (0x2e4c00, 0x2f2800, "sdk"),
+    (0x2f2800, 0x2f6000, "libc"),
+    (0x2f6000, 0x2fa800, "runtime"),
+    (0x2fa800, 0x3063e0, "libc"),
+    (0x3063e0, 0x307830, "kernel"),
+    (0x307830, 0x30F960, "sdk"),
+]
+LIB_SYSTEMS = {s for _, _, s in LIB_BANDS}
+NOT_SPREAD = LIB_SYSTEMS | {"common"}  # never handed on to game code by the graph or the neighbours
 
 
 def fixed_system(a):
     for lo, hi, s in RANGES:
         if lo <= a < hi:
             return s, "range"
-    for lo, hi in LIBS:
+    for lo, hi, s in LIB_BANDS:
         if lo <= a < hi:
-            return "lib", "lib"
+            return s, "lib"
     return None
 
 
@@ -98,10 +118,10 @@ def graph(funcs):
 def scores(a, sysof, out, inn, glob, gsys):
     sc = collections.Counter()
     for c in out.get(a, ()):
-        if sysof.get(c) not in (None, "lib", "common"):
+        if c in sysof and sysof[c] not in NOT_SPREAD:
             sc[sysof[c]] += 2
     for c in inn.get(a, ()):
-        if sysof.get(c) not in (None, "lib", "common"):
+        if c in sysof and sysof[c] not in NOT_SPREAD:
             sc[sysof[c]] += 1.5
     for x in glob.get(a, ()):
         gs = gsys.get(x)
@@ -114,7 +134,7 @@ def global_systems(sysof, glob):
     g = collections.defaultdict(set)
     for a, gs in glob.items():
         s = sysof.get(a)
-        if s and s not in ("common", "lib"):
+        if s and s not in NOT_SPREAD:
             for x in gs:
                 g[x].add(s)
     return g
@@ -162,7 +182,7 @@ def main(d):
 
     def neighbour_pass():
         n = 0
-        placed = [a for a in order if sysof.get(a) not in (None, "common", "lib")]
+        placed = [a for a in order if a in sysof and sysof[a] not in NOT_SPREAD]
         for a in order:
             if a in sysof or rows[a]["system"] == "runtime":
                 continue

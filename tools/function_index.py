@@ -9,7 +9,7 @@ only: nothing of the game's code goes in it.
 
 Names: the Ghidra name, replaced by any name our notes and code give the address (`Name` 0xaddr).
 System: from the name; for unnamed functions, the system of the named functions on both sides when they
-agree, marked with a trailing '?'. Status: 'ported' when the address or the name is written in tricky-rs/src (lines tagged STANDIN do not
+agree, marked with a trailing '?'. Status: 'host' for the libraries Rust and Bevy stand in for (HOST), 'ported' when the address or the name is written in tricky-rs/src (lines tagged STANDIN do not
 count), 'checked'
 is set by hand (or by the comparison harness, row F4) and is kept, otherwise 'not started'.
 """
@@ -22,6 +22,9 @@ ROOT = Path(__file__).resolve().parent.parent
 INDEX = ROOT / "tricky-rs" / "docs" / "function-index.csv"
 GUESSES = ROOT / "tricky-rs" / "docs" / "function-systems.csv"
 SRC = ROOT / "tricky-rs" / "src"
+SYMBOLS = ROOT / "ghidra" / "symbols.txt"
+# Systems Rust and Bevy stand in for: their functions are not ported (status 'host'). Row F1b.
+HOST = {"sdk", "kernel", "libc", "runtime", "lib-eamem"}
 NOTES = [ROOT / "tricky-rs" / "docs", ROOT / "notes"]
 
 # First match wins. Matched against the whole name (class::method or Free_Function).
@@ -131,13 +134,27 @@ def guessed_systems():
         return {int(r["address"], 16): r["system"] for r in csv.DictReader(f)}
 
 
+def symbol_names():
+    """Function names in ghidra/symbols.txt, the names agents gave in Ghidra:
+    `G <addr> <name>` a global function, `F <addr> <class> <method>` a class's."""
+    names = {}
+    for line in SYMBOLS.read_text(encoding="utf-8").splitlines():
+        p = line.split()
+        if len(p) == 3 and p[0] == "G":
+            names[int(p[1], 16)] = p[2]
+        elif len(p) == 4 and p[0] == "F":
+            names[int(p[1], 16)] = f"{p[2]}::{p[3]}"
+    return names
+
+
 def refresh(rows):
     starts = {int(r["address"], 16) for r in rows}
     names, ported = harvest(starts)
+    symbols = symbol_names()
     for r in rows:
         a = int(r["address"], 16)
-        if a in names and r["name"].startswith("FUN_"):
-            r["name"] = names[a]
+        if r["name"].startswith("FUN_"):
+            r["name"] = symbols.get(a) or names.get(a) or r["name"]
     in_src = names_in_src()
     guessed = guessed_systems()
     for r in rows:
@@ -147,7 +164,12 @@ def refresh(rows):
             r["system"] = guessed[a] + "?"
         named_in_src = LOOKS_NAMED.search(r["name"]) and r["name"] in in_src
         if r["status"] != "checked":
-            r["status"] = "ported" if a in ported or named_in_src else "not started"
+            if a in ported or named_in_src:
+                r["status"] = "ported"
+            elif r["system"].rstrip("?") in HOST:
+                r["status"] = "host"
+            else:
+                r["status"] = "not started"
     fill_guesses(rows)
     return rows
 

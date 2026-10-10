@@ -22,7 +22,7 @@ state machine and the renderer are ours. Nothing has been checked against the or
 
 | ID | Task | Area | Needs | Who | Notes |
 |---|---|---|---|---|---|
-| F1b | Split the linked libraries (`lib` in the index: 1,372 functions at 0x2bb000–0x2bec00 and 0x2c2044–0x30F960, which never call game code) into PS2 SDK, kernel stubs (0x3063e0–0x307830), libc, the C++ runtime and EA's sound library (`SND_*`), name them, and mark each `host` (not ported: Rust and Bevy stand in for it) or `port` | any | | ed-slopper/puffin (2026-10-10) | Gap of F1. Needs ghidra-mcp or the decompiler export. Changes `tools/function_index.py` (a `host` status) and `LIBS` in `tools/function_systems.py` |
+| F1d | Identify `lib-ea` (204 functions at 0x2c2044–0x2cc800, EA middleware the renderer, front end, HUD and file code call; 0x2c5160 reads a packed table for 130 callers) and split it into its libraries; decide whether `comm` (102 functions, `CCommDriver`/`CDeci2CopydataCommDriver`, the dev-kit debug link) is `host` | any | | | Gap of F1b. `LIB_BANDS` in `tools/function_systems.py`, `HOST` in `tools/function_index.py` |
 | F1c | Name the functions F1a placed only by guess (5,094 marked `?` in `tricky-rs/docs/function-index.csv`), system by system, in Ghidra and in `ghidra/symbols.txt`; start with boarder, race and world, the systems being ported now | any | F3 | | Gap of F1a: naming needs the binary in Ghidra (ghidra-mcp), which was not connected |
 | F2 | Shared Ghidra names: harvest every name the earlier sessions gave in Ghidra (they live in `tricky-rs/docs/original-rules.md`, the source comments and the ghidra-mcp project, not in `ghidra/symbols.txt`, which stops at the 2,884 RTTI names of 2026-10-04) into `ghidra/symbols.txt`, so a fresh project gets them | any | | | [est] The project on ed-slopper's PC (`ghidra/project`, 2026-10-04) has only the RTTI names; the later ones were made elsewhere. If ed-slopper still has the renamed project, export it instead |
 | F2a | Naming rules written down (AGENTS.md §14) and checked against the names already used | any | F2 | | [est] |
@@ -95,7 +95,7 @@ state machine and the renderer are ours. Nothing has been checked against the or
 | G8 | HUD: `HUD_DrawPlayerSprites` 0x1a2c40, `HUD_DrawPlayerText` 0x1a4f70, `HUD_DrawSprite` 0x1c0068, all of it at 640×480, with the game's text from `american.loc` | unowned | E5 | | [repo] `hudsprites.rs`, `sfnfont.rs` partly done |
 | G9 | Front end: title, main menu, mode select, rider / outfit / board select, options, records, trick book screens, unlock screens, music player, loading screens (`gApp+0x734`) | unowned | E1, E5 | | [repo] `ui.rs` is ours. Split by screen before claiming |
 | G9a | Pause menu and in-race options; the leftover `cDebugMenu` (0x187850) kept as a dev menu | unowned | G9 | | [repo] findings.md |
-| G10 | Audio engine: EA BNK voices (`SND_ParsePTLayer` 0x2d5410, `SNDVoice_CalcPitchMult` 0x2d5288), 3D voices, mixing and volumes, decoded from the disc at run time | unowned | E2b | | [repo] Today `.wav` exported by vgmstream; README: stream picks "by length, looping and tone" |
+| G10 | Audio engine (includes EA's sound library, `lib-snd` in the function index: 408 functions): EA BNK voices (`SND_ParsePTLayer` 0x2d5410, `SNDVoice_CalcPitchMult` 0x2d5288), 3D voices, mixing and volumes, decoded from the disc at run time | unowned | E2b | | [repo] Today `.wav` exported by vgmstream; README: stream picks "by length, looping and tone" |
 | G10a | Rider and world sounds checked: `BoardIn_*`, `Voice_Update3D`, `Audio_SurfaceGroup`, `WorldEmitter_Update` 0x22bf60 | any | G10 | | [repo] `boardsound.rs`, `worldsound.rs` |
 | G10b | Music: Pathfinder (`PF_*` 0x2bec00–0x2c2040) decoded at run time, song names from `music.inf` / `musicmap.inf` | unowned | G10 | | [repo] "Unresolved: song names"; `pathmusic.rs` |
 | G10c | Announcer (DJ Atomika) and rider voices: when each line is picked and played | unowned | G10 | | [est] |
@@ -162,9 +162,11 @@ matches the original.
 | D4 | First pass of riding, air, rails, tricks, scoring, wipe-outs, AI, race lines, camera, world animations, sounds and music from the exe (`tricky-rs` stage 4, `original-rules.md`) | P1/P2 | ed-slopper | 2026-10-10 | 84ea0bf |
 | F1 | Function index `tricky-rs/docs/function-index.csv` (7,425 functions, 2,320 named, 109 ported, 0 checked), `tools/function_index.py` to refresh it | P0 | ed-slopper/puffin | 2026-10-10 | 22a443f |
 | F1a | Systems for the unplaced functions: `tools/function_systems.py` (call graph, shared globals, neighbours, proven address ranges, the library spans) writes `tricky-rs/docs/function-systems.csv`; 3,959 without a system down to 150 | P0 | ed-slopper/puffin | 2026-10-10 | f0c7b2d |
+| F1b | Linked libraries split into bands (`LIB_BANDS` in `tools/function_systems.py`): EA sound and middleware (port), EA memory, Sony SDK, libc, C++ runtime, kernel stubs (host); `host` status in the index (1,181 functions); 13 library functions read and named in `ghidra/symbols.txt`, which the index now reads | P0 | ed-slopper/puffin | 2026-10-10 | COMMIT |
 
 ## Changes to the board
 
 - 2026-10-10 ed-slopper/puffin: board created from the repo, the local tree and the notes.
 - 2026-10-10 ed-slopper/puffin: F1 done; added F1a, F1b (gaps of F1).
 - 2026-10-10 ed-slopper/puffin: F1a done; F1b rewritten with the library spans found; added F1c (gap of F1a).
+- 2026-10-10 ed-slopper/puffin: F1b done; added F1d (gap of F1b); G10 notes the EA sound library; AGENTS.md §14 had the symbols.txt line format wrong, fixed.
