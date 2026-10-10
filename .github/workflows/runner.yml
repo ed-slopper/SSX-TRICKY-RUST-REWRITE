@@ -1,0 +1,43 @@
+# Board row F5. Runs when the function runner changes. Tests that need the game (TRICKY_ELF) skip.
+name: Function runner
+
+on:
+  push:
+    paths:
+      - 'tools/r5900/**'
+      - '.github/workflows/runner.yml'
+  pull_request:
+    paths:
+      - 'tools/r5900/**'
+      - '.github/workflows/runner.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# A newer push stops the older run of this workflow on the same branch.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  runner:
+    name: Function runner (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        working-directory: tools/r5900
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: tools/r5900
+      - run: cargo test --locked
+      - run: cargo clippy --locked --all-targets -- -D warnings

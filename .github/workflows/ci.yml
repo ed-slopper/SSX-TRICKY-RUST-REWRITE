@@ -1,12 +1,18 @@
-# Board row F5. Nothing here has the game: tests that need it (TRICKY_ELF) skip.
-name: CI
+# Board row F5. Seconds; runs on every push. Nothing here has the game.
+name: Guard
 
 on:
   push:
   pull_request:
+  workflow_dispatch:
 
 permissions:
   contents: read
+
+# A newer push stops the older run of this workflow on the same branch.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   guard:
@@ -23,63 +29,3 @@ jobs:
         run: python -m compileall -q tools
       - name: Names in ghidra/symbols.txt follow AGENTS.md §14
         run: python tools/function_index.py names
-
-  runner:
-    name: Function runner (${{ matrix.os }})
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ubuntu-latest, windows-latest]
-    runs-on: ${{ matrix.os }}
-    defaults:
-      run:
-        working-directory: tools/r5900
-    steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
-        with:
-          components: clippy
-      - uses: Swatinem/rust-cache@v2
-        with:
-          workspaces: tools/r5900
-      - run: cargo test --locked
-      - run: cargo clippy --locked --all-targets -- -D warnings
-
-  tricky-rs:
-    name: tricky-rs (${{ matrix.os }})
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ubuntu-latest, windows-latest]
-    runs-on: ${{ matrix.os }}
-    defaults:
-      run:
-        working-directory: tricky-rs
-    steps:
-      - uses: actions/checkout@v4
-      - name: Linux libraries Bevy needs (audio, gamepads, X11)
-        if: runner.os == 'Linux'
-        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends pkg-config libasound2-dev libudev-dev libx11-dev libxcursor-dev libxi-dev libxrandr-dev libxkbcommon-dev
-      - uses: dtolnay/rust-toolchain@stable
-        with:
-          components: clippy
-      - uses: Swatinem/rust-cache@v2
-        with:
-          workspaces: tricky-rs
-      - run: cargo build --locked
-      - run: cargo test --locked
-      # Warnings are reported, not yet fatal: the code predates CI. Row F5a makes this -D warnings.
-      # Each finding also becomes an annotation (file, line, message), which can be read without signing in
-      # to GitHub; GitHub shows up to 10 errors and 10 warnings per step.
-      - name: cargo clippy
-        shell: bash
-        run: |
-          set +e
-          cargo clippy --locked --all-targets --message-format=short 2>&1 | tee clippy.txt
-          status=${PIPESTATUS[0]}
-          for level in error warning; do
-            grep -E "^[^ ]+\.rs:[0-9]+:[0-9]+: $level" clippy.txt | sort -u | head -10 |
-              sed -E "s#^([^:]+):([0-9]+):([0-9]+): $level(\[[^]]*\])?: (.*)#::$level file=tricky-rs/\1,line=\2,col=\3::\5 \4#"
-          done
-          echo "$(grep -cE ': error' clippy.txt) errors, $(grep -cE ': warning' clippy.txt) warnings"
-          exit $status

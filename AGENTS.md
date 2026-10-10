@@ -224,6 +224,10 @@ Restart Claude and check that `decompile_function` is in the tool list.
 - Run the build and the self-test that covers your system before marking a row done. When the comparison
   harness exists (row F4), a ported function is **checked** only when it matches the original on it.
 
+- CI (`.github/workflows/`): `Guard` runs on every push (no game files, our Python tools, names), `Function
+  runner` when `tools/r5900/` changes, `tricky-rs` (Bevy, about 20 minutes) only when `tricky-rs/` changes or
+  by hand. Don't build tricky-rs, locally or by pushing to it, unless a change needs testing or the human asks.
+
 ## 16. End of every session
 
 Finish by writing, for each person with an agent on this repo, a ready-to-paste prompt for their next task.
