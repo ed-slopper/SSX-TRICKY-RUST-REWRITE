@@ -28,7 +28,9 @@ A 3-2-1 countdown holds everyone in the gate.
 | Next character | C | |
 | Previous / next track | [ and ] or PageUp / PageDown | |
 | Restart (new countdown) | Enter | Start |
-| Back to last safe spot | Backspace | Select |
+| Back to last safe spot (costs a little boost, as in the original) | Backspace | Select |
+| Next camera (board, near, far, over) | C | Triangle / Y |
+| Skip the pre-race intro | Space | Cross / A |
 | Free camera on/off | Tab | |
 | Rails overlay, hide help | R, F1 | |
 | Edge smoothing (4x MSAA) on/off, if it runs slowly | F2 | |
@@ -222,6 +224,22 @@ thirds, full), `reset`, `countdown` (3, 2, 1; GO is the same beep an octave up u
 `pickup`, `tricky`, `menu_move`, `crowd`, and optional `crash.wav`, `glass.wav`, `go.wav`. `audio/unlabeled/`
 holds every distinct sound of the board, effects, Garibaldi, crowd and TRICKY banks, numbered, for identifying.
 
+**The courses' own sounds** (`audio/world/`, every bank of `DATA/AUDIO/AUDIO.BIG` decoded by
+`tools/bnk/levelaudio.py` + `tools/bnk/worldsounds.py`, plus each level's `audio/levelaudio.json`): the crowds, snow
+cats, birds, rivers, cowbells and chants placed on the course's objects fade in and out as the camera passes, with
+the game's six volume curves; running into fences, signs, flags and the like knocks with that object's own sound
+(louder the faster you hit it, quieter further from the camera); and the fireworks bang when their trigger is
+touched. With these files the stand-in `crowd.wav` stays quiet.
+
+**The course's own music in the intro.** With `audio/course/<track>/seg_00..16.wav` (each course's
+`DATA/AUDIO/<COURSE>.BIG`, decoded by `tools/bnk/levelaudio.py`) the flyover plays the course theme as the game
+strings it together (A1, another A, two B, then C parts), the closing part when the intro ends or is skipped, and
+the race song is held back until GO.
+
+**The game's fonts.** With `chars/fonts/` (from `DATA/FONTS/TITLE.SFN` and `MENU.SFN`, made by
+`tools/sfn/sfn2png.py`) the in-race place, time, points, speed, multiplier and trick names are drawn in the
+original fonts, sizes, colours and places, with the 2-pixel drop shadow.
+
 **Best results** (best time, best score, race and show-off medals per track) are kept in `tricky-save.json` next
 to the program and shown in the menu.
 
@@ -267,3 +285,132 @@ board's name and kind; the stats line under it changes with the board (the game 
   `src/trickdata.rs`. Alpine boards also use the game's lower-drag, stronger-push formulas.
 - All twelve are available from the start (the game unlocks them as you earn experience). Rivals ride their first
   board as rookies and their UBERBOARD as masters.
+
+## 1:1 with the original (in progress)
+
+The riding is being rebuilt to match the decompiled game, rule by rule; `docs/original-rules.md` has every rule
+and constant found so far, with the function addresses. Done in this pass:
+
+- **Riding:** the original's carving model. Steering tips the board's support force sideways (the "lean"), the
+  board then yaws round after the direction of travel, and a hard carve costs a lot of speed. Steering, crouch and
+  brake are analog and move at the game's rates; slow speeds steer weakly. Drag acts along the board and grows
+  under load; the edge only weakly resists sideways slip; a spring holds the board on the snow and it leaves the
+  ground when the snow drops away by more than a few centimetres. The rider pushes himself along only roughly
+  down the course, and boost only works going straight. Riding backwards slowly swings the board round (switch).
+- **Jumping and the air:** the crouch charges exponentially; the jump fires a moment after you let go; tiny
+  wind-ups count for nothing and a nearly pure spin or flip wind-up is made pure. In the air the stick drives
+  the rotation inside a band that narrows through the jump; let go and the rotation finishes itself (to the next
+  half turn for spins, full turn for flips, back only when within 40 degrees). Without a wind-up nothing turns
+  until you let go and press again. Crash limits are no longer symmetric, a nose-down or very fast landing is a
+  hard landing, and the landing no longer straightens the board for you.
+- **Rails:** A / D balances: for 0.6 s the board centres itself, then it drifts off one side unless you lean
+  against it, and too far off you fall off (no crash). Shift + A / D turns the board a quarter turn. Boost on a
+  rail is a kick per press (held only while crouched). No friction or speed limit on rails.
+- **Scoring:** chain bonuses (4,000 to 16,000 for 2 to 5+ tricks in a row), air time bonus, rail tricks never
+  count as repeats, rail half turns pay as you make them, leaving a rail fakie gives the switch bonus, any gain
+  at a full meter re-opens the uber window, multiplier pickups only count in the air or on a rail.
+- **Opponents and races:** opponents follow the course's own AI path events (target speeds, jump zones), steer
+  and cruise by the game's rules, re-pick their skill every second by who is ahead, and use the game's catch-up
+  (their physics runs 0.7x to 1.5x depending on the gap to you, inside a lead window per starting slot). The
+  countdown is 2.5 s. Show-off runs against the track's clock (Garibaldi 120 s, Alaska 135 s, others 90 s) with
+  the game's medal scores per track.
+- **Start gate:** hold Up / W in the gate during the countdown to lean forward; rock back with Down / S about
+  half a second before GO for a slingshot start (up to about twice the normal 20 km/h push-out). Each
+  character's gate stat sets how fast they rock. Computer riders rock and time it by skill.
+- **Grudges:** each rider has a friend, a foe and a liking for each of the others (the game's tables). Knock a
+  computer rider about enough and it holds a grudge: it chases you, shoves you when alongside and taunts you.
+  Only riders with a grudge shove; getting even cools them down.
+- **Snow:** the board spray now follows the game: carving throws a sheet of snow off the edge (much more in
+  powder, little on hard snow and ice), a thin trail in the air and on rails, a fan when braking, a splash on hard
+  landings.
+- **The finish:** over the line every rider brakes, coasts to a stop, stands up and cheers or sulks by result;
+  the results come up 4 s after the line, as in the game.
+- **After the race:** once you have stopped, the game's own post-race scenes play at the finish area: a rival
+  who has a grudge against you has words first, then your character's win or lose scene with the others around
+  (the clips come from `chars/anims/finish.json`, extracted from ANM.BIG). Space skips. Then the results.
+- **Board tracks:** riders leave faint tracks in the snow (deeper on ice, fainter in powder) that fade out
+  behind them.
+- **Career:** races are two heats and a final; career points (15/10/5 per medal, best medal per track) train
+  your rider from the starting attributes to the caps and give a rank (Master at 240); computer riders improve
+  with you. The HUD clock now shows hundredths, the place turns gold when leading, trick names show in gold.
+- **Unlocks:** as in a new game: Mac, Moby, Elise and Eddie to start, one more rider per gold medal; Garibaldi,
+  Snowdream and Elysium open, each medal opens the next track (Alaska opens Untracked and Pipedream); boards by
+  career points. Setting Training to "master" unlocks everything (like the original's cheat).
+- **Rivals:** the post-race rival scene now follows the game's rivalry score (grudges and getting even);
+  taunts follow the original's rule. Multiplier pickups only work in show-off; no points after the finish line.
+- **Trick book:** each rider's 30 trick book entries in six chapters, from the disc's TRICKDEF.DAT (made into
+  `chars/trickbook.json` by `tools/trickbook/trickbook.py SLUS_203.26 TRICKDEF.DAT chars`). Land the tricks of
+  the current chapter to tick them off ("TRICK BOOK: ..." under the trick name); the menu shows the chapter and
+  the next trick; finishing the book unlocks the rider's UBERBOARD. Progress is kept in `tricky-book.json`.
+- **Ubers:** each rider's own uber names (e.g. Eddie's Indy uber is the Gut Buster) and their signature uber
+  where its animation exists; the uber's name replaces the grab's.
+- **Level scripts:** the course's own scripts (SSFLogic.json) now run their main effects: each event hides what
+  the original hides (race-only objects in show-off, the start gate in free ride) and switches the show-off
+  rails off in races; anything whose touch script resets the rider is a reset zone (crowds, rivers, backdrop
+  trees); boost pads push riders along (Alaska, Merqury); teleports work; the Merqury subway train and
+  Snowdream's ski lift chairs ride their splines (with the lift cables drawn).
+- **Moving scenery:** the level's keyframed objects play their animations as in the game (fans, penguins,
+  sailboats, Aloha's side-to-side barriers, helicopters), and broken glass, junk and letters fly apart with each
+  object's own debris settings from the level scripts.
+- **World animations:** signs, check-point tops, LCD logos and shop signs flip through their texture
+  flipbooks, the start lights count down red, yellow, green with the countdown, boost pads, rivers, waterfalls,
+  conveyors and jumbotron tops scroll their textures, flags and banners wave, and the scripts' one-shot clips
+  play when set off (Mesablanca's falling trees, Merqury's sewer gates) — all from the level scripts.
+  Crowds in the stands animate cell by cell from `chars/crowd/` (DATA/TEXTURES/CROWD.SSH), Megaplex's glass
+  panes crack when ridden on and break on a hard hit, and knocking down Merqury's garbage cans lights the strike
+  lights one by one and then the STRIKE sign.
+- **Wipe-outs as in the game:** the body tumbles as one rigid body (the game's masses, gravity, drag and
+  bounce rules), plays the impact clip for the side it lands on, rolls onto its back or front and slides to a
+  stop, then gets up facing down the course with one of the six get-up clips — or, if it lands upright, rides
+  straight on; a knock in the air with little spin recovers into an ordinary jump. Stuck for 3 s (7 s in all),
+  you are put back on the course. `TRICKY_CRASHAT=s` forces a wipe-out at race time s.
+- **Objects as the game treats them:** an object with a surface type is ridden like ground (Megaplex's glass
+  floors and frames, ramps, platforms); others are bounced off; scenery without "player bounce" is not solid.
+  Keyframed objects collide where they are drawn (Megaplex's iris doors open from their buttons, flippers,
+  ramps, bumpers, Merqury's trains), Megaplex's glass floors crack and break under you, and a restart puts the
+  world back as it was.
+- **Interactive race music:** with `audio/pf/` (all of DATA/AUDIO/MUSIC.BIG, made by `tools/music/musicbig.py`
+  and `pack.py`) each song plays as the game's Pathfinder graph: bars chosen by your place (or, alone, how full
+  the boost meter is), shortcut zones switching sections, an outro at the finish, and the song's beat-synced
+  in-air loops over big air and its own Tricky phrase.
+- **Pickups as in the game:** the multiplier gems spin and stay where they are when you go through them (the
+  game never removes them), as do the speed and trick boost pads.
+- **The game's own board sounds:** with `audio/bnk/` (the original zboard and zbxsfx banks exported by
+  `tools/bnk/bnk2wav.py BANK.bnk audio/bnk board|sfx`: each program's sample, its loop, and its root note, bend
+  range and volume, which set the pitch as the game's sound driver does) and `audio/snow.inf` (DATA/CONFIG/SNOW.INF) next to the levels, the board
+  plays the original glide, carve and scrape loops for each surface (packed snow, powder, ice, rock, metal, wood,
+  rails...), with volume and pitch worked out by the game's own snow sound programs from the board's load, slip,
+  dig and lean; takeoff and landing sounds per surface by impact; crash, grab, boost (by meter level),
+  pickup, reset and uber-ready sounds; the wind comes up only in big air as the music ducks.
+- **The game's HUD art:** with `chars/hud/` (HUDGAME.SSH's sheets as PNGs and the sprite table) the boost
+  meter, the TRICKY letters and the uber orb are the game's own sprites, placed as in the game.
+- **Particles:** the levels' particle emitters run as in the game (snow blowers, torches, spray, the bursts
+  when you hit a gem, a sign or glass), with the game's motion and colour rules; drawn with a plain soft sprite
+  with the game's particle sprites when `chars/particles/<name>.png` are there (made from DATA/TEXTURES/PARTICLE.SSH
+  with `tools/ssh/ssh2png.py PARTICLE.SSH chars/particles`).
+- **Uber sets per board:** each board type has the rider's own uber animations (`chars/<rider>/uber_fr.json`,
+  `uber_ex.json`, from fr/ex<Chr>Uber.afl), and every rider's signature uber is there on their own board type.
+- **Rivals:** how each rider feels about you carries from heat to heat in a circuit, worn down between heats.
+- **HUD:** the boost meter is the original's column of fourteen segments in red, orange and yellow bands; the
+  speed is bottom left.
+- **Wipe-outs:** hitting the snow from a tumble plays the original's impact clips.
+- **Sound:** four countdown beeps (0.5 s apart), no beep at GO, the music ducks in big air while the wind comes
+  up, and the boost sound follows the meter level.
+
+## Pre-race intro
+
+Before the countdown the original flies the camera through the course and then shows the riders in the start
+gate, from the course's camera scripts. tricky-rs plays the same scripts if it finds them: copy `DATA/CAMERA`
+from the game disc as `levels/<track>/Camera/track.cml` (GARIBALD.CML for gari, SNOWDREA for snowdream, ELYSIUM,
+MESABLAN, MERQURY, ALOHA, TOKYO for megaplex, ALASKA, PIPEDREA, UNTRACKE, TRICK) plus `commonob.cml` and
+`scripts.cml` (COMMONOB.CML, SCRIPTS.CML). Space skips it.
+
+In a race the riders also act out the original's staging scene (stretching, talking, polishing boards) and then
+loosen up in the gate. Those clips are not in the riding set: extract them from `DATA/CHAR/ANM.BIG` with
+`tools/afl/anmbig.py ANM.BIG out stg_com_1.afl stg_com_2.afl stg_com_3.afl stg_com_4.afl GAT_6COM_1.afl
+GAT_6COM_2.afl GAT_6COM_3.afl GAT_6COM_4.afl`, convert each with `tools/afl/aflexport.py`, and merge the clip
+lists into `chars/anims/scenes.json`. Without it the riders just wait in the gate.
+
+Freestyle and alpine boards have their own riding animations in the original (`franim.afl`, `exanim.afl`), and
+wipe-outs share `cmanim.afl` (sliding on the back or front, tumbling). Extract those the same way into
+`chars/anims/fr.json`, `ex.json` and `cm.json`; without them every board uses the BX set.

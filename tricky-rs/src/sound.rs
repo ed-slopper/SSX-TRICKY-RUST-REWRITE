@@ -14,7 +14,7 @@ const SHOTS: [&str; 13] = ["land", "jump", "rail_on", "crash", "glass", "menu_mo
 pub enum Loop { Ride, Air, Grind, Slide, Crowd, Music(usize) }
 
 #[derive(Resource, Default)]
-pub struct Sounds { shots: HashMap<&'static str, Handle<AudioSource>>, pub music: bool, pub effects: bool, songs: usize, dir: std::path::PathBuf }
+pub struct Sounds { shots: HashMap<&'static str, Handle<AudioSource>>, pub music: bool, pub effects: bool, songs: usize, pub dir: std::path::PathBuf }
 
 pub fn setup_sound(mut commands: Commands, level: Res<LevelRes>, mut assets: ResMut<Assets<AudioSource>>) {
     // `audio` sits next to `levels`; look from the path as given and from where it really is
@@ -50,7 +50,23 @@ pub fn course_music(
     for (e, kind) in &old { if matches!(kind, Loop::Music(_)) { commands.entity(e).despawn(); } }
     let name = list.dirs.get(list.current).and_then(|d| d.file_name()).map(|n| n.to_string_lossy().to_string()).unwrap_or_default();
     // the songs DATA/CONFIG/MUSICMAP.INF gives each course, by their file names on the disc
-    let songs: &[&str] = match name.as_str() {
+    let songs = course_songs(&name);
+
+    sounds.songs = 0;
+    let folder = sounds.dir.join("music");
+    for song in songs {
+        let Ok(bytes) = std::fs::read(folder.join(format!("{song}.ogg"))) else { continue };
+        let h = assets.add(AudioSource { bytes: bytes.into() });
+        commands.spawn((AudioPlayer::new(h), PlaybackSettings { mode: PlaybackMode::Loop, volume: Volume::Linear(0.0), ..default() }, Loop::Music(sounds.songs)));
+        sounds.songs += 1;
+    }
+    println!("music: {} songs from {}", sounds.songs, folder.display());
+}
+
+
+/// The songs DATA/CONFIG/MUSICMAP.INF gives each course, by their file names on the disc.
+pub fn course_songs(track: &str) -> &'static [&'static str] {
+    match track {
         "gari" => &["systemover", "smartbomb", "adamsrev"],
         "snowdream" => &["ginandsin", "shakemomma", "songfordot"],
         "elysium" => &["peaktime", "downtime", "superwoman"],
@@ -63,16 +79,7 @@ pub fn course_music(
         "pipedream" => &["bburner", "slayboarder"],
         "trick" => &["slaybreak"],
         _ => &["smartbomb"],
-    };
-    sounds.songs = 0;
-    let folder = sounds.dir.join("music");
-    for song in songs {
-        let Ok(bytes) = std::fs::read(folder.join(format!("{song}.ogg"))) else { continue };
-        let h = assets.add(AudioSource { bytes: bytes.into() });
-        commands.spawn((AudioPlayer::new(h), PlaybackSettings { mode: PlaybackMode::Loop, volume: Volume::Linear(0.0), ..default() }, Loop::Music(sounds.songs)));
-        sounds.songs += 1;
     }
-    println!("music: {} songs from {}", sounds.songs, folder.display());
 }
 
 #[derive(Default)]
@@ -81,7 +88,10 @@ pub struct Prev { on_snow: bool, air: f32, crashed: bool, rail: bool, uber: bool
 pub fn sound(
     time: Res<Time>, keys: Res<ButtonInput<KeyCode>>, rider: Res<RiderRes>, race: Res<RaceRes>, game: Res<ui::Game>, props: Res<Props>, mode: Res<Mode>,
     mut sounds: ResMut<Sounds>, mut sinks: Query<(&Loop, &mut AudioSink)>, mut commands: Commands, mut prev: Local<Prev>,
+    (board, world, course, pf): (Res<crate::boardsound::BoardSounds>, Res<crate::worldsound::WorldSounds>, Res<crate::coursemusic::CourseMusic>, Res<crate::pathmusic::PathMusic>),
 ) {
+    // with the game's own board sounds the stand-ins for them stay quiet
+    let original = board.on;
     if keys.just_pressed(KeyCode::KeyM) { sounds.music = !sounds.music; }
     if keys.just_pressed(KeyCode::KeyN) { sounds.effects = !sounds.effects; }
     let r = &rider.0;
@@ -91,17 +101,22 @@ pub fn sound(
     let on_snow = r.grounded && r.rail.is_none();
     let in_air = !r.grounded && r.rail.is_none();
     let near_crowd = game.screen != ui::Screen::Playing || race.0.state != RaceState::Running || race.0.progress() < 0.04 || race.0.progress() > 0.94;
+    // a big air ducks the music and brings up the wind (the original's music factor:
+    // clamp(1 - 0.437 T, 16/127, 1), T the seconds into the big part of the air)
+    let big = if in_air && r.crashed <= 0.0 { (prev.air - 1.0).max(0.0) } else { 0.0 };
+    let duck = (1.0 - 0.437 * big).clamp(16.0 / 127.0, 1.0);
     for (kind, mut sink) in &mut sinks {
         let (vol, pitch) = match kind {
+            Loop::Ride | Loop::Air | Loop::Grind | Loop::Slide if original => (0.0, 1.0),
             Loop::Ride if riding && on_snow && r.crashed <= 0.0 => {
                 let carve = r.input.steer.abs() * 0.3 * (speed / 10.0).min(1.0) + if r.input.brake { 0.3 * (speed / 6.0).min(1.0) } else { 0.0 };
                 ((fast * 0.45 + carve).min(0.9), 0.75 + 0.5 * fast - 0.1 * r.input.steer.abs())
             }
-            Loop::Air if riding && in_air => (0.12 + 0.25 * fast, 0.8 + 0.4 * fast),
+            Loop::Air if riding && in_air => ((0.12 + 0.25 * fast) * (2.0 - duck), 0.8 + 0.4 * fast),
             Loop::Grind if riding && r.rail.is_some() => (0.55, 0.8 + 0.4 * fast),
             Loop::Slide if riding && on_snow && r.crashed <= 0.0 && r.input.brake => (0.55 * (speed / 8.0).min(1.0), 0.85 + 0.3 * fast),
-            Loop::Crowd if sounds.effects && *mode == Mode::Ride && near_crowd => (if game.screen == ui::Screen::Menu { 0.18 } else { 0.4 }, 1.0),
-            Loop::Music(i) if sounds.music && *i == prev.song % sounds.songs.max(1) => (if game.screen == ui::Screen::Menu { 0.5 } else { 0.4 }, 1.0),
+            Loop::Crowd if sounds.effects && *mode == Mode::Ride && near_crowd && !world.on => (if game.screen == ui::Screen::Menu { 0.18 } else { 0.4 }, 1.0),
+            Loop::Music(i) if sounds.music && *i == prev.song % sounds.songs.max(1) && !course.holding && !pf.active => (if game.screen == ui::Screen::Menu { 0.5 } else { 0.4 * duck }, 1.0),
             _ => (0.0, 1.0),
         };
         // ease towards the level wanted so nothing clicks on or off
@@ -114,36 +129,38 @@ pub fn sound(
     // one-off sounds, from what changed since the last frame
     let mut play_at = |name: &str, vol: f32, speed: f32| {
         if !sounds.effects { return; }
+        if original && matches!(name, "land" | "jump" | "rail_on" | "crash" | "pickup" | "boost" | "reset" | "tricky") { return; }
         if let Some(h) = sounds.shots.get(name) {
             commands.spawn((AudioPlayer::new(h.clone()), PlaybackSettings { mode: PlaybackMode::Despawn, volume: Volume::Linear(vol), speed, ..default() }));
         }
     };
     let tier = (r.boost * 3.0 + 0.001) as u32;
     let mut go = false;
-    let mut play = |name: &str, vol: f32| play_at(name, vol, 1.0);
     let gone = props.0.iter().filter(|p| p.hidden && matches!(p.kind, Kind::Touch { .. })).count();
     if game.screen != ui::Screen::Menu && *mode == Mode::Ride {
-        if on_snow && !prev.on_snow && prev.air > 0.3 && r.crashed <= 0.0 { play("land", (0.4 + prev.air * 0.3).min(1.0)); }
-        if !r.grounded && prev.on_snow && r.vel.y > 3.0 { play("jump", 0.7); }
-        if r.rail.is_some() && !prev.rail { play("rail_on", 0.8); }
-        if r.crashed > 0.0 && !prev.crashed { play("crash", 1.0); }
-        if r.uber_ready() && !prev.uber { play("tricky", 0.9); }
+        if on_snow && !prev.on_snow && prev.air > 0.3 && r.crashed <= 0.0 { play_at("land", (0.4 + prev.air * 0.3).min(1.0), 1.0); }
+        if !r.grounded && prev.on_snow && r.vel.y > 3.0 { play_at("jump", 0.7, 1.0); }
+        if r.rail.is_some() && !prev.rail { play_at("rail_on", 0.8, 1.0); }
+        if r.crashed > 0.0 && !prev.crashed { play_at("crash", 1.0, 1.0); }
+        if r.uber_ready() && !prev.uber { play_at("tricky", 0.9, 1.0); }
         if gone > prev.gone {
             let glass = props.0.iter().any(|p| p.hidden && matches!(&p.kind, Kind::Touch { pieces, .. } if !pieces.is_empty()) && (p.home.0 - r.pos).length() < 12.0);
-            play(if glass { "glass" } else { "pickup" }, 0.8);
+            play_at(if glass { "glass" } else { "pickup" }, 0.8, 1.0);
         }
-        let count = if race.0.state == RaceState::Countdown { race.0.countdown.ceil() as i32 } else { 0 };
-        if r.boosting && !prev.boosting { play("boost", 0.8); }
-        if tier > prev.tier { play("levelup", 0.8); }
-        if r.respawns > prev.respawns && prev.screen == Some(game.screen) && race.0.state == RaceState::Running { play("reset", 0.8); }
-        if count != prev.count && game.screen == ui::Screen::Playing { if count == 0 { go = true; } else { play("countdown", 0.9); } }
+        // the countdown beeps every half second, four times (0.5, 1.0, 1.5, 2.0 s), and GO comes at 2.5 s
+        let count = if race.0.state == RaceState::Countdown { (race.0.countdown * 2.0).ceil() as i32 } else { 0 };
+        // the boost sound goes with how full the meter is
+        if r.boosting && !prev.boosting { play_at("boost", 0.6 + 0.1 * r.boost_level(), 0.9 + 0.1 * r.boost_level()); }
+        if tier > prev.tier { play_at("levelup", 0.8, 1.0); }
+        if r.respawns > prev.respawns && prev.screen == Some(game.screen) && race.0.state == RaceState::Running { play_at("reset", 0.8, 1.0); }
+        if count != prev.count && game.screen == ui::Screen::Playing { if count == 0 && prev.count > 0 { go = true; } else if (1..=4).contains(&count) { play_at("countdown", 0.9, 1.0); } }
         prev.count = count;
     }
-    if game.cursor + game.row * 10 + game.board * 100 != prev.cursor || game.master != prev.master { play("menu_move", 0.7); }
-    if prev.screen.is_some() && prev.screen != Some(game.screen) { play("menu_move", 0.9); }
-    if game.screen == ui::Screen::Paused && game.pause_cursor != prev.pause { play("menu_move", 0.7); }
-    // GO: its own sound if one has been found, otherwise the countdown beep an octave up
-    if go { if sounds.shots.contains_key("go") { play_at("go", 0.9, 1.0); } else { play_at("countdown", 1.0, 2.0); } }
+    if game.cursor + game.row * 10 + game.board * 100 != prev.cursor || game.master != prev.master { play_at("menu_move", 0.7, 1.0); }
+    if prev.screen.is_some() && prev.screen != Some(game.screen) { play_at("menu_move", 0.9, 1.0); }
+    if game.screen == ui::Screen::Paused && game.pause_cursor != prev.pause { play_at("menu_move", 0.7, 1.0); }
+    // GO: its own sound if one has been found (the original has none of its own: the crowd and the music carry it)
+    if go && sounds.shots.contains_key("go") { play_at("go", 0.9, 1.0); }
     // each new run moves on to the course's next song
     let song = prev.song + (prev.screen == Some(ui::Screen::Menu) && game.screen == ui::Screen::Playing) as usize;
     prev.air = if r.grounded || r.rail.is_some() { 0.0 } else { prev.air + time.delta_secs() };

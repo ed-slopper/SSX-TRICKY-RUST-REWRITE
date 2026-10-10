@@ -222,6 +222,10 @@ impl AnimSet {
         }
         Ok(set)
     }
+    /// Add another file's clips (later ones win on a name clash).
+    pub fn merge(&mut self, other: AnimSet) {
+        for c in other.clips { self.index.insert(c.name.clone(), self.clips.len()); self.clips.push(c); }
+    }
     pub fn len(&self) -> usize { self.clips.len() }
     pub fn get(&self, name: &str) -> Option<&Clip> { self.index.get(name).map(|i| &self.clips[*i]) }
     pub fn nth(&self, i: usize) -> Option<&Clip> { self.clips.get(i) }

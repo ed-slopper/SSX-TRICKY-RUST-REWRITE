@@ -1,0 +1,49 @@
+# Allowlist: ignore everything, then add back only what was written for this project.
+# Nothing from the game disc (ISO, extracted levels, characters, textures, animations,
+# the executable or its decompiled code) may be committed.
+/*
+!/.gitignore
+!/README.md
+!/notes/
+!/mods/
+!/tools/
+!/ghidra/
+!/tricky-rs/
+
+# notes: text only (the map image is rendered from game data)
+/notes/*.png
+
+# tools: scripts and our own source, not downloads or built binaries
+/tools/downloads/
+/tools/ssxlevel/*
+!/tools/ssxlevel/src/
+__pycache__/
+
+# ghidra: our scripts and name lists, not the project database (it contains the game's code)
+/ghidra/project/
+
+# tricky-rs: source only
+/tricky-rs/target/
+/tricky-rs/*.exe
+/tricky-rs/*.png
+/tricky-rs/*.mp4
+
+# belt and braces: game file types anywhere
+*.iso
+*.ISO
+*.BIG
+*.big
+*.elf
+SLUS_*
+*.ssh
+*.mpf
+*.afl
+*.pbd
+*.mus
+/tricky-rs/tricky-save.json
+/tricky-rs/exe.*
+/tricky-rs/src.zip
+*.bak
+
+# camera files copied from the disc
+/notes/cam_raw/

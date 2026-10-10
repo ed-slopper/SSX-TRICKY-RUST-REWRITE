@@ -4,6 +4,9 @@ use bevy::math::Vec3;
 
 pub struct Rail {
     pub pts: Vec<Vec3>,
+    /// the level spline it was made from, and whether the event's scripts leave it switched on
+    pub spline: usize,
+    pub on: bool,
     /// distance along the rail at each point
     cum: Vec<f32>,
     min: Vec3,
@@ -17,7 +20,7 @@ impl Rail {
         for w in pts.windows(2) { cum.push(cum.last().unwrap() + (w[1] - w[0]).length()); }
         let min = pts.iter().fold(Vec3::MAX, |a, p| a.min(*p));
         let max = pts.iter().fold(Vec3::MIN, |a, p| a.max(*p));
-        (*cum.last().unwrap() > 1.0).then_some(Self { pts, cum, min, max })
+        (*cum.last().unwrap() > 1.0).then_some(Self { pts, cum, min, max, spline: usize::MAX, on: true })
     }
     pub fn len(&self) -> f32 { *self.cum.last().unwrap() }
     /// Position and direction at a distance along the rail.
@@ -31,13 +34,14 @@ impl Rail {
 }
 
 #[derive(Default)]
-pub struct Rails(pub Vec<Rail>);
+pub struct Rails(pub Vec<Rail>, /** per event: rails the scripts switch (spline, on) */ pub [std::collections::HashMap<usize, bool>; 3]);
 
 impl Rails {
     /// Closest rail point within `reach` of `p`: (rail index, distance along it, how far away).
     pub fn nearest(&self, p: Vec3, reach: f32) -> Option<(usize, f32, f32)> {
         let mut best: Option<(usize, f32, f32)> = None;
         for (ri, rail) in self.0.iter().enumerate() {
+            if !rail.on { continue; }
             if p.cmplt(rail.min - reach).any() || p.cmpgt(rail.max + reach).any() { continue; }
             for i in 1..rail.pts.len() {
                 let (a, b) = (rail.pts[i - 1], rail.pts[i]);

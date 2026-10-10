@@ -19,6 +19,9 @@ pub struct Patch {
     pub points: Vec<[f32; 3]>,
     #[serde(default)]
     pub surface_type: i32,
+    /// show-off ramps: only there (drawn and solid) in show-off events
+    #[serde(default)]
+    pub trick_only_patch: bool,
     pub texture_path: String,
     #[serde(rename = "LightmapID")]
     pub lightmap_id: usize,
@@ -47,6 +50,10 @@ pub struct Instance {
     pub visable: bool,
     #[serde(default)]
     pub player_collision: bool,
+    /// flag 0x80: touching it bounces the rider off (`Boarder_InstanceBounce`); without it an
+    /// object with no surface type is not solid (its touch only runs its scripts)
+    #[serde(default)]
+    pub player_bounce: bool,
     #[serde(default)]
     pub collsion_mode: i32,
     #[serde(default)]
@@ -56,6 +63,10 @@ pub struct Instance {
     pub u0: f32,
     #[serde(default = "minus_one")]
     pub effect_slot_index: i32,
+    /// row of the surface table its collision uses: the object is ground like the terrain; -1: it
+    /// is never ground, only bounced off (PlayerBounce) or touched
+    #[serde(default = "minus_one")]
+    pub surface_type: i32,
 }
 fn minus_one() -> i32 { -1 }
 
@@ -107,11 +118,54 @@ pub struct ModelObject {
     pub position: Option<[f32; 3]>,
     pub rotation: Option<[f32; 4]>,
     pub scale: Option<[f32; 3]>,
+    /// keyframe curves (`cMeshAnimFrame`): base pose U1..U6, channel mask, cubic segments
+    #[serde(default)]
+    pub animation: Option<ObjAnim>,
+}
+/// A model object's animation: base pose (tx, ty, tz in cm, rx, ry, rz in degrees), a mask of the
+/// animated channels (bit i = channel i), and per animated channel its cubic segments.
+#[derive(Deserialize, Clone, Debug)]
+pub struct ObjAnim {
+    #[serde(rename = "U1", default)] pub u1: f32, #[serde(rename = "U2", default)] pub u2: f32, #[serde(rename = "U3", default)] pub u3: f32,
+    #[serde(rename = "U4", default)] pub u4: f32, #[serde(rename = "U5", default)] pub u5: f32, #[serde(rename = "U6", default)] pub u6: f32,
+    #[serde(rename = "AnimationAction", default)] pub action: u32,
+    #[serde(rename = "AnimationEntries", default)] pub entries: Vec<AnimEntry>,
+}
+#[derive(Deserialize, Clone, Debug)]
+pub struct AnimEntry { #[serde(rename = "AnimationMaths", default)] pub segs: Vec<AnimSeg> }
+#[derive(Deserialize, Clone, Copy, Debug)]
+pub struct AnimSeg {
+    #[serde(rename = "Value1")] pub a: f32, #[serde(rename = "Value2")] pub b: f32, #[serde(rename = "Value3")] pub c: f32,
+    #[serde(rename = "Value4")] pub d: f32, #[serde(rename = "Value5")] pub t0: f32, #[serde(rename = "Value6")] pub t1: f32,
+}
+impl ObjAnim {
+    /// The object's local matrix at `t` seconds (`cMeshAnimFrame::vf1`): animated channels replace
+    /// the base pose; each channel is ((a t + b) t + c) t + d on the segment holding t (clamped);
+    /// T * Rz * Ry * Rx, angles in degrees.
+    pub fn local(&self, t: f32) -> Mat4 {
+        let mut ch = [self.u1, self.u2, self.u3, self.u4, self.u5, self.u6];
+        let mut k = 0;
+        for bit in 0..16 {
+            if self.action >> bit & 1 == 0 { continue; }
+            if let (true, Some(e)) = (bit < 6, self.entries.get(k)) {
+                if let Some(s) = e.segs.iter().find(|s| t < s.t1).or(e.segs.last()) {
+                    let tc = t.clamp(s.t0, s.t1);
+                    ch[bit] = ((s.a * tc + s.b) * tc + s.c) * tc + s.d;
+                }
+            }
+            k += 1;
+        }
+        let r = |d: f32| d.to_radians();
+        Mat4::from_translation(Vec3::new(ch[0], ch[1], ch[2])) * Mat4::from_rotation_z(r(ch[5])) * Mat4::from_rotation_y(r(ch[4])) * Mat4::from_rotation_x(r(ch[3]))
+    }
 }
 #[derive(Deserialize)]
 #[serde(rename_all = "PascalCase")]
 pub struct Model {
     pub model_name: String,
+    /// the animation's length in frames (30 a second)
+    #[serde(default)]
+    pub anim_time: f32,
     pub model_objects: Vec<ModelObject>,
 }
 #[derive(Deserialize)]
@@ -126,6 +180,9 @@ pub struct Material {
     /// empty for the odd untextured material
     #[serde(default, deserialize_with = "null_string")]
     pub texture_path: String,
+    /// the frames a TexFlip controller (`cTexFlipNode`) steps through, frame 0 first
+    #[serde(default)]
+    pub texture_flipbook: Option<Vec<String>>,
 }
 fn null_string<'de, D: serde::Deserializer<'de>>(d: D) -> Result<String, D::Error> {
     Ok(Option::<String>::deserialize(d)?.unwrap_or_default())
@@ -149,10 +206,17 @@ struct SplineFile { splines: Vec<Spline> }
 
 #[derive(Deserialize)]
 #[serde(rename_all = "PascalCase")]
-pub struct RaceLine { pub path_pos: [f32; 3], pub path_points: Vec<[f32; 3]> }
+pub struct RaceLine { pub path_pos: [f32; 3], pub path_points: Vec<[f32; 3]>, #[serde(default)] pub distance_to_finish: f32, #[serde(default)] pub path_events: Vec<PathEvent> }
 #[derive(Deserialize, Default)]
 #[serde(rename_all = "PascalCase")]
-pub struct AiFile { #[serde(default)] pub race_lines: Vec<RaceLine> }
+pub struct AiFile { #[serde(default)] pub race_lines: Vec<RaceLine>, #[serde(default, rename = "AIPaths")] pub ai_paths: Vec<AiPath> }
+#[derive(Deserialize)]
+#[serde(rename_all = "PascalCase")]
+pub struct AiPath { pub path_pos: [f32; 3], pub path_points: Vec<[f32; 3]>, #[serde(default)] pub path_events: Vec<PathEvent>, #[serde(default = "fifty", rename = "U3")] pub u3: f32, #[serde(default = "yes")] pub respawnable: bool }
+fn fifty() -> f32 { 50.0 }
+#[derive(Deserialize, Clone, Copy)]
+#[serde(rename_all = "PascalCase")]
+pub struct PathEvent { pub event_type: i32, pub event_value: i32, pub event_start: f32, pub event_end: f32 }
 
 /// Triangle soup read from an OBJ file.
 #[derive(Default, Clone)]
@@ -245,6 +309,10 @@ pub struct Level {
     pub touch: std::collections::HashMap<usize, Vec<usize>>,
     /// Hidden instances that are the broken pieces of something in `touch`.
     pub pieces: std::collections::HashSet<usize>,
+    /// what the level scripts do (event hides, resets, teleports, boosts)
+    pub logic: crate::logic::LevelLogic,
+    /// instances the event scripts switch on and off
+    pub switchable: std::collections::HashSet<usize>,
 }
 
 impl Level {
@@ -265,7 +333,11 @@ impl Level {
                 touch.insert(i, linked);
             }
         }
+        let slot_of: Vec<i32> = instances.iter().map(|i| i.effect_slot_index).collect();
+        let logic = crate::logic::LevelLogic::load(dir, &slot_of);
+        let switchable = logic.switchable();
         Ok(Self {
+            logic, switchable,
             dir: dir.to_path_buf(),
             patches,
             pieces: touch.values().flatten().copied().filter(|i| !instances[*i].visable).collect(),
@@ -279,10 +351,56 @@ impl Level {
     }
     /// Instances that move, break or get picked up: handled one by one, not as static scenery.
     pub fn is_dynamic(&self, i: usize) -> bool {
-        self.instances[i].knockable() || self.touch.contains_key(&i) || self.pieces.contains(&i)
+        self.instances[i].knockable() || self.touch.contains_key(&i) || self.pieces.contains(&i) || self.logic.movers.contains_key(&i)
+    }
+    /// Cracked glass and what breaks with it (megaplex's glass floors): the pane, the invisible
+    /// surface riders ride on and the underside. Solid until the scripts break them.
+    pub fn glass(&self) -> std::collections::HashSet<usize> {
+        let cracks = &self.logic.cracks;
+        let mut g: std::collections::HashSet<usize> = cracks.keys().copied().collect();
+        for c in cracks.keys() { if let Some(l) = self.touch.get(c) { g.extend(l.iter().copied()); } }
+        for (j, l) in &self.touch { if l.iter().any(|x| cracks.contains_key(x)) { g.insert(*j); } }
+        g.retain(|i| self.instances.get(*i).is_some_and(|x| x.player_collision && x.collsion_mode == 1));
+        g
+    }
+    /// Doors a touch script opens with a keyframed clip and that put a rider back while shut
+    /// (megaplex's iris doors).
+    pub fn gates(&self) -> Vec<usize> {
+        let mut v: Vec<usize> = self.logic.anim_on.keys().copied().filter(|i| self.is_gate(*i)).collect();
+        v.sort();
+        v
+    }
+    /// A door: its clip is played once (mode 0) by a touch script, and touching it while shut puts
+    /// the rider back. (Merqury's subway trains loop their clip: not doors.)
+    pub fn is_gate(&self, i: usize) -> bool {
+        self.logic.anim_on.get(&i).is_some_and(|d| d.mode == 0) && self.logic.resets.contains(&i) && !self.logic.anims.contains_key(&i)
     }
     /// The main route down the course in game coordinates: race line 0, then whichever line
     /// starts where the previous one ended, and so on.
+    /// The AI path events the opponents ride by, placed in the world (game space): (where it
+    /// starts, where it ends, file event type, value). Type 101 = target speed (km/h), 100 = jump
+    /// (value >> 2 = speed in km/h, bit 1 = spin, bit 0 = flip). (File type = runtime id + 75.)
+    pub fn ai_events(&self) -> Vec<(Vec3, Vec3, i32, i32)> {
+        let mut out = Vec::new();
+        for path in &self.ai.ai_paths {
+            let mut p = Vec3::from(path.path_pos);
+            let mut pts = vec![p];
+            for d in &path.path_points { p += Vec3::from(*d); pts.push(p); }
+            let at = |dist: f32| {
+                let mut left = dist;
+                for w in pts.windows(2) {
+                    let l = (w[1] - w[0]).length();
+                    if left <= l { return w[0].lerp(w[1], if l > 0.0 { left / l } else { 0.0 }); }
+                    left -= l;
+                }
+                *pts.last().unwrap()
+            };
+            for e in &path.path_events {
+                if e.event_type == 100 || e.event_type == 101 { out.push((at(e.event_start), at(e.event_end), e.event_type, e.event_value)); }
+            }
+        }
+        out
+    }
     pub fn main_line(&self) -> Vec<Vec3> {
         let lines: Vec<Vec<Vec3>> = self.ai.race_lines.iter().map(|r| {
             let mut p = Vec3::from(r.path_pos);
@@ -303,6 +421,18 @@ impl Level {
                 .unwrap_or(lines.len());
         }
         out
+    }
+    /// Every race line with its distance to the finish and its events (game units).
+    pub fn race_lines(&self) -> crate::course::Lines {
+        let raw: Vec<_> = self.ai.race_lines.iter().map(|r| (Vec3::from(r.path_pos), r.path_points.iter().map(|p| Vec3::from(*p)).collect::<Vec<_>>(), r.distance_to_finish,
+            r.path_events.iter().map(|e| crate::course::Event { kind: e.event_type, value: e.event_value, start: e.event_start, end: e.event_end }).collect::<Vec<_>>())).collect();
+        crate::course::Lines::build(&raw, |v| Vec3::new(v.x, v.z, -v.y) * 0.01)
+    }
+    /// The opponents' AI path network.
+    pub fn ai_paths(&self) -> crate::course::AiPaths {
+        let raw: Vec<_> = self.ai.ai_paths.iter().map(|r| (Vec3::from(r.path_pos), r.path_points.iter().map(|p| Vec3::from(*p)).collect::<Vec<_>>(), r.u3, r.respawnable,
+            r.path_events.iter().map(|e| crate::course::Event { kind: e.event_type, value: e.event_value, start: e.event_start, end: e.event_end }).collect::<Vec<_>>())).collect();
+        crate::course::AiPaths::build(&raw, |v| Vec3::new(v.x, v.z, -v.y) * 0.01)
     }
     /// Start of the first race line and the direction it heads in (game coordinates).
     pub fn start(&self) -> (Vec3, Vec3) {

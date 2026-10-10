@@ -256,3 +256,28 @@ pub const BOARDS: [[Board; 12]; 12] = [
     // Marisol
     [Board { name: "Fiesta", kind: 2, bonus: [10, 10, 0, 10] }, Board { name: "Loco Motion", kind: 1, bonus: [10, 0, 0, 20] }, Board { name: "Sand Fish", kind: 2, bonus: [20, 20, 20, 10] }, Board { name: "Party Girl", kind: 2, bonus: [20, 20, 10, 20] }, Board { name: "Dance Explosion", kind: 2, bonus: [40, 50, 20, 20] }, Board { name: "Money Maker", kind: 2, bonus: [30, 40, 30, 30] }, Board { name: "Wind Rider", kind: 2, bonus: [60, 60, 50, 40] }, Board { name: "Booty Call", kind: 0, bonus: [50, 60, 50, 50] }, Board { name: "Heart Breaker", kind: 2, bonus: [60, 70, 80, 60] }, Board { name: "Latin Heat", kind: 2, bonus: [70, 60, 70, 70] }, Board { name: "Rave On", kind: 2, bonus: [80, 80, 70, 80] }, Board { name: "UBERBOARD", kind: 2, bonus: [90, 90, 90, 80] }],
 ];
+
+/// Each rider's uber tricks by the grab they start from (the trick book's chapter 6,
+/// DATA/TUTORIAL/TRICKDEF.DAT): the last is the rider's signature uber.
+pub const UBER_NAMES: [(&str, &[(&str, &str)]); 12] = [
+    ("Eddie", &[("Indy", "Gut Buster"), ("Stalefish", "SuperMan"), ("Mute", "Proper Propeller"), ("Method", "Hand in Hand"), ("Nosegrab", "Worm")]),
+    ("Kaori", &[("Mute", "Paddle Wheel"), ("Method", "Hand in Hand"), ("Indy", "Can Can"), ("Stalefish", "Body Board"), ("Tailgrab", "Pirouette Grind")]),
+    ("Luther", &[("Mute", "Torpedo"), ("Method", "FrogHop"), ("Indy", "The Rake"), ("Stalefish", "Nothing"), ("Tailgrab", "Bronco Buster")]),
+    ("Mac", &[("Mute", "Paddle Wheel"), ("Method", "Hand in Hand"), ("Indy", "Sad Sack"), ("Stalefish", "Scooter"), ("Tailgrab", "Walking The Dog")]),
+    ("Moby", &[("Indy", "Nac Nac"), ("Stalefish", "Nothing"), ("Mute", "Bar Hop"), ("Method", "FrogHop"), ("Nosegrab", "SuperMan Barspin")]),
+    ("Zoe", &[("Mute", "Bar Hop"), ("Method", "Indian"), ("Indy", "Nac Nac"), ("Stalefish", "Near Miss"), ("Nosegrab", "Pommel Me")]),
+    ("JP", &[("Indy", "Gut Buster"), ("Stalefish", "SuperMan"), ("Mute", "Paddle Wheel"), ("Method", "Hand in Hand"), ("Nosegrab", "HeadSpin 2 Poseur")]),
+    ("Elise", &[("Indy", "Nac Nac"), ("Stalefish", "Near Miss"), ("Mute", "Bar Hop"), ("Method", "Judo"), ("Tailgrab", "LaLaLa Lock Step")]),
+    ("Psymon", &[("Mute", "Torpedo"), ("Method", "FrogHop"), ("Indy", "Nac Nac"), ("Stalefish", "Nothing"), ("Tailgrab", "Guillotine")]),
+    ("Seeiah", &[("Indy", "Can Can"), ("Stalefish", "Body Board"), ("Mute", "Proper Propeller"), ("Method", "Hand in Hand"), ("Nosegrab", "Soul Grind")]),
+    ("Brodi", &[("Mute", "Iron Cross"), ("Method", "Airwalk"), ("Indy", "Cordova"), ("Stalefish", "StuntMan"), ("Nosegrab", "Hang 10 Backflip")]),
+    ("Marisol", &[("Mute", "Mulisha"), ("Method", "Airwalk"), ("Indy", "Cordova"), ("Stalefish", "Dervish"), ("Tailgrab", "Aerial Spock 540")]),
+];
+/// The name of a rider's uber started from a grab.
+pub fn uber_name(rider: &str, grab: &str) -> Option<&'static str> {
+    UBER_NAMES.iter().find(|u| u.0.eq_ignore_ascii_case(rider)).and_then(|u| u.1.iter().find(|g| g.0 == grab)).map(|g| g.1)
+}
+/// The grab a rider's signature uber starts from.
+pub fn signature_grab(rider: &str) -> Option<&'static str> {
+    UBER_NAMES.iter().find(|u| u.0.eq_ignore_ascii_case(rider)).and_then(|u| u.1.last()).map(|g| g.0)
+}
