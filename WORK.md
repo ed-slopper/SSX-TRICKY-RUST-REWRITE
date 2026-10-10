@@ -22,7 +22,8 @@ state machine and the renderer are ours. Nothing has been checked against the or
 
 | ID | Task | Area | Needs | Who | Notes |
 |---|---|---|---|---|---|
-| F1 | Function index: every function in the exe in `tricky-rs/docs/function-index.csv` with address, size, our name, system, status (`not started` / `ported` / `checked`), addresses and names only, plus a script that regenerates the status from the `0x…` addresses in `tricky-rs/src` | any | | ed-slopper/puffin (2026-10-10) | [est] Source list: the local `decomp/functions.csv` (7,425 rows) from `ExportDecomp.java`. Not the decompiled C |
+| F1a | Give a system to the 3,959 functions the index can't place yet (half the code, about 1 MB): by call graph and by the source-file order of neighbours, then name them | any | | | Gap of F1. `system` column of `tricky-rs/docs/function-index.csv` |
+| F1b | Find the libraries linked into the exe (PS2 `sce*` libraries, libc, the C++ runtime, EA's sound and Pathfinder libs) and mark their functions in the index as `host` (not ported: Rust and Bevy stand in for them) or `port` | any | | | Gap of F1. Needs ghidra-mcp or the decompiler export. Changes `tools/function_index.py` (add a `host` status) |
 | F2 | Shared Ghidra names: harvest every name the earlier sessions gave in Ghidra (they live in `tricky-rs/docs/original-rules.md`, the source comments and the ghidra-mcp project, not in `ghidra/symbols.txt`, which stops at the 2,884 RTTI names of 2026-10-04) into `ghidra/symbols.txt`, so a fresh project gets them | any | | | [est] The project on ed-slopper's PC (`ghidra/project`, 2026-10-04) has only the RTTI names; the later ones were made elsewhere. If ed-slopper still has the renamed project, export it instead |
 | F2a | Naming rules written down (AGENTS.md §14) and checked against the names already used | any | F2 | | [est] |
 | F3 | ghidra-mcp set up against this project on ed-slopper's PC: Ghidra 12.1.4 + EE extension (zips in `tools/downloads/`), program `SLUS_203.26`, `symbols.txt` applied, MCP tools visible to Claude | humans | | | [est] Agents can't install it for you. Steps in AGENTS.md §14 |
@@ -159,7 +160,9 @@ matches the original.
 | D2 | Patcher (`tools/ssxpatch.py`) and the debug-menu / unlock-all mods | P5 | ed-slopper | 2026-10-05 | 9e4e994 |
 | D3 | Level viewer and first riding (`tricky-rs` stage 1–2), `.afl` animation format decoded | P1 | ed-slopper | 2026-10-06 | bd4670b |
 | D4 | First pass of riding, air, rails, tricks, scoring, wipe-outs, AI, race lines, camera, world animations, sounds and music from the exe (`tricky-rs` stage 4, `original-rules.md`) | P1/P2 | ed-slopper | 2026-10-10 | 84ea0bf |
+| F1 | Function index `tricky-rs/docs/function-index.csv` (7,425 functions, 2,320 named, 109 ported, 0 checked), `tools/function_index.py` to refresh it | P0 | ed-slopper/puffin | 2026-10-10 | COMMIT |
 
 ## Changes to the board
 
 - 2026-10-10 ed-slopper/puffin: board created from the repo, the local tree and the notes.
+- 2026-10-10 ed-slopper/puffin: F1 done; added F1a, F1b (gaps of F1).
