@@ -11,6 +11,14 @@ PINE reads and writes memory and saves and loads states; it has no breakpoints o
     python tools/pine.py save <slot> | load <slot>      savestate slot 0-9
     python tools/pine.py watch <addr> <bytes> <seconds> <out.txt>
                                                         poll a block, write every distinct copy with a timestamp
+    python tools/pine.py riders                          the race object and its riders (addresses, place, speed)
+    python tools/pine.py record <seconds> <out.txt> [<bytes>]
+                                                        each tick: the race tick and every rider's first
+                                                        <bytes> (default 0x600), kept only when the tick did
+                                                        not change while reading (F4b; keep it on your PC)
+    python tools/pine.py counters [<start> <end>]       find tick counters and clocks: words in .data/.bss
+                                                        (default 0x31D300-0x40C174) that climb about 60 a
+                                                        second, or floats that climb about 1 a second
 
 A game must be booted: PCSX2 refuses PINE commands while none is (reads work while it is paused). PCSX2 serves
 one PINE client at a time: if every command times out, another program is holding the connection. Anything read from the game is
@@ -88,6 +96,57 @@ class Pine:
         self.call(LOAD_STATE, struct.pack("<B", slot))
 
 
+# Found 2026-10-10 over PINE (tricky-rs/docs/checking.md, F4b): stats entries are fixed in .data, one per rider
+# slot; a rider struct points at its entry from +0x464. The race object holds the riders at +0xC4, their count at
+# +0x88 and the race tick at +0x18 (60 a second).
+STATS_TABLE, STATS_STRIDE = 0x32DB70, 0x84
+RACE_TICK, RACE_COUNT, RACE_RIDERS = 0x18, 0x88, 0xC4
+RIDER_POS, RIDER_VEL, RIDER_TIMESCALE, RIDER_PLACE, RIDER_STATS = 0x140, 0x150, 0x12C, 0x110, 0x464
+
+
+def find_race(p):
+    """The race object: scan RAM for riders (by their stats pointer), then for the array that holds them all."""
+    ram = p.read_block(0, 0x2000000)
+    words = struct.unpack(f"<{len(ram) // 4}I", ram)
+    entries = {STATS_TABLE + k * STATS_STRIDE for k in range(12)}
+    riders = {4 * i - RIDER_STATS for i, w in enumerate(words) if w in entries and 4 * i > 0x400000
+              and words[(4 * i - RIDER_STATS + 0x420) // 4] <= 2}
+    for i in range(len(words) - 2):
+        if words[i] in riders:
+            race = 4 * i - RACE_RIDERS
+            n = words[(race + RACE_COUNT) // 4]
+            if 1 <= n <= 8 and all(words[i + k] in riders for k in range(n)):
+                return race, [words[i + k] for k in range(n)]
+    return None, []
+
+
+def find_counters(p, start=0x31D300, end=0x40C174, snaps=4, gap=0.5):
+    """Words that rise steadily with time across a few snapshots: ints at ~60/s (ticks), floats at ~1/s (seconds)."""
+    shots = []
+    for _ in range(snaps):
+        t = time.time()
+        shots.append((t, p.read_block(start, end - start)))
+        time.sleep(gap)
+    n = (end - start) // 4
+    ints = [struct.unpack(f"<{n}I", s[:4 * n]) for _, s in shots]
+    flts = [struct.unpack(f"<{n}f", s[:4 * n]) for _, s in shots]
+    dts = [b[0] - a[0] for a, b in zip(shots, shots[1:])]
+    found = []
+    for k in range(n):
+        di = [ints[j + 1][k] - ints[j][k] for j in range(snaps - 1)]
+        if all(d > 0 for d in di):
+            rates = [d / dt for d, dt in zip(di, dts)]
+            if all(30 <= r <= 90 for r in rates):
+                found.append((start + 4 * k, "int", ints[-1][k], sum(rates) / len(rates)))
+                continue
+        df = [flts[j + 1][k] - flts[j][k] for j in range(snaps - 1)]
+        if all(d > 0 for d in df) and all(abs(v) < 1e7 for v in (flts[0][k], flts[-1][k])):
+            rates = [d / dt for d, dt in zip(df, dts)]
+            if all(0.5 <= r <= 1.5 for r in rates):
+                found.append((start + 4 * k, "float", flts[-1][k], sum(rates) / len(rates)))
+    return found
+
+
 def main(argv):
     p = Pine()
     cmd = argv[:1]
@@ -122,6 +181,41 @@ def main(argv):
                     f.write(f"{time.time() - t0:.4f} {data.hex()}\n")
                     last, kept = data, kept + 1
         print(f"{polls} polls, {kept} distinct copies of {length} bytes at {addr:#x} in {argv[4]}")
+    elif cmd == ["riders"]:
+        race, riders = find_race(p)
+        if race is None:
+            sys.exit("no race found (is a race running?)")
+        print(f"race object {race:#x}, tick {p.read32(race + RACE_TICK)}, {len(riders)} riders")
+        for r in riders:
+            vel = struct.unpack("<3f", p.read_block(r + RIDER_VEL, 12))
+            ts, = struct.unpack("<f", p.read_block(r + RIDER_TIMESCALE, 4))
+            speed = sum(v * v for v in vel) ** 0.5
+            print(f"  rider {r:#x}  place {p.read32(r + RIDER_PLACE)}  {speed:7.1f} cm/s  timescale {ts:.4f}")
+    elif cmd == ["record"] and len(argv) in (3, 4):
+        seconds, out = float(argv[1]), argv[2]
+        size = int(argv[3], 0) if len(argv) == 4 else 0x600
+        race, riders = find_race(p)
+        if race is None:
+            sys.exit("no race found (is a race running?)")
+        kept, last, t0 = 0, None, time.time()
+        with open(out, "w", encoding="ascii") as f:
+            f.write(f"race {race:x} riders {' '.join(f'{r:x}' for r in riders)} bytes {size:x}\n")
+            while time.time() - t0 < seconds:
+                tick = p.read32(race + RACE_TICK)
+                if tick == last:
+                    continue
+                blocks = [p.read_block(r, size) for r in riders]
+                if p.read32(race + RACE_TICK) != tick:
+                    continue  # the game moved on while we read: drop the sample
+                f.write(f"tick {tick} " + " ".join(b.hex() for b in blocks) + "\n")
+                last, kept = tick, kept + 1
+        print(f"{kept} ticks of {len(riders)} riders in {seconds:g} s to {out}")
+    elif cmd == ["counters"]:
+        start, end = (int(argv[1], 16), int(argv[2], 16)) if len(argv) == 3 else (0x31D300, 0x40C174)
+        if p.status() != "running":
+            sys.exit("PCSX2 is not running the game (paused?): counters need the game to move")
+        for addr, kind, value, rate in find_counters(p, start, end):
+            print(f"{addr:#010x}  {kind:5s}  now {value:<14.6g} rising {rate:.2f}/s")
     else:
         sys.exit(__doc__)
 

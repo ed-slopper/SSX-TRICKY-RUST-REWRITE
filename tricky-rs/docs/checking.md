@@ -178,6 +178,28 @@ It uses PINE, PCSX2's own IPC (stock PCSX2, Settings > Advanced > PINE), through
 - **Files.** Traces are made from the game, so they stay on the player's PC (`traces/`, ignored by git); the repo
   holds the tools and the list of fields.
 
+### What PINE found in a race (2026-10-10)
+
+Read live with `tools/pine.py`, SSX Tricky SLUS-20326 in PCSX2, six riders in a race; the heap addresses were the
+same from race to race, but `pine.py riders` finds them anew each time, so nothing depends on them.
+
+| What | Where | How it was found |
+|---|---|---|
+| Rider stats | fixed entries in `.data` at 0x32DB70 + slot·0x84 (slot 0–5); `cAI::vf11` indexes the same table | the F4f captures' stats pointers |
+| Rider → its stats | rider+0x464 | `Boarder_ForwardDrag` reads it |
+| Race object | holds the riders at +0xC4 (an array), their count at +0x88 | an array of all six rider pointers in RAM; `Race_UpdatePlacingsAndRubberBand` 0x115100 reads the same fields |
+| Race tick | race+0x18, +1 per tick, 60 a second | sampled a second apart |
+| Rider position | rider+0x140 (x, y, z, cm, world) | moves by velocity × time scale / 60 each tick |
+| Rider velocity | rider+0x150 (cm/s) | as the jump and air code use it |
+| Rider time scale | rider+0x12C (1.0, or the rubber band's 0.70005 for computer riders ahead) | the riders at 0.7001 move 0.7 × velocity/60 a tick |
+| Rider place | rider+0x110 (0 = first) | as the placings code writes it |
+| Board class, stance | rider+0x420 (0 BX, 1 freestyle, 2 alpine), rider+0x1B4 | as in the port notes |
+| Other 60 Hz counters | 0x3BBA44, 0x3BBA8C, 0x3BBA90, 0x403A08–0x403A38 (frames since boot); 0x335720, 0x403D80 | `pine.py counters` |
+
+`pine.py record <seconds> <file>` keeps, for every tick, the tick and each rider's first 0x600 bytes, only when
+the tick did not change while reading: 181 consecutive ticks in 3 seconds, none missed. Still to find: the pad
+state the game reads each tick (F4b2). The replay test needs our riding code callable without Bevy (F4b3, F11).
+
 ## F4f: the runner against the running game
 
 **Done 2026-10-10**, with PCSX2-MCP's DebugServer, which the project no longer relies on (AGENTS.md §14):
