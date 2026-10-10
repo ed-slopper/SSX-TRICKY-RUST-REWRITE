@@ -36,7 +36,8 @@ state machine and the renderer are ours. Nothing has been checked against the or
 | F8 | Tag every stand-in already in `tricky-rs/src` with `STANDIN:` (SSX-Library JSON loader, Python-exported chars/sounds/fonts, our animation choice, our front end, ball physics for props, guessed sound stream picks, "my numbers" medals, `rider.rs` guessed constants, the 1.7 m sphere rider in `wipeout.rs`) | any | | | [repo] The README's "still mine" and "Not done yet" lists |
 | F9 | Address on every recreated function: sweep `tricky-rs/src` so each ported function's doc comment has `` `Name` 0xaddr ``, and functions without an original are either tagged `STANDIN:` or plainly our glue | any | F8 | | [repo] Most modules already name their originals in the header |
 | F10 | Remove the duplicate tools: `tools/{bnk,mpf,music,sfn}` and `tricky-rs/tools/{…}` are copies of each other; keep one | any | | | [repo] |
-| F11 | Split `tricky-rs` into a workspace: `tricky-data` (file formats, no Bevy), `tricky-game` (the game's logic, no Bevy), `tricky-rs` (Bevy host). Makes F4 tests possible without a window | any | | | [est] `main.rs` is 2,466 lines |
+| F11a | Riding physics as a Bevy-free crate `tricky-rs/game` (`tricky-game`, glam + serde only): `rider` (physics, wipe-outs, trick names), `collide`, `rails`, `trickdata`, `anim` (ObjAnim); `tricky-rs` re-exports them so its paths stay; builds and tests on Windows GNU without dlltool | any | | ed-slopper/puffin (2026-10-10) | [est] Split of F11. Unblocks F4b3, F4d |
+| F11b | The rest of F11: file formats (`level`, `course`, character and sound loaders) into a Bevy-free `tricky-data`, and the race, AI driver and camera (`rider.rs`'s `AiDriver`, `Race`, `ChaseCam`) into `tricky-game` | any | F11a | | [est] Split of F11 |
 
 ## P1 Core engine
 
@@ -197,3 +198,4 @@ matches the original.
 - 2026-10-10 ed-slopper/puffin: F5 done; added F5a (strict clippy on tricky-rs).
 - 2026-10-10 ed-slopper/puffin: F4b split: F4b1 done (map and recorder), F4b2 (pad state) and F4b3 (replay test) open.
 - 2026-10-10 ed-slopper/puffin: F4b2 done (pad layout checked live).
+- 2026-10-10 ed-slopper/puffin: split F11 into F11a (riding physics crate, claimed) and F11b.
