@@ -30,19 +30,15 @@ concurrency:
 
 jobs:
   tricky-rs:
-    name: tricky-rs (${{ matrix.os }})
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ubuntu-latest, windows-latest]
-    runs-on: ${{ matrix.os }}
+    # Linux only: the function runner covers Windows, and one OS halves the wait.
+    name: tricky-rs (ubuntu-latest)
+    runs-on: ubuntu-latest
     defaults:
       run:
         working-directory: tricky-rs
     steps:
       - uses: actions/checkout@v4
       - name: Linux libraries Bevy needs (audio, gamepads, X11)
-        if: runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install -y --no-install-recommends pkg-config libasound2-dev libudev-dev libx11-dev libxcursor-dev libxi-dev libxrandr-dev libxkbcommon-dev
       - uses: dtolnay/rust-toolchain@stable
         with:
@@ -51,7 +47,7 @@ jobs:
         with:
           workspaces: tricky-rs
           cache-on-failure: true
-      - run: cargo build --locked
+      # cargo test builds the game too, so no separate cargo build
       - run: cargo test --locked
       # Warnings are reported, not yet fatal: the code predates CI. Row F5a makes this -D warnings.
       # Each finding also becomes an annotation (file, line, message), which can be read without signing in
