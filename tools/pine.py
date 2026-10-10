@@ -102,6 +102,21 @@ class Pine:
 STATS_TABLE, STATS_STRIDE = 0x32DB70, 0x84
 RACE_TICK, RACE_COUNT, RACE_RIDERS = 0x18, 0x88, 0xC4
 RIDER_POS, RIDER_VEL, RIDER_TIMESCALE, RIDER_PLACE, RIDER_STATS = 0x140, 0x150, 0x12C, 0x110, 0x464
+# The pad: Sony's pad library writes each controller's data into a double buffer (two records 0x80 apart):
+# status, mode (0x73 analog, 0x79 pressure), buttons (2 bytes, active low), right x, right y, left x, left y,
+# then 12 pressures (right left up down triangle circle cross square L1 R1 L2 R2). Found at 0x845940 / 0x8459C0.
+PAD_BYTES = 20
+
+
+def find_pad(p):
+    """The first controller's double buffer: two pad records 0x80 apart in the same mode."""
+    import re
+    ram = p.read_block(0x100000, 0x1F00000)
+    for m in re.finditer(rb"[\x00\x01][\x73\x79]", ram):
+        o = m.start()
+        if o % 0x40 == 0 and ram[o + 0x81:o + 0x82] == ram[o + 1:o + 2]:
+            return 0x100000 + o
+    return None
 
 
 def find_race(p):
@@ -197,14 +212,17 @@ def main(argv):
         race, riders = find_race(p)
         if race is None:
             sys.exit("no race found (is a race running?)")
+        pad = find_pad(p)
         kept, last, t0 = 0, None, time.time()
         with open(out, "w", encoding="ascii") as f:
-            f.write(f"race {race:x} riders {' '.join(f'{r:x}' for r in riders)} bytes {size:x}\n")
+            f.write(f"race {race:x} riders {' '.join(f'{r:x}' for r in riders)} bytes {size:x} pad {pad or 0:x}\n")
             while time.time() - t0 < seconds:
                 tick = p.read32(race + RACE_TICK)
                 if tick == last:
                     continue
                 blocks = [p.read_block(r, size) for r in riders]
+                if pad:
+                    blocks.append(p.read_block(pad, PAD_BYTES))
                 if p.read32(race + RACE_TICK) != tick:
                     continue  # the game moved on while we read: drop the sample
                 f.write(f"tick {tick} " + " ".join(b.hex() for b in blocks) + "\n")

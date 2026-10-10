@@ -197,8 +197,20 @@ same from race to race, but `pine.py riders` finds them anew each time, so nothi
 | Other 60 Hz counters | 0x3BBA44, 0x3BBA8C, 0x3BBA90, 0x403A08–0x403A38 (frames since boot); 0x335720, 0x403D80 | `pine.py counters` |
 
 `pine.py record <seconds> <file>` keeps, for every tick, the tick and each rider's first 0x600 bytes, only when
-the tick did not change while reading: 181 consecutive ticks in 3 seconds, none missed. Still to find: the pad
-state the game reads each tick (F4b2). The replay test needs our riding code callable without Bevy (F4b3, F11).
+the tick did not change while reading: 181 consecutive ticks in 3 seconds, none missed.
+
+**The pad** (F4b2): Sony's pad library writes the first controller into a double buffer, two 20-byte records
+0x80 apart (0x845940 and 0x8459C0 in this boot; `pine.py` finds them by their shape and `record` saves one per
+tick). Checked live with every key of a keyboard pad:
+
+| Bytes | Field |
+|---|---|
+| 0, 1 | status; mode (0x73 analog, 0x79 pressure-sensitive) |
+| 2–3 | buttons, little-endian, 0 = pressed: bit 0 Select, 3 Start, 4–7 Up Right Down Left, 8 L2, 9 R2, 10 L1, 11 R1, 12 Triangle, 13 Circle, 14 Cross, 15 Square |
+| 4, 5 / 6, 7 | right stick x, y / left stick x, y (0x7F centred, 0x00 left or up, 0xFF right or down) |
+| 8–19 | pressures, 0–255: right, left, up, down, triangle, circle, cross, square, L1, R1, L2, R2 |
+
+A keyboard gives 255 or 0; a real controller gives the range. The replay test needs our riding code callable without Bevy (F4b3, F11).
 
 ## F4f: the runner against the running game
 
