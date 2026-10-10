@@ -92,3 +92,24 @@ pub fn side_friction(vr: f32, vf: f32, x214: f32, grip: f32, s: &FrictionState) 
     }
     f
 }
+
+/// `Boarder_GroundSpringForce` 0x109878: the force (cm/s²) holding the board on the snow, for its height `h`
+/// above the snow (cm, negative when sunk in) and its speed along the normal `vn` (cm/s); `d1`, `d2` are the
+/// spring band (rider+0x294, rider+0x298), `g` and `damping` the surface row's +0x0 and +0x24.
+/// The 30 is the game's global at 0x31d304.
+pub fn spring_force(h: f32, vn: f32, d1: f32, d2: f32, g: f32, damping: f32) -> f32 {
+    if 0.0 < h {
+        let mut f = -(g / 30.0) * h;
+        if 0.0 < vn {
+            f = f + -damping * vn;
+        }
+        f
+    } else if -d1 < h {
+        (-g * h) / d1 + -damping * vn
+    } else {
+        let x = if -d2 < h { h } else { -d2 };
+        let t = x + d1;
+        // (t + t): an add in the machine code (0x10992c), not a multiply by 2
+        g * (1.0 - (t + t) / (d2 - d1)) + -damping * vn
+    }
+}

@@ -832,9 +832,8 @@ impl Rider {
             self.band.0 += (band.0 - self.band.0).clamp(-dt, dt);
             self.band.1 += (band.1 - self.band.1).clamp(-dt, dt);
             let (d1, d2) = self.band;
-            let f_n = if h > 0.0 { -(gmag / 0.30) * h - if vn > 0.0 { damp * vn } else { 0.0 } }
-                else if h > -d1 { -gmag * h / d1 - damp * vn }
-                else { gmag * (1.0 - 2.0 * (h.max(-d2) + d1) / (d2 - d1)) - damp * vn };
+            // `Boarder_GroundSpringForce` 0x109878, exactly (crate::ground), in cm
+            let f_n = crate::ground::spring_force(h * 100.0, vn * 100.0, d1 * 100.0, d2 * 100.0, surf[0], damp) / 100.0;
             // the lean: steering tips the support force sideways (the original's positive steer is left)
             let s_left = -self.steer;
             let phi = (surf[5] * s_left).to_radians();

@@ -8,7 +8,7 @@
 
 use r5900::ps2float::Rules;
 use r5900::Runner;
-use tricky_game::ground::{forward_drag, side_friction, DragState, FrictionState};
+use tricky_game::ground::{forward_drag, side_friction, spring_force, DragState, FrictionState};
 
 /// The surface table's drag and grip terms of a few real rows (SURFACES in rider.rs: +4, +8, +0xc, +0x10).
 const ROWS: [[f32; 4]; 4] = [
@@ -157,4 +157,37 @@ fn side_friction_is_the_originals() {
         checked += 1;
     }
     eprintln!("Boarder_SideFriction: {checked} cases, all bit-identical");
+}
+
+#[test]
+fn spring_force_is_the_originals() {
+    let Some(mut r) = runner() else { return };
+    let m = layout(&mut r);
+    let mut rng = Rng(0x5971_96f0);
+    let mut checked = 0;
+    for case in 0..3000 {
+        let d1 = rng.f(0.3, 5.0);
+        let d2 = d1 + rng.f(0.5, 35.0);
+        // above the snow, just in it, and deeper than the band (all three of the game's cases)
+        let h = match case % 3 { 0 => rng.f(0.001, 15.0), 1 => -rng.f(0.0, d1 * 0.999), _ => -rng.f(d1, d2 + 10.0) };
+        let vn = rng.f(-500.0, 500.0);
+        let g = [989.826, 1300.85, 1200.45][case % 3];
+        let damping = rng.f(0.0, 50.0);
+
+        r.mem.write_f32(m.rider + 0x294, d1);
+        r.mem.write_f32(m.rider + 0x298, d2);
+        r.mem.write_f32(m.row, g);
+        r.mem.write_f32(m.row + 0x24, damping);
+        r.cpu.set_f(12, h);
+        r.cpu.set_f(13, vn);
+        r.cpu.set_gpr(4, m.boarder as u64);
+        r.cpu.set_gpr(5, m.row as u64);
+        r.call(0x109878).unwrap_or_else(|e| panic!("case {case}: {e}"));
+
+        let ours = spring_force(h, vn, d1, d2, g, damping);
+        assert_eq!(ours.to_bits(), r.cpu.f(0).to_bits(),
+            "case {case}: ours {ours} vs the game's {} for h {h} vn {vn} d1 {d1} d2 {d2} g {g} damping {damping}", r.cpu.f(0));
+        checked += 1;
+    }
+    eprintln!("Boarder_GroundSpringForce: {checked} cases, all bit-identical");
 }
