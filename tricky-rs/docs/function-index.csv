@@ -1423,9 +1423,9 @@ address,size,name,system,status
 0x16d1f8,52,FUN_0016d1f8,race?,not started
 0x16d230,204,FUN_0016d230,race?,not started
 0x16d300,1548,FUN_0016d300,race?,not started
-0x16d910,124,FUN_0016d910,,not started
-0x16d990,60,FUN_0016d990,camera?,not started
-0x16d9d0,60,FUN_0016d9d0,camera?,not started
+0x16d910,124,FUN_0016d910,race?,not started
+0x16d990,60,FUN_0016d990,race?,not started
+0x16d9d0,60,FUN_0016d9d0,race?,not started
 0x16da10,148,FUN_0016da10,race?,not started
 0x16daa8,224,FUN_0016daa8,boarder?,not started
 0x16db88,88,FUN_0016db88,boarder?,not started
@@ -1496,10 +1496,10 @@ address,size,name,system,status
 0x1730e0,124,FUN_001730e0,camera?,not started
 0x1731f8,116,FUN_001731f8,camera?,not started
 0x173270,1456,FUN_00173270,camera?,not started
-0x173820,460,FUN_00173820,camera?,not started
-0x1739f0,108,FUN_001739f0,camera?,not started
+0x173820,460,FUN_00173820,boarder?,not started
+0x1739f0,108,FUN_001739f0,,not started
 0x173a60,36,FUN_00173a60,camera?,not started
-0x173a88,12,FUN_00173a88,camera?,not started
+0x173a88,12,FUN_00173a88,boarder?,not started
 0x173a98,384,FUN_00173a98,race?,not started
 0x173c18,44,FUN_00173c18,race?,not started
 0x173c50,440,FUN_00173c50,race?,not started
@@ -1529,9 +1529,9 @@ address,size,name,system,status
 0x175e50,56,FUN_00175e50,common?,not started
 0x175e88,48,FUN_00175e88,race?,not started
 0x175eb8,148,FUN_00175eb8,race?,not started
-0x175f50,1996,FUN_00175f50,camera?,not started
-0x176720,304,FUN_00176720,camera?,not started
-0x176850,1768,FUN_00176850,camera?,not started
+0x175f50,1996,FUN_00175f50,race?,not started
+0x176720,304,FUN_00176720,race?,not started
+0x176850,1768,FUN_00176850,race?,not started
 0x176f38,232,FUN_00176f38,race?,not started
 0x177020,84,FUN_00177020,boarder?,not started
 0x177078,1308,cBxCamera::vf1_177078,camera,not started
@@ -3546,14 +3546,14 @@ address,size,name,system,status
 0x212210,92,FUN_00212210,save?,not started
 0x212270,16,FUN_00212270,save?,not started
 0x212280,68,cBXAudio::vf1_212280,audio,not started
-0x212300,68,FUN_00212300,frontend?,not started
-0x212348,48,FUN_00212348,frontend?,not started
-0x2123c8,48,FUN_002123c8,frontend?,not started
-0x2123f8,48,FUN_002123f8,frontend?,not started
+0x212300,68,FUN_00212300,audio?,not started
+0x212348,48,FUN_00212348,audio?,not started
+0x2123c8,48,FUN_002123c8,audio?,not started
+0x2123f8,48,FUN_002123f8,audio?,not started
 0x212428,600,FUN_00212428,audio?,not started
 0x212680,600,FUN_00212680,audio?,not started
-0x2128d8,132,FUN_002128d8,frontend?,not started
-0x212960,152,FUN_00212960,frontend?,not started
+0x2128d8,132,FUN_002128d8,audio?,not started
+0x212960,152,FUN_00212960,audio?,not started
 0x2129f8,1180,FUN_002129f8,audio?,not started
 0x212e98,2644,FUN_00212e98,audio?,not started
 0x2138f0,584,FUN_002138f0,frontend?,not started
@@ -3639,13 +3639,13 @@ address,size,name,system,status
 0x21c610,176,Audio_TrickyTrigger,audio,ported
 0x21c6c0,12,FUN_0021c6c0,audio?,not started
 0x21c6d0,308,FUN_0021c6d0,audio?,not started
-0x21c808,92,FUN_0021c808,frontend?,not started
-0x21c868,64,FUN_0021c868,frontend?,not started
-0x21c8a8,64,FUN_0021c8a8,frontend?,not started
-0x21c8e8,64,FUN_0021c8e8,frontend?,not started
-0x21c930,48,FUN_0021c930,frontend?,not started
-0x21c960,68,FUN_0021c960,frontend?,not started
-0x21c9a8,120,FUN_0021c9a8,frontend?,not started
+0x21c808,92,FUN_0021c808,audio?,not started
+0x21c868,64,FUN_0021c868,audio?,not started
+0x21c8a8,64,FUN_0021c8a8,audio?,not started
+0x21c8e8,64,FUN_0021c8e8,audio?,not started
+0x21c930,48,FUN_0021c930,audio?,not started
+0x21c960,68,FUN_0021c960,audio?,not started
+0x21c9a8,120,FUN_0021c9a8,audio?,not started
 0x21ca20,1104,FUN_0021ca20,frontend?,not started
 0x21ce78,184,FUN_0021ce78,audio?,not started
 0x21cf38,104,FUN_0021cf38,audio?,not started
@@ -3718,7 +3718,7 @@ address,size,name,system,status
 0x2214a8,36,cCrowdSys::vf6_2214a8,audio?,not started
 0x2214e8,80,cCrowdSys::__tf,runtime,host
 0x221538,108,FUN_00221538,render?,not started
-0x2215a8,60,FUN_002215a8,,not started
+0x2215a8,60,FUN_002215a8,audio?,not started
 0x221668,284,FUN_00221668,audio?,not started
 0x221788,80,FUN_00221788,audio?,not started
 0x2217d8,20,FUN_002217d8,audio?,not started
@@ -3931,7 +3931,7 @@ address,size,name,system,status
 0x229d40,84,FUN_00229d40,audio?,not started
 0x229d98,104,FUN_00229d98,audio?,not started
 0x229e00,104,FUN_00229e00,audio?,not started
-0x229e68,104,FUN_00229e68,frontend?,not started
+0x229e68,104,FUN_00229e68,audio?,not started
 0x229ed0,72,FUN_00229ed0,audio?,not started
 0x229f18,72,FUN_00229f18,audio?,not started
 0x229f60,60,FUN_00229f60,audio?,not started
@@ -4099,7 +4099,7 @@ address,size,name,system,status
 0x230d78,84,FUN_00230d78,audio?,not started
 0x230dd0,268,FUN_00230dd0,race?,not started
 0x230ee0,276,FUN_00230ee0,race?,not started
-0x230ff8,204,FUN_00230ff8,race?,not started
+0x230ff8,204,FUN_00230ff8,audio?,not started
 0x2310c8,488,FUN_002310c8,race?,not started
 0x2312b0,104,FUN_002312b0,audio?,not started
 0x231318,128,FUN_00231318,audio?,not started
@@ -5846,112 +5846,112 @@ address,size,name,system,status
 0x2b69b0,80,cListFE3DOffsetOp::__tf,runtime,host
 0x2b6a30,64,cListOperator::__tf,runtime,host
 0x2b6a70,44,FUN_002b6a70,,not started
-0x2b6ae0,144,CCommDriver::vf4_2b6ae0,comm,not started
-0x2b6b70,236,CCommDriver::vf6_2b6b70,comm,not started
-0x2b6c60,48,CCommDriver::vf3_2b6c60,comm,not started
-0x2b6c90,188,CCommDriver::vf14_2b6c90,comm,not started
-0x2b6d50,96,CCommDriver::vf15_2b6d50,comm,not started
-0x2b6db0,172,CCommDriver::vf13_2b6db0,comm,not started
-0x2b6e70,16,CCommDriver::vf12_2b6e70,comm,not started
-0x2b6e80,28,CCommDriver::vf11_2b6e80,comm,not started
-0x2b6ea0,8,CCommDriver::vf10_2b6ea0,comm,not started
-0x2b6ea8,12,CCommDriver::vf9_2b6ea8,comm,not started
-0x2b6eb8,8,CCommDriver::vf8_2b6eb8,comm,not started
-0x2b6ec0,8,CCommDriver::vf1_2b6ec0,comm,not started
-0x2b6ec8,264,CCommDriver::vf0_2b6ec8,comm,not started
-0x2b6fd0,176,FUN_002b6fd0,comm?,not started
+0x2b6ae0,144,CCommDriver::vf4_2b6ae0,comm,host
+0x2b6b70,236,CCommDriver::vf6_2b6b70,comm,host
+0x2b6c60,48,CCommDriver::vf3_2b6c60,comm,host
+0x2b6c90,188,CCommDriver::vf14_2b6c90,comm,host
+0x2b6d50,96,CCommDriver::vf15_2b6d50,comm,host
+0x2b6db0,172,CCommDriver::vf13_2b6db0,comm,host
+0x2b6e70,16,CCommDriver::vf12_2b6e70,comm,host
+0x2b6e80,28,CCommDriver::vf11_2b6e80,comm,host
+0x2b6ea0,8,CCommDriver::vf10_2b6ea0,comm,host
+0x2b6ea8,12,CCommDriver::vf9_2b6ea8,comm,host
+0x2b6eb8,8,CCommDriver::vf8_2b6eb8,comm,host
+0x2b6ec0,8,CCommDriver::vf1_2b6ec0,comm,host
+0x2b6ec8,264,CCommDriver::vf0_2b6ec8,comm,host
+0x2b6fd0,176,FUN_002b6fd0,comm?,host
 0x2b7080,64,CCommDriver::__tf,runtime,host
-0x2b70c0,88,FUN_002b70c0,comm?,not started
-0x2b7118,12,FUN_002b7118,comm?,not started
-0x2b7128,76,FUN_002b7128,comm?,not started
-0x2b7178,8,FUN_002b7178,comm?,not started
-0x2b7180,80,FUN_002b7180,comm?,not started
-0x2b71d0,188,CDeci2CopydataCommDriver::vf1_2b71d0,comm,not started
-0x2b7290,256,CDeci2CopydataCommDriver::vf2_2b7290,comm,not started
-0x2b7390,248,CDeci2CopydataCommDriver::vf5_2b7390,comm,not started
-0x2b7488,160,CDeci2CopydataCommDriver::vf6_2b7488,comm,not started
-0x2b7528,8,CDeci2CopydataCommDriver::vf7_2b7528,comm,not started
-0x2b7530,28,FUN_002b7530,comm?,not started
-0x2b7550,32,FUN_002b7550,comm?,not started
-0x2b7570,32,FUN_002b7570,comm?,not started
-0x2b7590,364,FUN_002b7590,comm?,not started
-0x2b7700,20,FUN_002b7700,comm?,not started
-0x2b7718,300,FUN_002b7718,comm?,not started
-0x2b7848,32,FUN_002b7848,comm?,not started
-0x2b7868,8,CDeci2CopydataCommDriver::vf8_2b7868,comm,not started
-0x2b7870,20,CDeci2CopydataCommDriver::vf0_2b7870,comm,not started
+0x2b70c0,88,FUN_002b70c0,comm?,host
+0x2b7118,12,FUN_002b7118,comm?,host
+0x2b7128,76,FUN_002b7128,comm?,host
+0x2b7178,8,FUN_002b7178,comm?,host
+0x2b7180,80,FUN_002b7180,comm?,host
+0x2b71d0,188,CDeci2CopydataCommDriver::vf1_2b71d0,comm,host
+0x2b7290,256,CDeci2CopydataCommDriver::vf2_2b7290,comm,host
+0x2b7390,248,CDeci2CopydataCommDriver::vf5_2b7390,comm,host
+0x2b7488,160,CDeci2CopydataCommDriver::vf6_2b7488,comm,host
+0x2b7528,8,CDeci2CopydataCommDriver::vf7_2b7528,comm,host
+0x2b7530,28,FUN_002b7530,comm?,host
+0x2b7550,32,FUN_002b7550,comm?,host
+0x2b7570,32,FUN_002b7570,comm?,host
+0x2b7590,364,FUN_002b7590,comm?,host
+0x2b7700,20,FUN_002b7700,comm?,host
+0x2b7718,300,FUN_002b7718,comm?,host
+0x2b7848,32,FUN_002b7848,comm?,host
+0x2b7868,8,CDeci2CopydataCommDriver::vf8_2b7868,comm,host
+0x2b7870,20,CDeci2CopydataCommDriver::vf0_2b7870,comm,host
 0x2b7950,80,CDeci2CopydataCommDriver::__tf,runtime,host
-0x2b79a0,88,FUN_002b79a0,comm?,not started
-0x2b7b18,84,FUN_002b7b18,comm?,not started
-0x2b7b78,104,FUN_002b7b78,comm?,not started
-0x2b7c08,28,FUN_002b7c08,comm?,not started
-0x2b7c50,220,FUN_002b7c50,comm?,not started
-0x2b7d30,256,FUN_002b7d30,comm?,not started
-0x2b7e30,68,FUN_002b7e30,comm?,not started
-0x2b7e78,116,FUN_002b7e78,comm?,not started
-0x2b7ef0,20,FUN_002b7ef0,comm?,not started
-0x2b7f08,80,FUN_002b7f08,comm?,not started
-0x2b7f58,196,FUN_002b7f58,comm?,not started
-0x2b8020,120,FUN_002b8020,comm?,not started
-0x2b8098,164,FUN_002b8098,comm?,not started
-0x2b8140,128,FUN_002b8140,comm?,not started
-0x2b81c0,80,FUN_002b81c0,comm?,not started
-0x2b8210,76,FUN_002b8210,comm?,not started
-0x2b8260,68,FUN_002b8260,comm?,not started
-0x2b82a8,164,FUN_002b82a8,comm?,not started
-0x2b8350,128,FUN_002b8350,comm?,not started
-0x2b83d0,72,FUN_002b83d0,comm?,not started
-0x2b8418,148,FUN_002b8418,comm?,not started
-0x2b84b0,200,FUN_002b84b0,comm?,not started
-0x2b8578,128,FUN_002b8578,comm?,not started
-0x2b85f8,96,FUN_002b85f8,comm?,not started
-0x2b8658,156,FUN_002b8658,comm?,not started
-0x2b86f8,104,FUN_002b86f8,comm?,not started
-0x2b8760,200,FUN_002b8760,comm?,not started
-0x2b8828,36,FUN_002b8828,comm?,not started
-0x2b8850,32,FUN_002b8850,comm?,not started
-0x2b8870,32,FUN_002b8870,comm?,not started
-0x2b8890,184,FUN_002b8890,comm?,not started
-0x2b8948,8,FUN_002b8948,comm?,not started
-0x2b8950,112,FUN_002b8950,comm?,not started
-0x2b89c0,12,FUN_002b89c0,comm?,not started
-0x2b89d0,60,FUN_002b89d0,comm?,not started
-0x2b8a10,8,FUN_002b8a10,comm?,not started
-0x2b8a18,264,FUN_002b8a18,comm?,not started
-0x2b8b20,224,FUN_002b8b20,comm?,not started
-0x2b8c00,72,FUN_002b8c00,comm?,not started
-0x2b8c48,44,FUN_002b8c48,comm?,not started
-0x2b8c78,56,FUN_002b8c78,comm?,not started
-0x2b8cb0,156,FUN_002b8cb0,comm?,not started
-0x2b8d50,188,FUN_002b8d50,comm?,not started
-0x2b8e10,88,FUN_002b8e10,comm?,not started
-0x2b8e68,284,FUN_002b8e68,comm?,not started
-0x2b8f88,116,FUN_002b8f88,comm?,not started
-0x2b9000,40,FUN_002b9000,comm?,not started
-0x2b9028,184,FUN_002b9028,comm?,not started
-0x2b90e0,200,FUN_002b90e0,comm?,not started
-0x2b91a8,176,FUN_002b91a8,comm?,not started
-0x2b9258,344,FUN_002b9258,comm?,not started
-0x2b93b0,76,FUN_002b93b0,comm?,not started
-0x2b9400,84,FUN_002b9400,comm?,not started
+0x2b79a0,88,FUN_002b79a0,comm?,host
+0x2b7b18,84,FUN_002b7b18,comm?,host
+0x2b7b78,104,FUN_002b7b78,comm?,host
+0x2b7c08,28,FUN_002b7c08,comm?,host
+0x2b7c50,220,FUN_002b7c50,comm?,host
+0x2b7d30,256,FUN_002b7d30,comm?,host
+0x2b7e30,68,FUN_002b7e30,comm?,host
+0x2b7e78,116,FUN_002b7e78,comm?,host
+0x2b7ef0,20,FUN_002b7ef0,comm?,host
+0x2b7f08,80,FUN_002b7f08,comm?,host
+0x2b7f58,196,FUN_002b7f58,comm?,host
+0x2b8020,120,FUN_002b8020,comm?,host
+0x2b8098,164,FUN_002b8098,comm?,host
+0x2b8140,128,FUN_002b8140,comm?,host
+0x2b81c0,80,FUN_002b81c0,comm?,host
+0x2b8210,76,FUN_002b8210,comm?,host
+0x2b8260,68,FUN_002b8260,comm?,host
+0x2b82a8,164,FUN_002b82a8,comm?,host
+0x2b8350,128,FUN_002b8350,comm?,host
+0x2b83d0,72,FUN_002b83d0,comm?,host
+0x2b8418,148,FUN_002b8418,comm?,host
+0x2b84b0,200,FUN_002b84b0,comm?,host
+0x2b8578,128,FUN_002b8578,comm?,host
+0x2b85f8,96,FUN_002b85f8,comm?,host
+0x2b8658,156,FUN_002b8658,comm?,host
+0x2b86f8,104,FUN_002b86f8,comm?,host
+0x2b8760,200,FUN_002b8760,comm?,host
+0x2b8828,36,FUN_002b8828,comm?,host
+0x2b8850,32,FUN_002b8850,comm?,host
+0x2b8870,32,FUN_002b8870,comm?,host
+0x2b8890,184,FUN_002b8890,comm?,host
+0x2b8948,8,FUN_002b8948,comm?,host
+0x2b8950,112,FUN_002b8950,comm?,host
+0x2b89c0,12,FUN_002b89c0,comm?,host
+0x2b89d0,60,FUN_002b89d0,comm?,host
+0x2b8a10,8,FUN_002b8a10,comm?,host
+0x2b8a18,264,FUN_002b8a18,comm?,host
+0x2b8b20,224,FUN_002b8b20,comm?,host
+0x2b8c00,72,FUN_002b8c00,comm?,host
+0x2b8c48,44,FUN_002b8c48,comm?,host
+0x2b8c78,56,FUN_002b8c78,comm?,host
+0x2b8cb0,156,FUN_002b8cb0,comm?,host
+0x2b8d50,188,FUN_002b8d50,comm?,host
+0x2b8e10,88,FUN_002b8e10,comm?,host
+0x2b8e68,284,FUN_002b8e68,comm?,host
+0x2b8f88,116,FUN_002b8f88,comm?,host
+0x2b9000,40,FUN_002b9000,comm?,host
+0x2b9028,184,FUN_002b9028,comm?,host
+0x2b90e0,200,FUN_002b90e0,comm?,host
+0x2b91a8,176,FUN_002b91a8,comm?,host
+0x2b9258,344,FUN_002b9258,comm?,host
+0x2b93b0,76,FUN_002b93b0,comm?,host
+0x2b9400,84,FUN_002b9400,comm?,host
 0x2b9458,200,FUN_002b9458,render?,not started
-0x2b9520,116,FUN_002b9520,comm?,not started
-0x2b9598,56,FUN_002b9598,comm?,not started
+0x2b9520,116,FUN_002b9520,comm?,host
+0x2b9598,56,FUN_002b9598,comm?,host
 0x2b95d0,184,FUN_002b95d0,render?,not started
-0x2b9688,112,FUN_002b9688,comm?,not started
-0x2b96f8,116,FUN_002b96f8,comm?,not started
-0x2b9770,84,FUN_002b9770,comm?,not started
-0x2b97e0,236,FUN_002b97e0,comm?,not started
-0x2b98d0,188,FUN_002b98d0,comm?,not started
-0x2b9990,104,FUN_002b9990,comm?,not started
-0x2b99f8,268,FUN_002b99f8,comm?,not started
-0x2b9b08,736,FUN_002b9b08,comm?,not started
-0x2b9df0,24,FUN_002b9df0,comm?,not started
-0x2b9e08,56,FUN_002b9e08,comm?,not started
-0x2b9e40,48,C8bitBuffer::vf1_2b9e40,comm,not started
-0x2b9e70,8,C8bitBuffer::vf2_2b9e70,comm,not started
-0x2b9e78,100,C8bitBuffer::vf0_2b9e78,comm,not started
-0x2b9ee0,172,C8bitBuffer::vf3_2b9ee0,comm,not started
+0x2b9688,112,FUN_002b9688,comm?,host
+0x2b96f8,116,FUN_002b96f8,comm?,host
+0x2b9770,84,FUN_002b9770,comm?,host
+0x2b97e0,236,FUN_002b97e0,comm?,host
+0x2b98d0,188,FUN_002b98d0,comm?,host
+0x2b9990,104,FUN_002b9990,comm?,host
+0x2b99f8,268,FUN_002b99f8,comm?,host
+0x2b9b08,736,FUN_002b9b08,comm?,host
+0x2b9df0,24,FUN_002b9df0,comm?,host
+0x2b9e08,56,FUN_002b9e08,comm?,host
+0x2b9e40,48,C8bitBuffer::vf1_2b9e40,comm,host
+0x2b9e70,8,C8bitBuffer::vf2_2b9e70,comm,host
+0x2b9e78,100,C8bitBuffer::vf0_2b9e78,comm,host
+0x2b9ee0,172,C8bitBuffer::vf3_2b9ee0,comm,host
 0x2b9f98,64,C8bitBuffer::__tf,runtime,host
 0x2b9fd8,188,FUN_002b9fd8,,not started
 0x2ba098,248,FUN_002ba098,,not started
@@ -6105,210 +6105,210 @@ address,size,name,system,status
 0x2c1db8,340,FUN_002c1db8,audio?,not started
 0x2c1f10,304,FUN_002c1f10,audio?,not started
 0x2c2040,72,FUN_002c2040,audio?,ported
-0x2c2088,652,FUN_002c2088,lib-ea?,not started
-0x2c2318,524,FUN_002c2318,lib-ea?,not started
-0x2c2528,200,FUN_002c2528,lib-ea?,not started
-0x2c25f0,28,FUN_002c25f0,lib-ea?,not started
-0x2c2610,80,FUN_002c2610,lib-ea?,not started
-0x2c2660,12,FUN_002c2660,lib-ea?,not started
-0x2c266c,40,FUN_002c266c,lib-ea?,not started
-0x2c2694,64,FUN_002c2694,lib-ea?,not started
-0x2c26d8,240,FUN_002c26d8,lib-ea?,not started
-0x2c27c8,948,FUN_002c27c8,lib-ea?,not started
-0x2c2bb8,60,FUN_002c2bb8,lib-ea?,not started
-0x2c2bf8,288,FUN_002c2bf8,lib-ea?,not started
-0x2c2d18,196,FUN_002c2d18,lib-ea?,not started
-0x2c2de0,432,FUN_002c2de0,lib-ea?,not started
-0x2c2f90,28,FUN_002c2f90,lib-ea?,not started
-0x2c2fb0,476,FUN_002c2fb0,lib-ea?,not started
-0x2c3190,28,FUN_002c3190,lib-ea?,not started
-0x2c31b0,804,FUN_002c31b0,lib-ea?,not started
-0x2c34d8,104,FUN_002c34d8,lib-ea?,not started
-0x2c3540,492,FUN_002c3540,lib-ea?,not started
-0x2c3730,3396,FUN_002c3730,lib-ea?,not started
-0x2c4478,96,FUN_002c4478,lib-ea?,not started
-0x2c44d8,44,FUN_002c44d8,lib-ea?,not started
-0x2c4508,216,FUN_002c4508,lib-ea?,not started
-0x2c45e0,772,FUN_002c45e0,lib-ea?,not started
-0x2c48e8,716,FUN_002c48e8,lib-ea?,not started
-0x2c4e90,68,FUN_002c4e90,lib-ea?,not started
-0x2c50b0,172,FUN_002c50b0,lib-ea?,not started
-0x2c5160,404,FUN_002c5160,lib-ea?,not started
-0x2c52f8,52,FUN_002c52f8,lib-ea?,not started
-0x2c5380,148,FUN_002c5380,lib-ea?,not started
-0x2c5418,32,FUN_002c5418,lib-ea?,not started
-0x2c5438,96,FUN_002c5438,lib-ea?,not started
-0x2c5498,32,FUN_002c5498,lib-ea?,not started
-0x2c54b8,88,FUN_002c54b8,lib-ea?,not started
-0x2c5510,72,FUN_002c5510,lib-ea?,not started
-0x2c5558,28,FUN_002c5558,lib-ea?,not started
-0x2c5578,228,FUN_002c5578,lib-ea?,not started
-0x2c5660,104,FUN_002c5660,lib-ea?,not started
-0x2c56c8,100,FUN_002c56c8,lib-ea?,not started
-0x2c5730,44,FUN_002c5730,lib-ea?,not started
-0x2c5760,68,FUN_002c5760,lib-ea?,not started
-0x2c57a8,96,FUN_002c57a8,lib-ea?,not started
-0x2c5808,144,FUN_002c5808,lib-ea?,not started
-0x2c5898,52,FUN_002c5898,lib-ea?,not started
-0x2c58d0,236,FUN_002c58d0,lib-ea?,not started
-0x2c59c0,212,FUN_002c59c0,lib-ea?,not started
-0x2c5a98,256,FUN_002c5a98,lib-ea?,not started
-0x2c5b98,196,FUN_002c5b98,lib-ea?,not started
-0x2c5c60,208,FUN_002c5c60,lib-ea?,not started
-0x2c5d30,240,FUN_002c5d30,lib-ea?,not started
-0x2c5e20,172,FUN_002c5e20,lib-ea?,not started
-0x2c5ed0,200,FUN_002c5ed0,lib-ea?,not started
-0x2c5f98,216,FUN_002c5f98,lib-ea?,not started
-0x2c6070,148,FUN_002c6070,lib-ea?,not started
-0x2c6108,88,FUN_002c6108,lib-ea?,not started
-0x2c6160,280,FUN_002c6160,lib-ea?,not started
-0x2c6278,220,FUN_002c6278,lib-ea?,not started
-0x2c6358,56,FUN_002c6358,lib-ea?,not started
-0x2c6390,64,FUN_002c6390,lib-ea?,not started
-0x2c63d0,144,FUN_002c63d0,lib-ea?,not started
-0x2c6460,124,FUN_002c6460,lib-ea?,not started
-0x2c64e0,116,FUN_002c64e0,lib-ea?,not started
-0x2c6558,72,FUN_002c6558,lib-ea?,not started
-0x2c65a0,112,FUN_002c65a0,lib-ea?,not started
-0x2c6610,84,FUN_002c6610,lib-ea?,not started
-0x2c6668,548,FUN_002c6668,lib-ea?,not started
-0x2c6890,60,FUN_002c6890,lib-ea?,not started
-0x2c68d0,84,FUN_002c68d0,lib-ea?,not started
-0x2c6928,252,FUN_002c6928,lib-ea?,not started
-0x2c6a28,348,FUN_002c6a28,lib-ea?,not started
-0x2c6b88,704,FUN_002c6b88,lib-ea?,not started
-0x2c6e48,40,FUN_002c6e48,lib-ea?,not started
-0x2c6e70,548,FUN_002c6e70,lib-ea?,not started
-0x2c7098,220,FUN_002c7098,lib-ea?,not started
-0x2c7178,168,FUN_002c7178,lib-ea?,not started
-0x2c7220,76,FUN_002c7220,lib-ea?,not started
-0x2c7270,108,FUN_002c7270,lib-ea?,not started
-0x2c72e0,96,FUN_002c72e0,lib-ea?,not started
-0x2c7340,96,FUN_002c7340,lib-ea?,not started
-0x2c73a0,48,FUN_002c73a0,lib-ea?,not started
-0x2c73d0,248,FUN_002c73d0,lib-ea?,not started
-0x2c74c8,268,FUN_002c74c8,lib-ea?,not started
-0x2c75d8,640,FUN_002c75d8,lib-ea?,not started
-0x2c7858,456,FUN_002c7858,lib-ea?,not started
-0x2c7a28,264,FUN_002c7a28,lib-ea?,not started
-0x2c7b30,224,FUN_002c7b30,lib-ea?,not started
-0x2c7c10,48,FUN_002c7c10,lib-ea?,not started
-0x2c7c40,48,FUN_002c7c40,lib-ea?,not started
-0x2c7c70,72,FUN_002c7c70,lib-ea?,not started
-0x2c7cb8,56,FUN_002c7cb8,lib-ea?,not started
-0x2c7cf0,48,FUN_002c7cf0,lib-ea?,not started
-0x2c7d20,196,FUN_002c7d20,lib-ea?,not started
-0x2c7de8,76,FUN_002c7de8,lib-ea?,not started
-0x2c7e38,32,FUN_002c7e38,lib-ea?,not started
-0x2c7e58,108,FUN_002c7e58,lib-ea?,not started
-0x2c7ec8,76,FUN_002c7ec8,lib-ea?,not started
-0x2c7f18,72,FUN_002c7f18,lib-ea?,not started
-0x2c7f60,180,FUN_002c7f60,lib-ea?,not started
-0x2c8018,80,FUN_002c8018,lib-ea?,not started
-0x2c8068,76,FUN_002c8068,lib-ea?,not started
-0x2c80b8,192,FUN_002c80b8,lib-ea?,not started
-0x2c8178,112,FUN_002c8178,lib-ea?,not started
-0x2c81e8,108,FUN_002c81e8,lib-ea?,not started
-0x2c8258,152,FUN_002c8258,lib-ea?,not started
-0x2c82f0,84,FUN_002c82f0,lib-ea?,not started
-0x2c8348,80,FUN_002c8348,lib-ea?,not started
-0x2c8398,148,FUN_002c8398,lib-ea?,not started
-0x2c8430,108,FUN_002c8430,lib-ea?,not started
-0x2c84a0,104,FUN_002c84a0,lib-ea?,not started
-0x2c8508,352,FUN_002c8508,lib-ea?,not started
-0x2c8668,80,FUN_002c8668,lib-ea?,not started
-0x2c86b8,76,FUN_002c86b8,lib-ea?,not started
-0x2c8708,220,FUN_002c8708,lib-ea?,not started
-0x2c87e8,240,FUN_002c87e8,lib-ea?,not started
-0x2c88d8,56,FUN_002c88d8,lib-ea?,not started
-0x2c8910,40,FUN_002c8910,lib-ea?,not started
-0x2c8938,308,FUN_002c8938,lib-ea?,not started
-0x2c8a70,28,FUN_002c8a70,lib-ea?,not started
-0x2c8a90,312,FUN_002c8a90,lib-ea?,not started
-0x2c8bc8,28,FUN_002c8bc8,lib-ea?,not started
-0x2c8be8,264,FUN_002c8be8,lib-ea?,not started
-0x2c8cf0,164,FUN_002c8cf0,lib-ea?,not started
-0x2c8d98,112,FUN_002c8d98,lib-ea?,not started
-0x2c8e08,32,FUN_002c8e08,lib-ea?,not started
-0x2c8e28,32,FUN_002c8e28,lib-ea?,not started
-0x2c8e48,84,FUN_002c8e48,lib-ea?,not started
-0x2c8ea0,84,FUN_002c8ea0,lib-ea?,not started
-0x2c8ef8,84,FUN_002c8ef8,lib-ea?,not started
-0x2c8f50,112,FUN_002c8f50,lib-ea?,not started
-0x2c8fc0,84,FUN_002c8fc0,lib-ea?,not started
-0x2c9018,84,FUN_002c9018,lib-ea?,not started
-0x2c9070,84,FUN_002c9070,lib-ea?,not started
-0x2c90c8,200,FUN_002c90c8,lib-ea?,not started
-0x2c9190,112,FUN_002c9190,lib-ea?,not started
-0x2c9200,536,FUN_002c9200,lib-ea?,not started
-0x2c9420,32,FUN_002c9420,lib-ea?,not started
-0x2c9440,28,FUN_002c9440,lib-ea?,not started
-0x2c9498,40,FUN_002c9498,lib-ea?,not started
-0x2c94c0,192,FUN_002c94c0,lib-ea?,not started
-0x2c9580,396,FUN_002c9580,lib-ea?,not started
-0x2c9710,540,FUN_002c9710,lib-ea?,not started
-0x2c9930,60,FUN_002c9930,lib-ea?,not started
-0x2c9970,848,FUN_002c9970,lib-ea?,not started
-0x2c9cc0,352,FUN_002c9cc0,lib-ea?,not started
-0x2c9e20,656,FUN_002c9e20,lib-ea?,not started
-0x2ca0b0,108,FUN_002ca0b0,lib-ea?,not started
-0x2ca120,80,FUN_002ca120,lib-ea?,not started
-0x2ca170,148,FUN_002ca170,lib-ea?,not started
-0x2ca208,276,FUN_002ca208,lib-ea?,not started
-0x2ca320,72,FUN_002ca320,lib-ea?,not started
-0x2ca368,72,FUN_002ca368,lib-ea?,not started
-0x2ca3b0,44,FUN_002ca3b0,lib-ea?,not started
-0x2ca3e0,44,FUN_002ca3e0,lib-ea?,not started
-0x2ca410,80,FUN_002ca410,lib-ea?,not started
-0x2ca460,348,FUN_002ca460,lib-ea?,not started
-0x2ca5c0,100,FUN_002ca5c0,lib-ea?,not started
-0x2ca628,204,FUN_002ca628,lib-ea?,not started
-0x2ca6f8,252,FUN_002ca6f8,lib-ea?,not started
-0x2ca7f8,176,FUN_002ca7f8,lib-ea?,not started
-0x2ca8a8,184,FUN_002ca8a8,lib-ea?,not started
-0x2ca960,168,FUN_002ca960,lib-ea?,not started
-0x2caa08,212,FUN_002caa08,lib-ea?,not started
-0x2caae0,192,FUN_002caae0,lib-ea?,not started
-0x2caba0,152,FUN_002caba0,lib-ea?,not started
-0x2cac38,108,FUN_002cac38,lib-ea?,not started
-0x2caca8,280,FUN_002caca8,lib-ea?,not started
-0x2cadc0,172,FUN_002cadc0,lib-ea?,not started
-0x2cae70,308,FUN_002cae70,lib-ea?,not started
-0x2cafa8,44,FUN_002cafa8,lib-ea?,not started
-0x2cafd8,436,FUN_002cafd8,lib-ea?,not started
-0x2cb190,96,FUN_002cb190,lib-ea?,not started
-0x2cb1f0,36,FUN_002cb1f0,lib-ea?,not started
-0x2cb218,228,FUN_002cb218,lib-ea?,not started
-0x2cb300,36,FUN_002cb300,lib-ea?,not started
-0x2cb328,1112,FUN_002cb328,lib-ea?,not started
-0x2cb780,164,FUN_002cb780,lib-ea?,not started
-0x2cb830,408,FUN_002cb830,lib-ea?,not started
-0x2cb9c8,8,FUN_002cb9c8,lib-ea?,not started
-0x2cb9d0,328,FUN_002cb9d0,lib-ea?,not started
-0x2cbb18,80,FUN_002cbb18,lib-ea?,not started
-0x2cbb68,188,FUN_002cbb68,lib-ea?,not started
-0x2cbc28,80,FUN_002cbc28,lib-ea?,not started
-0x2cbc88,128,FUN_002cbc88,lib-ea?,not started
-0x2cbd08,184,FUN_002cbd08,lib-ea?,not started
-0x2cbdc0,588,FUN_002cbdc0,lib-ea?,not started
-0x2cc010,28,FUN_002cc010,lib-ea?,not started
-0x2cc030,48,FUN_002cc030,lib-ea?,not started
-0x2cc060,72,FUN_002cc060,lib-ea?,not started
-0x2cc0a8,48,FUN_002cc0a8,lib-ea?,not started
-0x2cc0d8,72,FUN_002cc0d8,lib-ea?,not started
-0x2cc120,144,FUN_002cc120,lib-ea?,not started
-0x2cc1b0,184,FUN_002cc1b0,lib-ea?,not started
-0x2cc268,84,FUN_002cc268,lib-ea?,not started
-0x2cc2c0,100,FUN_002cc2c0,lib-ea?,not started
-0x2cc328,28,FUN_002cc328,lib-ea?,not started
-0x2cc348,28,FUN_002cc348,lib-ea?,not started
-0x2cc368,336,FUN_002cc368,lib-ea?,not started
-0x2cc4b8,236,FUN_002cc4b8,lib-ea?,not started
-0x2cc5a8,84,FUN_002cc5a8,lib-ea?,not started
-0x2cc600,124,FUN_002cc600,lib-ea?,not started
-0x2cc680,172,FUN_002cc680,lib-ea?,not started
-0x2cc730,108,FUN_002cc730,lib-ea?,not started
-0x2cc7a0,100,FUN_002cc7a0,lib-ea?,not started
+0x2c2088,652,FUN_002c2088,lib-shape?,not started
+0x2c2318,524,FUN_002c2318,lib-shape?,not started
+0x2c2528,200,Shape_FindByName,lib-shape?,not started
+0x2c25f0,28,FUN_002c25f0,lib-shape?,not started
+0x2c2610,80,Shape_GetLongName,lib-shape?,not started
+0x2c2660,12,Shape_GetCount,lib-shape?,not started
+0x2c266c,40,Shape_GetEntry,lib-shape?,not started
+0x2c2694,64,Shape_GetEntryName,lib-shape?,not started
+0x2c26d8,240,FUN_002c26d8,lib-shape?,not started
+0x2c27c8,948,FUN_002c27c8,lib-compress?,not started
+0x2c2bb8,60,FUN_002c2bb8,lib-compress?,not started
+0x2c2bf8,288,FUN_002c2bf8,lib-compress?,not started
+0x2c2d18,196,FUN_002c2d18,lib-compress?,not started
+0x2c2de0,432,Compress_Decode,lib-compress?,not started
+0x2c2f90,28,Compress_DecodeApi,lib-compress?,not started
+0x2c2fb0,476,Compress_UnpackedSize,lib-compress?,not started
+0x2c3190,28,Compress_UnpackedSizeApi,lib-compress?,not started
+0x2c31b0,804,RefPack_Decode,lib-compress?,not started
+0x2c34d8,104,FUN_002c34d8,lib-compress?,not started
+0x2c3540,492,BTree_Decode,lib-compress?,not started
+0x2c3730,3396,Huff_Decode,lib-compress?,not started
+0x2c4478,96,FUN_002c4478,lib-text?,not started
+0x2c44d8,44,FUN_002c44d8,lib-text?,not started
+0x2c4508,216,FUN_002c4508,lib-text?,not started
+0x2c45e0,772,FUN_002c45e0,lib-text?,not started
+0x2c48e8,716,FUN_002c48e8,lib-text?,not started
+0x2c4e90,68,FUN_002c4e90,lib-text?,not started
+0x2c50b0,172,Loc_MapId,lib-text?,not started
+0x2c5160,404,Loc_GetString,lib-text?,not started
+0x2c52f8,52,WStr_Len,lib-text?,not started
+0x2c5380,148,FUN_002c5380,lib-text?,not started
+0x2c5418,32,FUN_002c5418,lib-text?,not started
+0x2c5438,96,WStr_NCmp,lib-text?,not started
+0x2c5498,32,FUN_002c5498,lib-text?,not started
+0x2c54b8,88,WStr_NCopy,lib-text?,not started
+0x2c5510,72,WStr_FromAscii,lib-text?,not started
+0x2c5558,28,FUN_002c5558,lib-text?,not started
+0x2c5578,228,WStr_FormatArgs,lib-text?,not started
+0x2c5660,104,FUN_002c5660,lib-file?,host
+0x2c56c8,100,FUN_002c56c8,lib-file?,host
+0x2c5730,44,FUN_002c5730,lib-file?,host
+0x2c5760,68,FUN_002c5760,lib-file?,host
+0x2c57a8,96,FUN_002c57a8,lib-file?,host
+0x2c5808,144,FUN_002c5808,lib-file?,host
+0x2c5898,52,FUN_002c5898,lib-file?,host
+0x2c58d0,236,FUN_002c58d0,lib-file?,host
+0x2c59c0,212,FUN_002c59c0,lib-file?,host
+0x2c5a98,256,FUN_002c5a98,lib-file?,host
+0x2c5b98,196,FUN_002c5b98,lib-file?,host
+0x2c5c60,208,FUN_002c5c60,lib-file?,host
+0x2c5d30,240,FUN_002c5d30,lib-file?,host
+0x2c5e20,172,FUN_002c5e20,lib-file?,host
+0x2c5ed0,200,FUN_002c5ed0,lib-file?,host
+0x2c5f98,216,FUN_002c5f98,lib-file?,host
+0x2c6070,148,FUN_002c6070,lib-file?,host
+0x2c6108,88,FUN_002c6108,lib-file?,host
+0x2c6160,280,FUN_002c6160,lib-file?,host
+0x2c6278,220,FUN_002c6278,lib-file?,host
+0x2c6358,56,FUN_002c6358,lib-file?,host
+0x2c6390,64,FUN_002c6390,lib-file?,host
+0x2c63d0,144,FUN_002c63d0,lib-file?,host
+0x2c6460,124,FUN_002c6460,lib-file?,host
+0x2c64e0,116,FUN_002c64e0,lib-file?,host
+0x2c6558,72,FUN_002c6558,lib-file?,host
+0x2c65a0,112,FUN_002c65a0,lib-file?,host
+0x2c6610,84,FUN_002c6610,lib-file?,host
+0x2c6668,548,FUN_002c6668,lib-file?,host
+0x2c6890,60,FUN_002c6890,lib-file?,host
+0x2c68d0,84,FUN_002c68d0,lib-file?,host
+0x2c6928,252,FUN_002c6928,lib-file?,host
+0x2c6a28,348,FUN_002c6a28,lib-file?,host
+0x2c6b88,704,FUN_002c6b88,lib-file?,host
+0x2c6e48,40,FUN_002c6e48,lib-file?,host
+0x2c6e70,548,FUN_002c6e70,lib-file?,host
+0x2c7098,220,FUN_002c7098,lib-file?,host
+0x2c7178,168,FUN_002c7178,lib-file?,host
+0x2c7220,76,FUN_002c7220,lib-file?,host
+0x2c7270,108,FUN_002c7270,lib-file?,host
+0x2c72e0,96,FUN_002c72e0,lib-file?,host
+0x2c7340,96,FUN_002c7340,lib-file?,host
+0x2c73a0,48,FUN_002c73a0,lib-file?,host
+0x2c73d0,248,FUN_002c73d0,lib-file?,host
+0x2c74c8,268,FUN_002c74c8,lib-file?,host
+0x2c75d8,640,FUN_002c75d8,lib-file?,host
+0x2c7858,456,FUN_002c7858,lib-file?,host
+0x2c7a28,264,FUN_002c7a28,lib-file?,host
+0x2c7b30,224,FUN_002c7b30,lib-file?,host
+0x2c7c10,48,FUN_002c7c10,lib-file?,host
+0x2c7c40,48,FUN_002c7c40,lib-file?,host
+0x2c7c70,72,FUN_002c7c70,lib-file?,host
+0x2c7cb8,56,FUN_002c7cb8,lib-file?,host
+0x2c7cf0,48,FUN_002c7cf0,lib-file?,host
+0x2c7d20,196,FUN_002c7d20,lib-file?,host
+0x2c7de8,76,FUN_002c7de8,lib-file?,host
+0x2c7e38,32,FUN_002c7e38,lib-file?,host
+0x2c7e58,108,FUN_002c7e58,lib-file?,host
+0x2c7ec8,76,FUN_002c7ec8,lib-file?,host
+0x2c7f18,72,FUN_002c7f18,lib-file?,host
+0x2c7f60,180,FUN_002c7f60,lib-file?,host
+0x2c8018,80,FUN_002c8018,lib-file?,host
+0x2c8068,76,FUN_002c8068,lib-file?,host
+0x2c80b8,192,FUN_002c80b8,lib-file?,host
+0x2c8178,112,FUN_002c8178,lib-file?,host
+0x2c81e8,108,FUN_002c81e8,lib-file?,host
+0x2c8258,152,FUN_002c8258,lib-file?,host
+0x2c82f0,84,FUN_002c82f0,lib-file?,host
+0x2c8348,80,FUN_002c8348,lib-file?,host
+0x2c8398,148,FUN_002c8398,lib-file?,host
+0x2c8430,108,FUN_002c8430,lib-file?,host
+0x2c84a0,104,FUN_002c84a0,lib-file?,host
+0x2c8508,352,FUN_002c8508,lib-file?,host
+0x2c8668,80,FUN_002c8668,lib-file?,host
+0x2c86b8,76,FUN_002c86b8,lib-file?,host
+0x2c8708,220,FUN_002c8708,lib-file?,host
+0x2c87e8,240,FUN_002c87e8,lib-file?,host
+0x2c88d8,56,FUN_002c88d8,lib-file?,host
+0x2c8910,40,FUN_002c8910,lib-file?,host
+0x2c8938,308,FUN_002c8938,lib-file?,host
+0x2c8a70,28,FUN_002c8a70,lib-file?,host
+0x2c8a90,312,FUN_002c8a90,lib-file?,host
+0x2c8bc8,28,FUN_002c8bc8,lib-file?,host
+0x2c8be8,264,FUN_002c8be8,lib-file?,host
+0x2c8cf0,164,FUN_002c8cf0,lib-file?,host
+0x2c8d98,112,FUN_002c8d98,lib-file?,host
+0x2c8e08,32,FUN_002c8e08,lib-file?,host
+0x2c8e28,32,FUN_002c8e28,lib-file?,host
+0x2c8e48,84,FUN_002c8e48,lib-file?,host
+0x2c8ea0,84,FUN_002c8ea0,lib-file?,host
+0x2c8ef8,84,FUN_002c8ef8,lib-file?,host
+0x2c8f50,112,FUN_002c8f50,lib-file?,host
+0x2c8fc0,84,FUN_002c8fc0,lib-file?,host
+0x2c9018,84,FUN_002c9018,lib-file?,host
+0x2c9070,84,FUN_002c9070,lib-file?,host
+0x2c90c8,200,FUN_002c90c8,lib-file?,host
+0x2c9190,112,FUN_002c9190,lib-file?,host
+0x2c9200,536,FUN_002c9200,lib-file?,host
+0x2c9420,32,FUN_002c9420,lib-file?,host
+0x2c9440,28,FUN_002c9440,lib-file?,host
+0x2c9498,40,FUN_002c9498,lib-file?,host
+0x2c94c0,192,FUN_002c94c0,lib-file?,host
+0x2c9580,396,FUN_002c9580,lib-file?,host
+0x2c9710,540,FUN_002c9710,lib-file?,host
+0x2c9930,60,FUN_002c9930,lib-file?,host
+0x2c9970,848,FUN_002c9970,lib-file?,host
+0x2c9cc0,352,FUN_002c9cc0,lib-file?,host
+0x2c9e20,656,FUN_002c9e20,lib-file?,host
+0x2ca0b0,108,FUN_002ca0b0,lib-file?,host
+0x2ca120,80,FUN_002ca120,lib-file?,host
+0x2ca170,148,FUN_002ca170,lib-file?,host
+0x2ca208,276,FUN_002ca208,lib-file?,host
+0x2ca320,72,FUN_002ca320,lib-file?,host
+0x2ca368,72,FUN_002ca368,lib-file?,host
+0x2ca3b0,44,FUN_002ca3b0,lib-file?,host
+0x2ca3e0,44,FUN_002ca3e0,lib-file?,host
+0x2ca410,80,FUN_002ca410,lib-file?,host
+0x2ca460,348,FUN_002ca460,lib-file?,host
+0x2ca5c0,100,FUN_002ca5c0,lib-file?,host
+0x2ca628,204,FUN_002ca628,lib-file?,host
+0x2ca6f8,252,FUN_002ca6f8,lib-file?,host
+0x2ca7f8,176,FUN_002ca7f8,lib-file?,host
+0x2ca8a8,184,FUN_002ca8a8,lib-file?,host
+0x2ca960,168,FUN_002ca960,lib-file?,host
+0x2caa08,212,FUN_002caa08,lib-file?,host
+0x2caae0,192,FUN_002caae0,lib-file?,host
+0x2caba0,152,FUN_002caba0,lib-file?,host
+0x2cac38,108,FUN_002cac38,lib-file?,host
+0x2caca8,280,FUN_002caca8,lib-file?,host
+0x2cadc0,172,FUN_002cadc0,lib-file?,host
+0x2cae70,308,FUN_002cae70,lib-file?,host
+0x2cafa8,44,FUN_002cafa8,lib-file?,host
+0x2cafd8,436,FUN_002cafd8,lib-file?,host
+0x2cb190,96,FUN_002cb190,lib-file?,host
+0x2cb1f0,36,FUN_002cb1f0,lib-file?,host
+0x2cb218,228,FUN_002cb218,lib-file?,host
+0x2cb300,36,FUN_002cb300,lib-file?,host
+0x2cb328,1112,FUN_002cb328,lib-file?,host
+0x2cb780,164,FUN_002cb780,lib-file?,host
+0x2cb830,408,FUN_002cb830,lib-file?,host
+0x2cb9c8,8,FUN_002cb9c8,lib-file?,host
+0x2cb9d0,328,FUN_002cb9d0,lib-file?,host
+0x2cbb18,80,FUN_002cbb18,lib-file?,host
+0x2cbb68,188,FUN_002cbb68,lib-file?,host
+0x2cbc28,80,FUN_002cbc28,lib-file?,host
+0x2cbc88,128,BIG_Identify,lib-big?,not started
+0x2cbd08,184,FUN_002cbd08,lib-big?,not started
+0x2cbdc0,588,BIG_Lookup,lib-big?,not started
+0x2cc010,28,FUN_002cc010,lib-big?,not started
+0x2cc030,48,FUN_002cc030,lib-big?,not started
+0x2cc060,72,FUN_002cc060,lib-big?,not started
+0x2cc0a8,48,BIG_GetFileData,lib-big?,not started
+0x2cc0d8,72,FUN_002cc0d8,lib-big?,not started
+0x2cc120,144,FUN_002cc120,lib-big?,not started
+0x2cc1b0,184,FUN_002cc1b0,lib-big?,not started
+0x2cc268,84,BIG_GetFileName,lib-big?,not started
+0x2cc2c0,100,FUN_002cc2c0,lib-file?,host
+0x2cc328,28,FUN_002cc328,lib-file?,host
+0x2cc348,28,FUN_002cc348,lib-file?,host
+0x2cc368,336,FUN_002cc368,lib-file?,host
+0x2cc4b8,236,FUN_002cc4b8,lib-file?,host
+0x2cc5a8,84,FUN_002cc5a8,lib-file?,host
+0x2cc600,124,FUN_002cc600,lib-file?,host
+0x2cc680,172,FUN_002cc680,lib-file?,host
+0x2cc730,108,FUN_002cc730,lib-file?,host
+0x2cc7a0,100,FUN_002cc7a0,lib-file?,host
 0x2cc808,300,EAMem_Set,lib-eamem?,host
 0x2cc938,32,FUN_002cc938,lib-eamem?,host
 0x2cc958,40,FUN_002cc958,lib-eamem?,host
@@ -7087,7 +7087,7 @@ address,size,name,system,status
 0x2fa1d8,52,FUN_002fa1d8,runtime?,host
 0x2fa210,28,FUN_002fa210,runtime?,host
 0x2fa230,40,FUN_002fa230,runtime?,host
-0x2fa258,212,FUN_002fa258,runtime?,host
+0x2fa258,212,bsearch,runtime?,host
 0x2fa330,28,FUN_002fa330,runtime?,host
 0x2fa350,80,FUN_002fa350,runtime?,host
 0x2fa3a0,64,FUN_002fa3a0,runtime?,host

@@ -24,7 +24,7 @@ GUESSES = ROOT / "tricky-rs" / "docs" / "function-systems.csv"
 SRC = ROOT / "tricky-rs" / "src"
 SYMBOLS = ROOT / "ghidra" / "symbols.txt"
 # Systems Rust and Bevy stand in for: their functions are not ported (status 'host'). Row F1b.
-HOST = {"sdk", "kernel", "libc", "runtime", "lib-eamem"}
+HOST = {"sdk", "kernel", "libc", "runtime", "lib-eamem", "lib-file", "comm"}
 NOTES = [ROOT / "tricky-rs" / "docs", ROOT / "notes"]
 
 # First match wins. Matched against the whole name (class::method or Free_Function).
@@ -37,7 +37,7 @@ SYSTEMS = [
     (r"^cFE|Overlay|^FE_|^Frontend|^cTitle", "frontend"),
     (r"^HUD_|^Font_|^SpriteSet_|^cHud|^cFont", "hud"),
     (r"Audio|^Music|^SND|^PF_|^Voice|^BoardIn_|Sound|^cBXAudio|^WorldEmitter", "audio"),
-    (r"BigFile|^Big_|^RefPack|^File_|^cFile|^cAsync|^Load_|^AIP_Load", "files"),
+    (r"BigFile|^Big_|^File_|^cFile|^cAsync|^Load_|^AIP_Load", "files"),
     (r"^Score_|^TrickBook|^cScore", "scoring"),
     (r"^(AI|cAI|AIComputer|AIP|RelTable|Rider_OnKnocked)", "ai"),
     (r"^(Ragdoll|Wipeout|GetUp|CollBody|cRagdoll)", "wipeout"),

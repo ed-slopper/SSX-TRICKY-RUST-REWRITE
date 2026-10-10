@@ -22,7 +22,6 @@ state machine and the renderer are ours. Nothing has been checked against the or
 
 | ID | Task | Area | Needs | Who | Notes |
 |---|---|---|---|---|---|
-| F1d | Identify `lib-ea` (204 functions at 0x2c2044–0x2cc800, EA middleware the renderer, front end, HUD and file code call; 0x2c5160 reads a packed table for 130 callers) and split it into its libraries; decide whether `comm` (102 functions, `CCommDriver`/`CDeci2CopydataCommDriver`, the dev-kit debug link) is `host` | any | | ed-slopper/puffin (2026-10-10) | Gap of F1b. `LIB_BANDS` in `tools/function_systems.py`, `HOST` in `tools/function_index.py` |
 | F1c | Name the functions F1a placed only by guess (5,094 marked `?` in `tricky-rs/docs/function-index.csv`), system by system, in Ghidra and in `ghidra/symbols.txt`; start with boarder, race and world, the systems being ported now | any | F3 | | Gap of F1a: naming needs the binary in Ghidra (ghidra-mcp), which was not connected |
 | F2 | Shared Ghidra names: harvest every name the earlier sessions gave in Ghidra (they live in `tricky-rs/docs/original-rules.md`, the source comments and the ghidra-mcp project, not in `ghidra/symbols.txt`, which stops at the 2,884 RTTI names of 2026-10-04) into `ghidra/symbols.txt`, so a fresh project gets them | any | | | [est] The project on ed-slopper's PC (`ghidra/project`, 2026-10-04) has only the RTTI names; the later ones were made elsewhere. If ed-slopper still has the renamed project, export it instead |
 | F2a | Naming rules written down (AGENTS.md §14) and checked against the names already used | any | F2 | | [est] |
@@ -46,16 +45,16 @@ state machine and the renderer are ours. Nothing has been checked against the or
 | E1a | Fixed 60 Hz tick with per-boarder time scale (`dt = timescale/60`, boarder+0x12c) driving every system, frame-rate independent of the window | any | | | [repo] original-rules.md "Units"; check what `SmoothDt` in `main.rs` does today |
 | E1b | Random numbers: the game's `rand` and seeding, used by AI tricks, grabs, announcer, so runs can match the original | unowned | F1 | | [est] |
 | E2 | Read the player's disc: ISO 9660 reader in Rust, the `DATA/` tree, so the player points us at their ISO or drive | unowned | F11 | | [est] Replaces copying files out by hand |
-| E2a | BIG archives (C0FB and BIGF) in Rust, ported from the game's loader | unowned | E2 | | [repo] Python in `tools/afl/anmbig.py`; findings.md "Ideas for next steps" |
-| E2b | RefPack decompression in Rust | unowned | E2a | | [repo] Python in `tools/afl/refpack.py` |
+| E2a | BIG archives (C0FB and BIGF) in Rust, ported from the game's loader | unowned | E2 | | [repo] Python in `tools/afl/anmbig.py`; findings.md "Ideas for next steps". The game's reader: `lib-big`, `BIG_Identify` 0x2cbc88, `BIG_Lookup` 0x2cbdc0, `BIG_GetFileData` 0x2cc0a8 (F1d) |
+| E2b | RefPack decompression in Rust | unowned | E2a | | [repo] Python in `tools/afl/refpack.py`. The game's decoders: `Compress_Decode` 0x2c2de0 → `RefPack_Decode` 0x2c31b0, `Huff_Decode` 0x2c3730, `BTree_Decode` 0x2c3540 (F1d) |
 | E3 | Level files read by our code, as the game reads them, replacing the SSX-Library JSON project folder (`level.rs`) | unowned | E2b | | [repo] level-editing.md. Split before claiming: |
 | E3a | `.pbd`: Bezier patches, instances, models and meshes, materials, splines, lights | unowned | E3 | | [repo] |
-| E3b | `.ssh` textures (incl. `_L` lightmaps, `_sky`) | unowned | E2b | | [repo] Python in `tools/ssh/ssh2png.py` |
+| E3b | `.ssh` textures (incl. `_L` lightmaps, `_sky`) | unowned | E2b | | [repo] Python in `tools/ssh/ssh2png.py`. The game's shape reader: `lib-shape` 0x2c2044–0x2c27c8, `Shape_FindByName` 0x2c2528 (F1d) |
 | E3c | `.ssf`: collision models, physics data, trigger scripts | unowned | E3 | | [repo] |
 | E3d | `.aip` / `.sop`: AI paths, race lines, start positions (`AIP_LoadPathsFromFile` 0x197da0) | unowned | E3 | | [repo] `course.rs` reads AIP.json today |
 | E3e | `.ltg` grid, `.map` names, `.adl` audio links, `_sky.pbd` | unowned | E3 | | [repo] |
 | E4 | Character files in our code: `.mpf` models (`tools/mpf/SPEC.md`), `.afl` animations (`notes/animation-format.md`), outfit and board textures, read from `DATA/CHAR/*.BIG` | unowned | E2b | | [repo] Today exported to `chars/` by Python |
-| E5 | Config and text files: `DATA/CONFIG/*.INF` (SNOW, BANKS, MUSICMAP, INTROMUS), `.cml` cameras, `TRICKDEF.DAT`, `american.loc` and the other languages, `.SFN` fonts | unowned | E2b | | [repo] "Unresolved: HUD text (american.loc)" |
+| E5 | Config and text files: `DATA/CONFIG/*.INF` (SNOW, BANKS, MUSICMAP, INTROMUS), `.cml` cameras, `TRICKDEF.DAT`, `american.loc` and the other languages, `.SFN` fonts | unowned | E2b | | [repo] "Unresolved: HUD text (american.loc)". Text: `Loc_GetString` 0x2c5160, `WStr_FormatArgs` 0x2c5578 (`lib-text`, F1d) |
 | E6 | Loading and memory: what the game loads when (load screens, course switch), only as far as it changes behaviour | unowned | E1 | | [est] |
 | E7 | World: terrain tessellation as the game does it, world cells (`World_CellActivate_RunPersistant` 0x25fed0), instance queries `World_QueryInstances` 0x25b878, ray casts `World_RayCast` 0x25aff8 / `World_RayCastInstance` 0x25bf48 | unowned | E3a | | [repo] `collide.rs` (triangle grid of the drawn mesh) is a stand-in for these |
 | E8 | Physics: check the ported boarder motion against the original once F4 exists: ground `cBoarder_GroundMotion_Update` 0x10a0d8, drag 0x109cb8, side friction 0x109ef8, thrust 0x109950, spring 0x109878, probe 0x128ae8, surface table `SurfaceTable_Init` 0x256188 | any | F4a | | [repo] Ported in `rider.rs`; README still says some constants at the top of `rider.rs` are guesswork: find which |
@@ -163,6 +162,7 @@ matches the original.
 | F1 | Function index `tricky-rs/docs/function-index.csv` (7,425 functions, 2,320 named, 109 ported, 0 checked), `tools/function_index.py` to refresh it | P0 | ed-slopper/puffin | 2026-10-10 | 22a443f |
 | F1a | Systems for the unplaced functions: `tools/function_systems.py` (call graph, shared globals, neighbours, proven address ranges, the library spans) writes `tricky-rs/docs/function-systems.csv`; 3,959 without a system down to 150 | P0 | ed-slopper/puffin | 2026-10-10 | f0c7b2d |
 | F1b | Linked libraries split into bands (`LIB_BANDS` in `tools/function_systems.py`): EA sound and middleware (port), EA memory, Sony SDK, libc, C++ runtime, kernel stubs (host); `host` status in the index (1,181 functions); 13 library functions read and named in `ghidra/symbols.txt`, which the index now reads | P0 | ed-slopper/puffin | 2026-10-10 | 45ffac7 |
+| F1d | `lib-ea` split into EA's shape files, compression (RefPack, Huffman, BTree), wide text and the `.loc` string table, BIG archives (port) and the async file system and streams (host); `comm` (DECI2 dev-kit link) is host; 24 functions named in `ghidra/symbols.txt` | P0 | ed-slopper/puffin | 2026-10-10 | a548ace |
 
 ## Changes to the board
 
@@ -170,3 +170,4 @@ matches the original.
 - 2026-10-10 ed-slopper/puffin: F1 done; added F1a, F1b (gaps of F1).
 - 2026-10-10 ed-slopper/puffin: F1a done; F1b rewritten with the library spans found; added F1c (gap of F1a).
 - 2026-10-10 ed-slopper/puffin: F1b done; added F1d (gap of F1b); G10 notes the EA sound library; AGENTS.md §14 had the symbols.txt line format wrong, fixed.
+- 2026-10-10 ed-slopper/puffin: F1d done; E2a, E2b, E3b, E5 notes get the game's own functions for them.

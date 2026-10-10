@@ -43,7 +43,11 @@ RANGES = [
 # Linked libraries (row F1b). Nothing from 0x2c2044 on calls game code. The bands were placed by who calls
 # them and a few functions read by hand (tricky-rs/docs/function-index.md, "The libraries"):
 #   lib-snd    EA's sound library: the effect player the game's audio calls, SND_* and their internals  (port)
-#   lib-ea     EA's other middleware the game's renderer, front end and file code call                  (port)
+#   lib-shape  EA's shape files (.ssh/.fsh texture archives): directory, find by name                 (port)
+#   lib-compress  EA's compression: xxFB dispatch, RefPack, Huffman and BTree decoders                  (port)
+#   lib-text   EA's wide strings, %1 formatting and the localized string table (.loc)                   (port)
+#   lib-file   EA's file system: async requests, STRM streams, the I/O thread on the CD, host0: paths   (host)
+#   lib-big    EA's BIG archives (C0FB and BIGF): identify, look up by name or index                   (port)
 #   lib-eamem  EA's memory manager: alloc, free, its own memset and memcpy                              (host)
 #   sdk        Sony's libraries: device and graphics set-up, memory card, SIF/IOP                       (host)
 #   libc       newlib: strings, printf, maths, start-up                                                 (host)
@@ -51,7 +55,12 @@ RANGES = [
 #   kernel     the EE kernel's syscall stubs                                                            (host)
 LIB_BANDS = [
     (0x2bb000, 0x2bec00, "lib-snd"),
-    (0x2c2044, 0x2cc800, "lib-ea"),
+    (0x2c2044, 0x2c27c8, "lib-shape"),
+    (0x2c27c8, 0x2c4478, "lib-compress"),
+    (0x2c4478, 0x2c5660, "lib-text"),
+    (0x2c5660, 0x2cbc88, "lib-file"),
+    (0x2cbc88, 0x2cc2c0, "lib-big"),
+    (0x2cc2c0, 0x2cc800, "lib-file"),
     (0x2cc800, 0x2cf800, "lib-eamem"),
     (0x2cf800, 0x2e4c00, "lib-snd"),
     (0x2e4c00, 0x2f2800, "sdk"),

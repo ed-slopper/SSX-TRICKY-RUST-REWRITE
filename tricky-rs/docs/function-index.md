@@ -10,7 +10,7 @@ names only, nothing of the game's code.
 | `size` | Bytes, as Ghidra 12.1.4 sees the function |
 | `name` | Our name: Ghidra's, replaced for `FUN_…` by the name in `ghidra/symbols.txt`, else the name our notes or code give that address (`` `Name` 0xaddr ``) |
 | `system` | From the name when it has one. Otherwise a guess, marked `?`, from [`function-systems.csv`](function-systems.csv) (call graph, shared globals, neighbours, address ranges the notes prove; see `tools/function_systems.py`), or from the named functions on both sides. Empty = not known yet |
-| `status` | `not started`, `host` (a library Rust and Bevy stand in for: not ported, see below), `ported` (the address or the name is written in `tricky-rs/src`, outside lines tagged `STANDIN`), or `checked` (matches the original on the comparison harness, row F4; set by hand until F4 exists) |
+| `status` | `not started`, `host` (a library Rust and Bevy stand in for, or the dev-kit link: not ported, see below), `ported` (the address or the name is written in `tricky-rs/src`, outside lines tagged `STANDIN`), or `checked` (matches the original on the comparison harness, row F4; set by hand until F4 exists) |
 
 Regenerate after porting something:
 
@@ -34,24 +34,24 @@ puts the address on every recreated function and F8 tags the stand-ins, which ma
 
 | System | Functions | of them guessed | Bytes | Ported | Host |
 |---|---|---|---|---|---|
-| frontend | 1,510 | 870 | 448,044 | 0 | 0 |
-| audio | 668 | 627 | 171,576 | 17 | 0 |
+| frontend | 1,496 | 856 | 446,924 | 0 | 0 |
+| audio | 684 | 643 | 172,960 | 17 | 0 |
 | world | 563 | 328 | 166,464 | 28 | 0 |
 | runtime (gcc C++ runtime, type info, thunks) | 514 | 91 | 47,872 | 0 | 514 |
 | render | 494 | 300 | 139,184 | 0 | 0 |
-| boarder | 453 | 384 | 210,772 | 29 | 0 |
+| boarder | 455 | 386 | 211,244 | 29 | 0 |
 | lib-snd (EA sound library) | 408 | 408 | 97,436 | 0 | 0 |
-| race | 358 | 292 | 101,680 | 1 | 0 |
+| race | 363 | 297 | 105,788 | 1 | 0 |
 | sdk (Sony libraries) | 342 | 342 | 81,680 | 0 | 342 |
 | game (app, loaders, race handlers) | 290 | 173 | 71,624 | 0 | 0 |
-| camera | 235 | 219 | 73,916 | 2 | 0 |
-| lib-ea (EA middleware, not identified yet) | 204 | 204 | 41,032 | 0 | 0 |
+| camera | 227 | 211 | 69,148 | 2 | 0 |
 | debugmenu | 177 | 71 | 31,800 | 0 | 0 |
 | ai | 157 | 118 | 41,952 | 6 | 0 |
+| lib-file (EA async file system and streams) | 155 | 155 | 27,096 | 0 | 155 |
 | libc (newlib) | 154 | 154 | 61,700 | 0 | 154 |
-| (not known yet) | 150 | 0 | 30,788 | 1 | 0 |
+| (not known yet) | 149 | 0 | 30,712 | 1 | 0 |
 | save | 145 | 41 | 26,532 | 1 | 0 |
-| comm (debug link to the dev kit) | 102 | 78 | 12,160 | 0 | 0 |
+| comm (DECI2 dev-kit debug link) | 102 | 78 | 12,160 | 0 | 102 |
 | kernel (EE syscall stubs) | 86 | 86 | 3,644 | 0 | 86 |
 | lib-eamem (EA memory manager) | 85 | 85 | 11,668 | 0 | 85 |
 | animation | 74 | 59 | 37,656 | 4 | 0 |
@@ -61,10 +61,14 @@ puts the address on every recreated function and F8 tags the stand-ins, which ma
 | wipeout | 20 | 9 | 12,400 | 11 | 0 |
 | common (helpers called from four or more systems) | 19 | 19 | 2,300 | 0 | 0 |
 | video | 19 | 1 | 1,816 | 0 | 0 |
+| lib-text (EA wide strings, .loc string table) | 17 | 17 | 3,264 | 0 | 0 |
 | input | 14 | 0 | 932 | 0 | 0 |
+| lib-compress (EA RefPack, Huffman, BTree) | 12 | 12 | 7,252 | 0 | 0 |
 | tutorial | 11 | 1 | 1,168 | 0 | 0 |
+| lib-big (EA BIG archives) | 11 | 11 | 1,580 | 0 | 0 |
+| lib-shape (EA .ssh/.fsh texture archives) | 9 | 9 | 1,840 | 0 | 0 |
 | other (named, no system yet) | 2 | 0 | 180 | 0 | 0 |
-| **total** | **7,425** | **5,092** | **2,035,304** | **109** | **1,181** |
+| **total** | **7,425** | **5,093** | **2,035,304** | **109** | **1,438** |
 
 ## The libraries
 
@@ -77,7 +81,12 @@ They live in `LIB_BANDS` in `tools/function_systems.py`.
 | Span | System | Evidence | Port? |
 |---|---|---|---|
 | 0x2bb000–0x2bec00 | lib-snd | the effect player: called only by the game's audio code, plays by priority (0x2bba80, 93 callers) | port |
-| 0x2c2044–0x2cc800 | lib-ea | called by the game's renderer, front end, HUD and file code; 0x2c5160 reads a packed table for 130 callers; uses the kernel's threads and semaphores | port (to be identified, row F1d) |
+| 0x2c2044–0x2c27c8 | lib-shape | EA's shape files (`.ssh`/`.fsh`): count at +8, directory of `{name[4], offset}` from +0x10 (`Shape_GetEntry` 0x2c266c, `Shape_GetEntryName` 0x2c2694); `Shape_FindByName` 0x2c2528 compares each image's long name (attachment block `'p'`, `Shape_GetLongName` 0x2c2610) or else its 4-char name; called by `SpriteSet_BindHudGameTex`, `Crowd_LoadTexturesRandomize` | port (row E3b) |
+| 0x2c27c8–0x2c4478 | lib-compress | `Compress_Decode` 0x2c2de0 dispatches on the `xxFB` header: 0x10 → `RefPack_Decode` 0x2c31b0, 0x30/0x32/0x34 → `Huff_Decode` 0x2c3730, 0x46 → `BTree_Decode` 0x2c3540, 0x1e → a registered callback; `Compress_UnpackedSize` 0x2c2fb0 reads the 3-byte big-endian size after the header; used by `cAsyncBigFile` | port (row E2b) |
+| 0x2c4478–0x2c5660 | lib-text | 16-bit strings: `WStr_Len` 0x2c52f8, `WStr_NCmp` 0x2c5438, `WStr_NCopy` 0x2c54b8, `WStr_FromAscii` 0x2c5510, `WStr_FormatArgs` 0x2c5578 (`%1`…), number formatting; `Loc_GetString` 0x2c5160 (130 callers: front end, race, HUD) returns entry *id* of the current language's table (language u16 at +0xe, per-language offsets from +0x10), remapping the id first through a sorted `{u16 id, u16 index}` map with `bsearch` when flag bit 0 at +8 is set (`Loc_MapId` 0x2c50b0) | port (row E5) |
+| 0x2c5660–0x2cbc88 | lib-file | async file requests in 0x30-byte slots under a lock (open/read/seek ops 0x2–0x7 at 0x2ca7f8–0x2cac38), `STRM` streams for the video player and audio (0x2c6358, 0x2c6e70), whole-file loads (0x2c8938), the I/O thread on CD reads (`CreateThread`, `WaitSema`, 0x7ff sector rounding at 0x2c9e20) | host |
+| 0x2cbc88–0x2cc2c0 | lib-big | `BIG_Identify` 0x2cbc88 (`C0FB` → 1, `BIGF` → 2), `BIG_Lookup` 0x2cbdc0 by name or index, `BIG_GetFileName` 0x2cc268, `BIG_GetFileData` 0x2cc0a8; used by `cMemoryBigFile` | port (row E2a) |
+| 0x2cc2c0–0x2cc800 | lib-file | device set-up and drivers: `host0:` paths (0x2cc368), CD reads through the Sony library | host |
 | 0x2cc800–0x2cf800 | lib-eamem | `EAMem_Alloc(name, size, align)` 0x2ccf70, `EAMem_Free` 0x2ccfc0, its own memset (callers fill new blocks with 0xdeadc0de) and memcpy | host |
 | 0x2cf800–0x2e4c00 | lib-snd | `SND_*` (0x2d0908 lock, 0x2d5288, 0x2d5410); 0x2d5800 on is called only from the SND code | port |
 | 0x2e4c00–0x2f2800 | sdk | called by `cPS2Device`, `cPS2GraphicsMan`, `cPS2VideoPlayer`, `cApplication` and by the memory-card code (0x23d000–0x23f000 → 0x2f1000) | host |
@@ -89,7 +98,8 @@ They live in `LIB_BANDS` in `tools/function_systems.py`.
 
 "Host" means Rust, its standard library and Bevy do that job, so the function is not ported; what the game does
 with it (the sizes it allocates, the order it loads things) is still ported where it changes behaviour. The game's
-own type-info getters (`cClass::__tf`) are `runtime` and host too. EA's libraries are ported because they decide
+own type-info getters (`cClass::__tf`) are `runtime` and host too, and so is `comm` (`CCommDriver`,
+`CDeci2CopydataCommDriver`): Sony's DECI2 link to a development kit, which a retail console never has. EA's libraries are ported because they decide
 behaviour: which sounds play, how music moves, how tables are read.
 
 Guesses are guesses. In a spot check of 14 (2026-10-10, before the address ranges and `lib` were added) 12 looked
