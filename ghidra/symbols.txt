@@ -1161,7 +1161,7 @@ F 114f28 cReplayEndRaceHandler vf1
 F 115038 cReplayEndRaceHandler vf2
 F 113e10 cEndRaceHandler vf0
 F 1146a8 cEndRaceHandler vf1
-F 1141e0 cEndRaceHandler vf2
+F 1141e0 cEndRaceHandler Update
 F 113740 cRaceHandler vf0
 F 113820 cRaceHandler vf2
 F 113478 cStartRaceHandler vf0
@@ -1313,7 +1313,7 @@ F 142a60 cUVScrollNode vf7
 F 142690 cUVScrollNode vf17
 F 142948 cUVScrollNode vf23
 F 141c80 cZBoostNode vf0
-F 141cd8 cZBoostNode vf1
+F 141cd8 cZBoostNode Update
 F 141f98 cZBoostNode vf7
 F 149b78 cTubeEndBoostNode vf0
 F 140688 cTubeEndBoostNode vf1
@@ -1328,7 +1328,7 @@ F 141360 cRandomBoostNode vf27
 F 1415a0 cRandomBoostNode vf28
 F 1415b0 cRandomBoostNode vf29
 F 140b38 cLapBoostNode vf0
-F 140b90 cLapBoostNode vf1
+F 140b90 cLapBoostNode Update
 F 141188 cLapBoostNode vf2
 F 1411b0 cLapBoostNode vf7
 F 141198 cLapBoostNode vf21
@@ -2919,3 +2919,110 @@ G 2cbdc0 BIG_Lookup
 G 2cc0a8 BIG_GetFileData
 G 2cc268 BIG_GetFileName
 G 2fa258 bsearch
+G 100908 SpinState_Update
+G 102158 SpinState_StartFromStick
+G 103660 Ride_AITauntCheck
+G 1050e8 PrewindState_Update
+G 106668 FinishState_Update
+G 106a90 ResetState_Update
+G 1073e0 RailSlideControl_Update
+G 108198 GetUpState_Update
+G 108378 Air_MotionUpdate
+G 109308 Landing_ChooseState
+G 109878 Boarder_GroundSpringForce
+G 109950 Boarder_GroundThrust
+G 109cb8 Boarder_ForwardDrag
+G 109ef8 Boarder_SideFriction
+F 10a0d8 cBoarder GroundMotion_Update
+G 10b0d0 RailSlideMotion_Update
+G 10c198 WipeoutMotion_Enter
+G 10d6f8 Ragdoll_ComputeMassProps
+G 10dad8 Ragdoll_InitFromBoarder
+G 10dca8 Ragdoll_Step
+G 10e190 Ragdoll_Contacts
+G 10f178 Wipeout_StartGetUp
+G 10f9a0 Wipeout_PlayImpactClip
+G 10fd58 Ragdoll_GroundProbe
+G 1102c8 GetUpMotion_Update
+G 115100 Race_UpdatePlacingsAndRubberBand
+G 115fe8 World_ResetInstances
+G 118298 Boarder_UpdateRaceLineProgress
+G 118610 Boarder_SelectRaceLine
+G 118f10 Boarder_RequestReset
+G 11cff0 Boarder_SetTimeScaleRateLimited
+G 11d830 Boarder_Wipeout
+G 11da40 Boarder_Finish
+G 123b10 AirPredict_AtTakeoff
+G 123ec8 AirPredict_Tick
+G 123fc8 Boarder_RiderCollisions
+G 124920 Boarder_RiderHit
+G 125088 Boarder_InstanceCollisions
+G 125a00 Boarder_InstanceBounce
+G 125cb8 Rail_TryCapture
+G 126540 Boarder_WallImpactCheck
+G 126e30 Takeoff_SetSpinRates
+G 1284e0 Jump_ApplyImpulse
+G 12b340 Air_IntegrateRK4
+G 12ba78 Landing_CheckAngles
+G 12ccc8 Fx_LandingSplash
+G 12d108 Fx_BrakeFan_Update
+G 1311b0 Fx_SurfaceSpray
+G 132648 Fx_BoardTrack
+G 1350c0 Boarder_UpdateEffects
+G 138d60 AIComputer_AirTrickInput
+G 139d58 AIComputer_PlanJumpTrick
+G 13a0f0 AI_RubberBandSpeedScale
+G 13bd40 Instance_OnPlayerContact
+F 141ff0 cUVScrollNode cUVScrollNode
+F 142e90 cTexFlipNode cTexFlipNode
+F 144938 cFlagNode Init
+F 144ec8 cFlagNode BuildStrip
+F 145808 cCrackedNode ApplyImpact
+G 1458e0 Crowd_LoadTexturesRandomize
+F 145c00 cCrowdBoxNode Init
+F 145e08 cCrowdBoxNode StepCells
+G 153c50 RigidBody_Integrate
+G 153ee8 RigidBody_ContactImpulse
+G 1551c0 Score_FormatTrickName
+G 156de0 Score_Crash
+G 157490 Score_BuildTrickId
+G 15a030 AnimClip_Advance
+G 15ada8 AnimClip_ResolveAnmIndex
+G 161b40 Profile_ResetNewGame
+G 167208 RelTable_Init
+G 16c420 Circuit_ProcessUnlocks
+F 174888 cBxCamera EvalNamedCam
+G 197da0 AIP_LoadPathsFromFile
+F 199db8 cAnimDeltaNode Update
+G 19c858 Font_ParseSfn
+G 19d0c0 Font_DrawStringA
+G 19d568 Font_PrintfShadowedA
+G 1a2c40 HUD_DrawPlayerSprites
+G 1a4f70 HUD_DrawPlayerText
+G 1c0068 HUD_DrawSprite
+G 1cb770 AnimCurve_FindSegment
+G 1f4440 SpriteSet_InitHudGameRects
+G 1f9080 SpriteSet_BindHudGameTex
+G 20ee58 Audio_InGameUpdate
+G 2116d8 Audio_RaceInit
+G 214e60 Music_StartCourseSong
+G 215220 Audio_StartRaceMusic
+G 215288 Audio_OnRaceGo
+G 2165c8 Sfx_ScriptSoundPlay
+G 216c50 Sfx_InstanceCollision
+G 21b828 Audio_BigAirMusicDuck
+G 21c610 Audio_TrickyTrigger
+G 225318 Audio_MusicEvent
+G 2253e8 Music_SetPathVar
+G 225878 Music_ScheduleAirLoop
+G 22b370 WorldEmitter_GatherForListener
+G 22bf60 WorldEmitter_Update
+G 22d8a8 SoundId_ToBankProgram
+G 236530 CollBody_PointMassInertia
+G 256188 SurfaceTable_Init
+G 25aff8 World_RayCast
+G 25b878 World_QueryInstances
+G 25bf48 World_RayCastInstance
+G 25fed0 World_CellActivate_RunPersistant
+G 2d5288 SNDVoice_CalcPitchMult
+G 2d5410 SND_ParsePTLayer

@@ -98,7 +98,7 @@ address,size,name,system,status
 0x109950,872,Boarder_GroundThrust,boarder,not started
 0x109cb8,576,Boarder_ForwardDrag,boarder,not started
 0x109ef8,476,Boarder_SideFriction,boarder,not started
-0x10a0d8,3568,cBoarder_GroundMotion_Update,boarder,ported
+0x10a0d8,3568,cBoarder::GroundMotion_Update,boarder,ported
 0x10aec8,12,FUN_0010aec8,wipeout?,not started
 0x10aed8,40,FUN_0010aed8,world?,not started
 0x10af00,20,FUN_0010af00,ai?,not started
@@ -182,7 +182,7 @@ address,size,name,system,status
 0x113ce8,112,FUN_00113ce8,race?,not started
 0x113d58,180,FUN_00113d58,race?,not started
 0x113e10,932,cEndRaceHandler::vf0_113e10,race,not started
-0x1141e0,1224,cEndRaceHandler::vf2_1141e0,race,not started
+0x1141e0,1224,cEndRaceHandler::Update,race,ported
 0x1146a8,8,cEndRaceHandler::vf1_1146a8,race,not started
 0x1146b0,128,cPreAI::vf1_1146b0,boarder?,not started
 0x114730,196,cPostAI::vf1_114730,boarder?,not started
@@ -712,7 +712,7 @@ address,size,name,system,status
 0x140948,336,FUN_00140948,world?,not started
 0x140a98,160,FUN_00140a98,ai?,not started
 0x140b38,88,cLapBoostNode::vf0_140b38,world,not started
-0x140b90,1528,cLapBoostNode::vf1_140b90,world,not started
+0x140b90,1528,cLapBoostNode::Update,world,not started
 0x141188,8,cLapBoostNode::vf2_141188,world,not started
 0x141190,8,cLapBoostNode::vf22_141190,world,not started
 0x141198,24,cLapBoostNode::vf21_141198,world,not started
@@ -732,9 +732,9 @@ address,size,name,system,status
 0x141af0,236,FUN_00141af0,world?,not started
 0x141be0,160,FUN_00141be0,ai?,not started
 0x141c80,88,cZBoostNode::vf0_141c80,world,not started
-0x141cd8,700,cZBoostNode::vf1_141cd8,world,not started
+0x141cd8,700,cZBoostNode::Update,world,not started
 0x141f98,84,cZBoostNode::vf7_141f98,world,not started
-0x141ff0,196,cUVScrollNode,world,ported
+0x141ff0,196,cUVScrollNode::cUVScrollNode,world,ported
 0x1420b8,112,FUN_001420b8,world?,not started
 0x142128,124,cUVScrollNode::vf0_142128,world,not started
 0x1421a8,116,FUN_001421a8,world?,not started
@@ -750,7 +750,7 @@ address,size,name,system,status
 0x142c78,200,FUN_00142c78,world?,not started
 0x142d40,100,FUN_00142d40,world?,not started
 0x142da8,228,FUN_00142da8,world?,not started
-0x142e90,428,cTexFlipNode,world,ported
+0x142e90,428,cTexFlipNode::cTexFlipNode,world,ported
 0x143040,116,FUN_00143040,ai?,not started
 0x1430b8,704,cTexFlipNode::vf1_1430b8,world,ported
 0x143378,60,cTexFlipNode::vf17_143378,world,not started
@@ -773,9 +773,9 @@ address,size,name,system,status
 0x144778,152,FUN_00144778,world?,not started
 0x144810,184,FUN_00144810,world?,not started
 0x1448c8,108,cFlagNode::vf0_1448c8,world,not started
-0x144938,1296,cFlagNode_Init,world,ported
+0x144938,1296,cFlagNode::Init,world,ported
 0x144e48,128,cFlagNode::vf1_144e48,world,not started
-0x144ec8,908,cFlagNode_BuildStrip,world,ported
+0x144ec8,908,cFlagNode::BuildStrip,world,ported
 0x145258,408,cFlagNode::vf2_145258,world,not started
 0x1453f0,100,cFlagNode::vf7_1453f0,world,not started
 0x145458,208,FUN_00145458,world?,ported
@@ -786,15 +786,15 @@ address,size,name,system,status
 0x1457a0,8,cCrackedNode::vf2_1457a0,world,not started
 0x1457a8,60,cCrackedNode::vf23_1457a8,world,not started
 0x1457e8,28,cCrackedNode::vf17_1457e8,world,ported
-0x145808,124,cCrackedNode_ApplyImpact,world,ported
+0x145808,124,cCrackedNode::ApplyImpact,world,ported
 0x145888,84,cCrackedNode::vf7_145888,world,not started
 0x1458e0,520,Crowd_LoadTexturesRandomize,world,ported
 0x145ae8,60,FUN_00145ae8,world?,not started
 0x145b28,128,FUN_00145b28,world?,ported
 0x145ba8,88,FUN_00145ba8,world?,not started
-0x145c00,136,cCrowdBoxNode_Init,world,ported
+0x145c00,136,cCrowdBoxNode::Init,world,ported
 0x145c88,380,cCrowdBoxNode::vf1_145c88,world,ported
-0x145e08,436,cCrowdBoxNode_StepCells,world,ported
+0x145e08,436,cCrowdBoxNode::StepCells,world,ported
 0x145fc0,216,cCrowdBoxNode::vf2_145fc0,world,not started
 0x146098,84,cCrowdBoxNode::vf7_146098,world,not started
 0x1460f0,356,FUN_001460f0,world?,not started
@@ -1512,7 +1512,7 @@ address,size,name,system,status
 0x174010,444,FUN_00174010,camera?,not started
 0x1741d0,104,FUN_001741d0,camera?,not started
 0x174238,1612,FUN_00174238,camera?,not started
-0x174888,684,cBxCamera_EvalNamedCam,camera,ported
+0x174888,684,cBxCamera::EvalNamedCam,camera,ported
 0x174b38,248,FUN_00174b38,camera?,not started
 0x174c30,24,FUN_00174c30,camera?,not started
 0x174c48,16,FUN_00174c48,game?,not started
@@ -2295,7 +2295,7 @@ address,size,name,system,status
 0x1999e8,736,FUN_001999e8,ai?,not started
 0x199d10,84,cAnimDeltaNode,animation,ported
 0x199d68,80,FUN_00199d68,ai?,not started
-0x199db8,244,cAnimDeltaNode,animation,ported
+0x199db8,244,cAnimDeltaNode::Update,animation,ported
 0x199ee0,60,FUN_00199ee0,world?,not started
 0x199f20,392,FUN_00199f20,animation?,not started
 0x19a0a8,256,FUN_0019a0a8,ai?,not started

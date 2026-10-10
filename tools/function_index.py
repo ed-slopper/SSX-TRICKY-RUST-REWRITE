@@ -143,7 +143,9 @@ def symbol_names():
         if len(p) == 3 and p[0] == "G":
             names[int(p[1], 16)] = p[2]
         elif len(p) == 4 and p[0] == "F":
-            names[int(p[1], 16)] = f"{p[2]}::{p[3]}"
+            # ApplySsxSymbols.java adds the address to virtuals not yet understood: vf2 -> vf2_1141e0
+            method = f"{p[3]}_{p[1]}" if p[3].startswith("vf") else p[3]
+            names[int(p[1], 16)] = f"{p[2]}::{method}"
     return names
 
 
@@ -153,8 +155,11 @@ def refresh(rows):
     symbols = symbol_names()
     for r in rows:
         a = int(r["address"], 16)
-        if r["name"].startswith("FUN_"):
-            r["name"] = symbols.get(a) or names.get(a) or r["name"]
+        # ghidra/symbols.txt is the authority; the notes only name what it does not
+        if a in symbols:
+            r["name"] = symbols[a]
+        elif r["name"].startswith("FUN_"):
+            r["name"] = names.get(a, r["name"])
     in_src = names_in_src()
     guessed = guessed_systems()
     for r in rows:
@@ -162,7 +167,9 @@ def refresh(rows):
         r["system"] = system_of(r["name"])
         if r["system"] in ("", "other") and a in guessed:
             r["system"] = guessed[a] + "?"
-        named_in_src = LOOKS_NAMED.search(r["name"]) and r["name"] in in_src
+        # the source may write cClass::Method as cClass_Method
+        named_in_src = LOOKS_NAMED.search(r["name"]) and (
+            r["name"] in in_src or r["name"].replace("::", "_") in in_src)
         if r["status"] != "checked":
             if a in ported or named_in_src:
                 r["status"] = "ported"
