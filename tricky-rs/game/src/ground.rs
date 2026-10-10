@@ -151,7 +151,7 @@ pub fn ground_thrust(s: &ThrustState, push_target: f32, thrust_scale: f32) -> f3
     if t < whole {
         whole = whole - 1.0;
     }
-    let mut ang = (1.0471976 - (d - whole * 6.2831855).abs()) / 0.5235988;
+    let mut ang = (std::f32::consts::FRAC_PI_3 - (d - whole * 6.2831855).abs()) / std::f32::consts::FRAC_PI_6;
     if 1.0 <= ang {
         ang = 1.0;
     }

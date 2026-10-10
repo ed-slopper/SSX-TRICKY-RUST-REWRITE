@@ -474,7 +474,7 @@ address,size,name,system,status
 0x129500,296,FUN_00129500,boarder?,not started
 0x129628,6128,FUN_00129628,boarder?,not started
 0x12ae18,1320,FUN_0012ae18,boarder?,not started
-0x12b340,1844,Air_IntegrateRK4,boarder,ported
+0x12b340,1844,Air_IntegrateRK4,boarder,checked
 0x12ba78,1124,Landing_CheckAngles,boarder,ported
 0x12bee0,272,FUN_0012bee0,boarder?,not started
 0x12bff0,124,FUN_0012bff0,boarder?,not started

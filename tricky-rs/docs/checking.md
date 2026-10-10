@@ -268,7 +268,11 @@ on 3,000 random inputs each (speeds, loads, every board class, switch, powder, c
 steer) and asks for the same bits: **all 6,000 identical.** Both are `checked` in the function index.
 F4d2 added `spring_force` (`Boarder_GroundSpringForce` 0x109878) and `ground_thrust` (`Boarder_GroundThrust`
 0x109950, including its vector-unit speed, sqrt(((x² + y²) + z²) + w²)): 3,000 cases each, all identical,
-first try. Four functions `checked`.
+first try. Then `tricky-rs/game/src/air.rs`: `integrate_rk4` (`Air_IntegrateRK4` 0x12b340, the air step: one
+classic RK4 step on the vector unit, gravity −850.24 cm/s² rising and −1900.84 falling chosen per stage, horizontal
+drag −0.20002478·v, 1/2, 1/6 and 1/3 from `vdiv`, then the speed capped at 3347.22 cm/s, which it writes to
+rider+0x1c4 on every call). 3,000 cases (riding frames and 0.2 s-stepped flight predictions, at and over the
+cap), all identical, first try; `Rider::step` now flies with it. Five functions `checked`.
 
 - The decompiler's expression is not always the machine code's order: the first try differed by one ulp until
   the cubic term was grouped as the instructions do it, `(|vF|·0.001)·((L·row₂)·cubic)` (0x109e70, 0x109ea4,

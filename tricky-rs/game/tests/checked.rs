@@ -8,6 +8,7 @@
 
 use r5900::ps2float::Rules;
 use r5900::Runner;
+use tricky_game::air::integrate_rk4;
 use tricky_game::ground::{forward_drag, ground_thrust, side_friction, spring_force, DragState, FrictionState, ThrustState};
 
 /// The surface table's drag and grip terms of a few real rows (SURFACES in rider.rs: +4, +8, +0xc, +0x10).
@@ -241,4 +242,50 @@ fn ground_thrust_is_the_originals() {
         checked += 1;
     }
     eprintln!("Boarder_GroundThrust: {checked} cases, all bit-identical");
+}
+
+#[test]
+fn air_rk4_is_the_originals() {
+    let Some(mut r) = runner() else { return };
+    let m = layout(&mut r);
+    let (pos, vel) = (r.mem.alloc(16), r.mem.alloc(16));
+    let mut rng = Rng(0xa1b4_7e11);
+    let mut checked = 0;
+    for case in 0..3000 {
+        // a riding frame most of the time, a flight prediction (in 0.2 s steps) now and then
+        let substeps = case % 4 == 3;
+        let dt = match case % 4 {
+            0 => 1.0 / 60.0,
+            1 => rng.f(0.001, 0.05),
+            2 => 2.0 / 60.0,
+            _ => rng.f(0.01, 1.5),
+        };
+        let mut p = [rng.f(-50000.0, 50000.0), rng.f(-50000.0, 50000.0), rng.f(-20000.0, 20000.0), 1.0];
+        // around the cap now and then, and sometimes nearly still on the way up or down
+        let s = if case % 5 == 0 { 3400.0 } else { 2500.0 };
+        let mut v = [rng.f(-s, s), rng.f(-s, s), rng.f(-s, s), 0.0];
+        if case % 7 == 0 {
+            v[2] = rng.f(-5.0, 5.0);
+        }
+        for i in 0..4 {
+            r.mem.write_f32(pos + 4 * i as u32, p[i]);
+            r.mem.write_f32(vel + 4 * i as u32, v[i]);
+        }
+        r.cpu.set_f(12, dt);
+        r.cpu.set_gpr(4, m.rider as u64);
+        r.cpu.set_gpr(5, pos as u64);
+        r.cpu.set_gpr(6, vel as u64);
+        r.cpu.set_gpr(7, substeps as u64);
+        r.call(0x12b340).unwrap_or_else(|e| panic!("case {case}: {e}"));
+
+        let (p0, v0) = (p, v);
+        integrate_rk4(dt, &mut p, &mut v, substeps);
+        for i in 0..4 {
+            let (gp, gv) = (r.mem.read_f32(pos + 4 * i as u32), r.mem.read_f32(vel + 4 * i as u32));
+            assert_eq!((p[i].to_bits(), v[i].to_bits()), (gp.to_bits(), gv.to_bits()),
+                "case {case} lane {i}: ours {p:?} {v:?} vs the game's {gp} {gv} for dt {dt} substeps {substeps} from {p0:?} {v0:?}");
+        }
+        checked += 1;
+    }
+    eprintln!("Air_IntegrateRK4: {checked} cases, all bit-identical");
 }

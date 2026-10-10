@@ -943,13 +943,11 @@ impl Rider {
             if s > self.cap { self.vel *= self.cap / s; }
         } else {
             // ---- in the air (Air_IntegrateRK4 ballistics, SpinState_Update rotation)
-            self.vel.y -= if self.vel.y > 0.0 { GRAVITY_RISING } else { GRAVITY_FALLING } * dt;
-            let h = 1.0 / (1.0 + AIR_DRAG * dt);
-            self.vel.x *= h;
-            self.vel.z *= h;
-            let s = self.vel.length();
-            if s > AIR_CAP { self.vel *= AIR_CAP / s; }
-            p += self.vel * dt;
+            // the game's own step (checked bit for bit), in its cm and z up
+            let (mut gp, mut gv) = ([p.x * 100.0, p.z * 100.0, p.y * 100.0, 1.0], [self.vel.x * 100.0, self.vel.z * 100.0, self.vel.y * 100.0, 0.0]);
+            crate::air::integrate_rk4(dt, &mut gp, &mut gv, false);
+            p = Vec3::new(gp[0], gp[2], gp[1]) / 100.0;
+            self.vel = Vec3::new(gv[0], gv[2], gv[1]) / 100.0;
             self.air_time += dt;
             if !input.jump && self.air_time < 0.15 && (self.charge > 0.0 || self.jump_c > 0.0) {
                 let c = if self.jump_c > 0.0 { self.jump_c } else { self.charge };
