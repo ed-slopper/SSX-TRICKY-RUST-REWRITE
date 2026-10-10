@@ -16,6 +16,21 @@ Two tools, built by rows F4a and F4b:
 
 ## F4a: the function runner
 
+**Built** (2026-10-10): `tools/r5900`, no dependencies, builds with the GNU and MSVC toolchains.
+
+```
+cd tools/r5900
+cargo test                                         # the instruction tests; the ELF tests skip
+TRICKY_ELF=<path to your SLUS_203.26> cargo test   # also runs Boarder_ForwardDrag and Boarder_SideFriction
+```
+
+On hand-built inputs both match the formula the decompiler shows to within 2 to 7 units in the last place,
+always toward zero: the EE's rounding at work, and the size of the difference F4c is about. With zeroed inputs,
+`Boarder_GroundSpringForce`, `Boarder_GroundThrust` and `Air_IntegrateRK4` also run to the end; `Jump_ApplyImpulse`,
+`Takeoff_SetSpinRates` and `AI_RubberBandSpeedScale` stop at their first call (0x250e98, 0x12bee0), which needs a
+stub. Not implemented yet: MMI, the FPU accumulator forms (`adda.s`, `madd.s` …), most VU0 macro ops, `cfc2` of
+the flag registers, and the EE adder's missing guard bit; each stops the run with its name and address.
+
 A Rust crate, `tools/r5900` (a library with no Bevy), used from `cargo test` in `tricky-rs` as a dev-dependency.
 It loads the ELF, sets up registers and memory, calls one original function and returns what it left in the
 registers and memory, so a test can call our Rust function on the same inputs and compare.

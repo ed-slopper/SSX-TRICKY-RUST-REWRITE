@@ -1,0 +1,8 @@
+[package]
+name = "r5900"
+version = "0.1.0"
+edition = "2021"
+description = "Runs single functions of SSX Tricky's SLUS_203.26 (the player's own copy) to check tricky-rs against them (board row F4a)"
+publish = false
+
+[dependencies]
