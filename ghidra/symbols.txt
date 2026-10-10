@@ -3026,3 +3026,7 @@ G 25bf48 World_RayCastInstance
 G 25fed0 World_CellActivate_RunPersistant
 G 2d5288 SNDVoice_CalcPitchMult
 G 2d5410 SND_ParsePTLayer
+G 250d60 Math_Sin
+G 250e98 Math_Cos
+G 102f50 Vec4_Scale
+G 11b018 Boarder_AddMeter

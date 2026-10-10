@@ -28,8 +28,15 @@ On hand-built inputs both match the formula the decompiler shows to within 2 to 
 always toward zero: the EE's rounding at work, and the size of the difference F4c is about. With zeroed inputs,
 `Boarder_GroundSpringForce`, `Boarder_GroundThrust` and `Air_IntegrateRK4` also run to the end; `Jump_ApplyImpulse`,
 `Takeoff_SetSpinRates` and `AI_RubberBandSpeedScale` stop at their first call (0x250e98, 0x12bee0), which needs a
-stub. Not implemented yet: MMI, the FPU accumulator forms (`adda.s`, `madd.s` …), most VU0 macro ops, `cfc2` of
-the flag registers, and the EE adder's missing guard bit; each stops the run with its name and address.
+stub. Since F4e (2026-10-10) `tests/targets.rs` also runs `AI_RubberBandSpeedScale` 0x13a0f0, `Takeoff_SetSpinRates`
+0x126e30, `Jump_ApplyImpulse` 0x1284e0 (snow and rail) and `Air_IntegrateRK4` 0x12b340 to the end, and each
+matches the formula in `original-rules.md`: the rubber band through both clamps, K = 11.517(0.5449 + 0.6742T)
+for the spin and flip rates, Δv = 630.88 along normalize(N + 0.2F) on snow and along the board's up on a rail,
+gravity −850.24 and drag −0.20002v for one 1/60 s step. Their pure callees run as the original (`Math_Sin`
+0x250d60, `Math_Cos` 0x250e98, `Vec4_Scale` 0x102f50, the table getter 0x15fdd0); callees with side effects are
+stubs that record the call (scoring 0x156618, `Boarder_AddMeter` 0x11b018, the motion and clip setters).
+Not implemented yet: MMI, the FPU accumulator forms (`adda.s`, `madd.s` …), the VU0 macro ops no target has
+needed, and `cfc2` of the flag registers; each stops the run with its name and address.
 
 A Rust crate, `tools/r5900` (a library with no Bevy), used from `cargo test` in `tricky-rs` as a dev-dependency.
 It loads the ELF, sets up registers and memory, calls one original function and returns what it left in the

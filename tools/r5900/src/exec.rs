@@ -412,6 +412,10 @@ fn cop2(r: &mut Runner, pc: u32, w: u32, rs: usize, rt: usize, rd: usize, sa: u3
             c.q = pf::sqrt(t[ftf]); // vsqrt Q, ft.ftf
             None
         }
+        58 => {
+            c.q = pf::div(s[fsf], pf::sqrt(t[ftf])); // vrsqrt Q, fs.fsf, ft.ftf
+            None
+        }
         59 => None, // vwaitq: the result is already there
         x => return unimpl(format!("vu0 macro special2 {x}")),
     };
@@ -570,6 +574,7 @@ mod tests {
                 vu(15, 2, 1, 0, 0x3c | 1),  // vadday ACC = vf1 + vf2.y
                 vu(15, 2, 1, 6, 11),        // vmaddw vf6 = ACC + vf1 * vf2.w
                 vu(15, 0, 0, 0, 0x3f) | (14 << 6), // vwaitq
+                vu(3 << 2, 2, 1, 0, 0x3e) | (14 << 6), // vrsqrt Q = vf1.x / sqrt(vf2.w), checked below as vf7
             ],
             |rn| {
                 rn.cpu.vf[1] = [1.0, 2.0, 3.0, 4.0];
@@ -579,9 +584,9 @@ mod tests {
         let c = &rn.cpu;
         assert_eq!(c.vf[3], [3.0, 12.0, 3.0, 8.0]);
         assert_eq!(c.vf[4], [2.0, 4.0, 6.0, 8.0]);
-        assert_eq!(c.q, 0.25);
-        assert_eq!(c.vf[5], [0.25, 0.5, 0.75, 1.0]);
+        assert_eq!(c.vf[5], [0.25, 0.5, 0.75, 1.0], "vmulq by vdiv's Q = 1/4");
         assert_eq!(c.vf[6], [15.0, 20.0, 25.0, 30.0]);
+        assert_eq!(c.q, 0.5, "vrsqrt: 1 / sqrt(4)");
     }
 
     #[test]

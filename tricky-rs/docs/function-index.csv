@@ -13,7 +13,7 @@ address,size,name,system,status
 0x102dc0,40,FUN_00102dc0,world?,not started
 0x102de8,20,FUN_00102de8,ai?,not started
 0x102e80,208,FUN_00102e80,boarder?,not started
-0x102f50,44,FUN_00102f50,common?,not started
+0x102f50,44,Vec4_Scale,common?,not started
 0x102f80,44,FUN_00102f80,common?,not started
 0x102fb0,24,FUN_00102fb0,boarder?,not started
 0x102fc8,1012,FUN_00102fc8,boarder?,not started
@@ -271,7 +271,7 @@ address,size,name,system,status
 0x11a840,1892,FUN_0011a840,boarder?,not started
 0x11afa8,60,FUN_0011afa8,boarder?,not started
 0x11afe8,48,FUN_0011afe8,boarder?,not started
-0x11b018,476,FUN_0011b018,boarder?,not started
+0x11b018,476,Boarder_AddMeter,boarder,not started
 0x11b1f8,336,FUN_0011b1f8,boarder?,not started
 0x11b348,4860,FUN_0011b348,boarder?,not started
 0x11c648,100,FUN_0011c648,wipeout?,not started
@@ -4498,8 +4498,8 @@ address,size,name,system,status
 0x2508b8,400,FUN_002508b8,boarder?,not started
 0x250a48,452,FUN_00250a48,boarder?,not started
 0x250c10,332,FUN_00250c10,common?,not started
-0x250d60,308,FUN_00250d60,common?,not started
-0x250e98,312,FUN_00250e98,boarder?,not started
+0x250d60,308,Math_Sin,common?,not started
+0x250e98,312,Math_Cos,boarder?,not started
 0x250fd0,296,FUN_00250fd0,boarder?,not started
 0x2510f8,320,FUN_002510f8,boarder?,not started
 0x2514c0,72,FUN_002514c0,race?,not started
