@@ -195,6 +195,18 @@ New people: add your own line (in a `board-` commit) before you claim a row, and
 - Port notes, one file per system, live in `tricky-rs/docs/` (today mostly in `original-rules.md`; row F6
   splits it). Write proven facts and interpretations apart: "proven" = read from code, "inferred" = a guess.
 
+- **The running game: PCSX2-MCP** (<https://github.com/hkmodd/PCSX2-MCP>, board row F3b). Ghidra shows the code;
+  PCSX2-MCP shows the game while it runs, in a patched PCSX2 with the player's own disc: memory read, search and
+  diff, registers (GPR, FPU, VU), disassembly, breakpoints with conditions, watchpoints, stepping, backtraces,
+  savestates. Use it for what the code alone can't tell you: where an indirect call really goes, what a field
+  holds during a race, which function runs on which tick, and to check the function runner (F4f). Its tools are
+  `pcsx2_connect`, `pcsx2_read_memory`, `pcsx2_find_pattern`, `pcsx2_memory_diff`, `pcsx2_read_registers`,
+  `pcsx2_disassemble`, `pcsx2_continue`, `pcsx2_step`, `pcsx2_get_backtrace`, plus breakpoint and watchpoint tools;
+  call `pcsx2_connect` first and check `pcsx2_game_info` says SLUS-20326 before trusting an address. If its tools
+  are not in your list, tell the human once (row F3b) and go on without it. For thousands of reads (a whole
+  race), drive its DebugServer (TCP 21512) from a script rather than calling a tool per tick. Nothing it shows
+  goes into the repo but addresses, names and numbers, as with Ghidra.
+
 **Installing ghidra-mcp** (for the human): install Ghidra 12.x and JDK 21; install the Emotion Engine extension
 (`ghidra-emotionengine-reloaded`) through File > Install Extensions; import `SLUS_203.26` (language
 `r5900:LE:32:default`), auto-analyse, run `ApplySsxSymbols.java` on `ghidra/symbols.txt`. Then follow the

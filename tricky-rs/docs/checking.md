@@ -153,18 +153,31 @@ constants rounded to four places (0.7076 for 0.70764244), and the state 3/4 fact
 
 The runner checks functions one at a time; the trace checks that our tick does the same things in the same order.
 
-- **Read the game while it runs.** PCSX2 (1.7 and 2.x) has PINE, an IPC interface for reading and writing guest
-  memory from another program (Settings > Advanced > enable PINE; slot 28011). A small Rust or Python tool polls it.
-- **Know which tick it is.** PINE reads are not tied to the game's frames, so each sample also reads the game's own
-  tick counter, and only pairs of consecutive ticks are used. Finding that counter (and the boarder array and pad
-  state addresses) is F4b's first job; write them into the port notes.
+- **Stop the game on every tick.** PCSX2-MCP (row F3b) adds a debug server to PCSX2 (TCP port 21512) with
+  breakpoints, register and memory reads. A trace script sets a breakpoint on the boarder's per-tick update, and
+  at each hit reads what it needs and continues, so every tick is recorded and nothing moves while it reads. A
+  script talks to the debug server directly; calling an MCP tool per tick would take far too long for a race.
+  Without F3b, PCSX2's own PINE interface (Settings > Advanced; slot 28011) can read memory but is not tied to
+  the game's frames: then each sample also reads the game's tick counter and only pairs of consecutive ticks are
+  kept.
+- **Find the addresses first.** The per-tick update to break on, the boarder array, the pad state and the tick
+  counter, with PCSX2-MCP's memory search and diff (`pcsx2_find_pattern`, `pcsx2_memory_diff`) during a race.
+  Write them into the port notes.
 - **What to record per tick, per rider:** the boarder struct (position, velocity, orientation, motion state and
-  state timer, meter, trick state), the pad state the game read that tick, and the course's random seed state.
+  state timer, meter, trick state), the pad state the game read that tick, and the random seed state.
 - **Replay.** Load the recorded state at tick t into our structs, feed the recorded pad, step our code one tick and
   compare with tick t+1, field by field, within the tolerance F4c sets. Report the first field and tick that
   differ.
 - **Files.** Traces are made from the game, so they stay on the player's PC (`traces/`, ignored by git); the repo
   holds the tools and the list of fields.
+
+## F4f: the runner against the running game
+
+The worked example compares the runner with a formula read from the decompiler. Row F4f compares it with the game
+itself: break on `Boarder_ForwardDrag` 0x109cb8 during a race, read `$f12`, `$f13`, `$a0`, `$a1` and the structs
+they point to, step to the `jr $ra` and read `$f0`; then build the same inputs in `tools/r5900` and compare. A
+difference is a runner bug, or PCSX2 approximating the EE's floats (it is very close, not perfect); write which,
+for F4c.
 
 ## How a row gets to `checked`
 
