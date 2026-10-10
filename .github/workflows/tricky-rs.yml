@@ -5,9 +5,11 @@ on:
   push:
     paths:
       - 'tricky-rs/**'
+      - '.github/workflows/tricky-rs.yml'
   pull_request:
     paths:
       - 'tricky-rs/**'
+      - '.github/workflows/tricky-rs.yml'
   workflow_dispatch:
 
 permissions:
@@ -56,5 +58,8 @@ jobs:
             grep -E "^[^ ]+\.rs:[0-9]+:[0-9]+: $level" clippy.txt | sort -u | head -10 |
               sed -E "s#^([^:]+):([0-9]+):([0-9]+): $level(\[[^]]*\])?: (.*)#::$level file=tricky-rs/\1,line=\2,col=\3::\5 \4#"
           done
+          # errors without a file location (cargo's own, build failures), and what came just before cargo gave up
+          grep -E '^error' clippy.txt | sort -u | head -10 | sed -E 's#^error(\[[^]]*\])?: (.*)#::error::\2 \1#'
+          grep -B25 -m1 'could not compile' clippy.txt | tail -25 | sed 's#^#::notice::#'
           echo "$(grep -cE ': error' clippy.txt) errors, $(grep -cE ': warning' clippy.txt) warnings"
           exit $status
