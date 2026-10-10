@@ -69,17 +69,17 @@ jobs:
       - run: cargo build --locked
       - run: cargo test --locked
       # Warnings are reported, not yet fatal: the code predates CI. Row F5a makes this -D warnings.
-      # Errors and warnings also go to the job summary, which can be read without signing in to GitHub.
+      # Each finding also becomes an annotation (file, line, message), which can be read without signing in
+      # to GitHub; GitHub shows up to 10 errors and 10 warnings per step.
       - name: cargo clippy
         shell: bash
         run: |
           set +e
           cargo clippy --locked --all-targets --message-format=short 2>&1 | tee clippy.txt
           status=${PIPESTATUS[0]}
-          {
-            echo "### clippy on ${{ runner.os }}: exit $status"
-            echo '```'
-            grep -E '^(error|warning)|: (error|warning)' clippy.txt | sort | uniq -c | sort -rn | head -150
-            echo '```'
-          } >> "$GITHUB_STEP_SUMMARY"
+          for level in error warning; do
+            grep -E "^[^ ]+\.rs:[0-9]+:[0-9]+: $level" clippy.txt | sort -u | head -10 |
+              sed -E "s#^([^:]+):([0-9]+):([0-9]+): $level(\[[^]]*\])?: (.*)#::$level file=tricky-rs/,line=,col=:: #"
+          done
+          echo "$(grep -cE ': error' clippy.txt) errors, $(grep -cE ': warning' clippy.txt) warnings"
           exit $status
