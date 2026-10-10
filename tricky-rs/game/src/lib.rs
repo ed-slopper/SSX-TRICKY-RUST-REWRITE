@@ -3,6 +3,7 @@
 
 pub mod anim;
 pub mod collide;
+pub mod ground;
 pub mod rails;
 pub mod rider;
 pub mod trickdata;

@@ -152,9 +152,9 @@ fn forward_drag_matches_original() {
 }
 ```
 
-It would fail today, which is the point of building it. Our `drag_linear` and `drag_cubic` (`rider.rs`) use the
-constants rounded to four places (0.7076 for 0.70764244), and the state 3/4 factor above is not in
-`original-rules.md`. Both are gaps for the port, not for this row.
+It would have failed then: our `drag_linear` and `drag_cubic` used the constants rounded to four places (0.7076
+for 0.70764244). The "motion state 3 and 4" factor turned out to be the surface (rider+0x290: 3 and 4 are powder),
+and the port had it as the powder depth. E8e and F4d fixed and checked this (below).
 
 ## F4b: race traces from PCSX2, over PINE
 
@@ -258,6 +258,23 @@ rule; reproducing that is what is left of F4g. Whether to follow PCSX2 or the co
 
 The game's `$gp` at the breakpoint was 0x3C38F0, the value the runner works out from the entry code, and the code
 in memory was byte-identical to `SLUS_203.26`.
+
+## F4d: our functions against the original (done 2026-10-10)
+
+`tricky-rs/game/src/ground.rs` holds `forward_drag` (`Boarder_ForwardDrag` 0x109cb8) and `side_friction`
+(`Boarder_SideFriction` 0x109ef8) with the original's constants, units (cm, cm/s) and order of operations;
+`Rider::step` calls them. `tricky-rs/game/tests/checked.rs` runs the game's own functions in the runner and ours
+on 3,000 random inputs each (speeds, loads, every board class, switch, powder, crouch, boost, brake, full-lock
+steer) and asks for the same bits: **all 6,000 identical.** Both are `checked` in the function index.
+
+- The decompiler's expression is not always the machine code's order: the first try differed by one ulp until
+  the cubic term was grouped as the instructions do it, `(|vF|·0.001)·((L·row₂)·cubic)` (0x109e70, 0x109ea4,
+  0x109ed0). Read the float instructions (`tools/insn_census.py` style) when a check is one ulp off.
+- The runner rounds every operation to nearest for this check (`Rules::parse("add=n,mul=n,div=n,cvt=n")`), as
+  IEEE f32 does; nearest add and multiply is what PCSX2 showed (F4f, F4g), nearest divide is assumed (F4c).
+- Our stats don't separate every stat byte the game reads (the cubic drag reads stats+0x19, side friction
+  stats+0x13): `Rider` passes the speed and edging stats in their place until the stats tables are ported (G3).
+- `side_friction`'s third input is rider+0x214, most likely the shaped steer (|x|·1.0001 ≥ 1 only at full lock).
 
 ## How a row gets to `checked`
 

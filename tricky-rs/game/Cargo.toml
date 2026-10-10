@@ -9,3 +9,7 @@ publish = false
 # the same glam as Bevy 0.16, so tricky-rs and this crate share one Vec3
 glam = "0.29.3"
 serde = { version = "1", features = ["derive"] }
+
+[dev-dependencies]
+# the function runner, to check our functions against the original (row F4d; its tests skip without TRICKY_ELF)
+r5900 = { path = "../../tools/r5900" }

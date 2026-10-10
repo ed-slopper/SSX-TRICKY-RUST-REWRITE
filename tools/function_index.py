@@ -10,7 +10,7 @@ only: nothing of the game's code goes in it.
 
 Names: the Ghidra name, replaced by any name our notes and code give the address (`Name` 0xaddr).
 System: from the name; for unnamed functions, the system of the named functions on both sides when they
-agree, marked with a trailing '?'. Status: 'host' for the libraries Rust and Bevy stand in for (HOST), 'ported' when the address or the name is written in tricky-rs/src (lines tagged STANDIN do not
+agree, marked with a trailing '?'. Status: 'host' for the libraries Rust and Bevy stand in for (HOST), 'ported' when the address or the name is written in tricky-rs/src or tricky-rs/game/src (lines tagged STANDIN do not
 count), 'checked'
 is set by hand (or by the comparison harness, row F4) and is kept, otherwise 'not started'.
 """
@@ -22,7 +22,8 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 INDEX = ROOT / "tricky-rs" / "docs" / "function-index.csv"
 GUESSES = ROOT / "tricky-rs" / "docs" / "function-systems.csv"
-SRC = ROOT / "tricky-rs" / "src"
+# our Rust: the Bevy app and the Bevy-free game crate (row F11a); tests are not ports, so not scanned
+SRCS = [ROOT / "tricky-rs" / "src", ROOT / "tricky-rs" / "game" / "src"]
 SYMBOLS = ROOT / "ghidra" / "symbols.txt"
 RENAMED = ROOT / "ghidra" / "renamed.txt"
 # Systems Rust and Bevy stand in for: their functions are not ported (status 'host'). Row F1b.
@@ -83,7 +84,7 @@ def read_text(p):
 
 
 def text_files():
-    for p in sorted(SRC.rglob("*.rs")):
+    for p in sorted(f for d in SRCS for f in d.rglob("*.rs")):
         yield p
     for d in NOTES:
         for p in sorted(d.rglob("*.md")):
@@ -123,7 +124,7 @@ def fill_guesses(rows):
 def names_in_src():
     """Every function-like name our Rust source mentions (in code or comments)."""
     found = set()
-    for p in sorted(SRC.rglob("*.rs")):
+    for p in sorted(f for d in SRCS for f in d.rglob("*.rs")):
         found.update(WORD.findall(read_text(p)))
     return found
 

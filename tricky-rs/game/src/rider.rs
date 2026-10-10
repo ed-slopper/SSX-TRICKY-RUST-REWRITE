@@ -844,15 +844,15 @@ impl Rider {
             // drag along the board, heavier under load
             let load = (f_n / gmag).max(1.0);
             let st = &self.stats;
-            let afv = vf.abs();
-            // riding switch on a BX or alpine board takes 15% / 30% off the stat terms
-            let sw = if self.switch { match st.kind { 1 => 1.0, 0 => 0.84998363, _ => 0.69987833 } } else { 1.0 };
-            // in powder the drag depends on how deep the board sits
-            let mul = if self.surface == 3 || self.surface == 4 { 0.5 - h / d2 } else { 1.0 };
-            let drag = -vf * mul * (load * surf[1] * st.drag_linear() * sw
-                + (1.0 - self.crouch_v) * 0.10573
-                + (1.0 + 1.2154 * lvl) * st.brake() * sw * self.brake_v * self.brake_v
-                + afv * 0.1 * load * (surf[2] + afv * 0.1 * surf[3] * st.drag_cubic() * sw));
+            // `Boarder_ForwardDrag` 0x109cb8, exactly (crate::ground), in cm: our stats have no separate cubic
+            // stat (stats+0x19), so the speed stat stands in for it (row G3)
+            let drag_state = crate::ground::DragState {
+                speed: st.speed * 255.0, edging: st.edging * 255.0, cubic: st.speed * 255.0,
+                class: st.kind as u32, switch: self.switch,
+                powder: (self.surface == 3 || self.surface == 4).then_some((h * 100.0, d2 * 100.0)),
+                crouch: self.crouch_v, boost_level: lvl, brake: self.brake_v,
+            };
+            let drag = crate::ground::forward_drag(vf * 100.0, load, [surf[1], surf[2], surf[3]], &drag_state) / 100.0;
             // pushing along: toward the course direction only, harder the slower he goes
             let mut thrust = 0.0;
             if self.brake_v <= 0.0 {
@@ -878,10 +878,10 @@ impl Rider {
                 self.boosting = true;
             }
             // the edge resists sideways slip (weakly: the board turns by yawing after the velocity)
-            let x = afv;
-            let curve = if x < 5.556 { 0.20104 + 0.088997 * x } else if x < 13.889 { 0.69547 + 0.03613 * (x - 5.556) } else { (0.99655 - 0.010441 * (x - 13.889)).max(0.0) };
-            let switch_k = if self.switch { match st.kind { 1 => 1.0, 0 => 0.84998, _ => 0.69988 } } else { 1.0 };
-            let side = -vl * curve * surf[4] * (0.001 + 1.1412 * st.edging) / (1.0 + 3.5 * lvl) * switch_k;
+            // `Boarder_SideFriction` 0x109ef8, exactly (crate::ground), in cm; its third input is rider+0x214,
+            // most likely the shaped steer; our edging stands in for its grip stat (stats+0x13, row G3)
+            let friction_state = crate::ground::FrictionState { grip: st.edging * 255.0, class: st.kind as u32, switch: self.switch, boost_level: lvl };
+            let side = crate::ground::side_friction(vl * 100.0, vf * 100.0, self.steer, surf[4], &friction_state) / 100.0;
             let mut a = lean + f * (drag + thrust) + left * side - Vec3::Y * gmag;
             if h < -d2 {
                 p -= n * (h + d2).max(-0.10);
