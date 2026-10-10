@@ -1830,7 +1830,8 @@ fn ride(
                     && flat.length() < 10.0 && cos < 0.5 && roll < 0.91 {
                     let n = 1 + (roll * 1000.0) as u32 % 5;
                     let right = Vec3::new(o.rider.yaw.cos(), 0.0, -o.rider.yaw.sin());
-                    let behind = cos < -0.7071;
+                    // the game compares the angle with 2.3561945 (3π/4, 0x103aa0); cos(3π/4) = −1/√2
+                    let behind = cos < -std::f32::consts::FRAC_1_SQRT_2;
                     o.rider.taunt_clip = if behind { format!("bxRT_AITAUNT{n}") } else if flat.dot(right) > 0.0 { format!("bxRT_TAUNTTS{n}") } else { format!("bxRT_TAUNTHS{n}") };
                     o.rider.taunt = 0.0;
                 }
