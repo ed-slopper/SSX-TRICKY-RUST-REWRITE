@@ -6,6 +6,7 @@ only: nothing of the game's code goes in it.
 
     python tools/function_index.py build <functions.csv>   first build, from ghidra/scripts/ExportDecomp.java's list
     python tools/function_index.py status                  refresh names and statuses in the existing index
+    python tools/function_index.py names                   check ghidra/symbols.txt against AGENTS.md §14
 
 Names: the Ghidra name, replaced by any name our notes and code give the address (`Name` 0xaddr).
 System: from the name; for unnamed functions, the system of the named functions on both sides when they
@@ -23,6 +24,7 @@ INDEX = ROOT / "tricky-rs" / "docs" / "function-index.csv"
 GUESSES = ROOT / "tricky-rs" / "docs" / "function-systems.csv"
 SRC = ROOT / "tricky-rs" / "src"
 SYMBOLS = ROOT / "ghidra" / "symbols.txt"
+RENAMED = ROOT / "ghidra" / "renamed.txt"
 # Systems Rust and Bevy stand in for: their functions are not ported (status 'host'). Row F1b.
 HOST = {"sdk", "kernel", "libc", "runtime", "lib-eamem", "lib-file", "comm"}
 NOTES = [ROOT / "tricky-rs" / "docs", ROOT / "notes"]
@@ -44,7 +46,7 @@ SYSTEMS = [
     (r"^(Anim|cAnim|cMeshAnim|AnimCurve|AnimClip)", "animation"),
     (r"^(Circuit|cCircuit|Race_|cRace|cCourse|Course|cEndRace|cPreRace|PreRaceSel|c2P)", "race"),
     (r"^(TriggerScript|cWorld|World_|Instance_|Crowd|RigidBody|c\w+Node\b|c\w+Node(_|::))", "world"),
-    (r"^(cBoarder|Boarder_|cWorldBoarder|Air_|AirPredict|Landing_|Jump_|Spin|Prewind|Rail|Takeoff|GateAnticipate|FinishState|ResetState|SurfaceTable|c\w*Motion|c\w*ControlState|c\w*Control\b|Fx_|Emitter_|PBurst_)", "boarder"),
+    (r"^(cBoarder|Boarder_|cWorldBoarder|Air_|AirMotion|GroundMotion|AirPredict|Landing_|Jump_|Spin|Prewind|Rail|Takeoff|GateAnticipate|FinishState|ResetState|SurfaceTable|c\w*Motion|c\w*ControlState|c\w*Control\b|Fx_|Emitter_|PBurst_)", "boarder"),
     (r"^(cPS2|cGraphics|Render|Gfx|Tex|cTex|Mesh|cMesh|Light|cLight|VU|Draw)", "render"),
     (r"^(CComm|Net_|cNet)", "comm"),
     (r"^(cApp|cGame|App_|Game_|c\w*Load\b|c\w*Load::|cFirstLoad|cStartScreen|c\w*Handler\b|c\w*Handler::)", "game"),
@@ -149,6 +151,16 @@ def symbol_names():
     return names
 
 
+def renamed():
+    """Old names of renamed functions, from ghidra/renamed.txt (`<addr> <old> <new>`)."""
+    old = {}
+    for line in RENAMED.read_text(encoding="utf-8").splitlines():
+        p = line.split()
+        if len(p) == 3 and not line.startswith("#"):
+            old.setdefault(int(p[0], 16), set()).add(p[1])
+    return old
+
+
 def refresh(rows):
     starts = {int(r["address"], 16) for r in rows}
     names, ported = harvest(starts)
@@ -162,14 +174,16 @@ def refresh(rows):
             r["name"] = names.get(a, r["name"])
     in_src = names_in_src()
     guessed = guessed_systems()
+    old_names = renamed()
     for r in rows:
         a = int(r["address"], 16)
         r["system"] = system_of(r["name"])
         if r["system"] in ("", "other") and a in guessed:
             r["system"] = guessed[a] + "?"
-        # the source may write cClass::Method as cClass_Method
-        named_in_src = LOOKS_NAMED.search(r["name"]) and (
-            r["name"] in in_src or r["name"].replace("::", "_") in in_src)
+        # the source may write cClass::Method as cClass_Method, or still use a name since renamed
+        spellings = {r["name"], *old_names.get(a, ())}
+        named_in_src = any(LOOKS_NAMED.search(n) and (n in in_src or n.replace("::", "_") in in_src)
+                           for n in spellings)
         if r["status"] != "checked":
             if a in ported or named_in_src:
                 r["status"] = "ported"
@@ -215,10 +229,55 @@ def status():
     write(refresh(rows))
 
 
+# AGENTS.md §14, as patterns. A part is a capitalised word: Boarder, GroundMotion, SND, AIP.
+PART = r"[A-Z][A-Za-z0-9]*"
+GLOBAL_FN = re.compile(rf"^{PART}_{PART}(_{PART})?$")      # Module_Verb, Module_Part_Verb
+METHOD = re.compile(rf"^({PART}|vf\d+|__tf)$")             # CamelCase, vfN placeholder, type-info getter
+GLOBAL_DATA = re.compile(rf"^g{PART}(_{PART})?$")          # gApp, gCheat_Mallora
+OUR_CLASS = re.compile(rf"^c{PART}$")                       # a class without type info, named by us: cMenuManager
+CLASS_DATA = re.compile(r"^(typeinfo|vtable(_\d+)?)$")     # from tools/rtti_scan.py
+STANDARD = re.compile(r"^_*[a-z][a-z0-9_]*$")              # libc and runtime names: memcpy, __rtti_si
+
+
+def check_names():
+    """Every line of ghidra/symbols.txt against AGENTS.md §14; prints what breaks and exits 1 if anything does."""
+    with open(INDEX, newline="", encoding="utf-8") as f:
+        system = {int(r["address"], 16): r["system"].rstrip("?") for r in csv.DictReader(f)}
+    lines = SYMBOLS.read_text(encoding="utf-8").splitlines()
+    # classes with type info keep the game's own name, whatever its style; classes without it are named by us
+    rtti = {p[2] for p in (l.split() for l in lines) if len(p) == 4 and (p[0] == "L" or p[3] == "__tf")}
+    classes = rtti | {p[2] for p in (l.split() for l in lines)
+                      if len(p) == 4 and p[0] == "F" and OUR_CLASS.match(p[2])}
+    bad = []
+    for n, line in enumerate(lines, 1):
+        p = line.split()
+        if not p:
+            continue
+        kind, a = p[0], int(p[1], 16)
+        if kind == "G" and len(p) == 3:
+            ok = GLOBAL_FN.match(p[2]) or (STANDARD.match(p[2]) and system.get(a) in HOST)
+        elif kind == "F" and len(p) == 4:
+            # class names are the game's own (RTTI); a class's methods need its type info on record
+            ok = p[2] in classes and (METHOD.match(p[3]) or p[3] == p[2])
+        elif kind == "D" and len(p) == 3:
+            ok = GLOBAL_DATA.match(p[2])
+        elif kind == "L" and len(p) == 4:
+            ok = CLASS_DATA.match(p[3])
+        else:
+            ok = False
+        if not ok:
+            bad.append(f"  {SYMBOLS.relative_to(ROOT)}:{n}: {line}")
+    print(f"{len(lines)} names, {len(bad)} break AGENTS.md §14")
+    print("\n".join(bad))
+    return not bad
+
+
 if __name__ == "__main__":
     if len(sys.argv) == 3 and sys.argv[1] == "build":
         build(sys.argv[2])
     elif len(sys.argv) == 2 and sys.argv[1] == "status":
         status()
+    elif len(sys.argv) == 2 and sys.argv[1] == "names":
+        sys.exit(0 if check_names() else 1)
     else:
         sys.exit(__doc__)

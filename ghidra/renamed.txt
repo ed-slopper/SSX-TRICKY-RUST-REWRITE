@@ -1,0 +1,7 @@
+# Renames of names others already used: <addr> <old name> <new name>. AGENTS.md §14.
+# tools/function_index.py counts the old name in tricky-rs/src as the new one until row F9 updates the source.
+10a0d8 cBoarder_GroundMotion_Update GroundMotion_Update
+108378 Air_MotionUpdate AirMotion_Update
+187ad0 cDebugMenu::InstallStub_emptyInRetail cDebugMenu::InstallStub
+2ff870 libc_vfprintf vfprintf
+1141e0 cEndRaceHandler_Update cEndRaceHandler::Update

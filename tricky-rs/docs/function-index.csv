@@ -88,7 +88,7 @@ address,size,name,system,status
 0x108280,12,FUN_00108280,boarder?,not started
 0x108310,88,FUN_00108310,boarder?,not started
 0x108368,16,FUN_00108368,boarder?,not started
-0x108378,3980,Air_MotionUpdate,boarder,not started
+0x108378,3980,AirMotion_Update,boarder,not started
 0x109308,864,Landing_ChooseState,boarder,not started
 0x109668,40,FUN_00109668,world?,not started
 0x109690,20,FUN_00109690,ai?,not started
@@ -98,7 +98,7 @@ address,size,name,system,status
 0x109950,872,Boarder_GroundThrust,boarder,not started
 0x109cb8,576,Boarder_ForwardDrag,boarder,not started
 0x109ef8,476,Boarder_SideFriction,boarder,not started
-0x10a0d8,3568,cBoarder::GroundMotion_Update,boarder,ported
+0x10a0d8,3568,GroundMotion_Update,boarder,ported
 0x10aec8,12,FUN_0010aec8,wipeout?,not started
 0x10aed8,40,FUN_0010aed8,world?,not started
 0x10af00,20,FUN_0010af00,ai?,not started
@@ -1875,7 +1875,7 @@ address,size,name,system,status
 0x187750,216,cGameOptionsMenu::vf2_187750,debugmenu,not started
 0x187828,40,cGameOptionsMenu::vf3_187828,debugmenu,not started
 0x187850,636,cDebugMenu::cDebugMenu,debugmenu,not started
-0x187ad0,8,cDebugMenu::InstallStub_emptyInRetail,debugmenu,not started
+0x187ad0,8,cDebugMenu::InstallStub,debugmenu,not started
 0x187ad8,248,cDebugMenu::vf2_187ad8,debugmenu,not started
 0x187bd0,80,cDebugMenu::vf5_187bd0,debugmenu,not started
 0x187c20,148,cDebugMenu::vf6_187c20,debugmenu,not started
@@ -7155,7 +7155,7 @@ address,size,name,system,status
 0x2feba0,3012,FUN_002feba0,libc?,host
 0x2ff770,68,FUN_002ff770,libc?,host
 0x2ff7b8,180,FUN_002ff7b8,libc?,host
-0x2ff870,120,libc_vfprintf,libc?,host
+0x2ff870,120,vfprintf,libc?,host
 0x2ff8e8,5400,FUN_002ff8e8,libc?,host
 0x300e00,432,FUN_00300e00,libc?,host
 0x300fb0,224,FUN_00300fb0,libc?,host

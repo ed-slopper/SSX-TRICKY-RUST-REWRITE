@@ -4,7 +4,7 @@ Notes from the decompiled executable, gathered to make tricky-rs match the game 
 cm/s, and a fixed 60 Hz tick (`dt = timescale/60`, timescale at boarder+0x12c, normally 1). Functions are named
 in the Ghidra project (ghidra-mcp). "Proven" = read from code; "inferred" = interpretation.
 
-## Ground riding (`cBoarder_GroundMotion_Update` 0x10a0d8)
+## Ground riding (`GroundMotion_Update` 0x10a0d8)
 
 **Input shaping** (targets moved by cBoarder::vf7 0x117198 at `rate/60` per tick, timescale ignored):
 - Steer target = clamp(stick, ±0.905) × min(1, |v|/1135 cm/s); clamp ±1 while boosting. Rate =
@@ -77,7 +77,7 @@ surf[6]/surf[9] by row: 1 2.742/5.009; 2 2.849/5.530; 3 15.04/2.842; 4 30.03/2.9
   toggles fakie before touchdown.
 - Ballistics `Air_IntegrateRK4` 0x12b340: gravity −850.24 rising / −1900.84 falling cm/s², horizontal drag
   −0.20002v, cap 3347.2 cm/s.
-- Landing `Air_MotionUpdate` 0x108378, `Landing_CheckAngles` 0x12ba78, `Landing_ChooseState` 0x109308:
+- Landing `AirMotion_Update` 0x108378, `Landing_CheckAngles` 0x12ba78, `Landing_ChooseState` 0x109308:
   yaw = acos(forward·travel) 0..π; pitch = −atan2(fwd·N, up·N) (sign flipped when yaw > 90°).
   Crash: grab/tweak/uber clip not at its safe marker; surface 0, 6 or 10; pitch·(2.0408−1.0374·s16) outside
   [−2.968, +2.684]. Speed ×(1.0643−0.2454·clamp(|pitch|,15°,50°))·(1.1136−0.2603·clamp(|yaw|,25°,80°)).

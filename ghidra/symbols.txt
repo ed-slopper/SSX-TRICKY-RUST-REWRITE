@@ -2855,7 +2855,7 @@ F 2fa0b8 __builtin_type_info vf0
 F 2fa128 __attr_type_info vf0
 F 2fa198 __pointer_type_info vf0
 F 187850 cDebugMenu cDebugMenu
-F 187ad0 cDebugMenu InstallStub_emptyInRetail
+F 187ad0 cDebugMenu InstallStub
 F 1875d0 cGameOptionsMenu cGameOptionsMenu
 F 188ba8 cMenu cMenu
 F 189240 cMenu AddItem
@@ -2885,7 +2885,7 @@ D 3352b0 gCheat_Mallora
 G 2fb2b4 memcpy
 G 2fb468 memset
 G 2fca28 sprintf
-G 2ff870 libc_vfprintf
+G 2ff870 vfprintf
 G 2fd14c strcpy
 G 2fd260 strlen
 G 2cc808 EAMem_Set
@@ -2927,13 +2927,13 @@ G 106668 FinishState_Update
 G 106a90 ResetState_Update
 G 1073e0 RailSlideControl_Update
 G 108198 GetUpState_Update
-G 108378 Air_MotionUpdate
+G 108378 AirMotion_Update
 G 109308 Landing_ChooseState
 G 109878 Boarder_GroundSpringForce
 G 109950 Boarder_GroundThrust
 G 109cb8 Boarder_ForwardDrag
 G 109ef8 Boarder_SideFriction
-F 10a0d8 cBoarder GroundMotion_Update
+G 10a0d8 GroundMotion_Update
 G 10b0d0 RailSlideMotion_Update
 G 10c198 WipeoutMotion_Enter
 G 10d6f8 Ragdoll_ComputeMassProps

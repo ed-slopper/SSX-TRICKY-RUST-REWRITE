@@ -169,9 +169,26 @@ New people: add your own line (in a `board-` commit) before you claim a row, and
   names to `ghidra/symbols.txt` (`G <addr> <name>` for a global function, `F <addr> <class> <method>` for a class's, `D <addr> <name>` for global data, `L <addr> <class> <name>` for a class's data) in the same commit
   as your code, because the Ghidra project is not in the repo and this file is how everyone else gets your
   names (`ghidra/scripts/ApplySsxSymbols.java` applies it).
-- Naming: free functions `System_VerbThing` (`Boarder_Wipeout`, `Score_Crash`, `TriggerScript_ExecOp`); class
-  methods `cClass::Method`, virtuals not yet understood `cClass::vfN_<addr>` (from `tools/rtti_scan.py`); fields
-  in notes and comments as `boarder+0x12c timescale`. Keep a name once others use it; rename only to fix a wrong one.
+- Naming (checked by `python tools/function_index.py names`, which must pass before you push):
+  - Free functions: `Module_Verb`, one prefix per module, the thing the function works on: `Boarder_Wipeout`,
+    `Score_Crash`, `TriggerScript_ExecOp`, `Loc_GetString`. States and motions are modules of their own:
+    `SpinState_Update`, `WipeoutMotion_Enter`, `GroundMotion_Update`. One more `_` may separate a part of a
+    module: `Fx_BrakeFan_Update`. A system may have several modules (`Audio_`, `Music_`, `Sfx_` are all audio).
+  - Class methods: `cClass::Method` (CamelCase, no `_`) only when the function is proven to belong to the class:
+    a virtual (in its vtable), a constructor (`cClass::cClass`) or a call on an object of that class. Virtuals
+    not yet understood stay `cClass::vfN` (Ghidra shows `vfN_<addr>`, from `tools/rtti_scan.py`). Otherwise use
+    a free-function name, even if the first argument looks like `this`.
+  - Global data: `gName` or `gModule_Name` (`gApp`, `gCheat_Mallora`). Class data from `tools/rtti_scan.py`:
+    `typeinfo`, `vtable`, `vtable_N`. Fields in notes and comments: `boarder+0x12c timescale`.
+  - Exceptions: classes with type info keep the game's own name whatever its style (`CamCamera`,
+    `bxSphereTree`, `tPS2DrawState`, gcc's `__class_type_info`); classes without it get our `cName`
+    (`cMenuManager`). The type-info getters are `cClass::__tf`. Library functions we only host keep their
+    standard names (`memcpy`, `bsearch`, `__rtti_si`, the kernel's `CreateThread`); EA's library prefixes stay as
+    EA wrote them (`SND_`, `SNDVoice_`, `PF_`). Rust has no `::` in an identifier, so source and notes may
+    write `cClass::Method` as `cClass_Method`; the index treats both as one name. Spelling slips in names
+    others already use are kept (`World_CellActivate_RunPersistant`).
+  - Keep a name once others use it; rename only to fix a wrong one. When you do, add `<addr> <old> <new>` to
+    `ghidra/renamed.txt`: the index keeps counting the old name in `tricky-rs/src` until row F9 updates it.
 - If Ghidra cannot decompile a function (VU microcode, inline `qmfc2`/MMI, hand-written asm), write in the port
   notes how you read it instead (disassembly by hand, PCSX2 debugger trace, VU disassembler) and what you are
   still unsure of.
