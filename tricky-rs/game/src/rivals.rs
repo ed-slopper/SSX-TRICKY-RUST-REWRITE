@@ -32,6 +32,18 @@ pub const TOLERANCE: [[u8; 12]; 12] = [
     [100, 90, 15, 70, 68, 88, 60, 50, 63, 80, 66, 80], [66, 66, 33, 66, 66, 95, 33, 16, 50, 99, 86, 66],
 ];
 
+/// the most `me`'s attitude to `other` can reach (`RelTable_Init` 0x167208's word +8; `Rivals_InitPairs` 0x167ea0
+/// copies it to the pair's byte +0x21 and `Rivals_StartGrudge` holds the attitude to it). Mostly 100; 79-80 toward a
+/// friend (never a chasing grudge, 81), and Kaori and Brodi 59 toward most (never a grudge at all, 60).
+pub const CAP: [[u8; 12]; 12] = [
+    [100, 100, 100, 100, 100, 100, 100, 80, 100, 100, 100, 100], [59, 100, 79, 59, 59, 59, 79, 79, 100, 59, 59, 59],
+    [100, 100, 100, 100, 100, 100, 79, 100, 100, 100, 100, 100], [100, 79, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100],
+    [100, 100, 100, 100, 100, 79, 100, 100, 100, 100, 100, 100], [100, 100, 100, 100, 79, 100, 100, 100, 100, 100, 100, 100],
+    [100, 100, 79, 100, 100, 100, 100, 100, 100, 100, 100, 100], [80, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100],
+    [100, 100, 100, 100, 100, 79, 100, 100, 100, 100, 100, 100], [100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 79],
+    [59, 59, 100, 79, 80, 79, 79, 80, 79, 59, 100, 59], [100, 100, 100, 100, 100, 100, 100, 100, 100, 79, 100, 100],
+];
+
 /// One computer rider's grudge against the player.
 #[derive(Clone, Debug)]
 pub struct Grudge { pub attitude: f32, tolerance: f32, friend: bool, g: f32, pub level: i8, start: f32, pub cooled: bool,
@@ -95,4 +107,194 @@ impl Grudge {
     pub fn hostile(&self) -> bool { self.level == 2 || (self.level == 1 && !self.cooled) }
     /// Will shove the player when alongside (AIComputer_ShouldShove): level 1 or 2.
     pub fn shoves(&self) -> bool { self.level >= 1 }
+}
+
+// ---- the game's own grudge bookkeeping, exactly (board row G4a2, checked: `tests/rivals.rs`)
+
+/// One rider's record of another (rider+0x40 + 0x20 × the other's index), the bytes the rivalry functions use:
+/// +0x10 attitude, +0x11 its cap, +0x12 the tolerance, +0x13 the anger built up, +0x14 the attitude at the start,
+/// +0x15 the relation (1 friend), +0x16 bumps, +0x18 shoves, +0x1a knock-downs (by the other), +0x1c the rivalry.
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct PairBytes {
+    pub attitude: i8,
+    pub cap: i8,
+    pub tolerance: i8,
+    pub anger: i8,
+    pub start: i8,
+    pub relation: u8,
+    pub bumps: u16,
+    pub shoves: u16,
+    pub knocks: u16,
+    pub rivalry: i32,
+}
+
+/// A rider as the rivalry functions see it: its index (+0x460), whether a pad drives it (stats+0x65, the pad
+/// port, ≥ 0), its grudge (+0x118 on, +0x11c since which tick, +0x120 against whom, +0x124 the level, +0x128 cooled)
+/// and its records of the others.
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct RivalRider {
+    pub index: i32,
+    pub human: bool,
+    pub on: i32,
+    pub since: i32,
+    pub target: i32,
+    pub level: i32,
+    pub cooled: i32,
+    pub recs: Vec<PairBytes>,
+}
+
+/// What the rivalry functions call besides each other.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum RivalCall {
+    /// `Speech_OnGrudge`: a level-2 grudge begins
+    Grudge,
+}
+
+impl RivalRider {
+    fn rec(&mut self, of: i32) -> &mut PairBytes {
+        &mut self.recs[of as usize]
+    }
+
+    /// `Rivals_OnBump` 0x11ea70: `by` bumped this rider: one more bump; a computer rider bumped by a human gets 9
+    /// angrier (up to its tolerance) and at its tolerance starts a grudge.
+    pub fn on_bump(&mut self, by: &mut RivalRider, now: i32, calls: &mut Vec<RivalCall>) {
+        self.contact(by, 0, 9, now, calls);
+    }
+
+    /// `Rivals_OnHit` 0x11eaf8: shoved off balance by `by`: one more shove; a computer rider shoving a human eases
+    /// its grudge if it is against that rider (`Rivals_EaseGrudge` 1) and adds 1 to its rivalry with it; a human
+    /// shoving a computer rider makes it 15 angrier.
+    pub fn on_hit(&mut self, by: &mut RivalRider, now: i32, calls: &mut Vec<RivalCall>) {
+        self.contact(by, 1, 15, now, calls);
+    }
+
+    /// `Rivals_OnKnockdown` 0x11ebf8: put down by `by`: as a shove, with ease 2, rivalry 2 and anger 30.
+    pub fn on_knockdown(&mut self, by: &mut RivalRider, now: i32, calls: &mut Vec<RivalCall>) {
+        self.contact(by, 2, 30, now, calls);
+    }
+
+    fn contact(&mut self, by: &mut RivalRider, kind: i32, add: i8, now: i32, calls: &mut Vec<RivalCall>) {
+        let r = self.rec(by.index);
+        match kind {
+            0 => r.bumps = r.bumps.wrapping_add(1),
+            1 => r.shoves = r.shoves.wrapping_add(1),
+            _ => r.knocks = r.knocks.wrapping_add(1),
+        }
+        if kind != 0 && !by.human {
+            if self.human {
+                if by.on != 0 && by.target == self.index {
+                    by.ease_grudge(kind);
+                }
+                let r = by.rec(self.index);
+                r.rivalry = r.rivalry.wrapping_add(kind);
+            }
+            return;
+        }
+        if by.human && !self.human {
+            let r = self.rec(by.index);
+            r.anger = r.anger.wrapping_add(add);
+            if r.tolerance <= r.anger {
+                r.anger = r.tolerance;
+            }
+            if r.anger == r.tolerance {
+                self.start_grudge(by, now, calls);
+            }
+        }
+    }
+
+    /// `Rivals_StartGrudge` 0x11ecf8: a grudge against `at` (started, renewed, or moved from another rider, easing
+    /// that one first), its level by the attitude (81 and up 2 (with `Speech_OnGrudge`, rivalry +3), 60 and up 1
+    /// (+2), else 0 (+1); a friend always 0), the attitude 15 up (to its cap) and the anger spent.
+    pub fn start_grudge(&mut self, at: &RivalRider, now: i32, calls: &mut Vec<RivalCall>) {
+        if self.on == 0 {
+            self.on = 1;
+            self.cooled = 0;
+            self.since = now;
+            self.target = at.index;
+        } else if self.target == at.index {
+            self.cooled = 0;
+            self.since = now;
+        } else {
+            self.ease_grudge(0);
+            self.on = 1;
+            self.cooled = 0;
+            self.since = now;
+            self.target = at.index;
+        }
+        let t = self.target;
+        let att = self.rec(t).attitude as i32 as f32;
+        if 80.989_26 <= att {
+            self.level = 2;
+            calls.push(RivalCall::Grudge);
+            let r = self.rec(t);
+            r.rivalry = r.rivalry.wrapping_add(3);
+        } else if 60.0 <= att {
+            self.level = 1;
+            let r = self.rec(t);
+            r.rivalry = r.rivalry.wrapping_add(2);
+        } else {
+            self.level = 0;
+            let r = self.rec(t);
+            r.rivalry = r.rivalry.wrapping_add(1);
+        }
+        if self.rec(t).relation == 1 {
+            self.level = 0;
+        }
+        let r = self.rec(t);
+        r.attitude = r.attitude.wrapping_add(15);
+        if r.cap < r.attitude {
+            r.attitude = r.cap;
+        }
+        r.anger = 0;
+    }
+
+    /// `Rivals_EaseGrudge` 0x11ef00: the grudge's anger eased: by 45 (1), by 15 and cooled (0), by half (at least
+    /// 45) (2); never below 0.
+    pub fn ease_grudge(&mut self, kind: i32) {
+        if self.on == 0 {
+            return;
+        }
+        if kind == 0 {
+            self.cooled = 1;
+        }
+        let t = self.target;
+        let r = self.rec(t);
+        match kind {
+            1 => r.anger = r.anger.wrapping_sub(45),
+            0 => r.anger = r.anger.wrapping_sub(15),
+            2 => {
+                let a = r.anger;
+                let half = (a as i32 + ((a as u8 >> 7) as i32)) >> 1;
+                let d: i8 = if 45 < half { (half as i8).wrapping_neg() } else { -45 };
+                r.anger = (a as u8).wrapping_add(d as u8) as i8;
+            }
+            _ => {}
+        }
+        if r.anger < 0 {
+            r.anger = 0;
+        }
+    }
+
+    /// `Rivals_UpdateGrudgeTimeout` 0x11efd8: a level-1 grudge not yet cooled cools 360.44952 ticks after it began.
+    pub fn update_grudge_timeout(&mut self, now: i32) {
+        if self.on != 0 && self.level == 1 && self.cooled == 0 && (self.since as f32 + 360.449_52) < now as f32 {
+            self.ease_grudge(0);
+        }
+    }
+
+    /// `Rivals_UpdateAttitude` 0x11f050, after the race: the attitude toward `of` goes back to the start's, keeping
+    /// (bumps + 2·shoves + 3·knock-downs) / (3·(bumps + shoves + knock-downs)) of what it gained (all of it with no
+    /// contact... none: the start's).
+    pub fn update_attitude(&mut self, of: i32) {
+        let r = self.rec(of);
+        let s = r.shoves as f32;
+        let start = r.start as i32 as f32;
+        let n = (r.bumps as f32 + s) + r.knocks as f32;
+        if n == 0.0 {
+            r.attitude = start as i32 as i8;
+            return;
+        }
+        let k = ((((r.bumps as f32 + s) + s) + r.knocks as f32 * 3.0) / (n * 3.0)) * (r.attitude as i32 as f32 - start);
+        r.attitude = (start + k) as i32 as i8;
+    }
 }

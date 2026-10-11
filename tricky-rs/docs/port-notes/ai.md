@@ -75,3 +75,25 @@ Part of the port notes (index: [README.md](README.md)); units and wording as des
   decays (friend −3, neutral −2, rival −1).
 - Taunts (`Ride_AITauntCheck` 0x103660): riding ≥ 1.025 s, rand%100 < 91, the vendetta target (any level) within
   10 m and more than 60° off the heading; behind (> 135°) AITAUNT, else the side's TAUNTHS/TS.
+
+## Grudges, exactly (board row G4a2, checked: `tests/rivals.rs`, `tests/rel_table.rs`; `rivals::RivalRider`)
+
+- The relations table (`RelTable_Init` 0x167208, 12 × 12 × 16 bytes): +0 tolerance, +4 attitude, +8 the attitude's
+  cap (mostly 100; 79–80 toward a friend, so never a level-2 grudge; Kaori and Brodi 59 toward most riders, so no
+  grudge at all), +0xc relation. `Rivals_InitPairs` 0x167ea0 copies them per pair of the race (attitude: the table
+  for a computer rider, the career save for a player; cap, tolerance, relation) into the pair records.
+- In the pair record (rider+0x40 + 0x20 × the other's index): +0x10 attitude, +0x11 cap, +0x12 tolerance, +0x13
+  anger, +0x14 the attitude at the start, +0x15 relation, +0x16 / +0x18 / +0x1a bumps / shoves / knock-downs taken
+  from that rider, +0x1c rivalry. The grudge: rider+0x118 on, +0x11c since (tick), +0x120 against whom, +0x124
+  level, +0x128 cooled. A rider is a player if its pad port (stats+0x65) is ≥ 0.
+- `Rivals_OnBump` 0x11ea70 / `Rivals_OnHit` 0x11eaf8 (shoved off balance) / `Rivals_OnKnockdown` 0x11ebf8: the
+  count goes up; a player hitting a computer rider adds 9 / 15 / 30 to its anger, held to the tolerance, and at the
+  tolerance it starts a grudge; a computer rider shoving or knocking down a player eases its grudge against that
+  player (`Rivals_EaseGrudge` 1 / 2) and adds 1 / 2 to its rivalry.
+- `Rivals_StartGrudge` 0x11ecf8: starts or renews the grudge (moving it from another rider eases that one first);
+  level by the attitude: ≥ 80.98926 → 2 (`Speech_OnGrudge`, rivalry +3), ≥ 60 → 1 (+2), else 0 (+1); a friend
+  always 0; attitude +15 (to its cap); anger 0.
+- `Rivals_EaseGrudge` 0x11ef00: anger −45 (1), −15 and cooled (0), −max(45, half) (2); never below 0.
+  `Rivals_UpdateGrudgeTimeout` 0x11efd8: a level-1 grudge not cooled cools 360.44952 ticks (6 s) after it began.
+- `Rivals_UpdateAttitude` 0x11f050 after the race: back to the start's attitude when there was no contact, else
+  start + (bumps + 2 shoves + 3 knock-downs) / (3 (bumps + shoves + knock-downs)) × the gain.
