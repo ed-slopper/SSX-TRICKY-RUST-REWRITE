@@ -46,7 +46,7 @@ state machine and the renderer are ours. Nothing has been checked against the or
 | E3c | `.ssf`: collision models, physics data, trigger scripts | unowned | E3 | | [repo] |
 | E3d | `.aip` / `.sop`: AI paths, race lines, start positions (`AIP_LoadPathsFromFile` 0x197da0) | unowned | E3 | | [repo] `course.rs` reads AIP.json today |
 | E3e | `.ltg` grid, `.map` names, `.adl` audio links, `_sky.pbd` | unowned | E3 | | [repo] |
-| E4a | Character models: the game's `.mpf` reader (`BdrLoad_BuildSkin` 0x201138, `MpfFile_Open` 0x208468, `MpfFile_AddPart` 0x208488, the skin and LOD build) in our code, read from `DATA/CHAR/MDLPS2.BIG` / `BRDPS2.BIG` through `tricky-data` (E2a, E2b) | unowned | E2b | ed-slopper/puffin (2026-10-11) | Split of E4. Loader notes in `notes/characters.md` (F1c); today `chars/` is exported by `tools/ssxlevel` |
+| E4d | The rest of the `.mpf` meshes: the shadow meshes (material flags 0x10: positions only, another vector unit program) and the data after each of the face's 18 records (likely its expressions); the vector unit programs themselves, to prove the packet layout read from the data | unowned | E4a | | Gap of E4a. `port-notes/files.md` "Character and board models" |
 | E4b | Character animations: `.afl` clips from `DATA/CHAR/ANM.BIG` through `tricky-data` instead of the exported files | unowned | E2b | | Split of E4. Format: `notes/animation-format.md`, `tools/afl/` |
 | E4c | Outfit, head and board textures from `DATA/CHAR/TEXPS2.BIG` | unowned | E3b | | Split of E4 |
 | E5 | Config and text files: `DATA/CONFIG/*.INF` (SNOW, BANKS, MUSICMAP, INTROMUS), `.cml` cameras, `TRICKDEF.DAT`, `american.loc` and the other languages, `.SFN` fonts | unowned | E2b | | [repo] "Unresolved: HUD text (american.loc)". Text: `Loc_GetString` 0x2c5160, `WStr_FormatArgs` 0x2c5578 (`lib-text`, F1d) |
@@ -195,6 +195,7 @@ matches the original.
 | G4a1 | `RelTable_Init` 0x167208 checked: tolerance, attitude and relation of all 144 pairs in `rivals.rs` equal the original's in the function runner (`tests/rel_table.rs`); `rivals.rs` moved into `tricky-game` (the app uses it from there) | P2 | trailrig/heron | 2026-10-11 | d80e0b1 |
 | E8i | The constants at the top of `rider.rs` sorted out: 22 unused or doc-only ones removed (and the dead `spin_rate`/`flip_rate` fields); speed caps and their decay (`cBoarder::vf7` 0x117198), air gravity (`Air_IntegrateRK4`, from `air.rs`), the smallest jump (`JumpControl_Update` 0x1046e4), the jump's speed curve (`Jump_ApplyImpulse` 0x1284e0) and the boost drain (`Boarder_UpdateBoost` 0x11d218) now the game's exact floats; the boost cap needs a meter above 0, as the game's does; `TURN_ACCEL` tagged STANDIN (AI corner speed); scoring constants left to G17 | P1 | trailrig/heron | 2026-10-11 | cc1a764 |
 | G17 | Scoring constants exact: `PTS_*` and `SWITCH_BONUS` in `rider.rs` are the game's units (bit patterns from `Score_UpdateSpin` 0x155e00, `Score_UpdateFlip` 0x155e68, `Score_StartGrab` 0x155ee8, `Score_Tick` 0x156e80, `Score_LandTrick` 0x1569b0, `Score_StartTrickChain` 0x156618) × the points scale of `Score_CalcPoints` 0x155440; ubers score by their own unit (`PTS_UBER`, 0x156148), not the hold one; 3 score functions named | P2 | trailrig/heron | 2026-10-11 | 5587fea |
+| E4a | Character and board models from the player's disc: the `.mpf` reader in `tricky-data/src/mpf.rs` (the loader's tables proven from `SkinPart_Load` 0x205080 and `MpfFile_AddPart` 0x208488, the VIF packets inferred from the data), the game's part-name tables, `CharModel::rider_from_disc` / `board_from_disc`, `TRICKY_DISC` in the app; all 12 riders and 6 board shapes equal the exported models | P1 | ed-slopper/puffin | 2026-10-11 | 82b6fdd |
 
 ## Changes to the board
 
@@ -253,3 +254,4 @@ matches the original.
 - 2026-10-11 trailrig/heron: E8i done; added G17 (gap of E8i).
 - 2026-10-11 trailrig/heron: claim G17.
 - 2026-10-11 trailrig/heron: G17 done.
+- 2026-10-11 ed-slopper/puffin: E4a done; added E4d (gap of E4a).
