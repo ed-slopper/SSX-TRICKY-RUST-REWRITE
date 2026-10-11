@@ -6519,3 +6519,5 @@ G 20f630 Audio_PlayBigAirWind
 G 2106c0 Sfx_StartCarveLoop
 G 20fce0 Sfx_StartAirLoop
 G 21fc98 CrowdBox_StartSound
+G 21a210 Audio_PlayScoreTick
+G 233ff0 Speech_OnTenSecondsLeft

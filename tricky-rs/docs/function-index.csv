@@ -3613,7 +3613,7 @@ address,size,name,system,status
 0x219a48,808,Sfx_OnPlacingChange,audio?,not started
 0x219d70,592,Sfx_PickupMultiplier,audio?,not started
 0x219fc0,592,Sfx_PickupTime,audio?,not started
-0x21a210,600,FUN_0021a210,audio?,not started
+0x21a210,600,Audio_PlayScoreTick,audio,not started
 0x21a468,44,Audio_ClearAmbientLoaded,audio,not started
 0x21a498,176,Audio_ListBankNames,audio,not started
 0x21a548,248,Audio_LoadAmbientBank,audio,not started
@@ -4134,7 +4134,7 @@ address,size,name,system,status
 0x233e10,104,FUN_00233e10,audio?,not started
 0x233e78,104,Speech_OnBoost,audio?,not started
 0x233ee0,272,Speech_OnCheckpoint,boarder?,not started
-0x233ff0,100,FUN_00233ff0,audio?,not started
+0x233ff0,100,Speech_OnTenSecondsLeft,audio?,not started
 0x234058,92,FUN_00234058,audio?,not started
 0x2340b8,592,Speech_OnScriptCue47,audio?,not started
 0x234308,588,Speech_OnScriptCue48,audio?,not started
