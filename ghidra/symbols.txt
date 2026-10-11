@@ -6796,3 +6796,6 @@ G 2c6e70 Strm_Create
 G 2c74c8 Strm_Queue
 G 2c7858 Strm_Stop
 G 2c75d8 Strm_Purge
+G 2cae70 FileSys_QueueMountBig
+G 2cafd8 FileSys_QueueUnmountBig
+G 2c8fc0 FileSys_UnmountBig
