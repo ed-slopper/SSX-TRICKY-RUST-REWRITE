@@ -37,6 +37,24 @@ Part of the port notes (index: [README.md](README.md)); units and wording as des
 - Multiplier: 1, ×1.3 only for a trick off a rail left switch, pickups replace it (max). Repeats: last 5 IDs,
   points and meter ÷ (n+1). No landing-quality grades.
 
+## Landing, chains and banking, exactly (board row G2b, checked: `tests/trick_score.rs`)
+
+- `Score_LandTrick` 0x1569b0(rail, a, b): a trick (any spin, flip or grab) adds one to the chain (+0xf4), 0.19998 units
+  if a chain kind was set (+0x20) and 0.18 more into a rail, then counts repeats (not with +0x18) and announces it.
+  An AI rider (rider+0x418 ≥ 0) stops there: combo reset, share 0. Otherwise share = meter(units)/(n+1),
+  points = points/(n+1) + chain bonus (none for 0–1 tricks, 4,000 per trick from two up to 16,000; skipped into a
+  rail, chain cleared either way) + 1,000 a whole second of air from four (+0x44 ticks ÷ 60). Points > 0 push a
+  2.5 s message (kind 2, 3 if a repeat) and count toward the rank table (0/1001/2501/4001/7501/11501).
+- `Score_StartTrickChain` 0x156618(switch, kind, a, b): a chain in progress is scored first as a rail trick (id
+  word 1 = kind·0x1000 + half turns·0x10, time = rail ticks ÷ 60, a chain trick if over 1 s), then reset with the
+  multiplier 1.3 for a switch start. The focus player clears the audio object's +0x6e00 and sets +0x6e04.
+- `Score_BankPoints` 0x155aa8: points pushed as a 1.5 s message (kind 1), combo reset, chain 0, one more bank.
+- Trick id: special-name table by spin column (half turns; +10 for a positive spin or more than 10) and flip row
+  (+3 backwards or more than 3); a second table (0x320f40) for chains begun with +0x14 and called with b. Past the
+  table (21 × 7) the trick is 0x2c, "???", never a repeat (nor are three-grab tricks).
+- Names: grab ids 0–0x65 have names (0x65 "Combo Grab"); past them the original reads into the next data (no
+  grab in the game is that high), which our port prints as "(null)".
+
 ## Scoring (the rest)
 
 - Modes: 0 knockdown practice, 1 free ride, 2 practice race, 3 practice show-off, 4 circuit race, 5 circuit
