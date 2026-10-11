@@ -72,6 +72,7 @@ state machine and the renderer are ours. Nothing has been checked against the or
 | E10 | Input: pad reading, stick shaping and dead zones, button bits (the chord 0x600), vibration, `cCheatCodes::Update` 0x26CF60 | unowned | E1 | | [repo] findings.md |
 | E11 | Camera: named cameras `cBxCamera_EvalNamedCam` 0x174888 (ported), director scripts `cBxCamera_RunDirectorScript`, replay and finish cameras, camera collision | any | | | [repo] Chase cam ported in `rider.rs`; free camera is ours (keep, tag) |
 | E12 | Save and load: the memory-card profile, options, records, unlocks (`Profile_ResetNewGame` 0x161b40), in our own save file with the same fields | unowned | E1 | | [repo] `tricky-save.json` is the stand-in |
+| E14 | The game's math library ported exactly into `tricky-game` (`math.rs`) and checked bit for bit: `Math_Sin` 0x250d60, `Math_Cos` 0x250e98, `Math_SinCos` 0x250c10, `Math_Asin` 0x250fd0, `Math_Atan` 0x2510f8, `Math_AngleDiff` 0x1741d0, `Math_Hermite` 0x1704b0 (so exact ports can call them, e.g. `Landing_CheckAngles`) | any | F4a | trailrig/heron (2026-10-11) | Added by trailrig/heron |
 
 ## P2 Gameplay systems
 
@@ -278,3 +279,4 @@ matches the original.
 - 2026-10-11 trailrig/heron: G1a2 done (Takeoff_SetSpinRates checked).
 - 2026-10-11 trailrig/heron: split G2 into G2a (claimed) and G2b.
 - 2026-10-11 trailrig/heron: G2a done (8 functions checked).
+- 2026-10-11 trailrig/heron: added E14 (the math library), claimed.
