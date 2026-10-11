@@ -297,7 +297,7 @@ there (no rewind); a level is the value / 100 when 0..200 (the duck 0..100), els
     power first; the exports' Bézier points are converted from them), box, corners, +0x1a8 surface type, +0x1ac bit
     31 show-off only, +0x1b0 texture (low half) and lightmap page (high half).
   - instance: matrix, light directions (columns), three light colours, ambient colour, model id, previous / next,
-    box, material block. Its `.ssf` physics record: +0 mass (1e30 never moves), +4 bounce, the flag defaults (0x1
+    box (zero on the disc: filled at run time, row E7a3), material block. Its `.ssf` physics record: +0 mass (1e30 never moves), +4 bounce, the flag defaults (0x1
     shown, 0x20 collides, 0x80 bounces, 0x1000 ?, 0x2000 UV scroll), +0xc surface type, +0x10 collision mode,
     +0x12 the sphere-tree group (mode 3) or collision group, +0x14 effect slot.
   - material: texture (low half), +0x44 texture flip (a run of texture numbers). Spline: box, segment count, first

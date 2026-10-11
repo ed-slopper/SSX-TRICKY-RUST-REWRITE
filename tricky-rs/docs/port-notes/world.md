@@ -104,6 +104,31 @@ Part of the port notes (index: [README.md](README.md)); units and wording as des
   flags, each read four cycles after its result). Its tolerance argument is unused. Read from the code, not run
   (the runner has no micro mode); the test answers it with the port and checks its arguments.
 
+## World casts (row E7a2; `tricky_game::world`, checked: `tests/world.rs`)
+
+- The course object at 0x346488: +0 the `.ltg` grid, +4 the `.pbd`, +8 / +0xc material blocks and flips, +0x10 its
+  vtable (0x3a7d50), +0x14 the `.ssf`, +0x18 sphere-tree groups (8 bytes: first tree, count; trees 0x150 apart),
+  +0x20 collision groups (first mesh record, count), +0x24 the mesh records (0x14: tris, verts, three pointers).
+- `World_RayCast` 0x25aff8(course, query, result, last): cells from (middle − corner + size) / size − 2 to + 0 on x
+  (outer) and y (inner), clamped; each cell whose box meets the query's box, each of its +0x48 INodes with patches
+  (+0x24) or objects (+0x26; +0x28 in show-off modes 3 / 5, `DAT_0032de8c`) whose box meets it. Patches: skipped
+  when show-off only (+0x1ac < 0) outside those modes or surface 17, else box test, `World_LookupCollCache` and
+  the shape's +0x48; a hit notes (cell, INode, patch) in `last` (+0x10 / +0x12 / +0x14 halves) when given. Objects:
+  flag 0x20 and surface not −1, box test (+0xcc / +0xd8), `World_RayCastInstance`. A hit nearer the target than
+  the best and not rejected (+0x20, given the normal) is written: +0 kind (0 ground), +0x10 point, +0x20 normal,
+  +0x30 sphere tree, +0x34 surface, +0x38 object; a target below 0 takes the first. −1 for none.
+- `World_RayCastInstance` 0x25bf48: collision mode 1 (meshes), 2 (each part's mesh box, mesh +4 / +0x10) or 3
+  (sphere trees). Parts posed as `cMeshAnimNode` does (the animation's frames for animated parts when the
+  controller's +0x14 has 0x100), each times the object's matrix; the query goes into the inverse (3 × 3
+  transposed in place, position row = the transposed matrix applied to (−t, 0), w 1), popping before each part
+  after the first; mesh n of the group per part with a mesh. Hits go back through the part's matrix (point and
+  normal, all four lanes). Kind 1 with surface −1 for touch objects, else 2 for animated parts, 0.
+- `World_QueryInstances` 0x25b878: the same walk over INodes not blank (words +0x24, +0x28, half +0x2c, word +0x48
+  all 0), touch objects (flag 0x20, surface −1); an animated one's box becomes a cube about its position from
+  the least and greatest offsets of its box; the first object `World_RayCastInstance` hits.
+- An object's flags (+0xe8) are the physics record's word reset (defaults copied down); its box (+0xcc..+0xe0) is
+  zero in the file and filled at run time by code not yet found (row E7a3; the test gives each a box).
+
 ## Keyframed objects (`cAnimObjectNode` 0x198810, `cMeshAnimFrame::vf1` 0x1cb498, `AnimCurve_FindSegment` 0x1cb770)
 
 - Model objects with an Animation: base pose U1..U6 (tx, ty, tz cm; rx, ry, rz degrees), AnimationAction a mask

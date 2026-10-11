@@ -386,7 +386,7 @@ impl PatchRec {
 /// An instance record (0x100 bytes, row E3a2): +0 its matrix (rows: the axes scaled, then the position), +0x40 the
 /// three light directions as columns (+0x70 the ambient's (0, 0, 0, 1)), +0x80 / +0x90 / +0xa0 the three lights'
 /// colours, +0xb0 the ambient colour (128 = 1.0), +0xc0 its model id, +0xc4 / +0xc8 the previous and next instance
-/// (-1 none), +0xcc its box (min, max), +0xf0 its material block. Its collision, flags and scripts are in the
+/// (-1 none), +0xcc its box (min, max: zero on the disc, filled at run time; row E7a3), +0xf0 its material block. Its collision, flags and scripts are in the
 /// `.ssf` physics record for it ([`crate::ssf::Physics`]).
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct InstanceRec {
