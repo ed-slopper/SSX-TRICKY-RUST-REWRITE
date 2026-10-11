@@ -8,18 +8,21 @@
 //!   `Boarder_GroundThrust` 0x109950, `Boarder_ForwardDrag` 0x109cb8, `Boarder_SideFriction` 0x109ef8
 //!   (`crate::ground`), `Boarder_ProbeGround` 0x128ae8 and `Boarder_GetFallLine` 0x128a18 (`crate::probe`),
 //!   `Math_SinCos` 0x250c10, `Math_Asin` 0x250fd0 and `Math_Cos` 0x250e98 (`crate::math`), `Vec4_Scale` 0x102f50
+//! - run as ours since E8j, checked in `tests/orient.rs`: `Boarder_RotateAboutAxis` 0x128e90 with the
+//!   `Boarder_UpdateOrientation` 0x129008 it ends in (`crate::orient`, on the quaternion rider+0x170 and the
+//!   board's forward, side, up and heading it derives)
 //! - handed to [`Env`], because they are other rows' work: `Boarder_SetState` 0x11f608,
-//!   `Boarder_RotateAboutAxis`, `Boarder_WallCollide` 0x126250, the world's ray cast under the probe
-//!   (`World_RayCast` 0x25aff8, E7), `Boarder_TakeOff`, the rider's virtual 0x64 (called with the
-//!   position, velocity and normal when the surface is 6 or 10), `Boarder_Wipeout` 0x11d830, `Score_Crash`
-//!   0x156de0, `Boarder_AddMeter` 0x11b018, `Rail_TryCapture` and `Boarder_InstanceCollisions` 0x125088.
-//!   The test records each call, with its arguments, in the order they are made. The addresses of the three not yet
-//!   ported (`Boarder_RotateAboutAxis`, `Boarder_TakeOff`, `Rail_TryCapture`) are left out of this crate on purpose:
-//!   the function index counts any address written here as ported. They are in `tests/ground_motion.rs` and the
-//!   port notes (boarder.md).
+//!   `Boarder_WallCollide` 0x126250, the world's ray cast under the probe (`World_RayCast` 0x25aff8, E7),
+//!   `Boarder_TakeOff` 0x128470 (ported in `crate::orient::take_off`; what it calls is still the port's to
+//!   provide), the rider's virtual +0x64 (identified in E8j: it makes a burst of spray at the crash point and
+//!   changes nothing else, see boarder.md; called with the position, velocity and normal when the surface is 6 or
+//!   10), `Boarder_Wipeout` 0x11d830, `Score_Crash` 0x156de0, `Boarder_AddMeter` 0x11b018, rail capture (G1b, not ported yet)
+//!   and `Boarder_InstanceCollisions` 0x125088. The test records each call, with its arguments, in the order they
+//!   are made.
 
 use crate::ground::{forward_drag, ground_thrust, side_friction, spring_force, DragState, FrictionState, ThrustState};
 use crate::math;
+use crate::orient::{rotate_about_axis, Orient};
 use crate::probe::{self, add, cross, dot, scale, sub, Hit};
 
 type V4 = [f32; 4];
@@ -75,8 +78,13 @@ pub struct Rider {
     pub vel: V4,
     /// the rider's up +0x2c0 (the bob is how far the position moved along it)
     pub up: V4,
-    /// +0x1a0, the vector the board is turned from toward the ground (inferred: the board's own up)
+    /// +0x1a0, the board's up (its z axis turned by the quaternion, proven in E8j: `Boarder_UpdateOrientation`); the
+    /// board is turned from it toward the ground's normal
     pub board_up: V4,
+    /// the board's attitude quaternion +0x170 (w, x, y, z) and its side +0x190 (the x axis turned by it): turned
+    /// with `board_up`, the forward (`p.fwd`) and the heading `yaw` by `Boarder_RotateAboutAxis`
+    pub quat: V4,
+    pub board_side: V4,
     /// +0x12c time scale, +0x130 boost level (0 when not boosting), +0x134 speed-boost timer
     pub timescale: f32,
     pub boost_level: f32,
@@ -129,15 +137,13 @@ pub struct CrashRecord {
 pub trait Env {
     /// `Boarder_SetState` 0x11f608(rider, state)
     fn set_state(&mut self, r: &mut Rider, state: u32);
-    /// `Boarder_RotateAboutAxis`(rider, axis, angle): turns the board's frame about the axis
-    fn rotate(&mut self, r: &mut Rider, angle: f32, axis: V4);
     /// `Boarder_WallCollide` 0x126250: true when it returns non-zero
     fn wall_collide(&mut self, r: &mut Rider) -> bool;
     /// the world's ray cast under `Boarder_ProbeGround` (`cWorldLine`(0.5, from, to, 2), `World_RayCast`): what it hit
     fn ray_cast(&mut self, r: &mut Rider, from: V4, to: V4) -> Option<Hit>;
-    /// `Boarder_TakeOff`
+    /// `Boarder_TakeOff` 0x128470 (`crate::orient::take_off`)
     fn take_off(&mut self, r: &mut Rider);
-    /// the rider's virtual 0x64, with the position, velocity and normal
+    /// the rider's virtual +0x64 (a spray burst, effects only), with the position, velocity and normal
     fn crash_virtual(&mut self, r: &mut Rider, pos: V4, vel: V4, normal: V4);
     /// `Boarder_Wipeout` 0x11d830(rider, record)
     fn wipeout(&mut self, r: &mut Rider, record: &CrashRecord);
@@ -145,10 +151,21 @@ pub trait Env {
     fn score_crash(&mut self, r: &mut Rider) -> f32;
     /// `Boarder_AddMeter` 0x11b018(rider, amount)
     fn add_meter(&mut self, r: &mut Rider, amount: f32);
-    /// `Rail_TryCapture`
+    /// rail capture (G1b, not ported yet)
     fn rail_try_capture(&mut self, r: &mut Rider);
     /// `Boarder_InstanceCollisions` 0x125088
     fn instance_collisions(&mut self, r: &mut Rider);
+}
+
+/// `Boarder_RotateAboutAxis` 0x128e90 on the rider's attitude fields (`crate::orient`).
+fn rotate(r: &mut Rider, angle: f32, axis: V4) {
+    let mut o = Orient { q: r.quat, fwd: r.p.fwd, side: r.board_side, up: r.board_up, yaw: r.yaw };
+    rotate_about_axis(&mut o, angle, axis);
+    r.quat = o.q;
+    r.p.fwd = o.fwd;
+    r.board_side = o.side;
+    r.board_up = o.up;
+    r.yaw = o.yaw;
 }
 
 /// `GroundMotion_Update` 0x10a0d8 on `r`, with the surface table `table` (`crate::surface::SURFACE_TABLE`: the
@@ -322,7 +339,7 @@ pub fn update(r: &mut Rider, table: &[[f32; 25]; 20], env: &mut dyn Env) {
             turn = YAW_MAX;
         }
         let n = r.p.normal;
-        env.rotate(r, turn, n);
+        rotate(r, turn, n);
     }
 
     // the walls, then the ground under the new position
@@ -372,7 +389,7 @@ pub fn update(r: &mut Rider, table: &[[f32; 25]; 20], env: &mut dyn Env) {
         let axis = scale(axis, 1.0 / len);
         let l = if NEAR_ONE < len { NEAR_ONE } else { len };
         let angle = -math::asin(l) * k(0x3e6e_f051);
-        env.rotate(r, angle, axis);
+        rotate(r, angle, axis);
     }
 
     // the wobble: the phase runs on with speed, steering and braking

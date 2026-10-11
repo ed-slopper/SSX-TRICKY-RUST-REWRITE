@@ -63,13 +63,13 @@ rider field it writes, and every call it makes to what the test records, with it
 10. Off the powder (surface not 3 or 4, of the probe's new one) 0.4 of the speed into the ground is removed and the speed
     restored.
 11. A wall hit skips the next test; otherwise no ground, or row[6] < h, is `Boarder_TakeOff` and the end.
-12. Surface 6 or 10 (of the probe's) puts the rider down: the rider's virtual 0x64 (position, velocity, normal), then
+12. Surface 6 or 10 (of the probe's) puts the rider down: the rider's virtual 0x64 (`cBoarder::EmitBrakeSpray` 0x11a798, position, velocity, normal), then
     `Boarder_Wipeout` with a record (position, unit velocity, normal, normal·velocity, unit velocity),
     `Score_Crash`(rider+0x5820, 0), `Boarder_AddMeter` with its float, and the end.
-13. Otherwise: the board is turned toward the ground, about unit(n + (0, 0, n.z/2)) × rider+0x1a0 (inferred: the board's
-    up), by −asin(|axis|)·0.23333861, when |axis| > 1e-5; the wobble phase (motion+8) += min(1, 0.00036·|v|) ·
+13. Otherwise: the board is turned toward the ground, about unit(n + (0, 0, n.z/2)) × rider+0x1a0 (the board's
+    up, proven in E8j), by −asin(|axis|)·0.23333861, when |axis| > 1e-5; the wobble phase (motion+8) += min(1, 0.00036·|v|) ·
     (|steer| + |brake| + 0.1)·2.65, wrapped at 2π, rider+0x1cc = 7.5·that amplitude·cos(phase);
-    `Rail_TryCapture`, `Boarder_InstanceCollisions`.
+    rail capture (G1b), `Boarder_InstanceCollisions`.
 Not part of this proof (recorded calls only, answered by the test): the rotation, the wall collision, take-off, the
 virtual 0x64, the crash calls, rail capture and instance collisions. `Rider::step` in `rider.rs` still has its own
 approximate ground branch (metres, y up); it does not call `ground_motion::update` yet.
@@ -98,6 +98,25 @@ Proven (E8f): every word read by running the function in the runner; the exact v
 7.347 cm / 11.61 per s for [6]/[9], not 20/30 as noted before.
 surf[6]/surf[9] by row: 0 7.347/11.61; 1 2.742/5.009; 2 2.849/5.530; 3 15.04/2.842; 4 30.03/2.976; 5 2.775/4.052;
 6,10,15,16,17,19 20/30; 7 21.37/45.2; 8 20/39.4; 9 2.02/30; 11 0.70/17.9; 12 3.95/30; 13 2.64/0; 14 1.56/30; 18 2.58/40.
+
+## Orientation, rotation and take-off (E8j; exact in `tricky-rs/game/src/orient.rs`, `tests/orient.rs`)
+Proven (run in the function runner, 30,000 / 30,000 / 20,000 random cases bit for bit, planted bugs caught; the whole
+`GroundMotion_Update` with the exact rotation inside matches over 20,000 ticks):
+- rider+0x170 is the attitude quaternion (w, x, y, z). `Boarder_UpdateOrientation` 0x129008 normalises it (zero
+  length: only w := 1) and derives, each with the w lane 0: rider+0x190 side (x axis turned), rider+0x180 forward (y
+  axis), **rider+0x1a0 up (z axis)**, and rider+0x1b0 the heading (`Math_Atan` of fy/fx, ±π when fx < 0, ±π/2 when
+  fx == 0 and fy != 0, fy itself when both are 0). Turning an axis a: t = u × a, result = (a + t·2w) + (u × t)·2.
+- `Boarder_RotateAboutAxis` 0x128e90(angle, axis): sin/cos of angle/2, the quaternion (cos, sin·axis) multiplied in
+  front of the rider's, then `Boarder_UpdateOrientation`.
+- `Boarder_TakeOff` 0x128470: `Boarder_SetMotion`(1); then the state (rider+0x428) is read. If it is not 0xa
+  (`cJumpControl`): rider+0x1c8 := rider+0x208, `Jump_ApplyImpulse`(min 0), `Boarder_SetState`(0xd). If it is 0xa:
+  `Jump_ApplyImpulse`(min 0), tail call `Takeoff_SetSpinRates`.
+- The crash virtual of `GroundMotion_Update` (vtable+0x64 of cBoarder's vtable 0x367640, this-delta 0) is
+  `cBoarder::EmitBrakeSpray` 0x11a798 (slot 11): `Boarder_EmitBrakeSpray` 0x136e70 → `BoarderRender_EmitBrakeSpray`
+  0x135258 → `Fx_BrakeSpray_Emit` 0x12e008. It makes spray from the position, velocity and normal and changes
+  nothing of the ride. (The old test assumed a this-delta of 0x20: wrong.)
+Open: the bodies of `Boarder_SetMotion` 0x11f610 → 0x11c648 and `Boarder_SetState` 0x11f608 → 0x11c7d8, and the spray
+effect chain above, are not ported (rows G18, G19).
 
 ## Animation timing
 

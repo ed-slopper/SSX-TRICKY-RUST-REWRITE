@@ -2,10 +2,13 @@
 //! 0x10a0d8 run in the function runner on the player's SLUS_203.26 (TRICKY_ELF; skipped without it), with its
 //! callees run as the original wherever they are small and already checked (the four forces 0x109878, 0x109950,
 //! 0x109cb8, 0x109ef8, `Math_SinCos`, `Math_Asin`, `Math_Cos`, `Vec4_Scale`, `Boarder_ProbeGround` 0x128ae8 and
-//! `Boarder_GetFallLine` 0x128a18, with the world's ray cast answered by the test as in `tests/probe.rs`) and the
-//! other callees recorded (state change, rotation, wall collision, take-off, the crash calls, rail capture,
-//! instance collisions), and `tricky_game::ground_motion::update` on the same rider: every field the function
-//! writes and every recorded call, with its arguments, in order, over many random ticks.
+//! `Boarder_GetFallLine` 0x128a18, with the world's ray cast answered by the test as in `tests/probe.rs`; since
+//! E8j also `Boarder_RotateAboutAxis` 0x128e90 with `Boarder_UpdateOrientation` 0x129008, `Vec3_Scale` and
+//! `Math_Atan`, and the rider's crash virtual, the real chain from the vtable: `cBoarder::vf11` 0x11a798 →
+//! 0x136e70 → 0x135258, down to `Fx_BrakeSpray_Emit` 0x12e008, which is recorded) and the other callees recorded
+//! (state change, wall collision, take-off, the crash calls, rail capture, instance collisions), and
+//! `tricky_game::ground_motion::update` on the same rider: every field the function writes and every recorded
+//! call, with its arguments, in order, over many random ticks.
 //!
 //! `planted_bugs_are_caught` shows the comparison can tell: a rider that differs from the game's by one bit in one
 //! field must be caught.
@@ -40,13 +43,21 @@ impl Rng {
     fn chance(&mut self, one_in: u32) -> bool {
         self.next() % one_in == 0
     }
+    fn unit4(&mut self) -> V4 {
+        loop {
+            let v = [self.f(-1.0, 1.0), self.f(-1.0, 1.0), self.f(-1.0, 1.0), self.f(-1.0, 1.0)];
+            let l = (v[0] * v[0] + v[1] * v[1] + v[2] * v[2] + v[3] * v[3]).sqrt();
+            if l > 0.1 {
+                return [v[0] / l, v[1] / l, v[2] / l, v[3] / l];
+            }
+        }
+    }
 }
 
 /// A call the function makes to something that is not run here, with what it passes (bits, so NaN-proof).
 #[derive(Clone, Debug, PartialEq)]
 enum Ev {
     State(u32),
-    Rotate(u32, [u32; 4]),
     Wall(u32),
     Line(u32, [u32; 4], [u32; 4], u64),
     TakeOff,
@@ -82,9 +93,6 @@ impl Env for E {
     fn set_state(&mut self, _: &mut Rider, state: u32) {
         self.log.push(Ev::State(state));
     }
-    fn rotate(&mut self, _: &mut Rider, angle: f32, axis: V4) {
-        self.log.push(Ev::Rotate(angle.to_bits(), b4(axis)));
-    }
     fn wall_collide(&mut self, r: &mut Rider) -> bool {
         self.log.push(Ev::Wall(r.mask));
         self.wall
@@ -117,9 +125,6 @@ impl Env for E {
     }
 }
 
-/// An address inside the executable that nothing calls: the fake virtual the rider's vtable points to.
-const FAKE_VIRTUAL: u32 = 0x10aed8;
-
 struct W {
     r: Runner,
     rd: u32,
@@ -134,8 +139,12 @@ struct W {
 fn world() -> Option<W> {
     let mut r = Runner::from_env()?;
     r.float_rules = Rules::parse("add=n,mul=n,div=n,cvt=n").unwrap();
-    // what runs as the original
-    for a in [0x102f50, 0x250c10, 0x250fd0, 0x250e98, 0x109878, 0x109950, 0x109cb8, 0x109ef8, 0x15fdd0, 0x128ae8, 0x128a18] {
+    // what runs as the original (E8j: Boarder_RotateAboutAxis 0x128e90, Boarder_UpdateOrientation 0x129008,
+    // Vec3_Scale 0x102f80, Math_Atan 0x2510f8, and the crash virtual cBoarder::vf11 0x11a798 down to the stub)
+    for a in [
+        0x102f50, 0x250c10, 0x250fd0, 0x250e98, 0x109878, 0x109950, 0x109cb8, 0x109ef8, 0x15fdd0, 0x128ae8, 0x128a18, 0x128e90, 0x129008,
+        0x102f80, 0x2510f8, 0x11a798, 0x136e70, 0x135258,
+    ] {
         r.allow(a);
     }
     let stats = r.mem.alloc(0x100);
@@ -156,10 +165,18 @@ fn world() -> Option<W> {
             r.mem.write_f32(table + (i * 100 + j * 4) as u32, *w);
         }
     }
-    // the rider's vtable: the virtual at +0x64 (this adjusted by the short at +0x60)
+    // the rider's vtable (cBoarder's, 0x367640): the virtual at +0x64, `cBoarder::vf11` 0x11a798, called with `this`
+    // moved by the short at +0x60, which is 0 in the game's vtable
     r.mem.write_u32(rd, vtable);
-    r.mem.write_u16(vtable + 0x60, 0x20);
-    r.mem.write_u32(vtable + 0x64, FAKE_VIRTUAL);
+    r.mem.write_u16(vtable + 0x60, 0);
+    r.mem.write_u32(vtable + 0x64, 0x11a798);
+    // what vf11 reaches: the object at rider+0x5ae0 (its word 0 is the rider, +0x3e0 the render object whose +0x99b0
+    // is the brake spray's state)
+    let handler = r.mem.alloc(0x400);
+    let render = r.mem.alloc(0x9a00);
+    r.mem.write_u32(rd + 0x5ae0, handler);
+    r.mem.write_u32(handler, rd);
+    r.mem.write_u32(handler + 0x3e0, render);
     // the game's start-up code for the ground motion sets the load factor at 0x31d308 (30 / 30)
     r.call(0x10af18).expect("StaticInit_GroundMotion");
 
@@ -170,12 +187,6 @@ fn world() -> Option<W> {
     let l = log.clone();
     // Boarder_SetState 0x11f608
     r.stub(0x11f608, move |cpu, _| l.borrow_mut().push(Ev::State(cpu.gpr(5) as u32)));
-    let l = log.clone();
-    // Boarder_RotateAboutAxis 0x128e90 (not ported yet)
-    r.stub(0x128e90, move |cpu, mem| {
-        let axis = rv(mem, cpu.gpr(5) as u32);
-        l.borrow_mut().push(Ev::Rotate(cpu.f(12).to_bits(), b4(axis)));
-    });
     let (l, w) = (log.clone(), wall.clone());
     // Boarder_WallCollide 0x126250
     r.stub(0x126250, move |cpu, mem| {
@@ -183,13 +194,15 @@ fn world() -> Option<W> {
         cpu.set_gpr(2, w.get() as u64);
     });
     let l = log.clone();
-    // Boarder_TakeOff 0x128470 (not ported yet)
+    // Boarder_TakeOff 0x128470 (ported and checked in tests/orient.rs; its callees are the port's to provide)
     r.stub(0x128470, move |_, _| l.borrow_mut().push(Ev::TakeOff));
     let l = log.clone();
-    // the rider's virtual 0x64 (not identified yet)
-    r.stub(FAKE_VIRTUAL, move |cpu, mem| {
-        let (pos, vel, normal) = (rv(mem, cpu.gpr(5) as u32), rv(mem, cpu.gpr(6) as u32), rv(mem, cpu.gpr(7) as u32));
-        assert_eq!(cpu.gpr(4) as u32, rd + 0x20, "the virtual's this");
+    // Fx_BrakeSpray_Emit 0x12e008, where the crash virtual ends: (the brake spray's state, the rider, position,
+    // velocity, normal); the rider's own position, velocity and normal are what the virtual passes on
+    r.stub(0x12e008, move |cpu, mem| {
+        assert_eq!(cpu.gpr(4) as u32, render + 0x99b0, "the brake spray's state");
+        assert_eq!(cpu.gpr(5) as u32, rd, "the rider");
+        let (pos, vel, normal) = (rv(mem, cpu.gpr(6) as u32), rv(mem, cpu.gpr(7) as u32), rv(mem, cpu.gpr(8) as u32));
         l.borrow_mut().push(Ev::Virtual(b4(pos), b4(vel), b4(normal)));
     });
     let l = log.clone();
@@ -240,7 +253,9 @@ impl W {
         for (o, v) in [
             (0x140, p.p.pos),
             (0x150, p.vel),
+            (0x170, p.quat),
             (0x180, p.p.fwd),
+            (0x190, p.board_side),
             (0x1a0, p.board_up),
             (0x2a0, p.p.normal),
             (0x2b0, p.p.fall),
@@ -297,8 +312,11 @@ impl W {
         let mut r = *like;
         r.p.pos = rv(m, rd + 0x140);
         r.vel = rv(m, rd + 0x150);
+        r.quat = rv(m, rd + 0x170);
         r.p.fwd = rv(m, rd + 0x180);
+        r.board_side = rv(m, rd + 0x190);
         r.board_up = rv(m, rd + 0x1a0);
+        r.yaw = m.read_f32(rd + 0x1b0);
         r.p.normal = rv(m, rd + 0x2a0);
         r.p.fall = rv(m, rd + 0x2b0);
         r.up = rv(m, rd + 0x2c0);
@@ -322,10 +340,10 @@ impl W {
 
 /// Every field of the rider the function can touch, as bits.
 fn bits(r: &Rider) -> Vec<u32> {
-    [r.p.pos, r.vel, r.p.fwd, r.board_up, r.p.normal, r.p.fall, r.up, r.p.ground, r.p.plane_fwd, r.p.side]
+    [r.p.pos, r.vel, r.p.fwd, r.board_up, r.p.normal, r.p.fall, r.up, r.p.ground, r.p.plane_fwd, r.p.side, r.quat, r.board_side]
         .iter()
         .flatten()
-        .chain([r.drag, r.p.height, r.bob, r.wobble, r.lean, r.phase].iter())
+        .chain([r.drag, r.p.height, r.bob, r.wobble, r.lean, r.phase, r.yaw].iter())
         .map(|x| x.to_bits())
         .chain([r.p.surface, r.p.surface_ticks, r.p.kind, r.state, r.mask])
         .collect()
@@ -377,6 +395,8 @@ fn gen(g: &mut Rng) -> Case {
         vel: [vel[0], vel[1], vel[2], 0.0],
         up: g.unit(0.3),
         board_up: g.unit(-1.0),
+        quat: g.unit4(),
+        board_side: g.unit(-1.0),
         timescale: if g.chance(3) { g.f(0.2, 3.0) } else { 1.0 },
         boost_level: [0.0, 0.0, 0.25, 0.6013, 1.0][(g.next() % 5) as usize],
         speed_timer: if g.chance(4) { g.f(0.0, 3.0) } else { 0.0 },
@@ -476,11 +496,11 @@ fn compare(w: &mut W, case: &Case, ours: &Rider) -> Result<Seen, String> {
     let (tb, ob) = (bits(&theirs), bits(&mine));
     if tb != ob {
         let names = [
-            "pos", "vel", "fwd", "board_up", "normal", "fall", "up", "ground", "plane_fwd", "side", "drag", "height", "bob", "wobble", "lean", "phase",
-            "surface", "surface_ticks", "kind", "state", "mask",
+            "pos", "vel", "fwd", "board_up", "normal", "fall", "up", "ground", "plane_fwd", "side", "quat", "board_side", "drag", "height", "bob", "wobble",
+            "lean", "phase", "yaw", "surface", "surface_ticks", "kind", "state", "mask",
         ];
         let at = (0..tb.len()).find(|&i| tb[i] != ob[i]).unwrap();
-        let name = if at < 40 { format!("{}[{}]", names[at / 4], at % 4) } else { names[at - 40 + 10].to_string() };
+        let name = if at < 48 { format!("{}[{}]", names[at / 4], at % 4) } else { names[at - 48 + 12].to_string() };
         return Err(format!("{name}: game {:#010x} ours {:#010x}\n game {theirs:?}\n ours {mine:?}", tb[at], ob[at]));
     }
     let r = &case.rider;
@@ -491,7 +511,7 @@ fn compare(w: &mut W, case: &Case, ours: &Rider) -> Result<Seen, String> {
         take_off: has(|e| matches!(e, Ev::TakeOff)) as u32,
         crash: has(|e| matches!(e, Ev::Virtual(..))) as u32,
         rail: has(|e| matches!(e, Ev::Rail)) as u32,
-        rotations: their_log.iter().filter(|e| matches!(e, Ev::Rotate(..))).count() as u32,
+        rotations: (theirs.quat.map(f32::to_bits) != case.rider.quat.map(f32::to_bits)) as u32,
         pushed_out: (r.d2 + r.p.height < 0.0) as u32,
         clamped_out: (r.d2 + r.p.height < -10.0) as u32,
         ceiling: (r.p.normal[2] < 0.0) as u32,
@@ -526,7 +546,7 @@ fn ground_motion_is_the_originals() {
     assert!(t.take_off > 3000, "{t:?}");
     assert!(t.crash > 300, "{t:?}");
     assert!(t.rail > 3000, "{t:?}");
-    assert!(t.rotations > 20000, "{t:?}");
+    assert!(t.rotations > 15000, "{t:?}");
     assert!(t.pushed_out > 3000 && t.clamped_out > 1500, "{t:?}");
     assert!(t.ceiling > 500 && t.skipped_yaw > 300 && t.powder > 1500, "{t:?}");
     assert_eq!(WALL_MASK, 3);
@@ -537,7 +557,7 @@ fn ground_motion_is_the_originals() {
 fn planted_bugs_are_caught() {
     let Some(mut w) = world() else { return };
     let mut g = Rng(0x0b09_0000_0000_0001);
-    let bugs: [(&str, fn(&mut Rider)); 8] = [
+    let bugs: [(&str, fn(&mut Rider)); 10] = [
         ("crouch", |r| r.crouch = f32::from_bits(r.crouch.to_bits() + 1)),
         ("steer", |r| r.steer = f32::from_bits(r.steer.to_bits() + 1)),
         ("timescale", |r| r.timescale = f32::from_bits(r.timescale.to_bits() + 1)),
@@ -546,6 +566,8 @@ fn planted_bugs_are_caught() {
         ("phase", |r| r.phase = f32::from_bits(r.phase.to_bits() + 1)),
         ("bob", |r| r.bob = f32::from_bits(r.bob.to_bits() + 1)),
         ("height", |r| r.p.height = f32::from_bits(r.p.height.to_bits() + 1)),
+        ("quat w", |r| r.quat[0] = f32::from_bits(r.quat[0].to_bits() + 1)),
+        ("quat z", |r| r.quat[3] = f32::from_bits(r.quat[3].to_bits() + 1)),
     ];
     let cases: Vec<Case> = (0..400).map(|_| gen(&mut g)).collect();
     for (name, bug) in bugs {

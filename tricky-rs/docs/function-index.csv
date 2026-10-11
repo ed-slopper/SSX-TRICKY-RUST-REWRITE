@@ -8,13 +8,13 @@ address,size,name,system,status
 0x100598,876,SpinControl_Enter,boarder,not started
 0x100908,6224,SpinState_Update,boarder,ported
 0x102158,1704,SpinState_StartFromStick,boarder,checked
-0x102800,464,SpinState_PlayExitClip,boarder,not started
+0x102800,464,SpinState_PlayExitClip,boarder,ported
 0x1029d0,1008,SpinControl_Exit,boarder,not started
 0x102dc0,40,SpinControl_SaveSnapshot,save,not started
 0x102de8,20,SpinControl_LoadSnapshot,boarder,not started
-0x102e80,208,Quat_Multiply,boarder?,not started
+0x102e80,208,Quat_Multiply,boarder?,ported
 0x102f50,44,Vec4_Scale,common?,ported
-0x102f80,44,Vec3_Scale,common?,not started
+0x102f80,44,Vec3_Scale,common?,ported
 0x102fb0,24,CruiseControl_Enter,boarder?,not started
 0x102fc8,1012,CruiseControl_Update,boarder?,not started
 0x1033c0,16,CruiseControl_Exit,boarder?,not started
@@ -75,7 +75,7 @@ address,size,name,system,status
 0x106cd8,40,ResetWaitControl_SaveSnapshot,save,not started
 0x106d00,20,ResetWaitControl_LoadSnapshot,ai?,not started
 0x106dc0,8,Boarder_OnClipQueued,boarder,not started
-0x106dc8,1560,RailSlideControl_Enter,boarder,not started
+0x106dc8,1560,RailSlideControl_Enter,boarder,ported
 0x1073e0,524,RailSlideControl_Update,boarder,ported
 0x1075f0,52,RailSlideControl_Exit,boarder,not started
 0x107628,260,RailSlideControl_PlayQueuedClip,boarder,not started
@@ -88,7 +88,7 @@ address,size,name,system,status
 0x108280,12,WipeOutRecoverControl_Exit,boarder?,not started
 0x108310,88,AirMotion_Enter,boarder,not started
 0x108368,16,AirMotion_Exit,boarder,not started
-0x108378,3980,AirMotion_Update,boarder,not started
+0x108378,3980,AirMotion_Update,boarder,ported
 0x109308,864,Landing_ChooseState,boarder,checked
 0x109668,40,AirMotion_SaveSnapshot,save,not started
 0x109690,20,AirMotion_LoadSnapshot,boarder,not started
@@ -264,7 +264,7 @@ address,size,name,system,status
 0x11a020,116,Race_FindLineAhead,race,not started
 0x11a098,688,Boarder_TeleportToInstance,boarder,not started
 0x11a348,1100,cBoarder::vf10_11a348,boarder,not started
-0x11a798,8,cBoarder::vf11_11a798,boarder,not started
+0x11a798,8,cBoarder::EmitBrakeSpray,boarder,not started
 0x11a7a0,8,cBoarder::vf12_11a7a0,boarder,not started
 0x11a7a8,8,Boarder_ResetRender,boarder,not started
 0x11a7b0,32,Boarder_LaunchFromGate,boarder,not started
@@ -273,7 +273,7 @@ address,size,name,system,status
 0x11afa8,60,Boarder_Freeze,boarder,not started
 0x11afe8,48,Boarder_StartLessonWait,boarder,not started
 0x11b018,476,Boarder_AddMeter,boarder,checked
-0x11b1f8,336,Boarder_DrainMeter,boarder,not started
+0x11b1f8,336,Boarder_DrainMeter,boarder,ported
 0x11b348,4860,cBoarderHandler::cBoarderHandler,boarder,not started
 0x11c648,100,Boarder_ChangeMotionState,boarder,not started
 0x11c6b0,96,Boarder_ExitMotionState,boarder,not started
@@ -284,7 +284,7 @@ address,size,name,system,status
 0x11c8e8,184,Boarder_EnterControlState,boarder,not started
 0x11c9a0,232,Boarder_UpdateControl,boarder,not started
 0x11ca88,52,Boarder_GetCamera,camera,not started
-0x11cae8,1284,Boarder_PlaceAt,boarder,not started
+0x11cae8,1284,Boarder_PlaceAt,boarder,ported
 0x11cff0,68,Boarder_SetTimeScaleRateLimited,boarder,not started
 0x11d038,812,Boarder_UpdateBoost,boarder,checked
 0x11d368,108,AIComputer_RandomTrick,ai,not started
@@ -296,7 +296,7 @@ address,size,name,system,status
 0x11d998,68,Boarder_IsFinishedAndStopped,boarder,ported
 0x11d9e0,92,FUN_0011d9e0,boarder?,not started
 0x11da40,192,Boarder_Finish,boarder,not started
-0x11db00,2824,SpinControl_CalcLandingAlign,boarder,not started
+0x11db00,2824,SpinControl_CalcLandingAlign,boarder,ported
 0x11e608,88,Pickup_Points,boarder?,not started
 0x11e660,148,Pickup_Multiplier,boarder?,not started
 0x11e6f8,424,Boarder_HitCheckpoint,boarder,not started
@@ -444,7 +444,7 @@ address,size,name,system,status
 0x1257a0,604,Boarder_TurnFromWall,boarder,not started
 0x125a00,580,Boarder_InstanceBounce,boarder,ported
 0x125c48,108,Boarder_AccumulateImpact,boarder,not started
-0x125cb8,1432,Rail_TryCapture,boarder,not started
+0x125cb8,1432,Rail_TryCapture,boarder,ported
 0x126250,748,Boarder_WallCollide,boarder,ported
 0x126540,520,Boarder_WallImpactCheck,boarder,ported
 0x126748,84,Boarder_UpdateBroadphase,boarder,not started
@@ -459,19 +459,19 @@ address,size,name,system,status
 0x126e30,400,Takeoff_SetSpinRates,boarder,checked
 0x126fc0,724,Takeoff_PlayLaunchClip,boarder,ported
 0x127298,76,Boarder_PlayTakeoffClip,boarder,ported
-0x1272e8,1576,SpinState_UpdateTrickClips,boarder,not started
-0x127918,1004,Boarder_UpdateLeanAnim,boarder,not started
-0x127d08,372,FUN_00127d08,boarder?,not started
+0x1272e8,1576,SpinState_UpdateTrickClips,boarder,ported
+0x127918,1004,Boarder_UpdateLeanAnim,boarder,ported
+0x127d08,372,FUN_00127d08,boarder?,ported
 0x127e80,720,FUN_00127e80,boarder?,ported
 0x128150,668,FUN_00128150,boarder?,ported
 0x1283f0,124,StaticInit_Boarder3,boarder?,not started
-0x128470,112,Boarder_TakeOff,boarder,not started
+0x128470,112,Boarder_TakeOff,boarder,checked
 0x1284e0,1336,Jump_ApplyImpulse,boarder,checked
 0x128a18,208,Boarder_GetFallLine,boarder,checked
 0x128ae8,820,Boarder_ProbeGround,boarder,checked
 0x128e20,108,Boarder_ResetOrientation,boarder,not started
-0x128e90,372,Boarder_RotateAboutAxis,boarder,not started
-0x129008,1268,Boarder_UpdateOrientation,boarder,not started
+0x128e90,372,Boarder_RotateAboutAxis,boarder,checked
+0x129008,1268,Boarder_UpdateOrientation,boarder,checked
 0x129500,296,Boarder_UpdateLeanTargets,boarder,not started
 0x129628,6128,Boarder_UpdatePose,boarder,ported
 0x12ae18,1320,Boarder_UpdateSkeleton,boarder,not started
@@ -1086,14 +1086,14 @@ address,size,name,system,status
 0x1550f8,36,cTrickInfo::~cTrickInfo,tutorial,not started
 0x155140,64,cTrickInfo::__tf,runtime,host
 0x1551c0,488,Score_FormatTrickName,scoring,ported
-0x1553a8,100,Score_Init,scoring,not started
+0x1553a8,100,Score_Init,scoring,ported
 0x155410,48,Score_GetMultiplier,scoring,checked
 0x155440,128,Score_CalcPoints,scoring,checked
 0x1554c0,116,Score_CalcBasePoints,scoring,checked
 0x155538,80,FUN_00155538,scoring?,not started
 0x155588,1172,Score_GetGradeForPoints,scoring,not started
-0x155a20,136,Score_Reset,scoring,not started
-0x155aa8,104,Score_BankPoints,scoring,not started
+0x155a20,136,Score_Reset,scoring,ported
+0x155aa8,104,Score_BankPoints,scoring,ported
 0x155b10,164,Score_AddPickupPoints,scoring,not started
 0x155bb8,168,Score_AddPickupTime,scoring,not started
 0x155c60,64,Scoring_MsgCheckpointTime,scoring?,not started
@@ -1107,28 +1107,28 @@ address,size,name,system,status
 0x155ee8,356,Score_StartGrab,scoring,checked
 0x156050,244,SpinState_SetTrickClipRate,boarder,ported
 0x156148,1056,Scoring_OnTrickEvent,scoring?,ported
-0x156568,176,Score_CommitAndRestartChain,scoring,not started
+0x156568,176,Score_CommitAndRestartChain,scoring,ported
 0x156618,636,Score_StartTrickChain,scoring,ported
-0x1568b0,44,FUN_001568b0,scoring?,not started
+0x1568b0,44,FUN_001568b0,scoring?,ported
 0x156900,104,Score_PointsToIconTier,scoring,not started
-0x156968,72,Score_AirTimePoints,scoring,not started
+0x156968,72,Score_AirTimePoints,scoring,ported
 0x1569b0,1068,Score_LandTrick,scoring,ported
 0x156de0,156,Score_Crash,scoring,ported
 0x156e80,392,Score_Tick,scoring,checked
-0x157008,128,Scoring_ResetCombo,scoring?,not started
-0x157088,268,Score_AnnounceTrick,scoring,not started
+0x157008,128,Scoring_ResetCombo,scoring?,ported
+0x157088,268,Score_AnnounceTrick,scoring,ported
 0x157198,68,Score_RoundSpinTo180,scoring,checked
-0x1571e0,128,FUN_001571e0,scoring?,not started
-0x157268,160,Score_CountRecentRepeats,scoring,not started
+0x1571e0,128,Score_AddGrab,scoring,ported
+0x157268,160,Score_CountRecentRepeats,scoring,ported
 0x157308,40,FUN_00157308,scoring?,not started
-0x157330,352,Scoring_PushMessage,scoring?,not started
+0x157330,352,Scoring_PushMessage,scoring?,ported
 0x157490,1252,Score_BuildTrickId,scoring,ported
 0x157978,8,FUN_00157978,,not started
 0x157980,40,Score_SaveSnapshot,save,not started
 0x1579a8,56,Score_LoadSnapshot,scoring,not started
 0x1579e0,572,Score_TrickBookCheck,scoring,ported
 0x157c18,52,TrickId_Matches,scoring?,not started
-0x157c50,92,Score_IsFocusPlayer,scoring,not started
+0x157c50,92,Score_IsFocusPlayer,scoring,ported
 0x157d58,12,FUN_00157d58,frontend?,not started
 0x157d68,56,FUN_00157d68,render?,not started
 0x157da0,112,AnimMemBank_Init,animation,not started
@@ -1198,7 +1198,7 @@ address,size,name,system,status
 0x15ed68,200,AnimCtl_Construct,animation,not started
 0x15ee30,140,AnimCtl_Reset,animation,not started
 0x15eec0,56,AnimCtl_GetClipType,animation,ported
-0x15eef8,80,AnimCtl_TurnAllLayers,animation,not started
+0x15eef8,80,AnimCtl_TurnAllLayers,animation,ported
 0x15ef48,80,FUN_0015ef48,boarder?,not started
 0x15ef98,136,AnimCtl_StopClipsInCategory,animation,not started
 0x15f020,48,AnimCtl_ClearClips,animation,not started
@@ -1216,7 +1216,7 @@ address,size,name,system,status
 0x15fcf8,216,AnimCtl_PlayClip,animation,ported
 0x15fdd0,16,AnimCtl_GetClip,animation,ported
 0x15fde0,144,FUN_0015fde0,animation?,ported
-0x15fe70,84,AnimCtl_GetLayerPhase,animation,not started
+0x15fe70,84,AnimCtl_GetLayerPhase,animation,ported
 0x15fec8,116,AnimCtl_GetClipDuration,animation,not started
 0x15ff40,116,AnimCtl_IsClipAtEnd,animation,ported
 0x15ffb8,80,AnimCtl_TestClipFlag,animation,ported
@@ -2369,7 +2369,7 @@ address,size,name,system,status
 0x19e3b0,8,thunk_FUN_0019ded0,runtime,host
 0x19e460,572,Font_DrawWithCursor,hud,not started
 0x19e6a0,124,StaticInit_Font,other,not started
-0x19e7a0,160,Score_GetRankForPoints,scoring,not started
+0x19e7a0,160,Score_GetRankForPoints,scoring,ported
 0x19e840,68,Score_GetRankColour,scoring,not started
 0x19e888,12492,HudOverlay_InitTables,frontend,not started
 0x1a1958,8,cHUDOverlay::Reset,frontend,not started
