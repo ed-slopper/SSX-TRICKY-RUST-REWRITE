@@ -20,6 +20,7 @@ pub mod loc;
 pub mod logic;
 pub mod ltg;
 pub mod mpf;
+pub mod pbd;
 pub mod music;
 pub mod sfn;
 pub mod snowsfx;

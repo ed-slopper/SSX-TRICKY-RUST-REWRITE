@@ -248,3 +248,23 @@ there (no rewind); a level is the value / 100 when 0..200 (the duck 0..100), els
   `AudioTGroup_GetBounds` 0x22aaa0 boxes them (moved by the instance's position) for the audio grid.
 - Skies: `Course_LoadSkies` 0x185b18 loads `data/models/<course>_sky.pbd` (+ `.ssh`), one per course.
 - `.map` files are not read by the game (no such name in the ELF); they are the tools' instance names.
+
+## Level data, `.pbd` (row E3a; `tricky_data::pbd`, checked: `tricky-game/tests/pbd.rs`)
+
+- `cCourseResolve_PS2::ResolveDataHeader` 0x255630 and the resolvers it calls (their debug prints name every
+  field). Header: version, format (1 = PS2), 15 counts (player starts, patches, instances, particle instances,
+  materials, material blocks, lights, splines, spline segments, texture flips, models, particle models, textures,
+  cameras, light map size) and 18 offsets (the same tables, the model / particle model / camera pointer tables, the
+  hash table, the VIF block). Records: patch 0x1c0, instance 0x100, particle instance 0x70, material 0x48, light
+  0x5c, spline 0x28, spline segment 0x80; material blocks and texture flips are runs of (count, words).
+- The resolver turns offsets into pointers and indices into records: instance +0xc0 its model (by id through the
+  model pointer table), +0xc4 / +0xc8 other instances, +0xf0 its material block; particle instance +0x40 its model;
+  material +0x44 its texture flip; spline +0x20 a segment; segment +0x50 / +0x54 segments, +0x58 a spline; models'
+  hierarchies (6-word nodes: parent, three LOD meshes, animation, matrix — −1 the identity at 0x346440), meshes
+  (contexts table, each context's VIF data from the VIF block), animations (channels); particle models; cameras;
+  the hash table's six lists (patches, instances, models, lights, splines, cameras).
+- Naming: the game's "splines" (+0x20 / +0x5c, 0x28 bytes) are what `Course_GetSplineSegment` returns and the
+  `.ssf` calls segments; its "spline segments" (0x80) are `Course_GetSpline`'s.
+- A quirk: the texture flips' offset (+0x64) is resolved twice, so the header word ends up file + file + offset
+  (the flip table is built in between, from the right address).
+- Skies (`<course>_sky.pbd`, in the course's archive) are the same format: one model; most courses share one file.
