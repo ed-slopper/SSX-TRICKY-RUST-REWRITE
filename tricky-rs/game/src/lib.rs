@@ -18,6 +18,7 @@ pub mod math;
 pub mod rails;
 pub mod rivals;
 pub mod score;
+pub mod spin;
 pub mod rider;
 pub mod surface;
 pub mod trickdata;

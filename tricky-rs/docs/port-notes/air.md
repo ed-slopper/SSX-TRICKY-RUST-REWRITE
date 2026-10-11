@@ -56,6 +56,21 @@ Part of the port notes (index: [README.md](README.md)); units and wording as des
   switch), K = 0.5449139 + 0.6741781·tricks/255; the clip by direction (0x226–0x22d, octants of atan2 riding stance);
   then state 1 and 0x10. From the pad only eight directions exist and the game's atan puts the diagonals just inside
   45°, so clips 0x22a and 0x226 and the snap are never reached.
+- `SpinState_Update` 0x100908 proven (G1a5a, `spin::spin_update`, 40,000 random ticks in the function runner, every field and
+  call bit for bit, half-pipe turn included): the landing alignment turns at most 80°/s of the time left
+  (clamp(+0x34, ±1.3962634·t), × dt/max(dt, t)) by a quaternion about +0x40; spin/flip += rate·dt and are scored in whole
+  degrees (spin mirrored by stats word +0x40). Stick (pad fields at bits 18/16, or 14/12 once started from the stick
+  without 0x400): rates go to x·|lo+hi| and −y·|lo+hi| at 75 rad/s². Let go (or mode 2): the exit clip, mode 2, the band's
+  inner bound and floor to 0, owed spin ±π for the half-pipe clips 0x23c/0x23d (which then turn the rider by their phase),
+  emax 2π; the errors as before, but measured from the late wind-up (+0x274/+0x278 in thirds of a turn): spin back
+  within 40°, flip round within 40° of 180°, else on to the next half turn on the band's side; flip back within 40° else on
+  to the next whole turn; rate = (0.5449139 + 0.6741781·T/255)·150.53665·clamp(err, ±emax)·dt. Every tick the bands
+  shrink by 0.9930117 + 0.002014339·T/255 and are held at the floor on their own side; spin clamped to [lo, hi], flip to
+  [lo, hi] (upper strict). Mode 2 settled (|rates| < 0.7, not clip 0x225): `SpinState_StartFromStick`, else the half-pipe
+  turn (not alpine, +0x1f0 = 0, facing back into the pipe, < 277.78 cm/s along +0x4ab0): rotate by
+  q(spin)·q(flip)·z·q(flip)⁻¹·q(spin)⁻¹, keep the pivot bone's height in place, toggle switch, clip 0x225; else the
+  late wind-up (stat +0x10: (0.54741764 + 0.6545031·s/255)·1.3750083·dt a tick, started by clip 0x222). Pad bit 0x100
+  asks for a reset (101.46).
 - `PrewindState_Update` 0x1050e8 proven (G1a4, `boarder::prewind_update` on the G1d/G1e helpers, 20,000 random ticks): from
   a standing start (rider+0x1dc 0, no jump bit 4, not started, rider+0x418 < 0) it waits for crouch release; else it
   primes both wind-up rates to 2.0005 and, with no wind-up, rides on (clip 0x1ff, state 3). Crouch held (bit 2): boost

@@ -158,7 +158,7 @@ fn atan2_inline(y: f32, x: f32) -> f32 {
 }
 
 /// A two-bit direction field of the pad word: −1, 0 or 1 (the field's value 3 reads −1, 2 reads 0).
-fn pad_dir(word: u32, shift: u32) -> f32 {
+pub(crate) fn pad_dir(word: u32, shift: u32) -> f32 {
     match ((word << shift) as i32) >> 30 {
         -1 => -1.0,
         1 => 1.0,
