@@ -133,6 +133,35 @@ fn bounds(p00: V4, p10: V4, p01: V4, p11: V4) -> ([f32; 3], [f32; 3]) {
     ([lo(0), lo(1), lo(2)], [hi(0), hi(1), hi(2)])
 }
 
+/// The query's part in the patch test: its kind (+0), box, triangle (+0x28) and refinement (+0x50).
+pub trait TriQuery {
+    fn kind(&self) -> u32;
+    fn bounds(&self) -> (V4, V4);
+    fn tri(&self, a: V4, b: V4, c: V4, n: V4) -> Option<Hit>;
+    fn refine(&self, u: f32, v: f32, coeffs: &[V4; 16], hit: &mut Hit);
+}
+
+impl TriQuery for WorldLine {
+    fn kind(&self) -> u32 {
+        self.kind
+    }
+    fn bounds(&self) -> (V4, V4) {
+        (self.lo, self.hi)
+    }
+    fn tri(&self, a: V4, b: V4, c: V4, n: V4) -> Option<Hit> {
+        let r = self.triangle(a, b, c, n);
+        if r.hit {
+            let (pos, normal) = r.at.unwrap();
+            Some(Hit { pos, normal, t: r.t.unwrap() })
+        } else {
+            None
+        }
+    }
+    fn refine(&self, u: f32, v: f32, coeffs: &[V4; 16], hit: &mut Hit) {
+        WorldLine::refine(self, u, v, coeffs, hit)
+    }
+}
+
 /// A patch hit: the hit (for a kind-2 query refined by its +0x50 at the quad's middle (u, v), row E7c2, which is
 /// also given).
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -147,8 +176,9 @@ pub struct PatchHit {
 /// the first time) against the line's, then triangle A (p11, p10, p01), then B (p01, p10, p00), each with its
 /// normal (made the first time: unit((p11 − p10) × (p10 − p01)), unit((p01 − p10) × (p10 − p00))). The first hit
 /// is the answer (noted in `last`); kind 2 then refines it at the quad's middle ([`WorldLine::refine`]).
-pub fn patch_test(q: &WorldLine, grid: &mut PatchGrid, patch: u32, mut last: Option<&mut LastHit>) -> Option<PatchHit> {
-    let coarse = q.kind == 0;
+pub fn patch_test(q: &impl TriQuery, grid: &mut PatchGrid, patch: u32, mut last: Option<&mut LastHit>) -> Option<PatchHit> {
+    let kind = q.kind();
+    let coarse = kind == 0;
     let (step, n, third, sixth) = if coarse { (3usize, 3usize, 0.333_333_34f32, 0.166_666_67f32) } else { (1, 9, 0.111_111_11, 0.055_555_556) };
     let pts = grid.points;
     let corners = |i: usize, j: usize| {
@@ -157,7 +187,7 @@ pub fn patch_test(q: &WorldLine, grid: &mut PatchGrid, patch: u32, mut last: Opt
     };
     let coeffs = grid.coeffs;
     let done = |mut hit: Hit, i: usize, j: usize| {
-        let at = if q.kind == 2 { Some((i as f32 * third + sixth, j as f32 * third + sixth)) } else { None };
+        let at = if kind == 2 { Some((i as f32 * third + sixth, j as f32 * third + sixth)) } else { None };
         if let Some((u, v)) = at {
             q.refine(u, v, &coeffs, &mut hit);
         }
@@ -174,27 +204,15 @@ pub fn patch_test(q: &WorldLine, grid: &mut PatchGrid, patch: u32, mut last: Opt
     let try_a = |qd: &mut Quad, c: (V4, V4, V4, V4)| {
         let (_, p10, p01, p11) = c;
         let n = *qd.normal_a.get_or_insert_with(|| unit(cross(sub(p11, p10), sub(p10, p01))));
-        let r = q.triangle(p11, p10, p01, n);
-        if r.hit {
-            let (pos, normal) = r.at.unwrap();
-            Some(Hit { pos, normal, t: r.t.unwrap() })
-        } else {
-            None
-        }
+        q.tri(p11, p10, p01, n)
     };
     let try_b = |qd: &mut Quad, c: (V4, V4, V4, V4)| {
         let (p00, p10, p01, _) = c;
         let n = *qd.normal_b.get_or_insert_with(|| unit(cross(sub(p01, p10), sub(p10, p00))));
-        let r = q.triangle(p01, p10, p00, n);
-        if r.hit {
-            let (pos, normal) = r.at.unwrap();
-            Some(Hit { pos, normal, t: r.t.unwrap() })
-        } else {
-            None
-        }
+        q.tri(p01, p10, p00, n)
     };
     if let Some(l) = last.as_deref_mut() {
-        if l.patch == patch && l.kind == q.kind {
+        if l.patch == patch && l.kind == kind {
             let (i, j) = (l.row as u16 as usize, l.col as u16 as usize);
             let c = corners(i, j);
             let qd = &mut quads[i * n + j];
@@ -206,7 +224,7 @@ pub fn patch_test(q: &WorldLine, grid: &mut PatchGrid, patch: u32, mut last: Opt
             *l = LastHit { patch: 0, row: 0, col: 0, tri_a: 0, kind: 0, cell: -1, node: -1, index: -1 };
         }
     }
-    let (lo, hi) = (q.lo, q.hi);
+    let (lo, hi) = q.bounds();
     for i in 0..n {
         for j in 0..n {
             let c = corners(i, j);
@@ -221,7 +239,7 @@ pub fn patch_test(q: &WorldLine, grid: &mut PatchGrid, patch: u32, mut last: Opt
                 if let Some(hit) = h {
                     if let Some(l) = last.as_deref_mut() {
                         l.patch = patch;
-                        l.kind = q.kind;
+                        l.kind = kind;
                         l.row = i as i16;
                         l.col = j as i16;
                         l.tri_a = a as u32;

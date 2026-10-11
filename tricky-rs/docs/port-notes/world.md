@@ -104,6 +104,27 @@ Part of the port notes (index: [README.md](README.md)); units and wording as des
   flags, each read four cycles after its result). Its tolerance argument is unused. Read from the code, not run
   (the runner has no micro mode); the test answers it with the port and checks its arguments.
 
+## The rider's shape (row E7a3; `tricky_game::worldboarder`, checked: `tests/worldboarder.rs`)
+
+- `cWorldBoarder` (0x300 bytes, vtable 0x3a77d8), made from the rider's collision body (rider+0x470): kind 1 when
+  made with flag 0, else 0 (`Boarder_WallCollide` and `Boarder_InstanceCollisions` pass 1: kind 0, so the coarse
+  patch quads and a target of −1, the first hit); +0x10 / +0x20 the body's active bounds (`CollBody_GetActiveBounds`:
+  the spheres the mask +0x24 names, or the bounding sphere when it is 0), +0x30 their middle; +0x50 the body in use
+  (a copy put through the object part's frame at +0x60, `CollBody_Copy` / `CollBody_Transform`). Target: twice
+  the body's radius for kind 1. Reject (+0x2d0 set, the walls do with the ground normal at +0x2e0): a hit whose
+  normal · that > 0.8 (floors, for the walls). Front faces only when +0x2f0 is set (the object query sets it).
+- A hit's t is its depth: the test gives a penetration vector, t = |v| and the normal v·(1/t); the point is where
+  the sphere meets the plane.
+- `Collide_SphereTriangle` 0x236bb8 (and its front-only 0x237480: 0 ≤ d; either-side 0x237d50: the normal turned
+  to the sphere): the bounding sphere's distance d to the plane within its radius, its foot inside the triangle
+  (`Tri_ContainsPointVu0`) or, when the centre is at least r from a, an edge (ab, ac, bc as segments) within r.
+  Without a mask the penetration is n·(r − d); with one, each named sphere (d below its radius and the best) the
+  same way, the shallowest kept.
+- `Collide_SphereBox` 0x23b6e8: per axis whose other two lanes lie inside, the depths (c − lo) + r and (hi − c) + r
+  (not negative), the least kept with its face's normal and the centre moved onto that face. `Collide_BoarderBox`
+  0x238640: the bounding sphere's; with a mask the game tests the bounding sphere again for each named sphere
+  (a slip in the game: same answer, or none if the mask names no sphere).
+
 ## World casts (row E7a2; `tricky_game::world`, checked: `tests/world.rs`)
 
 - The course object at 0x346488: +0 the `.ltg` grid, +4 the `.pbd`, +8 / +0xc material blocks and flips, +0x10 its
