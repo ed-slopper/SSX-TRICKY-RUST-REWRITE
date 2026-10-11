@@ -39,6 +39,41 @@ Part of the port notes (index: [README.md](README.md)); units and wording as des
   cap = max(target, cap − 3.472) per tick.
 - Backwards turnaround: vF < −111 cm/s, brake 0, state 3/5/12 → board turns 180°, switch toggles, steer negated.
 
+**One ground tick, in the original's order** (`GroundMotion_Update` 0x10a0d8). Proven (E8h): exact in
+`tricky-rs/game/src/ground_motion.rs`, checked bit for bit in `tests/ground_motion.rs` over 20,000 random ticks (every
+rider field it writes, and every call it makes to what the test records, with its arguments, in order). In cm, z up:
+1. Before anything moves: vn = v·n, vf = v·fwd(+0x320), vr = v·side(+0x330); dt = rider+0x12c / 60; the surface row of
+   rider+0x290 as it is now. **That row is used to the end**, also for the airborne test (row[6] against the height the
+   probe finds), not the row of the surface the probe lands on.
+2. The four forces (`ground.rs`): spring(h, vn), thrust, drag(vf, load) with load = (`DAT_0031d308` · spring) / g, where
+   `StaticInit_GroundMotion` 0x10af18 sets `DAT_0031d308` = `DAT_0031d304` / 30 = 1.0, and side friction(vr, vf, steer).
+   Powder in the drag is surface 3 **or** 4. Then spring = 0 when n.z < 0 and spring < 0; rider+0x160 = drag.
+3. Lean: rider+0x1d8 = row[5]·(π/180)·steer, `Math_SinCos`; m = min(2g, spring) / cos; the acceleration is
+   n·(spring − m) + (n·cos + side·sin)·m, plus fwd·(drag + thrust), plus side·friction, plus (0, 0, −g), summed in that order.
+4. Riding backwards (brake exactly 0, vf < −111.11111, state 3, 5 or 0xc): `Boarder_SetState`(4), here, before the
+   acceleration is built.
+5. Sunk: s = max(d2 + h, −10); when s < 0: pos −= n·s, h −= s, v −= n·vn (vn from step 1), and a −= n·(a·n) when a·n < 0.
+6. Euler: pos += v·dt (the velocity before this tick's), then v += a·dt.
+7. The bob (rider+0x1c0, cm): (bob + (pos·up before − pos·up after))·(1 − 4.684·dt), held between (1 − crouch)·lo and
+   crouch·hi (lo, hi = −20, 10; alpine −10, 15), 0 in states 0xb and 0xc, then moved to it at most 1.6667 cm a tick.
+8. The board yaws toward the velocity (formula above, now exact), through `Boarder_RotateAboutAxis` about the normal,
+   unless state 0xe with no steer. The clamp is ±0.10471976 on the angle after the gain, and the gain is
+   min(1, |v|²·2.0029847e-5·dt) · max(G, ±steer).
+9. rider+0x494 = 3 while `Boarder_WallCollide` runs (the constant at 0x31d300), −1 after; then `Boarder_ProbeGround`.
+10. Off the powder (surface not 3 or 4, of the probe's new one) 0.4 of the speed into the ground is removed and the speed
+    restored.
+11. A wall hit skips the next test; otherwise no ground, or row[6] < h, is `Boarder_TakeOff` and the end.
+12. Surface 6 or 10 (of the probe's) puts the rider down: the rider's virtual 0x64 (position, velocity, normal), then
+    `Boarder_Wipeout` with a record (position, unit velocity, normal, normal·velocity, unit velocity),
+    `Score_Crash`(rider+0x5820, 0), `Boarder_AddMeter` with its float, and the end.
+13. Otherwise: the board is turned toward the ground, about unit(n + (0, 0, n.z/2)) × rider+0x1a0 (inferred: the board's
+    up), by −asin(|axis|)·0.23333861, when |axis| > 1e-5; the wobble phase (motion+8) += min(1, 0.00036·|v|) ·
+    (|steer| + |brake| + 0.1)·2.65, wrapped at 2π, rider+0x1cc = 7.5·that amplitude·cos(phase);
+    `Rail_TryCapture`, `Boarder_InstanceCollisions`.
+Not part of this proof (recorded calls only, answered by the test): the rotation, the wall collision, take-off, the
+virtual 0x64, the crash calls, rail capture and instance collisions. `Rider::step` in `rider.rs` still has its own
+approximate ground branch (metres, y up); it does not call `ground_motion::update` yet.
+
 **Forward drag** `Boarder_ForwardDrag` 0x109cb8 on vF only, with L = max(1, fN/g):
 `−vF·mul·(L·surf1·lin + (1−crouch)·0.10573 + (1+1.2154·lvl)·1.7513·B²·Bst + |vF|·0.001·L·(surf2 + |vF|·0.001·surf3·cub))`,
 lin = 1.0649822 − 0.30845523·S (alpine 0.70764244 − 0.30197912·S), cub = 1.2848105 − 0.29035342·S2, Bst = 0.6150995 + 0.9181778·E.

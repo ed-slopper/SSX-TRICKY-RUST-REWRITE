@@ -98,7 +98,7 @@ address,size,name,system,status
 0x109950,872,Boarder_GroundThrust,boarder,checked
 0x109cb8,576,Boarder_ForwardDrag,boarder,checked
 0x109ef8,476,Boarder_SideFriction,boarder,checked
-0x10a0d8,3568,GroundMotion_Update,boarder,ported
+0x10a0d8,3568,GroundMotion_Update,boarder,checked
 0x10aec8,12,GroundMotion_Exit,boarder,not started
 0x10aed8,40,GroundMotion_SaveSnapshot,save,not started
 0x10af00,20,GroundMotion_LoadSnapshot,boarder,not started

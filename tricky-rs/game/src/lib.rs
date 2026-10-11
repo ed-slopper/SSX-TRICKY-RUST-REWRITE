@@ -12,6 +12,7 @@ pub mod props;
 pub mod race;
 pub mod rand;
 pub mod ground;
+pub mod ground_motion;
 pub mod jump;
 pub mod landing;
 pub mod math;
