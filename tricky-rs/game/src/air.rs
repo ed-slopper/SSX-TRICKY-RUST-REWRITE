@@ -68,3 +68,103 @@ pub fn integrate_rk4(dt: f32, pos: &mut [f32; 4], vel: &mut [f32; 4], substeps: 
         left -= 0.2;
     }
 }
+
+/// What the world ray (`cWorldLine`(0, from, to, 0), `World_RayCast` 0x25aff8) answers along one step of a
+/// predicted flight: the fraction along it (negative: nothing hit), and the hit's point, normal and surface word
+/// (the hit record's +0x10, +0x20, +0x34).
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct RayHit {
+    pub point: [f32; 4],
+    pub normal: [f32; 4],
+    pub word: u32,
+}
+
+/// The flight prediction (`cAirPredict`, rider+0x57b0): +8 the time it reached (the landing time), +0x10 the
+/// landing point, +0x20 the velocity there, +0x30 the ground's normal there, +0x40 its surface word (−1 none),
+/// +0x44 the landing time again, +0x48 the time to the top of the arc, +0x4c (0), +0x50 the top's time when a
+/// landing was found.
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct Predict {
+    pub t: f32,
+    pub point: [f32; 4],
+    pub vel: [f32; 4],
+    pub normal: [f32; 4],
+    pub word: u32,
+    pub t_land: f32,
+    pub t_top: f32,
+    pub x4c: f32,
+    pub x50: f32,
+}
+
+/// `AirPredict_AtTakeoff` 0x123b10, from the rider's position (+0x140), velocity (+0x150) and normal (+0x2a0):
+/// - rising: the time to the top by halving (from 2 s between 0 and 4, whole flights of [`integrate_rk4`] without
+///   substeps; at most 10 tries, or until the bracket is under 0.01);
+/// - then the flight from 0.13333334 s on, in steps growing ×1.28 from 1/60 s (25 at most), each step's segment
+///   (stretched 2% at both ends) cast against the world (`ray`); the first hit gives the landing: the velocity and
+///   time interpolated to the hit's fraction, its point, normal and word. No hit: the rider's own position,
+///   velocity and normal, word −1, times 0.
+pub fn predict_at_takeoff(pos: [f32; 4], vel: [f32; 4], normal: [f32; 4], ray: &mut dyn FnMut([f32; 4], [f32; 4]) -> (f32, RayHit)) -> Predict {
+    let mut pr = Predict { normal: [0.0, 0.0, 1.0, 0.0], ..Default::default() };
+    if 0.0 < vel[2] {
+        let (mut hi, mut lo, mut t) = (4.0f32, 0.0f32, 2.0f32);
+        let mut tries = 0;
+        loop {
+            let (mut p, mut v) = (pos, vel);
+            integrate_rk4(t, &mut p, &mut v, false);
+            let mut m = t;
+            if v[2] < 0.0 {
+                hi = t;
+                m = lo;
+            }
+            tries += 1;
+            if 9 < tries {
+                pr.t_top = t;
+                break;
+            }
+            t = (hi + m) * 0.5;
+            if hi - m < 0.01 {
+                pr.t_top = t;
+                break;
+            }
+            lo = m;
+        }
+    }
+    let (mut p, mut v) = (pos, vel);
+    pr.t = f32::from_bits(0x3e08_8889);
+    integrate_rk4(pr.t, &mut p, &mut v, true);
+    let mut mult = 1.0f32;
+    let tick = f32::from_bits(0x3c88_8889);
+    let stretch = f32::from_bits(0x3ca3_d70a);
+    for _ in 0..0x19 {
+        let step = mult * tick;
+        pr.t += step;
+        let (p0, v0) = (p, v);
+        integrate_rk4(step, &mut p, &mut v, true);
+        let d = [p[0] - p0[0], p[1] - p0[1], p[2] - p0[2], p[3] - p0[3]];
+        let e = scale(d, stretch);
+        let from = [p0[0] - e[0], p0[1] - e[1], p0[2] - e[2], p0[3] - e[3]];
+        let to = add(p, e);
+        let (h, hit) = ray(from, to);
+        if 0.0 <= h {
+            let rest = 1.0 - h;
+            pr.vel = add(scale(v, h), scale(v0, rest));
+            pr.x50 = pr.t_top;
+            let t = pr.t - step * rest;
+            pr.point = hit.point;
+            pr.normal = hit.normal;
+            pr.word = hit.word;
+            pr.t_land = t;
+            pr.t = t;
+            return pr;
+        }
+        mult *= f32::from_bits(0x3fa3_d70a);
+    }
+    pr.t = 0.0;
+    pr.point = pos;
+    pr.vel = vel;
+    pr.normal = normal;
+    pr.word = 0xffff_ffff;
+    pr.t_land = 0.0;
+    pr.x50 = 0.0;
+    pr
+}
