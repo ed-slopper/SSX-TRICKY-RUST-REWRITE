@@ -99,6 +99,9 @@ Part of the port notes (index: [README.md](README.md)); units and wording as des
   start + (bumps + 2 shoves + 3 knock-downs) / (3 (bumps + shoves + knock-downs)) × the gain.
 - The app's computer riders keep their grudge against the player with these (row G4a3, `rivals::Grudge` over
   `RivalRider`): the pair set up as `Rivals_InitPairs` does, carried between heats by `Rivals_DecayAttitudes`
-  0x168028 (−3 friend, −2 neutral, −1 foe; at least 0 and the table's), time in ticks. STANDIN: chasing
-  (`AIComputer_IsHostileTarget`) and shoving (`AIComputer_ShouldShove`) still read the level as before (level 2,
-  or level 1 not cooled; level ≥ 1); those two are not ported yet.
+  0x168028 (−3 friend, −2 neutral, −1 foe; at least 0 and the table's), time in ticks. Chasing is
+  `AIComputer_IsRivalTarget` 0x139928 exactly (grudge on, against that rider, level 2 or level 1 not cooled; every
+  rider in knockdown practice). STANDIN: shoving still reads level ≥ 1; the game's choice of target and when to
+  shove is in `AIComputer_PickTargetRider` 0x1396c8 (every 12 ticks under 540 of rider+0x348, riders within 700 cm by
+  the pair records, weighted distance × (1 − cos bearing) or × (1 + |cos bearing|) for a rival target; dropped past
+  1050 cm) and `AIComputer_RideNearRider` 0x137dc0 / `AIComputer_RideAtRival` 0x137a18 (row G4).

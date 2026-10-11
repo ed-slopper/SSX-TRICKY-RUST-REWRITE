@@ -160,13 +160,14 @@ impl Grudge {
         self.ai.recs[PLAYER as usize].rivalry
     }
 
-    /// Chasing the player (AIComputer_IsHostileTarget): a level-2 grudge, or a level-1 one not yet cooled.
-    /// STANDIN: `AIComputer_IsHostileTarget` itself is not ported yet.
+    /// Chasing the player: `AIComputer_IsRivalTarget` 0x139928 exactly (a grudge against it at level 2, or level 1
+    /// not yet cooled; in knockdown practice, game mode 0, every rider is a target, not ours).
     pub fn hostile(&self) -> bool {
         self.ai.on != 0 && (self.ai.level == 2 || (self.ai.level == 1 && self.ai.cooled == 0))
     }
 
-    /// Will shove the player when alongside (AIComputer_ShouldShove): level 1 or 2. STANDIN: not ported yet.
+    /// Will shove the player when alongside: level 1 or 2. STANDIN: the game decides inside its rival riding
+    /// (`AIComputer_RideAtRival` 0x137a18 / `AIComputer_PickTargetRider` 0x1396c8, row G4), not ported yet.
     pub fn shoves(&self) -> bool {
         self.ai.on != 0 && self.ai.level >= 1
     }
