@@ -6512,3 +6512,10 @@ G 23bf18 AsyncFile_CompleteRequest
 G 1482c0 CamAnimFrame_Create
 G 22e5a8 Speech_PlayFELine
 G 22e4e0 Speech_PostFEEvent
+G 216930 Audio_PlayCountdownBeep
+G 212960 Audio_PlayFEScreenChange
+G 212428 Audio_PlayFERiderChange
+G 20f630 Audio_PlayBigAirWind
+G 2106c0 Sfx_StartCarveLoop
+G 20fce0 Sfx_StartAirLoop
+G 21fc98 CrowdBox_StartSound

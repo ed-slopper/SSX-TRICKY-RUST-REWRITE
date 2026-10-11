@@ -3516,7 +3516,7 @@ address,size,name,system,status
 0x20f430,204,Audio_StartFrontendMusic,audio,not started
 0x20f530,68,Audio_StopMusicAndSpeech,audio,not started
 0x20f578,184,Audio_Shutdown,audio,not started
-0x20f630,652,FUN_0020f630,audio?,not started
+0x20f630,652,Audio_PlayBigAirWind,audio,not started
 0x20f8c0,72,Audio_CancelMusicDuck,audio,not started
 0x20f908,140,Sfx_SurfaceSoundType,audio,not started
 0x20f998,20,Audio_SetMusicMode,audio,not started
@@ -3524,9 +3524,9 @@ address,size,name,system,status
 0x20fa80,228,Audio_AnyRiderNearAhead,audio,not started
 0x20fb68,244,Audio_IsNearerPlayer2,audio,not started
 0x20fc60,124,Audio_GetRiderListener,audio,not started
-0x20fce0,868,FUN_0020fce0,audio?,not started
+0x20fce0,868,Sfx_StartAirLoop,audio?,not started
 0x210048,1656,FUN_00210048,audio?,not started
-0x2106c0,884,FUN_002106c0,audio?,not started
+0x2106c0,884,Sfx_StartCarveLoop,audio?,not started
 0x210a38,148,Audio_InitRiderSounds,audio,not started
 0x210ad0,128,Sfx_StartRiderLoops,audio?,not started
 0x210b50,232,Audio_CancelRaceEvents,audio,not started
@@ -3551,10 +3551,10 @@ address,size,name,system,status
 0x212348,48,FUN_00212348,audio?,not started
 0x2123c8,48,FUN_002123c8,audio?,not started
 0x2123f8,48,FUN_002123f8,audio?,not started
-0x212428,600,FUN_00212428,audio?,not started
+0x212428,600,Audio_PlayFERiderChange,audio,not started
 0x212680,600,FUN_00212680,audio?,not started
 0x2128d8,132,FUN_002128d8,audio?,not started
-0x212960,152,FUN_00212960,audio?,not started
+0x212960,152,Audio_PlayFEScreenChange,audio,not started
 0x2129f8,1180,FUN_002129f8,audio?,not started
 0x212e98,2644,FUN_00212e98,audio?,not started
 0x2138f0,584,Sfx_PlayMenuSelect,frontend?,not started
@@ -3588,7 +3588,7 @@ address,size,name,system,status
 0x2162f0,728,Sfx_OnWallHit,audio?,not started
 0x2165c8,816,Sfx_ScriptSoundPlay,audio,ported
 0x2168f8,52,FUN_002168f8,audio?,not started
-0x216930,48,FUN_00216930,audio?,not started
+0x216930,48,Audio_PlayCountdownBeep,audio,not started
 0x216960,748,Sfx_OnRiderCollision,audio?,not started
 0x216c50,260,Sfx_InstanceCollision,audio?,ported
 0x216d58,1952,FUN_00216d58,audio?,not started
@@ -3689,7 +3689,7 @@ address,size,name,system,status
 0x21ef58,88,FUN_0021ef58,frontend?,not started
 0x21efb0,3252,CrowdBox_Update,world,not started
 0x21fc68,44,FUN_0021fc68,audio?,not started
-0x21fc98,1368,FUN_0021fc98,audio?,not started
+0x21fc98,1368,CrowdBox_StartSound,audio,not started
 0x2201f8,316,CrowdBox_StopSlot,world,not started
 0x220338,108,CrowdBox_StopAll,world,not started
 0x2203a8,396,CrowdBox_PlayCheer,world,not started
