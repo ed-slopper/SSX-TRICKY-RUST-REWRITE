@@ -213,6 +213,41 @@ fn step(r: &mut Runner, pc: u32) -> Result<Next, Error> {
             Ok(Next::Seq)
         }
         28 => unimpl("MMI"),
+        26 | 27 => {
+            // ldl / ldr: the unaligned doubleword's high (ldl) or low (ldr) part, little-endian
+            let byte = addr & 7;
+            let mem = u64::from_le_bytes(load::<8>(r, pc, addr & !7)?);
+            let old = r.cpu.gpr(rt);
+            let v = if op == 26 {
+                let sh = 8 * (7 - byte);
+                let keep = if sh == 0 { 0 } else { (1u64 << sh) - 1 };
+                (old & keep) | (mem << sh)
+            } else {
+                let sh = 8 * byte;
+                let keep = if sh == 0 { 0 } else { !(u64::MAX >> sh) };
+                (old & keep) | (mem >> sh)
+            };
+            r.cpu.set_gpr(rt, v);
+            Ok(Next::Seq)
+        }
+        44 | 45 => {
+            // sdl / sdr: store the high (sdl) or low (sdr) part of the doubleword at an unaligned address
+            let byte = addr & 7;
+            let at = addr & !7;
+            let mem = u64::from_le_bytes(load::<8>(r, pc, at)?);
+            let v = r.cpu.gpr(rt);
+            let out = if op == 44 {
+                let sh = 8 * (7 - byte);
+                let mask = u64::MAX >> sh;
+                (mem & !mask) | ((v >> sh) & mask)
+            } else {
+                let sh = 8 * byte;
+                let mask = u64::MAX << sh;
+                (mem & !mask) | (v << sh)
+            };
+            store(r, pc, at, &out.to_le_bytes())?;
+            Ok(Next::Seq)
+        }
         30 => {
             let v = u128::from_le_bytes(load::<16>(r, pc, addr & !15)?); // lq
             if rt != 0 {
@@ -606,6 +641,30 @@ mod tests {
         rn.stub(0x0020_0000, |c, _| c.set_gpr(2, 7));
         rn.call(CODE).unwrap();
         assert_eq!(rn.cpu.gpr(2), 7);
+    }
+
+    #[test]
+    fn unaligned_doublewords() {
+        // ldl/ldr pair at an odd address reads the 8 bytes there; sdl/sdr writes them back elsewhere, unaligned
+        let mut rn = Runner::empty();
+        let data: Vec<u8> = (0u8..32).collect();
+        rn.mem.write(0x0030_0000, &data).unwrap();
+        let (base, at) = (0x0030_0000u32, 3u32);
+        rn.cpu.set_gpr(4, base as u64);
+        let i = |op: u32, rt: u32, off: u32| (op << 26) | (4 << 21) | (rt << 16) | off;
+        let code = [i(26, 2, at + 7), i(27, 2, at), i(44, 2, 0x10 + 5 + 7), i(45, 2, 0x10 + 5), 0x03e0_0008, 0];
+        for (k, w) in code.iter().enumerate() {
+            rn.mem.write_u32(CODE + 4 * k as u32, *w);
+        }
+        rn.call(CODE).unwrap();
+        assert_eq!(rn.cpu.gpr(2), u64::from_le_bytes([3, 4, 5, 6, 7, 8, 9, 10]), "ldl/ldr");
+        let mut out = [0u8; 8];
+        rn.mem.read(base + 0x15, &mut out).unwrap();
+        assert_eq!(out, [3, 4, 5, 6, 7, 8, 9, 10], "sdl/sdr");
+        let mut around = [0u8; 2];
+        rn.mem.read(base + 0x14, &mut around[..1]).unwrap();
+        rn.mem.read(base + 0x1d, &mut around[1..]).unwrap();
+        assert_eq!(around, [0x14, 0x1d], "the bytes around are kept");
     }
 
     #[test]

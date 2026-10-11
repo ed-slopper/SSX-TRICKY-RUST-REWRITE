@@ -153,3 +153,93 @@ pub fn update_boost(held: bool, start: bool, sounds: bool, tricky: bool, f: &mut
     }
     calls
 }
+
+/// What `Boarder_SetSteerTarget` reads.
+#[derive(Clone, Copy, Debug, Default)]
+pub struct SteerState {
+    /// boost level (rider+0x130; boosting allows a full lock), board class (rider+0x420), velocity (rider+0x150),
+    /// the steer now (rider+0x214) and the surface (rider+0x290; 3 and 4 are powder)
+    pub boost_level: f32,
+    pub class: u32,
+    pub vel: [f32; 4],
+    pub steer: f32,
+    pub surface: u32,
+}
+
+/// `Boarder_SetSteerTarget` 0x126948: the steer target (to rider+0x21c) and the rate it is reached at (to rider+0x218).
+/// Without boost the lock is ±0.9051856; below a class's full-lock speed (1138.27 cm/s alpine, 1134.97 BX, 1119.01
+/// freestyle) it shrinks with speed; the rate is 7.0173593 × the distance, 0.1..8.018349, × 0.6 on powder.
+pub fn set_steer_target(target: f32, s: &SteerState) -> (f32, f32) {
+    let mut t = target;
+    if s.boost_level == 0.0 {
+        t = t.clamp(-0.905_185_6, 0.905_185_6);
+    }
+    let full = if s.class == 2 { 1_138.272_7 } else if s.class == 0 { 1_134.973_9 } else { 1_119.009_5 };
+    let v = s.vel;
+    let p = [v[0] * v[0], v[1] * v[1], v[2] * v[2], v[3] * v[3]];
+    let speed = (((p[0] + p[1]) + 1.0 * p[2]) + 1.0 * p[3]).sqrt();
+    let k = speed / full;
+    if k < 1.0 {
+        t *= k;
+    }
+    let mut rate = ((t - s.steer).abs() * 7.017_359_3).clamp(0.1, 8.018_349);
+    if s.surface.wrapping_sub(3) < 2 {
+        rate *= 0.599_972_6;
+    }
+    (t, rate)
+}
+
+/// `Boarder_IsTricky` 0x11f430: more than five ubers done this run (rider+0x58a8).
+pub fn is_tricky(ubers: i32) -> bool {
+    5 < ubers
+}
+
+/// The wind-up clips, by direction (centre, back, then the eight sectors) and by rider+0x1dc (0..4): the table the
+/// game copies from 0x35fed0.
+pub const WIND_CLIPS: [[u32; 5]; 9] = [
+    [0x218, 0x218, 0x218, 0x261, 0x260],
+    [0x220, 0x262, 0x262, 0x268, 0x26c],
+    [0x21c, 0x21c, 0x21c, 0x268, 0x26c],
+    [0x21a, 0x264, 0x264, 0x266, 0x26b],
+    [0x21b, 0x21b, 0x21b, 0x269, 0x26d],
+    [0x21e, 0x21e, 0x21e, 0x268, 0x26c],
+    [0x219, 0x265, 0x265, 0x267, 0x26a],
+    [0x21d, 0x21d, 0x21d, 0x269, 0x26d],
+    [0x21f, 0x263, 0x263, 0x269, 0x26d],
+];
+
+/// `PrewindState_UpdateWindClip` 0x1055f0: the clip for the wind-up now (spin rider+0x220, flip rider+0x22c; both
+/// negated riding switch), from `WIND_CLIPS` row by its direction and column `kind` (rider+0x1dc).
+pub fn wind_clip(spin: f32, flip: f32, switch: bool, kind: usize) -> u32 {
+    let (x, y) = if switch { (-spin, -flip) } else { (spin, flip) };
+    let a = if x == 0.0 {
+        if y == 0.0 { 0.0 } else if 0.0 <= y { std::f32::consts::FRAC_PI_2 } else { -std::f32::consts::FRAC_PI_2 }
+    } else {
+        let t = crate::math::atan(y / x);
+        if x < 0.0 {
+            if 0.0 < y { t + std::f32::consts::PI } else { t - std::f32::consts::PI }
+        } else {
+            t
+        }
+    };
+    let row = if flip == 0.0 && spin == 0.0 {
+        0
+    } else if 2.748_893_5 < a.abs() {
+        1
+    } else if 1.963_495_4 < a {
+        2
+    } else if 1.178_097_2 < a {
+        3
+    } else if std::f32::consts::FRAC_PI_8 < a {
+        4
+    } else if a < -1.963_495_4 {
+        5
+    } else if a < -1.178_097_2 {
+        6
+    } else if a < -std::f32::consts::FRAC_PI_8 {
+        7
+    } else {
+        8
+    };
+    WIND_CLIPS[row][kind]
+}

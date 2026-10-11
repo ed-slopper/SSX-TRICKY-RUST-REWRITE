@@ -219,3 +219,66 @@ fn crouch_and_wind_targets_are_the_originals() {
         assert_eq!(theirs, wv.map(f32::to_bits).to_vec(), "case {case}: PrewindState_SetWindTarget({v}, {rate}, {flip})");
     }
 }
+
+#[test]
+fn steer_target_and_tricky_are_the_originals() {
+    let Some(mut w) = world() else { return };
+    let mut g = Rng(0x05ee_7a46_e500_0001);
+    for case in 0..10000 {
+        let s = boarder::SteerState {
+            boost_level: if g.next() % 2 == 0 { 0.0 } else { g.f(0.2, 1.0) },
+            class: g.next() % 3,
+            vel: [g.f(-1500.0, 1500.0), g.f(-1500.0, 1500.0), g.f(-300.0, 300.0), 0.0],
+            steer: g.f(-1.0, 1.0),
+            surface: g.next() % 20,
+        };
+        let target = g.f(-1.3, 1.3);
+        let rd = w.rd;
+        w.r.mem.write_f32(rd + 0x130, s.boost_level);
+        w.r.mem.write_u32(rd + 0x420, s.class);
+        for (k, x) in s.vel.iter().enumerate() {
+            w.r.mem.write_f32(rd + 0x150 + 4 * k as u32, *x);
+        }
+        w.r.mem.write_f32(rd + 0x214, s.steer);
+        w.r.mem.write_u32(rd + 0x290, s.surface);
+        w.r.cpu.set_f(12, target);
+        w.r.cpu.set_gpr(4, rd as u64);
+        w.r.call(0x126948).unwrap();
+        let (t, rate) = boarder::set_steer_target(target, &s);
+        assert_eq!(w.r.mem.read_u32(rd + 0x21c), t.to_bits(), "case {case} {s:?} target {target}: steer target");
+        assert_eq!(w.r.mem.read_u32(rd + 0x218), rate.to_bits(), "case {case}: rate");
+    }
+    let mut r = Runner::from_env().unwrap();
+    let rd = r.mem.alloc(0x6000);
+    for n in [-1, 0, 5, 6, 7, 100] {
+        r.mem.write_u32(rd + 0x58a8, n as u32);
+        r.cpu.set_gpr(4, rd as u64);
+        r.call(0x11f430).unwrap();
+        assert_eq!(r.cpu.gpr(2) != 0, boarder::is_tricky(n), "Boarder_IsTricky({n})");
+    }
+}
+
+#[test]
+fn wind_clip_is_the_originals() {
+    let Some(mut w) = world() else { return };
+    w.r.allow(0x2510f8); // Math_Atan
+    let clip = Rc::new(RefCell::new(None));
+    let c = clip.clone();
+    w.r.stub(0x15fcf8, move |cpu, _| *c.borrow_mut() = Some(cpu.gpr(5) as u32));
+    let state = w.r.mem.alloc(0x20);
+    w.r.mem.write_u32(state + 0xc, w.rd);
+    let mut g = Rng(0x0217_d0c1_e500_0001);
+    for case in 0..20000 {
+        let pick = |g: &mut Rng| match g.next() % 4 { 0 => 0.0, 1 => g.f(-1.0, 1.0), 2 => [1.0, -1.0, 0.5, -0.5][(g.next() % 4) as usize], _ => g.f(-0.05, 0.05) };
+        let (spin, flip, switch, kind) = (pick(&mut g), pick(&mut g), g.next() % 2 == 0, (g.next() % 5) as usize);
+        let rd = w.rd;
+        w.r.mem.write_f32(rd + 0x220, spin);
+        w.r.mem.write_f32(rd + 0x22c, flip);
+        w.r.mem.write_u32(rd + 0x1b4, switch as u32);
+        w.r.mem.write_u32(rd + 0x1dc, kind as u32);
+        *clip.borrow_mut() = None;
+        w.r.cpu.set_gpr(4, state as u64);
+        w.r.call(0x1055f0).unwrap_or_else(|e| panic!("case {case}: {e}"));
+        assert_eq!(*clip.borrow(), Some(boarder::wind_clip(spin, flip, switch, kind)), "case {case}: spin {spin} flip {flip} switch {switch} kind {kind}");
+    }
+}

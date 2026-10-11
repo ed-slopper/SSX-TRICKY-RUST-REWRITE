@@ -161,4 +161,10 @@ Riding switch (rider+0x1b4) mirrors the inputs of modes 4 and 9.
 - `Boarder_SetCrouchTarget` 0x126c00: target (0 while rider+0x1fc is set) to +0x210, rate 5.002488·max(0.1, |target − crouch|)
   to +0x20c. `PrewindState_SetWindTarget` 0x105a60: wind-up [now, rate, target]: target = v (negated to flip), rate =
   r·|v − now|·(0.8124317 + 0.32901537·stat18/255).
+- `Boarder_SetSteerTarget` 0x126948 (G1e): lock ±0.9051856 unless boosting; × |v|/1138.2727 (alpine), /1134.9739 (BX), /1119.0095
+  (freestyle) below that speed; rate = clamp(7.0173593·|target − steer|, 0.1, 8.018349), ×0.5999726 on powder (3, 4); to
+  rider+0x21c, +0x218. `Boarder_IsTricky` 0x11f430: rider+0x58a8 > 5 ubers.
+- `PrewindState_UpdateWindClip` 0x1055f0 (G1e): the wind-up clip from the table at 0x35fed0 (9 rows × rider+0x1dc 0..4;
+  `boarder::WIND_CLIPS`): centre when both wind-ups are 0, else by atan2(flip, spin) (negated riding switch): back past
+  157.5°, then 112.5°, 67.5°, 22.5° up and −112.5°, −67.5°, −22.5° down, else forward.
 
