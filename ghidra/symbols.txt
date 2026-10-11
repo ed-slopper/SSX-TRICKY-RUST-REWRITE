@@ -5189,3 +5189,6 @@ G 161118 AnimMode_CrouchSteerBlend
 G 1601d0 AnimMode_DirectionBlend
 G 1033d0 CruiseControl_LookBack
 G 103b88 CruiseControl_RandomFlourish
+G 126fc0 Takeoff_PlayLaunchClip
+G 1055f0 PrewindState_UpdateWindClip
+G 11d4e8 Boarder_PickIdleClip
