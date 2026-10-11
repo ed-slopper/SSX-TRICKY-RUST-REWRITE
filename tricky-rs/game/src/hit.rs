@@ -96,3 +96,97 @@ pub fn pair_speeds(n: V4, va: V4, vb: V4, ma: f32, mb: f32) -> (f32, f32) {
     let k = (dot(vb, n) - dot(va, n)) / (ma + mb);
     (mb * k, -ma * k)
 }
+
+/// `Race_UpdatePairDistances` 0x115a80, every tick: for each pair of riders (in the race's order) the flat distance
+/// between their positions (rider+0x480; x and y only) and the bearing each way (atan2 of the difference, the game's
+/// inline atan2 around `Math_Atan`): the later rider keeps the angle from it to the earlier one as it comes, the
+/// earlier one that angle + π wrapped to −π..π. `records[i][j]` is rider i's record of rider j (rider+0x40 + 0x20·j:
+/// [0] the distance, [1] the bearing); the diagonal is left alone.
+pub fn pair_distances(pos: &[V4], records: &mut [Vec<[f32; 2]>]) {
+    for i in 0..pos.len() {
+        for j in i + 1..pos.len() {
+            let d = sub(pos[i], pos[j]);
+            let dist = (d[0] * d[0] + d[1] * d[1]).sqrt();
+            records[i][j][0] = dist;
+            records[j][i][0] = dist;
+            let a = crate::jump::atan2_inline(d[1], d[0]);
+            let t = (a + std::f32::consts::PI) * 0.159_154_94 + 0.5;
+            let mut fl = t as i32 as f32;
+            if t < fl {
+                fl -= 1.0;
+            }
+            records[i][j][1] = (a + std::f32::consts::PI) - fl * 6.283_185_5;
+            records[j][i][1] = a;
+        }
+    }
+}
+
+/// What the shove reads of each rider: position (+0x140), velocity (+0x150), the frame the shove is measured in
+/// (+0x4aa0 forward, +0x4ab0 side, +0x4ac0 up, +0x4ad0 where), the shove's heading (+0x1e0), the speed stat
+/// (`Boarder_GetSpeedStat`) and the stability byte (stats+0x12).
+#[derive(Clone, Copy, Debug, Default)]
+pub struct ShoveRider {
+    pub pos: V4,
+    pub vel: V4,
+    pub fwd: V4,
+    pub side: V4,
+    pub up: V4,
+    pub at: V4,
+    pub heading: f32,
+    pub speed_stat: f32,
+    pub stability: u8,
+}
+
+/// The shove in `Boarder_RiderCollisions` 0x123fc8 (the shover's layer-1 clip of type 0x15 between its flags 1
+/// and 2, three ticks since either's last shove): the other rider is reached if within 150 cm along the shover's up,
+/// 180 cm across it and 55° of its shove heading (the bearing −atan2(d·fwd, d·side)); the hit's speed is (108.58082,
+/// 250.59537 in knockdown practice, + (6.6·n · (v_other − v_me))·m_me / (m_me + m_other)) × (0.54663557 + 0.739932 ×
+/// stability / 255) along n, the unit from the shover to the other (positions +0x140), given to `Boarder_RiderHit` on
+/// the other if the first sum is above 0. `None` if out of reach or not positive.
+pub fn shove(me: &ShoveRider, other: &ShoveRider, practice: bool) -> Option<(f32, V4)> {
+    let d = sub(other.at, me.at);
+    let h = dot(d, me.up);
+    if !(h.abs() <= 150.0) {
+        return None;
+    }
+    let lat = sub(d, scale(me.up, h));
+    if !(dot(lat, lat).sqrt() <= 180.0) {
+        return None;
+    }
+    let f = dot(d, me.fwd);
+    let s = dot(d, me.side);
+    let bearing = if s == 0.0 {
+        if f == 0.0 {
+            -f
+        } else if 0.0 <= f {
+            -std::f32::consts::FRAC_PI_2
+        } else {
+            std::f32::consts::FRAC_PI_2
+        }
+    } else {
+        let t = crate::math::atan(f / s);
+        if s < 0.0 {
+            -(if 0.0 < f { t + std::f32::consts::PI } else { t - std::f32::consts::PI })
+        } else {
+            -t
+        }
+    };
+    let rel = bearing - me.heading;
+    let k = rel * 0.159_154_94 + 0.5;
+    let mut fl = k as i32 as f32;
+    if k < fl {
+        fl -= 1.0;
+    }
+    if !((rel - fl * 6.283_185_5).abs() < 0.959_931_1) {
+        return None;
+    }
+    let base = if practice { 250.595_37 } else { 108.580_82 };
+    let n = normalize(sub(other.pos, me.pos));
+    let n66 = scale(n, f32::from_bits(0x40d3_40b7));
+    let rv = sub(other.vel, me.vel);
+    let speed = base + (dot(n66, rv) * me.speed_stat) / (me.speed_stat + other.speed_stat);
+    if !(0.0 < speed) {
+        return None;
+    }
+    Some((speed * (me.stability as f32 * 0.739_932 * 0.003_921_569 + 0.546_635_57), n))
+}

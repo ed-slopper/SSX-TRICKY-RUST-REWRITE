@@ -87,3 +87,28 @@ Part of the port notes (index: [README.md](README.md)); units and wording as des
 - In our riders (`Rider::hit`, `props::bump`): STANDIN one body sphere per rider, a three-tick wait per rider
   instead of per pair, the pair record (wipe-out offset, hop angle) not kept (no hop), never knockdown practice, the
   push's virtual not called.
+
+## Collision bodies, pair records and the shove, exactly (board row E8d2, checked: `tests/collbody.rs`, `tests/hit.rs`)
+
+- The rider's collision body (rider+0x470, `tricky-rs/game/src/collbody.rs`): `CollBody_InitRider` 0x236050 sets 18
+  spheres (radii 25, 20, 15, 15, 15, 15, 10, 10, 25, 25, 20, 20, 30, 30, 20, 20, 20, 20 cm) and a bounding radius
+  (m × 100; its centre kept); `CollBody_UpdateFromBones` 0x2361b0 puts spheres 0–13 on skeleton bones 2, 4, 6, 10, 7,
+  11, 8, 12, 13, 16, 14, 17, 15, 18, the board's spheres 14–17 at ±70 and ±45 cm from the middle of 12 and 13 along
+  the line between them, the bounding centre halfway between 8 and 9; `CollBody_Translate` moves it all;
+  `CollBody_OverlapSpheres` 0x236a00: bounding spheres first, then the first overlapping pair (a's spheres in order,
+  then b's) gives the push (unit a→b × overlap) and the touching point on a's sphere.
+- The pair records (rider+0x40 + 0x20 × the other's index), written every tick by `Race_UpdatePairDistances`
+  0x115a80: [0] the flat distance between the riders (rider+0x480, x and y), [1] the bearing to the other (the later
+  rider of a pair keeps atan2 of the difference as is, the earlier one + π wrapped to −π..π); +8 and +0xc the ticks
+  of the last hit and shove, +0x1a a count. The AI reads them too (`AIComputer_PickTargetRider`: within 700 cm, and
+  others). `Boarder_RiderHit`'s wipe-out goes the pair's distance along the hit; its hop needs the rider heading
+  within 45° of the bearing to the one that hit it.
+- The shove (`Boarder_RiderCollisions`, `hit::shove`): the shover's layer-1 clip type 0x15 between clip flags 1 and
+  2, three ticks since the pair's last shove both ways; the other's point (+0x4ad0) within 150 cm along the shover's
+  up (+0x4ac0), 180 cm across, and its bearing −atan2(d·fwd (+0x4aa0), d·side (+0x4ab0)) within 55° of the shove's
+  heading (+0x1e0). Speed (108.58082, or 250.59537 in knockdown practice) + (6.6·n · (v_other − v_me)) × m_me /
+  (m_me + m_other), if above 0 × (0.54663557 + 0.739932 × stability / 255), into `Boarder_RiderHit` on the other
+  along n (positions +0x140); a knock-down scores as in a collision.
+- Our riders' shoves go through `hit::shove` (`props::shove_push`; STANDIN frame: heading, right, world up, the
+  position; shove heading 0 right, π left). Still STANDIN: the collision body (our riders have no game skeleton in
+  the game crate, so one sphere), the pair records (not kept), the hop.

@@ -256,14 +256,27 @@ pub fn bump(a: &mut Rider, b: &mut Rider) {
     }
 }
 
-/// A shove (clip 0x15): the push a rider gives one alongside, as a change of velocity for them.
-pub fn shove_push(from: &Rider, to: &Rider) -> Vec3 {
-    let d = to.pos - from.pos;
-    let dir = Vec3::new(d.x, 0.0, d.z).normalize_or_zero();
-    let (m, mo) = (from.stats.mass().max(1.0), to.stats.mass().max(1.0));
-    let closing = (from.vel - to.vel).dot(dir).max(0.0);
-    let j = (1.0858 + closing * m / (m + mo)) * (0.54663557 + 0.739932 * from.stats.stability);
-    dir * j
+/// A shove (clip 0x15, `Boarder_RiderCollisions` 0x123fc8, exact through `hit::shove`): if `to` is in reach of
+/// `from`'s shove (150 cm along its up, 180 cm across, 55° of the side it shoves to, `from.shove_side`), the hit it
+/// takes, as a change of velocity (m/s). STANDIN: the rider's frame (rider+0x4aa0..0x4ad0) as our heading, right,
+/// world up and position; the shove's heading (rider+0x1e0) 0 to the right, π to the left; never knockdown practice.
+pub fn shove_push(from: &Rider, to: &Rider) -> Option<Vec3> {
+    let g = |v: Vec3, k: f32, w: f32| [v.x * k, v.z * k, v.y * k, w];
+    let side = Vec3::new(from.yaw.cos(), 0.0, -from.yaw.sin());
+    let me = crate::hit::ShoveRider {
+        pos: g(from.pos, 100.0, 1.0),
+        vel: g(from.vel, 100.0, 0.0),
+        fwd: g(crate::rider::heading(from.yaw), 1.0, 0.0),
+        side: g(side, 1.0, 0.0),
+        up: [0.0, 0.0, 1.0, 0.0],
+        at: g(from.pos, 100.0, 1.0),
+        heading: if from.shove_side >= 0.0 { 0.0 } else { std::f32::consts::PI },
+        speed_stat: from.speed_stat(),
+        stability: crate::rider::stat_byte(from.stats.stability),
+    };
+    let other = crate::hit::ShoveRider { pos: g(to.pos, 100.0, 1.0), vel: g(to.vel, 100.0, 0.0), at: g(to.pos, 100.0, 1.0), speed_stat: to.speed_stat(), ..me };
+    let (speed, n) = crate::hit::shove(&me, &other, false)?;
+    Some(Vec3::new(n[0], n[2], n[1]) * (speed / 100.0))
 }
 
 /// Tokyo Megaplex's lap tube (level effects cLapBoostNode, cZBoostNode, cTubeEndBoostNode): at the

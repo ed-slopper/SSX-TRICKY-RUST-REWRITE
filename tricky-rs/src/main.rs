@@ -1615,14 +1615,10 @@ fn ride(
         let right = Vec3::new(r.yaw.cos(), 0.0, -r.yaw.sin());
         let nearest = opponents.0.iter().map(|o| o.rider.pos - r.pos).min_by(|a, b| a.length().total_cmp(&b.length()));
         r.shove_side = nearest.map_or(1.0, |d| if d.dot(right) >= 0.0 { 1.0 } else { -1.0 });
-        // the shove reaches a rider within 1.8 m, 1.5 m up or down, and 55 degrees of where you face
-        let face = heading(r.yaw);
+        // the shove reaches a rider within 1.5 m up or down, 1.8 m across and 55 degrees of the side shoved to
         for o in opponents.0.iter_mut() {
-            let d = o.rider.pos - r.pos;
-            let flat = Vec3::new(d.x, 0.0, d.z);
-            let ahead = flat.normalize_or_zero().dot(face).abs() < 55f32.to_radians().sin() || flat.length() < 0.6;
-            if flat.length() < 1.8 && d.y.abs() < 1.5 && ahead && o.rider.crashed <= 0.0 {
-                let push = props::shove_push(r, &o.rider);
+            if o.rider.crashed > 0.0 { continue; }
+            if let Some(push) = props::shove_push(r, &o.rider) {
                 let was = o.rider.stumble > 0.0;
                 let down = o.rider.take_hit(push, false);
                 if down { hit = true; }
@@ -1901,7 +1897,7 @@ fn ride(
                     o.rider.shove_side = if gap.dot(right) >= 0.0 { 1.0 } else { -1.0 };
                     let push = props::shove_push(&o.rider, r);
                     let was = r.stumble > 0.0;
-                    if r.shove <= 0.0 {
+                    if let (true, Some(push)) = (r.shove <= 0.0, push) {
                         let down = r.take_hit(push, false);
                         if down { o.rider.add_meter(1.0); r.last_trick = "Shoved!".into(); r.trick_timer = 2.0; }
                         // getting its own back cools the grudge
