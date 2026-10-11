@@ -78,7 +78,9 @@ state machine and the renderer are ours. Nothing has been checked against the or
 | ID | Task | Area | Needs | Who | Notes |
 |---|---|---|---|---|---|
 | G1 | Boarder state machine: every state (0x00–0x14) and motion (0–6), their enter/update/exit, `cBoarder` vtable, in the original's order per tick | unowned | F1 | | [repo] Many states ported one by one; the dispatch is ours |
-| G1a | Prewind, jump, takeoff, spin and flip control (`PrewindState_Update` 0x1050e8, `Jump_ApplyImpulse` 0x1284e0, `Takeoff_SetSpinRates` 0x126e30, `SpinState_Update` 0x100908, `SpinState_StartFromStick` 0x102158) checked | any | F4a | | [repo] Ported, unchecked |
+| G1a | Prewind, jump, takeoff, spin and flip control (`PrewindState_Update` 0x1050e8, `Jump_ApplyImpulse` 0x1284e0, `Takeoff_SetSpinRates` 0x126e30, `SpinState_Update` 0x100908, `SpinState_StartFromStick` 0x102158) checked | any | F4a | | [repo] Ported, unchecked Split: G1a1, G1a2 |
+| G1a1 | `Jump_ApplyImpulse` 0x1284e0 ported exactly into `tricky-game` (cm, the vector unit's order, the steep-lip branch) and checked bit for bit in the function runner | any | F4a | trailrig/heron (2026-10-11) | Split of G1a |
+| G1a2 | The rest of G1a: `PrewindState_Update` 0x1050e8, `Takeoff_SetSpinRates` 0x126e30, `SpinState_Update` 0x100908, `SpinState_StartFromStick` 0x102158 checked; `Rider::step` calls the exact jump (G1a1) | any | G1a1 | | Split of G1a |
 | G1b | Rails checked: `RailSlideMotion_Update` 0x10b0d0, `RailSlideControl_Update` 0x1073e0, `Rail_TryCapture` 0x125cb8 | any | F4a | | [repo] README: rail speeds "still mine"; find what isn't ported |
 | G1c | Finish, reset and gate states: `FinishState_Update` 0x106668, `ResetState_Update` 0x106a90, `Boarder_RequestReset` 0x118f10, `GateAnticipate_*` | any | F4a | | [repo] |
 | G2 | Tricks and scoring checked: `Score_*` 0x155410–0x157490, `Score_BuildTrickId` 0x157490, `Score_FormatTrickName` 0x1551c0, repeats, chains, multipliers, uber timer, TRICKY | any | F4a | | [repo] Ported in `rider.rs`/`trickdata.rs` |
@@ -266,3 +268,4 @@ matches the original.
 - 2026-10-11 ed-slopper/puffin: E4a done; added E4d (gap of E4a).
 - 2026-10-11 trailrig/heron: claim E9a.
 - 2026-10-11 trailrig/heron: E9a done; added E9b–E9j.
+- 2026-10-11 trailrig/heron: split G1a into G1a1 (claimed) and G1a2.
