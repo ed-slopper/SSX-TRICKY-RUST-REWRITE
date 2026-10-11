@@ -4433,3 +4433,19 @@ G 26fe50 FE3DWorld_FindByHash
 G 266190 FE3DRider_SaveSelection
 G 2657a8 FE_SetupRaceFromMenu
 F 2b1b20 cFE3DScrollingText cFE3DScrollingText
+G 263000 FEWorld_ShowCourseVideo
+G 251d18 CacheBuffer_Free
+G 245598 FE_GetSelectedCourse
+G 2403a8 Dma_SendGif
+G 23ea18 MemCard_GetSlotError
+G 234bb8 Speech_InterruptIfPlaying
+G 231398 Speech_LessonLine
+G 22e360 WorldTriggerMgr_Reset
+G 22c5a0 WorldEmitter_Stop
+G 228998 SpeechSys_UpdateAll
+G 2255c0 MusicSys_SelectSong
+G 225588 MusicSys_CountEnabled
+G 225380 MusicSys_SetSection
+F 24c748 cFELoadFromQuit cFELoadFromQuit
+F 247a60 c2PTrackLoad c2PTrackLoad
+F 245840 c1PTrackLoad c1PTrackLoad
