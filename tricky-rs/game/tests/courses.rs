@@ -132,3 +132,25 @@ fn venues_and_unlocks_match_the_original() {
         }
     }
 }
+
+#[test]
+fn skies_are_the_games() {
+    let Some(mut r) = Runner::from_env() else { return };
+    let m = &mut r.mem;
+    let mut at = 0x3880c0;
+    let mut seen = 0;
+    while (m.read_u32(at) as i32) >= 0 {
+        let course = m.read_u32(at);
+        let n = m.read_u32(at + 4);
+        let names: Vec<String> = (0..n).map(|k| {
+            let i = m.read_u32(at + 8 + 4 * k);
+            let p = m.read_u32(0x337cb8 + 4 * i);
+            cstr(m, p)
+        }).collect();
+        assert_eq!(names, tricky_game::courses::skies(course).iter().map(|s| s.to_string()).collect::<Vec<_>>(), "course {course}");
+        at += 48;
+        seen += 1;
+    }
+    assert_eq!(seen, 12);
+    assert!(tricky_game::courses::skies(12).is_empty());
+}

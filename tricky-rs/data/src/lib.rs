@@ -3,6 +3,7 @@
 //! keyframed object curves. `tricky-game` builds on it; the Bevy app `tricky-rs` re-exports it.
 
 pub mod afl;
+pub mod adl;
 pub mod aip;
 pub mod anim;
 pub mod audiocfg;
@@ -17,6 +18,7 @@ pub mod intro;
 pub mod level;
 pub mod loc;
 pub mod logic;
+pub mod ltg;
 pub mod mpf;
 pub mod music;
 pub mod sfn;

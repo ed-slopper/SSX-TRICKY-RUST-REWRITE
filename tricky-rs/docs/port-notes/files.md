@@ -231,3 +231,20 @@ there (no rewind); a level is the value / 100 when 0..200 (the duck 0..100), els
   corners (the tree's +0x10, 8 vectors from 0x3439d0) × the next level's half-size, an occupancy byte saying which
   exist (`SphTree_SphereRecurse` 0x23a728). The loaded tree is 0x150 bytes (header copy at +0xd0, its +0 the tree's
   running index).
+
+## World grid, audio links, skies (row E3e; `tricky_data::ltg`, `tricky_data::adl`, `courses::skies`; checked: `tricky-game/tests/ltg.rs`, `tests/courses.rs`)
+
+- `.ltg` (`cCourseResolve_Common::ResolveTGroupHeader` 0x252470 and on; their debug prints name the fields):
+  version (3 bytes) and endianness, the world's box (min, max, centre), the TGroup size (10000 cm), the grid's
+  width × height in TGroups, used / empty, the INode size (2500), INodes across (4) and in a TGroup (16), the
+  TGroup table's offset (a word per square, row by row, 0 empty) and where the TGroups start. A TGroup: its box,
+  counts (patches, instances, splines, lights inside, lights crossing, particle instances, two more, elements), the
+  offsets of its index lists into the `.pbd` (resolved to pointers by `Course_GetPatch` / `GetInstance` /
+  `GetSpline` / `GetLight` / `GetParticleInstance`), and 16 INodes (0x4c bytes at +0x54: box, seven counts, six
+  list offsets into the TGroup's lists). `WorldGrid_CellAt` 0x260ba8 maps INode coordinates to the INode.
+- `.adl`: a zero byte, 1.0, a count, then (instance name hash, zone offset) pairs (`AudioTGroups_Bind` 0x22a5f0:
+  the hash becomes the instance, whose +0xf4 points back). A zone: a word, a count, shapes (type 0: 7 words, 1 and
+  2: 12, 3: 6; 0/2/3 spheres at words 2..5, 1 a box with half-sizes 5..7 along direction 8..10).
+  `AudioTGroup_GetBounds` 0x22aaa0 boxes them (moved by the instance's position) for the audio grid.
+- Skies: `Course_LoadSkies` 0x185b18 loads `data/models/<course>_sky.pbd` (+ `.ssh`), one per course.
+- `.map` files are not read by the game (no such name in the ELF); they are the tools' instance names.

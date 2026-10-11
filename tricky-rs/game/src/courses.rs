@@ -152,3 +152,14 @@ pub fn course_unlocked(u: &Unlocks, mode: u32, course: u32, cheat: bool) -> bool
         u.bits & (1 << (course & 31)) & mask != 0
     }
 }
+
+/// `Course_LoadSkies` 0x185b18: the skies a course loads (the table 0x3880c0: course, count, names from 0x337cb8),
+/// each as `data/models/<name>.pbd` with its textures `data/models/<name>.ssh` (`Course_LoadSky` 0x185c28, up to ten
+/// layers). One each on the disc.
+pub fn skies(course: u32) -> &'static [&'static str] {
+    const SKIES: [&str; 12] = ["gari_sky", "snow_sky", "elysium_sky", "mesa_sky", "merquer_sky", "aloha_sky", "pipe_sky", "untrack_sky", "megaple_sky", "bigair_sky", "trick_sky", "alaska_sky"];
+    match course {
+        0..=11 => std::slice::from_ref(&SKIES[course as usize]),
+        _ => &[],
+    }
+}
