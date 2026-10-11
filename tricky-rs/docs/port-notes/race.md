@@ -84,3 +84,16 @@ Part of the port notes (index: [README.md](README.md)); units and wording as des
   rival (scr<Riv>_CON_n), slots 2–5 scrFL_Common1..4; n random of 4 (Psymon rival 1..3, Psymon player 1/3, Elise
   player 1..3). All scene spots are relative to Mdl_StageArea_Finish_0 (frame 2). Clips loop. The rival scene
   plays first; the rival is the rider whose feeling toward the player is strongest (> 2).
+
+## Rank catch-up: the unchecked list walk
+
+Proven on the PS2: `Race_UpdatePlacingsAndRubberBand` 0x115100 runs every 6 ticks (`race+0x18 % 6`), over
+`race+0x88` riders, with `race+0x7c` players (rider+0x418 < 0 marks a human, sorted by `0x7fffffff - x`).
+
+Lead from another version (Xbox `default.xbe`, not `SLUS_203.26`; from the OpenTricky project's notes,
+`port/tools/fork/fix_riderlist.py`, Xbox addresses there): the Xbox function sorts the riders, splits them into a
+player list (4 slots) and an AI list (6 slots) on its stack, then walks the AI list up to the AI count fixed when
+the race was built and gives each AI a target from the player list, with no check of how many entries either
+list really got. When the counts disagree, it reads stack leftovers as a rider index (a crash was seen once on
+the Xbox). Not yet checked on the PS2: whoever ports this function should read whether 0x115100 walks its lists
+the same unchecked way, and port that 1:1 (the bug included), noting it here.
