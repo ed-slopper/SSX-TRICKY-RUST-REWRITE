@@ -485,3 +485,16 @@ new state's enter routine with a1 = the old value. Each routine gets its object 
 0x15 (objects +0x610 … +0x810, see `states.rs`); entering 0x16 (reset) zeroes the reset timer (manager +0x818)
 inline. Checked for every old and new value 0..0x20 of both.
 
+The state routines (row G18a): `states::run_routine` has 28 of the small enter/exit routines (field resets, the
+boost off, clips, the sound flag at rider+0x5ae4 cleared through 0x218b68 → 0x11f440, which also sets +0x5af0 = 5;
+`ChangeFakieControl_Enter` flips the stance +0x1b4, turns the board π about its up, sets the animation's facing
++0x46e0 to the stance's 0 or π wrapped, negates steer +0x214 and lean +0x244, and plays clip 0x200 (0x1ff for an
+alpine board in its natural stance); `FinishLineControl_Enter` marks a crossing at 277.77777 cm/s or slower).
+`SpinControl_Enter` (`spin::spin_enter`): rates × 1.6 when rider+0x138 > 0, × 0.8 against the natural stance
+(stats+0x40); bands (rate, 0.3·rate, |rate| up to 1.3962634; swapped for a negative rate); mode 0 if the layer-0
+clip type is 0xb, else 2; the landing alignment `SpinControl_CalcLandingAlign` 0x11db00 (`spin::landing_align`:
+the turn conj(q)·target, the target lying on the slope normal (the slope with z × 1.5) with the board's forward
+kept; off alpine boards the target without the forward turn too, the smaller wrapped angle wins; none over slope
+kinds 6 and 10), dropped when bigger than 2.0943952 × the normal's z (at most 1.3962634) on the ground or with the
+board's up above level. Checked: 20,000 routine runs and 40,000 spin entries against the original.
+

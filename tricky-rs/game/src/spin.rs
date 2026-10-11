@@ -35,6 +35,8 @@ pub struct SpinObj {
     /// +0x34: angle still to turn towards the landing slope, about the axis at +0x40
     pub align: f32,
     pub align_axis: [f32; 3],
+    /// +0x4c: the axis's fourth lane (`SpinControl_CalcLandingAlign` writes all four)
+    pub align_w: f32,
     /// +0x50 / +0x54: the largest error the auto-complete may still use (spin, flip)
     pub emax_spin: f32,
     pub emax_flip: f32,
@@ -538,4 +540,177 @@ fn reset(pad: u32, mut calls: Vec<SpinCall>) -> Vec<SpinCall> {
         calls.push(SpinCall::Reset(0x42ca_ebe0));
     }
     calls
+}
+
+/// What `SpinControl_CalcLandingAlign` reads of the rider.
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct AlignRider {
+    /// +0x57f0: the kind of slope below (6 and 10: no alignment)
+    pub slope_kind: u32,
+    /// +0x57e0: the landing slope (its z, +0x57e8, is weighted ×1.5)
+    pub slope: V4,
+    /// +0x180: the board's forward; +0x170: the attitude quaternion
+    pub fwd: V4,
+    pub quat: V4,
+    /// +0x420: the board class (2 alpine: only the forward-keeping alignment)
+    pub class: u32,
+}
+
+/// The angle and axis of a turn quaternion `d` (w first): 2·(π/2 − asin |w|), the half sign of w, and the vector
+/// part over sin(angle · ±½) (all four lanes, w 0).
+fn turn_of(d: V4) -> (f32, V4) {
+    let half_pi = f32::from_bits(0x3fc9_0fdb);
+    let (a, half) = if 0.0 < d[0] {
+        let x = if 1.0 < d[0] { 1.0 } else { d[0] };
+        (crate::math::asin(x), 0.5)
+    } else {
+        let x = if d[0] < -1.0 { 1.0 } else { -d[0] };
+        (crate::math::asin(x), -0.5)
+    };
+    let angle = (half_pi - a) + (half_pi - a);
+    let s = crate::math::sin(angle * half);
+    let k = 1.0 / s;
+    let v = [d[1], d[2], d[3], 0.0];
+    (angle, [v[0] * k, v[1] * k, v[2] * k, v[3] * k])
+}
+
+/// `SpinControl_CalcLandingAlign` 0x11db00: the turn (angle, axis) that takes the rider's attitude to one lying on
+/// the landing slope. None over slope kinds 6 and 10 (angle 0, axis kept). The slope's normal n is the slope with
+/// its z × 1.5, made unit; the target is the identity turned z → n, then turned from its own forward to the board's
+/// forward flattened onto the slope (by the angle asin(min(|F × G|, 0.99999)), or π less it when F · G < 0; when
+/// |F × G| ≤ 0.0001, half a turn about n if F · G < 0, else none); the turn is conj(q) · target. Off an alpine
+/// board the target without the forward kept is tried as well (turned by that angle − π, or half a turn about n
+/// when F · G > 0) and taken when its angle, wrapped to −π..π, is smaller.
+pub fn landing_align(r: &AlignRider, axis: &mut V4, angle: &mut f32) {
+    if r.slope_kind == 6 || r.slope_kind == 10 {
+        *angle = 0.0;
+        return;
+    }
+    use crate::jump::{dot, normalize, scale, sub};
+    use crate::orient::{quat_multiply, rotate_vec_to_vec, turn_axis};
+    let lifted = [r.slope[0] + 0.0, r.slope[1] + 0.0, r.slope[2] + r.slope[2] * 0.5, r.slope[3] + 0.0];
+    let n = normalize(lifted);
+    let q0 = rotate_vec_to_vec([1.0, 0.0, 0.0, 0.0], [0.0, 0.0, 1.0, 0.0], n);
+    let f = turn_axis(q0, [0.0, 1.0, 0.0]);
+    let g = normalize(sub(r.fwd, scale(n, dot(r.fwd, n))));
+    let c = crate::probe::cross(f, g);
+    let len = dot(c, c).sqrt();
+    let fg = dot(f, g);
+    let mut q1 = q0;
+    let mut a = [0.0f32; 4];
+    let mut theta = 0.0f32;
+    let half_pi = f32::from_bits(0x3fc9_0fdb);
+    let pi = f32::from_bits(0x4049_0fdb);
+    let far = 0.0001 < len;
+    if far {
+        let k = 1.0 / len;
+        a = [c[0] * k, c[1] * k, c[2] * k, c[3] * k];
+        let s = if 0.99999 < len { 0.99999 } else { len };
+        theta = if fg < 0.0 { pi - crate::math::asin(s) } else { crate::math::asin(s) };
+        let (sn, cs) = crate::math::sin_cos(theta * 0.5);
+        q1 = quat_multiply([cs, sn * a[0], sn * a[1], sn * a[2]], q1);
+    } else if fg < 0.0 {
+        let (sn, cs) = crate::math::sin_cos(half_pi);
+        q1 = quat_multiply([cs, sn * n[0], sn * n[1], sn * n[2]], q1);
+    }
+    let conj = [r.quat[0], -r.quat[1], -r.quat[2], -r.quat[3]];
+    let (ang1, ax1) = turn_of(quat_multiply(conj, q1));
+    *angle = ang1;
+    *axis = ax1;
+    if r.class == 2 {
+        return;
+    }
+    let mut q2 = q0;
+    if far {
+        let (sn, cs) = crate::math::sin_cos((theta - pi) * 0.5);
+        q2 = quat_multiply([cs, sn * a[0], sn * a[1], sn * a[2]], q2);
+    } else if 0.0 < fg {
+        let (sn, cs) = crate::math::sin_cos(half_pi);
+        q2 = quat_multiply([cs, sn * n[0], sn * n[1], sn * n[2]], q2);
+    }
+    let (ang2, ax2) = turn_of(quat_multiply(conj, q2));
+    let wrapped = |x: f32| (x - floor(x * 0.159_154_94 + 0.5) * TAU).abs();
+    if wrapped(ang2) < wrapped(*angle) {
+        *angle = ang2;
+        *axis = ax2;
+    }
+}
+
+/// What `SpinControl_Enter` reads and writes of the rider besides [`AlignRider`].
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct SpinEnterRider {
+    /// +0x138 (over 0: the rates × 1.6)
+    pub x138: f32,
+    /// +0x1b4 riding switch, stats+0x40 (the rider's natural stance): rates × 0.8 when they differ
+    pub switch: u32,
+    pub stance: u32,
+    /// +0x1dc, +0x1a8 the board's up z
+    pub kind: u32,
+    pub up_z: f32,
+    /// +0x274 / +0x278 (cleared), +0x218 (4), +0x21c, +0x268, +0x26c, +0x270 (cleared)
+    pub wind_spin: f32,
+    pub wind_flip: f32,
+    pub x218: f32,
+    pub x21c: f32,
+    pub x268: [f32; 3],
+}
+
+/// A band from a rate: (upper, lower, floor) as `SpinControl_Enter` sets them (+0x14.. for the spin, +0x20.. for
+/// the flip): the rate and 0.3 of it, the floor its size up to 1.3962634 (80°).
+fn band(w: f32) -> (f32, f32, f32) {
+    let max = f32::from_bits(0x3fb2_b8c2);
+    if 0.0 < w {
+        (w, w * 0.3, if max <= w { max } else { w })
+    } else if w < 0.0 {
+        (w * 0.3, w, if -w < max { -w } else { max })
+    } else {
+        (0.0, 0.0, 0.0)
+    }
+}
+
+/// `SpinControl_Enter` 0x100598: the rates scaled (× 1.6 when rider+0x138 > 0, × 0.8 riding against the natural
+/// stance), the bands from them, the object cleared, mode 0 if the clip on layer 0 is of type 0xb (else 2), the
+/// landing alignment ([`landing_align`]) dropped when larger than the slope allows (on the ground kind 0, or with
+/// the board's up above level: 2.0943952 × the slope normal's z, at most 1.3962634), and the rider's fields reset.
+pub fn spin_enter(st: &mut SpinObj, r: &mut SpinEnterRider, a: &AlignRider, clip_type: u32) {
+    if 0.0 < r.x138 {
+        st.w_spin *= 1.6;
+        st.w_flip *= 1.6;
+    }
+    if r.switch != r.stance {
+        st.w_spin *= 0.8;
+        st.w_flip *= 0.8;
+    }
+    (st.spin_hi, st.spin_lo, st.spin_floor) = band(st.w_spin);
+    (st.flip_hi, st.flip_lo, st.flip_floor) = band(st.w_flip);
+    st.phase = 0.0;
+    st.owed = 0.0;
+    st.x5c = 0;
+    st.x64 = 0;
+    st.x60 = 0;
+    r.wind_flip = 0.0;
+    r.wind_spin = 0.0;
+    st.mode = if clip_type == 0xb { 0 } else { 2 };
+    let mut axis = [st.align_axis[0], st.align_axis[1], st.align_axis[2], st.align_w];
+    landing_align(a, &mut axis, &mut st.align);
+    st.align_axis = [axis[0], axis[1], axis[2]];
+    st.align_w = axis[3];
+    if r.kind == 0 || 0.0 < r.up_z {
+        let lifted = [a.slope[0] + 0.0, a.slope[1] + 0.0, a.slope[2] + a.slope[2] * 0.5, a.slope[3] + 0.0];
+        let nz = crate::jump::normalize(lifted)[2] * f32::from_bits(0x4006_0a92);
+        let max = f32::from_bits(0x3fb2_b8c2);
+        let big = st.align.abs();
+        if nz < max {
+            if max < big {
+                st.align = 0.0;
+            }
+        } else if nz < big {
+            st.align = 0.0;
+        }
+    }
+    r.x21c = 0.0;
+    r.x218 = 4.0;
+    r.x268 = [0.0; 3];
+    st.emax_flip = 0.0;
+    st.emax_spin = 0.0;
 }
