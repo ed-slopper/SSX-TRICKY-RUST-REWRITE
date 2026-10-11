@@ -76,7 +76,7 @@ state machine and the renderer are ours. Nothing has been checked against the or
 |---|---|---|---|---|---|
 | G1 | Boarder state machine: every state (0x00–0x14) and motion (0–6), their enter/update/exit, `cBoarder` vtable, in the original's order per tick | unowned | F1 | | [repo] Many states ported one by one; the dispatch is ours |
 | G1a | Prewind, jump, takeoff, spin and flip control (`PrewindState_Update` 0x1050e8, `Jump_ApplyImpulse` 0x1284e0, `Takeoff_SetSpinRates` 0x126e30, `SpinState_Update` 0x100908, `SpinState_StartFromStick` 0x102158) checked | any | F4a | | [repo] Ported, unchecked Split: G1a1, G1a2 |
-| G1a5b | The rest of G1a5: `Rider::step` (`tricky-rs/game/src/rider.rs`) calls the exact prewind, jump, take-off, spin start and spin (`boarder::prewind_update`, `jump::jump_impulse`, `jump::takeoff_spin_rates`, `jump::spin_start_from_stick`, `spin::spin_update`, all checked) on the rider's own fields (cm, z up), replacing `Rider::air_rotation` and the hand-written prewind and jump | any | G1a5a | | Split of G1a5 (wiring; needs a play test) |
+| G1a5b | The rest of G1a5: `Rider::step` (`tricky-rs/game/src/rider.rs`) calls the exact prewind, jump, take-off, spin start and spin (`boarder::prewind_update`, `jump::jump_impulse`, `jump::takeoff_spin_rates`, `jump::spin_start_from_stick`, `spin::spin_update`, all checked) on the rider's own fields (cm, z up), replacing `Rider::air_rotation` and the hand-written prewind and jump | any | G1a5a | ed-slopper/puffin (2026-10-11) | Split of G1a5 (wiring; needs a play test) |
 | G1b | Rails checked: `RailSlideMotion_Update` 0x10b0d0, `RailSlideControl_Update` 0x1073e0, `Rail_TryCapture` 0x125cb8 | any | F4a | | [repo] README: rail speeds "still mine"; find what isn't ported |
 | G1c | Finish, reset and gate states: `FinishState_Update` 0x106668, `ResetState_Update` 0x106a90, `Boarder_RequestReset` 0x118f10, `GateAnticipate_*` | any | F4a | | [repo] Split: G1c1, G1c2 |
 | G1c3 | The rest of G1c: `Gate2BaseControl_Update` 0x105dc0, `ResetState_Update` 0x106a90, `ResetState_PlaceRider` 0x119220, `Boarder_RequestReset` 0x118f10 checked | any | F4a | | Split of G1c |
@@ -366,3 +366,5 @@ matches the original.
 - 2026-10-11 trailrig/heron: claim G20b.
 - 2026-10-11 trailrig/heron: G20b done (probe offset exact: body scale + lean record, checked in the runner); added G20b2 (gap of G20b), noted the +0x2c0 half in G20c.
 - 2026-10-11 trailrig/heron: claim G20c.
+
+- 2026-10-11 ed-slopper/puffin: claim G1a5b.
