@@ -84,7 +84,6 @@ state machine and the renderer are ours. Nothing has been checked against the or
 | G1a5 | The rest of G1a: `SpinState_Update` 0x100908 checked; `Rider::step` calls the exact prewind, jump, take-off and spin start (G1a1–G1a4) | any | G1a4 | | Split of G1a |
 | G1b | Rails checked: `RailSlideMotion_Update` 0x10b0d0, `RailSlideControl_Update` 0x1073e0, `Rail_TryCapture` 0x125cb8 | any | F4a | | [repo] README: rail speeds "still mine"; find what isn't ported |
 | G1c | Finish, reset and gate states: `FinishState_Update` 0x106668, `ResetState_Update` 0x106a90, `Boarder_RequestReset` 0x118f10, `GateAnticipate_*` | any | F4a | | [repo] Split: G1c1, G1c2 |
-| G1c1 | `FinishState_Update` 0x106668 with `Boarder_SetBrakeCrouchInput` 0x126b38 and `Boarder_SetBrakeTarget` 0x126c78 ported exactly into `tricky-game` and checked in the function runner | any | F4a | trailrig/heron (2026-10-11) | Split of G1c |
 | G1c2 | The rest of G1c: `ResetState_Update` 0x106a90, `Boarder_RequestReset` 0x118f10, `GateAnticipate_*` checked | any | F4a | | Split of G1c |
 | G2 | Tricks and scoring checked: `Score_*` 0x155410–0x157490, `Score_BuildTrickId` 0x157490, `Score_FormatTrickName` 0x1551c0, repeats, chains, multipliers, uber timer, TRICKY | any | F4a | | [repo] Ported in `rider.rs`/`trickdata.rs` Split: G2a, G2b |
 | G2b | The rest of G2: `Score_LandTrick` 0x1569b0, `Score_StartTrickChain` 0x156618, `Score_BankPoints` 0x155aa8, `Score_BuildTrickId` 0x157490, `Score_FormatTrickName` 0x1551c0, repeats, chains, uber timer, TRICKY checked; `Rider::step` scores through `score.rs` | any | G2a | | Split of G2 |
@@ -225,6 +224,7 @@ matches the original.
 | G1a4 | `PrewindState_Update` 0x1050e8 ported exactly (`boarder::prewind_update`, on the checked G1d/G1e helpers) and checked in the function runner on 20,000 random ticks with the original's helpers running: every field and every call (boost sounds, clips, states, reset) bit for bit (`tests/prewind.rs`) | P2 | trailrig/heron | 2026-10-11 | 6b74122 |
 | E4c | Rider textures from the player's disc: the exe's path tables (0x341a38 suit/boots, 0x341ce8 head/helm, 0x341d50 boards) as `ssh::rider_texture_path`, read by the app with `TRICKY_DISC` (outfit 1 and board 1 as the exports had them) | P1 | ed-slopper/puffin | 2026-10-11 | 9898b17 |
 | E5a | Text from the disc: `tricky-data/src/loc.rs` reads `american.loc` as `Loc_GetString` 0x2c5160 / `Loc_MapId` 0x2c50b0 do (3,774 strings); `CONSTANT.LOC` (unused by the game) names every string id | P1 | ed-slopper/puffin | 2026-10-11 | c2040d5 |
+| G1c1 | `FinishState_Update` 0x106668, `Boarder_SetBrakeCrouchInput` 0x126b38 and `Boarder_SetBrakeTarget` 0x126c78 ported exactly (`tricky-rs/game/src/finish.rs`) and checked in the function runner (`tests/finish.rs`: 20,000 random finish ticks over every phase, mode and outcome, 20,000 brake/crouch inputs): every field and call bit for bit; `Boarder_StartCelebrate` 0x11f3b8 and `Boarder_StartDisappointed` 0x11f3f8 named | P2 | trailrig/heron | 2026-10-11 | HASH |
 
 ## Changes to the board
 
@@ -317,3 +317,4 @@ matches the original.
 - 2026-10-11 ed-slopper/puffin: split E5 into E5a-E5e; claim E5a.
 - 2026-10-11 ed-slopper/puffin: E5a done; added E5a2 (gap of E5a).
 - 2026-10-11 ed-slopper/puffin: claim E5d.
+- 2026-10-11 trailrig/heron: G1c1 done (finish state and brake helpers checked).

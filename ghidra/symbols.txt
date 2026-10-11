@@ -5294,3 +5294,5 @@ G 157ed8 AnimCurve_Eval
 G 158030 AnimCurve_EvalPiece
 G 2c2318 Shape_Unpack
 G 2c2088 Shape_UnpackBlocks
+G 11f3b8 Boarder_StartCelebrate
+G 11f3f8 Boarder_StartDisappointed

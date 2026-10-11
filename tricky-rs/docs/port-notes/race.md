@@ -97,3 +97,17 @@ the race was built and gives each AI a target from the player list, with no chec
 list really got. When the counts disagree, it reads stack leftovers as a rider index (a crash was seen once on
 the Xbox). Not yet checked on the PS2: whoever ports this function should read whether 0x115100 walks its lists
 the same unchecked way, and port that 1:1 (the bug included), noting it here.
+
+## The finish state (proven, G1c1; exact in `tricky-rs/game/src/finish.rs`)
+
+- `FinishState_Update` 0x106668 counts ticks (state+0xc; "early" while under 301). Phase 0: brake/crouch input (0, 1)
+  until slow (|v| < 277.78 cm/s), fully braked, or 301 ticks; steer target 0; phase 1. Phase 1: crouch, steer and brake
+  targets 0, velocity ×0.93 a tick until brake and steer are 0 (or 301 ticks); clip 0x2ee, stop, phase 2. Phase 2:
+  when the clip ends (or 301 ticks): celebrate (`Boarder_StartCelebrate` 0x11f3b8: rider+0x2c = race tick, +0x34 = 0)
+  or be disappointed (`Boarder_StartDisappointed` 0x11f3f8: rider+0x30 = race tick): circuit modes 3/5 by medal (3 =
+  none: disappointed); mode 7 first place under the event's target (0x32de98); mode 6 by gApp+0x730 → +0x34 → +100;
+  else the front half of the field (place < (riders + 1)/2). Clip 0x2ef, the finish pose, motion 4, phase 3; phase 4
+  once layer 1 plays a type-8 clip.
+- `Boarder_SetBrakeTarget` 0x126c78, `Boarder_SetBrakeCrouchInput` 0x126b38: see `finish.rs` (its first argument goes
+  to the crouch target, the second to the brake target, as the machine code passes them).
+

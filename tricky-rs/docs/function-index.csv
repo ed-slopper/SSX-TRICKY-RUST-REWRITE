@@ -67,7 +67,7 @@ address,size,name,system,status
 0x1065c8,36,FinishLineControl_IsDone,boarder?,not started
 0x1065f0,16,FUN_001065f0,boarder?,not started
 0x106600,100,FinishLineControl_Enter,boarder?,not started
-0x106668,916,FinishState_Update,boarder,ported
+0x106668,916,FinishState_Update,boarder,checked
 0x106a00,40,FinishLineControl_SaveSnapshot,save,not started
 0x106a28,20,FinishLineControl_LoadSnapshot,ai?,not started
 0x106a48,60,ResetWaitControl_Exit,game?,not started
@@ -320,8 +320,8 @@ address,size,name,system,status
 0x11f118,388,FUN_0011f118,frontend?,not started
 0x11f2a0,176,FUN_0011f2a0,frontend?,not started
 0x11f350,104,FUN_0011f350,frontend?,not started
-0x11f3b8,60,FUN_0011f3b8,boarder?,not started
-0x11f3f8,56,FUN_0011f3f8,boarder?,not started
+0x11f3b8,60,Boarder_StartCelebrate,boarder?,checked
+0x11f3f8,56,Boarder_StartDisappointed,boarder?,checked
 0x11f430,16,Boarder_IsTricky,boarder,checked
 0x11f440,36,FUN_0011f440,audio?,not started
 0x11f468,28,FUN_0011f468,audio?,not started
@@ -453,9 +453,9 @@ address,size,name,system,status
 0x126918,44,Vec4_ScaleCopy5,boarder?,not started
 0x126948,380,Boarder_SetSteerTarget,boarder,checked
 0x126ac8,112,Boarder_SetSteerTargetUnscaled,boarder,not started
-0x126b38,196,Boarder_SetBrakeCrouchInput,boarder,not started
+0x126b38,196,Boarder_SetBrakeCrouchInput,boarder,checked
 0x126c00,120,Boarder_SetCrouchTarget,boarder,checked
-0x126c78,440,Boarder_SetBrakeTarget,boarder,not started
+0x126c78,440,Boarder_SetBrakeTarget,boarder,checked
 0x126e30,400,Takeoff_SetSpinRates,boarder,checked
 0x126fc0,724,FUN_00126fc0,boarder?,not started
 0x127298,76,Boarder_PlayTakeoffClip,boarder,not started
