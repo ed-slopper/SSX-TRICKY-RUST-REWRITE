@@ -58,7 +58,7 @@ state machine and the renderer are ours. Nothing has been checked against the or
 | E9b2 | Run the script threads in the app (`tricky_game::script` on `tricky_data::ssf` instead of `logic.rs`'s static walk of SSFLogic.json): the world's node list order (`BxList_Add` 0x17d4e8 links new nodes at the head; the update loop's order to confirm), `World_DeleteScriptObject` 0x13bbc0, the starters (area wake, contact, controller goal, the engine's RaceMode / StartCountDown calls) | unowned | E9b, E7 | | Gap of E9b |
 | E9d | World ops 1 (camera node), 2 (effects, spline riders), 8 (sound), 13 (reset), 23 (camera shake `Cam_Shake` 0x177758), 24 (teleport), 25 (rail switch `RailMan_SetRail` 0x149030) | unowned | E9b | | Gap of E9a |
 | E9g2 | `cMeshAnimNode` (20, the falling pieces of broken objects): ctor 0x1466b8 (per-piece matrices from the model's hierarchy, the starting velocity from p6..p8 or the contact, ×p9), Update 0x147230 (spin about each piece's axis, velocity, gravity p4 × −16.333334), Kill; and the fence's mesh bending (`FenceNode_InitShape` 0x143ff8, `UpdateShape` 0x143cd0) | unowned | E9g | | Gap of E9g |
-| E9i | Texture and object animation controllers: `cUVScrollNode` (10), `cTexFlipNode` (11), `cFlagNode` (13), `cUVScrollTexFlipNode` (19), `cAnimObjectNode` (0x100), `cAnimDeltaNode` (0x101), `AnimComboNode_Init` (0x102), the unnamed node 0x19a5a8 (0x103) | unowned | E9b | | Gap of E9a. G7h checks five of them |
+| E9i | Texture and object animation controllers: `cUVScrollNode` (10), `cTexFlipNode` (11), `cFlagNode` (13), `cUVScrollTexFlipNode` (19), `cAnimObjectNode` (0x100), `cAnimDeltaNode` (0x101), `AnimComboNode_Init` (0x102), the unnamed node 0x19a5a8 (0x103) | unowned | E9b | ed-slopper/puffin (2026-10-11) | Gap of E9a. G7h checks five of them |
 | E9j | The rest: `cCrowdBoxNode` (17), `cParticleNode` (22), `cMovieNode` (23) | unowned | E9b | | Gap of E9a |
 | E10 | Input: pad reading, stick shaping and dead zones, button bits (the chord 0x600), vibration, `cCheatCodes::Update` 0x26CF60 | unowned | E1 | | [repo] findings.md |
 | E11 | Camera: named cameras `cBxCamera_EvalNamedCam` 0x174888 (ported), director scripts `cBxCamera_RunDirectorScript`, replay and finish cameras, camera collision | any | | | [repo] Chase cam ported in `rider.rs`; free camera is ours (keep, tag) |
@@ -483,3 +483,4 @@ matches the original.
 - 2026-10-11 ed-slopper/puffin: E9h done (roller body left to E8c).
 - 2026-10-11 ed-slopper/puffin: claim E9g.
 - 2026-10-11 ed-slopper/puffin: E9g done; added E9g2 (mesh-anim pieces, fence bending).
+- 2026-10-11 ed-slopper/puffin: claim E9i.
