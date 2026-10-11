@@ -3404,3 +3404,84 @@ G 192f30 Replay_WriteNodeRef
 G 192f78 Replay_WriteLink
 G 193020 Replay_WriteOffset
 G 192fe8 Replay_WriteOffset2
+G 117d20 Boarder_SaveSnapshot
+G 160058 AnimCtl_SaveSnapshot
+G 123f08 AirPredict_SaveSnapshot
+G 157980 Score_SaveSnapshot
+G 109668 AirMotion_SaveSnapshot
+G 10aed8 GroundMotion_SaveSnapshot
+G 10c060 RailSlideMotion_SaveSnapshot
+G 1101c0 WipeoutMotion_SaveSnapshot
+G 110770 WipeOutRecoverMotion_SaveSnapshot
+G 1043b8 BumpControl_SaveSnapshot
+G 103e78 CruiseControl_SaveSnapshot
+G 106a00 FinishLineControl_SaveSnapshot
+G 1061e8 GateAnticipateControl_SaveSnapshot
+G 105030 LandNormalControl_SaveSnapshot
+G 100558 NaturalAirControl_SaveSnapshot
+G 105ad0 PrewindControl_SaveSnapshot
+G 108050 RailSlideControl_SaveSnapshot
+G 102dc0 SpinControl_SaveSnapshot
+G 106cd8 ResetWaitControl_SaveSnapshot
+G 198688 AIP_GetPathIndex
+G 1986d8 AIP_GetLineIndex
+G 100580 NaturalAirControl_LoadSnapshot
+G 102de8 SpinControl_LoadSnapshot
+G 103ea0 CruiseControl_LoadSnapshot
+G 1043e0 BumpControl_LoadSnapshot
+G 105058 LandNormalControl_LoadSnapshot
+G 105af8 PrewindControl_LoadSnapshot
+G 106210 GateAnticipateControl_LoadSnapshot
+G 106a28 FinishLineControl_LoadSnapshot
+G 106d00 ResetWaitControl_LoadSnapshot
+G 108078 RailSlideControl_LoadSnapshot
+G 109690 AirMotion_LoadSnapshot
+G 10af00 GroundMotion_LoadSnapshot
+G 10c088 RailSlideMotion_LoadSnapshot
+G 110218 WipeoutMotion_LoadSnapshot
+G 110798 WipeOutRecoverMotion_LoadSnapshot
+G 117ec0 Boarder_LoadSnapshot
+G 123f30 AirPredict_LoadSnapshot
+G 1579a8 Score_LoadSnapshot
+G 1600d0 AnimCtl_LoadSnapshot
+G 192ca0 Replay_Read
+G 192ce8 Replay_Peek
+G 192d20 Replay_PeekNodeType
+G 192df0 Replay_ReadNodeRef
+G 192e40 Replay_ReadLink
+G 192ec0 Replay_ReadOffset
+G 192ef8 Replay_ReadOffset2
+G 192b38 Replay_AllocStream
+G 192ba8 Replay_FreeStream
+G 192bf0 Replay_RewindRead
+G 192c00 Replay_ResetWrite
+G 18f8a8 Replay_RestoreNode
+F 146258 cUVScrollTexFlipNode cUVScrollTexFlipNode
+F 143040 cTexFlipNode cTexFlipNode
+F 140a98 cLapBoostNode cLapBoostNode
+F 141be0 cZBoostNode cZBoostNode
+F 1412e8 cRandomBoostNode cRandomBoostNode
+F 145528 cCrackedNode cCrackedNode
+F 143870 cFenceNode cFenceNode
+F 140590 cBoostNode cBoostNode
+F 1401a0 cRailNode cRailNode
+F 1420b8 cUVScrollNode cUVScrollNode
+F 13fe50 cTimerNode cTimerNode
+F 13fc58 cDebounceNode cDebounceNode
+F 13dee8 cRollerNode cRollerNode
+F 13b128 cCounterNode cCounterNode
+F 19a0a8 cAnimComboNode cAnimComboNode
+F 148ad0 cMovieNode cMovieNode
+F 1479d0 cTrickTriggerNode cTrickTriggerNode
+F 148028 cParticleNode cParticleNode
+F 146e10 cMeshAnimNode cMeshAnimNode
+F 198b48 cAnimObjectNode cAnimObjectNode
+F 199d68 cAnimDeltaNode cAnimDeltaNode
+F 141800 cTubeEndBoostNode cTubeEndBoostNode
+F 147d78 cEmitterNode cEmitterNode
+F 13d2f8 cScriptNode cScriptNode
+F 1fa480 cSplinePathNode cSplinePathNode
+F 19a700 cAnimTexFlipNode cAnimTexFlipNode
+F 148e38 cRailManNode cRailManNode
+F 148680 cCollideEmitterNode cCollideEmitterNode
+F 13b078 cRestoreNode cRestoreNode

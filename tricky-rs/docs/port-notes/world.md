@@ -41,6 +41,17 @@ Part of the port notes (index: [README.md](README.md)); units and wording as des
 - vf21/vf22/vf23 are the controller messages (vf23(value, node, kind): set a parameter, e.g. a timer's seconds ×60;
   vf21/vf22 finish the node, then it deletes itself through vf0(3)); vf17 runs when a rider touches the object
   (30-tick cooldown on the animated ones). Not named yet.
+- Restoring (`Replay_RestoreNode` 0x18f8a8): reads the saved type id (`Replay_PeekNodeType`), allocates the node
+  under its tag (the class name without c/Node: "Timer", "UVScrollTexFlip", "Script" …) and runs that class's
+  stream constructor (`cTimerNode::cTimerNode` 0x13fe50 …), which reads the fields back with `Replay_Read` 0x192ca0.
+  Ids: 0 Roller, 2 Debounce, 6 Counter, 7 Boost, 8 Timer, 9 Rail, 0xa UVScroll, 0xb TexFlip, 0xc Fence, 0xd Flag,
+  0xe Cracked, 0xf LapBoost, 0x10 RandomBoost, 0x11 CrowdBox, 0x12 ZBoost, 0x13 UVScrollTexFlip, 0x14 MeshAnim,
+  0x15 TrickTrigger, 0x16 Particle, 0x17 Movie, 0x18 TubeEndBoost, 0x100 AnimObject, 0x101 AnimDelta,
+  0x102 AnimCombo, 0x103 AnimTexFlip, 0x3e9 Script, 0x3ea SplinePath, 0x3eb Emitter, 0x3ec CollideEmitter,
+  0x3ed RailMan, 0x3ee Restore.
+- The rider does the same without a factory: `Boarder_SaveSnapshot` 0x117d20 / `Boarder_LoadSnapshot` 0x117ec0
+  walk the anim controller, air prediction, score, then every motion and control object (`<Class>_SaveSnapshot`,
+  each followed in memory by its `<Class>_LoadSnapshot`).
 
 ## Object collision (`World_RayCast` 0x25aff8, `World_RayCastInstance` 0x25bf48, `World_QueryInstances` 0x25b878, `Boarder_InstanceBounce` 0x125a00)
 
