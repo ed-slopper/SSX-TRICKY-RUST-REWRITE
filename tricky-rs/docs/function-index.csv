@@ -487,7 +487,7 @@ address,size,name,system,status
 0x12c7e0,1256,Fx_Splash_EmitAtPoint,boarder,ported
 0x12ccc8,1088,Fx_LandingSplash,boarder,ported
 0x12d108,1464,Fx_BrakeFan_Update,boarder,ported
-0x12d6c0,464,FUN_0012d6c0,boarder?,not started
+0x12d6c0,464,Fx_Spray_ComputeParticle,boarder,not started
 0x12d890,1736,Fx_Spray_DrawParticles,boarder,not started
 0x12df58,116,Fx_BrakeSpray_Init,boarder,not started
 0x12dfd0,56,Fx_BrakeSpray_Reset,boarder,not started
@@ -559,7 +559,7 @@ address,size,name,system,status
 0x137dc0,924,AIComputer_RideNearRider,ai,not started
 0x138160,124,StaticInit_AIComputer,boarder?,not started
 0x1381e0,44,Vec4_ScaleCopy7,boarder?,not started
-0x138210,416,FUN_00138210,boarder?,not started
+0x138210,416,cComputer::cComputer,boarder?,not started
 0x1383b0,132,AIComputer_Reset,ai,not started
 0x138438,40,cComputer::vf8_138438,boarder?,not started
 0x1384b8,368,cComputer::GetControls,ai?,not started
@@ -1212,7 +1212,7 @@ address,size,name,system,status
 0x15f7c8,632,AnimCtl_BlendPose,animation,not started
 0x15fa40,196,AnimCtl_GetClipDisplacement,animation,not started
 0x15fb08,172,FUN_0015fb08,animation?,not started
-0x15fbb8,320,FUN_0015fbb8,animation?,not started
+0x15fbb8,320,RaceScene_SetClipMarker,animation?,not started
 0x15fcf8,216,AnimCtl_PlayClip,animation,ported
 0x15fdd0,16,AnimCtl_GetClip,animation,ported
 0x15fde0,144,FUN_0015fde0,animation?,ported
@@ -1667,7 +1667,7 @@ address,size,name,system,status
 0x17c530,64,cAppMan::cAppMan,game,not started
 0x17c570,328,App_Run,game,not started
 0x17c6b8,44,App_SetMode,game,not started
-0x17c6e8,536,FUN_0017c6e8,render?,not started
+0x17c6e8,536,App_MainLoop,game,not started
 0x17c908,144,FUN_0017c908,render?,not started
 0x17c998,64,FUN_0017c998,render?,not started
 0x17c9d8,360,FUN_0017c9d8,render?,not started
@@ -1817,7 +1817,7 @@ address,size,name,system,status
 0x183538,296,FUN_00183538,frontend?,not started
 0x183660,292,Overlay_DrawDontRemoveCard,frontend,not started
 0x183788,864,MemCardMsg_DrawOptions,save,not started
-0x183ae8,308,FUN_00183ae8,hud?,not started
+0x183ae8,308,MemCardMsg_DrawButtonPrompt,save,not started
 0x183c20,1672,MemCardMsg_Draw,save,not started
 0x1842a8,112,Loc_GetUnquotedString,game?,not started
 0x184318,136,StartScreenSingle_Create,frontend?,not started
@@ -2010,10 +2010,10 @@ address,size,name,system,status
 0x18c288,140,DebugMenu_BeginDraw,debugmenu?,not started
 0x18c318,104,DebugMenu_EndDraw,debugmenu?,not started
 0x18c380,932,DebugMenu_DrawBox,debugmenu?,not started
-0x18c728,680,FUN_0018c728,debugmenu?,not started
-0x18c9d0,680,FUN_0018c9d0,debugmenu?,not started
+0x18c728,680,DebugMenu_DrawUpArrow,debugmenu?,not started
+0x18c9d0,680,DebugMenu_DrawDownArrow,debugmenu?,not started
 0x18cc78,576,MenuItem_MeasureLabel,debugmenu?,not started
-0x18ceb8,524,FUN_0018ceb8,debugmenu?,not started
+0x18ceb8,524,DebugMenu_DrawItemBox,debugmenu?,not started
 0x18d0c8,436,MenuItem_DrawLabel,debugmenu?,not started
 0x18d280,224,cStringMenuItem::Measure,debugmenu,not started
 0x18d360,832,cStringMenuItem::Draw,debugmenu,not started
@@ -2225,7 +2225,7 @@ address,size,name,system,status
 0x1957b0,40,TextBox_Init,render,not started
 0x1957d8,620,TextBox_Draw,render,not started
 0x195a48,572,FUN_00195a48,hud?,not started
-0x195c88,340,FUN_00195c88,frontend?,not started
+0x195c88,340,TextBox_DrawCentered,render,not started
 0x195de0,260,TextBox_DrawVCentered,render,not started
 0x195ee8,264,TextBox_Reset,render,not started
 0x195ff0,52,TextBox_ClearText,render,not started
@@ -2328,7 +2328,7 @@ address,size,name,system,status
 0x19b730,404,Draw_TexturedRect,render,not started
 0x19b8c8,640,Sprite_DrawRotatedQuad,boarder?,not started
 0x19bb48,688,Sprite_DrawRotatedTexQuad,boarder?,not started
-0x19bdf8,404,FUN_0019bdf8,frontend?,not started
+0x19bdf8,404,Sprite_SubmitQuad,frontend?,not started
 0x19bf90,596,FUN_0019bf90,frontend?,not started
 0x19c1e8,292,Draw_Line,render,not started
 0x19c310,324,FUN_0019c310,,not started
@@ -2664,7 +2664,7 @@ address,size,name,system,status
 0x1c4270,44,PS2Draw_ClearBuckets,render?,not started
 0x1c42a0,156,PS2Draw_SortBuckets,render?,not started
 0x1c4340,292,FUN_001c4340,render?,not started
-0x1c4468,464,FUN_001c4468,render?,not started
+0x1c4468,464,PS2Draw_FindOrAddBatch,render?,not started
 0x1c4638,20,FUN_001c4638,render?,not started
 0x1c4650,1508,PS2Draw_SelectMatrixSet,render?,not started
 0x1c4c38,244,PS2Draw_SelectViewport,render?,not started
@@ -2912,7 +2912,7 @@ address,size,name,system,status
 0x1d4338,216,MockupEditor_Draw,frontend?,not started
 0x1d4410,296,FUN_001d4410,,not started
 0x1d4538,296,FUN_001d4538,,not started
-0x1d4660,304,FUN_001d4660,,not started
+0x1d4660,304,MockupEditor_AddItem,other,not started
 0x1d4790,44,MockupEditor_NextItem,game?,not started
 0x1d47c0,44,MockupEditor_PrevItem,game?,not started
 0x1d47f0,1260,MockupEditor_Update,game?,not started
@@ -2934,16 +2934,16 @@ address,size,name,system,status
 0x1d5570,544,FUN_001d5570,world?,not started
 0x1d5790,332,FUN_001d5790,world?,not started
 0x1d58e0,252,FUN_001d58e0,world?,not started
-0x1d59e0,16,FUN_001d59e0,world?,not started
-0x1d59f0,24,FUN_001d59f0,world?,not started
+0x1d59e0,16,ParticleSys_SetTime,world?,not started
+0x1d59f0,24,ParticleSys_AdvanceTime,world?,not started
 0x1d5a08,36,Rand_VuNext,world?,not started
 0x1d5a30,304,ParticleSys_StepEmitter,world?,not started
 0x1d5b60,10532,FUN_001d5b60,world?,not started
 0x1d8488,8,FUN_001d8488,ai?,not started
 0x1d8490,1592,ParticleSys_Create,world?,not started
-0x1d8ac8,52,FUN_001d8ac8,world?,not started
+0x1d8ac8,52,ParticleNode_SetLifetime,world?,not started
 0x1d8b00,28,FUN_001d8b00,world?,not started
-0x1d8b20,164,FUN_001d8b20,world?,not started
+0x1d8b20,164,ParticleNode_Update,world?,not started
 0x1d8bc8,384,ParticleSys_Draw,world?,not started
 0x1d8d48,56,ParticleNode_SaveState,save,not started
 0x1d8d80,64,ParticleSys_ReadReplay,ai?,not started
@@ -2953,7 +2953,7 @@ address,size,name,system,status
 0x1d8fd8,64,PoolList_Pop,world?,not started
 0x1d9018,68,PoolList_Push,world?,not started
 0x1d9060,168,ParticleGroup_Add,boarder?,not started
-0x1d9108,48,FUN_001d9108,boarder?,not started
+0x1d9108,48,ParticleGroup_Get,boarder?,not started
 0x1d9138,208,ParticleGroup_Remove,world?,not started
 0x1d9208,1272,FUN_001d9208,world?,not started
 0x1d9700,504,FUN_001d9700,render?,not started
@@ -3060,7 +3060,7 @@ address,size,name,system,status
 0x1e4060,64,FUN_001e4060,render?,not started
 0x1e40a0,76,FUN_001e40a0,render?,not started
 0x1e40f0,44,FUN_001e40f0,render?,not started
-0x1e4120,28,FUN_001e4120,render?,not started
+0x1e4120,28,Gfx_RenderThreadEntry,render,not started
 0x1e4140,324,Gfx_RenderThread,render,not started
 0x1e4288,2964,FUN_001e4288,render?,not started
 0x1e4e20,148,FUN_001e4e20,render?,not started
@@ -3088,8 +3088,8 @@ address,size,name,system,status
 0x1e81f8,20,FUN_001e81f8,render?,not started
 0x1e8210,924,cPS2GraphicsMan::vf77_1e8210,render,not started
 0x1e85b0,648,PS2Render_UpdateModelMatrices,render?,not started
-0x1e8838,140,FUN_001e8838,render?,not started
-0x1e88c8,96,FUN_001e88c8,render?,not started
+0x1e8838,140,PS2Render_Submit,render?,not started
+0x1e88c8,96,PS2Render_FlushState,render?,not started
 0x1e8928,48,cPS2GraphicsMan::vf36_1e8928,render,not started
 0x1e8958,24,cPS2GraphicsMan::vf24_1e8958,render,not started
 0x1e8970,76,cPS2GraphicsMan::vf23_1e8970,render,not started
@@ -3104,7 +3104,7 @@ address,size,name,system,status
 0x1e8dc8,8,cPS2GridMesh::vf1_1e8dc8,render,not started
 0x1e8dd0,80,cPS2GridMesh::__tf,runtime,host
 0x1e8e20,128,cPS2GraphicsMan::vf12_1e8e20,render,not started
-0x1e8ea0,8,FUN_001e8ea0,render?,not started
+0x1e8ea0,8,Gfx_FlipDisplay,render,not started
 0x1e8fd8,44,cPS2GraphicsMan::vf90_1e8fd8,render,not started
 0x1e9008,44,cPS2GraphicsMan::vf89_1e9008,render,not started
 0x1e9038,48,cPS2GraphicsMan::vf88_1e9038,render,not started
@@ -3202,7 +3202,7 @@ address,size,name,system,status
 0x1ef918,116,RaceMenuOverlay_EndSaveReplay,save,not started
 0x1ef990,1056,RaceMenuOverlay_SetState,frontend,not started
 0x1efdb0,132,FUN_001efdb0,game?,not started
-0x1efe38,184,FUN_001efe38,hud?,not started
+0x1efe38,184,RaceMenuOverlay_Draw,frontend,not started
 0x1efef0,468,RaceMenuOverlay_UpdateReplayMenu,frontend,not started
 0x1f00c8,288,RaceMenuOverlay_UpdateConfirm,frontend,not started
 0x1f01e8,284,RaceMenuOverlay_DrawReplayMenu,frontend,not started
@@ -3221,7 +3221,7 @@ address,size,name,system,status
 0x1f0f48,372,FUN_001f0f48,frontend?,not started
 0x1f10c0,100,ScreenAnim_Init,frontend?,not started
 0x1f1128,148,FUN_001f1128,game?,not started
-0x1f11c0,148,FUN_001f11c0,race?,not started
+0x1f11c0,148,LoadScreen_AddStatBar,race?,not started
 0x1f1258,120,ScreenAnim_Reset,other,not started
 0x1f12d0,372,ScreenAnim_Update,game?,not started
 0x1f1448,60,ScreenAnim_GetValue,game?,not started
@@ -3281,26 +3281,26 @@ address,size,name,system,status
 0x1ff6f0,300,VideoStream_Init,audio?,not started
 0x1ff820,112,VideoStreamMan_Destroy,audio?,not started
 0x1ff890,148,VideoStream_CreateFrameTexture,audio?,not started
-0x1ff928,96,FUN_001ff928,audio?,not started
-0x1ff988,8,FUN_001ff988,audio?,not started
+0x1ff928,96,VideoStreamMan_DecodeFrame,audio?,not started
+0x1ff988,8,VideoStreamMan_FreeFrameBuffer,audio?,not started
 0x1ff990,128,VideoStream_Open,audio?,not started
 0x1ffa10,40,VideoStream_Stop,audio?,not started
-0x1ffa38,76,FUN_001ffa38,audio?,not started
-0x1ffa88,244,FUN_001ffa88,audio?,not started
-0x1ffb80,84,FUN_001ffb80,audio?,not started
+0x1ffa38,76,VideoStreamMan_Reopen,audio?,not started
+0x1ffa88,244,VideoStreamMan_UpdateFrame,audio?,not started
+0x1ffb80,84,VideoStreamMan_UploadFrame,audio?,not started
 0x1ffbd8,420,VideoStream_AllocShape,audio?,not started
 0x1ffd80,96,cVideoStreamMan::cVideoStreamMan,video,not started
 0x1ffde0,144,cVideoStreamMan::~cVideoStreamMan,video,not started
 0x1ffe70,188,VideoPlayer_AddStream,audio?,not started
 0x1fff30,356,VideoPlayer_Open,frontend?,not started
 0x200098,88,VideoPlayer_Release,frontend?,not started
-0x2000f0,88,FUN_002000f0,audio?,not started
-0x200148,88,FUN_00200148,audio?,not started
-0x2001a0,40,FUN_002001a0,frontend?,not started
+0x2000f0,88,VideoStreamMan_Release,audio?,not started
+0x200148,88,VideoStreamMan_ReleaseAll,audio?,not started
+0x2001a0,40,VideoStreamMan_GetTexture,frontend?,not started
 0x2001c8,44,Movie_GetFrameTexture,other,not started
 0x2001f8,116,cVideoStreamMan::vf1_2001f8,video,not started
 0x200270,116,cVideoStreamMan::vf2_200270,video,not started
-0x2002e8,20,FUN_002002e8,frontend?,not started
+0x2002e8,20,VideoStreamMan_IsFinished,frontend?,not started
 0x200300,80,cVideoStreamMan::__tf,runtime,host
 0x200390,748,FUN_00200390,world?,not started
 0x200680,100,Instance_Draw,world,not started
@@ -3327,20 +3327,20 @@ address,size,name,system,status
 0x202428,80,cAsyncBdrLoad::__tf,runtime,host
 0x202478,36,cBdrLoad::~cBdrLoad,game,not started
 0x2024a0,64,cBdrLoad::__tf,runtime,host
-0x202520,568,FUN_00202520,animation?,not started
+0x202520,568,Euler_ShortestDelta,animation?,not started
 0x202758,148,FUN_00202758,animation?,not started
 0x2027f0,116,FUN_002027f0,animation?,not started
 0x202868,196,PoseBlend_Begin,animation?,not started
 0x202930,92,PoseBlend_Add,animation?,not started
 0x202990,68,PoseBlend_Finish,animation?,not started
-0x2029d8,292,FUN_002029d8,animation?,not started
+0x2029d8,292,PoseBlend_EvalCurves,animation?,not started
 0x202b00,3904,FUN_00202b00,animation?,not started
 0x203a40,92,cSkelSequence::vf2_203a40,render,not started
 0x203aa0,40,cSkelSequence::SaveSnapshot,save,not started
 0x203ac8,20,cSkelSequence::vf4_203ac8,render,not started
-0x203ae0,28,FUN_00203ae0,animation?,not started
-0x203b00,72,FUN_00203b00,render?,not started
-0x203b48,24,FUN_00203b48,render?,not started
+0x203ae0,28,ClipList_Insert,animation?,not started
+0x203b00,72,ClipList_RemoveAndDestroy,other,not started
+0x203b48,24,ClipList_Init,other,not started
 0x203b98,60,ClipList_Count,world?,not started
 0x203bd8,72,ClipList_Remove,boarder?,not started
 0x203c20,108,ClipList_DestroyAll,boarder?,not started
@@ -3375,13 +3375,13 @@ address,size,name,system,status
 0x2055c0,176,SkinPart_ResolveTextureNames,render?,ported
 0x205670,300,SkinPart_ResolveMaterials,render?,ported
 0x2057a0,600,SkinPart_SetChildMatrices,boarder?,not started
-0x2059f8,124,FUN_002059f8,boarder?,not started
+0x2059f8,124,Skel_GetBoneWorldPos,boarder?,not started
 0x205a78,1056,FUN_00205a78,boarder?,not started
 0x205e98,2428,FUN_00205e98,boarder?,not started
 0x206818,648,SkinPart_CopyBoneMatrices,other,not started
 0x206ac0,160,SkinLod_AddPart,render?,ported
-0x206b60,40,FUN_00206b60,render?,not started
-0x206b88,136,FUN_00206b88,render?,not started
+0x206b60,40,SkinLod_MaterialEquals,render?,not started
+0x206b88,136,SkinLod_MaterialListEquals,render?,not started
 0x206c10,344,SkinLod_CollectMaterials,render?,not started
 0x206d68,200,SkinLod_AllocParts,render?,not started
 0x206e30,112,SkinLod_Scale,render?,not started
@@ -3400,10 +3400,10 @@ address,size,name,system,status
 0x208220,152,RiderSkin_Scale,render?,not started
 0x2082b8,112,RiderSkin_ResolveTextureNames,render?,not started
 0x208328,112,RiderSkin_ResolveMaterials,render?,not started
-0x208398,60,FUN_00208398,boarder?,not started
+0x208398,60,Boarder_GetBoneWorldPos,boarder,not started
 0x2083d8,16,RiderSkin_SetRootMatrix,boarder?,not started
-0x2083e8,16,FUN_002083e8,boarder?,not started
-0x2083f8,8,FUN_002083f8,boarder?,not started
+0x2083e8,16,Boarder_SetSkinChildMatrices,boarder,not started
+0x2083f8,8,Boarder_BuildBoneMatrices,boarder,not started
 0x208400,100,RiderSkin_CopyBoneMatrices,boarder?,not started
 0x208468,32,MpfFile_Open,boarder?,ported
 0x208488,184,MpfFile_AddPart,render?,ported
@@ -3414,7 +3414,7 @@ address,size,name,system,status
 0x208950,424,AsyncSys_Init,audio?,not started
 0x208af8,124,cAsyncSys::~cAsyncSys,files,not started
 0x208b78,204,AsyncSys_AllocBuffer,audio?,not started
-0x208c48,104,FUN_00208c48,audio?,not started
+0x208c48,104,AsyncSys_Shutdown,audio?,not started
 0x208cb0,552,AsyncSys_StartNext,audio?,not started
 0x208ed8,432,AsyncSys_QueueLoad,audio?,not started
 0x209088,896,AsyncSys_CancelBank,audio?,not started
@@ -3431,7 +3431,7 @@ address,size,name,system,status
 0x209f70,196,BankInstance_AllocStatic,audio?,not started
 0x20a038,116,BankSlot_Free,audio?,not started
 0x20a0b0,100,BankSlot_Link,audio?,not started
-0x20a118,84,FUN_0020a118,audio?,not started
+0x20a118,84,BankSlot_Unlink,audio?,not started
 0x20a170,72,BankSlot_IsLoaded,audio?,not started
 0x20a1b8,96,BankInstance_Release,audio?,not started
 0x20a218,76,BankInstance_AllocDynamic,audio?,not started
@@ -3442,14 +3442,14 @@ address,size,name,system,status
 0x20a508,20,BankManager_UnloadBank,audio?,not started
 0x20a520,176,BankManager_LoadBank,audio?,not started
 0x20a5d0,32,BankManager_AllocStatic,audio?,not started
-0x20a5f0,20,FUN_0020a5f0,game?,not started
+0x20a5f0,20,BankManager_FreeSlot,game?,not started
 0x20a608,28,BankManager_LinkSlots,audio?,not started
-0x20a628,20,FUN_0020a628,audio?,not started
+0x20a628,20,BankManager_UnlinkSlot,audio?,not started
 0x20a640,20,cBankManager::vf9_20a640,audio,not started
 0x20a658,48,cBankManager::vf10_20a658,audio,not started
 0x20a688,40,cBankManager::vf11_20a688,audio,not started
 0x20a6b0,48,BankManager_GetHandle,audio?,not started
-0x20a6e0,128,FUN_0020a6e0,audio?,not started
+0x20a6e0,128,BankManager_IsSlotLoaded,audio?,not started
 0x20a7b8,80,cBankManager::__tf,runtime,host
 0x20a888,56,BankInstance_Init,audio?,not started
 0x20a8c0,28,FUN_0020a8c0,audio?,not started
@@ -3462,14 +3462,14 @@ address,size,name,system,status
 0x20aba8,12,FUN_0020aba8,audio?,not started
 0x20abb8,64,FUN_0020abb8,audio?,not started
 0x20abf8,12,FUN_0020abf8,audio?,not started
-0x20ac08,72,FUN_0020ac08,audio?,not started
+0x20ac08,72,BankInstance_ComputeDistance,audio?,not started
 0x20ac50,232,FUN_0020ac50,audio?,not started
 0x20ad38,236,BankInstance_SetPitch,audio?,not started
 0x20ae28,656,SndVoice_SetVolume,audio?,not started
 0x20b0b8,156,SndVoice_Stop,audio?,not started
 0x20b158,1324,FUN_0020b158,audio?,not started
-0x20b688,116,FUN_0020b688,audio?,not started
-0x20b700,580,FUN_0020b700,audio?,not started
+0x20b688,116,BankInstance_CullByDistance,audio?,not started
+0x20b700,580,BankInstance_UpdatePositional,audio?,not started
 0x20b948,104,SndVoice_Pause,audio?,not started
 0x20b9b0,80,BankInstance_ResetPitch,audio?,not started
 0x20ba00,404,BankInstance_Stop,audio?,not started
@@ -3485,8 +3485,8 @@ address,size,name,system,status
 0x20c148,184,cBankMonitor::vf6_20c148,audio?,not started
 0x20c200,156,BankMonitor_Find,audio?,not started
 0x20c2a0,104,SndSys_StopBankSound,audio,not started
-0x20c308,120,FUN_0020c308,audio?,not started
-0x20c380,104,FUN_0020c380,audio?,not started
+0x20c308,120,BankInstances_CountPlaying,audio?,not started
+0x20c380,104,BankInstances_CountUsed,audio?,not started
 0x20c3e8,60,BankMonitor_ResetTimers,frontend?,not started
 0x20c468,80,cBankMonitor::__tf,runtime,host
 0x20c560,172,BankSys_Init,audio?,not started
@@ -3559,8 +3559,8 @@ address,size,name,system,status
 0x212e98,2644,FUN_00212e98,audio?,not started
 0x2138f0,584,Sfx_PlayMenuSelect,frontend?,not started
 0x213b38,552,FUN_00213b38,audio?,not started
-0x213d60,552,FUN_00213d60,audio?,not started
-0x213f88,580,FUN_00213f88,audio?,not started
+0x213d60,552,Audio_PlayMenuMoveSound,audio,not started
+0x213f88,580,Audio_PlayMenuBackSound,audio,not started
 0x2141d0,600,FUN_002141d0,audio?,not started
 0x214428,552,FUN_00214428,audio?,not started
 0x214650,552,FUN_00214650,audio?,not started
@@ -3690,9 +3690,9 @@ address,size,name,system,status
 0x21efb0,3252,CrowdBox_Update,world,not started
 0x21fc68,44,FUN_0021fc68,audio?,not started
 0x21fc98,1368,FUN_0021fc98,audio?,not started
-0x2201f8,316,FUN_002201f8,frontend?,not started
+0x2201f8,316,CrowdBox_StopSlot,world,not started
 0x220338,108,FUN_00220338,frontend?,not started
-0x2203a8,396,FUN_002203a8,audio?,not started
+0x2203a8,396,CrowdBox_PlayCheer,world,not started
 0x220538,396,CrowdBox_StartCheer,world,not started
 0x2206c8,24,CrowdBox_Arm,world,not started
 0x2206e0,60,CrowdBox_Stop,world,not started
@@ -3706,10 +3706,10 @@ address,size,name,system,status
 0x220f80,20,SoundId_Split,audio,not started
 0x220f98,100,WorldEmitter_StopById,audio,not started
 0x221000,100,FUN_00221000,audio?,not started
-0x221068,32,FUN_00221068,audio?,not started
+0x221068,32,Audio_PlayCrowdCheer,audio,not started
 0x221088,32,CrowdSys_StartBoxCheer,world,not started
-0x2210a8,32,FUN_002210a8,audio?,not started
-0x2210c8,32,FUN_002210c8,audio?,not started
+0x2210a8,32,Audio_ArmCrowdBox,audio,not started
+0x2210c8,32,Audio_StopCrowdBox,audio,not started
 0x2210e8,440,FUN_002210e8,audio?,not started
 0x2212a0,144,FUN_002212a0,audio?,not started
 0x221330,152,CrowdSys_StopAll,world,not started
@@ -3752,8 +3752,8 @@ address,size,name,system,status
 0x222a78,16,SndEvent_IsFree,audio?,not started
 0x222a88,44,SndEvent_Clear,audio?,not started
 0x222ab8,12,FUN_00222ab8,audio?,not started
-0x222ac8,12,FUN_00222ac8,audio?,not started
-0x222ad8,8,FUN_00222ad8,audio?,not started
+0x222ac8,12,SndEvent_Enable,audio?,not started
+0x222ad8,8,SndEvent_Disable,audio?,not started
 0x222ae0,48,FUN_00222ae0,audio?,not started
 0x222b10,144,cMonitor::cMonitor,audio?,not started
 0x222ba0,144,cMonitor::~cMonitor,audio?,not started
@@ -3790,8 +3790,8 @@ address,size,name,system,status
 0x224458,20,FUN_00224458,audio?,not started
 0x224470,20,FUN_00224470,audio?,not started
 0x224488,8,FUN_00224488,audio?,not started
-0x224498,288,FUN_00224498,audio?,not started
-0x2245b8,104,FUN_002245b8,audio?,not started
+0x224498,288,Song_UpdateVolume,audio?,not started
+0x2245b8,104,Song_FadeOut,audio?,not started
 0x224620,52,PathX_GetSongState,audio?,not started
 0x224658,80,FUN_00224658,audio?,not started
 0x2246a8,192,Song_RandomSegmentMs,audio?,ported
@@ -3812,18 +3812,18 @@ address,size,name,system,status
 0x224e68,548,MusicSys_PlaySong,audio,not started
 0x225090,428,MusicSys_StartSong,audio,not started
 0x225240,28,MusicSys_StopCurrent,audio,not started
-0x225260,28,FUN_00225260,frontend?,not started
+0x225260,28,Audio_ResumeSong,audio,not started
 0x225280,148,MusicSys_StopSong,audio,not started
 0x225318,100,Audio_MusicEvent,audio,ported
 0x225380,100,MusicSys_SetSection,audio,not started
 0x2253e8,28,Music_SetPathVar,audio,ported
-0x225428,28,FUN_00225428,audio?,not started
+0x225428,28,Audio_SetSongVolume,audio,not started
 0x225468,140,MusicSys_FadeTo,audio,not started
 0x225588,52,MusicSys_CountEnabled,audio,not started
 0x2255c0,84,MusicSys_SelectSong,audio,not started
 0x225618,68,Music_PrevSong,audio,not started
 0x225660,64,MusicSys_NextEnabledSong,audio,not started
-0x2256a0,28,FUN_002256a0,audio?,not started
+0x2256a0,28,Audio_UpdateSongVolume,audio,not started
 0x2256c0,168,MusicSys_LoadSongBank,audio,not started
 0x225768,112,Music_ScheduleBreak,audio,not started
 0x2257d8,120,Music_CancelBreak,audio,not started
@@ -3842,7 +3842,7 @@ address,size,name,system,status
 0x225ca8,56,Music_StopTricky,audio,not started
 0x225ce0,60,Music_CountEnabledSongs,audio,not started
 0x225d80,124,StaticInit_Music,audio?,not started
-0x225e98,48,FUN_00225e98,audio?,not started
+0x225e98,48,Audio_GetSongState,audio,not started
 0x225ed0,80,cMusicSys::__tf,runtime,host
 0x225fa8,48,cPS2SoundManager::cPS2SoundManager,audio,not started
 0x225fd8,100,cPS2SoundManager::vf7_225fd8,audio,not started
@@ -3915,15 +3915,15 @@ address,size,name,system,status
 0x2295f8,44,FUN_002295f8,audio?,not started
 0x229628,44,Stream_IsPlaying,audio?,not started
 0x229658,40,FUN_00229658,audio?,not started
-0x229680,44,FUN_00229680,audio?,not started
+0x229680,44,Stream_GetHandle,audio?,not started
 0x2296b0,12,FUN_002296b0,audio?,not started
 0x2296c0,80,Stream_GetPlayTime,audio?,not started
 0x229710,48,Stream_Resume,audio?,not started
 0x229740,48,Stream_Pause,audio?,not started
-0x229770,128,FUN_00229770,audio?,not started
+0x229770,128,Stream_PlayFile,audio?,not started
 0x2297f0,116,Stream_OpenInBig,audio?,not started
 0x229868,8,Stream_Stop,audio?,not started
-0x229870,32,FUN_00229870,audio?,not started
+0x229870,32,Stream_GetState,audio?,not started
 0x229890,184,StreamSys_Init,audio?,not started
 0x229948,172,cStreamSys::~cStreamSys,render?,not started
 0x2299f8,240,StreamSys_CreateStream,audio?,not started
@@ -3933,9 +3933,9 @@ address,size,name,system,status
 0x229d98,104,StreamSys_StopAll,audio?,not started
 0x229e00,104,StreamSys_ResumeAll,audio?,not started
 0x229e68,104,StreamSys_PauseAll,audio?,not started
-0x229ed0,72,FUN_00229ed0,audio?,not started
+0x229ed0,72,StreamSys_PlayFile,audio?,not started
 0x229f18,72,StreamSys_Play,audio?,not started
-0x229f60,60,FUN_00229f60,audio?,not started
+0x229f60,60,StreamSys_GetSlotState,audio?,not started
 0x229fa0,40,StreamSys_StopStream,audio?,not started
 0x229fc8,60,FUN_00229fc8,audio?,not started
 0x22a008,60,StreamSys_GetPlayTime,audio?,not started
@@ -3946,7 +3946,7 @@ address,size,name,system,status
 0x22a178,60,StreamSys_IsSlotPlaying,audio?,not started
 0x22a1e0,40,FUN_0022a1e0,audio?,not started
 0x22a228,40,StreamSys_SetVolume,audio?,not started
-0x22a278,60,FUN_0022a278,audio?,not started
+0x22a278,60,StreamSys_GetSlotHandle,audio?,not started
 0x22a2b8,20,StreamSys_GetStream,audio?,not started
 0x22a2d0,36,FUN_0022a2d0,,not started
 0x22a2f8,80,cStreamSys::__tf,runtime,host
@@ -4195,7 +4195,7 @@ address,size,name,system,status
 0x239750,400,SphTree_ForEachLeafRecurse,render?,not started
 0x2398e0,80,bxSphereTree::__tf,runtime,host
 0x239930,44,FUN_00239930,render?,not started
-0x239960,448,FUN_00239960,render?,not started
+0x239960,448,Rle_Encode,render?,not started
 0x239b20,136,SphTree_RleDecode,render?,not started
 0x239ba8,144,SphereTree::SphereTree,world?,not started
 0x239c38,20,SphereTree::~SphereTree,world?,not started
@@ -4382,7 +4382,7 @@ address,size,name,system,status
 0x241f78,124,Huff_AssignDepths,camera?,not started
 0x241ff8,532,Huff_BuildTree,camera?,not started
 0x242210,268,Huff_RunCost,camera?,not started
-0x242320,432,FUN_00242320,camera?,not started
+0x242320,432,Huff_WriteVarNum,camera?,not started
 0x2424d0,116,Huff_WriteClueSymbol,camera?,not started
 0x242548,48,Huff_WriteSymbol,camera?,not started
 0x242578,384,Huff_InitRunCosts,camera?,not started
@@ -4461,7 +4461,7 @@ address,size,name,system,status
 0x24c8e0,72,cFELoadFromQuit::vf9_24c8e0,frontend,not started
 0x24c928,2112,cFELoadFromQuit::vf10_24c928,frontend,not started
 0x24d168,52,cFELoadFromQuit::vf4_24d168,frontend,not started
-0x24d1a0,496,FUN_0024d1a0,race?,not started
+0x24d1a0,496,LoadScreen_SetupTips,race?,not started
 0x24d390,88,cFELoadFromQuit::vf5_24d390,frontend,not started
 0x24d3e8,228,cFELoadFromQuit::vf7_24d3e8,frontend,not started
 0x24d4d0,804,cFELoadFromQuit::vf8_24d4d0,frontend,not started
@@ -4519,12 +4519,12 @@ address,size,name,system,status
 0x251d18,88,CacheBuffer_Free,render?,not started
 0x251d70,72,FUN_00251d70,ai?,not started
 0x251db8,168,CacheBuffer_Evict,world?,not started
-0x251e60,68,FUN_00251e60,world?,not started
+0x251e60,68,CacheBuffer_Touch,world?,not started
 0x251ea8,52,cAIFwdDiffCache::cAIFwdDiffCache,ai,not started
 0x251ee0,20,cAIFwdDiffCache::~cAIFwdDiffCache,ai,not started
 0x251ef8,84,FUN_00251ef8,render?,not started
-0x251f50,216,FUN_00251f50,world?,not started
-0x252028,120,FUN_00252028,world?,not started
+0x251f50,216,CacheBuffer_Lookup,world?,not started
+0x252028,120,CacheBuffer_ClearEntry,world?,not started
 0x2520a0,28,FUN_002520a0,world?,not started
 0x2520c8,80,cAIFwdDiffCache::__tf,runtime,host
 0x252128,64,cBxCache::__tf,runtime,host
@@ -4574,7 +4574,7 @@ address,size,name,system,status
 0x254b20,44,Course_GetSplineSegment,race,not started
 0x254b50,40,Course_GetSpline,race,not started
 0x254b78,44,FUN_00254b78,race?,not started
-0x254ba8,12,FUN_00254ba8,race?,not started
+0x254ba8,12,Course_GetHashTables,race,not started
 0x254bb8,56,FUN_00254bb8,race?,not started
 0x254bf0,56,FUN_00254bf0,race?,not started
 0x254c28,56,FUN_00254c28,race?,not started
@@ -4596,7 +4596,7 @@ address,size,name,system,status
 0x2550c8,136,Course_FindInstanceByHash,race,not started
 0x255150,136,Course_FindCamAnimByHash,race,not started
 0x2551d8,136,FUN_002551d8,race?,not started
-0x255260,176,FUN_00255260,race?,not started
+0x255260,176,Course_FindObjectByHash,race,not started
 0x255310,40,Course_DebugPrint,race,not started
 0x255568,64,cCourseResolve_Common::__tf,runtime,host
 0x2555a8,60,cCourseResolve_PS2::cCourseResolve_PS2,race,not started
@@ -4641,7 +4641,7 @@ address,size,name,system,status
 0x25b878,1744,World_QueryInstances,world,ported
 0x25bf48,1864,World_RayCastInstance,world,ported
 0x25c690,188,World_IsBlocked,world,not started
-0x25c750,8,FUN_0025c750,world?,not started
+0x25c750,8,World_LookupCollCache,world,not started
 0x25c798,44,Vec4_ScaleCopy10,world?,not started
 0x25c7c8,3084,cWorldIntersectType::vf8_25c7c8,world,not started
 0x25d3d8,476,World_RayCastMeshTris,world,not started
@@ -4660,9 +4660,9 @@ address,size,name,system,status
 0x25ebe0,80,cWorldLine::__tf,runtime,host
 0x25ec30,44,Vec4_ScaleCopy11,world?,not started
 0x25ec60,40,FUN_0025ec60,world?,not started
-0x25ec88,44,FUN_0025ec88,world?,not started
-0x25ecb8,16,FUN_0025ecb8,world?,not started
-0x25ecc8,28,FUN_0025ecc8,,not started
+0x25ec88,44,VisList_Clear,world?,not started
+0x25ecb8,16,VisList_Get,world?,not started
+0x25ecc8,28,VisList_Add,other,not started
 0x25ece8,136,cCourseResolve::cCourseResolve,race,not started
 0x25ed70,128,FUN_0025ed70,race?,not started
 0x25edf0,1704,Course_LoadRenderData,race,not started
@@ -4679,15 +4679,15 @@ address,size,name,system,status
 0x260898,264,Course_RemapLightmapTextures,race,not started
 0x2609b0,28,FUN_002609b0,world?,not started
 0x2609d0,328,World_LoadTextures,world,not started
-0x260b18,144,FUN_00260b18,world?,not started
-0x260ba8,248,FUN_00260ba8,world?,not started
+0x260b18,144,WorldGrid_CellAtPos,world?,not started
+0x260ba8,248,WorldGrid_CellAt,world?,not started
 0x260ca0,24,FUN_00260ca0,world?,not started
 0x260cb8,72,FUN_00260cb8,world?,not started
 0x260d08,204,World_GetCellAt,world,not started
 0x260dd8,144,World_FindScript,world,not started
 0x260e68,44,Course_GetScriptEntry,race,not started
-0x260f90,8,FUN_00260f90,world?,not started
-0x260f98,8,FUN_00260f98,world?,not started
+0x260f90,8,CellList_Clear,world?,not started
+0x260f98,8,CellList_Add,world?,not started
 0x260fa0,28,FUN_00260fa0,world?,not started
 0x260fc0,28,FUN_00260fc0,world?,not started
 0x260fe0,80,cCourseResolve::__tf,runtime,host
@@ -4811,7 +4811,7 @@ address,size,name,system,status
 0x2670e8,784,FE3DCharacter_UpdateLighting,frontend?,not started
 0x2673f8,272,FUN_002673f8,frontend?,not started
 0x267508,360,FUN_00267508,frontend?,not started
-0x267670,488,FUN_00267670,frontend?,not started
+0x267670,488,FE3DLighting_Lerp,frontend?,not started
 0x267858,180,FE3DCharSel_IsOutfitBlocked,frontend?,not started
 0x267910,140,FE3DCharSel_IsOutfitTakenBy,frontend?,not started
 0x2679a0,376,FE3DCharSel_PickFreeOutfit,frontend?,not started
@@ -4891,7 +4891,7 @@ address,size,name,system,status
 0x269ee8,1160,cFE3DAnimRotate::vf10_269ee8,frontend,not started
 0x26a370,192,cFE3DAnimRotate::vf12_26a370,frontend,not started
 0x26a430,132,cFE3DAnimTranslate::vf10_26a430,frontend,not started
-0x26a4b8,276,FUN_0026a4b8,frontend?,not started
+0x26a4b8,276,cFE3DCamera::cFE3DCamera,camera,not started
 0x26a5d0,132,FE3DCamera_DrawWorld,camera,not started
 0x26a658,1288,cFE3DCamera::vf10_26a658,camera,not started
 0x26ab60,204,FE3DCameraScripted_Init,camera,not started
@@ -4935,16 +4935,16 @@ address,size,name,system,status
 0x26cd48,80,cFE3DGeometry::__tf,runtime,host
 0x26cd98,44,FUN_0026cd98,frontend?,not started
 0x26cdc8,32,CheatCode_Matches,input,not started
-0x26cde8,16,FUN_0026cde8,frontend?,not started
-0x26cdf8,16,FUN_0026cdf8,frontend?,not started
+0x26cde8,16,FEInput_IsEnter,frontend?,not started
+0x26cdf8,16,FEInput_IsEscape,frontend?,not started
 0x26ce08,40,FEKey_IsAccept,frontend?,not started
 0x26ce30,40,FEKey_IsBack,frontend?,not started
 0x26ce58,16,FUN_0026ce58,frontend?,not started
 0x26ce68,16,FUN_0026ce68,frontend?,not started
-0x26ce78,16,FUN_0026ce78,frontend?,not started
-0x26ce88,16,FUN_0026ce88,frontend?,not started
-0x26ce98,16,FUN_0026ce98,frontend?,not started
-0x26cea8,16,FUN_0026cea8,frontend?,not started
+0x26ce78,16,FEInput_IsUp,frontend?,not started
+0x26ce88,16,FEInput_IsDown,frontend?,not started
+0x26ce98,16,FEInput_IsLeft,frontend?,not started
+0x26cea8,16,FEInput_IsRight,frontend?,not started
 0x26cef8,44,FEPlayer_IsPadConnected,frontend?,not started
 0x26cf28,56,FUN_0026cf28,frontend?,not started
 0x26cf60,608,cCheatCodes::Update,input,not started
@@ -5178,7 +5178,7 @@ address,size,name,system,status
 0x276188,56,FUN_00276188,frontend?,not started
 0x2761c0,44,FUN_002761c0,world?,not started
 0x276268,116,FUN_00276268,frontend?,not started
-0x2762e0,8,FUN_002762e0,frontend?,not started
+0x2762e0,8,FE3DGroup_Add,frontend?,not started
 0x276338,80,cFE3DWGroup::__tf,runtime,host
 0x2763a0,8,cFE3DState::vf25_2763a0,frontend,not started
 0x2763a8,8,cFE3DState::vf24_2763a8,frontend,not started
@@ -5354,9 +5354,9 @@ address,size,name,system,status
 0x2924d0,356,FEMemCard_EnableButtons,save,not started
 0x292638,368,FUN_00292638,save?,not started
 0x2927a8,48,FUN_002927a8,save?,not started
-0x2927d8,56,FUN_002927d8,save?,not started
-0x292810,176,FUN_00292810,save?,not started
-0x2928c0,88,FUN_002928c0,save?,not started
+0x2927d8,56,FEMemCard_ShowLocMessage,save,not started
+0x292810,176,FEMemCard_ShowMessage,save,not started
+0x2928c0,88,FEMemCard_HideMessage,save,not started
 0x292918,40,cFEStateMCOverlay::vf50_292918,save,not started
 0x292940,40,cFEStateMCOverlay::vf51_292940,save,not started
 0x292968,772,FEMemCard_FillSlotList,save,not started
@@ -5586,7 +5586,7 @@ address,size,name,system,status
 0x2abb60,20,cFE3DStateVideo::~cFE3DStateVideo,frontend,not started
 0x2abbc0,8,cFE3DStateVideo::vf13_2abbc0,frontend,not started
 0x2abbc8,80,cFE3DStateVideo::__tf,runtime,host
-0x2abc68,8,FUN_002abc68,frontend?,not started
+0x2abc68,8,FE3D_AddWidget,frontend?,not started
 0x2abc70,44,cFE3DGroup::vf1_2abc70,frontend,not started
 0x2abca0,264,cFE3DGroup::vf10_2abca0,frontend,not started
 0x2abda8,180,cFE3DGroup::vf11_2abda8,frontend,not started
@@ -5617,7 +5617,7 @@ address,size,name,system,status
 0x2ac620,116,cFE3DGroup::vf13_2ac620,frontend,not started
 0x2ac698,28,FUN_002ac698,frontend?,not started
 0x2ac6b8,80,cFE3DGroup::~cFE3DGroup,frontend,not started
-0x2ac708,260,FUN_002ac708,frontend?,not started
+0x2ac708,260,cFE3DGroup::cFE3DGroup,frontend,not started
 0x2ac810,80,cFE3DGroup::__tf,runtime,host
 0x2ac8a8,80,cListFE3DUpdateOp::__tf,runtime,host
 0x2ac930,80,cListFE3DRenderTextOp::__tf,runtime,host
@@ -5720,7 +5720,7 @@ address,size,name,system,status
 0x2b0120,48,cFE3DWListBox::vf1_2b0120,frontend,not started
 0x2b0150,168,cFE3DWListBox::vf11_2b0150,frontend,not started
 0x2b01f8,52,cFE3DWListBox::vf37_2b01f8,frontend,not started
-0x2b0230,480,FUN_002b0230,frontend?,not started
+0x2b0230,480,cFE3DWNameEntry::cFE3DWNameEntry,frontend,not started
 0x2b0410,24,NameEntry_GetChar,frontend?,not started
 0x2b0428,60,NameEntry_SetChar,frontend?,not started
 0x2b0468,120,cFE3DWNameEntry::vf37_2b0468,frontend,not started
@@ -5775,7 +5775,7 @@ address,size,name,system,status
 0x2b2a30,68,cFE3DWNameEntry::~cFE3DWNameEntry,frontend,not started
 0x2b2c58,80,cFE3DWNameEntry::__tf,runtime,host
 0x2b2cb0,80,cFE3DWListBox::~cFE3DWListBox,frontend,not started
-0x2b2d00,448,FUN_002b2d00,frontend?,not started
+0x2b2d00,448,cFE3DWListBox::cFE3DWListBox,frontend,not started
 0x2b2ec0,444,FUN_002b2ec0,frontend?,not started
 0x2b3080,80,cFE3DWListBox::__tf,runtime,host
 0x2b30d0,8,cFE3DWEntry::vf22_2b30d0,frontend,not started
@@ -5783,7 +5783,7 @@ address,size,name,system,status
 0x2b32a8,80,FUN_002b32a8,frontend?,not started
 0x2b3300,80,FUN_002b3300,frontend?,not started
 0x2b3358,68,cFE3DWEntry::~cFE3DWEntry,frontend,not started
-0x2b35d0,436,FUN_002b35d0,frontend?,not started
+0x2b35d0,436,cFE3DWEntry::cFE3DWEntry,frontend,not started
 0x2b3788,80,cFE3DWEntry::__tf,runtime,host
 0x2b37d8,8,cFE3DProgressBar::vf23_2b37d8,frontend,not started
 0x2b37e0,8,cFE3DProgressBar::vf39_2b37e0,frontend,not started
@@ -5792,24 +5792,24 @@ address,size,name,system,status
 0x2b3950,8,FUN_002b3950,frontend?,not started
 0x2b39b8,104,cFE3DProgressBar::vf1_2b39b8,frontend,not started
 0x2b3a20,68,cFE3DProgressBar::~cFE3DProgressBar,frontend,not started
-0x2b3d10,436,FUN_002b3d10,frontend?,not started
+0x2b3d10,436,cFE3DProgressBar::cFE3DProgressBar,frontend,not started
 0x2b3ee8,80,cFE3DProgressBar::__tf,runtime,host
 0x2b3f38,8,cFE3DTiledIcon::vf20_2b3f38,frontend,not started
 0x2b3f60,20,cFE3DTiledIcon::~cFE3DTiledIcon,frontend,not started
-0x2b4190,520,FUN_002b4190,frontend?,not started
+0x2b4190,520,cFE3DTiledIcon::cFE3DTiledIcon,frontend,not started
 0x2b4398,80,cFE3DTiledIcon::__tf,runtime,host
 0x2b43e8,8,cFE3DIcon::vf19_2b43e8,frontend,not started
 0x2b4408,20,cFE3DIcon::~cFE3DIcon,frontend,not started
-0x2b4620,436,FUN_002b4620,frontend?,not started
+0x2b4620,436,cFE3DIcon::cFE3DIcon,frontend,not started
 0x2b47d8,80,cFE3DIcon::__tf,runtime,host
 0x2b4828,8,cFE3DWColouredText::vf25_2b4828,frontend,not started
 0x2b4830,40,cFE3DWColouredText::vf39_2b4830,frontend,not started
 0x2b4858,76,FUN_002b4858,frontend?,not started
-0x2b48b0,64,FUN_002b48b0,frontend?,not started
+0x2b48b0,64,cFE3DWColouredText::cFE3DWColouredText,frontend,not started
 0x2b48f0,80,cFE3DWColouredText::__tf,runtime,host
 0x2b4940,8,cFE3DWBufferedSingleLineText::vf44_2b4940,frontend,not started
 0x2b4948,20,cFE3DWBufferedSingleLineText::~cFE3DWBufferedSingleLineText,frontend,not started
-0x2b4998,64,FUN_002b4998,frontend?,not started
+0x2b4998,64,cFE3DWBufferedSingleLineText::cFE3DWBufferedSingleLineText,frontend,not started
 0x2b49d8,80,cFE3DWBufferedSingleLineText::__tf,runtime,host
 0x2b4a28,8,cFE3DWSingleLineText::vf43_2b4a28,frontend,not started
 0x2b4ab0,436,FUN_002b4ab0,frontend?,not started
@@ -5841,7 +5841,7 @@ address,size,name,system,status
 0x2b66d8,68,cFE3DWList::vf5_2b66d8,frontend,not started
 0x2b6720,212,cFE3DWList::vf13_2b6720,frontend,not started
 0x2b6838,68,cFE3DWList::~cFE3DWList,frontend,not started
-0x2b68e0,72,FUN_002b68e0,frontend?,not started
+0x2b68e0,72,cFE3DWList::cFE3DWList,frontend,not started
 0x2b6928,80,cFE3DWList::__tf,runtime,host
 0x2b6978,52,FUN_002b6978,,not started
 0x2b69b0,80,cListFE3DOffsetOp::__tf,runtime,host
@@ -5866,7 +5866,7 @@ address,size,name,system,status
 0x2b7118,12,FUN_002b7118,comm?,host
 0x2b7128,76,FUN_002b7128,comm?,host
 0x2b7178,8,FUN_002b7178,comm?,host
-0x2b7180,80,FUN_002b7180,comm?,host
+0x2b7180,80,Comm_Crc16,comm?,host
 0x2b71d0,188,CDeci2CopydataCommDriver::vf1_2b71d0,comm,host
 0x2b7290,256,CDeci2CopydataCommDriver::vf2_2b7290,comm,host
 0x2b7390,248,CDeci2CopydataCommDriver::vf5_2b7390,comm,host
@@ -5902,16 +5902,16 @@ address,size,name,system,status
 0x2b82a8,164,Cstring_AssignAscii,comm?,host
 0x2b8350,128,Cstring_Assign,comm?,host
 0x2b83d0,72,Cstring_GetBuffer,comm?,host
-0x2b8418,148,FUN_002b8418,comm?,host
-0x2b84b0,200,FUN_002b84b0,comm?,host
+0x2b8418,148,Cstring_CopyToAscii,comm?,host
+0x2b84b0,200,Cstring_ToAsciiBuffer,comm?,host
 0x2b8578,128,Cstring_Append,comm?,host
-0x2b85f8,96,FUN_002b85f8,comm?,host
-0x2b8658,156,FUN_002b8658,comm?,host
+0x2b85f8,96,Cstring_AppendChar,comm?,host
+0x2b8658,156,Cstring_AppendAscii,comm?,host
 0x2b86f8,104,Cstring_EqualsChar,comm?,host
 0x2b8760,200,Cstring_EqualsAscii,comm?,host
-0x2b8828,36,FUN_002b8828,comm?,host
-0x2b8850,32,FUN_002b8850,comm?,host
-0x2b8870,32,FUN_002b8870,comm?,host
+0x2b8828,36,Cstring_NotEqualsChar,comm?,host
+0x2b8850,32,Cstring_NotEqualsAscii,comm?,host
+0x2b8870,32,Cstring_NotEquals,comm?,host
 0x2b8890,184,Cstring_Equals,comm?,host
 0x2b8948,8,Cstring_Capacity,comm?,host
 0x2b8950,112,Cstring_SetLength,comm?,host
@@ -5919,19 +5919,19 @@ address,size,name,system,status
 0x2b89d0,60,Cstring_Free,comm?,host
 0x2b8a10,8,Cstring_Length,comm?,host
 0x2b8a18,264,Cstring_Find,comm?,host
-0x2b8b20,224,FUN_002b8b20,comm?,host
-0x2b8c00,72,FUN_002b8c00,comm?,host
-0x2b8c48,44,FUN_002b8c48,comm?,host
-0x2b8c78,56,FUN_002b8c78,comm?,host
+0x2b8b20,224,Cstring_FindLast,comm?,host
+0x2b8c00,72,Cstring_FindMatch,comm?,host
+0x2b8c48,44,Cstring_LeftOfMatch,comm?,host
+0x2b8c78,56,Cstring_RightOfMatch,comm?,host
 0x2b8cb0,156,Cstring_Left,comm?,host
 0x2b8d50,188,Cstring_Right,comm?,host
 0x2b8e10,88,Cstring_MidToEnd,comm?,host
 0x2b8e68,284,Cstring_Mid,comm?,host
 0x2b8f88,116,Cstring_Shrink,comm?,host
-0x2b9000,40,FUN_002b9000,comm?,host
-0x2b9028,184,FUN_002b9028,comm?,host
-0x2b90e0,200,FUN_002b90e0,comm?,host
-0x2b91a8,176,FUN_002b91a8,comm?,host
+0x2b9000,40,Cstring_Trim,comm?,host
+0x2b9028,184,Cstring_TrimLeft,comm?,host
+0x2b90e0,200,Cstring_TrimRight,comm?,host
+0x2b91a8,176,Cstring_Prepend,comm?,host
 0x2b9258,344,Cstring_ReplaceAll,comm?,host
 0x2b93b0,76,FUN_002b93b0,comm?,host
 0x2b9400,84,FUN_002b9400,comm?,host
@@ -5942,13 +5942,13 @@ address,size,name,system,status
 0x2b9688,112,Cstring_SerializedSize,comm?,host
 0x2b96f8,116,Cstring_PackedSize,comm?,host
 0x2b9770,84,Cstring_AllocPacked,comm?,host
-0x2b97e0,236,FUN_002b97e0,comm?,host
-0x2b98d0,188,FUN_002b98d0,comm?,host
-0x2b9990,104,FUN_002b9990,comm?,host
-0x2b99f8,268,FUN_002b99f8,comm?,host
+0x2b97e0,236,Cstring_Pack,comm?,host
+0x2b98d0,188,Cstring_Unpack,comm?,host
+0x2b9990,104,Cstring_StartsWith,comm?,host
+0x2b99f8,268,Cstring_PopLine,comm?,host
 0x2b9b08,736,Cstring_TrimNumber,comm?,host
-0x2b9df0,24,FUN_002b9df0,comm?,host
-0x2b9e08,56,FUN_002b9e08,comm?,host
+0x2b9df0,24,C8bitBuffer::C8bitBuffer,comm,host
+0x2b9e08,56,C8bitBuffer_InitFromCstring,comm,host
 0x2b9e40,48,C8bitBuffer::vf1_2b9e40,comm,host
 0x2b9e70,8,C8bitBuffer::vf2_2b9e70,comm,host
 0x2b9e78,100,C8bitBuffer::~C8bitBuffer,comm,host
@@ -5957,7 +5957,7 @@ address,size,name,system,status
 0x2b9fd8,188,PS2VideoPlayer_Create,other,not started
 0x2ba098,248,PS2VideoPlayer_Init,other,not started
 0x2ba190,176,cPS2VideoPlayer::~cPS2VideoPlayer,render,not started
-0x2ba240,80,FUN_002ba240,render?,not started
+0x2ba240,80,VideoStream_FlushFrames,render?,not started
 0x2ba290,372,FUN_002ba290,render?,not started
 0x2ba438,296,FUN_002ba438,render?,not started
 0x2ba560,684,cPS2VideoPlayer::vf1_2ba560,render,not started
@@ -5984,27 +5984,27 @@ address,size,name,system,status
 0x2bb078,20,FUN_002bb078,lib-snd?,not started
 0x2bb090,8,FUN_002bb090,lib-snd?,not started
 0x2bb098,56,SpeechLib_SetBankTable,lib-snd?,not started
-0x2bb110,104,FUN_002bb110,lib-snd?,not started
-0x2bb180,108,FUN_002bb180,lib-snd?,not started
-0x2bb1f0,128,FUN_002bb1f0,lib-snd?,not started
+0x2bb110,104,SpeechLib_FindFreeBankSlot,lib-snd?,not started
+0x2bb180,108,SpeechLib_FindBankById,lib-snd?,not started
+0x2bb1f0,128,SpeechLib_FindBankByIds,lib-snd?,not started
 0x2bb270,60,FUN_002bb270,lib-snd?,not started
-0x2bb2b0,36,FUN_002bb2b0,lib-snd?,not started
+0x2bb2b0,36,SpeechLib_ClearBankSlot,lib-snd?,not started
 0x2bb2d8,148,FUN_002bb2d8,lib-snd?,not started
 0x2bb370,188,FUN_002bb370,lib-snd?,not started
 0x2bb430,192,FUN_002bb430,lib-snd?,not started
 0x2bb4f0,284,SpeechLib_RegisterBank,lib-snd?,not started
 0x2bb610,64,FUN_002bb610,lib-snd?,not started
-0x2bb650,92,FUN_002bb650,lib-snd?,not started
-0x2bb6b0,80,FUN_002bb6b0,lib-snd?,not started
+0x2bb650,92,SpeechLib_FindEventBank,lib-snd?,not started
+0x2bb6b0,80,SpeechLib_FindEvent,lib-snd?,not started
 0x2bb700,76,FUN_002bb700,lib-snd?,not started
 0x2bb750,80,FUN_002bb750,lib-snd?,not started
-0x2bb7a0,44,FUN_002bb7a0,lib-snd?,not started
+0x2bb7a0,44,SpeechLib_ClearEventBanks,lib-snd?,not started
 0x2bb7d0,60,FUN_002bb7d0,lib-snd?,not started
 0x2bb810,196,FUN_002bb810,lib-snd?,not started
 0x2bb8d8,376,SpeechLib_AllocVoice,lib-snd?,not started
 0x2bba50,44,FUN_002bba50,lib-snd?,not started
 0x2bba80,632,SpeechLib_PostEvent,lib-snd?,not started
-0x2bbcf8,108,FUN_002bbcf8,lib-snd?,not started
+0x2bbcf8,108,SpeechLib_PostEventArgs,lib-snd?,not started
 0x2bbd68,12,FUN_002bbd68,lib-snd?,not started
 0x2bbd78,88,FUN_002bbd78,lib-snd?,not started
 0x2bbdd0,632,FUN_002bbdd0,lib-snd?,not started
@@ -6013,7 +6013,7 @@ address,size,name,system,status
 0x2bc320,364,FUN_002bc320,lib-snd?,not started
 0x2bc490,44,FUN_002bc490,lib-snd?,not started
 0x2bc4c0,132,FUN_002bc4c0,lib-snd?,not started
-0x2bc548,140,FUN_002bc548,lib-snd?,not started
+0x2bc548,140,SpeechLib_Service,lib-snd?,not started
 0x2bc5e0,288,FUN_002bc5e0,lib-snd?,not started
 0x2bc700,28,FUN_002bc700,lib-snd?,not started
 0x2bc738,20,FUN_002bc738,lib-snd?,not started
@@ -6023,7 +6023,7 @@ address,size,name,system,status
 0x2bc7a0,176,FUN_002bc7a0,lib-snd?,not started
 0x2bc850,232,FUN_002bc850,lib-snd?,not started
 0x2bc938,104,FUN_002bc938,lib-snd?,not started
-0x2bc9a0,56,FUN_002bc9a0,lib-snd?,not started
+0x2bc9a0,56,SpeechLib_TestBit,lib-snd?,not started
 0x2bc9d8,164,FUN_002bc9d8,lib-snd?,not started
 0x2bca80,176,FUN_002bca80,lib-snd?,not started
 0x2bcb30,412,FUN_002bcb30,lib-snd?,not started
@@ -6035,7 +6035,7 @@ address,size,name,system,status
 0x2bcf90,72,FUN_002bcf90,lib-snd?,not started
 0x2bcfd8,160,FUN_002bcfd8,lib-snd?,not started
 0x2bd078,284,FUN_002bd078,lib-snd?,not started
-0x2bd198,128,FUN_002bd198,lib-snd?,not started
+0x2bd198,128,SpeechLib_Shuffle,lib-snd?,not started
 0x2bd218,208,FUN_002bd218,lib-snd?,not started
 0x2bd2e8,132,FUN_002bd2e8,lib-snd?,not started
 0x2bd370,184,FUN_002bd370,lib-snd?,not started
@@ -6044,9 +6044,9 @@ address,size,name,system,status
 0x2bd798,396,FUN_002bd798,lib-snd?,not started
 0x2bd928,420,FUN_002bd928,lib-snd?,not started
 0x2bdad0,12,FUN_002bdad0,lib-snd?,not started
-0x2bdae0,132,FUN_002bdae0,lib-snd?,not started
-0x2bdb68,264,FUN_002bdb68,lib-snd?,not started
-0x2bdc70,36,FUN_002bdc70,lib-snd?,not started
+0x2bdae0,132,SpeechLib_ClearQueue,lib-snd?,not started
+0x2bdb68,264,SpeechLib_QueueEvent,lib-snd?,not started
+0x2bdc70,36,SpeechLib_HasQueued,lib-snd?,not started
 0x2bdc98,340,FUN_002bdc98,lib-snd?,not started
 0x2bddf0,80,FUN_002bddf0,lib-snd?,not started
 0x2bde40,764,FUN_002bde40,lib-snd?,not started
@@ -6057,11 +6057,11 @@ address,size,name,system,status
 0x2be310,344,FUN_002be310,lib-snd?,not started
 0x2be468,484,FUN_002be468,lib-snd?,not started
 0x2be650,40,FUN_002be650,lib-snd?,not started
-0x2be678,236,FUN_002be678,lib-snd?,not started
-0x2be768,108,FUN_002be768,lib-snd?,not started
-0x2be7d8,164,FUN_002be7d8,lib-snd?,not started
-0x2be880,72,FUN_002be880,lib-snd?,not started
-0x2be8c8,64,FUN_002be8c8,lib-snd?,not started
+0x2be678,236,SpeechLib_Rand,lib-snd?,not started
+0x2be768,108,SpeechLib_SeedRand,lib-snd?,not started
+0x2be7d8,164,SpeechLib_FindInHistory,lib-snd?,not started
+0x2be880,72,SpeechLib_PushHistory,lib-snd?,not started
+0x2be8c8,64,SpeechLib_InitHistory,lib-snd?,not started
 0x2be908,280,SpeechLib_PickVariant,lib-snd?,not started
 0x2bea20,40,FUN_002bea20,lib-snd?,not started
 0x2bea48,360,FUN_002bea48,lib-snd?,not started
@@ -6102,9 +6102,9 @@ address,size,name,system,status
 0x2c1890,420,FUN_002c1890,audio?,not started
 0x2c1a38,348,PathX_StopTracks,audio?,not started
 0x2c1b98,296,FUN_002c1b98,audio?,not started
-0x2c1cc0,248,FUN_002c1cc0,audio?,not started
-0x2c1db8,340,FUN_002c1db8,audio?,not started
-0x2c1f10,304,FUN_002c1f10,audio?,not started
+0x2c1cc0,248,PathX_StopSong,audio?,not started
+0x2c1db8,340,PathX_SetVolume,audio?,not started
+0x2c1f10,304,PathX_FadeTracks,audio?,not started
 0x2c2040,72,FUN_002c2040,audio?,ported
 0x2c2088,652,Shape_UnpackBlocks,lib-shape?,not started
 0x2c2318,524,Shape_Unpack,lib-shape?,ported
@@ -6116,7 +6116,7 @@ address,size,name,system,status
 0x2c2694,64,Shape_GetEntryName,lib-shape?,not started
 0x2c26d8,240,Shape_PixelFormatIndex,lib-shape?,not started
 0x2c27c8,948,FUN_002c27c8,lib-compress?,not started
-0x2c2bb8,60,FUN_002c2bb8,lib-compress?,not started
+0x2c2bb8,60,Compress_IsType18,lib-compress?,not started
 0x2c2bf8,288,Compress_Decode18Rows,lib-compress?,not started
 0x2c2d18,196,Compress_Decode18,lib-compress?,ported
 0x2c2de0,432,Compress_Decode,lib-compress?,ported
@@ -6127,45 +6127,45 @@ address,size,name,system,status
 0x2c34d8,104,BTree_EmitSymbol,lib-compress?,not started
 0x2c3540,492,BTree_Decode,lib-compress?,not started
 0x2c3730,3396,Huff_Decode,lib-compress?,not started
-0x2c4478,96,FUN_002c4478,lib-text?,not started
-0x2c44d8,44,FUN_002c44d8,lib-text?,not started
+0x2c4478,96,Fmt_WriteDigits,lib-text?,not started
+0x2c44d8,44,Fmt_WriteAbsDigits,lib-text?,not started
 0x2c4508,216,FUN_002c4508,lib-text?,not started
 0x2c45e0,772,FUN_002c45e0,lib-text?,not started
 0x2c48e8,716,WStr_VFormat,lib-text?,not started
-0x2c4e90,68,FUN_002c4e90,lib-text?,not started
+0x2c4e90,68,WStr_Sprintf,lib-text?,not started
 0x2c50b0,172,Loc_MapId,lib-text?,ported
 0x2c5160,404,Loc_GetString,lib-text?,ported
 0x2c52f8,52,WStr_Len,lib-text?,not started
-0x2c5380,148,FUN_002c5380,lib-text?,not started
-0x2c5418,32,FUN_002c5418,lib-text?,not started
+0x2c5380,148,WStr_Find,lib-text?,not started
+0x2c5418,32,WStr_Cmp,lib-text?,not started
 0x2c5438,96,WStr_NCmp,lib-text?,not started
 0x2c5498,32,WStr_CopyAll,lib-text?,not started
 0x2c54b8,88,WStr_NCopy,lib-text?,not started
 0x2c5510,72,WStr_FromAscii,lib-text?,not started
 0x2c5558,28,FUN_002c5558,lib-text?,not started
 0x2c5578,228,WStr_FormatArgs,lib-text?,not started
-0x2c5660,104,FUN_002c5660,lib-file?,host
+0x2c5660,104,AsyncFile_ListAppend,lib-file?,host
 0x2c56c8,100,AsyncFile_AllocSlot,lib-file?,host
 0x2c5730,44,AsyncFile_ResetSlot,lib-file?,host
 0x2c5760,68,AsyncFile_FindSlot,lib-file?,host
 0x2c57a8,96,AsyncFile_FreeSlot,lib-file?,host
-0x2c5808,144,FUN_002c5808,lib-file?,host
+0x2c5808,144,AsyncFile_Complete,lib-file?,host
 0x2c5898,52,FUN_002c5898,lib-file?,host
 0x2c58d0,236,FUN_002c58d0,lib-file?,host
 0x2c59c0,212,FUN_002c59c0,lib-file?,host
 0x2c5a98,256,FUN_002c5a98,lib-file?,host
 0x2c5b98,196,FUN_002c5b98,lib-file?,host
 0x2c5c60,208,AsyncFile_Init,lib-file?,host
-0x2c5d30,240,FUN_002c5d30,lib-file?,host
+0x2c5d30,240,AsyncFile_CancelAll,lib-file?,host
 0x2c5e20,172,AsyncFile_Load,lib-file?,host
 0x2c5ed0,200,AsyncFile_LoadInto,lib-file?,host
-0x2c5f98,216,FUN_002c5f98,lib-file?,host
+0x2c5f98,216,AsyncFile_StartRead,lib-file?,host
 0x2c6070,148,AsyncFile_SetCallback,lib-file?,host
 0x2c6108,88,AsyncFile_IsDone,lib-file?,host
 0x2c6160,280,AsyncFile_Finish,lib-file?,host
 0x2c6278,220,AsyncFile_Cancel,lib-file?,host
 0x2c6358,56,Strm_GetHeader,lib-file?,host
-0x2c6390,64,FUN_002c6390,lib-file?,host
+0x2c6390,64,RingBuf_InRange,lib-file?,host
 0x2c63d0,144,FUN_002c63d0,lib-file?,host
 0x2c6460,124,FUN_002c6460,lib-file?,host
 0x2c64e0,116,FUN_002c64e0,lib-file?,host
@@ -6178,7 +6178,7 @@ address,size,name,system,status
 0x2c6928,252,FUN_002c6928,lib-file?,host
 0x2c6a28,348,FUN_002c6a28,lib-file?,host
 0x2c6b88,704,FUN_002c6b88,lib-file?,host
-0x2c6e48,40,FUN_002c6e48,lib-file?,host
+0x2c6e48,40,Strm_CalcMemSize,lib-file?,host
 0x2c6e70,548,FUN_002c6e70,lib-file?,host
 0x2c7098,220,FUN_002c7098,lib-file?,host
 0x2c7178,168,VideoStream_Close,lib-file?,host
@@ -6191,33 +6191,33 @@ address,size,name,system,status
 0x2c74c8,268,FUN_002c74c8,lib-file?,host
 0x2c75d8,640,FUN_002c75d8,lib-file?,host
 0x2c7858,456,FUN_002c7858,lib-file?,host
-0x2c7a28,264,FUN_002c7a28,lib-file?,host
-0x2c7b30,224,FUN_002c7b30,lib-file?,host
-0x2c7c10,48,FUN_002c7c10,lib-file?,host
-0x2c7c40,48,FUN_002c7c40,lib-file?,host
-0x2c7c70,72,FUN_002c7c70,lib-file?,host
-0x2c7cb8,56,FUN_002c7cb8,lib-file?,host
+0x2c7a28,264,Strm_GetPacket,lib-file?,host
+0x2c7b30,224,Strm_ReleasePacket,lib-file?,host
+0x2c7c10,48,Strm_GetBufferedBytes,lib-file?,host
+0x2c7c40,48,Strm_GetState,lib-file?,host
+0x2c7c70,72,Strm_IsFinished,lib-file?,host
+0x2c7cb8,56,Strm_GetBufferSize,lib-file?,host
 0x2c7cf0,48,FUN_002c7cf0,lib-file?,host
 0x2c7d20,196,FUN_002c7d20,lib-file?,host
 0x2c7de8,76,FUN_002c7de8,lib-file?,host
 0x2c7e38,32,FileSys_Exists,lib-file?,host
-0x2c7e58,108,FUN_002c7e58,lib-file?,host
-0x2c7ec8,76,FUN_002c7ec8,lib-file?,host
+0x2c7e58,108,File_GetSizeCb,files,not started
+0x2c7ec8,76,File_GetSize,files,not started
 0x2c7f18,72,FUN_002c7f18,lib-file?,host
-0x2c7f60,180,FUN_002c7f60,lib-file?,host
-0x2c8018,80,FUN_002c8018,lib-file?,host
+0x2c7f60,180,File_LoadAllocCb,files,not started
+0x2c8018,80,File_LoadAlloc,files,not started
 0x2c8068,76,FUN_002c8068,lib-file?,host
-0x2c80b8,192,FUN_002c80b8,lib-file?,host
-0x2c8178,112,FUN_002c8178,lib-file?,host
+0x2c80b8,192,File_LoadAllocSizeCb,files,not started
+0x2c8178,112,File_LoadAllocSize,files,not started
 0x2c81e8,108,File_ReadWhole,files,not started
-0x2c8258,152,FUN_002c8258,lib-file?,host
-0x2c82f0,84,FUN_002c82f0,lib-file?,host
+0x2c8258,152,File_LoadIntoCb,files,not started
+0x2c82f0,84,File_LoadInto,files,not started
 0x2c8348,80,FUN_002c8348,lib-file?,host
-0x2c8398,148,FUN_002c8398,lib-file?,host
-0x2c8430,108,FUN_002c8430,lib-file?,host
+0x2c8398,148,File_LoadManyCb,files,not started
+0x2c8430,108,File_LoadMany,files,not started
 0x2c84a0,104,FUN_002c84a0,lib-file?,host
-0x2c8508,352,FUN_002c8508,lib-file?,host
-0x2c8668,80,FUN_002c8668,lib-file?,host
+0x2c8508,352,File_OpenBigCb,files,not started
+0x2c8668,80,File_OpenBig,files,not started
 0x2c86b8,76,FUN_002c86b8,lib-file?,host
 0x2c8708,220,Host_WriteFile,lib-file?,host
 0x2c87e8,240,Host_WriteFileChecked,lib-file?,host
@@ -6227,13 +6227,13 @@ address,size,name,system,status
 0x2c8a70,28,File_Load,files,not started
 0x2c8a90,312,FUN_002c8a90,lib-file?,host
 0x2c8bc8,28,FUN_002c8bc8,lib-file?,host
-0x2c8be8,264,FUN_002c8be8,lib-file?,host
-0x2c8cf0,164,FUN_002c8cf0,lib-file?,host
-0x2c8d98,112,FUN_002c8d98,lib-file?,host
-0x2c8e08,32,FUN_002c8e08,lib-file?,host
+0x2c8be8,264,File_ReadChunkCb,files,not started
+0x2c8cf0,164,File_ReadChunked,files,not started
+0x2c8d98,112,File_OpenSync,files,not started
+0x2c8e08,32,File_ReadSync,files,not started
 0x2c8e28,32,FUN_002c8e28,lib-file?,host
-0x2c8e48,84,FUN_002c8e48,lib-file?,host
-0x2c8ea0,84,FUN_002c8ea0,lib-file?,host
+0x2c8e48,84,File_CloseSync,files,not started
+0x2c8ea0,84,File_SizeSync,files,not started
 0x2c8ef8,84,FUN_002c8ef8,lib-file?,host
 0x2c8f50,112,FileSys_MountBig,lib-file?,ported
 0x2c8fc0,84,FUN_002c8fc0,lib-file?,host
@@ -6245,50 +6245,50 @@ address,size,name,system,status
 0x2c9420,32,CdFs_CompareEntryName,lib-file?,ported
 0x2c9440,28,CdFs_CompareName,lib-file?,ported
 0x2c9498,40,FUN_002c9498,lib-file?,host
-0x2c94c0,192,FUN_002c94c0,lib-file?,host
-0x2c9580,396,FUN_002c9580,lib-file?,host
+0x2c94c0,192,CdStream_IssueRead,lib-file?,host
+0x2c9580,396,CdStream_Thread,lib-file?,host
 0x2c9710,540,FUN_002c9710,lib-file?,host
 0x2c9930,60,FUN_002c9930,lib-file?,host
 0x2c9970,848,CdFs_Mount,lib-file?,ported
 0x2c9cc0,352,CdFs_FindFile,lib-file?,ported
 0x2c9e20,656,FUN_002c9e20,lib-file?,host
-0x2ca0b0,108,FUN_002ca0b0,lib-file?,host
-0x2ca120,80,FUN_002ca120,lib-file?,host
-0x2ca170,148,FUN_002ca170,lib-file?,host
-0x2ca208,276,FUN_002ca208,lib-file?,host
-0x2ca320,72,FUN_002ca320,lib-file?,host
-0x2ca368,72,FUN_002ca368,lib-file?,host
+0x2ca0b0,108,CdFs_GetFileInfo,lib-file?,host
+0x2ca120,80,CdFs_FindEntry,lib-file?,host
+0x2ca170,148,FileSys_Init,lib-file?,host
+0x2ca208,276,FileSys_InitWithBuffer,lib-file?,host
+0x2ca320,72,FileSys_CalcMemSize,lib-file?,host
+0x2ca368,72,FileSys_GetStatus,lib-file?,host
 0x2ca3b0,44,FUN_002ca3b0,lib-file?,host
 0x2ca3e0,44,FUN_002ca3e0,lib-file?,host
-0x2ca410,80,FUN_002ca410,lib-file?,host
+0x2ca410,80,FileSys_SetCallback,lib-file?,host
 0x2ca460,348,FUN_002ca460,lib-file?,host
-0x2ca5c0,100,FUN_002ca5c0,lib-file?,host
-0x2ca628,204,FUN_002ca628,lib-file?,host
-0x2ca6f8,252,FUN_002ca6f8,lib-file?,host
+0x2ca5c0,100,FileSys_CancelOp,lib-file?,host
+0x2ca628,204,FileSys_WaitOp,lib-file?,host
+0x2ca6f8,252,FileSys_GetResult,lib-file?,host
 0x2ca7f8,176,FileSys_Open,lib-file?,host
-0x2ca8a8,184,FUN_002ca8a8,lib-file?,host
-0x2ca960,168,FUN_002ca960,lib-file?,host
-0x2caa08,212,FUN_002caa08,lib-file?,host
-0x2caae0,192,FUN_002caae0,lib-file?,host
-0x2caba0,152,FUN_002caba0,lib-file?,host
+0x2ca8a8,184,FileSys_QueueOpen,lib-file?,host
+0x2ca960,168,FileSys_QueueClose,lib-file?,host
+0x2caa08,212,FileSys_QueueRead,lib-file?,host
+0x2caae0,192,FileSys_QueueWrite,lib-file?,host
+0x2caba0,152,FileSys_GetFileSize,lib-file?,host
 0x2cac38,108,FUN_002cac38,lib-file?,host
 0x2caca8,280,FileSys_OnBigHeaderRead,lib-file?,ported
 0x2cadc0,172,FUN_002cadc0,lib-file?,host
 0x2cae70,308,FUN_002cae70,lib-file?,host
 0x2cafa8,44,FUN_002cafa8,lib-file?,host
 0x2cafd8,436,FUN_002cafd8,lib-file?,host
-0x2cb190,96,FUN_002cb190,lib-file?,host
+0x2cb190,96,FileSys_RunWithHeap,lib-file?,host
 0x2cb1f0,36,FUN_002cb1f0,lib-file?,host
-0x2cb218,228,FUN_002cb218,lib-file?,host
-0x2cb300,36,FUN_002cb300,lib-file?,host
+0x2cb218,228,FileSys_SetRootPath,lib-file?,host
+0x2cb300,36,FileSys_GetRootPath,lib-file?,host
 0x2cb328,1112,FileSys_RunQueue,lib-file?,ported
-0x2cb780,164,FUN_002cb780,lib-file?,host
+0x2cb780,164,FileSys_CompleteCurrent,lib-file?,host
 0x2cb830,408,FUN_002cb830,lib-file?,host
 0x2cb9c8,8,FUN_002cb9c8,lib-file?,host
-0x2cb9d0,328,FUN_002cb9d0,lib-file?,host
-0x2cbb18,80,FUN_002cbb18,lib-file?,host
-0x2cbb68,188,FUN_002cbb68,lib-file?,host
-0x2cbc28,80,FUN_002cbc28,lib-file?,host
+0x2cb9d0,328,FileSys_AllocOp,lib-file?,host
+0x2cbb18,80,FileSys_FreeOp,lib-file?,host
+0x2cbb68,188,FileSys_AllocHandle,lib-file?,host
+0x2cbc28,80,FileSys_FreeHandle,lib-file?,host
 0x2cbc88,128,BIG_Identify,lib-big?,ported
 0x2cbd08,184,BIG_HeaderSize,lib-big?,ported
 0x2cbdc0,588,BIG_Lookup,lib-big?,ported
@@ -6305,43 +6305,43 @@ address,size,name,system,status
 0x2cc348,28,FUN_002cc348,lib-file?,host
 0x2cc368,336,FileSys_MakeDevicePath,lib-file?,host
 0x2cc4b8,236,FileSys_OpenOnDisc,lib-file?,host
-0x2cc5a8,84,FUN_002cc5a8,lib-file?,host
-0x2cc600,124,FUN_002cc600,lib-file?,host
-0x2cc680,172,FUN_002cc680,lib-file?,host
-0x2cc730,108,FUN_002cc730,lib-file?,host
-0x2cc7a0,100,FUN_002cc7a0,lib-file?,host
+0x2cc5a8,84,HostFs_Close,lib-file?,host
+0x2cc600,124,FileSys_DevRead,lib-file?,host
+0x2cc680,172,HostFs_ServiceRead,lib-file?,host
+0x2cc730,108,HostFs_Write,lib-file?,host
+0x2cc7a0,100,FileSys_DevGetSize,lib-file?,host
 0x2cc808,300,EAMem_Set,lib-eamem?,host
 0x2cc938,32,FUN_002cc938,lib-eamem?,host
-0x2cc958,40,FUN_002cc958,lib-eamem?,host
-0x2cc980,28,FUN_002cc980,lib-eamem?,host
+0x2cc958,40,Compress_Alloc,lib-eamem?,host
+0x2cc980,28,Compress_Free,lib-eamem?,host
 0x2cc9a0,96,FUN_002cc9a0,lib-eamem?,host
 0x2cca00,1344,EAMem_AllocEx,lib-eamem?,host
 0x2ccf50,28,FUN_002ccf50,lib-eamem?,host
 0x2ccf70,40,EAMem_Alloc,lib-eamem?,host
 0x2ccf98,40,FUN_002ccf98,lib-eamem?,host
 0x2ccfc0,420,EAMem_Free,lib-eamem?,host
-0x2cd168,232,FUN_002cd168,lib-eamem?,host
+0x2cd168,232,EAMem_InitBlock,lib-eamem?,host
 0x2cd250,40,FUN_002cd250,lib-eamem?,host
 0x2cd278,644,EAMem_InitHeap,lib-eamem?,host
-0x2cd500,112,FUN_002cd500,lib-eamem?,host
-0x2cd570,104,FUN_002cd570,lib-eamem?,host
-0x2cd798,136,FUN_002cd798,lib-eamem?,host
-0x2cd820,108,FUN_002cd820,lib-eamem?,host
+0x2cd500,112,EAMem_DestroyHeap,lib-eamem?,host
+0x2cd570,104,EAMem_FreeAll,lib-eamem?,host
+0x2cd798,136,EAMem_InitMainHeap,lib-eamem?,host
+0x2cd820,108,EAMem_InitDefaultHeap,lib-eamem?,host
 0x2cd890,28,FUN_002cd890,lib-eamem?,host
-0x2cd8b0,224,FUN_002cd8b0,lib-eamem?,host
+0x2cd8b0,224,EAMem_DestroyAll,lib-eamem?,host
 0x2cd990,32,FUN_002cd990,lib-eamem?,host
-0x2cd9b0,8,FUN_002cd9b0,lib-eamem?,host
+0x2cd9b0,8,EAMem_GetSize,lib-eamem?,host
 0x2cd9b8,84,FUN_002cd9b8,lib-eamem?,host
 0x2cda18,576,FUN_002cda18,lib-eamem?,host
 0x2cdc60,104,FUN_002cdc60,lib-eamem?,host
 0x2cdcc8,244,FUN_002cdcc8,lib-eamem?,host
 0x2cddc0,176,FUN_002cddc0,lib-eamem?,host
 0x2cde70,152,FUN_002cde70,lib-eamem?,host
-0x2cdf08,204,FUN_002cdf08,lib-eamem?,host
-0x2cdfd8,116,FUN_002cdfd8,lib-eamem?,host
-0x2ce04c,200,FUN_002ce04c,lib-eamem?,host
+0x2cdf08,204,EAMem_ValidateHeap,lib-eamem?,host
+0x2cdfd8,116,EAMem_ValidateAll,lib-eamem?,host
+0x2ce04c,200,Crc_Compute16,lib-eamem?,host
 0x2ce114,272,EAMem_Copy,lib-eamem?,host
-0x2ce228,112,FUN_002ce228,lib-eamem?,host
+0x2ce228,112,Mem_Move,lib-eamem?,host
 0x2ce2c0,8,FUN_002ce2c0,lib-eamem?,host
 0x2ce2c8,220,Debug_Fatal,lib-eamem?,host
 0x2ce3c0,48,FUN_002ce3c0,lib-eamem?,host
@@ -6355,76 +6355,76 @@ address,size,name,system,status
 0x2ce848,72,FUN_002ce848,lib-eamem?,host
 0x2ce890,80,FUN_002ce890,lib-eamem?,host
 0x2ce8e0,112,FUN_002ce8e0,lib-eamem?,host
-0x2ce950,92,FUN_002ce950,lib-eamem?,host
-0x2ce9b0,32,FUN_002ce9b0,lib-eamem?,host
-0x2ce9d0,120,FUN_002ce9d0,lib-eamem?,host
-0x2cea98,68,FUN_002cea98,lib-eamem?,host
-0x2ceae0,32,FUN_002ceae0,lib-eamem?,host
+0x2ce950,92,Sys_RunExitHandlers,lib-eamem?,host
+0x2ce9b0,32,Sys_Abort,lib-eamem?,host
+0x2ce9d0,120,Sys_AddExitHandler,lib-eamem?,host
+0x2cea98,68,Mutex_Init,lib-eamem?,host
+0x2ceae0,32,Mutex_Destroy,lib-eamem?,host
 0x2ceb00,96,Mutex_Lock,lib-eamem?,host
 0x2ceb60,80,Mutex_Unlock,lib-eamem?,host
 0x2cebb0,8,FUN_002cebb0,lib-eamem?,host
 0x2cebb8,48,FUN_002cebb8,lib-eamem?,host
-0x2cebe8,176,FUN_002cebe8,lib-eamem?,host
-0x2cec98,100,FUN_002cec98,lib-eamem?,host
-0x2ced00,284,FUN_002ced00,lib-eamem?,host
-0x2cee20,96,FUN_002cee20,lib-eamem?,host
+0x2cebe8,176,Sys_AddPollTask,lib-eamem?,host
+0x2cec98,100,Sys_RemovePollTask,lib-eamem?,host
+0x2ced00,284,Sys_RunPollTasks,lib-eamem?,host
+0x2cee20,96,Sys_PollFor,lib-eamem?,host
 0x2cee88,52,FUN_002cee88,lib-eamem?,host
-0x2ceec0,56,FUN_002ceec0,lib-eamem?,host
+0x2ceec0,56,Sys_InitMainThread,lib-eamem?,host
 0x2cef30,216,Thread_Create,lib-eamem?,host
-0x2cf008,92,FUN_002cf008,lib-eamem?,host
+0x2cf008,92,Thread_Kill,lib-eamem?,host
 0x2cf068,140,FUN_002cf068,lib-eamem?,host
-0x2cf0f8,172,FUN_002cf0f8,lib-eamem?,host
-0x2cf1a8,88,FUN_002cf1a8,lib-eamem?,host
-0x2cf200,80,FUN_002cf200,lib-eamem?,host
-0x2cf250,80,FUN_002cf250,lib-eamem?,host
-0x2cf2a0,88,FUN_002cf2a0,lib-eamem?,host
+0x2cf0f8,172,Thread_SleepTicks,lib-eamem?,host
+0x2cf1a8,88,Thread_SleepMs,lib-eamem?,host
+0x2cf200,80,Thread_IsCurrent,lib-eamem?,host
+0x2cf250,80,Thread_GetPriority,lib-eamem?,host
+0x2cf2a0,88,Thread_SetPriority,lib-eamem?,host
 0x2cf2f8,32,FUN_002cf2f8,lib-eamem?,host
-0x2cf318,60,FUN_002cf318,lib-eamem?,host
+0x2cf318,60,Thread_Join,lib-eamem?,host
 0x2cf358,104,FUN_002cf358,lib-eamem?,host
-0x2cf3c0,40,FUN_002cf3c0,lib-eamem?,host
-0x2cf3e8,28,FUN_002cf3e8,lib-eamem?,host
-0x2cf408,28,FUN_002cf408,lib-eamem?,host
-0x2cf428,28,FUN_002cf428,lib-eamem?,host
-0x2cf448,28,FUN_002cf448,lib-eamem?,host
-0x2cf468,68,FUN_002cf468,lib-eamem?,host
-0x2cf4b0,28,FUN_002cf4b0,lib-eamem?,host
-0x2cf4d0,128,FUN_002cf4d0,lib-eamem?,host
-0x2cf550,68,FUN_002cf550,lib-eamem?,host
+0x2cf3c0,40,Sema_Create,lib-eamem?,host
+0x2cf3e8,28,Sema_Delete,lib-eamem?,host
+0x2cf408,28,Sema_Signal,lib-eamem?,host
+0x2cf428,28,Sema_Wait,lib-eamem?,host
+0x2cf448,28,Sema_Poll,lib-eamem?,host
+0x2cf468,68,RecMutex_Create,lib-eamem?,host
+0x2cf4b0,28,RecMutex_Destroy,lib-eamem?,host
+0x2cf4d0,128,RecMutex_Lock,lib-eamem?,host
+0x2cf550,68,RecMutex_Unlock,lib-eamem?,host
 0x2cf598,108,FUN_002cf598,lib-eamem?,host
 0x2cf608,60,FUN_002cf608,lib-eamem?,host
-0x2cf648,332,FUN_002cf648,lib-eamem?,host
-0x2cf798,68,FUN_002cf798,lib-eamem?,host
+0x2cf648,332,Timer_Init,lib-eamem?,host
+0x2cf798,68,Timer_Shutdown,lib-eamem?,host
 0x2cf7e0,264,FUN_002cf7e0,lib-eamem?,host
 0x2cf8e8,264,FUN_002cf8e8,lib-snd?,not started
-0x2cf9f0,204,FUN_002cf9f0,lib-snd?,not started
-0x2cfac0,12,FUN_002cfac0,lib-snd?,not started
-0x2cfad0,48,FUN_002cfad0,lib-snd?,not started
-0x2cfb18,44,FUN_002cfb18,lib-snd?,not started
-0x2cfb48,48,FUN_002cfb48,lib-snd?,not started
-0x2cfb80,44,FUN_002cfb80,lib-snd?,not started
-0x2cfbb0,72,FUN_002cfbb0,lib-snd?,not started
-0x2cfc00,396,FUN_002cfc00,lib-snd?,not started
-0x2cfd90,252,FUN_002cfd90,lib-snd?,not started
+0x2cf9f0,204,Timer_IrqHandler,lib-snd?,not started
+0x2cfac0,12,Timer_GetTicks,lib-snd?,not started
+0x2cfad0,48,Timer_Delta,lib-snd?,not started
+0x2cfb18,44,Timer_SetAlarm,lib-snd?,not started
+0x2cfb48,48,Timer_WaitAlarm,lib-snd?,not started
+0x2cfb80,44,Timer_AlarmExpired,lib-snd?,not started
+0x2cfbb0,72,Timer_WaitTicks,lib-snd?,not started
+0x2cfc00,396,Sort_Radix16,lib-snd?,not started
+0x2cfd90,252,Sort_ShellPairs,lib-snd?,not started
 0x2cfe90,28,FUN_002cfe90,lib-snd?,not started
 0x2cfeb0,460,FUN_002cfeb0,lib-snd?,not started
 0x2d0080,476,FUN_002d0080,lib-snd?,not started
 0x2d0260,464,SND_Init,audio,not started
-0x2d0430,224,FUN_002d0430,lib-snd?,not started
+0x2d0430,224,SND_Shutdown,audio,not started
 0x2d0520,32,FUN_002d0520,lib-snd?,not started
 0x2d0548,88,FUN_002d0548,lib-snd?,not started
 0x2d05a0,248,FUN_002d05a0,lib-snd?,not started
 0x2d0698,624,FUN_002d0698,lib-snd?,not started
 0x2d0908,48,SND_Lock,audio,not started
 0x2d0938,48,SND_Unlock,audio,not started
-0x2d0968,56,FUN_002d0968,lib-snd?,not started
-0x2d09a0,220,FUN_002d09a0,lib-snd?,not started
+0x2d0968,56,SND_AddTickCallback,audio,not started
+0x2d09a0,220,SND_RemoveTickCallback,audio,not started
 0x2d0a80,28,FUN_002d0a80,lib-snd?,not started
 0x2d0aa0,28,FUN_002d0aa0,lib-snd?,not started
 0x2d0ac0,48,FUN_002d0ac0,lib-snd?,not started
-0x2d0af0,112,FUN_002d0af0,lib-snd?,not started
-0x2d0b60,52,FUN_002d0b60,lib-snd?,not started
+0x2d0af0,112,SndMem_Init,lib-snd?,not started
+0x2d0b60,52,SndMem_UsedPercent,lib-snd?,not started
 0x2d0b98,568,FUN_002d0b98,lib-snd?,not started
-0x2d0dd0,200,FUN_002d0dd0,lib-snd?,not started
+0x2d0dd0,200,SndMem_Free,lib-snd?,not started
 0x2d0e98,252,FUN_002d0e98,lib-snd?,not started
 0x2d0f98,616,FUN_002d0f98,lib-snd?,not started
 0x2d1200,472,FUN_002d1200,lib-snd?,not started
@@ -6434,11 +6434,11 @@ address,size,name,system,status
 0x2d14d0,160,FUN_002d14d0,lib-snd?,not started
 0x2d1570,268,FUN_002d1570,lib-snd?,not started
 0x2d1680,152,FUN_002d1680,lib-snd?,not started
-0x2d1718,152,FUN_002d1718,lib-snd?,not started
+0x2d1718,152,SND_PlayBankSound,audio,not started
 0x2d17b0,140,FUN_002d17b0,lib-snd?,not started
 0x2d1840,136,FUN_002d1840,lib-snd?,not started
-0x2d18c8,92,FUN_002d18c8,lib-snd?,not started
-0x2d1928,56,FUN_002d1928,lib-snd?,not started
+0x2d18c8,92,SndStream_CloseAll,lib-snd?,not started
+0x2d1928,56,SndStream_Get,lib-snd?,not started
 0x2d1960,288,FUN_002d1960,lib-snd?,not started
 0x2d1a80,56,FUN_002d1a80,lib-snd?,not started
 0x2d1ab8,184,FUN_002d1ab8,lib-snd?,not started
@@ -6449,70 +6449,70 @@ address,size,name,system,status
 0x2d20c8,176,FUN_002d20c8,lib-snd?,not started
 0x2d2178,248,FUN_002d2178,lib-snd?,not started
 0x2d2270,564,FUN_002d2270,lib-snd?,not started
-0x2d24a8,56,FUN_002d24a8,lib-snd?,not started
+0x2d24a8,56,SndStream_CountOpen,lib-snd?,not started
 0x2d24e0,584,FUN_002d24e0,lib-snd?,not started
-0x2d2728,348,FUN_002d2728,lib-snd?,not started
-0x2d2888,32,FUN_002d2888,lib-snd?,not started
-0x2d28a8,160,FUN_002d28a8,lib-snd?,not started
-0x2d2948,28,FUN_002d2948,lib-snd?,not started
-0x2d2968,284,FUN_002d2968,lib-snd?,not started
+0x2d2728,348,SndStream_Queue,lib-snd?,not started
+0x2d2888,32,SndStream_Open,lib-snd?,not started
+0x2d28a8,160,SndStream_Close,lib-snd?,not started
+0x2d2948,28,SndStream_QueueFile,lib-snd?,not started
+0x2d2968,284,SndStream_Stop,lib-snd?,not started
 0x2d2a88,52,FUN_002d2a88,lib-snd?,not started
-0x2d2ac0,68,FUN_002d2ac0,lib-snd?,not started
-0x2d2b08,264,FUN_002d2b08,lib-snd?,not started
-0x2d2c10,320,FUN_002d2c10,lib-snd?,not started
+0x2d2ac0,68,SndStream_CalcMemSize,lib-snd?,not started
+0x2d2b08,264,SndStream_GetStatus,lib-snd?,not started
+0x2d2c10,320,SndHandle_GetState,lib-snd?,not started
 0x2d2d50,96,FUN_002d2d50,lib-snd?,not started
 0x2d2db0,36,FUN_002d2db0,lib-snd?,not started
 0x2d2dd8,56,FUN_002d2dd8,lib-snd?,not started
-0x2d2e10,64,FUN_002d2e10,lib-snd?,not started
-0x2d2e50,104,FUN_002d2e50,lib-snd?,not started
+0x2d2e10,64,SndStream_SetVolume,lib-snd?,not started
+0x2d2e50,104,SndStream_FadeVolume,lib-snd?,not started
 0x2d2eb8,84,FUN_002d2eb8,lib-snd?,not started
-0x2d2f10,64,FUN_002d2f10,lib-snd?,not started
+0x2d2f10,64,SndStream_SetPitch,lib-snd?,not started
 0x2d2f50,60,FUN_002d2f50,lib-snd?,not started
 0x2d2f90,180,FUN_002d2f90,lib-snd?,not started
-0x2d3048,188,FUN_002d3048,lib-snd?,not started
-0x2d3108,172,FUN_002d3108,lib-snd?,not started
-0x2d31b8,164,FUN_002d31b8,lib-snd?,not started
-0x2d3260,88,FUN_002d3260,lib-snd?,not started
-0x2d32b8,124,FUN_002d32b8,lib-snd?,not started
-0x2d3338,32,FUN_002d3338,lib-snd?,not started
+0x2d3048,188,SndHandle_Fade,lib-snd?,not started
+0x2d3108,172,SndHandle_SetVolume,lib-snd?,not started
+0x2d31b8,164,SndHandle_SetPitch,lib-snd?,not started
+0x2d3260,88,SndHandle_Stop,lib-snd?,not started
+0x2d32b8,124,SND_StopAll,audio,not started
+0x2d3338,32,SndHandle_IsDead,lib-snd?,not started
 0x2d3358,292,FUN_002d3358,lib-snd?,not started
-0x2d3480,196,FUN_002d3480,lib-snd?,not started
+0x2d3480,196,SndHandle_SetPan,lib-snd?,not started
 0x2d3548,176,FUN_002d3548,lib-snd?,not started
 0x2d35f8,288,FUN_002d35f8,lib-snd?,not started
 0x2d3718,96,FUN_002d3718,lib-snd?,not started
 0x2d3780,96,FUN_002d3780,lib-snd?,not started
-0x2d37e8,76,FUN_002d37e8,lib-snd?,not started
-0x2d3838,252,FUN_002d3838,lib-snd?,not started
+0x2d37e8,76,SndMidi_Validate,lib-snd?,not started
+0x2d3838,252,SndMidi_UpdateFade,lib-snd?,not started
 0x2d3938,140,FUN_002d3938,lib-snd?,not started
 0x2d39c8,452,FUN_002d39c8,lib-snd?,not started
 0x2d3b90,160,FUN_002d3b90,lib-snd?,not started
 0x2d3c30,488,FUN_002d3c30,lib-snd?,not started
 0x2d3e18,228,FUN_002d3e18,lib-snd?,not started
 0x2d3f00,520,FUN_002d3f00,lib-snd?,not started
-0x2d4108,288,FUN_002d4108,lib-snd?,not started
-0x2d4228,160,FUN_002d4228,lib-snd?,not started
-0x2d42c8,64,FUN_002d42c8,lib-snd?,not started
-0x2d4308,92,FUN_002d4308,lib-snd?,not started
-0x2d4368,212,FUN_002d4368,lib-snd?,not started
-0x2d4440,356,FUN_002d4440,lib-snd?,not started
-0x2d45a8,184,FUN_002d45a8,lib-snd?,not started
-0x2d4660,220,FUN_002d4660,lib-snd?,not started
-0x2d4740,200,FUN_002d4740,lib-snd?,not started
-0x2d4808,124,FUN_002d4808,lib-snd?,not started
-0x2d4888,240,FUN_002d4888,lib-snd?,not started
-0x2d4978,144,FUN_002d4978,lib-snd?,not started
-0x2d4a08,88,FUN_002d4a08,lib-snd?,not started
-0x2d4a60,80,FUN_002d4a60,lib-snd?,not started
+0x2d4108,288,SndMidi_Tick,lib-snd?,not started
+0x2d4228,160,SndMidi_Init,lib-snd?,not started
+0x2d42c8,64,SndMidi_Shutdown,lib-snd?,not started
+0x2d4308,92,SndMidi_StopAll,lib-snd?,not started
+0x2d4368,212,SndMidi_Stop,lib-snd?,not started
+0x2d4440,356,SndMidi_Play,lib-snd?,not started
+0x2d45a8,184,SndMidi_SetPitch,lib-snd?,not started
+0x2d4660,220,SndMidi_SetPan,lib-snd?,not started
+0x2d4740,200,SndMidi_Pause,lib-snd?,not started
+0x2d4808,124,SndMidi_Resume,lib-snd?,not started
+0x2d4888,240,SndMidi_SetVolume,lib-snd?,not started
+0x2d4978,144,SndMidi_Fade,lib-snd?,not started
+0x2d4a08,88,SndMidi_GetState,lib-snd?,not started
+0x2d4a60,80,SndPlayOpts_Init,lib-snd?,not started
 0x2d4ab0,56,FUN_002d4ab0,lib-snd?,not started
 0x2d4ae8,1136,FUN_002d4ae8,lib-snd?,not started
 0x2d4f58,404,FUN_002d4f58,lib-snd?,not started
-0x2d50f0,88,FUN_002d50f0,lib-snd?,not started
-0x2d5148,172,FUN_002d5148,lib-snd?,not started
-0x2d51f8,144,FUN_002d51f8,lib-snd?,not started
+0x2d50f0,88,SndVoice_Validate,lib-snd?,not started
+0x2d5148,172,SndVoice_CalcVolume,lib-snd?,not started
+0x2d51f8,144,Snd_CentsToPitchMult,lib-snd?,not started
 0x2d5288,196,SNDVoice_CalcPitchMult,audio,ported
-0x2d5350,192,FUN_002d5350,lib-snd?,not started
+0x2d5350,192,SndVoice_NextInGroup,lib-snd?,not started
 0x2d5410,1356,SND_ParsePTLayer,audio,not started
-0x2d5960,116,FUN_002d5960,lib-snd?,not started
+0x2d5960,116,SndVoice_NextGroupId,lib-snd?,not started
 0x2d59d8,1084,FUN_002d59d8,lib-snd?,not started
 0x2d5e18,664,FUN_002d5e18,lib-snd?,not started
 0x2d60b0,1340,FUN_002d60b0,lib-snd?,not started
@@ -6520,11 +6520,11 @@ address,size,name,system,status
 0x2d6618,652,FUN_002d6618,lib-snd?,not started
 0x2d68a8,100,FUN_002d68a8,lib-snd?,not started
 0x2d6910,24,FUN_002d6910,lib-snd?,not started
-0x2d6928,236,FUN_002d6928,lib-snd?,not started
+0x2d6928,236,Snd_Rand,lib-snd?,not started
 0x2d6a18,180,FUN_002d6a18,lib-snd?,not started
 0x2d6ad0,52,FUN_002d6ad0,lib-snd?,not started
-0x2d6b08,128,FUN_002d6b08,lib-snd?,not started
-0x2d6b88,128,FUN_002d6b88,lib-snd?,not started
+0x2d6b08,128,Dma_ToScratchpad,lib-snd?,not started
+0x2d6b88,128,Dma_FromScratchpad,lib-snd?,not started
 0x2d6c08,180,FUN_002d6c08,lib-snd?,not started
 0x2d6cc0,1240,FUN_002d6cc0,lib-snd?,not started
 0x2d7198,436,FUN_002d7198,lib-snd?,not started
@@ -6555,22 +6555,22 @@ address,size,name,system,status
 0x2da770,112,FUN_002da770,lib-snd?,not started
 0x2da7e0,244,FUN_002da7e0,lib-snd?,not started
 0x2da8d8,164,FUN_002da8d8,lib-snd?,not started
-0x2da980,160,FUN_002da980,lib-snd?,not started
-0x2daa20,188,FUN_002daa20,lib-snd?,not started
-0x2daae0,168,FUN_002daae0,lib-snd?,not started
-0x2dab88,176,FUN_002dab88,lib-snd?,not started
-0x2dac38,120,FUN_002dac38,lib-snd?,not started
+0x2da980,160,Vu0_SaveRegs,save,not started
+0x2daa20,188,Vu0_RestoreRegs,lib-snd?,not started
+0x2daae0,168,SND_SaveScratchpad,save,not started
+0x2dab88,176,SND_RestoreScratchpad,audio,not started
+0x2dac38,120,SND_IopRpc,audio,not started
 0x2dacb0,48,FUN_002dacb0,lib-snd?,not started
-0x2dace0,120,FUN_002dace0,lib-snd?,not started
-0x2dad58,400,FUN_002dad58,lib-snd?,not started
+0x2dace0,120,SND_GetVoiceRange,audio,not started
+0x2dad58,400,SND_SetDefaultConfig,audio,not started
 0x2daee8,1228,FUN_002daee8,lib-snd?,not started
 0x2db3b8,724,FUN_002db3b8,lib-snd?,not started
 0x2db690,96,FUN_002db690,lib-snd?,not started
-0x2db6f0,68,FUN_002db6f0,lib-snd?,not started
+0x2db6f0,68,Str_Cat,lib-snd?,not started
 0x2db738,896,FUN_002db738,lib-snd?,not started
-0x2dbab8,344,FUN_002dbab8,lib-snd?,not started
+0x2dbab8,344,SND_MixThread,audio,not started
 0x2dbc10,1500,SND_LoadIopDriver,audio,not started
-0x2dc1f0,324,FUN_002dc1f0,lib-snd?,not started
+0x2dc1f0,324,SND_StopDriver,audio,not started
 0x2dc338,8,FUN_002dc338,lib-snd?,not started
 0x2dc340,420,FUN_002dc340,lib-snd?,not started
 0x2dc4e8,520,FUN_002dc4e8,lib-snd?,not started
@@ -6580,10 +6580,10 @@ address,size,name,system,status
 0x2dcd40,176,FUN_002dcd40,lib-snd?,not started
 0x2dcdf0,224,FUN_002dcdf0,lib-snd?,not started
 0x2dced0,176,FUN_002dced0,lib-snd?,not started
-0x2dcf80,88,FUN_002dcf80,lib-snd?,not started
-0x2dcfd8,40,FUN_002dcfd8,lib-snd?,not started
-0x2dd000,96,FUN_002dd000,lib-snd?,not started
-0x2dd060,112,FUN_002dd060,lib-snd?,not started
+0x2dcf80,88,SND_InitLockSema,audio,not started
+0x2dcfd8,40,SND_DeleteLockSema,audio,not started
+0x2dd000,96,SndSema_Lock,lib-snd?,not started
+0x2dd060,112,SndSema_Unlock,lib-snd?,not started
 0x2dd0d0,184,FUN_002dd0d0,lib-snd?,not started
 0x2dd188,236,FUN_002dd188,lib-snd?,not started
 0x2dd278,268,FUN_002dd278,lib-snd?,not started
@@ -6602,25 +6602,25 @@ address,size,name,system,status
 0x2de258,268,FUN_002de258,lib-snd?,not started
 0x2de368,80,FUN_002de368,lib-snd?,not started
 0x2de3b8,96,FUN_002de3b8,lib-snd?,not started
-0x2de418,140,FUN_002de418,lib-snd?,not started
-0x2de4c8,128,FUN_002de4c8,lib-snd?,not started
-0x2de548,128,FUN_002de548,lib-snd?,not started
+0x2de418,140,Sif_SendDma,lib-snd?,not started
+0x2de4c8,128,SndDma_ToScratchpad,lib-snd?,not started
+0x2de548,128,SndDma_FromScratchpad,lib-snd?,not started
 0x2de5c8,120,FUN_002de5c8,lib-snd?,not started
 0x2de640,516,FUN_002de640,lib-snd?,not started
 0x2de848,212,FUN_002de848,lib-snd?,not started
-0x2de920,120,FUN_002de920,lib-snd?,not started
+0x2de920,120,SpuMem_SetRange,lib-snd?,not started
 0x2de998,416,FUN_002de998,lib-snd?,not started
 0x2deb38,192,FUN_002deb38,lib-snd?,not started
 0x2debf8,180,FUN_002debf8,lib-snd?,not started
-0x2decac,272,FUN_002decac,lib-snd?,not started
-0x2dedc0,40,FUN_002dedc0,lib-snd?,not started
-0x2dede8,156,FUN_002dede8,lib-snd?,not started
-0x2dee88,116,FUN_002dee88,lib-snd?,not started
+0x2decac,272,Snd_MemCopy,lib-snd?,not started
+0x2dedc0,40,SND_AddStreamTask,audio,not started
+0x2dede8,156,SND_RemoveStreamTask,audio,not started
+0x2dee88,116,SND_RunStreamTasks,audio,not started
 0x2def00,232,FUN_002def00,lib-snd?,not started
-0x2defe8,280,FUN_002defe8,lib-snd?,not started
-0x2df100,88,FUN_002df100,lib-snd?,not started
-0x2df158,64,FUN_002df158,lib-snd?,not started
-0x2df198,60,FUN_002df198,lib-snd?,not started
+0x2defe8,280,Math_UMul64,lib-snd?,not started
+0x2df100,88,Math_UDiv64by32,lib-snd?,not started
+0x2df158,64,SndBank_FindFreeSlot,lib-snd?,not started
+0x2df198,60,SndBank_GetSound,audio,not started
 0x2df1d8,96,FUN_002df1d8,lib-snd?,not started
 0x2df238,12,FUN_002df238,lib-snd?,not started
 0x2df248,44,FUN_002df248,lib-snd?,not started
@@ -6634,7 +6634,7 @@ address,size,name,system,status
 0x2df978,60,FUN_002df978,lib-snd?,not started
 0x2df9b8,588,FUN_002df9b8,lib-snd?,not started
 0x2dfc08,100,FUN_002dfc08,lib-snd?,not started
-0x2dfc70,124,FUN_002dfc70,lib-snd?,not started
+0x2dfc70,124,SndStream_FindRequest,lib-snd?,not started
 0x2dfcf0,172,FUN_002dfcf0,lib-snd?,not started
 0x2dfda0,216,FUN_002dfda0,lib-snd?,not started
 0x2dfe78,120,FUN_002dfe78,lib-snd?,not started
@@ -6667,8 +6667,8 @@ address,size,name,system,status
 0x2e12a0,188,FUN_002e12a0,lib-snd?,not started
 0x2e1360,148,FUN_002e1360,lib-snd?,not started
 0x2e13f8,132,FUN_002e13f8,lib-snd?,not started
-0x2e1480,92,FUN_002e1480,lib-snd?,not started
-0x2e14e0,76,FUN_002e14e0,lib-snd?,not started
+0x2e1480,92,SndFxChain_Insert,lib-snd?,not started
+0x2e14e0,76,SndFxChain_Remove,lib-snd?,not started
 0x2e1530,72,FUN_002e1530,lib-snd?,not started
 0x2e1578,72,FUN_002e1578,lib-snd?,not started
 0x2e15c0,52,FUN_002e15c0,lib-snd?,not started
@@ -6687,8 +6687,8 @@ address,size,name,system,status
 0x2e27c0,132,FUN_002e27c0,lib-snd?,not started
 0x2e2848,124,FUN_002e2848,lib-snd?,not started
 0x2e28c8,720,FUN_002e28c8,lib-snd?,not started
-0x2e2b98,104,FUN_002e2b98,lib-snd?,not started
-0x2e2c00,80,FUN_002e2c00,lib-snd?,not started
+0x2e2b98,104,SndBits_Read,lib-snd?,not started
+0x2e2c00,80,SndBits_Skip,lib-snd?,not started
 0x2e2c50,580,FUN_002e2c50,lib-snd?,not started
 0x2e2e98,120,FUN_002e2e98,lib-snd?,not started
 0x2e2f10,252,FUN_002e2f10,lib-snd?,not started
@@ -6698,7 +6698,7 @@ address,size,name,system,status
 0x2e3620,940,FUN_002e3620,lib-snd?,not started
 0x2e39d0,116,FUN_002e39d0,lib-snd?,not started
 0x2e3a48,20,FUN_002e3a48,lib-snd?,not started
-0x2e3a5c,208,FUN_002e3a5c,lib-snd?,not started
+0x2e3a5c,208,Snd_FloatToPcm16,lib-snd?,not started
 0x2e3b2c,132,FUN_002e3b2c,lib-snd?,not started
 0x2e3c00,144,FUN_002e3c00,lib-snd?,not started
 0x2e3c90,44,FUN_002e3c90,lib-snd?,not started
@@ -6732,21 +6732,21 @@ address,size,name,system,status
 0x2e52e8,424,FUN_002e52e8,sdk?,host
 0x2e5490,152,FUN_002e5490,sdk?,host
 0x2e5528,136,FUN_002e5528,sdk?,host
-0x2e55b0,160,FUN_002e55b0,sdk?,host
-0x2e56e0,272,FUN_002e56e0,sdk?,host
-0x2e57f0,12,FUN_002e57f0,sdk?,host
+0x2e55b0,160,sceDevVif1Reset,sdk?,host
+0x2e56e0,272,sceGsResetGraph,sdk?,host
+0x2e57f0,12,sceGsGetGParam,sdk?,host
 0x2e5800,52,FUN_002e5800,sdk?,host
-0x2e5838,40,FUN_002e5838,sdk?,host
-0x2e5860,220,FUN_002e5860,sdk?,host
+0x2e5838,40,sceDmaGetChan,sdk?,host
+0x2e5860,220,sceDmaReset,sdk?,host
 0x2e5950,472,FUN_002e5950,sdk?,host
-0x2e5b88,216,FUN_002e5b88,sdk?,host
-0x2e5c60,228,FUN_002e5c60,sdk?,host
-0x2e5d48,228,FUN_002e5d48,sdk?,host
-0x2e5e30,196,FUN_002e5e30,sdk?,host
-0x2e5ef8,236,FUN_002e5ef8,sdk?,host
-0x2e5fe8,240,FUN_002e5fe8,sdk?,host
-0x2e60d8,196,FUN_002e60d8,sdk?,host
-0x2e61a0,208,FUN_002e61a0,sdk?,host
+0x2e5b88,216,sceDmaSend,sdk?,host
+0x2e5c60,228,sceDmaSendN,sdk?,host
+0x2e5d48,228,sceDmaSendI,sdk?,host
+0x2e5e30,196,sceDmaRecv,sdk?,host
+0x2e5ef8,236,sceDmaRecvN,sdk?,host
+0x2e5fe8,240,sceDmaRecvI,sdk?,host
+0x2e60d8,196,sceDmaSync,sdk?,host
+0x2e61a0,208,sceDmaWatch,sdk?,host
 0x2e62b0,20,FUN_002e62b0,sdk?,host
 0x2e62c8,20,FUN_002e62c8,sdk?,host
 0x2e62e0,96,FUN_002e62e0,sdk?,host
@@ -6777,17 +6777,17 @@ address,size,name,system,status
 0x2e71b8,156,FUN_002e71b8,sdk?,host
 0x2e7258,128,FUN_002e7258,sdk?,host
 0x2e72d8,484,scePadPortOpen,sdk?,host
-0x2e74c0,184,FUN_002e74c0,sdk?,host
+0x2e74c0,184,scePadPortClose,sdk?,host
 0x2e7578,96,FUN_002e7578,sdk?,host
-0x2e7628,124,FUN_002e7628,sdk?,host
-0x2e76a8,120,FUN_002e76a8,sdk?,host
-0x2e7758,100,FUN_002e7758,sdk?,host
-0x2e77c0,80,FUN_002e77c0,sdk?,host
-0x2e7848,288,FUN_002e7848,sdk?,host
-0x2e7a88,312,FUN_002e7a88,sdk?,host
-0x2e7bc0,180,FUN_002e7bc0,sdk?,host
-0x2e7c78,184,FUN_002e7c78,sdk?,host
-0x2e7d30,216,FUN_002e7d30,sdk?,host
+0x2e7628,124,scePadRead,sdk?,host
+0x2e76a8,120,scePadGetState,sdk?,host
+0x2e7758,100,scePadSetReqState,sdk?,host
+0x2e77c0,80,scePadGetReqState,sdk?,host
+0x2e7848,288,scePadInfoMode,sdk?,host
+0x2e7a88,312,scePadInfoAct,sdk?,host
+0x2e7bc0,180,scePadSetMainMode,sdk?,host
+0x2e7c78,184,scePadSetActDirect,sdk?,host
+0x2e7d30,216,scePadSetActAlign,sdk?,host
 0x2e7e08,180,FUN_002e7e08,sdk?,host
 0x2e7ec0,176,FUN_002e7ec0,sdk?,host
 0x2e7f70,92,FUN_002e7f70,sdk?,host
@@ -6799,7 +6799,7 @@ address,size,name,system,status
 0x2e8288,104,FUN_002e8288,sdk?,host
 0x2e82f0,36,FUN_002e82f0,sdk?,host
 0x2e8318,104,FUN_002e8318,sdk?,host
-0x2e8380,84,FUN_002e8380,sdk?,host
+0x2e8380,84,sceCdCallback,sdk?,host
 0x2e83d8,160,FUN_002e83d8,sdk?,host
 0x2e8478,188,FUN_002e8478,sdk?,host
 0x2e8538,212,FUN_002e8538,sdk?,host
@@ -6820,8 +6820,8 @@ address,size,name,system,status
 0x2e9728,480,sceCdRead,sdk?,host
 0x2e9908,656,FUN_002e9908,sdk?,host
 0x2e9b98,176,FUN_002e9b98,sdk?,host
-0x2e9c48,152,FUN_002e9c48,sdk?,host
-0x2e9ce0,152,FUN_002e9ce0,sdk?,host
+0x2e9c48,152,sceCdGetDiskType,sdk?,host
+0x2e9ce0,152,sceCdGetError,sdk?,host
 0x2e9d78,248,sceCdReadClock,sdk?,host
 0x2e9e70,156,FUN_002e9e70,sdk?,host
 0x2e9f10,572,FUN_002e9f10,sdk?,host
@@ -6850,8 +6850,8 @@ address,size,name,system,status
 0x2eaad8,76,FUN_002eaad8,sdk?,host
 0x2eab28,196,FUN_002eab28,sdk?,host
 0x2eabf0,16,FUN_002eabf0,sdk?,host
-0x2eac00,44,FUN_002eac00,sdk?,host
-0x2eac30,88,FUN_002eac30,sdk?,host
+0x2eac00,44,Mpeg_Errorf,sdk?,host
+0x2eac30,88,Mpeg_Error,sdk?,host
 0x2eac88,212,FUN_002eac88,sdk?,host
 0x2ead60,32,FUN_002ead60,sdk?,host
 0x2ead80,1176,FUN_002ead80,sdk?,host
@@ -6876,8 +6876,8 @@ address,size,name,system,status
 0x2ee2a8,136,FUN_002ee2a8,sdk?,host
 0x2ee330,380,FUN_002ee330,sdk?,host
 0x2ee4b0,316,FUN_002ee4b0,sdk?,host
-0x2ee5f0,48,FUN_002ee5f0,sdk?,host
-0x2ee620,164,FUN_002ee620,sdk?,host
+0x2ee5f0,48,Ipu_Cmd,sdk?,host
+0x2ee620,164,Ipu_WaitIdle,sdk?,host
 0x2ee6c8,176,FUN_002ee6c8,sdk?,host
 0x2ee778,436,FUN_002ee778,sdk?,host
 0x2ee930,308,FUN_002ee930,sdk?,host
@@ -6944,14 +6944,14 @@ address,size,name,system,status
 0x2f34e8,2380,FUN_002f34e8,libc?,host
 0x2f3e38,656,FUN_002f3e38,libc?,host
 0x2f40d0,36,FUN_002f40d0,libc?,host
-0x2f40f8,28,FUN_002f40f8,libc?,host
+0x2f40f8,28,fabsf,libc?,host
 0x2f4118,228,FUN_002f4118,libc?,host
-0x2f4200,36,FUN_002f4200,libc?,host
-0x2f4228,344,FUN_002f4228,libc?,host
-0x2f4388,48,FUN_002f4388,libc?,host
-0x2f43b8,84,FUN_002f43b8,libc?,host
-0x2f4410,176,FUN_002f4410,libc?,host
-0x2f44c0,32,FUN_002f44c0,libc?,host
+0x2f4200,36,isnanf,libc?,host
+0x2f4228,344,scalbnf,libc?,host
+0x2f4388,48,copysignf,libc?,host
+0x2f43b8,84,__do_global_dtors,runtime,host
+0x2f4410,176,__do_global_ctors,runtime,host
+0x2f44c0,32,__main,runtime,host
 0x2f44e0,16,FUN_002f44e0,libc?,host
 0x2f44f0,36,FUN_002f44f0,libc?,host
 0x2f4518,44,FUN_002f4518,libc?,host
@@ -6971,25 +6971,25 @@ address,size,name,system,status
 0x2f4d58,816,FUN_002f4d58,libc?,host
 0x2f5088,468,FUN_002f5088,libc?,host
 0x2f5268,476,FUN_002f5268,libc?,host
-0x2f5450,48,FUN_002f5450,libc?,host
-0x2f5480,96,FUN_002f5480,libc?,host
+0x2f5450,48,exit,libc?,host
+0x2f5480,96,__muldi3,runtime,host
 0x2f54e0,8,cPadDevice::vf8_2f54e0,input,not started
 0x2f54e8,1484,FUN_002f54e8,libc?,host
-0x2f5ab8,300,FUN_002f5ab8,libc?,host
-0x2f5be8,152,FUN_002f5be8,libc?,host
+0x2f5ab8,300,__pack_d,runtime,host
+0x2f5be8,152,__unpack_d,runtime,host
 0x2f5c88,576,FUN_002f5c88,libc?,host
-0x2f5ec8,88,FUN_002f5ec8,libc?,host
-0x2f5f20,100,FUN_002f5f20,libc?,host
+0x2f5ec8,88,__adddf3,runtime,host
+0x2f5f20,100,__subdf3,runtime,host
 0x2f5f88,680,FUN_002f5f88,libc?,host
-0x2f6230,356,FUN_002f6230,runtime?,host
-0x2f6398,276,FUN_002f6398,runtime?,host
-0x2f64b0,76,FUN_002f64b0,runtime?,host
-0x2f6500,184,FUN_002f6500,runtime?,host
-0x2f65b8,148,FUN_002f65b8,runtime?,host
-0x2f6650,160,FUN_002f6650,runtime?,host
-0x2f66f0,56,FUN_002f66f0,runtime?,host
-0x2f6728,44,FUN_002f6728,runtime?,host
-0x2f6758,84,FUN_002f6758,runtime?,host
+0x2f6230,356,__divdf3,runtime,host
+0x2f6398,276,__fpcmp_parts_d,runtime,host
+0x2f64b0,76,__cmpdf2,runtime,host
+0x2f6500,184,__floatsidf,runtime,host
+0x2f65b8,148,__fixdfsi,runtime,host
+0x2f6650,160,__fixunsdfsi,runtime,host
+0x2f66f0,56,__negdf2,runtime,host
+0x2f6728,44,__make_dp,runtime,host
+0x2f6758,84,__truncdfsf2,runtime,host
 0x2f67b0,24,FUN_002f67b0,runtime?,host
 0x2f67c8,32,FUN_002f67c8,runtime?,host
 0x2f67f8,60,FUN_002f67f8,runtime?,host
@@ -7007,23 +7007,23 @@ address,size,name,system,status
 0x2f6e30,80,bad_exception::__tf,runtime,host
 0x2f6e80,48,exception::~exception,runtime?,host
 0x2f6ec8,64,exception::__tf,runtime,host
-0x2f6f08,268,FUN_002f6f08,runtime?,host
-0x2f7018,144,FUN_002f7018,runtime?,host
+0x2f6f08,268,__pack_f,runtime,host
+0x2f7018,144,__unpack_f,runtime,host
 0x2f70a8,564,FUN_002f70a8,runtime?,host
-0x2f72e0,88,FUN_002f72e0,runtime?,host
-0x2f7338,100,FUN_002f7338,runtime?,host
+0x2f72e0,88,__addsf3,runtime,host
+0x2f7338,100,__subsf3,runtime,host
 0x2f73a0,500,FUN_002f73a0,runtime?,host
-0x2f7598,352,FUN_002f7598,runtime?,host
-0x2f76f8,276,FUN_002f76f8,runtime?,host
-0x2f7810,76,FUN_002f7810,runtime?,host
-0x2f7860,184,FUN_002f7860,runtime?,host
-0x2f7918,140,FUN_002f7918,runtime?,host
-0x2f79a8,152,FUN_002f79a8,runtime?,host
-0x2f7a40,56,FUN_002f7a40,runtime?,host
-0x2f7a78,44,FUN_002f7a78,runtime?,host
+0x2f7598,352,__divsf3,runtime,host
+0x2f76f8,276,__fpcmp_parts_f,runtime,host
+0x2f7810,76,__cmpsf2,runtime,host
+0x2f7860,184,__floatsisf,runtime,host
+0x2f7918,140,__fixsfsi,runtime,host
+0x2f79a8,152,__fixunssfsi,runtime,host
+0x2f7a40,56,__negsf2,runtime,host
+0x2f7a78,44,__make_fp,runtime,host
 0x2f7aa8,64,__extendsfdf2,runtime,host
-0x2f7ae8,68,FUN_002f7ae8,runtime?,host
-0x2f7b30,80,FUN_002f7b30,runtime?,host
+0x2f7ae8,68,read_uleb128,runtime?,host
+0x2f7b30,80,read_sleb128,runtime?,host
 0x2f7b80,252,FUN_002f7b80,runtime?,host
 0x2f7c80,604,FUN_002f7c80,runtime?,host
 0x2f7ee8,68,FUN_002f7ee8,runtime?,host
@@ -7032,19 +7032,19 @@ address,size,name,system,status
 0x2f80f8,228,FUN_002f80f8,runtime?,host
 0x2f81e0,260,FUN_002f81e0,runtime?,host
 0x2f82e8,920,FUN_002f82e8,runtime?,host
-0x2f8680,40,FUN_002f8680,runtime?,host
-0x2f86a8,48,FUN_002f86a8,runtime?,host
-0x2f86d8,40,FUN_002f86d8,runtime?,host
-0x2f8700,48,FUN_002f8700,runtime?,host
-0x2f8730,120,FUN_002f8730,runtime?,host
-0x2f87a8,32,FUN_002f87a8,runtime?,host
+0x2f8680,40,__register_frame_info,runtime,host
+0x2f86a8,48,__register_frame,runtime,host
+0x2f86d8,40,__register_frame_info_table,runtime,host
+0x2f8700,48,__register_frame_table,runtime,host
+0x2f8730,120,__deregister_frame_info,runtime,host
+0x2f87a8,32,__deregister_frame,runtime,host
 0x2f87c8,472,FUN_002f87c8,runtime?,host
 0x2f89a0,372,FUN_002f89a0,runtime?,host
 0x2f8b38,12,bad_alloc::vf1_2f8b38,runtime?,host
 0x2f8b48,80,bad_alloc::__tf,runtime,host
 0x2f8b98,48,bad_alloc::~bad_alloc,runtime?,host
-0x2f8bc8,196,FUN_002f8bc8,runtime?,host
-0x2f8cf0,36,FUN_002f8cf0,runtime?,host
+0x2f8bc8,196,__builtin_new,runtime,host
+0x2f8cf0,36,__builtin_vec_new,runtime,host
 0x2f8d68,48,type_info::~type_info,runtime?,host
 0x2f8d98,64,FUN_002f8d98,runtime?,host
 0x2f8dd8,36,__rtti_user,runtime,host
@@ -7084,10 +7084,10 @@ address,size,name,system,status
 0x2fa128,28,__attr_type_info::~__attr_type_info,runtime,host
 0x2fa148,80,__pointer_type_info::__tf,runtime,host
 0x2fa198,28,__pointer_type_info::~__pointer_type_info,runtime,host
-0x2fa1b8,32,FUN_002fa1b8,runtime?,host
+0x2fa1b8,32,abort,runtime?,host
 0x2fa1d8,52,__assert,runtime,host
-0x2fa210,28,FUN_002fa210,runtime?,host
-0x2fa230,40,FUN_002fa230,runtime?,host
+0x2fa210,28,atof,runtime?,host
+0x2fa230,40,atoi,runtime?,host
 0x2fa258,212,bsearch,runtime?,ported
 0x2fa330,28,FUN_002fa330,runtime?,host
 0x2fa350,80,FUN_002fa350,runtime?,host
@@ -7095,61 +7095,61 @@ address,size,name,system,status
 0x2fa3e0,28,FUN_002fa3e0,runtime?,host
 0x2fa400,80,FUN_002fa400,runtime?,host
 0x2fa450,140,FUN_002fa450,runtime?,host
-0x2fa4e0,12,FUN_002fa4e0,runtime?,host
+0x2fa4e0,12,__getreent,runtime,host
 0x2fa4f0,88,FUN_002fa4f0,runtime?,host
 0x2fa548,112,FUN_002fa548,runtime?,host
 0x2fa5b8,224,FUN_002fa5b8,runtime?,host
-0x2fa698,12,FUN_002fa698,runtime?,host
-0x2fa6a8,12,FUN_002fa6a8,runtime?,host
-0x2fa6b8,140,FUN_002fa6b8,runtime?,host
+0x2fa698,12,_cleanup_r,runtime?,host
+0x2fa6a8,12,_cleanup,runtime?,host
+0x2fa6b8,140,__sinit,runtime,host
 0x2fa748,52,FUN_002fa748,runtime?,host
-0x2fa780,148,FUN_002fa780,runtime?,host
-0x2fa818,40,FUN_002fa818,libc?,host
-0x2fa840,16,FUN_002fa840,libc?,host
+0x2fa780,148,_fwalk,runtime?,host
+0x2fa818,40,malloc,libc?,host
+0x2fa840,16,free,libc?,host
 0x2fa850,596,FUN_002fa850,libc?,host
 0x2faaa8,1912,FUN_002faaa8,libc?,host
-0x2fb220,148,FUN_002fb220,libc?,host
+0x2fb220,148,memcmp,libc?,host
 0x2fb2b4,176,memcpy,libc?,host
-0x2fb364,260,FUN_002fb364,libc?,host
+0x2fb364,260,memmove,libc?,host
 0x2fb468,192,memset,libc?,host
 0x2fb528,8,FUN_002fb528,libc?,host
 0x2fb530,8,FUN_002fb530,libc?,host
 0x2fb538,60,FUN_002fb538,libc?,host
-0x2fb578,80,FUN_002fb578,libc?,host
+0x2fb578,80,printf,libc?,host
 0x2fb5c8,2584,qsort,libc?,ported
-0x2fbff0,44,FUN_002fbff0,libc?,host
+0x2fbff0,44,realloc,libc?,host
 0x2fc020,1392,FUN_002fc020,libc?,host
-0x2fc590,92,FUN_002fc590,libc?,host
-0x2fc5f0,112,FUN_002fc5f0,libc?,host
+0x2fc590,92,_sbrk_r,libc?,host
+0x2fc5f0,112,_init_signal_r,libc?,host
 0x2fc660,140,FUN_002fc660,libc?,host
-0x2fc6f0,240,FUN_002fc6f0,libc?,host
+0x2fc6f0,240,_raise_r,libc?,host
 0x2fc7e0,184,FUN_002fc7e0,libc?,host
-0x2fc898,40,FUN_002fc898,libc?,host
+0x2fc898,40,raise,libc?,host
 0x2fc8f0,36,FUN_002fc8f0,libc?,host
-0x2fc940,92,FUN_002fc940,libc?,host
-0x2fc9a0,28,FUN_002fc9a0,libc?,host
+0x2fc940,92,_kill_r,libc?,host
+0x2fc9a0,28,_getpid_r,libc?,host
 0x2fc9c0,104,FUN_002fc9c0,libc?,host
 0x2fca28,112,sprintf,libc?,host
-0x2fcaa0,136,FUN_002fcaa0,libc?,host
-0x2fcb28,100,FUN_002fcb28,libc?,host
-0x2fcb90,128,FUN_002fcb90,libc?,host
-0x2fcc10,104,FUN_002fcc10,libc?,host
-0x2fcc78,32,FUN_002fcc78,libc?,host
+0x2fcaa0,136,sscanf,libc?,host
+0x2fcb28,100,__sread,runtime,host
+0x2fcb90,128,__swrite,runtime,host
+0x2fcc10,104,__sseek,runtime,host
+0x2fcc78,32,__sclose,runtime,host
 0x2fcc98,180,stricmp,libc?,ported
-0x2fcd4c,300,FUN_002fcd4c,libc?,host
-0x2fce78,400,FUN_002fce78,libc?,host
+0x2fcd4c,300,strcat,libc?,host
+0x2fce78,400,strchr,libc?,host
 0x2fd008,324,strcmp,libc?,ported
 0x2fd14c,276,strcpy,libc?,host
 0x2fd260,312,strlen,libc?,host
 0x2fd398,220,strnicmp,libc?,ported
 0x2fd478,436,FUN_002fd478,libc?,host
 0x2fd630,444,strncpy,libc?,host
-0x2fd7f0,108,FUN_002fd7f0,libc?,host
+0x2fd7f0,108,strstr,libc?,host
 0x2fd860,3836,FUN_002fd860,libc?,host
-0x2fe760,44,FUN_002fe760,libc?,host
-0x2fe790,36,FUN_002fe790,libc?,host
+0x2fe760,44,strtod,libc?,host
+0x2fe790,36,atoff,libc?,host
 0x2fe7b8,568,FUN_002fe7b8,libc?,host
-0x2fe9f0,52,FUN_002fe9f0,libc?,host
+0x2fe9f0,52,strtol,libc?,host
 0x2fea28,68,FUN_002fea28,libc?,host
 0x2fea70,180,FUN_002fea70,libc?,host
 0x2feb28,120,FUN_002feb28,libc?,host
@@ -7162,10 +7162,10 @@ address,size,name,system,status
 0x300fb0,224,FUN_00300fb0,libc?,host
 0x301090,2824,FUN_00301090,libc?,host
 0x301b98,260,FUN_00301b98,libc?,host
-0x301ca0,84,FUN_00301ca0,libc?,host
-0x301cf8,96,FUN_00301cf8,libc?,host
+0x301ca0,84,vsprintf,libc?,host
+0x301cf8,96,_write_r,libc?,host
 0x301d58,268,FUN_00301d58,libc?,host
-0x301e68,88,FUN_00301e68,libc?,host
+0x301e68,88,_close_r,libc?,host
 0x301ec0,532,FUN_00301ec0,libc?,host
 0x3020d8,4536,_dtoa_r,libc?,host
 0x3032a8,432,FUN_003032a8,libc?,host
@@ -7173,7 +7173,7 @@ address,size,name,system,status
 0x303658,408,FUN_00303658,libc?,host
 0x3037f8,340,FUN_003037f8,libc?,host
 0x303950,720,FUN_00303950,libc?,host
-0x303ce0,260,FUN_00303ce0,libc?,host
+0x303ce0,260,fflush,libc?,host
 0x303de8,284,FUN_00303de8,libc?,host
 0x303f08,796,FUN_00303f08,libc?,host
 0x304228,364,FUN_00304228,libc?,host
@@ -7181,38 +7181,38 @@ address,size,name,system,status
 0x304770,132,FUN_00304770,libc?,host
 0x3047f8,12,FUN_003047f8,libc?,host
 0x304838,36,FUN_00304838,libc?,host
-0x304860,96,FUN_00304860,libc?,host
-0x3048c0,336,FUN_003048c0,libc?,host
+0x304860,96,_lseek_r,libc?,host
+0x3048c0,336,__smakebuf,runtime,host
 0x304a10,60,FUN_00304a10,libc?,host
-0x304a4c,224,FUN_00304a4c,libc?,host
-0x304b30,168,FUN_00304b30,libc?,host
-0x304bd8,44,FUN_00304bd8,libc?,host
-0x304c08,276,FUN_00304c08,libc?,host
-0x304d20,328,FUN_00304d20,libc?,host
-0x304e68,132,FUN_00304e68,libc?,host
-0x304ef0,192,FUN_00304ef0,libc?,host
-0x304fb0,56,FUN_00304fb0,libc?,host
+0x304a4c,224,memchr,libc?,host
+0x304b30,168,_Balloc,libc?,host
+0x304bd8,44,_Bfree,libc?,host
+0x304c08,276,__multadd,runtime,host
+0x304d20,328,__s2b,runtime,host
+0x304e68,132,__hi0bits,runtime,host
+0x304ef0,192,__lo0bits,runtime,host
+0x304fb0,56,__i2b,runtime,host
 0x304fe8,556,FUN_00304fe8,libc?,host
-0x305218,252,FUN_00305218,libc?,host
-0x305318,376,FUN_00305318,libc?,host
-0x305490,104,FUN_00305490,libc?,host
-0x3054f8,400,FUN_003054f8,libc?,host
-0x305688,152,FUN_00305688,libc?,host
-0x305720,380,FUN_00305720,libc?,host
-0x3058a0,380,FUN_003058a0,libc?,host
-0x305a20,192,FUN_00305a20,libc?,host
+0x305218,252,__pow5mult,runtime,host
+0x305318,376,__lshift,runtime,host
+0x305490,104,__mcmp,runtime,host
+0x3054f8,400,__mdiff,runtime,host
+0x305688,152,__ulp,runtime,host
+0x305720,380,__b2d,runtime,host
+0x3058a0,380,__d2b,runtime,host
+0x305a20,192,__ratio,runtime,host
 0x305ae0,108,FUN_00305ae0,libc?,host
-0x305b50,96,FUN_00305b50,libc?,host
+0x305b50,96,_read_r,libc?,host
 0x305bb0,28,FUN_00305bb0,libc?,host
 0x305bd0,376,FUN_00305bd0,libc?,host
-0x305d48,72,FUN_00305d48,libc?,host
-0x305d90,56,FUN_00305d90,libc?,host
+0x305d48,72,isinf,libc?,host
+0x305d90,56,isnan,libc?,host
 0x305dc8,536,FUN_00305dc8,libc?,host
 0x305fe8,52,FUN_00305fe8,libc?,host
 0x306020,240,FUN_00306020,libc?,host
 0x306110,392,FUN_00306110,libc?,host
-0x306298,188,FUN_00306298,libc?,host
-0x306358,92,FUN_00306358,libc?,host
+0x306298,188,_calloc_r,libc?,host
+0x306358,92,_fstat_r,libc?,host
 0x3063e0,16,SetGsCrt,kernel?,host
 0x306400,16,_Exit,kernel?,host
 0x3064c0,16,AddIntcHandler,kernel?,host
@@ -7267,30 +7267,30 @@ address,size,name,system,status
 0x306c10,16,Deci2Call,kernel?,host
 0x306c50,12,FUN_00306c50,kernel?,host
 0x306ca0,96,FUN_00306ca0,kernel?,host
-0x306d00,124,FUN_00306d00,kernel?,host
-0x306d80,116,FUN_00306d80,kernel?,host
+0x306d00,124,write,kernel?,host
+0x306d80,116,read,kernel?,host
 0x306df8,40,FUN_00306df8,kernel?,host
-0x306e20,8,FUN_00306e20,kernel?,host
-0x306e30,8,FUN_00306e30,kernel?,host
-0x306e38,172,FUN_00306e38,kernel?,host
-0x306ee8,8,FUN_00306ee8,kernel?,host
-0x306ef0,20,FUN_00306ef0,kernel?,host
-0x306f08,8,FUN_00306f08,kernel?,host
-0x306f10,40,FUN_00306f10,kernel?,host
+0x306e20,8,close,kernel?,host
+0x306e30,8,lseek,kernel?,host
+0x306e38,172,sbrk,kernel?,host
+0x306ee8,8,isatty,kernel?,host
+0x306ef0,20,fstat,kernel?,host
+0x306f08,8,getpid,kernel?,host
+0x306f10,40,kill,kernel?,host
 0x306f38,40,FUN_00306f38,kernel?,host
 0x306f60,40,FUN_00306f60,kernel?,host
 0x306f88,164,FUN_00306f88,kernel?,host
 0x307030,124,FUN_00307030,kernel?,host
 0x3070c8,164,FUN_003070c8,kernel?,host
 0x307170,124,FUN_00307170,kernel?,host
-0x307208,104,FUN_00307208,kernel?,host
-0x307270,104,FUN_00307270,kernel?,host
-0x3072d8,104,FUN_003072d8,kernel?,host
-0x307340,104,FUN_00307340,kernel?,host
-0x3073a8,32,FUN_003073a8,kernel?,host
-0x3073c8,32,FUN_003073c8,kernel?,host
-0x3073e8,32,FUN_003073e8,kernel?,host
-0x307408,32,FUN_00307408,kernel?,host
+0x307208,104,DisableIntc,kernel?,host
+0x307270,104,EnableIntc,kernel?,host
+0x3072d8,104,DisableDmac,kernel?,host
+0x307340,104,EnableDmac,kernel?,host
+0x3073a8,32,iEnableIntc,kernel?,host
+0x3073c8,32,iDisableIntc,kernel?,host
+0x3073e8,32,iEnableDmac,kernel?,host
+0x307408,32,iDisableDmac,kernel?,host
 0x307428,16,RFU116_SetSyscall,kernel?,host
 0x307438,16,FUN_00307438,kernel?,host
 0x307480,16,RFU091,kernel?,host
@@ -7300,15 +7300,15 @@ address,size,name,system,status
 0x307718,148,FUN_00307718,kernel?,host
 0x3077b0,124,FUN_003077b0,kernel?,host
 0x307830,152,FUN_00307830,sdk?,host
-0x3078c8,68,FUN_003078c8,sdk?,host
-0x307910,36,FUN_00307910,sdk?,host
-0x307938,48,FUN_00307938,sdk?,host
-0x307968,36,FUN_00307968,sdk?,host
-0x307990,52,FUN_00307990,sdk?,host
-0x3079c8,52,FUN_003079c8,sdk?,host
-0x307a30,36,FUN_00307a30,sdk?,host
-0x307a58,36,FUN_00307a58,sdk?,host
-0x307a80,36,FUN_00307a80,sdk?,host
+0x3078c8,68,sceDeci2Open,sdk?,host
+0x307910,36,sceDeci2Close,sdk?,host
+0x307938,48,sceDeci2ReqSend,sdk?,host
+0x307968,36,sceDeci2Poll,sdk?,host
+0x307990,52,sceDeci2ExRecv,sdk?,host
+0x3079c8,52,sceDeci2ExSend,sdk?,host
+0x307a30,36,sceDeci2ExLock,sdk?,host
+0x307a58,36,sceDeci2ExUnLock,sdk?,host
+0x307a80,36,kputs,sdk?,host
 0x307aa8,36,FUN_00307aa8,sdk?,host
 0x307ad0,60,FUN_00307ad0,sdk?,host
 0x307b10,60,FUN_00307b10,sdk?,host
@@ -7323,16 +7323,16 @@ address,size,name,system,status
 0x308178,352,FUN_00308178,sdk?,host
 0x3082e0,1476,FUN_003082e0,sdk?,host
 0x3088a8,56,FUN_003088a8,sdk?,host
-0x3088e0,96,FUN_003088e0,sdk?,host
+0x3088e0,96,scePrintf,sdk?,host
 0x308970,24,FUN_00308970,sdk?,host
 0x3089b8,640,FUN_003089b8,sdk?,host
 0x308c38,52,FUN_00308c38,sdk?,host
-0x308c70,24,FUN_00308c70,sdk?,host
-0x308ca0,44,FUN_00308ca0,sdk?,host
-0x308cd0,40,FUN_00308cd0,sdk?,host
-0x308cf8,308,FUN_00308cf8,sdk?,host
-0x308e30,60,FUN_00308e30,sdk?,host
-0x308e70,60,FUN_00308e70,sdk?,host
+0x308c70,24,sceSifSetCmdBuffer,sdk?,host
+0x308ca0,44,sceSifAddCmdHandler,sdk?,host
+0x308cd0,40,sceSifRemoveCmdHandler,sdk?,host
+0x308cf8,308,_sceSifSendCmd,sdk?,host
+0x308e30,60,sceSifSendCmd,sdk?,host
+0x308e70,60,isceSifSendCmd,sdk?,host
 0x308eb0,296,FUN_00308eb0,sdk?,host
 0x308fd8,172,DCache_WritebackInvalidate,sdk?,host
 0x309088,412,FUN_00309088,sdk?,host
@@ -7343,18 +7343,18 @@ address,size,name,system,status
 0x309348,64,FUN_00309348,sdk?,host
 0x309388,180,FUN_00309388,sdk?,host
 0x309440,96,FUN_00309440,sdk?,host
-0x3094a0,344,FUN_003094a0,sdk?,host
+0x3094a0,344,sceSifGetOtherData,sdk?,host
 0x3095f8,76,FUN_003095f8,sdk?,host
 0x309648,176,FUN_00309648,sdk?,host
-0x3096f8,320,FUN_003096f8,sdk?,host
-0x3098c8,492,FUN_003098c8,sdk?,host
-0x309ab8,60,FUN_00309ab8,sdk?,host
-0x309af8,148,FUN_00309af8,sdk?,host
-0x309c60,148,FUN_00309c60,sdk?,host
-0x309cf8,144,FUN_00309cf8,sdk?,host
-0x309d88,88,FUN_00309d88,sdk?,host
-0x309de0,452,FUN_00309de0,sdk?,host
-0x309fa8,60,FUN_00309fa8,sdk?,host
+0x3096f8,320,sceSifBindRpc,sdk?,host
+0x3098c8,492,sceSifCallRpc,sdk?,host
+0x309ab8,60,sceSifCheckStatRpc,sdk?,host
+0x309af8,148,sceSifSetRpcQueue,sdk?,host
+0x309c60,148,sceSifRemoveRpc,sdk?,host
+0x309cf8,144,sceSifRemoveRpcQueue,sdk?,host
+0x309d88,88,sceSifGetNextRequest,sdk?,host
+0x309de0,452,sceSifExecRequest,sdk?,host
+0x309fa8,60,sceSifRpcLoop,sdk?,host
 0x309fe8,92,FUN_00309fe8,sdk?,host
 0x30a048,136,FUN_0030a048,sdk?,host
 0x30a0d0,108,FUN_0030a0d0,sdk?,host
@@ -7393,9 +7393,9 @@ address,size,name,system,status
 0x30cf80,560,FUN_0030cf80,sdk?,host
 0x30d1b0,480,FUN_0030d1b0,sdk?,host
 0x30d390,456,FUN_0030d390,sdk?,host
-0x30d558,136,FUN_0030d558,sdk?,host
-0x30d5e0,112,FUN_0030d5e0,sdk?,host
-0x30d650,120,FUN_0030d650,sdk?,host
+0x30d558,136,sceSifInitIopHeap,sdk?,host
+0x30d5e0,112,sceSifAllocIopHeap,sdk?,host
+0x30d650,120,sceSifFreeIopHeap,sdk?,host
 0x30d6c8,240,FUN_0030d6c8,sdk?,host
 0x30d7b8,256,FUN_0030d7b8,sdk?,host
 0x30d8b8,140,FUN_0030d8b8,sdk?,host
@@ -7404,24 +7404,24 @@ address,size,name,system,status
 0x30db88,28,FUN_0030db88,sdk?,host
 0x30dba8,28,FUN_0030dba8,sdk?,host
 0x30dbc8,548,FUN_0030dbc8,sdk?,host
-0x30ddf0,32,FUN_0030ddf0,sdk?,host
+0x30ddf0,32,sceSifLoadModule,sdk?,host
 0x30de10,28,FUN_0030de10,sdk?,host
 0x30de30,260,FUN_0030de30,sdk?,host
 0x30df38,28,FUN_0030df38,sdk?,host
 0x30df80,236,FUN_0030df80,sdk?,host
 0x30e070,220,FUN_0030e070,sdk?,host
-0x30e150,304,FUN_0030e150,sdk?,host
-0x30e280,40,FUN_0030e280,sdk?,host
-0x30e2a8,72,FUN_0030e2a8,sdk?,host
+0x30e150,304,sceSifResetIop,sdk?,host
+0x30e280,40,sceSifIsAliveIop,sdk?,host
+0x30e2a8,72,sceSifSyncIop,sdk?,host
 0x30e2f0,272,sceSifRebootIop,sdk?,host
-0x30e400,72,FUN_0030e400,sdk?,host
-0x30e448,24,FUN_0030e448,sdk?,host
+0x30e400,72,DIntr,sdk?,host
+0x30e448,24,EIntr,sdk?,host
 0x30e460,16,RFU116_SetSyscall,sdk?,host
 0x30e470,64,FUN_0030e470,sdk?,host
-0x30e4b0,36,FUN_0030e4b0,sdk?,host
+0x30e4b0,36,_InitSys,sdk?,host
 0x30e4d8,1772,FUN_0030e4d8,sdk?,host
-0x30ebc8,92,FUN_0030ebc8,sdk?,host
-0x30ec28,236,FUN_0030ec28,sdk?,host
-0x30ed18,152,FUN_0030ed18,sdk?,host
+0x30ebc8,92,__fixdfdi,runtime,host
+0x30ec28,236,__fixunsdfdi,runtime,host
+0x30ed18,152,__floatdidf,runtime,host
 0x30edb0,1628,FUN_0030edb0,sdk?,host
 0x30f418,1332,FUN_0030f418,sdk?,host
