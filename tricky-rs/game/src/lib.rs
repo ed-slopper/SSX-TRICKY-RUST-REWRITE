@@ -46,6 +46,7 @@ pub mod rider;
 pub mod surface;
 pub mod terrain;
 pub mod world;
+pub mod walls;
 pub mod worldline;
 pub mod worldops;
 pub mod texanim;

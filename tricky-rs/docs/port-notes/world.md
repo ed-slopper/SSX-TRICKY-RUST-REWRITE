@@ -156,6 +156,28 @@ Part of the port notes (index: [README.md](README.md)); units and wording as des
   unit(∂P/∂v × ∂P/∂u); its t is not changed. A degenerate patch's determinant can be 0: the PS2's x/0 = MAX and
   clamped sums keep it finite (`ps2f::F`).
 
+## Walls and objects (row E8b; `tricky_game::walls`, checked: `tests/walls.rs`)
+
+- `Boarder_WallCollide` 0x126250: `World_RayCast` with `cWorldBoarder`(rider+0x470, 1) given the ground normal
+  (shape +0x2e0). For t > 0: a normal facing into the ground (n · ground < 0) is made n − (n · g)·g, unit; then
+  `Boarder_AccumulateImpact`, a push of (n·1.1)·t (`Boarder_Translate`, then rider+0x140 += it). With
+  v_in = −n · v ≥ 0: s = max(v_in/2, 55.555553), v += (v_in + s)·n, `Boarder_TurnFromWall` in mode 2 (+0x424), the
+  impact check at s with the record (hit point, unit v, n, v_in); the object's collision sound when the hit was
+  one, the wall sound; true. Else false.
+- `Boarder_WallImpactCheck` 0x126540(speed, rider, record, n): d = up (+0x4ac0) · n. Mode 1 under 833.3333 cm/s:
+  +0x300 += (2.5 − d)·max(n.z, 0.2). Not mode 5: speed > 833.3333·d + 1944.4443 → `Boarder_Wipeout`(rider,
+  record), `Score_Crash` → `Boarder_AddMeter`; else (not d > 0 in mode 1) speed > 833.3333·d → `Boarder_Stumble`
+  along unit(n − (n · up)·up).
+- `Boarder_InstanceCollisions` 0x125088: `World_QueryInstances` with the same shape; on t ≥ 0 the normal is
+  turned off the ground in mode 2 (always), the contact record (point, unit v, n, v_in, unit v) goes to
+  `Instance_OnPlayerContact`, a bouncy object (flag 0x80) to `Boarder_InstanceBounce`, then its sound. Then the
+  rollers (rider+0x700 list: sphere trees and rigid-body impulses, row E8c).
+- `Boarder_InstanceBounce` 0x125a00(t, rider, object, contact, record), not in control state 0x16: mass 0 →
+  stumble along n only. Else a fixed object (no controller, or its +0x54 says so) pushes the rider by n·(1.1·t)
+  and bounces at max(b·v_in + v_in, v_in + 55.555553) (b the record's bounce; wall turn in mode 2); a moving one
+  shares it: k = 1/(speed stat/mass + 1), a = v_in·k, s = √max(a² − (1 − b)·k, 0) − a. Then the rider's virtual
+  +0x6c (0.0012·v_in), v += s·n, the impact check at s with the contact record.
+
 ## Keyframed objects (`cAnimObjectNode` 0x198810, `cMeshAnimFrame::vf1` 0x1cb498, `AnimCurve_FindSegment` 0x1cb770)
 
 - Model objects with an Animation: base pose U1..U6 (tx, ty, tz cm; rx, ry, rz degrees), AnimationAction a mask
