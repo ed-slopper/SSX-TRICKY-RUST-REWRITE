@@ -534,6 +534,31 @@ pub struct GroundCache {
     yaw: f32,
 }
 
+impl GroundCache {
+    /// A game-side rider stored as the port had it when it was last written: at `pos`, `vel` and `yaw` (port units).
+    /// The ground tick ends by storing one of these; tests hand in the original's own tick result with it.
+    pub fn new(g: gm::Rider, pos: Vec3, vel: Vec3, yaw: f32) -> Self {
+        Self { g, pos, vel, yaw }
+    }
+
+    /// The game-side rider.
+    pub fn rider(&self) -> &gm::Rider {
+        &self.g
+    }
+
+    /// The board's attitude as the game-side rider has it: the quaternion rider+0x170, the forward +0x180, side +0x190
+    /// and up +0x1a0 it derives and the heading +0x1b0. The game keeps these untouched through a jump (board row
+    /// G20c3c): this is what the landing's first ground tick starts from.
+    pub fn attitude(&self) -> Orient {
+        Orient { q: self.g.quat, fwd: self.g.p.fwd, side: self.g.board_side, up: self.g.board_up, yaw: self.g.yaw }
+    }
+
+    /// The port has not moved the rider since this was stored (same position and yaw).
+    pub fn is_at(&self, pos: Vec3, yaw: f32) -> bool {
+        self.pos == pos && self.yaw == yaw
+    }
+}
+
 /// A rotation matrix with columns `x`, `y`, `z` as a unit quaternion (w, x, y, z).
 fn quat_of(x: V4, y: V4, z: V4) -> V4 {
     let (m00, m10, m20) = (x[0], x[1], x[2]);
@@ -557,10 +582,11 @@ fn quat_of(x: V4, y: V4, z: V4) -> V4 {
 
 impl Rider {
     /// The game-side rider from the port's: the board lies on the ground (its up is the ground's normal) and points
-    /// along the port's yaw. After a placement the attitude is the game's own, kept through the air (`Rider::att`,
-    /// `Boarder_PlaceAt` 0x11cae8, row G20c3b) while the port left the yaw alone. STANDIN: otherwise the game's
-    /// attitude quaternion (rider+0x170) is only kept between ticks, not across a take-off or a trick's landing,
-    /// where the port rebuilds it (rows G20c3c, G1a5b3b and G5).
+    /// along the port's yaw. The attitude is the game's own, kept through the air (`Rider::att`), while the port left
+    /// the yaw alone: after a placement `Boarder_PlaceAt` 0x11cae8's (row G20c3b), after a jump off the snow the one
+    /// the take-off tick left (`Boarder_TakeOff` 0x128470 after `GroundMotion_Update` 0x10a0d8, row G20c3c). STANDIN:
+    /// otherwise (a spin or flip in the air, a landing the port turned, a take-off from a rail) the game's attitude
+    /// quaternion (rider+0x170) is rebuilt from the yaw and the normal (rows G20c3c2, G1a5b3b, G20c2c3 and G5).
     pub fn seed_ground(&self) -> gm::Rider {
         let n = unit(to_game(self.normal, 1.0, 0.0));
         let o = match self.att {
