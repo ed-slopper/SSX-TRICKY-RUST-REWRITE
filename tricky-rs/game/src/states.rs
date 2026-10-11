@@ -165,6 +165,10 @@ pub struct StateRider {
     /// +0x5ae4 (a sound flag) and +0x5af0
     pub x5ae4: u32,
     pub x5af0: u32,
+    /// +0x46dc: the animation controller's layer mask
+    pub x46dc: u32,
+    /// the word at +0xb50 of the pivot bone's record (rider + +0x44d8 × 0x394), none when +0x44d8 < 0
+    pub bone_b50: Option<u32>,
     /// read: the camera (+0x38), the board class (+0x420), the control state (+0x428), stats+0x40
     pub cam: i32,
     pub class: u32,
@@ -209,6 +213,8 @@ pub enum RoutineCall {
     PlayClip(u32),
     /// `AnimCtl_TurnAllLayers` 0x15eef8(π, rider+0x46c0)
     TurnAllLayers,
+    /// `AnimCtl_PlayClip` 0x15fcf8(rider+0x46c0, clip, 0, 5) with the layer mask +0x46dc it is played under
+    PlayClipMasked(u32, u32),
 }
 
 /// `Sfx_ClearRiderFlag` 0x218b68 → 0x11f440(rider, 0): +0x5ae4 cleared, and +0x5af0 = 5 when it was set.
@@ -401,6 +407,35 @@ pub fn run_routine(addr: u32, r: &mut StateRider, o: &mut StateObj, a1: u32) -> 
             } else {
                 calls.push(C::PlayClip(0x200));
             }
+        }
+        // LandNormalControl_Enter: past a quarter second, the landing clip under a mask of the pivot bone's
+        // layers: straight (0x20c) when the board points within 30° of the travel flattened onto its up, else to the
+        // side the travel goes (0x20d, 0x20e; mirrored riding switch); the mask then all set
+        0x1049f8 => {
+            if f32::from_bits(o.w8) <= 0.25 {
+                return Some(calls);
+            }
+            let mut mask = 0u32;
+            for k in [3u32, 6, 10, 12, 4, 9, 11, 5, 7, 8, 1, 2] {
+                if let Some(b) = r.bone_b50 {
+                    mask |= 1u32 << (b.wrapping_add(k) & 0x1f);
+                }
+            }
+            r.x46dc = mask;
+            use crate::jump::{dot, normalize, scale, sub};
+            let v = normalize(r.vel);
+            let h = normalize(sub(v, scale(r.orient.up, dot(v, r.orient.up))));
+            let clip = if dot(r.orient.fwd, h).abs() <= 0.866 {
+                let mut side = dot(r.orient.side, h);
+                if r.stance != 0 {
+                    side = -side;
+                }
+                if side <= 0.0 { 0x20e } else { 0x20d }
+            } else {
+                0x20c
+            };
+            calls.push(C::PlayClipMasked(clip, r.x46dc));
+            r.x46dc = 0xffff_ffff;
         }
         _ => return None,
     }

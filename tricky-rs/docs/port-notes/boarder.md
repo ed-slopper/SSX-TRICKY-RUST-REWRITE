@@ -501,4 +501,8 @@ board's up above level. Checked: 20,000 routine runs and 40,000 spin entries aga
 sin −f/2, 0, 0), renormalised (`Boarder_UpdateOrientation`), and the position moved by the new attitude turning
 (p turned back by that turn − p), p = (0, 0, the pivot bone's z) (bone = rider + +0x44d8 × 0x394 + 0x8c8); spin and
 flip then 0. Checked 40,000 times.
+`LandNormalControl_Enter` (in `run_routine`): only past 0.25 s (object +8); the layer mask +0x46dc = bits
+(b + 1 … b + 12) of the pivot bone's +0xb50 word b (0 with no bone); the travel flattened onto the board's up:
+within 30° of the board's forward (|dot| > 0.866) clip 0x20c, else 0x20e when it goes to the board's left (side ·
+travel ≤ 0, mirrored riding switch), else 0x20d; played under the mask, which is then set to −1.
 

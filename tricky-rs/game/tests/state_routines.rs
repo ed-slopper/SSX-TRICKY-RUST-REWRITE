@@ -24,7 +24,8 @@ impl Rng {
 }
 
 /// Each ported routine and where its object keeps the rider.
-const ROUTINES: [(u32, u32); 28] = [
+const ROUTINES: [(u32, u32); 29] = [
+    (0x1049f8, 0xc),
     (0x108368, 0x20), (0x108310, 0x20), (0x10aec8, 0xc), (0x109858, 0xc), (0x10b090, 0x10), (0x10b068, 0x10),
     (0x10d680, 0x60), (0x110290, 0xc), (0x110260, 0xc), (0x104388, 0x10), (0x104190, 0x10), (0x1033c0, 0x14),
     (0x102fb0, 0x14), (0x104178, 0), (0x103eb8, 0), (0x104688, 0), (0x104790, 0), (0x104e38, 0xc), (0x1055a8, 0xc),
@@ -75,6 +76,7 @@ fn write(m: &mut r5900::Mem, rd: u32, r: &StateRider) {
     m.write_f32(rd + 0x46e0, r.x46e0);
     m.write_u32(rd + 0x5ae4, r.x5ae4);
     m.write_u32(rd + 0x5af0, r.x5af0);
+    m.write_u32(rd + 0x46dc, r.x46dc);
     m.write_u32(rd + 0x38, r.cam as u32);
     m.write_u32(rd + 0x420, r.class);
     m.write_u32(rd + 0x428, r.state);
@@ -110,6 +112,7 @@ fn read(m: &mut r5900::Mem, rd: u32, base: &StateRider) -> StateRider {
     r.x46e0 = m.read_f32(rd + 0x46e0);
     r.x5ae4 = m.read_u32(rd + 0x5ae4);
     r.x5af0 = m.read_u32(rd + 0x5af0);
+    r.x46dc = m.read_u32(rd + 0x46dc);
     r
 }
 
@@ -122,7 +125,7 @@ fn bits(r: &StateRider) -> String {
             (f(r.x138), f(r.x13c), r.orient.q.map(f), r.orient.fwd.map(f), r.orient.side.map(f), r.orient.up.map(f), f(r.orient.yaw)),
             (r.stance, f(r.x1cc), r.kind, r.x1e4, r.x1e8, r.x1ec, r.x1fc.map(f)),
             (f(r.steer), f(r.x218), f(r.x21c), f(r.lean), r.x268.map(f), f(r.x284), f(r.x288), f(r.x28c)),
-            (f(r.x448), f(r.x44c), r.x46d4, f(r.x46e0), r.x5ae4, r.x5af0),
+            (f(r.x448), f(r.x44c), r.x46d4, f(r.x46e0), r.x5ae4, r.x5af0, r.x46dc),
         )
     )
 }
@@ -164,7 +167,10 @@ fn state_routines_match_the_original() {
             Box::new(move |c, _| (c.gpr(4) as u32 == 0xc000 + cn.get() as u32 && c.gpr(5) == 0x360630 && c.gpr(6) == 0).then_some(RoutineCall::StartCamScript))
         }),
         (0x15f050, Box::new(move |c, _| (c.gpr(4) as u32 == rider + 0x46c0).then_some(RoutineCall::BlendOutAll))),
-        (0x15fcf8, Box::new(move |c, _| (c.gpr(4) as u32 == rider + 0x46c0 && c.gpr(6) == 0 && c.gpr(7) == 5).then_some(RoutineCall::PlayClip(c.gpr(5) as u32)))),
+        (0x15fcf8, Box::new(move |c, m| (c.gpr(4) as u32 == rider + 0x46c0 && c.gpr(6) == 0 && c.gpr(7) == 5).then(|| {
+            let clip = c.gpr(5) as u32;
+            if (0x20c..=0x20e).contains(&clip) { RoutineCall::PlayClipMasked(clip, m.read_u32(rider + 0x46dc)) } else { RoutineCall::PlayClip(clip) }
+        }))),
         (0x15eef8, Box::new(move |c, _| (c.gpr(4) as u32 == rider + 0x46c0 && c.f(12) == std::f32::consts::PI).then_some(RoutineCall::TurnAllLayers))),
     ];
     for (a, f) in stubs {
@@ -184,7 +190,7 @@ fn state_routines_match_the_original() {
         let mut sr = StateRider {
             x138: fs(), x13c: fs(), vel: [0.0; 4], orient: o, stance: 0, x1cc: fs(), kind: 0, x1e4: 0, x1e8: 0, x1ec: 0,
             x1fc: [fs(), fs(), fs(), fs(), fs(), fs()], steer: fs(), x218: fs(), x21c: fs(), lean: fs(), x268: [fs(), fs(), fs()],
-            x284: fs(), x288: fs(), x28c: fs(), x448: fs(), x44c: fs(), x46d4: 0, x46e0: fs(), x5ae4: 0, x5af0: 0,
+            x284: fs(), x288: fs(), x28c: fs(), x448: fs(), x44c: fs(), x46d4: 0, x46e0: fs(), x5ae4: 0, x5af0: 0, x46dc: 0, bone_b50: None,
             cam: 0, class: 0, state: 0, stats40: 0,
         };
         let sp = [g.f(0.0, 270.0), 277.77777, g.f(280.0, 3000.0)][g.next() as usize % 3];
@@ -198,11 +204,22 @@ fn state_routines_match_the_original() {
         sr.class = g.next() % 3;
         sr.state = [0xd, 3, 0x10][g.next() as usize % 3];
         sr.stats40 = g.next() % 2;
+        sr.x46dc = g.next();
+        let bone = (g.next() % 6) as i32 - 1;
+        sr.bone_b50 = if bone < 0 { None } else { Some([g.next() % 20, g.next()][g.next() as usize % 2]) };
+        if g.next() % 2 == 0 {
+            sr.vel = [g.f(-3000.0, 3000.0), g.f(-3000.0, 3000.0), g.f(-500.0, 500.0), 0.0];
+        }
         cam_now.set(sr.cam);
         let a1 = [6u32, 2, 0x16, 3][g.next() as usize % 4];
-        let mut so = StateObj { w8: g.next(), wc: g.next(), w10: g.next() };
+        let mut so = StateObj { w8: if g.next() % 2 == 0 { g.f(0.0, 1.0).to_bits() } else { g.next() }, wc: g.next(), w10: g.next() };
         write(&mut r.mem, rider, &sr);
         r.mem.write_u32(stats + 0x40, sr.stats40);
+        r.mem.write_u32(rider + 0x44d8, bone as u32);
+        if let Some(b) = sr.bone_b50 {
+            r.mem.write_u32(rider + bone as u32 * 0x394 + 0xb50, b);
+        }
+        put4(&mut r.mem, rider + 0x150, sr.vel);
         for w in 0..0x1a {
             r.mem.write_u32(obj + 4 * w, 0xdead_0000 + w);
         }
