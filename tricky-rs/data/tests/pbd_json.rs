@@ -194,3 +194,65 @@ fn materials_splines_lights_and_names_match_the_exported_json() {
     }
     eprintln!("materials {}, splines {} ({} segments), lights {}, names of {} instances compared", checked[0], checked[1], checked[2], checked[3], checked[4]);
 }
+
+
+#[test]
+fn meshes_match_the_exported_obj_files() {
+    use tricky_data::pbd::{context_strips, strip_triangles};
+    let Some(dir) = std::env::var_os("TRICKY_PBD_DIR") else { return };
+    let levels = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../levels");
+    let (mut objs, mut tris) = (0usize, 0usize);
+    for (folder, file) in [("snowdream", "snow"), ("elysium", "elysium"), ("mesablanca", "mesa"), ("merqury", "merquer"), ("aloha", "aloha"), ("pipedream", "pipe"), ("untracked", "untrack"), ("megaplex", "megaple"), ("alaska", "alaska")] {
+        let Ok(bytes) = std::fs::read(std::path::Path::new(&dir).join(format!("{file}.pbd"))) else { continue };
+        let meshes = levels.join(folder).join("Meshes");
+        if !meshes.exists() {
+            continue;
+        }
+        let pbd = Pbd::parse(&bytes).unwrap();
+        let vif = pbd.header.offset(0x84) as usize;
+        let mut k = 0usize;
+        for (mi, m) in pbd.models.iter().enumerate() {
+            let scale = [6, 7, 8].map(|i| f32::from_bits(m.head[i]));
+            for n in &m.nodes {
+                if n.words[1] == 0 {
+                    continue;
+                }
+                let mesh = m.meshes.iter().find(|x| x.offset == n.offset + n.words[1]).unwrap();
+                for cx in &mesh.contexts {
+                    let strips = context_strips(&bytes, vif + cx.words[3] as usize, scale).unwrap_or_else(|e| panic!("{folder}: model {mi}: {e}"));
+                    let Ok(text) = std::fs::read_to_string(meshes.join(format!("{k}.obj"))) else { k += 1; continue };
+                    let mut v = vec![];
+                    let mut f = vec![];
+                    let (mut vt, mut vn) = (vec![], vec![]);
+                    for l in text.lines() {
+                        let w: Vec<&str> = l.split_whitespace().collect();
+                        match w.first() {
+                            Some(&"v") => v.push([w[1], w[2], w[3]].map(|x| x.parse::<f32>().unwrap())),
+                            Some(&"vt") => vt.push([w[1], w[2]].map(|x| x.parse::<f32>().unwrap())),
+                            Some(&"vn") => vn.push([w[1], w[2], w[3]].map(|x| x.parse::<f32>().unwrap())),
+                            Some(&"f") => f.push([w[1], w[2], w[3]].map(|x| x.split('/').map(|n| n.parse::<usize>().unwrap() - 1).collect::<Vec<_>>())),
+                            _ => {}
+                        }
+                    }
+                    let ours: Vec<[tricky_data::pbd::WorldVertex; 3]> = strips.iter().flat_map(|s| strip_triangles(s.len()).map(move |t| t.map(|i| s[i]))).collect();
+                    assert_eq!(ours.len(), f.len(), "{folder}: {k}.obj (model {mi}) triangles");
+                    for (ti, (a, b)) in ours.iter().zip(&f).enumerate() {
+                        for c in 0..3 {
+                            let (p, q) = (a[c], &b[c]);
+                            let close = |x: f32, y: f32, e: f32| (x - y).abs() <= e + 1e-5 * y.abs();
+                            let ok = (0..3).all(|x| close(p.pos[x], v[q[0]][x], 1e-3))
+                                && close(p.uv[0], vt[q[1]][0], 1e-6)
+                                && close(1.0 - p.uv[1], vt[q[1]][1], 1e-6)
+                                && (0..3).all(|x| close(p.nrm[x], vn[q[2]][x], 1e-6));
+                            assert!(ok, "{folder}: {k}.obj triangle {ti} corner {c}: {p:?} vs {:?} {:?} {:?}", v[q[0]], vt[q[1]], vn[q[2]]);
+                        }
+                    }
+                    objs += 1;
+                    tris += f.len();
+                    k += 1;
+                }
+            }
+        }
+    }
+    eprintln!("{objs} meshes, {tris} triangles compared");
+}

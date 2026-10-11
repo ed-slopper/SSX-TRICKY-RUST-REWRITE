@@ -283,3 +283,11 @@ there (no rewind); a level is the value / 100 when 0..200 (the duck 0..100), els
   - The `.map` (on the disc beside the others, not read by the game) names everything (and gives the hashes).
   - gari's export in the levels folder is of another build: its splines all differ and its patches' flag word is 0
     there (its show-off patches are surface 18); everything else agrees.
+- Meshes (row E3a3; `pbd::{context_strips, strip_triangles}`, checked against the levels folders' Meshes/*.obj:
+  8,297 meshes, 311,620 triangles, positions, UVs and normals). A model's node +4 is its mesh; each mesh context's
+  word 3 is its offset into the VIF block (header +0x84). Read from the packets themselves (the VU1 program is not
+  decompiled): a DMA chain of `cnt` packets (and `ref` ones, which hold no vertices) to `ret` / `end`; in it,
+  batches of five unpacks: V4-32 (a GS tag; word 4 the strip count), V2-8 (each strip's length × 3, three
+  quadwords a vertex), then per vertex (masked, `STCYCL` 1/3) V2-16 UVs (4.12; the exports write 1 − v), V3-16
+  normals (1.15) and V3-16 positions (1.15 times the model's vertex scale, model head +0x18). Each strip is drawn
+  as a triangle strip, every other triangle reversed. gari is not compared (its export is of another build).

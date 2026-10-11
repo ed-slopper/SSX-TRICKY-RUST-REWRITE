@@ -521,3 +521,95 @@ impl LightRec {
         self.v3(16)
     }
 }
+
+
+/// A vertex of a world mesh (row E3a3).
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct WorldVertex {
+    pub pos: [f32; 3],
+    pub uv: [f32; 2],
+    pub nrm: [f32; 3],
+}
+
+/// A mesh context's geometry from its VIF data (row E3a3): the packets the game sends to the vector unit as they are,
+/// read here from the packets themselves (the vector unit's program is not decompiled; inferred from the data and
+/// checked against the levels folders' exported meshes). The DMA chain is `cnt` packets (and `ref` ones, which hold
+/// no vertex data) up to `ret` / `end`. A batch is five unpacks: a V4-32 header (a GS tag, then the strip count at
+/// word 4), V2-8 strip lengths (three quadwords a vertex, so each length / 3), then per vertex (masked, `STCYCL` 1/3)
+/// V2-16 UVs (4.12, as the GS takes them; the exports flip v to 1 - v), V3-16 normals (1.15) and V3-16 positions
+/// (1.15, times the model's vertex scale).
+pub fn context_strips(b: &[u8], start: usize, scale: [f32; 3]) -> Result<Vec<Vec<WorldVertex>>, String> {
+    let mut at = start;
+    let mut unpacks: Vec<(u32, &[u8])> = vec![];
+    let mut ended = false;
+    for _ in 0..100_000 {
+        let lo = word(b, at).ok_or("chain past the end")?;
+        let qwc = (lo & 0xffff) as usize;
+        let id = (lo >> 28) & 7;
+        if id == 3 {
+            at += 16;
+            continue;
+        }
+        let body = b.get(at + 8..at + 16 + qwc * 16).ok_or("packet past the end")?;
+        let mut i = 0;
+        while i + 4 <= body.len() {
+            let w = u32::from_le_bytes([body[i], body[i + 1], body[i + 2], body[i + 3]]);
+            i += 4;
+            let cmd = (w >> 24) & 0x7f;
+            let num = ((w >> 16) & 0xff) as usize;
+            match cmd {
+                0x60..=0x7f => {
+                    let comps = ((cmd >> 2) & 3) as usize + 1;
+                    let bits = [32, 16, 8, 5][(cmd & 3) as usize];
+                    let n = (bits * comps * num).div_ceil(32) * 4;
+                    unpacks.push((cmd & 0x0f, body.get(i..i + n).ok_or("unpack past the packet")?));
+                    i += n;
+                }
+                0x30 | 0x31 => i += 16,
+                0x20 => i += 4,
+                _ => {}
+            }
+        }
+        at += 16 + qwc * 16;
+        if id == 6 || id == 7 {
+            ended = true;
+            break;
+        }
+    }
+    if !ended {
+        return Err("chain without an end".into());
+    }
+    let mut strips = vec![];
+    for batch in unpacks.chunks(5) {
+        let (hdr, lens, uv, nrm, pos) = match batch {
+            [(0xc, h), (0x6, l), (0x5, u), (0x9, n), (0x9, p)] => (*h, *l, *u, *n, *p),
+            _ => return Err(format!("unexpected batch {:?}", batch.iter().map(|x| x.0).collect::<Vec<_>>())),
+        };
+        let n_strips = u32::from_le_bytes([hdr[16], hdr[17], hdr[18], hdr[19]]) as usize;
+        let half = |s: &[u8], k: usize| i16::from_le_bytes([s[2 * k], s[2 * k + 1]]);
+        let count = pos.len() / 6;
+        let mut v = 0;
+        for s in 0..n_strips {
+            let len = *lens.get(2 * s).ok_or("strip lengths short")? as usize / 3;
+            let mut strip = Vec::with_capacity(len);
+            for _ in 0..len {
+                if v >= count {
+                    return Err("strip longer than the batch".into());
+                }
+                strip.push(WorldVertex {
+                    pos: [0, 1, 2].map(|k| half(pos, 3 * v + k) as f32 / 32768.0 * scale[k]),
+                    uv: [0, 1].map(|k| half(uv, 2 * v + k) as f32 / 4096.0),
+                    nrm: [0, 1, 2].map(|k| half(nrm, 3 * v + k) as f32 / 32768.0),
+                });
+                v += 1;
+            }
+            strips.push(strip);
+        }
+    }
+    Ok(strips)
+}
+
+/// A strip's triangles: (i, i+1, i+2) and, every other one, (i+2, i+1, i).
+pub fn strip_triangles(n: usize) -> impl Iterator<Item = [usize; 3]> {
+    (0..n.saturating_sub(2)).map(|i| if i % 2 == 0 { [i, i + 1, i + 2] } else { [i + 2, i + 1, i] })
+}
