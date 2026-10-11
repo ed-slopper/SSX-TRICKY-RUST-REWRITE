@@ -44,7 +44,7 @@ Part of the port notes (index: [README.md](README.md)); units and wording as des
   bail penalty, no points multiplier. Bail: chain 0, pending trick lost, meter −0.10. Stumble −0.02.
 - Trick-trigger zones (controller 0x15): run a script if the rider's score rises by a threshold within a time.
 
-## Trick book (DATA/TUTORIAL/TRICKDEF.DAT, `Score_TrickBookCheck` 0x157a00)
+## Trick book (DATA/TUTORIAL/TRICKDEF.DAT, `Score_TrickBookCheck` 0x1579e0)
 
 - 12 sets (one per rider, in character order) × 30 records × 28 bytes; 6 chapters of 5. Only the first
   unfinished chapter counts. A trick matches on its id word (combo name, grabs, spin size) and flip bits

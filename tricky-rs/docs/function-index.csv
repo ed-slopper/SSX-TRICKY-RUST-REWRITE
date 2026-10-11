@@ -112,6 +112,7 @@ address,size,name,system,status
 0x10c120,24,FUN_0010c120,boarder?,not started
 0x10c138,44,FUN_0010c138,,not started
 0x10c198,340,WipeoutMotion_Enter,wipeout,ported
+0x10c2f0,5004,WipeoutMotion_Update,wipeout,ported
 0x10d680,116,FUN_0010d680,frontend?,not started
 0x10d6f8,992,Ragdoll_ComputeMassProps,wipeout,ported
 0x10dad8,460,Ragdoll_InitFromBoarder,wipeout,ported
@@ -653,7 +654,7 @@ address,size,name,system,status
 0x13bd40,312,Instance_OnPlayerContact,world,ported
 0x13be78,340,FUN_0013be78,world?,not started
 0x13bfd0,1532,TriggerScript_ExecOp,world,ported
-0x13c5d0,2788,FUN_0013c5d0,world?,not started
+0x13c5d0,2788,TriggerScript_Op0_SpawnController,world,ported
 0x13d0b8,116,FUN_0013d0b8,world?,not started
 0x13d130,452,FUN_0013d130,world?,not started
 0x13d2f8,224,FUN_0013d2f8,world?,not started
@@ -725,7 +726,7 @@ address,size,name,system,status
 0x141630,84,cRandomBoostNode::vf7_141630,world,not started
 0x141688,372,FUN_00141688,world?,not started
 0x141800,168,FUN_00141800,ai?,not started
-0x1418a8,336,cTubeEndBoostNode::vf27_1418a8,world,not started
+0x1418a8,336,cTubeEndBoostNode::BoostRider,world,not started
 0x1419f8,16,cTubeEndBoostNode::vf28_1419f8,world,not started
 0x141a08,124,cTubeEndBoostNode::vf29_141a08,world,not started
 0x141a88,104,cTubeEndBoostNode::vf7_141a88,world,not started
@@ -770,15 +771,15 @@ address,size,name,system,status
 0x1444d0,168,FUN_001444d0,world?,not started
 0x144578,408,cFenceNode::vf2_144578,world,not started
 0x144710,100,cFenceNode::vf7_144710,world,not started
-0x144778,152,FUN_00144778,world?,not started
-0x144810,184,FUN_00144810,world?,not started
+0x144778,152,cFlagNode::cFlagNode,world,not started
+0x144810,184,cFlagNode::cFlagNode,world,not started
 0x1448c8,108,cFlagNode::vf0_1448c8,world,not started
 0x144938,1296,cFlagNode::Init,world,ported
 0x144e48,128,cFlagNode::vf1_144e48,world,not started
 0x144ec8,908,cFlagNode::BuildStrip,world,ported
 0x145258,408,cFlagNode::vf2_145258,world,not started
 0x1453f0,100,cFlagNode::vf7_1453f0,world,not started
-0x145458,208,FUN_00145458,world?,ported
+0x145458,208,cCrackedNode::cCrackedNode,world,ported
 0x145528,116,FUN_00145528,ai?,not started
 0x1455a0,288,cCrackedNode::vf1_1455a0,world,ported
 0x1456c0,128,cCrackedNode::vf21_1456c0,world,not started
@@ -790,8 +791,8 @@ address,size,name,system,status
 0x145888,84,cCrackedNode::vf7_145888,world,not started
 0x1458e0,520,Crowd_LoadTexturesRandomize,world,ported
 0x145ae8,60,FUN_00145ae8,world?,not started
-0x145b28,128,FUN_00145b28,world?,ported
-0x145ba8,88,FUN_00145ba8,world?,not started
+0x145b28,128,cCrowdBoxNode::cCrowdBoxNode,world,ported
+0x145ba8,88,cCrowdBoxNode::cCrowdBoxNode,world,not started
 0x145c00,136,cCrowdBoxNode::Init,world,ported
 0x145c88,380,cCrowdBoxNode::vf1_145c88,world,ported
 0x145e08,436,cCrowdBoxNode::StepCells,world,ported
@@ -1122,10 +1123,10 @@ address,size,name,system,status
 0x157308,40,FUN_00157308,scoring?,not started
 0x157330,352,FUN_00157330,scoring?,not started
 0x157490,1252,Score_BuildTrickId,scoring,ported
-0x157978,8,FUN_00157978,,not started
+0x157978,8,FUN_00157978,scoring?,not started
 0x157980,40,FUN_00157980,world?,not started
 0x1579a8,56,FUN_001579a8,scoring?,not started
-0x1579e0,572,FUN_001579e0,scoring?,not started
+0x1579e0,572,Score_TrickBookCheck,scoring,ported
 0x157c18,52,FUN_00157c18,scoring?,not started
 0x157c50,92,FUN_00157c50,scoring?,not started
 0x157d58,12,FUN_00157d58,frontend?,not started
@@ -2279,7 +2280,7 @@ address,size,name,system,status
 0x198720,24,FUN_00198720,files?,not started
 0x198738,24,FUN_00198738,files?,not started
 0x198750,24,FUN_00198750,files?,not started
-0x198810,820,cAnimObjectNode,animation,ported
+0x198810,820,cAnimObjectNode::cAnimObjectNode,animation,not started
 0x198b48,604,FUN_00198b48,ai?,not started
 0x198da8,272,FUN_00198da8,world?,not started
 0x198eb8,260,FUN_00198eb8,world?,not started
@@ -2293,7 +2294,7 @@ address,size,name,system,status
 0x1998d0,36,FUN_001998d0,world?,not started
 0x1998f8,240,FUN_001998f8,world?,not started
 0x1999e8,736,FUN_001999e8,ai?,not started
-0x199d10,84,cAnimDeltaNode,animation,ported
+0x199d10,84,cAnimDeltaNode::cAnimDeltaNode,animation,not started
 0x199d68,80,FUN_00199d68,ai?,not started
 0x199db8,244,cAnimDeltaNode::Update,animation,ported
 0x199ee0,60,FUN_00199ee0,world?,not started

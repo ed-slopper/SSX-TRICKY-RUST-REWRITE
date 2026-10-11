@@ -14,7 +14,7 @@ Part of the port notes (index: [README.md](README.md)); units and wording as des
 - HUD words (american.loc): "KNOCKDOWN!", "BIG AIR BONUS", chain "1x COMBO"…"4+ COMBO", race checkpoint
   "CHECKPOINT" + split, show-off "TIME BONUS" + "%d seconds", "FINAL LAP" / "%d LAPS TO GO", "FINISH", "TIME UP".
 
-## World controllers (`TriggerScript_ExecOp`, `TriggerScript_Op0_SpawnController` 0x13c600)
+## World controllers (`TriggerScript_ExecOp`, `TriggerScript_Op0_SpawnController` 0x13c5d0)
 
 - Controllers attach to instances (inst+0xe4); flags inst+0xe8: 0x4 animated, 0x80 bounces the rider, 0x800
   disabled. Script slots: 1 on collide, 3 on rest, 4 on timer/counter/break. Lifetimes are seconds × 60.

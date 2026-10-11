@@ -5,3 +5,4 @@
 187ad0 cDebugMenu::InstallStub_emptyInRetail cDebugMenu::InstallStub
 2ff870 libc_vfprintf vfprintf
 1141e0 cEndRaceHandler_Update cEndRaceHandler::Update
+1418a8 cTubeEndBoostNode::vf27 cTubeEndBoostNode::BoostRider

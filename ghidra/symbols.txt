@@ -1319,7 +1319,7 @@ F 149b78 cTubeEndBoostNode vf0
 F 140688 cTubeEndBoostNode vf1
 F 141a88 cTubeEndBoostNode vf7
 F 1408d0 cTubeEndBoostNode vf23
-F 1418a8 cTubeEndBoostNode vf27
+F 1418a8 cTubeEndBoostNode BoostRider
 F 1419f8 cTubeEndBoostNode vf28
 F 141a08 cTubeEndBoostNode vf29
 F 149bf0 cRandomBoostNode vf0
@@ -3030,3 +3030,14 @@ G 250d60 Math_Sin
 G 250e98 Math_Cos
 G 102f50 Vec4_Scale
 G 11b018 Boarder_AddMeter
+G 1579e0 Score_TrickBookCheck
+G 13c5d0 TriggerScript_Op0_SpawnController
+G 10c2f0 WipeoutMotion_Update
+D 343150 gMusicSys
+F 198810 cAnimObjectNode cAnimObjectNode
+F 199d10 cAnimDeltaNode cAnimDeltaNode
+F 144778 cFlagNode cFlagNode
+F 144810 cFlagNode cFlagNode
+F 145b28 cCrowdBoxNode cCrowdBoxNode
+F 145ba8 cCrowdBoxNode cCrowdBoxNode
+F 145458 cCrackedNode cCrackedNode

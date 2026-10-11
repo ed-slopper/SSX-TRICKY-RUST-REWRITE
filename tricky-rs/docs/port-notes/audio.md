@@ -2,7 +2,7 @@
 
 Part of the port notes (index: [README.md](README.md)); units and wording as described there.
 
-## Sound and music (`Audio_*`, `Music_*`, `cMusicSys` 0x343150)
+## Sound and music (`Audio_*`, `Music_*`, `gMusicSys` 0x343150, the one `cMusicSys`)
 
 - Countdown beeps at 0.5, 1.0, 1.5, 2.0 s; no GO sound of its own (the song is unpaused at GO, `Audio_OnRaceGo`).
 - Songs: musicmap.inf enables up to 4 songs per course; at race start the song is advanced rand(0..21) times

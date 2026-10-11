@@ -1,4 +1,4 @@
-//! The trick book (`Score_TrickBookCheck` 0x157a00, `TrickBook_*`): six chapters of five tricks per
+//! The trick book (`Score_TrickBookCheck` 0x1579e0, `TrickBook_*`): six chapters of five tricks per
 //! rider, read from `chars/trickbook.json` (decoded from the disc's DATA/TUTORIAL/TRICKDEF.DAT). Only
 //! the first unfinished chapter counts; a landed trick ticks off an entry when its spin, flips and
 //! grabs are the same (the original ignores the spin's direction, a switch takeoff and how it lands).
