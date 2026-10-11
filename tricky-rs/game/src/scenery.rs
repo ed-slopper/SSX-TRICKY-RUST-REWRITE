@@ -60,7 +60,8 @@ impl Crowd {
     }
 
     /// `cCrowdBoxNode::StepCells` 0x145e08: when excited, each cell's phase moves on; at the end of each cycle the
-    /// cell picks a new set and (below excitement 7) may sit out up to 63 frames. Then the shown cells' frames.
+    /// cell picks a new set and (below excitement 7) may sit out up to 63 frames. Then the shown cells' frames (rows × columns;
+    /// past 16 the game reads beyond its cell arrays, not modelled: the cells wrap here).
     pub fn step(&mut self, env: &mut impl CrowdEnv) {
         if self.excited != 0 {
             for i in 0..16 {

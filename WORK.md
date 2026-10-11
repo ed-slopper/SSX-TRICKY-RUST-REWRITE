@@ -278,7 +278,7 @@ matches the original.
 | E9g | Breakables: `cCrackedNode` and `cFenceNode` ported (`tricky_game::breakables`: health and cooldown, the event-4 script on breaking, the swing passed between fence sections), checked against the game's objects in the runner (tests/breakables.rs). Mesh-anim pieces and the fence's bending: E9g2 | P2 | ed-slopper/puffin | 2026-10-11 | 7bbcde4 |
 | E9i | Texture animation controllers ported (`tricky_game::texanim`): `cUVScrollNode`, `cTexFlipNode`, `cUVScrollTexFlipNode`, `cTexFlip`'s frame pick and the scrolled-model registry; checked over 220k steps against the game's objects in the runner (tests/texanim.rs). Flags and keyframed animations: E9i2 | P2 | ed-slopper/puffin | 2026-10-11 | 40e3484 |
 | E9i2 | Flags and keyframed object animations ported (`tricky_game::objanim`: `cFlagNode`, `cAnimObjectNode`, `cAnimDeltaNode`, `cAnimComboNode`, `cAnimTexFlipNode` — the clip cursor, timers, contacts, messages), checked over 100k steps against the game's objects in the runner (tests/objanim.rs). Sampling clips onto parts and the flag strip are drawing | P2 | ed-slopper/puffin | 2026-10-11 | 9389c4e |
-| E9j | Crowd boxes, particle nodes and the jumbotron movie ported (`tricky_game::scenery`: the crowd's excitement and cell animation with its tables, the emitter's lifetime, the video names), checked against the game in the runner (tests/scenery.rs) | P2 | ed-slopper/puffin | 2026-10-11 | HASH |
+| E9j | Crowd boxes, particle nodes and the jumbotron movie ported (`tricky_game::scenery`: the crowd's excitement and cell animation with its tables, the emitter's lifetime, the video names), checked against the game in the runner (tests/scenery.rs) | P2 | ed-slopper/puffin | 2026-10-11 | fa8f976 |
 
 ## Changes to the board
 
