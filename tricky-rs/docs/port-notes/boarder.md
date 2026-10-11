@@ -515,3 +515,20 @@ regular; +0x46d4 then 0 / 1), facing −π or 0, clip 0x255. Others: regular (al
 steer, lean, +0x27c and +0x280 negated, +0x46d4 = stance) with the layers turned π (not for kinds 3 / 4 off an
 alpine board). Then `Boarder_OnClipQueued`. The facing values are the compiler's folded wraps (π → −π).
 
+## Rail capture and the rail control (row G1b; checked: `tests/rail_world.rs`, `tests/rail_control.rs`)
+
+`Rail_TryCapture` 0x125cb8 (`ground_tick::rail_try_capture`): the closest rail point to the board; not when the
+board has passed it (offset · travel < −0.2), not during a clip of type 0xe/0xf/0x10 without flag 4, and only within
+0.9 of the fall-off limits. The velocity goes along the travel tangent at min(speed, max(555.55554, speed along
+it)), z × 0.1; the rail kind from atan2(z row · t, x row · t): |a| > 150° 2, a < −30° 4, a > 30° 3, else 1; the rail
+word to rider+0x290 and the sound manager +0x6e40; `Score_LandTrick`(kind, stance, 0), `Boarder_AddMeter`,
+motion 3, state 0xf.
+
+`RailSlideControl_Update` 0x1073e0 (`rail_control::update`): boost from pad bit 4; the armed flag (+0x10) set by pad
+bit 1, then kept while bits 1 or 2 are held. With no quarter turn queued: no turn axis (pad bits 17..22) and no bit
+3: steer target (bits 5..10 / 31, unscaled), crouch target (bits 11..16 / 31), and the prewind (state 0xe) when
+armed; else the crouch target 0 and, uncrouched, a quarter turn the way of the turn axis (or the steer).
+`RailSlideControl_CommitQuarterTurn` 0x107730: layers ±π/2, ±90° spin scored, by rail kind the facing, stance and
+clip (0x258..0x25f) and the clip to queue (+8); `RailSlideControl_PlayQueuedClip` 0x107628 plays it when the turn's
+clip ends and sets the new rail kind (1→4, 2→3, 3→1, 4→2). Pad bit 0: reset at 101.46.
+
