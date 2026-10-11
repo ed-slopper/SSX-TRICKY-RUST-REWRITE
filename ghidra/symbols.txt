@@ -4738,3 +4738,55 @@ G 21a548 Audio_LoadAmbientBank
 G 21a468 Audio_ClearAmbientLoaded
 G 220f80 SoundId_Split
 G 224368 Song_Delete
+G 214e08 Audio_StopIntroStream
+G 211fb8 Audio_FadeMusicTo
+G 211b58 Audio_StopRaceAudio
+G 210a38 Audio_InitRiderSounds
+G 20f8c0 Audio_CancelMusicDuck
+G 20f578 Audio_Shutdown
+G 20d9f0 Audio_MusicStateToMode
+G 20c040 Audio_StopAllVoices
+G 20b0b8 SndVoice_Stop
+G 20a8e0 SndVoice_IsDone
+G 20ae28 SndVoice_SetVolume
+G 20a5d0 BankManager_AllocStatic
+G 20a460 BankManager_LoadIfChanged
+G 20a170 BankSlot_IsLoaded
+G 20a038 BankSlot_Free
+G 2086d8 AsyncSys_PopQueue
+G 2044c0 BdrLoad_FindPartName
+F 1ffd80 cVideoStreamMan cVideoStreamMan
+F 1c9b20 cFogObjMan cFogObjMan
+G 1ff000 VideoStream_Draw
+G 1fece8 VideoStream_Update
+G 2001c8 Movie_GetFrameTexture
+G 1f9970 HUD_LoadIconPack
+G 1f9608 SpriteSet_RegisterFirstShape
+G 1f9550 SpriteSet_RegisterNamedShapes
+G 1f1258 ScreenAnim_Reset
+G 1e7d38 GridMesh_PackNormal
+G 1e7cf8 GridMesh_PackUV
+G 1e0eb8 Gfx_GetBrightness
+G 1d2d50 MCSlot_GetLabel
+G 1c90d0 SnowFall_SetDensity
+G 1c9218 SnowFall_SnapOrigin
+G 1c41a0 Gfx_InitStatePool
+G 1c3ba8 TexMan_UploadTexture
+F 18a4e0 cCommandMenuItem cCommandMenuItem
+F 18a1d0 cSubMenuItem cSubMenuItem
+F 18a878 cIntMenuItem cIntMenuItem
+F 18ab68 cFloatMenuItem cFloatMenuItem
+G 1a7758 Overlay_HideAll
+G 19e840 Score_GetRankColour
+G 19e7a0 Score_GetRankForPoints
+G 19d9e0 Font_GetGlyphWidth
+G 19d800 Font_PrintAsciiShadowedRight
+G 196f28 AIPath_Load
+G 1938a0 ReplayPin_ClearHighlightRef
+G 1931d0 ReplayPin_Clear
+G 193068 ReplayKeyframe_Reset
+G 193aa0 ReplayPin_GetHighlight
+G 191d88 Replay_GetStatus
+G 190c70 Replay_UpdateCamTrack
+G 18f800 Replay_RestoreNodes
+G 18df38 Draw_RectI
