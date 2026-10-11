@@ -243,3 +243,147 @@ pub fn wind_clip(spin: f32, flip: f32, switch: bool, kind: usize) -> u32 {
     };
     WIND_CLIPS[row][kind]
 }
+
+/// The rider (and prewind state) fields `PrewindState_Update` reads and writes, around [`Fields`].
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct Prewind {
+    pub f: Fields,
+    /// the prewind state's flag (state+8): the wind-up has started
+    pub started: u32,
+    /// rider+0x1dc (the kind of take-off: 0 snow; it picks the wind-up clip column and rate) and rider+0x418
+    pub kind: u32,
+    pub x418: i32,
+    /// the spin and flip wind-ups, [now, rate, target] (rider+0x220.., rider+0x22c..)
+    pub spin: [f32; 3],
+    pub flip: [f32; 3],
+    /// rider+0x1c8: the crouch kept for the jump
+    pub x1c8: f32,
+    /// velocity (rider+0x150), the board's forward in the air (rider+0x180)
+    pub vel: [f32; 4],
+    pub board: [f32; 4],
+    /// the steer now, its rate and target (rider+0x214, +0x218, +0x21c)
+    pub steer: f32,
+    pub steer_rate: f32,
+    pub steer_target: f32,
+    pub surface: u32,
+    pub switch: u32,
+    pub class: u32,
+    /// rider+0x304 (set with a reset request), rider+0x58a8 (ubers done)
+    pub x304: u32,
+    pub ubers: i32,
+    /// the wind-up stat byte (stats+0x18)
+    pub windup_stat: u8,
+}
+
+/// The side calls `PrewindState_Update` makes, in order (besides those of [`update_boost`]).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum PrewindCall {
+    Boost(Call),
+    /// `AnimCtl_PlayClip`(clip, 0, 5)
+    Clip(u32),
+    /// `Boarder_SetState`
+    State(u32),
+    /// `Boarder_RequestReset`(101.46)
+    Reset,
+}
+
+fn sext6(word: u32, shift: u32) -> f32 {
+    (((word << shift) as i32) >> 26) as f32 / 31.0
+}
+
+/// `PrewindState_Update` 0x1050e8, once a tick with the pad word `pad`: hold crouch to wind up (spin and flip from the
+/// sticks, steer, boost), let go to jump (state 10, with the wind-up clip) or, from a standing start, ride on (state
+/// 3); the select button or surface 0 asks for a reset. `sounds` as for [`update_boost`].
+pub fn prewind_update(pad: u32, sounds: bool, p: &mut Prewind) -> Vec<PrewindCall> {
+    let mut calls = vec![];
+    let mut to_reset_check = false;
+    let mut released = false;
+    if p.kind == 0 {
+        if pad & 4 == 0 && p.started == 0 && p.x418 < 0 {
+            released = true;
+        } else {
+            p.spin[2] = 0.0;
+            p.spin[1] = f32::from_bits(0x4000_0846);
+            p.flip[2] = 0.0;
+            p.flip[1] = f32::from_bits(0x4000_0846);
+            p.started = 1;
+            if p.spin[0] == p.flip[2] && p.flip[0] == p.flip[2] {
+                calls.push(PrewindCall::Clip(0x1ff));
+                calls.push(PrewindCall::State(3));
+                return calls;
+            }
+            to_reset_check = true;
+        }
+    } else {
+        released = true;
+    }
+    if released {
+        if pad & 2 == 0 {
+            // let go: jump with the wind-up there is, snapped to a pure spin or flip near an axis
+            p.f.crouch_target = 0.0;
+            p.f.crouch_rate = f32::from_bits(0x4155_5555);
+            p.x1c8 = p.f.crouch;
+            let mut s = p.spin[0].abs();
+            let mut fl = p.flip[0].abs();
+            if s < 0.2 {
+                p.spin = [0.0, 0.0, 0.0];
+                s = 0.0;
+            }
+            if fl < 0.2 {
+                p.flip = [0.0, 0.0, 0.0];
+                fl = 0.0;
+            }
+            if s != 0.0 || fl != 0.0 {
+                let a = if s == 0.0 {
+                    if 0.0 <= fl { std::f32::consts::FRAC_PI_2 } else { -std::f32::consts::FRAC_PI_2 }
+                } else {
+                    crate::math::atan(fl / s)
+                };
+                if 1.396_225_6 < a {
+                    p.spin[2] = 0.0;
+                    p.spin[0] = 0.0;
+                    p.spin[1] = 0.0;
+                } else if a < 0.174_570_72 {
+                    p.flip[2] = 0.0;
+                    p.flip[0] = 0.0;
+                    p.flip[1] = 0.0;
+                }
+            }
+            calls.push(PrewindCall::Clip(wind_clip(p.spin[0], p.flip[0], p.switch != 0, p.kind as usize)));
+            calls.push(PrewindCall::State(10));
+            return calls;
+        }
+        // crouched: boost, crouch, wind up from the sticks, steer
+        let tricky = is_tricky(p.ubers);
+        for c in update_boost((pad >> 3) & 1 != 0, false, sounds, tricky, &mut p.f) {
+            calls.push(PrewindCall::Boost(c));
+        }
+        set_crouch_target(1.0, &mut p.f);
+        let mut steer = sext6(pad, 9);
+        if pad & 0x10 == 0 {
+            let rate = f32::from_bits(if p.kind != 0 { 0x4080_0846 } else { 0x4000_0846 });
+            set_wind_target(sext6(pad, 21), rate, false, p.windup_stat, &mut p.spin);
+            set_wind_target(sext6(pad, 15), rate, p.switch ^ 1 != 0, p.windup_stat, &mut p.flip);
+        } else {
+            steer = -sext6(pad, 21);
+        }
+        let steer = steer.clamp(-0.5, 0.5);
+        let (v, b) = (p.vel, p.board);
+        let q = [v[0] * b[0], v[1] * b[1], v[2] * b[2], v[3] * b[3]];
+        let along = ((q[0] + q[1]) + 1.0 * q[2]) + 1.0 * q[3];
+        if 0.0 < along {
+            let s = SteerState { boost_level: p.f.boost_level, class: p.class, vel: p.vel, steer: p.steer, surface: p.surface };
+            let (t, rate) = set_steer_target(steer, &s);
+            p.steer_target = t;
+            p.steer_rate = rate;
+        } else if steer != 0.0 {
+            p.started = 1;
+        }
+        to_reset_check = true;
+    }
+    if to_reset_check && (pad & 1 != 0 || p.surface == 0) {
+        p.x304 = (pad ^ 1) & 1;
+        calls.push(PrewindCall::Reset);
+    }
+    calls
+}

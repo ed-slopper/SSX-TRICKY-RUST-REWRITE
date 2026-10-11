@@ -78,7 +78,6 @@ state machine and the renderer are ours. Nothing has been checked against the or
 |---|---|---|---|---|---|
 | G1 | Boarder state machine: every state (0x00–0x14) and motion (0–6), their enter/update/exit, `cBoarder` vtable, in the original's order per tick | unowned | F1 | | [repo] Many states ported one by one; the dispatch is ours |
 | G1a | Prewind, jump, takeoff, spin and flip control (`PrewindState_Update` 0x1050e8, `Jump_ApplyImpulse` 0x1284e0, `Takeoff_SetSpinRates` 0x126e30, `SpinState_Update` 0x100908, `SpinState_StartFromStick` 0x102158) checked | any | F4a | | [repo] Ported, unchecked Split: G1a1, G1a2 |
-| G1a4 | `PrewindState_Update` 0x1050e8 ported exactly into `tricky-game` on the G1d/G1e helpers and checked in the function runner | any | G1a3 | trailrig/heron (2026-10-11) | Split of G1a |
 | G1a5 | The rest of G1a: `SpinState_Update` 0x100908 checked; `Rider::step` calls the exact prewind, jump, take-off and spin start (G1a1–G1a4) | any | G1a4 | | Split of G1a |
 | G1b | Rails checked: `RailSlideMotion_Update` 0x10b0d0, `RailSlideControl_Update` 0x1073e0, `Rail_TryCapture` 0x125cb8 | any | F4a | | [repo] README: rail speeds "still mine"; find what isn't ported |
 | G1c | Finish, reset and gate states: `FinishState_Update` 0x106668, `ResetState_Update` 0x106a90, `Boarder_RequestReset` 0x118f10, `GateAnticipate_*` | any | F4a | | [repo] |
@@ -218,6 +217,7 @@ matches the original.
 | G1d | Boarder meter and input helpers ported exactly (`tricky-rs/game/src/boarder.rs`): `Boarder_AddMeter` 0x11b018, `Boarder_UpdateBoost` 0x11d038, `Boarder_SetCrouchTarget` 0x126c00, `PrewindState_SetWindTarget` 0x105a60, each bit for bit in the function runner with its sound/HUD calls in order (`tests/boarder.rs`, 8,000 cases each); the runner now sends tail calls (`j` into a stubbed function) through the stub (it ran the real callee before; unit test added) | P2 | trailrig/heron | 2026-10-11 | fd62ef1 |
 | G1e | `Boarder_SetSteerTarget` 0x126948, `Boarder_IsTricky` 0x11f430 and `PrewindState_UpdateWindClip` 0x1055f0 (with its clip table 0x35fed0) ported exactly into `boarder.rs` and checked bit for bit in the function runner (10,000 steers, 20,000 wind-ups); the runner learnt ldl/ldr/sdl/sdr (unaligned doublewords, with a unit test) | P2 | trailrig/heron | 2026-10-11 | 2e951ad |
 | E3b | `.ssh` textures in `tricky-data/src/ssh.rs`: the shape library's directory, block chain and name lookup (`Shape_FindByName` 0x2c2528, `Shape_GetLongName` 0x2c2610), 8-bit palette and RGBA images (the only kinds in the disc's 807 files); all 192 exported rider textures equal the disc's under the exports' 0-0x80 to 0-255 mapping (`port-notes/files.md`) | P1 | ed-slopper/puffin | 2026-10-11 | a363515 |
+| G1a4 | `PrewindState_Update` 0x1050e8 ported exactly (`boarder::prewind_update`, on the checked G1d/G1e helpers) and checked in the function runner on 20,000 random ticks with the original's helpers running: every field and every call (boost sounds, clips, states, reset) bit for bit (`tests/prewind.rs`) | P2 | trailrig/heron | 2026-10-11 | HASH |
 
 ## Changes to the board
 
@@ -304,3 +304,4 @@ matches the original.
 - 2026-10-11 trailrig/heron: G1e done (3 functions checked).
 - 2026-10-11 trailrig/heron: G1a4 split into G1a4 (claimed) and G1a5.
 - 2026-10-11 ed-slopper/puffin: E3b done; claim E4c.
+- 2026-10-11 trailrig/heron: G1a4 done (PrewindState_Update checked).

@@ -56,3 +56,10 @@ Part of the port notes (index: [README.md](README.md)); units and wording as des
   switch), K = 0.5449139 + 0.6741781·tricks/255; the clip by direction (0x226–0x22d, octants of atan2 riding stance);
   then state 1 and 0x10. From the pad only eight directions exist and the game's atan puts the diagonals just inside
   45°, so clips 0x22a and 0x226 and the snap are never reached.
+- `PrewindState_Update` 0x1050e8 proven (G1a4, `boarder::prewind_update` on the G1d/G1e helpers, 20,000 random ticks): from
+  a standing start (rider+0x1dc 0, no jump bit 4, not started, rider+0x418 < 0) it waits for crouch release; else it
+  primes both wind-up rates to 2.0005 and, with no wind-up, rides on (clip 0x1ff, state 3). Crouch held (bit 2): boost
+  from bit 3, crouch target 1, wind-up targets from the stick fields (bits 5–10 spin, 11–16 flip, /31; rate 2.0005,
+  4.0005 off snow), steer ±0.5 from bits 17–22 (or the spin field with bit 0x10) only while moving along the board.
+  Release: crouch target 0 at 13.333/s, rider+0x1c8 := crouch, wind-ups under 0.2 dropped, snapped to pure spin or
+  flip within 10° of an axis, the wind-up clip, state 10. Bit 1 or surface 0 asks for a reset (rider+0x304 = !bit 1).

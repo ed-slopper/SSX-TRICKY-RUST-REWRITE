@@ -42,7 +42,7 @@ address,size,name,system,status
 0x105030,40,LandNormalControl_SaveSnapshot,save,not started
 0x105058,20,LandNormalControl_LoadSnapshot,ai?,not started
 0x105070,120,PrewindControl_Enter,boarder,not started
-0x1050e8,1212,PrewindState_Update,boarder,ported
+0x1050e8,1212,PrewindState_Update,boarder,checked
 0x1055a8,68,PrewindControl_Exit,boarder,not started
 0x1055f0,1136,FUN_001055f0,boarder?,checked
 0x105a60,112,PrewindState_SetWindTarget,boarder,checked
