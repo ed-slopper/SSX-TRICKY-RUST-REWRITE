@@ -61,6 +61,15 @@ ExecOp returns 1 to go on, 0 to wait (op 4), −1 to end the thread (a failed op
 | 25 | switch rail p2 to state p3 | `RailMan_SetRail` 0x149030 |
 | 26 | run function p2 with no rider | `cScriptNode::cScriptNode` |
 
+Pickups ported (row E9c; `tricky_game::pickup`, checked: `tests/pickup.rs`). Score fields: +0x94 points from
+pickups; counts +0x98/+0x9c/+0xa0 (500/2000/5000 points), +0xa4/+0xa8/+0xac (1/5/10 s), +0xb0/+0xb4/+0xb8 (x2/x3/x5);
+`Score_Reset` clears them. Points: a 2.5 s message of kind 6, then `Boarder_AddMeter`(0.04). Time: a 2.5 s message
+of kind 9 with the whole seconds, the seconds onto the race clock's limit (gApp+0x730 → +0x1c → +0x14), and
+`Sfx_PickupTime` 0x219fc0 in every mode. Multiplier: counted for a rider whose +0x424 is 1 or 3; a higher one than
+the score's +0x28 replaces it with a message of kind 12 (time −1); `Sfx_PickupMultiplier` 0x219d70 for the rider whose
++0x41c is 1, in every mode. Boosts (17, 18): the time left becomes the larger (`Boarder_AddSpeedBoostTime` 0x11e910
++0x134; `Boarder_AddSpinBoostTime` 0x11e930 +0x138, and +0x13c = 1); not limited to show-off.
+
 | controller | class (constructor) | | controller | class (constructor) |
 |---|---|---|---|---|
 | 0 | `cRollerNode` 0x13dee8 | | 14 | `cCrackedNode` 0x145458 |

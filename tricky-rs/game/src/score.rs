@@ -50,6 +50,10 @@ pub struct Score {
     pub x84: i32,
     pub x88: i32,
     pub x8c: i32,
+    /// +0x94 points from pickups; pickups taken: +0x98 500s, +0x9c 2000s, +0xa0 5000s, +0xa4 1 s, +0xa8 5 s, +0xac 10 s,
+    /// +0xb0 x2, +0xb4 x3, +0xb8 x5 (`tricky_game::pickup`)
+    pub pickup_points: i32,
+    pub pickups: [i32; 9],
     /// +0xbc riders knocked down (`Scoring_MsgKnockdown`)
     pub xbc: i32,
     /// +0x90 crashes, +0xc0 crashes of the other kind (`Score_Crash`'s flag; a 1.5 s message of kind 5)

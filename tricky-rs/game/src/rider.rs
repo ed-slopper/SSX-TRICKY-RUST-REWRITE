@@ -632,11 +632,11 @@ impl Rider {
         self.clear_air();
     }
     pub fn pick_multiplier(&mut self, m: u32) {
-        // the original counts multipliers only in the air or on a rail
+        // `Pickup_Multiplier` 0x11e660 counts it in show-off for a rider whose +0x424 is 1 or 3. STANDIN: that
+        // word is taken to be in the air or on a rail (not confirmed)
         if self.grounded || !self.showoff { return; }
         self.multiplier = self.multiplier.max(m);
-        // STANDIN: `Score_SetPickupMultiplier` 0x155cd0 is not ported; the pickup sets the score's multiplier
-        self.sc.mult = self.sc.mult.max(m as f32);
+        let _ = self.sc.set_pickup_multiplier(m as f32);
         self.last_trick = format!("x{m} on your next trick");
         self.trick_timer = 2.0;
     }
@@ -652,8 +652,8 @@ impl Rider {
         self.last_trick = "TRICK BOOST".into();
         self.trick_timer = 2.0;
     }
-    /// Script op 0xf: straight onto the meter.
-    pub fn pick_boost(&mut self, amount: f32) { self.add_meter(amount); }
+    /// Script op 0xf (`Pickup_Meter` 0x11e958): straight onto the meter, in show-off only.
+    pub fn pick_boost(&mut self, amount: f32) { if self.showoff { self.add_meter(amount); } }
     /// Six landed uber tricks spell TRICKY: boost no longer runs out.
     pub fn tricky(&self) -> bool { crate::boarder::is_tricky(self.sc.x88) }
     /// Uber tricks can be started (the meter was filled in the last twenty seconds, or TRICKY).

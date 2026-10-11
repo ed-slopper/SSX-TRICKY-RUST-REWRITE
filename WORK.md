@@ -55,7 +55,6 @@ state machine and the renderer are ours. Nothing has been checked against the or
 | E8d | Rider-to-rider: `Boarder_RiderCollisions` 0x123fc8, `Boarder_RiderHit` 0x124920, shoves | any | F4a | | [repo] Ported, unchecked. Split: E8d1, E8d2 |
 | E9 | Script machine: `TriggerScript_Run`, `TriggerScript_ExecOp` 0x13bfd0 with every op, controllers (`TriggerScript_Op0_SpawnController` 0x13c600), persistent cell scripts, run at runtime instead of read statically | unowned | E3c | | [repo] `logic.rs` reads SSFLogic.json statically today |
 | E9b | Script threads: `TriggerScript_Run` 0x13be78 and the flow ops of `TriggerScript_ExecOp` 0x13bfd0 (4 wait, 5 conditions, 7/21/26 new threads, 3/9/10/11 controller messages) run at runtime, in the game's order | unowned | E3c | | Gap of E9a. Table in port-notes/scripts.md |
-| E9c | Pickup ops 6, 14, 15, 16 (points, multiplier, meter, time; show-off only) and 17, 18 (speed, spin boost): `Pickup_*` 0x11e608–0x11e958, `Score_AddPickupPoints` 0x155b10, `Score_SetPickupMultiplier` 0x155cd0, `Score_AddPickupTime` 0x155bb8 | unowned | E9b | ed-slopper/puffin (2026-10-11) | Gap of E9a. G13 checks them |
 | E9d | World ops 1 (camera node), 2 (effects, spline riders), 8 (sound), 13 (reset), 23 (camera shake `Cam_Shake` 0x177758), 24 (teleport), 25 (rail switch `RailMan_SetRail` 0x149030) | unowned | E9b | | Gap of E9a |
 | E9e | Logic controllers: `cDebounceNode` (2), `cCounterNode` (6), `cTimerNode` (8), `cTrickTriggerNode` (21), dead-node modes (5, `TriggerScript_ApplyControllerOp` 0x13ac88) | unowned | E9b | | Gap of E9a |
 | E9f | Boost controllers: `cBoostNode` (7), `cLapBoostNode` (15), `cRandomBoostNode` (16), `cZBoostNode` (18), `cTubeEndBoostNode` (24) | unowned | E9b | | Gap of E9a. G14 checks 15 and 18 |
@@ -272,6 +271,7 @@ matches the original.
 | E5b2 | Config loaders on the exact reader, checked in the runner against the game's functions on the disc's files: SNOW.INF's board sound programs (`Sfx_LoadSurfaceConfig` / `Sfx_LoadBoardConfig`: `tricky_data::snowsfx`, all 30 byte for byte; `boardsound.rs` now uses them, its interpreter still ours: the game's is not found), the mix levels (`Audio_LoadVolumeLevels`) and the intro music (`Music_StartCourseSong`) (`tricky_data::audiocfg`). The loaders that feed the sound engine (BANKS, CROWD, CHANT, SPEECH, narration, NASCRIPT events, the jukebox stream) go with G10 | P1 | ed-slopper/puffin | 2026-10-11 | e05c906 |
 | C0 | The course and mode facts from the game (`tricky-rs/game/src/courses.rs`): the course table 0x332f28 (numbers, names, files, show-off times), the mode word 0x32de8c named from the event menu (`cFE3DStateEventSel::CreateNextState`), 0x32de88 = the course, the World Circuit order and medal thresholds, `Circuit_GetMedal` and `cRaceHandler::Enter`'s time limit, checked against the ELF and in the runner (tests/courses.rs); `ui::showoff` reads them. Which courses each mode offers: C0b | P3 | ed-slopper/puffin | 2026-10-11 | d23dee1 |
 | C0b | Which courses each mode offers: the venue menu order 0x3a8af0 and `Career_IsCourseUnlocked` 0x163bb8 ported (`courses::VENUES`, `course_unlocked`, runner-checked in tests/courses.rs); the per-mode race setup (`Circuit_SetupRace`, `Circuit_SetupEventRiders`) read and written up in race.md for C12 | P3 | ed-slopper/puffin | 2026-10-11 | efef317 |
+| E9c | Pickup ops 6, 14, 15, 16, 17, 18: `Pickup_*`, `Score_AddPickupPoints`, `Score_SetPickupMultiplier`, `Score_AddPickupTime`, the boost timers ported (`tricky_game::pickup`, the score's pickup fields), runner-checked (tests/pickup.rs); the rider's multiplier pickup uses it. Still STANDIN: what triggers them (E9b) and rider+0x424 read as in the air / on a rail | P3 | ed-slopper/puffin | 2026-10-11 | HASH |
 
 ## Changes to the board
 
@@ -461,3 +461,4 @@ matches the original.
 - 2026-10-11 ed-slopper/puffin: claim C0b.
 - 2026-10-11 ed-slopper/puffin: C0b done (unlocks ported; race setup notes for C12).
 - 2026-10-11 ed-slopper/puffin: claim E9c.
+- 2026-10-11 ed-slopper/puffin: E9c done.
