@@ -434,6 +434,17 @@ when nothing is found); the real `RailSlideMotion_Update` with the real `Rail_Cl
 outside the limits, both blends, reversed travel, no rail in reach): the normal, lean angle, recorded hit and blend
 equal ours, and the original calls `Boarder_SetState` 0x11f608 exactly when ours says the board is off the rail.
 
+The rail attitude (row G20c2c2; `ground_tick::rail_attitude`, `orient::quat_multiply`, `rotate_vec_to_vec`,
+`slerp`): after the normal's store (0x10bbb8) the board's wanted up is `n·cos(lean) + (n × t)·sin(lean)` (t the
+travel tangent); the target quaternion is the identity turned z → that up (`Quat_RotateVecToVec` 0x2508b8: axis a × b
+over its length, angle asin(min(len, 0.99999)) or π − that when a·b < 0, (cos ½θ, sin ½θ·axis) · q), then turned
+from its own y axis (turned as `Boarder_UpdateOrientation` turns it) to t; rider+0x170 goes 1/12 of the way to it
+(`Quat_Slerp` 0x250a48: dot summed x, y, z, w; the shorter way; π/2 − asin(dot) and three `Math_Sin`, or linear
+when 1 − dot ≤ 0.001), then `Boarder_UpdateOrientation`. `Quat_Multiply` 0x102e80 sums each lane left to right
+(w: ((p0q0 − p1q1) − p2q2) − p3q3; x: ((p0q1 + p1q0) + p2q3) − p3q2; …). Checked: the three routines alone
+(30,000 cases each, near-equal and opposite inputs) and the quaternion, axes and heading the real
+`RailSlideMotion_Update` leaves in the rail cases above, bit for bit (`tests/rail_world.rs`).
+
 Not wired, new rows: `Rider::rail_step` still uses `rail_lateral` and the last normal (STANDIN), because it has no
 world grid (the game builds one when it loads the course; the port's rails are the level's splines flattened to
 polylines in `rails.rs`: G20c2c1) and no attitude quaternion through a rail (the second half of

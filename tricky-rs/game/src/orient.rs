@@ -37,7 +37,7 @@ pub struct Orient {
 /// t = u × a (u the quaternion's vector part), the result is `a + t·2w + (u × t)·2`, summed left to right, the
 /// two scalings being `Vec3_Scale` 0x102f80 (three lanes, the product with the scale). The products with the
 /// axis's zeros are kept (they decide the sign of a zero).
-fn turn_axis(q: V4, a: [f32; 3]) -> V4 {
+pub(crate) fn turn_axis(q: V4, a: [f32; 3]) -> V4 {
     let (w, x, y, z) = (q[0], q[1], q[2], q[3]);
     let t = [y * a[2] - z * a[1], z * a[0] - x * a[2], x * a[1] - y * a[0]];
     let u = [y * t[2] - z * t[1], z * t[0] - x * t[2], x * t[1] - y * t[0]];
@@ -140,4 +140,54 @@ pub fn take_off(r: &mut TakeOffRider, env: &mut dyn TakeOffEnv) {
         env.jump_impulse(r, 0.0);
         env.takeoff_spin_rates(r);
     }
+}
+
+/// `Quat_Multiply` 0x102e80: p · q (w, x, y, z), each lane summed left to right as the machine code does.
+pub fn quat_multiply(p: V4, q: V4) -> V4 {
+    let [p0, p1, p2, p3] = p;
+    let [q0, q1, q2, q3] = q;
+    [
+        ((p0 * q0 - p1 * q1) - p2 * q2) - p3 * q3,
+        ((p0 * q1 + p1 * q0) + p2 * q3) - p3 * q2,
+        ((p0 * q2 + p2 * q0) + p3 * q1) - p1 * q3,
+        ((p0 * q3 + p3 * q0) + p1 * q2) - p2 * q1,
+    ]
+}
+
+/// `Quat_RotateVecToVec` 0x2508b8: `q` turned further by the rotation taking `a` to `b` (both unit length, four
+/// lanes): the axis a × b (vopmula / vopmsub) and its length s (vsqrt; 0: `q` as it was), the axis divided by s
+/// (vdiv, vmulq), the angle asin(min(s, 0.99999)), or π less it when a · b < 0, then (cos ½θ, sin ½θ · axis) · q
+/// (`Math_SinCos`, `Quat_Multiply`).
+pub fn rotate_vec_to_vec(q: V4, a: V4, b: V4) -> V4 {
+    let c = crate::probe::cross(a, b);
+    let s = crate::jump::dot(c, c).sqrt();
+    if s == 0.0 {
+        return q;
+    }
+    let k = 1.0 / s;
+    let axis = [c[0] * k, c[1] * k, c[2] * k, c[3] * k];
+    let s = if 0.99999 < s { 0.99999 } else { s };
+    let angle = if crate::jump::dot(a, b) < 0.0 { PI - math::asin(s) } else { math::asin(s) };
+    let (sin, cos) = math::sin_cos(angle * 0.5);
+    quat_multiply([cos, sin * axis[0], sin * axis[1], sin * axis[2]], q)
+}
+
+/// `Quat_Slerp` 0x250a48: from `a` to `b` by `t` along the shorter way (`b` negated when a · b < 0, the dot summed
+/// x, y, z then w); the angle π/2 − asin(dot) and its sines (`Math_Asin`, `Math_Sin`), or straight 1 − t and t
+/// when 1 − dot is 0.001 or less.
+pub fn slerp(t: f32, a: V4, b: V4) -> V4 {
+    let mut d = ((a[1] * b[1] + a[2] * b[2]) + a[3] * b[3]) + a[0] * b[0];
+    let mut b = b;
+    if d < 0.0 {
+        b = [-b[0], -b[1], -b[2], -b[3]];
+        d = -d;
+    }
+    let (wa, wb) = if 0.001 < 1.0 - d {
+        let angle = HALF_PI - math::asin(d);
+        let s = math::sin(angle);
+        (math::sin((1.0 - t) * angle) / s, math::sin(t * angle) / s)
+    } else {
+        (1.0 - t, t)
+    };
+    [wa * a[0] + wb * b[0], wa * a[1] + wb * b[1], wa * a[2] + wb * b[2], wa * a[3] + wb * b[3]]
 }

@@ -283,7 +283,8 @@ fn rail_slide_normal_is_the_originals() {
     // (+0x284), and whether it takes the board off the rail (it calls `Boarder_SetState` 0x11f608) are
     // `ground_tick::rail_slide_normal`'s
     let Some(mut r) = runner() else { return };
-    for a in [0x102f50, 0x102f80, 0x250c10, 0x259330] {
+    let real = [0x102f50, 0x102f80, 0x250c10, 0x259330, 0x2508b8, 0x250a48, 0x102e80, 0x10c120, 0x250fd0, 0x250d60, 0x129008, 0x2510f8];
+    for a in real {
         r.allow(a);
     }
     // every other call of the function (the vector helpers it only fills stack with, the quaternions, the collision
@@ -295,7 +296,7 @@ fn rail_slide_normal_is_the_originals() {
             jals.insert((w & 0x03ff_ffff) << 2);
         }
     }
-    for a in [0x102f50, 0x102f80, 0x250c10, 0x259330] {
+    for a in real {
         jals.remove(&a);
     }
     let off_rail = Rc::new(RefCell::new(0u32));
@@ -316,6 +317,7 @@ fn rail_slide_normal_is_the_originals() {
     r.mem.write_u32(rider + 0x5ae0, other);
     let mut g = Rng(0x5eed_010b_0d01);
     let (mut inside, mut outside, mut none, mut blended, mut flipped, mut wrong) = (0, 0, 0, 0, 0, Vec::new());
+    let mut attitude_wrong: Vec<String> = Vec::new();
     for round in 0..40 {
         let (w, cps, per_cell) = random_world(&mut g);
         let wp = put_world(&mut r, &w, per_cell);
@@ -358,6 +360,14 @@ fn rail_slide_normal_is_the_originals() {
             r.mem.write_f32(rider + 0x130, 0.0);
             r.mem.write_f32(obj + 0xc, input.time);
             r.mem.write_f32(obj + 8, input.lean);
+            let q0 = {
+                let v = [g.unit(), g.unit(), g.unit(), g.unit()];
+                let l = (((v[1] * v[1] + v[2] * v[2]) + v[3] * v[3]) + v[0] * v[0]).sqrt().max(1e-3);
+                [v[0] / l, v[1] / l, v[2] / l, v[3] / l]
+            };
+            put_v(&mut r, rider + 0x170, q0);
+            r.mem.write_f32(rider + 0x1b0, 9.0);
+            put_v(&mut r, rider + 0x180, [9.0; 4]);
             put_v(&mut r, rider + 0x2a0, [7.0; 4]);
             put_v(&mut r, rider + 0x2d0, [8.0; 4]);
             r.mem.write_u32(rider + 0x290, 0x1234_5678);
@@ -379,7 +389,17 @@ fn rail_slide_normal_is_the_originals() {
                     let common = gh == bits(s.hit.point) && gw == s.hit.word && gb == s.blend.to_bits();
                     match s.on {
                         None => common && gset == 1 && gn == [7.0f32.to_bits(); 4] && gl == input.lean.to_bits(),
-                        Some(n) => common && gset == 0 && gn == bits(n.normal) && gl == n.lean.to_bits(),
+                        Some(n) => {
+                            let mut o = tricky_game::orient::Orient { q: gt::rail_attitude(q0, n.normal, gt::rail_travel(s.hit.tangent, input.vel), n.lean), ..Default::default() };
+                            tricky_game::orient::update_orientation(&mut o);
+                            let att = (get_v(&mut r, rider + 0x170), get_v(&mut r, rider + 0x180), get_v(&mut r, rider + 0x190), get_v(&mut r, rider + 0x1a0), r.mem.read_u32(rider + 0x1b0));
+                            let same = att == (bits(o.q), bits(o.fwd), bits(o.side), bits(o.up), o.yaw.to_bits());
+                            if !same {
+                                attitude_wrong.push(format!("round {round} query {q}: game {att:x?}
+  ours {o:?}"));
+                            }
+                            common && gset == 0 && gn == bits(n.normal) && gl == n.lean.to_bits() && same
+                        }
                     }
                 }
             };
@@ -409,4 +429,63 @@ fn rail_slide_normal_is_the_originals() {
     }
     assert!(wrong.is_empty(), "{} differ:\n{}", wrong.len(), wrong.join("\n"));
     assert!(inside > 1500 && outside > 500 && none > 100 && blended > 500 && flipped > 500, "inside {inside}, outside {outside}, none {none}, blended {blended}, flipped {flipped}");
+}
+
+#[test]
+fn quaternion_helpers_are_the_originals() {
+    // `Quat_Multiply` 0x102e80, `Quat_RotateVecToVec` 0x2508b8 and `Quat_Slerp` 0x250a48 on their own, on random
+    // and near-equal quaternions and on parallel, opposite and random unit vectors
+    use tricky_game::orient::{quat_multiply, rotate_vec_to_vec, slerp};
+    let Some(mut r) = runner() else { return };
+    for a in [0x102e80, 0x2508b8, 0x250a48, 0x250c10, 0x250fd0, 0x250d60] {
+        r.allow(a);
+    }
+    let (out, pa, pb, pc) = (r.mem.alloc(16), r.mem.alloc(16), r.mem.alloc(16), r.mem.alloc(16));
+    let mut g = Rng(0x0907_aa31_5c4e_2d18);
+    let quat = |g: &mut Rng| {
+        let v = [g.unit(), g.unit(), g.unit(), g.unit()];
+        let l = (((v[0] * v[0] + v[1] * v[1]) + v[2] * v[2]) + v[3] * v[3]).sqrt().max(1e-3);
+        [v[0] / l, v[1] / l, v[2] / l, v[3] / l]
+    };
+    let mut near = 0;
+    for case in 0..30_000 {
+        let p = quat(&mut g);
+        let q = match g.below(4) {
+            0 => [p[0] + g.unit() * 1e-3, p[1] + g.unit() * 1e-3, p[2], p[3] + g.unit() * 1e-3],
+            1 => [-p[0], -p[1] + g.unit() * 1e-3, -p[2], -p[3]],
+            _ => quat(&mut g),
+        };
+        put_v(&mut r, pa, p);
+        put_v(&mut r, pb, q);
+        r.cpu.set_gpr(4, out as u64);
+        r.cpu.set_gpr(5, pa as u64);
+        r.cpu.set_gpr(6, pb as u64);
+        r.call(0x102e80).unwrap();
+        assert_eq!(get_v(&mut r, out), bits(quat_multiply(p, q)), "case {case}: multiply {p:?} {q:?}");
+        let t = [0.0, 1.0, g.range(0.0, 1.0), 1.0 / 12.0][g.below(4) as usize];
+        r.cpu.set_f(12, t);
+        r.cpu.set_gpr(4, out as u64);
+        r.cpu.set_gpr(5, pa as u64);
+        r.cpu.set_gpr(6, pb as u64);
+        r.call(0x250a48).unwrap();
+        assert_eq!(get_v(&mut r, out), bits(slerp(t, p, q)), "case {case}: slerp {t} {p:?} {q:?}");
+        let d = ((p[1] * q[1] + p[2] * q[2]) + p[3] * q[3]) + p[0] * q[0];
+        near += (1.0 - d.abs() <= 0.001) as u32;
+        let a = unit3(&mut g);
+        let b = match g.below(5) {
+            0 => a,
+            1 => [-a[0], -a[1], -a[2], 0.0],
+            2 => { let v = [a[0] + g.unit() * 1e-3, a[1], a[2] + g.unit() * 1e-3, 0.0]; let l = (v[0] * v[0] + v[1] * v[1] + v[2] * v[2]).sqrt(); [v[0] / l, v[1] / l, v[2] / l, 0.0] }
+            _ => unit3(&mut g),
+        };
+        put_v(&mut r, out, p);
+        put_v(&mut r, pc, a);
+        put_v(&mut r, pb, b);
+        r.cpu.set_gpr(4, out as u64);
+        r.cpu.set_gpr(5, pc as u64);
+        r.cpu.set_gpr(6, pb as u64);
+        r.call(0x2508b8).unwrap();
+        assert_eq!(get_v(&mut r, out), bits(rotate_vec_to_vec(p, a, b)), "case {case}: rotate {p:?} by {a:?} to {b:?}");
+    }
+    assert!(near > 3000, "near-equal slerps: {near}");
 }

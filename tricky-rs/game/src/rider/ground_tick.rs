@@ -481,6 +481,22 @@ pub fn rail_slide_normal(world: &RailWorld, i: &RailSlideIn) -> Option<RailSlide
     Some(RailSlide { hit, blend, on: Some(RailNormal { normal: rail_normal(travel, i.up, lean), lean }) })
 }
 
+/// The board's attitude on the rail (board row G20c2c2): `RailSlideMotion_Update` 0x10b0d0 from the normal's store
+/// (0x10bbb8) to `Boarder_UpdateOrientation` (0x10bdbc). From the normal `n` it just made, the travel `t`
+/// ([`rail_travel`]) and the lean angle (its `Math_SinCos`): the board's up wanted, `n·cos + (n × t)·sin`
+/// (`Vec4_Scale`, vadd); the target, the identity turned from z to that up (`Quat_RotateVecToVec`), then turned again
+/// from its own forward (the y axis turned by it, as [`orient::turn_axis`]) to the travel; the quaternion
+/// (rider+0x170) a twelfth of the way to it (`Quat_Slerp` at 1/12). The caller then runs
+/// [`orient::update_orientation`] for +0x180..+0x1b0.
+pub fn rail_attitude(q: V4, normal: V4, travel: V4, lean: f32) -> V4 {
+    let (sin, cos) = crate::math::sin_cos(lean);
+    let up = add(scale(normal, cos), scale(cross(normal, travel), sin));
+    let target = orient::rotate_vec_to_vec([1.0, 0.0, 0.0, 0.0], [0.0, 0.0, 1.0, 0.0], up);
+    let fwd = orient::turn_axis(target, [0.0, 1.0, 0.0]);
+    let target = orient::rotate_vec_to_vec(target, fwd, travel);
+    orient::slerp(f32::from_bits(0x3daa_aaab), q, target)
+}
+
 /// A game direction (z up) as a port direction (y up), the other way of [`game_dir`].
 pub fn port_dir(v: V4) -> Vec3 {
     to_port(v, 1.0)
