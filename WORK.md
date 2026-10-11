@@ -55,7 +55,7 @@ state machine and the renderer are ours. Nothing has been checked against the or
 | E8d | Rider-to-rider: `Boarder_RiderCollisions` 0x123fc8, `Boarder_RiderHit` 0x124920, shoves | any | F4a | | [repo] Ported, unchecked. Split: E8d1, E8d2 |
 | E9 | Script machine: `TriggerScript_Run`, `TriggerScript_ExecOp` 0x13bfd0 with every op, controllers (`TriggerScript_Op0_SpawnController` 0x13c600), persistent cell scripts, run at runtime instead of read statically | unowned | E3c | | [repo] `logic.rs` reads SSFLogic.json statically today |
 | E9b | Script threads: `TriggerScript_Run` 0x13be78 and the flow ops of `TriggerScript_ExecOp` 0x13bfd0 (4 wait, 5 conditions, 7/21/26 new threads, 3/9/10/11 controller messages) run at runtime, in the game's order | unowned | E3c | | Gap of E9a. Table in port-notes/scripts.md |
-| E9c | Pickup ops 6, 14, 15, 16 (points, multiplier, meter, time; show-off only) and 17, 18 (speed, spin boost): `Pickup_*` 0x11e608–0x11e958, `Score_AddPickupPoints` 0x155b10, `Score_SetPickupMultiplier` 0x155cd0, `Score_AddPickupTime` 0x155bb8 | unowned | E9b | | Gap of E9a. G13 checks them |
+| E9c | Pickup ops 6, 14, 15, 16 (points, multiplier, meter, time; show-off only) and 17, 18 (speed, spin boost): `Pickup_*` 0x11e608–0x11e958, `Score_AddPickupPoints` 0x155b10, `Score_SetPickupMultiplier` 0x155cd0, `Score_AddPickupTime` 0x155bb8 | unowned | E9b | ed-slopper/puffin (2026-10-11) | Gap of E9a. G13 checks them |
 | E9d | World ops 1 (camera node), 2 (effects, spline riders), 8 (sound), 13 (reset), 23 (camera shake `Cam_Shake` 0x177758), 24 (teleport), 25 (rail switch `RailMan_SetRail` 0x149030) | unowned | E9b | | Gap of E9a |
 | E9e | Logic controllers: `cDebounceNode` (2), `cCounterNode` (6), `cTimerNode` (8), `cTrickTriggerNode` (21), dead-node modes (5, `TriggerScript_ApplyControllerOp` 0x13ac88) | unowned | E9b | | Gap of E9a |
 | E9f | Boost controllers: `cBoostNode` (7), `cLapBoostNode` (15), `cRandomBoostNode` (16), `cZBoostNode` (18), `cTubeEndBoostNode` (24) | unowned | E9b | | Gap of E9a. G14 checks 15 and 18 |
@@ -460,3 +460,4 @@ matches the original.
 - 2026-10-11 ed-slopper/puffin: C0 done; C0b added (venue menu, unlocks, race rules per mode).
 - 2026-10-11 ed-slopper/puffin: claim C0b.
 - 2026-10-11 ed-slopper/puffin: C0b done (unlocks ported; race setup notes for C12).
+- 2026-10-11 ed-slopper/puffin: claim E9c.
