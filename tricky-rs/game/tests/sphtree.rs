@@ -102,7 +102,8 @@ fn sphere_trees_match_the_original() {
         r.cpu.set_gpr(5, path as u64);
         r.call(0x25f598).unwrap();
         // packed trees: the cache's decoding is the game's `SphTree_RleDecode`; the cache hands it back
-        let decode_buf = 0x0150_0000u32;
+        let decode_buf = 0x0120_0000u32 + 0x0010_0000;
+        let bufs: Rc<std::cell::RefCell<std::collections::HashMap<u32, (u32, u32)>>> = Rc::new(std::cell::RefCell::new(std::collections::HashMap::new()));
         r.allow(0x239b20);
         r.stub(0x238f50, move |c, m| {
             let tree = c.gpr(5) as u32;
@@ -110,8 +111,12 @@ fn sphere_trees_match_the_original() {
             let data = m.read_u32(tree + 0x24);
             m.read(data, &mut src);
             let out = rle_decode(&src);
-            m.write(decode_buf, &out).unwrap();
-            c.set_gpr(2, decode_buf as u64);
+            // each tree its own buffer (the game's cache keeps several)
+            let mut map = bufs.borrow_mut();
+            let next = map.values().map(|(a, n)| a + n).max().unwrap_or(decode_buf);
+            let at = map.entry(tree).or_insert(((next + 15) & !15, out.len() as u32)).0;
+            m.write(at, &out).unwrap();
+            c.set_gpr(2, at as u64);
         });
         r.stub(0x2391c8, |_, _| {});
         for a in [0x2394a8, 0x23a728, 0x239d60, 0x102f50, 0x257810, 0x235fc8, 0x236830, 0x257af8] {

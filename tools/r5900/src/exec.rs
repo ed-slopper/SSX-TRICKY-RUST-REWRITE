@@ -120,6 +120,16 @@ fn step(r: &mut Runner, pc: u32) -> Result<Next, Error> {
                 }
                 16 => c.hi as u64,                            // mfhi
                 18 => c.lo as u64,                            // mflo
+                17 | 19 => {
+                    // mthi / mtlo: the low 64 bits (the pipeline-1 half kept)
+                    let keep = |x: u128| (x >> 64) << 64;
+                    if fun == 17 {
+                        c.hi = keep(c.hi) | a as u128;
+                    } else {
+                        c.lo = keep(c.lo) | a as u128;
+                    }
+                    return Ok(Next::Seq);
+                }
                 24 => {
                     // mult: on the EE it also writes rd
                     let p = (a as u32 as i32 as i64) * (b as u32 as i32 as i64);
@@ -835,6 +845,16 @@ fn mmi(r: &mut Runner, pc: u32, w: u32, rs: usize, rt: usize, rd: usize, fun: u3
     let set_hi1 = |c: &mut crate::Cpu, v: u64| c.hi = (c.hi & u64::MAX as u128) | ((v as u128) << 64);
     let set_lo1 = |c: &mut crate::Cpu, v: u64| c.lo = (c.lo & u64::MAX as u128) | ((v as u128) << 64);
     match fun {
+        0x00 | 0x01 => {
+            // madd / maddu: {HI, LO} (32 bits each) += rs * rt; LO, HI sign-extended, and rd = LO
+            let acc = ((c.hi as u64 as u32 as u64) << 32 | c.lo as u64 as u32 as u64) as i64;
+            let p = if fun == 0 { (a as u32 as i32 as i64).wrapping_mul(b as u32 as i32 as i64) } else { ((a as u32 as u64) * (b as u32 as u64)) as i64 };
+            let t = acc.wrapping_add(p) as u64;
+            let keep = |x: u128| (x >> 64) << 64;
+            c.lo = keep(c.lo) | sext32(t as u32) as u128;
+            c.hi = keep(c.hi) | sext32((t >> 32) as u32) as u128;
+            c.set_gpr(rd, sext32(t as u32));
+        }
         0x10 => c.set_gpr(rd, (c.hi >> 64) as u64), // mfhi1
         0x11 => set_hi1(c, a),                       // mthi1
         0x12 => c.set_gpr(rd, (c.lo >> 64) as u64), // mflo1

@@ -141,6 +141,24 @@ Part of the port notes (index: [README.md](README.md)); units and wording as des
 - `Collide_BoarderSphTree` 0x2394a8: the body's bounding sphere, then each sphere (all of them, whatever the mask):
   the first that touches (when the bounding one touches but no sphere does, no hit).
 
+## The rollers' shape (row E7a5; `sphtree::WorldSphTree`, checked: `tests/sphtree_shape.rs`)
+
+- `cWorldSphTree` (vtable 0x3a85f8; `RollerNode_Collide` and 0x13f330 make them): kind 0 (coarse patch quads, target
+  -1), box the tree's centre +- its top radius, the tree in use at +0x50 (a copy put through a frame at +0x60,
+  `SphTree_Transform` 0x239f88: the directions and centre as they are now).
+- Triangle (`SphTree_IntersectTriangle` 0x23a390 / `SphTree_TriangleRecurse` 0x23ada0): the children tried in an
+  order from `SphTree_SortOctants` 0x23b398 (keys (int)(direction . -1000n), opposites negated, sorted largest first
+  by `Sort_ShellPairs` 0x2cfd90, a shell sort with gaps 1, 4, 13, ...); best depth from 0 (only penetrations); the
+  root skipped when behind the plane; a node goes on when its foot is inside the triangle or (not a leaf, radius 20
+  or more) corner a is inside it or an edge passes through it; a leaf (at the depth, past level 2 or childless)
+  keeps d - r when deeper. Either side (`SphTree_TouchesTriangle` 0x2395c0): within the top radius of the plane,
+  the normal turned to the centre.
+- Box (`SphTree_IntersectBox` / `SphTree_BoxRecurse` 0x23a9a0): `Collide_SphereBox` per node, the first leaf.
+- Tree against tree (`SphTree_IntersectTree` / `SphTree_TreeRecurse` 0x23a570): no test at the root; each child
+  as a sphere of this level radius against the other tree (`SphTree_SphereRecurse`), recursing where it touches;
+  a node with no children, at the depth or past level 3 answers yes (keeping whatever was last written).
+- `cWorldSphere` (0x3a8550) is never made by the game (no constructor, nothing points at its vtable).
+
 ## World casts (row E7a2; `tricky_game::world`, checked: `tests/world.rs`)
 
 - The course object at 0x346488: +0 the `.ltg` grid, +4 the `.pbd`, +8 / +0xc material blocks and flips, +0x10 its
