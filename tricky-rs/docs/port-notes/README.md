@@ -12,6 +12,7 @@ One file per system (board row F6, split from the former `original-rules.md`):
 - [scoring.md](scoring.md): Meter, scoring, tricks (Meter, uber, scoring; Trick names and points; Scoring; Trick book; Uber sets per board)
 - [wipeout.md](wipeout.md): Wipe-outs (Wipe-outs; Wipe-out body; Wipe-out motion)
 - [ai.md](ai.md): AI and rivals (AI, race, camera; Rivals and grudges; Rivalry)
+- [math.md](math.md): Math library (sine, cosine, arcsine, arctangent, angle difference, Hermite)
 - [race.md](race.md): Race, course and finish (Race lines, course events; Tokyo Megaplex laps; Pre-race scenes, surfaces, meter; Start gate; The finish; Post-race scenes)
 - [camera.md](camera.md): Cameras (Chase camera; Camera scripts)
 - [world.md](world.md): World objects (World objects; World controllers; Object collision; Keyframed objects; World animations)

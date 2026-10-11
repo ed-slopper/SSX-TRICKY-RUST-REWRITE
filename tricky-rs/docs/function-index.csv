@@ -1471,7 +1471,7 @@ address,size,name,system,status
 0x1703c0,124,FUN_001703c0,camera?,not started
 0x170440,44,FUN_00170440,camera?,not started
 0x170470,60,FUN_00170470,camera?,not started
-0x1704b0,96,FUN_001704b0,camera?,not started
+0x1704b0,96,FUN_001704b0,math,checked
 0x170510,252,FUN_00170510,camera?,not started
 0x170610,724,FUN_00170610,camera?,not started
 0x1708e8,960,FUN_001708e8,camera?,not started
@@ -1511,7 +1511,7 @@ address,size,name,system,status
 0x173f60,164,FUN_00173f60,camera?,not started
 0x174008,8,FUN_00174008,frontend?,not started
 0x174010,444,FUN_00174010,camera?,not started
-0x1741d0,104,FUN_001741d0,camera?,not started
+0x1741d0,104,FUN_001741d0,math,checked
 0x174238,1612,FUN_00174238,camera?,not started
 0x174888,684,cBxCamera::EvalNamedCam,camera,ported
 0x174b38,248,FUN_00174b38,camera?,not started
@@ -4498,11 +4498,11 @@ address,size,name,system,status
 0x250728,400,Quat_RotateByVecToVec,boarder?,not started
 0x2508b8,400,Quat_RotateVecToVec,boarder?,not started
 0x250a48,452,Quat_Slerp,boarder?,not started
-0x250c10,332,FUN_00250c10,common?,not started
-0x250d60,308,Math_Sin,common?,not started
-0x250e98,312,Math_Cos,boarder?,not started
-0x250fd0,296,Math_Asin,boarder?,not started
-0x2510f8,320,Math_Atan,boarder?,not started
+0x250c10,332,FUN_00250c10,math,checked
+0x250d60,308,Math_Sin,math,checked
+0x250e98,312,Math_Cos,math,checked
+0x250fd0,296,Math_Asin,math,checked
+0x2510f8,320,Math_Atan,math,checked
 0x2514c0,72,FUN_002514c0,race?,not started
 0x251508,96,Spline_FindSegmentForward,boarder?,not started
 0x251568,96,Spline_FindSegmentBackward,boarder?,not started

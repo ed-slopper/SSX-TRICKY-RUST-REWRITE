@@ -72,7 +72,6 @@ state machine and the renderer are ours. Nothing has been checked against the or
 | E10 | Input: pad reading, stick shaping and dead zones, button bits (the chord 0x600), vibration, `cCheatCodes::Update` 0x26CF60 | unowned | E1 | | [repo] findings.md |
 | E11 | Camera: named cameras `cBxCamera_EvalNamedCam` 0x174888 (ported), director scripts `cBxCamera_RunDirectorScript`, replay and finish cameras, camera collision | any | | | [repo] Chase cam ported in `rider.rs`; free camera is ours (keep, tag) |
 | E12 | Save and load: the memory-card profile, options, records, unlocks (`Profile_ResetNewGame` 0x161b40), in our own save file with the same fields | unowned | E1 | | [repo] `tricky-save.json` is the stand-in |
-| E14 | The game's math library ported exactly into `tricky-game` (`math.rs`) and checked bit for bit: `Math_Sin` 0x250d60, `Math_Cos` 0x250e98, `Math_SinCos` 0x250c10, `Math_Asin` 0x250fd0, `Math_Atan` 0x2510f8, `Math_AngleDiff` 0x1741d0, `Math_Hermite` 0x1704b0 (so exact ports can call them, e.g. `Landing_CheckAngles`) | any | F4a | trailrig/heron (2026-10-11) | Added by trailrig/heron |
 
 ## P2 Gameplay systems
 
@@ -211,6 +210,7 @@ matches the original.
 | G1a1 | `Jump_ApplyImpulse` 0x1284e0 ported exactly (`tricky-rs/game/src/jump.rs`: cm, the vector unit's order, the game's own cos 50°/70° and sin 20°, the steep-lip branch) and checked bit for bit against the original in the function runner on 6,000 random riders, every branch (`tests/jump.rs`) | P2 | trailrig/heron | 2026-10-11 | 559d4f0 |
 | G1a2 | `Takeoff_SetSpinRates` 0x126e30 ported exactly (`jump::takeoff_spin_rates`: the rates, the no-spin clips 0x218/0x260/0x261, which clip routine runs) and checked bit for bit in the function runner on 5,000 random take-offs, with its callees and their order (`tests/takeoff.rs`) | P2 | trailrig/heron | 2026-10-11 | ee98c47 |
 | G2a | The score object's arithmetic ported exactly (`tricky-rs/game/src/score.rs`: points and base points, the meter share, spin rounding, spin/flip/grab units with the grab rate table, the per-tick hold, rail and timer step) and checked bit for bit in the function runner (`tests/score.rs`: 5,000 point calls, 5,000 roundings incl. the extremes, 8,000 unit updates); 8 functions checked | P2 | trailrig/heron | 2026-10-11 | 3352ce8 |
+| E14 | The game's math library ported exactly (`tricky-rs/game/src/math.rs`: sine, cosine, sine-cosine, arcsine, arctangent with their polynomials and $gp coefficients, angle difference, Hermite) and checked bit for bit in the function runner (`tests/math.rs`: 20,000+ inputs each, the branch edges); port-notes/math.md; 7 functions checked | P1 | trailrig/heron | 2026-10-11 | HASH |
 
 ## Changes to the board
 
@@ -280,3 +280,4 @@ matches the original.
 - 2026-10-11 trailrig/heron: split G2 into G2a (claimed) and G2b.
 - 2026-10-11 trailrig/heron: G2a done (8 functions checked).
 - 2026-10-11 trailrig/heron: added E14 (the math library), claimed.
+- 2026-10-11 trailrig/heron: E14 done (7 functions checked).
