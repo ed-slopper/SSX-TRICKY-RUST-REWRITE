@@ -5245,3 +5245,9 @@ G 1d41c0 MockupItem_SetAxis
 G 1d3e40 MockupItem_Increase
 G 1d3f30 MockupItem_Decrease
 G 1d3bb0 MockupItem_Init
+F 1cbbc8 cLensFXObjNode cLensFXObjNode
+F 1c8db8 cSnowFallMan cSnowFallMan
+G 1ef610 ReplayOverlay_Init
+G 1c08a8 Gfx_InstallVif1Handler
+G 1c08f0 Gfx_RemoveVif1Handler
+G 1c0c70 Gfx_Vif1Interrupt
