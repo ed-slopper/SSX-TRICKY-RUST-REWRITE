@@ -42,7 +42,7 @@ state machine and the renderer are ours. Nothing has been checked against the or
 | E3 | Level files read by our code, as the game reads them, replacing the SSX-Library JSON project folder (`level.rs`) | unowned | E2b | | [repo] level-editing.md. Split before claiming: |
 | E3a | `.pbd`: Bezier patches, instances, models and meshes, materials, splines, lights | unowned | E3 | | [repo] |
 | E3c | `.ssf`: collision models, physics data, trigger scripts | unowned | E3 | | [repo] Split: E3c1, E3c2 |
-| E3e | `.ltg` grid, `.map` names, `.adl` audio links, `_sky.pbd` | unowned | E3 | | [repo] |
+| E3e | `.ltg` grid, `.map` names, `.adl` audio links, `_sky.pbd` | unowned | E3 | ed-slopper/puffin (2026-10-11) | [repo] |
 | E4d | The rest of the `.mpf` meshes: the shadow meshes (material flags 0x10: positions only, another vector unit program) and the data after each of the face's 18 records (likely its expressions); the vector unit programs themselves, to prove the packet layout read from the data | unowned | E4a | | Gap of E4a. `port-notes/files.md` "Character and board models" |
 | E5a2 | The HUD's and menus' text from `american.loc` by the ids the game asks for (`Loc_GetString` callers; `CONSTANT.LOC` names them) instead of our strings | unowned | E5a | | Gap of E5a |
 | E6 | Loading and memory: what the game loads when (load screens, course switch), only as far as it changes behaviour | unowned | E1 | | [est] |
@@ -499,3 +499,4 @@ matches the original.
 - 2026-10-11 ed-slopper/puffin: E9g2 done; added E9g3 (piece starting poses, fence bending).
 - 2026-10-11 ed-slopper/puffin: claim E3c2.
 - 2026-10-11 ed-slopper/puffin: E3c2 done.
+- 2026-10-11 ed-slopper/puffin: claim E3e.
