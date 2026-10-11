@@ -332,6 +332,25 @@ riders each):
 - Takeoff, the jump impulse, the flight prediction (RK4 with sub-steps, $a3 ≠ 0) and the jump's steep-lip
   branch are row F4h2.
 
+## F4h2: takeoffs from a recorded race (2026-10-10, part done)
+
+A third recording (`pine.py record 40`, 2,334 ticks, six riders, with jumps), and each rider's stat block saved
+over PINE in the same race (TRICKY_STATS: `rider stats-address hex` lines).
+
+- **Air step:** our `integrate_rk4` gives **4,275 of 4,275** airborne rider-ticks bit for bit, none off by an ulp;
+  in the runner only round-to-nearest gives them all (F4g). Rubber band 13,861 of 13,998, misses one rate-limit
+  step either way as before.
+- **Takeoffs:** `takeoffs_against_the_running_game` finds the ticks a rider in the jump state (0xa) leaves the
+  snow, runs the game's `Jump_ApplyImpulse` 0x1284e0 in the runner on the rider recorded at that tick (Math_Cos,
+  Math_Sin and Vec4_Scale run as the original; scoring stubbed) and takes it from the game's velocity change.
+  With the smallest jump 630.88 cm/s (the argument the 0x1003xx caller passes; 0 from 0x128470 leaves 150–540
+  cm/s unexplained), 13 of 18 takeoffs leave 6–62 cm/s: one tick of gravity (21.7 cm/s at 1300.85 cm/s²) and the
+  ground forces of that tick. Three (Δv 260–440 cm/s, falling) leave the snow in the jump state without an
+  impulse; two of rider 1's and one larger jump leave 143–163 cm/s: charged jumps, whose impulse depends on how
+  far the crouch unwound (rider+0x1c8 − rider+0x208) within the tick.
+- Bit for bit needs the state inside the tick (crouch, the ground forces before the impulse): replaying the whole
+  tick, row F4b3. The flight prediction (RK4 with sub-steps) and the steep-lip branch are still to do.
+
 ## How a row gets to `checked`
 
 1. Port the function (address in its doc comment, AGENTS.md §13).

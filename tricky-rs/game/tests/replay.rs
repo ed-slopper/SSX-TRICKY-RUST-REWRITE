@@ -168,3 +168,65 @@ fn air_steps_tell_the_float_rules_apart() {
         eprintln!("{path}: under {rules} the runner gives the game's air step on {runner} of {ours}");
     }
 }
+
+fn is_air_step(a: &[u8], b: &[u8]) -> bool {
+    let dt = f32_at(a, 0x12c) * 0.016666668;
+    let (mut p, mut v) = (vec4(a, 0x140), vec4(a, 0x150));
+    integrate_rk4(dt, &mut p, &mut v, false);
+    p.map(f32::to_bits) == vec4(b, 0x140).map(f32::to_bits) && v.map(f32::to_bits) == vec4(b, 0x150).map(f32::to_bits)
+}
+
+/// Takeoffs (row F4h2): the ticks a rider in the jump state (0xa) leaves the snow (air steps from the next
+/// tick on). The game's `Jump_ApplyImpulse` 0x1284e0 runs in the function runner on the rider recorded at the
+/// takeoff tick (stat block from TRICKY_STATS: `rider stats-address hex` lines saved over PINE in the same race;
+/// scoring stubbed). The game's whole tick also runs the ground forces, so the check is what is left of the
+/// game's velocity change once the impulse is taken out: a tick of gravity and ground forces, a few cm/s.
+#[test]
+fn takeoffs_against_the_running_game() {
+    let (Ok(paths), Ok(stats)) = (std::env::var("TRICKY_RECORDING"), std::env::var("TRICKY_STATS")) else { return };
+    let Some(mut r) = r5900::Runner::from_env() else { return };
+    r.float_rules = r5900::ps2float::Rules::parse("add=n,mul=n,div=n,cvt=n").unwrap();
+    for f in [0x250e98, 0x250d60, 0x102f50] {
+        r.allow(f); // Math_Cos, Math_Sin, Vec4_Scale
+    }
+    r.stub(0x156618, |c, _| c.set_f(0, 0.0)); // scoring
+    r.stub(0x11b018, |_, _| {}); // the meter
+    let stats: Vec<Vec<u8>> = std::fs::read_to_string(&stats).unwrap().lines()
+        .map(|l| { let h = l.split_whitespace().nth(2).unwrap(); (0..h.len()).step_by(2).map(|i| u8::from_str_radix(&h[i..i + 2], 16).unwrap()).collect() })
+        .collect();
+    let path = paths.split(';').next().unwrap();
+    let (n, ticks) = load(path);
+    let rider = r.mem.alloc(0x6000);
+    let stat = r.mem.alloc(0x100);
+    let mut worst: f32 = 0.0;
+    let mut jumps = 0;
+    for w in ticks.windows(3) {
+        if w[1].tick != w[0].tick + 1 || w[2].tick != w[1].tick + 1 {
+            continue;
+        }
+        for i in 0..n {
+            let (a, b, c) = (&w[0].riders[i], &w[1].riders[i], &w[2].riders[i]);
+            let state = u32::from_le_bytes(a[0x428..0x42c].try_into().unwrap());
+            if state != 0xa || is_air_step(a, b) || !is_air_step(b, c) {
+                continue;
+            }
+            r.mem.write(rider, a).unwrap();
+            r.mem.write(stat, &stats[i]).unwrap();
+            r.mem.write_u32(rider + 0x464, stat);
+            // the smallest jump: the caller's argument (0 from 0x128470, 630.88 from 0x1003xx; TRICKY_JUMP_MIN)
+            let min = std::env::var("TRICKY_JUMP_MIN").ok().and_then(|x| x.parse().ok()).unwrap_or(630.88f32);
+            r.cpu.set_f(12, min);
+            r.cpu.set_gpr(4, rider as u64);
+            r.cpu.set_gpr(5, rider as u64);
+            r.call(0x1284e0).unwrap_or_else(|e| panic!("tick {} rider {i}: {e}", w[0].tick));
+            let imp: Vec<f32> = (0..3).map(|q| r.mem.read_f32(rider + 0x150 + 4 * q as u32) - f32_at(a, 0x150 + 4 * q)).collect();
+            let game: Vec<f32> = (0..3).map(|q| f32_at(b, 0x150 + 4 * q) - f32_at(a, 0x150 + 4 * q)).collect();
+            let rest: Vec<f32> = (0..3).map(|q| game[q] - imp[q]).collect();
+            let size = |v: &[f32]| v.iter().map(|x| x * x).sum::<f32>().sqrt();
+            eprintln!("  tick {} rider {i}: game Δv {:.1} cm/s, impulse {:.1}, left over {rest:.2?} ({:.2} cm/s)", w[0].tick, size(&game), size(&imp), size(&rest));
+            worst = worst.max(size(&rest));
+            jumps += 1;
+        }
+    }
+    eprintln!("{path}: {jumps} jumps; the game's Δv less the impulse is at most {worst:.2} cm/s");
+}
