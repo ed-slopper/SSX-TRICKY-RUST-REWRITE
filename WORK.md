@@ -46,7 +46,6 @@ state machine and the renderer are ours. Nothing has been checked against the or
 | E3d | `.aip` / `.sop`: AI paths, race lines, start positions (`AIP_LoadPathsFromFile` 0x197da0) | unowned | E3 | | [repo] `course.rs` reads AIP.json today |
 | E3e | `.ltg` grid, `.map` names, `.adl` audio links, `_sky.pbd` | unowned | E3 | | [repo] |
 | E4d | The rest of the `.mpf` meshes: the shadow meshes (material flags 0x10: positions only, another vector unit program) and the data after each of the face's 18 records (likely its expressions); the vector unit programs themselves, to prove the packet layout read from the data | unowned | E4a | | Gap of E4a. `port-notes/files.md` "Character and board models" |
-| E4c | Outfit, head and board textures from `DATA/CHAR/TEXPS2.BIG` | unowned | E3b | ed-slopper/puffin (2026-10-11) | Split of E4 |
 | E5 | Config and text files: `DATA/CONFIG/*.INF` (SNOW, BANKS, MUSICMAP, INTROMUS), `.cml` cameras, `TRICKDEF.DAT`, `american.loc` and the other languages, `.SFN` fonts | unowned | E2b | | [repo] "Unresolved: HUD text (american.loc)". Text: `Loc_GetString` 0x2c5160, `WStr_FormatArgs` 0x2c5578 (`lib-text`, F1d) |
 | E6 | Loading and memory: what the game loads when (load screens, course switch), only as far as it changes behaviour | unowned | E1 | | [est] |
 | E7 | World: terrain tessellation as the game does it, world cells (`World_CellActivate_RunPersistant` 0x25fed0), instance queries `World_QueryInstances` 0x25b878, ray casts `World_RayCast` 0x25aff8 / `World_RayCastInstance` 0x25bf48 | unowned | E3a | | [repo] `collide.rs` (triangle grid of the drawn mesh) is a stand-in for these |
@@ -218,6 +217,7 @@ matches the original.
 | G1e | `Boarder_SetSteerTarget` 0x126948, `Boarder_IsTricky` 0x11f430 and `PrewindState_UpdateWindClip` 0x1055f0 (with its clip table 0x35fed0) ported exactly into `boarder.rs` and checked bit for bit in the function runner (10,000 steers, 20,000 wind-ups); the runner learnt ldl/ldr/sdl/sdr (unaligned doublewords, with a unit test) | P2 | trailrig/heron | 2026-10-11 | 2e951ad |
 | E3b | `.ssh` textures in `tricky-data/src/ssh.rs`: the shape library's directory, block chain and name lookup (`Shape_FindByName` 0x2c2528, `Shape_GetLongName` 0x2c2610), 8-bit palette and RGBA images (the only kinds in the disc's 807 files); all 192 exported rider textures equal the disc's under the exports' 0-0x80 to 0-255 mapping (`port-notes/files.md`) | P1 | ed-slopper/puffin | 2026-10-11 | a363515 |
 | G1a4 | `PrewindState_Update` 0x1050e8 ported exactly (`boarder::prewind_update`, on the checked G1d/G1e helpers) and checked in the function runner on 20,000 random ticks with the original's helpers running: every field and every call (boost sounds, clips, states, reset) bit for bit (`tests/prewind.rs`) | P2 | trailrig/heron | 2026-10-11 | 6b74122 |
+| E4c | Rider textures from the player's disc: the exe's path tables (0x341a38 suit/boots, 0x341ce8 head/helm, 0x341d50 boards) as `ssh::rider_texture_path`, read by the app with `TRICKY_DISC` (outfit 1 and board 1 as the exports had them) | P1 | ed-slopper/puffin | 2026-10-11 | 9898b17 |
 
 ## Changes to the board
 
@@ -305,3 +305,4 @@ matches the original.
 - 2026-10-11 trailrig/heron: G1a4 split into G1a4 (claimed) and G1a5.
 - 2026-10-11 ed-slopper/puffin: E3b done; claim E4c.
 - 2026-10-11 trailrig/heron: G1a4 done (PrewindState_Update checked).
+- 2026-10-11 ed-slopper/puffin: E4c done.
