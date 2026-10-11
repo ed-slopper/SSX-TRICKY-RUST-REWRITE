@@ -21,9 +21,9 @@ One file per system (board row F6, split from the former `original-rules.md`):
 - [audio.md](audio.md): Sound and music (Sound and music; Rider sounds; Sound banks; Level sounds; Music)
 - [hud.md](hud.md): HUD and fonts (HUD; HUD sprites; Fonts)
 - [frontend.md](frontend.md): World Circuit and unlocks (World Circuit; Unlocks)
-- [files.md](files.md): The disc, BIG archives, compression (The disc; BIG archives; Compression; Character and board models; Textures)
+- [files.md](files.md): The disc, BIG archives, compression (The disc; BIG archives; Compression; Character and board models; Textures; Text)
 
 ## Unresolved
 
 Ragdoll sphere places (masses known); song names (music.inf / musicmap.inf); post-race scene row filters; spark and dust
-sprite rendering; HUD text (american.loc).
+sprite rendering; HUD text: the strings are read now (`tricky-data::loc`, E5a), the HUD's ids still to wire.

@@ -12,6 +12,7 @@ pub mod course;
 pub mod disc;
 pub mod intro;
 pub mod level;
+pub mod loc;
 pub mod logic;
 pub mod mpf;
 pub mod ssh;

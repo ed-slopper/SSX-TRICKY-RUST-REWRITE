@@ -117,3 +117,15 @@ head, helm, 12 boards). That mapping is a stand-in for the GS's texture function
 
 Also found: a `BIGF` directory's size (+0xc) can end inside the last entry's name; the game reads on into the
 rest of its first read, so `Files::mount` keeps the whole first read as the header buffer.
+
+## Text, `.loc` (row E5a)
+
+Proven (`tricky-data/src/loc.rs`): `Loc_LoadForRegion` 0x17c150 loads `data/lang/american.loc` (region 0) or
+`british.loc` (region 1, not on the NTSC disc) whole. +8 flags (bit 0: +4 is an id map, `Loc_MapId` 0x2c50b0,
+a `bsearch` over (u16 key, u16 value) pairs); +0xe u16 picks the string block (offset at +0x10 + 4 * it); a
+block has +0xc the count and from +0x10 the strings' offsets; strings are 16-bit characters ending in 0.
+
+`american.loc` has 3,774 strings. The disc also has two files the exe never names:
+- `CONSTANT.LOC`: the same table with the developers' name of every string id (`kHUDKnockdown` 0xe93,
+  `kOvCombo` 0xe41, `kOVInvalidCard` 0x16e, ...). Use it to read which text a `Loc_GetString` call asks for.
+- `LETTER.LOC`: the English text with a few strings changed (a variant, unused).
