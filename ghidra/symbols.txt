@@ -6467,3 +6467,15 @@ G 306ee8 isatty
 G 30ec28 __fixunsdfdi
 G 30ebc8 __fixdfdi
 G 30ed18 __floatdidf
+G 17ad68 PadDevice_Poll
+G 1c72e8 Game_DrawFrame
+G 1e06e0 Gfx_SetDisplayMode
+G 20b158 BankInstance_Start
+G 215c28 Audio_StopQueuedSounds
+G 2347c8 Speech_OnPlacingChange
+G 291e00 FEMemCard_ShowDialog
+G 2ae3c0 FE3DProgressBar_UpdateFill
+G 1e3fa8 Gfx_VblankStartHandler
+G 2b7590 Deci2Comm_Handler
+G 235530 Speech_QueueBigScore
+G 23beb0 AsyncBigFile_FinishRead

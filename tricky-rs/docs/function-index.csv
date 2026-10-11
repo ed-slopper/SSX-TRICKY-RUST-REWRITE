@@ -1629,7 +1629,7 @@ address,size,name,system,status
 0x17ac40,204,cPS2Device::cPS2Device,render,not started
 0x17ad10,76,cPS2Device::~cPS2Device,render,not started
 0x17ad60,8,cPS2Device::vf8_17ad60,render,not started
-0x17ad68,1288,FUN_0017ad68,render?,not started
+0x17ad68,1288,PadDevice_Poll,render?,not started
 0x17b270,8,cPS2Device::vf9_17b270,render,not started
 0x17b278,964,cPS2Device::vf10_17b278,render,not started
 0x17b590,32,cPS2Device::vf3_17b590,render,not started
@@ -2682,7 +2682,7 @@ address,size,name,system,status
 0x1c71b0,92,tPS2DrawState::vf0_1c71b0,other,not started
 0x1c7210,64,tPS2DrawState::__tf,runtime,host
 0x1c7290,88,Game_DrawLists,game,not started
-0x1c72e8,1320,FUN_001c72e8,debugmenu?,not started
+0x1c72e8,1320,Game_DrawFrame,game,not started
 0x1c7810,220,cTerrainObjNode::Draw,world,not started
 0x1c78f0,12,cModelsObjNode::Draw,world,not started
 0x1c7900,204,cSkyBoxObjNode::cSkyBoxObjNode,world,not started
@@ -3024,7 +3024,7 @@ address,size,name,system,status
 0x1e04b8,280,Render_FormatVramStats,render,not started
 0x1e05d0,140,Render_CalcTexVramSize,render,not started
 0x1e0680,48,FUN_001e0680,render?,not started
-0x1e06e0,764,FUN_001e06e0,render?,not started
+0x1e06e0,764,Gfx_SetDisplayMode,render,not started
 0x1e09e0,984,FUN_001e09e0,render?,not started
 0x1e0db8,256,Render_SetColorScale,render,not started
 0x1e0eb8,252,Gfx_GetBrightness,render,not started
@@ -3054,7 +3054,7 @@ address,size,name,system,status
 0x1e2e60,1024,cPS2GraphicsMan::vf75_1e2e60,render,not started
 0x1e3260,2100,cPS2GraphicsMan::vf70_1e3260,render,not started
 0x1e3a98,1292,cPS2GraphicsMan::vf76_1e3a98,render,not started
-0x1e3fa8,52,FUN_001e3fa8,render?,not started
+0x1e3fa8,52,Gfx_VblankStartHandler,render,not started
 0x1e3fe0,68,FUN_001e3fe0,render?,not started
 0x1e4028,52,FUN_001e4028,render?,not started
 0x1e4060,64,FUN_001e4060,render?,not started
@@ -3467,7 +3467,7 @@ address,size,name,system,status
 0x20ad38,236,BankInstance_SetPitch,audio?,not started
 0x20ae28,656,SndVoice_SetVolume,audio?,not started
 0x20b0b8,156,SndVoice_Stop,audio?,not started
-0x20b158,1324,FUN_0020b158,audio?,not started
+0x20b158,1324,BankInstance_Start,audio?,not started
 0x20b688,116,BankInstance_CullByDistance,audio?,not started
 0x20b700,580,BankInstance_UpdatePositional,audio?,not started
 0x20b948,104,SndVoice_Pause,audio?,not started
@@ -3583,7 +3583,7 @@ address,size,name,system,status
 0x2154e0,372,SndSys_IsQueued,audio?,not started
 0x215658,828,FUN_00215658,audio?,not started
 0x215998,652,SndSys_QueueSounds,audio,not started
-0x215c28,752,FUN_00215c28,audio?,not started
+0x215c28,752,Audio_StopQueuedSounds,audio,not started
 0x215f18,984,FUN_00215f18,audio?,not started
 0x2162f0,728,Sfx_OnWallHit,audio?,not started
 0x2165c8,816,Sfx_ScriptSoundPlay,audio,ported
@@ -4142,7 +4142,7 @@ address,size,name,system,status
 0x234610,132,FUN_00234610,audio?,not started
 0x234698,148,Speech_CharacterBit,audio?,not started
 0x234730,148,Speech_RiderMask,audio?,not started
-0x2347c8,1004,FUN_002347c8,audio?,not started
+0x2347c8,1004,Speech_OnPlacingChange,audio?,not started
 0x234bb8,128,Speech_InterruptIfPlaying,audio?,not started
 0x234c38,200,Speech_IsRivalOrGrudge,race?,not started
 0x234d00,612,Speech_RiderHitLine,world?,not started
@@ -4152,7 +4152,7 @@ address,size,name,system,status
 0x235298,252,FUN_00235298,audio?,not started
 0x235398,204,Speech_OnStumble,audio?,not started
 0x235468,192,FUN_00235468,audio?,not started
-0x235530,152,FUN_00235530,audio?,not started
+0x235530,152,Speech_QueueBigScore,audio?,not started
 0x2355c8,216,Speech_InitCharScriptSamples,audio?,not started
 0x2356a0,76,Speech_FreeCharScriptSamples,audio?,not started
 0x2356f0,32,Speech_CheckBigScore,audio?,not started
@@ -4233,7 +4233,7 @@ address,size,name,system,status
 0x23be98,8,cAsyncBigFile::vf3_23be98,files,not started
 0x23bea0,8,cAsyncBigFile::vf2_23bea0,files,not started
 0x23bea8,8,cAsyncBigFile::vf4_23bea8,files,not started
-0x23beb0,100,FUN_0023beb0,files?,not started
+0x23beb0,100,AsyncBigFile_FinishRead,files,not started
 0x23bf18,244,FUN_0023bf18,files?,not started
 0x23c010,64,cAsyncBigFile::vf8_23c010,files,not started
 0x23c050,52,cAsyncBigFile::vf9_23c050,files,not started
@@ -5348,7 +5348,7 @@ address,size,name,system,status
 0x2916c8,232,cFEStateMCOverlay::vf49_2916c8,save,not started
 0x2917b0,1528,cFEStateMCOverlay::vf54_2917b0,save,not started
 0x291da8,88,FUN_00291da8,save?,not started
-0x291e00,1460,FUN_00291e00,save?,not started
+0x291e00,1460,FEMemCard_ShowDialog,save,not started
 0x2923b8,108,FUN_002923b8,save?,not started
 0x292428,164,FEMemCard_ShowMessageWidgets,save,not started
 0x2924d0,356,FEMemCard_EnableButtons,save,not started
@@ -5693,7 +5693,7 @@ address,size,name,system,status
 0x2adfc8,208,cFE3DTiledIcon::vf11_2adfc8,frontend,not started
 0x2ae098,408,FE3DButton_Layout,frontend?,not started
 0x2ae230,400,FUN_002ae230,frontend?,not started
-0x2ae3c0,928,FUN_002ae3c0,frontend?,not started
+0x2ae3c0,928,FE3DProgressBar_UpdateFill,frontend?,not started
 0x2ae760,140,FE3DProgressBar_StepUp,frontend?,not started
 0x2ae7f0,140,FE3DProgressBar_StepDown,frontend?,not started
 0x2ae880,1700,cFE3DProgressBar::vf11_2ae880,frontend,not started
@@ -5875,7 +5875,7 @@ address,size,name,system,status
 0x2b7530,28,FUN_002b7530,comm?,host
 0x2b7550,32,FUN_002b7550,comm?,host
 0x2b7570,32,FUN_002b7570,comm?,host
-0x2b7590,364,FUN_002b7590,comm?,host
+0x2b7590,364,Deci2Comm_Handler,comm?,host
 0x2b7700,20,FUN_002b7700,comm?,host
 0x2b7718,300,Net_ReceivePacket,comm,host
 0x2b7848,32,FUN_002b7848,comm?,host
