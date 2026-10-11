@@ -109,7 +109,7 @@ address,size,name,system,status
 0x10b0d0,3984,RailSlideMotion_Update,boarder,ported
 0x10c060,40,FUN_0010c060,world?,not started
 0x10c088,20,FUN_0010c088,ai?,not started
-0x10c120,24,FUN_0010c120,boarder?,not started
+0x10c120,24,Vec4_Set,boarder?,not started
 0x10c138,44,FUN_0010c138,,not started
 0x10c198,340,WipeoutMotion_Enter,wipeout,ported
 0x10c2f0,5004,WipeoutMotion_Update,wipeout,ported
@@ -431,7 +431,7 @@ address,size,name,system,status
 0x1239d0,116,cSpinControlState::__tf,runtime,host
 0x123a48,64,cReplayRecordHeader::__tf,runtime,host
 0x123a88,44,FUN_00123a88,boarder?,not started
-0x123ab8,88,FUN_00123ab8,boarder?,not started
+0x123ab8,88,AirPredict_Reset,boarder,not started
 0x123b10,948,AirPredict_AtTakeoff,boarder,ported
 0x123ec8,52,AirPredict_Tick,boarder,ported
 0x123f00,8,FUN_00123f00,boarder?,not started
@@ -439,13 +439,13 @@ address,size,name,system,status
 0x123f30,20,FUN_00123f30,ai?,not started
 0x123fc8,2392,Boarder_RiderCollisions,boarder,ported
 0x124920,1200,Boarder_RiderHit,boarder,ported
-0x124dd0,696,FUN_00124dd0,boarder?,not started
+0x124dd0,696,Boarder_Stumble,boarder,ported
 0x125088,1812,Boarder_InstanceCollisions,boarder,ported
 0x1257a0,604,FUN_001257a0,boarder?,not started
 0x125a00,580,Boarder_InstanceBounce,boarder,ported
-0x125c48,108,FUN_00125c48,boarder?,not started
+0x125c48,108,Boarder_AccumulateImpact,boarder,not started
 0x125cb8,1432,Rail_TryCapture,boarder,not started
-0x126250,748,FUN_00126250,boarder?,not started
+0x126250,748,Boarder_WallCollide,boarder,ported
 0x126540,520,Boarder_WallImpactCheck,boarder,ported
 0x126748,84,FUN_00126748,boarder?,not started
 0x1267a0,228,Boarder_Translate,boarder,not started
@@ -458,7 +458,7 @@ address,size,name,system,status
 0x126c78,440,FUN_00126c78,boarder?,not started
 0x126e30,400,Takeoff_SetSpinRates,boarder,not started
 0x126fc0,724,FUN_00126fc0,boarder?,not started
-0x127298,76,FUN_00127298,boarder?,not started
+0x127298,76,Boarder_PlayTakeoffClip,boarder,not started
 0x1272e8,1576,FUN_001272e8,scoring?,not started
 0x127918,1004,FUN_00127918,boarder?,not started
 0x127d08,372,FUN_00127d08,boarder?,not started
@@ -468,10 +468,10 @@ address,size,name,system,status
 0x128470,112,FUN_00128470,boarder?,not started
 0x1284e0,1336,Jump_ApplyImpulse,boarder,ported
 0x128a18,208,FUN_00128a18,boarder?,not started
-0x128ae8,820,FUN_00128ae8,boarder?,not started
+0x128ae8,820,Boarder_ProbeGround,boarder,not started
 0x128e20,108,FUN_00128e20,boarder?,not started
 0x128e90,372,Boarder_RotateAboutAxis,boarder,not started
-0x129008,1268,FUN_00129008,boarder?,not started
+0x129008,1268,Boarder_UpdateOrientation,boarder,not started
 0x129500,296,FUN_00129500,boarder?,not started
 0x129628,6128,FUN_00129628,boarder?,not started
 0x12ae18,1320,FUN_0012ae18,boarder?,not started
@@ -1198,7 +1198,7 @@ address,size,name,system,status
 0x15ed68,200,FUN_0015ed68,render?,not started
 0x15ee30,140,FUN_0015ee30,boarder?,not started
 0x15eec0,56,AnimCtl_GetClipType,animation,not started
-0x15eef8,80,FUN_0015eef8,boarder?,not started
+0x15eef8,80,AnimCtl_TurnAllLayers,animation,not started
 0x15ef48,80,FUN_0015ef48,boarder?,not started
 0x15ef98,136,FUN_0015ef98,boarder?,not started
 0x15f020,48,FUN_0015f020,boarder?,not started
@@ -2259,7 +2259,7 @@ address,size,name,system,status
 0x197830,224,FUN_00197830,boarder?,not started
 0x197910,232,cPath::vf0_197910,ai,not started
 0x1979f8,340,FUN_001979f8,boarder?,not started
-0x197b50,64,FUN_00197b50,boarder?,not started
+0x197b50,64,AIP_GetPathLength,ai,not started
 0x197b90,112,cPath::vf1_197b90,ai,not started
 0x197ce0,8,cPath::vf3_197ce0,ai,not started
 0x197ce8,8,cPath::vf2_197ce8,ai,not started
@@ -4648,7 +4648,7 @@ address,size,name,system,status
 0x25d7a0,8,cWorldIntersectType::vf9_25d7a0,world,not started
 0x25d7a8,8,cWorldIntersectType::vf3_25d7a8,world,not started
 0x25d7b0,64,cWorldIntersectType::__tf,runtime,host
-0x25d7f0,344,FUN_0025d7f0,boarder?,not started
+0x25d7f0,344,cWorldLine::cWorldLine,world,not started
 0x25d948,124,cWorldLine::vf0_25d948,world,not started
 0x25d9c8,24,cWorldLine::vf1_25d9c8,world,not started
 0x25d9e0,308,cWorldLine::vf4_25d9e0,world,not started

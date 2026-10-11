@@ -3056,3 +3056,14 @@ G 1267a0 Boarder_Translate
 G 128e90 Boarder_RotateAboutAxis
 F 123a48 cReplayRecordHeader __tf
 F 257810 cWorldBoarder cWorldBoarder
+G 10c120 Vec4_Set
+G 197b50 AIP_GetPathLength
+G 127298 Boarder_PlayTakeoffClip
+G 15eef8 AnimCtl_TurnAllLayers
+G 123ab8 AirPredict_Reset
+G 125c48 Boarder_AccumulateImpact
+F 25d7f0 cWorldLine cWorldLine
+G 129008 Boarder_UpdateOrientation
+G 128ae8 Boarder_ProbeGround
+G 124dd0 Boarder_Stumble
+G 126250 Boarder_WallCollide

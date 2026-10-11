@@ -468,7 +468,7 @@ impl Rider {
         self.uber = 0.0;
         self.grab = 0;
     }
-    /// `Boarder_Stumble`: a knock that does not put you down (state 2): a moment off balance.
+    /// `Boarder_Stumble` 0x124dd0: a knock that does not put you down (state 2): a moment off balance.
     pub fn stumble_by(&mut self, meter: bool) {
         if self.crashed > 0.0 || self.stumble > 0.0 { return; }
         if meter { self.add_meter(-0.02); }
@@ -962,7 +962,7 @@ impl Rider {
             if input.jump { self.charge = self.crouch_v; }
         }
 
-        // walls: a sphere around the body (Boarder_WallCollide: bounce off at least 0.56 m/s)
+        // walls: a sphere around the body (`Boarder_WallCollide` 0x126250: bounce off at least 0.56 m/s)
         let lift = Vec3::Y * (BODY_RADIUS + 0.35);
         let (c, contacts) = world.push_out(p + lift, BODY_RADIUS);
         p = c - lift;
