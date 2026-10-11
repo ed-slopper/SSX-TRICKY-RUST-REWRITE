@@ -390,13 +390,15 @@ pub struct Rider {
     /// rider+0x308: how high the body is drawn above the snow, cm (board row G16; `pose::ease_body_height`): the
     /// model is drawn at the position + this along the rider's up (`Boarder_UpdatePose` 0x129628)
     pub body_height: f32,
-    /// the board's attitude the game keeps through the air (board row G20c3b): what `Boarder_PlaceAt` 0x11cae8 left
-    /// at a placement (`orient::placed_attitude`: the quaternion rider+0x170 and the axes +0x180..+0x1b0), and the
-    /// port's yaw it was made for. The game's quaternion is not turned by the trick's spin and flip (those are the
-    /// separate angles rider+0x1d0 and +0x1d4, applied at the pose, `pose::board_frame`), so it stays as placed until
+    /// the board's attitude the game keeps through the air (board rows G20c3b, G20c3c): the quaternion rider+0x170 and
+    /// the axes +0x180..+0x1b0, and the port's yaw they were made for. Set at a placement (`Boarder_PlaceAt` 0x11cae8,
+    /// `orient::placed_attitude`) and at a take-off off the snow (what the ground tick that took off left:
+    /// `GroundCache::attitude`). The game's quaternion is not turned by the trick's spin and flip (those are the
+    /// separate angles rider+0x1d0 and +0x1d4, applied at the pose, `pose::board_frame`), so it stays as it was until
     /// the landing; `seed_ground` starts the ground tick from it while the port left the yaw alone, spin and flip at
-    /// zero. Dropped by the first ground tick (the game-side rider's own quaternion takes over), by a take-off, and by
-    /// any spin or flip in the air (their landing alignment is `SpinState_Update`, row G1a5b3b).
+    /// zero. Dropped by the first ground tick (the game-side rider's own quaternion takes over) and by any spin or
+    /// flip in the air (their landing alignment is `SpinState_Update`, rows G20c3c2 and G1a5b3b); only the wall bump
+    /// of `AirMotion_Update` 0x108378 would turn it besides (row G20c3c3: the port's air walls do not).
     pub att: Option<(Orient, f32)>,
     /// ticks before this rider can be hit by another again (`Boarder_RiderCollisions`: three ticks)
     pub hit_wait: u8,
@@ -848,9 +850,16 @@ impl Rider {
         self.charge = 0.0;
         self.grounded = false;
         self.air_time = 0.0;
-        self.gm = None;
-        // STANDIN: the attitude at take-off is not kept through the air yet (G20c3c); the landing rebuilds it
-        self.att = None;
+        // the board's attitude is the game's own through the jump (row G20c3c): the quaternion rider+0x170 and the
+        // axes +0x180..+0x1b0 are not touched in the air (the spin and flip are the separate angles +0x1d0 and
+        // +0x1d4), so what the ground tick that took off left is what the landing's first tick starts from
+        // (`seed_ground`). Taken from the game-side rider when the port has not moved the rider since; a take-off
+        // with none (from the air, a rail) keeps what the rider already keeps.
+        if let Some(c) = self.gm.take() {
+            if c.is_at(self.pos, self.yaw) {
+                self.att = Some((c.attitude(), self.yaw));
+            }
+        }
     }
     /// Crouching for a jump (`PrewindState_Update` 0x1050e8): the crouch and the wind-up follow their targets
     /// at the original's rates.
@@ -1039,8 +1048,8 @@ impl Rider {
                 jumped = true;
             }
             self.air_rotation(&input, dt);
-            // the landing alignment of a spin or flip is `SpinState_Update`'s (G1a5b3b): until then only a drop without
-            // either keeps the game's attitude
+            // the landing alignment of a spin or flip is `SpinState_Update`'s (G20c3c2, G1a5b3b): until then only a jump
+            // or a drop without either keeps the game's attitude (G20c3c, G20c3b)
             if self.spin != 0.0 || self.flip != 0.0 { self.att = None; }
             // `SpinState_Update` 0x100908: the spin (rider+0x1d0, mirrored for stats+0x40) and flip in degrees
             let m = if self.data.goofy { -1.0 } else { 1.0 };
