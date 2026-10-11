@@ -35,7 +35,7 @@ Header (36 bytes): `u32 hash, u32 firstPointer, u8 type, u8 groupCount, 11 x u16
 Angles use the same convention as the model's bind pose: rotation = `Rz(-z) * Ry(-y) * Rx(-x)`.
 Space: board at the origin lying along Y, +Y = direction of travel, +X = toe side, +Z up; the board's
 underside is about 4.8 cm below the origin. Air and trick clips are authored about 55 cm above it.
-Playback is 30 frames a second (my assumption; it looks right, not confirmed in code).
+Playback is 30 frames a second: `AnimClip_Advance` 0x15a030 adds `dt * rate * 30 / 60` per 60 Hz tick (proven).
 
 ## Curve encoding
 
@@ -48,9 +48,12 @@ float; rebuild it as bytes `[0x80, b0, b1, b2]`.
 | 4 | 2 + 4*count | raw floats, one per frame |
 | 6 | 8 + count | float24 offset, float24 scale, then one byte per frame: offset + scale*byte |
 | 7 | 8 + 2*count | same with u16 per frame |
-| 5 | varies | `count` sub-curves back to back; each sub-curve's own count is how many frames it covers, and t restarts at 0 in each |
+| 5 | varies | `count` pieces back to back; a piece covers its own count **minus one** frames (`AnimCurve_Eval` 0x157ed8: `t <= count - 1`, then `t -= count - 1`), so pieces share their end frames; 0 past the last |
 
-For kinds 0-3 the count is the number of frames the piece covers.
+For kinds 0-3 the count is the number of frames the piece spans, ends included. Between frames the table kinds
+interpolate linearly (`AnimCurve_EvalPiece` 0x158030: 4 lerps the floats, 6 and 7 lerp the raw values, then
+`* scale + offset`); counts are signed 12-bit. The Python tools (and the JSON exports made with them) read a
+kind-5 piece as `count` frames long, which jumps at the joins; `tricky-data/src/afl.rs` follows the game.
 
 ## Names
 
@@ -62,13 +65,16 @@ h = 0
 for c in name:  h = h*16 + c;  g = h & 0xF0000000;  if g: h ^= (g >> 23) ^ g
 ```
 
-The names themselves are in the executable as a table (`bxRL_CROUCHCYCLE`, `bxT_NOSEGRAB`, ...); `animnames.json`
-maps every clip in every file to its name. Prefixes: `bx`, `fr`, `ex` = the three board types' sets;
+The names themselves are in the executable as a table of 1,858 pointers at 0x3242a0: 1,412 clip names (the
+clip id; the clip-mode table 0x325fb0 has the same order), then the 446 `.afl` file names in the game's order,
+opened as `|data/char/%s.afl` (0x379000). Both are in `tricky-data/src/anim_names.rs`; `animnames.json` maps
+every clip in every file to its name. Prefixes: `bx`, `fr`, `ex` = the three board types' sets;
 `A_` air, `AA_` air adjust, `B_` bails, `G_` gate, `GU_` get-ups, `J_` jumps, `L_` landings, `R_`/`RL_`/`RC_` riding,
 `RR_` rail riding?, `RS_` rail slides, `RT_` taunts, `T_`/`TW_` tricks and tweaks, `UT_` uber tricks.
 
 ## What is not done
 
-- Only `bxanim.afl` is exported and used. `fr`/`ex` sets and the per-rider uber trick files decode the same way.
+- tricky-rs reads the clips from the disc when it is given (`TRICKY_DISC`, row E4b): `bxanim`, `franim`, `exanim`,
+  `cmanim`, the riders' uber files (`<kind><Rid>Uber`) and every other file merged as the scenes.
 - The event fields in the clip header are not interpreted.
 - The game's own rules for which clip plays when are not reconstructed; tricky-rs uses its own.

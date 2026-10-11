@@ -2,7 +2,9 @@
 //! folders and their scripts, characters and animation clips, race lines and AI paths, camera scripts,
 //! keyframed object curves. `tricky-game` builds on it; the Bevy app `tricky-rs` re-exports it.
 
+pub mod afl;
 pub mod anim;
+pub mod anim_names;
 pub mod big;
 pub mod character;
 pub mod compress;

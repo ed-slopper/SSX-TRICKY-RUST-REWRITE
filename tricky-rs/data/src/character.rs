@@ -4,7 +4,7 @@
 //! here from a handful of joint angles that follow what the rider is doing.
 //!
 //! STANDIN: models, skeletons and clips read from our Python exports (chars/*.json, anims/*.json), for the game's own character and animation files
-//! (models come from the player's disc instead when it is given: `rider_from_disc`, row E4a; clips are still exported, E4b)
+//! (models and clips come from the player's disc instead when it is given: `rider_from_disc`, row E4a; `afl_from_disc`, row E4b)
 //! STANDIN: the pose built from joint angles (when no clip is there), for the game's animation of the rider (G5)
 //!
 //! Model space (as stored): centimetres, hips at the origin, +X = the character's left,
@@ -273,14 +273,72 @@ struct RawClips { clips: Vec<RawClip> }
 
 fn euler(r: &[f32]) -> Quat { Quat::from_euler(EulerRot::ZYX, -r[2], -r[1], -r[0]) }
 
+/// The riders' three letters in the uber files' names (`bxEddUber` ... at 0x378d60), by our folder names.
+pub const UBER_RIDERS: [(&str, &str); 12] = [
+    ("eddie", "Edd"), ("elise", "Eli"), ("mac", "Mac"), ("jp", "JP"), ("zoe", "Zoe"), ("moby", "Mob"),
+    ("luther", "Lut"), ("kaori", "Kao"), ("psymon", "Psy"), ("seeiah", "See"), ("brodi", "Bro"), ("marisol", "Mar"),
+];
+
 #[derive(Default)]
 pub struct AnimSet { clips: Vec<Clip>, index: HashMap<String, usize> }
 impl AnimSet {
     pub fn load(path: &Path) -> Result<Self, String> {
         let text = std::fs::read_to_string(path).map_err(|e| format!("{}: {e}", path.display()))?;
         let raw: RawClips = serde_json::from_str(&text).map_err(|e| format!("{}: {e}", path.display()))?;
+        Ok(Self::from_clips(raw.clips))
+    }
+
+    /// The riding clips of an `.afl` file (row E4b): every clip with a body group (type 0: hips position,
+    /// 19 bone rotations) and a board group (type 1: position, rotation), sampled at each whole frame with
+    /// the game's curve evaluator, named from the exe's clip names (`anim_<n>` for the few it does not name).
+    pub fn from_afl(bytes: &[u8]) -> Result<Self, String> {
+        let afl = crate::afl::AflFile::open(bytes)?;
+        let mut clips = Vec::new();
+        for (i, c) in afl.clips.iter().enumerate() {
+            let (Some(body), Some(board)) = (c.group(0), c.group(1)) else { continue };
+            let frames = c.frames() as usize;
+            if frames == 0 { continue; }
+            let mut data = Vec::with_capacity(frames * 66);
+            for f in 0..frames {
+                let t = f as f32;
+                data.extend((0..60).map(|k| afl.eval(body.first_curve, k, t)));
+                data.extend((0..6).map(|k| afl.eval(board.first_curve, k, t)));
+            }
+            clips.push(RawClip { name: c.name().map_or_else(|| format!("anim_{i}"), str::to_string), frames, data });
+        }
+        Ok(Self::from_clips(clips))
+    }
+
+    /// A clip file from the player's disc: `|data/char/<file>.afl` (`anim_names::FILES`; opened as the
+    /// game opens it, 0x379000).
+    pub fn afl_from_disc(files: &mut crate::big::Files, file: &str) -> Result<Self, String> {
+        let path = format!("|data/char/{file}.afl");
+        let bytes = files.load(&path).map_err(|e| format!("{path}: {e}"))?.ok_or_else(|| format!("{path}: not on the disc"))?;
+        Self::from_afl(&bytes).map_err(|e| format!("{path}: {e}"))
+    }
+
+    /// A rider's uber tricks for a board kind (`bx`, `fr`, `ex`): the file `<kind><Rid>Uber`, the rider's
+    /// three letters as the exe's file names have them.
+    pub fn uber_from_disc(files: &mut crate::big::Files, kind: &str, rider: &str) -> Result<Self, String> {
+        let short = UBER_RIDERS.iter().find(|(n, _)| n.eq_ignore_ascii_case(rider)).ok_or_else(|| format!("no uber file for {rider}"))?.1;
+        Self::afl_from_disc(files, &format!("{kind}{short}Uber"))
+    }
+
+    /// Every clip of the files that are neither a board kind's set (`bxanim`, `franim`, `exanim`,
+    /// `cmanim`) nor a rider's uber tricks: the scenes (gates, pre-race, finish, cut-scenes), merged in the
+    /// game's file order.
+    pub fn scenes_from_disc(files: &mut crate::big::Files) -> Result<Self, String> {
         let mut set = AnimSet::default();
-        for c in raw.clips {
+        for f in crate::anim_names::FILES {
+            if f.ends_with("anim") || f.ends_with("Uber") { continue; }
+            set.merge(Self::afl_from_disc(files, f)?);
+        }
+        Ok(set)
+    }
+
+    fn from_clips(raw: Vec<RawClip>) -> Self {
+        let mut set = AnimSet::default();
+        for c in raw {
             if c.frames == 0 || c.data.len() < c.frames * 66 { continue; }
             let mut frames: Vec<Sample> = (0..c.frames).map(|f| {
                 let d = &c.data[f * 66..f * 66 + 66];
@@ -297,7 +355,7 @@ impl AnimSet {
             set.index.insert(c.name.clone(), set.clips.len());
             set.clips.push(Clip { name: c.name, frames });
         }
-        Ok(set)
+        set
     }
     /// Add another file's clips (later ones win on a name clash).
     pub fn merge(&mut self, other: AnimSet) {
@@ -412,6 +470,87 @@ mod tests {
         for (file, part) in [("board_bx", "Bx"), ("board_fr", "Fr"), ("board_al", "Al"), ("board_bx_goofy", "BxGoofy"), ("board_fr_goofy", "FrGoofy"), ("board_al_goofy", "AlGoofy")] {
             let p = board.part(board.find(part).unwrap()).unwrap();
             compare(file, &CharModel::from_mpf(&[&p]), &CharModel::load(&chars.join(format!("{file}.json"))).unwrap());
+        }
+    }
+}
+
+#[cfg(test)]
+mod anim_tests {
+    use super::*;
+
+    /// The scenes and every rider's uber tricks: the same clips (names and lengths) as the exports.
+    #[test]
+    fn disc_scenes_and_ubers() {
+        let Ok(iso) = std::env::var("TRICKY_ISO") else { return };
+        let chars = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../chars");
+        if !chars.join("anims/scenes.json").exists() { return; }
+        let mut files = crate::big::Files::new(crate::disc::Disc::open(&iso).unwrap());
+        files.mount_game_archives().unwrap();
+        let same = |what: &str, ours: &AnimSet, theirs: &AnimSet| {
+            for c in &theirs.clips {
+                let o = ours.get(&c.name).unwrap_or_else(|| panic!("{what}: no clip {}", c.name));
+                assert_eq!(o.frames.len(), c.frames.len(), "{what} {}", c.name);
+            }
+        };
+        let scenes = AnimSet::scenes_from_disc(&mut files).unwrap();
+        for f in ["scenes", "finish"] { same(f, &scenes, &AnimSet::load(&chars.join(format!("anims/{f}.json"))).unwrap()); }
+        for (rider, _) in UBER_RIDERS {
+            for (kind, json) in [("bx", "uber"), ("fr", "uber_fr"), ("ex", "uber_ex")] {
+                let p = chars.join(rider).join(format!("{json}.json"));
+                if !p.exists() { continue; }
+                same(&format!("{rider} {kind}"), &AnimSet::uber_from_disc(&mut files, kind, rider).unwrap(), &AnimSet::load(&p).unwrap());
+            }
+        }
+        println!("scenes: {} clips", scenes.len());
+    }
+
+    /// The game's clips (row E4b) against the clips exported before: needs `TRICKY_ISO` and `chars/anims`.
+    #[test]
+    fn disc_clips_match_the_exports() {
+        let Ok(iso) = std::env::var("TRICKY_ISO") else { return };
+        let anims = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../chars/anims");
+        if !anims.join("bx.json").exists() { return; }
+        let mut files = crate::big::Files::new(crate::disc::Disc::open(&iso).unwrap());
+        files.mount_game_archives().unwrap();
+        for (json, afl) in [("bx", "bxanim"), ("fr", "franim"), ("ex", "exanim"), ("cm", "cmanim")] {
+            let ours = AnimSet::from_afl(&files.load(&format!("|data/char/{afl}.afl")).unwrap().unwrap()).unwrap();
+            let theirs = AnimSet::load(&anims.join(format!("{json}.json"))).unwrap();
+            let (mut clips, mut frames, mut off, mut worst) = (0, 0, 0, (0.0f32, String::new()));
+            for c in &theirs.clips {
+                let o = ours.get(&c.name).unwrap_or_else(|| panic!("{json}: no clip {}", c.name));
+                assert_eq!(o.frames.len(), c.frames.len(), "{json} {}: frames", c.name);
+                clips += 1;
+                for (a, b) in o.frames.iter().zip(&c.frames) {
+                    frames += 1;
+                    let mut d = a.hips.distance(b.hips).max(a.board_pos.distance(b.board_pos));
+                    for (p, q) in a.rot.iter().zip(&b.rot).chain([(&a.board_rot, &b.board_rot)]) {
+                        // about the angle in degrees, without acos' f32 noise near 1
+                        let e = (*p - *q).length().min((*p + *q).length());
+                        d = d.max(e * 114.59);
+                    }
+                    if d > 0.05 { off += 1; }
+                    if d > worst.0 { worst = (d, c.name.clone()); }
+                }
+            }
+            // which of the two moves more smoothly frame to frame (a wrong curve reading jumps)
+            let jerk = |set: &AnimSet| -> f32 {
+                let mut tot = 0.0;
+                for c in &theirs.clips {
+                    let Some(c) = set.get(&c.name) else { continue };
+                    for w in c.frames.windows(2) {
+                        let mut d: f32 = 0.0;
+                        for (p, q) in w[0].rot.iter().zip(&w[1].rot) { d = d.max((*p - *q).length().min((*p + *q).length())); }
+                        tot += d;
+                    }
+                }
+                tot
+            };
+            println!("{json}: frame-to-frame motion, ours {:.1}, exported {:.1}", jerk(&ours), jerk(&theirs));
+            // the exports read a piece of a multi-piece curve as `count` frames long instead of the game's
+            // `count - 1` (`AnimCurve_Eval` 0x157ed8), so they jump at piece joins and move more
+            assert!(jerk(&ours) < jerk(&theirs), "{json}: ours moves more than the exports");
+            let _ = &mut files;
+            println!("{json}: {clips} clips ({} ours), {frames} frames, {off} differ by more than 0.05 (cm or degrees), worst {:.3} in {}", ours.len(), worst.0, worst.1);
         }
     }
 }

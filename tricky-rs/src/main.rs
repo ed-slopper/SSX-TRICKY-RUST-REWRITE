@@ -2025,7 +2025,7 @@ fn load_chars(level_dir: &Path, images: &mut Assets<Image>, materials: &mut Asse
     let mut disc = std::env::var("TRICKY_DISC").ok().and_then(|p| {
         let mut f = tricky_data::big::Files::new(tricky_data::disc::Disc::open(&p).map_err(|e| eprintln!("disc {p}: {e}")).ok()?);
         f.mount_game_archives().map_err(|e| eprintln!("disc {p}: {e}")).ok()?;
-        println!("models from the disc {p}");
+        println!("models and animations from the disc {p}");
         Some(f)
     });
     let board = disc.as_mut().and_then(|f| CharModel::board_from_disc(f, None).map_err(|e| eprintln!("{e}")).ok());
@@ -2049,7 +2049,11 @@ fn load_chars(level_dir: &Path, images: &mut Assets<Image>, materials: &mut Asse
                 base_color_texture: tex, unlit: true, cull_mode: None, double_sided: true, ..default()
             }));
         }
-        let ubers = ["uber.json", "uber_fr.json", "uber_ex.json"].map(|f| AnimSet::load(&d.join(f)).ok().filter(|a| a.len() > 0));
+        let ubers = [("bx", "uber.json"), ("fr", "uber_fr.json"), ("ex", "uber_ex.json")].map(|(kind, f)| {
+            // from the disc (row E4b), else the exported clips
+            disc.as_mut().and_then(|files| AnimSet::uber_from_disc(files, kind, &name).map_err(|e| eprintln!("{e}")).ok())
+                .or_else(|| AnimSet::load(&d.join(f)).ok()).filter(|a| a.len() > 0)
+        });
         // bord1.png .. bord12.png, the rider's twelve boards (the plain bord.png if they are missing)
         let boards = (1..=12).map(|n| match image::open(d.join(format!("bord{n}.png"))) {
             Ok(i) => materials.add(StandardMaterial { base_color_texture: Some(images.add(make_image(i.to_rgba8(), true))), unlit: true, cull_mode: None, double_sided: true, ..default() }),
@@ -2059,15 +2063,21 @@ fn load_chars(level_dir: &Path, images: &mut Assets<Image>, materials: &mut Asse
         lib.chars.push(CharEntry { name, model, mats, ubers, boards, data });
     }
     lib.player = lib.chars.iter().position(|c| c.name == "mac").unwrap_or(0);
-    lib.anims = AnimSet::load(&dir.join("anims/bx.json")).ok().filter(|a| a.len() > 0);
-    lib.scenes = AnimSet::load(&dir.join("anims/scenes.json")).ok().filter(|a| a.len() > 0);
-    // the post-race scenes' clips (win, lose, rivals), extracted into finish.json
-    if let Ok(f) = AnimSet::load(&dir.join("anims/finish.json")) {
-        match lib.scenes.as_mut() { Some(s) => s.merge(f), None => lib.scenes = Some(f) }
+    // the clips from the disc (row E4b), else the exported ones
+    let mut set = |file: &str, json: &str| disc.as_mut().and_then(|f| AnimSet::afl_from_disc(f, file).map_err(|e| eprintln!("{e}")).ok())
+        .or_else(|| AnimSet::load(&dir.join(json)).ok()).filter(|a| a.len() > 0);
+    lib.anims = set("bxanim", "anims/bx.json");
+    lib.fr = set("franim", "anims/fr.json");
+    lib.ex = set("exanim", "anims/ex.json");
+    lib.cm = set("cmanim", "anims/cm.json");
+    lib.scenes = disc.as_mut().and_then(|f| AnimSet::scenes_from_disc(f).map_err(|e| eprintln!("{e}")).ok());
+    if lib.scenes.is_none() {
+        lib.scenes = AnimSet::load(&dir.join("anims/scenes.json")).ok().filter(|a| a.len() > 0);
+        // the post-race scenes' clips (win, lose, rivals), extracted into finish.json
+        if let Ok(f) = AnimSet::load(&dir.join("anims/finish.json")) {
+            match lib.scenes.as_mut() { Some(s) => s.merge(f), None => lib.scenes = Some(f) }
+        }
     }
-    lib.fr = AnimSet::load(&dir.join("anims/fr.json")).ok().filter(|a| a.len() > 0);
-    lib.ex = AnimSet::load(&dir.join("anims/ex.json")).ok().filter(|a| a.len() > 0);
-    lib.cm = AnimSet::load(&dir.join("anims/cm.json")).ok().filter(|a| a.len() > 0);
     println!("animations: {}", lib.anims.as_ref().map_or(0, |a| a.len()));
     println!("characters: {}", lib.chars.iter().map(|c| c.name.as_str()).collect::<Vec<_>>().join(", "));
     lib
