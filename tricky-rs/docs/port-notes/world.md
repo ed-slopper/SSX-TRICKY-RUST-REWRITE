@@ -32,6 +32,16 @@ Part of the port notes (index: [README.md](README.md)); units and wording as des
   2 Elysium, 3 Mesablanca, 4 Merqury, 5 Aloha, 6 Pipedream, 7 Untracked, 8 Tokyo Megaplex, 9 Big Air Dome,
   10 Trick Tutorial, 11 Alaska.
 
+## Node virtual slots (all world nodes: `cBxObjNode` → `cBxTypeObjNode` → `cBxSortObjNode` → `cDeadNode` → …)
+
+- vf0 the destructor (`cTimerNode::~cTimerNode`; sets the class vtable back, then the base's), vf1 `Update` (once a
+  tick: scripts run their ops, timers and counters count down), vf2 `Draw` (hands the model to the renderer),
+  vf7 `SaveSnapshot` (writes the node's state into the replay snapshot: a 0xdeadbXXX tag per class, then fields,
+  through `Replay_Write` 0x192c10, `Replay_WriteNodeRef` 0x192f30 for node pointers as pool indices).
+- vf21/vf22/vf23 are the controller messages (vf23(value, node, kind): set a parameter, e.g. a timer's seconds ×60;
+  vf21/vf22 finish the node, then it deletes itself through vf0(3)); vf17 runs when a rider touches the object
+  (30-tick cooldown on the animated ones). Not named yet.
+
 ## Object collision (`World_RayCast` 0x25aff8, `World_RayCastInstance` 0x25bf48, `World_QueryInstances` 0x25b878, `Boarder_InstanceBounce` 0x125a00)
 
 - Instance record (inst+0xec): +0 mass (U0), +4 PlayerBounceAmmount, +0xc SurfaceType, +0x10 collision mode
