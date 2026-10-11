@@ -82,7 +82,7 @@ state machine and the renderer are ours. Nothing has been checked against the or
 | G1c | Finish, reset and gate states: `FinishState_Update` 0x106668, `ResetState_Update` 0x106a90, `Boarder_RequestReset` 0x118f10, `GateAnticipate_*` | any | F4a | | [repo] Split: G1c1, G1c2 |
 | G1c3 | The rest of G1c: `Gate2BaseControl_Update` 0x105dc0, `ResetState_Update` 0x106a90, `ResetState_PlaceRider` 0x119220, `Boarder_RequestReset` 0x118f10 checked | any | F4a | | Split of G1c |
 | G2 | Tricks and scoring checked: `Score_*` 0x155410–0x157490, `Score_BuildTrickId` 0x157490, `Score_FormatTrickName` 0x1551c0, repeats, chains, multipliers, uber timer, TRICKY | any | F4a | | [repo] Ported in `rider.rs`/`trickdata.rs` Split: G2a, G2b |
-| G2d | `Rider::step` (`tricky-rs/game/src/rider.rs`) scores through `score.rs` (`land_trick`, `start_trick_chain`, `bank_points`, the unit updates and `tick`, all checked) and names tricks with `TrickDef::name` on the built id, replacing the hand-written scoring | any | G2b | | Split of G2b (wiring; needs a play test) |
+| G2d | `Rider::step` (`tricky-rs/game/src/rider.rs`) scores through `score.rs` (`land_trick`, `start_trick_chain`, `bank_points`, the unit updates and `tick`, all checked) and names tricks with `TrickDef::name` on the built id, replacing the hand-written scoring | any | G2b | ed-slopper/puffin (2026-10-11) | Split of G2b (wiring; needs a play test) |
 | G3 | Rider attributes and progression: stats per rider and level, training points, boards per rider and their unlock points, outfits | unowned | E12 | | [repo] `trickdata.rs` has the tables; rookie/master is our menu |
 | G4 | AI checked: path following 0x1375c8 / 0x1372f8, rubber band 0x115100 / 0x13a0f0, skill pairs, tricks 0x139d58 / 0x138d60, resets, shoves | any | F4a, E1b | | [repo] Ported in `rider.rs`/`main.rs` |
 | G4a | Rivals and vendettas checked: `RelTable_Init` 0x167208, `Rider_OnKnockedDownBy`, `AI_StartVendetta`, `AI_CoolVendetta` | any | F4a | | [repo] `rivals.rs` Split: G4a1, G4a2 |
@@ -337,4 +337,4 @@ matches the original.
 - 2026-10-11 ed-slopper/puffin: G2b done (land, chain start, bank, trick id, names checked); split off G2c (uber/TRICKY) and G2d (wiring into Rider::step), both open.
 - 2026-10-11 ed-slopper/puffin: claim G2c.
 
-- 2026-10-11 ed-slopper/puffin: G2c done (meter drain, grab end/uber count checked; TRICKY = score+0x88 > 5).
+- 2026-10-11 ed-slopper/puffin: G2c done (meter drain, grab end/uber count checked; TRICKY = score+0x88 > 5).- 2026-10-11 ed-slopper/puffin: claim G2d.
