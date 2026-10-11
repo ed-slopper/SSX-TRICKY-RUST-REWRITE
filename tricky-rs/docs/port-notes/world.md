@@ -147,6 +147,14 @@ Part of the port notes (index: [README.md](README.md)); units and wording as des
   triangle only, no box test); a miss clears the record (+0x10..+0x14 halves −1). Then every quad in order, box
   test, triangle A (p11, p10, p01) then B (p01, p10, p00) by the shape's +0x28: the **first** hit is taken and
   noted; a kind-2 query (the ground probe) then refines it with its +0x50 at the quad's middle (row E7c2).
+- `cWorldLine` +0x50 (0x25df50, row E7c2; `WorldLine::refine`): from the quad's middle (u, v), P(u, v) = Σₖ Gₖ·Vₖ
+  with Gₖ = coefficient rows 4k..4k+3 combined by (u³, u², u, 1) and V = (v³, v², v, 1); ∂P/∂u by (3u², 2u, 1, 0),
+  ∂P/∂v by (3v², 2v, 1, 0) (each 3u² as (u·3)·u). Four Newton steps on P − λ·dir = start: with a = ∂P/∂u, b = ∂P/∂v,
+  c = −dir, the nine cofactors over det = (aₓ(b_y c_z − b_z c_y) + bₓ(c_y a_z − c_z a_y)) + cₓ(a_y b_z − a_z b_y),
+  du = (m₀rₓ + m₃r_y) + m₆r_z and dv = (m₁rₓ + m₄r_y) + m₇r_z for r = start − P. A step taking u or v out of 0..1
+  stops with the hit as it was; after the fourth the hit's point becomes P (w 1) and its normal
+  unit(∂P/∂v × ∂P/∂u); its t is not changed. A degenerate patch's determinant can be 0: the PS2's x/0 = MAX and
+  clamped sums keep it finite (`ps2f::F`).
 
 ## Keyframed objects (`cAnimObjectNode` 0x198810, `cMeshAnimFrame::vf1` 0x1cb498, `AnimCurve_FindSegment` 0x1cb770)
 

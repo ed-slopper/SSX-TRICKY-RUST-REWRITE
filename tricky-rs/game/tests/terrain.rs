@@ -3,10 +3,7 @@
 //! the game's `CacheBuffer_ClearEntry` (the runner cannot run the vector unit's patch program), then lines of every
 //! kind through them, with and without the caller's last-hit record, through `cWorldIntersectType` +0x48 0x25c7c8;
 //! the answer, the hit, the last-hit record and every quad record the game filled compared bit for bit. A kind-2
-//! hit's refinement (`cWorldLine` +0x50, row E7c2) is stubbed and its (u, v) compared.
-
-use std::cell::RefCell;
-use std::rc::Rc;
+//! hit's refinement (`cWorldLine` +0x50, row E7c2) runs as the game's too.
 
 use r5900::ps2float::Rules;
 use r5900::{Mem, Runner};
@@ -54,9 +51,7 @@ fn patch_test_matches_the_original() {
         let v = tri_contains_point(g(m, c.gpr(4)), g(m, c.gpr(5)), g(m, c.gpr(6)), g(m, c.gpr(7)));
         c.set_gpr(2, v as u64);
     });
-    let refined: Rc<RefCell<Vec<(u32, u32, u32)>>> = Rc::new(RefCell::new(vec![]));
-    let rf = refined.clone();
-    r.stub(0x25df50, move |c, _| rf.borrow_mut().push((c.f(12).to_bits(), c.f(13).to_bits(), c.gpr(5) as u32)));
+    r.allow(0x25df50);
     let patch = r.mem.alloc(0x1c0);
     let entry = r.mem.alloc(0x1cd0);
     let line = r.mem.alloc(0xa0);
@@ -127,7 +122,6 @@ fn patch_test_matches_the_original() {
                 for (k, w) in lw(&ours_last).iter().enumerate() {
                     r.mem.write_u32(last + 4 * k as u32, *w);
                 }
-                refined.borrow_mut().clear();
                 r.cpu.set_gpr(4, line as u64);
                 r.cpu.set_gpr(5, patch as u64);
                 r.cpu.set_gpr(6, entry as u64);
@@ -143,10 +137,8 @@ fn patch_test_matches_the_original() {
                 if let Some(h) = ours {
                     let theirs = (rw(&mut r.mem, out, 4), rw(&mut r.mem, out + 0x10, 4), r.mem.read_u32(out + 0x20));
                     assert_eq!(theirs, (h.hit.pos.map(f32::to_bits).to_vec(), h.hit.normal.map(f32::to_bits).to_vec(), h.hit.t.to_bits()), "{what}: the hit");
-                    let want: Vec<(u32, u32, u32)> = h.refine.map(|(u, v)| (u.to_bits(), v.to_bits(), patch)).into_iter().collect();
-                    assert_eq!(*refined.borrow(), want, "{what}: refined at");
                     hits += 1;
-                    refines += want.len();
+                    refines += h.refine.is_some() as usize;
                 }
                 if with_last {
                     let theirs = rw(&mut r.mem, last, 6);
@@ -213,4 +205,75 @@ fn tessellation_follows_the_polynomial() {
         }
     }
     eprintln!("worst relative difference {worst:e}");
+}
+
+/// `cWorldLine` +0x50 (0x25df50, row E7c2): the Newton refinement on the disc's patches from quad middles and
+/// random (u, v), lines through and beside the patch; the point and normal it writes (or leaves) compared.
+#[test]
+fn refinement_matches_the_original() {
+    let Ok(dir) = std::env::var("TRICKY_PBD_DIR") else { return };
+    let Some(mut r) = Runner::from_env() else { return };
+    r.float_rules = Rules::parse("add=n,mul=n,div=n,cvt=n").unwrap();
+    for a in [0x25df50, 0x25d7f0] {
+        r.allow(a);
+    }
+    let patch = r.mem.alloc(0x1c0);
+    let line = r.mem.alloc(0xa0);
+    let from = r.mem.alloc(16);
+    let to = r.mem.alloc(16);
+    let pos = r.mem.alloc(16);
+    let nrm = r.mem.alloc(16);
+    let mut g = Rng(0x2ef1_e000_0000_0003);
+    let (mut moved, mut kept) = (0, 0);
+    for c in ["gari", "snow", "elysium", "mesa", "merquer", "aloha", "pipe", "untrack", "megaple", "trick", "alaska"] {
+        let Ok(bytes) = std::fs::read(format!("{dir}/{c}.pbd")) else { continue };
+        let pbd = Pbd::parse(&bytes).unwrap();
+        for _ in 0..600 {
+            let raw = &pbd.patches[g.next() as usize % pbd.patches.len()];
+            let words: Vec<u32> = raw.chunks(4).map(|b| u32::from_le_bytes([b[0], b[1], b[2], b[3]])).collect();
+            for (k, w) in words.iter().enumerate() {
+                r.mem.write_u32(patch + 4 * k as u32, *w);
+            }
+            let coeffs: [V4; 16] = std::array::from_fn(|k| [0, 1, 2, 3].map(|l| f32::from_bits(words[0x14 + 4 * k + l])));
+            let pts = tricky_game::terrain::tessellate(&coeffs);
+            let p = pts[g.next() as usize % 100];
+            let up = g.pick(&[100.0f32, 600.0]);
+            let side = [g.pick(&[0.0f32, 0.0, 30.0, -90.0]), g.pick(&[0.0f32, 15.0, -40.0])];
+            let fr = [p[0] - side[0], p[1] - side[1], p[2] + up, 1.0];
+            let tt = [p[0] + side[0], p[1] + side[1], p[2] - up, 1.0];
+            wv(&mut r.mem, from, fr);
+            wv(&mut r.mem, to, tt);
+            r.cpu.set_f(12, 0.5);
+            r.cpu.set_gpr(4, line as u64);
+            r.cpu.set_gpr(5, from as u64);
+            r.cpu.set_gpr(6, to as u64);
+            r.cpu.set_gpr(7, 2);
+            r.call(0x25d7f0).unwrap();
+            let q = WorldLine::new(0.5, fr, tt, 2);
+            let (u, v) = if g.next() % 2 == 0 {
+                ((g.next() % 9) as f32 * 0.111_111_11 + 0.055_555_556, (g.next() % 9) as f32 * 0.111_111_11 + 0.055_555_556)
+            } else {
+                ((g.next() % 1000) as f32 / 999.0, (g.next() % 1000) as f32 / 999.0)
+            };
+            let before = tricky_game::worldline::Hit { pos: [-7.0; 4], normal: [-9.0; 4], t: 0.25 };
+            wv(&mut r.mem, pos, before.pos);
+            wv(&mut r.mem, nrm, before.normal);
+            r.cpu.set_f(12, u);
+            r.cpu.set_f(13, v);
+            r.cpu.set_gpr(4, line as u64);
+            r.cpu.set_gpr(5, patch as u64);
+            r.cpu.set_gpr(6, pos as u64);
+            r.cpu.set_gpr(7, nrm as u64);
+            r.call(0x25df50).unwrap();
+            let mut ours = before;
+            q.refine(u, v, &coeffs, &mut ours);
+            assert_eq!((rw(&mut r.mem, pos, 4), rw(&mut r.mem, nrm, 4)), (ours.pos.map(f32::to_bits).to_vec(), ours.normal.map(f32::to_bits).to_vec()), "{c}: refined at ({u}, {v})");
+            if ours == before {
+                kept += 1;
+            } else {
+                moved += 1;
+            }
+        }
+    }
+    eprintln!("{moved} refined, {kept} left");
 }

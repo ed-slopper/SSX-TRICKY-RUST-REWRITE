@@ -64,6 +64,8 @@ pub struct Quad {
 /// 3 × 3 coarse ones (every third point).
 #[derive(Clone, Debug, PartialEq)]
 pub struct PatchGrid {
+    /// the patch's coefficients (+0x50), for the kind-2 refinement
+    pub coeffs: [V4; 16],
     pub points: [V4; 100],
     pub fine: [Quad; 81],
     pub coarse: [Quad; 9],
@@ -71,7 +73,7 @@ pub struct PatchGrid {
 
 impl PatchGrid {
     pub fn new(coeffs: &[V4; 16]) -> PatchGrid {
-        PatchGrid { points: tessellate(coeffs), fine: [Quad::default(); 81], coarse: [Quad::default(); 9] }
+        PatchGrid { coeffs: *coeffs, points: tessellate(coeffs), fine: [Quad::default(); 81], coarse: [Quad::default(); 9] }
     }
 }
 
@@ -131,8 +133,8 @@ fn bounds(p00: V4, p10: V4, p01: V4, p11: V4) -> ([f32; 3], [f32; 3]) {
     ([lo(0), lo(1), lo(2)], [hi(0), hi(1), hi(2)])
 }
 
-/// A patch hit: the triangle's hit, and for a kind-2 query the quad's middle (u, v) its +0x50 refines it at
-/// (row E7c2).
+/// A patch hit: the hit (for a kind-2 query refined by its +0x50 at the quad's middle (u, v), row E7c2, which is
+/// also given).
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct PatchHit {
     pub hit: Hit,
@@ -144,7 +146,7 @@ pub struct PatchHit {
 /// first (no box test); a miss clears `last` and every quad is tried in order (rows, then columns): its box (made
 /// the first time) against the line's, then triangle A (p11, p10, p01), then B (p01, p10, p00), each with its
 /// normal (made the first time: unit((p11 − p10) × (p10 − p01)), unit((p01 − p10) × (p10 − p00))). The first hit
-/// is the answer (noted in `last`); kind 2 then refines it at the quad's middle.
+/// is the answer (noted in `last`); kind 2 then refines it at the quad's middle ([`WorldLine::refine`]).
 pub fn patch_test(q: &WorldLine, grid: &mut PatchGrid, patch: u32, mut last: Option<&mut LastHit>) -> Option<PatchHit> {
     let coarse = q.kind == 0;
     let (step, n, third, sixth) = if coarse { (3usize, 3usize, 0.333_333_34f32, 0.166_666_67f32) } else { (1, 9, 0.111_111_11, 0.055_555_556) };
@@ -153,7 +155,14 @@ pub fn patch_test(q: &WorldLine, grid: &mut PatchGrid, patch: u32, mut last: Opt
         let p = |r: usize, c: usize| pts[r * 10 + c];
         (p(i * step, j * step), p(i * step + step, j * step), p(i * step, j * step + step), p(i * step + step, j * step + step))
     };
-    let refine = |i: usize, j: usize| if q.kind == 2 { Some((i as f32 * third + sixth, j as f32 * third + sixth)) } else { None };
+    let coeffs = grid.coeffs;
+    let done = |mut hit: Hit, i: usize, j: usize| {
+        let at = if q.kind == 2 { Some((i as f32 * third + sixth, j as f32 * third + sixth)) } else { None };
+        if let Some((u, v)) = at {
+            q.refine(u, v, &coeffs, &mut hit);
+        }
+        PatchHit { hit, refine: at }
+    };
     let quads: &mut [Quad] = if coarse { &mut grid.coarse } else { &mut grid.fine };
     let fill_box = |qd: &mut Quad, c: (V4, V4, V4, V4)| {
         if qd.min.is_none() {
@@ -192,7 +201,7 @@ pub fn patch_test(q: &WorldLine, grid: &mut PatchGrid, patch: u32, mut last: Opt
             fill_box(qd, c);
             let h = if l.tri_a == 0 { try_b(qd, c) } else { try_a(qd, c) };
             if let Some(hit) = h {
-                return Some(PatchHit { hit, refine: refine(i, j) });
+                return Some(done(hit, i, j));
             }
             *l = LastHit { patch: 0, row: 0, col: 0, tri_a: 0, kind: 0, cell: -1, node: -1, index: -1 };
         }
@@ -217,7 +226,7 @@ pub fn patch_test(q: &WorldLine, grid: &mut PatchGrid, patch: u32, mut last: Opt
                         l.col = j as i16;
                         l.tri_a = a as u32;
                     }
-                    return Some(PatchHit { hit, refine: refine(i, j) });
+                    return Some(done(hit, i, j));
                 }
             }
         }

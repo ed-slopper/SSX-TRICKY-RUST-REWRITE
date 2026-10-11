@@ -7,6 +7,8 @@
 //! for every shape), +0x28 a triangle, +0x30 a triangle from either side, +0x38 a sphere tree (none for a line),
 //! +0x40 a box, +0x48 a patch (the shared one, through the patch cache: row E7c), +0x50 a patch's surface point.
 
+use crate::ps2f::F;
+
 type V4 = [f32; 4];
 
 /// A hit: where, the surface's normal there, and t along the line (0 at its start, 1 at its end).
@@ -239,4 +241,93 @@ pub fn tri_contains_point(a: V4, b: V4, c: V4, p: V4) -> bool {
     }
     let u1 = u - 1.0;
     neg(u1) && neg(u1 + v * 1.0)
+}
+
+type P4 = [F; 4];
+
+fn pf(v: V4) -> P4 {
+    v.map(F)
+}
+
+/// vmula.x / vmadda.y / vmadda.z / vmadd.w: g0·b.x + g1·b.y + g2·b.z + g3·b.w, lane by lane.
+fn comb(g: &[P4], b: P4) -> P4 {
+    [0, 1, 2, 3].map(|i| ((g[0][i] * b[0] + g[1][i] * b[1]) + g[2][i] * b[2]) + g[3][i] * b[3])
+}
+
+/// vmul then (x + y) + 1·z + 1·w.
+fn dot_p(a: P4, b: P4) -> F {
+    let p = [a[0] * b[0], a[1] * b[1], a[2] * b[2], a[3] * b[3]];
+    ((p[0] + p[1]) + F(1.0) * p[2]) + F(1.0) * p[3]
+}
+
+/// The patch's four row vectors combined by `u` (G₀..G₃), then lane `k` of each dotted with `v`.
+fn surface(c: &[P4; 16], u: P4, v: P4) -> P4 {
+    let g = [comb(&c[0..4], u), comb(&c[4..8], u), comb(&c[8..12], u), comb(&c[12..16], u)];
+    let lane = |k: usize| dot_p([g[0][k], g[1][k], g[2][k], g[3][k]], v);
+    [lane(0), lane(1), lane(2), F(0.0)]
+}
+
+impl WorldLine {
+    /// +0x50 (0x25df50): a ground-probe hit on a patch moved onto the patch's surface. From the quad's middle
+    /// (u, v) with P(u, v) = Σ (coefficient row k combined by (u³, u², u, 1)) · (v³, v², v, 1), its derivatives
+    /// (by (3u², 2u, 1, 0) and (3v², 2v, 1, 0)), four Newton steps on P(u, v) − λ·dir = start, each solved by the
+    /// 3 × 3 cofactors over the determinant: (du, dv, dλ) = M · (start − P). A step leaving 0..1 in u or v stops
+    /// with nothing changed; after the fourth the point (w 1) and unit(∂P/∂v × ∂P/∂u) replace the hit's (its t
+    /// stays). In the PS2's floats (a degenerate patch's determinant can be 0).
+    pub fn refine(&self, u0: f32, v0: f32, coeffs: &[V4; 16], hit: &mut Hit) {
+        let c: [P4; 16] = coeffs.map(pf);
+        let one = F(1.0);
+        let (mut u, mut v) = (F(u0), F(v0));
+        let basis = |s: F| {
+            let s2 = s * s;
+            [s2 * s, s2, s, one]
+        };
+        let slope = |s: F| [(s * F(3.0)) * s, s + s, one, F(0.0)];
+        let eval = |u: F, v: F| {
+            let (bu, bv) = (basis(u), basis(v));
+            let p = surface(&c, bu, bv);
+            let dv = surface(&c, bu, slope(v));
+            let du = surface(&c, slope(u), bv);
+            ([p[0], p[1], p[2], one], du, dv)
+        };
+        let (mut p, mut a, mut b) = eval(u, v);
+        let start = pf(self.start);
+        for _ in 0..4 {
+            let r = [start[0] - p[0], start[1] - p[1], start[2] - p[2]];
+            let (cx, cy, cz) = (-F(self.dir[0]), -F(self.dir[1]), -F(self.dir[2]));
+            let (ax, ay, az) = (a[0], a[1], a[2]);
+            let (bx, by, bz) = (b[0], b[1], b[2]);
+            let f9 = ay * bz - az * by;
+            let f13 = cx * f9;
+            let f5 = cy * az - cz * ay;
+            let f4 = by * cz - bz * cy;
+            let det = (ax * f4 + bx * f5) + f13;
+            let inv = one / det;
+            let m = [
+                f4 * inv,
+                f5 * inv,
+                f9 * inv,
+                (cx * bz - cz * bx) * inv,
+                (ax * cz - az * cx) * inv,
+                (bx * az - bz * ax) * inv,
+                (bx * cy - by * cx) * inv,
+                (cx * ay - cy * ax) * inv,
+                (ax * by - ay * bx) * inv,
+            ];
+            let du = (m[0] * r[0] + m[3] * r[1]) + m[6] * r[2];
+            let dv = (m[1] * r[0] + m[4] * r[1]) + m[7] * r[2];
+            u = u + du;
+            v = v + dv;
+            if u < F(0.0) || one < u || v < F(0.0) || one < v {
+                return;
+            }
+            (p, a, b) = eval(u, v);
+        }
+        // vopmula / vopmsub (∂P/∂v × ∂P/∂u), w 0, then vrsqrt and vmulq
+        let acc = [b[1] * a[2], b[2] * a[0], b[0] * a[1]];
+        let n = [acc[0] - a[1] * b[2], acc[1] - a[2] * b[0], acc[2] - a[0] * b[1], F(0.0)];
+        let q = one / dot_p(n, n).sqrt();
+        hit.pos = p.map(|x| x.0);
+        hit.normal = n.map(|x| (x * q).0);
+    }
 }
