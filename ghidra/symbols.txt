@@ -3082,7 +3082,7 @@ G 11e930 Boarder_AddSpinBoostTime
 G 11e988 Boarder_ScoreCrash
 G 11e9a0 Boarder_ScoreKnockdown
 G 11c770 Boarder_UpdateMotion
-G 197738 AIP_GetPointAtDistance
+G 197738 AIP_GetDirectionAtDistance
 G 105a60 PrewindState_SetWindTarget
 G 128470 Boarder_TakeOff
 G 11c9a0 Boarder_UpdateControl
@@ -3092,3 +3092,17 @@ G 128a18 Boarder_GetFallLine
 G 196858 AIP_CanResetAt
 G 119be0 Boarder_StartReset
 G 126b38 Boarder_SetBrakeCrouchInput
+G 11b1f8 Boarder_DrainMeter
+G 129500 Boarder_UpdateLeanTargets
+G 126c78 Boarder_SetBrakeTarget
+G 236a00 CollBody_OverlapSpheres
+G 198110 AIP_FindNearestLines
+G 1979f8 AIP_GetPositionAtDistance
+G 197250 AIP_ProjectOntoPath
+G 197478 AIP_ProjectOntoPathFrom
+G 118090 Boarder_UpdatePathAhead
+G 1257a0 Boarder_TurnFromWall
+G 115a80 Race_UpdatePairDistances
+G 12e6e8 Fx_BrakeSpray_Update
+G 11a098 Boarder_TeleportToInstance
+G 118c08 Boarder_AdvanceOnPath
