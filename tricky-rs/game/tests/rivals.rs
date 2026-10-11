@@ -160,3 +160,36 @@ fn rivalry_matches_the_original() {
     }
     assert!(seen[7] > 100, "grudges with speech: {seen:?}");
 }
+
+#[test]
+fn grudges_as_the_game_keeps_them() {
+    use tricky_game::rivals::{index, Grudge};
+    // Eddie (82 toward Moby, tolerance 16): one knock-down fills the tolerance: a level-2 grudge, rivalry +3
+    let mut g = Grudge::new(index("Eddie"), index("Moby"));
+    assert_eq!(g.level(), -1);
+    g.hit(30.0, 1.0);
+    assert_eq!((g.level(), g.score()), (2, 3), "Eddie against Moby");
+    assert!(g.hostile() && g.shoves());
+    // getting even (a knock-down on the player) adds 2 to the rivalry
+    g.got_even(true);
+    assert_eq!(g.score(), 5);
+    // Kaori's cap toward Eddie is 59: knocked about all race, her grudge never passes level 0
+    let mut k = Grudge::new(index("Kaori"), index("Eddie"));
+    for s in 0..40 {
+        k.hit(30.0, s as f32);
+    }
+    assert_eq!(k.level(), 0, "Kaori against Eddie");
+    assert!(!k.hostile() && !k.shoves());
+    // a level-1 grudge cools 360.44952 ticks (just over 6 s) after it began
+    let mut m = Grudge::new(index("Moby"), index("Eddie"));
+    for _ in 0..3 {
+        m.hit(30.0, 10.0);
+    }
+    assert_eq!(m.level(), 1, "Moby (65) against Eddie");
+    m.tick(16.0);
+    assert!(m.hostile());
+    m.tick(16.1);
+    assert!(!m.hostile() && m.shoves(), "cooled but still shoving");
+    // after the race with no contact: back to the start
+    assert_eq!(Grudge::new(index("Mac"), index("Zoe")).settled(), 30.0);
+}

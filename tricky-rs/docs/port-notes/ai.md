@@ -97,3 +97,8 @@ Part of the port notes (index: [README.md](README.md)); units and wording as des
   `Rivals_UpdateGrudgeTimeout` 0x11efd8: a level-1 grudge not cooled cools 360.44952 ticks (6 s) after it began.
 - `Rivals_UpdateAttitude` 0x11f050 after the race: back to the start's attitude when there was no contact, else
   start + (bumps + 2 shoves + 3 knock-downs) / (3 (bumps + shoves + knock-downs)) × the gain.
+- The app's computer riders keep their grudge against the player with these (row G4a3, `rivals::Grudge` over
+  `RivalRider`): the pair set up as `Rivals_InitPairs` does, carried between heats by `Rivals_DecayAttitudes`
+  0x168028 (−3 friend, −2 neutral, −1 foe; at least 0 and the table's), time in ticks. STANDIN: chasing
+  (`AIComputer_IsHostileTarget`) and shoving (`AIComputer_ShouldShove`) still read the level as before (level 2,
+  or level 1 not cooled; level ≥ 1); those two are not ported yet.

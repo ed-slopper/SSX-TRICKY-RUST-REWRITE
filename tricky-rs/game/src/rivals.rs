@@ -44,69 +44,137 @@ pub const CAP: [[u8; 12]; 12] = [
     [59, 59, 100, 79, 80, 79, 79, 80, 79, 59, 100, 59], [100, 100, 100, 100, 100, 100, 100, 100, 100, 79, 100, 100],
 ];
 
-/// One computer rider's grudge against the player.
+/// One computer rider's grudge against the player, kept with the game's own bookkeeping ([`RivalRider`], checked
+/// bit for bit): the computer rider's record of the player (attitude, cap, tolerance, anger, the counts, rivalry)
+/// and its grudge, and the player's record of it. Time is the game's tick (60 a second).
 #[derive(Clone, Debug)]
-pub struct Grudge { pub attitude: f32, tolerance: f32, friend: bool, g: f32, pub level: i8, start: f32, pub cooled: bool,
-    /// the rivalry score (pair record +0x1c): vendettas +1/+2/+3 by level, shoving the player +1,
-    /// knocking the player down +2; over 2 after the race, this rider has words with the player
-    pub score: u32,
-    /// the attitude at the start of the race, and the player's bumps, shoves and knockdowns on it
-    base: f32, bumps: u32, shoves: u32, knocks: u32, rel: u8 }
+pub struct Grudge {
+    ai: RivalRider,
+    player: RivalRider,
+}
+
+const AI: i32 = 1;
+const PLAYER: i32 = 0;
+
 impl Grudge {
+    /// The pair as `Rivals_InitPairs` 0x167ea0 sets it for a computer rider `me` and the player: the table's
+    /// attitude (also the start's), cap, tolerance and relation; no anger, no counts, no grudge.
     pub fn new(me: usize, player: usize) -> Self {
-        Self { attitude: ATTITUDE[me.min(11)][player.min(11)] as f32, tolerance: TOLERANCE[me.min(11)][player.min(11)] as f32,
-               friend: relation(me, player) == 1, g: 0.0, level: -1, start: 0.0, cooled: false, score: 0,
-               base: ATTITUDE[me.min(11)][player.min(11)] as f32, bumps: 0, shoves: 0, knocks: 0, rel: relation(me, player) }
+        Self::with_attitude(me, player, ATTITUDE[me.min(11)][player.min(11)] as i8)
     }
-    /// Starting from how it felt about the player after the last heat (`Circuit_BuildHeatRelations`):
-    /// that feeling, worn down between heats (a friend by 3, others by 2, a foe by 1), never below
-    /// the table's.
+
+    fn with_attitude(me: usize, player: usize, attitude: i8) -> Self {
+        let (m, p) = (me.min(11), player.min(11));
+        let rec = PairBytes {
+            attitude,
+            cap: CAP[m][p] as i8,
+            tolerance: TOLERANCE[m][p] as i8,
+            start: attitude,
+            relation: relation(m, p),
+            ..PairBytes::default()
+        };
+        let back = PairBytes { attitude: ATTITUDE[p][m] as i8, cap: CAP[p][m] as i8, tolerance: TOLERANCE[p][m] as i8, start: ATTITUDE[p][m] as i8, relation: relation(p, m), ..PairBytes::default() };
+        let mut ai = RivalRider { index: AI, human: false, recs: vec![PairBytes::default(); 2], ..RivalRider::default() };
+        ai.recs[PLAYER as usize] = rec;
+        let mut pl = RivalRider { index: PLAYER, human: true, recs: vec![PairBytes::default(); 2], ..RivalRider::default() };
+        pl.recs[AI as usize] = back;
+        Grudge { ai, player: pl }
+    }
+
+    /// Starting from how it felt about the player after the last heat: `Rivals_DecayAttitudes` 0x168028 wears it
+    /// down between heats (a friend by 3, a neutral by 2, a foe by 1), never below 0 nor the table's.
     pub fn carried(me: usize, player: usize, last: Option<f32>) -> Self {
-        let mut g = Self::new(me, player);
-        if let Some(a) = last {
-            let table = g.attitude;
-            let decay = match g.rel { 1 => 3.0, 2 => 1.0, _ => 2.0 };
-            g.attitude = (a - decay).max(table).max(0.0);
-            g.base = g.attitude;
+        let Some(a) = last else { return Self::new(me, player) };
+        let (m, p) = (me.min(11), player.min(11));
+        let mut att = a as i32 as i8;
+        att = match relation(m, p) {
+            1 => att.wrapping_sub(3),
+            0 => att.wrapping_sub(2),
+            2 => att.wrapping_sub(1),
+            _ => att,
+        };
+        if att < 0 {
+            att = 0;
         }
-        g
+        let table = ATTITUDE[m][p] as i8;
+        if att < table {
+            att = table;
+        }
+        Self::with_attitude(me, player, att)
     }
-    /// After the race (`Rider_SettleAttitudeAfterRace`): with no contact back to the start; else
-    /// the gain is kept by (bumps + 2 shoves + 3 knockdowns) / (3 n).
+
+    /// After the race (`Rivals_UpdateAttitude` 0x11f050): back to the start's attitude with no contact, else
+    /// keeping (bumps + 2 shoves + 3 knock-downs) / (3 n) of the gain.
     pub fn settled(&self) -> f32 {
-        let n = self.bumps + self.shoves + self.knocks;
-        if n == 0 { return self.base; }
-        self.base + (self.bumps + 2 * self.shoves + 3 * self.knocks) as f32 / (3 * n) as f32 * (self.attitude - self.base)
+        let mut ai = self.ai.clone();
+        ai.update_attitude(PLAYER);
+        ai.recs[PLAYER as usize].attitude as f32
     }
-    /// The player put this rider down (30), shoved it off balance (15) or bumped it off balance (9).
+
+    /// The player put this rider down (30), shoved it off balance (15) or bumped it off balance (9)
+    /// (`Rivals_OnKnockdown`, `Rivals_OnHit`, `Rivals_OnBump`). `now` in seconds of race.
     pub fn hit(&mut self, amount: f32, now: f32) {
-        if amount >= 30.0 { self.knocks += 1 } else if amount >= 15.0 { self.shoves += 1 } else { self.bumps += 1 }
-        self.g = (self.g + amount).min(self.tolerance);
-        if self.g >= self.tolerance {
-            let a = self.attitude;
-            let lvl = if a >= 80.98926 { 2 } else if a >= 60.0 { 1 } else { 0 };
-            self.score += lvl as u32 + 1;
-            self.level = if self.friend { 0 } else { lvl };
-            self.attitude = (a + 15.0).min(100.0);
-            self.g = 0.0;
-            self.start = now;
-            self.cooled = false;
+        let t = tick(now);
+        let mut calls = Vec::new();
+        if amount >= 30.0 {
+            self.ai.on_knockdown(&mut self.player, t, &mut calls);
+        } else if amount >= 15.0 {
+            self.ai.on_hit(&mut self.player, t, &mut calls);
+        } else {
+            self.ai.on_bump(&mut self.player, t, &mut calls);
         }
     }
-    /// It got its own back: a knockdown or shove-stumble on the player cools it down.
+
+    /// It got its own back: it put the player down (`knocked`) or shoved it off balance (the player's
+    /// `Rivals_OnKnockdown` / `Rivals_OnHit`: the grudge eased, the rivalry up).
     pub fn got_even(&mut self, knocked: bool) {
-        self.score += if knocked { 2 } else { 1 };
-        if self.level < 0 { return; }
-        self.g = (self.g - if knocked { 45f32.max(self.g / 2.0) } else { 45.0 }).max(0.0);
+        let mut calls = Vec::new();
+        if knocked {
+            self.player.on_knockdown(&mut self.ai, 0, &mut calls);
+        } else {
+            self.player.on_hit(&mut self.ai, 0, &mut calls);
+        }
     }
-    /// A level-1 grudge cools after about six seconds.
+
+    /// `Rivals_UpdateGrudgeTimeout` 0x11efd8: a level-1 grudge cools 360.44952 ticks after it began.
     pub fn tick(&mut self, now: f32) {
-        if self.level == 1 && !self.cooled && now - self.start > 360.45 / 60.0 { self.cooled = true; self.g = (self.g - 15.0).max(0.0); }
+        self.ai.update_grudge_timeout(tick(now));
     }
+
+    /// The grudge's level (0..2), or −1 with none.
+    pub fn level(&self) -> i8 {
+        if self.ai.on != 0 { self.ai.level as i8 } else { -1 }
+    }
+
+    /// For checks (TRICKY_GRUDGE, TRICKY_POST): a level-`l` grudge against the player at once.
+    pub fn force_level(&mut self, l: i32) {
+        self.ai.on = 1;
+        self.ai.target = PLAYER;
+        self.ai.level = l;
+        self.ai.cooled = 0;
+    }
+
+    /// The rivalry with the player (pair record +0x1c): grudges +1/+2/+3 by level, shoving the player +1,
+    /// knocking it down +2; over 2 after the race, this rider has words with the player.
+    pub fn score(&self) -> i32 {
+        self.ai.recs[PLAYER as usize].rivalry
+    }
+
     /// Chasing the player (AIComputer_IsHostileTarget): a level-2 grudge, or a level-1 one not yet cooled.
-    pub fn hostile(&self) -> bool { self.level == 2 || (self.level == 1 && !self.cooled) }
-    /// Will shove the player when alongside (AIComputer_ShouldShove): level 1 or 2.
-    pub fn shoves(&self) -> bool { self.level >= 1 }
+    /// STANDIN: `AIComputer_IsHostileTarget` itself is not ported yet.
+    pub fn hostile(&self) -> bool {
+        self.ai.on != 0 && (self.ai.level == 2 || (self.ai.level == 1 && self.ai.cooled == 0))
+    }
+
+    /// Will shove the player when alongside (AIComputer_ShouldShove): level 1 or 2. STANDIN: not ported yet.
+    pub fn shoves(&self) -> bool {
+        self.ai.on != 0 && self.ai.level >= 1
+    }
+}
+
+/// Seconds of race as the game's ticks.
+fn tick(now: f32) -> i32 {
+    (now * 60.0).floor() as i32
 }
 
 // ---- the game's own grudge bookkeeping, exactly (board row G4a2, checked: `tests/rivals.rs`)

@@ -1813,7 +1813,7 @@ fn ride(
                 let last = if game.round > 0 { game.attitude.get(&them).copied() } else { None };
                 let mut g = rivals::Grudge::carried(them, me_idx, last);
                 // TRICKY_GRUDGE: everyone starts out after the player (for testing)
-                if std::env::var("TRICKY_GRUDGE").is_ok() { g.level = 2; }
+                if std::env::var("TRICKY_GRUDGE").is_ok() { g.force_level(2); }
                 o.grudge = Some(g);
             }
             let place = dtfs.iter().filter(|d| **d < dtfs[oi + 1]).count();
@@ -1836,7 +1836,7 @@ fn ride(
                 // level) within 10 m and more than 60 degrees off its heading
                 let cos = flat.normalize_or_zero().dot(heading(o.rider.yaw));
                 let roll = ((race.0.time * 977.0 + oi as f32 * 131.0).sin() * 43758.547).fract().abs();
-                if g.level >= 0 && o.rider.grounded && o.rider.crashed <= 0.0 && o.rider.taunt < 0.0 && o.rider.shove <= 0.0
+                if g.level() >= 0 && o.rider.grounded && o.rider.crashed <= 0.0 && o.rider.taunt < 0.0 && o.rider.shove <= 0.0
                     && flat.length() < 10.0 && cos < 0.5 && roll < 0.91 {
                     let n = 1 + (roll * 1000.0) as u32 % 5;
                     let right = Vec3::new(o.rider.yaw.cos(), 0.0, -o.rider.yaw.sin());
@@ -1950,7 +1950,7 @@ fn ride(
             race.0.state = RaceState::Finished;
             race.0.time = 100.0;
             rider.0.fin = Some((2, 5.0, p != "lose"));
-            if p == "rival" { if let Some(o) = opponents.0.first_mut() { o.grudge.get_or_insert_with(|| rivals::Grudge::new(0, 0)).level = 2; } }
+            if p == "rival" { if let Some(o) = opponents.0.first_mut() { o.grudge.get_or_insert_with(|| rivals::Grudge::new(0, 0)).force_level(2); } }
         }
     }
     let stopped = rider.0.finished_and_stopped() || std::env::var("TRICKY_SIM").is_ok();
@@ -1967,7 +1967,7 @@ fn ride(
         // word first, then the player wins or loses at the finish area
         let me = rivals::index(lib.chars.get(lib.player).map_or("", |c| c.name.as_str()));
         let rival = opponents.0.iter().enumerate()
-            .filter_map(|(i, o)| o.grudge.as_ref().filter(|g| g.score > 2).map(|g| (g.score, i)))
+            .filter_map(|(i, o)| o.grudge.as_ref().filter(|g| g.score() > 2).map(|g| (g.score(), i)))
             .max_by_key(|a| a.0)
             .map(|(_, i)| (rivals::index(lib.chars.get(opponents.0[i].character).map_or("", |c| c.name.as_str())), i + 1));
         match race.0.cml.clone() {
