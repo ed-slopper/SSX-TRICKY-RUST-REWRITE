@@ -38,9 +38,13 @@ Part of the port notes (index: [README.md](README.md)); units and wording as des
   tick: scripts run their ops, timers and counters count down), vf2 `Draw` (hands the model to the renderer),
   vf7 `SaveSnapshot` (writes the node's state into the replay snapshot: a 0xdeadbXXX tag per class, then fields,
   through `Replay_Write` 0x192c10, `Replay_WriteNodeRef` 0x192f30 for node pointers as pool indices).
-- vf21/vf22/vf23 are the controller messages (vf23(value, node, kind): set a parameter, e.g. a timer's seconds ×60;
-  vf21/vf22 finish the node, then it deletes itself through vf0(3)); vf17 runs when a rider touches the object
-  (30-tick cooldown on the animated ones). Not named yet.
+- vf21 `Finish`(runScript): unless the instance has a "finished" event script to run (`Controller_RunFinishScript`
+  0x13a9f8, event 3), marks the instance done (flag 2) and deletes the node (vf0 with 3). vf22 `Kill`: the same
+  without the script. vf23 `OnMessage`(value, kind): the base handles 7 (clear instance flag 0x800) and 8 (set it);
+  classes add their own (a timer's 1 sets its seconds ×60, a counter's 1/2 tick bits off). vf17 `OnContact` on the
+  animated ones runs the instance's contact script (event 1, `Controller_RunContactScript` 0x13aaf8) with a 30-tick
+  cooldown. Event scripts come from `Instance_GetEventScript` 0x25fe78 (instance+0xec → +0x14 → 7 per instance:
+  1 contact, 3 finished, 4 expired); each runs as a new `cScriptNode` (0x13b8c0).
 - Restoring (`Replay_RestoreNode` 0x18f8a8): reads the saved type id (`Replay_PeekNodeType`), allocates the node
   under its tag (the class name without c/Node: "Timer", "UVScrollTexFlip", "Script" …) and runs that class's
   stream constructor (`cTimerNode::cTimerNode` 0x13fe50 …), which reads the fields back with `Replay_Read` 0x192ca0.
