@@ -497,4 +497,8 @@ the turn conj(q)·target, the target lying on the slope normal (the slope with z
 kept; off alpine boards the target without the forward turn too, the smaller wrapped angle wins; none over slope
 kinds 6 and 10), dropped when bigger than 2.0943952 × the normal's z (at most 1.3962634) on the ground or with the
 board's up above level. Checked: 20,000 routine runs and 40,000 spin entries against the original.
+`SpinControl_Exit` (`spin::spin_exit`): with spin or flip left, q ← q · (cos −s/2, 0, 0, sin −s/2) · (cos −f/2,
+sin −f/2, 0, 0), renormalised (`Boarder_UpdateOrientation`), and the position moved by the new attitude turning
+(p turned back by that turn − p), p = (0, 0, the pivot bone's z) (bone = rider + +0x44d8 × 0x394 + 0x8c8); spin and
+flip then 0. Checked 40,000 times.
 

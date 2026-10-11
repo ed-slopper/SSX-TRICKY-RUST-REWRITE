@@ -159,3 +159,60 @@ fn spin_enter_matches_the_original() {
     }
     assert!(dropped > 1000 && aligned > 5000 && swapped > 5000, "dropped {dropped}, aligned {aligned}, two-way {swapped}");
 }
+
+#[test]
+fn spin_exit_matches_the_original() {
+    // `SpinControl_Exit` 0x1029d0 against `spin::spin_exit`: the attitude and its axes, the position, spin and flip
+    use tricky_game::spin::{spin_exit, SpinRider};
+    let Some(mut r) = Runner::from_env() else { return };
+    r.float_rules = Rules::parse("add=n,mul=n,div=n,cvt=n").unwrap();
+    for a in [0x102e80u32, 0x250c10, 0x129008, 0x2510f8, 0x102f80, 0x102f50] {
+        r.allow(a);
+    }
+    let rider = r.mem.alloc(0x6000);
+    let st = r.mem.alloc(0x100);
+    r.mem.write_u32(st + 0x70, rider);
+    let mut g = Rng(0x2c6f_90e1_b47a_d538);
+    let mut moved = 0;
+    for case in 0..40_000 {
+        let mut o = Orient { q: [g.f(-1.0, 1.0), g.f(-1.0, 1.0), g.f(-1.0, 1.0), g.f(-1.0, 1.0)], ..Default::default() };
+        update_orientation(&mut o);
+        let mut sr = SpinRider {
+            quat: o.q,
+            spin: [0.0, g.f(-20.0, 20.0)][g.next() as usize % 2],
+            flip: [0.0, g.f(-20.0, 20.0)][g.next() as usize % 2],
+            pos: [g.f(-9000.0, 9000.0), g.f(-9000.0, 9000.0), g.f(-900.0, 900.0), [1.0, 0.0][g.next() as usize % 2]],
+            bone: [g.f(-50.0, 50.0), g.f(-50.0, 50.0), g.f(-20.0, 120.0)],
+            ..Default::default()
+        };
+        let bone_index = g.next() % 8;
+        let m = &mut r.mem;
+        put4(m, rider + 0x170, o.q);
+        for at in [0x180u32, 0x190, 0x1a0] {
+            put4(m, rider + at, [9.0; 4]);
+        }
+        m.write_f32(rider + 0x1b0, 9.0);
+        put4(m, rider + 0x140, sr.pos);
+        m.write_f32(rider + 0x1d0, sr.spin);
+        m.write_f32(rider + 0x1d4, sr.flip);
+        m.write_u32(rider + 0x44d8, bone_index);
+        let b = rider + bone_index * 0x394 + 0x8c8;
+        m.write_f32(b, sr.bone[0]);
+        m.write_f32(b + 4, sr.bone[1]);
+        m.write_f32(b + 8, sr.bone[2]);
+        r.cpu.set_gpr(4, st as u64);
+        r.call(0x1029d0).unwrap_or_else(|e| panic!("case {case}: {e}"));
+        let input = sr;
+        let out = spin_exit(&mut sr);
+        let m = &mut r.mem;
+        let ctx = format!("case {case}: {input:?}");
+        let theirs = (get4(m, rider + 0x170), get4(m, rider + 0x140), m.read_u32(rider + 0x1d0), m.read_u32(rider + 0x1d4));
+        assert_eq!(theirs, (bits(sr.quat), bits(sr.pos), sr.spin.to_bits(), sr.flip.to_bits()), "{ctx}");
+        if let Some(o) = out {
+            let axes = (get4(m, rider + 0x180), get4(m, rider + 0x190), get4(m, rider + 0x1a0), m.read_u32(rider + 0x1b0));
+            assert_eq!(axes, (bits(o.fwd), bits(o.side), bits(o.up), o.yaw.to_bits()), "{ctx}: axes");
+            moved += 1;
+        }
+    }
+    assert!(moved > 20_000, "{moved}");
+}

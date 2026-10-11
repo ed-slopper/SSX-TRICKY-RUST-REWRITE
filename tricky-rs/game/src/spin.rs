@@ -714,3 +714,35 @@ pub fn spin_enter(st: &mut SpinObj, r: &mut SpinEnterRider, a: &AlignRider, clip
     st.emax_flip = 0.0;
     st.emax_spin = 0.0;
 }
+
+/// `SpinControl_Exit` 0x1029d0: with any spin or flip left (rider+0x1d0, +0x1d4), the attitude is turned back by
+/// them (q · (cos −spin/2, 0, 0, sin −spin/2) · (cos −flip/2, sin −flip/2, 0, 0)), renormalised with its axes
+/// (`Boarder_UpdateOrientation`; returned), and the position moved so the pivot bone stays put: its height p =
+/// (0, 0, bone z) turned the other way by that turn, less p, turned by the new attitude, added to the position;
+/// spin and flip then 0. `None`: nothing to undo.
+pub fn spin_exit(r: &mut SpinRider) -> Option<crate::orient::Orient> {
+    if r.spin == 0.0 && r.flip == 0.0 {
+        return None;
+    }
+    let (s1, c1) = sin_cos(r.spin * -0.5);
+    let (s2, c2) = sin_cos(r.flip * -0.5);
+    let t = quat_mul([c1, 0.0, 0.0, s1], [c2, s2, 0.0, 0.0]);
+    let mut o = crate::orient::Orient { q: quat_mul(r.quat, t), ..Default::default() };
+    crate::orient::update_orientation(&mut o);
+    r.quat = o.q;
+    // p turned by the inverse turn: (p − t·2w) + u·2, with t = v × p and u = v × t
+    let zero = 0.0f32;
+    let bz = r.bone[2];
+    let (w, x, y, z) = (t[0], t[1], t[2], t[3]);
+    let tv = [y * bz - z * zero, z * zero - x * bz, x * zero - y * zero];
+    let u = [y * tv[2] - z * tv[1], z * tv[0] - x * tv[2], x * tv[1] - y * tv[0]];
+    let two_w = w + w;
+    let p = [zero, zero, bz];
+    let back = [(p[0] - tv[0] * two_w) + u[0] * 2.0, (p[1] - tv[1] * two_w) + u[1] * 2.0, (p[2] - tv[2] * two_w) + u[2] * 2.0];
+    let e = [back[0] - p[0], back[1] - p[1], back[2] - p[2]];
+    let world = crate::orient::turn_axis(o.q, e);
+    r.pos = [r.pos[0] + world[0], r.pos[1] + world[1], r.pos[2] + world[2], r.pos[3] + zero];
+    r.flip = 0.0;
+    r.spin = 0.0;
+    Some(o)
+}
