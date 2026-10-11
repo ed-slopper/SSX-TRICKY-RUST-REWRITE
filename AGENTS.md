@@ -175,7 +175,8 @@ New people: add your own line (in a `board-` commit) before you claim a row, and
     `SpinState_Update`, `WipeoutMotion_Enter`, `GroundMotion_Update`. One more `_` may separate a part of a
     module: `Fx_BrakeFan_Update`. A system may have several modules (`Audio_`, `Music_`, `Sfx_` are all audio).
   - Class methods: `cClass::Method` (CamelCase, no `_`) only when the function is proven to belong to the class:
-    a virtual (in its vtable), a constructor (`cClass::cClass`) or a call on an object of that class. Virtuals
+    a virtual (in its vtable), a constructor (`cClass::cClass`), a destructor (`cClass::~cClass`, the
+    vtable slot after `__tf`) or a call on an object of that class. Virtuals
     not yet understood stay `cClass::vfN` (Ghidra shows `vfN_<addr>`, from `tools/rtti_scan.py`). Otherwise use
     a free-function name, even if the first argument looks like `this`.
   - Global data: `gName` or `gModule_Name` (`gApp`, `gCheat_Mallora`). Class data from `tools/rtti_scan.py`:

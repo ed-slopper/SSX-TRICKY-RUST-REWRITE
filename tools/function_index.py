@@ -259,7 +259,7 @@ def check_names():
             ok = GLOBAL_FN.match(p[2]) or (STANDARD.match(p[2]) and system.get(a) in HOST)
         elif kind == "F" and len(p) == 4:
             # class names are the game's own (RTTI); a class's methods need its type info on record
-            ok = p[2] in classes and (METHOD.match(p[3]) or p[3] == p[2])
+            ok = p[2] in classes and (METHOD.match(p[3]) or p[3] in (p[2], "~" + p[2]))  # ctor, dtor
         elif kind == "D" and len(p) == 3:
             ok = GLOBAL_DATA.match(p[2])
         elif kind == "L" and len(p) == 4:

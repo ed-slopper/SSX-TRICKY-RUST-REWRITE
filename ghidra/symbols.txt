@@ -3195,3 +3195,98 @@ G 11a840 Boarder_PlaceAtStart
 G 11e9d8 Boarder_GetGateStartTimer
 G 11d998 Boarder_IsFinishLineDone
 G 1065c8 FinishLineControl_IsDone
+G 105b90 Vec4_ScaleCopy1
+G 1097f8 Vec4_ScaleCopy2
+G 10afb0 Vec4_ScaleCopy3
+G 1231d8 Vec4_ScaleCopy4
+G 126918 Vec4_ScaleCopy5
+G 12c088 Vec4_ScaleCopy6
+G 1381e0 Vec4_ScaleCopy7
+G 123a88 AirPredict_Init
+G 11afe8 Boarder_StartLessonWait
+G 15a658 AnimLayer_Turn
+G 15a6c8 AnimLayer_FindClip
+G 160008 AnimCtl_TestClipBit
+G 15fec8 AnimCtl_GetClipDuration
+G 15ef98 AnimCtl_StopClipsInCategory
+G 203bd8 ClipList_Remove
+G 203c20 ClipList_DestroyAll
+G 128e20 Boarder_ResetOrientation
+G 107fc8 RailSlideControl_SwitchStance
+G 119c90 Boarder_StartResetAt
+G 1927d8 Replay_RecordOrPlayInput
+G 1928f0 Replay_RecordInput
+G 192880 Replay_PushInput
+G 192998 Replay_ReadInput
+F 1209f0 cWipeOutRecoverControl ~cWipeOutRecoverControl
+F 120b28 cWipeOutControl ~cWipeOutControl
+F 120c60 cGetupFromSitControl ~cGetupFromSitControl
+F 120d98 cSitAndWaitControl ~cSitAndWaitControl
+F 120ed8 cSpinControl ~cSpinControl
+F 121018 cRailSlideControl ~cRailSlideControl
+F 121158 cPrewindControl ~cPrewindControl
+F 121298 cNaturalAirControl ~cNaturalAirControl
+F 1213d8 cLandNormalControl ~cLandNormalControl
+F 121510 cLandHardControl ~cLandHardControl
+F 121648 cJumpControl ~cJumpControl
+F 121780 cGateLaunchControl ~cGateLaunchControl
+F 1218c0 cGateAnticipateControl ~cGateAnticipateControl
+F 121a00 cLessonWaitControl ~cLessonWaitControl
+F 121b38 cGate2BaseControl ~cGate2BaseControl
+F 121c78 cResetWaitControl ~cResetWaitControl
+F 121db8 cFinishLineControl ~cFinishLineControl
+F 121ef0 cFakieCruiseControl ~cFakieCruiseControl
+F 122028 cChangeFakieControl ~cChangeFakieControl
+F 122168 cCruiseControl ~cCruiseControl
+F 1222a8 cBumpControl ~cBumpControl
+F 1223e0 cVoidControl ~cVoidControl
+F 122520 cWipeOutRecoverMotion ~cWipeOutRecoverMotion
+F 122660 cWipeOutMotion ~cWipeOutMotion
+F 122798 cStaticMotion ~cStaticMotion
+F 1228d8 cRailSlideMotion ~cRailSlideMotion
+F 122a18 cGroundMotion ~cGroundMotion
+F 122b58 cAirMotion ~cAirMotion
+G 236758 CollBody_GetSphereBounds
+F 1355c8 cBoarderRender ~cBoarderRender
+F 1356f8 cBoarderRender vf7
+F 13a628 cComputer ~cComputer
+F 11f618 cComputer vf7
+F 138438 cComputer vf8
+F 1384b8 cComputer GetControls
+F 138460 cComputer vf13
+F 151080 cPlayer ~cPlayer
+F 153390 cPlayer vf7
+F 151250 cPlayer GetControls
+F 1532c0 cPlayer vf11
+F 153350 cPlayer vf12
+F 153640 cPlayer vf14
+F 153608 cPlayer vf15
+F 1535d0 cPlayer vf16
+F 1535b0 cPlayer vf18
+F 116828 cBoarder cBoarder
+G 13a2b0 AI_InitSkill
+G 236830 CollBody_GetActiveBounds
+G 2515c8 Spline_Evaluate
+G 251508 Spline_FindSegmentForward
+G 251568 Spline_FindSegmentBackward
+G 12e0e8 Fx_SpawnLandingPuffs
+G 19b8c8 Sprite_DrawRotatedQuad
+G 19bb48 Sprite_DrawRotatedTexQuad
+G 1feaf0 HUD_DrawSpriteAnchored
+G 1797f8 Pad_GetAxis
+G 179940 Pad_ReadAxis
+G 197830 AIP_DistanceToLineBox
+G 197f28 AIP_SortLinesByDistance
+G 250728 Quat_RotateByVecToVec
+G 150d18 Rumble_Update
+G 150a80 Rumble_Impact
+G 150be8 Rumble_Add
+G 15f5b8 AnimCtl_HandleClipEnd
+G 161640 AnimCtl_EndActionStop
+G 1613a0 AnimCtl_EndActionToBase
+G 161528 AnimCtl_EndActionPlay223
+G 161360 AnimCtl_EndActionPlay202
+G 161400 AnimCtl_EndActionChain
+G 161568 AnimCtl_EndActionPlay2DF
+G 1615a8 AnimCtl_EndActionPlay2DE
+G 1615e8 AnimCtl_EndActionToRide
