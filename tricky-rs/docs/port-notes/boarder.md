@@ -549,6 +549,32 @@ armed; else the crouch target 0 and, uncrouched, a quarter turn the way of the t
 clip (0x258..0x25f) and the clip to queue (+8); `RailSlideControl_PlayQueuedClip` 0x107628 plays it when the turn's
 clip ends and sets the new rail kind (1→4, 2→3, 3→1, 4→2). Pad bit 0: reset at 101.46.
 
+### A rider that is down is not captured (row E8m; `tests/physics.rs`: `a_rider_put_down_in_the_air_is_not_captured_by_a_rail`)
+
+**Proven (decompiler, SLUS_203.26).** `Rail_TryCapture` 0x125cb8 reads no wipe-out flag of its own: its refusals are the
+offset test, the clip-type test and the fall-off limits above. It has exactly two callers (`get_xrefs_to`):
+`AirMotion_Update` 0x108378 (the call at 0x1089f0) and `GroundMotion_Update` 0x10a0d8 (0x10ae78). The wipe-out state
+never reaches them: `Boarder_Wipeout` 0x11d830 calls `Boarder_SetState`(0x13) and `Boarder_SetMotion`(5) at once
+(`Boarder_SetMotion` 0x11f610 exits the old motion and enters the new in the same call, no deferral), and
+`WipeoutMotion_Update` 0x10c2f0 and `GetUpMotion_Update` 0x1102c8 do not call `Rail_TryCapture`. So the game refuses a
+downed rider by structure (the motion that captures is not the one running), not by a test.
+
+**The way back into capture is the fall recover.** `WipeoutMotion_Update`, in the air with the body upright to the landing
+(dot of +0x1a0 and +0x57e0 over 0.9, speed under 4): clip 0x224, `Boarder_SetMotion`(1), `Boarder_SetState`(0xd), a
+rider in the ordinary air motion again, which `AirMotion_Update` may then capture on a rail. The port's
+`Rider::end_wipe(.., CLIP_FALLRECOVER, false)` is that exit (`crashed` = 0, airborne).
+
+**The port had one slip, now fixed.** `Rider::step_tick` runs the wall check before the rail check; an air wall put the
+rider down (`crashed` = 1) and the rail branch under "dropping onto a rail from the air" then locked the board on and
+set `crashed = 0.0` in the same tick, so a downed rider "got up" on the rail. Now the branch needs `crashed <= 0.0`
+and no longer writes `crashed`. A rider already down on an earlier tick never reached the branch (`wipe_step` returns
+first). Inferred, not shown: the E8l run's capture 0.5 s after the wipe-out was most likely the fall-recover exit above,
+which the game allows (the sim run after the fix is unchanged: 235.0 s, 5 wipe-outs).
+
+**Not ported (new rows):** the clip-type gate (a layer-0 clip of type 0xe/0xf/0x10 without flag 4 refuses a capture;
+which type clip 0x224 has is not read), and the order of the wall check against `Rail_TryCapture` inside the game's
+tick (the port's order is ours).
+
 
 ## The attitude at a placement (row G20c3a; checked: `tests/placement.rs`)
 

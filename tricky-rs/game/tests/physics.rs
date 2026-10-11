@@ -2,7 +2,7 @@
 
 use glam::Vec3;
 use tricky_game::collide::CollisionWorld;
-use tricky_game::rails::Rails;
+use tricky_game::rails::{Rail, Rails};
 use tricky_game::rider::{wrap, Input, Rider, GRAVITY_FALLING};
 
 #[test]
@@ -179,4 +179,47 @@ fn a_lip_takes_the_rider_off_without_a_crash_and_the_landing_is_back_on_the_snow
     assert!(r.crashed <= 0.0, "down after the landing: cause {}, at {:?}", r.cause, r.pos);
     assert!(r.pos.z < -48.0 && (r.pos.y - (-16.0 + 0.2 * (r.pos.z + 48.0))).abs() < 1.0, "not on the landing snow: {:?}", r.pos);
     assert!(r.vel.length() > 5.0, "stalled after the landing: {:?}", r.vel);
+}
+
+/// A long rail along −z at y = 0 and a rider in the air just above it, flying down it at 18 m/s (row E8m).
+fn rail_and_flyer() -> (Rails, Rider) {
+    let rail = Rail::new(vec![Vec3::new(0.0, 0.0, 5.0), Vec3::new(0.0, 0.0, -40.0)]).unwrap();
+    let rails = Rails(vec![rail], Default::default());
+    let mut r = Rider::new(Vec3::new(0.0, 0.3, -9.5), 0.0);
+    r.grounded = false;
+    r.air_time = 0.5;
+    r.vel = Vec3::new(0.0, 0.0, -18.0);
+    (rails, r)
+}
+
+#[test]
+fn a_rider_put_down_in_the_air_is_not_captured_by_a_rail() {
+    // row E8m: `Rail_TryCapture` 0x125cb8 has two callers, `AirMotion_Update` 0x1089f0 and `GroundMotion_Update`
+    // 0x10ae78. `Boarder_Wipeout` 0x11d830 switches the motion to 5 at once (`Boarder_SetMotion` 0x11f610 exits
+    // the old motion and enters the new), and `WipeoutMotion_Update` 0x10c2f0 and `GetUpMotion_Update` 0x1102c8
+    // never call it: a downed rider is not captured, and a capture never gets it up.
+    let mut world = CollisionWorld::default();
+    world.min_y = -1.0e6;
+    // control: with nothing in the way the rider is locked onto the rail on the first tick
+    let (rails, mut r) = rail_and_flyer();
+    r.step(&world, &rails, Input::default(), 1.0 / 60.0);
+    assert!(r.rail.is_some() && r.crashed <= 0.0, "the control rider was not captured: rail {:?} crashed {}", r.rail, r.crashed);
+
+    // a wall across the line: the rider hits it in the air on the same tick that it is over the rail (an air wall:
+    // `Boarder_WallImpactCheck`, a crash), so it is down and the rail must not take it
+    let mut wall = CollisionWorld::default();
+    wall.min_y = -1.0e6;
+    let q = |x: f32, y: f32, z: f32| Vec3::new(x, y, z);
+    wall.add_ex([q(-5.0, -5.0, -10.0), q(5.0, 10.0, -10.0), q(5.0, -5.0, -10.0)], None, false, 1, false);
+    wall.add_ex([q(-5.0, -5.0, -10.0), q(-5.0, 10.0, -10.0), q(5.0, 10.0, -10.0)], None, false, 1, false);
+    let (rails, mut r) = rail_and_flyer();
+    r.step(&wall, &rails, Input::default(), 1.0 / 60.0);
+    assert!(r.crashed > 0.0, "the wall did not put the rider down (cause {:?}, pos {:?})", r.cause, r.pos);
+    assert!(r.rail.is_none(), "a downed rider was captured by the rail");
+    // and it stays down: no rail, not up, over the next half second
+    for i in 0..30 {
+        r.step(&wall, &rails, Input::default(), 1.0 / 60.0);
+        assert!(r.rail.is_none(), "tick {i}: captured while down");
+        assert!(r.crashed > 0.0, "tick {i}: up again after {:.2} s down", r.down_t);
+    }
 }

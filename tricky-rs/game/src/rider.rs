@@ -1103,8 +1103,11 @@ impl Rider {
             }
         }
 
-        // dropping onto a rail from the air locks the board onto it
-        if !self.grounded && !jumped && self.rail_cooldown <= 0.0 && self.air_time > 0.08 && self.vel.y < 2.5 {
+        // dropping onto a rail from the air locks the board onto it. Not a rider that was put down this tick (an air
+        // wall in `walls` above): `Rail_TryCapture` 0x125cb8 is called by `AirMotion_Update` 0x1089f0 and
+        // `GroundMotion_Update` 0x10ae78 only, and `Boarder_Wipeout` 0x11d830 has already switched the motion to 5
+        // (`Boarder_SetMotion` 0x11f610 is immediate), whose `WipeoutMotion_Update` 0x10c2f0 never captures (row E8m)
+        if !self.grounded && self.crashed <= 0.0 && !jumped && self.rail_cooldown <= 0.0 && self.air_time > 0.08 && self.vel.y < 2.5 {
             if let Some((ri, d, _)) = rails.nearest(self.pos, RAIL_REACH) {
                 let (rp, tan) = rails.0[ri].at(d);
                 let along = self.vel.dot(tan);
@@ -1127,7 +1130,6 @@ impl Rider {
                     self.land(Some(self.rail_kind));
                     // `RailSlideControl_Enter`: the rail's spin starts from nothing
                     self.sc.update_spin(0);
-                    self.crashed = 0.0;
                     self.rail_twist = tw;
                     self.rail_goal = (tw / std::f32::consts::FRAC_PI_2).round() * std::f32::consts::FRAC_PI_2;
                     self.rail_goal0 = self.rail_goal;
