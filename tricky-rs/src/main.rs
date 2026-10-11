@@ -27,7 +27,7 @@ mod sfnfont;
 mod coursemusic;
 mod pathmusic;
 mod editor;
-mod rivals;
+use tricky_game::rivals;
 mod rider;
 mod worldanim;
 

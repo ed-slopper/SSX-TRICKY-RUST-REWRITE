@@ -49,6 +49,11 @@ Part of the port notes (index: [README.md](README.md)); units and wording as des
 
 ## Rivals and grudges (`RelTable_Init` 0x167208, `Rider_OnKnockedDownBy`, `AI_StartVendetta`, `AI_CoolVendetta`)
 
+- Table layout (proven, G4a1): `RelTable_Init` fills 12 × 12 entries of 16 bytes (row = who feels, column = about
+  whom, in `rivals::NAMES` order): +0 tolerance, +4 attitude, +8 a third value (mostly 100; not ported, G4a2),
+  +0xc relation (0 neutral, 1 friend, 2 foe). `tricky-rs/game/src/rivals.rs` matches all 432 ported values
+  (`tests/rel_table.rs`).
+
 - Each rider has a friend and a foe and a 12×12 attitude (0..100) and tolerance table (src/rivals.rs).
 - The player hitting an AI adds to its grudge: knockdown 30, shove-stumble 15, bump-stumble 9 (capped at the
   tolerance). Reaching the tolerance starts a vendetta: level 0 for a friend, else 2 if attitude ≥ 80.98926,
