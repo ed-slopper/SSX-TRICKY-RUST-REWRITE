@@ -389,3 +389,175 @@ pub fn apply(old: Option<u32>, mode: u32) -> Vec<Apply> {
     }
     .unwrap_or_default()
 }
+
+/// `cRailNode` (type 9, row E9h): switches a rail (a spline segment's flags word +0x18, bit 0) on or off for a
+/// time. Constructor 0x1400d8: +0x34 the segment (p3, a half; −1 none), +0x38 `(int)(p5 · 60)` frames, +0x3c on
+/// (p4 ≠ 0); the object's flags `& 0xffffffdd | 0x44`.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct RailNode {
+    pub object: u32,
+    pub segment: i32,
+    pub ticks: i32,
+    pub on: u32,
+}
+
+/// What a rail node needs: the object's flags and the segment's flags word.
+pub trait RailEnv: CtrlEnv {
+    fn segment_flags(&mut self, segment: i32) -> &mut u32;
+}
+
+impl RailNode {
+    pub fn new(object: u32, args: &[u32], env: &mut impl RailEnv) -> RailNode {
+        let a = |k: usize| args.get(k).copied().unwrap_or(0);
+        let n = RailNode { object, segment: a(1) as u16 as i16 as i32, ticks: frames(f32::from_bits(a(3))), on: (a(2) != 0) as u32 };
+        let f = env.flags(object);
+        *f = *f & 0xffff_ffdd | 0x44;
+        n.set(n.on != 0, env);
+        n
+    }
+
+    /// `RailNode_Enable` 0x1403c0 / `RailNode_Disable` 0x140400.
+    fn set(&self, on: bool, env: &mut impl RailEnv) {
+        if self.segment != -1 {
+            let f = env.segment_flags(self.segment);
+            *f = if on { *f | 1 } else { *f & !1 };
+        }
+    }
+
+    /// Update 0x1402b0: after the frames, Finish(1).
+    pub fn update(&mut self, env: &mut impl RailEnv) {
+        if self.ticks > 0 {
+            self.ticks -= 1;
+            if self.ticks == 0 {
+                self.finish(1, env);
+            }
+        }
+    }
+
+    /// Kill 0x1402f8.
+    pub fn kill(&mut self, env: &mut impl RailEnv) {
+        if self.ticks >= 0 {
+            self.delete(env);
+        }
+    }
+
+    /// Finish 0x140338.
+    pub fn finish(&mut self, flag: u32, env: &mut impl RailEnv) {
+        let ran = flag != 0 && {
+            let s = env.event_script(self.object, 3);
+            if s >= 0 {
+                env.call(CtrlCall::Start(s, self.object));
+            }
+            s >= 0
+        };
+        if !ran && self.ticks >= 0 {
+            self.delete(env);
+        }
+    }
+
+    /// OnMessage 0x140398: kind 0 off, 1 on, others the base's.
+    pub fn on_message(&mut self, kind: u32, env: &mut impl RailEnv) {
+        match kind {
+            0 => self.set(false, env),
+            1 => self.set(true, env),
+            _ => base_message(self.object, kind, env),
+        }
+    }
+
+    /// `~cRailNode` 0x140218: the object's flags restored (mask 0xffff0100), the segment's defaults (upper half)
+    /// copied into its lower half; then it detaches.
+    pub fn delete(&mut self, env: &mut impl RailEnv) {
+        let f = env.flags(self.object);
+        *f = restore_flags(*f, 0xffff_0100);
+        if self.segment != -1 {
+            let s = env.segment_flags(self.segment);
+            *s = *s & 0xffff_0000 | *s >> 16;
+        }
+        env.call(CtrlCall::Delete);
+    }
+}
+
+/// The controller layer of `cRollerNode` (type 0, the knockable objects; row E9h): when it sleeps and the forces it
+/// hands to the rigid body each frame. The body itself (`RigidBody_Integrate` 0x153c50, the transform, the sphere
+/// tree, `RollerNode_Collide`) is row E8c. Fields: the rigid body at +0x30 (+0x38 inverse mass, +0x3c the 3×3
+/// inverse inertia, +0x80 momentum, +0x90 angular momentum, +0xa0 velocity, +0xb0 angular velocity), +0xc8 the
+/// energy average, +0xe4 seconds awake, +0xe8 a knock that decays, +0x140 asleep.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct Roller {
+    pub object: u32,
+    pub inv_mass: f32,
+    pub inv_inertia: [f32; 9],
+    pub momentum: [f32; 4],
+    pub ang_momentum: [f32; 4],
+    pub vel: [f32; 4],
+    pub ang_vel: [f32; 4],
+    pub energy: f32,
+    pub awake: f32,
+    pub knock: f32,
+    pub asleep: u32,
+}
+
+impl Roller {
+    /// `cRollerNode::Update` 0x13e8a8 up to the integration: `None` while asleep, or when it goes to sleep this frame
+    /// (momenta and velocities zeroed, Finish(1)); else the force (gravity −980·mass on z, less the momentum × a
+    /// damping that grows with the knock and the time awake) and the torque (the angular momentum × the same).
+    pub fn update(&mut self, env: &mut impl CtrlEnv) -> Option<([f32; 4], [f32; 4])> {
+        if self.asleep != 0 {
+            return None;
+        }
+        let dot = |a: [f32; 4], b: [f32; 4]| {
+            let m = [a[0] * b[0], a[1] * b[1], a[2] * b[2], a[3] * b[3]];
+            ((m[0] + m[1]) + 1.0 * m[2]) + 1.0 * m[3]
+        };
+        let e = dot(self.vel, self.momentum) + dot(self.ang_vel, self.ang_momentum);
+        let mass = if self.inv_mass == 0.0 { -1.0 } else { 1.0 / self.inv_mass };
+        self.awake += f32::from_bits(0x3c88_8889);
+        self.energy = self.energy * f32::from_bits(0x3f73_3333) + e * f32::from_bits(0x3d4c_cccd) / mass;
+        if self.energy < 10000.0 || 10.0 <= self.awake {
+            self.awake = 0.0;
+            self.momentum = [0.0; 4];
+            self.vel = [0.0; 4].map(|v: f32| v * self.inv_mass);
+            self.ang_momentum = [0.0; 4];
+            let l = self.ang_momentum;
+            let i = self.inv_inertia;
+            self.ang_vel = [
+                i[0] * l[0] + i[3] * l[1] + i[6] * l[2],
+                i[1] * l[0] + i[4] * l[1] + i[7] * l[2],
+                i[2] * l[0] + i[5] * l[1] + i[8] * l[2],
+                0.0,
+            ];
+            self.finish(1, env);
+            return None;
+        }
+        self.knock *= f32::from_bits(0x3f55_5555);
+        let t = self.knock * 10.0;
+        let s = if t < 0.0 {
+            0.0
+        } else if 2.0 < t {
+            2.0
+        } else {
+            t
+        };
+        let k = (self.awake + self.awake) * s + s;
+        // the FPU's division by 0 gives the largest float, signed
+        let g = f32::from_bits(0xc475_0000);
+        let gz = if self.inv_mass == 0.0 { if g.is_sign_negative() != self.inv_mass.is_sign_negative() { -f32::MAX } else { f32::MAX } } else { g / self.inv_mass };
+        let grav = [0.0, 0.0, gz, 0.0];
+        let force = [0, 1, 2, 3].map(|j| grav[j] - self.momentum[j] * k);
+        let torque = [0, 1, 2, 3].map(|j| 0.0 - self.ang_momentum[j] * k);
+        Some((force, torque))
+    }
+
+    /// Finish 0x13e860: flag 1 tries the object's event-3 script; otherwise (or without one) it goes to sleep
+    /// (+0x140 = 1). It is never deleted by finishing; Kill deletes it.
+    pub fn finish(&mut self, flag: u32, env: &mut impl CtrlEnv) {
+        if flag != 0 {
+            let s = env.event_script(self.object, 3);
+            if s >= 0 {
+                env.call(CtrlCall::Start(s, self.object));
+                return;
+            }
+        }
+        self.asleep = 1;
+    }
+}

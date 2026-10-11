@@ -156,3 +156,17 @@ Types 1, 3 and 4 spawn nothing.
   first frame in, moved 20 toward the centre and 10 up; from then on (also when farther out but already in) x, y
   velocity × 0.92 and the push. Riders not overlapping are marked out. Kill does nothing; Finish(1) only runs the
   object's event-3 script, the node stays.
+
+## Movers (row E9h; `controllers::RailNode`, `controllers::Roller`, checked: `tests/movers.rs`)
+
+- Rail node (9): p3 (a half) the spline segment, p4 ≠ 0 on, p5 seconds (`(int)(·60)` frames, then Finish(1)). The
+  segment's flags word (+0x18; the `.ssf` word with its defaults in the upper half): bit 0 = the rail is live;
+  messages 0 / 1 switch it; deleting the node copies the defaults back (and restores the object's flags, mask
+  0xffff0100). The constructor sets the object's flags `& 0xffffffdd | 0x44`.
+- Roller (0, knockable objects): asleep while +0x140 is set (vf 0x64 reads it, 0x6c sets it, 0x74 clears it —
+  op 0 on an awake roller of the same type restarts it). Each awake frame: energy = v·p + ω·L (VU0 order), the
+  average +0xc8 = 0.95·avg + 0.05·energy / mass (mass −1 when the inverse mass is 0); 1/60 s more awake. Average
+  < 10000 or 10 s awake: momenta and velocities zeroed and Finish(1) (the object's event-3 script, else sleep).
+  Else the knock +0xe8 decays × 0.8333333 and s = clamp(knock·10, 0, 2); k = 2·awake·s + s; force = (0, 0,
+  −980 / inverse mass) − k·momentum, torque = −k·L, handed to `RigidBody_Integrate`(1/60) — the body, its
+  transform and `RollerNode_Collide` are row E8c. Kill deletes it; Finish never does.
