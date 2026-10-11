@@ -50,7 +50,6 @@ state machine and the renderer are ours. Nothing has been checked against the or
 | E6 | Loading and memory: what the game loads when (load screens, course switch), only as far as it changes behaviour | unowned | E1 | | [est] |
 | E7 | World: terrain tessellation as the game does it, world cells (`World_CellActivate_RunPersistant` 0x25fed0), instance queries `World_QueryInstances` 0x25b878, ray casts `World_RayCast` 0x25aff8 / `World_RayCastInstance` 0x25bf48 | unowned | E3a | | [repo] `collide.rs` (triangle grid of the drawn mesh) is a stand-in for these |
 | E8 | Physics: check the ported boarder motion against the original once F4 exists: ground `cBoarder_GroundMotion_Update` 0x10a0d8, drag 0x109cb8, side friction 0x109ef8, thrust 0x109950, spring 0x109878, probe 0x128ae8, surface table `SurfaceTable_Init` 0x256188 | any | F4a | | [repo] Ported in `rider.rs`; README still says some constants at the top of `rider.rs` are guesswork: find which. Split: E8f–E8i |
-| E8j | `Boarder_RotateAboutAxis` 0x128e90 and `Boarder_TakeOff` 0x128470 ported exactly and checked, and the rider's virtual 0x64 that `GroundMotion_Update` calls on a crash (surface 6 or 10) identified, so `ground_motion::update` can run them instead of the test recording them; also what rider+0x1a0 is (the board's up, inferred) | any | F4a | trailrig/heron (2026-10-11) | Gap of E8h |
 | E8k | Run the exact ground tick in the port: `Rider::step` in `rider.rs` (metres, y up, its own approximate ground branch) calls `tricky_game::ground_motion::update` (cm, z up) with an `Env` made of the port's own wall collision, probe, take-off, crash, rail capture and instance collisions | any | E8j | | Gap of E8h. Needs E8b (walls) and G1b (rail capture) as far as the port has them; the rest stays STANDIN |
 | E8a | Air: `Air_IntegrateRK4` 0x12b340, `AirPredict_AtTakeoff` 0x123b10, landing `Air_MotionUpdate` 0x108378, `Landing_CheckAngles` 0x12ba78, `Landing_ChooseState` 0x109308 | any | F4a | | [repo] Ported, unchecked Split: E8a1, E8a2 |
 | E8a3 | The rest of E8a: `AirPredict_AtTakeoff` 0x123b10 (needs the world ray, E7), `Air_MotionUpdate` 0x108378 checked | any | F4a | | Split of E8a |
@@ -111,6 +110,8 @@ state machine and the renderer are ours. Nothing has been checked against the or
 | G14 | Megaplex laps and boost tubes checked: `cLapBoostNode` 0x140b90, `cZBoostNode` 0x141cd8 | any | E9 | | [repo] |
 | G15 | Spray, trail and splashes per surface from the real table (`tricky_game::surface`): `surf()` in `tricky-rs/src/spray.rs` is rounded and guesses which surfaces spray; the game sprays from words [13..21] on every surface but 9, 13, 18, 19 (those spark, `Fx_SurfaceSpray` 0x1311b0) and uses [22..24] for the trail and splashes (port-notes/effects.md) | any | E8f | | Gap of E8f; corrected by E13 |
 | G16 | Draw the rider at rider+0x308 above the snow (surface word [10], eased 1.6667 cm a tick on the ground), as `Boarder_UpdatePose` 0x129628 does; the port draws at the board's position | any | E8f | | Gap of E13 |
+| G18 | `Boarder_SetMotion` 0x11f610 → 0x11c648 and `Boarder_SetState` 0x11f608 → 0x11c7d8 bodies exact (the motion and state switch `Boarder_TakeOff` and the ground tick call; the `TakeOffEnv` / `Env` of `orient.rs` / `ground_motion.rs` take them) | any | E8j | | Gap of E8j |
+| G19 | The crash spray exact: `cBoarder::EmitBrakeSpray` 0x11a798 → `Boarder_EmitBrakeSpray` 0x136e70 → `BoarderRender_EmitBrakeSpray` 0x135258 → `Fx_BrakeSpray_Emit` 0x12e008 (effects only; position, velocity, normal) | any | E8f | | Gap of E8j; overlaps G15 |
 
 ## P3 Content
 
@@ -231,6 +232,7 @@ matches the original.
 | E8g | `Boarder_ProbeGround` 0x128ae8 and `Boarder_GetFallLine` 0x128a18 ported exactly (`tricky-rs/game/src/probe.rs`) and checked in the function runner (`tests/probe.rs`: 20,000 probes, hits, misses, flat and near-vertical ground; the cast line and every field bit for bit, the world ray cast answered by the test) | P2 | trailrig/heron | 2026-10-11 | 870944f |
 | E5c | Camera files from the disc: `Cml::from_disc` loads the course's, `commonob` and `scripts` as `Camera_LoadCmlFiles` 0x1783e8 does (`Camera_GetCourseCmlName` 0x178330 ported), read by the app with `TRICKY_DISC`; equal to the level folders' copies | P1 | ed-slopper/puffin | 2026-10-11 | 2586fdd |
 | E8h | `GroundMotion_Update` 0x10a0d8 ported exactly (`tricky-rs/game/src/ground_motion.rs`: forces, lean, sink, Euler step, bob, yaw, wall mask, probe, bleed, take-off / crash / tilt / wobble, in the machine code's order) and checked as a whole in the function runner on 20,000 random ticks (`tests/ground_motion.rs`): the four forces, `Math_SinCos`/`Asin`/`Cos`, `Vec4_Scale`, `Boarder_ProbeGround` and `Boarder_GetFallLine` run as the original (the world ray cast answered by the test), the other callees recorded; every field it writes and every call with its arguments, in order, bit for bit; exact-tie cases and a one-bit planted error are caught | P1 | trailrig/heron | 2026-10-11 | 50e74ef |
+| E8j | `Boarder_RotateAboutAxis` 0x128e90 and `Boarder_TakeOff` 0x128470 ported exactly and checked, and the rider's virtual 0x64 that `GroundMotion_Update` calls on a crash (surface 6 or 10) identified, so `ground_motion::update` can run them instead of the test recording them; also what rider+0x1a0 is (the board's up, inferred) | P1 | trailrig/heron | 2026-10-11 | 9a73a17 |
 
 ## Changes to the board
 
@@ -347,3 +349,4 @@ matches the original.
 - 2026-10-11 trailrig/heron: claim E8h.
 - 2026-10-11 trailrig/heron: E8h done; added E8j and E8k (gaps of E8h).
 - 2026-10-11 trailrig/heron: claim E8j.
+- 2026-10-11 trailrig/heron: E8j done; added G18, G19 (gaps of E8j).
