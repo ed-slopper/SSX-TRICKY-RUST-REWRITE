@@ -38,7 +38,6 @@ state machine and the renderer are ours. Nothing has been checked against the or
 | E1a1 | The player's and the AI riders' physics in `ride` (`tricky-rs/src/main.rs`) on a fixed 60 Hz tick: whole ticks of `1/60 × timescale` carried over from frame to frame, instead of variable sub-steps of up to 1/120 s | any | | trailrig/heron (2026-10-11) | Split of E1a |
 | E1a2 | The rest of E1a: world animations, props, particles, spray, camera on the same tick; draw between ticks (interpolate, ours: tag STANDIN) | any | E1a1 | | Split of E1a |
 | E1b | Random numbers: the game's `rand` and seeding, used by AI tricks, grabs, announcer, so runs can match the original | unowned | F1 | | [est] |
-| E2 | Read the player's disc: ISO 9660 reader in Rust, the `DATA/` tree, so the player points us at their ISO or drive | unowned | F11 | ed-slopper/puffin (2026-10-11) | [est] Replaces copying files out by hand |
 | E2a | BIG archives (C0FB and BIGF) in Rust, ported from the game's loader | unowned | E2 | | [repo] Python in `tools/afl/anmbig.py`; findings.md "Ideas for next steps". The game's reader: `lib-big`, `BIG_Identify` 0x2cbc88, `BIG_Lookup` 0x2cbdc0, `BIG_GetFileData` 0x2cc0a8 (F1d) |
 | E2b | RefPack decompression in Rust | unowned | E2a | | [repo] Python in `tools/afl/refpack.py`. The game's decoders: `Compress_Decode` 0x2c2de0 → `RefPack_Decode` 0x2c31b0, `Huff_Decode` 0x2c3730, `BTree_Decode` 0x2c3540 (F1d) |
 | E3 | Level files read by our code, as the game reads them, replacing the SSX-Library JSON project folder (`level.rs`) | unowned | E2b | | [repo] level-editing.md. Split before claiming: |
@@ -154,6 +153,7 @@ matches the original.
 
 | ID | Task | Section | Who | Date | Commit |
 |---|---|---|---|---|---|
+| E2 | Read the player's disc: the game's CD file table (`CdFs_Mount` 0x2c9970, `CdFs_FindFile` 0x2c9cc0, its `qsort`/`bsearch`) ported 1:1 in `tricky-data/src/disc.rs`, from an image or a drive; checked against an independent ISO walk (260 files) and a byte compare; notes in `port-notes/files.md` | P1 | ed-slopper/puffin | 2026-10-11 | 27e5bfb |
 | D1 | Ghidra project analysed, RTTI recovered (394 classes, 2,884 names, `tools/rtti_scan.py`), decompiler export | P0 | ed-slopper | 2026-10-05 | 9e4e994 |
 | D2 | Patcher (`tools/ssxpatch.py`) and the debug-menu / unlock-all mods | P5 | ed-slopper | 2026-10-05 | 9e4e994 |
 | D3 | Level viewer and first riding (`tricky-rs` stage 1–2), `.afl` animation format decoded | P1 | ed-slopper | 2026-10-06 | bd4670b |
@@ -230,3 +230,4 @@ matches the original.
 - 2026-10-11 trailrig/heron: split E1a into E1a1 (claimed) and E1a2.
 - 2026-10-11 ed-slopper/puffin: F1c in progress (still claimed): 5,201 names (index 4,382/7,426). Added since: audio/speech (85 speech events by id, banks, streams, emitters, crowd), sphere-tree collision and the sweep-and-prune broadphase, EA Huffman encoder, rider skin/mpf loader (notes/characters.md), GS state packets, AI ride modes, pause menu pages, animation clip modes (port-notes/boarder.md). Left: PS2 memcard driver states, renderer mesh/swizzle, replay control drawing, HUD layout tables, ~30 large unnamed maths routines.
 - 2026-10-11 ed-slopper/puffin: claim E2 (on the way to E4, asked by ed-slopper); F1c paused, still claimed.
+- 2026-10-11 ed-slopper/puffin: E2 done.
