@@ -34,7 +34,9 @@ state machine and the renderer are ours. Nothing has been checked against the or
 | ID | Task | Area | Needs | Who | Notes |
 |---|---|---|---|---|---|
 | E1 | Start-up and main loop: `entry` 0x100008, the `gApp` (0x337C58) init, `cGame::Init` 0x17E148, `cGame::Update` 0x181638, game modes and the front end ↔ race switch, pause (`cGame::IsPaused` 0x17F078) | unowned | F1 | | [est] Our Bevy app loop is the stand-in |
-| E1a | Fixed 60 Hz tick with per-boarder time scale (`dt = timescale/60`, boarder+0x12c) driving every system, frame-rate independent of the window | any | | | [repo] `port-notes/README.md` (units); check what `SmoothDt` in `main.rs` does today |
+| E1a | Fixed 60 Hz tick with per-boarder time scale (`dt = timescale/60`, boarder+0x12c) driving every system, frame-rate independent of the window | any | | | [repo] `port-notes/README.md` (units); check what `SmoothDt` in `main.rs` does today Split: E1a1, E1a2 |
+| E1a1 | The player's and the AI riders' physics in `ride` (`tricky-rs/src/main.rs`) on a fixed 60 Hz tick: whole ticks of `1/60 × timescale` carried over from frame to frame, instead of variable sub-steps of up to 1/120 s | any | | trailrig/heron (2026-10-11) | Split of E1a |
+| E1a2 | The rest of E1a: world animations, props, particles, spray, camera on the same tick; draw between ticks (interpolate, ours: tag STANDIN) | any | E1a1 | | Split of E1a |
 | E1b | Random numbers: the game's `rand` and seeding, used by AI tricks, grabs, announcer, so runs can match the original | unowned | F1 | | [est] |
 | E2 | Read the player's disc: ISO 9660 reader in Rust, the `DATA/` tree, so the player points us at their ISO or drive | unowned | F11 | | [est] Replaces copying files out by hand |
 | E2a | BIG archives (C0FB and BIGF) in Rust, ported from the game's loader | unowned | E2 | | [repo] Python in `tools/afl/anmbig.py`; findings.md "Ideas for next steps". The game's reader: `lib-big`, `BIG_Identify` 0x2cbc88, `BIG_Lookup` 0x2cbdc0, `BIG_GetFileData` 0x2cc0a8 (F1d) |
@@ -225,3 +227,4 @@ matches the original.
 - 2026-10-11 trailrig/heron: trailrig added to Areas (AGENTS.md §12); split E8 into E8f–E8i.
 - 2026-10-11 trailrig/heron: claim E8f.
 - 2026-10-11 trailrig/heron: E8f done; added E13 and G15 (gaps of E8f).
+- 2026-10-11 trailrig/heron: split E1a into E1a1 (claimed) and E1a2.
