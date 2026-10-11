@@ -4498,3 +4498,14 @@ G 179e60 Pad_ParseButtonNames
 G 178078 Mat4_TransformVec4
 G 163bb8 Career_IsCourseUnlocked
 G 1637d0 Career_ClearPlayerSlot
+G 157088 Score_AnnounceTrick
+G 156618 Score_StartTrickChain
+G 155e00 Score_UpdateSpin
+G 155aa8 Score_BankPoints
+G 1554c0 Score_CalcBasePoints
+G 155410 Score_GetMultiplier
+G 157c50 Score_IsFocusPlayer
+G 1569b0 Score_LandTrick
+G 11f2a0 Boarder_EstimateFinishTime
+G 2b1008 FE3DText_SetupTextBox
+G 2b0b90 FE3DTextBox_Init
