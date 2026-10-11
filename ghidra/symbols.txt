@@ -5124,3 +5124,13 @@ G 208400 RiderSkin_CopyBoneMatrices
 G 201790 BdrLoad_RequestRider
 G 2021f8 BdrLoad_BindTextures
 G 2070e8 RiderSkin_ClearParts
+G 1c04f8 GsPkt_SetClamp
+G 1c0560 GsPkt_SetZBuf
+G 1c05d8 GsPkt_SetTest
+G 1c03e8 GsPkt_SetAlpha
+G 1c0340 GsPkt_SetScissor
+G 1c06a0 GsPkt_Close
+G 1c51f0 PS2Draw_WriteFullState
+G 1c5368 PS2Draw_WriteStateChanges
+G 1c5c88 PS2Draw_WriteTexState
+G 1c4fe0 PS2Draw_FlushBuckets
