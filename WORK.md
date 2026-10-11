@@ -55,7 +55,7 @@ state machine and the renderer are ours. Nothing has been checked against the or
 | E8c | Knockable objects with the game's rigid bodies (`CollBody_PointMassInertia` 0x236530 and its step), replacing the ball physics in `props.rs` | unowned | E7 | | [repo] props.rs: "simulated as balls" |
 | E8d | Rider-to-rider: `Boarder_RiderCollisions` 0x123fc8, `Boarder_RiderHit` 0x124920, shoves | any | F4a | | [repo] Ported, unchecked. Split: E8d1, E8d2 |
 | E9 | Script machine: `TriggerScript_Run`, `TriggerScript_ExecOp` 0x13bfd0 with every op, controllers (`TriggerScript_Op0_SpawnController` 0x13c600), persistent cell scripts, run at runtime instead of read statically | unowned | E3c | | [repo] `logic.rs` reads SSFLogic.json statically today |
-| E9b | Script threads: `TriggerScript_Run` 0x13be78 and the flow ops of `TriggerScript_ExecOp` 0x13bfd0 (4 wait, 5 conditions, 7/21/26 new threads, 3/9/10/11 controller messages) run at runtime, in the game's order | unowned | E3c | | Gap of E9a. Table in port-notes/scripts.md |
+| E9b | Script threads: `TriggerScript_Run` 0x13be78 and the flow ops of `TriggerScript_ExecOp` 0x13bfd0 (4 wait, 5 conditions, 7/21/26 new threads, 3/9/10/11 controller messages) run at runtime, in the game's order | unowned | E3c1 | ed-slopper/puffin (2026-10-11) | Gap of E9a. Table in port-notes/scripts.md |
 | E9d | World ops 1 (camera node), 2 (effects, spline riders), 8 (sound), 13 (reset), 23 (camera shake `Cam_Shake` 0x177758), 24 (teleport), 25 (rail switch `RailMan_SetRail` 0x149030) | unowned | E9b | | Gap of E9a |
 | E9e | Logic controllers: `cDebounceNode` (2), `cCounterNode` (6), `cTimerNode` (8), `cTrickTriggerNode` (21), dead-node modes (5, `TriggerScript_ApplyControllerOp` 0x13ac88) | unowned | E9b | | Gap of E9a |
 | E9f | Boost controllers: `cBoostNode` (7), `cLapBoostNode` (15), `cRandomBoostNode` (16), `cZBoostNode` (18), `cTubeEndBoostNode` (24) | unowned | E9b | | Gap of E9a. G14 checks 15 and 18 |
@@ -468,3 +468,4 @@ matches the original.
 - 2026-10-11 ed-slopper/puffin: split E3c (E3c1, E3c2); claim E3c1.
 - 2026-10-11 trailrig/heron: G20c3c done (take-off attitude kept through the air, checked in the runner); split off G20c3c2 (spin or flip, now needs G1a5b3b and G5) and added G20c3c3 (the air's wall bump, gap of G20c3c); E8l note: the MultiTool is on the PC but its output folder must be empty.
 - 2026-10-11 ed-slopper/puffin: E3c1 done.
+- 2026-10-11 ed-slopper/puffin: claim E9b (its script data now from E3c1).
