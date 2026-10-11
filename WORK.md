@@ -215,3 +215,4 @@ matches the original.
 - 2026-10-10 ed-slopper/puffin: F11b done (tricky-data; race, AI and props in tricky-game).
 - 2026-10-10 ed-slopper/puffin: F3 done (ghidra-mcp connected); F1c and F2b no longer wait on it.
 - 2026-10-10 ed-slopper/puffin: F2b done (first row with ghidra-mcp).
+- 2026-10-10 ed-slopper/puffin: F1c in progress (still claimed): boarder done (state machine, snapshots, controls), race and world mostly done, plus class-slot passes (destructors, node Update/Draw/SaveSnapshot, handlers Enter/Exit/Update, FE states, overlays, loading screens, menu items, course loader), RNG, string scan. ~1,470 names; index 3,047/7,426 named. Left: big race/world/camera routines, renderer state setters, frontend screen builders, audio/speech loaders.
