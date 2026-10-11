@@ -4419,3 +4419,17 @@ G 150428 Contact_SortPairs
 G 14ed88 Lesson_GetString
 G 14b638 LessonMan_EndAttempt
 G 116a68 Boarder_SetRiderInfo
+G 14d7d0 Lesson_ResetScene
+G 14d6e0 Lesson_HandleMenuInput
+G 14d5e0 Lesson_DrawMenu
+G 14b768 Lesson_SetupRider
+G 110f28 Race_IsPlayerPad
+G 2b5668 FE3DMenu_Scroll
+G 2ade40 FE3DWidget_SlideIn
+G 2addb0 FE3DWidget_Place
+G 2ac160 List_Reset
+G 2abf38 ListNode_Unlink
+G 26fe50 FE3DWorld_FindByHash
+G 266190 FE3DRider_SaveSelection
+G 2657a8 FE_SetupRaceFromMenu
+F 2b1b20 cFE3DScrollingText cFE3DScrollingText
