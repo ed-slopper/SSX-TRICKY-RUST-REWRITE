@@ -86,7 +86,7 @@ state machine and the renderer are ours. Nothing has been checked against the or
 | G3 | Rider attributes and progression: stats per rider and level, training points, boards per rider and their unlock points, outfits | unowned | E12 | | [repo] `trickdata.rs` has the tables; rookie/master is our menu |
 | G4 | AI checked: path following 0x1375c8 / 0x1372f8, rubber band 0x115100 / 0x13a0f0, skill pairs, tricks 0x139d58 / 0x138d60, resets, shoves | any | F4a, E1b | | [repo] Ported in `rider.rs`/`main.rs` |
 | G4a | Rivals and vendettas checked: `RelTable_Init` 0x167208, `Rider_OnKnockedDownBy`, `AI_StartVendetta`, `AI_CoolVendetta` | any | F4a | | [repo] `rivals.rs` Split: G4a1, G4a2 |
-| G4a2 | The rest of G4a: `Rider_OnKnockedDownBy`, `AI_StartVendetta`, `AI_CoolVendetta` checked, and the table's word +8 (per pair, mostly 100) ported: find its readers | any | F4a | | Split of G4a |
+| G4a2 | The rest of G4a: `Rider_OnKnockedDownBy`, `AI_StartVendetta`, `AI_CoolVendetta` checked, and the table's word +8 (per pair, mostly 100) ported: find its readers | any | F4a | ed-slopper/puffin (2026-10-11) | Split of G4a |
 | G5 | Animation: the game's own animation state machine and blending for all 248 `bxanim` clips (plus cmanim, ps2anim, ubers), clip markers, replacing our choice of clip | unowned | F1, E4 | | [repo] README: "Which clip plays when is my state logic". Split by state before claiming |
 | G6 | Wipe-out body: ragdoll spheres where the game puts them (`Ragdoll_Step` 0x10dca8, `Ragdoll_Contacts` 0x10e190, `CollBody_PointMassInertia` 0x236530) | unowned | E4 | | [repo] "Unresolved: ragdoll sphere places"; `wipeout.rs` uses a stand-in 1.7 m rider |
 | G7 | Rendering, as the PS2 renderer does it. Split before claiming: | unowned | E3a, E3b | | [repo] |
@@ -392,3 +392,4 @@ matches the original.
 - 2026-10-11 ed-slopper/puffin: E8d split: E8d1 done (RiderHit exact, checked; bumps and shoves through it), E8d2 open.
 - 2026-10-11 ed-slopper/puffin: claim E8d2.
 - 2026-10-11 ed-slopper/puffin: E8d2 done (collision body, pair records, shove exact and checked); E8d3 open (wiring: needs bones).
+- 2026-10-11 ed-slopper/puffin: claim G4a2.
