@@ -2,6 +2,7 @@
 //! function runner (tools/r5900) need to call directly. tricky-rs re-exports these modules.
 
 pub mod air;
+pub mod air_motion;
 pub mod aicomp;
 pub mod aipath;
 pub mod boarder;

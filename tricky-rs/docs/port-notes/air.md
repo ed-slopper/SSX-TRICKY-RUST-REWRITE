@@ -130,3 +130,36 @@ Part of the port notes (index: [README.md](README.md)); units and wording as des
 - Our rider jumps through `jump::jump_impulse` (row G1a5b3a): on snow with the ground normal and the board's
   forward (steep lips leaned along the lip, the flag to `Score_StartTrickChain`), off a rail along the board's up;
   STANDIN rider+0x208 = 0. `TRICKY_JUMPDBG=1` prints each jump.
+
+## The take-off prediction and the air tick, exactly (row E8a3; checked: `tests/air_predict.rs`, `tests/air_motion.rs`)
+
+`AirPredict_AtTakeoff` 0x123b10 (`air::predict_at_takeoff`): rising, the time to the top by halving (2 s between 0
+and 4 s, whole `Air_IntegrateRK4` flights without substeps, 10 tries or a bracket under 0.01); then the flight from
+0.13333334 s in steps growing ×1.28 from 1/60 s (25 at most), each step's segment stretched 2% at both ends and cast
+against the world (`cWorldLine`(0, …, 0)); the first hit: velocity and time interpolated to its fraction, its point,
+normal and word, the top's time kept at +0x50. None: the rider's own position, velocity and normal, word −1.
+
+`AirMotion_Update` 0x108378 (`air_motion::update`, the calls other rows' work through `AirEnv`):
+- the flight step (dt = +0x12c / 60, no substeps), `AirPredict_Tick`, the surface from the prediction's (+0x57f0;
+  a new one: ticks 0x80000001);
+- the down ray: the pivot (the board's frame applied to −bone, w 1) from −100 to +200 along the frame's up row,
+  `cWorldLine`(0.5, …, 1) with the mask at rider+0x430; a hit sets the normal +0x2a0; moving into it (n·v < 0):
+  `Boarder_ProbeGround` from the position moved by the pivot's height turned back by the trick's spin and flip
+  (the same turn `SpinControl_Exit` undoes, here without renormalising), the position put back; ground found and
+  the height under half the surface table's word 6: landing (sunk below 0: put on the ground point less that
+  offset, height 0);
+- flying: `Rail_TryCapture`, `Boarder_InstanceCollisions`, rider+0x494 = 0xcf, the wall ray (`cWorldBoarder` from
+  rider+0x470): a hit pushes out by normal × 1.1 × its fraction (`Boarder_Translate` and the position); moving into
+  the wall, a glancing hit (normal · board up over 0.6 + 0.3·(vn·−0.00045), at most 0.90000004) turns the board up
+  to 6° toward the wall's normal (axis board-up × normal) and takes the speed into it away; a square one is a crash;
+  then +0x494 = −1, `cWorldBoarder::vf10`(2);
+- landing: 0x123f00, `AirMotion_SetFallScale`(vn), virtual +0x6c(vn × −0.00072000007), clip type 0x1a on layer 1
+  blended out, `Landing_CheckAngles`: 0 → +0x798 = −vn and a crash (the record's +0x40 left stale); else +0x798 =
+  −vn, switch (stance ≠ natural, flipped for an angle over π/2), `Landing_ChooseState`, the velocity × (1.0642503 −
+  0.24541846·clamp(|a2|, 15°, 50°)) and × (1.113588 − 0.26032454·clamp(|a1|, 25°, 80°)) (each only above its floor),
+  `Score_LandTrick`(0, switch, normal z < 0.7) into `Boarder_AddMeter`; a new trick landed (+0x58a8 went up):
+  virtual +0x84(2), celebrate 100, the air-time speech for a Tricky boost under 6 tricks, +0x28 = (+0x28 + 1) mod 4;
+  else celebrate when the score beats the level's threshold (0x3625c8: 0.75 … 0.25 by stats+0x74); landing puffs,
+  `Sfx_UpdateAir`; then virtual +0x9c.
+Checked: 20,000 predictions and 20,000 air ticks (all five outcomes) against the original.
+
