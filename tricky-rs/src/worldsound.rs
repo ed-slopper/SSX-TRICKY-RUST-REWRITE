@@ -209,7 +209,7 @@ pub fn world_sound(
         let Some(speed) = p.knock.take() else { continue };
         if let Some(w) = ws.collision.get(&p.inst).cloned() { shots.push((w, knock_level(speed * 100.0) * falloff(p.pos.distance(ear)))); }
     }
-    let fired: Vec<usize> = parts.fired.drain(..).collect();
+    let fired: Vec<usize> = std::mem::take(&mut parts.fired);
     for t in fired {
         let Some(list) = ws.script.get(&t).cloned() else { continue };
         // a trigger can set off a whole row of objects; the game's voices run out after a few

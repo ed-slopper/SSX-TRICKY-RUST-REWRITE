@@ -100,7 +100,6 @@ impl Lines {
     pub fn is_empty(&self) -> bool { self.lines.is_empty() }
     /// Does any line carry a finish event?
     pub fn has_laps(&self) -> bool { LAPS_ON && self.lines.iter().any(|l| l.events.iter().any(|e| e.kind == EV_LAP)) }
-    pub fn has_finish(&self) -> bool { self.lines.iter().any(|l| l.events.iter().any(|e| e.kind == EV_FINISH)) }
     /// `Boarder_SelectRaceLine`: look 8 m ahead along the travel; of the three nearest lines, the one
     /// that both passes close to that point and carries on in that direction.
     fn select(&self, pos: Vec3, vel: Vec3, exclude: Option<usize>) -> Option<usize> {
@@ -131,7 +130,7 @@ impl Lines {
         pr.off = off;
         // change lines: well off this one (checked once a second), near its end, or at a fork
         let fork = l.events.iter().any(|e| e.kind == EV_BRANCH && (l.dtf - e.start - pr.best).abs() < 3.0);
-        let pick = if off > 5.0 && pr.ticks % 60 == 0 { Some(None) } else if along > l.len() - 2.0 { Some(Some(pr.line)) } else if fork { Some(None) } else { None };
+        let pick = if off > 5.0 && pr.ticks.is_multiple_of(60) { Some(None) } else if along > l.len() - 2.0 { Some(Some(pr.line)) } else if fork { Some(None) } else { None };
         if let Some(ex) = pick {
             if let Some(n) = self.select(pos, vel, ex) {
                 if n != pr.line { pr.line = n; pr.inside.clear(); }

@@ -156,7 +156,7 @@ pub fn particles(
                     p0 + w * a + (v0 - w) / k * (0.73 * x - 0.113 * x * x)
                 } else { p0 + v0 * a + v3(d.accel) * 0.5 * a * a };
                 let mut c = [0.0f32; 4];
-                for ch in 0..4 { c[ch] = ((d.c[0][ch] + (d.c[1][ch] - d.c[0][ch]) * a / tmax + r(6) * d.c[2][ch] + r(7) * d.c[3][ch]) * 128.0).clamp(0.0, 255.0) / 128.0; }
+                for (ch, v) in c.iter_mut().enumerate() { *v = ((d.c[0][ch] + (d.c[1][ch] - d.c[0][ch]) * a / tmax + r(6) * d.c[2][ch] + r(7) * d.c[3][ch]) * 128.0).clamp(0.0, 255.0) / 128.0; }
                 let fade = 1.0 - j as f32 / copies as f32;
                 let col = if d.blend == 4 { let k = 1.0 - (c[3] * fade).min(1.0); [k, k, k, 1.0] } else { [c[0].min(2.0), c[1].min(2.0), c[2].min(2.0), (c[3] * fade).min(1.0)] };
                 let ctr = g2b(pos) - origin;

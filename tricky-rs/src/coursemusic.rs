@@ -75,7 +75,7 @@ pub fn course_music(
     let intro_over = was.is_some_and(|w| w.1 && !now.1);
     let go = was.is_some_and(|w| w.2 == RaceState::Countdown && now.2 != RaceState::Countdown);
     let quit = !playing || r.state != RaceState::Countdown;
-    let mut clear = |commands: &mut Commands, which: Option<&CoursePart>| for (e, p) in &parts { if which.is_none_or(|w| w == p) { commands.entity(e).try_despawn(); } };
+    let clear = |commands: &mut Commands, which: Option<&CoursePart>| for (e, p) in &parts { if which.is_none_or(|w| w == p) { commands.entity(e).try_despawn(); } };
     if go || (quit && !parts.is_empty() && was.is_some_and(|w| w.2 == RaceState::Countdown || w.3 != now.3)) { clear(&mut commands, None); }
     if !have || !playing || r.state != RaceState::Countdown { return; }
     let vol = if sounds.music { 0.4 } else { 0.0 };

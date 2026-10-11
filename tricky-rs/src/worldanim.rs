@@ -199,7 +199,7 @@ impl WorldAnim {
         let mut rows = [[Vec3::ZERO; 8]; 2];
         let mut uvs = Vec::new();
         for (r, (a, b)) in [(0, 1), (2, 3)].into_iter().enumerate() {
-            for c in 0..8 { let (p, t) = lerp(a, b, c); rows[r][c] = p; uvs.push([t.x, t.y]); }
+            for (c, cell) in rows[r].iter_mut().enumerate() { let (p, t) = lerp(a, b, c); *cell = p; uvs.push([t.x, t.y]); }
         }
         let idx: Vec<u32> = (0..7u32).flat_map(|c| [c, c + 1, 8 + c, c + 1, 9 + c, 8 + c]).collect();
         let m = inst_m * obj_m;
@@ -423,7 +423,7 @@ impl WorldAnim {
             !(c.life > 0 && { c.life -= 1; c.life == 0 })
         });
         // cCrowdBoxNode update 0x145c88: every 5 frames
-        if self.ticks % 5 == 0 {
+        if self.ticks.is_multiple_of(5) {
             let mut crowds = std::mem::take(&mut self.crowds);
             for c in crowds.values_mut() { self.step_crowd(c); }
             self.crowds = crowds;

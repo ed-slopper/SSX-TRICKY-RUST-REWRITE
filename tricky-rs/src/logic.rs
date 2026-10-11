@@ -91,7 +91,8 @@ pub struct CounterDef { pub count: i32, pub life: f32 }
 pub enum WOp {
     Flip(FlipDef), Scroll(ScrollDef), Flag(FlagDef), Delta(AnimDef), Crack(CrackDef), Crowd(CrowdDef), Counter(CounterDef),
     /// a keyframed clip played on the object (`cAnimObjectNode`, sub-types 256 / 258)
-    Anim(AnimDef),
+    // parsed for the object-animation port, not read yet
+    Anim(#[allow(dead_code)] AnimDef),
     /// Debounce (sub-type 2): the object counts as busy for this long (0: for good)
     Debounce(f32),
     /// a dead node (sub-type 5) that takes the object away
@@ -336,8 +337,8 @@ impl LevelLogic {
                     (WOp::Crowd(d), Some(i)) => { self.crowds.insert(i, d); }
                     (WOp::Flag(d), Some(i)) => { self.flags.insert(i, d); }
                     (WOp::Delta(d), Some(i)) => { self.anim_delta.insert(i, d); }
-                    (WOp::Run(i, h), _) => if seen.insert((Some(i), h)) { if let Some(o) = w.headers.get(h) { stack.push((Some(i), o)); } },
-                    (WOp::Call(fi), _) => if seen.insert((None, usize::MAX - fi)) { if let Some(o) = w.functions.get(fi) { stack.push((None, &o.1)); } },
+                    (WOp::Run(i, h), _) if seen.insert((Some(i), h)) => { if let Some(o) = w.headers.get(h) { stack.push((Some(i), o)); } }
+                    (WOp::Call(fi), _) if seen.insert((None, usize::MAX - fi)) => { if let Some(o) = w.functions.get(fi) { stack.push((None, &o.1)); } }
                     _ => {}
                 }
             }

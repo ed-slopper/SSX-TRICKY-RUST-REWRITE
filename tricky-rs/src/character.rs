@@ -64,7 +64,7 @@ impl CharModel {
                 };
                 let mut ws = [(0u16, 0.0f32); 4];
                 let mut total = 0.0;
-                for (k, pair) in w.chunks_exact(2).take(4).enumerate() {
+                for (k, pair) in w.as_chunks::<2>().0.iter().take(4).enumerate() {
                     ws[k] = ((pair[0].max(0) as usize).min(bones.len().saturating_sub(1)) as u16, pair[1] as f32);
                     total += pair[1] as f32;
                 }

@@ -166,7 +166,7 @@ impl Iterator for PfDecoder {
     type Item = i16;
     fn next(&mut self) -> Option<i16> {
         if self.chan == 0 {
-            if self.frame % 256 == 0 && !self.stopped { self.check(); self.shared.node_pos.store(self.pos as u32, Ordering::Relaxed); }
+            if self.frame.is_multiple_of(256) && !self.stopped { self.check(); self.shared.node_pos.store(self.pos as u32, Ordering::Relaxed); }
             self.frame += 1;
             if !self.stopped && self.pos >= self.len {
                 let n = match self.next { Some(n) => n, None => { let v = self.shared.var.load(Ordering::Relaxed); let b = self.song.branch(&mut self.walk, self.cur, v); self.song.resolve(&mut self.walk, self.cur, b, v) } };

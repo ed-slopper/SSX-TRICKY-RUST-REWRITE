@@ -56,14 +56,15 @@ jobs:
       - name: cargo test (tricky-game, the Bevy-free physics)
         working-directory: tricky-rs/game
         run: cargo test --locked
-      # Warnings are reported, not yet fatal: the code predates CI. Row F5a makes this -D warnings.
+      # Strict (row F5a): any clippy warning fails the build. main.rs allows too_many_arguments and
+      # type_complexity, as Bevy code does; anything else is fixed, or allowed where it stands with a reason.
       # Each finding also becomes an annotation (file, line, message), which can be read without signing in
       # to GitHub; GitHub shows up to 10 errors and 10 warnings per step.
       - name: cargo clippy
         shell: bash
         run: |
           set +e
-          cargo clippy --locked --all-targets --message-format=short 2>&1 | tee clippy.txt
+          cargo clippy --locked --all-targets --message-format=short -- -D warnings 2>&1 | tee clippy.txt
           status=${PIPESTATUS[0]}
           for level in error warning; do
             grep -E "^[^ ]+\.rs:[0-9]+:[0-9]+: $level" clippy.txt | sort -u | head -10 |

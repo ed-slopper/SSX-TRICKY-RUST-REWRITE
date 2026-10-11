@@ -40,7 +40,7 @@ impl Spray {
     }
     /// The original's board effects (`Boarder_UpdateEffects` 0x1350c0, `Fx_SurfaceSpray` 0x1311b0,
     /// `Fx_BrakeFan_Update` 0x12d108, `Fx_LandingSplash` 0x12ccc8), in metres.
-    fn from_rider(&mut self, slot: usize, r: &Rider, dt: f32) {
+    fn add_rider(&mut self, slot: usize, r: &Rider, dt: f32) {
         if self.owed.len() <= slot {
             self.owed.resize(slot + 1, 0.0); self.was_air.resize(slot + 1, 0.0); self.air_rate.resize(slot + 1, 70.0);
             self.fan.resize(slot + 1, 0.0); self.fall.resize(slot + 1, 0.0);
@@ -144,8 +144,8 @@ pub fn spray(
     if game.screen == ui::Screen::Paused { return; }
     let dt = time.dt.min(0.05);
     if *mode == Mode::Ride && game.screen != ui::Screen::Menu {
-        spray.from_rider(0, &rider.0, dt);
-        for (i, o) in opponents.0.iter().enumerate() { spray.from_rider(i + 1, &o.rider, dt); }
+        spray.add_rider(0, &rider.0, dt);
+        for (i, o) in opponents.0.iter().enumerate() { spray.add_rider(i + 1, &o.rider, dt); }
     }
     if std::env::var("TRICKY_SPRAYTEST").is_ok() {
         // a rider carving hard on the spot, to look at the spray
@@ -154,7 +154,7 @@ pub fn spray(
         r.normal = Vec3::Y;
         r.vel = crate::rider::heading(r.yaw) * 4.0;
         r.input.steer = 1.0;
-        spray.from_rider(0, &r, dt * 5.0);
+        spray.add_rider(0, &r, dt * 5.0);
     }
     for f in spray.flakes.iter_mut() {
         if f.life <= 0.0 { continue; }

@@ -122,7 +122,7 @@ pub struct ModelObject {
     #[serde(default)]
     pub animation: Option<ObjAnim>,
 }
-pub use tricky_game::anim::{AnimEntry, AnimSeg, ObjAnim};
+pub use tricky_game::anim::ObjAnim;
 
 #[derive(Deserialize)]
 #[serde(rename_all = "PascalCase")]

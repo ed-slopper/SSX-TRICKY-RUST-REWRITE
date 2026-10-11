@@ -8,6 +8,10 @@
 //! Tab switches to the free camera: click to look, WASD, Space/Ctrl up/down, Shift fast, +/- speed.
 //! R rails overlay, F1 help.
 
+// Bevy systems take their resources and queries as arguments, and queries are spelled as types: long
+// argument lists and complex types are how Bevy code reads (Bevy itself allows these two lints).
+#![allow(clippy::too_many_arguments, clippy::type_complexity)]
+
 mod character;
 use tricky_game::{collide, rails, trickdata};
 mod level;
@@ -287,19 +291,19 @@ fn main() {
         if let Some(h) = loaded.world.ground(at + Vec3::Y * 3.0, 0.0, 30.0) { at.y = h.y; }
         let mut prop = Prop::new(at, Quat::IDENTITY, Vec3::Y * 0.5, 0.5);
         let mut r = Rider::new(loaded.start + Vec3::Y * 0.5, loaded.yaw);
-        let (mut t, dt, mut hit_at, mut top, mut before) = (0.0f32, 1.0 / 120.0, None, at.y, 0.0);
+        let (mut t, dt, mut hit_at, mut top) = (0.0f32, 1.0 / 120.0, None, at.y);
         while t < 12.0 {
             r.step(&loaded.world, &loaded.rails, Input { tuck: true, boost: true, ..Input::default() }, dt);
             r.boost = 1.0;
             let speed = r.vel.length();
-            if prop.hit_by(&mut r) && hit_at.is_none() { hit_at = Some(t); before = speed; println!("hit at {t:.2} s: rider {:.0} -> {:.0} km/h", before * 3.6, r.vel.length() * 3.6); }
+            if prop.hit_by(&mut r) && hit_at.is_none() { hit_at = Some(t); println!("hit at {t:.2} s: rider {:.0} -> {:.0} km/h", speed * 3.6, r.vel.length() * 3.6); }
             prop.step(&loaded.world, dt);
             top = top.max(prop.pos.y);
             t += dt;
             if hit_at.is_some() && !prop.moving { break; }
         }
         // the same run through a pane of glass with two broken pieces and a x3 pickup behind it
-        let mut props = vec![
+        let mut props = [
             Prop::with_box(Kind::Touch { pieces: vec![1, 2], pickup: Pickup::None }, at, Quat::IDENTITY, Vec3::new(-2.0, 0.0, -0.1), Vec3::new(2.0, 3.0, 0.1)),
             Prop::with_box(Kind::Piece, at, Quat::IDENTITY, Vec3::splat(-0.3), Vec3::splat(0.3)),
             Prop::with_box(Kind::Piece, at + Vec3::Y, Quat::IDENTITY, Vec3::splat(-0.3), Vec3::splat(0.3)),
@@ -1271,7 +1275,7 @@ fn screenshot(mut commands: Commands, shot: Option<ResMut<Shot>>, mut exit: Even
     let secs: Option<f32> = std::env::var("TRICKY_SHOTAT").ok().and_then(|v| v.parse().ok());
     if let Some(t) = secs { if !*armed { if race.0.time >= t { *armed = true; shot.frame = 30; } else { shot.frame = 0; } } }
     let at = std::env::var("TRICKY_SHOTFRAME").ok().and_then(|v| v.parse().ok()).unwrap_or(30);
-    if shot.frame == at { commands.spawn(Screenshot::primary_window()).observe(save_to_disk(Path::new(&shot.path).to_path_buf())); }
+    if shot.frame == at { commands.spawn(Screenshot::primary_window()).observe(save_to_disk(std::path::PathBuf::from(&shot.path))); }
     if shot.frame == at + 15 { exit.write(AppExit::Success); }
 }
 
@@ -1301,7 +1305,7 @@ fn make_mover(level: &Level, index: usize, parts: &[(Option<usize>, PathBuf)], s
     let mut local: Vec<(usize, Vec<[Vec3; 3]>)> = Vec::new();
     for (k, key) in parts {
         let mesh = cache.entry(key.to_string_lossy().to_string()).or_insert_with(|| load_obj(key));
-        local.push((k.unwrap_or(0), mesh.positions.chunks_exact(3).map(|t| [Vec3::from(t[0]), Vec3::from(t[1]), Vec3::from(t[2])]).collect()));
+        local.push((k.unwrap_or(0), mesh.positions.as_chunks::<3>().0.iter().map(|t| [Vec3::from(t[0]), Vec3::from(t[1]), Vec3::from(t[2])]).collect()));
     }
     let objs = model.model_objects.iter().map(|o| collide::MoverObj {
         parent: o.parent_id,
@@ -1386,7 +1390,7 @@ fn build_collision(level: &Level) -> CollisionWorld {
             for (k, key) in parts {
                 let m = at(k);
                 let mesh = cache.entry(key.to_string_lossy().to_string()).or_insert_with(|| load_obj(&key));
-                for t in mesh.positions.chunks_exact(3) {
+                for t in mesh.positions.as_chunks::<3>().0 {
                     let v = |i: usize| g2b(m.transform_point3(Vec3::from(t[i])));
                     world.add_reset([v(0), v(1), v(2)]);
                 }
@@ -1410,7 +1414,7 @@ fn build_collision(level: &Level) -> CollisionWorld {
             let m = at(k);
             let key = path.to_string_lossy().to_string();
             let mesh = cache.entry(key).or_insert_with(|| load_obj(&path));
-            for t in mesh.positions.chunks_exact(3) {
+            for t in mesh.positions.as_chunks::<3>().0 {
                 let v = |i: usize| g2b(m.transform_point3(Vec3::from(t[i])));
                 for k in 0..3 { bounds.0 = bounds.0.min(v(k)); bounds.1 = bounds.1.max(v(k)); }
                 world.add_obj([v(0), v(1), v(2)], surf, kind);
@@ -1721,7 +1725,7 @@ fn ride(
     // the rider last was on the snow and riding
     {
         let paths = &race.0.paths;
-        let mut keep = |rr: &mut Rider| {
+        let keep = |rr: &mut Rider| {
             if paths.is_empty() || !rr.grounded || rr.crashed > 0.0 || rr.rail.is_some() { return; }
             if let Some((p, yaw)) = paths.respawn_point(rr.pos) {
                 let ground = world.0.ground(p + Vec3::Y * 3.0, 3.0, 20.0).map_or(p.y, |h| h.y);
@@ -1777,7 +1781,7 @@ fn ride(
             let mine = len - race.0.prog.dtf;
             let mut others: Vec<f32> = opponents.0.iter().map(|o| len - o.prog.dtf).collect();
             others.sort_by(|a, b| b.total_cmp(a));
-            let other = if others[0] > mine { others[0] } else { others[0] };
+            let other = others[0];
             let rate = race.0.time / mine.max(1.0);
             let gap = rate * (other - mine);
             let ahead = gap <= 0.0;
@@ -1859,7 +1863,7 @@ fn ride(
                 if crossed {
                     o.driver.finished = Some(race.0.time);
                     let n = opponents_len + 1;
-                    o.rider.start_finish(place < (n + 1) / 2);
+                    o.rider.start_finish(place < n.div_ceil(2));
                 }
             }
         }
@@ -1930,7 +1934,7 @@ fn ride(
     if race.0.state == RaceState::Finished && rider.0.fin.is_none() {
         let n = opponents.0.len() + 1;
         let place = opponents.0.iter().filter(|o| o.driver.finished.is_some_and(|t| t < race.0.time)).count();
-        let win = if game.event == ui::Event::ShowOff { true } else { place < (n + 1) / 2 };
+        let win = if game.event == ui::Event::ShowOff { true } else { place < n.div_ceil(2) };
         rider.0.start_finish(win);
     }
     // TRICKY_POST=win|lose|rival: jump straight to the end of the race (to look at the post-race scenes)
@@ -2148,7 +2152,7 @@ fn animate_visuals(
         // the game's own animation if we have it, the code-built pose otherwise
         // each board type has its own set of riding clips (bx / fr / ex), wipe-outs share one (cm)
         let kind_set = match r.stats.kind { 1 => lib.fr.as_ref().map(|s| (s, "fr")), 2 => lib.ex.as_ref().map(|s| (s, "ex")), _ => None };
-        let mut sample = lib.anims.as_ref().and_then(|set| animate(set, kind_set, lib.cm.as_ref(), entry.ubers[(r.stats.kind as usize).min(2)].as_ref().or(entry.ubers[0].as_ref()), gate, finished, r, &mut *vis, on_snow, dt));
+        let mut sample = lib.anims.as_ref().and_then(|set| animate(set, kind_set, lib.cm.as_ref(), entry.ubers[(r.stats.kind as usize).min(2)].as_ref().or(entry.ubers[0].as_ref()), gate, finished, r, &mut vis, on_snow, dt));
         // in a pre-race scene each rider loops the scene's clip for them
         let k = match vis.who { Who::Player => 0, Who::Ai(i) => i + 1 };
         if let (Some(sc), Some(set)) = (race.0.scene.as_ref().filter(|s| !s.ended), lib.scenes.as_ref()) {
@@ -2190,12 +2194,20 @@ fn animate(set: &AnimSet, kind_set: Option<(&AnimSet, &str)>, cm: Option<&AnimSe
     let crouch = vis.pose.crouch;
     let lean = vis.pose.lean;
     let a = &mut vis.anim;
+    // only while actually turning: the stick is held, or a flip is still coming round to level
+    let turning = |a: &mut AnimState| {
+        let tau = std::f32::consts::TAU;
+        let tilt = r.flip.rem_euclid(tau).min(tau - r.flip.rem_euclid(tau));
+        let turning = r.input.steer.abs() > 0.1 || r.input.flip != 0.0 || tilt > 0.35;
+        if !turning { a.rot = 0.0; }
+        turning
+    };
     a.cycle += dt * fps;
     if on_snow && !a.was_on_snow && a.air > 0.35 { a.land = 0.0; }
     a.air = if on_snow { 0.0 } else { a.air + dt };
     a.was_on_snow = on_snow;
     a.land += dt * fps;
-    if r.grab != 0 { if a.grab != r.grab { a.grab = r.grab; a.grab_frame = 0.0; } }
+    if r.grab != 0 && a.grab != r.grab { a.grab = r.grab; a.grab_frame = 0.0; }
     // a "bx" name is looked up in the board type's own set first (frRL_..., exRL_...)
     let clip = |n: &str| -> Option<&character::Clip> {
         if let (Some((ks, pre)), Some(rest)) = (kind_set, n.strip_prefix("bx")) {
@@ -2248,14 +2260,7 @@ fn animate(set: &AnimSet, kind_set: Option<(&AnimSet, &str)>, cm: Option<&AnimSe
             let tw = grab.strip_prefix("bxT_").and_then(|n| clip(&format!("bxTW_{n}")));
             a.tweak = if r.grab != 0 && r.input.tweak && a.grab_frame >= peak - 0.5 { a.tweak + dt * fps } else { (a.tweak - dt * fps * 2.0).max(0.0) };
             match tw { Some(t) if a.tweak > 0.0 => held.blend(&t.at(a.tweak.min(t.len() * 0.5), false), (a.tweak / 4.0).min(1.0)), _ => held }
-        } else if {
-            // only while actually turning: the stick is held, or a flip is still coming round to level
-            let tau = std::f32::consts::TAU;
-            let tilt = r.flip.rem_euclid(tau).min(tau - r.flip.rem_euclid(tau));
-            let turning = r.input.steer.abs() > 0.1 || r.input.flip != 0.0 || tilt > 0.35;
-            if !turning { a.rot = 0.0; }
-            turning
-        } {
+        } else if turning(a) {
             // tuck into the rotation, then hold its cycle
             a.rot += dt * fps;
             let tau = std::f32::consts::TAU;
@@ -2342,7 +2347,8 @@ fn chase_camera(
     let opponents_n = opponents.0.len();
     // the pre-race intro (the course's camera scripts): a fly-through, then the start gate
     let post = race.0.post;
-    if game.screen != ui::Screen::Playing || (race.0.state != RaceState::Countdown && post != 1 && post != 2) { *started = false; if director.is_some() { *director = None; race.0.intro = false; } if let Some(sc) = race.0.scene.as_mut() { sc.ended = true; } }
+    if game.screen != ui::Screen::Playing || (race.0.state != RaceState::Countdown && post != 1 && post != 2) { *started = false; if director.is_some() { *director = None; race.0.intro = false; }
+        if let Some(sc) = race.0.scene.as_mut() { sc.ended = true; } }
     else if post == 1 {
         // after the race: the rival's scene and the win or lose scene, at the finish area
         if let Some(cml) = race.0.cml.clone() {

@@ -229,8 +229,8 @@ impl AiDriver {
         self.clock += dt;
         if self.finished.is_some() { return Input { brake: true, ..Input::default() }; }
         let mut best = (self.idx, f32::MAX);
-        for i in self.idx..(self.idx + 12).min(line.len()) {
-            let d = (line[i] - r.pos).length_squared();
+        for (i, p) in line.iter().enumerate().take(self.idx + 12).skip(self.idx) {
+            let d = (*p - r.pos).length_squared();
             if d < best.1 { best = (i, d); }
         }
         self.idx = best.0;
@@ -326,7 +326,7 @@ impl AiDriver {
             if !hold && grab != 0 && left <= thr { self.plan.2 = 0; }
             if !self.planned || (spin_dir == 0.0 && flip_dir == 0.0 && !hold) {
                 // nothing to do: steer for the line
-                return Input { steer: if left < 0.5 { 0.0 } else { 0.0 }, ..Input::default() };
+                return Input::default();
             }
             return Input { steer: spin_dir, flip: flip_dir, grab: if hold { grab } else { 0 }, ..Input::default() };
         }
@@ -381,7 +381,10 @@ impl Race {
     pub fn update(&mut self, r: &Rider, dt: f32) {
         if self.line.len() < 4 { return; }
         match self.state {
-            RaceState::Countdown => { if !self.intro { self.countdown -= dt; } if self.countdown <= 0.0 { self.state = RaceState::Running; } }
+            RaceState::Countdown => {
+                if !self.intro { self.countdown -= dt; }
+                if self.countdown <= 0.0 { self.state = RaceState::Running; }
+            }
             RaceState::Running => {
                 self.time += dt;
                 // follow our place along the line; look a little ahead only, so a shortcut that
@@ -596,10 +599,9 @@ pub fn self_test(world: &mut CollisionWorld, rails: &Rails, line: &[Vec3], cours
         for hold in [0.1f32, 0.4, 0.8] {
             let mut r = Rider::new(start + Vec3::Y * 0.3, start_yaw);
             let (mut t, dt) = (0.0f32, 1.0 / 120.0);
-            let (mut top, mut base, mut left_at, mut air) = (0.0f32, 0.0, None, 0.0f32);
+            let (mut top, mut left_at, mut air) = (0.0f32, None, 0.0f32);
             while t < 6.0 {
                 let jump = t > 2.0 && t < 2.0 + hold;
-                if t > 1.99 && t < 2.0 { base = r.pos.y; }
                 r.step(world, rails, Input { jump, ..Input::default() }, dt);
                 if t > 2.0 && !r.grounded { if let Some(g) = world.ground(r.pos, 0.0, 50.0) { top = top.max(r.pos.y - g.y); } }
                 if t > 2.0 && !r.grounded { air = air.max(r.air_time); if left_at.is_none() { left_at = Some(t - 2.0 - hold); } }

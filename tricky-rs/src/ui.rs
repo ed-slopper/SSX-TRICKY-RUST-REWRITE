@@ -174,8 +174,8 @@ pub fn setup_ui(mut commands: Commands) {
         p.spawn((text(120.0, HudItem::Big), abs(Node { top: Val::Percent(28.0), width: Val::Percent(100.0), justify_content: JustifyContent::Center, ..default() }), TextLayout::new_with_justify(JustifyText::Center)));
         p.spawn((text(13.0, HudItem::Fps), abs(Node { bottom: Val::Px(4.0), left: Val::Px(10.0), ..default() })));
         // the boost meter: a column of fourteen segments on the right, as the original's
-        for i in 0..14 {
-            p.spawn((abs(Node { left: Val::Percent(570.0 / 6.4), top: Val::Percent((140.0 + SEG_Y[i]) / 4.8), width: Val::Px(26.0), height: Val::Px(12.0), border: UiRect::all(Val::Px(1.0)), ..default() }),
+        for (i, y) in SEG_Y.iter().enumerate() {
+            p.spawn((abs(Node { left: Val::Percent(570.0 / 6.4), top: Val::Percent((140.0 + y) / 4.8), width: Val::Px(26.0), height: Val::Px(12.0), border: UiRect::all(Val::Px(1.0)), ..default() }),
                      BackgroundColor(Color::srgba(0.0, 0.0, 0.0, 0.4)), BorderColor(Color::srgba(1.0, 1.0, 1.0, 0.5)), BorderRadius::all(Val::Px(3.0)), BoostSeg(i)));
         }
     });
@@ -190,7 +190,7 @@ pub fn setup_ui(mut commands: Commands) {
 /// The trick book: each trick the player lands is checked against the rider's current chapter.
 pub fn trick_book(mut rider: ResMut<RiderRes>, lib: Res<CharLib>, mut book: ResMut<crate::book::Book>) {
     if rider.0.landed.is_empty() { return; }
-    let landed: Vec<String> = rider.0.landed.drain(..).collect();
+    let landed: Vec<String> = std::mem::take(&mut rider.0.landed);
     let me = lib.chars.get(lib.player).map(|c| c.name.clone()).unwrap_or_default();
     for t in landed {
         if let Some((name, chapter)) = book.check(&me, &t) {
@@ -321,7 +321,7 @@ pub fn hud(
             HudItem::Time => match game.event {
                 Event::Race => format!("{}\n", clock(race.0.time)),
                 // show-off runs against the clock
-                Event::ShowOff => format!("{}", clock((showoff(&track_key(&list)).1 + race.0.bonus - race.0.time).max(0.0))),
+                Event::ShowOff => clock((showoff(&track_key(&list)).1 + race.0.bonus - race.0.time).max(0.0)).to_string(),
                 Event::FreeRide => format!("{}{}", clock(race.0.time), race.0.best.map(|b| format!("   best {}", clock(b))).unwrap_or_default()),
             },
             HudItem::Score => {
