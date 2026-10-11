@@ -3186,3 +3186,12 @@ L 3663b0 cWipeOutControl vtable
 L 366300 cWipeOutRecoverControl vtable
 L 366bf0 cLessonWaitControl vtable
 L 366d50 cResetWaitControl vtable
+G 178330 Camera_GetCourseCmlName
+G 178310 Camera_GetCommonCmlName
+G 178320 Camera_GetScriptsCmlName
+G 1783e8 Camera_LoadCmlFiles
+G 16e4c0 Cml_LoadIfExists
+G 11a840 Boarder_PlaceAtStart
+G 11e9d8 Boarder_GetGateStartTimer
+G 11d998 Boarder_IsFinishLineDone
+G 1065c8 FinishLineControl_IsDone

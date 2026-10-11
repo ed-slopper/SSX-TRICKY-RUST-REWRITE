@@ -64,7 +64,7 @@ address,size,name,system,status
 0x106480,124,FUN_00106480,boarder?,not started
 0x106500,60,LessonWaitControl_Enter,boarder?,not started
 0x106548,124,FUN_00106548,boarder?,not started
-0x1065c8,36,FUN_001065c8,boarder?,not started
+0x1065c8,36,FinishLineControl_IsDone,boarder?,not started
 0x1065f0,16,FUN_001065f0,boarder?,not started
 0x106600,100,FinishLineControl_Enter,boarder?,not started
 0x106668,916,FinishState_Update,boarder,ported
@@ -269,7 +269,7 @@ address,size,name,system,status
 0x11a7a8,8,FUN_0011a7a8,boarder?,not started
 0x11a7b0,32,FUN_0011a7b0,boarder?,not started
 0x11a7d0,108,FUN_0011a7d0,boarder?,not started
-0x11a840,1892,FUN_0011a840,boarder?,not started
+0x11a840,1892,Boarder_PlaceAtStart,boarder,not started
 0x11afa8,60,FUN_0011afa8,boarder?,not started
 0x11afe8,48,FUN_0011afe8,boarder?,not started
 0x11b018,476,Boarder_AddMeter,boarder,not started
@@ -293,7 +293,7 @@ address,size,name,system,status
 0x11d4e8,708,FUN_0011d4e8,boarder?,not started
 0x11d7b0,124,FUN_0011d7b0,boarder?,not started
 0x11d830,360,Boarder_Wipeout,boarder,ported
-0x11d998,68,FUN_0011d998,boarder?,not started
+0x11d998,68,Boarder_IsFinishLineDone,boarder,not started
 0x11d9e0,92,FUN_0011d9e0,boarder?,not started
 0x11da40,192,Boarder_Finish,boarder,not started
 0x11db00,2824,FUN_0011db00,boarder?,not started
@@ -306,7 +306,7 @@ address,size,name,system,status
 0x11e958,44,FUN_0011e958,boarder?,not started
 0x11e988,20,Boarder_ScoreCrash,boarder,not started
 0x11e9a0,52,Boarder_ScoreKnockdown,boarder,not started
-0x11e9d8,40,FUN_0011e9d8,boarder?,not started
+0x11e9d8,40,Boarder_GetGateStartTimer,boarder,not started
 0x11ea00,28,FUN_0011ea00,boarder?,not started
 0x11ea20,8,FUN_0011ea20,frontend?,not started
 0x11ea28,68,FUN_0011ea28,frontend?,not started
@@ -1453,7 +1453,7 @@ address,size,name,system,status
 0x16e318,236,FUN_0016e318,camera?,not started
 0x16e408,96,FUN_0016e408,camera?,not started
 0x16e468,88,FUN_0016e468,camera?,not started
-0x16e4c0,84,FUN_0016e4c0,camera?,not started
+0x16e4c0,84,Cml_LoadIfExists,camera?,not started
 0x16e518,112,FUN_0016e518,camera?,not started
 0x16e588,168,FUN_0016e588,camera?,not started
 0x16e630,124,FUN_0016e630,camera?,not started
@@ -1554,10 +1554,10 @@ address,size,name,system,status
 0x178240,100,cCamControl::vf0_178240,boarder,not started
 0x1782a8,40,FUN_001782a8,boarder?,not started
 0x1782d0,60,FUN_001782d0,boarder?,not started
-0x178310,12,FUN_00178310,boarder?,not started
-0x178320,12,FUN_00178320,boarder?,not started
-0x178330,184,FUN_00178330,boarder?,not started
-0x1783e8,228,FUN_001783e8,boarder?,not started
+0x178310,12,Camera_GetCommonCmlName,camera,not started
+0x178320,12,Camera_GetScriptsCmlName,camera,not started
+0x178330,184,Camera_GetCourseCmlName,camera,not started
+0x1783e8,228,Camera_LoadCmlFiles,camera,not started
 0x1784d0,240,cCamControl::vf1_1784d0,boarder,not started
 0x1785c0,188,FUN_001785c0,camera?,not started
 0x1786c0,12,FUN_001786c0,camera?,not started
