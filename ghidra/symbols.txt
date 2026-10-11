@@ -3638,3 +3638,138 @@ G 254b50 Course_GetSpline
 G 254a80 Course_GetLight
 G 254af0 Course_GetMaterial
 G 255310 Course_DebugPrint
+F 114f30 cAIStateHandler __tf
+F 115048 cReplayEndRaceHandler __tf
+F 1150b0 cSelectLessonHandler __tf
+F 13b880 cReplayRecordHeader __tf
+F 13d680 cReplayRecordHeader __tf
+F 149a10 cTexFlip __tf
+F 14aa60 cReplayRecordHeader __tf
+F 14f510 cAIStateHandler __tf
+F 15ad68 cReplayRecordHeader __tf
+F 16dc68 CamAnimation __tf
+F 16dce8 cOfflineObject __tf
+F 16df00 cOfflineObject __tf
+F 16e7f0 cOfflineObject __tf
+F 171388 CamPath __tf
+F 171410 cOfflineObject __tf
+F 171f60 CamRegion __tf
+F 171fe0 cOfflineObject __tf
+F 1721e8 CamScene __tf
+F 172268 cOfflineObject __tf
+F 178038 cOfflineObject __tf
+F 17c4b0 cAppMan __tf
+F 17e0b8 cReplayRecordHeader __tf
+F 181e70 cLoadModule __tf
+F 181ed8 cGameModule __tf
+F 182070 cReplayRecordHeader __tf
+F 1844c8 cGameModule __tf
+F 186118 cCourseResolve __tf
+F 186b28 cGameModule __tf
+F 19b090 cReplayRecordHeader __tf
+F 1c7210 tPS2DrawState __tf
+F 1cbb88 cReplayRecordHeader __tf
+F 2024a0 cBdrLoad __tf
+F 23b548 SphereTreeBufCache __tf
+F 269338 cFE3DWGroup __tf
+F 2693f0 cListFE3DUpdateOp __tf
+F 269478 cListFE3DRenderTextOp __tf
+F 269508 cListFE3DRenderOp __tf
+F 269588 cListOperator __tf
+F 269708 cListFE3DGetExtentOp __tf
+F 269798 cListFE3DOnInputOp __tf
+F 269818 cListFE3DFormatOp __tf
+F 269898 cListFE3DUpdateActivityOp __tf
+F 269918 cListFE3DResetActivityOp __tf
+F 269998 cListFE3DSkipActivityOp __tf
+F 269a20 cListFE3DOffsetOp __tf
+F 26faa0 cListFE3DFormatOp __tf
+F 26fbb0 cListFE3DResetActivityOp __tf
+F 26fc40 cListFE3DUpdateOp __tf
+F 26fcc8 cListFE3DRenderTextOp __tf
+F 26fd48 cListOperator __tf
+F 26fe00 cListFE3DOffsetOp __tf
+F 270038 cListFE3DUpdateOp __tf
+F 2700c0 cListFE3DRenderTextOp __tf
+F 270150 cListFE3DRenderOp __tf
+F 270260 cListOperator __tf
+F 276338 cFE3DWGroup __tf
+F 2766b8 cListFE3DGetExtentOp __tf
+F 276748 cListFE3DOnInputOp __tf
+F 2767c8 cListFE3DFormatOp __tf
+F 276848 cListFE3DUpdateActivityOp __tf
+F 2768c8 cListFE3DResetActivityOp __tf
+F 276948 cListFE3DSkipActivityOp __tf
+F 2769d0 cListFE3DOffsetOp __tf
+F 276a50 cListFE3DUpdateOp __tf
+F 276ad0 cListFE3DRenderTextOp __tf
+F 276b58 cListFE3DRenderOp __tf
+F 276ba8 cListOperator __tf
+F 28eb40 cFE3DWGroup __tf
+F 28ed30 cListFE3DGetExtentOp __tf
+F 28edc0 cListFE3DOnInputOp __tf
+F 28ee40 cListFE3DFormatOp __tf
+F 28eec0 cListFE3DUpdateActivityOp __tf
+F 28ef40 cListFE3DResetActivityOp __tf
+F 28efc0 cListFE3DSkipActivityOp __tf
+F 28f048 cListFE3DOffsetOp __tf
+F 28f0c8 cListFE3DUpdateOp __tf
+F 28f148 cListFE3DRenderTextOp __tf
+F 28f1d0 cListFE3DRenderOp __tf
+F 28f220 cListOperator __tf
+F 29e200 cFE3DWGroup __tf
+F 29e3f0 cListFE3DGetExtentOp __tf
+F 29e480 cListFE3DOnInputOp __tf
+F 29e500 cListFE3DFormatOp __tf
+F 29e580 cListFE3DUpdateActivityOp __tf
+F 29e600 cListFE3DResetActivityOp __tf
+F 29e680 cListFE3DSkipActivityOp __tf
+F 29e708 cListFE3DOffsetOp __tf
+F 29e788 cListFE3DUpdateOp __tf
+F 29e808 cListFE3DRenderTextOp __tf
+F 29e890 cListFE3DRenderOp __tf
+F 29e8e0 cListOperator __tf
+F 2ab540 cListFE3DResetActivityOp __tf
+F 2ab5c0 cListFE3DSkipActivityOp __tf
+F 2ab648 cListFE3DOffsetOp __tf
+F 2ab6c8 cListFE3DUpdateOp __tf
+F 2ab748 cListFE3DRenderTextOp __tf
+F 2ab7d0 cListFE3DRenderOp __tf
+F 2ab820 cListOperator __tf
+F 2ad048 cListOperator __tf
+F 2ad200 cListFE3DOffsetOp __tf
+G 1125c8 Race_CreateHandlers
+G 154580 TrickDef_Load
+G 158ea0 AnimData_OpenBig
+G 158908 AnimFileList_Load
+G 1589b8 AnimFileList_Load2
+G 163358 Career_DefaultPlayerName
+G 179a88 Pad_LoadButtonMap
+G 179b18 Pad_ParseButtonMap
+G 17a420 Input_Init
+G 17b748 App_LoadFonts
+G 17bdf8 App_OpenBigFiles
+G 17c0a8 Loc_Load
+G 17c150 Loc_LoadForRegion
+G 182858 Iop_RebootAndLoadModules
+G 186268 Course_OpenModelsBig
+G 1983d0 AIP_LoadEventPaths
+G 198518 AIP_LoadAIPaths
+G 1a6ba0 HUD_FormatTime
+G 1a6c90 HUD_FormatTimeSigned
+G 243b88 FE_FormatRaceTime
+G 1d2f60 Save_GetGameCode
+G 23d6e0 MemCard_Create
+G 244290 LoadScreen_LoadPics
+G 2459b0 LoadScreen_GetModePicName
+G 245a48 LoadScreen_GetTrackPicName
+G 245b68 LoadScreen_GetRiderPicName
+G 255e48 CourseDma_ResolveModels
+G 255eb8 CourseDma_ResolveModel
+G 255f08 CourseDma_ResolveModelHierarchies
+G 255ff0 CourseDma_ResolveMesh
+G 256080 CourseDma_ResolveMeshContext
+G 21cf38 Jukebox_Open
+G 214878 Audio_LoadLoadingScreenBank
+G 20da50 Audio_CreateSystem
+G 226370 Audio_CreateSoundManager
