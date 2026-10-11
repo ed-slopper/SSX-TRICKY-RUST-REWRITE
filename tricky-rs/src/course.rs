@@ -100,7 +100,7 @@ impl Lines {
     pub fn is_empty(&self) -> bool { self.lines.is_empty() }
     /// Does any line carry a finish event?
     pub fn has_laps(&self) -> bool { LAPS_ON && self.lines.iter().any(|l| l.events.iter().any(|e| e.kind == EV_LAP)) }
-    /// `Boarder_SelectRaceLine`: look 8 m ahead along the travel; of the three nearest lines, the one
+    /// `Boarder_SelectRaceLine` 0x118610: look 8 m ahead along the travel; of the three nearest lines, the one
     /// that both passes close to that point and carries on in that direction.
     fn select(&self, pos: Vec3, vel: Vec3, exclude: Option<usize>) -> Option<usize> {
         let p = pos + vel.normalize_or_zero() * 8.0;
@@ -114,7 +114,7 @@ impl Lines {
             (i, cost)
         }).min_by(|a, b| a.1.total_cmp(&b.1)).map(|c| c.0)
     }
-    /// Advance a rider's progress (one call per frame). Returns the events entered this time.
+    /// Advance a rider's progress (`Boarder_UpdateRaceLineProgress` 0x118298; one call per frame). Returns the events entered this time.
     pub fn update(&self, pr: &mut Progress, pos: Vec3, vel: Vec3) -> Vec<Event> {
         let mut out = Vec::new();
         if self.lines.is_empty() { return out; }

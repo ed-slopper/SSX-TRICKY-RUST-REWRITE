@@ -8,7 +8,7 @@ pub fn index(name: &str) -> usize { NAMES.iter().position(|n| n.eq_ignore_ascii_
 
 /// (friend, foe) of each rider, as the row feels it.
 const FRIEND_FOE: [(usize, usize); 12] = [(7, 4), (10, 8), (6, 3), (1, 4), (5, 6), (4, 6), (2, 10), (0, 11), (5, 1), (11, 2), (0, 2), (9, 7)];
-/// 0 neutral, 1 friend, 2 foe
+/// 0 neutral, 1 friend, 2 foe (`RelTable_Init` 0x167208's table)
 pub fn relation(me: usize, other: usize) -> u8 {
     let (f, e) = FRIEND_FOE[me.min(11)];
     if other == f { 1 } else if other == e { 2 } else { 0 }

@@ -56,6 +56,7 @@ fn vw(x: f32) -> Val { Val::Vw(x / 640.0 * 100.0) }
 fn vh(y: f32) -> Val { Val::Vh(y / 480.0 * 100.0) }
 
 impl Font {
+    /// A font's glyphs (what `Font_ParseSfn` 0x19c858 reads, from our export).
     fn load(dir: &std::path::Path, name: &str, images: &mut Assets<Image>) -> Option<Font> {
         let img = image::open(dir.join(format!("{name}.png"))).ok()?.to_rgba8();
         let (w, h) = img.dimensions();
@@ -99,7 +100,8 @@ impl Font {
     }
 }
 
-/// Lay out every changed text as glyph nodes.
+/// Lay out every changed text as glyph nodes (`HUD_DrawPlayerText` 0x1a4f70 with `Font_DrawStringA` 0x19d0c0 and
+/// `Font_PrintfShadowedA` 0x19d568).
 #[allow(clippy::too_many_arguments)]
 pub fn sfn_text(
     mut commands: Commands, lib: Res<CharLib>, mut fonts: ResMut<SfnFonts>, mut images: ResMut<Assets<Image>>,

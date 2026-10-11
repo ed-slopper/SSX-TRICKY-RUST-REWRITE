@@ -443,7 +443,7 @@ impl Rider {
         // any gain at a full meter (re)opens the twenty-second uber window
         if delta > 0.0 && self.boost >= 1.0 { self.uber_timer = UBER_SECONDS; }
     }
-    /// `Boarder_Wipeout`: down into the tumble; costs a tenth of the meter (`Score_Crash`), and a
+    /// `Boarder_Wipeout` 0x11d830: down into the tumble; costs a tenth of the meter (`Score_Crash` 0x156de0), and a
     /// running uber window closes with the meter cut to two thirds.
     pub fn wipe_out(&mut self) { self.go_down(true); }
     /// A wipe-out on demand (TRICKY_CRASHAT checks): as if the landing went wrong.
@@ -616,7 +616,7 @@ impl Rider {
         self.rail_side = 0.0;
     }
 
-    /// The board meets the snow. The original only scales the speed for a crooked or tilted
+    /// The board meets the snow (`Landing_ChooseState` 0x109308). The original only scales the speed for a crooked or tilted
     /// landing (edge grip then turns the board); a board coming down tail-first is turned round
     /// and the rider is switch.
     pub fn touch_down(&mut self) {
@@ -640,7 +640,7 @@ impl Rider {
         self.vel *= 1.0643 - 0.2454 * off.clamp(15f32.to_radians(), 50f32.to_radians());
     }
     /// Shoved over by another rider.
-    /// The original's rider hit (`Boarder_RiderHit`): `dv` is the velocity change from the hit.
+    /// The original's rider hit (`Boarder_RiderHit` 0x124920): `dv` is the velocity change from the hit.
     /// Over 7.34 m/s puts you down (a rail rider always comes off), over 1.67 m/s is a stumble.
     /// Returns true if it put the rider down.
     pub fn take_hit(&mut self, dv: Vec3, lose_meter: bool) -> bool {
@@ -715,7 +715,7 @@ impl Rider {
         self.grounded = false;
         self.air_time = 0.0;
     }
-    /// Crouching for a jump (`PrewindState_Update`): the crouch and the wind-up follow their targets
+    /// Crouching for a jump (`PrewindState_Update` 0x1050e8): the crouch and the wind-up follow their targets
     /// at the original's rates.
     pub fn prewind(&mut self, input: &Input, dt: f32) {
         // twice as quick on a rail (0x40800846 = 4.001 there)
@@ -751,6 +751,9 @@ impl Rider {
     /// Boost thrust level from the meter (1, 0.6, 0.25) when boosting, else 0.
     pub fn boost_level(&self) -> f32 { if self.boost > 0.666 || self.tricky() { 1.0 } else if self.boost > 0.3336 { 0.6013 } else { 0.25 } }
 
+    /// One tick: on the snow `GroundMotion_Update` 0x10a0d8 with its forces (`Boarder_GroundSpringForce` 0x109878,
+    /// `Boarder_GroundThrust` 0x109950, `Boarder_ForwardDrag` 0x109cb8, `Boarder_SideFriction` 0x109ef8), in the
+    /// air `Air_IntegrateRK4` 0x12b340, on a rail `RailSlideMotion_Update` 0x10b0d0.
     pub fn step(&mut self, world: &CollisionWorld, rails: &Rails, input: Input, dt: f32) {
         let mut input = input;
         // the meter leaks slowly (human riders); the uber window runs down everywhere, but never
@@ -1101,7 +1104,7 @@ impl Rider {
         }
     }
 
-    /// Spin and flip in the air, as `SpinState_Update` does it. Holding the stick drives the
+    /// Spin and flip in the air, as `SpinState_Update` 0x100908 does it. Holding the stick drives the
     /// rotation inside a band that narrows through the jump; letting go finishes it: forwards to
     /// the next half turn (spin) or full turn (flip), back only when within 40 degrees.
     pub fn air_rotation(&mut self, input: &Input, dt: f32) {
@@ -1225,7 +1228,7 @@ impl Rider {
         }
     }
 
-    /// Riding a rail (`RailSlideMotion_Update` / `RailSlideControl_Update`). The stick balances:
+    /// Riding a rail (`RailSlideMotion_Update` 0x10b0d0 / `RailSlideControl_Update` 0x1073e0). The stick balances:
     /// for the first 0.6 s the board pulls itself to the middle of the rail, after that it drifts
     /// off one side unless you lean against it, and too far off you fall off (not a crash). Boost
     /// held with left / right turns the board a quarter turn (regular, sideways, fakie). There is
@@ -1416,7 +1419,7 @@ fn special_trick(bs: bool, h: u32, f: i32) -> Option<&'static str> {
         _ => return None,
     })
 }
-/// The trick's name as the original writes it (`Score_FormatTrickName`): prefix, side, spin,
+/// The trick's name as the original writes it (`Score_FormatTrickName` 0x1551c0): prefix, side, spin,
 /// flips (Rodeo / Misty when every flip carries 540 of spin), special name, the spin after the
 /// flips, grabs ("To Late" a second one, "Combo Grab" for three), and "Air" / "To Fakie" / "To Rail".
 /// `spin` is the game's sign (positive = backside); returns "" for nothing done.

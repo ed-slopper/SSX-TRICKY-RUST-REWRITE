@@ -386,8 +386,8 @@ impl CollisionWorld {
         let cells = (cell(lo.x)..=cell(hi.x)).flat_map(move |cx| (cell(lo.z)..=cell(hi.z)).map(move |cz| (cx, cz)));
         cells.filter_map(|k| self.grid.get(&k)).flat_map(|ids| ids.iter().map(|&id| &self.tris[id as usize])).chain(self.movers_in(lo, hi))
     }
-    /// The instance of a bounce object the sphere touches (Sfx_InstanceCollision's target, from
-    /// `World_QueryInstances`), if any.
+    /// The instance of a bounce object the sphere touches (`Sfx_InstanceCollision` 0x216c50's target, from
+    /// `World_QueryInstances` 0x25b878), if any.
     pub fn wall_instance(&self, center: Vec3, radius: f32) -> Option<u32> {
         let r = Vec3::splat(radius);
         for t in self.near(center - r, center + r) {

@@ -83,6 +83,7 @@ impl Trail {
     }
 }
 
+/// The board's track in the snow (`Fx_BoardTrack` 0x132648).
 pub fn tracks(
     rider: Res<RiderRes>, opponents: Res<Opponents>, game: Res<ui::Game>, mode: Res<Mode>,
     mut tracks: ResMut<Tracks>, mut meshes: ResMut<Assets<Mesh>>, mut place: Query<&mut Transform, With<TrackMesh>>,

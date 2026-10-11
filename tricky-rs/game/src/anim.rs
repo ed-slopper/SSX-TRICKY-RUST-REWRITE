@@ -20,7 +20,7 @@ pub struct AnimSeg {
     #[serde(rename = "Value4")] pub d: f32, #[serde(rename = "Value5")] pub t0: f32, #[serde(rename = "Value6")] pub t1: f32,
 }
 impl ObjAnim {
-    /// The object's local matrix at `t` seconds (`cMeshAnimFrame::vf1`): animated channels replace
+    /// The object's local matrix at `t` seconds (`cMeshAnimFrame::vf1` 0x1cb498): animated channels replace
     /// the base pose; each channel is ((a t + b) t + c) t + d on the segment holding t (clamped);
     /// T * Rz * Ry * Rx, angles in degrees.
     pub fn local(&self, t: f32) -> Mat4 {

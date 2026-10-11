@@ -56,6 +56,7 @@ fn join(parts: &[Vec<u8>]) -> Option<Vec<u8>> {
     Some(out)
 }
 
+/// The intro's course music (`Music_StartCourseSong` 0x214e60, `Audio_InGameUpdate` 0x20ee58, `Audio_OnRaceGo` 0x215288).
 #[allow(clippy::too_many_arguments)]
 pub fn course_music(
     mut cm: ResMut<CourseMusic>, race: Res<RaceRes>, list: Res<LevelList>, game: Res<ui::Game>, mode: Res<Mode>, sounds: Res<crate::sound::Sounds>,

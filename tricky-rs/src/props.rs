@@ -213,7 +213,7 @@ impl Prop {
 }
 
 /// Riders shove each other apart instead of passing through.
-/// Two riders running into each other (`Boarder_RiderCollisions` / `Boarder_RiderHit`): pushed
+/// Two riders running into each other (`Boarder_RiderCollisions` 0x123fc8 / `Boarder_RiderHit` 0x124920): pushed
 /// apart, and each takes the closing speed weighted by the other's mass. A hard enough hit puts a
 /// rider down; if only one goes down the other gets a full meter.
 pub fn bump(a: &mut Rider, b: &mut Rider) {

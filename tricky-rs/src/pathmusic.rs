@@ -232,6 +232,8 @@ pub struct PathMusic {
 #[derive(Component)]
 pub struct PfPlayer;
 
+/// The race song and its air loops (`Audio_StartRaceMusic` 0x215220, `Music_SetPathVar` 0x2253e8, `Audio_MusicEvent`
+/// 0x225318, `Music_ScheduleAirLoop` 0x225878, `Audio_TrickyTrigger` 0x21c610).
 #[allow(clippy::too_many_arguments)]
 pub fn path_music(
     mut pm: ResMut<PathMusic>, sounds: Res<crate::sound::Sounds>, list: Res<LevelList>, game: Res<ui::Game>, mode: Res<Mode>, race: Res<RaceRes>,

@@ -95,7 +95,7 @@ impl AiDriver {
         (self.rng % 100) as i32 - 16
     }
     fn rand(&mut self) -> u32 { self.rng ^= self.rng << 13; self.rng ^= self.rng >> 17; self.rng ^= self.rng << 5; self.rng }
-    /// AIComputer_PlanJumpTrick: whether to spin/flip (only where the jump allows), which way, a
+    /// `AIComputer_PlanJumpTrick` 0x139d58: whether to spin/flip (only where the jump allows), which way, a
     /// random grab of the rider's fifteen, and whether to hold it late.
     fn plan_trick(&mut self, r: &Rider, value: i32) {
         let b = (r.stats.tricks * 255.0) as i32;

@@ -193,7 +193,7 @@ impl Rider {
         self.wipe = Some(w);
     }
 
-    /// One step of motion 5 / 6.
+    /// One step of motion 5 / 6 (`WipeoutMotion_Update` 0x10c2f0, `GetUpState_Update` 0x108198).
     pub(super) fn wipe_step(&mut self, world: &CollisionWorld, dt: f32) {
         if self.wipe.is_none() { self.wipe_enter(); }
         let Some(mut w) = self.wipe.take() else { return };
@@ -227,8 +227,9 @@ impl Rider {
         if self.pos.y < world.min_y - 30.0 || world.in_reset(self.pos + Vec3::Y * 0.8, BODY_RADIUS) { let at = self.safe; self.respawn(at); }
     }
 
-    /// The tumble (`WipeoutMotion_Update`, any clip but the slides). Returns false once the
-    /// rider is out of the wipe-out.
+    /// The tumble (`WipeoutMotion_Update` 0x10c2f0, any clip but the slides; `RigidBody_Integrate` 0x153c50,
+    /// `Ragdoll_GroundProbe` 0x10fd58, `Ragdoll_Step` 0x10dca8, `Ragdoll_Contacts` 0x10e190). Returns false once
+    /// the rider is out of the wipe-out.
     fn tumble_tick(&mut self, w: &mut Wipe, world: &CollisionWorld, dt: f32) -> bool {
         let p = rag();
         let ticks = dt * 60.0;

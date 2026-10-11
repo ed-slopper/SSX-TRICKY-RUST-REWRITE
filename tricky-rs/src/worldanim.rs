@@ -237,6 +237,8 @@ impl WorldAnim {
             }
         }
     }
+    /// One trigger-script op on instance `i`: starts its controller (`cCounterNode::vf23` 0x13b2f0,
+    /// `cTexFlipNode::vf23` 0x1433d8, `cCrowdBoxNode::Init` 0x145c00) or its clip.
     fn apply(&mut self, level: &Level, anims: &mut AnimObjects, i: usize, op: WOp) {
         match op {
             WOp::Debounce(t) => { self.busy.insert(i, if t > 0.0 { (t * 60.0) as i32 } else { -1 }); }
@@ -364,6 +366,8 @@ impl WorldAnim {
 
     // ------------------------------------------------------------ controllers (one 60 Hz tick)
 
+    /// One 60 Hz tick of every controller (`cCounterNode::vf1` 0x13b178, `cCrackedNode::vf1` 0x1455a0,
+    /// `cCrowdBoxNode::vf1` 0x145c88).
     fn tick(&mut self) {
         let mut dead = Vec::new();
         let mut r = Vec::new();
@@ -462,7 +466,7 @@ impl Crack {
     }
 }
 
-/// How hard a rider hits glass (`Boarder_InstanceCollisions`' contact record: the direction of
+/// How hard a rider hits glass (`Boarder_InstanceCollisions` 0x125088's contact record: the direction of
 /// travel · the normal, times the velocity · the normal), cm/s.
 fn impact(vel: Vec3, normal: Vec3) -> f32 {
     let v = vel * 100.0;
@@ -510,6 +514,8 @@ fn bounds(level: &Level, i: usize, cache: &mut HashMap<std::path::PathBuf, ObjMe
     (b.0.x <= b.1.x).then_some(b)
 }
 
+/// The level's object scripts and controllers each frame (`World_CellActivate_RunPersistant` 0x25fed0,
+/// `Instance_OnPlayerContact` 0x13bd40, `World_ResetInstances` 0x115fe8, `cCrackedNode::vf17` 0x1457e8).
 #[allow(clippy::too_many_arguments)]
 pub fn world_anim(
     time: Res<SmoothDt>, game: Res<ui::Game>, level: Res<LevelRes>, race: Res<RaceRes>, rider: Res<RiderRes>, opponents: Res<Opponents>,

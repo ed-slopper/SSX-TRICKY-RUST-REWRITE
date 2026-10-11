@@ -59,7 +59,7 @@ pub fn curve(kind: u8, x: f32) -> f32 {
     }
 }
 
-/// How loud a knock is for the rider's speed (cm/s): the table in Sfx_InstanceCollision.
+/// How loud a knock is for the rider's speed (cm/s): the table in `Sfx_InstanceCollision` 0x216c50.
 fn knock_level(cms: f32) -> f32 {
     let pts = [(200.0, 33.0), (400.0, 70.0), (550.0, 100.0), (800.0, 127.0)];
     if cms <= pts[0].0 { return pts[0].1 / 127.0; }
@@ -170,6 +170,8 @@ pub fn setup_world_sound(mut commands: Commands, level: Res<LevelRes>) {
     commands.insert_resource(ws);
 }
 
+/// The level's sounds (`WorldEmitter_Update` 0x22bf60, `WorldEmitter_GatherForListener` 0x22b370, `Sfx_ScriptSoundPlay` 0x2165c8,
+/// `Sfx_InstanceCollision` 0x216c50).
 #[allow(clippy::too_many_arguments)]
 pub fn world_sound(
     time: Res<Time>, level: Res<LevelRes>, world: Res<World>, game: Res<ui::Game>, mode: Res<Mode>, sounds: Res<crate::sound::Sounds>,

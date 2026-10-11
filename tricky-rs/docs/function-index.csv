@@ -89,7 +89,7 @@ address,size,name,system,status
 0x108310,88,FUN_00108310,boarder?,not started
 0x108368,16,FUN_00108368,boarder?,not started
 0x108378,3980,AirMotion_Update,boarder,not started
-0x109308,864,Landing_ChooseState,boarder,not started
+0x109308,864,Landing_ChooseState,boarder,ported
 0x109668,40,FUN_00109668,world?,not started
 0x109690,20,FUN_00109690,ai?,not started
 0x1097f8,44,FUN_001097f8,boarder?,not started
@@ -2738,7 +2738,7 @@ address,size,name,system,status
 0x1cb210,100,FUN_001cb210,ai?,not started
 0x1cb278,136,FUN_001cb278,animation?,not started
 0x1cb300,404,cAnimFrame::vf1_1cb300,animation,not started
-0x1cb498,448,cMeshAnimFrame::vf1_1cb498,animation,not started
+0x1cb498,448,cMeshAnimFrame::vf1_1cb498,animation,ported
 0x1cb658,188,FUN_001cb658,animation?,not started
 0x1cb718,76,FUN_001cb718,animation?,not started
 0x1cb768,8,cCamAnimFrame::vf1_1cb768,animation?,not started

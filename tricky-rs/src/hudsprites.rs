@@ -26,6 +26,7 @@ const LETTERS: [(f32, f32); 6] = [(-42.0, -25.0), (-27.0, -35.0), (-13.0, -43.0)
 fn vw(x: f32) -> Val { Val::Vw(x / 640.0 * 100.0) }
 fn vh(y: f32) -> Val { Val::Vh(y / 480.0 * 100.0) }
 
+/// The HUD's sprites (`HUD_DrawPlayerSprites` 0x1a2c40, rectangles from `SpriteSet_InitHudGameRects` 0x1f4440).
 #[allow(clippy::too_many_arguments)]
 pub fn hud_sprites(
     mut commands: Commands, lib: Res<CharLib>, rider: Res<RiderRes>, game: Res<ui::Game>, mode: Res<Mode>, time: Res<Time>,

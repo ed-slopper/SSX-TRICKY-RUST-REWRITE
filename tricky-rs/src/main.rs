@@ -1282,7 +1282,7 @@ fn screenshot(mut commands: Commands, shot: Option<ResMut<Shot>>, mut exit: Even
 
 // ---------------------------------------------------------------- riding
 
-/// An object's collision meshes, each with the model part it moves with (`World_RayCastInstance`):
+/// An object's collision meshes, each with the model part it moves with (`World_RayCastInstance` 0x25bf48):
 /// mode 1 has a collision mesh per model part that has a mesh, in the parts' order; mode 3 collides
 /// with the drawn meshes; mode 2 is a box test (not solid here yet).
 fn collision_parts(level: &Level, inst: &Instance) -> Vec<(Option<usize>, PathBuf)> {
