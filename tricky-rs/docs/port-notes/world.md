@@ -120,7 +120,7 @@ Part of the port notes (index: [README.md](README.md)); units and wording as des
   shuffles; seeded by `Rand_SeedFx`) and `Rand_Game` 0x23d4d8 (state 0x345e70: AI decisions, stumbles, path picks;
   seeded by `Rand_SeedGame` at race init and saved in the replay snapshot by `Rand_SaveGameSnapshot`).
 - State is six u32 words s0..s5. Next: s4 += s5, s3 += s4 + c, s2 += s3 + c, s1 += s2 + c, s0 += s1 + c (each c
-  the carry out of the add before it), then s5 += 1; if s5 wrapped to 0, s4 += 1 and so on up the chain while each
+  the carry out of the add before it, tested as new < old for that word; the first, s4 + s5, as sum < either), then s5 += 1; if s5 wrapped to 0, s4 += 1 and so on up the chain while each
   wraps (s0 += 1 last). Returns s0.
 - Seed x: s0 = x − 0x0dd2f1aa, s1 = x − 0x77ced917, s2 = x − 0x39db22d1, s3 = x + 0x0702c49c,
   s4 = x − 0x61cac083, s5 = x + 0x6fdf3b64.
