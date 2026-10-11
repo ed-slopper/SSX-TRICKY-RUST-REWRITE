@@ -23,6 +23,7 @@ pub mod jump;
 pub mod landing;
 pub mod math;
 pub mod orient;
+pub mod pose;
 pub mod rail_control;
 pub mod rails;
 pub mod reset;

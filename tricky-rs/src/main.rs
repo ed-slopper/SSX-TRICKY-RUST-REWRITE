@@ -2177,7 +2177,8 @@ fn animate_visuals(
         vis.roll += (want_roll - vis.roll) * k(8.0);
         // down in a wipe-out the body is the tumbling rigid body's frame
         let base = match r.wipe.as_ref().filter(|_| r.crashed > 0.0) { Some(w) => w.q, None => Transform::from_translation(r.pos).looking_to(fwd, up).rotation * Quat::from_rotation_z(vis.roll) };
-        tf.translation = r.pos;
+        // the body is drawn rider+0x308 above the snow along the rider's up (`Boarder_UpdatePose` 0x129628, row G16)
+        tf.translation = r.pos + tricky_game::rider::ground_tick::port_dir(r.up) * (r.body_height * 0.01);
         vis.base = vis.base.slerp(base, k(14.0));
         // flips turn the whole body about its middle, on top of the smoothed heading
         let flip = Quat::from_rotation_x(-r.flip);
@@ -2391,7 +2392,7 @@ fn rider_model(time: Res<SmoothDt>, rider: Res<RiderRes>, model: Option<Single<&
     let h = heading(r.yaw);
     let fwd = (h - up * h.dot(up)).normalize_or(h);
     let target = Transform::from_translation(r.pos).looking_to(fwd, up).rotation;
-    model.translation = r.pos;
+    model.translation = r.pos + tricky_game::rider::ground_tick::port_dir(r.up) * (r.body_height * 0.01);
     model.rotation = model.rotation.slerp(target, 1.0 - (-14.0 * time.dt).exp());
 }
 

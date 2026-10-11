@@ -560,3 +560,15 @@ flag): the quaternion, the three axes and the heading.
 **Not wired.** `Rider::respawn` drops the rider a metre above the snow, so the game keeps this attitude through the
 air (turned by spin and flip, rows G1a and G5) until the landing; the port has no air attitude, and `seed_ground` still
 rebuilds it from yaw and normal (STANDIN). Wiring is the landing half of G20c3.
+## The board's frame and the body height (row G16; checked: `tests/pose.rs`)
+
+`Boarder_UpdatePose` 0x129628 builds the frame rider+0x4aa0.. (rows: the board's x, y, z axes, then the drawn
+position) before posing the skeleton (`pose::board_frame`): the rotation matrix of the quaternion +0x170; with a steer
+(+0x214 ≠ 0) and not on a rail, times a turn about the board's y axis by steer × 1.134464 (alpine) or × 0.87266463;
+the position row = +0x140 + (+0x308)·up(+0x2c0) + (stats+0x60 · lean +0x244)·side(+0x330); with a spin or flip
+(+0x1d0, +0x1d4) the frame turned by the spin about z then the flip about x, about the pivot bone's height (the
+position row moved to the bone and back). The matrix products are the vector unit's (each row the frame's rows
+weighted by the turn's row). `cBoarder::vf7` 0x117198 (only with rider+0x46b0 set) eases +0x308 toward the surface
+table's word 10 in ground motion, toward 0 otherwise, at most 1.6666666 cm a tick (`pose::ease_body_height`). The port
+draws its rider model at the position + `Rider::body_height` along the rider's up.
+
