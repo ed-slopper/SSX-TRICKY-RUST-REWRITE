@@ -8,6 +8,7 @@ pub mod props;
 pub mod race;
 pub mod rand;
 pub mod ground;
+pub mod jump;
 pub mod rails;
 pub mod rivals;
 pub mod rider;

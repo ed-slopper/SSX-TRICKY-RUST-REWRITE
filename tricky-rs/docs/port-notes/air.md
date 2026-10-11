@@ -10,6 +10,11 @@ Part of the port notes (index: [README.md](README.md)); units and wording as des
   reaches 0 (takeoff c/13.33 s after release).
 - Jump `Jump_ApplyImpulse` 0x1284e0: Δv = max(630.88, c²(0.0985+0.787J)·S(v)), S = 0.881v+24.68 below 993.5 cm/s
   else 899.87; direction normalize(N + 0.2F), N = ground normal rider+0x2a0, F = board forward rider+0x320 (0x1286e8; checked with the function runner, F4e); on a rail (rider+0x424 = 3) Δv goes along the board's up rider+0x1a0. Steep lips (50–70°) blend velocity toward the lip, up to 0.9.
+  Proven exactly (G1a1, `tricky-rs/game/src/jump.rs`, bit for bit in the runner): c = max(0, rider+0x1c8 − rider+0x208);
+  Δv = c·(c·J)·S with J = stat·0.78700274/255 + 0.09851468, then at least $f12. Steep lip when F.z ≥ 0, v.z ≥ 0 and
+  t = (N.z − cos 50°)/(cos 70° − cos 50°) ≥ 0: h = normalize(N.x, N.y, 0), L = normalize(F − (F·h)h),
+  b = clamp(t·L.z/sin 20°, 0, 0.9), v′ = ((1−b)v + b|v|L)/2 + Δv·normalize((1−b)N + bL); the flag goes to
+  `Score_StartTrickChain`.
 - Takeoff rates `Takeoff_SetSpinRates` 0x126e30: K = 11.517(0.5449+0.6742T); spin ω0 = K·ws (×2/3 alpine),
   flip ω0 = (2/3)K·wf; ×0.8 fakie; ×1.6 in spin-boost zones (course event 0x12). Band hi = ω0, lo = 0.3ω0,
   floor = min(|ω0|, 1.396); all 0 with no wind-up.
