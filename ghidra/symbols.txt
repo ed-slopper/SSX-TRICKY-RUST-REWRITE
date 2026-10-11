@@ -6804,3 +6804,9 @@ G 16e8f0 Cam_SetShakeParams
 G 193ad0 ReplayPin_ZeroStart
 G 193ad8 ReplayPin_SetEnd
 G 157308 Score_ClearTrickEntries
+G 2c63d0 Strm_ConsumeBytes
+G 2c6460 Strm_AllocRequest
+G 2c64e0 Strm_AppendRequest
+G 2c6558 Strm_LookupRequest
+G 2c65a0 Strm_UnlinkRequest
+G 155dc8 Boarder_AddSpeedSample
