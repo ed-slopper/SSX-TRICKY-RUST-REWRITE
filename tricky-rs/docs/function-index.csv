@@ -2639,7 +2639,7 @@ address,size,name,system,status
 0x1c09d0,396,FUN_001c09d0,render?,not started
 0x1c0b60,268,FUN_001c0b60,render?,not started
 0x1c0c70,100,FUN_001c0c70,render?,not started
-0x1c0cd8,204,FUN_001c0cd8,render?,not started
+0x1c0cd8,204,TexMan_Init,render,not started
 0x1c0da8,208,FUN_001c0da8,render?,not started
 0x1c0e78,124,FUN_001c0e78,render?,not started
 0x1c0ef8,2244,FUN_001c0ef8,render?,not started
@@ -2647,9 +2647,9 @@ address,size,name,system,status
 0x1c1ab8,280,FUN_001c1ab8,render?,not started
 0x1c1bd0,392,FUN_001c1bd0,render?,not started
 0x1c1d58,500,FUN_001c1d58,render?,not started
-0x1c1f50,5112,FUN_001c1f50,render?,not started
+0x1c1f50,5112,TexMan_UploadTextures,render,not started
 0x1c3348,308,FUN_001c3348,render?,not started
-0x1c3480,220,FUN_001c3480,render?,not started
+0x1c3480,220,TexMan_InitLoadNodes,render,not started
 0x1c3560,240,FUN_001c3560,render?,not started
 0x1c3650,272,FUN_001c3650,render?,not started
 0x1c3760,184,FUN_001c3760,render?,not started
@@ -2657,7 +2657,7 @@ address,size,name,system,status
 0x1c3ba8,476,FUN_001c3ba8,render?,not started
 0x1c3d88,480,FUN_001c3d88,render?,not started
 0x1c3f68,284,FUN_001c3f68,render?,not started
-0x1c4088,208,FUN_001c4088,render?,not started
+0x1c4088,208,Gfx_InitStatePools,render,not started
 0x1c4158,72,FUN_001c4158,render?,not started
 0x1c41a0,128,FUN_001c41a0,render?,not started
 0x1c4220,80,FUN_001c4220,render?,not started
@@ -3512,7 +3512,7 @@ address,size,name,system,status
 0x20eaf0,560,cBXAudio::vf12_20eaf0,audio,not started
 0x20ed20,312,FUN_0020ed20,audio?,not started
 0x20ee58,776,Audio_InGameUpdate,audio,ported
-0x20f160,708,FUN_0020f160,audio?,not started
+0x20f160,708,Audio_LoadFEConfig,audio,not started
 0x20f430,204,FUN_0020f430,audio?,not started
 0x20f530,68,FUN_0020f530,frontend?,not started
 0x20f578,184,FUN_0020f578,frontend?,not started
@@ -3530,8 +3530,8 @@ address,size,name,system,status
 0x210a38,148,FUN_00210a38,audio?,not started
 0x210ad0,128,FUN_00210ad0,audio?,not started
 0x210b50,232,FUN_00210b50,audio?,not started
-0x210c38,1120,FUN_00210c38,audio?,not started
-0x211098,1584,FUN_00211098,audio?,not started
+0x210c38,1120,Sfx_LoadSurfaceConfig,audio?,not started
+0x211098,1584,Audio_LoadInGameConfig,audio,not started
 0x2116d8,648,Audio_RaceInit,audio,not started
 0x211960,440,FUN_00211960,audio?,not started
 0x211b18,60,FUN_00211b18,audio?,not started
@@ -3623,7 +3623,7 @@ address,size,name,system,status
 0x21a710,48,FUN_0021a710,audio?,not started
 0x21a740,68,FUN_0021a740,audio?,not started
 0x21a788,60,FUN_0021a788,audio?,not started
-0x21a7c8,1736,FUN_0021a7c8,audio?,not started
+0x21a7c8,1736,Sfx_LoadBoardConfig,audio?,not started
 0x21ae90,1448,FUN_0021ae90,audio?,not started
 0x21b440,196,FUN_0021b440,audio?,not started
 0x21b628,236,FUN_0021b628,audio?,not started
@@ -3647,13 +3647,13 @@ address,size,name,system,status
 0x21c930,48,FUN_0021c930,audio?,not started
 0x21c960,68,FUN_0021c960,audio?,not started
 0x21c9a8,120,FUN_0021c9a8,audio?,not started
-0x21ca20,1104,FUN_0021ca20,frontend?,not started
+0x21ca20,1104,Audio_LoadVolumeLevels,audio,not started
 0x21ce78,184,FUN_0021ce78,audio?,not started
 0x21cf38,104,Jukebox_Open,audio?,not started
 0x21cfa0,124,FUN_0021cfa0,audio?,not started
 0x21d078,56,FUN_0021d078,frontend?,not started
 0x21d0b0,16,FUN_0021d0b0,boarder?,not started
-0x21d0c0,1284,FUN_0021d0c0,audio?,not started
+0x21d0c0,1284,Audio_LoadAmbientBanks,audio,not started
 0x21d5c8,72,FUN_0021d5c8,audio?,not started
 0x21d610,112,FUN_0021d610,audio?,not started
 0x21d680,812,FUN_0021d680,audio?,not started
@@ -3702,7 +3702,7 @@ address,size,name,system,status
 0x220968,96,FUN_00220968,audio?,not started
 0x2209c8,496,FUN_002209c8,render?,not started
 0x220bb8,300,FUN_00220bb8,render?,not started
-0x220ce8,656,FUN_00220ce8,audio?,not started
+0x220ce8,656,Sfx_LoadTrickConfig,audio?,not started
 0x220f80,20,FUN_00220f80,,not started
 0x220f98,100,FUN_00220f98,frontend?,not started
 0x221000,100,FUN_00221000,audio?,not started
@@ -3783,7 +3783,7 @@ address,size,name,system,status
 0x223b78,196,FUN_00223b78,audio?,not started
 0x223c40,104,FUN_00223c40,audio?,not started
 0x223ca8,184,FUN_00223ca8,audio?,not started
-0x223d60,1536,FUN_00223d60,audio?,not started
+0x223d60,1536,Music_LoadPathfinder,audio,not started
 0x224368,128,FUN_00224368,audio?,not started
 0x2243e8,56,FUN_002243e8,audio?,not started
 0x224420,56,FUN_00224420,audio?,not started
@@ -3869,12 +3869,12 @@ address,size,name,system,status
 0x2279c8,128,cSoundSys::~cSoundSys,audio,not started
 0x227a48,44,cSoundSys::vf1_227a48,audio,not started
 0x227a80,64,cSoundSys::__tf,runtime,host
-0x227b38,228,FUN_00227b38,audio?,not started
+0x227b38,228,SpeechBank_Load,audio?,not started
 0x227c20,28,FUN_00227c20,audio?,not started
 0x227c40,100,FUN_00227c40,audio?,not started
 0x227ca8,16,FUN_00227ca8,audio?,not started
 0x227cb8,184,FUN_00227cb8,audio?,not started
-0x227d70,1012,FUN_00227d70,audio?,not started
+0x227d70,1012,Speech_LoadEvents,audio?,not started
 0x228168,372,FUN_00228168,audio?,not started
 0x2282e0,144,FUN_002282e0,audio?,not started
 0x228370,56,FUN_00228370,audio?,not started
@@ -3972,7 +3972,7 @@ address,size,name,system,status
 0x22c5a0,108,FUN_0022c5a0,frontend?,not started
 0x22c610,36,FUN_0022c610,audio?,not started
 0x22c638,12,FUN_0022c638,audio?,not started
-0x22c648,2616,FUN_0022c648,audio?,not started
+0x22c648,2616,Audio_LoadWorldTriggerBanks,audio,not started
 0x22d080,24,FUN_0022d080,audio?,not started
 0x22d098,204,FUN_0022d098,audio?,not started
 0x22d168,28,FUN_0022d168,audio?,not started
@@ -3986,7 +3986,7 @@ address,size,name,system,status
 0x22d8a8,912,SoundId_ToBankProgram,audio,not started
 0x22dc38,80,FUN_0022dc38,audio?,not started
 0x22dc88,88,FUN_0022dc88,audio?,not started
-0x22dce0,1228,FUN_0022dce0,audio?,not started
+0x22dce0,1228,Audio_LoadChantBanks,audio,not started
 0x22e1b8,136,FUN_0022e1b8,audio?,not started
 0x22e240,44,FUN_0022e240,audio?,not started
 0x22e270,92,FUN_0022e270,audio?,not started
@@ -5129,9 +5129,9 @@ address,size,name,system,status
 0x2718f0,204,FUN_002718f0,frontend?,not started
 0x2719c0,1844,FUN_002719c0,frontend?,not started
 0x2720f8,7708,FUN_002720f8,frontend?,not started
-0x273f18,232,FUN_00273f18,frontend?,not started
-0x274000,264,FUN_00274000,frontend?,not started
-0x274108,256,FUN_00274108,frontend?,not started
+0x273f18,232,FE_CreateDialog,frontend,not started
+0x274000,264,FE_CreateList,frontend,not started
+0x274108,256,FE_CreateList2,frontend,not started
 0x274208,112,FUN_00274208,frontend?,not started
 0x274278,112,FUN_00274278,frontend?,not started
 0x2742e8,1216,FUN_002742e8,frontend?,not started
@@ -5246,12 +5246,12 @@ address,size,name,system,status
 0x27e3c0,524,cFE3DStateTrickBook::vf26_27e3c0,frontend,not started
 0x27e5d0,552,cFE3DStateTrickBook::vf22_27e5d0,frontend,not started
 0x27e7f8,288,cFE3DStateTrickBook::vf24_27e7f8,frontend,not started
-0x27e918,3304,FUN_0027e918,frontend?,not started
-0x27f600,14128,FUN_0027f600,frontend?,not started
-0x282d30,8000,FUN_00282d30,frontend?,not started
+0x27e918,3304,FE_BuildRiderProfileScreen,frontend,not started
+0x27f600,14128,FE_BuildRiderBioScreen,frontend,not started
+0x282d30,8000,FE_BuildRiderRecordsScreen,frontend,not started
 0x284c70,752,FUN_00284c70,frontend?,not started
 0x284f60,720,FUN_00284f60,frontend?,not started
-0x285230,26424,FUN_00285230,frontend?,not started
+0x285230,26424,FE_BuildRiderShortBioScreen,frontend,not started
 0x28b968,1124,cFE3DStateRiderProfile::vf11_28b968,frontend,not started
 0x28bdd0,76,cFE3DStateRiderProfile::Update,frontend,not started
 0x28be20,232,cFE3DStateRiderProfile::CreateNextState,frontend,not started
@@ -5389,10 +5389,10 @@ address,size,name,system,status
 0x293ba0,128,cFE3DStateTitle::LayoutWidgets,frontend,not started
 0x293c20,496,cFE3DStateDVDContent::CreateNextState,frontend,not started
 0x293e10,10848,cFE3DStateDVDContent::vf11_293e10,frontend,not started
-0x296870,2192,FUN_00296870,frontend?,not started
-0x297178,3624,FUN_00297178,frontend?,not started
-0x297fa0,968,FUN_00297fa0,frontend?,not started
-0x298368,856,FUN_00298368,frontend?,not started
+0x296870,2192,FE_BuildDvdCharacterList,frontend,not started
+0x297178,3624,FE_BuildDvdJukebox,frontend,not started
+0x297fa0,968,FE_BuildDvdCharacterMenu,frontend,not started
+0x298368,856,FE_BuildDvdDemoMenu,frontend,not started
 0x2986c0,2988,cFE3DStateDVDContent::Update,frontend,not started
 0x299270,128,cFE3DStateDVDContent::Activate,frontend,not started
 0x2992f0,68,cFE3DStateDVDContent::Deactivate,frontend,not started
@@ -5519,11 +5519,11 @@ address,size,name,system,status
 0x29f5f0,304,FUN_0029f5f0,frontend?,not started
 0x29f720,1056,FUN_0029f720,frontend?,not started
 0x29fb40,48,FUN_0029fb40,frontend?,not started
-0x29fb70,15224,FUN_0029fb70,frontend?,not started
-0x2a36e8,7400,FUN_002a36e8,frontend?,not started
-0x2a53d0,11268,FUN_002a53d0,frontend?,not started
+0x29fb70,15224,FE_BuildSoundOptions,frontend,not started
+0x2a36e8,7400,FE_BuildControllerConfig,frontend,not started
+0x2a53d0,11268,FE_BuildOptionsScreen,frontend,not started
 0x2a7fd8,932,FUN_002a7fd8,frontend?,not started
-0x2a8380,412,FUN_002a8380,frontend?,not started
+0x2a8380,412,FE_BuildCredits,frontend,not started
 0x2a8520,1296,FUN_002a8520,frontend?,not started
 0x2a8a30,2004,cFE3DStateOptions::vf11_2a8a30,frontend,not started
 0x2a9208,76,cFE3DStateOptions::vf12_2a9208,frontend,not started

@@ -34,9 +34,9 @@ Part of the port notes (index: [README.md](README.md)); units and wording as des
   unpinned one.
 - Highlights: per rider up to 10 clips (+0x394c count, +0x3dc8 list); a clip is [keyframe, length, …]. Pins
   (`ReplayPin_*`, 4 slots at +0x3920) hold the best clips by two scores.
-- Playback state +0x20 (1 play, 3 stopped, 4–8 paused/stepping, 9 start, 0xb reset world, 0xd idle); command +0x28
+- Playback state +0x20 (1 play, 2 marking a highlight, 3 paused, 4–8 stepping, 9 start, 0xb reset world, 0xd idle); command +0x28
   handled by `Replay_DoCommand` (1 rewind, 2 to end, 3 step back, 4 step forward, 5 play, 6 toggle pause, 7 pause,
-  8 stop, 9/10 restart). A playlist (+0x391c, `ReplayPlaylist_*`) plays clips back to back.
+  8 mark highlight, 9/10 restart). A playlist (+0x391c, `ReplayPlaylist_*`) plays clips back to back.
 - Camera tracks: one per rider (0xe24 bytes at +0x5c), up to 128 cuts {preset, chase params, frame};
   `ReplayCamTrack_Generate` records them from a dry run with `Camera_SetReplayMode(1, rider)`.
 - Saving (`ReplaySave_Step`, 17 stages, 0x4000-byte blocks, byte-sum checksum): header 0x12300003 (0x44 bytes),
