@@ -77,7 +77,9 @@ state machine and the renderer are ours. Nothing has been checked against the or
 | G2 | Tricks and scoring checked: `Score_*` 0x155410–0x157490, `Score_BuildTrickId` 0x157490, `Score_FormatTrickName` 0x1551c0, repeats, chains, multipliers, uber timer, TRICKY | any | F4a | | [repo] Ported in `rider.rs`/`trickdata.rs` |
 | G3 | Rider attributes and progression: stats per rider and level, training points, boards per rider and their unlock points, outfits | unowned | E12 | | [repo] `trickdata.rs` has the tables; rookie/master is our menu |
 | G4 | AI checked: path following 0x1375c8 / 0x1372f8, rubber band 0x115100 / 0x13a0f0, skill pairs, tricks 0x139d58 / 0x138d60, resets, shoves | any | F4a, E1b | | [repo] Ported in `rider.rs`/`main.rs` |
-| G4a | Rivals and vendettas checked: `RelTable_Init` 0x167208, `Rider_OnKnockedDownBy`, `AI_StartVendetta`, `AI_CoolVendetta` | any | F4a | | [repo] `rivals.rs` |
+| G4a | Rivals and vendettas checked: `RelTable_Init` 0x167208, `Rider_OnKnockedDownBy`, `AI_StartVendetta`, `AI_CoolVendetta` | any | F4a | | [repo] `rivals.rs` Split: G4a1, G4a2 |
+| G4a1 | `RelTable_Init` 0x167208 checked: the 12×12 table (tolerance, attitude, word +8, relation) run in the function runner against `rivals.rs`, which moves into `tricky-game` | any | F4a | trailrig/heron (2026-10-11) | Split of G4a |
+| G4a2 | The rest of G4a: `Rider_OnKnockedDownBy`, `AI_StartVendetta`, `AI_CoolVendetta` checked | any | F4a | | Split of G4a |
 | G5 | Animation: the game's own animation state machine and blending for all 248 `bxanim` clips (plus cmanim, ps2anim, ubers), clip markers, replacing our choice of clip | unowned | F1, E4 | | [repo] README: "Which clip plays when is my state logic". Split by state before claiming |
 | G6 | Wipe-out body: ragdoll spheres where the game puts them (`Ragdoll_Step` 0x10dca8, `Ragdoll_Contacts` 0x10e190, `CollBody_PointMassInertia` 0x236530) | unowned | E4 | | [repo] "Unresolved: ragdoll sphere places"; `wipeout.rs` uses a stand-in 1.7 m rider |
 | G7 | Rendering, as the PS2 renderer does it. Split before claiming: | unowned | E3a, E3b | | [repo] |
@@ -244,3 +246,4 @@ matches the original.
 - 2026-10-11 trailrig/heron: E13 done; G15 corrected (which surfaces spray); added G16 (body height, gap of E13).
 - 2026-10-11 trailrig/heron: split E1b into E1b1 (claimed) and E1b2.
 - 2026-10-11 trailrig/heron: E1b1 done (6 functions checked).
+- 2026-10-11 trailrig/heron: split G4a into G4a1 (claimed) and G4a2.
