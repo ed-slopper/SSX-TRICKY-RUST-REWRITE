@@ -196,6 +196,14 @@ impl Files {
         None
     }
 
+    /// Opens, reads and unpacks a file, as the game's loader `File_LoadAndUnpack` 0x2c8938 does (its opens
+    /// search the archives too).
+    pub fn load(&mut self, path: &str) -> io::Result<Option<Vec<u8>>> {
+        let Some(f) = self.open(path, true) else { return Ok(None) };
+        let raw = self.read(&f)?;
+        Ok(crate::compress::load(raw))
+    }
+
     /// Reads an opened file's bytes (still packed if the archive packed them).
     pub fn read(&mut self, f: &OpenFile) -> io::Result<Vec<u8>> {
         self.disc.read_at(f.start, f.size as usize)
@@ -259,5 +267,6 @@ mod tests {
         assert!(files.open("data/char/anm.big|data/char/eddie_body.mpf", false).is_none());
         let bytes = files.read(&f).unwrap();
         assert_eq!(bytes.len(), f.size as usize);
+        assert_eq!(files.load("data/char/eddie_body.mpf").unwrap().unwrap().len(), crate::compress::unpacked_size(&bytes) as usize);
     }
 }

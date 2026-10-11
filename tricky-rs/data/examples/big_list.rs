@@ -1,5 +1,5 @@
 //! Lists every file of the game's mounted BIG archives (row E2a): `cargo run -p tricky-data --example big_list -- <image or drive>`.
-//! Prints `archive name size checksum` (checksum: sum of the bytes as read, still packed).
+//! Prints `archive name size checksum unpacked-size unpacked-checksum` (sums of the bytes).
 fn main() {
     let a: Vec<String> = std::env::args().collect();
     let mut files = tricky_data::big::Files::new(tricky_data::disc::Disc::open(&a[1]).expect("mount"));
@@ -9,6 +9,8 @@ fn main() {
         let f = files.open(&format!("{big}|{name}"), false).expect("open");
         let data = files.read(&f).expect("read");
         let sum: u64 = data.iter().map(|&b| b as u64).sum();
-        println!("{big} {name} {} {sum}", data.len());
+        let un = tricky_data::compress::load(data.clone()).unwrap_or_default();
+        let usum: u64 = un.iter().map(|&b| b as u64).sum();
+        println!("{big} {name} {} {sum} {} {usum}", data.len(), un.len());
     }
 }

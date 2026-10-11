@@ -50,3 +50,21 @@ Proven (`lib-big` and the async file system; ported in `tricky-data/src/big.rs`)
 
 Checked: all 793 entries of the four character archives read through `Files` equal the archives extracted
 before (sizes and byte sums); the three audio archives mount (1146 entries in all).
+
+## Compression (row E2b)
+
+Proven (ported in `tricky-data/src/compress.rs`):
+
+- A packed file starts with a type byte and 0xfb. `Compress_Decode` 0x2c2de0 dispatches on the type with its
+  low bit cleared: RefPack 0x10/0x90 (`RefPack_Decode` 0x2c31b0), Huffman 0x30/0x32/0x34/0xb0/0xb2/0xb4
+  (`Huff_Decode` 0x2c3730), BTree 0x46/0xc6 (`BTree_Decode` 0x2c3540), 0x2c2d18 for 0x18/0x1a/0x1c/0x98/0x9a/0x9c,
+  and a registered codec (gp-0x7fc8) for 0x1e/0x9e.
+- `Compress_UnpackedSize` 0x2c2fb0: a 3-byte size (4 bytes with bit 7) at +2, whatever the low bit says.
+  `RefPack_Decode` instead skips one more size field when the low bit is set (0x11fb: size at +5) and returns
+  that field.
+- `File_LoadAndUnpack` 0x2c8938 (via `File_Load` 0x2c8a70): opens with mode 1 (so the archives are searched),
+  reads the file, and if `Compress_UnpackedSize` is not 0 decodes it into a buffer of that size.
+- Every packed file on the disc is RefPack 0x10 (the four character archives, the course archives, `PS2LOAD`,
+  `SSXFE`, `TRICK`); nothing uses the other codecs (row E2c).
+
+Checked: all 793 entries of the character archives unpack to the same bytes as `tools/afl/refpack.py`.

@@ -5272,3 +5272,7 @@ G 2cc4b8 FileSys_OpenOnDisc
 G 2cc368 FileSys_MakeDevicePath
 G 2c9018 FileSys_OpenSync
 G 2c7e38 FileSys_Exists
+G 2c8938 File_LoadAndUnpack
+G 2c81e8 File_ReadWhole
+G 2c8a70 File_Load
+G 2ca7f8 FileSys_Open

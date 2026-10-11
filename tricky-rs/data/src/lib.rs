@@ -5,6 +5,7 @@
 pub mod anim;
 pub mod big;
 pub mod character;
+pub mod compress;
 pub mod course;
 pub mod disc;
 pub mod intro;
