@@ -5741,3 +5741,18 @@ G 193448 ReplayPin_End
 G 14cf38 LessonOverlay_DrawTrickInfo
 G 194230 ReplaySave_Reset
 G 16c328 Circuit_SaveRiderPoints
+F 189c38 cEnumMenuItem cEnumMenuItem
+F 18a498 cCommandMenuItem cCommandMenuItem
+F 18a820 cIntMenuItem cIntMenuItem
+F 18ae80 cAngleMenuItem cAngleMenuItem
+F 18b198 cStringMenuItem cStringMenuItem
+F 18b1d0 cStringMenuItem cStringMenuItem
+F 18b660 cColorMenuItem cColorMenuItem
+F 18b870 cExpandMenuItem cExpandMenuItem
+F 18b8f8 cExpandMenuItem cExpandMenuItem
+F 18bf50 cRGBTitleMenuItem cRGBTitleMenuItem
+G 18eac8 Replay_Init
+G 158c38 AnimData_Construct
+G 259030 World_ProbeGround
+G 155588 Score_GetGradeForPoints
+G 161730 Career_Construct

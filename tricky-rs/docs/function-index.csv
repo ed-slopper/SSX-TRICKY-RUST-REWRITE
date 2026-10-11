@@ -1091,7 +1091,7 @@ address,size,name,system,status
 0x155440,128,Score_CalcPoints,scoring,checked
 0x1554c0,116,Score_CalcBasePoints,scoring,checked
 0x155538,80,FUN_00155538,scoring?,not started
-0x155588,1172,FUN_00155588,scoring?,not started
+0x155588,1172,Score_GetGradeForPoints,scoring,not started
 0x155a20,136,Score_Reset,scoring,not started
 0x155aa8,104,Score_BankPoints,scoring,not started
 0x155b10,164,Score_AddPickupPoints,scoring,not started
@@ -1148,7 +1148,7 @@ address,size,name,system,status
 0x158af0,28,AnimFile_Reset,animation,not started
 0x158b10,248,FUN_00158b10,files?,not started
 0x158c10,40,AnimFile_Bind,animation,ported
-0x158c38,144,FUN_00158c38,frontend?,not started
+0x158c38,144,AnimData_Construct,animation,not started
 0x158cc8,76,AnimData_Clear,animation,not started
 0x158d18,76,AnimData_Init,animation,not started
 0x158d68,88,AnimData_GetClipId,animation,not started
@@ -1244,7 +1244,7 @@ address,size,name,system,status
 0x1615e8,84,AnimCtl_EndActionToRide,animation,not started
 0x161640,92,AnimCtl_EndActionStop,animation,not started
 0x1616a0,124,StaticInit_AnimCtl,other,not started
-0x161730,48,FUN_00161730,race?,not started
+0x161730,48,Career_Construct,race?,not started
 0x161760,64,FUN_00161760,race?,not started
 0x1617a0,148,Career_InitNewGame,race?,not started
 0x161838,16,FUN_00161838,race?,not started
@@ -1940,7 +1940,7 @@ address,size,name,system,status
 0x1899c0,204,cBoolMenuItem::HandleInput,debugmenu,not started
 0x189a90,260,cBoolMenuItem::Measure,debugmenu,not started
 0x189b98,160,cBoolMenuItem::Draw,debugmenu,not started
-0x189c38,68,FUN_00189c38,debugmenu?,not started
+0x189c38,68,cEnumMenuItem::cEnumMenuItem,debugmenu,not started
 0x189c80,64,FUN_00189c80,debugmenu?,not started
 0x189cc0,116,cEnumMenuItem::cEnumMenuItem,debugmenu,not started
 0x189d78,648,cEnumMenuItem::HandleInput,debugmenu,not started
@@ -1955,7 +1955,7 @@ address,size,name,system,status
 0x18a3d8,52,cPopMenuItem::Measure,debugmenu,not started
 0x18a410,76,cPopMenuItem::Draw,debugmenu,not started
 0x18a460,56,FUN_0018a460,debugmenu?,not started
-0x18a498,68,FUN_0018a498,debugmenu?,not started
+0x18a498,68,cCommandMenuItem::cCommandMenuItem,debugmenu,not started
 0x18a4e0,88,cCommandMenuItem::cCommandMenuItem,debugmenu,not started
 0x18a548,132,cCommandMenuItem::HandleInput,debugmenu,not started
 0x18a5d0,84,cCommandMenuItem::Measure,debugmenu,not started
@@ -1968,7 +1968,7 @@ address,size,name,system,status
 0x18a7d8,8,cSpaceMenuItem::IsSelectable,debugmenu,not started
 0x18a7e0,52,cSpaceMenuItem::Measure,debugmenu,not started
 0x18a818,8,cSpaceMenuItem::Draw,debugmenu,not started
-0x18a820,84,FUN_0018a820,debugmenu?,not started
+0x18a820,84,cIntMenuItem::cIntMenuItem,debugmenu,not started
 0x18a878,132,cIntMenuItem::cIntMenuItem,debugmenu,not started
 0x18a900,64,FUN_0018a900,debugmenu?,not started
 0x18a940,364,cIntMenuItem::HandleInput,debugmenu,not started
@@ -1978,20 +1978,20 @@ address,size,name,system,status
 0x18abf8,432,cFloatMenuItem::HandleInput,debugmenu,not started
 0x18ada8,56,cFloatMenuItem::Measure,debugmenu,not started
 0x18ade0,160,cFloatMenuItem::Draw,debugmenu,not started
-0x18ae80,144,FUN_0018ae80,debugmenu?,not started
+0x18ae80,144,cAngleMenuItem::cAngleMenuItem,debugmenu,not started
 0x18af10,432,cAngleMenuItem::HandleInput,debugmenu,not started
 0x18b0c0,56,cAngleMenuItem::Measure,debugmenu,not started
 0x18b0f8,160,cAngleMenuItem::Draw,debugmenu,not started
-0x18b198,52,FUN_0018b198,debugmenu?,not started
-0x18b1d0,108,FUN_0018b1d0,debugmenu?,not started
+0x18b198,52,cStringMenuItem::cStringMenuItem,debugmenu,not started
+0x18b1d0,108,cStringMenuItem::cStringMenuItem,debugmenu,not started
 0x18b240,20,FUN_0018b240,debugmenu?,not started
 0x18b258,1028,cStringMenuItem::HandleInput,debugmenu,not started
-0x18b660,88,FUN_0018b660,debugmenu?,not started
+0x18b660,88,cColorMenuItem::cColorMenuItem,debugmenu,not started
 0x18b6b8,340,cColorMenuItem::HandleInput,debugmenu,not started
 0x18b810,44,cExpandMenuItemMenu::vf2_18b810,debugmenu?,not started
 0x18b840,44,cExpandMenuItemMenu::vf3_18b840,debugmenu?,not started
-0x18b870,136,FUN_0018b870,debugmenu?,not started
-0x18b8f8,164,FUN_0018b8f8,debugmenu?,not started
+0x18b870,136,cExpandMenuItem::cExpandMenuItem,debugmenu,not started
+0x18b8f8,164,cExpandMenuItem::cExpandMenuItem,debugmenu,not started
 0x18b9a0,8,FUN_0018b9a0,debugmenu?,not started
 0x18b9f8,108,FUN_0018b9f8,debugmenu?,not started
 0x18ba68,236,cExpandMenuItem::HandleInput,debugmenu,not started
@@ -2001,7 +2001,7 @@ address,size,name,system,status
 0x18bd78,312,cExpandMenuItem::Draw,debugmenu,not started
 0x18beb0,120,cExpandMenuItem::vf5_18beb0,debugmenu,not started
 0x18bf28,40,cExpandMenuItem::vf6_18bf28,debugmenu,not started
-0x18bf50,88,FUN_0018bf50,debugmenu?,not started
+0x18bf50,88,cRGBTitleMenuItem::cRGBTitleMenuItem,debugmenu,not started
 0x18bfa8,8,cRGBTitleMenuItem::IsSelectable,debugmenu,not started
 0x18bfb0,248,FUN_0018bfb0,debugmenu?,not started
 0x18c0a8,108,cRGBMenuItem::HandleInput,debugmenu,not started
@@ -2061,7 +2061,7 @@ address,size,name,system,status
 0x18e798,64,cMenuItem::__tf,runtime,host
 0x18e850,404,FUN_0018e850,game?,not started
 0x18e9e8,224,FUN_0018e9e8,game?,not started
-0x18eac8,252,FUN_0018eac8,game?,not started
+0x18eac8,252,Replay_Init,game?,not started
 0x18ebc8,8,FUN_0018ebc8,game?,not started
 0x18ebd0,664,Replay_Clear,game?,not started
 0x18ee68,84,Replay_AllocKeyframe,camera?,not started
@@ -4633,7 +4633,7 @@ address,size,name,system,status
 0x257d50,44,Vec4_ScaleCopy9,world?,not started
 0x257dc0,4712,FUN_00257dc0,world?,not started
 0x259028,8,FUN_00259028,world?,not started
-0x259030,768,FUN_00259030,world?,not started
+0x259030,768,World_ProbeGround,world,not started
 0x259330,3320,Rail_ClosestPoint,boarder,not started
 0x25a028,312,Lights_InsertStrongest,render,not started
 0x25a160,3600,World_GetLightsAt,world,not started
