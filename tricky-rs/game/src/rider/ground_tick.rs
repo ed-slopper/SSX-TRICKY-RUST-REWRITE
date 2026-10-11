@@ -19,6 +19,9 @@
 //!   the lean record that [`lean_ease`] and [`lean_targets`] keep
 //! - the rider's up (rider+0x2c0, board row G20c): the record [`Rider::up`], set by `Boarder_PlaceAt` 0x11cae8 and
 //!   accumulated by [`lean_up`] at the end of every tick; the ground tick reads it, as `GroundMotion_Update` does
+//! - the normal (rider+0x2a0, board row G20c2): on a rail `RailSlideMotion_Update` 0x10b0d0's ([`rail_normal`], with the
+//!   lean angle [`Rider::rail_lean`] from [`rail_lean_angle`]) and at a respawn `Boarder_PlaceAt` 0x11cae8's
+//!   ([`placed_normal`]); in the air it is still the port's own
 //! - rail capture (row G1b) and `Boarder_InstanceCollisions` 0x125088 (row E8b): not done while riding, as before
 
 use super::{wrap, Rider};
@@ -77,9 +80,97 @@ pub fn lean_up(up: V4, normal: V4) -> V4 {
     unit(add(up, scale(normal, 0.5)))
 }
 
+/// The rail tangent's |z| over which `RailSlideMotion_Update` 0x10b0d0 (0x10b76c) calls the rail steep (about 67° from
+/// the level): `0.92`, 0x3f6b851f.
+const STEEP_RAIL: f32 = f32::from_bits(0x3f6b851f);
+
+/// The rail's lean angle, the rail motion object's +8 (zero from `RailSlideMotion_Enter` 0x10b068), one tick on:
+/// `RailSlideMotion_Update` 0x10b0d0 (0x10b934–0x10b9e8). The angle aims at `lateral · k · m` (the rider's sideways
+/// distance from the rail in cm, k·m = 0.6981317 · 0.0125 with the board across the rail, rider+0x1dc 3 or 4, else
+/// 0.34906584 · 0.033333335), negated when the board's up points down (`up_z`, rider+0x1a8 < 0), and moves to it in
+/// steps of at most 5 (radians). Its sine and cosine feed [`rail_normal`], which only reads them on a steep rail.
+pub fn rail_lean_angle(prev: f32, lateral: f32, kind: u32, up_z: f32) -> f32 {
+    let (per_cm, scale_) = if kind.wrapping_sub(3) < 2 {
+        (f32::from_bits(0x3f32_b8c2), f32::from_bits(0x3c4c_cccd))
+    } else {
+        (f32::from_bits(0x3eb2_b8c2), f32::from_bits(0x3d08_8889))
+    };
+    let mut aim = lateral * per_cm * scale_;
+    if up_z < 0.0 {
+        aim = -aim;
+    }
+    let five = f32::from_bits(0x40a0_0000);
+    if aim + five < prev {
+        prev - five
+    } else if prev < aim - five {
+        prev + five
+    } else {
+        aim
+    }
+}
+
+/// The ground normal (rider+0x2a0) `RailSlideMotion_Update` 0x10b0d0 leaves while the rider is on the rail (its store at
+/// 0x10bbb8), from the rail's unit tangent `tangent` (the closest point's, turned to run with the velocity), the
+/// board's up (rider+0x1a0, before the tick's own turn) and the lean angle [`rail_lean_angle`] just made. All four lanes,
+/// in the vector unit's order.
+/// - on a rail that is not steep (|tz| ≤ 0.92): the level's up with its part along the tangent taken out, made unit
+///   length (`vmulx`, `vsub`, `vrsqrt`), turned round when it points against the board's up;
+/// - on a steep one: the board's up tipped about the rail by the lean angle: `c1 = unit(up × t)`, `c2 = t × c1`,
+///   normal = `c2 · cos − c1 · sin` (not made unit again).
+pub fn rail_normal(tangent: V4, board_up: V4, angle: f32) -> V4 {
+    let (sin, cos) = crate::math::sin_cos(angle);
+    if STEEP_RAIL < tangent[2].abs() {
+        let c1 = unit(cross(board_up, tangent));
+        let c2 = cross(tangent, c1);
+        sub(scale(c2, cos), scale(c1, sin))
+    } else {
+        let n = unit(sub([0.0, 0.0, 1.0, 0.0], scale(tangent, tangent[2])));
+        if dot(n, board_up) < 0.0 {
+            scale(n, -1.0)
+        } else {
+            n
+        }
+    }
+}
+
+/// The normal (rider+0x2a0) `Boarder_PlaceAt` 0x11cae8 leaves: (0, 0, 1, 0) (stored at 0x11cc5c), and when its ray cast
+/// under the spawn (`World_RayCast` 0x25aff8, row E7) hits, the ray's normal `hit` (0x11cd08). It then copies the
+/// normal to the rider's up (rider+0x2c0, 0x11cdf4: the four words). With the flag (a3 ≠ 0, the start-gate placements)
+/// the ray is not cast and the default stays.
+pub fn placed_normal(hit: Option<V4>) -> V4 {
+    hit.unwrap_or([0.0, 0.0, 1.0, 0.0])
+}
+
+/// STANDIN: the rider's sideways distance from the rail in cm, the game's `rider+0x190 · (closest point − position)`
+/// (0x10b438), for the game's own closest point (`Rail_ClosestPoint` 0x259330) and board attitude (the quaternion,
+/// rows G1 and G5): the port's offset `off` (m, positive to the left of the travel) with the board's side (+0x190, its
+/// right) taken as the cross of the tangent and the board's up `normal` (game space), the board lying along the rail.
+pub(super) fn rail_lateral(travel: Vec3, normal: V4, off: f32) -> f32 {
+    let side = unit(cross(game_dir(travel), normal));
+    let left = Vec3::Y.cross(travel).normalize_or(Vec3::X);
+    rail_offset(side, to_game(-left * off, 100.0, 0.0))
+}
+
+/// The sideways distance `RailSlideMotion_Update` 0x10b0d0 measures (0x10b438): the board's right (+0x190) dotted with
+/// the vector from the board to the closest point on the rail (cm, all four lanes).
+pub fn rail_offset(right: V4, to_rail: V4) -> f32 {
+    dot(right, to_rail)
+}
+
+/// The rail's tangent turned to the way the board travels (0x10b1d0..0x10b228): reversed, all four lanes, when the unit
+/// velocity (+0x150) is against it.
+pub fn rail_travel(tangent: V4, velocity: V4) -> V4 {
+    if dot(unit(velocity), tangent) < 0.0 { scale(tangent, -1.0) } else { tangent }
+}
+
+/// A game direction (z up) as a port direction (y up), the other way of [`game_dir`].
+pub fn port_dir(v: V4) -> Vec3 {
+    to_port(v, 1.0)
+}
+
 /// A port direction (unit, y up) as the game's (z up): [`to_game`] with k = 1, w = 0. The rider's normal and up are kept
 /// in the game's space, so the lean record's tick and the ground tick take them as they are.
-pub(super) fn game_dir(v: Vec3) -> V4 {
+pub fn game_dir(v: Vec3) -> V4 {
     to_game(v, 1.0, 0.0)
 }
 
@@ -263,8 +354,10 @@ impl Rider {
     /// The lean record aimed for the next tick and the rider's up moved toward the normal (`Boarder_UpdateLeanTargets`
     /// 0x129500), after the tick's motion: from the steer as it is now (the game's sign: the port's is the other way),
     /// the velocity in cm/s and the normal the tick ended with.
-    /// STANDIN: in the air and on a rail the normal (+0x2a0) is the port's own: the game's `AirMotion_Update` 0x108378
-    /// takes it from its down ray whenever that hits, and `RailSlideMotion_Update` 0x10b0d0 sets it from the rail (row G20c2).
+    /// STANDIN: in the air the normal (+0x2a0) is the port's own: the game's `AirMotion_Update` 0x108378 takes it from its
+    /// down ray whenever that hits (0x108588, `World_RayCast` 0x25aff8, rows G20c2b and E7). On a rail it is
+    /// `RailSlideMotion_Update`'s ([`rail_normal`]) and at a respawn `Boarder_PlaceAt`'s ([`placed_normal`], its ray
+    /// hit apart), row G20c2.
     pub fn lean_aim(&mut self) {
         let (rate, target) = lean_targets(self.lean_motion(), -self.steer, to_game(self.vel, 100.0, 0.0));
         self.lean[1] = rate;

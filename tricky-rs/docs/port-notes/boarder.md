@@ -363,8 +363,35 @@ runs `Boarder_UpdateLeanTargets` over 2,000 chains of 12 ticks (each result fed 
 unit, tilted, not unit length, with and without a w) and `lean_up` matches the four words bit for bit, the normal
 untouched; `rider_up_follows_the_original` does the same through `Rider::lean_aim` from the port's normal (y up).
 
-Not done (new rows): in the air and on a rail the port's normal is its own, where the game's rider+0x2a0 is written by
-`AirMotion_Update` 0x108378 from its down ray whenever that hits (0x108588) and by `RailSlideMotion_Update` 0x10b0d0
-(0x10bbb8) from the rail, so the up is exact on the snow but not through a jump or a grind (G20c2); the placement's
-normal at a respawn is the port's last one, for the ray cast under the spawn (E7, same row); the control state, the
-ray cast's hit kind (+0x2e0) and the attitude quaternion across a landing are G20c3.
+Not done (new rows): in the air the port's normal is its own, where the game's rider+0x2a0 is written by
+`AirMotion_Update` 0x108378 from its down ray whenever that hits (0x108588), so the up is exact on the snow and on a
+rail but not through a jump (G20c2b); the control state, the ray cast's hit kind (+0x2e0) and the attitude quaternion
+across a landing are G20c3.
+
+## The ground normal, rider+0x2a0 (G20c2)
+
+Writers (decompile and disassembly of the three originals):
+- `Boarder_PlaceAt` 0x11cae8 sets it to (0, 0, 1, 0) (0x11cc5c), then, when it is not told to skip the ray, casts one
+  under the spawn (`World_RayCast` 0x25aff8) and takes the hit normal when the ray hits (0x11cd08); the up (+0x2c0)
+  is a copy of it (0x11cdf4).
+- `RailSlideMotion_Update` 0x10b0d0 (store 0x10bbb8), every tick the board is on the rail and inside the fall-off
+  limits. The tangent T is the rail's at the closest point (`Rail_ClosestPoint` 0x259330), reversed (all four lanes)
+  when the unit velocity is against it. The lean angle (object +8) starts at 0 (`RailSlideMotion_Enter` 0x10b068) and
+  moves to `lateral * k1 * k2` (lateral = board right (+0x190) dot the vector to the closest point, cm; k1, k2 =
+  0.6981317, 0.0125 for kinds 3 and 4, 0.34906584, 0.033333335 otherwise; negated when the board's up z (+0x1a8)
+  is negative) by at most 5 per tick. Flat rail (|T.z| <= 0.92): n = unit(Z - T * T.z), turned to the side of the
+  board's up (+0x1a0). Steep rail: c1 = unit(up x T), c2 = T x c1, n = c2 * cos(a) - c1 * sin(a).
+- `AirMotion_Update` 0x108378 (0x108588): the hit normal of its down ray, when it hits. Not ported (needs E7).
+
+Ported (`rider/ground_tick.rs`): `rail_lean_angle`, `rail_normal`, `placed_normal`, `rail_travel`, `rail_offset`;
+`Rider::rail_lean` (reset at the capture), `Rider::rail_step` sets `normal` from them every tick on the rail, and
+`Rider::respawn` sets (0, 0, 1, 0) and the up from it. Checked in the function runner (`tests/normal.rs`): the real
+`RailSlideMotion_Update` runs 20,000 times with the closest point given and the vector helpers real (steep and flat
+tangents, reversed travel, all four easing cases, w lanes): its normal (four words) and the lean angle equal
+`rail_normal` and `rail_lean_angle` bit for bit; the real `Boarder_PlaceAt` with the ray given (hit, miss, skipped)
+leaves the normal and up that `placed_normal` gives.
+
+STANDIN: the rail's closest point and the board's right/up are the game's attitude and a world query. The port builds
+the lateral offset from its own rail offset (`rail_lateral`: the board right taken as T x up, lying along the rail) and
+the board's up from the last normal; the respawn has no ray under it, so it is always (0, 0, 1, 0). Gap rows G20c2b
+(air normal and the placement's ray hit, E7) and G20c2c (the board's attitude as the rail's input).

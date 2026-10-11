@@ -364,6 +364,9 @@ pub struct Rider {
     pub full_count: i32,
     /// rider+0x1dc on a rail: how the board sits on it (1 along, 2 backward, 3 and 4 across), from the capture
     pub rail_kind: u32,
+    /// the rail motion object's +8: the lean angle (rad) that tips the normal on a steep rail, zero at the capture
+    /// (`RailSlideMotion_Enter` 0x10b068), moved on by `ground_tick::rail_lean_angle` every tick on the rail
+    pub rail_lean: f32,
     /// the rail quarter turns committed so far (`RailSlideControl_CommitQuarterTurn`), from the entry angle
     pub rail_goal0: f32,
     pub rail_committed: f32,
@@ -396,7 +399,7 @@ impl Rider {
                last_trick: String::new(), trick_timer: 0.0, crashed: 0.0, hard_land: 0.0, crouch_v: 0.0, brake_v: 0.0, jump_c: 0.0, jump_delay: 0.0, height: 0.0,
                course_dir: None, course_pts: None, wipe: None, crash_at: None, gm: None, crash_spray: None, lean: [0.0; 3], up: [0.0, 0.0, 1.0, 0.0], recover: None, ai: false, down_t: 0.0, getup: -1.0, stumble: 0.0, wall_hit: None, speed_timer: 0.0, spin_timer: 0.0, spin_used: false, tube_class: u8::MAX, gate_p: 0.0, gate_hi: 0.0, gate_lo: 0.0, gate_still: 0.0, gate_target: 0.0, gate_speed: 0.0, gate_state: 8, gate_rock_dir: 0, band: (0.005, 0.0250417), spin_base: 0.0, flip_base: 0.0, late: false, cause: "", spin_ax: Axis::default(), flip_ax: Axis::default(), air_mode2: false, rail_off: 0.0, rail_time: 0.0, rail_halves: 0, boost_was: false, chain: 0,
                ubers: Vec::new(), uber: 0.0, uber_id: 0, uber_done: false, letters: 0, multiplier: 1,
-               sc: new_score(), tick_acc: 0.0, full_count: 0, rail_kind: 0, rail_goal0: 0.0, rail_committed: 0.0, show_parts: Vec::new(), grab_scored: false, grab_tw: false, hit_wait: 0 }
+               sc: new_score(), tick_acc: 0.0, full_count: 0, rail_kind: 0, rail_lean: 0.0, rail_goal0: 0.0, rail_committed: 0.0, show_parts: Vec::new(), grab_scored: false, grab_tw: false, hit_wait: 0 }
     }
     /// `Boarder_Respawn`: dropped a metre above the snow, already moving down the course at 30 km/h.
     pub fn respawn(&mut self, at: (Vec3, f32)) {
@@ -425,8 +428,9 @@ impl Rider {
         self.grind_time = 0.0;
         // `Boarder_PlaceAt` 0x11cae8 zeroes the lean record (+0x244, +0x248, +0x24c)
         self.lean = [0.0; 3];
-        // `Boarder_PlaceAt` 0x11cae8 copies the normal (+0x2a0) to the rider's up (+0x2c0). STANDIN: the normal is the
-        // port's last one, for the placement's ray cast under the spawn (`World_RayCast` 0x25aff8, row E7)
+        // `Boarder_PlaceAt` 0x11cae8 sets the normal (+0x2a0) to the ray hit's under the spawn, (0,0,1,0) when it hits
+        // nothing, and copies it to the rider's up (+0x2c0). STANDIN: no ray hit (`World_RayCast` 0x25aff8, row E7)
+        self.normal = ground_tick::port_dir(ground_tick::placed_normal(None));
         self.up = ground_tick::game_dir(self.normal);
         // `Boarder_PlaceAt` 0x11cae8: the chain banked, its meter change (−0.12) applied
         let (m, calls) = self.sc.bank_points();
@@ -1061,6 +1065,8 @@ impl Rider {
                     // `Rail_TryCapture`: how the board sits on the rail (STANDIN: the angle's sign as ours)
                     let deg30 = 0.5235988;
                     self.rail_kind = if tw.abs() > 2.6179938 { 2 } else if tw < -deg30 { 4 } else if tw > deg30 { 3 } else { 1 };
+                    // `RailSlideMotion_Enter` 0x10b068: the lean angle starts at zero
+                    self.rail_lean = 0.0;
                     self.land(Some(self.rail_kind));
                     // `RailSlideControl_Enter`: the rail's spin starts from nothing
                     self.sc.update_spin(0);
@@ -1248,6 +1254,10 @@ impl Rider {
         self.rail_time += dt;
         let rail = &rails.0[ri];
         let (_, tan) = rail.at(d);
+        // `RailSlideMotion_Update` 0x10b0d0 reads the tangent where the board is now, and the balance offset before it moves
+        let travel0 = tan * if s >= 0.0 { 1.0 } else { -1.0 };
+        let board_up = ground_tick::game_dir(self.normal); // STANDIN for the board's up (+0x1a0)
+        let lateral = ground_tick::rail_lateral(travel0, board_up, self.rail_off);
         s += -9.8 * tan.y * dt;
         // boost: a kick per press; held only while crouched
         let pressed = input.boost && !self.boost_was;
@@ -1293,7 +1303,9 @@ impl Rider {
         self.pos = p + left * self.rail_off;
         self.vel = tan * s;
         self.yaw = f32::atan2(-travel.x, -travel.z) - self.rail_twist;
-        self.normal = (Vec3::Y - travel * travel.y).normalize_or(Vec3::Y);
+        // the normal and its lean angle as `RailSlideMotion_Update` 0x10b0d0 writes them (+0x2a0, object +8)
+        self.rail_lean = ground_tick::rail_lean_angle(self.rail_lean, lateral, self.rail_kind, board_up[2]);
+        self.normal = ground_tick::port_dir(ground_tick::rail_normal(ground_tick::game_dir(travel0), board_up, self.rail_lean));
         self.grounded = false;
         self.air_time = 0.0;
         self.grind_time += dt;
