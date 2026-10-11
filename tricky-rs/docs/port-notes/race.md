@@ -60,6 +60,21 @@ Part of the port notes (index: [README.md](README.md)); units and wording as des
   left < 60·sc, else rock (turn round each time p reaches the target).
 - Result: rocking back about 26 ticks before GO gives ~10.7 m/s instead of 5.5.
 
+### Proven (G1c2; exact in `tricky-rs/game/src/gate.rs`, checked bit for bit in `tests/gate.rs`)
+
+- k = stat·0.71808594·0.003921569 + 0.4875571 with stat the start byte stats+0x15 (0..255), in that order.
+- `GateAnticipateControl_Update` 0x105f58: the stick is the pad word's low 6 bits, sign-extended, /31. Target m0
+  (`FUN_0015fde0` on layer 1), m0·0.5 or 0; rider+0x240 target, +0x23c rate k·4.437673·max(|target − p|, 0.2146618),
+  p (+0x238) steps by rate·0.016666668 and snaps to the target when within a step. If p did not move, still
+  (state+8) += 0.016666668 s; else still = 0 and hi (+0x10) or lo (+0xc) = p. rider+0x1c0 = `Boarder_GetGateStartTimer`.
+- `GateAnticipateControl_Exit` 0x106140: rider+0x1c8 = 0x440ae38e (555.5555 cm/s); when target < 0.5 and still <
+  0.006666667 (so: p moved on the last tick), v = (hi − lo)·2024.8037·(1 − p)/(still + 1) (still in seconds, not
+  ×60 as above), kept when ≥ 555.55554.
+- `GateLaunchControl_Enter` 0x106228: target 1, rate k·4.437673·0.2146618. `_Update` 0x1062b0: p steps as above; if
+  the VU length of the velocity is exactly 0 and m1 (`FUN_0015fde0` layer 2) ≤ p: velocity = board forward
+  (rider+0x180) × (k·launch), `Boarder_SetMotion`(2). At p == 1: `Boarder_SetMotion`(2) unless already 2,
+  `AnimCtl_PlayClip` 0x1fd, `Boarder_SetState`(7).
+
 ## The finish (`Boarder_Finish` 0x11da40, `FinishState_Update` 0x106668, `cEndRaceHandler_Update` 0x1141e0)
 
 - Every rider over the line enters state 6 (pad/AI ignored): substate 0 brakes hard until under 277.78 cm/s;

@@ -54,13 +54,13 @@ address,size,name,system,status
 0x105c60,288,GetupFromSitControl_Update,boarder?,not started
 0x105d80,60,Gate2BaseControl_Enter,race?,not started
 0x105dc0,388,Gate2BaseControl_Update,boarder?,not started
-0x105f48,16,GateAnticipateControl_Enter,boarder,not started
-0x105f58,484,GateAnticipateControl_Update,boarder,not started
-0x106140,168,GateAnticipateControl_Exit,boarder,not started
+0x105f48,16,GateAnticipateControl_Enter,boarder,checked
+0x105f58,484,GateAnticipateControl_Update,boarder,checked
+0x106140,168,GateAnticipateControl_Exit,boarder,checked
 0x1061e8,40,GateAnticipateControl_SaveSnapshot,save,not started
 0x106210,20,GateAnticipateControl_LoadSnapshot,boarder,not started
-0x106228,132,GateLaunchControl_Enter,boarder?,not started
-0x1062b0,464,GateLaunchControl_Update,boarder?,not started
+0x106228,132,GateLaunchControl_Enter,boarder,checked
+0x1062b0,464,GateLaunchControl_Update,boarder,checked
 0x106480,124,FUN_00106480,boarder?,not started
 0x106500,60,LessonWaitControl_Enter,boarder?,not started
 0x106548,124,FUN_00106548,boarder?,not started
