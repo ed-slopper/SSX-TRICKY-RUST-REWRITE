@@ -4227,3 +4227,20 @@ G 157330 Scoring_PushMessage
 G 2ac178 List_DeleteAll
 G 2759c8 FE_GetSpriteRect
 F 17cf50 cBxObjNode cBxObjNode
+G 2309a8 Speech_GetModeMask
+G 222cc0 SndSys_ScheduleEvent
+G 215488 Audio_StopAll
+G 1f9d28 SpriteSet_PollLoad
+G 1e85b0 PS2Render_UpdateModelMatrices
+G 1a8688 Overlay_GetNewButtons
+G 17d8b0 BxList_NextOrNull
+G 2ac4b0 FE3D_GetSpriteRect
+G 2ac3b0 FE3DThing_StartTween
+G 2ac140 List_PushBack
+G 274208 FE3D_BuildDialogScreen
+G 240ed8 Name_Hash
+G 23d5d0 Debug_Printf
+G 228958 SpeechSys_CanPlay
+G 1c4c38 PS2Draw_SelectViewport
+G 1aae10 Results_SetRowLayout
+G 1a77f8 OverlayMan_IsAnyActive
