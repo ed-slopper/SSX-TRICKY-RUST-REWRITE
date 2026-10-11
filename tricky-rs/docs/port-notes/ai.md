@@ -163,3 +163,17 @@ Part of the port notes (index: [README.md](README.md)); units and wording as des
   ≤ the rider's distance), value bit 1, value bit 0] (the last two go to `AIComputer_PlanJumpTrick`).
   `AIComputer_FindSpeedHint` 0x1393e0: to 600 cm past; the first speed hint (event 101): value × 27.777777 cm/s,
   inside already.
+
+## The AI paths' geometry, exactly (row G4f, checked on every course's paths: `tests/aipath.rs`; `aipath.rs`)
+
+- `AIP_GetPathLength` 0x197b50: the segment lengths added in order. `AIP_GetPositionAtDistance` 0x1979f8: walk the
+  segments (direction × length) from the start (w 1); past the end the end, flag 0. `AIP_GetDirectionAtDistance`
+  0x197738: the segment's direction (the last past the end).
+- `AIP_ProjectOntoPath` 0x197250: per segment, the flat (x, y) projection clamped to it, the nearest by flat
+  distance² (strictly less); returns its distance along, the point, √ the flat distance².
+  `AIP_ProjectOntoPathFrom` 0x197478: the same from a remembered segment (rider+0x390 start, +0x3a0 distance along,
+  +0x3a4 index; −1 from the start), no further than 3000 past it, and stopping at the first segment the point falls
+  within (when it started from one); it moves the memory to the nearest segment.
+- `AIP_DistanceToLineBox` 0x197830: the largest per-axis distance outside the path's box (+0x1c min, +0x28 max).
+  `AIP_SortLinesByDistance` 0x197f28 (the course's set at 0x337fb8): up to n paths, first those the point is inside
+  (in order), then the nearest box one at a time (the earlier on a tie); with the flag only respawnable ones.

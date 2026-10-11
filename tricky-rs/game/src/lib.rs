@@ -3,6 +3,7 @@
 
 pub mod air;
 pub mod aicomp;
+pub mod aipath;
 pub mod boarder;
 pub use tricky_data::anim;
 pub mod collbody;
