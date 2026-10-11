@@ -6,7 +6,7 @@
 
 use crate::collide::CollisionWorld;
 use crate::rider::{Rider, BODY_RADIUS};
-use bevy::math::{Quat, Vec3};
+use glam::{Quat, Vec3};
 
 /// What touching it does.
 #[derive(Clone, Copy, PartialEq, Debug)]
@@ -30,7 +30,7 @@ pub struct Prop {
     /// the level instance it was made from
     pub inst: usize,
     /// how it flies when broken off (the level script's debris settings), if it has them
-    pub debris: Option<crate::logic::DebrisDef>,
+    pub debris: Option<tricky_data::logic::DebrisDef>,
     /// a pickup that stays where it is when touched (the multiplier gems, speed boost pads)
     pub stays: bool,
     /// broken by the level scripts (cracked glass, `worldanim`), not by touching it
@@ -262,7 +262,7 @@ pub fn shove_push(from: &Rider, to: &Rider) -> Vec3 {
 pub struct Tube { lap: (Vec3, Vec3), z: (Vec3, Vec3), end: (Vec3, Vec3), top_y: f32, out: [(Vec3, f32); 3] }
 impl Tube {
     /// From the level's instances (game coordinates); None on courses without the tube.
-    pub fn find(level: &crate::level::Level) -> Option<Self> {
+    pub fn find(level: &tricky_data::level::Level) -> Option<Self> {
         let at = |name: &str| level.instances.iter().find(|i| i.instance_name.starts_with(name)).map(|i| Vec3::from(i.location));
         let (lap, z, end) = (at("Mdl_Endboost_Lap")?, at("Mdl_Endboost_Z")?, at("Mdl_Endboost_End")?);
         // game (x, y, z) cm -> Bevy (x, z, -y) m; boxes as (centre, half size) from the meshes

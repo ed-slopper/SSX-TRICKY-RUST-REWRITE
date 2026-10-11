@@ -4077,11 +4077,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "tricky-data"
+version = "0.1.0"
+dependencies = [
+ "glam",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "tricky-game"
 version = "0.1.0"
 dependencies = [
  "glam",
  "serde",
+ "tricky-data",
 ]
 
 [[package]]
@@ -4093,6 +4103,7 @@ dependencies = [
  "rodio",
  "serde",
  "serde_json",
+ "tricky-data",
  "tricky-game",
 ]
 

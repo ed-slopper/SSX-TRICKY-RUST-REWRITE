@@ -5,7 +5,7 @@
 //!
 //! STANDIN: SSX-Library's JSON project folder, for the game's own level files and their readers (DATA/MODELS/*.pbd and the rest)
 
-use bevy::math::{Mat4, Quat, Vec2, Vec3};
+use glam::{Mat4, Quat, Vec2, Vec3};
 use serde::Deserialize;
 use std::{fs, path::{Path, PathBuf}};
 
@@ -124,7 +124,7 @@ pub struct ModelObject {
     #[serde(default)]
     pub animation: Option<ObjAnim>,
 }
-pub use tricky_game::anim::ObjAnim;
+pub use crate::anim::ObjAnim;
 
 #[derive(Deserialize)]
 #[serde(rename_all = "PascalCase")]

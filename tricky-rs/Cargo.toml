@@ -5,6 +5,7 @@ edition = "2021"
 
 [dependencies]
 tricky-game = { path = "game" }
+tricky-data = { path = "data" }
 rodio = { version = "0.20", default-features = false, features = ["vorbis"] }
 bevy = { version = "0.16.1", default-features = false, features = [
     "bevy_asset", "bevy_color", "bevy_core_pipeline", "bevy_pbr", "bevy_render",

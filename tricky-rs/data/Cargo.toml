@@ -1,0 +1,12 @@
+[package]
+name = "tricky-data"
+version = "0.1.0"
+edition = "2021"
+description = "SSX Tricky's file formats and the data read from them (levels, level scripts, characters, race lines, camera scripts), without Bevy (row F11b)"
+publish = false
+
+[dependencies]
+# the same glam as Bevy 0.16, so every crate shares one Vec3
+glam = "0.29.3"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"

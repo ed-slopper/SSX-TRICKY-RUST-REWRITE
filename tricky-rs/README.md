@@ -80,7 +80,7 @@ What is simulated: rail grinding, gravity along the slope, edge grip (carving), 
 walls, rocks, trees and buildings, riding on flat object tops, respawn if you fall out of the world.
 The terrain you collide with is exactly the terrain that is drawn. Objects use the game's own collision meshes.
 
-The physics constants at the top of `src/rider.rs` are tuned by guesswork, not taken from the game yet.
+The physics constants at the top of `game/src/rider.rs` are the game's (see `docs/port-notes/`); the few still ours are tagged `STANDIN:`.
 
 ### Self-test
 
@@ -100,19 +100,22 @@ cargo run --release -- ..\levels\gari
 
 ## Source layout
 
-Two crates. `game/` (`tricky-game`) is the riding physics without Bevy (glam and serde only), so tests and the
-function runner can call it directly and it builds anywhere; `src/` is the Bevy app and re-exports it.
+Three crates. `data/` (`tricky-data`) reads the files: levels, level scripts, characters, race lines, camera
+scripts. `game/` (`tricky-game`) is the riding, the race and the AI on top of it. Neither uses Bevy (glam, serde
+and serde_json only), so tests and the function runner can call them directly and they build anywhere; `src/`
+is the Bevy app and re-exports both, so its `crate::level`, `crate::rider` and the like still work.
 
 - `game/src/rider.rs` (+ `rider/wipeout.rs`) - the rider's physics, wipe-outs and trick names as plain functions.
 - `game/src/collide.rs` - triangle grid: ground-under-point and push-sphere-out-of-walls queries.
 - `game/src/rails.rs` - grindable rails built from the level's splines.
 - `game/src/trickdata.rs` - rider stats and trick tables read out of the executable.
-- `game/src/anim.rs` - keyframed object animation curves.
+- `game/src/race.rs` - the race around the rider: AI driver, race timing, chase camera, and the headless self-test.
+- `game/src/props.rs` - knockable objects and rider-to-rider contact.
 - `game/tests/` - tests of the physics on its own (`cd game && cargo test`).
-- `src/level.rs` - project-folder loader (JSON + OBJ), Bezier evaluation. Stays in game coordinates (X/Y ground, Z up).
-- `src/props.rs` - knockable objects and rider-to-rider contact.
-- `src/character.rs` - character model loading, the code-driven pose, CPU skinning.
-- `src/rider.rs` - the race around the rider: AI driver, race timing, chase camera, and the headless self-test.
+- `data/src/level.rs` - project-folder loader (JSON + OBJ), Bezier evaluation. Stays in game coordinates (X/Y ground, Z up).
+- `data/src/logic.rs` - the level's scripts and controllers; `data/src/course.rs` - race lines and AI paths;
+  `data/src/intro.rs` - camera scripts (CML) and scenes; `data/src/anim.rs` - keyframed object animation curves.
+- `data/src/character.rs` - character model loading, the code-driven pose, CPU skinning.
 - `src/main.rs`  - Bevy app: textures with mipmaps, terrain/object/sky meshes, input, cameras, HUD.
 
 The Python tools this README names (`tools/bnk`, `tools/mpf`, `tools/music`, `tools/sfn`) are in the repo's own

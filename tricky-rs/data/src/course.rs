@@ -5,7 +5,7 @@
 //! level (2D) length of each segment, and every line knows its distance to the finish (DTF) at
 //! its start. A rider's progress is the best (smallest) distance to the finish reached so far;
 //! events between the old and the new best fire as the rider passes them.
-use bevy::prelude::Vec3;
+use glam::Vec3;
 
 /// File event types on race lines (`Path_ReadEvent`: runtime = file + 1).
 pub const EV_FINISH: i32 = 9;

@@ -12,16 +12,13 @@
 // argument lists and complex types are how Bevy code reads (Bevy itself allows these two lints).
 #![allow(clippy::too_many_arguments, clippy::type_complexity)]
 
-mod character;
-use tricky_game::{collide, rails, trickdata};
-mod level;
-mod props;
+use tricky_data::{character, course, intro, level, logic};
+use tricky_game::{collide, props, rails, trickdata};
 mod ui;
 mod sound;
 mod spray;
 mod tracks;
 mod book;
-mod logic;
 mod particles;
 mod boardsound;
 mod hudsprites;
@@ -30,8 +27,6 @@ mod sfnfont;
 mod coursemusic;
 mod pathmusic;
 mod editor;
-mod course;
-mod intro;
 mod rivals;
 mod rider;
 mod worldanim;

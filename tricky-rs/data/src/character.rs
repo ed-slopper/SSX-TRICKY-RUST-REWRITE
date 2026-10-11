@@ -9,7 +9,7 @@
 //! Model space (as stored): centimetres, hips at the origin, +X = the character's left,
 //! -Y = the way the character faces, +Z = up.
 
-use bevy::math::{EulerRot, Mat3, Mat4, Quat, Vec2, Vec3};
+use glam::{EulerRot, Mat3, Mat4, Quat, Vec2, Vec3};
 use serde::Deserialize;
 use std::collections::HashMap;
 use std::path::Path;

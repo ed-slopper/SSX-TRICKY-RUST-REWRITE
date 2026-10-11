@@ -23,7 +23,7 @@ ROOT = Path(__file__).resolve().parent.parent
 INDEX = ROOT / "tricky-rs" / "docs" / "function-index.csv"
 GUESSES = ROOT / "tricky-rs" / "docs" / "function-systems.csv"
 # our Rust: the Bevy app and the Bevy-free game crate (row F11a); tests are not ports, so not scanned
-SRCS = [ROOT / "tricky-rs" / "src", ROOT / "tricky-rs" / "game" / "src"]
+SRCS = [ROOT / "tricky-rs" / "src", ROOT / "tricky-rs" / "game" / "src", ROOT / "tricky-rs" / "data" / "src"]
 SYMBOLS = ROOT / "ghidra" / "symbols.txt"
 RENAMED = ROOT / "ghidra" / "renamed.txt"
 # Systems Rust and Bevy stand in for: their functions are not ported (status 'host'). Row F1b.

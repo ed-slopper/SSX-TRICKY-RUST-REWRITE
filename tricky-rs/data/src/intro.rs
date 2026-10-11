@@ -5,7 +5,7 @@
 //! A .cml file: word 0 a hash, then the first record of each type (0 cameras, 2 director scripts,
 //! 4 camera regions, ...). Every record has a 0x20-byte header (+0 next of the type, +8 body,
 //! +0x10 name) and a body of fields; 0xDEADC0ED marks a field left unset.
-use bevy::prelude::Vec3;
+use glam::Vec3;
 use std::path::Path;
 
 const NONE: u32 = 0xDEAD_C0ED;

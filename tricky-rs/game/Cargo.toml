@@ -6,6 +6,8 @@ description = "SSX Tricky's riding physics, wipe-outs, collision and trick data,
 publish = false
 
 [dependencies]
+# the file formats and what is read from them (row F11b)
+tricky-data = { path = "../data" }
 # the same glam as Bevy 0.16, so tricky-rs and this crate share one Vec3
 glam = "0.29.3"
 serde = { version = "1", features = ["derive"] }

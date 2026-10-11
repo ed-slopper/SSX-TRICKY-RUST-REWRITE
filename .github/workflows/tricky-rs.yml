@@ -8,6 +8,7 @@ on:
       - 'tricky-rs/Cargo.toml'
       - 'tricky-rs/Cargo.lock'
       - 'tricky-rs/game/**'
+      - 'tricky-rs/data/**'
       - '.github/workflows/tricky-rs.yml'
   pull_request:
     paths:
@@ -15,6 +16,7 @@ on:
       - 'tricky-rs/Cargo.toml'
       - 'tricky-rs/Cargo.lock'
       - 'tricky-rs/game/**'
+      - 'tricky-rs/data/**'
       - '.github/workflows/tricky-rs.yml'
   workflow_dispatch:
 
@@ -50,11 +52,15 @@ jobs:
           workspaces: |
             tricky-rs
             tricky-rs/game
+            tricky-rs/data
           cache-on-failure: true
       # cargo test builds the game too, so no separate cargo build
       - run: cargo test --locked
       - name: cargo test (tricky-game, the Bevy-free physics)
         working-directory: tricky-rs/game
+        run: cargo test --locked
+      - name: cargo test (tricky-data, the file formats)
+        working-directory: tricky-rs/data
         run: cargo test --locked
       # Strict (row F5a): any clippy warning fails the build. main.rs allows too_many_arguments and
       # type_complexity, as Bevy code does; anything else is fixed, or allowed where it stands with a reason.

@@ -31,6 +31,7 @@ __pycache__/
 /tricky-rs/target/
 /tricky-rs/target-msvc/
 /tricky-rs/game/target/
+/tricky-rs/data/target/
 /tricky-rs/*.exe
 /tricky-rs/*.png
 /tricky-rs/*.mp4
