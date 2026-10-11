@@ -264,6 +264,18 @@ impl IniReader {
         Some(self.read_quoted())
     }
 
+    /// The cursor back to the top (what the loaders do by setting +8 to +4).
+    pub fn rewind(&mut self) {
+        self.cur = 0;
+    }
+
+    /// `IniReader_ParseInt` 0x221da0: past spaces, the next word, `sscanf` "%d" of it.
+    pub fn parse_int(&mut self) -> Option<i32> {
+        self.skip_space();
+        let t = self.read_token();
+        scan_int(&t)
+    }
+
     /// `IniReader_ReadInt` 0x221fd8: when the last token is `key`, `= n` (`sscanf` "%d" of the next word; `None`
     /// inside when it has no number, where the game leaves its stack word).
     pub fn read_int(&mut self, key: &[u8]) -> Option<Option<i32>> {

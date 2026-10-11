@@ -22,50 +22,40 @@ enum Op { Load(String), Num(f32), Map(f32), Square, Sqrt, Add(f32), Sub(f32), Mu
 struct Programs(HashMap<(String, String), Vec<Op>>);
 
 impl Programs {
+    /// The programs as the game compiles SNOW.INF (`Sfx_LoadSurfaceConfig` / `Sfx_LoadBoardConfig`, row E5b2:
+    /// `tricky_data::snowsfx`), read back into instructions for `run`. STANDIN: `run` is ours (the game's interpreter
+    /// is not found yet); a LOAD of an input past 4 and LOG run as nothing.
     fn parse(text: &str) -> Self {
+        use tricky_data::snowsfx::{compile_all, decode, Op as G, MODES, SURFACES};
         let mut out = HashMap::new();
-        let mut tops: Vec<String> = Vec::new();
-        let mut last_was_top = false;
-        let mut sub: Option<String> = None;
-        let mut ops: Vec<Op> = Vec::new();
-        let flush = |tops: &Vec<String>, sub: &Option<String>, ops: &mut Vec<Op>, out: &mut HashMap<(String, String), Vec<Op>>| {
-            if let Some(s) = sub { for t in tops { out.insert((t.clone(), s.clone()), ops.clone()); } }
-            ops.clear();
-        };
-        for raw in text.lines() {
-            let line = raw.split('#').next().unwrap_or("");
-            let t = line.trim();
-            if t.is_empty() { continue; }
-            if t.starts_with('[') && t.ends_with(']') {
-                let name = t[1..t.len() - 1].trim().to_uppercase();
-                let indented = line.starts_with(' ') || line.starts_with('\t');
-                flush(&tops, &sub, &mut ops, &mut out);
-                if indented { sub = Some(name); last_was_top = false; }
-                else {
-                    if !last_was_top { tops.clear(); }
-                    tops.push(name);
-                    sub = None;
-                    last_was_top = true;
-                }
-                continue;
+        for (mi, progs) in compile_all(text.as_bytes()).iter().enumerate() {
+            for (si, p) in progs.iter().enumerate() {
+                let ops = decode(p).into_iter().map(|g| match g {
+                    G::Load(i) => match i { 0 => Op::Load("slip".into()), 1 => Op::Load("dig".into()), 2 => Op::Load("lean".into()), 3 => Op::Load("board".into()), 4 => Op::Load("bend".into()), _ => Op::Nop },
+                    G::LoadConst(n) => Op::Num(n as f32),
+                    G::Map(n) => Op::Map(n as f32),
+                    G::Square => Op::Square,
+                    G::Sqrt => Op::Sqrt,
+                    G::Log => Op::Nop,
+                    G::Add(n) => Op::Add(n as f32),
+                    G::Sub(n) => Op::Sub(n as f32),
+                    G::Mul(n) => Op::Mul(n as f32),
+                    G::Div(n) => Op::Div(n as f32),
+                    G::Neg => Op::Neg,
+                    G::Abs => Op::Abs,
+                    G::Bound(lo, hi) => Op::Bound(lo as f32, hi as f32),
+                    G::Push => Op::Push,
+                    G::Pop => Op::Pop,
+                    G::SAdd => Op::SAdd,
+                    G::SSub => Op::SSub,
+                    G::SMul => Op::SMul,
+                    G::SDiv => Op::SDiv,
+                    G::AssignVol => Op::Vol,
+                    G::AssignBend => Op::Bend,
+                }).collect();
+                out.insert((SURFACES[si].to_string(), MODES[mi].to_string()), ops);
             }
-            last_was_top = false;
-            let mut w = t.split(|c: char| c.is_whitespace() || c == ',').filter(|s| !s.is_empty());
-            let word = w.next().unwrap_or("").to_ascii_lowercase();
-            let a: Vec<f32> = w.clone().filter_map(|x| x.parse().ok()).collect();
-            let arg = a.first().copied().unwrap_or(0.0);
-            ops.push(match word.as_str() {
-                "load" => match w.next() { Some(x) => match x.parse::<f32>() { Ok(n) => Op::Num(n), Err(_) => Op::Load(x.to_ascii_lowercase()) }, None => Op::Nop },
-                "loadconst" => Op::Num(arg),
-                "map" => Op::Map(arg), "square" => Op::Square, "sqrt" => Op::Sqrt,
-                "add" => Op::Add(arg), "sub" => Op::Sub(arg), "mul" => Op::Mul(arg), "div" => Op::Div(arg),
-                "bound" => Op::Bound(arg, a.get(1).copied().unwrap_or(127.0)),
-                "push" => Op::Push, "pop" => Op::Pop, "sadd" => Op::SAdd, "ssub" => Op::SSub, "smul" => Op::SMul, "sdiv" => Op::SDiv,
-                "neg" => Op::Neg, "abs" => Op::Abs, "assignvol" => Op::Vol, "assignbend" => Op::Bend,
-                _ => Op::Nop,
-            });
         }
-        flush(&tops, &sub, &mut ops, &mut out);
         Self(out)
     }
     /// Run a program: (volume, bend), both 0..127 (bend 64 = no change).

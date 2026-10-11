@@ -363,3 +363,101 @@ fn music_config_matches_the_original() {
         println!("{:>10}: {names:?}", String::from_utf8_lossy(k));
     }
 }
+
+#[test]
+fn board_sound_programs_match_the_original() {
+    // `Sfx_LoadSurfaceConfig` 0x210c38 (with `Sfx_LoadBoardConfig` 0x21a7c8) on SNOW.INF: every surface × mode
+    // program's bytes against `tricky_data::snowsfx::compile_all`
+    use tricky_data::snowsfx::{compile_all, decode, MODES, SURFACES};
+    let Some(dir) = std::env::var_os("TRICKY_CONFIG_DIR") else { return };
+    let snow = std::fs::read(std::path::PathBuf::from(dir).join("SNOW.INF")).unwrap();
+    let Some(mut r) = Runner::from_env() else { return };
+    for a in [0x2217d8u32, 0x2217f0, 0x2218c0, 0x221988, 0x221a00, 0x221af0, 0x221b60, 0x221918, 0x221be8, 0x221c90, 0x221d58, 0x221da0, 0x221de8, 0x221e90, 0x221ef8, 0x221f70, 0x221fd8, 0x21a7c8, 0x2cc808] {
+        r.allow(a);
+    }
+    fn read(m: &mut r5900::Mem, at: u32) -> Vec<u8> {
+        let mut v = Vec::new();
+        let mut a = at;
+        loop {
+            let mut b = [0u8];
+            m.read(a, &mut b);
+            if b[0] == 0 {
+                return v;
+            }
+            v.push(b[0]);
+            a += 1;
+        }
+    }
+    r.stub(0x2fcc98, |c, m| {
+        let (a, b) = (read(m, c.gpr(4) as u32), read(m, c.gpr(5) as u32));
+        let eq = a.len() == b.len() && a.iter().zip(&b).all(|(x, y)| x.to_ascii_lowercase() == y.to_ascii_lowercase());
+        c.set_gpr(2, if eq { 0 } else { 1 });
+    });
+    r.stub(0x2fcaa0, |c, m| {
+        // sscanf(word, "%d", out): the leading number, or the word left alone
+        let w = read(m, c.gpr(4) as u32);
+        let s = String::from_utf8_lossy(&w).trim_start().to_string();
+        let b = s.as_bytes();
+        let mut e = 0;
+        if e < b.len() && (b[e] == b'-' || b[e] == b'+') {
+            e += 1;
+        }
+        let d = b[e..].iter().take_while(|x| x.is_ascii_digit()).count();
+        if d > 0 {
+            let v: i64 = s[..e + d].parse().unwrap();
+            m.write_u32(c.gpr(6) as u32, v as i32 as u32);
+            c.set_gpr(2, 1);
+        } else {
+            m.write_u32(c.gpr(6) as u32, 0);
+            c.set_gpr(2, 0);
+        }
+    });
+    r.stub(0x2fb2b4, |c, m| {
+        let (d, s, n) = (c.gpr(4) as u32, c.gpr(5) as u32, c.gpr(6) as u32);
+        let mut buf = vec![0u8; n as usize];
+        m.read(s, &mut buf);
+        for (k, x) in buf.iter().enumerate() {
+            m.write_u8(d + k as u32, *x);
+        }
+        c.set_gpr(2, d as u64);
+    });
+    let heap = r.mem.alloc(0x2_0000);
+    let next = Rc::new(std::cell::Cell::new(heap));
+    let nx = next.clone();
+    r.stub(0x2ccf70, move |c, _| {
+        let size = (c.gpr(5) as u32 + 15) & !15;
+        let at = nx.get();
+        nx.set(at + size);
+        c.set_gpr(2, at as u64);
+    });
+    let text = r.mem.alloc(snow.len() as u32 + 16);
+    for (k, b) in snow.iter().enumerate() {
+        r.mem.write_u8(text + k as u32, *b);
+    }
+    r.mem.write_u8(text + snow.len() as u32, 0);
+    let len = snow.len() as u32;
+    r.stub(0x221668, move |c, m| {
+        let rd = c.gpr(4) as u32;
+        m.write_u32(rd, len);
+        m.write_u32(rd + 4, text);
+        m.write_u32(rd + 8, text);
+        c.set_gpr(2, rd as u64);
+    });
+    for a in [0x221788u32, 0x114f80] {
+        r.stub(a, |_, _| {});
+    }
+    let obj = r.mem.alloc(0x8000);
+    r.cpu.set_gpr(4, obj as u64);
+    r.call(0x210c38).expect("Sfx_LoadSurfaceConfig");
+    let ours = compile_all(&snow);
+    for (mi, mode) in MODES.iter().enumerate() {
+        for (si, surf) in SURFACES.iter().enumerate() {
+            let e = obj + 0x745c + 0x50 * si as u32 + 0x320 * mi as u32;
+            let (p, n) = (r.mem.read_u32(e), r.mem.read_u32(e + 0x44));
+            let mut theirs = vec![0u8; n as usize];
+            r.mem.read(p, &mut theirs);
+            assert_eq!(theirs, ours[mi][si], "{surf} {mode}");
+            println!("{surf:>6} {mode:<7} {:3} bytes: {:?}", theirs.len(), decode(&theirs));
+        }
+    }
+}
