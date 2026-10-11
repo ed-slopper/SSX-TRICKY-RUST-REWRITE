@@ -4509,3 +4509,194 @@ G 1569b0 Score_LandTrick
 G 11f2a0 Boarder_EstimateFinishTime
 G 2b1008 FE3DText_SetupTextBox
 G 2b0b90 FE3DTextBox_Init
+G 29b9f8 FEDifficultSel_UpdateDesc
+G 29b5d0 FEEventSel_UpdateDesc
+G 29a7a8 FEModeSelect_UpdateDesc
+G 28de90 FECustomBody_UpdateDesc
+G 27a240 FECharacterAccept_UpdateDesc
+G 29f720 FEOptions_ApplyDisplay
+G 29baa0 FEVenueSel_UpdateLocks
+G 27a4a8 FETrickBook_UpdatePageCount
+F 1864a0 cVideoModule cVideoModule
+F 1ca2c8 cFogVolume cFogVolume
+F 1ca320 cPS2FogVolume cPS2FogVolume
+F 1ce0f0 cLightMan cLightMan
+F 1d9be0 cPS2BezierMan cPS2BezierMan
+F 225fa8 cPS2SoundManager cPS2SoundManager
+F 23d908 cPS2MemCard cPS2MemCard
+F 2455c0 cFirstLoad cFirstLoad
+F 249758 c1PFELoad c1PFELoad
+F 24b028 c2PFELoad c2PFELoad
+F 24d7f8 cTrickTutorialLoad cTrickTutorialLoad
+F 24ea20 cRiderRankingLoad cRiderRankingLoad
+F 263280 cFE3D cFE3D
+F 265ca0 cFE3D cFE3D
+F 2702e0 cFE3DSound cFE3DSound
+F 1bd358 cHelpRaceOverlay Draw
+F 1bd3b8 cHelpRaceOverlay DrawText
+F 1bd310 cHelpRaceOverlay Update
+F 1bd2b0 cHelpRaceOverlay Reset
+F 1b73e0 cHiScoreRecordOverlay DrawText
+F 1b7d98 cHiScoreRecordOverlay Update
+F 1b6d60 cHiScoreRecordOverlay Reset
+F 1b4950 cNextRaceOverlay Draw
+F 1b4d98 cNextRaceOverlay DrawText
+F 1b5878 cNextRaceOverlay Update
+F 1b4120 cNextRaceOverlay Reset
+F 1b65f0 cUnlockedOverlay DrawText
+F 1b6ac0 cUnlockedOverlay Update
+F 1b5ef8 cUnlockedOverlay Reset
+F 198eb8 cAnimObjectNode OnContact
+F 199200 cAnimObjectNode Kill
+F 19a390 cAnimComboNode Kill
+F 180d08 cGame vf4
+F 1811a0 cGame vf6
+F 148478 cCollideEmitterNode vf12
+F 19a8f0 cAnimTexFlipNode vf28
+G 102e00 StaticInit_SpinControl
+G 105b10 StaticInit_PrewindControl
+G 106480 StaticInit_GateLaunchControl
+G 106548 StaticInit_LessonWaitControl
+G 106d18 StaticInit_ResetWaitControl
+G 108090 StaticInit_RailSlideControl
+G 108290 StaticInit_WipeOutRecoverControl
+G 1096a8 StaticInit_AirMotion
+G 10af18 StaticInit_GroundMotion
+G 10afe8 StaticInit_GroundMotion2
+G 10c0a0 StaticInit_RailSlideMotion
+G 1107b0 StaticInit_WipeOutRecoverMotion
+G 114948 StaticInit_PostAI
+G 115ce8 StaticInit_Race
+G 1165c8 StaticInit_AIWorld
+G 1167a8 StaticInit_AIWorld2
+G 11f4e8 StaticInit_Boarder
+G 123f48 StaticInit_AirPredict
+G 126888 StaticInit_Boarder2
+G 1283f0 StaticInit_Boarder3
+G 12bff0 StaticInit_Takeoff
+G 136ee0 StaticInit_BoarderRender
+G 138160 StaticInit_AIComputer
+G 13a520 StaticInit_Computer
+G 13b578 StaticInit_CounterNode
+G 13d4b8 StaticInit_ScriptNode
+G 149198 StaticInit_RailManNode
+G 14edb0 StaticInit_Lesson
+G 153490 StaticInit_Player
+G 1544c0 StaticInit_RigidBody
+G 154f98 StaticInit_GameTrickInfo
+G 157cb0 StaticInit_Score
+G 15a990 StaticInit_AnimLayer
+G 1616a0 StaticInit_AnimCtl
+G 167180 StaticInit_Career
+G 1682e0 StaticInit_Rivals
+G 169d58 StaticInit_RaceScene
+G 16d910 StaticInit_Circuit
+G 16dbe8 StaticInit_CamScript
+G 16de00 StaticInit_CamCamera
+G 16e630 StaticInit_Cml
+G 16e6f0 StaticInit_CamDirector
+G 16e870 StaticInit_OfflineObject
+G 1703c0 StaticInit_Camera
+G 171308 StaticInit_CamPath
+G 171ee0 StaticInit_CamRegion
+G 172168 StaticInit_CamScene
+G 1730e0 StaticInit_CamCamera2
+G 177c60 StaticInit_Cam
+G 178e40 StaticInit_Camera2
+G 1790b8 StaticInit_OfflineObject2
+G 179138 StaticInit_OfflineObject3
+G 1791b8 StaticInit_OfflineObject4
+G 17c1d8 StaticInit_Loc
+G 17dc08 StaticInit_BxList
+G 181908 StaticInit_Game
+G 1843a8 StaticInit_StartScreenSingle
+G 1858c0 StaticInit_StartScreenSingle2
+G 185f90 StaticInit_Sky
+G 186a00 StaticInit_VideoModule
+G 188310 StaticInit_SoundVolumeMenu
+G 18de60 StaticInit_RGBTitleMenuItem
+G 1955e8 StaticInit_ReplayPlaylist
+G 1965e8 StaticInit_TextBox
+G 1968c8 StaticInit_AIP
+G 196a58 StaticInit_EventPath
+G 196b18 StaticInit_EventPath2
+G 196be8 StaticInit_EventPath3
+G 196c50 StaticInit_EventPath4
+G 196cb8 StaticInit_EventPath5
+G 196d88 StaticInit_EventPath6
+G 196e58 StaticInit_EventPath7
+G 197c78 StaticInit_Path
+G 198768 StaticInit_AnimObjectNode
+G 19a998 StaticInit_AnimTexFlipNode
+G 19c778 StaticInit_Font2
+G 19e6a0 StaticInit_Font
+G 1a6998 StaticInit_HUD
+G 1bd898 StaticInit_HelpRaceOverlay
+G 1c7c58 StaticInit_SkyBoxObjNode
+G 1c8cd0 StaticInit_TerrainObjNode
+G 1c9a18 StaticInit_SnowFallMan
+G 1cad38 StaticInit_PS2FogVolume
+G 1cafd0 StaticInit_EffectsLoader
+G 1d39a0 StaticInit_MemCardUI
+G 1d4f80 StaticInit_MockupEditor
+G 1d9a68 StaticInit_ParticleMan
+G 1d9ba8 StaticInit_ParticleMan2
+G 1db640 StaticInit_Render
+G 1f04b8 StaticInit_ReplayOverlay
+G 1fa090 StaticInit_SplineModelNode
+G 1fb230 StaticInit_SplinePathNode
+G 1fec90 StaticInit_HUD3
+G 201018 StaticInit_Instance
+G 2023a8 StaticInit_AsyncBdrLoad
+G 208540 StaticInit_BdrLoad
+G 20cdb0 StaticInit_SndSys
+G 21e598 StaticInit_Audio
+G 21ebd8 StaticInit_Controller
+G 221428 StaticInit_CrowdSys
+G 222888 StaticInit_MidiSys
+G 225d80 StaticInit_Music
+G 228e38 StaticInit_SpeechSys
+G 22a3c8 StaticInit_StreamSys
+G 22b240 StaticInit_AudioTGroups
+G 22bd68 StaticInit_WorldEmitter
+G 22e420 StaticInit_WorldTriggerMgr
+G 22e628 StaticInit_WorldTriggerMgr2
+G 235dc8 StaticInit_Speech
+G 235f48 StaticInit_Speech2
+G 23bab0 StaticInit_SphereTreeBufCache
+G 23d448 StaticInit_MemPool
+G 23d5f8 StaticInit_MemCard
+G 24ff58 StaticInit_RiderRankingLoad
+G 251238 StaticInit_Spline2
+G 251b20 StaticInit_Spline
+G 2577a0 StaticInit_SurfaceTable
+G 260ea8 StaticInit_World
+G 265b10 StaticInit_FE3DMain
+G 267d88 StaticInit_FE3DCharacter
+G 268c38 StaticInit_FE3DDialog
+G 26c380 StaticInit_FE3DCamera
+G 26d260 StaticInit_CheatCodes
+G 26f1f8 StaticInit_FE3DMenu
+G 26ffd0 StaticInit_FE3DWorld
+G 271140 StaticInit_FE3DSound
+G 275c88 StaticInit_FE3DTextIcon
+G 28df58 StaticInit_FECustomBody
+G 293168 StaticInit_FEStateMCOverlay
+G 29d688 StaticInit_FE3DStateUserName
+G 2aaab0 StaticInit_FE3DStateOptions
+G 2aba78 StaticInit_FE3DStateVideo
+G 2ac4d8 StaticInit_FE3DGroup
+G 2ad728 StaticInit_FE3DWidget
+G 2b25c0 StaticInit_FE3DScrollingText
+G 2b64b8 StaticInit_FE3DWList
+G 2bac00 StaticInit_VideoPlayer
+G 15a980 StaticDtor_AnimLayer
+G 167170 StaticDtor_Career
+G 169d28 StaticDtor_RaceScene
+G 177c50 StaticDtor_Cam
+G 185f80 StaticDtor_Sky
+G 18de50 StaticDtor_RGBTitleMenuItem
+G 257790 StaticDtor_SurfaceTable
+G 260e98 StaticDtor_World
+G 26d250 StaticDtor_CheatCodes
+G 2bac40 StaticDtor_VideoPlayer
