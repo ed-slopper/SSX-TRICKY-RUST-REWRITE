@@ -500,3 +500,4 @@ matches the original.
 - 2026-10-11 ed-slopper/puffin: claim E3c2.
 - 2026-10-11 ed-slopper/puffin: E3c2 done.
 - 2026-10-11 ed-slopper/puffin: claim E3e.
+- 2026-10-11 irregulur/lynx: added irregulur to the Areas table in AGENTS.md.
