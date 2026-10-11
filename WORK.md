@@ -40,7 +40,7 @@ state machine and the renderer are ours. Nothing has been checked against the or
 | E1b2 | Replace the xorshift stand-ins (`race.rs`, `props.rs`, `intro.rs`) with the game's streams at the game's call sites, in the game's order | unowned | E1b1 | | Split of E1b |
 | E2c | The codecs the disc does not use: Huffman (`Huff_Decode` 0x2c3730), BTree (`BTree_Decode` 0x2c3540), 0x2c2d18 (types 0x18/0x1a/0x1c), for mods that pack files with them | unowned | E2b | | Gap of E2b. `Compress_Decode` 0x2c2de0's table is in `port-notes/files.md` |
 | E3 | Level files read by our code, as the game reads them, replacing the SSX-Library JSON project folder (`level.rs`) | unowned | E2b | | [repo] level-editing.md. Split before claiming: |
-| E3a3 | The models' meshes from the `.pbd`'s VIF data (contexts → strips of vertices, normals, UVs; `ResolveMeshContext`, the VU1 programs the meshes use) to replace the exports' Meshes/*.obj; and the collision meshes from the `.ssf` to replace Collision/*.obj | unowned | E3a, E3c1, E4 | | Gap of E3a2 |
+| E3a3 | The models' meshes from the `.pbd`'s VIF data (contexts → strips of vertices, normals, UVs; `ResolveMeshContext`, the VU1 programs the meshes use) to replace the exports' Meshes/*.obj; and the collision meshes from the `.ssf` to replace Collision/*.obj | unowned | E3a, E3c1, E4 | ed-slopper/puffin (2026-10-11) | Gap of E3a2 |
 | E3a4 | The app loads levels from the disc: `level.rs` on `tricky_data::{pbd, ssf, ltg, adl, map}` (E3a2's records), textures and lightmaps from the course's `.ssh` / `_L.ssh` (E3b), meshes (E3a3), scripts (E9b2), instead of the SSX-Library project folders | unowned | E3a2, E3a3 | | Gap of E3a2 |
 | E3c | `.ssf`: collision models, physics data, trigger scripts | unowned | E3 | | [repo] Split: E3c1, E3c2 |
 | E4d | The rest of the `.mpf` meshes: the shadow meshes (material flags 0x10: positions only, another vector unit program) and the data after each of the face's 18 records (likely its expressions); the vector unit programs themselves, to prove the packet layout read from the data | unowned | E4a | | Gap of E4a. `port-notes/files.md` "Character and board models" |
@@ -510,4 +510,5 @@ matches the original.
 - 2026-10-11 ed-slopper/puffin: E3a done; added E3a2 (load levels from the disc's files in the app).
 - 2026-10-11 ed-slopper/puffin: claim E3a2.
 - 2026-10-11 ed-slopper/puffin: E3a2 done (the records' fields); added E3a3 (meshes from the VIF data), E3a4 (the app loads from the disc).
+- 2026-10-11 ed-slopper/puffin: claim E3a3.
 - 2026-10-11 irregulur/lynx: F1c stopped (released): +239 names this round, notes in the row.
