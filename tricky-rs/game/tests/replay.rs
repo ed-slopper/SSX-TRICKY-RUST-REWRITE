@@ -86,7 +86,9 @@ fn air_steps_match_the_running_game() {
 fn rubber_band_matches_the_running_game() {
     let Ok(paths) = std::env::var("TRICKY_RECORDING") else { return };
     let Some(mut r) = r5900::Runner::from_env() else { return };
-    r.float_rules = r5900::ps2float::Rules::parse("add=n,mul=n,div=n,cvt=n").unwrap();
+    // round to nearest unless TRICKY_FLOAT_RULES says otherwise (to see that the replay tells the rules apart)
+    let rules = std::env::var("TRICKY_FLOAT_RULES").unwrap_or_else(|_| "add=n,mul=n,div=n,cvt=n".into());
+    r.float_rules = r5900::ps2float::Rules::parse(&rules).unwrap();
     r.allow(0x250e98);
     for path in paths.split(';').filter(|p| !p.is_empty()) {
         let (n, ticks) = load(path);
@@ -122,5 +124,47 @@ fn rubber_band_matches_the_running_game() {
             }
         }
         eprintln!("{path}: rubber band {exact} of {pairs} rider-ticks exact; per rider (ticks, exact): {per_rider:?}");
+    }
+}
+
+/// Which float rules the running game's air steps agree with: the game's own `Air_IntegrateRK4` in the
+/// function runner under TRICKY_FLOAT_RULES (default: to nearest) on every recorded tick pair (board row F4g).
+#[test]
+fn air_steps_tell_the_float_rules_apart() {
+    let Ok(paths) = std::env::var("TRICKY_RECORDING") else { return };
+    let Some(mut r) = r5900::Runner::from_env() else { return };
+    let rules = std::env::var("TRICKY_FLOAT_RULES").unwrap_or_else(|_| "add=n,mul=n,div=n,cvt=n".into());
+    r.float_rules = r5900::ps2float::Rules::parse(&rules).unwrap();
+    for path in paths.split(';').filter(|p| !p.is_empty()) {
+        let (_, ticks) = load(path);
+        let rider = r.mem.alloc(ticks[0].riders[0].len() as u32);
+        let (mut ours, mut runner) = (0, 0);
+        for w in ticks.windows(2) {
+            if w[1].tick != w[0].tick + 1 {
+                continue;
+            }
+            for (a, b) in w[0].riders.iter().zip(&w[1].riders) {
+                let dt = f32_at(a, 0x12c) * 0.016666668;
+                let (mut p, mut v) = (vec4(a, 0x140), vec4(a, 0x150));
+                integrate_rk4(dt, &mut p, &mut v, false);
+                let (gp, gv) = (vec4(b, 0x140).map(f32::to_bits), vec4(b, 0x150).map(f32::to_bits));
+                if p.map(f32::to_bits) != gp || v.map(f32::to_bits) != gv {
+                    continue; // not an air step (or nudged): only the airborne ticks
+                }
+                ours += 1;
+                r.mem.write(rider, a).unwrap();
+                r.cpu.set_f(12, dt);
+                r.cpu.set_gpr(4, rider as u64);
+                r.cpu.set_gpr(5, (rider + 0x140) as u64);
+                r.cpu.set_gpr(6, (rider + 0x150) as u64);
+                r.cpu.set_gpr(7, 0);
+                r.call(0x12b340).unwrap();
+                let (rp, rv) = ((0..4).map(|k| r.mem.read_u32(rider + 0x140 + 4 * k)).collect::<Vec<_>>(), (0..4).map(|k| r.mem.read_u32(rider + 0x150 + 4 * k)).collect::<Vec<_>>());
+                if rp == gp && rv == gv {
+                    runner += 1;
+                }
+            }
+        }
+        eprintln!("{path}: under {rules} the runner gives the game's air step on {runner} of {ours}");
     }
 }

@@ -29,6 +29,7 @@ __pycache__/
 
 # tricky-rs: source only
 /tricky-rs/target/
+/tricky-rs/target-msvc/
 /tricky-rs/game/target/
 /tricky-rs/*.exe
 /tricky-rs/*.png

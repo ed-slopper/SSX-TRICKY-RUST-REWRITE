@@ -256,6 +256,34 @@ adder (any multiply rounding), never with IEEE rounding throughout. Neither rule
 so PCSX2 most likely emulates the EE's multiplier and adder bit by bit (its accurate FPU), which is neither IEEE
 rule; reproducing that is what is left of F4g. Whether to follow PCSX2 or the console is F4c.
 
+**F4g, continued 2026-10-10: normal play rounds to nearest.** The per-tick replays of F4h come from PCSX2
+running normally (read over PINE, no breakpoints). `air_steps_tell_the_float_rules_apart` in
+`tricky-rs/game/tests/replay.rs` runs the game's own `Air_IntegrateRK4` in the runner on the 341 airborne
+rider-ticks under each rule (`TRICKY_FLOAT_RULES`):
+
+| Rules | Game's air step reproduced |
+|---|---|
+| add, mul, div to nearest | **341 of 341** |
+| divide toward zero | 252 |
+| multiply toward zero | 214 |
+| add toward zero (with any multiply) | 1 |
+| EE adder (dropped shifted-out bits) | 0 |
+| everything toward zero (the manual) | 1 |
+
+So in normal play the air step's vector-unit adds and multiplies, its `vdiv`s and its FPU multiplies and divide
+all round to nearest, as IEEE f32 does. (The rubber band replay does not tell the rules apart: its result sits on
+its clamps and rate-limit steps.)
+
+The 1–2 ulp differences above were all FPU (COP1) operations, captured while PCSX2-MCP's debugger stopped the
+game at breakpoints. 20 single operations from the probe stops that could be read off cleanly (15 `mul.s`,
+4 `add.s`) each match round-to-nearest, and yet the drag's chain `S·(−0.29035342)·(1/255)` for stat bytes 76 and
+81 comes out truncated where its exact products were 0.76–0.84 ulp above a float. No fixed rule fits both, nor
+does a radix-4 Booth multiplier with low partial-product columns dropped (best 14 of 19 samples, any column,
+either operand recoded, negative partial products floored or truncated toward zero). What is open: whether
+COP1 differs from the vector unit, or the debugger's mode differs from normal play. Settle it with a COP1-heavy
+function per tick in normal play (the ground forces, F4h2/F4b3); until then the port stays IEEE-nearest, which
+is what normal play shows.
+
 The game's `$gp` at the breakpoint was 0x3C38F0, the value the runner works out from the entry code, and the code
 in memory was byte-identical to `SLUS_203.26`.
 
