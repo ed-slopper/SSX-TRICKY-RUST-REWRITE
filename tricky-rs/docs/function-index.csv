@@ -254,13 +254,13 @@ address,size,name,system,status
 0x118090,516,Boarder_UpdatePathAhead,boarder,not started
 0x118298,888,Boarder_UpdateRaceLineProgress,boarder,ported
 0x118610,544,Boarder_SelectRaceLine,boarder,ported
-0x118830,980,FUN_00118830,boarder?,not started
+0x118830,980,Boarder_ChoosePathAhead,boarder,not started
 0x118c08,776,Boarder_AdvanceOnPath,boarder,not started
 0x118f10,772,Boarder_RequestReset,boarder,not started
 0x119220,2496,ResetState_PlaceRider,boarder,not started
 0x119be0,172,Boarder_StartReset,boarder,not started
 0x119c90,160,Boarder_StartResetAt,boarder,not started
-0x119d30,752,FUN_00119d30,boarder?,ported
+0x119d30,752,Boarder_FindNearestLine,boarder,ported
 0x11a020,116,FUN_0011a020,boarder?,not started
 0x11a098,688,Boarder_TeleportToInstance,boarder,not started
 0x11a348,1100,cBoarder::vf10_11a348,boarder,not started
@@ -274,7 +274,7 @@ address,size,name,system,status
 0x11afe8,48,Boarder_StartLessonWait,boarder,not started
 0x11b018,476,Boarder_AddMeter,boarder,not started
 0x11b1f8,336,Boarder_DrainMeter,boarder,not started
-0x11b348,4860,FUN_0011b348,boarder?,not started
+0x11b348,4860,cBoarderHandler::cBoarderHandler,boarder,not started
 0x11c648,100,Boarder_ChangeMotionState,boarder,not started
 0x11c6b0,96,Boarder_ExitMotionState,boarder,not started
 0x11c710,96,Boarder_EnterMotionState,boarder,not started
@@ -329,8 +329,8 @@ address,size,name,system,status
 0x11f4e8,284,FUN_0011f4e8,boarder?,not started
 0x11f608,8,Boarder_SetState,boarder,not started
 0x11f610,8,Boarder_SetMotion,boarder,not started
-0x11f628,324,FUN_0011f628,boarder?,not started
-0x11f770,4648,FUN_0011f770,boarder?,not started
+0x11f628,324,cBoarderHandler::__tf,runtime,host
+0x11f770,4648,cBoarderHandler::~cBoarderHandler,boarder,not started
 0x120998,84,cWipeOutRecoverControl::__tf,runtime,host
 0x1209f0,224,cWipeOutRecoverControl::~cWipeOutRecoverControl,boarder,not started
 0x120ad0,84,cWipeOutControl::__tf,runtime,host
@@ -493,9 +493,9 @@ address,size,name,system,status
 0x12dfd0,56,FUN_0012dfd0,boarder?,not started
 0x12e008,220,FUN_0012e008,world?,not started
 0x12e0e8,584,Fx_SpawnLandingPuffs,boarder,not started
-0x12e330,948,FUN_0012e330,boarder?,not started
+0x12e330,948,Fx_Spray_SpawnParticle,boarder,not started
 0x12e6e8,560,Fx_BrakeSpray_Update,boarder,not started
-0x12e918,752,FUN_0012e918,boarder?,not started
+0x12e918,752,Fx_Spray_Draw,boarder,not started
 0x12ec08,108,FUN_0012ec08,game?,not started
 0x12ec78,28,FUN_0012ec78,game?,not started
 0x12ec98,12,FUN_0012ec98,game?,not started
@@ -534,7 +534,7 @@ address,size,name,system,status
 0x135200,84,FUN_00135200,boarder?,not started
 0x135258,12,FUN_00135258,world?,not started
 0x135268,12,FUN_00135268,boarder?,not started
-0x135278,848,FUN_00135278,boarder?,not started
+0x135278,848,cBoarderRender::cBoarderRender,boarder,not started
 0x1355c8,304,cBoarderRender::~cBoarderRender,boarder,not started
 0x1356f8,1984,cBoarderRender::vf7_1356f8,boarder,not started
 0x135eb8,652,FUN_00135eb8,world?,not started

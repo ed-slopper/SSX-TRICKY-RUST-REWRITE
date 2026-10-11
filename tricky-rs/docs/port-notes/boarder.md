@@ -62,7 +62,7 @@ surf[6]/surf[9] by row: 1 2.742/5.009; 2 2.849/5.530; 3 15.04/2.842; 4 30.03/2.9
 - Clip descriptor table 0x325fa8 (7 ints per game clip id: category, lookup mode, update type, end action, layer,
   blend-in, fade-out); game clip id → name via `AnimClip_ResolveAnmIndex` 0x15ada8.
 
-## The rider's states and motions are classes (from the boarder type-info list at 0x11f628)
+## The rider's states and motions are classes (from `cBoarderHandler::__tf` 0x11f628, which registers them)
 
 - Controls (the state, rider+0x428): `cVoidControl`, `cBumpControl`, `cCruiseControl`, `cChangeFakieControl`,
   `cFakieCruiseControl`, `cFinishLineControl`, `cGate2BaseControl`, `cGateAnticipateControl`, `cGateLaunchControl`,
@@ -104,6 +104,9 @@ surf[6]/surf[9] by row: 1 2.742/5.009; 2 2.849/5.530; 3 15.04/2.842; 4 30.03/2.9
   `FinishState_Update`, `RailSlideControl_Update`, `GetUpState_Update`, `ResetState_Update`).
 - Motions (rider+0x424): 1 `cAirMotion`, 2 `cGroundMotion`, 3 `cRailSlideMotion`, 4 `cStaticMotion` (no enter or
   exit), 5 `cWipeOutMotion`, 6 `cWipeOutRecoverMotion`; same pattern through `Boarder_ChangeMotionState` 0x11c648.
+- The rider objects: `cPlayer` (human) and `cComputer` (AI) derive from `cBoarderHandler` (constructor 0x11b348,
+  which builds every control and motion object), which derives from `cBoarderRender` (0x135278) over `cBoarder`
+  (0x116828).
 - Every control and motion class has a destructor in the vtable slot after `__tf` (`cCruiseControl::~cCruiseControl`
   0x122168 and so on). The rider's controls come from virtual 9: `cBoarder::vf7` 0x117198 (the per-tick update) calls
   it to fill a control word, then hands that to `Boarder_UpdateControl`. `cPlayer::GetControls` 0x151250 packs the

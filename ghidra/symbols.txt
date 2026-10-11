@@ -3250,7 +3250,7 @@ G 236758 CollBody_GetSphereBounds
 F 1355c8 cBoarderRender ~cBoarderRender
 F 1356f8 cBoarderRender vf7
 F 13a628 cComputer ~cComputer
-F 11f618 cComputer vf7
+F 11f618 cBoarderHandler vf7
 F 138438 cComputer vf8
 F 1384b8 cComputer GetControls
 F 138460 cComputer vf13
@@ -3290,3 +3290,14 @@ G 161400 AnimCtl_EndActionChain
 G 161568 AnimCtl_EndActionPlay2DF
 G 1615a8 AnimCtl_EndActionPlay2DE
 G 1615e8 AnimCtl_EndActionToRide
+F 11f628 cBoarderHandler __tf
+L 40af68 cBoarderHandler typeinfo
+L 366250 cBoarderHandler vtable
+L 3661f0 cBoarderHandler vtable_2
+F 11b348 cBoarderHandler cBoarderHandler
+F 11f770 cBoarderHandler ~cBoarderHandler
+F 135278 cBoarderRender cBoarderRender
+G 12e330 Fx_Spray_SpawnParticle
+G 12e918 Fx_Spray_Draw
+G 119d30 Boarder_FindNearestLine
+G 118830 Boarder_ChoosePathAhead
