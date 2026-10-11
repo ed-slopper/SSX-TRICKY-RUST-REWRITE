@@ -60,7 +60,7 @@ state machine and the renderer are ours. Nothing has been checked against the or
 | E8c | Knockable objects with the game's rigid bodies (`CollBody_PointMassInertia` 0x236530 and its step), replacing the ball physics in `props.rs` | unowned | E7 | | [repo] props.rs: "simulated as balls" |
 | E8d | Rider-to-rider: `Boarder_RiderCollisions` 0x123fc8, `Boarder_RiderHit` 0x124920, shoves | any | F4a | | [repo] Ported, unchecked |
 | E9 | Script machine: `TriggerScript_Run`, `TriggerScript_ExecOp` 0x13bfd0 with every op, controllers (`TriggerScript_Op0_SpawnController` 0x13c600), persistent cell scripts, run at runtime instead of read statically | unowned | E3c | | [repo] `logic.rs` reads SSFLogic.json statically today |
-| E9a | List every trigger-script op and controller type with its address and what it does, as rows E9b… | unowned | | | [est] |
+| E9a | List every trigger-script op and controller type with its address and what it does, as rows E9b… | unowned | | trailrig/heron (2026-10-11) | [est] |
 | E10 | Input: pad reading, stick shaping and dead zones, button bits (the chord 0x600), vibration, `cCheatCodes::Update` 0x26CF60 | unowned | E1 | | [repo] findings.md |
 | E11 | Camera: named cameras `cBxCamera_EvalNamedCam` 0x174888 (ported), director scripts `cBxCamera_RunDirectorScript`, replay and finish cameras, camera collision | any | | | [repo] Chase cam ported in `rider.rs`; free camera is ours (keep, tag) |
 | E12 | Save and load: the memory-card profile, options, records, unlocks (`Profile_ResetNewGame` 0x161b40), in our own save file with the same fields | unowned | E1 | | [repo] `tricky-save.json` is the stand-in |
@@ -255,3 +255,4 @@ matches the original.
 - 2026-10-11 trailrig/heron: claim G17.
 - 2026-10-11 trailrig/heron: G17 done.
 - 2026-10-11 ed-slopper/puffin: E4a done; added E4d (gap of E4a).
+- 2026-10-11 trailrig/heron: claim E9a.
