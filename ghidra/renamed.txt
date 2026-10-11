@@ -632,3 +632,5 @@
 252e18 cCourseResolve_Common::vf10 cCourseResolve_Common::ResolveDataHeader
 253b58 cCourseResolve_Common::vf17 cCourseResolve_Common::ResolveMeshContext
 253e80 cCourseResolve_Common::vf26 cCourseResolve_Common::ResolveParticleMesh
+190f58 Replay_IsKeyframeSaved Replay_IsKeyframeInHighlight
+192178 Replay_FindSavedKeyframe Replay_FindHighlight
