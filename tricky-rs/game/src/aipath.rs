@@ -486,3 +486,139 @@ pub fn find_nearest_line(paths: &[Path], lines: &RaceLines, f: &mut Follow, r: &
     }
     true
 }
+
+/// One `Boarder_PlaceAt` 0x11cae8 call of a reset: the heading, the height passed on (the caller's), the place and
+/// the velocity (the path's direction × 833.3333, z 0). The game clears rider+0x24 just before it unless the rider
+/// is Tricky-boosting (`Boarder_IsTricky`), and cuts the rider's camera (`Camera_CutForReset`) just after.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct Placement {
+    pub heading: f32,
+    pub height: f32,
+    pub pos: V4,
+    pub vel: V4,
+}
+
+/// One other rider as the reset sees it: position (+0x140) and velocity (+0x150).
+pub type Other = (V4, V4);
+
+struct Near {
+    rider: usize,
+    side: V4,
+    plane: f32,
+    used: bool,
+    s: f32,
+    sign: i32,
+}
+
+/// `ResetState_PlaceRider` 0x119220 (a0 the rider, a1 `spread`, f12 `height`): the rider's place moves to the
+/// respawn point ([`Path::respawn_at`]: +0x344 and the point, +0x350), facing along the path there. With `spread`,
+/// out of the way of the other riders standing within 1000 of it: each one's side line (across its direction of
+/// travel, flat) that the point is within 199 of, nearest first, pushes it 200 clear, to the side that keeps it on
+/// the same side of the lines already cleared (the first to the side it is on); a push that goes over 800 or into
+/// the world (`ray` from the point raised by `height` to there as well, its hit fraction; ≥ 0 a hit) puts the rider
+/// on the race line 500 further back instead ([`find_nearest_line`], whose own placement comes first) and keeps the
+/// point that gives; else it moves there and, if the last rider cleared is heading within 30° of the path, takes
+/// its direction. The placements made, in order (see [`Placement`]); false where the race line was not found (the
+/// game goes on with an unset point).
+#[allow(clippy::too_many_arguments)]
+pub fn place_rider(paths: &[Path], lines: &RaceLines, f: &mut Follow, r: &mut RacePlace, laps_left: i32, spread: bool, height: f32, others: &[Other], ray: &mut dyn FnMut(V4, V4) -> f32, out: &mut Vec<Placement>) -> bool {
+    let (along, at) = paths[f.path].respawn_at(f.along);
+    f.along = along;
+    f.near = at;
+    let mut dir = paths[f.path].direction_at(f.along);
+    let mut heading = crate::jump::atan2_inline(dir[1], dir[0]);
+    if spread {
+        let mut near: Vec<Near> = Vec::new();
+        for (k, o) in others.iter().enumerate() {
+            let d = sub(o.0, f.near);
+            if crate::jump::dot(d, d).sqrt() < 1000.0 {
+                near.push(Near { rider: k, side: [0.0; 4], plane: 0.0, used: false, s: 0.0, sign: 0 });
+            }
+        }
+        if near.is_empty() {
+            return finish(f, dir, heading, height, out);
+        }
+        for n in near.iter_mut() {
+            let v = crate::jump::normalize(others[n.rider].1);
+            // the side: v × up (vopmula / vopmsub), normalised
+            let up = [0.0f32, 0.0, 1.0, 0.0];
+            let c = [v[1] * up[2] - up[1] * v[2], v[2] * up[0] - up[2] * v[0], v[0] * up[1] - up[0] * v[1], 0.0];
+            n.side = crate::jump::normalize(c);
+            n.plane = -crate::jump::dot(others[n.rider].0, n.side);
+        }
+        let mut offset = [0.0f32; 4];
+        let mut moved = false;
+        let mut last = 0usize;
+        loop {
+            let mut best = 200.0f32;
+            let mut pick: Option<usize> = None;
+            for (i, n) in near.iter_mut().enumerate() {
+                if n.used {
+                    continue;
+                }
+                let s = crate::jump::dot(add(f.near, offset), n.side) + n.plane;
+                let a = s.abs();
+                if a < 199.0 && a < best {
+                    n.s = s;
+                    best = a;
+                    pick = Some(i);
+                }
+            }
+            let Some(p) = pick else { break };
+            let s = near[p].s;
+            let ps = near[p].side;
+            let mut sign = 1;
+            for j in near.iter().filter(|n| n.used) {
+                let same = (0.0 <= s && 0 < sign) || (s < 0.0 && sign < 0);
+                let t = if same {
+                    if 0 < j.sign { crate::jump::dot(j.side, ps) } else { crate::jump::dot(scale(j.side, -1.0), ps) }
+                } else if 0 < j.sign {
+                    crate::jump::dot(j.side, scale(ps, -1.0))
+                } else {
+                    crate::jump::dot(scale(j.side, -1.0), scale(ps, -1.0))
+                };
+                if t <= 0.0 {
+                    sign = -1;
+                }
+            }
+            let push_on = if 0.0 <= s { 0 < sign } else { sign < 1 };
+            let m = if push_on {
+                near[p].sign = 1;
+                200.0 - s
+            } else {
+                near[p].sign = -1;
+                -(s + 200.0)
+            };
+            offset = add(offset, scale(ps, m));
+            near[p].used = true;
+            last = p;
+            moved = true;
+        }
+        if moved {
+            let far = 800.0 < crate::jump::dot(offset, offset).sqrt();
+            let from = add(f.near, [0.0, 0.0, height, 0.0]);
+            let hit = ray(from, add(from, offset));
+            if far || 0.0 <= hit {
+                if !find_nearest_line(paths, lines, f, r, r.to_finish + 500.0, laps_left) {
+                    return false;
+                }
+                if !place_rider(paths, lines, f, r, laps_left, false, height, others, ray, out) {
+                    return false;
+                }
+            } else {
+                let v = crate::jump::normalize(others[near[last].rider].1);
+                if 0.866 < crate::jump::dot(v, dir) {
+                    dir = v;
+                    heading = crate::jump::atan2_inline(dir[1], dir[0]);
+                }
+                f.near = add(f.near, offset);
+            }
+        }
+    }
+    finish(f, dir, heading, height, out)
+}
+
+fn finish(f: &Follow, dir: V4, heading: f32, height: f32, out: &mut Vec<Placement>) -> bool {
+    out.push(Placement { heading, height, pos: f.near, vel: [dir[0] * 833.3333, dir[1] * 833.3333, 0.0, dir[3]] });
+    true
+}

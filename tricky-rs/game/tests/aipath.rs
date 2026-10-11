@@ -442,3 +442,172 @@ fn reset_placing_matches_the_original() {
     println!("moved {moved}, blocked {blocked}, path changed {changed}, nearest line {found}");
     assert!(moved > 100 && blocked > 10 && changed > 100 && found > 1000, "moved {moved}, blocked {blocked}, changed {changed}, found {found}");
 }
+
+#[test]
+fn reset_place_rider_matches_the_original() {
+    // `ResetState_PlaceRider` 0x119220 on riders about every course's paths with up to five others standing near the
+    // respawn point; `World_RayCast` answered from a script (its line's ends recorded through the `cWorldLine`
+    // constructor), `Boarder_IsTricky`, `Boarder_PlaceAt` and `Camera_CutForReset` recorded; `Boarder_FindNearestLine`
+    // (and the placement under it) run as the game runs it
+    use std::cell::RefCell;
+    use std::rc::Rc;
+    use tricky_game::aipath::{place_rider, Follow, Placement, RaceLines, RacePlace};
+    let Some(dir) = std::env::var_os("TRICKY_AIP_DIR") else { return };
+    let mut files: Vec<_> = std::fs::read_dir(&dir).unwrap().filter_map(|e| e.ok()).map(|e| e.path()).filter(|p| p.extension().is_some_and(|x| x == "aip")).collect();
+    files.sort();
+    let mut g = Rng(0x2b9e_47d1_c6a0_8f35);
+    let (mut spread, mut pushes, mut fell_back, mut turned) = (0u32, 0u32, 0u32, 0u32);
+    for file in files {
+        let Some(mut r) = Runner::from_env() else { return };
+        r.float_rules = Rules::parse("add=n,mul=n,div=n,cvt=n").unwrap();
+        for f in [0x102f50u32, 0x2510f8, 0x2f79a8, 0x2f7018, 0x197b50, 0x1979f8, 0x197738, 0x197250, 0x197478, 0x197830, 0x197f28, 0x197f08, 0x197910, 0x197ef0, 0x196858, 0x196758, 0x1982d0, 0x118c08, 0x119d30, 0x119220] {
+            r.allow(f);
+        }
+        let bytes = std::fs::read(&file).unwrap();
+        load_set(&mut r, &bytes);
+        let aip = tricky_data::aip::read(&bytes).unwrap();
+        let paths: Vec<Path> = aip.ai_paths.iter().map(Path::from_aip).collect();
+        let lines = RaceLines::from_aip(&aip);
+        let (base, lbase) = (r.mem.read_u32(0x337fb8 + 4), r.mem.read_u32(0x337fb8 + 0xc));
+        let app = r.mem.alloc(0x800);
+        let game = r.mem.alloc(0x400);
+        r.mem.write_u32(0x337c58, app);
+        r.mem.write_u32(app + 0x730, game);
+        let riders: Vec<u32> = (0..6).map(|_| r.mem.alloc(0x5900)).collect();
+        let rs = riders.clone();
+        r.stub(0x1814a8, move |c, _| c.set_gpr(2, rs[c.gpr(5) as usize] as u64));
+        let rays: Rc<RefCell<Vec<(V4b, V4b, u32, f32)>>> = Rc::default();
+        let script: Rc<RefCell<Vec<f32>>> = Rc::default();
+        let rl = rays.clone();
+        r.stub(0x25d7f0, move |c, m| rl.borrow_mut().push((get4(m, c.gpr(5) as u32), get4(m, c.gpr(6) as u32), c.f(12).to_bits(), 0.0)));
+        let (rl, sc) = (rays.clone(), script.clone());
+        r.stub(0x25aff8, move |c, _| {
+            let v = sc.borrow_mut().remove(0);
+            rl.borrow_mut().last_mut().unwrap().3 = v;
+            c.set_f(0, v);
+        });
+        let tricky = Rc::new(std::cell::Cell::new(0u64));
+        let tk = tricky.clone();
+        r.stub(0x11f430, move |c, _| c.set_gpr(2, tk.get()));
+        let placed: Rc<RefCell<Vec<(u32, u32, V4b, V4b, u64, u32)>>> = Rc::default();
+        let pl = placed.clone();
+        let me_at = Rc::new(std::cell::Cell::new(0u32));
+        let ma = me_at.clone();
+        r.stub(0x11cae8, move |c, m| {
+            let x24 = m.read_u32(ma.get() + 0x24);
+            pl.borrow_mut().push((c.f(12).to_bits(), c.f(13).to_bits(), get4(m, c.gpr(5) as u32), get4(m, c.gpr(6) as u32), c.gpr(7), x24));
+        });
+        let cuts: Rc<RefCell<Vec<u32>>> = Rc::default();
+        let ct = cuts.clone();
+        r.stub(0x173a60, move |c, _| ct.borrow_mut().push(c.gpr(4) as u32));
+        for i in 0..8u32 {
+            r.mem.write_u32(game + 0xa0 + 0x80 * i, 0xc000 + i);
+        }
+        let name = file.file_name().unwrap().to_string_lossy().to_string();
+        for case in 0..1500 {
+            let n = 2 + g.next() as usize % 5;
+            let me = g.next() as usize % n;
+            let rider = riders[me];
+            me_at.set(rider);
+            let k = g.next() as usize % paths.len();
+            let p = &paths[k];
+            let len = p.length();
+            let mut f = Follow { path: k, last: g.f(0.0, len), along: g.f(0.0, len), off: g.f(0.0, 500.0), near: [g.f(-9.0, 9.0); 4], ahead: [g.f(-9.0, 9.0); 4], heading: g.f(-3.0, 3.0), cache: Cache::default() };
+            if !p.events.is_empty() && g.next() % 3 == 0 {
+                let e = p.events[g.next() as usize % p.events.len()];
+                f.along = g.f(e.2, e.3);
+            }
+            let (_, at) = p.respawn_at(f.along);
+            let pdir = p.direction_at(p.respawn_at(f.along).0);
+            let mut rp = RacePlace { line: 0, to_finish: g.f(0.0, lines.to_finish[lines.main] - 600.0), best: g.f(0.0, 90000.0), cache: Cache { start: [g.f(-9.0, 9.0); 4], along: g.f(0.0, 99.0), index: 3 } };
+            let laps = (g.next() % 3) as i32 - 1;
+            let spreading = g.next() % 5 != 0;
+            let height = g.f(0.0, 200.0);
+            let reach = [300.0f32, 700.0, 1200.0][g.next() as usize % 3];
+            let mut others: Vec<(V4, V4)> = Vec::new();
+            for (i, &o) in riders.iter().enumerate().take(n) {
+                let pos = [at[0] + g.f(-reach, reach), at[1] + g.f(-reach, reach), at[2] + g.f(-100.0, 100.0), 1.0];
+                let vel = if g.next() % 2 == 0 {
+                    [pdir[0] * 1500.0 + g.f(-300.0, 300.0), pdir[1] * 1500.0 + g.f(-300.0, 300.0), g.f(-100.0, 100.0), 0.0]
+                } else {
+                    [g.f(-2500.0, 2500.0), g.f(-2500.0, 2500.0), g.f(-300.0, 300.0), 0.0]
+                };
+                put4(&mut r.mem, o + 0x140, pos);
+                put4(&mut r.mem, o + 0x150, vel);
+                if i != me {
+                    others.push((pos, vel));
+                }
+            }
+            let ray_v: Vec<f32> = (0..4).map(|_| if g.next() % 4 == 0 { g.f(0.0, 1.0) } else { -1.0 }).collect();
+            *script.borrow_mut() = ray_v.clone();
+            rays.borrow_mut().clear();
+            placed.borrow_mut().clear();
+            cuts.borrow_mut().clear();
+            let is_tricky = g.next() % 3 == 0;
+            tricky.set(is_tricky as u64);
+            let cam = if g.next() % 4 == 0 { -1 } else { (g.next() % 8) as i32 };
+            let m = &mut r.mem;
+            m.write_u32(0x32db6c, n as u32);
+            m.write_u32(rider + 0x24, 0x77);
+            m.write_u32(rider + 0x38, cam as u32);
+            m.write_u32(rider + 0x57a4, base + 0x40 * k as u32);
+            m.write_u32(rider + 0x57a0, lbase);
+            m.write_f32(rider + 0x340, f.last);
+            m.write_f32(rider + 0x344, f.along);
+            m.write_f32(rider + 0x348, f.off);
+            put4(m, rider + 0x350, f.near);
+            put4(m, rider + 0x360, f.ahead);
+            m.write_f32(rider + 0x370, f.heading);
+            put4(m, rider + 0x390, f.cache.start);
+            m.write_f32(rider + 0x3a0, f.cache.along);
+            m.write_u32(rider + 0x3a4, f.cache.index as u32);
+            m.write_f32(rider + 0x374, rp.to_finish);
+            m.write_f32(rider + 0x378, rp.best);
+            put4(m, rider + 0x3b0, rp.cache.start);
+            m.write_f32(rider + 0x3c0, rp.cache.along);
+            m.write_u32(rider + 0x3c4, rp.cache.index as u32);
+            m.write_u32(rider + 0x114, laps as u32);
+            r.cpu.set_gpr(4, rider as u64);
+            r.cpu.set_gpr(5, spreading as u64);
+            r.cpu.set_f(12, height);
+            r.call(0x119220).unwrap_or_else(|e| panic!("{name} case {case}: {e}"));
+            // ours
+            let mut q = ray_v.clone();
+            let mut our_rays = Vec::new();
+            let mut ray = |a: V4, b: V4| { let v = q.remove(0); our_rays.push((bits(a), bits(b), 0.5f32.to_bits(), v)); v };
+            let mut out: Vec<Placement> = Vec::new();
+            let path0 = f.path;
+            assert!(place_rider(&paths, &lines, &mut f, &mut rp, laps, spreading, height, &others, &mut ray, &mut out), "{name} case {case}: no race line");
+            let ctx = format!("{name} case {case}: spread {spreading}, {} others, path {k}", others.len());
+            assert_eq!(*rays.borrow(), our_rays, "{ctx}: rays");
+            let theirs: Vec<_> = placed.borrow().clone();
+            let ours: Vec<_> = out.iter().map(|p| (p.heading.to_bits(), p.height.to_bits(), bits(p.pos), bits(p.vel), 0u64, if is_tricky { 0x77 } else { 0 })).collect();
+            assert_eq!(theirs, ours, "{ctx}: placements");
+            let cut: Vec<u32> = if cam < 0 { vec![] } else { vec![0xc000 + cam as u32; out.len()] };
+            assert_eq!(*cuts.borrow(), cut, "{ctx}: camera cuts");
+            let m = &mut r.mem;
+            let theirs = (
+                ((m.read_u32(rider + 0x57a4) - base) / 0x40) as usize,
+                m.read_u32(rider + 0x340), m.read_u32(rider + 0x344), m.read_u32(rider + 0x348),
+                get4(m, rider + 0x350), get4(m, rider + 0x360), m.read_u32(rider + 0x370),
+                get4(m, rider + 0x390), m.read_u32(rider + 0x3a0), m.read_u32(rider + 0x3a4) as i32,
+            );
+            let ours = (f.path, f.last.to_bits(), f.along.to_bits(), f.off.to_bits(), bits(f.near), bits(f.ahead), f.heading.to_bits(), bits(f.cache.start), f.cache.along.to_bits(), f.cache.index);
+            assert_eq!(theirs, ours, "{ctx}: follow");
+            let theirs = (((m.read_u32(rider + 0x57a0) - lbase) / 0x3c) as usize, m.read_u32(rider + 0x374), m.read_u32(rider + 0x378), get4(m, rider + 0x3b0), m.read_u32(rider + 0x3c0), m.read_u32(rider + 0x3c4) as i32);
+            let ours = (rp.line, rp.to_finish.to_bits(), rp.best.to_bits(), bits(rp.cache.start), rp.cache.along.to_bits(), rp.cache.index);
+            assert_eq!(theirs, ours, "{ctx}: race place");
+            spread += (!our_rays.is_empty()) as u32;
+            fell_back += (out.len() > 1) as u32;
+            pushes += (out.len() == 1 && !our_rays.is_empty()) as u32;
+            turned += (out.len() == 1 && !our_rays.is_empty() && out[0].vel[0] != pdir[0] * 833.3333) as u32;
+            let _ = path0;
+        }
+        println!("{name}: placing checked");
+    }
+    println!("spread {spread}, pushed clear {pushes}, fell back to the race line {fell_back}, took a rider's direction {turned}");
+    assert!(spread > 1000 && pushes > 300 && fell_back > 300 && turned > 50, "spread {spread}, pushes {pushes}, fell back {fell_back}, turned {turned}");
+}
+
+type V4 = [f32; 4];
+type V4b = [u32; 4];

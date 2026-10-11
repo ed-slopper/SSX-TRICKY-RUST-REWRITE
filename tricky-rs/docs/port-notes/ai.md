@@ -216,3 +216,15 @@ Part of the port notes (index: [README.md](README.md)); units and wording as des
   path/last/along/off/near, memory −1), 800 ahead, heading (inline atan2); both memories −1; the race place from
   the nearest point: +0x374 = line's distance − along; with laps left (rider+0x114 > 0) the lap's best +0x378 takes
   it if it went back or on more than half the main line. Then `ResetState_PlaceRider`.
+- `ResetState_PlaceRider` 0x119220 (a0 rider, a1 spread, f12 height; `place_rider`): +0x344 / +0x350 to the
+  respawn point, facing the path's direction there (inline atan2). Spread: the other riders within 1000 (vsqrt), each
+  one's side line: side = normalise(normalise(vel) × (0,0,1)), plane −pos·side. Repeatedly, of the lines not yet
+  cleared, the one the (moved) point is nearest to, under 199: sign starts +1 and turns −1 if, for any cleared line,
+  the side dot (each flipped by its own push side, the new one flipped when the point's side and sign differ) is
+  ≤ 0; push 200 − s (side +1) or −(s + 200) (side −1) along its side, chosen by the point's side and that sign. If
+  it moved: a `World_RayCast` along `cWorldLine`(0.5, from the point + (0,0,height), to + offset, 1); a hit (≥ 0)
+  or a push over 800 → `Boarder_FindNearestLine`(+0x374 + 500, height) (which places once) and the outer one places
+  again at the new point with its own direction; else the point moves, and the last-cleared rider's direction is
+  taken if within 30° (dot > 0.866). Then velocity = dir.xy × 833.3333 (z 0), +0x24 = 0 unless
+  `Boarder_IsTricky`, `Boarder_PlaceAt` 0x11cae8(heading, height, rider, &+0x350, &vel, 0), `Camera_CutForReset` of
+  the rider's camera (+0x38 ≥ 0). Checked with the ray cast scripted, on every course (`tests/aipath.rs`).
