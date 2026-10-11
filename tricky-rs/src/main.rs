@@ -202,7 +202,16 @@ struct BodyPart { part: usize, board: bool }
 struct Loaded { level: Level, world: CollisionWorld, rails: Rails, line: Vec<Vec3>, start: Vec3, yaw: f32, course: rider::AiCourse, lines: course::Lines, paths: course::AiPaths, tube: Option<props::Tube>, cml: Option<std::sync::Arc<intro::Cml>>, stage: Option<(Vec3, Quat)>, finish_area: Option<(Vec3, Quat)> }
 
 fn open_level(dir: &Path) -> Result<Loaded, String> {
-    let level = Level::load(dir)?;
+    let mut level = Level::load(dir)?;
+    // the course's AI paths and race lines from the player's disc (TRICKY_DISC, row E3d: its .aip as
+    // `AIP_LoadPathsFromFile` reads it), else the level folder's AIP.json
+    if let Some(ai) = std::env::var("TRICKY_DISC").ok().and_then(|p| {
+        let mut files = tricky_data::big::Files::new(tricky_data::disc::Disc::open(&p).ok()?);
+        tricky_data::aip::from_disc(&mut files, &dir.file_name()?.to_string_lossy(), "aip")
+    }) {
+        println!("AI paths from the disc: {} paths, {} race lines", ai.ai_paths.len(), ai.event_paths.len());
+        level.ai = tricky_data::level::AiFile::from_aip(&ai);
+    }
     let mut world = build_collision(&level);
     let mut rails = Rails(level.splines.iter().enumerate().filter_map(|(si, sp)| {
         let mut pts: Vec<Vec3> = Vec::new();

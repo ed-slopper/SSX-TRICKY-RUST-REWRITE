@@ -157,3 +157,19 @@ course id 0 garibald, 1 snowdrea, 2 elysium, 3 mesablan, 4 merqury, 5 aloha, 6 a
 tokyo, 10 trick, 11 alaska), `commonob` and `scripts`, each `%s.cml` (0x37fba8) in DATA/CAMERA, skipping a
 missing one (`Cml_LoadIfExists` 0x16e4c0). `intro::Cml::from_disc` reads them; equal to the level folders' copies.
 Our level folder to course id mapping (`intro::course_of_folder`) is a stand-in for the course table (row C0).
+
+## `.aip` / `.sop`: AI paths and race lines (board row E3d, checked: `tricky-game/tests/aip.rs`, `tricky-data/tests/aip_json.rs`)
+
+- In each course's DATA/MODELS/<course>.BIG (gari, snow, elysium, mesa, merquer, aloha, pipe, untrack, megaple,
+  trick, alaska): `<course>.aip` (the race) and `<course>.sop` (the same layout; show-off), compressed.
+- `AIP_LoadPathsFromFile` 0x197da0 (`tricky_data::aip::read`): a word it skips (0x0a0a0a0a), the section count,
+  sections of (type, size, data). Type 0, AI paths (`AIP_LoadAIPaths` 0x198518, `cAIPath`, 0x40 bytes each): count,
+  start-position count, the start positions (path indices; always six). Type 1, race lines (`AIP_LoadEventPaths`
+  0x1983d0, `cEventPath`, 0x3c bytes): count, the main line's index. Each path (`AIPath_Load` 0x196f28):
+  parameters (id, size, bytes; `cAIPath` 100 = U3 (default 50), 101 = respawnable (default 1); `cEventPath` 0 = the
+  distance to the finish), point and event counts, the start, the box (min, max), points of (unit direction,
+  length), events of (type, value, start, end), the type kept as its place in the table at 0x337e70 (−1, 0..23,
+  100..105, 300).
+- The game keeps the points and events where they lie in the loaded file (only the event types rewritten in place).
+- The app reads the course's `.aip` from the disc with TRICKY_DISC (`aip::from_disc`, `AiFile::from_aip`), else
+  the level folder's AIP.json (SSX-Library's export: the same paths, its points direction × length).

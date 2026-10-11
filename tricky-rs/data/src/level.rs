@@ -181,6 +181,20 @@ pub struct AiFile { #[serde(default)] pub race_lines: Vec<RaceLine>, #[serde(def
 #[serde(rename_all = "PascalCase")]
 pub struct AiPath { pub path_pos: [f32; 3], pub path_points: Vec<[f32; 3]>, #[serde(default)] pub path_events: Vec<PathEvent>, #[serde(default = "fifty", rename = "U3")] pub u3: f32, #[serde(default = "yes")] pub respawnable: bool }
 fn fifty() -> f32 { 50.0 }
+
+impl AiFile {
+    /// The paths of a course's `.aip` (row E3d, as the game loads it) in the level folder's form: race lines from
+    /// the event paths (their points as offsets: direction × length; the distance to the finish from parameter 0),
+    /// AI paths with their U3 and respawnable flag; the events with the file's type codes.
+    pub fn from_aip(a: &crate::aip::Aip) -> AiFile {
+        let pts = |p: &crate::aip::AipPath| p.points.iter().map(|(d, l)| [d[0] * l, d[1] * l, d[2] * l]).collect::<Vec<_>>();
+        let evs = |p: &crate::aip::AipPath| p.events.iter().map(|e| PathEvent { event_type: e.code, event_value: e.value as i32, event_start: e.start, event_end: e.end }).collect::<Vec<_>>();
+        AiFile {
+            race_lines: a.event_paths.iter().map(|p| RaceLine { path_pos: p.start, path_points: pts(p), distance_to_finish: p.param(0).map_or(0.0, f32::from_bits), path_events: evs(p) }).collect(),
+            ai_paths: a.ai_paths.iter().map(|p| AiPath { path_pos: p.start, path_points: pts(p), path_events: evs(p), u3: p.u3() as f32, respawnable: p.respawnable() != 0 }).collect(),
+        }
+    }
+}
 #[derive(Deserialize, Clone, Copy)]
 #[serde(rename_all = "PascalCase")]
 pub struct PathEvent { pub event_type: i32, pub event_value: i32, pub event_start: f32, pub event_end: f32 }
