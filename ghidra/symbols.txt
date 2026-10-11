@@ -6005,3 +6005,105 @@ F 2b4998 cFE3DWBufferedSingleLineText cFE3DWBufferedSingleLineText
 F 2b68e0 cFE3DWList cFE3DWList
 G 2abc68 FE3D_AddWidget
 G 2b7180 Comm_Crc16
+G 17c6e8 App_MainLoop
+G 183ae8 MemCardMsg_DrawButtonPrompt
+G 15fbb8 RaceScene_SetClipMarker
+G 12d6c0 Fx_Spray_ComputeParticle
+G 18c728 DebugMenu_DrawUpArrow
+G 18c9d0 DebugMenu_DrawDownArrow
+G 18ceb8 DebugMenu_DrawItemBox
+G 195c88 TextBox_DrawCentered
+G 19bdf8 Sprite_SubmitQuad
+G 1c4468 PS2Draw_FindOrAddBatch
+G 1d4660 MockupEditor_AddItem
+G 202520 Euler_ShortestDelta
+G 20b700 BankInstance_UpdatePositional
+G 213d60 Audio_PlayMenuMoveSound
+G 213f88 Audio_PlayMenuBackSound
+G 2201f8 CrowdBox_StopSlot
+G 2203a8 CrowdBox_PlayCheer
+G 221068 Audio_PlayCrowdCheer
+F 138210 cComputer cComputer
+F 2b0230 cFE3DWNameEntry cFE3DWNameEntry
+F 2b2d00 cFE3DWListBox cFE3DWListBox
+F 2b35d0 cFE3DWEntry cFE3DWEntry
+F 2b3d10 cFE3DProgressBar cFE3DProgressBar
+F 2b4190 cFE3DTiledIcon cFE3DTiledIcon
+F 2b4620 cFE3DIcon cFE3DIcon
+G 242320 Huff_WriteVarNum
+G 239960 Rle_Encode
+G 24d1a0 LoadScreen_SetupTips
+G 267670 FE3DLighting_Lerp
+G 2b8418 Cstring_CopyToAscii
+G 2b84b0 Cstring_ToAsciiBuffer
+G 2b85f8 Cstring_AppendChar
+G 2b8658 Cstring_AppendAscii
+G 2b8828 Cstring_NotEqualsChar
+G 2b8850 Cstring_NotEqualsAscii
+G 2b8870 Cstring_NotEquals
+G 2b8b20 Cstring_FindLast
+G 2b8c00 Cstring_FindMatch
+G 2b8c48 Cstring_LeftOfMatch
+G 2b8c78 Cstring_RightOfMatch
+G 2b9990 Cstring_StartsWith
+G 2b99f8 Cstring_PopLine
+G 2b9000 Cstring_Trim
+G 2b9028 Cstring_TrimLeft
+G 2b90e0 Cstring_TrimRight
+G 2b91a8 Cstring_Prepend
+G 2b97e0 Cstring_Pack
+G 2b98d0 Cstring_Unpack
+F 2b9df0 C8bitBuffer C8bitBuffer
+G 2b9e08 C8bitBuffer_InitFromCstring
+G 2ba240 VideoStream_FlushFrames
+G 2bb110 SpeechLib_FindFreeBankSlot
+G 2bb180 SpeechLib_FindBankById
+G 2bb1f0 SpeechLib_FindBankByIds
+G 2bb2b0 SpeechLib_ClearBankSlot
+G 2bb650 SpeechLib_FindEventBank
+G 2bb6b0 SpeechLib_FindEvent
+G 2bb7a0 SpeechLib_ClearEventBanks
+G 2bbcf8 SpeechLib_PostEventArgs
+G 2be678 SpeechLib_Rand
+G 2be768 SpeechLib_SeedRand
+G 2be8c8 SpeechLib_InitHistory
+G 2be880 SpeechLib_PushHistory
+G 2be7d8 SpeechLib_FindInHistory
+G 2bc9a0 SpeechLib_TestBit
+G 2bdc70 SpeechLib_HasQueued
+G 2bdae0 SpeechLib_ClearQueue
+G 2bdb68 SpeechLib_QueueEvent
+G 2bc548 SpeechLib_Service
+G 2bd198 SpeechLib_Shuffle
+G 2c2bb8 Compress_IsType18
+G 2c4478 Fmt_WriteDigits
+G 2c44d8 Fmt_WriteAbsDigits
+G 2c4e90 WStr_Sprintf
+G 2c5380 WStr_Find
+G 2c5418 WStr_Cmp
+G 2c5660 AsyncFile_ListAppend
+G 2c5808 AsyncFile_Complete
+G 2c5d30 AsyncFile_CancelAll
+G 2c5f98 AsyncFile_StartRead
+G 2c6390 RingBuf_InRange
+G 2c1db8 PathX_SetVolume
+G 2c1f10 PathX_FadeTracks
+G 2c1cc0 PathX_StopSong
+G 2c7f60 File_LoadAllocCb
+G 2c80b8 File_LoadAllocSizeCb
+G 2c8258 File_LoadIntoCb
+G 2c7e58 File_GetSizeCb
+G 2c8508 File_OpenBigCb
+G 2c7ec8 File_GetSize
+G 2c8018 File_LoadAlloc
+G 2c8178 File_LoadAllocSize
+G 2c82f0 File_LoadInto
+G 2c8398 File_LoadManyCb
+G 2c8430 File_LoadMany
+G 2c7a28 Strm_GetPacket
+G 2c7b30 Strm_ReleasePacket
+G 2c7c70 Strm_IsFinished
+G 2c7c10 Strm_GetBufferedBytes
+G 2c7c40 Strm_GetState
+G 2c7cb8 Strm_GetBufferSize
+G 2c6e48 Strm_CalcMemSize
