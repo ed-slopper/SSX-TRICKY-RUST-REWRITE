@@ -222,3 +222,12 @@ there (no rewind); a level is the value / 100 when 0..200 (the duck 0..100), els
   0x14-byte records (course+0x24) and (first record, count) per group (course+0x20).
 - On the disc: gari 3393 objects, 306 effect headers, 20 functions, 412 collision groups; ssxfe (the front end)
   has 33 functions and no collision. `untrack` and `trick` have no functions.
+- Sphere trees (row E3c2; `Ssf::sphere_trees`): each group's trees follow one another (`SphTree_Load` 0x239340
+  returns the bytes it read; the group's byte count is their sum). Header 0x70 bytes: +0 / +4 the sizes of the two
+  data blocks after the levels, +8 a flag (0: the occupancy bytes are the data itself, else 0 — the tree's cache
+  fills them), +0xc the depth, +0x10 the centre (also the tree's +0x90, w 1), +0x1c the centre of mass, +0x28 and
+  +0x4c two 3×3 matrices (inertia and inverse); then depth + 1 level records (12 bytes: sphere radius, cell
+  half-size, child index stride 8ⁿ) and the data. The trees are octrees: a node's eight children sit at the
+  corners (the tree's +0x10, 8 vectors from 0x3439d0) × the next level's half-size, an occupancy byte saying which
+  exist (`SphTree_SphereRecurse` 0x23a728). The loaded tree is 0x150 bytes (header copy at +0xd0, its +0 the tree's
+  running index).

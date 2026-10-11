@@ -4,7 +4,7 @@
 //! spline segments, collision tables and fixed-up scripts compared with `tricky_data::ssf`; then `World_FindScript`
 //! and `Instance_GetEventScript` asked about every function and object.
 
-use std::cell::{Cell, RefCell};
+use std::cell::Cell;
 use std::rc::Rc;
 
 use r5900::Runner;
@@ -21,7 +21,6 @@ struct Loaded {
     objects: u32,
     models: u32,
     segs: u32,
-    trees: Rc<RefCell<Vec<(u32, u32)>>>,
 }
 
 fn load(bytes: &[u8], objects: u32, segments: u32) -> Option<Loaded> {
@@ -60,18 +59,18 @@ fn load(bytes: &[u8], objects: u32, segments: u32) -> Option<Loaded> {
     r.stub(0x238af0, |_, _| {});
     r.stub(0x239ba8, |_, _| {});
     r.stub(0x23b520, |_, _| {});
-    let trees = Rc::new(RefCell::new(vec![]));
-    let t = trees.clone();
-    // SphTree_Load(tree, data, index) returns the bytes it read: a group's first tree is all this row checks
-    r.stub(0x239340, move |c, _| {
-        t.borrow_mut().push((c.gpr(5) as u32, c.gpr(6) as u32));
-        c.set_gpr(2, 0);
+    // SphTree_Load runs as the game's (row E3c2); EAMem_Copy is a plain copy
+    r.allow(0x239340);
+    r.stub(0x2ce114, |c, m| {
+        let mut b = vec![0u8; c.gpr(6) as usize];
+        m.read(c.gpr(5) as u32, &mut b);
+        m.write(c.gpr(4) as u32, &b).unwrap();
     });
     r.cpu.set_gpr(4, course as u64);
     let path = r.mem.alloc(16);
     r.cpu.set_gpr(5, path as u64);
     r.call(0x25f598).unwrap();
-    Some(Loaded { r, course, file, objects: objs, models, segs, trees })
+    Some(Loaded { r, course, file, objects: objs, models, segs })
 }
 
 fn ops_at(m: &mut r5900::Mem, mut p: u32, count: u32) -> Vec<(u32, u32, Vec<u32>)> {
@@ -158,14 +157,43 @@ fn ssf_files_load_as_the_game_loads_them() {
                 k += 1;
             }
         }
-        // each sphere-tree group's first tree is read where the group says
-        let firsts: Vec<u32> = {
-            let t = l.trees.borrow();
-            let mut at = 0;
-            ssf.sphere_groups.iter().filter_map(|g| { let f = t.get(at).map(|x| x.0); at += g.count as usize; f }).collect()
-        };
-        let want: Vec<u32> = ssf.sphere_groups.iter().filter(|g| g.count > 0).map(|g| l.file + g.offset).collect();
-        assert_eq!(firsts, want, "{c}: sphere groups");
+        // the sphere trees: per group (first tree, count) at course+0x18, the trees (0x150 bytes) at course+0x1c, each
+        // with its header copied to +0xd0 and pointers into the file
+        let (gtab, tbase) = (m.read_u32(l.course + 0x18), m.read_u32(l.course + 0x1c));
+        let mut k = 0u32;
+        for (gi, (g, trees)) in ssf.sphere_groups.iter().zip(&ssf.sphere_trees).enumerate() {
+            assert_eq!(trees.iter().map(|t| t.size()).sum::<usize>(), g.bytes as usize, "{c}: sphere group {gi} bytes");
+            assert_eq!((m.read_u32(gtab + 8 * gi as u32), m.read_u32(gtab + 8 * gi as u32 + 4)), (tbase + 0x150 * k, g.count), "{c}: sphere group {gi}");
+            let mut at = l.file + g.offset;
+            for (ti, t) in trees.iter().enumerate() {
+                let n = tbase + 0x150 * k;
+                let h = n + 0xd0;
+                let w = |m: &mut r5900::Mem, o: u32| m.read_u32(h + o);
+                assert_eq!(m.read_u32(n + 0xa0), h, "{c}: tree {gi}.{ti}");
+                assert_eq!([w(m, 0), w(m, 4), w(m, 8), w(m, 0xc), w(m, 0x10)], [k, 0, t.flag, t.depth, 1], "{c}: tree {gi}.{ti} header");
+                let fl = |v: &[f32]| v.iter().map(|x| x.to_bits()).collect::<Vec<u32>>();
+                let rd = |m: &mut r5900::Mem, o: u32, n: u32| (0..n).map(|i| m.read_u32(h + o + 4 * i)).collect::<Vec<u32>>();
+                assert_eq!(rd(m, 0x14, 3), fl(&t.centre), "{c}: tree {gi}.{ti} centre");
+                assert_eq!(rd(m, 0x2c, 3), fl(&t.mass_centre), "{c}: tree {gi}.{ti} mass centre");
+                assert_eq!(rd(m, 0x38, 9), fl(&t.inertia), "{c}: tree {gi}.{ti} inertia");
+                assert_eq!(rd(m, 0x5c, 9), fl(&t.inv_inertia), "{c}: tree {gi}.{ti} inverse");
+                let levels = w(m, 0x20);
+                assert_eq!(levels, at + 0x70, "{c}: tree {gi}.{ti} levels");
+                for (li, lv) in t.levels.iter().enumerate() {
+                    let a = levels + 12 * li as u32;
+                    assert_eq!((m.read_u32(a), m.read_u32(a + 4), m.read_u32(a + 8) as i32), (lv.0.to_bits(), lv.1.to_bits(), lv.2), "{c}: tree {gi}.{ti} level {li}");
+                }
+                let data = w(m, 0x24);
+                assert_eq!(data, levels + 12 * t.levels.len() as u32, "{c}: tree {gi}.{ti} data");
+                assert_eq!(w(m, 0x28), if t.flag == 0 { data } else { 0 }, "{c}: tree {gi}.{ti} masks");
+                let mut db = vec![0u8; t.data.len()];
+                m.read(data, &mut db);
+                assert_eq!(db, t.data, "{c}: tree {gi}.{ti} data bytes");
+                assert_eq!([0x90u32, 0x94, 0x98, 0x9c].map(|o| m.read_u32(n + o)), [t.centre[0].to_bits(), t.centre[1].to_bits(), t.centre[2].to_bits(), 0x3f80_0000], "{c}: tree {gi}.{ti}");
+                at += t.size() as u32;
+                k += 1;
+            }
+        }
         // the game's lookups on what it loaded
         let name = l.r.mem.alloc(32);
         let mut asks: Vec<String> = ssf.functions.iter().map(|f| f.name.to_ascii_uppercase()).collect();

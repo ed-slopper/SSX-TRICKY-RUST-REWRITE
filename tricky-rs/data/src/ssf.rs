@@ -83,6 +83,8 @@ pub struct Ssf {
     /// argument picks one)
     pub slots: Vec<[i32; 7]>,
     pub sphere_groups: Vec<Group>,
+    /// each sphere-tree group's trees (`SphTree_Load` 0x239340, one after another)
+    pub sphere_trees: Vec<Vec<SphTree>>,
     pub coll_groups: Vec<Group>,
     /// each collision group's meshes
     pub collision: Vec<Vec<CollMesh>>,
@@ -148,6 +150,20 @@ impl Ssf {
             table(count, off, 12).into_iter().map(|o| Some(Group { offset: word(b, o)?, bytes: word(b, o + 4)?, count: word(b, o + 8)? })).collect::<Option<Vec<_>>>()
         };
         let sphere_groups = groups(h(0x14)?, h(0x18)?).ok_or(t)?;
+        let sphere_trees = sphere_groups
+            .iter()
+            .map(|g| {
+                let mut p = g.offset as usize;
+                (0..g.count)
+                    .map(|_| {
+                        let tree = SphTree::parse(b, p)?;
+                        p += tree.size();
+                        Some(tree)
+                    })
+                    .collect::<Option<Vec<_>>>()
+            })
+            .collect::<Option<Vec<_>>>()
+            .ok_or(t)?;
         let coll_groups = groups(h(0x1c)?, h(0x20)?).ok_or(t)?;
         let collision = coll_groups
             .iter()
@@ -199,7 +215,7 @@ impl Ssf {
             .ok_or(t)?;
         let object_physics = table(objects, h(0x40)?, 4).into_iter().map(|o| word(b, o)).collect::<Option<Vec<_>>>().ok_or(t)?;
         let spline_segments = table(h(0x44)?, h(0x48)?, 8).into_iter().map(|o| Some([word(b, o)?, word(b, o + 4)?])).collect::<Option<Vec<_>>>().ok_or(t)?;
-        Ok(Ssf { magic: h(0)?, stamp: h(8)?, slots, sphere_groups, coll_groups, collision, effects, functions, physics, object_physics, spline_segments })
+        Ok(Ssf { magic: h(0)?, stamp: h(8)?, slots, sphere_groups, sphere_trees, coll_groups, collision, effects, functions, physics, object_physics, spline_segments })
     }
 
     /// `World_FindScript` 0x260dd8: the function named `name` (case-blind; the first of that name), else −1.
@@ -221,5 +237,52 @@ impl Ssf {
     /// half the upper half moved down).
     pub fn segment_x18(w0: u32) -> u32 {
         (w0 & 0xffff_0000) | (w0 >> 16)
+    }
+}
+
+/// A sphere tree as `SphTree_Load` 0x239340 reads it: an octree of spheres around an object's shape, with the
+/// object's mass properties. Header (0x70 bytes): +0 and +4 the sizes of the two data blocks after the levels,
+/// +8 a flag (0: the occupancy bytes are the data itself; else the tree's cache builds them), +0xc the depth, +0x10
+/// the centre, +0x1c a second point (the centre of mass), +0x28 and +0x4c two 3×3 matrices (the inertia tensor and
+/// its inverse); then one 12-byte record per level (depth + 1: the spheres' radius, the cells' half-size, the index
+/// stride of the level's children) and the data.
+#[derive(Clone, Debug, PartialEq)]
+pub struct SphTree {
+    pub size_a: u32,
+    pub size_b: u32,
+    pub flag: u32,
+    pub depth: u32,
+    pub centre: [f32; 3],
+    pub mass_centre: [f32; 3],
+    pub inertia: [f32; 9],
+    pub inv_inertia: [f32; 9],
+    /// per level (radius, half-size, child stride)
+    pub levels: Vec<(f32, f32, i32)>,
+    /// the `size_a + size_b` bytes after the levels
+    pub data: Vec<u8>,
+}
+
+impl SphTree {
+    fn parse(b: &[u8], at: usize) -> Option<SphTree> {
+        let w = |o: usize| word(b, at + o);
+        let f = |o: usize| w(o).map(f32::from_bits);
+        let v3 = |o: usize| Some([f(o)?, f(o + 4)?, f(o + 8)?]);
+        let m9 = |o: usize| -> Option<[f32; 9]> {
+            let mut m = [0.0; 9];
+            for (k, v) in m.iter_mut().enumerate() {
+                *v = f(o + 4 * k)?;
+            }
+            Some(m)
+        };
+        let (size_a, size_b, flag, depth) = (w(0)?, w(4)?, w(8)?, w(0xc)?);
+        let levels = (0..depth as usize + 1).map(|i| Some((f(0x70 + 12 * i)?, f(0x74 + 12 * i)?, w(0x78 + 12 * i)? as i32))).collect::<Option<Vec<_>>>()?;
+        let d0 = at + 0x70 + (depth as usize + 1) * 12;
+        let data = b.get(d0..d0 + size_a as usize + size_b as usize)?.to_vec();
+        Some(SphTree { size_a, size_b, flag, depth, centre: v3(0x10)?, mass_centre: v3(0x1c)?, inertia: m9(0x28)?, inv_inertia: m9(0x4c)?, levels, data })
+    }
+
+    /// The bytes the tree takes (what `SphTree_Load` returns).
+    pub fn size(&self) -> usize {
+        0x70 + (self.depth as usize + 1) * 12 + self.size_a as usize + self.size_b as usize
     }
 }
