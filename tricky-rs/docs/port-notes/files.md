@@ -200,3 +200,25 @@ there (no rewind); a level is the value / 100 when 0..200 (the duck 0..100), els
 (TRICK has none). Then segment 0, one of 1..3 at random (`(rand & 0x7fff)·3/0x7fff + 1`: 4 for 0x7fff), and two of
 4..7 (`·4/0x7fff + 4`: 8 for 0x7fff); not in modes 3, 7, 8, 11.
 
+
+## Course logic and collision, `.ssf` (row E3c1; `tricky_data::ssf`, checked: `tricky-game/tests/ssf.rs`)
+
+- `Course_LoadRenderData` 0x25edf0 builds the course's file names as `|data/models/<file><ext>` (in the course's
+  archive): `.ltg`, `.pbd`, `.ssh`, `.ssf`, `.adl`, `.aip` (`.sop` in show-off), and `<file>_L.ssh` (the first six
+  letters of a long name, then `_L`) for the lightmaps. `Course_LoadSphereTrees` 0x25f598 reads the `.ssf`; without
+  one (or with the wrong version, or an object count that is not the course's) every object gets the default
+  physics record 0x3d2d70 (1000.0, 0.5, flags 3 << 16, −1).
+- Header (19 words): +0 0x1e0200, +4 version u16 0x1500, +8 a build stamp; then count/offset pairs: +0xc/+0x10
+  event slots (7 words: the effect header each of seven events runs, −1 none; `Instance_GetEventScript` 0x25fe78),
+  +0x14/+0x18 sphere-tree groups and +0x1c/+0x20 collision groups (offset, bytes, count), +0x24/+0x28 effect headers
+  (op count, offset from the end of that table), +0x2c/+0x30 script functions (op count, offset as the headers', a
+  16-byte name; `World_FindScript` 0x260dd8 compares case-blind), +0x34/+0x38 physics records (0x18 bytes: +8
+  flags, copied to instance+0xe8; +0x14 the event-slot record as a signed half), +0x3c/+0x40 one physics record
+  index per object (instance+0xec points at it; flag bit 0x2000 of the upper half sets model+0x10 bit 0x10),
+  +0x44/+0x48 spline segments (word 0 to segment+0x18 with its upper half also moved down, word 1 to +0x24).
+- A script op: word 0 the op, word 1 its size in bytes (`TriggerScript_Run` 0x13be78 steps by it), the arguments
+  after. A collision mesh: triangle count n, vertex count m, padding bytes, n triangles of three u32 indices, the
+  padding, m vertices (4 floats), n planes (normal and w); the loader keeps (n, m, triangles, vertices, planes) in
+  0x14-byte records (course+0x24) and (first record, count) per group (course+0x20).
+- On the disc: gari 3393 objects, 306 effect headers, 20 functions, 412 collision groups; ssxfe (the front end)
+  has 33 functions and no collision. `untrack` and `trick` have no functions.

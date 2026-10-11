@@ -21,6 +21,7 @@ pub mod mpf;
 pub mod music;
 pub mod sfn;
 pub mod snowsfx;
+pub mod ssf;
 pub mod ssh;
 pub mod trick_names;
 pub mod trick_slots;

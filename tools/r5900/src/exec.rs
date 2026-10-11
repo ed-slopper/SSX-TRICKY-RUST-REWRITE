@@ -221,7 +221,7 @@ fn step(r: &mut Runner, pc: u32) -> Result<Next, Error> {
             c.set_gpr(rt, c.gpr(rs).wrapping_add(sext16(imm))); // daddiu
             Ok(Next::Seq)
         }
-        28 => unimpl("MMI"),
+        28 => mmi(r, pc, w, rs, rt, rd, fun),
         26 | 27 => {
             // ldl / ldr: the unaligned doubleword's high (ldl) or low (ldr) part, little-endian
             let byte = addr & 7;
@@ -806,4 +806,61 @@ mod tests {
         let e = rn.call(CODE).unwrap_err();
         assert!(e.to_string().contains("MMI"), "{e}");
     }
+
+    #[test]
+    fn mult1_uses_the_second_pipeline() {
+        let mut rn = Runner::empty();
+        // mult1 r3, r4, r5; mflo1 r6; mfhi1 r7; mflo r8; jr ra; nop
+        let mmi = |rs: u32, rt: u32, rd: u32, f: u32| 28 << 26 | rs << 21 | rt << 16 | rd << 11 | f;
+        for (i, w) in [mmi(4, 5, 3, 0x18), mmi(0, 0, 6, 0x12), mmi(0, 0, 7, 0x10), 18 | 8 << 11, 31 << 21 | 8, 0].iter().enumerate() {
+            rn.mem.write_u32(CODE + 4 * i as u32, *w);
+        }
+        rn.cpu.set_gpr(4, (-70000i64) as u64);
+        rn.cpu.set_gpr(5, 90000);
+        rn.cpu.lo = 0x1234;
+        rn.call(CODE).unwrap();
+        let p = -70000i64 * 90000;
+        assert_eq!(rn.cpu.gpr(3), p as u32 as i32 as i64 as u64);
+        assert_eq!(rn.cpu.gpr(6), p as u32 as i32 as i64 as u64);
+        assert_eq!(rn.cpu.gpr(7), (p >> 32) as u32 as i32 as i64 as u64);
+        assert_eq!(rn.cpu.gpr(8), 0x1234, "LO0 untouched");
+    }
+}
+
+/// The MMI instructions implemented so far: the pipeline-1 multiply and divide (`mult1`, `multu1`, `div1`,
+/// `divu1`) and their HI1/LO1 moves; HI1 and LO1 are the upper 64 bits of HI and LO.
+fn mmi(r: &mut Runner, pc: u32, w: u32, rs: usize, rt: usize, rd: usize, fun: u32) -> Result<Next, Error> {
+    let c = &mut r.cpu;
+    let (a, b) = (c.gpr(rs), c.gpr(rt));
+    let set_hi1 = |c: &mut crate::Cpu, v: u64| c.hi = (c.hi & u64::MAX as u128) | ((v as u128) << 64);
+    let set_lo1 = |c: &mut crate::Cpu, v: u64| c.lo = (c.lo & u64::MAX as u128) | ((v as u128) << 64);
+    match fun {
+        0x10 => c.set_gpr(rd, (c.hi >> 64) as u64), // mfhi1
+        0x11 => set_hi1(c, a),                       // mthi1
+        0x12 => c.set_gpr(rd, (c.lo >> 64) as u64), // mflo1
+        0x13 => set_lo1(c, a),                       // mtlo1
+        0x18 | 0x19 => {
+            // mult1 / multu1: as mult / multu into LO1, HI1 (and rd)
+            let p = if fun == 0x18 { (a as u32 as i32 as i64).wrapping_mul(b as u32 as i32 as i64) as u64 } else { (a as u32 as u64) * (b as u32 as u64) };
+            set_lo1(c, sext32(p as u32));
+            set_hi1(c, sext32((p >> 32) as u32));
+            c.set_gpr(rd, sext32(p as u32));
+        }
+        0x1a => {
+            let (n, d) = (a as u32 as i32, b as u32 as i32);
+            if d != 0 {
+                set_lo1(c, sext32(n.wrapping_div(d) as u32));
+                set_hi1(c, sext32(n.wrapping_rem(d) as u32));
+            }
+        }
+        0x1b => {
+            let (n, d) = (a as u32, b as u32);
+            if d != 0 {
+                set_lo1(c, sext32(n / d));
+                set_hi1(c, sext32(n % d));
+            }
+        }
+        _ => return Err(Error::Unimplemented { pc, word: w, what: format!("MMI {fun:#x}") }),
+    }
+    Ok(Next::Seq)
 }
