@@ -445,6 +445,24 @@ when 1 − dot ≤ 0.001), then `Boarder_UpdateOrientation`. `Quat_Multiply` 0x1
 (30,000 cases each, near-equal and opposite inputs) and the quaternion, axes and heading the real
 `RailSlideMotion_Update` leaves in the rail cases above, bit for bit (`tests/rail_world.rs`).
 
+The whole rail tick (row G20c2c4; `ground_tick::rail_slide_motion`, `RailMotion`, `RailEnd`), dt = rider+0x12c / 60:
+- k = 0.5 under 555.55554 cm/s, else speed × 0.0009; no rail in reach: take off.
+- Outside the fall-off limits: pushed 277.77777 cm/s off along the unit offset to the rail (the tangent when
+  |offset·t| > 0.5), squared to the velocity first when the velocity runs against it; take off.
+- Inside: time += dt; position += up · clamp(offset·up, ±8.333333); velocity = t(v·t)·(dt·30) + v·(1 − dt·30);
+  gravity (0, 0, −980) along t, minus t(v·t)·0 (sic), plus t·+0x130·±2450.8232 (the sign of v·t) when +0x130 > 0,
+  × dt into the velocity; position += v·dt. Balance along the board's right × dt: steer·(clamp(k, 0.5, 2)·145.07674)
+  (steer = +0x214, negated unless the board's up points down) − lateral′·(gain·clamp(1/k², 1, 4)); gain −5 for the
+  first 0.6 s (after this tick's dt) or on a steep rail (|t.z| > 0.92), else 1.8153523, capped at −1 within
+  2.5000005 of the rail; lateral′ clamped ±20 only when the gain is not negative; upside down within 20 of the rail
+  the force is at least 290.15347 back toward it. Then the lean angle, normal and attitude; rider+0x494 = 3 around
+  `Boarder_InstanceCollisions` 0x125088 and `Boarder_WallCollide` 0x126250, then −1.
+- Take off: +0x214, +0x218, +0x21c = 0; `Score_StartTrickChain` 0x156618(rider+0x5820, rider+0x1b4 ≠ stats+0x40,
+  +0x1dc, 0, 0) → `Boarder_AddMeter` 0x11b018(its result); `Takeoff_Setup` 0x12bee0; `Boarder_PlayTakeoffClip`
+  0x127298; motion 1; state manager +0x798, +0x76c, +0x770 = 0; state 0x10.
+Checked against the real function on 12,000 random rail ticks (`tests/rail_world.rs`): every field and call bit
+for bit.
+
 Not wired, new rows: `Rider::rail_step` still uses `rail_lateral` and the last normal (STANDIN), because it has no
 world grid (the game builds one when it loads the course; the port's rails are the level's splines flattened to
 polylines in `rails.rs`: G20c2c1) and no attitude quaternion through a rail (the second half of

@@ -893,3 +893,148 @@ impl TakeOffEnv for TakeOffGlue<'_> {
     /// STANDIN: nothing, for `Boarder_SetState` 0x11f608's body (row G18).
     fn set_state(&mut self, _r: &mut TakeOffRider, _state: u32) {}
 }
+
+/// Everything `RailSlideMotion_Update` 0x10b0d0 reads and writes (row G20c2c4), in the game's space (cm, z up).
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct RailMotion {
+    /// rider+0x140, +0x150
+    pub pos: V4,
+    pub vel: V4,
+    /// rider+0x170..+0x1b0: the attitude and its axes (`side` +0x190, `up` +0x1a0)
+    pub orient: Orient,
+    /// rider+0x4a60..: the board's frame rows; +0x4a90 its position
+    pub frame: [V4; 3],
+    pub board_pos: V4,
+    /// rider+0x1dc
+    pub kind: u32,
+    /// rider+0x284
+    pub blend: f32,
+    /// rider+0x2a0
+    pub normal: V4,
+    /// rider+0x2d0, +0x290: the last rail hit
+    pub hit_point: V4,
+    pub hit_word: u32,
+    /// rider+0x12c: the tick's length in 60ths of a second
+    pub ticks: f32,
+    /// rider+0x130: the push along the rail (from the stick, × ±2450.8232)
+    pub push: f32,
+    /// rider+0x214 (the steer), +0x218, +0x21c
+    pub steer: f32,
+    pub x218: f32,
+    pub x21c: f32,
+    /// the motion object's +8 (lean angle) and +0xc (seconds on the rail)
+    pub lean: f32,
+    pub time: f32,
+}
+
+/// How a rail tick ends.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum RailEnd {
+    /// still on: rider+0x494 = 3, `Boarder_InstanceCollisions`, `Boarder_WallCollide`(rider), +0x494 = −1
+    OnRail,
+    /// off (no rail in reach, or outside the fall-off limits after the push away): +0x214, +0x218, +0x21c = 0, then
+    /// `Score_StartTrickChain`(rider+0x5820, rider+0x1b4 ≠ stats+0x40, +0x1dc, 0, 0) with its result to
+    /// `Boarder_AddMeter`, `Takeoff_Setup`, `Boarder_PlayTakeoffClip`, `Boarder_SetMotion`(1), the state manager's
+    /// +0x798, +0x76c, +0x770 = 0 and `Boarder_SetState`(0x10)
+    TakeOff,
+}
+
+/// The world's pull along a rail (0x3bbf00, set once: (0, 0, −980, 0)).
+const RAIL_GRAVITY: V4 = [0.0, 0.0, -980.0, 0.0];
+
+/// `RailSlideMotion_Update` 0x10b0d0, all of it (rows G20c2c, G20c2c2, G20c2c4). With dt = rider+0x12c / 60, the
+/// unit velocity and the rail's closest point to the board ([`RailWorld::closest_point`]; none: take off):
+/// - the hit recorded; the travel tangent `t` ([`rail_travel`]); k = 0.5 under 555.55554 cm/s, else speed × 0.0009;
+/// - outside the fall-off limits (see [`rail_slide_normal`]): pushed 277.77777 cm/s away along the unit offset to the
+///   rail, or the tangent when they are within 60° of each other, first made square to the velocity when that runs
+///   against it; then take off;
+/// - inside: the time moves on dt; the position moves along the board's up by its offset to the rail that way
+///   (clamped to ±8.333333); the velocity eased to its part along `t` by dt·30; gravity along `t` (and the push
+///   +0x130 · ±2450.8232, the sign of the velocity along `t`) by dt into the velocity, which moves the position by
+///   dt; the balance: steer (negated unless the board is upside down) · (k clamped 0.5..2 · 145.07674) − lateral
+///   (clamped ±20 when the gain is not negative) · gain · clamp(1/k², 1..4), the gain −5 for the first 0.6 s or on
+///   a steep rail, else 1.8153523, and at most −1 within 2.5000005 of the rail; upside down within 20 of the rail
+///   at least 290.15347 back toward it; along the board's right by dt; then the lean angle, normal
+///   ([`rail_normal`]) and attitude ([`rail_attitude`], [`orient::update_orientation`]).
+pub fn rail_slide_motion(world: &RailWorld, m: &mut RailMotion) -> RailEnd {
+    let vdir = unit(m.vel);
+    let dt = m.ticks * f32::from_bits(0x3c88_8889);
+    let Some(hit) = world.closest_point(m.board_pos) else { return take_off(m) };
+    m.hit_word = hit.word;
+    m.hit_point = hit.point;
+    let t = if dot(vdir, hit.tangent) < 0.0 { scale(hit.tangent, -1.0) } else { hit.tangent };
+    let speed = dot(m.vel, m.vel).sqrt();
+    let k = if speed < f32::from_bits(0x440a_e38e) { 0.5 } else { speed * f32::from_bits(0x3a6b_edfb) };
+    let k2 = k * k;
+    let d = sub(hit.point, m.board_pos);
+    let off = add(d, scale(m.frame[1], -30.0));
+    let (ox, oy, oz) = (dot(m.frame[0], off), dot(m.frame[1], off), dot(m.frame[2], off));
+    if m.time < 0.6 {
+        m.blend = 1.0;
+    }
+    let b = m.blend;
+    let rest = 1.0 - b;
+    let inside = ox.abs() < b * 150.0 + rest * 80.0 && oy.abs() < b * 50.0 + rest * 50.0 && oz.abs() < b * 50.0 + rest * 30.0;
+    if !inside {
+        let dn = unit(d);
+        let mut p = if 0.5 < dot(dn, t).abs() { t } else { dn };
+        if dot(m.vel, p) < 0.0 {
+            let vn = unit(m.vel);
+            p = unit(sub(p, scale(vn, dot(p, vn))));
+        }
+        m.vel = sub(m.vel, scale(p, f32::from_bits(0x438a_e38e)));
+        return take_off(m);
+    }
+    let lat = dot(m.orient.side, d);
+    m.time += dt;
+    let h = dot(d, m.orient.up);
+    let lim = f32::from_bits(0x4105_5555);
+    let h = if h < -lim { -lim } else if lim < h { lim } else { h };
+    m.pos = add(m.pos, scale(m.orient.up, h));
+    let vt = dot(m.vel, t);
+    let along = scale(t, vt);
+    let ease = dt * 30.0;
+    m.vel = add(scale(along, ease), scale(m.vel, 1.0 - ease));
+    let mut f = sub(scale(t, dot(RAIL_GRAVITY, t)), scale(along, 0.0));
+    if 0.0 < m.push {
+        let p = m.push * if 0.0 < vt { f32::from_bits(0x4519_2d2c) } else { f32::from_bits(0xc519_2d2c) };
+        f = add(f, scale(t, p));
+    }
+    m.vel = add(m.vel, scale(f, dt));
+    m.pos = add(m.pos, scale(m.vel, dt));
+    let kk = if k < 0.5 { 0.5 } else if 2.0 < k { 2.0 } else { k };
+    let st = if m.orient.up[2] < 0.0 { m.steer } else { -m.steer };
+    let mut force = st * (kk * f32::from_bits(0x4311_13a5));
+    let steep = STEEP_RAIL < t[2].abs();
+    let mut gain = if m.time < 0.6 || steep { -5.0 } else { f32::from_bits(0x3fe8_5d77) };
+    if lat.abs() < f32::from_bits(0x4020_0002) {
+        gain = if -1.0 < gain { -1.0 } else { gain };
+    }
+    let inv = 1.0 / k2;
+    let mm = if inv < 1.0 { 1.0 } else if 4.0 < inv { 4.0 } else { inv };
+    let l = if 0.0 <= gain { if lat < -20.0 { -20.0 } else if 20.0 < lat { 20.0 } else { lat } } else { lat };
+    force = force - l * (gain * mm);
+    if m.orient.up[2] < 0.0 && lat.abs() < 20.0 {
+        let cap = f32::from_bits(0x4391_13a5);
+        if 0.0 < lat {
+            if -cap < force {
+                force = -cap;
+            }
+        } else if force < cap {
+            force = cap;
+        }
+    }
+    m.pos = add(m.pos, scale(m.orient.side, force * dt));
+    m.lean = rail_lean_angle(m.lean, lat, m.kind, m.orient.up[2]);
+    m.normal = rail_normal(t, m.orient.up, m.lean);
+    m.orient.q = rail_attitude(m.orient.q, m.normal, t, m.lean);
+    orient::update_orientation(&mut m.orient);
+    RailEnd::OnRail
+}
+
+fn take_off(m: &mut RailMotion) -> RailEnd {
+    m.x21c = 0.0;
+    m.steer = 0.0;
+    m.x218 = 0.0;
+    RailEnd::TakeOff
+}

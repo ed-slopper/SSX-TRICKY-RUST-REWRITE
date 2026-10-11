@@ -489,3 +489,168 @@ fn quaternion_helpers_are_the_originals() {
     }
     assert!(near > 3000, "near-equal slerps: {near}");
 }
+
+#[test]
+fn rail_slide_motion_is_the_originals() {
+    // all of `RailSlideMotion_Update` 0x10b0d0 (row G20c2c4) against `ground_tick::rail_slide_motion`: position,
+    // velocity, attitude, normal, hit, blend, lean, time and the steer fields, and the calls it ends in (the
+    // collisions on the rail; the take-off chain off it, `Score_StartTrickChain` answered)
+    use gt::{RailEnd, RailMotion};
+    use tricky_game::orient::{update_orientation, Orient};
+    type Log = Rc<RefCell<Vec<(&'static str, Vec<u32>)>>>;
+    let Some(mut r) = runner() else { return };
+    for a in [0x102f50, 0x102f80, 0x250c10, 0x259330, 0x2508b8, 0x250a48, 0x102e80, 0x10c120, 0x250fd0, 0x250d60, 0x129008, 0x2510f8] {
+        r.allow(a);
+    }
+    let log: Log = Rc::default();
+    let rider = r.mem.alloc(0x6000);
+    for (a, name) in [(0x11f610u32, "motion"), (0x11f608, "state"), (0x12bee0, "takeoff_setup"), (0x127298, "takeoff_clip"), (0x125088, "instance_collisions"), (0x126250, "wall_collide")] {
+        let l = log.clone();
+        r.stub(a, move |c, m| {
+            let x494 = m.read_u32(rider + 0x494);
+            l.borrow_mut().push((name, vec![c.gpr(4) as u32, c.gpr(5) as u32, x494]));
+        });
+    }
+    let l = log.clone();
+    r.stub(0x156618, move |c, _| {
+        l.borrow_mut().push(("trick_chain", vec![c.gpr(4) as u32, c.gpr(5) as u32, c.gpr(6) as u32, c.gpr(7) as u32, c.gpr(8) as u32]));
+        c.set_f(0, 0.37);
+    });
+    let l = log.clone();
+    r.stub(0x11b018, move |c, _| l.borrow_mut().push(("add_meter", vec![c.gpr(4) as u32, c.f(12).to_bits()])));
+    let obj = r.mem.alloc(0x40);
+    let ctl = r.mem.alloc(0x100);
+    let mgr = r.mem.alloc(0x1000);
+    r.mem.write_u32(obj + 0x10, rider);
+    r.mem.write_u32(rider + 0x464, ctl);
+    r.mem.write_u32(rider + 0x5ae0, mgr);
+    let mut g = Rng(0x6a11_5e1d_e0c4_77b3);
+    let (mut on, mut pushed, mut none, mut wrong) = (0, 0, 0, Vec::new());
+    for round in 0..40 {
+        let (w, cps, per_cell) = random_world(&mut g);
+        let wp = put_world(&mut r, &w, per_cell);
+        r.mem.write_u32(GWORLD, wp);
+        for q in 0..300 {
+            let z = unit3(&mut g);
+            let x = {
+                let t = cross3([0.0, 0.0, 1.0, 0.0], z);
+                let l = (t[0] * t[0] + t[1] * t[1] + t[2] * t[2]).sqrt();
+                if l < 0.2 { [1.0, 0.0, 0.0, 0.0] } else { [t[0] / l, t[1] / l, t[2] / l, 0.0] }
+            };
+            let y = cross3(z, x);
+            let board_pos: V4 = if !cps.is_empty() && g.below(6) != 0 {
+                let c = &cps[g.below(cps.len() as u32) as usize];
+                let p = bezier(c, g.range(0.0, 1.0));
+                let (a, b, d) = (g.unit() * 170.0, g.unit() * 60.0 - 30.0, g.unit() * 60.0);
+                [p[0] + x[0] * a + y[0] * b + z[0] * d, p[1] + x[1] * a + y[1] * b + z[1] * d, p[2] + x[2] * a + y[2] * b + z[2] * d, 1.0]
+            } else {
+                [w.x0 + g.range(-300.0, w.nx as f32 * w.cell + 300.0), w.y0 + g.range(-300.0, w.ny as f32 * w.cell + 300.0), g.unit() * 500.0, 1.0]
+            };
+            let qv = [g.unit(), g.unit(), g.unit(), g.unit()];
+            let ql = (((qv[1] * qv[1] + qv[2] * qv[2]) + qv[3] * qv[3]) + qv[0] * qv[0]).sqrt().max(1e-3);
+            let mut orient = Orient { q: [qv[0] / ql, qv[1] / ql, qv[2] / ql, qv[3] / ql], ..Default::default() };
+            update_orientation(&mut orient);
+            let sp = [g.range(0.0, 400.0), g.range(400.0, 3000.0)][g.below(2) as usize];
+            let vd = unit3(&mut g);
+            let mut m = RailMotion {
+                pos: [board_pos[0] + g.unit() * 20.0, board_pos[1] + g.unit() * 20.0, board_pos[2] + g.unit() * 20.0, 1.0],
+                vel: [vd[0] * sp + 0.5, vd[1] * sp, vd[2] * sp, 0.0],
+                orient,
+                frame: [x, y, z],
+                board_pos,
+                kind: [1u32, 2, 3, 4][g.below(4) as usize],
+                blend: if g.below(2) == 0 { 0.0 } else { g.range(0.0, 1.0) },
+                normal: [7.0; 4],
+                hit_point: [8.0; 4],
+                hit_word: 0x1234_5678,
+                ticks: [1.0, g.range(0.5, 2.0)][g.below(2) as usize],
+                push: [0.0, g.range(0.0, 1.0), -0.5][g.below(3) as usize],
+                steer: g.unit(),
+                x218: g.unit(),
+                x21c: g.unit(),
+                lean: g.unit() * 12.0,
+                time: if g.below(3) == 0 { g.range(0.0, 0.6) } else { g.range(0.6, 4.0) },
+            };
+            let chain_kind = g.below(2);
+            r.mem.write_u32(ctl + 0x40, 5);
+            r.mem.write_u32(rider + 0x1b4, if chain_kind == 0 { 5 } else { 9 });
+            for (at, v) in [(0x140, m.pos), (0x150, m.vel), (0x170, m.orient.q), (0x180, m.orient.fwd), (0x190, m.orient.side), (0x1a0, m.orient.up), (0x4a60, x), (0x4a70, y), (0x4a80, z), (0x4a90, board_pos), (0x2a0, m.normal), (0x2d0, m.hit_point)] {
+                put_v(&mut r, rider + at, v);
+            }
+            let mm = &mut r.mem;
+            mm.write_f32(rider + 0x1b0, m.orient.yaw);
+            mm.write_u32(rider + 0x1dc, m.kind);
+            mm.write_f32(rider + 0x284, m.blend);
+            mm.write_u32(rider + 0x290, m.hit_word);
+            mm.write_f32(rider + 0x12c, m.ticks);
+            mm.write_f32(rider + 0x130, m.push);
+            mm.write_f32(rider + 0x214, m.steer);
+            mm.write_f32(rider + 0x218, m.x218);
+            mm.write_f32(rider + 0x21c, m.x21c);
+            mm.write_u32(rider + 0x494, 0x77);
+            mm.write_f32(obj + 8, m.lean);
+            mm.write_f32(obj + 0xc, m.time);
+            for o in [0x798u32, 0x76c, 0x770] {
+                mm.write_u32(mgr + o, 0x55);
+            }
+            mm.write_u32(0x31d30c, 0);
+            log.borrow_mut().clear();
+            let input = m;
+            r.cpu.set_gpr(4, obj as u64);
+            r.call(0x10b0d0).unwrap_or_else(|e| panic!("round {round} query {q}: {e:?}"));
+            let end = gt::rail_slide_motion(&w, &mut m);
+            let mut want: Vec<(&'static str, Vec<u32>)> = Vec::new();
+            match end {
+                RailEnd::OnRail => {
+                    want.push(("instance_collisions", vec![rider, 0, 3]));
+                    want.push(("wall_collide", vec![rider, 0, 3]));
+                    on += 1;
+                }
+                RailEnd::TakeOff => {
+                    want.push(("trick_chain", vec![rider + 0x5820, chain_kind, m.kind, 0, 0]));
+                    want.push(("add_meter", vec![rider, 0.37f32.to_bits()]));
+                    want.push(("takeoff_setup", vec![rider, 0, 0x77]));
+                    want.push(("takeoff_clip", vec![rider, 0, 0x77]));
+                    want.push(("motion", vec![rider, 1, 0x77]));
+                    want.push(("state", vec![rider, 0x10, 0x77]));
+                    if m.vel != input.vel { pushed += 1 } else { none += 1 }
+                }
+            }
+            // the second word of the calls taking only the rider is whatever a1 held
+            let got: Vec<(&'static str, Vec<u32>)> = log.borrow().iter().map(|(n, v)| {
+                let mut v = v.clone();
+                if matches!(*n, "instance_collisions" | "wall_collide" | "takeoff_setup" | "takeoff_clip") {
+                    v[1] = 0;
+                }
+                (*n, v)
+            }).collect();
+            let rm = &mut r;
+            let game = (
+                (get_v(rm, rider + 0x140), get_v(rm, rider + 0x150), get_v(rm, rider + 0x170), get_v(rm, rider + 0x180), get_v(rm, rider + 0x190), get_v(rm, rider + 0x1a0), rm.mem.read_u32(rider + 0x1b0)),
+                (get_v(rm, rider + 0x2a0), get_v(rm, rider + 0x2d0), rm.mem.read_u32(rider + 0x290), rm.mem.read_u32(rider + 0x284)),
+                [rm.mem.read_u32(rider + 0x214), rm.mem.read_u32(rider + 0x218), rm.mem.read_u32(rider + 0x21c)],
+                (rm.mem.read_u32(obj + 8), rm.mem.read_u32(obj + 0xc), rm.mem.read_u32(rider + 0x494)),
+                [rm.mem.read_u32(mgr + 0x798), rm.mem.read_u32(mgr + 0x76c), rm.mem.read_u32(mgr + 0x770)],
+            );
+            let off = end == RailEnd::TakeOff;
+            let ours = (
+                (bits(m.pos), bits(m.vel), bits(m.orient.q), bits(m.orient.fwd), bits(m.orient.side), bits(m.orient.up), m.orient.yaw.to_bits()),
+                (bits(m.normal), bits(m.hit_point), m.hit_word, m.blend.to_bits()),
+                [m.steer.to_bits(), m.x218.to_bits(), m.x21c.to_bits()],
+                (m.lean.to_bits(), m.time.to_bits(), if off { 0x77 } else { 0xffff_ffff }),
+                if off { [0, 0, 0] } else { [0x55; 3] },
+            );
+            if game != ours || got != want {
+                wrong.push(format!("round {round} query {q}: {input:?}\n  game {game:x?}\n  ours {ours:x?}\n  calls {got:x?}\n  want  {want:x?}"));
+                if wrong.len() > 3 {
+                    break;
+                }
+            }
+        }
+        if wrong.len() > 3 {
+            break;
+        }
+    }
+    assert!(wrong.is_empty(), "{} differ:\n{}", wrong.len(), wrong.join("\n"));
+    assert!(on > 1500 && pushed > 500 && none > 100, "on {on}, pushed off {pushed}, no rail {none}");
+}
