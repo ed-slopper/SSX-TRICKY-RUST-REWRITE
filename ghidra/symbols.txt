@@ -4790,3 +4790,65 @@ G 191d88 Replay_GetStatus
 G 190c70 Replay_UpdateCamTrack
 G 18f800 Replay_RestoreNodes
 G 18df38 Draw_RectI
+F 189cc0 cEnumMenuItem cEnumMenuItem
+G 188d20 Menu_SelectPrev
+G 180b58 Game_ResetCameras
+G 17f1a0 Game_SetViewportMode
+G 17cd30 WStr_CopyN
+G 17ccf8 WStr_ToAscii
+G 163d30 Career_IsUnlockBitSet
+G 158d18 AnimData_Init
+G 158c10 AnimFile_Bind
+G 158af0 AnimFile_Reset
+G 157ea8 AnimMemBank_AlignStart
+G 157e68 AnimMemBank_Alloc
+F 154d20 cGameTrickInfo cGameTrickInfo
+G 14f5f0 Vec4_Set
+G 14cfb0 LessonOverlay_DrawTrickPage
+G 115dc0 Game_ResetWorld
+G 110830 Body_Translate
+G 2b1ff0 FE3DScrollingText_SetSpeed
+G 2b1ea0 FE3DScrollingText_CountLines
+G 2b1e58 FE3DScrollingText_ShiftDown
+G 2b1de8 FE3DScrollingText_ShiftUp
+G 2b1da0 FE3DScrollingText_AddLine
+F 29e920 cFE3DStateOptions cFE3DStateOptions
+F 293390 cFE3DStateTitle cFE3DStateTitle
+F 28c690 cFE3DStateCustomBoard cFE3DStateCustomBoard
+F 276be8 cFE3DStateCharacterSelect cFE3DStateCharacterSelect
+G 2b10c8 FE3DText_Layout
+G 2b1070 FE3DText_LoadStringId
+G 2ae7f0 FE3DProgressBar_StepDown
+G 2ae760 FE3DProgressBar_StepUp
+G 2ac1e8 List_Count
+G 2ac120 List_PushFront
+G 29fb40 OptionsState_Refresh
+G 275c60 FEStateStack_Clear
+G 275c10 FE_FinishState
+G 271868 FE3DState_HasFlag
+F 26b3f8 cFE3DCameraCombined cFE3DCameraCombined
+F 267f58 cFE3DThing cFE3DThing
+G 26cdc8 CheatCode_Matches
+G 26c2c0 VenueSel_PlayCurrentShot
+G 26bcb8 CustomBody_PlayCameraShot
+G 26bb38 CustomBoard_PlayCameraShot
+G 26b9f0 CharModify_PlayCameraShot
+G 26b760 CharSelect_PlayCameraShot
+G 269c70 FEWorld_OpenCourseVideo
+G 267c70 CustomBoard_IsUnlocked
+G 263150 VenueSel_SetVenue
+G 261e98 VenueSel_ClearVenue
+G 257630 Game_SendVu0InitChain
+G 2575b8 App_SendVu0InitChain
+G 251a28 SplinePathNode_Load
+G 251748 SplinePathNode_DrawPath
+G 24e228 TrickTutorialLoad_SetTitle
+G 241e48 Delta_Encode
+G 240e80 Name_ElfHash
+G 23d868 Sjis_ToAscii
+G 23d770 Ascii_ToSjis
+G 23d680 MemCard_SjisToAscii
+G 23d628 MemCard_AsciiToSjis
+F 23c9d0 cMemoryBigFile cMemoryBigFile
+G 23be28 BigFile_ClearTable
+G 2356f0 Speech_CheckBigScore
