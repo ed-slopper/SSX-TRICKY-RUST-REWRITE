@@ -5281,3 +5281,12 @@ G 155e68 Score_UpdateFlip
 G 155ee8 Score_StartGrab
 G 156e80 Score_Tick
 G 2fd398 strnicmp
+G 11e608 Pickup_Points
+G 11e660 Pickup_Multiplier
+G 11e958 Pickup_Meter
+G 11e8a0 Pickup_Time
+G 155b10 Score_AddPickupPoints
+G 155cd0 Score_SetPickupMultiplier
+G 155bb8 Score_AddPickupTime
+G 11ca88 Boarder_GetCamera
+G 177758 Cam_Shake

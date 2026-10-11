@@ -60,7 +60,15 @@ state machine and the renderer are ours. Nothing has been checked against the or
 | E8c | Knockable objects with the game's rigid bodies (`CollBody_PointMassInertia` 0x236530 and its step), replacing the ball physics in `props.rs` | unowned | E7 | | [repo] props.rs: "simulated as balls" |
 | E8d | Rider-to-rider: `Boarder_RiderCollisions` 0x123fc8, `Boarder_RiderHit` 0x124920, shoves | any | F4a | | [repo] Ported, unchecked |
 | E9 | Script machine: `TriggerScript_Run`, `TriggerScript_ExecOp` 0x13bfd0 with every op, controllers (`TriggerScript_Op0_SpawnController` 0x13c600), persistent cell scripts, run at runtime instead of read statically | unowned | E3c | | [repo] `logic.rs` reads SSFLogic.json statically today |
-| E9a | List every trigger-script op and controller type with its address and what it does, as rows E9b… | unowned | | trailrig/heron (2026-10-11) | [est] |
+| E9b | Script threads: `TriggerScript_Run` 0x13be78 and the flow ops of `TriggerScript_ExecOp` 0x13bfd0 (4 wait, 5 conditions, 7/21/26 new threads, 3/9/10/11 controller messages) run at runtime, in the game's order | unowned | E3c | | Gap of E9a. Table in port-notes/scripts.md |
+| E9c | Pickup ops 6, 14, 15, 16 (points, multiplier, meter, time; show-off only) and 17, 18 (speed, spin boost): `Pickup_*` 0x11e608–0x11e958, `Score_AddPickupPoints` 0x155b10, `Score_SetPickupMultiplier` 0x155cd0, `Score_AddPickupTime` 0x155bb8 | unowned | E9b | | Gap of E9a. G13 checks them |
+| E9d | World ops 1 (camera node), 2 (effects, spline riders), 8 (sound), 13 (reset), 23 (camera shake `Cam_Shake` 0x177758), 24 (teleport), 25 (rail switch `RailMan_SetRail` 0x149030) | unowned | E9b | | Gap of E9a |
+| E9e | Logic controllers: `cDebounceNode` (2), `cCounterNode` (6), `cTimerNode` (8), `cTrickTriggerNode` (21), dead-node modes (5, `TriggerScript_ApplyControllerOp` 0x13ac88) | unowned | E9b | | Gap of E9a |
+| E9f | Boost controllers: `cBoostNode` (7), `cLapBoostNode` (15), `cRandomBoostNode` (16), `cZBoostNode` (18), `cTubeEndBoostNode` (24) | unowned | E9b | | Gap of E9a. G14 checks 15 and 18 |
+| E9g | Breakables: `cFenceNode` (12), `cCrackedNode` (14), `cMeshAnimNode` (20) | unowned | E9b | | Gap of E9a |
+| E9h | Movers: `cRollerNode` (0), `cRailNode` (9) | unowned | E9b | | Gap of E9a |
+| E9i | Texture and object animation controllers: `cUVScrollNode` (10), `cTexFlipNode` (11), `cFlagNode` (13), `cUVScrollTexFlipNode` (19), `cAnimObjectNode` (0x100), `cAnimDeltaNode` (0x101), `AnimComboNode_Init` (0x102), the unnamed node 0x19a5a8 (0x103) | unowned | E9b | | Gap of E9a. G7h checks five of them |
+| E9j | The rest: `cCrowdBoxNode` (17), `cParticleNode` (22), `cMovieNode` (23) | unowned | E9b | | Gap of E9a |
 | E10 | Input: pad reading, stick shaping and dead zones, button bits (the chord 0x600), vibration, `cCheatCodes::Update` 0x26CF60 | unowned | E1 | | [repo] findings.md |
 | E11 | Camera: named cameras `cBxCamera_EvalNamedCam` 0x174888 (ported), director scripts `cBxCamera_RunDirectorScript`, replay and finish cameras, camera collision | any | | | [repo] Chase cam ported in `rider.rs`; free camera is ours (keep, tag) |
 | E12 | Save and load: the memory-card profile, options, records, unlocks (`Profile_ResetNewGame` 0x161b40), in our own save file with the same fields | unowned | E1 | | [repo] `tricky-save.json` is the stand-in |
@@ -196,6 +204,7 @@ matches the original.
 | E8i | The constants at the top of `rider.rs` sorted out: 22 unused or doc-only ones removed (and the dead `spin_rate`/`flip_rate` fields); speed caps and their decay (`cBoarder::vf7` 0x117198), air gravity (`Air_IntegrateRK4`, from `air.rs`), the smallest jump (`JumpControl_Update` 0x1046e4), the jump's speed curve (`Jump_ApplyImpulse` 0x1284e0) and the boost drain (`Boarder_UpdateBoost` 0x11d218) now the game's exact floats; the boost cap needs a meter above 0, as the game's does; `TURN_ACCEL` tagged STANDIN (AI corner speed); scoring constants left to G17 | P1 | trailrig/heron | 2026-10-11 | cc1a764 |
 | G17 | Scoring constants exact: `PTS_*` and `SWITCH_BONUS` in `rider.rs` are the game's units (bit patterns from `Score_UpdateSpin` 0x155e00, `Score_UpdateFlip` 0x155e68, `Score_StartGrab` 0x155ee8, `Score_Tick` 0x156e80, `Score_LandTrick` 0x1569b0, `Score_StartTrickChain` 0x156618) × the points scale of `Score_CalcPoints` 0x155440; ubers score by their own unit (`PTS_UBER`, 0x156148), not the hold one; 3 score functions named | P2 | trailrig/heron | 2026-10-11 | 5587fea |
 | E4a | Character and board models from the player's disc: the `.mpf` reader in `tricky-data/src/mpf.rs` (the loader's tables proven from `SkinPart_Load` 0x205080 and `MpfFile_AddPart` 0x208488, the VIF packets inferred from the data), the game's part-name tables, `CharModel::rider_from_disc` / `board_from_disc`, `TRICKY_DISC` in the app; all 12 riders and 6 board shapes equal the exported models | P1 | ed-slopper/puffin | 2026-10-11 | 82b6fdd |
+| E9a | Every trigger-script op (0–26) and controller type (0–24, 0x100–0x103) listed with its handler or class and what it does (`TriggerScript_ExecOp` 0x13bfd0, `TriggerScript_Op0_SpawnController` 0x13c5d0), port-notes/scripts.md; rows E9b–E9j; 9 functions named (pickups, their score helpers, camera shake) | P1 | trailrig/heron | 2026-10-11 | HASH |
 
 ## Changes to the board
 
@@ -256,3 +265,4 @@ matches the original.
 - 2026-10-11 trailrig/heron: G17 done.
 - 2026-10-11 ed-slopper/puffin: E4a done; added E4d (gap of E4a).
 - 2026-10-11 trailrig/heron: claim E9a.
+- 2026-10-11 trailrig/heron: E9a done; added E9b–E9j.
