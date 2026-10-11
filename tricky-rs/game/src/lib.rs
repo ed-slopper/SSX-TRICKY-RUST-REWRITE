@@ -10,6 +10,7 @@ pub use tricky_data::anim;
 pub mod collbody;
 pub mod collide;
 pub mod controls;
+pub mod controllers;
 pub mod courses;
 pub mod finish;
 pub mod gate;

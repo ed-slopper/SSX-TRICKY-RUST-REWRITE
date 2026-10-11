@@ -105,3 +105,24 @@ Types 1, 3 and 4 spawn nothing.
 - Starters: area wake → event 0 (objects with no controller; `TriggerScript_Spawn`), contact → event 1 (rider and
   contexts), controller goal → event 3, `World_RunScript` → a function by name after ending the first running
   thread on it. Events 0 and 1 take any slot value but −1; event 3 only ≥ 0.
+
+## Logic controllers (row E9e; `tricky_game::controllers`, checked: `tests/controllers.rs`)
+
+- A controller node: +0x14 its type, +0x28 the object (whose +0xe4 points back). Virtuals used by the scripts:
+  Update (+0x10), Finish(flag) (+0xb4), Kill (+0xbc), OnMessage(value in f12, kind) (+0xc4), the deleting
+  destructor (+0xc, 3; it detaches from the object). Finish(1) first tries the object's event-3 script and stops
+  there if it ran one; Finish(0) never does.
+- Object flags (+0xe8): the `.ssf` record's flags word; resets copy the upper half (defaults) into the lower and set
+  2 (`m = f & mask; m | m >> 16 (arithmetic) | 2`): mask 0xffff0100 in Finish and type-5 mode 0, 0xffff0000 in Kill.
+  Message kinds 7 / 8 clear / set 0x800; dead and restore nodes write `f & 0xffffff0d | 4` (0x800 too for mode 3).
+- Debounce (2): `(int)(p3·60)` frames, then Finish(1); Kill and Finish delete it only while its count is ≥ 0.
+- Counter (6): p3's low half = hits needed. Message values 1..10 are bits 0..9; kind 1 counts a bit once, kind 2
+  counts value 1 or a bit whose lower neighbour is already set (in order), kind 3 always counts. At 0 hits it runs
+  event 4 and Finish(0); else `(int)(p4·60)` frames to Finish(1).
+- Timer (8): every frame +0x38 − 1; below 1 it runs event 4 and Finish(0) (then still counts +0x34 on the deleted
+  node); +0x34 = `(int)(p3·60)` frames to Finish(1); message kind 1 sets +0x38 = `(int)(value·60)`.
+- Trick trigger (21, needs a rider): records the rider's points (+0x5910) and +0x460; each frame walks the
+  objects overlapping its box (+0x50 in the broadphase): for its rider, +0x424 = 1 waits; else points gained ≥ p4
+  runs event 4 and forgets the rider; anything else Finish(1). With no rider, `(int)(p5·60)` frames to Finish(0).
+- Op 0 replacing: a type-5 node is never replaced; the same type restarts (vf 0x74) only when its vf 0x64 says it is
+  running (0 for these four); another type deletes the old first (type 20 takes the old over and deletes it after).
