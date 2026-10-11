@@ -15,8 +15,18 @@
 //! - +0x24 [9] normal damping, 1/s (proven, `Boarder_GroundSpringForce`)
 //! - +0x2c [11] speed the rider pushes himself to, km/h; +0x30 [12] thrust scale (proven, `Boarder_GroundThrust`
 //!   0x109950)
-//! - +0x34..+0x40 [13..16] spray: rate factor, flake size cm, two life times s (port-notes/effects.md, spray.rs)
-//! - [10], [18..20], [22..24]: floats not yet traced; [17] and [21] are integers (written with `sw`)
+//! - +0x28 [10] how high the body is drawn above the snow, cm (proven: `cBoarder::vf7` 0x117198 eases rider+0x308
+//!   toward it at 1.6667 cm a tick on the ground, toward 0 elsewhere; `Boarder_UpdatePose` 0x129628 draws the body
+//!   at rider+0x140 + rider+0x308 · up)
+//! - +0x34..+0x54 [13..21] ground spray (proven, `Fx_SurfaceSpray` 0x1311b0, only in ground motion and not on
+//!   surfaces 9, 13, 18, 19, which throw sparks instead): [13] rate factor (× 0.006·speed·(1 + 149·steer²) a
+//!   second), [14] flake size (× 0.8 to × 1.2), [15] [16] the two lives, [17] sprite (index into gApp+0x30),
+//!   [18] how far the colour is pulled to its grey, [19] brightness added, [20] alpha (× 128), [21] the
+//!   particle's draw mode (default 5)
+//! - +0x58..+0x60 [22..24] board trail and splashes (proven): [22] trail width × (|e| − 0.2) (`Fx_BoardTrail_Update`
+//!   0x12fef0, e = steer·(1 − |rider+0x1fc|)), and no splash below 0.02, splash ring × 0.8 (`Fx_LandingSplash`
+//!   0x12ccc8, `Fx_Splash_EmitAtPoint` 0x12c7e0, `Fx_BrakeFan_Update` 0x12d108); [23] the trail's tilt off the
+//!   snow's normal; [24] the trail's bend × speed × e
 
 /// `SurfaceTable_Init` 0x256188: the table it writes, row by row (index = surface type).
 pub const SURFACE_TABLE: [[f32; 25]; 20] = [

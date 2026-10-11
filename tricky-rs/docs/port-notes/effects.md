@@ -25,3 +25,10 @@ Part of the port notes (index: [README.md](README.md)); units and wording as des
   (keys at U33.., U37.., U41.., U45.., alpha first); U49 texture in particle.ssh (part, snfl, clod, spry, halo,
   ...), U50 blend (0 additive, 1 alpha, 4 darken). Collision-slot emitters burst on contact; sub-type 2 bursts at
   the rider's hit point (cap 1 per AI, 3 per human).
+- Surface table words used by the effects (proven, E13; values in `tricky-rs/game/src/surface.rs`): ground spray
+  (`Fx_SurfaceSpray` 0x1311b0, ground motion, not surfaces 9, 13, 18, 19, which spark) takes [13] rate, [14] size
+  × 0.8–1.2, [15] [16] lives, [17] sprite index (gApp+0x30), [18] pull of the light colour (rider+0x5ae0 +0x470)
+  toward its grey, [19] brightness added, [20] alpha × 128, [21] draw mode. Board trail (`Fx_BoardTrail_Update`
+  0x12fef0, ground only, |e| > 0.3 with e = steer·(1 − |rider+0x1fc|), sign by stance): width [22]·(|e| − 0.2), tilt
+  ±[23] along the normal, bend [24]·speed·e eased 1/30 a tick. Splashes (`Fx_LandingSplash` 0x12ccc8,
+  `Fx_Splash_EmitAtPoint` 0x12c7e0): none if [22] < 0.02, ring size [22]·0.8.

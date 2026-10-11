@@ -3942,6 +3942,7 @@ G 23a728 SphTree_SphereRecurse
 G 153808 RigidBody_SetPosition
 G 12c4d0 Fx_BrakeFan_Emit
 G 12c190 Fx_Splash_EmitRing
+G 12c7e0 Fx_Splash_EmitAtPoint
 G 16fb08 Camera_CollidePush
 G 194910 Replay_LoadStream
 G 10ed68 Ragdoll_HitRoller

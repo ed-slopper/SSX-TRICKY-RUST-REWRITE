@@ -484,7 +484,7 @@ address,size,name,system,status
 0x12c178,20,FUN_0012c178,boarder?,not started
 0x12c190,832,FUN_0012c190,world?,not started
 0x12c4d0,780,FUN_0012c4d0,world?,not started
-0x12c7e0,1256,FUN_0012c7e0,world?,not started
+0x12c7e0,1256,Fx_Splash_EmitAtPoint,effects,not started
 0x12ccc8,1088,Fx_LandingSplash,boarder,ported
 0x12d108,1464,Fx_BrakeFan_Update,boarder,ported
 0x12d6c0,464,FUN_0012d6c0,boarder?,not started

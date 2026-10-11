@@ -64,7 +64,6 @@ state machine and the renderer are ours. Nothing has been checked against the or
 | E10 | Input: pad reading, stick shaping and dead zones, button bits (the chord 0x600), vibration, `cCheatCodes::Update` 0x26CF60 | unowned | E1 | | [repo] findings.md |
 | E11 | Camera: named cameras `cBxCamera_EvalNamedCam` 0x174888 (ported), director scripts `cBxCamera_RunDirectorScript`, replay and finish cameras, camera collision | any | | | [repo] Chase cam ported in `rider.rs`; free camera is ours (keep, tag) |
 | E12 | Save and load: the memory-card profile, options, records, unlocks (`Profile_ResetNewGame` 0x161b40), in our own save file with the same fields | unowned | E1 | | [repo] `tricky-save.json` is the stand-in |
-| E13 | The surface table's untraced words: find what reads `SurfaceTable_Init` 0x256188 words [10], [17..24] (rider+0x290 row) and port them | any | E8f | trailrig/heron (2026-10-11) | Gap of E8f. Values are in `tricky-rs/game/src/surface.rs` |
 
 ## P2 Gameplay systems
 
@@ -101,7 +100,8 @@ state machine and the renderer are ours. Nothing has been checked against the or
 | G12 | Instant replay | unowned | E1, E11 | | [repo] in the debug menu (findings.md) |
 | G13 | Pickups and course events checked: points, multipliers, boost, show-off time, speed boost, spin-boost zones (ops 6, 0xe–0x12) | any | E9 | | [repo] |
 | G14 | Megaplex laps and boost tubes checked: `cLapBoostNode` 0x140b90, `cZBoostNode` 0x141cd8 | any | E9 | | [repo] |
-| G15 | Spray per surface from the real table: `surf()` in `tricky-rs/src/spray.rs` is rounded and wrong for rows 9 (game 0.0319, 2, 0.335, 0.597) and 19 (game rate 1.0, ours 0); read words [13..16] from `tricky_game::surface` | any | E8f | | Gap of E8f |
+| G15 | Spray, trail and splashes per surface from the real table (`tricky_game::surface`): `surf()` in `tricky-rs/src/spray.rs` is rounded and guesses which surfaces spray; the game sprays from words [13..21] on every surface but 9, 13, 18, 19 (those spark, `Fx_SurfaceSpray` 0x1311b0) and uses [22..24] for the trail and splashes (port-notes/effects.md) | any | E8f | | Gap of E8f; corrected by E13 |
+| G16 | Draw the rider at rider+0x308 above the snow (surface word [10], eased 1.6667 cm a tick on the ground), as `Boarder_UpdatePose` 0x129628 does; the port draws at the board's position | any | E8f | | Gap of E13 |
 
 ## P3 Content
 
@@ -189,6 +189,7 @@ matches the original.
 | E2 | Read the player's disc: the game's CD file table (`CdFs_Mount` 0x2c9970, `CdFs_FindFile` 0x2c9cc0, its `qsort`/`bsearch`) ported 1:1 in `tricky-data/src/disc.rs`, from an image or a drive; checked against an independent ISO walk (260 files) and a byte compare; notes in `port-notes/files.md` | P1 | ed-slopper/puffin | 2026-10-11 | 27e5bfb |
 | E2a | BIG archives (`C0FB`, `BIGF`) in `tricky-data/src/big.rs`, ported from the game's loader: `BIG_Identify` 0x2cbc88, `BIG_HeaderSize` 0x2cbd08, `BIG_Lookup` 0x2cbdc0, the mounts of `App_OpenBigFiles` 0x17bdf8 in order and the opener's (0x2cb328) disc / `|name` / `archive|name` rules; all 793 character-archive entries checked against the extracted copies | P1 | ed-slopper/puffin | 2026-10-11 | 3886064 |
 | E2b | RefPack decompression in `tricky-data/src/compress.rs`: `Compress_UnpackedSize` 0x2c2fb0, `Compress_Decode` 0x2c2de0 (RefPack: the only codec on the disc), `RefPack_Decode` 0x2c31b0, and the loader's rule (`File_LoadAndUnpack` 0x2c8938) as `Files::load`; all 793 character-archive entries equal `tools/afl/refpack.py` | P1 | ed-slopper/puffin | 2026-10-11 | b01f37e |
+| E13 | Surface table's untraced words read in Ghidra: [10] body height above the snow (`cBoarder::vf7` 0x117198 → rider+0x308 → `Boarder_UpdatePose` 0x129628), [13..21] ground spray (`Fx_SurfaceSpray` 0x1311b0), [22..24] trail and splashes (`Fx_BoardTrail_Update` 0x12fef0, `Fx_LandingSplash` 0x12ccc8, new `Fx_Splash_EmitAtPoint` 0x12c7e0); readers found by scanning for the table pointer (cGame+0x24); `surface.rs`, port notes | P1 | trailrig/heron | 2026-10-11 | HASH |
 
 ## Changes to the board
 
@@ -238,3 +239,4 @@ matches the original.
 - 2026-10-11 ed-slopper/puffin: E2a done; claim E2b.
 - 2026-10-11 trailrig/heron: claim E13.
 - 2026-10-11 ed-slopper/puffin: E2b done; added E2c (gap of E2b); split E4 into E4a-E4c; claim E4a.
+- 2026-10-11 trailrig/heron: E13 done; G15 corrected (which surfaces spray); added G16 (body height, gap of E13).

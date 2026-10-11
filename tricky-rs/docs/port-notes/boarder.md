@@ -48,15 +48,20 @@ Boost level 1.0 / 0.6013 / 0.25 by meter > 0.666 / > 0.3336 / else.
 
 **Surface table** (`SurfaceTable_Init` 0x256188; 20 rows × 25 words, table pointer in $a0): [0] g, [1] lin, [2] quad,
 [3] cubic drag, [4] side grip, [5] lean°, [6] airborne height cm, [7] [8] spring band d1 d2 cm, [9] normal damping,
-[11] push target km/h, [12] thrust scale, [13..16] spray (rate, flake cm, two lives s), [17] and [21] integers.
+[10] body drawn above the snow cm, [11] push target km/h, [12] thrust scale, [13..21] ground spray, [22..24] board trail
+and splashes (`tricky-rs/game/src/surface.rs` has every word and its reader; E13).
 Proven (E8f): every word read by running the function in the runner; the exact values are
 `tricky-rs/game/src/surface.rs` and `tests/surface_table.rs` checks all 500 bit for bit. Row 0 (off the course) is
-7.347 cm / 11.61 per s for [6]/[9], not 20/30 as noted before. Not yet traced (E13): [10], [17..24].
+7.347 cm / 11.61 per s for [6]/[9], not 20/30 as noted before.
 surf[6]/surf[9] by row: 0 7.347/11.61; 1 2.742/5.009; 2 2.849/5.530; 3 15.04/2.842; 4 30.03/2.976; 5 2.775/4.052;
 6,10,15,16,17,19 20/30; 7 21.37/45.2; 8 20/39.4; 9 2.02/30; 11 0.70/17.9; 12 3.95/30; 13 2.64/0; 14 1.56/30; 18 2.58/40.
 
 ## Animation timing
 
+- Body height (proven, E13): `cBoarder::vf7` 0x117198 eases rider+0x308 toward surface word [10] at 1.6667 cm a tick
+  in ground motion (rider+0x424 = 2), toward 0 otherwise; `Boarder_UpdatePose` 0x129628 draws the body at
+  rider+0x140 + rider+0x308 · up (rider+0x2c0). The same function eases the spring band d1, d2 (rider+0x294, +0x298)
+  toward words [7], [8] at 1.6667 cm a tick.
 - Clips are 30 fps data played at 0.5 frame per 60 Hz tick × rate (`AnimClip_Advance` 0x15a030); a clip of n
   frames reaches its end after 2(n−1) ticks and chains on the next.
 - Grab (and tweak) clips play at rate 0.782 + 0.806·s14.
