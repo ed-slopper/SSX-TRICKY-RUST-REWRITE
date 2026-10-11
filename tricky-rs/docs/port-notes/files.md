@@ -191,3 +191,12 @@ most) is a song: its name, the path BASEPATH + LOOPDATA. `MusicSys_LoadMusicMap`
 `Course_GetInfo`) finds the map's section by prefix and enables, for each `SONG = "…"`, the first song whose name
 contains it (case matters; four at most); none: song 0. The app plays these (TRICKY_DISC), in the game's song order.
 
+Audio settings (row E5b2, `tricky_data::audiocfg`, checked: `tricky-game/tests/ini.rs`): `Audio_LoadVolumeLevels`
+0x21ca20 reads SFXLEVEL, MUSICLEVEL, CHARSPCHLEVEL, PASPCHLEVEL, JUKEBOXLEVEL, UBERLEVEL, INTRODUCK from the scaling
+section (IGLEVELSCALING in a race, FELEVELSCALING in the menus) and then from the course's section, searched on from
+there (no rewind); a level is the value / 100 when 0..200 (the duck 0..100), else 1.0 (the duck 0.75), into
+0x343054..0x34306c. `Music_StartCourseSong` 0x214e60: the course's name lower-cased, the first INTROMUS section
+(lower-cased) it contains that is not empty, its first word SONG = "file" → `data/audio/<file>` as the intro stream
+(TRICK has none). Then segment 0, one of 1..3 at random (`(rand & 0x7fff)·3/0x7fff + 1`: 4 for 0x7fff), and two of
+4..7 (`·4/0x7fff + 4`: 8 for 0x7fff); not in modes 3, 7, 8, 11.
+

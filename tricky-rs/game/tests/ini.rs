@@ -461,3 +461,160 @@ fn board_sound_programs_match_the_original() {
         }
     }
 }
+
+/// The calls a function makes (its `jal` targets over `len` bytes).
+fn jal_targets(r: &mut Runner, at: u32, len: u32) -> Vec<u32> {
+    let mut out = std::collections::BTreeSet::new();
+    for k in 0..len / 4 {
+        let w = r.mem.read_u32(at + 4 * k);
+        if w >> 26 == 3 {
+            out.insert((w & 0x03ff_ffff) << 2);
+        }
+    }
+    out.into_iter().collect()
+}
+
+fn cread(m: &mut r5900::Mem, at: u32) -> Vec<u8> {
+    let mut v = Vec::new();
+    let mut a = at;
+    loop {
+        let mut b = [0u8];
+        m.read(a, &mut b);
+        if b[0] == 0 {
+            return v;
+        }
+        v.push(b[0]);
+        a += 1;
+    }
+}
+
+fn cwrite(m: &mut r5900::Mem, at: u32, s: &[u8]) {
+    for (k, c) in s.iter().enumerate() {
+        m.write_u8(at + k as u32, *c);
+    }
+    m.write_u8(at + s.len() as u32, 0);
+}
+
+/// A runner with the reader's functions real and the C library answered.
+fn reader_runner() -> Option<Runner> {
+    let mut r = Runner::from_env()?;
+    r.float_rules = Rules::parse("add=n,mul=n,div=n,cvt=n").unwrap();
+    for a in [0x2217d8u32, 0x2217f0, 0x2218c0, 0x221988, 0x221a00, 0x221af0, 0x221b60, 0x221918, 0x221be8, 0x221c90, 0x221d58, 0x221da0, 0x221de8, 0x221e90, 0x221ef8, 0x221f70, 0x221fd8] {
+        r.allow(a);
+    }
+    r.stub(0x2fcc98, |c, m| {
+        let (a, b) = (cread(m, c.gpr(4) as u32), cread(m, c.gpr(5) as u32));
+        let eq = a.len() == b.len() && a.iter().zip(&b).all(|(x, y)| x.to_ascii_lowercase() == y.to_ascii_lowercase());
+        c.set_gpr(2, if eq { 0 } else { 1 });
+    });
+    r.stub(0x2fd7f0, |c, m| {
+        let (h, n) = (cread(m, c.gpr(4) as u32), cread(m, c.gpr(5) as u32));
+        let at = if n.is_empty() { Some(0) } else { h.windows(n.len()).position(|w| w == n.as_slice()) };
+        c.set_gpr(2, at.map(|i| c.gpr(4) + i as u64).unwrap_or(0));
+    });
+    r.stub(0x2fd14c, |c, m| {
+        let s = cread(m, c.gpr(5) as u32);
+        cwrite(m, c.gpr(4) as u32, &s);
+        c.set_gpr(2, c.gpr(4));
+    });
+    r.stub(0x2fcaa0, |c, m| {
+        let w = cread(m, c.gpr(4) as u32);
+        let s = String::from_utf8_lossy(&w).trim_start().to_string();
+        let b = s.as_bytes();
+        let mut e = 0;
+        if e < b.len() && (b[e] == b'-' || b[e] == b'+') {
+            e += 1;
+        }
+        let d = b[e..].iter().take_while(|x| x.is_ascii_digit()).count();
+        if d > 0 {
+            let v: i64 = s[..e + d].parse().unwrap();
+            m.write_u32(c.gpr(6) as u32, v as i32 as u32);
+        }
+        c.set_gpr(2, (d > 0) as u64);
+    });
+    Some(r)
+}
+
+#[test]
+fn audio_config_matches_the_original() {
+    // `Audio_LoadVolumeLevels` 0x21ca20 on AUDIO.INF and `Music_StartCourseSong` 0x214e60 on INTROMUS.INF, for both
+    // scaling sections and every course, against `tricky_data::audiocfg`
+    use tricky_data::audiocfg::{intro_song, levels};
+    let Some(dir) = std::env::var_os("TRICKY_CONFIG_DIR") else { return };
+    let dir = std::path::PathBuf::from(dir);
+    let (audio, intro) = (std::fs::read(dir.join("AUDIO.INF")).unwrap(), std::fs::read(dir.join("INTROMUS.INF")).unwrap());
+    let Some(mut r) = reader_runner() else { return };
+    let courses = ["GARI", "SNOW", "ELYSIUM", "MESA", "MERQUER", "ALOHA", "PIPE", "UNTRACK", "MEGAPLE", "TRICK", "ALASKA", "FE", "NOSUCH"];
+    // the levels
+    for a in jal_targets(&mut r, 0x21ca20, 0x600) {
+        if !(0x221668..0x222040).contains(&a) {
+            r.stub(a, |c, _| c.set_gpr(2, 0));
+        }
+    }
+    let (text, rd, s1, s2) = (r.mem.alloc(audio.len() as u32 + 16), r.mem.alloc(0x900), r.mem.alloc(0x40), r.mem.alloc(0x40));
+    cwrite(&mut r.mem, text, &audio);
+    for scaling in ["IGLEVELSCALING", "FELEVELSCALING"] {
+        for course in courses {
+            r.mem.write_u32(rd, audio.len() as u32);
+            r.mem.write_u32(rd + 4, text);
+            r.mem.write_u32(rd + 8, text);
+            cwrite(&mut r.mem, s1, scaling.as_bytes());
+            cwrite(&mut r.mem, s2, course.as_bytes());
+            for k in 0..7 {
+                r.mem.write_u32(0x343054 + 4 * k, 0x7777);
+            }
+            r.cpu.set_gpr(4, 0x1000);
+            r.cpu.set_gpr(5, rd as u64);
+            r.cpu.set_gpr(6, s1 as u64);
+            r.cpu.set_gpr(7, s2 as u64);
+            r.call(0x21ca20).expect("Audio_LoadVolumeLevels");
+            let l = levels(&audio, scaling.as_bytes(), course.as_bytes());
+            let theirs: Vec<u32> = (0..7).map(|k| r.mem.read_u32(0x343054 + 4 * k)).collect();
+            let ours: Vec<u32> = [l.sfx, l.music, l.char_speech, l.pa_speech, l.jukebox, l.uber, l.intro_duck].iter().map(|x| x.to_bits()).collect();
+            assert_eq!(theirs, ours, "{scaling} {course}: {l:?}");
+        }
+    }
+    println!("levels: {:?}", levels(&audio, b"IGLEVELSCALING", b"ELYSIUM"));
+    // the intro music, on a runner of its own (a stub registered first wins)
+    let Some(mut r) = reader_runner() else { return };
+    for a in jal_targets(&mut r, 0x214e60, 0x600) {
+        if !(0x221668..0x222040).contains(&a) && ![0x2fcc98u32, 0x2fd7f0, 0x2fd14c, 0x229d18, 0x2fca28, 0x186350].contains(&a) {
+            r.stub(a, |c, _| c.set_gpr(2, 0));
+        }
+    }
+    let file: Rc<RefCell<Option<Vec<u8>>>> = Rc::default();
+    let f = file.clone();
+    r.stub(0x229d18, move |c, m| *f.borrow_mut() = Some(cread(m, c.gpr(6) as u32)));
+    r.stub(0x2fca28, |c, m| {
+        // sprintf(out, "data/audio/%s", s)
+        let s = cread(m, c.gpr(6) as u32);
+        cwrite(m, c.gpr(4) as u32, &[b"data/audio/".as_slice(), &s].concat());
+    });
+    let (it, name) = (r.mem.alloc(intro.len() as u32 + 16), r.mem.alloc(0x40));
+    cwrite(&mut r.mem, it, &intro);
+    let il = intro.len() as u32;
+    r.stub(0x221668, move |c, m| {
+        let rd = c.gpr(4) as u32;
+        m.write_u32(rd, il);
+        m.write_u32(rd + 4, it);
+        m.write_u32(rd + 8, it);
+        c.set_gpr(2, rd as u64);
+    });
+    r.stub(0x186350, move |c, _| c.set_gpr(2, name as u64));
+    r.stub(0x221788, |_, _| {});
+    let (app, game) = (r.mem.alloc(0x800), r.mem.alloc(0x100));
+    r.mem.write_u32(0x337c58, app);
+    r.mem.write_u32(app + 0x730, game);
+    r.mem.write_u32(0x32de88, 7);
+    let obj = r.mem.alloc(0x8000);
+    for course in courses {
+        cwrite(&mut r.mem, name, course.as_bytes());
+        *file.borrow_mut() = None;
+        r.cpu.set_gpr(4, obj as u64);
+        r.cpu.set_gpr(5, 0);
+        r.call(0x214e60).expect("Music_StartCourseSong");
+        let ours = intro_song(&intro, course.as_bytes());
+        assert_eq!(*file.borrow(), ours, "{course}");
+        println!("{course:>8}: {:?}", ours.map(|s| String::from_utf8_lossy(&s).to_string()));
+    }
+}

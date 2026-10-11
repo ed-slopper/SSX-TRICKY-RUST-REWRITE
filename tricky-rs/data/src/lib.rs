@@ -5,6 +5,7 @@
 pub mod afl;
 pub mod aip;
 pub mod anim;
+pub mod audiocfg;
 pub mod anim_names;
 pub mod big;
 pub mod character;
