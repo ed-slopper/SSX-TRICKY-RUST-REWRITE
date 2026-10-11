@@ -829,7 +829,7 @@ address,size,name,system,status
 0x1481c8,8,cParticleNode::Draw,world,not started
 0x1481d0,72,cParticleNode::SaveSnapshot,save,not started
 0x148218,168,FUN_00148218,frontend?,not started
-0x1482c0,144,FUN_001482c0,frontend?,not started
+0x1482c0,144,CamAnimFrame_Create,frontend?,not started
 0x148350,292,CamAnim_SetShot,frontend?,not started
 0x148478,76,cCollideEmitterNode::vf12_148478,world,not started
 0x148560,284,cCollideEmitterNode::cCollideEmitterNode,world,not started
@@ -1387,7 +1387,7 @@ address,size,name,system,status
 0x16ae68,872,Career_SetupAIRider,race?,not started
 0x16b1d0,36,FUN_0016b1d0,race?,not started
 0x16b1f8,36,FUN_0016b1f8,race?,not started
-0x16b220,36,FUN_0016b220,race?,not started
+0x16b220,36,Career_GetRiderAttrib,race?,not started
 0x16b248,36,FUN_0016b248,race?,not started
 0x16b270,36,FUN_0016b270,race?,not started
 0x16b298,152,Career_AverageStatGroups,race?,not started
@@ -3578,7 +3578,7 @@ address,size,name,system,status
 0x215288,232,Audio_OnRaceGo,audio,ported
 0x215370,136,Audio_UpdateCrowdBoxes,audio,not started
 0x2153f8,92,Audio_ResumeAll,audio,not started
-0x215458,48,FUN_00215458,frontend?,not started
+0x215458,48,Audio_PlayPauseSound,audio,not started
 0x215488,88,Audio_StopAll,audio,not started
 0x2154e0,372,SndSys_IsQueued,audio?,not started
 0x215658,828,FUN_00215658,audio?,not started
@@ -3997,9 +3997,9 @@ address,size,name,system,status
 0x22e3f0,12,FUN_0022e3f0,audio?,not started
 0x22e400,32,FUN_0022e400,race?,not started
 0x22e420,124,StaticInit_WorldTriggerMgr,other,not started
-0x22e4e0,108,FUN_0022e4e0,frontend?,not started
+0x22e4e0,108,Speech_PostFEEvent,frontend?,not started
 0x22e550,88,FUN_0022e550,frontend?,not started
-0x22e5a8,124,FUN_0022e5a8,frontend?,not started
+0x22e5a8,124,Speech_PlayFELine,frontend?,not started
 0x22e628,124,StaticInit_WorldTriggerMgr2,other,not started
 0x22e6a8,208,SpeechEvt_Post100200f,audio?,not started
 0x22e778,72,SpeechEvt_Post1002010,audio?,not started
@@ -4234,7 +4234,7 @@ address,size,name,system,status
 0x23bea0,8,cAsyncBigFile::vf2_23bea0,files,not started
 0x23bea8,8,cAsyncBigFile::vf4_23bea8,files,not started
 0x23beb0,100,AsyncBigFile_FinishRead,files,not started
-0x23bf18,244,FUN_0023bf18,files?,not started
+0x23bf18,244,AsyncFile_CompleteRequest,files?,not started
 0x23c010,64,cAsyncBigFile::vf8_23c010,files,not started
 0x23c050,52,cAsyncBigFile::vf9_23c050,files,not started
 0x23c088,264,cAsyncBigFile::vf6_23c088,files,not started
@@ -4617,7 +4617,7 @@ address,size,name,system,status
 0x2575b8,116,App_SendVu0InitChain,game,not started
 0x257630,116,Game_SendVu0InitChain,game,not started
 0x2576a8,96,FUN_002576a8,world?,not started
-0x257708,120,FUN_00257708,world?,not started
+0x257708,120,Vu0_CopyOutData,world?,not started
 0x257780,12,FUN_00257780,world?,not started
 0x257810,176,cWorldBoarder::cWorldBoarder,world,not started
 0x2578c0,88,cWorldBoarder::vf3_2578c0,world,not started

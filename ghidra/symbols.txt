@@ -6505,3 +6505,10 @@ G 2b7c50 CommDriver_SendPacket
 G 2b7d30 CommDriver_RecvPacket
 G 2b7e78 CommDriver_Dispatch
 G 2b7e30 CommDriver_Poll
+G 215458 Audio_PlayPauseSound
+G 16b220 Career_GetRiderAttrib
+G 257708 Vu0_CopyOutData
+G 23bf18 AsyncFile_CompleteRequest
+G 1482c0 CamAnimFrame_Create
+G 22e5a8 Speech_PlayFELine
+G 22e4e0 Speech_PostFEEvent
