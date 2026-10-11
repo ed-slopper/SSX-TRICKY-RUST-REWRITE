@@ -12,7 +12,7 @@ address,size,name,system,status
 0x1029d0,1008,FUN_001029d0,boarder?,not started
 0x102dc0,40,FUN_00102dc0,world?,not started
 0x102de8,20,FUN_00102de8,ai?,not started
-0x102e80,208,FUN_00102e80,boarder?,not started
+0x102e80,208,Quat_Multiply,boarder?,not started
 0x102f50,44,Vec4_Scale,common?,not started
 0x102f80,44,FUN_00102f80,common?,not started
 0x102fb0,24,FUN_00102fb0,boarder?,not started
@@ -327,8 +327,8 @@ address,size,name,system,status
 0x11f468,28,FUN_0011f468,audio?,not started
 0x11f488,92,FUN_0011f488,boarder?,not started
 0x11f4e8,284,FUN_0011f4e8,boarder?,not started
-0x11f608,8,FUN_0011f608,boarder?,not started
-0x11f610,8,FUN_0011f610,boarder?,not started
+0x11f608,8,Boarder_SetState,boarder,not started
+0x11f610,8,Boarder_SetMotion,boarder,not started
 0x11f628,324,FUN_0011f628,boarder?,not started
 0x11f770,4648,FUN_0011f770,boarder?,not started
 0x120998,84,cWipeOutRecoverControl::__tf,runtime,host
@@ -429,7 +429,7 @@ address,size,name,system,status
 0x1238e0,116,cPrewindControlState::__tf,runtime,host
 0x123958,116,cRailSlideControlState::__tf,runtime,host
 0x1239d0,116,cSpinControlState::__tf,runtime,host
-0x123a48,64,FUN_00123a48,boarder?,not started
+0x123a48,64,cReplayRecordHeader::__tf,runtime,host
 0x123a88,44,FUN_00123a88,boarder?,not started
 0x123ab8,88,FUN_00123ab8,boarder?,not started
 0x123b10,948,AirPredict_AtTakeoff,boarder,ported
@@ -448,13 +448,13 @@ address,size,name,system,status
 0x126250,748,FUN_00126250,boarder?,not started
 0x126540,520,Boarder_WallImpactCheck,boarder,ported
 0x126748,84,FUN_00126748,boarder?,not started
-0x1267a0,228,FUN_001267a0,boarder?,not started
+0x1267a0,228,Boarder_Translate,boarder,not started
 0x126888,124,FUN_00126888,boarder?,not started
 0x126918,44,FUN_00126918,boarder?,not started
 0x126948,380,FUN_00126948,boarder?,not started
 0x126ac8,112,FUN_00126ac8,boarder?,not started
 0x126b38,196,FUN_00126b38,boarder?,not started
-0x126c00,120,FUN_00126c00,boarder?,not started
+0x126c00,120,Boarder_SetCrouchTarget,boarder,not started
 0x126c78,440,FUN_00126c78,boarder?,not started
 0x126e30,400,Takeoff_SetSpinRates,boarder,not started
 0x126fc0,724,FUN_00126fc0,boarder?,not started
@@ -470,7 +470,7 @@ address,size,name,system,status
 0x128a18,208,FUN_00128a18,boarder?,not started
 0x128ae8,820,FUN_00128ae8,boarder?,not started
 0x128e20,108,FUN_00128e20,boarder?,not started
-0x128e90,372,FUN_00128e90,boarder?,not started
+0x128e90,372,Boarder_RotateAboutAxis,boarder,not started
 0x129008,1268,FUN_00129008,boarder?,not started
 0x129500,296,FUN_00129500,boarder?,not started
 0x129628,6128,FUN_00129628,boarder?,not started
@@ -1197,7 +1197,7 @@ address,size,name,system,status
 0x15aec0,16040,FUN_0015aec0,animation?,not started
 0x15ed68,200,FUN_0015ed68,render?,not started
 0x15ee30,140,FUN_0015ee30,boarder?,not started
-0x15eec0,56,FUN_0015eec0,boarder?,not started
+0x15eec0,56,AnimCtl_GetClipType,animation,not started
 0x15eef8,80,FUN_0015eef8,boarder?,not started
 0x15ef48,80,FUN_0015ef48,boarder?,not started
 0x15ef98,136,FUN_0015ef98,boarder?,not started
@@ -1213,13 +1213,13 @@ address,size,name,system,status
 0x15fa40,196,FUN_0015fa40,animation?,not started
 0x15fb08,172,FUN_0015fb08,animation?,not started
 0x15fbb8,320,FUN_0015fbb8,animation?,not started
-0x15fcf8,216,FUN_0015fcf8,boarder?,not started
-0x15fdd0,16,FUN_0015fdd0,boarder?,not started
+0x15fcf8,216,AnimCtl_PlayClip,animation,not started
+0x15fdd0,16,AnimCtl_GetClip,animation,not started
 0x15fde0,144,FUN_0015fde0,animation?,not started
 0x15fe70,84,FUN_0015fe70,boarder?,not started
 0x15fec8,116,FUN_0015fec8,boarder?,not started
-0x15ff40,116,FUN_0015ff40,boarder?,not started
-0x15ffb8,80,FUN_0015ffb8,boarder?,not started
+0x15ff40,116,AnimCtl_IsClipAtEnd,animation,not started
+0x15ffb8,80,AnimCtl_TestClipFlag,animation,not started
 0x160008,80,FUN_00160008,boarder?,not started
 0x160058,120,FUN_00160058,world?,not started
 0x1600d0,112,FUN_001600d0,ai?,not started
@@ -4501,8 +4501,8 @@ address,size,name,system,status
 0x250c10,332,FUN_00250c10,common?,not started
 0x250d60,308,Math_Sin,common?,not started
 0x250e98,312,Math_Cos,boarder?,not started
-0x250fd0,296,FUN_00250fd0,boarder?,not started
-0x2510f8,320,FUN_002510f8,boarder?,not started
+0x250fd0,296,Math_Asin,boarder?,not started
+0x2510f8,320,Math_Atan,boarder?,not started
 0x2514c0,72,FUN_002514c0,race?,not started
 0x251508,96,FUN_00251508,boarder?,not started
 0x251568,96,FUN_00251568,boarder?,not started
@@ -4619,7 +4619,7 @@ address,size,name,system,status
 0x2576a8,96,FUN_002576a8,world?,not started
 0x257708,120,FUN_00257708,world?,not started
 0x257780,12,FUN_00257780,world?,not started
-0x257810,176,FUN_00257810,boarder?,not started
+0x257810,176,cWorldBoarder::cWorldBoarder,world,not started
 0x2578c0,88,cWorldBoarder::vf3_2578c0,world,not started
 0x257918,92,cWorldBoarder::vf0_257918,world,not started
 0x257978,16,cWorldBoarder::vf1_257978,world,not started

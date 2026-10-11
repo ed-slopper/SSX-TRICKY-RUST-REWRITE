@@ -3041,3 +3041,18 @@ F 144810 cFlagNode cFlagNode
 F 145b28 cCrowdBoxNode cCrowdBoxNode
 F 145ba8 cCrowdBoxNode cCrowdBoxNode
 F 145458 cCrackedNode cCrackedNode
+G 11f608 Boarder_SetState
+G 11f610 Boarder_SetMotion
+G 15fdd0 AnimCtl_GetClip
+G 15eec0 AnimCtl_GetClipType
+G 15ffb8 AnimCtl_TestClipFlag
+G 15fcf8 AnimCtl_PlayClip
+G 15ff40 AnimCtl_IsClipAtEnd
+G 2510f8 Math_Atan
+G 250fd0 Math_Asin
+G 102e80 Quat_Multiply
+G 126c00 Boarder_SetCrouchTarget
+G 1267a0 Boarder_Translate
+G 128e90 Boarder_RotateAboutAxis
+F 123a48 cReplayRecordHeader __tf
+F 257810 cWorldBoarder cWorldBoarder
