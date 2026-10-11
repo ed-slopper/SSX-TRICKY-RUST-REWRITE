@@ -268,3 +268,18 @@ there (no rewind); a level is the value / 100 when 0..200 (the duck 0..100), els
 - A quirk: the texture flips' offset (+0x64) is resolved twice, so the header word ends up file + file + offset
   (the flip table is built in between, from the right address).
 - Skies (`<course>_sky.pbd`, in the course's archive) are the same format: one model; most courses share one file.
+- Fields (row E3a2; `pbd::{PatchRec, InstanceRec, MaterialRec, SplineRec, SegmentRec, LightRec}`, `ssf::Physics`,
+  `map::Map`; checked against the levels folders' JSON exports: `tricky-data/tests/pbd_json.rs`):
+  - patch: lightmap rectangle, four corner UVs (u, v, 1, 1), the surface as 16 polynomial coefficients (highest
+    power first; the exports' Bézier points are converted from them), box, corners, +0x1a8 surface type, +0x1ac bit
+    31 show-off only, +0x1b0 texture (low half) and lightmap page (high half).
+  - instance: matrix, light directions (columns), three light colours, ambient colour, model id, previous / next,
+    box, material block. Its `.ssf` physics record: +0 mass (1e30 never moves), +4 bounce, the flag defaults (0x1
+    shown, 0x20 collides, 0x80 bounces, 0x1000 ?, 0x2000 UV scroll), +0xc surface type, +0x10 collision mode,
+    +0x12 the sphere-tree group (mode 3) or collision group, +0x14 effect slot.
+  - material: texture (low half), +0x44 texture flip (a run of texture numbers). Spline: box, segment count, first
+    segment. Segment: a cubic as four coefficients (highest first), previous / next, spline, box, length. Light:
+    type, sprite size, colour, direction, position, box.
+  - The `.map` (on the disc beside the others, not read by the game) names everything (and gives the hashes).
+  - gari's export in the levels folder is of another build: its splines all differ and its patches' flag word is 0
+    there (its show-off patches are surface 18); everything else agrees.

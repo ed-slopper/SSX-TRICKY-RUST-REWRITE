@@ -108,3 +108,89 @@ fn instances_match_the_exported_json() {
     }
     eprintln!("{checked} instances compared");
 }
+
+
+#[test]
+fn materials_splines_lights_and_names_match_the_exported_json() {
+    use tricky_data::map::Map;
+    use tricky_data::pbd::{LightRec, MaterialRec, SegmentRec, SplineRec};
+    let Some(dir) = std::env::var_os("TRICKY_PBD_DIR") else { return };
+    let levels = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../levels");
+    let mut checked = [0usize; 5];
+    for (folder, file) in [("gari", "gari"), ("snowdream", "snow"), ("elysium", "elysium"), ("mesablanca", "mesa"), ("merqury", "merquer"), ("aloha", "aloha"), ("pipedream", "pipe"), ("untracked", "untrack"), ("megaplex", "megaple"), ("alaska", "alaska")] {
+        let Ok(bytes) = std::fs::read(std::path::Path::new(&dir).join(format!("{file}.pbd"))) else { continue };
+        let pbd = Pbd::parse(&bytes).unwrap();
+        let read = |n: &str| -> Option<serde_json::Value> { serde_json::from_str(&std::fs::read_to_string(levels.join(folder).join(n)).ok()?).ok() };
+        let fs = |v: &serde_json::Value| v.as_array().unwrap().iter().map(|x| x.as_f64().unwrap() as f32).collect::<Vec<f32>>();
+        let map = std::fs::read_to_string(std::path::Path::new(&dir).join(format!("{file}.map"))).ok().map(|t| Map::parse(&t));
+        if let Some(j) = read("Materials.json") {
+            let j = j["Materials"].as_array().unwrap();
+            assert_eq!(pbd.materials.len(), j.len(), "{folder}: materials");
+            for (k, (w, t)) in pbd.materials.iter().zip(j).enumerate() {
+                let m = MaterialRec(*w);
+                let tex = if m.texture() == 0xffff { String::new() } else { format!("{:04}.png", m.texture()) };
+                assert_eq!(tex, t["TexturePath"].as_str().unwrap_or(""), "{folder}: material {k}");
+                let book: Vec<String> = if m.flip() < 0 { vec![] } else { pbd.texture_flips[m.flip() as usize].iter().map(|x| format!("{:04}.png", x)).collect() };
+                let theirs: Vec<String> = t["TextureFlipbook"].as_array().map(|a| a.iter().map(|x| x.as_str().unwrap().to_string()).collect()).unwrap_or_default();
+                assert_eq!(book, theirs, "{folder}: material {k} flip-book");
+                if let Some(map) = &map {
+                    assert_eq!(map.name("MATERIALS", k), t["MaterialName"].as_str(), "{folder}: material {k} name");
+                }
+                checked[0] += 1;
+            }
+        }
+        if let Some(j) = read("Splines.json") {
+            let j = j["Splines"].as_array().unwrap();
+            assert_eq!(pbd.splines.len(), j.len(), "{folder}: splines");
+            for (k, (w, t)) in pbd.splines.iter().zip(j).enumerate() {
+                let s = SplineRec(*w);
+                let segs = t["Segments"].as_array().unwrap();
+                assert_eq!(s.segments() as usize, segs.len(), "{folder}: spline {k} segments");
+                for (n, sj) in segs.iter().enumerate() {
+                    let g = SegmentRec(pbd.segments[(s.first() as usize) + n]);
+                    assert_eq!(g.spline() as usize, k, "{folder}: spline {k} segment {n}");
+                    // gari's export is of another build of the course (every segment differs; names and counts agree)
+                    for (a, b) in g.bezier().iter().zip(sj["Points"].as_array().unwrap()).filter(|_| folder != "gari") {
+                        let b = fs(b);
+                        for i in 0..3 {
+                            assert!((a[i] - b[i]).abs() <= 0.05 + 2e-6 * b[i].abs(), "{folder}: spline {k} segment {n}: {a:?} vs {b:?}");
+                        }
+                    }
+                    checked[2] += 1;
+                }
+                if let Some(map) = &map {
+                    assert_eq!(map.name("SPLINES", k), t["SplineName"].as_str(), "{folder}: spline {k} name");
+                }
+                checked[1] += 1;
+            }
+        }
+        if let Some(j) = read("Lights.json") {
+            let j = j["Lights"].as_array().unwrap();
+            assert_eq!(pbd.lights.len(), j.len(), "{folder}: lights");
+            for (k, (w, t)) in pbd.lights.iter().zip(j).enumerate() {
+                let l = LightRec(*w);
+                assert_eq!(
+                    (l.kind() as i64, l.colour().to_vec(), l.direction().to_vec(), l.position().to_vec(), l.lowest().to_vec(), l.highest().to_vec()),
+                    (t["Type"].as_i64().unwrap(), fs(&t["Colour"]), fs(&t["Direction"]), fs(&t["Position"]), fs(&t["LowestXYZ"]), fs(&t["HighestXYZ"])),
+                    "{folder}: light {k}"
+                );
+                if let Some(map) = &map {
+                    assert_eq!(map.name("LIGHTS", k), t["LightName"].as_str(), "{folder}: light {k} name");
+                }
+                checked[3] += 1;
+            }
+        }
+        if let (Some(map), Some(pj), Some(ij)) = (&map, read("Patches.json"), read("Instances.json")) {
+            for (k, t) in pj["Patches"].as_array().unwrap().iter().enumerate() {
+                assert_eq!(map.name("PATCHES", k), t["PatchName"].as_str(), "{folder}: patch {k} name");
+            }
+            for (k, t) in ij["Instances"].as_array().unwrap().iter().enumerate() {
+                assert_eq!(map.name("INTERNAL INSTANCES", k), t["InstanceName"].as_str(), "{folder}: instance {k} name");
+                let e = &map.section("INTERNAL INSTANCES")[k];
+                assert_eq!(e.hash as i64, t["Hash"].as_i64().unwrap(), "{folder}: instance {k} hash");
+                checked[4] += 1;
+            }
+        }
+    }
+    eprintln!("materials {}, splines {} ({} segments), lights {}, names of {} instances compared", checked[0], checked[1], checked[2], checked[3], checked[4]);
+}

@@ -423,3 +423,101 @@ impl InstanceRec {
         [self.light_dirs[0][k], self.light_dirs[1][k], self.light_dirs[2][k]]
     }
 }
+
+/// A material record (0x48 bytes, row E3a2): +0 the texture (low half; the high half and +4 -1 on the disc), +0x14
+/// 1.0, +0x18 3, +0x1c a large float, +0x40 a word, +0x44 its texture flip (-1 none; a run of texture numbers).
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct MaterialRec(pub [u32; 18]);
+
+impl MaterialRec {
+    pub fn texture(&self) -> u16 {
+        self.0[0] as u16
+    }
+    pub fn flip(&self) -> i32 {
+        self.0[17] as i32
+    }
+}
+
+/// A spline record (0x28 bytes, the game's "spline", row E3a2): its box (min, max), +0x18 a word, +0x1c its segment
+/// count, +0x20 its first segment, +0x24 -1.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct SplineRec(pub [u32; 10]);
+
+impl SplineRec {
+    pub fn segments(&self) -> u32 {
+        self.0[7]
+    }
+    pub fn first(&self) -> u32 {
+        self.0[8]
+    }
+}
+
+/// A spline segment record (0x80 bytes, row E3a2): +0 the cubic's four coefficients (x, y, z, w; highest power first,
+/// +0x30 the start point with w 1), +0x40 four more words, +0x50 / +0x54 the previous and next segment (-1 none),
+/// +0x58 its spline, +0x5c its box (min, max), +0x74 its length.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct SegmentRec(pub [u32; 32]);
+
+impl SegmentRec {
+    fn f(&self, k: usize) -> f32 {
+        f32::from_bits(self.0[k])
+    }
+    /// The coefficient of t^a.
+    pub fn coeff(&self, a: usize) -> [f32; 3] {
+        let k = 4 * (3 - a);
+        [self.f(k), self.f(k + 1), self.f(k + 2)]
+    }
+    /// The four Bezier control points (converted in double precision; the game keeps the coefficients).
+    pub fn bezier(&self) -> [[f32; 3]; 4] {
+        const M: [[f64; 4]; 4] = [[1.0, 0.0, 0.0, 0.0], [1.0, 1.0 / 3.0, 0.0, 0.0], [1.0, 2.0 / 3.0, 1.0 / 3.0, 0.0], [1.0, 1.0, 1.0, 1.0]];
+        let mut out = [[0.0f32; 3]; 4];
+        for (i, o) in out.iter_mut().enumerate() {
+            for (k, v) in o.iter_mut().enumerate() {
+                *v = (0..4).map(|a| M[i][a] * self.coeff(a)[k] as f64).sum::<f64>() as f32;
+            }
+        }
+        out
+    }
+    pub fn prev(&self) -> i32 {
+        self.0[20] as i32
+    }
+    pub fn next(&self) -> i32 {
+        self.0[21] as i32
+    }
+    pub fn spline(&self) -> u32 {
+        self.0[22]
+    }
+    pub fn length(&self) -> f32 {
+        self.f(29)
+    }
+}
+
+/// A light record (0x5c bytes, row E3a2): +0 its type, +4 its sprite size, +8 a float, +0xc a word, +0x10 its colour,
+/// +0x1c its direction, +0x28 its position, +0x34 / +0x40 its box, +0x4c a float, +0x50 a word, +0x54 a float, +0x58
+/// a word.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct LightRec(pub [u32; 23]);
+
+impl LightRec {
+    fn v3(&self, k: usize) -> [f32; 3] {
+        [f32::from_bits(self.0[k]), f32::from_bits(self.0[k + 1]), f32::from_bits(self.0[k + 2])]
+    }
+    pub fn kind(&self) -> u32 {
+        self.0[0]
+    }
+    pub fn colour(&self) -> [f32; 3] {
+        self.v3(4)
+    }
+    pub fn direction(&self) -> [f32; 3] {
+        self.v3(7)
+    }
+    pub fn position(&self) -> [f32; 3] {
+        self.v3(10)
+    }
+    pub fn lowest(&self) -> [f32; 3] {
+        self.v3(13)
+    }
+    pub fn highest(&self) -> [f32; 3] {
+        self.v3(16)
+    }
+}

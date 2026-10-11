@@ -19,6 +19,7 @@ pub mod level;
 pub mod loc;
 pub mod logic;
 pub mod ltg;
+pub mod map;
 pub mod mpf;
 pub mod pbd;
 pub mod music;
