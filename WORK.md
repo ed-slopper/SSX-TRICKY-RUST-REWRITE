@@ -54,7 +54,7 @@ state machine and the renderer are ours. Nothing has been checked against the or
 | E8d | Rider-to-rider: `Boarder_RiderCollisions` 0x123fc8, `Boarder_RiderHit` 0x124920, shoves | any | F4a | | [repo] Ported, unchecked. Split: E8d1, E8d2 |
 | E9 | Script machine: `TriggerScript_Run`, `TriggerScript_ExecOp` 0x13bfd0 with every op, controllers (`TriggerScript_Op0_SpawnController` 0x13c600), persistent cell scripts, run at runtime instead of read statically | unowned | E3c | | [repo] `logic.rs` reads SSFLogic.json statically today |
 | E9b2 | Run the script threads in the app (`tricky_game::script` on `tricky_data::ssf` instead of `logic.rs`'s static walk of SSFLogic.json): the world's node list order (`BxList_Add` 0x17d4e8 links new nodes at the head; the update loop's order to confirm), `World_DeleteScriptObject` 0x13bbc0, the starters (area wake, contact, controller goal, the engine's RaceMode / StartCountDown calls) | unowned | E9b, E7 | | Gap of E9b |
-| E9g3 | The starting poses of the falling pieces (`cMeshAnimNode` 0x1466b8: each model part's matrix through its parents, or an animation's frame matrices when it replaces a node, times the object's, `Mat4_ToPosQuat` 0x2504f0) and the fence's mesh bending (`FenceNode_InitShape` 0x143ff8, `FenceNode_UpdateShape` 0x143cd0) | unowned | E9g2, E4 | | Gap of E9g2 |
+| E9g3 | The starting poses of the falling pieces (`cMeshAnimNode` 0x1466b8: each model part's matrix through its parents, or an animation's frame matrices when it replaces a node, times the object's, `Mat4_ToPosQuat` 0x2504f0) and the fence's mesh bending (`FenceNode_InitShape` 0x143ff8, `FenceNode_UpdateShape` 0x143cd0) | unowned | E9g2, E4 | ed-slopper/puffin (2026-10-11) | Gap of E9g2 |
 | E10 | Input: pad reading, stick shaping and dead zones, button bits (the chord 0x600), vibration, `cCheatCodes::Update` 0x26CF60 | unowned | E1 | | [repo] findings.md |
 | E11 | Camera: named cameras `cBxCamera_EvalNamedCam` 0x174888 (ported), director scripts `cBxCamera_RunDirectorScript`, replay and finish cameras, camera collision | any | | | [repo] Chase cam ported in `rider.rs`; free camera is ours (keep, tag) |
 | E12 | Save and load: the memory-card profile, options, records, unlocks (`Profile_ResetNewGame` 0x161b40), in our own save file with the same fields | unowned | E1 | | [repo] `tricky-save.json` is the stand-in |
@@ -529,3 +529,4 @@ matches the original.
 - 2026-10-11 irregulur/lynx: claim F1c (short batch).
 - 2026-10-11 irregulur/lynx: F1c stopped (released) after 5 more names.
 - 2026-10-11 ed-slopper/puffin: E2c done (Huffman, BTree, colour blocks).
+- 2026-10-11 ed-slopper/puffin: claim E9g3.
