@@ -23,6 +23,7 @@ pub mod landing;
 pub mod math;
 pub mod orient;
 pub mod rails;
+pub mod reset;
 pub mod rivals;
 pub mod score;
 pub mod spin;

@@ -228,3 +228,17 @@ Part of the port notes (index: [README.md](README.md)); units and wording as des
   taken if within 30° (dot > 0.866). Then velocity = dir.xy × 833.3333 (z 0), +0x24 = 0 unless
   `Boarder_IsTricky`, `Boarder_PlaceAt` 0x11cae8(heading, height, rider, &+0x350, &vel, 0), `Camera_CutForReset` of
   the rider's camera (+0x38 ≥ 0). Checked with the ray cast scripted, on every course (`tests/aipath.rs`).
+- The reset state is the state manager's (rider+0x5ae0) +0x810: +8 time, +0xc the height to place at, +0x10 how far
+  to move on, +0x14 −1. `Boarder_RequestReset` 0x118f10 (a0 rider, f12 height; `reset::request_reset`): nothing once
+  finished (+0x418 ≥ 0) or where `AIP_CanResetAt` says no; the reset sound if +0x41c == 1; mode 0 (0x32de8c) with
+  others: `Boarder_StartReset`(mean of the others' +0x374, ≥ 0); modes 2/4/7 with others, +0x374 > 10000 and
+  0x32de88 ≠ 8: move on 0.8003195 × the speed of the first rider in the next place (the one before for the last;
+  0 if the stats byte +0x65 is negative); else 0. Then motion 4, state 0x16.
+- `ResetState_Update` 0x106a90 (`reset::reset_update`): t += 1/60; +0x448 = clamp(2(0.5 − t)); t > 0.2: HUD item 0xc
+  (with a camera), +0x44c = clamp(1 − (0.5 − t)/0.3); t > 0.8: the camera scripts stopped (race +0x20 in 1..9, for
+  the camera-script player 0x337770), `Boarder_AdvanceOnPath`(+0x10), `ResetState_PlaceRider`(+0xc, no spread);
+  +0x44c = 0 while race +0x54.
+- `Gate2BaseControl_Update` 0x105dc0 (`reset::gate2_base_control`): boost (pad bits 3, 4), steer target (bits 5..10
+  signed / 31), lean anim (bits 23..24, 25..26 → −1/0/1); pad bit 0 clear on the ground: ride off (motion 2, state
+  3) unless clip 0x1fd; else +0x304 = !bit 0 and a reset at 101.46 (0x42caebe0). State 0x13 does the same inline
+  without the steering.
