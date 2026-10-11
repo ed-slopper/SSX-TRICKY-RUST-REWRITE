@@ -5695,3 +5695,14 @@ G 233e78 Speech_OnBoost
 G 2297f0 Stream_OpenInBig
 G 2256c0 MusicSys_LoadSongBank
 G 239d18 SphTree_Translate
+G 2522e0 Course_LookupInstanceById
+G 252318 Course_LookupParticleById
+G 254b20 Course_GetSplineSegment
+G 2550c8 Course_FindInstanceByHash
+G 255150 Course_FindCamAnimByHash
+G 260e68 Course_GetScriptEntry
+G 239340 SphTree_Load
+G 240a98 CourseDma_PatchContext
+G 2514c0 SplineModel_Init
+G 2f1d88 sceMcGetDir
+G 23db40 MemCard_ReadDir

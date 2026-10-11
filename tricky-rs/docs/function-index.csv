@@ -4188,7 +4188,7 @@ address,size,name,system,status
 0x2391c8,8,SphTree_Assert,world?,not started
 0x2391d0,20,bxSphereTree::~bxSphereTree,world?,not started
 0x2391e8,344,FUN_002391e8,world?,not started
-0x239340,360,FUN_00239340,world?,not started
+0x239340,360,SphTree_Load,world?,not started
 0x2394a8,280,Collide_BoarderSphTree,world?,not started
 0x2395c0,308,SphTree_TouchesTriangle,world?,not started
 0x2396f8,84,SphTree_ForEachLeaf,render?,not started
@@ -4285,7 +4285,7 @@ address,size,name,system,status
 0x23d998,364,cPS2MemCard::vf1_23d998,save,not started
 0x23db08,8,cPS2MemCard::vf6_23db08,save,not started
 0x23db10,48,cPS2MemCard::vf5_23db10,save,not started
-0x23db40,136,FUN_0023db40,save?,not started
+0x23db40,136,MemCard_ReadDir,save,not started
 0x23dbc8,116,cPS2MemCard::vf12_23dbc8,save,not started
 0x23dc40,12,cPS2MemCard::vf61_23dc40,save,not started
 0x23dd10,8,cPS2MemCard::vf7_23dd10,save,not started
@@ -4367,7 +4367,7 @@ address,size,name,system,status
 0x2402c0,172,Rand_Seed,world?,checked
 0x2403a8,204,Dma_SendGif,render?,not started
 0x2408c8,204,Dma_SendGifChain,render?,not started
-0x240a98,480,FUN_00240a98,race?,not started
+0x240a98,480,CourseDma_PatchContext,race,not started
 0x240c78,516,FUN_00240c78,race?,not started
 0x240e80,88,Name_ElfHash,frontend?,ported
 0x240ed8,32,Name_Hash,frontend?,not started
@@ -4503,7 +4503,7 @@ address,size,name,system,status
 0x250e98,312,Math_Cos,boarder?,checked
 0x250fd0,296,Math_Asin,boarder?,checked
 0x2510f8,320,Math_Atan,boarder?,checked
-0x2514c0,72,FUN_002514c0,race?,not started
+0x2514c0,72,SplineModel_Init,race?,not started
 0x251508,96,Spline_FindSegmentForward,boarder?,not started
 0x251568,96,Spline_FindSegmentBackward,boarder?,not started
 0x2515c8,520,Spline_Evaluate,boarder?,not started
@@ -4533,8 +4533,8 @@ address,size,name,system,status
 0x252278,40,cCourseResolve_Common::vf1_252278,race,not started
 0x2522a0,20,cCourseResolve_Common::Reset,race,not started
 0x2522b8,40,cCourseResolve_Common::vf3_2522b8,race,not started
-0x2522e0,52,FUN_002522e0,race?,not started
-0x252318,52,FUN_00252318,race?,not started
+0x2522e0,52,Course_LookupInstanceById,race,not started
+0x252318,52,Course_LookupParticleById,race,not started
 0x252350,184,cCourseResolve_Common::Resolve,race,not started
 0x252408,100,cCourseResolve_Common::ResolveDataOnly,race,not started
 0x252470,724,cCourseResolve_Common::ResolveTGroupHeader,race,not started
@@ -4571,7 +4571,7 @@ address,size,name,system,status
 0x254a50,44,Course_GetParticleInstance,race,not started
 0x254a80,44,Course_GetLight,race,not started
 0x254af0,44,Course_GetMaterial,race,not started
-0x254b20,44,FUN_00254b20,race?,not started
+0x254b20,44,Course_GetSplineSegment,race,not started
 0x254b50,40,Course_GetSpline,race,not started
 0x254b78,44,FUN_00254b78,race?,not started
 0x254ba8,12,FUN_00254ba8,race?,not started
@@ -4593,8 +4593,8 @@ address,size,name,system,status
 0x254f30,136,FUN_00254f30,race?,not started
 0x254fb8,136,FUN_00254fb8,race?,not started
 0x255040,136,FUN_00255040,race?,not started
-0x2550c8,136,FUN_002550c8,race?,not started
-0x255150,136,FUN_00255150,race?,not started
+0x2550c8,136,Course_FindInstanceByHash,race,not started
+0x255150,136,Course_FindCamAnimByHash,race,not started
 0x2551d8,136,FUN_002551d8,race?,not started
 0x255260,176,FUN_00255260,race?,not started
 0x255310,40,Course_DebugPrint,race,not started
@@ -4685,7 +4685,7 @@ address,size,name,system,status
 0x260cb8,72,FUN_00260cb8,world?,not started
 0x260d08,204,World_GetCellAt,world,not started
 0x260dd8,144,World_FindScript,world,not started
-0x260e68,44,FUN_00260e68,world?,not started
+0x260e68,44,Course_GetScriptEntry,race,not started
 0x260f90,8,FUN_00260f90,world?,not started
 0x260f98,8,FUN_00260f98,world?,not started
 0x260fa0,28,FUN_00260fa0,world?,not started
@@ -6925,7 +6925,7 @@ address,size,name,system,status
 0x2f1a80,68,FUN_002f1a80,sdk?,host
 0x2f1ac8,220,FUN_002f1ac8,sdk?,host
 0x2f1c00,388,FUN_002f1c00,sdk?,host
-0x2f1d88,344,FUN_002f1d88,sdk?,host
+0x2f1d88,344,sceMcGetDir,sdk?,host
 0x2f1ee0,132,FUN_002f1ee0,sdk?,host
 0x2f1f68,336,FUN_002f1f68,sdk?,host
 0x2f20b8,200,FUN_002f20b8,sdk?,host
