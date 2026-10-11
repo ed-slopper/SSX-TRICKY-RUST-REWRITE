@@ -153,7 +153,6 @@ matches the original.
 
 | ID | Task | Section | Who | Date | Commit |
 |---|---|---|---|---|---|
-| E2 | Read the player's disc: the game's CD file table (`CdFs_Mount` 0x2c9970, `CdFs_FindFile` 0x2c9cc0, its `qsort`/`bsearch`) ported 1:1 in `tricky-data/src/disc.rs`, from an image or a drive; checked against an independent ISO walk (260 files) and a byte compare; notes in `port-notes/files.md` | P1 | ed-slopper/puffin | 2026-10-11 | 27e5bfb |
 | D1 | Ghidra project analysed, RTTI recovered (394 classes, 2,884 names, `tools/rtti_scan.py`), decompiler export | P0 | ed-slopper | 2026-10-05 | 9e4e994 |
 | D2 | Patcher (`tools/ssxpatch.py`) and the debug-menu / unlock-all mods | P5 | ed-slopper | 2026-10-05 | 9e4e994 |
 | D3 | Level viewer and first riding (`tricky-rs` stage 1–2), `.afl` animation format decoded | P1 | ed-slopper | 2026-10-06 | bd4670b |
@@ -186,6 +185,7 @@ matches the original.
 | F3 | ghidra-mcp set up on ed-slopper's PC: Ghidra 12.1.4 + Emotion Engine extension at `D:\code\modding\ghidra_12.1.4_PUBLIC`, the repo's `ghidra/Project` opened (owner changed from root), `symbols.txt` applied (ApplySsxSymbols), ghidra-mcp 7.0.0 built from source and enabled, bridge added to Claude; `force_decompile` 0x12b340 returns `Air_IntegrateRK4`. Install snags written into AGENTS.md §14 | P0 | ed-slopper (with puffin) | 2026-10-10 | 406fa6b |
 | F2b | Settled in Ghidra (ghidra-mcp): `Score_TrickBookCheck` and `TriggerScript_Op0_SpawnController` are 0x1579e0 and 0x13c5d0 (the notes' addresses were 0x20/0x30 in; nothing branches there); `WipeoutMotion_Update` 0x10c2f0 created as a function (one 5,004-byte body up to 0x10d680) and added to the index; 0x343150 is `gMusicSys`, the global pointer to the one `cMusicSys` (its destructor clears it); 0x198810 and 0x199d10 are the `cAnimObjectNode` and `cAnimDeltaNode` constructors (they install vtables 0x38c650/0x38c558, whose type-info entries are those classes'); `cTubeEndBoostNode::vf27` renamed `BoostRider` (pushes a rider in slot n toward the slot's speed along the tube); all seven F2 class methods proven (called only from their class's vtable methods or constructors, or in the vtable: `cAnimDeltaNode::Update`), five constructors named. symbols.txt, renamed.txt, port notes, index updated | P0 | ed-slopper/puffin | 2026-10-10 | 7ef6924 |
 | E8f | Surface table checked: `SurfaceTable_Init` 0x256188 run in the function runner, all 500 words in `tricky-rs/game/src/surface.rs` bit-identical (`tests/surface_table.rs`); SURFACES, SURF_EXTRA, SURF_BAND in rider.rs now taken from it (were rounded; row 0's air height and damping were wrong) | P1 | trailrig/heron | 2026-10-11 | c2a1967 |
+| E2 | Read the player's disc: the game's CD file table (`CdFs_Mount` 0x2c9970, `CdFs_FindFile` 0x2c9cc0, its `qsort`/`bsearch`) ported 1:1 in `tricky-data/src/disc.rs`, from an image or a drive; checked against an independent ISO walk (260 files) and a byte compare; notes in `port-notes/files.md` | P1 | ed-slopper/puffin | 2026-10-11 | 27e5bfb |
 
 ## Changes to the board
 
