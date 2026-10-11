@@ -38,8 +38,7 @@ state machine and the renderer are ours. Nothing has been checked against the or
 | E1a1 | The player's and the AI riders' physics in `ride` (`tricky-rs/src/main.rs`) on a fixed 60 Hz tick: whole ticks of `1/60 × timescale` carried over from frame to frame, instead of variable sub-steps of up to 1/120 s | any | | trailrig/heron (2026-10-11) | Split of E1a |
 | E1a2 | The rest of E1a: world animations, props, particles, spray, camera on the same tick; draw between ticks (interpolate, ours: tag STANDIN) | any | E1a1 | | Split of E1a |
 | E1b | Random numbers: the game's `rand` and seeding, used by AI tricks, grabs, announcer, so runs can match the original | unowned | F1 | | [est] |
-| E2a | BIG archives (C0FB and BIGF) in Rust, ported from the game's loader | unowned | E2 | ed-slopper/puffin (2026-10-11) | [repo] Python in `tools/afl/anmbig.py`; findings.md "Ideas for next steps". The game's reader: `lib-big`, `BIG_Identify` 0x2cbc88, `BIG_Lookup` 0x2cbdc0, `BIG_GetFileData` 0x2cc0a8 (F1d) |
-| E2b | RefPack decompression in Rust | unowned | E2a | | [repo] Python in `tools/afl/refpack.py`. The game's decoders: `Compress_Decode` 0x2c2de0 → `RefPack_Decode` 0x2c31b0, `Huff_Decode` 0x2c3730, `BTree_Decode` 0x2c3540 (F1d) |
+| E2b | RefPack decompression in Rust | unowned | E2a | ed-slopper/puffin (2026-10-11) | [repo] Python in `tools/afl/refpack.py`. The game's decoders: `Compress_Decode` 0x2c2de0 → `RefPack_Decode` 0x2c31b0, `Huff_Decode` 0x2c3730, `BTree_Decode` 0x2c3540 (F1d) |
 | E3 | Level files read by our code, as the game reads them, replacing the SSX-Library JSON project folder (`level.rs`) | unowned | E2b | | [repo] level-editing.md. Split before claiming: |
 | E3a | `.pbd`: Bezier patches, instances, models and meshes, materials, splines, lights | unowned | E3 | | [repo] |
 | E3b | `.ssh` textures (incl. `_L` lightmaps, `_sky`) | unowned | E2b | | [repo] Python in `tools/ssh/ssh2png.py`. The game's shape reader: `lib-shape` 0x2c2044–0x2c27c8, `Shape_FindByName` 0x2c2528 (F1d) |
@@ -186,6 +185,7 @@ matches the original.
 | F2b | Settled in Ghidra (ghidra-mcp): `Score_TrickBookCheck` and `TriggerScript_Op0_SpawnController` are 0x1579e0 and 0x13c5d0 (the notes' addresses were 0x20/0x30 in; nothing branches there); `WipeoutMotion_Update` 0x10c2f0 created as a function (one 5,004-byte body up to 0x10d680) and added to the index; 0x343150 is `gMusicSys`, the global pointer to the one `cMusicSys` (its destructor clears it); 0x198810 and 0x199d10 are the `cAnimObjectNode` and `cAnimDeltaNode` constructors (they install vtables 0x38c650/0x38c558, whose type-info entries are those classes'); `cTubeEndBoostNode::vf27` renamed `BoostRider` (pushes a rider in slot n toward the slot's speed along the tube); all seven F2 class methods proven (called only from their class's vtable methods or constructors, or in the vtable: `cAnimDeltaNode::Update`), five constructors named. symbols.txt, renamed.txt, port notes, index updated | P0 | ed-slopper/puffin | 2026-10-10 | 7ef6924 |
 | E8f | Surface table checked: `SurfaceTable_Init` 0x256188 run in the function runner, all 500 words in `tricky-rs/game/src/surface.rs` bit-identical (`tests/surface_table.rs`); SURFACES, SURF_EXTRA, SURF_BAND in rider.rs now taken from it (were rounded; row 0's air height and damping were wrong) | P1 | trailrig/heron | 2026-10-11 | c2a1967 |
 | E2 | Read the player's disc: the game's CD file table (`CdFs_Mount` 0x2c9970, `CdFs_FindFile` 0x2c9cc0, its `qsort`/`bsearch`) ported 1:1 in `tricky-data/src/disc.rs`, from an image or a drive; checked against an independent ISO walk (260 files) and a byte compare; notes in `port-notes/files.md` | P1 | ed-slopper/puffin | 2026-10-11 | 27e5bfb |
+| E2a | BIG archives (`C0FB`, `BIGF`) in `tricky-data/src/big.rs`, ported from the game's loader: `BIG_Identify` 0x2cbc88, `BIG_HeaderSize` 0x2cbd08, `BIG_Lookup` 0x2cbdc0, the mounts of `App_OpenBigFiles` 0x17bdf8 in order and the opener's (0x2cb328) disc / `|name` / `archive|name` rules; all 793 character-archive entries checked against the extracted copies | P1 | ed-slopper/puffin | 2026-10-11 | 3886064 |
 
 ## Changes to the board
 
@@ -232,3 +232,4 @@ matches the original.
 - 2026-10-11 ed-slopper/puffin: claim E2 (on the way to E4, asked by ed-slopper); F1c paused, still claimed.
 - 2026-10-11 ed-slopper/puffin: E2 done.
 - 2026-10-11 ed-slopper/puffin: claim E2a.
+- 2026-10-11 ed-slopper/puffin: E2a done; claim E2b.
