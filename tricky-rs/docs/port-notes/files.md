@@ -149,3 +149,11 @@ of 12 bytes from 200, 11 before), +0xa count, +0x10/+0x11 origin, +0x14 records,
 `Font_BuildTexture` 0x19cca8: 4-bit pixels, low nibble first, into a square texture (side: max of the width and
 the smallest power of two above the height), colours RGB 0x80 with alpha `i * 128 / 15`. The glyphs and line
 heights equal `chars/fonts/*.json` for both fonts.
+
+## Camera files, `.CML` (row E5c)
+
+Proven: `Camera_LoadCmlFiles` 0x1783e8 loads, in order, the course's file (`Camera_GetCourseCmlName` 0x178330:
+course id 0 garibald, 1 snowdrea, 2 elysium, 3 mesablan, 4 merqury, 5 aloha, 6 and 9 pipedrea, 7 untracke, 8
+tokyo, 10 trick, 11 alaska), `commonob` and `scripts`, each `%s.cml` (0x37fba8) in DATA/CAMERA, skipping a
+missing one (`Cml_LoadIfExists` 0x16e4c0). `intro::Cml::from_disc` reads them; equal to the level folders' copies.
+Our level folder to course id mapping (`intro::course_of_folder`) is a stand-in for the course table (row C0).
