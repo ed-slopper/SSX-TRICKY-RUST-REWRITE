@@ -1493,39 +1493,39 @@ F 185410 cStartScreenSingle vf6
 F 185430 cStartScreenSingle vf7
 F 186168 cCourseResolve ~cCourseResolve
 F 252278 cCourseResolve_Common vf1
-F 2522a0 cCourseResolve_Common vf2
+F 2522a0 cCourseResolve_Common Reset
 F 2522b8 cCourseResolve_Common vf3
-F 252350 cCourseResolve_Common vf4
-F 252408 cCourseResolve_Common vf5
-F 252470 cCourseResolve_Common vf6
-F 252748 cCourseResolve_Common vf7
-F 2527e0 cCourseResolve_Common vf8
-F 252b88 cCourseResolve_Common vf9
-F 255630 cCourseResolve_PS2 vf10
-F 253400 cCourseResolve_Common vf11
-F 253540 cCourseResolve_Common vf12
-F 2535b0 cCourseResolve_Common vf13
-F 253630 cCourseResolve_Common vf14
-F 2537d8 cCourseResolve_Common vf15
-F 2539b0 cCourseResolve_Common vf16
-F 255c20 cCourseResolve_PS2 vf17
-F 253fb0 cCourseResolve_Common vf18
-F 254078 cCourseResolve_Common vf19
-F 254120 cCourseResolve_Common vf20
-F 2534c8 cCourseResolve_Common vf21
-F 253b60 cCourseResolve_Common vf22
-F 253bd0 cCourseResolve_Common vf23
-F 253c50 cCourseResolve_Common vf24
-F 253d30 cCourseResolve_Common vf25
-F 255cc0 cCourseResolve_PS2 vf26
-F 254160 cCourseResolve_Common vf27
-F 2541e8 cCourseResolve_Common vf28
-F 2542a8 cCourseResolve_Common vf29
-F 254318 cCourseResolve_Common vf30
-F 254398 cCourseResolve_Common vf31
-F 254600 cCourseResolve_Common vf32
+F 252350 cCourseResolve_Common Resolve
+F 252408 cCourseResolve_Common ResolveDataOnly
+F 252470 cCourseResolve_Common ResolveTGroupHeader
+F 252748 cCourseResolve_Common ResolveTGroups
+F 2527e0 cCourseResolve_Common ResolveTGroup
+F 252b88 cCourseResolve_Common ResolveINode
+F 255630 cCourseResolve_PS2 ResolveDataHeader
+F 253400 cCourseResolve_Common ResolveInstances
+F 253540 cCourseResolve_Common ResolveModelPointers
+F 2535b0 cCourseResolve_Common ResolveModels
+F 253630 cCourseResolve_Common ResolveModel
+F 2537d8 cCourseResolve_Common ResolveModelHierarchies
+F 2539b0 cCourseResolve_Common ResolveMesh
+F 255c20 cCourseResolve_PS2 ResolveMeshContext
+F 253fb0 cCourseResolve_Common ResolveMaterialBlocks
+F 254078 cCourseResolve_Common ResolveAnimation
+F 254120 cCourseResolve_Common ResolveChannel
+F 2534c8 cCourseResolve_Common ResolveParticleInstances
+F 253b60 cCourseResolve_Common ResolveParticleModelPointers
+F 253bd0 cCourseResolve_Common ResolveParticleModels
+F 253c50 cCourseResolve_Common ResolveParticleModel
+F 253d30 cCourseResolve_Common ResolveParticleModelHierarchies
+F 255cc0 cCourseResolve_PS2 ResolveParticleMesh
+F 254160 cCourseResolve_Common ResolveSplines
+F 2541e8 cCourseResolve_Common ResolveSplineSegments
+F 2542a8 cCourseResolve_Common ResolveCameraPointers
+F 254318 cCourseResolve_Common ResolveCameras
+F 254398 cCourseResolve_Common ResolveCamera
+F 254600 cCourseResolve_Common ResolveMaterials
 F 254678 cCourseResolve_Common vf33
-F 2546a8 cCourseResolve_Common vf34
+F 2546a8 cCourseResolve_Common ResolveHashTable
 F 1864f8 cVideoModule ~cVideoModule
 F 186558 cVideoModule vf1
 F 186580 cVideoModule vf2
@@ -2192,9 +2192,9 @@ F 243de8 cFlakeSpinnerLoad ~cFlakeSpinnerLoad
 F 251ee0 cAIFwdDiffCache ~cAIFwdDiffCache
 F 251bc8 cBxCache ~cBxCache
 F 252220 cCourseResolve_Common ~cCourseResolve_Common
-F 252e18 cCourseResolve_Common vf10
-F 253b58 cCourseResolve_Common vf17
-F 253e80 cCourseResolve_Common vf26
+F 252e18 cCourseResolve_Common ResolveDataHeader
+F 253b58 cCourseResolve_Common ResolveMeshContext
+F 253e80 cCourseResolve_Common ResolveParticleMesh
 F 2555e8 cCourseResolve_PS2 ~cCourseResolve_PS2
 F 257918 cWorldBoarder vf0
 F 257978 cWorldBoarder vf1
@@ -3630,3 +3630,11 @@ G 1d8bc8 ParticleSys_Draw
 G 142af0 TexFlip_Init
 G 1776d0 Camera_SetMode
 G 177db0 Camera_Cut
+
+G 2549f8 Course_GetPatch
+G 254a28 Course_GetInstance
+G 254a50 Course_GetParticleInstance
+G 254b50 Course_GetSpline
+G 254a80 Course_GetLight
+G 254af0 Course_GetMaterial
+G 255310 Course_DebugPrint

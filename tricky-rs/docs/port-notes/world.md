@@ -130,3 +130,17 @@ Part of the port notes (index: [README.md](README.md)); units and wording as des
   s4 = x − 0x61cac083, s5 = x + 0x6fdf3b64.
 - Floats: (r & 0x7fffff | 0x3f800000) as f32 − 1.0 gives [0, 1); `Rand_GameRange`(lo, hi) = lo + (hi − lo)·that.
   The port's xorshift stand-ins (race.rs, intro.rs) are not this generator.
+
+## Course file loading (`cCourseResolve_Common` / `cCourseResolve_PS2`)
+
+- The course data comes in with every pointer stored as an offset; `Resolve` (vf4, returns 0 ok, 1 failed,
+  3/4 missing file, 6 more than 4000 entries) fixes them up section by section. Each virtual names its section in
+  a debug print that is compiled out (`Course_DebugPrint` 0x255310 is empty): TGroup header (version, the grid of
+  tgroups: width/height/num/used/empty), tgroups, tgroup (counts of patches, instances, particle instances, splines,
+  lights inside), inode, data header (PS2 data header on the PS2 class), instances, model pointers, models, model,
+  model hierarchies, mesh, PS2 mesh context, material blocks, animation, channel, particle instances / model
+  pointers / models / model / hierarchies / mesh, splines, spline segments, camera pointers, cameras, camera,
+  materials, hash table.
+- Lookups by index: `Course_GetPatch` 0x2549f8 (0x1c0 bytes each), `Course_GetInstance` 0x254a28,
+  `Course_GetParticleInstance` 0x254a50 (0x70), `Course_GetSpline` 0x254b50 (0x80), `Course_GetLight` 0x254a80
+  (0x5c), `Course_GetMaterial` 0x254af0 (0x48).
