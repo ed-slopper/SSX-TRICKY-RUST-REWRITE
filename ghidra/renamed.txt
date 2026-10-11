@@ -634,3 +634,4 @@
 253e80 cCourseResolve_Common::vf26 cCourseResolve_Common::ResolveParticleMesh
 190f58 Replay_IsKeyframeSaved Replay_IsKeyframeInHighlight
 192178 Replay_FindSavedKeyframe Replay_FindHighlight
+2b0f68 FE3DText_SetString FE3DText_SetStringId
