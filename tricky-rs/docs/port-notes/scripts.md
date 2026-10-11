@@ -241,3 +241,13 @@ Types 1, 3 and 4 spawn nothing.
   the first free one takes the state, and the spline's live bit (segment +0x18 bit 0) follows it. Full table: ignored.
 - Op 13 is the reset request (`reset.rs`); op 8's sound, ops 1 and 23 (camera node, shake) belong to the audio
   and camera rows.
+
+## Falling pieces (row E9g2; `tricky_game::debris`, checked: `tests/debris.rs`)
+
+- `cMeshAnimNode` (20): op words stays (1: the pieces stay when the time is up), gravity (× −16.333334 cm a frame²),
+  life (s), a direction p6..p8 (zero: the contact's +0x10 × |speed|; else turned by the object's matrix), the
+  spread p9..p11 and a multiplier p12 for the base velocity. Up to 24 pieces, one per model part, each starting at
+  its part's world pose. Each gets a spin of 2..10 radians a second about a random axis and the velocity base +
+  random(0..spread) on each axis (x, y either way, z up), per frame. Each frame the pieces turn (quaternion × the
+  half-angle spin, renormalised; a zero length sets w = 1) and move, then fall. When the time is up the node
+  finishes (unless the pieces stay) and stops; Kill restores (staying pieces) or gives way to a dead node.

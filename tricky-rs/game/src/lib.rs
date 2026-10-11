@@ -14,6 +14,7 @@ pub mod collide;
 pub mod controls;
 pub mod controllers;
 pub mod courses;
+pub mod debris;
 pub mod finish;
 pub mod gate;
 pub mod hit;
