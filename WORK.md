@@ -49,7 +49,6 @@ state machine and the renderer are ours. Nothing has been checked against the or
 | E5a2 | The HUD's and menus' text from `american.loc` by the ids the game asks for (`Loc_GetString` callers; `CONSTANT.LOC` names them) instead of our strings | unowned | E5a | | Gap of E5a |
 | E5b | Config files: `DATA/CONFIG/*.INF` (SNOW, BANKS, MUSIC, MUSICMAP, INTROMUS, AUDIO, CROWD, CHANT, SPEECH, JUKEBOX, NASCRIPT) and `BTNMAP*.DAT` | unowned | E2b | | Split of E5 |
 | E5c | Camera scripts: `DATA/CAMERA/*.CML` from the disc | unowned | E2b | | Split of E5 |
-| E5e | Fonts: `DATA/FONTS/*.SFN` (today `chars/fonts`, `tools/sfn`) from the disc | unowned | E3b | ed-slopper/puffin (2026-10-11) | Split of E5 |
 | E6 | Loading and memory: what the game loads when (load screens, course switch), only as far as it changes behaviour | unowned | E1 | | [est] |
 | E7 | World: terrain tessellation as the game does it, world cells (`World_CellActivate_RunPersistant` 0x25fed0), instance queries `World_QueryInstances` 0x25b878, ray casts `World_RayCast` 0x25aff8 / `World_RayCastInstance` 0x25bf48 | unowned | E3a | | [repo] `collide.rs` (triangle grid of the drawn mesh) is a stand-in for these |
 | E8 | Physics: check the ported boarder motion against the original once F4 exists: ground `cBoarder_GroundMotion_Update` 0x10a0d8, drag 0x109cb8, side friction 0x109ef8, thrust 0x109950, spring 0x109878, probe 0x128ae8, surface table `SurfaceTable_Init` 0x256188 | any | F4a | | [repo] Ported in `rider.rs`; README still says some constants at the top of `rider.rs` are guesswork: find which. Split: E8f–E8i |
@@ -226,6 +225,7 @@ matches the original.
 | E5a | Text from the disc: `tricky-data/src/loc.rs` reads `american.loc` as `Loc_GetString` 0x2c5160 / `Loc_MapId` 0x2c50b0 do (3,774 strings); `CONSTANT.LOC` (unused by the game) names every string id | P1 | ed-slopper/puffin | 2026-10-11 | c2040d5 |
 | G1c1 | `FinishState_Update` 0x106668, `Boarder_SetBrakeCrouchInput` 0x126b38 and `Boarder_SetBrakeTarget` 0x126c78 ported exactly (`tricky-rs/game/src/finish.rs`) and checked in the function runner (`tests/finish.rs`: 20,000 random finish ticks over every phase, mode and outcome, 20,000 brake/crouch inputs): every field and call bit for bit; `Boarder_StartCelebrate` 0x11f3b8 and `Boarder_StartDisappointed` 0x11f3f8 named | P2 | trailrig/heron | 2026-10-11 | 67d0990 |
 | E5d | The trick book from the disc: `tricky-data/src/trickdef.rs` (`TrickDef_Load` 0x154580's file, `Score_FormatTrickName` 0x1551c0 from its disassembly with the table region 0x320970-0x320f58), read by the app's book with `TRICKY_DISC`; all 360 names equal the export | P1 | ed-slopper/puffin | 2026-10-11 | 1e83035 |
+| E5e | Fonts from the disc: `tricky-data/src/sfn.rs` (`Font_ParseGlyphs` 0x19c910, `Font_BuildTexture` 0x19cca8, the scales `cGame::Init` 0x17e148 sets), read by the app with `TRICKY_DISC`; glyphs equal the export | P1 | ed-slopper/puffin | 2026-10-11 | f59e63f |
 
 ## Changes to the board
 
@@ -322,3 +322,4 @@ matches the original.
 - 2026-10-11 trailrig/heron: G1c2 split into G1c2 (claimed, the start gate) and G1c3.
 - 2026-10-11 ed-slopper/puffin: E5d done.
 - 2026-10-11 ed-slopper/puffin: claim E5e.
+- 2026-10-11 ed-slopper/puffin: E5e done.
