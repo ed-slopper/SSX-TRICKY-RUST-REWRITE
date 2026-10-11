@@ -5171,3 +5171,8 @@ G 1393e0 AIComputer_FindSpeedHint
 G 1399a8 AIComputer_BelowGapMin
 G 139a30 AIComputer_AboveGapMax
 G 139ab8 AIComputer_CheckStuck
+G 135170 BoarderRender_DrawEffects
+G 130b98 Fx_BoardTrail_Draw
+G 132308 Fx_SurfaceSpray_Draw
+G 1331a8 Fx_BoardTrack_Draw
+G 1333c0 Fx_BoardTrack_DrawStrip
