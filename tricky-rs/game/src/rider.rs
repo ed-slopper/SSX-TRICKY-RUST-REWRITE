@@ -645,6 +645,17 @@ impl Rider {
         self.rail_side = 0.0;
     }
 
+    /// A change of stance as the game's own routines make it (`ChangeFakieControl_Enter` 0x103eb8,
+    /// `RailSlideControl_SwitchStance` 0x107fc8; `states.rs`): with the switch flag, the steer (+0x214) and the lean
+    /// value (+0x244) change sign. The turn of the board itself stays the caller's (board row G20b2).
+    pub(crate) fn set_switch(&mut self, switch: bool) {
+        if switch != self.switch {
+            self.switch = switch;
+            self.steer = -self.steer;
+            self.lean[0] = -self.lean[0];
+        }
+    }
+
     /// The board meets the snow (`Landing_ChooseState` 0x109308). The original only scales the speed for a crooked or tilted
     /// landing (edge grip then turns the board); a board coming down tail-first is turned round
     /// and the rider is switch.
@@ -657,7 +668,7 @@ impl Rider {
             let travel = f32::atan2(-hv.x, -hv.z);
             let mut d = wrap(self.yaw - travel);
             if d.abs() > FRAC_PI_2 {
-                self.switch = !self.switch;
+                self.set_switch(!self.switch);
                 self.yaw += PI;
                 d = wrap(d + PI);
             }
@@ -1079,7 +1090,7 @@ impl Rider {
                     self.rail_committed = self.rail_goal;
                     self.rail_held = true;
                     self.rail_side_signed = 0.0;
-                    self.switch = false;
+                    self.set_switch(false);
                     self.rail_entry = along.abs();
                     self.rail_spun = 0.0;
                     self.rail_side = 0.0;
@@ -1333,7 +1344,7 @@ impl Rider {
             // leaving fakie (or switch) gives the next air trick the switch bonus
             let fakie = self.rail_twist.cos() < -0.5;
             self.take_off();
-            if fakie { self.switch_takeoff = true; self.switch = true; }
+            if fakie { self.switch_takeoff = true; self.set_switch(true); }
             self.rail = None;
             self.rail_cooldown = 0.45;
             self.end_grind();
