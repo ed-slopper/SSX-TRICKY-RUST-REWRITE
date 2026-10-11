@@ -84,8 +84,9 @@ state machine and the renderer are ours. Nothing has been checked against the or
 | G1c3 | The rest of G1c: `Gate2BaseControl_Update` 0x105dc0, `ResetState_Update` 0x106a90, `ResetState_PlaceRider` 0x119220, `Boarder_RequestReset` 0x118f10 checked | any | F4a | | Split of G1c |
 | G2 | Tricks and scoring checked: `Score_*` 0x155410–0x157490, `Score_BuildTrickId` 0x157490, `Score_FormatTrickName` 0x1551c0, repeats, chains, multipliers, uber timer, TRICKY | any | F4a | | [repo] Ported in `rider.rs`/`trickdata.rs` Split: G2a, G2b |
 | G3 | Rider attributes and progression: stats per rider and level, training points, boards per rider and their unlock points, outfits | unowned | E12 | | [repo] `trickdata.rs` has the tables; rookie/master is our menu |
-| G4 | AI checked: path following 0x1375c8 / 0x1372f8, rubber band 0x115100 / 0x13a0f0, skill pairs, tricks 0x139d58 / 0x138d60, resets, shoves | any | F4a, E1b | | [repo] Ported in `rider.rs`/`main.rs`. Split: G4a, G4b |
+| G4 | AI checked: path following 0x1375c8 / 0x1372f8, rubber band 0x115100 / 0x13a0f0, skill pairs, tricks 0x139d58 / 0x138d60, resets, shoves | any | F4a, E1b | | [repo] Ported in `rider.rs`/`main.rs`. Split: G4a, G4b, G4c |
 | G4a | Rivals and vendettas checked: `RelTable_Init` 0x167208, `Rider_OnKnockedDownBy`, `AI_StartVendetta`, `AI_CoolVendetta` | any | F4a | | [repo] `rivals.rs` Split: G4a1, G4a2 |
+| G4c | The AI's riding modes ported exactly and checked: `AIComputer_RideNearRider` 0x137dc0, `AIComputer_RideAtRival` 0x137a18 (the shove), `AIComputer_RideLine` 0x1375c8, `AIComputer_RideToJump` 0x137858, with `AIComputer_FindJumpMarker` 0x1392a8 / `AIComputer_FindSpeedHint` 0x1393e0 as they need | any | G4b | ed-slopper/puffin (2026-10-11) | Split of G4 |
 | G5 | Animation: the game's own animation state machine and blending for all 248 `bxanim` clips (plus cmanim, ps2anim, ubers), clip markers, replacing our choice of clip | unowned | F1, E4 | | [repo] README: "Which clip plays when is my state logic". Split by state before claiming |
 | G6 | Wipe-out body: ragdoll spheres where the game puts them (`Ragdoll_Step` 0x10dca8, `Ragdoll_Contacts` 0x10e190, `CollBody_PointMassInertia` 0x236530) | unowned | E4 | | [repo] "Unresolved: ragdoll sphere places"; `wipeout.rs` uses a stand-in 1.7 m rider |
 | G7 | Rendering, as the PS2 renderer does it. Split before claiming: | unowned | E3a, E3b | | [repo] |
@@ -400,3 +401,4 @@ matches the original.
 - 2026-10-11 ed-slopper/puffin: G4a3 done (app grudges on the exact bookkeeping).
 - 2026-10-11 ed-slopper/puffin: G4 split off G4b (AI target and steering helpers), claimed.
 - 2026-10-11 ed-slopper/puffin: G4b done (AI target and steering helpers exact, checked).
+- 2026-10-11 ed-slopper/puffin: G4 split off G4c (AI riding modes), claimed.
