@@ -83,6 +83,27 @@ Part of the port notes (index: [README.md](README.md)); units and wording as des
   game pushes the drawn clip's time; the sim runs its own clock and plays a clip when its trigger box is
   touched). The rider is pushed out / lifted, not carried sideways (the original adds no platform velocity).
 
+## World queries (row E7a; `tricky_game::worldline`, checked: `tests/worldline.rs`)
+
+- A cast takes a query object (vtable +0x08 into an instance's frame, +0x10 back, +0x18 its target t, +0x20 reject
+  a hit, +0x28 triangle, +0x30 triangle from either side, +0x38 sphere tree, +0x40 box, +0x48 patch through the
+  patch cache, +0x50 a patch's surface point). The shapes: `cWorldIntersectType` (base: no reject, patches),
+  `cWorldLine` 0x3a7aa8 (the ground probe's and most others), `cWorldSphere` 0x3a8550, `cWorldSphTree` 0x3a85f8,
+  `cWorldBoarder` 0x3a77d8.
+- `cWorldLine` (0xa0): kind, in-frame flag, the ends' box and its middle, start / direction (in use and in the
+  world), target. Triangle: t = ((a − start) · n) / (dir · n) unless |dir · n| < 1e-10 (t is written even when
+  outside 0..1); for 0 ≤ t ≤ 1 the point and n, and the answer is `Tri_ContainsPointVu0`. Either side: n turned
+  when dir · n < 0. Box: slabs from t = −1..2; the way in unless it is before 0 or (the way out is within 1 and
+  nearer the target), then the way out if before 1; with the face's normal (0x3d2d10, filled on first use).
+- `World_RayCastMeshTris` 0x25d3d8: an `.ssf` collision mesh (one-sided, or either side with its +0x1c bit 0),
+  the hit nearest the target, first hit when the target is below 0 — but each hit is compared with the previous
+  hit's t (the game updates its best on every hit), not the best so far.
+- `Tri_ContainsPointVu0` 0x23b6b0 runs the VU0 micro program at 0x570 (the 215-instruction upload in the chain
+  at 0x31cac0, `App_SendVu0InitChain`): with e1 = b − a, e2 = c − a, w = p − a, n = e1 × e2, d = e1 · (n × e2)
+  beyond ±1e-10, u = w · (n × e2) / d, v = n · (w × e1) / d: inside when u ≥ 0, v ≥ 0, u < 1, u + v < 1 (sign
+  flags, each read four cycles after its result). Its tolerance argument is unused. Read from the code, not run
+  (the runner has no micro mode); the test answers it with the port and checks its arguments.
+
 ## Keyframed objects (`cAnimObjectNode` 0x198810, `cMeshAnimFrame::vf1` 0x1cb498, `AnimCurve_FindSegment` 0x1cb770)
 
 - Model objects with an Animation: base pose U1..U6 (tx, ty, tz cm; rx, ry, rz degrees), AnimationAction a mask
