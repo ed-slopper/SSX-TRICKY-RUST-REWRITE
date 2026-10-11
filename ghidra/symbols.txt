@@ -3614,3 +3614,17 @@ G 250428 Mat4_FromPosQuat
 G 260108 World_CellDeactivate
 G 260d08 World_GetCellAt
 G 25c690 World_IsBlocked
+F 148560 cCollideEmitterNode cCollideEmitterNode
+G 1ce310 Mat4_RotateBy
+G 149030 RailMan_SetRail
+G 18f5d0 Replay_SaveNodeList
+G 190660 Replay_SaveObjRefs
+G 1c9ba8 FogObjMan_Build
+F 1460f0 cUVScrollTexFlipNode cUVScrollTexFlipNode
+G 154338 RigidBody_AddImpulse
+G 2609d0 World_LoadTextures
+G 17d2f0 BxList_Init
+G 13be78 TriggerScript_Run
+G 13f448 Roller_OnHit
+G 1d8bc8 ParticleSys_Draw
+G 142af0 TexFlip_Init
