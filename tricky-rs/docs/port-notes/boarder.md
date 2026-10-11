@@ -133,6 +133,23 @@ Proven (E8f): every word read by running the function in the runner; the exact v
 surf[6]/surf[9] by row: 0 7.347/11.61; 1 2.742/5.009; 2 2.849/5.530; 3 15.04/2.842; 4 30.03/2.976; 5 2.775/4.052;
 6,10,15,16,17,19 20/30; 7 21.37/45.2; 8 20/39.4; 9 2.02/30; 11 0.70/17.9; 12 3.95/30; 13 2.64/0; 14 1.56/30; 18 2.58/40.
 
+**Play test of the ground tick on Garibaldi (E8l, 2026-10-11; measured, not proven).** The player's own extraction of
+`gari.big` (3,885 patches, 3,393 instances, 169 rails, 561,141 collision triangles), the release build, headless:
+- `TRICKY_SIM=600`: the autopilot reaches the finish in 235 s (231 s before E8k, commit 73e6f8a), 5,562 m, top speed
+  121 km/h, 0 falls out of the world, "autopilot stuck" 1 time (also 1 before). It leaves the snow 150 times
+  (301 ground/air switches, 209 before: the exact tick takes off where the old branch did not) and is put down 5 times
+  (2 before): 4 "air wall" (the port's air walls, row G20c3c3) and 1 "grab" (a landing with a grab held); none at a lip, none on the
+  ground. The slowest moment after a wipe-out is 11 km/h, up again after 2 to 3 s. No stall, no crash loop.
+- `TRICKY_RAILTEST=1`: all five longest rails lock on within 0.2 s, ride 4.7 to 9.5 s and leave into the air; identical to the
+  run before E8k (the rail code is the port's, as before).
+- `TRICKY_TRICKTEST=1`: the nine scripted drops score as before E8k, line for line.
+`game/tests/physics.rs` keeps the lip as a test (`a_lip_takes_the_rider_off_without_a_crash_and_the_landing_is_back_on_the_snow`:
+a run-in, an 8 m gap, 8 m of drop, the landing slope: it leaves the snow, is not put down at the lip, lands and keeps riding).
+Seen and left (not the ground tick): in that run a rider wiped out in the air was captured by a rail 0.5 s later and
+"got up" at 106 km/h, because the port's rail capture (`rider.rs`, the `self.rail = Some(..)` branch) does not look at
+`crashed` and sets it to 0 (row E8m); the autopilot's distance from the race line (100 to 400 m on the second half) is
+the same before and after E8k.
+
 ## Orientation, rotation and take-off (E8j; exact in `tricky-rs/game/src/orient.rs`, `tests/orient.rs`)
 Proven (run in the function runner, 30,000 / 30,000 / 20,000 random cases bit for bit, planted bugs caught; the whole
 `GroundMotion_Update` with the exact rotation inside matches over 20,000 ticks):

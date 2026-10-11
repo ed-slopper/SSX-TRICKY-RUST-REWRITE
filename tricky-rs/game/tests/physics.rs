@@ -140,3 +140,43 @@ fn riders_carry_the_games_stat_bytes() {
         }
     }
 }
+
+/// A strip of snow (two triangles) from z = `z0` to `z1` (`z0 > z1`), 20 m wide, at heights `y0` and `y1`.
+fn strip(w: &mut CollisionWorld, z0: f32, y0: f32, z1: f32, y1: f32, surface: u8) {
+    let q = |x: f32, y: f32, z: f32| Vec3::new(x, y, z);
+    w.add_ex([q(-10.0, y0, z0), q(10.0, y0, z0), q(-10.0, y1, z1)], None, true, surface, false);
+    w.add_ex([q(10.0, y0, z0), q(10.0, y1, z1), q(-10.0, y1, z1)], None, true, surface, false);
+}
+
+#[test]
+fn a_lip_takes_the_rider_off_without_a_crash_and_the_landing_is_back_on_the_snow() {
+    // row E8l: the exact ground tick on the game's own take-off (`Jump_ApplyImpulse`'s lip branch runs on every
+    // take-off): a downhill run-in, an 8 m gap with the snow 8 m lower, then the landing slope. The rider leaves
+    // the snow at the lip, is not put down there, lands on the lower snow and keeps riding.
+    let mut world = CollisionWorld::default();
+    world.min_y = -1.0e6;
+    strip(&mut world, 0.0, 0.0, -40.0, -8.0, 1); // run-in, falling 0.2 per metre
+    strip(&mut world, -48.0, -16.0, -140.0, -34.4, 1); // landing, falling 0.2 per metre
+    let mut r = Rider::new(Vec3::new(0.0, 0.0, -1.0), 0.0);
+    r.grounded = true;
+    r.surface = 1;
+    r.normal = Vec3::Y;
+    r.vel = Vec3::new(0.0, 0.0, -18.0);
+    let rails = Rails::default();
+    let (mut left_at, mut landed_at, mut crashed_at_lip) = (None, None, false);
+    for i in 0..360 {
+        r.step(&world, &rails, Input::default(), 1.0 / 60.0);
+        assert!(r.pos.is_finite() && r.vel.is_finite(), "tick {i}: {:?} {:?}", r.pos, r.vel);
+        if left_at.is_none() && !r.grounded {
+            left_at = Some(i);
+            crashed_at_lip = r.crashed > 0.0;
+        }
+        if left_at.is_some() && landed_at.is_none() && r.grounded { landed_at = Some(i); }
+    }
+    assert!(left_at.is_some(), "never left the snow, now at {:?}", r.pos);
+    assert!(!crashed_at_lip, "put down at the lip: cause {}", r.cause);
+    assert!(landed_at.is_some(), "never landed, now at {:?}", r.pos);
+    assert!(r.crashed <= 0.0, "down after the landing: cause {}, at {:?}", r.cause, r.pos);
+    assert!(r.pos.z < -48.0 && (r.pos.y - (-16.0 + 0.2 * (r.pos.z + 48.0))).abs() < 1.0, "not on the landing snow: {:?}", r.pos);
+    assert!(r.vel.length() > 5.0, "stalled after the landing: {:?}", r.vel);
+}
