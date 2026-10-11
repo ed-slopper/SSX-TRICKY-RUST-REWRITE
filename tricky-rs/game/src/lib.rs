@@ -27,6 +27,7 @@ pub mod reset;
 pub mod rivals;
 pub mod score;
 pub mod spin;
+pub mod states;
 pub mod stats;
 pub mod rider;
 pub mod surface;

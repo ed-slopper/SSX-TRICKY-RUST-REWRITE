@@ -472,3 +472,16 @@ rate `0x3daaaaab`) to a target made from the normal, the tangent and the lean an
 ports it, G20c2c3 wires it with the attitude across a landing, G20c3). The rest of `RailSlideMotion_Update` (velocity
 blended to the tangent at 30 per second, gravity along it, the balance, the push off the rail outside the limits,
 the take-off call chain) is hand-written in `rail_step`: G20c2c4, with G1b.
+
+## State changes (row G18; `states.rs`, checked: `tests/states.rs`)
+
+`Boarder_SetMotion` 0x11f610 and `Boarder_SetState` 0x11f608 are one-instruction jumps to
+`Boarder_ChangeMotionState` 0x11c648 / `Boarder_ChangeControlState` 0x11c7d8 with a0 = the state manager
+(rider+0x5ae0, whose first word is the rider). Nothing when the value is already set; else the old state's exit
+routine (the field still old, a1 still the new value), the store (rider+0x424 motion, +0x428 control state), then the
+new state's enter routine with a1 = the old value. Each routine gets its object in the manager: motions 1 air +0x480,
+2 ground +0x4b0, 3 rail +0x4c0, 5 wipe-out +0x4f0, 6 recover +0x5f0 (0 and 4 none). Control states: exits for 2, 3,
+4, 5, 8, 0xb, 0xc, 0xe, 0xf, 0x10, 0x14, 0x16; enters for 2, 3, 4, 6, 7, 8, 9, 0xc, 0xd, 0xe, 0xf, 0x10, 0x13,
+0x15 (objects +0x610 … +0x810, see `states.rs`); entering 0x16 (reset) zeroes the reset timer (manager +0x818)
+inline. Checked for every old and new value 0..0x20 of both.
+
