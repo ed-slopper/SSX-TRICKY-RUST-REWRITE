@@ -55,7 +55,7 @@ state machine and the renderer are ours. Nothing has been checked against the or
 | E8 | Physics: check the ported boarder motion against the original once F4 exists: ground `cBoarder_GroundMotion_Update` 0x10a0d8, drag 0x109cb8, side friction 0x109ef8, thrust 0x109950, spring 0x109878, probe 0x128ae8, surface table `SurfaceTable_Init` 0x256188 | any | F4a | | [repo] Ported in `rider.rs`; README still says some constants at the top of `rider.rs` are guesswork: find which. Split: E8f–E8i |
 | E8g | Ground probe checked: `Boarder_ProbeGround` 0x128ae8 (ray +200 → −100 cm along n: new n, h, surface) | any | F4a | | Split of E8. Needs the world ray (E7) stubbed or run |
 | E8h | Ground motion checked: `GroundMotion_Update` 0x10a0d8 as a whole, with its callees run as the original (leaves already checked in F4d, F4d2) | any | F4a | | Split of E8 |
-| E8i | The guessed constants at the top of `tricky-rs/game/src/rider.rs`: find which are the game's and which are ours, port or tag them | any | F4a | | Split of E8 |
+| E8i | The guessed constants at the top of `tricky-rs/game/src/rider.rs`: find which are the game's and which are ours, port or tag them | any | F4a | trailrig/heron (2026-10-11) | Split of E8 |
 | E8a | Air: `Air_IntegrateRK4` 0x12b340, `AirPredict_AtTakeoff` 0x123b10, landing `Air_MotionUpdate` 0x108378, `Landing_CheckAngles` 0x12ba78, `Landing_ChooseState` 0x109308 | any | F4a | | [repo] Ported, unchecked |
 | E8b | Walls and objects: `Boarder_WallImpactCheck` 0x126540, wall collision 0x126250, `Boarder_InstanceCollisions` 0x125088, `Boarder_InstanceBounce` 0x125a00 | unowned | E7 | | [repo] |
 | E8c | Knockable objects with the game's rigid bodies (`CollBody_PointMassInertia` 0x236530 and its step), replacing the ball physics in `props.rs` | unowned | E7 | | [repo] props.rs: "simulated as balls" |
@@ -248,3 +248,4 @@ matches the original.
 - 2026-10-11 trailrig/heron: E1b1 done (6 functions checked).
 - 2026-10-11 trailrig/heron: split G4a into G4a1 (claimed) and G4a2.
 - 2026-10-11 trailrig/heron: G4a1 done; G4a2 gets the table's word +8.
+- 2026-10-11 trailrig/heron: claim E8i.
