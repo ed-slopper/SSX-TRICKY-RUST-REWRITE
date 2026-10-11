@@ -173,3 +173,21 @@ Our level folder to course id mapping (`intro::course_of_folder`) is a stand-in 
 - The game keeps the points and events where they lie in the loaded file (only the event types rewritten in place).
 - The app reads the course's `.aip` from the disc with TRICKY_DISC (`aip::from_disc`, `AiFile::from_aip`), else
   the level folder's AIP.json (SSX-Library's export: the same paths, its points direction × length).
+
+## Config files (row E5b; checked: `tricky-game/tests/ini.rs`)
+
+`DATA/CONFIG/*.INF` are read with one reader, `IniReader_*` 0x221668..0x222040 (`tricky_data::ini::IniReader`): a
+cursor over the text (a NUL after it) and one token buffer. `#` and `;` comment to the line's end; `[NAME]` heads a
+section (`IniReader_NextSection` scans for the next `[`); `KEY = "string"` / `= n` (`sscanf` "%d") / `= x` ("%f"),
+the key compared with the last token read (`stricmp`). `IniReader_FindSection` matches a name in any case,
+`IniReader_FindSectionMatching` by prefix either way (case matters); `IniReader_SkipToNextSection` also skips the
+headers of sections that follow at once, so an empty section's keys are its successor's. The loaders (the pointer
+table at 0x343070): `Audio_LoadFEConfig` 0x20f160, `Audio_LoadInGameConfig` 0x211098 (audio, banks, crowd, chant),
+`Sfx_LoadSurfaceConfig` 0x210c38 (snow), `Music_StartCourseSong` 0x214e60 (intromus), `MusicSys_Init` 0x224a98
+(music), `MusicSys_LoadMusicMap` 0x224cf8 (musicmap), speech 0x3436fc, nascript.
+
+Music (`tricky_data::music`): `MusicSys_Init` reads `[GLOBAL]` BASEPATH, then every other section in order (32 at
+most) is a song: its name, the path BASEPATH + LOOPDATA. `MusicSys_LoadMusicMap`(course name upper-cased, from
+`Course_GetInfo`) finds the map's section by prefix and enables, for each `SONG = "…"`, the first song whose name
+contains it (case matters; four at most); none: song 0. The app plays these (TRICKY_DISC), in the game's song order.
+

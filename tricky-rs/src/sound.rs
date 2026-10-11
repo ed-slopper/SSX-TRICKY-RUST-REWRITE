@@ -51,8 +51,9 @@ pub fn course_music(
     *current = Some(list.current);
     for (e, kind) in &old { if matches!(kind, Loop::Music(_)) { commands.entity(e).despawn(); } }
     let name = list.dirs.get(list.current).and_then(|d| d.file_name()).map(|n| n.to_string_lossy().to_string()).unwrap_or_default();
-    // the songs DATA/CONFIG/MUSICMAP.INF gives each course, by their file names on the disc
-    let songs = course_songs(&name);
+    // the songs DATA/CONFIG/MUSICMAP.INF gives each course, by their file names on the disc: read as the game
+    // reads them from the player's disc (row E5b), else the same lists written out below
+    let songs: Vec<String> = disc_course_songs(&name).unwrap_or_else(|| course_songs(&name).iter().map(|s| s.to_string()).collect());
 
     sounds.songs = 0;
     let folder = sounds.dir.join("music");
@@ -66,7 +67,26 @@ pub fn course_music(
 }
 
 
-/// The songs DATA/CONFIG/MUSICMAP.INF gives each course, by their file names on the disc.
+/// The songs the game's music configuration gives a course (row E5b): `MusicSys_Init`'s song table from
+/// DATA/CONFIG/MUSIC.INF and `MusicSys_LoadMusicMap`'s choice from MUSICMAP.INF (`tricky_data::music`), read from the
+/// player's disc (TRICKY_DISC), in the game's song order, by each song's Pathfinder file's name (PATHDATA without
+/// `.mpf`, our audio files' names). The course's key is its archive name upper-cased (inferred for `Course_GetInfo`'s
+/// string; the map's sections match it by prefix either way).
+fn disc_course_songs(track: &str) -> Option<Vec<String>> {
+    let p = std::env::var("TRICKY_DISC").ok()?;
+    let mut files = tricky_data::big::Files::new(tricky_data::disc::Disc::open(&p).ok()?);
+    let music = files.load("data/config/music.inf").ok().flatten()?;
+    let map = files.load("data/config/musicmap.inf").ok().flatten()?;
+    let table = tricky_data::music::music_table(&music);
+    let course = tricky_data::aip::big_name(track)?.to_ascii_uppercase();
+    let (mask, _) = tricky_data::music::course_songs(&map, &table, course.as_bytes());
+    let songs: Vec<String> = table.songs.iter().enumerate().filter(|(i, _)| mask & (1 << i) != 0)
+        .filter_map(|(_, s)| s.path_data.as_ref()).map(|p| String::from_utf8_lossy(p).trim_end_matches(".mpf").to_string()).collect();
+    (!songs.is_empty()).then_some(songs)
+}
+
+/// The songs DATA/CONFIG/MUSICMAP.INF gives each course, by their file names on the disc (written out, for when
+/// there is no disc to read them from).
 pub fn course_songs(track: &str) -> &'static [&'static str] {
     match track {
         "gari" => &["systemover", "smartbomb", "adamsrev"],
