@@ -50,3 +50,9 @@ Part of the port notes (index: [README.md](README.md)); units and wording as des
   backwards: half turn (π about up, layers −π, forward and side negated, switch flips, rider+0x46e0 = wrapped heading),
   then 0x1ff (back in stance) or 0x240, state 0xb.
 - Grabs follow clip markers at speed 0.782+0.806·s14.
+- `SpinState_StartFromStick` 0x102158 proven (G1a3, `jump::spin_start_from_stick`, every reachable pad word): the pad word's two
+  2-bit direction fields (bits 16–19, or 12–15 with bit 0x400) give x, y in {−1, 0, 1}; none held → no spin (returns 0).
+  Within 10° of an axis it snaps; switch flips y. Rates spin+0x2c = K·x·5.2530804, spin+0x30 = K·y·5.2530804 (negated
+  switch), K = 0.5449139 + 0.6741781·tricks/255; the clip by direction (0x226–0x22d, octants of atan2 riding stance);
+  then state 1 and 0x10. From the pad only eight directions exist and the game's atan puts the diagonals just inside
+  45°, so clips 0x22a and 0x226 and the snap are never reached.

@@ -7,7 +7,7 @@ address,size,name,system,status
 0x100580,20,NaturalAirControl_LoadSnapshot,ai?,not started
 0x100598,876,SpinControl_Enter,boarder,not started
 0x100908,6224,SpinState_Update,boarder,ported
-0x102158,1704,SpinState_StartFromStick,boarder,ported
+0x102158,1704,SpinState_StartFromStick,boarder,checked
 0x102800,464,FUN_00102800,boarder?,not started
 0x1029d0,1008,SpinControl_Exit,boarder,not started
 0x102dc0,40,SpinControl_SaveSnapshot,save,not started

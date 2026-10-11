@@ -137,3 +137,97 @@ pub fn takeoff_spin_rates(s: &TakeoffState) -> Takeoff {
     }
     Takeoff { spin, flip, x1f0: None, launch_clip: true }
 }
+
+/// atan2 as the game's code writes it inline around `Math_Atan` (`crate::math::atan`): y over x, ±π/2 on the y
+/// axis, 0 at the origin.
+fn atan2_inline(y: f32, x: f32) -> f32 {
+    if x == 0.0 {
+        if y != 0.0 {
+            if 0.0 <= y { std::f32::consts::FRAC_PI_2 } else { -std::f32::consts::FRAC_PI_2 }
+        } else {
+            y
+        }
+    } else {
+        let t = crate::math::atan(y / x);
+        if x < 0.0 {
+            if 0.0 < y { t + std::f32::consts::PI } else { t - std::f32::consts::PI }
+        } else {
+            t
+        }
+    }
+}
+
+/// A two-bit direction field of the pad word: −1, 0 or 1 (the field's value 3 reads −1, 2 reads 0).
+fn pad_dir(word: u32, shift: u32) -> f32 {
+    match ((word << shift) as i32) >> 30 {
+        -1 => -1.0,
+        1 => 1.0,
+        _ => 0.0,
+    }
+}
+
+/// What `SpinState_StartFromStick` does when the stick (or d-pad) points somewhere.
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct SpinStart {
+    /// the spin and flip rates (spin object +0x2c, +0x30), rad/s
+    pub spin: f32,
+    pub flip: f32,
+    /// the clip played for the direction (`AnimCtl_PlayClip`(clip, 0, 5)); `None` exactly on the −135° edge
+    pub clip: Option<u32>,
+}
+
+/// `SpinState_StartFromStick` 0x102158: a spin started from the pad word `pad` (bit 0x400 picks which pair of
+/// direction fields is read). `None` (the game returns 0) when no direction is held. Otherwise the game sets
+/// spin+0x58 = 1, plays the clip, scores the start (`Boarder_AddMeter`) and goes to state 1 then 0x10.
+/// `tricks` is the tricks stat byte (stats+0x1a), `switch` riding switch (rider+0x1b4).
+#[allow(clippy::neg_cmp_op_on_partial_ord)] // the game's own comparisons, NaN behaviour included
+pub fn spin_start_from_stick(pad: u32, tricks: u8, switch: bool) -> Option<SpinStart> {
+    let (mut x, mut y) = if pad & 0x400 == 0 { (pad_dir(pad, 14), -pad_dir(pad, 12)) } else { (pad_dir(pad, 18), -pad_dir(pad, 16)) };
+    // the game reads the second field as −1 → +1.0, 1 → −1.0, else −0.0
+    if y == 0.0 {
+        y = -0.0;
+    }
+    if x == 0.0 && y == 0.0 {
+        return None;
+    }
+    // close to an axis it snaps onto it (within 10° of either)
+    let a = atan2_inline(y.abs(), x.abs());
+    if 1.396_225_6 < a {
+        x = 0.0;
+    } else if a < 0.174_570_72 {
+        y = 0.0;
+    }
+    if switch {
+        y = -y;
+    }
+    let k = tricks as f32 * 0.674_178_1 * 0.003_921_569 + 0.544_913_9;
+    let mut flip = k * y * 5.253_080_4;
+    if switch {
+        flip = -flip;
+    }
+    let spin = k * x * 5.253_080_4;
+    let dir = if switch { atan2_inline(-y, -x) } else { atan2_inline(y, x) };
+    let a = dir;
+    use std::f32::consts::{FRAC_PI_2 as P2, FRAC_PI_4 as P4, PI};
+    let p34 = 2.356_194_5f32;
+    let clip = if !(a <= p34) || a < -p34 {
+        Some(0x22d)
+    } else if !(a <= P2) && a < PI {
+        Some(0x229)
+    } else if !(a <= P4) && a < p34 {
+        Some(0x227)
+    } else if !(a <= 0.0) && a < P2 {
+        Some(0x228)
+    } else if !(a <= -P4) && a < P4 {
+        Some(0x22c)
+    } else if !(a <= -P2) && a < 0.0 {
+        Some(0x22a)
+    } else if !(a <= -p34) && a < -P4 {
+        Some(0x226)
+    } else if -PI < a && a < -P2 {
+        Some(0x22b)
+    } else {
+        None
+    };
+    Some(SpinStart { spin, flip, clip })
+}
