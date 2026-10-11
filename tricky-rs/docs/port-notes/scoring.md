@@ -55,6 +55,18 @@ Part of the port notes (index: [README.md](README.md)); units and wording as des
 - Names: grab ids 0–0x65 have names (0x65 "Combo Grab"); past them the original reads into the next data (no
   grab in the game is that high), which our port prints as "(null)".
 
+## Uber timer and TRICKY, exactly (board row G2c, checked: `tests/boarder.rs`, `tests/trick_score.rs`)
+
+- `Scoring_OnTrickEvent` 0x156148(seconds, clip) is a grab let go (only while one is held): the clip's grab id
+  (jump table 0x370fc0; clips 0x278..0x2db, ubers 0x2ac.. = ids 0x35..0x64) goes into the jump's grab list
+  (`Score_AddGrab` 0x1571e0: not again if it is the last one, three at most), +0x5c counts ubers and +0x58 other
+  grabs, hold time summed (+0x50) and longest kept (+0x54), units += seconds × 0.04500384 × the grab's rate.
+- Landing adds +0x5c into score+0x88 = rider+0x58a8: `Boarder_IsTricky` is that total > 5, so TRICKY is the sixth
+  uber landed (an AI rider's landing never adds it).
+- `Boarder_DrainMeter` 0x11b1f8 each tick: the uber timer −1/60 to 0, except in the air (+0x424 = 1) where it
+  holds at one tick; TRICKY holds timer and meter at 1; else a player's meter drains (15.483508 − 15.210359 ×
+  stat/255) × 9.166667e-6 a tick (stats+0x1b).
+
 ## Scoring (the rest)
 
 - Modes: 0 knockdown practice, 1 free ride, 2 practice race, 3 practice show-off, 4 circuit race, 5 circuit

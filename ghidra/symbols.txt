@@ -5474,6 +5474,7 @@ G 155ca0 Scoring_MsgMultiplier
 G 155d98 Scoring_MsgKnockdown
 G 156968 Score_AirTimePoints
 G 157268 Score_CountRecentRepeats
+G 1571e0 Score_AddGrab
 G 157c18 TrickId_Matches
 G 158dc0 SkelAnim_CreateTree
 G 159a80 SkelAnim_DestroyTree

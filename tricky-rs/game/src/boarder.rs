@@ -189,6 +189,29 @@ pub fn set_steer_target(target: f32, s: &SteerState) -> (f32, f32) {
     (t, rate)
 }
 
+/// `Boarder_DrainMeter` 0x11b1f8, once a tick: the uber timer runs down by a tick (to 0; in the air, rider+0x424
+/// = 1, it stops at one tick instead of running out); in TRICKY (`tricky`) the timer and the meter are held at 1;
+/// otherwise a player's (rider+0x418 < 0, `player`) meter drains by the drain stat (stats+0x1b): 15.48 − 15.21 ×
+/// stat/255, × 9.166667e-6 a tick.
+pub fn drain_meter(air: bool, player: bool, drain_stat: u8, tricky: bool, f: &mut Fields) {
+    let tick = f32::from_bits(0x3c88_8889);
+    let t = f.uber_timer;
+    if air && 0.0 < t && t <= tick {
+        f.uber_timer = tick;
+    } else {
+        let n = t - tick;
+        f.uber_timer = if n < 0.0 { 0.0 } else { n };
+    }
+    if tricky {
+        f.uber_timer = 1.0;
+        f.meter = 1.0;
+    } else if player && f.meter != 0.0 {
+        let d = ((drain_stat as f32 * f32::from_bits(0xc173_5da1)) * f32::from_bits(0x3b80_8081) + f32::from_bits(0x4177_bc73)) * f32::from_bits(0x3719_ca89);
+        let m = f.meter - d;
+        f.meter = if m < 0.0 { 0.0 } else { m };
+    }
+}
+
 /// `Boarder_IsTricky` 0x11f430: more than five ubers done this run (rider+0x58a8).
 pub fn is_tricky(ubers: i32) -> bool {
     5 < ubers

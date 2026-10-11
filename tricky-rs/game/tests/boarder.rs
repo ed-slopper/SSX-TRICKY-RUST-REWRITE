@@ -221,6 +221,32 @@ fn crouch_and_wind_targets_are_the_originals() {
 }
 
 #[test]
+fn drain_meter_is_the_originals() {
+    let Some(mut w) = world() else { return };
+    let mut g = Rng(0x0d7a_1e3e_e500_0001);
+    let tick = f32::from_bits(0x3c88_8889);
+    for case in 0..10000 {
+        let mut ours = random_fields(&mut g);
+        let (a, b) = (g.f(0.0, 0.05), g.f(0.0, 20.0));
+        ours.uber_timer = g.pick(&[0.0, tick, tick * 0.5, tick * 1.5, -0.1, 20.0, a, b]);
+        let air = g.next() % 3;
+        let ai = g.pick(&[-1.0, -1.0, 0.0, 2.0]) as i32;
+        let stat = g.next() as u8;
+        let tricky = g.next() % 5 == 0;
+        *w.tricky.borrow_mut() = tricky;
+        w.put(&ours);
+        w.r.mem.write_u32(w.rd + 0x424, air);
+        w.r.mem.write_u32(w.rd + 0x418, ai as u32);
+        w.r.mem.write_u8(w.stats + 0x1b, stat);
+        w.r.cpu.set_gpr(4, w.rd as u64);
+        w.r.call(0x11b1f8).unwrap_or_else(|e| panic!("case {case}: {e}"));
+        boarder::drain_meter(air == 1, ai < 0, stat, tricky, &mut ours);
+        let theirs = w.get();
+        assert_eq!(bits(&theirs), bits(&ours), "case {case} air {air} ai {ai} stat {stat} tricky {tricky}: game {theirs:?} ours {ours:?}");
+    }
+}
+
+#[test]
 fn steer_target_and_tricky_are_the_originals() {
     let Some(mut w) = world() else { return };
     let mut g = Rng(0x05ee_7a46_e500_0001);

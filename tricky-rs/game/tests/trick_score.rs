@@ -374,3 +374,42 @@ fn trick_names_match_the_original() {
 
 /// `sprintf` and what newlib's `_vfprintf_r` calls for `%s` (`vfprintf`, `__sinit` and the stdio set-up under it).
 const ALLOW_SPRINTF: [u32; 12] = [0x1551c0, 0x2fca28, 0x2ff8e8, 0x2ff870, 0x2fa6b8, 0x2fa4f0, 0x304838, 0x3047f8, 0x304a10, 0x2ff770, 0x304398, 0x2fb364];
+
+/// `Scoring_OnTrickEvent` 0x156148 (a grab let go; with 0x1571e0, the grab list) on every clip around the grab
+/// range: the list, the uber and grab counts, hold times and units.
+#[test]
+fn grab_end_matches_the_original() {
+    let Some(mut r) = Runner::from_env() else { return };
+    r.float_rules = Rules::parse("add=n,mul=n,div=n,cvt=n").unwrap();
+    r.allow(0x1571e0);
+    let at = r.mem.alloc(0x300);
+    let rider = r.mem.alloc(0x420);
+    let mut g = Rng(0x9e4d_0c11_37a2_5f08);
+    let (mut ubers, mut kept, mut appended) = (0, 0, 0);
+    for case in 0..30_000 {
+        let mut s = fresh(&mut g);
+        new_trick(&mut g, &mut s);
+        // grab lists as a jump builds them: ids from the clips, some repeated
+        for k in 0..3 {
+            s.grabs[k] = if k == 0 || s.grabs[k - 1] != 0 { [0, g.i(1, 0x64) as u32, s.grabs[k.saturating_sub(1)]][g.next() as usize % 3] } else { 0 };
+        }
+        s.grab_ticks = [-1, g.i(0, 30), g.i(0, 400)][g.next() as usize % 3];
+        s.grab_rate = g.f(0.5, 2.5);
+        let clip = if g.b(4) == 1 { g.i(0x260, 0x2f0) as u32 } else { 0x278 + (g.next() % 100) };
+        let last = s.grabs.iter().take(3).rev().find(|x| **x != 0).copied();
+        let secs = g.f(0.0, 3.0);
+        put(&mut r.mem, at, rider, &s);
+        r.cpu.set_f(12, secs);
+        r.cpu.set_gpr(4, at as u64);
+        r.cpu.set_gpr(5, clip as u64);
+        r.call(0x156148).unwrap_or_else(|e| panic!("case {case}: {e:?}"));
+        let mut ours = s;
+        ours.end_grab(secs, clip);
+        let theirs = get(&mut r.mem, at, rider);
+        assert_eq!(format!("{theirs:?}"), format!("{ours:?}"), "case {case} clip {clip:#x} from {s:?}");
+        ubers += (ours.x5c != s.x5c) as u32;
+        kept += (s.grab_ticks >= 0 && last == Some(tricky_game::score::grab_of_clip(clip).0)) as u32;
+        appended += (ours.grabs != s.grabs) as u32;
+    }
+    assert!(ubers > 20 && kept > 20 && appended > 20, "ubers {ubers}, kept {kept}, appended {appended}");
+}

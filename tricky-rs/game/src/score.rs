@@ -605,3 +605,77 @@ impl Score {
         (f32::from_bits(0xbdf5_b343), calls)
     }
 }
+
+/// The grab id `Scoring_OnTrickEvent` records for a grab clip (0x278..0x2db, the jump table at 0x370fc0; 0 for
+/// any other clip) and whether it is an uber (clips 0x2ac.., grabs 0x35..0x64).
+pub fn grab_of_clip(clip: u32) -> (u32, bool) {
+    let k = clip.wrapping_sub(0x278);
+    let id = match k {
+        0..=3 => k + 1,
+        4..=19 => k + 2,
+        0x14 => 0x17,
+        0x15 => 0x18,
+        0x16 => 0x16,
+        0x17 => 0x19,
+        0x18 => 0x1a,
+        0x19 => 5,
+        0x1a..=0x1d => k + 1,
+        0x1e..=0x2d => k + 2,
+        0x2e => 0x31,
+        0x2f => 0x32,
+        0x30 => 0x30,
+        0x31 => 0x33,
+        0x32 => 0x34,
+        0x33 => 0x1f,
+        0x34..=0x63 => k + 1,
+        _ => 0,
+    };
+    (id, (0x34..0x64).contains(&k))
+}
+
+impl Score {
+    /// 0x1571e0: the grab goes into the jump's list (+0x60, three slots) unless it is the grab already last in it
+    /// (a grab held again); a full list is left alone.
+    pub fn add_grab(&mut self, id: u32) {
+        if self.grabs[0] == 0 {
+            self.grabs[0] = id;
+            return;
+        }
+        let mut i = 0;
+        loop {
+            if self.grabs[i] == id && (i == 2 || self.grabs[i + 1] == 0) {
+                return;
+            }
+            if 2 < i + 1 {
+                return;
+            }
+            i += 1;
+            if self.grabs[i] == 0 {
+                self.grabs[i] = id;
+                return;
+            }
+        }
+    }
+
+    /// `Scoring_OnTrickEvent` 0x156148(seconds, clip): a grab let go (nothing unless one is held, +0x38 ≥ 0). The
+    /// grab goes into the list, one more uber (+0x5c; the rider's +0x58a8 that makes TRICKY from six) or grab
+    /// (+0x58), its hold time summed (+0x50) and the longest kept (+0x54), the hold count off, and units for the
+    /// clip's `seconds` × 0.04500384 × the grab's rate.
+    pub fn end_grab(&mut self, seconds: f32, clip: u32) {
+        if self.grab_ticks < 0 {
+            return;
+        }
+        let (id, uber) = grab_of_clip(clip);
+        self.add_grab(id);
+        if uber {
+            self.x5c = self.x5c.wrapping_add(1);
+        } else {
+            self.x58 = self.x58.wrapping_add(1);
+        }
+        let held = self.grab_ticks as f32 * f32::from_bits(0x3c88_8889);
+        self.x50 += held;
+        self.x54 = if held < self.x54 { self.x54 } else { held };
+        self.grab_ticks = -1;
+        self.units += (seconds * f32::from_bits(0x3d38_55f2)) * self.grab_rate;
+    }
+}
