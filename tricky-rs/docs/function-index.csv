@@ -2413,7 +2413,7 @@ address,size,name,system,status
 0x1a7d18,44,FUN_001a7d18,frontend?,not started
 0x1a7d48,44,FUN_001a7d48,frontend?,not started
 0x1a7d78,60,ScreenOverlay_Init,frontend,not started
-0x1a7db8,180,FUN_001a7db8,game?,not started
+0x1a7db8,180,HUDItem_Show,game?,not started
 0x1a7e70,204,Overlay_HideForPlayer,frontend,not started
 0x1a7f40,460,FUN_001a7f40,frontend?,not started
 0x1a8110,460,FUN_001a8110,frontend?,not started
@@ -2424,7 +2424,7 @@ address,size,name,system,status
 0x1a8668,12,Overlay_PlaySelectSound,frontend,not started
 0x1a8678,12,FUN_001a8678,audio?,not started
 0x1a8688,280,Overlay_GetNewButtons,frontend,not started
-0x1a87a0,340,FUN_001a87a0,frontend?,not started
+0x1a87a0,340,PauseMenu_PollRepeatButton,frontend?,not started
 0x1a88f8,8,cScreenOverlay::Update,frontend,not started
 0x1a8900,172,BackdropOverlay_Init,frontend,not started
 0x1a89b0,292,FUN_001a89b0,frontend?,not started
@@ -2740,7 +2740,7 @@ address,size,name,system,status
 0x1cb278,136,FUN_001cb278,animation?,not started
 0x1cb300,404,cAnimFrame::vf1_1cb300,animation,not started
 0x1cb498,448,cMeshAnimFrame::vf1_1cb498,animation,ported
-0x1cb658,188,FUN_001cb658,animation?,not started
+0x1cb658,188,AnimFrame_MulMatrix,animation,not started
 0x1cb718,76,FUN_001cb718,animation?,not started
 0x1cb768,8,cCamAnimFrame::vf1_1cb768,animation?,not started
 0x1cb770,192,AnimCurve_FindSegment,animation,not started
@@ -2922,8 +2922,8 @@ address,size,name,system,status
 0x1d4d08,108,FUN_001d4d08,game?,not started
 0x1d4d78,108,FUN_001d4d78,game?,not started
 0x1d4de8,408,MockupEditor_DrawItems,other,not started
-0x1d50b0,208,FUN_001d50b0,,not started
-0x1d5180,360,FUN_001d5180,world?,not started
+0x1d50b0,208,ParticleSys_InitEmitter,other,not started
+0x1d5180,360,ParticleSys_RandomizeFactors,world?,not started
 0x1d52e8,20,FUN_001d52e8,world?,not started
 0x1d5300,32,FUN_001d5300,world?,not started
 0x1d5338,68,FUN_001d5338,world?,not started
@@ -3203,8 +3203,8 @@ address,size,name,system,status
 0x1ef990,1056,RaceMenuOverlay_SetState,frontend,not started
 0x1efdb0,132,FUN_001efdb0,game?,not started
 0x1efe38,184,FUN_001efe38,hud?,not started
-0x1efef0,468,FUN_001efef0,frontend?,not started
-0x1f00c8,288,FUN_001f00c8,frontend?,not started
+0x1efef0,468,RaceMenuOverlay_UpdateReplayMenu,frontend,not started
+0x1f00c8,288,RaceMenuOverlay_UpdateConfirm,frontend,not started
 0x1f01e8,284,RaceMenuOverlay_DrawReplayMenu,frontend,not started
 0x1f0308,248,cReplayOverlay::vf3_1f0308,frontend,not started
 0x1f0400,100,cReplayOverlay::vf4_1f0400,frontend,not started
@@ -3330,9 +3330,9 @@ address,size,name,system,status
 0x202520,568,FUN_00202520,animation?,not started
 0x202758,148,FUN_00202758,animation?,not started
 0x2027f0,116,FUN_002027f0,animation?,not started
-0x202868,196,FUN_00202868,animation?,not started
-0x202930,92,FUN_00202930,animation?,not started
-0x202990,68,FUN_00202990,animation?,not started
+0x202868,196,PoseBlend_Begin,animation?,not started
+0x202930,92,PoseBlend_Add,animation?,not started
+0x202990,68,PoseBlend_Finish,animation?,not started
 0x2029d8,292,FUN_002029d8,animation?,not started
 0x202b00,3904,FUN_00202b00,animation?,not started
 0x203a40,92,cSkelSequence::vf2_203a40,render,not started
@@ -3528,7 +3528,7 @@ address,size,name,system,status
 0x210048,1656,FUN_00210048,audio?,not started
 0x2106c0,884,FUN_002106c0,audio?,not started
 0x210a38,148,Audio_InitRiderSounds,audio,not started
-0x210ad0,128,FUN_00210ad0,audio?,not started
+0x210ad0,128,Sfx_StartRiderLoops,audio?,not started
 0x210b50,232,Audio_CancelRaceEvents,audio,not started
 0x210c38,1120,Sfx_LoadSurfaceConfig,audio?,not started
 0x211098,1584,Audio_LoadInGameConfig,audio,not started
@@ -3608,7 +3608,7 @@ address,size,name,system,status
 0x2191c0,152,Sfx_OnMeterAdd,audio?,ported
 0x219258,76,FUN_00219258,audio?,not started
 0x2192a8,1208,Sfx_UpdateBoost,audio?,ported
-0x219760,120,FUN_00219760,audio?,ported
+0x219760,120,Sfx_UpdateBoostStop,audio?,ported
 0x2197d8,624,Sfx_OnBoost,audio?,ported
 0x219a48,808,Sfx_OnPlacingChange,audio?,not started
 0x219d70,592,Sfx_PickupMultiplier,audio?,not started
@@ -3635,11 +3635,11 @@ address,size,name,system,status
 0x21c010,100,Audio_GetRiderPos,audio,not started
 0x21c078,36,Audio_RiderCount,audio,not started
 0x21c0a0,716,FUN_0021c0a0,audio?,not started
-0x21c4d0,64,FUN_0021c4d0,audio?,not started
+0x21c4d0,64,Music_EndTricky,audio,not started
 0x21c510,224,Audio_LoadGlobalBankList,audio,not started
 0x21c610,176,Audio_TrickyTrigger,audio,ported
 0x21c6c0,12,FUN_0021c6c0,audio?,not started
-0x21c6d0,308,FUN_0021c6d0,audio?,not started
+0x21c6d0,308,Music_UpdateMeterCues,audio,not started
 0x21c808,92,FUN_0021c808,audio?,not started
 0x21c868,64,FUN_0021c868,audio?,not started
 0x21c8a8,64,FUN_0021c8a8,audio?,not started
@@ -3704,7 +3704,7 @@ address,size,name,system,status
 0x220bb8,300,CrowdSys_Free,world,not started
 0x220ce8,656,Sfx_LoadTrickConfig,audio?,not started
 0x220f80,20,SoundId_Split,audio,not started
-0x220f98,100,FUN_00220f98,frontend?,not started
+0x220f98,100,WorldEmitter_StopById,audio,not started
 0x221000,100,FUN_00221000,audio?,not started
 0x221068,32,FUN_00221068,audio?,not started
 0x221088,32,CrowdSys_StartBoxCheer,world,not started
@@ -3748,9 +3748,9 @@ address,size,name,system,status
 0x222908,80,cMidiSys::__tf,runtime,host
 0x222998,20,SndEvent_Init,audio?,not started
 0x2229b0,28,FUN_002229b0,audio?,not started
-0x2229d0,168,FUN_002229d0,audio?,not started
+0x2229d0,168,SndEvent_Set,audio?,not started
 0x222a78,16,SndEvent_IsFree,audio?,not started
-0x222a88,44,FUN_00222a88,audio?,not started
+0x222a88,44,SndEvent_Clear,audio?,not started
 0x222ab8,12,FUN_00222ab8,audio?,not started
 0x222ac8,12,FUN_00222ac8,audio?,not started
 0x222ad8,8,FUN_00222ad8,audio?,not started
@@ -3824,9 +3824,9 @@ address,size,name,system,status
 0x225618,68,Music_PrevSong,audio,not started
 0x225660,64,MusicSys_NextEnabledSong,audio,not started
 0x2256a0,28,FUN_002256a0,audio?,not started
-0x2256c0,168,FUN_002256c0,audio?,not started
-0x225768,112,FUN_00225768,audio?,not started
-0x2257d8,120,FUN_002257d8,audio?,not started
+0x2256c0,168,MusicSys_LoadSongBank,audio,not started
+0x225768,112,Music_ScheduleBreak,audio,not started
+0x2257d8,120,Music_CancelBreak,audio,not started
 0x225850,40,FUN_00225850,audio?,not started
 0x225878,208,Music_ScheduleAirLoop,audio,ported
 0x225948,12,FUN_00225948,audio?,not started
@@ -3921,7 +3921,7 @@ address,size,name,system,status
 0x229710,48,Stream_Resume,audio?,not started
 0x229740,48,Stream_Pause,audio?,not started
 0x229770,128,FUN_00229770,audio?,not started
-0x2297f0,116,FUN_002297f0,audio?,not started
+0x2297f0,116,Stream_OpenInBig,audio?,not started
 0x229868,8,Stream_Stop,audio?,not started
 0x229870,32,FUN_00229870,audio?,not started
 0x229890,184,StreamSys_Init,audio?,not started
@@ -3989,8 +3989,8 @@ address,size,name,system,status
 0x22dce0,1228,Audio_LoadChantBanks,audio,not started
 0x22e1b8,136,FUN_0022e1b8,audio?,not started
 0x22e240,44,FUN_0022e240,audio?,not started
-0x22e270,92,FUN_0022e270,audio?,not started
-0x22e2d0,100,FUN_0022e2d0,audio?,not started
+0x22e270,92,WorldEmitter_WasPlayed,audio,not started
+0x22e2d0,100,WorldEmitter_MarkPlayed,audio,not started
 0x22e338,40,World_ResetAudio,audio,not started
 0x22e360,36,WorldTriggerMgr_Reset,audio?,not started
 0x22e388,100,FUN_0022e388,audio?,not started
@@ -4093,8 +4093,8 @@ address,size,name,system,status
 0x230660,92,SpeechEvt_Post4008016,race?,not started
 0x2306c0,96,SpeechEvt_Post4008017,race?,not started
 0x2307f0,140,Speech_CourseMask,race?,not started
-0x230880,140,FUN_00230880,race?,not started
-0x230910,132,FUN_00230910,race?,not started
+0x230880,140,Speech_CharMaskOf,race?,not started
+0x230910,132,Speech_CurrentCourseMask,race?,not started
 0x2309a8,88,Speech_GetModeMask,common?,not started
 0x230a00,884,Speech_LoadNarration,audio?,not started
 0x230d78,84,Speech_FreeNarration,audio?,not started
@@ -4127,12 +4127,12 @@ address,size,name,system,status
 0x233950,200,Speech_OnAirEnter,audio?,not started
 0x233a18,148,Speech_OnRiderReset,audio?,not started
 0x233ab0,56,FUN_00233ab0,audio?,not started
-0x233b70,48,FUN_00233b70,audio?,not started
+0x233b70,48,Speech_WipeoutChance,audio?,not started
 0x233ba0,276,FUN_00233ba0,audio?,not started
 0x233cb8,128,Speech_OnRiderCollision,audio?,not started
 0x233d38,216,Speech_OnWipeout,audio?,not started
 0x233e10,104,FUN_00233e10,audio?,not started
-0x233e78,104,FUN_00233e78,audio?,not started
+0x233e78,104,Speech_OnBoost,audio?,not started
 0x233ee0,272,Speech_OnCheckpoint,boarder?,not started
 0x233ff0,100,FUN_00233ff0,audio?,not started
 0x234058,92,FUN_00234058,audio?,not started
@@ -4201,7 +4201,7 @@ address,size,name,system,status
 0x239c38,20,SphereTree::~SphereTree,world?,not started
 0x239c50,72,SphTree_GetRadius,world?,not started
 0x239c98,128,FUN_00239c98,world?,not started
-0x239d18,72,FUN_00239d18,world?,not started
+0x239d18,72,SphTree_Translate,world?,not started
 0x239d60,548,SphTree_SetTransform,world?,not started
 0x239f88,472,SphTree_Transform,world?,not started
 0x23a160,172,Collide_SphereSphTree,world?,not started
