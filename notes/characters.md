@@ -47,3 +47,17 @@ How the game builds a rider from `.mpf` files (names in `ghidra/symbols.txt`):
   (`SkinPart_ResolveMaterials` 0x205670), and vertices are scaled once (`SkinPart_Scale`).
 - Each frame `RiderSkin_SkinMatrices` 0x207c30 multiplies each part's bind matrices (0x40 bytes each) by the
   bone matrices at +0x3d80.
+
+### Part data layout (E4a, from `SkinPart_Load` 0x205080)
+
+Offsets in a part's 0x50-byte directory entry are from the start of the part's data (proven; field meanings
+partly inferred):
+- data +0: texture-name sets, 0x20 bytes each, count entry+0x44 (`SkinPart_ResolveTextureNames`).
+- entry+0x18 → bone records, 0x54 bytes each, count entry+0x42 (scaled at +0x18..+0x20 by `SkinPart_Scale`;
+  parent at +0x10, index at +0x12, read by `SkinPart_SetChildMatrices`).
+- entry+0x1c → vec4 list, count entry+0x46 (scaled with the bones).
+- entry+0x20 → materials, 0x14 bytes each, count entry+0x40: +0xc count and +0x10 pointer to (pointer, count)
+  pairs, each pointing at `count` 0xc-byte records (start pointer, end pointer, ...): the mesh packet ranges.
+- entry+0x28 → part+0x20 (not yet known).
+- entry+0x2c → 8-byte records (second word a pointer), count entry+0x3e.
+- entry+0x30 → 0xc-byte records (second word a pointer), count entry+0x3c (`SkinLod_CollectMaterials` pairs).
