@@ -55,7 +55,6 @@ state machine and the renderer are ours. Nothing has been checked against the or
 | E8 | Physics: check the ported boarder motion against the original once F4 exists: ground `cBoarder_GroundMotion_Update` 0x10a0d8, drag 0x109cb8, side friction 0x109ef8, thrust 0x109950, spring 0x109878, probe 0x128ae8, surface table `SurfaceTable_Init` 0x256188 | any | F4a | | [repo] Ported in `rider.rs`; README still says some constants at the top of `rider.rs` are guesswork: find which. Split: E8f–E8i |
 | E8g | Ground probe checked: `Boarder_ProbeGround` 0x128ae8 (ray +200 → −100 cm along n: new n, h, surface) | any | F4a | | Split of E8. Needs the world ray (E7) stubbed or run |
 | E8h | Ground motion checked: `GroundMotion_Update` 0x10a0d8 as a whole, with its callees run as the original (leaves already checked in F4d, F4d2) | any | F4a | | Split of E8 |
-| E8i | The guessed constants at the top of `tricky-rs/game/src/rider.rs`: find which are the game's and which are ours, port or tag them | any | F4a | trailrig/heron (2026-10-11) | Split of E8 |
 | E8a | Air: `Air_IntegrateRK4` 0x12b340, `AirPredict_AtTakeoff` 0x123b10, landing `Air_MotionUpdate` 0x108378, `Landing_CheckAngles` 0x12ba78, `Landing_ChooseState` 0x109308 | any | F4a | | [repo] Ported, unchecked |
 | E8b | Walls and objects: `Boarder_WallImpactCheck` 0x126540, wall collision 0x126250, `Boarder_InstanceCollisions` 0x125088, `Boarder_InstanceBounce` 0x125a00 | unowned | E7 | | [repo] |
 | E8c | Knockable objects with the game's rigid bodies (`CollBody_PointMassInertia` 0x236530 and its step), replacing the ball physics in `props.rs` | unowned | E7 | | [repo] props.rs: "simulated as balls" |
@@ -104,6 +103,7 @@ state machine and the renderer are ours. Nothing has been checked against the or
 | G14 | Megaplex laps and boost tubes checked: `cLapBoostNode` 0x140b90, `cZBoostNode` 0x141cd8 | any | E9 | | [repo] |
 | G15 | Spray, trail and splashes per surface from the real table (`tricky_game::surface`): `surf()` in `tricky-rs/src/spray.rs` is rounded and guesses which surfaces spray; the game sprays from words [13..21] on every surface but 9, 13, 18, 19 (those spark, `Fx_SurfaceSpray` 0x1311b0) and uses [22..24] for the trail and splashes (port-notes/effects.md) | any | E8f | | Gap of E8f; corrected by E13 |
 | G16 | Draw the rider at rider+0x308 above the snow (surface word [10], eased 1.6667 cm a tick on the ground), as `Boarder_UpdatePose` 0x129628 does; the port draws at the board's position | any | E8f | | Gap of E13 |
+| G17 | The scoring constants at the top of `tricky-rs/game/src/rider.rs` (`PTS_*`, `SWITCH_BONUS`, `UBER_SECONDS`) are rounded ("value × 6786.5, rounded to 10"): take the game's exact values from `Score_*` 0x155410–0x157490 | any | F4a | | Gap of E8i |
 
 ## P3 Content
 
@@ -194,6 +194,7 @@ matches the original.
 | E13 | Surface table's untraced words read in Ghidra: [10] body height above the snow (`cBoarder::vf7` 0x117198 → rider+0x308 → `Boarder_UpdatePose` 0x129628), [13..21] ground spray (`Fx_SurfaceSpray` 0x1311b0), [22..24] trail and splashes (`Fx_BoardTrail_Update` 0x12fef0, `Fx_LandingSplash` 0x12ccc8, new `Fx_Splash_EmitAtPoint` 0x12c7e0); readers found by scanning for the table pointer (cGame+0x24); `surface.rs`, port notes | P1 | trailrig/heron | 2026-10-11 | 1348d46 |
 | E1b1 | The game's random numbers in `tricky-game` (`rand.rs`): `Rand_Seed` 0x2402c0, `Rand_Next` 0x2401e0, `Rand_Fx` 0x23d4a8, `Rand_Game` 0x23d4d8, `Rand_GameRange` 0x23d4f8, `Rand_GameJitter` 0x23d560 checked bit for bit in the function runner (`tests/rand.rs`: 3,000+ draws incl. every carry, 3,000 range/jitter calls); seeding wrappers and the replay snapshot ported | P1 | trailrig/heron | 2026-10-11 | c38d5b4 |
 | G4a1 | `RelTable_Init` 0x167208 checked: tolerance, attitude and relation of all 144 pairs in `rivals.rs` equal the original's in the function runner (`tests/rel_table.rs`); `rivals.rs` moved into `tricky-game` (the app uses it from there) | P2 | trailrig/heron | 2026-10-11 | d80e0b1 |
+| E8i | The constants at the top of `rider.rs` sorted out: 19 unused or doc-only ones removed (and the dead `spin_rate`/`flip_rate` fields); speed caps and their decay (`cBoarder::vf7` 0x117198), air gravity (`Air_IntegrateRK4`, from `air.rs`), the smallest jump (`JumpControl_Update` 0x1046e4), the jump's speed curve (`Jump_ApplyImpulse` 0x1284e0) and the boost drain (`Boarder_UpdateBoost` 0x11d218) now the game's exact floats; the boost cap needs a meter above 0, as the game's does; `TURN_ACCEL` tagged STANDIN (AI corner speed); scoring constants left to G17 | P1 | trailrig/heron | 2026-10-11 | HASH |
 
 ## Changes to the board
 
@@ -249,3 +250,4 @@ matches the original.
 - 2026-10-11 trailrig/heron: split G4a into G4a1 (claimed) and G4a2.
 - 2026-10-11 trailrig/heron: G4a1 done; G4a2 gets the table's word +8.
 - 2026-10-11 trailrig/heron: claim E8i.
+- 2026-10-11 trailrig/heron: E8i done; added G17 (gap of E8i).

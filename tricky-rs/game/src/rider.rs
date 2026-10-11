@@ -12,21 +12,11 @@ use crate::surface::SURFACE_TABLE;
 pub mod wipeout;
 pub use wipeout::{Wipe, course_points};
 
-// The numbers below are the original game's, read out of the decompiled SLUS_203.26 (converted from
-// its cm and 1/60 s frames to metres and seconds), for a rider with middling stats on ordinary snow.
-/// gravity on the snow (surface table row 1), and in the air: gentle on the way up, hard on the way down
-pub const GRAVITY: f32 = 13.0;
-pub const GRAVITY_RISING: f32 = 8.5024;
-pub const GRAVITY_FALLING: f32 = 19.0084;
-/// the air only slows the horizontal part of the velocity (1/s)
-pub const AIR_DRAG: f32 = 0.2;
-/// drag on the snow as a rate (1/s): DRAG_LIN + DRAG_STAND when not crouched + DRAG_V * v + DRAG_V2 * v^2
-pub const DRAG_LIN: f32 = 0.0019;
-pub const DRAG_STAND: f32 = 0.1057;
-pub const DRAG_V: f32 = 0.000196;
-pub const DRAG_V2: f32 = 0.0000856;
-/// braking adds this much drag (1/s)
-pub const BRAKE: f32 = 1.88;
+// The numbers below are the original game's (SLUS_203.26), converted from its cm and 60 Hz ticks to metres and
+// seconds; each says where it is read (row E8i).
+/// gravity in the air, m/s²: gentle on the way up, hard on the way down (`Air_IntegrateRK4` 0x12b340, crate::air)
+pub const GRAVITY_RISING: f32 = -crate::air::GRAVITY_RISING * 0.01;
+pub const GRAVITY_FALLING: f32 = -crate::air::GRAVITY_FALLING * 0.01;
 /// The ground spring's band per surface (m): sunk deeper than d1 it pushes back fully, d2 is how far a
 /// board can sink (powder 15-35 cm). `SurfaceTable_Init` 0x256188 words [7] and [8] (crate::surface), cm → m.
 pub const SURF_BAND: [(f32, f32); 20] = {
@@ -38,40 +28,23 @@ pub const SURF_BAND: [(f32, f32); 20] = {
     }
     t
 };
-/// hard speed limits (m/s): 100.4 km/h on the snow, up to 120.5 km/h boosting or in the air
-pub const SPEED_CAP: f32 = 27.89;
-pub const BOOST_CAPS: [f32; 3] = [29.32, 30.72, 33.47];
-pub const AIR_CAP: f32 = 33.472;
-/// once the boost stops the limit comes back down this fast (m/s^2)
-pub const CAP_DECAY: f32 = 2.08;
-/// the rider pushes along by himself up to 51.85 km/h
-pub const PUSH_TO: f32 = 14.4;
-pub const PUSH: f32 = 1.75;
-pub const PUSH_MAX: f32 = 5.0;
-/// sideways acceleration of a full carve: g * tan(58.3 deg * 0.905); below TURN_FULL_SPEED it scales with speed
+/// the speed limit on the snow and while boosting, m/s (`cBoarder::vf7` 0x117198: 2788.8394 cm/s; boosting with
+/// the meter above 0, 0.33362994, 0.66599226 or with a speed-boost pickup 2932.43, 3072.1418, 3347.2222)
+pub const SPEED_CAP: f32 = 2788.8394 * 0.01;
+pub const BOOST_CAPS: [f32; 3] = [2932.43 * 0.01, 3072.1418 * 0.01, 3347.2222 * 0.01];
+/// once the boost stops the limit comes back down 3.472222 cm/s a tick (`cBoarder::vf7` 0x117198), in m/s²
+pub const CAP_DECAY: f32 = 3.472222 * 60.0 * 0.01;
+/// STANDIN: our AI's corner-speed estimate (m/s², about g·tan(58.3°·0.905)), for the game's AI path following (G4)
 pub const TURN_ACCEL: f32 = 17.1;
-pub const TURN_FULL_SPEED: f32 = 11.3;
-/// rotation in the air (rad/s): what a jump starts with, with no wind-up and with a full one (a wound-up flip gets 2/3 of the spin's)
+/// a spin's rate with no wind-up (rad/s), for the TRICKY_TRICKTEST self-test's timing only; the game's rates are
+/// `Takeoff_SetSpinRates` 0x126e30
 pub const AIR_SPIN: f32 = 4.63;
-pub const AIR_SPIN_WOUND: f32 = 10.16;
-pub const FLIP_RATE: f32 = AIR_SPIN;
-pub const FLIP_WOUND: f32 = AIR_SPIN_WOUND * 2.0 / 3.0;
-/// the rotation dies away through the jump (x0.70 each second) down to this floor
-pub const SPIN_DECAY: f32 = 0.70;
-pub const SPIN_FLOOR: f32 = 1.396;
-/// seconds for the wind-up to follow the stick while crouched for a jump
-pub const WIND_TIME: f32 = 0.5;
-/// jump: 6.31 m/s at least, a little more with a full crouch (which takes 0.66 s)
-pub const JUMP_MIN: f32 = 6.31;
-pub const JUMP_FULL: f32 = 7.2;
-pub const CHARGE_TIME: f32 = 0.66;
-pub const BOOST_ACCEL: f32 = 3.75;
-/// seconds of boost in a full meter
-pub const BOOST_SECONDS: f32 = 22.218;
+/// the smallest jump, m/s (`JumpControl_Update` 0x1046e4: 630.8786 cm/s)
+pub const JUMP_MIN: f32 = 630.8786 * 0.01;
+/// seconds of boost in a full meter: holding boost drains 0.000750150706 (0x3a44a5c3) a tick (`Boarder_UpdateBoost` 0x11d218)
+pub const BOOST_SECONDS: f32 = 1.0 / (f32::from_bits(0x3a44_a5c3) * 60.0);
 // STANDIN: one sphere round the body for walls, for the game's collision spheres and `Boarder_WallCollide` probes
 pub const BODY_RADIUS: f32 = 0.45;
-/// rails do not carry you faster than this
-pub const RAIL_CAP: f32 = 29.3;
 /// how close (m) the board has to pass to a rail, while in the air, to lock on
 /// STANDIN: our reach, for the game's rail capture test (`Rail_TryCapture`)
 pub const RAIL_REACH: f32 = 0.9;
@@ -182,8 +155,9 @@ impl Stats {
     pub fn spin_decay(&self) -> f32 { (0.99301 + 0.00201 * self.tricks).powi(60) }
     pub fn wind_time(&self) -> f32 { 1.0 / (2.0005 * (0.812 + 0.329 * self.windup)) }
     pub fn jump(&self, crouch: f32, speed: f32) -> f32 {
-        let by_speed = if speed < 9.93 { 0.2468 + 0.881 * speed } else { 8.9987 };
-        JUMP_MIN.max(crouch * crouch * (0.0985 + 0.787 * self.jump) * by_speed)
+        // `Jump_ApplyImpulse` 0x1284e0, in m/s: S = 0.8809335·v + 24.678448 cm/s below 993.4801 cm/s, else 899.86835
+        let by_speed = if speed < 9.934801 { 0.24678448 + 0.8809335 * speed } else { f32::from_bits(0x4460_f793) * 0.01 };
+        JUMP_MIN.max(crouch * crouch * (0.09851468 + 0.7870027 * self.jump) * by_speed)
     }
     /// how far from upright (radians) a landing can be
     pub fn crash_pitch(&self) -> f32 { 2.684 / (2.0408 - 1.0374 * self.stability) }
@@ -239,8 +213,6 @@ pub struct Rider {
     /// wind-up before a jump (-1..1) for spin and flip, and the rotation rates the jump started with
     pub wind: f32,
     pub wind_flip: f32,
-    pub spin_rate: f32,
-    pub flip_rate: f32,
     /// the speed limit right now (it lags behind when a boost ends)
     pub cap: f32,
     pub steer: f32,
@@ -384,7 +356,7 @@ impl Rider {
     pub fn new(pos: Vec3, yaw: f32) -> Self {
         Self { pos, vel: Vec3::ZERO, yaw, grounded: false, normal: Vec3::Y, charge: 0.0, air_time: 0.0,
                spawn: (pos, yaw), safe: (pos, yaw), safe_timer: 0.0, safe_external: false, respawns: 0, rail: None, rail_cooldown: 0.0, input: Input::default(),
-               spin: 0.0, flip: 0.0, flip_dir: 0.0, wind: 0.0, wind_flip: 0.0, spin_rate: AIR_SPIN, flip_rate: FLIP_RATE, cap: SPEED_CAP, steer: 0.0, grab: 0, grab_hold: 0.0, grab_out: None, grab_done: [false; 16], grab_tweaked: [false; 16], air_pts: 0.0, air_names: Vec::new(), ubers_done: 0, switch_takeoff: false, from_rail: false, rail_pts: 0.0, recent: VecDeque::new(), uber_timer: 0.0, stats: Stats::default(), data: &RIDERS[0], surface: 1, grind_time: 0.0, rail_twist: 0.0, rail_spun: 0.0, rail_side: 0.0, rail_entry: 0.0, rail_goal: 0.0, rail_held: false, rail_side_signed: 0.0, shove: 0.0, shove_side: 1.0, taunt: -1.0, taunt_clip: String::new(), fin: None, showoff: false, landed: Vec::new(), crash_kind: 0, land_kind: 0, switch: false, score: 0, boost: 0.0, boosting: false,
+               spin: 0.0, flip: 0.0, flip_dir: 0.0, wind: 0.0, wind_flip: 0.0, cap: SPEED_CAP, steer: 0.0, grab: 0, grab_hold: 0.0, grab_out: None, grab_done: [false; 16], grab_tweaked: [false; 16], air_pts: 0.0, air_names: Vec::new(), ubers_done: 0, switch_takeoff: false, from_rail: false, rail_pts: 0.0, recent: VecDeque::new(), uber_timer: 0.0, stats: Stats::default(), data: &RIDERS[0], surface: 1, grind_time: 0.0, rail_twist: 0.0, rail_spun: 0.0, rail_side: 0.0, rail_entry: 0.0, rail_goal: 0.0, rail_held: false, rail_side_signed: 0.0, shove: 0.0, shove_side: 1.0, taunt: -1.0, taunt_clip: String::new(), fin: None, showoff: false, landed: Vec::new(), crash_kind: 0, land_kind: 0, switch: false, score: 0, boost: 0.0, boosting: false,
                last_trick: String::new(), trick_timer: 0.0, crashed: 0.0, hard_land: 0.0, crouch_v: 0.0, brake_v: 0.0, jump_c: 0.0, jump_delay: 0.0, height: 0.0,
                course_dir: None, course_pts: None, wipe: None, crash_at: None, recover: None, ai: false, down_t: 0.0, getup: -1.0, stumble: 0.0, wall_hit: None, speed_timer: 0.0, spin_timer: 0.0, spin_used: false, tube_class: u8::MAX, gate_p: 0.0, gate_hi: 0.0, gate_lo: 0.0, gate_still: 0.0, gate_target: 0.0, gate_speed: 0.0, gate_state: 8, gate_rock_dir: 0, band: (0.005, 0.0250417), spin_base: 0.0, flip_base: 0.0, late: false, cause: "", spin_ax: Axis::default(), flip_ax: Axis::default(), air_mode2: false, rail_off: 0.0, rail_time: 0.0, rail_halves: 0, boost_was: false, chain: 0,
                ubers: Vec::new(), uber: 0.0, uber_id: 0, uber_done: false, letters: 0, multiplier: 1 }
@@ -935,7 +907,7 @@ impl Rider {
             // the speed limit (vf7): up at once with a boost, back down slowly afterwards
             // the boosting cap goes by the meter left (vf7), the speed-boost pickup by its own timer
             let m = self.boost;
-            let target = if sped || (self.boosting && (m > 0.66599226 || self.tricky())) { BOOST_CAPS[2] } else if self.boosting && m > 0.33362994 { BOOST_CAPS[1] } else if self.boosting { BOOST_CAPS[0] } else { SPEED_CAP };
+            let target = if sped || (self.boosting && (m > 0.66599226 || self.tricky())) { BOOST_CAPS[2] } else if self.boosting && m > 0.33362994 { BOOST_CAPS[1] } else if self.boosting && m > 0.0 { BOOST_CAPS[0] } else { SPEED_CAP };
             self.cap = target.max(self.cap - CAP_DECAY * dt);
             let s = self.vel.length();
             if s > self.cap { self.vel *= self.cap / s; }

@@ -4,8 +4,8 @@
 //! converts to and from its metres (y up).
 
 /// Gravity rising and falling, cm/s² (0xc4548f73, 0xc4ed9ac0), and the horizontal drag (0xbe4cd34c).
-const GRAVITY_RISING: f32 = -850.2414;
-const GRAVITY_FALLING: f32 = -1900.8359;
+pub const GRAVITY_RISING: f32 = -850.2414;
+pub const GRAVITY_FALLING: f32 = -1900.8359;
 const DRAG: f32 = -0.20002478;
 
 /// The speed cap in the air, cm/s: the game writes it to rider+0x1c4 on every call (0x4551338e).
