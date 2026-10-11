@@ -5599,3 +5599,26 @@ G 140400 RailNode_Disable
 G 143b08 Fence_Swing
 G 148350 CamAnim_SetShot
 F 148dc8 cRailManNode cRailManNode
+G 12eca8 Fx_BoardPuff_Update
+G 12f178 Fx_BoardPuff_Draw
+G 12f4c0 Fx_SpeedDust_Update
+G 12fb40 Fx_SpeedDust_Draw
+G 29ef50 SoundOptions_Refresh
+G 2a9720 SoundOptions_OnChange
+G 29f5f0 DisplayOptions_Refresh
+G 2b1fa8 FE3DScrollingText_ClearLines
+G 2b1ee8 FE3DScrollingText_Advance
+G 2c5e20 AsyncFile_Load
+G 2c5ed0 AsyncFile_LoadInto
+G 2c6070 AsyncFile_SetCallback
+G 2c6108 AsyncFile_IsDone
+G 2c6160 AsyncFile_Finish
+G 2c6278 AsyncFile_Cancel
+G 2c26d8 Shape_PixelFormatIndex
+G 2c2d18 Compress_Decode18
+G 2c2bf8 Compress_Decode18Rows
+G 2c34d8 BTree_EmitSymbol
+G 2c5498 WStr_CopyAll
+G 2bed58 PathX_SelectSong
+G 2bee88 PathX_CountActiveTracks
+G 2c7340 Strm_GetChunk

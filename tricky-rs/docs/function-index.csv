@@ -499,13 +499,13 @@ address,size,name,system,status
 0x12ec08,108,FUN_0012ec08,game?,not started
 0x12ec78,28,FUN_0012ec78,game?,not started
 0x12ec98,12,FUN_0012ec98,game?,not started
-0x12eca8,1228,FUN_0012eca8,game?,not started
-0x12f178,676,FUN_0012f178,game?,not started
+0x12eca8,1228,Fx_BoardPuff_Update,boarder,not started
+0x12f178,676,Fx_BoardPuff_Draw,boarder,not started
 0x12f420,108,FUN_0012f420,game?,not started
 0x12f490,28,FUN_0012f490,game?,not started
 0x12f4b0,12,FUN_0012f4b0,boarder?,not started
-0x12f4c0,1660,FUN_0012f4c0,world?,not started
-0x12fb40,776,FUN_0012fb40,boarder?,not started
+0x12f4c0,1660,Fx_SpeedDust_Update,boarder,not started
+0x12fb40,776,Fx_SpeedDust_Draw,boarder,not started
 0x12fe48,140,FUN_0012fe48,boarder?,not started
 0x12fed8,24,FUN_0012fed8,boarder?,not started
 0x12fef0,1976,Fx_BoardTrail_Update,boarder,ported
@@ -5512,11 +5512,11 @@ address,size,name,system,status
 0x29ec70,220,FUN_0029ec70,frontend?,not started
 0x29ed50,224,FUN_0029ed50,frontend?,not started
 0x29ee30,284,FUN_0029ee30,frontend?,not started
-0x29ef50,548,FUN_0029ef50,frontend?,not started
+0x29ef50,548,SoundOptions_Refresh,audio,not started
 0x29f178,692,FUN_0029f178,frontend?,not started
 0x29f430,216,FUN_0029f430,game?,not started
 0x29f508,232,FUN_0029f508,game?,not started
-0x29f5f0,304,FUN_0029f5f0,frontend?,not started
+0x29f5f0,304,DisplayOptions_Refresh,frontend?,not started
 0x29f720,1056,FEOptions_ApplyDisplay,frontend?,not started
 0x29fb40,48,OptionsState_Refresh,frontend?,not started
 0x29fb70,15224,FE_BuildSoundOptions,frontend,not started
@@ -5530,7 +5530,7 @@ address,size,name,system,status
 0x2a9258,248,cFE3DStateOptions::Activate,frontend,not started
 0x2a9350,312,FUN_002a9350,frontend?,not started
 0x2a9488,664,FUN_002a9488,frontend?,not started
-0x2a9720,296,FUN_002a9720,frontend?,not started
+0x2a9720,296,SoundOptions_OnChange,audio,not started
 0x2a9848,344,FUN_002a9848,frontend?,not started
 0x2a99a0,684,FUN_002a99a0,frontend?,not started
 0x2a9c50,8,FUN_002a9c50,frontend?,not started
@@ -5760,8 +5760,8 @@ address,size,name,system,status
 0x2b1de8,108,FE3DScrollingText_ShiftUp,frontend?,not started
 0x2b1e58,72,FE3DScrollingText_ShiftDown,frontend?,not started
 0x2b1ea0,68,FE3DScrollingText_CountLines,frontend?,not started
-0x2b1ee8,188,FUN_002b1ee8,frontend?,not started
-0x2b1fa8,68,FUN_002b1fa8,frontend?,not started
+0x2b1ee8,188,FE3DScrollingText_Advance,frontend?,not started
+0x2b1fa8,68,FE3DScrollingText_ClearLines,frontend?,not started
 0x2b1ff0,84,FE3DScrollingText_SetSpeed,frontend?,not started
 0x2b2048,56,cFE3DScrollingText::vf38_2b2048,frontend,not started
 0x2b2080,928,cFE3DScrollingText::vf11_2b2080,frontend,not started
@@ -6069,10 +6069,10 @@ address,size,name,system,status
 0x2bebe8,128,FUN_002bebe8,lib-snd?,not started
 0x2bec68,56,FUN_002bec68,audio?,not started
 0x2beca0,180,Path_Init,audio?,not started
-0x2bed58,92,FUN_002bed58,audio?,not started
+0x2bed58,92,PathX_SelectSong,audio?,not started
 0x2bedb8,52,FUN_002bedb8,audio?,not started
 0x2bedf0,148,FUN_002bedf0,audio?,not started
-0x2bee88,128,FUN_002bee88,audio?,not started
+0x2bee88,128,PathX_CountActiveTracks,audio?,not started
 0x2bef08,204,FUN_002bef08,audio?,not started
 0x2befd8,96,FUN_002befd8,audio?,not started
 0x2bf038,200,FUN_002bf038,audio?,not started
@@ -6114,17 +6114,17 @@ address,size,name,system,status
 0x2c2660,12,Shape_GetCount,lib-shape?,ported
 0x2c266c,40,Shape_GetEntry,lib-shape?,ported
 0x2c2694,64,Shape_GetEntryName,lib-shape?,not started
-0x2c26d8,240,FUN_002c26d8,lib-shape?,not started
+0x2c26d8,240,Shape_PixelFormatIndex,lib-shape?,not started
 0x2c27c8,948,FUN_002c27c8,lib-compress?,not started
 0x2c2bb8,60,FUN_002c2bb8,lib-compress?,not started
-0x2c2bf8,288,FUN_002c2bf8,lib-compress?,not started
-0x2c2d18,196,FUN_002c2d18,lib-compress?,ported
+0x2c2bf8,288,Compress_Decode18Rows,lib-compress?,not started
+0x2c2d18,196,Compress_Decode18,lib-compress?,ported
 0x2c2de0,432,Compress_Decode,lib-compress?,ported
 0x2c2f90,28,Compress_DecodeApi,lib-compress?,not started
 0x2c2fb0,476,Compress_UnpackedSize,lib-compress?,ported
 0x2c3190,28,Compress_UnpackedSizeApi,lib-compress?,not started
 0x2c31b0,804,RefPack_Decode,lib-compress?,ported
-0x2c34d8,104,FUN_002c34d8,lib-compress?,not started
+0x2c34d8,104,BTree_EmitSymbol,lib-compress?,not started
 0x2c3540,492,BTree_Decode,lib-compress?,not started
 0x2c3730,3396,Huff_Decode,lib-compress?,not started
 0x2c4478,96,FUN_002c4478,lib-text?,not started
@@ -6139,7 +6139,7 @@ address,size,name,system,status
 0x2c5380,148,FUN_002c5380,lib-text?,not started
 0x2c5418,32,FUN_002c5418,lib-text?,not started
 0x2c5438,96,WStr_NCmp,lib-text?,not started
-0x2c5498,32,FUN_002c5498,lib-text?,not started
+0x2c5498,32,WStr_CopyAll,lib-text?,not started
 0x2c54b8,88,WStr_NCopy,lib-text?,not started
 0x2c5510,72,WStr_FromAscii,lib-text?,not started
 0x2c5558,28,FUN_002c5558,lib-text?,not started
@@ -6157,13 +6157,13 @@ address,size,name,system,status
 0x2c5b98,196,FUN_002c5b98,lib-file?,host
 0x2c5c60,208,FUN_002c5c60,lib-file?,host
 0x2c5d30,240,FUN_002c5d30,lib-file?,host
-0x2c5e20,172,FUN_002c5e20,lib-file?,host
-0x2c5ed0,200,FUN_002c5ed0,lib-file?,host
+0x2c5e20,172,AsyncFile_Load,lib-file?,host
+0x2c5ed0,200,AsyncFile_LoadInto,lib-file?,host
 0x2c5f98,216,FUN_002c5f98,lib-file?,host
-0x2c6070,148,FUN_002c6070,lib-file?,host
-0x2c6108,88,FUN_002c6108,lib-file?,host
-0x2c6160,280,FUN_002c6160,lib-file?,host
-0x2c6278,220,FUN_002c6278,lib-file?,host
+0x2c6070,148,AsyncFile_SetCallback,lib-file?,host
+0x2c6108,88,AsyncFile_IsDone,lib-file?,host
+0x2c6160,280,AsyncFile_Finish,lib-file?,host
+0x2c6278,220,AsyncFile_Cancel,lib-file?,host
 0x2c6358,56,Strm_GetHeader,lib-file?,host
 0x2c6390,64,FUN_002c6390,lib-file?,host
 0x2c63d0,144,FUN_002c63d0,lib-file?,host
@@ -6185,7 +6185,7 @@ address,size,name,system,status
 0x2c7220,76,FUN_002c7220,lib-file?,host
 0x2c7270,108,FUN_002c7270,lib-file?,host
 0x2c72e0,96,FUN_002c72e0,lib-file?,host
-0x2c7340,96,FUN_002c7340,lib-file?,host
+0x2c7340,96,Strm_GetChunk,lib-file?,host
 0x2c73a0,48,FUN_002c73a0,lib-file?,host
 0x2c73d0,248,FUN_002c73d0,lib-file?,host
 0x2c74c8,268,FUN_002c74c8,lib-file?,host
