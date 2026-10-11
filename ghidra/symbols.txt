@@ -1159,11 +1159,11 @@ F 111738 cAI vf19
 F 115040 cReplayEndRaceHandler vf0
 F 114f28 cReplayEndRaceHandler vf1
 F 115038 cReplayEndRaceHandler vf2
-F 113e10 cEndRaceHandler vf0
-F 1146a8 cEndRaceHandler vf1
+F 113e10 cEndRaceHandler Enter
+F 1146a8 cEndRaceHandler Exit
 F 1141e0 cEndRaceHandler Update
-F 113740 cRaceHandler vf0
-F 113820 cRaceHandler vf2
+F 113740 cRaceHandler Enter
+F 113820 cRaceHandler Update
 F 113478 cStartRaceHandler vf0
 F 1134d0 cStartRaceHandler vf1
 F 1134a0 cStartRaceHandler vf2
@@ -1173,9 +1173,9 @@ F 113600 cCountdownHandler vf2
 F 1150a8 cSelectLessonHandler vf0
 F 1150a0 cSelectLessonHandler vf1
 F 115098 cSelectLessonHandler vf2
-F 112b88 cPreRaceHandler vf0
-F 113468 cPreRaceHandler vf1
-F 112d10 cPreRaceHandler vf2
+F 112b88 cPreRaceHandler Enter
+F 113468 cPreRaceHandler Exit
+F 112d10 cPreRaceHandler Update
 F 116650 cAIWorld vf0
 F 115e28 cAIWorld vf1
 F 1164c0 cAIWorld vf7
@@ -3193,7 +3193,7 @@ G 1783e8 Camera_LoadCmlFiles
 G 16e4c0 Cml_LoadIfExists
 G 11a840 Boarder_PlaceAtStart
 G 11e9d8 Boarder_GetGateStartTimer
-G 11d998 Boarder_IsFinishLineDone
+G 11d998 Boarder_IsFinishedAndStopped
 G 1065c8 FinishLineControl_IsDone
 G 105b90 Vec4_ScaleCopy1
 G 1097f8 Vec4_ScaleCopy2
@@ -3301,3 +3301,21 @@ G 12e330 Fx_Spray_SpawnParticle
 G 12e918 Fx_Spray_Draw
 G 119d30 Boarder_FindNearestLine
 G 118830 Boarder_ChoosePathAhead
+G 1699a0 RaceScene_Select
+G 1109b0 RaceScene_Prepare
+G 110a40 RaceScene_Play
+G 110ab8 RaceScene_CheckSkip
+G 175de0 CamScript_Start
+G 175eb8 CamScript_Stop
+G 175e50 CamScript_IsRunning
+G 112848 Race_HasStartGate
+G 11a7b0 Boarder_LaunchFromGate
+G 11afa8 Boarder_Freeze
+G 181d60 Game_UseSingleView
+G 181d50 Game_RestoreViews
+G 115a30 Race_ClearAiTargets
+G 164fc0 Career_CheckNewRecords
+G 1a7848 HUD_ShowItem
+G 1a7860 HUD_HideItem
+G 11e6f8 Boarder_HitCheckpoint
+G 13bfd0 TriggerScript_ExecOp

@@ -7,3 +7,11 @@
 1141e0 cEndRaceHandler_Update cEndRaceHandler::Update
 1418a8 cTubeEndBoostNode::vf27 cTubeEndBoostNode::BoostRider
 197738 AIP_GetPointAtDistance AIP_GetDirectionAtDistance
+11d998 Boarder_IsFinishLineDone Boarder_IsFinishedAndStopped
+113e10 cEndRaceHandler::vf0 cEndRaceHandler::Enter
+1146a8 cEndRaceHandler::vf1 cEndRaceHandler::Exit
+113740 cRaceHandler::vf0 cRaceHandler::Enter
+113820 cRaceHandler::vf2 cRaceHandler::Update
+112b88 cPreRaceHandler::vf0 cPreRaceHandler::Enter
+113468 cPreRaceHandler::vf1 cPreRaceHandler::Exit
+112d10 cPreRaceHandler::vf2 cPreRaceHandler::Update
