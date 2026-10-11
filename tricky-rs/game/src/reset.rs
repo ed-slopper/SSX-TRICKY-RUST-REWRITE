@@ -39,9 +39,9 @@ pub struct Request<'a> {
     pub place: i32,
     /// the stats byte +0x65 (stats at rider+0x464) is negative: no speed carried
     pub no_speed: bool,
-    /// the game mode word (0x32de8c) and 0x32de88
+    /// the game mode word (0x32de8c) and the course being played (0x32de88, `courses`)
     pub mode: i32,
-    pub x32de88: i32,
+    pub course: i32,
     /// every rider in the race (`Race_GetRider` 0..0x32db6c)
     pub riders: &'a [RaceRider],
 }
@@ -57,7 +57,7 @@ pub struct Started {
 /// `Boarder_RequestReset` 0x118f10 (a0 the rider, f12 the height): none once finished or where the path allows no
 /// reset. In mode 0 with others in the race: `Boarder_StartReset` with the others' mean distance to the finish (not
 /// under 0) as the distance to move on. Otherwise, in modes 2, 4 and 7 with others, over 10000 from the finish and
-/// 0x32de88 not 8: 0.8003195 × the speed of the first rider in the next place (the place before for the last; 0 for
+/// the course (0x32de88) not Tokyo Megaplex (8): 0.8003195 × the speed of the first rider in the next place (the place before for the last; 0 for
 /// none, or when the rider's stats say so); else 0.
 pub fn request_reset(height: f32, q: &Request) -> Option<Started> {
     if 0 <= q.finish || !q.can_reset {
@@ -77,7 +77,7 @@ pub fn request_reset(height: f32, q: &Request) -> Option<Started> {
         }
         return Some(Started { sound, state: state(0.0) });
     }
-    if n < 2 || q.to_finish <= 10000.0 || q.x32de88 == 8 || !(q.mode == 2 || q.mode == 7 || q.mode == 4) {
+    if n < 2 || q.to_finish <= 10000.0 || q.course == 8 || !(q.mode == 2 || q.mode == 7 || q.mode == 4) {
         return Some(Started { sound, state: state(0.0) });
     }
     let next = if q.place < n - 1 { q.place + 1 } else { q.place - 1 };

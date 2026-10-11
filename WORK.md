@@ -128,7 +128,8 @@ matches the original.
 
 | ID | Task | Area | Needs | Who | Notes |
 |---|---|---|---|---|---|
-| C0 | Read the real course and event list from the game: course table, which modes each course has, track limits and medal scores, so the rows below come from the game, not from us | unowned | F1 | ed-slopper/puffin (2026-10-11) | [est] `port-notes/ai.md` ("AI, race, camera") already has time limits and medals per course |
+| C0 | The course and mode facts from the game (`tricky-rs/game/src/courses.rs`): the course table 0x332f28 (numbers, names, files, show-off times), the mode word 0x32de8c named from the event menu (`cFE3DStateEventSel::CreateNextState`), 0x32de88 = the course, the World Circuit order and medal thresholds, `Circuit_GetMedal` and `cRaceHandler::Enter`'s time limit, checked against the ELF and in the runner (tests/courses.rs); `ui::showoff` reads them. Which courses each mode offers: C0b | unowned | F1 | ed-slopper/puffin | 2026-10-11 | HASH |
+| C0b | The rest of C0: which courses each mode and game type offers and when they unlock (the venue menu `cFE3DStateVenueSel`, `VenueSel_*`, the unlock strings 0x000e…), and the race rules per mode (riders, laps, heats: `Circuit_SetupRace` 0x16d230, `Circuit_SetupEventRiders` 0x16d300) | unowned | C0 | | Gap of C0 |
 | C1 | Garibaldi | unowned | C0, E9 | | [est] |
 | C2 | Snowdream | unowned | C0, E9 | | [est] |
 | C3 | Elysium Alps | unowned | C0, E9 | | [est] |
@@ -456,3 +457,4 @@ matches the original.
 - 2026-10-11 trailrig/heron: claim G20c3c (no `levels\gari` export on the PC, so E8l stays open); split off G20c3c2 (spin or flip, needs G1a5b3b and G5); G20c3c no longer needs G1a5b3b.
 - 2026-10-11 ed-slopper/puffin: E5b2 done; the engine-bound config loaders noted on G10.
 - 2026-10-11 ed-slopper/puffin: claim C0.
+- 2026-10-11 ed-slopper/puffin: C0 done; C0b added (venue menu, unlocks, race rules per mode).

@@ -90,14 +90,14 @@ fn reset_requests_match_the_original() {
             place: all[me].place,
             no_speed: g.next() % 5 == 0,
             mode: [0, 1, 2, 3, 4, 7, 2, 4][g.next() as usize % 8],
-            x32de88: if g.next() % 6 == 0 { 8 } else { (g.next() % 8) as i32 },
+            course: if g.next() % 6 == 0 { 8 } else { (g.next() % 8) as i32 },
             riders: &all,
         };
         can.set(q.can_reset);
         let m = &mut r.mem;
         m.write_u32(0x32db6c, n as u32);
         m.write_u32(0x32de8c, q.mode as u32);
-        m.write_u32(0x32de88, q.x32de88 as u32);
+        m.write_u32(0x32de88, q.course as u32);
         m.write_u32(rider + 0x418, q.finish as u32);
         m.write_u32(rider + 0x41c, q.x41c as u32);
         m.write_u32(rider + 0x5ae0, mgr);

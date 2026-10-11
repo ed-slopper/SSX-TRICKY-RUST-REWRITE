@@ -126,3 +126,22 @@ the same unchecked way, and port that 1:1 (the bug included), noting it here.
 - `Boarder_SetBrakeTarget` 0x126c78, `Boarder_SetBrakeCrouchInput` 0x126b38: see `finish.rs` (its first argument goes
   to the crouch target, the second to the brake target, as the machine code passes them).
 
+## Courses and modes (row C0; `tricky_game::courses`, checked: `tests/courses.rs`)
+
+- The course table 0x332f28 (7 words a course): number, name, menu code, show-off time (hundredths), file name ×2,
+  a flag. 0 Garibaldi (gari, 120 s), 1 Snowdream (snow, 90), 2 Elysium Alps (elysium, 90), 3 Mesablanca (mesa, 90),
+  4 Merqury City (merquer, 90), 5 Aloha Ice Jam (aloha, 90), 6 Pipedream (pipe, 90), 7 Untracked (untrack, none),
+  8 Tokyo Megaplex (megaple, 90), 9 Big Air Dome (bigair, 90: not on the disc as a course), 10 Trick Tutorial
+  (trick, none), 11 Alaska (alaska, 135), 12 the front end (ssxfe). `Course_OpenModelsBig` 0x186268 builds the
+  runtime list (0x84-byte records: `data/models/<file>.big`, the file name at +0x44 = `Course_GetInfo` 0x186350).
+- 0x32de88 is the course being played (its number); 0x32de8c the game mode, set by the event menu
+  (`cFE3DStateEventSel::CreateNextState` 0x29ad48) with the game type (gApp+0x734 → +0xf0: 0 practice, 1 single
+  event, 2 World Circuit): 0 knock-down practice, 1 head to head, 2 race, 3 show-off, 4 World Circuit race,
+  5 World Circuit show-off, 6 trick tutorial, 7 freeride (the names of 0 and 1 from what reads them).
+- `cRaceHandler::Enter` 0x113740: the race clock's limit = the course's show-off time / 100 in modes 3 and 5.
+- World Circuit order (0x3352f0): Garibaldi, Snowdream, Elysium, Mesablanca, Merqury, Megaplex, Aloha, Alaska.
+  Races (mode 4): heats, the top three go on (`Circuit_ScoreEventResult` 0x16d0b0: places 1–3 weigh 0.833, 0.334,
+  0.167). Medals (`Circuit_GetMedal` 0x16baa8; thresholds 0x335370, gold / silver / bronze): gari 55k/40k/25k, snow
+  95k/65k/35k, elysium and mesa 225k/150k/75k, merquer 275k/175k/125k, megaple 350k/225k/100k, aloha
+  175k/115k/75k, alaska 500k/300k/150k (also any course not listed), pipe 800k/500k/250k (its own branch).
+

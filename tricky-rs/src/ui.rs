@@ -14,21 +14,18 @@ pub enum Event { Race, ShowOff, FreeRide }
 /// A circuit race is two heats and a final (`Circuit_AfterRaceAdvanceHeat`): the top three go through.
 pub const ROUNDS: [&str; 3] = ["HEAT 1", "HEAT 2", "FINAL"];
 pub const MEDALS: [&str; 3] = ["GOLD", "SILVER", "BRONZE"];
-/// Show-off medal scores (gold, silver, bronze) and time limit (s) per track, from the game's
-/// track table (0x332f2c) and medal table (0x335370).
+/// Show-off medal scores (gold, silver, bronze) and time limit (s) per track: the game's course table (0x332f28),
+/// medal table (0x335370) and Pipedream's own thresholds (`Circuit_GetMedal`), via `tricky_game::courses` (row C0).
+/// An unknown folder is taken as Garibaldi.
 pub fn showoff(track: &str) -> ([u32; 3], f32) {
-    match track {
-        "gari" => ([55_000, 40_000, 25_000], 120.0),
-        "snowdream" => ([95_000, 65_000, 35_000], 90.0),
-        "elysium" => ([225_000, 150_000, 75_000], 90.0),
-        "mesablanca" => ([225_000, 150_000, 75_000], 90.0),
-        "merqury" => ([275_000, 175_000, 125_000], 90.0),
-        "aloha" => ([175_000, 115_000, 75_000], 90.0),
-        "megaplex" => ([350_000, 225_000, 100_000], 90.0),
-        "alaska" => ([500_000, 300_000, 150_000], 135.0),
-        "pipedream" => ([800_000, 500_000, 250_000], 90.0),
-        _ => ([55_000, 40_000, 25_000], 120.0),
-    }
+    use tricky_game::courses::{by_file, time_limit, MEDALS};
+    let course = tricky_data::aip::big_name(track).and_then(by_file).or_else(|| by_file("gari")).expect("garibaldi");
+    let medals = if course.number == 6 {
+        [800_000, 500_000, 250_000]
+    } else {
+        MEDALS.iter().find(|(c, _)| *c == course.number).map(|(_, t)| *t).unwrap_or(MEDALS[7].1)
+    };
+    (medals.map(|v| v as u32), time_limit(course.number, 3))
 }
 pub fn track_key(list: &LevelList) -> String { list.dirs.get(list.current).and_then(|d| d.file_name()).map(|n| n.to_string_lossy().to_string()).unwrap_or_default() }
 /// riders in a race heat, the player included; the first three go through
