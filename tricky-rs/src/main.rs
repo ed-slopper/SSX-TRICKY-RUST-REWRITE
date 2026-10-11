@@ -2107,10 +2107,13 @@ fn animate_visuals(
         // where the body is and which way it faces
         let on_snow = r.grounded || r.air_time < 0.15 || r.rail.is_some();
         let up = if on_snow { r.normal } else { Vec3::Y };
-        let h = heading(r.facing());
+        // riding switch the game swaps which way the feet point and the head still looks ahead (its
+        // animation mirror flag, rider+0x46d4): the body is the board's way round, drawn mirrored below
+        let mirror = r.switch && r.crashed <= 0.0;
+        let h = heading(r.yaw);
         let fwd = (h - up * h.dot(up)).normalize_or(h);
         let k = |rate: f32| 1.0 - (-rate * dt).exp();
-        let want_roll = if r.grounded { (if r.switch { 1.0 } else { -1.0 }) * r.input.steer * 0.32 * (r.vel.length() / 12.0).min(1.0) } else { 0.0 };
+        let want_roll = if r.grounded { -r.input.steer * 0.32 * (r.vel.length() / 12.0).min(1.0) } else { 0.0 };
         vis.roll += (want_roll - vis.roll) * k(8.0);
         // down in a wipe-out the body is the tumbling rigid body's frame
         let base = match r.wipe.as_ref().filter(|_| r.crashed > 0.0) { Some(w) => w.q, None => Transform::from_translation(r.pos).looking_to(fwd, up).rotation * Quat::from_rotation_z(vis.roll) };
@@ -2166,6 +2169,10 @@ fn animate_visuals(
             let Some(p) = model.and_then(|m| m.parts.get(part.part)) else { continue };
             if sample.is_some() { character::skin_part_anim(p, mats, pos, nrm); }
             else { character::skin_part(p, mats, if part.board { 0.0 } else { lift }, pos, nrm); }
+            // switch: mirrored across the board's long axis (local x is sideways; the materials draw both faces)
+            if mirror {
+                for v in pos.iter_mut().chain(nrm.iter_mut()) { v[0] = -v[0]; }
+            }
             let col: Vec<[f32; 4]> = nrm.iter().map(|n| {
                 let l = (0.58 + 0.6 * Vec3::from(*n).dot(sun).max(0.0)).min(1.25).powf(2.2);
                 [l, l, l, 1.0]
