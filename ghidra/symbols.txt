@@ -5199,3 +5199,7 @@ G 2083d8 RiderSkin_SetRootMatrix
 G 1364d0 BoarderRender_Draw
 G 136370 BoarderRender_PickLod
 G 166cb0 Career_UpdateBestStats
+G 1ee660 Gfx_BeginScreenSpace
+G 1ee6e8 Gfx_EndScreenSpace
+G 1a1968 HUD_BuildSplitList
+G 1a1e50 HUD_HasSplitAt
