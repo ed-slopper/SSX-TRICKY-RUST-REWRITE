@@ -571,6 +571,7 @@ fn setup(
     commands.insert_resource(book::Book::load(&lib.dir));
     commands.insert_resource(lib);
     // otherwise a placeholder rider: a board with a body on it
+    // STANDIN: boxes for a rider, when no character has been exported
     if !have_chars {
     let mut flat = |c: Color| materials.add(StandardMaterial { base_color: c, unlit: true, ..default() });
     let (board, jacket, skin) = (flat(Color::srgb(0.95, 0.35, 0.1)), flat(Color::srgb(0.15, 0.25, 0.75)), flat(Color::srgb(0.9, 0.72, 0.6)));
@@ -2188,6 +2189,7 @@ fn animate_visuals(
 }
 
 /// Pick and blend the animation clips that match what the rider is doing.
+/// STANDIN: our choice of clip from what the rider is doing, for the boarder's animation state machine (G5)
 #[allow(clippy::too_many_arguments)]
 fn animate(set: &AnimSet, kind_set: Option<(&AnimSet, &str)>, cm: Option<&AnimSet>, ubers: Option<&AnimSet>, gate: Option<f32>, finished: bool, r: &Rider, vis: &mut RiderVisual, on_snow: bool, dt: f32) -> Option<Sample> {
     let fps = character::ANIM_FPS;

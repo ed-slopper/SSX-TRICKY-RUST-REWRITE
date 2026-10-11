@@ -61,17 +61,13 @@ pub const CHARGE_TIME: f32 = 0.66;
 pub const BOOST_ACCEL: f32 = 3.75;
 /// seconds of boost in a full meter
 pub const BOOST_SECONDS: f32 = 22.218;
-/// how fast sideways slip is killed (1/s); this is what makes the board carve
-pub const EDGE_GRIP: f32 = 7.0;
+// STANDIN: one sphere round the body for walls, for the game's collision spheres and `Boarder_WallCollide` probes
 pub const BODY_RADIUS: f32 = 0.45;
-pub const WALL_BOUNCE: f32 = 0.25;
-/// landing further than this from upright is a wipe-out (about 100 degrees: the original is forgiving)
-pub const CRASH_PITCH: f32 = 1.75;
 /// rails do not carry you faster than this
 pub const RAIL_CAP: f32 = 29.3;
 /// how close (m) the board has to pass to a rail, while in the air, to lock on
+/// STANDIN: our reach, for the game's rail capture test (`Rail_TryCapture`)
 pub const RAIL_REACH: f32 = 0.9;
-pub const RAIL_FRICTION: f32 = 0.03;
 /// how fast the board turns on a rail when steered (rad/s)
 /// a quarter turn on a rail is its 15-frame clip: 28 ticks (`RailSlideControl_CommitQuarterTurn`)
 pub const RAIL_TWIST: f32 = std::f32::consts::FRAC_PI_2 / (28.0 / 60.0);
@@ -86,8 +82,6 @@ pub const PTS_RAIL: f32 = 1018.2;
 pub const PTS_ONTO_RAIL: f32 = 1221.7;
 pub const PTS_OFF_RAIL: f32 = 1357.2;
 pub const SWITCH_BONUS: f32 = 1.3;
-/// seconds a grab has to be reached for before it counts
-pub const GRAB_REACH: f32 = 0.22;
 /// a full meter gives this long to do uber tricks
 pub const UBER_SECONDS: f32 = 20.0;
 

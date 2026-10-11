@@ -2,6 +2,8 @@
 //! Loader for a level project folder as produced by SSX-Library / the SSX Multitool
 //! (Patches.json, Instances.json, Models.json, Materials.json, Splines.json, Meshes/*.obj, ...).
 //! Everything here stays in the game's own coordinate system: X/Y horizontal, Z up.
+//!
+//! STANDIN: SSX-Library's JSON project folder, for the game's own level files and their readers (DATA/MODELS/*.pbd and the rest)
 
 use bevy::math::{Mat4, Quat, Vec2, Vec3};
 use serde::Deserialize;

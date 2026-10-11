@@ -3,6 +3,7 @@
 //! them (`HUD_DrawPlayerText` 0x1a4f70), in the game's 640x480 screen.
 //!
 //! Atlases and glyph metrics come from `chars/fonts/{title,menu}.{png,json}` (tools/sfn/sfn2png.py).
+//! STANDIN: atlases exported by tools/sfn/sfn2png.py, for reading the game's SFN files at run time
 //! Drawing: each glyph at pen + offset, both times the scale (the font's own: title 1.4 x 1.3,
 //! menu 1.8 x 1.4, times the caller's); the pen moves by the glyph's advance; no kerning, no extra
 //! spacing; a glyph the font lacks is skipped. Width for centring and right-aligning is the

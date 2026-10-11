@@ -1,5 +1,7 @@
 //! The front end: main menu, the event structure (race heats, show-off, free ride), the results
 //! screen and the on-screen display while riding.
+//!
+//! STANDIN: our menus, event flow and results screen, for the game's front end (its menus, circuit and results screens)
 
 use crate::rider::RaceState;
 use crate::{clock, standings, CharLib, LevelList, Mode, Opponents, RaceRes, RiderRes, SmoothDt};

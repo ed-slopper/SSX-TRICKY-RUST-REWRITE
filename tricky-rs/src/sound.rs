@@ -8,6 +8,8 @@ use bevy::audio::{PlaybackMode, Volume};
 use bevy::prelude::*;
 use std::collections::HashMap;
 
+// STANDIN: effect samples picked from the banks by ear (audio/<name>.wav, README "Sound and snow"), and when to play them, for the
+// game's own sound programs where boardsound.rs and worldsound.rs have none yet
 const SHOTS: [&str; 13] = ["land", "jump", "rail_on", "crash", "glass", "menu_move", "countdown", "pickup", "tricky", "go", "boost", "reset", "levelup"];
 
 #[derive(Component, Clone, Copy, PartialEq)]

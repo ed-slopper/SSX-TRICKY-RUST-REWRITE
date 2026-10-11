@@ -178,7 +178,7 @@ Read out of the game's executable:
 - **Snow types.** The course's own surface types now use the game's table (grip, drag, gravity), so ice,
   powder and the groomed runs ride differently.
 
-The show-off medal scores (150,000 / 80,000 / 40,000) are still mine.
+The show-off medal scores and time limits are the game's own (track table 0x332f2c, medal table 0x335370).
 
 ## Sound and snow
 

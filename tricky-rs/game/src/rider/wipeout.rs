@@ -16,7 +16,8 @@ use super::*;
 use glam::{Mat3, Quat};
 use std::sync::OnceLock;
 
-/// A stand-in for the rider's collision spheres. `CollBody_PointMassInertia` 0x236530 weighs the
+/// STANDIN: spheres placed on a 1.7 m rider, for each character's own collision spheres.
+/// `CollBody_PointMassInertia` 0x236530 weighs the
 /// spheres 4,2,2,2,2,2,2,2,4,4,2,2,2,2,3,3 (table 0x3a3f68, 40 in all); where they sit comes from
 /// each character's model, which we do not have, so these are placed on a 1.7 m rider standing
 /// on a 1.5 m board: (mass, centre in the body frame in Bevy axes (x right, y up, z tail), radius).

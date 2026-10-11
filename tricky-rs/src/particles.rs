@@ -3,7 +3,7 @@
 //! Each particle is worked out from its birth time alone, as the game does:
 //!   P = M (origin + u1 A + u2 B),  V = M (vel + u3 S1 + u4 S2 + u5 S3),  W = accel / k
 //!   pos(t) = P + W t + (V - W) / k * f(min(k t, 2.7)),  f(x) = 0.73 x - 0.113 x^2
-//! (a stand-in for drag towards the terminal velocity W). Colour runs from c0 to c1 over the
+//! (STANDIN: f(x), for the game's drag towards the terminal velocity W). Colour runs from c0 to c1 over the
 //! longest life, plus random amounts of c2 and c3; trails repeat the particle a little earlier.
 
 use crate::logic::EmitterDef;

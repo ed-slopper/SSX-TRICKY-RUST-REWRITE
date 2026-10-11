@@ -1,6 +1,8 @@
 //! Things on the course that get knocked away when a rider hits them (path markers, crash
 //! bags, small billboards). Each is a ball as far as physics goes: it flies, bounces and rolls
 //! to a stop on the snow.
+//!
+//! STANDIN: a ball's physics, for the game's own object collision and bounce (port-notes/world.md)
 
 use crate::collide::CollisionWorld;
 use crate::rider::{Rider, BODY_RADIUS};

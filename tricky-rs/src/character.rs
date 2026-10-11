@@ -3,6 +3,9 @@
 //! The original animation data (.afl) has not been decoded by anyone yet, so the pose is built
 //! here from a handful of joint angles that follow what the rider is doing.
 //!
+//! STANDIN: models, skeletons and clips read from our Python exports (chars/*.json, anims/*.json), for the game's own character and animation files
+//! STANDIN: the pose built from joint angles (when no clip is there), for the game's animation of the rider (G5)
+//!
 //! Model space (as stored): centimetres, hips at the origin, +X = the character's left,
 //! -Y = the way the character faces, +Z = up.
 
