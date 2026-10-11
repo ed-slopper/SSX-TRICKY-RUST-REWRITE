@@ -49,7 +49,7 @@ state machine and the renderer are ours. Nothing has been checked against the or
 | E5a2 | The HUD's and menus' text from `american.loc` by the ids the game asks for (`Loc_GetString` callers; `CONSTANT.LOC` names them) instead of our strings | unowned | E5a | | Gap of E5a |
 | E5b | Config files: `DATA/CONFIG/*.INF` (SNOW, BANKS, MUSIC, MUSICMAP, INTROMUS, AUDIO, CROWD, CHANT, SPEECH, JUKEBOX, NASCRIPT) and `BTNMAP*.DAT` | unowned | E2b | | Split of E5 |
 | E5c | Camera scripts: `DATA/CAMERA/*.CML` from the disc | unowned | E2b | | Split of E5 |
-| E5d | `DATA/TUTORIAL/TRICKDEF.DAT` (today `chars/trickbook.json`) from the disc | unowned | E2b | | Split of E5 |
+| E5d | `DATA/TUTORIAL/TRICKDEF.DAT` (today `chars/trickbook.json`) from the disc | unowned | E2b | ed-slopper/puffin (2026-10-11) | Split of E5 |
 | E5e | Fonts: `DATA/FONTS/*.SFN` (today `chars/fonts`, `tools/sfn`) from the disc | unowned | E3b | | Split of E5 |
 | E6 | Loading and memory: what the game loads when (load screens, course switch), only as far as it changes behaviour | unowned | E1 | | [est] |
 | E7 | World: terrain tessellation as the game does it, world cells (`World_CellActivate_RunPersistant` 0x25fed0), instance queries `World_QueryInstances` 0x25b878, ray casts `World_RayCast` 0x25aff8 / `World_RayCastInstance` 0x25bf48 | unowned | E3a | | [repo] `collide.rs` (triangle grid of the drawn mesh) is a stand-in for these |
@@ -316,3 +316,4 @@ matches the original.
 - 2026-10-11 trailrig/heron: split G1c into G1c1 (claimed) and G1c2.
 - 2026-10-11 ed-slopper/puffin: split E5 into E5a-E5e; claim E5a.
 - 2026-10-11 ed-slopper/puffin: E5a done; added E5a2 (gap of E5a).
+- 2026-10-11 ed-slopper/puffin: claim E5d.
