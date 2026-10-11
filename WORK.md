@@ -57,7 +57,7 @@ state machine and the renderer are ours. Nothing has been checked against the or
 | E9 | Script machine: `TriggerScript_Run`, `TriggerScript_ExecOp` 0x13bfd0 with every op, controllers (`TriggerScript_Op0_SpawnController` 0x13c600), persistent cell scripts, run at runtime instead of read statically | unowned | E3c | | [repo] `logic.rs` reads SSFLogic.json statically today |
 | E9b2 | Run the script threads in the app (`tricky_game::script` on `tricky_data::ssf` instead of `logic.rs`'s static walk of SSFLogic.json): the world's node list order (`BxList_Add` 0x17d4e8 links new nodes at the head; the update loop's order to confirm), `World_DeleteScriptObject` 0x13bbc0, the starters (area wake, contact, controller goal, the engine's RaceMode / StartCountDown calls) | unowned | E9b, E7 | | Gap of E9b |
 | E9d | World ops 1 (camera node), 2 (effects, spline riders), 8 (sound), 13 (reset), 23 (camera shake `Cam_Shake` 0x177758), 24 (teleport), 25 (rail switch `RailMan_SetRail` 0x149030) | unowned | E9b | | Gap of E9a |
-| E9g | Breakables: `cFenceNode` (12), `cCrackedNode` (14), `cMeshAnimNode` (20) | unowned | E9b | | Gap of E9a |
+| E9g | Breakables: `cFenceNode` (12), `cCrackedNode` (14), `cMeshAnimNode` (20) | unowned | E9b | ed-slopper/puffin (2026-10-11) | Gap of E9a |
 | E9i | Texture and object animation controllers: `cUVScrollNode` (10), `cTexFlipNode` (11), `cFlagNode` (13), `cUVScrollTexFlipNode` (19), `cAnimObjectNode` (0x100), `cAnimDeltaNode` (0x101), `AnimComboNode_Init` (0x102), the unnamed node 0x19a5a8 (0x103) | unowned | E9b | | Gap of E9a. G7h checks five of them |
 | E9j | The rest: `cCrowdBoxNode` (17), `cParticleNode` (22), `cMovieNode` (23) | unowned | E9b | | Gap of E9a |
 | E10 | Input: pad reading, stick shaping and dead zones, button bits (the chord 0x600), vibration, `cCheatCodes::Update` 0x26CF60 | unowned | E1 | | [repo] findings.md |
@@ -480,3 +480,4 @@ matches the original.
 - 2026-10-11 ed-slopper/puffin: E9f2 done.
 - 2026-10-11 ed-slopper/puffin: claim E9h.
 - 2026-10-11 ed-slopper/puffin: E9h done (roller body left to E8c).
+- 2026-10-11 ed-slopper/puffin: claim E9g.
