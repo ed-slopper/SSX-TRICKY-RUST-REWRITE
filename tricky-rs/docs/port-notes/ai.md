@@ -177,3 +177,21 @@ Part of the port notes (index: [README.md](README.md)); units and wording as des
 - `AIP_DistanceToLineBox` 0x197830: the largest per-axis distance outside the path's box (+0x1c min, +0x28 max).
   `AIP_SortLinesByDistance` 0x197f28 (the course's set at 0x337fb8): up to n paths, first those the point is inside
   (in order), then the nearest box one at a time (the earlier on a tie); with the flag only respawnable ones.
+
+## Path following, exactly (row G4f, checked on every course: `tests/aipath.rs`)
+
+- rider+0x418 is the finish time (−1 until the line, `Boarder_Finish` 0x11da40), not "human".
+- `Boarder_UpdatePathAhead` 0x118090, every tick, every rider: last distance (+0x340) = distance (+0x344); the
+  projection from its memory (+0x390) gives the distance, the nearest point (+0x350) and how far off (+0x348); the
+  point 800 ahead (+0x360). While racing (+0x418 < 0): over 500 off on every 60th tick, or within 200 of the path's
+  end (forced: not the same path), or a fork marker (event 300, `cPath::vf1` 0x197b90) between the last distance and
+  this one → `Boarder_ChoosePathAhead`. Then +0x370 = the heading from the nearest point to the point ahead.
+- `Boarder_ChoosePathAhead` 0x118830: the look point 800 ahead along the velocity; the preference (unless +0x41c):
+  alpine board (+0x420 = 2): 0 when leading (place +0x110 = 0), 100 with a negative meter, else 50; class 0: 0 in
+  3rd/4th place (place 2–3) with at least 0.10337617 meter, 100 under it; class 1: 0 in 4th/5th with at least
+  0.31186903, 100 under; kept unless `(uint)(rider virtual +0x74 × 100) < Rand_Game() % 100` (then 50). Of the six
+  nearest paths to the look point (box distance), each that runs 200 past the look point's projection: cost = |rider
+  − path|² + |look − path 800 further|² − (100 − |U3 − preference|) × 23187.357 (no preference term with +0x41c);
+  the cheapest; the same path means no change. A new path: memory reset, projected from the start, the point
+  ahead, last distance = distance.
+- Not yet: `Boarder_AdvanceOnPath` 0x118c08 and `Boarder_FindNearestLine` 0x119d30 (the reset placement; row G1c3).

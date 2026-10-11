@@ -17,12 +17,14 @@ pub struct Path {
     pub points: Vec<([f32; 3], f32)>,
     pub u3: u32,
     pub respawnable: u32,
+    /// the events as the game keeps them: (type as its place in the table, value, start, end)
+    pub events: Vec<(u32, u32, f32, f32)>,
 }
 
 impl Path {
     /// From a path of a course's `.aip`.
     pub fn from_aip(p: &tricky_data::aip::AipPath) -> Path {
-        Path { start: p.start, min: p.v1, max: p.v2, points: p.points.clone(), u3: p.u3(), respawnable: p.respawnable() }
+        Path { start: p.start, min: p.v1, max: p.v2, points: p.points.clone(), u3: p.u3(), respawnable: p.respawnable(), events: p.events.iter().map(|e| (e.kind, e.value, e.start, e.end)).collect() }
     }
 
     fn dir(&self, k: usize) -> V4 {
@@ -201,4 +203,139 @@ pub fn sort_by_distance(paths: &[Path], p: V4, n: usize, respawnable: bool) -> V
         out.push(best);
     }
     out
+}
+
+impl Path {
+    /// `cPath::vf1` 0x197b90 (vtable +0x14): a fork marker (event type 0x1f, file code 300) overlapping `from..to`.
+    pub fn fork_between(&self, from: f32, to: f32) -> bool {
+        self.events.iter().any(|e| e.2 <= to && from <= e.3 && e.0 == 0x1f)
+    }
+}
+
+/// The rider's place on its AI path (rider+0x57a4 the path, +0x340 the last distance along, +0x344 the distance
+/// along, +0x348 how far off it (flat), +0x350 the nearest point, +0x360 the point 800 ahead, +0x370 the heading
+/// from the one to the other, +0x390 the projection's memory).
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct Follow {
+    pub path: usize,
+    pub last: f32,
+    pub along: f32,
+    pub off: f32,
+    pub near: V4,
+    pub ahead: V4,
+    pub heading: f32,
+    pub cache: Cache,
+}
+
+/// What `Boarder_ChoosePathAhead` weighs a path by: the rider's position (+0x140) and velocity (+0x150), +0x41c
+/// (set: no preference), the board class (+0x420), its place (+0x110), the meter (+0x1c), how likely it keeps its
+/// preference (the rider's virtual +0x74, 0..1).
+#[derive(Clone, Copy, Debug, Default)]
+pub struct Chooser {
+    pub pos: V4,
+    pub vel: V4,
+    pub x41c: i32,
+    pub class: u32,
+    pub place: i32,
+    pub meter: f32,
+    pub keep: f32,
+}
+
+/// `Boarder_ChoosePathAhead` 0x118830: from the point 800 ahead along the velocity, of the six nearest paths (not
+/// the one ridden when `forced`, at its end) that run on 200 past it, the one passing nearest the rider and the
+/// point and carrying on that way (the squared distances from the rider to the path and from the point to the
+/// path 800 further), less (100 − |its U3 − the preference|) × 23187.357. The preference: by board class, place and
+/// meter (0 a leader on an alpine board; 100 short of meter; else 50), kept with the chance `keep` against
+/// `Rand_Game() % 100` (`rand`, called once unless +0x41c). A new path moves the rider onto it (true).
+pub fn choose_path_ahead(paths: &[Path], f: &mut Follow, forced: bool, c: &Chooser, rand: &mut dyn FnMut() -> i32) -> bool {
+    let look = crate::jump::add(c.pos, scale(crate::jump::normalize(c.vel), 800.0));
+    let mut pref = 50;
+    if c.x41c == 0 {
+        let mut p = 50;
+        if c.class == 2 {
+            if c.place == 0 {
+                p = 0;
+            } else if c.meter < 0.0 {
+                p = 100;
+            }
+        } else if c.class == 0 {
+            if 0.103_376_17 <= c.meter {
+                if (c.place.wrapping_sub(2) as u32) < 2 {
+                    p = 0;
+                }
+            } else {
+                p = 100;
+            }
+        } else if 0.311_869_03 <= c.meter {
+            if (c.place.wrapping_sub(3) as u32) < 2 {
+                p = 0;
+            }
+        } else {
+            p = 100;
+        }
+        pref = p;
+        let r = rand();
+        let k = c.keep * 100.0;
+        // libgcc's `__fixunssfsi`: below 2^31 as a signed conversion (a negative chance wraps high)
+        let kept = if k >= 2_147_483_648.0 { ((k - 2_147_483_648.0) as i32 as u32).wrapping_add(0x8000_0000) } else { k as i32 as u32 };
+        if kept < (r % 100) as u32 {
+            pref = 50;
+        }
+    }
+    let mut best = 1e37f32;
+    let mut chosen: Option<usize> = None;
+    for k in sort_by_distance(paths, look, 6, false) {
+        if k == f.path && forced {
+            continue;
+        }
+        let p = &paths[k];
+        let (d, near, _) = p.project(look);
+        if !(d <= p.length() - 200.0) {
+            continue;
+        }
+        let ahead = p.position_at(d + 800.0).0;
+        let a = sub(look, ahead);
+        let b = sub(c.pos, near);
+        let mut cost = crate::jump::dot(b, b) + crate::jump::dot(a, a);
+        if c.x41c == 0 {
+            cost -= (100 - (p.u3 as i32 - pref).abs()) as f32 * 23_187.357;
+        }
+        if cost < best {
+            best = cost;
+            chosen = if k == f.path { None } else { Some(k) };
+        }
+    }
+    let Some(k) = chosen else { return false };
+    f.path = k;
+    f.cache.index = -1;
+    let (d, off) = paths[k].project_from(c.pos, &mut f.near, &mut f.cache);
+    f.off = off;
+    f.along = d;
+    f.ahead = paths[k].position_at(d + 800.0).0;
+    f.last = f.along;
+    true
+}
+
+/// `Boarder_UpdatePathAhead` 0x118090, every tick: the rider's place on its path moves on (the last distance kept,
+/// the projection from its memory, the point 800 ahead); while racing (rider+0x418 < 0, `racing`) a new path is
+/// chosen when over 500 off it (on every 60th tick), within 200 of its end (not the same one), or past a fork
+/// marker; then the heading from the nearest point to the point ahead (the game's inline atan2).
+pub fn update_path_ahead(paths: &[Path], f: &mut Follow, racing: bool, tick: i32, c: &Chooser, rand: &mut dyn FnMut() -> i32) {
+    f.last = f.along;
+    let (d, off) = paths[f.path].project_from(c.pos, &mut f.near, &mut f.cache);
+    f.off = off;
+    f.along = d;
+    f.ahead = paths[f.path].position_at(d + 800.0).0;
+    if racing {
+        if 500.0 < f.off && tick % 60 == 0 {
+            choose_path_ahead(paths, f, false, c, rand);
+        } else if paths[f.path].length() - 200.0 < f.along {
+            choose_path_ahead(paths, f, true, c, rand);
+        } else if paths[f.path].fork_between(f.last, f.along) {
+            choose_path_ahead(paths, f, false, c, rand);
+        }
+    }
+    let dx = f.ahead[0] - f.near[0];
+    let dy = f.ahead[1] - f.near[1];
+    f.heading = crate::jump::atan2_inline(dy, dx);
 }

@@ -148,3 +148,125 @@ fn path_geometry_matches_the_original() {
         println!("{name}: {} paths checked", paths.len());
     }
 }
+
+#[test]
+fn path_following_matches_the_original() {
+    // `Boarder_UpdatePathAhead` 0x118090 (and `Boarder_ChoosePathAhead` 0x118830 under it) on riders placed about
+    // every course's paths, loaded into the game's own path set (0x337fb8); `Rand_Game` and the rider's virtual +0x74
+    // answered, the race tick and the rider's fields set
+    use std::cell::RefCell;
+    use std::rc::Rc;
+    use tricky_game::aipath::{update_path_ahead, Chooser, Follow};
+    let Some(dir) = std::env::var_os("TRICKY_AIP_DIR") else { return };
+    let mut files: Vec<_> = std::fs::read_dir(&dir).unwrap().filter_map(|e| e.ok()).map(|e| e.path()).filter(|p| p.extension().is_some_and(|x| x == "aip")).collect();
+    files.sort();
+    let mut g = Rng(0x7c51_e0a9_3b26_d48f);
+    let mut chose = [0u32; 2];
+    for file in files {
+        let Some(mut r) = Runner::from_env() else { return };
+        r.float_rules = Rules::parse("add=n,mul=n,div=n,cvt=n").unwrap();
+        for f in [0x102f50u32, 0x2510f8, 0x2f79a8, 0x2f7018, 0x118090, 0x118830, 0x197b50, 0x1979f8, 0x197250, 0x197478, 0x197830, 0x197f28, 0x197f08, 0x197910, 0x197b90] {
+            r.allow(f);
+        }
+        let bytes = std::fs::read(&file).unwrap();
+        // the course's paths in the game's path set
+        for f in [0x197da0u32, 0x198518, 0x1983d0, 0x196f28, 0x198738, 0x198720, 0x198750, 0x197130, 0x197170, 0x2cc808, 0x2ce114, 0x196700, 0x196718, 0x196990, 0x196998] {
+            r.allow(f);
+        }
+        let buf = r.mem.alloc(bytes.len() as u32 + 16);
+        for (k, b) in bytes.iter().enumerate() {
+            r.mem.write_u8(buf + k as u32, *b);
+        }
+        r.stub(0x2c8a70, move |c, _| c.set_gpr(2, buf as u64));
+        let heap = r.mem.alloc(0x40_0000);
+        let next = Rc::new(std::cell::Cell::new(heap));
+        let n = next.clone();
+        r.stub(0x2ccf70, move |c, _| {
+            let size = (c.gpr(5) as u32 + 15) & !15;
+            let at = n.get();
+            n.set(at + size);
+            c.set_gpr(2, at as u64);
+        });
+        r.cpu.set_gpr(4, 0x337fb8);
+        r.cpu.set_gpr(5, 0);
+        r.call(0x197da0).expect("load");
+        let paths: Vec<Path> = tricky_data::aip::read(&bytes).unwrap().ai_paths.iter().map(Path::from_aip).collect();
+        let base = r.mem.read_u32(0x337fb8 + 4);
+        let rolls: Rc<RefCell<Vec<i32>>> = Rc::default();
+        let rl = rolls.clone();
+        r.stub(0x23d4d8, move |c, _| { let v = rl.borrow_mut().remove(0); c.set_gpr(2, v as u64); });
+        let keep = Rc::new(std::cell::Cell::new(0.5f32));
+        let kp = keep.clone();
+        r.stub(0x1000, move |c, _| c.set_f(0, kp.get()));
+        let app = r.mem.alloc(0x800);
+        let game = r.mem.alloc(0x100);
+        let world = r.mem.alloc(0x100);
+        r.mem.write_u32(0x337c58, app);
+        r.mem.write_u32(app + 0x730, game);
+        r.mem.write_u32(game + 0x1c, world);
+        let rider = r.mem.alloc(0x5900);
+        let vt = r.mem.alloc(0x100);
+        r.mem.write_u32(rider, vt);
+        r.mem.write_u16(vt + 0x70, 0);
+        r.mem.write_u32(vt + 0x74, 0x1000);
+        let name = file.file_name().unwrap().to_string_lossy().to_string();
+        for case in 0..1500 {
+            let k = g.next() as usize % paths.len();
+            let p = &paths[k];
+            let len = p.length();
+            let d0 = if g.next() % 4 == 0 { g.f((len - 250.0).max(0.0), len) } else { g.f(0.0, len) };
+            let (q, _) = p.position_at(d0);
+            let off = [300.0f32, 600.0, 900.0][g.next() as usize % 3];
+            let pos = [q[0] + g.f(-off, off), q[1] + g.f(-off, off), q[2] + g.f(-200.0, 200.0), 1.0];
+            let vel = [g.f(-2500.0, 2500.0), g.f(-2500.0, 2500.0), g.f(-300.0, 300.0), 0.0];
+            let mut f = Follow { path: k, last: g.f(0.0, len), along: d0, off: 0.0, near: [g.f(-9.0, 9.0); 4], ahead: [0.0; 4], heading: 0.0, cache: Cache::default() };
+            if g.next() % 2 == 0 {
+                let i = g.next() as usize % p.points.len();
+                let run: f32 = p.points[..i].iter().map(|x| x.1).fold(0.0, |a, b| a + b);
+                f.cache = Cache { start: p.position_at(run).0, along: run, index: i as i32 };
+            }
+            let c = Chooser { pos, vel, x41c: (g.next() % 4 == 0) as i32, class: g.next() % 3, place: (g.next() % 6) as i32, meter: g.f(-0.1, 1.0), keep: [g.f(0.0, 1.0), 1.0, 0.0][g.next() as usize % 3] };
+            let racing = g.next() % 5 != 0;
+            let tick = (g.next() % 300) as i32 * if g.next() % 2 == 0 { 60 } else { 1 };
+            let roll_v: Vec<i32> = (0..4).map(|_| (g.next() % 1000) as i32).collect();
+            *rolls.borrow_mut() = roll_v.clone();
+            keep.set(c.keep);
+            let m = &mut r.mem;
+            m.write_u32(world + 0x18, tick as u32);
+            put4(m, rider + 0x140, pos);
+            put4(m, rider + 0x150, vel);
+            m.write_u32(rider + 0x57a4, base + 0x40 * k as u32);
+            m.write_f32(rider + 0x340, f.last);
+            m.write_f32(rider + 0x344, f.along);
+            put4(m, rider + 0x350, f.near);
+            put4(m, rider + 0x390, f.cache.start);
+            m.write_f32(rider + 0x3a0, f.cache.along);
+            m.write_u32(rider + 0x3a4, f.cache.index as u32);
+            m.write_u32(rider + 0x418, if racing { 0xffff_ffff } else { 500 });
+            m.write_u32(rider + 0x41c, c.x41c as u32);
+            m.write_u32(rider + 0x420, c.class);
+            m.write_u32(rider + 0x110, c.place as u32);
+            m.write_f32(rider + 0x1c, c.meter);
+            r.cpu.set_gpr(4, rider as u64);
+            r.call(0x118090).unwrap_or_else(|e| panic!("{name} case {case}: {e}"));
+            let used = roll_v.len() - rolls.borrow().len();
+            let path0 = f.path;
+            let mut q = roll_v.clone();
+            let mut rand = || q.remove(0);
+            update_path_ahead(&paths, &mut f, racing, tick, &c, &mut rand);
+            let m = &mut r.mem;
+            let theirs = (
+                ((m.read_u32(rider + 0x57a4) - base) / 0x40) as usize,
+                m.read_u32(rider + 0x340), m.read_u32(rider + 0x344), m.read_u32(rider + 0x348),
+                get4(m, rider + 0x350), get4(m, rider + 0x360), m.read_u32(rider + 0x370),
+                get4(m, rider + 0x390), m.read_u32(rider + 0x3a0), m.read_u32(rider + 0x3a4) as i32,
+            );
+            let ours = (f.path, f.last.to_bits(), f.along.to_bits(), f.off.to_bits(), bits(f.near), bits(f.ahead), f.heading.to_bits(), bits(f.cache.start), f.cache.along.to_bits(), f.cache.index);
+            assert_eq!(theirs, ours, "{name} case {case}: path {k}, racing {racing}, tick {tick}, {c:?}");
+            assert_eq!(used, roll_v.len() - q.len(), "{name} case {case}: rolls");
+            chose[(f.path != path0) as usize] += 1;
+        }
+        println!("{name}: path following checked");
+    }
+    assert!(chose[1] > 200, "kept / changed path: {chose:?}");
+}
