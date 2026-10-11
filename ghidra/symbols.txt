@@ -6786,3 +6786,9 @@ G 2fa748 fiprintf
 G 2feb28 vfiprintf
 G 2feba0 _vfiprintf_r
 G 2f46b0 __sjthrow
+G 11f440 Boarder_SetSfxMuted
+G 11f468 Boarder_TickSfxFadeIn
+G 218318 Sfx_MuteRiderLoops
+G 218b68 Sfx_UnmuteRiderLoops
+G 214e00 Audio_SetMusicMode4
+G 21a710 Sfx_GetSteerAmount
