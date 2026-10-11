@@ -126,3 +126,23 @@ Types 1, 3 and 4 spawn nothing.
   runs event 4 and forgets the rider; anything else Finish(1). With no rider, `(int)(p5·60)` frames to Finish(0).
 - Op 0 replacing: a type-5 node is never replaced; the same type restarts (vf 0x74) only when its vf 0x64 says it is
   running (0 for these four); another type deletes the old first (type 20 takes the old over and deletes it after).
+
+## Boosts (row E9f; `tricky_game::boosts`, checked: `tests/boosts.rs`)
+
+- Op 0 words (op+0xc on): plain / random / tube end (`cBoostNode` 0x140498): mode (half; 1 = always on), re-arm
+  seconds (`(int)(·60)` frames, +0x58; mode 1 starts armed, +0x5c), rate (+0x54), target (×100, +0x50), direction
+  (+0x40, w 0). Random adds a second corner (op+0x28 → +0x110); tube end three aim points (op+0x28, +0x34, +0x40 →
+  +0x110..) and three targets (op+0x4c.. ×100 → +0x1a0). Z (`cZBoostNode` 0x141af0): rate, target, direction, the
+  height (op+0x20 → +0x5c) and the snap distance (op+0x24 → +0x60).
+- Update (0x140688): on while mode 0 or the re-arm count (decremented first) is still > 0; the overlapping riders
+  are walked when mode 1 or the count is out, and each one the object's mesh hits (`WorldNode_RayCast`) is pushed:
+  d = target − v·dir (four lanes, VU0 order); d > 0: v += dir·(d·rate·1/60). Pushing keeps it on; otherwise
+  Finish(1). Message kind 1 re-arms.
+- Random: a rider's direction is picked once — the box's middle plus `Rand_GameRange(−h, h)` per axis where the
+  half-size h > 0.005, normalised — and forgotten when the boost is idle and the rider was not pushed that frame.
+  Tube end: the direction is aim point n normalised and the target n, n from 0x31d338[rider] (set by the lap boost).
+  A zero direction normalises to 0 (VU0's 1/√0 is the largest float).
+- Z: riders the mesh hits are marked; each marked rider below the height is lifted: within the snap distance its z
+  is set to the height, else (re-placed first when on a rail, +0x424 = 5) it is pushed and its x, y velocity
+  zeroed; a marked rider at or above the height is unmarked. No marked rider below: Finish(1).
+- Not modelled: VU0's clamping on overflow (only reached with rates and targets far beyond the courses').
