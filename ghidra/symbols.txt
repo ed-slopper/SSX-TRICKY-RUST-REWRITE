@@ -5198,3 +5198,4 @@ G 2057a0 SkinPart_SetChildMatrices
 G 2083d8 RiderSkin_SetRootMatrix
 G 1364d0 BoarderRender_Draw
 G 136370 BoarderRender_PickLod
+G 166cb0 Career_UpdateBestStats

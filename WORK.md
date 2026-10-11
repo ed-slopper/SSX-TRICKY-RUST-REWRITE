@@ -228,3 +228,4 @@ matches the original.
 - 2026-10-11 trailrig/heron: claim E8f.
 - 2026-10-11 trailrig/heron: E8f done; added E13 and G15 (gaps of E8f).
 - 2026-10-11 trailrig/heron: split E1a into E1a1 (claimed) and E1a2.
+- 2026-10-11 ed-slopper/puffin: F1c in progress (still claimed): 5,201 names (index 4,382/7,426). Added since: audio/speech (85 speech events by id, banks, streams, emitters, crowd), sphere-tree collision and the sweep-and-prune broadphase, EA Huffman encoder, rider skin/mpf loader (notes/characters.md), GS state packets, AI ride modes, pause menu pages, animation clip modes (port-notes/boarder.md). Left: PS2 memcard driver states, renderer mesh/swizzle, replay control drawing, HUD layout tables, ~30 large unnamed maths routines.
