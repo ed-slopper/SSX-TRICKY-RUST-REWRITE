@@ -43,6 +43,7 @@ pub mod states;
 pub mod stats;
 pub mod rider;
 pub mod surface;
+pub mod terrain;
 pub mod world;
 pub mod worldline;
 pub mod worldops;

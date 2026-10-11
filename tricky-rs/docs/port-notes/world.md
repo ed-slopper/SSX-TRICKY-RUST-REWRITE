@@ -129,6 +129,25 @@ Part of the port notes (index: [README.md](README.md)); units and wording as des
 - An object's flags (+0xe8) are the physics record's word reset (defaults copied down); its box (+0xcc..+0xe0) is
   zero in the file and filled at run time by code not yet found (row E7a3; the test gives each a box).
 
+## Terrain collision (row E7c1; `tricky_game::terrain`, checked: `tests/terrain.rs`)
+
+- The patch cache (`CollCache_Init` 0x251ef8, `CacheBuffer_Lookup` 0x251f50 via `World_LookupCollCache` 0x25c750):
+  entries of 0x1cd0 bytes, the least-used one evicted; a new entry is cleared (`CacheBuffer_ClearEntry`: 1e10 in
+  every quad record's normals and box) and filled by the vector unit: `FUN_002576a8` loads the patch's 16
+  coefficient vectors (+0x50) into vf1..vf16 and runs VU0 micro address 0; `Vu0_CopyOutData` copies the 100 points
+  from VU0 data qword 32 to entry +0x10.
+- The patch program (in the 215-instruction upload, chain 0x31cac0; its basis table (t³, t², t, 1) for t = k/9 at
+  data qwords 16..25 comes from the chain at 0x31d1d0): for each row i, C_k = vf(4k+1)·Bᵢ.x + … + vf(4k+4)·Bᵢ.w,
+  then point (i, j) = C₀·Bⱼ.x + C₁·Bⱼ.y + C₂·Bⱼ.z + C₃·Bⱼ.w (x, y, z; w 1): the patch's polynomial at s = j/9,
+  t = i/9.
+- The patch test (`cWorldIntersectType` +0x48, 0x25c7c8): kind 0 queries use the 3 × 3 coarse quads (every third
+  point, records at +0x1a90), others the 9 × 9 fine ones (+0x650); each 0x40 record: triangle A's normal
+  unit((p11 − p10) × (p10 − p01)), B's unit((p01 − p10) × (p10 − p00)), the box (made when first needed). The
+  caller's last-hit record (+0 patch, +4 / +6 quad, +8 triangle A, +0xc kind) names a quad to try first (its
+  triangle only, no box test); a miss clears the record (+0x10..+0x14 halves −1). Then every quad in order, box
+  test, triangle A (p11, p10, p01) then B (p01, p10, p00) by the shape's +0x28: the **first** hit is taken and
+  noted; a kind-2 query (the ground probe) then refines it with its +0x50 at the quad's middle (row E7c2).
+
 ## Keyframed objects (`cAnimObjectNode` 0x198810, `cMeshAnimFrame::vf1` 0x1cb498, `AnimCurve_FindSegment` 0x1cb770)
 
 - Model objects with an Animation: base pose U1..U6 (tx, ty, tz cm; rx, ry, rz degrees), AnimationAction a mask

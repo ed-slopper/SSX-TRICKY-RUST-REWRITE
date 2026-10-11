@@ -5,6 +5,7 @@
 //! runner on the disc's courses (`tests/world.rs`). The query is a [`Shape`] (`cWorldLine` here, row E7a); a patch's
 //! own test goes through the patch cache (row E7c) and is the caller's ([`WorldEnv::patch`]).
 
+pub use crate::terrain::LastHit;
 use crate::worldline::{Hit, WorldLine};
 
 type V4 = [f32; 4];
@@ -164,18 +165,11 @@ pub struct CastHit {
     pub object: Option<usize>,
 }
 
-/// Where the last patch hit was (the caller's +0x10 / +0x12 / +0x14 halves: cell, INode, patch in the INode).
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
-pub struct LastPatch {
-    pub cell: i16,
-    pub node: i16,
-    pub patch: i16,
-}
-
 /// What the casts need from outside.
 pub trait WorldEnv {
-    /// The shape's +0x48 for patch `i` (through the patch cache, `World_LookupCollCache`, row E7c).
-    fn patch(&mut self, q: &dyn Shape, i: usize) -> Option<Hit>;
+    /// The shape's +0x48 for patch `i` (through the patch cache, `World_LookupCollCache`; `terrain::patch_test`),
+    /// given the caller's last-hit record.
+    fn patch(&mut self, q: &dyn Shape, i: usize, last: Option<&mut LastHit>) -> Option<Hit>;
     /// An animated object's `n`-th animated part's frame (`MeshAnimNode_GetFrameMatrix` 0x1998d0).
     fn frame(&mut self, object: usize, n: usize) -> [V4; 4];
 }
@@ -223,7 +217,7 @@ impl World {
     /// test (each hit noted in `last`), then its solid objects (flag 0x20, surface not −1) whose boxes meet it,
     /// through [`Self::ray_cast_instance`]. A hit nearer the target than the best (and not rejected) is kept;
     /// with a target below 0 the first one is taken. −1 for none.
-    pub fn ray_cast(&self, q: &mut dyn Shape, show_off: bool, mut last: Option<&mut LastPatch>, env: &mut dyn WorldEnv) -> (f32, Option<CastHit>) {
+    pub fn ray_cast(&self, q: &mut dyn Shape, show_off: bool, mut last: Option<&mut LastHit>, env: &mut dyn WorldEnv) -> (f32, Option<CastHit>) {
         let target = q.target();
         let mut best = 1e20f32;
         let mut out = None;
@@ -248,10 +242,12 @@ impl World {
                             if patch.surface == 0x11 || !overlaps(patch.min, patch.max, q) {
                                 continue;
                             }
-                            let Some(h) = env.patch(q, p) else { continue };
+                            let Some(h) = env.patch(q, p, last.as_deref_mut()) else { continue };
                             if let Some(l) = last.as_deref_mut() {
                                 let (cx, cy) = (if x < 0 { 0 } else { x.min(self.width - 1) }, if y < 0 { 0 } else { y.min(self.height - 1) });
-                                *l = LastPatch { cell: (cy as i16).wrapping_mul(self.width as i16).wrapping_add(cx as i16), node: k as i16, patch: pi as i16 };
+                                l.cell = (cy as i16).wrapping_mul(self.width as i16).wrapping_add(cx as i16);
+                                l.node = k as i16;
+                                l.index = pi as i16;
                             }
                             let _ = ci;
                             if (h.t - target).abs() < (best - target).abs() && !q.reject(h.normal) {

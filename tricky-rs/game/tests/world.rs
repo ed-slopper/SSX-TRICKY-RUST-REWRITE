@@ -13,7 +13,7 @@ use r5900::{Mem, Runner};
 use tricky_data::pbd::Pbd;
 use tricky_data::ssf::Ssf;
 use tricky_game::controllers::restore_flags;
-use tricky_game::world::{Cell, CollMesh, LastPatch, Node, Object, Part, PartMesh, Patch, Shape, World, WorldEnv};
+use tricky_game::world::{Cell, CollMesh, LastHit, Node, Object, Part, PartMesh, Patch, Shape, World, WorldEnv};
 use tricky_game::worldline::{Hit, WorldLine};
 
 type V4 = [f32; 4];
@@ -66,7 +66,7 @@ struct Env {
 }
 
 impl WorldEnv for Env {
-    fn patch(&mut self, _: &dyn Shape, i: usize) -> Option<Hit> {
+    fn patch(&mut self, _: &dyn Shape, i: usize, _: Option<&mut LastHit>) -> Option<Hit> {
         self.asked.push(i);
         fake_patch(self.salt, i)
     }
@@ -400,7 +400,7 @@ fn world_casts_match_the_original() {
             r.call(if query { 0x25b878 } else { 0x25aff8 }).unwrap_or_else(|e| panic!("{c} case {case}: {e:?}"));
             let got = r.cpu.f(0);
             let mut q = WorldLine::new(target, fr, tt, 2);
-            let mut lp = LastPatch { cell: 0x7777, node: 0x7777, patch: 0x7777 };
+            let mut lp = LastHit { cell: 0x7777, node: 0x7777, index: 0x7777, ..Default::default() };
             let (t, hit) = if query { world.query_instances(&mut q, show, &mut env) } else { world.ray_cast(&mut q, show, if with_last { Some(&mut lp) } else { None }, &mut env) };
             let what = format!("{c} case {case} ({}, show-off {show})", if query { "query" } else { "ray" });
             assert_eq!(got.to_bits(), t.to_bits(), "{what}: t");
@@ -429,7 +429,7 @@ fn world_casts_match_the_original() {
             }
             if with_last && !query {
                 let theirs = [h(m, last + 0x10), h(m, last + 0x12), h(m, last + 0x14)];
-                assert_eq!(theirs, [lp.cell, lp.node, lp.patch], "{what}: last patch");
+                assert_eq!(theirs, [lp.cell, lp.node, lp.index], "{what}: last patch");
             }
             totals[2] += 1;
             totals[3] += env.asked.len();
