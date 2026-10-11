@@ -6810,3 +6810,8 @@ G 2c64e0 Strm_AppendRequest
 G 2c6558 Strm_LookupRequest
 G 2c65a0 Strm_UnlinkRequest
 G 155dc8 Boarder_AddSpeedSample
+G 2c6610 Strm_MatchChunkType
+G 2c6890 Strm_OnReadDone
+G 2c68d0 Strm_OpenAfterClose
+G 2c6a28 Strm_KickNextRequest
+G 2c6b88 Strm_ScanPackets
