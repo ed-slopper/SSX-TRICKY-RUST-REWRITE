@@ -5,7 +5,9 @@ Part of the port notes (index: [README.md](README.md)); units and wording as des
 ## Meter, uber, scoring (score object boarder+0x5820, `Score_*` 0x155410–0x157490)
 
 - Points = round10(mult·units·6786.545); meter += units·0.6786545·(0.97878+0.35966·a1d)/(repeats+1) (negative too).
-- Units: half spin 0.0699543; flip 0.2499898; grab start (n+1)·0.0424975; hold rate·0.000750064/tick;
+- Units (exact floats in `tricky-rs/game/src/rider.rs`, G17): half spin 0.0699543 (`Score_UpdateSpin`); flip in
+  `Score_UpdateFlip` 0x155e68, grab start and grab rate (score+0x2c, by clip id) in `Score_StartGrab` 0x155ee8, hold
+  and rail per tick in `Score_Tick` 0x156e80. Values: flip 0.2499898; grab start (n+1)·0.0424975; hold rate·0.000750064/tick;
   uber clip seconds·0.0450038·rate; rail per tick f(v)·0.0025006 (f = v/(3200−3v), 0 under 50, 1 from 800 cm/s);
   rail spin +0.0699543 per new max of |round180|; onto rail 0.18; off rail 0.19998.
 - Leaving a rail scores the rail trick with no repeat check; > 1 s adds 1 to the chain; leaving switch/fakie gives

@@ -51,18 +51,28 @@ pub const RAIL_REACH: f32 = 0.9;
 /// how fast the board turns on a rail when steered (rad/s)
 /// a quarter turn on a rail is its 15-frame clip: 28 ticks (`RailSlideControl_CommitQuarterTurn` 0x107730)
 pub const RAIL_TWIST: f32 = std::f32::consts::FRAC_PI_2 / (28.0 / 60.0);
-// ---- scoring, from the original (points = value * 6786.5, rounded to 10)
-pub const PTS_SPIN_180: f32 = 474.7;
-pub const PTS_FLIP: f32 = 1696.6;
-/// starting a grab: this times (grabs already done this jump + 1), up to four
-pub const PTS_GRAB_START: f32 = 288.4;
-/// holding a grab, per second, times the grab's rate (1 to 2.5; a tweak doubles it; ubers are 18 or 20)
-pub const PTS_HOLD: f32 = 305.4;
-pub const PTS_RAIL: f32 = 1018.2;
-pub const PTS_ONTO_RAIL: f32 = 1221.7;
-pub const PTS_OFF_RAIL: f32 = 1357.2;
-pub const SWITCH_BONUS: f32 = 1.3;
-/// a full meter gives this long to do uber tricks
+// ---- scoring (row G17): the game adds "units" (score+0x24) and turns them into points as
+// round10(units · multiplier · 0.6786545 · 10000) (`Score_CalcPoints` 0x155440); these are those units, read from
+// the score code as bit patterns, times the same scale.
+const POINTS_PER_UNIT: f32 = f32::from_bits(0x3f2d_bc4d) * 10000.0; // 0.6786545 (`Score_CalcPoints`)
+/// half a turn of spin (`Score_UpdateSpin` 0x155e00: 0.06995432)
+pub const PTS_SPIN_180: f32 = f32::from_bits(0x3d8f_4436) * POINTS_PER_UNIT;
+/// a flip (`Score_UpdateFlip` 0x155e68: 0.2499898)
+pub const PTS_FLIP: f32 = f32::from_bits(0x3e7f_fd53) * POINTS_PER_UNIT;
+/// starting a grab: this times (grabs already done this jump + 1), up to four (`Score_StartGrab` 0x155ee8: 0.042497508)
+pub const PTS_GRAB_START: f32 = f32::from_bits(0x3d2e_11de) * POINTS_PER_UNIT;
+/// holding a grab, per second, times the grab's rate (1 to 2.5; a tweak doubles it) (`Score_Tick` 0x156e80: 0.000750064 a tick)
+pub const PTS_HOLD: f32 = f32::from_bits(0x3a44_9ff2) * 60.0 * POINTS_PER_UNIT;
+/// an uber trick, per second of its clip, times the uber's rate (18 or 20) (`Scoring_OnTrickEvent` 0x156148: 0.04500384)
+pub const PTS_UBER: f32 = f32::from_bits(0x3d38_55f2) * POINTS_PER_UNIT;
+/// grinding, per second at full speed (`Score_Tick` 0x156e80: 0.0025006225 a tick)
+pub const PTS_RAIL: f32 = f32::from_bits(0x3b23_e17c) * 60.0 * POINTS_PER_UNIT;
+/// getting onto and off a rail (`Score_LandTrick` 0x1569b0: 0.18001097, 0.19997726)
+pub const PTS_ONTO_RAIL: f32 = f32::from_bits(0x3e38_54cc) * POINTS_PER_UNIT;
+pub const PTS_OFF_RAIL: f32 = f32::from_bits(0x3e4c_c6d7) * POINTS_PER_UNIT;
+/// leaving a rail switch or fakie: the next air trick × 1.3 (`Score_StartTrickChain` 0x156618)
+pub const SWITCH_BONUS: f32 = f32::from_bits(0x3fa6_6666);
+/// a full meter gives this long to do uber tricks (`Score_StartGrab` 0x155ee8 and 0x156050 set it to 20.0)
 pub const UBER_SECONDS: f32 = 20.0;
 
 /// The original's surface table (`SurfaceTable_Init` 0x256188, crate::surface), by the patch's surface type:
@@ -1137,7 +1147,7 @@ impl Rider {
                 let clip = self.ubers.get(self.uber_id).map(|u| u.0.clone()).unwrap_or_default();
                 let sig = crate::trickdata::signature_grab(self.data.name);
                 let row = self.data.rows.iter().find(|r| (!r.uber_clip.is_empty() && !clip.contains("UT_SIG") && uber_grab(r.uber_clip) == uber_grab(&clip)) || (clip.contains("UT_SIG") && Some(r.grab) == sig));
-                self.air_pts += frames / 30.0 * PTS_HOLD * row.map_or(18.0, |r| if r.uber_rate > 0.0 { r.uber_rate } else { 18.0 });
+                self.air_pts += frames / 30.0 * PTS_UBER * row.map_or(18.0, |r| if r.uber_rate > 0.0 { r.uber_rate } else { 18.0 });
                 // the uber takes the grab's place in the name (each rider's own uber names)
                 let name = row.map_or("Uber".to_string(), |r| crate::trickdata::uber_name(self.data.name, r.grab).unwrap_or(r.uber).to_string());
                 match row.and_then(|r| self.air_names.iter().rposition(|n| n == r.grab || n == r.tweak)) {

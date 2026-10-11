@@ -5277,3 +5277,6 @@ G 2c8938 File_LoadAndUnpack
 G 2c81e8 File_ReadWhole
 G 2c8a70 File_Load
 G 2ca7f8 FileSys_Open
+G 155e68 Score_UpdateFlip
+G 155ee8 Score_StartGrab
+G 156e80 Score_Tick
