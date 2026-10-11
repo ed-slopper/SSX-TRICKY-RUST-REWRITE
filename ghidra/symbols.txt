@@ -6801,6 +6801,6 @@ G 2cafd8 FileSys_QueueUnmountBig
 G 2c8fc0 FileSys_UnmountBig
 G 2cebb0 FileSys_QueueUnsupported
 G 16e8f0 Cam_SetShakeParams
-G 193ad0 ReplayPin_Clear
+G 193ad0 ReplayPin_ZeroStart
 G 193ad8 ReplayPin_SetEnd
 G 157308 Score_ClearTrickEntries
