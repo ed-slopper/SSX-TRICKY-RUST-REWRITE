@@ -10,6 +10,7 @@ use crate::score::{Score, ScoreCall};
 use glam::Vec3;
 use crate::surface::SURFACE_TABLE;
 pub mod wipeout;
+pub mod ground_tick;
 pub use wipeout::{Wipe, course_points};
 
 // The numbers below are the original game's (SLUS_203.26), converted from its cm and 60 Hz ticks to metres and
@@ -351,6 +352,10 @@ pub struct Rider {
     /// this grab started scoring (`Score_StartGrab`) and was tweaked (its rate and its name the tweak's)
     pub grab_scored: bool,
     pub grab_tw: bool,
+    /// the game-side rider of the exact ground tick (`ground_tick.rs`), kept between ticks
+    pub gm: Option<ground_tick::GroundCache>,
+    /// the crash on surface 6 or 10 sprays from here: (position, velocity, normal), for the effects (row G19)
+    pub crash_spray: Option<(Vec3, Vec3, Vec3)>,
 }
 
 pub fn heading(yaw: f32) -> Vec3 { Vec3::new(-yaw.sin(), 0.0, -yaw.cos()) }
@@ -361,7 +366,7 @@ impl Rider {
                spawn: (pos, yaw), safe: (pos, yaw), safe_timer: 0.0, safe_external: false, respawns: 0, rail: None, rail_cooldown: 0.0, input: Input::default(),
                spin: 0.0, flip: 0.0, flip_dir: 0.0, wind: 0.0, wind_flip: 0.0, cap: SPEED_CAP, steer: 0.0, grab: 0, grab_hold: 0.0, grab_out: None, grab_done: [false; 16], grab_tweaked: [false; 16], ubers_done: 0, switch_takeoff: false, from_rail: false, uber_timer: 0.0, stats: Stats::default(), data: &RIDERS[0], surface: 1, grind_time: 0.0, rail_twist: 0.0, rail_spun: 0.0, rail_side: 0.0, rail_entry: 0.0, rail_goal: 0.0, rail_held: false, rail_side_signed: 0.0, shove: 0.0, shove_side: 1.0, taunt: -1.0, taunt_clip: String::new(), fin: None, showoff: false, landed: Vec::new(), crash_kind: 0, land_kind: 0, switch: false, score: 0, boost: 0.0, boosting: false,
                last_trick: String::new(), trick_timer: 0.0, crashed: 0.0, hard_land: 0.0, crouch_v: 0.0, brake_v: 0.0, jump_c: 0.0, jump_delay: 0.0, height: 0.0,
-               course_dir: None, course_pts: None, wipe: None, crash_at: None, recover: None, ai: false, down_t: 0.0, getup: -1.0, stumble: 0.0, wall_hit: None, speed_timer: 0.0, spin_timer: 0.0, spin_used: false, tube_class: u8::MAX, gate_p: 0.0, gate_hi: 0.0, gate_lo: 0.0, gate_still: 0.0, gate_target: 0.0, gate_speed: 0.0, gate_state: 8, gate_rock_dir: 0, band: (0.005, 0.0250417), spin_base: 0.0, flip_base: 0.0, late: false, cause: "", spin_ax: Axis::default(), flip_ax: Axis::default(), air_mode2: false, rail_off: 0.0, rail_time: 0.0, rail_halves: 0, boost_was: false, chain: 0,
+               course_dir: None, course_pts: None, wipe: None, crash_at: None, gm: None, crash_spray: None, recover: None, ai: false, down_t: 0.0, getup: -1.0, stumble: 0.0, wall_hit: None, speed_timer: 0.0, spin_timer: 0.0, spin_used: false, tube_class: u8::MAX, gate_p: 0.0, gate_hi: 0.0, gate_lo: 0.0, gate_still: 0.0, gate_target: 0.0, gate_speed: 0.0, gate_state: 8, gate_rock_dir: 0, band: (0.005, 0.0250417), spin_base: 0.0, flip_base: 0.0, late: false, cause: "", spin_ax: Axis::default(), flip_ax: Axis::default(), air_mode2: false, rail_off: 0.0, rail_time: 0.0, rail_halves: 0, boost_was: false, chain: 0,
                ubers: Vec::new(), uber: 0.0, uber_id: 0, uber_done: false, letters: 0, multiplier: 1,
                sc: new_score(), tick_acc: 0.0, full_count: 0, rail_kind: 0, rail_goal0: 0.0, rail_committed: 0.0, show_parts: Vec::new(), grab_scored: false, grab_tw: false }
     }
@@ -693,6 +698,7 @@ impl Rider {
         self.charge = 0.0;
         self.grounded = false;
         self.air_time = 0.0;
+        self.gm = None;
     }
     /// Crouching for a jump (`PrewindState_Update` 0x1050e8): the crouch and the wind-up follow their targets
     /// at the original's rates.
@@ -755,9 +761,6 @@ impl Rider {
         self.input = input;
         self.boosting = false;
         self.rail_cooldown = (self.rail_cooldown - dt).max(0.0);
-        let surf = SURFACES[(self.surface as usize).min(19)];
-        let extra = SURF_EXTRA[(self.surface as usize).min(19)];
-        let gmag = surf[0] * 0.01;
 
         // ---- input shaping (cBoarder::vf7): each value moves toward its target at a limited rate
         let speed0 = self.vel.length();
@@ -785,134 +788,75 @@ impl Rider {
         }
 
         let mut jumped = false;
+        // the snow under the rider was handled by the ground tick (walls and probe included)
+        let mut handled = false;
         let mut p = self.pos;
         if self.grounded {
-            // ---- riding (cBoarder_GroundMotion_Update), Bevy space: metres, Y up
-            let n = self.normal;
-            let f = self.forward();
-            let left = n.cross(f).normalize_or(Vec3::X);
-            let v = self.vel;
-            let (vf, vl, vn) = (v.dot(f), v.dot(left), v.dot(n));
-            // spring holding the board on the snow
-            let h = self.height;
-            let damp = extra[1];
+            // ---- riding: the game's own ground tick, `GroundMotion_Update` 0x10a0d8 with its forces
+            // (`Boarder_GroundSpringForce` 0x109878, `Boarder_GroundThrust` 0x109950, `Boarder_ForwardDrag` 0x109cb8,
+            // `Boarder_SideFriction` 0x109ef8), the board's yaw, the walls and the ground probe: cm, z up, in
+            // `ground_tick.rs` (row E8k)
             // the spring band follows the surface (SurfaceTable rows [7] [8]), easing at 1 m/s
             let band = SURF_BAND[(self.surface as usize).min(19)];
             self.band.0 += (band.0 - self.band.0).clamp(-dt, dt);
             self.band.1 += (band.1 - self.band.1).clamp(-dt, dt);
-            let (d1, d2) = self.band;
-            // `Boarder_GroundSpringForce` 0x109878, exactly (crate::ground), in cm
-            let f_n = crate::ground::spring_force(h * 100.0, vn * 100.0, d1 * 100.0, d2 * 100.0, surf[0], damp) / 100.0;
-            // the lean: steering tips the support force sideways (the original's positive steer is left)
-            let s_left = -self.steer;
-            let phi = (surf[5] * s_left).to_radians();
-            let m = f_n.min(2.0 * gmag);
-            let lean = n * (f_n - m / phi.cos() + m) + left * (m * phi.tan());
             let lvl = if sped { 1.0 } else if boosting_input { self.boost_level() } else { 0.0 };
-            // drag along the board, heavier under load
-            let load = (f_n / gmag).max(1.0);
-            let st = &self.stats;
-            // `Boarder_ForwardDrag` 0x109cb8, exactly (crate::ground), in cm: our stats have no separate cubic
-            // stat (stats+0x19), so the speed stat stands in for it (row G3)
-            let drag_state = crate::ground::DragState {
-                speed: st.speed * 255.0, edging: st.edging * 255.0, cubic: st.speed * 255.0,
-                class: st.kind as u32, switch: self.switch,
-                powder: (self.surface == 3 || self.surface == 4).then_some((h * 100.0, d2 * 100.0)),
-                crouch: self.crouch_v, boost_level: lvl, brake: self.brake_v,
-            };
-            let drag = crate::ground::forward_drag(vf * 100.0, load, [surf[1], surf[2], surf[3]], &drag_state) / 100.0;
-            // pushing along: toward the course direction only, harder the slower he goes
-            // `Boarder_GroundThrust` 0x109950, exactly (crate::ground), in cm: self-push toward the course and boost
-            let course_yaw = self.course_dir.map_or(self.yaw, |c| f32::atan2(-c.x, -c.z));
-            let thrust_state = crate::ground::ThrustState {
-                brake: self.brake_v, board_yaw: self.yaw, course_yaw,
-                boost_level: if boosting_input { self.boost_level() } else { 0.0 }, speed_timer: self.speed_timer,
-                steer: self.steer, forward_up: f.y, vel: [v.x * 100.0, v.y * 100.0, v.z * 100.0, 0.0],
-                class: st.kind as u32, speed: st.speed * 255.0,
-                // STANDIN: our crouch/steer/speed test, for the game's "skate push clip (0x221) playing" (G5)
-                skating: self.crouch_v > 0.5 && self.steer.abs() < 0.2 && speed0 < 8.33,
-            };
-            let thrust = crate::ground::ground_thrust(&thrust_state, surf[6], surf[7]) / 100.0;
             // the boost meter drains while boosting (the thrust itself is in ground_thrust)
             if boosting_input {
                 if !self.tricky() && !sped { self.boost = (self.boost - dt / BOOST_SECONDS).max(0.0); }
                 self.boosting = true;
             }
-            // the edge resists sideways slip (weakly: the board turns by yawing after the velocity)
-            // `Boarder_SideFriction` 0x109ef8, exactly (crate::ground), in cm; its third input is rider+0x214,
-            // most likely the shaped steer; our edging stands in for its grip stat (stats+0x13, row G3)
-            let friction_state = crate::ground::FrictionState { grip: st.edging * 255.0, class: st.kind as u32, switch: self.switch, boost_level: lvl };
-            let side = crate::ground::side_friction(vl * 100.0, vf * 100.0, self.steer, surf[4], &friction_state) / 100.0;
-            let mut a = lean + f * (drag + thrust) + left * side - Vec3::Y * gmag;
-            if h < -d2 {
-                p -= n * (h + d2).max(-0.10);
-                self.vel -= n * vn;
-                let an = a.dot(n);
-                if an < 0.0 { a -= n * an; }
-            }
-            p += self.vel * dt;
-            self.vel += a * dt;
-
-            // the board yaws round after the direction of travel
-            let v = self.vel;
-            let sp = v.length();
-            if sp > 0.05 {
-                let (ac, b) = match st.kind { 2 => (0.20834, 0.26221), 0 => (0.30019, 0.34919), _ => (0.4, 0.52398) };
-                let theta = (v.cross(f).dot(n) / sp).clamp(-0.99999, 0.99999).asin();
-                let mut tgt = -theta + s_left * b * (1.0 + ac / 2.0 * (1.0 - s_left * s_left)) / (1.0 + 0.01 * self.crouch_v);
-                if v.dot(f) < 0.0 { tgt = -tgt; }
-                let fall = (Vec3::NEG_Y - n * (-n.y)).normalize_or_zero();
-                let gg = ((sp / 5.556).min(1.0) * (0.5 - (v / sp).dot(fall).abs()) * 40.0).max(0.0).min(1.0) + 0.01;
-                let k = (0.2003 * sp * sp * dt).min(1.0) * gg.max(if tgt > 0.0 { s_left } else { -s_left });
-                let cap = 6f32.to_radians() * dt * 60.0;
-                self.yaw += (tgt * k).clamp(-cap, cap);
-            }
-            // riding backwards slowly: the board swings round and he rides switch
-            if self.vel.dot(self.forward()) < -1.11 && self.brake_v <= 0.0 && self.crashed <= 0.0 {
-                self.yaw += std::f32::consts::PI;
-                self.switch = !self.switch;
-                self.steer = -self.steer;
-            }
-
-            // jump: letting go of the crouch springs off once the crouch has unwound
-            if input.jump {
-                self.prewind(&input, dt);
-                self.jump_delay = 0.0;
-            } else if self.charge > 0.0 && self.jump_delay <= 0.0 && self.jump_c <= 0.0 {
-                self.jump_c = self.charge;
-                self.jump_delay = (self.charge / 13.333).max(1e-4);
-                self.release_windup();
-            } else if self.jump_delay > 0.0 {
-                self.jump_delay -= dt;
-                if self.jump_delay <= 0.0 {
+            let left = self.ground_tick(world, dt, lvl);
+            handled = true;
+            p = self.pos;
+            if left {
+                // off the snow (`Boarder_TakeOff` ran inside the tick): the air from here
+                let c = self.charge;
+                self.take_off();
+                self.charge = c;
+            } else {
+                let n = self.normal;
+                let f = self.forward();
+                // jump: letting go of the crouch springs off once the crouch has unwound
+                if input.jump {
+                    self.prewind(&input, dt);
+                    self.jump_delay = 0.0;
+                } else if self.charge > 0.0 && self.jump_delay <= 0.0 && self.jump_c <= 0.0 {
+                    self.jump_c = self.charge;
+                    self.jump_delay = (self.charge / 13.333).max(1e-4);
+                    self.release_windup();
+                } else if self.jump_delay > 0.0 {
+                    self.jump_delay -= dt;
+                    if self.jump_delay <= 0.0 {
+                        let c = self.jump_c;
+                        self.vel += (n + f * 0.2).normalize() * self.jump_speed(c);
+                        self.jump_c = 0.0;
+                        self.take_off();
+                        // STANDIN: the steep-lip flag comes with `Jump_ApplyImpulse` (row G1a5b)
+                        self.begin_chain(0, false);
+                        jumped = true;
+                    }
+                } else if self.jump_c > 0.0 {
+                    // a jump released during a moment in the air (a bump) fires on touching down
                     let c = self.jump_c;
                     self.vel += (n + f * 0.2).normalize() * self.jump_speed(c);
                     self.jump_c = 0.0;
                     self.take_off();
-                    // STANDIN: the steep-lip flag comes with `Jump_ApplyImpulse` (row G1a5b)
                     self.begin_chain(0, false);
                     jumped = true;
+                } else {
+                    self.wind = 0.0;
+                    self.wind_flip = 0.0;
+                    self.charge = 0.0;
                 }
-            } else if self.jump_c > 0.0 {
-                // a jump released during a moment in the air (a bump) fires on touching down
-                let c = self.jump_c;
-                self.vel += (n + f * 0.2).normalize() * self.jump_speed(c);
-                self.jump_c = 0.0;
-                self.take_off();
-                self.begin_chain(0, false);
-                jumped = true;
-            } else {
-                self.wind = 0.0;
-                self.wind_flip = 0.0;
-                self.charge = 0.0;
+                // the speed limit (vf7): up at once with a boost, back down slowly afterwards
+                // the boosting cap goes by the meter left (vf7), the speed-boost pickup by its own timer
+                let m = self.boost;
+                let target = if sped || (self.boosting && (m > 0.66599226 || self.tricky())) { BOOST_CAPS[2] } else if self.boosting && m > 0.33362994 { BOOST_CAPS[1] } else if self.boosting && m > 0.0 { BOOST_CAPS[0] } else { SPEED_CAP };
+                self.cap = target.max(self.cap - CAP_DECAY * dt);
+                let s = self.vel.length();
+                if s > self.cap { self.vel *= self.cap / s; }
             }
-            // the speed limit (vf7): up at once with a boost, back down slowly afterwards
-            // the boosting cap goes by the meter left (vf7), the speed-boost pickup by its own timer
-            let m = self.boost;
-            let target = if sped || (self.boosting && (m > 0.66599226 || self.tricky())) { BOOST_CAPS[2] } else if self.boosting && m > 0.33362994 { BOOST_CAPS[1] } else if self.boosting && m > 0.0 { BOOST_CAPS[0] } else { SPEED_CAP };
-            self.cap = target.max(self.cap - CAP_DECAY * dt);
-            let s = self.vel.length();
-            if s > self.cap { self.vel *= self.cap / s; }
         } else {
             // ---- in the air (Air_IntegrateRK4 ballistics, SpinState_Update rotation)
             // the game's own step (checked bit for bit), in its cm and z up
@@ -942,64 +886,12 @@ impl Rider {
             if input.jump { self.charge = self.crouch_v; }
         }
 
-        // walls: a sphere around the body (`Boarder_WallCollide` 0x126250: bounce off at least 0.56 m/s)
-        let lift = Vec3::Y * (BODY_RADIUS + 0.35);
-        let (c, contacts) = world.push_out(p + lift, BODY_RADIUS);
-        p = c - lift;
-        for n in contacts {
-            let vn = self.vel.dot(n);
-            if vn < 0.0 {
-                let vin = -vn;
-                if self.wall_hit.is_none_or(|w| w.1 < self.vel.length()) { self.wall_hit = Some((c, self.vel.length())); }
-                let side = if n.dot(Vec3::new(self.yaw.cos(), 0.0, -self.yaw.sin())) > 0.0 { 2 } else { 3 };
-                let up = self.board_up();
-                if self.grounded {
-                    // Boarder_WallImpactCheck: s = max(vin/2, 0.56); over 8.33(up.n)+19.44 m/s is a crash,
-                    // over 8.33(up.n) a stumble (only a real knock, not a brush)
-                    let s = (0.5 * vin).max(0.5556);
-                    let un = up.dot(n);
-                    if s > 8.3333 * un + 19.4444 { self.crash_kind = side; self.cause = "wall"; self.crash_at = Some((c - n * BODY_RADIUS, n)); self.wipe_out(); }
-                    else if s > 8.3333 * un && vin > 4.0 { self.stumble_by(true); }
-                    self.vel += n * (vin + (0.5 * vin).max(0.556));
-                } else if vin > 1.0 && n.y < 0.7 && self.air_time > 0.15 {
-                    // in the air: glance off anything close to the way your feet point, else go down
-                    let f = (0.6 + 0.0135 * vin).min(0.9);
-                    // (inside the Megaplex tube the glass only steers the rider)
-                    if up.dot(n) > f || self.tube_class != u8::MAX { self.vel += n * vin; }
-                    else { if std::env::var("TRICKY_CRASHDBG").is_ok() { println!("air wall vin {vin:.2} n {n:.2?} up {up:.2?} flip {:.2} air {:.2}", self.flip, self.air_time); } self.crash_at = Some((c - n * BODY_RADIUS, n)); self.crash_kind = side; self.cause = "air wall"; self.wipe_out(); }
-                } else {
-                    self.vel += n * (vin + (0.5 * vin).max(0.556));
-                }
-            }
-        }
+        // walls (on the snow they are inside the ground tick): a sphere around the body
+        if !handled { self.walls(world, &mut p); }
 
         let s = self.vel.length();
-        if self.grounded {
-            // the probe (Boarder_GroundProbe): a ray from 2 m above to 1 m below along the normal
-            match world.ground(p, 2.0, 1.0) {
-                Some(hit) => {
-                    let h = (p.y - hit.y) * hit.normal.y;
-                    self.surface = hit.surface;
-                    let air_h = SURF_EXTRA[(hit.surface as usize).min(19)][0] * 0.01;
-                    if h > air_h && !jumped {
-                        self.height = h;
-                        let c = self.charge;
-                        self.take_off();
-                        self.charge = c;
-                    } else {
-                        self.height = h;
-                        self.normal = hit.normal;
-                        // speed-keeping bleed of the normal velocity (not in powder)
-                        if hit.surface != 3 && hit.surface != 4 {
-                            let before = self.vel.length();
-                            self.vel -= hit.normal * (0.4 * self.vel.dot(hit.normal));
-                            let after = self.vel.length();
-                            if after > 1e-3 { self.vel *= before / after; }
-                        }
-                    }
-                }
-                None => { let c = self.charge; self.take_off(); self.charge = c; }
-            }
+        if handled {
+            // the ground tick did the probe
         } else if !jumped {
             // landing: snow at or above our feet, and moving into it
             if let Some(hit) = world.ground(p, 1.2, 0.02) {

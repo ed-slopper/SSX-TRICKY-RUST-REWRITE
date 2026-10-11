@@ -71,8 +71,41 @@ rider field it writes, and every call it makes to what the test records, with it
     (|steer| + |brake| + 0.1)·2.65, wrapped at 2π, rider+0x1cc = 7.5·that amplitude·cos(phase);
     rail capture (G1b), `Boarder_InstanceCollisions`.
 Not part of this proof (recorded calls only, answered by the test): the rotation, the wall collision, take-off, the
-virtual 0x64, the crash calls, rail capture and instance collisions. `Rider::step` in `rider.rs` still has its own
-approximate ground branch (metres, y up); it does not call `ground_motion::update` yet.
+virtual 0x64, the crash calls, rail capture and instance collisions.
+
+**The port rides on it (E8k).** `Rider::step` (`game/src/rider.rs`) no longer has its own ground branch: on the snow it
+calls `ground_motion::update` through `game/src/rider/ground_tick.rs`, with the port's fields converted to the game's
+cm and z up. Proven by construction, not by a recording: the conversion is a rotation, game (x, y, z) = port (x, −z, y)
+(a mirror would flip every cross product, and with it the side and the lean): the port's forward (−sin yaw, 0, −cos yaw)
+is the game's heading yaw + π/2, the identity attitude (forward along +y) is the port's yaw 0 on level ground, and the
+game's steer is positive to the left, the port's to the right (`steer` is negated both ways). The game-side rider
+(`Rider::gm`) is kept between ticks, so the attitude quaternion, the board's lag behind the ground, the bob, the wobble
+phase and the probe's results are the game's; it is rebuilt from the port's yaw and ground normal when the port moved
+the rider itself (position, velocity or yaw differ from what the last tick stored: landing, respawn, get-up, a pad).
+What `Env` is answered with:
+- exact: `Boarder_TakeOff` 0x128470 (`orient::take_off`) with `Jump_ApplyImpulse` 0x1284e0 (`jump::jump_impulse`, min 0,
+  crouch = rider+0x208) on the game-side velocity; the revert (`Boarder_SetState`(4)) swings the board π about the
+  normal with `Boarder_RotateAboutAxis` (the exact rotation), toggles switch and negates the steer
+- the port's own, tagged STANDIN: the walls (a sphere against the drawn mesh, `Rider::walls`, for
+  `Boarder_WallCollide` 0x126250 and `Boarder_WallImpactCheck` 0x126540, row E8b), the ray cast under the probe (a
+  vertical query of the drawn mesh 2 m over, 1 m under the probe point, for `World_RayCast` 0x25aff8, row E7), the
+  control state (3, or 0xb after a hard landing: no state machine yet, row G1), the stats the port lacks (grip and the
+  cubic term from its edging and speed, the probe's sideways offset 0, rider+0x2c0 = the board's up, rows G3, G16)
+- `Boarder_Wipeout`, `Score_Crash` and `Boarder_AddMeter` of a crash on surface 6 / 10 are `Rider::go_down` (one call;
+  `score_crash` and `add_meter` of the `Env` do nothing); inside the Megaplex tube the crash is skipped (ours, row E9)
+- the crash spray (`cBoarder::EmitBrakeSpray` 0x11a798) is recorded in `Rider::crash_spray` (position, velocity, normal),
+  nothing draws it yet (row G19); `Boarder_SetMotion` / `Boarder_SetState` bodies do nothing (row G18)
+- not done on the snow, as before: rail capture (the port captures a rail from the air only, row G1b), instance
+  collisions (row E8b)
+Changes this makes to the ride, all the game's: the spring, drag, thrust and friction now see one boost level
+(rider+0x130, 1 on a speed-boost pickup) and one steer (the shaped steer, positive left); the airborne test and the
+surface-6/10 test use the probe's new answer; the ground normal is the probe's every tick (straight up when the ray
+misses); a take-off on a steep lip (normal z over cos 50°) goes through the steep-lip branch of `Jump_ApplyImpulse`.
+A rider at exactly zero speed gets a speed of 1e-6 cm/s along the board (the yaw step divides by it; the game never
+rides at a standstill, the start gate has its own states: ours, row G1c). Checked in `game/tests/physics.rs` (a rider on
+a slope stays on the snow, gains speed within the limit, follows the surface, turns the way the stick points; rides
+off the edge; surface 6 puts it down), not against the running game: that needs a recording of a ride through the port
+(rows F4b3, F4h2). `TRICKY_SIM=600` needs a level export and was not run in this session.
 
 **Forward drag** `Boarder_ForwardDrag` 0x109cb8 on vF only, with L = max(1, fN/g):
 `−vF·mul·(L·surf1·lin + (1−crouch)·0.10573 + (1+1.2154·lvl)·1.7513·B²·Bst + |vF|·0.001·L·(surf2 + |vF|·0.001·surf3·cub))`,
