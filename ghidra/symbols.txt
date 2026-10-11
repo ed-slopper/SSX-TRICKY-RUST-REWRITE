@@ -5919,3 +5919,89 @@ G 1cb960 AnimFrame_SetIdentity
 F 1cb278 cMeshAnimFrame cMeshAnimFrame
 F 1cb718 cCamAnimFrame cCamAnimFrame
 F 1cba68 cAnimFrame cAnimFrame
+G 1d59e0 ParticleSys_SetTime
+G 1d59f0 ParticleSys_AdvanceTime
+G 1d8b20 ParticleNode_Update
+G 1d8ac8 ParticleNode_SetLifetime
+G 1d9108 ParticleGroup_Get
+G 1e4120 Gfx_RenderThreadEntry
+G 1e8838 PS2Render_Submit
+G 1e88c8 PS2Render_FlushState
+G 1e8ea0 Gfx_FlipDisplay
+G 1efe38 RaceMenuOverlay_Draw
+G 1f11c0 LoadScreen_AddStatBar
+G 1ff928 VideoStreamMan_DecodeFrame
+G 1ff988 VideoStreamMan_FreeFrameBuffer
+G 1ffa38 VideoStreamMan_Reopen
+G 1ffa88 VideoStreamMan_UpdateFrame
+G 1ffb80 VideoStreamMan_UploadFrame
+G 2000f0 VideoStreamMan_Release
+G 200148 VideoStreamMan_ReleaseAll
+G 2001a0 VideoStreamMan_GetTexture
+G 2002e8 VideoStreamMan_IsFinished
+G 203ae0 ClipList_Insert
+G 203b00 ClipList_RemoveAndDestroy
+G 203b48 ClipList_Init
+G 2029d8 PoseBlend_EvalCurves
+G 206b60 SkinLod_MaterialEquals
+G 206b88 SkinLod_MaterialListEquals
+G 2059f8 Skel_GetBoneWorldPos
+G 208398 Boarder_GetBoneWorldPos
+G 2083e8 Boarder_SetSkinChildMatrices
+G 2083f8 Boarder_BuildBoneMatrices
+G 208c48 AsyncSys_Shutdown
+G 20a118 BankSlot_Unlink
+G 20a5f0 BankManager_FreeSlot
+G 20a628 BankManager_UnlinkSlot
+G 20a6e0 BankManager_IsSlotLoaded
+G 20ac08 BankInstance_ComputeDistance
+G 20b688 BankInstance_CullByDistance
+G 20c308 BankInstances_CountPlaying
+G 20c380 BankInstances_CountUsed
+G 2210a8 Audio_ArmCrowdBox
+G 2210c8 Audio_StopCrowdBox
+G 222ac8 SndEvent_Enable
+G 222ad8 SndEvent_Disable
+G 2245b8 Song_FadeOut
+G 225448 Audio_FadeOutSong
+G 224498 Song_UpdateVolume
+G 2256a0 Audio_UpdateSongVolume
+G 225428 Audio_SetSongVolume
+G 225260 Audio_ResumeSong
+G 225e98 Audio_GetSongState
+G 229870 Stream_GetState
+G 229f60 StreamSys_GetSlotState
+G 229770 Stream_PlayFile
+G 229ed0 StreamSys_PlayFile
+G 229680 Stream_GetHandle
+G 22a278 StreamSys_GetSlotHandle
+G 254ba8 Course_GetHashTables
+G 255260 Course_FindObjectByHash
+G 260ba8 WorldGrid_CellAt
+G 260b18 WorldGrid_CellAtPos
+G 260f90 CellList_Clear
+G 260f98 CellList_Add
+G 25ec88 VisList_Clear
+G 25ecc8 VisList_Add
+G 25ecb8 VisList_Get
+G 251f50 CacheBuffer_Lookup
+G 251e60 CacheBuffer_Touch
+G 252028 CacheBuffer_ClearEntry
+G 25c750 World_LookupCollCache
+F 26a4b8 cFE3DCamera cFE3DCamera
+G 26cde8 FEInput_IsEnter
+G 26cdf8 FEInput_IsEscape
+G 26ce78 FEInput_IsUp
+G 26ce88 FEInput_IsDown
+G 26ce98 FEInput_IsLeft
+G 26cea8 FEInput_IsRight
+G 2762e0 FE3DGroup_Add
+G 292810 FEMemCard_ShowMessage
+G 2927d8 FEMemCard_ShowLocMessage
+G 2928c0 FEMemCard_HideMessage
+F 2ac708 cFE3DGroup cFE3DGroup
+F 2b48b0 cFE3DWColouredText cFE3DWColouredText
+F 2b4998 cFE3DWBufferedSingleLineText cFE3DWBufferedSingleLineText
+F 2b68e0 cFE3DWList cFE3DWList
+G 2abc68 FE3D_AddWidget
+G 2b7180 Comm_Crc16
