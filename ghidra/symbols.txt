@@ -3590,3 +3590,15 @@ F 1bf580 cViewHiScoresOverlay vf19
 L 38f880 cResultsOverlay vtable
 F 1bfc70 cResultsOverlay vf0
 F 1ab148 cResultsOverlay vf14
+F 147cf8 cEmitterNode cEmitterNode
+F 13bc78 cScriptNode cScriptNode
+G 13ba30 TriggerScript_SetContext
+G 15a798 AnimLayer_SaveSnapshot
+G 13abf0 Controller_ReplaceWithDead
+G 1444d0 FenceNode_AddSwing
+G 116420 AIWorld_MarkCellActive
+G 1162f8 AIWorld_UpdateActiveCells
+G 1163a0 AIWorld_ReleaseActiveCells
+G 260dd8 World_FindScript
+G 148ed8 RailMan_ApplyRailState
+F 239ba8 SphereTree SphereTree
