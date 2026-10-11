@@ -5801,3 +5801,15 @@ G 2924d0 FEMemCard_EnableButtons
 G 292e70 FEMemCard_LayoutMessage
 G 299338 FEJukebox_ShowSong
 G 276d78 FE3DCharSel_RefreshLocks
+G 13aad0 WorldNode_RayCast
+G 1383b0 AIComputer_Reset
+G 136e90 Boarder_SpawnLandingPuffs
+G 135268 BoarderRender_SpawnLandingPuffs
+G 1325b8 Fx_BoardTrack_GetLight
+G 1394e0 AIComputer_FindNearbyRider
+G 29f178 SoundOptions_Apply
+G 2a99a0 DisplayOptions_OnChange
+G 29f430 GameOptions_Refresh
+G 29f508 GameOptions_Apply
+G 2a9488 ControllerConfig_Layout
+G 2ae098 FE3DButton_Layout

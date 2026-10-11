@@ -518,7 +518,7 @@ address,size,name,system,status
 0x132308,448,Fx_SurfaceSpray_Draw,boarder,not started
 0x1324c8,80,Fx_BoardTrack_Init,boarder,not started
 0x132518,160,Fx_BoardTrack_Reset,boarder,not started
-0x1325b8,140,FUN_001325b8,boarder?,not started
+0x1325b8,140,Fx_BoardTrack_GetLight,boarder,not started
 0x132648,2912,Fx_BoardTrack,boarder,ported
 0x1331a8,532,Fx_BoardTrack_Draw,boarder,ported
 0x1333c0,1092,Fx_BoardTrack_DrawStrip,boarder,not started
@@ -533,7 +533,7 @@ address,size,name,system,status
 0x135170,140,BoarderRender_DrawEffects,boarder?,not started
 0x135200,84,BoarderRender_ResetEffects,boarder?,not started
 0x135258,12,FUN_00135258,world?,not started
-0x135268,12,FUN_00135268,boarder?,not started
+0x135268,12,BoarderRender_SpawnLandingPuffs,boarder?,not started
 0x135278,848,cBoarderRender::cBoarderRender,boarder,not started
 0x1355c8,304,cBoarderRender::~cBoarderRender,boarder,not started
 0x1356f8,1984,cBoarderRender::vf7_1356f8,boarder,not started
@@ -544,7 +544,7 @@ address,size,name,system,status
 0x136c48,492,FUN_00136c48,render?,not started
 0x136e38,52,FUN_00136e38,render?,not started
 0x136e70,32,FUN_00136e70,world?,not started
-0x136e90,12,FUN_00136e90,boarder?,not started
+0x136e90,12,Boarder_SpawnLandingPuffs,boarder,not started
 0x136ea0,64,BoarderRender_Reset,boarder?,not started
 0x136f88,100,FUN_00136f88,game?,not started
 0x137040,84,cBoarderRender::__tf,runtime,host
@@ -560,7 +560,7 @@ address,size,name,system,status
 0x138160,124,StaticInit_AIComputer,boarder?,not started
 0x1381e0,44,Vec4_ScaleCopy7,boarder?,not started
 0x138210,416,FUN_00138210,boarder?,not started
-0x1383b0,132,FUN_001383b0,boarder?,not started
+0x1383b0,132,AIComputer_Reset,ai,not started
 0x138438,40,cComputer::vf8_138438,boarder?,not started
 0x1384b8,368,cComputer::GetControls,ai?,not started
 0x138628,448,AIComputer_ControlsCountdown,ai,not started
@@ -574,7 +574,7 @@ address,size,name,system,status
 0x139210,148,FUN_00139210,ai?,not started
 0x1392a8,312,AIComputer_FindJumpMarker,ai,not started
 0x1393e0,256,AIComputer_FindSpeedHint,ai,not started
-0x1394e0,484,FUN_001394e0,boarder?,not started
+0x1394e0,484,AIComputer_FindNearbyRider,ai,not started
 0x1396c8,608,AIComputer_PickTargetRider,ai,not started
 0x139928,124,AIComputer_IsRivalTarget,ai,not started
 0x1399a8,132,AIComputer_BelowGapMin,ai,not started
@@ -599,7 +599,7 @@ address,size,name,system,status
 0x13a9f8,76,Controller_RunFinishScript,world?,not started
 0x13aa48,72,cControllerNode::OnMessage,world,not started
 0x13aab0,28,Instance_DetachController,world,not started
-0x13aad0,36,FUN_0013aad0,world?,not started
+0x13aad0,36,WorldNode_RayCast,world?,not started
 0x13aaf8,244,Controller_RunContactScript,world?,not started
 0x13abf0,148,Controller_ReplaceWithDead,world?,not started
 0x13ac88,624,TriggerScript_ApplyControllerOp,world,not started
@@ -5513,9 +5513,9 @@ address,size,name,system,status
 0x29ed50,224,FUN_0029ed50,frontend?,not started
 0x29ee30,284,FUN_0029ee30,frontend?,not started
 0x29ef50,548,SoundOptions_Refresh,audio,not started
-0x29f178,692,FUN_0029f178,frontend?,not started
-0x29f430,216,FUN_0029f430,game?,not started
-0x29f508,232,FUN_0029f508,game?,not started
+0x29f178,692,SoundOptions_Apply,audio,not started
+0x29f430,216,GameOptions_Refresh,game?,not started
+0x29f508,232,GameOptions_Apply,game?,not started
 0x29f5f0,304,DisplayOptions_Refresh,frontend?,not started
 0x29f720,1056,FEOptions_ApplyDisplay,frontend?,not started
 0x29fb40,48,OptionsState_Refresh,frontend?,not started
@@ -5529,10 +5529,10 @@ address,size,name,system,status
 0x2a9208,76,cFE3DStateOptions::vf12_2a9208,frontend,not started
 0x2a9258,248,cFE3DStateOptions::Activate,frontend,not started
 0x2a9350,312,FUN_002a9350,frontend?,not started
-0x2a9488,664,FUN_002a9488,frontend?,not started
+0x2a9488,664,ControllerConfig_Layout,frontend?,not started
 0x2a9720,296,SoundOptions_OnChange,audio,not started
 0x2a9848,344,FUN_002a9848,frontend?,not started
-0x2a99a0,684,FUN_002a99a0,frontend?,not started
+0x2a99a0,684,DisplayOptions_OnChange,frontend?,not started
 0x2a9c50,8,FUN_002a9c50,frontend?,not started
 0x2a9c58,224,cFE3DStateOptions::CreateNextState,frontend,not started
 0x2a9d38,864,cFE3DStateOptions::vf22_2a9d38,frontend,not started
@@ -5691,7 +5691,7 @@ address,size,name,system,status
 0x2adf30,24,FUN_002adf30,frontend?,not started
 0x2adf88,64,FUN_002adf88,frontend?,not started
 0x2adfc8,208,cFE3DTiledIcon::vf11_2adfc8,frontend,not started
-0x2ae098,408,FUN_002ae098,frontend?,not started
+0x2ae098,408,FE3DButton_Layout,frontend?,not started
 0x2ae230,400,FUN_002ae230,frontend?,not started
 0x2ae3c0,928,FUN_002ae3c0,frontend?,not started
 0x2ae760,140,FE3DProgressBar_StepUp,frontend?,not started
