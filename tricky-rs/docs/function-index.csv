@@ -79,7 +79,7 @@ address,size,name,system,status
 0x1073e0,524,RailSlideControl_Update,boarder,ported
 0x1075f0,52,FUN_001075f0,boarder?,not started
 0x107628,260,FUN_00107628,boarder?,not started
-0x107730,2200,FUN_00107730,boarder?,not started
+0x107730,2200,RailSlideControl_CommitQuarterTurn,boarder,ported
 0x107fc8,132,FUN_00107fc8,boarder?,not started
 0x108050,40,FUN_00108050,world?,not started
 0x108078,20,FUN_00108078,ai?,not started
@@ -257,7 +257,7 @@ address,size,name,system,status
 0x118830,980,FUN_00118830,boarder?,not started
 0x118c08,776,Boarder_AdvanceOnPath,boarder,not started
 0x118f10,772,Boarder_RequestReset,boarder,not started
-0x119220,2496,FUN_00119220,boarder?,not started
+0x119220,2496,ResetState_PlaceRider,boarder,not started
 0x119be0,172,Boarder_StartReset,boarder,not started
 0x119c90,160,FUN_00119c90,boarder?,not started
 0x119d30,752,FUN_00119d30,boarder?,ported

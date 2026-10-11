@@ -69,7 +69,7 @@ pub const RAIL_CAP: f32 = 29.3;
 /// STANDIN: our reach, for the game's rail capture test (`Rail_TryCapture`)
 pub const RAIL_REACH: f32 = 0.9;
 /// how fast the board turns on a rail when steered (rad/s)
-/// a quarter turn on a rail is its 15-frame clip: 28 ticks (`RailSlideControl_CommitQuarterTurn`)
+/// a quarter turn on a rail is its 15-frame clip: 28 ticks (`RailSlideControl_CommitQuarterTurn` 0x107730)
 pub const RAIL_TWIST: f32 = std::f32::consts::FRAC_PI_2 / (28.0 / 60.0);
 // ---- scoring, from the original (points = value * 6786.5, rounded to 10)
 pub const PTS_SPIN_180: f32 = 474.7;

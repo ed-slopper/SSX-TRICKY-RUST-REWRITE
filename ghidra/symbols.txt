@@ -3106,3 +3106,5 @@ G 115a80 Race_UpdatePairDistances
 G 12e6e8 Fx_BrakeSpray_Update
 G 11a098 Boarder_TeleportToInstance
 G 118c08 Boarder_AdvanceOnPath
+G 107730 RailSlideControl_CommitQuarterTurn
+G 119220 ResetState_PlaceRider
