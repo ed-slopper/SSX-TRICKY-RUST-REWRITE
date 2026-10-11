@@ -7,6 +7,7 @@ L 3646e8 cPreAI vtable
 F 114cd0 cAI __tf
 L 40aec8 cAI typeinfo
 L 364738 cAI vtable
+G 1230e0 EaseRecord_Init
 F 181a68 cReplayEndRaceHandler __tf
 L 40ad08 cReplayEndRaceHandler typeinfo
 L 364e28 cReplayEndRaceHandler vtable

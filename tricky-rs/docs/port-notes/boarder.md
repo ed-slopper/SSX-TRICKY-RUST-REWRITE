@@ -85,12 +85,12 @@ the rider itself (position, velocity or yaw differ from what the last tick store
 What `Env` is answered with:
 - exact: `Boarder_TakeOff` 0x128470 (`orient::take_off`) with `Jump_ApplyImpulse` 0x1284e0 (`jump::jump_impulse`, min 0,
   crouch = rider+0x208) on the game-side velocity; the revert (`Boarder_SetState`(4)) swings the board π about the
-  normal with `Boarder_RotateAboutAxis` (the exact rotation), toggles switch and negates the steer
+  normal with `Boarder_RotateAboutAxis` (the exact rotation), toggles switch and negates the steer and the lean value (rider+0x244, as `ChangeFakieControl_Enter` 0x103eb8 does)
 - the port's own, tagged STANDIN: the walls (a sphere against the drawn mesh, `Rider::walls`, for
   `Boarder_WallCollide` 0x126250 and `Boarder_WallImpactCheck` 0x126540, row E8b), the ray cast under the probe (a
   vertical query of the drawn mesh 2 m over, 1 m under the probe point, for `World_RayCast` 0x25aff8, row E7), the
-  control state (3, or 0xb after a hard landing: no state machine yet, row G1), the probe's sideways offset 0,
-  rider+0x2c0 = the board's up (rows G20b, G16). The stat bytes the tick reads (speed +0x0e, edging +0x11, grip +0x13,
+  control state (3, or 0xb after a hard landing: no state machine yet, row G1),
+  rider+0x2c0 = the board's up (rows G20c, G16; `Boarder_UpdateLeanTargets` 0x129500 also writes it, see below). The stat bytes the tick reads (speed +0x0e, edging +0x11, grip +0x13,
   cubic +0x19) and the jump's (+0x17) are the game's exact ones since G20a (section below)
 - `Boarder_Wipeout`, `Score_Crash` and `Boarder_AddMeter` of a crash on surface 6 / 10 are `Rider::go_down` (one call;
   `score_crash` and `add_meter` of the `Env` do nothing); inside the Megaplex tube the crash is skipped (ours, row E9)
@@ -301,3 +301,34 @@ computer riders.
 - not done: where the career's level bytes come from (training points; row G3 — the port feeds the training fraction
   between each group's start and cap, STANDIN), the computer riders' value (their rival level, row G20a2), and the stat
   bytes other code still takes from the port's floats (tricks → `Boarder_AddMeter`, wind-up, gate, stability).
+
+## The probe's sideways offset: stats+0x60 and rider+0x244 (board row G20b)
+
+Proven (read from code, run in the function runner in `game/tests/stats.rs`):
+- `Boarder_ProbeGround` 0x128ae8 and `Boarder_UpdatePose` 0x129628 both start from pos + side (+0x330) · (stats+0x60 ·
+  rider+0x244); the pose scales its body offsets (15, 25, 60 and the 96/98/114.. cm of the hips) by stats+0x60 too, so
+  stats+0x60 is the rider's **body scale** and rider+0x244 is a lean, in cm for a full-size rider.
+- stats+0x60 is the float at `gRider_Table` (0x331ea8) + rider · 0x38 + 0x24: `Career_SetupPlayerRider` 0x16a9d8 copies
+  it (`DAT_00331ecc`), and `Career_SetupAIRider` 0x16ae68 copies the same offset of the row it is given (the tests pass the
+  table's own rows). The twelve values are `stats::SCALE` (0.85, 0.70, 1.00, 0.75, 0.87, 0.85, 0.90, 0.95, 0.85, 0.90,
+  0.98, 0.85). The player alone gets 0.8 (`0x3f4ccccd`) when the all-max word `DAT_003352b8` is set outside mode 6.
+- rider+0x244 is a three-word easing record, the same kind as the steer (+0x214, rate +0x218, target +0x21c; set by
+  `Boarder_SetSteerTarget` 0x126948): value +0x244, rate +0x248, target +0x24c. `cBoarder::vf7` 0x117198 moves the value
+  toward the target by rate · (1/60) a tick, whatever the timescale (`lean_ease`; the port uses rate · dt, equal at 60 Hz).
+  `Boarder_UpdateLeanTargets` 0x129500, at the end of vf7, sets the rate to 66.67 (`0x42855555`) and the target to 0 in
+  motion 3 (the rail) or else −60 · steer (+0x214) · min(1, |v| (+0x150) · 0.6944444) (`lean_targets`). So the lean follows
+  the steer, up to 60 · 0.905 = 54 cm · scale to the side.
+- Writers of rider+0x244, all of them (a scan of the exe for every store at +0x244, and for the record's base): `Boarder_PlaceAt`
+  0x11cae8 zeroes the record, vf7 eases the value, `ChangeFakieControl_Enter` 0x103eb8 and `RailSlideControl_SwitchStance`
+  0x107fc8 negate it with the steer. `WipeoutMotion_Enter` 0x10c198 sets the rate to 2.0 and the target to 0 (the next
+  `Boarder_UpdateLeanTargets` overwrites them). Nothing else writes it.
+- Motion ids (`Boarder_EnterMotionState` 0x11c710, rider+0x424): 1 air, 2 ground, 3 rail slide, 5 wipeout, 6 recover.
+
+Ported: `stats::SCALE`, `Stats::scale`, `Rider::lean` (value, rate, target), `lean_ease` and `lean_targets` in
+`rider/ground_tick.rs`, run every tick by `Rider::step` (ease first, aim last); the ground tick's probe reads
+`stats.scale · lean[0]`. Zeroed in `Rider::respawn` (PlaceAt), negated in the revert (state 4).
+
+Not done (new rows): the port's `touch_down` and rail code flip `switch` without negating the steer or the lean as
+`ChangeFakieControl_Enter` / `RailSlideControl_SwitchStance` do (G20b2); the motion id is derived from the port's flags
+(STANDIN, G18); the second half of `Boarder_UpdateLeanTargets`, rider+0x2c0 = unit(+0x2c0 + 0.5 · +0x2a0), is not ported
+(row G20c; the ground tick still takes the up from the board); the pose's use of rider+0x244 is the pose's (G16).

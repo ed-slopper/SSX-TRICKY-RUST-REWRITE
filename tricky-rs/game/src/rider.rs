@@ -127,15 +127,18 @@ pub struct Stats { pub edging: f32, pub speed: f32, pub stability: f32, pub tric
     pub gate: f32,
     /// the game's 16 stat bytes (stats+0x0e..0x1d, `crate::stats`), as `Career_SetupPlayerRider` 0x16a9d8 leaves them:
     /// the ground tick reads speed, edging, grip and the cubic term from them, the jump its stat byte
-    pub bytes: [u8; 16] }
+    pub bytes: [u8; 16],
+    /// stats+0x60, the rider's body scale (`crate::stats::SCALE`): the ground probe starts `scale · lean` to the side
+    pub scale: f32 }
 impl Default for Stats {
-    /// STANDIN: a neutral rider for tests: the bytes are our fractions as bytes, for the game's career (row G3)
+    /// STANDIN: a neutral rider for tests: the bytes are our fractions as bytes, for the game's career (row G3), and
+    /// a body scale of 1 (no rider's)
     fn default() -> Self {
         let mut bytes = [0u8; 16];
         for (i, f) in [(crate::stats::SPEED, 0.5), (crate::stats::EDGING, 0.5), (crate::stats::GRIP, 0.5), (crate::stats::CUBIC, 0.5), (crate::stats::JUMP, 0.75)] {
             bytes[i] = stat_byte(f);
         }
-        Self { edging: 0.5, speed: 0.5, stability: 0.5, tricks: 0.5, jump: 0.75, windup: 0.75, weight: 75.0, alpine: false, kind: 1, meter_leak: 0.5, gate: 0.7, bytes }
+        Self { edging: 0.5, speed: 0.5, stability: 0.5, tricks: 0.5, jump: 0.75, windup: 0.75, weight: 75.0, alpine: false, kind: 1, meter_leak: 0.5, gate: 0.7, bytes, scale: 1.0 }
     }
 }
 impl Stats {
@@ -152,7 +155,8 @@ impl Stats {
             let lvl = |v: (u8, u8)| (v.0 as f32 + (v.1 as f32 - v.0 as f32) * t).round() as u8;
             crate::stats::player_bytes(&crate::stats::BASE[i], &crate::stats::CAPS[i], board.bonus, [lvl(d.edging), lvl(d.speed), lvl(d.stability), lvl(d.tricks)], false)
         });
-        Self { edging: f(d.edging, 0), speed: f(d.speed, 1), stability: f(d.stability, 2), tricks: f(d.tricks, 3), bytes,
+        let scale = crate::trickdata::RIDERS.iter().position(|r| r.name == d.name).map_or(1.0, |i| crate::stats::SCALE[i]);
+        Self { edging: f(d.edging, 0), speed: f(d.speed, 1), stability: f(d.stability, 2), tricks: f(d.tricks, 3), bytes, scale,
                jump: d.jump as f32 / 100.0, windup: d.windup as f32 / 100.0, weight: d.weight as f32, alpine: board.kind == 2, kind: board.kind, meter_leak: 0.5,
                gate: match d.name { "Kaori" | "Marisol" => 0.80, "Luther" => 0.64, "Mac" => 0.85, "Moby" | "Seeiah" => 0.75, "Zoe" => 0.82, "JP" => 0.88, _ => 0.70 } }
     }
@@ -372,6 +376,9 @@ pub struct Rider {
     pub gm: Option<ground_tick::GroundCache>,
     /// the crash on surface 6 or 10 sprays from here: (position, velocity, normal), for the effects (row G19)
     pub crash_spray: Option<(Vec3, Vec3, Vec3)>,
+    /// the lean record (board row G20b): rider+0x244 the value (the probe's sideways offset, with `stats.scale`),
+    /// +0x248 the rate and +0x24c the target, eased by `lean_ease` and aimed by `lean_aim` (`ground_tick.rs`)
+    pub lean: [f32; 3],
 }
 
 pub fn heading(yaw: f32) -> Vec3 { Vec3::new(-yaw.sin(), 0.0, -yaw.cos()) }
@@ -382,7 +389,7 @@ impl Rider {
                spawn: (pos, yaw), safe: (pos, yaw), safe_timer: 0.0, safe_external: false, respawns: 0, rail: None, rail_cooldown: 0.0, input: Input::default(),
                spin: 0.0, flip: 0.0, flip_dir: 0.0, wind: 0.0, wind_flip: 0.0, cap: SPEED_CAP, steer: 0.0, grab: 0, grab_hold: 0.0, grab_out: None, grab_done: [false; 16], grab_tweaked: [false; 16], ubers_done: 0, switch_takeoff: false, from_rail: false, uber_timer: 0.0, stats: Stats::default(), data: &RIDERS[0], surface: 1, grind_time: 0.0, rail_twist: 0.0, rail_spun: 0.0, rail_side: 0.0, rail_entry: 0.0, rail_goal: 0.0, rail_held: false, rail_side_signed: 0.0, shove: 0.0, shove_side: 1.0, taunt: -1.0, taunt_clip: String::new(), fin: None, showoff: false, landed: Vec::new(), crash_kind: 0, land_kind: 0, switch: false, score: 0, boost: 0.0, boosting: false,
                last_trick: String::new(), trick_timer: 0.0, crashed: 0.0, hard_land: 0.0, crouch_v: 0.0, brake_v: 0.0, jump_c: 0.0, jump_delay: 0.0, height: 0.0,
-               course_dir: None, course_pts: None, wipe: None, crash_at: None, gm: None, crash_spray: None, recover: None, ai: false, down_t: 0.0, getup: -1.0, stumble: 0.0, wall_hit: None, speed_timer: 0.0, spin_timer: 0.0, spin_used: false, tube_class: u8::MAX, gate_p: 0.0, gate_hi: 0.0, gate_lo: 0.0, gate_still: 0.0, gate_target: 0.0, gate_speed: 0.0, gate_state: 8, gate_rock_dir: 0, band: (0.005, 0.0250417), spin_base: 0.0, flip_base: 0.0, late: false, cause: "", spin_ax: Axis::default(), flip_ax: Axis::default(), air_mode2: false, rail_off: 0.0, rail_time: 0.0, rail_halves: 0, boost_was: false, chain: 0,
+               course_dir: None, course_pts: None, wipe: None, crash_at: None, gm: None, crash_spray: None, lean: [0.0; 3], recover: None, ai: false, down_t: 0.0, getup: -1.0, stumble: 0.0, wall_hit: None, speed_timer: 0.0, spin_timer: 0.0, spin_used: false, tube_class: u8::MAX, gate_p: 0.0, gate_hi: 0.0, gate_lo: 0.0, gate_still: 0.0, gate_target: 0.0, gate_speed: 0.0, gate_state: 8, gate_rock_dir: 0, band: (0.005, 0.0250417), spin_base: 0.0, flip_base: 0.0, late: false, cause: "", spin_ax: Axis::default(), flip_ax: Axis::default(), air_mode2: false, rail_off: 0.0, rail_time: 0.0, rail_halves: 0, boost_was: false, chain: 0,
                ubers: Vec::new(), uber: 0.0, uber_id: 0, uber_done: false, letters: 0, multiplier: 1,
                sc: new_score(), tick_acc: 0.0, full_count: 0, rail_kind: 0, rail_goal0: 0.0, rail_committed: 0.0, show_parts: Vec::new(), grab_scored: false, grab_tw: false }
     }
@@ -411,6 +418,8 @@ impl Rider {
         self.clear_air();
         self.from_rail = false;
         self.grind_time = 0.0;
+        // `Boarder_PlaceAt` 0x11cae8 zeroes the lean record (+0x244, +0x248, +0x24c)
+        self.lean = [0.0; 3];
         // `Boarder_PlaceAt` 0x11cae8: the chain banked, its meter change (−0.12) applied
         let (m, calls) = self.sc.bank_points();
         self.show(&calls);
@@ -756,6 +765,13 @@ impl Rider {
     /// `Boarder_GroundThrust` 0x109950, `Boarder_ForwardDrag` 0x109cb8, `Boarder_SideFriction` 0x109ef8), in the
     /// air `Air_IntegrateRK4` 0x12b340, on a rail `RailSlideMotion_Update` 0x10b0d0.
     pub fn step(&mut self, world: &CollisionWorld, rails: &Rails, input: Input, dt: f32) {
+        // the lean record moves toward the target the last tick left (`cBoarder::vf7` 0x117198, before the motion),
+        // and is aimed again from this tick's steer and speed at its end (`Boarder_UpdateLeanTargets` 0x129500)
+        self.lean_ease(dt);
+        self.step_tick(world, rails, input, dt);
+        self.lean_aim();
+    }
+    fn step_tick(&mut self, world: &CollisionWorld, rails: &Rails, input: Input, dt: f32) {
         let mut input = input;
         self.score_ticks(dt);
         self.trick_timer = (self.trick_timer - dt).max(0.0);

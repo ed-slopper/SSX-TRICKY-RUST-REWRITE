@@ -15,6 +15,8 @@
 //!   they do nothing here, and the spin rates come from [`Rider::take_off`]
 //! - STANDIN: the crash's virtual 0x64, `cBoarder::EmitBrakeSpray` 0x11a798, is only recorded in [`Rider::crash_spray`] (row G19)
 //! - `Boarder_Wipeout` 0x11d830, `Score_Crash` 0x156de0, `Boarder_AddMeter` 0x11b018: all in [`Rider::go_down`]
+//! - the probe's sideways offset (board row G20b): stats+0x60 (`Stats::scale`, `crate::stats::SCALE`) times rider+0x244,
+//!   the lean record that [`lean_ease`] and [`lean_targets`] keep
 //! - rail capture (row G1b) and `Boarder_InstanceCollisions` 0x125088 (row E8b): not done while riding, as before
 
 use super::{wrap, Rider};
@@ -28,6 +30,39 @@ use crate::surface::SURFACE_TABLE;
 use glam::Vec3;
 
 type V4 = [f32; 4];
+
+/// The lean record's rate (rider+0x248) as `Boarder_UpdateLeanTargets` 0x129500 sets it: `0x42855555`, 66.67 per second.
+pub const LEAN_RATE: f32 = f32::from_bits(0x42855555);
+
+/// The lean value (rider+0x244) moved one tick toward its target (+0x24c) at `rate` (+0x248) per second: the step of
+/// `cBoarder::vf7` 0x117198 for this record, `rate · dt` (the game's `rate · 0.016666668`) either way, or the target
+/// itself when it is within a step. `lean` = (value, rate, target).
+pub fn lean_ease(lean: [f32; 3], dt: f32) -> f32 {
+    let (cur, rate, target) = (lean[0], lean[1], lean[2]);
+    let step = rate * dt;
+    if target + step < cur {
+        cur - step
+    } else if cur < target - step {
+        cur + step
+    } else {
+        target
+    }
+}
+
+/// The lean record's new rate and target: `Boarder_UpdateLeanTargets` 0x129500 (its rider+0x248 / +0x24c half; the
+/// rider+0x2c0 half is row G20c). The rate is always 66.67; the target is 0 in motion 3 (the rail), else `−60 · steer`
+/// (+0x214, the game's sign) scaled by the speed (|+0x150| · 0.6944444) while that is under 1.
+pub fn lean_targets(motion: u32, steer: f32, vel: V4) -> (f32, f32) {
+    if motion == 3 {
+        return (LEAN_RATE, 0.0);
+    }
+    let speed = dot(vel, vel).sqrt() * f32::from_bits(0x3f31c71c);
+    let mut target = steer * -60.0;
+    if speed < 1.0 {
+        target *= speed;
+    }
+    (LEAN_RATE, target)
+}
 
 const HALF_PI: f32 = std::f32::consts::FRAC_PI_2;
 
@@ -100,10 +135,8 @@ impl Rider {
                 plane_fwd,
                 side: cross(n, plane_fwd),
                 fall: probe::fall_line(n, o.fwd),
-                // STANDIN: the probe starts under the position (rider+0x244 and stats+0x60 are 0), for the stat
-                // that moves it sideways (row G3)
-                x244: 0.0,
-                stat60: 0.0,
+                x244: self.lean[0],
+                stat60: self.stats.scale,
                 height,
                 surface: self.surface as u32,
                 surface_ticks: 0,
@@ -162,6 +195,9 @@ impl Rider {
         g.mask = 0xffff_ffff;
         // the game's stat bytes (`crate::stats`): speed +0x0e, edging +0x11, grip +0x13 and the cubic term +0x19
         let b = |i: usize| st.bytes[i] as f32;
+        // the probe's sideways offset: stats+0x60 · rider+0x244 (the cached copy is stale, the port eased the lean)
+        g.p.x244 = self.lean[0];
+        g.p.stat60 = st.scale;
         g.stats = gm::Stats { speed: b(stats::SPEED), edging: b(stats::EDGING), grip: b(stats::GRIP), cubic: b(stats::CUBIC), stance: 0 };
         // STANDIN: our crouch/steer/speed test, for the game's "skate push clip (0x221) playing" (G5)
         g.skating = self.crouch_v > 0.5 && self.steer.abs() < 0.2 && self.vel.length() < 8.33;
@@ -180,8 +216,36 @@ impl Rider {
         self.surface = g.p.surface.min(19) as u8;
         self.switch = g.switch != 0;
         self.steer = -g.steer;
+        self.lean[0] = g.p.x244;
         self.gm = Some(GroundCache { g, pos: self.pos, vel: self.vel, yaw: self.yaw });
         left
+    }
+
+    /// STANDIN: the motion id (rider+0x424: 1 air, 2 ground, 3 rail, 5 wipeout) from the port's own flags, for the
+    /// game's motion state machine (row G18)
+    fn lean_motion(&self) -> u32 {
+        if self.rail.is_some() {
+            3
+        } else if self.crashed > 0.0 {
+            5
+        } else if self.grounded {
+            2
+        } else {
+            1
+        }
+    }
+
+    /// The lean value one tick on (`cBoarder::vf7` 0x117198), before the tick's motion.
+    pub(super) fn lean_ease(&mut self, dt: f32) {
+        self.lean[0] = lean_ease(self.lean, dt);
+    }
+
+    /// The lean record aimed for the next tick (`Boarder_UpdateLeanTargets` 0x129500), after the tick's motion: from the
+    /// steer as it is now (the game's sign: the port's is the other way) and the velocity in cm/s.
+    pub(super) fn lean_aim(&mut self) {
+        let (rate, target) = lean_targets(self.lean_motion(), -self.steer, to_game(self.vel, 100.0, 0.0));
+        self.lean[1] = rate;
+        self.lean[2] = target;
     }
 
     /// The walls: a sphere around the body (`Boarder_WallCollide` 0x126250: bounce off at least 0.56 m/s) and
@@ -264,7 +328,7 @@ impl GroundEnv<'_> {
 
 impl gm::Env for GroundEnv<'_> {
     /// `Boarder_SetState` 0x11f608. Only the revert (state 4: ridden backwards, brake off) is done: the board swings
-    /// half way round, switch toggles and the steer flips sign. STANDIN: our revert, for the state's body (row G18).
+    /// half way round, switch toggles and the steer and the lean flip sign. STANDIN: our revert, for the state's body (row G18).
     fn set_state(&mut self, g: &mut gm::Rider, state: u32) {
         if state == 4 {
             let mut o = Orient { q: g.quat, fwd: g.p.fwd, side: g.board_side, up: g.board_up, yaw: g.yaw };
@@ -276,6 +340,8 @@ impl gm::Env for GroundEnv<'_> {
             g.yaw = o.yaw;
             g.switch ^= 1;
             g.steer = -g.steer;
+            // `ChangeFakieControl_Enter` 0x103eb8 negates the lean value (+0x244) with the steer (+0x214)
+            g.p.x244 = -g.p.x244;
         }
     }
 

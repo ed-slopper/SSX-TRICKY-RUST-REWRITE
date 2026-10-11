@@ -104,3 +104,37 @@ pub fn ai_bytes(base: &[u8; 16], caps: &[u8; 4], value: Option<i32>, use_caps: b
     }
     out.map(scale)
 }
+
+/// Each rider's body scale, stats+0x60 (board row G20b): the float at `gRider_Table` + rider · 0x38 + 0x24, which both
+/// set-ups copy to the entry (`Career_SetupPlayerRider` 0x16a9d8 as `DAT_00331ecc`, `Career_SetupAIRider` 0x16ae68
+/// from its row's `+0x24`; the computer riders are handed the table's own rows). The ground probe starts its ray
+/// `scale · rider+0x244` to the side of the position and `Boarder_UpdatePose` 0x129628 scales its body offsets by it.
+/// Rider order = `trickdata::RIDERS`; the bit patterns are the exe's.
+pub const SCALE: [f32; 12] = [
+    f32::from_bits(0x3f59999a), // 0.85
+    f32::from_bits(0x3f333333), // 0.70
+    f32::from_bits(0x3f800000), // 1.00
+    f32::from_bits(0x3f400000), // 0.75
+    f32::from_bits(0x3f5eb852), // 0.87
+    f32::from_bits(0x3f59999a), // 0.85
+    f32::from_bits(0x3f666666), // 0.90
+    f32::from_bits(0x3f733333), // 0.95
+    f32::from_bits(0x3f59999a), // 0.85
+    f32::from_bits(0x3f666666), // 0.90
+    f32::from_bits(0x3f7ae148), // 0.98
+    f32::from_bits(0x3f59999a), // 0.85
+];
+
+/// The scale the all-max-attributes word (`DAT_003352b8` != 0) gives the player outside the trick tutorial (mode
+/// `DAT_0032de8c` 6): `0x3f4ccccd`. The computer riders keep their row's.
+pub const SCALE_ALL_MAX: f32 = f32::from_bits(0x3f4ccccd);
+
+/// The player's stats+0x60, the scale part of `Career_SetupPlayerRider` 0x16a9d8.
+pub fn player_scale(rider: usize, all_max: bool, mode: u32) -> f32 {
+    if all_max && mode != 6 { SCALE_ALL_MAX } else { SCALE[rider] }
+}
+
+/// A computer rider's stats+0x60, the scale part of `Career_SetupAIRider` 0x16ae68.
+pub fn ai_scale(rider: usize) -> f32 {
+    SCALE[rider]
+}

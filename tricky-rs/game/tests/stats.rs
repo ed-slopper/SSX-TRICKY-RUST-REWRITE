@@ -81,6 +81,10 @@ fn tables_are_the_exes() {
         if (d.jump, d.windup) != (BASE[i][stats::JUMP], BASE[i][10]) {
             wrong.push(format!("{} jump/wind-up", d.name));
         }
+        // the probe's scale, stats+0x60: the row's float at +0x24
+        if r.mem.read_u32(row + 0x24) != stats::SCALE[i].to_bits() {
+            wrong.push(format!("{} scale: game {:#x}, ours {:#x}", d.name, r.mem.read_u32(row + 0x24), stats::SCALE[i].to_bits()));
+        }
         if d.weight as u32 != r.mem.read_u32(row + 0x20) {
             wrong.push(format!("{} weight", d.name));
         }
@@ -136,6 +140,7 @@ fn player_stat_bytes_are_the_originals() {
     let mut wrong = Vec::new();
     let mut runs = 0;
     let mut caps_runs = 0;
+    let mut scale_runs = 0;
     for n in 0..20_000u32 {
         let rider = (g.next() % 12) as usize;
         let board = (g.next() % 12) as usize;
@@ -176,6 +181,12 @@ fn player_stat_bytes_are_the_originals() {
         let b1 = all_max != 0 || (mallora != 0 && rider == 7);
         let mix = (max_attrib == 0 && !b1) || mode == 6;
         let ours = stats::player_bytes(&BASE[rider], &CAPS[rider], BOARDS[rider][board].bonus, levels, !mix);
+        // stats+0x60, the probe's scale
+        let (game_scale, our_scale) = (r.mem.read_u32(entry + 0x60), stats::player_scale(rider, all_max != 0, mode).to_bits());
+        if game_scale != our_scale {
+            wrong.push(format!("rider {rider} all_max {all_max} mode {mode}: scale game {game_scale:#x}, ours {our_scale:#x}"));
+        }
+        scale_runs += (all_max != 0 && mode != 6) as u32;
         runs += 1;
         caps_runs += (!mix) as u32;
         if game != ours {
@@ -187,6 +198,7 @@ fn player_stat_bytes_are_the_originals() {
     }
     assert!(wrong.is_empty(), "{} of {runs} differ:\n{}", wrong.len(), wrong.join("\n"));
     assert!(caps_runs > 100, "the max-attribute path was run {caps_runs} times");
+    assert!(scale_runs > 100, "the all-max scale was run {scale_runs} times");
 }
 
 #[test]
@@ -219,6 +231,10 @@ fn ai_stat_bytes_are_the_originals() {
         r.call(0x16ae68).expect("Career_SetupAIRider runs to its return");
         let game = read_bytes(&mut r, entry + 0xe, 16);
         let ours = stats::ai_bytes(&BASE[rider], &CAPS[rider], if null { None } else { Some(value) }, max_attrib != 0);
+        let (game_scale, our_scale) = (r.mem.read_u32(entry + 0x60), stats::ai_scale(rider).to_bits());
+        if game_scale != our_scale {
+            wrong.push(format!("rider {rider}: scale game {game_scale:#x}, ours {our_scale:#x}"));
+        }
         runs += 1;
         if game != ours {
             wrong.push(format!("rider {rider} value {value} null {null} max {max_attrib}: game {game:?}, ours {ours:?}"));
@@ -228,4 +244,134 @@ fn ai_stat_bytes_are_the_originals() {
         }
     }
     assert!(wrong.is_empty(), "{} of {runs} differ:\n{}", wrong.len(), wrong.join("\n"));
+}
+
+// ---- the lean record: rider+0x244 value, +0x248 rate, +0x24c target (board row G20b)
+
+const LEAN: u32 = 0x244;
+
+fn float_edge(g: &mut Rng) -> f32 {
+    match g.next() % 10 {
+        0 => 0.0,
+        1 => 1.0,
+        2 => -1.0,
+        3 => 0.905,
+        4 => -0.905,
+        5 => (g.next() as f32 / 65536.0 - 0.5) * 8.0,
+        _ => ((g.next() % 20_001) as f32 - 10_000.0) / 10_000.0,
+    }
+}
+
+#[test]
+fn lean_targets_are_the_originals() {
+    // `Boarder_UpdateLeanTargets` 0x129500: the rate (+0x248) and target (+0x24c) it leaves, in every motion, over the
+    // steers and the speeds under and over its 1.44 cm/s knee
+    let Some(mut r) = runner() else { return };
+    let mut g = Rng(0x5eed_0012_9500);
+    let rider = r.mem.alloc(0x400);
+    let mut wrong = Vec::new();
+    let (mut slow, mut rail) = (0, 0);
+    for n in 0..20_000u32 {
+        let motion = [1u32, 2, 2, 2, 3, 5, 6, 4][(g.next() % 8) as usize];
+        let steer = float_edge(&mut g);
+        let speed = match g.next() % 4 {
+            0 => 0.0,
+            1 => (g.next() % 3000) as f32 / 1000.0,
+            _ => (g.next() % 300_000) as f32 / 100.0,
+        };
+        // a direction, so |v| = speed up to rounding; the fourth word is the vector's w
+        let (a, b) = ((g.next() % 6283) as f32 / 1000.0, (g.next() % 3141) as f32 / 1000.0);
+        let vel = [speed * b.sin() * a.cos(), speed * b.sin() * a.sin(), speed * b.cos(), 0.0];
+        r.mem.write_u32(rider + 0x424, motion);
+        r.mem.write_f32(rider + 0x214, steer);
+        for k in 0..4 {
+            r.mem.write_f32(rider + 0x150 + 4 * k, vel[k as usize]);
+        }
+        // the half that makes the rider's up (+0x2c0) needs a normal and an up
+        for (k, v) in [0.0f32, 0.0, 1.0, 0.0].into_iter().enumerate() {
+            r.mem.write_f32(rider + 0x2a0 + 4 * k as u32, v);
+            r.mem.write_f32(rider + 0x2c0 + 4 * k as u32, v);
+        }
+        for k in 0..3 {
+            r.mem.write_u32(rider + LEAN + 4 * k, 0xdead_0000 + k);
+        }
+        r.cpu.set_gpr(4, rider as u64);
+        r.call(0x129500).expect("Boarder_UpdateLeanTargets runs to its return");
+        let (rate, target) = tricky_game::rider::ground_tick::lean_targets(motion, steer, vel);
+        let (game_rate, game_target) = (r.mem.read_u32(rider + LEAN + 4), r.mem.read_u32(rider + LEAN + 8));
+        slow += (motion != 3 && (vel[0] * vel[0] + vel[1] * vel[1] + vel[2] * vel[2]).sqrt() * 0.6944444 < 1.0) as u32;
+        rail += (motion == 3) as u32;
+        // the value itself (+0x244) is not touched
+        if r.mem.read_u32(rider + LEAN) != 0xdead_0000 {
+            wrong.push(format!("call {n}: wrote the lean value"));
+        }
+        if (game_rate, game_target) != (rate.to_bits(), target.to_bits()) {
+            wrong.push(format!("call {n}: motion {motion} steer {steer} vel {vel:?}: game ({game_rate:#x}, {game_target:#x}), ours ({:#x}, {:#x})", rate.to_bits(), target.to_bits()));
+            if wrong.len() > 10 {
+                break;
+            }
+        }
+    }
+    assert!(wrong.is_empty(), "{} differ:\n{}", wrong.len(), wrong.join("\n"));
+    assert!(slow > 1000 && rail > 1000, "knee {slow}, rail {rail}");
+}
+
+#[test]
+fn lean_ease_is_the_originals() {
+    // `cBoarder::vf7` 0x117198 run whole, everything it calls recorded as doing nothing: the lean value (+0x244)
+    // after it is `lean_ease` of the record before it
+    let Some(mut r) = runner() else { return };
+    let mut g = Rng(0x5eed_0011_7198);
+    let rider = r.mem.alloc(0x6000);
+    let vt = r.mem.alloc(0x100);
+    let game = r.mem.alloc(0x100);
+    let tbl = r.mem.alloc(0x400);
+    let sub = r.mem.alloc(0x100);
+    // every call the function makes is a stub; the one through the vtable (slot +0x54) too
+    let code_start = 0x117198u32;
+    let mut jals = std::collections::BTreeSet::new();
+    for k in 0..(2952 / 4) {
+        let w = r.mem.read_u32(code_start + 4 * k);
+        if w >> 26 == 3 {
+            jals.insert((w & 0x03ff_ffff) << 2);
+        }
+    }
+    for a in jals {
+        r.stub(a, |cpu, _| cpu.set_gpr(2, 0));
+    }
+    r.stub(0x4000, |cpu, _| cpu.set_gpr(2, 0));
+    r.mem.write_u32(vt + 0x54, 0x4000);
+    r.mem.write_u32(rider, vt);
+    r.mem.write_u32(0x337c58 + 0x730, game);
+    r.mem.write_u32(game + 0x24, tbl);
+    r.mem.write_u32(game + 0x1c, sub);
+    r.mem.write_u32(sub + 0x1c, 1);
+    let dt = 1.0f32 / 60.0;
+    let mut wrong = Vec::new();
+    let (mut up, mut down, mut near) = (0, 0, 0);
+    for n in 0..20_000u32 {
+        let lean = [float_edge(&mut g) * 60.0, float_edge(&mut g).abs() * 70.0, float_edge(&mut g) * 60.0];
+        r.mem.write_u32(rider + 0x46b0, 1);
+        for k in 0..3 {
+            r.mem.write_f32(rider + LEAN + 4 * k as u32, lean[k]);
+        }
+        r.cpu.set_gpr(4, rider as u64);
+        r.call(0x117198).expect("cBoarder::vf7 runs to its return");
+        let game_value = r.mem.read_u32(rider + LEAN);
+        let ours = tricky_game::rider::ground_tick::lean_ease(lean, dt);
+        let step = lean[1] * dt;
+        up += (lean[2] - step > lean[0]) as u32;
+        down += (lean[2] + step < lean[0]) as u32;
+        near += (lean[2] + step >= lean[0] && lean[2] - step <= lean[0]) as u32;
+        if game_value != ours.to_bits() {
+            wrong.push(format!("call {n}: lean {lean:?}: game {game_value:#x}, ours {:#x}", ours.to_bits()));
+            if wrong.len() > 10 {
+                break;
+            }
+        }
+        // the rate and target are left alone (the stub stands for `Boarder_UpdateLeanTargets`)
+        assert_eq!((r.mem.read_f32(rider + LEAN + 4), r.mem.read_f32(rider + LEAN + 8)), (lean[1], lean[2]));
+    }
+    assert!(wrong.is_empty(), "{} differ:\n{}", wrong.len(), wrong.join("\n"));
+    assert!(up > 1000 && down > 1000 && near > 1000, "up {up}, down {down}, within a step {near}");
 }
