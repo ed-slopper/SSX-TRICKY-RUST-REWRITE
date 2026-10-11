@@ -46,9 +46,13 @@ ang = (60° − |boardYaw − courseYaw|)/30° capped at 1 (courseYaw = course s
 boost = lvl·(0.07983 − |s|)·(23.50 + 10.53·max(0, f_up))·surf12 m/s² — any steer above 0.08 kills it.
 Boost level 1.0 / 0.6013 / 0.25 by meter > 0.666 / > 0.3336 / else.
 
-**Surface table** (`SurfaceTable_Init` 0x256188; 20 rows × 25 floats): [0] g, [1] lin, [2] quad, [3] cubic drag,
-[4] side grip, [5] lean°, [6] airborne height cm, [9] normal damping, [11] push target km/h, [12] thrust scale.
-surf[6]/surf[9] by row: 1 2.742/5.009; 2 2.849/5.530; 3 15.04/2.842; 4 30.03/2.976; 5 2.775/4.052;
+**Surface table** (`SurfaceTable_Init` 0x256188; 20 rows × 25 words, table pointer in $a0): [0] g, [1] lin, [2] quad,
+[3] cubic drag, [4] side grip, [5] lean°, [6] airborne height cm, [7] [8] spring band d1 d2 cm, [9] normal damping,
+[11] push target km/h, [12] thrust scale, [13..16] spray (rate, flake cm, two lives s), [17] and [21] integers.
+Proven (E8f): every word read by running the function in the runner; the exact values are
+`tricky-rs/game/src/surface.rs` and `tests/surface_table.rs` checks all 500 bit for bit. Row 0 (off the course) is
+7.347 cm / 11.61 per s for [6]/[9], not 20/30 as noted before. Not yet traced (E13): [10], [17..24].
+surf[6]/surf[9] by row: 0 7.347/11.61; 1 2.742/5.009; 2 2.849/5.530; 3 15.04/2.842; 4 30.03/2.976; 5 2.775/4.052;
 6,10,15,16,17,19 20/30; 7 21.37/45.2; 8 20/39.4; 9 2.02/30; 11 0.70/17.9; 12 3.95/30; 13 2.64/0; 14 1.56/30; 18 2.58/40.
 
 ## Animation timing

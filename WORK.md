@@ -50,7 +50,6 @@ state machine and the renderer are ours. Nothing has been checked against the or
 | E6 | Loading and memory: what the game loads when (load screens, course switch), only as far as it changes behaviour | unowned | E1 | | [est] |
 | E7 | World: terrain tessellation as the game does it, world cells (`World_CellActivate_RunPersistant` 0x25fed0), instance queries `World_QueryInstances` 0x25b878, ray casts `World_RayCast` 0x25aff8 / `World_RayCastInstance` 0x25bf48 | unowned | E3a | | [repo] `collide.rs` (triangle grid of the drawn mesh) is a stand-in for these |
 | E8 | Physics: check the ported boarder motion against the original once F4 exists: ground `cBoarder_GroundMotion_Update` 0x10a0d8, drag 0x109cb8, side friction 0x109ef8, thrust 0x109950, spring 0x109878, probe 0x128ae8, surface table `SurfaceTable_Init` 0x256188 | any | F4a | | [repo] Ported in `rider.rs`; README still says some constants at the top of `rider.rs` are guesswork: find which. Split: E8f–E8i |
-| E8f | Surface table checked: `SurfaceTable_Init` 0x256188 (20 rows × 25 floats) run in the function runner, every value our port uses compared bit for bit | any | F4a | trailrig/heron (2026-10-11) | Split of E8 |
 | E8g | Ground probe checked: `Boarder_ProbeGround` 0x128ae8 (ray +200 → −100 cm along n: new n, h, surface) | any | F4a | | Split of E8. Needs the world ray (E7) stubbed or run |
 | E8h | Ground motion checked: `GroundMotion_Update` 0x10a0d8 as a whole, with its callees run as the original (leaves already checked in F4d, F4d2) | any | F4a | | Split of E8 |
 | E8i | The guessed constants at the top of `tricky-rs/game/src/rider.rs`: find which are the game's and which are ours, port or tag them | any | F4a | | Split of E8 |
@@ -63,6 +62,7 @@ state machine and the renderer are ours. Nothing has been checked against the or
 | E10 | Input: pad reading, stick shaping and dead zones, button bits (the chord 0x600), vibration, `cCheatCodes::Update` 0x26CF60 | unowned | E1 | | [repo] findings.md |
 | E11 | Camera: named cameras `cBxCamera_EvalNamedCam` 0x174888 (ported), director scripts `cBxCamera_RunDirectorScript`, replay and finish cameras, camera collision | any | | | [repo] Chase cam ported in `rider.rs`; free camera is ours (keep, tag) |
 | E12 | Save and load: the memory-card profile, options, records, unlocks (`Profile_ResetNewGame` 0x161b40), in our own save file with the same fields | unowned | E1 | | [repo] `tricky-save.json` is the stand-in |
+| E13 | The surface table's untraced words: find what reads `SurfaceTable_Init` 0x256188 words [10], [17..24] (rider+0x290 row) and port them | any | E8f | | Gap of E8f. Values are in `tricky-rs/game/src/surface.rs` |
 
 ## P2 Gameplay systems
 
@@ -99,6 +99,7 @@ state machine and the renderer are ours. Nothing has been checked against the or
 | G12 | Instant replay | unowned | E1, E11 | | [repo] in the debug menu (findings.md) |
 | G13 | Pickups and course events checked: points, multipliers, boost, show-off time, speed boost, spin-boost zones (ops 6, 0xe–0x12) | any | E9 | | [repo] |
 | G14 | Megaplex laps and boost tubes checked: `cLapBoostNode` 0x140b90, `cZBoostNode` 0x141cd8 | any | E9 | | [repo] |
+| G15 | Spray per surface from the real table: `surf()` in `tricky-rs/src/spray.rs` is rounded and wrong for rows 9 (game 0.0319, 2, 0.335, 0.597) and 19 (game rate 1.0, ours 0); read words [13..16] from `tricky_game::surface` | any | E8f | | Gap of E8f |
 
 ## P3 Content
 
@@ -182,6 +183,7 @@ matches the original.
 | F11b | The rest of F11: new Bevy-free crate `tricky-rs/data` (`tricky-data`: level folder, level scripts, characters and clips, race lines and AI paths, camera scripts, object curves), and the race, AI driver, chase camera (`game/src/race.rs`) and props (`game/src/props.rs`) into `tricky-game`, which now builds on `tricky-data`; the app re-exports both (paths unchanged), CI tests the new crate, `function_index.py` scans it; all tests pass, function index unchanged. The sound loaders stay in the app (they hand audio to Bevy) | P0 | ed-slopper/puffin | 2026-10-10 | 3eb8498 |
 | F3 | ghidra-mcp set up on ed-slopper's PC: Ghidra 12.1.4 + Emotion Engine extension at `D:\code\modding\ghidra_12.1.4_PUBLIC`, the repo's `ghidra/Project` opened (owner changed from root), `symbols.txt` applied (ApplySsxSymbols), ghidra-mcp 7.0.0 built from source and enabled, bridge added to Claude; `force_decompile` 0x12b340 returns `Air_IntegrateRK4`. Install snags written into AGENTS.md §14 | P0 | ed-slopper (with puffin) | 2026-10-10 | 406fa6b |
 | F2b | Settled in Ghidra (ghidra-mcp): `Score_TrickBookCheck` and `TriggerScript_Op0_SpawnController` are 0x1579e0 and 0x13c5d0 (the notes' addresses were 0x20/0x30 in; nothing branches there); `WipeoutMotion_Update` 0x10c2f0 created as a function (one 5,004-byte body up to 0x10d680) and added to the index; 0x343150 is `gMusicSys`, the global pointer to the one `cMusicSys` (its destructor clears it); 0x198810 and 0x199d10 are the `cAnimObjectNode` and `cAnimDeltaNode` constructors (they install vtables 0x38c650/0x38c558, whose type-info entries are those classes'); `cTubeEndBoostNode::vf27` renamed `BoostRider` (pushes a rider in slot n toward the slot's speed along the tube); all seven F2 class methods proven (called only from their class's vtable methods or constructors, or in the vtable: `cAnimDeltaNode::Update`), five constructors named. symbols.txt, renamed.txt, port notes, index updated | P0 | ed-slopper/puffin | 2026-10-10 | 7ef6924 |
+| E8f | Surface table checked: `SurfaceTable_Init` 0x256188 run in the function runner, all 500 words in `tricky-rs/game/src/surface.rs` bit-identical (`tests/surface_table.rs`); SURFACES, SURF_EXTRA, SURF_BAND in rider.rs now taken from it (were rounded; row 0's air height and damping were wrong) | P1 | trailrig/heron | 2026-10-11 | c2a1967 |
 
 ## Changes to the board
 
@@ -222,3 +224,4 @@ matches the original.
 - 2026-10-10 ed-slopper/puffin: F1c in progress (still claimed): boarder done (state machine, snapshots, controls), race and world mostly done, plus class-slot passes (destructors, node Update/Draw/SaveSnapshot, handlers Enter/Exit/Update, FE states, overlays, loading screens, menu items, course loader), RNG, string scan. ~1,470 names; index 3,047/7,426 named. Left: big race/world/camera routines, renderer state setters, frontend screen builders, audio/speech loaders.
 - 2026-10-11 trailrig/heron: trailrig added to Areas (AGENTS.md §12); split E8 into E8f–E8i.
 - 2026-10-11 trailrig/heron: claim E8f.
+- 2026-10-11 trailrig/heron: E8f done; added E13 and G15 (gaps of E8f).

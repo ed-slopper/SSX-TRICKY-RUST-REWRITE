@@ -4612,7 +4612,7 @@ address,size,name,system,status
 0x256080,128,CourseDma_ResolveMeshContext,race,not started
 0x256100,40,FUN_00256100,,not started
 0x256138,80,cCourseResolve_PS2::__tf,runtime,host
-0x256188,5156,SurfaceTable_Init,boarder,ported
+0x256188,5156,SurfaceTable_Init,boarder,checked
 0x2575b0,8,FUN_002575b0,game?,not started
 0x2575b8,116,FUN_002575b8,game?,not started
 0x257630,116,FUN_00257630,game?,not started
