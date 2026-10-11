@@ -24,7 +24,8 @@ impl Rng {
 }
 
 /// Each ported routine and where its object keeps the rider.
-const ROUTINES: [(u32, u32); 29] = [
+const ROUTINES: [(u32, u32); 30] = [
+    (0x106dc8, 0x14),
     (0x1049f8, 0xc),
     (0x108368, 0x20), (0x108310, 0x20), (0x10aec8, 0xc), (0x109858, 0xc), (0x10b090, 0x10), (0x10b068, 0x10),
     (0x10d680, 0x60), (0x110290, 0xc), (0x110260, 0xc), (0x104388, 0x10), (0x104190, 0x10), (0x1033c0, 0x14),
@@ -77,6 +78,10 @@ fn write(m: &mut r5900::Mem, rd: u32, r: &StateRider) {
     m.write_u32(rd + 0x5ae4, r.x5ae4);
     m.write_u32(rd + 0x5af0, r.x5af0);
     m.write_u32(rd + 0x46dc, r.x46dc);
+    m.write_f32(rd + 0x1f4, r.x1f4);
+    m.write_f32(rd + 0x1f8, r.x1f8);
+    m.write_f32(rd + 0x27c, r.x27c);
+    m.write_f32(rd + 0x280, r.x280);
     m.write_u32(rd + 0x38, r.cam as u32);
     m.write_u32(rd + 0x420, r.class);
     m.write_u32(rd + 0x428, r.state);
@@ -113,6 +118,10 @@ fn read(m: &mut r5900::Mem, rd: u32, base: &StateRider) -> StateRider {
     r.x5ae4 = m.read_u32(rd + 0x5ae4);
     r.x5af0 = m.read_u32(rd + 0x5af0);
     r.x46dc = m.read_u32(rd + 0x46dc);
+    r.x1f4 = m.read_f32(rd + 0x1f4);
+    r.x1f8 = m.read_f32(rd + 0x1f8);
+    r.x27c = m.read_f32(rd + 0x27c);
+    r.x280 = m.read_f32(rd + 0x280);
     r
 }
 
@@ -126,6 +135,7 @@ fn bits(r: &StateRider) -> String {
             (r.stance, f(r.x1cc), r.kind, r.x1e4, r.x1e8, r.x1ec, r.x1fc.map(f)),
             (f(r.steer), f(r.x218), f(r.x21c), f(r.lean), r.x268.map(f), f(r.x284), f(r.x288), f(r.x28c)),
             (f(r.x448), f(r.x44c), r.x46d4, f(r.x46e0), r.x5ae4, r.x5af0, r.x46dc),
+            (f(r.x1f4), f(r.x1f8), f(r.x27c), f(r.x280)),
         )
     )
 }
@@ -134,7 +144,7 @@ fn bits(r: &StateRider) -> String {
 fn state_routines_match_the_original() {
     let Some(mut r) = Runner::from_env() else { return };
     r.float_rules = Rules::parse("add=n,mul=n,div=n,cvt=n").unwrap();
-    for a in [0x218b68u32, 0x11f440, 0x128e90, 0x129008, 0x250c10, 0x2510f8, 0x102f80, 0x102f50] {
+    for a in [0x218b68u32, 0x11f440, 0x128e90, 0x129008, 0x250c10, 0x2510f8, 0x102f80, 0x102f50, 0x107fc8] {
         r.allow(a);
     }
     let log: Rc<RefCell<Vec<RoutineCall>>> = Rc::default();
@@ -171,7 +181,10 @@ fn state_routines_match_the_original() {
             let clip = c.gpr(5) as u32;
             if (0x20c..=0x20e).contains(&clip) { RoutineCall::PlayClipMasked(clip, m.read_u32(rider + 0x46dc)) } else { RoutineCall::PlayClip(clip) }
         }))),
-        (0x15eef8, Box::new(move |c, _| (c.gpr(4) as u32 == rider + 0x46c0 && c.f(12) == std::f32::consts::PI).then_some(RoutineCall::TurnAllLayers))),
+        (0x15eef8, Box::new(move |c, _| (c.gpr(4) as u32 == rider + 0x46c0).then(|| if c.f(12) == std::f32::consts::PI { RoutineCall::TurnAllLayers } else { RoutineCall::TurnAllLayersBy(c.f(12).to_bits()) }))),
+        (0x155e00, Box::new(move |c, _| (c.gpr(4) as u32 == rider + 0x5820 && c.gpr(5) == 0).then_some(RoutineCall::ScoreSpinZero))),
+        (0x126c78, Box::new(move |c, _| (c.gpr(4) as u32 == rider && c.f(12) == 0.0).then_some(RoutineCall::BrakeTargetZero))),
+        (0x106dc0, Box::new(move |c, _| (c.gpr(4) as u32 == rider).then_some(RoutineCall::OnClipQueued))),
     ];
     for (a, f) in stubs {
         let l = log.clone();
@@ -190,13 +203,13 @@ fn state_routines_match_the_original() {
         let mut sr = StateRider {
             x138: fs(), x13c: fs(), vel: [0.0; 4], orient: o, stance: 0, x1cc: fs(), kind: 0, x1e4: 0, x1e8: 0, x1ec: 0,
             x1fc: [fs(), fs(), fs(), fs(), fs(), fs()], steer: fs(), x218: fs(), x21c: fs(), lean: fs(), x268: [fs(), fs(), fs()],
-            x284: fs(), x288: fs(), x28c: fs(), x448: fs(), x44c: fs(), x46d4: 0, x46e0: fs(), x5ae4: 0, x5af0: 0, x46dc: 0, bone_b50: None,
+            x284: fs(), x288: fs(), x28c: fs(), x448: fs(), x44c: fs(), x46d4: 0, x46e0: fs(), x5ae4: 0, x5af0: 0, x46dc: 0, bone_b50: None, x1f4: fs(), x1f8: fs(), x27c: fs(), x280: fs(),
             cam: 0, class: 0, state: 0, stats40: 0,
         };
         let sp = [g.f(0.0, 270.0), 277.77777, g.f(280.0, 3000.0)][g.next() as usize % 3];
         sr.vel = [sp, 0.0, 0.0, 0.0];
         sr.stance = g.next() % 2;
-        sr.kind = g.next() % 5;
+        sr.kind = g.next() % 6;
         (sr.x1e4, sr.x1e8, sr.x1ec, sr.x46d4) = (g.next(), g.next(), g.next(), g.next());
         sr.x5ae4 = g.next() % 2;
         sr.x5af0 = g.next() % 9;

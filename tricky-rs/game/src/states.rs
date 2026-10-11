@@ -165,6 +165,12 @@ pub struct StateRider {
     /// +0x5ae4 (a sound flag) and +0x5af0
     pub x5ae4: u32,
     pub x5af0: u32,
+    /// +0x1f4, +0x1f8
+    pub x1f4: f32,
+    pub x1f8: f32,
+    /// +0x27c, +0x280 (negated with the stance on a rail)
+    pub x27c: f32,
+    pub x280: f32,
     /// +0x46dc: the animation controller's layer mask
     pub x46dc: u32,
     /// the word at +0xb50 of the pivot bone's record (rider + +0x44d8 × 0x394), none when +0x44d8 < 0
@@ -213,6 +219,14 @@ pub enum RoutineCall {
     PlayClip(u32),
     /// `AnimCtl_TurnAllLayers` 0x15eef8(π, rider+0x46c0)
     TurnAllLayers,
+    /// `AnimCtl_TurnAllLayers` 0x15eef8(angle bits, rider+0x46c0) for an angle other than π
+    TurnAllLayersBy(u32),
+    /// `Score_UpdateSpin` 0x155e00(rider+0x5820, 0)
+    ScoreSpinZero,
+    /// `Boarder_SetBrakeTarget` 0x126c78(0, rider)
+    BrakeTargetZero,
+    /// `Boarder_OnClipQueued` 0x106dc0(rider)
+    OnClipQueued,
     /// `AnimCtl_PlayClip` 0x15fcf8(rider+0x46c0, clip, 0, 5) with the layer mask +0x46dc it is played under
     PlayClipMasked(u32, u32),
 }
@@ -437,7 +451,115 @@ pub fn run_routine(addr: u32, r: &mut StateRider, o: &mut StateObj, a1: u32) -> 
             calls.push(C::PlayClipMasked(clip, r.x46dc));
             r.x46dc = 0xffff_ffff;
         }
+        // RailSlideControl_Enter: onto a rail. The board is turned to its stance for the rail kind (+0x1dc: 4 and 3
+        // across the rail, ±π/2 about its up; 2 and others along it), switching stance where the kind wants the
+        // other one (an alpine board keeps its natural stance, stats+0x40, and has kinds 1 and 2 swapped for it),
+        // the animation's facing set to match, and the rail clip played (0x257, 0x256, 0x255, 0x254)
+        0x106dc8 => {
+            o.w8 = 0;
+            o.wc = 0;
+            calls.push(C::ScoreSpinZero);
+            calls.push(C::BrakeTargetZero);
+            o.w10 = 0;
+            r.x1f4 = f32::from_bits(0x4055_5555);
+            r.x1f8 = 0.0;
+            calls.push(C::BlendOutAll);
+            let alpine = r.class == 2;
+            let natural_switch = r.stats40 != 0;
+            if alpine && natural_switch {
+                if r.kind == 2 {
+                    r.kind = 1;
+                } else if r.kind == 1 {
+                    r.kind = 2;
+                }
+            }
+            let pi = f32::from_bits(0x4049_0fdb);
+            let half = f32::from_bits(0x3fc9_0fdb);
+            // the facing as the compiler folded it: angle − floor(c)·2π, c the angle's turns + ½
+            let face = |angle: f32, c: f32| {
+                let mut n = c as i32 as f32;
+                if c < n {
+                    n -= 1.0;
+                }
+                angle - n * f32::from_bits(0x40c9_0fdb)
+            };
+            let clip;
+            match r.kind {
+                4 | 3 => {
+                    let across = if r.kind == 4 { 1.0 } else { -1.0 };
+                    let (angle, c) = if alpine && natural_switch {
+                        if r.stance == 0 {
+                            switch_stance(r);
+                            calls.push(C::TurnAllLayers);
+                        }
+                        (-half * across, if across > 0.0 { 0.25 } else { 0.75 })
+                    } else {
+                        if r.stance != 0 {
+                            switch_stance(r);
+                            if alpine {
+                                calls.push(C::TurnAllLayers);
+                            }
+                        }
+                        (half * across, if across > 0.0 { 0.75 } else { 0.25 })
+                    };
+                    let up = r.orient.up;
+                    crate::orient::rotate_about_axis(&mut r.orient, angle, up);
+                    // the layers turn by +π/2 across (kind 4), −π/2 the other way (kind 3), whatever the board
+                    calls.push(C::TurnAllLayersBy((half * across).to_bits()));
+                    r.x46e0 = face(angle, c);
+                    clip = if r.kind == 4 { 0x257 } else { 0x256 };
+                }
+                2 => {
+                    let wants_switch = !(alpine && natural_switch);
+                    if wants_switch {
+                        if r.stance == 0 {
+                            switch_stance(r);
+                            if alpine {
+                                r.x46d4 = 0;
+                            }
+                            calls.push(C::TurnAllLayers);
+                            r.x46e0 = face(pi, 1.0);
+                        }
+                    } else if r.stance != 0 {
+                        switch_stance(r);
+                        r.x46d4 = 1;
+                        calls.push(C::TurnAllLayers);
+                        r.x46e0 = face(0.0, 0.5);
+                    }
+                    clip = 0x255;
+                }
+                _ => {
+                    if alpine && natural_switch {
+                        if r.stance == 0 {
+                            switch_stance(r);
+                            calls.push(C::TurnAllLayers);
+                            r.x46e0 = face(pi, 1.0);
+                        }
+                    } else if r.stance != 0 {
+                        switch_stance(r);
+                        calls.push(C::TurnAllLayers);
+                        r.x46e0 = face(0.0, 0.5);
+                    }
+                    clip = 0x254;
+                }
+            }
+            calls.push(C::PlayClip(clip));
+            calls.push(C::OnClipQueued);
+        }
         _ => return None,
     }
     Some(calls)
+}
+
+/// `RailSlideControl_SwitchStance` 0x107fc8: the stance flipped, the board turned π about its up, steer, lean and
+/// +0x27c, +0x280 negated, the animation's stance +0x46d4 set to the new one.
+fn switch_stance(r: &mut StateRider) {
+    r.stance ^= 1;
+    let up = r.orient.up;
+    crate::orient::rotate_about_axis(&mut r.orient, f32::from_bits(0x4049_0fdb), up);
+    r.steer = -r.steer;
+    r.x46d4 = r.stance;
+    r.lean = -r.lean;
+    r.x27c = -r.x27c;
+    r.x280 = -r.x280;
 }

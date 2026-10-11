@@ -505,4 +505,13 @@ flip then 0. Checked 40,000 times.
 (b + 1 … b + 12) of the pivot bone's +0xb50 word b (0 with no bone); the travel flattened onto the board's up:
 within 30° of the board's forward (|dot| > 0.866) clip 0x20c, else 0x20e when it goes to the board's left (side ·
 travel ≤ 0, mirrored riding switch), else 0x20d; played under the mask, which is then set to −1.
+`RailSlideControl_Enter` (in `run_routine`): object +8, +0xc, +0x10 = 0, `Score_UpdateSpin`(0),
+`Boarder_SetBrakeTarget`(0), rider+0x1f4 = 3.3333333, +0x1f8 = 0, the clips blended out. An alpine board in its
+natural switch stance (stats+0x40 ≠ 0) has rail kinds 1 and 2 swapped. Kind 4 / 3 (across): the stance made regular
+(alpine natural-switch: switch), the board turned ∓π/2 / ±π/2 about its up, the layers +π/2 (kind 4) / −π/2 (kind
+3), the facing +0x46e0 the board's turn; clip 0x257 / 0x256. Kind 2: the stance made switch (alpine natural-switch:
+regular; +0x46d4 then 0 / 1), facing −π or 0, clip 0x255. Others: regular (alpine natural-switch: switch), clip
+0x254. A stance change is `RailSlideControl_SwitchStance` 0x107fc8 (stance flipped, board turned π about its up,
+steer, lean, +0x27c and +0x280 negated, +0x46d4 = stance) with the layers turned π (not for kinds 3 / 4 off an
+alpine board). Then `Boarder_OnClipQueued`. The facing values are the compiler's folded wraps (π → −π).
 
