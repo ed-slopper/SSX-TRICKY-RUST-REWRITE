@@ -6552,3 +6552,12 @@ G 17a128 PadCfg_GrabPressed
 G 17a138 PadCfg_GrabOthers
 G 17a0a0 Pad_ParseAxisPair
 G 1982d0 AIPathSet_FindRaceLineAt
+G 128150 Boarder_PlayCelebrate
+G 127e80 Boarder_PlayDisappointed
+G 235298 Speech_Celebrate
+G 235468 Speech_Disappointed
+G 11a7d0 Boarder_SetStartState
+G 11d9e0 Boarder_IsDoneFinishing
+G 1065f0 FinishLineControl_IsPhase4
+G 122f10 Boarder_InitEaseRecords
+G 117190 Boarder_FlushEndedClips
