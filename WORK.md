@@ -47,7 +47,7 @@ state machine and the renderer are ours. Nothing has been checked against the or
 | E6 | Loading and memory: what the game loads when (load screens, course switch), only as far as it changes behaviour | unowned | E1 | | [est] |
 | E7 | World: terrain tessellation as the game does it, world cells (`World_CellActivate_RunPersistant` 0x25fed0), instance queries `World_QueryInstances` 0x25b878, ray casts `World_RayCast` 0x25aff8 / `World_RayCastInstance` 0x25bf48 | unowned | E3a | | [repo] Split: E7a, E7b, E7c. `collide.rs` (triangle grid of the drawn mesh) is a stand-in for these |
 | E7a6 | Find what fills an object's box (+0xcc..+0xe0; zero in the `.pbd`, read by every cast) at run time and port it (static searches for writers found none; PINE on a running game would show the values) | unowned | E7a5 | | Gap of E7a5 |
-| E7b | World cells: which cells are live, `World_CellActivate_RunPersistant` 0x25fed0 and the persistent cell scripts | unowned | E7a | | Split of E7 |
+| E7b | World cells: which cells are live, `World_CellActivate_RunPersistant` 0x25fed0 and the persistent cell scripts | unowned | E7a | ed-slopper/puffin (2026-10-11) | Split of E7 |
 | E7c3 | The app's ground on `world` + `terrain` (the course's patches and objects from the disc, E3a4) instead of `collide.rs`'s grid of the drawn mesh; the patch cache's eviction only matters for speed | unowned | E7c2, E3a4, E7a3 | | Gap of E7c2 |
 | E8 | Physics: check the ported boarder motion against the original once F4 exists: ground `cBoarder_GroundMotion_Update` 0x10a0d8, drag 0x109cb8, side friction 0x109ef8, thrust 0x109950, spring 0x109878, probe 0x128ae8, surface table `SurfaceTable_Init` 0x256188 | any | F4a | | [repo] Ported in `rider.rs`; README still says some constants at the top of `rider.rs` are guesswork: find which. Split: E8f–E8i |
 | E8n | The capture's clip-type gate: `Rail_TryCapture` 0x125cb8 refuses a layer-0 clip of type 0xe/0xf/0x10 without flag 4 (`ground_tick::rail_try_capture` has it, checked); the port's air capture (`Rider::step_tick`, "dropping onto a rail from the air") does not ask the clip, and which type the fall-recover clip 0x224 and the trick clips have in the port is not read | any | G1b, E8m | | Gap of E8m; overlaps G20c2c3 (wiring the exact capture in place of the port's own) |
@@ -563,3 +563,4 @@ matches the original.
 - 2026-10-11 trailrig/heron: E8m done; added E8n, E8o (gaps of E8m).
 - 2026-10-11 ed-slopper/puffin: claim E7a5.
 - 2026-10-11 ed-slopper/puffin: E7a5 done (cWorldSphTree); added E7a6 (the objects' run-time boxes).
+- 2026-10-11 ed-slopper/puffin: claim E7b.
