@@ -182,6 +182,9 @@ Read out of the game's executable:
   different one), 305 a second for holding it times the grab's rate (1 to 2.5), ubers at 18 to 20 times that
   rate, rails about 1,000 a second plus 1,220 for getting on and 1,360 for tricking off. A trick repeated among
   your last five pays a half, then a third. 10,000 points fill the meter; a wipe-out takes a tenth of it.
+  All of this now runs through the game's own score functions (`game/src/score.rs`, each checked bit for bit
+  against the original): the rider's spins, flips, grabs, rails, landings, late tricks, crashes and respawns call
+  them as the game does, and trick names come from the game's own name tables.
 - **Snow types.** The course's own surface types now use the game's table (grip, drag, gravity), so ice,
   powder and the groomed runs ride differently.
 

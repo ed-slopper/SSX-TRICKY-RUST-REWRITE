@@ -67,6 +67,35 @@ Part of the port notes (index: [README.md](README.md)); units and wording as des
   holds at one tick; TRICKY holds timer and meter at 1; else a player's meter drains (15.483508 − 15.210359 ×
   stat/255) × 9.166667e-6 a tick (stats+0x1b).
 
+## Who calls the score functions (board row G2d; wired in `Rider`, `tricky-rs/game/src/rider.rs`)
+
+- `Jump_ApplyImpulse` 0x1284e0: `Score_StartTrickChain`(stance ≠ stats+0x40, rider+0x1dc, steep lip, 0) and the
+  share to `Boarder_AddMeter`. Riding off an edge starts no chain (no air-time count).
+- `SpinState_Update` 0x100908 each tick: `Score_UpdateSpin`(rider+0x1d0 in degrees, negated for stats+0x40),
+  `Score_UpdateFlip`(rider+0x1d4 in degrees).
+- `SpinState_UpdateTrickClips` 0x1272e8: `Score_StartGrab`(clip) as a grab clip reaches its hold flag;
+  `Scoring_OnTrickEvent`(0, clip) as a grab clip ends; an uber clip (type 0x10) ends with its length in seconds.
+- `AirMotion_Update` 0x108378: a landing is `Score_LandTrick`(0, landing switch: stance ≠ stats+0x40, flipped when
+  the board came down more than 90° round, normal z < 0.7); a crash there `Score_Crash`(0).
+- `Rail_TryCapture` 0x125cb8: rider+0x1dc = 1 (board within 30° of the rail), 2 (past 150°), 3 / 4 (across, by
+  side), then `Score_LandTrick`(that kind, rider+0x1b4, 0); `RailSlideControl_Enter` `Score_UpdateSpin`(0);
+  `RailSlideControl_CommitQuarterTurn` `Score_UpdateSpin`(the rail's turn in degrees).
+- `RailSlideMotion_Update` 0x10b0d0 leaving: `Score_StartTrickChain`(stance ≠ stats+0x40, rider+0x1dc, 0, 0).
+- `SpinState_StartFromStick` 0x102158 (late trick): `Score_CommitAndRestartChain`(rider+0x1b4).
+- `Boarder_PlaceAt` 0x11cae8: `Score_BankPoints`, its −0.12 to the meter unless a reset was asked for (+0x304).
+- Crashes (`AirMotion_Update`, `GroundMotion_Update`, `Boarder_RiderCollisions`, `Boarder_WallImpactCheck`):
+  `Score_Crash`(0) and its −0.1 to the meter. Every tick: `Score_Tick`(|v| cm/s), and per rider in the race tick
+  `Boarder_DrainMeter`. The HUD reads the run's points from score+0xf0 (rider+0x5910).
+- Our rider runs these on a 60 Hz clock of its own (the physics steps at up to 1/120 s). STANDIN in the wiring:
+  stat bytes from our 0..1 attributes (×255), rider+0x424 = 1 taken as in the air, the steep-lip flag (needs
+  `jump::jump_impulse`, row G1a5b), the rail capture angle's sign, a tweak (rate and name of the tweak clip on
+  the held grab), an uber's `Score_StartGrab` when it takes over a grab, the spin counted again from a late
+  restart, the pickup multiplier, the HUD text for chain and big-air bonuses, and stats+0x40 taken as the rider's
+  goofy stance (so a goofy rider's spin is scored mirrored: the same turn is FS for one, BS for the other).
+- What changes against our old scoring: a flip counts only when the rounded flip is a whole turn (265° lands as no
+  flip; ours rounded it up), and the side follows the stance. `TRICKY_SCOREDBG=1` prints what each landing hands
+  `Score_LandTrick`.
+
 ## Scoring (the rest)
 
 - Modes: 0 knockdown practice, 1 free ride, 2 practice race, 3 practice show-off, 4 circuit race, 5 circuit

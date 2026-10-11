@@ -6,7 +6,7 @@
 use crate::collide::CollisionWorld;
 use crate::rails::Rails;
 use crate::trickdata::{RiderData, COMBOS, RIDERS};
-use std::collections::VecDeque;
+use crate::score::{Score, ScoreCall};
 use glam::Vec3;
 use crate::surface::SURFACE_TABLE;
 pub mod wipeout;
@@ -51,25 +51,7 @@ pub const RAIL_REACH: f32 = 0.9;
 /// how fast the board turns on a rail when steered (rad/s)
 /// a quarter turn on a rail is its 15-frame clip: 28 ticks (`RailSlideControl_CommitQuarterTurn` 0x107730)
 pub const RAIL_TWIST: f32 = std::f32::consts::FRAC_PI_2 / (28.0 / 60.0);
-// ---- scoring (row G17): the game adds "units" (score+0x24) and turns them into points as
-// round10(units · multiplier · 0.6786545 · 10000) (`Score_CalcPoints` 0x155440); these are those units, read from
-// the score code as bit patterns, times the same scale.
-const POINTS_PER_UNIT: f32 = f32::from_bits(0x3f2d_bc4d) * 10000.0; // 0.6786545 (`Score_CalcPoints`)
-/// half a turn of spin (`Score_UpdateSpin` 0x155e00: 0.06995432)
-pub const PTS_SPIN_180: f32 = f32::from_bits(0x3d8f_4436) * POINTS_PER_UNIT;
-/// a flip (`Score_UpdateFlip` 0x155e68: 0.2499898)
-pub const PTS_FLIP: f32 = f32::from_bits(0x3e7f_fd53) * POINTS_PER_UNIT;
-/// starting a grab: this times (grabs already done this jump + 1), up to four (`Score_StartGrab` 0x155ee8: 0.042497508)
-pub const PTS_GRAB_START: f32 = f32::from_bits(0x3d2e_11de) * POINTS_PER_UNIT;
-/// holding a grab, per second, times the grab's rate (1 to 2.5; a tweak doubles it) (`Score_Tick` 0x156e80: 0.000750064 a tick)
-pub const PTS_HOLD: f32 = f32::from_bits(0x3a44_9ff2) * 60.0 * POINTS_PER_UNIT;
-/// an uber trick, per second of its clip, times the uber's rate (18 or 20) (`Scoring_OnTrickEvent` 0x156148: 0.04500384)
-pub const PTS_UBER: f32 = f32::from_bits(0x3d38_55f2) * POINTS_PER_UNIT;
-/// grinding, per second at full speed (`Score_Tick` 0x156e80: 0.0025006225 a tick)
-pub const PTS_RAIL: f32 = f32::from_bits(0x3b23_e17c) * 60.0 * POINTS_PER_UNIT;
-/// getting onto and off a rail (`Score_LandTrick` 0x1569b0: 0.18001097, 0.19997726)
-pub const PTS_ONTO_RAIL: f32 = f32::from_bits(0x3e38_54cc) * POINTS_PER_UNIT;
-pub const PTS_OFF_RAIL: f32 = f32::from_bits(0x3e4c_c6d7) * POINTS_PER_UNIT;
+// ---- scoring: the score object's own functions (`score.rs`, checked bit for bit) on `Rider::sc`.
 /// leaving a rail switch or fakie: the next air trick × 1.3 (`Score_StartTrickChain` 0x156618)
 pub const SWITCH_BONUS: f32 = f32::from_bits(0x3fa6_6666);
 /// a full meter gives this long to do uber tricks (`Score_StartGrab` 0x155ee8 and 0x156050 set it to 20.0)
@@ -233,15 +215,9 @@ pub struct Rider {
     pub grab_out: Option<(u8, f32)>,
     pub grab_done: [bool; 16],
     pub grab_tweaked: [bool; 16],
-    /// points earned so far in this jump from grabs and ubers, and what they were called
-    pub air_pts: f32,
-    pub air_names: Vec<String>,
     pub ubers_done: u8,
     pub switch_takeoff: bool,
     pub from_rail: bool,
-    pub rail_pts: f32,
-    /// the last five tricks landed: repeating one pays a half, a third...
-    pub recent: VecDeque<String>,
     /// seconds left in which uber tricks can be done
     pub uber_timer: f32,
     pub stats: Stats,
@@ -358,6 +334,23 @@ pub struct Rider {
     pub letters: u8,
     /// from a multiplier pickup: applied to the next trick landed
     pub multiplier: u32,
+    /// the score object (rider+0x5820): every trick, rail, grab, crash and bank goes through the game's own
+    /// functions in `score.rs` (checked bit for bit); `score` and `letters` are read from it
+    pub sc: Score,
+    /// time not yet run through the 60 Hz score tick and meter drain (`Score_Tick`, `Boarder_DrainMeter`)
+    pub tick_acc: f32,
+    /// rider+0x28: full meters, mod 4 (`Boarder_AddMeter`)
+    pub full_count: i32,
+    /// rider+0x1dc on a rail: how the board sits on it (1 along, 2 backward, 3 and 4 across), from the capture
+    pub rail_kind: u32,
+    /// the rail quarter turns committed so far (`RailSlideControl_CommitQuarterTurn`), from the entry angle
+    pub rail_goal0: f32,
+    pub rail_committed: f32,
+    /// the parts of the trick being shown, joined when its points come in
+    pub show_parts: Vec<String>,
+    /// this grab started scoring (`Score_StartGrab`) and was tweaked (its rate and its name the tweak's)
+    pub grab_scored: bool,
+    pub grab_tw: bool,
 }
 
 pub fn heading(yaw: f32) -> Vec3 { Vec3::new(-yaw.sin(), 0.0, -yaw.cos()) }
@@ -366,10 +359,11 @@ impl Rider {
     pub fn new(pos: Vec3, yaw: f32) -> Self {
         Self { pos, vel: Vec3::ZERO, yaw, grounded: false, normal: Vec3::Y, charge: 0.0, air_time: 0.0,
                spawn: (pos, yaw), safe: (pos, yaw), safe_timer: 0.0, safe_external: false, respawns: 0, rail: None, rail_cooldown: 0.0, input: Input::default(),
-               spin: 0.0, flip: 0.0, flip_dir: 0.0, wind: 0.0, wind_flip: 0.0, cap: SPEED_CAP, steer: 0.0, grab: 0, grab_hold: 0.0, grab_out: None, grab_done: [false; 16], grab_tweaked: [false; 16], air_pts: 0.0, air_names: Vec::new(), ubers_done: 0, switch_takeoff: false, from_rail: false, rail_pts: 0.0, recent: VecDeque::new(), uber_timer: 0.0, stats: Stats::default(), data: &RIDERS[0], surface: 1, grind_time: 0.0, rail_twist: 0.0, rail_spun: 0.0, rail_side: 0.0, rail_entry: 0.0, rail_goal: 0.0, rail_held: false, rail_side_signed: 0.0, shove: 0.0, shove_side: 1.0, taunt: -1.0, taunt_clip: String::new(), fin: None, showoff: false, landed: Vec::new(), crash_kind: 0, land_kind: 0, switch: false, score: 0, boost: 0.0, boosting: false,
+               spin: 0.0, flip: 0.0, flip_dir: 0.0, wind: 0.0, wind_flip: 0.0, cap: SPEED_CAP, steer: 0.0, grab: 0, grab_hold: 0.0, grab_out: None, grab_done: [false; 16], grab_tweaked: [false; 16], ubers_done: 0, switch_takeoff: false, from_rail: false, uber_timer: 0.0, stats: Stats::default(), data: &RIDERS[0], surface: 1, grind_time: 0.0, rail_twist: 0.0, rail_spun: 0.0, rail_side: 0.0, rail_entry: 0.0, rail_goal: 0.0, rail_held: false, rail_side_signed: 0.0, shove: 0.0, shove_side: 1.0, taunt: -1.0, taunt_clip: String::new(), fin: None, showoff: false, landed: Vec::new(), crash_kind: 0, land_kind: 0, switch: false, score: 0, boost: 0.0, boosting: false,
                last_trick: String::new(), trick_timer: 0.0, crashed: 0.0, hard_land: 0.0, crouch_v: 0.0, brake_v: 0.0, jump_c: 0.0, jump_delay: 0.0, height: 0.0,
                course_dir: None, course_pts: None, wipe: None, crash_at: None, recover: None, ai: false, down_t: 0.0, getup: -1.0, stumble: 0.0, wall_hit: None, speed_timer: 0.0, spin_timer: 0.0, spin_used: false, tube_class: u8::MAX, gate_p: 0.0, gate_hi: 0.0, gate_lo: 0.0, gate_still: 0.0, gate_target: 0.0, gate_speed: 0.0, gate_state: 8, gate_rock_dir: 0, band: (0.005, 0.0250417), spin_base: 0.0, flip_base: 0.0, late: false, cause: "", spin_ax: Axis::default(), flip_ax: Axis::default(), air_mode2: false, rail_off: 0.0, rail_time: 0.0, rail_halves: 0, boost_was: false, chain: 0,
-               ubers: Vec::new(), uber: 0.0, uber_id: 0, uber_done: false, letters: 0, multiplier: 1 }
+               ubers: Vec::new(), uber: 0.0, uber_id: 0, uber_done: false, letters: 0, multiplier: 1,
+               sc: new_score(), tick_acc: 0.0, full_count: 0, rail_kind: 0, rail_goal0: 0.0, rail_committed: 0.0, show_parts: Vec::new(), grab_scored: false, grab_tw: false }
     }
     /// `Boarder_Respawn`: dropped a metre above the snow, already moving down the course at 30 km/h.
     pub fn respawn(&mut self, at: (Vec3, f32)) {
@@ -395,9 +389,11 @@ impl Rider {
         self.cap = SPEED_CAP;
         self.clear_air();
         self.from_rail = false;
-        self.rail_pts = 0.0;
         self.grind_time = 0.0;
-        self.add_meter(-0.12);
+        // `Boarder_PlaceAt` 0x11cae8: the chain banked, its meter change (−0.12) applied
+        let (m, calls) = self.sc.bank_points();
+        self.show(&calls);
+        self.add_meter(m);
         self.respawns += 1;
     }
     pub fn clear_air(&mut self) {
@@ -412,19 +408,72 @@ impl Rider {
         self.grab_out = None;
         self.grab_done = [false; 16];
         self.grab_tweaked = [false; 16];
-        self.air_pts = 0.0;
-        self.air_names.clear();
         self.ubers_done = 0;
         self.uber = 0.0;
         self.uber_done = false;
     }
-    /// The boost meter. Filling it opens twenty seconds in which uber tricks can be done.
-    pub fn add_meter(&mut self, delta: f32) {
-        let was = self.boost;
-        let _ = was;
-        self.boost = (self.boost + delta * self.stats.meter()).clamp(0.0, 1.0);
-        // any gain at a full meter (re)opens the twenty-second uber window
-        if delta > 0.0 && self.boost >= 1.0 { self.uber_timer = UBER_SECONDS; }
+    /// The boost meter (`Boarder_AddMeter` 0x11b018, exact): the gain scaled by the meter stat, clamped to 0..1; a
+    /// gain at a full meter (re)opens the twenty-second uber window.
+    pub fn add_meter(&mut self, units: f32) {
+        let mut f = crate::boarder::Fields { meter: self.boost, uber_timer: self.uber_timer, full_count: self.full_count, ..Default::default() };
+        crate::boarder::add_meter(units, stat_byte(self.stats.tricks), &mut f);
+        self.boost = f.meter;
+        self.uber_timer = f.uber_timer;
+        self.full_count = f.full_count;
+    }
+    /// The game's per-tick score step and meter drain (`Score_Tick` 0x156e80, `Boarder_DrainMeter` 0x11b1f8), at
+    /// 60 Hz whatever the physics step.
+    fn score_ticks(&mut self, dt: f32) {
+        self.sc.rider_418 = if self.ai { 0 } else { -1 };
+        self.tick_acc += dt;
+        while self.tick_acc >= 1.0 / 60.0 {
+            self.tick_acc -= 1.0 / 60.0;
+            let speed = match self.rail { Some((_, _, s)) => s.abs(), None => self.vel.length() } * 100.0;
+            self.sc.tick(speed);
+            let mut f = crate::boarder::Fields { meter: self.boost, uber_timer: self.uber_timer, full_count: self.full_count, ..Default::default() };
+            // STANDIN: rider+0x424 = 1 taken as "in the air"; the drain stat (stats+0x1b) is our meter_leak
+            let air = !self.grounded && self.rail.is_none();
+            crate::boarder::drain_meter(air, !self.ai, stat_byte(self.stats.meter_leak), self.tricky(), &mut f);
+            self.boost = f.meter;
+            self.uber_timer = f.uber_timer;
+        }
+        self.sync_score();
+    }
+    fn sync_score(&mut self) {
+        self.score = self.sc.xf0;
+        self.letters = self.sc.x88.clamp(0, 6) as u8;
+    }
+    /// What the score functions said, for the HUD: the trick's name (`Score_FormatTrickName` on the id the
+    /// announcer gets), its bonuses, and its points when they come in.
+    fn show(&mut self, calls: &[ScoreCall]) {
+        for c in calls {
+            match *c {
+                ScoreCall::Announce(id, _) => {
+                    let def = tricky_data::trickdef::TrickDef { words: id, flip: 0, spin: 0, rail: 0, plus: [0; 2], slot: [0; 2] };
+                    let name = def.name().split_whitespace().collect::<Vec<_>>().join(" ");
+                    if !name.is_empty() && !self.ai && self.fin.is_none() { self.landed.push(name.clone()); }
+                    self.show_parts = vec![name];
+                }
+                // the chain bonus and big air; the labels are ours (STANDIN: the HUD's own text is not ported)
+                ScoreCall::Message(_, 0xf, v, _) => self.show_parts.push(["1x COMBO", "2x COMBO", "3x COMBO", "4+ COMBO"][((v / 4000 - 1).clamp(0, 3)) as usize].to_string()),
+                ScoreCall::Message(_, 0x10, _, _) => self.show_parts.push("BIG AIR BONUS".into()),
+                ScoreCall::Message(_, 2 | 3, v, _) if v > 0 => {
+                    let parts: Vec<String> = self.show_parts.drain(..).filter(|s| !s.is_empty()).collect();
+                    self.last_trick = format!("{}  +{v}", parts.join(" + "));
+                    self.trick_timer = 3.0;
+                }
+                _ => {}
+            }
+        }
+        self.sync_score();
+    }
+    /// `Score_StartTrickChain` 0x156618 (a jump, or leaving a rail): the switch flag is the stance, `kind` rider+0x1dc
+    /// (0 from snow, the rail's kind leaving one), `steep` `Jump_ApplyImpulse`'s steep lip; the share of a rail
+    /// being left goes to the meter.
+    fn begin_chain(&mut self, kind: u32, steep: bool) {
+        let (share, calls) = self.sc.start_trick_chain(self.switch as u32, kind, steep as u32, 0, !self.ai);
+        self.show(&calls);
+        self.add_meter(share);
     }
     /// `Boarder_Wipeout` 0x11d830: down into the tumble; costs a tenth of the meter (`Score_Crash` 0x156de0), and a
     /// running uber window closes with the meter cut to two thirds.
@@ -436,9 +485,12 @@ impl Rider {
         self.last_trick = "CRASH".into();
         self.trick_timer = 2.0;
         // a crash in the middle of a trick in the uber window cuts the meter to two thirds and closes it
-        let mid_trick = !self.grounded && (self.air_pts > 0.0 || self.spin.abs() > 1.0 || self.flip.abs() > 1.0 || !self.air_names.is_empty());
+        let mid_trick = !self.grounded && (self.sc.units > 0.0 || self.spin.abs() > 1.0 || self.flip.abs() > 1.0 || self.sc.grabs[0] != 0);
         if !self.tricky() && self.uber_timer > 0.0 && mid_trick { self.boost = self.boost.min(0.66599226); self.uber_timer = 0.0; }
-        if lose_meter { self.add_meter(-0.1); }
+        // `Score_Crash` 0x156de0: the chain lost, the trick so far banked, −0.1 meter
+        let (m, calls) = self.sc.crash(false);
+        self.show(&calls);
+        if lose_meter { self.add_meter(m); }
         self.crashed = 1.0;
         self.down_t = 0.0;
         self.getup = -1.0;
@@ -457,99 +509,46 @@ impl Rider {
         if meter { self.add_meter(-0.02); }
         self.stumble = 0.5;
     }
-    /// Bank a trick: the original halves (thirds, ...) the pay of one repeated among the last five.
-    pub fn award(&mut self, names: Vec<String>, base: f32, mult: f32) { self.award_with(names, base, mult, true, 0.0) }
-    /// `bonus` (chains, air time) is added after the repeat division and is not multiplied.
-    pub fn award_with(&mut self, names: Vec<String>, base: f32, mult: f32, repeat_check: bool, bonus: f32) {
-        // nothing is banked once over the line (Score_Land checks the finish time)
-        if names.is_empty() || base + bonus < 5.0 || self.fin.is_some() { return; }
-        let key = names.join(" + ");
-        let repeats = if repeat_check { self.recent.iter().filter(|k| **k == key).count() as f32 } else { 0.0 };
-        if repeat_check {
-            self.recent.push_back(key.clone());
-            if self.recent.len() > 5 { self.recent.pop_front(); }
-        }
-        let pts = (((base * mult / (repeats + 1.0) + bonus) / 10.0).round() * 10.0) as u32;
-        self.score += pts;
-        // the meter gets the unmultiplied points (never negative); computer riders get none from tricks
-        if !self.ai { self.add_meter(base.max(0.0) / 10000.0 / (repeats + 1.0)); }
-        let note = if mult > 1.01 { format!("  x{mult:.1}").replace(".0", "") } else { String::new() };
-        self.last_trick = format!("{key}{note}  +{pts}");
-        self.trick_timer = 3.0;
-    }
-    /// Score_Takeoff in mid-air: post and pay for the trick so far, start counting again.
+    /// `SpinState_StartFromStick` 0x102158 in mid-air: the trick so far is named and counted toward repeats
+    /// (`Score_CommitAndRestartChain`), a new chain starts and the rest is a "Late" trick.
     pub fn bank_late(&mut self) {
-        use std::f32::consts::{PI, TAU};
-        let (sp, fl) = (self.spin - self.spin_base, self.flip - self.flip_base);
-        let grabs: Vec<String> = self.air_names.drain(..).collect();
-        let name = trick_name(-sp, fl, self.switch_takeoff && !self.late, self.from_rail && !self.late, false, false, &grabs);
-        if !name.is_empty() {
-            let pts = self.air_pts + (sp.abs() / PI).round() * PTS_SPIN_180 + (fl.abs() / TAU).round() * PTS_FLIP;
-            let name = if self.late { format!("Late {name}") } else { name };
-            if !self.ai { self.landed.push(name.clone()); }
-            self.award_with(vec![name], pts, self.multiplier as f32, !self.late, 0.0);
-            self.chain += 1;
-        }
-        self.air_pts = 0.0;
+        let a = (self.switch != self.data.goofy) as u32;
+        let (m, calls) = self.sc.commit_and_restart_chain(a, !self.ai);
+        self.show(&calls);
+        self.add_meter(m);
         self.grab_done = [false; 16];
         self.grab_tweaked = [false; 16];
-        self.spin_base = (self.spin / PI).round() * PI;
-        self.flip_base = (self.flip / TAU).round() * TAU;
+        // STANDIN: the spin and flip count again from here (the original's rider+0x1d0/+0x1d4 at a restart is
+        // not read yet)
+        self.spin_base = self.spin;
+        self.flip_base = self.flip;
         self.late = true;
     }
-    /// Called when the board touches down (snow or rail): score what was done in the air.
-    pub fn land(&mut self) {
+    /// Called when the board touches down: onto snow (`AirMotion_Update` 0x108378: `Score_LandTrick`(0, landing
+    /// switch, normal z < 0.7)) or onto a rail (`Rail_TryCapture` 0x125cb8: `Score_LandTrick`(rail kind, stance, 0)).
+    pub fn land(&mut self, rail: Option<u32>) {
         // the spin-boost is spent on the jump it was used for
         if self.spin_used { self.spin_timer = 0.0; self.spin_used = false; }
-        let half_turns = ((self.spin - self.spin_base).abs() / std::f32::consts::PI).round() as u32;
-        let flips = ((self.flip - self.flip_base).abs() / std::f32::consts::TAU).round() as u32;
         let tau = std::f32::consts::TAU;
         let off = (self.flip.rem_euclid(tau)).min(tau - self.flip.rem_euclid(tau));
         let uber_cut_short = self.uber > 0.0 && !self.uber_done;
-        if off > self.stats.crash_pitch() || !self.grab_safe() || uber_cut_short {
+        if rail.is_none() && (off > self.stats.crash_pitch() || !self.grab_safe() || uber_cut_short) {
             // too far from upright, or still holding the board: wipe out
             self.crash_kind = if self.flip < -0.5 { 1 } else { 0 };
             if std::env::var("TRICKY_AIDBG").is_ok() { println!("    landing: flip {:.2} off {:.2} limit {:.2} spin {:.2} grab {} hold {:.2} uber {}", self.flip, off, self.stats.crash_pitch(), self.spin, self.grab, self.grab_hold, uber_cut_short); }
             self.cause = if off > self.stats.crash_pitch() { "landing angle" } else if uber_cut_short { "uber" } else { "grab" };
             self.wipe_out();
         } else {
-            let mut pts = self.air_pts;
-            if half_turns > 0 { pts += half_turns as f32 * PTS_SPIN_180; }
-            if flips > 0 { pts += flips as f32 * PTS_FLIP; }
-            let grabs: Vec<String> = self.air_names.drain(..).collect();
-            let onto_rail = self.rail.is_some();
-            // the game's spin sign is the other way round to ours (positive = backside)
-            let name = trick_name(-(self.spin - self.spin_base), self.flip - self.flip_base, self.switch_takeoff && !self.late, self.from_rail && !self.late, onto_rail, self.switch != self.switch_takeoff, &grabs);
-            // the part after a mid-air restart is "Late" and never counts as a repeat
-            let name = if self.late && !name.is_empty() { format!("Late {name}") } else { name };
-            if !name.is_empty() && !self.ai && self.fin.is_none() { self.landed.push(name.clone()); }
-            let mut names: Vec<String> = if name.is_empty() { Vec::new() } else { vec![name.clone()] };
-            // air time from 4 s pays 1000 a second; chains of tricks (and rails over a second) pay
-            // on the landing that ends them; neither is multiplied
-            let mut bonus = if self.air_time >= 4.0 { (self.air_time - 3.0).floor() * 1000.0 } else { 0.0 };
-            let big_air = bonus > 0.0;
-            if !names.is_empty() {
-                if self.from_rail { pts += PTS_OFF_RAIL; }
-                if onto_rail { pts += PTS_ONTO_RAIL; }
-                self.chain += 1;
-            }
-            if !onto_rail {
-                if self.chain >= 2 {
-                    bonus += [4000.0, 8000.0, 12000.0, 16000.0][(self.chain.min(5) - 2) as usize];
-                    // the original's labels: a chain of two is "1x COMBO" ... five and more "4+ COMBO"
-                    names.push(["1x COMBO", "2x COMBO", "3x COMBO", "4+ COMBO"][(self.chain.min(5) - 2) as usize].to_string());
-                }
-                self.chain = 0;
-            }
-            if !names.is_empty() || bonus > 0.0 {
-                // x1.3 only for a trick off a rail left switch; a pickup replaces it
-                let mult = (self.multiplier as f32).max(if self.from_rail && self.switch_takeoff { SWITCH_BONUS } else { 1.0 });
-                if big_air { names.push("BIG AIR BONUS".into()); }
-                // "???" (beyond the tables) never counts as a repeat
-                let check = name != "???" && !self.late;
-                self.award_with(names, pts, mult, check, bonus);
-            }
-            self.letters = (self.letters + self.ubers_done).min(6);
+            // a grab still held is let go as the board lands
+            self.release_grab();
+            let (kind, a, b) = match rail {
+                Some(k) => (k, (self.switch != self.data.goofy) as u32, 0),
+                None => (0, self.switch as u32, (self.normal.y < 0.7) as u32),
+            };
+            if std::env::var("TRICKY_SCOREDBG").is_ok() { println!("    land: spin {:.3} base {:.3} flip {:.3} base {:.3} goofy {} switch {} sc.spin {} sc.flip {} x10 {} x20 {} grabs {:?}", self.spin, self.spin_base, self.flip, self.flip_base, self.data.goofy, self.switch, self.sc.spin, self.sc.flip, self.sc.x10, self.sc.x20, self.sc.grabs); }
+            let (share, calls) = self.sc.land_trick(kind, a, b);
+            self.show(&calls);
+            self.add_meter(share);
             self.multiplier = 1;
         }
         self.from_rail = false;
@@ -559,6 +558,8 @@ impl Rider {
         // the original counts multipliers only in the air or on a rail
         if self.grounded || !self.showoff { return; }
         self.multiplier = self.multiplier.max(m);
+        // STANDIN: `Score_SetPickupMultiplier` 0x155cd0 is not ported; the pickup sets the score's multiplier
+        self.sc.mult = self.sc.mult.max(m as f32);
         self.last_trick = format!("x{m} on your next trick");
         self.trick_timer = 2.0;
     }
@@ -577,24 +578,19 @@ impl Rider {
     /// Script op 0xf: straight onto the meter.
     pub fn pick_boost(&mut self, amount: f32) { self.add_meter(amount); }
     /// Six landed uber tricks spell TRICKY: boost no longer runs out.
-    pub fn tricky(&self) -> bool { self.letters >= 6 }
+    pub fn tricky(&self) -> bool { crate::boarder::is_tricky(self.sc.x88) }
     /// Uber tricks can be started (the meter was filled in the last twenty seconds, or TRICKY).
     pub fn uber_ready(&self) -> bool { self.uber_timer > 0.0 || self.tricky() }
+    /// Leaving a rail (`RailSlideMotion_Update` 0x10b0d0): the rail is scored as the chain's trick and a new chain
+    /// begins (`Score_StartTrickChain`(stance, rail kind)).
     pub fn end_grind(&mut self) {
-        if self.grind_time > 0.0 && self.rail_pts > 0.0 {
-            let turns = self.rail_halves;
-            let slide = self.rail_side > self.grind_time * 0.5;
-            let mut names = vec![format!("{:.1} s {}", self.grind_time, if !slide { if self.rail_twist.cos() < -0.5 { "Switch 50/50 Rail" } else { "50/50 Rail" } } else if self.rail_side_signed > 0.0 { "BS Rail" } else { "FS Rail" })];
-            if turns > 0 { names.push(format!("{} on the rail", turns * 180)); }
-            // (the half turns are already in the rail points); rail tricks are never "repeats"
-            let pts = self.rail_pts;
-            self.award_with(names, pts, 1.0, false, 0.0);
-            if self.grind_time > 1.0 { self.chain += 1; }
+        if self.grind_time > 0.0 {
+            let kind = self.rail_kind;
+            self.begin_chain(kind, false);
             self.from_rail = true;
         }
         self.rail_halves = 0;
         self.grind_time = 0.0;
-        self.rail_pts = 0.0;
         self.rail_spun = 0.0;
         self.rail_side = 0.0;
     }
@@ -739,14 +735,7 @@ impl Rider {
     /// air `Air_IntegrateRK4` 0x12b340, on a rail `RailSlideMotion_Update` 0x10b0d0.
     pub fn step(&mut self, world: &CollisionWorld, rails: &Rails, input: Input, dt: f32) {
         let mut input = input;
-        // the meter leaks slowly (human riders); the uber window runs down everywhere, but never
-        // runs out in mid-air
-        if self.tricky() { self.boost = 1.0; self.uber_timer = 1.0; }
-        else {
-            self.boost = (self.boost - (15.4835 - 15.2104 * self.stats.meter_leak) * 5.5e-4 * dt).max(0.0);
-            let floor = if !self.grounded && self.rail.is_none() && self.uber_timer > 0.0 { 1.0 / 60.0 } else { 0.0 };
-            self.uber_timer = (self.uber_timer - dt).max(floor);
-        }
+        self.score_ticks(dt);
         self.trick_timer = (self.trick_timer - dt).max(0.0);
         self.hard_land = (self.hard_land - dt).max(0.0);
         self.stumble = (self.stumble - dt).max(0.0);
@@ -900,6 +889,8 @@ impl Rider {
                     self.vel += (n + f * 0.2).normalize() * self.jump_speed(c);
                     self.jump_c = 0.0;
                     self.take_off();
+                    // STANDIN: the steep-lip flag comes with `Jump_ApplyImpulse` (row G1a5b)
+                    self.begin_chain(0, false);
                     jumped = true;
                 }
             } else if self.jump_c > 0.0 {
@@ -908,6 +899,7 @@ impl Rider {
                 self.vel += (n + f * 0.2).normalize() * self.jump_speed(c);
                 self.jump_c = 0.0;
                 self.take_off();
+                self.begin_chain(0, false);
                 jumped = true;
             } else {
                 self.wind = 0.0;
@@ -938,9 +930,14 @@ impl Rider {
                 self.jump_c = 0.0;
                 self.jump_delay = 0.0;
                 self.take_off();
+                self.begin_chain(0, false);
                 jumped = true;
             }
             self.air_rotation(&input, dt);
+            // `SpinState_Update` 0x100908: the spin (rider+0x1d0, mirrored for stats+0x40) and flip in degrees
+            let m = if self.data.goofy { -1.0 } else { 1.0 };
+            self.sc.update_spin((-(self.spin - self.spin_base) * m * 57.295776) as i32);
+            self.sc.update_flip(((self.flip - self.flip_base) * 57.295776) as i32);
             self.air_grabs(&input, dt);
             if input.jump { self.charge = self.crouch_v; }
         }
@@ -1025,7 +1022,7 @@ impl Rider {
                         let r = self.flip - tau * (self.flip / tau).round();
                         if r < -std::f32::consts::FRAC_PI_4 || impact < -27.77 { self.hard_land = 0.5; }
                     }
-                    self.land();
+                    self.land(None);
                     self.steer = 0.0;
                 }
             }
@@ -1057,10 +1054,17 @@ impl Rider {
                     let along = along.signum() * s.min(along.abs().max(5.56));
                     self.rail = Some((ri, d, along));
                     self.charge = 0.0;
-                    self.land();
+                    // `Rail_TryCapture`: how the board sits on the rail (STANDIN: the angle's sign as ours)
+                    let deg30 = 0.5235988;
+                    self.rail_kind = if tw.abs() > 2.6179938 { 2 } else if tw < -deg30 { 4 } else if tw > deg30 { 3 } else { 1 };
+                    self.land(Some(self.rail_kind));
+                    // `RailSlideControl_Enter`: the rail's spin starts from nothing
+                    self.sc.update_spin(0);
                     self.crashed = 0.0;
                     self.rail_twist = tw;
                     self.rail_goal = (tw / std::f32::consts::FRAC_PI_2).round() * std::f32::consts::FRAC_PI_2;
+                    self.rail_goal0 = self.rail_goal;
+                    self.rail_committed = self.rail_goal;
                     self.rail_held = true;
                     self.rail_side_signed = 0.0;
                     self.switch = false;
@@ -1133,7 +1137,9 @@ impl Rider {
         self.flip_dir = if self.flip_ax.w.abs() > 0.05 { self.flip_ax.w.signum() } else { 0.0 };
     }
 
-    /// Grabs, tweaks and uber tricks while in the air.
+    /// Grabs, tweaks and uber tricks while in the air. The scoring is the game's (`SpinState_UpdateTrickClips`
+    /// 0x1272e8): `Score_StartGrab` as a grab reaches its hold, the hold scored by `Score_Tick`, and
+    /// `Scoring_OnTrickEvent` as it is let go (an uber's with its length in seconds).
     pub fn air_grabs(&mut self, input: &Input, dt: f32) {
         if self.air_time < 0.15 { return; }
         if self.uber > 0.0 && !self.uber_done {
@@ -1144,32 +1150,29 @@ impl Rider {
             if self.uber >= frames - 1.0 {
                 self.uber_done = true;
                 self.ubers_done += 1;
-                let clip = self.ubers.get(self.uber_id).map(|u| u.0.clone()).unwrap_or_default();
-                let sig = crate::trickdata::signature_grab(self.data.name);
-                let row = self.data.rows.iter().find(|r| (!r.uber_clip.is_empty() && !clip.contains("UT_SIG") && uber_grab(r.uber_clip) == uber_grab(&clip)) || (clip.contains("UT_SIG") && Some(r.grab) == sig));
-                self.air_pts += frames / 30.0 * PTS_UBER * row.map_or(18.0, |r| if r.uber_rate > 0.0 { r.uber_rate } else { 18.0 });
-                // the uber takes the grab's place in the name (each rider's own uber names)
-                let name = row.map_or("Uber".to_string(), |r| crate::trickdata::uber_name(self.data.name, r.grab).unwrap_or(r.uber).to_string());
-                match row.and_then(|r| self.air_names.iter().rposition(|n| n == r.grab || n == r.tweak)) {
-                    Some(i) => self.air_names[i] = name,
-                    None => self.air_names.push(name),
-                }
+                let clip = self.uber_clip();
+                self.sc.end_grab(frames / 30.0, clip);
+                self.grab_scored = false;
             }
         } else if let Some(i) = COMBOS.iter().position(|c| *c == input.grab & 15) {
             let rate = 30.0 * (0.78212035 + 0.8057834 * self.stats.tricks);
-            if self.grab != i as u8 + 1 { self.grab = i as u8 + 1; self.grab_hold = 0.0; self.grab_out = None; }
+            if self.grab != i as u8 + 1 {
+                self.release_grab();
+                self.grab = i as u8 + 1;
+                self.grab_hold = 0.0;
+                self.grab_out = None;
+            }
             let row = &self.data.rows[i];
             let (m1, m2, _, _) = grab_markers(row.clip);
             // the grab clip reaches in and holds at its second marker (grab clips play at
             // 0.782 + 0.806 x tricks of normal speed, Grab_Update); the grab counts from marker 1
             self.grab_hold = (self.grab_hold + rate * dt).min(m2);
             if self.grab_hold >= m1 {
-                if !self.grab_done[i] {
-                    // each different grab in a jump starts higher than the last
-                    let before = self.grab_done.iter().filter(|d| **d).count().min(3) as f32;
+                if !self.grab_scored {
+                    self.grab_scored = true;
+                    self.grab_tw = false;
                     self.grab_done[i] = true;
-                    self.air_pts += PTS_GRAB_START * (before + 1.0);
-                    self.air_names.push(row.grab.to_string());
+                    self.sc.start_grab(grab_clip(row.grab));
                 }
                 // the signature uber (bxUT_SIG...) starts from the grab the trick book gives it
                 let sig = crate::trickdata::signature_grab(self.data.name) == Some(row.grab);
@@ -1179,18 +1182,21 @@ impl Rider {
                     self.uber = 0.01;
                     self.uber_done = false;
                     self.uber_id = uber.unwrap();
-                } else {
-                    if input.tweak && !self.grab_tweaked[i] {
-                        self.grab_tweaked[i] = true;
-                        if let Some(n) = self.air_names.iter_mut().rev().find(|n| **n == row.grab) { *n = row.tweak.to_string(); }
-                    }
-                    self.air_pts += PTS_HOLD * row.rate * if input.tweak { 2.0 } else { 1.0 } * dt;
+                    // STANDIN: the uber clip replaces the grab, so its hold starts over at the uber's rate
+                    let clip = self.uber_clip();
+                    self.sc.start_grab(clip);
+                } else if input.tweak && !self.grab_tw {
+                    // STANDIN: a tweak keeps the grab going at the tweak clip's rate and takes its name
+                    self.grab_tw = true;
+                    self.grab_tweaked[i] = true;
+                    if let Some(r) = crate::score::grab_rate(grab_clip(row.tweak)) { self.sc.grab_rate = r; }
                 }
             }
         } else {
             // let go: the clip plays out from where it was; landing before it is past its
             // fourth marker is a crash
             if self.grab != 0 { self.grab_out = Some((self.grab, self.grab_hold)); }
+            self.release_grab();
             self.grab = 0;
             self.grab_hold = 0.0;
             if let Some((g, f)) = self.grab_out {
@@ -1201,6 +1207,22 @@ impl Rider {
             }
             if self.uber_done { self.uber = 0.0; self.uber_done = false; }
         }
+    }
+    /// The held grab let go (`Scoring_OnTrickEvent`(0, its clip)): into the jump's grab list.
+    pub fn release_grab(&mut self) {
+        if !self.grab_scored { return; }
+        self.grab_scored = false;
+        if self.grab == 0 { return; }
+        let row = &self.data.rows[(self.grab as usize - 1).min(14)];
+        let clip = grab_clip(if self.grab_tw { row.tweak } else { row.grab });
+        self.sc.end_grab(0.0, clip);
+    }
+    /// The uber being done as the game's clip id (through its name in the trick-name table).
+    fn uber_clip(&self) -> u32 {
+        let clip = self.ubers.get(self.uber_id).map(|u| u.0.clone()).unwrap_or_default();
+        let sig = crate::trickdata::signature_grab(self.data.name);
+        let row = self.data.rows.iter().find(|r| (!r.uber_clip.is_empty() && !clip.contains("UT_SIG") && uber_grab(r.uber_clip) == uber_grab(&clip)) || (clip.contains("UT_SIG") && Some(r.grab) == sig));
+        row.map_or(0, |r| grab_clip(crate::trickdata::uber_name(self.data.name, r.grab).unwrap_or(r.uber)))
     }
     /// Is the board free to land (no grab clip short of its safe marker)?
     pub fn grab_safe(&self) -> bool {
@@ -1232,8 +1254,6 @@ impl Rider {
             self.boosting = true;
         }
         self.boost_was = input.boost;
-        let sc = s.abs() * 100.0;
-        self.rail_pts += PTS_RAIL * dt * if sc >= 800.0 { 1.0 } else if sc < 50.0 { 0.0 } else { sc / (3200.0 - 3.0 * sc) };
         d += s * dt;
         let (p, tan) = rail.at(d);
         let travel = tan * if s >= 0.0 { 1.0 } else { -1.0 };
@@ -1258,9 +1278,11 @@ impl Rider {
         let turn = (self.rail_goal - self.rail_twist).clamp(-RAIL_TWIST * dt, RAIL_TWIST * dt);
         self.rail_twist += turn;
         self.rail_spun += turn.abs();
-        // each new furthest half turn round pays a half spin
-        let halves = (self.rail_twist / std::f32::consts::PI).round().abs() as u32;
-        if halves > self.rail_halves { self.rail_halves = halves; self.rail_pts += PTS_SPIN_180; }
+        // `RailSlideControl_CommitQuarterTurn` 0x107730: a quarter turn reached is the rail's spin (degrees)
+        if (self.rail_goal - self.rail_twist).abs() < 1e-4 && self.rail_goal != self.rail_committed {
+            self.rail_committed = self.rail_goal;
+            self.sc.update_spin(((self.rail_goal - self.rail_goal0).to_degrees().round()) as i32);
+        }
         self.rail_side_signed += self.rail_twist.sin() * dt;
         if self.rail_twist.sin().abs() > 0.7 { self.rail_side += dt; }
 
@@ -1442,3 +1464,26 @@ pub fn trick_name(spin: f32, flip: f32, switch: bool, from_rail: bool, onto_rail
     out.split_whitespace().collect::<Vec<_>>().join(" ")
 }
 
+
+/// A new score object (`Score_Init` 0x1553a8: reset, then banked).
+pub fn new_score() -> Score {
+    let mut s = Score { rider_418: -1, ..Score::default() };
+    s.reset();
+    s.bank_points();
+    s
+}
+
+/// One of our 0..1 attributes as the game's stat byte. STANDIN: our stats are fractions of the game's bytes.
+pub fn stat_byte(x: f32) -> u8 {
+    (x * 255.0).round().clamp(0.0, 255.0) as u8
+}
+
+/// The game's clip id for a grab, tweak or uber by its name: its grab id in the trick-name table (0x320b58), then
+/// the clip `Scoring_OnTrickEvent` maps to it. 0 if the name is not there.
+pub fn grab_clip(name: &str) -> u32 {
+    use tricky_data::trick_names as t;
+    let want = format!("{name} ");
+    let first = ((t::GRAB - t::BASE) / 4) as usize;
+    let Some(id) = (0..0x66u32).find(|k| t::WORDS.get(first + *k as usize).copied().flatten() == Some(want.as_str())) else { return 0 };
+    (0x278..0x2dc).find(|c| crate::score::grab_of_clip(*c).0 == id).unwrap_or(0)
+}

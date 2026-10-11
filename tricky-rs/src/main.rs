@@ -1588,6 +1588,8 @@ fn ride(
     if restart {
         let at = r.spawn;
         r.respawn(at);
+        // a new run: a new score object (`Score_Init`)
+        r.sc = tricky_game::rider::new_score();
         r.score = 0;
         r.boost = 0.0;
         r.letters = 0;
