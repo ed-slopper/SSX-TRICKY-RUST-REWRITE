@@ -489,35 +489,35 @@ address,size,name,system,status
 0x12d108,1464,Fx_BrakeFan_Update,boarder,ported
 0x12d6c0,464,FUN_0012d6c0,boarder?,not started
 0x12d890,1736,Fx_Spray_DrawParticles,boarder,not started
-0x12df58,116,FUN_0012df58,boarder?,not started
-0x12dfd0,56,FUN_0012dfd0,boarder?,not started
+0x12df58,116,Fx_BrakeSpray_Init,boarder,not started
+0x12dfd0,56,Fx_BrakeSpray_Reset,boarder,not started
 0x12e008,220,FUN_0012e008,world?,not started
 0x12e0e8,584,Fx_SpawnLandingPuffs,boarder,not started
 0x12e330,948,Fx_Spray_SpawnParticle,boarder,not started
 0x12e6e8,560,Fx_BrakeSpray_Update,boarder,not started
 0x12e918,752,Fx_Spray_Draw,boarder,not started
-0x12ec08,108,FUN_0012ec08,game?,not started
+0x12ec08,108,Fx_BoardPuff_Init,boarder,not started
 0x12ec78,28,FUN_0012ec78,game?,not started
-0x12ec98,12,FUN_0012ec98,game?,not started
+0x12ec98,12,Fx_BoardPuff_Reset,boarder,not started
 0x12eca8,1228,Fx_BoardPuff_Update,boarder,not started
 0x12f178,676,Fx_BoardPuff_Draw,boarder,not started
-0x12f420,108,FUN_0012f420,game?,not started
+0x12f420,108,Fx_SpeedDust_Init,boarder,not started
 0x12f490,28,FUN_0012f490,game?,not started
-0x12f4b0,12,FUN_0012f4b0,boarder?,not started
+0x12f4b0,12,Fx_SpeedDust_Reset,boarder,not started
 0x12f4c0,1660,Fx_SpeedDust_Update,boarder,not started
 0x12fb40,776,Fx_SpeedDust_Draw,boarder,not started
-0x12fe48,140,FUN_0012fe48,boarder?,not started
-0x12fed8,24,FUN_0012fed8,boarder?,not started
+0x12fe48,140,Fx_BoardTrail_Init,boarder,not started
+0x12fed8,24,Fx_BoardTrail_Reset,boarder,not started
 0x12fef0,1976,Fx_BoardTrail_Update,boarder,ported
 0x1306b0,684,Fx_BoardTrail_SetPoint,boarder,not started
 0x130960,568,Fx_BoardTrail_Push,boarder,not started
 0x130b98,1396,Fx_BoardTrail_Draw,boarder,not started
-0x131110,80,FUN_00131110,boarder?,not started
-0x131160,76,FUN_00131160,boarder?,not started
+0x131110,80,Fx_SurfaceSpray_Init,boarder,not started
+0x131160,76,Fx_SurfaceSpray_Reset,boarder,not started
 0x1311b0,4440,Fx_SurfaceSpray,boarder,ported
 0x132308,448,Fx_SurfaceSpray_Draw,boarder,not started
-0x1324c8,80,FUN_001324c8,boarder?,not started
-0x132518,160,FUN_00132518,boarder?,not started
+0x1324c8,80,Fx_BoardTrack_Init,boarder,not started
+0x132518,160,Fx_BoardTrack_Reset,boarder,not started
 0x1325b8,140,FUN_001325b8,boarder?,not started
 0x132648,2912,Fx_BoardTrack,boarder,ported
 0x1331a8,532,Fx_BoardTrack_Draw,boarder,ported
@@ -531,7 +531,7 @@ address,size,name,system,status
 0x134830,2192,FUN_00134830,boarder?,not started
 0x1350c0,176,Boarder_UpdateEffects,boarder,ported
 0x135170,140,BoarderRender_DrawEffects,boarder?,not started
-0x135200,84,FUN_00135200,boarder?,not started
+0x135200,84,BoarderRender_ResetEffects,boarder?,not started
 0x135258,12,FUN_00135258,world?,not started
 0x135268,12,FUN_00135268,boarder?,not started
 0x135278,848,cBoarderRender::cBoarderRender,boarder,not started
@@ -947,7 +947,7 @@ address,size,name,system,status
 0x14d898,140,Lesson_RestartRider,game?,not started
 0x14d928,8,FUN_0014d928,game?,not started
 0x14d930,24,FUN_0014d930,game?,not started
-0x14d948,124,Lesson_SetupMenu4,game?,not started
+0x14d948,124,Lesson_SetupTrickMenu,game?,not started
 0x14d9c8,108,Lesson_SetupMenu3A,game?,not started
 0x14da38,108,Lesson_SetupMenu3B,game?,not started
 0x14daa8,244,Lesson_SetupPrompt,game?,not started
@@ -1137,7 +1137,7 @@ address,size,name,system,status
 0x157ea8,48,AnimMemBank_AlignStart,animation,not started
 0x157ed8,344,AnimCurve_Eval,animation,ported
 0x158030,1676,AnimCurve_EvalPiece,animation,ported
-0x1586c0,216,FUN_001586c0,animation?,not started
+0x1586c0,216,AnimData_GetRootOffset,animation,not started
 0x158798,80,FUN_00158798,animation?,not started
 0x1587e8,44,FUN_001587e8,animation?,not started
 0x158818,80,FUN_00158818,animation?,not started
@@ -1310,10 +1310,10 @@ address,size,name,system,status
 0x164cd8,80,FUN_00164cd8,race?,not started
 0x164d28,68,FUN_00164d28,race?,not started
 0x164d70,80,FUN_00164d70,race?,not started
-0x164dc0,56,FUN_00164dc0,frontend?,not started
-0x164df8,68,FUN_00164df8,race?,not started
-0x164e40,56,FUN_00164e40,race?,not started
-0x164e78,68,FUN_00164e78,race?,not started
+0x164dc0,56,Career_GetPlayerOutfit,frontend?,not started
+0x164df8,68,Career_SetPlayerOutfit,race?,not started
+0x164e40,56,Career_GetPlayerBoard,race?,not started
+0x164e78,68,Career_SetPlayerBoard,race?,not started
 0x164ec0,56,FUN_00164ec0,race?,not started
 0x164ef8,68,FUN_00164ef8,race?,not started
 0x164f40,56,FUN_00164f40,race?,not started
@@ -1391,10 +1391,10 @@ address,size,name,system,status
 0x16b248,36,FUN_0016b248,race?,not started
 0x16b270,36,FUN_0016b270,race?,not started
 0x16b298,152,Career_AverageStatGroups,race?,not started
-0x16b330,196,FUN_0016b330,race?,not started
-0x16b3f8,196,FUN_0016b3f8,race?,not started
-0x16b4c0,196,FUN_0016b4c0,race?,not started
-0x16b588,196,FUN_0016b588,race?,not started
+0x16b330,196,Course_GetDifficultyString,race,not started
+0x16b3f8,196,Course_GetLocationString,race,not started
+0x16b4c0,196,Course_GetVerticalDropString,race,not started
+0x16b588,196,Course_GetLengthString,race,not started
 0x16b650,44,Course_GetNameStringId,race,not started
 0x16b6d8,56,FUN_0016b6d8,race?,not started
 0x16b7b0,56,FUN_0016b7b0,race?,not started
@@ -1595,7 +1595,7 @@ address,size,name,system,status
 0x179fb0,104,Pad_ParseButtonPair,input,not started
 0x17a018,16,FUN_0017a018,render?,not started
 0x17a028,16,FUN_0017a028,render?,not started
-0x17a038,104,FUN_0017a038,render?,not started
+0x17a038,104,Pad_ParseButtonPair2,input,not started
 0x17a0a0,104,FUN_0017a0a0,render?,not started
 0x17a108,16,FUN_0017a108,render?,not started
 0x17a118,16,FUN_0017a118,render?,not started
@@ -1616,7 +1616,7 @@ address,size,name,system,status
 0x17a840,84,Input_FindPressedDevice,input,not started
 0x17a898,20,FUN_0017a898,render?,not started
 0x17a8b0,164,FUN_0017a8b0,render?,not started
-0x17aa08,76,FUN_0017aa08,render?,not started
+0x17aa08,76,cPadDevice::cPadDevice,input,not started
 0x17aa58,8,cPadDevice::vf3_17aa58,input,not started
 0x17aa60,8,cPadDevice::vf4_17aa60,input,not started
 0x17aa68,8,cPadDevice::vf1_17aa68,input,not started
@@ -1678,7 +1678,7 @@ address,size,name,system,status
 0x17ccb8,60,WStr_SetAscii,race?,not started
 0x17ccf8,56,WStr_ToAscii,other,not started
 0x17cd30,60,WStr_CopyN,frontend?,not started
-0x17cdb8,68,FUN_0017cdb8,hud?,not started
+0x17cdb8,68,WStr_ToAsciiN,hud?,not started
 0x17ce00,52,WStr_Append,frontend?,not started
 0x17ce38,52,WStr_Format,frontend?,not started
 0x17ce70,168,WStr_FormatAscii,frontend?,not started
@@ -1815,10 +1815,10 @@ address,size,name,system,status
 0x1831d8,720,cStartScreen::vf6_1831d8,game,not started
 0x1834a8,144,FUN_001834a8,game?,not started
 0x183538,296,FUN_00183538,frontend?,not started
-0x183660,292,FUN_00183660,frontend?,not started
-0x183788,864,FUN_00183788,frontend?,not started
+0x183660,292,Overlay_DrawDontRemoveCard,frontend,not started
+0x183788,864,MemCardMsg_DrawOptions,save,not started
 0x183ae8,308,FUN_00183ae8,hud?,not started
-0x183c20,1672,FUN_00183c20,hud?,not started
+0x183c20,1672,MemCardMsg_Draw,save,not started
 0x1842a8,112,FUN_001842a8,game?,not started
 0x184318,136,StartScreenSingle_Create,frontend?,not started
 0x1843a0,8,FUN_001843a0,game?,not started
@@ -1835,7 +1835,7 @@ address,size,name,system,status
 0x1859b8,8,cStartScreenSingle::~cStartScreenSingle,game,not started
 0x1859c0,104,Sky_InitLayers,render?,not started
 0x185a28,80,Sky_FreeLayers,render?,not started
-0x185a78,156,FUN_00185a78,render?,not started
+0x185a78,156,Sky_FreeLayer,render?,not started
 0x185b18,268,Course_LoadSkies,race,not started
 0x185c28,296,Course_LoadSky,race,not started
 0x185d50,20,Sky_GetLayer,render?,not started
@@ -2176,7 +2176,7 @@ address,size,name,system,status
 0x193c68,44,Replay_StartRiderSounds,audio,not started
 0x193c98,72,Replay_Abort,race?,not started
 0x193ce0,80,Camera_IsFocusRider,camera,not started
-0x193d30,104,FUN_00193d30,,not started
+0x193d30,104,Replay_SaveCurrentKeyframe,save,not started
 0x193d98,220,ReplaySave_Init,save,not started
 0x193e78,152,ReplaySave_FlushChunk,save,not started
 0x193f10,96,ReplaySave_SetChunk,save,not started
@@ -2434,7 +2434,7 @@ address,size,name,system,status
 0x1a8c50,444,FUN_001a8c50,frontend?,not started
 0x1a8e10,276,FUN_001a8e10,frontend?,not started
 0x1a8f28,116,FUN_001a8f28,frontend?,not started
-0x1a8fa0,552,Overlay_DrawPercentLabel,frontend,not started
+0x1a8fa0,552,Rivals_DrawAttitudeLabel,hud?,not started
 0x1a91c8,1880,HUD_DrawScoreDelta,hud,not started
 0x1a9928,656,HUD_DrawLabelBox,hud,not started
 0x1a9bb8,968,Backdrop_DrawFrame,frontend?,not started
@@ -2458,7 +2458,7 @@ address,size,name,system,status
 0x1ac130,732,cCountdownOverlay::vf33_1ac130,frontend,not started
 0x1ac410,368,PauseMenu_Resume,frontend?,not started
 0x1ac580,248,PauseMenu_PopLevel,frontend?,not started
-0x1ac678,356,FUN_001ac678,frontend?,not started
+0x1ac678,356,PauseMenu_BuildMainPage,frontend?,not started
 0x1ac7e0,1568,PauseMenu_DrawMainPage,frontend?,not started
 0x1ace00,920,PauseMenu_UpdateMainPage,frontend?,not started
 0x1ad198,1164,PauseMenu_DrawMusicList,frontend?,not started
@@ -2480,16 +2480,16 @@ address,size,name,system,status
 0x1af720,544,Results_BuildPages,frontend?,not started
 0x1af950,2100,Results_BuildCareerPage,race?,not started
 0x1b0188,1644,Results_BuildStandingsPage,race?,not started
-0x1b07f8,412,Results_BuildRecordPage,frontend?,not started
+0x1b07f8,412,Results_BuildTimeChallengePage,frontend?,not started
 0x1b0998,544,Results_BuildRiderStatsRows,ai?,not started
 0x1b0bb8,1728,Results_BuildMedalPage,race?,not started
 0x1b1278,1144,Results_AddRiderStats,race?,not started
 0x1b16f0,952,Results_BuildStatsPage,race?,not started
-0x1b1aa8,256,FUN_001b1aa8,race?,not started
+0x1b1aa8,256,Results_BuildLessonPage,race?,not started
 0x1b1ba8,324,Results_SetMedalVerdict,race?,not started
-0x1b2158,720,FUN_001b2158,hud?,not started
-0x1b2428,3732,FUN_001b2428,ai?,not started
-0x1b32c0,1580,FUN_001b32c0,frontend?,not started
+0x1b2158,720,Results_DrawBestTrick,hud?,not started
+0x1b2428,3732,Results_DrawVersusPage,ai?,not started
+0x1b32c0,1580,Results_UpdateSaveBeforeExit,save,not started
 0x1b38f0,272,cViewHiScoresOverlay::cViewHiScoresOverlay,frontend,not started
 0x1b3a00,1068,cViewHiScoresOverlay::Reset,frontend,not started
 0x1b3e30,152,cViewHiScoresOverlay::Draw,frontend,not started
@@ -2498,7 +2498,7 @@ address,size,name,system,status
 0x1b4120,284,cNextRaceOverlay::Reset,frontend,not started
 0x1b4250,620,Results_BuildStandingsHeader,frontend?,not started
 0x1b44c0,972,Results_BuildHiScorePage,frontend?,not started
-0x1b4890,188,Results_BuildRecordHeader,frontend?,not started
+0x1b4890,188,Results_BuildTimeChallengeHeader,frontend?,not started
 0x1b4950,1092,cNextRaceOverlay::Draw,frontend,not started
 0x1b4d98,2780,cNextRaceOverlay::DrawText,frontend,not started
 0x1b5878,68,cNextRaceOverlay::Update,frontend,not started
@@ -2531,13 +2531,13 @@ address,size,name,system,status
 0x1ba200,8,cSelectNextEventOverlay::vf53_1ba200,frontend,not started
 0x1ba300,44,FUN_001ba300,frontend?,not started
 0x1ba330,1108,AttribPointsOverlay_Update,frontend,not started
-0x1ba788,3816,FUN_001ba788,frontend?,not started
+0x1ba788,3816,AttribPointsOverlay_Draw,frontend,not started
 0x1bb670,8,cPointDistributionOverlay::vf3_1bb670,frontend,not started
-0x1bbb30,1004,FUN_001bbb30,frontend?,not started
-0x1bbf20,1916,FUN_001bbf20,hud?,not started
+0x1bbb30,1004,NextEventOverlay_SaveBeforeExitA,save,not started
+0x1bbf20,1916,NextEventOverlay_DrawVenue,frontend,not started
 0x1bc6a0,8,cSelectNextVenueOverlay::vf3_1bc6a0,frontend,not started
-0x1bc8a0,1156,FUN_001bc8a0,frontend?,not started
-0x1bcd28,1120,FUN_001bcd28,hud?,not started
+0x1bc8a0,1156,NextEventOverlay_SaveBeforeExitB,save,not started
+0x1bcd28,1120,NextEventOverlay_DrawEvent,frontend,not started
 0x1bd188,8,cSelectNextEventOverlay::vf3_1bd188,frontend,not started
 0x1bd190,288,cHelpRaceOverlay::cHelpRaceOverlay,frontend,not started
 0x1bd2b0,84,cHelpRaceOverlay::Reset,frontend,not started
@@ -2781,7 +2781,7 @@ address,size,name,system,status
 0x1ce778,264,MemCardOp_StartSave,save,not started
 0x1ce880,44,FUN_001ce880,frontend?,not started
 0x1ce8b0,72,MemCardOp_Begin,save,not started
-0x1ce8f8,256,FUN_001ce8f8,frontend?,not started
+0x1ce8f8,256,MemCard_FormatSaveTitle,save,not started
 0x1ce9f8,1068,cSelectNextEventOverlay::vf54_1ce9f8,frontend,not started
 0x1cee28,60,cSelectNextEventOverlay::vf55_1cee28,frontend,not started
 0x1cee68,72,MemCardOp_Create,save,not started
@@ -3205,7 +3205,7 @@ address,size,name,system,status
 0x1efe38,184,FUN_001efe38,hud?,not started
 0x1efef0,468,FUN_001efef0,frontend?,not started
 0x1f00c8,288,FUN_001f00c8,frontend?,not started
-0x1f01e8,284,RaceMenuOverlay_DrawSaveMenu,save,not started
+0x1f01e8,284,RaceMenuOverlay_DrawReplayMenu,frontend,not started
 0x1f0308,248,cReplayOverlay::vf3_1f0308,frontend,not started
 0x1f0400,100,cReplayOverlay::vf4_1f0400,frontend,not started
 0x1f0468,20,cReplayOverlay::vf6_1f0468,frontend,not started
@@ -4430,7 +4430,7 @@ address,size,name,system,status
 0x247b78,88,c2PTrackLoad::~c2PTrackLoad,race,not started
 0x247bd0,388,c2PTrackLoad::StartAssetLoad,race,not started
 0x247d58,2208,c2PTrackLoad::PollAssetLoad,race,not started
-0x2485f8,1128,FUN_002485f8,frontend?,not started
+0x2485f8,1128,LoadScreen_FillEventText,frontend?,not started
 0x248a60,52,c2PTrackLoad::vf4_248a60,race,not started
 0x248a98,56,c2PTrackLoad::vf3_248a98,race,not started
 0x248ad0,68,c2PTrackLoad::vf5_248ad0,race,not started
@@ -5359,10 +5359,10 @@ address,size,name,system,status
 0x2928c0,88,FUN_002928c0,save?,not started
 0x292918,40,cFEStateMCOverlay::vf50_292918,save,not started
 0x292940,40,cFEStateMCOverlay::vf51_292940,save,not started
-0x292968,772,FUN_00292968,save?,not started
+0x292968,772,FEMemCard_FillSlotList,save,not started
 0x292c70,168,cFEStateMCOverlay::vf1_292c70,save,not started
 0x292d40,60,cFEStateMCOverlay::vf55_292d40,save,not started
-0x292d80,236,FUN_00292d80,save?,not started
+0x292d80,236,FEMemCard_ShowEmptySlots,save,not started
 0x292e70,564,FUN_00292e70,save?,not started
 0x2930a8,112,FUN_002930a8,save?,not started
 0x293120,72,FUN_00293120,frontend?,not started
@@ -5443,7 +5443,7 @@ address,size,name,system,status
 0x29bee0,44,cFE3DStateVenueSel::vf18_29bee0,frontend,not started
 0x29bf10,48,cFE3DStateVenueSel::LayoutWidgets,frontend,not started
 0x29bf40,208,cFE3DStateVenueSel::vf22_29bf40,frontend,not started
-0x29c010,552,FUN_0029c010,frontend?,not started
+0x29c010,552,FEVenue_FillEventTitle,frontend?,not started
 0x29c238,160,cFE3DStateVenueSel::vf26_29c238,frontend,not started
 0x29c2d8,152,cFE3DStateUserName::CreateNextState,frontend,not started
 0x29c370,3932,cFE3DStateUserName::vf11_29c370,frontend,not started
