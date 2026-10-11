@@ -2025,7 +2025,7 @@ fn load_chars(level_dir: &Path, images: &mut Assets<Image>, materials: &mut Asse
     let mut disc = std::env::var("TRICKY_DISC").ok().and_then(|p| {
         let mut f = tricky_data::big::Files::new(tricky_data::disc::Disc::open(&p).map_err(|e| eprintln!("disc {p}: {e}")).ok()?);
         f.mount_game_archives().map_err(|e| eprintln!("disc {p}: {e}")).ok()?;
-        println!("models and animations from the disc {p}");
+        println!("models, animations and textures from the disc {p}");
         Some(f)
     });
     let board = disc.as_mut().and_then(|f| CharModel::board_from_disc(f, None).map_err(|e| eprintln!("{e}")).ok());
@@ -2041,10 +2041,19 @@ fn load_chars(level_dir: &Path, images: &mut Assets<Image>, materials: &mut Asse
         let name = d.file_name().unwrap().to_string_lossy().to_string();
         let from_disc = disc.as_mut().and_then(|f| CharModel::rider_from_disc(f, &name).map_err(|e| eprintln!("{e}")).ok());
         let Some(model) = from_disc.or_else(|| CharModel::load(&d.join("model.json")).ok()) else { continue };
+        // a texture from the disc (row E4c), else the exported PNG
+        // STANDIN: outfit 1 and board 1, as the exports had them, for the outfit and board the player picks (front end)
+        let disc_tex = |disc: &mut Option<tricky_data::big::Files>, tex: &str, board: u8| -> Option<image::RgbaImage> {
+            let files = disc.as_mut()?;
+            let rider = tricky_data::mpf::names::RIDERS.iter().find(|r| r.eq_ignore_ascii_case(&name))?;
+            let path = tricky_data::ssh::rider_texture_path(rider, tex, 1, board)?;
+            let img = tricky_data::ssh::load_image(files, &path).map_err(|e| eprintln!("{e}")).ok()?;
+            image::RgbaImage::from_raw(img.width as u32, img.height as u32, img.rgba_full_range())
+        };
         let mut mats = HashMap::new();
         for name in model.parts.iter().map(|p| p.texture.as_str()).chain(["bord"]) {
             let file = d.join(format!("{name}.png"));
-            let tex = image::open(&file).ok().map(|i| images.add(make_image(i.to_rgba8(), true)));
+            let tex = disc_tex(&mut disc, name, 1).or_else(|| image::open(&file).ok().map(|i| i.to_rgba8())).map(|i| images.add(make_image(i, true)));
             mats.insert(name.to_string(), materials.add(StandardMaterial {
                 base_color_texture: tex, unlit: true, cull_mode: None, double_sided: true, ..default()
             }));
@@ -2055,9 +2064,9 @@ fn load_chars(level_dir: &Path, images: &mut Assets<Image>, materials: &mut Asse
                 .or_else(|| AnimSet::load(&d.join(f)).ok()).filter(|a| a.len() > 0)
         });
         // bord1.png .. bord12.png, the rider's twelve boards (the plain bord.png if they are missing)
-        let boards = (1..=12).map(|n| match image::open(d.join(format!("bord{n}.png"))) {
-            Ok(i) => materials.add(StandardMaterial { base_color_texture: Some(images.add(make_image(i.to_rgba8(), true))), unlit: true, cull_mode: None, double_sided: true, ..default() }),
-            Err(_) => mats.get("bord").cloned().unwrap_or_default(),
+        let boards = (1..=12).map(|n| match disc_tex(&mut disc, "bord", n).or_else(|| image::open(d.join(format!("bord{n}.png"))).ok().map(|i| i.to_rgba8())) {
+            Some(i) => materials.add(StandardMaterial { base_color_texture: Some(images.add(make_image(i, true))), unlit: true, cull_mode: None, double_sided: true, ..default() }),
+            None => mats.get("bord").cloned().unwrap_or_default(),
         }).collect();
         let data = trickdata::RIDERS.iter().position(|r| r.name.eq_ignore_ascii_case(&name)).unwrap_or(0);
         lib.chars.push(CharEntry { name, model, mats, ubers, boards, data });

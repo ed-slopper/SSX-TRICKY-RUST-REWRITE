@@ -61,3 +61,11 @@ partly inferred):
 - entry+0x28 → part+0x20 (not yet known).
 - entry+0x2c → 8-byte records (second word a pointer), count entry+0x3e.
 - entry+0x30 → 0xc-byte records (second word a pointer), count entry+0x3c (`SkinLod_CollectMaterials` pairs).
+
+### Textures (E4c)
+
+`BdrLoad_RequestRider` 0x201790 loads a rider's textures from the exe's path tables: 0x341a38 suit and boots
+(seven outfit slots per rider, the seventh the sixth again; then `mmm1_*` and `mallora_suit` / `elise1_boot`),
+0x341ce8 head and helm, 0x341d50 the twelve boards (then `mallora_bord`, `mmm1_bord`). `tricky-data::ssh::
+rider_texture_path` builds the same paths; tricky-rs reads them from the disc with `TRICKY_DISC` (outfit 1 and
+board 1 as the exports had them, until the front end picks them).

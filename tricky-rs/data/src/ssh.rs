@@ -136,5 +136,36 @@ mod tests {
             images += ssh.shapes.iter().filter(|s| s.image.is_some()).count();
         }
         assert!(images > 300);
+        // every path the exe's tables name is on the disc
+        for r in crate::mpf::names::RIDERS {
+            for t in ["suit", "boot", "head", "helm"] {
+                for o in 1..=7 { load_image(&mut files, &rider_texture_path(r, t, o, 1).unwrap()).unwrap(); }
+            }
+            for b in 1..=12 { load_image(&mut files, &rider_texture_path(r, "bord", 1, b).unwrap()).unwrap(); }
+        }
     }
+}
+
+/// The paths `BdrLoad_RequestRider` 0x201790 loads a rider's textures from, as the exe's tables have them:
+/// 0x341a38 suit and boots (seven outfits per rider, the seventh the sixth again), 0x341ce8 head and helm,
+/// 0x341d50 the twelve boards. `rider` is the game's name (`mpf::names::RIDERS`; `zz_mmm`'s files are `mmm`).
+/// `texture` is a texture set's name (`suit`, `boot`, `head`, `helm`, `bord`); `outfit` 1-7, `board` 1-12.
+pub fn rider_texture_path(rider: &str, texture: &str, outfit: u8, board: u8) -> Option<String> {
+    let r = if rider == "zz_mmm" { "mmm" } else { rider };
+    let outfit = outfit.clamp(1, 7).min(6);
+    Some(match texture {
+        "suit" | "boot" if r == "mmm" => format!("|data/char/mmm1_{texture}.ssh"),
+        "suit" | "boot" => format!("|data/char/{r}{outfit}_{texture}.ssh"),
+        "head" | "helm" => format!("|data/char/{r}_{texture}.ssh"),
+        "bord" if r == "mmm" => "|data/char/mmm1_bord.ssh".to_string(),
+        "bord" => format!("|data/char/{r}{}_bord.ssh", board.clamp(1, 12)),
+        _ => return None,
+    })
+}
+
+/// The first image of an `.ssh` from the player's disc.
+pub fn load_image(files: &mut crate::big::Files, path: &str) -> Result<Image, String> {
+    let bytes = files.load(path).map_err(|e| format!("{path}: {e}"))?.ok_or_else(|| format!("{path}: not on the disc"))?;
+    let ssh = SshFile::open(&bytes).map_err(|e| format!("{path}: {e}"))?;
+    ssh.shapes.into_iter().find_map(|s| s.image).ok_or_else(|| format!("{path}: no image"))
 }
