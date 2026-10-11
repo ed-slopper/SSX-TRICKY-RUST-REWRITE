@@ -103,7 +103,7 @@ state machine and the renderer are ours. Nothing has been checked against the or
 | G14 | Megaplex laps and boost tubes checked: `cLapBoostNode` 0x140b90, `cZBoostNode` 0x141cd8 | any | E9 | | [repo] |
 | G15 | Spray, trail and splashes per surface from the real table (`tricky_game::surface`): `surf()` in `tricky-rs/src/spray.rs` is rounded and guesses which surfaces spray; the game sprays from words [13..21] on every surface but 9, 13, 18, 19 (those spark, `Fx_SurfaceSpray` 0x1311b0) and uses [22..24] for the trail and splashes (port-notes/effects.md) | any | E8f | | Gap of E8f; corrected by E13 |
 | G16 | Draw the rider at rider+0x308 above the snow (surface word [10], eased 1.6667 cm a tick on the ground), as `Boarder_UpdatePose` 0x129628 does; the port draws at the board's position | any | E8f | | Gap of E13 |
-| G17 | The scoring constants at the top of `tricky-rs/game/src/rider.rs` (`PTS_*`, `SWITCH_BONUS`, `UBER_SECONDS`) are rounded ("value × 6786.5, rounded to 10"): take the game's exact values from `Score_*` 0x155410–0x157490 | any | F4a | | Gap of E8i |
+| G17 | The scoring constants at the top of `tricky-rs/game/src/rider.rs` (`PTS_*`, `SWITCH_BONUS`, `UBER_SECONDS`) are rounded ("value × 6786.5, rounded to 10"): take the game's exact values from `Score_*` 0x155410–0x157490 | any | F4a | trailrig/heron (2026-10-11) | Gap of E8i |
 
 ## P3 Content
 
@@ -251,3 +251,4 @@ matches the original.
 - 2026-10-11 trailrig/heron: G4a1 done; G4a2 gets the table's word +8.
 - 2026-10-11 trailrig/heron: claim E8i.
 - 2026-10-11 trailrig/heron: E8i done; added G17 (gap of E8i).
+- 2026-10-11 trailrig/heron: claim G17.
