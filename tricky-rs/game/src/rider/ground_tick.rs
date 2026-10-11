@@ -22,6 +22,11 @@
 //! - the normal (rider+0x2a0, board row G20c2): on a rail `RailSlideMotion_Update` 0x10b0d0's ([`rail_normal`], with the
 //!   lean angle [`Rider::rail_lean`] from [`rail_lean_angle`]) and at a respawn `Boarder_PlaceAt` 0x11cae8's
 //!   ([`placed_normal`]); in the air it is still the port's own
+//! - the rail normal's inputs (row G20c2c): `Rail_ClosestPoint` 0x259330 over the world grid ([`RailWorld::closest_point`]) and the
+//!   whole normal from the game's own inputs ([`rail_slide_normal`]: the closest point, the fall-off limits, the lean
+//!   angle and [`rail_normal`], from the board's frame, right, up, velocity and the motion's time, blend and angle) are
+//!   exact and checked, but `Rider::rail_step` does not call them yet: the port has no world grid (STANDIN, row
+//!   G20c2c1) and no attitude quaternion through a rail (row G20c2c3)
 //! - rail capture (row G1b) and `Boarder_InstanceCollisions` 0x125088 (row E8b): not done while riding, as before
 
 use super::{wrap, Rider};
@@ -142,9 +147,10 @@ pub fn placed_normal(hit: Option<V4>) -> V4 {
 }
 
 /// STANDIN: the rider's sideways distance from the rail in cm, the game's `rider+0x190 · (closest point − position)`
-/// (0x10b438), for the game's own closest point (`Rail_ClosestPoint` 0x259330) and board attitude (the quaternion,
-/// rows G1 and G5): the port's offset `off` (m, positive to the left of the travel) with the board's side (+0x190, its
-/// right) taken as the cross of the tangent and the board's up `normal` (game space), the board lying along the rail.
+/// (0x10b438), for the game's own closest point (`Rail_ClosestPoint` 0x259330, here [`RailWorld::closest_point`], which
+/// needs the world grid: row G20c2c1) and board attitude (the quaternion, rows G20c2c2 and G20c2c3): the port's offset
+/// `off` (m, positive to the left of the travel) with the board's side (+0x190, its right) taken as the cross of the
+/// tangent and the board's up `normal` (game space), the board lying along the rail.
 pub(super) fn rail_lateral(travel: Vec3, normal: V4, off: f32) -> f32 {
     let side = unit(cross(game_dir(travel), normal));
     let left = Vec3::Y.cross(travel).normalize_or(Vec3::X);
@@ -161,6 +167,318 @@ pub fn rail_offset(right: V4, to_rail: V4) -> f32 {
 /// velocity (+0x150) is against it.
 pub fn rail_travel(tangent: V4, velocity: V4) -> V4 {
     if dot(unit(velocity), tangent) < 0.0 { scale(tangent, -1.0) } else { tangent }
+}
+
+/// The reach of every box test in `Rail_ClosestPoint` 0x259330: 300 cm (`0x43960000`) round the query point.
+const REACH: f32 = f32::from_bits(0x4396_0000);
+
+/// The owner of a rail curve (the object at curve+0x58): `Rail_ClosestPoint` 0x259330 only looks at bit 0 of its
+/// +0x18 (the rail is switched on) and hands its +0x24 word back as the hit's +0x34 (stored as rider+0x290 by
+/// `RailSlideMotion_Update` 0x10b0d0, 0x10b158).
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct RailOwner {
+    /// +0x18: bit 0 set = the curve counts
+    pub flags: u32,
+    /// +0x24
+    pub tag: u32,
+}
+
+/// One curve of the world grid (the record the pointer at patch+0x3c lists), cm, z up. Its four rows (curve+0x00,
+/// +0x10, +0x20, +0x30) are the cubic's coefficients: the point at t is `m0·t³ + m1·t² + m2·t + m3`, all four lanes.
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct RailCurve {
+    pub m: [V4; 4],
+    /// curve+0x58. STANDIN (none): the original reads its +0x18 even for a null pointer (address 0x18); no table of
+    /// the game has one, so a curve without an owner is simply skipped here.
+    pub owner: Option<RailOwner>,
+    /// curve+0x5c..0x73: the box (min x, y, z, then max x, y, z)
+    pub bbox: [f32; 6],
+}
+
+impl RailCurve {
+    /// The basis vector through the four rows: `vmulax`, `vmadday`, `vmaddaz`, `vmaddw` (each product rounded, then
+    /// the sum), lane by lane.
+    fn eval(&self, b: V4) -> V4 {
+        let mut o = [0.0f32; 4];
+        for k in 0..4 {
+            o[k] = ((self.m[0][k] * b[0] + self.m[1][k] * b[1]) + self.m[2][k] * b[2]) + self.m[3][k] * b[3];
+        }
+        o
+    }
+
+    /// The point at t: the basis (t³, t², t, 1) with t³ = t · (t · t).
+    fn at(&self, t: f32) -> V4 {
+        let t2 = t * t;
+        let t3 = t * t2;
+        self.eval([t3, t2, t, 1.0])
+    }
+}
+
+/// One patch record (0x4c bytes at `cell+0x38 + n·0x4c`).
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct RailPatch {
+    /// patch+0x00..0x17: the box (min x, y, z, then max x, y, z)
+    pub bbox: [f32; 6],
+    /// patch+0x24 (a word), +0x28 (a halfword; the halfword after it, +0x2a, is the curve count), +0x2c (a halfword)
+    /// and +0x48 (a word): the record is in use when any of them or the count is not zero (proven only as that
+    /// test: what they hold is not known)
+    pub x24: u32,
+    pub x28: u16,
+    pub x2c: i16,
+    pub x48: u32,
+    /// the curves the pointer at patch+0x3c lists; their count is the halfword at patch+0x2a
+    pub curves: Vec<RailCurve>,
+}
+
+/// One cell of the world grid: its box and its patches (`gWorld+0x48` of them, contiguous).
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct RailCell {
+    pub bbox: [f32; 6],
+    pub patches: Vec<RailPatch>,
+}
+
+/// The world grid `Rail_ClosestPoint` 0x259330 walks (the object at `gWorld` 0x346488, the same grid `World_RayCast`
+/// 0x25aff8 reads): a rectangle of `nx · ny` square cells of side `cell` (cm) from the origin (`x0`, `y0`), each
+/// pointing at a [`RailCell`] or at nothing. STANDIN (row G20c2c1): the port builds this from nothing yet; the game
+/// builds it when it loads the course.
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct RailWorld {
+    /// world+0x04, +0x08
+    pub x0: f32,
+    pub y0: f32,
+    /// world+0x28: the side of a cell
+    pub cell: f32,
+    /// world+0x2c, +0x30
+    pub nx: i32,
+    pub ny: i32,
+    /// world+0x4c: `ny · nx` cells, row by row
+    pub cells: Vec<Option<RailCell>>,
+}
+
+/// What `Rail_ClosestPoint` writes into its output record: the point on the curve (out+0x10), the unit tangent
+/// there (out+0x20), and the owner's word (out+0x34).
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct RailHit {
+    pub point: V4,
+    pub tangent: V4,
+    pub word: u32,
+}
+
+/// The lower and upper ends of the parameter range `Rail_ClosestPoint` searches after its four chords, by the chord
+/// that came closest (0 = the curve's start itself): the two five-word tables at 0x3a78e0 and 0x3a78f8.
+const SEARCH_LO: [f32; 5] = [0.0, 0.0, 0.0, 0.25, 0.25];
+const SEARCH_HI: [f32; 5] = [0.75, 0.75, 1.0, 1.0, 1.0];
+/// The golden-section ratios (0x3ec3910c, 0x3f1e377a) and the width the search stops at (0x3a03126f).
+const GOLD_LO: f32 = f32::from_bits(0x3ec3_910c);
+const GOLD_HI: f32 = f32::from_bits(0x3f1e_377a);
+const SEARCH_WIDTH: f32 = f32::from_bits(0x3a03_126f);
+
+/// Distance between two points (all four lanes): `vsqrt` of the sum of squares, as the original measures it.
+fn dist4(a: V4, b: V4) -> f32 {
+    let v = sub(a, b);
+    dot(v, v).sqrt()
+}
+
+/// The part of `Rail_ClosestPoint` 0x259330 that works on one curve (0x259790–0x259ee0): the start and four chords
+/// at t = ¼, ½, ¾, 1 find the chord nearest `pos` (the foot of `pos` on each, clamped to it), a golden-section search
+/// of the bracket [`SEARCH_LO`]/[`SEARCH_HI`] of that chord follows (at most 24 steps, until it is under 0.0005
+/// wide), and the result is the *last* point it evaluated, with its parameter and distance (not the best one).
+fn curve_search(c: &RailCurve, pos: V4) -> (V4, f32, f32) {
+    // the chords
+    let mut prev = c.at(0.0);
+    let mut best = dist4(pos, prev);
+    let mut best_k = 0usize;
+    for k in 1..=4usize {
+        let t = k as f32 * 0.25;
+        let pk = c.at(t);
+        let seg = sub(pk, prev);
+        let rel = sub(pos, prev);
+        let mut u = dot(rel, seg) / dot(seg, seg);
+        if u < 0.0 {
+            u = 0.0;
+        }
+        if 1.0 < u {
+            u = 1.0;
+        }
+        let foot = add(prev, scale(seg, u));
+        let d = dist4(pos, foot);
+        if d < best {
+            best = d;
+            best_k = k;
+        }
+        prev = pk;
+    }
+    // the golden-section search
+    let (mut a, mut b) = (SEARCH_LO[best_k], SEARCH_HI[best_k]);
+    let w = b - a;
+    let mut c1 = a + w * GOLD_LO;
+    let mut c2 = a + w * GOLD_HI;
+    let mut d1 = dist4(c.at(c1), pos);
+    let mut d2 = dist4(c.at(c2), pos);
+    // the point, parameter and distance of the last evaluation: at first c2 (the point left in the original's buffer
+    // is the one at b, which no step can leave as the last: the first step always evaluates once more)
+    let mut last = (c.at(b), c2, d2);
+    let mut steps = 0;
+    while steps < 24 && !((b - a).abs() <= SEARCH_WIDTH) {
+        if d2 < d1 {
+            a = c1;
+            c1 = c2;
+            d1 = d2;
+            c2 = c2 * GOLD_HI + b * GOLD_LO;
+            let p = c.at(c2);
+            d2 = dist4(p, pos);
+            last = (p, c2, d2);
+        } else {
+            b = c2;
+            c2 = c1;
+            d2 = d1;
+            c1 = c1 * GOLD_HI + a * GOLD_LO;
+            let p = c.at(c1);
+            d1 = dist4(p, pos);
+            last = (p, c1, d1);
+        }
+        steps += 1;
+    }
+    last
+}
+
+impl RailWorld {
+    /// `Rail_ClosestPoint` 0x259330 (`world` = the grid at `gWorld`, `pos` = the query point, all four lanes; the third
+    /// argument is not read). Walks the cells from two before the point's cell to its own (clamped into the grid) in
+    /// x, y, skipping what is more than 300 cm from the point (cell, patch and curve boxes), and in each curve that is
+    /// switched on (owner flags bit 0) searches the nearest point ([`curve_search`]); a curve's result is taken when
+    /// it is the first or nearer than the best so far. `None` = the original returns 0 and writes nothing.
+    pub fn closest_point(&self, pos: V4) -> Option<RailHit> {
+        // the cell of the point: ((p − origin) + side) / side, cut toward zero (cvt.w.s)
+        let cs = self.cell;
+        let ix = (((pos[0] - self.x0) + cs) / cs) as i32;
+        let iy = (((pos[1] - self.y0) + cs) / cs) as i32;
+        let nx1 = self.nx.wrapping_sub(1) as i64;
+        let ny1 = self.ny.wrapping_sub(1) as i64;
+        let ix_c = if 0 < ix { ix as i64 } else { 0 };
+        let iy_c = if 0 < iy { iy as i64 } else { 0 };
+        let a1 = ix.wrapping_sub(2) as i64;
+        let t1 = iy.wrapping_sub(2) as i64;
+        let x_lo = if -1 < a1 { a1 } else { 0 };
+        let x_hi = if nx1 < ix_c { nx1 } else { ix_c };
+        let y_lo = if -1 < t1 { t1 } else { 0 };
+        let y_hi = if ny1 < iy_c { ny1 } else { iy_c };
+        let near = |b: &[f32; 6]| {
+            b[0] <= pos[0] + REACH
+                && pos[0] - REACH <= b[3]
+                && b[1] <= pos[1] + REACH
+                && pos[1] - REACH <= b[4]
+                && b[2] <= pos[2] + REACH
+                && pos[2] - REACH <= b[5]
+        };
+        let mut found: Option<(RailHit, f32)> = None;
+        let mut x = x_lo;
+        while x <= x_hi {
+            let mut y = y_lo;
+            while y <= y_hi {
+                let cx = if x < 0 { 0 } else if nx1 < x { nx1 } else { x };
+                let cy = if y < 0 { 0 } else if ny1 < y { ny1 } else { y };
+                y += 1;
+                let idx = cy * self.nx as i64 + cx;
+                let Some(Some(cell)) = usize::try_from(idx).ok().and_then(|i| self.cells.get(i)) else { continue };
+                if !near(&cell.bbox) {
+                    continue;
+                }
+                for patch in &cell.patches {
+                    if patch.x24 == 0 && patch.x28 == 0 && patch.curves.is_empty() && patch.x2c == 0 && patch.x48 == 0 {
+                        continue;
+                    }
+                    if !near(&patch.bbox) {
+                        continue;
+                    }
+                    for c in &patch.curves {
+                        let Some(owner) = c.owner else { continue };
+                        if owner.flags & 1 == 0 || !near(&c.bbox) {
+                            continue;
+                        }
+                        let (point, t, d) = curve_search(c, pos);
+                        if found.is_none_or(|(_, best)| d < best) {
+                            // the tangent: the derivative's basis (3t², 2t, 1, 0) through the rows, made unit length
+                            let dv = c.eval([(t * 3.0) * t, t + t, 1.0, 0.0]);
+                            found = Some((RailHit { point, tangent: unit(dv), word: owner.tag }, d));
+                        }
+                    }
+                }
+            }
+            x += 1;
+        }
+        found.map(|(h, _)| h)
+    }
+}
+
+/// What `RailSlideMotion_Update` 0x10b0d0 reads to place the board on the rail, all in the game's space (cm, z up).
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct RailSlideIn {
+    /// rider+0x4a90: the board's position
+    pub pos: V4,
+    /// rider+0x4a60, +0x4a70, +0x4a80: the board's frame rows (x, y, z)
+    pub frame: [V4; 3],
+    /// rider+0x150: the velocity
+    pub vel: V4,
+    /// rider+0x190: the board's right (the attitude quaternion's x axis; rows G1, G5)
+    pub side: V4,
+    /// rider+0x1a0: the board's up (its z axis)
+    pub up: V4,
+    /// rider+0x1dc: the stance kind (3 and 4 are the slides)
+    pub kind: u32,
+    /// motion object +0xc: seconds on the rail
+    pub time: f32,
+    /// rider+0x284: the fall-off blend (1 for the first 0.6 s)
+    pub blend: f32,
+    /// motion object +8: the lean angle
+    pub lean: f32,
+}
+
+/// The normal and lean angle `RailSlideMotion_Update` leaves while the board stays on the rail.
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct RailNormal {
+    /// rider+0x2a0
+    pub normal: V4,
+    /// motion object +8
+    pub lean: f32,
+}
+
+/// What `RailSlideMotion_Update` does with the rail it finds: the hit it stores (rider+0x2d0 the point, +0x290 the
+/// word), the blend it leaves at rider+0x284, and the normal and lean angle when the board is inside the fall-off
+/// limits (`None`: it is outside, and the original takes the board off the rail).
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct RailSlide {
+    pub hit: RailHit,
+    pub blend: f32,
+    pub on: Option<RailNormal>,
+}
+
+/// The rail normal from the game's own inputs (board row G20c2c): `RailSlideMotion_Update` 0x10b0d0 from the call of
+/// `Rail_ClosestPoint` (0x10b108) to the normal's store (0x10bbb8), without the velocity and the attitude it also
+/// moves. `None`: no rail within reach (the original skips everything and takes the board off).
+/// - the board's offset from the closest point is tested against the fall-off limits: with the blend b (1 while the
+///   rail time is under 0.6 s), the point minus the position, moved 30 cm along the frame's y row, dotted with the
+///   frame's rows must stay under 150b + 80(1−b), 50, 50b + 30(1−b) (x, y, z; at or over any of them = off);
+/// - inside: the tangent is turned to the travel ([`rail_travel`]), the lean angle follows the sideways offset
+///   `side · (point − position)` ([`rail_offset`], [`rail_lean_angle`]) and the normal is [`rail_normal`] of both.
+pub fn rail_slide_normal(world: &RailWorld, i: &RailSlideIn) -> Option<RailSlide> {
+    let hit = world.closest_point(i.pos)?;
+    let d = sub(hit.point, i.pos);
+    let mut blend = i.blend;
+    if i.time < 0.6 {
+        blend = 1.0;
+    }
+    let rest = 1.0 - blend;
+    let off = add(d, scale(i.frame[1], -30.0));
+    let outside = blend * 150.0 + rest * 80.0 <= dot(i.frame[0], off).abs()
+        || blend * 50.0 + rest * 50.0 <= dot(i.frame[1], off).abs()
+        || blend * 50.0 + rest * 30.0 <= dot(i.frame[2], off).abs();
+    if outside {
+        return Some(RailSlide { hit, blend, on: None });
+    }
+    let travel = rail_travel(hit.tangent, i.vel);
+    let lean = rail_lean_angle(i.lean, rail_offset(i.side, d), i.kind, i.up[2]);
+    Some(RailSlide { hit, blend, on: Some(RailNormal { normal: rail_normal(travel, i.up, lean), lean }) })
 }
 
 /// A game direction (z up) as a port direction (y up), the other way of [`game_dir`].

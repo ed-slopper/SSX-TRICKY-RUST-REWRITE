@@ -2879,6 +2879,7 @@ G 2f8e00 __rtti_si
 G 2f8e20 __rtti_class
 G 2f8dd8 __rtti_user
 D 337e08 gMenuManager
+D 346488 gWorld
 D 337c58 gApp
 D 3352a0 gCheat_UnlockEverything
 D 3352ac gCheat_MaxAttrib

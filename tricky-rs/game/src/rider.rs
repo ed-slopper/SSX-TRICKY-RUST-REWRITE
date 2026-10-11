@@ -1258,7 +1258,7 @@ impl Rider {
         let (_, tan) = rail.at(d);
         // `RailSlideMotion_Update` 0x10b0d0 reads the tangent where the board is now, and the balance offset before it moves
         let travel0 = tan * if s >= 0.0 { 1.0 } else { -1.0 };
-        let board_up = ground_tick::game_dir(self.normal); // STANDIN for the board's up (+0x1a0)
+        let board_up = ground_tick::game_dir(self.normal); // STANDIN for the board's up (+0x1a0) and, with `rail_lateral`, the closest point and the board's right (+0x190): rows G20c2c1, G20c2c3
         let lateral = ground_tick::rail_lateral(travel0, board_up, self.rail_off);
         s += -9.8 * tan.y * dt;
         // boost: a kick per press; held only while crouched

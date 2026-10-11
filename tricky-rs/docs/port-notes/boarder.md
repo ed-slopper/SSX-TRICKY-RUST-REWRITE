@@ -395,3 +395,51 @@ STANDIN: the rail's closest point and the board's right/up are the game's attitu
 the lateral offset from its own rail offset (`rail_lateral`: the board right taken as T x up, lying along the rail) and
 the board's up from the last normal; the respawn has no ray under it, so it is always (0, 0, 1, 0). Gap rows G20c2b
 (air normal and the placement's ray hit, E7) and G20c2c (the board's attitude as the rail's input).
+
+## The rail normal's inputs from the game (G20c2c)
+
+Proven (disassembly of `Rail_ClosestPoint` 0x259330, `SLUS_203.26`): the world is the object the pointer `gWorld`
+0x346488 holds (the grid `World_RayCast` 0x25aff8, `AIWorld_*` and the camera's collision also read): origin x, y at
++0x04, +0x08, cell side +0x28 (cm), cells across and down +0x2c, +0x30, the number of patch records per cell +0x48,
+the table of cell pointers +0x4c (row by row, null = empty). A cell: box (min x, y, z, max x, y, z) at +0x00, the
+patch records (0x4c bytes each) at the pointer +0x38. A patch: box at +0x00, in use when the word +0x24, the halfword
++0x28, the curve count (halfword +0x2a), the halfword +0x2c or the word +0x48 is not zero, the curve pointers at the
+pointer +0x3c. A curve: the cubic's four rows at +0x00..+0x3f (the point is `m0 t³ + m1 t² + m2 t + m3`, all four
+lanes, `vmulax`/`vmadday`/`vmaddaz`/`vmaddw` order), its owner at the pointer +0x58 (bit 0 of the owner's +0x18 = the
+rail is on, the owner's +0x24 word goes to the hit's +0x34), its box at +0x5c..+0x73.
+
+`Rail_ClosestPoint`(world, pos, unused, out) walks the cells from `ix − 2` to `ix` and `iy − 2` to `iy`
+(`ix = ((x − x0) + side) / side` cut toward zero, clamped into the grid), x outer and y inner, and in each cell, patch
+and curve whose box is within 300 cm of the point (every test is `min ≤ p + 300` and `p − 300 ≤ max`, all three axes)
+searches the curve: the start and the chords to t = ¼, ½, ¾, 1 (each chord's foot of the point, clamped to it) give the
+nearest chord k (0 if the start itself wins; ties keep the earlier), then a golden-section search over the bracket
+the tables at 0x3a78e0 (lower: 0, 0, 0, ¼, ¼) and 0x3a78f8 (upper: ¾, ¾, 1, 1, 1) give for k, with the ratios 0.381966
+and 0.618034, stops at a width of 0.0005 (at most 24 steps). The result is the **last point evaluated**, its parameter
+and its distance (not the best of the search); a curve's result replaces the best when it is the first or its
+distance is smaller. The hit is the point (out+0x10), the unit tangent from the derivative basis (3t², 2t, 1, 0)
+through the same rows (out+0x20, four lanes) and the owner's word (out+0x34); the function returns 1 when any curve
+was taken and writes nothing otherwise. Every distance is `vsqrt` of the four-lane sum of squares, so a w lane in the
+point counts.
+
+Ported (`rider/ground_tick.rs`): `RailWorld::closest_point` (with `RailCell`, `RailPatch`, `RailCurve`, `RailOwner`,
+`RailHit`) and `rail_slide_normal` (`RailSlideIn`, `RailSlide`, `RailNormal`): `RailSlideMotion_Update` 0x10b0d0 from the
+closest point to the normal's store, i.e. the hit recorded (rider+0x2d0 point, +0x290 word), the fall-off test with
+the blend (1 for the first 0.6 s of the rail, else rider+0x284: limits `150b + 80(1−b)`, `50`, `50b + 30(1−b)` on the
+frame rows dotted with the point minus the position moved 30 cm along the frame's y row), and inside the limits the
+tangent turned to the travel, the lean angle and the normal (`rail_travel`, `rail_offset`, `rail_lean_angle`,
+`rail_normal`). Checked in the function runner (`tests/rail_world.rs`, both against a world grid built in the runner's
+memory with random cubic curves, boxes that miss, switched-off owners, empty records and missing cells):
+`Rail_ClosestPoint` 9,000 queries, its point, tangent, word and the "found" result bit for bit (and untouched output
+when nothing is found); the real `RailSlideMotion_Update` with the real `Rail_ClosestPoint` 12,000 times (inside and
+outside the limits, both blends, reversed travel, no rail in reach): the normal, lean angle, recorded hit and blend
+equal ours, and the original calls `Boarder_SetState` 0x11f608 exactly when ours says the board is off the rail.
+
+Not wired, new rows: `Rider::rail_step` still uses `rail_lateral` and the last normal (STANDIN), because it has no
+world grid (the game builds one when it loads the course; the port's rails are the level's splines flattened to
+polylines in `rails.rs`: G20c2c1) and no attitude quaternion through a rail (the second half of
+`RailSlideMotion_Update`, 0x10bbb8 on, turns the quaternion rider+0x170 a twelfth of the way (`Quat_Slerp` 0x250a48,
+rate `0x3daaaaab`) to a target made from the normal, the tangent and the lean angle with `Quat_RotateVecToVec`
+0x2508b8 (read from the decompile, not ported or run yet), then calls `Boarder_UpdateOrientation` 0x129008, which makes +0x190 and +0x1a0 for the next tick: G20c2c2
+ports it, G20c2c3 wires it with the attitude across a landing, G20c3). The rest of `RailSlideMotion_Update` (velocity
+blended to the tangent at 30 per second, gravity along it, the balance, the push off the rail outside the limits,
+the take-off call chain) is hand-written in `rail_step`: G20c2c4, with G1b.
