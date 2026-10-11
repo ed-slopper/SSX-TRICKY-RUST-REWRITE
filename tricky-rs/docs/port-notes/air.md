@@ -15,7 +15,8 @@ Part of the port notes (index: [README.md](README.md)); units and wording as des
   t = (N.z − cos 50°)/(cos 70° − cos 50°) ≥ 0: h = normalize(N.x, N.y, 0), L = normalize(F − (F·h)h),
   b = clamp(t·L.z/sin 20°, 0, 0.9), v′ = ((1−b)v + b|v|L)/2 + Δv·normalize((1−b)N + bL); the flag goes to
   `Score_StartTrickChain`.
-- Takeoff rates `Takeoff_SetSpinRates` 0x126e30: K = 11.517(0.5449+0.6742T); spin ω0 = K·ws (×2/3 alpine),
+- Takeoff rates `Takeoff_SetSpinRates` 0x126e30: K = 11.517(0.5449+0.6742T); spin ω0 = K·ws (×2/3 alpine), Ported exactly and checked bit for bit (G1a2, `jump::takeoff_spin_rates`): K = (T·0.6741781/255 + 0.5449139)·11.5171995, spin = K·ws
+  (×0.6666667 alpine), flip = (K·0.6666667)·wf (negated fakie); clips 0x218, 0x260, 0x261 take off with none.
   flip ω0 = (2/3)K·wf; ×0.8 fakie; ×1.6 in spin-boost zones (course event 0x12). Band hi = ω0, lo = 0.3ω0,
   floor = min(|ω0|, 1.396); all 0 with no wind-up.
 - Air control `SpinState_Update` 0x100908 (stick digital −1/0/+1):

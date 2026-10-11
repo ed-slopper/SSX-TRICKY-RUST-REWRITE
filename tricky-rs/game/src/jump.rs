@@ -88,3 +88,52 @@ pub fn jump_impulse(min: f32, s: &JumpState) -> (V4, bool) {
     let v = add(scale(s.vel, a), scale(along, b * speed));
     (add(scale(v, 0.5), scale(dir, dv)), true)
 }
+
+/// What `Takeoff_SetSpinRates` reads from the rider (after `Takeoff_Setup`, which it calls first).
+#[derive(Clone, Copy, Debug, Default)]
+pub struct TakeoffState {
+    /// the clip playing on layer 0 (`AnimCtl_GetClip`): 0x218 and 0x260/0x261 take off with no spin
+    pub clip: i64,
+    /// rider+0x208
+    pub x208: f32,
+    /// the tricks stat byte (stats+0x1a)
+    pub tricks_stat: u8,
+    /// the spin and flip wind-ups (rider+0x220, rider+0x22c)
+    pub wind_spin: f32,
+    pub wind_flip: f32,
+    /// board class (rider+0x420; 2 alpine) and switch/fakie (rider+0x1b4)
+    pub class: u32,
+    pub fakie: bool,
+}
+
+/// What `Takeoff_SetSpinRates` writes.
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct Takeoff {
+    /// the air motion's spin and flip rates (motion+0x76c, motion+0x770)
+    pub spin: f32,
+    pub flip: f32,
+    /// after clip 0x218 only: 1 − rider+0x208, written to rider+0x1f0 and rider+0x1f8 (rider+0x1f4 := 0)
+    pub x1f0: Option<f32>,
+    /// which clip routine runs: `Takeoff_PlayLaunchClip` 0x126fc0 (true) or `Boarder_PlayTakeoffClip` 0x127298
+    pub launch_clip: bool,
+}
+
+/// `Takeoff_SetSpinRates` 0x126e30: the spin and flip the rider leaves the snow with, from the wind-ups and the
+/// tricks stat (rad/s; a flip gets 2/3 of the spin's rate, an alpine board's spin 2/3, a flip switched riding fakie).
+/// Then state 0x10 and the wind-ups are cleared (rider+0x220..0x234), in the game as here by the caller.
+pub fn takeoff_spin_rates(s: &TakeoffState) -> Takeoff {
+    if s.clip == 0x218 || s.clip == 0x260 || s.clip == 0x261 {
+        let x1f0 = (s.clip == 0x218).then_some(1.0 - s.x208);
+        return Takeoff { spin: 0.0, flip: 0.0, x1f0, launch_clip: false };
+    }
+    let k = (s.tricks_stat as f32 * 0.6741781 * 0.003921569 + 0.5449139) * 11.5171995;
+    let mut spin = k * s.wind_spin;
+    let mut flip = k * 0.6666667 * s.wind_flip;
+    if s.class == 2 {
+        spin *= 0.6666667;
+    }
+    if s.fakie {
+        flip = -flip;
+    }
+    Takeoff { spin, flip, x1f0: None, launch_clip: true }
+}

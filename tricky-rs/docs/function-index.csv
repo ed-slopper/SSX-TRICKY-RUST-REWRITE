@@ -456,7 +456,7 @@ address,size,name,system,status
 0x126b38,196,Boarder_SetBrakeCrouchInput,boarder,not started
 0x126c00,120,Boarder_SetCrouchTarget,boarder,not started
 0x126c78,440,Boarder_SetBrakeTarget,boarder,not started
-0x126e30,400,Takeoff_SetSpinRates,boarder,not started
+0x126e30,400,Takeoff_SetSpinRates,boarder,checked
 0x126fc0,724,FUN_00126fc0,boarder?,not started
 0x127298,76,Boarder_PlayTakeoffClip,boarder,not started
 0x1272e8,1576,FUN_001272e8,scoring?,not started

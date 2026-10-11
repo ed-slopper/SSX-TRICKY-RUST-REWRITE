@@ -79,7 +79,6 @@ state machine and the renderer are ours. Nothing has been checked against the or
 |---|---|---|---|---|---|
 | G1 | Boarder state machine: every state (0x00–0x14) and motion (0–6), their enter/update/exit, `cBoarder` vtable, in the original's order per tick | unowned | F1 | | [repo] Many states ported one by one; the dispatch is ours |
 | G1a | Prewind, jump, takeoff, spin and flip control (`PrewindState_Update` 0x1050e8, `Jump_ApplyImpulse` 0x1284e0, `Takeoff_SetSpinRates` 0x126e30, `SpinState_Update` 0x100908, `SpinState_StartFromStick` 0x102158) checked | any | F4a | | [repo] Ported, unchecked Split: G1a1, G1a2 |
-| G1a2 | `Takeoff_SetSpinRates` 0x126e30 ported exactly into `tricky-game` and checked bit for bit in the function runner | any | G1a1 | trailrig/heron (2026-10-11) | Split of G1a |
 | G1a3 | The rest of G1a: `PrewindState_Update` 0x1050e8, `SpinState_Update` 0x100908, `SpinState_StartFromStick` 0x102158 checked; `Rider::step` calls the exact jump and spin rates (G1a1, G1a2) | any | G1a2 | | Split of G1a |
 | G1b | Rails checked: `RailSlideMotion_Update` 0x10b0d0, `RailSlideControl_Update` 0x1073e0, `Rail_TryCapture` 0x125cb8 | any | F4a | | [repo] README: rail speeds "still mine"; find what isn't ported |
 | G1c | Finish, reset and gate states: `FinishState_Update` 0x106668, `ResetState_Update` 0x106a90, `Boarder_RequestReset` 0x118f10, `GateAnticipate_*` | any | F4a | | [repo] |
@@ -208,6 +207,7 @@ matches the original.
 | E4a | Character and board models from the player's disc: the `.mpf` reader in `tricky-data/src/mpf.rs` (the loader's tables proven from `SkinPart_Load` 0x205080 and `MpfFile_AddPart` 0x208488, the VIF packets inferred from the data), the game's part-name tables, `CharModel::rider_from_disc` / `board_from_disc`, `TRICKY_DISC` in the app; all 12 riders and 6 board shapes equal the exported models | P1 | ed-slopper/puffin | 2026-10-11 | 82b6fdd |
 | E9a | Every trigger-script op (0–26) and controller type (0–24, 0x100–0x103) listed with its handler or class and what it does (`TriggerScript_ExecOp` 0x13bfd0, `TriggerScript_Op0_SpawnController` 0x13c5d0), port-notes/scripts.md; rows E9b–E9j; 9 functions named (pickups, their score helpers, camera shake) | P1 | trailrig/heron | 2026-10-11 | bc5ef48 |
 | G1a1 | `Jump_ApplyImpulse` 0x1284e0 ported exactly (`tricky-rs/game/src/jump.rs`: cm, the vector unit's order, the game's own cos 50°/70° and sin 20°, the steep-lip branch) and checked bit for bit against the original in the function runner on 6,000 random riders, every branch (`tests/jump.rs`) | P2 | trailrig/heron | 2026-10-11 | 559d4f0 |
+| G1a2 | `Takeoff_SetSpinRates` 0x126e30 ported exactly (`jump::takeoff_spin_rates`: the rates, the no-spin clips 0x218/0x260/0x261, which clip routine runs) and checked bit for bit in the function runner on 5,000 random take-offs, with its callees and their order (`tests/takeoff.rs`) | P2 | trailrig/heron | 2026-10-11 | HASH |
 
 ## Changes to the board
 
@@ -273,3 +273,4 @@ matches the original.
 - 2026-10-11 trailrig/heron: G1a1 done (Jump_ApplyImpulse checked).
 - 2026-10-11 ed-slopper/puffin: claim E4b.
 - 2026-10-11 trailrig/heron: G1a2 split into G1a2 (claimed) and G1a3.
+- 2026-10-11 trailrig/heron: G1a2 done (Takeoff_SetSpinRates checked).
