@@ -4449,3 +4449,52 @@ G 225380 MusicSys_SetSection
 F 24c748 cFELoadFromQuit cFELoadFromQuit
 F 247a60 c2PTrackLoad c2PTrackLoad
 F 245840 c1PTrackLoad c1PTrackLoad
+G 229398 Stream_SetVolume
+G 224e68 MusicSys_PlaySong
+G 2235a0 PathX_GetPositionMs
+G 221fd8 IniReader_ReadInt
+G 21edf0 PtrArray_FreeAll
+G 2151c8 Audio_FreeRaceStream
+G 2138f0 Sfx_PlayMenuSelect
+G 1a8668 Overlay_PlaySelectSound
+G 212210 Audio_SetSpeechLevel
+G 20c3e8 BankMonitor_ResetTimers
+G 20bd68 BankMonitor_AddInstance
+G 20ba00 BankInstance_Stop
+G 20a6b0 BankManager_GetHandle
+G 20a520 BankManager_LoadBank
+G 209ca8 BankInstance_UnloadChain
+G 203fa0 MemBank_AlignSize
+G 2010c8 BdrLoad_LoadRider
+G 1fff30 VideoPlayer_Open
+G 1f9ca0 LoadScreen_LoadTexturePack
+G 1e7da0 Vec3_PackShort
+G 1d8d80 ParticleSys_ReadReplay
+G 1c4d68 PS2Draw_SetState
+G 1c4d30 PS2Draw_SetTexturePage
+G 1c4220 PS2DrawState_Init
+G 1ac580 PauseMenu_PopLevel
+G 1a9f80 HUD_DrawBar
+G 1a82e8 HUD_DrawNumber
+G 1a7e70 Overlay_HideForPlayer
+G 1a7d78 ScreenOverlay_Init
+G 1a7878 Overlay_SetPlayerPad
+G 1a68f8 HUD_WobbleOffset
+G 19c788 Font_Init
+G 19b730 Draw_TexturedRect
+G 199258 MeshAnim_ApplyFrames
+G 199030 AnimNode_TickDelay
+F 18a320 cPopMenuItem cPopMenuItem
+F 189948 cBoolMenuItem cBoolMenuItem
+G 1893a0 Menu_SetSelection
+G 188c50 Menu_SelectNext
+G 185d50 Sky_GetLayer
+G 181470 Game_GetCamera
+G 17f1f0 Game_IsLeadOrFocusRider
+G 17a740 InputRecorder_Playback
+G 17a208 Parse_SkipLine
+G 17a148 Parse_SkipSpace
+G 179e60 Pad_ParseButtonNames
+G 178078 Mat4_TransformVec4
+G 163bb8 Career_IsCourseUnlocked
+G 1637d0 Career_ClearPlayerSlot
