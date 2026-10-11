@@ -17,12 +17,13 @@
 //! - `Boarder_Wipeout` 0x11d830, `Score_Crash` 0x156de0, `Boarder_AddMeter` 0x11b018: all in [`Rider::go_down`]
 //! - rail capture (row G1b) and `Boarder_InstanceCollisions` 0x125088 (row E8b): not done while riding, as before
 
-use super::{stat_byte, wrap, Rider};
+use super::{wrap, Rider};
 use crate::collide::CollisionWorld;
 use crate::ground_motion as gm;
 use crate::jump::{self, JumpState};
 use crate::orient::{self, Orient, TakeOffEnv, TakeOffRider};
 use crate::probe::{self, cross, dot, scale, sub, Hit};
+use crate::stats;
 use crate::surface::SURFACE_TABLE;
 use glam::Vec3;
 
@@ -159,18 +160,13 @@ impl Rider {
         // machine (row G1)
         g.state = if self.hard_land > 0.0 { 0xb } else { 3 };
         g.mask = 0xffff_ffff;
-        g.stats = gm::Stats {
-            speed: st.speed * 255.0,
-            edging: st.edging * 255.0,
-            // STANDIN: our edging for the grip stat (stats+0x13) and our speed for the cubic term (stats+0x19), row G3
-            grip: st.edging * 255.0,
-            cubic: st.speed * 255.0,
-            stance: 0,
-        };
+        // the game's stat bytes (`crate::stats`): speed +0x0e, edging +0x11, grip +0x13 and the cubic term +0x19
+        let b = |i: usize| st.bytes[i] as f32;
+        g.stats = gm::Stats { speed: b(stats::SPEED), edging: b(stats::EDGING), grip: b(stats::GRIP), cubic: b(stats::CUBIC), stance: 0 };
         // STANDIN: our crouch/steer/speed test, for the game's "skate push clip (0x221) playing" (G5)
         g.skating = self.crouch_v > 0.5 && self.steer.abs() < 0.2 && self.vel.length() < 8.33;
 
-        let jump_stat = stat_byte(st.jump);
+        let jump_stat = st.bytes[stats::JUMP];
         let mut env = GroundEnv { r: self, world, left: false, jump_stat };
         gm::update(&mut g, &SURFACE_TABLE, &mut env);
         let left = env.left;

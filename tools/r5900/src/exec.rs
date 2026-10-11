@@ -136,6 +136,15 @@ fn step(r: &mut Runner, pc: u32) -> Result<Next, Error> {
                     }
                     return Ok(Next::Seq);
                 }
+                27 => {
+                    // divu
+                    let (n, d) = (a as u32, b as u32);
+                    if d != 0 {
+                        c.lo = sext32(n / d) as u128;
+                        c.hi = sext32(n % d) as u128;
+                    }
+                    return Ok(Next::Seq);
+                }
                 33 => sext32((a as u32).wrapping_add(b as u32)), // addu
                 35 => sext32((a as u32).wrapping_sub(b as u32)), // subu
                 36 => a & b,
@@ -512,6 +521,17 @@ mod tests {
         assert_eq!(rn.cpu.gpr(10), 0x8468_ACE8);
         let rn = run(&[i(15, 0, 8, 0x8000u16 as i16 as i32)], |_| {});
         assert_eq!(rn.cpu.gpr(8), 0xFFFF_FFFF_8000_0000, "lui sign-extends");
+    }
+
+    #[test]
+    fn divu_divides_unsigned() {
+        // 0xFFFF_FFFE / 3 = 0x5555_5554 remainder 2 (signed div would give -2 / 3 = 0, remainder -2)
+        let rn = run(&[r(0, 4, 5, 0, 0, 27), r(0, 0, 0, 8, 0, 18), r(0, 0, 0, 9, 0, 16)], |rn| {
+            rn.cpu.set_gpr(4, 0xFFFF_FFFE);
+            rn.cpu.set_gpr(5, 3);
+        });
+        assert_eq!(rn.cpu.gpr(8), 0x5555_5554, "lo");
+        assert_eq!(rn.cpu.gpr(9), 2, "hi");
     }
 
     #[test]

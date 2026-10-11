@@ -89,8 +89,9 @@ What `Env` is answered with:
 - the port's own, tagged STANDIN: the walls (a sphere against the drawn mesh, `Rider::walls`, for
   `Boarder_WallCollide` 0x126250 and `Boarder_WallImpactCheck` 0x126540, row E8b), the ray cast under the probe (a
   vertical query of the drawn mesh 2 m over, 1 m under the probe point, for `World_RayCast` 0x25aff8, row E7), the
-  control state (3, or 0xb after a hard landing: no state machine yet, row G1), the stats the port lacks (grip and the
-  cubic term from its edging and speed, the probe's sideways offset 0, rider+0x2c0 = the board's up, rows G3, G16)
+  control state (3, or 0xb after a hard landing: no state machine yet, row G1), the probe's sideways offset 0,
+  rider+0x2c0 = the board's up (rows G20b, G16). The stat bytes the tick reads (speed +0x0e, edging +0x11, grip +0x13,
+  cubic +0x19) and the jump's (+0x17) are the game's exact ones since G20a (section below)
 - `Boarder_Wipeout`, `Score_Crash` and `Boarder_AddMeter` of a crash on surface 6 / 10 are `Rider::go_down` (one call;
   `score_crash` and `add_meter` of the `Env` do nothing); inside the Megaplex tube the crash is skipped (ours, row E9)
 - the crash spray (`cBoarder::EmitBrakeSpray` 0x11a798) is recorded in `Rider::crash_spray` (position, velocity, normal),
@@ -263,3 +264,40 @@ Riding switch (rider+0x1b4) mirrors the inputs of modes 4 and 9.
   `boarder::WIND_CLIPS`): centre when both wind-ups are 0, else by atan2(flip, spin) (negated riding switch): back past
   157.5°, then 112.5°, 67.5°, 22.5° up and −112.5°, −67.5°, −22.5° down, else forward.
 
+
+## The stat bytes (proven, G20a; exact in `tricky-rs/game/src/stats.rs`, `tests/stats.rs`)
+
+A rider's stats are 16 bytes at stats+0x0e..0x1d of its slot's entry in the race table (`gRace_Entries` 0x32db70, 0x84
+a slot, count `gRace_EntryCount` 0x32db6c; `rider+0x464` points at the entry, `Boarder_SetRiderInfo` 0x116a68 sets it).
+`Career_PrepareRace` 0x163980 → `Career_SetupRidersForMode` 0x165558 → `Career_BuildRaceRiders` 0x165cf0 fills the
+entries, one call per slot: `Career_SetupPlayerRider` 0x16a9d8 for a human, `Career_SetupAIRider` 0x16ae68 for the
+computer riders.
+
+- the entry starts as the rider's 16 base bytes (`gRider_Table` 0x331ea8: 0x38 a rider, id in word 0, bytes +0x0c..0x1b
+  the base, +0x1c..0x1f the four caps, word +0x20 the weight). Four groups of those bytes (`gStat_Groups` 0x335260: a
+  count then the byte positions) are mixed; the rest stay at the base:
+
+  | group | stat | bytes (stats+) | base bytes |
+  |---|---|---|---|
+  | 0 | edging | 0x11, **0x13 grip** | 3, 5 |
+  | 1 | speed | 0x0e, **0x19 cubic drag** | 0, 11 |
+  | 2 | stability | 0x12, 0x16 | 4, 8 |
+  | 3 | tricks | 0x14, 0x1a, 0x1d (the meter's stat1d) | 6, 12, 15 |
+
+  Bytes in no group: 1, 2, 7 (the gate), 9 (**+0x17 jump**), 10 (+0x18 wind-up), 13, 14. The bytes of one group hold
+  the same base in all 12 riders, so grip is the edging value and the cubic term the speed value: the port's guess
+  (grip from its edging, cubic from its speed) was the right shape, only not the integers.
+- player: `avg` = `Career_AverageStatGroups` 0x16b298 (each group's base bytes, integer mean); `frac` = (level − avg) /
+  (100 − avg) in floats (0 when avg is 100, may be negative), level = the career's byte for the group (career record
+  +0xc..+0xf); a grouped byte = trunc(0.2·bonus + (base + frac·(100 − base))·0.8), the bonus the board's byte of the group
+  (`gBoard_Table` 0x332148: 12 boards a rider, 20 bytes each, the four bonuses at +16).
+  With `gCheat_MaxAttrib` (0x3352ac), the entry's +0x80 not 2 (set to 0 by the word at 0x3352b8) or the Mallora cheat on
+  rider 7, every grouped byte is the rider's cap byte instead; game mode 6 (tutorial, 0x32de8c) always mixes.
+- computer: no board; `frac` = min(1, (value·0.25) / (100 − avg)), the value the caller's `*param_3` (the rival level,
+  null = bare base bytes); a grouped byte = trunc(base + 0 + frac·(100 − base)); the cap byte with `gCheat_MaxAttrib`.
+- last, both: every byte b becomes b·255/100 (integers): 70 → 178, so the jump stat is 178, not our rounded 179.
+- checked: both set-ups run in the function runner on 20,000 random riders, boards, levels, cheats and modes each, the 16
+  bytes bit for bit; the tables (groups, bases, caps, weights, 144 board bonuses, trickdata's attributes) equal the exe's.
+- not done: where the career's level bytes come from (training points; row G3 — the port feeds the training fraction
+  between each group's start and cap, STANDIN), the computer riders' value (their rival level, row G20a2), and the stat
+  bytes other code still takes from the port's floats (tricks → `Boarder_AddMeter`, wind-up, gate, stability).

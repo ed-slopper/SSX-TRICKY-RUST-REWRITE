@@ -118,3 +118,25 @@ fn steering_turns_the_board_on_the_snow() {
     // port steer: +1 right. Facing −z, right is +x
     assert!(right.pos.x > left.pos.x + 0.5, "left x {} right x {}", left.pos.x, right.pos.x);
 }
+
+#[test]
+fn riders_carry_the_games_stat_bytes() {
+    // row G20a: `Stats::of` leaves the 16 bytes `Career_SetupPlayerRider` 0x16a9d8 would, from the rider's base bytes,
+    // the board's bonus and a level per group (ours: the training fraction between the start and the cap)
+    use tricky_game::rider::Stats;
+    use tricky_game::stats::{self, BASE, CAPS, CUBIC, EDGING, GRIP, JUMP, SPEED};
+    use tricky_game::trickdata::{BOARDS, RIDERS};
+    for (i, d) in RIDERS.iter().enumerate() {
+        let board = &BOARDS[i][0];
+        for t in [0.0f32, 1.0] {
+            let b = Stats::of(d, t, board).bytes;
+            let level = |v: (u8, u8)| if t == 0.0 { v.0 } else { v.1 };
+            let want = stats::player_bytes(&BASE[i], &CAPS[i], board.bonus, [level(d.edging), level(d.speed), level(d.stability), level(d.tricks)], false);
+            assert_eq!(b, want, "{} at training {t}", d.name);
+            // grip is the edging group's second byte and the cubic term the speed group's: one value each
+            assert_eq!((b[GRIP], b[CUBIC]), (b[EDGING], b[SPEED]), "{}", d.name);
+            // the jump is the rider's base byte in the game's integer scaling: 70 → 178, not our rounded 179
+            assert_eq!(b[JUMP] as i32, d.jump as i32 * 255 / 100, "{}", d.name);
+        }
+    }
+}

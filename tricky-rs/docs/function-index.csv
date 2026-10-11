@@ -1383,14 +1383,14 @@ address,size,name,system,status
 0x169e38,2876,Career_InitStaticTables,race?,not started
 0x16a978,28,FUN_0016a978,race?,not started
 0x16a998,60,FUN_0016a998,race?,not started
-0x16a9d8,1164,Career_SetupPlayerRider,race?,not started
-0x16ae68,872,Career_SetupAIRider,race?,not started
+0x16a9d8,1164,Career_SetupPlayerRider,race?,ported
+0x16ae68,872,Career_SetupAIRider,race?,ported
 0x16b1d0,36,FUN_0016b1d0,race?,not started
 0x16b1f8,36,FUN_0016b1f8,race?,not started
 0x16b220,36,Career_GetRiderAttrib,race?,not started
 0x16b248,36,FUN_0016b248,race?,not started
 0x16b270,36,FUN_0016b270,race?,not started
-0x16b298,152,Career_AverageStatGroups,race?,not started
+0x16b298,152,Career_AverageStatGroups,race?,checked
 0x16b330,196,Course_GetDifficultyString,race,not started
 0x16b3f8,196,Course_GetLocationString,race,not started
 0x16b4c0,196,Course_GetVerticalDropString,race,not started

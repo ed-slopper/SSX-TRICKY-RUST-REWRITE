@@ -124,9 +124,19 @@ pub struct Stats { pub edging: f32, pub speed: f32, pub stability: f32, pub tric
     pub kind: u8, pub meter_leak: f32,
     /// the fixed gate-start stat (stat byte 7, the same on every board): how fast the rider winds
     /// up in the gate and pushes out
-    pub gate: f32 }
+    pub gate: f32,
+    /// the game's 16 stat bytes (stats+0x0e..0x1d, `crate::stats`), as `Career_SetupPlayerRider` 0x16a9d8 leaves them:
+    /// the ground tick reads speed, edging, grip and the cubic term from them, the jump its stat byte
+    pub bytes: [u8; 16] }
 impl Default for Stats {
-    fn default() -> Self { Self { edging: 0.5, speed: 0.5, stability: 0.5, tricks: 0.5, jump: 0.75, windup: 0.75, weight: 75.0, alpine: false, kind: 1, meter_leak: 0.5, gate: 0.7 } }
+    /// STANDIN: a neutral rider for tests: the bytes are our fractions as bytes, for the game's career (row G3)
+    fn default() -> Self {
+        let mut bytes = [0u8; 16];
+        for (i, f) in [(crate::stats::SPEED, 0.5), (crate::stats::EDGING, 0.5), (crate::stats::GRIP, 0.5), (crate::stats::CUBIC, 0.5), (crate::stats::JUMP, 0.75)] {
+            bytes[i] = stat_byte(f);
+        }
+        Self { edging: 0.5, speed: 0.5, stability: 0.5, tricks: 0.5, jump: 0.75, windup: 0.75, weight: 75.0, alpine: false, kind: 1, meter_leak: 0.5, gate: 0.7, bytes }
+    }
 }
 impl Stats {
     /// A new rider or a fully trained one, on the chosen board: the game's own mix of 80% rider
@@ -136,7 +146,13 @@ impl Stats {
     pub fn of(d: &RiderData, training: f32, board: &crate::trickdata::Board) -> Self {
         let t = training.clamp(0.0, 1.0);
         let f = |v: (u8, u8), g: usize| (0.8 * (v.0 as f32 + (v.1 as f32 - v.0 as f32) * t) + 0.2 * board.bonus[g] as f32) / 100.0;
-        Self { edging: f(d.edging, 0), speed: f(d.speed, 1), stability: f(d.stability, 2), tricks: f(d.tricks, 3),
+        // the game's stat bytes (`Career_SetupPlayerRider` 0x16a9d8). STANDIN: each group's level is our training
+        // fraction between its start and its cap, for the career's level bytes (row G3)
+        let bytes = crate::trickdata::RIDERS.iter().position(|r| r.name == d.name).map_or([0; 16], |i| {
+            let lvl = |v: (u8, u8)| (v.0 as f32 + (v.1 as f32 - v.0 as f32) * t).round() as u8;
+            crate::stats::player_bytes(&crate::stats::BASE[i], &crate::stats::CAPS[i], board.bonus, [lvl(d.edging), lvl(d.speed), lvl(d.stability), lvl(d.tricks)], false)
+        });
+        Self { edging: f(d.edging, 0), speed: f(d.speed, 1), stability: f(d.stability, 2), tricks: f(d.tricks, 3), bytes,
                jump: d.jump as f32 / 100.0, windup: d.windup as f32 / 100.0, weight: d.weight as f32, alpine: board.kind == 2, kind: board.kind, meter_leak: 0.5,
                gate: match d.name { "Kaori" | "Marisol" => 0.80, "Luther" => 0.64, "Mac" => 0.85, "Moby" | "Seeiah" => 0.75, "Zoe" => 0.82, "JP" => 0.88, _ => 0.70 } }
     }

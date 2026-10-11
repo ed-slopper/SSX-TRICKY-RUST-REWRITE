@@ -2882,6 +2882,11 @@ D 337c58 gApp
 D 3352a0 gCheat_UnlockEverything
 D 3352ac gCheat_MaxAttrib
 D 3352b0 gCheat_Mallora
+D 32db6c gRace_EntryCount
+D 32db70 gRace_Entries
+D 331ea8 gRider_Table
+D 332148 gBoard_Table
+D 335260 gStat_Groups
 G 2fb2b4 memcpy
 G 2fb468 memset
 G 2fca28 sprintf
