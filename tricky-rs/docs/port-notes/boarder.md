@@ -589,16 +589,44 @@ So after `Boarder_PlaceAt` the board lies as placed until the landing, and the g
 `Rider::att` = (`orient::placed_attitude(placed_heading(yaw), None)`, the port's yaw it was made for), set by
 `Rider::new` (the start line) and `Rider::respawn`. `Rider::seed_ground` takes it while the port's yaw equals the
 one it was made for (the port turns the yaw in the air with the spin), instead of rebuilding the attitude from yaw and
-normal; the first ground tick takes it (`att = None`: the game-side rider's own quaternion goes on), and so does a
-take-off (`Rider::take_off`) and any spin or flip in the air (`Rider::step`, after `air_rotation`). Checked: the
+normal; the first ground tick takes it (`att = None`: the game-side rider's own quaternion goes on), and so does any
+spin or flip in the air (`Rider::step`, after `air_rotation`); a take-off replaces it with the ground tick's own (G20c3c,
+below). Checked: the
 quaternion, forward, side, up and heading of the seed equal the real `Boarder_PlaceAt`'s bit for bit for 3,000 yaws
 (respawn and new), and after a real drop onto a slope in `Rider::step` (the rider lands with the attitude still the
 placed one; a spin drops it).
 
 Left (STANDIN, rows from this one): the placement's own ray cast is not made at a respawn (E7), so a respawn on a
-slope starts flat instead of tipped to the slope (the ground tick turns it, 1/12 a tick); the attitude at a take-off
-is not kept through the jump's air (row G20c3c); a landing from a spin or flip is `SpinState_Update`'s alignment, not
-wired (G1a5b3b, G5); the wall bump in the air is the port's own.
+slope starts flat instead of tipped to the slope (the ground tick turns it, 1/12 a tick); a landing from a spin or
+flip is `SpinState_Update`'s alignment, not wired (G1a5b3b, G5); the wall bump in the air is the port's own.
+
+### ... and at a take-off (row G20c3c; checked: `tests/takeoff_attitude.rs`)
+
+A jump off the snow keeps the attitude the same way. The take-off tick is `GroundMotion_Update` 0x10a0d8 (its turns:
+the yaw toward the velocity, the lean toward the ground's normal) ending in `Boarder_TakeOff` 0x128470, which sets the
+motion (air), `Jump_ApplyImpulse` 0x1284e0 (velocity only) and the spin rates; none of them writes rider+0x170, the
+axes +0x180..+0x1a0 or the heading +0x1b0, and the air motion does not either (see above). So the attitude at the
+landing is the one the take-off tick left (proven: the real `AirMotion_Update` leaves it as it was on every tick of
+a free flight, in the test).
+
+`Rider::take_off` takes the quaternion and axes of the ground tick's game-side rider (`GroundCache::attitude`, kept in
+`Rider::gm` since the last ground tick) into `Rider::att`, with the port's yaw it was made for, when the port has not
+moved the rider since (`GroundCache::is_at`); a take-off with no game-side rider (from a rail or the air) keeps what the
+rider already keeps. `Rider::seed_ground` starts the landing's first ground tick from it while the yaw is the same and
+there is no spin or flip. The ground tick's input is built by `Rider::ground_input`, public so the test can run the real
+function on exactly what the port hands its own.
+
+Checked in the function runner (the player's `SLUS_203.26`): 1,500 random riders on a plain riding state with no
+ground under the board (the tick ends in `Boarder_TakeOff`), the real `GroundMotion_Update` on `ground_input`'s result
+and the port's `ground_tick` + `take_off`: the quaternion, the three axes and the heading equal bit for bit; then 1 to
+24 real `AirMotion_Update` ticks (nothing hit) leave them unchanged, and `seed_ground` after as many port air steps
+equals them. 939 more cases were set aside because the original calls `Boarder_SetState` (a revert or landing state, which
+the port's tick runs through `states::set_state`, checked in `tests/state_routines.rs`). The rebuilt attitude (before this
+row) differs from the original's in all of 200 cases, and a spin in the air still drops the kept one.
+
+Left (STANDIN, rows from this one): a jump with spin or flip (the kept attitude is dropped; the landing's alignment is
+`SpinState_Update`'s, G20c3c2, G1a5b3b); the air's wall bump (`AirMotion_Update`'s turn at most 0x3dd67750 rad; the
+port's air walls are `Rider::walls`, G20c3c3, E8b); a take-off from a rail (G20c2c3).
 
 ## The board's frame and the body height (row G16; checked: `tests/pose.rs`)
 

@@ -632,7 +632,33 @@ impl Rider {
     /// One tick on the snow: `GroundMotion_Update` 0x10a0d8 (`crate::ground_motion::update`). `boost_level` is
     /// rider+0x130. Returns true when the rider left the snow (`Boarder_TakeOff` ran). The port's position, velocity,
     /// yaw, normal, height, surface, switch and steer are written back.
-    pub(super) fn ground_tick(&mut self, world: &CollisionWorld, dt: f32, boost_level: f32) -> bool {
+    pub fn ground_tick(&mut self, world: &CollisionWorld, dt: f32, boost_level: f32) -> bool {
+        let mut g = self.ground_input(dt, boost_level);
+        let st = &self.stats;
+        let jump_stat = st.bytes[stats::JUMP];
+        let mut env = GroundEnv { r: self, world, left: false, jump_stat };
+        gm::update(&mut g, &SURFACE_TABLE, &mut env);
+        let left = env.left;
+
+        // back to the port
+        self.pos = to_port(g.p.pos, 0.01);
+        self.vel = to_port(g.vel, 0.01);
+        self.yaw = wrap(g.yaw - HALF_PI);
+        self.normal = to_port(g.p.normal, 1.0);
+        self.height = g.p.height * 0.01;
+        self.surface = g.p.surface.min(19) as u8;
+        self.switch = g.switch != 0;
+        self.steer = -g.steer;
+        self.lean[0] = g.p.x244;
+        self.gm = Some(GroundCache { g, pos: self.pos, vel: self.vel, yaw: self.yaw });
+        left
+    }
+
+    /// The game-side rider `GroundMotion_Update` 0x10a0d8 is handed this tick: the one kept from the last tick (or
+    /// seeded from the port's, [`Rider::seed_ground`]) with what the port feeds every tick written over it (time scale,
+    /// boost, steer, the stat bytes, the control state ...). Takes the kept rider out of `self.gm`; `ground_tick` puts
+    /// the tick's result back. Public so a test can run the original on the same input (row G20c3c).
+    pub fn ground_input(&mut self, dt: f32, boost_level: f32) -> gm::Rider {
         // the game-side rider: kept while the port left it alone
         let mut g = match self.gm.take() {
             Some(c) if c.pos == self.pos && c.yaw == self.yaw => {
@@ -682,24 +708,7 @@ impl Rider {
         g.stats = gm::Stats { speed: b(stats::SPEED), edging: b(stats::EDGING), grip: b(stats::GRIP), cubic: b(stats::CUBIC), stance: 0 };
         // STANDIN: our crouch/steer/speed test, for the game's "skate push clip (0x221) playing" (G5)
         g.skating = self.crouch_v > 0.5 && self.steer.abs() < 0.2 && self.vel.length() < 8.33;
-
-        let jump_stat = st.bytes[stats::JUMP];
-        let mut env = GroundEnv { r: self, world, left: false, jump_stat };
-        gm::update(&mut g, &SURFACE_TABLE, &mut env);
-        let left = env.left;
-
-        // back to the port
-        self.pos = to_port(g.p.pos, 0.01);
-        self.vel = to_port(g.vel, 0.01);
-        self.yaw = wrap(g.yaw - HALF_PI);
-        self.normal = to_port(g.p.normal, 1.0);
-        self.height = g.p.height * 0.01;
-        self.surface = g.p.surface.min(19) as u8;
-        self.switch = g.switch != 0;
-        self.steer = -g.steer;
-        self.lean[0] = g.p.x244;
-        self.gm = Some(GroundCache { g, pos: self.pos, vel: self.vel, yaw: self.yaw });
-        left
+        g
     }
 
     /// STANDIN: the motion id (rider+0x424: 1 air, 2 ground, 3 rail, 5 wipeout) from the port's own flags, for the
