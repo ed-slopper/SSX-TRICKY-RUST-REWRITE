@@ -185,3 +185,18 @@ Types 1, 3 and 4 spawn nothing.
   0.4 × size against the speed's direction, when ≥ 0.25: a free neighbour gets a fence node (which passes it on to
   both sides in 4 frames), a fence neighbour gets `Fence_Swing`. Update: angle += speed; at either end it bounces at
   half the size; at rest (size and |angle| < 0.01) Finish(1). The mesh bending is drawing (`FenceNode_UpdateShape`).
+
+## Texture animation (row E9i; `tricky_game::texanim`, checked: `tests/texanim.rs`)
+
+- UV scroll (10): op words mode, du, dv, run (s), pause (s), life (s). Each frame the clock gains 1/60; moving for
+  `run` seconds then (with a pause) still for `pause`; modes 1 and 2 reverse the step at each turn, mode 1 also eases
+  (the step × the time from the nearer end / run). The offsets wrap at ±1. Messages 1–6 set step, run / pause
+  (0..60) and the offsets (−4..4). Contacts run the object's contact script with a 30-frame cooldown. Each scrolled
+  model takes a slot of the 128-entry registry 0x31d938 (model, users) — the first free slot, unless its model is
+  there already.
+- Flip-book (11): op words start frame (below 0: one of the first eight at random; −2 also random at each step),
+  backwards, rate (frames a second), life, mode. Mode 0 steps forward or back (wrapping), modes 1 / 2 flicker: a step
+  at 10 a second, then one at the base rate × (0.25 + 0.75·random). `TexFlip_SetFrame` clamps to the last frame; a
+  negative frame there is random (1 for three frames or fewer). Messages: 1 rate, 2 frame (rounded up, 0..9), 3 next
+  frame (wrapping to 1), 4 shown. The random number is `Rand_Fx`'s word made a float in [0, 1).
+- Both (19): the scroll and a flip-book from op words 8–11 (start, rate, mode, backwards), the flip stepped first.
