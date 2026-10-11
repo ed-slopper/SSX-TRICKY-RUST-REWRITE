@@ -312,7 +312,8 @@ fn world_casts_match_the_original() {
                 Some(Cell { min: f3(m, tg), max: f3(m, tg + 12), nodes })
             })
             .collect();
-        let world = World { origin: [m.read_f32(grid + 4), m.read_f32(grid + 8)], size: m.read_f32(grid + 0x28), width, height, nodes_per_cell: per, cells, patches, objects, models, collision };
+        let trees = ssf.sphere_trees.iter().map(|g| g.iter().map(tricky_game::sphtree::SphereTree::new).collect()).collect();
+        let world = World { trees, origin: [m.read_f32(grid + 4), m.read_f32(grid + 8)], size: m.read_f32(grid + 0x28), width, height, nodes_per_cell: per, cells, patches, objects, models, collision };
 
         // the casts' stubs: the patch cache and a patch's own test
         let salt = Rc::new(std::cell::Cell::new(0u32));

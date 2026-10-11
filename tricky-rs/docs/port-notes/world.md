@@ -125,6 +125,22 @@ Part of the port notes (index: [README.md](README.md)); units and wording as des
   0x238640: the bounding sphere's; with a mask the game tests the bounding sphere again for each named sphere
   (a slip in the game: same answer, or none if the mask names no sphere).
 
+## Sphere trees in the world (row E7a4; `tricky_game::sphtree`, checked: `tests/sphtree.rs`)
+
+- A tree in the world (0x150 bytes, `SphereTree::SphereTree` 0x239ba8): +0x10 the eight children's directions, from
+  the table 0x3439d0 (±1 per axis, x the index's high bit; zero in the file, filled by start-up code 0x23bab0),
+  +0x90 its centre (w 1), +0xa0 its header (+0xd0: `SphTree_Load`). `SphTree_SetTransform` 0x239d60 puts
+  directions 0..3 through a matrix (4..7 their opposites) and the file's centre.
+- A packed tree (header +8 set) has its occupancy bytes run-length coded; `SphereTreeCache_Get` 0x238f50 decodes
+  them into a round-robin cache with `SphTree_RleDecode` 0x239b20 (a count byte c: c < 0 copies −c bytes, c > 0
+  repeats the next byte c + 1 times, 0 ends).
+- `SphTree_SphereRecurse` 0x23a728(r, c, node, level, index): R = r + the level's radius; if |c − node|² < R²: below
+  the depth with an occupied node, each child k (node + direction·the next level's half-size, index (k + 1)·the
+  level's stride + index) until one answers; else a leaf: penetration unit(c − node)·(R − |c − node|), contact
+  c − n·(r − that).
+- `Collide_BoarderSphTree` 0x2394a8: the body's bounding sphere, then each sphere (all of them, whatever the mask):
+  the first that touches (when the bounding one touches but no sphere does, no hit).
+
 ## World casts (row E7a2; `tricky_game::world`, checked: `tests/world.rs`)
 
 - The course object at 0x346488: +0 the `.ltg` grid, +4 the `.pbd`, +8 / +0xc material blocks and flips, +0x10 its

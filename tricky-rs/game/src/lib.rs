@@ -39,6 +39,7 @@ pub mod rivals;
 pub mod scenery;
 pub mod score;
 pub mod script;
+pub mod sphtree;
 pub mod spin;
 pub mod states;
 pub mod stats;

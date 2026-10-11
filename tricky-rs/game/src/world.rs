@@ -6,6 +6,7 @@
 //! own test goes through the patch cache (row E7c) and is the caller's ([`WorldEnv::patch`]).
 
 pub use crate::terrain::LastHit;
+use crate::sphtree::SphereTree;
 use crate::worldline::{Hit, WorldLine};
 
 type V4 = [f32; 4];
@@ -26,8 +27,8 @@ pub trait Shape {
     fn reject(&self, normal: V4) -> bool;
     /// +0x40
     fn boxed(&self, lo: V4, hi: V4) -> Option<Hit>;
-    /// +0x38: sphere tree `n` of group `group`
-    fn sphere_tree(&self, group: usize, n: usize) -> Option<Hit>;
+    /// +0x38: a sphere tree
+    fn sphere_tree(&self, tree: &SphereTree) -> Option<Hit>;
     /// `World_RayCastMeshTris` with this shape's +0x28 / +0x30
     fn mesh(&self, m: &CollMesh, either_side: bool) -> Option<Hit>;
 }
@@ -57,7 +58,7 @@ impl Shape for WorldLine {
     fn boxed(&self, lo: V4, hi: V4) -> Option<Hit> {
         WorldLine::boxed(self, lo, hi)
     }
-    fn sphere_tree(&self, _: usize, _: usize) -> Option<Hit> {
+    fn sphere_tree(&self, _: &SphereTree) -> Option<Hit> {
         None
     }
     fn mesh(&self, m: &CollMesh, either_side: bool) -> Option<Hit> {
@@ -150,6 +151,8 @@ pub struct World {
     pub objects: Vec<Object>,
     pub models: Vec<Vec<Part>>,
     pub collision: Vec<Vec<CollMesh>>,
+    /// the sphere-tree groups (course+0x18), for collision mode 3
+    pub trees: Vec<Vec<SphereTree>>,
 }
 
 /// The result record a cast fills (15 words): +0 what was hit (0 ground, 1 a touch object, 2 an animated part),
@@ -330,7 +333,7 @@ impl World {
                 3 => {
                     tree = Some((obj.group as usize, n_mesh));
                     n_mesh += 1;
-                    q.sphere_tree(obj.group as usize, n_mesh - 1)
+                    self.trees.get(obj.group as usize).and_then(|g| g.get(n_mesh - 1)).and_then(|t| q.sphere_tree(t))
                 }
                 _ => {
                     let cm = self.collision.get(obj.group as usize).and_then(|g| g.get(n_mesh));

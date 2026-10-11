@@ -3,9 +3,11 @@
 //! `Boarder_WallCollide` and `Boarder_InstanceCollisions` use it, with `Collide_SphereTriangle` 0x236bb8, its
 //! front-only 0x237480 and either-side 0x237d50 forms, `Collide_BoarderBox` 0x238640 / `Collide_SphereBox`
 //! 0x23b6e8 and `CollBody_GetActiveBounds` 0x236830. A hit's "t" is the depth it reaches into the surface.
-//! Checked in the function runner (`tests/worldboarder.rs`). Sphere trees (+0x38): row E7a4.
+//! Checked in the function runner (`tests/worldboarder.rs`); its sphere trees (+0x38, [`SphereTree::body`]) in
+//! `tests/sphtree.rs`.
 
 use crate::collbody::CollBody;
+use crate::sphtree::SphereTree;
 use crate::world::{CollMesh, Shape};
 use crate::worldline::{tri_contains_point, Hit};
 
@@ -324,8 +326,9 @@ impl Shape for WorldBoarder {
     fn boxed(&self, lo: V4, hi: V4) -> Option<Hit> {
         boarder_box(&self.body, lo, hi).map(|(pen, p)| Self::hit(pen, p))
     }
-    fn sphere_tree(&self, _: usize, _: usize) -> Option<Hit> {
-        None
+    /// +0x38 (0x257af8): `Collide_BoarderSphTree`
+    fn sphere_tree(&self, tree: &SphereTree) -> Option<Hit> {
+        tree.body(&self.body).map(|(pen, p)| Self::hit(pen, p))
     }
     /// `World_RayCastMeshTris` with +0x28 / +0x30
     fn mesh(&self, m: &CollMesh, either_side: bool) -> Option<Hit> {
