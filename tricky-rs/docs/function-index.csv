@@ -563,13 +563,13 @@ address,size,name,system,status
 0x1383b0,132,FUN_001383b0,boarder?,not started
 0x138438,40,cComputer::vf8_138438,boarder?,not started
 0x1384b8,368,cComputer::GetControls,ai?,not started
-0x138628,448,FUN_00138628,ai?,not started
-0x1387e8,468,FUN_001387e8,ai?,not started
+0x138628,448,AIComputer_ControlsCountdown,ai,not started
+0x1387e8,468,AIComputer_ControlsRide,ai,not started
 0x1389c0,8,FUN_001389c0,ai?,not started
-0x1389c8,244,FUN_001389c8,boarder?,not started
-0x138ac0,160,FUN_00138ac0,ai?,not started
-0x138b60,84,FUN_00138b60,boarder?,not started
-0x138bb8,420,FUN_00138bb8,ai?,not started
+0x1389c8,244,AIComputer_ControlsDispatch,ai,not started
+0x138ac0,160,AIComputer_ControlsTurnAround,ai,not started
+0x138b60,84,AIComputer_ControlsIdle,ai,not started
+0x138bb8,420,AIComputer_ControlsAir,ai,not started
 0x138d60,1200,AIComputer_AirTrickInput,ai,ported
 0x139210,148,FUN_00139210,ai?,not started
 0x1392a8,312,AIComputer_FindJumpMarker,ai,not started
@@ -582,9 +582,9 @@ address,size,name,system,status
 0x139ab8,672,AIComputer_CheckStuck,ai,not started
 0x139d58,516,AIComputer_PlanJumpTrick,ai,ported
 0x139f60,196,AIComputer_SetThrottle,ai,not started
-0x13a028,200,FUN_0013a028,ai?,not started
+0x13a028,200,AIComputer_SetTuck,ai,not started
 0x13a0f0,304,AI_RubberBandSpeedScale,ai,ported
-0x13a220,144,FUN_0013a220,ai?,not started
+0x13a220,144,AIComputer_UpdateSkillScale,ai,not started
 0x13a2b0,424,AI_InitSkill,ai,not started
 0x13a460,84,cComputer::SaveSnapshot,save,not started
 0x13a520,124,StaticInit_Computer,other,not started
@@ -647,7 +647,7 @@ address,size,name,system,status
 0x13b978,180,cScriptNode::cScriptNode,world,not started
 0x13ba30,164,TriggerScript_SetContext,world,not started
 0x13bad8,176,World_RunScript,world,not started
-0x13bbc0,180,FUN_0013bbc0,ai?,not started
+0x13bbc0,180,World_DeleteScriptObject,world,not started
 0x13bc78,168,cScriptNode::cScriptNode,world,not started
 0x13bd20,20,cScriptNode::~cScriptNode,world,not started
 0x13bd38,8,cScriptNode::Update,world,not started
@@ -673,7 +673,7 @@ address,size,name,system,status
 0x13e6a0,448,FUN_0013e6a0,world?,not started
 0x13e860,72,cRollerNode::Finish,world,not started
 0x13e8a8,1156,cRollerNode::Update,world,not started
-0x13ed30,116,FUN_0013ed30,world?,not started
+0x13ed30,116,RollerNode_Translate,world?,not started
 0x13eda8,1412,RollerNode_Collide,world?,not started
 0x13f330,280,FUN_0013f330,world?,not started
 0x13f448,380,Roller_OnHit,world?,not started
@@ -700,8 +700,8 @@ address,size,name,system,status
 0x1402f8,64,cRailNode::Kill,world,not started
 0x140338,92,cRailNode::Finish,world,not started
 0x140398,40,cRailNode::OnMessage,world,not started
-0x1403c0,60,FUN_001403c0,world?,not started
-0x140400,60,FUN_00140400,world?,not started
+0x1403c0,60,RailNode_Enable,boarder,not started
+0x140400,60,RailNode_Disable,boarder,not started
 0x140440,84,cRailNode::SaveSnapshot,save,not started
 0x140498,248,cBoostNode::cBoostNode,world,not started
 0x140590,160,cBoostNode::cBoostNode,world,not started
@@ -763,7 +763,7 @@ address,size,name,system,status
 0x143800,108,cFenceNode::~cFenceNode,world,not started
 0x143870,184,cFenceNode::cFenceNode,world,not started
 0x143928,476,Fence_SpawnWobble,world?,not started
-0x143b08,92,FUN_00143b08,world?,not started
+0x143b08,92,Fence_Swing,world?,not started
 0x143b68,356,cFenceNode::Update,world,not started
 0x143cd0,808,FenceNode_UpdateShape,world?,not started
 0x143ff8,1068,FenceNode_InitShape,world?,not started
@@ -830,7 +830,7 @@ address,size,name,system,status
 0x1481d0,72,cParticleNode::SaveSnapshot,save,not started
 0x148218,168,FUN_00148218,frontend?,not started
 0x1482c0,144,FUN_001482c0,frontend?,not started
-0x148350,292,FUN_00148350,frontend?,not started
+0x148350,292,CamAnim_SetShot,frontend?,not started
 0x148478,76,cCollideEmitterNode::vf12_148478,world,not started
 0x148560,284,cCollideEmitterNode::cCollideEmitterNode,world,not started
 0x148680,196,cCollideEmitterNode::cCollideEmitterNode,world,not started
@@ -847,7 +847,7 @@ address,size,name,system,status
 0x148d20,8,cMovieNode::Update,world,not started
 0x148d28,152,cMovieNode::Draw,world,not started
 0x148dc0,8,cMovieNode::SaveSnapshot,save,not started
-0x148dc8,112,FUN_00148dc8,ai?,not started
+0x148dc8,112,cRailManNode::cRailManNode,world,not started
 0x148e38,156,cRailManNode::cRailManNode,world,not started
 0x148ed8,148,RailMan_ApplyRailState,boarder,not started
 0x148f70,188,cRailManNode::~cRailManNode,world,not started

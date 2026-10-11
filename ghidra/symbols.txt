@@ -5584,3 +5584,18 @@ G 2b8e68 Cstring_Mid
 G 26ce08 FEKey_IsAccept
 G 26ce30 FEKey_IsBack
 G 25a028 Lights_InsertStrongest
+G 138628 AIComputer_ControlsCountdown
+G 1387e8 AIComputer_ControlsRide
+G 1389c8 AIComputer_ControlsDispatch
+G 138ac0 AIComputer_ControlsTurnAround
+G 138b60 AIComputer_ControlsIdle
+G 138bb8 AIComputer_ControlsAir
+G 13a028 AIComputer_SetTuck
+G 13a220 AIComputer_UpdateSkillScale
+G 13bbc0 World_DeleteScriptObject
+G 13ed30 RollerNode_Translate
+G 1403c0 RailNode_Enable
+G 140400 RailNode_Disable
+G 143b08 Fence_Swing
+G 148350 CamAnim_SetShot
+F 148dc8 cRailManNode cRailManNode
