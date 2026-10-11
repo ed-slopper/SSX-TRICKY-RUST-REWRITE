@@ -62,7 +62,7 @@ state machine and the renderer are ours. Nothing has been checked against the or
 | E10 | Input: pad reading, stick shaping and dead zones, button bits (the chord 0x600), vibration, `cCheatCodes::Update` 0x26CF60 | unowned | E1 | | [repo] findings.md |
 | E11 | Camera: named cameras `cBxCamera_EvalNamedCam` 0x174888 (ported), director scripts `cBxCamera_RunDirectorScript`, replay and finish cameras, camera collision | any | | | [repo] Chase cam ported in `rider.rs`; free camera is ours (keep, tag) |
 | E12 | Save and load: the memory-card profile, options, records, unlocks (`Profile_ResetNewGame` 0x161b40), in our own save file with the same fields | unowned | E1 | | [repo] `tricky-save.json` is the stand-in |
-| E13 | The surface table's untraced words: find what reads `SurfaceTable_Init` 0x256188 words [10], [17..24] (rider+0x290 row) and port them | any | E8f | | Gap of E8f. Values are in `tricky-rs/game/src/surface.rs` |
+| E13 | The surface table's untraced words: find what reads `SurfaceTable_Init` 0x256188 words [10], [17..24] (rider+0x290 row) and port them | any | E8f | trailrig/heron (2026-10-11) | Gap of E8f. Values are in `tricky-rs/game/src/surface.rs` |
 
 ## P2 Gameplay systems
 
@@ -233,3 +233,4 @@ matches the original.
 - 2026-10-11 ed-slopper/puffin: E2 done.
 - 2026-10-11 ed-slopper/puffin: claim E2a.
 - 2026-10-11 ed-slopper/puffin: E2a done; claim E2b.
+- 2026-10-11 trailrig/heron: claim E13.
