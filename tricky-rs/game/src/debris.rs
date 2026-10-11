@@ -1,13 +1,13 @@
 //! The falling pieces of broken objects, `cMeshAnimNode` (type 20, board row E9g2), as the game runs them: each
-//! part of the object's model flies off with its own spin and velocity under gravity. The pieces' starting poses
-//! (the model's part matrices through its hierarchy, times the object's, `Mat4_ToPosQuat` 0x2504f0) are this
-//! module's input; drawing the pieces is rendering. Checked against the game's own objects in the function runner
+//! part of the object's model flies off with its own spin and velocity under gravity, from its starting pose
+//! ([`starts`], row E9g3: the model's part matrices through its hierarchy or the animation's frames, times the
+//! object's, `Mat4_ToPosQuat` 0x2504f0); drawing the pieces is rendering. Checked against the game's own objects in the function runner
 //! (`tests/debris.rs`).
 
 use crate::breakables::{BreakCall, BreakEnv, Contact};
 use crate::controllers::{restore_flags, CtrlCall};
 use crate::math::sin_cos;
-use crate::orient::quat_multiply;
+use crate::orient::{mat4_to_pos_quat, quat_multiply};
 
 type V4 = [f32; 4];
 
@@ -24,6 +24,45 @@ fn frames(v: f32) -> i32 {
     } else {
         p as i32
     }
+}
+
+/// A part of the object's model (a 6-word model node): its parent (−1 none), whether an animation drives it (+0x10)
+/// and its matrix (+0x14; none: the identity at 0x346440).
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct Part {
+    pub parent: i32,
+    pub animated: bool,
+    pub matrix: Option<[V4; 4]>,
+}
+
+/// Rows `m` through the frame `f` (vmulabc / vmaddabc / vmaddbc: each row the frame's rows weighted by its four
+/// lanes, summed in order).
+fn through(f: [V4; 4], m: [V4; 4]) -> [V4; 4] {
+    m.map(|v| [0, 1, 2, 3].map(|i| ((f[0][i] * v[0] + f[1][i] * v[1]) + f[2][i] * v[2]) + f[3][i] * v[3]))
+}
+
+const IDENTITY: [V4; 4] = [[1.0, 0.0, 0.0, 0.0], [0.0, 1.0, 0.0, 0.0], [0.0, 0.0, 1.0, 0.0], [0.0, 0.0, 0.0, 1.0]];
+
+/// The pieces' starting poses, as `cMeshAnimNode::cMeshAnimNode` 0x1466b8 makes them before its spins and
+/// velocities: each part's matrix (or the identity) through its parent's world matrix (parts come after their
+/// parents; one that does not reads a slot not yet made: zeros here); with an animation whose +0x14 has bit 0x100
+/// (`anim_flags`; the game first calls its +0xf4), the animated parts take their frame matrices instead
+/// (`MeshAnimNode_GetFrameMatrix` 0x1998d0, `frame(n)` for the n-th animated part). Each world matrix is then put
+/// through the object's matrix `rows` and split by `Mat4_ToPosQuat` into (position, rotation).
+pub fn starts(parts: &[Part], rows: [V4; 4], anim_flags: Option<u32>, frame: &mut dyn FnMut(usize) -> [V4; 4]) -> Vec<(V4, V4)> {
+    let animate = anim_flags.is_some_and(|f| f >> 8 & 1 != 0);
+    let mut world = vec![[[0.0f32; 4]; 4]; parts.len()];
+    let mut n = 0;
+    for (i, p) in parts.iter().enumerate() {
+        let local = if animate && p.animated {
+            n += 1;
+            frame(n - 1)
+        } else {
+            p.matrix.unwrap_or(IDENTITY)
+        };
+        world[i] = if p.parent == -1 { local } else { through(world.get(p.parent as usize).copied().unwrap_or_default(), local) };
+    }
+    world.iter().map(|w| mat4_to_pos_quat(through(rows, *w))).collect()
 }
 
 /// What the debris needs beyond [`BreakEnv`].

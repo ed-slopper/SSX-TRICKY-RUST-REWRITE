@@ -176,8 +176,8 @@ pub enum Neighbour {
 }
 
 /// `cFenceNode`: +0x34 the angle, +0x38 the swing's size (at most 1), +0x3c its speed, +0x40 / +0x44 frames until
-/// the swing is passed to the neighbour on side 1 (+0x1b0) / side 0 (+0x1b4). The bending of its mesh
-/// (`FenceNode_InitShape`, `FenceNode_UpdateShape`, +0x54) is drawing.
+/// the swing is passed to the neighbour on side 1 (+0x1b0) / side 0 (+0x1b4). The bending of its mesh:
+/// [`FenceShape`].
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Fence {
     pub object: u32,
@@ -316,5 +316,71 @@ impl Fence {
         }
         env.breaks(BreakCall::FenceShape);
         false
+    }
+}
+
+/// 0x31d350: how far each of a fence's eight vertex pairs moves with the swing (a half sine wave).
+const FENCE_BEND: [f32; 8] = [0.0, 0.38267, 0.7071, 0.92387, 0.92387, 0.7071, 0.38267, 0.0];
+
+/// A fence's drawn mesh (row E9g3), as `FenceNode_InitShape` 0x143ff8 sets it up: +0x48 the mode (op word +0xc;
+/// 1: both edges bend), +0x4c the bend (op word +0x10, divided by the scale), +0x1a4 the scale (the model's +0x18,
+/// at least 1, × 250), two edges of eight vertices (+0x58, +0xb8) and their UVs (+0x118, +0x158), the normal
+/// (+0x198).
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct FenceShape {
+    pub mode: u32,
+    pub bend: f32,
+    pub scale: f32,
+    pub a: [[f32; 3]; 8],
+    pub b: [[f32; 3]; 8],
+    pub uv_a: [[f32; 2]; 8],
+    pub uv_b: [[f32; 2]; 8],
+    pub normal: [f32; 3],
+}
+
+/// The vertices and normals `FenceNode_UpdateShape` hands the renderer (edge a, then edge b), with the shape's UVs.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct FenceMesh {
+    pub verts: [[f32; 3]; 16],
+    pub normals: [[f32; 3]; 16],
+}
+
+impl FenceShape {
+    /// `FenceNode_InitShape` 0x143ff8 from the renderer's quad for the model (its +0x2b4: four corners, the normal
+    /// and four UVs): the corners' x × 0.004, then each edge (corner 0 → 1, 2 → 3, and the UVs alike) split into
+    /// eight points, start + (end − start) · i · (1/7). The node's other set-up (the neighbours, the object's flags,
+    /// the renderer's mesh +0x54) is the caller's.
+    pub fn new(corners: [[f32; 3]; 4], normal: [f32; 3], uvs: [[f32; 2]; 4], model_scale: f32, mode: u32, bend: f32) -> FenceShape {
+        let s = if model_scale < 1.0 { 1.0 } else { model_scale };
+        let scale = s * 250.0;
+        let c = corners.map(|[x, y, z]| [x * 0.004, y, z]);
+        const SEVENTH: f32 = 0.142_857_15;
+        let lerp3 = |p: [f32; 3], q: [f32; 3], t: f32| [0, 1, 2].map(|k| p[k] + (q[k] - p[k]) * t * SEVENTH);
+        let lerp2 = |p: [f32; 2], q: [f32; 2], t: f32| [0, 1].map(|k| p[k] + (q[k] - p[k]) * t * SEVENTH);
+        let mut sh = FenceShape { mode, bend: bend / scale, scale, a: [[0.0; 3]; 8], b: [[0.0; 3]; 8], uv_a: [[0.0; 2]; 8], uv_b: [[0.0; 2]; 8], normal };
+        for i in 0..8 {
+            let t = i as f32;
+            sh.a[i] = lerp3(c[0], c[1], t);
+            sh.b[i] = lerp3(c[2], c[3], t);
+            sh.uv_a[i] = lerp2(uvs[0], uvs[1], t);
+            sh.uv_b[i] = lerp2(uvs[2], uvs[3], t);
+        }
+        sh
+    }
+
+    /// `FenceNode_UpdateShape` 0x143cd0 for the node's angle: each pair i moves by (angle · bend · 200 · w_i,
+    /// (angle · bend · 0) · w_i twice) with w the half sine at 0x31d350; edge a always, edge b in mode 1; every
+    /// normal the shape's. (Nothing when the renderer gave no mesh.)
+    pub fn bent(&self, angle: f32) -> FenceMesh {
+        let f = angle * self.bend;
+        let z = f * 0.0;
+        let off = FENCE_BEND.map(|w| [f * 200.0 * w, z * w, z * w]);
+        let add = |p: [f32; 3], o: [f32; 3]| [p[0] + o[0], p[1] + o[1], p[2] + o[2]];
+        let mut m = FenceMesh { verts: [[0.0; 3]; 16], normals: [self.normal; 16] };
+        for i in 0..8 {
+            m.verts[i] = add(self.a[i], off[i]);
+            m.verts[8 + i] = if self.mode == 1 { add(self.b[i], off[i]) } else { self.b[i] };
+        }
+        m
     }
 }

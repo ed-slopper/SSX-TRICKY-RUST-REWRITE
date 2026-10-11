@@ -11,7 +11,7 @@ use r5900::ps2float::Rules;
 use r5900::Runner;
 use tricky_game::breakables::{BreakCall, BreakEnv, Contact, Neighbour};
 use tricky_game::controllers::{CtrlCall, CtrlEnv};
-use tricky_game::debris::{Debris, DebrisEnv, Piece};
+use tricky_game::debris::{starts, Debris, DebrisEnv, Part, Piece};
 
 struct Rng(u64);
 impl Rng {
@@ -107,35 +107,93 @@ fn debris_matches_the_original() {
     let mats = r.mem.alloc(0x40 * 24);
     let op = r.mem.alloc(0x40);
     let ctx = r.mem.alloc(0x40);
+    let frames = r.mem.alloc(0x40 * 24);
+    // the identity matrices at 0x346410 (3×3) and 0x346440 (4×4), zero in the file, as the game's start-up code
+    // 0x251238 fills them
+    r.call(0x251238).unwrap();
+    // the animation: its node at anim + 0x30 (the constructor gets that), a vtable with +0xf4 a stub
+    let anim = r.mem.alloc(0x100);
+    let vtable = r.mem.alloc(0x100);
+    let anim_update = r.mem.alloc(0x10);
+    r.mem.write_u32(anim + 0x30 + 8, vtable);
+    r.mem.write_u32(vtable + 0xf0, 0);
+    r.mem.write_u32(vtable + 0xf4, anim_update);
+    let updates = Rc::new(RefCell::new(0));
+    let u = updates.clone();
+    r.stub(anim_update, move |c, _| {
+        assert_eq!(c.gpr(4) as u32, anim);
+        *u.borrow_mut() += 1;
+    });
+    r.stub(0x1998d0, move |c, _| {
+        assert_eq!(c.gpr(4) as u32, anim);
+        c.set_gpr(2, (frames + 0x40 * c.gpr(5) as u32) as u64);
+    });
     let mut g = Rng(0xdeb2_1500_1234_8765);
     let mut steps = 0;
+    let mut posed = 0;
     for case in 0..1500 {
-        // the object's matrix: a rotation about z and a position
-        let (s, c) = g.pick(&[(0.0f32, 1.0f32), (1.0, 0.0), (0.6, 0.8), (-0.8, 0.6)]);
-        let rows = [[c, s, 0.0, 0.0], [-s, c, 0.0, 0.0], [0.0, 0.0, 1.0, 0.0], [g.pick(&[0.0f32, 500.0]), g.pick(&[0.0f32, -1200.0]), g.pick(&[0.0f32, 300.0]), 1.0]];
+        // the object's matrix: a rotation (about z, or a half turn about x or y: no positive trace) and a position
+        let (s, c) = g.pick(&[(0.0f32, 1.0f32), (1.0, 0.0), (0.6, 0.8), (-0.8, 0.6), (0.0, -1.0)]);
+        let pos = [g.pick(&[0.0f32, 500.0]), g.pick(&[0.0f32, -1200.0]), g.pick(&[0.0f32, 300.0]), 1.0];
+        let rows = match g.next() % 4 {
+            0 => [[1.0, 0.0, 0.0, 0.0], [0.0, -1.0, 0.0, 0.0], [0.0, 0.0, -1.0, 0.0], pos],
+            1 => [[-1.0, 0.0, 0.0, 0.0], [0.0, 1.0, 0.0, 0.0], [0.0, 0.0, -1.0, 0.0], pos],
+            _ => [[c, s, 0.0, 0.0], [-s, c, 0.0, 0.0], [0.0, 0.0, 1.0, 0.0], pos],
+        };
         for (i, row) in rows.iter().enumerate() {
             for (k, v) in row.iter().enumerate() {
                 r.mem.write_f32(object + 16 * i as u32 + 4 * k as u32, *v);
             }
         }
-        // the model: n parts, each its own matrix (a translation), no parents
+        // the model: n parts, each under an earlier one or none, with a matrix (turned and moved) or none; some
+        // animated
         let n = 1 + g.next() % 24;
         r.mem.write_u32(object + 0xc0, model);
         r.mem.write_u32(model + 4, n);
         r.mem.write_u32(model + 8, parts);
+        let mut model_parts = vec![];
         for p in 0..n {
             let at = parts + 0x18 * p;
             let m = mats + 0x40 * p;
-            r.mem.write_u32(at, 0xffff_ffff);
-            r.mem.write_u32(at + 0x14, m);
+            let parent = if p > 0 && g.next() % 2 == 0 { (g.next() % p) as i32 } else { -1 };
+            let animated = g.next() % 3 == 0;
+            r.mem.write_u32(at, parent as u32);
+            r.mem.write_u32(at + 0x10, animated as u32 * 0x1234);
             let t = [g.pick(&[0.0f32, 30.0, -45.0]), g.pick(&[0.0f32, 12.0]), g.pick(&[0.0f32, 80.0]), 1.0];
-            let id = [[1.0f32, 0.0, 0.0, 0.0], [0.0, 1.0, 0.0, 0.0], [0.0, 0.0, 1.0, 0.0], t];
-            for (i, row) in id.iter().enumerate() {
-                for (k, v) in row.iter().enumerate() {
-                    r.mem.write_f32(m + 16 * i as u32 + 4 * k as u32, *v);
+            let (s, c) = g.pick(&[(0.0f32, 1.0f32), (0.6, 0.8), (0.0, -1.0), (-0.28, 0.96)]);
+            let mat = match g.next() % 4 {
+                0 => None,
+                1 => Some([[1.0f32, 0.0, 0.0, 0.0], [0.0, c, s, 0.0], [0.0, -s, c, 0.0], t]),
+                _ => Some([[c, 0.0, -s, 0.0], [0.0, 1.0, 0.0, 0.0], [s, 0.0, c, 0.0], t]),
+            };
+            r.mem.write_u32(at + 0x14, if mat.is_some() { m } else { 0 });
+            if let Some(mat) = mat {
+                for (i, row) in mat.iter().enumerate() {
+                    for (k, v) in row.iter().enumerate() {
+                        r.mem.write_f32(m + 16 * i as u32 + 4 * k as u32, *v);
+                    }
                 }
             }
+            model_parts.push(Part { parent, animated, matrix: mat });
         }
+        // an animation (its frame matrices: moved and turned about z), with or without bit 0x100
+        let anim_flags = match g.next() % 3 {
+            0 => None,
+            1 => Some(0x100u32 | g.next() % 0x100),
+            _ => Some(g.next() & !0x100),
+        };
+        let mut frame_mats = vec![];
+        for k in 0..24u32 {
+            let (s, c) = g.pick(&[(0.0f32, 1.0f32), (0.6, 0.8), (1.0, 0.0), (0.0, -1.0)]);
+            let fm = [[c, s, 0.0, 0.0], [-s, c, 0.0, 0.0], [0.0, 0.0, 1.0, 0.0], [g.pick(&[0.0f32, 7.0]), g.pick(&[0.0f32, -20.0]), g.pick(&[0.0f32, 55.0]), 1.0]];
+            for (i, row) in fm.iter().enumerate() {
+                for (kk, v) in row.iter().enumerate() {
+                    r.mem.write_f32(frames + 0x40 * k + 16 * i as u32 + 4 * kk as u32, *v);
+                }
+            }
+            frame_mats.push(fm);
+        }
+        r.mem.write_u32(anim + 0x30 + 0x14, anim_flags.unwrap_or(0));
         let f = |g: &mut Rng, v: &[f32]| g.pick(v).to_bits();
         let mut a = [0u32; 11];
         a[0] = 0x14;
@@ -177,9 +235,14 @@ fn debris_matches_the_original() {
         r.cpu.set_gpr(6, object as u64);
         r.cpu.set_gpr(7, op as u64);
         r.cpu.set_gpr(8, if with { ctx as u64 } else { 0 });
-        r.cpu.set_gpr(9, 0);
+        r.cpu.set_gpr(9, if anim_flags.is_some() { (anim + 0x30) as u64 } else { 0 });
+        *updates.borrow_mut() = 0;
         r.call(0x1466b8).unwrap_or_else(|e| panic!("case {case}: {e:?}"));
-        let starts: Vec<([f32; 4], [f32; 4])> = (0..n).map(|i| (v4(&mut r.mem, node + 0x3c0 + 16 * i), v4(&mut r.mem, node + 0x38 + 16 * i))).collect();
+        assert_eq!(*updates.borrow(), anim_flags.is_some_and(|f| f & 0x100 != 0) as i32, "case {case}: the animation's update");
+        let starts = starts(&model_parts, rows, anim_flags, &mut |k| frame_mats[k]);
+        let theirs: Vec<([f32; 4], [f32; 4])> = (0..n).map(|i| (v4(&mut r.mem, node + 0x3c0 + 16 * i), v4(&mut r.mem, node + 0x38 + 16 * i))).collect();
+        assert_eq!(starts.iter().map(|(p, q)| (bits(*p), bits(*q))).collect::<Vec<_>>(), theirs.iter().map(|(p, q)| (bits(*p), bits(*q))).collect::<Vec<_>>(), "case {case}: starting poses");
+        posed += n as usize;
         let mut d = Debris::new(object, &a, rows, with.then_some(&c0), &starts, &mut env);
         let read = |m: &mut r5900::Mem, i: u32| {
             let p = Piece { rot: v4(m, node + 0x38 + 16 * i), axis: v4(m, node + 0x1c0 + 16 * i), spin: m.read_f32(node + 0x340 + 4 * i), pos: v4(m, node + 0x3c0 + 16 * i), vel: v4(m, node + 0x540 + 16 * i) };
@@ -220,5 +283,5 @@ fn debris_matches_the_original() {
         }
         assert_eq!(fx.borrow().len(), env.fx.len(), "case {case}: random words used");
     }
-    eprintln!("{steps} steps compared");
+    eprintln!("{steps} steps compared, {posed} starting poses");
 }

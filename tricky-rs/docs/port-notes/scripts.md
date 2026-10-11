@@ -184,7 +184,13 @@ Types 1, 3 and 4 spawn nothing.
   once. A hit while the size is < 1: b·a × (speed · 0.001), passing restarted (4 frames). Passing to a neighbour:
   0.4 × size against the speed's direction, when ≥ 0.25: a free neighbour gets a fence node (which passes it on to
   both sides in 4 frames), a fence neighbour gets `Fence_Swing`. Update: angle += speed; at either end it bounces at
-  half the size; at rest (size and |angle| < 0.01) Finish(1). The mesh bending is drawing (`FenceNode_UpdateShape`).
+  half the size; at rest (size and |angle| < 0.01) Finish(1).
+- The fence's mesh (row E9g3; `breakables::FenceShape`, checked: `tests/fence_shape.rs`): `FenceNode_InitShape`
+  0x143ff8 takes the renderer's quad for the model (four corners, a normal, four UVs), scales the corners' x by
+  0.004 and splits edges 0→1 and 2→3 (and the UVs) into eight points each; the bend is op word +0x10 / (model
+  scale, at least 1, × 250). `FenceNode_UpdateShape` 0x143cd0 moves point pair i by angle × bend × 200 × a half
+  sine (0x31d350: 0, 0.38267, 0.7071, 0.92387, …) along x, both edges in mode 1 (op word +0xc), else only the
+  first, and hands vertices, normals and UVs to the renderer's mesh.
 
 ## Texture animation (row E9i; `tricky_game::texanim`, checked: `tests/texanim.rs`)
 
@@ -251,3 +257,8 @@ Types 1, 3 and 4 spawn nothing.
   random(0..spread) on each axis (x, y either way, z up), per frame. Each frame the pieces turn (quaternion × the
   half-angle spin, renormalised; a zero length sets w = 1) and move, then fall. When the time is up the node
   finishes (unless the pieces stay) and stops; Kill restores (staying pieces) or gives way to a dead node.
+- Starting poses (row E9g3; `debris::starts`, `orient::mat4_to_pos_quat`): each model part's matrix (none: the
+  identity at 0x346440, filled by start-up code 0x251238) through its parent's world matrix; with an animation
+  whose +0x14 has bit 0x100 (after its +0xf4), the animated parts (node +0x10) take its frame matrices
+  (`MeshAnimNode_GetFrameMatrix` 0x1998d0) instead. Each through the object's matrix, then `Mat4_ToPosQuat`
+  0x2504f0: position row 3, rotation (w, x, y, z) from the trace or, when it is not positive, the largest diagonal.

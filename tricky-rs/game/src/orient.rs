@@ -226,3 +226,31 @@ pub fn slerp(t: f32, a: V4, b: V4) -> V4 {
     };
     [wa * a[0] + wb * b[0], wa * a[1] + wb * b[1], wa * a[2] + wb * b[2], wa * a[3] + wb * b[3]]
 }
+
+/// `Mat4_ToPosQuat` 0x2504f0: a matrix (rows) to its position (row 3, w kept) and rotation (w, x, y, z). With a
+/// positive trace t (m00 + m11 + m22) s = √(t + 1), w = s / 2 and the rest (m12 − m21, m20 − m02, m01 − m10) · ½/s;
+/// else from the largest diagonal entry i (then j, k after it): s = √(m_ii − m_jj − m_kk + 1), q_i = s / 2, and
+/// with f = ½/s (0 when s is 0) w = (m_jk − m_kj) f, q_j = (m_ij + m_ji) f, q_k = (m_ik + m_ki) f.
+pub fn mat4_to_pos_quat(m: [V4; 4]) -> (V4, V4) {
+    let e = |i: usize, j: usize| m[i][j];
+    let t = (e(0, 0) + e(1, 1)) + e(2, 2);
+    if 0.0 < t {
+        let s = (t + 1.0).sqrt();
+        let f = 0.5 / s;
+        return (m[3], [s * 0.5, (e(1, 2) - e(2, 1)) * f, (e(2, 0) - e(0, 2)) * f, (e(0, 1) - e(1, 0)) * f]);
+    }
+    let mut i = (e(0, 0) < e(1, 1)) as usize;
+    if e(i, i) < e(2, 2) {
+        i = 2;
+    }
+    let j = (i + 1) % 3;
+    let k = (j + 1) % 3;
+    let s = ((e(i, i) - e(j, j)) - e(k, k) + 1.0).sqrt();
+    let mut q = [0.0f32; 4];
+    q[i] = s * 0.5;
+    let f = if s != 0.0 { 0.5 / s } else { s };
+    q[3] = (e(j, k) - e(k, j)) * f;
+    q[j] = (e(i, j) + e(j, i)) * f;
+    q[k] = (e(i, k) + e(k, i)) * f;
+    (m[3], [q[3], q[0], q[1], q[2]])
+}
