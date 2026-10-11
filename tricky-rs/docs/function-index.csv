@@ -1,6 +1,6 @@
 address,size,name,system,status
 0x100008,160,entry,runtime,host
-0x1000a8,8,FUN_001000a8,,not started
+0x1000a8,8,Crt_Exit,other,not started
 0x1000b8,36,NaturalAirControl_Enter,boarder?,not started
 0x1000e0,1140,NaturalAirControl_Update,boarder?,not started
 0x100558,40,NaturalAirControl_SaveSnapshot,save,not started
@@ -1641,7 +1641,7 @@ address,size,name,system,status
 0x17b6b0,68,cPS2Device::vf7_17b6b0,render,not started
 0x17b6f8,80,cPS2Device::__tf,runtime,host
 0x17b748,256,App_LoadFonts,game,not started
-0x17b848,92,FUN_0017b848,frontend?,not started
+0x17b848,92,Course_OpenBig,race,not started
 0x17b8a8,144,App_CreateEffectsLoader,game,not started
 0x17b938,56,FUN_0017b938,frontend?,not started
 0x17b970,12,Render_GetBrightness,render,not started
@@ -1655,7 +1655,7 @@ address,size,name,system,status
 0x17c118,56,FUN_0017c118,game?,not started
 0x17c150,128,Loc_LoadForRegion,game?,ported
 0x17c1d0,8,FUN_0017c1d0,game?,not started
-0x17c2e0,8,FUN_0017c2e0,frontend?,not started
+0x17c2e0,8,Course_CloseBig,race,not started
 0x17c360,28,FUN_0017c360,,not started
 0x17c380,28,FUN_0017c380,game?,not started
 0x17c3a8,28,FUN_0017c3a8,audio?,not started
@@ -2059,8 +2059,8 @@ address,size,name,system,status
 0x18e718,8,cBoolMenuItem::~cBoolMenuItem,debugmenu,not started
 0x18e748,64,cMenu::__tf,runtime,host
 0x18e798,64,cMenuItem::__tf,runtime,host
-0x18e850,404,FUN_0018e850,game?,not started
-0x18e9e8,224,FUN_0018e9e8,game?,not started
+0x18e850,404,ReplayMgr_Init,game?,not started
+0x18e9e8,224,ReplayMgr_Free,game?,not started
 0x18eac8,252,Replay_Init,game?,not started
 0x18ebc8,8,FUN_0018ebc8,game?,not started
 0x18ebd0,664,Replay_Clear,game?,not started
@@ -2336,7 +2336,7 @@ address,size,name,system,status
 0x19c620,344,FUN_0019c620,,not started
 0x19c788,48,Font_Init,hud,not started
 0x19c7b8,80,Font_Construct,hud,not started
-0x19c808,76,FUN_0019c808,game?,not started
+0x19c808,76,Font_Delete,hud,not started
 0x19c858,116,Font_ParseSfn,hud,ported
 0x19c8d0,60,Font_Free,hud,not started
 0x19c910,764,Font_ParseGlyphs,hud,ported
@@ -3201,7 +3201,7 @@ address,size,name,system,status
 0x1ef7f0,292,RaceMenuOverlay_BeginSaveReplay,save,not started
 0x1ef918,116,RaceMenuOverlay_EndSaveReplay,save,not started
 0x1ef990,1056,RaceMenuOverlay_SetState,frontend,not started
-0x1efdb0,132,FUN_001efdb0,game?,not started
+0x1efdb0,132,RaceMenuOverlay_HandleInput,frontend,not started
 0x1efe38,184,RaceMenuOverlay_Draw,frontend,not started
 0x1efef0,468,RaceMenuOverlay_UpdateReplayMenu,frontend,not started
 0x1f00c8,288,RaceMenuOverlay_UpdateConfirm,frontend,not started
@@ -3576,7 +3576,7 @@ address,size,name,system,status
 0x2151c8,84,Audio_FreeRaceStream,audio,not started
 0x215220,100,Audio_StartRaceMusic,audio,ported
 0x215288,232,Audio_OnRaceGo,audio,ported
-0x215370,136,FUN_00215370,audio?,not started
+0x215370,136,Audio_UpdateCrowdBoxes,audio,not started
 0x2153f8,92,Audio_ResumeAll,audio,not started
 0x215458,48,FUN_00215458,frontend?,not started
 0x215488,88,Audio_StopAll,audio,not started
@@ -3664,7 +3664,7 @@ address,size,name,system,status
 0x21e248,592,FUN_0021e248,audio?,not started
 0x21e498,40,FUN_0021e498,audio?,not started
 0x21e4f0,44,Audio_ResumeAfterSpeech,audio,not started
-0x21e528,108,FUN_0021e528,audio?,not started
+0x21e528,108,Audio_CheerForRider,audio,not started
 0x21e688,8,FUN_0021e688,frontend?,not started
 0x21e690,28,FUN_0021e690,frontend?,not started
 0x21e6c0,28,cBXAudio::vf3_21e6c0,audio,not started
@@ -3674,7 +3674,7 @@ address,size,name,system,status
 0x21e7e0,60,FUN_0021e7e0,audio?,not started
 0x21e8a0,56,cController::cController,audio?,not started
 0x21e8d8,20,cController::~cController,audio?,not started
-0x21e8f0,220,FUN_0021e8f0,audio?,not started
+0x21e8f0,220,BankInstance_Update,audio?,not started
 0x21e9d0,116,cController::vf7_21e9d0,audio?,not started
 0x21ea48,196,FUN_0021ea48,audio?,not started
 0x21eb10,96,cController::vf4_21eb10,audio?,not started
@@ -3691,7 +3691,7 @@ address,size,name,system,status
 0x21fc68,44,FUN_0021fc68,audio?,not started
 0x21fc98,1368,FUN_0021fc98,audio?,not started
 0x2201f8,316,CrowdBox_StopSlot,world,not started
-0x220338,108,FUN_00220338,frontend?,not started
+0x220338,108,CrowdBox_StopAll,world,not started
 0x2203a8,396,CrowdBox_PlayCheer,world,not started
 0x220538,396,CrowdBox_StartCheer,world,not started
 0x2206c8,24,CrowdBox_Arm,world,not started
@@ -3732,7 +3732,7 @@ address,size,name,system,status
 0x221b60,136,IniReader_FindSectionMatching,audio?,not started
 0x221be8,168,IniReader_ReadQuoted,audio?,not started
 0x221c90,196,IniReader_ReadToken,audio?,not started
-0x221d58,68,FUN_00221d58,audio?,not started
+0x221d58,68,IniReader_ParseFloat,audio?,not started
 0x221da0,68,IniReader_ParseInt,audio?,not started
 0x221de8,168,IniReader_Expect,audio?,not started
 0x221e90,104,IniReader_AtSectionEnd,audio?,not started
@@ -3771,17 +3771,17 @@ address,size,name,system,status
 0x2231a8,44,FUN_002231a8,audio?,not started
 0x2231d8,532,PathX_OpenSong,audio?,not started
 0x223450,140,PathX_FreeTrack,audio?,not started
-0x2234e0,192,FUN_002234e0,audio?,not started
+0x2234e0,192,StreamSlot_IsDone,audio?,not started
 0x2235a0,164,PathX_GetPositionMs,audio?,not started
 0x223648,200,PathX_Init,audio?,not started
 0x223710,112,PathX_StopDriver,audio?,not started
-0x223780,464,FUN_00223780,audio?,not started
-0x223950,320,FUN_00223950,audio?,not started
+0x223780,464,StreamSlot_GetPosition,audio?,not started
+0x223950,320,StreamSlot_Play,audio?,not started
 0x223a90,48,FUN_00223a90,audio?,not started
-0x223ac0,172,FUN_00223ac0,audio?,not started
+0x223ac0,172,StreamSlot_Fade,audio?,not started
 0x223b70,8,FUN_00223b70,audio?,not started
-0x223b78,196,FUN_00223b78,audio?,not started
-0x223c40,104,FUN_00223c40,audio?,not started
+0x223b78,196,StreamSlot_SetPitch,audio?,not started
+0x223c40,104,StreamSlot_Stop,audio?,not started
 0x223ca8,184,Music_CreatePathfinder,audio,not started
 0x223d60,1536,Music_LoadPathfinder,audio,not started
 0x224368,128,Song_Delete,audio?,not started
@@ -3877,7 +3877,7 @@ address,size,name,system,status
 0x227d70,1012,Speech_LoadEvents,audio?,not started
 0x228168,372,SpeechSys_FreeBanks,audio?,not started
 0x2282e0,144,SpeechSys_IsIdle,audio?,not started
-0x228370,56,FUN_00228370,audio?,not started
+0x228370,56,SpeechSys_ServiceIfIdle,audio?,not started
 0x2283a8,88,SpeechSys_LoadBank,audio?,not started
 0x228400,724,Speech_PlayEvent,audio?,not started
 0x2286e8,20,SpeechSys_StopStream,audio?,not started
@@ -3901,7 +3901,7 @@ address,size,name,system,status
 0x228e38,124,StaticInit_SpeechSys,audio?,not started
 0x228eb8,80,cSpeechSys::__tf,runtime,host
 0x228fb0,668,Stream_Init,audio?,not started
-0x229268,128,FUN_00229268,render?,not started
+0x229268,128,Stream_Delete,render?,not started
 0x2292e8,96,Stream_Open,audio?,not started
 0x229348,76,FUN_00229348,audio?,not started
 0x229398,8,Stream_SetVolume,audio?,not started
@@ -4098,7 +4098,7 @@ address,size,name,system,status
 0x2309a8,88,Speech_GetModeMask,common?,not started
 0x230a00,884,Speech_LoadNarration,audio?,not started
 0x230d78,84,Speech_FreeNarration,audio?,not started
-0x230dd0,268,FUN_00230dd0,race?,not started
+0x230dd0,268,Speech_QueueCamScriptLine,race?,not started
 0x230ee0,276,Speech_QueueCamScriptLines,race?,not started
 0x230ff8,204,FUN_00230ff8,audio?,not started
 0x2310c8,488,Speech_OnCamScriptIntro,race?,not started
@@ -4522,7 +4522,7 @@ address,size,name,system,status
 0x251e60,68,CacheBuffer_Touch,world?,not started
 0x251ea8,52,cAIFwdDiffCache::cAIFwdDiffCache,ai,not started
 0x251ee0,20,cAIFwdDiffCache::~cAIFwdDiffCache,ai,not started
-0x251ef8,84,FUN_00251ef8,render?,not started
+0x251ef8,84,CollCache_Init,render?,not started
 0x251f50,216,CacheBuffer_Lookup,world?,not started
 0x252028,120,CacheBuffer_ClearEntry,world?,not started
 0x2520a0,28,FUN_002520a0,world?,not started
@@ -5886,10 +5886,10 @@ address,size,name,system,status
 0x2b7b18,84,FUN_002b7b18,comm?,host
 0x2b7b78,104,FUN_002b7b78,comm?,host
 0x2b7c08,28,FUN_002b7c08,comm?,host
-0x2b7c50,220,FUN_002b7c50,comm?,host
-0x2b7d30,256,FUN_002b7d30,comm?,host
-0x2b7e30,68,FUN_002b7e30,comm?,host
-0x2b7e78,116,FUN_002b7e78,comm?,host
+0x2b7c50,220,CommDriver_SendPacket,comm?,host
+0x2b7d30,256,CommDriver_RecvPacket,comm?,host
+0x2b7e30,68,CommDriver_Poll,comm?,host
+0x2b7e78,116,CommDriver_Dispatch,comm?,host
 0x2b7ef0,20,Cstring_Init,comm?,host
 0x2b7f08,80,Cstring_InitChar,comm?,host
 0x2b7f58,196,Cstring_InitAscii,comm?,host
