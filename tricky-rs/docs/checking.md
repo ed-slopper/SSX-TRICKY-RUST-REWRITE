@@ -283,6 +283,27 @@ cap), all identical, first try; `Rider::step` now flies with it. Five functions 
   stats+0x13): `Rider` passes the speed and edging stats in their place until the stats tables are ported (G3).
 - `side_friction`'s third input is rider+0x214, most likely the shaped steer (|x|·1.0001 ≥ 1 only at full lock).
 
+## F4h: against the running game, tick by tick (done 2026-10-10)
+
+`tricky-rs/game/tests/replay.rs` replays races recorded over PINE (`pine.py record`; `TRICKY_RECORDING`, files
+separated by `;`, they stay on your PC; skipped without them). Two recordings from F4b1 (181 and 121 ticks, six
+riders each):
+
+- **Air step.** The game calls `Air_IntegrateRK4` once a tick on the rider itself: dt = time scale (rider+0x12c)
+  × 0.016666668, position +0x140, velocity +0x150, no sub-steps (0x100000.c's caller). Our `integrate_rk4` from
+  tick t gives tick t+1's position and velocity **bit for bit on 341 of the 342 rider-ticks in the air**; every
+  other miss is far off (the rider was on the snow). The one exception (trace1 tick 7750, rider 1, mid-hop) has
+  the velocity exact and x, y 2 ulp (0.016 cm) further on: no rounding rule of the runner gives the game's value
+  (they all give ours or less), so something else nudged the position that tick, most likely a collision push.
+  So PCSX2's own floats agree with our IEEE-nearest port here, not just the runner.
+- **Rubber band.** `AI_RubberBandSpeedScale` 0x13a0f0 (with `Math_Cos` 0x250e98) run in the function runner on
+  the rider as recorded at tick t, then `Boarder_SetTimeScaleRateLimited` 0x11cff0 (at most 0.008446341 a tick),
+  against the time scale at t+1: **1,782 of 1,800 rider-ticks exact** (trace2 720 of 720). Each of the 18 misses
+  is exactly one rate-limit step ahead or behind, caught up on the next ticks: the AI update ran twice or not at
+  all between two recorded race ticks, a matter of when the recorder reads, not of the function.
+- Takeoff, the jump impulse, the flight prediction (RK4 with sub-steps, $a3 ≠ 0) and the jump's steep-lip
+  branch are row F4h2.
+
 ## How a row gets to `checked`
 
 1. Port the function (address in its doc comment, AGENTS.md §13).
