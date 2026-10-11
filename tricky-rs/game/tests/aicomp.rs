@@ -7,6 +7,8 @@ use r5900::ps2float::Rules;
 use r5900::Runner;
 use tricky_game::aicomp::{is_rival_target, pick_target_rider, set_throttle, set_tuck, steer_towards, Frame, GrudgeOf};
 
+type V4 = [f32; 4];
+
 struct Rng(u64);
 impl Rng {
     fn next(&mut self) -> u32 {
@@ -186,4 +188,175 @@ fn shove_choice_matches_the_original() {
         found[match ours { None => 0, Some(false) => 1, Some(true) => 2 }] += 1;
     }
     assert!(found.iter().all(|n| *n > 200), "none / right / left: {found:?}");
+}
+
+#[test]
+fn riding_modes_match_the_original() {
+    // the four riding modes run as the dispatcher calls them, with the course queries (`AIComputer_FindJumpMarker`,
+    // `AIComputer_FindSpeedHint`) answered from a script both sides read in the same order, the target rider's
+    // position and velocity, and `AIComputer_PlanJumpTrick` recorded
+    use std::cell::RefCell;
+    use std::rc::Rc;
+    use tricky_game::aicomp::{Ai, Mode, ModeCall, World as AiWorld};
+    let Some(mut w) = world() else { return };
+    for f in [0x1372f8u32, 0x139f60, 0x13a028, 0x1396c8, 0x250c10, 0x1375c8] {
+        w.r.allow(f);
+    }
+    #[derive(Clone, Copy, Debug)]
+    enum Ans { Jump(Option<([i32; 3], Option<f32>)>), Hint(Option<(i32, Option<f32>)>) }
+    let script: Rc<RefCell<Vec<Ans>>> = Rc::default();
+    let s = script.clone();
+    w.r.stub(0x1392a8, move |c, m| {
+        let a = s.borrow_mut().remove(0);
+        let Ans::Jump(a) = a else { panic!("expected a jump query, got {a:?}") };
+        match a {
+            Some((v, sp)) => {
+                if let Some(sp) = sp { m.write_f32(c.gpr(5) as u32, sp); }
+                for (k, r) in [6usize, 7, 8].iter().enumerate() { m.write_u32(c.gpr(*r) as u32, v[k] as u32); }
+                c.set_gpr(2, 1);
+            }
+            None => c.set_gpr(2, 0),
+        }
+    });
+    let s = script.clone();
+    w.r.stub(0x1393e0, move |c, m| {
+        let a = s.borrow_mut().remove(0);
+        let Ans::Hint(a) = a else { panic!("expected a hint query, got {a:?}") };
+        match a {
+            Some((flag, sp)) => {
+                if let Some(sp) = sp { m.write_f32(c.gpr(5) as u32, sp); }
+                m.write_u32(c.gpr(6) as u32, flag as u32);
+                c.set_gpr(2, 1);
+            }
+            None => c.set_gpr(2, 0),
+        }
+    });
+    let plans: Rc<RefCell<Vec<ModeCall>>> = Rc::default();
+    let p = plans.clone();
+    w.r.stub(0x139d58, move |c, _| p.borrow_mut().push(ModeCall::PlanJumpTrick(c.gpr(5) as i32, c.gpr(6) as i32)));
+    let others: Vec<u32> = (0..6).map(|_| w.r.mem.alloc(0x200)).collect();
+    let os = others.clone();
+    w.r.stub(0x1814a8, move |c, _| c.set_gpr(2, os[c.gpr(5) as usize] as u64));
+    let table = [0x31d318u32, 0x31d320, 0x31d328, 0x31d330];
+    let mut g = Rng(0x0c3a_5fe1_8d27_b694);
+    let mut seen = [[0u32; 4]; 4];
+    for case in 0..40_000 {
+        let n = 2 + (g.next() % 5) as i32;
+        let me = (g.next() % n as u32) as i32;
+        let mode = [Mode::ToJump, Mode::Line, Mode::NearRider, Mode::AtRival][g.next() as usize % 4];
+        let target = if mode == Mode::Line || mode == Mode::ToJump { -1 } else { (me + 1 + (g.next() % (n as u32 - 1)) as i32) % n };
+        let pos = [g.f(-5000.0, 5000.0), g.f(-5000.0, 5000.0), g.f(-500.0, 500.0), 1.0];
+        let speed_scale = if g.next() % 2 == 0 { 1.0 } else { g.f(0.5, 2.5) };
+        let mut ai = Ai {
+            skill: speed_scale,
+            speed: g.f(300.0, 3000.0),
+            target,
+            mode,
+            frame: Frame { pos, fwd: g.unit(), side: g.unit(), up: if g.next() % 2 == 0 { [0.0, 0.0, 1.0, 0.0] } else { g.unit() } },
+            vel: [g.f(-2500.0, 2500.0), g.f(-2500.0, 2500.0), g.f(-300.0, 300.0), 0.0],
+            line: [pos[0] + g.f(-3000.0, 3000.0), pos[1] + g.f(-3000.0, 3000.0), pos[2] + g.f(-300.0, 300.0), 1.0],
+            travel: g.f(-7.0, 7.0),
+            heading: g.f(-7.0, 7.0),
+            x348: [g.f(0.0, 150.0), g.f(150.0, 700.0), 153.10213, 540.0][g.next() as usize % 4],
+            meter: [1.0, g.f(0.0, 1.5), 0.9][g.next() as usize % 3],
+            me,
+            recs: (0..6).map(|_| [[g.f(0.0, 700.0), g.f(0.0, 1200.0), 0.0, 200.0][g.next() as usize % 4], g.f(-3.5, 3.5)]).collect(),
+            grudge: GrudgeOf { on: (g.next() % 2) as i32, target: (g.next() % n as u32) as i32, level: (g.next() % 3) as i32, cooled: (g.next() % 2) as i32 },
+        };
+        let tick = (g.next() % 100) as i32 * if g.next() % 2 == 0 { 12 } else { 1 };
+        let practice = g.next() % 5 == 0;
+        let ov: Vec<(V4, V4)> = (0..6).map(|_| ([g.f(-5000.0, 5000.0), g.f(-5000.0, 5000.0), g.f(-500.0, 500.0), 1.0], [g.f(-2500.0, 2500.0), g.f(-2500.0, 2500.0), g.f(-300.0, 300.0), 0.0])).collect();
+        // the course's answers: enough for any path through the modes
+        let mut answers = Vec::new();
+        for k in 0..4 {
+            let sp = if g.next() % 3 == 0 { Some(g.f(300.0, 3000.0)) } else { None };
+            if k % 2 == 0 {
+                answers.push(Ans::Jump(if g.next() % 3 == 0 { Some(([(g.next() % 2) as i32, (g.next() % 30) as i32, (g.next() % 30) as i32], sp)) } else { None }));
+            } else {
+                answers.push(Ans::Hint(if g.next() % 2 == 0 { Some(((g.next() % 2) as i32, sp)) } else { None }));
+            }
+        }
+        // in the order the modes ask: line: hint, jump; to-jump: jump (then the line's hint, jump); others: jump
+        let order: Vec<Ans> = match mode {
+            Mode::Line => vec![answers[1], answers[0]],
+            Mode::ToJump => vec![answers[0], answers[1], answers[2]],
+            _ => vec![answers[0]],
+        };
+        *script.borrow_mut() = order.clone();
+        plans.borrow_mut().clear();
+        let m = &mut w.r.mem;
+        m.write_f32(w.comp + 0x86c, ai.skill);
+        m.write_f32(w.comp + 0x868, ai.speed);
+        m.write_u32(w.comp + 0x890, ai.target as u32);
+        m.write_u16(w.comp + 0x89c, mode as u16);
+        m.write_u32(w.comp + 0x8a0, 0xdead);
+        m.write_u32(w.comp + 0x8a4, 0xbeef);
+        put4(m, w.rider + 0x140, ai.frame.pos);
+        put4(m, w.rider + 0x4aa0, ai.frame.fwd);
+        put4(m, w.rider + 0x4ab0, ai.frame.side);
+        put4(m, w.rider + 0x4ac0, ai.frame.up);
+        put4(m, w.rider + 0x150, ai.vel);
+        put4(m, w.rider + 0x360, ai.line);
+        m.write_f32(w.rider + 0x370, ai.travel);
+        m.write_f32(w.rider + 0x1b0, ai.heading);
+        m.write_f32(w.rider + 0x348, ai.x348);
+        m.write_f32(w.rider + 0x1c, ai.meter);
+        m.write_u32(w.rider + 0x460, me as u32);
+        for (o, v) in [(0x118, ai.grudge.on), (0x120, ai.grudge.target), (0x124, ai.grudge.level), (0x128, ai.grudge.cooled)] {
+            m.write_u32(w.rider + o, v as u32);
+        }
+        for (k, rc) in ai.recs.iter().enumerate() {
+            m.write_f32(w.rider + 0x40 + 0x20 * k as u32, rc[0]);
+            m.write_f32(w.rider + 0x44 + 0x20 * k as u32, rc[1]);
+        }
+        for (k, (p, v)) in ov.iter().enumerate() {
+            put4(m, others[k] + 0x140, *p);
+            put4(m, others[k] + 0x150, *v);
+        }
+        m.write_u32(MODE, if practice { 0 } else { 1 });
+        m.write_u32(w.world + 0x18, tick as u32);
+        m.write_u32(w.world + 0x88, n as u32);
+        let word0 = g.next();
+        m.write_u32(w.out, word0);
+        let addr = [0x137858u32, 0x1375c8, 0x137dc0, 0x137a18][mode as usize];
+        w.r.cpu.set_gpr(4, w.comp as u64);
+        w.r.cpu.set_gpr(5, w.out as u64);
+        w.r.call(addr).unwrap_or_else(|e| panic!("case {case} ({mode:?}): {e}"));
+        let left = script.borrow().len();
+        // ours, from the same answers
+        let mut q = order;
+        let qa = std::cell::RefCell::new(&mut q);
+        let mut jump = |sp: &mut f32| {
+            let a = qa.borrow_mut().remove(0);
+            let Ans::Jump(a) = a else { panic!("ours: expected a jump query") };
+            a.map(|(v, s)| { if let Some(s) = s { *sp = s; } v })
+        };
+        let mut calls = Vec::new();
+        let word;
+        {
+            // both queries read the one queue, in the order asked
+            let hint_queue = &qa;
+            let mut hint = |sp: &mut f32| {
+                let a = hint_queue.borrow_mut().remove(0);
+                let Ans::Hint(a) = a else { panic!("ours: expected a hint query") };
+                a.map(|(f, s)| { if let Some(s) = s { *sp = s; } f })
+            };
+            let other = |i: i32| ov[i as usize];
+            let mut aw = AiWorld { jump_marker: &mut jump, speed_hint: &mut hint, other: &other, tick, n, practice };
+            word = ai.ride(&mut aw, word0, &mut calls);
+        }
+        let ctx = format!("case {case} ({mode:?}) answers {:?}", answers);
+        assert_eq!(w.r.mem.read_u32(w.out), word, "{ctx}: pad word {:#010x} vs {word:#010x}", w.r.mem.read_u32(w.out));
+        assert_eq!(qa.borrow().len(), left, "{ctx}: queries asked");
+        assert_eq!(*plans.borrow(), calls, "{ctx}: calls");
+        assert_eq!(w.r.mem.read_u32(w.comp + 0x868), ai.speed.to_bits(), "{ctx}: speed");
+        assert_eq!(w.r.mem.read_u32(w.comp + 0x890) as i32, ai.target, "{ctx}: target");
+        let m2 = (w.r.mem.read_u32(w.comp + 0x89c) & 0xffff) as u16;
+        assert_eq!(m2, ai.mode as u16, "{ctx}: mode");
+        if ai.mode != mode {
+            assert_eq!(w.r.mem.read_u32(w.comp + 0x8a0), w.r.mem.read_u32(table[ai.mode as usize]), "{ctx}: the mode's method");
+        }
+        seen[mode as usize][ai.mode as usize] += 1;
+    }
+    println!("mode changes {seen:?}");
 }

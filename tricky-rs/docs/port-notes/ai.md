@@ -130,3 +130,24 @@ Part of the port notes (index: [README.md](README.md)); units and wording as des
   200 cm when faster.
 - The app's computer riders shove through `aicomp::find_nearby_rider` (row G4c; STANDIN: the pair record and the
   heading from our positions and yaw, the shove clip as our shove timer).
+
+## The riding modes, exactly (board row G4d, checked: `tests/aicomp.rs`; `aicomp::Ai::ride`)
+
+- `AIComputer_RideLine` 0x1375c8: steer at the line point (+0x360). With a speed hint (`AIComputer_FindSpeedHint`
+  0x1393e0, which may set cComputer+0x868, the speed to ride at): over speed + 138.89 cm/s brake if the hint says
+  so; under (speed − 138.89) (× skill / 1.4103198) crouch (hint flag 0) or tuck. Without: boost (bit 3) with a
+  full meter (× skill / 1.4103198) and crouch. Then a jump marker ahead (`AIComputer_FindJumpMarker` 0x1392a8,
+  which may set the speed) → to the jump, target −1; else a target rider (`AIComputer_PickTargetRider`) → near it,
+  or at it if a rival.
+- `AIComputer_RideToJump` 0x137858: no marker → the line (and rides it this tick); else steer at the line; a
+  marker wanting a trick (its first word), rider+0x348 under 153.10213 and the steer under 0.53616524 →
+  `AIComputer_PlanJumpTrick`(marker words 2, 3) and jump (bit 1); else tuck under speed − 138.89, brake over
+  speed + 138.89.
+- `AIComputer_RideNearRider` 0x137dc0: the target over 90° off the travel heading (+0x370): steer at the line, tuck
+  if slower than it (else crouch). Within the cone a 150 cm body takes at its distance (atan 150 / d) and faster
+  than it: steer at the line point turned (`Math_SinCos`) by the angle out of the cone, and tuck. Else the line and
+  crouch. Then jump marker → to the jump; no target → the line; a rival → at it.
+- `AIComputer_RideAtRival` 0x137a18 as above (aim 300 cm ahead of the rival along its velocity); then jump marker →
+  to the jump; no target → the line; not a rival → near it.
+- In line mode the game reads an unset stack word for "rival" if a target were kept; it never is (line mode has
+  no target).
