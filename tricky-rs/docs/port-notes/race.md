@@ -145,3 +145,19 @@ the same unchecked way, and port that 1:1 (the bug included), noting it here.
   95k/65k/35k, elysium and mesa 225k/150k/75k, merquer 275k/175k/125k, megaple 350k/225k/100k, aloha
   175k/115k/75k, alaska 500k/300k/150k (also any course not listed), pipe 800k/500k/250k (its own branch).
 
+- Which courses a mode offers (row C0b; `courses::VENUES`, `course_unlocked`). The venue menu
+  (`cFE3DStateVenueSel`) lists 0x3a8af0: the circuit's eight, then Untracked and Pipedream; `CreateNextState` sets
+  0x32de88 from it, `FEVenueSel_UpdateLocks` 0x29baa0 greys each by `Career_IsCourseUnlocked` 0x163bb8 (career
+  0x32b390, mode 0x32de8c). That function: with the unlock-everything cheat (0x3352a0) the mode's mask alone (a
+  stack table: knock-down / head to head everything but the tutorial; race no Pipedream, Untracked, tutorial;
+  show-off no Untracked, tutorial); in modes 4–6 the tutorial always, nothing without a circuit career (+0x30fc < 0),
+  else the career's circuit table (+0x3114, per course +0x26 race, +0x27 show-off); else the career's bit (+8) and
+  the mask. The venue help line asks Pipedream and Untracked with mode 1 (open: strings 0xde7 / 0xde8, else the
+  career's hint `FUN_0016b860`); the others print the career's line with " race" (0x31), show-off (0x32) or 0xd31.
+- Per-mode race setup (read, port with C12): `Circuit_SetupRace` 0x16d230 (show-off): one rider (the player,
+  `Career_SetupPlayerRider`), race+0x14 = 2, +0x330 = 2 + the course's medal-table index << 16.
+  `Circuit_SetupEventRiders` 0x16d300 (circuit race): six riders; +0x330 = heat + circuit index << 16; on heat 0 it
+  marks, for every rider, who the pre-race picks (`PreRaceSel_Choose` 0x32ecf0) put in each of the three heats
+  (0x335658 + rider·16); the player goes in slot 1 + rand&3 (Alaska: slot 1 when that is 1 or 2), the two picked
+  rivals either side, the other picks into empty slots, then the rest by a random draw among riders still out
+  (rand % 10000, highest first); then `Circuit_SetupRider` ×6, `Rivals_InitPairsCircuit`, `Career_FinalizeRoster`.

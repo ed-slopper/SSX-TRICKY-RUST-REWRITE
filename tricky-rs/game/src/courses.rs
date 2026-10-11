@@ -109,3 +109,46 @@ pub fn time_limit(course: u32, mode: u32) -> f32 {
         0.0
     }
 }
+
+/// The venue menu's order (`cFE3DStateVenueSel`, the course numbers at 0x3a8af0): the World Circuit's eight, then
+/// Untracked and Pipedream. Its `UpdateLocks` 0x29baa0 greys each with [`course_unlocked`] for the current mode; the
+/// help line for Pipedream and Untracked asks with mode 1 (unlocked: strings 0xde7, 0xde8; else the career's hint).
+pub const VENUES: [u32; 10] = [0, 1, 2, 3, 4, 8, 5, 11, 7, 6];
+
+/// The career state `Career_IsCourseUnlocked` reads (the career at 0x32b390).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Unlocks {
+    /// +8: one bit per course unlocked for the single events
+    pub bits: u32,
+    /// +0x30fc (signed byte): below 0, no World Circuit career is open
+    pub career_slot: i8,
+    /// +0x3114 → +0x26 + course·4 / +0x27: the course is open in the circuit's race / show-off
+    pub circuit: [[u8; 2]; 12],
+}
+
+/// The courses each mode may ever offer (`Career_IsCourseUnlocked`'s stack table, modes 0..9): every bit but 10 for
+/// knock-down and head-to-head, no Pipedream, Untracked or tutorial for a race, no Untracked or tutorial for show-off,
+/// the tutorial mode bits 9 up.
+pub const MODE_COURSES: [u32; 10] = [0xfffffbff, 0xfffffbff, 0xfffffb3f, 0xfffffb7f, 0xfffffb3f, 0xfffffb3f, 0xfffffe00, 0xfffffb3f, 0xfffffbff, 0xffffffff];
+
+/// `Career_IsCourseUnlocked` 0x163bb8: may `course` be played in `mode`? With the unlock-everything cheat
+/// (0x3352a0), whatever the mode allows. Else for the circuit modes 4, 5 and the tutorial 6: the trick tutorial
+/// (10) always, nothing without a career, else the career's circuit byte (race for 4, show-off for 5 and 6); for the
+/// others the mode allows it and the career's bit is set. (`mode` 0..9, `course` 0..11 as the game asks.)
+pub fn course_unlocked(u: &Unlocks, mode: u32, course: u32, cheat: bool) -> bool {
+    let mask = MODE_COURSES[mode as usize];
+    if cheat {
+        return (mask as i32 >> (course & 31)) & 1 != 0;
+    }
+    if mode.wrapping_sub(4) < 3 {
+        if course == 10 {
+            true
+        } else if u.career_slot < 0 {
+            false
+        } else {
+            u.circuit[course as usize][if mode == 4 { 0 } else { 1 }] != 0
+        }
+    } else {
+        u.bits & (1 << (course & 31)) & mask != 0
+    }
+}

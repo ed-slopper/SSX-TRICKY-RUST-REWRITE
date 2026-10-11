@@ -4,7 +4,7 @@
 //! `tricky_game::courses`.
 
 use r5900::Runner;
-use tricky_game::courses::{medal, time_limit, CIRCUIT, COURSES, MEDALS};
+use tricky_game::courses::{course_unlocked, medal, time_limit, Unlocks, CIRCUIT, COURSES, MEDALS, VENUES};
 
 fn cstr(m: &mut r5900::Mem, at: u32) -> String {
     let mut v = Vec::new();
@@ -83,6 +83,52 @@ fn medals_and_time_limits_match_the_original() {
             r.cpu.set_gpr(5, race as u64);
             r.call(0x113740).unwrap();
             assert_eq!(r.mem.read_u32(race + 0x14), time_limit(course, mode).to_bits(), "course {course}, mode {mode}");
+        }
+    }
+}
+
+#[test]
+fn venues_and_unlocks_match_the_original() {
+    let Some(mut r) = Runner::from_env() else { return };
+    let mut b = [0u8; 10];
+    r.mem.read(0x3a8af0, &mut b);
+    assert_eq!(b.map(|v| v as u32), VENUES);
+    let career = r.mem.alloc(0x3200);
+    let circ = r.mem.alloc(0x60);
+    r.mem.write_u32(career + 0x3114, circ);
+    let mut seed = 0x9e37_79b9_7f4a_7c15u64;
+    let mut next = || {
+        seed ^= seed << 13;
+        seed ^= seed >> 7;
+        seed ^= seed << 17;
+        (seed >> 16) as u32
+    };
+    for _ in 0..4000 {
+        let mut u = Unlocks { bits: next(), career_slot: [-1i8, 0, 1, -128, 3][next() as usize % 5], circuit: [[0; 2]; 12] };
+        for c in u.circuit.iter_mut() {
+            *c = [(next() % 3) as u8 * (next() % 2) as u8, (next() % 2) as u8];
+        }
+        r.mem.write_u32(career + 8, u.bits);
+        let mut slot = [0u8; 4];
+        r.mem.read(career + 0x30fc, &mut slot);
+        slot[0] = u.career_slot as u8;
+        r.mem.write(career + 0x30fc, &slot);
+        let mut t = [0u8; 0x60];
+        for (i, c) in u.circuit.iter().enumerate() {
+            t[i * 4 + 0x26] = c[0];
+            t[i * 4 + 0x27] = c[1];
+        }
+        r.mem.write(circ, &t);
+        let cheat = next() % 4 == 0;
+        r.mem.write_u32(0x3352a0, cheat as u32);
+        for mode in 0..10u32 {
+            for course in 0..12u32 {
+                r.cpu.set_gpr(4, career as u64);
+                r.cpu.set_gpr(5, mode as u64);
+                r.cpu.set_gpr(6, course as u64);
+                r.call(0x163bb8).unwrap();
+                assert_eq!(r.cpu.gpr(2) as u32 != 0, course_unlocked(&u, mode, course, cheat), "mode {mode} course {course} {u:?} cheat {cheat}");
+            }
         }
     }
 }
