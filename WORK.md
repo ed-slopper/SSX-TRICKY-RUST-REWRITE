@@ -55,7 +55,6 @@ state machine and the renderer are ours. Nothing has been checked against the or
 | E8g | Ground probe checked: `Boarder_ProbeGround` 0x128ae8 (ray +200 → −100 cm along n: new n, h, surface) | any | F4a | | Split of E8. Needs the world ray (E7) stubbed or run |
 | E8h | Ground motion checked: `GroundMotion_Update` 0x10a0d8 as a whole, with its callees run as the original (leaves already checked in F4d, F4d2) | any | F4a | | Split of E8 |
 | E8a | Air: `Air_IntegrateRK4` 0x12b340, `AirPredict_AtTakeoff` 0x123b10, landing `Air_MotionUpdate` 0x108378, `Landing_CheckAngles` 0x12ba78, `Landing_ChooseState` 0x109308 | any | F4a | | [repo] Ported, unchecked Split: E8a1, E8a2 |
-| E8a2 | `Landing_ChooseState` 0x109308 ported exactly into `tricky-game` (`landing.rs`) and checked in the function runner | any | F4a | trailrig/heron (2026-10-11) | Split of E8a |
 | E8a3 | The rest of E8a: `AirPredict_AtTakeoff` 0x123b10 (needs the world ray, E7), `Air_MotionUpdate` 0x108378 checked | any | F4a | | Split of E8a |
 | E8b | Walls and objects: `Boarder_WallImpactCheck` 0x126540, wall collision 0x126250, `Boarder_InstanceCollisions` 0x125088, `Boarder_InstanceBounce` 0x125a00 | unowned | E7 | | [repo] |
 | E8c | Knockable objects with the game's rigid bodies (`CollBody_PointMassInertia` 0x236530 and its step), replacing the ball physics in `props.rs` | unowned | E7 | | [repo] props.rs: "simulated as balls" |
@@ -214,6 +213,7 @@ matches the original.
 | E14 | The game's math library ported exactly (`tricky-rs/game/src/math.rs`: sine, cosine, sine-cosine, arcsine, arctangent with their polynomials and $gp coefficients, angle difference, Hermite) and checked bit for bit in the function runner (`tests/math.rs`: 20,000+ inputs each, the branch edges); port-notes/math.md; 7 functions checked | P1 | trailrig/heron | 2026-10-11 | 01744d3 |
 | E4b | Animation clips from the player's disc: `tricky-data/src/afl.rs` (the game's curve evaluators `AnimCurve_Eval` 0x157ed8 / `AnimCurve_EvalPiece` 0x158030, file and clip headers), the exe's clip and file names (`anim_names.rs`, 0x3242a0), `AnimSet::afl_from_disc` / `uber_from_disc` / `scenes_from_disc`, read by the app with `TRICKY_DISC`; same clips as the exports, which read multi-piece curves one frame too long (`notes/animation-format.md`) | P1 | ed-slopper/puffin | 2026-10-11 | faeca52 |
 | E8a1 | `Landing_CheckAngles` 0x12ba78 ported exactly (`tricky-rs/game/src/landing.rs`, using E14's `Math_Asin`/`Math_Atan`) and checked bit for bit in the function runner on 8,000 random landings, the early outs, state change and clean/unclean verdicts included (`tests/landing.rs`); the runner learnt vopmula/vopmsub (the vector unit's cross product, with a unit test) | P1 | trailrig/heron | 2026-10-11 | a04687e |
+| E8a2 | `Landing_ChooseState` 0x109308 ported exactly (`landing::choose_state`: landing clip and state, grab reset, the alpine half turn) and checked in the function runner on 6,000 random landings: same clips, states, calls in order and fields bit for bit (`tests/landing_choice.rs`) | P1 | trailrig/heron | 2026-10-11 | HASH |
 
 ## Changes to the board
 
@@ -289,3 +289,4 @@ matches the original.
 - 2026-10-11 trailrig/heron: E8a1 done (Landing_CheckAngles checked).
 - 2026-10-11 trailrig/heron: E1a1 released (code on its branch, needs a level run).
 - 2026-10-11 trailrig/heron: E8a2 split into E8a2 (claimed) and E8a3.
+- 2026-10-11 trailrig/heron: E8a2 done (Landing_ChooseState checked).

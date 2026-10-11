@@ -43,4 +43,10 @@ Part of the port notes (index: [README.md](README.md)); units and wording as des
   (B = rider+0x180) to rider+0x320, side = n × forward (w 0) to rider+0x330; pitch = π/2 − asin(clamp(B·t, ±0.9999999)),
   t = the velocity's direction with its part along the board's up removed; roll = −atan2(B·n, U·n); clean when
   ±roll (sign flipped past |pitch| > π/2) × (2.040804 − 1.0374061·stability/255) is within −2.967825..2.6840878.
+- `Landing_ChooseState` 0x109308 proven (E8a2, `landing::choose_state`): motion 2; a grab clip (type 0xe) resets crouch/steer
+  and lands clean (clip 0x1ff, state 0xc). Soft = pitch ≥ −45°, firm = vn ≥ −2777.1052 cm/s. Non-alpine: soft and firm
+  → 0x1ff/0xc; else facing forwards (|yaw| ≤ 90°) 0x23e (soft) or 0x242, backwards 0x23f or 0x243, state 0xb. Alpine
+  forwards in stance: firm → (soft 0x1ff/0xc, else 0x242/0xb), not firm 0x23e/0xb; riding switch 0x240/0xb. Alpine
+  backwards: half turn (π about up, layers −π, forward and side negated, switch flips, rider+0x46e0 = wrapped heading),
+  then 0x1ff (back in stance) or 0x240, state 0xb.
 - Grabs follow clip markers at speed 0.782+0.806·s14.

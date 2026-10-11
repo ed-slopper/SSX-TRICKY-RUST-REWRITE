@@ -99,3 +99,70 @@ pub fn check_angles(s: &LandingState, n: V4) -> Option<Landing> {
     let ok = (-2.967_825..=2.684_087_8).contains(&r);
     Some(Landing { forward, side, pitch, roll, ok })
 }
+
+/// What `Landing_ChooseState` reads.
+#[derive(Clone, Copy, Debug, Default)]
+pub struct ChooseState {
+    /// the clip type on layer 0 (`AnimCtl_GetClipType`): 0xe is a grab clip
+    pub clip_type: i64,
+    /// board class (rider+0x420; 2 alpine), riding switch (rider+0x1b4) and the rider's natural stance (stats+0x40)
+    pub class: u32,
+    pub switch: u32,
+    pub stance: u32,
+}
+
+/// What it does.
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct Choice {
+    /// the landing clip played on layer 0 (`AnimCtl_PlayClip`(clip, 0, 5)) and the new state (0xc lands clean
+    /// into riding, 0xb a hard landing)
+    pub clip: u32,
+    pub state: u32,
+    /// out of a grab clip: the crouch and steer fields are reset (rider+0x1fc..0x21c, +0x268..0x270)
+    pub grab_reset: bool,
+    /// an alpine board landing backwards: the rider turns half round (π about the up axis, every clip layer −π,
+    /// forward and side negated), riding switch flips, rider+0x46e0 gets the new heading offset
+    pub turned: Option<(u32, f32)>,
+}
+
+/// `Landing_ChooseState` 0x109308 (after `Boarder_SetMotion`(2)): `yaw` and `pitch` from `Landing_CheckAngles`,
+/// `vn` the speed into the snow (cm/s, negative going down).
+pub fn choose_state(s: &ChooseState, yaw: f32, pitch: f32, vn: f32) -> Choice {
+    let soft = -std::f32::consts::FRAC_PI_4 <= pitch;
+    let firm = -2_777.105_2 <= vn;
+    let pick = |clip, state| Choice { clip, state, grab_reset: false, turned: None };
+    if s.clip_type == 0xe {
+        return Choice { grab_reset: true, ..pick(0x1ff, 0xc) };
+    }
+    let forwards = yaw.abs() <= std::f32::consts::FRAC_PI_2;
+    if s.class == 2 {
+        if forwards {
+            if s.switch == s.stance {
+                if firm {
+                    return if soft { pick(0x1ff, 0xc) } else { pick(0x242, 0xb) };
+                }
+                return pick(0x23e, 0xb);
+            }
+            return pick(0x240, 0xb);
+        }
+        let switch = s.switch ^ 1;
+        let ang = if switch != 0 { std::f32::consts::PI } else { 0.0 };
+        let t = ang * 0.159_154_94 + 0.5;
+        let mut n = (t as i32) as f32;
+        if t < n {
+            n -= 1.0;
+        }
+        let turned = Some((switch, ang - n * 6.283_185_5));
+        let clip = if switch == s.stance { 0x1ff } else { 0x240 };
+        return Choice { turned, ..pick(clip, 0xb) };
+    }
+    if soft && firm {
+        return pick(0x1ff, 0xc);
+    }
+    match (forwards, soft) {
+        (true, true) => pick(0x23e, 0xb),
+        (true, false) => pick(0x242, 0xb),
+        (false, true) => pick(0x23f, 0xb),
+        (false, false) => pick(0x243, 0xb),
+    }
+}

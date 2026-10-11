@@ -89,7 +89,7 @@ address,size,name,system,status
 0x108310,88,AirMotion_Enter,boarder,not started
 0x108368,16,AirMotion_Exit,boarder,not started
 0x108378,3980,AirMotion_Update,boarder,not started
-0x109308,864,Landing_ChooseState,boarder,ported
+0x109308,864,Landing_ChooseState,boarder,checked
 0x109668,40,AirMotion_SaveSnapshot,save,not started
 0x109690,20,AirMotion_LoadSnapshot,boarder,not started
 0x1097f8,44,Vec4_ScaleCopy2,other,not started
