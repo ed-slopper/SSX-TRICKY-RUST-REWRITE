@@ -12,26 +12,26 @@ const SIN_0: f32 = 0.0;
 const SIN_20: f32 = f32::from_bits(0x3eaf_1d43);
 
 /// A dot product as the vector unit forms it (vmul, then vaddabc / vmaddabc / vmaddbc): ((x + y) + z) + w.
-fn dot(a: V4, b: V4) -> f32 {
+pub(crate) fn dot(a: V4, b: V4) -> f32 {
     let p = [a[0] * b[0], a[1] * b[1], a[2] * b[2], a[3] * b[3]];
     ((p[0] + p[1]) + 1.0 * p[2]) + 1.0 * p[3]
 }
 
 /// `Vec4_Scale` 0x102f50 and vmulbc: every lane times `k`.
-fn scale(a: V4, k: f32) -> V4 {
+pub(crate) fn scale(a: V4, k: f32) -> V4 {
     [a[0] * k, a[1] * k, a[2] * k, a[3] * k]
 }
 
-fn add(a: V4, b: V4) -> V4 {
+pub(crate) fn add(a: V4, b: V4) -> V4 {
     [a[0] + b[0], a[1] + b[1], a[2] + b[2], a[3] + b[3]]
 }
 
-fn sub(a: V4, b: V4) -> V4 {
+pub(crate) fn sub(a: V4, b: V4) -> V4 {
     [a[0] - b[0], a[1] - b[1], a[2] - b[2], a[3] - b[3]]
 }
 
 /// Normalised by vrsqrt (Q = 1 / sqrt(|a|²)) and vmulq.
-fn normalize(a: V4) -> V4 {
+pub(crate) fn normalize(a: V4) -> V4 {
     scale(a, 1.0 / dot(a, a).sqrt())
 }
 

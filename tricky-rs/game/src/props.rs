@@ -212,10 +212,13 @@ impl Prop {
     }
 }
 
-/// Riders shove each other apart instead of passing through.
-/// Two riders running into each other (`Boarder_RiderCollisions` 0x123fc8 / `Boarder_RiderHit` 0x124920): pushed
-/// apart, and each takes the closing speed weighted by the other's mass. A hard enough hit puts a
-/// rider down; if only one goes down the other gets a full meter.
+/// Two riders running into each other (`Boarder_RiderCollisions` 0x123fc8): pushed apart by 0.55 of the overlap,
+/// then (once every three ticks) the closing speed is split by their speed stats (`hit::pair_speeds`) and each
+/// takes it as a hit (`Boarder_RiderHit`, exact). If one goes down the other scores a knock-down
+/// (`Boarder_ScoreKnockdown`: a full meter) and the fallen one a crash (`Boarder_ScoreCrash`); if both, each a
+/// crash and its tenth of the meter. A rider finished and stopped is not moved and weighs 1e30.
+/// STANDIN: one sphere per rider (the game's collision body spheres, `CollBody_OverlapSpheres`, are not ported)
+/// and a wait per rider instead of the game's per pair.
 pub fn bump(a: &mut Rider, b: &mut Rider) {
     let d = b.pos - a.pos;
     if d.y.abs() > 1.6 { return; }
@@ -225,23 +228,30 @@ pub fn bump(a: &mut Rider, b: &mut Rider) {
     if dist >= reach || dist < 1e-4 { return; }
     let n = flat / dist;
     let push = (reach - dist) * 0.55;
-    a.pos -= n * push * 0.5;
-    b.pos += n * push * 0.5;
-    let closing = (a.vel - b.vel).dot(n);
-    if closing <= 0.0 { return; }
-    // boosting makes a rider up to nine times as hard to stop (Boarder_Mass: x (1 + 8 x boost level))
-    let lvl = |r: &Rider| if r.boosting { r.boost_level() } else { 0.0 };
-    let (ma, mb) = (a.stats.mass().max(1.0) * (1.0 + 8.0 * lvl(a)), b.stats.mass().max(1.0) * (1.0 + 8.0 * lvl(b)));
-    let (da, db) = (closing * mb / (ma + mb), closing * ma / (ma + mb));
+    let (sa, sb) = (a.finished_and_stopped(), b.finished_and_stopped());
+    if !sa { a.pos -= n * push * if sb { 1.0 } else { 0.5 }; }
+    if !sb { b.pos += n * push * if sa { 1.0 } else { 0.5 }; }
+    if a.hit_wait > 0 || b.hit_wait > 0 { return; }
+    a.hit_wait = 3;
+    b.hit_wait = 3;
+    let g = |v: Vec3| [v.x * 100.0, v.z * 100.0, v.y * 100.0, 0.0];
+    let ma = if sa { 1e30 } else { a.speed_stat() };
+    let mb = if sb { 1e30 } else { b.speed_stat() };
+    let (ha, hb) = crate::hit::pair_speeds([n.x, n.z, n.y, 0.0], g(a.vel), g(b.vel), ma, mb);
     let a_was = a.crashed > 0.0;
     let b_was = b.crashed > 0.0;
-    let a_down = !a_was && !b_was && a.take_hit(-n * da, false);
-    let b_down = !a_was && !b_was && b.take_hit(n * db, false);
-    if a_was || b_was { return; }
+    let a_down = a.hit(ha, n, false);
+    let b_down = b.hit(hb, n, false);
     match (a_down, b_down) {
-        (true, false) => b.add_meter(1.0),
-        (false, true) => a.add_meter(1.0),
-        (true, true) => { a.add_meter(-0.1); b.add_meter(-0.1); }
+        (false, true) if !a_was => { a.knocked_someone(); let (_, c) = b.sc.crash(false); b.score_calls(&c); }
+        (true, false) if !b_was => { b.knocked_someone(); let (_, c) = a.sc.crash(false); a.score_calls(&c); }
+        (true, true) => {
+            for r in [&mut *b, &mut *a] {
+                let (m, c) = r.sc.crash(false);
+                r.score_calls(&c);
+                r.add_meter(m);
+            }
+        }
         _ => {}
     }
 }

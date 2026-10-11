@@ -50,6 +50,8 @@ pub struct Score {
     pub x84: i32,
     pub x88: i32,
     pub x8c: i32,
+    /// +0xbc riders knocked down (`Scoring_MsgKnockdown`)
+    pub xbc: i32,
     /// +0x90 crashes, +0xc0 crashes of the other kind (`Score_Crash`'s flag; a 1.5 s message of kind 5)
     pub x90: i32,
     pub xc0: i32,
@@ -764,5 +766,13 @@ impl Score {
         }
         self.grab_rate = 1.0;
         self.mult = 1.0;
+    }
+}
+
+impl Score {
+    /// `Scoring_MsgKnockdown` 0x155d98: one more rider knocked down (+0xbc) and a 2.1 s message of kind 4.
+    pub fn msg_knockdown(&mut self) -> ScoreCall {
+        self.xbc = self.xbc.wrapping_add(1);
+        ScoreCall::Message(0x4006_6666, 4, 0, 0)
     }
 }

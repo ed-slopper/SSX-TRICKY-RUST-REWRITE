@@ -66,3 +66,24 @@ Part of the port notes (index: [README.md](README.md)); units and wording as des
   0x2e1–6 cmCI_ and 0x2e8–d cmI_ (BUTT FACE FEET HEAD LEFT RIGHT), 0x224 A_FALLRECOVER, 0x250/1 CT_CRUNCH/STRETCH2BASE.
 - Mass: sphere masses 4,2,2,2,2,2,2,2,4,4,2,2,2,2,3,3 (0x3a3f68); I = 1.5× point-mass inertia. Sphere places
   are per character (not extracted): the remake uses a 1.7 m stand-in (rider/wipeout.rs).
+
+## Rider hits, exactly (board row E8d1, checked: `tests/hit.rs`; `tricky-rs/game/src/hit.rs`)
+
+- `Boarder_RiderHit` 0x124920(speed, rider, other, pair record, dir): the push is the speed clamped to ±500 cm/s;
+  over 1000 cm/s on the ground (motion 2), with the rider's heading (+0x1b0) within 45° of the record's angle and the
+  push out of the ground, the rider hops instead (crouch +0x1c8 = 1, `Jump_ApplyImpulse` with the speed in $f12,
+  motion 1, state 0xd); else the direction is flattened onto the ground plane (not in the air, motion 1), the push
+  added to the velocity, the rider's virtual +0x6c given push × 0.0012. Motion 5/6 (down) stops there. In the air a
+  push out of the ground counts as 0. Over 733.9661 cm/s (530.50287 in game mode 0, knockdown practice, 0x32de8c),
+  or any hit on a rail: `Boarder_Wipeout` with (position + dir × record[0], the velocity's direction, dir, push),
+  `Rivals_OnKnockdown`, the speech lines; over 167.31738: `Boarder_Stumble` (−0.02 meter) and `Rivals_OnHit`
+  (the other shoving, clip type 0x15) or `Rivals_OnBump`.
+- `Boarder_RiderCollisions`: the pair's closing speed k = (v_b·n − v_a·n) / (m_a + m_b) with m =
+  `Boarder_GetSpeedStat` 0x11d7b0 = weight byte × (0.79599 + 2.145779 × stability byte / 255) × (1 + 8 × boost
+  level) (1e30 for a rider finished and stopped, who is not moved either); a takes m_b·k, b −m_a·k. One down:
+  `Boarder_ScoreKnockdown` 0x11e9a0 for the other (`Scoring_MsgKnockdown`: +0xbc, message kind 4; +1.0 meter) and
+  `Boarder_ScoreCrash` 0x11e988 for the fallen (`Score_Crash`(mode 0), no meter); both: each `Score_Crash`(0) and its
+  −0.1. Two equal riders closing at over 14.7 m/s both go down.
+- In our riders (`Rider::hit`, `props::bump`): STANDIN one body sphere per rider, a three-tick wait per rider
+  instead of per pair, the pair record (wipe-out offset, hop angle) not kept (no hop), never knockdown practice, the
+  push's virtual not called.

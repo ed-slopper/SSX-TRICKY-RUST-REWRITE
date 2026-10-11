@@ -8,6 +8,7 @@ pub mod collide;
 pub mod controls;
 pub mod finish;
 pub mod gate;
+pub mod hit;
 pub mod probe;
 pub mod props;
 pub mod race;

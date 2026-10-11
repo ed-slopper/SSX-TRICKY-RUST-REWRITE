@@ -382,7 +382,8 @@ pub struct Rider {
     /// the rider's up, rider+0x2c0 (board row G20c), in the game's space (z up, w 0): the normal at `Boarder_PlaceAt`
     /// 0x11cae8, then unit(up + 0.5 · normal) at the end of every tick (`lean_up`, `Boarder_UpdateLeanTargets`
     /// 0x129500); the ground tick's springs and bob read it, `Boarder_UpdatePose` 0x129628 draws along it
-    pub up: [f32; 4],
+    pub up: [f32; 4],    /// ticks before this rider can be hit by another again (`Boarder_RiderCollisions`: three ticks)
+    pub hit_wait: u8,
 }
 
 pub fn heading(yaw: f32) -> Vec3 { Vec3::new(-yaw.sin(), 0.0, -yaw.cos()) }
@@ -395,7 +396,7 @@ impl Rider {
                last_trick: String::new(), trick_timer: 0.0, crashed: 0.0, hard_land: 0.0, crouch_v: 0.0, brake_v: 0.0, jump_c: 0.0, jump_delay: 0.0, height: 0.0,
                course_dir: None, course_pts: None, wipe: None, crash_at: None, gm: None, crash_spray: None, lean: [0.0; 3], up: [0.0, 0.0, 1.0, 0.0], recover: None, ai: false, down_t: 0.0, getup: -1.0, stumble: 0.0, wall_hit: None, speed_timer: 0.0, spin_timer: 0.0, spin_used: false, tube_class: u8::MAX, gate_p: 0.0, gate_hi: 0.0, gate_lo: 0.0, gate_still: 0.0, gate_target: 0.0, gate_speed: 0.0, gate_state: 8, gate_rock_dir: 0, band: (0.005, 0.0250417), spin_base: 0.0, flip_base: 0.0, late: false, cause: "", spin_ax: Axis::default(), flip_ax: Axis::default(), air_mode2: false, rail_off: 0.0, rail_time: 0.0, rail_halves: 0, boost_was: false, chain: 0,
                ubers: Vec::new(), uber: 0.0, uber_id: 0, uber_done: false, letters: 0, multiplier: 1,
-               sc: new_score(), tick_acc: 0.0, full_count: 0, rail_kind: 0, rail_goal0: 0.0, rail_committed: 0.0, show_parts: Vec::new(), grab_scored: false, grab_tw: false }
+               sc: new_score(), tick_acc: 0.0, full_count: 0, rail_kind: 0, rail_goal0: 0.0, rail_committed: 0.0, show_parts: Vec::new(), grab_scored: false, grab_tw: false, hit_wait: 0 }
     }
     /// `Boarder_Respawn`: dropped a metre above the snow, already moving down the course at 30 km/h.
     pub fn respawn(&mut self, at: (Vec3, f32)) {
@@ -465,6 +466,7 @@ impl Rider {
         self.tick_acc += dt;
         while self.tick_acc >= 1.0 / 60.0 {
             self.tick_acc -= 1.0 / 60.0;
+            self.hit_wait = self.hit_wait.saturating_sub(1);
             let speed = match self.rail { Some((_, _, s)) => s.abs(), None => self.vel.length() } * 100.0;
             self.sc.tick(speed);
             let mut f = crate::boarder::Fields { meter: self.boost, uber_timer: self.uber_timer, full_count: self.full_count, ..Default::default() };
@@ -519,15 +521,20 @@ impl Rider {
     pub fn force_wipe(&mut self) { self.cause = "forced"; self.crash_kind = 0; self.wipe_out(); }
     pub fn go_down(&mut self, lose_meter: bool) {
         if self.crashed > 0.0 { return; }
+        self.fall();
+        // `Score_Crash` 0x156de0: the chain lost, the trick so far banked, −0.1 meter
+        let (m, calls) = self.sc.crash(false);
+        self.show(&calls);
+        if lose_meter { self.add_meter(m); }
+    }
+    /// `Boarder_Wipeout` 0x11d830 itself: down, unscored (its callers score it).
+    fn fall(&mut self) {
+        if self.crashed > 0.0 { return; }
         self.last_trick = "CRASH".into();
         self.trick_timer = 2.0;
         // a crash in the middle of a trick in the uber window cuts the meter to two thirds and closes it
         let mid_trick = !self.grounded && (self.sc.units > 0.0 || self.spin.abs() > 1.0 || self.flip.abs() > 1.0 || self.sc.grabs[0] != 0);
         if !self.tricky() && self.uber_timer > 0.0 && mid_trick { self.boost = self.boost.min(0.66599226); self.uber_timer = 0.0; }
-        // `Score_Crash` 0x156de0: the chain lost, the trick so far banked, −0.1 meter
-        let (m, calls) = self.sc.crash(false);
-        self.show(&calls);
-        if lose_meter { self.add_meter(m); }
         self.crashed = 1.0;
         self.down_t = 0.0;
         self.getup = -1.0;
@@ -655,23 +662,69 @@ impl Rider {
         if off > 25f32.to_radians() { self.land_kind = 3; }
         self.vel *= 1.0643 - 0.2454 * off.clamp(15f32.to_radians(), 50f32.to_radians());
     }
-    /// Shoved over by another rider.
-    /// The original's rider hit (`Boarder_RiderHit` 0x124920): `dv` is the velocity change from the hit.
-    /// Over 7.34 m/s puts you down (a rail rider always comes off), over 1.67 m/s is a stumble.
-    /// Returns true if it put the rider down.
+    /// Shoved over by another rider: `dv` the velocity change of the shove (m/s). A knock-down is scored as
+    /// `Boarder_ScoreCrash` does (the trick banked; the meter only with `lose_meter`). Returns true if it put the
+    /// rider down.
     pub fn take_hit(&mut self, dv: Vec3, lose_meter: bool) -> bool {
-        if self.crashed > 0.0 { return false; }
         let m = dv.length();
-        let applied = if m > 5.0 { dv * (5.0 / m) } else { dv };
-        self.vel += if self.grounded { applied - self.normal * applied.dot(self.normal) } else { applied };
-        let airborne_up = !self.grounded && self.rail.is_none() && dv.y > 0.0;
-        if (m > 7.3397 || self.rail.is_some()) && !airborne_up {
-            self.crash_kind = if dv.dot(Vec3::new(self.yaw.cos(), 0.0, -self.yaw.sin())) > 0.0 { 3 } else { 2 };
-            self.go_down(lose_meter);
-            return true;
+        if m <= 0.0 { return false; }
+        let down = self.hit(m * 100.0, dv / m, true);
+        if down {
+            let (k, calls) = self.sc.crash(false);
+            self.show(&calls);
+            if lose_meter { self.add_meter(k); }
         }
-        if m > 1.6732 { self.stumble_by(true); }
-        false
+        down
+    }
+    /// `Boarder_RiderHit` 0x124920, exact (`hit::rider_hit`, checked): a hit of `speed` (cm/s, signed) along the
+    /// unit `dir` from a rider shoving (`shove`) or not. Over 733.97 cm/s it puts the rider down (unscored: the
+    /// caller scores it), always on a rail, never in the air when the hit is upward; over 167.32 it is a stumble.
+    /// STANDIN: the pair record the game keeps per pair of riders (where the wipe-out goes, the angle for the hop
+    /// into the air) is not kept, so the hop never happens; the game mode is not knockdown practice; the push's
+    /// virtual (+0x6c) is not called.
+    pub fn hit(&mut self, speed: f32, dir: Vec3, shove: bool) -> bool {
+        if self.crashed > 0.0 { return false; }
+        let g = |v: Vec3, k: f32, w: f32| [v.x * k, v.z * k, v.y * k, w];
+        let mut h = crate::hit::HitRider {
+            heading: self.yaw,
+            pos: g(self.pos, 100.0, 1.0),
+            vel: g(self.vel, 100.0, 0.0),
+            normal: g(self.normal, 1.0, 0.0),
+            motion: if self.rail.is_some() { 3 } else if self.grounded { 2 } else { 1 },
+            crouch: self.crouch_v,
+        };
+        let mut calls = Vec::new();
+        let down = crate::hit::rider_hit(speed, g(dir, 1.0, 0.0), [0.0, self.yaw + std::f32::consts::PI], false, shove, &mut h, &mut calls);
+        self.vel = Vec3::new(h.vel[0], h.vel[2], h.vel[1]) / 100.0;
+        for c in calls {
+            match c {
+                crate::hit::HitCall::Stumble { .. } => self.stumble_by(true),
+                crate::hit::HitCall::Wipeout { dir: d, .. } => {
+                    let d = Vec3::new(d[0], d[2], d[1]);
+                    self.crash_kind = if d.dot(Vec3::new(self.yaw.cos(), 0.0, -self.yaw.sin())) > 0.0 { 3 } else { 2 };
+                    self.fall();
+                }
+                _ => {}
+            }
+        }
+        down
+    }
+    /// `Boarder_ScoreKnockdown` 0x11e9a0: this rider put another down: a knock-down message and a full meter.
+    pub fn knocked_someone(&mut self) {
+        let call = self.sc.msg_knockdown();
+        self.show(&[call]);
+        self.add_meter(1.0);
+    }
+    /// The score functions' calls, for the HUD (as the rider shows its own).
+    pub fn score_calls(&mut self, calls: &[ScoreCall]) {
+        self.show(calls);
+    }
+    /// `Boarder_GetSpeedStat` 0x11d7b0: the rider's weight in a collision: weight × (0.79599 + 2.145779 × the
+    /// stability byte / 255), × (1 + 8 × the boost level).
+    pub fn speed_stat(&self) -> f32 {
+        let m = stat_byte_w(self.stats.weight) as f32 * (stat_byte(self.stats.stability) as f32 * 2.145_779 * 0.003_921_569 + 0.795_99);
+        let lvl = if self.boosting { self.boost_level() } else { 0.0 };
+        lvl * 7.999_995 * m + m
     }
     /// Crossing the line puts the rider in the finish state, whoever is riding.
     pub fn start_finish(&mut self, win: bool) {
@@ -1422,6 +1475,11 @@ pub fn new_score() -> Score {
     s.reset();
     s.bank_points();
     s
+}
+
+/// The weight attribute (kg) as the game's weight byte (stats+0x1e). STANDIN: taken as the kilograms.
+pub fn stat_byte_w(kg: f32) -> u8 {
+    kg.round().clamp(0.0, 255.0) as u8
 }
 
 /// One of our 0..1 attributes as the game's stat byte. STANDIN: our stats are fractions of the game's bytes.

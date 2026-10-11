@@ -68,3 +68,27 @@ fn trick_table_rows_are_our_riders_grabs() {
         }
     }
 }
+
+#[test]
+fn riders_running_into_each_other() {
+    // two riders on flat snow, one closing on the other from behind (`Boarder_RiderCollisions` /
+    // `Boarder_RiderHit`): the closing speed is shared by weight (a boosting rider weighs nine times as much); each
+    // share over 7.34 m/s puts that rider down; one knocking the other down scores a knock-down
+    for (speed, boosting, a_down, b_down) in [(2.0f32, false, false, false), (5.0, false, false, false), (10.0, true, false, true), (25.0, false, true, true)] {
+        let mut a = Rider::new(Vec3::new(0.0, 0.0, 0.0), 0.0);
+        let mut b = Rider::new(Vec3::new(0.0, 0.0, -0.5), 0.0);
+        for r in [&mut a, &mut b] {
+            r.grounded = true;
+            r.normal = Vec3::Y;
+        }
+        a.vel = Vec3::new(0.0, 0.0, -speed);
+        if boosting {
+            a.boosting = true;
+            a.boost = 1.0;
+        }
+        tricky_game::props::bump(&mut a, &mut b);
+        assert_eq!((a.crashed > 0.0, b.crashed > 0.0), (a_down, b_down), "{speed} m/s: who went down");
+        assert!(b.vel.z < 0.0 && a.vel.z > -speed, "{speed} m/s: the push goes forward ({:?}, {:?})", a.vel, b.vel);
+        assert_eq!(a.sc.xbc, (b_down && !a_down) as i32, "{speed} m/s: knock-downs scored");
+    }
+}
