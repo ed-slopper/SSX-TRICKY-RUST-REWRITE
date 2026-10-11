@@ -635,3 +635,4 @@
 190f58 Replay_IsKeyframeSaved Replay_IsKeyframeInHighlight
 192178 Replay_FindSavedKeyframe Replay_FindHighlight
 2b0f68 FE3DText_SetString FE3DText_SetStringId
+23a728 Octree_QuerySphere SphTree_SphereRecurse
