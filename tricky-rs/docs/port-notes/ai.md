@@ -118,3 +118,15 @@ Part of the port notes (index: [README.md](README.md)); units and wording as des
 - `AIComputer_IsRivalTarget` 0x139928 and `AIComputer_PickTargetRider` 0x1396c8 as in the grudges section above
   (the pick every 12th tick, riders within 700 cm, weight distance × (1 − cos bearing), a rival × (1 + |cos|), the
   lightest with ties to the later rider; dropped past 1050 cm or over 600 of rider+0x348; under 540 to pick).
+- `AIComputer_ControlsDispatch` 0x1389c8 every tick: `AIComputer_CheckStuck` into bit 0, then the shove:
+  `AIComputer_FindNearbyRider` 0x1394e0 — not during a shove clip (layer 1 type 0x15), every 6th tick, the first rider
+  within 200 cm (pair record) whose bearing is 30°–150° off the heading (+0x1b0) and that the rider holds a grudge
+  against at level 1 or 2 (cooled or not); the pad word's shove field (bits 23–24) 3 (ShoveLeft) when the bearing
+  difference is above 0, else 1 (ShoveRight). Then the riding mode by cComputer+0x8a0..0x8a4 (+0x89c the mode: 0
+  to a jump `AIComputer_RideToJump` 0x137858, 1 the line `AIComputer_RideLine` 0x1375c8, 2 near a rider
+  `AIComputer_RideNearRider` 0x137dc0, 3 at a rival `AIComputer_RideAtRival` 0x137a18; method table 0x31d318).
+  `AIComputer_RideAtRival` steers at a point 300 cm ahead of the rival along its velocity, brakes (bits 17–22 full)
+  when faster than the rival, tucks within 15°, throttles 15°–50°; behind 90° it steers to the line and brakes past
+  200 cm when faster.
+- The app's computer riders shove through `aicomp::find_nearby_rider` (row G4c; STANDIN: the pair record and the
+  heading from our positions and yaw, the shove clip as our shove timer).

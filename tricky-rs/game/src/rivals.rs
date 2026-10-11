@@ -166,6 +166,11 @@ impl Grudge {
         self.ai.on != 0 && (self.ai.level == 2 || (self.ai.level == 1 && self.ai.cooled == 0))
     }
 
+    /// The grudge as the AI's helpers read it (rider+0x118..0x128; the player is rider 0).
+    pub fn of(&self) -> crate::aicomp::GrudgeOf {
+        crate::aicomp::GrudgeOf { on: self.ai.on, target: self.ai.target, level: self.ai.level, cooled: self.ai.cooled }
+    }
+
     /// Will shove the player when alongside: level 1 or 2. STANDIN: the game decides inside its rival riding
     /// (`AIComputer_RideAtRival` 0x137a18 / `AIComputer_PickTargetRider` 0x1396c8, row G4), not ported yet.
     pub fn shoves(&self) -> bool {

@@ -137,3 +137,48 @@ pub fn pick_target_rider(target: &mut i32, rival: &mut bool, recs: &[[f32; 2]], 
     }
     0 <= *target
 }
+
+/// `AIComputer_FindNearbyRider` 0x1394e0 (called by `AIComputer_ControlsDispatch` 0x1389c8 every tick): the shove.
+/// Not while the rider's layer-1 clip is a shove (type 0x15), only on every 6th tick: the first rider (in index
+/// order) within 200 cm (the pair record) and alongside (the bearing from the rider's heading, wrapped, between 30°
+/// and 150° either side) that the rider holds a grudge against at level 1 or 2 (cooled or not). `Some(true)` when
+/// that rider is to the left of the heading (the bearing difference above 0), else `Some(false)`; the dispatcher
+/// puts it in the pad word's shove field (bits 23–24: 3 for true, 1 for false).
+pub fn find_nearby_rider(shoving: bool, tick: i32, recs: &[[f32; 2]], heading: f32, me: i32, n: i32, g: &GrudgeOf) -> Option<bool> {
+    if shoving || tick % 6 != 0 {
+        return None;
+    }
+    for i in 0..n {
+        if i == me {
+            continue;
+        }
+        let r = recs[i as usize];
+        if !(r[0] < 200.0) {
+            continue;
+        }
+        let a = heading - r[1];
+        let k = a * 0.159_154_94 + 0.5;
+        let mut fl = k as i32 as f32;
+        if k < fl {
+            fl -= 1.0;
+        }
+        let a = a - fl * 6.283_185_5;
+        let m = a.abs();
+        if !(0.523_598_8 < m) || !(m < 2.617_993_8) {
+            continue;
+        }
+        if g.on != 0 && g.target == i && (g.level == 1 || g.level == 2) {
+            return Some(0.0 < a);
+        }
+    }
+    None
+}
+
+/// The shove field `AIComputer_ControlsDispatch` 0x1389c8 writes from [`find_nearby_rider`].
+pub fn shove_bits(word: u32, side: Option<bool>) -> u32 {
+    match side {
+        Some(true) => word & 0xfe7f_ffff | 0x180_0000,
+        Some(false) => word & 0xfe7f_ffff | 0x80_0000,
+        None => word,
+    }
+}

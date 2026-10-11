@@ -145,3 +145,45 @@ fn target_choice_matches_the_original() {
     }
     assert!(picked.iter().all(|n| *n > 200), "none / target / rival target: {picked:?}");
 }
+
+#[test]
+fn shove_choice_matches_the_original() {
+    use tricky_game::aicomp::find_nearby_rider;
+    let Some(mut w) = world() else { return };
+    let shove = std::rc::Rc::new(std::cell::RefCell::new(false));
+    let s = shove.clone();
+    w.r.stub(0x15eec0, move |c, _| c.set_gpr(2, if *s.borrow() { 0x15 } else { 2 }));
+    let mut g = Rng(0x41d9_0c66_b3e2_5a18);
+    let mut found = [0u32; 3];
+    for case in 0..40_000 {
+        let n = 2 + (g.next() % 5) as i32;
+        let me = (g.next() % n as u32) as i32;
+        let gr = GrudgeOf { on: (g.next() % 3 != 0) as i32, target: (g.next() % n as u32) as i32, level: (g.next() % 4) as i32 - 1, cooled: (g.next() % 2) as i32 };
+        let heading = g.f(-7.0, 7.0);
+        let tick = (g.next() % 100) as i32 * if g.next() % 2 == 0 { 6 } else { 1 };
+        let shoving = g.next() % 5 == 0;
+        let recs: Vec<[f32; 2]> = (0..6).map(|_| [[g.f(0.0, 200.0), g.f(200.0, 400.0), 200.0][g.next() as usize % 3], heading + g.f(-4.0, 4.0)]).collect();
+        *shove.borrow_mut() = shoving;
+        let m = &mut w.r.mem;
+        m.write_u32(w.world + 0x18, tick as u32);
+        m.write_u32(w.world + 0x88, n as u32);
+        m.write_f32(w.rider + 0x1b0, heading);
+        m.write_u32(w.rider + 0x460, me as u32);
+        for (o, v) in [(0x118, gr.on), (0x120, gr.target), (0x124, gr.level), (0x128, gr.cooled)] {
+            m.write_u32(w.rider + o, v as u32);
+        }
+        for (k, rc) in recs.iter().enumerate() {
+            m.write_f32(w.rider + 0x40 + 0x20 * k as u32, rc[0]);
+            m.write_f32(w.rider + 0x44 + 0x20 * k as u32, rc[1]);
+        }
+        m.write_u32(w.out, 7);
+        w.r.cpu.set_gpr(4, w.comp as u64);
+        w.r.cpu.set_gpr(5, w.out as u64);
+        w.r.call(0x1394e0).unwrap_or_else(|e| panic!("case {case}: {e}"));
+        let theirs = if w.r.cpu.gpr(2) != 0 { Some(w.r.mem.read_u32(w.out) != 0) } else { None };
+        let ours = find_nearby_rider(shoving, tick, &recs, heading, me, n, &gr);
+        assert_eq!(theirs, ours, "case {case}: n {n} me {me} tick {tick} grudge {gr:?} recs {recs:?} heading {heading}");
+        found[match ours { None => 0, Some(false) => 1, Some(true) => 2 }] += 1;
+    }
+    assert!(found.iter().all(|n| *n > 200), "none / right / left: {found:?}");
+}

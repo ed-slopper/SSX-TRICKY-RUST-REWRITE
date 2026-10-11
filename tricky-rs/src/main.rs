@@ -1878,8 +1878,6 @@ fn ride(
         if !waiting {
             // riders shove each other, and anyone can send a marker or crash bag flying
             for i in 0..opponents.0.len() {
-                // a rival looks for someone to shove every 12 ticks: within 2 m and 30-150 degrees
-                // off its heading (to the side), as the original's AI does
                 let o = &mut opponents.0[i];
                 o.driver.shove_wait -= dt;
                 let gap = r.pos - o.rider.pos;
@@ -1887,14 +1885,25 @@ fn ride(
                 let side_on = flat.normalize_or_zero().dot(heading(o.rider.yaw)).abs() < 0.866;
                 let close = flat.length() < 2.0 && gap.y.abs() < 1.5 && side_on && r.crashed <= 0.0 && o.rider.crashed <= 0.0 && o.rider.rail.is_none() && race.0.time > 3.0;
                 o.driver.beside = if close { o.driver.beside + dt } else { 0.0 };
-                // only a rider holding a grudge shoves (AIComputer_ShouldShove)
-                let grudging = o.grudge.as_ref().is_some_and(|g| g.shoves());
-                if close && grudging && o.driver.shove_wait <= 0.0 && game.event == ui::Event::Race {
+                // the shove (`AIComputer_FindNearbyRider`, exact): every 6th tick, a rider it holds a grudge
+                // against (level 1 or 2) within 2 m and 30-150 degrees off its heading, to that side.
+                // STANDIN: the pair record and heading made here from our positions and yaw (the player is
+                // rider 0, this rider 1), the shove clip as the rider's shove timer
+                let tick = (race.0.time * 60.0).round() as i32;
+                let gp = |v: Vec3| [v.x * 100.0, v.z * 100.0, v.y * 100.0, 1.0];
+                let mut recs = vec![vec![[0.0f32; 2]; 2]; 2];
+                tricky_game::hit::pair_distances(&[gp(r.pos), gp(o.rider.pos)], &mut recs);
+                let h = heading(o.rider.yaw);
+                let side = match o.grudge.as_ref() {
+                    Some(g) if r.crashed <= 0.0 && o.rider.crashed <= 0.0 && o.rider.rail.is_none() && race.0.time > 3.0 && game.event == ui::Event::Race =>
+                        tricky_game::aicomp::find_nearby_rider(o.rider.shove > 0.0, tick, &recs[1], h.z.atan2(h.x), 1, 2, &g.of()),
+                    _ => None,
+                };
+                if let Some(left) = side {
                     // the shove clip runs about 0.7 s before another can start
                     o.driver.shove_wait = 0.7;
                     o.rider.shove = 0.7;
-                    let right = Vec3::new(o.rider.yaw.cos(), 0.0, -o.rider.yaw.sin());
-                    o.rider.shove_side = if gap.dot(right) >= 0.0 { 1.0 } else { -1.0 };
+                    o.rider.shove_side = if left { -1.0 } else { 1.0 };
                     let push = props::shove_push(&o.rider, r);
                     let was = r.stumble > 0.0;
                     if let (true, Some(push)) = (r.shove <= 0.0, push) {
