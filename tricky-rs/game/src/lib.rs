@@ -4,6 +4,7 @@
 pub mod air;
 pub mod boarder;
 pub use tricky_data::anim;
+pub mod collbody;
 pub mod collide;
 pub mod controls;
 pub mod finish;
