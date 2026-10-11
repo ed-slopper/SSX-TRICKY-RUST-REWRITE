@@ -2290,14 +2290,14 @@ address,size,name,system,status
 0x199200,88,cAnimObjectNode::Kill,animation,not started
 0x199258,132,MeshAnim_ApplyFrames,render,not started
 0x1992e0,64,cAnimComboNode::Draw,animation,not started
-0x199320,1328,FUN_00199320,world?,not started
+0x199320,1328,cAnimObjectNode::vf28_199320,animation,not started
 0x1998d0,36,FUN_001998d0,world?,not started
 0x1998f8,240,cAnimObjectNode::SaveSnapshot,save,not started
 0x1999e8,736,AnimObjectNode_CreateOverlap,animation,not started
 0x199d10,84,cAnimDeltaNode::cAnimDeltaNode,animation,not started
 0x199d68,80,cAnimDeltaNode::cAnimDeltaNode,animation,not started
 0x199db8,244,cAnimDeltaNode::Update,animation,ported
-0x199ee0,60,FUN_00199ee0,world?,not started
+0x199ee0,60,cAnimComboNode::vf38_199ee0,animation,not started
 0x199f20,392,AnimComboNode_Init,animation,not started
 0x19a0a8,256,cAnimComboNode::cAnimComboNode,animation,not started
 0x19a1a8,112,cAnimComboNode::~cAnimComboNode,animation,not started
@@ -2646,7 +2646,7 @@ address,size,name,system,status
 0x1c17c0,760,TexMan_LockTexture,render,not started
 0x1c1ab8,280,FUN_001c1ab8,render?,not started
 0x1c1bd0,392,FUN_001c1bd0,render?,not started
-0x1c1d58,500,FUN_001c1d58,render?,not started
+0x1c1d58,500,TexMan_UploadPixels,render,not started
 0x1c1f50,5112,TexMan_UploadTextures,render,not started
 0x1c3348,308,TexMan_UpdateLod,render,not started
 0x1c3480,220,TexMan_InitLoadNodes,render,not started
@@ -2670,7 +2670,7 @@ address,size,name,system,status
 0x1c4c38,244,PS2Draw_SelectViewport,render?,not started
 0x1c4d30,52,PS2Draw_SetTexturePage,render?,not started
 0x1c4d68,384,PS2Draw_SetState,render?,not started
-0x1c4ee8,60,FUN_001c4ee8,render?,not started
+0x1c4ee8,60,PS2Draw_BindTexture,render?,not started
 0x1c4f28,184,FUN_001c4f28,render?,not started
 0x1c4fe0,524,PS2Draw_FlushBuckets,render?,not started
 0x1c51f0,376,PS2Draw_WriteFullState,render?,not started
@@ -2699,9 +2699,9 @@ address,size,name,system,status
 0x1c8c70,92,FUN_001c8c70,boarder?,not started
 0x1c8cd0,124,StaticInit_TerrainObjNode,other,not started
 0x1c8db8,268,cSnowFallMan::cSnowFallMan,render,not started
-0x1c8ec8,512,FUN_001c8ec8,world?,not started
+0x1c8ec8,512,SnowFall_InitLayers,world?,not started
 0x1c90d0,96,SnowFall_SetDensity,other,not started
-0x1c9130,140,FUN_001c9130,render?,not started
+0x1c9130,140,SnowFall_SetScale,render?,not started
 0x1c91c0,72,FUN_001c91c0,game?,not started
 0x1c9218,160,SnowFall_SnapOrigin,render?,not started
 0x1c92b8,88,cSnowFallMan::vf1_1c92b8,render,not started
@@ -2757,7 +2757,7 @@ address,size,name,system,status
 0x1cbbc8,496,cLensFXObjNode::cLensFXObjNode,world,not started
 0x1cbdb8,104,cLensFXObjNode::~cLensFXObjNode,world,not started
 0x1cbe20,616,cLensFXObjNode::Draw,world,not started
-0x1cc088,264,FUN_001cc088,world?,not started
+0x1cc088,264,LensFX_AddFlare,world?,not started
 0x1cc190,3756,FUN_001cc190,camera?,not started
 0x1cd040,3128,FUN_001cd040,boarder?,not started
 0x1ce008,80,cLensFXObjNode::__tf,runtime,host
@@ -2772,7 +2772,7 @@ address,size,name,system,status
 0x1ce3f0,8,cLightMan::vf12_1ce3f0,render,not started
 0x1ce3f8,8,cLightMan::vf8_1ce3f8,render,not started
 0x1ce410,64,cLightMan::__tf,runtime,host
-0x1ce490,236,FUN_001ce490,frontend?,not started
+0x1ce490,236,cMCOverlayManager::cMCOverlayManager,save,not started
 0x1ce580,44,cMCOverlayManager::~cMCOverlayManager,save,not started
 0x1ce5b0,264,MemCardOp_StartLoad,save,not started
 0x1ce6b8,72,FUN_001ce6b8,frontend?,not started
@@ -2937,7 +2937,7 @@ address,size,name,system,status
 0x1d59e0,16,FUN_001d59e0,world?,not started
 0x1d59f0,24,FUN_001d59f0,world?,not started
 0x1d5a08,36,Rand_VuNext,world?,not started
-0x1d5a30,304,FUN_001d5a30,world?,not started
+0x1d5a30,304,ParticleSys_StepEmitter,world?,not started
 0x1d5b60,10532,FUN_001d5b60,world?,not started
 0x1d8488,8,FUN_001d8488,ai?,not started
 0x1d8490,1592,ParticleSys_Create,world?,not started
@@ -2952,9 +2952,9 @@ address,size,name,system,status
 0x1d8f50,132,cParticleMan::~cParticleMan,render,not started
 0x1d8fd8,64,PoolList_Pop,world?,not started
 0x1d9018,68,PoolList_Push,world?,not started
-0x1d9060,168,FUN_001d9060,boarder?,not started
+0x1d9060,168,ParticleGroup_Add,boarder?,not started
 0x1d9108,48,FUN_001d9108,boarder?,not started
-0x1d9138,208,FUN_001d9138,world?,not started
+0x1d9138,208,ParticleGroup_Remove,world?,not started
 0x1d9208,1272,FUN_001d9208,world?,not started
 0x1d9700,504,FUN_001d9700,render?,not started
 0x1d98f8,8,cParticleMan::vf1_1d98f8,render,not started
@@ -2975,7 +2975,7 @@ address,size,name,system,status
 0x1db1c8,28,FUN_001db1c8,render?,not started
 0x1db1e8,780,Render_BuildBezierTables,render,not started
 0x1db4f8,56,FUN_001db4f8,render?,not started
-0x1db530,268,FUN_001db530,render?,not started
+0x1db530,268,Render_FillBezierWeights,render,not started
 0x1db640,508,StaticInit_Render,render?,not started
 0x1db840,8,cPS2BezierMan::vf13_1db840,render,not started
 0x1db848,8,cPS2BezierMan::vf12_1db848,render,not started
@@ -3009,10 +3009,10 @@ address,size,name,system,status
 0x1dd9f8,1764,cPS2GraphicsMan::vf72_1dd9f8,render,not started
 0x1de0e0,1764,cPS2GraphicsMan::vf73_1de0e0,render,not started
 0x1de7c8,704,cPS2GraphicsMan::vf67_1de7c8,render,not started
-0x1dea88,180,FUN_001dea88,render?,not started
+0x1dea88,180,PS2Render_ResetMeshCache,render?,not started
 0x1deb40,140,PS2Render_LinkMesh,render?,not started
-0x1debd0,100,FUN_001debd0,render?,not started
-0x1dec38,180,FUN_001dec38,render?,not started
+0x1debd0,100,PS2Render_UnlinkMesh,render?,not started
+0x1dec38,180,PS2Render_FlushMeshCache,render?,not started
 0x1decf0,360,cPS2GraphicsMan::vf68_1decf0,render,not started
 0x1dee58,36,cPS2GraphicsMan::vf69_1dee58,render,not started
 0x1dee80,672,cPS2GraphicsMan::vf99_1dee80,render,not started
@@ -3022,7 +3022,7 @@ address,size,name,system,status
 0x1dfe30,344,cPS2GraphicsMan::vf93_1dfe30,render,not started
 0x1dff88,1328,cPS2GraphicsMan::vf94_1dff88,render,not started
 0x1e04b8,280,Render_FormatVramStats,render,not started
-0x1e05d0,140,FUN_001e05d0,render?,not started
+0x1e05d0,140,Render_CalcTexVramSize,render,not started
 0x1e0680,48,FUN_001e0680,render?,not started
 0x1e06e0,764,FUN_001e06e0,render?,not started
 0x1e09e0,984,FUN_001e09e0,render?,not started

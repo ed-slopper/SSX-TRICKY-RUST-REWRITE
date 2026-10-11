@@ -5756,3 +5756,19 @@ G 158c38 AnimData_Construct
 G 259030 World_ProbeGround
 G 155588 Score_GetGradeForPoints
 G 161730 Career_Construct
+F 199320 cAnimObjectNode vf28
+F 199ee0 cAnimComboNode vf38
+G 1c1d58 TexMan_UploadPixels
+G 1c8ec8 SnowFall_InitLayers
+G 1c9130 SnowFall_SetScale
+G 1d5a30 ParticleSys_StepEmitter
+G 1d9060 ParticleGroup_Add
+G 1d9138 ParticleGroup_Remove
+G 1dea88 PS2Render_ResetMeshCache
+G 1dec38 PS2Render_FlushMeshCache
+G 1debd0 PS2Render_UnlinkMesh
+G 1db530 Render_FillBezierWeights
+G 1e05d0 Render_CalcTexVramSize
+G 1cc088 LensFX_AddFlare
+G 1c4ee8 PS2Draw_BindTexture
+F 1ce490 cMCOverlayManager cMCOverlayManager
