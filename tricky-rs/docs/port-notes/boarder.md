@@ -532,3 +532,31 @@ armed; else the crouch target 0 and, uncrouched, a quarter turn the way of the t
 clip (0x258..0x25f) and the clip to queue (+8); `RailSlideControl_PlayQueuedClip` 0x107628 plays it when the turn's
 clip ends and sets the new rail kind (1→4, 2→3, 3→1, 4→2). Pad bit 0: reset at 101.46.
 
+
+## The attitude at a placement (row G20c3a; checked: `tests/placement.rs`)
+
+`Boarder_PlaceAt` 0x11cae8 builds the rider's attitude (the quaternion rider+0x170 and the axes rider+0x180 forward,
++0x190 side, +0x1a0 up, the heading +0x1b0) in three steps (`orient::placed_attitude`), proven from the disassembly:
+
+1. `Boarder_ResetOrientation` 0x128e20 (`orient::reset_orientation`): `Vec4_Set` 0x10c120 gives (1, 0, 0, 0), then
+   `Boarder_RotateAboutAxis` by −π/2 (`0xbfc90fdb`) about (0, 0, 1, 0). The board points along +x: heading 0.
+2. `Boarder_RotateAboutAxis` by the first argument (f12, the heading in radians, the angle of the forward from +x)
+   about (0, 0, 1, 0) (0x11cb7c).
+3. Only when the last argument is 0 and the placement's ray (`cWorldLine` 0x25d7f0 from 2 cm above the place to
+   `height` + 200 below, `World_RayCast` 0x25aff8, result > 0) hits: the normal is stored at +0x2a0 and the board is
+   turned about the axis c = normal × board up (`vopmula` / `vopmsub` on (normal, up): c.x = n.y·up.z − up.y·n.z …, w
+   cleared) with s = |c| (`vsqrt`). Skipped when s ≤ 1e-5 (`0x3727c5ac`); else the axis is c · (1 / s) (`vdiv`, `vmulq`:
+   from the unclamped s), s is held to 0.99999 (`0x3f7fff58`) and the angle is −`Math_Asin`(s) (0x11cdb0). The
+   rotation never takes the angle past 90° (asin only): a hit whose normal points down still turns the short way.
+
+With the last argument non-zero (`Boarder_PlaceAt`'s alternate placement) there is no ray and step 3 does not run.
+Inferred: the callers' first argument is the game heading (what `ResetState_PlaceRider` and `Boarder_StartReset` pass,
+`aipath.rs`); the port keeps a yaw (heading = yaw + π/2, `ground_tick`), so the conversion at a respawn is ours.
+
+Checked bit for bit against the real function in the runner (6,000 placements: every branch, hits that tilt the board
+and ones behind it, horizontal normals that reach the 0.99999 hold, normals a hair off the up near 1e-5, no ray, the
+flag): the quaternion, the three axes and the heading.
+
+**Not wired.** `Rider::respawn` drops the rider a metre above the snow, so the game keeps this attitude through the
+air (turned by spin and flip, rows G1a and G5) until the landing; the port has no air attitude, and `seed_ground` still
+rebuilds it from yaw and normal (STANDIN). Wiring is the landing half of G20c3.

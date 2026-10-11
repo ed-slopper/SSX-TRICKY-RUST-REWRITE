@@ -102,6 +102,41 @@ pub fn rotate_about_axis(o: &mut Orient, angle: f32, axis: V4) {
     update_orientation(o);
 }
 
+/// `Boarder_ResetOrientation` 0x128e20: the quaternion set to (1, 0, 0, 0) (`Vec4_Set` 0x10c120), then turned by
+/// −π/2 (`0xbfc90fdb`) about z with `Boarder_RotateAboutAxis`: the board lies flat and points along +x (heading 0).
+pub fn reset_orientation(o: &mut Orient) {
+    o.q = [1.0, 0.0, 0.0, 0.0];
+    rotate_about_axis(o, -HALF_PI, [0.0, 0.0, 1.0, 0.0]);
+}
+
+/// The board's attitude at a placement (board row G20c3a): `Boarder_PlaceAt` 0x11cae8 from its call of
+/// `Boarder_ResetOrientation` to the end of its ray's branch. The board is turned by the heading `heading` (its
+/// first argument, radians: the angle of the board's forward from +x) about z; when the placement's ray (`cWorldLine`
+/// 0x25d7f0, `World_RayCast` 0x25aff8, 2 cm above to `height` + 200 below the place) hits, with the hit's normal `hit`,
+/// the board is turned further by −asin(s) about the axis (hit × board up) / s, s the length of that cross product
+/// (the rotation is skipped when s is 1e-5 or less, and s is held to 0.99999 for the asin, but not for the axis).
+/// With no hit the heading's turn is all there is. The caller (`Boarder_PlaceAt` with its last argument 0) passes
+/// the ray's normal in the same space as the quaternion (z up).
+pub fn placed_attitude(heading: f32, hit: Option<V4>) -> Orient {
+    let mut o = Orient::default();
+    reset_orientation(&mut o);
+    rotate_about_axis(&mut o, heading, [0.0, 0.0, 1.0, 0.0]);
+    if let Some(n) = hit {
+        // vopmula / vopmsub on (normal, up), w cleared
+        let c = crate::probe::cross(n, o.up);
+        let s = crate::jump::dot(c, c).sqrt();
+        if f32::from_bits(0x3727_c5ac) < s {
+            // vdiv Q = 1 / s, every lane times Q
+            let k = 1.0 / s;
+            let axis = [c[0] * k, c[1] * k, c[2] * k, c[3] * k];
+            let top = f32::from_bits(0x3f7f_ff58);
+            let s = if top < s { top } else { s };
+            rotate_about_axis(&mut o, -math::asin(s), axis);
+        }
+    }
+    o
+}
+
 /// What `Boarder_TakeOff` reads and writes of the rider itself.
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct TakeOffRider {
