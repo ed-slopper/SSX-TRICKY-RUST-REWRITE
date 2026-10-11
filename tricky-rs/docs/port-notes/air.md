@@ -63,7 +63,7 @@ Part of the port notes (index: [README.md](README.md)); units and wording as des
   without 0x400): rates go to x·|lo+hi| and −y·|lo+hi| at 75 rad/s². Let go (or mode 2): the exit clip, mode 2, the band's
   inner bound and floor to 0, owed spin ±π for the half-pipe clips 0x23c/0x23d (which then turn the rider by their phase),
   emax 2π; the errors as before, but measured from the late wind-up (+0x274/+0x278 in thirds of a turn): spin back
-  within 40°, flip round within 40° of 180°, else on to the next half turn on the band's side; flip back within 40° else on
+  to 0 within 40°, to the half turn within 40° of 180°, else on to the next half turn on the band's side; flip back within 40° else on
   to the next whole turn; rate = (0.5449139 + 0.6741781·T/255)·150.53665·clamp(err, ±emax)·dt. Every tick the bands
   shrink by 0.9930117 + 0.002014339·T/255 and are held at the floor on their own side; spin clamped to [lo, hi], flip to
   [lo, hi] (upper strict). Mode 2 settled (|rates| < 0.7, not clip 0x225): `SpinState_StartFromStick`, else the half-pipe
