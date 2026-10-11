@@ -70,8 +70,9 @@ surf[6]/surf[9] by row: 1 2.742/5.009; 2 2.849/5.530; 3 15.04/2.842; 4 30.03/2.9
   `cRailSlideControl`, `cSpinControl`, `cSitAndWaitControl`, `cGetupFromSitControl`, `cWipeOutControl`,
   `cWipeOutRecoverControl`, `cLessonWaitControl`, `cResetWaitControl` (vtables: `cFakieCruiseControl` 0x366eb0,
   `cChangeFakieControl` 0x366f60, `cCruiseControl` 0x367010). Riding fakie is a state of its own, and so is
-  changing out of it: which state number each class is (the dispatch at 0x11c9a0) is not mapped yet; the boarder
-  constructor 0x11b348 builds them.
+  changing out of it: which state number each class is (the dispatch, `Boarder_UpdateControl` 0x11c9a0) is not mapped
+  yet; the boarder constructor 0x11b348 builds them. Known so far: 4 the turnaround (revert), 0x16 the reset wait
+  (`Boarder_StartReset` 0x119be0), 0xd in the air, 3 riding, 2 the stumble.
 - Motions (rider+0x424): `cAirMotion`, `cGroundMotion`, `cRailSlideMotion`, `cStaticMotion`, `cWipeOutMotion`,
   `cWipeOutRecoverMotion`.
 

@@ -258,7 +258,7 @@ address,size,name,system,status
 0x118c08,776,FUN_00118c08,boarder?,not started
 0x118f10,772,Boarder_RequestReset,boarder,not started
 0x119220,2496,FUN_00119220,boarder?,not started
-0x119be0,172,FUN_00119be0,boarder?,not started
+0x119be0,172,Boarder_StartReset,boarder,not started
 0x119c90,160,FUN_00119c90,boarder?,not started
 0x119d30,752,FUN_00119d30,boarder?,ported
 0x11a020,116,FUN_0011a020,boarder?,not started
@@ -282,7 +282,7 @@ address,size,name,system,status
 0x11c7d8,100,FUN_0011c7d8,boarder?,not started
 0x11c840,168,FUN_0011c840,boarder?,not started
 0x11c8e8,184,FUN_0011c8e8,boarder?,not started
-0x11c9a0,232,FUN_0011c9a0,boarder?,not started
+0x11c9a0,232,Boarder_UpdateControl,boarder,not started
 0x11ca88,52,FUN_0011ca88,boarder?,not started
 0x11cae8,1284,Boarder_PlaceAt,boarder,not started
 0x11cff0,68,Boarder_SetTimeScaleRateLimited,boarder,not started
@@ -452,8 +452,8 @@ address,size,name,system,status
 0x126888,124,FUN_00126888,boarder?,not started
 0x126918,44,FUN_00126918,boarder?,not started
 0x126948,380,Boarder_SetSteerTarget,boarder,not started
-0x126ac8,112,FUN_00126ac8,boarder?,not started
-0x126b38,196,FUN_00126b38,boarder?,not started
+0x126ac8,112,Boarder_SetSteerTargetUnscaled,boarder,not started
+0x126b38,196,Boarder_SetBrakeCrouchInput,boarder,not started
 0x126c00,120,Boarder_SetCrouchTarget,boarder,not started
 0x126c78,440,FUN_00126c78,boarder?,not started
 0x126e30,400,Takeoff_SetSpinRates,boarder,not started
@@ -465,9 +465,9 @@ address,size,name,system,status
 0x127e80,720,FUN_00127e80,boarder?,not started
 0x128150,668,FUN_00128150,boarder?,not started
 0x1283f0,124,FUN_001283f0,boarder?,not started
-0x128470,112,FUN_00128470,boarder?,not started
+0x128470,112,Boarder_TakeOff,boarder,not started
 0x1284e0,1336,Jump_ApplyImpulse,boarder,ported
-0x128a18,208,FUN_00128a18,boarder?,not started
+0x128a18,208,Boarder_GetFallLine,boarder,not started
 0x128ae8,820,Boarder_ProbeGround,boarder,not started
 0x128e20,108,FUN_00128e20,boarder?,not started
 0x128e90,372,Boarder_RotateAboutAxis,boarder,not started
@@ -1196,7 +1196,7 @@ address,size,name,system,status
 0x15ada8,280,AnimClip_ResolveAnmIndex,animation,ported
 0x15aec0,16040,FUN_0015aec0,animation?,not started
 0x15ed68,200,FUN_0015ed68,render?,not started
-0x15ee30,140,FUN_0015ee30,boarder?,not started
+0x15ee30,140,AnimCtl_Reset,animation,not started
 0x15eec0,56,AnimCtl_GetClipType,animation,not started
 0x15eef8,80,AnimCtl_TurnAllLayers,animation,not started
 0x15ef48,80,FUN_0015ef48,boarder?,not started
@@ -2242,7 +2242,7 @@ address,size,name,system,status
 0x196700,20,cAIPath::vf2_196700,ai,not started
 0x196718,64,cAIPath::vf3_196718,ai,not started
 0x196758,252,FUN_00196758,boarder?,not started
-0x196858,112,FUN_00196858,boarder?,not started
+0x196858,112,AIP_CanResetAt,ai,not started
 0x196940,80,cAIPath::__tf,runtime,host
 0x196990,8,cEventPath::vf2_196990,ai,not started
 0x196998,24,cEventPath::vf3_196998,ai,not started

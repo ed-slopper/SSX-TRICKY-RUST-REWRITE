@@ -3084,3 +3084,11 @@ G 11e9a0 Boarder_ScoreKnockdown
 G 11c770 Boarder_UpdateMotion
 G 197738 AIP_GetPointAtDistance
 G 105a60 PrewindState_SetWindTarget
+G 128470 Boarder_TakeOff
+G 11c9a0 Boarder_UpdateControl
+G 15ee30 AnimCtl_Reset
+G 126ac8 Boarder_SetSteerTargetUnscaled
+G 128a18 Boarder_GetFallLine
+G 196858 AIP_CanResetAt
+G 119be0 Boarder_StartReset
+G 126b38 Boarder_SetBrakeCrouchInput
