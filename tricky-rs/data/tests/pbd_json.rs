@@ -202,7 +202,7 @@ fn meshes_match_the_exported_obj_files() {
     let Some(dir) = std::env::var_os("TRICKY_PBD_DIR") else { return };
     let levels = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../levels");
     let (mut objs, mut tris) = (0usize, 0usize);
-    for (folder, file) in [("snowdream", "snow"), ("elysium", "elysium"), ("mesablanca", "mesa"), ("merqury", "merquer"), ("aloha", "aloha"), ("pipedream", "pipe"), ("untracked", "untrack"), ("megaplex", "megaple"), ("alaska", "alaska")] {
+    for (folder, file) in [("snowdream", "snow"), ("elysium", "elysium"), ("mesablanca", "mesa"), ("merqury", "merquer"), ("aloha", "aloha"), ("pipedream", "pipe"), ("untracked", "untrack"), ("megaplex", "megaple"), ("alaska", "alaska"), ("trick", "trick")] {
         let Ok(bytes) = std::fs::read(std::path::Path::new(&dir).join(format!("{file}.pbd"))) else { continue };
         let meshes = levels.join(folder).join("Meshes");
         if !meshes.exists() {
@@ -255,4 +255,69 @@ fn meshes_match_the_exported_obj_files() {
         }
     }
     eprintln!("{objs} meshes, {tris} triangles compared");
+}
+
+
+#[test]
+fn collision_meshes_match_the_exported_obj_files() {
+    use tricky_data::ssf::Ssf;
+    let (Some(dir), Some(sdir)) = (std::env::var_os("TRICKY_PBD_DIR"), std::env::var_os("TRICKY_SSF_DIR")) else { return };
+    let levels = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../levels");
+    let (mut objs, mut tris) = (0usize, 0usize);
+    for (folder, file) in [("gari", "gari"), ("snowdream", "snow"), ("elysium", "elysium"), ("mesablanca", "mesa"), ("merqury", "merquer"), ("aloha", "aloha"), ("pipedream", "pipe"), ("untracked", "untrack"), ("megaplex", "megaple"), ("alaska", "alaska"), ("trick", "trick")] {
+        let (Ok(bytes), Ok(sbytes), Ok(json)) = (
+            std::fs::read(std::path::Path::new(&dir).join(format!("{file}.pbd"))),
+            std::fs::read(std::path::Path::new(&sdir).join(format!("{file}.ssf"))),
+            std::fs::read_to_string(levels.join(folder).join("Instances.json")),
+        ) else {
+            continue;
+        };
+        let pbd = Pbd::parse(&bytes).unwrap();
+        let ssf = Ssf::parse(&sbytes, pbd.instances.len() as u32).unwrap();
+        let theirs: serde_json::Value = serde_json::from_str(&json).unwrap();
+        let mut seen = std::collections::HashSet::new();
+        for (k, t) in theirs["Instances"].as_array().unwrap().iter().enumerate() {
+            let p = ssf.physics[ssf.object_physics[k] as usize];
+            let paths: Vec<&str> = t["CollsionModelPaths"].as_array().map(|a| a.iter().map(|x| x.as_str().unwrap()).collect()).unwrap_or_default();
+            if p.collision_mode() == 3 || p.group() < 0 {
+                assert!(paths.is_empty(), "{folder}: instance {k} has no collision mesh but {paths:?}");
+                continue;
+            }
+            let meshes = &ssf.collision[p.group() as usize];
+            assert_eq!(paths.len(), meshes.len(), "{folder}: instance {k}: group {} paths {paths:?}", p.group());
+            for (path, mesh) in paths.iter().zip(meshes) {
+            if !seen.insert(path.to_string()) {
+                continue;
+            }
+            let text = std::fs::read_to_string(levels.join(folder).join("Collision").join(path)).unwrap();
+            let (mut v, mut vn, mut f) = (vec![], vec![], vec![]);
+            for l in text.lines() {
+                let w: Vec<&str> = l.split_whitespace().collect();
+                match w.first() {
+                    Some(&"v") => v.push([w[1], w[2], w[3]].map(|x| x.parse::<f32>().unwrap())),
+                    Some(&"vn") => vn.push([w[1], w[2], w[3]].map(|x| x.parse::<f32>().unwrap())),
+                    Some(&"f") => f.push([w[1], w[2], w[3]].map(|x| {
+                        let mut s = x.split("//");
+                        (s.next().unwrap().parse::<usize>().unwrap() - 1, s.next().unwrap().parse::<usize>().unwrap() - 1)
+                    })),
+                    _ => {}
+                }
+            }
+            let ours: Vec<([[f32; 3]; 3], [f32; 3])> = std::iter::once(mesh)
+                .flat_map(|m| m.tris.iter().zip(&m.planes).map(|(t, pl)| (t.map(|i| { let q = m.verts[i as usize]; [q[0], q[1], q[2]] }), [pl[0], pl[1], pl[2]])))
+                .collect();
+            let what = format!("{folder}: {} (instance {k}, group {})", path, p.group());
+            assert_eq!(ours.len(), f.len(), "{what}: triangles");
+            for (ti, ((a, n), b)) in ours.iter().zip(&f).enumerate() {
+                for c in 0..3 {
+                    assert_eq!(a[c], v[b[c].0], "{what}: triangle {ti}");
+                    assert_eq!(*n, vn[b[c].1], "{what}: triangle {ti} normal");
+                }
+            }
+            objs += 1;
+            tris += f.len();
+            }
+        }
+    }
+    eprintln!("{objs} collision meshes, {tris} triangles compared");
 }

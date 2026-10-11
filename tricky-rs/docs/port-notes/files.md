@@ -220,6 +220,9 @@ there (no rewind); a level is the value / 100 when 0..200 (the duck 0..100), els
   after. A collision mesh: triangle count n, vertex count m, padding bytes, n triangles of three u32 indices, the
   padding, m vertices (4 floats), n planes (normal and w); the loader keeps (n, m, triangles, vertices, planes) in
   0x14-byte records (course+0x24) and (first record, count) per group (course+0x20).
+- An instance's collision meshes (row E3a5; checked against the levels folders' Collision/*.obj, 3,789 meshes,
+  88,828 triangles, all 11 folders, exact): its physics record's collision mode not 3 and group ≥ 0 → that group's
+  meshes, each its own OBJ in the exports (numbered by mesh across all groups); each triangle's normal is its plane's.
 - On the disc: gari 3393 objects, 306 effect headers, 20 functions, 412 collision groups; ssxfe (the front end)
   has 33 functions and no collision. `untrack` and `trick` have no functions.
 - Sphere trees (row E3c2; `Ssf::sphere_trees`): each group's trees follow one another (`SphTree_Load` 0x239340
@@ -284,7 +287,7 @@ there (no rewind); a level is the value / 100 when 0..200 (the duck 0..100), els
   - gari's export in the levels folder is of another build: its splines all differ and its patches' flag word is 0
     there (its show-off patches are surface 18); everything else agrees.
 - Meshes (row E3a3; `pbd::{context_strips, strip_triangles}`, checked against the levels folders' Meshes/*.obj:
-  8,297 meshes, 311,620 triangles, positions, UVs and normals). A model's node +4 is its mesh; each mesh context's
+  8,325 meshes, 313,373 triangles, positions, UVs and normals). A model's node +4 is its mesh; each mesh context's
   word 3 is its offset into the VIF block (header +0x84). Read from the packets themselves (the VU1 program is not
   decompiled): a DMA chain of `cnt` packets (and `ref` ones, which hold no vertices) to `ret` / `end`; in it,
   batches of five unpacks: V4-32 (a GS tag; word 4 the strip count), V2-8 (each strip's length × 3, three
