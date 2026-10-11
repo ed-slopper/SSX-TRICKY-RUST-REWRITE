@@ -4,6 +4,7 @@
 //! here from a handful of joint angles that follow what the rider is doing.
 //!
 //! STANDIN: models, skeletons and clips read from our Python exports (chars/*.json, anims/*.json), for the game's own character and animation files
+//! (models come from the player's disc instead when it is given: `rider_from_disc`, row E4a; clips are still exported, E4b)
 //! STANDIN: the pose built from joint angles (when no clip is there), for the game's animation of the rider (G5)
 //!
 //! Model space (as stored): centimetres, hips at the origin, +X = the character's left,
@@ -45,6 +46,79 @@ impl CharModel {
     pub fn load(path: &Path) -> Result<Self, String> {
         let text = std::fs::read_to_string(path).map_err(|e| format!("{}: {e}", path.display()))?;
         let raw: RawModel = serde_json::from_str(&text).map_err(|e| format!("{}: {e}", path.display()))?;
+        Ok(Self::from_raw(&raw))
+    }
+
+    /// A rider or board built from the game's own model parts (row E4a): the parts `BdrLoad_BuildSkin`
+    /// 0x201138 puts together (body first). The skeleton is the body's bones followed by every other
+    /// part's own (goggles, eyes, hair); weights and parents name a bone as `slot << 8 | index in its part`,
+    /// the slot being the part's (+0x4a; the body's is 0).
+    pub fn from_mpf(parts: &[&crate::mpf::MpfPart]) -> Self {
+        let mut raw = RawModel { bones: Vec::new(), materials: Vec::new(), meshes: Vec::new() };
+        let mut bone_of: HashMap<u16, usize> = HashMap::new();
+        for p in parts {
+            for (i, b) in p.bones.iter().enumerate() {
+                let key = (p.slot as u8 as u16) << 8 | i as u16;
+                if bone_of.contains_key(&key) { continue; }
+                bone_of.insert(key, raw.bones.len());
+                let parent = if b.parent < 0 { -1 } else { bone_of.get(&((b.parent_slot as u8 as u16) << 8 | b.parent as u16)).map_or(-1, |&g| g as i32) };
+                raw.bones.push(RawBone { name: b.name.clone(), parent, pos: b.pos, rot: b.rot });
+            }
+        }
+        for p in parts {
+            for m in &p.meshes {
+                let tex = p.textures.get(m.texture).map(|t| t.texture().to_string()).unwrap_or_default();
+                // materials come in threes (plain, gloss, environment) per texture, as in the exports
+                let mat = match raw.materials.iter().position(|x| *x == tex) {
+                    Some(i) => i,
+                    None => { raw.materials.extend([tex.clone(), format!("{tex} gloss"), format!("{tex} envr")]); raw.materials.len() - 3 }
+                };
+                let mut mesh = RawMesh { shadow: false, pos: Vec::new(), nrm: Vec::new(), uv: Vec::new(), weights: Vec::new(), mat: Vec::new() };
+                for t in m.triangles() {
+                    for v in t {
+                        mesh.pos.extend(v.pos);
+                        mesh.nrm.extend(v.nrm);
+                        mesh.uv.extend(v.uv);
+                        mesh.weights.push(p.weights[v.weights].iter().flat_map(|&(b, pct)| [bone_of.get(&b).map_or(0, |&g| g as i32), pct as i32]).collect());
+                    }
+                    mesh.mat.push(mat as i32);
+                }
+                raw.meshes.push(mesh);
+            }
+        }
+        Self::from_raw(&raw)
+    }
+
+    /// A rider from the player's disc (row E4a): the closest level of detail of `BdrLoad_BuildSkin`
+    /// 0x201138's parts, from `|data/char/<rider>_body.mpf` and `_head.mpf`. `rider` is the game's name
+    /// (`crate::mpf::names::RIDERS`).
+    pub fn rider_from_disc(files: &mut crate::big::Files, rider: &str) -> Result<Self, String> {
+        use crate::mpf::{names, MpfFile};
+        let r = names::RIDERS.iter().position(|n| n.eq_ignore_ascii_case(rider)).ok_or_else(|| format!("no rider {rider}"))?;
+        let mut parts = Vec::new();
+        for (kind, table) in [("body", &names::BODY[r][0][..]), ("head", &names::HEAD[r][0][..])] {
+            let path = format!("|data/char/{}_{kind}.mpf", names::RIDERS[r]);
+            let bytes = files.load(&path).map_err(|e| format!("{path}: {e}"))?.ok_or_else(|| format!("{path}: not on the disc"))?;
+            let mpf = MpfFile::open(&bytes).map_err(|e| format!("{path}: {e}"))?;
+            for n in table.iter().flatten() {
+                let e = mpf.find(n).ok_or_else(|| format!("{path}: no part {n}"))?;
+                parts.push(mpf.part(e).map_err(|e| format!("{path}: {e}"))?);
+            }
+        }
+        Ok(Self::from_mpf(&parts.iter().collect::<Vec<_>>()))
+    }
+
+    /// A board shape from `|data/char/board.mpf` by its part name (`Bx`, `FrGoofy`, ...; matched as the
+    /// game matches, see `MpfFile::find`), or the file's first part with `None`.
+    pub fn board_from_disc(files: &mut crate::big::Files, part: Option<&str>) -> Result<Self, String> {
+        let path = "|data/char/board.mpf";
+        let bytes = files.load(path).map_err(|e| format!("{path}: {e}"))?.ok_or_else(|| format!("{path}: not on the disc"))?;
+        let mpf = crate::mpf::MpfFile::open(&bytes).map_err(|e| format!("{path}: {e}"))?;
+        let e = match part { Some(n) => mpf.find(n), None => mpf.parts.first() }.ok_or_else(|| format!("{path}: no part {part:?}"))?;
+        Ok(Self::from_mpf(&[&mpf.part(e).map_err(|e| format!("{path}: {e}"))?]))
+    }
+
+    fn from_raw(raw: &RawModel) -> Self {
         let mut bones: Vec<Bone> = Vec::new();
         let mut world: Vec<Mat4> = Vec::new();
         for b in &raw.bones {
@@ -81,7 +155,7 @@ impl CharModel {
                 });
             }
         }
-        Ok(Self { bones, parts })
+        Self { bones, parts }
     }
 
     fn bone(&self, name: &str) -> Option<usize> { self.bones.iter().position(|b| b.name == name) }
@@ -274,5 +348,70 @@ pub fn skin_part_anim(part: &Part, mats: &[Mat4], pos: &mut Vec<[f32; 3]>, nrm: 
         p.z += 4.8;
         pos.push(anim_to_local(p).into());
         nrm.push(anim_dir_to_local(n.normalize_or(Vec3::Z)).into());
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::mpf::{names, MpfFile};
+
+    /// The game's own models (row E4a) against the models exported before: needs `TRICKY_ISO` and the
+    /// exported `chars/` folder (both the player's own, outside the repo).
+    #[test]
+    fn disc_models_match_the_exports() {
+        let Ok(iso) = std::env::var("TRICKY_ISO") else { return };
+        let chars = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../chars");
+        if !chars.join("board.json").exists() { return; }
+        let mut files = crate::big::Files::new(crate::disc::Disc::open(&iso).unwrap());
+        files.mount_game_archives().unwrap();
+        let compare = |name: &str, ours: &CharModel, theirs: &CharModel| {
+            assert_eq!(ours.bones.len(), theirs.bones.len(), "{name}: bones");
+            for b in &theirs.bones {
+                let o = ours.bones.iter().find(|x| x.name == b.name).unwrap_or_else(|| panic!("{name}: bone {}", b.name));
+                let parent = |m: &CharModel, p: i32| if p < 0 { String::new() } else { m.bones[p as usize].name.clone() };
+                assert_eq!(parent(ours, o.parent), parent(theirs, b.parent), "{name}: parent of {}", b.name);
+                assert!(o.local.abs_diff_eq(b.local, 1e-3), "{name}: bone {}", b.name);
+            }
+            for t in &theirs.parts {
+                let o = ours.parts.iter().find(|p| p.texture == t.texture).unwrap_or_else(|| panic!("{name}: part {}", t.texture));
+                // position (0.01 cm), uv (1/1000), normal (1/100), weights by bone name (whole percent)
+                let key = |m: &CharModel, v: &Vert| {
+                    let mut k: Vec<i64> = (v.pos * 100.0).round().to_array().iter().chain((v.uv * 1000.0).round().to_array().iter()).chain((v.nrm * 100.0).round().to_array().iter()).map(|&x| x as i64).collect();
+                    let mut w: Vec<(String, i64)> = v.w.iter().filter(|x| x.1 > 0.0).map(|&(b, f)| (m.bones[b as usize].name.clone(), (f * 100.0).round() as i64)).collect();
+                    w.sort();
+                    k.extend(w.iter().flat_map(|(n, f)| [n.bytes().fold(0i64, |h, c| h * 31 + c as i64), *f]));
+                    k
+                };
+                let mut a: Vec<_> = o.verts.iter().map(|v| key(ours, v)).collect();
+                let mut b: Vec<_> = t.verts.iter().map(|v| key(theirs, v)).collect();
+                a.sort();
+                b.sort();
+                assert_eq!(a.len(), b.len(), "{name}: {} vertices", t.texture);
+                let off = a.iter().zip(&b).filter(|(x, y)| x.len() != y.len() || x.iter().zip(y.iter()).any(|(p, q)| (p - q).abs() > 1)).count();
+                assert_eq!(off, 0, "{name}: {} vertices differ", t.texture);
+            }
+        };
+        let mut checked = 0;
+        for (r, rider) in names::RIDERS.iter().enumerate() {
+            let json = chars.join(rider).join("model.json");
+            if !json.exists() { continue; }
+            let body = files.load(&format!("|data/char/{rider}_body.mpf")).unwrap().unwrap();
+            let head = files.load(&format!("|data/char/{rider}_head.mpf")).unwrap().unwrap();
+            let (body, head) = (MpfFile::open(&body).unwrap(), MpfFile::open(&head).unwrap());
+            let mut parts = Vec::new();
+            for n in names::BODY[r][0].iter().flatten() { parts.push(body.part(body.find(n).unwrap()).unwrap()); }
+            for n in names::HEAD[r][0].iter().flatten() { parts.push(head.part(head.find(n).unwrap()).unwrap()); }
+            let ours = CharModel::from_mpf(&parts.iter().collect::<Vec<_>>());
+            compare(rider, &ours, &CharModel::load(&json).unwrap());
+            checked += 1;
+        }
+        assert!(checked > 0);
+        let board = files.load("|data/char/board.mpf").unwrap().unwrap();
+        let board = MpfFile::open(&board).unwrap();
+        for (file, part) in [("board_bx", "Bx"), ("board_fr", "Fr"), ("board_al", "Al"), ("board_bx_goofy", "BxGoofy"), ("board_fr_goofy", "FrGoofy"), ("board_al_goofy", "AlGoofy")] {
+            let p = board.part(board.find(part).unwrap()).unwrap();
+            compare(file, &CharModel::from_mpf(&[&p]), &CharModel::load(&chars.join(format!("{file}.json"))).unwrap());
+        }
     }
 }

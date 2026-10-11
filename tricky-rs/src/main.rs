@@ -2021,13 +2021,26 @@ fn chars_dir(level_dir: &Path) -> Option<PathBuf> {
 
 fn load_chars(level_dir: &Path, images: &mut Assets<Image>, materials: &mut Assets<StandardMaterial>) -> CharLib {
     let Some(dir) = chars_dir(level_dir) else { return CharLib::default() };
-    let mut lib = CharLib { board: CharModel::load(&dir.join("board.json")).ok(), dir: dir.clone(), ..default() };
-    lib.shapes = ["bx", "bx_goofy", "fr", "fr_goofy", "al", "al_goofy"].iter().map(|n| CharModel::load(&dir.join(format!("board_{n}.json"))).ok()).collect();
+    // the player's disc (TRICKY_DISC: an image or a drive, rows E2-E2b): the models come from it (row E4a)
+    let mut disc = std::env::var("TRICKY_DISC").ok().and_then(|p| {
+        let mut f = tricky_data::big::Files::new(tricky_data::disc::Disc::open(&p).map_err(|e| eprintln!("disc {p}: {e}")).ok()?);
+        f.mount_game_archives().map_err(|e| eprintln!("disc {p}: {e}")).ok()?;
+        println!("models from the disc {p}");
+        Some(f)
+    });
+    let board = disc.as_mut().and_then(|f| CharModel::board_from_disc(f, None).map_err(|e| eprintln!("{e}")).ok());
+    let mut lib = CharLib { board: board.or_else(|| CharModel::load(&dir.join("board.json")).ok()), dir: dir.clone(), ..default() };
+    lib.shapes = [("bx", "Bx"), ("bx_goofy", "BxGoofy"), ("fr", "Fr"), ("fr_goofy", "FrGoofy"), ("al", "Al"), ("al_goofy", "AlGoofy")].iter()
+        .map(|(n, part)| disc.as_mut().and_then(|f| CharModel::board_from_disc(f, Some(part)).map_err(|e| eprintln!("{e}")).ok())
+            .or_else(|| CharModel::load(&dir.join(format!("board_{n}.json"))).ok()))
+        .collect();
     let mut dirs: Vec<PathBuf> = std::fs::read_dir(&dir).into_iter().flatten().flatten().map(|e| e.path())
         .filter(|p| p.join("model.json").exists()).collect();
     dirs.sort();
     for d in dirs {
-        let Ok(model) = CharModel::load(&d.join("model.json")) else { continue };
+        let name = d.file_name().unwrap().to_string_lossy().to_string();
+        let from_disc = disc.as_mut().and_then(|f| CharModel::rider_from_disc(f, &name).map_err(|e| eprintln!("{e}")).ok());
+        let Some(model) = from_disc.or_else(|| CharModel::load(&d.join("model.json")).ok()) else { continue };
         let mut mats = HashMap::new();
         for name in model.parts.iter().map(|p| p.texture.as_str()).chain(["bord"]) {
             let file = d.join(format!("{name}.png"));
@@ -2037,7 +2050,6 @@ fn load_chars(level_dir: &Path, images: &mut Assets<Image>, materials: &mut Asse
             }));
         }
         let ubers = ["uber.json", "uber_fr.json", "uber_ex.json"].map(|f| AnimSet::load(&d.join(f)).ok().filter(|a| a.len() > 0));
-        let name = d.file_name().unwrap().to_string_lossy().to_string();
         // bord1.png .. bord12.png, the rider's twelve boards (the plain bord.png if they are missing)
         let boards = (1..=12).map(|n| match image::open(d.join(format!("bord{n}.png"))) {
             Ok(i) => materials.add(StandardMaterial { base_color_texture: Some(images.add(make_image(i.to_rgba8(), true))), unlit: true, cull_mode: None, double_sided: true, ..default() }),

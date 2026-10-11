@@ -11,3 +11,4 @@ pub mod disc;
 pub mod intro;
 pub mod level;
 pub mod logic;
+pub mod mpf;

@@ -68,3 +68,33 @@ Proven (ported in `tricky-data/src/compress.rs`):
   `SSXFE`, `TRICK`); nothing uses the other codecs (row E2c).
 
 Checked: all 793 entries of the character archives unpack to the same bytes as `tools/afl/refpack.py`.
+
+## Character and board models, `.mpf` (row E4a)
+
+Proven (loader, see also `notes/characters.md`): file header (+4 part count, +6 directory, +8 data), the
+0x50-byte part entries, `MpfFile_AddPart`'s name match (`strnicmp` 0x2fd398 on 15 characters), and the part
+tables `SkinPart_Load` 0x205080 fixes up:
+- texture sets at the data's start, 0x20 each (count +0x44): five 4-character names, gloss strength at +0x14;
+- bones at +0x18, 0x54 each (count +0x42): name, +0x10 parent slot, +0x12 parent index, +0x18 position, +0x24
+  rotation (Euler, inverse); a bone is named `slot << 8 | index`, the slot being a part's +0x4a (body 0,
+  eyes 5, goggles 6, hair 7 or 8);
+- weight sets at +0x30, 0xc each (count +0x3c): (count, pointer) of u32 `bone << 16 | percent`;
+- weight palettes at +0x2c, 8 each (count +0x3e): (count, pointer) of weight-set numbers, one per packet list;
+- materials at +0x20, 0x14 each (count +0x40): +0 flags (1; 0x100 face; 0x11 shadow), +4 texture set, +0xc /
+  +0x10 its packet lists: (pointer, count) of 0xc-byte records whose first word starts a DMA chain.
+- The names of the parts a rider is built from (`BdrLoad_BuildSkin` 0x201138): tables 0x341318 (body, three
+  per level of detail), 0x341588 (head, five) and 0x341998 (board), copied into `mpf::names`.
+
+Inferred from the data (the vector unit programs are not decompiled; `tricky-data/src/mpf.rs`):
+- A packet chain is `cnt` DMA tags of VIF codes, ending with `end` or `ret`. A batch is four unpacks then a
+  program start (`MSCAL`; a `ret` record has none): a V4-32 header (a GS tag: triangle strip, ST/RGBAQ/XYZ2;
+  then the strip count and one strip length per quadword), and per vertex, three quadwords apart: V4-16 UV
+  (4.12 fixed; z is the vector unit address of the vertex's weight palette entry: `(z - 14) / 4`), V3-16
+  normal (/32767) and V3-32 position (cm).
+- A list with several records draws all of them (the face: 18 pieces, each followed by more data, likely its
+  expressions, not read). Shadow meshes (flags 0x10) are positions only for another program: not decoded
+  (row E4d).
+
+Checked: for the 12 riders exported before and the six board shapes, the models built from the disc
+(`CharModel::rider_from_disc`, `board_from_disc`) equal the exports: bones, parents, bind positions, and every
+vertex's position, UV, normal and weights.
