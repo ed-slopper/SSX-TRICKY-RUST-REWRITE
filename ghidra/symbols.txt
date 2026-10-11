@@ -3539,3 +3539,54 @@ G 13a9f8 Controller_RunFinishScript
 G 13aaf8 Controller_RunContactScript
 G 13aab0 Instance_DetachController
 F 13b8c0 cScriptNode cScriptNode
+G 203b98 ClipList_Count
+G 1d8fd8 PoolList_Pop
+G 1d9018 PoolList_Push
+G 251968 Spline_GetLength
+F 1533f8 cPlayer SaveSnapshot
+F 13a460 cComputer SaveSnapshot
+F 146660 cUVScrollTexFlipNode SaveSnapshot
+G 21ed98 List_PickRandom
+G 17d4e8 BxList_Add
+G 17d740 BxList_Move
+G 13d538 TriggerScript_Spawn
+G 2519b0 Spline_SaveSnapshot
+G 200680 Instance_Draw
+L 369b20 cBoarderRender vtable
+L 36a910 cComputer vtable
+L 36ce78 cUVScrollTexFlipNode vtable
+F 149868 cUVScrollTexFlipNode ~cUVScrollTexFlipNode
+F 1462d0 cUVScrollTexFlipNode Update
+L 386980 cGame vtable
+F 17ecf8 cGame vf0
+L 38c368 cAnimTexFlipNode vtable
+F 19ac48 cAnimTexFlipNode ~cAnimTexFlipNode
+F 19a778 cAnimTexFlipNode Update
+F 19a8b0 cAnimTexFlipNode Draw
+L 38c460 cAnimComboNode vtable
+F 19a1a8 cAnimComboNode ~cAnimComboNode
+F 19a218 cAnimComboNode Update
+F 1992e0 cAnimComboNode Draw
+F 19a410 cAnimComboNode SaveSnapshot
+L 38c650 cAnimObjectNode vtable
+F 198da8 cAnimObjectNode ~cAnimObjectNode
+F 199058 cAnimObjectNode Update
+F 1998f8 cAnimObjectNode SaveSnapshot
+L 38f328 cUnlockedOverlay vtable
+F 1beab8 cUnlockedOverlay vf0
+L 38f3c0 cHelpRaceOverlay vtable
+F 1becd8 cHelpRaceOverlay vf0
+L 38f458 cNextRaceOverlay vtable
+F 1bef08 cNextRaceOverlay vf0
+L 38f4f0 cHiScoreRecordOverlay vtable
+F 1bf130 cHiScoreRecordOverlay vf0
+L 38f588 cViewHiScoresOverlay vtable
+F 1bf348 cViewHiScoresOverlay vf0
+F 1b3e30 cViewHiScoresOverlay vf12
+F 1ab1a0 cViewHiScoresOverlay vf13
+F 1b3ec8 cViewHiScoresOverlay vf14
+F 1b3a00 cViewHiScoresOverlay vf15
+F 1bf580 cViewHiScoresOverlay vf19
+L 38f880 cResultsOverlay vtable
+F 1bfc70 cResultsOverlay vf0
+F 1ab148 cResultsOverlay vf14
