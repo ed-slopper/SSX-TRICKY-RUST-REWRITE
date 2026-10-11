@@ -5292,3 +5292,5 @@ G 11ca88 Boarder_GetCamera
 G 177758 Cam_Shake
 G 157ed8 AnimCurve_Eval
 G 158030 AnimCurve_EvalPiece
+G 2c2318 Shape_Unpack
+G 2c2088 Shape_UnpackBlocks

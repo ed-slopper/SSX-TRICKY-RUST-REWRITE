@@ -14,3 +14,4 @@ pub mod intro;
 pub mod level;
 pub mod logic;
 pub mod mpf;
+pub mod ssh;

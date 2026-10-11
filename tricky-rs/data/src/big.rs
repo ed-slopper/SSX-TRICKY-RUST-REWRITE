@@ -46,7 +46,7 @@ pub struct BigEntry {
 /// `stricmp`), or with no name the entry number `index`.
 pub fn lookup(header: &[u8], name: Option<&str>, index: usize) -> Option<BigEntry> {
     let kind = identify(header);
-    let end = header_size(header).min(header.len());
+    let end = header_size(header);
     let (mut p, width) = match kind {
         1 => (6, 3),
         2 => (0x10, 4),
@@ -55,6 +55,9 @@ pub fn lookup(header: &[u8], name: Option<&str>, index: usize) -> Option<BigEntr
     let mut i = 0;
     while p < end {
         let at = p + 2 * width;
+        if at >= header.len() {
+            break;
+        }
         let len = header[at..].iter().position(|&c| c == 0).unwrap_or(header.len() - at);
         let entry_name = &header[at..at + len];
         let hit = match name {
@@ -158,9 +161,10 @@ impl Files {
             // the game frees the buffer here; it never mounts a file that is not an archive
             return Ok(false);
         }
-        // the first read is the start of the file; a longer directory is read again whole
+        // the first read stays the header buffer; a longer directory is read again whole (the `BIGF` size at
+        // +0xc can end inside the last entry's name, which the game then reads from the rest of the buffer)
         let n = header_size(&first).min(file.size as usize);
-        let header = if n <= first.len() { first[..n].to_vec() } else { self.disc.read_at(start, n)? };
+        let header = if n <= first.len() { first } else { self.disc.read_at(start, n)? };
         self.bigs.insert(0, MountedBig { path: path.to_string(), header, file });
         Ok(true)
     }

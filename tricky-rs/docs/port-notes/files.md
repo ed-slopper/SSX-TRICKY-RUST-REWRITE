@@ -98,3 +98,22 @@ Inferred from the data (the vector unit programs are not decompiled; `tricky-dat
 Checked: for the 12 riders exported before and the six board shapes, the models built from the disc
 (`CharModel::rider_from_disc`, `board_from_disc`) equal the exports: bones, parents, bind positions, and every
 vertex's position, UV, normal and weights.
+
+## Textures, `.ssh` (row E3b)
+
+Proven (`lib-shape`, `tricky-data/src/ssh.rs`): `SHPS`, total size, count, version, then (name[4], offset)
+pairs (`Shape_GetEntry` 0x2c266c). A shape is a chain of blocks; each block's first word holds the type (low
+byte) and the offset to the next block (upper 24 bits, 0 = last). `Shape_GetLongName` 0x2c2610 finds type 0x70
+(name at +4); `Shape_FindByName` 0x2c2528 compares the long name if there is one, else the 4-character name
+(`strcmp`). `Shape_Unpack` 0x2c2318 unpacks blocks with bit 0x80 (codecs) and converts types 0x60-0x62.
+
+Every `.ssh` on the disc and in its archives (807 files) uses only: 0x02 (8-bit indices), 0x21 (its 256-colour
+palette, RGBA bytes in order), 0x05 (RGBA), 0x70 (long name), 0x7c (hotspots). Colours and alpha are stored as
+the GS takes them, 0-0x80 (`TexMan_UploadTexture` 0x1c3ba8 uploads PSMT8 / PSMCT32 as they are).
+
+The textures exported before (`chars/*/*.png`) are these images with colour `c * 255 / 128` rounded down and
+alpha doubled (capped at 255): checked equal for all 192 rider textures (12 riders: suit and boots of outfit 1,
+head, helm, 12 boards). That mapping is a stand-in for the GS's texture function (`Image::rgba_full_range`).
+
+Also found: a `BIGF` directory's size (+0xc) can end inside the last entry's name; the game reads on into the
+rest of its first read, so `Files::mount` keeps the whole first read as the header buffer.
