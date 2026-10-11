@@ -40,7 +40,7 @@ state machine and the renderer are ours. Nothing has been checked against the or
 | E1b2 | Replace the xorshift stand-ins (`race.rs`, `props.rs`, `intro.rs`) with the game's streams at the game's call sites, in the game's order | unowned | E1b1 | | Split of E1b |
 | E2c | The codecs the disc does not use: Huffman (`Huff_Decode` 0x2c3730), BTree (`BTree_Decode` 0x2c3540), 0x2c2d18 (types 0x18/0x1a/0x1c), for mods that pack files with them | unowned | E2b | | Gap of E2b. `Compress_Decode` 0x2c2de0's table is in `port-notes/files.md` |
 | E3 | Level files read by our code, as the game reads them, replacing the SSX-Library JSON project folder (`level.rs`) | unowned | E2b | | [repo] level-editing.md. Split before claiming: |
-| E3a2 | Load levels from the disc's files in the app: `level.rs` and `logic.rs` on `tricky_data::{pbd, ssf, ltg, adl}` instead of the SSX-Library JSON project folder; and what the records' fields mean (patches: G7a / E7, instances, lights, materials: G7b, splines: rails) | unowned | E3a, E3c1, E3e | | Gap of E3a |
+| E3a2 | Load levels from the disc's files in the app: `level.rs` and `logic.rs` on `tricky_data::{pbd, ssf, ltg, adl}` instead of the SSX-Library JSON project folder; and what the records' fields mean (patches: G7a / E7, instances, lights, materials: G7b, splines: rails) | unowned | E3a, E3c1, E3e | ed-slopper/puffin (2026-10-11) | Gap of E3a |
 | E3c | `.ssf`: collision models, physics data, trigger scripts | unowned | E3 | | [repo] Split: E3c1, E3c2 |
 | E4d | The rest of the `.mpf` meshes: the shadow meshes (material flags 0x10: positions only, another vector unit program) and the data after each of the face's 18 records (likely its expressions); the vector unit programs themselves, to prove the packet layout read from the data | unowned | E4a | | Gap of E4a. `port-notes/files.md` "Character and board models" |
 | E5a2 | The HUD's and menus' text from `american.loc` by the ids the game asks for (`Loc_GetString` callers; `CONSTANT.LOC` names them) instead of our strings | unowned | E5a | | Gap of E5a |
@@ -506,3 +506,4 @@ matches the original.
 - 2026-10-11 ed-slopper/puffin: E3e done.
 - 2026-10-11 ed-slopper/puffin: claim E3a.
 - 2026-10-11 ed-slopper/puffin: E3a done; added E3a2 (load levels from the disc's files in the app).
+- 2026-10-11 ed-slopper/puffin: claim E3a2.
