@@ -306,3 +306,120 @@ impl Pbd {
         })
     }
 }
+
+/// A patch record (0x1c0 bytes, row E3a2): +0 its rectangle in its lightmap page (x, y, width, height), +0x10 the
+/// texture coordinates of its four corners (u, v, 1, 1), +0x50 the surface's 16 polynomial coefficients (x, y, z, 1
+/// each; highest power first: [15 − (4a + b)] multiplies sᵃ·tᵇ), +0x150 its box (min, max), +0x168 its four corners
+/// (control points 0, 3, 12, 15), +0x1a8 the surface type, +0x1ac flags (bit 31: show-off only), +0x1b0 the texture
+/// (low half) and lightmap page (high half), +0x1b4 −1 on the disc.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct PatchRec {
+    pub lightmap: [f32; 4],
+    pub uv: [[f32; 4]; 4],
+    pub coeffs: [[f32; 4]; 16],
+    pub bbox: [f32; 6],
+    pub corners: [[f32; 4]; 4],
+    pub surface: u32,
+    pub flags: u32,
+    pub texture: u16,
+    pub lightmap_page: u16,
+    pub x1b4: u32,
+}
+
+impl PatchRec {
+    pub fn parse(r: &[u8]) -> Option<PatchRec> {
+        let f = |o: usize| word(r, o).map(f32::from_bits);
+        let v4 = |o: usize| Some([f(o)?, f(o + 4)?, f(o + 8)?, f(o + 12)?]);
+        let mut uv = [[0.0; 4]; 4];
+        for (k, x) in uv.iter_mut().enumerate() {
+            *x = v4(0x10 + 16 * k)?;
+        }
+        let mut coeffs = [[0.0; 4]; 16];
+        for (k, x) in coeffs.iter_mut().enumerate() {
+            *x = v4(0x50 + 16 * k)?;
+        }
+        let mut bbox = [0.0; 6];
+        for (k, x) in bbox.iter_mut().enumerate() {
+            *x = f(0x150 + 4 * k)?;
+        }
+        let mut corners = [[0.0; 4]; 4];
+        for (k, x) in corners.iter_mut().enumerate() {
+            *x = v4(0x168 + 16 * k)?;
+        }
+        let t = word(r, 0x1b0)?;
+        Some(PatchRec { lightmap: v4(0)?, uv, coeffs, bbox, corners, surface: word(r, 0x1a8)?, flags: word(r, 0x1ac)?, texture: t as u16, lightmap_page: (t >> 16) as u16, x1b4: word(r, 0x1b4)? })
+    }
+
+    /// The coefficient of sᵃ·tᵇ.
+    pub fn coeff(&self, a: usize, b: usize) -> [f32; 3] {
+        let c = self.coeffs[15 - (4 * a + b)];
+        [c[0], c[1], c[2]]
+    }
+
+    /// The patch's 16 Bézier control points (row-major, s by rows), converted from the coefficients (in double
+    /// precision; the game evaluates the coefficients themselves).
+    pub fn bezier(&self) -> [[f32; 3]; 16] {
+        // power → Bézier: P = M · C · Mᵀ with M the inverse of the Bernstein-to-power matrix
+        const M: [[f64; 4]; 4] = [[1.0, 0.0, 0.0, 0.0], [1.0, 1.0 / 3.0, 0.0, 0.0], [1.0, 2.0 / 3.0, 1.0 / 3.0, 0.0], [1.0, 1.0, 1.0, 1.0]];
+        let mut out = [[0.0f32; 3]; 16];
+        for i in 0..4 {
+            for j in 0..4 {
+                for k in 0..3 {
+                    let mut s = 0.0f64;
+                    for a in 0..4 {
+                        for b in 0..4 {
+                            s += M[i][a] * M[j][b] * self.coeff(a, b)[k] as f64;
+                        }
+                    }
+                    out[4 * i + j][k] = s as f32;
+                }
+            }
+        }
+        out
+    }
+
+    pub fn showoff_only(&self) -> bool {
+        self.flags & 0x8000_0000 != 0
+    }
+}
+
+/// An instance record (0x100 bytes, row E3a2): +0 its matrix (rows: the axes scaled, then the position), +0x40 the
+/// three light directions as columns (+0x70 the ambient's (0, 0, 0, 1)), +0x80 / +0x90 / +0xa0 the three lights'
+/// colours, +0xb0 the ambient colour (128 = 1.0), +0xc0 its model id, +0xc4 / +0xc8 the previous and next instance
+/// (-1 none), +0xcc its box (min, max), +0xf0 its material block. Its collision, flags and scripts are in the
+/// `.ssf` physics record for it ([`crate::ssf::Physics`]).
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct InstanceRec {
+    pub matrix: [[f32; 4]; 4],
+    pub light_dirs: [[f32; 4]; 4],
+    pub light_colours: [[f32; 4]; 3],
+    pub ambient: [f32; 4],
+    pub model: i32,
+    pub prev: i32,
+    pub next: i32,
+    pub bbox: [f32; 6],
+    pub material_block: u32,
+}
+
+impl InstanceRec {
+    pub fn from_words(w: &[u32; 64]) -> InstanceRec {
+        let f = |k: usize| f32::from_bits(w[k]);
+        let v4 = |k: usize| [f(k), f(k + 1), f(k + 2), f(k + 3)];
+        InstanceRec {
+            matrix: [v4(0), v4(4), v4(8), v4(12)],
+            light_dirs: [v4(16), v4(20), v4(24), v4(28)],
+            light_colours: [v4(32), v4(36), v4(40)],
+            ambient: v4(44),
+            model: w[48] as i32,
+            prev: w[49] as i32,
+            next: w[50] as i32,
+            bbox: [f(51), f(52), f(53), f(54), f(55), f(56)],
+            material_block: w[60],
+        }
+    }
+
+    /// Light `k`: its direction (column k of the light matrix).
+    pub fn light_dir(&self, k: usize) -> [f32; 3] {
+        [self.light_dirs[0][k], self.light_dirs[1][k], self.light_dirs[2][k]]
+    }
+}

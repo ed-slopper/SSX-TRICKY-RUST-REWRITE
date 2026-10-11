@@ -52,6 +52,31 @@ impl Physics {
     pub fn slot(&self) -> i16 {
         self.0[5] as u16 as i16
     }
+    /// +0: the mass (1e30 for things that never move)
+    pub fn mass(&self) -> f32 {
+        f32::from_bits(self.0[0])
+    }
+    /// +4: how much a rider bounces off it
+    pub fn bounce(&self) -> f32 {
+        f32::from_bits(self.0[1])
+    }
+    /// the flags' defaults (upper half): 0x1 shown, 0x20 riders collide, 0x80 riders bounce off, 0x1000 (unknown),
+    /// 0x2000 UV-scrolled (row E3a2)
+    pub fn defaults(&self) -> u16 {
+        (self.0[2] >> 16) as u16
+    }
+    /// +0xc: the surface type its collision uses (-1: never ground)
+    pub fn surface(&self) -> i32 {
+        self.0[3] as i32
+    }
+    /// +0x10 (half): the collision mode (3: a rigid body that gets knocked about)
+    pub fn collision_mode(&self) -> i16 {
+        self.0[4] as u16 as i16
+    }
+    /// +0x12 (half): with mode 3 its sphere-tree group (the physics), else its collision-mesh group (-1 none)
+    pub fn group(&self) -> i16 {
+        (self.0[4] >> 16) as u16 as i16
+    }
 }
 
 /// A collision mesh: `tris` triangles of three vertex indices, the vertices, and one plane (normal, w) per triangle.
