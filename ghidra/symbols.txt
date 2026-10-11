@@ -6561,3 +6561,17 @@ G 11d9e0 Boarder_IsDoneFinishing
 G 1065f0 FinishLineControl_IsPhase4
 G 122f10 Boarder_InitEaseRecords
 G 117190 Boarder_FlushEndedClips
+G 1148d0 Game_IsTutorial
+G 161760 Career_Destruct
+G 16bb70 Circuit_Construct
+G 16a978 Circuit_Destruct
+G 168688 RaceScene_Destruct
+G 1618a0 Career_IsCircuitFinalEvent
+G 16bbd0 Circuit_IsFinalEvent
+G 1618c0 Career_GotRaceFinalUnlock
+G 16bc30 Circuit_GotRaceFinalUnlock
+G 1618e0 Career_GotShowoffFinalUnlock
+G 16bc40 Circuit_GotShowoffFinalUnlock
+G 148748 CollideEmitterNode_CreateParticles
+G 165778 Career_SetupTutorialRiders
+G 165688 Career_SetupSoloRider
