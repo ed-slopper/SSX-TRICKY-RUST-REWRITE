@@ -128,7 +128,7 @@ matches the original.
 
 | ID | Task | Area | Needs | Who | Notes |
 |---|---|---|---|---|---|
-| C0 | Read the real course and event list from the game: course table, which modes each course has, track limits and medal scores, so the rows below come from the game, not from us | unowned | F1 | | [est] `port-notes/ai.md` ("AI, race, camera") already has time limits and medals per course |
+| C0 | Read the real course and event list from the game: course table, which modes each course has, track limits and medal scores, so the rows below come from the game, not from us | unowned | F1 | ed-slopper/puffin (2026-10-11) | [est] `port-notes/ai.md` ("AI, race, camera") already has time limits and medals per course |
 | C1 | Garibaldi | unowned | C0, E9 | | [est] |
 | C2 | Snowdream | unowned | C0, E9 | | [est] |
 | C3 | Elysium Alps | unowned | C0, E9 | | [est] |
@@ -455,3 +455,4 @@ matches the original.
 - 2026-10-11 trailrig/heron: G20c3b done (placement attitude kept through the drop, callers' headings read, checked in the runner); added G20c3b2, G20c3b3, G20c3b4, G20c3c (gaps of G20c3b).
 - 2026-10-11 trailrig/heron: claim G20c3c (no `levels\gari` export on the PC, so E8l stays open); split off G20c3c2 (spin or flip, needs G1a5b3b and G5); G20c3c no longer needs G1a5b3b.
 - 2026-10-11 ed-slopper/puffin: E5b2 done; the engine-bound config loaders noted on G10.
+- 2026-10-11 ed-slopper/puffin: claim C0.
