@@ -236,6 +236,9 @@ fn open_level(dir: &Path) -> Result<Loaded, String> {
     let finish_area = level.instances.iter().find(|i| i.instance_name.starts_with("Mdl_StageArea_Finish")).map(|i| (Vec3::from(i.location), level::quat4(i.rotation)));
     Ok(Loaded { level, world, rails, line, start, yaw, course, lines, paths, tube, cml, stage, finish_area })
 }
+/// One game tick, 1/60 s: the race clock counts 60 a second (race+0x18; row E1a1).
+const TICK: f32 = 1.0 / 60.0;
+
 /// Frame time averaged over the last few frames. The display refreshes at a steady rate but the
 /// measured time between frames jitters by a few milliseconds; moving the rider and camera by the
 /// raw value makes fast motion look juddery even at a solid 60 fps.
@@ -1535,8 +1538,10 @@ fn ride(
     time: Res<SmoothDt>, keys: Res<ButtonInput<KeyCode>>, pads: Query<&Gamepad>,
     world: Res<World>, rails: Res<RailsRes>, mut rider: ResMut<RiderRes>, mut race: ResMut<RaceRes>,
     mut opponents: ResMut<Opponents>, lib: Res<CharLib>, mut props: ResMut<Props>, mut game: ResMut<ui::Game>, list: Res<LevelList>,
-    mut skill_clock: Local<f32>, mut auto: Local<Option<rider::AiDriver>>, wa: Option<ResMut<worldanim::WorldAnim>>, mut restarted: Local<bool>,
+    mut clocks: Local<(f32, f32)>, mut auto: Local<Option<rider::AiDriver>>, wa: Option<ResMut<worldanim::WorldAnim>>, mut restarted: Local<bool>,
 ) {
+    // the AI skill clock, and the frame time not yet run as ticks (row E1a1)
+    let (skill_clock, tick_bank) = &mut *clocks;
     let r = &mut rider.0;
     let key = |a: KeyCode, b: KeyCode| keys.pressed(a) || keys.pressed(b);
     let up = key(KeyCode::KeyW, KeyCode::ArrowUp);
@@ -1740,10 +1745,13 @@ fn ride(
     if let Some(at) = std::env::var("TRICKY_CRASHAT").ok().and_then(|v| v.parse::<f32>().ok()) {
         if race.0.state == RaceState::Running && race.0.time >= at && race.0.time - time.dt.min(0.1) < at && r.crashed <= 0.0 { r.force_wipe(); }
     }
-    // fixed small steps so the physics does not depend on frame rate
-    let mut left = time.dt.min(0.1);
-    while left > 1e-5 {
-        let dt = left.min(1.0 / 120.0);
+    // the game's tick: the race counts 60 a second (race+0x18, docs/checking.md F4b1) and every boarder moves
+    // dt = timescale/60 a tick (boarder+0x12c; the player's is 1, the AI's `o.driver.time_scale`). Whole ticks
+    // only, the frame time left over carried to the next frame; a hitch runs at most 0.1 s of ticks.
+    *tick_bank = (*tick_bank + time.dt.min(0.1)).min(0.1 + TICK);
+    while *tick_bank >= TICK * (1.0 - 1e-3) {
+        *tick_bank -= TICK;
+        let dt = TICK;
         // TRICKY_AUTOPLAY: the player's rider drives itself (for screenshots and checks)
         let input = if !waiting && std::env::var("TRICKY_AUTOPLAY").is_ok() {
             let d = auto.get_or_insert_with(|| rider::AiDriver::new(0.0, 1.0));
@@ -1918,7 +1926,6 @@ fn ride(
                 if let Some(p) = props.0.get_mut(i) { p.throw(vel, n); }
             }
         }
-        left -= dt;
     }
     // across the line: the heat is over
     // show-off ends when its clock runs out
