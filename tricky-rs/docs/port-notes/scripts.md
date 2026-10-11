@@ -6,7 +6,7 @@ Part of the port notes (index: [README.md](README.md)); units and wording as des
 
 - A script is a list of effects run as its own thread (instance, rider, contact) until its first wait (op 4,
   WaitTime seconds, at least a frame); a condition (op 5) returning false ends the thread. EffectSlots:
-  PersistantEffectSlot when the object's area wakes (near a rider or the camera), Slot3 when it sleeps,
+  PersistantEffectSlot when the object's area wakes (near a rider or the camera; which cells and when: world.md, Live cells), Slot3 when it sleeps,
   CollisionEffectSlot on rider contact (only when the object has no controller; flag PlayerCollision and no
   surface type; one object per rider per frame, every frame), Slot4 when a controller stops, EffectTriggerSlot
   when a controller reaches its goal (counter at 0, timer, broken, trick points).

@@ -10,6 +10,7 @@ pub mod boosts;
 pub mod breakables;
 pub use tricky_data::anim;
 pub mod collbody;
+pub mod cells;
 pub mod collide;
 pub mod controls;
 pub mod controllers;

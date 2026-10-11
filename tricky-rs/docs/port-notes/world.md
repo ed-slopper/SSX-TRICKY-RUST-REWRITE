@@ -233,6 +233,37 @@ Part of the port notes (index: [README.md](README.md)); units and wording as des
   shares it: k = 1/(speed stat/mass + 1), a = v_in·k, s = √max(a² − (1 − b)·k, 0) − a. Then the rider's virtual
   +0x6c (0.0012·v_in), v += s·n, the impact check at s with the contact record.
 
+## Live cells (row E7b; `tricky_game::cells`, checked: `tests/cells.rs`)
+
+- The AI world (`cAIWorld`) keeps the grid cells (TGroups) around the riders live. It has 108 slots at +0xc
+  (8 bytes each: the TGroup, +4 a short counting ticks since it was last marked, +6 a short "new") and their grid
+  indices at +0x36c.
+- `cAIWorld::vf1` 0x115e28, each tick: the patch cache ages (`FUN_00251d70`, only speed). Each rider's grid cell
+  (+0x16c) comes from its position (+0x140) through `Boarder_UpdateGridCell` 0x11d438: (p − corner + size)/size − 1
+  per axis, truncated and clamped. If the first rider is still in the cell it had (+0x42c), the race object's +0x1c
+  decides: below 2 the camera point (`FUN_00173c18`: camera +0x42c, or the point at 0x3368b0 when 0x337774 is set)
+  is marked too and the pass goes on; otherwise the other riders are checked in turn, and if none changed cell the
+  tick stops there.
+- The pass: every held slot ages (`FUN_001162c0`, +4 less 1), `AIWorld_MarkCellsAround` 0x1160f8 marks the cells
+  around each rider (and the camera point): x from cell − 2 to cell (x outer), y the same, with cell computed
+  without the − 1, so the 3 × 3 block is centred on the rider.s cell; each clamped.
+  `AIWorld_MarkCellActive` 0x116420 ignores index 0xffff and empty cells; a held cell gets +4 = 1, a new one the
+  first free slot with +4 = 1 and +6 = 1 (the 108 slots never fill on the disc's courses; a full table drops it).
+- `AIWorld_UpdateActiveCells` 0x1162f8: a new slot's cell is turned on and +6 cleared; otherwise a slot with +4
+  below 1 is turned off and freed (index −1). `AIWorld_ReleaseActiveCells` 0x1163a0 turns off and frees every one.
+- The objects a cell turns on or off: each INode (+0x38, 0x4c bytes) whose show-off count (+0x28) is not 0, its first
+  +0x26 objects, or +0x28 in show-off modes (0x32de8c = 3 or 5). An INode with only the show-off count 0 is skipped
+  even outside show-off.
+- `World_CellActivate_RunPersistant` 0x25fed0: flag 0x100 on (+0xe8). Without a controller (+0xe4) its event-0 script
+  starts (`Instance_GetEventScript` 0x25fe78: physics record +0x14 a slot, the .ssf's +0x10 table of 0x1c-byte
+  records, −1 for none; `TriggerScript_Spawn` 0x13d538). With one, the controller's virtual +0x64 and then +0x7c
+  are asked, and if both say yes its +0x74 runs.
+- `World_CellDeactivate` 0x260108: flag 0x100 off. A controller of type 5 (+0x14) is left alone; otherwise the
+  event-2 script starts, or, with no such script, the controller's +0xbc (kill) runs.
+- Checked in the runner on 400 made-up grids (empty cells, 1 to 16 INodes per cell, objects with and without
+  controllers of each kind and scripts), 3,200 steps of marking, ageing, updating, releasing and whole ticks with
+  1, 2 or 4 riders: every script started and controller call in order, the flags, the slots and the riders' cells.
+
 ## Keyframed objects (`cAnimObjectNode` 0x198810, `cMeshAnimFrame::vf1` 0x1cb498, `AnimCurve_FindSegment` 0x1cb770)
 
 - Model objects with an Animation: base pose U1..U6 (tx, ty, tz cm; rx, ry, rz degrees), AnimationAction a mask
