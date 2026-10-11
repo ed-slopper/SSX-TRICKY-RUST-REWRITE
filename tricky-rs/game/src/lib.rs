@@ -42,5 +42,6 @@ pub mod states;
 pub mod stats;
 pub mod rider;
 pub mod surface;
+pub mod worldops;
 pub mod texanim;
 pub mod trickdata;

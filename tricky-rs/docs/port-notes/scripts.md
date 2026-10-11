@@ -228,3 +228,16 @@ Types 1, 3 and 4 spawn nothing.
   it a lifetime; a lifetime counts down 1/60 a frame and at 0 the node finishes (Finish(1)).
 - Movie (23): opens `data/video/j<course>.sss` (jgari, jsnow, jelysium, jmesa, jmerquer, jaloha, jpipe, jmegaple,
   jalaska; `jumbo.sss` otherwise) at 128 × 64.
+
+## World ops (row E9d; `tricky_game::worldops`, checked: `tests/worldops.rs`)
+
+- Op 2 (`TriggerOp_SpawnEffect`): nothing on an object held by a dead node; sub-type 0 an emitter, 1 a spline
+  model (objects riding spline p3, unless −1), 2 a collide emitter from the rider while it has fewer than 3 (human)
+  or 1 (others) (0x31d498 per slot).
+- Op 24 (`Boarder_TeleportToInstance`): to the object's position plus 3 m along its first row × the slot's side
+  (slots 0..4: left, left-forward, forward, right-forward, right; others none), facing its second row's x, y; placed
+  at rest; the rider's camera cut.
+- Op 25 (`RailMan_SetRail`): a 128-slot table of (spline, state) at the rail manager's +0x28; the spline's slot or
+  the first free one takes the state, and the spline's live bit (segment +0x18 bit 0) follows it. Full table: ignored.
+- Op 13 is the reset request (`reset.rs`); op 8's sound, ops 1 and 23 (camera node, shake) belong to the audio
+  and camera rows.

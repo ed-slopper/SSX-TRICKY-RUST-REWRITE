@@ -56,7 +56,6 @@ state machine and the renderer are ours. Nothing has been checked against the or
 | E8d | Rider-to-rider: `Boarder_RiderCollisions` 0x123fc8, `Boarder_RiderHit` 0x124920, shoves | any | F4a | | [repo] Ported, unchecked. Split: E8d1, E8d2 |
 | E9 | Script machine: `TriggerScript_Run`, `TriggerScript_ExecOp` 0x13bfd0 with every op, controllers (`TriggerScript_Op0_SpawnController` 0x13c600), persistent cell scripts, run at runtime instead of read statically | unowned | E3c | | [repo] `logic.rs` reads SSFLogic.json statically today |
 | E9b2 | Run the script threads in the app (`tricky_game::script` on `tricky_data::ssf` instead of `logic.rs`'s static walk of SSFLogic.json): the world's node list order (`BxList_Add` 0x17d4e8 links new nodes at the head; the update loop's order to confirm), `World_DeleteScriptObject` 0x13bbc0, the starters (area wake, contact, controller goal, the engine's RaceMode / StartCountDown calls) | unowned | E9b, E7 | | Gap of E9b |
-| E9d | World ops 1 (camera node), 2 (effects, spline riders), 8 (sound), 13 (reset), 23 (camera shake `Cam_Shake` 0x177758), 24 (teleport), 25 (rail switch `RailMan_SetRail` 0x149030) | unowned | E9b | ed-slopper/puffin (2026-10-11) | Gap of E9a |
 | E9g2 | `cMeshAnimNode` (20, the falling pieces of broken objects): ctor 0x1466b8 (per-piece matrices from the model's hierarchy, the starting velocity from p6..p8 or the contact, ×p9), Update 0x147230 (spin about each piece's axis, velocity, gravity p4 × −16.333334), Kill; and the fence's mesh bending (`FenceNode_InitShape` 0x143ff8, `UpdateShape` 0x143cd0) | unowned | E9g | | Gap of E9g |
 | E10 | Input: pad reading, stick shaping and dead zones, button bits (the chord 0x600), vibration, `cCheatCodes::Update` 0x26CF60 | unowned | E1 | | [repo] findings.md |
 | E11 | Camera: named cameras `cBxCamera_EvalNamedCam` 0x174888 (ported), director scripts `cBxCamera_RunDirectorScript`, replay and finish cameras, camera collision | any | | | [repo] Chase cam ported in `rider.rs`; free camera is ours (keep, tag) |
@@ -279,6 +278,7 @@ matches the original.
 | E9i | Texture animation controllers ported (`tricky_game::texanim`): `cUVScrollNode`, `cTexFlipNode`, `cUVScrollTexFlipNode`, `cTexFlip`'s frame pick and the scrolled-model registry; checked over 220k steps against the game's objects in the runner (tests/texanim.rs). Flags and keyframed animations: E9i2 | P2 | ed-slopper/puffin | 2026-10-11 | 40e3484 |
 | E9i2 | Flags and keyframed object animations ported (`tricky_game::objanim`: `cFlagNode`, `cAnimObjectNode`, `cAnimDeltaNode`, `cAnimComboNode`, `cAnimTexFlipNode` — the clip cursor, timers, contacts, messages), checked over 100k steps against the game's objects in the runner (tests/objanim.rs). Sampling clips onto parts and the flag strip are drawing | P2 | ed-slopper/puffin | 2026-10-11 | 9389c4e |
 | E9j | Crowd boxes, particle nodes and the jumbotron movie ported (`tricky_game::scenery`: the crowd's excitement and cell animation with its tables, the emitter's lifetime, the video names), checked against the game in the runner (tests/scenery.rs) | P2 | ed-slopper/puffin | 2026-10-11 | fa8f976 |
+| E9d | World ops ported (`tricky_game::worldops`): op 2's effect spawn rules, op 24's teleport placement, op 25's rail manager table and live bits; checked against the game in the runner (tests/worldops.rs). Op 13 is G1c3's `reset::request_reset`; op 8 (script sound) goes to G10, ops 1 and 23 (camera node, `Cam_Shake`) to the camera rows | P2 | ed-slopper/puffin | 2026-10-11 | HASH |
 
 ## Changes to the board
 
@@ -493,3 +493,4 @@ matches the original.
 - 2026-10-11 ed-slopper/puffin: claim E9j.
 - 2026-10-11 ed-slopper/puffin: E9j done.
 - 2026-10-11 ed-slopper/puffin: claim E9d.
+- 2026-10-11 ed-slopper/puffin: E9d done.
