@@ -7,6 +7,7 @@ pub use tricky_data::anim;
 pub mod collide;
 pub mod finish;
 pub mod gate;
+pub mod probe;
 pub mod props;
 pub mod race;
 pub mod rand;

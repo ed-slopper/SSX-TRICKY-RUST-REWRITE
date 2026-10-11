@@ -25,6 +25,14 @@ Part of the port notes (index: [README.md](README.md)); units and wording as des
   class 1 (0.4, 0.52398).
 - Wall collision 0x126250: v += n·(vn + max(0.5·vn, 55.6 cm/s)), push-out 1.1× depth.
 - Ground probe 0x128ae8: ray +200 → −100 cm along n → new n, h, surface.
+  Proven (E8g; exact in `tricky-rs/game/src/probe.rs`, checked bit for bit in `tests/probe.rs`): the probe point is
+  pos (+0x140) + side (+0x330)·(stats+0x60 · rider+0x244); `cWorldLine::cWorldLine`(0.5, point − 100n, point + 200n, 2),
+  `World_RayCast` 0x25aff8 on the world 0x346488 with the cache rider+0x430. Miss (distance < 0): n = up, kind
+  (+0x2e0) 3, fall line (+0x2b0) = forward, returns 0. Hit: surface +0x290 (a new one sets the tick count +0x29c to
+  0x80000001; the same one zeroes it unless it is negative), n +0x2a0, ground point +0x2d0, kind = the hit's, h +0x1bc
+  = (point − hit)·n, fall line `Boarder_GetFallLine` 0x128a18 (n × unit(n × up), or forward when |n × up| ≤ 0.0001),
+  returns 1. Both ways: forward in the plane +0x320 = unit(f − (f·n)n) (vrsqrt), side +0x330 = n × that (w 0). The hit
+  record: +0 kind, +0x10 point, +0x20 normal, +0x34 surface.
 - Normal bleed (not on surfaces 3, 4): v −= 0.4(v·n′)n′, |v| restored.
 - Airborne when the probe misses or h > surf[6] (2.74 cm on groomed snow).
 - Speed caps (vf7): 2788.84 cm/s; boosting 2932/3072/3347 by meter level; 3347 while timer +0x134 > 0;

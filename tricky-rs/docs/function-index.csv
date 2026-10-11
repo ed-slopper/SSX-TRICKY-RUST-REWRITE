@@ -467,8 +467,8 @@ address,size,name,system,status
 0x1283f0,124,FUN_001283f0,boarder?,not started
 0x128470,112,Boarder_TakeOff,boarder,not started
 0x1284e0,1336,Jump_ApplyImpulse,boarder,checked
-0x128a18,208,Boarder_GetFallLine,boarder,not started
-0x128ae8,820,Boarder_ProbeGround,boarder,not started
+0x128a18,208,Boarder_GetFallLine,boarder,checked
+0x128ae8,820,Boarder_ProbeGround,boarder,checked
 0x128e20,108,Boarder_ResetOrientation,boarder,not started
 0x128e90,372,Boarder_RotateAboutAxis,boarder,not started
 0x129008,1268,Boarder_UpdateOrientation,boarder,not started
