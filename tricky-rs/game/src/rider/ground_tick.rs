@@ -557,16 +557,24 @@ fn quat_of(x: V4, y: V4, z: V4) -> V4 {
 
 impl Rider {
     /// The game-side rider from the port's: the board lies on the ground (its up is the ground's normal) and points
-    /// along the port's yaw. STANDIN: the game's attitude quaternion (rider+0x170) is only kept between ticks, not
-    /// across a landing or a respawn, where the port has no such thing (rows G1 and G5).
-    fn seed_ground(&self) -> gm::Rider {
+    /// along the port's yaw. After a placement the attitude is the game's own, kept through the air (`Rider::att`,
+    /// `Boarder_PlaceAt` 0x11cae8, row G20c3b) while the port left the yaw alone. STANDIN: otherwise the game's
+    /// attitude quaternion (rider+0x170) is only kept between ticks, not across a take-off or a trick's landing,
+    /// where the port rebuilds it (rows G20c3c, G1a5b3b and G5).
+    pub fn seed_ground(&self) -> gm::Rider {
         let n = unit(to_game(self.normal, 1.0, 0.0));
-        let psi = self.yaw + HALF_PI;
-        let h = [psi.cos(), psi.sin(), 0.0, 0.0];
-        let fwd = unit(sub(h, scale(n, dot(h, n))));
-        let side = cross(fwd, n);
-        let mut o = Orient { q: quat_of(side, fwd, n), ..Orient::default() };
-        orient::update_orientation(&mut o);
+        let o = match self.att {
+            Some((a, yaw)) if yaw == self.yaw => a,
+            _ => {
+                let psi = self.yaw + HALF_PI;
+                let h = [psi.cos(), psi.sin(), 0.0, 0.0];
+                let fwd = unit(sub(h, scale(n, dot(h, n))));
+                let side = cross(fwd, n);
+                let mut o = Orient { q: quat_of(side, fwd, n), ..Orient::default() };
+                orient::update_orientation(&mut o);
+                o
+            }
+        };
         let pos = to_game(self.pos, 100.0, 1.0);
         let plane_fwd = unit(sub(o.fwd, scale(n, dot(o.fwd, n))));
         let height = self.height * 100.0;
@@ -611,6 +619,8 @@ impl Rider {
             _ => {
                 let mut g = self.seed_ground();
                 g.vel = to_game(self.vel, 100.0, 0.0);
+                // the game-side rider's own quaternion takes over from here
+                self.att = None;
                 g
             }
         };

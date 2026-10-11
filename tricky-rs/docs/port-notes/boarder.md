@@ -550,16 +550,56 @@ clip ends and sets the new rail kind (1→4, 2→3, 3→1, 4→2). Pad bit 0: re
    rotation never takes the angle past 90° (asin only): a hit whose normal points down still turns the short way.
 
 With the last argument non-zero (`Boarder_PlaceAt`'s alternate placement) there is no ray and step 3 does not run.
-Inferred: the callers' first argument is the game heading (what `ResetState_PlaceRider` and `Boarder_StartReset` pass,
-`aipath.rs`); the port keeps a yaw (heading = yaw + π/2, `ground_tick`), so the conversion at a respawn is ours.
+The first argument is the game heading, proven for the callers below (row G20c3b); the port's `Rider` keeps a yaw, and
+`rider::placed_heading(yaw)` = wrap(yaw + π/2) is the conversion (the port's forward (−sin, 0, −cos) in x, y up is the
+game's (x, −z, y), the angle atan2(cos yaw, −sin yaw)).
 
 Checked bit for bit against the real function in the runner (6,000 placements: every branch, hits that tilt the board
 and ones behind it, horizontal normals that reach the 0.99999 hold, normals a hair off the up near 1e-5, no ray, the
 flag): the quaternion, the three axes and the heading.
 
-**Not wired.** `Rider::respawn` drops the rider a metre above the snow, so the game keeps this attitude through the
-air (turned by spin and flip, rows G1a and G5) until the landing; the port has no air attitude, and `seed_ground` still
-rebuilds it from yaw and normal (STANDIN). Wiring is the landing half of G20c3.
+### Who calls `Boarder_PlaceAt`, and with which heading (row G20c3b; proven from the decompiler)
+
+`Boarder_PlaceAt`(f12 heading, f13 height, a0 rider, a1 &place, a2 &velocity, a3 flag). Six callers:
+
+| caller | heading | place, velocity, flag |
+|---|---|---|
+| `ResetState_PlaceRider` 0x119220 (0x119b70) | atan2(dir.y, dir.x), the path's direction at the respawn point (`AIP_GetDirectionAtDistance`), unless the spread moved the rider to a neighbour's direction (within 30°), then that one's | place +0x350, velocity dir.xy × 833.3333 (z 0), flag 0, height the caller's |
+| `Boarder_StartReset` 0x119be0 | none: it only stores the height (reset state +0x81c) and the distance to move on (+0x820), then state 0x16; `ResetState_Update` places later through `ResetState_PlaceRider` | |
+| the start line, `cBoarder::vf8` 0x116ab8 (0x116d88) | atan2(dir.y, dir.x) of the path's direction at distance 0 | path point (+0xc) + dir × `Boarder_StartLineOffset` 0x11ea00 (stats+0x60 · 90 − 90 cm), velocity 0, height 0, flag 0 |
+| `Boarder_TeleportToInstance` 0x11a098 (0x11a2fc) | atan2 of the instance matrix's y row (x, y) after `Matrix_Transform` | the matrix's translation + 300 cm along an offset chosen by rider+0x460, velocity 0, height 0, flag 0 |
+| `RaceScene_UpdateCastClip` 0x16daa8 (0x16db00) | the scene's own float (+0x30) | the scene's place (+0x20), velocity 0, flag 1 (no ray, no `AnimCtl_Reset`) |
+| 0x141e90 and 0x176ea0 (`CamScript_StartScene`) | not read | (gap, row G20c3b3) |
+
+Every heading read is the same inline atan2 (±π/2 on the y axis, `Math_Atan` 0x2510f8 over y/x, ±π by the sign of x):
+in (−π, π], and with the approximate `Math_Atan`, **not** `f32::atan2`. Compared with `Rider::respawn(at: (pos, yaw))`:
+the port's yaw is `atan2(−x, −z)` of its own line (`race.rs`), so `placed_heading(yaw)` is the same angle to within
+1.3e-5 rad (the game's `Math_Atan` error; measured on 20,000 directions, `tests/placement.rs`), exactly the same
+only when the yaw is made with `jump::atan2_inline` from the game's direction (gap, row G20c3b2).
+
+### The attitude kept through the air (row G20c3b; checked: `tests/placement.rs`)
+
+The game keeps the placed quaternion (rider+0x170) while the rider drops: the trick's spin and flip are separate
+angles (rider+0x1d0, +0x1d4) applied at the pose (`pose::board_frame`) and at the pivot (`air_motion`'s
+`pivot_offset`: the bone's height turned back by them, seen from the attitude *without* them). In the air the
+quaternion is turned only by the wall bump (`AirMotion_Update` 0x108378, the lean toward the wall's normal, at most
+0x3dd67750 rad) and, at the landing, by `SpinState_Update`'s alignment (`spin.rs`, rider with a spin or flip).
+So after `Boarder_PlaceAt` the board lies as placed until the landing, and the ground tick starts from it.
+
+`Rider::att` = (`orient::placed_attitude(placed_heading(yaw), None)`, the port's yaw it was made for), set by
+`Rider::new` (the start line) and `Rider::respawn`. `Rider::seed_ground` takes it while the port's yaw equals the
+one it was made for (the port turns the yaw in the air with the spin), instead of rebuilding the attitude from yaw and
+normal; the first ground tick takes it (`att = None`: the game-side rider's own quaternion goes on), and so does a
+take-off (`Rider::take_off`) and any spin or flip in the air (`Rider::step`, after `air_rotation`). Checked: the
+quaternion, forward, side, up and heading of the seed equal the real `Boarder_PlaceAt`'s bit for bit for 3,000 yaws
+(respawn and new), and after a real drop onto a slope in `Rider::step` (the rider lands with the attitude still the
+placed one; a spin drops it).
+
+Left (STANDIN, rows from this one): the placement's own ray cast is not made at a respawn (E7), so a respawn on a
+slope starts flat instead of tipped to the slope (the ground tick turns it, 1/12 a tick); the attitude at a take-off
+is not kept through the jump's air (row G20c3c); a landing from a spin or flip is `SpinState_Update`'s alignment, not
+wired (G1a5b3b, G5); the wall bump in the air is the port's own.
+
 ## The board's frame and the body height (row G16; checked: `tests/pose.rs`)
 
 `Boarder_UpdatePose` 0x129628 builds the frame rider+0x4aa0.. (rows: the board's x, y, z axes, then the drawn

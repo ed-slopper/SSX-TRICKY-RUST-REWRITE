@@ -9,6 +9,7 @@ use crate::trickdata::{RiderData, COMBOS, RIDERS};
 use crate::score::{Score, ScoreCall};
 use glam::Vec3;
 use crate::surface::SURFACE_TABLE;
+use crate::orient::{self, Orient};
 pub mod wipeout;
 pub mod ground_tick;
 pub use wipeout::{Wipe, course_points};
@@ -388,21 +389,41 @@ pub struct Rider {
     pub up: [f32; 4],
     /// rider+0x308: how high the body is drawn above the snow, cm (board row G16; `pose::ease_body_height`): the
     /// model is drawn at the position + this along the rider's up (`Boarder_UpdatePose` 0x129628)
-    pub body_height: f32,    /// ticks before this rider can be hit by another again (`Boarder_RiderCollisions`: three ticks)
+    pub body_height: f32,
+    /// the board's attitude the game keeps through the air (board row G20c3b): what `Boarder_PlaceAt` 0x11cae8 left
+    /// at a placement (`orient::placed_attitude`: the quaternion rider+0x170 and the axes +0x180..+0x1b0), and the
+    /// port's yaw it was made for. The game's quaternion is not turned by the trick's spin and flip (those are the
+    /// separate angles rider+0x1d0 and +0x1d4, applied at the pose, `pose::board_frame`), so it stays as placed until
+    /// the landing; `seed_ground` starts the ground tick from it while the port left the yaw alone, spin and flip at
+    /// zero. Dropped by the first ground tick (the game-side rider's own quaternion takes over), by a take-off, and by
+    /// any spin or flip in the air (their landing alignment is `SpinState_Update`, row G1a5b3b).
+    pub att: Option<(Orient, f32)>,
+    /// ticks before this rider can be hit by another again (`Boarder_RiderCollisions`: three ticks)
     pub hit_wait: u8,
 }
 
 pub fn heading(yaw: f32) -> Vec3 { Vec3::new(-yaw.sin(), 0.0, -yaw.cos()) }
 
+/// The first argument `Boarder_PlaceAt` 0x11cae8 gets for a port yaw (board row G20c3b): the angle of the board's
+/// forward from +x in the game's space (x, y flat, z up), which is `atan2(dir.y, dir.x)` of the direction the callers
+/// read from the path (`ResetState_PlaceRider` 0x119220, the start line in `cBoarder::vf8` 0x116ab8; both with the
+/// inline atan2 of `Boarder_UpdateOrientation` 0x129008, so in (−π, π]). The port's forward `heading(yaw)` is
+/// (−sin, 0, −cos) in x, y up, z toward the viewer; as the game's (x, −z, y) it points at atan2(cos yaw, −sin yaw)
+/// = yaw + π/2, wrapped.
+pub fn placed_heading(yaw: f32) -> f32 { wrap(yaw + std::f32::consts::FRAC_PI_2) }
+
 impl Rider {
     pub fn new(pos: Vec3, yaw: f32) -> Self {
-        Self { pos, vel: Vec3::ZERO, yaw, grounded: false, normal: Vec3::Y, charge: 0.0, air_time: 0.0,
+        let mut r = Self { pos, vel: Vec3::ZERO, yaw, grounded: false, normal: Vec3::Y, charge: 0.0, air_time: 0.0,
                spawn: (pos, yaw), safe: (pos, yaw), safe_timer: 0.0, safe_external: false, respawns: 0, rail: None, rail_cooldown: 0.0, input: Input::default(),
                spin: 0.0, flip: 0.0, flip_dir: 0.0, wind: 0.0, wind_flip: 0.0, cap: SPEED_CAP, steer: 0.0, grab: 0, grab_hold: 0.0, grab_out: None, grab_done: [false; 16], grab_tweaked: [false; 16], ubers_done: 0, switch_takeoff: false, from_rail: false, uber_timer: 0.0, stats: Stats::default(), data: &RIDERS[0], surface: 1, grind_time: 0.0, rail_twist: 0.0, rail_spun: 0.0, rail_side: 0.0, rail_entry: 0.0, rail_goal: 0.0, rail_held: false, rail_side_signed: 0.0, shove: 0.0, shove_side: 1.0, taunt: -1.0, taunt_clip: String::new(), fin: None, showoff: false, landed: Vec::new(), crash_kind: 0, land_kind: 0, switch: false, score: 0, boost: 0.0, boosting: false, body_height: 0.0,
                last_trick: String::new(), trick_timer: 0.0, crashed: 0.0, hard_land: 0.0, crouch_v: 0.0, brake_v: 0.0, jump_c: 0.0, jump_delay: 0.0, height: 0.0,
                course_dir: None, course_pts: None, wipe: None, crash_at: None, gm: None, crash_spray: None, lean: [0.0; 3], up: [0.0, 0.0, 1.0, 0.0], recover: None, ai: false, down_t: 0.0, getup: -1.0, stumble: 0.0, wall_hit: None, speed_timer: 0.0, spin_timer: 0.0, spin_used: false, tube_class: u8::MAX, gate_p: 0.0, gate_hi: 0.0, gate_lo: 0.0, gate_still: 0.0, gate_target: 0.0, gate_speed: 0.0, gate_state: 8, gate_rock_dir: 0, band: (0.005, 0.0250417), spin_base: 0.0, flip_base: 0.0, late: false, cause: "", spin_ax: Axis::default(), flip_ax: Axis::default(), air_mode2: false, rail_off: 0.0, rail_time: 0.0, rail_halves: 0, boost_was: false, chain: 0,
                ubers: Vec::new(), uber: 0.0, uber_id: 0, uber_done: false, letters: 0, multiplier: 1,
-               sc: new_score(), tick_acc: 0.0, full_count: 0, rail_kind: 0, rail_lean: 0.0, rail_goal0: 0.0, rail_committed: 0.0, show_parts: Vec::new(), grab_scored: false, grab_tw: false, hit_wait: 0 }
+               sc: new_score(), tick_acc: 0.0, full_count: 0, rail_kind: 0, rail_lean: 0.0, rail_goal0: 0.0, rail_committed: 0.0, show_parts: Vec::new(), grab_scored: false, grab_tw: false, hit_wait: 0, att: None };
+        // the start line's `Boarder_PlaceAt` 0x11cae8 (`cBoarder::vf8` 0x116ab8: heading from the path's direction)
+        r.att = Some((orient::placed_attitude(placed_heading(yaw), None), yaw));
+        r
     }
     /// `Boarder_Respawn`: dropped a metre above the snow, already moving down the course at 30 km/h.
     pub fn respawn(&mut self, at: (Vec3, f32)) {
@@ -435,6 +456,9 @@ impl Rider {
         // nothing, and copies it to the rider's up (+0x2c0). STANDIN: no ray hit (`World_RayCast` 0x25aff8, row E7)
         self.normal = ground_tick::port_dir(ground_tick::placed_normal(None));
         self.up = ground_tick::game_dir(self.normal);
+        // and its attitude (G20c3b), which the game keeps through the drop: the quaternion is only turned by the
+        // placement's ray (STANDIN: no ray hit here either, row E7), the heading and nothing else
+        self.att = Some((orient::placed_attitude(placed_heading(at.1), None), self.yaw));
         // `Boarder_PlaceAt` 0x11cae8: the chain banked, its meter change (−0.12) applied
         let (m, calls) = self.sc.bank_points();
         self.show(&calls);
@@ -825,6 +849,8 @@ impl Rider {
         self.grounded = false;
         self.air_time = 0.0;
         self.gm = None;
+        // STANDIN: the attitude at take-off is not kept through the air yet (G20c3c); the landing rebuilds it
+        self.att = None;
     }
     /// Crouching for a jump (`PrewindState_Update` 0x1050e8): the crouch and the wind-up follow their targets
     /// at the original's rates.
@@ -1013,6 +1039,9 @@ impl Rider {
                 jumped = true;
             }
             self.air_rotation(&input, dt);
+            // the landing alignment of a spin or flip is `SpinState_Update`'s (G1a5b3b): until then only a drop without
+            // either keeps the game's attitude
+            if self.spin != 0.0 || self.flip != 0.0 { self.att = None; }
             // `SpinState_Update` 0x100908: the spin (rider+0x1d0, mirrored for stats+0x40) and flip in degrees
             let m = if self.data.goofy { -1.0 } else { 1.0 };
             self.sc.update_spin((-(self.spin - self.spin_base) * m * 57.295776) as i32);

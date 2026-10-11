@@ -3081,6 +3081,7 @@ G 12bee0 Takeoff_Setup
 G 11d038 Boarder_UpdateBoost
 G 11f430 Boarder_IsTricky
 G 11cae8 Boarder_PlaceAt
+G 11ea00 Boarder_StartLineOffset
 L 366eb0 cFakieCruiseControl vtable
 L 366f60 cChangeFakieControl vtable
 L 367010 cCruiseControl vtable
