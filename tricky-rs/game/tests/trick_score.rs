@@ -59,6 +59,8 @@ fn put(m: &mut r5900::Mem, at: u32, rider: u32, s: &Score) {
         (0x84, s.x84),
         (0x88, s.x88),
         (0x8c, s.x8c),
+        (0x90, s.x90),
+        (0xc0, s.xc0),
         (0xe4, s.best_points),
         (0xf4, s.chain),
         (0x158, s.recent_at),
@@ -117,6 +119,8 @@ fn get(m: &mut r5900::Mem, at: u32, rider: u32) -> Score {
         x84: i(m, 0x84),
         x88: i(m, 0x88),
         x8c: i(m, 0x8c),
+        x90: i(m, 0x90),
+        xc0: i(m, 0xc0),
         xc4: f(m, 0xc4),
         xc8: f(m, 0xc8),
         xcc: f(m, 0xcc),
@@ -205,7 +209,7 @@ fn fresh(g: &mut Rng) -> Score {
 fn trick_scoring_matches_the_original() {
     let Some(mut r) = Runner::from_env() else { return };
     r.float_rules = Rules::parse("add=n,mul=n,div=n,cvt=n").unwrap();
-    for f in [0x157198, 0x2cc808, 0x155440, 0x1554c0, 0x155410, 0x19e7a0, 0x156968, 0x1568b0, 0x155cc8, 0x157008, 0x157308, 0x157268, 0x157490] {
+    for f in [0x156de0, 0x156568, 0x155a20, 0x156618, 0x157198, 0x2cc808, 0x155440, 0x1554c0, 0x155410, 0x19e7a0, 0x156968, 0x1568b0, 0x155cc8, 0x157008, 0x157308, 0x157268, 0x157490] {
         r.allow(f);
     }
     let log: Rc<RefCell<Vec<ScoreCall>>> = Rc::default();
@@ -225,7 +229,15 @@ fn trick_scoring_matches_the_original() {
     });
     let focus = Rc::new(RefCell::new(false));
     let fo = focus.clone();
-    r.stub(0x157c50, move |c, _| c.set_gpr(2, *fo.borrow() as u64));
+    let l = log.clone();
+    // the focus player's chain start (its writes to the audio object follow the answer)
+    r.stub(0x157c50, move |c, _| {
+        let f = *fo.borrow();
+        if f {
+            l.borrow_mut().push(ScoreCall::Focus);
+        }
+        c.set_gpr(2, f as u64);
+    });
     let audio = r.mem.alloc(0x7000);
     r.mem.write_u32(0x343050, audio);
     let at = r.mem.alloc(0x300);
@@ -250,7 +262,7 @@ fn trick_scoring_matches_the_original() {
         r.mem.write_u32(audio + 0x6e00, 7);
         r.mem.write_u32(audio + 0x6e04, 7);
         log.borrow_mut().clear();
-        let what = g.next() % 8;
+        let what = g.next() % 11;
         let mut ours = s;
         let (share, calls) = match what {
             0..=4 => {
@@ -286,13 +298,37 @@ fn trick_scoring_matches_the_original() {
                 r.cpu.set_gpr(8, b as u64);
                 let out = ours.start_trick_chain(switch, kind, a, b, f);
                 r.call(0x156618).unwrap_or_else(|e| panic!("case {case}: {e:?}"));
-                if r.mem.read_u32(audio + 0x6e04) == 1 && r.mem.read_u32(audio + 0x6e00) == 0 {
-                    log.borrow_mut().insert(0, ScoreCall::Focus);
-                }
+                assert_eq!((r.mem.read_u32(audio + 0x6e04), r.mem.read_u32(audio + 0x6e00)), if f { (1, 0) } else { (7, 7) }, "case {case}: focus writes");
                 hit[11] += (s.x20 != 0) as u32;
                 hit[12] += (s.x20 != 0 && out.1.iter().any(|c| matches!(c, ScoreCall::Message(..)))) as u32;
                 hit[13] += (ours.x1c != 0) as u32;
                 out
+            }
+            8 => {
+                let flag = g.b(2);
+                r.cpu.set_gpr(4, at as u64);
+                r.cpu.set_gpr(5, flag as u64);
+                let out = ours.crash(flag != 0);
+                r.call(0x156de0).unwrap_or_else(|e| panic!("case {case}: {e:?}"));
+                hit[15] += (flag != 0) as u32;
+                out
+            }
+            9 => {
+                let switch = g.b(2);
+                let f = g.b(2) == 1;
+                *focus.borrow_mut() = f;
+                r.cpu.set_gpr(4, at as u64);
+                r.cpu.set_gpr(5, switch as u64);
+                let out = ours.commit_and_restart_chain(switch, f);
+                r.call(0x156568).unwrap_or_else(|e| panic!("case {case}: {e:?}"));
+                assert_eq!((r.mem.read_u32(audio + 0x6e04), r.mem.read_u32(audio + 0x6e00)), if f { (1, 0) } else { (7, 7) }, "case {case}: focus writes");
+                out
+            }
+            7 if g.b(4) == 1 => {
+                r.cpu.set_gpr(4, at as u64);
+                ours.reset();
+                r.call(0x155a20).unwrap_or_else(|e| panic!("case {case}: {e:?}"));
+                (r.cpu.f(0), Vec::new())
             }
             _ => {
                 r.cpu.set_gpr(4, at as u64);
@@ -309,7 +345,7 @@ fn trick_scoring_matches_the_original() {
         s = ours;
     }
     println!("{hit:?}");
-    for (k, n) in hit.iter().enumerate().take(15) {
+    for (k, n) in hit.iter().enumerate() {
         assert!(*n > 20, "branch {k} reached only {n} times: {hit:?}");
     }
 }

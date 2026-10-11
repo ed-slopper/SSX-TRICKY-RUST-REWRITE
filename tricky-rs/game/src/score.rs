@@ -50,6 +50,9 @@ pub struct Score {
     pub x84: i32,
     pub x88: i32,
     pub x8c: i32,
+    /// +0x90 crashes, +0xc0 crashes of the other kind (`Score_Crash`'s flag; a 1.5 s message of kind 5)
+    pub x90: i32,
+    pub xc0: i32,
     /// +0xc4 air time, +0xc8, +0xcc rail time, +0xd0 longest air, +0xd4, +0xd8 longest rail (seconds)
     pub xc4: f32,
     pub xc8: f32,
@@ -677,5 +680,89 @@ impl Score {
         self.x54 = if held < self.x54 { self.x54 } else { held };
         self.grab_ticks = -1;
         self.units += (seconds * f32::from_bits(0x3d38_55f2)) * self.grab_rate;
+    }
+}
+
+impl Score {
+    /// `Score_Crash` 0x156de0(flag): the chain is lost (+0xf4 = 0), one more crash (+0xc0 and a message of kind 5
+    /// with `flag`, +0x90 without), the trick so far banked as a message of kind 1 and the combo reset. Returns
+    /// the meter change, −0.1 (0xbdccc9f3).
+    pub fn crash(&mut self, flag: bool) -> (f32, Vec<ScoreCall>) {
+        let mut calls = Vec::new();
+        self.chain = 0;
+        if !flag {
+            self.x90 = self.x90.wrapping_add(1);
+        } else {
+            self.xc0 = self.xc0.wrapping_add(1);
+            calls.push(ScoreCall::Message(0x3fc0_0000, 5, 0, 0));
+        }
+        let pts = calc_points(self.units, self.mult);
+        if 0 < pts {
+            calls.push(ScoreCall::Message(0x3fc0_0000, 1, pts, 0));
+        }
+        self.reset_combo();
+        (f32::from_bits(0xbdcc_c9f3), calls)
+    }
+
+    /// `Score_CommitAndRestartChain` 0x156568(switch): a late trick (`SpinState_StartFromStick`, `switch` the
+    /// rider's +0x1b4): the trick so far is named and counted toward repeats (not scored), its spin, flip, grabs
+    /// and timers cleared, and a new chain started (`Score_StartTrickChain`(switch, 0, 0, 1)). Returns 0.0, the
+    /// meter change.
+    pub fn commit_and_restart_chain(&mut self, switch: u32, focus: bool) -> (f32, Vec<ScoreCall>) {
+        let mut calls = Vec::new();
+        let (id, any) = self.build_trick_id(0, switch, 0);
+        if any {
+            let n = self.count_recent_repeats(id);
+            calls.push(ScoreCall::Announce(id, (0 < n) as u32));
+        }
+        self.spin = 0;
+        self.flip = 0;
+        self.spin_scored = 0;
+        self.flip_scored = 0;
+        self.x40 = 0;
+        self.x20 = 0;
+        self.rail_ticks = -1;
+        self.grab_ticks = -1;
+        self.grabs[0] = 0;
+        self.grabs[1] = 0;
+        self.grabs[2] = 0;
+        let (_, more) = self.start_trick_chain(switch, 0, 0, 1, focus);
+        calls.extend(more);
+        (0.0, calls)
+    }
+
+    /// `Score_Reset` 0x155a20: a new run: the totals, records, rank counts, best trick (−1 points), messages and
+    /// recent tricks cleared; multiplier and grab rate 1.
+    pub fn reset(&mut self) {
+        let keep = *self;
+        *self = Score {
+            units: keep.units,
+            spin: keep.spin,
+            flip: keep.flip,
+            grab_ticks: keep.grab_ticks,
+            rail_ticks: keep.rail_ticks,
+            x40: keep.x40,
+            x44: keep.x44,
+            spin_scored: keep.spin_scored,
+            flip_scored: keep.flip_scored,
+            grabs: keep.grabs,
+            x10: keep.x10,
+            x14: keep.x14,
+            x18: keep.x18,
+            x1c: keep.x1c,
+            x20: keep.x20,
+            x50: keep.x50,
+            x54: keep.x54,
+            x58: keep.x58,
+            x5c: keep.x5c,
+            rider_418: keep.rider_418,
+            ..Score::default()
+        };
+        self.best_points = -1;
+        for (k, e) in self.timed.iter_mut().enumerate() {
+            *e = (0, keep.timed[k].1, keep.timed[k].2);
+        }
+        self.grab_rate = 1.0;
+        self.mult = 1.0;
     }
 }
