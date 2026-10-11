@@ -61,3 +61,17 @@ surf[6]/surf[9] by row: 1 2.742/5.009; 2 2.849/5.530; 3 15.04/2.842; 4 30.03/2.9
   35, FROMFACEBWD 41, CT_ROLLBWD2BASE 51; riding resumes 2n−1 ticks after it starts.
 - Clip descriptor table 0x325fa8 (7 ints per game clip id: category, lookup mode, update type, end action, layer,
   blend-in, fade-out); game clip id → name via `AnimClip_ResolveAnmIndex` 0x15ada8.
+
+## The rider's states and motions are classes (from the boarder type-info list at 0x11f628)
+
+- Controls (the state, rider+0x428): `cVoidControl`, `cBumpControl`, `cCruiseControl`, `cChangeFakieControl`,
+  `cFakieCruiseControl`, `cFinishLineControl`, `cGate2BaseControl`, `cGateAnticipateControl`, `cGateLaunchControl`,
+  `cJumpControl`, `cLandHardControl`, `cLandNormalControl`, `cNaturalAirControl`, `cPrewindControl`,
+  `cRailSlideControl`, `cSpinControl`, `cSitAndWaitControl`, `cGetupFromSitControl`, `cWipeOutControl`,
+  `cWipeOutRecoverControl`, `cLessonWaitControl`, `cResetWaitControl` (vtables: `cFakieCruiseControl` 0x366eb0,
+  `cChangeFakieControl` 0x366f60, `cCruiseControl` 0x367010). Riding fakie is a state of its own, and so is
+  changing out of it: which state number each class is (the dispatch at 0x11c9a0) is not mapped yet; the boarder
+  constructor 0x11b348 builds them.
+- Motions (rider+0x424): `cAirMotion`, `cGroundMotion`, `cRailSlideMotion`, `cStaticMotion`, `cWipeOutMotion`,
+  `cWipeOutRecoverMotion`.
+

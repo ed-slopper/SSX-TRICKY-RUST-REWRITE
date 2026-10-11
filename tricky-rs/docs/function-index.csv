@@ -284,9 +284,9 @@ address,size,name,system,status
 0x11c8e8,184,FUN_0011c8e8,boarder?,not started
 0x11c9a0,232,FUN_0011c9a0,boarder?,not started
 0x11ca88,52,FUN_0011ca88,boarder?,not started
-0x11cae8,1284,FUN_0011cae8,boarder?,not started
+0x11cae8,1284,Boarder_PlaceAt,boarder,not started
 0x11cff0,68,Boarder_SetTimeScaleRateLimited,boarder,not started
-0x11d038,812,FUN_0011d038,boarder?,not started
+0x11d038,812,Boarder_UpdateBoost,boarder,not started
 0x11d368,108,FUN_0011d368,ai?,not started
 0x11d3d8,92,FUN_0011d3d8,world?,not started
 0x11d438,172,FUN_0011d438,ai?,not started
@@ -322,7 +322,7 @@ address,size,name,system,status
 0x11f350,104,FUN_0011f350,frontend?,not started
 0x11f3b8,60,FUN_0011f3b8,boarder?,not started
 0x11f3f8,56,FUN_0011f3f8,boarder?,not started
-0x11f430,16,FUN_0011f430,boarder?,not started
+0x11f430,16,Boarder_IsTricky,boarder,not started
 0x11f440,36,FUN_0011f440,audio?,not started
 0x11f468,28,FUN_0011f468,audio?,not started
 0x11f488,92,FUN_0011f488,boarder?,not started
@@ -451,7 +451,7 @@ address,size,name,system,status
 0x1267a0,228,Boarder_Translate,boarder,not started
 0x126888,124,FUN_00126888,boarder?,not started
 0x126918,44,FUN_00126918,boarder?,not started
-0x126948,380,FUN_00126948,boarder?,not started
+0x126948,380,Boarder_SetSteerTarget,boarder,not started
 0x126ac8,112,FUN_00126ac8,boarder?,not started
 0x126b38,196,FUN_00126b38,boarder?,not started
 0x126c00,120,Boarder_SetCrouchTarget,boarder,not started
@@ -477,7 +477,7 @@ address,size,name,system,status
 0x12ae18,1320,FUN_0012ae18,boarder?,not started
 0x12b340,1844,Air_IntegrateRK4,boarder,checked
 0x12ba78,1124,Landing_CheckAngles,boarder,ported
-0x12bee0,272,FUN_0012bee0,boarder?,not started
+0x12bee0,272,Takeoff_Setup,boarder,not started
 0x12bff0,124,FUN_0012bff0,boarder?,not started
 0x12c088,44,FUN_0012c088,boarder?,not started
 0x12c0e8,140,FUN_0012c0e8,boarder?,not started
@@ -4496,8 +4496,8 @@ address,size,name,system,status
 0x250428,200,FUN_00250428,world?,not started
 0x2504f0,564,FUN_002504f0,world?,not started
 0x250728,400,FUN_00250728,boarder?,not started
-0x2508b8,400,FUN_002508b8,boarder?,not started
-0x250a48,452,FUN_00250a48,boarder?,not started
+0x2508b8,400,Quat_RotateVecToVec,boarder?,not started
+0x250a48,452,Quat_Slerp,boarder?,not started
 0x250c10,332,FUN_00250c10,common?,not started
 0x250d60,308,Math_Sin,common?,not started
 0x250e98,312,Math_Cos,boarder?,not started

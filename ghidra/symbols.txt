@@ -3067,3 +3067,13 @@ G 129008 Boarder_UpdateOrientation
 G 128ae8 Boarder_ProbeGround
 G 124dd0 Boarder_Stumble
 G 126250 Boarder_WallCollide
+G 126948 Boarder_SetSteerTarget
+G 2508b8 Quat_RotateVecToVec
+G 250a48 Quat_Slerp
+G 12bee0 Takeoff_Setup
+G 11d038 Boarder_UpdateBoost
+G 11f430 Boarder_IsTricky
+G 11cae8 Boarder_PlaceAt
+L 366eb0 cFakieCruiseControl vtable
+L 366f60 cChangeFakieControl vtable
+L 367010 cCruiseControl vtable
