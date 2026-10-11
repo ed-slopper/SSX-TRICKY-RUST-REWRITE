@@ -3357,3 +3357,24 @@ G 17ccb8 WStr_SetAscii
 G 164178 TrickBook_CountDoneInPage
 G 164020 TrickBook_IsPageComplete
 G 164060 TrickBook_CountCompletePages
+G 161840 Career_ClearAllPlayerFlags
+G 1668f0 HighScore_Reset
+G 1686a8 PreRaceSel_Clear
+G 163ab0 Career_FinishRace
+G 16c3b0 Circuit_AdvanceEvent
+G 166450 Career_ResetRiders
+F 25ece8 cCourseResolve cCourseResolve
+F 2555a8 cCourseResolve_PS2 cCourseResolve_PS2
+F 2521e8 cCourseResolve_Common cCourseResolve_Common
+F 251ea8 cAIFwdDiffCache cAIFwdDiffCache
+F 251ba0 cBxCache cBxCache
+G 1617a0 Career_InitNewGame
+G 164730 Career_GetPlayerLevelStringId
+G 164808 Career_GetPlayerLevelName
+G 168720 PreRaceSel_Choose
+G 1687f0 PreRaceSel_MatchRow
+G 1688f0 PreRaceSel_MatchRowWithRoster
+G 180760 Game_GetLeadingPlayer
+G 176f38 CamScript_ResetActorAnims
+G 165468 Career_GetAttributes
+G 16b298 Career_AverageStatGroups

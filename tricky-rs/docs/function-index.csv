@@ -139,9 +139,9 @@ address,size,name,system,status
 0x1108d0,32,FUN_001108d0,world?,not started
 0x1108f0,144,cAI::vf10_1108f0,ai,not started
 0x110980,44,FUN_00110980,race?,not started
-0x1109b0,140,FUN_001109b0,race?,not started
-0x110a40,116,FUN_00110a40,race?,not started
-0x110ab8,316,FUN_00110ab8,race?,not started
+0x1109b0,140,RaceScene_Prepare,race?,not started
+0x110a40,116,RaceScene_Play,race?,not started
+0x110ab8,316,RaceScene_CheckSkip,race?,not started
 0x110bf8,812,cAI::vf11_110bf8,ai,not started
 0x110f28,120,FUN_00110f28,ai?,not started
 0x110fa0,356,cAI::vf13_110fa0,ai,not started
@@ -158,21 +158,21 @@ address,size,name,system,status
 0x1126f0,160,cAI::vf1_1126f0,ai,not started
 0x112790,76,cAI::vf7_112790,ai,not started
 0x1127e0,100,cAI::vf8_1127e0,ai,not started
-0x112848,108,FUN_00112848,game?,not started
+0x112848,108,Race_HasStartGate,race,not started
 0x1128b8,104,FUN_001128b8,boarder?,not started
 0x112920,460,FUN_00112920,race?,not started
 0x112af0,152,FUN_00112af0,race?,not started
-0x112b88,388,cPreRaceHandler::vf0_112b88,race,not started
-0x112d10,1876,cPreRaceHandler::vf2_112d10,race,not started
-0x113468,16,cPreRaceHandler::vf1_113468,race,not started
+0x112b88,388,cPreRaceHandler::Enter,race,not started
+0x112d10,1876,cPreRaceHandler::Update,race,not started
+0x113468,16,cPreRaceHandler::Exit,race,not started
 0x113478,68,cStartRaceHandler::vf0_113478,game,not started
 0x1134a0,48,cStartRaceHandler::vf2_1134a0,game,not started
 0x1134d0,80,cStartRaceHandler::vf1_1134d0,game,not started
 0x113520,224,cCountdownHandler::vf0_113520,game,not started
 0x113600,312,cCountdownHandler::vf2_113600,game,not started
 0x113738,8,cCountdownHandler::vf1_113738,game,not started
-0x113740,224,cRaceHandler::vf0_113740,race,not started
-0x113820,612,cRaceHandler::vf2_113820,race,not started
+0x113740,224,cRaceHandler::Enter,race,not started
+0x113820,612,cRaceHandler::Update,race,ported
 0x113a88,292,FUN_00113a88,boarder?,not started
 0x113bb0,12,FUN_00113bb0,frontend?,not started
 0x113bc0,12,FUN_00113bc0,race?,not started
@@ -182,9 +182,9 @@ address,size,name,system,status
 0x113c60,136,FUN_00113c60,race?,not started
 0x113ce8,112,FUN_00113ce8,race?,not started
 0x113d58,180,FUN_00113d58,race?,not started
-0x113e10,932,cEndRaceHandler::vf0_113e10,race,not started
+0x113e10,932,cEndRaceHandler::Enter,race,not started
 0x1141e0,1224,cEndRaceHandler::Update,race,ported
-0x1146a8,8,cEndRaceHandler::vf1_1146a8,race,not started
+0x1146a8,8,cEndRaceHandler::Exit,race,not started
 0x1146b0,128,cPreAI::vf1_1146b0,boarder?,not started
 0x114730,196,cPostAI::vf1_114730,boarder?,not started
 0x1147f8,212,FUN_001147f8,camera?,not started
@@ -216,7 +216,7 @@ address,size,name,system,status
 0x1150a8,8,cSelectLessonHandler::vf0_1150a8,game,not started
 0x1150b0,80,FUN_001150b0,game?,not started
 0x115100,2352,Race_UpdatePlacingsAndRubberBand,race,ported
-0x115a30,76,FUN_00115a30,race?,not started
+0x115a30,76,Race_ClearAiTargets,race,not started
 0x115a80,616,Race_UpdatePairDistances,race,not started
 0x115db8,8,thunk_FUN_00115df0,runtime,host
 0x115dc0,40,FUN_00115dc0,game?,not started
@@ -267,10 +267,10 @@ address,size,name,system,status
 0x11a798,8,cBoarder::vf11_11a798,boarder,not started
 0x11a7a0,8,cBoarder::vf12_11a7a0,boarder,not started
 0x11a7a8,8,FUN_0011a7a8,boarder?,not started
-0x11a7b0,32,FUN_0011a7b0,boarder?,not started
+0x11a7b0,32,Boarder_LaunchFromGate,boarder,not started
 0x11a7d0,108,FUN_0011a7d0,boarder?,not started
 0x11a840,1892,Boarder_PlaceAtStart,boarder,not started
-0x11afa8,60,FUN_0011afa8,boarder?,not started
+0x11afa8,60,Boarder_Freeze,boarder,not started
 0x11afe8,48,Boarder_StartLessonWait,boarder,not started
 0x11b018,476,Boarder_AddMeter,boarder,not started
 0x11b1f8,336,Boarder_DrainMeter,boarder,not started
@@ -293,7 +293,7 @@ address,size,name,system,status
 0x11d4e8,708,FUN_0011d4e8,boarder?,not started
 0x11d7b0,124,FUN_0011d7b0,boarder?,not started
 0x11d830,360,Boarder_Wipeout,boarder,ported
-0x11d998,68,Boarder_IsFinishLineDone,boarder,not started
+0x11d998,68,Boarder_IsFinishedAndStopped,boarder,ported
 0x11d9e0,92,FUN_0011d9e0,boarder?,not started
 0x11da40,192,Boarder_Finish,boarder,not started
 0x11db00,2824,FUN_0011db00,boarder?,not started
@@ -1246,13 +1246,13 @@ address,size,name,system,status
 0x1616a0,124,FUN_001616a0,,not started
 0x161730,48,FUN_00161730,race?,not started
 0x161760,64,FUN_00161760,race?,not started
-0x1617a0,148,FUN_001617a0,race?,not started
+0x1617a0,148,Career_InitNewGame,race?,not started
 0x161838,16,FUN_00161838,race?,not started
-0x161840,96,FUN_00161840,race?,not started
+0x161840,96,Career_ClearAllPlayerFlags,race?,not started
 0x1618a0,28,FUN_001618a0,race?,not started
 0x1618c0,28,FUN_001618c0,race?,not started
 0x1618e0,28,FUN_001618e0,race?,not started
-0x161900,36,FUN_00161900,race?,not started
+0x161900,36,Career_IsPlayerActive,race?,not started
 0x161928,364,FUN_00161928,frontend?,not started
 0x161a98,164,FUN_00161a98,save?,not started
 0x161b40,6168,Profile_ResetNewGame,save,ported
@@ -1264,7 +1264,7 @@ address,size,name,system,status
 0x1637d0,40,FUN_001637d0,frontend?,not started
 0x1637f8,388,FUN_001637f8,frontend?,not started
 0x163980,292,FUN_00163980,race?,not started
-0x163ab0,96,FUN_00163ab0,race?,not started
+0x163ab0,96,Career_FinishRace,race?,not started
 0x163b10,36,FUN_00163b10,frontend?,not started
 0x163b38,124,FUN_00163b38,frontend?,not started
 0x163bb8,264,FUN_00163bb8,frontend?,not started
@@ -1274,30 +1274,30 @@ address,size,name,system,status
 0x163e70,152,FUN_00163e70,race?,not started
 0x163f08,8,FUN_00163f08,game?,not started
 0x163f10,8,FUN_00163f10,frontend?,not started
-0x163f18,56,FUN_00163f18,frontend?,not started
-0x163f50,52,FUN_00163f50,race?,not started
-0x163f88,96,FUN_00163f88,race?,not started
-0x163fe8,52,FUN_00163fe8,race?,not started
-0x164020,64,FUN_00164020,race?,not started
-0x164060,68,FUN_00164060,race?,not started
+0x163f18,56,Career_GetPlayerTrickBook,frontend?,not started
+0x163f50,52,Career_GetPlayerFlags,race?,not started
+0x163f88,96,Career_CountPlayerFlags,race?,not started
+0x163fe8,52,Career_GetPlayerStats,race?,not started
+0x164020,64,TrickBook_IsPageComplete,scoring,not started
+0x164060,68,TrickBook_CountCompletePages,scoring,not started
 0x1640a8,92,FUN_001640a8,scoring?,not started
 0x164108,8,FUN_00164108,frontend?,not started
 0x164110,100,FUN_00164110,frontend?,not started
-0x164178,124,FUN_00164178,frontend?,not started
+0x164178,124,TrickBook_CountDoneInPage,scoring,not started
 0x1641f8,92,FUN_001641f8,frontend?,not started
 0x164258,44,FUN_00164258,frontend?,not started
-0x164288,140,FUN_00164288,frontend?,not started
-0x164318,20,FUN_00164318,frontend?,not started
-0x164330,56,FUN_00164330,frontend?,not started
-0x164368,48,FUN_00164368,race?,not started
-0x164398,332,FUN_00164398,race?,not started
+0x164288,140,Career_CountProfiles,frontend?,not started
+0x164318,20,Career_GetPlayerSlot,frontend?,not started
+0x164330,56,Career_GetPlayerProfile,frontend?,not started
+0x164368,48,Career_GetAttributePoints,race?,not started
+0x164398,332,Career_SpendAttributePoint,race?,not started
 0x1644e8,328,FUN_001644e8,race?,not started
 0x164638,120,FUN_00164638,race?,not started
 0x1646b0,128,FUN_001646b0,race?,not started
-0x164730,212,FUN_00164730,race?,not started
-0x164808,56,FUN_00164808,race?,not started
-0x164840,212,FUN_00164840,race?,not started
-0x164918,52,FUN_00164918,frontend?,not started
+0x164730,212,Career_GetPlayerLevelStringId,race?,not started
+0x164808,56,Career_GetPlayerLevelName,race?,not started
+0x164840,212,Career_GetPlayerLevel,race?,not started
+0x164918,52,Career_GetPlayerName,frontend?,not started
 0x164950,20,FUN_00164950,frontend?,not started
 0x164968,348,FUN_00164968,race?,not started
 0x164ac8,68,FUN_00164ac8,race?,not started
@@ -1318,9 +1318,9 @@ address,size,name,system,status
 0x164ef8,68,FUN_00164ef8,race?,not started
 0x164f40,56,FUN_00164f40,race?,not started
 0x164f78,68,FUN_00164f78,race?,not started
-0x164fc0,1084,FUN_00164fc0,race?,not started
-0x165400,104,FUN_00165400,race?,not started
-0x165468,240,FUN_00165468,race?,not started
+0x164fc0,1084,Career_CheckNewRecords,race?,not started
+0x165400,104,Career_ClearPlayerFlags,race?,not started
+0x165468,240,Career_GetAttributes,race?,not started
 0x165558,260,FUN_00165558,race?,not started
 0x165660,36,FUN_00165660,race?,not started
 0x165688,240,FUN_00165688,race?,not started
@@ -1328,25 +1328,25 @@ address,size,name,system,status
 0x165a40,344,FUN_00165a40,race?,not started
 0x165b98,344,FUN_00165b98,race?,not started
 0x165cf0,1888,FUN_00165cf0,race?,not started
-0x166450,92,FUN_00166450,race?,not started
-0x1664b0,56,FUN_001664b0,race?,not started
+0x166450,92,Career_ResetRiders,race?,not started
+0x1664b0,56,Career_InitRiderList,race?,not started
 0x1664e8,100,FUN_001664e8,race?,not started
-0x166550,48,FUN_00166550,race?,not started
-0x166580,20,FUN_00166580,race?,not started
-0x166598,100,FUN_00166598,race?,not started
+0x166550,48,Career_FindPlayerSlot,race?,not started
+0x166580,20,Career_GetPlayerId,race?,not started
+0x166598,100,Career_FindRiderOfPlayer,race?,not started
 0x166600,508,FUN_00166600,race?,not started
-0x166800,64,FUN_00166800,race?,not started
-0x166840,44,FUN_00166840,race?,not started
-0x166870,48,FUN_00166870,race?,not started
-0x1668a0,80,FUN_001668a0,race?,not started
-0x1668f0,116,FUN_001668f0,race?,not started
-0x166968,240,FUN_00166968,race?,not started
-0x166a58,536,FUN_00166a58,race?,not started
+0x166800,64,Replay_AllocBuffer,race?,not started
+0x166840,44,Replay_FreeBuffer,race?,not started
+0x166870,48,Replay_SaveRiderSetup,save,not started
+0x1668a0,80,Replay_LoadFromBuffer,race?,not started
+0x1668f0,116,HighScore_Reset,race?,not started
+0x166968,240,HighScore_Insert,race?,not started
+0x166a58,536,Career_UpdateAttributes,race?,not started
 0x166c70,60,FUN_00166c70,save?,not started
 0x166cb0,748,FUN_00166cb0,ai?,not started
-0x166fa0,60,FUN_00166fa0,race?,not started
-0x166fe0,48,FUN_00166fe0,race?,not started
-0x167010,40,FUN_00167010,race?,not started
+0x166fa0,60,Career_RecordBestTime,race?,not started
+0x166fe0,48,Career_RecordBestScore,race?,not started
+0x167010,40,Career_CountCourseStart,race?,not started
 0x167038,36,FUN_00167038,frontend?,not started
 0x167060,272,FUN_00167060,frontend?,not started
 0x167170,16,FUN_00167170,race?,not started
@@ -1361,10 +1361,10 @@ address,size,name,system,status
 0x1682e0,124,FUN_001682e0,race?,not started
 0x168360,808,FUN_00168360,race?,not started
 0x168688,28,FUN_00168688,race?,not started
-0x1686a8,116,FUN_001686a8,race?,not started
-0x168720,204,FUN_00168720,race?,not started
-0x1687f0,252,FUN_001687f0,race?,not started
-0x1688f0,236,FUN_001688f0,race?,not started
+0x1686a8,116,PreRaceSel_Clear,race,not started
+0x168720,204,PreRaceSel_Choose,race,not started
+0x1687f0,252,PreRaceSel_MatchRow,race,not started
+0x1688f0,236,PreRaceSel_MatchRowWithRoster,race,not started
 0x1689e0,56,FUN_001689e0,race?,not started
 0x168a18,356,FUN_00168a18,race?,not started
 0x168b80,8,FUN_00168b80,race?,not started
@@ -1375,9 +1375,9 @@ address,size,name,system,status
 0x169668,28,FUN_00169668,race?,not started
 0x169688,16,FUN_00169688,race?,not started
 0x169698,688,FUN_00169698,race?,not started
-0x1699a0,444,FUN_001699a0,race?,not started
-0x169b60,84,FUN_00169b60,race?,not started
-0x169bb8,48,FUN_00169bb8,race?,not started
+0x1699a0,444,RaceScene_Select,race?,not started
+0x169b60,84,RaceScene_GetCast,race?,not started
+0x169bb8,48,RaceScene_GetScriptName,race?,not started
 0x169be8,316,FUN_00169be8,race?,not started
 0x169d28,48,FUN_00169d28,race?,not started
 0x169e38,2876,FUN_00169e38,race?,not started
@@ -1390,7 +1390,7 @@ address,size,name,system,status
 0x16b220,36,FUN_0016b220,race?,not started
 0x16b248,36,FUN_0016b248,race?,not started
 0x16b270,36,FUN_0016b270,race?,not started
-0x16b298,152,FUN_0016b298,race?,not started
+0x16b298,152,Career_AverageStatGroups,race?,not started
 0x16b330,196,FUN_0016b330,race?,not started
 0x16b3f8,196,FUN_0016b3f8,race?,not started
 0x16b4c0,196,FUN_0016b4c0,race?,not started
@@ -1401,8 +1401,8 @@ address,size,name,system,status
 0x16b860,44,FUN_0016b860,race?,not started
 0x16b8e0,44,FUN_0016b8e0,race?,not started
 0x16ba18,72,FUN_0016ba18,race?,not started
-0x16ba60,72,FUN_0016ba60,race?,not started
-0x16baa8,172,FUN_0016baa8,race?,not started
+0x16ba60,72,Circuit_GetMedalThresholds,race,not started
+0x16baa8,172,Circuit_GetMedal,race,not started
 0x16bb58,20,FUN_0016bb58,race?,not started
 0x16bb70,40,FUN_0016bb70,race?,not started
 0x16bb98,8,thunk_FUN_0016a978,runtime,host
@@ -1412,11 +1412,11 @@ address,size,name,system,status
 0x16bc40,12,FUN_0016bc40,race?,not started
 0x16bc50,76,FUN_0016bc50,race?,not started
 0x16bca8,8,FUN_0016bca8,race?,not started
-0x16bcb0,852,FUN_0016bcb0,race?,not started
+0x16bcb0,852,Circuit_ProcessRaceResult,race,not started
 0x16c008,540,FUN_0016c008,race?,not started
 0x16c228,252,FUN_0016c228,race?,not started
 0x16c328,132,FUN_0016c328,race?,not started
-0x16c3b0,112,FUN_0016c3b0,race?,not started
+0x16c3b0,112,Circuit_AdvanceEvent,race,not started
 0x16c420,3000,Circuit_ProcessUnlocks,race,not started
 0x16cfd8,208,FUN_0016cfd8,race?,not started
 0x16d0a8,8,FUN_0016d0a8,race?,not started
@@ -1526,14 +1526,14 @@ address,size,name,system,status
 0x175ba0,208,FUN_00175ba0,camera?,not started
 0x175c70,60,FUN_00175c70,race?,not started
 0x175cb0,300,FUN_00175cb0,camera?,not started
-0x175de0,108,FUN_00175de0,race?,not started
-0x175e50,56,FUN_00175e50,common?,not started
-0x175e88,48,FUN_00175e88,race?,not started
-0x175eb8,148,FUN_00175eb8,race?,not started
+0x175de0,108,CamScript_Start,race?,not started
+0x175e50,56,CamScript_IsRunning,common?,not started
+0x175e88,48,CamScript_SetName,race?,not started
+0x175eb8,148,CamScript_Stop,race?,not started
 0x175f50,1996,FUN_00175f50,race?,not started
 0x176720,304,FUN_00176720,race?,not started
 0x176850,1768,FUN_00176850,race?,not started
-0x176f38,232,FUN_00176f38,race?,not started
+0x176f38,232,CamScript_ResetActorAnims,race?,not started
 0x177020,84,FUN_00177020,boarder?,not started
 0x177078,1308,cBxCamera::vf1_177078,camera,not started
 0x1776d0,28,FUN_001776d0,camera?,not started
@@ -1673,9 +1673,9 @@ address,size,name,system,status
 0x17c9d8,360,FUN_0017c9d8,render?,not started
 0x17cb40,92,FUN_0017cb40,render?,not started
 0x17cbc8,64,cAppMan::__tf,runtime,host
-0x17cc48,52,FUN_0017cc48,race?,not started
-0x17cc80,52,FUN_0017cc80,common?,not started
-0x17ccb8,60,FUN_0017ccb8,race?,not started
+0x17cc48,52,WStr_Count,race?,not started
+0x17cc80,52,WStr_Copy,common?,not started
+0x17ccb8,60,WStr_SetAscii,race?,not started
 0x17ccf8,56,FUN_0017ccf8,,not started
 0x17cd30,60,FUN_0017cd30,frontend?,not started
 0x17cdb8,68,FUN_0017cdb8,hud?,not started
@@ -1756,7 +1756,7 @@ address,size,name,system,status
 0x1802b8,148,FUN_001802b8,game?,not started
 0x180350,452,FUN_00180350,debugmenu?,not started
 0x180518,584,FUN_00180518,game?,not started
-0x180760,232,FUN_00180760,race?,not started
+0x180760,232,Game_GetLeadingPlayer,game,not started
 0x180848,456,FUN_00180848,race?,not started
 0x180a10,324,FUN_00180a10,race?,not started
 0x180b58,276,FUN_00180b58,game?,not started
@@ -1783,8 +1783,8 @@ address,size,name,system,status
 0x181a68,80,cReplayEndRaceHandler::__tf,runtime,host
 0x181ad0,80,cSelectLessonHandler::__tf,runtime,host
 0x181b28,64,cAIStateHandler::__tf,runtime,host
-0x181d50,16,FUN_00181d50,debugmenu?,not started
-0x181d60,12,FUN_00181d60,race?,not started
+0x181d50,16,Game_RestoreViews,game,not started
+0x181d60,12,Game_UseSingleView,game,not started
 0x181de8,92,cGame::__tf,runtime,host
 0x181e48,36,cLoadModule::vf0_181e48,game?,not started
 0x181e70,64,FUN_00181e70,game?,not started
@@ -2392,12 +2392,12 @@ address,size,name,system,status
 0x1a6d38,636,FUN_001a6d38,frontend?,not started
 0x1a6fb8,1792,FUN_001a6fb8,frontend?,not started
 0x1a76b8,156,cOverlayMan::vf0_1a76b8,frontend,not started
-0x1a7758,76,FUN_001a7758,frontend?,not started
+0x1a7758,76,FUN_001a7758,,not started
 0x1a77a8,80,FUN_001a77a8,hud?,not started
 0x1a77f8,80,FUN_001a77f8,common?,not started
-0x1a7848,20,FUN_001a7848,game?,not started
-0x1a7860,20,FUN_001a7860,game?,not started
-0x1a7878,72,FUN_001a7878,frontend?,not started
+0x1a7848,20,HUD_ShowItem,hud,not started
+0x1a7860,20,HUD_HideItem,hud,not started
+0x1a7878,72,FUN_001a7878,,not started
 0x1a78c0,524,cOverlayMan::vf2_1a78c0,frontend,not started
 0x1a7ad0,96,cOverlayMan::vf1_1a7ad0,frontend,not started
 0x1a7b30,88,FUN_001a7b30,frontend?,not started
@@ -4513,14 +4513,14 @@ address,size,name,system,status
 0x251a28,112,FUN_00251a28,ai?,not started
 0x251a98,136,FUN_00251a98,world?,not started
 0x251b20,124,FUN_00251b20,,not started
-0x251ba0,36,FUN_00251ba0,race?,not started
+0x251ba0,36,cBxCache::cBxCache,race?,not started
 0x251bc8,88,cBxCache::vf0_251bc8,other,not started
 0x251c20,244,FUN_00251c20,render?,not started
 0x251d18,88,FUN_00251d18,render?,not started
 0x251d70,72,FUN_00251d70,ai?,not started
 0x251db8,168,FUN_00251db8,world?,not started
 0x251e60,68,FUN_00251e60,world?,not started
-0x251ea8,52,FUN_00251ea8,race?,not started
+0x251ea8,52,cAIFwdDiffCache::cAIFwdDiffCache,ai,not started
 0x251ee0,20,cAIFwdDiffCache::vf0_251ee0,ai,not started
 0x251ef8,84,FUN_00251ef8,render?,not started
 0x251f50,216,FUN_00251f50,world?,not started
@@ -4528,7 +4528,7 @@ address,size,name,system,status
 0x2520a0,28,FUN_002520a0,world?,not started
 0x2520c8,80,cAIFwdDiffCache::__tf,runtime,host
 0x252128,64,cBxCache::__tf,runtime,host
-0x2521e8,52,FUN_002521e8,race?,not started
+0x2521e8,52,cCourseResolve_Common::cCourseResolve_Common,race,not started
 0x252220,88,cCourseResolve_Common::vf0_252220,race,not started
 0x252278,40,cCourseResolve_Common::vf1_252278,race,not started
 0x2522a0,20,cCourseResolve_Common::vf2_2522a0,race,not started
@@ -4599,7 +4599,7 @@ address,size,name,system,status
 0x255260,176,FUN_00255260,race?,not started
 0x255310,40,FUN_00255310,race?,not started
 0x255568,64,cCourseResolve_Common::__tf,runtime,host
-0x2555a8,60,FUN_002555a8,race?,not started
+0x2555a8,60,cCourseResolve_PS2::cCourseResolve_PS2,race,not started
 0x2555e8,68,cCourseResolve_PS2::vf0_2555e8,race,not started
 0x255630,1516,cCourseResolve_PS2::vf10_255630,race,not started
 0x255c20,156,cCourseResolve_PS2::vf17_255c20,race,not started
@@ -4663,7 +4663,7 @@ address,size,name,system,status
 0x25ec88,44,FUN_0025ec88,world?,not started
 0x25ecb8,16,FUN_0025ecb8,world?,not started
 0x25ecc8,28,FUN_0025ecc8,,not started
-0x25ece8,136,FUN_0025ece8,race?,not started
+0x25ece8,136,cCourseResolve::cCourseResolve,race,not started
 0x25ed70,128,FUN_0025ed70,,not started
 0x25edf0,1704,FUN_0025edf0,render?,not started
 0x25f498,252,FUN_0025f498,render?,not started
