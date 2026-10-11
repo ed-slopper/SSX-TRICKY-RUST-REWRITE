@@ -14,7 +14,7 @@ Columns:
 
 Where things stand (2026-10-10): `tricky-rs` rides all eleven tracks with the game's own riding, air, rail,
 trick, scoring, wipe-out, AI, camera, race-line and music rules read from the exe
-(`tricky-rs/docs/original-rules.md`). It does **not** yet read the game's files itself: levels come from
+(`tricky-rs/docs/port-notes/`). It does **not** yet read the game's files itself: levels come from
 SSX-Library's JSON export and characters, sounds and fonts from our Python tools. The front end, the animation
 state machine and the renderer are ours. Nothing has been checked against the original by machine.
 
@@ -29,7 +29,6 @@ state machine and the renderer are ours. Nothing has been checked against the or
 | F4h2 | The rest of F4h, per tick over PINE: takeoff and the jump (`Jump_ApplyImpulse` 0x1284e0: find the ticks a rider leaves the snow in a recording, replay the game's tick code there in the runner from the recorded rider), the flight prediction (`AirPredict_AtTakeoff` 0x123b10, RK4 with sub-steps, $a3 ≠ 0: its results land in the rider) and the jump's steep-lip branch, which no test reaches yet; add them to `tricky-rs/game/tests/replay.rs` | any | F4h | | Gap of F4h. Needs a recording with jumps (`pine.py record`, PCSX2 running a race); 2026-10-10 part done by ed-slopper/puffin: recording 3 (with jumps, stats saved) gives the air step 4,275 of 4,275 bit for bit; the game's jump impulse (smallest jump 630.88) explains 13 of 18 takeoffs to within one tick of gravity and ground forces, the rest are lip launches or charged jumps (`checking.md`, F4h2). Left: bit-exact takeoffs need the in-tick state (F4b3), the flight prediction, the steep lip |
 | F4b3 | Replay test (pad recorded since F4b2; our physics callable without Bevy since F11a): load a recorded tick t (`pine.py record`) into our rider structs, feed the pad, step one tick, compare with t+1 field by field; or replay the game's own tick code in the function runner from a full RAM dump | unowned | F4b1, F4b2, F11a | | Gap of F4b1. Our tick must be callable without Bevy (F11) |
 | F4g | Reproduce PCSX2's float rounding exactly: over 159 captured calls of `Boarder_ForwardDrag`/`Boarder_SideFriction` the best simple rule (add/sub/mul to nearest, the default) gives 111 bit-exact, the rest 1–2 ulp. The first instruction where runner and game part is `add.s` at 0x109d6c (drag's cub term), where only toward-zero multiplies + nearest add, or the EE adder, reproduce the game: PCSX2 likely emulates the EE multiplier/adder bit by bit. Model that (from the EE manual's description, not PCSX2's GPL source) in `tools/r5900/src/ps2float.rs`, test it against the 159 saved captures (`TRICKY_FLOAT_RULES`) and the per-tick replays of F4b, and tighten `tests/captured.rs` to exact | any | F4f | | Stopped 2026-10-10 by ed-slopper/puffin: probe tool, per-op `Rules`, `TRICKY_FLOAT_RULES` sweep, findings in `tricky-rs/docs/checking.md` (F4g). Captures stay on your PC; new data comes per tick over PINE (F4b); `tools/pcsx2_debug.py` needs PCSX2-MCP, no longer recommended; 2026-10-10 again by ed-slopper/puffin: normal play (PINE replays) rounds the air step to nearest, 341 of 341, no other rule comes close; the 1–2 ulp misses were COP1 under the debugger, single-op samples there are nearest too and a truncated Booth multiplier doesn't fit (`checking.md`, F4g continued). Next: a COP1-heavy function per tick in normal play |
-| F6 | Port notes per system: split `tricky-rs/docs/original-rules.md` (687 lines) into `tricky-rs/docs/port-notes/<system>.md` (boarder, air, rails, scoring, ai, race, camera, wipeout, world, scripts, audio, hud, frontend, files), with an index | any | | | [repo] |
 | F7 | Decide the reference binary: `SLUS_203.26` (NTSC-U) as the only one, or also PAL / other platforms | humans | | | [est] Everything so far is NTSC-U |
 | F8 | Tag every stand-in already in `tricky-rs/src` with `STANDIN:` (SSX-Library JSON loader, Python-exported chars/sounds/fonts, our animation choice, our front end, ball physics for props, guessed sound stream picks, "my numbers" medals, `rider.rs` guessed constants, the 1.7 m sphere rider in `wipeout.rs`) | any | | | [repo] The README's "still mine" and "Not done yet" lists |
 | F9 | Address on every recreated function: sweep `tricky-rs/src` so each ported function's doc comment has `` `Name` 0xaddr ``, and functions without an original are either tagged `STANDIN:` or plainly our glue | any | F8 | | [repo] Most modules already name their originals in the header |
@@ -41,7 +40,7 @@ state machine and the renderer are ours. Nothing has been checked against the or
 | ID | Task | Area | Needs | Who | Notes |
 |---|---|---|---|---|---|
 | E1 | Start-up and main loop: `entry` 0x100008, the `gApp` (0x337C58) init, `cGame::Init` 0x17E148, `cGame::Update` 0x181638, game modes and the front end ↔ race switch, pause (`cGame::IsPaused` 0x17F078) | unowned | F1 | | [est] Our Bevy app loop is the stand-in |
-| E1a | Fixed 60 Hz tick with per-boarder time scale (`dt = timescale/60`, boarder+0x12c) driving every system, frame-rate independent of the window | any | | | [repo] original-rules.md "Units"; check what `SmoothDt` in `main.rs` does today |
+| E1a | Fixed 60 Hz tick with per-boarder time scale (`dt = timescale/60`, boarder+0x12c) driving every system, frame-rate independent of the window | any | | | [repo] `port-notes/README.md` (units); check what `SmoothDt` in `main.rs` does today |
 | E1b | Random numbers: the game's `rand` and seeding, used by AI tricks, grabs, announcer, so runs can match the original | unowned | F1 | | [est] |
 | E2 | Read the player's disc: ISO 9660 reader in Rust, the `DATA/` tree, so the player points us at their ISO or drive | unowned | F11 | | [est] Replaces copying files out by hand |
 | E2a | BIG archives (C0FB and BIGF) in Rust, ported from the game's loader | unowned | E2 | | [repo] Python in `tools/afl/anmbig.py`; findings.md "Ideas for next steps". The game's reader: `lib-big`, `BIG_Identify` 0x2cbc88, `BIG_Lookup` 0x2cbdc0, `BIG_GetFileData` 0x2cc0a8 (F1d) |
@@ -112,7 +111,7 @@ matches the original.
 
 | ID | Task | Area | Needs | Who | Notes |
 |---|---|---|---|---|---|
-| C0 | Read the real course and event list from the game: course table, which modes each course has, track limits and medal scores, so the rows below come from the game, not from us | unowned | F1 | | [est] original-rules.md already has time limits and medals per course |
+| C0 | Read the real course and event list from the game: course table, which modes each course has, track limits and medal scores, so the rows below come from the game, not from us | unowned | F1 | | [est] `port-notes/ai.md` ("AI, race, camera") already has time limits and medals per course |
 | C1 | Garibaldi | unowned | C0, E9 | | [est] |
 | C2 | Snowdream | unowned | C0, E9 | | [est] |
 | C3 | Elysium Alps | unowned | C0, E9 | | [est] |
@@ -178,6 +177,7 @@ matches the original.
 | F4d2 | The other leaves `checked`: `Boarder_GroundSpringForce` 0x109878, `Boarder_GroundThrust` 0x109950 (boost inside the thrust, none while braking; skate clip 0x221 a STANDIN until G5) and `Air_IntegrateRK4` 0x12b340 (`tricky-rs/game/src/air.rs`, now the port's air step), each bit-identical on 3,000 random inputs; five functions checked | P0 | ed-slopper/puffin | 2026-10-10 | 27160f4 |
 | F4h | Per tick against the running game (`tricky-rs/game/tests/replay.rs`, recordings via `TRICKY_RECORDING`): the air step is bit-identical to PCSX2 on 341 of 342 airborne rider-ticks (the other one nudged by something else), the rubber band (`AI_RubberBandSpeedScale` in the runner + rate limit) on 1,782 of 1,800 (misses are the recorder's timing, one step either way); findings in `tricky-rs/docs/checking.md` | P0 | ed-slopper/puffin | 2026-10-10 | ded4df1 |
 | F5a | Clippy strict on tricky-rs: the 53 warnings fixed (31) or allowed with a reason (`too_many_arguments`, `type_complexity` crate-wide in `main.rs`, as Bevy code does; one parsed-but-unread animation field); `.github/workflows/tricky-rs.yml` runs clippy with `-D warnings` | P0 | ed-slopper/puffin | 2026-10-10 | 39eecac |
+| F6 | Port notes split per system: `tricky-rs/docs/original-rules.md` into `tricky-rs/docs/port-notes/` (boarder, air, rails, scoring, wipeout, ai, race, camera, world, scripts, effects, audio, hud, frontend; `README.md` is the index with the units and the unresolved list); every line kept, references updated, function index unchanged | P0 | ed-slopper/puffin | 2026-10-10 | HASH |
 
 ## Changes to the board
 
@@ -208,3 +208,4 @@ matches the original.
 - 2026-10-10 ed-slopper/puffin: F4g released again with findings (normal play rounds to nearest).
 - 2026-10-10 ed-slopper/puffin: F5a done (clippy strict).
 - 2026-10-10 ed-slopper/puffin: F4h2 part done (takeoffs within a tick's forces; air step on a third recording), left open.
+- 2026-10-10 ed-slopper/puffin: F6 done (port notes per system).

@@ -295,8 +295,8 @@ board's name and kind; the stats line under it changes with the board (the game 
 
 ## 1:1 with the original (in progress)
 
-The riding is being rebuilt to match the decompiled game, rule by rule; `docs/original-rules.md` has every rule
-and constant found so far, with the function addresses. Done in this pass:
+The riding is being rebuilt to match the decompiled game, rule by rule; `docs/port-notes/` has every rule
+and constant found so far, one file per system, with the function addresses. Done in this pass:
 
 - **Riding:** the original's carving model. Steering tips the board's support force sideways (the "lean"), the
   board then yaws round after the direction of travel, and a hard carve costs a lot of speed. Steering, crouch and

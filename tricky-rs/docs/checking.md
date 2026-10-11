@@ -30,7 +30,7 @@ always toward zero: the EE's rounding at work, and the size of the difference F4
 `Takeoff_SetSpinRates` and `AI_RubberBandSpeedScale` stop at their first call (0x250e98, 0x12bee0), which needs a
 stub. Since F4e (2026-10-10) `tests/targets.rs` also runs `AI_RubberBandSpeedScale` 0x13a0f0, `Takeoff_SetSpinRates`
 0x126e30, `Jump_ApplyImpulse` 0x1284e0 (snow and rail) and `Air_IntegrateRK4` 0x12b340 to the end, and each
-matches the formula in `original-rules.md`: the rubber band through both clamps, K = 11.517(0.5449 + 0.6742T)
+matches the formula in the port notes (`port-notes/`): the rubber band through both clamps, K = 11.517(0.5449 + 0.6742T)
 for the spin and flip rates, Δv = 630.88 along normalize(N + 0.2F) on snow and along the board's up on a rail,
 gravity −850.24 and drag −0.20002v for one 1/60 s step. Their pure callees run as the original (`Math_Sin`
 0x250d60, `Math_Cos` 0x250e98, `Vec4_Scale` 0x102f50, the table getter 0x15fdd0); callees with side effects are

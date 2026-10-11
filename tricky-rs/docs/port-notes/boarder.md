@@ -1,0 +1,63 @@
+# Riding on the snow: how the original works
+
+Part of the port notes (index: [README.md](README.md)); units and wording as described there.
+
+## Ground riding (`GroundMotion_Update` 0x10a0d8)
+
+**Input shaping** (targets moved by cBoarder::vf7 0x117198 at `rate/60` per tick, timescale ignored):
+- Steer target = clamp(stick, ±0.905) × min(1, |v|/1135 cm/s); clamp ±1 while boosting. Rate =
+  clamp(7.017·|err|, 0.1, 8.018)/s, ×0.6 on surfaces 3 and 4.
+- Crouch rate = max(|err|, 0.1)·5.0025/s. Brake rate = max(|err|, 0.1)·5.035/s (release (1.1−|err|)·5.035).
+  Brake forced to 0 while crouched; crouch and brake cancel.
+
+**Forces** (previous probe's normal n, forward f, side r = n×f, height h above snow):
+- Ground spring `Boarder_GroundSpringForce` 0x109878, d1 = 0.5 cm, d2 = 2.504 cm:
+  h > 0: −(g/30)·h − (vn>0 ? surf[9]·vn : 0); −d1 < h ≤ 0: −g·h/d1 − surf[9]·vn;
+  else g·(1 − 2(max(h,−d2)+d1)/(d2−d1)) − surf[9]·vn.
+- Lean φ = surf[5]°·steer, m = min(fN, 2g):
+  `a = n(fN − m/cosφ) + (n cosφ + r sinφ)(m/cosφ) + f(drag + thrust) + r·side + (0,0,−g)`.
+- If h < −d2: pos −= n·max(h+d2, −10); remove normal velocity; clamp a·n ≥ 0.
+- Explicit Euler: pos += v·dt; v += a·dt.
+- Board yaws toward the velocity:
+  θ = asin((v×f)·n/|v|); tgt = −θ + s·b·(1 + a_c/2·(1−s²))/(1 + 0.01·crouch) (negated if v·f<0);
+  k = min(1, |v|²·2.003e-5·dt)·max(G, s·sign(tgt)); G = min(1, clamp(min(|v|/555.6,1)·(0.5−|v̂·fallLine|)·40, 0, ∞)+0.01);
+  rotate about n by clamp(tgt·k, ±6°) per tick. (a_c, b) = class 0 (0.30019, 0.34919), alpine (0.20834, 0.26221),
+  class 1 (0.4, 0.52398).
+- Wall collision 0x126250: v += n·(vn + max(0.5·vn, 55.6 cm/s)), push-out 1.1× depth.
+- Ground probe 0x128ae8: ray +200 → −100 cm along n → new n, h, surface.
+- Normal bleed (not on surfaces 3, 4): v −= 0.4(v·n′)n′, |v| restored.
+- Airborne when the probe misses or h > surf[6] (2.74 cm on groomed snow).
+- Speed caps (vf7): 2788.84 cm/s; boosting 2932/3072/3347 by meter level; 3347 while timer +0x134 > 0;
+  cap = max(target, cap − 3.472) per tick.
+- Backwards turnaround: vF < −111 cm/s, brake 0, state 3/5/12 → board turns 180°, switch toggles, steer negated.
+
+**Forward drag** `Boarder_ForwardDrag` 0x109cb8 on vF only, with L = max(1, fN/g):
+`−vF·mul·(L·surf1·lin + (1−crouch)·0.10573 + (1+1.2154·lvl)·1.7513·B²·Bst + |vF|·0.001·L·(surf2 + |vF|·0.001·surf3·cub))`,
+lin = 1.0649822 − 0.30845523·S (alpine 0.70764244 − 0.30197912·S), cub = 1.2848105 − 0.29035342·S2, Bst = 0.6150995 + 0.9181778·E.
+
+**Side friction** `Boarder_SideFriction` 0x109ef8: `−vR·curve(|vF|)·surf[4]·(0.001+1.1412·E)/(1+3.5·lvl)`,
+×0.85 switch (×0.70 alpine). curve (m/s): v<5.556 → 0.20104+0.088997v; v<13.889 → 0.69547+0.03613(v−5.556);
+else 0.99655−0.010441(v−13.889).
+
+**Self-push / boost** `Boarder_GroundThrust` 0x109950:
+push = surf12·k·ang·min(surf11/3.6 − |v|, 11.11) m/s², k = 0.738+0.277·S (alpine 1.205+0.305·S),
+ang = (60° − |boardYaw − courseYaw|)/30° capped at 1 (courseYaw = course spline 8 m ahead). Skate anim
+(crouched, |steer|<0.2, v<8.33) gives 0.2·k·deficit. No push while braking.
+boost = lvl·(0.07983 − |s|)·(23.50 + 10.53·max(0, f_up))·surf12 m/s² — any steer above 0.08 kills it.
+Boost level 1.0 / 0.6013 / 0.25 by meter > 0.666 / > 0.3336 / else.
+
+**Surface table** (`SurfaceTable_Init` 0x256188; 20 rows × 25 floats): [0] g, [1] lin, [2] quad, [3] cubic drag,
+[4] side grip, [5] lean°, [6] airborne height cm, [9] normal damping, [11] push target km/h, [12] thrust scale.
+surf[6]/surf[9] by row: 1 2.742/5.009; 2 2.849/5.530; 3 15.04/2.842; 4 30.03/2.976; 5 2.775/4.052;
+6,10,15,16,17,19 20/30; 7 21.37/45.2; 8 20/39.4; 9 2.02/30; 11 0.70/17.9; 12 3.95/30; 13 2.64/0; 14 1.56/30; 18 2.58/40.
+
+## Animation timing
+
+- Clips are 30 fps data played at 0.5 frame per 60 Hz tick × rate (`AnimClip_Advance` 0x15a030); a clip of n
+  frames reaches its end after 2(n−1) ticks and chains on the next.
+- Grab (and tweak) clips play at rate 0.782 + 0.806·s14.
+- Rail quarter turn: a 15-frame clip, committed at frame 14 (28 ticks, 0.467 s); the clip turns the board.
+- Get-up: by slide (butt/face) and direction to the course: FROMFACEFWD 30 frames, FROMBUTTFWD/BUTTRIGHT/FACERIGHT
+  35, FROMFACEBWD 41, CT_ROLLBWD2BASE 51; riding resumes 2n−1 ticks after it starts.
+- Clip descriptor table 0x325fa8 (7 ints per game clip id: category, lookup mode, update type, end action, layer,
+  blend-in, fade-out); game clip id → name via `AnimClip_ResolveAnmIndex` 0x15ada8.

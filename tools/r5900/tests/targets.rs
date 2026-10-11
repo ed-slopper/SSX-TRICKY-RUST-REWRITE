@@ -1,6 +1,6 @@
 //! The next targets of the checking design (board row F4e): `AI_RubberBandSpeedScale`, `Takeoff_SetSpinRates`,
 //! `Jump_ApplyImpulse` and `Air_IntegrateRK4`, run to the end on inputs built from the port notes
-//! (`tricky-rs/docs/original-rules.md`) and checked against the notes' formulas where there is one. Their small
+//! (`tricky-rs/docs/port-notes/`) and checked against the notes' formulas where there is one. Their small
 //! pure callees run as the original (sine, cosine, vector scale, a table getter); callees with side effects are
 //! stubs that record the call. Skips when TRICKY_ELF is not set.
 

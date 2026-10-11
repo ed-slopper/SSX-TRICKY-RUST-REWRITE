@@ -192,8 +192,8 @@ New people: add your own line (in a `board-` commit) before you claim a row, and
 - If Ghidra cannot decompile a function (VU microcode, inline `qmfc2`/MMI, hand-written asm), write in the port
   notes how you read it instead (disassembly by hand, PCSX2 debugger trace, VU disassembler) and what you are
   still unsure of.
-- Port notes, one file per system, live in `tricky-rs/docs/` (today mostly in `original-rules.md`; row F6
-  splits it). Write proven facts and interpretations apart: "proven" = read from code, "inferred" = a guess.
+- Port notes, one file per system, live in `tricky-rs/docs/port-notes/` (index: its `README.md`); add to the
+  system's file, or start one and list it in the index. Write proven facts and interpretations apart: "proven" = read from code, "inferred" = a guess.
 
 - **The running game: PINE** (PCSX2's own IPC: Settings > Advanced > PINE, slot 28011, stock PCSX2). Ghidra
   shows the code; PINE shows the game while it runs, with the player's own disc: read and write any EE address

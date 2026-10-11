@@ -34,7 +34,7 @@ WORD = re.compile(r"\b([A-Za-z_][A-Za-z0-9_:~]*)\b")
 DAT = re.compile(r"\b(?:DAT|PTR_DAT|PTR|s)_[A-Za-z0-9_]*?([0-9a-f]{8})\b")
 WEAK = {"", "runtime", "other"}
 
-# Address ranges whose system our notes already prove (tricky-rs/docs/original-rules.md). They win over the graph.
+# Address ranges whose system our notes already prove (tricky-rs/docs/port-notes/). They win over the graph.
 RANGES = [
     (0x155410, 0x157490 + 4, "scoring"),  # Score_*
     (0x16b000, 0x16d400, "race"),         # Circuit_*
