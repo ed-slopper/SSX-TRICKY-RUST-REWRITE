@@ -46,7 +46,7 @@ state machine and the renderer are ours. Nothing has been checked against the or
 | E3d | `.aip` / `.sop`: AI paths, race lines, start positions (`AIP_LoadPathsFromFile` 0x197da0) | unowned | E3 | | [repo] `course.rs` reads AIP.json today |
 | E3e | `.ltg` grid, `.map` names, `.adl` audio links, `_sky.pbd` | unowned | E3 | | [repo] |
 | E4d | The rest of the `.mpf` meshes: the shadow meshes (material flags 0x10: positions only, another vector unit program) and the data after each of the face's 18 records (likely its expressions); the vector unit programs themselves, to prove the packet layout read from the data | unowned | E4a | | Gap of E4a. `port-notes/files.md` "Character and board models" |
-| E5a | Text: `DATA/LANG/*.LOC` (`AMERICAN`, `LETTER`, `CONSTANT`) read as the game reads them (`Loc_Load` 0x17c0a8, `Loc_LoadForRegion` 0x17c150, `Loc_MapId` 0x2c50b0, `Loc_GetString` 0x2c5160) | unowned | E2b | ed-slopper/puffin (2026-10-11) | Split of E5. "Unresolved: HUD text (american.loc)" |
+| E5a2 | The HUD's and menus' text from `american.loc` by the ids the game asks for (`Loc_GetString` callers; `CONSTANT.LOC` names them) instead of our strings | unowned | E5a | | Gap of E5a |
 | E5b | Config files: `DATA/CONFIG/*.INF` (SNOW, BANKS, MUSIC, MUSICMAP, INTROMUS, AUDIO, CROWD, CHANT, SPEECH, JUKEBOX, NASCRIPT) and `BTNMAP*.DAT` | unowned | E2b | | Split of E5 |
 | E5c | Camera scripts: `DATA/CAMERA/*.CML` from the disc | unowned | E2b | | Split of E5 |
 | E5d | `DATA/TUTORIAL/TRICKDEF.DAT` (today `chars/trickbook.json`) from the disc | unowned | E2b | | Split of E5 |
@@ -224,6 +224,7 @@ matches the original.
 | E3b | `.ssh` textures in `tricky-data/src/ssh.rs`: the shape library's directory, block chain and name lookup (`Shape_FindByName` 0x2c2528, `Shape_GetLongName` 0x2c2610), 8-bit palette and RGBA images (the only kinds in the disc's 807 files); all 192 exported rider textures equal the disc's under the exports' 0-0x80 to 0-255 mapping (`port-notes/files.md`) | P1 | ed-slopper/puffin | 2026-10-11 | a363515 |
 | G1a4 | `PrewindState_Update` 0x1050e8 ported exactly (`boarder::prewind_update`, on the checked G1d/G1e helpers) and checked in the function runner on 20,000 random ticks with the original's helpers running: every field and every call (boost sounds, clips, states, reset) bit for bit (`tests/prewind.rs`) | P2 | trailrig/heron | 2026-10-11 | 6b74122 |
 | E4c | Rider textures from the player's disc: the exe's path tables (0x341a38 suit/boots, 0x341ce8 head/helm, 0x341d50 boards) as `ssh::rider_texture_path`, read by the app with `TRICKY_DISC` (outfit 1 and board 1 as the exports had them) | P1 | ed-slopper/puffin | 2026-10-11 | 9898b17 |
+| E5a | Text from the disc: `tricky-data/src/loc.rs` reads `american.loc` as `Loc_GetString` 0x2c5160 / `Loc_MapId` 0x2c50b0 do (3,774 strings); `CONSTANT.LOC` (unused by the game) names every string id | P1 | ed-slopper/puffin | 2026-10-11 | c2040d5 |
 
 ## Changes to the board
 
@@ -314,3 +315,4 @@ matches the original.
 - 2026-10-11 ed-slopper/puffin: E4c done.
 - 2026-10-11 trailrig/heron: split G1c into G1c1 (claimed) and G1c2.
 - 2026-10-11 ed-slopper/puffin: split E5 into E5a-E5e; claim E5a.
+- 2026-10-11 ed-slopper/puffin: E5a done; added E5a2 (gap of E5a).
