@@ -194,4 +194,25 @@ Part of the port notes (index: [README.md](README.md)); units and wording as des
   − path|² + |look − path 800 further|² − (100 − |U3 − preference|) × 23187.357 (no preference term with +0x41c);
   the cheapest; the same path means no change. A new path: memory reset, projected from the start, the point
   ahead, last distance = distance.
-- Not yet: `Boarder_AdvanceOnPath` 0x118c08 and `Boarder_FindNearestLine` 0x119d30 (the reset placement; row G1c3).
+- Resets: see below.
+
+## Reset placement, exactly (row G1c3, checked on every course: `tests/aipath.rs`)
+
+- Event types (as the game keeps them, the place in the table at 0x337e70; file code in brackets): 0x19 (100), 0x1c
+  (103), 0x1d (104), 0x1e (105).
+- `AIP_CanResetAt` 0x196858: no reset where a 0x1d event covers the distance (`Path::can_reset_at`).
+- `ResetState_GetRespawnPos` 0x196758 (`Path::respawn_at`): of the events covering the distance, 0x19 moves it on
+  to the furthest end, 0x1c back to the earliest start, 0x1e on to the furthest end; the 0x1c/0x1e place wins
+  unless it is still the distance itself. The point there.
+- The race lines (`.aip` event paths, `aipath::RaceLines`): each one's distance to the finish at its start
+  (+0x38, parameter 0); `AIPathSet_FindRaceLineAt` 0x1982d0: the place clamped to the main line's, the first line
+  whose span holds it, the point there (none: 0, the point untouched).
+- `Boarder_AdvanceOnPath` 0x118c08 (`advance_on_path`): the point `by` further on (past the end: on along the last
+  direction), the six nearest *respawnable* paths by box (`AIPathSet_SortByDistance` 0x197f08 is the sort with the
+  flag set), the same cost as the path chooser without the preference, then projected from memory, the point 800
+  ahead, last = along.
+- `Boarder_FindNearestLine` 0x119d30 (f12 the place from the finish, a0 the rider; `find_nearest_line`): the
+  race line's point, the respawnable path of the six with the least flat distance (each better one sets
+  path/last/along/off/near, memory −1), 800 ahead, heading (inline atan2); both memories −1; the race place from
+  the nearest point: +0x374 = line's distance − along; with laps left (rider+0x114 > 0) the lap's best +0x378 takes
+  it if it went back or on more than half the main line. Then `ResetState_PlaceRider`.

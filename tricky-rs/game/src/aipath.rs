@@ -339,3 +339,150 @@ pub fn update_path_ahead(paths: &[Path], f: &mut Follow, racing: bool, tick: i32
     let dy = f.ahead[1] - f.near[1];
     f.heading = crate::jump::atan2_inline(dy, dx);
 }
+
+impl Path {
+    /// `AIP_CanResetAt` 0x196858: no "no reset" event (type 0x1d, file code 104) covers `d`.
+    pub fn can_reset_at(&self, d: f32) -> bool {
+        !self.events.iter().any(|e| e.2 <= d && d <= e.3 && e.0 == 0x1d)
+    }
+
+    /// `ResetState_GetRespawnPos` 0x196758: where a rider reset at `d` comes back, and the point there. Of the
+    /// events covering `d`: type 0x19 (code 100) moves it on to the furthest end, 0x1c (103) back to the earliest
+    /// start and 0x1e (105) on to the furthest end; the 0x1c / 0x1e place wins unless it is still `d`.
+    pub fn respawn_at(&self, d: f32) -> (f32, V4) {
+        let (mut on, mut moved) = (d, d);
+        for e in &self.events {
+            if e.2 <= d && d <= e.3 {
+                match e.0 {
+                    0x19 => on = if e.3 < on { on } else { e.3 },
+                    0x1c => moved = if moved < e.2 { moved } else { e.2 },
+                    0x1e => moved = if e.3 < moved { moved } else { e.3 },
+                    _ => {}
+                }
+            }
+        }
+        let at = if moved == d { on } else { moved };
+        (at, self.position_at(at).0)
+    }
+}
+
+/// The race lines (the `.aip`'s event paths, `cEventPath`, 0x3c bytes each): their geometry, each one's distance to
+/// the finish at its start (+0x38, parameter 0) and the main one's index (the path set's +0x10).
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct RaceLines {
+    pub lines: Vec<Path>,
+    pub to_finish: Vec<f32>,
+    pub main: usize,
+}
+
+impl RaceLines {
+    pub fn from_aip(a: &tricky_data::aip::Aip) -> RaceLines {
+        RaceLines {
+            lines: a.event_paths.iter().map(Path::from_aip).collect(),
+            to_finish: a.event_paths.iter().map(|p| f32::from_bits(p.param(0).unwrap_or(0))).collect(),
+            main: a.main_event_path as usize,
+        }
+    }
+
+    /// `AIPathSet_FindRaceLineAt` 0x1982d0: the first line reaching the place `d` from the finish (no further than
+    /// the main line's start), and the point there.
+    pub fn line_at(&self, d: f32) -> Option<(usize, V4)> {
+        let main = self.to_finish[self.main];
+        let d = if d <= main { d } else { main };
+        for (k, l) in self.lines.iter().enumerate() {
+            let v = self.to_finish[k] - d;
+            if 0.0 <= v && v <= l.length() {
+                return Some((k, l.position_at(v).0));
+            }
+        }
+        None
+    }
+}
+
+/// The rider's place on the race line (rider+0x57a0 the line, +0x374 its distance to the finish, +0x378 the best
+/// of it this lap, +0x3b0 the projection's memory).
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct RacePlace {
+    pub line: usize,
+    pub to_finish: f32,
+    pub best: f32,
+    pub cache: Cache,
+}
+
+/// `Boarder_AdvanceOnPath` 0x118c08, for a reset: the point `by` further along the rider's path (on past its end
+/// along its last direction), then, of the six nearest respawnable paths that run on 200 past it, the one passing
+/// nearest it and carrying on that way (as [`choose_path_ahead`], with no preference); the rider's place moves to
+/// that point.
+pub fn advance_on_path(paths: &[Path], f: &mut Follow, by: f32) {
+    let p = &paths[f.path];
+    let len = p.length();
+    let pt = if f.along + by <= len {
+        p.position_at(f.along + by).0
+    } else {
+        let dir = p.direction_at(len);
+        let end = p.position_at(len).0;
+        add(end, scale(dir, by - (len - f.along)))
+    };
+    let mut best = 1e37f32;
+    let mut chosen: Option<usize> = None;
+    for k in sort_by_distance(paths, pt, 6, true) {
+        let q = &paths[k];
+        let (d, near, _) = q.project(pt);
+        if !(d <= q.length() - 200.0) {
+            continue;
+        }
+        let a = sub(pt, q.position_at(d + 800.0).0);
+        let b = sub(pt, near);
+        let cost = crate::jump::dot(b, b) + crate::jump::dot(a, a);
+        if cost < best {
+            best = cost;
+            chosen = if k == f.path { None } else { Some(k) };
+        }
+    }
+    if let Some(k) = chosen {
+        f.path = k;
+        f.cache.index = -1;
+    }
+    let (d, off) = paths[f.path].project_from(pt, &mut f.near, &mut f.cache);
+    f.off = off;
+    f.along = d;
+    f.ahead = paths[f.path].position_at(d + 800.0).0;
+    f.last = f.along;
+}
+
+/// `Boarder_FindNearestLine` 0x119d30 up to its call of `ResetState_PlaceRider`: the rider put on the race line
+/// at the place `d` from the finish ([`RaceLines::line_at`]; false, nothing changed, where no line reaches it —
+/// the game goes on with an unset point), on the respawnable path (of the six nearest) passing nearest that point,
+/// with the point 800 ahead and the heading; then the place on the race line from the nearest point, and with laps
+/// left (rider+0x114) the lap's best unless it went back or on more than half the main line.
+pub fn find_nearest_line(paths: &[Path], lines: &RaceLines, f: &mut Follow, r: &mut RacePlace, d: f32, laps_left: i32) -> bool {
+    let Some((line, pt)) = lines.line_at(d) else { return false };
+    r.line = line;
+    let mut best = 1e37f32;
+    for k in sort_by_distance(paths, pt, 6, true) {
+        let (along, near, lat) = paths[k].project(pt);
+        if lat < best {
+            f.last = along;
+            f.path = k;
+            f.near = near;
+            f.cache.index = -1;
+            f.off = lat;
+            f.along = along;
+            best = lat;
+        }
+    }
+    f.ahead = paths[f.path].position_at(f.along + 800.0).0;
+    f.heading = crate::jump::atan2_inline(f.ahead[1] - f.near[1], f.ahead[0] - f.near[0]);
+    f.cache.index = -1;
+    r.cache.index = -1;
+    let mut scratch = [0.0; 4];
+    let (along, _) = lines.lines[line].project_from(f.near, &mut scratch, &mut r.cache);
+    r.to_finish = lines.to_finish[line] - along;
+    if 0 < laps_left {
+        let gain = r.to_finish - r.best;
+        if gain < 0.0 || lines.to_finish[lines.main] * 0.5 < gain {
+            r.best = r.to_finish;
+        }
+    }
+    true
+}

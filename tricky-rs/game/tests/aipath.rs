@@ -270,3 +270,175 @@ fn path_following_matches_the_original() {
     }
     assert!(chose[1] > 200, "kept / changed path: {chose:?}");
 }
+
+/// The course's paths loaded into the game's own path set (0x337fb8) in the runner.
+fn load_set(r: &mut Runner, bytes: &[u8]) {
+    for f in [0x197da0u32, 0x198518, 0x1983d0, 0x196f28, 0x198738, 0x198720, 0x198750, 0x197130, 0x197170, 0x2cc808, 0x2ce114, 0x196700, 0x196718, 0x196990, 0x196998] {
+        r.allow(f);
+    }
+    let buf = r.mem.alloc(bytes.len() as u32 + 16);
+    for (k, b) in bytes.iter().enumerate() {
+        r.mem.write_u8(buf + k as u32, *b);
+    }
+    r.stub(0x2c8a70, move |c, _| c.set_gpr(2, buf as u64));
+    let heap = r.mem.alloc(0x40_0000);
+    let next = std::rc::Rc::new(std::cell::Cell::new(heap));
+    let n = next.clone();
+    r.stub(0x2ccf70, move |c, _| {
+        let size = (c.gpr(5) as u32 + 15) & !15;
+        let at = n.get();
+        n.set(at + size);
+        c.set_gpr(2, at as u64);
+    });
+    r.cpu.set_gpr(4, 0x337fb8);
+    r.cpu.set_gpr(5, 0);
+    r.call(0x197da0).expect("load");
+}
+
+#[test]
+fn reset_placing_matches_the_original() {
+    // `AIP_CanResetAt` 0x196858, `ResetState_GetRespawnPos` 0x196758 and `AIPathSet_FindRaceLineAt` 0x1982d0 on every
+    // course's AI paths and race lines; `Boarder_AdvanceOnPath` 0x118c08 and `Boarder_FindNearestLine` 0x119d30 (its
+    // `ResetState_PlaceRider` recorded) on riders about them
+    use std::cell::RefCell;
+    use std::rc::Rc;
+    use tricky_game::aipath::{advance_on_path, find_nearest_line, Follow, RaceLines, RacePlace};
+    let Some(dir) = std::env::var_os("TRICKY_AIP_DIR") else { return };
+    let mut files: Vec<_> = std::fs::read_dir(&dir).unwrap().filter_map(|e| e.ok()).map(|e| e.path()).filter(|p| p.extension().is_some_and(|x| x == "aip")).collect();
+    files.sort();
+    let mut g = Rng(0x5e2d_91c7_a04b_3f68);
+    let (mut moved, mut blocked, mut changed, mut found) = (0u32, 0u32, 0u32, 0u32);
+    for file in files {
+        let Some(mut r) = Runner::from_env() else { return };
+        r.float_rules = Rules::parse("add=n,mul=n,div=n,cvt=n").unwrap();
+        for f in [0x102f50u32, 0x2510f8, 0x2f79a8, 0x2f7018, 0x197b50, 0x1979f8, 0x197738, 0x197250, 0x197478, 0x197830, 0x197f28, 0x197f08, 0x197910, 0x197ef0, 0x196858, 0x196758, 0x1982d0, 0x118c08, 0x119d30] {
+            r.allow(f);
+        }
+        let bytes = std::fs::read(&file).unwrap();
+        load_set(&mut r, &bytes);
+        let aip = tricky_data::aip::read(&bytes).unwrap();
+        let paths: Vec<Path> = aip.ai_paths.iter().map(Path::from_aip).collect();
+        let lines = RaceLines::from_aip(&aip);
+        let (base, lbase) = (r.mem.read_u32(0x337fb8 + 4), r.mem.read_u32(0x337fb8 + 0xc));
+        let placed: Rc<RefCell<Vec<(u64, u64, u32)>>> = Rc::default();
+        let pl = placed.clone();
+        r.stub(0x119220, move |c, _| pl.borrow_mut().push((c.gpr(4), c.gpr(5), c.f(12).to_bits())));
+        let (out, dist) = (r.mem.alloc(16), r.mem.alloc(16));
+        let name = file.file_name().unwrap().to_string_lossy().to_string();
+        // the events' checks, on both kinds of path, often right at an event's ends
+        for case in 0..4000 {
+            let line = g.next() % 2 == 0 && !lines.lines.is_empty();
+            let (p, pa) = if line {
+                let k = g.next() as usize % lines.lines.len();
+                (&lines.lines[k], lbase + 0x3c * k as u32)
+            } else {
+                let k = g.next() as usize % paths.len();
+                (&paths[k], base + 0x40 * k as u32)
+            };
+            let len = p.length();
+            let d = if !p.events.is_empty() && g.next() % 2 == 0 {
+                let e = p.events[g.next() as usize % p.events.len()];
+                [e.2, e.3, g.f(e.2, e.3)][g.next() as usize % 3]
+            } else {
+                g.f(-100.0, len + 100.0)
+            };
+            r.cpu.set_f(12, d);
+            r.cpu.set_gpr(4, pa as u64);
+            r.call(0x196858).unwrap();
+            assert_eq!(r.cpu.gpr(2) != 0, p.can_reset_at(d), "{name} case {case}: can reset at {d}");
+            blocked += !p.can_reset_at(d) as u32;
+            r.mem.write_f32(dist, d);
+            r.cpu.set_gpr(4, out as u64);
+            r.cpu.set_gpr(5, pa as u64);
+            r.cpu.set_gpr(6, dist as u64);
+            r.call(0x196758).unwrap();
+            let (at, pos) = p.respawn_at(d);
+            assert_eq!((r.mem.read_u32(dist), get4(&mut r.mem, out)), (at.to_bits(), bits(pos)), "{name} case {case}: respawn at {d}");
+            moved += (at != d) as u32;
+            let main = lines.to_finish.get(lines.main).copied().unwrap_or(0.0);
+            let d = g.f(-500.0, main + 500.0);
+            put4(&mut r.mem, out, [7.0; 4]);
+            r.cpu.set_f(12, d);
+            r.cpu.set_gpr(4, 0x337fb8);
+            r.cpu.set_gpr(5, out as u64);
+            r.call(0x1982d0).unwrap();
+            let theirs = match r.cpu.gpr(2) as u32 {
+                0 => None,
+                a => Some((((a - lbase) / 0x3c) as usize, get4(&mut r.mem, out))),
+            };
+            assert_eq!(theirs, lines.line_at(d).map(|(k, v)| (k, bits(v))), "{name} case {case}: race line at {d}");
+        }
+        // riders put back along their paths, and onto the race line
+        let rider = r.mem.alloc(0x5900);
+        for case in 0..1500 {
+            let k = g.next() as usize % paths.len();
+            let p = &paths[k];
+            let len = p.length();
+            let d0 = if g.next() % 4 == 0 { g.f((len - 1500.0).max(0.0), len) } else { g.f(0.0, len) };
+            let mut f = Follow { path: k, last: g.f(0.0, len), along: d0, off: g.f(0.0, 500.0), near: [g.f(-9.0, 9.0); 4], ahead: [g.f(-9.0, 9.0); 4], heading: g.f(-3.0, 3.0), cache: Cache::default() };
+            if g.next() % 2 == 0 {
+                let i = g.next() as usize % p.points.len();
+                let run: f32 = p.points[..i].iter().map(|x| x.1).fold(0.0, |a, b| a + b);
+                f.cache = Cache { start: p.position_at(run).0, along: run, index: i as i32 };
+            }
+            let mut rp = RacePlace { line: 0, to_finish: g.f(0.0, 9000.0), best: g.f(0.0, 90000.0), cache: Cache { start: [g.f(-9.0, 9.0); 4], along: g.f(0.0, 99.0), index: 3 } };
+            let laps = (g.next() % 3) as i32 - 1;
+            let m = &mut r.mem;
+            m.write_u32(rider + 0x57a4, base + 0x40 * k as u32);
+            m.write_u32(rider + 0x57a0, lbase);
+            m.write_f32(rider + 0x340, f.last);
+            m.write_f32(rider + 0x344, f.along);
+            m.write_f32(rider + 0x348, f.off);
+            put4(m, rider + 0x350, f.near);
+            put4(m, rider + 0x360, f.ahead);
+            m.write_f32(rider + 0x370, f.heading);
+            put4(m, rider + 0x390, f.cache.start);
+            m.write_f32(rider + 0x3a0, f.cache.along);
+            m.write_u32(rider + 0x3a4, f.cache.index as u32);
+            m.write_f32(rider + 0x374, rp.to_finish);
+            m.write_f32(rider + 0x378, rp.best);
+            put4(m, rider + 0x3b0, rp.cache.start);
+            m.write_f32(rider + 0x3c0, rp.cache.along);
+            m.write_u32(rider + 0x3c4, rp.cache.index as u32);
+            m.write_u32(rider + 0x114, laps as u32);
+            let nearest = g.next() % 2 == 0;
+            let by = g.f(0.0, 4000.0);
+            let path0 = f.path;
+            r.cpu.set_gpr(4, rider as u64);
+            if nearest {
+                let d = g.f(-500.0, lines.to_finish[lines.main] + 500.0);
+                if lines.line_at(d).is_none() {
+                    continue;
+                }
+                r.cpu.set_f(12, d);
+                r.cpu.set_f(13, 1.5);
+                r.cpu.set_gpr(5, 0x5a5a);
+                placed.borrow_mut().clear();
+                r.call(0x119d30).unwrap_or_else(|e| panic!("{name} case {case}: {e}"));
+                assert!(find_nearest_line(&paths, &lines, &mut f, &mut rp, d, laps));
+                assert_eq!(placed.borrow().len(), 1, "{name} case {case}: placed");
+                found += 1;
+            } else {
+                r.cpu.set_f(12, by);
+                r.call(0x118c08).unwrap_or_else(|e| panic!("{name} case {case}: {e}"));
+                advance_on_path(&paths, &mut f, by);
+            }
+            changed += (f.path != path0) as u32;
+            let m = &mut r.mem;
+            let theirs = (
+                ((m.read_u32(rider + 0x57a4) - base) / 0x40) as usize,
+                m.read_u32(rider + 0x340), m.read_u32(rider + 0x344), m.read_u32(rider + 0x348),
+                get4(m, rider + 0x350), get4(m, rider + 0x360), m.read_u32(rider + 0x370),
+                get4(m, rider + 0x390), m.read_u32(rider + 0x3a0), m.read_u32(rider + 0x3a4) as i32,
+            );
+            let ours = (f.path, f.last.to_bits(), f.along.to_bits(), f.off.to_bits(), bits(f.near), bits(f.ahead), f.heading.to_bits(), bits(f.cache.start), f.cache.along.to_bits(), f.cache.index);
+            assert_eq!(theirs, ours, "{name} case {case}: nearest line {nearest}, path {k}, by {by}");
+            let theirs = (((m.read_u32(rider + 0x57a0) - lbase) / 0x3c) as usize, m.read_u32(rider + 0x374), m.read_u32(rider + 0x378), get4(m, rider + 0x3b0), m.read_u32(rider + 0x3c0), m.read_u32(rider + 0x3c4) as i32);
+            let ours = (rp.line, rp.to_finish.to_bits(), rp.best.to_bits(), bits(rp.cache.start), rp.cache.along.to_bits(), rp.cache.index);
+            assert_eq!(theirs, ours, "{name} case {case}: race place, nearest line {nearest}, laps {laps}");
+        }
+        println!("{name}: reset placing checked");
+    }
+    println!("moved {moved}, blocked {blocked}, path changed {changed}, nearest line {found}");
+    assert!(moved > 100 && blocked > 10 && changed > 100 && found > 1000, "moved {moved}, blocked {blocked}, changed {changed}, found {found}");
+}
