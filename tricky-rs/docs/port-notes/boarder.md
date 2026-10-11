@@ -122,3 +122,23 @@ surf[6]/surf[9] by row: 0 7.347/11.61; 1 2.742/5.009; 2 2.849/5.530; 3 15.04/2.8
 - Pad rumble (`cPlayer::vf7`/`vf11` → `Rumble_Update` 0x150d18, `Rumble_Impact` 0x150a80): an impact of
   −dot(velocity, normal)·1.389 (clamped 0..2) above 0.3 buzzes the small motor for 0.02–0.1 s and sets the big
   motor's strength, which decays ×0.98333 − 0.025 per tick; nothing during replays.
+
+## Animation clip modes (F1c)
+
+`AnimCtl_UpdateLayers` 0x15f390 walks the 3 animation layers (0x70 bytes each) and calls `AnimCtl_UpdateClip`
+0x15f440 on every clip. That picks how the clip is driven from a per-clip table at 0x325fb0 (stride 0x1c, by the
+clip id at clip+0x40), then fires the clip's sound markers (`AnimCtl_FireClipSounds`):
+
+| mode | function | driven by |
+|---|---|---|
+| 0-3 | `AnimMode_Advance` 0x161340 (and three copies) | time |
+| 4 | `AnimMode_BrakeBlend` 0x160680 | brake (rider+0x1fc) and rider+0x268, two sources per board class (tables at 0x3791e8) |
+| 5 | `AnimMode_CrouchBlend` 0x1605a0 | crouch (rider+0x208), sources per board class at 0x3791d0 |
+| 6 | `AnimMode_CrouchFrame` 0x161300 | frame = (1 - crouch) × length |
+| 7 | `AnimMode_CrouchSteerBlend` 0x161118 | crouch and the steer sign (rider+0x214), tables at 0x3794b8 |
+| 8 | 0x160140 | frame = rider+0x1f0 × length |
+| 9 | `AnimMode_DirectionBlend` 0x1601d0 | angle of (rider+0x27c, rider+0x280), quadrant blend |
+| 10 | 0x160b20 | like 9 |
+| 11 | 0x160af0 | frame = rider+0x238 × length |
+
+Riding switch (rider+0x1b4) mirrors the inputs of modes 4 and 9.

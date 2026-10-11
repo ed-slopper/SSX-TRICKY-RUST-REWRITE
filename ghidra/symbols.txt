@@ -5176,3 +5176,16 @@ G 130b98 Fx_BoardTrail_Draw
 G 132308 Fx_SurfaceSpray_Draw
 G 1331a8 Fx_BoardTrack_Draw
 G 1333c0 Fx_BoardTrack_DrawStrip
+G 15f390 AnimCtl_UpdateLayers
+G 15f440 AnimCtl_UpdateClip
+G 15f300 AnimCtl_FireClipSounds
+G 159bb8 AnimClip_SetSource
+G 159e80 AnimClip_GetPhase
+G 161340 AnimMode_Advance
+G 160680 AnimMode_BrakeBlend
+G 1605a0 AnimMode_CrouchBlend
+G 161300 AnimMode_CrouchFrame
+G 161118 AnimMode_CrouchSteerBlend
+G 1601d0 AnimMode_DirectionBlend
+G 1033d0 CruiseControl_LookBack
+G 103b88 CruiseControl_RandomFlourish
