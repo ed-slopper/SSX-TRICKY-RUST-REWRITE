@@ -3628,3 +3628,5 @@ G 13be78 TriggerScript_Run
 G 13f448 Roller_OnHit
 G 1d8bc8 ParticleSys_Draw
 G 142af0 TexFlip_Init
+G 1776d0 Camera_SetMode
+G 177db0 Camera_Cut
