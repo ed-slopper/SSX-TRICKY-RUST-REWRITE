@@ -69,10 +69,39 @@ surf[6]/surf[9] by row: 1 2.742/5.009; 2 2.849/5.530; 3 15.04/2.842; 4 30.03/2.9
   `cJumpControl`, `cLandHardControl`, `cLandNormalControl`, `cNaturalAirControl`, `cPrewindControl`,
   `cRailSlideControl`, `cSpinControl`, `cSitAndWaitControl`, `cGetupFromSitControl`, `cWipeOutControl`,
   `cWipeOutRecoverControl`, `cLessonWaitControl`, `cResetWaitControl` (vtables: `cFakieCruiseControl` 0x366eb0,
-  `cChangeFakieControl` 0x366f60, `cCruiseControl` 0x367010). Riding fakie is a state of its own, and so is
-  changing out of it: which state number each class is (the dispatch, `Boarder_UpdateControl` 0x11c9a0) is not mapped
-  yet; the boarder constructor 0x11b348 builds them. Known so far: 4 the turnaround (revert), 0x16 the reset wait
-  (`Boarder_StartReset` 0x119be0), 0xd in the air, 3 riding, 2 the stumble.
-- Motions (rider+0x424): `cAirMotion`, `cGroundMotion`, `cRailSlideMotion`, `cStaticMotion`, `cWipeOutMotion`,
-  `cWipeOutRecoverMotion`.
+  `cChangeFakieControl` 0x366f60, `cCruiseControl` 0x367010; the rest are L lines in symbols.txt).
+- State number → class, from the boarder constructor 0x11b348 (each control object's virtual-base pointer gets its
+  class's vtable) and the three dispatches on rider+0x428: `Boarder_ExitControlState` 0x11c840 (old state),
+  `Boarder_EnterControlState` 0x11c8e8 (new state), `Boarder_UpdateControl` 0x11c9a0. `Boarder_SetState` →
+  `Boarder_ChangeControlState` 0x11c7d8 does nothing when the state is unchanged, else exit, set, enter.
+
+  | state | class | object (word in the control block) |
+  |---|---|---|
+  | 1 | `cVoidControl` | 0x180 |
+  | 2 | `cBumpControl` (the stumble) | 0x184 |
+  | 3 | `cCruiseControl` (riding) | 0x18c |
+  | 4 | `cChangeFakieControl` (the revert) | 0x194 |
+  | 5 | `cFakieCruiseControl` (riding fakie; its update is inlined in the dispatch, turn clips 0x201–0x204) | 0x198 |
+  | 6 | `cFinishLineControl` | 0x19c |
+  | 7 | `cGate2BaseControl` | 0x1a4 |
+  | 8 | `cGateAnticipateControl` | 0x1a8 |
+  | 9 | `cGateLaunchControl` | 0x1b0 |
+  | 0xa | `cJumpControl` | 0x1b4 |
+  | 0xb | `cLandHardControl` | 0x1b8 |
+  | 0xc | `cLandNormalControl` | 0x1bc |
+  | 0xd | `cNaturalAirControl` (in the air) | 0x1c0 |
+  | 0xe | `cPrewindControl` | 0x1c4 |
+  | 0xf | `cRailSlideControl` | 0x1c8 |
+  | 0x10 | `cSpinControl` | 0x1d0 |
+  | 0x11 | `cSitAndWaitControl` | 0x1f0 |
+  | 0x12 | `cGetupFromSitControl` | 0x1f4 |
+  | 0x13 | `cWipeOutControl` (update inlined: asks for a reset) | 0x1f8 |
+  | 0x14 | `cWipeOutRecoverControl` (the get-up) | 0x1fc |
+  | 0x15 | `cLessonWaitControl` | 0x200 |
+  | 0x16 | `cResetWaitControl` (`Boarder_StartReset` 0x119be0) | 0x204 |
+
+  The handlers are named `<Class>_Enter/_Update/_Exit` (older names kept: `SpinState_Update`, `PrewindState_Update`,
+  `FinishState_Update`, `RailSlideControl_Update`, `GetUpState_Update`, `ResetState_Update`).
+- Motions (rider+0x424): 1 `cAirMotion`, 2 `cGroundMotion`, 3 `cRailSlideMotion`, 4 `cStaticMotion` (no enter or
+  exit), 5 `cWipeOutMotion`, 6 `cWipeOutRecoverMotion`; same pattern through `Boarder_ChangeMotionState` 0x11c648.
 

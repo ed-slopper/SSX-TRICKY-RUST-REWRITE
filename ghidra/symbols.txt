@@ -3108,3 +3108,81 @@ G 11a098 Boarder_TeleportToInstance
 G 118c08 Boarder_AdvanceOnPath
 G 107730 RailSlideControl_CommitQuarterTurn
 G 119220 ResetState_PlaceRider
+G 11c7d8 Boarder_ChangeControlState
+G 11c840 Boarder_ExitControlState
+G 11c8e8 Boarder_EnterControlState
+G 11c648 Boarder_ChangeMotionState
+G 11c6b0 Boarder_ExitMotionState
+G 11c710 Boarder_EnterMotionState
+G 104190 BumpControl_Enter
+G 1041b0 BumpControl_Update
+G 104388 BumpControl_Exit
+G 102fb0 CruiseControl_Enter
+G 102fc8 CruiseControl_Update
+G 1033c0 CruiseControl_Exit
+G 103eb8 ChangeFakieControl_Enter
+G 104030 ChangeFakieControl_Update
+G 104178 ChangeFakieControl_Exit
+G 104688 FakieCruiseControl_Exit
+G 106600 FinishLineControl_Enter
+G 105d80 Gate2BaseControl_Enter
+G 105dc0 Gate2BaseControl_Update
+G 105f48 GateAnticipateControl_Enter
+G 105f58 GateAnticipateControl_Update
+G 106140 GateAnticipateControl_Exit
+G 106228 GateLaunchControl_Enter
+G 1062b0 GateLaunchControl_Update
+G 1046b0 JumpControl_Update
+G 104800 LandHardControl_Update
+G 104790 LandHardControl_Exit
+G 1049f8 LandNormalControl_Enter
+G 104e68 LandNormalControl_Update
+G 104e38 LandNormalControl_Exit
+G 1000b8 NaturalAirControl_Enter
+G 1000e0 NaturalAirControl_Update
+G 105070 PrewindControl_Enter
+G 1055a8 PrewindControl_Exit
+G 106dc8 RailSlideControl_Enter
+G 1075f0 RailSlideControl_Exit
+G 100598 SpinControl_Enter
+G 1029d0 SpinControl_Exit
+G 105bc0 SitAndWaitControl_Update
+G 105c60 GetupFromSitControl_Update
+G 108110 WipeOutControl_Enter
+G 108280 WipeOutRecoverControl_Exit
+G 106500 LessonWaitControl_Enter
+G 106a48 ResetWaitControl_Exit
+G 108310 AirMotion_Enter
+G 108368 AirMotion_Exit
+G 109858 GroundMotion_Enter
+G 10aec8 GroundMotion_Exit
+G 10b068 RailSlideMotion_Enter
+G 10b090 RailSlideMotion_Exit
+G 10d680 WipeoutMotion_Exit
+G 110260 WipeOutRecoverMotion_Enter
+G 110290 WipeOutRecoverMotion_Exit
+L 367590 cAirMotion vtable
+L 3674e0 cGroundMotion vtable
+L 367430 cRailSlideMotion vtable
+L 367380 cStaticMotion vtable
+L 3672d0 cWipeOutMotion vtable
+L 367220 cWipeOutRecoverMotion vtable
+L 367170 cVoidControl vtable
+L 3670c0 cBumpControl vtable
+L 366e00 cFinishLineControl vtable
+L 366ca0 cGate2BaseControl vtable
+L 366b40 cGateAnticipateControl vtable
+L 366a90 cGateLaunchControl vtable
+L 3669e0 cJumpControl vtable
+L 366930 cLandHardControl vtable
+L 366880 cLandNormalControl vtable
+L 3667d0 cNaturalAirControl vtable
+L 366720 cPrewindControl vtable
+L 366670 cRailSlideControl vtable
+L 3665c0 cSpinControl vtable
+L 366510 cSitAndWaitControl vtable
+L 366460 cGetupFromSitControl vtable
+L 3663b0 cWipeOutControl vtable
+L 366300 cWipeOutRecoverControl vtable
+L 366bf0 cLessonWaitControl vtable
+L 366d50 cResetWaitControl vtable

@@ -1,111 +1,111 @@
 address,size,name,system,status
 0x100008,160,entry,runtime,host
 0x1000a8,8,FUN_001000a8,,not started
-0x1000b8,36,FUN_001000b8,boarder?,not started
-0x1000e0,1140,FUN_001000e0,boarder?,not started
+0x1000b8,36,NaturalAirControl_Enter,boarder?,not started
+0x1000e0,1140,NaturalAirControl_Update,boarder?,not started
 0x100558,40,FUN_00100558,world?,not started
 0x100580,20,FUN_00100580,ai?,not started
-0x100598,876,FUN_00100598,boarder?,not started
+0x100598,876,SpinControl_Enter,boarder,not started
 0x100908,6224,SpinState_Update,boarder,ported
 0x102158,1704,SpinState_StartFromStick,boarder,ported
 0x102800,464,FUN_00102800,boarder?,not started
-0x1029d0,1008,FUN_001029d0,boarder?,not started
+0x1029d0,1008,SpinControl_Exit,boarder,not started
 0x102dc0,40,FUN_00102dc0,world?,not started
 0x102de8,20,FUN_00102de8,ai?,not started
 0x102e80,208,Quat_Multiply,boarder?,not started
 0x102f50,44,Vec4_Scale,common?,not started
 0x102f80,44,FUN_00102f80,common?,not started
-0x102fb0,24,FUN_00102fb0,boarder?,not started
-0x102fc8,1012,FUN_00102fc8,boarder?,not started
-0x1033c0,16,FUN_001033c0,boarder?,not started
+0x102fb0,24,CruiseControl_Enter,boarder?,not started
+0x102fc8,1012,CruiseControl_Update,boarder?,not started
+0x1033c0,16,CruiseControl_Exit,boarder?,not started
 0x1033d0,656,FUN_001033d0,boarder?,not started
 0x103660,1316,Ride_AITauntCheck,boarder?,ported
 0x103b88,752,FUN_00103b88,boarder?,not started
 0x103e78,40,FUN_00103e78,world?,not started
 0x103ea0,20,FUN_00103ea0,ai?,not started
-0x103eb8,376,FUN_00103eb8,boarder?,not started
-0x104030,324,FUN_00104030,boarder?,not started
-0x104178,24,FUN_00104178,boarder?,not started
-0x104190,28,FUN_00104190,boarder?,not started
-0x1041b0,472,FUN_001041b0,boarder?,not started
-0x104388,48,FUN_00104388,boarder?,not started
+0x103eb8,376,ChangeFakieControl_Enter,boarder?,not started
+0x104030,324,ChangeFakieControl_Update,boarder?,not started
+0x104178,24,ChangeFakieControl_Exit,boarder?,not started
+0x104190,28,BumpControl_Enter,boarder?,not started
+0x1041b0,472,BumpControl_Update,boarder?,not started
+0x104388,48,BumpControl_Exit,boarder?,not started
 0x1043b8,40,FUN_001043b8,world?,not started
 0x1043e0,20,FUN_001043e0,ai?,not started
-0x104688,40,FUN_00104688,boarder?,not started
-0x1046b0,204,FUN_001046b0,boarder?,not started
-0x104790,108,FUN_00104790,boarder?,not started
-0x104800,416,FUN_00104800,boarder?,not started
+0x104688,40,FakieCruiseControl_Exit,boarder?,not started
+0x1046b0,204,JumpControl_Update,boarder?,not started
+0x104790,108,LandHardControl_Exit,boarder?,not started
+0x104800,416,LandHardControl_Update,boarder?,not started
 0x1049a0,88,FUN_001049a0,boarder?,not started
-0x1049f8,1088,FUN_001049f8,boarder?,not started
-0x104e38,44,FUN_00104e38,boarder?,not started
-0x104e68,452,FUN_00104e68,boarder?,not started
+0x1049f8,1088,LandNormalControl_Enter,boarder?,not started
+0x104e38,44,LandNormalControl_Exit,boarder?,not started
+0x104e68,452,LandNormalControl_Update,boarder?,not started
 0x105030,40,FUN_00105030,world?,not started
 0x105058,20,FUN_00105058,ai?,not started
-0x105070,120,FUN_00105070,boarder?,not started
+0x105070,120,PrewindControl_Enter,boarder,not started
 0x1050e8,1212,PrewindState_Update,boarder,ported
-0x1055a8,68,FUN_001055a8,boarder?,not started
+0x1055a8,68,PrewindControl_Exit,boarder,not started
 0x1055f0,1136,FUN_001055f0,boarder?,not started
 0x105a60,112,PrewindState_SetWindTarget,boarder,not started
 0x105ad0,40,FUN_00105ad0,world?,not started
 0x105af8,20,FUN_00105af8,ai?,not started
 0x105b10,124,FUN_00105b10,boarder?,not started
 0x105b90,44,FUN_00105b90,boarder?,not started
-0x105bc0,160,FUN_00105bc0,boarder?,not started
-0x105c60,288,FUN_00105c60,boarder?,not started
-0x105d80,60,FUN_00105d80,race?,not started
-0x105dc0,388,FUN_00105dc0,boarder?,not started
-0x105f48,16,FUN_00105f48,boarder?,not started
-0x105f58,484,FUN_00105f58,boarder?,not started
-0x106140,168,FUN_00106140,boarder?,not started
+0x105bc0,160,SitAndWaitControl_Update,boarder?,not started
+0x105c60,288,GetupFromSitControl_Update,boarder?,not started
+0x105d80,60,Gate2BaseControl_Enter,race?,not started
+0x105dc0,388,Gate2BaseControl_Update,boarder?,not started
+0x105f48,16,GateAnticipateControl_Enter,boarder,not started
+0x105f58,484,GateAnticipateControl_Update,boarder,not started
+0x106140,168,GateAnticipateControl_Exit,boarder,not started
 0x1061e8,40,FUN_001061e8,world?,not started
 0x106210,20,FUN_00106210,ai?,not started
-0x106228,132,FUN_00106228,boarder?,not started
-0x1062b0,464,FUN_001062b0,boarder?,not started
+0x106228,132,GateLaunchControl_Enter,boarder?,not started
+0x1062b0,464,GateLaunchControl_Update,boarder?,not started
 0x106480,124,FUN_00106480,boarder?,not started
-0x106500,60,FUN_00106500,boarder?,not started
+0x106500,60,LessonWaitControl_Enter,boarder?,not started
 0x106548,124,FUN_00106548,boarder?,not started
 0x1065c8,36,FUN_001065c8,boarder?,not started
 0x1065f0,16,FUN_001065f0,boarder?,not started
-0x106600,100,FUN_00106600,boarder?,not started
+0x106600,100,FinishLineControl_Enter,boarder?,not started
 0x106668,916,FinishState_Update,boarder,ported
 0x106a00,40,FUN_00106a00,world?,not started
 0x106a28,20,FUN_00106a28,ai?,not started
-0x106a48,60,FUN_00106a48,game?,not started
+0x106a48,60,ResetWaitControl_Exit,game?,not started
 0x106a90,580,ResetState_Update,boarder,not started
 0x106cd8,40,FUN_00106cd8,world?,not started
 0x106d00,20,FUN_00106d00,ai?,not started
 0x106dc0,8,FUN_00106dc0,boarder?,not started
-0x106dc8,1560,FUN_00106dc8,scoring?,not started
+0x106dc8,1560,RailSlideControl_Enter,boarder,not started
 0x1073e0,524,RailSlideControl_Update,boarder,ported
-0x1075f0,52,FUN_001075f0,boarder?,not started
+0x1075f0,52,RailSlideControl_Exit,boarder,not started
 0x107628,260,FUN_00107628,boarder?,not started
 0x107730,2200,RailSlideControl_CommitQuarterTurn,boarder,ported
 0x107fc8,132,FUN_00107fc8,boarder?,not started
 0x108050,40,FUN_00108050,world?,not started
 0x108078,20,FUN_00108078,ai?,not started
-0x108110,44,FUN_00108110,boarder?,not started
+0x108110,44,WipeOutControl_Enter,boarder?,not started
 0x108198,228,GetUpState_Update,wipeout,ported
-0x108280,12,FUN_00108280,boarder?,not started
-0x108310,88,FUN_00108310,boarder?,not started
-0x108368,16,FUN_00108368,boarder?,not started
+0x108280,12,WipeOutRecoverControl_Exit,boarder?,not started
+0x108310,88,AirMotion_Enter,boarder,not started
+0x108368,16,AirMotion_Exit,boarder,not started
 0x108378,3980,AirMotion_Update,boarder,not started
 0x109308,864,Landing_ChooseState,boarder,ported
 0x109668,40,FUN_00109668,world?,not started
 0x109690,20,FUN_00109690,ai?,not started
 0x1097f8,44,FUN_001097f8,boarder?,not started
-0x109858,32,FUN_00109858,wipeout?,not started
+0x109858,32,GroundMotion_Enter,boarder,not started
 0x109878,212,Boarder_GroundSpringForce,boarder,checked
 0x109950,872,Boarder_GroundThrust,boarder,checked
 0x109cb8,576,Boarder_ForwardDrag,boarder,checked
 0x109ef8,476,Boarder_SideFriction,boarder,checked
 0x10a0d8,3568,GroundMotion_Update,boarder,ported
-0x10aec8,12,FUN_0010aec8,wipeout?,not started
+0x10aec8,12,GroundMotion_Exit,boarder,not started
 0x10aed8,40,FUN_0010aed8,world?,not started
 0x10af00,20,FUN_0010af00,ai?,not started
 0x10afb0,44,FUN_0010afb0,boarder?,not started
 0x10afe8,124,FUN_0010afe8,boarder?,not started
-0x10b068,40,FUN_0010b068,wipeout?,not started
-0x10b090,60,FUN_0010b090,wipeout?,not started
+0x10b068,40,RailSlideMotion_Enter,boarder,not started
+0x10b090,60,RailSlideMotion_Exit,boarder,not started
 0x10b0d0,3984,RailSlideMotion_Update,boarder,ported
 0x10c060,40,FUN_0010c060,world?,not started
 0x10c088,20,FUN_0010c088,ai?,not started
@@ -113,7 +113,7 @@ address,size,name,system,status
 0x10c138,44,FUN_0010c138,,not started
 0x10c198,340,WipeoutMotion_Enter,wipeout,ported
 0x10c2f0,5004,WipeoutMotion_Update,wipeout,ported
-0x10d680,116,FUN_0010d680,frontend?,not started
+0x10d680,116,WipeoutMotion_Exit,wipeout,not started
 0x10d6f8,992,Ragdoll_ComputeMassProps,wipeout,ported
 0x10dad8,460,Ragdoll_InitFromBoarder,wipeout,ported
 0x10dca8,1252,Ragdoll_Step,wipeout,ported
@@ -126,8 +126,8 @@ address,size,name,system,status
 0x10fd58,1124,Ragdoll_GroundProbe,wipeout,ported
 0x1101c0,88,FUN_001101c0,world?,not started
 0x110218,68,FUN_00110218,ai?,not started
-0x110260,44,FUN_00110260,boarder?,not started
-0x110290,56,FUN_00110290,boarder?,not started
+0x110260,44,WipeOutRecoverMotion_Enter,boarder?,not started
+0x110290,56,WipeOutRecoverMotion_Exit,boarder?,not started
 0x1102c8,1192,GetUpMotion_Update,wipeout,ported
 0x110770,40,FUN_00110770,world?,not started
 0x110798,20,FUN_00110798,ai?,not started
@@ -275,13 +275,13 @@ address,size,name,system,status
 0x11b018,476,Boarder_AddMeter,boarder,not started
 0x11b1f8,336,Boarder_DrainMeter,boarder,not started
 0x11b348,4860,FUN_0011b348,boarder?,not started
-0x11c648,100,FUN_0011c648,wipeout?,not started
-0x11c6b0,96,FUN_0011c6b0,wipeout?,not started
-0x11c710,96,FUN_0011c710,wipeout?,not started
+0x11c648,100,Boarder_ChangeMotionState,boarder,not started
+0x11c6b0,96,Boarder_ExitMotionState,boarder,not started
+0x11c710,96,Boarder_EnterMotionState,boarder,not started
 0x11c770,104,Boarder_UpdateMotion,boarder,not started
-0x11c7d8,100,FUN_0011c7d8,boarder?,not started
-0x11c840,168,FUN_0011c840,boarder?,not started
-0x11c8e8,184,FUN_0011c8e8,boarder?,not started
+0x11c7d8,100,Boarder_ChangeControlState,boarder,not started
+0x11c840,168,Boarder_ExitControlState,boarder,not started
+0x11c8e8,184,Boarder_EnterControlState,boarder,not started
 0x11c9a0,232,Boarder_UpdateControl,boarder,not started
 0x11ca88,52,FUN_0011ca88,boarder?,not started
 0x11cae8,1284,Boarder_PlaceAt,boarder,not started
