@@ -115,6 +115,9 @@ function runner can call it directly and it builds anywhere; `src/` is the Bevy 
 - `src/rider.rs` - the race around the rider: AI driver, race timing, chase camera, and the headless self-test.
 - `src/main.rs`  - Bevy app: textures with mipmaps, terrain/object/sky meshes, input, cameras, HUD.
 
+The Python tools this README names (`tools/bnk`, `tools/mpf`, `tools/music`, `tools/sfn`) are in the repo's own
+`tools/` folder, next to `tricky-rs/`.
+
 ## What the viewer taught us about the data
 
 - World units are about 1 cm; the app scales by 0.01.
