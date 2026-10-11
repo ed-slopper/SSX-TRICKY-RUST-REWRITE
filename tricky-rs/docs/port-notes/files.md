@@ -129,3 +129,14 @@ block has +0xc the count and from +0x10 the strings' offsets; strings are 16-bit
 - `CONSTANT.LOC`: the same table with the developers' name of every string id (`kHUDKnockdown` 0xe93,
   `kOvCombo` 0xe41, `kOVInvalidCard` 0x16e, ...). Use it to read which text a `Loc_GetString` call asks for.
 - `LETTER.LOC`: the English text with a few strings changed (a variant, unused).
+
+## Trick book, `TRICKDEF.DAT` (row E5d)
+
+Proven (`tricky-data/src/trickdef.rs`): `TrickDef_Load` 0x154580 reads `data/tutorial/trickdef.dat` whole
+(0x2760 bytes: 12 riders × 30 tricks × 28 bytes). `Score_FormatTrickName` 0x1551c0 prints fourteen `%s` from
+pointer tables at 0x320970-0x320f58 (read from the disassembly: rail-to `w1>>12&15` at 0x320b08, rail spin
+`w1>>4&15` 0x320b20, stance `w1>>16&15` 0x320970, spin side `w1>>27&7` 0x320988, spin `w0>>24&15` 0x320998,
+flip count `w1>>24&7` 0x3209c8, flip kind `w1>>8&15` 0x3209d8, combo `w0&255` 0x3209f0, spin after `w0>>28`
+0x320aa8, grab `w0>>8&255` 0x320b58, late `w1>>30` 0x320b50, second grab `w0>>16&255`, ending `w1>>20&15`
+0x320ad8, crash `w1&15` 0x320ae8). The tables are adjacent and an index past one reads the next, so
+`trick_names.rs` keeps the whole region. All 360 names equal `chars/trickbook.json`.

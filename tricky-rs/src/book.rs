@@ -1,5 +1,6 @@
 //! The trick book (`Score_TrickBookCheck` 0x1579e0, `TrickBook_*`): six chapters of five tricks per
-//! rider, read from `chars/trickbook.json` (decoded from the disc's DATA/TUTORIAL/TRICKDEF.DAT). Only
+//! rider, read from the player's disc (`TRICKY_DISC`, DATA/TUTORIAL/TRICKDEF.DAT, row E5d) or else from
+//! `chars/trickbook.json` (decoded from that file before). Only
 //! the first unfinished chapter counts; a landed trick ticks off an entry when its spin, flips and
 //! grabs are the same (the original ignores the spin's direction, a switch takeoff and how it lands).
 //! Chapters 1-5 each earn an outfit; the whole book earns the rider's UBERBOARD.
@@ -34,7 +35,18 @@ pub fn key(name: &str) -> String {
 impl Book {
     pub fn load(chars_dir: &std::path::Path) -> Self {
         let mut b = Book::default();
-        if let Ok(text) = std::fs::read_to_string(chars_dir.join("trickbook.json")) {
+        // the book from the player's disc (TRICKY_DISC, row E5d): `TrickDef_Load` 0x154580's file, the names
+        // as `Score_FormatTrickName` 0x1551c0 prints them
+        if let Some(book) = std::env::var("TRICKY_DISC").ok().and_then(|p| {
+            let disc = tricky_data::disc::Disc::open(&p).map_err(|e| eprintln!("disc {p}: {e}")).ok()?;
+            let mut files = tricky_data::big::Files::new(disc);
+            let bytes = files.load("data/tutorial/trickdef.dat").ok()??;
+            tricky_data::trickdef::read(&bytes).map_err(|e| eprintln!("{e}")).ok()
+        }) {
+            for (r, list) in book.iter().enumerate() {
+                b.tricks.insert(tricky_data::trickdef::RIDERS[r].to_string(), list.iter().map(|t| t.name().trim().to_string()).collect());
+            }
+        } else if let Ok(text) = std::fs::read_to_string(chars_dir.join("trickbook.json")) {
             if let Ok(v) = serde_json::from_str::<HashMap<String, Vec<serde_json::Value>>>(&text) {
                 for (set, list) in v {
                     // "set0_Eddie" -> "eddie"
