@@ -45,7 +45,7 @@ address,size,name,system,status
 0x1050e8,1212,PrewindState_Update,boarder,ported
 0x1055a8,68,FUN_001055a8,boarder?,not started
 0x1055f0,1136,FUN_001055f0,boarder?,not started
-0x105a60,112,FUN_00105a60,boarder?,not started
+0x105a60,112,PrewindState_SetWindTarget,boarder,not started
 0x105ad0,40,FUN_00105ad0,world?,not started
 0x105af8,20,FUN_00105af8,ai?,not started
 0x105b10,124,FUN_00105b10,boarder?,not started
@@ -278,7 +278,7 @@ address,size,name,system,status
 0x11c648,100,FUN_0011c648,wipeout?,not started
 0x11c6b0,96,FUN_0011c6b0,wipeout?,not started
 0x11c710,96,FUN_0011c710,wipeout?,not started
-0x11c770,104,FUN_0011c770,boarder?,not started
+0x11c770,104,Boarder_UpdateMotion,boarder,not started
 0x11c7d8,100,FUN_0011c7d8,boarder?,not started
 0x11c840,168,FUN_0011c840,boarder?,not started
 0x11c8e8,184,FUN_0011c8e8,boarder?,not started
@@ -301,11 +301,11 @@ address,size,name,system,status
 0x11e660,148,FUN_0011e660,boarder?,not started
 0x11e6f8,424,Boarder_HitCheckpoint,boarder,not started
 0x11e8a0,112,FUN_0011e8a0,boarder?,not started
-0x11e910,32,FUN_0011e910,boarder?,not started
-0x11e930,40,FUN_0011e930,boarder?,not started
+0x11e910,32,Boarder_AddSpeedBoostTime,boarder,not started
+0x11e930,40,Boarder_AddSpinBoostTime,boarder,not started
 0x11e958,44,FUN_0011e958,boarder?,not started
-0x11e988,20,FUN_0011e988,boarder?,not started
-0x11e9a0,52,FUN_0011e9a0,boarder?,not started
+0x11e988,20,Boarder_ScoreCrash,boarder,not started
+0x11e9a0,52,Boarder_ScoreKnockdown,boarder,not started
 0x11e9d8,40,FUN_0011e9d8,boarder?,not started
 0x11ea00,28,FUN_0011ea00,boarder?,not started
 0x11ea20,8,FUN_0011ea20,frontend?,not started
@@ -2254,7 +2254,7 @@ address,size,name,system,status
 0x197170,224,FUN_00197170,files?,not started
 0x197250,548,FUN_00197250,boarder?,not started
 0x197478,700,FUN_00197478,boarder?,not started
-0x197738,104,FUN_00197738,boarder?,not started
+0x197738,104,AIP_GetPointAtDistance,ai,not started
 0x1977f0,64,FUN_001977f0,boarder?,not started
 0x197830,224,FUN_00197830,boarder?,not started
 0x197910,232,cPath::vf0_197910,ai,not started

@@ -3077,3 +3077,10 @@ G 11cae8 Boarder_PlaceAt
 L 366eb0 cFakieCruiseControl vtable
 L 366f60 cChangeFakieControl vtable
 L 367010 cCruiseControl vtable
+G 11e910 Boarder_AddSpeedBoostTime
+G 11e930 Boarder_AddSpinBoostTime
+G 11e988 Boarder_ScoreCrash
+G 11e9a0 Boarder_ScoreKnockdown
+G 11c770 Boarder_UpdateMotion
+G 197738 AIP_GetPointAtDistance
+G 105a60 PrewindState_SetWindTarget
