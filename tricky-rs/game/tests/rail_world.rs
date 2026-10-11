@@ -654,3 +654,144 @@ fn rail_slide_motion_is_the_originals() {
     assert!(wrong.is_empty(), "{} differ:\n{}", wrong.len(), wrong.join("\n"));
     assert!(on > 1500 && pushed > 500 && none > 100, "on {on}, pushed off {pushed}, no rail {none}");
 }
+
+#[test]
+fn rail_capture_is_the_originals() {
+    // `Rail_TryCapture` 0x125cb8 (row G1b) with the real `Rail_ClosestPoint` against `ground_tick::rail_try_capture`:
+    // whether it catches the rail, the velocity, kind and word it leaves, and the calls it makes (the clip queries
+    // answered from a script, `Score_LandTrick` answered)
+    use gt::{rail_try_capture, CaptureIn};
+    type Log = Rc<RefCell<Vec<(&'static str, Vec<u32>)>>>;
+    let Some(mut r) = runner() else { return };
+    for a in [0x102f50, 0x259330, 0x2510f8] {
+        r.allow(a);
+    }
+    let log: Log = Rc::default();
+    let rider = r.mem.alloc(0x6000);
+    let sound = r.mem.alloc(0x8000);
+    r.mem.write_u32(0x343050, sound);
+    let types: Rc<RefCell<Vec<u32>>> = Rc::default();
+    let flag = Rc::new(std::cell::Cell::new(false));
+    let (l, ty) = (log.clone(), types.clone());
+    r.stub(0x15eec0, move |c, _| {
+        assert_eq!((c.gpr(4) as u32, c.gpr(5)), (rider + 0x46c0, 0));
+        l.borrow_mut().push(("clip_type", vec![]));
+        let v = ty.borrow_mut().remove(0);
+        c.set_gpr(2, v as u64);
+    });
+    let (l, fl) = (log.clone(), flag.clone());
+    r.stub(0x15ffb8, move |c, _| {
+        l.borrow_mut().push(("clip_flag", vec![c.gpr(5) as u32, c.gpr(6) as u32]));
+        c.set_gpr(2, fl.get() as u64);
+    });
+    let l = log.clone();
+    r.stub(0x1569b0, move |c, _| {
+        l.borrow_mut().push(("land_trick", vec![c.gpr(4) as u32, c.gpr(5) as u32, c.gpr(6) as u32, c.gpr(7) as u32]));
+        c.set_f(0, 0.25);
+    });
+    for (a, name) in [(0x11b018u32, "add_meter"), (0x11f610, "motion"), (0x11f608, "state")] {
+        let l = log.clone();
+        r.stub(a, move |c, _| l.borrow_mut().push((name, vec![c.gpr(4) as u32, c.gpr(5) as u32, c.f(12).to_bits()])));
+    }
+    let mut g = Rng(0x3e8c_5a17_d092_b6f4);
+    let (mut caught, mut missed, mut kinds) = (0, 0, [0u32; 5]);
+    let mut wrong = Vec::new();
+    for round in 0..40 {
+        let (w, cps, per_cell) = random_world(&mut g);
+        let wp = put_world(&mut r, &w, per_cell);
+        r.mem.write_u32(GWORLD, wp);
+        for q in 0..300 {
+            let z = unit3(&mut g);
+            let x = {
+                let t = cross3([0.0, 0.0, 1.0, 0.0], z);
+                let l = (t[0] * t[0] + t[1] * t[1] + t[2] * t[2]).sqrt();
+                if l < 0.2 { [1.0, 0.0, 0.0, 0.0] } else { [t[0] / l, t[1] / l, t[2] / l, 0.0] }
+            };
+            let y = cross3(z, x);
+            let board_pos: V4 = if !cps.is_empty() && g.below(6) != 0 {
+                let c = &cps[g.below(cps.len() as u32) as usize];
+                let p = bezier(c, g.range(0.0, 1.0));
+                let (a, b, d) = (g.unit() * 150.0, g.unit() * 50.0 - 30.0, g.unit() * 50.0);
+                [p[0] + x[0] * a + y[0] * b + z[0] * d, p[1] + x[1] * a + y[1] * b + z[1] * d, p[2] + x[2] * a + y[2] * b + z[2] * d, 1.0]
+            } else {
+                [w.x0 + g.range(-300.0, w.nx as f32 * w.cell + 300.0), w.y0 + g.range(-300.0, w.ny as f32 * w.cell + 300.0), g.unit() * 500.0, 1.0]
+            };
+            let sp = [g.range(0.0, 500.0), g.range(500.0, 3000.0)][g.below(2) as usize];
+            let vd = unit3(&mut g);
+            let input = CaptureIn {
+                vel: [vd[0] * sp + 0.5, vd[1] * sp, vd[2] * sp, 0.0],
+                board_pos,
+                frame: [x, y, z],
+                blend: if g.below(2) == 0 { 1.0 } else { g.range(0.0, 1.0) },
+            };
+            let script: Vec<u32> = (0..3).map(|_| [0xe, 0xf, 0x10, 3, 0xb][g.below(5) as usize]).collect();
+            *types.borrow_mut() = script.clone();
+            flag.set(g.below(2) == 0);
+            let stance = g.below(2);
+            for (at, v) in [(0x150, input.vel), (0x4a60, x), (0x4a70, y), (0x4a80, z), (0x4a90, board_pos)] {
+                put_v(&mut r, rider + at, v);
+            }
+            r.mem.write_f32(rider + 0x284, input.blend);
+            r.mem.write_u32(rider + 0x1b4, stance);
+            r.mem.write_u32(rider + 0x1dc, 0x77);
+            r.mem.write_u32(rider + 0x290, 0x1234_5678);
+            r.mem.write_u32(sound + 0x6e40, 0x1234_5678);
+            log.borrow_mut().clear();
+            r.cpu.set_gpr(4, rider as u64);
+            r.call(0x125cb8).unwrap_or_else(|e| panic!("round {round} query {q}: {e:?}"));
+            let mut ours_script = script.clone();
+            let mut ours_log: Vec<(&'static str, Vec<u32>)> = Vec::new();
+            let calls = RefCell::new(&mut ours_log);
+            let mut clip_type = || {
+                calls.borrow_mut().push(("clip_type", vec![]));
+                ours_script.remove(0)
+            };
+            let fl = flag.get();
+            let mut clip_flag = || {
+                calls.borrow_mut().push(("clip_flag", vec![4, 0]));
+                fl
+            };
+            let got = rail_try_capture(&w, &input, &mut clip_type, &mut clip_flag);
+            let _ = calls;
+            let rm = &mut r;
+            let (gv, gk, gw, gs) = (get_v(rm, rider + 0x150), rm.mem.read_u32(rider + 0x1dc), rm.mem.read_u32(rider + 0x290), rm.mem.read_u32(sound + 0x6e40));
+            let mut want = ours_log.clone();
+            let ok = match got {
+                None => {
+                    missed += 1;
+                    gv == bits(input.vel) && gk == 0x77 && gw == 0x1234_5678 && gs == 0x1234_5678
+                }
+                Some(c) => {
+                    caught += 1;
+                    kinds[c.kind as usize] += 1;
+                    want.push(("land_trick", vec![rider + 0x5820, c.kind, stance, 0]));
+                    want.push(("add_meter", vec![rider, 0, 0.25f32.to_bits()]));
+                    want.push(("motion", vec![rider, 3, 0]));
+                    want.push(("state", vec![rider, 0xf, 0]));
+                    gv == bits(c.vel) && gk == c.kind && gw == c.word && gs == c.word
+                }
+            };
+            // the motion and state calls carry no float, the meter call no second word: compare those words as 0
+            let got_log: Vec<(&'static str, Vec<u32>)> = log.borrow().iter().map(|(n, v)| {
+                let mut v = v.clone();
+                match *n {
+                    "add_meter" => v[1] = 0,
+                    "motion" | "state" => v[2] = 0,
+                    _ => {}
+                }
+                (*n, v)
+            }).collect();
+            if !ok || got_log != want {
+                wrong.push(format!("round {round} query {q}: {input:?} script {script:x?} flag {}\n  game vel {gv:x?} kind {gk:#x} word {gw:#x} sound {gs:#x}\n  ours {got:?}\n  calls {got_log:x?}\n  want  {want:x?}", flag.get()));
+                if wrong.len() > 3 {
+                    break;
+                }
+            }
+        }
+        if wrong.len() > 3 {
+            break;
+        }
+    }
+    assert!(wrong.is_empty(), "{} differ:\n{}", wrong.len(), wrong.join("\n"));
+    assert!(caught > 500 && missed > 1000 && kinds[1..].iter().all(|&k| k > 50), "caught {caught}, missed {missed}, kinds {kinds:?}");
+}

@@ -1062,3 +1062,77 @@ fn take_off(m: &mut RailMotion) -> RailEnd {
     m.x218 = 0.0;
     RailEnd::TakeOff
 }
+
+/// What `Rail_TryCapture` 0x125cb8 reads, in the game's space.
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct CaptureIn {
+    /// rider+0x150: the velocity
+    pub vel: V4,
+    /// rider+0x4a90 and the frame rows +0x4a60, +0x4a70, +0x4a80
+    pub board_pos: V4,
+    pub frame: [V4; 3],
+    /// rider+0x284: the fall-off blend
+    pub blend: f32,
+}
+
+/// A rail caught: the new velocity (rider+0x150), the rail kind (rider+0x1dc: 1 along, 2 backwards, 3 and 4
+/// across) and the rail's word (rider+0x290, and the sound manager's +0x6e40). The game then calls
+/// `Score_LandTrick` 0x1569b0(rider+0x5820, kind, stance +0x1b4, 0), `Boarder_AddMeter` with its result,
+/// `Boarder_SetMotion`(3) and `Boarder_SetState`(0xf).
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct Capture {
+    pub vel: V4,
+    pub kind: u32,
+    pub word: u32,
+}
+
+/// `Rail_TryCapture` 0x125cb8: the rail's closest point to the board ([`RailWorld::closest_point`]); the board must
+/// not have passed it (offset · travel direction ≥ −0.2, the offset taken 30 cm along the frame's y row as in
+/// [`rail_slide_normal`]), nor be in a clip of type 0xe, 0xf or 0x10 without flag 4 (`clip_type`, asked up to three
+/// times as the game asks `AnimCtl_GetClipType`, and `clip_flag4`, `AnimCtl_TestClipFlag`(4, 0)), and must be
+/// within 0.9 of the fall-off limits. Then the velocity goes along the travel tangent at the speed, at most the
+/// speed along it or 555.55554 if that is more, its z × 0.1; the kind from the angle of the tangent in the board's
+/// frame (atan2(z row · t, x row · t)): beyond 150° 2, under −30° 4, over 30° 3, else 1.
+pub fn rail_try_capture(world: &RailWorld, i: &CaptureIn, clip_type: &mut dyn FnMut() -> u32, clip_flag4: &mut dyn FnMut() -> bool) -> Option<Capture> {
+    let vdir = unit(i.vel);
+    let hit = world.closest_point(i.board_pos)?;
+    let t = if dot(vdir, hit.tangent) < 0.0 { scale(hit.tangent, -1.0) } else { hit.tangent };
+    let off = add(sub(hit.point, i.board_pos), scale(i.frame[1], -30.0));
+    if dot(off, vdir) < -0.2 {
+        return None;
+    }
+    let ct = clip_type();
+    let in_trick = ct == 0xe || clip_type() == 0xf || clip_type() == 0x10;
+    if in_trick && !clip_flag4() {
+        return None;
+    }
+    let b = i.blend;
+    let rest = 1.0 - b;
+    let k = f32::from_bits(0x3f66_6666);
+    let ox = dot(i.frame[0], off);
+    let oy = dot(i.frame[1], off);
+    let oz = dot(i.frame[2], off);
+    if !(ox.abs() < (b * 150.0 + rest * 80.0) * k && oy.abs() < (b * 50.0 + rest * 50.0) * k && oz.abs() < (b * 50.0 + rest * 30.0) * k) {
+        return None;
+    }
+    let along = dot(i.vel, t);
+    let cap = if f32::from_bits(0x440a_e38e) < along { along } else { f32::from_bits(0x440a_e38e) };
+    let speed = dot(i.vel, i.vel).sqrt();
+    let s = if cap < speed { cap } else { speed };
+    let mut vel = scale(t, s);
+    vel[2] *= 0.1;
+    let x = dot(i.frame[0], t);
+    let y = dot(i.frame[2], t);
+    let a = crate::jump::atan2_inline(y, x);
+    let (wide, narrow) = (f32::from_bits(0x4027_8d36), f32::from_bits(0x3f06_0a92));
+    let kind = if !(a.abs() <= wide) {
+        2
+    } else if !(-narrow <= a) {
+        4
+    } else if !(a <= narrow) {
+        3
+    } else {
+        1
+    };
+    Some(Capture { vel, kind, word: hit.word })
+}
