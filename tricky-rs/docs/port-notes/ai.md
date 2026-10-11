@@ -105,3 +105,16 @@ Part of the port notes (index: [README.md](README.md)); units and wording as des
   shove is in `AIComputer_PickTargetRider` 0x1396c8 (every 12 ticks under 540 of rider+0x348, riders within 700 cm by
   the pair records, weighted distance × (1 − cos bearing) or × (1 + |cos bearing|) for a rival target; dropped past
   1050 cm) and `AIComputer_RideNearRider` 0x137dc0 / `AIComputer_RideAtRival` 0x137a18 (row G4).
+
+## The AI's target and steering helpers, exactly (board row G4b, checked: `tests/aicomp.rs`; `tricky-rs/game/src/aicomp.rs`)
+
+- The computer object (cComputer, player+… for AI): +0 its rider, +0x86c the skill scale, +0x890 the target rider
+  (−1 none). A race has at most six riders: six pair records end at rider+0x11f, just before the grudge (+0x118).
+- `AIComputer_SteerTowards` 0x1372f8: the target's direction from the rider (+0x140), flattened onto the rider's
+  plane (up +0x4ac0), angle −atan2(d·fwd (+0x4aa0), d·side (+0x4ab0)); steer = |angle| × 6.2897024 (× skill /
+  1.0241041 when skill ≠ 1), 0 under 0.2, at most 0.9705659, the angle's sign.
+- `AIComputer_SetThrottle` 0x139f60 / `AIComputer_SetTuck` 0x13a028: the pad word's crouch stick (bits 11–16) at
+  1, or skill / 2.211699 when skill ≠ 1 and the rider is at 833.3333 cm/s or more; the tuck also sets bit 3.
+- `AIComputer_IsRivalTarget` 0x139928 and `AIComputer_PickTargetRider` 0x1396c8 as in the grudges section above
+  (the pick every 12th tick, riders within 700 cm, weight distance × (1 − cos bearing), a rival × (1 + |cos|), the
+  lightest with ties to the later rider; dropped past 1050 cm or over 600 of rider+0x348; under 540 to pick).
