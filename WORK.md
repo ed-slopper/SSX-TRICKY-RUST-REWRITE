@@ -82,7 +82,9 @@ state machine and the renderer are ours. Nothing has been checked against the or
 | G1a3 | The rest of G1a: `PrewindState_Update` 0x1050e8, `SpinState_Update` 0x100908, `SpinState_StartFromStick` 0x102158 checked; `Rider::step` calls the exact jump and spin rates (G1a1, G1a2) | any | G1a2 | | Split of G1a |
 | G1b | Rails checked: `RailSlideMotion_Update` 0x10b0d0, `RailSlideControl_Update` 0x1073e0, `Rail_TryCapture` 0x125cb8 | any | F4a | | [repo] README: rail speeds "still mine"; find what isn't ported |
 | G1c | Finish, reset and gate states: `FinishState_Update` 0x106668, `ResetState_Update` 0x106a90, `Boarder_RequestReset` 0x118f10, `GateAnticipate_*` | any | F4a | | [repo] |
-| G2 | Tricks and scoring checked: `Score_*` 0x155410–0x157490, `Score_BuildTrickId` 0x157490, `Score_FormatTrickName` 0x1551c0, repeats, chains, multipliers, uber timer, TRICKY | any | F4a | | [repo] Ported in `rider.rs`/`trickdata.rs` |
+| G2 | Tricks and scoring checked: `Score_*` 0x155410–0x157490, `Score_BuildTrickId` 0x157490, `Score_FormatTrickName` 0x1551c0, repeats, chains, multipliers, uber timer, TRICKY | any | F4a | | [repo] Ported in `rider.rs`/`trickdata.rs` Split: G2a, G2b |
+| G2a | The score object's arithmetic ported exactly into `tricky-game` (`score.rs`) and checked bit for bit: `Score_CalcPoints` 0x155440, `Score_CalcBasePoints` 0x1554c0, `Score_GetMultiplier` 0x155410, `Score_RoundSpinTo180` 0x157198, `Score_UpdateSpin` 0x155e00, `Score_UpdateFlip` 0x155e68, `Score_StartGrab` 0x155ee8, `Score_Tick` 0x156e80 | any | F4a | trailrig/heron (2026-10-11) | Split of G2 |
+| G2b | The rest of G2: `Score_LandTrick` 0x1569b0, `Score_StartTrickChain` 0x156618, `Score_BankPoints` 0x155aa8, `Score_BuildTrickId` 0x157490, `Score_FormatTrickName` 0x1551c0, repeats, chains, uber timer, TRICKY checked; `Rider::step` scores through `score.rs` | any | G2a | | Split of G2 |
 | G3 | Rider attributes and progression: stats per rider and level, training points, boards per rider and their unlock points, outfits | unowned | E12 | | [repo] `trickdata.rs` has the tables; rookie/master is our menu |
 | G4 | AI checked: path following 0x1375c8 / 0x1372f8, rubber band 0x115100 / 0x13a0f0, skill pairs, tricks 0x139d58 / 0x138d60, resets, shoves | any | F4a, E1b | | [repo] Ported in `rider.rs`/`main.rs` |
 | G4a | Rivals and vendettas checked: `RelTable_Init` 0x167208, `Rider_OnKnockedDownBy`, `AI_StartVendetta`, `AI_CoolVendetta` | any | F4a | | [repo] `rivals.rs` Split: G4a1, G4a2 |
@@ -274,3 +276,4 @@ matches the original.
 - 2026-10-11 ed-slopper/puffin: claim E4b.
 - 2026-10-11 trailrig/heron: G1a2 split into G1a2 (claimed) and G1a3.
 - 2026-10-11 trailrig/heron: G1a2 done (Takeoff_SetSpinRates checked).
+- 2026-10-11 trailrig/heron: split G2 into G2a (claimed) and G2b.
