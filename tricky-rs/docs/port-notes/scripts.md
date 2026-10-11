@@ -200,3 +200,18 @@ Types 1, 3 and 4 spawn nothing.
   negative frame there is random (1 for three frames or fewer). Messages: 1 rate, 2 frame (rounded up, 0..9), 3 next
   frame (wrapping to 1), 4 shown. The random number is `Rand_Fx`'s word made a float in [0, 1).
 - Both (19): the scroll and a flip-book from op words 8–11 (start, rate, mode, backwards), the flip stepped first.
+
+## Object animation (row E9i2; `tricky_game::objanim`, checked: `tests/objanim.rs`)
+
+- Flag (13): op words mirror, rate (cycles a second; a word of −60 is random 0.5..2), size (−1: random 5..50, then
+  over 250 × the model's length, at least 1), life; the phase starts random (`Rand_Fx`) and wraps at 1.
+- Keyframed (0x100 and the three built on it): op words loop (0 once, 1 loop, 2 back and forth), start and end
+  frames (end < 0: the model's), speed (frames a second; its jitter uses `Rand_GameRange`(−1, 1)), contact re-arm (s),
+  random start (`Rand_GameRange`(start, end)), direction (4 backwards). The files count 30 frames a second; the
+  cursor moves rate = speed / 30 / 60 a frame, wrapping or bouncing at the ends; a one-shot clip ends with
+  Finish(1). Message 1 delays (s), 4 jumps to a frame inside the clip. A contact while not cooling down runs the
+  object's contact script and re-arms the cooldown.
+- Delta (0x101): not playing by itself; message 2 adds frames to play (at |rate|).
+- Combo (0x102): message 3 starts a second clip (op words 9..11: start, end, speed) from its start; op word 12 ≠ 0
+  stops the node for good at its end (Kill then leaves it).
+- Flip (0x103): the clip plus a flip-book (op words 9, 10: start frame, rate), stepping forward or at random (−2).

@@ -26,6 +26,7 @@ pub mod ground_motion;
 pub mod jump;
 pub mod landing;
 pub mod math;
+pub mod objanim;
 pub mod orient;
 pub mod pickup;
 pub mod pose;
