@@ -17,6 +17,8 @@
 //! - `Boarder_Wipeout` 0x11d830, `Score_Crash` 0x156de0, `Boarder_AddMeter` 0x11b018: all in [`Rider::go_down`]
 //! - the probe's sideways offset (board row G20b): stats+0x60 (`Stats::scale`, `crate::stats::SCALE`) times rider+0x244,
 //!   the lean record that [`lean_ease`] and [`lean_targets`] keep
+//! - the rider's up (rider+0x2c0, board row G20c): the record [`Rider::up`], set by `Boarder_PlaceAt` 0x11cae8 and
+//!   accumulated by [`lean_up`] at the end of every tick; the ground tick reads it, as `GroundMotion_Update` does
 //! - rail capture (row G1b) and `Boarder_InstanceCollisions` 0x125088 (row E8b): not done while riding, as before
 
 use super::{wrap, Rider};
@@ -24,7 +26,7 @@ use crate::collide::CollisionWorld;
 use crate::ground_motion as gm;
 use crate::jump::{self, JumpState};
 use crate::orient::{self, Orient, TakeOffEnv, TakeOffRider};
-use crate::probe::{self, cross, dot, scale, sub, Hit};
+use crate::probe::{self, add, cross, dot, scale, sub, Hit};
 use crate::stats;
 use crate::surface::SURFACE_TABLE;
 use glam::Vec3;
@@ -62,6 +64,23 @@ pub fn lean_targets(motion: u32, steer: f32, vel: V4) -> (f32, f32) {
         target *= speed;
     }
     (LEAN_RATE, target)
+}
+
+/// The rider's up (rider+0x2c0) one tick on: the other half of `Boarder_UpdateLeanTargets` 0x129500, up = unit(up + 0.5 ·
+/// normal) over all four lanes, with the normal (+0x2a0) as the tick left it. In the vector unit's order: the half
+/// normal is made first (`vmulbc`), added to the up (`vadd`), and the sum of squares and its `vrsqrt` make the unit
+/// vector (`vmulq`), the same as [`unit`]. The up therefore trails the ground's normal (it is not the board's up,
+/// +0x1a0, and `Boarder_UpdatePose` 0x129628 only reads it).
+/// Writers of +0x2c0, all of `SLUS_203.26`: this function every tick (0x129618) and `Boarder_PlaceAt` 0x11cae8
+/// (0x11cdf4), which starts it equal to the normal.
+pub fn lean_up(up: V4, normal: V4) -> V4 {
+    unit(add(up, scale(normal, 0.5)))
+}
+
+/// A port direction (unit, y up) as the game's (z up): [`to_game`] with k = 1, w = 0. The rider's normal and up are kept
+/// in the game's space, so the lean record's tick and the ground tick take them as they are.
+pub(super) fn game_dir(v: Vec3) -> V4 {
+    to_game(v, 1.0, 0.0)
 }
 
 const HALF_PI: f32 = std::f32::consts::FRAC_PI_2;
@@ -142,7 +161,7 @@ impl Rider {
                 surface_ticks: 0,
                 kind: 0,
             },
-            up: o.up,
+            up: self.up,
             board_up: o.up,
             quat: o.q,
             board_side: o.side,
@@ -179,7 +198,8 @@ impl Rider {
         g.timescale = dt * 60.0;
         g.boost_level = boost_level;
         g.speed_timer = self.speed_timer;
-        g.up = g.board_up; // STANDIN: rider+0x2c0 is written by `Boarder_UpdatePose` (row G16)
+        // rider+0x2c0: the record the last tick's `Boarder_UpdateLeanTargets` left (`Boarder_PlaceAt` for the first)
+        g.up = self.up;
         // the course's direction ahead, as a game heading
         g.course_yaw = self.course_dir.map_or(g.yaw, |c| f32::atan2(-c.z, c.x));
         g.switch = self.switch as u32;
@@ -240,12 +260,16 @@ impl Rider {
         self.lean[0] = lean_ease(self.lean, dt);
     }
 
-    /// The lean record aimed for the next tick (`Boarder_UpdateLeanTargets` 0x129500), after the tick's motion: from the
-    /// steer as it is now (the game's sign: the port's is the other way) and the velocity in cm/s.
-    pub(super) fn lean_aim(&mut self) {
+    /// The lean record aimed for the next tick and the rider's up moved toward the normal (`Boarder_UpdateLeanTargets`
+    /// 0x129500), after the tick's motion: from the steer as it is now (the game's sign: the port's is the other way),
+    /// the velocity in cm/s and the normal the tick ended with.
+    /// STANDIN: in the air and on a rail the normal (+0x2a0) is the port's own: the game's `AirMotion_Update` 0x108378
+    /// takes it from its down ray whenever that hits, and `RailSlideMotion_Update` 0x10b0d0 sets it from the rail (row G20c2).
+    pub fn lean_aim(&mut self) {
         let (rate, target) = lean_targets(self.lean_motion(), -self.steer, to_game(self.vel, 100.0, 0.0));
         self.lean[1] = rate;
         self.lean[2] = target;
+        self.up = lean_up(self.up, game_dir(self.normal));
     }
 
     /// The walls: a sphere around the body (`Boarder_WallCollide` 0x126250: bounce off at least 0.56 m/s) and

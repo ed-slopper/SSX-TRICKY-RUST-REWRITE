@@ -90,7 +90,7 @@ What `Env` is answered with:
   `Boarder_WallCollide` 0x126250 and `Boarder_WallImpactCheck` 0x126540, row E8b), the ray cast under the probe (a
   vertical query of the drawn mesh 2 m over, 1 m under the probe point, for `World_RayCast` 0x25aff8, row E7), the
   control state (3, or 0xb after a hard landing: no state machine yet, row G1),
-  rider+0x2c0 = the board's up (rows G20c, G16; `Boarder_UpdateLeanTargets` 0x129500 also writes it, see below). The stat bytes the tick reads (speed +0x0e, edging +0x11, grip +0x13,
+  rider+0x2c0 = the rider's up, the game's own record since G20c (`Rider::up`, section "The rider's up" below). The stat bytes the tick reads (speed +0x0e, edging +0x11, grip +0x13,
   cubic +0x19) and the jump's (+0x17) are the game's exact ones since G20a (section below)
 - `Boarder_Wipeout`, `Score_Crash` and `Boarder_AddMeter` of a crash on surface 6 / 10 are `Rider::go_down` (one call;
   `score_crash` and `add_meter` of the `Env` do nothing); inside the Megaplex tube the crash is skipped (ours, row E9)
@@ -330,5 +330,41 @@ Ported: `stats::SCALE`, `Stats::scale`, `Rider::lean` (value, rate, target), `le
 
 Not done (new rows): the port's `touch_down` and rail code flip `switch` without negating the steer or the lean as
 `ChangeFakieControl_Enter` / `RailSlideControl_SwitchStance` do (G20b2); the motion id is derived from the port's flags
-(STANDIN, G18); the second half of `Boarder_UpdateLeanTargets`, rider+0x2c0 = unit(+0x2c0 + 0.5 · +0x2a0), is not ported
-(row G20c; the ground tick still takes the up from the board); the pose's use of rider+0x244 is the pose's (G16).
+(STANDIN, G18); the pose's use of rider+0x244 is the pose's (G16). (The other half of `Boarder_UpdateLeanTargets`, the rider's up
+rider+0x2c0, is ported since G20c, next section.)
+
+## The rider's up, rider+0x2c0 (G20c)
+
+Proven from the code of `SLUS_203.26` (Ghidra, plus a scan of the whole text for stores and address-of at offsets
+0x2c0..0x2cc):
+
+- **Writers**: exactly two. `Boarder_UpdateLeanTargets` 0x129500 (its last store, 0x129618) every tick:
+  up = unit(up + 0.5 · normal), over all four lanes with the vector unit's order (`vmulbc` the half normal,
+  `vadd`, the sum of squares, `vrsqrt`, `vmulq`); the normal is rider+0x2a0. And `Boarder_PlaceAt` 0x11cae8 (0x11cdf4):
+  up = normal (the four words copied) after the placement's ray cast has set the normal (the default, before the
+  cast, is (0, 0, 1, 0)). `Boarder_UpdatePose` 0x129628 does not write it (its `Vec4_Scale(rider+0x308, out, rider+0x2c0)`
+  reads it); no other function stores to it with that offset, and the address is formed (`addiu rX, rider, 0x2c0`) only
+  by `Boarder_UpdatePose` (0x12994c, to read) and `cBoarderRender::vf7_1356f8` (0x135c40, which works on the model
+  object at rider+0x4494, not the rider). Not excluded: a copy of the whole record through a pointer built another way.
+- **Readers**: `GroundMotion_Update` 0x10a0d8 twice (0x10a510, 0x10a590: the dot of the position with it before and after
+  the tick's move, for the bob rider+0x1c0), `Boarder_UpdateLeanTargets` itself, `Boarder_UpdatePose` 0x129628 (0x129fec,
+  the body drawn at position + rider+0x308 · up, G16) and `Boarder_UpdateSkeleton` 0x12ae18 (0x12ae88, 0x12af20).
+- **Order in a tick** (`cBoarder::vf7` 0x117198): `Boarder_UpdateMotion` calls `GroundMotion_Update` (call at 0x11c7a8) in
+  the middle, `Boarder_UpdateLeanTargets` is the last call before the render's `vf7` (call at 0x117ce4). So the ground tick
+  reads the up the previous tick's end left (or `Boarder_PlaceAt`'s), and the tick's own normal (set by its probe)
+  only reaches the up at the end of that tick.
+- The up is not the board's up (rider+0x1a0, `Boarder_UpdateOrientation`): it trails the ground's normal.
+
+Ported: `Rider::up` (game space, z up, w 0), `lean_up` in `rider/ground_tick.rs`, run at the end of every tick by
+`Rider::lean_aim` (with the lean record's aim), set equal to the normal by `Rider::respawn` (`Boarder_PlaceAt`) and
+by `Rider::new` ((0, 0, 1, 0), flat ground); `Rider::ground_tick` gives it to `GroundMotion_Update` as `g.up`
+(it used the board's up, a STANDIN, before). Checked in the function runner (`tests/stats.rs`): `lean_up_is_the_originals`
+runs `Boarder_UpdateLeanTargets` over 2,000 chains of 12 ticks (each result fed back in as the next up, normals
+unit, tilted, not unit length, with and without a w) and `lean_up` matches the four words bit for bit, the normal
+untouched; `rider_up_follows_the_original` does the same through `Rider::lean_aim` from the port's normal (y up).
+
+Not done (new rows): in the air and on a rail the port's normal is its own, where the game's rider+0x2a0 is written by
+`AirMotion_Update` 0x108378 from its down ray whenever that hits (0x108588) and by `RailSlideMotion_Update` 0x10b0d0
+(0x10bbb8) from the rail, so the up is exact on the snow but not through a jump or a grind (G20c2); the placement's
+normal at a respawn is the port's last one, for the ray cast under the spawn (E7, same row); the control state, the
+ray cast's hit kind (+0x2e0) and the attitude quaternion across a landing are G20c3.

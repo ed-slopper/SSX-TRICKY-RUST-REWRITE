@@ -316,6 +316,121 @@ fn lean_targets_are_the_originals() {
     assert!(slow > 1000 && rail > 1000, "knee {slow}, rail {rail}");
 }
 
+/// A direction for the normal: mostly unit with z up (ground), some leaning over, some not unit length at all.
+fn normal_like(g: &mut Rng) -> [f32; 4] {
+    let (a, b) = ((g.next() % 62_832) as f32 / 10_000.0, (g.next() % 31_416) as f32 / 10_000.0);
+    let mut v = [b.sin() * a.cos(), b.sin() * a.sin(), b.cos(), 0.0];
+    match g.next() % 8 {
+        0 => v = [0.0, 0.0, 1.0, 0.0],
+        1 => v = [v[0] * 0.3, v[1] * 0.3, 0.9 + (g.next() % 100) as f32 / 1000.0, 0.0],
+        2 => v = v.map(|x| x * 1.0 + (g.next() % 7) as f32 * 1e-4 * x),
+        _ => {}
+    }
+    v
+}
+
+fn put_v(r: &mut Runner, at: u32, v: [f32; 4]) {
+    for (k, x) in v.iter().enumerate() {
+        r.mem.write_f32(at + 4 * k as u32, *x);
+    }
+}
+
+fn get_v(r: &mut Runner, at: u32) -> [u32; 4] {
+    [0, 1, 2, 3].map(|k| r.mem.read_u32(at + 4 * k))
+}
+
+#[test]
+fn lean_up_is_the_originals() {
+    // `Boarder_UpdateLeanTargets` 0x129500, the other half (board row G20c): the rider's up (+0x2c0) it leaves is
+    // `lean_up(up, normal)` bit for bit, over chains of ticks that feed each result back in as the next up (the way the
+    // record accumulates), and the normal (+0x2a0) is left alone. Some chains have a w in the normal and the up too.
+    let Some(mut r) = runner() else { return };
+    let mut g = Rng(0x5eed_0012_95c0);
+    let rider = r.mem.alloc(0x400);
+    let mut wrong = Vec::new();
+    let (mut moved, mut steady) = (0, 0);
+    for chain in 0..2_000u32 {
+        let mut up = normal_like(&mut g);
+        let w = g.next() % 10 == 0;
+        if w {
+            up[3] = (g.next() % 1000) as f32 / 1000.0;
+        }
+        for tick in 0..12u32 {
+            let mut n = normal_like(&mut g);
+            if w {
+                n[3] = (g.next() % 1000) as f32 / 1000.0;
+            }
+            r.mem.write_u32(rider + 0x424, [1u32, 2, 2, 3][(g.next() % 4) as usize]);
+            put_v(&mut r, rider + 0x2a0, n);
+            put_v(&mut r, rider + 0x2c0, up);
+            put_v(&mut r, rider + 0x150, [100.0, 0.0, 0.0, 0.0]);
+            r.cpu.set_gpr(4, rider as u64);
+            r.call(0x129500).expect("Boarder_UpdateLeanTargets runs to its return");
+            let game = get_v(&mut r, rider + 0x2c0);
+            let ours = tricky_game::rider::ground_tick::lean_up(up, n).map(f32::to_bits);
+            moved += (game != up.map(f32::to_bits)) as u32;
+            steady += (n == up) as u32;
+            if get_v(&mut r, rider + 0x2a0) != n.map(f32::to_bits) {
+                wrong.push(format!("chain {chain} tick {tick}: wrote the normal"));
+            }
+            if game != ours {
+                wrong.push(format!("chain {chain} tick {tick}: up {up:?} normal {n:?}: game {game:x?}, ours {ours:x?}"));
+                if wrong.len() > 10 {
+                    break;
+                }
+            }
+            up = game.map(f32::from_bits);
+        }
+        if wrong.len() > 10 {
+            break;
+        }
+    }
+    assert!(wrong.is_empty(), "{} differ:\n{}", wrong.len(), wrong.join("\n"));
+    assert!(moved > 20_000, "moved {moved}, steady {steady}");
+}
+
+#[test]
+fn rider_up_follows_the_original() {
+    // The rider's record (`Rider::up`, in the game's space) as `Rider::lean_aim` keeps it, from the port's normal (y up),
+    // against the original run on the same normal and up in the game's space (z up): a rider that starts on a slope
+    // (`Boarder_PlaceAt` 0x11cae8: up = normal) and rides over changing ground.
+    use glam::Vec3;
+    use tricky_game::rider::Rider;
+    let Some(mut r) = runner() else { return };
+    let mut g = Rng(0x5eed_0012_95c1);
+    let rider = r.mem.alloc(0x400);
+    let mut wrong = Vec::new();
+    for run in 0..500u32 {
+        let mut me = Rider::new(Vec3::ZERO, 0.0);
+        let start = normal_like(&mut g);
+        // the port's normal is the game's (x, y, z) as (x, z, −y)
+        let port = |n: [f32; 4]| Vec3::new(n[0], n[2], -n[1]);
+        me.normal = port(start);
+        me.up = [start[0], start[1], start[2], 0.0];
+        for tick in 0..30u32 {
+            let n = normal_like(&mut g);
+            me.normal = port(n);
+            let before = me.up;
+            r.mem.write_u32(rider + 0x424, 2);
+            put_v(&mut r, rider + 0x2a0, [n[0], n[1], n[2], 0.0]);
+            put_v(&mut r, rider + 0x2c0, before);
+            put_v(&mut r, rider + 0x150, [100.0, 0.0, 0.0, 0.0]);
+            r.cpu.set_gpr(4, rider as u64);
+            r.call(0x129500).expect("Boarder_UpdateLeanTargets runs to its return");
+            let game = get_v(&mut r, rider + 0x2c0);
+            me.lean_aim();
+            if me.up.map(f32::to_bits) != game {
+                wrong.push(format!("run {run} tick {tick}: up {before:?} normal {n:?}: game {game:x?}, ours {:x?}", me.up.map(f32::to_bits)));
+                break;
+            }
+        }
+        if wrong.len() > 10 {
+            break;
+        }
+    }
+    assert!(wrong.is_empty(), "{} differ:\n{}", wrong.len(), wrong.join("\n"));
+}
+
 #[test]
 fn lean_ease_is_the_originals() {
     // `cBoarder::vf7` 0x117198 run whole, everything it calls recorded as doing nothing: the lean value (+0x244)
