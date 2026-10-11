@@ -78,3 +78,26 @@ Part of the port notes (index: [README.md](README.md)); units and wording as des
   4.0005 off snow), steer ±0.5 from bits 17–22 (or the spin field with bit 0x10) only while moving along the board.
   Release: crouch target 0 at 13.333/s, rider+0x1c8 := crouch, wind-ups under 0.2 dropped, snapped to pure spin or
   flip within 10° of an axis, the wind-up clip, state 10. Bit 1 or surface 0 asks for a reset (rider+0x304 = !bit 1).
+
+## The pad word (`cPlayer::GetControls` 0x151250, board row G1a5b1, checked: `tests/controls.rs`)
+
+- Every boarder state reads one 32-bit pad word, built each tick for the state it is in (rider+0x428) from the pad
+  mapper (player+0x870): axes (`Pad_GetAxis` 0x1797f8) packed as `(int)(axis·31) & 0x3f`, directions as two bits
+  (−1 below −0.5, 1 above 0.5, else 0; NaN −1), buttons as one bit from four queries (mapper vtable +0xc, +0x14,
+  +0x1c, +0x24, by action id). Ported in `tricky-rs/game/src/controls.rs`.
+- States 2–5, 7, 0xb, 0xc, 0x12 (riding): axis 4 → bits 5–10, axis 0 → 17–22, axis 1 → 11–16; +0x1c(0x1b) bit 1,
+  +0xc(0x1b) bit 2, +0x1c(0x25) bit 0, +0x14(0x1d) bit 3, +0x24(0x1d) bit 4; bits 23–24 = 3 for action 0x26, 1 for
+  0x27, else axis 5's direction; bits 25–26 axis 6's direction. These and 0xf also call
+  `Boarder_UpdateSlopeTimeScale` 0x153130.
+- State 0xd (prewind): +0x1c(0x25) bit 1; axis 4 → bits 8–13, axis 0xd → 14–19, axis 0xe → 20–25, axis 1 → 2–7;
+  bits 26–27 the 0x26/0x27/axis 5 field, 28–29 axis 6; bit 0 if action 0x24 or any of 0..0x19 is down (+0xc).
+- State 0x10 (spin): +0x1c(0x25) bit 8, +0x14(0x20) bit 9, +0x14(0x21) bit 10; directions of axes 2, 3, 8, 9, 10,
+  11 in bits 12–23; +0xc(0x24) bit 11; bits 24–25 the 0x26/0x27/axis 5 field, 26–27 axis 6; the low byte 0x1a, or
+  the last of actions 0..0x19 down. With bit 11 the low byte is the trick slot (player+0x868), filled from
+  `AIComputer_RandomEasyTrick` 0x11d3d8 when empty (0x1a); bit 11 is then cleared.
+- States 8, 9, 0x11: axis 0xf → bits 0–5. 10: +0xc(0x1b) bit 1, +0x1c(0x25) bit 0. 0xe: axis 0xc → 17–22, 0xd →
+  5–10, 0xe → 11–16, +0x1c(0x25) bit 0, +0xc(0x1b) 1, +0xc(0x1c) 2, +0x14(0x1d) 3, +0x14(0x23) 4. 0xf: axis 4 →
+  5–10, 1 → 11–16, 7 → 17–22, +0x1c(0x1b) 1, +0xc(0x1b) 2, +0x1c(0x25) 0, +0x14(0x22) 3, +0x14(0x1d) 4. 0x13:
+  axis 10 → 1–6, 11 → 7–12, +0x1c(0x25) 0. 0x14: +0x1c(0x25) 0. 0x15: +0x24(0x28) 0. Others: 0.
+- With an overlay up and no race running the pad is not read (word 0, or 0x1a in state 0x10). What the action ids
+  and axes are on the pad is row G1a5b2.

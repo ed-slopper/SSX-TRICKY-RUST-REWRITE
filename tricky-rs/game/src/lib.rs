@@ -5,6 +5,7 @@ pub mod air;
 pub mod boarder;
 pub use tricky_data::anim;
 pub mod collide;
+pub mod controls;
 pub mod finish;
 pub mod gate;
 pub mod probe;
