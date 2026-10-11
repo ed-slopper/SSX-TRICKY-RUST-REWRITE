@@ -2792,8 +2792,8 @@ address,size,name,system,status
 0x1cf648,76,FUN_001cf648,hud?,not started
 0x1cf698,76,FUN_001cf698,hud?,not started
 0x1cf6e8,484,FUN_001cf6e8,hud?,not started
-0x1cf8d0,68,FUN_001cf8d0,frontend?,not started
-0x1cf918,396,FUN_001cf918,frontend?,not started
+0x1cf8d0,68,MCOverlay_WaitTimer,save,not started
+0x1cf918,396,MCOverlay_CheckCard,save,not started
 0x1cfaa8,288,FUN_001cfaa8,frontend?,not started
 0x1cfbc8,304,FUN_001cfbc8,frontend?,not started
 0x1cfcf8,488,FUN_001cfcf8,frontend?,not started
@@ -2945,7 +2945,7 @@ address,size,name,system,status
 0x1d8b00,28,FUN_001d8b00,world?,not started
 0x1d8b20,164,FUN_001d8b20,world?,not started
 0x1d8bc8,384,ParticleSys_Draw,world?,not started
-0x1d8d48,56,FUN_001d8d48,world?,not started
+0x1d8d48,56,ParticleNode_SaveState,save,not started
 0x1d8d80,64,ParticleSys_ReadReplay,ai?,not started
 0x1d8dc0,44,FUN_001d8dc0,,not started
 0x1d8e30,288,ParticleMan_Init,frontend?,not started
@@ -3359,10 +3359,10 @@ address,size,name,system,status
 0x203ff8,76,FUN_00203ff8,render?,not started
 0x204048,28,FUN_00204048,render?,not started
 0x204068,568,BdrLoad_LoadOutfitParts,render?,not started
-0x2042a0,72,FUN_002042a0,boarder?,not started
-0x2042e8,196,FUN_002042e8,boarder?,not started
-0x2043b0,72,FUN_002043b0,boarder?,not started
-0x2043f8,196,FUN_002043f8,boarder?,not started
+0x2042a0,72,BdrLoad_RegisterShapeFile,boarder?,not started
+0x2042e8,196,BdrLoad_RegisterShapes,boarder?,not started
+0x2043b0,72,BdrLoad_RebindShapeFile,boarder?,not started
+0x2043f8,196,BdrLoad_RebindShapes,boarder?,not started
 0x2044c0,200,BdrLoad_FindPartName,render?,not started
 0x204588,16,FUN_00204588,boarder?,not started
 0x204598,160,SkinTexList_Find,render?,not started
@@ -3760,7 +3760,7 @@ address,size,name,system,status
 0x222c30,32,cMonitor::vf4_222c30,audio?,not started
 0x222c50,108,SndSys_FindFreeEvent,audio?,not started
 0x222cc0,212,SndSys_ScheduleEvent,audio?,not started
-0x222db0,64,FUN_00222db0,audio?,not started
+0x222db0,64,SndSys_CancelAllEvents,audio?,not started
 0x222df0,164,SndSys_CancelEvents,audio?,not started
 0x222ef8,80,cMonitor::__tf,runtime,host
 0x222fb0,56,PathX_FindFreeSlot,audio?,not started
@@ -3794,11 +3794,11 @@ address,size,name,system,status
 0x2245b8,104,FUN_002245b8,audio?,not started
 0x224620,52,PathX_GetSongState,audio?,not started
 0x224658,80,FUN_00224658,audio?,not started
-0x2246a8,192,FUN_002246a8,audio?,ported
+0x2246a8,192,Song_RandomSegmentMs,audio?,ported
 0x224768,36,FUN_00224768,audio?,not started
 0x224790,48,FUN_00224790,audio?,not started
-0x2247c0,52,FUN_002247c0,audio?,not started
-0x2247f8,68,FUN_002247f8,audio?,not started
+0x2247c0,52,Song_GetStatus,audio?,not started
+0x2247f8,68,Song_GetPlayPosMs,audio?,not started
 0x224840,84,Song_GetLengthMs,audio?,not started
 0x224898,32,Song_BeatMs,audio?,not started
 0x2248b8,60,Song_LengthMs,audio?,not started
@@ -3810,7 +3810,7 @@ address,size,name,system,status
 0x224c90,100,cMusicSys::~cMusicSys,audio?,not started
 0x224cf8,360,MusicSys_LoadMusicMap,audio,not started
 0x224e68,548,MusicSys_PlaySong,audio,not started
-0x225090,428,FUN_00225090,audio?,not started
+0x225090,428,MusicSys_StartSong,audio,not started
 0x225240,28,MusicSys_StopCurrent,audio,not started
 0x225260,28,FUN_00225260,frontend?,not started
 0x225280,148,MusicSys_StopSong,audio,not started
@@ -3889,7 +3889,7 @@ address,size,name,system,status
 0x228958,60,SpeechSys_CanPlay,audio?,not started
 0x228998,100,SpeechSys_UpdateAll,frontend?,not started
 0x228a00,188,SpeechSys_AddBank,audio?,not started
-0x228ac0,40,FUN_00228ac0,audio?,not started
+0x228ac0,40,Speech_LoadEventsForSlot,audio?,not started
 0x228ae8,156,FUN_00228ae8,audio?,not started
 0x228b88,48,FUN_00228b88,audio?,not started
 0x228bb0,48,FUN_00228bb0,audio?,not started
@@ -3906,20 +3906,20 @@ address,size,name,system,status
 0x229348,76,FUN_00229348,audio?,not started
 0x229398,8,Stream_SetVolume,audio?,not started
 0x2293a0,60,Stream_SetPitch,audio?,not started
-0x2293e0,176,FUN_002293e0,audio?,not started
+0x2293e0,176,Stream_UpdateVolume,audio?,not started
 0x229490,72,Stream_GetStatus,audio?,not started
-0x2294d8,88,FUN_002294d8,audio?,not started
+0x2294d8,88,Stream_GetPlayInfo,audio?,not started
 0x229530,72,FUN_00229530,audio?,not started
 0x229578,72,FUN_00229578,audio?,not started
-0x2295c0,52,FUN_002295c0,audio?,not started
+0x2295c0,52,Stream_HasReached,audio?,not started
 0x2295f8,44,FUN_002295f8,audio?,not started
 0x229628,44,Stream_IsPlaying,audio?,not started
 0x229658,40,FUN_00229658,audio?,not started
 0x229680,44,FUN_00229680,audio?,not started
 0x2296b0,12,FUN_002296b0,audio?,not started
-0x2296c0,80,FUN_002296c0,audio?,not started
-0x229710,48,FUN_00229710,audio?,not started
-0x229740,48,FUN_00229740,audio?,not started
+0x2296c0,80,Stream_GetPlayTime,audio?,not started
+0x229710,48,Stream_Resume,audio?,not started
+0x229740,48,Stream_Pause,audio?,not started
 0x229770,128,FUN_00229770,audio?,not started
 0x2297f0,116,FUN_002297f0,audio?,not started
 0x229868,8,Stream_Stop,audio?,not started
@@ -3931,10 +3931,10 @@ address,size,name,system,status
 0x229d18,40,StreamSys_SetFile,audio?,not started
 0x229d40,84,StreamSys_DestroyStream,audio?,not started
 0x229d98,104,StreamSys_StopAll,audio?,not started
-0x229e00,104,FUN_00229e00,audio?,not started
-0x229e68,104,FUN_00229e68,audio?,not started
+0x229e00,104,StreamSys_ResumeAll,audio?,not started
+0x229e68,104,StreamSys_PauseAll,audio?,not started
 0x229ed0,72,FUN_00229ed0,audio?,not started
-0x229f18,72,FUN_00229f18,audio?,not started
+0x229f18,72,StreamSys_Play,audio?,not started
 0x229f60,60,FUN_00229f60,audio?,not started
 0x229fa0,40,StreamSys_StopStream,audio?,not started
 0x229fc8,60,FUN_00229fc8,audio?,not started
@@ -3943,7 +3943,7 @@ address,size,name,system,status
 0x22a088,60,FUN_0022a088,audio?,not started
 0x22a0c8,88,FUN_0022a0c8,audio?,not started
 0x22a120,84,FUN_0022a120,audio?,not started
-0x22a178,60,FUN_0022a178,audio?,not started
+0x22a178,60,StreamSys_IsSlotPlaying,audio?,not started
 0x22a1e0,40,FUN_0022a1e0,audio?,not started
 0x22a228,40,StreamSys_SetVolume,audio?,not started
 0x22a278,60,FUN_0022a278,audio?,not started
@@ -3954,7 +3954,7 @@ address,size,name,system,status
 0x22a4c8,76,AudioTGroups_Delete,audio,not started
 0x22a518,108,AudioTGroups_Load,audio,not started
 0x22a588,104,AudioTGroups_Free,audio,not started
-0x22a5f0,228,FUN_0022a5f0,race?,not started
+0x22a5f0,228,AudioTGroups_Bind,audio,not started
 0x22a6d8,968,AudioTGroups_BuildGrid,audio,not started
 0x22aaa0,544,AudioTGroup_GetBounds,audio,not started
 0x22acc0,836,FUN_0022acc0,camera?,not started
@@ -4092,21 +4092,21 @@ address,size,name,system,status
 0x230610,76,SpeechEvt_Post4008015,race?,not started
 0x230660,92,SpeechEvt_Post4008016,race?,not started
 0x2306c0,96,SpeechEvt_Post4008017,race?,not started
-0x2307f0,140,FUN_002307f0,race?,not started
+0x2307f0,140,Speech_CourseMask,race?,not started
 0x230880,140,FUN_00230880,race?,not started
 0x230910,132,FUN_00230910,race?,not started
 0x2309a8,88,Speech_GetModeMask,common?,not started
 0x230a00,884,Speech_LoadNarration,audio?,not started
 0x230d78,84,Speech_FreeNarration,audio?,not started
 0x230dd0,268,FUN_00230dd0,race?,not started
-0x230ee0,276,FUN_00230ee0,race?,not started
+0x230ee0,276,Speech_QueueCamScriptLines,race?,not started
 0x230ff8,204,FUN_00230ff8,audio?,not started
 0x2310c8,488,Speech_OnCamScriptIntro,race?,not started
 0x2312b0,104,Speech_IsCamScriptLinePlaying,audio?,not started
 0x231318,128,Speech_StopCamScriptLine,audio?,not started
 0x231398,328,Speech_LessonLine,game?,not started
 0x2314e0,104,FUN_002314e0,audio?,not started
-0x231548,148,FUN_00231548,race?,not started
+0x231548,148,Speech_QueueResultLine,race?,not started
 0x2315e0,544,FUN_002315e0,race?,not started
 0x231800,752,FUN_00231800,audio?,not started
 0x231af8,344,FUN_00231af8,race?,not started
@@ -4141,10 +4141,10 @@ address,size,name,system,status
 0x234558,180,FUN_00234558,audio?,not started
 0x234610,132,FUN_00234610,audio?,not started
 0x234698,148,Speech_CharacterBit,audio?,not started
-0x234730,148,FUN_00234730,audio?,not started
+0x234730,148,Speech_RiderMask,audio?,not started
 0x2347c8,1004,FUN_002347c8,audio?,not started
 0x234bb8,128,Speech_InterruptIfPlaying,audio?,not started
-0x234c38,200,FUN_00234c38,race?,not started
+0x234c38,200,Speech_IsRivalOrGrudge,race?,not started
 0x234d00,612,Speech_RiderHitLine,world?,not started
 0x234f68,296,Speech_OnAITaunt,audio?,not started
 0x235090,220,Speech_OnCrashNearby,world?,not started
@@ -4635,7 +4635,7 @@ address,size,name,system,status
 0x259028,8,FUN_00259028,world?,not started
 0x259030,768,FUN_00259030,world?,not started
 0x259330,3320,Rail_ClosestPoint,boarder,not started
-0x25a028,312,FUN_0025a028,world?,not started
+0x25a028,312,Lights_InsertStrongest,render,not started
 0x25a160,3600,World_GetLightsAt,world,not started
 0x25aff8,2172,World_RayCast,world,ported
 0x25b878,1744,World_QueryInstances,world,ported
@@ -4937,8 +4937,8 @@ address,size,name,system,status
 0x26cdc8,32,CheatCode_Matches,input,not started
 0x26cde8,16,FUN_0026cde8,frontend?,not started
 0x26cdf8,16,FUN_0026cdf8,frontend?,not started
-0x26ce08,40,FUN_0026ce08,frontend?,not started
-0x26ce30,40,FUN_0026ce30,frontend?,not started
+0x26ce08,40,FEKey_IsAccept,frontend?,not started
+0x26ce30,40,FEKey_IsBack,frontend?,not started
 0x26ce58,16,FUN_0026ce58,frontend?,not started
 0x26ce68,16,FUN_0026ce68,frontend?,not started
 0x26ce78,16,FUN_0026ce78,frontend?,not started
@@ -5898,35 +5898,35 @@ address,size,name,system,status
 0x2b8140,128,Cstring_InitWideN,comm?,host
 0x2b81c0,80,FUN_002b81c0,comm?,host
 0x2b8210,76,Cstring_Destroy,comm?,host
-0x2b8260,68,FUN_002b8260,comm?,host
+0x2b8260,68,Cstring_AssignChar,comm?,host
 0x2b82a8,164,Cstring_AssignAscii,comm?,host
-0x2b8350,128,FUN_002b8350,comm?,host
+0x2b8350,128,Cstring_Assign,comm?,host
 0x2b83d0,72,Cstring_GetBuffer,comm?,host
 0x2b8418,148,FUN_002b8418,comm?,host
 0x2b84b0,200,FUN_002b84b0,comm?,host
-0x2b8578,128,FUN_002b8578,comm?,host
+0x2b8578,128,Cstring_Append,comm?,host
 0x2b85f8,96,FUN_002b85f8,comm?,host
 0x2b8658,156,FUN_002b8658,comm?,host
-0x2b86f8,104,FUN_002b86f8,comm?,host
+0x2b86f8,104,Cstring_EqualsChar,comm?,host
 0x2b8760,200,Cstring_EqualsAscii,comm?,host
 0x2b8828,36,FUN_002b8828,comm?,host
 0x2b8850,32,FUN_002b8850,comm?,host
 0x2b8870,32,FUN_002b8870,comm?,host
-0x2b8890,184,FUN_002b8890,comm?,host
+0x2b8890,184,Cstring_Equals,comm?,host
 0x2b8948,8,Cstring_Capacity,comm?,host
 0x2b8950,112,Cstring_SetLength,comm?,host
 0x2b89c0,12,Cstring_HasBuffer,comm?,host
-0x2b89d0,60,FUN_002b89d0,comm?,host
+0x2b89d0,60,Cstring_Free,comm?,host
 0x2b8a10,8,Cstring_Length,comm?,host
-0x2b8a18,264,FUN_002b8a18,comm?,host
+0x2b8a18,264,Cstring_Find,comm?,host
 0x2b8b20,224,FUN_002b8b20,comm?,host
 0x2b8c00,72,FUN_002b8c00,comm?,host
 0x2b8c48,44,FUN_002b8c48,comm?,host
 0x2b8c78,56,FUN_002b8c78,comm?,host
-0x2b8cb0,156,FUN_002b8cb0,comm?,host
-0x2b8d50,188,FUN_002b8d50,comm?,host
-0x2b8e10,88,FUN_002b8e10,comm?,host
-0x2b8e68,284,FUN_002b8e68,comm?,host
+0x2b8cb0,156,Cstring_Left,comm?,host
+0x2b8d50,188,Cstring_Right,comm?,host
+0x2b8e10,88,Cstring_MidToEnd,comm?,host
+0x2b8e68,284,Cstring_Mid,comm?,host
 0x2b8f88,116,Cstring_Shrink,comm?,host
 0x2b9000,40,FUN_002b9000,comm?,host
 0x2b9028,184,FUN_002b9028,comm?,host
