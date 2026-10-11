@@ -21,3 +21,15 @@ Part of the port notes (index: [README.md](README.md)); units and wording as des
 - Outfits: 7 per rider; 1–5 from trick book chapters 1–5, 6 at Master. The trick book (6 × 5 tricks) is in
   data/tutorial/trickdef.dat (28-byte records); finishing it gives the UBERBOARD (999).
 - Cheat (hold the two shoulder buttons in mask 0x600, then 12 presses): X ▲ → ● ■ ↓ ▲ ■ ← ● X ↑ unlocks everything.
+
+## Frontend state slots (`cFE3DState` and every `cFE3DState*` screen)
+
+- Phase at state+0x10: 0 hidden, 1 fading in, 2 active, 3 fading out, 4 waiting for the next screen, 5 done.
+- vf3 `Hide`, vf4 `TransitionIn` (optional screen fade by state+0x20: 1 half, 2 slow; shows the widgets, phase 1),
+  vf5 `TransitionOut` (fade by state+0x24, phase 3), vf7 `Finish` (phase 5; asks vf10 `CreateNextState` for the
+  next screen and starts it), vf9 `UpdateTransition` (moves 0→1→2 and 3→4 once the widgets stop animating),
+  vf14 `Activate` / vf15 `Deactivate` (input on/off for the screen's widget group), vf16 `LayoutWidgets`
+  (centres the title on 640), vf17 `Update` (per frame: pad input, back/accept, starting the next screen).
+- Debug menu items (`cMenuItem` and subclasses): vf1 `HandleInput`, vf2 `IsSelectable`, vf3 `Measure`, vf4 `Draw`.
+- Loading screens (`c1PTrackLoad`, `cFirstLoad` …): vf7 `DrawBackground`, vf8 `DrawOverlay`, vf9 `StartAssetLoad`,
+  vf10 `PollAssetLoad`.
