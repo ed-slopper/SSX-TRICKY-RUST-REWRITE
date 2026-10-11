@@ -38,7 +38,7 @@ state machine and the renderer are ours. Nothing has been checked against the or
 | E1a2 | The rest of E1a: world animations, props, particles, spray, camera on the same tick; draw between ticks (interpolate, ours: tag STANDIN) | any | E1a1 | | Split of E1a |
 | E1b | Random numbers: the game's `rand` and seeding, used by AI tricks, grabs, announcer, so runs can match the original | unowned | F1 | | [est] Split: E1b1, E1b2 |
 | E1b2 | Replace the xorshift stand-ins (`race.rs`, `props.rs`, `intro.rs`) with the game's streams at the game's call sites, in the game's order | unowned | E1b1 | | Split of E1b |
-| E2c | The codecs the disc does not use: Huffman (`Huff_Decode` 0x2c3730), BTree (`BTree_Decode` 0x2c3540), 0x2c2d18 (types 0x18/0x1a/0x1c), for mods that pack files with them | unowned | E2b | | Gap of E2b. `Compress_Decode` 0x2c2de0's table is in `port-notes/files.md` |
+| E2c | The codecs the disc does not use: Huffman (`Huff_Decode` 0x2c3730), BTree (`BTree_Decode` 0x2c3540), 0x2c2d18 (types 0x18/0x1a/0x1c), for mods that pack files with them | unowned | E2b | ed-slopper/puffin (2026-10-11) | Gap of E2b. `Compress_Decode` 0x2c2de0's table is in `port-notes/files.md` |
 | E3 | Level files read by our code, as the game reads them, replacing the SSX-Library JSON project folder (`level.rs`) | unowned | E2b | | [repo] level-editing.md. Split before claiming: |
 | E3a6 | The world meshes' VU1 program read, to prove E3a3's layout (the GS tag's fields, the `ref` packets, the masked rows, the strip winding) | unowned | E3a3 | | Gap of E3a5 |
 | E3a4 | The app loads levels from the disc: `level.rs` on `tricky_data::{pbd, ssf, ltg, adl, map}` (E3a2's records), textures and lightmaps from the course's `.ssh` / `_L.ssh` (E3b), meshes (E3a3), scripts (E9b2), instead of the SSX-Library project folders | unowned | E3a2, E3a3 | | Gap of E3a2 |
@@ -519,3 +519,4 @@ matches the original.
 - 2026-10-11 ed-slopper/puffin: E3a3 done (world meshes from the VIF data); added E3a5 (collision meshes, the VU1 program).
 - 2026-10-11 ed-slopper/puffin: claim E3a5.
 - 2026-10-11 ed-slopper/puffin: E3a5 done (collision meshes checked); added E3a6 (the world meshes' VU1 program).
+- 2026-10-11 ed-slopper/puffin: claim E2c.
