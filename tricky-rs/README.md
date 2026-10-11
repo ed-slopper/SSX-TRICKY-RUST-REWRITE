@@ -194,10 +194,12 @@ this repository; it is made from your disc). With the folder missing the game is
 music off and on, N the effects.
 
 - `ride.wav`, `air.wav`, `land.wav`, `jump.wav`, `grind.wav`, `rail_on.wav` from `zboard.bnk` (the board bank:
-  streams 4, 1, 2, 3, 54, 53), `boost.wav`, `crash.wav`, `glass.wav`, `menu_move.wav`, `menu_ok.wav`,
-  `pickup.wav` from `zBxsfx.bnk` (streams 5, 8, 25, 10, 11, 23), `crowd.wav` from `Crowd.bnk`, `tricky.wav`
-  from `tricky.bnk`, all inside `DATA/AUDIO/AUDIO.BIG`. The banks carry no names, so which stream is which
-  sound was picked by length, looping and tone, not read from the game: some may be the wrong sound.
+  streams 4, 1, 2, 3, 54, 53), `boost.wav`, `crash.wav`, `glass.wav`, `menu_ok.wav`, `pickup.wav` from
+  `zBxsfx.bnk` (streams 5, 8, 25, 11, 23), `crowd.wav` from `Crowd.bnk`, `tricky.wav` from `tricky.bnk`, all
+  inside `DATA/AUDIO/AUDIO.BIG`. The banks carry no names, so which stream is which sound was picked by length,
+  looping and tone, not read from the game: some may be the wrong sound. `menu_move.wav` is `zBxsfx.bnk` sound
+  112, the one the game plays for a menu move (`Audio_PlayMenuMoveSound`, seen in the running game); stream 10,
+  first taken for it, is the race HUD's score tick (`Audio_PlayScoreTick`) and is kept as `score_tick.wav`.
 - `music.ogg` is "Smartbomb" (one of Garibaldi's three songs): the 317 one-bar pieces of `smartbomb.mus` in
   `DATA/AUDIO/MUSIC.BIG`, in file order. The game stitches the bars together as you ride; this is one fixed
   nine-minute pass through them.
@@ -235,7 +237,7 @@ emitter objects (fireworks triggers and so on) are not solid any more; one of th
 **Sound files as now used** (in `audio/`): `ride`, `air`, `grind`, `slide` (loops; `slide` plays while braking),
 `land`, `jump`, `rail_on`, `boost` (once, when a boost starts), `levelup` (the boost meter passing a third, two
 thirds, full), `reset`, `countdown` (3, 2, 1; GO is the same beep an octave up until a `go.wav` exists),
-`pickup`, `tricky`, `menu_move`, `crowd`, and optional `crash.wav`, `glass.wav`, `go.wav`. `audio/unlabeled/`
+`pickup`, `tricky`, `menu_move` (sound 112), `crowd`, and optional `crash.wav`, `glass.wav`, `go.wav`. `audio/unlabeled/`
 holds every distinct sound of the board, effects, Garibaldi, crowd and TRICKY banks, numbered, for identifying.
 
 **The courses' own sounds** (`audio/world/`, every bank of `DATA/AUDIO/AUDIO.BIG` decoded by
