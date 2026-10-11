@@ -42,12 +42,11 @@ state machine and the renderer are ours. Nothing has been checked against the or
 | E2c | The codecs the disc does not use: Huffman (`Huff_Decode` 0x2c3730), BTree (`BTree_Decode` 0x2c3540), 0x2c2d18 (types 0x18/0x1a/0x1c), for mods that pack files with them | unowned | E2b | | Gap of E2b. `Compress_Decode` 0x2c2de0's table is in `port-notes/files.md` |
 | E3 | Level files read by our code, as the game reads them, replacing the SSX-Library JSON project folder (`level.rs`) | unowned | E2b | | [repo] level-editing.md. Split before claiming: |
 | E3a | `.pbd`: Bezier patches, instances, models and meshes, materials, splines, lights | unowned | E3 | | [repo] |
-| E3b | `.ssh` textures (incl. `_L` lightmaps, `_sky`) | unowned | E2b | ed-slopper/puffin (2026-10-11) | [repo] Python in `tools/ssh/ssh2png.py`. The game's shape reader: `lib-shape` 0x2c2044–0x2c27c8, `Shape_FindByName` 0x2c2528 (F1d) |
 | E3c | `.ssf`: collision models, physics data, trigger scripts | unowned | E3 | | [repo] |
 | E3d | `.aip` / `.sop`: AI paths, race lines, start positions (`AIP_LoadPathsFromFile` 0x197da0) | unowned | E3 | | [repo] `course.rs` reads AIP.json today |
 | E3e | `.ltg` grid, `.map` names, `.adl` audio links, `_sky.pbd` | unowned | E3 | | [repo] |
 | E4d | The rest of the `.mpf` meshes: the shadow meshes (material flags 0x10: positions only, another vector unit program) and the data after each of the face's 18 records (likely its expressions); the vector unit programs themselves, to prove the packet layout read from the data | unowned | E4a | | Gap of E4a. `port-notes/files.md` "Character and board models" |
-| E4c | Outfit, head and board textures from `DATA/CHAR/TEXPS2.BIG` | unowned | E3b | | Split of E4 |
+| E4c | Outfit, head and board textures from `DATA/CHAR/TEXPS2.BIG` | unowned | E3b | ed-slopper/puffin (2026-10-11) | Split of E4 |
 | E5 | Config and text files: `DATA/CONFIG/*.INF` (SNOW, BANKS, MUSICMAP, INTROMUS), `.cml` cameras, `TRICKDEF.DAT`, `american.loc` and the other languages, `.SFN` fonts | unowned | E2b | | [repo] "Unresolved: HUD text (american.loc)". Text: `Loc_GetString` 0x2c5160, `WStr_FormatArgs` 0x2c5578 (`lib-text`, F1d) |
 | E6 | Loading and memory: what the game loads when (load screens, course switch), only as far as it changes behaviour | unowned | E1 | | [est] |
 | E7 | World: terrain tessellation as the game does it, world cells (`World_CellActivate_RunPersistant` 0x25fed0), instance queries `World_QueryInstances` 0x25b878, ray casts `World_RayCast` 0x25aff8 / `World_RayCastInstance` 0x25bf48 | unowned | E3a | | [repo] `collide.rs` (triangle grid of the drawn mesh) is a stand-in for these |
@@ -218,6 +217,7 @@ matches the original.
 | G1a3 | `SpinState_StartFromStick` 0x102158 ported exactly (`jump::spin_start_from_stick`: pad direction fields, axis snap, spin and flip rates, the clip by direction) and checked in the function runner on every pad word whose direction bits matter × both stances × every tricks stat (196,608 starts): rates bit for bit, same clip, states (`tests/spin_start.rs`) | P2 | trailrig/heron | 2026-10-11 | d503d45 |
 | G1d | Boarder meter and input helpers ported exactly (`tricky-rs/game/src/boarder.rs`): `Boarder_AddMeter` 0x11b018, `Boarder_UpdateBoost` 0x11d038, `Boarder_SetCrouchTarget` 0x126c00, `PrewindState_SetWindTarget` 0x105a60, each bit for bit in the function runner with its sound/HUD calls in order (`tests/boarder.rs`, 8,000 cases each); the runner now sends tail calls (`j` into a stubbed function) through the stub (it ran the real callee before; unit test added) | P2 | trailrig/heron | 2026-10-11 | fd62ef1 |
 | G1e | `Boarder_SetSteerTarget` 0x126948, `Boarder_IsTricky` 0x11f430 and `PrewindState_UpdateWindClip` 0x1055f0 (with its clip table 0x35fed0) ported exactly into `boarder.rs` and checked bit for bit in the function runner (10,000 steers, 20,000 wind-ups); the runner learnt ldl/ldr/sdl/sdr (unaligned doublewords, with a unit test) | P2 | trailrig/heron | 2026-10-11 | 2e951ad |
+| E3b | `.ssh` textures in `tricky-data/src/ssh.rs`: the shape library's directory, block chain and name lookup (`Shape_FindByName` 0x2c2528, `Shape_GetLongName` 0x2c2610), 8-bit palette and RGBA images (the only kinds in the disc's 807 files); all 192 exported rider textures equal the disc's under the exports' 0-0x80 to 0-255 mapping (`port-notes/files.md`) | P1 | ed-slopper/puffin | 2026-10-11 | a363515 |
 
 ## Changes to the board
 
@@ -303,3 +303,4 @@ matches the original.
 - 2026-10-11 trailrig/heron: added G1e (more boarder input helpers), claimed.
 - 2026-10-11 trailrig/heron: G1e done (3 functions checked).
 - 2026-10-11 trailrig/heron: G1a4 split into G1a4 (claimed) and G1a5.
+- 2026-10-11 ed-slopper/puffin: E3b done; claim E4c.
