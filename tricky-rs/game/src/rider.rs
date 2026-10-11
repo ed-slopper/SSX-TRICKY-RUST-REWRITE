@@ -713,6 +713,27 @@ impl Rider {
     /// Which way the body faces: the board's heading, turned round when riding switch.
     pub fn facing(&self) -> f32 { if self.switch { self.yaw + std::f32::consts::PI } else { self.yaw } }
     pub fn jump_speed(&self, c: f32) -> f32 { self.stats.jump(c, self.vel.length()) }
+    /// `Jump_ApplyImpulse` 0x1284e0, exact (`jump::jump_impulse`, checked): the jump's velocity from the crouch `c`,
+    /// the jump stat, the speed, the ground normal, the board's forward and (off a rail) its up, at least 630.8786
+    /// cm/s; a steep lip leans it along the lip. Returns the steep-lip flag `Score_StartTrickChain` gets.
+    /// STANDIN: rider+0x208 (taken off the crouch) as 0, the stat byte from our 0..1 attribute.
+    fn apply_jump(&mut self, c: f32, normal: Vec3, forward: Vec3, up: Vec3, rail: bool) -> bool {
+        let g = |v: Vec3, k: f32| [v.x * k, v.z * k, v.y * k, 0.0];
+        let s = crate::jump::JumpState {
+            crouch: c,
+            x208: 0.0,
+            vel: g(self.vel, 100.0),
+            jump_stat: stat_byte(self.stats.jump),
+            motion: if rail { 3 } else { 0 },
+            up: g(up, 1.0),
+            normal: g(normal, 1.0),
+            forward: g(forward, 1.0),
+        };
+        let (v, steep) = crate::jump::jump_impulse(f32::from_bits(0x441d_b83b), &s);
+        if std::env::var("TRICKY_JUMPDBG").is_ok() { println!("    jump: c {c:.2} rail {rail} steep {steep} normal {normal:.2?} fwd {forward:.2?} vel {:.2?} -> {:.2?}", self.vel, Vec3::new(v[0], v[2], v[1]) / 100.0); }
+        self.vel = Vec3::new(v[0], v[2], v[1]) / 100.0;
+        steep
+    }
     /// Leaving the snow (`SpinState_Enter`): the wind-up decides the rotation band for this jump.
     pub fn take_off(&mut self) {
         // a spin-boost makes this takeoff's rotation 1.6x as fast
@@ -868,20 +889,19 @@ impl Rider {
                     self.jump_delay -= dt;
                     if self.jump_delay <= 0.0 {
                         let c = self.jump_c;
-                        self.vel += (n + f * 0.2).normalize() * self.jump_speed(c);
+                        let steep = self.apply_jump(c, n, f, self.board_up(), false);
                         self.jump_c = 0.0;
                         self.take_off();
-                        // STANDIN: the steep-lip flag comes with `Jump_ApplyImpulse` (row G1a5b)
-                        self.begin_chain(0, false);
+                        self.begin_chain(0, steep);
                         jumped = true;
                     }
                 } else if self.jump_c > 0.0 {
                     // a jump released during a moment in the air (a bump) fires on touching down
                     let c = self.jump_c;
-                    self.vel += (n + f * 0.2).normalize() * self.jump_speed(c);
+                    let steep = self.apply_jump(c, n, f, self.board_up(), false);
                     self.jump_c = 0.0;
                     self.take_off();
-                    self.begin_chain(0, false);
+                    self.begin_chain(0, steep);
                     jumped = true;
                 } else {
                     self.wind = 0.0;
@@ -909,11 +929,11 @@ impl Rider {
                 if self.jump_c <= 0.0 { self.release_windup(); }
                 let n = self.normal;
                 let f = self.forward();
-                self.vel += (n + f * 0.2).normalize() * self.jump_speed(c);
+                let steep = self.apply_jump(c, n, f, self.board_up(), false);
                 self.jump_c = 0.0;
                 self.jump_delay = 0.0;
                 self.take_off();
-                self.begin_chain(0, false);
+                self.begin_chain(0, steep);
                 jumped = true;
             }
             self.air_rotation(&input, dt);
@@ -1239,7 +1259,7 @@ impl Rider {
                 let c = self.charge;
                 let phi = (self.rail_off * 100.0 * if slide { 0.698 * 0.0125 } else { 0.349 * 0.0333 }).clamp(-0.8, 0.8);
                 let up = Vec3::Y * phi.cos() + left * self.rail_off.signum() * phi.abs().sin();
-                self.vel += up * self.jump_speed(c);
+                self.apply_jump(c, self.normal, self.forward(), up, true);
                 self.release_windup();
             }
             if fell { self.vel += left * self.rail_off.signum() * 2.778; }
