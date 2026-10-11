@@ -128,7 +128,7 @@ matches the original.
 
 | ID | Task | Area | Needs | Who | Notes |
 |---|---|---|---|---|---|
-| C0b | The rest of C0: which courses each mode and game type offers and when they unlock (the venue menu `cFE3DStateVenueSel`, `VenueSel_*`, the unlock strings 0x000e…), and the race rules per mode (riders, laps, heats: `Circuit_SetupRace` 0x16d230, `Circuit_SetupEventRiders` 0x16d300) | unowned | C0 | | Gap of C0 |
+| C0b | The rest of C0: which courses each mode and game type offers and when they unlock (the venue menu `cFE3DStateVenueSel`, `VenueSel_*`, the unlock strings 0x000e…), and the race rules per mode (riders, laps, heats: `Circuit_SetupRace` 0x16d230, `Circuit_SetupEventRiders` 0x16d300) | unowned | C0 | ed-slopper/puffin (2026-10-11) | Gap of C0 |
 | C1 | Garibaldi | unowned | C0, E9 | | [est] |
 | C2 | Snowdream | unowned | C0, E9 | | [est] |
 | C3 | Elysium Alps | unowned | C0, E9 | | [est] |
@@ -458,3 +458,4 @@ matches the original.
 - 2026-10-11 ed-slopper/puffin: E5b2 done; the engine-bound config loaders noted on G10.
 - 2026-10-11 ed-slopper/puffin: claim C0.
 - 2026-10-11 ed-slopper/puffin: C0 done; C0b added (venue menu, unlocks, race rules per mode).
+- 2026-10-11 ed-slopper/puffin: claim C0b.
