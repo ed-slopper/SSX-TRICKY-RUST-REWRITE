@@ -38,4 +38,9 @@ Part of the port notes (index: [README.md](README.md)); units and wording as des
   [−2.968, +2.684]. Speed ×(1.0643−0.2454·clamp(|pitch|,15°,50°))·(1.1136−0.2603·clamp(|yaw|,25°,80°)).
   Hard landing (blocks riding/prewind for its clip) if pitch < −45° or normal speed < −2777 cm/s.
   The landing does not re-aim the board; edge grip does.
+- `Landing_CheckAngles` proven exactly (E8a1, `tricky-rs/game/src/landing.rs`): early out (returns 0, nothing written) for a
+  grab/tweak/uber clip (types 0xe–0x10) without flag 4, or surface 0, 6, 10; else state 1, forward = normalize(B − (B·n)n)
+  (B = rider+0x180) to rider+0x320, side = n × forward (w 0) to rider+0x330; pitch = π/2 − asin(clamp(B·t, ±0.9999999)),
+  t = the velocity's direction with its part along the board's up removed; roll = −atan2(B·n, U·n); clean when
+  ±roll (sign flipped past |pitch| > π/2) × (2.040804 − 1.0374061·stability/255) is within −2.967825..2.6840878.
 - Grabs follow clip markers at speed 0.782+0.806·s14.

@@ -387,6 +387,11 @@ fn cop2(r: &mut Runner, pc: u32, w: u32, rs: usize, rt: usize, rd: usize, sa: u3
             40 => lanes(&|i| pf::add(s[i], t[i])),                                      // vadd
             42 => lanes(&|i| pf::mul(s[i], t[i])),                                      // vmul
             44 => lanes(&|i| pf::sub(s[i], t[i])),                                      // vsub
+            // vopmsub: fd = ACC − (fs.y·ft.z, fs.z·ft.x, fs.x·ft.y) (with vopmula, the cross product)
+            46 => {
+                let p = [pf::mul(s[1], t[2]), pf::mul(s[2], t[0]), pf::mul(s[0], t[1])];
+                [pf::sub(c.acc[0], p[0]), pf::sub(c.acc[1], p[1]), pf::sub(c.acc[2], p[2]), c.acc[3]]
+            }
             _ => return unimpl(format!("vu0 macro funct {fun}")),
         };
         set_vf(c, fd, dest, v);
@@ -400,6 +405,7 @@ fn cop2(r: &mut Runner, pc: u32, w: u32, rs: usize, rt: usize, rd: usize, sa: u3
         8..=11 => Some(lanes(&|i| pf::add(acc[i], pf::mul(s[i], bc)))), // vmaddabc
         24..=27 => Some(lanes(&|i| pf::mul(s[i], bc))),                 // vmulabc
         42 => Some(lanes(&|i| pf::mul(s[i], t[i]))),                    // vmula
+        46 => Some([pf::mul(s[1], t[2]), pf::mul(s[2], t[0]), pf::mul(s[0], t[1]), acc[3]]), // vopmula
         48 => {
             set_vf(c, ft, dest, s); // vmove ft, fs
             None
@@ -587,6 +593,20 @@ mod tests {
         assert_eq!(c.vf[5], [0.25, 0.5, 0.75, 1.0], "vmulq by vdiv's Q = 1/4");
         assert_eq!(c.vf[6], [15.0, 20.0, 25.0, 30.0]);
         assert_eq!(c.q, 0.5, "vrsqrt: 1 / sqrt(4)");
+    }
+
+    #[test]
+    fn vu0_cross_product() {
+        // vopmula.xyz ACC, vf1, vf2 then vopmsub.xyz vf3, vf2, vf1: vf3 = vf1 × vf2
+        let mut rn = Runner::empty();
+        rn.cpu.vf[1] = [1.0, 2.0, 3.0, 0.0];
+        rn.cpu.vf[2] = [4.0, 5.0, 6.0, 0.0];
+        let code = [vu(14, 2, 1, 0xb, 0x3e), vu(14, 1, 2, 3, 0x2e), 0x03e0_0008, 0];
+        for (i, w) in code.iter().enumerate() {
+            rn.mem.write_u32(CODE + 4 * i as u32, *w);
+        }
+        rn.call(CODE).unwrap();
+        assert_eq!(&rn.cpu.vf[3][..3], &[2.0 * 6.0 - 5.0 * 3.0, 3.0 * 4.0 - 6.0 * 1.0, 1.0 * 5.0 - 4.0 * 2.0]);
     }
 
     #[test]

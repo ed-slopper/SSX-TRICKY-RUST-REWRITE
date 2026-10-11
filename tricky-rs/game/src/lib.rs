@@ -9,6 +9,7 @@ pub mod race;
 pub mod rand;
 pub mod ground;
 pub mod jump;
+pub mod landing;
 pub mod math;
 pub mod rails;
 pub mod rivals;
