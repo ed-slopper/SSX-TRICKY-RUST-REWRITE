@@ -5150,3 +5150,13 @@ G 13f5c8 Roller_CheckCollision
 G 1ad198 PauseMenu_DrawMusicList
 G 127918 Boarder_UpdateLeanAnim
 G 1546c8 TrickInfo_BuildText
+F 1ac130 cCountdownOverlay vf33
+F 1abc00 cCountdownOverlay vf34
+G 1af470 OverlayMan_CreateOverlays
+G 150e38 Race_CreateBoarders
+G 14d320 LessonOverlay_DrawInstructions
+G 180518 Game_AssignCameraRiders
+G 15f060 AnimCtl_BeginClip
+G 135eb8 BoarderRender_UpdateLighting
+F 1abe70 cCountdownOverlay vf31
+F 1ac080 cCountdownOverlay vf32
