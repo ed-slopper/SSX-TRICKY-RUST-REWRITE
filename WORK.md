@@ -48,7 +48,6 @@ state machine and the renderer are ours. Nothing has been checked against the or
 | E4d | The rest of the `.mpf` meshes: the shadow meshes (material flags 0x10: positions only, another vector unit program) and the data after each of the face's 18 records (likely its expressions); the vector unit programs themselves, to prove the packet layout read from the data | unowned | E4a | | Gap of E4a. `port-notes/files.md` "Character and board models" |
 | E5a2 | The HUD's and menus' text from `american.loc` by the ids the game asks for (`Loc_GetString` callers; `CONSTANT.LOC` names them) instead of our strings | unowned | E5a | | Gap of E5a |
 | E5b | Config files: `DATA/CONFIG/*.INF` (SNOW, BANKS, MUSIC, MUSICMAP, INTROMUS, AUDIO, CROWD, CHANT, SPEECH, JUKEBOX, NASCRIPT) and `BTNMAP*.DAT` | unowned | E2b | | Split of E5 |
-| E5c | Camera scripts: `DATA/CAMERA/*.CML` from the disc | unowned | E2b | ed-slopper/puffin (2026-10-11) | Split of E5 |
 | E6 | Loading and memory: what the game loads when (load screens, course switch), only as far as it changes behaviour | unowned | E1 | | [est] |
 | E7 | World: terrain tessellation as the game does it, world cells (`World_CellActivate_RunPersistant` 0x25fed0), instance queries `World_QueryInstances` 0x25b878, ray casts `World_RayCast` 0x25aff8 / `World_RayCastInstance` 0x25bf48 | unowned | E3a | | [repo] `collide.rs` (triangle grid of the drawn mesh) is a stand-in for these |
 | E8 | Physics: check the ported boarder motion against the original once F4 exists: ground `cBoarder_GroundMotion_Update` 0x10a0d8, drag 0x109cb8, side friction 0x109ef8, thrust 0x109950, spring 0x109878, probe 0x128ae8, surface table `SurfaceTable_Init` 0x256188 | any | F4a | | [repo] Ported in `rider.rs`; README still says some constants at the top of `rider.rs` are guesswork: find which. Split: E8f–E8i |
@@ -226,6 +225,7 @@ matches the original.
 | E5d | The trick book from the disc: `tricky-data/src/trickdef.rs` (`TrickDef_Load` 0x154580's file, `Score_FormatTrickName` 0x1551c0 from its disassembly with the table region 0x320970-0x320f58), read by the app's book with `TRICKY_DISC`; all 360 names equal the export | P1 | ed-slopper/puffin | 2026-10-11 | 1e83035 |
 | E5e | Fonts from the disc: `tricky-data/src/sfn.rs` (`Font_ParseGlyphs` 0x19c910, `Font_BuildTexture` 0x19cca8, the scales `cGame::Init` 0x17e148 sets), read by the app with `TRICKY_DISC`; glyphs equal the export | P1 | ed-slopper/puffin | 2026-10-11 | f59e63f |
 | G1c2 | The start gate ported exactly (`tricky-rs/game/src/gate.rs`): `GateAnticipateControl_Enter` 0x105f48, `_Update` 0x105f58, `_Exit` 0x106140, `GateLaunchControl_Enter` 0x106228, `_Update` 0x1062b0, checked in the function runner (`tests/gate.rs`: 20,000 random rocks and launches, every field and call bit for bit); the launch-speed formula in race.md corrected (still is seconds, not ×60) | P2 | trailrig/heron | 2026-10-11 | 9683178 |
+| E5c | Camera files from the disc: `Cml::from_disc` loads the course's, `commonob` and `scripts` as `Camera_LoadCmlFiles` 0x1783e8 does (`Camera_GetCourseCmlName` 0x178330 ported), read by the app with `TRICKY_DISC`; equal to the level folders' copies | P1 | ed-slopper/puffin | 2026-10-11 | 2586fdd |
 
 ## Changes to the board
 
@@ -325,3 +325,4 @@ matches the original.
 - 2026-10-11 ed-slopper/puffin: E5e done.
 - 2026-10-11 trailrig/heron: G1c2 done.
 - 2026-10-11 ed-slopper/puffin: claim E5c.
+- 2026-10-11 ed-slopper/puffin: E5c done.
