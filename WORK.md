@@ -47,7 +47,7 @@ state machine and the renderer are ours. Nothing has been checked against the or
 | E3d | `.aip` / `.sop`: AI paths, race lines, start positions (`AIP_LoadPathsFromFile` 0x197da0) | unowned | E3 | | [repo] `course.rs` reads AIP.json today |
 | E3e | `.ltg` grid, `.map` names, `.adl` audio links, `_sky.pbd` | unowned | E3 | | [repo] |
 | E4d | The rest of the `.mpf` meshes: the shadow meshes (material flags 0x10: positions only, another vector unit program) and the data after each of the face's 18 records (likely its expressions); the vector unit programs themselves, to prove the packet layout read from the data | unowned | E4a | | Gap of E4a. `port-notes/files.md` "Character and board models" |
-| E4b | Character animations: `.afl` clips from `DATA/CHAR/ANM.BIG` through `tricky-data` instead of the exported files | unowned | E2b | | Split of E4. Format: `notes/animation-format.md`, `tools/afl/` |
+| E4b | Character animations: `.afl` clips from `DATA/CHAR/ANM.BIG` through `tricky-data` instead of the exported files | unowned | E2b | ed-slopper/puffin (2026-10-11) | Split of E4. Format: `notes/animation-format.md`, `tools/afl/` |
 | E4c | Outfit, head and board textures from `DATA/CHAR/TEXPS2.BIG` | unowned | E3b | | Split of E4 |
 | E5 | Config and text files: `DATA/CONFIG/*.INF` (SNOW, BANKS, MUSICMAP, INTROMUS), `.cml` cameras, `TRICKDEF.DAT`, `american.loc` and the other languages, `.SFN` fonts | unowned | E2b | | [repo] "Unresolved: HUD text (american.loc)". Text: `Loc_GetString` 0x2c5160, `WStr_FormatArgs` 0x2c5578 (`lib-text`, F1d) |
 | E6 | Loading and memory: what the game loads when (load screens, course switch), only as far as it changes behaviour | unowned | E1 | | [est] |
@@ -270,3 +270,4 @@ matches the original.
 - 2026-10-11 trailrig/heron: E9a done; added E9b–E9j.
 - 2026-10-11 trailrig/heron: split G1a into G1a1 (claimed) and G1a2.
 - 2026-10-11 trailrig/heron: G1a1 done (Jump_ApplyImpulse checked).
+- 2026-10-11 ed-slopper/puffin: claim E4b.
