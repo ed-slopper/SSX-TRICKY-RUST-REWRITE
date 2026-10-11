@@ -34,7 +34,35 @@ fn name(d: &[u8], o: usize) -> String {
     String::from_utf8_lossy(&b[..b.iter().position(|c| *c == 0).unwrap_or(b.len())]).into_owned()
 }
 
+/// `Camera_GetCourseCmlName` 0x178330: a course's camera file, by the game's course id.
+pub fn course_cml_name(course: u32) -> Option<&'static str> {
+    Some(match course {
+        0 => "garibald", 1 => "snowdrea", 2 => "elysium", 3 => "mesablan", 4 => "merqury", 5 => "aloha",
+        6 | 9 => "pipedrea", 7 => "untracke", 8 => "tokyo", 10 => "trick", 11 => "alaska",
+        _ => return None,
+    })
+}
+
+/// The game's course id of one of our level folders (`levels/<name>`).
+/// STANDIN: our folder names, for the course table the game picks a course from (row C0)
+pub fn course_of_folder(folder: &str) -> Option<u32> {
+    Some(match folder {
+        "gari" => 0, "snowdream" => 1, "elysium" => 2, "mesablanca" => 3, "merqury" => 4, "aloha" => 5,
+        "pipedream" => 6, "untracked" => 7, "megaplex" => 8, "trick" => 10, "alaska" => 11,
+        _ => return None,
+    })
+}
+
 impl Cml {
+    /// The camera files from the player's disc (row E5c), as `Camera_LoadCmlFiles` 0x1783e8 loads them: the
+    /// course's, then `commonob` (0x178310), then `scripts` (0x178320), each `<name>.cml` in DATA/CAMERA
+    /// (`Cml_LoadIfExists` 0x16e4c0 skips a missing one).
+    pub fn from_disc(files: &mut crate::big::Files, course: u32) -> Option<Self> {
+        let names = [course_cml_name(course)?, "commonob", "scripts"];
+        let files: Vec<Vec<u8>> = names.iter().filter_map(|n| files.load(&format!("data/camera/{n}.cml")).ok().flatten()).collect();
+        if files.is_empty() { None } else { Some(Cml { files }) }
+    }
+
     /// `dir/Camera/{track,commonob,scripts}.cml`, copied from the game disc's DATA/CAMERA.
     pub fn load(dir: &Path) -> Option<Self> {
         let files: Vec<Vec<u8>> = ["track.cml", "commonob.cml", "scripts.cml"].iter()
@@ -253,4 +281,25 @@ pub fn post_scene(name: &str, cast: &Cast) -> (Vec<String>, Vec<Option<usize>>) 
         }
         (clips, slot_of)
     } else { (scene_clips(name), Vec::new()) }
+}
+
+#[cfg(test)]
+mod cml_tests {
+    use super::*;
+
+    /// Needs the player's own image and the level folders: the disc's camera files equal their copies.
+    #[test]
+    fn disc_cml_equals_the_copies() {
+        let Ok(iso) = std::env::var("TRICKY_ISO") else { return };
+        let levels = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../levels");
+        let mut files = crate::big::Files::new(crate::disc::Disc::open(&iso).unwrap());
+        let mut checked = 0;
+        for folder in ["gari", "snowdream", "elysium", "mesablanca", "merqury", "aloha", "pipedream", "untracked", "megaplex", "trick", "alaska"] {
+            let Ok(copy) = Cml::load(&levels.join(folder)).ok_or(()) else { continue };
+            let disc = Cml::from_disc(&mut files, course_of_folder(folder).unwrap()).unwrap();
+            assert!(copy.files == disc.files, "{folder}");
+            checked += 1;
+        }
+        assert!(checked > 0);
+    }
 }

@@ -231,7 +231,13 @@ fn open_level(dir: &Path) -> Result<Loaded, String> {
     if tube.is_some() { world.pads.retain(|p| !matches!(p.kind, collide::PadKind::Boost { .. })); }
     println!("level scripts: {} objects switched by event, {} script resets, {} spline riders, {} boost pads, {} teleports, {} pickups, {} doors, {} glass pieces",
         level.switchable.len(), level.logic.resets.len(), level.logic.movers.len(), world.pads.iter().filter(|p| matches!(p.kind, collide::PadKind::Boost { .. })).count(), level.logic.teleports.len(), world.pads.iter().filter(|p| matches!(p.kind, collide::PadKind::Pickup { .. })).count(), world.gates.len(), level.glass().len());
-    let cml = intro::Cml::load(dir).map(std::sync::Arc::new);
+    // the course's camera files from the player's disc (TRICKY_DISC, row E5c), else the level folder's copies
+    let from_disc = std::env::var("TRICKY_DISC").ok().and_then(|p| {
+        let course = intro::course_of_folder(&dir.file_name()?.to_string_lossy())?;
+        let mut files = tricky_data::big::Files::new(tricky_data::disc::Disc::open(&p).ok()?);
+        intro::Cml::from_disc(&mut files, course)
+    });
+    let cml = from_disc.or_else(|| intro::Cml::load(dir)).map(std::sync::Arc::new);
     let stage = level.instances.iter().find(|i| i.instance_name.starts_with("Mdl_StageArea_Start")).map(|i| (Vec3::from(i.location), level::quat4(i.rotation)));
     let finish_area = level.instances.iter().find(|i| i.instance_name.starts_with("Mdl_StageArea_Finish")).map(|i| (Vec3::from(i.location), level::quat4(i.rotation)));
     Ok(Loaded { level, world, rails, line, start, yaw, course, lines, paths, tube, cml, stage, finish_area })
