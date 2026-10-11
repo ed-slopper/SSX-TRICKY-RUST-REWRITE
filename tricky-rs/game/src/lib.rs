@@ -6,6 +6,7 @@ pub use tricky_data::anim;
 pub mod collide;
 pub mod props;
 pub mod race;
+pub mod rand;
 pub mod ground;
 pub mod rails;
 pub mod rider;

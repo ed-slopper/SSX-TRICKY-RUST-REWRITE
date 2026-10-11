@@ -129,7 +129,8 @@ Part of the port notes (index: [README.md](README.md)); units and wording as des
 - Seed x: s0 = x − 0x0dd2f1aa, s1 = x − 0x77ced917, s2 = x − 0x39db22d1, s3 = x + 0x0702c49c,
   s4 = x − 0x61cac083, s5 = x + 0x6fdf3b64.
 - Floats: (r & 0x7fffff | 0x3f800000) as f32 − 1.0 gives [0, 1); `Rand_GameRange`(lo, hi) = lo + (hi − lo)·that.
-  The port's xorshift stand-ins (race.rs, intro.rs) are not this generator.
+  Ported in `tricky-rs/game/src/rand.rs` (`Rand`, `Streams`) and checked bit for bit in the function runner
+  (`tests/rand.rs`, E1b1). The port's xorshift stand-ins (race.rs, props.rs, intro.rs) still have to switch to it (E1b2).
 
 ## Course file loading (`cCourseResolve_Common` / `cCourseResolve_PS2`)
 

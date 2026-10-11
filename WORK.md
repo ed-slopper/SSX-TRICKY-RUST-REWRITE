@@ -38,7 +38,6 @@ state machine and the renderer are ours. Nothing has been checked against the or
 | E1a1 | The player's and the AI riders' physics in `ride` (`tricky-rs/src/main.rs`) on a fixed 60 Hz tick: whole ticks of `1/60 × timescale` carried over from frame to frame, instead of variable sub-steps of up to 1/120 s | any | | trailrig/heron (2026-10-11) | Split of E1a |
 | E1a2 | The rest of E1a: world animations, props, particles, spray, camera on the same tick; draw between ticks (interpolate, ours: tag STANDIN) | any | E1a1 | | Split of E1a |
 | E1b | Random numbers: the game's `rand` and seeding, used by AI tricks, grabs, announcer, so runs can match the original | unowned | F1 | | [est] Split: E1b1, E1b2 |
-| E1b1 | The game's generator in `tricky-game` (`rand.rs`): `Rand_Next` 0x2401e0, `Rand_Seed` 0x2402c0, the two streams `Rand_Fx` 0x23d4a8 / `Rand_Game` 0x23d4d8 and their seeding, `Rand_GameRange` 0x23d4f8, `Rand_GameJitter` 0x23d560, checked bit for bit in the function runner | unowned | F1 | trailrig/heron (2026-10-11) | Split of E1b |
 | E1b2 | Replace the xorshift stand-ins (`race.rs`, `props.rs`, `intro.rs`) with the game's streams at the game's call sites, in the game's order | unowned | E1b1 | | Split of E1b |
 | E2c | The codecs the disc does not use: Huffman (`Huff_Decode` 0x2c3730), BTree (`BTree_Decode` 0x2c3540), 0x2c2d18 (types 0x18/0x1a/0x1c), for mods that pack files with them | unowned | E2b | | Gap of E2b. `Compress_Decode` 0x2c2de0's table is in `port-notes/files.md` |
 | E3 | Level files read by our code, as the game reads them, replacing the SSX-Library JSON project folder (`level.rs`) | unowned | E2b | | [repo] level-editing.md. Split before claiming: |
@@ -192,6 +191,7 @@ matches the original.
 | E2a | BIG archives (`C0FB`, `BIGF`) in `tricky-data/src/big.rs`, ported from the game's loader: `BIG_Identify` 0x2cbc88, `BIG_HeaderSize` 0x2cbd08, `BIG_Lookup` 0x2cbdc0, the mounts of `App_OpenBigFiles` 0x17bdf8 in order and the opener's (0x2cb328) disc / `|name` / `archive|name` rules; all 793 character-archive entries checked against the extracted copies | P1 | ed-slopper/puffin | 2026-10-11 | 3886064 |
 | E2b | RefPack decompression in `tricky-data/src/compress.rs`: `Compress_UnpackedSize` 0x2c2fb0, `Compress_Decode` 0x2c2de0 (RefPack: the only codec on the disc), `RefPack_Decode` 0x2c31b0, and the loader's rule (`File_LoadAndUnpack` 0x2c8938) as `Files::load`; all 793 character-archive entries equal `tools/afl/refpack.py` | P1 | ed-slopper/puffin | 2026-10-11 | b01f37e |
 | E13 | Surface table's untraced words read in Ghidra: [10] body height above the snow (`cBoarder::vf7` 0x117198 → rider+0x308 → `Boarder_UpdatePose` 0x129628), [13..21] ground spray (`Fx_SurfaceSpray` 0x1311b0), [22..24] trail and splashes (`Fx_BoardTrail_Update` 0x12fef0, `Fx_LandingSplash` 0x12ccc8, new `Fx_Splash_EmitAtPoint` 0x12c7e0); readers found by scanning for the table pointer (cGame+0x24); `surface.rs`, port notes | P1 | trailrig/heron | 2026-10-11 | 1348d46 |
+| E1b1 | The game's random numbers in `tricky-game` (`rand.rs`): `Rand_Seed` 0x2402c0, `Rand_Next` 0x2401e0, `Rand_Fx` 0x23d4a8, `Rand_Game` 0x23d4d8, `Rand_GameRange` 0x23d4f8, `Rand_GameJitter` 0x23d560 checked bit for bit in the function runner (`tests/rand.rs`: 3,000+ draws incl. every carry, 3,000 range/jitter calls); seeding wrappers and the replay snapshot ported | P1 | trailrig/heron | 2026-10-11 | HASH |
 
 ## Changes to the board
 
@@ -243,3 +243,4 @@ matches the original.
 - 2026-10-11 ed-slopper/puffin: E2b done; added E2c (gap of E2b); split E4 into E4a-E4c; claim E4a.
 - 2026-10-11 trailrig/heron: E13 done; G15 corrected (which surfaces spray); added G16 (body height, gap of E13).
 - 2026-10-11 trailrig/heron: split E1b into E1b1 (claimed) and E1b2.
+- 2026-10-11 trailrig/heron: E1b1 done (6 functions checked).
