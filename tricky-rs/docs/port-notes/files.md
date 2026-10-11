@@ -26,3 +26,27 @@ Proven (`lib-file`, host code on the PS2; ported 1:1 anyway in `tricky-data/src/
 
 Checked: the table of `SSX Tricky (USA).iso` equals an independent ISO 9660 walk (260 files, extents and
 sizes); `data/char/mdlps2.big` read through it is byte-identical to the copy extracted before.
+
+## BIG archives (row E2a)
+
+Proven (`lib-big` and the async file system; ported in `tricky-data/src/big.rs`):
+
+- `BIG_Identify` 0x2cbc88: big-endian u16 0xc0fb → `C0FB` (1), `BIGF` → 2. `BIG_HeaderSize` 0x2cbd08: `C0FB` u16
+  at +2 plus 4, `BIGF` u32 at +0xc (both big-endian).
+- `BIG_Lookup` 0x2cbdc0: `C0FB` directory from +6 (u24 offset, u24 size, name), `BIGF` from +0x10 (u32, u32, name);
+  names end with a zero; matched with `stricmp` 0x2fcc98, or by entry number when no name is given. Offsets
+  are from the archive's start. `BIG_GetFileData` 0x2cc0a8 takes offset 0 as "not found".
+- `App_OpenBigFiles` 0x17bdf8 mounts, in order: `data/audio/speech.big`, `data/audio/audio.big` (if there),
+  `data/char/mdlps2.big`, `brdps2.big`, `anm.big`, `texps2.big`, `data/audio/music.big` (if there).
+  `FileSys_MountBig` 0x2c8f50 reads the file's start; `FileSys_OnBigHeaderRead` 0x2caca8 reads the whole
+  directory again if it is longer, and puts the archive at the head of the mount list (newest searched first).
+  Only the directory stays in memory.
+- `FileSys_RunQueue` 0x2cb328 opens a path: no `|` → the disc first (`FileSys_OpenOnDisc` 0x2cc4b8 →
+  `CdFs_FindFile`), then, only when the open mode has bit 0, every archive; `|name` → every archive, not the
+  disc; `archive|name` → the archive mounted under exactly that path (`strcmp`).
+- `FileSys_MakeDevicePath` 0x2cc368 strips `cd:` and handles `host0:` (dev kit only) and prepends the current
+  folder (0x34eef8) to a path that does not start with `\`, `/` or `~`; on a retail disc the current folder is
+  the root. Inferred: our `Files::open` does not keep a current folder.
+
+Checked: all 793 entries of the four character archives read through `Files` equal the archives extracted
+before (sizes and byte sums); the three audio archives mount (1146 entries in all).

@@ -5259,3 +5259,16 @@ G 2c90c8 CdFs_ReadSector
 G 2c9440 CdFs_CompareName
 G 2c9420 CdFs_CompareEntryName
 G 2fb5c8 qsort
+G 2cbd08 BIG_HeaderSize
+G 2fcc98 stricmp
+G 2cc030 BIG_GetFileOffset
+G 2cc060 BIG_GetFileDataByIndex
+G 2cc010 BIG_Find
+G 2cc120 BIG_GetFileDataList
+G 2c8f50 FileSys_MountBig
+G 2caca8 FileSys_OnBigHeaderRead
+G 2cb328 FileSys_RunQueue
+G 2cc4b8 FileSys_OpenOnDisc
+G 2cc368 FileSys_MakeDevicePath
+G 2c9018 FileSys_OpenSync
+G 2c7e38 FileSys_Exists

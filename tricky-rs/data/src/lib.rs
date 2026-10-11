@@ -3,6 +3,7 @@
 //! keyframed object curves. `tricky-game` builds on it; the Bevy app `tricky-rs` re-exports it.
 
 pub mod anim;
+pub mod big;
 pub mod character;
 pub mod course;
 pub mod disc;

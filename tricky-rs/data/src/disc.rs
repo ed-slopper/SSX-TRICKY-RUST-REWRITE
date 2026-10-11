@@ -120,6 +120,16 @@ impl Disc {
         Ok(buf)
     }
 
+    /// Reads `size` bytes from byte `start` of the disc (whole sectors, as drives need).
+    pub fn read_at(&mut self, start: u64, size: usize) -> io::Result<Vec<u8>> {
+        let first = start / SECTOR as u64;
+        let skip = (start % SECTOR as u64) as usize;
+        self.src.seek(SeekFrom::Start(first * SECTOR as u64))?;
+        let mut buf = vec![0; (skip + size + SECTOR - 1) / SECTOR * SECTOR];
+        self.src.read_exact(&mut buf)?;
+        Ok(buf[skip..skip + size].to_vec())
+    }
+
     /// `find` then `read`.
     pub fn read_path(&mut self, path: &str) -> io::Result<Option<Vec<u8>>> {
         match self.find(path).cloned() {
