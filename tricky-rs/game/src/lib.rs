@@ -7,6 +7,7 @@ pub mod aicomp;
 pub mod aipath;
 pub mod boarder;
 pub mod boosts;
+pub mod breakables;
 pub use tricky_data::anim;
 pub mod collbody;
 pub mod collide;

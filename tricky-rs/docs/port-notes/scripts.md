@@ -170,3 +170,18 @@ Types 1, 3 and 4 spawn nothing.
   Else the knock +0xe8 decays × 0.8333333 and s = clamp(knock·10, 0, 2); k = 2·awake·s + s; force = (0, 0,
   −980 / inverse mass) − k·momentum, torque = −k·L, handed to `RigidBody_Integrate`(1/60) — the body, its
   transform and `RollerNode_Collide` are row E8c. Kill deletes it; Finish never does.
+
+## Breakables (row E9g; `tricky_game::breakables`, checked: `tests/breakables.rs`)
+
+- A contact (the thread's context): +0x10 a, +0x20 b (four lanes each), +0x30 a speed.
+- Cracked (14): p3 seconds to live (`(int)(·60)`), p4 health; built with the thread's contact applied at once; the
+  object's flags `& ~2 | 4`; its texture flip set up. A hit (vtable +0x90) counts when the 30-frame cooldown is
+  over: health −= |a·b · speed| · 0.036 (0x3d1374bd), cooldown 30. Update: cooldown down; the time to live down (at
+  0: Finish(1)); while health ≤ 0, the object's event-4 script is started every frame (no script: the node gives way
+  to a dead node). Messages: kind 1 time to live, kind 2 health; no base messages. Kill / Finish restore the flags.
+- Fence (12): swing size (≤ 1) and speed (a tenth of the size, keeping its direction). Built from a contact: swing
+  b·a (no shape) or the object's normalised first matrix row ·a, × (|speed| · 0.001), passed to both neighbours at
+  once. A hit while the size is < 1: b·a × (speed · 0.001), passing restarted (4 frames). Passing to a neighbour:
+  0.4 × size against the speed's direction, when ≥ 0.25: a free neighbour gets a fence node (which passes it on to
+  both sides in 4 frames), a fence neighbour gets `Fence_Swing`. Update: angle += speed; at either end it bounces at
+  half the size; at rest (size and |angle| < 0.01) Finish(1). The mesh bending is drawing (`FenceNode_UpdateShape`).
