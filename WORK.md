@@ -50,7 +50,7 @@ state machine and the renderer are ours. Nothing has been checked against the or
 | E6 | Loading and memory: what the game loads when (load screens, course switch), only as far as it changes behaviour | unowned | E1 | | [est] |
 | E7 | World: terrain tessellation as the game does it, world cells (`World_CellActivate_RunPersistant` 0x25fed0), instance queries `World_QueryInstances` 0x25b878, ray casts `World_RayCast` 0x25aff8 / `World_RayCastInstance` 0x25bf48 | unowned | E3a | | [repo] `collide.rs` (triangle grid of the drawn mesh) is a stand-in for these |
 | E8 | Physics: check the ported boarder motion against the original once F4 exists: ground `cBoarder_GroundMotion_Update` 0x10a0d8, drag 0x109cb8, side friction 0x109ef8, thrust 0x109950, spring 0x109878, probe 0x128ae8, surface table `SurfaceTable_Init` 0x256188 | any | F4a | | [repo] Ported in `rider.rs`; README still says some constants at the top of `rider.rs` are guesswork: find which. Split: E8f–E8i |
-| E8h | Ground motion checked: `GroundMotion_Update` 0x10a0d8 as a whole, with its callees run as the original (leaves already checked in F4d, F4d2) | any | F4a | | Split of E8 |
+| E8h | Ground motion checked: `GroundMotion_Update` 0x10a0d8 as a whole, with its callees run as the original (leaves already checked in F4d, F4d2) | any | F4a | trailrig/heron (2026-10-11) | Split of E8 |
 | E8a | Air: `Air_IntegrateRK4` 0x12b340, `AirPredict_AtTakeoff` 0x123b10, landing `Air_MotionUpdate` 0x108378, `Landing_CheckAngles` 0x12ba78, `Landing_ChooseState` 0x109308 | any | F4a | | [repo] Ported, unchecked Split: E8a1, E8a2 |
 | E8a3 | The rest of E8a: `AirPredict_AtTakeoff` 0x123b10 (needs the world ray, E7), `Air_MotionUpdate` 0x108378 checked | any | F4a | | Split of E8a |
 | E8b | Walls and objects: `Boarder_WallImpactCheck` 0x126540, wall collision 0x126250, `Boarder_InstanceCollisions` 0x125088, `Boarder_InstanceBounce` 0x125a00 | unowned | E7 | | [repo] |
@@ -342,3 +342,4 @@ matches the original.
 - 2026-10-11 ed-slopper/puffin: G2d done (rider scores through score.rs; wants a play test).
 - 2026-10-11 ed-slopper/puffin: claim E1a1 (run the branch on a level, merge).
 - 2026-10-11 ed-slopper/puffin: E1a1 done (branch run on Garibaldi and merged, 5b51fa9).
+- 2026-10-11 trailrig/heron: claim E8h.
