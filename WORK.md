@@ -79,7 +79,9 @@ state machine and the renderer are ours. Nothing has been checked against the or
 | G1a | Prewind, jump, takeoff, spin and flip control (`PrewindState_Update` 0x1050e8, `Jump_ApplyImpulse` 0x1284e0, `Takeoff_SetSpinRates` 0x126e30, `SpinState_Update` 0x100908, `SpinState_StartFromStick` 0x102158) checked | any | F4a | | [repo] Ported, unchecked Split: G1a1, G1a2 |
 | G1a5 | The rest of G1a: `SpinState_Update` 0x100908 checked; `Rider::step` calls the exact prewind, jump, take-off and spin start (G1a1–G1a4) | any | G1a4 | | Split of G1a |
 | G1b | Rails checked: `RailSlideMotion_Update` 0x10b0d0, `RailSlideControl_Update` 0x1073e0, `Rail_TryCapture` 0x125cb8 | any | F4a | | [repo] README: rail speeds "still mine"; find what isn't ported |
-| G1c | Finish, reset and gate states: `FinishState_Update` 0x106668, `ResetState_Update` 0x106a90, `Boarder_RequestReset` 0x118f10, `GateAnticipate_*` | any | F4a | | [repo] |
+| G1c | Finish, reset and gate states: `FinishState_Update` 0x106668, `ResetState_Update` 0x106a90, `Boarder_RequestReset` 0x118f10, `GateAnticipate_*` | any | F4a | | [repo] Split: G1c1, G1c2 |
+| G1c1 | `FinishState_Update` 0x106668 with `Boarder_SetBrakeCrouchInput` 0x126b38 and `Boarder_SetBrakeTarget` 0x126c78 ported exactly into `tricky-game` and checked in the function runner | any | F4a | trailrig/heron (2026-10-11) | Split of G1c |
+| G1c2 | The rest of G1c: `ResetState_Update` 0x106a90, `Boarder_RequestReset` 0x118f10, `GateAnticipate_*` checked | any | F4a | | Split of G1c |
 | G2 | Tricks and scoring checked: `Score_*` 0x155410–0x157490, `Score_BuildTrickId` 0x157490, `Score_FormatTrickName` 0x1551c0, repeats, chains, multipliers, uber timer, TRICKY | any | F4a | | [repo] Ported in `rider.rs`/`trickdata.rs` Split: G2a, G2b |
 | G2b | The rest of G2: `Score_LandTrick` 0x1569b0, `Score_StartTrickChain` 0x156618, `Score_BankPoints` 0x155aa8, `Score_BuildTrickId` 0x157490, `Score_FormatTrickName` 0x1551c0, repeats, chains, uber timer, TRICKY checked; `Rider::step` scores through `score.rs` | any | G2a | | Split of G2 |
 | G3 | Rider attributes and progression: stats per rider and level, training points, boards per rider and their unlock points, outfits | unowned | E12 | | [repo] `trickdata.rs` has the tables; rookie/master is our menu |
@@ -306,3 +308,4 @@ matches the original.
 - 2026-10-11 ed-slopper/puffin: E3b done; claim E4c.
 - 2026-10-11 trailrig/heron: G1a4 done (PrewindState_Update checked).
 - 2026-10-11 ed-slopper/puffin: E4c done.
+- 2026-10-11 trailrig/heron: split G1c into G1c1 (claimed) and G1c2.
