@@ -34,6 +34,7 @@ pub mod rail_control;
 pub mod rails;
 pub mod reset;
 pub mod rivals;
+pub mod scenery;
 pub mod score;
 pub mod script;
 pub mod spin;

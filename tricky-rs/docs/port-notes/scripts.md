@@ -215,3 +215,16 @@ Types 1, 3 and 4 spawn nothing.
 - Combo (0x102): message 3 starts a second clip (op words 9..11: start, end, speed) from its start; op word 12 ≠ 0
   stops the node for good at its end (Kill then leaves it).
 - Flip (0x103): the clip plus a flip-book (op words 9, 10: start frame, rate), stepping forward or at random (−2).
+
+## Crowds, particles, jumbotron (row E9j; `tricky_game::scenery`, checked: `tests/scenery.rs`)
+
+- Crowd box (17): op words 2, 3 rows and columns. 16 cells, each a phase (random 0..15) and an animation set (random
+  0..3; the four 16-frame sets at 0x31d378). Every fifth race frame the excitement is set: 7 when the race's +0x1c
+  is 1, else from the human rider within 200 m (`CrowdSys_GetBoxState` + 4, & 7), else 0. While excited, each cell's
+  phase advances; at each cycle's end it takes a new random set and, below 7, sits out up to 63 frames with the
+  chance 0x31d478[excitement]/256 (256, 0, 50, 100, 200, 100, 50). A cell shows set[(phase + cell) & 15], or the
+  set's first frame while sitting out.
+- Particle node (22): the op's effect's lifetime; a running emitter (< 0) steps every frame until message 1 gives
+  it a lifetime; a lifetime counts down 1/60 a frame and at 0 the node finishes (Finish(1)).
+- Movie (23): opens `data/video/j<course>.sss` (jgari, jsnow, jelysium, jmesa, jmerquer, jaloha, jpipe, jmegaple,
+  jalaska; `jumbo.sss` otherwise) at 128 × 64.
