@@ -2241,7 +2241,7 @@ address,size,name,system,status
 0x196530,132,TextBox_GetHeight,render,not started
 0x196700,20,cAIPath::vf2_196700,ai,not started
 0x196718,64,cAIPath::vf3_196718,ai,not started
-0x196758,252,FUN_00196758,boarder?,not started
+0x196758,252,ResetState_GetRespawnPos,boarder,not started
 0x196858,112,AIP_CanResetAt,ai,not started
 0x196940,80,cAIPath::__tf,runtime,host
 0x196990,8,cEventPath::vf2_196990,ai,not started
@@ -3830,7 +3830,7 @@ address,size,name,system,status
 0x225850,40,FUN_00225850,audio?,not started
 0x225878,208,Music_ScheduleAirLoop,audio,ported
 0x225948,12,FUN_00225948,audio?,not started
-0x225958,116,FUN_00225958,audio?,not started
+0x225958,116,Music_TryScheduleAirLoop,audio,not started
 0x2259d0,188,FUN_002259d0,audio?,not started
 0x225a90,56,FUN_00225a90,audio?,not started
 0x225ac8,68,FUN_00225ac8,audio?,not started

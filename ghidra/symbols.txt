@@ -6521,3 +6521,5 @@ G 20fce0 Sfx_StartAirLoop
 G 21fc98 CrowdBox_StartSound
 G 21a210 Audio_PlayScoreTick
 G 233ff0 Speech_OnTenSecondsLeft
+G 225958 Music_TryScheduleAirLoop
+G 196758 ResetState_GetRespawnPos
