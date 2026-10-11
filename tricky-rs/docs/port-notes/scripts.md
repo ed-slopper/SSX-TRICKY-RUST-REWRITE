@@ -146,3 +146,13 @@ Types 1, 3 and 4 spawn nothing.
   is set to the height, else (re-placed first when on a rail, +0x424 = 5) it is pushed and its x, y velocity
   zeroed; a marked rider at or above the height is unmarked. No marked rider below: Finish(1).
 - Not modelled: VU0's clamping on overflow (only reached with rates and targets far beyond the courses').
+- Lap boost (row E9f2; `boosts::LapBoost`, checked: `tests/lapboost.rs`), Megaplex's gates: rate p3, target p4 ×100,
+  direction p5..p7; at creation each rider's lap (+0x114) is noted (+0x58, halves). Each frame, for every rider
+  overlapping the box (no mesh test): the noted count drops by one while it is ≥ the rider's lap; below 0 the rider
+  is left alone. On its first frame in, the rider's side is written to 0x31d338 for the tube-end boosts: 0 when it is
+  within 10 m of the box's floor, else 2, or 1 when it is behind the gate's centre along the object's first matrix
+  row (x, y only). Motion 6: velocity × 0.95, nothing more. Motion 5 (rail): x, y velocity × 0.95 and the rail object
+  gets velocity / its +0x568 (+0x5b0) and the velocity (+0x5d0). Then, within 10 m of the box's centre (x, y): on the
+  first frame in, moved 20 toward the centre and 10 up; from then on (also when farther out but already in) x, y
+  velocity × 0.92 and the push. Riders not overlapping are marked out. Kill does nothing; Finish(1) only runs the
+  object's event-3 script, the node stays.

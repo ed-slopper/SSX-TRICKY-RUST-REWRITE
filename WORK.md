@@ -57,7 +57,6 @@ state machine and the renderer are ours. Nothing has been checked against the or
 | E9 | Script machine: `TriggerScript_Run`, `TriggerScript_ExecOp` 0x13bfd0 with every op, controllers (`TriggerScript_Op0_SpawnController` 0x13c600), persistent cell scripts, run at runtime instead of read statically | unowned | E3c | | [repo] `logic.rs` reads SSFLogic.json statically today |
 | E9b2 | Run the script threads in the app (`tricky_game::script` on `tricky_data::ssf` instead of `logic.rs`'s static walk of SSFLogic.json): the world's node list order (`BxList_Add` 0x17d4e8 links new nodes at the head; the update loop's order to confirm), `World_DeleteScriptObject` 0x13bbc0, the starters (area wake, contact, controller goal, the engine's RaceMode / StartCountDown calls) | unowned | E9b, E7 | | Gap of E9b |
 | E9d | World ops 1 (camera node), 2 (effects, spline riders), 8 (sound), 13 (reset), 23 (camera shake `Cam_Shake` 0x177758), 24 (teleport), 25 (rail switch `RailMan_SetRail` 0x149030) | unowned | E9b | | Gap of E9a |
-| E9f2 | The lap boost `cLapBoostNode` (15; Megaplex): ctor 0x140948, Update 0x140b90 (per-rider lap counts +0x58, the side picked into 0x31d338 for the tube-end boosts, braking on rails and in state 6, the pull toward the box's centre), Kill / Finish | unowned | E9f | ed-slopper/puffin (2026-10-11) | Gap of E9f. G14 checks it |
 | E9g | Breakables: `cFenceNode` (12), `cCrackedNode` (14), `cMeshAnimNode` (20) | unowned | E9b | | Gap of E9a |
 | E9h | Movers: `cRollerNode` (0), `cRailNode` (9) | unowned | E9b | | Gap of E9a |
 | E9i | Texture and object animation controllers: `cUVScrollNode` (10), `cTexFlipNode` (11), `cFlagNode` (13), `cUVScrollTexFlipNode` (19), `cAnimObjectNode` (0x100), `cAnimDeltaNode` (0x101), `AnimComboNode_Init` (0x102), the unnamed node 0x19a5a8 (0x103) | unowned | E9b | | Gap of E9a. G7h checks five of them |
@@ -277,6 +276,7 @@ matches the original.
 | E9b | Script threads: `TriggerScript_Run` 0x13be78 and all of `TriggerScript_ExecOp` 0x13bfd0's flow (wait, conditions, new threads, controller messages; the other ops as the game's calls) ported (`tricky_game::script`), checked frame by frame on 6000 random scripts in the runner (tests/script.rs); the starters' event rules (`event_thread`). Op 5's table entry corrected (the condition ends the thread when it holds) | P1 | ed-slopper/puffin | 2026-10-11 | cbaba2f |
 | E9e | Logic controllers ported (`tricky_game::controllers`): `cDebounceNode`, `cCounterNode`, `cTimerNode`, `cTrickTriggerNode` (Update, Kill, Finish, OnMessage, constructors), `cDeadNode` / `cRestoreNode`, the object-flag resets, and op 0's replace rules and type 5's modes; checked on 8000 random method sequences against the game's own objects in the runner (tests/controllers.rs). The trick trigger's overlap walk goes through `CtrlEnv::rider_in_box` (broadphase: E7) | P2 | ed-slopper/puffin | 2026-10-11 | dadaed8 |
 | E9f | Boost controllers ported (`tricky_game::boosts`): `cBoostNode`, `cRandomBoostNode`, `cTubeEndBoostNode`, `cZBoostNode` (constructors, Update, the per-rider push, re-arm), checked against the game's objects in the runner with scripted overlaps, mesh hits and random numbers (tests/boosts.rs, 19k pushes). The lap boost is E9f2 | P2 | ed-slopper/puffin | 2026-10-11 | 4a815dd |
+| E9f2 | The lap boost `cLapBoostNode` ported (`boosts::LapBoost`: ctor, Update with the lap counts, the side choice for the tube-end boosts, rail and motion-6 braking, the pull to the gate's centre, the push), checked on 48k rider visits against the game in the runner (tests/lapboost.rs) | P2 | ed-slopper/puffin | 2026-10-11 | HASH |
 
 ## Changes to the board
 
@@ -477,3 +477,4 @@ matches the original.
 - 2026-10-11 ed-slopper/puffin: claim E9f.
 - 2026-10-11 ed-slopper/puffin: E9f done; added E9f2 (the lap boost).
 - 2026-10-11 ed-slopper/puffin: claim E9f2.
+- 2026-10-11 ed-slopper/puffin: E9f2 done.

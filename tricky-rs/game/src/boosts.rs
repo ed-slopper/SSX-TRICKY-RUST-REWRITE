@@ -281,3 +281,137 @@ impl Boost {
         }
     }
 }
+
+/// A rider as the lap boost sees it (row E9f2).
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct LapRider {
+    /// +0x460 the rider's slot, +0x114 its lap, +0x424 its motion (5 rail, 6: slowed)
+    pub index: u32,
+    pub lap: i32,
+    pub x424: i32,
+    /// +0x140, +0x150
+    pub pos: [f32; 4],
+    pub vel: [f32; 4],
+    /// on a rail (motion 5): the rail object's +0x568 (its length), and the two vectors the boost writes into it
+    /// (+0x5b0 the velocity over the length, +0x5d0 the velocity)
+    pub rail_len: f32,
+    pub rail_rate: [f32; 4],
+    pub rail_vel: [f32; 4],
+}
+
+/// The lap boost's object: its bounding box (+0xcc min, +0xd8 max) and the first row of its matrix.
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct LapObject {
+    pub min: [f32; 3],
+    pub max: [f32; 3],
+    pub rows: [[f32; 4]; 4],
+}
+
+pub trait LapEnv {
+    /// the riders overlapping the box, in the broadphase's order (no mesh test)
+    fn touching(&self) -> Vec<u32>;
+    fn riders(&self) -> u32;
+    fn rider(&mut self, slot: u32) -> &mut LapRider;
+    /// 0x31d338 + 4·slot: the side for the tube-end boosts
+    fn set_tube_choice(&mut self, slot: u32, side: u32);
+}
+
+/// `cLapBoostNode` (type 15, Megaplex's lap gates): +0x40 the direction, +0x50 the target (×100), +0x54 the rate,
+/// +0x58 per rider a lap count (a half), +0x64 per rider "inside" (a half).
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct LapBoost {
+    pub dir: [f32; 4],
+    pub target: f32,
+    pub rate: f32,
+    pub laps: [i16; 6],
+    pub inside: [i16; 6],
+}
+
+impl LapBoost {
+    /// `cLapBoostNode::cLapBoostNode` 0x140948: rate p3, target p4 ×100, direction p5..p7; each rider's lap (+0x114)
+    /// noted.
+    pub fn new(a: &[u32], laps: &[i32]) -> LapBoost {
+        let f = |k: usize| f32::from_bits(a.get(k).copied().unwrap_or(0));
+        let mut l = [0i16; 6];
+        for (i, v) in laps.iter().enumerate().take(6) {
+            l[i] = *v as i16;
+        }
+        LapBoost { dir: [f(3), f(4), f(5), 0.0], target: f(2) * 100.0, rate: f(1), laps: l, inside: [0; 6] }
+    }
+
+    /// `cLapBoostNode::Update` 0x140b90.
+    pub fn update(&mut self, obj: &LapObject, env: &mut impl LapEnv) {
+        let n = env.riders() as usize;
+        let mut seen = [0u8; 6];
+        for slot in env.touching() {
+            let r = *env.rider(slot);
+            let i = r.index as usize;
+            seen[i] = 1;
+            if r.lap <= self.laps[i] as i32 {
+                self.laps[i] = self.laps[i].wrapping_sub(1);
+            }
+            if self.laps[i] < 0 {
+                continue;
+            }
+            if self.inside[i] == 0 {
+                // which side of the gate the rider comes in on, when well above the box's floor
+                let mut side = 0;
+                if 1000.0 < r.pos[2] - obj.min[2] {
+                    side = 2;
+                    let a = [obj.min[0], obj.min[1], 0.0, 1.0];
+                    let b = [obj.max[0], obj.max[1], 0.0, 1.0];
+                    let half = [0, 1, 2, 3].map(|k| (b[k] - a[k]) * 0.5);
+                    let mid = [0, 1, 2, 3].map(|k| a[k] + half[k]);
+                    let p = [r.pos[0], r.pos[1], 0.0, 1.0];
+                    let m = obj.rows;
+                    let mut axis = [0, 1, 2, 3].map(|k| m[0][k] * 1.0 + m[1][k] * 0.0 + m[2][k] * 0.0 + m[3][k] * 0.0);
+                    axis[2] = 0.0;
+                    let d = [0, 1, 2, 3].map(|k| p[k] - mid[k]);
+                    if dot4(d, axis) < 0.0 {
+                        side = 1;
+                    }
+                }
+                env.set_tube_choice(i as u32, side);
+            }
+            let r = env.rider(slot);
+            if r.x424 == 6 {
+                r.vel = r.vel.map(|v| v * f32::from_bits(0x3f73_3333));
+                continue;
+            }
+            if r.x424 == 5 {
+                let k = f32::from_bits(0x3f73_3333);
+                r.vel[1] *= k;
+                r.vel[0] *= k;
+                let q = 1.0 / r.rail_len;
+                r.rail_rate = r.vel.map(|v| v * q);
+                r.rail_vel = r.vel;
+            }
+            let c = [(obj.max[0] + obj.min[0]) * 0.5, (obj.max[1] + obj.min[1]) * 0.5, (obj.max[2] + obj.min[2]) * 0.5, 1.0];
+            let mut d = [0, 1, 2, 3].map(|k| c[k] - r.pos[k]);
+            d[2] = 0.0;
+            let dist = dot4(d, d).sqrt();
+            if dist <= 1000.0 {
+                if self.inside[i] == 0 {
+                    // first frame in: pulled 20 toward the middle and 10 up
+                    let n4 = normalise(d);
+                    let t = [n4[0] * 20.0, n4[1] * 20.0, 10.0, n4[3] * 20.0];
+                    for k in 0..4 {
+                        r.pos[k] += t[k];
+                    }
+                }
+            } else if self.inside[i] == 0 {
+                continue;
+            }
+            self.inside[i] = 1;
+            let k = f32::from_bits(0x3f6b_851f);
+            r.vel[0] *= k;
+            r.vel[1] *= k;
+            push(&mut r.vel, self.dir, self.target, self.rate);
+        }
+        for i in 0..n.min(6) {
+            if seen[i] == 0 {
+                self.inside[i] = 0;
+            }
+        }
+    }
+}
