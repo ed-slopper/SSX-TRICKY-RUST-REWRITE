@@ -4998,3 +4998,45 @@ G 233220 Speech_OnScoreMessage
 G 232498 Speech_AnnounceTrick
 G 231ff8 Speech_OnNextRace
 G 233138 Speech_PickRaceGoLine
+G 22bc40 WorldEmitter_Falloff
+G 22d188 WorldEmitter_FindFree
+G 22d080 WorldEmitter_Clear
+G 22d408 WorldEmitter_StopAll
+G 22bf30 WorldEmitter_Matches
+G 22d1b8 WorldEmitter_Find
+G 22aaa0 AudioTGroup_GetBounds
+G 22a470 AudioTGroups_Init
+G 22a4c8 AudioTGroups_Delete
+G 22a518 AudioTGroups_Load
+G 22a228 StreamSys_SetVolume
+G 22a2b8 StreamSys_GetStream
+G 22a048 StreamSys_HasReached
+G 22a008 StreamSys_GetPlayTime
+G 2293a0 Stream_SetPitch
+G 2292e8 Stream_Open
+G 229628 Stream_IsPlaying
+F 227960 cSoundSys cSoundSys
+F 226848 cSndPlayOpts cSndPlayOpts
+F 222b10 cMonitor cMonitor
+G 2283a8 SpeechSys_LoadBank
+G 228168 SpeechSys_FreeBanks
+G 227cb8 SpeechBank_Init
+G 227c40 SpeechBank_Delete
+G 227c20 SpeechBank_Clear
+G 227ca8 SpeechBank_HasId
+G 225ce0 Music_CountEnabledSongs
+G 225c40 Music_StartTricky
+G 225ca8 Music_StopTricky
+G 225618 Music_PrevSong
+G 224978 Song_CurrentBeat
+G 224918 Song_MsToNextBeat
+G 2248b8 Song_LengthMs
+G 224840 Song_GetLengthMs
+G 2243e8 Song_Pause
+G 224420 Song_Resume
+G 222fb0 PathX_FindFreeSlot
+G 222a78 SndEvent_IsFree
+G 222c50 SndSys_FindFreeEvent
+G 222998 SndEvent_Init
+G 221be8 IniReader_ReadQuoted
+G 221988 IniReader_SkipLine
