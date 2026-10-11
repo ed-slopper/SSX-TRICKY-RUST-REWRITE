@@ -82,7 +82,6 @@ state machine and the renderer are ours. Nothing has been checked against the or
 | G1a4 | The rest of G1a: `PrewindState_Update` 0x1050e8, `SpinState_Update` 0x100908 checked; `Rider::step` calls the exact jump, take-off and spin start (G1a1–G1a3) | any | G1a3 | | Split of G1a |
 | G1b | Rails checked: `RailSlideMotion_Update` 0x10b0d0, `RailSlideControl_Update` 0x1073e0, `Rail_TryCapture` 0x125cb8 | any | F4a | | [repo] README: rail speeds "still mine"; find what isn't ported |
 | G1c | Finish, reset and gate states: `FinishState_Update` 0x106668, `ResetState_Update` 0x106a90, `Boarder_RequestReset` 0x118f10, `GateAnticipate_*` | any | F4a | | [repo] |
-| G1d | Boarder meter and input helpers ported exactly into `tricky-game` (`boarder.rs`) and checked bit for bit: `Boarder_AddMeter` 0x11b018 (meter, uber timer, TRICKY), `Boarder_UpdateBoost` 0x11d038 (boost level, drain, boost flame), `Boarder_SetCrouchTarget` 0x126c00, `PrewindState_SetWindTarget` 0x105a60 | any | F4a | trailrig/heron (2026-10-11) | Added by trailrig/heron |
 | G2 | Tricks and scoring checked: `Score_*` 0x155410–0x157490, `Score_BuildTrickId` 0x157490, `Score_FormatTrickName` 0x1551c0, repeats, chains, multipliers, uber timer, TRICKY | any | F4a | | [repo] Ported in `rider.rs`/`trickdata.rs` Split: G2a, G2b |
 | G2b | The rest of G2: `Score_LandTrick` 0x1569b0, `Score_StartTrickChain` 0x156618, `Score_BankPoints` 0x155aa8, `Score_BuildTrickId` 0x157490, `Score_FormatTrickName` 0x1551c0, repeats, chains, uber timer, TRICKY checked; `Rider::step` scores through `score.rs` | any | G2a | | Split of G2 |
 | G3 | Rider attributes and progression: stats per rider and level, training points, boards per rider and their unlock points, outfits | unowned | E12 | | [repo] `trickdata.rs` has the tables; rookie/master is our menu |
@@ -216,6 +215,7 @@ matches the original.
 | E8a1 | `Landing_CheckAngles` 0x12ba78 ported exactly (`tricky-rs/game/src/landing.rs`, using E14's `Math_Asin`/`Math_Atan`) and checked bit for bit in the function runner on 8,000 random landings, the early outs, state change and clean/unclean verdicts included (`tests/landing.rs`); the runner learnt vopmula/vopmsub (the vector unit's cross product, with a unit test) | P1 | trailrig/heron | 2026-10-11 | a04687e |
 | E8a2 | `Landing_ChooseState` 0x109308 ported exactly (`landing::choose_state`: landing clip and state, grab reset, the alpine half turn) and checked in the function runner on 6,000 random landings: same clips, states, calls in order and fields bit for bit (`tests/landing_choice.rs`) | P1 | trailrig/heron | 2026-10-11 | ab9c4c4 |
 | G1a3 | `SpinState_StartFromStick` 0x102158 ported exactly (`jump::spin_start_from_stick`: pad direction fields, axis snap, spin and flip rates, the clip by direction) and checked in the function runner on every pad word whose direction bits matter × both stances × every tricks stat (196,608 starts): rates bit for bit, same clip, states (`tests/spin_start.rs`) | P2 | trailrig/heron | 2026-10-11 | d503d45 |
+| G1d | Boarder meter and input helpers ported exactly (`tricky-rs/game/src/boarder.rs`): `Boarder_AddMeter` 0x11b018, `Boarder_UpdateBoost` 0x11d038, `Boarder_SetCrouchTarget` 0x126c00, `PrewindState_SetWindTarget` 0x105a60, each bit for bit in the function runner with its sound/HUD calls in order (`tests/boarder.rs`, 8,000 cases each); the runner now sends tail calls (`j` into a stubbed function) through the stub (it ran the real callee before; unit test added) | P2 | trailrig/heron | 2026-10-11 | HASH |
 
 ## Changes to the board
 
@@ -297,3 +297,4 @@ matches the original.
 - 2026-10-11 trailrig/heron: added G1d (boarder meter and input helpers), claimed.
 - 2026-10-11 ed-slopper/puffin: F7 notes: the Xbox build (OpenTricky) as a possible second reference, for the humans to decide; race.md notes its rank catch-up bug lead.
 - 2026-10-11 ed-slopper/puffin: claim E3b.
+- 2026-10-11 trailrig/heron: G1d done (4 functions checked; runner tail-call fix).

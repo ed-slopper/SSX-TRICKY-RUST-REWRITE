@@ -45,7 +45,7 @@ address,size,name,system,status
 0x1050e8,1212,PrewindState_Update,boarder,ported
 0x1055a8,68,PrewindControl_Exit,boarder,not started
 0x1055f0,1136,FUN_001055f0,boarder?,not started
-0x105a60,112,PrewindState_SetWindTarget,boarder,not started
+0x105a60,112,PrewindState_SetWindTarget,boarder,checked
 0x105ad0,40,PrewindControl_SaveSnapshot,save,not started
 0x105af8,20,PrewindControl_LoadSnapshot,boarder,not started
 0x105b10,124,FUN_00105b10,,not started
@@ -272,7 +272,7 @@ address,size,name,system,status
 0x11a840,1892,Boarder_PlaceAtStart,boarder,not started
 0x11afa8,60,Boarder_Freeze,boarder,not started
 0x11afe8,48,Boarder_StartLessonWait,boarder,not started
-0x11b018,476,Boarder_AddMeter,boarder,not started
+0x11b018,476,Boarder_AddMeter,boarder,checked
 0x11b1f8,336,Boarder_DrainMeter,boarder,not started
 0x11b348,4860,cBoarderHandler::cBoarderHandler,boarder,not started
 0x11c648,100,Boarder_ChangeMotionState,boarder,not started
@@ -286,7 +286,7 @@ address,size,name,system,status
 0x11ca88,52,FUN_0011ca88,boarder?,not started
 0x11cae8,1284,Boarder_PlaceAt,boarder,not started
 0x11cff0,68,Boarder_SetTimeScaleRateLimited,boarder,not started
-0x11d038,812,Boarder_UpdateBoost,boarder,not started
+0x11d038,812,Boarder_UpdateBoost,boarder,checked
 0x11d368,108,FUN_0011d368,ai?,not started
 0x11d3d8,92,FUN_0011d3d8,world?,not started
 0x11d438,172,FUN_0011d438,ai?,not started
@@ -454,7 +454,7 @@ address,size,name,system,status
 0x126948,380,Boarder_SetSteerTarget,boarder,not started
 0x126ac8,112,Boarder_SetSteerTargetUnscaled,boarder,not started
 0x126b38,196,Boarder_SetBrakeCrouchInput,boarder,not started
-0x126c00,120,Boarder_SetCrouchTarget,boarder,not started
+0x126c00,120,Boarder_SetCrouchTarget,boarder,checked
 0x126c78,440,Boarder_SetBrakeTarget,boarder,not started
 0x126e30,400,Takeoff_SetSpinRates,boarder,checked
 0x126fc0,724,FUN_00126fc0,boarder?,not started

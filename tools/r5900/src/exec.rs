@@ -50,7 +50,9 @@ fn enter(r: &mut Runner, slot_pc: u32, target: u32) -> Result<u32, Error> {
     let caller = slot_pc.wrapping_sub(4);
     let w = r.mem.read_u32(caller);
     let is_call = w >> 26 == 3 || (w >> 26 == 0 && w & 63 == 9); // jal, jalr
-    if !is_call || target == RETURN_SENTINEL {
+    // a tail call (`j` into a stubbed function) runs the stub and returns to the caller's caller
+    let is_tail = w >> 26 == 2 && r.stubs.contains_key(&target);
+    if !(is_call || is_tail) || target == RETURN_SENTINEL {
         return Ok(target);
     }
     if let Some(mut stub) = r.stubs.remove(&target) {
@@ -593,6 +595,17 @@ mod tests {
         assert_eq!(c.vf[5], [0.25, 0.5, 0.75, 1.0], "vmulq by vdiv's Q = 1/4");
         assert_eq!(c.vf[6], [15.0, 20.0, 25.0, 30.0]);
         assert_eq!(c.q, 0.5, "vrsqrt: 1 / sqrt(4)");
+    }
+
+    #[test]
+    fn tail_calls_go_through_stubs() {
+        // j 0x200000 (a tail call) with a stub there: the stub runs, then control returns to $ra
+        let mut rn = Runner::empty();
+        rn.mem.write_u32(CODE, (2 << 26) | (0x0020_0000 >> 2)); // j 0x200000
+        rn.mem.write_u32(CODE + 4, 0);
+        rn.stub(0x0020_0000, |c, _| c.set_gpr(2, 7));
+        rn.call(CODE).unwrap();
+        assert_eq!(rn.cpu.gpr(2), 7);
     }
 
     #[test]

@@ -147,3 +147,18 @@ clip id at clip+0x40), then fires the clip's sound markers (`AnimCtl_FireClipSou
 | 11 | 0x160af0 | frame = rider+0x238 × length |
 
 Riding switch (rider+0x1b4) mirrors the inputs of modes 4 and 9.
+
+## Meter, boost, crouch and wind-up helpers (proven, G1d; exact in `tricky-rs/game/src/boarder.rs`)
+
+- `Boarder_AddMeter` 0x11b018: gain = units·(0.9787758 + 0.35966223·stat1d/255), passed to the rider's virtual +0x84; meter
+  (rider+0x1c) += gain, clamped 0..1 (crossing 1 from below 0.85 calls 0x2191c0). A positive gain at a full meter sets the
+  uber timer (rider+0x24) to 20 and calls 0x21dce0; from an empty timer it also counts rider+0x28 = (n + 1) mod 4 and
+  tail-calls `Audio_TrickyTrigger`.
+- `Boarder_UpdateBoost` 0x11d038 (held, start): no button or no meter → level (rider+0x130) 0, flame +0x254 = 1.5259, +0x258 = 0
+  (sounds 0x2197d8 / 0x219760 when the race state allows). Boosting: the first tick sets the flame by meter (+0x258
+  0.749/0.550/0.650, +0x254 2.144, fade +0x25c 1); level 1.0 / 0.6013 / 0.2500 by meter > 0.666 / > 0.3336 / else; drains
+  0.0007501507 a tick unless TRICKY; the flame fades once +0x250 reaches the level's mark.
+- `Boarder_SetCrouchTarget` 0x126c00: target (0 while rider+0x1fc is set) to +0x210, rate 5.002488·max(0.1, |target − crouch|)
+  to +0x20c. `PrewindState_SetWindTarget` 0x105a60: wind-up [now, rate, target]: target = v (negated to flip), rate =
+  r·|v − now|·(0.8124317 + 0.32901537·stat18/255).
+
