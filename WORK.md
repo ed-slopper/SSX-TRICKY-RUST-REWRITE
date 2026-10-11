@@ -47,7 +47,6 @@ state machine and the renderer are ours. Nothing has been checked against the or
 | E3d | `.aip` / `.sop`: AI paths, race lines, start positions (`AIP_LoadPathsFromFile` 0x197da0) | unowned | E3 | | [repo] `course.rs` reads AIP.json today |
 | E3e | `.ltg` grid, `.map` names, `.adl` audio links, `_sky.pbd` | unowned | E3 | | [repo] |
 | E4d | The rest of the `.mpf` meshes: the shadow meshes (material flags 0x10: positions only, another vector unit program) and the data after each of the face's 18 records (likely its expressions); the vector unit programs themselves, to prove the packet layout read from the data | unowned | E4a | | Gap of E4a. `port-notes/files.md` "Character and board models" |
-| E4b | Character animations: `.afl` clips from `DATA/CHAR/ANM.BIG` through `tricky-data` instead of the exported files | unowned | E2b | ed-slopper/puffin (2026-10-11) | Split of E4. Format: `notes/animation-format.md`, `tools/afl/` |
 | E4c | Outfit, head and board textures from `DATA/CHAR/TEXPS2.BIG` | unowned | E3b | | Split of E4 |
 | E5 | Config and text files: `DATA/CONFIG/*.INF` (SNOW, BANKS, MUSICMAP, INTROMUS), `.cml` cameras, `TRICKDEF.DAT`, `american.loc` and the other languages, `.SFN` fonts | unowned | E2b | | [repo] "Unresolved: HUD text (american.loc)". Text: `Loc_GetString` 0x2c5160, `WStr_FormatArgs` 0x2c5578 (`lib-text`, F1d) |
 | E6 | Loading and memory: what the game loads when (load screens, course switch), only as far as it changes behaviour | unowned | E1 | | [est] |
@@ -213,6 +212,7 @@ matches the original.
 | G1a2 | `Takeoff_SetSpinRates` 0x126e30 ported exactly (`jump::takeoff_spin_rates`: the rates, the no-spin clips 0x218/0x260/0x261, which clip routine runs) and checked bit for bit in the function runner on 5,000 random take-offs, with its callees and their order (`tests/takeoff.rs`) | P2 | trailrig/heron | 2026-10-11 | ee98c47 |
 | G2a | The score object's arithmetic ported exactly (`tricky-rs/game/src/score.rs`: points and base points, the meter share, spin rounding, spin/flip/grab units with the grab rate table, the per-tick hold, rail and timer step) and checked bit for bit in the function runner (`tests/score.rs`: 5,000 point calls, 5,000 roundings incl. the extremes, 8,000 unit updates); 8 functions checked | P2 | trailrig/heron | 2026-10-11 | 3352ce8 |
 | E14 | The game's math library ported exactly (`tricky-rs/game/src/math.rs`: sine, cosine, sine-cosine, arcsine, arctangent with their polynomials and $gp coefficients, angle difference, Hermite) and checked bit for bit in the function runner (`tests/math.rs`: 20,000+ inputs each, the branch edges); port-notes/math.md; 7 functions checked | P1 | trailrig/heron | 2026-10-11 | 01744d3 |
+| E4b | Animation clips from the player's disc: `tricky-data/src/afl.rs` (the game's curve evaluators `AnimCurve_Eval` 0x157ed8 / `AnimCurve_EvalPiece` 0x158030, file and clip headers), the exe's clip and file names (`anim_names.rs`, 0x3242a0), `AnimSet::afl_from_disc` / `uber_from_disc` / `scenes_from_disc`, read by the app with `TRICKY_DISC`; same clips as the exports, which read multi-piece curves one frame too long (`notes/animation-format.md`) | P1 | ed-slopper/puffin | 2026-10-11 | faeca52 |
 
 ## Changes to the board
 
@@ -284,3 +284,4 @@ matches the original.
 - 2026-10-11 trailrig/heron: added E14 (the math library), claimed.
 - 2026-10-11 trailrig/heron: E14 done (7 functions checked).
 - 2026-10-11 trailrig/heron: split E8a into E8a1 (claimed) and E8a2.
+- 2026-10-11 ed-slopper/puffin: E4b done.
