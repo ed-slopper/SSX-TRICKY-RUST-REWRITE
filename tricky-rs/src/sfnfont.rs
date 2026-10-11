@@ -2,8 +2,9 @@
 //! `Font_DrawStringA` 0x19d0c0, `Font_PrintfShadowedA` 0x19d568) and the in-race text drawn with
 //! them (`HUD_DrawPlayerText` 0x1a4f70), in the game's 640x480 screen.
 //!
-//! Atlases and glyph metrics come from `chars/fonts/{title,menu}.{png,json}` (tools/sfn/sfn2png.py).
-//! STANDIN: atlases exported by tools/sfn/sfn2png.py, for reading the game's SFN files at run time
+//! Atlases and glyph metrics come from the player's disc (`TRICKY_DISC`, `tricky_data::sfn`, row E5e), or else
+//! from `chars/fonts/{title,menu}.{png,json}` (tools/sfn/sfn2png.py).
+//! STANDIN: without a disc, atlases exported by tools/sfn/sfn2png.py, for reading the game's SFN files at run time
 //! Drawing: each glyph at pen + offset, both times the scale (the font's own: title 1.4 x 1.3,
 //! menu 1.8 x 1.4, times the caller's); the pen moves by the glyph's advance; no kerning, no extra
 //! spacing; a glyph the font lacks is skipped. Width for centring and right-aligning is the
@@ -74,6 +75,21 @@ impl Font {
         let s = |n: &str| gs.and_then(|g| g.get(n)).and_then(|x| x.as_f64()).unwrap_or(1.0) as f32;
         Some(Font { image, glyphs, line: v.get("line_height").and_then(|x| x.as_f64()).unwrap_or(16.0) as f32, sx: s("x"), sy: s("y") })
     }
+    /// A font from the player's disc (`TRICKY_DISC`, row E5e): `data/fonts/<name>.sfn` read as
+    /// `Font_ParseGlyphs` 0x19c910 / `Font_BuildTexture` 0x19cca8 do, with the scale `cGame::Init` sets.
+    fn from_disc(name: &str, scale: (f32, f32), images: &mut Assets<Image>) -> Option<Font> {
+        let p = std::env::var("TRICKY_DISC").ok()?;
+        let mut files = tricky_data::big::Files::new(tricky_data::disc::Disc::open(&p).map_err(|e| eprintln!("disc {p}: {e}")).ok()?);
+        let bytes = files.load(&format!("data/fonts/{name}.sfn")).ok()??;
+        let f = tricky_data::sfn::SfnFont::open(&bytes).map_err(|e| eprintln!("{name}.sfn: {e}")).ok()?;
+        let image = images.add(Image::new(bevy::render::render_resource::Extent3d { width: f.width as u32, height: f.height as u32, depth_or_array_layers: 1 },
+            bevy::render::render_resource::TextureDimension::D2, f.rgba_full_range(), bevy::render::render_resource::TextureFormat::Rgba8UnormSrgb,
+            bevy::asset::RenderAssetUsages::default()));
+        let glyphs = f.glyphs.iter().filter_map(|g| char::from_u32(g.code as u32).map(|c| (c, Glyph {
+            x: g.x as f32, y: g.y as f32, w: g.w as f32, h: g.h as f32, xoff: g.xoff as f32, yoff: g.yoff as f32, adv: g.advance as f32,
+        }))).collect();
+        Some(Font { image, glyphs, line: f.line_height() as f32, sx: scale.0, sy: scale.1 })
+    }
     /// The glyph boxes' width (Font_MeasureA), in 640 units.
     fn width(&self, text: &str, scale: f32) -> f32 {
         let (sx, mut pen, mut lo, mut hi) = (self.sx * scale, 0.0f32, f32::MAX, f32::MIN);
@@ -113,7 +129,9 @@ pub fn sfn_text(
     if !fonts.tried {
         fonts.tried = true;
         let dir = lib.dir.join("fonts");
-        let (Some(t), Some(m)) = (Font::load(&dir, "title", &mut images), Font::load(&dir, "menu", &mut images)) else { println!("fonts: chars/fonts not found, plain text"); return };
+        let title = Font::from_disc("title", tricky_data::sfn::TITLE_SCALE, &mut images).or_else(|| Font::load(&dir, "title", &mut images));
+        let menu = Font::from_disc("menu", tricky_data::sfn::MENU_SCALE, &mut images).or_else(|| Font::load(&dir, "menu", &mut images));
+        let (Some(t), Some(m)) = (title, menu) else { println!("fonts: chars/fonts not found, plain text"); return };
         fonts.fonts = vec![t, m];
         let Ok(root) = root.single() else { return };
         let full = Node { position_type: PositionType::Absolute, left: Val::Px(0.0), top: Val::Px(0.0), width: Val::Percent(100.0), height: Val::Percent(100.0), ..default() };

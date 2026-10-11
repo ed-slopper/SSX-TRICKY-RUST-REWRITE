@@ -140,3 +140,12 @@ flip count `w1>>24&7` 0x3209c8, flip kind `w1>>8&15` 0x3209d8, combo `w0&255` 0x
 0x320aa8, grab `w0>>8&255` 0x320b58, late `w1>>30` 0x320b50, second grab `w0>>16&255`, ending `w1>>20&15`
 0x320ad8, crash `w1&15` 0x320ae8). The tables are adjacent and an index past one reads the next, so
 `trick_names.rs` keeps the whole region. All 360 names equal `chars/trickbook.json`.
+
+## Fonts, `.SFN` (row E5e)
+
+Proven (`tricky-data/src/sfn.rs`): `cGame::Init` 0x17e148 loads `data/fonts/title.sfn` (gApp+0x5c, scale
+1.4 x 1.3) and `data/fonts/menu.sfn` (gApp+0x60, 1.8 x 1.4). `Font_ParseGlyphs` 0x19c910: +8 version (records
+of 12 bytes from 200, 11 before), +0xa count, +0x10/+0x11 origin, +0x14 records, +0x1c bitmap.
+`Font_BuildTexture` 0x19cca8: 4-bit pixels, low nibble first, into a square texture (side: max of the width and
+the smallest power of two above the height), colours RGB 0x80 with alpha `i * 128 / 15`. The glyphs and line
+heights equal `chars/fonts/*.json` for both fonts.

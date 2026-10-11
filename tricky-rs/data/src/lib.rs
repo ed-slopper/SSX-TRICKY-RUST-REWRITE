@@ -15,6 +15,7 @@ pub mod level;
 pub mod loc;
 pub mod logic;
 pub mod mpf;
+pub mod sfn;
 pub mod ssh;
 pub mod trick_names;
 pub mod trickdef;
