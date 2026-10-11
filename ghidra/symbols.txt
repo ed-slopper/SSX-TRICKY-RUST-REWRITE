@@ -3485,3 +3485,23 @@ F 19a700 cAnimTexFlipNode cAnimTexFlipNode
 F 148e38 cRailManNode cRailManNode
 F 148680 cCollideEmitterNode cCollideEmitterNode
 F 13b078 cRestoreNode cRestoreNode
+G 2401e0 Rand_Next
+G 2402c0 Rand_Seed
+G 2401b0 Rand_SaveSnapshot
+G 23d4a8 Rand_Fx
+G 23d4d8 Rand_Game
+G 23d4c8 Rand_SeedGame
+G 23d498 Rand_SeedFx
+G 23d5b0 Rand_SaveGameSnapshot
+G 23d4f8 Rand_GameRange
+G 1d5a08 Rand_VuNext
+G 1108d0 Vec4_AddTo
+G 110868 Vec4_ScaleCopy8
+G 257d50 Vec4_ScaleCopy9
+G 25c798 Vec4_ScaleCopy10
+G 25ec30 Vec4_ScaleCopy11
+G 261608 Vec4_ScaleCopy12
+F 142ac8 cTexFlip cTexFlip
+G 17d6e0 BxList_Unlink
+G 17d710 BxList_Remove
+G 23d560 Rand_GameJitter

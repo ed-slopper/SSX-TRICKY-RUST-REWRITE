@@ -113,3 +113,16 @@ Part of the port notes (index: [README.md](README.md)); units and wording as des
 - Scripts run as threads: a wait (op 4) parks the thread; op 7 runs the other object's script at once.
   The collision slot runs only while the object has no controller: Debounce (2) keeps it busy D s (0 for good),
   a dead node for good.
+
+## Random numbers (`Rand_Next` 0x2401e0)
+
+- Two streams of the same generator: `Rand_Fx` 0x23d4a8 (state 0x345e58: effects, frontend, scene picks, career
+  shuffles; seeded by `Rand_SeedFx`) and `Rand_Game` 0x23d4d8 (state 0x345e70: AI decisions, stumbles, path picks;
+  seeded by `Rand_SeedGame` at race init and saved in the replay snapshot by `Rand_SaveGameSnapshot`).
+- State is six u32 words s0..s5. Next: s4 += s5, s3 += s4 + c, s2 += s3 + c, s1 += s2 + c, s0 += s1 + c (each c
+  the carry out of the add before it), then s5 += 1; if s5 wrapped to 0, s4 += 1 and so on up the chain while each
+  wraps (s0 += 1 last). Returns s0.
+- Seed x: s0 = x − 0x0dd2f1aa, s1 = x − 0x77ced917, s2 = x − 0x39db22d1, s3 = x + 0x0702c49c,
+  s4 = x − 0x61cac083, s5 = x + 0x6fdf3b64.
+- Floats: (r & 0x7fffff | 0x3f800000) as f32 − 1.0 gives [0, 1); `Rand_GameRange`(lo, hi) = lo + (hi − lo)·that.
+  The port's xorshift stand-ins (race.rs, intro.rs) are not this generator.
