@@ -35,7 +35,7 @@ state machine and the renderer are ours. Nothing has been checked against the or
 |---|---|---|---|---|---|
 | E1 | Start-up and main loop: `entry` 0x100008, the `gApp` (0x337C58) init, `cGame::Init` 0x17E148, `cGame::Update` 0x181638, game modes and the front end ↔ race switch, pause (`cGame::IsPaused` 0x17F078) | unowned | F1 | | [est] Our Bevy app loop is the stand-in |
 | E1a | Fixed 60 Hz tick with per-boarder time scale (`dt = timescale/60`, boarder+0x12c) driving every system, frame-rate independent of the window | any | | | [repo] `port-notes/README.md` (units); check what `SmoothDt` in `main.rs` does today Split: E1a1, E1a2 |
-| E1a1 | The player's and the AI riders' physics in `ride` (`tricky-rs/src/main.rs`) on a fixed 60 Hz tick: whole ticks of `1/60 × timescale` carried over from frame to frame, instead of variable sub-steps of up to 1/120 s | any | | | Split of E1a. Stopped 2026-10-11 by trailrig/heron: done on branch `work-E1a1-fixed-60hz-tick-trailrig-heron` (7d77fde: `ride` in `tricky-rs/src/main.rs` runs whole 1/60 s ticks, leftover frame time banked, at most 0.1 s of ticks a frame; builds). Left: run `TRICKY_SIM=600` and a race on a level (no level folder here), then merge. The self-tests in `game/src/race.rs` still step 1/120 s |
+| E1a1 | The player's and the AI riders' physics in `ride` (`tricky-rs/src/main.rs`) on a fixed 60 Hz tick: whole ticks of `1/60 × timescale` carried over from frame to frame, instead of variable sub-steps of up to 1/120 s | any | | | ed-slopper/puffin (2026-10-11)
 | E1a2 | The rest of E1a: world animations, props, particles, spray, camera on the same tick; draw between ticks (interpolate, ours: tag STANDIN) | any | E1a1 | | Split of E1a |
 | E1b | Random numbers: the game's `rand` and seeding, used by AI tricks, grabs, announcer, so runs can match the original | unowned | F1 | | [est] Split: E1b1, E1b2 |
 | E1b2 | Replace the xorshift stand-ins (`race.rs`, `props.rs`, `intro.rs`) with the game's streams at the game's call sites, in the game's order | unowned | E1b1 | | Split of E1b |
@@ -340,3 +340,4 @@ matches the original.
 - 2026-10-11 ed-slopper/puffin: G2c done (meter drain, grab end/uber count checked; TRICKY = score+0x88 > 5).- 2026-10-11 ed-slopper/puffin: claim G2d.
 
 - 2026-10-11 ed-slopper/puffin: G2d done (rider scores through score.rs; wants a play test).
+- 2026-10-11 ed-slopper/puffin: claim E1a1 (run the branch on a level, merge).
