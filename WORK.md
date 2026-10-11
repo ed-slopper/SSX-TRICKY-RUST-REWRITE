@@ -115,7 +115,7 @@ state machine and the renderer are ours. Nothing has been checked against the or
 | G20 | The inputs the ground tick still takes from the port: stats+0x13 (grip), +0x19 (cubic drag), +0x60 (probe offset), rider+0x2c0 (the rider's up), the control state (always 3, or 0xb after a hard landing: `Env::set_state` revert is ours), the ray cast's hit kind (+0x2e0, always 0), the attitude quaternion across a landing / respawn (rebuilt from yaw and normal) | any | E8k | | Gap of E8k; grip and cubic overlap G3, the state G1, the ray cast E7. Split: G20a–G20c |
 | G20a2 | The rest of the stat bytes: the computer riders' bytes from `stats::ai_bytes` with their rival level (`*param_3` of `Career_SetupAIRider` 0x16ae68: find where `Career_BuildRaceRiders` 0x165cf0 gets it, career +0x164 + rider·8?), the player's career level bytes (career record +0xc..+0xf) instead of our training fraction, and the stats the port still takes from its floats (stability, tricks → `Boarder_AddMeter`'s stat1d, wind-up stat18, gate stat7, meter leak) read from `Stats::bytes` | any | G20a | | Gap of G20a; overlaps G3, G4 |
 | G20b2 | The stance flips that negate the steer and the lean: `touch_down` and the rail code flip `switch` without negating steer (+0x214) or lean (+0x244) as `ChangeFakieControl_Enter` 0x103eb8 and `RailSlideControl_SwitchStance` 0x107fc8 do (only the ground revert, state 4, does) | any | G20b | | Gap of G20b; overlaps G1, G18 |
-| G20c | rider+0x2c0 (the rider's up), the control state (3 / 0xb), the ray cast's hit kind (+0x2e0), the attitude quaternion across a landing and a respawn | any | E8k | | Split of G20; overlaps G1, G16, E7. `Boarder_UpdateLeanTargets` 0x129500 also writes rider+0x2c0 = unit(+0x2c0 + 0.5·normal +0x2a0) every tick (G20b ported only its lean half), so the up is that accumulated vector, not `Boarder_UpdatePose`'s |
+| G20c | rider+0x2c0 (the rider's up), the control state (3 / 0xb), the ray cast's hit kind (+0x2e0), the attitude quaternion across a landing and a respawn | any | E8k | trailrig/heron (2026-10-11) | Split of G20; overlaps G1, G16, E7. `Boarder_UpdateLeanTargets` 0x129500 also writes rider+0x2c0 = unit(+0x2c0 + 0.5·normal +0x2a0) every tick (G20b ported only its lean half), so the up is that accumulated vector, not `Boarder_UpdatePose`'s |
 
 ## P3 Content
 
@@ -365,3 +365,4 @@ matches the original.
 - 2026-10-11 trailrig/heron: G20a done (stat bytes exact, 3 functions run in the runner, `Career_AverageStatGroups` checked); added G20a2 (gap of G20a).
 - 2026-10-11 trailrig/heron: claim G20b.
 - 2026-10-11 trailrig/heron: G20b done (probe offset exact: body scale + lean record, checked in the runner); added G20b2 (gap of G20b), noted the +0x2c0 half in G20c.
+- 2026-10-11 trailrig/heron: claim G20c.
