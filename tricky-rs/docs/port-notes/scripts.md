@@ -39,9 +39,9 @@ ExecOp returns 1 to go on, 0 to wait (op 4), −1 to end the thread (a failed op
 | 0 | spawn a controller of type p2 on the instance (table below); the same type already running gets its vf 0x74 (restart); a running one of another type is stopped first (vf 0xc, 3); type 5 is never replaced | `TriggerScript_Op0_SpawnController` 0x13c5d0 |
 | 1 | spawn a camera node | `TriggerOp_SpawnCameraNode` 0x13d0b8 |
 | 2 | spawn an effect (sub-type 1: spline riders) | `TriggerOp_SpawnEffect` 0x13d130 |
-| 3 | message the controller: its vf 0xc4(p3, p2), if the instance has one | (inline) |
+| 3 | message the controller: its vf 0xc4(p2, p3 as a float in f12), if there is an instance and it has one | (inline) |
 | 4 | wait p2 seconds (thread+0x40) | (inline) |
-| 5 | condition p2: 0 speed (p3 0: |v| > p4 cm/s, 1: |v| < p4 km/h), 1 random (`Rand_GameRange`(0, 1) against p4; p3 picks which side passes), 2 human only (rider+0x41c), 3 stop if the instance already has a controller | (inline) |
+| 5 | condition p2, ending the thread when it holds: 0 speed (|rider+0x150| over four lanes, w too; p3 0: > p4 cm/s, 1: < p4 × 27.777777, km/h; no rider: passes), 1 random (r = `Rand_GameRange`(0, 1); p3 0: p4 < r, 1: r < p4), 2 not the human (rider+0x41c = 0), 3 the instance already has a controller; other kinds and modes pass | (inline) |
 | 6 | points pickup p2 (show-off modes 3, 5 only): score+0x94 += p2, meter +0.04 | `Pickup_Points` 0x11e608 → `Score_AddPickupPoints` 0x155b10 |
 | 7 | run effect p3 on instance p2 (a new script thread) | `cScriptNode::cScriptNode` |
 | 8 | play script sound p2 at the instance | `Sfx_ScriptSoundPlay` 0x2165c8 |
@@ -87,3 +87,21 @@ the score's +0x28 replaces it with a message of kind 12 (time −1); `Sfx_Pickup
 | 0x102 | `AnimComboNode_Init` 0x199f20 | | 0x103 | unnamed node (constructor 0x19a5a8) |
 
 Types 1, 3 and 4 spawn nothing.
+
+## Threads (row E9b; `tricky_game::script`, checked: `tests/script.rs`)
+
+- A thread (`cScriptNode`, 0xf0 bytes, list type 0x3e9): +0x38 op index, +0x3c byte offset, +0x40 wait, +0xe0 the
+  script (an effect header, `FUN_0025feb8`: file+0x28 + 8·i; or a function, `Course_GetScriptEntry` 0x260e68:
+  file+0x30 + 0x18·i, neither bounds-checked above), +0xe4 the instance, +0xe8 the rider, +0x50 / +0x90 two 0x40-byte
+  contexts with flags +0xd0 / +0xd4. The constructors run it at once (`TriggerScript_Run`), so a script with no wait
+  is over before its constructor returns.
+- `TriggerScript_Run` 0x13be78 (= `cScriptNode::Update` 0x13bd38): a positive wait loses 1/60 s (0.016666668) and
+  holds while it is still ≥ 0, then is cleared; the ops run in order. A wait (op 4: +0x40 = p2's bits) steps past
+  itself and returns, ending the thread instead when it was the last op; a failed op 5 ends the thread at once; the
+  end of the ops ends it. Ending = its vf 0xc(3). So a wait of t seconds resumes on the first frame where
+  t − n·(1/60) < 0 in single floats (1/60 s: two frames).
+- Ops 7 / 21 pass the thread's rider and contexts to the new thread; op 26 none; op 7's instance comes from
+  `Course_GetInstance`(p2) and nothing happens without one; ops 21 / 26 do nothing for p2 < 0.
+- Starters: area wake → event 0 (objects with no controller; `TriggerScript_Spawn`), contact → event 1 (rider and
+  contexts), controller goal → event 3, `World_RunScript` → a function by name after ending the first running
+  thread on it. Events 0 and 1 take any slot value but −1; event 3 only ≥ 0.

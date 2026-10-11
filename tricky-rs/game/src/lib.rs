@@ -31,6 +31,7 @@ pub mod rails;
 pub mod reset;
 pub mod rivals;
 pub mod score;
+pub mod script;
 pub mod spin;
 pub mod states;
 pub mod stats;
