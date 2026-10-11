@@ -66,6 +66,26 @@ Proven (ported in `tricky-data/src/compress.rs`):
   reads the file, and if `Compress_UnpackedSize` is not 0 decodes it into a buffer of that size.
 - Every packed file on the disc is RefPack 0x10 (the four character archives, the course archives, `PS2LOAD`,
   `SSXFE`, `TRICK`); nothing uses the other codecs (row E2c).
+- The other three (row E2c; `compress::{huff_decode, btree_decode, decode18}`, checked: `tricky-game/tests/
+  compress.rs`, streams made by the test unpacked by the game's `Compress_Decode` and ours, byte for byte):
+  - Huffman (`Huff_Decode` 0x2c3730): big-endian 16-bit reads, most significant bit first. Size: 4 bytes at +2
+    with bit 7 (+6 with bit 0), else the bit stream's first 24 bits (from +2, +5 with bit 0). Then the escape
+    byte; per code length from 1 a number − 4 codes, until the tree is full; per code a number − 3 not-yet-used
+    byte values to step on from the last (from 0xff, wrapping). A number: `1ab` → 4 + ab, else z zeros, a one and
+    n = z + 2 bits → bits + 2^n; with 16 or more zeros the game counts them one by one and gets n = z + 3, so no
+    number from 2^18 to 2^19 − 1 can be written. Codes ≤ 8 bits come from a 256-entry table, longer ones by
+    comparing the top 16 bits with each length's last code. After the escape code a number − 4: not 0 repeats the
+    last byte that often, 0 then a bit: 0 an 8-bit literal, 1 the end. 0x32fb sums the bytes once, 0x34fb twice;
+    the type is compared with bit 7 kept, so 0xb2/0xb4 never do.
+  - BTree (`BTree_Decode` 0x2c3540, `BTree_EmitSymbol` 0x2c34d8): a 3-byte size at +2 (+5 for 0x47fb only; bit
+    7 does not make it 4 bytes), the escape byte, a count and (byte, left, right) for each byte that stands for a
+    pair; then bytes: plain, pairs (expanded recursively), or the escape and a literal (0 ends).
+  - 0x2c2d18 (`Compress_Decode18`): 16-bit pictures in DXT1-like 4×4 blocks: a 3-byte size at +2, the width at
+    +6, 8-byte blocks from +8 (two RGB565 colours, four rows of 2-bit picks), rows of blocks until the size is
+    reached. The middle colours are 5:3 and 3:5 mixes when colour 0 > colour 1, else the average and 0 (clear);
+    a 0 in colour 0 or 1 becomes 1 first; out as PS2 1-5-5-5 (`0x8000 | b << 10 | g << 5 | r`, 0 stays 0).
+    `Compress_IsType18` returns 100 (0x1afb) or 0 but `Compress_Decode18Rows` checks for 3 or 5 (blocks with 8
+    more bytes before them), so that form is never used.
 
 Checked: all 793 entries of the character archives unpack to the same bytes as `tools/afl/refpack.py`.
 

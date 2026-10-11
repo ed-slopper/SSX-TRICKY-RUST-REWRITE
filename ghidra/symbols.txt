@@ -5626,6 +5626,7 @@ G 2c6278 AsyncFile_Cancel
 G 2c26d8 Shape_PixelFormatIndex
 G 2c2d18 Compress_Decode18
 G 2c2bf8 Compress_Decode18Rows
+G 2c27c8 Compress_Decode18Block
 G 2c34d8 BTree_EmitSymbol
 G 2c5498 WStr_CopyAll
 G 2bed58 PathX_SelectSong
