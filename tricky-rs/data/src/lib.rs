@@ -5,6 +5,7 @@
 pub mod anim;
 pub mod character;
 pub mod course;
+pub mod disc;
 pub mod intro;
 pub mod level;
 pub mod logic;

@@ -5251,3 +5251,11 @@ G 1ef610 ReplayOverlay_Init
 G 1c08a8 Gfx_InstallVif1Handler
 G 1c08f0 Gfx_RemoveVif1Handler
 G 1c0c70 Gfx_Vif1Interrupt
+G 2c9970 CdFs_Mount
+G 2c9200 CdFs_ScanDir
+G 2c9190 CdFs_HashPath
+G 2c9cc0 CdFs_FindFile
+G 2c90c8 CdFs_ReadSector
+G 2c9440 CdFs_CompareName
+G 2c9420 CdFs_CompareEntryName
+G 2fb5c8 qsort
