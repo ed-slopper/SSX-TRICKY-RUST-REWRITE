@@ -6536,3 +6536,16 @@ G 174c58 CamScript_UpdateCutFade
 G 1956c8 Replay_ClearPins
 G 2609b0 RailNode_GetSpline
 G 265c28 FE3D_IsMultiplayer
+G 179758 Input_ComboHeld
+G 179780 Input_AnyHeld
+G 1797a8 Input_ComboPressed
+G 1797d0 Input_AnyPressed
+G 179818 Input_BindButton
+G 179838 Input_BindAxis
+G 17a018 PadCfg_ButtonPressed
+G 17a028 PadCfg_ButtonOthers
+G 17a108 PadCfg_AxisMask
+G 17a118 PadCfg_AxisNegate
+G 17a128 PadCfg_GrabPressed
+G 17a138 PadCfg_GrabOthers
+G 17a0a0 Pad_ParseAxisPair

@@ -239,6 +239,44 @@ fn step(r: &mut Runner, pc: u32) -> Result<Next, Error> {
             r.cpu.set_gpr(rt, v);
             Ok(Next::Seq)
         }
+        34 | 38 => {
+            // lwl / lwr: the unaligned word's high (lwl) or low (lwr) part, little-endian; the result is
+            // sign-extended when it holds the word's top byte (always for lwl, lwr only at byte 0)
+            let byte = addr & 3;
+            let mem = u32::from_le_bytes(load::<4>(r, pc, addr & !3)?);
+            let old = r.cpu.gpr(rt);
+            let old32 = old as u32;
+            let v = if op == 34 {
+                let sh = 8 * (3 - byte);
+                let keep = if sh == 0 { 0 } else { (1u32 << sh) - 1 };
+                sext32((old32 & keep) | (mem << sh))
+            } else {
+                let sh = 8 * byte;
+                let keep = if sh == 0 { 0 } else { !(u32::MAX >> sh) };
+                let w = (old32 & keep) | (mem >> sh);
+                if byte == 0 { sext32(w) } else { (old & !0xffff_ffff) | w as u64 }
+            };
+            r.cpu.set_gpr(rt, v);
+            Ok(Next::Seq)
+        }
+        42 | 46 => {
+            // swl / swr: store the high (swl) or low (swr) part of the word at an unaligned address
+            let byte = addr & 3;
+            let at = addr & !3;
+            let mem = u32::from_le_bytes(load::<4>(r, pc, at)?);
+            let v = r.cpu.gpr(rt) as u32;
+            let out = if op == 42 {
+                let sh = 8 * (3 - byte);
+                let mask = u32::MAX >> sh;
+                (mem & !mask) | ((v >> sh) & mask)
+            } else {
+                let sh = 8 * byte;
+                let mask = u32::MAX << sh;
+                (mem & !mask) | (v << sh)
+            };
+            store(r, pc, at, &out.to_le_bytes())?;
+            Ok(Next::Seq)
+        }
         44 | 45 => {
             // sdl / sdr: store the high (sdl) or low (sdr) part of the doubleword at an unaligned address
             let byte = addr & 7;
@@ -661,6 +699,26 @@ mod tests {
         rn.stub(0x0020_0000, |c, _| c.set_gpr(2, 7));
         rn.call(CODE).unwrap();
         assert_eq!(rn.cpu.gpr(2), 7);
+    }
+
+    #[test]
+    fn unaligned_words() {
+        // lwl/lwr pair at an odd address reads the 4 bytes there (sign-extended); swl/swr writes them back
+        let mut rn = Runner::empty();
+        let data: Vec<u8> = (0u8..32).map(|b| b | 0x80).collect();
+        rn.mem.write(0x0030_0000, &data).unwrap();
+        let (base, at) = (0x0030_0000u32, 5u32);
+        rn.cpu.set_gpr(4, base as u64);
+        let i = |op: u32, rt: u32, off: u32| (op << 26) | (4 << 21) | (rt << 16) | off;
+        let code = [i(34, 2, at + 3), i(38, 2, at), i(42, 2, 0x10 + 2 + 3), i(46, 2, 0x10 + 2), 0x03e0_0008, 0];
+        for (k, w) in code.iter().enumerate() {
+            rn.mem.write_u32(CODE + 4 * k as u32, *w);
+        }
+        rn.call(CODE).unwrap();
+        assert_eq!(rn.cpu.gpr(2), u32::from_le_bytes([0x85, 0x86, 0x87, 0x88]) as i32 as i64 as u64, "lwl/lwr");
+        let mut out = [0u8; 6];
+        rn.mem.read(base + 0x11, &mut out).unwrap();
+        assert_eq!(out, [0x91, 0x85, 0x86, 0x87, 0x88, 0x96], "swl/swr and the bytes around");
     }
 
     #[test]

@@ -52,3 +52,19 @@ fn a_spin_and_a_grab_landed_score() {
     assert!(r.last_trick.contains('+'), "shown: {:?}", r.last_trick);
     println!("{} ({} points, meter {:.3})", r.last_trick, r.score, r.boost);
 }
+
+#[test]
+fn trick_table_rows_are_our_riders_grabs() {
+    // the game's trick table (0x333098, rider by the character order, 15 rows in button-map order) names the same
+    // grab and tweak as our trickdata rows (by clip id) on board 0; the other boards change the last rows
+    use tricky_data::trick_slots::TRICK_SLOTS;
+    for (r, d) in RIDERS.iter().enumerate() {
+        for b in 0..1 {
+            for (k, row) in d.rows.iter().enumerate() {
+                let t = TRICK_SLOTS[r][b][k];
+                assert_eq!(grab_clip(row.grab), t[1] as u32, "{} board {b} row {k}: grab {}", d.name, row.grab);
+                assert_eq!(grab_clip(row.tweak), t[2] as u32, "{} board {b} row {k}: tweak {}", d.name, row.tweak);
+            }
+        }
+    }
+}

@@ -101,3 +101,26 @@ Part of the port notes (index: [README.md](README.md)); units and wording as des
   axis 10 → 1–6, 11 → 7–12, +0x1c(0x25) 0. 0x14: +0x1c(0x25) 0. 0x15: +0x24(0x28) 0. Others: 0.
 - With an overlay up and no race running the pad is not read (word 0, or 0x1a in state 0x10). What the action ids
   and axes are on the pad is row G1a5b2.
+
+## The pad mapper (`cInput`, board row G1a5b2, checked: `tests/pad.rs`, `tests/rider_score.rs`)
+
+- The pad (`cPS2Device` vf10 0x17b278): libpad's button word mapped to the game's bits by the table at 0x337c08
+  (d-pad 1/2/4/8 up/down/right/left, square 0x10, triangle 0x20, circle 0x40, start 0x80, select 0x100, L1 0x200,
+  R1 0x400, X 0x800, L2 0x1000, R2 0x2000, L3 0x4000, R3 0x8000); the d-pad as an axis pair (left, up −1); sticks
+  (byte − 127.5)/127.5 (right, down +), past ±0.5 also as bits (0x20000 up … 0x1000000 right stick left).
+- `DATA/CONFIG/BTNMAP<n>.DAT` (n = stats+0x6c; `Pad_ParseButtonMap` 0x179b18, bound by `Pad_SetupVibration`
+  0x152770): `IS_BOOL` buttons are actions 0x1b–0x28 in file order (Antic X, AnticAbort L3 / none, Boost square,
+  CameraToggle, CameraReverse none / triangle, Tweak square, LateSpinMode, RailSpinMode, PrewindTurnMode,
+  RandomGrab (no shoulder), Reset select, ShoveLeft, ShoveRight, LessonWait X); `IS_BOOLGRAB` combos (easyA L2,
+  easyB R1, easyC R2, easyD L1, the pairs, the triples, all four) go to the rider's trick slots (column 0 of the
+  trick table at 0x333098, per rider stats+0x5c and board stats+0x44: slot, grab clip, tweak clip, uber clip
+  (0x300 none); `tricky_data::trick_slots`); `IS_ANALOG` are axes 0–15 (Brake, Crouch, Spin, Flip, Turn,
+  ShoveSide, ShoveFwd, RailSpin, LateSpin, LateFlip, AirTurn, AirTilt, PrewindTurn, PrewindSpin, PrewindFlip,
+  GateRock). Map 0 spins and flips on the d-pad only; map 1 also on the left stick, with no prewind turn.
+- `Input_BindButton` 0x179818 keeps a button's "pressed" set and "pressed ∪ others" (the buttons looked at);
+  queries: `Input_ComboHeld` (looked-at buttons down = exactly the pressed set), `Input_AnyHeld` (any of them;
+  NONE never), `Input_ComboPressed` / `Input_AnyPressed` (the same counting only buttons that went down this tick).
+- `Pad_ReadAxis` 0x179940: the d-pad if the mask has it and it is pressed, else the left stick, else the right,
+  negated; a POS / NEG mask keeps one side; dead zone 0.38046828; then the map's negate. Stick up is Crouch, down
+  is Brake.
+- Our `trickdata` rows are the table's board-0 rows for every rider; boards 1 and 2 change some of the later rows.

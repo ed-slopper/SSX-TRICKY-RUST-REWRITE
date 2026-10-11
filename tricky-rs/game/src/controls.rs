@@ -181,3 +181,272 @@ pub fn get_controls(c: ControlsIn, p: &mut dyn PadMapper, trick: &mut u32, rando
     }
     w
 }
+
+// ---- the pad mapper (`cInput`, board row G1a5b2)
+
+/// The game's button bits (`Pad_ParseButtonNames`' table at 0x337a90), as the pad device sets them.
+pub const DPAD_UP: u32 = 0x1;
+pub const DPAD_DOWN: u32 = 0x2;
+pub const DPAD_RIGHT: u32 = 0x4;
+pub const DPAD_LEFT: u32 = 0x8;
+pub const SQUARE: u32 = 0x10;
+pub const TRIANGLE: u32 = 0x20;
+pub const CIRCLE: u32 = 0x40;
+pub const START: u32 = 0x80;
+pub const SELECT: u32 = 0x100;
+pub const LSHIFT: u32 = 0x200;
+pub const RSHIFT: u32 = 0x400;
+pub const X: u32 = 0x800;
+pub const LSHIFT2: u32 = 0x1000;
+pub const RSHIFT2: u32 = 0x2000;
+pub const LJOY: u32 = 0x4000;
+pub const RJOY: u32 = 0x8000;
+pub const LJOY_UP: u32 = 0x20000;
+pub const LJOY_DOWN: u32 = 0x40000;
+pub const LJOY_RIGHT: u32 = 0x80000;
+pub const LJOY_LEFT: u32 = 0x100000;
+pub const RJOY_UP: u32 = 0x200000;
+pub const RJOY_DOWN: u32 = 0x400000;
+pub const RJOY_RIGHT: u32 = 0x800000;
+pub const RJOY_LEFT: u32 = 0x1000000;
+/// `NONE` in a button map: never.
+pub const NONE: u32 = 0xffff_ffff;
+const SHIFTS: u32 = LSHIFT | RSHIFT | LSHIFT2 | RSHIFT2;
+
+/// The libpad button bits (pressed = 1) each game bit 0..15 is read from (0x337c08).
+pub const PS2_BITS: [u32; 16] = [0x1000, 0x4000, 0x2000, 0x8000, 0x80, 0x10, 0x20, 0x800, 0x100, 0x4, 0x8, 0x40, 0x1, 0x2, 0x200, 0x400];
+
+/// The pad as the game keeps it (the device the mapper reads): this tick's and last tick's button bits, the d-pad
+/// as an axis pair (+0x14, +0x18: left and up are -1) and the sticks (+0x1c..+0x28: (byte - 127.5) / 127.5, right
+/// and down positive).
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct PadDevice {
+    pub prev: u32,
+    pub buttons: u32,
+    pub dpad: [f32; 2],
+    pub left: [f32; 2],
+    pub right: [f32; 2],
+}
+
+impl PadDevice {
+    /// `cPS2Device` vf10 0x17b278 for a connected pad: last tick's buttons kept, this tick's from the libpad word
+    /// `ps2` (pressed = 1), the sticks from their bytes (`analog`: left x, y, right x, y; `None` for a digital pad,
+    /// sticks 0), the d-pad as +-1 and the sticks past half as their direction bits. (The key repeat after it,
+    /// `PadDevice_UpdateRepeat` 0x17a958, is not ported.)
+    pub fn read(&mut self, ps2: u16, analog: Option<[u8; 4]>) {
+        self.prev = self.buttons;
+        let mut b = 0;
+        for (i, m) in PS2_BITS.iter().enumerate() {
+            if ps2 as u32 & m != 0 {
+                b |= 1 << i;
+            }
+        }
+        match analog {
+            Some([lx, ly, rx, ry]) => {
+                let n = |v: u8| (v as i32 as f32 - 127.5) / 127.5;
+                self.left = [n(lx), n(ly)];
+                self.right = [n(rx), n(ry)];
+                self.dpad = dpad_axes(b);
+                if self.left[0] < -0.5 {
+                    b |= LJOY_LEFT;
+                }
+                if 0.5 < self.left[0] {
+                    b |= LJOY_RIGHT;
+                }
+                if self.left[1] < -0.5 {
+                    b |= LJOY_UP;
+                }
+                if 0.5 < self.left[1] {
+                    b |= LJOY_DOWN;
+                }
+                if self.right[0] < -0.5 {
+                    b |= RJOY_LEFT;
+                }
+                if 0.5 < self.right[0] {
+                    b |= RJOY_RIGHT;
+                }
+                if self.right[1] < -0.5 {
+                    b |= RJOY_UP;
+                }
+                if 0.5 < self.right[1] {
+                    b |= RJOY_DOWN;
+                }
+            }
+            None => {
+                self.left = [0.0; 2];
+                self.right = [0.0; 2];
+                self.dpad = dpad_axes(b);
+            }
+        }
+        self.buttons = b;
+    }
+}
+
+/// The d-pad as an axis pair: left (else right) on x, up (else down) on y.
+fn dpad_axes(b: u32) -> [f32; 2] {
+    let x = if b & DPAD_LEFT != 0 { -1.0 } else if b & DPAD_RIGHT != 0 { 1.0 } else { 0.0 };
+    let y = if b & DPAD_UP != 0 { -1.0 } else if b & DPAD_DOWN != 0 { 1.0 } else { 0.0 };
+    [x, y]
+}
+
+/// The analog mask bits of a button map (`ANALOG_*`).
+pub const ANALOG_JOY_L_X: u32 = 0x1;
+pub const ANALOG_JOY_L_Y: u32 = 0x8;
+pub const ANALOG_JOY_L_POS_Y: u32 = 0x10;
+pub const ANALOG_JOY_L_NEG_Y: u32 = 0x20;
+pub const ANALOG_JOY_R_X: u32 = 0x40;
+pub const ANALOG_JOY_R_Y: u32 = 0x200;
+pub const ANALOG_PAD_X: u32 = 0x1000;
+pub const ANALOG_PAD_Y: u32 = 0x8000;
+pub const ANALOG_PAD_POS_Y: u32 = 0x10000;
+pub const ANALOG_PAD_NEG_Y: u32 = 0x20000;
+
+/// `Pad_ReadAxis` 0x179940: an axis by its mask and negate flag: the d-pad if the mask has it and it is pressed,
+/// else the left stick, else the right (each negated, x or y by the mask), kept only on the side a POS / NEG mask
+/// allows and past the dead zone 0.38046828, then negated again if the map says so.
+pub fn read_axis(d: &PadDevice, mask: u32, negate: bool) -> f32 {
+    let x = mask & 0x71c7 != 0;
+    let mut v = 0.0f32;
+    if mask & 0x3f000 != 0 {
+        v = -(if x { d.dpad[0] } else { d.dpad[1] });
+    }
+    let mut zero = v == 0.0;
+    if zero && mask & 0x3f != 0 {
+        v = -(if x { d.left[0] } else { d.left[1] });
+        zero = v == 0.0;
+    }
+    if zero && mask & 0xfc0 != 0 {
+        v = -(if x { d.right[0] } else { d.right[1] });
+    }
+    if (mask & 0x12492 == 0 || 0.0 <= v) && (mask & 0x24924 == 0 || v <= 0.0) && 0.380_468_28 <= v.abs() {
+        if negate {
+            -v
+        } else {
+            v
+        }
+    } else {
+        0.0
+    }
+}
+
+/// A button map as the mapper holds it (`cInput` +4, +0xa8, +0x14c): per action id 0..0x28 the buttons that must
+/// be down and the buttons looked at (the map's other set with them), and per axis its mask and negate flag.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct ButtonMap {
+    pub pressed: [u32; 0x29],
+    pub looked_at: [u32; 0x29],
+    pub axes: [(u32, bool); 16],
+}
+
+/// The button map's grab combos in file order (`IS_BOOLGRAB` easyA..hardE), the same in both maps.
+const GRAB_COMBOS: [u32; 15] = [
+    LSHIFT2,
+    RSHIFT,
+    RSHIFT2,
+    LSHIFT,
+    RSHIFT | RSHIFT2,
+    LSHIFT | LSHIFT2,
+    RSHIFT2 | LSHIFT,
+    RSHIFT2 | LSHIFT2,
+    RSHIFT | LSHIFT,
+    LSHIFT2 | RSHIFT,
+    LSHIFT | RSHIFT | RSHIFT2,
+    RSHIFT | RSHIFT2 | LSHIFT2,
+    RSHIFT | LSHIFT | LSHIFT2,
+    RSHIFT2 | LSHIFT | LSHIFT2,
+    LSHIFT | LSHIFT2 | RSHIFT | RSHIFT2,
+];
+
+impl ButtonMap {
+    /// `DATA/CONFIG/BTNMAP<n>.DAT` (n = stats+0x6c, 0 or 1) as `Pad_SetupVibration` 0x152770 binds it for a
+    /// rider: the 14 buttons (`IS_BOOL`, actions 0x1b..0x28), the 15 grab combos to the rider's trick slots
+    /// (`slots`: column 0 of the rider's and board's `tricky_data::trick_slots::TRICK_SLOTS`), and the 16 axes
+    /// (`IS_ANALOG`). Action ids no grab is bound to keep 0 and 0 (always "down").
+    pub fn btnmap(n: u32, slots: [u16; 15]) -> ButtonMap {
+        let mut m = ButtonMap { pressed: [0; 0x29], looked_at: [0; 0x29], axes: [(0, false); 16] };
+        let mut bind = |a: usize, pressed: u32, other: u32| {
+            m.pressed[a] = pressed;
+            m.looked_at[a] = other | pressed;
+        };
+        for (k, s) in slots.iter().enumerate() {
+            bind(*s as usize, GRAB_COMBOS[k], SHIFTS);
+        }
+        let one = n != 0;
+        // Antic, AnticAbort, Boost, CameraToggle, CameraReverse, Tweak, LateSpinMode, RailSpinMode,
+        // PrewindTurnMode, RandomGrab, Reset, ShoveLeft, ShoveRight, LessonWait (the maps' ALL is 0)
+        let bools: [(u32, u32); 14] = [
+            (X, 0),
+            (if one { NONE } else { LJOY }, 0),
+            (SQUARE, 0),
+            (NONE, 0),
+            (if one { TRIANGLE } else { NONE }, 0),
+            (SQUARE, 0),
+            (NONE, 0),
+            (NONE, 0),
+            (NONE, 0),
+            (NONE, SHIFTS),
+            (SELECT, 0),
+            (NONE, 0),
+            (NONE, 0),
+            (X, 0),
+        ];
+        for (k, (p, other)) in bools.iter().enumerate() {
+            bind(0x1b + k, *p, *other);
+        }
+        let xy = ANALOG_PAD_X | ANALOG_JOY_L_X;
+        let yy = ANALOG_PAD_Y | ANALOG_JOY_L_Y;
+        // Brake, Crouch, Spin, Flip, Turn, ShoveSide, ShoveFwd, RailSpin, LateSpin, LateFlip, AirTurn, AirTilt,
+        // PrewindTurn, PrewindSpin, PrewindFlip, GateRock
+        m.axes = [
+            (ANALOG_PAD_NEG_Y | ANALOG_JOY_L_NEG_Y, true),
+            (ANALOG_PAD_POS_Y | ANALOG_JOY_L_POS_Y, false),
+            (if one { xy } else { ANALOG_PAD_X }, true),
+            (if one { yy } else { ANALOG_PAD_Y }, true),
+            (xy, false),
+            (ANALOG_JOY_R_X, false),
+            (ANALOG_JOY_R_Y, false),
+            (ANALOG_PAD_X, false),
+            (ANALOG_PAD_X, true),
+            (ANALOG_PAD_Y, true),
+            (ANALOG_JOY_L_X, true),
+            (ANALOG_JOY_L_Y, true),
+            (if one { 0 } else { ANALOG_JOY_L_X }, false),
+            (if one { xy } else { ANALOG_PAD_X }, true),
+            (if one { yy } else { ANALOG_PAD_Y }, true),
+            (if one { yy } else { ANALOG_JOY_L_Y }, false),
+        ];
+        m
+    }
+}
+
+/// The mapper (`cInput`) on a pad: what `GetControls` asks.
+pub struct Mapper<'a> {
+    pub map: &'a ButtonMap,
+    pub pad: &'a PadDevice,
+}
+
+impl PadMapper for Mapper<'_> {
+    /// `Pad_ReadAxis` 0x179940
+    fn axis(&mut self, axis: u32) -> f32 {
+        let (m, n) = self.map.axes[axis as usize];
+        read_axis(self.pad, m, n)
+    }
+    /// vf0 0x179860: the combo is down (of the buttons looked at, exactly those)
+    fn q0c(&mut self, a: u32) -> u32 {
+        (self.pad.buttons & self.map.looked_at[a as usize] == self.map.pressed[a as usize]) as u32
+    }
+    /// vf1 0x179890: any of its buttons is down
+    fn q14(&mut self, a: u32) -> u32 {
+        let p = self.map.pressed[a as usize];
+        (p != NONE && self.pad.buttons & p != 0) as u32
+    }
+    /// vf2 0x1798c8: the combo, counting only buttons that went down this tick
+    fn q1c(&mut self, a: u32) -> u32 {
+        (self.pad.buttons & !self.pad.prev & self.map.looked_at[a as usize] == self.map.pressed[a as usize]) as u32
+    }
+    /// vf3 0x179900: any of its buttons went down this tick
+    fn q24(&mut self, a: u32) -> u32 {
+        let p = self.map.pressed[a as usize];
+        (p != NONE && self.pad.buttons & !self.pad.prev & p != 0) as u32
+    }
+}
