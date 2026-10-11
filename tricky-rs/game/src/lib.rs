@@ -9,4 +9,5 @@ pub mod race;
 pub mod ground;
 pub mod rails;
 pub mod rider;
+pub mod surface;
 pub mod trickdata;

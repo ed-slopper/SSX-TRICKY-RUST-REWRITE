@@ -8,6 +8,7 @@ use crate::rails::Rails;
 use crate::trickdata::{RiderData, COMBOS, RIDERS};
 use std::collections::VecDeque;
 use glam::Vec3;
+use crate::surface::SURFACE_TABLE;
 pub mod wipeout;
 pub use wipeout::{Wipe, course_points};
 
@@ -26,12 +27,18 @@ pub const DRAG_V: f32 = 0.000196;
 pub const DRAG_V2: f32 = 0.0000856;
 /// braking adds this much drag (1/s)
 pub const BRAKE: f32 = 1.88;
-/// hard speed limits (m/s): 100.4 km/h on the snow, up to 120.5 km/h boosting or in the air
 /// The ground spring's band per surface (m): sunk deeper than d1 it pushes back fully, d2 is how far a
-/// board can sink (powder 15-35 cm). From SurfaceTable_Init 0x256188 rows [7] and [8].
-pub const SURF_BAND: [(f32, f32); 20] = [(1.0, 1.17844), (0.005, 0.0250417), (0.005, 0.0308877), (0.150913, 0.297817), (0.25204, 0.356268),
-    (0.005, 0.0225027), (0.1, 0.2), (0.138205, 0.302712), (0.143509, 0.235225), (0.005, 0.0153559), (0.1, 0.2), (0.005, 0.01),
-    (0.005, 0.0632051), (0.005, 0.015127), (0.005, 0.0513762), (0.1, 0.2), (0.1, 0.2), (0.1, 0.2), (0.00501527, 0.0505194), (0.1, 0.2)];
+/// board can sink (powder 15-35 cm). `SurfaceTable_Init` 0x256188 words [7] and [8] (crate::surface), cm → m.
+pub const SURF_BAND: [(f32, f32); 20] = {
+    let mut t = [(0.0, 0.0); 20];
+    let mut i = 0;
+    while i < 20 {
+        t[i] = (SURFACE_TABLE[i][7] * 0.01, SURFACE_TABLE[i][8] * 0.01);
+        i += 1;
+    }
+    t
+};
+/// hard speed limits (m/s): 100.4 km/h on the snow, up to 120.5 km/h boosting or in the air
 pub const SPEED_CAP: f32 = 27.89;
 pub const BOOST_CAPS: [f32; 3] = [29.32, 30.72, 33.47];
 pub const AIR_CAP: f32 = 33.472;
@@ -85,39 +92,33 @@ pub const SWITCH_BONUS: f32 = 1.3;
 /// a full meter gives this long to do uber tricks
 pub const UBER_SECONDS: f32 = 20.0;
 
-/// The original's surface table, by the patch's surface type: gravity (cm/s^2), drag (linear,
-/// v^2, v^3 with v in 10 m/s), side grip, most lean (degrees), the speed the rider pushes
-/// himself to (km/h) and how hard.
-pub const SURFACES: [[f32; 8]; 20] = [
-    [989.826, 1.0, 1.0, 1.0, 1.0, 58.3, 0.0, 0.0],                       // 0 off the course
-    [1300.85, 0.00204, 0.00196, 0.00751, 1.2017, 58.3, 51.8501, 2.00119], // 1 groomed snow
-    [1200.45, 0.00606, 0.0061, 0.00884, 1.50908, 58.3, 45.6771, 1.81067], // 2 second-line snow
-    [1151.31, 0.04996, 0.00505, 0.00508, 3.00133, 58.3, 40.5149, 3.08695], // 3 powder
-    [999.135, 0.14175, 0.01857, 0.00795, 3.5026, 58.3, 36.1039, 2.01986],  // 4 deep powder
-    [1350.93, 0.0, 0.0, 0.00254, 0.0025, 45.0004, 64.0374, 3.00319],      // 5 ice
-    [980.0, 0.01, 0.0, 0.025, 1.0, 58.3, 52.5, 2.2],                      // 6 structures
-    [980.0, 0.02913, 0.01153, 0.0, 0.19627, 58.3, 40.7847, 2.39158],      // 7
-    [980.0, 0.00861, 0.00785, 0.00771, 1.57987, 58.3, 43.2219, 2.008],    // 8
-    [980.0, 0.0545, 0.00501, 0.00522, 0.89228, 21.3399, 19.5848, 1.67792], // 9 rock, concrete
-    [980.0, 0.01, 0.0, 0.025, 1.0, 58.3, 52.5, 2.2],                      // 10
-    [980.0, 0.01096, 0.00249, 0.025, 0.0, 58.3, 26.3196, 1.46681],        // 11
-    [980.0, 0.01, 0.00258, 0.0, 0.89228, 58.3, 54.3926, 2.212],           // 12
-    [980.0, 0.03971, 0.14873, 0.04455, 0.1, 58.3, 60.9113, 1.42786],      // 13 metal
-    [980.0, 0.00444, 0.00195, 0.00576, 0.03, 58.3, 65.3384, 2.2],         // 14
-    [980.0, 0.00217, 0.00223, 0.00768, 1.0, 58.3, 52.5, 2.2],             // 15
-    [980.0, 0.01, 0.0, 0.025, 1.0, 58.3, 52.5, 2.2],                      // 16
-    [980.0, 0.01, 0.0, 0.025, 1.0, 58.3, 52.5, 2.2],                      // 17
-    [1350.86, 0.0, 0.0, 0.0026, 1.20915, 58.3, 60.0436, 3.00478],         // 18 show-off ramps
-    [980.0, 0.01, 0.0, 0.025, 1.0, 58.3, 52.5, 2.2],                      // 19
-];
+/// The original's surface table (`SurfaceTable_Init` 0x256188, crate::surface), by the patch's surface type:
+/// gravity (cm/s^2), drag (linear, v^2, v^3 with v in 10 m/s), side grip, most lean (degrees), the speed the
+/// rider pushes himself to (km/h) and how hard: words [0..=5], [11], [12]. Rows: 0 off the course, 1 groomed
+/// snow, 2 second-line snow, 3 powder, 4 deep powder, 5 ice, 6 structures, 9 rock and concrete, 13 metal,
+/// 18 show-off ramps.
+pub const SURFACES: [[f32; 8]; 20] = {
+    let mut t = [[0.0; 8]; 20];
+    let mut i = 0;
+    while i < 20 {
+        let r = &SURFACE_TABLE[i];
+        t[i] = [r[0], r[1], r[2], r[3], r[4], r[5], r[11], r[12]];
+        i += 1;
+    }
+    t
+};
 
 /// The rest of the surface table: how far above the snow (cm) the board may be before it is in
-/// the air, and how hard the snow damps the board's bounce (1/s). Indexed like `SURFACES`.
-pub const SURF_EXTRA: [[f32; 2]; 20] = [
-    [20.0, 30.0], [2.742, 5.009], [2.849, 5.530], [15.04, 2.842], [30.03, 2.976], [2.775, 4.052], [20.0, 30.0],
-    [21.37, 45.2], [20.0, 39.4], [2.02, 30.0], [20.0, 30.0], [0.70, 17.9], [3.95, 30.0], [2.64, 0.0], [1.56, 30.0],
-    [20.0, 30.0], [20.0, 30.0], [20.0, 30.0], [2.58, 40.0], [20.0, 30.0],
-];
+/// the air, and how hard the snow damps the board's bounce (1/s): words [6] and [9]. Indexed like `SURFACES`.
+pub const SURF_EXTRA: [[f32; 2]; 20] = {
+    let mut t = [[0.0; 2]; 20];
+    let mut i = 0;
+    while i < 20 {
+        t[i] = [SURFACE_TABLE[i][6], SURFACE_TABLE[i][9]];
+        i += 1;
+    }
+    t
+};
 
 /// One axis of rotation in the air (`SpinState_Update`): rate, the band it is held in, and the
 /// largest error the auto-complete may still use.
