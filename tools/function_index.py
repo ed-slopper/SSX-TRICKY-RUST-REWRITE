@@ -237,7 +237,7 @@ METHOD = re.compile(rf"^({PART}|vf\d+|__tf)$")             # CamelCase, vfN plac
 GLOBAL_DATA = re.compile(rf"^g{PART}(_{PART})?$")          # gApp, gCheat_Mallora
 OUR_CLASS = re.compile(rf"^c{PART}$")                       # a class without type info, named by us: cMenuManager
 CLASS_DATA = re.compile(r"^(typeinfo|vtable(_\d+)?)$")     # from tools/rtti_scan.py
-STANDARD = re.compile(r"^_*[a-z][a-z0-9_]*$")              # libc and runtime names: memcpy, __rtti_si
+STANDARD = re.compile(r"^(_*[a-z][a-z0-9_]*|sce[A-Z][A-Za-z0-9]*)$")  # libc and runtime names: memcpy, __rtti_si; Sony's: sceCdRead
 
 
 def check_names():
