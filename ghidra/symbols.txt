@@ -6523,3 +6523,9 @@ G 21a210 Audio_PlayScoreTick
 G 233ff0 Speech_OnTenSecondsLeft
 G 225958 Music_TryScheduleAirLoop
 G 196758 ResetState_GetRespawnPos
+G 1c0020 HUD_GetSpriteRect
+G 173a88 CamControl_Reset
+G 174c58 CamScript_UpdateCutFade
+G 1956c8 Replay_ClearPins
+G 2609b0 RailNode_GetSpline
+G 265c28 FE3D_IsMultiplayer

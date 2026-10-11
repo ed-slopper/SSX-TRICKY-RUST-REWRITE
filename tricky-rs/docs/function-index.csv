@@ -1500,7 +1500,7 @@ address,size,name,system,status
 0x173820,460,BxCamera_Init,camera,not started
 0x1739f0,108,FUN_001739f0,camera?,not started
 0x173a60,36,Camera_CutForReset,camera,not started
-0x173a88,12,FUN_00173a88,boarder?,not started
+0x173a88,12,CamControl_Reset,boarder?,not started
 0x173a98,384,Camera_Reset,camera,not started
 0x173c18,44,FUN_00173c18,race?,not started
 0x173c50,440,Camera_SetFocusRider,camera,not started
@@ -1517,7 +1517,7 @@ address,size,name,system,status
 0x174b38,248,Camera_UpdateCutFade,camera,not started
 0x174c30,24,Camera_StartCutFade,camera,not started
 0x174c48,16,Camera_ForceCutFade,camera,not started
-0x174c58,20,FUN_00174c58,camera?,not started
+0x174c58,20,CamScript_UpdateCutFade,camera?,not started
 0x174c70,40,Camera_ChaseIfIdle,camera,not started
 0x174c98,144,CamScript_CutTo,camera?,not started
 0x174d28,1832,CamScript_BlendLinear,camera?,not started
@@ -2219,7 +2219,7 @@ address,size,name,system,status
 0x195690,28,ReplayPlaylist_Clear,frontend?,not started
 0x1956b0,12,FUN_001956b0,frontend?,not started
 0x1956c0,8,thunk_FUN_00193a78,runtime,host
-0x1956c8,40,FUN_001956c8,frontend?,not started
+0x1956c8,40,Replay_ClearPins,frontend?,not started
 0x1956f0,28,FUN_001956f0,frontend?,not started
 0x195710,28,FUN_00195710,frontend?,not started
 0x1957b0,40,TextBox_Init,render,not started
@@ -2602,7 +2602,7 @@ address,size,name,system,status
 0x1bff08,92,cSaveOverlay::__tf,runtime,host
 0x1bff78,76,cBackdropOverlay::~cBackdropOverlay,frontend,not started
 0x1bffc8,80,cBackdropOverlay::__tf,runtime,host
-0x1c0020,28,FUN_001c0020,frontend?,not started
+0x1c0020,28,HUD_GetSpriteRect,hud,not started
 0x1c0040,8,cScreenOverlay::vf17_1c0040,frontend,not started
 0x1c0048,8,cScreenOverlay::vf16_1c0048,frontend,not started
 0x1c0050,8,cScreenOverlay::Reset,frontend,not started
@@ -4677,7 +4677,7 @@ address,size,name,system,status
 0x260458,668,World_CullVisibility,world,not started
 0x2606f8,412,Course_RemapTextures,race,not started
 0x260898,264,Course_RemapLightmapTextures,race,not started
-0x2609b0,28,FUN_002609b0,world?,not started
+0x2609b0,28,RailNode_GetSpline,boarder,not started
 0x2609d0,328,World_LoadTextures,world,not started
 0x260b18,144,WorldGrid_CellAtPos,world?,not started
 0x260ba8,248,WorldGrid_CellAt,world?,not started
@@ -4788,7 +4788,7 @@ address,size,name,system,status
 0x265af8,20,FE_IsSinglePlayerMode,frontend,not started
 0x265bb8,12,FUN_00265bb8,frontend?,not started
 0x265bc8,28,FUN_00265bc8,frontend?,not started
-0x265c28,36,FUN_00265c28,frontend?,not started
+0x265c28,36,FE3D_IsMultiplayer,frontend?,not started
 0x265c68,8,cFE3D::vf3_265c68,frontend,not started
 0x265ca0,176,cFE3D::cFE3D,frontend,not started
 0x265d50,80,cFE3D::__tf,runtime,host
