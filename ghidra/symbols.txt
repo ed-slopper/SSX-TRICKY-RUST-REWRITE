@@ -5196,3 +5196,5 @@ G 11db00 SpinControl_CalcLandingAlign
 G 12ae18 Boarder_UpdateSkeleton
 G 2057a0 SkinPart_SetChildMatrices
 G 2083d8 RiderSkin_SetRootMatrix
+G 1364d0 BoarderRender_Draw
+G 136370 BoarderRender_PickLod
