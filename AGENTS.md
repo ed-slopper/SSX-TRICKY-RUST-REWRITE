@@ -214,7 +214,12 @@ New people: add your own line (in a `board-` commit) before you claim a row, and
 `r5900:LE:32:default`), auto-analyse, run `ApplySsxSymbols.java` on `ghidra/symbols.txt`. Then follow the
 README of <https://github.com/bethington/ghidra-mcp>: install its Ghidra plugin, start its server from the
 CodeBrowser with the program open, and add it to Claude (`claude mcp add` with the command its README gives).
-Restart Claude and check that `decompile_function` is in the tool list.
+Restart Claude and check that the ghidra-mcp tools (`force_decompile`, `disassemble_function`, `get_functions`, ...)
+are in the tool list. Snags seen on Windows (2026-10-10): a project made on Linux opens only after its owner in
+`ssxtricky.rep/project.prp` is changed to your user name; ghidra-mcp's Gradle build asks for exactly JDK 21
+(install one, or build with your newer JDK and `options.release = 21`); its plugin is enabled in the **project**
+window (File > Configure > Utility), and Ghidra must be restarted after `deploy` for it to appear. Point the bridge
+at `uv.exe` by its full path.
 
 ## 15. Building and checking
 
