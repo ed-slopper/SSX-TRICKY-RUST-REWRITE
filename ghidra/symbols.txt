@@ -5040,3 +5040,53 @@ G 222c50 SndSys_FindFreeEvent
 G 222998 SndEvent_Init
 G 221be8 IniReader_ReadQuoted
 G 221988 IniReader_SkipLine
+F 220850 cCrowdSys cCrowdSys
+F 21e8a0 cController cController
+G 2213f8 CrowdSys_GetBoxState
+G 221088 CrowdSys_StartBoxCheer
+G 220538 CrowdBox_StartCheer
+G 220968 CrowdSys_UpdateBoxes
+G 21efb0 CrowdBox_Update
+G 2206e0 CrowdBox_Stop
+G 2206c8 CrowdBox_Arm
+G 21ee70 CrowdBox_Init
+G 2190f0 Sfx_OnTrickBookDone
+G 218eb0 Sfx_OnRiderReset
+G 218b20 Sfx_StopWipeoutLoop
+F 20db18 cBXAudio cBXAudio
+G 211b18 Audio_FreeCourseAudio
+G 211960 Audio_ShutdownRace
+G 211f90 Audio_VolumeDown
+G 211f68 Audio_VolumeUp
+G 211f50 Audio_GetVolumeSlot
+G 212018 Audio_UpdateMusicFade
+G 20dad0 Audio_DeleteSystem
+G 20c0e0 BankMonitor_ResetInstance
+G 20bfe8 BankMonitor_PauseAll
+G 20b948 SndVoice_Pause
+G 20bce8 BankMonitor_FindFreeInstance
+G 20ab48 SndVoice_DopplerPitch
+G 20aab8 SndVoice_DistanceVolume
+G 20a888 BankInstance_Init
+G 2162f0 Sfx_OnWallHit
+G 216960 Sfx_OnRiderCollision
+G 2181e8 Sfx_OnWipeout
+G 2174f8 Sfx_OnAirEnter
+G 217d50 Sfx_UpdateAir
+G 218328 Sfx_OnWipeoutImpact
+G 209c18 BankSlot_Init
+G 20a0b0 BankSlot_Link
+G 20a608 BankManager_LinkSlots
+G 209cf8 BankSlot_Load
+G 208ed8 AsyncSys_QueueLoad
+G 209408 AsyncSys_Update
+G 2006e8 LensFX_Draw
+F 1eb5d0 cReplayControlOverlay cReplayControlOverlay
+F 1ea4d0 cPS2LensFXObjNode cPS2LensFXObjNode
+F 1ea0c0 cPS2GraphicsMan cPS2GraphicsMan
+G 1ff990 VideoStream_Open
+G 1f9c18 RiderProfile_LoadTextures
+G 1f9b90 TrickBook_LoadTextures
+G 1f99f8 OverlayMan_LoadTextures
+G 1f0e80 ScreenAnim_Step
+G 1e4140 Gfx_RenderThread
