@@ -72,7 +72,7 @@ Part of the port notes (index: [README.md](README.md)); units and wording as des
   late wind-up (stat +0x10: (0.54741764 + 0.6545031·s/255)·1.3750083·dt a tick, started by clip 0x222). Pad bit 0x100
   asks for a reset (101.46).
 - `PrewindState_Update` 0x1050e8 proven (G1a4, `boarder::prewind_update` on the G1d/G1e helpers, 20,000 random ticks): from
-  a standing start (rider+0x1dc 0, no jump bit 4, not started, rider+0x418 < 0) it waits for crouch release; else it
+  a standing start (rider+0x1dc 0, no jump bit 4, not started, rider+0x418 < 0, i.e. not finished) it waits for crouch release; else it
   primes both wind-up rates to 2.0005 and, with no wind-up, rides on (clip 0x1ff, state 3). Crouch held (bit 2): boost
   from bit 3, crouch target 1, wind-up targets from the stick fields (bits 5–10 spin, 11–16 flip, /31; rate 2.0005,
   4.0005 off snow), steer ±0.5 from bits 17–22 (or the spin field with bit 0x10) only while moving along the board.

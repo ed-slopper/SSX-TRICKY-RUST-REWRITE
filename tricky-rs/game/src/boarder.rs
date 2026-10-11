@@ -191,7 +191,7 @@ pub fn set_steer_target(target: f32, s: &SteerState) -> (f32, f32) {
 
 /// `Boarder_DrainMeter` 0x11b1f8, once a tick: the uber timer runs down by a tick (to 0; in the air, rider+0x424
 /// = 1, it stops at one tick instead of running out); in TRICKY (`tricky`) the timer and the meter are held at 1;
-/// otherwise a player's (rider+0x418 < 0, `player`) meter drains by the drain stat (stats+0x1b): 15.48 − 15.21 ×
+/// otherwise the meter of a rider still racing (rider+0x418 < 0: not over the line, `player`) drains by the drain stat (stats+0x1b): 15.48 − 15.21 ×
 /// stat/255, × 9.166667e-6 a tick.
 pub fn drain_meter(air: bool, player: bool, drain_stat: u8, tricky: bool, f: &mut Fields) {
     let tick = f32::from_bits(0x3c88_8889);
@@ -273,7 +273,8 @@ pub struct Prewind {
     pub f: Fields,
     /// the prewind state's flag (state+8): the wind-up has started
     pub started: u32,
-    /// rider+0x1dc (the kind of take-off: 0 snow; it picks the wind-up clip column and rate) and rider+0x418
+    /// rider+0x1dc (the kind of take-off: 0 snow; it picks the wind-up clip column and rate) and rider+0x418 (the finish
+    /// time, −1 until the line)
     pub kind: u32,
     pub x418: i32,
     /// the spin and flip wind-ups, [now, rate, target] (rider+0x220.., rider+0x22c..)

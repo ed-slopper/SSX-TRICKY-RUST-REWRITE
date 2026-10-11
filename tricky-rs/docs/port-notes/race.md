@@ -103,7 +103,7 @@ Part of the port notes (index: [README.md](README.md)); units and wording as des
 ## Rank catch-up: the unchecked list walk
 
 Proven on the PS2: `Race_UpdatePlacingsAndRubberBand` 0x115100 runs every 6 ticks (`race+0x18 % 6`), over
-`race+0x88` riders, with `race+0x7c` players (rider+0x418 < 0 marks a human, sorted by `0x7fffffff - x`).
+`race+0x88` riders, with `race+0x7c` players (rider+0x418 is the finish time, race time × 100 set by `Boarder_Finish` 0x11da40, −1 until the line; sorted by `0x7fffffff - x`).
 
 Lead from another version (Xbox `default.xbe`, not `SLUS_203.26`; from the OpenTricky project's notes,
 `port/tools/fork/fix_riderlist.py`, Xbox addresses there): the Xbox function sorts the riders, splits them into a

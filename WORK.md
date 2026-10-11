@@ -412,4 +412,4 @@ matches the original.
 - 2026-10-11 ed-slopper/puffin: G4d done (AI riding modes exact, checked); G4e open (wiring, needs E3d's markers).
 - 2026-10-11 ed-slopper/puffin: claim E3d (the .aip/.sop files as the game reads them).
 - 2026-10-11 ed-slopper/puffin: E3d done (.aip/.sop exact, checked against the game's loader on every course; app reads them from the disc).
-- 2026-10-11 ed-slopper/puffin: G4e course queries done (36acf17); add and claim G4f (path following, before G4e's wiring).
+- 2026-10-11 ed-slopper/puffin: G4e course queries done (36acf17); add and claim G4f (path following, before G4e's wiring).- 2026-10-11 ed-slopper/puffin: correction: rider+0x418 is the finish time (Boarder_Finish 0x11da40; −1 while racing), not 'human vs AI': scoring and the meter drain now stop at the finish for every rider (were: never for AI riders); notes fixed.

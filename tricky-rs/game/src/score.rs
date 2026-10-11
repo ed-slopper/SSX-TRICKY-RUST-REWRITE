@@ -72,7 +72,7 @@ pub struct Score {
     /// +0x130: the last five trick ids, +0x158 where the next goes
     pub recent: [[u32; 2]; 5],
     pub recent_at: i32,
-    /// the rider's +0x418 (through +0x24c): negative for a player
+    /// the rider's +0x418 (through +0x24c): −1 until it crosses the line, then its finish time (`Boarder_Finish`)
     pub rider_418: i32,
 }
 
@@ -464,7 +464,7 @@ impl Score {
         (id, 0 < flips || 0 < spins || 0 < grabs)
     }
 
-    /// `Score_LandTrick` 0x1569b0(rail, a, b): the trick landed. A player (rider+0x418 < 0) scores it: points over
+    /// `Score_LandTrick` 0x1569b0(rail, a, b): the trick landed. A rider still racing (rider+0x418 < 0: not over the line) scores it: points over
     /// the repeats, the chain bonus from two tricks in a chain (not into a rail), air time past four seconds, the
     /// per-rank count and the best trick; then the combo is reset. Returns the meter's share over the repeats
     /// (0.0 for an AI rider). `rail` lands into a rail (its tick count kept).

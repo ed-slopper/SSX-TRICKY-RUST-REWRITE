@@ -466,7 +466,9 @@ impl Rider {
     /// The game's per-tick score step and meter drain (`Score_Tick` 0x156e80, `Boarder_DrainMeter` 0x11b1f8), at
     /// 60 Hz whatever the physics step.
     fn score_ticks(&mut self, dt: f32) {
-        self.sc.rider_418 = if self.ai { 0 } else { -1 };
+        // rider+0x418: −1 until the line, then the finish time (`Boarder_Finish` 0x11da40: race time × 100);
+        // only its sign is read here (STANDIN: the time itself is not kept)
+        self.sc.rider_418 = if self.fin.is_some() { 0 } else { -1 };
         self.tick_acc += dt;
         while self.tick_acc >= 1.0 / 60.0 {
             self.tick_acc -= 1.0 / 60.0;
@@ -476,7 +478,7 @@ impl Rider {
             let mut f = crate::boarder::Fields { meter: self.boost, uber_timer: self.uber_timer, full_count: self.full_count, ..Default::default() };
             // STANDIN: rider+0x424 = 1 taken as "in the air"; the drain stat (stats+0x1b) is our meter_leak
             let air = !self.grounded && self.rail.is_none();
-            crate::boarder::drain_meter(air, !self.ai, stat_byte(self.stats.meter_leak), self.tricky(), &mut f);
+            crate::boarder::drain_meter(air, self.fin.is_none(), stat_byte(self.stats.meter_leak), self.tricky(), &mut f);
             self.boost = f.meter;
             self.uber_timer = f.uber_timer;
         }

@@ -41,7 +41,7 @@ Part of the port notes (index: [README.md](README.md)); units and wording as des
 
 - `Score_LandTrick` 0x1569b0(rail, a, b): a trick (any spin, flip or grab) adds one to the chain (+0xf4), 0.19998 units
   if a chain kind was set (+0x20) and 0.18 more into a rail, then counts repeats (not with +0x18) and announces it.
-  An AI rider (rider+0x418 ≥ 0) stops there: combo reset, share 0. Otherwise share = meter(units)/(n+1),
+  A rider over the line (rider+0x418 ≥ 0: its finish time, `Boarder_Finish` 0x11da40; −1 while racing) stops there: combo reset, share 0 — nothing scores after the finish, for any rider. Otherwise share = meter(units)/(n+1),
   points = points/(n+1) + chain bonus (none for 0–1 tricks, 4,000 per trick from two up to 16,000; skipped into a
   rail, chain cleared either way) + 1,000 a whole second of air from four (+0x44 ticks ÷ 60). Points > 0 push a
   2.5 s message (kind 2, 3 if a repeat) and count toward the rank table (0/1001/2501/4001/7501/11501).
@@ -62,9 +62,9 @@ Part of the port notes (index: [README.md](README.md)); units and wording as des
   (`Score_AddGrab` 0x1571e0: not again if it is the last one, three at most), +0x5c counts ubers and +0x58 other
   grabs, hold time summed (+0x50) and longest kept (+0x54), units += seconds × 0.04500384 × the grab's rate.
 - Landing adds +0x5c into score+0x88 = rider+0x58a8: `Boarder_IsTricky` is that total > 5, so TRICKY is the sixth
-  uber landed (an AI rider's landing never adds it).
+  uber landed (a landing after the finish never adds it).
 - `Boarder_DrainMeter` 0x11b1f8 each tick: the uber timer −1/60 to 0, except in the air (+0x424 = 1) where it
-  holds at one tick; TRICKY holds timer and meter at 1; else a player's meter drains (15.483508 − 15.210359 ×
+  holds at one tick; TRICKY holds timer and meter at 1; else the meter of a rider still racing (rider+0x418 < 0) drains (15.483508 − 15.210359 ×
   stat/255) × 9.166667e-6 a tick (stats+0x1b).
 
 ## Who calls the score functions (board row G2d; wired in `Rider`, `tricky-rs/game/src/rider.rs`)
