@@ -83,7 +83,6 @@ state machine and the renderer are ours. Nothing has been checked against the or
 | G1b | Rails checked: `RailSlideMotion_Update` 0x10b0d0, `RailSlideControl_Update` 0x1073e0, `Rail_TryCapture` 0x125cb8 | any | F4a | | [repo] README: rail speeds "still mine"; find what isn't ported |
 | G1c | Finish, reset and gate states: `FinishState_Update` 0x106668, `ResetState_Update` 0x106a90, `Boarder_RequestReset` 0x118f10, `GateAnticipate_*` | any | F4a | | [repo] |
 | G2 | Tricks and scoring checked: `Score_*` 0x155410–0x157490, `Score_BuildTrickId` 0x157490, `Score_FormatTrickName` 0x1551c0, repeats, chains, multipliers, uber timer, TRICKY | any | F4a | | [repo] Ported in `rider.rs`/`trickdata.rs` Split: G2a, G2b |
-| G2a | The score object's arithmetic ported exactly into `tricky-game` (`score.rs`) and checked bit for bit: `Score_CalcPoints` 0x155440, `Score_CalcBasePoints` 0x1554c0, `Score_GetMultiplier` 0x155410, `Score_RoundSpinTo180` 0x157198, `Score_UpdateSpin` 0x155e00, `Score_UpdateFlip` 0x155e68, `Score_StartGrab` 0x155ee8, `Score_Tick` 0x156e80 | any | F4a | trailrig/heron (2026-10-11) | Split of G2 |
 | G2b | The rest of G2: `Score_LandTrick` 0x1569b0, `Score_StartTrickChain` 0x156618, `Score_BankPoints` 0x155aa8, `Score_BuildTrickId` 0x157490, `Score_FormatTrickName` 0x1551c0, repeats, chains, uber timer, TRICKY checked; `Rider::step` scores through `score.rs` | any | G2a | | Split of G2 |
 | G3 | Rider attributes and progression: stats per rider and level, training points, boards per rider and their unlock points, outfits | unowned | E12 | | [repo] `trickdata.rs` has the tables; rookie/master is our menu |
 | G4 | AI checked: path following 0x1375c8 / 0x1372f8, rubber band 0x115100 / 0x13a0f0, skill pairs, tricks 0x139d58 / 0x138d60, resets, shoves | any | F4a, E1b | | [repo] Ported in `rider.rs`/`main.rs` |
@@ -210,6 +209,7 @@ matches the original.
 | E9a | Every trigger-script op (0–26) and controller type (0–24, 0x100–0x103) listed with its handler or class and what it does (`TriggerScript_ExecOp` 0x13bfd0, `TriggerScript_Op0_SpawnController` 0x13c5d0), port-notes/scripts.md; rows E9b–E9j; 9 functions named (pickups, their score helpers, camera shake) | P1 | trailrig/heron | 2026-10-11 | bc5ef48 |
 | G1a1 | `Jump_ApplyImpulse` 0x1284e0 ported exactly (`tricky-rs/game/src/jump.rs`: cm, the vector unit's order, the game's own cos 50°/70° and sin 20°, the steep-lip branch) and checked bit for bit against the original in the function runner on 6,000 random riders, every branch (`tests/jump.rs`) | P2 | trailrig/heron | 2026-10-11 | 559d4f0 |
 | G1a2 | `Takeoff_SetSpinRates` 0x126e30 ported exactly (`jump::takeoff_spin_rates`: the rates, the no-spin clips 0x218/0x260/0x261, which clip routine runs) and checked bit for bit in the function runner on 5,000 random take-offs, with its callees and their order (`tests/takeoff.rs`) | P2 | trailrig/heron | 2026-10-11 | ee98c47 |
+| G2a | The score object's arithmetic ported exactly (`tricky-rs/game/src/score.rs`: points and base points, the meter share, spin rounding, spin/flip/grab units with the grab rate table, the per-tick hold, rail and timer step) and checked bit for bit in the function runner (`tests/score.rs`: 5,000 point calls, 5,000 roundings incl. the extremes, 8,000 unit updates); 8 functions checked | P2 | trailrig/heron | 2026-10-11 | HASH |
 
 ## Changes to the board
 
@@ -277,3 +277,4 @@ matches the original.
 - 2026-10-11 trailrig/heron: G1a2 split into G1a2 (claimed) and G1a3.
 - 2026-10-11 trailrig/heron: G1a2 done (Takeoff_SetSpinRates checked).
 - 2026-10-11 trailrig/heron: split G2 into G2a (claimed) and G2b.
+- 2026-10-11 trailrig/heron: G2a done (8 functions checked).

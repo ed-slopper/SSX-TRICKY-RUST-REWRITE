@@ -4,7 +4,8 @@ Part of the port notes (index: [README.md](README.md)); units and wording as des
 
 ## Meter, uber, scoring (score object boarder+0x5820, `Score_*` 0x155410–0x157490)
 
-- Points = round10(mult·units·6786.545); meter += units·0.6786545·(0.97878+0.35966·a1d)/(repeats+1) (negative too).
+- Points = round10(mult·units·6786.545) (`Score_CalcPoints`; the score object's arithmetic is ported exactly in
+  `tricky-rs/game/src/score.rs` and checked bit for bit, G2a); meter += units·0.6786545·(0.97878+0.35966·a1d)/(repeats+1) (negative too).
 - Units (exact floats in `tricky-rs/game/src/rider.rs`, G17): half spin 0.0699543 (`Score_UpdateSpin`); flip in
   `Score_UpdateFlip` 0x155e68, grab start and grab rate (score+0x2c, by clip id) in `Score_StartGrab` 0x155ee8, hold
   and rail per tick in `Score_Tick` 0x156e80. Values: flip 0.2499898; grab start (n+1)·0.0424975; hold rate·0.000750064/tick;

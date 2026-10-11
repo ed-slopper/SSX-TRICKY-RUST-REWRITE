@@ -1087,9 +1087,9 @@ address,size,name,system,status
 0x155140,64,cTrickInfo::__tf,runtime,host
 0x1551c0,488,Score_FormatTrickName,scoring,ported
 0x1553a8,100,FUN_001553a8,scoring?,not started
-0x155410,48,FUN_00155410,scoring?,not started
-0x155440,128,FUN_00155440,scoring?,not started
-0x1554c0,116,FUN_001554c0,scoring?,not started
+0x155410,48,FUN_00155410,scoring?,checked
+0x155440,128,FUN_00155440,scoring?,checked
+0x1554c0,116,FUN_001554c0,scoring?,checked
 0x155538,80,FUN_00155538,scoring?,not started
 0x155588,1172,FUN_00155588,scoring?,not started
 0x155a20,136,FUN_00155a20,scoring?,not started
@@ -1102,9 +1102,9 @@ address,size,name,system,status
 0x155cd0,196,FUN_00155cd0,scoring?,not started
 0x155d98,44,FUN_00155d98,scoring?,not started
 0x155dc8,52,FUN_00155dc8,scoring?,not started
-0x155e00,100,FUN_00155e00,scoring?,not started
-0x155e68,128,FUN_00155e68,scoring?,not started
-0x155ee8,356,FUN_00155ee8,scoring?,not started
+0x155e00,100,FUN_00155e00,scoring?,checked
+0x155e68,128,FUN_00155e68,scoring?,checked
+0x155ee8,356,FUN_00155ee8,scoring?,checked
 0x156050,244,FUN_00156050,scoring?,not started
 0x156148,1056,FUN_00156148,scoring?,not started
 0x156568,176,FUN_00156568,scoring?,not started
@@ -1114,10 +1114,10 @@ address,size,name,system,status
 0x156968,72,FUN_00156968,scoring?,not started
 0x1569b0,1068,FUN_001569b0,scoring?,not started
 0x156de0,156,Score_Crash,scoring,ported
-0x156e80,392,FUN_00156e80,scoring?,not started
+0x156e80,392,FUN_00156e80,scoring?,checked
 0x157008,128,FUN_00157008,scoring?,not started
 0x157088,268,FUN_00157088,scoring?,not started
-0x157198,68,FUN_00157198,scoring?,not started
+0x157198,68,FUN_00157198,scoring?,checked
 0x1571e0,128,FUN_001571e0,scoring?,not started
 0x157268,160,FUN_00157268,scoring?,not started
 0x157308,40,FUN_00157308,scoring?,not started

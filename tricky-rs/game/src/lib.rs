@@ -11,6 +11,7 @@ pub mod ground;
 pub mod jump;
 pub mod rails;
 pub mod rivals;
+pub mod score;
 pub mod rider;
 pub mod surface;
 pub mod trickdata;
