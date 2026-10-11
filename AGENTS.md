@@ -126,6 +126,7 @@ A row's Area is a person, `unowned` (nobody's yet, anyone may take it), `any` (s
 | Person | Branch | Area | Files |
 |---|---|---|---|
 | ed-slopper | `main` | Everything so far: the Rust rewrite, the tools, the notes, the mods | `tricky-rs/**`, `tools/**`, `notes/**`, `mods/**`, `ghidra/**` |
+| trailrig | `main` | Nothing of their own yet: `unowned` and `any` rows | |
 
 New people: add your own line (in a `board-` commit) before you claim a row, and take rows that are `unowned` or
 `any` until an owner hands an area over.
