@@ -937,7 +937,7 @@ address,size,name,system,status
 0x14c2c0,8,FUN_0014c2c0,frontend?,not started
 0x14c2c8,8,FUN_0014c2c8,frontend?,not started
 0x14c2d0,3176,LessonOverlay_DrawTrickBookPage,frontend,not started
-0x14cf38,120,FUN_0014cf38,frontend?,not started
+0x14cf38,120,LessonOverlay_DrawTrickInfo,frontend,not started
 0x14cfb0,392,LessonOverlay_DrawTrickPage,frontend,not started
 0x14d138,484,LessonOverlay_DrawTipPage,frontend,not started
 0x14d320,700,LessonOverlay_DrawInstructions,frontend,not started
@@ -1092,7 +1092,7 @@ address,size,name,system,status
 0x1554c0,116,Score_CalcBasePoints,scoring,checked
 0x155538,80,FUN_00155538,scoring?,not started
 0x155588,1172,FUN_00155588,scoring?,not started
-0x155a20,136,FUN_00155a20,scoring?,not started
+0x155a20,136,Score_Reset,scoring,not started
 0x155aa8,104,Score_BankPoints,scoring,not started
 0x155b10,164,Score_AddPickupPoints,scoring,not started
 0x155bb8,168,Score_AddPickupTime,scoring,not started
@@ -1149,12 +1149,12 @@ address,size,name,system,status
 0x158b10,248,FUN_00158b10,files?,not started
 0x158c10,40,AnimFile_Bind,animation,ported
 0x158c38,144,FUN_00158c38,frontend?,not started
-0x158cc8,76,FUN_00158cc8,game?,not started
+0x158cc8,76,AnimData_Clear,animation,not started
 0x158d18,76,AnimData_Init,animation,not started
 0x158d68,88,AnimData_GetClipId,animation,not started
 0x158dc0,224,SkelAnim_CreateTree,other,ported
 0x158ea0,284,AnimData_OpenBig,animation,not started
-0x158fc0,176,FUN_00158fc0,files?,not started
+0x158fc0,176,AnimData_PollLoad,animation,not started
 0x159070,208,AnimData_Reset,animation,not started
 0x159140,12,FUN_00159140,files?,not started
 0x159150,1500,AnimData_LoadClipTable,animation,not started
@@ -1415,7 +1415,7 @@ address,size,name,system,status
 0x16bcb0,852,Circuit_ProcessRaceResult,race,not started
 0x16c008,540,Rivals_InitPairsCircuit,race?,not started
 0x16c228,252,FUN_0016c228,race?,not started
-0x16c328,132,FUN_0016c328,race?,not started
+0x16c328,132,Circuit_SaveRiderPoints,save,not started
 0x16c3b0,112,Circuit_AdvanceEvent,race,not started
 0x16c420,3000,Circuit_ProcessUnlocks,race,not started
 0x16cfd8,208,Circuit_SetupRider,race,not started
@@ -2111,7 +2111,7 @@ address,size,name,system,status
 0x191ca0,140,Replay_AddInputStream,camera?,not started
 0x191d30,88,Replay_RemoveInputStream,camera?,not started
 0x191d88,296,Replay_GetStatus,frontend?,not started
-0x191eb0,420,FUN_00191eb0,,not started
+0x191eb0,420,Replay_InsertHighlight,other,not started
 0x192058,288,Replay_RemoveHighlight,camera?,not started
 0x192178,104,Replay_FindHighlight,camera?,not started
 0x1922a8,432,Replay_BeginHighlight,ai?,not started
@@ -2159,8 +2159,8 @@ address,size,name,system,status
 0x1932e8,8,thunk_FUN_001931d0,runtime,host
 0x1932f0,8,ReplayPin_ReleaseThunk,camera?,not started
 0x1932f8,120,ReplayPin_Release,camera?,not started
-0x193370,216,FUN_00193370,camera?,not started
-0x193448,164,FUN_00193448,camera?,not started
+0x193370,216,ReplayPin_Begin,camera?,not started
+0x193448,164,ReplayPin_End,camera?,not started
 0x1934f0,228,ReplayPin_FindWorstSlot,camera?,not started
 0x1935d8,500,ReplayPin_PickSlot,camera?,not started
 0x1937d0,208,ReplayPin_Commit,camera?,not started
@@ -2183,7 +2183,7 @@ address,size,name,system,status
 0x193f70,456,ReplaySave_Step,save,not started
 0x194138,188,ReplaySave_WriteHeader,save,not started
 0x1941f8,56,ReplaySave_EmitHeader,save,not started
-0x194230,52,FUN_00194230,camera?,not started
+0x194230,52,ReplaySave_Reset,save,not started
 0x194268,72,ReplaySave_EmitCamTracks,save,not started
 0x1942b0,60,ReplaySave_BeginKeyframes,save,not started
 0x1942f0,268,ReplaySave_EmitKeyframe,save,not started
@@ -4801,7 +4801,7 @@ address,size,name,system,status
 0x266190,84,FE3DRider_SaveSelection,save,not started
 0x2661e8,8,FUN_002661e8,frontend?,not started
 0x266208,276,FUN_00266208,race?,not started
-0x266320,112,FUN_00266320,,not started
+0x266320,112,FE3DCharacter_LoadRiderAsync,other,not started
 0x266390,84,FUN_00266390,boarder?,not started
 0x2663e8,12,FUN_002663e8,frontend?,not started
 0x2663f8,2556,cFE3DCharacter::vf10_2663f8,frontend,not started
@@ -4813,7 +4813,7 @@ address,size,name,system,status
 0x267508,360,FUN_00267508,frontend?,not started
 0x267670,488,FUN_00267670,frontend?,not started
 0x267858,180,FE3DCharSel_IsOutfitBlocked,frontend?,not started
-0x267910,140,FUN_00267910,frontend?,not started
+0x267910,140,FE3DCharSel_IsOutfitTakenBy,frontend?,not started
 0x2679a0,376,FE3DCharSel_PickFreeOutfit,frontend?,not started
 0x267b18,260,FE3DCharSel_RestoreChoice,frontend?,not started
 0x267c20,36,FUN_00267c20,frontend?,not started
@@ -4879,8 +4879,8 @@ address,size,name,system,status
 0x269998,80,cListFE3DSkipActivityOp::__tf,runtime,host
 0x2699e8,52,cListFE3DOffsetOp::vf1_2699e8,frontend?,not started
 0x269a20,80,cListFE3DOffsetOp::__tf,runtime,host
-0x269a70,92,FUN_00269a70,frontend?,not started
-0x269ad0,56,FUN_00269ad0,frontend?,not started
+0x269a70,92,FE3DGeometry_BindInstance,frontend?,not started
+0x269ad0,56,FE3DGeometry_GetPos,frontend?,not started
 0x269b08,224,cFE3DGeometry::vf10_269b08,frontend,not started
 0x269be8,64,FUN_00269be8,frontend?,not started
 0x269c28,68,cFE3DMovieGeometry::~cFE3DMovieGeometry,frontend,not started
@@ -5731,7 +5731,7 @@ address,size,name,system,status
 0x2b0dd8,160,cFE3DWText::vf11_2b0dd8,frontend,not started
 0x2b0e78,40,cFE3DWText::vf12_2b0e78,frontend,not started
 0x2b0ea0,116,cFE3DWText::vf37_2b0ea0,frontend,not started
-0x2b0f18,80,FUN_002b0f18,frontend?,not started
+0x2b0f18,80,FE3DText_SetWideText,frontend?,not started
 0x2b0f68,76,FE3DText_SetStringId,frontend?,not started
 0x2b0fb8,76,FE3DText_SetText,frontend?,not started
 0x2b1008,100,FE3DText_SetupTextBox,frontend?,not started
@@ -5893,7 +5893,7 @@ address,size,name,system,status
 0x2b7ef0,20,Cstring_Init,comm?,host
 0x2b7f08,80,Cstring_InitChar,comm?,host
 0x2b7f58,196,Cstring_InitAscii,comm?,host
-0x2b8020,120,FUN_002b8020,comm?,host
+0x2b8020,120,Cstring_InitCopy,comm?,host
 0x2b8098,164,Cstring_InitAsciiN,comm?,host
 0x2b8140,128,Cstring_InitWideN,comm?,host
 0x2b81c0,80,FUN_002b81c0,comm?,host
@@ -5978,12 +5978,12 @@ address,size,name,system,status
 0x2bae08,124,FUN_002bae08,audio?,not started
 0x2baeb8,24,FUN_002baeb8,audio?,not started
 0x2baed0,24,FUN_002baed0,audio?,not started
-0x2baf38,220,FUN_002baf38,audio?,not started
-0x2bb018,68,FUN_002bb018,lib-snd?,not started
+0x2baf38,220,SpeechLib_Init,audio?,not started
+0x2bb018,68,SpeechLib_Shutdown,lib-snd?,not started
 0x2bb060,20,FUN_002bb060,lib-snd?,not started
 0x2bb078,20,FUN_002bb078,lib-snd?,not started
 0x2bb090,8,FUN_002bb090,lib-snd?,not started
-0x2bb098,56,FUN_002bb098,lib-snd?,not started
+0x2bb098,56,SpeechLib_SetBankTable,lib-snd?,not started
 0x2bb110,104,FUN_002bb110,lib-snd?,not started
 0x2bb180,108,FUN_002bb180,lib-snd?,not started
 0x2bb1f0,128,FUN_002bb1f0,lib-snd?,not started
@@ -5992,7 +5992,7 @@ address,size,name,system,status
 0x2bb2d8,148,FUN_002bb2d8,lib-snd?,not started
 0x2bb370,188,FUN_002bb370,lib-snd?,not started
 0x2bb430,192,FUN_002bb430,lib-snd?,not started
-0x2bb4f0,284,FUN_002bb4f0,lib-snd?,not started
+0x2bb4f0,284,SpeechLib_RegisterBank,lib-snd?,not started
 0x2bb610,64,FUN_002bb610,lib-snd?,not started
 0x2bb650,92,FUN_002bb650,lib-snd?,not started
 0x2bb6b0,80,FUN_002bb6b0,lib-snd?,not started
@@ -6001,7 +6001,7 @@ address,size,name,system,status
 0x2bb7a0,44,FUN_002bb7a0,lib-snd?,not started
 0x2bb7d0,60,FUN_002bb7d0,lib-snd?,not started
 0x2bb810,196,FUN_002bb810,lib-snd?,not started
-0x2bb8d8,376,FUN_002bb8d8,lib-snd?,not started
+0x2bb8d8,376,SpeechLib_AllocVoice,lib-snd?,not started
 0x2bba50,44,FUN_002bba50,lib-snd?,not started
 0x2bba80,632,SpeechLib_PostEvent,lib-snd?,not started
 0x2bbcf8,108,FUN_002bbcf8,lib-snd?,not started
@@ -6009,7 +6009,7 @@ address,size,name,system,status
 0x2bbd78,88,FUN_002bbd78,lib-snd?,not started
 0x2bbdd0,632,FUN_002bbdd0,lib-snd?,not started
 0x2bc048,292,FUN_002bc048,lib-snd?,not started
-0x2bc200,288,FUN_002bc200,lib-snd?,not started
+0x2bc200,288,SpeechLib_FreeVoice,lib-snd?,not started
 0x2bc320,364,FUN_002bc320,lib-snd?,not started
 0x2bc490,44,FUN_002bc490,lib-snd?,not started
 0x2bc4c0,132,FUN_002bc4c0,lib-snd?,not started
@@ -6062,10 +6062,10 @@ address,size,name,system,status
 0x2be7d8,164,FUN_002be7d8,lib-snd?,not started
 0x2be880,72,FUN_002be880,lib-snd?,not started
 0x2be8c8,64,FUN_002be8c8,lib-snd?,not started
-0x2be908,280,FUN_002be908,lib-snd?,not started
+0x2be908,280,SpeechLib_PickVariant,lib-snd?,not started
 0x2bea20,40,FUN_002bea20,lib-snd?,not started
 0x2bea48,360,FUN_002bea48,lib-snd?,not started
-0x2bebb0,52,FUN_002bebb0,lib-snd?,not started
+0x2bebb0,52,SpeechLib_GetTime,lib-snd?,not started
 0x2bebe8,128,FUN_002bebe8,lib-snd?,not started
 0x2bec68,56,FUN_002bec68,audio?,not started
 0x2beca0,180,Path_Init,audio?,not started
@@ -6087,7 +6087,7 @@ address,size,name,system,status
 0x2c00d0,952,FUN_002c00d0,audio?,not started
 0x2c0488,1040,FUN_002c0488,audio?,not started
 0x2c0898,588,FUN_002c0898,audio?,not started
-0x2c0b08,424,FUN_002c0b08,audio?,not started
+0x2c0b08,424,PathX_RegisterSong,audio?,not started
 0x2c0cb0,872,PathX_LoadSong,audio?,not started
 0x2c1018,80,FUN_002c1018,audio?,not started
 0x2c1068,200,FUN_002c1068,audio?,not started
@@ -6100,7 +6100,7 @@ address,size,name,system,status
 0x2c1500,196,FUN_002c1500,audio?,not started
 0x2c15c8,708,FUN_002c15c8,audio?,not started
 0x2c1890,420,FUN_002c1890,audio?,not started
-0x2c1a38,348,FUN_002c1a38,audio?,not started
+0x2c1a38,348,PathX_StopTracks,audio?,not started
 0x2c1b98,296,FUN_002c1b98,audio?,not started
 0x2c1cc0,248,FUN_002c1cc0,audio?,not started
 0x2c1db8,340,FUN_002c1db8,audio?,not started
@@ -6145,17 +6145,17 @@ address,size,name,system,status
 0x2c5558,28,FUN_002c5558,lib-text?,not started
 0x2c5578,228,WStr_FormatArgs,lib-text?,not started
 0x2c5660,104,FUN_002c5660,lib-file?,host
-0x2c56c8,100,FUN_002c56c8,lib-file?,host
-0x2c5730,44,FUN_002c5730,lib-file?,host
-0x2c5760,68,FUN_002c5760,lib-file?,host
-0x2c57a8,96,FUN_002c57a8,lib-file?,host
+0x2c56c8,100,AsyncFile_AllocSlot,lib-file?,host
+0x2c5730,44,AsyncFile_ResetSlot,lib-file?,host
+0x2c5760,68,AsyncFile_FindSlot,lib-file?,host
+0x2c57a8,96,AsyncFile_FreeSlot,lib-file?,host
 0x2c5808,144,FUN_002c5808,lib-file?,host
 0x2c5898,52,FUN_002c5898,lib-file?,host
 0x2c58d0,236,FUN_002c58d0,lib-file?,host
 0x2c59c0,212,FUN_002c59c0,lib-file?,host
 0x2c5a98,256,FUN_002c5a98,lib-file?,host
 0x2c5b98,196,FUN_002c5b98,lib-file?,host
-0x2c5c60,208,FUN_002c5c60,lib-file?,host
+0x2c5c60,208,AsyncFile_Init,lib-file?,host
 0x2c5d30,240,FUN_002c5d30,lib-file?,host
 0x2c5e20,172,AsyncFile_Load,lib-file?,host
 0x2c5ed0,200,AsyncFile_LoadInto,lib-file?,host
@@ -6181,13 +6181,13 @@ address,size,name,system,status
 0x2c6e48,40,FUN_002c6e48,lib-file?,host
 0x2c6e70,548,FUN_002c6e70,lib-file?,host
 0x2c7098,220,FUN_002c7098,lib-file?,host
-0x2c7178,168,FUN_002c7178,lib-file?,host
+0x2c7178,168,VideoStream_Close,lib-file?,host
 0x2c7220,76,FUN_002c7220,lib-file?,host
 0x2c7270,108,FUN_002c7270,lib-file?,host
 0x2c72e0,96,FUN_002c72e0,lib-file?,host
 0x2c7340,96,Strm_GetChunk,lib-file?,host
 0x2c73a0,48,FUN_002c73a0,lib-file?,host
-0x2c73d0,248,FUN_002c73d0,lib-file?,host
+0x2c73d0,248,VideoStream_QueueFile,lib-file?,host
 0x2c74c8,268,FUN_002c74c8,lib-file?,host
 0x2c75d8,640,FUN_002c75d8,lib-file?,host
 0x2c7858,456,FUN_002c7858,lib-file?,host
