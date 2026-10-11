@@ -57,7 +57,7 @@ state machine and the renderer are ours. Nothing has been checked against the or
 | E9 | Script machine: `TriggerScript_Run`, `TriggerScript_ExecOp` 0x13bfd0 with every op, controllers (`TriggerScript_Op0_SpawnController` 0x13c600), persistent cell scripts, run at runtime instead of read statically | unowned | E3c | | [repo] `logic.rs` reads SSFLogic.json statically today |
 | E9b2 | Run the script threads in the app (`tricky_game::script` on `tricky_data::ssf` instead of `logic.rs`'s static walk of SSFLogic.json): the world's node list order (`BxList_Add` 0x17d4e8 links new nodes at the head; the update loop's order to confirm), `World_DeleteScriptObject` 0x13bbc0, the starters (area wake, contact, controller goal, the engine's RaceMode / StartCountDown calls) | unowned | E9b, E7 | | Gap of E9b |
 | E9d | World ops 1 (camera node), 2 (effects, spline riders), 8 (sound), 13 (reset), 23 (camera shake `Cam_Shake` 0x177758), 24 (teleport), 25 (rail switch `RailMan_SetRail` 0x149030) | unowned | E9b | | Gap of E9a |
-| E9e | Logic controllers: `cDebounceNode` (2), `cCounterNode` (6), `cTimerNode` (8), `cTrickTriggerNode` (21), dead-node modes (5, `TriggerScript_ApplyControllerOp` 0x13ac88) | unowned | E9b | | Gap of E9a |
+| E9e | Logic controllers: `cDebounceNode` (2), `cCounterNode` (6), `cTimerNode` (8), `cTrickTriggerNode` (21), dead-node modes (5, `TriggerScript_ApplyControllerOp` 0x13ac88) | unowned | E9b | ed-slopper/puffin (2026-10-11) | Gap of E9a |
 | E9f | Boost controllers: `cBoostNode` (7), `cLapBoostNode` (15), `cRandomBoostNode` (16), `cZBoostNode` (18), `cTubeEndBoostNode` (24) | unowned | E9b | | Gap of E9a. G14 checks 15 and 18 |
 | E9g | Breakables: `cFenceNode` (12), `cCrackedNode` (14), `cMeshAnimNode` (20) | unowned | E9b | | Gap of E9a |
 | E9h | Movers: `cRollerNode` (0), `cRailNode` (9) | unowned | E9b | | Gap of E9a |
@@ -471,3 +471,4 @@ matches the original.
 - 2026-10-11 ed-slopper/puffin: E3c1 done.
 - 2026-10-11 ed-slopper/puffin: claim E9b (its script data now from E3c1).
 - 2026-10-11 ed-slopper/puffin: E9b done; added E9b2 (running the threads in the app).
+- 2026-10-11 ed-slopper/puffin: claim E9e.
