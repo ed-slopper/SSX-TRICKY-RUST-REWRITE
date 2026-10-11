@@ -151,3 +151,15 @@ Part of the port notes (index: [README.md](README.md)); units and wording as des
   to the jump; no target → the line; not a rival → near it.
 - In line mode the game reads an unset stack word for "rival" if a target were kept; it never is (line mode has
   no target).
+
+## The course queries, exactly (row G4e, checked: `tests/aicomp.rs`)
+
+- The rider's current AI path is at rider+0x57a4, its distance along at rider+0x344 and the last at rider+0x340.
+  `cPath::vf0` 0x197910 (vtable +0xc; `cEventPath`'s 0x1969b0 measures from the end) gives the events
+  overlapping from..to (a static list at 0x337ef0) and sets a type bit for each that begins after `from` or runs
+  past `to`.
+- `AIComputer_FindJumpMarker` 0x1392a8: events from rider+0x340 to 300 cm past the rider; the first jump marker
+  (file event 100): the speed to ride at (value >> 2) × 27.777777 cm/s (the value's km/h), [inside already (its start
+  ≤ the rider's distance), value bit 1, value bit 0] (the last two go to `AIComputer_PlanJumpTrick`).
+  `AIComputer_FindSpeedHint` 0x1393e0: to 600 cm past; the first speed hint (event 101): value × 27.777777 cm/s,
+  inside already.

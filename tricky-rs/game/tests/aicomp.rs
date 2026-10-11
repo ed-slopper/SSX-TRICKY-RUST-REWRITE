@@ -360,3 +360,84 @@ fn riding_modes_match_the_original() {
     }
     println!("mode changes {seen:?}");
 }
+
+#[test]
+fn course_queries_match_the_original() {
+    // `AIComputer_FindJumpMarker` 0x1392a8 and `AIComputer_FindSpeedHint` 0x1393e0 on a `cAIPath` in memory (its
+    // vtable the game's, 0x38abd8, so its query `cPath::vf0` 0x197910 runs), and the query alone
+    use tricky_game::aicomp::{events_between, find_jump_marker, find_speed_hint, PathEvent};
+    let Some(mut w) = world() else { return };
+    w.r.allow(0x197910);
+    let path = w.r.mem.alloc(0x40);
+    let evs = w.r.mem.alloc(16 * 40);
+    let outs = w.r.mem.alloc(0x20);
+    w.r.mem.write_u32(path + 0x34, 0x38abd8);
+    w.r.mem.write_u32(w.rider + 0x57a4, path);
+    let mut g = Rng(0x5e21_c0a4_7d93_1f86);
+    let mut seen = [0u32; 4];
+    for case in 0..30_000 {
+        let n = (g.next() % 12) as usize;
+        let mut events = Vec::new();
+        for _ in 0..n {
+            let s = g.f(0.0, 3000.0);
+            events.push(PathEvent { kind: [0x19, 0x1a, 0x1f, 0, 0x1b][g.next() as usize % 5], value: g.next() % 400, start: s, end: s + [0.0, g.f(0.0, 800.0)][g.next() as usize % 2] });
+        }
+        for (k, e) in events.iter().enumerate() {
+            let a = evs + 16 * k as u32;
+            w.r.mem.write_u32(a, e.kind);
+            w.r.mem.write_u32(a + 4, e.value);
+            w.r.mem.write_f32(a + 8, e.start);
+            w.r.mem.write_f32(a + 12, e.end);
+        }
+        w.r.mem.write_u32(path, n as u32);
+        w.r.mem.write_u32(path + 4, evs);
+        let at = g.f(0.0, 3000.0);
+        let from = if g.next() % 4 == 0 { at + g.f(0.0, 400.0) } else { at - g.f(0.0, 100.0) };
+        w.r.mem.write_f32(w.rider + 0x340, from);
+        w.r.mem.write_f32(w.rider + 0x344, at);
+        let sp0 = g.f(100.0, 3000.0);
+        for which in 0..2 {
+            w.r.mem.write_f32(w.out, sp0);
+            for k in 0..3 { w.r.mem.write_u32(outs + 4 * k, 0x77); }
+            w.r.cpu.set_gpr(4, w.comp as u64);
+            w.r.cpu.set_gpr(5, w.out as u64);
+            w.r.cpu.set_gpr(6, outs as u64);
+            w.r.cpu.set_gpr(7, (outs + 4) as u64);
+            w.r.cpu.set_gpr(8, (outs + 8) as u64);
+            let addr = if which == 0 { 0x1392a8 } else { 0x1393e0 };
+            w.r.call(addr).unwrap_or_else(|e| panic!("case {case}: {e}"));
+            let found = w.r.cpu.gpr(2) != 0;
+            let sp = w.r.mem.read_f32(w.out);
+            let mut ours_sp = sp0;
+            if which == 0 {
+                let ours = find_jump_marker(&events, from, at, &mut ours_sp);
+                let theirs = found.then(|| [0, 1, 2].map(|k| w.r.mem.read_u32(outs + 4 * k) as i32));
+                assert_eq!(theirs, ours, "case {case}: jump marker in {events:?} from {from} at {at}");
+            } else {
+                let ours = find_speed_hint(&events, from, at, &mut ours_sp);
+                let theirs = found.then(|| w.r.mem.read_u32(outs) as i32);
+                assert_eq!(theirs, ours, "case {case}: speed hint in {events:?} from {from} at {at}");
+            }
+            assert_eq!(sp.to_bits(), ours_sp.to_bits(), "case {case}: speed");
+            seen[which * 2 + found as usize] += 1;
+        }
+        // the query on its own, with its type mask
+        let mask0 = g.next() & 0xffff;
+        w.r.mem.write_u32(outs + 0x10, mask0);
+        let to = at + g.f(-100.0, 800.0);
+        w.r.cpu.set_f(12, from);
+        w.r.cpu.set_f(13, to);
+        w.r.cpu.set_gpr(4, path as u64);
+        w.r.cpu.set_gpr(5, outs as u64);
+        w.r.cpu.set_gpr(6, (outs + 0x10) as u64);
+        w.r.cpu.set_gpr(7, 0);
+        w.r.call(0x197910).unwrap_or_else(|e| panic!("case {case}: query {e}"));
+        let count = w.r.cpu.gpr(2) as usize;
+        let list = w.r.mem.read_u32(outs);
+        let theirs: Vec<usize> = (0..count).map(|k| ((w.r.mem.read_u32(list + 4 * k as u32) - evs) / 16) as usize).collect();
+        let mut mask = mask0;
+        let ours = events_between(&events, from, to, &mut mask);
+        assert_eq!((theirs, w.r.mem.read_u32(outs + 0x10)), (ours, mask), "case {case}: query {from}..{to} over {events:?}");
+    }
+    assert!(seen.iter().all(|n| *n > 1000), "jump none/found, hint none/found: {seen:?}");
+}

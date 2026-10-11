@@ -454,3 +454,62 @@ impl Ai {
         word
     }
 }
+
+// ---- the course queries (board row G4e)
+
+/// One event of an AI path as the game keeps it in memory: its type as the place in the event table (0x19 a
+/// jump marker, file code 100; 0x1a a speed hint, 101; `tricky_data::aip::EVENT_TYPES`), value, start, end.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct PathEvent {
+    pub kind: u32,
+    pub value: u32,
+    pub start: f32,
+    pub end: f32,
+}
+
+/// `cPath::vf0` 0x197910 (`cAIPath`'s query, vtable +0xc): the events overlapping `from..to` (none when `to` is
+/// before `from`), in order, and in `mask` a bit for the type of each that begins after `from` or runs past `to`.
+pub fn events_between(events: &[PathEvent], from: f32, to: f32, mask: &mut u32) -> Vec<usize> {
+    if to < from {
+        return Vec::new();
+    }
+    let mut out = Vec::new();
+    for (k, e) in events.iter().enumerate() {
+        if e.start <= to && from <= e.end {
+            if !(e.start <= from) || to < e.end {
+                *mask |= 1 << (e.kind & 0x1f);
+            }
+            out.push(k);
+        }
+    }
+    out
+}
+
+/// `AIComputer_FindJumpMarker` 0x1392a8: the first jump marker (type 0x19) on the rider's path from rider+0x340
+/// (`from`) to 300 cm past rider+0x344 (`at`, its distance along). Sets the speed to ride at to (value >> 2) ×
+/// 27.777777 cm/s (km/h) and gives [inside it already, value bit 1, value bit 0].
+pub fn find_jump_marker(events: &[PathEvent], from: f32, at: f32, speed: &mut f32) -> Option<[i32; 3]> {
+    let mut mask = 0;
+    for k in events_between(events, from, at + 300.0, &mut mask) {
+        let e = events[k];
+        if e.kind == 0x19 {
+            *speed = ((e.value as i32) >> 2) as f32 * 27.777_777;
+            return Some([(e.start <= at) as i32, (e.value as i32) >> 1 & 1, (e.value & 1) as i32]);
+        }
+    }
+    None
+}
+
+/// `AIComputer_FindSpeedHint` 0x1393e0: the first speed hint (type 0x1a) from rider+0x340 to 600 cm past the
+/// rider: the speed to ride at value × 27.777777 cm/s (km/h), and whether the rider is inside it already.
+pub fn find_speed_hint(events: &[PathEvent], from: f32, at: f32, speed: &mut f32) -> Option<i32> {
+    let mut mask = 0;
+    for k in events_between(events, from, at + 600.0, &mut mask) {
+        let e = events[k];
+        if e.kind == 0x1a {
+            *speed = e.value as i32 as f32 * 27.777_777;
+            return Some((e.start <= at) as i32);
+        }
+    }
+    None
+}
