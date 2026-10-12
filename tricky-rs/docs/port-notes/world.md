@@ -264,6 +264,27 @@ Part of the port notes (index: [README.md](README.md)); units and wording as des
   controllers of each kind and scripts), 3,200 steps of marking, ageing, updating, releasing and whole ticks with
   1, 2 or 4 riders: every script started and controller call in order, the flags, the slots and the riders' cells.
 
+## Rigid bodies (row E8c1; `tricky_game::rigidbody`, checked: `tests/rigidbody.rs`)
+
+- `cRigidBody` (a roller node's +0x30): +8 the inverse mass, +0xc the world inverse inertia (3 × 3 column by column:
+  ωx = (i0·Lx + i3·Ly) + i6·Lz), +0x30 the position, +0x40 the orientation (w first), +0x50 the momentum, +0x60 the
+  angular momentum, +0x70 the velocity, +0x80 the spin. The momenta are the state; v and ω are derived.
+- `RigidBody_SetPosition` 0x153808 sets the spin, not the position: ω stored, L = (I⁻¹)⁻¹·ω by cofactors.
+- `RigidBody_UpdateVelocity` 0x153ad8: v = p·(1/m), ω = I⁻¹·L; |ω| above 23.561945 rad/s scales ω and L down.
+- `RigidBody_Integrate` 0x153c50(dt, force, torque): explicit Euler from the old rates: x += v·dt; q += ½(0, ω)q·dt,
+  normalised (a zero quaternion becomes w = 1); p += F·dt, L += τ·dt. v and ω wait for the next UpdateVelocity.
+- `RigidBody_AddImpulse` 0x154338(r, j): p += j, L += r × j, then v and ω (no spin limit).
+- `RigidBody_ContactImpulse` 0x153ee8(e, μ, point, n): no check that the point moves into the surface (callers do).
+  With μ ≠ 0 first a sliding impulse: j = −μ·|v_t| / (1/m + t·((I⁻¹(r × t)) × r)) along t = v_t/|v_t| (not limited
+  by the normal impulse: friction proportional to the sliding speed), and if the point then leaves the surface
+  (v·n > 0) it stops there. Then the bounce −(1 + e)(v·n) / (1/m + n·((I⁻¹(r × n)) × r)) along n. The dot products
+  are the VU0's four-lane ones, so a w in n or the point counts.
+- `CollBody_Transform` 0x236498: every sphere centre (and the bounding centre) through a 4 × 4 matrix.
+  `CollBody_PointMassInertia` 0x236530: the spheres as point masses from the table at 0x3a3f68 (4, 2 × 7, 4, 4,
+  2 × 4, 3 × 4: the wipe-out body), giving the mass, the centre of mass and the inertia about it.
+- Checked in the runner on 20,000 cases (random bodies, zero masses, zero quaternions, contacts with no sliding):
+  every field bit for bit.
+
 ## Keyframed objects (`cAnimObjectNode` 0x198810, `cMeshAnimFrame::vf1` 0x1cb498, `AnimCurve_FindSegment` 0x1cb770)
 
 - Model objects with an Animation: base pose U1..U6 (tx, ty, tz cm; rx, ry, rz degrees), AnimationAction a mask

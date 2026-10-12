@@ -45,6 +45,7 @@ pub mod spin;
 pub mod states;
 pub mod stats;
 pub mod rider;
+pub mod rigidbody;
 pub mod surface;
 pub mod terrain;
 pub mod world;
