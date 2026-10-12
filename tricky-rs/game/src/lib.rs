@@ -47,6 +47,7 @@ pub mod rails;
 pub mod reset;
 pub mod rivals;
 pub mod roller;
+pub mod scene;
 pub mod scenery;
 pub mod speech;
 pub mod score;

@@ -107,6 +107,24 @@ Part of the port notes (index: [README.md](README.md)); units and wording as des
   player 1..3). All scene spots are relative to Mdl_StageArea_Finish_0 (frame 2). Clips loop. The rival scene
   plays first; the rival is the rider whose feeling toward the player is strongest (> 2).
 
+## The race scenes' set-up (board row G11b; `tricky_game::scene`, checked: `tests/scene.rs`)
+
+- The scene object (`RaceScene`, 0x5c0 bytes: +0 the scene chosen, +4 fifteen scenes of six slots (a, b, the rider
+  picked), +0x43c the selection, +0x440 the cast, +0x458 the riders list) is filled from the pre-race selection
+  (0x32ecf0 from +0x33c: per scene the script number, then six slots of a, b, rider id, candidate).
+  `RaceScene_SetupFromPicks` 0x169698 copies every slot; one with a candidate draws `Rand_Fx` and takes candidate
+  `r % 1` (the count of candidates never grows past one, so it is always the first; the draw still happens), else −1.
+  Then the riders of all scenes once each, in scene and slot order, `NO_RIDER` (0x1bf) skipped and ending the list
+  under 90. `RaceScene_Reset` sets the scene to 0x10 and drops the selection.
+- `RaceScene_Select` 0x1699a0(scene): for each picked slot `Race_GetRider`(0) and `AnimCtl_FindFirstMarkerFrame`
+  (its +0x46c0, the slot's b as the clip); the slots with a marker become the cast ordered by that frame (ties keep the
+  earlier slot), −1 after them. `RaceScene_GetCast` / `FUN_00169948` count the cast (to −1, at most 6) and the riders
+  (to 0x1bf, 90 when none). `RaceScene_GetScriptName`: `SCRIPTS` (0x32f380, 58 names, RaceLoaded .. Null) by the
+  chosen scene's first word.
+- Checked in the runner on 20,000 random selections and objects: the whole object, the draws and the calls compared.
+  The scene index 0x3cc028 the selection reads (`PreRaceSel_BuildSceneIndex`) is E1b2o's; the cast's clips
+  (`RaceScene_PlayCastClip`, `_StartCastClip`, `_UpdateCastClip`) are animation (G5).
+
 ## Rank catch-up: the unchecked list walk
 
 Proven on the PS2: `Race_UpdatePlacingsAndRubberBand` 0x115100 runs every 6 ticks (`race+0x18 % 6`), over

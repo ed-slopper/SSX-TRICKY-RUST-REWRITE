@@ -1211,7 +1211,7 @@ address,size,name,system,status
 0x15f700,200,AnimCtl_FlushEndedClips,animation,not started
 0x15f7c8,632,AnimCtl_BlendPose,animation,not started
 0x15fa40,196,AnimCtl_GetClipDisplacement,animation,ported
-0x15fb08,172,AnimCtl_FindFirstMarkerFrame,animation,not started
+0x15fb08,172,AnimCtl_FindFirstMarkerFrame,animation,ported
 0x15fbb8,320,RaceScene_SetClipMarker,animation?,not started
 0x15fcf8,216,AnimCtl_PlayClip,animation,ported
 0x15fdd0,16,AnimCtl_GetClip,animation,ported
@@ -1359,7 +1359,7 @@ address,size,name,system,status
 0x168028,344,Rivals_DecayAttitudes,race?,ported
 0x168180,344,Rivals_DecayAttitudes2,race?,ported
 0x1682e0,124,StaticInit_Rivals,race?,not started
-0x168360,808,PreRaceSel_BuildSceneIndex,race,not started
+0x168360,808,PreRaceSel_BuildSceneIndex,race,ported
 0x168688,28,PreRaceSel_Destruct,race,not started
 0x1686a8,116,PreRaceSel_Clear,race,ported
 0x168720,204,PreRaceSel_Choose,race,ported
@@ -1371,13 +1371,13 @@ address,size,name,system,status
 0x168b88,1640,Career_FinalizeRoster,race?,ported
 0x1691f0,392,PreRaceSel_ResolveWithRoster,race,ported
 0x169378,700,PreRaceSel_PickSceneVariants,race,ported
-0x169640,40,RaceScene_Construct,race?,not started
+0x169640,40,RaceScene_Construct,race?,ported
 0x169668,28,RaceScene_Destruct,race?,not started
-0x169688,16,RaceScene_Reset,race?,not started
-0x169698,688,RaceScene_SetupFromPicks,race?,not started
-0x1699a0,444,RaceScene_Select,race?,not started
-0x169b60,84,RaceScene_GetCast,race?,not started
-0x169bb8,48,RaceScene_GetScriptName,race?,not started
+0x169688,16,RaceScene_Reset,race?,checked
+0x169698,688,RaceScene_SetupFromPicks,race?,checked
+0x1699a0,444,RaceScene_Select,race?,checked
+0x169b60,84,RaceScene_GetCast,race?,checked
+0x169bb8,48,RaceScene_GetScriptName,race?,checked
 0x169be8,316,RaceScene_PlayCastClip,race?,not started
 0x169d28,48,StaticDtor_RaceScene,race?,not started
 0x169e38,2876,Career_InitStaticTables,race?,checked
