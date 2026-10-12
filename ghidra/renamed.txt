@@ -648,3 +648,4 @@
 123f00 FUN_00123f00 AirPredict_ClearLandTime
 198fc0 FUN_00198fc0 AnimObjectNode_RefitBox
 2576a8 FUN_002576a8 Vu0_RunPatchProgram
+1fece8 VideoStream_Update FE3DTransition_Update

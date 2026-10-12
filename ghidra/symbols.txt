@@ -4767,7 +4767,7 @@ G 2044c0 BdrLoad_FindPartName
 F 1ffd80 cVideoStreamMan cVideoStreamMan
 F 1c9b20 cFogObjMan cFogObjMan
 G 1ff000 VideoStream_Draw
-G 1fece8 VideoStream_Update
+G 1fece8 FE3DTransition_Update
 G 2001c8 Movie_GetFrameTexture
 G 1f9970 HUD_LoadIconPack
 G 1f9608 SpriteSet_RegisterFirstShape
@@ -6890,3 +6890,11 @@ G 2576a8 Vu0_RunPatchProgram
 G 1537d0 RigidBody_Construct
 G 160b20 AnimMode_WindUpBlend
 G 160af0 AnimMode_GateLeanFrame
+G 1ff2b0 FE3DTransition_StartIn
+G 1ff4c8 FE3DTransition_StartOut
+G 1ff6a0 FE3DTransition_StopFade
+G 25ed70 World_Destruct
+G 260fc0 CellList_Destruct
+G 25ec60 VisList_Construct
+G 257780 Vu0_GetVi1
+G 255df0 CourseDma_TryResolveModels

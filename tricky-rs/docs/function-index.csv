@@ -1607,15 +1607,15 @@ address,size,name,system,status
 0x17a290,100,Pad_GetConfig,input,not started
 0x17a2f8,96,Pad_SetConfig,input,not started
 0x17a3a0,64,cInput::__tf,runtime,host
-0x17a420,416,Input_Init,input,not started
+0x17a420,416,Input_Init,input,ported
 0x17a5c0,152,Input_FreeDevices,input,not started
-0x17a658,12,Pad_LatchButtons,input,not started
-0x17a668,216,Input_ReadDevices,input,not started
-0x17a740,236,InputRecorder_Playback,render?,not started
+0x17a658,12,Pad_LatchButtons,input,ported
+0x17a668,216,Input_ReadDevices,input,ported
+0x17a740,236,InputRecorder_Playback,render?,ported
 0x17a830,16,Input_GetDevice,input,ported
-0x17a840,84,Input_FindPressedDevice,input,not started
-0x17a898,20,Input_GetDevicePressed,input,not started
-0x17a8b0,164,Input_ResetDevices,input,not started
+0x17a840,84,Input_FindPressedDevice,input,ported
+0x17a898,20,Input_GetDevicePressed,input,ported
+0x17a8b0,164,Input_ResetDevices,input,ported
 0x17aa08,76,cPadDevice::cPadDevice,input,not started
 0x17aa58,8,cPadDevice::vf3_17aa58,input,not started
 0x17aa60,8,cPadDevice::vf4_17aa60,input,not started
@@ -1635,8 +1635,8 @@ address,size,name,system,status
 0x17b590,32,cPS2Device::vf3_17b590,render,ported
 0x17b5b0,56,cPS2Device::vf4_17b5b0,render,ported
 0x17b5e8,36,cPS2Device::vf5_17b5e8,render,ported
-0x17b610,44,cPS2Device::vf1_17b610,render,not started
-0x17b640,36,cPS2Device::vf2_17b640,render,not started
+0x17b610,44,cPS2Device::vf1_17b610,render,ported
+0x17b640,36,cPS2Device::vf2_17b640,render,ported
 0x17b668,68,cPS2Device::vf6_17b668,render,not started
 0x17b6b0,68,cPS2Device::vf7_17b6b0,render,not started
 0x17b6f8,80,cPS2Device::__tf,runtime,host
@@ -1813,7 +1813,7 @@ address,size,name,system,status
 0x182dd8,248,cStartScreen::vf4_182dd8,game,not started
 0x182ed0,776,cStartScreen::vf2_182ed0,game,not started
 0x1831d8,720,cStartScreen::vf6_1831d8,game,not started
-0x1834a8,144,Input_GetAnyNewButtons,input,not started
+0x1834a8,144,Input_GetAnyNewButtons,input,ported
 0x183538,296,MemCardMsg_DrawBox,save,not started
 0x183660,292,Overlay_DrawDontRemoveCard,frontend,not started
 0x183788,864,MemCardMsg_DrawOptions,save,not started
@@ -2698,9 +2698,9 @@ address,size,name,system,status
 0x1c8c38,52,BoarderShadow_Init,boarder?,not started
 0x1c8c70,92,BoarderShadow_AllocTexture,boarder?,not started
 0x1c8cd0,124,StaticInit_TerrainObjNode,other,not started
-0x1c8db8,268,cSnowFallMan::cSnowFallMan,render,not started
-0x1c8ec8,512,SnowFall_InitLayers,world?,not started
-0x1c90d0,96,SnowFall_SetDensity,other,not started
+0x1c8db8,268,cSnowFallMan::cSnowFallMan,render,ported
+0x1c8ec8,512,SnowFall_InitLayers,world?,ported
+0x1c90d0,96,SnowFall_SetDensity,other,ported
 0x1c9130,140,SnowFall_SetScale,render?,not started
 0x1c91c0,72,SnowFall_SetRange,game?,not started
 0x1c9218,160,SnowFall_SnapOrigin,render?,not started
@@ -2923,7 +2923,7 @@ address,size,name,system,status
 0x1d4d78,108,FUN_001d4d78,game?,not started
 0x1d4de8,408,MockupEditor_DrawItems,other,not started
 0x1d50b0,208,ParticleSys_InitEmitter,other,not started
-0x1d5180,360,ParticleSys_RandomizeFactors,world?,not started
+0x1d5180,360,ParticleSys_RandomizeFactors,world?,ported
 0x1d52e8,20,ParticleSys_SetSizeRange,world?,not started
 0x1d5300,32,ParticleSys_SetLifeRange,world?,not started
 0x1d5338,68,ParticleSys_SetSpawnPoint,world?,not started
@@ -2936,7 +2936,7 @@ address,size,name,system,status
 0x1d58e0,252,ParticleSys_SetColors,world?,not started
 0x1d59e0,16,ParticleSys_SetTime,world?,ported
 0x1d59f0,24,ParticleSys_AdvanceTime,world?,ported
-0x1d5a08,36,Rand_VuNext,world?,not started
+0x1d5a08,36,Rand_VuNext,world?,ported
 0x1d5a30,304,ParticleSys_StepEmitter,world?,ported
 0x1d5b60,10532,FUN_001d5b60,world?,not started
 0x1d8488,8,FUN_001d8488,ai?,not started
@@ -2948,7 +2948,7 @@ address,size,name,system,status
 0x1d8d48,56,ParticleNode_SaveState,save,not started
 0x1d8d80,64,ParticleSys_ReadReplay,ai?,not started
 0x1d8dc0,44,FUN_001d8dc0,,not started
-0x1d8e30,288,ParticleMan_Init,frontend?,not started
+0x1d8e30,288,ParticleMan_Init,frontend?,ported
 0x1d8f50,132,cParticleMan::~cParticleMan,render,not started
 0x1d8fd8,64,PoolList_Pop,world?,not started
 0x1d9018,68,PoolList_Push,world?,not started
@@ -3270,14 +3270,14 @@ address,size,name,system,status
 0x1fccc8,7716,Sprite_DrawTiledGradient,frontend?,not started
 0x1feaf0,412,HUD_DrawSpriteAnchored,hud,not started
 0x1fecc8,32,FUN_001fecc8,game?,not started
-0x1fece8,792,VideoStream_Update,other,not started
+0x1fece8,792,FE3DTransition_Update,other,not started
 0x1ff000,684,VideoStream_Draw,debugmenu?,not started
-0x1ff2b0,532,FUN_001ff2b0,race?,not started
-0x1ff4c8,200,FUN_001ff4c8,race?,not started
+0x1ff2b0,532,FE3DTransition_StartIn,race?,not started
+0x1ff4c8,200,FE3DTransition_StartOut,race?,not started
 0x1ff590,120,FUN_001ff590,,not started
 0x1ff608,64,FUN_001ff608,,not started
 0x1ff648,80,FE3DTransition_Start,frontend?,not started
-0x1ff6a0,36,FUN_001ff6a0,race?,not started
+0x1ff6a0,36,FE3DTransition_StopFade,race?,not started
 0x1ff6f0,300,VideoStream_Init,audio?,not started
 0x1ff820,112,VideoStreamMan_Destroy,audio?,not started
 0x1ff890,148,VideoStream_CreateFrameTexture,audio?,not started
@@ -3667,7 +3667,7 @@ address,size,name,system,status
 0x21e528,108,Audio_CheerForRider,audio,not started
 0x21e688,8,FUN_0021e688,frontend?,ported
 0x21e690,28,FUN_0021e690,frontend?,not started
-0x21e6c0,28,cBXAudio::vf3_21e6c0,audio,not started
+0x21e6c0,28,cBXAudio::vf3_21e6c0,audio,ported
 0x21e6e8,80,cBXAudio::__tf,runtime,host
 0x21e738,80,FUN_0021e738,game?,not started
 0x21e788,88,FUN_0021e788,render?,not started
@@ -4604,7 +4604,7 @@ address,size,name,system,status
 0x255630,1516,cCourseResolve_PS2::ResolveDataHeader,race,ported
 0x255c20,156,cCourseResolve_PS2::ResolveMeshContext,race,ported
 0x255cc0,304,cCourseResolve_PS2::ResolveParticleMesh,race,ported
-0x255df0,88,FUN_00255df0,race?,not started
+0x255df0,88,CourseDma_TryResolveModels,race,not started
 0x255e48,112,CourseDma_ResolveModels,race,not started
 0x255eb8,80,CourseDma_ResolveModel,race,not started
 0x255f08,232,CourseDma_ResolveModelHierarchies,race,not started
@@ -4618,7 +4618,7 @@ address,size,name,system,status
 0x257630,116,Game_SendVu0InitChain,game,not started
 0x2576a8,96,Vu0_RunPatchProgram,world?,ported
 0x257708,120,Vu0_CopyOutData,world?,not started
-0x257780,12,FUN_00257780,world?,not started
+0x257780,12,Vu0_GetVi1,world?,not started
 0x257810,176,cWorldBoarder::cWorldBoarder,world,ported
 0x2578c0,88,cWorldBoarder::vf3_2578c0,world,ported
 0x257918,92,cWorldBoarder::vf0_257918,world,ported
@@ -4659,12 +4659,12 @@ address,size,name,system,status
 0x25ebd8,8,cWorldLine::vf2_25ebd8,world,not started
 0x25ebe0,80,cWorldLine::__tf,runtime,host
 0x25ec30,44,Vec4_ScaleCopy11,world?,not started
-0x25ec60,40,FUN_0025ec60,world?,not started
+0x25ec60,40,VisList_Construct,world?,not started
 0x25ec88,44,VisList_Clear,world?,not started
 0x25ecb8,16,VisList_Get,world?,not started
 0x25ecc8,28,VisList_Add,other,not started
 0x25ece8,136,cCourseResolve::cCourseResolve,race,not started
-0x25ed70,128,FUN_0025ed70,race?,not started
+0x25ed70,128,World_Destruct,world,not started
 0x25edf0,1704,Course_LoadRenderData,race,not started
 0x25f498,252,Course_Unload,race,not started
 0x25f598,1960,Course_LoadSphereTrees,race,ported
@@ -4689,7 +4689,7 @@ address,size,name,system,status
 0x260f90,8,CellList_Clear,world?,not started
 0x260f98,8,CellList_Add,world?,not started
 0x260fa0,28,FUN_00260fa0,world?,not started
-0x260fc0,28,FUN_00260fc0,world?,not started
+0x260fc0,28,CellList_Destruct,world?,not started
 0x260fe0,80,cCourseResolve::__tf,runtime,host
 0x261060,64,SphereTreeBufCache::__tf,runtime,host
 0x2611b0,72,cWorldSphere::vf0_2611b0,world,not started
