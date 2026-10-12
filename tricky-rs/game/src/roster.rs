@@ -439,3 +439,210 @@ impl crate::career::Career {
         self.bytes[o + 0xe..o + 0x1e].copy_from_slice(&bytes);
     }
 }
+
+/// Everything `Career_BuildRaceRiders` and the other roster builders need outside the career block.
+pub struct RosterCtx<'a> {
+    /// `PreRaceSel` (0x32ecf0)
+    pub sel: &'a mut PreRaceSel,
+    /// `gRider_Table`: 12 entries of 0x38 bytes (0x331ea8), and the strings their +4 point at (NUL included)
+    pub entries: &'a [u8],
+    pub names: &'a [Vec<u8>],
+    /// the board table at 0x332150
+    pub board_points: &'a [u8],
+    pub tables: &'a crate::career::StaticTables,
+    pub sel_tables: &'a RosterTables<'a>,
+    pub env: PlayerRiderEnv,
+    pub rel: &'a dyn crate::career::RelSource,
+}
+
+impl crate::career::Career {
+    fn rider_entry<'a>(ctx: &'a RosterCtx, rider: usize) -> &'a [u8] {
+        &ctx.entries[rider * 0x38..rider * 0x38 + 0x38]
+    }
+
+    /// The player name the slot's +0xc points at, NUL included (the pointer is into the block).
+    fn slot_name(&self, k: usize) -> Vec<u8> {
+        let at = self.ptr(0x30fc + 0x44 * k + 0xc);
+        self.bytes[at..].iter().copied().take_while(|&b| b != 0).chain(std::iter::once(0)).collect()
+    }
+
+    /// `Career_BuildRaceRiders` 0x165cf0: the race's `n` (+0x27dc) riders put in order and set up (`+0x2b0c` = 3).
+    /// The human players' riders first (their slots in order, as many as `n`); if the first slot is still empty
+    /// a random rider (`Rand_Fx % 12`); the pre-race selection made for it; its co-riders next, then (if short)
+    /// random riders by one draw each of `% 10000` in the order of the highest; with two or more riders the
+    /// order shuffled (a draw each, `% n`) and the selection's first two co-riders moved beside the first rider
+    /// (race 0xb: a second place rider moved to the front half); then each rider is set up (`setup_ai_rider`,
+    /// or `setup_player_rider` for a player whose outfit is made different from any other player's of the same
+    /// rider for the call); the roster finalised and the pairs initialised.
+    pub fn build_race_riders(&mut self, ctx: &mut RosterCtx, rand_fx: &mut dyn FnMut() -> u32) {
+        self.w32(0x2b0c, 3);
+        let n = self.r32(0x27dc) as i32;
+        let mut a = [0xci32; 6]; // the riders
+        let mut b = [-1i32; 6]; // their slots
+        let mut rec = 0u32; // the last player's record (sp+0x70)
+        let mut mask = 0u32;
+        let mut count = 0i32;
+        if count != n {
+            let mut slot = 0usize;
+            loop {
+                if (self.bytes[0x30fc + 0x44 * slot] as i8) >= 0 {
+                    let rider = self.r32(self.ptr(0x3110 + 0x44 * slot)) as i32;
+                    b[count as usize] = slot as i32;
+                    a[count as usize] = rider;
+                    rec = self.r32(0x3114 + 0x44 * slot);
+                    mask |= 1u32.wrapping_shl(rider as u32);
+                    count += 1;
+                }
+                slot += 1;
+                if slot >= 4 || count == n {
+                    break;
+                }
+            }
+        }
+        if a[0] == 0xc {
+            count += 1;
+            a[0] = (rand_fx() % 12) as i32;
+            mask |= 1u32.wrapping_shl(a[0] as u32);
+        }
+        let (p6, p7) = (self.r32(0x2af8), self.r32(0x2afc));
+        ctx.sel.choose(a[0] as u32, p6, p7, 3, ctx.sel_tables.rows[..3].try_into().unwrap(), rand_fx);
+        let n = self.r32(0x27dc) as i32;
+        if count != n {
+            for k in 0..5 {
+                let v = ctx.sel.co[k];
+                if v != 0xc && (mask >> (v as u32 & 31)) & 1 == 0 {
+                    a[count as usize] = v;
+                    mask |= 1u32.wrapping_shl(v as u32);
+                    count += 1;
+                }
+                if count == n {
+                    break;
+                }
+            }
+        }
+        if count < n {
+            let mut c = [0i32; 12];
+            for i in 0..12 {
+                c[i] = if (mask >> i) & 1 != 0 { -1 } else { (rand_fx() % 10000) as i32 };
+            }
+            let n = self.r32(0x27dc) as i32;
+            while count < n {
+                let (mut best, mut bi) = (-1i32, 12usize);
+                for (i, &v) in c.iter().enumerate() {
+                    if best < v {
+                        best = v;
+                        bi = i;
+                    }
+                }
+                a[count as usize] = bi as i32;
+                if bi < 12 {
+                    c[bi] = -1;
+                } else {
+                    rec = u32::MAX; // the game's write lands on its record pointer
+                }
+                count += 1;
+            }
+        }
+        let first = a[0];
+        if n >= 2 {
+            let nu = n as usize;
+            for i in 0..nu {
+                let d = rand_fx();
+                let n2 = self.r32(0x27dc);
+                let j = (d % n2) as usize;
+                a.swap(i, j);
+                b.swap(i, j);
+            }
+            let mut t4 = 0usize;
+            if a[0] != first {
+                t4 = 1;
+                while t4 < nu && a[t4] != first {
+                    t4 += 1;
+                }
+            }
+            if self.r32(0x2af8) == 0xb && (2..4).contains(&t4) {
+                a.swap(1, t4);
+                b.swap(1, t4);
+                t4 = 1;
+            }
+            let find = |a: &[i32; 6], v: i32| (0..nu).find(|&i| a[i] == v).map(|i| i as i32).unwrap_or(-1);
+            let c0 = ctx.sel.co[0];
+            if c0 != 0xc {
+                let mut i0 = find(&a, c0);
+                if i0 >= 0 {
+                    if t4 == 0 {
+                        if i0 == 1 {
+                            i0 = 0;
+                        }
+                        a.swap(0, 1);
+                        b.swap(0, 1);
+                        t4 = 1;
+                    }
+                    a.swap(i0 as usize, t4 - 1);
+                    b.swap(i0 as usize, t4 - 1);
+                }
+            }
+            let c1 = ctx.sel.co[1];
+            if c1 != 0xc {
+                let mut i1 = find(&a, c1);
+                if i1 >= 0 {
+                    if t4 == nu - 1 {
+                        let a1 = nu - 2;
+                        a.swap(t4, a1);
+                        b.swap(t4, a1);
+                        if i1 as usize == a1 {
+                            i1 = t4 as i32;
+                        }
+                        t4 = a1;
+                    }
+                    a.swap(i1 as usize, t4 + 1);
+                    b.swap(i1 as usize, t4 + 1);
+                }
+            }
+        }
+        let mut i = 0i32;
+        while i < n.max(0) && (i as usize) < 6 {
+            let iu = i as usize;
+            let rider = a[iu];
+            if b[iu] < 0 {
+                let rival = if rec != 0 && rec != u32::MAX { Some(self.r32(rec.wrapping_sub(crate::career::CAREER_BASE) as usize + 0x164 + 8 * rider as usize) as i32) } else { None };
+                let entry = Self::rider_entry(ctx, rider as usize);
+                let name = &ctx.names[rider as usize];
+                self.setup_ai_rider(iu, entry, name, ctx.board_points, rival, ctx.tables, ctx.env.max_attrib, rand_fx);
+            } else {
+                let s = b[iu] as usize;
+                let prof = self.ptr(0x3110 + 0x44 * s);
+                let outfit = self.r32(prof + 0xc);
+                let mut t = 0;
+                while t < 4 {
+                    if t == s || (self.bytes[0x30fc + 0x44 * t] as i8) < 0 {
+                        t += 1;
+                        continue;
+                    }
+                    let other = self.ptr(0x3110 + 0x44 * t);
+                    if self.r32(other) as i32 != rider {
+                        t += 1;
+                        continue;
+                    }
+                    let (oo, mine) = (self.r32(other + 0xc), self.r32(prof + 0xc));
+                    if oo != mine {
+                        t += 1;
+                        continue;
+                    }
+                    self.w32(prof + 0xc, ((oo as i32 + 1) % 7) as u32);
+                }
+                let player = self.bytes[0x30fc + 0x44 * s] as i8;
+                let word = self.r32((0x168c + 4 * player as isize) as usize);
+                self.w32(0x3100 + 0x44 * s, word);
+                let entry = Self::rider_entry(ctx, self.r32(self.ptr(0x3110 + 0x44 * s)) as usize);
+                let name = self.slot_name(s);
+                self.setup_player_rider(s, iu, entry, &name, ctx.board_points, ctx.tables, &ctx.env);
+                self.w32(prof + 0xc, outfit);
+            }
+            i += 1;
+        }
+        self.finalize_roster(ctx.sel, ctx.sel_tables, rand_fx);
+        let n = self.r32(0x27dc) as i32;
+        self.rivals_init_pairs(n, ctx.rel);
+    }
+}
