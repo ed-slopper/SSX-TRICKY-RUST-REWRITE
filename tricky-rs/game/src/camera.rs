@@ -965,3 +965,45 @@ pub fn region_is_inside(p: &RegionP, entries: &[[f32; 3]], env: &mut dyn RegionE
     }
     0
 }
+
+// ---- CamRegion_CheckCondition 0x171500 ----
+
+/// What the region's own test reads: the region's `+0x184`, `+0x18c`, `+0x188` and the entry it is placed on.
+#[derive(Clone, Debug, Default)]
+pub struct CondP {
+    pub w184: i32,
+    pub w18c: i32,
+    pub f188: f32,
+}
+
+/// The rider of the entry the region is placed on.
+#[derive(Clone, Debug)]
+pub struct CondRider {
+    /// +0x424.
+    pub motion: i32,
+    /// +0x57b8.
+    pub f57b8: f32,
+    /// +0x57c0.
+    pub v57c0: [f32; 3],
+}
+
+/// `CamRegion_CheckCondition` 0x171500: with `+0x184` set, the rider must be moving (+0x57b8 over 0.33) and at
+/// least `f188` from the entry's offset; otherwise a region without `+0x18c` always holds, and one with it
+/// holds while the rider's motion is 5 or 6.
+pub fn region_check_condition(p: &CondP, rider: Option<&CondRider>, p14: [f32; 3]) -> u64 {
+    if p.w184 == 0 {
+        if p.w18c == 0 {
+            return 1;
+        }
+        return match rider {
+            None => 0,
+            Some(r) => (r.motion == 5 || r.motion == 6) as u64,
+        };
+    }
+    let Some(r) = rider else { return 0 };
+    if !(f32::from_bits(0x3ea8_f5c3) < r.f57b8) {
+        return 0;
+    }
+    let d = [r.v57c0[0] - p14[0], r.v57c0[1] - p14[1], r.v57c0[2] - p14[2]];
+    (p.f188 <= dot3(d, d).sqrt()) as u64
+}
