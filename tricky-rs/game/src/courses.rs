@@ -163,3 +163,46 @@ pub fn skies(course: u32) -> &'static [&'static str] {
         _ => &[],
     }
 }
+
+/// The course info's string ids (`Loc_GetString`, E5a2) by course 0..11, as `Course_GetDifficultyString` 0x16b330,
+/// `Course_GetLocationString` 0x16b3f8, `Course_GetVerticalDropString` 0x16b4c0 and `Course_GetLengthString`
+/// 0x16b588 switch on it (9 shares 6's; others the last entry)
+pub const INFO_STRINGS: [[u32; 13]; 4] = [
+    [0xef, 0x20c, 0x2b, 0x141, 0x13b, 0xd, 0x1f1, 0x241, 0x224, 0x1f1, 0x117, 0xc96, 0x117],
+    [0xf2, 0x20f, 0x2e, 0x144, 0x13e, 0x10, 0x1f4, 0x244, 0x227, 0x1f4, 0x119, 0xc98, 0x119],
+    [0xf3, 0x210, 0x2f, 0x145, 0x13f, 0x11, 0x1f5, 0x245, 0x228, 0x1f5, 0x11a, 0xc97, 0x11a],
+    [0xf1, 0x20e, 0x2d, 0x143, 0x13d, 0xf, 0x1f3, 0x243, 0x226, 0x1f3, 0x118, 0xc94, 0x118],
+];
+
+/// Which of the course info strings
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Info {
+    Difficulty = 0,
+    Location = 1,
+    VerticalDrop = 2,
+    Length = 3,
+}
+
+/// The id of a course info string (course as the game's 64-bit argument: anything but 0..11 the last entry)
+pub fn info_string_id(info: Info, course: u64) -> u32 {
+    INFO_STRINGS[info as usize][if course < 12 { course as usize } else { 12 }]
+}
+
+/// The jump tables' answers by course 0..11, then the answer past them: `Course_GetNameStringId` 0x16b650
+/// (0x37ebf0), `Course_GetUnlockHintStringId` 0x16b860 (0x37ec80), `Course_GetDescriptionStringId` 0x16b8e0
+/// (0x37ecb0)
+pub const NAME_IDS: [u32; 13] = [0xe1d, 0xe68, 0xdf8, 0xe3e, 0xe3d, 0xdf5, 0xe65, 0xe6c, 0xe69, 0xe65, 0xe1a, 0xe6d, 0xe1d];
+pub const UNLOCK_HINT_IDS: [u32; 13] = [0xf0, 0x20d, 0x2c, 0x142, 0x13c, 0xe, 0x1f2, 0x242, 0x225, 0x1f2, 0x242, 0xd30, 0x242];
+pub const DESCRIPTION_IDS: [u32; 13] = [0xccd, 0xcce, 0xccf, 0xcd0, 0xcd1, 0xcd2, 0xcd3, 0xcd6, 0xcd4, 0xcd3, 0x240, 0xcd5, 0x240];
+
+/// The course's mark on the venue map (`Course_GetMapMarkerX` 0x16b6d8 / `Course_GetMapMarkerY` 0x16b7b0: float
+/// bits, 0.05 past the table)
+pub const MAP_MARKERS: [[u32; 13]; 2] = [
+    [0x3dbc6a7f, 0x3f6b851f, 0x3ef0a3d7, 0x3df5c28f, 0x3e6147ae, 0x3d0f5c29, 0x3eeb851f, 0x3da3d70a, 0x3f6b851f, 0x3eeb851f, 0x3d4ccccd, 0x3da3d70a, 0x3d4ccccd],
+    [0x3e800000, 0x3ec28f5c, 0x3e947ae1, 0x3ec28f5c, 0x3eae147b, 0x3ebd70a4, 0x3e947ae1, 0x3e4ccccd, 0x3ec28f5c, 0x3e947ae1, 0x3d4ccccd, 0x3e4ccccd, 0x3d4ccccd],
+];
+
+/// A jump-table answer for the course (the game's unsigned compare: anything but 0..11 the last)
+pub fn by_course(table: &[u32; 13], course: u64) -> u32 {
+    table[if course < 12 { course as usize } else { 12 }]
+}

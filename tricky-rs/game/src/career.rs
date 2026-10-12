@@ -1405,7 +1405,7 @@ impl Default for StaticTables {
 
 impl StaticTables {
     /// `Career_InitStaticTables` 0x169e38: once (while `pending`): the tables written and the character cheat's
-    /// word cleared.
+    /// word cleared. (`Career_Construct` 0x161730 runs it, then again through `Circuit_Construct` 0x16bb70.)
     pub fn init(&mut self, cheats: &mut crate::cheats::Cheats) {
         if self.pending != 0 {
             self.pending = 0;
@@ -1420,14 +1420,18 @@ impl StaticTables {
     }
 
     /// `Career_GetBoardWord` 0x16b1d0(character, board)
+    /// (the game indexes one flat table: character · 12 + board)
     pub fn board_word(&self, character: usize, board: usize) -> u32 {
-        self.boards[character][board]
+        let i = 12 * character + board;
+        self.boards[i / 12][i % 12]
     }
 
     /// `Career_GetOutfitWord0` 0x16b1f8 / `Career_GetOutfitWord1` 0x16b248 / `Career_GetRiderAttrib` 0x16b220 /
     /// `Career_GetOutfitWord3` 0x16b270(character, outfit): word 0..3
+    /// (the game indexes one flat table: character · 7 + outfit)
     pub fn outfit_word(&self, character: usize, outfit: usize, word: usize) -> u32 {
-        self.outfits[character][outfit][word]
+        let i = 7 * character + outfit;
+        self.outfits[i / 7][i % 7][word]
     }
 }
 
@@ -1533,5 +1537,71 @@ mod file_tests {
         bad[0x100] ^= 1;
         assert!(!CareerFile::open(Some(&bad), 0, 7, None).1);
         assert!(!CareerFile::open(Some(&img[..100]), 0, 7, None).1);
+    }
+}
+
+impl Career {
+    /// The player's profile (+0x3110 of its slot: character, entry +0x28, entry +0x30, outfit, board)
+    fn profile_at(&self, p: i8) -> usize {
+        self.ptr((0x3110 + 0x44 * self.find_player_slot(p) as isize) as usize)
+    }
+
+    /// `Career_GetPlayerBoardWord` 0x164ac8: the board table's word of the player's character and board
+    pub fn player_board_word(&self, t: &StaticTables, p: i8) -> u32 {
+        let at = self.profile_at(p);
+        t.board_word(self.r32(at) as usize, self.r32(at + 0x10) as usize)
+    }
+
+    /// `Career_GetPlayerBoardWordFor` 0x164b10(player, board)
+    pub fn player_board_word_for(&self, t: &StaticTables, p: i8, board: usize) -> u32 {
+        t.board_word(self.r32(self.profile_at(p)) as usize, board)
+    }
+
+    /// `Career_GetPlayerOutfitWord0` 0x164b60 / `Career_GetPlayerRiderAttrib` 0x164bf8 / `Career_GetPlayerOutfitWord1`
+    /// 0x164c90 / `Career_GetPlayerOutfitWord3` 0x164d28 (`word` 0, 2, 1, 3): the outfit table's word of the player's
+    /// character and outfit
+    pub fn player_outfit_word(&self, t: &StaticTables, p: i8, word: usize) -> u32 {
+        let at = self.profile_at(p);
+        t.outfit_word(self.r32(at) as usize, self.r32(at + 0xc) as usize, word)
+    }
+
+    /// The `…For` forms (0x164ba8, 0x164c40, 0x164cd8, 0x164d70)(player, outfit)
+    pub fn player_outfit_word_for(&self, t: &StaticTables, p: i8, outfit: usize, word: usize) -> u32 {
+        t.outfit_word(self.r32(self.profile_at(p)) as usize, outfit, word)
+    }
+
+    /// `Career_GetPlayerRecordWord1` 0x164f40 / `Career_GetPlayerRecordWord2` 0x164ec0: the profile's word 1 or 2
+    pub fn player_record_word(&self, p: i8, word: usize) -> u32 {
+        self.r32(self.profile_at(p) + 4 * word)
+    }
+
+    /// `Career_SetPlayerRecordWord1` 0x164f78 / `Career_SetPlayerRecordWord2` 0x164ef8
+    pub fn set_player_record_word(&mut self, p: i8, word: usize, v: u32) {
+        let at = self.profile_at(p) + 4 * word;
+        self.w32(at, v);
+    }
+
+    /// `Career_FinishRace` 0x163ab0: a circuit race or show-off advances its event (`Circuit_AdvanceEvent`, the
+    /// next screen at +0x3260); otherwise the next screen is 2, the tutorial (6) going back to the circuit race (4);
+    /// then `Career_UpdateAttributes`.
+    pub fn finish_race(&mut self, circuit: &mut crate::circuit::Circuit, cheats: &crate::cheats::Cheats, setup_event_riders: &mut dyn FnMut(&mut Career, &mut crate::circuit::Circuit)) {
+        let mode = self.r32(0x2afc);
+        if mode.wrapping_sub(4) < 2 {
+            let next = circuit.advance_event(self, setup_event_riders);
+            self.w32(0x3260, next);
+        } else {
+            if mode == 6 {
+                self.w32(0x2afc, 4);
+            }
+            self.w32(0x3260, 2);
+        }
+        self.update_attributes(cheats);
+    }
+
+    /// `Career_SetPendingVideo` 0x163f10: the video's name into +0x3714 (`strcpy`)
+    pub fn set_pending_video(&mut self, name: &[u8]) {
+        let end = name.iter().position(|b| *b == 0).unwrap_or(name.len());
+        self.bytes[0x3714..0x3714 + end].copy_from_slice(&name[..end]);
+        self.bytes[0x3714 + end] = 0;
     }
 }

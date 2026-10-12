@@ -36,7 +36,8 @@ pub struct Unlock {
 }
 
 /// The circuit's globals: `DAT_003353f0` (the show-off final unlocked, `Circuit_GotShowoffFinalUnlock` 0x16bc40),
-/// `DAT_003353f4` (the race final, `Circuit_GotRaceFinalUnlock` 0x16bc30), the list
+/// `DAT_003353f4` (the race final, `Circuit_GotRaceFinalUnlock` 0x16bc30; the career's `Career_GotRaceFinalUnlock`
+/// 0x1618c0 and `Career_GotShowoffFinalUnlock` 0x1618e0 forward to them), the list
 /// and its count `DAT_003353f8`, and the riders out of the circuit race (`DAT_00335664` + 0x10 · character).
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct Circuit {
@@ -315,7 +316,8 @@ impl Circuit {
         2
     }
 
-    /// `Circuit_IsFinalEvent` 0x16bbd0: a circuit race or show-off on its last course
+    /// `Circuit_IsFinalEvent` 0x16bbd0 (and `Career_IsCircuitFinalEvent` 0x1618a0 on the career's set-up): a
+    /// circuit race or show-off on its last course
     pub fn is_final_event(c: &Career) -> bool {
         let race = c.ptr(SETUP + 8);
         let course = c.r32(race + 0x31c);

@@ -260,3 +260,23 @@ count 0x3353f8, the riders out 0x335664 + 0x10 · character). The heats' rider s
   last entry's address), `Circuit_IsFinalEvent` is the seventh.
 - Checked in the runner: 20,000 random careers (players in slots, races in every mode, medals, trick books, flags,
   points) over every function, the block, globals and list compared; every kind of unlock reached.
+
+## The career's remaining wrappers and the course info (board row E12e; checked: `tests/circuit.rs`)
+
+- `Career_FinishRace` 0x163ab0: a circuit race or show-off (4, 5) takes `Circuit_AdvanceEvent`'s answer as the
+  next screen (+0x3260: 4 another heat, 2 done); any other mode 2, the tutorial (6) setting the mode back to 4;
+  then `Career_UpdateAttributes`. `Career_IsCircuitFinalEvent` 0x1618a0 and the final-unlock getters 0x1618c0 /
+  0x1618e0 forward to the circuit's (`Circuit::is_final_event`, its two flags); `Career_Construct` 0x161730 runs
+  `Career_InitStaticTables` twice (itself and through `Circuit_Construct`; the second does nothing).
+- The player's words: the board table at (character, profile +0x10 board), the outfit table at (character, profile
+  +0xc outfit) word 0, 2 (`Career_GetPlayerRiderAttrib`), 1, 3; the `…For` forms take the board or outfit; both
+  tables are read flat (character · 12 + board, character · 7 + outfit), so a board or outfit past the row reads the
+  next character's. The profile's words 1 and 2 have a getter and setter each. `Career_SetPendingVideo` copies a
+  name to +0x3714.
+- The course info (`courses::INFO_STRINGS`, `NAME_IDS`, `UNLOCK_HINT_IDS`, `DESCRIPTION_IDS`, `MAP_MARKERS`): string
+  ids for the difficulty, location, vertical drop and length (switches: course 9 shares Pipedream's, anything else
+  past 11 the last), the name, unlock hint and description ids and the venue map's marker (jump tables 0x37ebf0..
+  0x37ecb0; past course 11 by an unsigned compare: 0xe1d, 0x242, 0x240, 0.05). Course 10 (the trick tutorial) has
+  its own name 0xe1a but the default hint and description.
+- Checked in the runner: each wrapper on the random careers of `tests/circuit.rs` (1,600 cases each kind), the
+  course lookups for courses 0..15 and three values past them.

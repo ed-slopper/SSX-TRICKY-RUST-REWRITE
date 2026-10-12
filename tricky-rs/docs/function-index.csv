@@ -1244,14 +1244,14 @@ address,size,name,system,status
 0x1615e8,84,AnimCtl_EndActionToRide,animation,not started
 0x161640,92,AnimCtl_EndActionStop,animation,not started
 0x1616a0,124,StaticInit_AnimCtl,other,not started
-0x161730,48,Career_Construct,race?,not started
+0x161730,48,Career_Construct,race?,ported
 0x161760,64,Career_Destruct,race?,not started
 0x1617a0,148,Career_InitNewGame,race?,ported
 0x161838,16,FUN_00161838,race?,not started
 0x161840,96,Career_ClearAllPlayerFlags,race?,ported
-0x1618a0,28,Career_IsCircuitFinalEvent,race?,not started
-0x1618c0,28,Career_GotRaceFinalUnlock,race?,not started
-0x1618e0,28,Career_GotShowoffFinalUnlock,race?,not started
+0x1618a0,28,Career_IsCircuitFinalEvent,race?,ported
+0x1618c0,28,Career_GotRaceFinalUnlock,race?,ported
+0x1618e0,28,Career_GotShowoffFinalUnlock,race?,ported
 0x161900,36,Career_IsPlayerActive,race?,ported
 0x161928,364,Profile_SyncAudioSettings,save,ported
 0x161a98,164,Profile_ApplyAudioSettings,save,ported
@@ -1264,7 +1264,7 @@ address,size,name,system,status
 0x1637d0,40,Career_ClearPlayerSlot,frontend?,ported
 0x1637f8,388,Career_MergePlayerRecords,frontend?,ported
 0x163980,292,Career_PrepareRace,race?,ported
-0x163ab0,96,Career_FinishRace,race?,not started
+0x163ab0,96,Career_FinishRace,race?,checked
 0x163b10,36,Career_IsCharacterUnlocked,frontend?,ported
 0x163b38,124,Career_GetModeFlag,frontend?,not started
 0x163bb8,264,Career_IsCourseUnlocked,frontend?,ported
@@ -1273,7 +1273,7 @@ address,size,name,system,status
 0x163e28,72,Career_GetCourseMedal,other,ported
 0x163e70,152,Career_ResetPlayerRecord,race?,ported
 0x163f08,8,FUN_00163f08,game?,not started
-0x163f10,8,Career_SetPendingVideo,frontend?,not started
+0x163f10,8,Career_SetPendingVideo,frontend?,checked
 0x163f18,56,Career_GetPlayerTrickBook,frontend?,not started
 0x163f50,52,Career_GetPlayerFlags,race?,ported
 0x163f88,96,Career_CountPlayerFlags,race?,ported
@@ -1300,24 +1300,24 @@ address,size,name,system,status
 0x164918,52,Career_GetPlayerName,frontend?,ported
 0x164950,20,Career_SetPlayerRiderSlot,frontend?,ported
 0x164968,348,Career_SetPlayerName,race?,ported
-0x164ac8,68,Career_GetPlayerBoardWord,race?,not started
-0x164b10,80,Career_GetPlayerBoardWordFor,race?,not started
-0x164b60,68,Career_GetPlayerOutfitWord0,race?,not started
-0x164ba8,80,Career_GetPlayerOutfitWord0For,race?,not started
-0x164bf8,68,Career_GetPlayerRiderAttrib,race?,not started
-0x164c40,80,Career_GetPlayerRiderAttribFor,race?,not started
-0x164c90,68,Career_GetPlayerOutfitWord1,race?,not started
-0x164cd8,80,Career_GetPlayerOutfitWord1For,race?,not started
-0x164d28,68,Career_GetPlayerOutfitWord3,race?,not started
-0x164d70,80,Career_GetPlayerOutfitWord3For,race?,not started
+0x164ac8,68,Career_GetPlayerBoardWord,race?,checked
+0x164b10,80,Career_GetPlayerBoardWordFor,race?,checked
+0x164b60,68,Career_GetPlayerOutfitWord0,race?,checked
+0x164ba8,80,Career_GetPlayerOutfitWord0For,race?,checked
+0x164bf8,68,Career_GetPlayerRiderAttrib,race?,checked
+0x164c40,80,Career_GetPlayerRiderAttribFor,race?,checked
+0x164c90,68,Career_GetPlayerOutfitWord1,race?,checked
+0x164cd8,80,Career_GetPlayerOutfitWord1For,race?,checked
+0x164d28,68,Career_GetPlayerOutfitWord3,race?,checked
+0x164d70,80,Career_GetPlayerOutfitWord3For,race?,checked
 0x164dc0,56,Career_GetPlayerOutfit,frontend?,ported
 0x164df8,68,Career_SetPlayerOutfit,race?,ported
 0x164e40,56,Career_GetPlayerBoard,race?,ported
 0x164e78,68,Career_SetPlayerBoard,race?,ported
-0x164ec0,56,Career_GetPlayerRecordWord2,race?,not started
-0x164ef8,68,Career_SetPlayerRecordWord2,race?,not started
-0x164f40,56,Career_GetPlayerRecordWord1,race?,not started
-0x164f78,68,Career_SetPlayerRecordWord1,race?,not started
+0x164ec0,56,Career_GetPlayerRecordWord2,race?,checked
+0x164ef8,68,Career_SetPlayerRecordWord2,race?,checked
+0x164f40,56,Career_GetPlayerRecordWord1,race?,checked
+0x164f78,68,Career_SetPlayerRecordWord1,race?,checked
 0x164fc0,1084,Career_CheckNewRecords,race?,ported
 0x165400,104,Career_ClearPlayerFlags,race?,ported
 0x165468,240,Career_GetAttributes,race?,ported
@@ -1391,20 +1391,20 @@ address,size,name,system,status
 0x16b248,36,Career_GetOutfitWord1,race?,checked
 0x16b270,36,Career_GetOutfitWord3,race?,checked
 0x16b298,152,Career_AverageStatGroups,race?,checked
-0x16b330,196,Course_GetDifficultyString,race,not started
-0x16b3f8,196,Course_GetLocationString,race,not started
-0x16b4c0,196,Course_GetVerticalDropString,race,not started
-0x16b588,196,Course_GetLengthString,race,not started
-0x16b650,44,Course_GetNameStringId,race,not started
-0x16b6d8,56,Course_GetMapMarkerX,race,not started
-0x16b7b0,56,Course_GetMapMarkerY,race,not started
-0x16b860,44,Course_GetUnlockHintStringId,race,not started
-0x16b8e0,44,Course_GetDescriptionStringId,race,not started
+0x16b330,196,Course_GetDifficultyString,race,checked
+0x16b3f8,196,Course_GetLocationString,race,checked
+0x16b4c0,196,Course_GetVerticalDropString,race,checked
+0x16b588,196,Course_GetLengthString,race,checked
+0x16b650,44,Course_GetNameStringId,race,checked
+0x16b6d8,56,Course_GetMapMarkerX,race,checked
+0x16b7b0,56,Course_GetMapMarkerY,race,checked
+0x16b860,44,Course_GetUnlockHintStringId,race,checked
+0x16b8e0,44,Course_GetDescriptionStringId,race,checked
 0x16ba18,72,Circuit_FindEntry,race,checked
 0x16ba60,72,Circuit_GetMedalThresholds,race,checked
 0x16baa8,172,Circuit_GetMedal,race,checked
 0x16bb58,20,Circuit_ClampMedalRank,race,checked
-0x16bb70,40,Circuit_Construct,race,not started
+0x16bb70,40,Circuit_Construct,race,ported
 0x16bb98,8,thunk_FUN_0016a978,runtime,host
 0x16bba0,48,RiderSetup_Init,race?,ported
 0x16bbd0,92,Circuit_IsFinalEvent,race,checked

@@ -8,7 +8,7 @@ use std::cell::Cell;
 use std::rc::Rc;
 
 use r5900::Runner;
-use tricky_game::career::{Career, CAREER_BASE, CAREER_SIZE};
+use tricky_game::career::{Career, StaticTables, CAREER_BASE, CAREER_SIZE};
 use tricky_game::cheats::Cheats;
 use tricky_game::circuit::{self, Circuit, Unlock, SETUP};
 use tricky_game::rand::Streams;
@@ -177,7 +177,28 @@ fn circuit_is_the_original() {
         r.mem.write_u32(tbl + 0xc4 + 4 * i, views + 0x100 * i + 0x40);
     }
     let mut g = Rng(0xc12c_0000_0000_0001);
-    let mut counts = [0u32; 9];
+    let mut counts = [0u32; 12];
+    // the static tables, the game's and ours
+    let mut tables = StaticTables::default();
+    let mut cheats = Cheats::default();
+    tables.init(&mut cheats);
+    r.mem.write_u32(0x335258, 1);
+    r.mem.write_u32(0x3352b8, 0);
+    r.mem.write_u32(0x3352ac, 0);
+    r.call(0x169e38).unwrap();
+    // strcpy (MMI loops): the C library's answer
+    r.stub(0x2fd14c, |c, m| {
+        let (d, s) = (c.gpr(4) as u32, c.gpr(5) as u32);
+        for k in 0.. {
+            let b = (m.read_u32((s + k) & !3) >> (8 * ((s + k) & 3))) as u8;
+            m.write_u8(d + k, b);
+            if b == 0 {
+                break;
+            }
+        }
+        c.set_gpr(2, d as u64);
+    });
+    let name = r.mem.alloc(0x40);
     let mut kinds = [0u32; 10];
     for case in 0..20_000 {
         let mut c = random_career(&mut g);
@@ -187,7 +208,7 @@ fn circuit_is_the_original() {
         }
         let state = (c.clone(), ci.clone());
         let setup = (CAREER_BASE + SETUP as u32) as u64;
-        let op = g.below(9);
+        let op = g.below(12);
         counts[op as usize] += 1;
         let what = format!("case {case} op {op}");
         match op {
@@ -232,6 +253,56 @@ fn circuit_is_the_original() {
                 call(&mut r, 0x16d1f8, &[setup, p as u64], &state);
                 circuit::add_points_to_all(&mut c, p as i32);
             }
+            9 => {
+                if g.below(4) == 0 {
+                    c.w32(0x2afc, 6);
+                }
+                let state = (c.clone(), ci.clone());
+                let before = events.get();
+                call(&mut r, 0x163ab0, &[CAREER_BASE as u64], &state);
+                let mut ours_events = 0;
+                c.finish_race(&mut ci, &cheats, &mut |_, _| ours_events += 1);
+                assert_eq!(events.get() - before, ours_events, "{what}: next heat set up");
+            }
+            10 => {
+                // the player's words (profile words in range, boards and outfits past them too)
+                let active: Vec<usize> = (0..4).filter(|&k| c.is_player_active(k)).collect();
+                let k = active[g.below(active.len() as u32) as usize];
+                let p = c.player_id(k);
+                let prof = c.ptr(0x3110 + 0x44 * k);
+                c.w32(prof, g.below(11));
+                c.w32(prof + 0xc, g.below(7));
+                c.w32(prof + 0x10, g.below(12));
+                let state = (c.clone(), ci.clone());
+                let pa = CAREER_BASE as u64;
+                let pp = p as i64 as u64;
+                assert_eq!(call(&mut r, 0x164ac8, &[pa, pp], &state) as u32, c.player_board_word(&tables, p), "{what}: board word");
+                let b = g.below(20) as usize;
+                assert_eq!(call(&mut r, 0x164b10, &[pa, pp, b as u64], &state) as u32, c.player_board_word_for(&tables, p, b), "{what}: board word for");
+                for (f, ffor, w) in [(0x164b60u32, 0x164ba8u32, 0usize), (0x164bf8, 0x164c40, 2), (0x164c90, 0x164cd8, 1), (0x164d28, 0x164d70, 3)] {
+                    assert_eq!(call(&mut r, f, &[pa, pp], &state) as u32, c.player_outfit_word(&tables, p, w), "{what}: outfit word {w}");
+                    let o = g.below(12) as usize;
+                    assert_eq!(call(&mut r, ffor, &[pa, pp, o as u64], &state) as u32, c.player_outfit_word_for(&tables, p, o, w), "{what}: outfit word {w} for {o}");
+                }
+                let mut state = state;
+                for (get, set, w) in [(0x164f40u32, 0x164f78u32, 1usize), (0x164ec0, 0x164ef8, 2)] {
+                    assert_eq!(call(&mut r, get, &[pa, pp], &state) as u32, c.player_record_word(p, w), "{what}: record word {w}");
+                    let v = g.next();
+                    call(&mut r, set, &[pa, pp, v as u64], &state);
+                    c.set_player_record_word(p, w, v);
+                    compare(&mut r, &c, &ci, &what);
+                    state = (c.clone(), ci.clone());
+                }
+            }
+            11 => {
+                let len = g.below(30) as usize;
+                let text: Vec<u8> = (0..len).map(|_| 1 + g.below(255) as u8).chain([0]).collect();
+                for (i, b) in text.iter().enumerate() {
+                    r.mem.write_u8(name + i as u32, *b);
+                }
+                call(&mut r, 0x163f10, &[CAREER_BASE as u64, name as u64], &state);
+                c.set_pending_video(&text);
+            }
             _ => {
                 let theirs = call(&mut r, 0x16bbd0, &[setup], &state) != 0;
                 assert_eq!(theirs, Circuit::is_final_event(&c), "{what}: final");
@@ -251,4 +322,34 @@ fn circuit_is_the_original() {
     }
     eprintln!("ops {counts:?}, unlocks by kind {kinds:?}");
     assert!(kinds.iter().all(|k| *k > 0), "every kind of unlock reached");
+}
+
+/// The course info lookups (`Course_Get*String`, the name, hint and description ids, the map markers) for every
+/// course and past them
+#[test]
+fn course_info_is_the_original() {
+    use tricky_game::courses::{self, Info};
+    let Some(mut r) = Runner::from_env() else { return };
+    r.stub(0x2c5160, |c, _| {
+        let a = c.gpr(5);
+        c.set_gpr(2, a)
+    });
+    let app = r.mem.alloc(0x100);
+    r.mem.write_u32(0x337c58, app);
+    let mut ask = |f: u32, course: u64| {
+        r.cpu.set_gpr(5, course);
+        r.call(f).unwrap();
+        (r.cpu.gpr(2) as u32, r.cpu.f(0).to_bits())
+    };
+    for course in (0..16u64).chain([1 << 40, u64::MAX, 0x8000_0000]) {
+        for (f, info) in [(0x16b330u32, Info::Difficulty), (0x16b3f8, Info::Location), (0x16b4c0, Info::VerticalDrop), (0x16b588, Info::Length)] {
+            assert_eq!(ask(f, course).0, courses::info_string_id(info, course), "{f:#x} course {course}");
+        }
+        for (f, t) in [(0x16b650u32, &courses::NAME_IDS), (0x16b860, &courses::UNLOCK_HINT_IDS), (0x16b8e0, &courses::DESCRIPTION_IDS)] {
+            assert_eq!(ask(f, course).0, courses::by_course(t, course), "{f:#x} course {course}");
+        }
+        for (f, t) in [(0x16b6d8u32, &courses::MAP_MARKERS[0]), (0x16b7b0, &courses::MAP_MARKERS[1])] {
+            assert_eq!(ask(f, course).1, courses::by_course(t, course), "{f:#x} course {course}");
+        }
+    }
 }
