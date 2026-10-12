@@ -24,6 +24,7 @@ pub mod finish;
 pub mod fxrand;
 pub mod gate;
 pub mod hit;
+pub mod taunt;
 pub mod input;
 pub mod inputring;
 pub mod probe;
