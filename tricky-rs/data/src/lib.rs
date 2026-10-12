@@ -14,6 +14,7 @@ pub mod compress;
 pub mod course;
 pub mod disc;
 pub mod ini;
+pub mod inp;
 pub mod intro;
 pub mod level;
 pub mod loc;

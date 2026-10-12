@@ -77,9 +77,27 @@ speaks line 4 if a trick was seen (+0x64) else 5. Practice (8): `Rand_Fx % 3` pi
 ends in PracticeEnd (9, menu 0x22c 0x191 0x18e). End (10): same three-item menu, panel y 330.0 (PreviewEnd/PracticeEnd 240.0,
 Wait 435.0). Exit (11): sets the game object's done flag (+0x54), hides HUD 10 and 0xe.
 
+## The recorded input (C11c)
+
+Read from `cPlayer::GetControls` (calls `FUN_0014b7c8` before and `FUN_0014b8a8`, `FUN_0014b958` after the controls
+when the lesson manager exists), `cLessonPreviewHandler::Enter/Update`. Ported as `tricky-rs/data/src/inp.rs` (`Inp::parse`,
+`Playback`; tested on synthetic bytes, no real `.inp` is in the inputs).
+
+- The 0x4d598-byte buffer is a six-word header (word 0 position, zeroed after loading; word 1 frame count; words 2..5
+  unread) and up to 7200 records of 44 bytes (24 + 7200 x 44 = 0x4d598): a 12-byte control record, then the 32-byte state of
+  the pad device (previous buttons, buttons, six stick floats, read by `Pad_ReadAxis`).
+- Preview (state 5): before the controls are read the pad's state is saved (to lesson +0xbc, 32 bytes) and replaced by the
+  frame at the position; after, the position advances while below the count and the live state is put back. Perform (state 7)
+  only advances the position. The preview ends when the position reaches the count.
+- The game's own replay system is a different thing: `Replay_*Input` keep run-length coded input words
+  (`Replay_ReadInput` 0x192998: 0x1999 words at +0, run counts at +0x6664, count +0x8000, play index +0x8004).
+- The recorder (`InputRecorder_Playback` 0x17a740, `Input_ReadDevices` 0x17a668) is a ring of device states per frame
+  (frame size [1], capacity [2], read [3], write [4], devices from [6]): how the `.inp` files were made is probably that.
+
 ## Not read yet
 
 - Who moves the manager from Init to Intro (the Init handler returns at once; the owner of the manager, C11b2).
 - What the call on the race object (`gApp+0x730 -> +0x1c`, vtable slot +0x54, with 3 or 8) does: the end menus' "retry"
   choice calls it with 8 and requests no state itself (C11b2).
-- `Lesson_ResetScene` 0x14d7d0's callees and the `.inp` player (C11c), the overlays and the load screen (C11d).
+- `Lesson_ResetScene` 0x14d7d0's callees, the contents of `data/tutorial/<rider>.big` (C11c2), the overlays and the load
+  screen (C11d).
