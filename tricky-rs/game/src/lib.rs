@@ -29,6 +29,7 @@ pub mod ground;
 pub mod ground_motion;
 pub mod jump;
 pub mod landing;
+pub mod lesson;
 pub mod math;
 pub mod objanim;
 pub mod orient;

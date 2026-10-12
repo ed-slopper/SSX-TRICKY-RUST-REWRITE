@@ -65,8 +65,21 @@ Overlays: `cLessonOverlay`, `cLessonControllerOverlay` (0x1be4a0..); the results
 `Results_BuildLessonPage` (0x1b1aa8: strings 0xe47 title, 0x191 and 0x18e as the two rows). `Boarder_StartLessonWait`
 0x11afe8, `Speech_LessonLine` 0x231398.
 
+## Handlers, all read (C11b)
+
+Ported as `tricky-rs/game/src/lesson.rs` (`Lesson`, `Env`; unit-tested against the decompiled flow, not runner-checked).
+Flow: Init (1, set by the constructor, handler does nothing) -> Intro (2: speech line 0, camera script `RaceInBlocks2`,
+HUD 10 shown; Update requests Start) -> Start (3; Update waits for `CamScript_IsRunning` to end, then Wait) -> Wait (4).
+From Wait: Preview (5) loads `.inp`, swaps in the lesson pad map (restored in its Exit), speech line 1, ends when the
+recording is played (`rec[0] >= rec[1]`) in PreviewEnd (6, menu 0x22c 0x195 0x191 0x18e: retry list, perform, end
+attempt, exit). Perform (7): speech line 2, clears the replay; Update waits for the attempt-done flag, then End (10); Exit
+speaks line 4 if a trick was seen (+0x64) else 5. Practice (8): `Rand_Fx % 3` picks a camera from {577, 579, 306} (+0xac),
+ends in PracticeEnd (9, menu 0x22c 0x191 0x18e). End (10): same three-item menu, panel y 330.0 (PreviewEnd/PracticeEnd 240.0,
+Wait 435.0). Exit (11): sets the game object's done flag (+0x54), hides HUD 10 and 0xe.
+
 ## Not read yet
 
-The bodies of Init, Intro, Start, PreviewEnd, PracticeEnd, Exit handlers, `Lesson_HandleMenuInput`, `Lesson_ResetScene`,
-`Lesson_RestartRider`, the `.inp` player (who feeds the recorded pad to the rider), the overlays and the load screen:
-see the follow-up rows C11b..C11e.
+- Who moves the manager from Init to Intro (the Init handler returns at once; the owner of the manager, C11b2).
+- What the call on the race object (`gApp+0x730 -> +0x1c`, vtable slot +0x54, with 3 or 8) does: the end menus' "retry"
+  choice calls it with 8 and requests no state itself (C11b2).
+- `Lesson_ResetScene` 0x14d7d0's callees and the `.inp` player (C11c), the overlays and the load screen (C11d).
