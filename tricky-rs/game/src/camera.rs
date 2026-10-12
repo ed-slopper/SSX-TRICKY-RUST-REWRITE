@@ -880,3 +880,88 @@ pub fn collide_push(k: f32, pos: &mut [f32; 3], target: [f32; 3], env: &mut dyn 
     ];
     1
 }
+
+// ---- CamRegion_IsInside 0x171610 ----
+
+/// The camera region record (`*(cam + 4)`), fields named by byte offset.
+#[derive(Clone, Debug, Default)]
+pub struct RegionP {
+    /// +0x3c, +0x68, +0x94: the camera's position.
+    pub pos: [f32; 3],
+    /// +0x150: the reach.
+    pub f150: f32,
+    /// +0x154: the entry the region is placed on.
+    pub w154: i32,
+    /// +0x174: the region is a box turned about two axes (otherwise a cube of side 2·`f150`).
+    pub w174: i32,
+    /// +0x178: the box's length.
+    pub f178: f32,
+    /// +0x17c, +0x180: the box's two turns.
+    pub f17c: f32,
+    pub f180: f32,
+    /// +0x190: the stage area the position is taken from (0: none).
+    pub w190: i32,
+}
+
+pub trait RegionEnv {
+    /// `Cam_StageAreaToWorld` 0x1777d0 on the region's position.
+    fn stage_area_to_world(&mut self, area: i32, v: [f32; 4]) -> StageOut;
+    /// `CamRegion_CheckCondition` 0x171500 (the region's own test).
+    fn check_condition(&mut self) -> u64;
+}
+
+/// `m(i, j)` of the product `b` · `r` as the camera adds it (the same products `rot_apply` takes).
+fn mat_prod(b: [f32; 9], r: [f32; 9]) -> [f32; 9] {
+    let m = |i: usize, j: usize| (b[j] * r[i * 3] + b[3 + j] * r[i * 3 + 1]) + b[6 + j] * r[i * 3 + 2];
+    [m(0, 0), m(0, 1), m(0, 2), m(1, 0), m(1, 1), m(1, 2), m(2, 0), m(2, 1), m(2, 2)]
+}
+
+/// `CamRegion_IsInside` 0x171610: is the camera inside the region placed on `entries[w154]`? Returns the
+/// region's own test (`check_condition`) when it is, else 0.
+pub fn region_is_inside(p: &RegionP, entries: &[[f32; 3]], env: &mut dyn RegionEnv) -> u64 {
+    let mut a = p.pos;
+    let mut yaw = 0.0f32;
+    if p.w190 != 0 {
+        let o = env.stage_area_to_world(p.w190, [a[0], a[1], a[2], 0.0]);
+        yaw = o.yaw;
+        if o.ret {
+            a = [o.v[0], o.v[1], o.v[2]];
+        }
+    }
+    let e = entries[p.w154 as usize];
+    let mut d = [a[0] - e[0], a[1] - e[1], a[2] - e[2]];
+    if p.w174 == 0 {
+        let h = p.f150;
+        if !(d[0].abs() <= h) || !(d[1].abs() <= h) || !(d[2].abs() <= h) {
+            return 0;
+        }
+    } else {
+        let half = p.f178 * 0.5;
+        let h = if half < p.f150 { p.f150 } else { half };
+        if !(d[0].abs() <= h) || !(d[1].abs() <= h) || !(d[2].abs() <= h) {
+            return 0;
+        }
+        let mut ang = p.f17c;
+        if p.w190 != 0 {
+            ang = angle_diff(ang + yaw, 0.0);
+        }
+        let m1 = mat_prod(IDENT3, rot9(0.0, 0.0, 1.0, ang));
+        let m2 = mat_prod(m1, rot9(0.0, 1.0, 0.0, p.f180));
+        let z = 0.0f32;
+        let v = [
+            (m2[0] * half + m2[3] * z) + m2[6] * z,
+            (m2[1] * half + m2[4] * z) + m2[7] * z,
+            (m2[2] * half + m2[5] * z) + m2[8] * z,
+        ];
+        let q = ps2_div((d[0] * v[0] + d[1] * v[1]) + d[2] * v[2], half * half);
+        if !(q.abs() <= 1.0) {
+            return 0;
+        }
+        let s = [v[0] * q, v[1] * q, v[2] * q];
+        d = [d[0] - s[0], d[1] - s[1], d[2] - s[2]];
+    }
+    if dot3(d, d).sqrt() < p.f150 {
+        return env.check_condition();
+    }
+    0
+}
