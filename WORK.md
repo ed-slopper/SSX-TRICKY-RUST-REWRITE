@@ -82,7 +82,7 @@ state machine and the renderer are ours. Nothing has been checked against the or
 | G4a | Rivals and vendettas checked: `RelTable_Init` 0x167208, `Rider_OnKnockedDownBy`, `AI_StartVendetta`, `AI_CoolVendetta` | any | F4a | | [repo] `rivals.rs` Split: G4a1, G4a2 |
 | G4e | The app's computer riders ride with `aicomp::Ai::ride` (the four modes, the shove, the target choice) on the course's own jump markers and speed hints (`AIComputer_FindJumpMarker` 0x1392a8 / `AIComputer_FindSpeedHint` 0x1393e0 over the AI paths, E3d) and the line point (+0x360), replacing `AiDriver`'s steering and throttle | any | G4d, E3d, G4f | | Split of G4 (wiring; needs a play test) |
 | G5 | Animation: the game's own animation state machine and blending for all 248 `bxanim` clips (plus cmanim, ps2anim, ubers), clip markers, replacing our choice of clip | unowned | F1, E4 | | [repo] README: "Which clip plays when is my state logic". Split by state before claiming |
-| G6b | The wipe-out motion on `ragdoll`: `WipeoutMotion_Enter` 0x10c198 / `Update` 0x10c2f0 / `Exit`, `Wipeout_StartGetUp` 0x10f178, `Wipeout_PlayImpactClip` 0x10f9a0, `GetUpMotion_Update` 0x1102c8 checked in the runner | unowned | G6a | | Split of G6 |
+| G6b | The wipe-out motion on `ragdoll`: `WipeoutMotion_Enter` 0x10c198 / `Update` 0x10c2f0 / `Exit`, `Wipeout_StartGetUp` 0x10f178, `Wipeout_PlayImpactClip` 0x10f9a0, `GetUpMotion_Update` 0x1102c8 checked in the runner | unowned | G6a | ed-slopper/puffin (2026-10-11)
 | G6c | The app's wipe-outs on `ragdoll` and G6b (the rider's real collision body from the skeleton) instead of `rider/wipeout.rs`'s 1.7 m stand-in | unowned | G6b, E8d2 | | Split of G6 |
 | G7 | Rendering, as the PS2 renderer does it. Split before claiming: | unowned | E3a, E3b | | [repo] |
 | G7a | Terrain patches: the game's tessellation and LOD, subtractive lightmaps | unowned | G7 | | [repo] README "What the viewer taught us" |
@@ -589,3 +589,4 @@ matches the original.
 - 2026-10-11 trailrig/heron: E1b2a done (E1b2b to E1b2d stay open).
 - 2026-10-11 ed-slopper/puffin: claim G6.
 - 2026-10-11 ed-slopper/puffin: split G6 into G6a (the wipe-out body, done), G6b (the motion), G6c (the app).
+- 2026-10-11 ed-slopper/puffin: claim G6b.
