@@ -135,11 +135,19 @@ by voice 0..11 a bit of 0xfff, 0 past them) and call `SpeechSys_Trigger` at the 
   players' riders near the same listener; who speaks from local player / listener / relation 1 / attitude above 60
   (a also needs its count +0x5c + 0x20 · slot above 0), a `Rand_Fx` bit when both; spoken when their velocities
   along b's heading (`Math_SinCos`, cos · x + sin · y + z · 0) part by 670.56..1788.16: 0x3006019..0x300601c.
-- Checked in the runner: each post four times with random arguments; 60,000 random calls over 43 handlers and
+- Tricks (`Speech_AnnounceTrick` 0x232498(rider, the trick's two words, score)): no replay, a line allowed (+0x6e04),
+  a player's rider; the roll's kind is the score's band (0x3a38e8: 0, 4000, 10000 → 0, 1, 2; below 0 the ten words
+  before the chance table, string data in the exe); then 0x100201c (4, 2, 2, under 4000 1 else 2) and, for the first
+  line since +0x6e00 was cleared and a trick with parts, 0x100200f: the rotation's bit (word 0 bits 24..27, or 28..31
+  when set; 0..10), the stance (word 1 bits 16..19, overridden by bits 12..15, which also add 4 to the last word),
+  the grab and flip counts (bits 8..11), the spin (bits 24..26), the name (byte 1) and move (byte 0, ',' 0x3d) ids
+  and word 1 bits 27..29. The post's answer is kept in +0x6e04 (0 stops later lines); when not 0 the line is counted
+  and byte 2 names a second trick (0x1002010). Last, roll 0x10 in show-off 3 or 5: 0x1002054 with 1.
+- Checked in the runner: each post four times with random arguments; 60,000 random calls over 44 handlers and
   helpers with the speech library, replay, listener, near test, relations, the race's rider 0, the library's
   callbacks, the race clock and `Rand_Fx` scripted the same and random career blocks: every call and draw in order,
-  the checkpoint counts, the big-score ring and the end flags compared. Still to port: `Speech_AnnounceTrick`, the
-  script cues (`Speech_OnScriptCue47` / `48`), the lesson and cam-script lines.
+  the checkpoint counts, the big-score ring and the end flags compared. Still to port: the script cues
+  (`Speech_OnScriptCue47` / `48`), the lesson and cam-script lines.
 
 ## Front-end sounds (`cFE3DSound` → `Audio_PlayFE*`, F1c)
 

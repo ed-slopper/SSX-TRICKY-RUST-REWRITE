@@ -79,12 +79,13 @@ struct World {
     callbacks: Vec<u32>,
     clock: i32,
     after: Vec<i32>,
+    post_ret: u32,
     log: Vec<Ev>,
 }
 
 impl World {
     fn new(seed: u64) -> World {
-        World { rand: seed, replay: false, listener: 0, mode: 0, can_play: true, near: vec![], rel: [[0; 12]; 12], course: 0, app_mode: 0, rider0: 0, callbacks: vec![], clock: 0, after: vec![], log: vec![] }
+        World { rand: seed, replay: false, listener: 0, mode: 0, can_play: true, near: vec![], rel: [[0; 12]; 12], course: 0, app_mode: 0, rider0: 0, callbacks: vec![], clock: 0, after: vec![], post_ret: 1, log: vec![] }
     }
     fn draw(&mut self) -> u32 {
         self.rand ^= self.rand << 13;
@@ -124,8 +125,9 @@ impl SpeechEnv for World {
     fn relation(&mut self, a: u32, b: u32) -> i32 {
         self.rel[a as usize][b as usize]
     }
-    fn post(&mut self, e: Event) {
+    fn post(&mut self, e: Event) -> u32 {
         self.log.push(Ev::Post(e.words.to_vec()));
+        self.post_ret
     }
     fn trigger(&mut self, t: Trigger) -> Vec<u32> {
         self.log.push(Ev::Trigger(t.gain.to_bits(), t.slot, t.at.map_or(0, |r| r + 0x140), t.callback, t.voice));
@@ -179,6 +181,7 @@ fn setup(r: &mut Runner, w: &Rc<RefCell<World>>) {
         let at = c.gpr(4) as u32;
         let words = (0..20).map(|k| m.read_u32(at + 4 * k)).collect();
         x.borrow_mut().log.push(Ev::Post(words));
+        c.set_gpr(2, x.borrow().post_ret as u64);
     });
     let x = w.clone();
     r.stub(0x23d4a8, move |c, _| {
@@ -345,8 +348,10 @@ fn handlers_are_the_original() {
     let riders: Vec<u32> = (0..2).map(|_| r.mem.alloc(0x5900)).collect();
     let entries: Vec<u32> = (0..2).map(|_| r.mem.alloc(0x80)).collect();
     let mut g = Rng(0x5bee_c400_0000_0002);
-    let mut seen = [0u32; 43];
-    let mut posted = [0u32; 43];
+    let mut seen = [0u32; 44];
+    let mut posted = [0u32; 44];
+    let trick_at = r.mem.alloc(8);
+    let mut ids = std::collections::BTreeSet::new();
     for case in 0..60_000 {
         // the speech system
         let n = 1 + g.below(8) as usize;
@@ -357,6 +362,8 @@ fn handlers_are_the_original() {
             checkpoints: [0; 8],
             end_flags: [0u32, 1, 0x10, 0x11][g.below(4) as usize] * (g.below(3) == 0) as u32,
             placing_time: g.below(2000) as i32,
+            tricks_spoken: g.below(3) as i32 * (g.below(2) == 0) as i32,
+            trick_ok: [0u32, 1, 7][g.below(3) as usize] * (g.below(6) != 0) as u32,
             ring: (0..n).map(|_| g.next()).collect(),
             ring_write: g.below(n as u32) as i32,
             ring_read: g.below(n as u32) as i32,
@@ -371,6 +378,8 @@ fn handlers_are_the_original() {
         r.mem.write_u32(sys + 0x7dd8, ann.big_queued);
         r.mem.write_u32(sys + 0x7dcc, ann.end_flags);
         r.mem.write_u32(sys + 0x7ddc, ann.placing_time as u32);
+        r.mem.write_u32(sys + 0x6e00, ann.tricks_spoken as u32);
+        r.mem.write_u32(sys + 0x6e04, ann.trick_ok);
         for c in ann.checkpoints.iter_mut() {
             *c = g.below(6) as i32;
         }
@@ -407,6 +416,7 @@ fn handlers_are_the_original() {
             x.rider0 = riders[g.below(2) as usize];
             x.callbacks = (0..[0, 0, 1, 2][g.below(4) as usize]).map(|_| g.next()).collect();
             x.clock = g.below(3000) as i32;
+            x.post_ret = [0u32, 1, 3][g.below(3) as usize];
             x.after = (0..4).map(|k| if k == 3 || g.below(2) == 0 { -1 } else { g.below(4) as i32 }).collect();
             x.log.clear();
         }
@@ -472,7 +482,7 @@ fn handlers_are_the_original() {
             r.mem.write_u32(0x335408 + 12 * i as u32, u.value as u32);
         }
         let mut ours = w.borrow().clone();
-        let op = g.below(43) as usize;
+        let op = g.below(44) as usize;
         seen[op] += 1;
         let (a, b) = (rs[0], rs[1]);
         let (pa, pb) = (riders[0] as u64, riders[1] as u64);
@@ -672,6 +682,20 @@ fn handlers_are_the_original() {
                 call(&mut r, 0x2347c8, &[s, pa, pb]);
                 ann.on_placing_change(&mut ours, &a, &b);
             }
+            43 => {
+                let byte = |g: &mut Rng, top: u32| if g.below(8) == 0 { g.next() as u8 } else { g.below(top) as u8 };
+                let w0 = byte(&mut g, 46) as u32
+                    | (byte(&mut g, 104) as u32) << 8
+                    | (if g.below(2) == 0 { 0 } else { byte(&mut g, 104) as u32 }) << 16
+                    | (g.next() & 0xff00_0000) * (g.below(3) != 0) as u32;
+                let w1 = g.next() & [0u32, 0xffff_ffff, 0x0f0f_0f00, 0x3f_ff00][g.below(4) as usize];
+                let w0 = if g.below(6) == 0 { w0 & 0xf0ff_0000 } else { w0 };
+                r.mem.write_u32(trick_at, w0);
+                r.mem.write_u32(trick_at + 4, w1);
+                let score = [-50i32, 0, 3999, 4000, 9999, 10000, 25000][g.below(7) as usize];
+                call(&mut r, 0x232498, &[s, pa, trick_at as u64, score as i64 as u64]);
+                ann.announce_trick(&mut ours, &a, [w0, w1], score);
+            }
             42 => {
                 let p = g.below(5) as i32 - 1;
                 let t = call(&mut r, 0x2315e0, &[s, p as i64 as u64]) as u32;
@@ -692,6 +716,11 @@ fn handlers_are_the_original() {
         }
         let theirs = w.borrow().log.clone();
         posted[op] += theirs.iter().filter(|e| matches!(e, Ev::Post(_))).count() as u32;
+        for e in &theirs {
+            if let Ev::Post(wd) = e {
+                ids.insert(wd[0]);
+            }
+        }
         assert_eq!(theirs, ours.log, "case {case} op {op}: calls\nriders {a:?}\n{b:?}");
         for k in 0..8 {
             assert_eq!(r.mem.read_u32(sys + 0x6e6c + 4 * k) as i32, ann.checkpoints[k as usize], "case {case} op {op}: checkpoint {k}");
@@ -701,9 +730,14 @@ fn handlers_are_the_original() {
         assert_eq!(r.mem.read_u32(ring + 8) as i32, ann.ring_write, "case {case} op {op}: ring write");
         assert_eq!(r.mem.read_u32(sys + 0x7dd8), ann.big_queued, "case {case} op {op}: queued");
         assert_eq!(r.mem.read_u32(sys + 0x7dcc), ann.end_flags, "case {case} op {op}: end flags");
+        assert_eq!(r.mem.read_u32(sys + 0x6e00) as i32, ann.tricks_spoken, "case {case} op {op}: tricks spoken");
+        assert_eq!(r.mem.read_u32(sys + 0x6e04), ann.trick_ok, "case {case} op {op}: trick ok");
     }
     eprintln!("ops {seen:?}\nposts by op {posted:?}");
-    for op in (0..25).chain([31, 32, 33, 34, 36, 37, 38, 39, 40, 41]) {
+    for id in [0x100200fu32, 0x1002010, 0x100201c, 0x4008007, 0x4008009, 0x4008013, 0x400800a, 0x400800b, 0x400800c, 0x400800d, 0x3006019, 0x300601a, 0x300601b, 0x300601c] {
+        assert!(ids.contains(&id), "event {id:#x} never posted");
+    }
+    for op in (0..25).chain([31, 32, 33, 34, 36, 37, 38, 39, 40, 41, 43]) {
         assert!(op == 17 || posted[op] > 0, "op {op} never posted");
     }
 }

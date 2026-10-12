@@ -4114,7 +4114,7 @@ address,size,name,system,status
 0x231ff8,584,Speech_OnNextRace,frontend?,checked
 0x232240,240,Speech_OnHiScore,race?,checked
 0x232330,356,Speech_QueueUnlockLines,race?,checked
-0x232498,3232,Speech_AnnounceTrick,audio?,not started
+0x232498,3232,Speech_AnnounceTrick,audio?,checked
 0x233138,232,Speech_PickRaceGoLine,audio?,checked
 0x233220,444,Speech_OnScoreMessage,audio?,checked
 0x2333e0,100,Speech_OnTrickLanded,audio?,checked

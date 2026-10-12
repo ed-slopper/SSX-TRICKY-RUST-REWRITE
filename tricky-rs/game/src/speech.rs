@@ -70,8 +70,8 @@ pub trait SpeechEnv {
     fn interrupt_if_playing(&mut self, voice: u32);
     /// `RelTable_GetRelation`(`DAT_003352b4`, a, b) of two characters
     fn relation(&mut self, a: u32, b: u32) -> i32;
-    /// `SpeechLib_PostEvent`
-    fn post(&mut self, e: Event);
+    /// `SpeechLib_PostEvent`: its answer (the trick line keeps it)
+    fn post(&mut self, e: Event) -> u32;
     /// `SpeechSys_Trigger` 0x228bd8: the speech library serviced for the slot now; the values it handed the
     /// callback (`Speech_QueueBigScore`, when given) come back in order
     fn trigger(&mut self, t: Trigger) -> Vec<u32>;
@@ -192,6 +192,10 @@ pub struct Announcer {
     pub end_flags: u32,
     /// +0x7ddc: the race clock of the last placing line (they wait 600 frames)
     pub placing_time: i32,
+    /// +0x6e00: trick lines spoken (one per landing until cleared)
+    pub tricks_spoken: i32,
+    /// +0x6e04: the last trick line's post answer (0 stops them)
+    pub trick_ok: u32,
 }
 
 impl Announcer {
@@ -1135,6 +1139,139 @@ impl Announcer {
                 let rival = is_rival_or_grudge(env, a, b);
                 env.post(Event::new(if rival { 0x3006019 } else { 0x300601a }, &[character_bit(a.voice), character_bit(b.voice)]));
                 env.trigger(at(1, a.id, a.voice as u32));
+            }
+        }
+    }
+}
+
+/// The trick's name byte as the narration's trick id (`Speech_AnnounceTrick`'s switch on the trick word's bytes 1
+/// and 2): 1..0x65, else −1
+pub fn trick_name_id(b: u8) -> u32 {
+    const T: [u32; 29] = [0xf, 0x15, 0x10, 0x2c, 0x19, 7, 0x11, 4, 10, 0x12, 0x13, 5, 3, 1, 0x16, 0x17, 0xb, 9, 0x68, 0xc, 0x18, 8, 6, 0x14, 0xe, 2, 0x6f, 0x70, 0x23];
+    match b {
+        1..=29 => T[b as usize - 1],
+        30..=100 => 0x71 + (b as u32 - 30),
+        101 => 0x1e,
+        _ => u32::MAX,
+    }
+}
+
+/// The trick's byte 0 (its grab or move) as the narration's id: 1..43, 44 (',') 0x3d, else −1
+pub fn trick_move_id(b: u8) -> u32 {
+    const T: [u32; 43] = [
+        0x67, 0x69, 0x6a, 0x6b, 0x6c, 0x48, 0x44, 0x45, 0x3a, 0x46, 0x49, 0x24, 0x3b, 0x25, 0x34, 0x26, 0x28, 0x3c, 0x2f, 0x41, 0x35, 0x36, 0x42, 0x40,
+        0x47, 0x4e, 0x4d, 0x4c, 0x4b, 0x2a, 0x27, 0x4f, 0x37, 0x38, 0x31, 0x2e, 0x30, 0x3d, 0x3f, 0x3e, 0x4a, 0x43, 0x29,
+    ];
+    match b {
+        1..=43 => T[b as usize - 1],
+        44 => 0x3d,
+        _ => u32::MAX,
+    }
+}
+
+/// The score bands `Speech_AnnounceTrick` rolls by (0x3a38e8: 0, 4000, 10000): the band index, −1 below 0
+pub const TRICK_BANDS: [i64; 3] = [0, 4000, 10000];
+
+impl Announcer {
+    /// `Speech_AnnounceTrick` 0x232498(rider, the trick's two words, score): no replay, a line allowed (+0x6e04),
+    /// a player's rider: roll by the score's band: 0x100201c (4, 2, 2, under 4000 1 else 2); then, the first since
+    /// the count was cleared and a trick with parts: 0x100200f with its parts (rotation bits, stance, grabs, flips,
+    /// moves) and the name and move ids; the post's answer kept, and when not 0 counted and the second name byte
+    /// as 0x1002010. Last (also when it stopped early), roll 0x10 in show-off 3 or 5: 0x1002054 with 1.
+    pub fn announce_trick(&mut self, env: &mut dyn SpeechEnv, r: &SpeechRider, trick: [u32; 2], score: i32) {
+        if env.replay_playing() || self.trick_ok == 0 || !r.player() {
+            return;
+        }
+        let mut band = 2i32;
+        if (score as i64) < TRICK_BANDS[2] {
+            band = 1;
+            while 0 <= band && (score as i64) < TRICK_BANDS[band as usize] {
+                band -= 1;
+            }
+        }
+        if self.roll_band(env, band) {
+            env.post(Event::new(0x100201c, &[4, 2, 2, if score < 4000 { 1 } else { 2 }]));
+            if self.tricks_spoken == 0 {
+                self.trick_line(env, trick);
+            }
+        }
+        if self.roll(env, 0x10) {
+            let m = env.mode();
+            if m == 5 || m == 3 {
+                env.post(Event::new(0x1002054, &[1]));
+            }
+        }
+    }
+
+    /// The roll for a band (−1, a score below 0, reads the ten words before the table: the exe's string data there)
+    fn roll_band(&self, env: &mut dyn SpeechEnv, band: i32) -> bool {
+        if band < 0 {
+            const BEFORE: [i32; 10] = [0x536c6f72, 0x65746174, 0, 0, 0x53633731, 0x436e6970, 0x72746e6f, 0x74536c6f, 0x657461, 0];
+            let r = env.rand_fx();
+            return crate::fxrand::speech_roll(r, self.level, self.cap, 0, &BEFORE).unwrap_or(false);
+        }
+        self.roll(env, band as usize)
+    }
+
+    fn trick_line(&mut self, env: &mut dyn SpeechEnv, trick: [u32; 2]) {
+        let (w0, w1) = (trick[0], trick[1]);
+        let mut a = match (w1 >> 16) & 0xf {
+            0 | 1 => 2,
+            2 | 3 => 1,
+            _ => 0,
+        };
+        if w1 & 0xf0f0 == 0 && w0 & 0xf00_0000 == 0 && w1 & 0xf00 == 0 && w0 & 0xffff == 0 {
+            return;
+        }
+        let mut f = match (w1 >> 27) & 7 {
+            1 => 1,
+            2 => 2,
+            _ => 0,
+        };
+        match (w1 >> 12) & 0xf {
+            0 => a = 2,
+            1 => {
+                a = 4;
+                f |= 4;
+            }
+            2..=4 => {
+                a = 1;
+                f |= 4;
+            }
+            _ => {}
+        }
+        let bits = |n: u32| if n <= 10 { 1 << n } else { 0 };
+        let mut t = bits((w0 >> 24) & 0xf);
+        let e = match (w1 >> 24) & 7 {
+            1 => 2,
+            0 => 1,
+            2 => 4,
+            3 => 8,
+            _ => 0,
+        };
+        let (mut b, mut c) = (0, 0);
+        match (w1 >> 8) & 0xf {
+            1 => b = 1,
+            2 => b = 2,
+            3 => c = 1,
+            4 => c = 2,
+            _ => {}
+        }
+        let name = trick_name_id((w0 >> 8) as u8);
+        let mv = trick_move_id(w0 as u8);
+        if w0 & 0xf000_0000 != 0 {
+            let n = w0 >> 28;
+            if n <= 10 {
+                t = 1 << n;
+            }
+        }
+        let ok = env.post(Event::new(0x100200f, &[t, a, b, c, e, name, mv, f]));
+        self.trick_ok = ok;
+        if ok != 0 {
+            self.tricks_spoken += 1;
+            let second = (w0 >> 16) as u8;
+            if second != 0 {
+                env.post(Event::new(0x1002010, &[trick_name_id(second)]));
             }
         }
     }
