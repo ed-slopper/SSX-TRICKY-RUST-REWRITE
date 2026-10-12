@@ -265,3 +265,196 @@ fn finalize_roster_matches_the_original() {
     }
     assert!(branches.iter().take(2).all(|&c| c > 500), "{branches:?}");
 }
+
+#[test]
+fn setup_ai_rider_matches_the_original() {
+    use tricky_game::career::{Career, StaticTables, CAREER_BASE, CAREER_SIZE};
+    use tricky_game::rand::Streams;
+    let Some(mut r) = Runner::from_env() else { return };
+    r.float_rules = r5900::ps2float::Rules::parse("add=n,mul=n,div=n,cvt=n").unwrap();
+    for a in [0x16ae68u32, 0x16b1f8, 0x16b220, 0x16b248, 0x16b270, 0x16b1d0, 0x16b298, 0x23d4a8, 0x2401e0] {
+        r.allow(a);
+    }
+    // strcpy and EAMem_Copy (MMI loops): the C library's answer
+    r.stub(0x2fd14c, |c, m| {
+        let (d, s) = (c.gpr(4) as u32, c.gpr(5) as u32);
+        for k in 0.. {
+            let b = (m.read_u32((s + k) & !3) >> (8 * ((s + k) & 3))) as u8;
+            m.write_u8(d + k, b);
+            if b == 0 {
+                break;
+            }
+        }
+        c.set_gpr(2, d as u64);
+    });
+    r.stub(0x2ce114, |c, m| {
+        let (d, s, n) = (c.gpr(4) as u32, c.gpr(5) as u32, c.gpr(6) as u32);
+        for k in 0..n {
+            let b = (m.read_u32((s + k) & !3) >> (8 * ((s + k) & 3))) as u8;
+            m.write_u8(d + k, b);
+        }
+    });
+    let rd = |r: &mut Runner, a: u32, n: usize| -> Vec<u8> { (0..n.div_ceil(4)).flat_map(|i| r.mem.read_u32(a + 4 * i as u32).to_le_bytes()).take(n).collect() };
+    let entries = rd(&mut r, 0x331ea8, 12 * 0x38);
+    let bpoints = rd(&mut r, 0x332150, 12 * 0xf0 + 0x20);
+    let mut g = Rng(0x600d_f00d_0bad_cafe);
+    let mut tables = StaticTables::default();
+    for c in 0..12 {
+        for o in 0..7 {
+            for w in 0..4 {
+                tables.outfits[c][o][w] = g.next();
+                r.mem.write_u32(0x3cd0e0 + 0x70 * c as u32 + 0x10 * o as u32 + 4 * w as u32, tables.outfits[c][o][w]);
+            }
+        }
+        for b in 0..12 {
+            tables.boards[c][b] = g.next();
+            r.mem.write_u32(0x3cd620 + 0x30 * c as u32 + 4 * b as u32, tables.boards[c][b]);
+        }
+    }
+    let rival = r.mem.alloc(8);
+    let mut maxa = [0u32; 2];
+    for case in 0..20_000 {
+        let rider = (g.next() % 12) as usize;
+        let row = (g.next() % 6) as usize;
+        let entry = entries[rider * 0x38..rider * 0x38 + 0x38].to_vec();
+        let name_ptr = u32::from_le_bytes(entry[4..8].try_into().unwrap());
+        let mut name = Vec::new();
+        for i in 0.. {
+            let b = rd(&mut r, name_ptr + i, 1)[0];
+            name.push(b);
+            if b == 0 { break; }
+        }
+        let mut ours = Career::default();
+        for b in ours.bytes.iter_mut() {
+            *b = g.next() as u8;
+        }
+        for k in 0..CAREER_SIZE as u32 / 4 {
+            let v = u32::from_le_bytes(ours.bytes[4 * k as usize..4 * k as usize + 4].try_into().unwrap());
+            r.mem.write_u32(CAREER_BASE + 4 * k, v);
+        }
+        let max_attrib = g.next() % 3 == 0;
+        r.mem.write_u32(0x3352ac, max_attrib as u32);
+        let level = if g.next() % 4 == 0 { None } else { Some((g.next() % 140) as i32 - 20) };
+        if let Some(v) = level {
+            r.mem.write_u32(rival, v as u32);
+        }
+        let mut rand = Streams::default();
+        rand.seed_fx(g.next());
+        for (k, w) in rand.fx.s.iter().enumerate() {
+            r.mem.write_u32(0x345e58 + 4 * k as u32, *w);
+        }
+        r.cpu.set_gpr(4, CAREER_BASE as u64);
+        r.cpu.set_gpr(5, (0x331ea8 + 0x38 * rider) as u64);
+        r.cpu.set_gpr(6, if level.is_some() { rival as u64 } else { 0 });
+        r.cpu.set_gpr(7, (CAREER_BASE + 0x27e0 + 0x84 * row as u32) as u64);
+        r.call(0x16ae68).unwrap_or_else(|e| panic!("case {case}: {e}"));
+        ours.setup_ai_rider(row, &entry, &name, &bpoints, level, &tables, max_attrib, &mut || rand.fx());
+        for k in 0..CAREER_SIZE as u32 {
+            let got = (r.mem.read_u32((CAREER_BASE + k) & !3) >> (8 * ((CAREER_BASE + k) & 3))) as u8;
+            assert_eq!(got, ours.bytes[k as usize], "case {case}: byte {k:#x} (rider {rider} row {row} level {level:?} max {max_attrib})");
+        }
+        for (k, x) in rand.fx.s.iter().enumerate() {
+            assert_eq!(r.mem.read_u32(0x345e58 + 4 * k as u32), *x, "case {case}: stream {k}");
+        }
+        maxa[max_attrib as usize] += 1;
+    }
+    assert!(maxa.iter().all(|&c| c > 3000));
+}
+
+#[test]
+fn setup_player_rider_matches_the_original() {
+    use tricky_game::career::{Career, StaticTables, CAREER_BASE, CAREER_SIZE};
+    use tricky_game::roster::PlayerRiderEnv;
+    let Some(mut r) = Runner::from_env() else { return };
+    r.float_rules = r5900::ps2float::Rules::parse("add=n,mul=n,div=n,cvt=n").unwrap();
+    for a in [0x16a9d8u32, 0x16b1f8, 0x16b220, 0x16b248, 0x16b270, 0x16b1d0, 0x16b298, 0x166550, 0x164968, 0x164840, 0x2cd9d8] {
+        r.allow(a);
+    }
+    r.stub(0x2fd14c, |c, m| {
+        let (d, s) = (c.gpr(4) as u32, c.gpr(5) as u32);
+        for k in 0.. {
+            let b = (m.read_u32((s + k) & !3) >> (8 * ((s + k) & 3))) as u8;
+            m.write_u8(d + k, b);
+            if b == 0 {
+                break;
+            }
+        }
+        c.set_gpr(2, d as u64);
+    });
+    r.stub(0x2ce114, |c, m| {
+        let (d, s, n) = (c.gpr(4) as u32, c.gpr(5) as u32, c.gpr(6) as u32);
+        for k in 0..n {
+            let b = (m.read_u32((s + k) & !3) >> (8 * ((s + k) & 3))) as u8;
+            m.write_u8(d + k, b);
+        }
+    });
+    let rd = |r: &mut Runner, a: u32, n: usize| -> Vec<u8> { (0..n.div_ceil(4)).flat_map(|i| r.mem.read_u32(a + 4 * i as u32).to_le_bytes()).take(n).collect() };
+    let entries = rd(&mut r, 0x331ea8, 12 * 0x38);
+    let bpoints = rd(&mut r, 0x332150, 12 * 0xf0 + 0x20);
+    let mut g = Rng(0x0ddb_a11c_afe0_0001);
+    let mut tables = StaticTables::default();
+    for c in 0..12 {
+        for o in 0..7 {
+            for w in 0..4 {
+                tables.outfits[c][o][w] = g.next();
+                r.mem.write_u32(0x3cd0e0 + 0x70 * c as u32 + 0x10 * o as u32 + 4 * w as u32, tables.outfits[c][o][w]);
+            }
+        }
+        for b in 0..12 {
+            tables.boards[c][b] = g.next();
+            r.mem.write_u32(0x3cd620 + 0x30 * c as u32 + 4 * b as u32, tables.boards[c][b]);
+        }
+    }
+    let mut seen = [0u32; 4];
+    for case in 0..20_000 {
+        let mut ours = Career::default();
+        for b in ours.bytes.iter_mut() {
+            *b = g.next() as u8;
+        }
+        for k in 0..4usize {
+            let sb = 0x30fc + 0x44 * k;
+            ours.bytes[sb] = k as u8;
+            ours.w32(sb + 0x14, CAREER_BASE + 0x3400 + 0x20 * k as u32);
+            ours.w32(sb + 0x18, CAREER_BASE + 0x100 + 0x1c4 * (g.next() % 12));
+            ours.w32(sb + 0xc, CAREER_BASE + 0x3500 + 0x20 * k as u32);
+            ours.bytes[0x3500 + 0x20 * k + 15] = 0;
+            let p = 0x3400 + 0x20 * k;
+            ours.w32(p, g.next() % 12);
+            ours.w32(p + 0xc, g.next() % 7);
+            ours.w32(p + 0x10, g.next() % 12);
+        }
+        let k = (g.next() % 4) as usize;
+        let row = (g.next() % 6) as usize;
+        let mode = if g.next() % 3 == 0 { 6 } else { g.next() % 6 };
+        ours.w32(0x2afc, mode);
+        let env = PlayerRiderEnv {
+            words: [g.next(), g.next()],
+            character_cheat: if g.next() % 4 == 0 { 1 + g.next() % 3 } else { 0 },
+            mallora: g.next() % 3 == 0,
+            max_attrib: g.next() % 3 == 0,
+        };
+        for k in 0..CAREER_SIZE as u32 / 4 {
+            let v = u32::from_le_bytes(ours.bytes[4 * k as usize..4 * k as usize + 4].try_into().unwrap());
+            r.mem.write_u32(CAREER_BASE + 4 * k, v);
+        }
+        r.mem.write_u32(0x3352a4, env.words[0]);
+        r.mem.write_u32(0x3352a8, env.words[1]);
+        r.mem.write_u32(0x3352b8, env.character_cheat);
+        r.mem.write_u32(0x3352b0, env.mallora as u32);
+        r.mem.write_u32(0x3352ac, env.max_attrib as u32);
+        let rider = ours.r32(0x3400 + 0x20 * k) as usize;
+        let entry = entries[rider * 0x38..rider * 0x38 + 0x38].to_vec();
+        let name: Vec<u8> = ours.bytes[0x3500 + 0x20 * k..].iter().copied().take_while(|&b| b != 0).chain(std::iter::once(0)).collect();
+        r.cpu.set_gpr(4, CAREER_BASE as u64);
+        r.cpu.set_gpr(5, (CAREER_BASE + 0x30fc + 0x44 * k as u32) as u64);
+        r.cpu.set_gpr(6, (CAREER_BASE + 0x27e0 + 0x84 * row as u32) as u64);
+        r.call(0x16a9d8).unwrap_or_else(|e| panic!("case {case}: {e}"));
+        ours.setup_player_rider(k, row, &entry, &name, &bpoints, &tables, &env);
+        for b in 0..CAREER_SIZE as u32 {
+            let got = (r.mem.read_u32((CAREER_BASE + b) & !3) >> (8 * ((CAREER_BASE + b) & 3))) as u8;
+            assert_eq!(got, ours.bytes[b as usize], "case {case}: byte {b:#x} (rider {rider} slot {k} row {row} {env:?} mode {mode})");
+        }
+        seen[(mode == 6) as usize + 2 * (env.character_cheat != 0) as usize] += 1;
+    }
+    assert!(seen.iter().all(|&c| c > 1000), "{seen:?}");
+}

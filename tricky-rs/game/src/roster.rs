@@ -304,3 +304,138 @@ impl crate::career::Career {
         }
     }
 }
+
+impl crate::career::Career {
+    /// `Career_SetupAIRider` 0x16ae68(rider entry, rival level, row): the race rider row (0x84 bytes at
+    /// +0x27e0 + 0x84 row) made for a computer rider from its `gRider_Table` entry (`entry`, 0x38 bytes at
+    /// 0x331ea8 + 0x38 rider; `name` the string its +4 points at, NUL included). Two draws, in this order: the
+    /// outfit (`Rand_Fx % 5`) and the board (`% 12`, unsigned). `board_points` is the table at 0x332150 (rows of
+    /// 0xf0, entries of 0x14). The stat bytes are [`crate::stats::ai_bytes`] from the entry's bytes +0xc (base)
+    /// and +0x1c (caps).
+    pub fn setup_ai_rider(&mut self, row: usize, entry: &[u8], name: &[u8], board_points: &[u8], rival: Option<i32>, tables: &crate::career::StaticTables, max_attrib: bool, rand_fx: &mut dyn FnMut() -> u32) {
+        let o = 0x27e0 + 0x84 * row;
+        let w = |e: &[u8], at: usize| u32::from_le_bytes([e[at], e[at + 1], e[at + 2], e[at + 3]]);
+        self.bytes[o + 4..o + 4 + name.len()].copy_from_slice(name);
+        let outfit = (rand_fx() % 5) as usize;
+        let board = (rand_fx() % 12) as usize;
+        let rider = w(entry, 0);
+        self.w32(o + 0x38, rider);
+        self.w32(o + 0x3c, rider);
+        self.bytes[o + 0x1e] = entry[0x20];
+        self.w32(o + 0x5c, w(entry, 0x2c));
+        self.w32(o + 0x40, w(entry, 0x28));
+        self.w32(o + 0x60, w(entry, 0x24));
+        let bp = rider as usize * 0xf0 + board * 0x14;
+        self.w32(o + 0x44, w(board_points, bp));
+        self.bytes[o + 0x67] = 0xff;
+        self.bytes[o + 0x64] = entry[0x34];
+        self.bytes[o + 0x68] = 0xff;
+        self.bytes[o + 0x65] = 0xff;
+        self.bytes[o + 0x66] = 0xff;
+        for k in [0x70, 0x74, 0x78, 0x7c] {
+            self.w32(o + k, 0);
+        }
+        self.w32(o + 0x80, 2);
+        self.w32(o + 0x6c, u32::MAX);
+        let r = rider as usize;
+        self.w32(o + 0x4c, tables.outfit_word(r, outfit, 0));
+        self.w32(o + 0x50, tables.outfit_word(r, outfit, 2));
+        self.w32(o + 0x54, tables.outfit_word(r, outfit, 1));
+        self.w32(o + 0x58, tables.outfit_word(r, outfit, 3));
+        self.w32(o + 0x48, tables.board_word(r, board));
+        let base: [u8; 16] = entry[0xc..0x1c].try_into().unwrap();
+        let caps: [u8; 4] = entry[0x1c..0x20].try_into().unwrap();
+        let bytes = crate::stats::ai_bytes(&base, &caps, rival, max_attrib);
+        self.bytes[o + 0xe..o + 0x1e].copy_from_slice(&bytes);
+    }
+}
+
+/// What `Career_SetupPlayerRider` 0x16a9d8 reads outside the career block and the tables.
+#[derive(Clone, Copy, Debug, Default)]
+pub struct PlayerRiderEnv {
+    /// `DAT_003352a4`, `DAT_003352a8`: the two words kept in the row's +0x78 / +0x7c outside mode 6
+    pub words: [u32; 2],
+    /// `DAT_003352b8` (the character cheat), `gCheat_Mallora`, `gCheat_MaxAttrib`
+    pub character_cheat: u32,
+    pub mallora: bool,
+    pub max_attrib: bool,
+}
+
+impl crate::career::Career {
+    /// `Career_SetupPlayerRider` 0x16a9d8(slot = +0x30fc + 0x44 k, row): the race rider row made for the human
+    /// player of slot `k` from the slot's profile (rider, outfit, board), the rider's `gRider_Table` entry
+    /// (`entry`, `name` the player's name string the slot points at, NUL included) and the board's table row
+    /// (`board_points` as in [`Career::setup_ai_rider`]; its bytes +8..12 are the board's stat bonuses). No draws.
+    pub fn setup_player_rider(&mut self, k: usize, row: usize, entry: &[u8], name: &[u8], board_points: &[u8], tables: &crate::career::StaticTables, env: &PlayerRiderEnv) {
+        let o = 0x27e0 + 0x84 * row;
+        let mode = self.r32(0x2afc); // DAT_0032de8c, the career's race mode (6: the lesson)
+        let sb = 0x30fc + 0x44 * k;
+        let w = |e: &[u8], at: usize| u32::from_le_bytes([e[at], e[at + 1], e[at + 2], e[at + 3]]);
+        let prof = self.ptr(sb + 0x14);
+        let rec = self.ptr(sb + 0x18);
+        let rider = self.r32(prof);
+        let board = self.r32(prof + 0x10) as usize;
+        let outfit = self.r32(prof + 0xc) as usize;
+        let player = self.bytes[sb] as i8;
+        self.bytes[o + 4..o + 4 + name.len()].copy_from_slice(name);
+        self.w32(o + 0x38, rider);
+        self.w32(o + 0x3c, rider);
+        self.bytes[o + 0x1e] = entry[0x20];
+        self.w32(o + 0x5c, w(entry, 0x2c));
+        self.w32(o + 0x60, w(entry, 0x24));
+        self.bytes[o + 0x64] = entry[0x34];
+        self.w32(o + 0x40, self.r32(prof + 4));
+        self.bytes[o + 0x65] = player as u8;
+        self.w32(o + 0x6c, self.r32(sb + 4));
+        self.bytes[o + 0x68] = self.find_player_slot(player) as u8;
+        let bp = rider as usize * 0xf0 + board * 0x14;
+        self.w32(o + 0x44, w(board_points, bp));
+        self.bytes[o + 0x67] = 0xff;
+        self.bytes[o + 0x66] = 0xff;
+        if mode == 6 {
+            self.w32(o + 0x78, 0);
+            self.w32(o + 0x7c, 0);
+        } else {
+            self.w32(o + 0x78, env.words[0]);
+            self.w32(o + 0x7c, env.words[1]);
+        }
+        self.w32(o + 0x70, 0);
+        self.w32(o + 0x80, 2);
+        let level = self.player_level(player);
+        self.w32(o + 0x74, level);
+        let r = rider as usize;
+        self.w32(o + 0x4c, tables.outfit_word(r, outfit, 0));
+        self.w32(o + 0x50, tables.outfit_word(r, outfit, 2));
+        self.w32(o + 0x54, tables.outfit_word(r, outfit, 1));
+        self.w32(o + 0x58, tables.outfit_word(r, outfit, 3));
+        self.w32(o + 0x48, tables.board_word(r, board));
+        if env.character_cheat != 0 {
+            self.w32(o + 0x4c, 0x54);
+            self.w32(o + 0x58, 0xc);
+            self.w32(o + 0x48, 0x91);
+            self.w32(o + 0x80, 0);
+            self.w32(o + 0x50, 0xc);
+            self.w32(o + 0x54, 0xc);
+            if mode != 6 {
+                self.w32(o + 0x3c, 1);
+                self.w32(o + 0x60, 0x3f4c_cccd);
+            }
+        }
+        let mut changed = self.r32(o + 0x80) != 2;
+        if changed {
+            self.bytes[o + 0x64] = 0xc;
+        }
+        if env.mallora && self.r32(o + 0x38) == 7 {
+            self.w32(o + 0x4c, 0x55);
+            changed = true;
+            self.w32(o + 0x48, 0x90);
+        }
+        let base: [u8; 16] = entry[0xc..0x1c].try_into().unwrap();
+        let caps: [u8; 4] = entry[0x1c..0x20].try_into().unwrap();
+        let bonus: [u8; 4] = board_points[bp + 8..bp + 12].try_into().unwrap();
+        let levels: [u8; 4] = self.bytes[rec + 0xc..rec + 0x10].try_into().unwrap();
+        let use_caps = !((!env.max_attrib && !changed) || mode == 6);
+        let bytes = crate::stats::player_bytes(&base, &caps, bonus, levels, use_caps);
+        self.bytes[o + 0xe..o + 0x1e].copy_from_slice(&bytes);
+    }
+}
