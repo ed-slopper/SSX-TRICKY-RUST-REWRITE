@@ -708,3 +708,77 @@ pub fn eval_look_at(
         v.f48 = 1.0;
     }
 }
+
+// ---- Camera_CollideWorld 0x16fe60 ----
+
+/// The ray test's result: the hit point and the surface normal (four lanes each; the original reads the
+/// fourth lane of the sum and difference vectors).
+#[derive(Clone, Copy, Debug, Default)]
+pub struct RayRes {
+    pub hit: [f32; 4],
+    pub normal: [f32; 4],
+}
+
+/// A world line, as the original builds it on the stack: its constructor's object (`main`) and the words the
+/// copy into the call's own buffer skips (`holes`, left from the first line built there).
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct Line {
+    pub main: u32,
+    pub holes: u32,
+}
+
+/// The world queries `Camera_CollideWorld` makes (all on the world at 0x346488).
+pub trait WorldEnv {
+    /// `cWorldLine::cWorldLine` 0x25d7f0 with a zero first float; returns the object's identity.
+    fn line(&mut self, a: [f32; 4], b: [f32; 4], mode: i32) -> u32;
+    /// `World_RayCast` 0x25aff8.
+    fn ray_cast(&mut self, line: Line, res: &mut RayRes) -> f32;
+    /// `World_IsBlocked` 0x25c690.
+    fn is_blocked(&mut self, line: Line, res: &mut RayRes) -> bool;
+    /// `Camera_CollidePush` 0x16fb08(k, pos, target).
+    fn push(&mut self, k: f32, pos: &mut [f32; 3], target: [f32; 3]);
+}
+
+/// `Camera_CollideWorld` 0x16fe60(radius, pos, target): keeps the camera at `pos` out of the world when it moves
+/// along `target`; returns 1 when the position was moved off a wall. `counter` is the call count at 0x335720.
+pub fn collide_world(radius: f32, pos: &mut [f32; 3], target: [f32; 3], counter: &mut u32, env: &mut dyn WorldEnv) -> u32 {
+    *counter = counter.wrapping_add(1);
+    if target[0] == 0.0 && target[1] == 0.0 && target[2] == 0.0 {
+        return 0;
+    }
+    let mut tgt = target;
+    let mut a = [pos[0], pos[1], pos[2], 1.0];
+    let c1 = env.line([tgt[0], tgt[1], tgt[2], 1.0], [tgt[0] + 0.0, tgt[1] + 0.0, tgt[2] + 150.0, 1.0 + 0.0], 2);
+    let mut line = Line { main: c1, holes: c1 };
+    let mut res = RayRes::default();
+    let r = env.ray_cast(line, &mut res);
+    if 0.0 < r && 0.0 < res.normal[2] {
+        tgt = [
+            res.hit[0] + res.normal[0] * 20.0,
+            res.hit[1] + res.normal[1] * 20.0,
+            res.hit[2] + res.normal[2] * 20.0,
+        ];
+    }
+    let c2 = env.line([tgt[0], tgt[1], tgt[2], 1.0], a, 2);
+    line = Line { main: c2, holes: c1 };
+    let far = 500.0 < radius;
+    if env.is_blocked(line, &mut res) {
+        let d = [a[0] - res.hit[0], a[1] - res.hit[1], a[2] - res.hit[2], a[3] - res.hit[3]];
+        let n = res.normal;
+        let k = ((d[0] * n[0] + d[1] * n[1]) + 1.0 * (d[2] * n[2])) + 1.0 * (d[3] * n[3]);
+        let sc = [n[0] * k, n[1] * k, n[2] * k];
+        *pos = [pos[0] - sc[0], pos[1] - sc[1], pos[2] - sc[2]];
+        a = [pos[0], pos[1], pos[2], 1.0];
+        let c3 = env.line([tgt[0], tgt[1], tgt[2], 1.0], a, 2);
+        line = Line { main: c3, holes: c1 };
+        if env.is_blocked(line, &mut res) {
+            *pos = [res.hit[0], res.hit[1], res.hit[2]];
+        }
+        let m = if far { 60.0 } else { 40.0 };
+        let n = res.normal;
+        *pos = [pos[0] + n[0] * m, pos[1] + n[1] * m, pos[2] + n[2] * m];
+        return 1;
+    }
+    env.push(if far { 100.0 } else { 40.0 }, pos, tgt);
+    0
+}
