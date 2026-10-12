@@ -254,3 +254,110 @@ fn turn_around_and_air_match_the_original() {
         assert_eq!(draws.borrow().is_empty(), d.next().is_none() && true, "draws {case}");
     }
 }
+
+#[test]
+fn init_skill_and_reset_match_the_original() {
+    let Some(mut r) = runner() else { return };
+    let obj = r.mem.alloc(0x900);
+    let rider = r.mem.alloc(0x500);
+    r.mem.write_u32(obj, rider);
+    let mut g = Rng(0x1234_5678_9abc_def1);
+    for case in 0..2000 {
+        let mode = [0, 2, 4, 3, 7][g.next() as usize % 5];
+        let (w, a4) = ([0, 1, 2, 0x10000, g.next()][g.next() as usize % 5], [0, 1, 2, g.next()][g.next() as usize % 4]);
+        r.mem.write_u32(0x32de8c, mode);
+        r.mem.write_u32(0x32de9c, w);
+        r.mem.write_u32(0x32dea4, a4);
+        for o in (0x860..0x8c0).step_by(4) {
+            r.mem.write_u32(obj + o, 0xdead_beef);
+        }
+        r.mem.write_u32(rider + 0x41c, 9);
+        r.cpu.set_gpr(4, obj as u64);
+        r.call(0x13a2b0).unwrap_or_else(|e| panic!("init {case}: {e}"));
+        let (slow, fast) = init_skill(mode, w, a4);
+        assert_eq!(r.mem.read_f32(obj + 0x870).to_bits(), slow.to_bits(), "slow {case}");
+        assert_eq!(r.mem.read_f32(obj + 0x874).to_bits(), fast.to_bits(), "fast {case}");
+        for o in (0x860..0x8c0).step_by(4) {
+            r.mem.write_u32(obj + o, 0xdead_beef);
+        }
+        r.cpu.set_gpr(4, obj as u64);
+        r.call(0x1383b0).unwrap_or_else(|e| panic!("reset {case}: {e}"));
+        let f = reset(mode, w, a4);
+        for o in [0x87c, 0x880, 0x884, 0x888, 0x88c, 0x868, 0x894, 0x898] {
+            assert_eq!(r.mem.read_u32(obj + o), 0, "zero {o:#x} {case}");
+        }
+        assert_eq!(r.mem.read_u32(obj + 0x878), f.word878);
+        assert_eq!(r.mem.read_u32(obj + 0x890) as i32, f.word890);
+        assert_eq!(r.mem.read_u32(obj + 0x89c) & 0xffff, f.short89c as u32);
+        assert_eq!(r.mem.read_f32(obj + 0x86c).to_bits(), f.skill.to_bits());
+        assert_eq!(r.mem.read_u32(rider + 0x41c), 0);
+        // the 8 bytes copied from 0x31d320 land at +0x8a0
+        assert_eq!(r.mem.read_u32(obj + 0x8a0), r.mem.read_u32(0x31d320));
+        assert_eq!(r.mem.read_u32(obj + 0x8a4), r.mem.read_u32(0x31d324));
+        assert_eq!(r.mem.read_u32(obj + 0x89c) >> 16, 0xdead, "high half of the short word kept");
+    }
+}
+
+#[test]
+fn check_stuck_matches_the_original() {
+    let Some(mut r) = runner() else { return };
+    let obj = r.mem.alloc(0x900);
+    let rider = r.mem.alloc(0x5900);
+    r.mem.write_u32(obj, rider);
+    let calls: Rc<RefCell<(Vec<u32>, [u32; 2])>> = Rc::default();
+    let c = calls.clone();
+    r.stub(0x1399a8, move |cpu, _| {
+        let mut b = c.borrow_mut();
+        b.0.push(1);
+        cpu.set_gpr(2, b.1[0] as u64)
+    });
+    let c = calls.clone();
+    r.stub(0x139a30, move |cpu, _| {
+        let mut b = c.borrow_mut();
+        b.0.push(2);
+        cpu.set_gpr(2, b.1[1] as u64)
+    });
+    let mut g = Rng(0x600d_f00d_1111_2222);
+    let mut seen = [0u32; 2];
+    for case in 0..200_000 {
+        let s = StuckIn {
+            heading: g.f(-9.0, 9.0),
+            path: [g.f(-9.0, 9.0), 0.0][g.next() as usize % 2],
+            state: [1, 3, 5, 6, g.next() % 9][g.next() as usize % 5],
+            state2: [0x12, 0x13, 0x14, 0x15, g.next() % 40][g.next() as usize % 5],
+            speed: [g.f(0.0, 2000.0), 1000.0, 1500.0][g.next() as usize % 3],
+            f57fc: [g.f(0.0, 60.0), 30.0][g.next() as usize % 2],
+            mode: [0, 1, 2, 4][g.next() as usize % 4],
+            skill: [1.0, g.f(0.2, 4.0)][g.next() as usize % 2],
+            w890: [-1, 0, 5][g.next() as usize % 3],
+            c894: [g.next() % 400, 222, 223, 0][g.next() as usize % 4],
+            c898: [g.next() % 100, 59, 60, 0][g.next() as usize % 4],
+        };
+        let (b, a) = (g.next() & 1, g.next() & 1);
+        *calls.borrow_mut() = (Vec::new(), [b, a]);
+        r.mem.write_f32(rider + 0x370, s.heading);
+        r.mem.write_f32(rider + 0x1b0, s.path);
+        r.mem.write_u32(rider + 0x424, s.state);
+        r.mem.write_u32(rider + 0x428, s.state2);
+        r.mem.write_f32(rider + 0x348, s.speed);
+        r.mem.write_f32(rider + 0x57fc, s.f57fc);
+        r.mem.write_u32(0x32de8c, s.mode);
+        r.mem.write_f32(obj + 0x86c, s.skill);
+        r.mem.write_u32(obj + 0x890, s.w890 as u32);
+        r.mem.write_u32(obj + 0x894, s.c894);
+        r.mem.write_u32(obj + 0x898, s.c898);
+        r.cpu.set_gpr(4, obj as u64);
+        r.call(0x139ab8).unwrap_or_else(|e| panic!("case {case}: {e}"));
+        let got = r.cpu.gpr(2) as u32;
+        let mut o = s;
+        let log = RefCell::new(Vec::new());
+        let want = check_stuck(&mut o, &mut || { log.borrow_mut().push(1); b != 0 }, &mut || { log.borrow_mut().push(2); a != 0 });
+        let log = log.into_inner();
+        assert_eq!(got, want as u32, "ret {case}: {s:?} b {b} a {a}");
+        assert_eq!(calls.borrow().0, log, "calls {case}: {s:?}");
+        assert_eq!(r.mem.read_u32(obj + 0x894), o.c894, "894 {case}: {s:?}");
+        assert_eq!(r.mem.read_u32(obj + 0x898), o.c898, "898 {case}: {s:?}");
+        seen[want as usize] += 1;
+    }
+    assert!(seen.iter().all(|&n| n > 1000), "{seen:?}");
+}

@@ -149,3 +149,131 @@ pub fn controls_air(pad: &mut u32, marker: JumpMarker, tilt: f32, stat: u32, kep
     };
     *pad = (*pad & 0xffff_f81f) | (stick(y) << 5);
 }
+
+/// `AI_InitSkill` 0x13a2b0: the computer's two skill scales, `(slow, fast)` for object +0x870 / +0x874, from the
+/// race mode (0x32de8c) and, for modes 4 and 2, the race word's low half (0x32de9c) or word 0x32dea4. Both end
+/// clamped to 1.0 (the unreachable jump table in the original multiplies by 1.0).
+pub fn init_skill(mode: u32, race_word: u32, word_a4: u32) -> (f32, f32) {
+    let b = f32::from_bits;
+    let (slow, fast) = if mode == 4 {
+        match race_word & 0xffff {
+            0 => (b(0x3f41_3e09), b(0x3ecf_43c5)),
+            1 => (b(0x3f68_c259), b(0x3f35_59da)),
+            _ => (1.0, b(0x3f73_88f2)),
+        }
+    } else if mode == 2 {
+        match word_a4 {
+            0 => (b(0x3f1b_5f37), b(0x3e8c_5b95)),
+            1 => (b(0x3f5f_50b7), b(0x3f28_1a07)),
+            _ => (1.0, b(0x3f72_f782)),
+        }
+    } else {
+        (1.0, b(0x3f02_3d75))
+    };
+    (if 1.0 < slow { 1.0 } else { slow }, if 1.0 < fast { 1.0 } else { fast })
+}
+
+/// The object fields `AIComputer_Reset` 0x1383b0 sets (everything else it leaves).
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct ResetFields {
+    /// +0x87c, +0x880, +0x884, +0x888, +0x88c, +0x868, +0x894, +0x898 all 0
+    pub zeroed: bool,
+    /// +0x878 = 0x1a, +0x890 = -1, +0x89c (short) = 1, rider+0x41c = 0
+    pub word878: u32,
+    pub word890: i32,
+    pub short89c: u16,
+    /// +0x870 / +0x874 from `init_skill`, +0x86c the slow one
+    pub slow: f32,
+    pub fast: f32,
+    pub skill: f32,
+}
+
+pub fn reset(mode: u32, race_word: u32, word_a4: u32) -> ResetFields {
+    let (slow, fast) = init_skill(mode, race_word, word_a4);
+    ResetFields { zeroed: true, word878: 0x1a, word890: -1, short89c: 1, slow, fast, skill: slow }
+}
+
+/// What `AIComputer_CheckStuck` 0x139ab8 reads.
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct StuckIn {
+    /// rider +0x370 and +0x1b0, the heading and the path's
+    pub heading: f32,
+    pub path: f32,
+    /// rider +0x424, +0x428 (the state words), +0x348 (speed), +0x57fc
+    pub state: u32,
+    pub state2: u32,
+    pub speed: f32,
+    pub f57fc: f32,
+    /// the race mode word 0x32de8c and the object's skill +0x86c
+    pub mode: u32,
+    pub skill: f32,
+    /// object +0x890 (signed), the counters +0x894 and +0x898 (kept)
+    pub w890: i32,
+    pub c894: u32,
+    pub c898: u32,
+}
+
+/// `AIComputer_CheckStuck`: whether the computer rider is stuck (and should reverse/steer out). `below` and `above`
+/// are `AIComputer_BelowGapMin` / `AboveGapMax`, called only where the original calls them.
+pub fn check_stuck(s: &mut StuckIn, below: &mut dyn FnMut() -> bool, above: &mut dyn FnMut() -> bool) -> bool {
+    let diff = s.heading - s.path;
+    let f1 = diff * f32::from_bits(0x3e22_f983) + 0.5;
+    let mut t = (f1 as i32) as f32;
+    if f1 < t {
+        t -= 1.0;
+    }
+    let wrapped = diff - t * f32::from_bits(0x40c9_0fdb);
+    if s.w890 < 0 {
+        s.c898 = if f32::from_bits(0x3f86_0a92) < wrapped.abs() { s.c898.wrapping_add(1) } else { 0 };
+    } else {
+        s.c898 = 0;
+    }
+    let mut long_stuck = s.c898 as i32 >= 0x3d;
+    let bump = |c: &mut u32| *c = c.wrapping_add(1);
+    'tally: {
+        if s.state == 5 {
+            long_stuck = false;
+            bump(&mut s.c894);
+            break 'tally;
+        }
+        if s.state == 3 && (s.c898 as i32) > 0 {
+            return true;
+        }
+        let mut reset_a = false;
+        if s.mode != 0 {
+            if s.state == 1 || s.state == 6 || s.speed < 1000.0 {
+                reset_a = true;
+            } else {
+                bump(&mut s.c894);
+            }
+        } else if s.speed < 1500.0 {
+            s.c894 = 0;
+            break 'tally;
+        } else {
+            bump(&mut s.c894);
+        }
+        if reset_a {
+            long_stuck = false;
+            s.c894 = 0;
+            if s.state == 1 && 30.0 < s.f57fc {
+                return true;
+            }
+        }
+    }
+    let mut late = long_stuck;
+    if !late {
+        let c = s.c894 as i32 as f32;
+        late = if s.skill == 1.0 {
+            222.0 < c
+        } else {
+            222.0 < c * (s.skill / f32::from_bits(0x41fb_4969))
+        };
+    }
+    if !(0x13 <= s.state2 as i32 && (s.state2 as i32) < 0x15) {
+        return late && s.w890 < 0;
+    }
+    if !late && !below() {
+        return false;
+    }
+    !above()
+}
