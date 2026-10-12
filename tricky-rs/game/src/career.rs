@@ -1302,3 +1302,80 @@ impl StaticTables {
 pub fn status_name_id(status: i32) -> Option<u32> {
     (0..=9).contains(&status).then(|| 0x17 + status as u32)
 }
+
+/// What `Score_TrickBookCheck` 0x1579e0 reads and calls outside the career block (row C15).
+pub trait BookEnv {
+    /// The race object's lesson-mode gate: `(gApp+0x730)->+0x40` is null, or its `+0x20` is 0 or at least 10
+    fn mode_allows(&self) -> bool;
+    /// The scoring rider's player byte (`rider->+0x464->+0x65`); negative for none
+    fn player(&self) -> i8;
+    /// The tutorial lesson's trick to land (`(gApp+0x730)->+0x34`'s `+0x4e8`), if a lesson is running
+    fn lesson_trick(&self) -> Option<u32>;
+    /// `Trick_GetInfo(rider, t)` 0x154638's first two words (the trick's id and the flags the match compares)
+    fn trick_info(&self, rider: u32, t: u32) -> [u32; 2];
+    /// `FUN_0014c2a8`: the lesson's `+0x64` = 1 (the trick was landed)
+    fn lesson_done(&mut self);
+    /// `Scoring_PushMessage(1.2, score, 0x11, 0, 0)` 0x157330 then `Sfx_OnTrickBookDone`
+    fn book_done_message(&mut self);
+}
+
+/// `FUN_00157c18`: a landed trick's id words against a book entry's (the flags that count are 0x07000f00)
+pub fn trick_matches(id: [u32; 2], info: [u32; 2]) -> bool {
+    id[0] == info[0] && ((id[1] ^ info[1]) & 0x0700_0f00) == 0
+}
+
+/// `FUN_001640a8` 0x1640a8: the page a book trick is on (five a page)
+pub fn trick_page(t: u32) -> u32 {
+    let t = t as i32;
+    if t < 5 {
+        0
+    } else if t < 10 {
+        1
+    } else if t < 15 {
+        2
+    } else if t < 20 {
+        3
+    } else if t < 25 {
+        4
+    } else {
+        5
+    }
+}
+
+impl Career {
+    /// `Score_TrickBookCheck` 0x1579e0 (row C15): a trick was landed (`id`). With a lesson running it only tells the
+    /// lesson; else every book trick it matches that is neither done nor forced, on the first unfinished page,
+    /// is forced (+8) and flagged for this race (+0x310c); a ticked trick gets the message and the sound.
+    pub fn trick_book_check(&mut self, env: &mut dyn BookEnv, id: [u32; 2]) {
+        if !env.mode_allows() {
+            return;
+        }
+        let p = env.player();
+        if p < 0 {
+            return;
+        }
+        let (rec, k) = self.player_rec(p);
+        let book = rec + 0x14;
+        let rider = self.r32(book);
+        if let Some(lt) = env.lesson_trick() {
+            if trick_matches(id, env.trick_info(rider, lt)) {
+                env.lesson_done();
+            }
+            return;
+        }
+        let mut any = false;
+        for t in 0..0x1e {
+            let bit = 1u32 << t;
+            let rider = self.r32(book);
+            if trick_matches(id, env.trick_info(rider, t)) && self.r32(book + 8) & bit == 0 && self.r32(book + 4) & bit == 0 && trick_page(t) == self.complete_pages(p) {
+                any = true;
+                let f = (0x310c + k) as usize;
+                self.w32(f, self.r32(f) | bit);
+                self.w32(book + 8, self.r32(book + 8) | bit);
+            }
+        }
+        if any {
+            env.book_done_message();
+        }
+    }
+}
