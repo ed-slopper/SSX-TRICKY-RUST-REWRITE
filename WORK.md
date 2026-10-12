@@ -69,7 +69,7 @@ state machine and the renderer are ours. Nothing has been checked against the or
 
 | ID | Task | Area | Needs | Who | Notes |
 |---|---|---|---|---|---|
-| E12b | The rest of the career (0x161730..0x16d400 on `career::Career`): player slots (`Career_AssignPlayerRider`, `Career_GetPlayer*` / `Set*`), attributes (`Career_UpdateAttributes`, spend / refund), records (`Career_CheckNewRecords`, `Career_MergePlayerRecords`), unlocks (`Career_IsUnlocked`, `Career_ProcessUnlocks`), the trick book, the memory-card save and load of the block; the app saving the block instead of `tricky-save.json` | unowned | E12a | | Split of E12 |
+| E12b | The rest of the career (0x161730..0x16d400 on `career::Career`): player slots (`Career_AssignPlayerRider`, `Career_GetPlayer*` / `Set*`), attributes (`Career_UpdateAttributes`, spend / refund), records (`Career_CheckNewRecords`, `Career_MergePlayerRecords`), unlocks (`Career_IsUnlocked`, `Career_ProcessUnlocks`), the trick book, the memory-card save and load of the block; the app saving the block instead of `tricky-save.json` | unowned | E12a | ed-slopper/puffin (2026-10-11)
 | G1 | Boarder state machine: every state (0x00–0x14) and motion (0–6), their enter/update/exit, `cBoarder` vtable, in the original's order per tick | unowned | F1 | | [repo] Many states ported one by one; the dispatch is ours |
 | G1a | Prewind, jump, takeoff, spin and flip control (`PrewindState_Update` 0x1050e8, `Jump_ApplyImpulse` 0x1284e0, `Takeoff_SetSpinRates` 0x126e30, `SpinState_Update` 0x100908, `SpinState_StartFromStick` 0x102158) checked | any | F4a | | [repo] Ported, unchecked Split: G1a1, G1a2 |
 | G1a5b | The rest of G1a5: `Rider::step` (`tricky-rs/game/src/rider.rs`) calls the exact prewind, jump, take-off, spin start and spin (`boarder::prewind_update`, `jump::jump_impulse`, `jump::takeoff_spin_rates`, `jump::spin_start_from_stick`, `spin::spin_update`, all checked) on the rider's own fields (cm, z up), replacing `Rider::air_rotation` and the hand-written prewind and jump | any | G1a5a | | Split of G1a5 (wiring; needs a play test). Split: G1a5b1, G1a5b2, G1a5b3 (the exact functions read the game's pad word, built per boarder state by `cPlayer::GetControls`) |
@@ -614,3 +614,4 @@ matches the original.
 - 2026-10-11 ed-slopper/puffin: E10b done (button maps, key repeat, rumble); added E10c (devices, the recorder, the app on the maps).
 - 2026-10-11 ed-slopper/puffin: claim E12.
 - 2026-10-11 ed-slopper/puffin: split E12 into E12a (the career block and a new game, done) and E12b (the rest of the career).
+- 2026-10-11 ed-slopper/puffin: claim E12b.
