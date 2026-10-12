@@ -71,6 +71,7 @@ state machine and the renderer are ours. Nothing has been checked against the or
 |---|---|---|---|---|---|
 | E12d2 | The app's medals, times and scores on the career block instead of `tricky-save.json`: the race results through `Career::check_new_records` / `record_best_time` / `record_best_score` (a `RecordsEnv`, the app's character and course indices), the menus' unlocks (`is_character_unlocked`, `is_board_unlocked`, tracks) read from the block, the old json read once to carry medals over | any | E12d | | Gap of E12d |
 | E12c | The career's static tables: `career::StaticTables` (`Career_InitStaticTables` 0x169e38, the outfit and board tables and their five readers) and `status_name_id` (`Career_GetStatusName`) checked in the runner (tests/career.rs). The strings themselves: E5a2 | P2 | ed-slopper/puffin | 2026-10-11 | 07541ac |
+| C12 | The World Circuit's results and unlocks: `tricky_game::circuit` (`Circuit_ProcessRaceResult`, `Circuit_ProcessUnlocks`, `Circuit_ScoreEventResult`, `Circuit_AdvanceEvent`, `Circuit_SaveRiderPoints`, `Circuit_AddPointsToAll`, `FUN_0016c228`, `Circuit_IsFinalEvent`, the lookups) checked in the runner on 20,000 random careers, block, globals and unlock list compared (tests/circuit.rs). Heats' rider set-up: E1b2o. Gaps: C12a | P2 | ed-slopper/puffin | 2026-10-11 | bd7b49a |
 | G1 | Boarder state machine: every state (0x00–0x14) and motion (0–6), their enter/update/exit, `cBoarder` vtable, in the original's order per tick | unowned | F1 | | [repo] Many states ported one by one; the dispatch is ours |
 | G1a | Prewind, jump, takeoff, spin and flip control (`PrewindState_Update` 0x1050e8, `Jump_ApplyImpulse` 0x1284e0, `Takeoff_SetSpinRates` 0x126e30, `SpinState_Update` 0x100908, `SpinState_StartFromStick` 0x102158) checked | any | F4a | | [repo] Ported, unchecked Split: G1a1, G1a2 |
 | G1a5b | The rest of G1a5: `Rider::step` (`tricky-rs/game/src/rider.rs`) calls the exact prewind, jump, take-off, spin start and spin (`boarder::prewind_update`, `jump::jump_impulse`, `jump::takeoff_spin_rates`, `jump::spin_start_from_stick`, `spin::spin_update`, all checked) on the rider's own fields (cm, z up), replacing `Rider::air_rotation` and the hand-written prewind and jump | any | G1a5a | | Split of G1a5 (wiring; needs a play test). Split: G1a5b1, G1a5b2, G1a5b3 (the exact functions read the game's pad word, built per boarder state by `cPlayer::GetControls`) |
@@ -138,7 +139,7 @@ matches the original.
 | C8 | Alaska | unowned | C0, E9 | | [est] |
 | C9 | Pipedream (show-off only) | unowned | C0, E9 | | [est] |
 | C10 | Untracked (freeride) | unowned | C0, E9 | | [est] |
-| C12 | World Circuit race: heats, advancement, medals, points, unlocks (`Circuit_*` 0x16b000–0x16d400, `Circuit_ProcessUnlocks` 0x16c420) | unowned | C0, E12 | ed-slopper/puffin (2026-10-11)
+| C12a | The app's World Circuit on `tricky_game::circuit` instead of `ui.rs`'s stand-in: after each circuit race `Career::check_new_records` with a `RecordsEnv` calling `Circuit::process_race_result`, heats through `Circuit::advance_event` (with E1b2o's rider set-up), the unlock list shown on the results screens | unowned | C12, E12d2, E1b2o | | Gap of C12 |
 | C13 | World Circuit show-off: clock, checkpoints, medals | unowned | C0, E12 | | [repo] README: show-off medals "still mine" |
 | C14 | Single event, freeride and practice modes | unowned | C0, G9 | | [est] |
 | C15b | The app's trick book on the career block: `src/book.rs` (name-based, `tricky-book.json`) replaced by `Career::trick_book_check` with a `BookEnv` over the race object, the `Trick_GetInfo` table (0x31e210) and the HUD message / sound; the lesson gate | any | C15, E12d | | Gap of C15 |
@@ -670,3 +671,4 @@ matches the original.
 - 2026-10-11 trailrig/heron: E1b2m done (rider-list builders and dispatcher vs the original); added E1b2n (Circuit_SetupRiders, PrepareRace switch, n=0 edge).
 - 2026-10-11 trailrig/heron: E1b2n done (Circuit_SetupRiders single-rider path vs the original); added E1b2o (Circuit_SetupEventRiders and the rest).
 - 2026-10-11 ed-slopper/puffin: claim C12.
+- 2026-10-11 ed-slopper/puffin: C12 done; added C12a (the app on it).
