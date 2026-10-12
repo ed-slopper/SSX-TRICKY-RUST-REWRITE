@@ -1007,3 +1007,74 @@ pub fn region_check_condition(p: &CondP, rider: Option<&CondRider>, p14: [f32; 3
     let d = [r.v57c0[0] - p14[0], r.v57c0[1] - p14[1], r.v57c0[2] - p14[2]];
     (p.f188 <= dot3(d, d).sqrt()) as u64
 }
+
+// ---- Camera_TrackRider 0x173270 ----
+
+/// The tracker (`param_1`): `+4` the speed taken from the rider, `+8` the smoothed direction, `+0x14` the
+/// rider's marker position.
+#[derive(Clone, Debug, Default)]
+pub struct Tracker {
+    pub speed: f32,
+    pub dir: [f32; 3],
+    pub marker: [f32; 3],
+}
+
+/// What the tracker reads from its rider.
+#[derive(Clone, Debug)]
+pub struct TrackRider {
+    /// +0x424, +0x428.
+    pub w424: i32,
+    pub w428: i32,
+    /// +0x150: the velocity (four lanes).
+    pub v150: [f32; 4],
+    /// +0x180: the direction it is heading.
+    pub v180: [f32; 4],
+    /// +0x1b0.
+    pub f1b0: f32,
+    /// +0x4ad0.
+    pub v4ad0: [f32; 3],
+}
+
+/// `Camera_TrackRider` 0x173270(tracker, force): eases the tracker's direction toward the rider's velocity (or
+/// heading) and then makes it a unit vector (or leaves it when it has no length).
+pub fn track_rider(t: &mut Tracker, rider: Option<&TrackRider>, force: i64) {
+    if let Some(r) = rider {
+        let mut force = force != 0;
+        let d = t.dir;
+        if d[0] == 0.0 && d[1] == 0.0 {
+            force = true;
+        } else if dot3(d, d).sqrt() < 0.5 {
+            force = true;
+        }
+        let k = |bits: u32| f32::from_bits(bits);
+        let sum = |a: [f32; 3], b: [f32; 3]| [a[0] + b[0], a[1] + b[1], a[2] + b[2]];
+        let speed4 = v4_dot(r.v150, r.v150).sqrt();
+        let eased = |t: &Tracker, kd: f32, ks: f32| {
+            // direction · kd · speed + velocity · ks
+            let u = unit_or_same(t.dir);
+            let a = [u[0] * kd * speed4, u[1] * kd * speed4, u[2] * kd * speed4];
+            let b = [r.v150[0] * ks, r.v150[1] * ks, r.v150[2] * ks];
+            sum(a, b)
+        };
+        let v150 = [r.v150[0], r.v150[1], r.v150[2]];
+        if r.w428 != 0x12 && r.w424 == 5 {
+            t.dir = if force { v150 } else { eased(t, k(0x3f7d_70a4), k(0x3c23_d70a)) };
+        } else if r.w428 != 0x12 && r.w424 == 6 {
+            t.dir = if force { v150 } else { eased(t, k(0x3f73_3333), k(0x3d4c_cccd)) };
+        } else {
+            t.speed = r.f1b0;
+            let near = speed4 < 10.0;
+            t.dir = if force {
+                if near { [r.v180[0], r.v180[1], r.v180[2]] } else { v150 }
+            } else {
+                let u = unit_or_same(t.dir);
+                let a = [u[0] * k(0x3f73_3333), u[1] * k(0x3f73_3333), u[2] * k(0x3f73_3333)];
+                let w = if near { r.v180 } else { v4_unit(r.v150) };
+                let c = k(0x3d4c_cccd);
+                sum(a, [w[0] * c, w[1] * c, w[2] * c])
+            };
+        }
+        t.marker = r.v4ad0;
+    }
+    t.dir = unit_or_same(t.dir);
+}
