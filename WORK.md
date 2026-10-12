@@ -64,7 +64,7 @@ state machine and the renderer are ours. Nothing has been checked against the or
 | E9b2 | Run the script threads in the app (`tricky_game::script` on `tricky_data::ssf` instead of `logic.rs`'s static walk of SSFLogic.json): the world's node list order (`BxList_Add` 0x17d4e8 links new nodes at the head; the update loop's order to confirm), `World_DeleteScriptObject` 0x13bbc0, the starters (area wake, contact, controller goal, the engine's RaceMode / StartCountDown calls) | unowned | E9b, E7 | | Gap of E9b |
 | E11 | Camera: named cameras `cBxCamera_EvalNamedCam` 0x174888 (ported), director scripts `cBxCamera_RunDirectorScript`, replay and finish cameras, camera collision | any | | | [repo] Chase cam ported in `rider.rs`; free camera is ours (keep, tag) |
 | E10c | The input device list and its ring buffer (`Input_Init` 0x17a420, `Input_ReadDevices` 0x17a668, `InputRecorder_Playback` 0x17a740, `Input_FindPressedDevice`, `Input_ResetDevices`, `Input_GetAnyNewButtons`; the recorder the replays play back, G12), the cInput +0x1cc "shown" buttons `Pad_SetupVibration` also binds, and the app reading the disc's maps through `input::parse_button_map` instead of `ButtonMap::btnmap` | unowned | E10b | | Gap of E10b |
-| E12 | Save and load: the memory-card profile, options, records, unlocks (`Profile_ResetNewGame` 0x161b40), in our own save file with the same fields | unowned | E1 | | [repo] `tricky-save.json` is the stand-in |
+| E12 | Save and load: the memory-card profile, options, records, unlocks (`Profile_ResetNewGame` 0x161b40), in our own save file with the same fields | unowned | E1 | ed-slopper/puffin (2026-10-11)
 
 ## P2 Gameplay systems
 
@@ -611,3 +611,4 @@ matches the original.
 - 2026-10-11 ed-slopper/puffin: split E10 into E10a (the button cheats, done) and E10b (the rest of the input).
 - 2026-10-11 ed-slopper/puffin: claim E10b.
 - 2026-10-11 ed-slopper/puffin: E10b done (button maps, key repeat, rumble); added E10c (devices, the recorder, the app on the maps).
+- 2026-10-11 ed-slopper/puffin: claim E12.
