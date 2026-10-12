@@ -39,6 +39,27 @@ pub struct Records(pub std::collections::HashMap<String, Record>);
 fn save_path() -> std::path::PathBuf {
     std::env::current_exe().ok().and_then(|p| p.parent().map(|p| p.to_path_buf())).unwrap_or_default().join("tricky-save.json")
 }
+/// The game's own career block (row E12d), kept as the memory card's image in `tricky-career.sav` next to the
+/// program: loaded when its CRC is right, else a new game. The medals above still live in `tricky-save.json` until
+/// the race results are written into this block (row E12d2).
+#[derive(Resource)]
+pub struct CareerRes(pub tricky_game::career::Career);
+fn career_path() -> std::path::PathBuf {
+    std::env::current_exe().ok().and_then(|p| p.parent().map(|p| p.to_path_buf())).unwrap_or_default().join("tricky-career.sav")
+}
+impl CareerRes {
+    pub fn load() -> Self {
+        let file = std::fs::read(career_path()).ok();
+        let seed = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map_or(1, |d| d.as_nanos() as u32);
+        let (career, _) = tricky_game::career::CareerFile::open(file.as_deref(), 0, seed, None);
+        Self(career)
+    }
+    pub fn save(&mut self) {
+        let image = self.0.save_image(None);
+        let _ = std::fs::write(career_path(), image);
+    }
+}
+
 /// Board unlock costs in career points (0x332148 table): the original's twelve boards per rider.
 pub const BOARD_POINTS: [u32; 12] = [0, 0, 5, 20, 35, 60, 90, 120, 160, 200, 240, 999];
 /// The circuit's track order (0x3352f0): a medal on one opens the next. Garibaldi, Snowdream and
@@ -83,7 +104,7 @@ impl Records {
 }
 
 /// When a run ends, keep what was better than before.
-pub fn records(mut game: ResMut<Game>, race: Res<RaceRes>, rider: Res<RiderRes>, list: Res<LevelList>, mut recs: ResMut<Records>, mut was: Local<bool>) {
+pub fn records(mut game: ResMut<Game>, race: Res<RaceRes>, rider: Res<RiderRes>, list: Res<LevelList>, mut recs: ResMut<Records>, mut career: ResMut<CareerRes>, mut was: Local<bool>) {
     game.points = recs.points();
     let done = race.0.state == RaceState::Finished && game.screen != Screen::Menu;
     if done && !*was {
@@ -102,6 +123,7 @@ pub fn records(mut game: ResMut<Game>, race: Res<RaceRes>, rider: Res<RiderRes>,
             Event::FreeRide => { rec.time = Some(rec.time.map_or(race.0.time, |t| t.min(race.0.time))); rec.score = rec.score.max(rider.0.score); }
         }
         recs.save();
+        career.save();
     }
     *was = done;
 }

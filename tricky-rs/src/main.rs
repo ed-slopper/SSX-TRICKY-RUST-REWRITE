@@ -396,6 +396,7 @@ fn main() {
     .init_resource::<editor::Editor>()
     .init_resource::<editor::Reload>()
     .insert_resource(ui::Records::load())
+    .insert_resource(ui::CareerRes::load())
     .init_resource::<book::Book>()
     .init_resource::<hudsprites::HudSprites>()
     .init_resource::<sfnfont::SfnFonts>()

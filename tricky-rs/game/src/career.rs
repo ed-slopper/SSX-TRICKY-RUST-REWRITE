@@ -1237,6 +1237,30 @@ impl Career {
     }
 }
 
+/// The career as the app keeps it on disk (row E12d): the memory card's image (`Career::save_image`, CRC included).
+pub struct CareerFile;
+
+impl CareerFile {
+    /// What a start does: the file's image loaded (`Career::load_image`: its CRC must match), else a new game
+    /// (`Career::init_new_game`, `seed` for the game's random streams as the original seeds them at start). The flag
+    /// says the file was used.
+    pub fn open(file: Option<&[u8]>, language: u32, seed: u32, audio: Option<&mut dyn AudioSettings>) -> (Career, bool) {
+        let mut c = Career::default();
+        let mut audio = audio;
+        if let Some(bytes) = file {
+            if c.load_image(bytes, audio.as_deref_mut().map(|a| a as &mut dyn AudioSettings)) {
+                return (c, true);
+            }
+            c = Career::default();
+        }
+        let mut rand = Streams::default();
+        rand.seed_fx(seed);
+        rand.seed_game(seed);
+        c.init_new_game(language, &mut rand, audio);
+        (c, false)
+    }
+}
+
 /// The outfit table (0x3cd0e0, written by `Career_InitStaticTables`): by character and outfit four words: the
 /// outfit's model, then the character three times (the readers below). Outfit 6 repeats outfit 5.
 pub const OUTFITS: [[[u32; 4]; 7]; 12] = [
@@ -1377,5 +1401,28 @@ impl Career {
         if any {
             env.book_done_message();
         }
+    }
+}
+
+#[cfg(test)]
+mod file_tests {
+    use super::*;
+
+    #[test]
+    fn the_file_round_trips_and_a_bad_one_starts_a_new_game() {
+        let (mut a, used) = CareerFile::open(None, 0, 7, None);
+        assert!(!used);
+        a.w32(0x1670, 3);
+        let img = a.save_image(None);
+        assert_eq!(img.len(), SAVE_LEN);
+        let (b, used) = CareerFile::open(Some(&img), 0, 99, None);
+        assert!(used);
+        assert_eq!(b.r32(0x1670), 3);
+        assert_eq!(&b.bytes[SAVE_START..SAVE_START + SAVE_LEN - 8], &a.bytes[SAVE_START..SAVE_START + SAVE_LEN - 8]);
+        // a flipped byte fails the CRC; a short file too
+        let mut bad = img.clone();
+        bad[0x100] ^= 1;
+        assert!(!CareerFile::open(Some(&bad), 0, 7, None).1);
+        assert!(!CareerFile::open(Some(&img[..100]), 0, 7, None).1);
     }
 }
