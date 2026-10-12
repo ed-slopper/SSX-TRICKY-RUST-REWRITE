@@ -110,3 +110,55 @@ fn pre_race_selection_matches_the_original() {
     }
     assert!(hits > 2000 && none > 200, "hits {hits} none {none}");
 }
+
+#[test]
+fn rivals_init_pairs_matches_the_original() {
+    use tricky_game::career::{Career, InitialRelations, CAREER_BASE, CAREER_SIZE};
+    let Some(mut r) = Runner::from_env() else { return };
+    for a in [0x167ea0u32, 0x167208, 0x167da0, 0x167de0, 0x167dc0, 0x167e00, 0x166550] {
+        r.allow(a);
+    }
+    let t = r.mem.alloc(12 * 12 * 16);
+    r.cpu.set_gpr(4, t as u64);
+    r.call(0x167208).expect("RelTable_Init");
+    let mut g = Rng(0x1357_9bdf_2468_ace0);
+    let mut humans = 0;
+    for case in 0..20_000 {
+        let mut ours = tricky_game::career::Career::default();
+        for b in ours.bytes.iter_mut() {
+            *b = g.next() as u8;
+        }
+        let mut players = Vec::new();
+        for k in 0..4usize {
+            let o = 0x44 * k;
+            let p = if g.next() % 4 == 0 { 0xffu8 } else { k as u8 };
+            ours.bytes[0x30fc + o] = p;
+            if p != 0xff { players.push(p); }
+            ours.w32(0x3114 + o, CAREER_BASE + 0x100 + 0x1c4 * (g.next() % 12));
+        }
+        let n = (g.next() % 8) as i32 - 1;
+        for i in 0..6usize {
+            let ri = 0x27e0 + 0x84 * i;
+            ours.w32(ri + 0x38, g.next() % 12);
+            ours.bytes[ri + 0x65] = if players.is_empty() || g.next() % 2 == 0 { 0xff } else { players[g.next() as usize % players.len()] };
+        }
+        for k in 0..CAREER_SIZE as u32 / 4 {
+            let v = u32::from_le_bytes(ours.bytes[4 * k as usize..4 * k as usize + 4].try_into().unwrap());
+            r.mem.write_u32(CAREER_BASE + 4 * k, v);
+        }
+        r.mem.write_u32(0x3352b4, t);
+        r.cpu.set_gpr(4, t as u64);
+        r.cpu.set_gpr(5, n.min(6) as i64 as u64);
+        r.cpu.set_gpr(6, (CAREER_BASE + 0x27e0) as u64);
+        r.cpu.set_gpr(7, (CAREER_BASE + 0x30fc) as u64);
+        r.call(0x167ea0).unwrap_or_else(|e| panic!("case {case}: {e}"));
+        ours.rivals_init_pairs(n.min(6), &InitialRelations);
+        for k in 0..CAREER_SIZE as u32 {
+            let got = (r.mem.read_u32((CAREER_BASE + k) & !3) >> (8 * ((CAREER_BASE + k) & 3))) as u8;
+            assert_eq!(got, ours.bytes[k as usize], "case {case}: byte {k:#x} (count {n})");
+        }
+        humans += (0..6).filter(|&i| ours.bytes[0x27e0 + 0x84 * i + 0x65] as i8 >= 0).count();
+    }
+    let _ = Career::default();
+    assert!(humans > 10_000);
+}

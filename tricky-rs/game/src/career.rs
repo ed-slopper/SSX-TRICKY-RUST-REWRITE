@@ -1292,6 +1292,60 @@ impl Career {
     }
 }
 
+/// The riders' relation table as `Rivals_InitPairs` reads it (`RelTable_GetAttitude` 0x167da0, `FUN_00167de0` the
+/// cap, `FUN_00167dc0` the tolerance, `RelTable_GetRelation` 0x167e00): rows are the rider who feels.
+pub trait RelSource {
+    fn attitude(&self, me: i32, other: i32) -> u32;
+    fn cap(&self, me: i32, other: i32) -> u32;
+    fn tolerance(&self, me: i32, other: i32) -> u32;
+    fn relation(&self, me: i32, other: i32) -> u32;
+}
+
+/// The table as `RelTable_Init` leaves it.
+pub struct InitialRelations;
+impl RelSource for InitialRelations {
+    fn attitude(&self, me: i32, other: i32) -> u32 {
+        crate::rivals::ATTITUDE[me as usize][other as usize] as u32
+    }
+    fn cap(&self, me: i32, other: i32) -> u32 {
+        crate::rivals::CAP[me as usize][other as usize] as u32
+    }
+    fn tolerance(&self, me: i32, other: i32) -> u32 {
+        crate::rivals::TOLERANCE[me as usize][other as usize] as u32
+    }
+    fn relation(&self, me: i32, other: i32) -> u32 {
+        crate::rivals::relation(me as usize, other as usize) as u32
+    }
+}
+
+impl Career {
+    /// `Rivals_InitPairs` 0x167ea0(table, count, riders = +0x27e0, slots = +0x30fc): for every pair of the first
+    /// `count` race riders (rows of 0x84 bytes, the rider at +0x38, the player byte at +0x65), the row's four bytes
+    /// for the other at +0x20 + 4·other: the attitude (a human other: the player's own record, +0x168 + 8·rider of
+    /// its profile), the cap, the tolerance and the relation.
+    pub fn rivals_init_pairs(&mut self, count: i32, rel: &dyn RelSource) {
+        for i in 0..count.max(0) as usize {
+            for j in 0..count as usize {
+                let (ri, rj) = (0x27e0 + 0x84 * i, 0x27e0 + 0x84 * j);
+                let me = self.r32(ri + 0x38) as i32;
+                let other = self.r32(rj + 0x38) as i32;
+                let player = self.bytes[rj + 0x65] as i8;
+                let att = if player < 0 {
+                    rel.attitude(me, other) as u8
+                } else {
+                    let (rec, _) = self.player_rec(player);
+                    self.bytes[(rec as isize + 8 * me as isize + 0x168) as usize]
+                };
+                let at = ri + 4 * j;
+                self.bytes[at + 0x20] = att;
+                self.bytes[at + 0x21] = rel.cap(me, other) as u8;
+                self.bytes[at + 0x22] = rel.tolerance(me, other) as u8;
+                self.bytes[at + 0x23] = rel.relation(me, other) as u8;
+            }
+        }
+    }
+}
+
 /// The career as the app keeps it on disk (row E12d): the memory card's image (`Career::save_image`, CRC included).
 pub struct CareerFile;
 
