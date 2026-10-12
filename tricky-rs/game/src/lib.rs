@@ -20,6 +20,7 @@ pub mod debris;
 pub mod finish;
 pub mod gate;
 pub mod hit;
+pub mod input;
 pub mod probe;
 pub mod ps2f;
 pub mod ragdoll;

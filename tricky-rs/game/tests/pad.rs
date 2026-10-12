@@ -2,11 +2,17 @@
 //! (TRICKY_ELF; skipped without it): `cPS2Device` vf10 0x17b278 (the pad read), `Pad_ReadAxis` 0x179940, the four
 //! `cInput` queries (0x179860, 0x179890, 0x1798c8, 0x179900) on random pads and maps; and, with
 //! TRICKY_BTNMAP_DIR set to a folder holding the disc's `BTNMAP0.DAT` and `BTNMAP1.DAT`, the game's own parser
-//! (`Pad_ParseButtonMap` 0x179b18) on them against `ButtonMap::btnmap`.
+//! (`Pad_ParseButtonMap` 0x179b18) on them against `ButtonMap::btnmap`, and against our parser
+//! (`tricky_game::input`, row E10b) on them and on 600 edited copies; the key repeat (`PadDevice_UpdateRepeat`
+//! 0x17a958) and the rumble (`cPS2Device` vf3 / vf4 / vf5 and the motor timers of the poll) frame by frame.
+
+use std::cell::RefCell;
+use std::rc::Rc;
 
 use r5900::ps2float::Rules;
 use r5900::Runner;
 use tricky_game::controls::{read_axis, ButtonMap, Mapper, PadDevice, PadMapper};
+use tricky_game::input::{bind, parse_button_map, KeyRepeat, PadConfig, Rumble};
 
 struct Rng(u64);
 impl Rng {
@@ -47,7 +53,7 @@ fn get_device(m: &mut r5900::Mem, at: u32) -> PadDevice {
 }
 
 fn random_device(g: &mut Rng) -> PadDevice {
-    let mut v = |g: &mut Rng| match g.next() % 5 {
+    let v = |g: &mut Rng| match g.next() % 5 {
         0 => 0.0,
         1 => [1.0, -1.0, 0.38046828, -0.38046828, 0.3804682][g.next() as usize % 5],
         _ => g.f(-1.0, 1.0),
@@ -189,5 +195,228 @@ fn button_maps_parse_as_the_original() {
             let (m, neg) = (r.mem.read_u32(ctx + 0xfc + 8 * k), r.mem.read_u32(ctx + 0x100 + 8 * k));
             assert_eq!((m, neg != 0), ours.axes[k as usize], "map {n}: axis {k}");
         }
+    }
+}
+
+/// The parser's runner set-up (the newlib it calls; strncmp and strlen answered as the C library would).
+fn parser_runner() -> Option<Runner> {
+    let mut r = runner()?;
+    for f in [0x179b18u32, 0x179d98, 0x17a148, 0x17a208, 0x179fb0, 0x17a038, 0x17a0a0, 0x179e60, 0x2fcaa0, 0x17a1a8, 0x301090, 0x301b98, 0x305bd0] {
+        r.allow(f);
+    }
+    r.stub(0x2fd478, |c, m| {
+        let (a, b, n) = (c.gpr(4) as u32, c.gpr(5) as u32, c.gpr(6) as u32);
+        let byte = |m: &mut r5900::Mem, p: u32| (m.read_u32(p & !3) >> (8 * (p & 3))) as u8;
+        let mut d = 0i32;
+        for k in 0..n {
+            let (x, y) = (byte(m, a + k), byte(m, b + k));
+            if x != y || x == 0 {
+                d = x as i32 - y as i32;
+                break;
+            }
+        }
+        c.set_gpr(2, d as i64 as u64);
+    });
+    r.stub(0x2fd260, |c, m| {
+        let s = c.gpr(4) as u32;
+        let mut n = 0;
+        while (m.read_u32((s + n) & !3) >> (8 * ((s + n) & 3))) as u8 != 0 {
+            n += 1;
+        }
+        c.set_gpr(2, n as u64);
+    });
+    Some(r)
+}
+
+/// The game's `Pad_ParseButtonMap` on `text`: the parse context's counts and pairs.
+fn game_parse(r: &mut Runner, text: &[u8]) -> PadConfig {
+    let buf = r.mem.alloc(text.len() as u32 + 16);
+    for (k, b) in text.iter().enumerate() {
+        r.mem.write_u8(buf + k as u32, *b);
+    }
+    r.mem.write_u8(buf + text.len() as u32, 0);
+    let ctx = r.mem.alloc(0x200);
+    loop {
+        for o in (0..0x200).step_by(4) {
+            r.mem.write_u32(ctx + o, 0);
+        }
+        r.mem.write_u32(ctx, buf);
+        r.mem.write_u32(ctx + 4, text.len() as u32);
+        r.cpu.set_gpr(4, ctx as u64);
+        // newlib's internals behind sscanf at the end of the text (`__srefill`, `__sinit`, ...) run as they are
+        match r.call(0x179b18) {
+            Ok(()) => break,
+            Err(r5900::Error::UnstubbedCall { target, .. }) if target >= 0x2f0000 => r.allow(target),
+            Err(e) => panic!("{e}"),
+        }
+    }
+    let n = |r: &mut Runner, o: u32| r.mem.read_u32(ctx + o) as usize;
+    let (nb, ng, na) = (n(r, 8), n(r, 0xc), n(r, 0x10));
+    let pairs = |r: &mut Runner, base: u32, k: usize| (0..k as u32).map(|i| (r.mem.read_u32(ctx + base + 8 * i), r.mem.read_u32(ctx + base + 4 + 8 * i))).collect::<Vec<_>>();
+    PadConfig { bools: pairs(r, 0x14, nb.min(14)), grabs: pairs(r, 0x84, ng.min(15)), analog: pairs(r, 0xfc, na.min(16)) }
+}
+
+#[test]
+fn button_map_parser_is_the_original() {
+    let Some(dir) = std::env::var_os("TRICKY_BTNMAP_DIR") else { return };
+    let mut g = Rng(0xb7a3_0000_0000_0001);
+    let mut variants = 0;
+    for n in 0..2u32 {
+        let text = std::fs::read(std::path::Path::new(&dir).join(format!("BTNMAP{n}.DAT"))).expect("BTNMAP file");
+        // the file as it is: the game's parse, ours, and the binding against the transcription
+        let Some(mut r) = parser_runner() else { return };
+        let theirs = game_parse(&mut r, &text);
+        let ours = parse_button_map(&text);
+        assert_eq!(theirs, ours, "map {n}");
+        let slots: [u16; 15] = std::array::from_fn(|k| (k as u16 * 7 + 3) % 0x1b);
+        assert_eq!(bind(&ours, slots), ButtonMap::btnmap(n, slots), "map {n}: bound");
+        // and edited: lines dropped or doubled, characters deleted, changed, inserted
+        for _ in 0..300 {
+            let mut t = text.clone();
+            for _ in 0..1 + g.next() % 6 {
+                let at = g.next() as usize % t.len().max(1);
+                match g.next() % 6 {
+                    0 => {
+                        t.remove(at);
+                    }
+                    1 => t.insert(at, b" \t|(),{};\nXNA_09\x80"[g.next() as usize % 16]),
+                    2 => t[at] = b" \t|(),{};\nXNA_09\x80"[g.next() as usize % 16],
+                    3 => {
+                        let e = t[at..].iter().position(|c| *c == b'\n').map_or(t.len(), |p| at + p);
+                        t.drain(at..e);
+                    }
+                    4 => {
+                        let s = t[..at].iter().rposition(|c| *c == b'\n').map_or(0, |p| p + 1);
+                        let e = t[at..].iter().position(|c| *c == b'\n').map_or(t.len(), |p| at + p + 1);
+                        let line = t[s..e].to_vec();
+                        for (k, b) in line.iter().enumerate() {
+                            t.insert(s + k, *b);
+                        }
+                    }
+                    _ => t.truncate(at),
+                }
+            }
+            let Some(mut r) = parser_runner() else { return };
+            let theirs = game_parse(&mut r, &t);
+            let ours = parse_button_map(&t);
+            let cap = |c: &PadConfig| PadConfig { bools: c.bools.iter().take(14).copied().collect(), grabs: c.grabs.iter().take(15).copied().collect(), analog: c.analog.iter().take(16).copied().collect() };
+            assert_eq!(theirs, cap(&ours), "map {n} edited:\n{}", String::from_utf8_lossy(&t));
+            variants += 1;
+        }
+    }
+    eprintln!("{variants} edited maps parsed the same");
+}
+
+#[test]
+fn key_repeat_is_the_original() {
+    let Some(mut r) = runner() else { return };
+    r.allow(0x17a958);
+    let dev = r.mem.alloc(0x40);
+    let mut g = Rng(0x4e9_0000_0000_0001);
+    let mut k = KeyRepeat { repeat: 1, key: 0, held: 0xffff_ffff, frames: 0 };
+    let mut b = 0u32;
+    let mut keys = 0;
+    for frame in 0..100000 {
+        if g.next() % 6 == 0 {
+            b = match g.next() % 4 {
+                0 => 0,
+                1 => 1 << (g.next() % 25),
+                _ => (1 << (g.next() % 25)) | (1 << (g.next() % 25)),
+            };
+        }
+        if g.next() % 200 == 0 {
+            k.repeat ^= 1;
+        }
+        r.mem.write_u32(dev + 8, k.repeat);
+        r.mem.write_u32(dev + 0x10, b);
+        r.mem.write_u32(dev + 0x2c, k.key);
+        r.mem.write_u32(dev + 0x30, k.held);
+        r.mem.write_u32(dev + 0x34, k.frames as u32);
+        r.cpu.set_gpr(4, dev as u64);
+        r.call(0x17a958).unwrap();
+        k.update(b);
+        let theirs = KeyRepeat { repeat: r.mem.read_u32(dev + 8), key: r.mem.read_u32(dev + 0x2c), held: r.mem.read_u32(dev + 0x30), frames: r.mem.read_u32(dev + 0x34) as i32 };
+        assert_eq!(theirs, k, "frame {frame} buttons {b:#x}");
+        keys += (k.key != 0) as u32;
+    }
+    eprintln!("{keys} keys given");
+}
+
+#[test]
+fn rumble_is_the_original() {
+    let Some(mut r) = runner() else { return };
+    for a in [0x17ad68, 0x17b590, 0x17b5b0, 0x17b5e8] {
+        r.allow(a);
+    }
+    let state: Rc<RefCell<(u64, u64, u8)>> = Rc::new(RefCell::new((6, 1, 0)));
+    let s = state.clone();
+    r.stub(0x2e76a8, move |c, _| c.set_gpr(2, s.borrow().0));
+    let s = state.clone();
+    r.stub(0x2e7628, move |c, m| {
+        let (_, ret, b0) = *s.borrow();
+        m.write_u8(c.gpr(6) as u32, b0);
+        c.set_gpr(2, ret);
+    });
+    let sent: Rc<RefCell<Vec<(u8, u8)>>> = Rc::new(RefCell::new(vec![]));
+    let l = sent.clone();
+    r.stub(0x2e7c78, move |c, m| {
+        let a = c.gpr(6) as u32;
+        let w = m.read_u32(a);
+        l.borrow_mut().push((w as u8, (w >> 8) as u8));
+    });
+    let dev = r.mem.alloc(0x100);
+    let put = |m: &mut r5900::Mem, d: &Rumble| {
+        m.write_u32(dev + 0x48, d.allowed);
+        m.write_u8(dev + 0x78, d.small);
+        m.write_u8(dev + 0x79, d.large);
+        m.write_u32(dev + 0x80, d.send);
+        m.write_u32(dev + 0x84, d.small_frames as u32);
+        m.write_u32(dev + 0x88, d.large_frames as u32);
+    };
+    let get = |m: &mut r5900::Mem| {
+        let w = m.read_u32(dev + 0x78);
+        Rumble { allowed: m.read_u32(dev + 0x48), small: w as u8, large: (w >> 8) as u8, send: m.read_u32(dev + 0x80), small_frames: m.read_u32(dev + 0x84) as i32, large_frames: m.read_u32(dev + 0x88) as i32 }
+    };
+    let mut d = Rumble::default();
+    put(&mut r.mem, &d);
+    let mut g = Rng(0x7a6b_1e00_0000_0001);
+    for frame in 0..60000 {
+        match g.next() % 8 {
+            0 => {
+                let (on, f) = ((g.next() % 2) as u8, [-1i32, 0, 1, 5, 30][g.next() as usize % 5]);
+                r.cpu.set_gpr(4, dev as u64);
+                r.cpu.set_gpr(5, on as u64);
+                r.cpu.set_gpr(6, f as i64 as u64);
+                r.call(0x17b590).unwrap();
+                d.set_small(on, f);
+            }
+            1 => {
+                let (a, f) = ([0.0f32, 0.3, 0.5, 1.0, 0.999][g.next() as usize % 5], [-1i32, 0, 2, 12][g.next() as usize % 4]);
+                r.cpu.set_f(12, a);
+                r.cpu.set_gpr(4, dev as u64);
+                r.cpu.set_gpr(5, f as i64 as u64);
+                r.call(0x17b5b0).unwrap();
+                d.set_large(a, f);
+            }
+            2 if g.next() % 4 == 0 => {
+                let on = g.next() % 2;
+                r.cpu.set_gpr(4, dev as u64);
+                r.cpu.set_gpr(5, on as u64);
+                r.call(0x17b5e8).unwrap();
+                d.allow(on);
+            }
+            _ => {}
+        }
+        // the poll at state 10: read ready or not
+        let ready = g.next() % 10 != 0;
+        *state.borrow_mut() = (6, if ready { 1 } else { 0 }, 0);
+        r.mem.write_u32(dev + 0x60, 10);
+        sent.borrow_mut().clear();
+        r.cpu.set_gpr(4, dev as u64);
+        r.cpu.set_gpr(5, 0);
+        r.call(0x17ad68).unwrap();
+        let ours = d.tick(ready);
+        assert_eq!(get(&mut r.mem), d, "frame {frame}");
+        assert_eq!(sent.borrow().first().copied(), ours, "frame {frame}: sent");
     }
 }

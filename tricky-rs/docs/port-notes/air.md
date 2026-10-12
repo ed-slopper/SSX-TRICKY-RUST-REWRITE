@@ -126,6 +126,24 @@ Part of the port notes (index: [README.md](README.md)); units and wording as des
   negated; a POS / NEG mask keeps one side; dead zone 0.38046828; then the map's negate. Stick up is Crouch, down
   is Brake.
 - Our `trickdata` rows are the table's board-0 rows for every rider; boards 1 and 2 change some of the later rows.
+- The map files read (row E10b; `tricky_game::input`, checked: `tests/pad.rs`): `Pad_LoadButtonMap` 0x179a88 loads
+  `data/config/btnmap%d.dat` whole; `Pad_ParseButtonMap` finds `IS_BOOL`, then `IS_BOOLGRAB`, then `IS_ANALOG`
+  from where it got to (`Parse_FindSection`: a line starting with the name whose next line starts with `{`), each
+  entry a line `sscanf`'d with `{%*[ \t]%*[a-zA-Z],%*[ \t](%[0-9a-zA-Z_| \t]),%*[ \t](%[0-9a-zA-Z_| \t])` (so a
+  name with a digit, or no space after `{` or a comma, drops the line) until a line starting `};`.
+  `Parse_SkipSpace` counts bytes from 0x80 as space (signed). `Pad_ParseButtonNames`: each name the first in the
+  table at 0x337a90 it starts with that ends at a space, tab, `|` or the end (NONE is all bits, ALL none); an
+  unknown name ends the list. An axis's negate is any non-zero list. The binding reads 15 grabs, 14 buttons and
+  16 axes whatever the counts (a short file leaves the stack's leftovers; ours leaves 0). Checked on both disc
+  files and 600 edited copies against the game's parser; bound, both equal `ButtonMap::btnmap`.
+- The front end's keys (`PadDevice_UpdateRepeat` 0x17a958, the device's +0x2c the cheats and menus read): the
+  first of the table at 0x3857c0 whose buttons are down: select Esc (0x1b), start Enter (0xd), square / triangle /
+  circle / X 'a'..'d' ('A'..'D' with L1, R1, L2 or R2 held), d-pad or left stick left / right / down / up as PC scan
+  codes 0x4b00 / 0x4d00 / 0x5000 / 0x4800 (0x4700 / 0x4f00 / 0x5100 / 0x4900 shifted), R1 'r', R2 'R', L1 'l', L2
+  'L'. A new key is given once; held, again after 8 frames and every 8 after (when the device's +8 repeat is on).
+- Rumble (`cPS2Device`): vf3 0x17b590 small motor on/off for n frames, vf4 0x17b5b0 large motor at amount × 255
+  for n frames, vf5 0x17b5e8 allowed (both off on a change); each poll with the pad ready counts the frames down
+  and stops a motor at 0 (−1 = until told); not ready, both off. Sent with `scePadSetActDirect` when changed.
 
 - Our rider jumps through `jump::jump_impulse` (row G1a5b3a): on snow with the ground normal and the board's
   forward (steep lips leaned along the lip, the flag to `Score_StartTrickChain`), off a rail along the board's up;
