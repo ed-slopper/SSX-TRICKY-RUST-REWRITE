@@ -52,6 +52,7 @@ pub mod surface;
 pub mod terrain;
 pub mod world;
 pub mod walls;
+pub mod wipeout_motion;
 pub mod worldboarder;
 pub mod worldline;
 pub mod worldops;

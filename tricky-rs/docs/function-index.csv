@@ -1210,7 +1210,7 @@ address,size,name,system,status
 0x15f5b8,328,AnimCtl_HandleClipEnd,animation,not started
 0x15f700,200,AnimCtl_FlushEndedClips,animation,not started
 0x15f7c8,632,AnimCtl_BlendPose,animation,not started
-0x15fa40,196,AnimCtl_GetClipDisplacement,animation,not started
+0x15fa40,196,AnimCtl_GetClipDisplacement,animation,ported
 0x15fb08,172,FUN_0015fb08,animation?,not started
 0x15fbb8,320,RaceScene_SetClipMarker,animation?,not started
 0x15fcf8,216,AnimCtl_PlayClip,animation,ported
@@ -3596,8 +3596,8 @@ address,size,name,system,status
 0x217d50,1172,Sfx_UpdateAir,audio?,ported
 0x2181e8,300,Sfx_OnWipeout,audio?,not started
 0x218318,12,Sfx_MuteRiderLoops,audio?,not started
-0x218328,980,Sfx_OnWipeoutImpact,audio?,not started
-0x218700,972,Sfx_PlayWipeoutSlide,audio?,not started
+0x218328,980,Sfx_OnWipeoutImpact,audio?,ported
+0x218700,972,Sfx_PlayWipeoutSlide,audio?,ported
 0x218b20,72,Sfx_StopWipeoutLoop,frontend?,ported
 0x218b68,12,Sfx_UnmuteRiderLoops,audio?,ported
 0x218b78,676,Sfx_SpinTrickStart,audio?,not started

@@ -98,11 +98,55 @@ Part of the port notes (index: [README.md](README.md)); units and wording as des
   roller is woken (`Roller_OnHit` without a rider).
 - `Ragdoll_GroundProbe` 0x10fd58: the hip bone (rider + 0x394·[+0x44d8] + 0x8c8) turned by the rider's
   orientation, from the rider, taken onto the plane through the rider; a line ±400 cm along the ground's normal
-  (`cWorldLine` 0.5). No ground: normal (0, 0, 1), fall line = forward (+0x1a0), surface 3. Ground: its kind
-  (+0x2e0), its +0x34 word (+0x290), normal, height above it (+0x1bc), `Boarder_GetFallLine`, the point (+0x2d0).
-  Both: +0x320 the forward along the ground, unit.
+  (`cWorldLine` 0.5). No ground: normal (0, 0, 1), fall line = the board's up (+0x1a0), kind 3. Ground: its kind
+  (+0x2e0), its surface type (out +0x34 to +0x290), normal, height above it (+0x1bc), `Boarder_GetFallLine`, the
+  point (+0x2d0). Both: +0x320 the board's up (+0x1a0) along the ground, unit.
 - Checked in the runner on 6,000 random riders (bodies spread about them, every cast scripted, the shapes handed
   over compared): the rider, the body, the record, the roller and every call bit for bit.
+
+## The wipe-out motion, exactly (board row G6b; `tricky_game::wipeout_motion`, checked: `tests/ragdoll.rs`)
+
+- The motion (motion 5): the body (above) with +0xc seconds down, +0x10 seconds on the ground, +0x14 / +0x18 the
+  stick (the tumble's own control: torque about the board's side and forward), +0x30 / +0x50 the normal and the
+  speed when a slide ended. A tick is rider+0x12c / 60 s. The board's axes: +0x180 forward, +0x190 side, +0x1a0 up.
+- Enter (0x10c198): `Ragdoll_InitFromBoarder`; the stance (+0x1b4, +0x46d4: switch when +0x464's +0x40 is set and
+  +0x420 is 2) and its angle (+0x46e0, π wrapped to −π..π); `AnimCtl_BlendOutAll`; timers 0; the surface type kept
+  at +0x310 and taken as 10 until something is touched; +0x1dc 0; the impact clip; six pairs (+0x1f4, +0x200,
+  +0x20c, +0x218, +0x248, +0x26c) set to (2.0, 0); `Sfx_MuteRiderLoops`. Exit (0x10d680): `Sfx_StopWipeoutLoop`,
+  `Sfx_UnmuteRiderLoops` unless into motion 6, the rider's virtual +0x9c.
+- Slides (clips 0x2dc / 0x2dd): pos += v/60; v += (n_x·f, n_y·f, f − g)/60 with f = n_z·g, g from the surface
+  table (race +0x24, 100 bytes a type), × 0.98333; held to the ground by at most 8.333333 cm (height + ride height
+  +0x294); the velocity into the ground removed; `Ragdoll_GroundProbe`. Lost ground, n_z < 0.3 or a bad surface:
+  falling cycle and the body made again from the rider (the crash point and normal the rider's, +0x50 its speed).
+  The board turned toward lying flat (axis n × forward, negated on the face, angle asin(min(|·|, 0.99999))/12).
+  Get up when that sine is under 0.1, the speed under min(833.33 + 694.44·t_ground, 2222.22), |forward·n| > 0.9
+  and `Boarder_ProbeGround` finds the ground; else the world's collisions with rider+0x494 set to the word at
+  0x31d310.
+- Tumble: the rider lifted by (+0x294 + 10)/2·max(n_z, 0) along the normal for the step (`Boarder_Translate`) and
+  put back after it; `Ragdoll_Step`, `Ragdoll_GroundProbe`; +0x2e0 the record's kind. No touch: after 0.1 s in the
+  air the curled cycle becomes curled-to-stretched (`AirPredict_AtTakeoff`, else `AirPredict_Tick`); landing in
+  over 0.1 s on a good surface with the stick centred (both under 0.5): L = L·(1 − 3.3475056 dt) + (up × n_land)·
+  250951.34·dt·m + (forward × d_land)·(±125475.67)·dt·m (d_land the landing velocity along the ground, the sign by
+  forward · d_land), and up · n_land > 0.9 with |ω| < 4 recovers (clip 0x224, motion 1, state 0xd). A touch: the
+  ground normal the record's when steeper or the probe missed, the surface type the record's +0x34 for kinds 0 and
+  2 (else 10), the impact clip (and `FUN_00123f00`) when landing from a cycle.
+- On the ground over 0.25 s on a good surface (`Sfx_PlayWipeoutSlide`), steeper than 0.349 n_z: forward · n >
+  0.75 butt slide, < −0.75 face slide, else rolled with L += (forward × n)·(±400000)·dt·m. Straight up: t > 0.5,
+  t_ground > 0.1, |ω| < 7, n_z > 0.349, |forward · dir(course 8 m ahead)| > 0.8, up · n > 0.85 and the ground probe:
+  clip 0x250 (curled) or 0x251, motion 2, state 3. Then the stick: L += side·75285.4·dt·m·s_x + forward·(−125475.67)
+  ·dt·m·s_y, damped by (1 − 3.3475056 dt) unless the landing righting did it. t_ground ≥ 3 or t > 7: a human
+  (+0x418 < 0) gets the stuck counter (+0x2e4) 1e6; the computer slides by forward · n and gets up.
+- `Wipeout_StartGetUp` 0x10f178: the course 8 m ahead against the board's up (f) and side (r); the board turned a
+  quarter about its side, then about its up as the clip needs; clips 0x24a..0x253 as listed above; the rider moved
+  by the hip's place less the clip's displacement (`AnimCtl_GetClipDisplacement`), both turned; motion 6, state
+  0x14. `Wipeout_PlayImpactClip` 0x10f9a0: `Sfx_OnWipeoutImpact` first; up · n < −0.7 HEAD, > 0.7 FEET, else side ·
+  n > 0.7 LEFT, < −0.7 RIGHT, else forward · n > 0 BUTT, else FACE.
+- `GetUpMotion_Update` 0x1102c8 (motion 6): the slide's step with `Boarder_ProbeGround` before holding to the
+  ground; up turned to the normal (`Quat_RotateVecToVec` from the identity), its forward to the course along the
+  ground, the orientation slerped 1/12 of the way (`Quat_Slerp`); `Boarder_UpdateOrientation`; the collisions.
+- Checked in the runner on 40,000 cases (enter, update, the get-up start, impact clips, exit, the get-up motion;
+  the animation, probes, predictions and sounds scripted): the rider, the body, the timers and every call bit for
+  bit.
 
 ## Rider hits, exactly (board row E8d1, checked: `tests/hit.rs`; `tricky-rs/game/src/hit.rs`)
 

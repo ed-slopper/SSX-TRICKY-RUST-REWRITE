@@ -19,9 +19,9 @@ pub const GRAVITY: f32 = 1900.8359;
 pub const PULL: f32 = 600.0;
 
 /// The rider as the wipe-out body reads and writes it: +0x140 the position, +0x150 the velocity, +0x170 the
-/// orientation (w, x, y, z), +0x1a0 the board's forward, +0x1bc the height above the ground, +0x290, +0x2a0 the
-/// ground's normal, +0x2b0 the fall line, +0x2d0 the ground's point, +0x2e0 the surface, +0x2f0 the crash normal,
-/// +0x320 the forward along the ground, +0x350 the nearest course point, +0x470 the collision body; the hip bone's
+/// orientation (w, x, y, z), +0x1a0 the board's up (its z axis), +0x1bc the height above the ground, +0x290 the
+/// surface type (6 and 10 are the bad ones), +0x2a0 the ground's normal, +0x2b0 the fall line, +0x2d0 the ground's
+/// point, +0x2e0 the kind of the last touch (3 none), +0x2f0 the crash normal, +0x320 the up along the ground, +0x350 the nearest course point, +0x470 the collision body; the hip bone's
 /// place in the rider's frame (the skeleton's bone at +0x44d8: rider + 0x394 · index + 0x8c8), and the rider's id.
 #[derive(Clone, Debug, PartialEq)]
 pub struct RagRider {
@@ -29,13 +29,13 @@ pub struct RagRider {
     pub pos: V4,
     pub vel: V4,
     pub q: V4,
-    pub fwd: V4,
+    pub up: V4,
     pub height: f32,
-    pub x290: u32,
+    pub surface: u32,
     pub ground: V4,
     pub fall: V4,
     pub ground_at: V4,
-    pub surface: u32,
+    pub ground_kind: u32,
     pub crash_n: V4,
     pub side: V4,
     pub course: V4,
@@ -53,8 +53,8 @@ pub struct Ragdoll {
     pub rb: RigidBody,
 }
 
-/// A cast's result record: +0 its kind (the surface), +0x10 the point, +0x20 the normal, +0x30..+0x3b (+0x34 a
-/// word the probe keeps, +0x38 the object).
+/// A cast's result record: +0 its kind, +0x10 the point, +0x20 the normal, +0x30..+0x3b (+0x34 the
+/// surface type, +0x38 the object).
 #[derive(Clone, Copy, Debug, PartialEq, Default)]
 pub struct CastOut {
     pub kind: u32,
@@ -309,8 +309,8 @@ impl Ragdoll {
 
 /// `Ragdoll_GroundProbe` 0x10fd58: a line 400 cm either side along the ground's normal through the hip (turned
 /// by the rider's orientation, taken onto the plane through the rider along the normal). No ground: the normal
-/// straight up, the fall line the forward, surface 3. Ground: its kind, its +0x34 word, normal, point, the height
-/// above it and the fall line (`Boarder_GetFallLine`). Either way +0x320 the forward along the (new) ground.
+/// straight up, the fall line the board's up, kind 3. Ground: its kind, its surface type, normal, point, the height
+/// above it and the fall line (`Boarder_GetFallLine`). Either way +0x320 the board's up along the (new) ground.
 pub fn ground_probe(r: &mut RagRider, env: &mut impl RagEnv) -> bool {
     let down = scale(ld(r.ground), F(400.0));
     let h = [F(r.hip[0]), F(r.hip[1]), F(r.hip[2]), F(0.0)];
@@ -321,22 +321,22 @@ pub fn ground_probe(r: &mut RagRider, env: &mut impl RagEnv) -> bool {
     let to = add(p, down);
     let (t, out) = env.cast_line(st(from), st(to));
     let side = |r: &RagRider| {
-        let f = ld(r.fwd);
+        let f = ld(r.up);
         let g = ld(r.ground);
         st(unit(sub(f, scale(g, dot(f, g)))))
     };
     if t < 0.0 {
         r.ground = [0.0, 0.0, 1.0, 0.0];
         r.side = side(r);
-        r.fall = r.fwd;
-        r.surface = 3;
+        r.fall = r.up;
+        r.ground_kind = 3;
     } else {
-        r.surface = out.kind;
-        r.x290 = out.x30[1];
+        r.ground_kind = out.kind;
+        r.surface = out.x30[1];
         r.ground = out.normal;
         r.side = side(r);
         r.height = dot(sub(ld(r.pos), ld(out.pos)), ld(r.ground)).0;
-        r.fall = fall_line(r.ground, r.fwd);
+        r.fall = fall_line(r.ground, r.up);
         r.ground_at = out.pos;
     }
     0.0 <= t
