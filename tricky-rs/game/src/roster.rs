@@ -732,9 +732,9 @@ impl crate::career::Career {
 
     /// `Career_SetupRidersForMode` 0x165558: +0x3264 for 0x498 bytes cleared, then by the race mode (+0x2afc): 0 six
     /// riders built; 2 built; 3 and the modes not listed the player slots' riders; 4 and 5 the circuit's
-    /// (`circuit`, `Circuit_SetupRiders` 0x16bc50 on +0x320c: not ported); 6 the tutorial's; 7 reset; 8 six random;
+    /// (`Circuit_SetupRiders`; `event` is its race mode 4, `Circuit_SetupEventRiders`: not ported); 6 the tutorial's; 7 reset; 8 six random;
     /// 9 random.
-    pub fn setup_riders_for_mode(&mut self, ctx: &mut RosterCtx, circuit: &mut dyn FnMut(&mut crate::career::Career), rand_fx: &mut dyn FnMut() -> u32) {
+    pub fn setup_riders_for_mode(&mut self, ctx: &mut RosterCtx, event: &mut dyn FnMut(&mut crate::career::Career), rand_fx: &mut dyn FnMut() -> u32) {
         self.bytes[0x3264..0x3264 + 0x498].fill(0);
         match self.r32(0x2afc) {
             0 => {
@@ -743,12 +743,50 @@ impl crate::career::Career {
             }
             2 => self.build_race_riders(ctx, rand_fx),
             3 => self.init_rider_list(ctx, rand_fx),
-            4 | 5 => circuit(self),
+            4 | 5 => {
+                let k = (self.ptr(0x320c + 0x10) - 0x30fc) / 0x44;
+                self.circuit_setup_riders(k, ctx, event, rand_fx)
+            }
             6 => self.setup_tutorial_riders(ctx, rand_fx),
             7 => self.reset_riders(ctx, rand_fx),
             8 => self.pick_six_random_riders(ctx, rand_fx),
             9 => self.pick_random_riders(ctx, rand_fx),
             _ => self.init_rider_list(ctx, rand_fx),
         }
+    }
+}
+
+impl crate::career::Career {
+    /// `Circuit_SetupRiders` 0x16bc50 on the circuit block at +0x320c, `k` the slot its +0x10 points at: the
+    /// circuit's twelve words at +0x1c.. are -1 and its +0x18 is 0; race mode 4 is `Circuit_SetupEventRiders`
+    /// (`event`, not ported), anything else `FUN_0016d230`: the one rider is slot `k`'s player (level +0x14 = 2),
+    /// the race word +0x2b0c is the level plus the course's position in the medal table (8 if absent) times
+    /// 0x10000, then the selection (cleared, made for the profile's rider) and the roster.
+    pub fn circuit_setup_riders(&mut self, k: usize, ctx: &mut RosterCtx, event: &mut dyn FnMut(&mut crate::career::Career), rand_fx: &mut dyn FnMut() -> u32) {
+        let c = 0x320c;
+        for i in 0..12 {
+            self.w32(c + 0x1c + 4 * i, 0xffff_ffff);
+        }
+        self.w32(c + 0x18, 0);
+        if self.r32(0x2afc) == 4 {
+            return event(self);
+        }
+        self.w32(0x27dc, 1);
+        let sb = 0x30fc + 0x44 * k;
+        let player = self.bytes[sb] as i8;
+        self.w32(sb + 4, self.r32((0x1684 + 4 * player as isize) as usize));
+        let prof = self.ptr(sb + 0x14);
+        let entry = Self::rider_entry(ctx, self.r32(prof) as usize);
+        let name = self.slot_name(k);
+        self.setup_player_rider(k, 0, entry, &name, ctx.board_points, ctx.tables, &ctx.env);
+        self.w32(c + 0x14, 2);
+        let course = self.r32(0x2af8);
+        let idx = crate::courses::MEDALS.iter().position(|m| m.0 == course).unwrap_or(8) as u32;
+        self.w32(0x2b0c, 2u32.wrapping_add(idx << 16));
+        *ctx.sel = PreRaceSel::default();
+        let rider = self.r32(self.ptr(sb + 0x14));
+        let (p6, p7) = (self.r32(0x2af8), self.r32(0x2afc));
+        ctx.sel.choose(rider, p6, p7, 3, ctx.sel_tables.rows[..3].try_into().unwrap(), rand_fx);
+        self.finalize_roster(ctx.sel, ctx.sel_tables, rand_fx);
     }
 }

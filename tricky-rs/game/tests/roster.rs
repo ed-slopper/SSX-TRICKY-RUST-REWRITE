@@ -461,32 +461,32 @@ fn setup_player_rider_matches_the_original() {
 
 #[test]
 fn build_race_riders_matches_the_original() {
-    run_builder(0x165cf0, 12000, &|_, _| {}, &|c, x, f| c.build_race_riders(x, f));
+    run_builder(0x165cf0, 0, 12000, &|_, _| {}, &|c, x, f| c.build_race_riders(x, f));
 }
 
 #[test]
 fn init_rider_list_matches_the_original() {
-    run_builder(0x1664b0, 6000, &human, &|c, x, f| c.init_rider_list(x, f));
+    run_builder(0x1664b0, 0, 6000, &human, &|c, x, f| c.init_rider_list(x, f));
 }
 
 #[test]
 fn reset_riders_matches_the_original() {
-    run_builder(0x166450, 6000, &human, &|c, x, f| c.reset_riders(x, f));
+    run_builder(0x166450, 0, 6000, &human, &|c, x, f| c.reset_riders(x, f));
 }
 
 #[test]
 fn pick_six_random_riders_matches_the_original() {
-    run_builder(0x165a40, 6000, &|_, _| {}, &|c, x, f| c.pick_six_random_riders(x, f));
+    run_builder(0x165a40, 0, 6000, &|_, _| {}, &|c, x, f| c.pick_six_random_riders(x, f));
 }
 
 #[test]
 fn pick_random_riders_matches_the_original() {
-    run_builder(0x165b98, 6000, &|c, g| c.w32(0x16b8, 1 + g.next() as u32 % 6), &|c, x, f| c.pick_random_riders(x, f));
+    run_builder(0x165b98, 0, 6000, &|c, g| c.w32(0x16b8, 1 + g.next() as u32 % 6), &|c, x, f| c.pick_random_riders(x, f));
 }
 
 #[test]
 fn setup_tutorial_riders_matches_the_original() {
-    run_builder(0x165778, 6000, &human, &|c, x, f| c.setup_tutorial_riders(x, f));
+    run_builder(0x165778, 0, 6000, &human, &|c, x, f| c.setup_tutorial_riders(x, f));
 }
 
 /// these three need a human in slot 0, as the game always has (no human: a row never set up is read)
@@ -494,8 +494,25 @@ fn human(c: &mut tricky_game::career::Career, _: &mut Rng) {
     c.bytes[0x30fc] = 0;
 }
 
+#[test]
+fn circuit_setup_riders_matches_the_original() {
+    let set = |c: &mut tricky_game::career::Career, g: &mut Rng| {
+        c.bytes[0x30fc] = 0;
+        c.w32(0x2afc, 5);
+        c.w32(0x320c + 4, tricky_game::career::CAREER_BASE);
+        c.w32(0x320c + 8, tricky_game::career::CAREER_BASE + 0x27dc);
+        c.w32(0x320c + 0x10, tricky_game::career::CAREER_BASE + 0x30fc);
+        if g.next() % 2 == 0 {
+            let l = [0, 1, 2, 3, 4, 8, 5, 11, 7, 9];
+            c.w32(0x2af8, l[g.next() as usize % l.len()]);
+        }
+    };
+    run_builder(0x16bc50, 0x320c, 3000, &set, &|c, x, f| c.circuit_setup_riders(0, x, &mut |_| unreachable!(), f));
+}
+
 fn run_builder(
     addr: u32,
+    arg: u32,
     cases: usize,
     set_mode: &dyn Fn(&mut tricky_game::career::Career, &mut Rng),
     call: &dyn Fn(&mut tricky_game::career::Career, &mut tricky_game::roster::RosterCtx, &mut dyn FnMut() -> u32),
@@ -635,7 +652,7 @@ fn run_builder(
             for (k, w) in rand.fx.s.iter().enumerate() {
                 r.mem.write_u32(0x345e58 + 4 * k as u32, *w);
             }
-            r.cpu.set_gpr(4, CAREER_BASE as u64);
+            r.cpu.set_gpr(4, (CAREER_BASE + arg) as u64);
             match r.call(addr) {
                 Ok(()) => break,
                 Err(r5900::Error::UnstubbedCall { target, .. }) if target >= 0x100000 && attempts < 40 => {
