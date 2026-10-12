@@ -78,3 +78,4 @@ pub mod trickdata;
 pub mod racemisc;
 pub mod results;
 pub mod camera;
+pub mod brakespray;
