@@ -104,6 +104,7 @@ state machine and the renderer are ours. Nothing has been checked against the or
 | G10b | Music: Pathfinder (`PF_*` 0x2bec00–0x2c2040) decoded at run time, song names from `music.inf` / `musicmap.inf` | unowned | G10 | | [repo] "Unresolved: song names"; `pathmusic.rs` |
 | G10c | Announcer (DJ Atomika) and rider voices: when each line is picked and played | unowned | G10 | | [est] |
 | G11 | Pre- and post-race scenes: `cPreRaceHandler`, `cEndRaceHandler_Update` 0x1141e0, scripts table 0x32f380, row filters | unowned | E11, G5 | | [repo] `intro.rs`; "Unresolved: post-race scene row filters" |
+| G11b | The race scene set-up (`tricky_game::scene`): `RaceScene_Reset`, `RaceScene_SetupFromPicks` 0x169698 (the scenes' cast picks from the pre-race selection, the unique riders list), `RaceScene_Select` 0x1699a0 (the cast ordered by clip), `RaceScene_GetCast`, `FUN_00169948`, `RaceScene_GetScriptName` (the scripts table 0x32f380) checked in the runner; the table builder 0x168360 stays E1b2o's | unowned | G11 | ed-slopper/puffin (2026-10-11) | Split of G11 |
 | G11a | Movies: the disc's video files (EA logo, intro, unlock videos) | unowned | E2 | | [est] Find the format first |
 | G12 | Instant replay | unowned | E1, E11 | | [repo] in the debug menu (findings.md) |
 | G13 | Pickups and course events checked: points, multipliers, boost, show-off time, speed boost, spin-boost zones (ops 6, 0xe–0x12) | any | E9 | | [repo] |
@@ -680,3 +681,4 @@ matches the original.
 - 2026-10-11 ed-slopper/puffin: add and claim G10c1 (split of G10c).
 - 2026-10-12 trailrig/heron: E1b2o done (Rivals_InitPairsCircuit, Circuit_SetupEventRiders vs the original; every race mode's rider builder is now ported); added E1b2p (the app's side, edges).
 - 2026-10-11 ed-slopper/puffin: G10c1 done.
+- 2026-10-11 ed-slopper/puffin: add and claim G11b (split of G11).
