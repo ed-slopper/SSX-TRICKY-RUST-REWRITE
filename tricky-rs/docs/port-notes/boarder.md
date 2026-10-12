@@ -746,12 +746,24 @@ descriptor row of the layer's clip id (table 0x325fa8, 0x1c bytes a row; id 0x30
 exe (numbers only): clip ids **0x278..=0x291 are type 0xe, 0x292..=0x2ab type 0xf, 0x2ac..=0x2db type 0x10** (26 + 26 + 48 rows,
 the grab, tweak and uber clips; `Landing_CheckAngles` 0x12ba78 has the same test, `landing::check_angles`), and clip
 **0x224 (`bxA_FALLRECOVER`) is type 0**: the fall recover is not gated, a rider that recovers over a rail is captured.
-`AnimCtl_TestClipFlag` 0x15ffb8 reads bit `flag - 1` of the byte at +0x74 of the layer's clip record
-(`AnimLayer_FindClip`), so flag 4 is bit 3 of a per-clip byte set while the clip plays; the port's grab code treats it as
-the clip's fourth marker (`grab_markers().2`), which is what `Rider::grab_safe` tests for the landing.
+`AnimCtl_TestClipFlag` 0x15ffb8 reads bit `flag - 1` of the byte at +0x74 of the layer's clip record (`AnimLayer_FindClip`
+0x15a6c8: the layer's list of playing clips, the clip id at +0x40 of each node).
+
+**Where flag 4 comes from (row E8s, proven).** `AnimClip_Advance` 0x15a030 clears the four bytes +0x74..+0x77 of the clip
+node every tick, then for each of its source animations (the count at +0x44; the clip time `t` of each at +0x48 + 4i,
+advanced by `dt * rate * 30 / 60`) reads two lists of four ushort frame numbers from the animation's data, at +0xc and
++0x14 (0xffff = unused). With `hi` the larger and `lo` the smaller of the old and new time: marker k of the first list
+sets bit k of **+0x74** when `marker < hi` (the clip is past it), and bit k of +0x75 as well when `lo <= marker` (it was
+crossed this very tick); the second list does the same into +0x76 / +0x77. So **flag 4 = bit 3 of +0x74 = marker 3 (the
+fourth) of the first list, set while the clip is strictly past that frame**; a clip with no fourth marker (0xffff) never
+sets it and so never clears the gate (those frame numbers live in the player's animation files, not in the exe, and are
+not read). It is rebuilt every tick from the time, not latched. The port's grab notes call this marker `m4`
+(`grab_markers().2`, the 4th of the clip's markers 1, 2, 4 and the end); a grab held stops at its second marker, so
+holding never clears the gate.
 
 **Ported.** `Rider::capture_gated` (`!grab_safe() || uber not done`), the port's form of the same test it makes in
 `Rider::land` for `Landing_CheckAngles`, now refuses the air capture in `Rider::step_tick`: a grab held or playing out
 short of its fourth marker, or an uber trick not done, flies over the rail. The spin and flip clips are not in the gated
-ranges. **Inferred, not read:** that flag 4 is set exactly at the fourth marker (the port's grab notes say so; the clip
-record's byte +0x74 is not read), and that the uber clips' flag 4 is the port's `uber_done`.
+ranges. Row E8s made `grab_safe` strict (`f > m4`, the game's `marker < time`; it was `>=`). **Inferred, not read:** that
+the uber clips' flag 4 is the port's `uber_done` (the same mechanism, but the uber clips' marker frames are in the
+animation files).

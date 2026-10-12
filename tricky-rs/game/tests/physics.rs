@@ -290,6 +290,13 @@ fn a_grab_short_of_its_fourth_marker_refuses_the_rail_capture() {
     r.uber_done = false;
     r.step(&world, &rails, Input::default(), 1.0 / 60.0);
     assert!(r.rail.is_none() && r.rail_kind == 0, "captured in an uber trick that is not done");
+    // flag 4 is set only once the clip is strictly past the fourth marker (`AnimClip_Advance` 0x15a030, row E8s)
+    let (rails, mut r) = rail_and_flyer();
+    let m4 = tricky_game::rider::grab_markers(r.data.rows[0].clip).2;
+    r.grab_out = Some((1, m4));
+    assert!(r.capture_gated(), "at the marker itself flag 4 is not set yet");
+    r.grab_out = Some((1, m4 + 0.01));
+    assert!(!r.capture_gated(), "just past the marker flag 4 is set");
     // the grab past its fourth marker (flag 4 set): captured as without a grab
     let (rails, mut r) = rail_and_flyer();
     r.grab_out = Some((1, 1.0e3));

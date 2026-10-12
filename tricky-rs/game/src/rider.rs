@@ -1309,8 +1309,8 @@ impl Rider {
     }
     /// The clip-type gate of `Rail_TryCapture` 0x125cb8 (row E8n): no capture while the layer-0 clip is of type 0xe, 0xf or
     /// 0x10 (descriptor table 0x325fa8: clip ids 0x278..=0x291, 0x292..=0x2ab and 0x2ac..=0x2db, the grab, tweak and uber
-    /// clips) and clip flag 4 (`AnimCtl_TestClipFlag`, the fourth marker) is not set. The port keeps no clip ids in the
-    /// air, so this is its form of that test: the same one it makes for `Landing_CheckAngles` 0x12ba78 in [`Rider::land`]
+    /// clips) and clip flag 4 (`AnimCtl_TestClipFlag`, set by `AnimClip_Advance` 0x15a030 once the clip's time is past its
+    /// fourth marker, row E8s) is not set. The port keeps no clip ids in the air, so this is its form of that test: the same one it makes for `Landing_CheckAngles` 0x12ba78 in [`Rider::land`]
     /// (a grab held or still playing out short of its fourth marker, an uber trick not yet done). The fall-recover clip
     /// 0x224 and the spin and flip clips are not in those ranges (0x224 is type 0): they never gate.
     pub fn capture_gated(&self) -> bool { !self.grab_safe() || (self.uber > 0.0 && !self.uber_done) }
@@ -1318,7 +1318,9 @@ impl Rider {
     pub fn grab_safe(&self) -> bool {
         if self.grab != 0 { return false; }
         match self.grab_out {
-            Some((g, f)) => f >= grab_markers(self.data.rows[(g as usize - 1).min(14)].clip).2,
+            // flag 4 is set once the clip's time is past its fourth marker (`AnimClip_Advance` 0x15a030: marker < the larger of
+            // the old and new time, row E8s): strictly past
+            Some((g, f)) => f > grab_markers(self.data.rows[(g as usize - 1).min(14)].clip).2,
             None => true,
         }
     }
