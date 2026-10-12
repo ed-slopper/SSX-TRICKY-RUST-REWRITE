@@ -9,8 +9,9 @@ use crate::rand::Streams;
 use crate::rivals::ATTITUDE;
 use crate::stats::{average_groups, BASE};
 
-/// The bytes the career block reaches (the player slots' attributes end at +0x3910)
-pub const CAREER_SIZE: usize = 0x3910;
+/// The bytes the career block reaches: the player slots' attributes end at +0x3910, then the new-record list
+/// (0x32eca0, five 0x10 entries)
+pub const CAREER_SIZE: usize = 0x3960;
 
 /// The four starting characters' indices (0x3352c0, 0x3352c4, 0x3352cc, 0x3352c8 in the exe: Mac, Moby, Elise and
 /// Eddie), whose bits make the unlocked-character mask (+0xc).
@@ -999,5 +1000,202 @@ impl Career {
     /// `Career_GetEventMode` 0x1635b0 (a half)
     pub fn event_mode(&self) -> u16 {
         u16::from_le_bytes([self.bytes[0x2b0c], self.bytes[0x2b0d]])
+    }
+}
+
+/// What `Career_CheckNewRecords` asks of the race (`Race_GetRider`(gApp+0x730, i)+0x418: below 1 a computer
+/// rider) and of the circuit (`Circuit_ProcessRaceResult` 0x16bcb0 on the rider set-up, row C12).
+pub trait RecordsEnv {
+    fn rider_is_human(&self, i: usize) -> bool;
+    fn circuit_race_result(&mut self, career: &mut Career);
+}
+
+impl Career {
+    /// `HighScore_Insert` 0x166968(table, value, entry): the first place the value beats (lower for a time table,
+    /// +0x68 = 0; higher otherwise) among the table's +0x64 entries: those below move down one (the last drops),
+    /// the entry (name, character) goes in with the value. The entry's offset, or none.
+    pub fn insert_high_score(&mut self, t: usize, value: i32, name: &[u8], character: u32) -> Option<usize> {
+        let n = self.r32(t + 0x64) as i32;
+        let higher = self.r32(t + 0x68) != 0;
+        for i in 0..n.max(0) {
+            let e = t + 0x14 * i as usize;
+            let cur = self.r32(e + 0x10) as i32;
+            let beats = if higher { cur < value } else { value < cur };
+            if beats {
+                let mut j = n - 2;
+                while i <= j {
+                    let s = t + 0x14 * j as usize;
+                    let v = self.bytes[s..s + 0x14].to_vec();
+                    self.bytes[s + 0x14..s + 0x28].copy_from_slice(&v);
+                    j -= 1;
+                }
+                // the template: the name (the game's buffer holds whatever its stack held after the terminator)
+                self.bytes[e..e + 0xc].fill(0);
+                let len = name.len().min(0xb);
+                self.bytes[e..e + len].copy_from_slice(&name[..len]);
+                self.w32(e + 0xc, character);
+                self.w32(e + 0x10, value as u32);
+                return Some(e);
+            }
+        }
+        None
+    }
+
+    /// `Career_CheckNewRecords` 0x164fc0: in show-off modes 3 and 5 a player's race rider that is not human loses
+    /// the race's flags; the circuit's result; `Career_UpdateAttributes`; every slot's race flags cleared (marking
+    /// the profile changed if any were set); the new-record list (+0x3910, five 0x10 entries: player, table, table,
+    /// entry) emptied; then by the mode each player's race result into the course's tables: race modes 2 and 4 the
+    /// time (+0x327c by finishing place's rider) into table 0, show-off 3 and 5 the score (+0x3310 + 0xbc · rider)
+    /// into table 1, mode 7 the first's time into table 2; each new record listed.
+    pub fn check_new_records(&mut self, env: &mut impl RecordsEnv, cheats: &crate::cheats::Cheats) {
+        let mode = self.r32(0x2afc);
+        if mode == 3 || mode == 5 {
+            let n = self.r32(0x27dc) as i32;
+            for i in 0..n.max(0) as usize {
+                let p = self.bytes[0x2845 + 0x84 * i] as i8;
+                if 0 <= p && !env.rider_is_human(i) {
+                    self.clear_player_flags(p as i32);
+                }
+            }
+        }
+        env.circuit_race_result(self);
+        self.update_attributes(cheats);
+        let course = self.r32(0x2af8) as i32;
+        for k in 0..4 {
+            if self.r32(0x310c + 0x44 * k) != 0 {
+                self.w32(0x3258, 1);
+            }
+            self.w32(0x310c + 0x44 * k, 0);
+        }
+        for i in (0..5).rev() {
+            self.w32(0x3910 + 0x10 * i, 0xffff_ffff);
+        }
+        let mut listed = 0usize;
+        let table = (0x16c4 + 0x150 * course as isize) as usize;
+        let mut list = |c: &mut Career, p: i8, kind: u32, t: usize, e: usize| {
+            let at = 0x3910 + 0x10 * listed;
+            c.w32(at, p as i32 as u32);
+            c.w32(at + 4, kind);
+            c.w32(at + 8, CAREER_BASE + t as u32);
+            c.w32(at + 0xc, CAREER_BASE + e as u32);
+            listed += 1;
+        };
+        let entry = |c: &Career, rider: usize| -> (i8, Vec<u8>, u32) {
+            let p = c.bytes[0x2845 + 0x84 * rider] as i8;
+            let k = Self::so(c.find_player_slot(p));
+            let name_at = c.ri(0x3108 + 0x44 * c.find_player_slot(p) as isize).wrapping_sub(CAREER_BASE) as usize;
+            let end = c.bytes[name_at..].iter().position(|b| *b == 0).unwrap_or(0) + name_at;
+            let name = c.bytes[name_at..end].to_vec();
+            let ch = c.r32(c.ri(0x3110 + k).wrapping_sub(CAREER_BASE) as usize);
+            (p, name, ch)
+        };
+        match mode {
+            2 | 4 | 3 | 5 => {
+                let n = self.r32(0x27dc) as i32;
+                for place in 0..n.max(0) as usize {
+                    let rider = self.r32(0x3264 + 4 * place) as usize;
+                    if (self.bytes[0x2845 + 0x84 * rider] as i8) < 0 {
+                        continue;
+                    }
+                    let (p, name, ch) = entry(self, rider);
+                    let (t, value, kind) = if mode == 2 || mode == 4 { (table, self.r32(0x327c + 4 * rider) as i32, 0) } else { (table + 0x70, self.r32(0x3310 + 0xbc * rider) as i32, 1) };
+                    if let Some(e) = self.insert_high_score(t, value, &name, ch) {
+                        list(self, p, kind, t, e);
+                    }
+                }
+            }
+            7 => {
+                let rider = self.r32(0x3264) as usize;
+                let (p, name, ch) = entry(self, rider);
+                let t = table + 0xe0;
+                let value = self.r32(0x327c + 4 * rider) as i32;
+                if let Some(e) = self.insert_high_score(t, value, &name, ch) {
+                    list(self, p, 2, t, e);
+                }
+            }
+            _ => {}
+        }
+        if 0 < listed {
+            self.w32(0x3258, 1);
+        }
+    }
+
+    /// `Career_UpdateBestStats` 0x166cb0(character, a race's stats (0xbc bytes), tag): each best kept in the
+    /// character's record (+0x160.. pairs of value and tag) where the race beat it: four counts (stats +0x48,
+    /// +0x1c, +0x10, +0x14), three floats (+0x5c, +0x60, +0x64) and six counts (+0x84..).
+    pub fn update_best_stats(&mut self, character: usize, stats: &[u8], tag: u32) {
+        let base = 0x1c4 * character;
+        let si = |o: usize| i32::from_le_bytes(stats[o..o + 4].try_into().unwrap());
+        let sf = |o: usize| f32::from_le_bytes(stats[o..o + 4].try_into().unwrap());
+        for (best, from) in [(0x160, 0x48), (0x168, 0x1c), (0x170, 0x10), (0x178, 0x14)] {
+            if (self.r32(base + best) as i32) < si(from) {
+                self.w32(base + best, si(from) as u32);
+                self.w32(base + best + 4, tag);
+            }
+        }
+        for (best, from) in [(0x180, 0x5c), (0x188, 0x60), (0x190, 0x64)] {
+            if self.rf(base + best) < sf(from) {
+                self.wf(base + best, sf(from));
+                self.w32(base + best + 4, tag);
+            }
+        }
+        for i in 0..6 {
+            let best = base + 0x1cc + 8 * i;
+            if (self.r32(best) as i32) < si(0x84 + 4 * i) {
+                self.w32(best, si(0x84 + 4 * i) as u32);
+                self.w32(best + 4, tag);
+            }
+        }
+    }
+
+    /// `Career_RecordBestTime` 0x166fa0(character, course, time): kept if lower, or if none yet (−1)
+    pub fn record_best_time(&mut self, character: usize, course: usize, time: i32) {
+        let at = 0x1fc + 4 * course + 0x1c4 * character;
+        let cur = self.r32(at) as i32;
+        if time < cur || cur == -1 {
+            self.w32(at, time as u32);
+        }
+    }
+
+    /// `Career_RecordBestScore` 0x166fe0(character, course, score): kept if higher
+    pub fn record_best_score(&mut self, character: usize, course: usize, score: i32) {
+        let at = 0x230 + 4 * course + 0x1c4 * character;
+        if (self.r32(at) as i32) < score {
+            self.w32(at, score as u32);
+        }
+    }
+
+    /// `Career_CountCourseStart` 0x167010(character, course)
+    pub fn count_course_start(&mut self, character: usize, course: usize) {
+        let at = 0x198 + 4 * course + 0x1c4 * character;
+        self.w32(at, self.r32(at).wrapping_add(1));
+    }
+
+    /// `FUN_00167038`: the player wears outfit 6
+    pub fn wears_outfit_6(&self, p: i8) -> bool {
+        self.profile_word(p, 3) == 6
+    }
+
+    /// `Career_SelectSoloRider` 0x167060(player): every slot cleared, the player in slot 0 on character 0; if no
+    /// race rider is the player, the race's player riders renumbered: the first the player, the rest 0 (1 when the
+    /// player is 0).
+    pub fn select_solo_rider(&mut self, p: i32, cheats: &crate::cheats::Cheats) {
+        for k in 0..4 {
+            self.clear_player_slot(k);
+        }
+        self.assign_player_rider(0, p, 0, cheats);
+        let n = self.r32(0x27dc) as i32;
+        let found = (0..n.max(0) as usize).any(|i| self.bytes[0x2845 + 0x84 * i] as i8 as i32 == p);
+        if !found {
+            let ids = [p as u8, (p == 0) as u8];
+            let mut next = 0usize;
+            for i in 0..n.max(0) as usize {
+                if self.bytes[0x2845 + 0x84 * i] as i8 != -1 {
+                    // (the game reads its stack past the two: only the first two are known)
+                    self.bytes[0x2845 + 0x84 * i] = *ids.get(next).unwrap_or(&0);
+                    next += 1;
+                }
+            }
+        }
     }
 }

@@ -1318,7 +1318,7 @@ address,size,name,system,status
 0x164ef8,68,Career_SetPlayerRecordWord2,race?,not started
 0x164f40,56,Career_GetPlayerRecordWord1,race?,not started
 0x164f78,68,Career_SetPlayerRecordWord1,race?,not started
-0x164fc0,1084,Career_CheckNewRecords,race?,not started
+0x164fc0,1084,Career_CheckNewRecords,race?,ported
 0x165400,104,Career_ClearPlayerFlags,race?,ported
 0x165468,240,Career_GetAttributes,race?,ported
 0x165558,260,Career_SetupRidersForMode,race?,not started
@@ -1340,15 +1340,15 @@ address,size,name,system,status
 0x166870,48,Replay_SaveRiderSetup,save,not started
 0x1668a0,80,Replay_LoadFromBuffer,race?,not started
 0x1668f0,116,HighScore_Reset,race?,ported
-0x166968,240,HighScore_Insert,race?,not started
+0x166968,240,HighScore_Insert,race?,ported
 0x166a58,536,Career_UpdateAttributes,race?,ported
 0x166c70,60,FUN_00166c70,save?,ported
-0x166cb0,748,Career_UpdateBestStats,ai?,not started
-0x166fa0,60,Career_RecordBestTime,race?,not started
-0x166fe0,48,Career_RecordBestScore,race?,not started
-0x167010,40,Career_CountCourseStart,race?,not started
-0x167038,36,FUN_00167038,frontend?,not started
-0x167060,272,Career_SelectSoloRider,frontend?,not started
+0x166cb0,748,Career_UpdateBestStats,ai?,ported
+0x166fa0,60,Career_RecordBestTime,race?,ported
+0x166fe0,48,Career_RecordBestScore,race?,ported
+0x167010,40,Career_CountCourseStart,race?,ported
+0x167038,36,FUN_00167038,frontend?,ported
+0x167060,272,Career_SelectSoloRider,frontend?,ported
 0x167170,16,StaticDtor_Career,race?,not started
 0x167208,2960,RelTable_Init,ai,checked
 0x167da0,28,RelTable_GetAttitude,ai,not started
@@ -1412,7 +1412,7 @@ address,size,name,system,status
 0x16bc40,12,Circuit_GotShowoffFinalUnlock,race,not started
 0x16bc50,76,Circuit_SetupRiders,race,not started
 0x16bca8,8,FUN_0016bca8,race?,not started
-0x16bcb0,852,Circuit_ProcessRaceResult,race,not started
+0x16bcb0,852,Circuit_ProcessRaceResult,race,ported
 0x16c008,540,Rivals_InitPairsCircuit,race?,not started
 0x16c228,252,FUN_0016c228,race?,not started
 0x16c328,132,Circuit_SaveRiderPoints,save,not started
