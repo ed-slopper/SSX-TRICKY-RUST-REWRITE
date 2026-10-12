@@ -142,7 +142,7 @@ matches the original.
 | C14 | Single event, freeride and practice modes | unowned | C0, G9 | | [est] |
 | C15 | Trick book: chapters, unlock of uber tricks, rewards (`Score_TrickBookCheck` 0x157a00) | any | E5 | | [repo] `book.rs` |
 | C16 | Unlockables: characters, outfits, boards, the hidden ones, and the button cheats | unowned | C12, E10 | | [repo] |
-| C11b2 | The rest of the lesson manager: who moves it from Init to Intro (its owner's per-tick code, `cGame::Update` 0x181638?), what the race object's slot +0x54 does with 3 and 8 (`gApp+0x730 -> +0x1c`), and the lesson menus' drawing; then check `lesson.rs` against the original in the function runner | any | C11b | trailrig/heron (2026-10-11) | Gap of C11b; STANDINs in `lesson.rs` |
+| C11b3 | `lesson.rs` checked against the original in the function runner (`tools/r5900`: `cLessonMan::vf1` 0x14b9b8 and the handlers on a lesson object with scripted pad edges: states, menu positions, calls out) as the other `tests/*.rs` do; and the race object's states 6..10 (`Race_CreateHandlers`) as a port of their own with `Env::set_mode` | any | C11b2 | | Gap of C11b2 |
 | C11c2 | The lesson archive `data/tutorial/<rider>.big` (what it holds: the `.inp` files? the lesson sounds / speech?), a check of `tricky_data::inp` against a real `.inp` from the disc, and the pad swap (`Pad_GetConfig` / `Pad_SetConfig` 0x17a290 / 0x17a2f8) at the preview's start and end | any | C11c | | Gap of C11c; needs the disc's `data/tutorial` |
 | C11d | The tutorial screens: `cLessonOverlay` / `cLessonControllerOverlay` (0x1be4a0, 0x1be540), the page tabs and trick pictures (`tb_<rider><n>` textures), `Results_BuildLessonPage` 0x1b1aa8, the `Speech_LessonLine` lines; and the loading screen `cTrickTutorialLoad` 0x250068 | any | C11, E5 | | Gap of C11 |
 | C11e | The tutorial in the app: game mode 6 on the `trick` course (the course's level files from the disc, E3a4, the mode switch in `main.rs`), the pad map swap at start and exit, and the lessons' effect on the trick book (C15) | any | C11b, C11c, C11d, E3a4 | | Gap of C11 |
@@ -171,6 +171,7 @@ matches the original.
 
 | ID | Task | Section | Who | Date | Commit |
 |---|---|---|---|---|---|
+| C11b2 | The lesson's STANDINs resolved: the race object's states (`Race_CreateHandlers`: 6 LoadLesson .. 10 EndLesson), who starts the lesson (`cLoadLessonHandler`, `Lesson::on_load_done`), what the mode calls 3 (Countdown) and 8 (RestartLesson -> Intro) do; `lesson.rs` and `port-notes/tutorial.md` updated | P3 | trailrig/heron | 2026-10-11 | COMMIT |
 | C11c | The tutorial's recorded input: format of the `.inp` (6-word header, up to 7200 records of 44 bytes) and the preview's playback hooks in `GetControls`, as `tricky-rs/data/src/inp.rs` (parser, `Playback`) with tests; notes in `port-notes/tutorial.md` | P3 | trailrig/heron | 2026-10-11 | 650707c |
 | C11b | The lesson manager and its eleven handlers: `tricky-rs/game/src/lesson.rs` (state switch, Wait menu of pages / tricks / actions, preview, perform, practice, result menus, exit; `Env` trait), unit-tested; handlers all read, notes in `port-notes/tutorial.md` | P3 | trailrig/heron | 2026-10-11 | 05661c2 |
 | C11 | The `trick` course is the Trick Tutorial (game mode 6, `cLessonMan` with eleven handlers, `cTrickTutorialLoad`): data, states, menu and flow read and written up in `port-notes/tutorial.md`; follow-ups C11b..C11e | P3 | trailrig/heron | 2026-10-11 | 69292d0 |
@@ -628,3 +629,4 @@ matches the original.
 - 2026-10-11 irregulur/lynx: F1c unclaimed after the particle and speech batch.
 - 2026-10-11 trailrig/heron: C11c done (inp.rs); added C11c2 (gap of C11c).
 - 2026-10-11 irregulur/lynx: claim F1c (world nodes batch); tidied its note.
+- 2026-10-11 trailrig/heron: C11b2 done (the race's lesson states); added C11b3 (gap of C11b2).

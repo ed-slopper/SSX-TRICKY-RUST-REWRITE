@@ -7,12 +7,13 @@
 //! the recorded input) goes through [`Env`]; the port's screens and the `.inp` player (C11c, C11d) implement it.
 //! Checked by the unit tests below against the decompiled flow; not run against the original in the function runner.
 //!
-//! STANDIN: the Init handler does nothing, so who moves the manager from Init to Intro is unread (the owner of
-//! the manager, the game's per-tick code, probably; C11b2).
-//!
-//! STANDIN: what `Env::set_mode` (vtable slot +0x54 of the object at `gApp+0x730 → +0x1c`, called with 3 or 8)
-//! does is unread; the handlers that call it with 8 (End, PreviewEnd, PracticeEnd, choice 0) request no state
-//! themselves, so the next state is assumed to come from that call (C11b2).
+//! The race object's own states drive the lesson from outside (`Race_CreateHandlers` 0x1125c8): 6 LoadLesson, 7
+//! PreLesson, 8 RestartLesson, 9 SelectLesson, 10 EndLesson (and 1..5, 11 for races). `cLoadLessonHandler::Update`
+//! 0x14ecb0 waits for the course's textures (`FUN_00112920`), then `Lesson_RestartRider`, lesson state Intro (2) and
+//! race state 7 ([`Lesson::on_load_done`]). `Env::set_mode(3)` is race state 3 (Countdown: the race clock counts up
+//! 2.0 a tick to 0, then race state 4, the ride), `set_mode(8)` is RestartLesson (its Enter puts the lesson in
+//! Intro, its Update moves the race to 9, SelectLesson, which does nothing). Race states 7 and 9 do nothing, the
+//! lesson manager is in charge; `cEndLessonHandler` (10) only counts the clock up 1/60 a tick. (C11b2.)
 
 /// Button masks of the newly pressed buttons (`Lesson_HandleMenuInput` 0x14d6e0 and the Wait handler).
 pub mod btn {
@@ -106,8 +107,12 @@ pub trait Env {
     fn cam_cut_fade(&mut self);
     /// `Lesson_ResetScene` 0x14d7d0 (delete the node lists, reset the camera, the world and the rider).
     fn reset_scene(&mut self);
-    /// The call on the object at `gApp+0x730 → +0x1c` (slot +0x54) with 3 or 8: STANDIN, see the module doc.
+    /// The race object's state change (`gApp+0x730 → +0x1c`, slot +0x54): 3 Countdown, 8 RestartLesson (see the
+    /// module doc; the lesson's side of 8, going to Intro, is done by [`Lesson::retry_menu`]).
     fn set_mode(&mut self, mode: u32);
+    /// `Lesson_RestartRider` 0x14d898: the rider back at the lesson's start point (`Boarder_SetRestartPoint`,
+    /// `Boarder_StartLessonWait`).
+    fn restart_rider(&mut self);
     /// `FUN_001117f0` + clearing `+0x2c` of the rider's controller + `Boarder_Finish`.
     fn rider_finish(&mut self);
     /// The rider's speed fields (`Lesson_SetupRider` 0x14b768): page 5 gives (1.0, 20.0), else (0, 0).
@@ -500,12 +505,20 @@ impl Lesson {
         }
     }
 
-    /// Choice 0 of the end menus: reset the scene, back to the trick list, and the mode call with 8.
+    /// `cLoadLessonHandler::Update` 0x14ecb0, once the course has loaded: rider to the start, lesson to Intro.
+    pub fn on_load_done(&mut self, env: &mut dyn Env) {
+        env.restart_rider();
+        self.set_state(env, State::Intro);
+    }
+
+    /// Choice 0 of the end menus: reset the scene, back to the trick list (menu level 1), race state 8
+    /// (`cRestartLessonHandler::Enter` 0x14ec48 puts the lesson in Intro).
     fn retry_menu(&mut self, env: &mut dyn Env) {
         env.select_sound();
         env.reset_scene();
         self.menu_level = 1;
         env.set_mode(8);
+        self.set_state(env, State::Intro);
     }
 
     /// `cLessonWaitHandler::Update` 0x14dcc0.
@@ -657,6 +670,7 @@ mod tests {
         fn cam_cut_fade(&mut self) { self.log.push("cutfade".into()) }
         fn reset_scene(&mut self) { self.log.push("reset".into()) }
         fn set_mode(&mut self, m: u32) { self.log.push(format!("mode{m}")) }
+        fn restart_rider(&mut self) { self.log.push("restart".into()) }
         fn rider_finish(&mut self) { self.log.push("finish".into()) }
         fn set_rider_speed(&mut self, a: f32, b: f32) { self.log.push(format!("speed{a},{b}")) }
         fn pad_map(&mut self, l: bool) { self.log.push(format!("pad{l}")) }
@@ -670,7 +684,8 @@ mod tests {
     fn run_to_wait(l: &mut Lesson, e: &mut E) {
         l.tick(e); // Init (set by the constructor)
         assert_eq!(l.state, State::Init);
-        l.set_state(e, State::Intro); // STANDIN: who leaves Init is unread (the Init handler's Update, 0x14dba0 returns)
+        l.on_load_done(e); // the race's LoadLesson handler
+        assert!(e.log.contains(&"restart".to_string()));
         l.tick(e); // Intro: Enter, Update requests Start
         assert!(e.log.contains(&"cam RaceInBlocks2".to_string()));
         l.tick(e); // Start Enter, camera script over: Update requests Wait
@@ -787,6 +802,31 @@ mod tests {
         l.tick(&mut e); // choice 1: end attempt, back to Perform
         l.tick(&mut e);
         assert_eq!(l.state, State::Perform);
+    }
+
+    #[test]
+    fn retry_goes_back_through_the_intro() {
+        let mut l = Lesson::new(0);
+        let mut e = E::default();
+        run_to_wait(&mut l, &mut e);
+        l.set_state(&mut e, State::Perform);
+        l.menu_level = 2;
+        l.tick(&mut e);
+        l.attempt_done = true;
+        l.tick(&mut e);
+        l.tick(&mut e);
+        assert_eq!(l.state, State::End);
+        e.presses = vec![btn::ACCEPT]; // choice 0: retry
+        l.tick(&mut e);
+        assert_eq!(l.menu_level, 1);
+        assert!(e.log.contains(&"mode8".to_string()));
+        l.tick(&mut e);
+        assert_eq!(l.state, State::Intro);
+        l.tick(&mut e);
+        assert_eq!(l.state, State::Start);
+        l.tick(&mut e);
+        assert_eq!(l.state, State::Wait);
+        assert_eq!(l.menu_level, 1);
     }
 
     #[test]

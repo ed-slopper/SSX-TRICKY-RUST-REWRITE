@@ -94,10 +94,21 @@ when the lesson manager exists), `cLessonPreviewHandler::Enter/Update`. Ported a
 - The recorder (`InputRecorder_Playback` 0x17a740, `Input_ReadDevices` 0x17a668) is a ring of device states per frame
   (frame size [1], capacity [2], read [3], write [4], devices from [6]): how the `.inp` files were made is probably that.
 
+## The race's lesson states (C11b2)
+
+The race object (`gApp+0x730 -> +0x1c`) is a state machine too: `Race_CreateHandlers` 0x1125c8 names 1 PreRace, 2 StartRace,
+3 Countdown, 4 Race, 5 EndRace, 6 LoadLesson, 7 PreLesson, 8 RestartLesson, 9 SelectLesson, 10 EndLesson, 11
+ReplayEndRace (handler slots +0x24.. and +0x48..+0x5c, the name at +0x68, the state at +0x1c; slot +0x54 of its vtable is the
+state change). In the tutorial:
+
+- `cLoadLessonHandler` (6): Enter sets the load flag (+0x4f8); Update runs the texture loader (`FUN_00112920`) and when it
+  is done: `Lesson_RestartRider`, lesson state Intro, race state 7. This is who leaves the lesson's Init state.
+- PreLesson (7) and SelectLesson (9) do nothing: the lesson manager is in charge.
+- RestartLesson (8): Enter puts the lesson in Intro (2); Update moves the race to 9. The lesson's retry choices call it.
+- Countdown (3): what `set_mode(3)` is: the race clock counts up 2.0 a tick (to 0), then Race (4) and the rider rides.
+- EndLesson (10): clears the pad device's +0x2c; Update adds 1/60 to the race clock.
+
 ## Not read yet
 
-- Who moves the manager from Init to Intro (the Init handler returns at once; the owner of the manager, C11b2).
-- What the call on the race object (`gApp+0x730 -> +0x1c`, vtable slot +0x54, with 3 or 8) does: the end menus' "retry"
-  choice calls it with 8 and requests no state itself (C11b2).
 - `Lesson_ResetScene` 0x14d7d0's callees, the contents of `data/tutorial/<rider>.big` (C11c2), the overlays and the load
-  screen (C11d).
+  screen (C11d), the texture loader `FUN_00112920`.
