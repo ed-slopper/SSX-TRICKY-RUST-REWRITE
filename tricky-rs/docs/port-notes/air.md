@@ -153,8 +153,18 @@ Part of the port notes (index: [README.md](README.md)); units and wording as des
   analog (+0x14), the libpad buttons inverted (+0x18, halfword), the four stick bytes (+0x1c..). A frame with no
   pad changes only the pad's valid flag. `Input_FindPressedDevice` 0x17a840: the first pad whose key (+0x2c) is not
   0, and its index; `Input_GetAnyNewButtons` 0x1834a8: `now & !prev` of every pad or-ed; `Pad_LatchButtons`
-  0x17a658: prev = now; `Input_ResetDevices` 0x17a8b0: both motors off until told. Not ported: the poll's libpad
-  state machine (vf9, E10c2). The app does not use any of this yet: it reads Bevy's gamepad (E10c3).
+  0x17a658: prev = now; `Input_ResetDevices` 0x17a8b0: both motors off until told.
+- The poll (vf9 0x17b270, a jump to 0x17ad68; `inputring::Poller`, row E10c2, checked: `tests/inputring.rs` with
+  libpad scripted the same for both sides, 40,000 polls, every call and field compared): once a frame, state
+  (+0x60) 0 opens the port; 1 waits for libpad's stable state and reads the pad's id (4 digital, 7 dualshock; an
+  extended id of 7 sets analog, 4 goes on, id 4 with extended id 0 is ready at once); 2 sends the wanted mode
+  (+0x58, locked +0x5c: lock 3 else 2) when it differs; 3 waits for the change; 4 to 6 the pressure-mode setup
+  (the pad's pressure flag +0x4c is only ever cleared, so no pad here has pressure and the frame's pressure bytes
+  stay 0); 7 to 9 the actuator setup (align, then up to 5 request polls before giving up, +0x54); 10 reads the pad
+  (a failed read or a non-zero status byte is "gone": +0x44 = 1, back to 1). The frame is the pad's 20-byte read
+  made into the 0x2c record (`Record::from_pad`), or all zero (valid only when the pad is gone); the motors'
+  timers run last (above) and send `scePadSetActDirect` when changed. The app does not use any of this yet: it
+  reads Bevy's gamepad (E10c3).
 
 - Our rider jumps through `jump::jump_impulse` (row G1a5b3a): on snow with the ground normal and the board's
   forward (steep lips leaned along the lip, the flag to `Score_StartTrickChain`), off a rail along the board's up;

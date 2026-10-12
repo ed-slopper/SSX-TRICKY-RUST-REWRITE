@@ -202,6 +202,177 @@ impl Ring {
     }
 }
 
+/// What the pad poll asks of libpad (`libpad`'s calls as the game's wrappers make them; the results are libpad's
+/// own, passed on as they came: the poll tests them against 0, 1, 4, 5, 6 and 7 only).
+pub trait Libpad {
+    /// 0x2e72d8 `scePadPortOpen` (the device's own buffer at +0xc0): 1 when open
+    fn port_open(&mut self) -> i64;
+    /// 0x2e76a8 `scePadGetState`: 0 gone, 1 finding, 2 ..., 5 busy, 6 stable; 99 when the port was never opened
+    fn get_state(&mut self) -> i64;
+    /// 0x2e7a88 `scePadInfoMode` (`what` 1 the current id, 2 the extended id; 0 for none)
+    fn info_mode(&mut self, what: i64) -> i64;
+    /// 0x2e7bc0 `scePadSetMainMode` (mode 1 analog, 0 digital; lock 2 or 3): 1 when sent
+    fn set_main_mode(&mut self, mode: i64, lock: i64) -> i64;
+    /// 0x2e7f70: 1 when sent
+    fn enter_press_mode(&mut self) -> i64;
+    /// 0x2e7fd0: 1 when sent
+    fn press_mode_next(&mut self) -> i64;
+    /// 0x2e77c0 `scePadGetReqState`
+    fn req_state(&mut self) -> i64;
+    /// 0x2e7848 `scePadInfoAct` (actuator count when asked with −1): 0 for none
+    fn info_act(&mut self) -> i64;
+    /// 0x2e7d30 `scePadSetActAlign` (the table at 0x337c50): 1 when sent
+    fn set_act_align(&mut self) -> i64;
+    /// 0x2e7628 `scePadRead` into the 20-byte buffer: 0 for nothing read
+    fn read(&mut self, buf: &mut [u8; 20]) -> i64;
+    /// 0x2e7c78 `scePadSetActDirect`: the small and large motor bytes
+    fn set_act_direct(&mut self, small: u8, large: u8);
+}
+
+/// The poll's state (`cPS2Device` +0x44 .. +0x64): vf9 0x17b270 (a jump to 0x17ad68), once a frame.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Poller {
+    /// +0x44: the pad was there and is gone
+    pub gone: u32,
+    /// +0x4c: pressure sensitive buttons (the poll only ever clears it)
+    pub pressure: u32,
+    /// +0x50: in analog mode
+    pub analog: u32,
+    /// +0x54: set after the actuator setup gave up waiting
+    pub act_failed: u32,
+    /// +0x58: the mode wanted (the constructor's 1)
+    pub want: u32,
+    /// +0x5c: the mode is locked (the constructor's 1)
+    pub lock: u32,
+    /// +0x60: 0 not open, 1 finding, 2 mode, 3 mode sent, 4..6 pressure setup, 7..9 actuator setup, 10 ready
+    pub state: u32,
+    /// +0x64: the request state counted
+    pub count: i32,
+}
+
+impl Default for Poller {
+    /// `cPS2Device::cPS2Device` 0x17ac40 (mode wanted and locked)
+    fn default() -> Self {
+        Poller { gone: 0, pressure: 0, analog: 0, act_failed: 0, want: 1, lock: 1, state: 0, count: 0 }
+    }
+}
+
+impl Poller {
+    /// One poll. `out` asks for the frame (the ring's slot) and is the frame the pad gave; the rumble's motor
+    /// timers then run (`Rumble::tick` with the pad ready) and are sent when they changed.
+    pub fn poll(&mut self, lib: &mut dyn Libpad, rumble: &mut Rumble, want_frame: bool) -> Option<Record> {
+        let mut ready = false;
+        let mut pad = [0u8; 20];
+        if self.state == 0 && lib.port_open() == 1 {
+            self.state = 1;
+            self.gone = 0;
+        }
+        let s = lib.get_state();
+        if s == 0 {
+            self.gone = 0;
+            self.state = 1;
+        }
+        match self.state {
+            1 => {
+                if s == 6 {
+                    self.pressure = 0;
+                    self.analog = 0;
+                    self.act_failed = 0;
+                    let id = lib.info_mode(1);
+                    if id != 0 {
+                        let ex = lib.info_mode(2);
+                        if ex == 4 {
+                            self.state = 2;
+                        } else if ex < 5 {
+                            if ex == 0 && id == 4 {
+                                self.state = 10;
+                            }
+                        } else if ex == 7 {
+                            self.analog = 1;
+                            self.state = 2;
+                        }
+                    }
+                }
+            }
+            2 => {
+                let mut sent = false;
+                if self.analog != self.want && (self.lock != 0 || self.gone == 0) {
+                    let r = lib.set_main_mode((self.want != 0) as i64, if self.lock != 0 { 3 } else { 2 });
+                    if r == 1 {
+                        self.state = 3;
+                    }
+                    sent = true;
+                }
+                if !sent {
+                    self.state = if self.analog == 0 { 7 } else { 4 };
+                }
+            }
+            3 => {
+                if lib.get_state() != 5 {
+                    self.state = 1;
+                }
+            }
+            4 => self.state = if lib.enter_press_mode() == 1 { 5 } else { 7 },
+            5 => {
+                if lib.press_mode_next() == 1 {
+                    self.count = 0;
+                    self.state = 6;
+                }
+            }
+            6 => {
+                let r = lib.req_state();
+                if r == 1 {
+                    self.state = 5;
+                } else if r == 0 {
+                    self.count += 1;
+                    if 4 < self.count {
+                        self.pressure = 0;
+                        self.state = 7;
+                    }
+                } else {
+                    self.count = 0;
+                }
+            }
+            7 => self.state = if lib.info_act() == 0 { 10 } else { 8 },
+            8 => {
+                if lib.set_act_align() == 1 {
+                    self.count = 0;
+                    self.state = 9;
+                }
+            }
+            9 => {
+                let r = lib.req_state();
+                if r == 1 {
+                    self.state = 8;
+                } else if r == 0 {
+                    self.count += 1;
+                    if 4 < self.count {
+                        self.act_failed = 1;
+                        self.state = 10;
+                    }
+                } else {
+                    self.count = 0;
+                }
+            }
+            10 => {
+                if lib.read(&mut pad) == 0 || pad[0] != 0 {
+                    self.gone = 1;
+                    self.state = 1;
+                } else {
+                    self.gone = 0;
+                    ready = true;
+                }
+            }
+            _ => {}
+        }
+        let frame = want_frame.then(|| if ready { Record::from_pad(&pad, self.analog, self.pressure != 0) } else { Record::none(self.gone != 0) });
+        if let Some((small, large)) = rumble.tick(self.state == 10) {
+            lib.set_act_direct(small, large);
+        }
+        frame
+    }
+}
+
 /// The list as the game keeps it: the two pads and their ring.
 #[derive(Clone, Debug)]
 pub struct Input {
@@ -340,5 +511,61 @@ mod tests {
         p[1].rumble.set_large(1.0, 30);
         reset_devices(&mut p);
         assert_eq!((p[1].rumble.small, p[1].rumble.large, p[1].rumble.small_frames, p[1].rumble.large_frames), (0, 0, -1, -1));
+    }
+    struct Easy {
+        ex: i64,
+    }
+    impl Libpad for Easy {
+        fn port_open(&mut self) -> i64 { 1 }
+        fn get_state(&mut self) -> i64 { 6 }
+        fn info_mode(&mut self, what: i64) -> i64 { if what == 1 { 7 } else { self.ex } }
+        fn set_main_mode(&mut self, _: i64, _: i64) -> i64 { 1 }
+        fn enter_press_mode(&mut self) -> i64 { 0 }
+        fn press_mode_next(&mut self) -> i64 { 0 }
+        fn req_state(&mut self) -> i64 { 0 }
+        fn info_act(&mut self) -> i64 { 0 }
+        fn set_act_align(&mut self) -> i64 { 0 }
+        fn read(&mut self, buf: &mut [u8; 20]) -> i64 {
+            *buf = [0; 20];
+            buf[2] = 0xff;
+            buf[3] = 0xfe;
+            1
+        }
+        fn set_act_direct(&mut self, _: u8, _: u8) {}
+    }
+
+    #[test]
+    fn a_dualshock_gets_to_ready_and_gives_frames() {
+        let mut p = Poller::default();
+        let mut rumble = Rumble::default();
+        let mut lib = Easy { ex: 7 };
+        let mut frames = Vec::new();
+        for _ in 0..12 {
+            frames.push(p.poll(&mut lib, &mut rumble, true).unwrap());
+        }
+        assert_eq!((p.state, p.analog), (10, 1));
+        assert!(frames[..4].iter().all(|f| f.valid == 0));
+        let last = frames.last().unwrap();
+        assert_eq!((last.valid, last.analog, last.buttons), (1, 1, 1));
+        // the pad going away: a frame with valid set, back to finding
+        let mut lib = Easy { ex: 7 };
+        struct Gone(Easy);
+        impl Libpad for Gone {
+            fn port_open(&mut self) -> i64 { 1 }
+            fn get_state(&mut self) -> i64 { 6 }
+            fn info_mode(&mut self, w: i64) -> i64 { self.0.info_mode(w) }
+            fn set_main_mode(&mut self, _: i64, _: i64) -> i64 { 1 }
+            fn enter_press_mode(&mut self) -> i64 { 0 }
+            fn press_mode_next(&mut self) -> i64 { 0 }
+            fn req_state(&mut self) -> i64 { 0 }
+            fn info_act(&mut self) -> i64 { 0 }
+            fn set_act_align(&mut self) -> i64 { 0 }
+            fn read(&mut self, _: &mut [u8; 20]) -> i64 { 0 }
+            fn set_act_direct(&mut self, _: u8, _: u8) {}
+        }
+        let _ = &mut lib;
+        let mut g = Gone(Easy { ex: 7 });
+        let f = p.poll(&mut g, &mut rumble, true).unwrap();
+        assert_eq!((f.valid, p.gone, p.state), (1, 1, 1));
     }
 }
