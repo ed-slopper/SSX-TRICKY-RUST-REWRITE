@@ -97,7 +97,7 @@ state machine and the renderer are ours. Nothing has been checked against the or
 | G7c | Sky, fog, distance culling, `.ltg` grid use | unowned | G7, E3e | | [est] |
 | G7d | Lights and halos, glows, lens flares | unowned | G7 | | [repo] "lights/halos" not done |
 | G7e | Particles as the VU1 microcode draws them (0x31c288), spark and dust sprites | unowned | G7 | | [repo] "Unresolved: spark and dust sprite rendering"; `particles.rs` has the emitters |
-| G7f | Board tracks, spray, breakable shards checked against `Fx_BoardTrack` 0x132648, `Boarder_UpdateEffects` 0x1350c0 | any | F4a | | [repo] `tracks.rs`, `spray.rs` |
+| G7f | Board tracks, spray, breakable shards checked against `Fx_BoardTrack` 0x132648, `Boarder_UpdateEffects` 0x1350c0 | any | F4a | trailrig/heron (2026-10-12) | [repo] `tracks.rs`, `spray.rs` |
 | G7g | Rider shading and shadows, board reflections (env materials) | unowned | G7, E4 | | [est] |
 | G7h | World animations checked: `cTexFlipNode` 0x142e90, `cUVScrollNode` 0x141ff0, `cAnimDeltaNode` 0x199d10, `cFlagNode` 0x144938, `cAnimObjectNode` 0x198810 | any | E9 | | [repo] `worldanim.rs` |
 | G8 | HUD: `HUD_DrawPlayerSprites` 0x1a2c40, `HUD_DrawPlayerText` 0x1a4f70, `HUD_DrawSprite` 0x1c0068, all of it at 640×480, with the game's text from `american.loc` | unowned | E5 | | [repo] `hudsprites.rs`, `sfnfont.rs` partly done |
