@@ -1,7 +1,7 @@
-//! The game's cameras (board rows E11a–c): `CamCamera_EvalPosition` 0x16e900. Checked in the function runner
-//! (`tests/camera.rs`).
+//! The game's cameras (board rows E11a–c): `CamCamera_EvalPosition` 0x16e900 and `CamCamera_EvalLookAt` 0x1722e8.
+//! Checked in the function runner (`tests/camera.rs`).
 
-use crate::math::{angle_diff, atan, sin_cos};
+use crate::math::{angle_diff, asin, atan, sin_cos};
 
 const PI: f32 = 3.141_592_7;
 const HALF_PI: f32 = 1.570_796_4;
@@ -416,4 +416,295 @@ pub fn eval_position(
         p.f_b8 -= 0.016_666_668;
     }
     PosResult { ret, stage_yaw }
+}
+
+// ---- CamCamera_EvalLookAt 0x1722e8 ----
+
+/// The look-at block (`*(cam + 0x44)`), fields named by byte offset.
+#[derive(Clone, Debug, Default)]
+pub struct LookP {
+    /// +0x00: a target (list entry `w04`) is followed.
+    pub w00: i32,
+    pub w04: i32,
+    /// +0x08, +0x0c, +0x10: the look-at point's offset.
+    pub off: [f32; 3],
+    /// +0x14, +0x18, +0x1c: heading, pitch and roll added.
+    pub f14: f32,
+    pub f18: f32,
+    pub f1c: f32,
+    /// +0x20: the field of view; +0x24: its floor 1.0 applies to `out.f48`.
+    pub f20: f32,
+    pub f24: f32,
+    /// +0x28: the roll's divisor when `p7 == 0`.
+    pub f28: f32,
+    pub w2c: i32,
+    pub w30: i32,
+    /// +0x34: which matrix (-1, -2: the rider's own).
+    pub w34: i32,
+    pub w38: i32,
+    pub f3c: f32,
+    /// +0x40: look back (pitch negated, heading + π).
+    pub w40: i32,
+}
+
+/// What the look-at reads from a rider.
+#[derive(Clone, Debug)]
+pub struct LookRider {
+    /// +0x424.
+    pub motion: i32,
+    /// +0x57b8.
+    pub f57b8: f32,
+    /// +0x57d0.
+    pub v57d0: [f32; 3],
+    /// +0x57e0 (four lanes).
+    pub v57e0: [f32; 4],
+    /// +0x290.
+    pub w290: i32,
+    /// +0x2a0.
+    pub v2a0: [f32; 3],
+    /// +0x2d0.
+    pub v2d0: [f32; 3],
+    /// `*(rider + 0x464) + 0x60`.
+    pub f464_60: f32,
+    /// +0x4a90.
+    pub v4a90: [f32; 3],
+    /// The translation of matrix 0 of the table at +0x4498.
+    pub t4498: [f32; 3],
+}
+
+#[derive(Clone, Debug)]
+pub struct LookEntry {
+    pub rider: Option<LookRider>,
+    /// +0x14, +0x18, +0x1c.
+    pub p14: [f32; 3],
+}
+
+/// The view record: the camera position in, the angles out.
+#[derive(Clone, Debug, Default)]
+pub struct LookView {
+    pub pos: [f32; 3],
+    /// +0x0c heading, +0x10 pitch, +0x14 roll, +0x18 field of view, +0x48.
+    pub yaw: f32,
+    pub pitch: f32,
+    pub roll: f32,
+    pub fov: f32,
+    pub f48: f32,
+}
+
+/// The last flat direction to the target (words 0x335724 and 0x335728), kept while the target is on top of the
+/// camera.
+#[derive(Clone, Copy, Debug)]
+pub struct LastDir {
+    pub x: f32,
+    pub y: f32,
+}
+
+pub trait LookEnv {
+    /// Row 3 (xyz) of the target's matrix `idx` (rider +0x4494 table).
+    fn translation(&mut self, idx: i32) -> [f32; 3];
+}
+
+/// The R5900's divide: a zero divisor gives the largest float of the quotient's sign (0/0 included).
+fn ps2_div(a: f32, b: f32) -> f32 {
+    if b == 0.0 {
+        let neg = a.is_sign_negative() != b.is_sign_negative();
+        return if neg { -f32::MAX } else { f32::MAX };
+    }
+    a / b
+}
+
+fn dot3(a: [f32; 3], b: [f32; 3]) -> f32 {
+    a[0] * b[0] + a[1] * b[1] + a[2] * b[2]
+}
+
+/// `Vec3_Div` after a zero test: the vector over its length, or itself when the length is zero.
+fn unit_or_same(v: [f32; 3]) -> [f32; 3] {
+    let len = dot3(v, v).sqrt();
+    if len == 0.0 {
+        return v;
+    }
+    let inv = 1.0 / len;
+    [v[0] * inv, v[1] * inv, v[2] * inv]
+}
+
+/// A direction normalised by the vector unit (the sum of four squares, `vrsqrt`, `vmulq`).
+fn vu_unit(v: [f32; 4]) -> [f32; 3] {
+    let m = [v[0] * v[0], v[1] * v[1], v[2] * v[2], v[3] * v[3]];
+    let s = ((m[0] + m[1]) + 1.0 * m[2]) + 1.0 * m[3];
+    let q = if s == 0.0 { f32::MAX } else { 1.0 / s.sqrt() };
+    [v[0] * q, v[1] * q, v[2] * q]
+}
+
+/// The flat angle of (x, y) as the look-at takes it: atan(x / y) with y zero going to ±π/2.
+fn flat_angle(x: f32, y: f32) -> f32 {
+    if y == 0.0 {
+        if x == 0.0 {
+            return x;
+        }
+        return if 0.0 <= x { HALF_PI } else { -HALF_PI };
+    }
+    let a = atan(x / y);
+    if y < 0.0 {
+        return if 0.0 < x { a + PI } else { a - PI };
+    }
+    a
+}
+
+/// `CamCamera_EvalLookAt` 0x1722e8(extra, cam, view, list, —, timer, p7, p8): the heading, pitch, roll and field
+/// of view of the view from `view.pos` to the target.
+#[allow(clippy::too_many_arguments)]
+pub fn eval_look_at(
+    p: &LookP,
+    entries: &[LookEntry],
+    v: &mut LookView,
+    last: &mut LastDir,
+    timer: &mut f32,
+    p7: i64,
+    p8: i64,
+    extra: f32,
+    env: &mut dyn LookEnv,
+) {
+    let from = v.pos;
+    let mut fov_t: Option<f32> = None;
+    let mut t = [0.0f32 + p.off[0], 0.0f32 + p.off[1], 0.0f32 + p.off[2]];
+    if p.w00 == 0 {
+        v.yaw = p.f14;
+        v.pitch = p.f18;
+        v.roll = p.f1c;
+    } else {
+        let en = &entries[p.w04 as usize];
+        let add = if p.w34 == -2 {
+            en.rider.as_ref().expect("target rider").v2d0
+        } else {
+            en.p14
+        };
+        t = [t[0] + add[0], t[1] + add[1], t[2] + add[2]];
+        if p.w30 != 0 {
+            if let Some(r) = en.rider.as_ref() {
+                match p.w34 {
+                    -1 => {
+                        let q = r.t4498;
+                        let d = [q[0] - en.p14[0], q[1] - en.p14[1], q[2] - en.p14[2]];
+                        t = [t[0] + d[0], t[1] + d[1], t[2] + d[2]];
+                    }
+                    -2 => {
+                        let q = r.v4a90;
+                        let k = r.f464_60 * 195.0 * -0.4;
+                        let z = r.v2d0[2] - k;
+                        t = [t[0] + q[0], t[1] + q[1], t[2] + z];
+                        t = [t[0] - r.v2d0[0], t[1] - r.v2d0[1], t[2] - r.v2d0[2]];
+                    }
+                    idx => {
+                        let q = env.translation(idx);
+                        t = [(t[0] + q[0]) - en.p14[0], (t[1] + q[1]) - en.p14[1], (t[2] + q[2]) - en.p14[2]];
+                    }
+                }
+            }
+        }
+        let dx = t[0] - from[0];
+        let dy = t[1] - from[1];
+        let mut flat = (dx * dx + dy * dy).sqrt();
+        if flat < 0.01 {
+            flat = (last.x * last.x + last.y * last.y).sqrt();
+        } else {
+            last.x = dx;
+            last.y = dy;
+        }
+        let h = flat_angle(last.x, last.y);
+        v.yaw = (HALF_PI - h) + p.f14;
+        if let Some(r) = en.rider.as_ref() {
+            if r.motion == 1 && r.f57b8 < 0.033_333_335 {
+                let n = vu_unit(r.v57e0);
+                let u = [-r.v57d0[0], -r.v57d0[1], -r.v57d0[2]];
+                let dot = (u[0] * n[0] + u[1] * n[1]) + u[2] * n[2];
+                if 1000.0 < dot {
+                    *timer = 0.0;
+                }
+            } else if p8 == 1 && r.motion == 2 && *timer < 0.083_333_336 {
+                let n = vu_unit(r.v57e0);
+                let u = [-r.v57d0[0], -r.v57d0[1], -r.v57d0[2]];
+                let dot = (u[0] * n[0] + u[1] * n[1]) + u[2] * n[2];
+                let mut f = (dot - 1000.0) / 3000.0;
+                if 1.0 < f {
+                    f = 1.0;
+                }
+                let s = r.w290;
+                let k = if s == 4 {
+                    125.0
+                } else if s == 3 {
+                    166.0
+                } else if s < 5 || s >= 15 || s < 12 {
+                    200.0
+                } else {
+                    250.0
+                };
+                t[2] -= k * f;
+            }
+        }
+        let dz = t[2] - from[2];
+        let pitch = if flat == 0.0 {
+            if dz == 0.0 {
+                dz
+            } else if 0.0 <= dz {
+                HALF_PI
+            } else {
+                -HALF_PI
+            }
+        } else {
+            atan(dz / flat)
+        };
+        v.roll = 0.0;
+        v.pitch = pitch + p.f18;
+        if let Some(r) = en.rider.as_ref() {
+            if (p.w2c != 0 || p7 == 1) && !matches!(r.motion, 1 | 3 | 5 | 6) {
+                let up = r.v2a0;
+                let d = [t[0] - from[0], t[1] - from[1], t[2] - from[2]];
+                let nd = unit_or_same(d);
+                let k1 = (up[0] * nd[0] + up[1] * nd[1]) + up[2] * nd[2];
+                let s1 = [nd[0] * k1, nd[1] * k1, nd[2] * k1];
+                let w = [up[0] - s1[0], up[1] - s1[1], up[2] - s1[2]];
+                let wn = unit_or_same(w);
+                let k2 = (0.0 * nd[0] + 0.0 * nd[1]) + 1.0 * nd[2];
+                let s2 = [nd[0] * k2, nd[1] * k2, nd[2] * k2];
+                let vv = [0.0 - s2[0], 0.0 - s2[1], 1.0 - s2[2]];
+                let vn = unit_or_same(vv);
+                let mut dv = (vn[0] * wn[0] + vn[1] * wn[1]) + vn[2] * wn[2];
+                if dv < -1.0 || 1.0 < dv {
+                    dv = 1.0;
+                }
+                let a = asin(dv);
+                let c = [nd[1] * vn[2] - nd[2] * vn[1], nd[2] * vn[0] - nd[0] * vn[2], nd[0] * vn[1] - nd[1] * vn[0]];
+                let sg = (c[0] * wn[0] + c[1] * wn[1]) + c[2] * wn[2];
+                let mut ang = HALF_PI - a;
+                if sg < 0.0 {
+                    ang = -ang;
+                }
+                let div = if p7 != 0 { 1.0 } else { p.f28 };
+                v.roll = ps2_div(ang, div);
+            }
+        }
+        v.roll += p.f1c;
+        if p.w38 != 0 {
+            let d = [t[0] - from[0], t[1] - from[1], t[2] - from[2]];
+            let len = dot3(d, d).sqrt();
+            let mut f = ps2_div(p.f3c, len * p.f20);
+            if f < 0.25 {
+                f = 0.25;
+            }
+            if 2.0 < f {
+                f = 2.0;
+            }
+            fov_t = Some(f);
+        }
+    }
+    if p.w40 != 0 {
+        v.pitch = -v.pitch;
+        v.yaw += PI;
+    }
+    v.fov = fov_t.unwrap_or(p.f20);
+    v.yaw += extra;
+    v.f48 = p.f24;
+    if p.f24 < 1.0 {
+        v.f48 = 1.0;
+    }
 }
