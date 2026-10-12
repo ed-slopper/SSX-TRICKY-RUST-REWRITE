@@ -1314,15 +1314,15 @@ address,size,name,system,status
 0x164df8,68,Career_SetPlayerOutfit,race?,ported
 0x164e40,56,Career_GetPlayerBoard,race?,ported
 0x164e78,68,Career_SetPlayerBoard,race?,ported
-0x164ec0,56,FUN_00164ec0,race?,ported
-0x164ef8,68,FUN_00164ef8,race?,ported
-0x164f40,56,FUN_00164f40,race?,ported
-0x164f78,68,FUN_00164f78,race?,ported
+0x164ec0,56,Career_GetPlayerRecordWord2,race?,not started
+0x164ef8,68,Career_SetPlayerRecordWord2,race?,not started
+0x164f40,56,Career_GetPlayerRecordWord1,race?,not started
+0x164f78,68,Career_SetPlayerRecordWord1,race?,not started
 0x164fc0,1084,Career_CheckNewRecords,race?,not started
 0x165400,104,Career_ClearPlayerFlags,race?,ported
 0x165468,240,Career_GetAttributes,race?,ported
 0x165558,260,Career_SetupRidersForMode,race?,not started
-0x165660,36,FUN_00165660,race?,not started
+0x165660,36,Career_InitShortRecord,race?,not started
 0x165688,240,Career_SetupSoloRider,race?,not started
 0x165778,712,Career_SetupTutorialRiders,race?,not started
 0x165a40,344,Career_PickSixRandomRiders,race?,not started
@@ -1330,7 +1330,7 @@ address,size,name,system,status
 0x165cf0,1888,Career_BuildRaceRiders,race?,not started
 0x166450,92,Career_ResetRiders,race?,not started
 0x1664b0,56,Career_InitRiderList,race?,not started
-0x1664e8,100,FUN_001664e8,race?,ported
+0x1664e8,100,Career_GetPlayerLastRider,race?,not started
 0x166550,48,Career_FindPlayerSlot,race?,ported
 0x166580,20,Career_GetPlayerId,race?,ported
 0x166598,100,Career_FindRiderOfPlayer,race?,ported
@@ -1352,15 +1352,15 @@ address,size,name,system,status
 0x167170,16,StaticDtor_Career,race?,not started
 0x167208,2960,RelTable_Init,ai,checked
 0x167da0,28,RelTable_GetAttitude,ai,not started
-0x167dc0,28,FUN_00167dc0,race?,not started
-0x167de0,28,FUN_00167de0,race?,not started
+0x167dc0,28,RelTable_GetTolerance,ai,not started
+0x167de0,28,RelTable_GetAttitudeCap,ai,not started
 0x167e00,28,RelTable_GetRelation,ai,not started
 0x167ea0,392,Rivals_InitPairs,race?,ported
 0x168028,344,Rivals_DecayAttitudes,race?,ported
 0x168180,344,Rivals_DecayAttitudes2,race?,not started
 0x1682e0,124,StaticInit_Rivals,race?,not started
-0x168360,808,FUN_00168360,race?,not started
-0x168688,28,RaceScene_Destruct,race?,not started
+0x168360,808,PreRaceSel_BuildSceneIndex,race,not started
+0x168688,28,PreRaceSel_Destruct,race,not started
 0x1686a8,116,PreRaceSel_Clear,race,not started
 0x168720,204,PreRaceSel_Choose,race,not started
 0x1687f0,252,PreRaceSel_MatchRow,race,not started
@@ -1370,11 +1370,11 @@ address,size,name,system,status
 0x168b80,8,FUN_00168b80,race?,not started
 0x168b88,1640,Career_FinalizeRoster,race?,not started
 0x1691f0,392,PreRaceSel_ResolveWithRoster,race,not started
-0x169378,700,FUN_00169378,race?,ported
-0x169640,40,FUN_00169640,race?,not started
-0x169668,28,FUN_00169668,race?,not started
-0x169688,16,FUN_00169688,race?,not started
-0x169698,688,FUN_00169698,race?,not started
+0x169378,700,PreRaceSel_PickSceneVariants,race,ported
+0x169640,40,RaceScene_Construct,race?,not started
+0x169668,28,RaceScene_Destruct,race?,not started
+0x169688,16,RaceScene_Reset,race?,not started
+0x169698,688,RaceScene_SetupFromPicks,race?,not started
 0x1699a0,444,RaceScene_Select,race?,not started
 0x169b60,84,RaceScene_GetCast,race?,not started
 0x169bb8,48,RaceScene_GetScriptName,race?,not started
@@ -1396,10 +1396,10 @@ address,size,name,system,status
 0x16b4c0,196,Course_GetVerticalDropString,race,not started
 0x16b588,196,Course_GetLengthString,race,not started
 0x16b650,44,Course_GetNameStringId,race,not started
-0x16b6d8,56,FUN_0016b6d8,race?,not started
-0x16b7b0,56,FUN_0016b7b0,race?,not started
-0x16b860,44,FUN_0016b860,race?,not started
-0x16b8e0,44,FUN_0016b8e0,race?,not started
+0x16b6d8,56,Course_GetMapMarkerX,race,not started
+0x16b7b0,56,Course_GetMapMarkerY,race,not started
+0x16b860,44,Course_GetUnlockHintStringId,race,not started
+0x16b8e0,44,Course_GetDescriptionStringId,race,not started
 0x16ba18,72,Circuit_FindEntry,race,not started
 0x16ba60,72,Circuit_GetMedalThresholds,race,not started
 0x16baa8,172,Circuit_GetMedal,race,ported
