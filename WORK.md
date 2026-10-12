@@ -171,7 +171,7 @@ matches the original.
 
 | ID | Task | Section | Who | Date | Commit |
 |---|---|---|---|---|---|
-| C11b2 | The lesson's STANDINs resolved: the race object's states (`Race_CreateHandlers`: 6 LoadLesson .. 10 EndLesson), who starts the lesson (`cLoadLessonHandler`, `Lesson::on_load_done`), what the mode calls 3 (Countdown) and 8 (RestartLesson -> Intro) do; `lesson.rs` and `port-notes/tutorial.md` updated | P3 | trailrig/heron | 2026-10-11 | COMMIT |
+| C11b2 | The lesson's STANDINs resolved: the race object's states (`Race_CreateHandlers`: 6 LoadLesson .. 10 EndLesson), who starts the lesson (`cLoadLessonHandler`, `Lesson::on_load_done`), what the mode calls 3 (Countdown) and 8 (RestartLesson -> Intro) do; `lesson.rs` and `port-notes/tutorial.md` updated | P3 | trailrig/heron | 2026-10-11 | c9254ff |
 | C11c | The tutorial's recorded input: format of the `.inp` (6-word header, up to 7200 records of 44 bytes) and the preview's playback hooks in `GetControls`, as `tricky-rs/data/src/inp.rs` (parser, `Playback`) with tests; notes in `port-notes/tutorial.md` | P3 | trailrig/heron | 2026-10-11 | 650707c |
 | C11b | The lesson manager and its eleven handlers: `tricky-rs/game/src/lesson.rs` (state switch, Wait menu of pages / tricks / actions, preview, perform, practice, result menus, exit; `Env` trait), unit-tested; handlers all read, notes in `port-notes/tutorial.md` | P3 | trailrig/heron | 2026-10-11 | 05661c2 |
 | C11 | The `trick` course is the Trick Tutorial (game mode 6, `cLessonMan` with eleven handlers, `cTrickTutorialLoad`): data, states, menu and flow read and written up in `port-notes/tutorial.md`; follow-ups C11b..C11e | P3 | trailrig/heron | 2026-10-11 | 69292d0 |
