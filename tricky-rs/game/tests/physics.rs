@@ -223,3 +223,48 @@ fn a_rider_put_down_in_the_air_is_not_captured_by_a_rail() {
         assert!(r.crashed > 0.0, "tick {i}: up again after {:.2} s down", r.down_t);
     }
 }
+
+/// The wall across the flyer's line (row E8o): a vertical wall at z = −10, 10 m wide, from −5 to 10 m high.
+fn wall_across() -> CollisionWorld {
+    let mut wall = CollisionWorld::default();
+    wall.min_y = -1.0e6;
+    let q = |x: f32, y: f32, z: f32| Vec3::new(x, y, z);
+    wall.add_ex([q(-5.0, -5.0, -10.0), q(5.0, 10.0, -10.0), q(5.0, -5.0, -10.0)], None, false, 1, false);
+    wall.add_ex([q(-5.0, -5.0, -10.0), q(-5.0, 10.0, -10.0), q(5.0, 10.0, -10.0)], None, false, 1, false);
+    wall
+}
+
+#[test]
+fn the_air_tick_captures_on_a_rail_before_the_wall_puts_the_rider_down() {
+    // row E8o, proven in `AirMotion_Update` 0x108378: with no landing the tick runs `Rail_TryCapture` (call at 0x1089f0:
+    // `Score_LandTrick` for the rail, `Boarder_SetMotion`(3), `Boarder_SetState`(0xf)) and does NOT return: next come
+    // `Boarder_InstanceCollisions` (0x1089f8) and the wall ray (0x108a2c), whose `Boarder_Wipeout` 0x11d830 switches the
+    // motion to 5 at once. So a rider that hits a wall on the tick it is over a rail was locked onto the rail (the
+    // capture's `rail_kind` stands, the rail trick was scored) and is then down: no rail, crashed, "air wall".
+    let wall = wall_across();
+    let (rails, mut r) = rail_and_flyer();
+    assert_eq!(r.rail_kind, 0);
+    r.step(&wall, &rails, Input::default(), 1.0 / 60.0);
+    assert!(r.rail_kind != 0, "the rail did not capture before the wall (rail_kind {})", r.rail_kind);
+    assert!(r.crashed > 0.0 && r.cause == "air wall", "the wall did not put the captured rider down (cause {:?}, crashed {})", r.cause, r.crashed);
+    assert!(r.rail.is_none(), "a rider put down by the wall is still on the rail");
+    assert!(!r.grounded);
+}
+
+#[test]
+fn a_landing_on_the_tick_is_before_both_the_rail_and_the_wall() {
+    // row E8o: the down ray (0x108554) decides the landing first; a landed tick (`s6` cleared at 0x1089bc) skips
+    // `Rail_TryCapture`, `Boarder_InstanceCollisions` and the wall ray altogether (branch at 0x1089e4 to 0x108e58). The
+    // rider here is over the rail, has snow at its feet and a wall in front: it lands, is not captured, is not put down.
+    let mut world = wall_across();
+    let q = |x: f32, z: f32| Vec3::new(x, 0.0, z);
+    world.add_ex([q(-10.0, 5.0), q(10.0, 5.0), q(-10.0, -40.0)], None, true, 1, false);
+    world.add_ex([q(10.0, 5.0), q(10.0, -40.0), q(-10.0, -40.0)], None, true, 1, false);
+    let (rails, mut r) = rail_and_flyer();
+    // feet on the snow (the port's landing takes snow at or within 2 cm under the feet)
+    r.pos.y = 0.0;
+    r.step(&world, &rails, Input::default(), 1.0 / 60.0);
+    assert!(r.grounded, "the rider did not land (pos {:?})", r.pos);
+    assert!(r.rail.is_none() && r.rail_kind == 0, "a landed rider was captured by the rail");
+    assert!(r.crashed <= 0.0, "a landed rider was put down by the air wall (cause {:?})", r.cause);
+}

@@ -1059,12 +1059,13 @@ impl Rider {
             if input.jump { self.charge = self.crouch_v; }
         }
 
-        // walls (on the snow they are inside the ground tick): a sphere around the body
-        if !handled { self.walls(world, &mut p); }
-
+        // The air tick's order is `AirMotion_Update`'s 0x108378 (row E8o, proven): the integration, then the down ray
+        // (0x108554) that decides the landing, and only a rider not put down by it goes on to `Rail_TryCapture`
+        // (0x1089f0), `Boarder_InstanceCollisions` (0x1089f8) and the wall ray (0x108a2c); a landed tick has no capture
+        // and no air wall. So here: landing, then the rail, then the walls (below). The speed is the one going in.
         let s = self.vel.length();
         if handled {
-            // the ground tick did the probe
+            // the ground tick did the probe (and the walls)
         } else if !jumped {
             // landing: snow at or above our feet, and moving into it
             if let Some(hit) = world.ground(p, 1.2, 0.02) {
@@ -1103,10 +1104,12 @@ impl Rider {
             }
         }
 
-        // dropping onto a rail from the air locks the board onto it. Not a rider that was put down this tick (an air
-        // wall in `walls` above): `Rail_TryCapture` 0x125cb8 is called by `AirMotion_Update` 0x1089f0 and
-        // `GroundMotion_Update` 0x10ae78 only, and `Boarder_Wipeout` 0x11d830 has already switched the motion to 5
-        // (`Boarder_SetMotion` 0x11f610 is immediate), whose `WipeoutMotion_Update` 0x10c2f0 never captures (row E8m)
+        // dropping onto a rail from the air locks the board onto it. Not a rider that was put down (`Rail_TryCapture`
+        // 0x125cb8 is called by `AirMotion_Update` 0x1089f0 and `GroundMotion_Update` 0x10ae78 only, and
+        // `Boarder_Wipeout` 0x11d830 has switched the motion to 5, `Boarder_SetMotion` 0x11f610 being immediate, whose
+        // `WipeoutMotion_Update` 0x10c2f0 never captures, row E8m) and not one the landing probe put down: those never
+        // get here. The air wall comes AFTER the capture (row E8o): a rider over a rail that hits a wall on the same
+        // tick is captured (`Score_LandTrick` for the rail, `rail_kind` set) and then put down by the wall
         if !self.grounded && self.crashed <= 0.0 && !jumped && self.rail_cooldown <= 0.0 && self.air_time > 0.08 && self.vel.y < 2.5 {
             if let Some((ri, d, _)) = rails.nearest(self.pos, RAIL_REACH) {
                 let (rp, tan) = rails.0[ri].at(d);
@@ -1145,6 +1148,17 @@ impl Rider {
                     self.rail_halves = 0;
                 }
             }
+        }
+
+        // the air's walls, last (`Boarder_InstanceCollisions` 0x1089f8, then the wall ray 0x108a2c with its glance or
+        // `Boarder_Wipeout`): a sphere around the body, from where the capture left it. `AirMotion_Update` never calls
+        // `Boarder_WallCollide` 0x126250 (its callers are the ground, rail, get-up and wipe-out motions): the bounce
+        // branch of `walls` has no original in the air (row E8o, new gap). Not after a landing (grounded: the next tick's
+        // ground tick has the walls) and not for a rider already down.
+        if !handled && !self.grounded && self.crashed <= 0.0 {
+            let mut q = self.pos;
+            self.walls(world, &mut q);
+            self.pos = q;
         }
 
         self.boost_was = input.boost;

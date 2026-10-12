@@ -572,8 +572,63 @@ first). Inferred, not shown: the E8l run's capture 0.5 s after the wipe-out was 
 which the game allows (the sim run after the fix is unchanged: 235.0 s, 5 wipe-outs).
 
 **Not ported (new rows):** the clip-type gate (a layer-0 clip of type 0xe/0xf/0x10 without flag 4 refuses a capture;
-which type clip 0x224 has is not read), and the order of the wall check against `Rail_TryCapture` inside the game's
-tick (the port's order is ours).
+which type clip 0x224 has is not read). The order of the wall check against `Rail_TryCapture` inside the game's tick was
+row E8o, below: **the "down first" reading above was wrong for a rail**, the game captures first.
+
+### The order of the air tick (row E8o; `tests/physics.rs`: `the_air_tick_captures_on_a_rail_before_the_wall_puts_the_rider_down`, `a_landing_on_the_tick_is_before_both_the_rail_and_the_wall`)
+
+**Proven (decompiler and disassembly, SLUS_203.26).** `AirMotion_Update` 0x108378, in the order it runs:
+
+1. `Air_IntegrateRK4` 0x12b340 (call 0x1083d4), `AirPredict_Tick` 0x123ec8 (0x1083e0), the air's rail-index bookkeeping
+   (+0x57f0 into +0x290/+0x29c).
+2. **The landing probe**: a `cWorldLine` (0x25d7f0) of 300 cm (from -100 to +200 cm along a direction made from the
+   motion record at +0x8c8, negated and carried through the matrix at +0x4aa0; inferred: the down axis), `World_RayCast`
+   0x25aff8 (0x10856c). On a hit (`f0 >= 0`) it stores the hit normal in +0x2a0 and takes
+   `dot(normal, velocity)`; going in (`< 0`) it moves the board by the predicted attitude, runs `Boarder_ProbeGround`
+   0x128ae8 (0x108934) and, when the probe is good and the height test at +0x1bc passes (0x108998..0x1089bc), clears
+   the "not landed" flag (`s6`). Anything else leaves it set.
+3. **Landed** (`s6` = 0, branch 0x1089e4 to 0x108e58): `FUN_00123f00`, `Landing_CheckAngles` 0x12ba78, then
+   `Boarder_Wipeout` or `Landing_ChooseState` 0x109308 + `Score_LandTrick` 0x1569b0 (0x1090a0), `Boarder_AddMeter`, the
+   celebrate / speech calls, `Sfx_UpdateAir`. **No `Rail_TryCapture`, no `Boarder_InstanceCollisions`, no wall ray** on
+   that tick.
+4. **Not landed**, in this order: `Rail_TryCapture` 0x125cb8 (0x1089f0), `Boarder_InstanceCollisions` 0x125088
+   (0x1089f8), then the wall ray (a `cWorldBoarder` 0x257810 on the collision body at +0x470, mask +0x494 = 0xcf,
+   `World_RayCast` 0x25aff8 at 0x108a2c). `AirMotion_Update` does **not** return after a capture: a successful
+   `Rail_TryCapture` has already called `Score_LandTrick`, `Boarder_SetMotion`(3) and `Boarder_SetState`(0xf) (the
+   motion switch is immediate, E8m), and the two collision steps still run on the same object.
+5. The wall ray, on a hit (`f20 > 0`): `Boarder_Translate` 0x1267a0 moves the board by `1.1 * ray * hit` (0x108a7c); then
+   `f = dot(hit normal, velocity)`. `f >= 0`: nothing more. `f < 0`: with `t = min(0.9, 0.6 + 0.3 * (-f * 0.00045))` (0.9
+   when `-f * 0.00045 > 1`), if `dot(hit normal, +0x4ac0 axis) > t` the board glances: its quaternion (+0x170) is turned
+   toward the wall by at most 0x3dd67750 rad (`Boarder_UpdateOrientation` 0x129008) and the normal part of the velocity
+   is taken off (`vel -= f * normal`, no bounce); else `Boarder_Wipeout` 0x11d830 + `Score_Crash` 0x156de0 +
+   `Boarder_AddMeter`. The mask +0x494 goes back to -1 at the end (0x108e38).
+6. `Boarder_WallImpactCheck` 0x126540 is called from **`Boarder_InstanceCollisions`** (0x12552c, sphere-tree instances,
+   only when the velocity runs into the contact normal) and `Boarder_InstanceBounce` 0x125c0c, so in the air only for
+   *instances* (rollers, props), not the static world. **`Boarder_WallCollide` 0x126250 is never called in the air**:
+   its four callers (`get_xrefs_to`) are `GroundMotion_Update` 0x10aa2c, `RailSlideMotion_Update` 0x10c00c,
+   `GetUpMotion_Update` 0x110738 and `WipeoutMotion_Update` 0x10c7e4.
+
+This is the order of the checked port `air_motion::update` (`game/src/air_motion.rs`, row E8a3: `probe_ground`, then
+`rail_try_capture`, `instance_collisions`, `wall_ray`), which is not wired into `Rider::step` yet (G1a5b3 / G20c2b); the
+glance threshold's axis there is the board's up (+0x4ac0).
+
+**What follows for a rider over a rail that meets a wall.** If it is not landed that tick it is **captured first** and
+then hit by the wall ray: the rail landing is scored (`Score_LandTrick`(rail kind, stance, 0)), then the wipe-out and
+`Score_Crash`. The end state is the E8m one (down, motion 5, no rail), but the capture happened and its score stands. If
+the landing probe puts it down on that tick, neither the rail nor the wall is reached. The test fixes both.
+
+**Ported (`Rider::step_tick`).** The air branch now runs: integrate and rotate (the port's own jump release aside), the
+landing (`world.ground` at the integrated position, *before* any wall push), the rail capture (`self.pos`, the speed
+going in), then the air walls (`Rider::walls`, from where the capture left the board). A landed or already-down rider gets
+no air wall that tick. The port's landing used to come *after* a wall push-out of the position; it now takes the position
+the integration gave, as the game's ray does.
+
+**Where the port's own code cannot follow (new rows).** The port's wall is a sphere against the drawn mesh
+(`Rider::walls`, STANDIN, row E8b), not the game's ray from the collision body: its `else` bounce branch (`vel += n *
+(vin + max(0.5 vin, 0.556))`, from `Boarder_WallCollide`) and its gates (`vin > 1`, `n.y < 0.7`, `air_time > 0.15`) have no
+original in the air, where a hit with the velocity into the wall always glances or wipes out (item 5), and the glance
+threshold takes the +0x4ac0 axis, the port's `up`. The instance contacts (`Boarder_InstanceCollisions`) are not in the
+port's air at all (row E7). The landing probe is the port's `world.ground`, not the game's ray plus `Boarder_ProbeGround`.
 
 
 ## The attitude at a placement (row G20c3a; checked: `tests/placement.rs`)
