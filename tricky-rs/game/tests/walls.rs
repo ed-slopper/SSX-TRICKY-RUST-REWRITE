@@ -1,5 +1,6 @@
 //! Walls and objects (board row E8b) against the game in the function runner (TRICKY_ELF; skipped without it):
-//! `Boarder_WallCollide`, `Boarder_WallImpactCheck`, `Boarder_InstanceCollisions` (no rollers) and
+//! `Boarder_WallCollide`, `Boarder_WallImpactCheck`, `Boarder_InstanceCollisions` (half the time with a roller in the rider's contact list, its touch scripted:
+//! `roller::rider_kick_touch`, row E8c2) and
 //! `Boarder_InstanceBounce` on random riders, hits and objects, every callee stubbed and logged; the calls in
 //! order with their arguments, the answer and the rider's fields compared bit for bit with `tricky_game::walls`.
 
@@ -8,6 +9,9 @@ use std::rc::Rc;
 
 use r5900::ps2float::Rules;
 use r5900::{Mem, Runner};
+use tricky_game::rigidbody::RigidBody;
+use tricky_game::roller::{rider_kick_touch, RollerBody, RollerEnv};
+use tricky_game::sphtree::{SphereTree, WorldSphTree};
 use tricky_game::walls::{impact_check, instance_bounce, instance_collisions, wall_collide, CastRecord, Contact, Touched, WallEnv, WallRider};
 
 type V4 = [f32; 4];
@@ -53,6 +57,8 @@ enum Call {
     Contact(u32, [u32; 13], [u32; 12]),
     SfxObject(u32),
     SfxWall,
+    Touch,
+    Script(i32, u32),
 }
 
 fn b4(v: V4) -> [u32; 4] {
@@ -90,10 +96,67 @@ struct Script {
     query: (f32, CastRecord, Touched),
     crash: f32,
     speed: f32,
+    touch: Option<(V4, V4)>,
+    ev1: i32,
     log: Vec<Call>,
 }
 
 struct Env(Script);
+
+impl RollerEnv for Env {
+    fn ray_cast(&mut self, _: &WorldSphTree) -> (f32, V4, V4) {
+        unreachable!()
+    }
+    fn query_instances(&mut self, _: &WorldSphTree) -> (f32, V4, V4) {
+        unreachable!()
+    }
+    fn move_box(&mut self, _: V4, _: V4) {
+        unreachable!()
+    }
+    fn event_script(&self, _: u32, _: u32) -> i32 {
+        self.0.ev1
+    }
+    fn start_script(&mut self, s: i32, o: u32) {
+        self.0.log.push(Call::Script(s, o));
+    }
+    fn sfx(&mut self, _: u32, o: u32) {
+        self.0.log.push(Call::SfxObject(o));
+    }
+}
+
+/// A roller node (`cRollerNode`) in the runner's memory: its rigid body and what `Roller_OnHit` reads and writes.
+fn put_roller(m: &mut Mem, at: u32, b: &RollerBody) {
+    let rb = at + 0x30;
+    m.write_f32(rb + 8, b.rb.inv_mass);
+    for k in 0..9 {
+        m.write_f32(rb + 0xc + 4 * k as u32, b.rb.inv_inertia[k]);
+    }
+    for (o, v) in [(0x30, b.rb.pos), (0x40, b.rb.q), (0x50, b.rb.p), (0x60, b.rb.l), (0x70, b.rb.v), (0x80, b.rb.w)] {
+        for k in 0..4 {
+            m.write_f32(rb + o + 4 * k, v[k as usize]);
+        }
+    }
+    m.write_f32(at + 0xc8, b.energy);
+    m.write_f32(at + 0xe4, b.awake);
+    m.write_f32(at + 0xe8, b.knock);
+    m.write_u32(at + 0x140, b.asleep);
+}
+
+fn roller_words(m: &mut Mem, at: u32) -> Vec<u32> {
+    let mut v: Vec<u32> = (0..34).map(|k| m.read_u32(at + 0x38 + 4 * k)).collect();
+    v.extend([0xc8u32, 0xe4, 0xe8, 0x140].map(|o| m.read_u32(at + o)));
+    v
+}
+
+fn roller_ours(b: &RollerBody) -> Vec<u32> {
+    let mut v = vec![b.rb.inv_mass.to_bits()];
+    v.extend(b.rb.inv_inertia.map(f32::to_bits));
+    for a in [b.rb.pos, b.rb.q, b.rb.p, b.rb.l, b.rb.v, b.rb.w] {
+        v.extend(b4(a));
+    }
+    v.extend([b.energy.to_bits(), b.awake.to_bits(), b.knock.to_bits(), b.asleep]);
+    v
+}
 
 impl WallEnv for Env {
     fn cast_walls(&mut self, r: &WallRider) -> (f32, CastRecord) {
@@ -169,6 +232,7 @@ fn walls_match_the_original() {
     let cvt = r.mem.alloc(0x80);
     let fixed_fn = r.mem.alloc(0x10);
     let contact_buf = r.mem.alloc(0x60);
+    let roller_obj = r.mem.alloc(0x100);
     r.mem.write_u32(rider, vtable);
     r.mem.write_u32(vtable + 0x68, 0);
     r.mem.write_u32(vtable + 0x6c, knock_fn);
@@ -253,15 +317,52 @@ fn walls_match_the_original() {
     let l = lg.clone();
     r.stub(0x216c50, move |c, _| {
         let o = c.gpr(6) as u32;
-        l(Call::SfxObject(if o == object { 1 } else { o }))
+        l(Call::SfxObject(if o == object { 1 } else if o == roller_obj { 2 } else { o }))
     });
     let l = lg.clone();
     r.stub(0x2162f0, move |_, _| l(Call::SfxWall));
     let fx = fixed.clone();
     r.stub(fixed_fn, move |c, _| c.set_gpr(2, *fx.borrow() as u64));
+    // a roller in the rider's contact list (row E8c2): the touch scripted, `Roller_OnHit` the game's
+    let roller = r.mem.alloc(0x400);
+    let entry = r.mem.alloc(0x10);
+    r.mem.write_u32(roller + 8, 0x36d790);
+    r.mem.write_u32(roller + 0x14, 0);
+    r.mem.write_u32(roller + 0x28, roller_obj);
+    r.mem.write_u32(roller + 0x344, roller);
+    r.mem.write_u32(entry, roller + 0x2c0);
+    r.mem.write_u32(entry + 4, rider + 0x700);
+    r.mem.write_u32(entry + 8, 0);
+    r.mem.write_u32(entry + 0xc, 0);
+    for a in [0x13b7a8, 0x110838, 0x13f448, 0x149e28, 0x149e10, 0x154338] {
+        r.allow(a);
+    }
+    let (l, s) = (lg.clone(), script.clone());
+    r.stub(0x2394a8, move |c, m| {
+        l(Call::Touch);
+        let t = s.borrow().touch;
+        if let Some((p, q)) = t {
+            for k in 0..4 {
+                m.write_f32(c.gpr(6) as u32 + 4 * k, p[k as usize]);
+                m.write_f32(c.gpr(7) as u32 + 4 * k, q[k as usize]);
+            }
+        }
+        c.set_gpr(2, t.is_some() as u64);
+    });
+    let s = script.clone();
+    r.stub(0x25fe78, move |c, _| {
+        assert_eq!(c.gpr(6), 1);
+        c.set_gpr(2, s.borrow().ev1 as i64 as u64);
+    });
+    let pool = r.mem.alloc(0x100);
+    r.stub(0x23d3b0, move |c, _| c.set_gpr(2, pool as u64));
+    r.stub(0x2cc808, |_, _| {});
+    let l = lg.clone();
+    r.stub(0x13b8c0, move |c, _| l(Call::Script(c.gpr(6) as i32, if c.gpr(7) as u32 == roller_obj { 2 } else { 0 })));
 
     let mut g = Rng(0x0a11_5000_0000_0001);
     let mut counts = [0usize; 4];
+    let mut rolled = 0usize;
     let mut seen = std::collections::BTreeMap::<String, usize>::new();
     for case in 0..30000 {
         // the rider
@@ -299,7 +400,7 @@ fn walls_match_the_original() {
         r.mem.write_f32(phys + 4, o.bounce);
         r.mem.write_u32(object + 0xe4, if o.controller.is_some() { ctrl } else { 0 });
         *fixed.borrow_mut() = o.controller.unwrap_or(true);
-        let sc = Script { cast: (t, rec), query: (t, rec, o), crash: g.pick(&[-1.0f32, -2.5]), speed: g.pick(&[150.0f32, 900.0]), log: vec![] };
+        let sc = Script { cast: (t, rec), query: (t, rec, o), crash: g.pick(&[-1.0f32, -2.5]), speed: g.pick(&[150.0f32, 900.0]), touch: None, ev1: g.pick(&[-1i32, 12]), log: vec![] };
         *script.borrow_mut() = sc.clone();
         let mut env = Env(sc);
         let which = g.next() % 4;
@@ -312,8 +413,30 @@ fn walls_match_the_original() {
                 0
             }
             1 => {
+                // half the time a roller in the contact list
+                let mut ro = None;
+                if g.next() % 2 == 0 {
+                    let q = { let v = g.unit(); let l = (v[0] * v[0] + v[1] * v[1] + v[2] * v[2] + 0.25).sqrt(); [0.5 / l, v[0] / l, v[1] / l, v[2] / l] };
+                    let mut rb = RigidBody { inv_mass: g.pick(&[0.01f32, 0.2, 1.0]), pos: g.vec(1.0), q, p: g.vec(vk), l: g.vec(1.0), v: g.vec(vk), w: g.vec(0.01), ..Default::default() };
+                    rb.inv_inertia = [0; 9].map(|_| g.pick(&[0.0f32, 1e-4, -3e-5, 2e-4]));
+                    let tree = SphereTree { dirs: [[0.0; 4]; 8], centre: [0.0; 4], home: [0.0; 4], depth: 0, levels: vec![], masks: vec![] };
+                    let b = RollerBody { rb, energy: 5.0, mass: 1.0, xd0: 0.0, xd4: 0.0, e: 0.0, mu: 0.5, bounce_speed: 0.0, awake: 3.0, knock: 0.25, xf0: [0.0; 4], body_inertia: [0.0; 9], com: [0.0; 4], asleep: (g.next() % 2) as u32, tree, lo: [0.0; 4], hi: [0.0; 4] };
+                    put_roller(&mut r.mem, roller, &b);
+                    let touch = if g.next() % 5 == 0 { None } else { let d = g.vec(1.0); Some((g.vec(0.05), [wr.pos[0] + d[0] * 0.3, wr.pos[1] + d[1] * 0.3, wr.pos[2] + d[2] * 0.3, g.pick(&[1.0f32, 0.0])])) };
+                    script.borrow_mut().touch = touch;
+                    env.0.touch = touch;
+                    r.mem.write_u32(rider + 0x700, entry);
+                    ro = Some(b);
+                }
                 r.call(0x125088).unwrap();
                 instance_collisions(&mut wr, &mut env);
+                if let Some(mut b) = ro {
+                    let touch = env.0.touch;
+                    env.0.log.push(Call::Touch);
+                    rider_kick_touch(&mut b, 2, &mut wr, rider, touch, &mut env);
+                    assert_eq!(roller_words(&mut r.mem, roller), roller_ours(&b), "case {case}: the roller");
+                    rolled += 1;
+                }
                 1
             }
             2 => {
@@ -368,7 +491,7 @@ fn walls_match_the_original() {
             .iter()
             .map(|c| match c {
                 Call::Contact(o, cw, rw) => Call::Contact(if *o == 0 { 0 } else { 1 }, *cw, *rw),
-                Call::SfxObject(o) => Call::SfxObject(if *o == 77 { 77 } else if *o == 0 { 0 } else { 1 }),
+                Call::SfxObject(o) => Call::SfxObject(if *o == 77 || *o == 2 { *o } else if *o == 0 { 0 } else { 1 }),
                 c => c.clone(),
             })
             .collect();
@@ -394,5 +517,5 @@ fn walls_match_the_original() {
         );
         assert_eq!(m.read_u32(rider + KNOCKS), wr.knocks.to_bits(), "case {case} ({which}): knocks");
     }
-    eprintln!("{counts:?} (walls, objects, impact checks, bounces); calls {seen:?}");
+    eprintln!("{counts:?} (walls, objects, impact checks, bounces), {rolled} with a roller; calls {seen:?}");
 }

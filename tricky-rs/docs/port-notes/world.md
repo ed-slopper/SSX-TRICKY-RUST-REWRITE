@@ -226,7 +226,7 @@ Part of the port notes (index: [README.md](README.md)); units and wording as des
 - `Boarder_InstanceCollisions` 0x125088: `World_QueryInstances` with the same shape; on t ≥ 0 the normal is
   turned off the ground in mode 2 (always), the contact record (point, unit v, n, v_in, unit v) goes to
   `Instance_OnPlayerContact`, a bouncy object (flag 0x80) to `Boarder_InstanceBounce`, then its sound. Then the
-  rollers (rider+0x700 list: sphere trees and rigid-body impulses, row E8c).
+  rollers (rider+0x700 list: sphere trees and rigid-body impulses; Knockable objects, row E8c2).
 - `Boarder_InstanceBounce` 0x125a00(t, rider, object, contact, record), not in control state 0x16: mass 0 →
   stumble along n only. Else a fixed object (no controller, or its +0x54 says so) pushes the rider by n·(1.1·t)
   and bounces at max(b·v_in + v_in, v_in + 55.555553) (b the record's bounce; wall turn in mode 2); a moving one
@@ -284,6 +284,46 @@ Part of the port notes (index: [README.md](README.md)); units and wording as des
   2 × 4, 3 × 4: the wipe-out body), giving the mass, the centre of mass and the inertia about it.
 - Checked in the runner on 20,000 cases (random bodies, zero masses, zero quaternions, contacts with no sliding):
   every field bit for bit.
+
+## Knockable objects (row E8c2; `tricky_game::roller`, checked: `tests/roller.rs`, `tests/walls.rs`)
+
+- `cRollerNode` (type 0) past its controller layer (scripts.md, Movers): +0x30 the rigid body, +0xc8 the energy
+  average, +0xcc the mass, +0xd8 the bounce (0), +0xdc the friction (0.5), +0xe0 277.7778 cm/s (10 km/h), +0xe4
+  seconds awake, +0xe8 the knock, +0x100 the body inverse inertia, +0x130 the centre of mass in the object's frame,
+  +0x140 asleep, +0x150 its sphere tree (a copy of the course's, `FUN_002391e8`), +0x2a0 / +0x2b0 the tree's box,
+  +0x2c0 its broadphase entry (+0x84 the node).
+- The constructor (0x13d6c0, from script op 0): the mass and +0xd0 from the op's record (+0xc, +0x10); the tree
+  header's centre of mass (+0x2c) and inverse inertia (+0x5c) × 0.075; the body at the object's place plus the
+  centre of mass turned by its orientation (`Mat4_ToPosQuat`); the object's flags `& ~0x22 | 0x45`. Then a push:
+  with no velocity in the record (+0x18..+0x20 all 0) from the rider's contact (`FUN_0013dd40`: v = direction ×
+  speed / 2 + (0, 0, min(5000/m + 100, 600)), p = v·m, the spin 10 × the contact's +0x20), else that velocity
+  (`FUN_0013dbe8`: the spin 10 × the unit vector against it). Either sets the energy and clears the knock.
+- `RollerNode_UpdateTransform` 0x13e140: the world inverse inertia R·B·Rᵀ. `FUN_0013e6a0`: the object's place is
+  the body's less the turned centre of mass; `Mat4_FromPosQuat` 0x250428 then places the tree; the box is the
+  tree's centre ± its radius.
+- Each awake frame after the controller's forces (`cRollerNode::Update` 0x13e8a8): `RigidBody_Integrate`(1/60),
+  the inertia, `RigidBody_UpdateVelocity`, the tree and box, `Broadphase_MoveBox`, then `RollerNode_Collide`
+  0x13eda8: the tree as a `cWorldSphTree` against the world, then against the objects. A hit (depth > 0) pushes
+  the body out by the depth (at least 2 cm, `RollerNode_Translate`), damps L and v by 0.96666664 (p = v·m again),
+  and if the contact point moves into the surface: `RigidBody_ContactImpulse`(bounce, 0.5, ...) with no bounce off
+  the ground under 10 km/h, the knock + 1/60, and a ground hit after 5 s awake puts the time to 10 s (asleep next
+  frame).
+- Two rollers (`Roller_CheckCollision` 0x13f5c8, reached through the broadphase; its caller is not found yet): the
+  trees' touch (`SphTree_IntersectTree`); if the points close along the push n, j = −(1 + (e_a + e_b)/2)·closing /
+  (1/m_a + 1/m_b + n·((I_a⁻¹(r_a × n)) × r_a) + n·((I_b⁻¹(r_b × n)) × r_b)) along n to a and against b, and b gets
+  `Roller_OnHit`. A touch that writes nothing leaves the game reading its stack; the port skips it.
+- `Roller_OnHit` 0x13f448 only acts on an asleep roller: awake and knock 0, the energy from its motion, its event-1
+  script started (a `cScriptNode` of kind 3) or, without one, set awake; a rider's hit plays
+  `Sfx_InstanceCollision`.
+- The rider (`Boarder_InstanceCollisions`' rollers' loop over the rider's broadphase pairs, rider+0x700): for a
+  type-0 node, `Collide_BoarderSphTree` with the rider's body; n the push made unit; the rider's speed into n,
+  if positive, goes to `Boarder_WallImpactCheck` (the record: the point, the rider's direction, n, the closing
+  speed n·(v_rider − v_point)); if the closing speed is negative the roller takes 1.3·closing / (n·((I⁻¹(r × n)) ×
+  r) + 1/m + 1/`Boarder_GetSpeedStat`) along n and `Roller_OnHit` from the rider. Nodes of types 0x100..0x103 take
+  another path (`WorldNode_RayCast`, row E8c3).
+- Checked in the runner on every course's trees (4,400 cases: the transform, the frame and matrix, collisions with
+  the world's answers scripted and the shapes handed over compared, whole updates, hits, both pushes, the
+  constructor, pairs of rollers) and in tests/walls.rs (3,700 rider passes with a roller): every field and call.
 
 ## Keyframed objects (`cAnimObjectNode` 0x198810, `cMeshAnimFrame::vf1` 0x1cb498, `AnimCurve_FindSegment` 0x1cb770)
 

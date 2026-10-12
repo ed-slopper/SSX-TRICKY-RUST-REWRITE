@@ -1,4 +1,4 @@
-//! The game's rigid bodies (board row E8c): `cRigidBody` as the knockable objects (`cRollerNode`) and the wipe-out
+//! The game's rigid bodies (board row E8c1): `cRigidBody` as the knockable objects (`cRollerNode`) and the wipe-out
 //! body use it: `RigidBody_SetPosition` 0x153808 (in fact: set the spin, the angular momentum from it),
 //! `RigidBody_UpdateVelocity` 0x153ad8, `RigidBody_Integrate` 0x153c50, `RigidBody_ContactImpulse` 0x153ee8 and
 //! `RigidBody_AddImpulse` 0x154338; and a collision body's `CollBody_Transform` 0x236498 and
@@ -25,33 +25,33 @@ pub struct RigidBody {
     pub w: V4,
 }
 
-fn ld(a: V4) -> [F; 4] {
+pub(crate) fn ld(a: V4) -> [F; 4] {
     a.map(F)
 }
-fn st(a: [F; 4]) -> V4 {
+pub(crate) fn st(a: [F; 4]) -> V4 {
     a.map(|x| x.0)
 }
-fn add(a: [F; 4], b: [F; 4]) -> [F; 4] {
+pub(crate) fn add(a: [F; 4], b: [F; 4]) -> [F; 4] {
     [a[0] + b[0], a[1] + b[1], a[2] + b[2], a[3] + b[3]]
 }
-fn sub(a: [F; 4], b: [F; 4]) -> [F; 4] {
+pub(crate) fn sub(a: [F; 4], b: [F; 4]) -> [F; 4] {
     [a[0] - b[0], a[1] - b[1], a[2] - b[2], a[3] - b[3]]
 }
 /// `vmulx.xyzw` (and `Vec4_Scale` 0x102f50): every lane times s
-fn scale(a: [F; 4], s: F) -> [F; 4] {
+pub(crate) fn scale(a: [F; 4], s: F) -> [F; 4] {
     a.map(|x| x * s)
 }
 /// `vopmula.xyz` / `vopmsub.xyz` / `vsub.w`: a × b, w 0
-fn cross(a: [F; 4], b: [F; 4]) -> [F; 4] {
+pub(crate) fn cross(a: [F; 4], b: [F; 4]) -> [F; 4] {
     [a[1] * b[2] - b[1] * a[2], a[2] * b[0] - b[2] * a[0], a[0] * b[1] - b[0] * a[1], F(0.0)]
 }
 /// The VU0 dot product of all four lanes: ((x + y) + 1·z) + 1·w
-fn dot(a: [F; 4], b: [F; 4]) -> F {
+pub(crate) fn dot(a: [F; 4], b: [F; 4]) -> F {
     let t = [a[0] * b[0], a[1] * b[1], a[2] * b[2], a[3] * b[3]];
     ((t[0] + t[1]) + F(1.0) * t[2]) + F(1.0) * t[3]
 }
 /// A 3 × 3 (column by column) times the vector's x, y, z; w as given
-fn mat(m: &[f32; 9], a: [F; 4], w: F) -> [F; 4] {
+pub(crate) fn mat(m: &[f32; 9], a: [F; 4], w: F) -> [F; 4] {
     let m = m.map(F);
     [(m[0] * a[0] + m[3] * a[1]) + m[6] * a[2], (m[1] * a[0] + m[4] * a[1]) + m[7] * a[2], (m[2] * a[0] + m[5] * a[1]) + m[8] * a[2], w]
 }

@@ -169,7 +169,7 @@ Types 1, 3 and 4 spawn nothing.
   < 10000 or 10 s awake: momenta and velocities zeroed and Finish(1) (the object's event-3 script, else sleep).
   Else the knock +0xe8 decays × 0.8333333 and s = clamp(knock·10, 0, 2); k = 2·awake·s + s; force = (0, 0,
   −980 / inverse mass) − k·momentum, torque = −k·L, handed to `RigidBody_Integrate`(1/60) — the body, its
-  transform and `RollerNode_Collide` are row E8c. Kill deletes it; Finish never does.
+  transform and `RollerNode_Collide` are in world.md, Knockable objects (row E8c2). Kill deletes it; Finish never does.
 
 ## Breakables (row E9g; `tricky_game::breakables`, checked: `tests/breakables.rs`)
 

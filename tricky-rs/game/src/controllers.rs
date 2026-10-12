@@ -479,7 +479,7 @@ impl RailNode {
 
 /// The controller layer of `cRollerNode` (type 0, the knockable objects; row E9h): when it sleeps and the forces it
 /// hands to the rigid body each frame. The body itself (`RigidBody_Integrate` 0x153c50, the transform, the sphere
-/// tree, `RollerNode_Collide`) is row E8c. Fields: the rigid body at +0x30 (+0x38 inverse mass, +0x3c the 3×3
+/// tree, `RollerNode_Collide`) is `roller::RollerBody` (row E8c2). Fields: the rigid body at +0x30 (+0x38 inverse mass, +0x3c the 3×3
 /// inverse inertia, +0x80 momentum, +0x90 angular momentum, +0xa0 velocity, +0xb0 angular velocity), +0xc8 the
 /// energy average, +0xe4 seconds awake, +0xe8 a knock that decays, +0x140 asleep.
 #[derive(Clone, Copy, Debug, PartialEq)]

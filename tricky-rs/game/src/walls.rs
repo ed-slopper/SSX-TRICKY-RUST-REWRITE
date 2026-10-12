@@ -3,7 +3,7 @@
 //! wipe-out or a stumble), `Boarder_InstanceCollisions` 0x125088 (the touch objects: contact scripts and, for
 //! bouncy ones, `Boarder_InstanceBounce` 0x125a00). The casts (`World_RayCast` / `World_QueryInstances` with a
 //! `cWorldBoarder` shape, row E7a3) and the callees are the caller's ([`WallEnv`]); the rollers' loop at the end of
-//! `Boarder_InstanceCollisions` is rigid-body work (row E8c). Checked in the function runner (`tests/walls.rs`).
+//! `Boarder_InstanceCollisions` is `roller::rider_kick` (row E8c2). Checked in the function runner (`tests/walls.rs`).
 
 type V4 = [f32; 4];
 
@@ -213,7 +213,7 @@ pub fn instance_bounce(r: &mut WallRider, t: f32, o: &Touched, c: &Contact, rec:
     impact_check(r, s, c, n, env);
 }
 
-/// `Boarder_InstanceCollisions` 0x125088 up to its rollers' loop (row E8c): the rider's shape against the touch
+/// `Boarder_InstanceCollisions` 0x125088 up to its rollers' loop (`roller::rider_kick`, row E8c2): the rider's shape against the touch
 /// objects; on a hit (t ≥ 0) the normal is turned off the ground in mode 2, the contact record made (point,
 /// direction of travel, normal, speed into it), the object's contact scripts run, a bouncy one (flag 0x80)
 /// bounces the rider, and its collision sound plays.
