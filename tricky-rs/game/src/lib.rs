@@ -75,3 +75,4 @@ pub mod worldline;
 pub mod worldops;
 pub mod texanim;
 pub mod trickdata;
+pub mod racemisc;
