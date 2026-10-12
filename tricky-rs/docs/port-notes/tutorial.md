@@ -110,6 +110,15 @@ state change). In the tutorial:
 - Countdown (3): what `set_mode(3)` is: the race clock counts up 2.0 a tick (to 0), then Race (4) and the rider rides.
 - EndLesson (10): clears the pad device's +0x2c; Update adds 1/60 to the race clock.
 
+## Checked against the original (row C11b3)
+
+`tests/lesson.rs` runs the real `cLessonMan::vf1` and handlers in the function runner with the outside stubbed and
+logged, against `lesson.rs` on a scripted `Env` (200,000 random steps). It found one difference, now fixed: the Wait
+menu's refresh (`FUN_0014daa8`) at the page and trick levels does not clear the string list, only sets the first
+string (the action level clears all seven), so the strings left from an earlier menu stay. Also read there: the
+Practice Enter writes 0 to byte +0x5a70 of the game's player object (not modelled), and `Replay_Clear` runs only
+when the game object has a replay (+0x40).
+
 ## Not read yet
 
 - `Lesson_ResetScene` 0x14d7d0's callees, the contents of `data/tutorial/<rider>.big` (C11c2), the overlays and the load

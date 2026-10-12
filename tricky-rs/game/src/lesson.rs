@@ -5,7 +5,9 @@
 //!
 //! Everything the handlers touch outside the manager (the pad, the HUD, speech, the camera, the scene, the rider,
 //! the recorded input) goes through [`Env`]; the port's screens and the `.inp` player (C11c, C11d) implement it.
-//! Checked by the unit tests below against the decompiled flow; not run against the original in the function runner.
+//! Checked by the unit tests below, and against the original in the function runner (`tests/lesson.rs`: the real
+//! `cLessonMan::vf1` 0x14b9b8, its handlers and helpers on a lesson object, 200,000 steps of random pad edges, flags
+//! and state requests, every outside call, the manager's fields and the recording position compared).
 //!
 //! The race object's own states drive the lesson from outside (`Race_CreateHandlers` 0x1125c8): 6 LoadLesson, 7
 //! PreLesson, 8 RestartLesson, 9 SelectLesson, 10 EndLesson (and 1..5, 11 for races). `cLoadLessonHandler::Update`
@@ -252,8 +254,8 @@ impl Lesson {
 
     /// `FUN_0014daa8` 0x14daa8: the menu of the current level.
     fn refresh_menu(&mut self) {
-        self.items = [0; 7];
         match self.menu_level {
+            // (these two leave the other strings as they were: the list is cleared only for the action menu)
             0 | 1 => {
                 self.choice = 0;
                 self.count = 1;
@@ -262,6 +264,7 @@ impl Lesson {
             2 => {
                 self.count = 4;
                 self.choice = self.last_action;
+                self.items = [0; 7];
                 for (i, s) in text::ACTIONS.iter().enumerate() {
                     self.items[i] = *s;
                 }
