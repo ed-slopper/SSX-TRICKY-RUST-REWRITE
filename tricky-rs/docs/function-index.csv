@@ -1357,7 +1357,7 @@ address,size,name,system,status
 0x167e00,28,RelTable_GetRelation,ai,ported
 0x167ea0,392,Rivals_InitPairs,race?,ported
 0x168028,344,Rivals_DecayAttitudes,race?,ported
-0x168180,344,Rivals_DecayAttitudes2,race?,not started
+0x168180,344,Rivals_DecayAttitudes2,race?,ported
 0x1682e0,124,StaticInit_Rivals,race?,not started
 0x168360,808,PreRaceSel_BuildSceneIndex,race,not started
 0x168688,28,PreRaceSel_Destruct,race,not started
@@ -3510,7 +3510,7 @@ address,size,name,system,status
 0x20e730,776,cBXAudio::vf8_20e730,audio,not started
 0x20ea38,180,cBXAudio::vf15_20ea38,audio,not started
 0x20eaf0,560,cBXAudio::PlayFESound,audio,not started
-0x20ed20,312,Audio_GetListenerRider,audio,not started
+0x20ed20,312,Audio_GetListenerRider,audio,ported
 0x20ee58,776,Audio_InGameUpdate,audio,ported
 0x20f160,708,Audio_LoadFEConfig,audio,not started
 0x20f430,204,Audio_StartFrontendMusic,audio,not started
@@ -3520,7 +3520,7 @@ address,size,name,system,status
 0x20f8c0,72,Audio_CancelMusicDuck,audio,not started
 0x20f908,140,Sfx_SurfaceSoundType,audio,not started
 0x20f998,20,Audio_SetMusicMode,audio,not started
-0x20f9b0,208,Audio_FindRiderNear,audio,not started
+0x20f9b0,208,Audio_FindRiderNear,audio,ported
 0x20fa80,228,Audio_AnyRiderNearAhead,audio,not started
 0x20fb68,244,Audio_IsNearerPlayer2,audio,not started
 0x20fc60,124,Audio_GetRiderListener,audio,not started
@@ -3631,7 +3631,7 @@ address,size,name,system,status
 0x21b828,1076,Audio_BigAirMusicDuck,audio,ported
 0x21bc60,8,cBXAudio::vf2_21bc60,audio,not started
 0x21bca8,88,FUN_0021bca8,audio?,not started
-0x21bfd0,60,Replay_IsPlaying,audio?,not started
+0x21bfd0,60,Replay_IsPlaying,audio?,ported
 0x21c010,100,Audio_GetRiderPos,audio,not started
 0x21c078,36,Audio_RiderCount,audio,not started
 0x21c0a0,716,FUN_0021c0a0,audio?,not started
@@ -3886,14 +3886,14 @@ address,size,name,system,status
 0x2287d8,88,cSpeechSys::~cSpeechSys,render?,not started
 0x228830,168,Speech_InitLibrary,audio?,not started
 0x2288d8,128,SpeechSys_FreeAll,audio?,not started
-0x228958,60,SpeechSys_CanPlay,audio?,not started
+0x228958,60,SpeechSys_CanPlay,audio?,ported
 0x228998,100,SpeechSys_UpdateAll,frontend?,not started
 0x228a00,188,SpeechSys_AddBank,audio?,not started
 0x228ac0,40,Speech_LoadEventsForSlot,audio?,not started
 0x228ae8,156,FUN_00228ae8,audio?,not started
 0x228b88,48,FUN_00228b88,audio?,not started
 0x228bb0,48,FUN_00228bb0,audio?,not started
-0x228bd8,168,SpeechSys_Trigger,audio?,not started
+0x228bd8,168,SpeechSys_Trigger,audio?,ported
 0x228c80,144,FUN_00228c80,frontend?,not started
 0x228d10,188,SpeechSys_ClearEvent,frontend?,not started
 0x228dd0,60,FUN_00228dd0,audio?,not started
@@ -3997,101 +3997,101 @@ address,size,name,system,status
 0x22e3f0,12,FUN_0022e3f0,audio?,not started
 0x22e400,32,FUN_0022e400,race?,not started
 0x22e420,124,StaticInit_WorldTriggerMgr,other,not started
-0x22e4e0,108,Speech_PostFEEvent,frontend?,not started
+0x22e4e0,108,Speech_PostFEEvent,frontend?,checked
 0x22e550,88,FUN_0022e550,frontend?,not started
 0x22e5a8,124,Speech_PlayFELine,frontend?,not started
 0x22e628,124,StaticInit_WorldTriggerMgr2,other,not started
-0x22e6a8,208,SpeechEvt_Post100200f,audio?,not started
-0x22e778,72,SpeechEvt_Post1002010,audio?,not started
-0x22e7c0,116,SpeechEvt_Post1002012,audio?,not started
-0x22e838,136,SpeechEvt_Post1002013,audio?,not started
-0x22e8c0,56,SpeechEvt_Post100201a,audio?,not started
-0x22e8f8,136,SpeechEvt_Post100201c,audio?,not started
-0x22e980,56,SpeechEvt_Post100201e,audio?,not started
-0x22e9b8,116,SpeechEvt_Post100201f,audio?,not started
-0x22ea30,116,SpeechEvt_Post1002020,audio?,not started
-0x22eaa8,56,SpeechEvt_Post100202a,audio?,not started
-0x22eae0,76,SpeechEvt_Post100202b,audio?,not started
-0x22eb30,56,SpeechEvt_Post100202c,audio?,not started
-0x22eb68,76,SpeechEvt_Post100202d,audio?,not started
-0x22ebb8,76,SpeechEvt_Post100202e,audio?,not started
-0x22ec08,56,SpeechEvt_Post100202f,audio?,not started
-0x22ec40,76,SpeechEvt_Post1002030,audio?,not started
-0x22ec90,76,SpeechEvt_Post1002031,audio?,not started
-0x22ece0,76,SpeechEvt_Post1002033,audio?,not started
-0x22ed30,96,SpeechEvt_Post1002034,boarder?,not started
-0x22ed90,56,SpeechEvt_Post1002035,other,not started
-0x22edc8,56,SpeechEvt_Post1002036,audio?,not started
-0x22ee00,56,SpeechEvt_Post1002037,audio?,not started
-0x22ee38,76,SpeechEvt_Post1002046,audio?,not started
-0x22ee88,76,SpeechEvt_Post1002047,audio?,not started
-0x22eed8,76,SpeechEvt_Post1002048,audio?,not started
-0x22ef28,116,SpeechEvt_Post1002049,audio?,not started
-0x22efa0,116,SpeechEvt_Post100204a,audio?,not started
-0x22f018,76,SpeechEvt_Post100204b,audio?,not started
-0x22f068,56,SpeechEvt_Post100204c,audio?,not started
-0x22f0a0,56,SpeechEvt_Post100204d,audio?,not started
-0x22f0d8,76,SpeechEvt_Post100204e,audio?,not started
-0x22f128,56,SpeechEvt_Post100204f,audio?,not started
-0x22f160,76,SpeechEvt_Post1002050,audio?,not started
-0x22f1b0,76,SpeechEvt_Post1002051,audio?,not started
-0x22f200,56,SpeechEvt_Post1002052,audio?,not started
-0x22f238,56,SpeechEvt_Post1002053,audio?,not started
-0x22f270,76,SpeechEvt_Post1002054,audio?,not started
-0x22f2c0,56,SpeechEvt_Post1002055,audio?,not started
-0x22f2f8,56,SpeechEvt_Post1002056,audio?,not started
-0x22f330,96,SpeechEvt_Post300600f,audio?,not started
-0x22f390,96,SpeechEvt_Post3006019,audio?,not started
-0x22f3f0,96,SpeechEvt_Post300601a,audio?,not started
-0x22f450,96,SpeechEvt_Post300601b,audio?,not started
-0x22f4b0,96,SpeechEvt_Post300601c,audio?,not started
-0x22f510,96,SpeechEvt_Post3006020,audio?,not started
-0x22f570,96,SpeechEvt_Post3006021,audio?,not started
-0x22f5d0,76,SpeechEvt_Post3006022,audio?,not started
-0x22f620,96,SpeechEvt_Post3006023,world?,not started
-0x22f680,96,SpeechEvt_Post3006024,world?,not started
-0x22f6e0,76,SpeechEvt_Post3006025,audio?,not started
-0x22f730,76,SpeechEvt_Post3006026,audio?,not started
-0x22f780,76,SpeechEvt_Post3006027,audio?,not started
-0x22f7d0,76,SpeechEvt_Post3006028,audio?,not started
-0x22f820,76,SpeechEvt_Post300602b,audio?,not started
-0x22f870,96,SpeechEvt_Post3006030,other,not started
-0x22f8d0,96,SpeechEvt_Post3006031,other,not started
-0x22f930,96,SpeechEvt_Post3006032,other,not started
-0x22f990,76,SpeechEvt_Post3006033,other,not started
-0x22f9e0,76,SpeechEvt_Post3006034,other,not started
-0x22fa30,96,SpeechEvt_Post3006036,world?,not started
-0x22fa90,76,SpeechEvt_Post3006038,other,not started
-0x22fae0,84,FUN_0022fae0,,not started
-0x22fb38,88,FUN_0022fb38,,not started
-0x22fb90,88,FUN_0022fb90,,not started
-0x22fbe8,100,FUN_0022fbe8,,not started
-0x22fc50,84,FUN_0022fc50,,not started
-0x22fca8,88,FUN_0022fca8,,not started
-0x22fd00,72,SpeechEvt_Post500a000,audio?,not started
-0x22fd48,96,SpeechEvt_Post4008000,other,not started
-0x22fda8,92,SpeechEvt_Post4008002,race?,not started
-0x22fe08,92,SpeechEvt_Post4008003,race?,not started
-0x22fe68,92,SpeechEvt_Post4008004,race?,not started
-0x22fec8,92,SpeechEvt_Post4008005,race?,not started
-0x22ff28,136,SpeechEvt_Post4008006,race?,not started
-0x22ffb0,156,SpeechEvt_Post4008007,audio?,not started
-0x230050,116,SpeechEvt_Post4008008,audio?,not started
-0x2300c8,156,SpeechEvt_Post4008009,audio?,not started
-0x230168,96,SpeechEvt_Post400800a,race?,not started
-0x2301c8,116,SpeechEvt_Post400800b,race?,not started
-0x230240,136,SpeechEvt_Post400800c,race?,not started
-0x2302c8,96,SpeechEvt_Post400800d,race?,not started
-0x230328,96,SpeechEvt_Post400800e,other,not started
-0x230388,116,SpeechEvt_Post400800f,game?,not started
-0x230400,96,SpeechEvt_Post4008010,audio?,not started
-0x230460,76,SpeechEvt_Post4008011,other,not started
-0x2304b0,76,SpeechEvt_Post4008012,other,not started
-0x230500,176,SpeechEvt_Post4008013,race?,not started
-0x2305b0,96,SpeechEvt_Post4008014,race?,not started
-0x230610,76,SpeechEvt_Post4008015,race?,not started
-0x230660,92,SpeechEvt_Post4008016,race?,not started
-0x2306c0,96,SpeechEvt_Post4008017,race?,not started
+0x22e6a8,208,SpeechEvt_Post100200f,audio?,checked
+0x22e778,72,SpeechEvt_Post1002010,audio?,checked
+0x22e7c0,116,SpeechEvt_Post1002012,audio?,checked
+0x22e838,136,SpeechEvt_Post1002013,audio?,checked
+0x22e8c0,56,SpeechEvt_Post100201a,audio?,checked
+0x22e8f8,136,SpeechEvt_Post100201c,audio?,checked
+0x22e980,56,SpeechEvt_Post100201e,audio?,checked
+0x22e9b8,116,SpeechEvt_Post100201f,audio?,checked
+0x22ea30,116,SpeechEvt_Post1002020,audio?,checked
+0x22eaa8,56,SpeechEvt_Post100202a,audio?,checked
+0x22eae0,76,SpeechEvt_Post100202b,audio?,checked
+0x22eb30,56,SpeechEvt_Post100202c,audio?,checked
+0x22eb68,76,SpeechEvt_Post100202d,audio?,checked
+0x22ebb8,76,SpeechEvt_Post100202e,audio?,checked
+0x22ec08,56,SpeechEvt_Post100202f,audio?,checked
+0x22ec40,76,SpeechEvt_Post1002030,audio?,checked
+0x22ec90,76,SpeechEvt_Post1002031,audio?,checked
+0x22ece0,76,SpeechEvt_Post1002033,audio?,checked
+0x22ed30,96,SpeechEvt_Post1002034,boarder?,checked
+0x22ed90,56,SpeechEvt_Post1002035,other,checked
+0x22edc8,56,SpeechEvt_Post1002036,audio?,checked
+0x22ee00,56,SpeechEvt_Post1002037,audio?,checked
+0x22ee38,76,SpeechEvt_Post1002046,audio?,checked
+0x22ee88,76,SpeechEvt_Post1002047,audio?,checked
+0x22eed8,76,SpeechEvt_Post1002048,audio?,checked
+0x22ef28,116,SpeechEvt_Post1002049,audio?,checked
+0x22efa0,116,SpeechEvt_Post100204a,audio?,checked
+0x22f018,76,SpeechEvt_Post100204b,audio?,checked
+0x22f068,56,SpeechEvt_Post100204c,audio?,checked
+0x22f0a0,56,SpeechEvt_Post100204d,audio?,checked
+0x22f0d8,76,SpeechEvt_Post100204e,audio?,checked
+0x22f128,56,SpeechEvt_Post100204f,audio?,checked
+0x22f160,76,SpeechEvt_Post1002050,audio?,checked
+0x22f1b0,76,SpeechEvt_Post1002051,audio?,checked
+0x22f200,56,SpeechEvt_Post1002052,audio?,checked
+0x22f238,56,SpeechEvt_Post1002053,audio?,checked
+0x22f270,76,SpeechEvt_Post1002054,audio?,checked
+0x22f2c0,56,SpeechEvt_Post1002055,audio?,checked
+0x22f2f8,56,SpeechEvt_Post1002056,audio?,checked
+0x22f330,96,SpeechEvt_Post300600f,audio?,checked
+0x22f390,96,SpeechEvt_Post3006019,audio?,checked
+0x22f3f0,96,SpeechEvt_Post300601a,audio?,checked
+0x22f450,96,SpeechEvt_Post300601b,audio?,checked
+0x22f4b0,96,SpeechEvt_Post300601c,audio?,checked
+0x22f510,96,SpeechEvt_Post3006020,audio?,checked
+0x22f570,96,SpeechEvt_Post3006021,audio?,checked
+0x22f5d0,76,SpeechEvt_Post3006022,audio?,checked
+0x22f620,96,SpeechEvt_Post3006023,world?,checked
+0x22f680,96,SpeechEvt_Post3006024,world?,checked
+0x22f6e0,76,SpeechEvt_Post3006025,audio?,checked
+0x22f730,76,SpeechEvt_Post3006026,audio?,checked
+0x22f780,76,SpeechEvt_Post3006027,audio?,checked
+0x22f7d0,76,SpeechEvt_Post3006028,audio?,checked
+0x22f820,76,SpeechEvt_Post300602b,audio?,checked
+0x22f870,96,SpeechEvt_Post3006030,other,checked
+0x22f8d0,96,SpeechEvt_Post3006031,other,checked
+0x22f930,96,SpeechEvt_Post3006032,other,checked
+0x22f990,76,SpeechEvt_Post3006033,other,checked
+0x22f9e0,76,SpeechEvt_Post3006034,other,checked
+0x22fa30,96,SpeechEvt_Post3006036,world?,checked
+0x22fa90,76,SpeechEvt_Post3006038,other,checked
+0x22fae0,84,FUN_0022fae0,,checked
+0x22fb38,88,FUN_0022fb38,,checked
+0x22fb90,88,FUN_0022fb90,,checked
+0x22fbe8,100,FUN_0022fbe8,,checked
+0x22fc50,84,FUN_0022fc50,,checked
+0x22fca8,88,FUN_0022fca8,,checked
+0x22fd00,72,SpeechEvt_Post500a000,audio?,checked
+0x22fd48,96,SpeechEvt_Post4008000,other,checked
+0x22fda8,92,SpeechEvt_Post4008002,race?,checked
+0x22fe08,92,SpeechEvt_Post4008003,race?,checked
+0x22fe68,92,SpeechEvt_Post4008004,race?,checked
+0x22fec8,92,SpeechEvt_Post4008005,race?,checked
+0x22ff28,136,SpeechEvt_Post4008006,race?,checked
+0x22ffb0,156,SpeechEvt_Post4008007,audio?,checked
+0x230050,116,SpeechEvt_Post4008008,audio?,checked
+0x2300c8,156,SpeechEvt_Post4008009,audio?,checked
+0x230168,96,SpeechEvt_Post400800a,race?,checked
+0x2301c8,116,SpeechEvt_Post400800b,race?,checked
+0x230240,136,SpeechEvt_Post400800c,race?,checked
+0x2302c8,96,SpeechEvt_Post400800d,race?,checked
+0x230328,96,SpeechEvt_Post400800e,other,checked
+0x230388,116,SpeechEvt_Post400800f,game?,checked
+0x230400,96,SpeechEvt_Post4008010,audio?,checked
+0x230460,76,SpeechEvt_Post4008011,other,checked
+0x2304b0,76,SpeechEvt_Post4008012,other,checked
+0x230500,176,SpeechEvt_Post4008013,race?,checked
+0x2305b0,96,SpeechEvt_Post4008014,race?,checked
+0x230610,76,SpeechEvt_Post4008015,race?,checked
+0x230660,92,SpeechEvt_Post4008016,race?,checked
+0x2306c0,96,SpeechEvt_Post4008017,race?,checked
 0x2307f0,140,Speech_CourseMask,race?,not started
 0x230880,140,Speech_CharMaskOf,race?,not started
 0x230910,132,Speech_CurrentCourseMask,race?,not started
@@ -4117,41 +4117,41 @@ address,size,name,system,status
 0x232498,3232,Speech_AnnounceTrick,audio?,not started
 0x233138,232,Speech_PickRaceGoLine,audio?,not started
 0x233220,444,Speech_OnScoreMessage,audio?,not started
-0x2333e0,100,Speech_OnTrickLanded,audio?,not started
-0x233448,100,Speech_OnAirTime,audio?,ported
+0x2333e0,100,Speech_OnTrickLanded,audio?,checked
+0x233448,100,Speech_OnAirTime,audio?,checked
 0x2334b0,520,Speech_OnRaceGo,audio?,not started
-0x2336b8,132,Speech_OnGrudge,audio?,ported
-0x233740,136,FUN_00233740,audio?,not started
-0x2337c8,144,Speech_OnTricky,audio?,not started
-0x233858,244,Speech_OnRiderHit,audio?,ported
-0x233950,200,Speech_OnAirEnter,audio?,not started
-0x233a18,148,Speech_OnRiderReset,audio?,not started
+0x2336b8,132,Speech_OnGrudge,audio?,checked
+0x233740,136,FUN_00233740,audio?,checked
+0x2337c8,144,Speech_OnTricky,audio?,checked
+0x233858,244,Speech_OnRiderHit,audio?,checked
+0x233950,200,Speech_OnAirEnter,audio?,checked
+0x233a18,148,Speech_OnRiderReset,audio?,checked
 0x233ab0,56,FUN_00233ab0,audio?,not started
-0x233b70,48,Speech_WipeoutChance,audio?,not started
+0x233b70,48,Speech_WipeoutChance,audio?,checked
 0x233ba0,276,FUN_00233ba0,audio?,not started
-0x233cb8,128,Speech_OnRiderCollision,audio?,not started
-0x233d38,216,Speech_OnWipeout,audio?,not started
-0x233e10,104,FUN_00233e10,audio?,not started
-0x233e78,104,Speech_OnBoost,audio?,not started
-0x233ee0,272,Speech_OnCheckpoint,boarder?,not started
-0x233ff0,100,Speech_OnTenSecondsLeft,audio?,not started
-0x234058,92,FUN_00234058,audio?,not started
+0x233cb8,128,Speech_OnRiderCollision,audio?,checked
+0x233d38,216,Speech_OnWipeout,audio?,checked
+0x233e10,104,FUN_00233e10,audio?,checked
+0x233e78,104,Speech_OnBoost,audio?,checked
+0x233ee0,272,Speech_OnCheckpoint,boarder?,checked
+0x233ff0,100,Speech_OnTenSecondsLeft,audio?,checked
+0x234058,92,FUN_00234058,audio?,checked
 0x2340b8,592,Speech_OnScriptCue47,audio?,ported
 0x234308,588,Speech_OnScriptCue48,audio?,ported
-0x234558,180,FUN_00234558,audio?,not started
-0x234610,132,FUN_00234610,audio?,not started
-0x234698,148,Speech_CharacterBit,audio?,not started
-0x234730,148,Speech_RiderMask,audio?,not started
+0x234558,180,FUN_00234558,audio?,checked
+0x234610,132,FUN_00234610,audio?,checked
+0x234698,148,Speech_CharacterBit,audio?,checked
+0x234730,148,Speech_RiderMask,audio?,checked
 0x2347c8,1004,Speech_OnPlacingChange,audio?,not started
-0x234bb8,128,Speech_InterruptIfPlaying,audio?,not started
-0x234c38,200,Speech_IsRivalOrGrudge,race?,not started
-0x234d00,612,Speech_RiderHitLine,world?,ported
-0x234f68,296,Speech_OnAITaunt,audio?,not started
-0x235090,220,Speech_OnCrashNearby,world?,not started
-0x235170,296,Speech_OnAirNearby,audio?,not started
-0x235298,252,Speech_Celebrate,audio?,not started
-0x235398,204,Speech_OnStumble,audio?,not started
-0x235468,192,Speech_Disappointed,audio?,not started
+0x234bb8,128,Speech_InterruptIfPlaying,audio?,ported
+0x234c38,200,Speech_IsRivalOrGrudge,race?,checked
+0x234d00,612,Speech_RiderHitLine,world?,checked
+0x234f68,296,Speech_OnAITaunt,audio?,checked
+0x235090,220,Speech_OnCrashNearby,world?,checked
+0x235170,296,Speech_OnAirNearby,audio?,checked
+0x235298,252,Speech_Celebrate,audio?,checked
+0x235398,204,Speech_OnStumble,audio?,checked
+0x235468,192,Speech_Disappointed,audio?,checked
 0x235530,152,Speech_QueueBigScore,audio?,not started
 0x2355c8,216,Speech_InitCharScriptSamples,audio?,not started
 0x2356a0,76,Speech_FreeCharScriptSamples,audio?,not started
@@ -4161,7 +4161,7 @@ address,size,name,system,status
 0x235780,1008,Sfx_PlayClipSound,audio,not started
 0x235b70,56,SpeechSys_StopCharScript,frontend?,not started
 0x235ba8,432,Speech_OnBigScore,audio?,not started
-0x235d58,112,Speech_RollChance,audio?,ported
+0x235d58,112,Speech_RollChance,audio?,checked
 0x235e70,88,FUN_00235e70,render?,not started
 0x235fc8,52,CollBody_Construct,wipeout,not started
 0x236000,80,CollBody_ConstructCopy,wipeout,not started
@@ -6003,7 +6003,7 @@ address,size,name,system,status
 0x2bb810,196,FUN_002bb810,lib-snd?,not started
 0x2bb8d8,376,SpeechLib_AllocVoice,lib-snd?,not started
 0x2bba50,44,FUN_002bba50,lib-snd?,not started
-0x2bba80,632,SpeechLib_PostEvent,lib-snd?,not started
+0x2bba80,632,SpeechLib_PostEvent,lib-snd?,ported
 0x2bbcf8,108,SpeechLib_PostEventArgs,lib-snd?,not started
 0x2bbd68,12,FUN_002bbd68,lib-snd?,not started
 0x2bbd78,88,FUN_002bbd78,lib-snd?,not started

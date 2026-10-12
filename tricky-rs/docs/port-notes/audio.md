@@ -88,6 +88,31 @@ Part of the port notes (index: [README.md](README.md)); units and wording as des
   24 turn on and stops on their turning off. **Inferred:** whatever reads +0x7420/+0x7428 later starts the sound and
   keeps its handle at +0x7424 (the reader is not found yet; the bits' meaning neither).
 
+## The announcer's and riders' speech triggers (board row G10c1; checked: `tests/speech.rs`)
+
+`tricky_game::speech`. A trigger posts a speech event: `SpeechEvt_Post<id>` (0x22e4e0..0x2306c0, 92 of them) zero a
+0x50-byte record, put the id in word 0 and their arguments in order after it (through pointers or not, the record
+is the same; the 0x8000..0x8005 posts too) and hand it to `SpeechLib_PostEvent` 0x2bba80. Slot 0 is the announcer,
+slot 1 the riders' own voices: those post a 0x3006xxx event with the speaker's character bit (`Speech_CharacterBit`:
+by voice 0..11 a bit of 0xfff, 0 past them) and call `SpeechSys_Trigger` at the rider's position with its voice
+(13 the crash voice, 12 the announcer's).
+
+- `Speech_RollChance` 0x235d58(kind): one `Rand_Fx`, its low ten bits below the table 0x3a3528 (24 kinds × 10
+  levels, 0..1024) at the speech level (+0x383c truncated, held under +0x6e68).
+- The announcer's guards, in the game's order (it matters for the draws): a player's rider (+0x418 < 0), then
+  either roll → not the tutorial (mode word 0x32de8c ≠ 6) → no replay (boost 10 / 9, trick landed 4, air time 0x17,
+  ten seconds left 0xc, 0xd, rider collision 7 then the listener) or no replay → not the tutorial → roll (grudge 0x11
+  with the other a local player, 0x12 / tricky 0x13 the listener, tricky under six, rider hit 0x14, air enter 0x15 at
+  1341.12 cm/s, wipe-out 8 / 0x10). Checkpoints count per race index (+0x6e6c) for local players before the roll.
+- The riders' voices: a crash nearby interrupts the rider's voice and the announcer's, then (if slot 1 can play and
+  a listener is near) 0x3006023 / 0x3006024 by a `Rand_Fx` bit; two riders hitting each other pick a speaker (a draw
+  when both are near), the mask from `Speech_IsRivalOrGrudge` (relation 2, or 0..1 with a rival target or an attitude
+  above 60) and which hit; taunts need both near the same listener; air nearby needs three seconds of air.
+- Checked in the runner: each post four times with random arguments; 60,000 random calls over 27 handlers and
+  helpers with the speech library, replay, listener, near test, relations and `Rand_Fx` scripted the same: every call
+  and draw in order and the checkpoint counts compared. Still to port: `Speech_AnnounceTrick`, `Speech_OnPlacingChange`,
+  the race-go / race-end / next-race / score / cue / lesson / cam-script lines.
+
 ## Front-end sounds (`cFE3DSound` → `Audio_PlayFE*`, F1c)
 
 Proven (live Ghidra):
