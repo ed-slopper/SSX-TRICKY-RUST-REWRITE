@@ -121,6 +121,12 @@ string (the action level clears all seven), so the strings left from an earlier 
 Practice Enter writes 0 to byte +0x5a70 of the game's player object (not modelled), and `Replay_Clear` runs only
 when the game object has a replay (+0x40).
 
+The race side (row C11b4, `lesson::RaceLesson`, `race_lesson_modes_match_the_original`): modes 6 to 10 of `cAI`
+(`Race_CreateHandlers` 0x1125c8 makes the handler for a mode; `vf9` 0x1125a0 notes the mode the handlers last ran for
+and the handler before it; `vf1` 0x1126f0 runs `Exit`, `Enter`, `Update`). One quirk: LoadLesson's Update goes to mode 7
+with `Race_CreateHandlers` itself, not `vf9`, so nothing is noted and the next tick enters PreLesson with no `Exit`
+before it; RestartLesson's Update goes to 9 through `vf9`. 120,000 steps of random mode requests matched.
+
 ## Not read yet
 
 - `Lesson_ResetScene` 0x14d7d0's callees, the contents of `data/tutorial/<rider>.big` (C11c2), the overlays and the load

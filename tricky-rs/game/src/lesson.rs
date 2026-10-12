@@ -15,7 +15,8 @@
 //! race state 7 ([`Lesson::on_load_done`]). `Env::set_mode(3)` is race state 3 (Countdown: the race clock counts up
 //! 2.0 a tick to 0, then race state 4, the ride), `set_mode(8)` is RestartLesson (its Enter puts the lesson in
 //! Intro, its Update moves the race to 9, SelectLesson, which does nothing). Race states 7 and 9 do nothing, the
-//! lesson manager is in charge; `cEndLessonHandler` (10) only counts the clock up 1/60 a tick. (C11b2.)
+//! lesson manager is in charge; `cEndLessonHandler` (10) only counts the clock up 1/60 a tick. (C11b2.) The race side
+//! is [`RaceLesson`] (C11b4), checked in `tests/lesson.rs` as well.
 
 /// Button masks of the newly pressed buttons (`Lesson_HandleMenuInput` 0x14d6e0 and the Wait handler).
 pub mod btn {
@@ -130,6 +131,117 @@ pub trait Env {
     fn trick_text_nonempty(&self) -> bool;
     /// The game object's "done" flag (`gApp+0x730 → +0x54`), set by the Exit handler.
     fn set_done(&mut self);
+    /// One step of the lesson course's load (`FUN_00112920` 0x112920: the texture files bound as they arrive, the
+    /// speech system ready): true when everything is loaded.
+    fn load_step(&mut self) -> bool;
+    /// `cEndLessonHandler::Enter` 0x14ed40: the pad device's key (+0x2c) cleared.
+    fn clear_pad_key(&mut self);
+}
+
+/// The race object's side of the tutorial (`cAI` 0x364738, `Race_CreateHandlers` 0x1125c8): its mode (+0x1c) picks the
+/// handler (+0x64); lesson modes are 6 LoadLesson, 7 PreLesson, 8 RestartLesson, 9 SelectLesson, 10 EndLesson (1..5
+/// and 11 are the races' and not here). `cAI::vf1` 0x1126f0 runs the handler's `Exit` and the new one's `Enter` when
+/// the mode changed, then `Update`, every tick; `cAI::vf9` 0x1125a0 is [`RaceLesson::set_mode`].
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct RaceLesson {
+    /// +0x1c
+    pub mode: u32,
+    /// +0x20: the mode the handlers last ran for
+    pub ran: u32,
+    /// +0x64: the handler (by its mode number; 0 none)
+    pub handler: u32,
+    /// +0x60: the one before, until its `Exit` has run
+    pub prev_handler: u32,
+    /// +0x18
+    pub ticks: u32,
+    /// +0x14: the race clock (the end handler counts it up)
+    pub clock: f32,
+    /// +0x4f8: the course is loading
+    pub loading: bool,
+}
+
+/// `cEndLessonHandler::Update` 0x14ed68: 1/60 as the game's float.
+pub const END_CLOCK_STEP: f32 = 0.016666668;
+
+impl RaceLesson {
+    /// `cAI::vf9` 0x1125a0: a new mode is taken at the next tick.
+    pub fn set_mode(&mut self, m: u32) {
+        if m != self.mode {
+            self.ran = self.mode;
+            self.prev_handler = self.handler;
+            self.create_handlers(m);
+        }
+    }
+
+    /// `Race_CreateHandlers` 0x1125c8: modes 1..=11 have a handler, any other clears the mode and the handler.
+    fn create_handlers(&mut self, m: u32) {
+        if (1..=11).contains(&m) {
+            self.handler = m;
+            self.mode = m;
+        } else {
+            self.mode = 0;
+            self.handler = 0;
+        }
+    }
+
+    /// `cAI::vf1` 0x1126f0. Only the lesson modes (6..10) do anything here; a race mode's handler is not ported.
+    pub fn tick(&mut self, lesson: &mut Lesson, env: &mut dyn Env) {
+        if self.ran != self.mode {
+            if self.prev_handler != 0 {
+                self.exit(self.prev_handler);
+            }
+            self.enter(lesson, env, self.handler);
+            self.prev_handler = 0;
+            self.ran = self.mode;
+        }
+        self.update(lesson, env, self.handler);
+        self.ticks += 1;
+    }
+
+    fn exit(&mut self, _h: u32) {
+        // every lesson handler's Exit does nothing
+    }
+
+    fn enter(&mut self, lesson: &mut Lesson, env: &mut dyn Env, h: u32) {
+        match h {
+            // cLoadLessonHandler::Enter 0x14eca0
+            6 => self.loading = true,
+            // cRestartLessonHandler::Enter 0x14ec48
+            8 => lesson.set_state(env, State::Intro),
+            // cEndLessonHandler::Enter 0x14ed40
+            10 => env.clear_pad_key(),
+            _ => {}
+        }
+    }
+
+    fn update(&mut self, lesson: &mut Lesson, env: &mut dyn Env, h: u32) {
+        match h {
+            // cLoadLessonHandler::Update 0x14ecb0: the load step (HUD item 8 shows until it is done), then
+            // the rider to the start, the lesson to Intro, the race to PreLesson
+            6 => {
+                if self.loading {
+                    if env.load_step() {
+                        env.hud_hide(8);
+                        self.loading = false;
+                    } else {
+                        env.hud_show(8);
+                    }
+                }
+                if !self.loading {
+                    env.restart_rider();
+                    lesson.set_state(env, State::Intro);
+                    // (`Race_CreateHandlers(race, 7)` itself, not `vf9`: the handlers last run for are not noted)
+                    self.create_handlers(7);
+                }
+            }
+            // cRestartLessonHandler::Update 0x14ec60: on to SelectLesson
+            8 => self.set_mode(9),
+            // cEndLessonHandler::Update 0x14ed68
+            10 => self.clock += END_CLOCK_STEP,
+            // PreLesson (7) and SelectLesson (9) do nothing: the lesson manager is in charge
+            _ => {}
+        }
+    }
 }
 
 /// `cLessonMan`'s state (offsets in the comments).
@@ -682,6 +794,8 @@ mod tests {
         fn rand_fx(&mut self) -> u32 { self.rand }
         fn trick_text_nonempty(&self) -> bool { self.text }
         fn set_done(&mut self) { self.log.push("done".into()) }
+        fn load_step(&mut self) -> bool { true }
+        fn clear_pad_key(&mut self) { self.log.push("clearkey".into()) }
     }
 
     fn run_to_wait(l: &mut Lesson, e: &mut E) {

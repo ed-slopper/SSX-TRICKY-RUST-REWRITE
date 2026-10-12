@@ -55,6 +55,7 @@ struct Script {
     rand: u32,
     text: bool,
     replay: bool,
+    loaded: bool,
     rec_len: u32,
     riders: [u32; 16],
 }
@@ -108,6 +109,8 @@ impl Env for Mock {
     fn rand_fx(&mut self) -> u32 { self.log.push("rand".into()); self.s.rand }
     fn trick_text_nonempty(&self) -> bool { self.s.text }
     fn set_done(&mut self) { self.done = true }
+    fn load_step(&mut self) -> bool { self.s.loaded }
+    fn clear_pad_key(&mut self) { self.log.push("clearkey".into()) }
 }
 
 #[test]
@@ -296,6 +299,7 @@ fn lesson_manager_matches_the_original() {
             rand: g.next(),
             text: pick(&mut g, 4) == 0,
             replay: pick(&mut g, 2) == 0,
+            loaded: pick(&mut g, 3) == 0,
             rec_len: 1 + pick(&mut g, 6),
             riders: env.s.riders,
         };
@@ -378,5 +382,108 @@ fn lesson_manager_matches_the_original() {
     }
     for st in 1..=11 {
         assert!(seen[st] > 100, "state {st} seen {} times", seen[st]);
+    }
+}
+
+// ---- the race object's lesson modes 6..10 (cAI::vf1 0x1126f0, vf9 0x1125a0, Race_CreateHandlers 0x1125c8) ----
+
+use tricky_game::lesson::RaceLesson;
+
+#[test]
+fn race_lesson_modes_match_the_original() {
+    let Some(mut r) = Runner::from_env() else { return };
+    r.float_rules = Rules::parse("add=n,mul=n,div=n,cvt=n").unwrap();
+    for f in [0x1126f0u32, 0x1125a0, 0x1125c8, 0x14baa8, 0x14eca0, 0x14f4b0, 0x14ecb0, 0x14ec48, 0x14f400, 0x14ec60, 0x14ed30, 0x14f458, 0x14ed38, 0x1150a8, 0x1150a0, 0x115098, 0x14ed40, 0x114f28, 0x14ed68] {
+        r.allow(f);
+    }
+    let log: Rc<RefCell<Vec<String>>> = Rc::default();
+    let ready: Rc<RefCell<bool>> = Rc::default();
+    let app = r.mem.alloc(0x800);
+    let game = r.mem.alloc(0x200);
+    let race = r.mem.alloc(0x600);
+    let players = r.mem.alloc(0x2000);
+    let mapper = r.mem.alloc(0x10);
+    let dev = r.mem.alloc(0x100);
+    let l = r.mem.alloc(0x700);
+    r.mem.write_u32(GAPP, app);
+    r.mem.write_u32(app + 0x730, game);
+    r.mem.write_u32(game + 0x1c, race);
+    r.mem.write_u32(game + 0x34, l);
+    r.mem.write_u32(game + 0x38, 0x2222);
+    r.mem.write_u32(race + 0x8c, players);
+    r.mem.write_u32(race + 8, 0x364738); // cAI's vtable: vf9 is `set_mode`
+    r.mem.write_u32(players + 0x870, mapper);
+    r.mem.write_u32(mapper, dev);
+    let slots = [(6u32, 0x48u32, 0x36e780u32), (7, 0x4c, 0x36e760), (8, 0x50, 0x36e740), (9, 0x54, 0x364e48), (10, 0x58, 0x36e720)];
+    for (_, off, vtab) in slots {
+        r.mem.write_u32(race + off, vtab);
+    }
+    {
+        let lg = log.clone();
+        r.stub(0x14d898, move |_, _| lg.borrow_mut().push("restart".into()));
+        let (lg, rd) = (log.clone(), ready.clone());
+        r.stub(0x112920, move |c, m| {
+            let rc = c.gpr(4) as u32;
+            if m.read_u32(rc + 0x4f8) != 0 {
+                if *rd.borrow() {
+                    lg.borrow_mut().push("hide 8".into());
+                    m.write_u32(rc + 0x4f8, 0);
+                } else {
+                    lg.borrow_mut().push("show 8".into());
+                }
+            }
+        });
+    }
+    let mut g = Rng(0x5a17_c3e9_0b44_d2f1);
+    let mut mine = RaceLesson::default();
+    let mut lesson = Lesson::new(0);
+    let mut env = Mock::default();
+    r.mem.write_u32(l + 0x10, 1);
+    // the race starts in a mode (a null handler would be a crash in the original)
+    r.cpu.set_gpr(4, race as u64);
+    r.cpu.set_gpr(5, 6);
+    r.call(0x1125a0).unwrap();
+    mine.set_mode(6);
+    let mut seen = [0u32; 11]; // modes asked for (8 is left again within its first tick)
+    let handler_mode = |ptr: u32| slots.iter().find(|s| race + s.1 == ptr).map_or(0, |s| s.0);
+    for step in 0..120_000u32 {
+        let rdy = g.next() % 3 == 0;
+        *ready.borrow_mut() = rdy;
+        env.s.loaded = rdy;
+        log.borrow_mut().clear();
+        env.log.clear();
+        r.mem.write_u32(dev + 0x2c, 7);
+        if g.next() % 4 == 0 {
+            let m = [6u32, 7, 8, 9, 10][g.next() as usize % 5];
+            r.cpu.set_gpr(4, race as u64);
+            r.cpu.set_gpr(5, m as u64);
+            r.call(0x1125a0).unwrap_or_else(|e| panic!("step {step}: {e}"));
+            mine.set_mode(m);
+            seen[m as usize] += 1;
+        }
+        // the lesson manager's request is read and cleared by its own tick: do that here, as the manager would
+        if g.next() % 2 == 0 {
+            r.mem.write_u32(l + 0x10, 0);
+            lesson.requested = State::None;
+        }
+        r.cpu.set_gpr(4, race as u64);
+        r.call(0x1126f0).unwrap_or_else(|e| panic!("step {step}: {e}"));
+        mine.tick(&mut lesson, &mut env);
+        assert_eq!(*log.borrow(), env.log.iter().filter(|x| *x != "clearkey").cloned().collect::<Vec<_>>(), "step {step}: calls");
+        let cleared = r.mem.read_u32(dev + 0x2c) == 0;
+        assert_eq!(cleared, env.log.iter().any(|x| x == "clearkey"), "step {step}: pad key cleared");
+        assert_eq!(r.mem.read_u32(race + 0x1c), mine.mode, "step {step}: mode");
+        assert_eq!(r.mem.read_u32(race + 0x20), mine.ran, "step {step}: ran");
+        assert_eq!(r.mem.read_u32(race + 0x18), mine.ticks, "step {step}: ticks");
+        assert_eq!(r.mem.read_u32(race + 0x4f8) != 0, mine.loading, "step {step}: loading");
+        assert_eq!(f32::from_bits(r.mem.read_u32(race + 0x14)), mine.clock, "step {step}: clock");
+        let hp = r.mem.read_u32(race + 0x64);
+        assert_eq!(handler_mode(hp), mine.handler, "step {step}: handler");
+        let pp = r.mem.read_u32(race + 0x60);
+        assert_eq!(handler_mode(pp), mine.prev_handler, "step {step}: previous handler");
+        assert_eq!(r.mem.read_u32(l + 0x10), lesson.requested as u32, "step {step}: lesson request");
+    }
+    for m in 6..=10 {
+        assert!(seen[m] > 1000, "mode {m} seen {} times", seen[m]);
     }
 }
