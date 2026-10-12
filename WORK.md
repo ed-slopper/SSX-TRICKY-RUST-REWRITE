@@ -102,6 +102,7 @@ state machine and the renderer are ours. Nothing has been checked against the or
 | G10a | Rider and world sounds checked: `BoardIn_*`, `Voice_Update3D`, `Audio_SurfaceGroup`, `WorldEmitter_Update` 0x22bf60 | any | G10 | | [repo] `boardsound.rs`, `worldsound.rs` |
 | G10b | Music: Pathfinder (`PF_*` 0x2bec00–0x2c2040) decoded at run time, song names from `music.inf` / `musicmap.inf` | unowned | G10 | | [repo] "Unresolved: song names"; `pathmusic.rs` |
 | G10c | Announcer (DJ Atomika) and rider voices: when each line is picked and played | unowned | G10 | | [est] |
+| G10c1 | The announcer's triggers (`tricky_game::speech`): the 0x50-byte speech events (`SpeechEvt_Post*` 0x22e4e0..0x2306c0) and the race handlers that post them (`Speech_On*`, `Speech_RollChance` with the chance table 0x3a3528, `Speech_AnnounceTrick`, `Speech_OnPlacingChange`, the race-end and next-race lines) checked in the runner; the line pick inside the speech library (`SpeechLib_*`) and the banks/streams stay G10c | unowned | G10c | ed-slopper/puffin (2026-10-11) | Split of G10c |
 | G11 | Pre- and post-race scenes: `cPreRaceHandler`, `cEndRaceHandler_Update` 0x1141e0, scripts table 0x32f380, row filters | unowned | E11, G5 | | [repo] `intro.rs`; "Unresolved: post-race scene row filters" |
 | G11a | Movies: the disc's video files (EA logo, intro, unlock videos) | unowned | E2 | | [est] Find the format first |
 | G12 | Instant replay | unowned | E1, E11 | | [repo] in the debug menu (findings.md) |
@@ -675,3 +676,4 @@ matches the original.
 - 2026-10-11 ed-slopper/puffin: C12 done; added C12a (the app on it).
 - 2026-10-11 ed-slopper/puffin: add and claim E12e.
 - 2026-10-11 ed-slopper/puffin: E12e done.
+- 2026-10-11 ed-slopper/puffin: add and claim G10c1 (split of G10c).
