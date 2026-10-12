@@ -20,7 +20,18 @@ Part of the port notes (index: [README.md](README.md)); units and wording as des
   opens the next; a race medal on Alaska opens Untracked, a show-off medal there Pipedream.
 - Outfits: 7 per rider; 1–5 from trick book chapters 1–5, 6 at Master. The trick book (6 × 5 tricks) is in
   data/tutorial/trickdef.dat (28-byte records); finishing it gives the UBERBOARD (999).
-- Cheat (hold the two shoulder buttons in mask 0x600, then 12 presses): X ▲ → ● ■ ↓ ▲ ■ ← ● X ↑ unlocks everything.
+- Cheats (row E10a; `tricky_game::cheats`, checked: `tests/cheats.rs`): `cCheatCodes::Update` 0x26cf60 runs on each
+  front-end player every frame (`cFE3D` vf5 0x265398). With the pad connected (device +4) the player's +0 takes the
+  device's input word (+0x2c; a rumble when set: `FE_RumblePad`, the device's virtuals +0x34(1), +0x24(1, +0x4c)).
+  While the player takes codes (+0x38): holding L1 + R1 (0x600), each new press (this frame's buttons & ~last
+  frame's & ~0x600) goes into the twelve words at +4 (the count byte +0x34; a thirteenth press starts again at the
+  first) and +0 is cleared. On letting go after exactly twelve, `CheatCode_Matches` (memcmp of 0x30 bytes) against
+  0x347e60 unlock everything X ▲ → ● ■ ↓ ▲ ■ ← ● X ↑ (`gCheat_UnlockEverything` 0x3352a0), 0x347e90 max attributes
+  ▲ ▲ → ▲ ▲ ↓ X X ← X X ↑ (`gCheat_MaxAttrib` 0x3352ac), 0x347ec0 Mallora X X → ● ● ↓ ▲ ▲ ← ■ ■ ↑ (`gCheat_Mallora`
+  0x3352b0), then the one character code at 0x347ef0 X X → X X ↓ X X ← X X ↑ (`Career_ToggleCharacterCheat`: the
+  word at 0x3352b8 toggled, any others cleared); the first match toggles its switch and plays the front end's
+  sound (gApp+0x734 → +0xa4, virtual +0x54(3)). The count starts again whatever was entered. Checked in the
+  runner on 200,000 frames (2,786 codes taken).
 
 ## Frontend state slots (`cFE3DState` and every `cFE3DState*` screen)
 
