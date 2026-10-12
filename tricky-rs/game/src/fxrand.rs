@@ -70,6 +70,12 @@ pub fn segment_pick(r: u32, n: u32) -> u32 {
     (r & 0x7fff) * n / 0x7fff
 }
 
+/// `Audio_OnRaceGo` 0x215288 in game mode 6 (the lesson), in place of starting the race music: one `Rand_Fx` draw, an
+/// unsigned remainder by 100 (`divu`), is the Pathfinder variable (`Music_SetPathVar`). Read at 0x2152dc.
+pub fn lesson_path_var(rand_fx: u32) -> u32 {
+    rand_fx % 100
+}
+
 /// What `cGame::Init` 0x17e148 draws for the snow after `ParticleMan_Init`, in this order.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct GameSnow {
@@ -314,6 +320,12 @@ mod tests {
         assert_eq!(speech_roll(0x400 + 5, 7.0, 3, 1, &table), Some(true)); // held at the cap: 3
         assert_eq!(speech_roll(0, 0.0, 0, 5, &table), None);
         assert_eq!(speech_roll(0, -1.0, 9, 0, &table), None);
+    }
+
+    #[test]
+    fn lesson_path_var_is_an_unsigned_remainder() {
+        assert_eq!(lesson_path_var(0xffff_ffff), 95);
+        assert_eq!(lesson_path_var(250), 50);
     }
 
     #[test]
