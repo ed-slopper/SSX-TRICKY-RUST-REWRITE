@@ -161,3 +161,26 @@ the same unchecked way, and port that 1:1 (the bug included), noting it here.
   (0x335658 + rider·16); the player goes in slot 1 + rand&3 (Alaska: slot 1 when that is 1 or 2), the two picked
   rivals either side, the other picks into empty slots, then the rest by a random draw among riders still out
   (rand % 10000, highest first); then `Circuit_SetupRider` ×6, `Rivals_InitPairsCircuit`, `Career_FinalizeRoster`.
+
+## The career block and a new game (board row E12a; `tricky_game::career`, checked: `tests/career.rs`)
+
+- The career (0x32b390, what the memory card saves) is kept as its bytes (0x3900): our save file is the block.
+  Known so far: +4, +8 the course bits (0x407 at the start: Garibaldi, Snowdream, Elysium... as `courses.rs`),
+  +0xc the characters unlocked (bits of the starters at 0x3352c0..0x3352cc: Eddie, Mac, Moby, Elise), +0x10 a short
+  record per character (0x14: the rider, its entry's words +0x28 and +0x30), +0x100 a record per character (0x1c4:
+  per course bytes at +0x24, the boards unlocked +0x58, the group averages +0xc and levels +0x10, each other
+  rider's attitude to it at +0x164 + 8j), +0x1630 four player names (10 bytes), +0x1658..+0x1674 the sound
+  options, +0x1670..+0x16c0 the other options, +0x16c4 the high scores (13 courses × 0x150: three tables of five
+  0x14-byte entries: name, character, score), +0x30fc four player slots (0x44; +0 the slot's character, −1 none),
+  +0x3258 changed, +0x325c, +0x3260, +0x36fc a buffer (`Career_AllocSave`), +0x3820.. the slots' attributes.
+- `Career_InitNewGame` 0x1617a0: the relations table made once (`RelTable_Init` on 0x900 bytes at 0x3352b4),
+  `Profile_ResetNewGame`, `Career_UpdateAttributes` (nothing with no slots), +0x325c 0, +0x3260 1.
+  `Profile_ResetNewGame` 0x161b40: +8..+0x27dc cleared; the options (2, 1, 1, 1, 1, 1, 1, 1, 0.5, 6, 5); the player
+  names (`Career_DefaultPlayerName`: PLAYER%d in languages 0, 1, 4, SPIELER%d in 2, JOUEUR%d in 3); no slots;
+  each character's records (`Career_InitCharacterRecord`: boards needing 0 points open, levels avg × 0.4 + 0.5);
+  the high scores emptied (`HighScore_Reset`: each entry's character `Rand_Fx` % 12, unsigned: 195 draws of the
+  effects stream) then the 165 default entries (SOZ 22500, PONCH 24000 ...); the unlocks; per character 13
+  course words; the sound options synced from and back to the sound manager; +0x2b14, +0x3714, +4 cleared;
+  `FUN_00166c70` numbers the 13 character records.
+- Checked in the runner on 24 blocks of random bytes (each language, with and without a sound manager, the
+  relations table made or not): every byte of the block, the effects stream and the sound calls.

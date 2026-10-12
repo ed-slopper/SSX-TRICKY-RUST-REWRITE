@@ -1246,17 +1246,17 @@ address,size,name,system,status
 0x1616a0,124,StaticInit_AnimCtl,other,not started
 0x161730,48,Career_Construct,race?,not started
 0x161760,64,Career_Destruct,race?,not started
-0x1617a0,148,Career_InitNewGame,race?,not started
+0x1617a0,148,Career_InitNewGame,race?,ported
 0x161838,16,FUN_00161838,race?,not started
 0x161840,96,Career_ClearAllPlayerFlags,race?,not started
 0x1618a0,28,Career_IsCircuitFinalEvent,race?,not started
 0x1618c0,28,Career_GotRaceFinalUnlock,race?,not started
 0x1618e0,28,Career_GotShowoffFinalUnlock,race?,not started
 0x161900,36,Career_IsPlayerActive,race?,not started
-0x161928,364,Profile_SyncAudioSettings,save,not started
-0x161a98,164,Profile_ApplyAudioSettings,save,not started
+0x161928,364,Profile_SyncAudioSettings,save,ported
+0x161a98,164,Profile_ApplyAudioSettings,save,ported
 0x161b40,6168,Profile_ResetNewGame,save,ported
-0x163358,272,Career_DefaultPlayerName,other,not started
+0x163358,272,Career_DefaultPlayerName,other,ported
 0x163468,88,Career_GetRecords,frontend?,not started
 0x1634c0,236,Career_GetStatusName,other,not started
 0x1635b0,8,Career_GetEventMode,race?,not started
@@ -1334,15 +1334,15 @@ address,size,name,system,status
 0x166550,48,Career_FindPlayerSlot,race?,not started
 0x166580,20,Career_GetPlayerId,race?,not started
 0x166598,100,Career_FindRiderOfPlayer,race?,not started
-0x166600,508,Career_InitCharacterRecord,race?,not started
+0x166600,508,Career_InitCharacterRecord,race?,ported
 0x166800,64,Replay_AllocBuffer,race?,not started
 0x166840,44,Replay_FreeBuffer,race?,not started
 0x166870,48,Replay_SaveRiderSetup,save,not started
 0x1668a0,80,Replay_LoadFromBuffer,race?,not started
-0x1668f0,116,HighScore_Reset,race?,not started
+0x1668f0,116,HighScore_Reset,race?,ported
 0x166968,240,HighScore_Insert,race?,not started
-0x166a58,536,Career_UpdateAttributes,race?,not started
-0x166c70,60,FUN_00166c70,save?,not started
+0x166a58,536,Career_UpdateAttributes,race?,ported
+0x166c70,60,FUN_00166c70,save?,ported
 0x166cb0,748,Career_UpdateBestStats,ai?,not started
 0x166fa0,60,Career_RecordBestTime,race?,not started
 0x166fe0,48,Career_RecordBestScore,race?,not started
@@ -3536,16 +3536,16 @@ address,size,name,system,status
 0x211960,440,Audio_ShutdownRace,audio,not started
 0x211b18,60,Audio_FreeCourseAudio,audio,not started
 0x211b58,596,Audio_StopRaceAudio,audio,not started
-0x211db0,184,SndMgr_SetVolume,frontend?,not started
-0x211f20,20,SndMgr_GetVolume,frontend?,not started
+0x211db0,184,SndMgr_SetVolume,frontend?,ported
+0x211f20,20,SndMgr_GetVolume,frontend?,ported
 0x211f38,20,SndMgr_GetSlot,audio?,not started
 0x211f50,20,Audio_GetVolumeSlot,audio,not started
 0x211f68,36,Audio_VolumeUp,audio,not started
 0x211f90,36,Audio_VolumeDown,audio,not started
 0x211fb8,92,Audio_FadeMusicTo,audio,not started
 0x212018,504,Audio_UpdateMusicFade,audio,not started
-0x212210,92,Audio_SetSpeechLevel,audio,not started
-0x212270,16,FUN_00212270,save?,not started
+0x212210,92,Audio_SetSpeechLevel,audio,ported
+0x212270,16,FUN_00212270,save?,ported
 0x212280,68,cBXAudio::vf1_212280,audio,not started
 0x212300,68,FUN_00212300,audio?,not started
 0x212348,48,FUN_00212348,audio?,not started
@@ -3665,7 +3665,7 @@ address,size,name,system,status
 0x21e498,40,FUN_0021e498,audio?,not started
 0x21e4f0,44,Audio_ResumeAfterSpeech,audio,not started
 0x21e528,108,Audio_CheerForRider,audio,not started
-0x21e688,8,FUN_0021e688,frontend?,not started
+0x21e688,8,FUN_0021e688,frontend?,ported
 0x21e690,28,FUN_0021e690,frontend?,not started
 0x21e6c0,28,cBXAudio::vf3_21e6c0,audio,not started
 0x21e6e8,80,cBXAudio::__tf,runtime,host
