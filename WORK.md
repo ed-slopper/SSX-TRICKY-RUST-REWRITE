@@ -141,7 +141,7 @@ matches the original.
 | C12 | World Circuit race: heats, advancement, medals, points, unlocks (`Circuit_*` 0x16b000–0x16d400, `Circuit_ProcessUnlocks` 0x16c420) | unowned | C0, E12 | | [repo] `ui.rs` has a stand-in |
 | C13 | World Circuit show-off: clock, checkpoints, medals | unowned | C0, E12 | | [repo] README: show-off medals "still mine" |
 | C14 | Single event, freeride and practice modes | unowned | C0, G9 | | [est] |
-| C15 | Trick book: chapters, unlock of uber tricks, rewards (`Score_TrickBookCheck` 0x157a00) | any | E5 | | [repo] `book.rs` |
+| C15 | Trick book: chapters, unlock of uber tricks, rewards (`Score_TrickBookCheck` 0x157a00) | any | E5 | trailrig/heron (2026-10-11) | [repo] `book.rs` |
 | C16 | Unlockables: characters, outfits, boards, the hidden ones, and the button cheats | unowned | C12, E10 | | [repo] |
 | C11b5 | Practice Enter's write of 0 to byte +0x5a70 of the game's player object (`Env` has no call for it; find what reads it), and the lesson's start-up (`LessonMan_Init` 0x14aaa0: the rider's `.big` shapes, the lesson pad map, `Pad_LoadButtonMap`) as `Lesson::new`'s real inputs | any | C11b4, C11c2 | | Gap of C11b4 |
 | C11c2 | The lesson archive `data/tutorial/<rider>.big` (what it holds: the `.inp` files? the lesson sounds / speech?), a check of `tricky_data::inp` against a real `.inp` from the disc, and the pad swap (`Pad_GetConfig` / `Pad_SetConfig` 0x17a290 / 0x17a2f8) at the preview's start and end | any | C11c | | Gap of C11c; needs the disc's `data/tutorial` |
