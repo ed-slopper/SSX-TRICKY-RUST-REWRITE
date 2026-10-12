@@ -69,6 +69,7 @@ state machine and the renderer are ours. Nothing has been checked against the or
 
 | ID | Task | Area | Needs | Who | Notes |
 |---|---|---|---|---|---|
+| E12e | The career's remaining wrappers and the course info: `Career_FinishRace` 0x163ab0, the player's board/outfit/record word getters and setters (0x164ac8..0x164f78), `Career_IsCircuitFinalEvent` and the final-unlock getters, `Career_SetPendingVideo`, `Career_Construct`; `Course_Get{Difficulty,Location,VerticalDrop,Length}String`, `Course_GetNameStringId`, the map markers, unlock hint and description ids (0x16b330..0x16b8e0) | unowned | E12c, C12 | ed-slopper/puffin (2026-10-11) | Gap of E12c |
 | E12d2 | The app's medals, times and scores on the career block instead of `tricky-save.json`: the race results through `Career::check_new_records` / `record_best_time` / `record_best_score` (a `RecordsEnv`, the app's character and course indices), the menus' unlocks (`is_character_unlocked`, `is_board_unlocked`, tracks) read from the block, the old json read once to carry medals over | any | E12d | | Gap of E12d |
 | E12c | The career's static tables: `career::StaticTables` (`Career_InitStaticTables` 0x169e38, the outfit and board tables and their five readers) and `status_name_id` (`Career_GetStatusName`) checked in the runner (tests/career.rs). The strings themselves: E5a2 | P2 | ed-slopper/puffin | 2026-10-11 | 07541ac |
 | C12 | The World Circuit's results and unlocks: `tricky_game::circuit` (`Circuit_ProcessRaceResult`, `Circuit_ProcessUnlocks`, `Circuit_ScoreEventResult`, `Circuit_AdvanceEvent`, `Circuit_SaveRiderPoints`, `Circuit_AddPointsToAll`, `FUN_0016c228`, `Circuit_IsFinalEvent`, the lookups) checked in the runner on 20,000 random careers, block, globals and unlock list compared (tests/circuit.rs). Heats' rider set-up: E1b2o. Gaps: C12a | P2 | ed-slopper/puffin | 2026-10-11 | bd7b49a |
@@ -672,3 +673,4 @@ matches the original.
 - 2026-10-11 trailrig/heron: E1b2n done (Circuit_SetupRiders single-rider path vs the original); added E1b2o (Circuit_SetupEventRiders and the rest).
 - 2026-10-11 ed-slopper/puffin: claim C12.
 - 2026-10-11 ed-slopper/puffin: C12 done; added C12a (the app on it).
+- 2026-10-11 ed-slopper/puffin: add and claim E12e.
