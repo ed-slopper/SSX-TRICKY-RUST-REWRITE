@@ -295,7 +295,7 @@ pub fn rank_for_points(points: i32) -> i32 {
     0
 }
 
-/// 0x1568b0: the chain bonus for n tricks in a chain: none for 0 or 1, then 4,000 a trick up to 16,000 (n is
+/// `Score_ChainBonus` 0x1568b0: the chain bonus for n tricks in a chain: none for 0 or 1, then 4,000 a trick up to 16,000 (n is
 /// taken unsigned: a negative count gets 16,000).
 pub fn chain_bonus(n: i32) -> i32 {
     match n as u32 {

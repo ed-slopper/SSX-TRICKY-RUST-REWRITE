@@ -1,6 +1,6 @@
 //! The Trick Tutorial's lesson manager (board row C11b): `cLessonMan` (`LessonMan_Init` 0x14aaa0) and its eleven
 //! state handlers, read from SLUS_203.26 (`docs/port-notes/tutorial.md`). The manager is a state machine: a requested
-//! state is switched in at the start of its tick (`FUN_0014bb08` 0x14bb08: previous handler `Exit`, new handler
+//! state is switched in at the start of its tick (`LessonMan_SwitchState` 0x14bb08: previous handler `Exit`, new handler
 //! `Enter`), then the handler's `Update` runs (`cLessonMan::vf1` 0x14b9b8).
 //!
 //! Everything the handlers touch outside the manager (the pad, the HUD, speech, the camera, the scene, the rider,
@@ -201,7 +201,7 @@ impl Lesson {
         self.requested = s;
     }
 
-    /// `FUN_0014bb08` 0x14bb08.
+    /// `LessonMan_SwitchState` 0x14bb08.
     fn switch(&mut self, s: State) {
         if s == self.state {
             return;

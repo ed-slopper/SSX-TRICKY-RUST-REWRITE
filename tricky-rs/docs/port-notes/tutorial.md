@@ -35,7 +35,9 @@ previous handler, +0x50 ticks in state, +0x54 "attempt done" flag, +0x58 menu ch
 
 `vf1` (0x14b9b8, the per-tick Update): does nothing while the HUD dialog (`FUN_001a7c58` +0x42c) or the menu manager is
 active; counts ticks in state; a requested state (`LessonMan_SetState` 0x14baa8 stores it at +0x10) runs the switch
-`FUN_0014bb08`: previous handler `Exit`, current handler `Enter`, then every tick the handler's `Update`. Eleven handlers,
+`LessonMan_SwitchState` 0x14bb08 (if it differs from +0xc: old state to +0x14, old handler to +0x4c, new state to +0xc
+and its handler slot to +0x48; outside 1..11 both 0); then, while +0x14 differs from +0xc, `vf1` calls the old handler's
+`Exit`, zeroes the tick count and calls the new one's `Enter`; then every tick the handler's `Update`. Eleven handlers,
 one per state (slots +0x18..+0x44, 0 is none):
 
 | State | Class | Meaning |

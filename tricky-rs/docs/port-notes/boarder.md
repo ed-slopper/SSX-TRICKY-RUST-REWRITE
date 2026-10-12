@@ -778,3 +778,14 @@ animation files).
 - `BdrLoad_GetShapeSlot` 0x204588: entry i of the slot words at list+0x130 of the list `BdrLoad_RebindShapes`
   0x2043f8 walks (count, then 5-byte shape names from +4); a slot ≥ 0 with a shape found by name is rebound through
   the renderer (gApp+0x724, vtable +0x164).
+- Rider members torn down by `cBoarder::~cBoarder` 0x116990 (F1c, proven; all empty bodies with the gcc delete-flag
+  check): `Score_Destruct` 0x1230a0 (rider+0x5820), `AirPredict_Destruct` 0x1230c0 (+0x57b0),
+  `BdrLoad_DestructShapeList` 0x203ff8 (+0x4838), `CollBody_Destruct` 0x236190 (+0x470, also `cWorldBoarder`). The
+  shape list (+0x4838) is built by `BdrLoad_ConstructShapeList` 0x203fd0 and both call `BdrLoad_ClearShapeList`
+  0x204048: count 0, the 60 slot words at +0x130 set to −1.
+- `cBoarderRender` 0x135278 allocates one 0xc360-byte effects block (render+0x3e0: puffs +0, trail +0x1c20, surface
+  spray +0x4b60, board track +0x8020, brake spray +0x99b0, speed dust +0xb600); `BoarderRender_DestructEffects`
+  0x136f88 runs `Fx_SpeedDust_Destruct` 0x12f490 and `Fx_BoardPuff_Destruct` 0x12ec78 (both empty) and frees it.
+  `BoarderRender_CopyBoarderMatrix` 0x136e38 copies the rider's 4 × 4 matrix at rider+0x5760 (from `BoarderRender_Draw`).
+  Not named yet: render+0x3e4 (0x260 bytes, built by 0x133808/0x133890, set each tick by 0x133940 from bone at +0x130 of
+  the skeleton) and render+0x3e8 (0x150 bytes, 0x134288).
