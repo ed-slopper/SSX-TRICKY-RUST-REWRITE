@@ -80,3 +80,4 @@ pub mod results;
 pub mod camera;
 pub mod brakespray;
 pub mod splash;
+pub mod boardtrack;
