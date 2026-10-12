@@ -23,6 +23,7 @@ pub mod fxrand;
 pub mod gate;
 pub mod hit;
 pub mod input;
+pub mod inputring;
 pub mod probe;
 pub mod ps2f;
 pub mod ragdoll;

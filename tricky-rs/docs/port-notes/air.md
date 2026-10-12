@@ -144,6 +144,17 @@ Part of the port notes (index: [README.md](README.md)); units and wording as des
 - Rumble (`cPS2Device`): vf3 0x17b590 small motor on/off for n frames, vf4 0x17b5b0 large motor at amount × 255
   for n frames, vf5 0x17b5e8 allowed (both off on a change); each poll with the pad ready counts the frames down
   and stops a motor at 0 (−1 = until told); not ready, both off. Sent with `scePadSetActDirect` when changed.
+- The device list and its ring (`tricky_game::inputring`, row E10c, checked: `tests/inputring.rs`): the list at
+  `gApp+0x24` holds the ring (+0 buffer, +4 frame size 0x58, +8 eight frames, +0xc read, +0x10 write), the count
+  (+0x14, two) and the pads (+0x18..). `Input_ReadDevices` 0x17a668 has each pad's poll (vf9) write its 0x2c-byte
+  frame at the write index, which steps; `InputRecorder_Playback` 0x17a740 gives the frame at the read index to
+  each pad's vf10 (the pad read above) and steps it; empty when read = write, with no full check (an eighth
+  unplayed frame makes the ring look empty). A frame: 16 raw bytes (pressure, +0x68 on the pad), valid (+0x10),
+  analog (+0x14), the libpad buttons inverted (+0x18, halfword), the four stick bytes (+0x1c..). A frame with no
+  pad changes only the pad's valid flag. `Input_FindPressedDevice` 0x17a840: the first pad whose key (+0x2c) is not
+  0, and its index; `Input_GetAnyNewButtons` 0x1834a8: `now & !prev` of every pad or-ed; `Pad_LatchButtons`
+  0x17a658: prev = now; `Input_ResetDevices` 0x17a8b0: both motors off until told. Not ported: the poll's libpad
+  state machine (vf9, E10c2). The app does not use any of this yet: it reads Bevy's gamepad (E10c3).
 
 - Our rider jumps through `jump::jump_impulse` (row G1a5b3a): on snow with the ground normal and the board's
   forward (steep lips leaned along the lip, the flag to `Score_StartTrickChain`), off a rail along the board's up;
