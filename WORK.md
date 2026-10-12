@@ -82,7 +82,7 @@ state machine and the renderer are ours. Nothing has been checked against the or
 | G4a | Rivals and vendettas checked: `RelTable_Init` 0x167208, `Rider_OnKnockedDownBy`, `AI_StartVendetta`, `AI_CoolVendetta` | any | F4a | | [repo] `rivals.rs` Split: G4a1, G4a2 |
 | G4e | The app's computer riders ride with `aicomp::Ai::ride` (the four modes, the shove, the target choice) on the course's own jump markers and speed hints (`AIComputer_FindJumpMarker` 0x1392a8 / `AIComputer_FindSpeedHint` 0x1393e0 over the AI paths, E3d) and the line point (+0x360), replacing `AiDriver`'s steering and throttle | any | G4d, E3d, G4f | | Split of G4 (wiring; needs a play test) |
 | G5 | Animation: the game's own animation state machine and blending for all 248 `bxanim` clips (plus cmanim, ps2anim, ubers), clip markers, replacing our choice of clip | unowned | F1, E4 | | [repo] README: "Which clip plays when is my state logic". Split by state before claiming |
-| G6 | Wipe-out body: ragdoll spheres where the game puts them (`Ragdoll_Step` 0x10dca8, `Ragdoll_Contacts` 0x10e190, `CollBody_PointMassInertia` 0x236530) | unowned | E4 | | [repo] "Unresolved: ragdoll sphere places"; `wipeout.rs` uses a stand-in 1.7 m rider |
+| G6 | Wipe-out body: ragdoll spheres where the game puts them (`Ragdoll_Step` 0x10dca8, `Ragdoll_Contacts` 0x10e190, `CollBody_PointMassInertia` 0x236530) | unowned | E4 | ed-slopper/puffin (2026-10-11)
 | G7 | Rendering, as the PS2 renderer does it. Split before claiming: | unowned | E3a, E3b | | [repo] |
 | G7a | Terrain patches: the game's tessellation and LOD, subtractive lightmaps | unowned | G7 | | [repo] README "What the viewer taught us" |
 | G7b | Objects: per-instance lights (ambient + 3 directional, 128 = 1.0), materials, the PS2 blend modes for transparent materials | unowned | G7 | | [repo] "exact PS2 blending modes" not done |
@@ -585,3 +585,4 @@ matches the original.
 - 2026-10-11 trailrig/heron: E8s done; added E8t (gap of E8s).
 - 2026-10-11 trailrig/heron: split E1b2 into E1b2a to E1b2d; claim E1b2a.
 - 2026-10-11 trailrig/heron: E1b2a done (E1b2b to E1b2d stay open).
+- 2026-10-11 ed-slopper/puffin: claim G6.
