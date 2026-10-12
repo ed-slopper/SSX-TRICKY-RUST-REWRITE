@@ -71,3 +71,13 @@ Part of the port notes (index: [README.md](README.md)); units and wording as des
 - In-air layer: the song's LOOPDATA bank, one sample per beat (60000/BPM ms), phrases of BeatsPerPhrase (8) from bank program phrase*PhraseAlign(16)+beat; normal phrase rand%(PPB-1), in a shortcut zone PPB+rand%2, Tricky PPB-1. Silent unless big air; Tricky at UBERLEVEL 85%.
 - Big-air duck (Audio_BigAirMusicDuck 0x21b828): after 1.5 s of air the song drops to clamp((1-(1-floor/127)*t*0.5)*127, floor, 127), floor 16 (Untracked 50); the wind comes up by the same amount.
 - "It's Tricky" (Audio_TrickyTrigger 0x21c610, when the meter fills): speech plus the Tricky phrase from the next beat, twice through, ending with the uber timer.
+
+## Announcer's race-end lines (`Speech_*`, F1c)
+
+- Proven (read in Ghidra): `Speech_QueueResultLine` 0x231548 picks one of `Speech_QueuePlaceLine` 0x231800 (the
+  human's placing as a bit, 1, 2, 4, 8, 0x10, or 0x20 for last; event 0x4008007, plus 0x4008009 in a career event of
+  mode 2) and `Speech_QueueMedalLine` 0x231af8 (one entry only: `Circuit_GetMedal` as a bit, event 0x4008013). Both
+  set race+0x7dcc bit 0 so they speak once, and skip while a replay plays. `Speech_RaceStatsMask` 0x2315e0 turns the
+  rider's run into condition bits from per-course thresholds (course id 0x32de88; time fast/slow, two counts, and
+  +0x66c = 0 or > 1). `Speech_QueueUnlockLines` 0x232330 (from `cUnlockedOverlay::Reset` 0x1b5ef8) posts 0x4008015,
+  then one 0x400800d per unlocked item (list at 0x3353f8, entries of 12 bytes; item kinds 0..8, 0xb mapped to bits).

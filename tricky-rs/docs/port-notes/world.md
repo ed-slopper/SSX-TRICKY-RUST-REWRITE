@@ -424,7 +424,7 @@ Part of the port notes (index: [README.md](README.md)); units and wording as des
     built and the race init reseeds it, so the riders never see these draws.
   - Not read or not ported yet (E1b2e): the order the nodes are made in (the port: instance order for the clocks, script-op
     order for the controllers; the game's node list order is the order the cells wake and the scripts run), the other
-    `Rand_Fx` users in the draws list (`FUN_001d5180` 0x1d5180 (nine draws), `FUN_001d9208`, `FUN_001c8ec8`, `cGame::Init`'s
+    `Rand_Fx` users in the draws list (`FUN_001d5180` 0x1d5180 (nine draws), `ParticleGroup_UpdateTrail` 0x1d9208, `FUN_001c8ec8`, `cGame::Init`'s
     snow and rain draws 0x17e8c0..0x17e8e8, the emitters and the splash and spray code, which are G15 / G19).
 
 - The intro's and scenes' draws (row E1b2c, read): the camera director's random branch (`CamScript_Update` 0x175f50 case 10,

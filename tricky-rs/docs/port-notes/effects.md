@@ -25,6 +25,17 @@ Part of the port notes (index: [README.md](README.md)); units and wording as des
   (keys at U33.., U37.., U41.., U45.., alpha first); U49 texture in particle.ssh (part, snfl, clod, spry, halo,
   ...), U50 blend (0 additive, 1 alpha, 4 darken). Collision-slot emitters burst on contact; sub-type 2 bursts at
   the rider's hit point (cap 1 per AI, 3 per human).
+- The emitter's setters (proven, read in Ghidra; called by `ParticleSys_Create` 0x1d8490 and `Fx_SurfaceSpray`
+  0x1311b0; emitter = system+0x10, +0x3c its time scale): `ParticleSys_SetSizeRange` 0x1d52e8 (min, max → +0x10
+  max − min, +0x18 min − (max − min)), `ParticleSys_SetLifeRange` 0x1d5300 (the same, × +0x3c, at +0x14 / +0x1c),
+  `ParticleSys_SetSpawnPoint` 0x1d5338 / `_SetSpawnLine` 0x1d5380 / `_SetSpawnQuad` 0x1d5418 (origin +0xa0 and its two
+  spread axes +0xb0, +0xc0), `ParticleSys_SetVelocityBasis` 0x1d5790 / `_SetVelocityCone` 0x1d5570 (velocity +0x60 and
+  three spread axes +0x70, +0x80, +0x90, each ÷ +0x3c, +0x60 less 1.5 × their sum), `ParticleSys_SetForce` 0x1d54e0 /
+  `_ClearForce` 0x1d5548 (+0xd0), `ParticleSys_SetColors` 0x1d58e0 (+0xe0 start colour less 1.5 × (c2 + c3), +0x110
+  (c1 − c0) ÷ (life × +0x3c), +0xf0 / +0x100 the random c2, c3). `ParticleGroup_UpdateTrail` 0x1d9208 (from
+  `cBoarderRender::vf7` 0x1356f8): moves a group slot's particles and spawns new ones along the segment from the last
+  point, five `Rand_Fx` draws each. Not yet read: 0x1d5b60 (10.5 KB, vector maths only, called once by
+  `ParticleSys_Create` on system+0x150).
 - Surface table words used by the effects (proven, E13; values in `tricky-rs/game/src/surface.rs`): ground spray
   (`Fx_SurfaceSpray` 0x1311b0, ground motion, not surfaces 9, 13, 18, 19, which spark) takes [13] rate, [14] size
   × 0.8–1.2, [15] [16] lives, [17] sprite index (gApp+0x30), [18] pull of the light colour (rider+0x5ae0 +0x470)
