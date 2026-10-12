@@ -32,12 +32,17 @@ impl Rng {
 }
 
 fn bits(v: &[f32]) -> String {
-    v.iter().map(|x| format!("{:08x}", x.to_bits())).collect::<Vec<_>>().join(",")
+    v.iter()
+        .map(|x| format!("{:08x}", x.to_bits()))
+        .collect::<Vec<_>>()
+        .join(",")
 }
 
 #[derive(Clone, Default)]
 struct Script {
     ray: (f32, [f32; 4], [f32; 4]),
+    ray2: (f32, [f32; 4], [f32; 4]),
+    nray: usize,
     blk: [(bool, Option<([f32; 4], [f32; 4])>); 2],
     push: Option<[f32; 3]>,
     nblk: usize,
@@ -47,10 +52,11 @@ struct Script {
 
 struct Env(Rc<RefCell<Script>>);
 impl WorldEnv for Env {
-    fn line(&mut self, a: [f32; 4], b: [f32; 4], mode: i32) -> u32 {
+    fn line(&mut self, a: [f32; 4], b: [f32; 4], mode: i32, f12: f32) -> u32 {
         let mut s = self.0.borrow_mut();
         let t = s.ctors.len() as u32 + 1;
-        s.ctors.push(format!("{} {} {mode} {}", bits(&a), bits(&b), bits(&[0.0])));
+        s.ctors
+            .push(format!("{} {} {mode} {}", bits(&a), bits(&b), bits(&[f12])));
         let m = format!("ctor {t} {}", s.ctors[t as usize - 1]);
         s.log.push(m);
         t
@@ -59,9 +65,11 @@ impl WorldEnv for Env {
         let mut s = self.0.borrow_mut();
         let m = format!("ray {} {}", l.main, l.holes);
         s.log.push(m);
-        res.hit = s.ray.1;
-        res.normal = s.ray.2;
-        s.ray.0
+        let ry = if s.nray == 0 { s.ray } else { s.ray2 };
+        s.nray += 1;
+        res.hit = ry.1;
+        res.normal = ry.2;
+        ry.0
     }
     fn is_blocked(&mut self, l: Line, res: &mut RayRes) -> bool {
         let mut s = self.0.borrow_mut();
@@ -85,20 +93,26 @@ impl WorldEnv for Env {
     }
 }
 
-#[test]
-fn collide_world_matches_the_original() {
-    let Some(mut r) = Runner::from_env() else { return };
+fn install(r: &mut Runner, with_push: bool) -> Rc<RefCell<Script>> {
     r.float_rules = Rules::parse("add=n,mul=n,div=n,cvt=n").unwrap();
     r.allow(0x102f50);
     let st = Rc::new(RefCell::new(Script::default()));
-    let rd = |m: &mut r5900::Mem, a: u32, n: usize| -> Vec<f32> { (0..n).map(|k| m.read_f32(a + 4 * k as u32)).collect() };
+    let rd = |m: &mut r5900::Mem, a: u32, n: usize| -> Vec<f32> {
+        (0..n).map(|k| m.read_f32(a + 4 * k as u32)).collect()
+    };
     let s = st.clone();
     r.stub(0x25d7f0, move |c, m| {
         let a1 = rd(m, c.gpr(5) as u32, 4);
         let a2 = rd(m, c.gpr(6) as u32, 4);
         let mut s = s.borrow_mut();
         let t = s.ctors.len() as u32 + 1;
-        let line = format!("{} {} {} {}", bits(&a1), bits(&a2), c.gpr(7) as i32, bits(&[c.f(12)]));
+        let line = format!(
+            "{} {} {} {}",
+            bits(&a1),
+            bits(&a2),
+            c.gpr(7) as i32,
+            bits(&[c.f(12)])
+        );
         s.ctors.push(line.clone());
         s.log.push(format!("ctor {t} {line}"));
         for k in 0..37u32 {
@@ -113,11 +127,13 @@ fn collide_world_matches_the_original() {
         let mut s = s.borrow_mut();
         s.log.push(format!("ray {w0} {w8}"));
         let res = c.gpr(6) as u32;
+        let ry = if s.nray == 0 { s.ray } else { s.ray2 };
+        s.nray += 1;
         for k in 0..4u32 {
-            m.write_f32(res + 0x10 + 4 * k, s.ray.1[k as usize]);
-            m.write_f32(res + 0x20 + 4 * k, s.ray.2[k as usize]);
+            m.write_f32(res + 0x10 + 4 * k, ry.1[k as usize]);
+            m.write_f32(res + 0x20 + 4 * k, ry.2[k as usize]);
         }
-        c.set_f(0, s.ray.0);
+        c.set_f(0, ry.0);
     });
     let s = st.clone();
     r.stub(0x25c690, move |c, m| {
@@ -138,18 +154,37 @@ fn collide_world_matches_the_original() {
         c.set_gpr(2, b as u64);
     });
     let s = st.clone();
-    r.stub(0x16fb08, move |c, m| {
-        let pa = c.gpr(4) as u32;
-        let pos = rd(m, pa, 3);
-        let t = rd(m, c.gpr(5) as u32, 3);
-        let mut s = s.borrow_mut();
-        s.log.push(format!("push {} {} {}", bits(&[c.f(12)]), bits(&pos), bits(&t)));
-        if let Some(p) = s.push {
-            for k in 0..3 {
-                m.write_f32(pa + 4 * k as u32, p[k]);
+    if with_push {
+        r.stub(0x16fb08, move |c, m| {
+            let pa = c.gpr(4) as u32;
+            let pos = rd(m, pa, 3);
+            let t = rd(m, c.gpr(5) as u32, 3);
+            let mut s = s.borrow_mut();
+            s.log.push(format!(
+                "push {} {} {}",
+                bits(&[c.f(12)]),
+                bits(&pos),
+                bits(&t)
+            ));
+            if let Some(p) = s.push {
+                for k in 0..3 {
+                    m.write_f32(pa + 4 * k as u32, p[k]);
+                }
             }
-        }
-    });
+        });
+    }
+    st
+}
+
+#[test]
+fn collide_world_matches_the_original() {
+    let Some(mut r) = Runner::from_env() else {
+        return;
+    };
+    let st = install(&mut r, true);
+    let rd = |m: &mut r5900::Mem, a: u32, n: usize| -> Vec<f32> {
+        (0..n).map(|k| m.read_f32(a + 4 * k as u32)).collect()
+    };
     let posa = r.mem.alloc(16);
     let tga = r.mem.alloc(16);
     let mut g = Rng(0xfeed_beef_1234_5671);
@@ -161,12 +196,23 @@ fn collide_world_matches_the_original() {
         }
         let radius = [0.0f32, 100.0, 499.0, 500.0, 500.5, 800.0, -3.0][(g.next() % 7) as usize];
         let mut sc = Script::default();
-        sc.ray = ([-1.0f32, 0.0, 0.5, 3.0][(g.next() % 4) as usize], g.q(), g.q());
+        sc.ray = (
+            [-1.0f32, 0.0, 0.5, 3.0][(g.next() % 4) as usize],
+            g.q(),
+            g.q(),
+        );
         if g.next() % 3 != 0 {
             sc.ray.2[2] = sc.ray.2[2].abs() + 0.1;
         }
         for k in 0..2 {
-            sc.blk[k] = (g.next() % 3 != 0, if g.next() % 2 == 0 { Some((g.q(), g.q())) } else { None });
+            sc.blk[k] = (
+                g.next() % 3 != 0,
+                if g.next() % 2 == 0 {
+                    Some((g.q(), g.q()))
+                } else {
+                    None
+                },
+            );
         }
         if g.next() % 2 == 0 {
             sc.push = Some([g.f(), g.f(), g.f()]);
@@ -194,5 +240,58 @@ fn collide_world_matches_the_original() {
         assert_eq!(got, ret, "case {case} ret");
         assert_eq!(bits(&pos), bits(&want_pos), "case {case} pos");
         assert_eq!(counter, after, "case {case} counter");
+    }
+}
+
+#[test]
+fn collide_push_matches_the_original() {
+    let Some(mut r) = Runner::from_env() else {
+        return;
+    };
+    let st = install(&mut r, false);
+    let rd = |m: &mut r5900::Mem, a: u32, n: usize| -> Vec<f32> {
+        (0..n).map(|k| m.read_f32(a + 4 * k as u32)).collect()
+    };
+    let posa = r.mem.alloc(16);
+    let tga = r.mem.alloc(16);
+    let mut g = Rng(0x0bad_cafe_5555_1117);
+    for case in 0..60_000 {
+        let mut pos = [g.f(), g.f(), g.f()];
+        let mut tgt = [g.f(), g.f(), g.f()];
+        match g.next() % 10 {
+            0 => tgt = pos,
+            1 => tgt = [pos[0], pos[1], pos[2] + g.f()],
+            _ => {}
+        }
+        let k = [0.0f32, 40.0, 100.0, -5.0, 0.5][(g.next() % 5) as usize];
+        let mut sc = Script::default();
+        sc.ray = (
+            [-1.0f32, 0.0, 0.5, 3.0][(g.next() % 4) as usize],
+            g.q(),
+            g.q(),
+        );
+        sc.ray2 = (
+            [-1.0f32, 0.0, 0.5, 3.0][(g.next() % 4) as usize],
+            g.q(),
+            g.q(),
+        );
+        *st.borrow_mut() = sc.clone();
+        for j in 0..3 {
+            r.mem.write_f32(posa + 4 * j, pos[j as usize]);
+            r.mem.write_f32(tga + 4 * j, tgt[j as usize]);
+        }
+        r.cpu.set_gpr(4, posa as u64);
+        r.cpu.set_gpr(5, tga as u64);
+        r.cpu.set_f(12, k);
+        r.call(0x16fb08).unwrap();
+        let ret = r.cpu.gpr(2) as u32;
+        let want_pos = rd(&mut r.mem, posa, 3);
+        let want_log = st.borrow().log.clone();
+        let es = Rc::new(RefCell::new(sc));
+        let got = collide_push(k, &mut pos, tgt, &mut Env(es.clone()));
+        let got_log = es.borrow().log.clone();
+        assert_eq!(got_log, want_log, "case {case} log");
+        assert_eq!(got, ret, "case {case} ret");
+        assert_eq!(bits(&pos), bits(&want_pos), "case {case} pos");
     }
 }

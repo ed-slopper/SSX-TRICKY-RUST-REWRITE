@@ -161,7 +161,8 @@ fn rot9(ax: f32, ay: f32, az: f32, angle: f32) -> [f32; 9] {
 
 /// `r` times the constant matrix `b`, the vector through the product (the order the original adds in).
 fn rot_apply(a: [f32; 3], r: [f32; 9], b: [f32; 9]) -> [f32; 3] {
-    let m = |i: usize, j: usize| (b[j] * r[i * 3] + b[3 + j] * r[i * 3 + 1]) + b[6 + j] * r[i * 3 + 2];
+    let m =
+        |i: usize, j: usize| (b[j] * r[i * 3] + b[3 + j] * r[i * 3 + 1]) + b[6 + j] * r[i * 3 + 2];
     [
         (m(0, 0) * a[0] + m(1, 0) * a[1]) + m(2, 0) * a[2],
         (m(0, 1) * a[0] + m(1, 1) * a[1]) + m(2, 1) * a[2],
@@ -307,7 +308,11 @@ pub fn eval_position(
                 let f0 = if x8 == 0.0 && xc == 0.0 {
                     en.w4
                 } else if xc == 0.0 {
-                    if 0.0 <= x8 { -HALF_PI } else { HALF_PI }
+                    if 0.0 <= x8 {
+                        -HALF_PI
+                    } else {
+                        HALF_PI
+                    }
                 } else {
                     let mut a = atan(x8 / xc);
                     if xc < 0.0 {
@@ -596,7 +601,11 @@ pub fn eval_look_at(
                     }
                     idx => {
                         let q = env.translation(idx);
-                        t = [(t[0] + q[0]) - en.p14[0], (t[1] + q[1]) - en.p14[1], (t[2] + q[2]) - en.p14[2]];
+                        t = [
+                            (t[0] + q[0]) - en.p14[0],
+                            (t[1] + q[1]) - en.p14[1],
+                            (t[2] + q[2]) - en.p14[2],
+                        ];
                     }
                 }
             }
@@ -673,7 +682,11 @@ pub fn eval_look_at(
                     dv = 1.0;
                 }
                 let a = asin(dv);
-                let c = [nd[1] * vn[2] - nd[2] * vn[1], nd[2] * vn[0] - nd[0] * vn[2], nd[0] * vn[1] - nd[1] * vn[0]];
+                let c = [
+                    nd[1] * vn[2] - nd[2] * vn[1],
+                    nd[2] * vn[0] - nd[0] * vn[2],
+                    nd[0] * vn[1] - nd[1] * vn[0],
+                ];
                 let sg = (c[0] * wn[0] + c[1] * wn[1]) + c[2] * wn[2];
                 let mut ang = HALF_PI - a;
                 if sg < 0.0 {
@@ -730,7 +743,7 @@ pub struct Line {
 /// The world queries `Camera_CollideWorld` makes (all on the world at 0x346488).
 pub trait WorldEnv {
     /// `cWorldLine::cWorldLine` 0x25d7f0 with a zero first float; returns the object's identity.
-    fn line(&mut self, a: [f32; 4], b: [f32; 4], mode: i32) -> u32;
+    fn line(&mut self, a: [f32; 4], b: [f32; 4], mode: i32, f12: f32) -> u32;
     /// `World_RayCast` 0x25aff8.
     fn ray_cast(&mut self, line: Line, res: &mut RayRes) -> f32;
     /// `World_IsBlocked` 0x25c690.
@@ -741,15 +754,29 @@ pub trait WorldEnv {
 
 /// `Camera_CollideWorld` 0x16fe60(radius, pos, target): keeps the camera at `pos` out of the world when it moves
 /// along `target`; returns 1 when the position was moved off a wall. `counter` is the call count at 0x335720.
-pub fn collide_world(radius: f32, pos: &mut [f32; 3], target: [f32; 3], counter: &mut u32, env: &mut dyn WorldEnv) -> u32 {
+pub fn collide_world(
+    radius: f32,
+    pos: &mut [f32; 3],
+    target: [f32; 3],
+    counter: &mut u32,
+    env: &mut dyn WorldEnv,
+) -> u32 {
     *counter = counter.wrapping_add(1);
     if target[0] == 0.0 && target[1] == 0.0 && target[2] == 0.0 {
         return 0;
     }
     let mut tgt = target;
     let mut a = [pos[0], pos[1], pos[2], 1.0];
-    let c1 = env.line([tgt[0], tgt[1], tgt[2], 1.0], [tgt[0] + 0.0, tgt[1] + 0.0, tgt[2] + 150.0, 1.0 + 0.0], 2);
-    let mut line = Line { main: c1, holes: c1 };
+    let c1 = env.line(
+        [tgt[0], tgt[1], tgt[2], 1.0],
+        [tgt[0] + 0.0, tgt[1] + 0.0, tgt[2] + 150.0, 1.0 + 0.0],
+        2,
+        0.0,
+    );
+    let mut line = Line {
+        main: c1,
+        holes: c1,
+    };
     let mut res = RayRes::default();
     let r = env.ray_cast(line, &mut res);
     if 0.0 < r && 0.0 < res.normal[2] {
@@ -759,18 +786,29 @@ pub fn collide_world(radius: f32, pos: &mut [f32; 3], target: [f32; 3], counter:
             res.hit[2] + res.normal[2] * 20.0,
         ];
     }
-    let c2 = env.line([tgt[0], tgt[1], tgt[2], 1.0], a, 2);
-    line = Line { main: c2, holes: c1 };
+    let c2 = env.line([tgt[0], tgt[1], tgt[2], 1.0], a, 2, 0.0);
+    line = Line {
+        main: c2,
+        holes: c1,
+    };
     let far = 500.0 < radius;
     if env.is_blocked(line, &mut res) {
-        let d = [a[0] - res.hit[0], a[1] - res.hit[1], a[2] - res.hit[2], a[3] - res.hit[3]];
+        let d = [
+            a[0] - res.hit[0],
+            a[1] - res.hit[1],
+            a[2] - res.hit[2],
+            a[3] - res.hit[3],
+        ];
         let n = res.normal;
         let k = ((d[0] * n[0] + d[1] * n[1]) + 1.0 * (d[2] * n[2])) + 1.0 * (d[3] * n[3]);
         let sc = [n[0] * k, n[1] * k, n[2] * k];
         *pos = [pos[0] - sc[0], pos[1] - sc[1], pos[2] - sc[2]];
         a = [pos[0], pos[1], pos[2], 1.0];
-        let c3 = env.line([tgt[0], tgt[1], tgt[2], 1.0], a, 2);
-        line = Line { main: c3, holes: c1 };
+        let c3 = env.line([tgt[0], tgt[1], tgt[2], 1.0], a, 2, 0.0);
+        line = Line {
+            main: c3,
+            holes: c1,
+        };
         if env.is_blocked(line, &mut res) {
             *pos = [res.hit[0], res.hit[1], res.hit[2]];
         }
@@ -781,4 +819,64 @@ pub fn collide_world(radius: f32, pos: &mut [f32; 3], target: [f32; 3], counter:
     }
     env.push(if far { 100.0 } else { 40.0 }, pos, tgt);
     0
+}
+
+// ---- Camera_CollidePush 0x16fb08 ----
+
+fn v4_dot(a: [f32; 4], b: [f32; 4]) -> f32 {
+    let m = [a[0] * b[0], a[1] * b[1], a[2] * b[2], a[3] * b[3]];
+    ((m[0] + m[1]) + 1.0 * m[2]) + 1.0 * m[3]
+}
+
+fn v4_unit(v: [f32; 4]) -> [f32; 4] {
+    let s = v4_dot(v, v);
+    let q = if s == 0.0 { f32::MAX } else { 1.0 / s.sqrt() };
+    v.map(|x| x * q)
+}
+
+/// `Camera_CollidePush` 0x16fb08(k, pos, target): looks for a wall to the side of the line from `pos` to
+/// `target` (a sideways line of length k, then its turn about the line); when one is hit, `pos` goes to the hit
+/// point pushed k off the wall. Returns 1 when moved.
+pub fn collide_push(k: f32, pos: &mut [f32; 3], target: [f32; 3], env: &mut dyn WorldEnv) -> u32 {
+    let a = [pos[0], pos[1], pos[2], 1.0];
+    let b = [target[0], target[1], target[2], 1.0];
+    let d = [b[0] - a[0], b[1] - a[1], b[2] - a[2], b[3] - a[3]];
+    let u = v4_unit(d);
+    let z = [0.0, 0.0, 1.0, 0.0];
+    let kz = v4_dot(z, u);
+    let su = u.map(|x| x * kz);
+    let e = [z[0] - su[0], z[1] - su[1], z[2] - su[2], z[3] - su[3]];
+    let p = v4_unit(e);
+    let pk = p.map(|x| x * k);
+    let plus = |v: [f32; 4]| [a[0] + v[0], a[1] + v[1], a[2] + v[2], a[3] + v[3]];
+    let minus = |v: [f32; 4]| [a[0] - v[0], a[1] - v[1], a[2] - v[2], a[3] - v[3]];
+    let c1 = env.line(plus(pk), minus(pk), 1, 0.5);
+    let mut res = RayRes::default();
+    let mut line = Line {
+        main: c1,
+        holes: c1,
+    };
+    if !(0.0 < env.ray_cast(line, &mut res)) {
+        let c = [
+            pk[1] * u[2] - u[1] * pk[2],
+            pk[2] * u[0] - u[2] * pk[0],
+            pk[0] * u[1] - u[0] * pk[1],
+            0.0,
+        ];
+        let c2 = env.line(plus(c), minus(c), 1, 0.5);
+        line = Line {
+            main: c2,
+            holes: c1,
+        };
+        if !(0.0 < env.ray_cast(line, &mut res)) {
+            return 0;
+        }
+    }
+    let n = res.normal;
+    *pos = [
+        res.hit[0] + n[0] * k,
+        res.hit[1] + n[1] * k,
+        res.hit[2] + n[2] * k,
+    ];
+    1
 }
