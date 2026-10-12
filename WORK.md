@@ -69,7 +69,7 @@ state machine and the renderer are ours. Nothing has been checked against the or
 
 | ID | Task | Area | Needs | Who | Notes |
 |---|---|---|---|---|---|
-| E12d | The app's save on `career::Career`: the block saved and loaded (`save_image` / `load_image`) instead of `tricky-save.json`, the new game from `init_new_game` | unowned | E12b | | Split of E12b |
+| E12d | The app's save on `career::Career`: the block saved and loaded (`save_image` / `load_image`) instead of `tricky-save.json`, the new game from `init_new_game` | unowned | E12b | trailrig/heron (2026-10-11) | Split of E12b |
 | E12c | The career's static tables: `career::StaticTables` (`Career_InitStaticTables` 0x169e38, the outfit and board tables and their five readers) and `status_name_id` (`Career_GetStatusName`) checked in the runner (tests/career.rs). The strings themselves: E5a2 | P2 | ed-slopper/puffin | 2026-10-11 | 07541ac |
 | G1 | Boarder state machine: every state (0x00–0x14) and motion (0–6), their enter/update/exit, `cBoarder` vtable, in the original's order per tick | unowned | F1 | | [repo] Many states ported one by one; the dispatch is ours |
 | G1a | Prewind, jump, takeoff, spin and flip control (`PrewindState_Update` 0x1050e8, `Jump_ApplyImpulse` 0x1284e0, `Takeoff_SetSpinRates` 0x126e30, `SpinState_Update` 0x100908, `SpinState_StartFromStick` 0x102158) checked | any | F4a | | [repo] Ported, unchecked Split: G1a1, G1a2 |
