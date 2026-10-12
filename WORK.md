@@ -171,7 +171,7 @@ matches the original.
 
 | ID | Task | Section | Who | Date | Commit |
 |---|---|---|---|---|---|
-| C11b | The lesson manager and its eleven handlers: `tricky-rs/game/src/lesson.rs` (state switch, Wait menu of pages / tricks / actions, preview, perform, practice, result menus, exit; `Env` trait), unit-tested; handlers all read, notes in `port-notes/tutorial.md` | P3 | trailrig/heron | 2026-10-11 | COMMIT |
+| C11b | The lesson manager and its eleven handlers: `tricky-rs/game/src/lesson.rs` (state switch, Wait menu of pages / tricks / actions, preview, perform, practice, result menus, exit; `Env` trait), unit-tested; handlers all read, notes in `port-notes/tutorial.md` | P3 | trailrig/heron | 2026-10-11 | 05661c2 |
 | C11 | The `trick` course is the Trick Tutorial (game mode 6, `cLessonMan` with eleven handlers, `cTrickTutorialLoad`): data, states, menu and flow read and written up in `port-notes/tutorial.md`; follow-ups C11b..C11e | P3 | trailrig/heron | 2026-10-11 | 69292d0 |
 | D1 | Ghidra project analysed, RTTI recovered (394 classes, 2,884 names, `tools/rtti_scan.py`), decompiler export | P0 | ed-slopper | 2026-10-05 | 9e4e994 |
 | D2 | Patcher (`tools/ssxpatch.py`) and the debug-menu / unlock-all mods | P5 | ed-slopper | 2026-10-05 | 9e4e994 |
