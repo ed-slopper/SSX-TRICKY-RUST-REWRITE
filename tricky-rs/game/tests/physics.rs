@@ -268,3 +268,33 @@ fn a_landing_on_the_tick_is_before_both_the_rail_and_the_wall() {
     assert!(r.rail.is_none() && r.rail_kind == 0, "a landed rider was captured by the rail");
     assert!(r.crashed <= 0.0, "a landed rider was put down by the air wall (cause {:?})", r.cause);
 }
+
+#[test]
+fn a_grab_short_of_its_fourth_marker_refuses_the_rail_capture() {
+    // row E8n: `Rail_TryCapture` 0x125cb8 refuses while the layer-0 clip is of type 0xe, 0xf or 0x10 (the grab, tweak and
+    // uber clips, ids 0x278..=0x2db of the descriptor table 0x325fa8) and clip flag 4 is clear; the fall-recover clip
+    // 0x224 is type 0 and never gates. The port's form of the test is `Rider::capture_gated` (a grab held, or let go
+    // short of its fourth marker, or an uber trick not done): the rider flies on over the rail.
+    let mut world = CollisionWorld::default();
+    world.min_y = -1.0e6;
+    // a grab still playing out, far short of its fourth marker (25 frames): not captured
+    let (rails, mut r) = rail_and_flyer();
+    r.grab_out = Some((1, 0.0));
+    r.step(&world, &rails, Input::default(), 1.0 / 60.0);
+    assert!(r.capture_gated(), "a grab short of its marker did not gate");
+    assert!(r.rail.is_none() && r.rail_kind == 0, "captured with a grab clip short of flag 4");
+    assert!(r.crashed <= 0.0 && !r.grounded);
+    // an uber trick not done: not captured
+    let (rails, mut r) = rail_and_flyer();
+    r.uber = 1.0;
+    r.uber_done = false;
+    r.step(&world, &rails, Input::default(), 1.0 / 60.0);
+    assert!(r.rail.is_none() && r.rail_kind == 0, "captured in an uber trick that is not done");
+    // the grab past its fourth marker (flag 4 set): captured as without a grab
+    let (rails, mut r) = rail_and_flyer();
+    r.grab_out = Some((1, 1.0e3));
+    assert!(!r.capture_gated());
+    r.step(&world, &rails, Input::default(), 1.0 / 60.0);
+    assert!(r.rail.is_some() && r.rail_kind != 0, "not captured with flag 4 set");
+}
+

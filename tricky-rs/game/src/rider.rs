@@ -1110,7 +1110,7 @@ impl Rider {
         // `WipeoutMotion_Update` 0x10c2f0 never captures, row E8m) and not one the landing probe put down: those never
         // get here. The air wall comes AFTER the capture (row E8o): a rider over a rail that hits a wall on the same
         // tick is captured (`Score_LandTrick` for the rail, `rail_kind` set) and then put down by the wall
-        if !self.grounded && self.crashed <= 0.0 && !jumped && self.rail_cooldown <= 0.0 && self.air_time > 0.08 && self.vel.y < 2.5 {
+        if !self.grounded && self.crashed <= 0.0 && !jumped && self.rail_cooldown <= 0.0 && self.air_time > 0.08 && self.vel.y < 2.5 && !self.capture_gated() {
             if let Some((ri, d, _)) = rails.nearest(self.pos, RAIL_REACH) {
                 let (rp, tan) = rails.0[ri].at(d);
                 let along = self.vel.dot(tan);
@@ -1307,6 +1307,13 @@ impl Rider {
         let row = self.data.rows.iter().find(|r| (!r.uber_clip.is_empty() && !clip.contains("UT_SIG") && uber_grab(r.uber_clip) == uber_grab(&clip)) || (clip.contains("UT_SIG") && Some(r.grab) == sig));
         row.map_or(0, |r| grab_clip(crate::trickdata::uber_name(self.data.name, r.grab).unwrap_or(r.uber)))
     }
+    /// The clip-type gate of `Rail_TryCapture` 0x125cb8 (row E8n): no capture while the layer-0 clip is of type 0xe, 0xf or
+    /// 0x10 (descriptor table 0x325fa8: clip ids 0x278..=0x291, 0x292..=0x2ab and 0x2ac..=0x2db, the grab, tweak and uber
+    /// clips) and clip flag 4 (`AnimCtl_TestClipFlag`, the fourth marker) is not set. The port keeps no clip ids in the
+    /// air, so this is its form of that test: the same one it makes for `Landing_CheckAngles` 0x12ba78 in [`Rider::land`]
+    /// (a grab held or still playing out short of its fourth marker, an uber trick not yet done). The fall-recover clip
+    /// 0x224 and the spin and flip clips are not in those ranges (0x224 is type 0): they never gate.
+    pub fn capture_gated(&self) -> bool { !self.grab_safe() || (self.uber > 0.0 && !self.uber_done) }
     /// Is the board free to land (no grab clip short of its safe marker)?
     pub fn grab_safe(&self) -> bool {
         if self.grab != 0 { return false; }

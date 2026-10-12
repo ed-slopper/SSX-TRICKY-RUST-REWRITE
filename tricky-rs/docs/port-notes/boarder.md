@@ -572,7 +572,7 @@ first). Inferred, not shown: the E8l run's capture 0.5 s after the wipe-out was 
 which the game allows (the sim run after the fix is unchanged: 235.0 s, 5 wipe-outs).
 
 **Not ported (new rows):** the clip-type gate (a layer-0 clip of type 0xe/0xf/0x10 without flag 4 refuses a capture;
-which type clip 0x224 has is not read). The order of the wall check against `Rail_TryCapture` inside the game's tick was
+which type clip 0x224 has is not read; ported in row E8n, below). The order of the wall check against `Rail_TryCapture` inside the game's tick was
 row E8o, below: **the "down first" reading above was wrong for a rail**, the game captures first.
 
 ### The order of the air tick (row E8o; `tests/physics.rs`: `the_air_tick_captures_on_a_rail_before_the_wall_puts_the_rider_down`, `a_landing_on_the_tick_is_before_both_the_rail_and_the_wall`)
@@ -738,3 +738,20 @@ weighted by the turn's row). `cBoarder::vf7` 0x117198 (only with rider+0x46b0 se
 table's word 10 in ground motion, toward 0 otherwise, at most 1.6666666 cm a tick (`pose::ease_body_height`). The port
 draws its rider model at the position + `Rider::body_height` along the rider's up.
 
+### The capture's clip-type gate in the air (row E8n; `tests/physics.rs`: `a_grab_short_of_its_fourth_marker_refuses_the_rail_capture`)
+
+**Proven (decompiler and the exe's table).** `Rail_TryCapture` 0x125cb8 refuses when `AnimCtl_GetClipType`(layer 0) is
+0xe, 0xf or 0x10 and `AnimCtl_TestClipFlag`(4, 0) is clear. `AnimCtl_GetClipType` 0x15eec0 is the first word of the
+descriptor row of the layer's clip id (table 0x325fa8, 0x1c bytes a row; id 0x300 answers 8). Read from the table in the
+exe (numbers only): clip ids **0x278..=0x291 are type 0xe, 0x292..=0x2ab type 0xf, 0x2ac..=0x2db type 0x10** (26 + 26 + 48 rows,
+the grab, tweak and uber clips; `Landing_CheckAngles` 0x12ba78 has the same test, `landing::check_angles`), and clip
+**0x224 (`bxA_FALLRECOVER`) is type 0**: the fall recover is not gated, a rider that recovers over a rail is captured.
+`AnimCtl_TestClipFlag` 0x15ffb8 reads bit `flag - 1` of the byte at +0x74 of the layer's clip record
+(`AnimLayer_FindClip`), so flag 4 is bit 3 of a per-clip byte set while the clip plays; the port's grab code treats it as
+the clip's fourth marker (`grab_markers().2`), which is what `Rider::grab_safe` tests for the landing.
+
+**Ported.** `Rider::capture_gated` (`!grab_safe() || uber not done`), the port's form of the same test it makes in
+`Rider::land` for `Landing_CheckAngles`, now refuses the air capture in `Rider::step_tick`: a grab held or playing out
+short of its fourth marker, or an uber trick not done, flies over the rail. The spin and flip clips are not in the gated
+ranges. **Inferred, not read:** that flag 4 is set exactly at the fourth marker (the port's grab notes say so; the clip
+record's byte +0x74 is not read), and that the uber clips' flag 4 is the port's `uber_done`.
