@@ -138,7 +138,7 @@ matches the original.
 | C8 | Alaska | unowned | C0, E9 | | [est] |
 | C9 | Pipedream (show-off only) | unowned | C0, E9 | | [est] |
 | C10 | Untracked (freeride) | unowned | C0, E9 | | [est] |
-| C12 | World Circuit race: heats, advancement, medals, points, unlocks (`Circuit_*` 0x16b000–0x16d400, `Circuit_ProcessUnlocks` 0x16c420) | unowned | C0, E12 | | [repo] `ui.rs` has a stand-in |
+| C12 | World Circuit race: heats, advancement, medals, points, unlocks (`Circuit_*` 0x16b000–0x16d400, `Circuit_ProcessUnlocks` 0x16c420) | unowned | C0, E12 | ed-slopper/puffin (2026-10-11)
 | C13 | World Circuit show-off: clock, checkpoints, medals | unowned | C0, E12 | | [repo] README: show-off medals "still mine" |
 | C14 | Single event, freeride and practice modes | unowned | C0, G9 | | [est] |
 | C15b | The app's trick book on the career block: `src/book.rs` (name-based, `tricky-book.json`) replaced by `Career::trick_book_check` with a `BookEnv` over the race object, the `Trick_GetInfo` table (0x31e210) and the HUD message / sound; the lesson gate | any | C15, E12d | | Gap of C15 |
@@ -669,3 +669,4 @@ matches the original.
 - 2026-10-11 trailrig/heron: E1b2l done (AI/player rider setup, BuildRaceRiders vs the original); added E1b2m (runner-check the other builders, Circuit_SetupRiders).
 - 2026-10-11 trailrig/heron: E1b2m done (rider-list builders and dispatcher vs the original); added E1b2n (Circuit_SetupRiders, PrepareRace switch, n=0 edge).
 - 2026-10-11 trailrig/heron: E1b2n done (Circuit_SetupRiders single-rider path vs the original); added E1b2o (Circuit_SetupEventRiders and the rest).
+- 2026-10-11 ed-slopper/puffin: claim C12.
