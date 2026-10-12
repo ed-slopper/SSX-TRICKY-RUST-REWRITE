@@ -63,7 +63,8 @@ state machine and the renderer are ours. Nothing has been checked against the or
 | E9 | Script machine: `TriggerScript_Run`, `TriggerScript_ExecOp` 0x13bfd0 with every op, controllers (`TriggerScript_Op0_SpawnController` 0x13c600), persistent cell scripts, run at runtime instead of read statically | unowned | E3c | | [repo] `logic.rs` reads SSFLogic.json statically today |
 | E9b2 | Run the script threads in the app (`tricky_game::script` on `tricky_data::ssf` instead of `logic.rs`'s static walk of SSFLogic.json): the world's node list order (`BxList_Add` 0x17d4e8 links new nodes at the head; the update loop's order to confirm), `World_DeleteScriptObject` 0x13bbc0, the starters (area wake, contact, controller goal, the engine's RaceMode / StartCountDown calls) | unowned | E9b, E7 | | Gap of E9b |
 | E11 | Camera: named cameras `cBxCamera_EvalNamedCam` 0x174888 (ported), director scripts `cBxCamera_RunDirectorScript`, replay and finish cameras, camera collision | any | | | [repo] Chase cam ported in `rider.rs`; free camera is ours (keep, tag) |
-| E10c | The input device list and its ring buffer (`Input_Init` 0x17a420, `Input_ReadDevices` 0x17a668, `InputRecorder_Playback` 0x17a740, `Input_FindPressedDevice`, `Input_ResetDevices`, `Input_GetAnyNewButtons`; the recorder the replays play back, G12), the cInput +0x1cc "shown" buttons `Pad_SetupVibration` also binds, and the app reading the disc's maps through `input::parse_button_map` instead of `ButtonMap::btnmap` | unowned | E10b | trailrig/heron (2026-10-11) | Gap of E10b |
+| E10c2 | The pad poll's libpad state machine (`cPS2Device` vf9 0x17b270: states 1..10 over `scePadGetPortStatus`, `scePadInfoMode`, `scePadSetMainMode`, `scePadSetActAlign`, `scePadRead`; `Record::from_pad` and the motor tail are ported) as a trait-driven state machine, checked in the runner with the libpad calls stubbed | any | E10c | | Gap of E10c |
+| E10c3 | The app's input through the game's layers: Bevy gamepad/keys to a libpad word and sticks, `Ps2Pad::play`, the disc's `BTNMAP<n>.DAT` through `input::parse_button_map`/`bind` and `controls::Mapper` (not `ButtonMap::btnmap`), the "shown" buttons (cInput +0x1cc) and the vibration object `Pad_SetupVibration` makes | any | E10c | | Gap of E10c |
 
 ## P2 Gameplay systems
 
@@ -171,6 +172,7 @@ matches the original.
 ## Done
 
 | ID | Task | Section | Who | Date | Commit |
+| E10c | The input device list and its ring (`tricky_game::inputring`): the 0x2c-byte frame (`Record`), the 8-frame ring with the game's empty test (read = write, no full check), `Input_ReadDevices` / `InputRecorder_Playback`, `Input_FindPressedDevice`, `Input_GetAnyNewButtons`, `Pad_LatchButtons`, `Input_ResetDevices`, the pad's vf1/vf2/vf8 and vf10 over `PadDevice::read` + key repeat, vf9's record builder; checked in the runner (tests/inputring.rs: 6000 mixed ops on two real cPS2Device objects, ring bytes, indices, pads, queries). Gaps: E10c2, E10c3 | P1 | trailrig/heron | 2026-10-11 | 816243c |
 |---|---|---|---|---|---|
 | E1b2f | The sound system's generator found: its virtual rand is `cBXAudio::vf3` = `Rand_Fx` (the E1b2c note was wrong); course song A/B picks (`fxrand::segment_pick`, `coursemusic.rs`) and the air loop phrase (`pathmusic.rs`) now draw from the game's stream; formulas written up in `port-notes/world.md` | P1 | trailrig/heron | 2026-10-11 | 5c0f992 |
 | E1b2e | The other `Rand_Fx` users read and ported: particle emitter factors and their `Rand_VuNext` streams, the snow's draws in `cGame::Init` order, the crowd texture picks, the trail spawn draws written up (`tricky_game::fxrand`, `port-notes/world.md`); `DAT_0032de94` has no writer, `GAME_INIT_SEED` = 0 | P1 | trailrig/heron | 2026-10-11 | ad6b06b |
@@ -635,3 +637,5 @@ matches the original.
 - 2026-10-11 trailrig/heron: C11b2 done (the race's lesson states); added C11b3 (gap of C11b2).
 - 2026-10-11 trailrig/heron: E1b2e done (fxrand.rs, notes); added E1b2g, E1b2h (gaps of E1b2e).
 - 2026-10-11 trailrig/heron: E1b2f done (the sound system's rand is Rand_Fx; music pickers on it); added E1b2i (gap of E1b2f).
+
+- 2026-10-11 trailrig/heron: E10c done (inputring.rs, notes in air.md); added E10c2, E10c3 (gaps of E10c). Note for C11c2: the recorder's frame is the 0x2c `Record`, not necessarily inp.rs's 32-byte pad state (vf6/vf7 copy that one).
