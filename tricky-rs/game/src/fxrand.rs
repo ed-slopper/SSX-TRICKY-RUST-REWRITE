@@ -111,6 +111,106 @@ pub fn crowd_texture_pick(r: u32) -> usize {
     (r & 0xf) as usize
 }
 
+/// `Speech_RollChance` 0x235d84: whether a speech line of `kind` plays. The level is the speech system's float
+/// (+0x383c, truncated) held under its cap (+0x6e68); the chance table (0x3a3528, ten words a row, `kind` the row,
+/// 0..=1024 for never..always) is read at that level, and `Rand_Fx & 0x3ff` must be below it. `table` is the
+/// table from its start as words. (An index outside the table is an out-of-range read in the game: `None`.)
+pub fn speech_roll(rand_fx: u32, level: f32, cap: i32, kind: usize, table: &[i32]) -> Option<bool> {
+    let mut i = level as i32;
+    if cap < i {
+        i = cap;
+    }
+    let at = kind as i64 * 10 + i as i64;
+    let v = *table.get(usize::try_from(at).ok()?)?;
+    Some(((rand_fx & 0x3ff) as i32) < v)
+}
+
+/// `FUN_00224658` 0x224658: which of a sound bank's `count` variants is loaded (`FUN_002256c0` 0x2256c0 loads that
+/// one): `Rand_Fx % count`, an unsigned remainder (`divu`). A count of 0 is a divide trap in the game.
+pub fn bank_variant(rand_fx: u32, count: i32) -> i32 {
+    (rand_fx % count as u32) as i32
+}
+
+/// The roster's rider id that means "no rider" in `FUN_00169378` (a fixed empty look, no draw).
+pub const NO_RIDER: i32 = 0x1ad;
+
+/// The tables `FUN_00169378` reads, each from its address: `a` 0x3cc028 (ten bytes a rider id: six signed bytes, a
+/// halfword base at +6, a halfword variant count at +8), `b` 0x32f468 (twelve bytes a look: six halfwords), `c`
+/// 0x37cd70 (500 entries of eight bytes: a halfword key, a halfword value, a word).
+pub struct SceneTables<'a> {
+    pub a: &'a [u8],
+    pub b: &'a [u8],
+    pub c: &'a [u8],
+}
+
+/// One of a rider's six look slots (the words at +0x340 + 0x10 k of the scene record).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct Slot {
+    pub a: i32,
+    pub b: i32,
+    pub c: i32,
+    pub d: i32,
+}
+
+/// A rider's scene record (100 bytes at +0x33c + 100 i): the word the roster gives (+0x33c) and six slots.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct RiderScene {
+    pub first: i32,
+    pub slots: [Slot; 6],
+}
+
+fn h(t: &[u8], at: usize) -> i32 {
+    i16::from_le_bytes([t[at], t[at + 1]]) as i32
+}
+
+/// `FUN_00169378` 0x169378 (`Career_FinalizeRoster`'s per-rider look picks, 15 riders): `ids` are the riders'
+/// look ids (+0x14), `firsts` their first words (+0x50). A rider with [`NO_RIDER`] gets the empty look in every slot
+/// (13, 0x300, 0x1bf, -1) and draws nothing; any other draws one `Rand_Fx % variants` (or takes `forced` when it is
+/// not negative), notes it in `picks` (+0x8c) and fills the six slots from the tables. A slot whose key is not in
+/// table `c` keeps its old `c` and `d`; one that is in it gets that entry's value and word. Panics on a variant count of 0 (the game traps).
+pub fn rider_scene(
+    ids: &[i32; 15],
+    firsts: &[i32; 15],
+    forced: i32,
+    rand_fx: &mut dyn FnMut() -> u32,
+    t: &SceneTables,
+    scenes: &mut [RiderScene; 15],
+    picks: &mut [i32; 15],
+) {
+    for i in 0..15 {
+        let id = ids[i];
+        scenes[i].first = firsts[i];
+        if id == NO_RIDER {
+            for s in scenes[i].slots.iter_mut() {
+                *s = Slot { a: 0xd, b: 0x300, c: 0x1bf, d: -1 };
+            }
+            continue;
+        }
+        let row = id as usize * 10;
+        let count = h(t.a, row + 8);
+        let mut idx = (rand_fx() % count as u32) as i32; // divu
+        let mut look = h(t.a, row + 6) + idx;
+        if forced >= 0 {
+            look = h(t.a, row + 6) + forced;
+            idx = forced;
+        }
+        picks[i] = idx;
+        for k in 0..6 {
+            let key = h(t.b, k * 2 + look as usize * 12);
+            let s = &mut scenes[i].slots[k];
+            s.a = t.a[row + k] as i8 as i32;
+            s.b = key;
+            for e in 0..500 {
+                if h(t.c, e * 8) as u16 as i32 == key && key >= 0 {
+                    s.c = u16::from_le_bytes([t.c[e * 8 + 2], t.c[e * 8 + 3]]) as i32;
+                    s.d = i32::from_le_bytes([t.c[e * 8 + 4], t.c[e * 8 + 5], t.c[e * 8 + 6], t.c[e * 8 + 7]]);
+                    break;
+                }
+            }
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -204,5 +304,21 @@ mod tests {
             g = vu_next(g);
         }
         assert!(f.iter().all(|&x| x == g));
+    }
+    #[test]
+    fn speech_roll_reads_the_row_and_level() {
+        let mut table = vec![0i32; 30];
+        table[10 + 3] = 512;
+        assert_eq!(speech_roll(511, 3.9, 9, 1, &table), Some(true));
+        assert_eq!(speech_roll(512, 3.9, 9, 1, &table), Some(false));
+        assert_eq!(speech_roll(0x400 + 5, 7.0, 3, 1, &table), Some(true)); // held at the cap: 3
+        assert_eq!(speech_roll(0, 0.0, 0, 5, &table), None);
+        assert_eq!(speech_roll(0, -1.0, 9, 0, &table), None);
+    }
+
+    #[test]
+    fn bank_variant_is_an_unsigned_remainder() {
+        assert_eq!(bank_variant(10, 3), 1);
+        assert_eq!(bank_variant(0xffff_fff9, 4), 1); // 4294967289 % 4
     }
 }
