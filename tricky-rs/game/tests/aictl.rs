@@ -361,3 +361,43 @@ fn check_stuck_matches_the_original() {
     }
     assert!(seen.iter().all(|&n| n > 1000), "{seen:?}");
 }
+
+#[test]
+fn resolve_anm_index_matches_the_original() {
+    let Some(mut r) = runner() else { return };
+    let rider = r.mem.alloc(0x500);
+    let stats = r.mem.alloc(0x100);
+    r.mem.write_u32(rider + 0x464, stats);
+    let draw = Rc::new(RefCell::new(0u32));
+    let d = draw.clone();
+    r.stub(0x23d4d8, move |c, _| c.set_gpr(2, *d.borrow() as u64));
+    let mut g = Rng(0x2468_ace0_1357_9bdf);
+    let mut kinds = [0u32; 4];
+    for case in 0..60_000 {
+        let clip = g.next() % 0x548;
+        let w = g.next() % 4;
+        // the shipped table has only kinds 0 and 4 below 0x548: patch the others in to run every branch
+        if g.next() % 2 == 0 {
+            r.mem.write_u32(0x325fa8 + 0x1c * clip + 4, [0, 1, 2, 3, 4][g.next() as usize % 5]);
+            r.mem.write_u32(0x3bf180 + clip * 4, ((1 + g.next() % 5) << 16) | (g.next() % 9));
+        }
+        let s3c = [g.next() % 14, 0, 11, 12].map(|x| x as i32)[g.next() as usize % 4];
+        *draw.borrow_mut() = g.next();
+        r.mem.write_u32(rider + 0x420, w);
+        r.mem.write_u32(stats + 0x3c, s3c as u32);
+        let kind = r.mem.read_u32(0x325fa8 + 0x1c * clip + 4);
+        if kind == 3 && (r.mem.read_u32(0x3bf180 + clip * 4) >> 16) == 0 {
+            continue;
+        }
+        kinds[kind.min(3) as usize] += 1;
+        r.cpu.set_gpr(4, clip as u64);
+        r.cpu.set_gpr(5, rider as u64);
+        r.call(0x15ada8).unwrap_or_else(|e| panic!("case {case}: {e}"));
+        let want = r.cpu.gpr(2) as u32;
+        let d = *draw.borrow();
+        let mem = RefCell::new(&mut r.mem);
+        let got = resolve_anm_index(&|a| mem.borrow_mut().read_u32(a), clip, w, s3c, &mut || d);
+        assert_eq!(got, want, "case {case}: clip {clip:#x} kind {kind} w {w} s3c {s3c}");
+    }
+    assert!(kinds.iter().all(|&n| n > 100), "{kinds:?}");
+}

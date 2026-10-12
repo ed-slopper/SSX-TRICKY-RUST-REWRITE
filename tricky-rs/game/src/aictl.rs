@@ -277,3 +277,31 @@ pub fn check_stuck(s: &mut StuckIn, below: &mut dyn FnMut() -> bool, above: &mut
     }
     !above()
 }
+
+/// `AnimClip_ResolveAnmIndex` 0x15ada8 (board row E1b2d3): the game's clip id → the animation index the rider plays,
+/// by how the clip's row (0x325fa8 + 0x1c × clip, word +4) says it is chosen: 0 by the rider's outfit/body word
+/// (`rider+0x420`) from the table at 0x3c0bd0 (rows of 3 words); 1 by the stats word +0x3c (12 or more: 0x585) from
+/// 0x3c2fc8 (rows of 12); 3 a random one of a clip's variants (a `Rand_Game` draw, unsigned remainder by the row at
+/// 0x3bf180's high half, first variant its low half, rows of 3 words at 0x3bfd80); anything else the plain table at
+/// 0x3bffd0. `word` reads the game's memory at an address (the ELF's data).
+pub fn resolve_anm_index(word: &dyn Fn(u32) -> u32, clip: u32, rider_word: u32, stats_3c: i32, rand_game: &mut dyn FnMut() -> u32) -> u32 {
+    let kind = word(0x325fa8 + 0x1c * clip + 4);
+    match kind {
+        0 => word(0x3c0bd0 + rider_word.wrapping_mul(4).wrapping_add(clip * 0xc)),
+        1 => {
+            if stats_3c >= 12 {
+                return 0x585;
+            }
+            word(0x3c2fc8u32.wrapping_add((stats_3c as u32).wrapping_mul(4)).wrapping_add(clip * 0x30))
+        }
+        3 => {
+            let e = word(0x3bf180 + clip * 4);
+            let draw = rand_game();
+            let n = ((e as i32) >> 16) as u32;
+            assert!(n != 0, "AnimClip_ResolveAnmIndex: division by zero (trap)");
+            let idx = ((e as i16) as i32 as u32).wrapping_add(draw % n);
+            word(0x3bfd80u32.wrapping_add(rider_word.wrapping_mul(4)).wrapping_add(idx.wrapping_mul(0xc)))
+        }
+        _ => word(0x3bffd0 + clip * 4),
+    }
+}
