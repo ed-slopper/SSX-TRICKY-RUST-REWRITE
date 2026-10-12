@@ -1237,6 +1237,61 @@ impl Career {
     }
 }
 
+/// What `Career_PrepareRace` 0x163980 asks of the rest of the game (row E1b2j).
+pub trait PrepareEnv {
+    /// `Career_SetupRidersForMode` 0x165558: the rider list for the race mode (the builders are not ported yet)
+    fn setup_riders_for_mode(&mut self, career: &mut Career);
+    /// `Rand_Fx` 0x23d4a8
+    fn rand_fx(&mut self) -> u32;
+}
+
+impl Career {
+    /// `Career_PrepareRace` 0x163980: mode 10 (the career's +0x2af8) is race mode 6; the rider list built for the
+    /// mode; the six race slots numbered 0..count and the rest -1; `FUN_001637f8` (`merge_player_records`); every
+    /// player slot's id word (+0x3104), its attribute words copied from +0x3118 to +0x312c; then two draws kept as
+    /// the race's seeds (+0x2b04, then +0x2b00).
+    pub fn prepare_race(&mut self, env: &mut impl PrepareEnv) {
+        if self.r32(0x2af8) == 10 {
+            self.w32(0x2afc, 6);
+        }
+        env.setup_riders_for_mode(self);
+        let n = self.r32(0x27dc) as i32;
+        let mut i = 0usize;
+        let mut fill = true;
+        if n >= 1 {
+            while (i as i32) < n {
+                self.w32(0x27e0 + 0x84 * i, i as u32);
+                i += 1;
+            }
+            fill = n < 6;
+        }
+        if fill {
+            while i < 6 {
+                self.w32(0x27e0 + 0x84 * i, u32::MAX);
+                i += 1;
+            }
+        }
+        self.merge_player_records();
+        for k in 0..4 {
+            let o = 0x44 * k;
+            self.w32(0x3104 + o, self.bytes[0x30fc + o] as i8 as i32 as u32);
+            let a = self.r32(0x3118 + o);
+            let b = self.r32(0x311c + o);
+            self.w32(0x312c + o, a);
+            self.w32(0x3130 + o, b);
+            let a = self.r32(0x3120 + o);
+            let b = self.r32(0x3124 + o);
+            self.w32(0x3134 + o, a);
+            self.w32(0x3138 + o, b);
+            self.w32(0x313c + o, self.r32(0x3128 + o));
+        }
+        let d = env.rand_fx();
+        self.w32(0x2b04, d);
+        let d = env.rand_fx();
+        self.w32(0x2b00, d);
+    }
+}
+
 /// The career as the app keeps it on disk (row E12d): the memory card's image (`Career::save_image`, CRC included).
 pub struct CareerFile;
 
