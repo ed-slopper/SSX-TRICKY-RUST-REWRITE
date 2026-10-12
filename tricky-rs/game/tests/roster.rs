@@ -162,3 +162,106 @@ fn rivals_init_pairs_matches_the_original() {
     let _ = Career::default();
     assert!(humans > 10_000);
 }
+
+#[test]
+fn finalize_roster_matches_the_original() {
+    use tricky_game::career::{Career, CAREER_BASE, CAREER_SIZE};
+    use tricky_game::fxrand::SceneTables;
+    use tricky_game::rand::Streams;
+    use tricky_game::roster::{PreRaceSel, RosterTables};
+    let Some(mut r) = Runner::from_env() else { return };
+    for a in [0x168b88u32, 0x1691f0, 0x1688f0, 0x1687f0, 0x169378, 0x23d4a8, 0x2401e0] {
+        r.allow(a);
+    }
+    let tab = |r: &mut Runner, a: u32, n: usize| -> Vec<u8> { (0..n * 3).flat_map(|i| r.mem.read_u32(a + 4 * i as u32).to_le_bytes()).collect() };
+    let rows: Vec<Vec<u8>> = [(0x37b390u32, 9usize), (0x37b400, 0x85), (0x37ba40, 0x9f), (0x37c1b8, 0x3f), (0x37c4b0, 0x34), (0x37cd60, 1), (0x37c720, 0x85)].iter().map(|&(a, n)| tab(&mut r, a, n)).collect();
+    let mut g = Rng(0x2468_ace0_1357_9bdf);
+    // table a (0x3cc028) is built at run time: scripted rows for every id the tables hold
+    let mut ta = vec![0u8; 0x800 * 10];
+    for id in 0..0x800 {
+        for k in 0..6 {
+            ta[id * 10 + k] = g.next() as u8;
+        }
+        let base = (g.next() % 1500) as i16;
+        let count = 1 + (g.next() % 6) as i16;
+        ta[id * 10 + 6..id * 10 + 8].copy_from_slice(&base.to_le_bytes());
+        ta[id * 10 + 8..id * 10 + 10].copy_from_slice(&count.to_le_bytes());
+    }
+    for (i, w) in ta.chunks(4).enumerate() {
+        r.mem.write_u32(0x3cc028 + 4 * i as u32, u32::from_le_bytes(w.try_into().unwrap()));
+    }
+    let tb = tab(&mut r, 0x32f468, 0x2000);
+    let tc = tab(&mut r, 0x37cd70, 500 * 8 / 12 + 1);
+    let tables = RosterTables { rows: [&rows[0], &rows[1], &rows[2], &rows[3], &rows[4], &rows[5], &rows[6]], scene: SceneTables { a: &ta, b: &tb, c: &tc } };
+    let sel = r.mem.alloc(0x100);
+    let mut branches = [0u32; 4];
+    for case in 0..20_000 {
+        let mut ours = Career::default();
+        for b in ours.bytes.iter_mut() {
+            *b = g.next() as u8;
+        }
+        let n = 1 + (g.next() % 6) as usize;
+        ours.w32(0x27dc, n as u32);
+        for i in 0..6usize {
+            let o = 0x27dc + 0x84 * i;
+            ours.w32(o + 0x3c, if g.next() % 5 == 0 { g.next() % 12 } else { i as u32 % 12 });
+            ours.w32(o + 0x84, if g.next() % 3 == 0 { 2 } else { g.next() % 2 });
+            ours.bytes[o + 0x69] = if g.next() % 2 == 0 { 0xff } else { (g.next() % 4) as u8 };
+        }
+        ours.w32(0x2af8, g.next() % 12);
+        ours.w32(0x2afc, g.next() % 11);
+        ours.w32(0x2b0c, g.next() % 6);
+        for k in 0..CAREER_SIZE as u32 / 4 {
+            let v = u32::from_le_bytes(ours.bytes[4 * k as usize..4 * k as usize + 4].try_into().unwrap());
+            r.mem.write_u32(CAREER_BASE + 4 * k, v);
+        }
+        // the selection: co-riders from the roster or 12, ids and firsts and picks as they were
+        let mut s = PreRaceSel::default();
+        let roster_rider = |c: &Career, i: usize| c.r32(0x27dc + 0x84 * i + 0x3c) as i32;
+        for k in 0..5 {
+            s.co[k] = if g.next() % 3 == 0 { 0xc } else if g.next() % 4 == 0 { (g.next() % 12) as i32 } else { roster_rider(&ours, g.next() as usize % n) };
+        }
+        for k in 0..15 {
+            s.ids[k] = g.next() as i32 % 0x400 & 0x3ff;
+            s.firsts[k] = g.next() as i32 & 0x7f;
+            s.picks[k] = g.next() as i32 & 7;
+        }
+        s.rider = if g.next() % 4 == 0 { 0xc } else if g.next() % 3 == 0 { (g.next() % 12) as i32 } else { roster_rider(&ours, g.next() as usize % n) };
+        for k in 0..5 {
+            r.mem.write_u32(sel + 4 * k as u32, s.co[k] as u32);
+        }
+        for k in 0..15 {
+            r.mem.write_u32(sel + 0x14 + 4 * k as u32, s.ids[k] as u32);
+            r.mem.write_u32(sel + 0x50 + 4 * k as u32, s.firsts[k] as u32);
+            r.mem.write_u32(sel + 0x8c + 4 * k as u32, s.picks[k] as u32);
+        }
+        r.mem.write_u32(sel + 0xc8, s.rider as u32);
+        let mut rand = Streams::default();
+        rand.seed_fx(g.next());
+        for (k, w) in rand.fx.s.iter().enumerate() {
+            r.mem.write_u32(0x345e58 + 4 * k as u32, *w);
+        }
+        r.cpu.set_gpr(4, sel as u64);
+        r.cpu.set_gpr(5, (CAREER_BASE + 0x27dc) as u64);
+        r.call(0x168b88).unwrap_or_else(|e| panic!("case {case}: {e}"));
+        ours.finalize_roster(&mut s, &tables, &mut || rand.fx());
+        for k in 0..CAREER_SIZE as u32 {
+            let got = (r.mem.read_u32((CAREER_BASE + k) & !3) >> (8 * ((CAREER_BASE + k) & 3))) as u8;
+            assert_eq!(got, ours.bytes[k as usize], "case {case}: career byte {k:#x} (riders {n})");
+        }
+        let rd = |m: &mut r5900::Mem, o: u32| m.read_u32(sel + o) as i32;
+        for k in 0..5 {
+            assert_eq!(rd(&mut r.mem, 4 * k), s.co[k as usize], "case {case}: co {k}");
+        }
+        for k in 0..15 {
+            assert_eq!(rd(&mut r.mem, 0x14 + 4 * k), s.ids[k as usize], "case {case}: id {k}");
+            assert_eq!(rd(&mut r.mem, 0x50 + 4 * k), s.firsts[k as usize], "case {case}: first {k}");
+            assert_eq!(rd(&mut r.mem, 0x8c + 4 * k), s.picks[k as usize], "case {case}: pick {k}");
+        }
+        for (k, x) in rand.fx.s.iter().enumerate() {
+            assert_eq!(r.mem.read_u32(0x345e58 + 4 * k as u32), *x, "case {case}: stream {k}");
+        }
+        branches[(ours.r32(0x27dc + 0x918) as i32 >= 0) as usize] += 1;
+    }
+    assert!(branches.iter().take(2).all(|&c| c > 500), "{branches:?}");
+}
