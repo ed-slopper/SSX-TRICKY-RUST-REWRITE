@@ -21,6 +21,7 @@ pub mod gate;
 pub mod hit;
 pub mod probe;
 pub mod ps2f;
+pub mod ragdoll;
 pub mod props;
 pub mod race;
 pub mod rand;

@@ -27,7 +27,7 @@ Part of the port notes (index: [README.md](README.md)); units and wording as des
 
 ## Wipe-out body (`Ragdoll_Step` 0x10dca8, `Ragdoll_Contacts` 0x10e190, `Wipeout_StartGetUp` 0x10f178)
 
-- One rigid body from the collision spheres (masses 4,2,2,...; inertia ×1.5); |ω| ≤ 23.56 rad/s. Gravity 1900.84
+- One rigid body from the collision spheres (masses 4,2,2,...; inverse inertia 0.8·(1.2·I)⁻¹, see below); |ω| ≤ 23.56 rad/s. Gravity 1900.84
   cm/s², drag 0.5/s linear and angular; the hit's impulse (e 0.15) is the only initial spin; angular momentum
   × (1 − 3.3475·dt). Contacts: e = 0.8 − 0.7|n_z|, μ = 0.15|n_z| (none under 100 cm/s), then ×0.95.
 - Impact clips on hitting the snow: cmI_/cmCI_ HEAD, FEET, LEFT, RIGHT, BUTT, FACE by which body axis meets the
@@ -64,8 +64,45 @@ Part of the port notes (index: [README.md](README.md)); units and wording as des
   a tick to up = n, nose → 0x360; riding after 2n−1 ticks.
 - Clip ids: 0x2dc BUTTSLIDE, 0x2dd FACESLIDE, 0x2de F_FALLINGCYCLE, 0x2df CC_CRUNCHCYCLE, 0x2e0 CT_CRUNCH2STRETCH,
   0x2e1–6 cmCI_ and 0x2e8–d cmI_ (BUTT FACE FEET HEAD LEFT RIGHT), 0x224 A_FALLRECOVER, 0x250/1 CT_CRUNCH/STRETCH2BASE.
-- Mass: sphere masses 4,2,2,2,2,2,2,2,4,4,2,2,2,2,3,3 (0x3a3f68); I = 1.5× point-mass inertia. Sphere places
-  are per character (not extracted): the remake uses a 1.7 m stand-in (rider/wipeout.rs).
+- Mass: sphere masses 4,2,2,2,2,2,2,2,4,4,2,2,2,2,3,3,3,3 (0x3a3f68); inverse inertia 0.8·(1.2·I)⁻¹ of the point
+  masses. The spheres are where the skeleton puts them (`CollBody_UpdateFromBones`, row E8d2); the app still uses
+  a 1.7 m stand-in (rider/wipeout.rs, row G6c).
+
+## The wipe-out body, exactly (board row G6a; `tricky_game::ragdoll`, checked: `tests/ragdoll.rs`)
+
+- The motion's body (wipe-out motion +0x70, a `cRigidBody`): +8 seconds since the last touch, +0x20 / +0x40 the
+  crash point and normal, +0x60 the rider.
+- `Ragdoll_ComputeMassProps` 0x10d6f8 (each step): `CollBody_PointMassInertia` of the rider's body (rider+0x470);
+  1/m; the inertia × 1.2 inverted by cofactors, × 0.8; v and ω again (`RigidBody_UpdateVelocity`, with the spin
+  limit). Returns the centre of mass.
+- `Ragdoll_InitFromBoarder` 0x10dad8: the body at the centre of mass, the rider's orientation (+0x170) and
+  velocity (p = v·m), no spin (L from ω = 0); the crash normal turned round and kept at rider+0x2f0; if the crash
+  point closes on it, `RigidBody_ContactImpulse`(0.15, 0).
+- `Ragdoll_Step` 0x10dca8(dt): F = (0, 0, −1900.8359·m) − ½p, τ = −½L; while +8 < 0.15 s also 600·m toward the
+  course point (rider+0x350) taken along the ground (rider+0x2a0) and made unit. Integrate, v and ω, the contacts.
+  Then the rider: its offset from the centre of mass turned back by its old orientation, turned by the body's,
+  the rider placed at the body's position less it; its orientation and velocity the body's;
+  `Boarder_UpdateOrientation`.
+- `Ragdoll_Contacts` 0x10e190: the record's kind 3; the body's +0x24 set to the word at 0x31d314 while it casts
+  (−1 after); one `cWorldBoarder` built at the start serves every cast, so the later casts see the body where it
+  was. The world: a hit pushes the body (and the rider's spheres) out by its depth; if the point closes,
+  `Boarder_AccumulateImpact`, the rider's virtual +0x64(point, v, n), the bounce and the record kept. The bounce:
+  e = 0.8 − 0.7|n_z| and μ = 0.15|n_z| at 100 cm/s or more (else 0, 0), then p and L × 0.95 (v and ω from them,
+  no spin limit). A second cast the same way, without the virtual; a normal facing against the first is first
+  made to slide along it (n₂ − (n₂·n₁)n₁, unit). The objects: the normal taken along the ground and made unit; only
+  objects with flag 0x80 push the body out; a closing point is a contact (`Instance_OnPlayerContact` with the
+  point, the body's direction of travel, the normal and its speed), with flag 0x80 also an impact and a bounce
+  e 0.5, μ 0, and the sound. Then the rider's broadphase pairs: rollers get `Ragdoll_HitRoller`; type 0x3ef nodes
+  (riders) call `FUN_0010ebc8`, which is empty.
+- `Ragdoll_HitRoller` 0x10ed68: as two rollers (world.md) but j = −1.5·closing / (…), no bounces added: the
+  roller is woken (`Roller_OnHit` without a rider).
+- `Ragdoll_GroundProbe` 0x10fd58: the hip bone (rider + 0x394·[+0x44d8] + 0x8c8) turned by the rider's
+  orientation, from the rider, taken onto the plane through the rider; a line ±400 cm along the ground's normal
+  (`cWorldLine` 0.5). No ground: normal (0, 0, 1), fall line = forward (+0x1a0), surface 3. Ground: its kind
+  (+0x2e0), its +0x34 word (+0x290), normal, height above it (+0x1bc), `Boarder_GetFallLine`, the point (+0x2d0).
+  Both: +0x320 the forward along the ground, unit.
+- Checked in the runner on 6,000 random riders (bodies spread about them, every cast scripted, the shapes handed
+  over compared): the rider, the body, the record, the roller and every call bit for bit.
 
 ## Rider hits, exactly (board row E8d1, checked: `tests/hit.rs`; `tricky-rs/game/src/hit.rs`)
 

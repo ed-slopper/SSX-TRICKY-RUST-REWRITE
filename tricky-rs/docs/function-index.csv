@@ -120,7 +120,7 @@ address,size,name,system,status
 0x10e190,2616,Ragdoll_Contacts,wipeout,ported
 0x10ebc8,8,FUN_0010ebc8,wipeout?,not started
 0x10ebd0,408,FUN_0010ebd0,world?,not started
-0x10ed68,1040,Ragdoll_HitRoller,wipeout,not started
+0x10ed68,1040,Ragdoll_HitRoller,wipeout,ported
 0x10f178,2088,Wipeout_StartGetUp,wipeout,ported
 0x10f9a0,740,Wipeout_PlayImpactClip,wipeout,ported
 0x10fd58,1124,Ragdoll_GroundProbe,wipeout,ported
@@ -131,7 +131,7 @@ address,size,name,system,status
 0x1102c8,1192,GetUpMotion_Update,wipeout,ported
 0x110770,40,WipeOutRecoverMotion_SaveSnapshot,save,not started
 0x110798,20,WipeOutRecoverMotion_LoadSnapshot,ai?,not started
-0x110830,8,Body_Translate,other,not started
+0x110830,8,Body_Translate,other,ported
 0x110838,16,Obj_HasId,world?,not started
 0x110860,8,FUN_00110860,world?,not started
 0x110868,44,Vec4_ScaleCopy8,world?,not started
@@ -145,8 +145,8 @@ address,size,name,system,status
 0x110bf8,812,cAI::vf11_110bf8,ai,not started
 0x110f28,120,Race_IsPlayerPad,race,not started
 0x110fa0,356,cAI::vf13_110fa0,ai,not started
-0x111108,964,cAI::vf14_111108,ai,not started
-0x1114d0,144,cAI::vf15_1114d0,ai,not started
+0x111108,964,cAI::vf14_111108,ai,ported
+0x1114d0,144,cAI::vf15_1114d0,ai,ported
 0x111560,424,cAI::vf16_111560,ai,not started
 0x111708,44,cAI::vf18_111708,ai,not started
 0x111738,180,cAI::vf19_111738,ai,not started
