@@ -171,7 +171,7 @@ matches the original.
 
 | ID | Task | Section | Who | Date | Commit |
 |---|---|---|---|---|---|
-| C11 | The `trick` course is the Trick Tutorial (game mode 6, `cLessonMan` with eleven handlers, `cTrickTutorialLoad`): data, states, menu and flow read and written up in `port-notes/tutorial.md`; follow-ups C11b..C11e | P3 | trailrig/heron | 2026-10-11 | COMMIT |
+| C11 | The `trick` course is the Trick Tutorial (game mode 6, `cLessonMan` with eleven handlers, `cTrickTutorialLoad`): data, states, menu and flow read and written up in `port-notes/tutorial.md`; follow-ups C11b..C11e | P3 | trailrig/heron | 2026-10-11 | 69292d0 |
 | D1 | Ghidra project analysed, RTTI recovered (394 classes, 2,884 names, `tools/rtti_scan.py`), decompiler export | P0 | ed-slopper | 2026-10-05 | 9e4e994 |
 | D2 | Patcher (`tools/ssxpatch.py`) and the debug-menu / unlock-all mods | P5 | ed-slopper | 2026-10-05 | 9e4e994 |
 | D3 | Level viewer and first riding (`tricky-rs` stage 1–2), `.afl` animation format decoded | P1 | ed-slopper | 2026-10-06 | bd4670b |
