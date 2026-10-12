@@ -1346,6 +1346,62 @@ impl Career {
     }
 }
 
+impl Career {
+    /// `Rivals_InitPairsCircuit` 0x16c008 on the circuit block at +0x320c: as [`Career::rivals_init_pairs`], but a
+    /// human other's attitude is, at a circuit level (+0x320c+0x14) other than 0, the circuit's word for the rider
+    /// (+0x320c+0x1c+4·rider) when that is not negative; afterwards every attitude decays by its relation
+    /// (`Rivals_DecayAttitudes` 0x168028 at a level, `Rivals_DecayAttitudes2` 0x168180 at level 0, the same code):
+    /// relation 0 loses 2, 1 loses 3, 2 loses 1, a negative one is 0, and it is raised to the table's attitude.
+    pub fn rivals_init_pairs_circuit(&mut self, count: i32, rel: &dyn RelSource) {
+        let level = self.r32(0x320c + 0x14);
+        for i in 0..count.max(0) as usize {
+            for j in 0..count as usize {
+                let (ri, rj) = (0x27e0 + 0x84 * i, 0x27e0 + 0x84 * j);
+                let me = self.r32(ri + 0x38) as i32;
+                let other = self.r32(rj + 0x38) as i32;
+                let player = self.bytes[rj + 0x65] as i8;
+                let word = if level != 0 { self.r32(0x320c + 0x1c + 4 * (me as usize & 15)) as i32 } else { -1 };
+                let att = if player < 0 {
+                    rel.attitude(me, other) as u8
+                } else if level != 0 && word >= 0 {
+                    word as u8
+                } else {
+                    let (rec, _) = self.player_rec(player);
+                    self.bytes[(rec as isize + 8 * me as isize + 0x168) as usize]
+                };
+                let at = ri + 4 * j;
+                self.bytes[at + 0x20] = att;
+                self.bytes[at + 0x21] = rel.cap(me, other) as u8;
+                self.bytes[at + 0x22] = rel.tolerance(me, other) as u8;
+                self.bytes[at + 0x23] = rel.relation(me, other) as u8;
+            }
+        }
+        for i in 0..count.max(0) as usize {
+            for j in 0..count as usize {
+                let ri = 0x27e0 + 0x84 * i;
+                let at = ri + 4 * j;
+                let mut a = self.bytes[at + 0x20] as i8;
+                match self.bytes[at + 0x23] {
+                    0 => a = a.wrapping_sub(2),
+                    1 => a = a.wrapping_sub(3),
+                    2 => a = a.wrapping_sub(1),
+                    _ => {}
+                }
+                if a < 0 {
+                    a = 0;
+                }
+                let me = self.r32(ri + 0x38) as i32;
+                let other = self.r32(0x27e0 + 0x84 * j + 0x38) as i32;
+                let t = rel.attitude(me, other) as u8 as i8;
+                if a < t {
+                    a = t;
+                }
+                self.bytes[at + 0x20] = a as u8;
+            }
+        }
+    }
+}
+
 /// The career as the app keeps it on disk (row E12d): the memory card's image (`Career::save_image`, CRC included).
 pub struct CareerFile;
 
