@@ -141,7 +141,7 @@ matches the original.
 | C12 | World Circuit race: heats, advancement, medals, points, unlocks (`Circuit_*` 0x16b000–0x16d400, `Circuit_ProcessUnlocks` 0x16c420) | unowned | C0, E12 | | [repo] `ui.rs` has a stand-in |
 | C13 | World Circuit show-off: clock, checkpoints, medals | unowned | C0, E12 | | [repo] README: show-off medals "still mine" |
 | C14 | Single event, freeride and practice modes | unowned | C0, G9 | | [est] |
-| C15 | Trick book: chapters, unlock of uber tricks, rewards (`Score_TrickBookCheck` 0x157a00) | any | E5 | trailrig/heron (2026-10-11) | [repo] `book.rs` |
+| C15b | The app's trick book on the career block: `src/book.rs` (name-based, `tricky-book.json`) replaced by `Career::trick_book_check` with a `BookEnv` over the race object, the `Trick_GetInfo` table (0x31e210) and the HUD message / sound; the lesson gate | any | C15, E12d | | Gap of C15 |
 | C16 | Unlockables: characters, outfits, boards, the hidden ones, and the button cheats | unowned | C12, E10 | | [repo] |
 | C11b5 | Practice Enter's write of 0 to byte +0x5a70 of the game's player object (`Env` has no call for it; find what reads it), and the lesson's start-up (`LessonMan_Init` 0x14aaa0: the rider's `.big` shapes, the lesson pad map, `Pad_LoadButtonMap`) as `Lesson::new`'s real inputs | any | C11b4, C11c2 | | Gap of C11b4 |
 | C11c2 | The lesson archive `data/tutorial/<rider>.big` (what it holds: the `.inp` files? the lesson sounds / speech?), a check of `tricky_data::inp` against a real `.inp` from the disc, and the pad swap (`Pad_GetConfig` / `Pad_SetConfig` 0x17a290 / 0x17a2f8) at the preview's start and end | any | C11c | | Gap of C11c; needs the disc's `data/tutorial` |
@@ -172,6 +172,7 @@ matches the original.
 
 | ID | Task | Section | Who | Date | Commit |
 |---|---|---|---|---|---|
+| C15 | `Career::trick_book_check` = `Score_TrickBookCheck` 0x1579e0 (+ `trick_matches`, `trick_page`, `BookEnv`); checked in the runner against the original (`tests/trick_book.rs`: 60,000 random states: slots, books, flags, the lesson and mode gates, id matches; career block, lesson flag, message and sound compared). Gaps: C15b | P3 | trailrig/heron | 2026-10-11 | 6b532c9 |
 | E1b2i | The remaining `Rand_Fx` users ported in `fxrand.rs` and checked in the runner (`tests/scene_picks.rs`): `Speech_RollChance` 0x235d58 (30,000 random rolls), the sound bank variant pick 0x224658 (unsigned remainder, `divu`), and the roster's per-rider look picks `FUN_00169378` (4,000 rosters: draws, picks, all slots). Gaps: E1b2j | P1 | trailrig/heron | 2026-10-11 | f405697 |
 | C11b4 | The race object's lesson modes 6..10 (`lesson::RaceLesson`: `Race_CreateHandlers`, `cAI::vf9` set_mode, `vf1` tick, the five handlers); checked in the runner against the real `cAI::vf1`/`vf9` (120,000 random mode requests: mode, handlers, clock, load flag, the lesson's request, calls). Quirk: LoadLesson goes to PreLesson through `Race_CreateHandlers` itself, so no `Exit` runs. Gaps: C11b5 | P3 | trailrig/heron | 2026-10-11 | 7f1b07b |
 | C11b3 | `lesson.rs` checked against the original's lesson manager in the function runner (`tests/lesson.rs`: the real `cLessonMan::vf1` 0x14b9b8, all eleven handlers and the helpers, outside calls stubbed and logged, 200,000 random steps: pad edges, flags, external state requests; calls, fields, recording position, rider speed, done flag compared). Found and fixed one difference: the Wait menu refresh at the page and trick levels keeps the other strings. Gaps: C11b4 | P3 | trailrig/heron | 2026-10-11 | b766950 |
@@ -655,3 +656,4 @@ matches the original.
 - 2026-10-11 irregulur/lynx: F1c stopped (released) after 19 more names.
 
 - 2026-10-11 trailrig/heron: E1b2i done (speech roll, bank variant, rider scene picks vs the original); added E1b2j (gap of E1b2i).
+- 2026-10-11 trailrig/heron: C15 done (trick book check vs the original); added C15b (gap of C15).
