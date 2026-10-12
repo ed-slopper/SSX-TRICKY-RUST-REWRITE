@@ -69,7 +69,7 @@ state machine and the renderer are ours. Nothing has been checked against the or
 
 | ID | Task | Area | Needs | Who | Notes |
 |---|---|---|---|---|---|
-| E12d | The app's save on `career::Career`: the block saved and loaded (`save_image` / `load_image`) instead of `tricky-save.json`, the new game from `init_new_game` | unowned | E12b | trailrig/heron (2026-10-11) | Split of E12b |
+| E12d2 | The app's medals, times and scores on the career block instead of `tricky-save.json`: the race results through `Career::check_new_records` / `record_best_time` / `record_best_score` (a `RecordsEnv`, the app's character and course indices), the menus' unlocks (`is_character_unlocked`, `is_board_unlocked`, tracks) read from the block, the old json read once to carry medals over | any | E12d | | Gap of E12d |
 | E12c | The career's static tables: `career::StaticTables` (`Career_InitStaticTables` 0x169e38, the outfit and board tables and their five readers) and `status_name_id` (`Career_GetStatusName`) checked in the runner (tests/career.rs). The strings themselves: E5a2 | P2 | ed-slopper/puffin | 2026-10-11 | 07541ac |
 | G1 | Boarder state machine: every state (0x00–0x14) and motion (0–6), their enter/update/exit, `cBoarder` vtable, in the original's order per tick | unowned | F1 | | [repo] Many states ported one by one; the dispatch is ours |
 | G1a | Prewind, jump, takeoff, spin and flip control (`PrewindState_Update` 0x1050e8, `Jump_ApplyImpulse` 0x1284e0, `Takeoff_SetSpinRates` 0x126e30, `SpinState_Update` 0x100908, `SpinState_StartFromStick` 0x102158) checked | any | F4a | | [repo] Ported, unchecked Split: G1a1, G1a2 |
@@ -172,6 +172,7 @@ matches the original.
 
 | ID | Task | Section | Who | Date | Commit |
 |---|---|---|---|---|---|
+| E12d | The app starts on the game's career block: `career::CareerFile::open` (the memory card image if its CRC matches, else `init_new_game`), `ui::CareerRes` loaded at start and saved to `tricky-career.sav` with each kept run; unit test of the round trip and of a bad file. Gaps: E12d2 | P2 | trailrig/heron | 2026-10-11 | d813c5f |
 | C15 | `Career::trick_book_check` = `Score_TrickBookCheck` 0x1579e0 (+ `trick_matches`, `trick_page`, `BookEnv`); checked in the runner against the original (`tests/trick_book.rs`: 60,000 random states: slots, books, flags, the lesson and mode gates, id matches; career block, lesson flag, message and sound compared). Gaps: C15b | P3 | trailrig/heron | 2026-10-11 | 6b532c9 |
 | E1b2i | The remaining `Rand_Fx` users ported in `fxrand.rs` and checked in the runner (`tests/scene_picks.rs`): `Speech_RollChance` 0x235d58 (30,000 random rolls), the sound bank variant pick 0x224658 (unsigned remainder, `divu`), and the roster's per-rider look picks `FUN_00169378` (4,000 rosters: draws, picks, all slots). Gaps: E1b2j | P1 | trailrig/heron | 2026-10-11 | f405697 |
 | C11b4 | The race object's lesson modes 6..10 (`lesson::RaceLesson`: `Race_CreateHandlers`, `cAI::vf9` set_mode, `vf1` tick, the five handlers); checked in the runner against the real `cAI::vf1`/`vf9` (120,000 random mode requests: mode, handlers, clock, load flag, the lesson's request, calls). Quirk: LoadLesson goes to PreLesson through `Race_CreateHandlers` itself, so no `Exit` runs. Gaps: C11b5 | P3 | trailrig/heron | 2026-10-11 | 7f1b07b |
@@ -657,3 +658,4 @@ matches the original.
 
 - 2026-10-11 trailrig/heron: E1b2i done (speech roll, bank variant, rider scene picks vs the original); added E1b2j (gap of E1b2i).
 - 2026-10-11 trailrig/heron: C15 done (trick book check vs the original); added C15b (gap of C15).
+- 2026-10-11 trailrig/heron: E12d done (career file load / new game / save in the app); added E12d2 (gap of E12d).
