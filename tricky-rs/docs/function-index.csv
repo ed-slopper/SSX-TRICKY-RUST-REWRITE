@@ -933,7 +933,7 @@ address,size,name,system,status
 0x14bbe8,428,cLessonMan::vf2_14bbe8,tutorial,not started
 0x14bd98,764,LessonOverlay_DrawButtons,frontend,not started
 0x14c098,528,LessonOverlay_DrawPage,frontend,not started
-0x14c2a8,12,FUN_0014c2a8,scoring?,not started
+0x14c2a8,12,FUN_0014c2a8,scoring?,ported
 0x14c2c0,8,FUN_0014c2c0,frontend?,not started
 0x14c2c8,8,FUN_0014c2c8,frontend?,not started
 0x14c2d0,3176,LessonOverlay_DrawTrickBookPage,frontend,not started
@@ -1070,7 +1070,7 @@ address,size,name,system,status
 0x154548,44,Vec4_ScaleCopy17,other,not started
 0x154580,56,TrickDef_Load,other,ported
 0x1545b8,12,FUN_001545b8,,not started
-0x154638,36,Trick_GetInfo,frontend?,not started
+0x154638,36,Trick_GetInfo,frontend?,ported
 0x154688,64,cTrickInfo::vf2_154688,tutorial,not started
 0x1546c8,1104,TrickInfo_BuildText,game?,not started
 0x154b18,520,cGameTrickInfo::vf5_154b18,game,not started
@@ -1263,7 +1263,7 @@ address,size,name,system,status
 0x1635b8,532,Career_AssignPlayerRider,frontend?,ported
 0x1637d0,40,Career_ClearPlayerSlot,frontend?,ported
 0x1637f8,388,Career_MergePlayerRecords,frontend?,ported
-0x163980,292,Career_PrepareRace,race?,not started
+0x163980,292,Career_PrepareRace,race?,ported
 0x163ab0,96,Career_FinishRace,race?,not started
 0x163b10,36,Career_IsCharacterUnlocked,frontend?,ported
 0x163b38,124,Career_GetModeFlag,frontend?,not started
@@ -1280,7 +1280,7 @@ address,size,name,system,status
 0x163fe8,52,Career_GetPlayerStats,race?,not started
 0x164020,64,TrickBook_IsPageComplete,scoring,not started
 0x164060,68,TrickBook_CountCompletePages,scoring,ported
-0x1640a8,92,TrickBook_CountToTier,scoring,not started
+0x1640a8,92,TrickBook_CountToTier,scoring,ported
 0x164108,8,TrickBook_TricksPerPage,scoring,not started
 0x164110,100,TrickBook_PageFirstTrick,scoring,ported
 0x164178,124,TrickBook_CountDoneInPage,scoring,ported
@@ -1321,15 +1321,15 @@ address,size,name,system,status
 0x164fc0,1084,Career_CheckNewRecords,race?,ported
 0x165400,104,Career_ClearPlayerFlags,race?,ported
 0x165468,240,Career_GetAttributes,race?,ported
-0x165558,260,Career_SetupRidersForMode,race?,not started
+0x165558,260,Career_SetupRidersForMode,race?,ported
 0x165660,36,Career_InitShortRecord,race?,not started
 0x165688,240,Career_SetupSoloRider,race?,not started
-0x165778,712,Career_SetupTutorialRiders,race?,not started
-0x165a40,344,Career_PickSixRandomRiders,race?,not started
-0x165b98,344,Career_PickRandomRiders,race?,not started
-0x165cf0,1888,Career_BuildRaceRiders,race?,not started
-0x166450,92,Career_ResetRiders,race?,not started
-0x1664b0,56,Career_InitRiderList,race?,not started
+0x165778,712,Career_SetupTutorialRiders,race?,ported
+0x165a40,344,Career_PickSixRandomRiders,race?,ported
+0x165b98,344,Career_PickRandomRiders,race?,ported
+0x165cf0,1888,Career_BuildRaceRiders,race?,ported
+0x166450,92,Career_ResetRiders,race?,ported
+0x1664b0,56,Career_InitRiderList,race?,ported
 0x1664e8,100,Career_GetPlayerLastRider,race?,not started
 0x166550,48,Career_FindPlayerSlot,race?,ported
 0x166580,20,Career_GetPlayerId,race?,ported
@@ -1351,25 +1351,25 @@ address,size,name,system,status
 0x167060,272,Career_SelectSoloRider,frontend?,ported
 0x167170,16,StaticDtor_Career,race?,not started
 0x167208,2960,RelTable_Init,ai,checked
-0x167da0,28,RelTable_GetAttitude,ai,not started
+0x167da0,28,RelTable_GetAttitude,ai,ported
 0x167dc0,28,RelTable_GetTolerance,ai,not started
 0x167de0,28,RelTable_GetAttitudeCap,ai,not started
-0x167e00,28,RelTable_GetRelation,ai,not started
+0x167e00,28,RelTable_GetRelation,ai,ported
 0x167ea0,392,Rivals_InitPairs,race?,ported
 0x168028,344,Rivals_DecayAttitudes,race?,ported
 0x168180,344,Rivals_DecayAttitudes2,race?,not started
 0x1682e0,124,StaticInit_Rivals,race?,not started
 0x168360,808,PreRaceSel_BuildSceneIndex,race,not started
 0x168688,28,PreRaceSel_Destruct,race,not started
-0x1686a8,116,PreRaceSel_Clear,race,not started
-0x168720,204,PreRaceSel_Choose,race,not started
-0x1687f0,252,PreRaceSel_MatchRow,race,not started
-0x1688f0,236,PreRaceSel_MatchRowWithRoster,race,not started
-0x1689e0,56,PreRaceSel_SetCoRiders,race,not started
-0x168a18,356,PreRaceSel_ChooseFromTable,race,not started
+0x1686a8,116,PreRaceSel_Clear,race,ported
+0x168720,204,PreRaceSel_Choose,race,ported
+0x1687f0,252,PreRaceSel_MatchRow,race,ported
+0x1688f0,236,PreRaceSel_MatchRowWithRoster,race,ported
+0x1689e0,56,PreRaceSel_SetCoRiders,race,ported
+0x168a18,356,PreRaceSel_ChooseFromTable,race,ported
 0x168b80,8,FUN_00168b80,race?,not started
-0x168b88,1640,Career_FinalizeRoster,race?,not started
-0x1691f0,392,PreRaceSel_ResolveWithRoster,race,not started
+0x168b88,1640,Career_FinalizeRoster,race?,ported
+0x1691f0,392,PreRaceSel_ResolveWithRoster,race,ported
 0x169378,700,PreRaceSel_PickSceneVariants,race,ported
 0x169640,40,RaceScene_Construct,race?,not started
 0x169668,28,RaceScene_Destruct,race?,not started
@@ -1400,30 +1400,30 @@ address,size,name,system,status
 0x16b7b0,56,Course_GetMapMarkerY,race,not started
 0x16b860,44,Course_GetUnlockHintStringId,race,not started
 0x16b8e0,44,Course_GetDescriptionStringId,race,not started
-0x16ba18,72,Circuit_FindEntry,race,not started
-0x16ba60,72,Circuit_GetMedalThresholds,race,not started
-0x16baa8,172,Circuit_GetMedal,race,ported
-0x16bb58,20,Circuit_ClampMedalRank,race,not started
+0x16ba18,72,Circuit_FindEntry,race,checked
+0x16ba60,72,Circuit_GetMedalThresholds,race,checked
+0x16baa8,172,Circuit_GetMedal,race,checked
+0x16bb58,20,Circuit_ClampMedalRank,race,checked
 0x16bb70,40,Circuit_Construct,race,not started
 0x16bb98,8,thunk_FUN_0016a978,runtime,host
 0x16bba0,48,RiderSetup_Init,race?,ported
-0x16bbd0,92,Circuit_IsFinalEvent,race,not started
-0x16bc30,12,Circuit_GotRaceFinalUnlock,race,not started
-0x16bc40,12,Circuit_GotShowoffFinalUnlock,race,not started
-0x16bc50,76,Circuit_SetupRiders,race,not started
-0x16bca8,8,FUN_0016bca8,race?,not started
-0x16bcb0,852,Circuit_ProcessRaceResult,race,ported
-0x16c008,540,Rivals_InitPairsCircuit,race?,not started
-0x16c228,252,FUN_0016c228,race?,not started
-0x16c328,132,Circuit_SaveRiderPoints,save,not started
-0x16c3b0,112,Circuit_AdvanceEvent,race,not started
-0x16c420,3000,Circuit_ProcessUnlocks,race,not started
+0x16bbd0,92,Circuit_IsFinalEvent,race,checked
+0x16bc30,12,Circuit_GotRaceFinalUnlock,race,ported
+0x16bc40,12,Circuit_GotShowoffFinalUnlock,race,ported
+0x16bc50,76,Circuit_SetupRiders,race,ported
+0x16bca8,8,FUN_0016bca8,race?,ported
+0x16bcb0,852,Circuit_ProcessRaceResult,race,checked
+0x16c008,540,Rivals_InitPairsCircuit,race?,ported
+0x16c228,252,FUN_0016c228,race?,checked
+0x16c328,132,Circuit_SaveRiderPoints,save,checked
+0x16c3b0,112,Circuit_AdvanceEvent,race,checked
+0x16c420,3000,Circuit_ProcessUnlocks,race,checked
 0x16cfd8,208,Circuit_SetupRider,race,not started
 0x16d0a8,8,FUN_0016d0a8,race?,not started
-0x16d0b0,324,Circuit_ScoreEventResult,race,not started
-0x16d1f8,52,Circuit_AddPointsToAll,race,not started
+0x16d0b0,324,Circuit_ScoreEventResult,race,checked
+0x16d1f8,52,Circuit_AddPointsToAll,race,checked
 0x16d230,204,Circuit_SetupRace,race,not started
-0x16d300,1548,Circuit_SetupEventRiders,race,not started
+0x16d300,1548,Circuit_SetupEventRiders,race,ported
 0x16d910,124,StaticInit_Circuit,race?,not started
 0x16d990,60,CamAnimation::CamAnimation,race?,not started
 0x16d9d0,60,CamAnimation_InitScoped,race?,not started
@@ -3604,7 +3604,7 @@ address,size,name,system,status
 0x218e20,8,FUN_00218e20,audio?,not started
 0x218e28,136,Sfx_SpinTrickStop,audio?,not started
 0x218eb0,576,Sfx_OnRiderReset,audio?,ported
-0x2190f0,200,Sfx_OnTrickBookDone,audio?,not started
+0x2190f0,200,Sfx_OnTrickBookDone,audio?,ported
 0x2191c0,152,Sfx_OnMeterAdd,audio?,ported
 0x219258,76,FUN_00219258,audio?,not started
 0x2192a8,1208,Sfx_UpdateBoost,audio?,ported
@@ -3793,7 +3793,7 @@ address,size,name,system,status
 0x224498,288,Song_UpdateVolume,audio?,not started
 0x2245b8,104,Song_FadeOut,audio?,not started
 0x224620,52,PathX_GetSongState,audio?,not started
-0x224658,80,FUN_00224658,audio?,not started
+0x224658,80,FUN_00224658,audio?,ported
 0x2246a8,192,Song_RandomSegmentMs,audio?,ported
 0x224768,36,FUN_00224768,audio?,not started
 0x224790,48,FUN_00224790,audio?,not started
@@ -3824,7 +3824,7 @@ address,size,name,system,status
 0x225618,68,Music_PrevSong,audio,not started
 0x225660,64,MusicSys_NextEnabledSong,audio,not started
 0x2256a0,28,Audio_UpdateSongVolume,audio,not started
-0x2256c0,168,MusicSys_LoadSongBank,audio,not started
+0x2256c0,168,MusicSys_LoadSongBank,audio,ported
 0x225768,112,Music_ScheduleBreak,audio,not started
 0x2257d8,120,Music_CancelBreak,audio,not started
 0x225850,40,FUN_00225850,audio?,not started
@@ -4161,7 +4161,7 @@ address,size,name,system,status
 0x235780,1008,Sfx_PlayClipSound,audio,not started
 0x235b70,56,SpeechSys_StopCharScript,frontend?,not started
 0x235ba8,432,Speech_OnBigScore,audio?,not started
-0x235d58,112,Speech_RollChance,audio?,not started
+0x235d58,112,Speech_RollChance,audio?,ported
 0x235e70,88,FUN_00235e70,render?,not started
 0x235fc8,52,CollBody_Construct,wipeout,not started
 0x236000,80,CollBody_ConstructCopy,wipeout,not started

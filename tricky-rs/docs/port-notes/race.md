@@ -226,3 +226,37 @@ the same unchecked way, and port that 1:1 (the bug included), noting it here.
 - `Career_GetStatusName` 0x1634c0: statuses 0..9 are the strings 0x17..0x20 (`Loc_GetString`, E5a2), others none.
 - Checked in the runner on 20 cases of random memory (pending and not), every reader of every entry, and each
   status −2..11.
+
+## The World Circuit's results and unlocks (board row C12; checked: `tests/circuit.rs`)
+
+`tricky_game::circuit`, on the rider set-up at career +0x320c (+4 the saved part, +8 the race, +0xc the places,
++0x10 the player's slot, +0x14 the heat, +0x18 the heat's bonus, +0x1c twelve rider points) and the circuit's
+globals (0x3353f0 show-off final, 0x3353f4 race final, the unlock list 0x335400 of (who, kind, value) and its
+count 0x3353f8, the riders out 0x335664 + 0x10 · character). The heats' rider set-up is E1b2o's.
+
+- `Circuit_ProcessRaceResult` 0x16bcb0 (from `Career_CheckNewRecords`): only a circuit show-off (5), or a circuit
+  race (4) at its last heat (2). The medal: the show-off's score (places +0xac) through `Circuit_GetMedal`(score,
+  course); the race's first place held by a player's rider (clamped to 3). The course's medal byte in the player's
+  character record (+0x24 + 4·course show-off, +0x25 race; 3 none). A better medal adds the points difference
+  (0x37ee40: 15, 10, 5, 0) to the mode's total (+8 show-off, +4 race), to +0 and to all twelve rider points
+  (`Circuit_AddPointsToAll`, +0x164); +0 is then held to what the caps leave (Σ cap − group byte +0xc..), or set to
+  it once every circuit course has gold in both modes. Then `Circuit_ProcessUnlocks`(old +4 + +8, new, medal); a
+  non-empty list marks the career changed (+0x3258).
+- `Circuit_ProcessUnlocks` 0x16c420: a medal listed (kind 7); for each active slot, trick-book pages 0..4 newly
+  complete (kind 5, the record's +0x5c bits 2 << page) and the whole book (kind 8, with page 5: +0x20 set and the
+  circuit player's +0x58 bit 0x800), the race's flags (kind 9) — listed by slot, all listed before any bit is set.
+  When the total moved: the next course in the mode's order opened (the saved +0 bit, kind 2; the record's +0x26
+  race / +0x27 show-off byte, kind 1 / 0); a medal on Alaska (the last) opens the finals (bits 7 race, 6 show-off,
+  kind 2, the two globals); a gold unlocks the next character in the order 0x3352c0 (3, 4, 7, 0, 10, 5, 6, 1, 11,
+  8, 9, 2: kind 3, saved +4); boards whose points (0, 0, 5, 20, … 240, 999) the total reaches (+0x58, kind 4); the
+  level crossed (240, 200, 160, 120, 90, 60, 35, 20, 5, 0: the last crossed wins; kind 6, career +0x370c set, level
+  0 the +0x5c bit 0x40).
+- `Circuit_ScoreEventResult` 0x16d0b0: the player's character's heat place sets the bonus (+0x18: 0.833, 0.334,
+  0.167), past third it is out; riders past third are out; it goes on while the heat is not the last; at the last
+  heat a player not out keeps the rider points (`Circuit_SaveRiderPoints` 0x16c328: the set ones into +0x168, 8
+  apart). `Circuit_AdvanceEvent` 0x16c3b0: a race going on takes the next heat (4); else the heat back to 0 (2).
+  `FUN_0016c228`: the last player rider's view of the others (the race object's table) into the rider points.
+- The lookups: `Circuit_FindEntry` / `Circuit_GetMedalThresholds` give 8 for a course not in the order (and the
+  last entry's address), `Circuit_IsFinalEvent` is the seventh.
+- Checked in the runner: 20,000 random careers (players in slots, races in every mode, medals, trick books, flags,
+  points) over every function, the block, globals and list compared; every kind of unlock reached.
