@@ -215,3 +215,14 @@ the same unchecked way, and port that 1:1 (the bug included), noting it here.
   version is not checked.
 - Checked in the runner: 100,000 random operations from a new game (assigning, clearing, spending, refunding,
   resets, merges, names, flags, race results, bests) with the block compared each time; 50 saves.
+
+## The career's static tables (board row E12c; checked: `tests/career.rs`)
+
+- `Career_InitStaticTables` 0x169e38, once (while `DAT_00335258` is set, which it clears): the outfit table at
+  0x3cd0e0 (by character and outfit, 7 × 0x10: the outfit's model 7 · character + outfit, outfit 6 repeating 5,
+  then the character three times) and the board table at 0x3cd620 (12 × 12 words, each its own index), and
+  `gCheat_Character` cleared. Its readers (`Career_GetOutfitWord0/1/3`, `Career_GetRiderAttrib`,
+  `Career_GetBoardWord`) are lookups. `StaticTables` keeps them, with the table as data.
+- `Career_GetStatusName` 0x1634c0: statuses 0..9 are the strings 0x17..0x20 (`Loc_GetString`, E5a2), others none.
+- Checked in the runner on 20 cases of random memory (pending and not), every reader of every entry, and each
+  status −2..11.

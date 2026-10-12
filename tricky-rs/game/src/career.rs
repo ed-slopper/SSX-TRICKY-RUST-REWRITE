@@ -1236,3 +1236,69 @@ impl Career {
         true
     }
 }
+
+/// The outfit table (0x3cd0e0, written by `Career_InitStaticTables`): by character and outfit four words: the
+/// outfit's model, then the character three times (the readers below). Outfit 6 repeats outfit 5.
+pub const OUTFITS: [[[u32; 4]; 7]; 12] = [
+    [[0, 0, 0, 0], [1, 0, 0, 0], [2, 0, 0, 0], [3, 0, 0, 0], [4, 0, 0, 0], [5, 0, 0, 0], [5, 0, 0, 0]],
+    [[7, 1, 1, 1], [8, 1, 1, 1], [9, 1, 1, 1], [10, 1, 1, 1], [11, 1, 1, 1], [12, 1, 1, 1], [12, 1, 1, 1]],
+    [[14, 2, 2, 2], [15, 2, 2, 2], [16, 2, 2, 2], [17, 2, 2, 2], [18, 2, 2, 2], [19, 2, 2, 2], [19, 2, 2, 2]],
+    [[21, 3, 3, 3], [22, 3, 3, 3], [23, 3, 3, 3], [24, 3, 3, 3], [25, 3, 3, 3], [26, 3, 3, 3], [26, 3, 3, 3]],
+    [[28, 4, 4, 4], [29, 4, 4, 4], [30, 4, 4, 4], [31, 4, 4, 4], [32, 4, 4, 4], [33, 4, 4, 4], [33, 4, 4, 4]],
+    [[35, 5, 5, 5], [36, 5, 5, 5], [37, 5, 5, 5], [38, 5, 5, 5], [39, 5, 5, 5], [40, 5, 5, 5], [40, 5, 5, 5]],
+    [[42, 6, 6, 6], [43, 6, 6, 6], [44, 6, 6, 6], [45, 6, 6, 6], [46, 6, 6, 6], [47, 6, 6, 6], [47, 6, 6, 6]],
+    [[49, 7, 7, 7], [50, 7, 7, 7], [51, 7, 7, 7], [52, 7, 7, 7], [53, 7, 7, 7], [54, 7, 7, 7], [54, 7, 7, 7]],
+    [[56, 8, 8, 8], [57, 8, 8, 8], [58, 8, 8, 8], [59, 8, 8, 8], [60, 8, 8, 8], [61, 8, 8, 8], [61, 8, 8, 8]],
+    [[63, 9, 9, 9], [64, 9, 9, 9], [65, 9, 9, 9], [66, 9, 9, 9], [67, 9, 9, 9], [68, 9, 9, 9], [68, 9, 9, 9]],
+    [[70, 10, 10, 10], [71, 10, 10, 10], [72, 10, 10, 10], [73, 10, 10, 10], [74, 10, 10, 10], [75, 10, 10, 10], [75, 10, 10, 10]],
+    [[77, 11, 11, 11], [78, 11, 11, 11], [79, 11, 11, 11], [80, 11, 11, 11], [81, 11, 11, 11], [82, 11, 11, 11], [82, 11, 11, 11]],
+];
+
+/// The career's static tables: `DAT_00335258` (set until the first init), the outfit table and the board table
+/// (0x3cd620, 12 × 12 words, character · 12 + board: their own index).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct StaticTables {
+    pub pending: u32,
+    pub outfits: [[[u32; 4]; 7]; 12],
+    pub boards: [[u32; 12]; 12],
+}
+
+impl Default for StaticTables {
+    /// As the game loads: the tables zero, waiting for their init
+    fn default() -> Self {
+        StaticTables { pending: 1, outfits: [[[0; 4]; 7]; 12], boards: [[0; 12]; 12] }
+    }
+}
+
+impl StaticTables {
+    /// `Career_InitStaticTables` 0x169e38: once (while `pending`): the tables written and the character cheat's
+    /// word cleared.
+    pub fn init(&mut self, cheats: &mut crate::cheats::Cheats) {
+        if self.pending != 0 {
+            self.pending = 0;
+            self.outfits = OUTFITS;
+            for (c, row) in self.boards.iter_mut().enumerate() {
+                for (b, w) in row.iter_mut().enumerate() {
+                    *w = (12 * c + b) as u32;
+                }
+            }
+            cheats.character = [0];
+        }
+    }
+
+    /// `Career_GetBoardWord` 0x16b1d0(character, board)
+    pub fn board_word(&self, character: usize, board: usize) -> u32 {
+        self.boards[character][board]
+    }
+
+    /// `Career_GetOutfitWord0` 0x16b1f8 / `Career_GetOutfitWord1` 0x16b248 / `Career_GetRiderAttrib` 0x16b220 /
+    /// `Career_GetOutfitWord3` 0x16b270(character, outfit): word 0..3
+    pub fn outfit_word(&self, character: usize, outfit: usize, word: usize) -> u32 {
+        self.outfits[character][outfit][word]
+    }
+}
+
+/// `Career_GetStatusName` 0x1634c0: the string id (`Loc_GetString` on gApp+0x50) of status 0..9, else none
+pub fn status_name_id(status: i32) -> Option<u32> {
+    (0..=9).contains(&status).then(|| 0x17 + status as u32)
+}

@@ -1258,7 +1258,7 @@ address,size,name,system,status
 0x161b40,6168,Profile_ResetNewGame,save,ported
 0x163358,272,Career_DefaultPlayerName,other,ported
 0x163468,88,Career_GetRecords,frontend?,ported
-0x1634c0,236,Career_GetStatusName,other,not started
+0x1634c0,236,Career_GetStatusName,other,checked
 0x1635b0,8,Career_GetEventMode,race?,ported
 0x1635b8,532,Career_AssignPlayerRider,frontend?,ported
 0x1637d0,40,Career_ClearPlayerSlot,frontend?,ported
@@ -1380,16 +1380,16 @@ address,size,name,system,status
 0x169bb8,48,RaceScene_GetScriptName,race?,not started
 0x169be8,316,RaceScene_PlayCastClip,race?,not started
 0x169d28,48,StaticDtor_RaceScene,race?,not started
-0x169e38,2876,Career_InitStaticTables,race?,not started
+0x169e38,2876,Career_InitStaticTables,race?,checked
 0x16a978,28,Circuit_Destruct,race,not started
 0x16a998,60,Career_ToggleCharacterCheat,input,ported
 0x16a9d8,1164,Career_SetupPlayerRider,race?,ported
 0x16ae68,872,Career_SetupAIRider,race?,ported
-0x16b1d0,36,Career_GetBoardWord,race?,not started
-0x16b1f8,36,Career_GetOutfitWord0,race?,not started
-0x16b220,36,Career_GetRiderAttrib,race?,not started
-0x16b248,36,Career_GetOutfitWord1,race?,not started
-0x16b270,36,Career_GetOutfitWord3,race?,not started
+0x16b1d0,36,Career_GetBoardWord,race?,checked
+0x16b1f8,36,Career_GetOutfitWord0,race?,checked
+0x16b220,36,Career_GetRiderAttrib,race?,checked
+0x16b248,36,Career_GetOutfitWord1,race?,checked
+0x16b270,36,Career_GetOutfitWord3,race?,checked
 0x16b298,152,Career_AverageStatGroups,race?,checked
 0x16b330,196,Course_GetDifficultyString,race,not started
 0x16b3f8,196,Course_GetLocationString,race,not started

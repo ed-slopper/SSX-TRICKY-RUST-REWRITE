@@ -199,3 +199,79 @@ fn save_is_the_original() {
         assert!(!Career::default().load_image(&bad, None), "case {case}: a damaged image");
     }
 }
+
+/// `Career_InitStaticTables` 0x169e38 (on memory of random bytes, pending and not), its readers and
+/// `Career_GetStatusName` against `tricky_game::career::StaticTables` / `status_name_id`.
+#[test]
+fn static_tables_are_the_original() {
+    use tricky_game::career::{status_name_id, StaticTables};
+    use tricky_game::cheats::Cheats;
+    let Some(mut r) = Runner::from_env() else { return };
+    let ids: Rc<RefCell<Vec<u32>>> = Rc::new(RefCell::new(Vec::new()));
+    let i = ids.clone();
+    r.stub(0x2c5160, move |c, _| {
+        i.borrow_mut().push(c.gpr(5) as u32);
+        c.set_gpr(2, 0x1234);
+    });
+    let app = r.mem.alloc(0x100);
+    r.mem.write_u32(0x337c58, app);
+    let mut g = Rng(0x7ab1_e500_0000_0001);
+    for case in 0..20 {
+        let pending = if case % 3 == 2 { 0 } else { g.next() | 1 };
+        let mut ours = StaticTables { pending, ..Default::default() };
+        for c in 0..12 {
+            for o in 0..7 {
+                for w in 0..4 {
+                    ours.outfits[c][o][w] = g.next();
+                }
+            }
+            for b in 0..12 {
+                ours.boards[c][b] = g.next();
+            }
+        }
+        let mut cheats = Cheats { character: [g.next()], ..Default::default() };
+        r.mem.write_u32(0x335258, pending);
+        r.mem.write_u32(0x3352b8, cheats.character[0]);
+        for c in 0..12 {
+            for o in 0..7 {
+                for w in 0..4 {
+                    r.mem.write_u32(0x3cd0e0 + 0x70 * c as u32 + 0x10 * o as u32 + 4 * w as u32, ours.outfits[c][o][w]);
+                }
+            }
+            for b in 0..12 {
+                r.mem.write_u32(0x3cd620 + 0x30 * c as u32 + 4 * b as u32, ours.boards[c][b]);
+            }
+        }
+        call(&mut r, 0x169e38, &[0]);
+        ours.init(&mut cheats);
+        assert_eq!(r.mem.read_u32(0x335258), ours.pending, "case {case}: pending");
+        assert_eq!(r.mem.read_u32(0x3352b8), cheats.character[0], "case {case}: the character cheat");
+        for c in 0..12usize {
+            for o in 0..7usize {
+                for (w, f) in [0x16b1f8u32, 0x16b248, 0x16b220, 0x16b270].into_iter().enumerate() {
+                    let theirs = call(&mut r, f, &[0, c as u64, o as u64]) as u32;
+                    assert_eq!(theirs, ours.outfit_word(c, o, w), "case {case}: outfit {c} {o} word {w}");
+                }
+            }
+            for b in 0..12usize {
+                let theirs = call(&mut r, 0x16b1d0, &[0, c as u64, b as u64]) as u32;
+                assert_eq!(theirs, ours.board_word(c, b), "case {case}: board {c} {b}");
+            }
+        }
+    }
+    for s in -2..12i32 {
+        ids.borrow_mut().clear();
+        let theirs = call(&mut r, 0x1634c0, &[0, s as i64 as u64]) as u32;
+        let ours = status_name_id(s);
+        assert_eq!(ids.borrow().first().copied(), ours, "status {s}");
+        assert_eq!(theirs, if ours.is_some() { 0x1234 } else { 0 }, "status {s}: result");
+    }
+}
+
+fn call(r: &mut Runner, f: u32, args: &[u64]) -> u64 {
+    for (k, a) in args.iter().enumerate() {
+        r.cpu.set_gpr(4 + k, *a);
+    }
+    r.call(f).unwrap_or_else(|e| panic!("{f:#x}: {e}"));
+    r.cpu.gpr(2)
+}
