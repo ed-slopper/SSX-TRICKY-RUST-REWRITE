@@ -129,9 +129,12 @@ impl Streams {
 /// everything the front end drew before; the port has no such history.
 pub const RACE_SEED: u32 = 0x1d2c_3b4a;
 
-/// The seed the port gives `Rand_SeedGame` for the draws made while the course's objects are built. STANDIN: the game
-/// seeds the stream from `DAT_0032de94` at `cGame::Init` 0x17e148 (0x17e3f0).
-pub const GAME_INIT_SEED: u32 = 0x5a17_e9c3;
+/// The seed `cGame::Init` 0x17e148 gives `Rand_SeedGame` (0x17e3f0) for the draws made while the course's objects are
+/// built: `DAT_0032de94`. Nothing in the executable writes that word (its only reference is this read; the image has
+/// zero there, in the zero-filled data after the event setup words 0x32de88..0x32de98), so it is 0 on a fresh start
+/// (E1b2e). Unless a store through a base register not seen by the cross-references exists, which would show as a
+/// different first draw in a recording of the first frames.
+pub const GAME_INIT_SEED: u32 = 0;
 
 /// The game's two streams are globals (state at 0x345e58 and 0x345e70): every consumer draws from the same one, so the
 /// order of the draws across the riders and the systems is part of the result. Until a race is entered the game stream

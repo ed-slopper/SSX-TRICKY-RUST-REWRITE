@@ -4,6 +4,8 @@ Read from SLUS_203.26 by trailrig/heron for board row C11. "Proven" = read from 
 
 ## What the `trick` course is
 
+`FE_SetupRaceFromMenu` 0x2657a8 sets it up: in game mode 6 it writes course `DAT_0032de88 = 10` and one entry (`gRace_EntryCount = 1`) before `Career_PrepareRace`.
+
 Course 10 in the course table is "Trick Tutorial" (`trick`, no show-off time). It is the stage of the **Trick Tutorial**
 (game mode 6, the "Lesson" mode): `cGame::Init` creates the lesson manager (`LessonMan_Init` 0x14aaa0, a
 `cBxObjNode` subclass `cLessonMan`, vtable 0x36e570) when `DAT_0032de8c == 6`, and the loading screen is

@@ -422,10 +422,28 @@ Part of the port notes (index: [README.md](README.md)); units and wording as des
     when the jitter word is set; the jitter is a spread around the speed, not a second speed). The port had it the other
     way round and as a second speed. `cGame::Init` seeds `Rand_Game` from `DAT_0032de94` (0x17e1c4) before the objects are
     built and the race init reseeds it, so the riders never see these draws.
-  - Not read or not ported yet (E1b2e): the order the nodes are made in (the port: instance order for the clocks, script-op
-    order for the controllers; the game's node list order is the order the cells wake and the scripts run), the other
-    `Rand_Fx` users in the draws list (`FUN_001d5180` 0x1d5180 (nine draws), `ParticleGroup_UpdateTrail` 0x1d9208, `FUN_001c8ec8`, `cGame::Init`'s
-    snow and rain draws 0x17e8c0..0x17e8e8, the emitters and the splash and spray code, which are G15 / G19).
+  - The other `Rand_Fx` users (row E1b2e, read; ported as `tricky_game::fxrand`, tests in the module):
+    - `ParticleSys_RandomizeFactors` 0x1d5180: nine draws, each a float in [1, 2) (`(r & 0x7fffff | 0x3f800000)`), stored at
+      emitter offsets 0x28, 0x2c, 0x30, 0x34, 0x38, 0x40, 0x44, 0x48, 0x4c (called from `ParticleSys_Create` 0x1d85c4 and twice
+      in `Fx_SurfaceSpray`). They are then the emitter's nine separate random streams: `ParticleSys_StepEmitter` 0x1d5a30 runs
+      `Rand_VuNext` 0x1d5a08 (the vector unit's R register: `VRINIT` from the word's low 23 bits, `VRNEXT`) on each, in that
+      order, once per emission step. So the spray, trail and splash randomness is a third generator, seeded from `Rand_Fx`.
+    - `cGame::Init`'s snow: after `ParticleMan_Init`, when the game mode is neither 2 nor 4, the race has at most one rider
+      (`+0x7c`) and fewer than three entries (`+0x88`) one draw decides `snow = u < course record +0x54`; then
+      `SnowFall_InitLayers` 0x1c8ec8 (in the `cSnowFallMan` constructor) makes 7 layers x 4 draws (words 4, 6, 7, 5 of the
+      0x90-byte layer record, each in [1, 2)); then density `0.05 + 0.15 u` (`+0x78`, `SnowFall_SetDensity`); then two draws
+      for `FUN_001c91c0`: `5 + u` and `7 - u'` (`+0x4bc`, `+0x4c0`, which set each layer's words 1 and 2).
+    - `Crowd_LoadTexturesRandomize` 0x1458e0 (right after, from `cGame::Init`): for every instance whose model flags have
+      bit 0 set, in instance order, one draw `& 15` per sub-item (the crowd's cells) picks one of 16 textures.
+    - `ParticleGroup_UpdateTrail` 0x1d9208 (from the rider's effect, `vf7_1356f8`): per call one draw for the spawn count
+      (`trunc(+0x10 + +0x14 (2u - 1) + carry +0x18)`, the fraction kept), then per new particle five draws: its life
+      (`+0x1c + trunc(+0x20 (2u - 1))`), a speed (`+0x70 + +0x74 (2u - 1)`), a lateral factor (`2u - 1`, with `+0x78`,
+      `+0x7c`), and the two offsets along the vectors at +0x40 and +0x60 (`2u - 1` each). Not ported (the trail itself is
+      G15 / G19's).
+    - `cUVScrollTexFlipNode::Update` 0x1462d0: the flip stepping of `texanim::Flip` (its random frame `ceil(u (n - 1))` and
+      the flicker's `rate (0.75 u + 0.25)`), already in place.
+  - `DAT_0032de94` (the `Rand_SeedGame` seed at `cGame::Init`) has no writer in the executable and is zero in the image:
+    `GAME_INIT_SEED` is 0. The node order stays open (E1b2h).
 
 - The intro's and scenes' draws (row E1b2c, read): the camera director's random branch (`CamScript_Update` 0x175f50 case 10,
   0x176278) draws once from `Rand_Fx`, `divu` by 100 (unsigned, 0x176284), and takes the branch when the remainder is below

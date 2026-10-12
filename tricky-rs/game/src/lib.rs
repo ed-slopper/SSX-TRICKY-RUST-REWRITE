@@ -19,6 +19,7 @@ pub mod controllers;
 pub mod courses;
 pub mod debris;
 pub mod finish;
+pub mod fxrand;
 pub mod gate;
 pub mod hit;
 pub mod input;
