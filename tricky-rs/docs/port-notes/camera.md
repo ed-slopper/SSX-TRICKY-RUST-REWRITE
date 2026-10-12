@@ -34,6 +34,9 @@ Part of the port notes (index: [README.md](README.md)); units and wording as des
   unpinned one.
 - Highlights: per rider up to 10 clips (+0x394c count, +0x3dc8 list); a clip is [keyframe, length, …]. Pins
   (`ReplayPin_*`, 4 slots at +0x3920) hold the best clips by two scores.
+  `ReplayPin_GetQuota` 0x193250: how many pins a kind may hold (kind 1 +0x3944, kind 2 +0x3948, else 0);
+  `ReplayPin_PickSlot` 0x1935d8 takes a free slot, else, while this kind is below its quota − 1, the other kind's worst slot when that kind is at or over its quota;
+  at or over it, its own worst slot if the new clip scores at least as well.
 - Playback state +0x20 (1 play, 2 marking a highlight, 3 paused, 4–8 stepping, 9 start, 0xb reset world, 0xd idle); command +0x28
   handled by `Replay_DoCommand` (1 rewind, 2 to end, 3 step back, 4 step forward, 5 play, 6 toggle pause, 7 pause,
   8 mark highlight, 9/10 restart). A playlist (+0x391c, `ReplayPlaylist_*`) plays clips back to back.

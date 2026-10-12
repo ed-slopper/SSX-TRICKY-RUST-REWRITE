@@ -43,6 +43,13 @@ Part of the port notes (index: [README.md](README.md)); units and wording as des
   tick: scripts run their ops, timers and counters count down), vf2 `Draw` (hands the model to the renderer),
   vf7 `SaveSnapshot` (writes the node's state into the replay snapshot: a 0xdeadbXXX tag per class, then fields,
   through `Replay_Write` 0x192c10, `Replay_WriteNodeRef` 0x192f30 for node pointers as pool indices).
+- The node lists (`BxList_*`, the list set at 0x337c60, 14 lists of 0x34 bytes): `BxList_UpdateAll` 0x17d950 calls
+  every node's vf1, `BxList_DrawAll` 0x17d9d8 every node's vf2 (`Game_DrawLists` 0x1c7290 does the 13 lists named by
+  the table at 0x33d7d8; the frontend's 3D view draws lists 3 and 4). `BxList_SetSorted` 0x17dae0 sets bit 0 of a
+  list's flags (`cGame::Init` does it for list 3): `BxList_Add` then puts new nodes on the pending list (+0x1c), which
+  `BxList_MergePending` 0x17d548 inserts in order with the nodes' vf3
+  (does the new node go before this one?) and vf4 (if set, the new node takes the found one's place and the old one
+  is deleted).
 - vf21 `Finish`(runScript): unless the instance has a "finished" event script to run (`Controller_RunFinishScript`
   0x13a9f8, event 3), marks the instance done (flag 2) and deletes the node (vf0 with 3). vf22 `Kill`: the same
   without the script. vf23 `OnMessage`(value, kind): the base handles 7 (clear instance flag 0x800) and 8 (set it);
@@ -243,7 +250,7 @@ Part of the port notes (index: [README.md](README.md)); units and wording as des
 - The AI world (`cAIWorld`) keeps the grid cells (TGroups) around the riders live. It has 108 slots at +0xc
   (8 bytes each: the TGroup, +4 a short counting ticks since it was last marked, +6 a short "new") and their grid
   indices at +0x36c.
-- `cAIWorld::vf1` 0x115e28, each tick: the patch cache ages (`FUN_00251d70`, only speed). Each rider's grid cell
+- `cAIWorld::vf1` 0x115e28, each tick: the patch cache ages (`PatchCache_Age` 0x251d70, only speed). Each rider's grid cell
   (+0x16c) comes from its position (+0x140) through `Boarder_UpdateGridCell` 0x11d438: (p − corner + size)/size − 1
   per axis, truncated and clamped. If the first rider is still in the cell it had (+0x42c), the race object's +0x1c
   decides: below 2 the camera point (`Camera_GetFocusPoint` 0x173c18: camera +0x42c, or the point at 0x3368b0 when 0x337774 is set)
@@ -256,6 +263,8 @@ Part of the port notes (index: [README.md](README.md)); units and wording as des
   first free slot with +4 = 1 and +6 = 1 (the 108 slots never fill on the disc's courses; a full table drops it).
 - `AIWorld_UpdateActiveCells` 0x1162f8: a new slot's cell is turned on and +6 cleared; otherwise a slot with +4
   below 1 is turned off and freed (index −1). `AIWorld_ReleaseActiveCells` 0x1163a0 turns off and frees every one.
+- `AIWorld_ClearSlots` 0x115df0 (from `Game_ResetWorld` 0x115dc0, `Replay_Update` 0x191298 and `cGame::Init`): all
+  108 slots to [0, 0, 0] and their grid indices to −1, without turning any cell off.
 - The objects a cell turns on or off: each INode (+0x38, 0x4c bytes) whose show-off count (+0x28) is not 0, its first
   +0x26 objects, or +0x28 in show-off modes (0x32de8c = 3 or 5). An INode with only the show-off count 0 is skipped
   even outside show-off.
@@ -488,3 +497,14 @@ Part of the port notes (index: [README.md](README.md)); units and wording as des
 - Lookups by index: `Course_GetPatch` 0x2549f8 (0x1c0 bytes each), `Course_GetInstance` 0x254a28,
   `Course_GetParticleInstance` 0x254a50 (0x70), `Course_GetSpline` 0x254b50 (0x80), `Course_GetLight` 0x254a80
   (0x5c), `Course_GetMaterial` 0x254af0 (0x48).
+
+## Skies (`Course_LoadSky` 0x185c28; F1c, proven from the code, not ported)
+
+- The sky set at 0x337ce8 holds up to 10 layers of 0x14 bytes from +4 (`Sky_GetLayer` 0x185d50, count
+  `Sky_GetLayerCount` 0x185dc0) and, at +0xd0, a table from sky number to layer (−1 none).
+  `Sky_GetModelByIndex` 0x185d68 looks the layer up and returns its first model (`Course_LookupInstanceById`).
+- `cSkyBoxObjNode::cSkyBoxObjNode` 0x1c7900 builds the name "<course>_sky" (format at 0x390bf0), finds it among the
+  12 names at 0x337cb8 ("gari_sky", ...) and keeps that sky's model at +0xc.
+- `Sky_Delete` 0x186078: destroys the 10 layers last to first (each layer's destructor), then frees the set when
+  bit 0 of the flags is set.
+

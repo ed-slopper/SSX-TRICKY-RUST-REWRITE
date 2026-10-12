@@ -29,6 +29,9 @@ Part of the port notes (index: [README.md](README.md)); units and wording as des
   likewise per 180° (360° alpine) with a 20°/5° window; grab held until time left < 0.3 s (late) or
   0.8/(s14·0.8057834+0.78212035). Plain jumps: a random grab once air time > thr with > thr left. AIs never tweak
   or uber, never pick rails; on a rail they balance (−2·offset) then roll quarter turns.
+- `AIPath_FindEvent` 0x1977f0: the first event of a path (count +0, 16-byte events at +4) with the given type.
+  `cBoarder::vf8` 0x116ab8 (the rider's reset) uses it on course 8 only: the first path (0x337fc4, 0x3c each, count
+  0x337fc0) with an event 0xd (lap) sets rider+0x37c = path+0x38 − event+8, and rider+0x114 = 4.
 - Time left in the air (`AirPredict_AtTakeoff` 0x123b10): RK4 flight cast against the world at takeoff.
 - Course triggers (`cBoarder::vf10` 0x11a348): 10 finish, 0xd lap, 0xc checkpoint (`Boarder_HitCheckpoint`
   0x11e6f8: show-off clock += event value seconds, first rider only). Trigger-script ops (`TriggerScript_ExecOp`

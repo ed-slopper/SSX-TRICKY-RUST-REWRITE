@@ -254,12 +254,21 @@ clip id at clip+0x40), then fires the clip's sound markers (`AnimCtl_FireClipSou
 | 5 | `AnimMode_CrouchBlend` 0x1605a0 | crouch (rider+0x208), sources per board class at 0x3791d0 |
 | 6 | `AnimMode_CrouchFrame` 0x161300 | frame = (1 - crouch) × length |
 | 7 | `AnimMode_CrouchSteerBlend` 0x161118 | crouch and the steer sign (rider+0x214), tables at 0x3794b8 |
-| 8 | 0x160140 | frame = rider+0x1f0 × length |
+| 8 | `AnimMode_BoardClassFrame` 0x160140 | frame = rider+0x1f0 × length |
 | 9 | `AnimMode_DirectionBlend` 0x1601d0 | angle of (rider+0x27c, rider+0x280), quadrant blend |
 | 10 | `AnimMode_WindUpBlend` 0x160b20 | like 9, on the spin and flip wind-ups (rider+0x220, rider+0x22c), crouch-weighted |
 | 11 | `AnimMode_GateLeanFrame` 0x160af0 | frame = rider+0x238 (the start-gate lean) × length |
 
 Riding switch (rider+0x1b4) mirrors the inputs of modes 4 and 9.
+
+Mode 8 picks its source by board class (rider+0x420) from the table at 0x379180 and sets frame = rider+0x1f0 ×
+(length − 1), speed 1. `AnimCtl_BeginClip` 0x15f060 also calls `AnimClip_SetEndBlendOut` 0x15a330 with the clip's
+blend-out frames (table 0x325fc0): n = 0 means never (rate −1, start frame 0xfffffff), else the blend-out starts at
+length − (n + 1) with rate −|speed|·30/(60·n) a tick (as `AnimClip_SetBlendOut` 0x159d88). With a blend-in it first
+clears the layer's "current" flags (`AnimLayer_ClearCurrentFlags` 0x15a760, clip+0x68; the new clip gets 1).
+`AnimCtl_FindFirstMarkerFrame` 0x15fb08 (from `RaceScene_Select`): the frame of the clip's first marker of types 0–3,
+−1 if none. `Euler_Lerp` 0x202758: a + t·(shortest delta to b), per angle; `Euler_LerpArray` 0x2027f0 does it in place
+on n pairs (pose blending).
 
 ## Meter, boost, crouch and wind-up helpers (proven, G1d; exact in `tricky-rs/game/src/boarder.rs`)
 

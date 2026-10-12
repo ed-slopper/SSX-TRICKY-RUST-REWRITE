@@ -62,6 +62,10 @@ Proven (ported in `tricky-data/src/compress.rs`):
 - `Compress_UnpackedSize` 0x2c2fb0: a 3-byte size (4 bytes with bit 7) at +2, whatever the low bit says.
   `RefPack_Decode` instead skips one more size field when the low bit is set (0x11fb: size at +5) and returns
   that field.
+- A second, older Huffman set sits at 0x240ef8–0x242200 (`Huff_DecodeBlock`, `Huff_BuildTree`, ...).
+  `Huff_IsCompressed` 0x241d28 returns 100 for the headers 0x30fb–0x35fb and 0 for anything else;
+  `Huff_GetUnpackedSize` 0x241dd8 reads the 3-byte big-endian size at +2 (+5 when header bit 0x100 is set). Nothing
+  calls either directly (inferred: they sit in a codec table).
 - `File_LoadAndUnpack` 0x2c8938 (via `File_Load` 0x2c8a70): opens with mode 1 (so the archives are searched),
   reads the file, and if `Compress_UnpackedSize` is not 0 decodes it into a buffer of that size.
 - Every packed file on the disc is RefPack 0x10 (the four character archives, the course archives, `PS2LOAD`,
