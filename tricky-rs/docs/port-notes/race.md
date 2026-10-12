@@ -280,3 +280,5 @@ count 0x3353f8, the riders out 0x335664 + 0x10 · character). The heats' rider s
   its own name 0xe1a but the default hint and description.
 - Checked in the runner: each wrapper on the random careers of `tests/circuit.rs` (1,600 cases each kind), the
   course lookups for courses 0..15 and three values past them.
+
+- `StaticInit_RaceScene` 0x169dc0 (row E1b2q): nine scene constants written at 0x3cbff8..0x3cc020 (1.0, 0.9646, 0.0 and 0.0188, 0.949, 0.0012 as floats; nothing reads them by name), `FUN_00168360` (the scene table a, `fxrand::scene_table_a`), and `FUN_00169640` on the race scene object at 0x32edc0: its first word is 0x10 and its word 0x10f is 0 (`FUN_00169688`). That object is what `Update`, `RaceScene_Prepare` and `RaceScene_Play` run on; their rows own it.
