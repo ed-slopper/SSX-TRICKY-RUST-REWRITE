@@ -137,12 +137,15 @@ matches the original.
 | C8 | Alaska | unowned | C0, E9 | | [est] |
 | C9 | Pipedream (show-off only) | unowned | C0, E9 | | [est] |
 | C10 | Untracked (freeride) | unowned | C0, E9 | | [est] |
-| C11 | The `trick` course (find what it is used for: tutorial or practice) | unowned | C0 | trailrig/heron (2026-10-11) | [est] |
 | C12 | World Circuit race: heats, advancement, medals, points, unlocks (`Circuit_*` 0x16b000–0x16d400, `Circuit_ProcessUnlocks` 0x16c420) | unowned | C0, E12 | | [repo] `ui.rs` has a stand-in |
 | C13 | World Circuit show-off: clock, checkpoints, medals | unowned | C0, E12 | | [repo] README: show-off medals "still mine" |
 | C14 | Single event, freeride and practice modes | unowned | C0, G9 | | [est] |
 | C15 | Trick book: chapters, unlock of uber tricks, rewards (`Score_TrickBookCheck` 0x157a00) | any | E5 | | [repo] `book.rs` |
 | C16 | Unlockables: characters, outfits, boards, the hidden ones, and the button cheats | unowned | C12, E10 | | [repo] |
+| C11b | The lesson manager `cLessonMan` and its eleven handlers in `tricky_game` (state switch `FUN_0014bb08`, `LessonMan_SetState`, `EndAttempt`, the Wait menu of pages / tricks / actions, `Lesson_SetupRider`, `Lesson_ResetScene`, `Lesson_RestartRider`, `Lesson_HandleMenuInput`): read the handlers not yet read (Init, Intro, Start, PreviewEnd, PracticeEnd, Exit) and port the state machine with a pad-and-env trait | any | C11 | | Gap of C11; `port-notes/tutorial.md` |
+| C11c | The `.inp` input playback of the preview: format of `data\tutorial\<board>NN.inp` and the `<rider>.big` lesson archive (`tricky-data` reader), the player that feeds the recorded pad to the rider (find it from `Boarder_StartLessonWait` 0x11afe8 and the buffer at lesson+0x46c, 0x4d598 bytes), and a replay test of one trick | any | C11 | | Gap of C11 |
+| C11d | The tutorial screens: `cLessonOverlay` / `cLessonControllerOverlay` (0x1be4a0, 0x1be540), the page tabs and trick pictures (`tb_<rider><n>` textures), `Results_BuildLessonPage` 0x1b1aa8, the `Speech_LessonLine` lines; and the loading screen `cTrickTutorialLoad` 0x250068 | any | C11, E5 | | Gap of C11 |
+| C11e | The tutorial in the app: game mode 6 on the `trick` course (the course's level files from the disc, E3a4, the mode switch in `main.rs`), the pad map swap at start and exit, and the lessons' effect on the trick book (C15) | any | C11b, C11c, C11d, E3a4 | | Gap of C11 |
 
 ## P4 Finishing
 
@@ -168,6 +171,7 @@ matches the original.
 
 | ID | Task | Section | Who | Date | Commit |
 |---|---|---|---|---|---|
+| C11 | The `trick` course is the Trick Tutorial (game mode 6, `cLessonMan` with eleven handlers, `cTrickTutorialLoad`): data, states, menu and flow read and written up in `port-notes/tutorial.md`; follow-ups C11b..C11e | P3 | trailrig/heron | 2026-10-11 | COMMIT |
 | D1 | Ghidra project analysed, RTTI recovered (394 classes, 2,884 names, `tools/rtti_scan.py`), decompiler export | P0 | ed-slopper | 2026-10-05 | 9e4e994 |
 | D2 | Patcher (`tools/ssxpatch.py`) and the debug-menu / unlock-all mods | P5 | ed-slopper | 2026-10-05 | 9e4e994 |
 | D3 | Level viewer and first riding (`tricky-rs` stage 1–2), `.afl` animation format decoded | P1 | ed-slopper | 2026-10-06 | bd4670b |
@@ -598,3 +602,4 @@ matches the original.
 
 - 2026-10-11 trailrig/heron: E1b2c done (intro and scene picks); added E1b2f (gap of E1b2c).
 - 2026-10-11 trailrig/heron: E8q claim dropped (needs E7c3: the rider has no game `World`); Needs updated.
+- 2026-10-11 trailrig/heron: C11 done (the trick course is the Trick Tutorial; port-notes/tutorial.md); added C11b, C11c, C11d, C11e (gap of C11).

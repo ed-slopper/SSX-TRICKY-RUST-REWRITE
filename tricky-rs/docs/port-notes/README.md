@@ -21,6 +21,7 @@ One file per system (board row F6, split from the former `original-rules.md`):
 - [audio.md](audio.md): Sound and music (Sound and music; Rider sounds; Sound banks; Level sounds; Music)
 - [hud.md](hud.md): HUD and fonts (HUD; HUD sprites; Fonts)
 - [frontend.md](frontend.md): World Circuit and unlocks (World Circuit; Unlocks)
+- [tutorial.md](tutorial.md): The Trick Tutorial (the `trick` course, game mode 6, the lesson manager and its handlers)
 - [files.md](files.md): The disc, BIG archives, compression (The disc; BIG archives; Compression; Character and board models; Textures; Text)
 
 ## Unresolved

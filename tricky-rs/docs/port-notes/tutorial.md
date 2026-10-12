@@ -1,0 +1,72 @@
+# Trick Tutorial (the `trick` course, game mode 6)
+
+Read from SLUS_203.26 by trailrig/heron for board row C11. "Proven" = read from code.
+
+## What the `trick` course is
+
+Course 10 in the course table is "Trick Tutorial" (`trick`, no show-off time). It is the stage of the **Trick Tutorial**
+(game mode 6, the "Lesson" mode): `cGame::Init` creates the lesson manager (`LessonMan_Init` 0x14aaa0, a
+`cBxObjNode` subclass `cLessonMan`, vtable 0x36e570) when `DAT_0032de8c == 6`, and the loading screen is
+`cTrickTutorialLoad` (0x250068: `StartAssetLoad` 0x24d968 loads the loading-screen sound bank and the icon table 0x2cc;
+`PollAssetLoad` 0x24d9b0; `TrickTutorialLoad_SetTitle` 0x24e228). It is neither freeride nor practice: those use the
+other courses. (Proven.)
+
+## Data it reads
+
+- `data/tutorial/<rider>.big` (format string 0x31df58, `<rider>` = `gRider_Table[rider][2]`), opened with `BigArchive_Open`.
+- `data\tutorial\<board><NN>.inp` (0x31df38; `<board>` from the table at 0x331eb0 by rider, `NN` = trick index + 1): the
+  recorded pad input of the demonstration of each trick, played back by the preview. The buffer (0x4d598 bytes) is the
+  lesson manager's +0x46c.
+- `data/textures/tb_<rider><n><suffix>` (0x31df70): 6 pages x 5 trick pictures per rider (`.ssh`), loaded in the
+  constructor into +0x470 .. (30 handles; entry `Shape_GetEntry(sheet, 0..4)` named `%02d`).
+- `data/tutorial/trickdef.dat` is the trick book (see frontend.md, scoring.md); the page is `lesson+0x50c` (0..5),
+  `TrickBook_PageFirstTrick(page)` gives its first trick; the chosen trick is `lesson+0x4e8`.
+- The pad map: `Pad_LoadButtonMap`, the 14 lesson buttons (0x1b..0x28) and 16 stick entries copied to the input
+  system at the start (0x17a290, 0x179818/0x179838), restored at exit (0x17a2f8).
+
+## The lesson manager
+
+`cLessonMan` fields (proven): +0xc state, +0x10 requested state, +0x14 previous state, +0x48 current handler, +0x4c
+previous handler, +0x50 ticks in state, +0x54 "attempt done" flag, +0x58 menu choice, +0x60, +0x64 "trick input seen",
++0xa0/+0xa4 = 20.0, +0xa8 the archive, +0xac, +0xb0 menu level (0 page, 1 trick, 2 action), +0xb4/+0xb8 list window,
++0x46c recording buffer, +0x4e8 trick, +0x510 rider, +0x50c page, +0x514 a `cGameTrickInfo`.
+
+`vf1` (0x14b9b8, the per-tick Update): does nothing while the HUD dialog (`FUN_001a7c58` +0x42c) or the menu manager is
+active; counts ticks in state; a requested state (`LessonMan_SetState` 0x14baa8 stores it at +0x10) runs the switch
+`FUN_0014bb08`: previous handler `Exit`, current handler `Enter`, then every tick the handler's `Update`. Eleven handlers,
+one per state (slots +0x18..+0x44, 0 is none):
+
+| State | Class | Meaning |
+|---|---|---|
+| 1 | cLessonInitHandler | set up |
+| 2 | cLessonIntroHandler | intro |
+| 3 | cLessonStartHandler | start |
+| 4 | cLessonWaitHandler | the menu (pages, tricks, actions); Update 0x14dcc0 |
+| 5 | cLessonPreviewHandler | demonstration: plays the `.inp` (Enter 0x14e138: `Lesson_SetupRider`, `Speech_LessonLine(1)`, sound, load the `.inp`, HUD item 10 hidden, 0xe shown) |
+| 6 | cLessonPreviewEndHandler | after the demonstration |
+| 7 | cLessonPerformHandler | the player tries the trick (`Speech_LessonLine(2)`, clears the replay) |
+| 8 | cLessonPracticeHandler | free practice: Update 0x14e7c0 goes to state 9 when the attempt is done (+0x54), sets +0x64 when the trick text is non-empty |
+| 9 | cLessonPracticeEndHandler | |
+| 10 | cLessonEndHandler | result menu: 0 retry (reset scene, menu level 1), 1 `LessonMan_EndAttempt`, 2 exit |
+| 11 | cLessonExitHandler | leave (`Camera_ForceCutFade`, hides HUD item 10) |
+
+`LessonMan_EndAttempt` (0x14b638): reset the scene, hide HUD 10, show 0xe, then next state by the current one: 5/7/8
+-> `Lesson_SetupRider`; 6 -> 5; 9 -> 8; 10 -> 7; else 5.
+
+The Wait menu (proven): menu level 0 = pages (left/right through 0..5), 1 = tricks of the page (window of 5), 2 = actions
+0 preview (state 5, `.inp` of the trick), 1 perform (7), 2 practice (8), 3 exit with a three-string dialog
+(strings 0x146, 0x1d6, 0x188) then state 11. The buttons are the masks 0x100008 (up), 0x80004 (down), 0x800 (accept),
+0x20 (back) from `Lesson_HandleMenuInput` (0x14d6e0).
+
+`Lesson_SetupRider` (0x14b768): clears +0x54, +0x64, +0xac; for page 5 (Master) sets the rider's speed fields to
+(1.0, 20.0), else 0, 0. `Lesson_ResetScene` 0x14d7d0, `Lesson_RestartRider` 0x14d898.
+
+Overlays: `cLessonOverlay`, `cLessonControllerOverlay` (0x1be4a0..); the results page for a lesson is
+`Results_BuildLessonPage` (0x1b1aa8: strings 0xe47 title, 0x191 and 0x18e as the two rows). `Boarder_StartLessonWait`
+0x11afe8, `Speech_LessonLine` 0x231398.
+
+## Not read yet
+
+The bodies of Init, Intro, Start, PreviewEnd, PracticeEnd, Exit handlers, `Lesson_HandleMenuInput`, `Lesson_ResetScene`,
+`Lesson_RestartRider`, the `.inp` player (who feeds the recorded pad to the rider), the overlays and the load screen:
+see the follow-up rows C11b..C11e.
