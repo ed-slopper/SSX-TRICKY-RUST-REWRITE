@@ -645,3 +645,6 @@
 13e6a0 FUN_0013e6a0 RollerNode_PlaceFromBody
 146f40 FUN_00146f40 MeshAnimNode_Start
 148900 FUN_00148900 CollideEmitterNode_RiderHasRoom
+123f00 FUN_00123f00 AirPredict_ClearLandTime
+198fc0 FUN_00198fc0 AnimObjectNode_RefitBox
+2576a8 FUN_002576a8 Vu0_RunPatchProgram

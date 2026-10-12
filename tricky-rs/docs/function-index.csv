@@ -154,7 +154,7 @@ address,size,name,system,status
 0x111820,3376,cAI::vf17_111820,ai,not started
 0x112550,56,cAI::vf12_112550,ai,not started
 0x1125a0,40,cAI::vf9_1125a0,ai,not started
-0x1125c8,292,Race_CreateHandlers,race,not started
+0x1125c8,292,Race_CreateHandlers,race,ported
 0x1126f0,160,cAI::vf1_1126f0,ai,not started
 0x112790,76,cAI::SaveSnapshot,save,not started
 0x1127e0,100,cAI::vf8_1127e0,ai,not started
@@ -250,7 +250,7 @@ address,size,name,system,status
 0x117198,2952,cBoarder::vf7_117198,boarder,ported
 0x117d20,412,Boarder_SaveSnapshot,save,not started
 0x117ec0,424,Boarder_LoadSnapshot,boarder,not started
-0x118068,36,Boarder_SetRestartPoint,boarder,not started
+0x118068,36,Boarder_SetRestartPoint,boarder,ported
 0x118090,516,Boarder_UpdatePathAhead,boarder,ported
 0x118298,888,Boarder_UpdateRaceLineProgress,boarder,ported
 0x118610,544,Boarder_SelectRaceLine,boarder,ported
@@ -271,7 +271,7 @@ address,size,name,system,status
 0x11a7d0,108,Boarder_SetStartState,boarder,not started
 0x11a840,1892,Boarder_PlaceAtStart,boarder,not started
 0x11afa8,60,Boarder_Freeze,boarder,not started
-0x11afe8,48,Boarder_StartLessonWait,boarder,not started
+0x11afe8,48,Boarder_StartLessonWait,boarder,ported
 0x11b018,476,Boarder_AddMeter,boarder,checked
 0x11b1f8,336,Boarder_DrainMeter,boarder,ported
 0x11b348,4860,cBoarderHandler::cBoarderHandler,boarder,not started
@@ -434,7 +434,7 @@ address,size,name,system,status
 0x123ab8,88,AirPredict_Reset,boarder,not started
 0x123b10,948,AirPredict_AtTakeoff,boarder,ported
 0x123ec8,52,AirPredict_Tick,boarder,ported
-0x123f00,8,FUN_00123f00,boarder?,ported
+0x123f00,8,AirPredict_ClearLandTime,boarder,ported
 0x123f08,40,AirPredict_SaveSnapshot,save,not started
 0x123f30,20,AirPredict_LoadSnapshot,boarder,not started
 0x123fc8,2392,Boarder_RiderCollisions,boarder,ported
@@ -461,7 +461,7 @@ address,size,name,system,status
 0x127298,76,Boarder_PlayTakeoffClip,boarder,ported
 0x1272e8,1576,SpinState_UpdateTrickClips,boarder,ported
 0x127918,1004,Boarder_UpdateLeanAnim,boarder,ported
-0x127d08,372,FUN_00127d08,boarder?,ported
+0x127d08,372,Boarder_PlayWindUpMasked,boarder,ported
 0x127e80,720,Boarder_PlayDisappointed,boarder,ported
 0x128150,668,Boarder_PlayCelebrate,boarder,ported
 0x1283f0,124,StaticInit_Boarder3,boarder?,not started
@@ -924,9 +924,9 @@ address,size,name,system,status
 0x14b5a8,140,LessonMan_Reset,game?,ported
 0x14b638,300,LessonMan_EndAttempt,game?,ported
 0x14b768,96,Lesson_SetupRider,game?,ported
-0x14b7c8,224,FUN_0014b7c8,boarder?,ported
-0x14b8a8,172,FUN_0014b8a8,boarder?,ported
-0x14b958,92,FUN_0014b958,boarder?,ported
+0x14b7c8,224,LessonMan_PreviewLoadPad,boarder?,ported
+0x14b8a8,172,LessonMan_AdvanceAndRestorePad,boarder?,ported
+0x14b958,92,LessonMan_RestorePad,boarder?,ported
 0x14b9b8,240,cLessonMan::vf1_14b9b8,tutorial,ported
 0x14baa8,92,LessonMan_SetState,game?,ported
 0x14bb08,220,FUN_0014bb08,tutorial?,ported
@@ -944,7 +944,7 @@ address,size,name,system,status
 0x14d5e0,256,Lesson_DrawMenu,frontend?,not started
 0x14d6e0,240,Lesson_HandleMenuInput,game?,ported
 0x14d7d0,200,Lesson_ResetScene,game?,ported
-0x14d898,140,Lesson_RestartRider,game?,not started
+0x14d898,140,Lesson_RestartRider,game?,ported
 0x14d928,8,FUN_0014d928,game?,not started
 0x14d930,24,FUN_0014d930,game?,not started
 0x14d948,124,Lesson_SetupTrickMenu,game?,not started
@@ -975,10 +975,10 @@ address,size,name,system,status
 0x14eac8,288,cLessonEndHandler::Update,game,not started
 0x14ebe8,8,cLessonExitHandler::Enter,game,not started
 0x14ebf0,84,cLessonExitHandler::Update,game,not started
-0x14ec48,24,cRestartLessonHandler::Enter,game,not started
+0x14ec48,24,cRestartLessonHandler::Enter,game,ported
 0x14ec60,60,cRestartLessonHandler::Update,game,not started
 0x14eca0,12,cLoadLessonHandler::Enter,game,not started
-0x14ecb0,124,cLoadLessonHandler::Update,game,not started
+0x14ecb0,124,cLoadLessonHandler::Update,game,ported
 0x14ed30,8,cPreLessonHandler::Enter,game,not started
 0x14ed38,8,cPreLessonHandler::Update,game,not started
 0x14ed40,36,cEndLessonHandler::Enter,game,not started
@@ -1059,7 +1059,7 @@ address,size,name,system,status
 0x1533f8,84,cPlayer::SaveSnapshot,save,not started
 0x153668,92,cPlayer::__tf,runtime,host
 0x153758,116,cPlayerState::__tf,runtime,host
-0x1537d0,52,FUN_001537d0,world?,not started
+0x1537d0,52,RigidBody_Construct,world,not started
 0x153808,716,RigidBody_SetPosition,world,ported
 0x153ad8,376,RigidBody_UpdateVelocity,world,ported
 0x153c50,660,RigidBody_Integrate,world,ported
@@ -1227,8 +1227,8 @@ address,size,name,system,status
 0x1601d0,976,AnimMode_DirectionBlend,animation,not started
 0x1605a0,224,AnimMode_CrouchBlend,animation,not started
 0x160680,1136,AnimMode_BrakeBlend,animation,not started
-0x160af0,48,FUN_00160af0,animation?,not started
-0x160b20,1524,FUN_00160b20,boarder?,not started
+0x160af0,48,AnimMode_GateLeanFrame,animation,not started
+0x160b20,1524,AnimMode_WindUpBlend,animation,not started
 0x161118,484,AnimMode_CrouchSteerBlend,animation,not started
 0x161300,60,AnimMode_CrouchFrame,animation,not started
 0x161340,8,AnimMode_Advance,animation,not started
@@ -2284,7 +2284,7 @@ address,size,name,system,status
 0x198b48,604,cAnimObjectNode::cAnimObjectNode,animation,ported
 0x198da8,272,cAnimObjectNode::~cAnimObjectNode,animation,not started
 0x198eb8,260,cAnimObjectNode::OnContact,animation,ported
-0x198fc0,112,FUN_00198fc0,boarder?,ported
+0x198fc0,112,AnimObjectNode_RefitBox,animation,ported
 0x199030,36,AnimNode_TickDelay,animation,ported
 0x199058,424,cAnimObjectNode::Update,animation,ported
 0x199200,88,cAnimObjectNode::Kill,animation,ported
@@ -4616,7 +4616,7 @@ address,size,name,system,status
 0x2575b0,8,FUN_002575b0,game?,not started
 0x2575b8,116,App_SendVu0InitChain,game,not started
 0x257630,116,Game_SendVu0InitChain,game,not started
-0x2576a8,96,FUN_002576a8,world?,ported
+0x2576a8,96,Vu0_RunPatchProgram,world?,ported
 0x257708,120,Vu0_CopyOutData,world?,not started
 0x257780,12,FUN_00257780,world?,not started
 0x257810,176,cWorldBoarder::cWorldBoarder,world,ported

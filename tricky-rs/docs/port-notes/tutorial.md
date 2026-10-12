@@ -79,7 +79,7 @@ Wait 435.0). Exit (11): sets the game object's done flag (+0x54), hides HUD 10 a
 
 ## The recorded input (C11c)
 
-Read from `cPlayer::GetControls` (calls `FUN_0014b7c8` before and `FUN_0014b8a8`, `FUN_0014b958` after the controls
+Read from `cPlayer::GetControls` (calls `LessonMan_PreviewLoadPad` 0x14b7c8 before and `LessonMan_AdvanceAndRestorePad` 0x14b8a8 or `LessonMan_RestorePad` 0x14b958 after the controls
 when the lesson manager exists), `cLessonPreviewHandler::Enter/Update`. Ported as `tricky-rs/data/src/inp.rs` (`Inp::parse`,
 `Playback`; tested on synthetic bytes, no real `.inp` is in the inputs).
 

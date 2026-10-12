@@ -171,7 +171,7 @@ normal and word, the top's time kept at +0x50. None: the rider's own position, v
   the wall, a glancing hit (normal · board up over 0.6 + 0.3·(vn·−0.00045), at most 0.90000004) turns the board up
   to 6° toward the wall's normal (axis board-up × normal) and takes the speed into it away; a square one is a crash;
   then +0x494 = −1, `cWorldBoarder::vf10`(2);
-- landing: 0x123f00, `AirMotion_SetFallScale`(vn), virtual +0x6c(vn × −0.00072000007), clip type 0x1a on layer 1
+- landing: `AirPredict_ClearLandTime` 0x123f00 (prediction +0x44 := 0), `AirMotion_SetFallScale`(vn), virtual +0x6c(vn × −0.00072000007), clip type 0x1a on layer 1
   blended out, `Landing_CheckAngles`: 0 → +0x798 = −vn and a crash (the record's +0x40 left stale); else +0x798 =
   −vn, switch (stance ≠ natural, flipped for an angle over π/2), `Landing_ChooseState`, the velocity × (1.0642503 −
   0.24541846·clamp(|a2|, 15°, 50°)) and × (1.113588 − 0.26032454·clamp(|a1|, 25°, 80°)) (each only above its floor),

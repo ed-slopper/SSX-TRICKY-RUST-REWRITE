@@ -6880,3 +6880,13 @@ G 13e6a0 RollerNode_PlaceFromBody
 G 146f40 MeshAnimNode_Start
 G 148900 CollideEmitterNode_RiderHasRoom
 G 237d50 Collide_SphereTriangleTwoSided
+G 123f00 AirPredict_ClearLandTime
+G 127d08 Boarder_PlayWindUpMasked
+G 14b7c8 LessonMan_PreviewLoadPad
+G 14b8a8 LessonMan_AdvanceAndRestorePad
+G 14b958 LessonMan_RestorePad
+G 198fc0 AnimObjectNode_RefitBox
+G 2576a8 Vu0_RunPatchProgram
+G 1537d0 RigidBody_Construct
+G 160b20 AnimMode_WindUpBlend
+G 160af0 AnimMode_GateLeanFrame

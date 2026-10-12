@@ -188,7 +188,7 @@ Part of the port notes (index: [README.md](README.md)); units and wording as des
 
 - The patch cache (`CollCache_Init` 0x251ef8, `CacheBuffer_Lookup` 0x251f50 via `World_LookupCollCache` 0x25c750):
   entries of 0x1cd0 bytes, the least-used one evicted; a new entry is cleared (`CacheBuffer_ClearEntry`: 1e10 in
-  every quad record's normals and box) and filled by the vector unit: `FUN_002576a8` loads the patch's 16
+  every quad record's normals and box) and filled by the vector unit: `Vu0_RunPatchProgram` 0x2576a8 loads the patch's 16
   coefficient vectors (+0x50) into vf1..vf16 and runs VU0 micro address 0; `Vu0_CopyOutData` copies the 100 points
   from VU0 data qword 32 to entry +0x10.
 - The patch program (in the 215-instruction upload, chain 0x31cac0; its basis table (t³, t², t, 1) for t = k/9 at

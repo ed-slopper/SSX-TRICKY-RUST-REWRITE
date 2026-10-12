@@ -256,8 +256,8 @@ clip id at clip+0x40), then fires the clip's sound markers (`AnimCtl_FireClipSou
 | 7 | `AnimMode_CrouchSteerBlend` 0x161118 | crouch and the steer sign (rider+0x214), tables at 0x3794b8 |
 | 8 | 0x160140 | frame = rider+0x1f0 × length |
 | 9 | `AnimMode_DirectionBlend` 0x1601d0 | angle of (rider+0x27c, rider+0x280), quadrant blend |
-| 10 | 0x160b20 | like 9 |
-| 11 | 0x160af0 | frame = rider+0x238 × length |
+| 10 | `AnimMode_WindUpBlend` 0x160b20 | like 9, on the spin and flip wind-ups (rider+0x220, rider+0x22c), crouch-weighted |
+| 11 | `AnimMode_GateLeanFrame` 0x160af0 | frame = rider+0x238 (the start-gate lean) × length |
 
 Riding switch (rider+0x1b4) mirrors the inputs of modes 4 and 9.
 
