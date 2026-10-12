@@ -29,6 +29,7 @@ pub mod inputring;
 pub mod probe;
 pub mod ps2f;
 pub mod ragdoll;
+pub mod prerace;
 pub mod props;
 pub mod race;
 pub mod rand;

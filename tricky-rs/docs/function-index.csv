@@ -138,12 +138,12 @@ address,size,name,system,status
 0x110898,8,FUN_00110898,world?,not started
 0x1108d0,32,Vec4_AddTo,world?,not started
 0x1108f0,144,cAI::vf10_1108f0,ai,not started
-0x110980,44,RaceScene_StopSpeech,race?,not started
-0x1109b0,140,RaceScene_Prepare,race?,not started
-0x110a40,116,RaceScene_Play,race?,not started
-0x110ab8,316,RaceScene_CheckSkip,race?,not started
+0x110980,44,RaceScene_StopSpeech,race?,checked
+0x1109b0,140,RaceScene_Prepare,race?,checked
+0x110a40,116,RaceScene_Play,race?,checked
+0x110ab8,316,RaceScene_CheckSkip,race?,checked
 0x110bf8,812,cAI::vf11_110bf8,ai,not started
-0x110f28,120,Race_IsPlayerPad,race,not started
+0x110f28,120,Race_IsPlayerPad,race,checked
 0x110fa0,356,cAI::vf13_110fa0,ai,not started
 0x111108,964,cAI::vf14_111108,ai,ported
 0x1114d0,144,cAI::vf15_1114d0,ai,ported
@@ -158,13 +158,13 @@ address,size,name,system,status
 0x1126f0,160,cAI::vf1_1126f0,ai,ported
 0x112790,76,cAI::SaveSnapshot,save,not started
 0x1127e0,100,cAI::vf8_1127e0,ai,not started
-0x112848,108,Race_HasStartGate,race,not started
-0x1128b8,104,Race_ResetRiderRenders,race,not started
+0x112848,108,Race_HasStartGate,race,checked
+0x1128b8,104,Race_ResetRiderRenders,race,ported
 0x112920,460,Race_UpdateRiderStreaming,race,ported
-0x112af0,152,Race_AnyRiderLevelAbove7,race,not started
-0x112b88,388,cPreRaceHandler::Enter,race,not started
-0x112d10,1876,cPreRaceHandler::Update,race,not started
-0x113468,16,cPreRaceHandler::Exit,race,not started
+0x112af0,152,Race_AnyRiderLevelAbove7,race,checked
+0x112b88,388,cPreRaceHandler::Enter,race,checked
+0x112d10,1876,cPreRaceHandler::Update,race,checked
+0x113468,16,cPreRaceHandler::Exit,race,checked
 0x113478,68,cStartRaceHandler::Enter,game,not started
 0x1134a0,48,cStartRaceHandler::Update,game,not started
 0x1134d0,80,cStartRaceHandler::Exit,game,not started
@@ -266,10 +266,10 @@ address,size,name,system,status
 0x11a348,1100,cBoarder::vf10_11a348,boarder,not started
 0x11a798,8,cBoarder::EmitBrakeSpray,boarder,not started
 0x11a7a0,8,cBoarder::vf12_11a7a0,boarder,not started
-0x11a7a8,8,Boarder_ResetRender,boarder,not started
+0x11a7a8,8,Boarder_ResetRender,boarder,ported
 0x11a7b0,32,Boarder_LaunchFromGate,boarder,not started
 0x11a7d0,108,Boarder_SetStartState,boarder,not started
-0x11a840,1892,Boarder_PlaceAtStart,boarder,not started
+0x11a840,1892,Boarder_PlaceAtStart,boarder,ported
 0x11afa8,60,Boarder_Freeze,boarder,not started
 0x11afe8,48,Boarder_StartLessonWait,boarder,ported
 0x11b018,476,Boarder_AddMeter,boarder,checked
@@ -1783,8 +1783,8 @@ address,size,name,system,status
 0x181a68,80,cReplayEndRaceHandler::__tf,runtime,host
 0x181ad0,80,cSelectLessonHandler::__tf,runtime,host
 0x181b28,64,cAIStateHandler::__tf,runtime,host
-0x181d50,16,Game_RestoreViews,game,not started
-0x181d60,12,Game_UseSingleView,game,not started
+0x181d50,16,Game_RestoreViews,game,ported
+0x181d60,12,Game_UseSingleView,game,ported
 0x181de8,92,cGame::__tf,runtime,host
 0x181e48,36,cLoadModule::~cLoadModule,game?,not started
 0x181e70,64,cLoadModule::__tf,runtime,host
@@ -2392,7 +2392,7 @@ address,size,name,system,status
 0x1a6d38,636,Font_PrintWrapped,hud,not started
 0x1a6fb8,1792,OverlayMan_Init,frontend,not started
 0x1a76b8,156,cOverlayMan::~cOverlayMan,frontend,not started
-0x1a7758,76,Overlay_HideAll,frontend,not started
+0x1a7758,76,Overlay_HideAll,frontend,ported
 0x1a77a8,80,OverlayMan_IsAnyVisible,frontend,ported
 0x1a77f8,80,OverlayMan_IsAnyActive,frontend,not started
 0x1a7848,20,HUD_ShowItem,hud,ported
@@ -3272,8 +3272,8 @@ address,size,name,system,status
 0x1fecc8,32,FUN_001fecc8,game?,not started
 0x1fece8,792,FE3DTransition_Update,other,not started
 0x1ff000,684,VideoStream_Draw,debugmenu?,not started
-0x1ff2b0,532,FE3DTransition_StartIn,race?,not started
-0x1ff4c8,200,FE3DTransition_StartOut,race?,not started
+0x1ff2b0,532,FE3DTransition_StartIn,race?,ported
+0x1ff4c8,200,FE3DTransition_StartOut,race?,ported
 0x1ff590,120,FUN_001ff590,,not started
 0x1ff608,64,FUN_001ff608,,not started
 0x1ff648,80,FE3DTransition_Start,frontend?,not started
@@ -3995,7 +3995,7 @@ address,size,name,system,status
 0x22e360,36,WorldTriggerMgr_Reset,audio?,not started
 0x22e388,100,FUN_0022e388,audio?,not started
 0x22e3f0,12,FUN_0022e3f0,audio?,not started
-0x22e400,32,FUN_0022e400,race?,not started
+0x22e400,32,FUN_0022e400,race?,ported
 0x22e420,124,StaticInit_WorldTriggerMgr,other,not started
 0x22e4e0,108,Speech_PostFEEvent,frontend?,checked
 0x22e550,88,FUN_0022e550,frontend?,not started
@@ -4153,13 +4153,13 @@ address,size,name,system,status
 0x235398,204,Speech_OnStumble,audio?,checked
 0x235468,192,Speech_Disappointed,audio?,checked
 0x235530,152,Speech_QueueBigScore,audio?,checked
-0x2355c8,216,Speech_InitCharScriptSamples,audio?,not started
-0x2356a0,76,Speech_FreeCharScriptSamples,audio?,not started
+0x2355c8,216,Speech_InitCharScriptSamples,audio?,ported
+0x2356a0,76,Speech_FreeCharScriptSamples,audio?,ported
 0x2356f0,32,Speech_CheckBigScore,audio?,checked
 0x235710,104,SpeechSys_IsCharScriptReady,audio?,not started
 0x235778,8,FUN_00235778,audio?,not started
 0x235780,1008,Sfx_PlayClipSound,audio,not started
-0x235b70,56,SpeechSys_StopCharScript,frontend?,not started
+0x235b70,56,SpeechSys_StopCharScript,frontend?,ported
 0x235ba8,432,Speech_OnBigScore,audio?,checked
 0x235d58,112,Speech_RollChance,audio?,checked
 0x235e70,88,FUN_00235e70,render?,not started

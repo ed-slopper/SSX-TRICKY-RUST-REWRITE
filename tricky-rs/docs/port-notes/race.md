@@ -125,6 +125,25 @@ Part of the port notes (index: [README.md](README.md)); units and wording as des
   The scene index 0x3cc028 the selection reads (`PreRaceSel_BuildSceneIndex`) is E1b2o's; the cast's clips
   (`RaceScene_PlayCastClip`, `_StartCastClip`, `_UpdateCastClip`) are animation (G5).
 
+## The pre-race sequence (board row G11c; `tricky_game::prerace`, checked: `tests/prerace.rs`)
+
+- `cPreRaceHandler::Enter` 0x112b88: overlays hidden, one view; a race entered again (race +0xdc) starts at 0x12
+  (the countdown's end), a replayed one (+0xe0) at 0, a first one at 2, counting the course as started for each
+  profile's character (`Career_CountCourseStart`); the camera script "PreLoad"; "NoCountdown" run without a start
+  gate (`Race_HasStartGate`: not Untracked, modes 0, 2, 3, 4, 5, 7, 9); the race's virtual +0x6c.
+- `Update` 0x112d10 (state +4; each state falls into the next in the same frame when it can): 0 PreLoad, 1 wait
+  for loading (race +0x4f8); three scenes (2/6/10): a scene whose script word (career +0x2b18, 100 apart) is 0x39
+  "Null" is skipped, else `RaceScene_Select`(k) and `RaceScene_Prepare` (its cast's samples; it always answers 0, so
+  the wait-for-loading states 3, 7 and 0xb are never reached) then `RaceScene_Play` (the scene's script on the camera,
+  `FE3DTransition_StartIn`), held while the camera runs unless skipped (`RaceScene_CheckSkip`: the first player pad
+  pressed this frame, new X / triangle; a skip in the second scene skips the third too). Before the third the riders'
+  virtual +0x4c. 0xe: `FE3DTransition_StartOut`, the riders placed at the start; then (when loaded) the countdown's
+  screens: HUD item 0x12 when a player is over level 7 (0x10), else item 3 (0x11; none in mode 1), each left by a
+  skip; 0x12 the intro stream stopped; 0x14 the camera and speech stopped, the riders placed again, the race's
+  virtual +0x9c, 0x15 done. `Exit` restores the views.
+- Checked in the runner: 4,000 random careers and races through Enter, up to 14 frames of Update and Exit, the
+  engine's calls scripted the same: the state, the career block, the scene object, the pads and every call compared.
+
 ## Rank catch-up: the unchecked list walk
 
 Proven on the PS2: `Race_UpdatePlacingsAndRubberBand` 0x115100 runs every 6 ticks (`race+0x18 % 6`), over
