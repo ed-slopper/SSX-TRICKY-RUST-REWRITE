@@ -1199,3 +1199,40 @@ impl Career {
         }
     }
 }
+
+/// The memory card's part of the block: +8 for 0x27d4 bytes (the last two words the CRC and the version)
+pub const SAVE_START: usize = 8;
+pub const SAVE_LEN: usize = 0x27d4;
+/// The version word a save carries (+0x27d8; the load does not check it)
+pub const SAVE_VERSION: u32 = 0x1230_0003;
+
+impl Career {
+    /// `Career_SaveToCard` 0x1d2078: the sound options synced, the CRC word cleared, the version set, the CRC of the
+    /// saved part (`Crc_Compute16`) stored, and the part handed to the card (`MemCardOp_StartWrite`, here returned).
+    pub fn save_image(&mut self, mut audio: Option<&mut dyn AudioSettings>) -> Vec<u8> {
+        self.sync_audio(&mut audio);
+        self.w32(0x27d4, 0);
+        self.w32(0x27d8, SAVE_VERSION);
+        let crc = crc16(&self.bytes[SAVE_START..SAVE_START + SAVE_LEN]);
+        self.w32(0x27d4, crc);
+        self.bytes[SAVE_START..SAVE_START + SAVE_LEN].to_vec()
+    }
+
+    /// The load (the card overlay's state at 0x184ae8): the CRC word taken out of the read bytes (zeroed in them)
+    /// and checked against theirs; a match copies them over the saved part (so the CRC word reads 0 after) and
+    /// applies the sound options. False (the card's error 0x12) on a mismatch or a short image.
+    pub fn load_image(&mut self, image: &[u8], mut audio: Option<&mut dyn AudioSettings>) -> bool {
+        if image.len() < SAVE_LEN {
+            return false;
+        }
+        let mut buf = image[..SAVE_LEN].to_vec();
+        let saved = u32::from_le_bytes(buf[0x27cc..0x27d0].try_into().unwrap());
+        buf[0x27cc..0x27d0].fill(0);
+        if crc16(&buf) != saved {
+            return false;
+        }
+        self.bytes[SAVE_START..SAVE_START + SAVE_LEN].copy_from_slice(&buf);
+        self.apply_audio(&mut audio);
+        true
+    }
+}

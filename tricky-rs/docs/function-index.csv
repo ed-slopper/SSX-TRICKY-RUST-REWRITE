@@ -2826,7 +2826,7 @@ address,size,name,system,status
 0x1d1ac0,256,MCOverlay_State23,save,not started
 0x1d1bc0,108,MCOverlay_State24,save,not started
 0x1d1c30,332,MCOverlay_State07,save,not started
-0x1d1d80,84,MemCardOp_StartWrite,save,not started
+0x1d1d80,84,MemCardOp_StartWrite,save,ported
 0x1d1dd8,84,FUN_001d1dd8,frontend?,not started
 0x1d1e30,84,FUN_001d1e30,frontend?,not started
 0x1d1e88,44,FUN_001d1e88,frontend?,not started
@@ -2835,7 +2835,7 @@ address,size,name,system,status
 0x1d1f60,108,FUN_001d1f60,frontend?,not started
 0x1d1fd0,60,FUN_001d1fd0,frontend?,not started
 0x1d2010,100,FUN_001d2010,frontend?,not started
-0x1d2078,200,Career_SaveToCard,save,not started
+0x1d2078,200,Career_SaveToCard,save,ported
 0x1d2140,92,MemCardOp_Restart,save,not started
 0x1d21a0,16,MemCardOp_IsDone,save,not started
 0x1d21c0,8,MemCardOp_GetResult,save,not started

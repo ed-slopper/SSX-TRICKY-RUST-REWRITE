@@ -144,3 +144,58 @@ fn new_game_is_the_original() {
         assert_eq!(*log.borrow(), s.log, "case {case}: sound calls");
     }
 }
+
+#[test]
+fn save_is_the_original() {
+    let Some(mut r) = Runner::from_env() else { return };
+    r.float_rules = Rules::parse("add=n,mul=n,div=n,cvt=n").unwrap();
+    for a in [0x1d2078u32, 0x161928, 0x2ce04c] {
+        r.allow(a);
+    }
+    // the save's title (not part of the block)
+    r.stub(0x2fca28, |c, m| m.write_u8(c.gpr(4) as u32, 0));
+    r.stub(0x1d2fc8, |c, m| m.write_u8(c.gpr(4) as u32, 0));
+    r.stub(0x1d2f60, |c, m| m.write_u8(c.gpr(4) as u32, 0));
+    let written: Rc<RefCell<(u32, u32)>> = Rc::new(RefCell::new((0, 0)));
+    let w = written.clone();
+    r.stub(0x1d1d80, move |c, _| *w.borrow_mut() = (c.gpr(6) as u32, c.gpr(7) as u32));
+    r.mem.write_u32(0x343050, 0);
+    let card = r.mem.alloc(0x40);
+    let base = tricky_game::career::CAREER_BASE;
+    let mut g = Rng(0x5a7e_0000_0000_0001);
+    for case in 0..50 {
+        let mut ours = Career::default();
+        let mut s = Streams::default();
+        ours.init_new_game(0, &mut s, None);
+        for _ in 0..200 {
+            let at = 8 + (g.next() as usize % (0x27d4 - 4));
+            ours.bytes[at] = g.next() as u8;
+        }
+        for (k, b) in ours.bytes.iter().enumerate() {
+            r.mem.write_u8(base + k as u32, *b);
+        }
+        loop {
+            r.cpu.set_gpr(4, card as u64);
+            match r.call(0x1d2078) {
+                Ok(()) => break,
+                Err(r5900::Error::UnstubbedCall { target, .. }) if target >= 0x2f0000 => r.allow(target),
+                Err(e) => panic!("case {case}: {e}"),
+            }
+        }
+        let image = ours.save_image(None);
+        assert_eq!(*written.borrow(), (base + 8, 0x27d4), "case {case}: what goes to the card");
+        for k in 0..CAREER_SIZE {
+            let b = (r.mem.read_u32((base + k as u32) & !3) >> (8 * ((base + k as u32) & 3))) as u8;
+            assert_eq!(b, ours.bytes[k], "case {case}: +{k:#x}");
+        }
+        // the load: our own image back, and a damaged one refused
+        let mut back = Career::default();
+        assert!(back.load_image(&image, None), "case {case}: load");
+        let mut want = ours.bytes[8..0x27dc].to_vec();
+        want[0x27cc..0x27d0].fill(0);
+        assert_eq!(&back.bytes[8..0x27dc], &want[..], "case {case}: loaded");
+        let mut bad = image.clone();
+        bad[g.next() as usize % 0x27cc] ^= 1 << (g.next() % 8);
+        assert!(!Career::default().load_image(&bad, None), "case {case}: a damaged image");
+    }
+}

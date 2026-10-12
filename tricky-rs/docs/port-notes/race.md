@@ -190,3 +190,27 @@ the same unchecked way, and port that 1:1 (the bug included), noting it here.
   `FUN_00166c70` numbers the 13 character records.
 - Checked in the runner on 24 blocks of random bytes (each language, with and without a sound manager, the
   relations table made or not): every byte of the block, the effects stream and the sound calls.
+
+## The career's players, records and the memory card (board row E12b; checked: `tests/career_ops.rs`, `tests/career.rs`)
+
+- Pointers in the block are game addresses (the block at 0x32b390): a slot's +0x3108 its name, +0x3110 its
+  profile (+0x3118, five words: character, the entry's +0x28 and +0x30, outfit, board), +0x3114 its character
+  record; `RiderSetup_Init` writes the constants 0x32b398, 0x32db6c and 0x32e5f4. Ours keeps the same numbers.
+- `Career_AssignPlayerRider` (slot −1: the first free, past the fourth when all are taken, which writes over the
+  rider set-up at +0x320c: the flags are cleared in the call's delay slot, before `RiderSetup_Init`): the profile
+  it raced with if the same character (+0x312c), else the character's short record; `Career_UpdateAttributes`.
+- Attributes (+0x3820.. per slot): the record's points and their level (×0.4 + 0.5) to spend, the group levels
+  now and at the start, the caps (the rider's × 0.4 + 0.5); the max-attributes cheat takes every group to its cap
+  and leaves no points. Spending moves a group up to its cap, refunding back to its start; each rescales the
+  record's points (left / all × base) and its group byte (now / cap × the rider's cap).
+- `Career_CheckNewRecords`: show-off players riding a computer lose the race's flags; the circuit's result; the
+  slots' race flags cleared; the race's places into the course's tables (times in race modes 2 and 4, scores in
+  show-off 3 and 5, mode 7 the winner's time into the third table), each new record into the list after the block
+  (0x32eca0). A high-score entry is the name (the game's 12-byte buffer keeps its stack past the terminator) and
+  the character. `Career_UpdateBestStats` keeps a character's bests with a tag.
+- The memory card (`Career_SaveToCard` 0x1d2078): +8..+0x27dc, the sound options synced, +0x27d8 the version
+  0x12300003, +0x27d4 the CRC-16/ARC (`Crc_Compute16`, from 0xeafb) of the part with that word 0. The load takes
+  the word out (zeroed), checks it (error 0x12 if wrong), copies the part back and applies the sound options; the
+  version is not checked.
+- Checked in the runner: 100,000 random operations from a new game (assigning, clearing, spending, refunding,
+  resets, merges, names, flags, race results, bests) with the block compared each time; 50 saves.
