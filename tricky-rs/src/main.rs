@@ -652,6 +652,9 @@ fn anim_clock(def: &logic::AnimDef, model_end: f32) -> (f32, f32, f32) {
     (len, t, rate)
 }
 
+/// A scene pick as the game makes it: a `Rand_Fx` draw, unsigned `% n` (`divu`).
+fn fx_pick(n: u32) -> u32 { tricky_game::rand::rand_fx() % n }
+
 fn spawn_animated(
     commands: &mut Commands, level: &Level,
     meshes: &mut Assets<Mesh>, images: &mut Assets<Image>, materials: &mut Assets<StandardMaterial>, props: &Props,
@@ -2003,9 +2006,8 @@ fn ride(
             .map(|(_, i)| (rivals::index(lib.chars.get(opponents.0[i].character).map_or("", |c| c.name.as_str())), i + 1));
         match race.0.cml.clone() {
             Some(cml) if !quiet && race.0.finish_area.is_some() && game.event != ui::Event::FreeRide => {
-                let seed = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map_or(7, |d| d.subsec_nanos());
                 let win = rider.0.fin.is_some_and(|f| f.2);
-                let (scripts, cast) = intro::plan_post(&cml, me, win, rival, 1 + opponents.0.len(), seed);
+                let (scripts, cast) = intro::plan_post(&cml, me, win, rival, 1 + opponents.0.len(), &mut fx_pick);
                 race.0.post_scripts = scripts;
                 race.0.cast = Some(cast);
                 race.0.post = 1;
@@ -2424,8 +2426,7 @@ fn chase_camera(
         // after the race: the rival's scene and the win or lose scene, at the finish area
         if let Some(cml) = race.0.cml.clone() {
             let names: Vec<&str> = race.0.post_scripts.iter().map(|s| s.as_str()).collect();
-            let seed = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map_or(7, |d| d.subsec_nanos());
-            *director = Some(intro::Director::new(&cml, &names, seed));
+            *director = Some(intro::Director::new(&cml, &names));
             race.0.intro = true;
             race.0.post = 2;
         } else { race.0.post = 3; }
@@ -2435,10 +2436,10 @@ fn chase_camera(
         let quiet = std::env::var("TRICKY_INTRO").is_err() && (std::env::var("TRICKY_SIM").is_ok() || std::env::var("TRICKY_NOINTRO").is_ok() || std::env::var("TRICKY_SHOT").is_ok());
         if let (Some(cml), false) = (race.0.cml.clone(), quiet) {
             let fly = match game.event { ui::Event::Race => "RaceLoaded", ui::Event::ShowOff => "ShowLoaded", ui::Event::FreeRide => "FreeLoaded" };
-            let seed = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map_or(7, |d| d.subsec_nanos());
-            // a race also has the riders' staging scene and the gate scene (one of four each, at random)
-            let stg = format!("STG_COM_{}", 1 + seed % 4);
-            let gat = format!("GAT_6COM_{}", 1 + (seed / 7) % 4);
+            // a race also has the riders' staging scene and the gate scene (one of four each, a `Rand_Fx` draw `% 4` as
+            // `FUN_00169378` 0x169378 picks them; STANDIN: the port's draws are the only ones before them)
+            let stg = format!("STG_COM_{}", 1 + fx_pick(4));
+            let gat = format!("GAT_6COM_{}", 1 + fx_pick(4));
             let race_ev = game.event == ui::Event::Race;
             let only = std::env::var("TRICKY_INTRO").unwrap_or_default();
             let scripts: Vec<&str> = match only.as_str() {
@@ -2447,14 +2448,14 @@ fn chase_camera(
                 _ if race_ev => vec![fly, stg.as_str(), gat.as_str()],
                 _ => vec![fly, "Gate_Master"],
             };
-            *director = Some(intro::Director::new(&cml, &scripts, seed));
+            *director = Some(intro::Director::new(&cml, &scripts));
             race.0.intro = true;
         }
     }
     let skip = keys.just_pressed(KeyCode::Space) || pads.iter().any(|p| p.just_pressed(GamepadButton::South));
     let mut intro_view = None;
     if let (Some(d), Some(cml)) = (director.as_mut(), race.0.cml.clone()) {
-        d.step(&cml, time.dt);
+        d.step(&cml, time.dt, &mut tricky_game::rand::rand_fx);
         if std::env::var("TRICKY_INTRODBG").is_ok() { eprintln!("intro: done {} shot {:?} scene {:?}", d.done, d.shot.map(|s| s.pos), d.scene); }
         // the riders' scene: started and stopped by the script
         let want = if d.done { None } else { d.scene.clone() };

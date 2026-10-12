@@ -427,6 +427,20 @@ Part of the port notes (index: [README.md](README.md)); units and wording as des
     `Rand_Fx` users in the draws list (`FUN_001d5180` 0x1d5180 (nine draws), `FUN_001d9208`, `FUN_001c8ec8`, `cGame::Init`'s
     snow and rain draws 0x17e8c0..0x17e8e8, the emitters and the splash and spray code, which are G15 / G19).
 
+- The intro's and scenes' draws (row E1b2c, read): the camera director's random branch (`CamScript_Update` 0x175f50 case 10,
+  0x176278) draws once from `Rand_Fx`, `divu` by 100 (unsigned, 0x176284), and takes the branch when the remainder is below
+  `|p|` (`c.lt` at 0x1762e4). Ported: `intro::Director::step` takes the draw. The pre-race scene variants are
+  `Rand_Fx % count` (`FUN_00169378` 0x169378: per rider slot, from the 10-byte records at 0x3cc028, the first scene row
+  at +0x2e, the count at +0x30; one draw each unless a variant is forced) and `PreRaceSel_ChooseFromTable` 0x168a18 (one
+  draw `% matches`); `Career_PrepareRace` 0x163a40 draws twice and stores them at career +0x2b04 then +0x2b00 (nothing
+  reads them back with those offsets in the exe). The port's staging, gate and post-race picks are `% n` draws on the
+  global `Rand_Fx` (`fx_pick`); STANDIN: the game's draws before them (the riders' picks, the career's) are not made.
+- The music pickers are **not** `Rand_Fx`: `Music_StartCourseSong` 0x214e60 and `Song_RandomSegmentMs` 0x2246a8 (the air
+  loop's phrase) call a virtual of the sound system (`DAT_003436f8`: its second vtable's slot +0x24, `(r & 0x7fff) * n /
+  0x7fff` for the intro's A and B segments, `r % (count - 1)` for the air phrase), and `Audio_RaceInit` 0x2116d8 /
+  `Audio_OnRaceGo` 0x215288 draw `Rand_Fx % 100` only for `Music_SetPathVar` in game mode 6. That virtual is pure in
+  `cSoundSys`'s own table (0x3a0364 = 0x2f54e0); its implementation is in the object's real class, not found yet (E1b2f).
+
 ## Course file loading (`cCourseResolve_Common` / `cCourseResolve_PS2`)
 
 - The course data comes in with every pointer stored as an offset; `Resolve` (vf4, returns 0 ok, 1 failed,

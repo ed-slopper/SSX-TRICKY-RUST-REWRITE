@@ -139,16 +139,14 @@ pub struct Director {
     /// the scene the riders are playing (director op 0xE starts one, 0xF stops it), and a white flash
     pub scene: Option<String>,
     pub flash: f32,
-    rng: u32,
     pub done: bool,
 }
 impl Director {
-    pub fn new(cml: &Cml, scripts: &[&str], seed: u32) -> Self {
-        let mut d = Self { queue: scripts.iter().rev().map(|s| s.to_string()).collect(), script: Vec::new(), stack: Vec::new(), i: 0, t: 0.0, blend_from: None, shot: None, scene: None, flash: 0.0, rng: seed | 1, done: false };
+    pub fn new(cml: &Cml, scripts: &[&str]) -> Self {
+        let mut d = Self { queue: scripts.iter().rev().map(|s| s.to_string()).collect(), script: Vec::new(), stack: Vec::new(), i: 0, t: 0.0, blend_from: None, shot: None, scene: None, flash: 0.0, done: false };
         d.next_script(cml);
         d
     }
-    fn rand100(&mut self) -> f32 { self.rng ^= self.rng << 13; self.rng ^= self.rng >> 17; self.rng ^= self.rng << 5; (self.rng % 100) as f32 }
     fn next_script(&mut self, cml: &Cml) {
         while let Some(n) = self.queue.pop() {
             if let Some(s) = cml.script(&n) { self.script = s; self.i = 0; self.t = 0.0; return; }
@@ -158,8 +156,9 @@ impl Director {
     fn end_script(&mut self, cml: &Cml) {
         if let Some((s, i, t)) = self.stack.pop() { self.script = s; self.i = i; self.t = t; } else { self.next_script(cml); }
     }
-    /// Advance by `dt` seconds; the current camera is left in `shot`.
-    pub fn step(&mut self, cml: &Cml, dt: f32) {
+    /// Advance by `dt` seconds; the current camera is left in `shot`. `rand_fx` is the game's `Rand_Fx` 0x23d4a8 (the
+    /// random branch draws from it, `CamScript_Update` 0x175f50 case 10).
+    pub fn step(&mut self, cml: &Cml, dt: f32, rand_fx: &mut dyn FnMut() -> u32) {
         if self.done { return; }
         self.t += dt;
         self.flash = (self.flash - dt).max(0.0);
@@ -180,9 +179,10 @@ impl Director {
                     self.blend_from = None;
                     self.i += 1;
                 }
-                // a random branch: go to that script with probability p (the last one always)
+                // a random branch (case 10 of `CamScript_Update` 0x175f50): one `Rand_Fx` draw, unsigned `% 100` (`divu`
+                // 0x176284); go to that script when it is below |p|
                 10 => {
-                    if self.rand100() < e.p { if let Some(s) = cml.script(&e.name) { self.script = s; self.i = 0; self.t = 0.0; continue; } }
+                    if ((rand_fx() % 100) as f32) < e.p.abs() { if let Some(s) = cml.script(&e.name) { self.script = s; self.i = 0; self.t = 0.0; continue; } }
                     self.i += 1;
                 }
                 11 => { if let Some(s) = cml.script(&e.name) { self.stack.push((std::mem::take(&mut self.script), self.i + 1, self.t)); self.script = s; self.i = 0; self.t = 0.0; } else { self.i += 1; } }
@@ -242,11 +242,12 @@ const LOSE_ROWS: [&[(u32, u32)]; 12] = [
     &[(1, 1), (2, 3), (3, 2), (4, 3)], &[(1, 2), (2, 2), (3, 2), (4, 2)], &[(1, 1), (2, 3), (3, 3), (4, 3)], &[(1, 2), (2, 2), (3, 2), (4, 2)],
 ];
 
-/// The post-race scripts: the rival's taunt (FL_<RIV>_VS_USR) if there is one, then the win or lose scene.
-pub fn plan_post(cml: &Cml, player: usize, win: bool, rival: Option<(usize, usize)>, riders: usize, seed: u32) -> (Vec<String>, Cast) {
+/// The post-race scripts (`pick(n)` is a `Rand_Fx` draw `% n`, unsigned, as the game's scene picks are,
+/// `FUN_00169378` 0x169378): the rival's taunt (FL_<RIV>_VS_USR) if there is one, then the win or lose scene.
+pub fn plan_post(cml: &Cml, player: usize, win: bool, rival: Option<(usize, usize)>, riders: usize, pick: &mut dyn FnMut(u32) -> u32) -> (Vec<String>, Cast) {
     let player = player.min(11);
     let rows = if win { WIN_ROWS[player] } else { LOSE_ROWS[player] };
-    let (variant, script) = rows[(seed % rows.len() as u32) as usize];
+    let (variant, script) = rows[pick(rows.len() as u32) as usize];
     let mut scripts = Vec::new();
     let rival = rival.and_then(|(ch, k)| {
         let name = format!("FL_{}_VS_USR", CODES[ch.min(11)].to_uppercase());
@@ -254,7 +255,7 @@ pub fn plan_post(cml: &Cml, player: usize, win: bool, rival: Option<(usize, usiz
         scripts.push(name);
         // the rival pair's clip number: four of each, fewer for some (Psymon's, Elise's)
         let choices: &[u32] = if player == 8 { &[1, 3] } else if ch == 8 || player == 7 { &[1, 2, 3] } else { &[1, 2, 3, 4] };
-        Some((ch, k, choices[((seed / 5) % choices.len() as u32) as usize]))
+        Some((ch, k, choices[pick(choices.len() as u32) as usize]))
     });
     scripts.push(format!("FL_{}_{script}", if win { "WIN" } else { "LOS" }));
     (scripts, Cast { player, variant, rival, riders })
@@ -301,5 +302,23 @@ mod cml_tests {
             checked += 1;
         }
         assert!(checked > 0);
+    }
+}
+
+#[cfg(test)]
+mod pick_tests {
+    //! Row E1b2c: the post-race scene picks are `Rand_Fx` draws `% n` (`FUN_00169378` 0x169378), in the order variant then
+    //! the rival's clip.
+    use super::*;
+
+    #[test]
+    fn the_post_race_scene_is_picked_by_the_draws_it_is_given() {
+        let cml = Cml { files: Vec::new() };
+        let mut asked = Vec::new();
+        let mut pick = |n: u32| { asked.push(n); 1 % n };
+        let (scripts, cast) = plan_post(&cml, 0, true, None, 6, &mut pick);
+        // one pick, over the player's row of winning scenes
+        assert_eq!(asked, vec![WIN_ROWS[0].len() as u32]);
+        assert_eq!((cast.variant, scripts.last().cloned()), (WIN_ROWS[0][1].0, Some(format!("FL_WIN_{}", WIN_ROWS[0][1].1))));
     }
 }
