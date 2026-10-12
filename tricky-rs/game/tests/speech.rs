@@ -8,7 +8,7 @@ use std::rc::Rc;
 
 use r5900::Runner;
 use tricky_game::career::{Career, CAREER_BASE};
-use tricky_game::speech::{self, voices, Announcer, Event, SpeechEnv, SpeechRider, Trigger};
+use tricky_game::speech::{self, voices, Announcer, Event, Ring, SpeechEnv, SpeechRider, Trigger};
 
 struct Rng(u64);
 impl Rng {
@@ -55,8 +55,7 @@ const POSTS: &[(u32, u32, &str)] = &[
 enum Ev {
     Post(Vec<u32>),
     /// gain bits, slot, at (0 none), callback, voice
-    Trigger(u32, u32, u32, bool, u32),
-    Interrupt(u32),
+    Trigger(u32, u32, u32, u32, u32),
     Rand(u32),
     Hold(u32, u32),
     Clear(u32),
@@ -80,12 +79,17 @@ struct World {
     clock: i32,
     after: Vec<i32>,
     post_ret: u32,
+    /// per slot: the line's handle (below 0 none) and its monitor's +0x80 (none: no monitor)
+    handles: [i32; 2],
+    monitors: [Option<i32>; 2],
+    /// handles whose sound finished
+    done: Vec<u32>,
     log: Vec<Ev>,
 }
 
 impl World {
     fn new(seed: u64) -> World {
-        World { rand: seed, replay: false, listener: 0, mode: 0, can_play: true, near: vec![], rel: [[0; 12]; 12], course: 0, app_mode: 0, rider0: 0, callbacks: vec![], clock: 0, after: vec![], post_ret: 1, log: vec![] }
+        World { rand: seed, replay: false, listener: 0, mode: 0, can_play: true, near: vec![], rel: [[0; 12]; 12], course: 0, app_mode: 0, rider0: 0, callbacks: vec![], clock: 0, after: vec![], post_ret: 1, handles: [-1; 2], monitors: [None; 2], done: vec![], log: vec![] }
     }
     fn draw(&mut self) -> u32 {
         self.rand ^= self.rand << 13;
@@ -119,9 +123,6 @@ impl SpeechEnv for World {
     fn find_near(&mut self, rider: u32) -> i32 {
         self.near_of(rider)
     }
-    fn interrupt_if_playing(&mut self, voice: u32) {
-        self.log.push(Ev::Interrupt(voice));
-    }
     fn relation(&mut self, a: u32, b: u32) -> i32 {
         self.rel[a as usize][b as usize]
     }
@@ -131,11 +132,21 @@ impl SpeechEnv for World {
     }
     fn trigger(&mut self, t: Trigger) -> Vec<u32> {
         self.log.push(Ev::Trigger(t.gain.to_bits(), t.slot, t.at.map_or(0, |r| r + 0x140), t.callback, t.voice));
-        if t.callback {
+        if t.callback != 0 {
             self.callbacks.clone()
         } else {
             vec![]
         }
+    }
+    fn line_state(&mut self, slot: u32) -> Option<Option<i32>> {
+        if self.handles[slot as usize] < 0 {
+            None
+        } else {
+            Some(self.monitors[slot as usize])
+        }
+    }
+    fn handle_done(&mut self, handle: u32) -> bool {
+        self.done.contains(&handle)
     }
     fn course(&mut self) -> u32 {
         self.course
@@ -199,24 +210,54 @@ fn setup(r: &mut Runner, w: &Rc<RefCell<World>>) {
         let n = x.borrow().near_of((c.gpr(5) as u32).wrapping_sub(0x140));
         c.set_gpr(2, n as i64 as u64);
     });
+    // the slot's line: bank id = the slot, its handle, its monitor (+0x80)
+    r.stub(0x228e10, |c, _| {
+        let v = c.gpr(5);
+        c.set_gpr(2, v)
+    });
     let x = w.clone();
-    r.stub(0x234bb8, move |c, _| x.borrow_mut().log.push(Ev::Interrupt(c.gpr(5) as u32 & 0xff)));
+    r.stub(0x22a278, move |c, _| {
+        let h = x.borrow().handles[c.gpr(5) as usize];
+        c.set_gpr(2, h as i64 as u64)
+    });
+    let monitor = r.mem.alloc(0x100);
     let x = w.clone();
+    r.stub(0x20c200, move |c, m| {
+        let h = c.gpr(5) as i32;
+        let x = x.borrow();
+        let slot = x.handles.iter().position(|v| *v == h).unwrap();
+        match x.monitors[slot] {
+            None => c.set_gpr(2, 0),
+            Some(st) => {
+                m.write_u32(monitor + 0x80, st as u32);
+                c.set_gpr(2, monitor as u64)
+            }
+        }
+    });
+    let x = w.clone();
+    r.stub(0x22a0c8, move |c, _| {
+        let d = x.borrow().done.contains(&(c.gpr(5) as u32));
+        c.set_gpr(2, d as u64)
+    });    let x = w.clone();
     r.stub(0x167e00, move |c, _| {
         let v = x.borrow().rel[c.gpr(5) as usize][c.gpr(6) as usize];
         c.set_gpr(2, v as i64 as u64);
     });
     let x = w.clone();
     r.stub(0x228bd8, move |c, m| {
-        let callback = c.gpr(7) as u32 == 0x235530;
+        let callback = c.gpr(7) as u32;
         let ev = Ev::Trigger(c.f(12).to_bits(), c.gpr(5) as u32, c.gpr(6) as u32, callback, c.gpr(8) as u32 & 0xff);
         x.borrow_mut().log.push(ev);
-        if callback {
-            let sys = c.gpr(4) as u32;
-            let vals = x.borrow().callbacks.clone();
+        let sys = c.gpr(4) as u32;
+        let vals = x.borrow().callbacks.clone();
+        if callback == speech::BIG_SCORE_CALLBACK {
             for v in vals {
                 game_queue(m, sys, v);
                 x.borrow_mut().log.push(Ev::Hold(1, 0));
+            }
+        } else if callback == speech::CAM_LINE_CALLBACK {
+            for v in vals {
+                m.write_u32(sys + 0x7dc8, v);
             }
         }
     });
@@ -327,13 +368,16 @@ fn handlers_are_the_original() {
     let w = Rc::new(RefCell::new(World::new(7)));
     setup(&mut r, &w);
     // the handlers' own callees run as the game's
-    for a in [0x235d58u32, 0x233b70, 0x234698, 0x234730, 0x234c38, 0x235090, 0x233138, 0x1635b0, 0x2309a8, 0x235ba8, 0x235530, 0x164288, 0x164318, 0x166550, 0x231548, 0x231800, 0x231af8, 0x2315e0, 0x16baa8, 0x16ba60, 0x2307f0, 0x250c10] {
+    for a in [0x235d58u32, 0x233b70, 0x234698, 0x234730, 0x234c38, 0x235090, 0x233138, 0x1635b0, 0x2309a8, 0x235ba8, 0x235530, 0x164288, 0x164318, 0x166550, 0x231548, 0x231800, 0x231af8, 0x2315e0, 0x16baa8, 0x16ba60, 0x2307f0, 0x250c10, 0x230dd0, 0x230910, 0x230880, 0x234bb8, 0x228d10] {
         r.allow(a);
     }
     for &(f, _, _) in POSTS {
         r.allow(f);
     }
     let sys = r.mem.alloc(0x8000);
+    let cam_ring = r.mem.alloc(16);
+    let cam_buf = r.mem.alloc(4 * 8);
+    let cam_table = r.mem.alloc(31 * 4 * 4);
     r.mem.write_u32(0x343050, sys);
     let ring = r.mem.alloc(16);
     let ring_buf = r.mem.alloc(4 * 8);
@@ -348,8 +392,8 @@ fn handlers_are_the_original() {
     let riders: Vec<u32> = (0..2).map(|_| r.mem.alloc(0x5900)).collect();
     let entries: Vec<u32> = (0..2).map(|_| r.mem.alloc(0x80)).collect();
     let mut g = Rng(0x5bee_c400_0000_0002);
-    let mut seen = [0u32; 44];
-    let mut posted = [0u32; 44];
+    let mut seen = [0u32; 52];
+    let mut posted = [0u32; 52];
     let trick_at = r.mem.alloc(8);
     let mut ids = std::collections::BTreeSet::new();
     for case in 0..60_000 {
@@ -363,6 +407,9 @@ fn handlers_are_the_original() {
             end_flags: [0u32, 1, 0x10, 0x11][g.below(4) as usize] * (g.below(3) == 0) as u32,
             placing_time: g.below(2000) as i32,
             tricks_spoken: g.below(3) as i32 * (g.below(2) == 0) as i32,
+            cam_ring: None,
+            cam_lines: vec![],
+            cam_value: g.next(),
             trick_ok: [0u32, 1, 7][g.below(3) as usize] * (g.below(6) != 0) as u32,
             ring: (0..n).map(|_| g.next()).collect(),
             ring_write: g.below(n as u32) as i32,
@@ -380,6 +427,50 @@ fn handlers_are_the_original() {
         r.mem.write_u32(sys + 0x7ddc, ann.placing_time as u32);
         r.mem.write_u32(sys + 0x6e00, ann.tricks_spoken as u32);
         r.mem.write_u32(sys + 0x6e04, ann.trick_ok);
+        // the cut-scene lines: a ring (or none) and a table of four entries
+        if g.below(6) != 0 {
+            let n = 1 + g.below(8) as usize;
+            let mut ring = Ring { buf: (0..n).map(|_| if g.below(3) == 0 { 0xffff_fff0 | g.below(16) } else { g.below(6) }).collect(), write: g.below(n as u32) as i32, read: g.below(n as u32) as i32 };
+            // (a ring the drain would empty through negative words loops for ever in the game: end it on a line)
+            if g.below(2) == 0 {
+                let last = (ring.write + n as i32 - 1) % n as i32;
+                ring.buf[last as usize] = g.below(6);
+            }
+            r.mem.write_u32(sys + 0x7dbc, cam_ring);
+            r.mem.write_u32(cam_ring, n as u32);
+            r.mem.write_u32(cam_ring + 4, cam_buf);
+            r.mem.write_u32(cam_ring + 8, ring.write as u32);
+            r.mem.write_u32(cam_ring + 12, ring.read as u32);
+            for (k, v) in ring.buf.iter().enumerate() {
+                r.mem.write_u32(cam_buf + 4 * k as u32, *v);
+            }
+            ann.cam_ring = Some(ring);
+        } else {
+            r.mem.write_u32(sys + 0x7dbc, 0);
+        }
+        let cam_entries = 4usize;
+        let mut lines = vec![0i32; 31 * cam_entries];
+        for e in 0..cam_entries {
+            lines[31 * e] = g.below(4) as i32;
+            let len = g.below(6) as usize;
+            for k in 0..len {
+                lines[31 * e + 1 + k] = if g.below(4) == 0 { -1 } else { [500, 1000, 1999, 2500, 3500, 4500, 5001, 5032, 6500, 7000][g.below(10) as usize] };
+            }
+            if ann.cam_ring.is_none() {
+                for k in 0..len {
+                    if lines[31 * e + 1 + k] == -1 {
+                        lines[31 * e + 1 + k] = 1500;
+                    }
+                }
+            }
+        }
+        for (k, v) in lines.iter().enumerate() {
+            r.mem.write_u32(cam_table + 4 * k as u32, *v as u32);
+        }
+        r.mem.write_u32(sys + 0x7dc0, cam_table);
+        r.mem.write_u32(sys + 0x7dc4, cam_entries as u32);
+        r.mem.write_u32(sys + 0x7dc8, ann.cam_value);
+        ann.cam_lines = lines;
         for c in ann.checkpoints.iter_mut() {
             *c = g.below(6) as i32;
         }
@@ -417,6 +508,9 @@ fn handlers_are_the_original() {
             x.callbacks = (0..[0, 0, 1, 2][g.below(4) as usize]).map(|_| g.next()).collect();
             x.clock = g.below(3000) as i32;
             x.post_ret = [0u32, 1, 3][g.below(3) as usize];
+            x.handles = [0, 1].map(|k| if g.below(4) == 0 { -1 } else { 10 + k });
+            x.monitors = [0, 1].map(|_| if g.below(4) == 0 { None } else { Some(g.below(14) as i32) });
+            x.done = (0..6).filter(|_| g.below(2) == 0).collect();
             x.after = (0..4).map(|k| if k == 3 || g.below(2) == 0 { -1 } else { g.below(4) as i32 }).collect();
             x.log.clear();
         }
@@ -482,7 +576,7 @@ fn handlers_are_the_original() {
             r.mem.write_u32(0x335408 + 12 * i as u32, u.value as u32);
         }
         let mut ours = w.borrow().clone();
-        let op = g.below(44) as usize;
+        let op = g.below(52) as usize;
         seen[op] += 1;
         let (a, b) = (rs[0], rs[1]);
         let (pa, pb) = (riders[0] as u64, riders[1] as u64);
@@ -696,6 +790,49 @@ fn handlers_are_the_original() {
                 call(&mut r, 0x232498, &[s, pa, trick_at as u64, score as i64 as u64]);
                 ann.announce_trick(&mut ours, &a, [w0, w1], score);
             }
+            44 => {
+                let k = g.below(9) as i64 - 1;
+                call(&mut r, 0x231398, &[s, k as u64]);
+                ann.lesson_line(&mut ours, k);
+            }
+            45 => {
+                let i = g.below(12) as usize;
+                call(&mut r, 0x2314e0, &[s, i as u64]);
+                ann.bit_line(&mut ours, i);
+            }
+            46 => {
+                let line = [500i64, 1000, 1500, 2999, 3000, 4999, 5001, 5040, 6000, 6999, 7000][g.below(11) as usize];
+                call(&mut r, 0x230dd0, &[s, line as u64]);
+                ann.queue_cam_line(&mut ours, line);
+            }
+            47 => {
+                let id = g.below(5) as i32;
+                call(&mut r, 0x230ee0, &[s, id as u64]);
+                ann.queue_cam_lines(&mut ours, id);
+            }
+            48 => {
+                // (a ring the drain would empty through negative words loops for ever in the game)
+                let mut probe = ann.clone();
+                let mut pw = ours.clone();
+                if probe.drain_cam_lines(&mut pw).is_some() {
+                    let t = call(&mut r, 0x230ff8, &[s]) as i32;
+                    let o = ann.drain_cam_lines(&mut ours).unwrap();
+                    ret = Some((t == o, true));
+                }
+            }
+            49 => {
+                let t = call(&mut r, 0x2312b0, &[s]) != 0;
+                ret = Some((t, ann.cam_line_playing(&mut ours)));
+            }
+            50 => {
+                call(&mut r, 0x231318, &[s]);
+                ann.stop_cam_line(&mut ours);
+            }
+            51 => {
+                let k = g.below(4) as i64 - 1;
+                call(&mut r, 0x2310c8, &[s, pa, k as u64]);
+                ann.on_cam_intro(&mut ours, &car, &a, k);
+            }
             42 => {
                 let p = g.below(5) as i32 - 1;
                 let t = call(&mut r, 0x2315e0, &[s, p as i64 as u64]) as u32;
@@ -732,12 +869,19 @@ fn handlers_are_the_original() {
         assert_eq!(r.mem.read_u32(sys + 0x7dcc), ann.end_flags, "case {case} op {op}: end flags");
         assert_eq!(r.mem.read_u32(sys + 0x6e00) as i32, ann.tricks_spoken, "case {case} op {op}: tricks spoken");
         assert_eq!(r.mem.read_u32(sys + 0x6e04), ann.trick_ok, "case {case} op {op}: trick ok");
+        assert_eq!(r.mem.read_u32(sys + 0x7dc8), ann.cam_value, "case {case} op {op}: cam value");
+        if let Some(ring) = &ann.cam_ring {
+            let now: Vec<u32> = (0..ring.buf.len() as u32).map(|k| r.mem.read_u32(cam_buf + 4 * k)).collect();
+            assert_eq!(now, ring.buf, "case {case} op {op}: cam ring");
+            assert_eq!(r.mem.read_u32(cam_ring + 8) as i32, ring.write, "case {case} op {op}: cam write");
+            assert_eq!(r.mem.read_u32(cam_ring + 12) as i32, ring.read, "case {case} op {op}: cam read");
+        }
     }
     eprintln!("ops {seen:?}\nposts by op {posted:?}");
-    for id in [0x100200fu32, 0x1002010, 0x100201c, 0x4008007, 0x4008009, 0x4008013, 0x400800a, 0x400800b, 0x400800c, 0x400800d, 0x3006019, 0x300601a, 0x300601b, 0x300601c] {
+    for id in [0x4008002u32, 0x4008003, 0x4008004, 0x4008005, 0x4008006, 0x4008010, 0x400800f, 0x4008016, 0x100200fu32, 0x1002010, 0x100201c, 0x4008007, 0x4008009, 0x4008013, 0x400800a, 0x400800b, 0x400800c, 0x400800d, 0x3006019, 0x300601a, 0x300601b, 0x300601c] {
         assert!(ids.contains(&id), "event {id:#x} never posted");
     }
-    for op in (0..25).chain([31, 32, 33, 34, 36, 37, 38, 39, 40, 41, 43]) {
+    for op in (0..25).chain([31, 32, 33, 34, 36, 37, 38, 39, 40, 41, 43, 44, 45, 46, 47, 51]) {
         assert!(op == 17 || posted[op] > 0, "op {op} never posted");
     }
 }

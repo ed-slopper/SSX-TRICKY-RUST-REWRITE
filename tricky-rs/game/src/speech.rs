@@ -66,10 +66,13 @@ pub trait SpeechEnv {
     /// `Audio_FindRiderNear` 0x20f9b0(the radius `DAT_00343998`, the rider's position +0x140): the near listener's
     /// index, below 0 none
     fn find_near(&mut self, rider: u32) -> i32;
-    /// `Speech_InterruptIfPlaying` 0x234bb8(voice): a rider line of this voice playing is stopped
-    fn interrupt_if_playing(&mut self, voice: u32);
     /// `RelTable_GetRelation`(`DAT_003352b4`, a, b) of two characters
     fn relation(&mut self, a: u32, b: u32) -> i32;
+    /// `SpeechSys_GetBankId`(slot) → `StreamSys_GetSlotHandle` → `BankMonitor_Find`(handle, 3): no handle (below
+    /// 0) none; no monitor `Some(None)`; else its +0x80
+    fn line_state(&mut self, slot: u32) -> Option<Option<i32>>;
+    /// `FUN_0022a0c8`(handle): the sound handle finished (state 3) or gone
+    fn handle_done(&mut self, handle: u32) -> bool;
     /// `SpeechLib_PostEvent`: its answer (the trick line keeps it)
     fn post(&mut self, e: Event) -> u32;
     /// `SpeechSys_Trigger` 0x228bd8: the speech library serviced for the slot now; the values it handed the
@@ -93,19 +96,25 @@ pub trait SpeechEnv {
 }
 
 /// A `SpeechSys_Trigger` call: the gain (f12, 0 keeps the slot's), the slot, the position (a rider's +0x140: the
-/// rider's id; none for 0), whether `Speech_QueueBigScore` is the callback, and the voice
+/// rider's id; none for 0), the callback the library hands values to (0 none, [`BIG_SCORE_CALLBACK`],
+/// [`CAM_LINE_CALLBACK`]), and the voice
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Trigger {
     pub gain: f32,
     pub slot: u32,
     pub at: Option<u32>,
-    pub callback: bool,
+    pub callback: u32,
     pub voice: u32,
 }
 
+/// `Speech_QueueBigScore` 0x235530 as a trigger's callback
+pub const BIG_SCORE_CALLBACK: u32 = 0x235530;
+/// `FUN_00230998` as a trigger's callback: the value into +0x7dc8
+pub const CAM_LINE_CALLBACK: u32 = 0x230998;
+
 /// A trigger at a rider (gain 0, no callback)
 fn at(slot: u32, rider: u32, voice: u32) -> Trigger {
-    Trigger { gain: 0.0, slot, at: Some(rider), callback: false, voice }
+    Trigger { gain: 0.0, slot, at: Some(rider), callback: 0, voice }
 }
 
 /// What the triggers read of a rider (`cBoarder`): its id (the object, compared with the listener; its position
@@ -196,6 +205,34 @@ pub struct Announcer {
     pub tricks_spoken: i32,
     /// +0x6e04: the last trick line's post answer (0 stops them)
     pub trick_ok: u32,
+    /// +0x7dbc: the cut-scene lines' ring (none when not loaded)
+    pub cam_ring: Option<Ring>,
+    /// +0x7dc0 / +0x7dc4: the cut-scene line table, 31 words an entry (the id, then its lines until a 0; the game
+    /// reads on into the next entries), flat
+    pub cam_lines: Vec<i32>,
+    /// +0x7dc8: the value the library last handed `FUN_00230998` (−1 before)
+    pub cam_value: u32,
+}
+
+/// A ring of words (size, buffer, write, read): a push is dropped when full
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct Ring {
+    pub buf: Vec<u32>,
+    pub write: i32,
+    pub read: i32,
+}
+
+impl Ring {
+    fn push(&mut self, v: u32) {
+        let n = self.buf.len() as i32;
+        if (self.write + 1) % n != self.read {
+            self.buf[self.write as usize] = v;
+            self.write += 1;
+            if n <= self.write {
+                self.write = 0;
+            }
+        }
+    }
 }
 
 impl Announcer {
@@ -390,8 +427,8 @@ pub mod voices {
         if !r.player() {
             return;
         }
-        env.interrupt_if_playing(r.voice as u32);
-        env.interrupt_if_playing(0xc);
+        interrupt_if_playing(env, r.voice as u32);
+        interrupt_if_playing(env, 0xc);
         if env.can_play(1) && 0 <= env.find_near(r.id) {
             let args = [character_bit(r.voice), 0x40];
             let id = if env.rand_fx() & 1 == 0 { 0x3006024 } else { 0x3006023 };
@@ -405,7 +442,7 @@ pub mod voices {
         if !r.player() {
             return;
         }
-        env.interrupt_if_playing(r.voice as u32);
+        interrupt_if_playing(env, r.voice as u32);
         if env.can_play(1) && 0 <= env.find_near(r.id) {
             if kind == 0 {
                 on_crash_nearby(env, r);
@@ -421,7 +458,7 @@ pub mod voices {
         if !a.player() || !b.player() {
             return;
         }
-        env.interrupt_if_playing(b.voice as u32);
+        interrupt_if_playing(env, b.voice as u32);
         if !env.can_play(1) {
             return;
         }
@@ -639,12 +676,12 @@ impl Announcer {
             None => Some(env.race_rider(0)),
         };
         if kind == 0 {
-            env.trigger(Trigger { gain: 1500.0, slot: 1, at: pos, callback: false, voice: 0 });
+            env.trigger(Trigger { gain: 1500.0, slot: 1, at: pos, callback: 0, voice: 0 });
             return;
         }
         env.slot_hold(1, u32::MAX);
         self.big_queued = 0;
-        for v in env.trigger(Trigger { gain: 1500.0, slot: 1, at: pos, callback: true, voice: 0 }) {
+        for v in env.trigger(Trigger { gain: 1500.0, slot: 1, at: pos, callback: BIG_SCORE_CALLBACK, voice: 0 }) {
             self.queue_big_score(env, v);
         }
         if self.big_queued == 0 {
@@ -743,7 +780,7 @@ impl Announcer {
     /// player's rider (above 80: two or more 4 (and 0x10 with two or more at 20 or under), none 2; at 20 or under two
     /// or more 1, none 8) and the mode bit
     pub fn on_next_race(&self, env: &mut dyn SpeechEnv, c: &crate::career::Career) {
-        let none = Trigger { gain: 0.0, slot: 0, at: None, callback: false, voice: 0 };
+        let none = Trigger { gain: 0.0, slot: 0, at: None, callback: 0, voice: 0 };
         env.trigger(none);
         let mode = env.mode();
         if mode != 4 && mode != 2 {
@@ -857,7 +894,7 @@ fn medal_bit(m: u32) -> u32 {
     }
 }
 
-const SLOT0: Trigger = Trigger { gain: 0.0, slot: 0, at: None, callback: false, voice: 0 };
+const SLOT0: Trigger = Trigger { gain: 0.0, slot: 0, at: None, callback: 0, voice: 0 };
 
 impl Announcer {
     /// `FUN_00231800` (the placing line): once (+0x7dcc bit 0), no replay: the first player rider in the places, its
@@ -1272,6 +1309,196 @@ impl Announcer {
             let second = (w0 >> 16) as u8;
             if second != 0 {
                 env.post(Event::new(0x1002010, &[trick_name_id(second)]));
+            }
+        }
+    }
+}
+
+/// The bits `FUN_002314e0` reads (0x3a2750; ten bits then two zeros)
+pub const LINE_BITS: [u32; 12] = [1, 2, 4, 8, 0x10, 0x20, 0x40, 0x80, 0x100, 0x200, 0, 0];
+
+impl Announcer {
+    /// `Speech_LessonLine` 0x231398(which): no replay: the lesson's bit (0..2 once each, +0x7dcc bits 1..3; 3..7
+    /// 4..0x40), 0x400800f with it, the mode bit and 1
+    pub fn lesson_line(&mut self, env: &mut dyn SpeechEnv, which: i64) {
+        if env.replay_playing() {
+            return;
+        }
+        let mut once = |flag: u32, v: u32| {
+            if self.end_flags & flag == 0 {
+                self.end_flags |= flag;
+                v
+            } else {
+                0
+            }
+        };
+        let bit = match which {
+            0 => once(2, 1),
+            1 => once(4, 2),
+            2 => once(8, 2),
+            3 => 4,
+            4 => 8,
+            5 => 0x10,
+            6 => 0x20,
+            7 => 0x40,
+            _ => 0,
+        };
+        let mm = mode_mask(env.app_mode());
+        env.post(Event::new(0x400800f, &[bit, mm, 1]));
+        env.trigger(SLOT0);
+    }
+
+    /// `FUN_002314e0`(i): 0x4008010 with the line's bit (`LINE_BITS`, 0..11) and the mode bit
+    pub fn bit_line(&mut self, env: &mut dyn SpeechEnv, i: usize) {
+        let mm = mode_mask(env.app_mode());
+        env.post(Event::new(0x4008010, &[LINE_BITS[i], mm]));
+        env.trigger(SLOT0);
+    }
+
+    /// `Speech_QueueCamScriptLine` 0x230dd0(line): from 1000, by the thousand: 0x4008002 / 0x4008004 / 0x4008003 /
+    /// 0x4008005 with the line within it and the mode bit; 5000..5999 0x4008015 with the bit of (line − 5001);
+    /// 6000..6999 0x4008016; then slot 0 at voice 1 with `FUN_00230998` the callback
+    pub fn queue_cam_line(&mut self, env: &mut dyn SpeechEnv, line: i64) {
+        if line < 1000 {
+            return;
+        }
+        let mm = mode_mask(env.app_mode());
+        let l = line as i32;
+        if line < 2000 {
+            env.post(Event::new(0x4008002, &[(l - 1000) as u32, mm]));
+        } else if line < 3000 {
+            env.post(Event::new(0x4008004, &[(l - 2000) as u32, mm]));
+        } else if line < 4000 {
+            env.post(Event::new(0x4008003, &[(l - 3000) as u32, mm]));
+        } else if line < 5000 {
+            env.post(Event::new(0x4008005, &[(l - 4000) as u32, mm]));
+        } else if line < 6000 {
+            env.post(Event::new(0x4008015, &[1u32 << ((l as u32).wrapping_sub(0x1389) & 31)]));
+        } else if line < 7000 {
+            env.post(Event::new(0x4008016, &[(l - 6000) as u32, mm]));
+        }
+        let t = Trigger { gain: 0.0, slot: 0, at: None, callback: CAM_LINE_CALLBACK, voice: 1 };
+        for v in env.trigger(t) {
+            self.cam_value = v;
+        }
+    }
+
+    /// `Speech_QueueCamScriptLines` 0x230ee0(id): the last entry of the line table with the id: +0x7dc8 to −1, then
+    /// each line until a 0: −1 queues +0x7dc8 on the ring, others `Speech_QueueCamScriptLine`
+    pub fn queue_cam_lines(&mut self, env: &mut dyn SpeechEnv, id: i32) {
+        let n = self.cam_lines.len() / 31;
+        let Some(e) = (0..n).rev().find(|&k| self.cam_lines[31 * k] == id) else { return };
+        self.cam_value = u32::MAX;
+        let mut k = 31 * e + 1;
+        loop {
+            let w = self.cam_lines[k];
+            if w == 0 {
+                break;
+            }
+            if w == -1 {
+                let v = self.cam_value;
+                self.cam_ring.as_mut().expect("the game reads the ring through a null pointer").push(v);
+            } else {
+                self.queue_cam_line(env, w as i64);
+            }
+            k += 1;
+        }
+    }
+
+    /// `FUN_00230ff8`: the cut-scene ring drained past lines that finished: how many were taken (1 with no ring or
+    /// an empty one). The game stops at a line still playing whose value is not negative; one that empties the ring
+    /// leaves it looping for ever (`None`).
+    pub fn drain_cam_lines(&mut self, env: &mut dyn SpeechEnv) -> Option<i32> {
+        let Some(ring) = self.cam_ring.as_mut() else { return Some(1) };
+        if ring.write == ring.read {
+            return Some(1);
+        }
+        let mut n = 0;
+        loop {
+            let done = ring.write != ring.read && env.handle_done(ring.buf[ring.read as usize]);
+            if !done {
+                let v = if ring.write == ring.read { -1 } else { ring.buf[ring.read as usize] as i32 };
+                if 0 <= v {
+                    return Some(n);
+                }
+                if ring.write == ring.read {
+                    return None;
+                }
+            }
+            if ring.write != ring.read {
+                ring.read += 1;
+                if ring.buf.len() as i32 <= ring.read {
+                    ring.read = 0;
+                }
+            }
+            n += 1;
+        }
+    }
+
+    /// `Speech_IsCamScriptLinePlaying` 0x2312b0: slot 0 has a handle and its monitor is missing or at 1
+    pub fn cam_line_playing(&self, env: &mut dyn SpeechEnv) -> bool {
+        match env.line_state(0) {
+            None => false,
+            Some(None) => true,
+            Some(Some(s)) => s == 1,
+        }
+    }
+
+    /// `Speech_StopCamScriptLine` 0x231318: a slot-0 line at 1 cleared and the ring emptied (read = write)
+    pub fn stop_cam_line(&mut self, env: &mut dyn SpeechEnv) {
+        if let Some(Some(1)) = env.line_state(0) {
+            env.clear_event(0);
+            if let Some(r) = self.cam_ring.as_mut() {
+                r.read = r.write;
+            }
+        }
+    }
+
+    /// `Speech_OnCamScriptIntro` 0x2310c8(rider, kind): in a circuit race at its first event: 0x4008006 with the
+    /// course's bit | 0x400, the riders the rider's character is in relation 2 (kind 1) or 1 (kind 2) with (0x2000
+    /// for kind 0), the rider's own bit and the mode bit; slot 0 at voice 1
+    pub fn on_cam_intro(&self, env: &mut dyn SpeechEnv, c: &crate::career::Career, r: &SpeechRider, kind: i64) {
+        if env.mode() != 4 || c.event_mode() != 0 {
+            return;
+        }
+        let a = current_course_mask(env.course()) | 0x400;
+        let me = course_mask(r.voice as u64);
+        let mm = mode_mask(env.app_mode());
+        let mut b = 0;
+        let rel = match kind {
+            1 => Some(2),
+            2 => Some(1),
+            0 => {
+                b = 0x2000;
+                None
+            }
+            _ => None,
+        };
+        if let Some(want) = rel {
+            for k in 0..12 {
+                if env.relation(r.character, k) == want {
+                    b |= char_mask_of(k as u64);
+                }
+            }
+        }
+        env.post(Event::new(0x4008006, &[a, b, me, mm]));
+        env.trigger(Trigger { voice: 1, ..SLOT0 });
+    }
+
+}
+
+/// `Speech_InterruptIfPlaying` 0x234bb8(voice): no slot-1 handle 1; no monitor 0; a line of this voice (+0x80)
+/// cleared: 1; else 0
+pub fn interrupt_if_playing(env: &mut dyn SpeechEnv, voice: u32) -> bool {
+    match env.line_state(1) {
+        None => true,
+        Some(None) => false,
+        Some(Some(v)) => {
+            if v == voice as i32 {
+                env.clear_event(1);
+                true
+            } else {
+                false
             }
         }
     }

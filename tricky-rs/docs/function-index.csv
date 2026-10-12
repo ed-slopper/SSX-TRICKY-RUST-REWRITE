@@ -3483,7 +3483,7 @@ address,size,name,system,status
 0x20c0e0,20,BankMonitor_ResetInstance,audio?,not started
 0x20c0f8,76,cBankMonitor::vf5_20c0f8,audio?,not started
 0x20c148,184,cBankMonitor::vf6_20c148,audio?,not started
-0x20c200,156,BankMonitor_Find,audio?,not started
+0x20c200,156,BankMonitor_Find,audio?,ported
 0x20c2a0,104,SndSys_StopBankSound,audio,not started
 0x20c308,120,BankInstances_CountPlaying,audio?,not started
 0x20c380,104,BankInstances_CountUsed,audio?,not started
@@ -3897,7 +3897,7 @@ address,size,name,system,status
 0x228c80,144,FUN_00228c80,frontend?,not started
 0x228d10,188,SpeechSys_ClearEvent,frontend?,ported
 0x228dd0,60,FUN_00228dd0,audio?,not started
-0x228e10,40,SpeechSys_GetBankId,audio?,not started
+0x228e10,40,SpeechSys_GetBankId,audio?,ported
 0x228e38,124,StaticInit_SpeechSys,audio?,not started
 0x228eb8,80,cSpeechSys::__tf,runtime,host
 0x228fb0,668,Stream_Init,audio?,not started
@@ -3941,12 +3941,12 @@ address,size,name,system,status
 0x22a008,60,StreamSys_GetPlayTime,audio?,not started
 0x22a048,60,StreamSys_HasReached,audio?,not started
 0x22a088,60,FUN_0022a088,audio?,not started
-0x22a0c8,88,FUN_0022a0c8,audio?,not started
+0x22a0c8,88,FUN_0022a0c8,audio?,ported
 0x22a120,84,FUN_0022a120,audio?,not started
 0x22a178,60,StreamSys_IsSlotPlaying,audio?,not started
 0x22a1e0,40,FUN_0022a1e0,audio?,not started
 0x22a228,40,StreamSys_SetVolume,audio?,not started
-0x22a278,60,StreamSys_GetSlotHandle,audio?,not started
+0x22a278,60,StreamSys_GetSlotHandle,audio?,ported
 0x22a2b8,20,StreamSys_GetStream,audio?,not started
 0x22a2d0,36,FUN_0022a2d0,,not started
 0x22a2f8,80,cStreamSys::__tf,runtime,host
@@ -4098,14 +4098,14 @@ address,size,name,system,status
 0x2309a8,88,Speech_GetModeMask,common?,checked
 0x230a00,884,Speech_LoadNarration,audio?,not started
 0x230d78,84,Speech_FreeNarration,audio?,not started
-0x230dd0,268,Speech_QueueCamScriptLine,race?,not started
-0x230ee0,276,Speech_QueueCamScriptLines,race?,not started
-0x230ff8,204,FUN_00230ff8,audio?,not started
-0x2310c8,488,Speech_OnCamScriptIntro,race?,not started
-0x2312b0,104,Speech_IsCamScriptLinePlaying,audio?,not started
-0x231318,128,Speech_StopCamScriptLine,audio?,not started
-0x231398,328,Speech_LessonLine,game?,not started
-0x2314e0,104,FUN_002314e0,audio?,not started
+0x230dd0,268,Speech_QueueCamScriptLine,race?,checked
+0x230ee0,276,Speech_QueueCamScriptLines,race?,checked
+0x230ff8,204,FUN_00230ff8,audio?,checked
+0x2310c8,488,Speech_OnCamScriptIntro,race?,checked
+0x2312b0,104,Speech_IsCamScriptLinePlaying,audio?,checked
+0x231318,128,Speech_StopCamScriptLine,audio?,checked
+0x231398,328,Speech_LessonLine,game?,checked
+0x2314e0,104,FUN_002314e0,audio?,checked
 0x231548,148,Speech_QueueResultLine,race?,checked
 0x2315e0,544,Speech_RaceStatsMask,race?,checked
 0x231800,752,Speech_QueuePlaceLine,audio?,checked
@@ -4143,7 +4143,7 @@ address,size,name,system,status
 0x234698,148,Speech_CharacterBit,audio?,checked
 0x234730,148,Speech_RiderMask,audio?,checked
 0x2347c8,1004,Speech_OnPlacingChange,audio?,checked
-0x234bb8,128,Speech_InterruptIfPlaying,audio?,ported
+0x234bb8,128,Speech_InterruptIfPlaying,audio?,checked
 0x234c38,200,Speech_IsRivalOrGrudge,race?,checked
 0x234d00,612,Speech_RiderHitLine,world?,checked
 0x234f68,296,Speech_OnAITaunt,audio?,checked

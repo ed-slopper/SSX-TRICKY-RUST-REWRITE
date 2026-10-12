@@ -143,11 +143,21 @@ by voice 0..11 a bit of 0xfff, 0 past them) and call `SpeechSys_Trigger` at the 
   the grab and flip counts (bits 8..11), the spin (bits 24..26), the name (byte 1) and move (byte 0, ',' 0x3d) ids
   and word 1 bits 27..29. The post's answer is kept in +0x6e04 (0 stops later lines); when not 0 the line is counted
   and byte 2 names a second trick (0x1002010). Last, roll 0x10 in show-off 3 or 5: 0x1002054 with 1.
-- Checked in the runner: each post four times with random arguments; 60,000 random calls over 44 handlers and
+- Lessons and cut scenes: `Speech_LessonLine` 0x231398 (0x400800f; lessons 0..2 once each, +0x7dcc bits 1..3),
+  `FUN_002314e0` (0x4008010 with a bit from 0x3a2750), `Speech_QueueCamScriptLine` 0x230dd0 (lines 1000..6999 by the
+  thousand: 0x4008002, 0x4008004, 0x4008003, 0x4008005, 0x4008015 with the bit of line − 5001, 0x4008016; slot 0 at
+  voice 1 with `FUN_00230998` as the callback, which keeps the library's value at +0x7dc8),
+  `Speech_QueueCamScriptLines` 0x230ee0 (the last table entry with the id, +0x7dc0 / +0x7dc4, 31 words: its lines to a
+  0, −1 queuing +0x7dc8 on the ring at +0x7dbc), `FUN_00230ff8` (drains the ring past finished handles; the game loops
+  for ever when a negative word empties it), `Speech_IsCamScriptLinePlaying` / `Speech_StopCamScriptLine` (slot 0's
+  bank monitor, +0x80 = 1), `Speech_OnCamScriptIntro` 0x2310c8 (0x4008006 at a circuit race's first event: the
+  course's bit | 0x400, the riders in relation 2 or 1 with the rider's character, its bit, the mode bit) and
+  `Speech_InterruptIfPlaying` 0x234bb8 (slot 1's monitor: a line of the voice cleared).
+- Checked in the runner: each post four times with random arguments; 60,000 random calls over 52 handlers and
   helpers with the speech library, replay, listener, near test, relations, the race's rider 0, the library's
   callbacks, the race clock and `Rand_Fx` scripted the same and random career blocks: every call and draw in order,
-  the checkpoint counts, the big-score ring and the end flags compared. Still to port: the script cues
-  (`Speech_OnScriptCue47` / `48`), the lesson and cam-script lines.
+  the checkpoint counts, the big-score ring and the end flags compared. `Speech_OnScriptCue47` / `48`, despite
+  the names, fill a sound manager's slot (`SndMgr_GetSlot`, `SndSys_PlayPending`) before their one post: G10.
 
 ## Front-end sounds (`cFE3DSound` → `Audio_PlayFE*`, F1c)
 
