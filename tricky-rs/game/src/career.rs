@@ -9,8 +9,8 @@ use crate::rand::Streams;
 use crate::rivals::ATTITUDE;
 use crate::stats::{average_groups, BASE};
 
-/// The bytes the career block reaches (the player slots' attributes end at +0x38e0)
-pub const CAREER_SIZE: usize = 0x3900;
+/// The bytes the career block reaches (the player slots' attributes end at +0x3910)
+pub const CAREER_SIZE: usize = 0x3910;
 
 /// The four starting characters' indices (0x3352c0, 0x3352c4, 0x3352cc, 0x3352c8 in the exe: Mac, Moby, Elise and
 /// Eddie), whose bits make the unlocked-character mask (+0xc).
@@ -441,5 +441,563 @@ impl Career {
             a.set_mode(self.r32(0x1674));
         }
         self.w32(0x3258, 0);
+    }
+}
+
+/// The game address of the career block (0x32b390): its pointers into itself are this plus the offset.
+pub const CAREER_BASE: u32 = 0x32b390;
+
+/// `Crc_Compute16` 0x2ce04c: CRC-16/ARC (reflected 0xa001) from 0xeafb, four bytes a step, as the game's two
+/// byte tables (0x34f0f8 low, 0x34f1f8 high) give it.
+pub fn crc16(data: &[u8]) -> u32 {
+    let table = |i: usize| {
+        let mut c = i as u32;
+        for _ in 0..8 {
+            c = if c & 1 != 0 { (c >> 1) ^ 0xa001 } else { c >> 1 };
+        }
+        c
+    };
+    let lo = |i: u32| table(i as usize) & 0xff;
+    let hi = |i: u32| table(i as usize) >> 8;
+    let (mut a, mut b) = (0xfbu32, 0xeau32);
+    let mut p = 0;
+    let mut n = data.len() as i32;
+    while 0 <= n - 4 {
+        let d = |k: usize| data[p + k] as u32;
+        a = d(1) ^ lo(d(0) ^ b) ^ a;
+        let b1 = (d(2) ^ lo(a) ^ hi(d(0) ^ b)) & 0xff;
+        let b2 = (d(3) ^ lo(b1) ^ hi(a)) & 0xff;
+        a = hi(b2);
+        b = (lo(b2) ^ hi(b1)) & 0xff;
+        p += 4;
+        n -= 4;
+    }
+    loop {
+        n -= 1;
+        if n < 0 {
+            break;
+        }
+        let x = data[p] as u32 ^ b;
+        b = lo(x) ^ a;
+        p += 1;
+        a = hi(x);
+    }
+    b | a << 8
+}
+
+/// The modes' masks `FUN_00163b38` reads (0x379fa8, by the event mode +0x2afc)
+pub const MODE_MASKS: [u32; 10] = [0x400, 0x400, 0x4c0, 0x480, 0x4c0, 0x4c0, 0x1ff, 0x4c0, 0x400, 0];
+
+/// What a player slot's attributes read out (`Career_GetAttributes` 0x165468: four groups of the base level, the
+/// level now, the board's tenth and the cap plus it).
+pub type Attributes = [[u32; 4]; 4];
+
+impl Career {
+    pub fn r8(&self, o: usize) -> u8 {
+        self.bytes[o]
+    }
+    fn ri(&self, o: isize) -> u32 {
+        self.r32(o as usize)
+    }
+    /// A pointer the block holds, as an offset in it
+    pub fn ptr(&self, o: usize) -> usize {
+        self.r32(o).wrapping_sub(CAREER_BASE) as usize
+    }
+    /// `Career_FindPlayerSlot` 0x166550: the slot (0..3) holding player `p`, or −1
+    pub fn find_player_slot(&self, p: i8) -> i32 {
+        (0..4).find(|&k| self.bytes[0x30fc + 0x44 * k] as i8 == p).map_or(-1, |k| k as i32)
+    }
+
+    /// The offset of slot `k` (−1 the one before the first, as the game reads it)
+    fn so(k: i32) -> isize {
+        0x44 * k as isize
+    }
+
+    /// `Career_GetPlayerId` 0x166580
+    pub fn player_id(&self, slot: usize) -> i8 {
+        self.bytes[0x30fc + 0x44 * slot] as i8
+    }
+
+    /// `Career_IsPlayerActive` 0x161900
+    pub fn is_player_active(&self, slot: usize) -> bool {
+        0 <= self.player_id(slot)
+    }
+
+    /// `Career_FindRiderOfPlayer` 0x166598: the race rider (+0x27dc count, 0x84 each, +0x69 the player) of the
+    /// player in slot `slot`, or −1
+    pub fn find_rider_of_player(&self, slot: usize) -> i32 {
+        let p = self.player_id(slot);
+        let n = self.r32(0x27dc) as i32;
+        (0..n.max(0)).find(|&i| self.bytes[0x2845 + 0x84 * i as usize] as i8 == p).unwrap_or(-1)
+    }
+
+    /// `FUN_001664e8`: the rider player `p`'s slot last raced with (+0x312c, when +0x3104 says it was this player);
+    /// 0xc for no player, −1 for another
+    pub fn slot_last_rider(&self, p: i32) -> i32 {
+        if p < 0 {
+            return 0xc;
+        }
+        let k = Self::so(self.find_player_slot(p as i8));
+        if self.ri(0x3104 + k) as i32 == p {
+            self.ri(0x312c + k) as i32
+        } else {
+            -1
+        }
+    }
+
+    /// `RiderSetup_Init` 0x16bba0 (the circuit's rider set-up at +0x320c): the slot, and the career, race and
+    /// circuit tables' addresses (constants: 0x32b398, 0x32db6c, 0x32e5f4)
+    pub fn rider_setup_init(&mut self, slot_addr: u32) {
+        self.w32(0x320c + 0x10, slot_addr);
+        self.w32(0x320c + 0x18, 0);
+        self.w32(0x320c + 4, 0x32b398);
+        self.w32(0x320c + 8, 0x32db6c);
+        self.w32(0x320c + 0xc, 0x32e5f4);
+        self.w32(0x320c + 0x14, 0);
+    }
+
+    /// `Career_AssignPlayerRider` 0x1635b8(slot, player, rider): slot −1 is the first free (the first if it is free;
+    /// past the fourth when all are taken, as the game does); the slot's profile is the one it raced with when that
+    /// was this rider, else the rider's short record; the player, its options word (+0x168c + 4·player), its
+    /// character record, profile and name; flags cleared; `RiderSetup_Init`; `Career_UpdateAttributes`.
+    pub fn assign_player_rider(&mut self, slot: i32, player: i32, rider: i32, cheats: &crate::cheats::Cheats) {
+        let mut s = slot;
+        if s < 0 {
+            s = 0;
+            if 0 <= self.bytes[0x30fc] as i8 {
+                s = 1;
+                while s < 4 && 0 <= self.bytes[0x30fc + 0x44 * s as usize] as i8 {
+                    s += 1;
+                }
+            }
+        }
+        let k = 0x44 * s as usize;
+        if self.slot_last_rider(player) == rider {
+            for w in 0..5 {
+                let v = self.r32(0x312c + k + 4 * w);
+                self.w32(0x3118 + k + 4 * w, v);
+            }
+        } else {
+            let r = 0x10 + 0x14 * rider as isize;
+            for w in 0..5 {
+                let v = self.ri(r + 4 * w as isize);
+                self.w32(0x3118 + k + 4 * w, v);
+            }
+        }
+        if 0 <= player {
+            self.bytes[0x30fc + k] = player as u8;
+        }
+        let opt = self.ri(0x168c + 4 * player as isize);
+        self.w32(0x3100 + k, opt);
+        self.w32(0x3114 + k, CAREER_BASE.wrapping_add((rider * 0x1c4 + 0x100) as u32));
+        self.w32(0x3110 + k, CAREER_BASE + (k + 0x3118) as u32);
+        self.w32(0x3108 + k, CAREER_BASE + (10 * s as usize + 0x1630) as u32);
+        // (cleared in the call's delay slot: before the set-up, which slot 4 overlaps)
+        self.w32(0x310c + k, 0);
+        self.rider_setup_init(CAREER_BASE + (k + 0x30fc) as u32);
+        self.update_attributes(cheats);
+    }
+
+    /// `Career_ClearPlayerSlot` 0x1637d0
+    pub fn clear_player_slot(&mut self, slot: usize) {
+        let k = 0x44 * slot;
+        self.bytes[0x30fc + k] = 0xff;
+        self.w32(0x3114 + k, 0);
+        self.w32(0x3110 + k, 0);
+    }
+
+    /// `Career_SetPlayerRiderSlot` 0x164950
+    pub fn set_player_slot_id(&mut self, slot: usize, player: u8) {
+        self.bytes[0x30fc + 0x44 * slot] = player;
+    }
+
+    /// `Career_UpdateAttributes` 0x166a58: for each slot in use, the points (record +0) and their level
+    /// (×0.4 + 0.5) for spending, the four group levels (record +0x10..) as base and now, the caps from the rider's
+    /// (×0.4 + 0.5); the max-attributes cheat puts every group at its cap and leaves no points; the points to spend
+    /// are at most what the caps leave.
+    pub fn update_attributes(&mut self, cheats: &crate::cheats::Cheats) {
+        let max = cheats.max_attrib;
+        for k in 0..4 {
+            let s = 0x44 * k;
+            if (self.bytes[0x30fc + s] as i8) < 0 {
+                continue;
+            }
+            let rec = self.ptr(0x3114 + s);
+            let pts = self.r32(rec);
+            self.w32(0x3820 + 4 * k, pts);
+            let lvl = (pts as i32 as f32 * 0.4 + 0.5) as i32 as u32;
+            self.w32(0x3830 + 4 * k, lvl);
+            self.w32(0x3840 + 4 * k, lvl);
+            if max != 0 {
+                self.w32(0x3830 + 4 * k, 0);
+                self.w32(0x3840 + 4 * k, 0);
+            }
+            let rider = self.r32(self.ptr(0x3110 + s)) as usize;
+            let caps = crate::stats::CAPS[rider.min(11)];
+            let mut left = 0i32;
+            for i in 0..4 {
+                let b = self.bytes[rec + 0x10 + i] as u32;
+                self.w32(0x38d0 + 0x10 * k + 4 * i, b);
+                self.w32(0x3850 + 0x10 * k + 4 * i, b);
+                let cap = (caps[i] as f32 * 0.4 + 0.5) as i32 as u32;
+                self.w32(0x3890 + 0x10 * k + 4 * i, cap);
+                if max != 0 {
+                    self.w32(0x3850 + 0x10 * k + 4 * i, cap);
+                    self.w32(0x38d0 + 0x10 * k + 4 * i, cap);
+                }
+                left = left.wrapping_add(self.r32(0x3890 + 0x10 * k + 4 * i).wrapping_sub(self.r32(0x3850 + 0x10 * k + 4 * i)) as i32);
+            }
+            if left < self.r32(0x3840 + 4 * k) as i32 {
+                self.w32(0x3840 + 4 * k, left as u32);
+                self.w32(0x3830 + 4 * k, left as u32);
+            }
+        }
+    }
+
+    /// The record of the slot of player `p` (+0x3114's pointer) and the slot's offset
+    fn player_rec(&self, p: i8) -> (usize, isize) {
+        let k = Self::so(self.find_player_slot(p));
+        (self.ri(0x3114 + k).wrapping_sub(CAREER_BASE) as usize, k)
+    }
+
+    /// `Career_GetAttributePoints` 0x164368
+    pub fn attribute_points(&self, p: i8) -> u32 {
+        let k = self.find_player_slot(p) as isize;
+        self.ri(0x3830 + 4 * k)
+    }
+
+    /// Spending or refunding changes the record: its points (+0) from what is left to spend, its group byte
+    /// (+0xc + i) from the level against the cap times the rider's cap.
+    fn rescale(&mut self, k: isize, i: usize) {
+        let rec = self.ri(0x3114 + 0x44 * k).wrapping_sub(CAREER_BASE) as usize;
+        let rider = self.r32(self.ri(0x3110 + 0x44 * k).wrapping_sub(CAREER_BASE) as usize) as usize;
+        let pts = self.ri(0x3830 + 4 * k) as i32 as f32;
+        let all = self.ri(0x3840 + 4 * k) as i32 as f32;
+        let base = self.ri(0x3820 + 4 * k) as i32 as f32;
+        self.w32(rec, ((pts / all) * base) as i32 as u32);
+        let cur = self.ri(0x3850 + 0x10 * k + 4 * i as isize) as i32 as f32;
+        let cap = self.ri(0x3890 + 0x10 * k + 4 * i as isize) as i32 as f32;
+        let c = crate::stats::CAPS[rider.min(11)][i] as f32;
+        self.bytes[rec + 0xc + i] = ((cur / cap) * c) as i32 as u8;
+    }
+
+    /// `Career_SpendAttributePoint` 0x164398(player, group): a point into a group below its cap
+    pub fn spend_attribute_point(&mut self, p: i8, i: usize) -> bool {
+        let k = self.find_player_slot(p) as isize;
+        let pts = self.ri(0x3830 + 4 * k) as i32;
+        if 0 < pts {
+            let cur_at = (0x3850 + 0x10 * k + 4 * i as isize) as usize;
+            let cap = self.ri(0x3890 + 0x10 * k + 4 * i as isize) as i32;
+            if (self.r32(cur_at) as i32) < cap {
+                self.w32((0x3830 + 4 * k) as usize, (pts - 1) as u32);
+                let rec = self.ri(0x3114 + 0x44 * k).wrapping_sub(CAREER_BASE) as usize;
+                self.w32(cur_at, self.r32(cur_at).wrapping_add(1));
+                self.bytes[rec + 0x10 + i] = self.bytes[rec + 0x10 + i].wrapping_add(1);
+                self.rescale(k, i);
+                return true;
+            }
+        }
+        false
+    }
+
+    /// `Career_RefundAttributePoint` 0x1644e8(player, group): a point back from a group above its base
+    pub fn refund_attribute_point(&mut self, p: i8, i: usize) -> bool {
+        let k = self.find_player_slot(p) as isize;
+        let cur_at = (0x3850 + 0x10 * k + 4 * i as isize) as usize;
+        let refund = (self.ri(0x38d0 + 0x10 * k + 4 * i as isize) as i32) < self.r32(cur_at) as i32;
+        if refund {
+            let pts_at = (0x3830 + 4 * k) as usize;
+            self.w32(pts_at, self.r32(pts_at).wrapping_add(1));
+            let rec = self.ri(0x3114 + 0x44 * k).wrapping_sub(CAREER_BASE) as usize;
+            self.w32(cur_at, self.r32(cur_at).wrapping_sub(1));
+            self.bytes[rec + 0x10 + i] = self.bytes[rec + 0x10 + i].wrapping_sub(1);
+            self.rescale(k, i);
+        }
+        refund
+    }
+
+    /// `Career_GetAttributes` 0x165468(slot of player, board's bonus bytes): per group the base level, the level
+    /// now (the cap with the cheat), the board's bonus / 10 and the cap plus it.
+    pub fn attributes(&self, p: i8, bonus: [u8; 4], cheats: &crate::cheats::Cheats) -> Attributes {
+        let k = self.find_player_slot(p) as isize;
+        let rec = self.ri(0x30fc + 0x44 * k + 0x18).wrapping_sub(CAREER_BASE) as usize;
+        let mut out = [[0u32; 4]; 4];
+        for i in 0..4 {
+            let cap = self.ri(0x3890 + 0x10 * k + 4 * i as isize);
+            let tenth = (bonus[i] as f32 * 0.1) as i32 as u32;
+            out[i] = [self.ri(0x38d0 + 0x10 * k + 4 * i as isize), self.bytes[rec + 0x10 + i] as u32, tenth, cap.wrapping_add(tenth)];
+            if cheats.max_attrib != 0 {
+                out[i][1] = cap;
+            }
+        }
+        out
+    }
+
+    /// `Career_GetPlayerLevel` 0x164840: the level (0..9) from the record's +4 + +8 (points earned)
+    pub fn player_level(&self, p: i8) -> u32 {
+        let (rec, _) = self.player_rec(p);
+        let v = self.r32(rec + 4).wrapping_add(self.r32(rec + 8)) as i32;
+        match v {
+            v if 0xf0 <= v => 0,
+            v if 200 <= v => 1,
+            v if 0xa0 <= v => 2,
+            v if 0x78 <= v => 3,
+            v if 0x5a <= v => 4,
+            v if 0x3c <= v => 5,
+            v if 0x23 <= v => 6,
+            v if 0x14 <= v => 7,
+            v if 5 <= v => 8,
+            v if 0 <= v => 9,
+            _ => 0,
+        }
+    }
+
+    /// `Career_GetPlayerLevelStringId` 0x164730: the level's string (0x17..0x20; 0 below 0)
+    pub fn player_level_string(&self, p: i8) -> u32 {
+        match self.player_level(p) {
+            0 => {
+                let (rec, _) = self.player_rec(p);
+                if (self.r32(rec + 4).wrapping_add(self.r32(rec + 8)) as i32) < 0 {
+                    0
+                } else {
+                    0x17
+                }
+            }
+            l => 0x17 + l,
+        }
+    }
+
+    /// `Career_IsCharacterUnlocked` 0x163b10
+    pub fn is_character_unlocked(&self, c: u32, cheats: &crate::cheats::Cheats) -> bool {
+        cheats.unlock_everything != 0 || (self.r32(0xc) as i32 >> (c & 31)) & 1 != 0
+    }
+
+    /// `FUN_00163b38`: the mode's mask (`MODE_MASKS` by +0x2afc) has bit `b`
+    pub fn mode_has(&self, b: u32) -> bool {
+        let m = self.r32(0x2afc) as usize;
+        let mask = *MODE_MASKS.get(m).unwrap_or(&0);
+        (mask as i32 >> (b & 31)) & 1 != 0
+    }
+
+    /// `Career_IsUnlockBitSet` 0x163d30(player, bit): the player's record's boards (+0x58)
+    pub fn is_board_unlocked(&self, p: i8, b: u32, cheats: &crate::cheats::Cheats) -> bool {
+        if cheats.unlock_everything != 0 {
+            return true;
+        }
+        let (rec, _) = self.player_rec(p);
+        (self.r32(rec + 0x58) as i32 >> (b & 31)) & 1 != 0
+    }
+
+    /// `Career_IsUnlocked` 0x163d98(player, bit): the record's +0x5c (the outfits)
+    pub fn is_outfit_unlocked(&self, p: i8, b: u32, cheats: &crate::cheats::Cheats) -> bool {
+        if cheats.unlock_everything != 0 {
+            return true;
+        }
+        let (rec, _) = self.player_rec(p);
+        (self.r32(rec + 0x5c) as i32 >> (b & 31)) & 1 != 0
+    }
+
+    /// `Career_GetCourseMedal` 0x163e28(mode, course): the first slot's medal byte for the course (race mode 4:
+    /// +0x25, show-off 5: +0x24), else 3 (none)
+    pub fn course_medal(&self, mode: i32, course: i32) -> u8 {
+        if 0 <= self.bytes[0x30fc] as i8 {
+            let rec = self.ptr(0x3114) as isize;
+            if mode == 4 {
+                return self.bytes[(rec + 4 * course as isize + 0x25) as usize];
+            }
+            if mode == 5 {
+                return self.bytes[(rec + 4 * course as isize + 0x24) as usize];
+            }
+        }
+        3
+    }
+
+    /// `Career_ResetPlayerRecord` 0x163e70(player): the player's character record made new, its profile the short
+    /// record, `Career_UpdateAttributes`
+    pub fn reset_player_record(&mut self, p: i8, cheats: &crate::cheats::Cheats) {
+        let k = Self::so(self.find_player_slot(p));
+        let prof = self.ri(0x3110 + k).wrapping_sub(CAREER_BASE) as usize;
+        let rider = self.r32(prof) as usize;
+        self.init_character_record(rider);
+        for w in 0..5 {
+            let v = self.r32(0x10 + 0x14 * rider + 4 * w);
+            self.w32((0x3118 + k) as usize + 4 * w, v);
+        }
+        self.update_attributes(cheats);
+    }
+
+    /// `TrickBook_IsTrickDone` 0x164258 on the player's book (record +0x14: +4 done, +8 forced)
+    pub fn trick_done(&self, p: i8, t: u32) -> bool {
+        let (rec, _) = self.player_rec(p);
+        let book = rec + 0x14;
+        if (self.r32(book + 8) as i32 >> (t & 31)) & 1 != 0 {
+            return true;
+        }
+        (self.r32(book + 4) as i32 >> (t & 31)) & 1 != 0
+    }
+
+    /// `TrickBook_CountDoneInPage` 0x164178 (five a page, `TrickBook_PageFirstTrick` 5·page, 0x1e for page 6, 0
+    /// past it)
+    pub fn tricks_done_in_page(&self, p: i8, page: u32) -> u32 {
+        let first = if page <= 6 { 5 * page } else { 0 };
+        (0..5).filter(|i| self.trick_done(p, first + i)).count() as u32
+    }
+
+    /// `TrickBook_CountCompletePages` 0x164060
+    pub fn complete_pages(&self, p: i8) -> u32 {
+        let mut n = 0;
+        while self.tricks_done_in_page(p, n) == 5 {
+            n += 1;
+        }
+        n
+    }
+
+    /// `TrickBook_FirstUndoneTrick` 0x1641f8
+    pub fn first_undone_trick(&self, p: i8) -> i32 {
+        (0..0x1e).find(|&t| !self.trick_done(p, t)).map_or(-1, |t| t as i32)
+    }
+
+    /// `Career_GetPlayerFlags` +0x310c and `Career_CountPlayerFlags` 0x163f88
+    pub fn count_player_flags(&self, p: i8) -> u32 {
+        let k = Self::so(self.find_player_slot(p));
+        self.ri(0x310c + k).count_ones()
+    }
+
+    /// `Career_ClearPlayerFlags` 0x165400(player): this race's flags taken off the record's (+0x1c) and cleared
+    pub fn clear_player_flags(&mut self, p: i32) {
+        if p < 0 {
+            return;
+        }
+        let k = Self::so(self.find_player_slot(p as i8));
+        if (self.bytes[(0x30fc + k) as usize] as i8) < 0 {
+            return;
+        }
+        let flags = self.ri(0x310c + k);
+        let rec = self.ri(0x3114 + k).wrapping_sub(CAREER_BASE) as usize;
+        // (a player with no slot reads the bytes before the first: a pointer outside the block is not followed)
+        if rec + 0x20 <= self.bytes.len() {
+            self.w32(rec + 0x1c, self.r32(rec + 0x1c) & !flags);
+        }
+        self.w32((0x310c + k) as usize, 0);
+    }
+
+    /// `Career_ClearAllPlayerFlags` 0x161840: the rider set-up's +0x14 cleared, every slot's flags
+    pub fn clear_all_player_flags(&mut self) {
+        self.w32(0x320c + 0x14, 0);
+        for k in 0..4 {
+            let p = self.player_id(k) as i32;
+            self.clear_player_flags(p);
+        }
+    }
+
+    /// `Career_CountProfiles` 0x164288: players 0..3 with a slot and a profile
+    pub fn count_profiles(&self) -> u32 {
+        (0..4).filter(|&p| {
+            let k = self.find_player_slot(p as i8);
+            0 <= k && self.r32(0x3110 + 0x44 * k as usize) != 0
+        }).count() as u32
+    }
+
+    /// `Career_GetPlayerName` 0x164918: the name pointer's offset
+    pub fn player_name(&self, p: i8) -> String {
+        let k = Self::so(self.find_player_slot(p));
+        let at = self.ri(0x3108 + k).wrapping_sub(CAREER_BASE) as usize;
+        let end = self.bytes[at..].iter().position(|c| *c == 0).unwrap_or(0) + at;
+        String::from_utf8_lossy(&self.bytes[at..end]).into_owned()
+    }
+
+    /// `Career_SetPlayerName` 0x164968(player, name): a name of only spaces (or empty) is not taken; else copied
+    /// over the slot's name (marking the profile changed where a byte differs), and into the race rider of the
+    /// player (+0x27e4) if there is one.
+    pub fn set_player_name(&mut self, p: i8, name: &[u8]) {
+        let k = Self::so(self.find_player_slot(p));
+        let dst = self.ri(0x3108 + k).wrapping_sub(CAREER_BASE) as usize;
+        let mut q = 0;
+        loop {
+            let c = *name.get(q).unwrap_or(&0);
+            if c == 0 {
+                return;
+            }
+            if c != b' ' {
+                break;
+            }
+            q += 1;
+        }
+        let mut d = dst;
+        for &c in name.iter().take_while(|c| **c != 0) {
+            if self.bytes[d] as i8 as i32 != c as i8 as i32 {
+                self.w32(0x3258, 1);
+            }
+            self.bytes[d] = c;
+            d += 1;
+        }
+        self.bytes[d] = 0;
+        let n = self.r32(0x27dc) as i32;
+        for i in 0..n.max(0) as usize {
+            if self.bytes[0x2845 + 0x84 * i] as i8 == p {
+                let len = self.bytes[dst..].iter().position(|c| *c == 0).unwrap_or(0) + 1;
+                let src = self.bytes[dst..dst + len].to_vec();
+                self.bytes[0x27e4 + 0x84 * i..0x27e4 + 0x84 * i + len].copy_from_slice(&src);
+                break;
+            }
+        }
+    }
+
+    /// The profile words of player `p`'s slot (+0x3110's pointer: +0 rider, +4, +8, +0xc outfit, +0x10 board):
+    /// `FUN_00164f40` / `FUN_00164ec0` / `Career_GetPlayerOutfit` 0x164dc0 / `Career_GetPlayerBoard` 0x164e40
+    pub fn profile_word(&self, p: i8, w: usize) -> u32 {
+        let k = Self::so(self.find_player_slot(p));
+        self.r32(self.ri(0x3110 + k).wrapping_sub(CAREER_BASE) as usize + 4 * w)
+    }
+
+    /// `FUN_00164f78` / `FUN_00164ef8` / `Career_SetPlayerOutfit` 0x164df8 / `Career_SetPlayerBoard` 0x164e78
+    pub fn set_profile_word(&mut self, p: i8, w: usize, v: u32) {
+        let k = Self::so(self.find_player_slot(p));
+        let at = self.ri(0x3110 + k).wrapping_sub(CAREER_BASE) as usize + 4 * w;
+        self.w32(at, v);
+    }
+
+    /// `Career_MergePlayerRecords` 0x1637f8: for each character the lowest-numbered player racing it (by the slot's
+    /// profile rider) has its profile copied back to the character's short record when the two differ (by
+    /// `Crc_Compute16`), marking the career changed.
+    pub fn merge_player_records(&mut self) {
+        let mut best = [4i32; 12];
+        let mut src = [0usize; 12];
+        for k in 0..4 {
+            let c = self.bytes[0x30fc + 0x44 * k] as i8 as i32;
+            if 0 <= c {
+                let rider = self.r32(self.ptr(0x3110 + 0x44 * k)) as usize;
+                if c < best[rider] {
+                    best[rider] = c;
+                    src[rider] = 0x3118 + 0x44 * k;
+                }
+            }
+        }
+        for r in 0..12 {
+            if best[r] != 4 {
+                let dst = 0x10 + 0x14 * r;
+                if crc16(&self.bytes[dst..dst + 0x14]) != crc16(&self.bytes[src[r]..src[r] + 0x14]) {
+                    let v = self.bytes[src[r]..src[r] + 0x14].to_vec();
+                    self.bytes[dst..dst + 0x14].copy_from_slice(&v);
+                    self.w32(0x3258, 1);
+                }
+            }
+        }
+    }
+
+    /// `Career_GetRecords` 0x163468(table, course): the high-score table's offset (tables 0..2, else none)
+    pub fn records_offset(table: i32, course: i32) -> Option<usize> {
+        let b = 0x150 * course as isize;
+        match table {
+            0 => Some((0x16c4 + b) as usize),
+            1 => Some((0x1734 + b) as usize),
+            2 => Some((0x17a4 + b) as usize),
+            _ => None,
+        }
+    }
+
+    /// `Career_GetEventMode` 0x1635b0 (a half)
+    pub fn event_mode(&self) -> u16 {
+        u16::from_le_bytes([self.bytes[0x2b0c], self.bytes[0x2b0d]])
     }
 }

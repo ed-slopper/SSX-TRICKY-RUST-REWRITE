@@ -7,6 +7,7 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
+use r5900::ps2float::Rules;
 use r5900::Runner;
 use tricky_game::career::{AudioSettings, Career, CAREER_SIZE};
 use tricky_game::rand::{Rand, Streams};
@@ -61,6 +62,7 @@ impl AudioSettings for Snd {
 #[test]
 fn new_game_is_the_original() {
     let Some(mut r) = Runner::from_env() else { return };
+    r.float_rules = Rules::parse("add=n,mul=n,div=n,cvt=n").unwrap();
     for a in [0x1617a0u32, 0x161b40, 0x2cc808, 0x163358, 0x166600, 0x1668f0, 0x23d4a8, 0x2401e0, 0x165660, 0x16b298, 0x167da0, 0x167208, 0x166c70, 0x161928, 0x161a98, 0x166a58, 0x2fca28] {
         r.allow(a);
     }
