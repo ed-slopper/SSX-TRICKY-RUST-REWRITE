@@ -6898,3 +6898,13 @@ G 260fc0 CellList_Destruct
 G 25ec60 VisList_Construct
 G 257780 Vu0_GetVi1
 G 255df0 CourseDma_TryResolveModels
+G 235fc8 CollBody_Construct
+G 236000 CollBody_ConstructCopy
+G 236128 CollBody_SetSkeleton
+G 21d0b0 Audio_QueueEventSound
+G 21d5c8 Audio_StopEventSound
+G 204588 BdrLoad_GetShapeSlot
+G 1fa838 SplinePathNode_PlaceAll
+G 1fa8d8 SplinePathNode_PlaceOne
+G 205a78 Boarder_PoseBonesFromAngles
+G 205e98 Boarder_SolveLimbIk

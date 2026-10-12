@@ -25,6 +25,11 @@ Part of the port notes (index: [README.md](README.md)); units and wording as des
   ping-pong, speed/30, collides via a cube AABB), 0x101 AnimDelta (advances only while given delta), 0x102
   AnimCombo (loop + one-shot), 0x103 AnimTexFlip. Op 2: Emitter, SplinePath (vehicles/conveyors: N copies spaced
   along a spline, dist += v·100/60 a tick; mode 3 keeps 6000 units ahead of the race leader), CollideEmitter.
+  (F1c, proven) `cSplinePathNode::Update` 0x1fa6a0 → `SplinePathNode_PlaceAll` 0x1fa838: copy i (count +0x30) at
+  distance +0x50 + i·spacing (+0x48), wrapped by the spline length (+0x74); `SplinePathNode_PlaceOne` 0x1fa8d8
+  evaluates the spline (+0x64) into the copy's 0x20-byte slot (+0x7c) and sets its rotation: z = +0x44 + π/2 (+ π if
+  mode +0x34 is 2 and speed +0x4c < 0), minus atan2 of the direction vector Update passes in unless facing +0x38 is 2
+  or 3; x = ∓ its z (by speed sign) unless facing is 1 or 3. **Inferred:** that vector is the spline's tangent.
 - Other ops: 1 camera anim, 3/9 SetParam, 4 wait, 5 conditions (rider speed in km/h, random, human, has
   controller), 6 points, 7 run another instance's script, 8 sound, 10 stop, 11 kill/restore, 0xd reset rider,
   0xe–0x12 pickups and boosts, 0x17 camera param, 0x18 teleport rider to an instance, 0x19 rail state.

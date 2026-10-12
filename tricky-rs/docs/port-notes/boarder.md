@@ -767,3 +767,14 @@ short of its fourth marker, or an uber trick not done, flies over the rail. The 
 ranges. Row E8s made `grab_safe` strict (`f > m4`, the game's `marker < time`; it was `>=`). **Inferred, not read:** that
 the uber clips' flag 4 is the port's `uber_done` (the same mechanism, but the uber clips' marker frames are in the
 animation files).
+
+## Skeleton pose helpers (F1c names, not ported)
+
+- `Boarder_PoseBonesFromAngles` 0x205a78 (only from `Boarder_BuildBoneMatrices` 0x2083f8; proven): copies the root
+  matrix in, then for bones 0..12 multiplies the parent's matrix (parent index at skeleton table +0x12 per 0x54-byte
+  bone) by a rotation from three Euler angles (`Math_SinCos` of the 12-byte angle triple per bone) and a translation
+  (angles +0x108), on VU0; then `Boarder_SolveLimbIk` 0x205e98 twice, on bones 16, 17, 18 and 13, 14, 15 with its own
+  third and fourth arguments. **Inferred:** 0x205e98 is a two-bone limb (leg) solver (`Math_Asin`, three joints).
+- `BdrLoad_GetShapeSlot` 0x204588: entry i of the slot words at list+0x130 of the list `BdrLoad_RebindShapes`
+  0x2043f8 walks (count, then 5-byte shape names from +4); a slot ≥ 0 with a shape found by name is rebound through
+  the renderer (gApp+0x724, vtable +0x164).

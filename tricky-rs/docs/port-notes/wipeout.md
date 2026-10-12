@@ -178,6 +178,11 @@ Part of the port notes (index: [README.md](README.md)); units and wording as des
   the line between them, the bounding centre halfway between 8 and 9; `CollBody_Translate` moves it all;
   `CollBody_OverlapSpheres` 0x236a00: bounding spheres first, then the first overlapping pair (a's spheres in order,
   then b's) gives the push (unit a→b × overlap) and the touching point on a's sphere.
+- Body set-up (proven, F1c): `CollBody_Construct` 0x235fc8 only runs the 18 sphere constructors (empty; from `cBoarder`
+  on rider+0x470 and `cWorldBoarder` on +0x60); `CollBody_ConstructCopy` 0x236000 constructs then `CollBody_Copy`s
+  (no direct callers). Body+0 is the skeleton's bone matrices (`CollBody_UpdateFromBones` reads bone k at +0x30 + 0x40·k):
+  `CollBody_SetSkeleton` 0x236128 stores it (`cBoarder` passes rider+0x4ae0, `cBoarder::vf8` the pointer at +4 of
+  the object at rider+0x4494).
 - The pair records (rider+0x40 + 0x20 × the other's index), written every tick by `Race_UpdatePairDistances`
   0x115a80: [0] the flat distance between the riders (rider+0x480, x and y), [1] the bearing to the other (the later
   rider of a pair keeps atan2 of the difference as is, the earlier one + π wrapped to −π..π); +8 and +0xc the ticks

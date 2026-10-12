@@ -1629,7 +1629,7 @@ address,size,name,system,status
 0x17ac40,204,cPS2Device::cPS2Device,render,ported
 0x17ad10,76,cPS2Device::~cPS2Device,render,not started
 0x17ad60,8,cPS2Device::vf8_17ad60,render,not started
-0x17ad68,1288,PadDevice_Poll,render?,not started
+0x17ad68,1288,PadDevice_Poll,render?,ported
 0x17b270,8,cPS2Device::vf9_17b270,render,ported
 0x17b278,964,cPS2Device::vf10_17b278,render,ported
 0x17b590,32,cPS2Device::vf3_17b590,render,ported
@@ -3251,8 +3251,8 @@ address,size,name,system,status
 0x1fa480,448,cSplinePathNode::cSplinePathNode,world,not started
 0x1fa640,92,cSplinePathNode::~cSplinePathNode,world,not started
 0x1fa6a0,404,cSplinePathNode::Update,world,not started
-0x1fa838,160,FUN_001fa838,boarder?,not started
-0x1fa8d8,504,FUN_001fa8d8,boarder?,not started
+0x1fa838,160,SplinePathNode_PlaceAll,boarder?,not started
+0x1fa8d8,504,SplinePathNode_PlaceOne,boarder?,not started
 0x1fabc8,1504,cSplinePathNode::Draw,world,not started
 0x1fb1a8,132,cSplinePathNode::SaveSnapshot,save,not started
 0x1fb368,92,cSplinePathNode::__tf,runtime,host
@@ -3364,7 +3364,7 @@ address,size,name,system,status
 0x2043b0,72,BdrLoad_RebindShapeFile,boarder?,not started
 0x2043f8,196,BdrLoad_RebindShapes,boarder?,not started
 0x2044c0,200,BdrLoad_FindPartName,render?,not started
-0x204588,16,FUN_00204588,boarder?,not started
+0x204588,16,BdrLoad_GetShapeSlot,boarder?,not started
 0x204598,160,SkinTexList_Find,render?,not started
 0x2049b0,460,FUN_002049b0,,not started
 0x204f28,240,FUN_00204f28,,not started
@@ -3376,8 +3376,8 @@ address,size,name,system,status
 0x205670,300,SkinPart_ResolveMaterials,render?,ported
 0x2057a0,600,SkinPart_SetChildMatrices,boarder?,not started
 0x2059f8,124,Skel_GetBoneWorldPos,boarder?,not started
-0x205a78,1056,FUN_00205a78,boarder?,not started
-0x205e98,2428,FUN_00205e98,boarder?,not started
+0x205a78,1056,Boarder_PoseBonesFromAngles,boarder,not started
+0x205e98,2428,Boarder_SolveLimbIk,boarder,not started
 0x206818,648,SkinPart_CopyBoneMatrices,other,not started
 0x206ac0,160,SkinLod_AddPart,render?,ported
 0x206b60,40,SkinLod_MaterialEquals,render?,not started
@@ -3652,9 +3652,9 @@ address,size,name,system,status
 0x21cf38,104,Jukebox_Open,audio?,not started
 0x21cfa0,124,FUN_0021cfa0,audio?,not started
 0x21d078,56,Music_StopStreamAndFade,audio,not started
-0x21d0b0,16,FUN_0021d0b0,boarder?,not started
+0x21d0b0,16,Audio_QueueEventSound,audio,not started
 0x21d0c0,1284,Audio_LoadAmbientBanks,audio,not started
-0x21d5c8,72,FUN_0021d5c8,audio?,not started
+0x21d5c8,72,Audio_StopEventSound,audio,not started
 0x21d610,112,Audio_SetMusicState,audio,not started
 0x21d680,812,FUN_0021d680,audio?,not started
 0x21d9b0,812,FUN_0021d9b0,audio?,not started
@@ -4163,10 +4163,10 @@ address,size,name,system,status
 0x235ba8,432,Speech_OnBigScore,audio?,not started
 0x235d58,112,Speech_RollChance,audio?,not started
 0x235e70,88,FUN_00235e70,render?,not started
-0x235fc8,52,FUN_00235fc8,boarder?,not started
-0x236000,80,FUN_00236000,world?,not started
+0x235fc8,52,CollBody_Construct,wipeout,not started
+0x236000,80,CollBody_ConstructCopy,wipeout,not started
 0x236050,212,CollBody_InitRider,wipeout,ported
-0x236128,8,FUN_00236128,boarder?,not started
+0x236128,8,CollBody_SetSkeleton,wipeout,not started
 0x236130,96,CollBody_Copy,wipeout,not started
 0x236190,28,FUN_00236190,game?,not started
 0x2361b0,660,CollBody_UpdateFromBones,wipeout,ported
@@ -6776,22 +6776,22 @@ address,size,name,system,status
 0x2e7078,312,scePadInit,sdk?,host
 0x2e71b8,156,FUN_002e71b8,sdk?,host
 0x2e7258,128,FUN_002e7258,sdk?,host
-0x2e72d8,484,scePadPortOpen,sdk?,host
+0x2e72d8,484,scePadPortOpen,sdk?,ported
 0x2e74c0,184,scePadPortClose,sdk?,host
 0x2e7578,96,FUN_002e7578,sdk?,host
-0x2e7628,124,scePadRead,sdk?,host
-0x2e76a8,120,scePadGetState,sdk?,host
+0x2e7628,124,scePadRead,sdk?,ported
+0x2e76a8,120,scePadGetState,sdk?,ported
 0x2e7758,100,scePadSetReqState,sdk?,host
-0x2e77c0,80,scePadGetReqState,sdk?,host
-0x2e7848,288,scePadInfoMode,sdk?,host
-0x2e7a88,312,scePadInfoAct,sdk?,host
-0x2e7bc0,180,scePadSetMainMode,sdk?,host
-0x2e7c78,184,scePadSetActDirect,sdk?,host
-0x2e7d30,216,scePadSetActAlign,sdk?,host
+0x2e77c0,80,scePadGetReqState,sdk?,ported
+0x2e7848,288,scePadInfoMode,sdk?,ported
+0x2e7a88,312,scePadInfoAct,sdk?,ported
+0x2e7bc0,180,scePadSetMainMode,sdk?,ported
+0x2e7c78,184,scePadSetActDirect,sdk?,ported
+0x2e7d30,216,scePadSetActAlign,sdk?,ported
 0x2e7e08,180,FUN_002e7e08,sdk?,host
 0x2e7ec0,176,FUN_002e7ec0,sdk?,host
-0x2e7f70,92,FUN_002e7f70,sdk?,host
-0x2e7fd0,84,FUN_002e7fd0,sdk?,host
+0x2e7f70,92,FUN_002e7f70,sdk?,ported
+0x2e7fd0,84,FUN_002e7fd0,sdk?,ported
 0x2e8080,204,FUN_002e8080,sdk?,host
 0x2e8150,100,FUN_002e8150,sdk?,host
 0x2e81b8,104,FUN_002e81b8,sdk?,host

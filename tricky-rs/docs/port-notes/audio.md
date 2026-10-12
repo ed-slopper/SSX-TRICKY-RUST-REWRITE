@@ -81,3 +81,9 @@ Part of the port notes (index: [README.md](README.md)); units and wording as des
   rider's run into condition bits from per-course thresholds (course id 0x32de88; time fast/slow, two counts, and
   +0x66c = 0 or > 1). `Speech_QueueUnlockLines` 0x232330 (from `cUnlockedOverlay::Reset` 0x1b5ef8) posts 0x4008015,
   then one 0x400800d per unlocked item (list at 0x3353f8, entries of 12 bytes; item kinds 0..8, 0xb mapped to bits).
+
+- Rider event sounds (F1c, proven unless marked): `Audio_QueueEventSound` 0x21d0b0 (audio object `*0x343050`) stores
+  a kind at +0x7428 and sets +0x7420 = 1 (pending); `Audio_StopEventSound` 0x21d5c8 stops the bank sound whose handle is
+  at +0x7424 (if ≥ 0) and sets it to −1. `cBoarder::vf10` 0x11a348 queues kinds 0, 1, 2 when rider+0x388 bits 14, 23,
+  24 turn on and stops on their turning off. **Inferred:** whatever reads +0x7420/+0x7428 later starts the sound and
+  keeps its handle at +0x7424 (the reader is not found yet; the bits' meaning neither).
