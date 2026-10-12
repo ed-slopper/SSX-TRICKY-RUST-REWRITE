@@ -91,7 +91,7 @@ Types 1, 3 and 4 spawn nothing.
 ## Threads (row E9b; `tricky_game::script`, checked: `tests/script.rs`)
 
 - A thread (`cScriptNode`, 0xf0 bytes, list type 0x3e9): +0x38 op index, +0x3c byte offset, +0x40 wait, +0xe0 the
-  script (an effect header, `FUN_0025feb8`: file+0x28 + 8·i; or a function, `Course_GetScriptEntry` 0x260e68:
+  script (an effect header, `Course_GetEffectHeader` 0x25feb8: file+0x28 + 8·i; or a function, `Course_GetScriptEntry` 0x260e68:
   file+0x30 + 0x18·i, neither bounds-checked above), +0xe4 the instance, +0xe8 the rider, +0x50 / +0x90 two 0x40-byte
   contexts with flags +0xd0 / +0xd4. The constructors run it at once (`TriggerScript_Run`), so a script with no wait
   is over before its constructor returns.

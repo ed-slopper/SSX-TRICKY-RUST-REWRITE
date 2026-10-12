@@ -637,3 +637,6 @@
 2b0f68 FE3DText_SetString FE3DText_SetStringId
 23a728 Octree_QuerySphere SphTree_SphereRecurse
 168688 RaceScene_Destruct PreRaceSel_Destruct
+1162c0 FUN_001162c0 AIWorld_AgeActiveCells
+25feb8 FUN_0025feb8 Course_GetEffectHeader
+2391e8 FUN_002391e8 SphTree_Copy

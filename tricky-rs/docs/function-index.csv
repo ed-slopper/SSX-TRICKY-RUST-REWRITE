@@ -225,7 +225,7 @@ address,size,name,system,status
 0x115e28,444,cAIWorld::vf1_115e28,ai,ported
 0x115fe8,272,World_ResetInstances,world,ported
 0x1160f8,452,AIWorld_MarkCellsAround,ai,ported
-0x1162c0,52,FUN_001162c0,world?,ported
+0x1162c0,52,AIWorld_AgeActiveCells,ai,ported
 0x1162f8,164,AIWorld_UpdateActiveCells,ai,ported
 0x1163a0,128,AIWorld_ReleaseActiveCells,ai,ported
 0x116420,160,AIWorld_MarkCellActive,ai,ported
@@ -407,7 +407,7 @@ address,size,name,system,status
 0x122ff8,36,cBoarderCache::~cBoarderCache,boarder,not started
 0x123020,64,cBoarderCache::__tf,runtime,host
 0x123060,56,RiderSkin_InitMem,render?,not started
-0x123098,8,FUN_00123098,world?,not started
+0x123098,8,BroadphaseProxy_SetBoxFromMinMax,world?,not started
 0x1230a0,28,FUN_001230a0,game?,not started
 0x1230c0,28,FUN_001230c0,game?,not started
 0x1230e0,16,EaseRecord_Init,boarder?,not started
@@ -1039,11 +1039,11 @@ address,size,name,system,status
 0x1503b0,48,Broadphase_PairIndex,render?,not started
 0x1503e0,68,Broadphase_GetPairFlags,render?,not started
 0x150428,456,Contact_SortPairs,camera?,not started
-0x150670,104,FUN_00150670,world?,not started
+0x150670,104,BroadphaseProxy_Init,world?,not started
 0x1506d8,100,Contact_LinkToNode,render?,not started
 0x150740,164,Contact_UnlinkFromNode,other,not started
-0x1507e8,44,FUN_001507e8,world?,not started
-0x150818,44,FUN_00150818,world?,not started
+0x1507e8,44,BroadphaseProxy_SetBox,world?,not started
+0x150818,44,BroadphaseProxy_SetBoxB,world?,not started
 0x150848,536,FUN_00150848,world?,not started
 0x150a70,16,FUN_00150a70,boarder?,not started
 0x150a80,360,Rumble_Impact,boarder?,not started
@@ -1502,7 +1502,7 @@ address,size,name,system,status
 0x173a60,36,Camera_CutForReset,camera,ported
 0x173a88,12,CamControl_Reset,boarder?,not started
 0x173a98,384,Camera_Reset,camera,not started
-0x173c18,44,FUN_00173c18,race?,not started
+0x173c18,44,Camera_GetFocusPoint,camera,not started
 0x173c50,440,Camera_SetFocusRider,camera,not started
 0x173e08,104,Camera_GetModeIndex,camera,not started
 0x173e70,60,Camera_CycleMode,camera,not started
@@ -1703,11 +1703,11 @@ address,size,name,system,status
 0x17d740,72,BxList_Move,world?,not started
 0x17d788,216,BxList_MoveAll,world?,not started
 0x17d860,36,BxList_First,ai?,not started
-0x17d888,36,FUN_0017d888,world?,not started
+0x17d888,36,BxList_SortedFirst,world?,not started
 0x17d8b0,36,BxList_NextOrNull,ai?,not started
-0x17d8d8,36,FUN_0017d8d8,world?,not started
-0x17d900,36,FUN_0017d900,world?,not started
-0x17d928,36,FUN_0017d928,world?,not started
+0x17d8d8,36,BxList_SortedNextOrNull,world?,not started
+0x17d900,36,BxList_PendingFirst,world?,not started
+0x17d928,36,BxList_PendingNextOrNull,world?,not started
 0x17d950,132,BxList_UpdateAll,game?,not started
 0x17d9d8,116,FUN_0017d9d8,ai?,not started
 0x17da50,140,BxList_DeleteAll,ai?,not started
@@ -4187,7 +4187,7 @@ address,size,name,system,status
 0x238f50,568,SphereTreeCache_Get,render?,ported
 0x2391c8,8,SphTree_Assert,world?,not started
 0x2391d0,20,bxSphereTree::~bxSphereTree,world?,not started
-0x2391e8,344,FUN_002391e8,world?,not started
+0x2391e8,344,SphTree_Copy,world?,not started
 0x239340,360,SphTree_Load,world?,ported
 0x2394a8,280,Collide_BoarderSphTree,world?,ported
 0x2395c0,308,SphTree_TouchesTriangle,world?,ported
@@ -4200,7 +4200,7 @@ address,size,name,system,status
 0x239ba8,144,SphereTree::SphereTree,world?,ported
 0x239c38,20,SphereTree::~SphereTree,world?,not started
 0x239c50,72,SphTree_GetRadius,world?,ported
-0x239c98,128,FUN_00239c98,world?,not started
+0x239c98,128,SphTree_SetPosition,world?,not started
 0x239d18,72,SphTree_Translate,world?,not started
 0x239d60,548,SphTree_SetTransform,world?,ported
 0x239f88,472,SphTree_Transform,world?,ported
@@ -4587,8 +4587,8 @@ address,size,name,system,status
 0x254db0,56,Course_CamAnimHashTable,race,not started
 0x254de8,56,Course_SplineHashCount,race,not started
 0x254e20,56,Course_SplineHashTable,race,not started
-0x254e58,64,FUN_00254e58,race?,not started
-0x254e98,64,FUN_00254e98,race?,not started
+0x254e58,64,CourseResolve_IndexTable08,race,not started
+0x254e98,64,CourseResolve_IndexTable0C,race,not started
 0x254ed8,84,Course_HashBsearch,race,not started
 0x254f30,136,Course_FindLightByHash,race,not started
 0x254fb8,136,Course_FindPatchByHash,race,not started
@@ -4670,7 +4670,7 @@ address,size,name,system,status
 0x25f598,1960,Course_LoadSphereTrees,race,ported
 0x25fd40,308,Course_FreeCollision,race,not started
 0x25fe78,64,Instance_GetEventScript,world,ported
-0x25feb8,20,FUN_0025feb8,world?,ported
+0x25feb8,20,Course_GetEffectHeader,race,ported
 0x25fed0,400,World_CellActivate_RunPersistant,world,ported
 0x260108,368,World_CellDeactivate,world,ported
 0x260278,480,World_VisitCellsNear,world,not started
@@ -4681,8 +4681,8 @@ address,size,name,system,status
 0x2609d0,328,World_LoadTextures,world,not started
 0x260b18,144,WorldGrid_CellAtPos,world?,not started
 0x260ba8,248,WorldGrid_CellAt,world?,ported
-0x260ca0,24,FUN_00260ca0,world?,not started
-0x260cb8,72,FUN_00260cb8,world?,not started
+0x260ca0,24,World_GetInstanceSphTree,world,not started
+0x260cb8,72,WorldGrid_GetCellItem,world?,not started
 0x260d08,204,World_GetCellAt,world,not started
 0x260dd8,144,World_FindScript,world,ported
 0x260e68,44,Course_GetScriptEntry,race,ported

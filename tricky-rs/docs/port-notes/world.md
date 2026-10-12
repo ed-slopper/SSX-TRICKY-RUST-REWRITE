@@ -241,10 +241,10 @@ Part of the port notes (index: [README.md](README.md)); units and wording as des
 - `cAIWorld::vf1` 0x115e28, each tick: the patch cache ages (`FUN_00251d70`, only speed). Each rider's grid cell
   (+0x16c) comes from its position (+0x140) through `Boarder_UpdateGridCell` 0x11d438: (p − corner + size)/size − 1
   per axis, truncated and clamped. If the first rider is still in the cell it had (+0x42c), the race object's +0x1c
-  decides: below 2 the camera point (`FUN_00173c18`: camera +0x42c, or the point at 0x3368b0 when 0x337774 is set)
+  decides: below 2 the camera point (`Camera_GetFocusPoint` 0x173c18: camera +0x42c, or the point at 0x3368b0 when 0x337774 is set)
   is marked too and the pass goes on; otherwise the other riders are checked in turn, and if none changed cell the
   tick stops there.
-- The pass: every held slot ages (`FUN_001162c0`, +4 less 1), `AIWorld_MarkCellsAround` 0x1160f8 marks the cells
+- The pass: every held slot ages (`AIWorld_AgeActiveCells` 0x1162c0, +4 less 1), `AIWorld_MarkCellsAround` 0x1160f8 marks the cells
   around each rider (and the camera point): x from cell − 2 to cell (x outer), y the same, with cell computed
   without the − 1, so the 3 × 3 block is centred on the rider.s cell; each clamped.
   `AIWorld_MarkCellActive` 0x116420 ignores index 0xffff and empty cells; a held cell gets +4 = 1, a new one the
@@ -290,7 +290,7 @@ Part of the port notes (index: [README.md](README.md)); units and wording as des
 - `cRollerNode` (type 0) past its controller layer (scripts.md, Movers): +0x30 the rigid body, +0xc8 the energy
   average, +0xcc the mass, +0xd8 the bounce (0), +0xdc the friction (0.5), +0xe0 277.7778 cm/s (10 km/h), +0xe4
   seconds awake, +0xe8 the knock, +0x100 the body inverse inertia, +0x130 the centre of mass in the object's frame,
-  +0x140 asleep, +0x150 its sphere tree (a copy of the course's, `FUN_002391e8`), +0x2a0 / +0x2b0 the tree's box,
+  +0x140 asleep, +0x150 its sphere tree (a copy of the course's, `SphTree_Copy` 0x2391e8), +0x2a0 / +0x2b0 the tree's box,
   +0x2c0 its broadphase entry (+0x84 the node).
 - The constructor (0x13d6c0, from script op 0): the mass and +0xd0 from the op's record (+0xc, +0x10); the tree
   header's centre of mass (+0x2c) and inverse inertia (+0x5c) × 0.075; the body at the object's place plus the
