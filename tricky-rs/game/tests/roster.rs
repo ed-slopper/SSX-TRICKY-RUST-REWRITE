@@ -553,6 +553,68 @@ fn human(c: &mut tricky_game::career::Career, _: &mut Rng) {
 }
 
 #[test]
+fn circuit_setup_event_riders_matches_the_original() {
+    use std::cell::RefCell;
+    use tricky_game::roster::CircuitHeats;
+    let heats = RefCell::new(CircuitHeats::default());
+    let set = |c: &mut tricky_game::career::Career, g: &mut Rng| {
+        c.bytes[0x30fc] = 0;
+        c.w32(0x2afc, 4);
+        c.w32(0x320c + 4, tricky_game::career::CAREER_BASE);
+        c.w32(0x320c + 8, tricky_game::career::CAREER_BASE + 0x27dc);
+        c.w32(0x320c + 0x10, tricky_game::career::CAREER_BASE + 0x30fc);
+        let l = [0, 1, 2, 3, 4, 8, 5, 11, 7, 9];
+        c.w32(0x2af8, l[g.next() as usize % l.len()]);
+        c.w32(0x320c + 0x14, if g.next() % 3 == 0 { 0 } else { 1 + g.next() as u32 % 2 });
+        let mut h = CircuitHeats::default();
+        let mut open = 0;
+        for r in 0..12 {
+            h.rows[r] = [g.next() as u32 % 3, g.next() as u32 % 3, g.next() as u32 % 3, if g.next() % 8 == 0 { 1 } else { 0 }];
+            if h.rows[r][3] == 0 && h.rows[r][c.r32(0x320c + 0x14) as usize] == 2 { open += 1; }
+        }
+        // enough open riders that a place is never left to the table's end
+        for r in 0..12 {
+            if open < 9 && h.rows[r][3] != 0 || open < 9 && h.rows[r][c.r32(0x320c + 0x14) as usize] != 2 {
+                h.rows[r][3] = 0;
+                h.rows[r][c.r32(0x320c + 0x14) as usize] = 2;
+                open += 1;
+            }
+        }
+        *heats.borrow_mut() = h;
+    };
+    let hs = RefCell::new(CircuitHeats::default());
+    let _ = &hs;
+    let after = RefCell::new(CircuitHeats::default());
+    run_builder_hooks(
+        0x16d300,
+        0x320c,
+        3000,
+        &set,
+        &|c, x, f| {
+            let mut h = *heats.borrow();
+            c.circuit_setup_event_riders(0, &mut h, x, f);
+            *after.borrow_mut() = h;
+        },
+        &|r| {
+            let h = heats.borrow();
+            for i in 0..12 {
+                for w in 0..4 {
+                    r.mem.write_u32(0x335658 + 16 * i as u32 + 4 * w as u32, h.rows[i][w]);
+                }
+            }
+        },
+        &|r, case| {
+            let h = after.borrow();
+            for i in 0..12 {
+                for w in 0..4 {
+                    assert_eq!(r.mem.read_u32(0x335658 + 16 * i as u32 + 4 * w as u32), h.rows[i][w], "case {case}: heat mark {i}/{w}");
+                }
+            }
+        },
+    );
+}
+
+#[test]
 fn circuit_setup_riders_matches_the_original() {
     let set = |c: &mut tricky_game::career::Career, g: &mut Rng| {
         c.bytes[0x30fc] = 0;
@@ -565,7 +627,7 @@ fn circuit_setup_riders_matches_the_original() {
             c.w32(0x2af8, l[g.next() as usize % l.len()]);
         }
     };
-    run_builder(0x16bc50, 0x320c, 3000, &set, &|c, x, f| c.circuit_setup_riders(0, x, &mut |_| unreachable!(), f));
+    run_builder(0x16bc50, 0x320c, 3000, &set, &|c, x, f| c.circuit_setup_riders(0, &mut Default::default(), x, f));
 }
 
 fn run_builder(
@@ -574,6 +636,18 @@ fn run_builder(
     cases: usize,
     set_mode: &dyn Fn(&mut tricky_game::career::Career, &mut Rng),
     call: &dyn Fn(&mut tricky_game::career::Career, &mut tricky_game::roster::RosterCtx, &mut dyn FnMut() -> u32),
+) {
+    run_builder_hooks(addr, arg, cases, set_mode, call, &|_| {}, &|_, _| {})
+}
+
+fn run_builder_hooks(
+    addr: u32,
+    arg: u32,
+    cases: usize,
+    set_mode: &dyn Fn(&mut tricky_game::career::Career, &mut Rng),
+    call: &dyn Fn(&mut tricky_game::career::Career, &mut tricky_game::roster::RosterCtx, &mut dyn FnMut() -> u32),
+    mem_in: &dyn Fn(&mut Runner),
+    mem_out: &dyn Fn(&mut Runner, usize),
 ) {
     use tricky_game::career::{Career, InitialRelations, StaticTables, CAREER_BASE, CAREER_SIZE};
     use tricky_game::fxrand::SceneTables;
@@ -710,6 +784,7 @@ fn run_builder(
             for (k, w) in rand.fx.s.iter().enumerate() {
                 r.mem.write_u32(0x345e58 + 4 * k as u32, *w);
             }
+            mem_in(&mut r);
             r.cpu.set_gpr(4, (CAREER_BASE + arg) as u64);
             match r.call(addr) {
                 Ok(()) => break,
@@ -725,10 +800,15 @@ fn run_builder(
         let mut sel = s;
         let mut ctx = RosterCtx { sel: &mut sel, entries: &entries, names: &names, board_points: &bpoints, tables: &tables, sel_tables: &sel_tables, env, rel: &InitialRelations };
         call(&mut ours, &mut ctx, &mut || rand.fx());
-        for k in 0..CAREER_SIZE as u32 {
-            let got = (r.mem.read_u32((CAREER_BASE + k) & !3) >> (8 * ((CAREER_BASE + k) & 3))) as u8;
-            assert_eq!(got, ours.bytes[k as usize], "case {case}: career byte {k:#x} (riders {n}, humans {humans}, race {:#x})", ours.r32(0x2af8));
-        }
+        mem_out(&mut r, case);
+        let diffs: Vec<String> = (0..CAREER_SIZE as u32)
+            .filter_map(|k| {
+                let got = (r.mem.read_u32((CAREER_BASE + k) & !3) >> (8 * ((CAREER_BASE + k) & 3))) as u8;
+                (got != ours.bytes[k as usize]).then(|| format!("{k:#x}: original {got:#x}, ours {:#x}", ours.bytes[k as usize]))
+            })
+            .take(12)
+            .collect();
+        assert!(diffs.is_empty(), "case {case}: career bytes differ (riders {n}, humans {humans}, race {:#x}): {diffs:?}", ours.r32(0x2af8));
         let rdw = |m: &mut r5900::Mem, o: u32| m.read_u32(0x32ecf0 + o) as i32;
         for k in 0..5 {
             assert_eq!(rdw(&mut r.mem, 4 * k), sel.co[k as usize], "case {case}: co {k}");

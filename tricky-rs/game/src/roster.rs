@@ -732,9 +732,9 @@ impl crate::career::Career {
 
     /// `Career_SetupRidersForMode` 0x165558: +0x3264 for 0x498 bytes cleared, then by the race mode (+0x2afc): 0 six
     /// riders built; 2 built; 3 and the modes not listed the player slots' riders; 4 and 5 the circuit's
-    /// (`Circuit_SetupRiders`; `event` is its race mode 4, `Circuit_SetupEventRiders`: not ported); 6 the tutorial's; 7 reset; 8 six random;
+    /// (`Circuit_SetupRiders`, `heats` the circuit's marks); 6 the tutorial's; 7 reset; 8 six random;
     /// 9 random.
-    pub fn setup_riders_for_mode(&mut self, ctx: &mut RosterCtx, event: &mut dyn FnMut(&mut crate::career::Career), rand_fx: &mut dyn FnMut() -> u32) {
+    pub fn setup_riders_for_mode(&mut self, ctx: &mut RosterCtx, heats: &mut CircuitHeats, rand_fx: &mut dyn FnMut() -> u32) {
         self.bytes[0x3264..0x3264 + 0x498].fill(0);
         match self.r32(0x2afc) {
             0 => {
@@ -745,7 +745,7 @@ impl crate::career::Career {
             3 => self.init_rider_list(ctx, rand_fx),
             4 | 5 => {
                 let k = (self.ptr(0x320c + 0x10) - 0x30fc) / 0x44;
-                self.circuit_setup_riders(k, ctx, event, rand_fx)
+                self.circuit_setup_riders(k, heats, ctx, rand_fx)
             }
             6 => self.setup_tutorial_riders(ctx, rand_fx),
             7 => self.reset_riders(ctx, rand_fx),
@@ -759,17 +759,17 @@ impl crate::career::Career {
 impl crate::career::Career {
     /// `Circuit_SetupRiders` 0x16bc50 on the circuit block at +0x320c, `k` the slot its +0x10 points at: the
     /// circuit's twelve words at +0x1c.. are -1 and its +0x18 is 0; race mode 4 is `Circuit_SetupEventRiders`
-    /// (`event`, not ported), anything else `FUN_0016d230`: the one rider is slot `k`'s player (level +0x14 = 2),
+    /// (`Circuit_SetupEventRiders`), anything else `FUN_0016d230`: the one rider is slot `k`'s player (level +0x14 = 2),
     /// the race word +0x2b0c is the level plus the course's position in the medal table (8 if absent) times
     /// 0x10000, then the selection (cleared, made for the profile's rider) and the roster.
-    pub fn circuit_setup_riders(&mut self, k: usize, ctx: &mut RosterCtx, event: &mut dyn FnMut(&mut crate::career::Career), rand_fx: &mut dyn FnMut() -> u32) {
+    pub fn circuit_setup_riders(&mut self, k: usize, heats: &mut CircuitHeats, ctx: &mut RosterCtx, rand_fx: &mut dyn FnMut() -> u32) {
         let c = 0x320c;
         for i in 0..12 {
             self.w32(c + 0x1c + 4 * i, 0xffff_ffff);
         }
         self.w32(c + 0x18, 0);
         if self.r32(0x2afc) == 4 {
-            return event(self);
+            return self.circuit_setup_event_riders(k, heats, ctx, rand_fx);
         }
         self.w32(0x27dc, 1);
         let sb = 0x30fc + 0x44 * k;
@@ -787,6 +787,157 @@ impl crate::career::Career {
         let rider = self.r32(self.ptr(sb + 0x14));
         let (p6, p7) = (self.r32(0x2af8), self.r32(0x2afc));
         ctx.sel.choose(rider, p6, p7, 3, ctx.sel_tables.rows[..3].try_into().unwrap(), rand_fx);
+        self.finalize_roster(ctx.sel, ctx.sel_tables, rand_fx);
+    }
+}
+
+/// The circuit's heat marks (0x335658, 16 bytes per rider): for each of the three heats 0 the rider is in it, 1
+/// out (it went through an earlier one), 2 open; then a word that is 0 once the rider has been placed.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct CircuitHeats {
+    pub rows: [[u32; 4]; 12],
+}
+
+impl Default for CircuitHeats {
+    fn default() -> Self {
+        CircuitHeats { rows: [[2, 2, 2, 0]; 12] }
+    }
+}
+
+impl crate::career::Career {
+    /// `FUN_0016cfd8`(circuit, row `s`, `rider`) for the slot `k` the circuit points at: that slot's own rider is
+    /// set up as its player (the slot's word +4 from the career's +0x1684 by player, then the circuit's +0x18 in
+    /// the row's +0x74), any other as a computer rider with the slot record's level for it (+0x164 + 8·rider).
+    fn circuit_setup_rider(&mut self, k: usize, s: usize, rider: usize, ctx: &mut RosterCtx, rand_fx: &mut dyn FnMut() -> u32) {
+        let sb = 0x30fc + 0x44 * k;
+        let prof = self.ptr(sb + 0x14);
+        if self.r32(prof) as usize == rider {
+            let player = self.bytes[sb] as i8;
+            self.w32(sb + 4, self.r32((0x1684 + 4 * player as isize) as usize));
+            let entry = Self::rider_entry(ctx, rider);
+            let name = self.slot_name(k);
+            self.setup_player_rider(k, s, entry, &name, ctx.board_points, ctx.tables, &ctx.env);
+            let w = self.r32(0x320c + 0x18);
+            self.w32(0x27e0 + 0x84 * s + 0x70, w);
+        } else {
+            let rec = self.ptr(sb + 0x18);
+            let rival = self.r32(rec + 0x164 + 8 * rider) as i32;
+            let entry = Self::rider_entry(ctx, rider);
+            let name = &ctx.names[rider];
+            self.setup_ai_rider(s, entry, name, ctx.board_points, Some(rival), ctx.tables, ctx.env.max_attrib, rand_fx);
+        }
+    }
+
+    /// `Circuit_SetupEventRiders` 0x16d300 on the circuit block at +0x320c (slot `k` its player; its +0x14 the heat):
+    /// six riders (+0x27dc), the race word +0x2b0c the heat plus the course's place in the circuit times 0x10000.
+    /// In heat 0 every rider is marked with the heats the selection puts it in (the player in all three, a rider
+    /// the selection picks for a heat in that one and out of the earlier). The six places: the player in 1 + (a
+    /// draw & 3) (place 1 when that is 1 or 2 on course 0xb), the first two picks either side, the other picks into
+    /// the first empty places, the rest by a draw each (`% 10000`, unsigned) among the riders still open in this
+    /// heat, highest first; each set up, the pairs and the roster.
+    pub fn circuit_setup_event_riders(&mut self, k: usize, heats: &mut CircuitHeats, ctx: &mut RosterCtx, rand_fx: &mut dyn FnMut() -> u32) {
+        let c = 0x320c;
+        let sb = 0x30fc + 0x44 * k;
+        let course = self.r32(0x2af8);
+        let mode = self.r32(0x2afc);
+        let level = self.r32(c + 0x14);
+        let idx = crate::courses::CIRCUIT.iter().position(|&x| x == course).unwrap_or(8) as u32;
+        self.w32(0x27dc, 6);
+        self.w32(0x2b0c, level.wrapping_add(idx << 16));
+        let player_rider = self.r32(self.ptr(sb + 0x14));
+        let mut list = [0xci32; 6];
+        if level == 0 {
+            let mut picks = [[0i32; 5]; 3];
+            for h in 0..3 {
+                *ctx.sel = PreRaceSel::default();
+                ctx.sel.choose(player_rider, course, mode, h as u32, ctx.sel_tables.rows[..3].try_into().unwrap(), rand_fx);
+                picks[h] = ctx.sel.co;
+            }
+            for r in 0..12 {
+                heats.rows[r][3] = 0;
+                heats.rows[r][..3].fill(2);
+                let id = u32::from_le_bytes(ctx.entries[r * 0x38..r * 0x38 + 4].try_into().unwrap());
+                for h in 0..3 {
+                    if id == player_rider {
+                        heats.rows[r][h] = 0;
+                    } else {
+                        for a in 0..5 {
+                            if id as i32 == picks[h][a] {
+                                heats.rows[r][h] = 0;
+                                for j in 0..h {
+                                    heats.rows[r][j] = 1;
+                                }
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        *ctx.sel = PreRaceSel::default();
+        ctx.sel.choose(player_rider, course, mode, level, ctx.sel_tables.rows[..3].try_into().unwrap(), rand_fx);
+        let picks = ctx.sel.co;
+        let d = rand_fx();
+        let mut at = (d & 3) as usize + 1;
+        if course == 0xb && (d & 3).wrapping_sub(1) < 2 {
+            at = 1;
+        }
+        list[at] = player_rider as i32;
+        let lv = level as usize;
+        for (i, off) in [(0usize, -1isize), (1, 1)] {
+            if picks[i] != 0xc {
+                list[(at as isize + off) as usize] = picks[i];
+                heats.rows[picks[i] as usize][3] = 0;
+                heats.rows[picks[i] as usize][lv] = 0;
+            }
+        }
+        for u in 2..5 {
+            let v = picks[u];
+            if v != 0xc {
+                if let Some(s) = list.iter().position(|&x| x == 0xc) {
+                    list[s] = v;
+                    heats.rows[v as usize][3] = 0;
+                    heats.rows[v as usize][lv] = 0;
+                }
+            }
+        }
+        let mut cs = [0i32; 16];
+        for r in 0..12 {
+            cs[r] = if heats.rows[r][3] == 0 && heats.rows[r][lv] == 2 { (rand_fx() % 10000) as i32 } else { -1 };
+        }
+        let mut mask = 0u32;
+        for s in 0..6 {
+            if list[s] != 0xc {
+                mask |= 1u32.wrapping_shl(list[s] as u32);
+                continue;
+            }
+            let (mut best, mut bi) = (-1i32, 12usize);
+            for (i, &v) in cs[..12].iter().enumerate() {
+                if best < v {
+                    best = v;
+                    bi = i;
+                }
+            }
+            if bi == 12 {
+                if mask & 1 == 0 {
+                    bi = 0;
+                } else {
+                    let mut v = 1;
+                    while v < 12 && (mask >> v) & 1 != 0 {
+                        v += 1;
+                    }
+                    bi = if v < 12 { v } else { 12 };
+                }
+            }
+            cs[bi] = -1;
+            mask |= 1u32 << bi;
+            list[s] = bi as i32;
+        }
+        for s in 0..6 {
+            self.circuit_setup_rider(k, s, list[s] as usize, ctx, rand_fx);
+        }
+        let n = self.r32(0x27dc) as i32;
+        self.rivals_init_pairs_circuit(n, ctx.rel);
         self.finalize_roster(ctx.sel, ctx.sel_tables, rand_fx);
     }
 }
