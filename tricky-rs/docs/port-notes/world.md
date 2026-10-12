@@ -481,8 +481,12 @@ Part of the port notes (index: [README.md](README.md)); units and wording as des
   - `FUN_002256c0` 0x2256c0 (level sound banks): `Rand_Fx % variants` (`FUN_00224658`) picks which variant of a bank is loaded.
   - `Speech_RollChance` 0x235d84: `(Rand_Fx & 0x3ff) < table[min(level, +0x383c)][kind]` (table at 0x3a3528, 0x28 a row).
   - `Audio_RaceInit` 0x2116d8 / `Audio_OnRaceGo` 0x215288: `Rand_Fx % 100` for `Music_SetPathVar`, game mode 6 only.
-  STANDIN: the C part of the course intro (8..15 in the port) and the ambient and speech draws of `worldsound.rs` are the
-  port's own picks on its own generator, not the game's draws (E1b2i).
+  - the C part of the course intro (row E1b2q, read): `Audio_InGameUpdate` 0x20ee58 (0x20ef98), whenever fewer than two
+    segments wait in the stream queue, draws once and queues `8 + (r & 0x7fff) * 8 / 0x7fff` (unsigned; 8..=16, the
+    closing segment only when the low fifteen bits are all set); in courses 3, 7, 8 and 0xb it queues instead a counter
+    (+0x6e44, 0 at the start) that wraps from 16 to 8, with no draw other than the call. Ported: `coursemusic.rs`.
+  STANDIN: the ambient and speech draws of `worldsound.rs` are the port's own picks on its own generator, not the
+  game's draws (E1b2i).
 
 ## Course file loading (`cCourseResolve_Common` / `cCourseResolve_PS2`)
 

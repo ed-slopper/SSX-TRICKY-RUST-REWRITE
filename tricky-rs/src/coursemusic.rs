@@ -84,8 +84,10 @@ pub fn course_music(
     // the sound system's own random is `Rand_Fx` (cBXAudio::vf3 0x21e6c0 tail-calls it); `Music_StartCourseSong`
     // 0x214e60 turns a draw into a segment as `(r & 0x7fff) * n / 0x7fff`, so n + 1 values and the top one is rare
     let pick = |n: u32| tricky_game::fxrand::segment_pick(tricky_game::rand::rand_fx(), n) as usize;
-    // STANDIN: the C part's picks (not read: the stream's next-segment code) use the same draw modulo 8
-    let pick_c = || (tricky_game::rand::rand_fx() % 8) as usize;
+    // the C part: `Audio_InGameUpdate` 0x20ee58 (0x20ef98) tops the queue up whenever fewer than two segments wait with
+    // `8 + (r & 0x7fff) * 8 / 0x7fff` (unsigned) from the same draw, so 8..=16 and the closing segment 16 only when
+    // the low fifteen bits are all set
+    let pick_c = || tricky_game::fxrand::segment_pick(tricky_game::rand::rand_fx(), 8) as usize;
     if restart {
         clear(&mut commands, None);
         if r.intro {
