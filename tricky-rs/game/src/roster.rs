@@ -646,3 +646,109 @@ impl crate::career::Career {
         self.rivals_init_pairs(n, ctx.rel);
     }
 }
+
+impl crate::career::Career {
+    /// `Career_InitRiderList` 0x1664b0: the race's rider count (+0x27dc) is the number of player slots in use, then
+    /// [`Career::build_race_riders`].
+    pub fn init_rider_list(&mut self, ctx: &mut RosterCtx, rand_fx: &mut dyn FnMut() -> u32) {
+        let n = (0..4).filter(|&k| (self.bytes[0x30fc + 0x44 * k] as i8) >= 0).count();
+        self.w32(0x27dc, n as u32);
+        self.build_race_riders(ctx, rand_fx);
+    }
+
+    /// `Career_ResetRiders` 0x166450: [`Career::init_rider_list`], then each rider row's +0x70 is 1.0.
+    pub fn reset_riders(&mut self, ctx: &mut RosterCtx, rand_fx: &mut dyn FnMut() -> u32) {
+        self.init_rider_list(ctx, rand_fx);
+        for i in 0..self.r32(0x27dc) as i32 {
+            self.w32(0x27e0 + 0x84 * i as usize + 0x70, 0x3f80_0000);
+        }
+    }
+
+    /// The rest of `Career_PickSixRandomRiders` 0x165a40 and `Career_PickRandomRiders` 0x165b98 (`n` riders, set
+    /// by the caller): twelve draws order the twelve riders (largest draw first, `Sort_ShellPairs`), the first
+    /// `n` set up as computer riders with no rival level, the pairs, the selection and the roster finalised.
+    fn pick_riders(&mut self, ctx: &mut RosterCtx, rand_fx: &mut dyn FnMut() -> u32) {
+        self.w32(0x2b0c, 3);
+        let mut ids = [0i32; 12];
+        let mut keys = [0i32; 12];
+        for i in 0..12 {
+            ids[i] = i as i32;
+            keys[i] = rand_fx() as i32;
+        }
+        sort_shell_pairs(&mut keys, &mut ids);
+        let n = self.r32(0x27dc) as i32;
+        for k in 0..n.max(0) as usize {
+            let rider = ids[k] as usize;
+            let entry = Self::rider_entry(ctx, rider);
+            let name = &ctx.names[rider];
+            self.setup_ai_rider(k, entry, name, ctx.board_points, None, ctx.tables, ctx.env.max_attrib, rand_fx);
+        }
+        self.rivals_init_pairs(n, ctx.rel);
+        let (r0, p6, p7) = (self.r32(0x2818), self.r32(0x2af8), self.r32(0x2afc));
+        ctx.sel.choose(r0, p6, p7, 3, ctx.sel_tables.rows[..3].try_into().unwrap(), rand_fx);
+        self.finalize_roster(ctx.sel, ctx.sel_tables, rand_fx);
+    }
+
+    /// `Career_PickSixRandomRiders` 0x165a40: six random riders.
+    pub fn pick_six_random_riders(&mut self, ctx: &mut RosterCtx, rand_fx: &mut dyn FnMut() -> u32) {
+        self.w32(0x27dc, 6);
+        self.pick_riders(ctx, rand_fx);
+    }
+
+    /// `Career_PickRandomRiders` 0x165b98: as many random riders as the career's +0x16b8 says.
+    pub fn pick_random_riders(&mut self, ctx: &mut RosterCtx, rand_fx: &mut dyn FnMut() -> u32) {
+        let n = self.r32(0x16b8);
+        self.w32(0x27dc, n);
+        self.pick_riders(ctx, rand_fx);
+    }
+
+    /// `Career_SetupTutorialRiders` 0x165778: the first player in use is the only rider: its board word is 0 and its
+    /// record's four level bytes `-` while its row is set up, then both are put back; then one rider (+0x27dc = 1),
+    /// the pairs, the selection and the roster.
+    pub fn setup_tutorial_riders(&mut self, ctx: &mut RosterCtx, rand_fx: &mut dyn FnMut() -> u32) {
+        self.w32(0x2b0c, 3);
+        if let Some(k) = (0..4).find(|&k| (self.bytes[0x30fc + 0x44 * k] as i8) >= 0) {
+            let prof = self.ptr(0x3110 + 0x44 * k);
+            let player = self.bytes[0x30fc + 0x44 * k] as i8;
+            let word = self.r32((0x168c + 4 * player as isize) as usize);
+            self.w32(0x3100 + 0x44 * k, word);
+            let rec = self.ptr(0x3114 + 0x44 * k);
+            let board = self.r32(prof + 0x10);
+            self.w32(prof + 0x10, 0);
+            let saved = self.bytes[rec..rec + 0x1c4].to_vec();
+            self.bytes[rec + 0xc..rec + 0x10].fill(0x2d);
+            let entry = Self::rider_entry(ctx, self.r32(prof) as usize);
+            let name = self.slot_name(k);
+            self.setup_player_rider(k, 0, entry, &name, ctx.board_points, ctx.tables, &ctx.env);
+            self.w32(prof + 0x10, board);
+            self.bytes[rec..rec + 0x1c4].copy_from_slice(&saved);
+        }
+        self.w32(0x27dc, 1);
+        self.rivals_init_pairs(1, ctx.rel);
+        let (r0, p6, p7) = (self.r32(0x2818), self.r32(0x2af8), self.r32(0x2afc));
+        ctx.sel.choose(r0, p6, p7, 3, ctx.sel_tables.rows[..3].try_into().unwrap(), rand_fx);
+        self.finalize_roster(ctx.sel, ctx.sel_tables, rand_fx);
+    }
+
+    /// `Career_SetupRidersForMode` 0x165558: +0x3264 for 0x498 bytes cleared, then by the race mode (+0x2afc): 0 six
+    /// riders built; 2 built; 3 and the modes not listed the player slots' riders; 4 and 5 the circuit's
+    /// (`circuit`, `Circuit_SetupRiders` 0x16bc50 on +0x320c: not ported); 6 the tutorial's; 7 reset; 8 six random;
+    /// 9 random.
+    pub fn setup_riders_for_mode(&mut self, ctx: &mut RosterCtx, circuit: &mut dyn FnMut(&mut crate::career::Career), rand_fx: &mut dyn FnMut() -> u32) {
+        self.bytes[0x3264..0x3264 + 0x498].fill(0);
+        match self.r32(0x2afc) {
+            0 => {
+                self.w32(0x27dc, 6);
+                self.build_race_riders(ctx, rand_fx);
+            }
+            2 => self.build_race_riders(ctx, rand_fx),
+            3 => self.init_rider_list(ctx, rand_fx),
+            4 | 5 => circuit(self),
+            6 => self.setup_tutorial_riders(ctx, rand_fx),
+            7 => self.reset_riders(ctx, rand_fx),
+            8 => self.pick_six_random_riders(ctx, rand_fx),
+            9 => self.pick_random_riders(ctx, rand_fx),
+            _ => self.init_rider_list(ctx, rand_fx),
+        }
+    }
+}
