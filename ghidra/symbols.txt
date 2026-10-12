@@ -6834,3 +6834,4 @@ G 16b6d8 Course_GetMapMarkerX
 G 16b7b0 Course_GetMapMarkerY
 G 16b860 Course_GetUnlockHintStringId
 G 16b8e0 Course_GetDescriptionStringId
+G 169948 RaceScene_GetAnimList

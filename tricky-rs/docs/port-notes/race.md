@@ -36,7 +36,8 @@ Part of the port notes (index: [README.md](README.md)); units and wording as des
 - Objects (proven, F1c): the picks at 0x32ecf0 (`PreRaceSel_*`, `PreRaceSel_Destruct` 0x168688) and the scene at
   0x32edc0 (`RaceScene_*`: `RaceScene_Construct` 0x169640 / `RaceScene_Reset` 0x169688, +0 = 0x10, +0x43c = 0;
   `RaceScene_SetupFromPicks` 0x169698 copies 15 × 6 rows from the picks (+0x33c, 100 bytes a slot), one `Rand_Fx` draw
-  per row with a variant, and lists the distinct row values (+0x348, 0x1bf = none) at +0x458, at most 0x5a).
+  per row with a variant, and lists the distinct row values (+0x348, 0x1bf = none) at +0x458, at most 0x5a;
+  `RaceScene_GetAnimList` 0x169948 returns that list and its count, which `cAI::vf14_111108` passes to `AnimData_OpenBig`).
   `PreRaceSel_BuildSceneIndex` 0x168360 (no caller in the exe; static init) builds the 10-byte records at 0x3cc028 that
   `PreRaceSel_PickSceneVariants` 0x169378 draws from, out of 0x385 shorts at 0x37ab50.
 - Scene records (CML type 5): 8 × {anim script, enabled, rider selector (13 = next rider), place, frame (1 = start
