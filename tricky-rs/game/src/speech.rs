@@ -72,8 +72,33 @@ pub trait SpeechEnv {
     fn relation(&mut self, a: u32, b: u32) -> i32;
     /// `SpeechLib_PostEvent`
     fn post(&mut self, e: Event);
-    /// `SpeechSys_Trigger`(0, slot, the rider's position, 0, voice)
-    fn trigger(&mut self, slot: u32, rider: u32, voice: u32);
+    /// `SpeechSys_Trigger` 0x228bd8: the speech library serviced for the slot now; the values it handed the
+    /// callback (`Speech_QueueBigScore`, when given) come back in order
+    fn trigger(&mut self, t: Trigger) -> Vec<u32>;
+    /// The course word `DAT_0032de88`
+    fn course(&mut self) -> u32;
+    /// gApp+0x58 (what `Speech_GetModeMask` switches on)
+    fn app_mode(&mut self) -> u32;
+    /// `FUN_00228bb0`(slot, v): the slot's +0x34c
+    fn slot_hold(&mut self, slot: u32, v: u32);
+    /// `Race_GetRider`(gApp+0x730, i): its id
+    fn race_rider(&mut self, i: u32) -> u32;
+}
+
+/// A `SpeechSys_Trigger` call: the gain (f12, 0 keeps the slot's), the slot, the position (a rider's +0x140: the
+/// rider's id; none for 0), whether `Speech_QueueBigScore` is the callback, and the voice
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct Trigger {
+    pub gain: f32,
+    pub slot: u32,
+    pub at: Option<u32>,
+    pub callback: bool,
+    pub voice: u32,
+}
+
+/// A trigger at a rider (gain 0, no callback)
+fn at(slot: u32, rider: u32, voice: u32) -> Trigger {
+    Trigger { gain: 0.0, slot, at: Some(rider), callback: false, voice }
 }
 
 /// What the triggers read of a rider (`cBoarder`): its id (the object, compared with the listener; its position
@@ -138,14 +163,19 @@ pub fn wipeout_grade(level: i32) -> u32 {
     }
 }
 
-/// The speech system's state the triggers read: +0x383c the level (a float), +0x6e68 its cap, +0x6e50, and the
-/// checkpoints passed by race index (+0x6e6c)
+/// The speech system's state the triggers read (the audio object `DAT_00343050`): +0x383c the level (a float),
+/// +0x6e68 its cap, +0x6e50, the checkpoints passed by race index (+0x6e6c), the big-score ring (+0x7dd4 → its
+/// size, buffer, write and read indices) and +0x7dd8 (a big score queued by the library's callback)
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct Announcer {
     pub level: f32,
     pub cap: i32,
     pub resets_on: u32,
     pub checkpoints: [i32; 8],
+    pub ring: Vec<u32>,
+    pub ring_write: i32,
+    pub ring_read: i32,
+    pub big_queued: u32,
 }
 
 impl Announcer {
@@ -346,7 +376,7 @@ pub mod voices {
             let args = [character_bit(r.voice), 0x40];
             let id = if env.rand_fx() & 1 == 0 { 0x3006024 } else { 0x3006023 };
             env.post(Event::new(id, &args));
-            env.trigger(1, r.id, 0xd);
+            env.trigger(at(1, r.id, 0xd));
         }
     }
 
@@ -361,7 +391,7 @@ pub mod voices {
                 on_crash_nearby(env, r);
             } else {
                 env.post(Event::new(0x3006022, &[character_bit(r.voice)]));
-                env.trigger(1, r.id, 0xd);
+                env.trigger(at(1, r.id, 0xd));
             }
         }
     }
@@ -405,14 +435,14 @@ pub mod voices {
                 (true, true) => 1,
             };
             env.post(Event::new(0x3006036, &[bit, mask]));
-            env.trigger(1, a.id, a.voice as u32);
+            env.trigger(at(1, a.id, a.voice as u32));
             return;
         }
         let rival = is_rival_or_grudge(env, b, a);
         let bit = character_bit(b.voice);
         mask |= if rival { 4 } else { 8 };
         env.post(Event::new(0x3006036, &[bit, mask]));
-        env.trigger(1, b.id, 0xc);
+        env.trigger(at(1, b.id, 0xc));
     }
 
     /// `Speech_OnAITaunt` 0x234f68(a, b): two players' riders, one a local player or the listener, both near the
@@ -424,7 +454,7 @@ pub mod voices {
                 let na = env.find_near(a.id);
                 if 0 <= na && na == env.find_near(b.id) {
                     env.post(Event::new(0x300600f, &[character_bit(a.voice), character_bit(b.voice)]));
-                    env.trigger(1, a.id, a.voice as u32);
+                    env.trigger(at(1, a.id, a.voice as u32));
                 }
             }
         }
@@ -447,7 +477,7 @@ pub mod voices {
                 } else if kind == 1 {
                     env.post(Event::new(0x3006025, &[bit]));
                 }
-                env.trigger(1, r.id, r.voice as u32);
+                env.trigger(at(1, r.id, r.voice as u32));
             }
         }
     }
@@ -459,7 +489,7 @@ pub mod voices {
             if 0 <= env.find_near(r.id) {
                 let id = if 0.65 <= grade { 0x3006028 } else { 0x3006027 };
                 env.post(Event::new(id, &[bit]));
-                env.trigger(1, r.id, r.voice as u32);
+                env.trigger(at(1, r.id, r.voice as u32));
             }
         }
     }
@@ -470,8 +500,280 @@ pub mod voices {
             let bit = character_bit(r.voice);
             if 0 <= env.find_near(r.id) {
                 env.post(Event::new(0x300602b, &[bit]));
-                env.trigger(1, r.id, r.voice as u32);
+                env.trigger(at(1, r.id, r.voice as u32));
             }
         }
+    }
+}
+
+/// `Speech_CourseMask` 0x2307f0(course): a course's bit (0 past 11)
+pub fn course_mask(course: u64) -> u32 {
+    const M: [u32; 12] = [0x10, 0x100, 0x40, 1, 0x800, 4, 0x20, 2, 0x400, 8, 0x80, 0x200];
+    if course < 12 {
+        M[course as usize]
+    } else {
+        0
+    }
+}
+
+/// `Speech_CharMaskOf` 0x230880: the same bits, 0x2000 past 11
+pub fn char_mask_of(c: u64) -> u32 {
+    if c < 12 {
+        course_mask(c)
+    } else {
+        0x2000
+    }
+}
+
+/// `Speech_CurrentCourseMask` 0x230910: the course word's bit in the narration's course masks
+pub fn current_course_mask(course: u32) -> u32 {
+    match course {
+        1 => 2,
+        2 => 8,
+        3 => 4,
+        4 => 1,
+        5 => 0x40,
+        6 => 0x80,
+        7 => 0x200,
+        8 => 0x20,
+        0xb => 0x100,
+        _ => 0x10,
+    }
+}
+
+/// `Speech_GetModeMask` 0x2309a8: gApp+0x58 as a bit (2 → 2, 3 → 8, 4 → 4, else 1)
+pub fn mode_mask(app_mode: u32) -> u32 {
+    match app_mode {
+        2 => 2,
+        3 => 8,
+        4 => 4,
+        _ => 1,
+    }
+}
+
+/// `Speech_PickRaceGoLine` 0x233138(event mode, course, mode): the start line's bits
+pub fn race_go_line(event: i32, course: i32, mode: i64) -> u32 {
+    let v = match mode as i32 {
+        2 | 3 | 7 => 2,
+        4 => {
+            let v = match event {
+                1 => 4,
+                0 => 2,
+                2 => {
+                    if course == 5 {
+                        0x10
+                    } else {
+                        8
+                    }
+                }
+                _ => 0,
+            };
+            if mode != 4 {
+                return v | 1;
+            }
+            v | 0x200
+        }
+        5 => {
+            let v = if course == 6 { 0x40 } else { 0x20 };
+            if mode != 5 {
+                return v | 1;
+            }
+            v | 0x400
+        }
+        _ => 0,
+    };
+    v | 1
+}
+
+impl Announcer {
+    /// The ring's push (`Speech_QueueBigScore`'s and `Speech_OnBigScore`'s): kept unless full
+    fn ring_push(&mut self, v: u32) {
+        let n = self.ring.len() as i32;
+        if (self.ring_write + 1) % n != self.ring_read {
+            self.ring[self.ring_write as usize] = v;
+            self.ring_write += 1;
+            if n <= self.ring_write {
+                self.ring_write = 0;
+            }
+        }
+    }
+
+    /// `Speech_QueueBigScore` 0x235530(v): the library's callback: v queued, slot 1's hold off, +0x7dd8 set
+    pub fn queue_big_score(&mut self, env: &mut dyn SpeechEnv, v: u32) {
+        self.ring_push(v);
+        env.slot_hold(1, 0);
+        self.big_queued = 1;
+    }
+
+    /// `Speech_OnBigScore` 0x235ba8(rider or none, score, kind): a score of 1000 or more posts 0x500a000 with it and
+    /// speaks it at the rider (race rider 0 when none and kind ≠ 0; nowhere for kind 0) at gain 1500; with kind ≠ 0
+    /// slot 1 is held, the library may queue through the callback, else −1 is queued; then −2; the hold off.
+    pub fn on_big_score(&mut self, env: &mut dyn SpeechEnv, rider: Option<u32>, score: i64, kind: i64) {
+        if score < 1000 {
+            return;
+        }
+        env.post(Event::new(0x500a000, &[score as u32]));
+        let pos = match rider {
+            Some(r) => Some(r),
+            None if kind == 0 => None,
+            None => Some(env.race_rider(0)),
+        };
+        if kind == 0 {
+            env.trigger(Trigger { gain: 1500.0, slot: 1, at: pos, callback: false, voice: 0 });
+            return;
+        }
+        env.slot_hold(1, u32::MAX);
+        self.big_queued = 0;
+        for v in env.trigger(Trigger { gain: 1500.0, slot: 1, at: pos, callback: true, voice: 0 }) {
+            self.queue_big_score(env, v);
+        }
+        if self.big_queued == 0 {
+            self.ring_push(0xffff_ffff);
+        }
+        self.ring_push(0xffff_fffe);
+        env.slot_hold(1, 0);
+    }
+
+    /// `Speech_CheckBigScore` 0x2356f0(score): over 999, `Speech_OnBigScore`(none, score, 1)
+    pub fn check_big_score(&mut self, env: &mut dyn SpeechEnv, score: i64) {
+        if 999 < score {
+            self.on_big_score(env, None, score, 1);
+        }
+    }
+
+    /// `Speech_OnRaceGo` 0x2334b0: roll 5, not the tutorial, no replay: 0x100204a with the mode's bits, the
+    /// course's bit and the mode's kind, then 0x1002020 (a start line with bit 2) or 0x100201f with the line
+    pub fn on_race_go(&self, env: &mut dyn SpeechEnv, career: &crate::career::Career) {
+        if !(self.roll(env, 5) && env.mode() != 6 && !env.replay_playing()) {
+            return;
+        }
+        let mode = env.mode();
+        let (m, k) = match mode {
+            2 | 7 => (2, 1),
+            3 => (2, 2),
+            4 => (4, 1),
+            5 => (4, 2),
+            _ => (0, 0),
+        };
+        let m = m | 1;
+        let course = env.course();
+        let c = match course {
+            0 => 0x400,
+            1 => 1,
+            2 => 2,
+            3 => 4,
+            4 => 8,
+            5 => 0x20,
+            6 => 0x40,
+            7 => 0x80,
+            8 => 0x10,
+            0xb => 0x800,
+            _ => 0,
+        };
+        let line = race_go_line(career.event_mode() as i32, course as i32, mode as i32 as i64);
+        env.post(Event::new(0x100204a, &[m, c, k]));
+        if line & 2 == 0 {
+            env.post(Event::new(0x100201f, &[m, k, line]));
+        } else {
+            env.post(Event::new(0x1002020, &[m, c, k]));
+        }
+    }
+
+    /// `Speech_OnScoreMessage` 0x233220(rider, message, kind): the listener, a player, not the tutorial or mode 1,
+    /// no replay, roll 3: messages 4, 0xb, 0x10 (and 0xc with kind 2, 3, 5) post 0x100204e with their bit; 0xe and
+    /// 0xf post 0x1002031 with the kind's (1 → 1, 2 → 2, 3 → 4, 0 → 0, else 8)
+    pub fn on_score_message(&self, env: &mut dyn SpeechEnv, r: Option<&SpeechRider>, message: i64, kind: i64) {
+        let Some(r) = r else { return };
+        if !r.player() {
+            return;
+        }
+        let mode = env.mode();
+        if mode == 6 || mode == 1 || r.id != env.listener() || env.replay_playing() || !self.roll(env, 3) {
+            return;
+        }
+        let bit = match message {
+            4 => 0x40,
+            0xb => 4,
+            0xc => match kind {
+                3 => 0x10,
+                2 => 8,
+                5 => 0x20,
+                _ => 0,
+            },
+            0x10 => 1,
+            _ => 0,
+        };
+        if bit != 0 {
+            env.post(Event::new(0x100204e, &[bit]));
+        }
+        if 1 < (message as i32).wrapping_sub(0xe) as u32 {
+            return;
+        }
+        let v = match kind {
+            1 | 2 => kind as u32,
+            0 => 0,
+            3 => 4,
+            _ => 8,
+        };
+        env.post(Event::new(0x1002031, &[v]));
+    }
+
+    /// `Speech_OnNextRace` 0x231ff8(career): slot 0 serviced; for a single profile in a race (2) or circuit race
+    /// (4): when slot 0 cannot play, 0x4008015 with 2; then 0x4008017 with how the computer riders feel about the
+    /// player's rider (above 80: two or more 4 (and 0x10 with two or more at 20 or under), none 2; at 20 or under two
+    /// or more 1, none 8) and the mode bit
+    pub fn on_next_race(&self, env: &mut dyn SpeechEnv, c: &crate::career::Career) {
+        let none = Trigger { gain: 0.0, slot: 0, at: None, callback: false, voice: 0 };
+        env.trigger(none);
+        let mode = env.mode();
+        if mode != 4 && mode != 2 {
+            return;
+        }
+        if 1 < c.count_profiles() {
+            return;
+        }
+        if !env.can_play(0) {
+            env.post(Event::new(0x4008015, &[2]));
+            env.trigger(none);
+        }
+        let mm = mode_mask(env.app_mode());
+        let me = c.r8(0x30fc) as i8;
+        let n = c.r32(0x27dc) as i32;
+        let mut mine = -1i32;
+        for i in 0..n.max(0) {
+            if c.r8(0x2845 + 0x84 * i as usize) as i8 == me {
+                mine = i;
+                break;
+            }
+        }
+        let (mut fond, mut cold) = (0, 0);
+        for i in 0..n.max(0) as usize {
+            if c.r8(0x2845 + 0x84 * i) as i8 == -1 {
+                let at = (0x27dc + 0x24 + 0x84 * i as isize + 4 * mine as isize) as usize;
+                let v = c.r8(at) as i8 as i32 as f32;
+                if 80.0 < v {
+                    fond += 1;
+                } else if v <= 20.0 {
+                    cold += 1;
+                }
+            }
+        }
+        let mut v = 0;
+        if fond < 2 {
+            if fond == 0 {
+                v = 2;
+            }
+        } else {
+            v = if 1 < cold { 0x10 } else { 0 } | 4;
+        }
+        if cold < 2 {
+            if cold == 0 {
+                v |= 8;
+            }
+        } else {
+            v |= 1;
+        }
+        env.post(Event::new(0x4008017, &[v, mm]));
+        env.trigger(none);
     }
 }

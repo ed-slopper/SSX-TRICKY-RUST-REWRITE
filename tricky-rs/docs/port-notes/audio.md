@@ -108,10 +108,23 @@ by voice 0..11 a bit of 0xfff, 0 past them) and call `SpeechSys_Trigger` at the 
   a listener is near) 0x3006023 / 0x3006024 by a `Rand_Fx` bit; two riders hitting each other pick a speaker (a draw
   when both are near), the mask from `Speech_IsRivalOrGrudge` (relation 2, or 0..1 with a rival target or an attitude
   above 60) and which hit; taunts need both near the same listener; air nearby needs three seconds of air.
-- Checked in the runner: each post four times with random arguments; 60,000 random calls over 27 handlers and
-  helpers with the speech library, replay, listener, near test, relations and `Rand_Fx` scripted the same: every call
-  and draw in order and the checkpoint counts compared. Still to port: `Speech_AnnounceTrick`, `Speech_OnPlacingChange`,
-  the race-go / race-end / next-race / score / cue / lesson / cam-script lines.
+- The start (`Speech_OnRaceGo` 0x2334b0, roll 5): 0x100204a with the mode's bits (race 2|1, show-off 2|1 kind 2,
+  circuit 4|1 kind 1 / 2), the course's bit and the kind; then the start line (`Speech_PickRaceGoLine`: by mode, the
+  career's event mode for the circuit race, Pipedream / Mercury for the show-off) as 0x1002020 when it has bit 2,
+  else 0x100201f. Score messages (`Speech_OnScoreMessage`, roll 3, the listener, not mode 1 or 6) post 0x100204e and,
+  for messages 0xe / 0xf, 0x1002031. The next race (`Speech_OnNextRace`, one profile in mode 2 or 4) posts 0x4008017
+  with how the computer riders' attitudes to the player's rider split (above 80, 20 or under) and the gApp+0x58 bit.
+- Big scores (`Speech_OnBigScore` 0x235ba8, 1000 or more): 0x500a000 with the score, spoken at gain 1500 at the rider
+  (race rider 0 when none); slot 1 held (+0x34c) while the library may call back `Speech_QueueBigScore` with values for
+  the speech system's ring (+0x7dd4: size, buffer, write, read; a push is dropped when full), else −1 is queued; then
+  −2. `Speech_CheckBigScore` passes scores over 999.
+- The masks: `Speech_CourseMask` / `Speech_CharMaskOf` (12 bits, 0 / 0x2000 past 11), `Speech_CurrentCourseMask`
+  (the course word, a different order), `Speech_GetModeMask` (gApp+0x58).
+- Checked in the runner: each post four times with random arguments; 60,000 random calls over 37 handlers and
+  helpers with the speech library, replay, listener, near test, relations, the race's rider 0, the library's
+  callbacks and `Rand_Fx` scripted the same: every call and draw in order, the checkpoint counts and the big-score
+  ring compared. Still to port: `Speech_AnnounceTrick`, `Speech_OnPlacingChange`, the race-end, high-score, cue,
+  lesson and cam-script lines.
 
 ## Front-end sounds (`cFE3DSound` → `Audio_PlayFE*`, F1c)
 

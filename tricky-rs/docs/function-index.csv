@@ -3892,7 +3892,7 @@ address,size,name,system,status
 0x228ac0,40,Speech_LoadEventsForSlot,audio?,not started
 0x228ae8,156,FUN_00228ae8,audio?,not started
 0x228b88,48,FUN_00228b88,audio?,not started
-0x228bb0,48,FUN_00228bb0,audio?,not started
+0x228bb0,48,FUN_00228bb0,audio?,ported
 0x228bd8,168,SpeechSys_Trigger,audio?,ported
 0x228c80,144,FUN_00228c80,frontend?,not started
 0x228d10,188,SpeechSys_ClearEvent,frontend?,not started
@@ -4092,10 +4092,10 @@ address,size,name,system,status
 0x230610,76,SpeechEvt_Post4008015,race?,checked
 0x230660,92,SpeechEvt_Post4008016,race?,checked
 0x2306c0,96,SpeechEvt_Post4008017,race?,checked
-0x2307f0,140,Speech_CourseMask,race?,not started
-0x230880,140,Speech_CharMaskOf,race?,not started
-0x230910,132,Speech_CurrentCourseMask,race?,not started
-0x2309a8,88,Speech_GetModeMask,common?,not started
+0x2307f0,140,Speech_CourseMask,race?,checked
+0x230880,140,Speech_CharMaskOf,race?,checked
+0x230910,132,Speech_CurrentCourseMask,race?,checked
+0x2309a8,88,Speech_GetModeMask,common?,checked
 0x230a00,884,Speech_LoadNarration,audio?,not started
 0x230d78,84,Speech_FreeNarration,audio?,not started
 0x230dd0,268,Speech_QueueCamScriptLine,race?,not started
@@ -4111,15 +4111,15 @@ address,size,name,system,status
 0x231800,752,Speech_QueuePlaceLine,audio?,not started
 0x231af8,344,Speech_QueueMedalLine,race?,not started
 0x231c50,936,Speech_QueueRaceEndLines,race?,not started
-0x231ff8,584,Speech_OnNextRace,frontend?,not started
+0x231ff8,584,Speech_OnNextRace,frontend?,checked
 0x232240,240,Speech_OnHiScore,race?,not started
 0x232330,356,Speech_QueueUnlockLines,race?,not started
 0x232498,3232,Speech_AnnounceTrick,audio?,not started
-0x233138,232,Speech_PickRaceGoLine,audio?,not started
-0x233220,444,Speech_OnScoreMessage,audio?,not started
+0x233138,232,Speech_PickRaceGoLine,audio?,checked
+0x233220,444,Speech_OnScoreMessage,audio?,checked
 0x2333e0,100,Speech_OnTrickLanded,audio?,checked
 0x233448,100,Speech_OnAirTime,audio?,checked
-0x2334b0,520,Speech_OnRaceGo,audio?,not started
+0x2334b0,520,Speech_OnRaceGo,audio?,checked
 0x2336b8,132,Speech_OnGrudge,audio?,checked
 0x233740,136,FUN_00233740,audio?,checked
 0x2337c8,144,Speech_OnTricky,audio?,checked
@@ -4152,15 +4152,15 @@ address,size,name,system,status
 0x235298,252,Speech_Celebrate,audio?,checked
 0x235398,204,Speech_OnStumble,audio?,checked
 0x235468,192,Speech_Disappointed,audio?,checked
-0x235530,152,Speech_QueueBigScore,audio?,not started
+0x235530,152,Speech_QueueBigScore,audio?,checked
 0x2355c8,216,Speech_InitCharScriptSamples,audio?,not started
 0x2356a0,76,Speech_FreeCharScriptSamples,audio?,not started
-0x2356f0,32,Speech_CheckBigScore,audio?,not started
+0x2356f0,32,Speech_CheckBigScore,audio?,checked
 0x235710,104,SpeechSys_IsCharScriptReady,audio?,not started
 0x235778,8,FUN_00235778,audio?,not started
 0x235780,1008,Sfx_PlayClipSound,audio,not started
 0x235b70,56,SpeechSys_StopCharScript,frontend?,not started
-0x235ba8,432,Speech_OnBigScore,audio?,not started
+0x235ba8,432,Speech_OnBigScore,audio?,checked
 0x235d58,112,Speech_RollChance,audio?,checked
 0x235e70,88,FUN_00235e70,render?,not started
 0x235fc8,52,CollBody_Construct,wipeout,not started
