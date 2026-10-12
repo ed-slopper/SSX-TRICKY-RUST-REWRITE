@@ -77,3 +77,4 @@ pub mod texanim;
 pub mod trickdata;
 pub mod racemisc;
 pub mod results;
+pub mod camera;
