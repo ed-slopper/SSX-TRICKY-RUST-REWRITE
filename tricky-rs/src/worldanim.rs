@@ -68,7 +68,9 @@ pub struct WorldAnim {
     /// objects with a controller that keeps their touch script from running (ticks; -1 for good)
     busy: HashMap<usize, i32>,
     threads: Vec<Thread>, boxes: Vec<(usize, Vec3, Vec3)>,
-    started: bool, counting: bool, acc: f32, seed: u32,
+    started: bool, counting: bool, acc: f32,
+    /// the controllers in the order they were made (the game ticks them in its node list's order)
+    flip_order: Vec<usize>, crowd_order: Vec<usize>,
     cracks: HashMap<usize, Crack>, counters: HashMap<usize, Counter>, crowds: HashMap<usize, Crowd>,
     /// crowd boxes' cell entities (cell, entity) and the 16 crowd frames' materials (CROWD.SSH)
     crowd_cells: HashMap<usize, Vec<(usize, Entity)>>, crowd_mats: Option<Vec<Handle<StandardMaterial>>>,
@@ -98,10 +100,12 @@ fn flipped(level: &Level, i: usize) -> bool { level.logic.flips.contains(&i) || 
 impl WorldAnim {
     pub fn new(level: &Level) -> Self {
         let scroll_models = level.logic.scrolls.iter().filter_map(|i| level.instances.get(*i)).filter(|i| i.model_id >= 0).map(|i| i.model_id as usize).collect();
-        Self { scroll_models, seed: 0x2545_F491, ..default() }
+        Self { scroll_models, ..default() }
     }
-    fn next(&mut self) -> u32 { self.seed ^= self.seed << 13; self.seed ^= self.seed >> 17; self.seed ^= self.seed << 5; self.seed }
-    fn rand(&mut self) -> f32 { (self.next() >> 8) as f32 / 16_777_216.0 }
+    /// `Rand_Fx` 0x23d4a8: every world animation draws from the game's one effects stream.
+    fn next(&mut self) -> u32 { tricky_game::rand::rand_fx() }
+    /// A draw as the game turns it into a float: [0, 1) from the low 23 bits.
+    fn rand(&mut self) -> f32 { tricky_game::rand::Rand::unit(self.next()) }
     pub fn summary(&self) -> String {
         format!("world animations: {} materials, {} scrolling models, {} flags, {} crowd boxes", self.mats.len(), self.scroll_models.len(), self.flags.len(), self.crowd_cells.len())
     }
@@ -258,19 +262,23 @@ impl WorldAnim {
                 // cTexFlipNode ctor 0x142e90: a start frame < 0 is random (ceil(8 r))
                 let Some(count) = level.instances.get(i).and_then(|x| flipbook(level, x.model_id.max(0) as usize)).map(|f| f.len() as i32) else { return };
                 let frame = if d.start < 0 { (self.rand() * 8.0).ceil() as i32 } else { d.start }.min(count - 1);
-                self.flips.insert(i, Flip { def: d, frame, acc: 0.0, rate: d.speed * TICK, base: d.speed * TICK, state: d.mode, life: (d.life * 60.0) as i32, count });
+                if self.flips.insert(i, Flip { def: d, frame, acc: 0.0, rate: d.speed * TICK, base: d.speed * TICK, state: d.mode, life: (d.life * 60.0) as i32, count }).is_none() { self.flip_order.push(i); }
             }
             WOp::Scroll(d) => if let Some(x) = level.instances.get(i).filter(|x| x.model_id >= 0) {
                 self.scrolls.entry(x.model_id as usize).or_insert(Scroll { def: d, d: Vec2::new(d.du, d.dv), uv: Vec2::ZERO, tau: 0.0, running: true, life: (d.life * 60.0) as i32 });
             },
             WOp::Flag(d) => {
-                let r = (self.rand(), self.rand(), self.rand());
+                // cFlagNode::Init 0x144938: the draws in this order: the amplitude (if -1), the rate (if -1),
+                // then the phase (always)
+                let amp = if d.amp == -1.0 { Some(self.rand()) } else { None };
+                let rate = if d.rate == -1.0 { Some(self.rand()) } else { None };
+                let phase = self.rand();
                 if let Some(f) = self.flags.iter_mut().find(|f| f.inst == i) {
                     // -1: random rate 0.5..2 waves a second, amplitude 5..50 cm; a random phase
                     f.active = true;
-                    f.rate = if d.rate == -1.0 { 0.5 + 1.5 * r.0 } else { d.rate } * TICK;
-                    if d.amp == -1.0 { f.amp = 5.0 + 45.0 * r.1; }
-                    f.phase = r.2;
+                    f.rate = rate.map_or(d.rate, |r| 0.5 + 1.5 * r) * TICK;
+                    if let Some(r) = amp { f.amp = 5.0 + 45.0 * r; }
+                    f.phase = phase;
                     f.life = (d.life * 60.0) as i32;
                 }
             }
@@ -278,7 +286,9 @@ impl WorldAnim {
             // with -1: the cracked texture), counts the touch that made it as an impact
             WOp::Crack(d) => if !self.cracks.contains_key(&i) {
                 let n = level.instances.get(i).and_then(|x| flipbook(level, x.model_id.max(0) as usize)).map_or(1, |f| f.len() as i32);
-                let frame = if n > 1 { ((self.rand() * (n - 1) as f32).ceil() as i32).max(1) } else { 0 };
+                // TexFlip_SetFrame 0x142c80 with -1: from three frames up one is drawn, ceil((n - 1) u + 1); fewer show
+                // frame 1; never past the last
+                let frame = if n > 2 { (((n - 1) as f32 * self.rand() + 1.0).ceil() as i32).min(n - 1) } else { 1.min(n - 1).max(0) };
                 let mut c = Crack { life: (d.life * 60.0) as i32, cool: 30, health: d.health, frame, fired: false };
                 c.impact(self.impact);
                 self.cracks.insert(i, c);
@@ -290,6 +300,7 @@ impl WorldAnim {
                 for k in 0..16 { c.phase[k] = (self.next() & 15) as i32; c.anim[k] = (self.next() & 3) as usize; }
                 self.step_crowd(&mut c);
                 self.crowds.insert(i, c);
+                self.crowd_order.push(i);
             },
             WOp::Delta(_) => for o in anims.0.iter_mut().filter(|o| o.inst == i && o.budget.is_some()) {
                 o.budget = Some(0.0);
@@ -342,6 +353,8 @@ impl WorldAnim {
     /// start (AnimDelta clips wait for their script again).
     pub fn reset_run(&mut self, anims: &mut AnimObjects, delta: &HashMap<usize, crate::logic::AnimDef>) {
         self.flips.clear();
+        self.flip_order.clear();
+        self.crowd_order.clear();
         self.scrolls.clear();
         self.cracks.clear();
         self.counters.clear();
@@ -370,27 +383,31 @@ impl WorldAnim {
     /// `cCrowdBoxNode::vf1` 0x145c88).
     fn tick(&mut self) {
         let mut dead = Vec::new();
-        let mut r = Vec::new();
-        for _ in 0..self.flips.len() { r.push(self.rand()); }
-        for ((&i, f), r) in self.flips.iter_mut().zip(r) {
-            if f.life > 0 { f.life -= 1; if f.life == 0 { dead.push(i); continue; } }
-            if f.rate <= 0.0 { continue; }
-            f.acc += f.rate;
-            if f.acc < 1.0 { continue; }
-            f.acc -= 1.0;
-            match f.state {
-                0 => {
-                    if f.def.start == -2 && f.count > 1 { f.frame = (r * (f.count - 1) as f32).ceil() as i32; }
-                    else if !f.def.back { f.frame += 1; if f.frame >= f.count { f.frame = 0; } }
-                    else { f.frame -= 1; if f.frame < 0 { f.frame = f.count - 1; } }
+        // each flip ticks in the order it was made; it draws only where the game's update does (0x143100):
+        // a random step (start frame -2) and the blink's off-time
+        for i in self.flip_order.clone() {
+            let Some(mut f) = self.flips.remove(&i) else { continue };
+            'tick: {
+                if f.life > 0 { f.life -= 1; if f.life == 0 { dead.push(i); break 'tick; } }
+                if f.rate <= 0.0 { break 'tick; }
+                f.acc += f.rate;
+                if f.acc < 1.0 { break 'tick; }
+                f.acc -= 1.0;
+                match f.state {
+                    0 => {
+                        if f.def.start == -2 && f.count > 1 { f.frame = (((f.count - 1) as f32 * self.rand()).ceil() as i32).min(f.count - 1); }
+                        else if !f.def.back { f.frame += 1; if f.frame >= f.count { f.frame = 0; } }
+                        else { f.frame -= 1; if f.frame < 0 { f.frame = f.count - 1; } }
+                    }
+                    // blink: the next frame for 6 ticks, then on for 60 / (Speed (0.25 + 0.75 r)) ticks
+                    1 => { f.state = 2; f.frame += 1; f.rate = 1.0 / 6.0; if f.frame >= f.count { f.frame = 0; } }
+                    2 => { let r = self.rand(); f.state = 1; f.frame += 1; f.rate = f.base * (0.25 + 0.75 * r); if f.frame >= f.count { f.frame = 0; } }
+                    _ => {}
                 }
-                // blink: the next frame for 6 ticks, then on for 60 / (Speed (0.25 + 0.75 r)) ticks
-                1 => { f.state = 2; f.frame += 1; f.rate = 1.0 / 6.0; if f.frame >= f.count { f.frame = 0; } }
-                2 => { f.state = 1; f.frame += 1; f.rate = f.base * (0.25 + 0.75 * r); if f.frame >= f.count { f.frame = 0; } }
-                _ => {}
             }
+            self.flips.insert(i, f);
         }
-        for i in dead { self.flips.remove(&i); }
+        for i in dead { self.flips.remove(&i); self.flip_order.retain(|k| *k != i); }
         self.scrolls.retain(|_, s| {
             if s.life > 0 { s.life -= 1; if s.life == 0 { return false; } }
             let (run, pause) = (s.def.run, s.def.pause);
@@ -429,7 +446,7 @@ impl WorldAnim {
         // cCrowdBoxNode update 0x145c88: every 5 frames
         if self.ticks.is_multiple_of(5) {
             let mut crowds = std::mem::take(&mut self.crowds);
-            for c in crowds.values_mut() { self.step_crowd(c); }
+            for i in self.crowd_order.clone() { if let Some(c) = crowds.get_mut(&i) { self.step_crowd(c); } }
             self.crowds = crowds;
         }
         self.ticks = self.ticks.wrapping_add(1);
@@ -634,7 +651,7 @@ pub fn world_anim(
                 wa.broken.insert(i);
             }
         }
-        for (n, k) in thrown.into_iter().enumerate() { if let Some(p) = props.get_mut(k) { p.throw(vel, n); } }
+        crate::props::throw_all(props, &thrown.into_iter().map(|k| (k, vel)).collect::<Vec<_>>());
         let back: Vec<usize> = wa.broken.iter().copied().filter(|i| props.iter().any(|p| p.inst == *i && !p.hidden)).collect();
         for i in back { wa.broken.remove(&i); wa.cracks.remove(&i); wa.busy.remove(&i); }
     } else {

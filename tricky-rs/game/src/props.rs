@@ -58,16 +58,50 @@ pub struct Prop {
     t: f32,
     life: f32,
     pub mass: f32,
-    seed: u32,
     /// knocked or broken by a rider this frame, at this speed (m/s): for its collision sound
     pub knock: Option<f32>,
+}
+
+/// One piece's random numbers when a `cMeshAnimNode` starts (`FUN_00146f40` 0x146f40, all from `Rand_Fx`): the tumble's
+/// rate (2..10 rad/s) and axis (three draws of 2u − 1, normalised), then the spread: across and along (a draw u and a
+/// sign draw each: ±u) and up (u).
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct Draws { pub spin: f32, pub axis: Vec3, pub across: f32, pub along: f32, pub up: f32 }
+
+/// The draws for `n` pieces in the game's order: the first loop over all the pieces (rate, axis x, y, z), then the
+/// second loop (across, its sign, along, its sign, up): 9 draws a piece.
+pub fn debris_draws(n: usize) -> Vec<Draws> {
+    use crate::rand::Rand;
+    let mut s = crate::rand::streams();
+    let mut first = Vec::with_capacity(n);
+    for _ in 0..n {
+        let spin = Rand::unit(s.fx()) * 8.0 + 2.0;
+        let (x, y, z) = (Rand::unit(s.fx()), Rand::unit(s.fx()), Rand::unit(s.fx()));
+        first.push((spin, Vec3::new(x + x - 1.0, y + y - 1.0, z + z - 1.0)));
+    }
+    first.into_iter().map(|(spin, axis)| {
+        let a = Rand::unit(s.fx());
+        let a = if s.fx() & 1 != 0 { -a } else { a };
+        let b = Rand::unit(s.fx());
+        let b = if s.fx() & 1 != 0 { -b } else { b };
+        let up = Rand::unit(s.fx());
+        Draws { spin, axis, across: a, along: b, up }
+    }).collect()
+}
+
+/// Pieces set loose together (one owner's, normally): each with the rider's velocity it was broken at.
+pub fn throw_all(props: &mut [Prop], thrown: &[(usize, Vec3)]) {
+    let draws = debris_draws(thrown.len());
+    for (&(i, vel), d) in thrown.iter().zip(draws) {
+        if let Some(p) = props.get_mut(i) { p.throw(vel, d); }
+    }
 }
 
 impl Prop {
     pub fn new(pos: Vec3, rot: Quat, centre: Vec3, radius: f32) -> Self {
         Self { kind: Kind::Knock, inst: usize::MAX, debris: None, stays: false, scripted: false, gravity: 5.88, hidden: false, lo: centre - Vec3::splat(radius), hi: centre + Vec3::splat(radius),
                home: (pos, rot), pos, rot, vel: Vec3::ZERO, spin: Vec3::ZERO, centre, radius: radius.clamp(0.25, 1.6), moving: false,
-               ballistic: false, t: 0.0, life: 2.0, mass: 5.0, seed: (pos.x.to_bits() ^ pos.z.to_bits()).wrapping_mul(2654435761) | 1, knock: None }
+               ballistic: false, t: 0.0, life: 2.0, mass: 5.0, knock: None }
     }
     pub fn with_box(kind: Kind, pos: Vec3, rot: Quat, lo: Vec3, hi: Vec3) -> Self {
         let size = hi - lo;
@@ -112,33 +146,32 @@ impl Prop {
         }
         Some(pieces.clone())
     }
-    /// A broken piece set loose by a rider going through its owner.
-    pub fn throw(&mut self, rider_vel: Vec3, seed: usize) {
+    /// A broken piece set loose by a rider going through its owner. `d` is the piece's share of the node's draws
+    /// ([`debris_draws`]).
+    fn throw(&mut self, rider_vel: Vec3, d: Draws) {
         if self.kind != Kind::Piece { return; }
         self.hidden = false;
-        // cMeshAnimNode: half the rider's velocity plus a random spread (2 m/s each way across,
-        // up to 4 m/s up), a random tumble, a light pull down; gone after two seconds
-        self.seed ^= (seed as u32).wrapping_mul(0x9E37_79B9) | 1;
         match self.debris {
-            Some(d) => {
+            Some(deb) => {
                 // cMeshAnimNode: the script's velocity (or the rider's) times its multiplier, a random
                 // spread (either way across, up only), its own gravity and life
-                let base = if d.base.iter().all(|v| *v == 0.0) { rider_vel } else { Vec3::new(d.base[0], d.base[2], -d.base[1]) * 0.01 };
-                self.launch_ballistic(base * d.mult);
-                let (a, b, c) = (self.rnd() * 2.0 - 1.0, self.rnd() * 2.0 - 1.0, self.rnd());
-                self.vel = base * d.mult + Vec3::new(a * d.spread[0], c * d.spread[2], -b * d.spread[1]) * 0.01;
-                self.gravity = d.gravity * 9.8;
-                if d.life > 0.0 { self.life = d.life; }
+                let base = if deb.base.iter().all(|v| *v == 0.0) { rider_vel } else { Vec3::new(deb.base[0], deb.base[2], -deb.base[1]) * 0.01 };
+                self.launch_ballistic(base * deb.mult, d);
+                self.vel = base * deb.mult + Vec3::new(d.across * deb.spread[0], d.up * deb.spread[2], -d.along * deb.spread[1]) * 0.01;
+                self.gravity = deb.gravity * 9.8;
+                if deb.life > 0.0 { self.life = deb.life; }
             }
-            None => self.launch_ballistic(rider_vel * 0.5),
+            None => self.launch_ballistic(rider_vel * 0.5, d),
         }
     }
-    fn rnd(&mut self) -> f32 { self.seed ^= self.seed << 13; self.seed ^= self.seed >> 17; self.seed ^= self.seed << 5; (self.seed % 10000) as f32 / 10000.0 }
-    fn launch_ballistic(&mut self, base: Vec3) {
-        let (a, b, c) = (self.rnd() * 2.0 - 1.0, self.rnd() * 2.0 - 1.0, self.rnd());
-        self.vel = base + Vec3::new(a * 2.0, c * 4.0, b * 2.0);
-        let axis = Vec3::new(self.rnd() - 0.5, self.rnd() - 0.5, self.rnd() - 0.5).normalize_or(Vec3::X);
-        self.spin = axis * (2.0 + 8.0 * self.rnd());
+    /// A path marker's pieces fly off: the same start as a cMeshAnimNode's, for one piece.
+    fn fly_alone(&mut self, base: Vec3) {
+        let d = debris_draws(1)[0];
+        self.launch_ballistic(base, d);
+    }
+    fn launch_ballistic(&mut self, base: Vec3, d: Draws) {
+        self.vel = base + Vec3::new(d.across * 2.0, d.up * 4.0, d.along * 2.0);
+        self.spin = d.axis.normalize_or(Vec3::X) * d.spin;
         self.ballistic = true;
         self.moving = true;
         self.t = 0.0;
@@ -161,7 +194,7 @@ impl Prop {
         let dir = r.vel.normalize_or(n);
         if self.ballistic || self.mass <= 0.0 {
             // a path marker: its pieces fly off and vanish; the rider stumbles (mass 0)
-            self.launch_ballistic(dir * 0.5 * s);
+            self.fly_alone(dir * 0.5 * s);
             r.stumble_by(false);
         } else {
             // cRollerNode_LaunchFromHit: half the approach speed along the rider's heading and a
@@ -343,5 +376,42 @@ impl Tube {
             r.tube_class = u8::MAX;
         }
         false
+    }
+}
+
+#[cfg(test)]
+mod draw_tests {
+    //! Row E1b2b: a broken piece's tumble and spread are `Rand_Fx` draws in the order of `FUN_00146f40` 0x146f40.
+    use super::*;
+    use crate::rand::{streams, Rand};
+    use std::sync::Mutex;
+
+    /// the test below shares the global effects stream
+    static ONE_AT_A_TIME: Mutex<()> = Mutex::new(());
+
+    #[test]
+    fn pieces_draw_their_tumble_for_all_then_their_spread_for_all() {
+        let _g = ONE_AT_A_TIME.lock().unwrap_or_else(|e| e.into_inner());
+        let seed = 0x5eed_0b2b;
+        let mut want = Rand::seeded(seed);
+        let mut d = || want.draw();
+        // two pieces: rate, axis x, y, z for the first, then the same for the second; then across, its sign, along, its sign,
+        // up for the first, and the same for the second
+        let first: Vec<u32> = (0..8).map(|_| d()).collect();
+        let second: Vec<u32> = (0..10).map(|_| d()).collect();
+        streams().seed_fx(seed);
+        let got = debris_draws(2);
+        let u = Rand::unit;
+        assert_eq!(got[0].spin, u(first[0]) * 8.0 + 2.0);
+        assert_eq!(got[1].spin, u(first[4]) * 8.0 + 2.0);
+        assert_eq!(got[0].axis, Vec3::new(u(first[1]) * 2.0 - 1.0, u(first[2]) * 2.0 - 1.0, u(first[3]) * 2.0 - 1.0));
+        let sign = |x: u32| if x & 1 != 0 { -1.0 } else { 1.0 };
+        assert_eq!(got[0].across, u(second[0]) * sign(second[1]));
+        assert_eq!(got[0].along, u(second[2]) * sign(second[3]));
+        assert_eq!(got[0].up, u(second[4]));
+        assert_eq!(got[1].across, u(second[5]) * sign(second[6]));
+        assert_eq!(got[1].up, u(second[9]));
+        // nine draws a piece and none more
+        assert_eq!(streams().fx(), d());
     }
 }

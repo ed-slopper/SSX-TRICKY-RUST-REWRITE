@@ -328,7 +328,7 @@ fn main() {
             r2.step(&loaded.world, &loaded.rails, Input { tuck: true, ..Input::default() }, dt);
             let mut thrown = Vec::new();
             for p in props.iter_mut() { if let Some(list) = p.touched_by(&mut r2) { thrown.extend(list); if broke.is_none() { broke = Some((t2, r2.vel.length())); } } p.step(&loaded.world, dt); }
-            for (n, i) in thrown.into_iter().enumerate() { props[i].throw(r2.vel, n); }
+            props::throw_all(&mut props, &thrown.iter().map(|&i| (i, r2.vel)).collect::<Vec<_>>());
             t2 += dt;
         }
         println!("glass: {} ; pane hidden {}, pieces shown {} and moved {:.1} m / {:.1} m, pickup taken {}, rider multiplier x{}",
@@ -640,6 +640,18 @@ struct AnimInst { def: logic::AnimDef, model: usize, len: f32, t: f32, dir: f32,
 #[derive(Resource, Default)]
 struct AnimObjects(Vec<AnimInst>);
 
+/// A keyframed object's clock as `cAnimObjectNode` 0x198810 builds it: the clip's length and start (seconds; the
+/// files count 30 a second), the time it starts at (a random one between start and end when asked, a `Rand_Game`
+/// draw) and its rate (the speed, or the speed ± a jitter of the same unit: a second draw), per 60 Hz tick.
+fn anim_clock(def: &logic::AnimDef, model_end: f32) -> (f32, f32, f32) {
+    let len = if def.end < 0.0 { model_end } else { def.end } / 30.0;
+    let start = def.start.max(0.0) / 30.0;
+    let mut g = tricky_game::rand::streams();
+    let t = if def.random_start { g.game_range(start, len) } else if def.reverse { len } else { start };
+    let rate = if def.rate2 == 0.0 { def.rate / 30.0 } else { g.game_jitter(def.rate / 30.0, def.rate2 / 30.0) };
+    (len, t, rate)
+}
+
 fn spawn_animated(
     commands: &mut Commands, level: &Level,
     meshes: &mut Assets<Mesh>, images: &mut Assets<Image>, materials: &mut Assets<StandardMaterial>, props: &Props,
@@ -649,8 +661,13 @@ fn spawn_animated(
     let mut mats: HashMap<String, Handle<StandardMaterial>> = HashMap::new();
     let basis = Quat::from_rotation_x(-std::f32::consts::FRAC_PI_2);
     let mut out = AnimObjects::default();
-    let mut seed = 0x9E37_79B9u32;
-    let mut rnd = || { seed ^= seed << 13; seed ^= seed >> 17; seed ^= seed << 5; (seed % 10000) as f32 / 10000.0 };
+    // the clips' random starts and rate jitters are `Rand_Game` draws at the nodes' construction
+    // (`cAnimObjectNode` 0x198810), in the game's order: the start, then the rate. STANDIN: the game's stream
+    // is seeded from `DAT_0032de94` at `cGame::Init` and the nodes are built in the order the cells wake;
+    // the port draws in instance order from `GAME_INIT_SEED`, and the race init reseeds the stream after
+    // (`cAI::vf14_111108`), so the riders never see these draws, as in the game
+    let saved = tricky_game::rand::streams().game;
+    tricky_game::rand::seed_game(tricky_game::rand::GAME_INIT_SEED);
     for (i, inst) in level.instances.iter().enumerate() {
         if !inst.visable || !animated(level, i) { continue; }
         let Some(model) = set.models.get(inst.model_id as usize) else { continue };
@@ -690,10 +707,7 @@ fn spawn_animated(
             parts.push(child);
         }
         // the clock (cAnimObjectNode): frames / 30; rate in frames a second / 30
-        let len = if def.end < 0.0 { model.anim_time } else { def.end } / 30.0;
-        let start = def.start.max(0.0) / 30.0;
-        let rate = if def.rate2 != 0.0 { def.rate + (def.rate2 - def.rate) * rnd() } else { def.rate } / 30.0;
-        let t = if def.random_start { start + (len - start).max(0.0) * rnd() } else if def.reverse { len } else { start };
+        let (len, t, rate) = anim_clock(&def, model.anim_time);
         out.0.push(AnimInst { def, model: inst.model_id as usize, len, t, dir: if def.reverse { -1.0 } else { 1.0 }, rate, parts, prop: None, inst: i, budget });
     }
     // props with a keyframed part (the spinning multiplier gems) turn whole with it
@@ -702,9 +716,10 @@ fn spawn_animated(
         let Some(inst) = level.instances.get(p.inst) else { continue };
         let Some(model) = set.models.get(inst.model_id.max(0) as usize) else { continue };
         if !model.model_objects.iter().any(|o| o.animation.is_some()) { continue; }
-        let len = if def.end < 0.0 { model.anim_time } else { def.end } / 30.0;
-        out.0.push(AnimInst { def, model: inst.model_id as usize, len, t: def.start.max(0.0) / 30.0 + rnd() * len, dir: 1.0, rate: def.rate / 30.0, parts: Vec::new(), prop: Some(pi), inst: p.inst, budget: None });
+        let (len, t, rate) = anim_clock(&def, model.anim_time);
+        out.0.push(AnimInst { def, model: inst.model_id as usize, len, t, dir: 1.0, rate, parts: Vec::new(), prop: Some(pi), inst: p.inst, budget: None });
     }
+    tricky_game::rand::streams().game = saved;
     println!("keyframed objects: {}", out.0.len());
     out
 }
@@ -1944,9 +1959,7 @@ fn ride(
                 }
                 p.step(&world.0, dt);
             }
-            for (n, (i, vel)) in thrown.into_iter().enumerate() {
-                if let Some(p) = props.0.get_mut(i) { p.throw(vel, n); }
-            }
+            props::throw_all(&mut props.0, &thrown);
         }
     }
     // across the line: the heat is over

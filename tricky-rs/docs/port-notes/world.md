@@ -375,7 +375,7 @@ Part of the port notes (index: [README.md](README.md)); units and wording as des
   (`tests/rand.rs`, E1b1). The streams are globals in the game (0x345e58, 0x345e70) and so in the port
   (`rand::streams()`, `rand_game()`, `seed_game()`): every consumer draws from the same one, so the order of draws across
   riders and systems is part of the result. The port's other xorshift stand-ins (props.rs, intro.rs, the music and sound
-  pickers, the animated-object seeds) still have to switch to it (E1b2b, E1b2c).
+  pickers) still have to switch to it (E1b2c; the props, world animations and animated-object clocks are on it since E1b2b, below).
 - Race init (row E1b2a, proven): `cAI::vf15_1114d0` 0x1114d0 stores a `Rand_Fx` draw in `DAT_0032de90` (0x111520, also
   written at 0x1115d0) and `cAI::vf14_111108` 0x111108 calls `Rand_SeedGame(DAT_0032de90)` (0x1112dc; `Init` 0x17e148 does
   too, 0x17e248). STANDIN: the port seeds with `rand::RACE_SEED` at `Race::new` and `Race::restart`, having no front-end draws.
@@ -399,6 +399,33 @@ Part of the port notes (index: [README.md](README.md)); units and wording as des
   `1 - skill / 14.454015`); the grab roll (always) and, when it passes, the pick (`% 15`); then, only when the trick roll
   passed, one draw each for the spin and flip direction (bit 0 set: negated). Ported in `race::AiDriver::plan_trick`
   (tests `race::draw_tests`); the port drew the two direction bits whether or not the trick roll passed.
+
+- The world's draws (row E1b2b, read from the disassembly): every world-animation node draws from `Rand_Fx` (all of them
+  `Rand_Fx` 0x23d4a8; `get_xrefs_to`), except the keyframed objects' clocks, which are `Rand_Game`.
+  - `cTexFlipNode` ctor 0x142e90: a start frame < 0 draws once, `ceil(8u)`. `cTexFlipNode::Update` 0x143100 (the code at
+    0x14319c, 0x143214, 0x1432e0) draws only in a *random step* (start frame -2, flipbook of two or more frames:
+    `ceil((count - 1) u)`) and in the blink's off state (state 2: rate = base (0.75 u + 0.25)). State 1 and the plain
+    steps draw nothing. `cUVScrollTexFlipNode::Update` 0x1462d0 draws the same way (not ported, no node for it yet).
+  - `TexFlip_SetFrame` 0x142c80 with -1 (the cracked glass, ctor 0x145458 through `TexFlip_Init`): from three frames up
+    one draw, `ceil((n - 1) u + 1)`; one or two frames show frame 1 with no draw; never past the last frame.
+  - `cFlagNode::Init` 0x144938: the amplitude (if it is -1: `(45 u + 5) / 60`), then the rate (if -1: `(1.5 u + 0.5) / 60`),
+    then the phase (always, `u`). The port had drawn the rate first and all three every time.
+  - `cCrowdBoxNode::Init` 0x145c00: per cell (16) a phase draw `& 15` then a sequence draw `& 3`; `StepCells` 0x145e08 draws
+    one word when a cell's sequence ends (sequence = `& 3`, pause when `(r & 0xff) < table`, then `-(r & 0x3f)`).
+    `Crowd_LoadTexturesRandomize` 0x1458e0 (from `cGame::Init`, 0x17e8c0 area) draws one `& 15` per cell of every crowd box.
+  - `cMeshAnimNode` start `FUN_00146f40` 0x146f40 (broken pieces and path markers): nine draws a piece, in two loops over all
+    the pieces: first the tumble rate (`8 u + 2`) and its axis (x, y, z each `2 u - 1`, normalised), then the spread: across
+    (`u`, then a sign draw `& 1`), along (the same) and up (`u`). Ported in `props::debris_draws` / `throw_all` (test
+    `props::draw_tests`); the port had a per-piece xorshift and drew the spread twice for a scripted piece.
+  - `cAnimObjectNode` ctor 0x198810 (`Rand_Game`, `Rand_GameRange` 0x23d4f8 / `Rand_GameJitter` 0x23d560): the random start
+    first (`start + (end - start) u`, only when the script asks), then the rate (`speed ± jitter u'`, `u'` in -1..1, only
+    when the jitter word is set; the jitter is a spread around the speed, not a second speed). The port had it the other
+    way round and as a second speed. `cGame::Init` seeds `Rand_Game` from `DAT_0032de94` (0x17e1c4) before the objects are
+    built and the race init reseeds it, so the riders never see these draws.
+  - Not read or not ported yet (E1b2e): the order the nodes are made in (the port: instance order for the clocks, script-op
+    order for the controllers; the game's node list order is the order the cells wake and the scripts run), the other
+    `Rand_Fx` users in the draws list (`FUN_001d5180` 0x1d5180 (nine draws), `FUN_001d9208`, `FUN_001c8ec8`, `cGame::Init`'s
+    snow and rain draws 0x17e8c0..0x17e8e8, the emitters and the splash and spray code, which are G15 / G19).
 
 ## Course file loading (`cCourseResolve_Common` / `cCourseResolve_PS2`)
 

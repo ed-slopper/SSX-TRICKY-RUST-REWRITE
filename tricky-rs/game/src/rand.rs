@@ -129,6 +129,10 @@ impl Streams {
 /// everything the front end drew before; the port has no such history.
 pub const RACE_SEED: u32 = 0x1d2c_3b4a;
 
+/// The seed the port gives `Rand_SeedGame` for the draws made while the course's objects are built. STANDIN: the game
+/// seeds the stream from `DAT_0032de94` at `cGame::Init` 0x17e148 (0x17e3f0).
+pub const GAME_INIT_SEED: u32 = 0x5a17_e9c3;
+
 /// The game's two streams are globals (state at 0x345e58 and 0x345e70): every consumer draws from the same one, so the
 /// order of the draws across the riders and the systems is part of the result. Until a race is entered the game stream
 /// is the one `RACE_SEED` gives.
@@ -142,6 +146,11 @@ pub fn streams() -> std::sync::MutexGuard<'static, Streams> {
 /// `Rand_Game` 0x23d4d8 on the global stream.
 pub fn rand_game() -> u32 {
     streams().game()
+}
+
+/// `Rand_Fx` 0x23d4a8 on the global stream (effects, world animations, debris, crowds, front-end picks).
+pub fn rand_fx() -> u32 {
+    streams().fx()
 }
 
 /// `Rand_SeedGame` 0x23d4c8 on the global stream, as the race init does it (`cAI::vf14_111108` 0x111108, 0x1112dc).
