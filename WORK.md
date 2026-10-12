@@ -137,7 +137,7 @@ matches the original.
 | C8 | Alaska | unowned | C0, E9 | | [est] |
 | C9 | Pipedream (show-off only) | unowned | C0, E9 | | [est] |
 | C10 | Untracked (freeride) | unowned | C0, E9 | | [est] |
-| C11 | The `trick` course (find what it is used for: tutorial or practice) | unowned | C0 | | [est] |
+| C11 | The `trick` course (find what it is used for: tutorial or practice) | unowned | C0 | trailrig/heron (2026-10-11) | [est] |
 | C12 | World Circuit race: heats, advancement, medals, points, unlocks (`Circuit_*` 0x16b000–0x16d400, `Circuit_ProcessUnlocks` 0x16c420) | unowned | C0, E12 | | [repo] `ui.rs` has a stand-in |
 | C13 | World Circuit show-off: clock, checkpoints, medals | unowned | C0, E12 | | [repo] README: show-off medals "still mine" |
 | C14 | Single event, freeride and practice modes | unowned | C0, G9 | | [est] |
