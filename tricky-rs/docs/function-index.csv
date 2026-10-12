@@ -119,7 +119,7 @@ address,size,name,system,status
 0x10dca8,1252,Ragdoll_Step,wipeout,ported
 0x10e190,2616,Ragdoll_Contacts,wipeout,ported
 0x10ebc8,8,FUN_0010ebc8,wipeout?,not started
-0x10ebd0,408,FUN_0010ebd0,world?,not started
+0x10ebd0,408,Ragdoll_HitNode,wipeout,not started
 0x10ed68,1040,Ragdoll_HitRoller,wipeout,ported
 0x10f178,2088,Wipeout_StartGetUp,wipeout,ported
 0x10f9a0,740,Wipeout_PlayImpactClip,wipeout,ported
@@ -665,17 +665,17 @@ address,size,name,system,status
 0x13d630,80,cScriptNodeState::__tf,runtime,host
 0x13d680,64,cReplayRecordHeader::__tf,runtime,host
 0x13d6c0,1316,cRollerNode::cRollerNode,world,ported
-0x13dbe8,344,FUN_0013dbe8,world?,ported
-0x13dd40,424,FUN_0013dd40,world?,ported
+0x13dbe8,344,RollerNode_PushWithVelocity,world?,ported
+0x13dd40,424,RollerNode_PushFromContact,world?,ported
 0x13dee8,464,cRollerNode::cRollerNode,world,ported
 0x13e0b8,136,cRollerNode::~cRollerNode,world,not started
 0x13e140,1372,RollerNode_UpdateTransform,world?,ported
-0x13e6a0,448,FUN_0013e6a0,world?,ported
+0x13e6a0,448,RollerNode_PlaceFromBody,world?,ported
 0x13e860,72,cRollerNode::Finish,world,ported
 0x13e8a8,1156,cRollerNode::Update,world,ported
 0x13ed30,116,RollerNode_Translate,world?,ported
 0x13eda8,1412,RollerNode_Collide,world?,ported
-0x13f330,280,FUN_0013f330,world?,not started
+0x13f330,280,RollerNode_HitNode,world?,not started
 0x13f448,380,Roller_OnHit,world?,ported
 0x13f5c8,1072,Roller_CheckCollision,world?,ported
 0x13f9f8,404,cRollerNode::Draw,world,not started
@@ -743,7 +743,7 @@ address,size,name,system,status
 0x1422e0,944,cUVScrollNode::Update,world,ported
 0x142690,60,cUVScrollNode::OnContact,world,ported
 0x1426d0,232,cUVScrollNode::Draw,world,not started
-0x1427b8,396,FUN_001427b8,world?,not started
+0x1427b8,396,UVScrollNode_DrawMesh,world?,not started
 0x142948,276,cUVScrollNode::OnMessage,world,ported
 0x142a60,100,cUVScrollNode::SaveSnapshot,save,not started
 0x142ac8,36,cTexFlip::cTexFlip,render,not started
@@ -805,7 +805,7 @@ address,size,name,system,status
 0x1466b8,1876,cMeshAnimNode::cMeshAnimNode,animation,ported
 0x146e10,224,cMeshAnimNode::cMeshAnimNode,animation,ported
 0x146ef0,80,cMeshAnimNode::~cMeshAnimNode,animation,not started
-0x146f40,752,FUN_00146f40,world?,ported
+0x146f40,752,MeshAnimNode_Start,render,ported
 0x147230,620,cMeshAnimNode::Update,animation,ported
 0x1474a0,120,cMeshAnimNode::Kill,animation,ported
 0x147518,896,cMeshAnimNode::Draw,animation,not started
@@ -836,7 +836,7 @@ address,size,name,system,status
 0x148680,196,cCollideEmitterNode::cCollideEmitterNode,world,not started
 0x148748,328,CollideEmitterNode_CreateParticles,world?,not started
 0x148890,108,cCollideEmitterNode::~cCollideEmitterNode,world,not started
-0x148900,72,FUN_00148900,world?,ported
+0x148900,72,CollideEmitterNode_RiderHasRoom,world?,ported
 0x148948,156,cCollideEmitterNode::Update,world,not started
 0x1489e8,8,cCollideEmitterNode::Draw,world,not started
 0x1489f0,128,cCollideEmitterNode::SaveSnapshot,save,not started
@@ -924,14 +924,14 @@ address,size,name,system,status
 0x14b5a8,140,LessonMan_Reset,game?,ported
 0x14b638,300,LessonMan_EndAttempt,game?,ported
 0x14b768,96,Lesson_SetupRider,game?,ported
-0x14b7c8,224,FUN_0014b7c8,boarder?,not started
-0x14b8a8,172,FUN_0014b8a8,boarder?,not started
-0x14b958,92,FUN_0014b958,boarder?,not started
+0x14b7c8,224,FUN_0014b7c8,boarder?,ported
+0x14b8a8,172,FUN_0014b8a8,boarder?,ported
+0x14b958,92,FUN_0014b958,boarder?,ported
 0x14b9b8,240,cLessonMan::vf1_14b9b8,tutorial,ported
 0x14baa8,92,LessonMan_SetState,game?,ported
 0x14bb08,220,FUN_0014bb08,tutorial?,ported
 0x14bbe8,428,cLessonMan::vf2_14bbe8,tutorial,not started
-0x14bd98,764,FUN_0014bd98,game?,not started
+0x14bd98,764,LessonOverlay_DrawButtons,frontend,not started
 0x14c098,528,LessonOverlay_DrawPage,frontend,not started
 0x14c2a8,12,FUN_0014c2a8,scoring?,not started
 0x14c2c0,8,FUN_0014c2c0,frontend?,not started
@@ -958,8 +958,8 @@ address,size,name,system,status
 0x14dc38,76,cLessonStartHandler::Update,game,not started
 0x14dc88,56,cLessonWaitHandler::Enter,game,not started
 0x14dcc0,1144,cLessonWaitHandler::Update,game,ported
-0x14e138,312,cLessonPreviewHandler::Enter,game,not started
-0x14e270,60,cLessonPreviewHandler::Update,game,not started
+0x14e138,312,cLessonPreviewHandler::Enter,game,ported
+0x14e270,60,cLessonPreviewHandler::Update,game,ported
 0x14e2b0,44,cLessonPreviewHandler::Exit,game,not started
 0x14e2e0,164,cLessonPreviewEndHandler::Enter,game,not started
 0x14e388,460,cLessonPreviewEndHandler::Update,game,not started
@@ -3302,10 +3302,10 @@ address,size,name,system,status
 0x200270,116,cVideoStreamMan::vf2_200270,video,not started
 0x2002e8,20,VideoStreamMan_IsFinished,frontend?,not started
 0x200300,80,cVideoStreamMan::__tf,runtime,host
-0x200390,748,FUN_00200390,world?,not started
+0x200390,748,Instance_DrawVisibleCells,world,not started
 0x200680,100,Instance_Draw,world,not started
 0x2006e8,524,LensFX_Draw,world?,not started
-0x2008f8,1820,FUN_002008f8,world?,not started
+0x2008f8,1820,Patch_DrawVisibleCells,world?,not started
 0x201018,124,StaticInit_Instance,other,not started
 0x201098,44,FUN_00201098,,not started
 0x2010c8,80,BdrLoad_LoadRider,render?,not started
@@ -4178,7 +4178,7 @@ address,size,name,system,status
 0x236a00,440,CollBody_OverlapSpheres,wipeout,ported
 0x236bb8,2240,Collide_SphereTriangle,world?,ported
 0x237480,2252,Collide_SphereTriangleFront,world?,ported
-0x237d50,2284,FUN_00237d50,world?,ported
+0x237d50,2284,Collide_SphereTriangleTwoSided,world?,ported
 0x238640,408,Collide_BoarderBox,world?,ported
 0x238980,256,FUN_00238980,,not started
 0x238a80,44,FUN_00238a80,,not started

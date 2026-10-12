@@ -115,7 +115,7 @@ Part of the port notes (index: [README.md](README.md)); units and wording as des
   normal · that > 0.8 (floors, for the walls). Front faces only when +0x2f0 is set (the object query sets it).
 - A hit's t is its depth: the test gives a penetration vector, t = |v| and the normal v·(1/t); the point is where
   the sphere meets the plane.
-- `Collide_SphereTriangle` 0x236bb8 (and its front-only 0x237480: 0 ≤ d; either-side 0x237d50: the normal turned
+- `Collide_SphereTriangle` 0x236bb8 (and its front-only 0x237480: 0 ≤ d; either-side `Collide_SphereTriangleTwoSided` 0x237d50: the normal turned
   to the sphere): the bounding sphere's distance d to the plane within its radius, its foot inside the triangle
   (`Tri_ContainsPointVu0`) or, when the centre is at least r from a, an edge (ab, ac, bc as segments) within r.
   Without a mask the penetration is n·(r − d); with one, each named sphere (d below its radius and the best) the
@@ -143,7 +143,7 @@ Part of the port notes (index: [README.md](README.md)); units and wording as des
 
 ## The rollers' shape (row E7a5; `sphtree::WorldSphTree`, checked: `tests/sphtree_shape.rs`)
 
-- `cWorldSphTree` (vtable 0x3a85f8; `RollerNode_Collide` and 0x13f330 make them): kind 0 (coarse patch quads, target
+- `cWorldSphTree` (vtable 0x3a85f8; `RollerNode_Collide` and `RollerNode_HitNode` 0x13f330 make them): kind 0 (coarse patch quads, target
   -1), box the tree's centre +- its top radius, the tree in use at +0x50 (a copy put through a frame at +0x60,
   `SphTree_Transform` 0x239f88: the directions and centre as they are now).
 - Triangle (`SphTree_IntersectTriangle` 0x23a390 / `SphTree_TriangleRecurse` 0x23ada0): the children tried in an
@@ -295,10 +295,10 @@ Part of the port notes (index: [README.md](README.md)); units and wording as des
 - The constructor (0x13d6c0, from script op 0): the mass and +0xd0 from the op's record (+0xc, +0x10); the tree
   header's centre of mass (+0x2c) and inverse inertia (+0x5c) × 0.075; the body at the object's place plus the
   centre of mass turned by its orientation (`Mat4_ToPosQuat`); the object's flags `& ~0x22 | 0x45`. Then a push:
-  with no velocity in the record (+0x18..+0x20 all 0) from the rider's contact (`FUN_0013dd40`: v = direction ×
+  with no velocity in the record (+0x18..+0x20 all 0) from the rider's contact (`RollerNode_PushFromContact`: v = direction ×
   speed / 2 + (0, 0, min(5000/m + 100, 600)), p = v·m, the spin 10 × the contact's +0x20), else that velocity
-  (`FUN_0013dbe8`: the spin 10 × the unit vector against it). Either sets the energy and clears the knock.
-- `RollerNode_UpdateTransform` 0x13e140: the world inverse inertia R·B·Rᵀ. `FUN_0013e6a0`: the object's place is
+  (`RollerNode_PushWithVelocity`: the spin 10 × the unit vector against it). Either sets the energy and clears the knock.
+- `RollerNode_UpdateTransform` 0x13e140: the world inverse inertia R·B·Rᵀ. `RollerNode_PlaceFromBody`: the object's place is
   the body's less the turned centre of mass; `Mat4_FromPosQuat` 0x250428 then places the tree; the box is the
   tree's centre ± its radius.
 - Each awake frame after the controller's forces (`cRollerNode::Update` 0x13e8a8): `RigidBody_Integrate`(1/60),
@@ -413,7 +413,7 @@ Part of the port notes (index: [README.md](README.md)); units and wording as des
   - `cCrowdBoxNode::Init` 0x145c00: per cell (16) a phase draw `& 15` then a sequence draw `& 3`; `StepCells` 0x145e08 draws
     one word when a cell's sequence ends (sequence = `& 3`, pause when `(r & 0xff) < table`, then `-(r & 0x3f)`).
     `Crowd_LoadTexturesRandomize` 0x1458e0 (from `cGame::Init`, 0x17e8c0 area) draws one `& 15` per cell of every crowd box.
-  - `cMeshAnimNode` start `FUN_00146f40` 0x146f40 (broken pieces and path markers): nine draws a piece, in two loops over all
+  - `cMeshAnimNode` start `MeshAnimNode_Start` 0x146f40 (broken pieces and path markers): nine draws a piece, in two loops over all
     the pieces: first the tumble rate (`8 u + 2`) and its axis (x, y, z each `2 u - 1`, normalised), then the spread: across
     (`u`, then a sign draw `& 1`), along (the same) and up (`u`). Ported in `props::debris_draws` / `throw_all` (test
     `props::draw_tests`); the port had a per-piece xorshift and drew the spread twice for a scripted piece.

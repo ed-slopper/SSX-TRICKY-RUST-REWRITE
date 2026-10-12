@@ -6868,3 +6868,15 @@ G 2315e0 Speech_RaceStatsMask
 G 231800 Speech_QueuePlaceLine
 G 231af8 Speech_QueueMedalLine
 G 232330 Speech_QueueUnlockLines
+G 200390 Instance_DrawVisibleCells
+G 2008f8 Patch_DrawVisibleCells
+G 14bd98 LessonOverlay_DrawButtons
+G 1427b8 UVScrollNode_DrawMesh
+G 10ebd0 Ragdoll_HitNode
+G 13f330 RollerNode_HitNode
+G 13dd40 RollerNode_PushFromContact
+G 13dbe8 RollerNode_PushWithVelocity
+G 13e6a0 RollerNode_PlaceFromBody
+G 146f40 MeshAnimNode_Start
+G 148900 CollideEmitterNode_RiderHasRoom
+G 237d50 Collide_SphereTriangleTwoSided

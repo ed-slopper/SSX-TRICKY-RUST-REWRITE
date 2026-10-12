@@ -640,3 +640,8 @@
 1162c0 FUN_001162c0 AIWorld_AgeActiveCells
 25feb8 FUN_0025feb8 Course_GetEffectHeader
 2391e8 FUN_002391e8 SphTree_Copy
+13dd40 FUN_0013dd40 RollerNode_PushFromContact
+13dbe8 FUN_0013dbe8 RollerNode_PushWithVelocity
+13e6a0 FUN_0013e6a0 RollerNode_PlaceFromBody
+146f40 FUN_00146f40 MeshAnimNode_Start
+148900 FUN_00148900 CollideEmitterNode_RiderHasRoom
