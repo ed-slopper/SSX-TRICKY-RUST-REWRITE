@@ -19,7 +19,6 @@ pub struct CourseMusic {
     /// the current course has its music and it is the intro or countdown
     pub holding: bool,
     dir: std::path::PathBuf,
-    seed: u32,
 }
 
 #[derive(Component, PartialEq)]
@@ -63,7 +62,7 @@ pub fn course_music(
     mut assets: ResMut<Assets<AudioSource>>, mut commands: Commands, parts: Query<(Entity, &CoursePart)>, mut sinks: Query<&mut AudioSink, With<CoursePart>>,
     mut last: Local<Option<(usize, bool, RaceState, ui::Screen)>>,
 ) {
-    if cm.dir.as_os_str().is_empty() { cm.dir = sounds.dir.join("course"); cm.seed = 0x9e3779b9; }
+    if cm.dir.as_os_str().is_empty() { cm.dir = sounds.dir.join("course"); }
     let track = list.dirs.get(list.current).and_then(|d| d.file_name()).map(|n| n.to_string_lossy().to_string()).unwrap_or_default();
     let dir = cm.dir.join(&track);
     let have = dir.join("seg_16.wav").is_file();
@@ -82,7 +81,11 @@ pub fn course_music(
     let vol = if sounds.music { 0.4 } else { 0.0 };
     for mut s in &mut sinks { s.set_volume(Volume::Linear(vol)); }
     let load = |i: usize| std::fs::read(dir.join(format!("seg_{i:02}.wav"))).ok();
-    let mut rand = |n: u32| { cm.seed ^= cm.seed << 13; cm.seed ^= cm.seed >> 17; cm.seed ^= cm.seed << 5; (cm.seed % n) as usize };
+    // the sound system's own random is `Rand_Fx` (cBXAudio::vf3 0x21e6c0 tail-calls it); `Music_StartCourseSong`
+    // 0x214e60 turns a draw into a segment as `(r & 0x7fff) * n / 0x7fff`, so n + 1 values and the top one is rare
+    let pick = |n: u32| tricky_game::fxrand::segment_pick(tricky_game::rand::rand_fx(), n) as usize;
+    // STANDIN: the C part's picks (not read: the stream's next-segment code) use the same draw modulo 8
+    let pick_c = || (tricky_game::rand::rand_fx() % 8) as usize;
     if restart {
         clear(&mut commands, None);
         if r.intro {
@@ -90,8 +93,8 @@ pub fn course_music(
             let order: Vec<usize> = if matches!(track.as_str(), "mesablanca" | "untracked" | "megaplex" | "alaska") {
                 (0..16).chain(8..16).chain(8..16).collect()
             } else {
-                let mut o = vec![0, 1 + rand(3), 4 + rand(4), 4 + rand(4)];
-                for _ in 0..24 { o.push(8 + rand(8)); }
+                let mut o = vec![0, 1 + pick(3), 4 + pick(4), 4 + pick(4)];
+                for _ in 0..24 { o.push(8 + pick_c()); }
                 o
             };
             let parts: Option<Vec<Vec<u8>>> = order.iter().map(|i| load(*i)).collect();

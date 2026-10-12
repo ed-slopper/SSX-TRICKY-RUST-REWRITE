@@ -346,8 +346,8 @@ pub fn path_music(
     let pos = pm.shared.node_pos.load(Ordering::Relaxed) as f32 / pm.song.as_ref().map_or(36000.0, |s| s.1.rate as f32);
     match pm.air {
         None if big || tricky_now => {
-            pm.seed ^= pm.seed << 13; pm.seed ^= pm.seed >> 17; pm.seed ^= pm.seed << 5;
-            let phrase = if tricky_now { 3 } else { pm.seed % 3 };
+            // `Music_PickAirLoopPhrase` 0x2246a8: `Rand_Fx % (phrases - 1)` through the sound system's virtual rand
+            let phrase = if tricky_now { 3 } else { tricky_game::rand::rand_fx() % 3 };
             let k = ((pos / beat).floor() as u32 + 1) % 8;
             pm.air = Some((phrase, k, beat - pos % beat, if tricky_now { 16 } else { -1 }));
         }

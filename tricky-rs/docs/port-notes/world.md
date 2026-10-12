@@ -453,11 +453,22 @@ Part of the port notes (index: [README.md](README.md)); units and wording as des
   draw `% matches`); `Career_PrepareRace` 0x163a40 draws twice and stores them at career +0x2b04 then +0x2b00 (nothing
   reads them back with those offsets in the exe). The port's staging, gate and post-race picks are `% n` draws on the
   global `Rand_Fx` (`fx_pick`); STANDIN: the game's draws before them (the riders' picks, the career's) are not made.
-- The music pickers are **not** `Rand_Fx`: `Music_StartCourseSong` 0x214e60 and `Song_RandomSegmentMs` 0x2246a8 (the air
-  loop's phrase) call a virtual of the sound system (`DAT_003436f8`: its second vtable's slot +0x24, `(r & 0x7fff) * n /
-  0x7fff` for the intro's A and B segments, `r % (count - 1)` for the air phrase), and `Audio_RaceInit` 0x2116d8 /
-  `Audio_OnRaceGo` 0x215288 draw `Rand_Fx % 100` only for `Music_SetPathVar` in game mode 6. That virtual is pure in
-  `cSoundSys`'s own table (0x3a0364 = 0x2f54e0); its implementation is in the object's real class, not found yet (E1b2f).
+- The music pickers ARE `Rand_Fx` (row E1b2f, read; the E1b2c note that said otherwise was wrong): `Music_StartCourseSong`
+  0x214e60 and `FUN_002246a8` (the air loop's phrase, `Music_PickAirLoopPhrase` 0x2246a8) call the sound system's virtual at
+  vptr+0x24 (`DAT_003436f8`, a `cBXAudio` whose class chain is cBXAudio -> cController -> cCrowdSys -> cSpeechSys -> cMusicSys
+  -> cStreamSys -> cMidiSys -> cBankSys -> ... -> cSoundSys, where the slot is pure), and `cBXAudio::vf3` 0x21e6c0 is a
+  tail call of `Rand_Fx`. (The vtable entries are 8 bytes; the vptr points at the table's start, so +0x24 is the entry at
+  +0x20, the fifth word pair: delta, then the function.) The formulas, all on the raw word:
+  - course song: A = `1 + (r & 0x7fff) * 3 / 0x7fff` (1..=4: the top value only when the low 15 bits are all set), then two B
+    picks `4 + (r & 0x7fff) * 4 / 0x7fff` (4..=8) when the race is not a single-event restart, one B pick otherwise; none
+    in courses 3, 7, 8 and 0xb. Ported in `coursemusic.rs` via `fxrand::segment_pick`.
+  - the air loop's phrase: `Rand_Fx % (phrases - 1) * size` (no draw when a fixed phrase is asked for); a second form
+    `Rand_Fx % count2 + count1`. Ported: `pathmusic.rs` takes `Rand_Fx % 3`.
+  - `FUN_002256c0` 0x2256c0 (level sound banks): `Rand_Fx % variants` (`FUN_00224658`) picks which variant of a bank is loaded.
+  - `Speech_RollChance` 0x235d84: `(Rand_Fx & 0x3ff) < table[min(level, +0x383c)][kind]` (table at 0x3a3528, 0x28 a row).
+  - `Audio_RaceInit` 0x2116d8 / `Audio_OnRaceGo` 0x215288: `Rand_Fx % 100` for `Music_SetPathVar`, game mode 6 only.
+  STANDIN: the C part of the course intro (8..15 in the port) and the ambient and speech draws of `worldsound.rs` are the
+  port's own picks on its own generator, not the game's draws (E1b2i).
 
 ## Course file loading (`cCourseResolve_Common` / `cCourseResolve_PS2`)
 

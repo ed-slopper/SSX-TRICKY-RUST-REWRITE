@@ -64,6 +64,12 @@ pub fn snow_layers(rand_fx: &mut dyn FnMut() -> u32) -> [SnowLayer; 7] {
     out
 }
 
+/// `Music_StartCourseSong` 0x214e60's segment pick: `(r & 0x7fff) * n / 0x7fff`, 0..=n (the top value only when the
+/// low 15 bits are all set). The sound system's virtual rand (`cBXAudio::vf3` 0x21e6c0) is `Rand_Fx`.
+pub fn segment_pick(r: u32, n: u32) -> u32 {
+    (r & 0x7fff) * n / 0x7fff
+}
+
 /// What `cGame::Init` 0x17e148 draws for the snow after `ParticleMan_Init`, in this order.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct GameSnow {
@@ -177,6 +183,16 @@ mod tests {
         let g = game_init_snow(&mut r2, 4, 1, 1, 1.0);
         assert!(!g.on);
         assert_eq!(n, 28 + 3);
+    }
+
+    #[test]
+    fn segment_pick_reaches_n_only_on_all_ones() {
+        assert_eq!(segment_pick(0, 3), 0);
+        assert_eq!(segment_pick(0x7ffe, 3), 2);
+        assert_eq!(segment_pick(0x7fff, 3), 3);
+        assert_eq!(segment_pick(0xffff_8000, 4), 0); // only the low 15 bits count
+        assert_eq!(segment_pick(0x5fff, 4), 2);
+        assert_eq!(segment_pick(0x6000, 4), 3);
     }
 
     #[test]
