@@ -2014,7 +2014,7 @@ F 2213c8 cCrowdSys vf5
 F 2214a8 cCrowdSys vf6
 F 21e9d0 cController vf7
 F 20e730 cBXAudio vf8
-F 20eaf0 cBXAudio vf12
+F 20eaf0 cBXAudio PlayFESound
 F 20df08 cBXAudio vf13
 F 20e430 cBXAudio vf14
 F 20ea38 cBXAudio vf15
@@ -6950,3 +6950,21 @@ G 241dd8 Huff_GetUnpackedSize
 G 251d70 PatchCache_Age
 G 205068 SkinPart_Reset
 G 205018 SkinPart_Delete
+G 212300 Audio_PlayFESound32Gated
+G 212348 Audio_PlayFESound30
+G 212388 Audio_PlayFESound31
+G 2123c8 Audio_PlayFESound12
+G 2123f8 Audio_PlayFESound32
+G 212680 Audio_PlayFESound11
+G 2128d8 Audio_PlayFEScreenSound20
+G 21c808 Audio_PlayFEHeld20And00
+G 21c868 Audio_PlayFEHeld01
+G 21c8a8 Audio_PlayFEHeld02
+G 21c8e8 Audio_PlayFEHeld32
+G 21c930 Audio_PlayFESound01
+G 21c960 Audio_PlayFESound11ThenScreen
+G 21c9a8 Audio_StopFEHeld
+G 21cfa0 Jukebox_PlayTrack
+G 21d020 Jukebox_StopTrack
+G 21eca8 CrowdSoundList_Construct
+G 21ed30 CrowdSoundList_Add

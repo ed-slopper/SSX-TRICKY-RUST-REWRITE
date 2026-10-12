@@ -87,3 +87,30 @@ Part of the port notes (index: [README.md](README.md)); units and wording as des
   at +0x7424 (if ≥ 0) and sets it to −1. `cBoarder::vf10` 0x11a348 queues kinds 0, 1, 2 when rider+0x388 bits 14, 23,
   24 turn on and stops on their turning off. **Inferred:** whatever reads +0x7420/+0x7428 later starts the sound and
   keeps its handle at +0x7424 (the reader is not found yet; the bits' meaning neither).
+
+## Front-end sounds (`cFE3DSound` → `Audio_PlayFE*`, F1c)
+
+Proven (live Ghidra):
+- `cBXAudio::PlayFESound` 0x20eaf0 (vtable slot +0x6c, was vf12): queues one bank sound with no position
+  (volume 100, 0x5a, 0x32 defaults), bank in the `+0xa40` column, sound in `+0xa44`, voice slot 4
+  (`SndMgr_GetSlot(4)`), plays it and returns the handle. Every FE sound helper calls it with bank 0.
+- The menu helpers are named by the sound they play: `Audio_PlayFESound11` 0x212680 (handle kept in
+  audio+0x7434, the old one stopped first; `Audio_PlayFERiderChange` 0x212428 is the same with sound 0x10
+  and +0x7430), `Audio_PlayFESound12/30/31/32` 0x2123c8/0x212348/0x212388/0x2123f8,
+  `Audio_PlayFESound32Gated` 0x212300 (only when audio+0x3714 > 3), `Audio_PlayFESound01` 0x21c930.
+  `cFE3DSound::vf9` 0x270610 maps its event index to them.
+- audio+0x7438 is the screen sound handle: `Audio_PlayFEScreenChange` 0x212960 plays 0x21 there,
+  `Audio_PlayFEScreenSound20` 0x2128d8 plays 0x20 there (both only when +0x3714 is set, the first also
+  when +0x7454 is set). `Audio_PlayFESound11ThenScreen` 0x21c960 plays 0x11 and, when +0x3714 is 0,
+  sets +0x7454 and plays the screen change.
+- audio+0x7450 is a held sound: `Audio_PlayFEHeld01/02/32` 0x21c868/0x21c8a8/0x21c8e8 and
+  `Audio_PlayFEHeld20And00` 0x21c808 (plays 0x20, holds 0x00); `Audio_StopFEHeld` 0x21c9a8 stops it if
+  still alive and sets +0x7454 = 1.
+- Jukebox (DVD extras): `Jukebox_Open` 0x21cf38 opens stream 2 on data/audio/jukebox.big;
+  `Jukebox_PlayTrack` 0x21cfa0 plays track n (audio+0x6e98 count, names 0x40 bytes each from +0x6e9c,
+  empty names skipped) with `StreamSys_PlayFile(2, 2000, name)`; `Jukebox_StopTrack` 0x21d020 stops stream 2.
+- Crowd sample lists (`TRICKn`/`FALLn`/`ANTICIPATEn` in `Sfx_LoadTrickConfig` 0x220ce8, 3 levels of 0x54
+  bytes from audio+0x3730): `CrowdSoundList_Construct` 0x21eca8 zeroes {count, 5 entries};
+  `CrowdSoundList_Add` 0x21ed30 appends a loaded file (max 5), returns 1 when added.
+
+Inferred: the sound ids are entries of the front-end bank; what each one sounds like is not checked.

@@ -153,14 +153,14 @@ address,size,name,system,status
 0x1117f0,44,FUN_001117f0,game?,ported
 0x111820,3376,cAI::vf17_111820,ai,not started
 0x112550,56,cAI::vf12_112550,ai,not started
-0x1125a0,40,cAI::vf9_1125a0,ai,not started
+0x1125a0,40,cAI::vf9_1125a0,ai,ported
 0x1125c8,292,Race_CreateHandlers,race,ported
-0x1126f0,160,cAI::vf1_1126f0,ai,not started
+0x1126f0,160,cAI::vf1_1126f0,ai,ported
 0x112790,76,cAI::SaveSnapshot,save,not started
 0x1127e0,100,cAI::vf8_1127e0,ai,not started
 0x112848,108,Race_HasStartGate,race,not started
 0x1128b8,104,Race_ResetRiderRenders,race,not started
-0x112920,460,Race_UpdateRiderStreaming,race,not started
+0x112920,460,Race_UpdateRiderStreaming,race,ported
 0x112af0,152,Race_AnyRiderLevelAbove7,race,not started
 0x112b88,388,cPreRaceHandler::Enter,race,not started
 0x112d10,1876,cPreRaceHandler::Update,race,not started
@@ -976,13 +976,13 @@ address,size,name,system,status
 0x14ebe8,8,cLessonExitHandler::Enter,game,not started
 0x14ebf0,84,cLessonExitHandler::Update,game,not started
 0x14ec48,24,cRestartLessonHandler::Enter,game,ported
-0x14ec60,60,cRestartLessonHandler::Update,game,not started
-0x14eca0,12,cLoadLessonHandler::Enter,game,not started
+0x14ec60,60,cRestartLessonHandler::Update,game,ported
+0x14eca0,12,cLoadLessonHandler::Enter,game,ported
 0x14ecb0,124,cLoadLessonHandler::Update,game,ported
 0x14ed30,8,cPreLessonHandler::Enter,game,not started
 0x14ed38,8,cPreLessonHandler::Update,game,not started
-0x14ed40,36,cEndLessonHandler::Enter,game,not started
-0x14ed68,32,cEndLessonHandler::Update,game,not started
+0x14ed40,36,cEndLessonHandler::Enter,game,ported
+0x14ed68,32,cEndLessonHandler::Update,game,ported
 0x14ed88,36,Lesson_GetString,game?,not started
 0x14edb0,284,StaticInit_Lesson,game?,not started
 0x14eed0,24,Sprite_DrawRectScaled,game?,not started
@@ -3509,7 +3509,7 @@ address,size,name,system,status
 0x20e430,768,cBXAudio::vf14_20e430,audio,not started
 0x20e730,776,cBXAudio::vf8_20e730,audio,not started
 0x20ea38,180,cBXAudio::vf15_20ea38,audio,not started
-0x20eaf0,560,cBXAudio::vf12_20eaf0,audio,not started
+0x20eaf0,560,cBXAudio::PlayFESound,audio,not started
 0x20ed20,312,Audio_GetListenerRider,audio,not started
 0x20ee58,776,Audio_InGameUpdate,audio,ported
 0x20f160,708,Audio_LoadFEConfig,audio,not started
@@ -3547,13 +3547,13 @@ address,size,name,system,status
 0x212210,92,Audio_SetSpeechLevel,audio,ported
 0x212270,16,FUN_00212270,save?,ported
 0x212280,68,cBXAudio::vf1_212280,audio,not started
-0x212300,68,FUN_00212300,audio?,not started
-0x212348,48,FUN_00212348,audio?,not started
-0x2123c8,48,FUN_002123c8,audio?,not started
-0x2123f8,48,FUN_002123f8,audio?,not started
+0x212300,68,Audio_PlayFESound32Gated,audio,not started
+0x212348,48,Audio_PlayFESound30,audio,not started
+0x2123c8,48,Audio_PlayFESound12,audio,not started
+0x2123f8,48,Audio_PlayFESound32,audio,not started
 0x212428,600,Audio_PlayFERiderChange,audio,not started
-0x212680,600,FUN_00212680,audio?,not started
-0x2128d8,132,FUN_002128d8,audio?,not started
+0x212680,600,Audio_PlayFESound11,audio,not started
+0x2128d8,132,Audio_PlayFEScreenSound20,audio,not started
 0x212960,152,Audio_PlayFEScreenChange,audio,not started
 0x2129f8,1180,FUN_002129f8,audio?,not started
 0x212e98,2644,FUN_00212e98,audio?,not started
@@ -3640,17 +3640,17 @@ address,size,name,system,status
 0x21c610,176,Audio_TrickyTrigger,audio,ported
 0x21c6c0,12,FUN_0021c6c0,audio?,not started
 0x21c6d0,308,Music_UpdateMeterCues,audio,not started
-0x21c808,92,FUN_0021c808,audio?,not started
-0x21c868,64,FUN_0021c868,audio?,not started
-0x21c8a8,64,FUN_0021c8a8,audio?,not started
-0x21c8e8,64,FUN_0021c8e8,audio?,not started
-0x21c930,48,FUN_0021c930,audio?,not started
-0x21c960,68,FUN_0021c960,audio?,not started
-0x21c9a8,120,FUN_0021c9a8,audio?,not started
+0x21c808,92,Audio_PlayFEHeld20And00,audio,not started
+0x21c868,64,Audio_PlayFEHeld01,audio,not started
+0x21c8a8,64,Audio_PlayFEHeld02,audio,not started
+0x21c8e8,64,Audio_PlayFEHeld32,audio,not started
+0x21c930,48,Audio_PlayFESound01,audio,not started
+0x21c960,68,Audio_PlayFESound11ThenScreen,audio,not started
+0x21c9a8,120,Audio_StopFEHeld,audio,not started
 0x21ca20,1104,Audio_LoadVolumeLevels,audio,ported
 0x21ce78,184,Audio_LoadFEGlobalBankList,audio,not started
 0x21cf38,104,Jukebox_Open,audio?,not started
-0x21cfa0,124,FUN_0021cfa0,audio?,not started
+0x21cfa0,124,Jukebox_PlayTrack,audio?,not started
 0x21d078,56,Music_StopStreamAndFade,audio,not started
 0x21d0b0,16,Audio_QueueEventSound,audio,not started
 0x21d0c0,1284,Audio_LoadAmbientBanks,audio,not started
@@ -3680,9 +3680,9 @@ address,size,name,system,status
 0x21eb10,96,cController::vf4_21eb10,audio?,not started
 0x21eb70,100,Audio_UpdateSystems,audio,not started
 0x21ec58,80,cController::__tf,runtime,host
-0x21eca8,52,FUN_0021eca8,audio?,not started
+0x21eca8,52,CrowdSoundList_Construct,audio,not started
 0x21ece0,76,FUN_0021ece0,render?,not started
-0x21ed30,100,FUN_0021ed30,audio?,not started
+0x21ed30,100,CrowdSoundList_Add,audio,not started
 0x21ed98,84,List_PickRandom,world?,not started
 0x21edf0,124,PtrArray_FreeAll,render?,not started
 0x21ee70,232,CrowdBox_Init,world,not started
