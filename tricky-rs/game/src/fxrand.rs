@@ -322,3 +322,35 @@ mod tests {
         assert_eq!(bank_variant(0xffff_fff9, 4), 1); // 4294967289 % 4
     }
 }
+
+/// The scene table a (0x3cc028; ten bytes per id, `SceneTables::a`) as `FUN_00168360` (run by `StaticInit_RaceScene`)
+/// builds it from the game's data: `ids` the 901 signed shorts at 0x37ab50, `rows` the twenty six-byte rows at
+/// 0x37b260 and `counts` the twenty shorts at 0x37b2d8 (how many of the ids each row serves). For each position
+/// in `ids`, an id that differs from the one before gets its entry: the six bytes of the current row, the position
+/// (short at +6) and a count of 1 (short at +8); an id repeating the one before adds one to that count.
+pub fn scene_table_a(ids: &[u8], rows: &[u8], counts: &[u8]) -> Vec<u8> {
+    let short = |b: &[u8], i: usize| i16::from_le_bytes([b[2 * i], b[2 * i + 1]]);
+    let n = ids.len() / 2;
+    let top = (0..n).map(|i| short(ids, i).max(0) as usize).max().unwrap_or(0);
+    let mut t = vec![0u8; 10 * (top + 1).max(0x800)];
+    let (mut cnt, mut row, mut prev) = (0i64, 0usize, 0x1adi64);
+    for i in 0..n {
+        cnt += 1;
+        let id = short(ids, i) as i64;
+        if (short(counts, row) as i64) < cnt {
+            cnt = 1;
+            row += 1;
+        }
+        let at = (id * 10) as usize;
+        if id == prev {
+            let c = i16::from_le_bytes([t[at + 8], t[at + 9]]).wrapping_add(1);
+            t[at + 8..at + 10].copy_from_slice(&c.to_le_bytes());
+        } else {
+            t[at..at + 6].copy_from_slice(&rows[6 * row..6 * row + 6]);
+            t[at + 6..at + 8].copy_from_slice(&(i as i16).to_le_bytes());
+            t[at + 8..at + 10].copy_from_slice(&1i16.to_le_bytes());
+        }
+        prev = id;
+    }
+    t
+}

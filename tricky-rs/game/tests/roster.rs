@@ -826,3 +826,20 @@ fn run_builder_hooks(
     }
     assert!(cover[0] + cover[1] > 100, "{cover:?}");
 }
+
+#[test]
+fn scene_table_a_matches_the_original() {
+    let Some(mut r) = Runner::from_env() else { return };
+    r.allow(0x1686a8);
+    let rd = |r: &mut Runner, a: u32, n: usize| -> Vec<u8> { (0..n.div_ceil(4)).flat_map(|i| r.mem.read_u32(a + 4 * i as u32).to_le_bytes()).take(n).collect() };
+    let ids = rd(&mut r, 0x37ab50, 0x70a);
+    let rows = rd(&mut r, 0x37b260, 0x78);
+    let counts = rd(&mut r, 0x37b2d8, 0x28);
+    r.cpu.set_gpr(4, 0x32ecf0);
+    r.call(0x168360).expect("FUN_00168360");
+    let ours = tricky_game::fxrand::scene_table_a(&ids, &rows, &counts);
+    let got = rd(&mut r, 0x3cc028, ours.len());
+    let bad: Vec<usize> = (0..ours.len()).filter(|&i| got[i] != ours[i]).take(10).collect();
+    assert!(bad.is_empty(), "table differs at {bad:x?}");
+    assert!(ours.iter().any(|&b| b != 0));
+}
