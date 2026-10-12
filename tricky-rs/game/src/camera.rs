@@ -1078,3 +1078,146 @@ pub fn track_rider(t: &mut Tracker, rider: Option<&TrackRider>, force: i64) {
     }
     t.dir = unit_or_same(t.dir);
 }
+
+// ---- Camera_SmoothOutput 0x174238 ----
+
+/// The calls `Camera_SmoothOutput` makes besides the angle maths.
+pub trait SmoothEnv {
+    /// `Camera_CollidePush` 0x16fb08(k, pos, target).
+    fn collide_push(&mut self, k: f32, pos: &mut [f32; 3], target: [f32; 3]);
+}
+
+/// The camera object as the smoothing sees it: its words by byte offset (`o[off / 4]`), at least 0x4e8 bytes.
+struct Words<'a>(&'a mut [u32]);
+impl Words<'_> {
+    fn i(&self, off: usize) -> u32 {
+        self.0[off / 4]
+    }
+    fn f(&self, off: usize) -> f32 {
+        f32::from_bits(self.0[off / 4])
+    }
+    fn set(&mut self, off: usize, v: u32) {
+        self.0[off / 4] = v;
+    }
+    fn setf(&mut self, off: usize, v: f32) {
+        self.0[off / 4] = v.to_bits();
+    }
+    fn v3(&self, off: usize) -> [f32; 3] {
+        [self.f(off), self.f(off + 4), self.f(off + 8)]
+    }
+    /// Words `0x42c..0x484` and `0x484..0x4dc` are the "now" and the "wanted" copies of the same record.
+    fn latch(&mut self) {
+        for k in 0..22 {
+            self.0[(0x484 + 4 * k) / 4] = self.0[(0x42c + 4 * k) / 4];
+        }
+    }
+    fn unlatch(&mut self) {
+        for k in 0..22 {
+            self.0[(0x42c + 4 * k) / 4] = self.0[(0x484 + 4 * k) / 4];
+        }
+    }
+    fn push(&mut self, env: &mut dyn SmoothEnv) {
+        if 0.0 < self.f(0x20) {
+            let mut p = self.v3(0x42c);
+            env.collide_push(f32::from_bits(0x4248_0000), &mut p, self.v3(0x4a8));
+            for k in 0..3 {
+                self.setf(0x42c + 4 * k, p[k]);
+            }
+        }
+    }
+    /// Flips the heading by half a turn when it points against the one wanted (`+0x4d0`).
+    fn flip(&mut self) {
+        if angle_diff(self.f(0x490), self.f(0x4d0)) < 0.0 {
+            let pi = f32::from_bits(0x4049_0fdb);
+            let a = angle_diff(self.f(0x490) + pi, 0.0);
+            self.setf(0x490, a);
+            let b = angle_diff(pi, self.f(0x494));
+            self.setf(0x494, b);
+        }
+    }
+}
+
+/// `Camera_SmoothOutput` 0x174238: eases the camera's position and angles (`0x42c…`) toward the wanted ones
+/// (`0x484…`), or latches them when the camera has just been cut.
+pub fn smooth_output(o: &mut [u32], env: &mut dyn SmoothEnv) {
+    let mut w = Words(o);
+    let pi = f32::from_bits(0x4049_0fdb);
+    w.set(0x1c, 1);
+    let state = w.i(0xc) as i32;
+    let mut l = w.v3(0x484);
+    if state < 3 {
+        w.set(0x460, 0);
+    }
+    if w.i(4) == 0 && w.i(0x4d8) == 0 {
+        // the plain easing
+        let blend = if w.i(0x18) == 0 {
+            true
+        } else if w.i(0x4bc) == 0 {
+            false
+        } else {
+            0 < w.i(0x4c0) as i32
+        };
+        if !blend {
+            for k in 0..3 {
+                w.set(0x4dc + 4 * k, w.i(0x484 + 4 * k));
+            }
+        } else {
+            let a = w.v3(0x4dc).map(|x| x * f32::from_bits(0x3f4c_cccd));
+            let b = w.v3(0x484).map(|x| x * f32::from_bits(0x3e4c_cccd));
+            for k in 0..3 {
+                w.setf(0x4dc + 4 * k, a[k] + b[k]);
+            }
+            l = w.v3(0x4dc);
+        }
+        let mut f21 = w.f(0x4cc);
+        if f21 < 50.0 && 0.0 < w.f(0x20) {
+            f21 = w.f(0x20) * 20.0 + 10.0;
+        }
+        if state < 3 {
+            let k = 1.0f32 / 1.0;
+            for i in 0..3 {
+                let p = w.f(0x42c + 4 * i);
+                let d = l[i] - p;
+                w.setf(0x42c + 4 * i, p + d * k);
+            }
+        }
+        if w.i(0x4b4) != 0 {
+            w.push(env);
+            w.flip();
+        }
+        if state == 3 {
+            w.latch();
+        }
+        let a = angle_diff(w.f(0x490), w.f(0x438));
+        w.setf(0x438, w.f(0x438) + ps2_div(a, f21));
+        let a = angle_diff(w.f(0x494), w.f(0x43c));
+        w.setf(0x43c, w.f(0x43c) + ps2_div(a, f21));
+        let a = angle_diff(w.f(0x498), w.f(0x440));
+        let f1 = w.f(0x49c) - w.f(0x444);
+        w.setf(0x440, w.f(0x440) + ps2_div(a, 25.0));
+        w.setf(0x444, w.f(0x444) + ps2_div(f1, f21));
+    } else {
+        // a cut: take the wanted record at once
+        w.set(0x4d8, 0);
+        if w.i(0x4b4) != 0 {
+            w.flip();
+        }
+        if state == 3 {
+            w.latch();
+        }
+        w.unlatch();
+        for k in 0..3 {
+            w.set(0x4dc + 4 * k, w.i(0x484 + 4 * k));
+        }
+        if w.i(0x4b4) != 0 {
+            w.push(env);
+        }
+        w.setf(0x10, 500.0);
+    }
+    let _ = pi;
+    if w.i(8) == 0 {
+        w.set(4, 0);
+    }
+    w.set(0x18, 0);
+    w.set(8, 0);
+}
