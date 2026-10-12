@@ -190,3 +190,78 @@ pub fn shove(me: &ShoveRider, other: &ShoveRider, practice: bool) -> Option<(f32
     }
     Some((speed * (me.stability as f32 * 0.739_932 * 0.003_921_569 + 0.546_635_57), n))
 }
+
+/// What `Boarder_Stumble` 0x124dd0 reads of the rider that stumbles.
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct StumbleRider {
+    /// rider+0x428: the state (only 3 and 0xe stumble; anything but 2 takes the meter first)
+    pub state: u32,
+    /// rider+0x180 (its heading), +0x150 (velocity) and +0x190 (its side)
+    pub forward: V4,
+    pub vel: V4,
+    pub side: V4,
+    /// rider+0x1b4: switch stance, the side taken the other way
+    pub switch: bool,
+}
+
+/// What `Boarder_Stumble` does, in order.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum StumbleCall {
+    /// `Boarder_AddMeter`(−0.0200…): unless the rider is already in state 2 or the caller says not
+    Meter,
+    /// the rider's object (rider+0x5ae0) +0x618 is this angle and +0x61c is 0, before the clip: the fast stumbles
+    Lean(f32),
+    /// `AnimCtl_PlayClip`(rider+0x46c0, clip, 0, 5)
+    Clip(u32),
+    /// `Speech_OnStumble`(rider, fast), then `Boarder_SetState`(rider, 2)
+    Speech { fast: bool },
+}
+
+/// The five angles at 0x368540 a fast sideways stumble leans by (`Rand_Game % 5`): 0, ±π, ±2π.
+pub const LEANS: [f32; 5] = [0.0, std::f32::consts::PI, -std::f32::consts::PI, std::f32::consts::TAU, -std::f32::consts::TAU];
+
+/// `Boarder_Stumble` 0x124dd0(rider, dir, quiet): the rider (in state 3 or 0xe) is knocked along the unit `dir`.
+/// Along its heading: clip 0x244 head on (dot above 0.707107), 0x245 from behind (below −0.707107); otherwise by
+/// the side (the dot of `dir` with the side, turned round in switch stance): negative clip 0x247, or when the rider
+/// is fast (its speed above 1388.8888 and its velocity along `dir` below 1111.1111) 0x249; not negative 0x246 or
+/// fast 0x248, the fast ones after a lean picked by `rand_game() % 5` (unsigned).
+pub fn stumble(r: &StumbleRider, dir: V4, quiet: bool, rand_game: &mut dyn FnMut() -> u32, calls: &mut Vec<StumbleCall>) {
+    if r.state != 2 && !quiet {
+        calls.push(StumbleCall::Meter);
+    }
+    if r.state != 3 && r.state != 0xe {
+        return;
+    }
+    let along = dot(r.forward, dir);
+    let clip;
+    let mut fast = false;
+    if 0.707_107 < along {
+        clip = 0x244;
+    } else if along < -0.707_107 {
+        clip = 0x245;
+    } else {
+        let toward = dot(dir, r.vel);
+        let mut side = dot(r.side, dir);
+        if toward < 1111.111_1 && 1388.888_8 < dot(r.vel, r.vel).sqrt() {
+            fast = true;
+        }
+        if r.switch {
+            side = -side;
+        }
+        if side < 0.0 {
+            if fast {
+                calls.push(StumbleCall::Lean(LEANS[(rand_game() % 5) as usize]));
+                clip = 0x249;
+            } else {
+                clip = 0x247;
+            }
+        } else if fast {
+            calls.push(StumbleCall::Lean(LEANS[(rand_game() % 5) as usize]));
+            clip = 0x248;
+        } else {
+            clip = 0x246;
+        }
+    }
+    calls.push(StumbleCall::Clip(clip));
+    calls.push(StumbleCall::Speech { fast });
+}

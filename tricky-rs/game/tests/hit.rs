@@ -317,3 +317,92 @@ fn shoves_match_the_original() {
     }
     assert!(reached > 500, "shoves that reached: {reached}");
 }
+
+#[test]
+fn stumble_matches_the_original() {
+    use tricky_game::hit::{stumble, StumbleCall, StumbleRider};
+    let Some(mut r) = Runner::from_env() else { return };
+    r.float_rules = Rules::parse("add=n,mul=n,div=n,cvt=n").unwrap();
+    let log: Rc<RefCell<Vec<String>>> = Rc::default();
+    let draws: Rc<RefCell<Vec<u32>>> = Rc::default();
+    let l = log.clone();
+    r.stub(0x11b018, move |_, _| l.borrow_mut().push("meter".into()));
+    let l = log.clone();
+    r.stub(0x15fcf8, move |c, m| {
+        let o = m.read_u32(c.gpr(4) as u32 - 0x46c0 + 0x5ae0);
+        l.borrow_mut().push(format!("clip {:#x} lean {} {}", c.gpr(5), m.read_f32(o + 0x618), m.read_f32(o + 0x61c)));
+    });
+    let l = log.clone();
+    r.stub(0x235398, move |c, _| l.borrow_mut().push(format!("speech {}", c.gpr(6))));
+    let l = log.clone();
+    r.stub(0x11f608, move |c, _| l.borrow_mut().push(format!("state {}", c.gpr(5))));
+    let d = draws.clone();
+    r.stub(0x23d4d8, move |c, _| c.set_gpr(2, d.borrow_mut().remove(0) as u64));
+    r.mem.write_u32(0x343050, 0);
+    let rider = r.mem.alloc(0x6000);
+    let obj = r.mem.alloc(0x700);
+    let dirp = r.mem.alloc(0x10);
+    r.mem.write_u32(rider + 0x5ae0, obj);
+    let mut g = Rng(0x7c31_92ab_0de4_5f18);
+    let mut seen = [0u32; 7];
+    for case in 0..30_000 {
+        let fwd = g.unit();
+        let ours = StumbleRider {
+            state: [3, 3, 0xe, 2, 5, 0][g.next() as usize % 6],
+            forward: fwd,
+            vel: match g.next() % 3 {
+                0 => [g.f(-3000.0, 3000.0), g.f(-3000.0, 3000.0), g.f(-500.0, 500.0), 0.0],
+                1 => [g.f(-1500.0, 1500.0), g.f(-1500.0, 1500.0), 0.0, 0.0],
+                _ => [g.f(-100.0, 100.0), g.f(-100.0, 100.0), 0.0, 0.0],
+            },
+            side: g.unit(),
+            switch: g.next() % 2 == 0,
+        };
+        let dir = if g.next() % 4 == 0 { [fwd[0] * if g.next() % 2 == 0 { 1.0 } else { -1.0 }, fwd[1], fwd[2], 0.0] } else { g.unit() };
+        let quiet = g.next() % 3 == 0;
+        let script = [g.next(), g.next()];
+        *draws.borrow_mut() = vec![script[0]];
+        let m = &mut r.mem;
+        m.write_u32(rider + 0x428, ours.state);
+        put4(m, rider + 0x180, ours.forward);
+        put4(m, rider + 0x150, ours.vel);
+        put4(m, rider + 0x190, ours.side);
+        m.write_u32(rider + 0x1b4, ours.switch as u32);
+        m.write_f32(obj + 0x618, 9.0);
+        m.write_f32(obj + 0x61c, 9.0);
+        put4(m, dirp, dir);
+        log.borrow_mut().clear();
+        r.cpu.set_gpr(4, rider as u64);
+        r.cpu.set_gpr(5, dirp as u64);
+        r.cpu.set_gpr(6, quiet as u64);
+        r.call(0x124dd0).unwrap_or_else(|e| panic!("case {case}: {e}"));
+        let mut calls = Vec::new();
+        let mut d = vec![script[0]].into_iter();
+        stumble(&ours, dir, quiet, &mut || d.next().expect("one draw"), &mut calls);
+        let mut want = Vec::new();
+        let mut lean = (9.0f32, 9.0f32);
+        for c in &calls {
+            match *c {
+                StumbleCall::Meter => want.push("meter".to_string()),
+                StumbleCall::Lean(a) => lean = (a, 0.0),
+                StumbleCall::Clip(k) => want.push(format!("clip {k:#x} lean {} {}", lean.0, lean.1)),
+                StumbleCall::Speech { fast } => {
+                    want.push(format!("speech {}", fast as u32));
+                    want.push("state 2".into());
+                }
+            }
+        }
+        assert_eq!(format!("{:?}", log.borrow()), format!("{want:?}"), "case {case}: {ours:?} dir {dir:?}");
+        let k = match calls.iter().rev().find_map(|c| if let StumbleCall::Clip(k) = c { Some(*k) } else { None }) {
+            Some(0x244) => 0,
+            Some(0x245) => 1,
+            Some(0x246) => 2,
+            Some(0x247) => 3,
+            Some(0x248) => 4,
+            Some(0x249) => 5,
+            _ => 6,
+        };
+        seen[k] += 1;
+    }
+    assert!(seen.iter().all(|&n| n > 100), "{seen:?}");
+}
