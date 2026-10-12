@@ -120,11 +120,26 @@ by voice 0..11 a bit of 0xfff, 0 past them) and call `SpeechSys_Trigger` at the 
   −2. `Speech_CheckBigScore` passes scores over 999.
 - The masks: `Speech_CourseMask` / `Speech_CharMaskOf` (12 bits, 0 / 0x2000 past 11), `Speech_CurrentCourseMask`
   (the course word, a different order), `Speech_GetModeMask` (gApp+0x58).
-- Checked in the runner: each post four times with random arguments; 60,000 random calls over 37 handlers and
+- The race's end (`tricky_game::speech`, checked; the F1c notes above read): `Speech_QueueResultLine` speaks once
+  (+0x7dcc bit 0): the placing line (`FUN_00231800`: the first player rider in the places, its place bit, 2 | 4 when
+  it is in the new-record list (the game reads on past the list's five entries into the pre-race selection object at
+  0x32ecf0 until a negative word), the mode bit, the stats mask; 0x4008009 too at a circuit final) or the medal line
+  (`FUN_00231af8`, one rider: slot 0 cleared, 0x4008013). The stats mask (`FUN_002315e0`) reads the rider's run at
+  career +0x3300 (time), +0x32ac / +0x32b0 (counts), +0x32dc, 0xbc apart, against per-course thresholds.
+  `Speech_QueueRaceEndLines` (once, bit 4) adds the circuit lines (top half: 0x400800c, then 0x400800a naming the
+  character with the most of the player's count at +0x3348) or the show-off medal's 0x400800c; `Speech_OnHiScore`
+  posts 0x400800b when no result line was spoken; `Speech_QueueUnlockLines` (0x232330) one 0x400800d per course
+  unlocked (kinds 0..2 of the circuit's list). The mode and course words the lines read (0x32de8c, 0x32de88) are the
+  career's +0x2afc and +0x2af8. `SpeechEvt_Post4008015` takes one word (a caller passes two).
+- Overtakes (`Speech_OnPlacingChange` 0x2347c8): 600 frames after the last (+0x7ddc against the race clock), two
+  players' riders near the same listener; who speaks from local player / listener / relation 1 / attitude above 60
+  (a also needs its count +0x5c + 0x20 · slot above 0), a `Rand_Fx` bit when both; spoken when their velocities
+  along b's heading (`Math_SinCos`, cos · x + sin · y + z · 0) part by 670.56..1788.16: 0x3006019..0x300601c.
+- Checked in the runner: each post four times with random arguments; 60,000 random calls over 43 handlers and
   helpers with the speech library, replay, listener, near test, relations, the race's rider 0, the library's
-  callbacks and `Rand_Fx` scripted the same: every call and draw in order, the checkpoint counts and the big-score
-  ring compared. Still to port: `Speech_AnnounceTrick`, `Speech_OnPlacingChange`, the race-end, high-score, cue,
-  lesson and cam-script lines.
+  callbacks, the race clock and `Rand_Fx` scripted the same and random career blocks: every call and draw in order,
+  the checkpoint counts, the big-score ring and the end flags compared. Still to port: `Speech_AnnounceTrick`, the
+  script cues (`Speech_OnScriptCue47` / `48`), the lesson and cam-script lines.
 
 ## Front-end sounds (`cFE3DSound` → `Audio_PlayFE*`, F1c)
 

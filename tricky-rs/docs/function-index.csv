@@ -2504,7 +2504,7 @@ address,size,name,system,status
 0x1b5878,68,cNextRaceOverlay::Update,frontend,not started
 0x1b58c0,820,cUnlockedOverlay::cUnlockedOverlay,frontend,not started
 0x1b5bf8,768,Results_AddAwardLine,race?,not started
-0x1b5ef8,1376,cUnlockedOverlay::Reset,frontend,not started
+0x1b5ef8,1376,cUnlockedOverlay::Reset,frontend,ported
 0x1b65f0,1228,cUnlockedOverlay::DrawText,frontend,not started
 0x1b6ac0,204,cUnlockedOverlay::Update,frontend,not started
 0x1b6b90,460,HiScoreRecordOverlay_Init,frontend,not started
@@ -3895,7 +3895,7 @@ address,size,name,system,status
 0x228bb0,48,FUN_00228bb0,audio?,ported
 0x228bd8,168,SpeechSys_Trigger,audio?,ported
 0x228c80,144,FUN_00228c80,frontend?,not started
-0x228d10,188,SpeechSys_ClearEvent,frontend?,not started
+0x228d10,188,SpeechSys_ClearEvent,frontend?,ported
 0x228dd0,60,FUN_00228dd0,audio?,not started
 0x228e10,40,SpeechSys_GetBankId,audio?,not started
 0x228e38,124,StaticInit_SpeechSys,audio?,not started
@@ -4106,14 +4106,14 @@ address,size,name,system,status
 0x231318,128,Speech_StopCamScriptLine,audio?,not started
 0x231398,328,Speech_LessonLine,game?,not started
 0x2314e0,104,FUN_002314e0,audio?,not started
-0x231548,148,Speech_QueueResultLine,race?,not started
-0x2315e0,544,Speech_RaceStatsMask,race?,not started
-0x231800,752,Speech_QueuePlaceLine,audio?,not started
-0x231af8,344,Speech_QueueMedalLine,race?,not started
-0x231c50,936,Speech_QueueRaceEndLines,race?,not started
+0x231548,148,Speech_QueueResultLine,race?,checked
+0x2315e0,544,Speech_RaceStatsMask,race?,checked
+0x231800,752,Speech_QueuePlaceLine,audio?,checked
+0x231af8,344,Speech_QueueMedalLine,race?,checked
+0x231c50,936,Speech_QueueRaceEndLines,race?,checked
 0x231ff8,584,Speech_OnNextRace,frontend?,checked
-0x232240,240,Speech_OnHiScore,race?,not started
-0x232330,356,Speech_QueueUnlockLines,race?,not started
+0x232240,240,Speech_OnHiScore,race?,checked
+0x232330,356,Speech_QueueUnlockLines,race?,checked
 0x232498,3232,Speech_AnnounceTrick,audio?,not started
 0x233138,232,Speech_PickRaceGoLine,audio?,checked
 0x233220,444,Speech_OnScoreMessage,audio?,checked
@@ -4142,7 +4142,7 @@ address,size,name,system,status
 0x234610,132,FUN_00234610,audio?,checked
 0x234698,148,Speech_CharacterBit,audio?,checked
 0x234730,148,Speech_RiderMask,audio?,checked
-0x2347c8,1004,Speech_OnPlacingChange,audio?,not started
+0x2347c8,1004,Speech_OnPlacingChange,audio?,checked
 0x234bb8,128,Speech_InterruptIfPlaying,audio?,ported
 0x234c38,200,Speech_IsRivalOrGrudge,race?,checked
 0x234d00,612,Speech_RiderHitLine,world?,checked

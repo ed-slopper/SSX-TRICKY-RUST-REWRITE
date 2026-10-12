@@ -59,6 +59,7 @@ enum Ev {
     Interrupt(u32),
     Rand(u32),
     Hold(u32, u32),
+    Clear(u32),
 }
 
 /// The scripted game both sides ask
@@ -76,12 +77,14 @@ struct World {
     rider0: u32,
     /// what the library hands `Speech_QueueBigScore` on a trigger with it
     callbacks: Vec<u32>,
+    clock: i32,
+    after: Vec<i32>,
     log: Vec<Ev>,
 }
 
 impl World {
     fn new(seed: u64) -> World {
-        World { rand: seed, replay: false, listener: 0, mode: 0, can_play: true, near: vec![], rel: [[0; 12]; 12], course: 0, app_mode: 0, rider0: 0, callbacks: vec![], log: vec![] }
+        World { rand: seed, replay: false, listener: 0, mode: 0, can_play: true, near: vec![], rel: [[0; 12]; 12], course: 0, app_mode: 0, rider0: 0, callbacks: vec![], clock: 0, after: vec![], log: vec![] }
     }
     fn draw(&mut self) -> u32 {
         self.rand ^= self.rand << 13;
@@ -143,6 +146,15 @@ impl SpeechEnv for World {
     }
     fn race_rider(&mut self, _i: u32) -> u32 {
         self.rider0
+    }
+    fn clear_event(&mut self, slot: u32) {
+        self.log.push(Ev::Clear(slot));
+    }
+    fn race_clock(&mut self) -> i32 {
+        self.clock
+    }
+    fn record_after(&mut self, k: usize) -> i32 {
+        self.after[k]
     }
 }
 
@@ -209,6 +221,8 @@ fn setup(r: &mut Runner, w: &Rc<RefCell<World>>) {
     r.stub(0x228bb0, move |c, _| x.borrow_mut().log.push(Ev::Hold(c.gpr(5) as u32, c.gpr(6) as u32)));
     let x = w.clone();
     r.stub(0x1814a8, move |c, _| c.set_gpr(2, x.borrow().rider0 as u64));
+    let x = w.clone();
+    r.stub(0x228d10, move |c, _| x.borrow_mut().log.push(Ev::Clear(c.gpr(5) as u32)));
     // memset
     r.stub(0x2fb468, |c, m| {
         let (d, v, n) = (c.gpr(4) as u32, c.gpr(5) as u8, c.gpr(6) as u32);
@@ -268,9 +282,11 @@ fn random_rider(g: &mut Rng) -> SpeechRider {
         rival: g.below(4) as i32,
         slot: g.below(6) as i32,
         attitudes: att,
-        speed: [0.0f32, 1341.0, 1341.12, 1341.13, 2000.0][g.below(5) as usize],
         air: [0.0f32, 2.9, 3.0, 5.0][g.below(4) as usize],
         tricky: g.below(9) as i32,
+        vel: [(g.below(4000) as f32 - 1000.0) * 1.37, (g.below(4000) as f32 - 1000.0) * 1.37, [0.0f32, 1341.0, 1341.12, 1341.13, 2000.0, -500.0][g.below(6) as usize]],
+        heading: (g.below(6283) as f32 / 1000.0) - 3.1416,
+        counts: [0; 8].map(|_: i32| g.below(3) as i32 - 1),
         character: g.below(12),
         voice: g.below(14) as u8,
         level: g.below(8) as i32,
@@ -287,9 +303,15 @@ fn write_rider(r: &mut Runner, at: u32, entry: u32, s: &SpeechRider) {
     for (k, a) in s.attitudes.iter().enumerate() {
         r.mem.write_u8(at + 0x50 + 0x20 * k as u32, *a as u8);
     }
-    r.mem.write_f32(at + 0x158, s.speed);
     r.mem.write_f32(at + 0x57f4, s.air);
     r.mem.write_u32(at + 0x58a8, s.tricky as u32);
+    for k in 0..3 {
+        r.mem.write_f32(at + 0x150 + 4 * k as u32, s.vel[k]);
+    }
+    r.mem.write_f32(at + 0x370, s.heading);
+    for (k, v) in s.counts.iter().enumerate() {
+        r.mem.write_u32(at + 0x5c + 0x20 * k as u32, *v as u32);
+    }
     r.mem.write_u32(at + 0x464, entry);
     r.mem.write_u32(entry + 0x38, s.character);
     r.mem.write_u8(entry + 100, s.voice);
@@ -302,7 +324,7 @@ fn handlers_are_the_original() {
     let w = Rc::new(RefCell::new(World::new(7)));
     setup(&mut r, &w);
     // the handlers' own callees run as the game's
-    for a in [0x235d58u32, 0x233b70, 0x234698, 0x234730, 0x234c38, 0x235090, 0x233138, 0x1635b0, 0x2309a8, 0x235ba8, 0x235530, 0x164288, 0x164318, 0x166550] {
+    for a in [0x235d58u32, 0x233b70, 0x234698, 0x234730, 0x234c38, 0x235090, 0x233138, 0x1635b0, 0x2309a8, 0x235ba8, 0x235530, 0x164288, 0x164318, 0x166550, 0x231548, 0x231800, 0x231af8, 0x2315e0, 0x16baa8, 0x16ba60, 0x2307f0, 0x250c10] {
         r.allow(a);
     }
     for &(f, _, _) in POSTS {
@@ -316,11 +338,15 @@ fn handlers_are_the_original() {
     r.mem.write_u32(ring + 4, ring_buf);
     let app = r.mem.alloc(0x800);
     r.mem.write_u32(0x337c58, app);
+    let game = r.mem.alloc(0x40);
+    let race_obj = r.mem.alloc(0x40);
+    r.mem.write_u32(app + 0x730, game);
+    r.mem.write_u32(game + 0x1c, race_obj);
     let riders: Vec<u32> = (0..2).map(|_| r.mem.alloc(0x5900)).collect();
     let entries: Vec<u32> = (0..2).map(|_| r.mem.alloc(0x80)).collect();
     let mut g = Rng(0x5bee_c400_0000_0002);
-    let mut seen = [0u32; 37];
-    let mut posted = [0u32; 37];
+    let mut seen = [0u32; 43];
+    let mut posted = [0u32; 43];
     for case in 0..60_000 {
         // the speech system
         let n = 1 + g.below(8) as usize;
@@ -329,6 +355,8 @@ fn handlers_are_the_original() {
             cap: g.below(10) as i32,
             resets_on: g.below(2),
             checkpoints: [0; 8],
+            end_flags: [0u32, 1, 0x10, 0x11][g.below(4) as usize] * (g.below(3) == 0) as u32,
+            placing_time: g.below(2000) as i32,
             ring: (0..n).map(|_| g.next()).collect(),
             ring_write: g.below(n as u32) as i32,
             ring_read: g.below(n as u32) as i32,
@@ -341,6 +369,8 @@ fn handlers_are_the_original() {
         r.mem.write_u32(ring + 8, ann.ring_write as u32);
         r.mem.write_u32(ring + 12, ann.ring_read as u32);
         r.mem.write_u32(sys + 0x7dd8, ann.big_queued);
+        r.mem.write_u32(sys + 0x7dcc, ann.end_flags);
+        r.mem.write_u32(sys + 0x7ddc, ann.placing_time as u32);
         for c in ann.checkpoints.iter_mut() {
             *c = g.below(6) as i32;
         }
@@ -376,6 +406,8 @@ fn handlers_are_the_original() {
             x.app_mode = g.below(6);
             x.rider0 = riders[g.below(2) as usize];
             x.callbacks = (0..[0, 0, 1, 2][g.below(4) as usize]).map(|_| g.next()).collect();
+            x.clock = g.below(3000) as i32;
+            x.after = (0..4).map(|k| if k == 3 || g.below(2) == 0 { -1 } else { g.below(4) as i32 }).collect();
             x.log.clear();
         }
         r.mem.write_u32(0x32de8c, w.borrow().mode);
@@ -384,7 +416,32 @@ fn handlers_are_the_original() {
         // the career the start and next-race lines read
         let mut car = Career::default();
         car.bytes[0x2b0c] = g.below(4) as u8;
-        car.w32(0x27dc, 1 + g.below(6));
+        car.w32(0x27dc, g.below(7));
+        let n = car.r32(0x27dc) as usize;
+        let mut order: Vec<u32> = (0..n as u32).collect();
+        for i in (1..n).rev() {
+            order.swap(i, g.below(i as u32 + 1) as usize);
+        }
+        for (i, o) in order.iter().enumerate() {
+            car.w32(0x3264 + 4 * i, *o);
+        }
+        car.w32(0x3310, g.below(600_000));
+        for i in 0..6 {
+            car.w32(0x2818 + 0x84 * i, g.below(13));
+            let o = 0xbc * i;
+            car.wf(0x3300 + o, g.below(130_000) as f32 + 0.5);
+            car.w32(0x32ac + o, g.below(14));
+            car.w32(0x32b0 + o, g.below(14));
+            car.w32(0x32dc + o, g.below(4));
+            for k in 0..5 {
+                car.w32(0x3348 + o + 4 * k, g.below(5));
+            }
+        }
+        let full = g.below(3) == 0;
+        for k in 0..5 {
+            let v = if full || g.below(2) == 0 { g.below(4) as i32 } else { -1 };
+            car.w32(0x3910 + 0x10 * k, v as u32);
+        }
         for i in 0..6 {
             car.bytes[0x2845 + 0x84 * i] = if g.below(3) == 0 { g.below(4) as u8 } else { 0xff };
             for j in 0..8 {
@@ -395,24 +452,27 @@ fn handlers_are_the_original() {
             car.bytes[0x30fc + 0x44 * k] = if g.below(2) == 0 { g.below(4) as u8 } else { 0xff };
             car.w32(0x3110 + 0x44 * k, g.below(2));
         }
-        for k in [0x2b0cu32, 0x27dc] {
-            for b in 0..4 {
-                r.mem.write_u8(CAREER_BASE + k + b, car.bytes[(k + b) as usize]);
-            }
+        // (the mode and course words are the career's +0x2afc and +0x2af8)
+        car.w32(0x2afc, w.borrow().mode);
+        car.w32(0x2af8, w.borrow().course);
+        r.mem.write(CAREER_BASE, &car.bytes).unwrap();
+        for (k, v) in w.borrow().after.iter().enumerate() {
+            r.mem.write_u32(0x32ecf0 + 0x10 * k as u32, *v as u32);
         }
-        for i in 0..6u32 {
-            r.mem.write_u8(CAREER_BASE + 0x2845 + 0x84 * i, car.bytes[(0x2845 + 0x84 * i) as usize]);
-            for j in 0..8 {
-                let at = 0x27dc + 0x20 + 0x84 * i + 4 * j;
-                r.mem.write_u8(CAREER_BASE + at, car.bytes[at as usize]);
-            }
+        r.mem.write_u32(race_obj + 0x18, w.borrow().clock as u32);
+        // the circuit's unlock list
+        let mut circ = tricky_game::circuit::Circuit::default();
+        for _ in 0..g.below(4) {
+            circ.unlocks.push(tricky_game::circuit::Unlock { who: 0, kind: g.below(5), value: g.below(13) as i32 });
         }
-        for k in 0..4u32 {
-            r.mem.write_u8(CAREER_BASE + 0x30fc + 0x44 * k, car.bytes[(0x30fc + 0x44 * k) as usize]);
-            r.mem.write_u32(CAREER_BASE + 0x3110 + 0x44 * k, car.r32((0x3110 + 0x44 * k) as usize));
+        r.mem.write_u32(0x3353f8, circ.unlocks.len() as u32);
+        for (i, u) in circ.unlocks.iter().enumerate() {
+            r.mem.write_u32(0x335400 + 12 * i as u32, u.who as u32);
+            r.mem.write_u32(0x335404 + 12 * i as u32, u.kind);
+            r.mem.write_u32(0x335408 + 12 * i as u32, u.value as u32);
         }
         let mut ours = w.borrow().clone();
-        let op = g.below(37) as usize;
+        let op = g.below(43) as usize;
         seen[op] += 1;
         let (a, b) = (rs[0], rs[1]);
         let (pa, pb) = (riders[0] as u64, riders[1] as u64);
@@ -575,6 +635,48 @@ fn handlers_are_the_original() {
                 call(&mut r, 0x231ff8, &[s]);
                 ann.on_next_race(&mut ours, &car);
             }
+            37 => {
+                let t = call(&mut r, 0x231548, &[s]) != 0;
+                ret = Some((t, ann.queue_result_line(&mut ours, &car)));
+            }
+            38 => {
+                let rank = g.below(12) as u64;
+                call(&mut r, 0x232240, &[s, rank]);
+                ann.on_hi_score(&mut ours, &car, rank as i64);
+            }
+            39 => {
+                call(&mut r, 0x231c50, &[s]);
+                ann.queue_race_end_lines(&mut ours, &car);
+            }
+            40 => {
+                call(&mut r, 0x232330, &[s]);
+                ann.queue_unlock_lines(&mut ours, &car, &circ);
+            }
+            41 => {
+                // mostly two players' riders, one passing the other along b's heading by 500..2000
+                let (mut a, mut b) = (a, b);
+                if g.below(4) != 0 {
+                    a.controller = -1;
+                    b.controller = -1;
+                    let (sn, cs) = tricky_game::math::sin_cos(b.heading);
+                    let d = 500.0 + g.below(1500) as f32;
+                    a.vel = [b.vel[0] + cs * d, b.vel[1] + sn * d, a.vel[2]];
+                    write_rider(&mut r, riders[0], entries[0], &a);
+                    write_rider(&mut r, riders[1], entries[1], &b);
+                    let mut x = w.borrow_mut();
+                    x.near = riders.iter().map(|id| (*id, 1)).collect();
+                    x.can_play = true;
+                    ours.near = x.near.clone();
+                    ours.can_play = true;
+                }
+                call(&mut r, 0x2347c8, &[s, pa, pb]);
+                ann.on_placing_change(&mut ours, &a, &b);
+            }
+            42 => {
+                let p = g.below(5) as i32 - 1;
+                let t = call(&mut r, 0x2315e0, &[s, p as i64 as u64]) as u32;
+                ret = Some((t == speech::race_stats_mask(&car, ours.course, p as i8), true));
+            }
             25 => {
                 let theirs = call(&mut r, 0x233b70, &[pa]) as u32;
                 ret = Some((theirs == speech::wipeout_grade(a.level), true));
@@ -598,9 +700,10 @@ fn handlers_are_the_original() {
         assert_eq!(ring_now, ann.ring, "case {case} op {op}: ring");
         assert_eq!(r.mem.read_u32(ring + 8) as i32, ann.ring_write, "case {case} op {op}: ring write");
         assert_eq!(r.mem.read_u32(sys + 0x7dd8), ann.big_queued, "case {case} op {op}: queued");
+        assert_eq!(r.mem.read_u32(sys + 0x7dcc), ann.end_flags, "case {case} op {op}: end flags");
     }
     eprintln!("ops {seen:?}\nposts by op {posted:?}");
-    for op in (0..25).chain([31, 32, 33, 34, 36]) {
+    for op in (0..25).chain([31, 32, 33, 34, 36, 37, 38, 39, 40, 41]) {
         assert!(op == 17 || posted[op] > 0, "op {op} never posted");
     }
 }
