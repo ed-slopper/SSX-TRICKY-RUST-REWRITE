@@ -25,6 +25,7 @@ pub mod fxrand;
 pub mod gate;
 pub mod aictl;
 pub mod ridercol;
+pub mod sfxcalc;
 pub mod hit;
 pub mod taunt;
 pub mod input;
