@@ -386,6 +386,14 @@ Part of the port notes (index: [README.md](README.md)); units and wording as des
   `Boarder_RiderCollisions` 0x124384, `AIComputer_PlanJumpTrick` 0x139d9c, 0x139dc0, 0x139e88, 0x139f04, 0x139f24,
   `FUN_00138bb8` 0x138c98 and `Rand_GameRange` 0x23d50c. All the `% 100`, `% 15` are unsigned (`divu`), whatever the
   decompiler shows.
+- Read for E1b2d, not ported (they hang off clip and state systems the port does not have): `Boarder_Stumble` 0x124dd0 draws once
+  (0x124f84 or 0x124fd0, `% 5` into the word table at 0x368540, stored at `rider+0x5ae0`+0x618) only for the *fast* knock
+  (the hit's speed along the rider's travel over 1388.8888 cm/s with the part along its normal under 1111.1111), in the two
+  branches that play clips 0x249 and 0x248; the slow ones (clips 0x244..0x247) draw nothing; it returns without effect unless
+  the control state (+0x428) is 3 or 0xe, and `Boarder_SetState`(2) follows. `Ride_AITauntCheck` 0x1036a0 draws once per tick
+  when the layer-1 clip type is 8 (cruise) and its timer (+0xc, +1/60 a tick) is at least 1.0253273: taunts when `% 100 < 91`
+  (0x5b), then looks for a rival within 1000.13 cm and more than 1.0471976 rad off the heading to turn at (clips 0x211,
+  0x212, 0x213).
 - `AIComputer_PlanJumpTrick` 0x139d58 draws, in order: the trick roll (`Rand_Game() % 100 - 16 < tricks stat`) only when a
   spin or a flip is allowed; the late draw (always; late when `20 < (draw % 100) * k`, `k = 0` for skill 1.0, else
   `1 - skill / 14.454015`); the grab roll (always) and, when it passes, the pick (`% 15`); then, only when the trick roll
