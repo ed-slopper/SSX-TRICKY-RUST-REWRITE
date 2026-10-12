@@ -11,7 +11,7 @@ pub struct Rand {
 
 impl Rand {
     /// `Rand_Seed` 0x2402c0: every word is the seed plus its own constant.
-    pub fn seeded(x: u32) -> Self {
+    pub const fn seeded(x: u32) -> Self {
         Self {
             s: [
                 x.wrapping_sub(0x0dd2_f1aa),
@@ -123,3 +123,29 @@ impl Streams {
         self.game.snapshot()
     }
 }
+
+/// The seed the port gives `Rand_SeedGame` at a race's start. STANDIN: the game seeds the game stream with `DAT_0032de90`,
+/// which `cAI::vf15_1114d0` 0x1114d0 sets to a draw of `Rand_Fx` when the race is entered (0x111520), so it depends on
+/// everything the front end drew before; the port has no such history.
+pub const RACE_SEED: u32 = 0x1d2c_3b4a;
+
+/// The game's two streams are globals (state at 0x345e58 and 0x345e70): every consumer draws from the same one, so the
+/// order of the draws across the riders and the systems is part of the result. Until a race is entered the game stream
+/// is the one `RACE_SEED` gives.
+static STREAMS: std::sync::Mutex<Streams> = std::sync::Mutex::new(Streams { fx: Rand::seeded(RACE_SEED), game: Rand::seeded(RACE_SEED) });
+
+/// The global streams, locked for the caller's draws.
+pub fn streams() -> std::sync::MutexGuard<'static, Streams> {
+    STREAMS.lock().unwrap_or_else(|e| e.into_inner())
+}
+
+/// `Rand_Game` 0x23d4d8 on the global stream.
+pub fn rand_game() -> u32 {
+    streams().game()
+}
+
+/// `Rand_SeedGame` 0x23d4c8 on the global stream, as the race init does it (`cAI::vf14_111108` 0x111108, 0x1112dc).
+pub fn seed_game(x: u32) {
+    streams().seed_game(x);
+}
+

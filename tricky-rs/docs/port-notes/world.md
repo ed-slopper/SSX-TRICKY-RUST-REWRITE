@@ -372,7 +372,25 @@ Part of the port notes (index: [README.md](README.md)); units and wording as des
   s4 = x − 0x61cac083, s5 = x + 0x6fdf3b64.
 - Floats: (r & 0x7fffff | 0x3f800000) as f32 − 1.0 gives [0, 1); `Rand_GameRange`(lo, hi) = lo + (hi − lo)·that.
   Ported in `tricky-rs/game/src/rand.rs` (`Rand`, `Streams`) and checked bit for bit in the function runner
-  (`tests/rand.rs`, E1b1). The port's xorshift stand-ins (race.rs, props.rs, intro.rs) still have to switch to it (E1b2).
+  (`tests/rand.rs`, E1b1). The streams are globals in the game (0x345e58, 0x345e70) and so in the port
+  (`rand::streams()`, `rand_game()`, `seed_game()`): every consumer draws from the same one, so the order of draws across
+  riders and systems is part of the result. The port's other xorshift stand-ins (props.rs, intro.rs, the music and sound
+  pickers, the animated-object seeds) still have to switch to it (E1b2b, E1b2c).
+- Race init (row E1b2a, proven): `cAI::vf15_1114d0` 0x1114d0 stores a `Rand_Fx` draw in `DAT_0032de90` (0x111520, also
+  written at 0x1115d0) and `cAI::vf14_111108` 0x111108 calls `Rand_SeedGame(DAT_0032de90)` (0x1112dc; `Init` 0x17e148 does
+  too, 0x17e248). STANDIN: the port seeds with `rand::RACE_SEED` at `Race::new` and `Race::restart`, having no front-end draws.
+- Every `Rand_Game` call site (`get_xrefs_to` 0x23d4d8): `AnimClip_ResolveAnmIndex` 0x15ae54, `Ride_AITauntCheck` 0x1036d4,
+  `CruiseControl_RandomFlourish` 0x103c00, `Boarder_Stumble` 0x124f84 and 0x124fd0, `Boarder_ChoosePathAhead` 0x1189ac,
+  `FUN_0011d368` 0x11d39c (a random grab of the rider's fifteen: `table[rider+0x44][rider+0x5c][Rand_Game() % 15]`,
+  from `AIComputer_PlanJumpTrick` and `AIComputer_AirTrickInput` 0x138f7c), `FUN_0011d3d8` 0x11d40c,
+  `Boarder_RiderCollisions` 0x124384, `AIComputer_PlanJumpTrick` 0x139d9c, 0x139dc0, 0x139e88, 0x139f04, 0x139f24,
+  `FUN_00138bb8` 0x138c98 and `Rand_GameRange` 0x23d50c. All the `% 100`, `% 15` are unsigned (`divu`), whatever the
+  decompiler shows.
+- `AIComputer_PlanJumpTrick` 0x139d58 draws, in order: the trick roll (`Rand_Game() % 100 - 16 < tricks stat`) only when a
+  spin or a flip is allowed; the late draw (always; late when `20 < (draw % 100) * k`, `k = 0` for skill 1.0, else
+  `1 - skill / 14.454015`); the grab roll (always) and, when it passes, the pick (`% 15`); then, only when the trick roll
+  passed, one draw each for the spin and flip direction (bit 0 set: negated). Ported in `race::AiDriver::plan_trick`
+  (tests `race::draw_tests`); the port drew the two direction bits whether or not the trick roll passed.
 
 ## Course file loading (`cCourseResolve_Common` / `cCourseResolve_PS2`)
 

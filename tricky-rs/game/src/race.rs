@@ -74,7 +74,6 @@ pub struct AiDriver {
     /// (-1, 0, +1), the grab (shoulder mask, 0 none), letting go late, and whether it is planned
     plan: (f32, f32, u8, bool),
     planned: bool,
-    rng: u32,
     jumps: u32,
     /// the original's catch-up: this rider's physics runs this much faster or slower (0.7..1.5)
     pub time_scale: f32,
@@ -87,26 +86,30 @@ pub struct AiDriver {
     route_done: bool,
 }
 impl AiDriver {
-    pub fn new(offset: f32, skill: f32) -> Self { Self { idx: 0, last_idx: 0, stuck_for: 0.0, offset, skill, finished: None, stuck: 0, clock: 0.0, beside: 0.0, seen_respawns: 0, over: Vec::new(), slow_for: 0.0, shove_wait: 4.0, plan: (0.0, 0.0, 0, false), planned: false, rng: 0x9E37_79B9 ^ ((offset * 1000.0) as i32 as u32).wrapping_mul(2654435761) ^ ((skill * 977.0) as u32), jumps: 0, time_scale: 1.0, was_crouching: false, route: Vec::new(), route_course: AiCourse::default(), route_last: None, route_done: false } }
-    /// rand() % 100 - 16, as the original rolls it against the tricks stat (0..255)
+    pub fn new(offset: f32, skill: f32) -> Self { Self { idx: 0, last_idx: 0, stuck_for: 0.0, offset, skill, finished: None, stuck: 0, clock: 0.0, beside: 0.0, seen_respawns: 0, over: Vec::new(), slow_for: 0.0, shove_wait: 4.0, plan: (0.0, 0.0, 0, false), planned: false, jumps: 0, time_scale: 1.0, was_crouching: false, route: Vec::new(), route_course: AiCourse::default(), route_last: None, route_done: false } }
+    /// `Rand_Game() % 100 - 16`, an unsigned remainder (`divu`), as the original rolls it against the tricks stat (0..255)
+    /// (`AIComputer_PlanJumpTrick` 0x139d58, `FUN_00138bb8` 0x138c98): the game's one stream, row E1b2a.
     fn roll(&mut self) -> i32 {
-        self.rng ^= self.rng << 13; self.rng ^= self.rng >> 17; self.rng ^= self.rng << 5;
-        (self.rng % 100) as i32 - 16
+        (crate::rand::rand_game() % 100) as i32 - 16
     }
-    fn rand(&mut self) -> u32 { self.rng ^= self.rng << 13; self.rng ^= self.rng >> 17; self.rng ^= self.rng << 5; self.rng }
+    /// `Rand_Game` 0x23d4d8
+    fn rand(&mut self) -> u32 { crate::rand::rand_game() }
     /// `AIComputer_PlanJumpTrick` 0x139d58: whether to spin/flip (only where the jump allows), which way, a
     /// random grab of the rider's fifteen, and whether to hold it late.
     fn plan_trick(&mut self, r: &Rider, value: i32) {
         let b = (r.stats.tricks * 255.0) as i32;
         let (spin, flip) = (value & 2 != 0, value & 1 != 0);
         let trick = (spin || flip) && self.roll() < b;
-        let k = if self.skill >= 1.0 { 0.0 } else { 1.0 - self.skill / 14.454015 };
+        let k = if self.skill == 1.0 { 0.0 } else { 1.0 - self.skill / 14.454015 };
         let late = (self.rand() % 100) as f32 * k > 20.0;
         let grab = if self.roll() < b { crate::trickdata::COMBOS[(self.rand() % 15) as usize] } else { 0 };
         let mut sd = if trick && spin { 1.0 } else { 0.0 };
         let mut fd = if trick && flip { 1.0 } else { 0.0 };
-        if self.rand() & 1 != 0 { sd = -sd; }
-        if self.rand() & 1 != 0 { fd = -fd; }
+        // the two sign draws are made only when the trick roll passed (0x139ec8: `param_1[0x21f] != 0`), spin first
+        if trick {
+            if self.rand() & 1 != 0 { sd = -sd; }
+            if self.rand() & 1 != 0 { fd = -fd; }
+        }
         self.plan = (sd, fd, grab, late);
         self.planned = true;
     }
@@ -372,8 +375,9 @@ pub struct Race { pub line: Vec<Vec3>, pub idx: usize, pub time: f32, pub state:
     pub finish_area: Option<(Vec3, glam::Quat)>, pub post: u8, pub post_scripts: Vec<String>, pub cast: Option<tricky_data::intro::Cast> }
 impl Race {
     /// The original's countdown: GO after 2.5 s (beeps at 0.5, 1.0, 1.5 and 2.0 s).
-    pub fn new(line: Vec<Vec3>) -> Self { Self { line, idx: 0, time: 0.0, state: RaceState::Countdown, best: None, countdown: 2.5, course: AiCourse::default(), lines: Default::default(), prog: Default::default(), bonus: 0.0, checkpoints: 0, paths: Default::default(), tube: None, cml: None, intro: false, scene: None, stage: None, finish_area: None, post: 0, post_scripts: Vec::new(), cast: None } }
-    pub fn restart(&mut self) { self.idx = 0; self.time = 0.0; self.state = RaceState::Countdown; self.countdown = 2.5; self.prog = Default::default(); self.bonus = 0.0; self.checkpoints = 0; self.post = 0; self.post_scripts.clear(); self.cast = None; }
+    /// A race entered: `Rand_SeedGame` seeds the game stream (`cAI::vf14_111108` 0x1112dc; STANDIN seed, see [`crate::rand::RACE_SEED`]).
+    pub fn new(line: Vec<Vec3>) -> Self { crate::rand::seed_game(crate::rand::RACE_SEED); Self { line, idx: 0, time: 0.0, state: RaceState::Countdown, best: None, countdown: 2.5, course: AiCourse::default(), lines: Default::default(), prog: Default::default(), bonus: 0.0, checkpoints: 0, paths: Default::default(), tube: None, cml: None, intro: false, scene: None, stage: None, finish_area: None, post: 0, post_scripts: Vec::new(), cast: None } }
+    pub fn restart(&mut self) { crate::rand::seed_game(crate::rand::RACE_SEED); self.idx = 0; self.time = 0.0; self.state = RaceState::Countdown; self.countdown = 2.5; self.prog = Default::default(); self.bonus = 0.0; self.checkpoints = 0; self.post = 0; self.post_scripts.clear(); self.cast = None; }
     /// Metres of racing line still to go from a line point.
     pub fn remaining(&self, idx: usize) -> f32 { self.line.windows(2).skip(idx).map(|w| (w[1] - w[0]).length()).sum() }
     pub fn progress(&self) -> f32 { if self.line.len() < 2 { 0.0 } else { self.idx as f32 / (self.line.len() - 1) as f32 } }
@@ -765,4 +769,77 @@ pub fn self_test(world: &mut CollisionWorld, rails: &Rails, line: &[Vec3], cours
     println!("wipe-outs: {crashes}, stumbles: {stumbles}, score {}, last trick \"{}\"", r.score, r.last_trick);
     println!("ground/air switches: {flips} ({:.1} per second)", flips as f32 / t.max(1.0));
     println!("distance {:.0} m, top speed {:.0} km/h, airborne {:.0} s, on rails {:.0} s, autopilot stuck {} times, fell out of the world {} times", dist, top * 3.6, air, grind, ai.stuck + stuck, r.respawns - ai.stuck - stuck);
+}
+
+#[cfg(test)]
+mod draw_tests {
+    //! Row E1b2a: the AI's draws are the game's one `Rand_Game` stream, in the order of `AIComputer_PlanJumpTrick` 0x139d58.
+    use super::*;
+    use crate::rand::{seed_game, streams, Rand};
+    use std::sync::Mutex;
+
+    /// the tests below share the global stream
+    static ONE_AT_A_TIME: Mutex<()> = Mutex::new(());
+
+    fn rider(tricks: f32) -> Rider {
+        let mut r = Rider::new(Vec3::ZERO, 0.0);
+        r.stats.tricks = tricks;
+        r
+    }
+
+    #[test]
+    fn a_planned_trick_draws_in_the_games_order() {
+        let _g = ONE_AT_A_TIME.lock().unwrap_or_else(|e| e.into_inner());
+        let seed = 0x5eed_0001;
+        let mut want = Rand::seeded(seed);
+        let mut d = || want.draw();
+        // spin and flip allowed, tricks 255: the trick roll (0x139d9c) passes, then the late draw (0x139dc0), the grab roll
+        // (0x139e88) and its pick (`FUN_0011d368` 0x11d39c, % 15), then the two sign draws (0x139f04, 0x139f24)
+        let (t, late, g, pick, sd, fd) = (d(), d(), d(), d(), d(), d());
+        assert!((t % 100) as i32 - 16 < 255 && (g % 100) as i32 - 16 < 255);
+        let k = 1.0 - 0.9f32 / 14.454015;
+        let mut ai = AiDriver::new(0.0, 0.9);
+        seed_game(seed);
+        ai.plan_trick(&rider(1.0), 3);
+        let sign = |x: u32| if x & 1 != 0 { -1.0 } else { 1.0 };
+        assert_eq!(ai.plan, (sign(sd), sign(fd), crate::trickdata::COMBOS[(pick % 15) as usize], (late % 100) as f32 * k > 20.0));
+        // exactly six draws were made: the next one is the seventh
+        assert_eq!(streams().game(), d());
+    }
+
+    #[test]
+    fn the_sign_draws_are_made_only_after_a_passed_trick_roll() {
+        let _g = ONE_AT_A_TIME.lock().unwrap_or_else(|e| e.into_inner());
+        let seed = 0x5eed_0002;
+        // no spin or flip allowed (value 0): no trick roll; the late draw and the grab roll only, and the grab's pick when
+        // it passes; tricks 0 makes the roll (% 100 - 16 < 0) fail for draws 16 and up, so look at what the stream says
+        let mut want = Rand::seeded(seed);
+        let _late = want.draw();
+        let roll = want.draw();
+        let passes = (roll % 100) as i32 - 16 < 0;
+        if passes { want.draw(); }
+        let mut ai = AiDriver::new(0.0, 0.9);
+        seed_game(seed);
+        ai.plan_trick(&rider(0.0), 0);
+        assert_eq!(ai.plan.0, 0.0);
+        assert_eq!(ai.plan.1, 0.0);
+        assert_eq!(streams().game(), want.draw(), "draws made with passes = {passes}");
+        // with spin allowed and a trick roll that fails (tricks 0, a draw whose % 100 is 16 or more) there are no sign draws
+        let mut tries = 0;
+        let seed = loop {
+            let s = 0x5eed_1000 + tries;
+            let mut w = Rand::seeded(s);
+            if (w.draw() % 100) >= 16 { break s; }
+            tries += 1;
+        };
+        let mut want = Rand::seeded(seed);
+        let _trick = want.draw();
+        let _late = want.draw();
+        let roll = want.draw();
+        if (roll % 100) as i32 - 16 < 0 { want.draw(); }
+        let mut ai = AiDriver::new(0.0, 0.9);
+        seed_game(seed);
+        ai.plan_trick(&rider(0.0), 2);
+        assert_eq!(streams().game(), want.draw());
+    }
 }
