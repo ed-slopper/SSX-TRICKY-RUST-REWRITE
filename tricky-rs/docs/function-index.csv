@@ -2,7 +2,7 @@ address,size,name,system,status
 0x100008,160,entry,runtime,ported
 0x1000a8,8,Crt_Exit,other,not started
 0x1000b8,36,NaturalAirControl_Enter,boarder?,ported
-0x1000e0,1140,NaturalAirControl_Update,boarder?,not started
+0x1000e0,1140,NaturalAirControl_Update,boarder?,checked
 0x100558,40,NaturalAirControl_SaveSnapshot,save,not started
 0x100580,20,NaturalAirControl_LoadSnapshot,ai?,not started
 0x100598,876,SpinControl_Enter,boarder,ported
@@ -16,29 +16,29 @@ address,size,name,system,status
 0x102f50,44,Vec4_Scale,common?,ported
 0x102f80,44,Vec3_Scale,common?,ported
 0x102fb0,24,CruiseControl_Enter,boarder?,ported
-0x102fc8,1012,CruiseControl_Update,boarder?,not started
+0x102fc8,1012,CruiseControl_Update,boarder?,checked
 0x1033c0,16,CruiseControl_Exit,boarder?,ported
-0x1033d0,656,CruiseControl_LookBack,boarder?,not started
+0x1033d0,656,CruiseControl_LookBack,boarder?,checked
 0x103660,1316,Ride_AITauntCheck,boarder?,ported
 0x103b88,752,CruiseControl_RandomFlourish,boarder?,ported
 0x103e78,40,CruiseControl_SaveSnapshot,save,not started
 0x103ea0,20,CruiseControl_LoadSnapshot,ai?,not started
 0x103eb8,376,ChangeFakieControl_Enter,boarder?,ported
-0x104030,324,ChangeFakieControl_Update,boarder?,not started
+0x104030,324,ChangeFakieControl_Update,boarder?,checked
 0x104178,24,ChangeFakieControl_Exit,boarder?,ported
 0x104190,28,BumpControl_Enter,boarder?,ported
-0x1041b0,472,BumpControl_Update,boarder?,not started
+0x1041b0,472,BumpControl_Update,boarder?,checked
 0x104388,48,BumpControl_Exit,boarder?,ported
 0x1043b8,40,BumpControl_SaveSnapshot,save,not started
 0x1043e0,20,BumpControl_LoadSnapshot,ai?,not started
 0x104688,40,FakieCruiseControl_Exit,boarder?,ported
 0x1046b0,204,JumpControl_Update,boarder?,ported
 0x104790,108,LandHardControl_Exit,boarder?,ported
-0x104800,416,LandHardControl_Update,boarder?,not started
+0x104800,416,LandHardControl_Update,boarder?,checked
 0x1049a0,88,AirMotion_SetFallScale,boarder,ported
 0x1049f8,1088,LandNormalControl_Enter,boarder?,ported
 0x104e38,44,LandNormalControl_Exit,boarder?,ported
-0x104e68,452,LandNormalControl_Update,boarder?,not started
+0x104e68,452,LandNormalControl_Update,boarder?,checked
 0x105030,40,LandNormalControl_SaveSnapshot,save,not started
 0x105058,20,LandNormalControl_LoadSnapshot,ai?,not started
 0x105070,120,PrewindControl_Enter,boarder,ported
@@ -50,8 +50,8 @@ address,size,name,system,status
 0x105af8,20,PrewindControl_LoadSnapshot,boarder,not started
 0x105b10,124,StaticInit_PrewindControl,other,not started
 0x105b90,44,Vec4_ScaleCopy1,other,not started
-0x105bc0,160,SitAndWaitControl_Update,boarder?,not started
-0x105c60,288,GetupFromSitControl_Update,boarder?,not started
+0x105bc0,160,SitAndWaitControl_Update,boarder?,checked
+0x105c60,288,GetupFromSitControl_Update,boarder?,checked
 0x105d80,60,Gate2BaseControl_Enter,race?,ported
 0x105dc0,388,Gate2BaseControl_Update,boarder?,ported
 0x105f48,16,GateAnticipateControl_Enter,boarder,checked

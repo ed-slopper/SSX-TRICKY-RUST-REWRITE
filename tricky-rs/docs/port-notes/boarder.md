@@ -834,3 +834,37 @@ animation files).
   `PadCfg_Destruct` 0x14f550 (empty, deleting).
 - `AIComputer_CrossedEvent1b` 0x139210 (no callers): true if any path event (rider+0x57a4, cPath vtable +0xc) between
   +0x340 and +0x344 has type 0x1b. `SplinePathNode_IsVisible` 0x251a98: renderer vtable +0x284 cull test on +0x5c.
+
+## The control states' updates (board row G1f; `tricky_game::control`, checked: `tests/control.rs`)
+
+Each reads the pad word as `cPlayer::GetControls` packs it (sticks: six signed bits / 31 at shifts 0x15 steer,
+0xf crouch, 9 brake, 0x12 / 0x18 / 0xc / 6 in the air; directions: two signed bits at 7 / 5 (ground) and 4 / 2
+(air); bit 0 reset, bit 1 the air's reset, bit 2 the brake, bits 3 / 4 the boost buttons) and calls the boarder's
+helpers. Most end alike: off the course (+0x290 = 0) or with bit 0, +0x304 = !bit 0 and `Boarder_RequestReset`(101.46).
+
+- `CruiseControl_Update` 0x102fc8: a computer rider whose clip is not the stop clip 0x221 goes to state 6; boost,
+  steer, brake / crouch (the crouch held to 0.5 for board class 2 unless layer 1 plays a look); +0x10 the brake held
+  (bit 1 starts it, bits 1 / 2 keep it), which clears the board's +0x718; the lean target follows the steer (rate 2;
+  0 while stopping). Braking with the board's +0x718 clear: the brake target 0 and, stopped, state 0xe and the
+  rider's virtual +0x7c(1). Crouched, steering under 0.2, not braking and under 833.33 cm/s (|v| by the VU): the stop
+  clip. Then the lean animation, `Boarder_PlayCelebrate`, `Boarder_PlayDisappointed`, `Ride_AITauntCheck`, the
+  look back, `CruiseControl_RandomFlourish`, the reset check.
+- `CruiseControl_LookBack` 0x1033d0: while layer 1 plays a look (type 8) a timer (+8) runs; after a second the first
+  other rider (by slot) under 1477.63 away whose bearing (+0x44 + 0x20 · k) is more than 120° off the heading
+  (wrapped by floor(a / 2π + 0.5)) turns the head: clip 0x210 when that side matches the stance (+0x1b4), else
+  0x20f, played with the clip filter +0x46dc set from the trick slot's word (bits word + 3, + 4, + 5, + 9), then −1.
+- `ChangeFakieControl_Update`, `LandHardControl_Update`, `BumpControl_Update`: the landing clip decides (0x202 → 5;
+  0x1ff (and 0x221 for the fakie change) → 3, or 0xe with the brake button); a hard landing steers backward when the
+  velocity is against the board; a bump turns with its clip's phase (+8 · phase, the change since +0xc).
+- `LandNormalControl_Update`: 3 / 0xe once crouched back to the landing's crouch (+8); steering unless braking;
+  not braking, the crouch target at least the landing's, rate 8.33.
+- `NaturalAirControl_Update` 0x1000e0: the crouch (held at 1 on clip 0x224), the lean animation, the wind-up; still
+  settling (brake, steer, lean or the two other triples not at rest): eased back (rates 4) or, with the steer target
+  set, steering held to the air's limit (+8); at rest and not crouched past half with no steer: the crouch-out
+  (+0x1f0 / +0x1f8 = 1 − crouch), the take-off clip after 0.35 s of air, the board's +0x76c / +0x770 / +0x798
+  cleared, state 0x10 (the jump's wind-up). Bit 1 asks for a reset.
+- `SitAndWaitControl_Update` 0x105bc0: at race state 4, the rider's camera starts "RaceStarted2", clip 0x1fe, motion
+  6, state 0x12. `GetupFromSitControl_Update` 0x105c60: held still until the get-up clip ends (or 0x1ff), then clip
+  0x221, state 3, motion 2 and a push of 416.67 along the board; brake and crouch cleared every frame.
+- Checked in the runner on 80,000 random riders, pads and clips: every field, the state objects and every call with
+  its arguments (and the clip filter when a clip starts) compared; every branch reached.
