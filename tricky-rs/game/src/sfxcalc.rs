@@ -218,3 +218,29 @@ pub fn run_snow_program(prog: &[u8], w: &mut [i32], input: &mut dyn FnMut(u32) -
         }
     }
 }
+
+/// `SndVoice_DistanceVolume` 0x20aab8: the volume (of `volume`) a voice `distance` away has with audible `range`:
+/// the distance less half a unit (not below 0), then the squared fraction of the range left; 0 beyond it.
+pub fn voice_distance_volume(distance: f32, range: f32, volume: i32) -> i32 {
+    let mut d = distance - 0.5;
+    if d < 0.0 {
+        d = 0.0;
+    }
+    if d < range && 0.0 < range {
+        let t = (range - d) / range;
+        return (t * t * volume as f32) as i32;
+    }
+    0
+}
+
+/// `SndVoice_DopplerPitch` 0x20ab48: the pitch factor of a voice closing at `speed` over `unit` (the ratio clamped to
+/// +-894.08, the speed of sound scaled by the game's units, then (x + 8000) / 8000).
+pub fn voice_doppler_pitch(speed: f32, unit: f32) -> f32 {
+    let mut x = speed / unit;
+    if x < f32::from_bits(0xc45f_851e) {
+        x = f32::from_bits(0xc45f_851e);
+    } else if f32::from_bits(0x445f_851e) < x {
+        x = f32::from_bits(0x445f_851e);
+    }
+    (x + 8000.0) / 8000.0
+}

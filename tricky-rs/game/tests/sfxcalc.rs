@@ -207,3 +207,47 @@ fn near_ahead_volume_and_music_state_match_the_original() {
         assert_eq!(r.cpu.gpr(2) as u32, music_state_to_mode(s), "music state {s}");
     }
 }
+
+#[test]
+fn voice_distance_volume_and_doppler_match_the_original() {
+    let Some(mut r) = runner() else { return };
+    let mut g = Rng(0x0fed_cba9_8765_4321);
+    for case in 0..60_000 {
+        let d = match g.next() % 6 {
+            0 => 0.5,
+            1 => 0.0,
+            2 => g.f(-1.0, 3.0),
+            _ => g.f(0.0, 120.0),
+        };
+        let range = match g.next() % 6 {
+            0 => 0.0,
+            1 => -g.f(0.0, 5.0),
+            2 => d - 0.5,
+            _ => g.f(0.0, 150.0),
+        };
+        let vol = match g.next() % 4 {
+            0 => 127,
+            1 => 0,
+            2 => -((g.next() % 200) as i32),
+            _ => (g.next() % 20_000) as i32,
+        };
+        r.cpu.set_f(12, d);
+        r.cpu.set_f(13, range);
+        r.cpu.set_gpr(4, vol as i64 as u64);
+        r.call(0x20aab8).unwrap();
+        assert_eq!(r.cpu.gpr(2) as u32, voice_distance_volume(d, range, vol) as u32, "case {case} d {d} range {range} vol {vol}");
+        let unit = [1.0f32, 3.0, 0.25, -2.0, 100.0, 0.001][g.next() as usize % 6];
+        let speed = match g.next() % 6 {
+            0 => g.f(-2_000_000.0, 2_000_000.0),
+            1 => f32::from_bits(0x445f_851e).to_bits() as f32 * 0.0 + f32::from_bits(0x445f_851e) * unit,
+            2 => f32::from_bits(0xc45f_851e) * unit,
+            3 => f32::from_bits(0x445f_851e + (g.next() % 3) - 1),
+            4 => f32::from_bits(0xc45f_851e + (g.next() % 3) - 1),
+            _ => g.f(-3000.0, 3000.0),
+        };
+        r.cpu.set_f(12, speed);
+        r.cpu.set_f(13, unit);
+        r.call(0x20ab48).unwrap();
+        assert_eq!(r.cpu.f(0).to_bits(), voice_doppler_pitch(speed, unit).to_bits(), "case {case} speed {speed} unit {unit}");
+    }
+}
