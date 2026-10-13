@@ -503,3 +503,225 @@ fn camera_blend_linear_matches_the_original() {
     }
     eprintln!("blend: {n} cases, {full} finished, {part} part way, {first} at the start");
 }
+
+#[test]
+fn camera_blend_orbit_matches_the_original() {
+    use std::cell::RefCell;
+    use std::collections::VecDeque;
+    use std::rc::Rc;
+    let Some(mut r) = Runner::from_env() else { return };
+    r.float_rules = Rules::parse("add=n,mul=n,div=n,cvt=n").unwrap();
+    for a in [0x1741d0u32, 0x175450] {
+        r.allow(a);
+    }
+    let obj = r.mem.alloc(0xf00);
+    let views: Vec<u32> = (0..3).map(|_| r.mem.alloc(0x130)).collect();
+    let lenses: Vec<u32> = (0..3).map(|_| r.mem.alloc(0x60)).collect();
+    let pars: Vec<u32> = (0..3).map(|_| r.mem.alloc(0x130)).collect();
+    let lens_blk: Vec<u32> = (0..3).map(|_| r.mem.alloc(0x60)).collect();
+    for k in 0..3 {
+        r.mem.write_u32(views[k] + 0x11c, pars[k]);
+        r.mem.write_u32(lenses[k] + 0x44, lens_blk[k]);
+    }
+    let q: Rc<RefCell<VecDeque<u32>>> = Rc::new(RefCell::new(VecDeque::new()));
+    let log: Rc<RefCell<Vec<Vec<u32>>>> = Rc::new(RefCell::new(vec![]));
+    let cams: Rc<RefCell<Vec<u32>>> = Rc::new(RefCell::new(vec![]));
+    let slot_of = |cams: &Vec<u32>, p: u32| cams.iter().position(|c| *c == p).expect("camera") as u32;
+    fn hash(w: &[u32]) -> u32 {
+        w.iter().fold(0x1234_5678u32, |h, x| h.rotate_left(5) ^ x.wrapping_mul(0x9e37_79b1))
+    }
+    let (c, l) = (cams.clone(), log.clone());
+    r.stub(0x16dd68, move |cpu, _| {
+        let mut c = c.borrow_mut();
+        let s = c.len() as u32;
+        c.push(cpu.gpr(4) as u32);
+        l.borrow_mut().push(vec![1, s, cpu.gpr(5) as u32]);
+        cpu.set_gpr(2, cpu.gpr(4));
+    });
+    let (c, v) = (cams.clone(), views.clone());
+    r.stub(0x16dda8, move |cpu, _| {
+        let s = c.borrow().iter().position(|x| *x == cpu.gpr(4) as u32).unwrap();
+        cpu.set_gpr(2, v[s] as u64);
+    });
+    let (c, v) = (cams.clone(), lenses.clone());
+    r.stub(0x16ddb8, move |cpu, _| {
+        let s = c.borrow().iter().position(|x| *x == cpu.gpr(4) as u32).unwrap();
+        cpu.set_gpr(2, v[s] as u64);
+    });
+    let (l, qq, pc) = (log.clone(), q.clone(), pars[2]);
+    let vc = views[2];
+    r.stub(0x16e900, move |cpu, m| {
+        assert_eq!(cpu.gpr(4) as u32, vc);
+        assert_eq!(cpu.gpr(5) as u32, obj + 0x484);
+        assert_eq!(cpu.gpr(6) as u32, obj + 0xb68);
+        assert_eq!(cpu.gpr(8), 0);
+        let h = hash(&(0..71).map(|i| m.read_u32(pc + 4 * i)).collect::<Vec<_>>());
+        l.borrow_mut().push(vec![2, cpu.gpr(7) as u32, h]);
+        let mut q = qq.borrow_mut();
+        for i in 0..3 {
+            m.write_u32(obj + 0x484 + 4 * i, q.pop_front().unwrap());
+        }
+    });
+    let (l, qq, ln) = (log.clone(), q.clone(), lenses.clone());
+    let lb = lens_blk.clone();
+    r.stub(0x1722e8, move |cpu, m| {
+        let slot = ln.iter().position(|x| *x == cpu.gpr(4) as u32).unwrap() as u32;
+        assert_eq!(cpu.gpr(6) as u32, obj + 0xb68);
+        assert_eq!(cpu.gpr(8) as u32, obj + 0x10);
+        assert_eq!(cpu.gpr(9) as u32, m.read_u32(obj + 0xeac));
+        assert_eq!(cpu.gpr(10), 0);
+        let h = if slot == 2 { hash(&(0..17).map(|i| m.read_u32(lb[2] + 4 * i)).collect::<Vec<_>>()) } else { 0 };
+        let rec = cpu.gpr(5) as u32;
+        l.borrow_mut().push(vec![3, slot, cpu.gpr(7) as u32, cpu.f(12).to_bits(), h, (rec == obj + 0x484) as u32]);
+        let mut q = qq.borrow_mut();
+        for i in 3..7 {
+            m.write_u32(rec + 4 * i, q.pop_front().unwrap());
+        }
+    });
+    let l = log.clone();
+    r.stub(0x174238, move |_, m| {
+        let mut v = vec![4];
+        v.extend((0..22).map(|i| m.read_u32(obj + 0x484 + 4 * i)));
+        v.push(m.read_u32(obj + 0x18));
+        l.borrow_mut().push(v);
+    });
+    let (l, c) = (log.clone(), cams.clone());
+    r.stub(0x174c58, move |cpu, m| {
+        let s = slot_of(&c.borrow(), cpu.gpr(5) as u32);
+        let mut v = vec![5, s];
+        v.extend((0..22).map(|i| m.read_u32(obj + 0x484 + 4 * i)));
+        v.push(m.read_u32(obj + 0x18));
+        l.borrow_mut().push(v);
+    });
+    let (l, c) = (log.clone(), cams.clone());
+    r.stub(0x16ded0, move |cpu, _| {
+        let s = slot_of(&c.borrow(), cpu.gpr(4) as u32);
+        l.borrow_mut().push(vec![6, s, cpu.gpr(5) as u32]);
+    });
+
+    struct E {
+        q: Rc<RefCell<VecDeque<u32>>>,
+        log: Rc<RefCell<Vec<Vec<u32>>>>,
+    }
+    impl OrbitEnv for E {
+        fn build(&mut self, slot: u32, arg: u32) {
+            self.log.borrow_mut().push(vec![1, slot, arg]);
+        }
+        fn position(&mut self, c: &[u32; 71], rec: &mut [u32], flag: u32) {
+            self.log.borrow_mut().push(vec![2, flag, hash(c)]);
+            let mut q = self.q.borrow_mut();
+            for i in 0..3 {
+                rec[i] = q.pop_front().unwrap();
+            }
+        }
+        fn look_at(&mut self, slot: u32, lc: &[u32; 17], rec: &mut [u32], flag: u32, f12: f32) {
+            let h = if slot == 2 { hash(lc) } else { 0 };
+            self.log.borrow_mut().push(vec![3, slot, flag, f12.to_bits(), h, (slot == 2) as u32]);
+            let mut q = self.q.borrow_mut();
+            for i in 3..7 {
+                rec[i] = q.pop_front().unwrap();
+            }
+        }
+        fn smooth(&mut self, o: &mut [u32]) {
+            let mut v = vec![4];
+            v.extend_from_slice(&o[0x484 / 4..0x484 / 4 + 22]);
+            v.push(o[0x18 / 4]);
+            self.log.borrow_mut().push(v);
+        }
+        fn hand_over(&mut self, slot: u32, o: &mut [u32]) {
+            let mut v = vec![5, slot];
+            v.extend_from_slice(&o[0x484 / 4..0x484 / 4 + 22]);
+            v.push(o[0x18 / 4]);
+            self.log.borrow_mut().push(v);
+        }
+        fn done(&mut self, slot: u32) {
+            self.log.borrow_mut().push(vec![6, slot, 2]);
+        }
+    }
+
+    let mut g = Rng(0x1754_50c1_9e3b_77a5);
+    let (mut n, mut full, mut flipped) = (0, 0, 0);
+    for case in 0..20_000 {
+        let mut o: Vec<u32> = (0..0x3c0).map(|_| g.next()).collect();
+        for i in 0..22 {
+            let v = if i < 3 { g.f() * 2000.0 } else if i < 6 { g.ang() * 1.5 } else if i == 6 { (g.next() % 1500) as f32 / 1000.0 + 0.4 } else { f32::from_bits(g.next()) };
+            o[0x484 / 4 + i] = v.to_bits();
+        }
+        o[0x18 / 4] = g.next() % 3;
+        let a0 = g.next();
+        let a1 = g.next();
+        let flip = g.next() % 3 == 0;
+        let t = match g.next() % 9 {
+            0 => 0.0,
+            1 => 1.0,
+            2 => 1.0 + g.f().abs(),
+            3 => -(g.f().abs()),
+            _ => (g.next() % 100_000) as f32 / 100_000.0,
+        };
+        let mut a: [u32; 71] = std::array::from_fn(|_| g.next());
+        let mut b: [u32; 71] = std::array::from_fn(|_| g.next());
+        for (blk, off) in [(&mut a, 0usize), (&mut b, 1)] {
+            let _ = off;
+            blk[0xdc / 4] = (g.ang() * 1.5).to_bits();
+            blk[0x100 / 4] = (g.ang() * 0.8).to_bits();
+            blk[0xcc / 4] = (g.f() * 300.0).to_bits();
+        }
+        if g.next() % 4 == 0 {
+            b[0xdc / 4] = a[0xdc / 4];
+        }
+        let c0: [u32; 71] = std::array::from_fn(|_| g.next());
+        let la: [u32; 17] = std::array::from_fn(|_| g.next());
+        let lc0: [u32; 17] = std::array::from_fn(|_| g.next());
+        let words: Vec<u32> = (0..16)
+            .map(|i| {
+                let k = i % 8;
+                (if k < 3 { g.f() * 1500.0 } else if k < 7 { g.ang() * 1.5 } else { g.f() }).to_bits()
+            })
+            .collect();
+        for (i, w) in o.iter().enumerate() {
+            r.mem.write_u32(obj + 4 * i as u32, *w);
+        }
+        for i in 0..71 {
+            r.mem.write_u32(pars[0] + 4 * i, a[i as usize]);
+            r.mem.write_u32(pars[1] + 4 * i, b[i as usize]);
+            r.mem.write_u32(pars[2] + 4 * i, c0[i as usize]);
+        }
+        for i in 0..17 {
+            r.mem.write_u32(lens_blk[0] + 4 * i, la[i as usize]);
+            r.mem.write_u32(lens_blk[2] + 4 * i, lc0[i as usize]);
+        }
+        *q.borrow_mut() = words.iter().cloned().collect();
+        log.borrow_mut().clear();
+        cams.borrow_mut().clear();
+        r.cpu.set_gpr(4, obj as u64);
+        r.cpu.set_gpr(5, a0 as u64);
+        r.cpu.set_gpr(6, a1 as u64);
+        r.cpu.set_gpr(7, flip as u64 * (1 + g.next() as u64 % 5));
+        r.cpu.set_f(12, t);
+        r.call(0x175450).unwrap();
+        let want = std::mem::take(&mut *log.borrow_mut());
+        let want_ret = r.cpu.gpr(2) & 1;
+
+        *q.borrow_mut() = words.iter().cloned().collect();
+        let mut e = E { q: q.clone(), log: log.clone() };
+        let (mut c, mut lc) = (c0, lc0);
+        let ret = blend_orbit(&mut o, t, flip, &a, &b, &mut c, &la, &mut lc, [a0, a1], &mut e);
+        let got = std::mem::take(&mut *log.borrow_mut());
+        assert_eq!(want, got, "case {case} calls, t {t}");
+        assert_eq!(want_ret, ret as u64, "case {case} return");
+        for (i, w) in o.iter().enumerate() {
+            assert_eq!(r.mem.read_u32(obj + 4 * i as u32), *w, "case {case} object word {i:#x} t {t}");
+        }
+        for i in 0..71 {
+            assert_eq!(r.mem.read_u32(pars[2] + 4 * i), c[i as usize], "case {case} param {i}");
+            assert_eq!(r.mem.read_u32(pars[0] + 4 * i), a[i as usize]);
+        }
+        for i in 0..17 {
+            assert_eq!(r.mem.read_u32(lens_blk[2] + 4 * i), lc[i as usize], "case {case} lens {i}");
+        }
+        n += 1;
+        full += ret as u32;
+        flipped += flip as u32;
+    }
+    eprintln!("orbit: {n} cases, {full} finished, {flipped} flipped");
+}

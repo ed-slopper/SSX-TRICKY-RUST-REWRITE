@@ -428,3 +428,76 @@ pub fn blend_linear(s: &mut BlendState, obj: &mut [u32], t: f32, arg0: u32, arg1
         false
     }
 }
+
+/// What `CamScript_BlendOrbit` calls: three cameras built on the stack (slot 0 and 1 from its arguments, slot 2 from
+/// the fixed parameter block at 0x382e78), the position and look-at evaluation, the smoothing, the hand-over to the
+/// cut fade and the destructors. Records are the object's `+0x484` record or the local copy of it (22 words).
+pub trait OrbitEnv {
+    fn build(&mut self, slot: u32, arg: u32);
+    /// `CamCamera_EvalPosition` of the third camera (its parameter block `c`) into `rec`; `flag` is `obj[1]`.
+    fn position(&mut self, c: &[u32; 71], rec: &mut [u32], flag: u32);
+    /// `CamCamera_EvalLookAt` of the lens of camera `slot` (2: the third, its lens block `lc`; 1: the second) on `rec`;
+    /// `f12` is the first float argument (zero).
+    fn look_at(&mut self, slot: u32, lc: &[u32; 17], rec: &mut [u32], flag: u32, f12: f32);
+    fn smooth(&mut self, obj: &mut [u32]);
+    fn hand_over(&mut self, slot: u32, obj: &mut [u32]);
+    fn done(&mut self, slot: u32);
+}
+
+/// `CamScript_BlendOrbit` 0x175450: blend the camera object from camera `a`'s view to camera `b`'s as `t` goes
+/// 0 → 1 by turning about the target: a third camera `c` takes `a`'s parameter block and lens, then its heading
+/// (`+0xdc`), pitch (`+0x100`) and distance (`+0xcc`) are eased toward `b`'s (the heading the long way round when
+/// `flip`), the object's record comes from evaluating `c`, and its angles and lens are eased toward `b`'s lens
+/// look-at. Returns true once `t >= 1`.
+#[allow(clippy::too_many_arguments)]
+pub fn blend_orbit(
+    obj: &mut [u32],
+    t: f32,
+    flip: bool,
+    a: &[u32; 71],
+    b: &[u32; 71],
+    c: &mut [u32; 71],
+    la: &[u32; 17],
+    lc: &mut [u32; 17],
+    args: [u32; 2],
+    env: &mut dyn OrbitEnv,
+) -> bool {
+    let f = f32::from_bits;
+    env.build(0, args[0]);
+    env.build(1, args[1]);
+    env.build(2, 0x382e78);
+    *c = *a;
+    *lc = *la;
+    let mut d = angle_diff(f(b[0xdc / 4]), f(a[0xdc / 4]));
+    if flip {
+        d = if d < 0.0 { ad(d, 6.283_185_5) } else { ad(d, -6.283_185_5) };
+    }
+    c[0xdc / 4] = ad(f(a[0xdc / 4]), m(d, t)).to_bits();
+    let p0 = f(a[0x100 / 4]);
+    let d = angle_diff(f(b[0x100 / 4]), p0);
+    c[0x100 / 4] = ad(p0, m(d, t)).to_bits();
+    let ca = f(a[0xcc / 4]);
+    c[0xcc / 4] = ad(ca, m(sb(f(b[0xcc / 4]), ca), t)).to_bits();
+    let flag = obj[1];
+    env.position(c, &mut obj[REC..REC + 22], flag);
+    env.look_at(2, lc, &mut obj[REC..REC + 22], flag, 0.0);
+    let mut tmp = [0u32; 22];
+    tmp.copy_from_slice(&obj[REC..REC + 22]);
+    env.look_at(1, lc, &mut tmp, flag, 0.0);
+    for i in 3..6 {
+        let d = angle_diff(f(tmp[i]), f(obj[REC + i]));
+        obj[REC + i] = ad(f(obj[REC + i]), m(d, t)).to_bits();
+    }
+    let o6 = f(obj[REC + 6]);
+    obj[REC + 6] = ad(o6, m(sb(f(tmp[6]), o6), t)).to_bits();
+    env.smooth(obj);
+    env.hand_over(0, obj);
+    let end = t >= 1.0;
+    if end {
+        obj[0x18 / 4] = 1;
+    }
+    env.done(2);
+    env.done(1);
+    env.done(0);
+    end
+}
