@@ -296,6 +296,9 @@ pub struct Level {
     pub switchable: std::collections::HashSet<usize>,
     /// The meshes read from the disc (`from_disc`), by the path the folder would have them at; empty for a folder.
     pub meshes: std::collections::HashMap<PathBuf, ObjMesh>,
+    /// The textures and lightmaps read from the disc (`from_disc`), by the path the folder would have them at
+    /// (`<dir>/Textures/<n>.png`, `<dir>/Lightmaps/<n>.png`, `<dir>/Skybox/Textures/<n>.png`); empty for a folder.
+    pub images: std::collections::HashMap<PathBuf, crate::ssh::Image>,
 }
 
 impl Level {
@@ -321,6 +324,7 @@ impl Level {
             splines: read::<SplineFile>(&dir.join("Splines.json")).map(|f| f.splines).unwrap_or_default(),
             ai: read::<AiFile>(&dir.join("AIP.json")).unwrap_or_default(),
             meshes: Default::default(),
+            images: Default::default(),
         })
     }
     /// A mesh by its path in the level (`<dir>/Meshes/<n>.obj`, `<dir>/Skybox/Meshes/<n>.obj`,
@@ -336,8 +340,9 @@ impl Level {
     /// it). The records are put in the folder's form, field for field what SSX-Library exported from the same files
     /// (checked: tests/level_disc.rs), and the meshes are kept under the paths the folder has them at.
     ///
-    /// `scripts`: STANDIN: a levels folder's SSFLogic.json for what the scripts do (`logic`, `touch`), until the
-    /// app runs the `.ssf`'s scripts itself (row E9b2); without one the level has no scripted behaviour.
+    /// `scripts`: the level's folder (its `dir`, under which the meshes and textures are kept, row E3a7), which need
+    /// not exist. STANDIN: its SSFLogic.json for what the scripts do (`logic`, `touch`), until the app runs the
+    /// `.ssf`'s scripts itself (row E9b2); without one the level has no scripted behaviour.
     pub fn from_disc(files: &mut crate::big::Files, folder: &str, scripts: Option<&Path>) -> Result<Self, String> {
         let name = crate::aip::big_name(folder).ok_or_else(|| format!("{folder}: not a course"))?;
         files.mount(&format!("data/models/{name}.big")).map_err(|e| e.to_string())?;
@@ -425,6 +430,20 @@ impl Level {
             Spline { spline_name: named("SPLINES", k), segments }
         }).collect();
 
+        // the textures: `Course_RemapTextures` 0x2606f8 / `Course_RemapLightmapTextures` 0x260898 load the course's
+        // `.ssh` and its lightmaps' (`World_LoadTextures`) and point the materials' and patches' texture numbers at
+        // the shapes in file order; the lightmaps' file is the name cut to 6 letters, then `_L` (`Course_LoadRenderData`
+        // 0x25edf0); the sky's is `<file>_sky.ssh` (`Course_LoadSkies` 0x185b18)
+        let lightmaps = format!("{}_L", &name[..name.len().min(6)]);
+        let mut images = std::collections::HashMap::new();
+        for (file, sub) in [(name.to_string(), "Textures"), (lightmaps, "Lightmaps"), (format!("{name}_sky"), "Skybox/Textures")] {
+            let bytes = files.load(&format!("|data/models/{file}.ssh")).map_err(|e| e.to_string())?.ok_or_else(|| format!("{file}.ssh: not on the disc"))?;
+            let ssh = crate::ssh::SshFile::open(&bytes).map_err(|e| format!("{file}.ssh: {e}"))?;
+            for (k, shape) in ssh.shapes.iter().enumerate() {
+                if let Some(img) = &shape.image { images.insert(dir.join(sub).join(format!("{k:04}.png")), img.clone()); }
+            }
+        }
+
         // the scripts' part, as `load` does it (STANDIN: from the folder's SSFLogic.json, see above)
         let logic_file = scripts.and_then(|d| read::<LogicFile>(&d.join("SSFLogic.json")).ok()).unwrap_or_default();
         let touch = touch_effects(&instances, &logic_file);
@@ -433,7 +452,7 @@ impl Level {
         let switchable = logic.switchable();
         Ok(Self {
             pieces: touch.values().flatten().copied().filter(|i| !instances[*i].visable).collect(),
-            logic, switchable, dir, patches, instances, touch, world, sky, splines, ai, meshes,
+            logic, switchable, dir, patches, instances, touch, world, sky, splines, ai, meshes, images,
         })
     }
     /// Instances that move, break or get picked up: handled one by one, not as static scenery.

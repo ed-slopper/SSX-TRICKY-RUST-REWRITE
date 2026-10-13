@@ -1,6 +1,6 @@
 //! `Level::from_disc` (row E3a4) against `Level::load` of the levels folders (SSX-Library's exports of the same
 //! files): with TRICKY_DISC (the player's disc) and the levels folder beside tricky-rs, every course's patches,
-//! instances, models, materials, splines, sky and meshes must agree (the exports round to 6 digits; gari's export is
+//! instances, models, materials, splines, sky, meshes and textures (row E3a7) must agree (the exports round to 6 digits; gari's export is
 //! of another build of the course, so its splines and meshes are not compared and its patches' show-off flag differs).
 
 use std::path::Path;
@@ -77,7 +77,7 @@ fn levels_from_the_disc_match_the_folders() {
     let Ok(iso) = std::env::var("TRICKY_DISC") else { return };
     let levels = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../levels");
     let mut files = tricky_data::big::Files::new(tricky_data::disc::Disc::open(&iso).unwrap());
-    let mut counts = [0usize; 6];
+    let mut counts = [0usize; 7];
     for folder in ["gari", "snowdream", "elysium", "mesablanca", "merqury", "aloha", "pipedream", "untracked", "megaplex", "alaska", "trick"] {
         let dir = levels.join(folder);
         let Ok(f) = Level::load(&dir) else { continue };
@@ -132,6 +132,23 @@ fn levels_from_the_disc_match_the_folders() {
             }
         }
         counts[4] += d.splines.len();
+
+        // the textures, lightmaps and sky textures: every PNG the folder has, from the disc and the same
+        // (the exports are the shapes in the full 0-255 range, `ssh::Image::rgba_full_range`)
+        for sub in ["Textures", "Lightmaps", "Skybox/Textures"] {
+            for e in std::fs::read_dir(dir.join(sub)).into_iter().flatten().flatten() {
+                let path = e.path();
+                if path.extension().is_none_or(|x| x != "png") { continue }
+                let img = d.images.get(&path).unwrap_or_else(|| panic!("{}: not read", path.display()));
+                let png = image::open(&path).unwrap().to_rgba8();
+                assert_eq!((img.width as u32, img.height as u32), png.dimensions(), "{}", path.display());
+                // the lightmaps' exports kept the stored alpha (the app reads only their colour)
+                let (a, b) = (img.rgba_full_range(), png.into_raw());
+                let same = a.iter().zip(&b).enumerate().all(|(i, (x, y))| x == y || (sub == "Lightmaps" && i % 4 == 3 && img.rgba[i] == *y));
+                assert!(same, "{}: pixels", path.display());
+                counts[6] += 1;
+            }
+        }
     }
-    eprintln!("{} patches, {} instances, {} world meshes, {} sky meshes, {} splines, {} collision meshes compared", counts[0], counts[1], counts[2], counts[3], counts[4], counts[5]);
+    eprintln!("{} patches, {} instances, {} world meshes, {} sky meshes, {} splines, {} collision meshes, {} textures compared", counts[0], counts[1], counts[2], counts[3], counts[4], counts[5], counts[6]);
 }

@@ -203,12 +203,12 @@ struct Loaded { level: Level, world: CollisionWorld, rails: Rails, line: Vec<Vec
 
 fn open_level(dir: &Path) -> Result<Loaded, String> {
     // the level from the player's disc (TRICKY_DISC, row E3a4: the course's .pbd, .ssf, .aip and sky as the game
-    // loads them), else the level folder; the folder still gives the textures (row E3a4b) and the scripts (STANDIN,
-    // see `Level::from_disc`)
+    // loads them, and its textures, row E3a7), else the level folder; the folder, when there is one, still gives the
+    // scripts (STANDIN, see `Level::from_disc`)
     let from_disc = std::env::var("TRICKY_DISC").ok().and_then(|p| {
         let mut files = tricky_data::big::Files::new(tricky_data::disc::Disc::open(&p).ok()?);
         let folder = dir.file_name()?.to_string_lossy().to_string();
-        Level::from_disc(&mut files, &folder, dir.join("SSFLogic.json").exists().then_some(dir)).map_err(|e| eprintln!("level {folder} from the disc: {e}")).ok()
+        Level::from_disc(&mut files, &folder, Some(dir)).map_err(|e| eprintln!("level {folder} from the disc: {e}")).ok()
     });
     let from_disc_ok = from_disc.is_some();
     let mut level = match from_disc { Some(l) => { println!("level from the disc"); l } None => Level::load(dir)? };
@@ -379,6 +379,13 @@ fn main() {
     let full = std::fs::canonicalize(&dir).unwrap_or(dir.clone());
     let mut dirs: Vec<PathBuf> = full.parent().and_then(|p| std::fs::read_dir(p).ok()).into_iter().flatten().flatten()
         .map(|e| e.path()).filter(|p| p.join("Patches.json").exists()).collect();
+    // with the disc, every course, whether there is a folder for it or not (row E3a7)
+    if std::env::var("TRICKY_DISC").is_ok() {
+        for c in ["alaska", "aloha", "elysium", "gari", "megaplex", "merqury", "mesablanca", "pipedream", "snowdream", "trick", "untracked"] {
+            let p = full.parent().map_or_else(|| PathBuf::from(c), |d| d.join(c));
+            if !dirs.contains(&p) { dirs.push(p); }
+        }
+    }
     dirs.sort();
     if dirs.is_empty() { dirs.push(full.clone()); }
     let current = dirs.iter().position(|d| *d == full).unwrap_or(0);
@@ -437,16 +444,31 @@ fn main() {
 struct Tex { handle: Handle<Image>, has_alpha: bool }
 
 /// Loads PNGs once, builds a mip chain, and remembers whether they use transparency.
-struct TexCache { dir: PathBuf, map: HashMap<String, Option<(Handle<Image>, bool)>> }
+struct TexCache { dir: PathBuf, map: HashMap<String, Option<(Handle<Image>, bool)>>, disc: HashMap<String, image::RgbaImage> }
 impl TexCache {
-    fn new(dir: PathBuf) -> Self { Self { dir, map: HashMap::new() } }
+    fn new(dir: PathBuf) -> Self { Self { dir, map: HashMap::new(), disc: HashMap::new() } }
+    /// The textures of a folder of the level, the disc's when the level came from it (row E3a7).
+    fn level(level: &Level, dir: PathBuf) -> Self {
+        let disc = level.images.iter().filter(|(p, _)| p.parent() == Some(dir.as_path()))
+            .filter_map(|(p, _)| Some((p.file_name()?.to_string_lossy().to_string(), level_image(level, p)?))).collect();
+        Self { disc, ..Self::new(dir) }
+    }
     fn get(&mut self, name: &str, images: &mut Assets<Image>) -> Option<Tex> {
-        let dir = &self.dir;
+        let (dir, disc) = (&self.dir, &mut self.disc);
         self.map.entry(name.to_string()).or_insert_with(|| {
-            let img = image::open(dir.join(name)).ok()?.to_rgba8();
+            let img = match disc.remove(name) { Some(i) => i, None => image::open(dir.join(name)).ok()?.to_rgba8() };
             let has_alpha = img.pixels().any(|p| p.0[3] < 250);
             Some((images.add(make_image(img, true)), has_alpha))
         }).clone().map(|(handle, has_alpha)| Tex { handle, has_alpha })
+    }
+}
+
+/// A texture or lightmap of the level by the path the folder has it at: the disc's (`Level::images`, row E3a7)
+/// when the level came from it, else the folder's PNG.
+fn level_image(level: &Level, path: &Path) -> Option<image::RgbaImage> {
+    match level.images.get(path) {
+        Some(i) => image::RgbaImage::from_raw(i.width as u32, i.height as u32, i.rgba_full_range()),
+        None => image::open(path).ok().map(|i| i.to_rgba8()),
     }
 }
 
@@ -670,7 +692,7 @@ fn spawn_animated(
     meshes: &mut Assets<Mesh>, images: &mut Assets<Image>, materials: &mut Assets<StandardMaterial>, props: &Props,
 ) -> AnimObjects {
     let set = &level.world;
-    let mut tex = TexCache::new(set.dir.join("Textures"));
+    let mut tex = TexCache::level(level, set.dir.join("Textures"));
     let mut mats: HashMap<String, Handle<StandardMaterial>> = HashMap::new();
     let basis = Quat::from_rotation_x(-std::f32::consts::FRAC_PI_2);
     let mut out = AnimObjects::default();
@@ -804,7 +826,7 @@ fn spawn_props(
     meshes: &mut Assets<Mesh>, images: &mut Assets<Image>, materials: &mut Assets<StandardMaterial>, wa: &mut worldanim::WorldAnim,
 ) -> Props {
     let set = &level.world;
-    let mut tex = TexCache::new(set.dir.join("Textures"));
+    let mut tex = TexCache::level(level, set.dir.join("Textures"));
     let mut mats: HashMap<String, Handle<StandardMaterial>> = HashMap::new();
     let basis = Quat::from_rotation_x(-std::f32::consts::FRAC_PI_2);
     let mut props: Vec<Prop> = Vec::new();
@@ -1025,7 +1047,7 @@ fn spawn_terrain(
     // lightmap pages, sampled on the CPU into vertex colours (each patch owns an 8x8 texel square,
     // so a 9x9 vertex grid captures all of it)
     let mut pages: HashMap<usize, Option<image::RgbaImage>> = HashMap::new();
-    let mut tex = TexCache::new(level.dir.join("Textures"));
+    let mut tex = TexCache::level(level, level.dir.join("Textures"));
     let mut chunks: Chunks = HashMap::new();
     let mut ramps: Chunks = HashMap::new();
     let n = PATCH_SEGS;
@@ -1033,7 +1055,7 @@ fn spawn_terrain(
         if p.points.len() < 16 { continue; }
         let chunks = if p.trick_only_patch { &mut ramps } else { &mut chunks };
         let page = pages.entry(p.lightmap_id).or_insert_with(|| {
-            image::open(level.dir.join("Lightmaps").join(format!("{:04}.png", p.lightmap_id))).ok().map(|i| i.to_rgba8())
+            level_image(level, &level.dir.join("Lightmaps").join(format!("{:04}.png", p.lightmap_id)))
         });
         let (cx, cz) = chunk_of(g2b(bezier_patch(&p.points, 0.5, 0.5).0));
         let buf = chunks.entry((p.texture_path.as_str(), false, cx, cz)).or_default();
@@ -1178,7 +1200,7 @@ fn spawn_instances(
     meshes: &mut Assets<Mesh>, images: &mut Assets<Image>, materials: &mut Assets<StandardMaterial>, wa: &mut worldanim::WorldAnim,
 ) -> usize {
     let set = &level.world;
-    let mut tex = TexCache::new(set.dir.join("Textures"));
+    let mut tex = TexCache::level(level, set.dir.join("Textures"));
     let mut objs: HashMap<String, ObjMesh> = HashMap::new();
     let mut chunks: Chunks = HashMap::new();
     for (index, inst) in level.instances.iter().enumerate() {
@@ -1202,7 +1224,7 @@ fn spawn_sky(
 ) {
     let set = &level.sky;
     if set.models.is_empty() { return; }
-    let mut tex = TexCache::new(set.dir.join("Textures"));
+    let mut tex = TexCache::level(level, set.dir.join("Textures"));
     let mut parts = Vec::new();
     let mut radius = 1.0f32;
     for model in &set.models {
@@ -2069,7 +2091,9 @@ fn sync_visuals(
 /// The characters' folder (riders, boards, and global textures such as the crowd's).
 fn chars_dir(level_dir: &Path) -> Option<PathBuf> {
     let exe = std::env::current_exe().ok().and_then(|p| p.parent().map(|p| p.to_path_buf())).unwrap_or_default();
-    [level_dir.join("../../chars"), exe.join("../chars"), exe.join("chars"), PathBuf::from("chars")]
+    // also by name: with the disc the level's folder need not exist, and `../..` does not resolve then (row E3a7)
+    let beside = level_dir.parent().and_then(Path::parent).map_or_else(|| PathBuf::from("chars"), |p| p.join("chars"));
+    [level_dir.join("../../chars"), beside, exe.join("../chars"), exe.join("chars"), PathBuf::from("chars")]
         .into_iter().find(|d| d.join("board.json").exists() || d.join("mac/model.json").exists())
 }
 

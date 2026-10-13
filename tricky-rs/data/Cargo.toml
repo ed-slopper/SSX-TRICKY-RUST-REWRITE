@@ -10,3 +10,7 @@ publish = false
 glam = "0.29.3"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+
+[dev-dependencies]
+# the levels folders' PNGs, for tests/level_disc.rs
+image = { version = "0.25", default-features = false, features = ["png"] }

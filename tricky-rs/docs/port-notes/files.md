@@ -324,6 +324,15 @@ there (no rewind); a level is the value / 100 when 0..200 (the duck 0..100), els
   `.aip`; `Course_LoadSkies` 0x185b18 reads `<file>_sky.pbd`. The `.map` (names only) is read by no code in the game;
   the port takes the names from it to keep the folders' names. A model node's matrix (+0x14, -1 none) is split into
   position, rotation and scale; its animation keeps the head's six floats, the action word and each channel's cubic
-  segments (count at the channel, then the offset to the first). The textures, lightmaps and scripts still come from
-  the levels folder (rows E3a7, E9b2); with `TRICKY_SIM=600` elysium and aloha ride the same from the disc as from
+  segments (count at the channel, then the offset to the first). The scripts still come from the levels folder (row
+  E9b2); with `TRICKY_SIM=600` elysium and aloha ride the same from the disc as from
   the folder (distance, speed, airtime, falls within a few percent; the folder's numbers are rounded to 6 digits).
+- The course's textures from the disc (row E3a7; checked: `tricky-data/tests/level_disc.rs`, 1,710 textures,
+  lightmaps and sky textures of all 11 folders, pixel for pixel). Proven: `Course_RemapTextures` 0x2606f8 and
+  `Course_RemapLightmapTextures` 0x260898 load an `.ssh` each (`World_LoadTextures`) and replace every material's
+  four texture numbers, its flip-book's, and the patches' (+0x1b0, four shorts, kind 1 = texture, 5 = lightmap in
+  +0x1ac's 3-bit fields) by the table entry of that number: the numbers are the shapes' order in the file, which is
+  what the folders' `<n>.png` are. The files: `<file>.ssh`, the lightmaps' `<file cut to 6 letters>_L.ssh`
+  (`Course_LoadRenderData` 0x25edf0: `elysiu_L`), the sky's `<file>_sky.ssh`. The exports kept the lightmaps' stored
+  alpha (0-0x80); the app reads only their colour. With the disc the app needs no levels folder: the course list is
+  the 11 courses, and a course's folder, if there is one, gives only the scripts.
