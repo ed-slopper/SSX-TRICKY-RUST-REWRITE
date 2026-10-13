@@ -144,6 +144,26 @@ Part of the port notes (index: [README.md](README.md)); units and wording as des
 - Checked in the runner: 4,000 random careers and races through Enter, up to 14 frames of Update and Exit, the
   engine's calls scripted the same: the state, the career block, the scene object, the pads and every call compared.
 
+## The post-race sequence (board row G11d; `tricky_game::prerace::EndRace`, checked: `tests/prerace.rs`)
+
+- `cEndRaceHandler::Enter` 0x113e10: `Race_ClearAiTargets`, `Game_MoveLeaderToSlot0`, one view,
+  `Career_CheckNewRecords`. The first scene is a rival's: over the other riders (in race order, the player's rider
+  at career +0x30f4 skipped) the highest count from 3 up (rider +0x5c + 0x20 · the other's index) — another rider's
+  about the player's rider gives scene 10 + its place among the others (a jump table, 0x364660), the player's rider's
+  about another 5 + it; none 0x10. The second is the win (3) or loss (4) scene: in a show-off (3, 5) a medal for the
+  score (rider +0x5910), in freeride (7) first place (+0x110) in under the course's time (career +0x2b08, compared
+  as floats), otherwise a place in the top half ((riders + 1) / 2). A circuit race keeps the best time (+0x418), a
+  circuit show-off the best score, under slot 0's player's character. HUD items 0 and 7 hidden, the PreLoad camera,
+  every rider frozen.
+- `cEndRaceHandler::Update` 0x1141e0: the race clock (+0x14) on by 1/60; the two scenes as in the pre-race sequence
+  (states 0..3 and 4..7; a skip in the first skips both); 8, once the race control's +0x54 is clear and the results
+  overlay is not busy: the fade out, the speech stopped, HUD item 2 for a new record (career +0x3910), else 0xd when
+  the circuit unlocked anything but a medal, else 1; the PreLoad camera; 9 waits for loading; 10 starts the replay's
+  rider sounds each frame while +0x54 is clear; 0xc (set by the results menu) shows item 9 and opens the menu;
+  0xb restarts the race. `Exit` does nothing.
+- Checked in the runner with the pre-race test: 4,000 random careers and races through Enter and up to 14 frames,
+  the menu's 0xb / 0xc thrown in: the states, the clock, the career block, the scene object and every call compared.
+
 ## Rank catch-up: the unchecked list walk
 
 Proven on the PS2: `Race_UpdatePlacingsAndRubberBand` 0x115100 runs every 6 ticks (`race+0x18 % 6`), over

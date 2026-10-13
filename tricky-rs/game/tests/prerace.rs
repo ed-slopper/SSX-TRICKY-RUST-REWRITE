@@ -9,7 +9,7 @@ use std::rc::Rc;
 use r5900::Runner;
 use tricky_game::career::{Career, CAREER_BASE, CAREER_SIZE};
 use tricky_game::cheats::Cheats;
-use tricky_game::prerace::{PreRace, PreRaceEnv, RaceView};
+use tricky_game::prerace::{EndRace, EndRaceEnv, PreRace, PreRaceEnv, RaceView};
 use tricky_game::rand::Streams;
 use tricky_game::scene::{RaceScene, SceneEnv, Slot, NO_RIDER, SCENES, SLOTS};
 
@@ -54,6 +54,13 @@ enum Ev {
     Device(i32),
     Rider,
     Marker(u32, i32),
+    ClearAi,
+    MoveLeader,
+    CheckRecords,
+    Freeze(usize),
+    OpenMenu,
+    ReplaySounds,
+    Restart,
 }
 
 #[derive(Clone, Default)]
@@ -68,6 +75,12 @@ struct World {
     players: Vec<i8>,
     rider0: u32,
     frames: Vec<(i32, i32)>,
+    counts: [[i32; 6]; 6],
+    place: [i32; 6],
+    time: [i32; 6],
+    score: [i32; 6],
+    results_shown: bool,
+    results_busy: bool,
     log: Vec<Ev>,
 }
 
@@ -183,6 +196,48 @@ impl PreRaceEnv for World {
     }
 }
 
+impl EndRaceEnv for World {
+    fn clear_ai_targets(&mut self) {
+        self.log.push(Ev::ClearAi);
+    }
+    fn move_leader_to_slot0(&mut self) {
+        self.log.push(Ev::MoveLeader);
+    }
+    fn check_new_records(&mut self, _c: &mut Career) {
+        self.log.push(Ev::CheckRecords);
+    }
+    fn freeze(&mut self, i: usize) {
+        self.log.push(Ev::Freeze(i));
+    }
+    fn rider_count(&mut self, i: usize, j: usize) -> i32 {
+        self.counts[i][j]
+    }
+    fn rider_place(&mut self, i: usize) -> i32 {
+        self.place[i]
+    }
+    fn rider_time(&mut self, i: usize) -> i32 {
+        self.time[i]
+    }
+    fn rider_score(&mut self, i: usize) -> i32 {
+        self.score[i]
+    }
+    fn results_shown(&mut self) -> bool {
+        self.results_shown
+    }
+    fn results_busy(&mut self) -> bool {
+        self.results_busy
+    }
+    fn open_results_menu(&mut self) {
+        self.log.push(Ev::OpenMenu);
+    }
+    fn replay_rider_sounds(&mut self) {
+        self.log.push(Ev::ReplaySounds);
+    }
+    fn restart_race(&mut self) {
+        self.log.push(Ev::Restart);
+    }
+}
+
 const SCENE_OBJ: u32 = 0x32edc0;
 
 fn write_scene(r: &mut Runner, o: &RaceScene) {
@@ -244,10 +299,19 @@ const RIDER_RESET: u32 = 0x01f0_0020;
 
 #[test]
 fn prerace_is_the_original() {
+    run(false);
+}
+
+#[test]
+fn endrace_is_the_original() {
+    run(true);
+}
+
+fn run(post: bool) {
     let Some(mut r) = Runner::from_env() else { return };
     let w = Rc::new(RefCell::new(World::default()));
     // the riders and their place in the race (for the logs)
-    let riders: Vec<u32> = (0..6).map(|_| r.mem.alloc(0x500)).collect();
+    let riders: Vec<u32> = (0..6).map(|_| r.mem.alloc(0x5a00)).collect();
     let idx = {
         let riders = riders.clone();
         move |p: u32| riders.iter().position(|a| *a == p).unwrap_or(99)
@@ -271,7 +335,20 @@ fn prerace_is_the_original() {
     log_stub!(0x181d50, Ev::RestoreViews);
     log_stub!(RACE_ENTERED, Ev::RaceEntered);
     log_stub!(RACE_START, Ev::RaceStart);
-    log_stub!(0x1814a8, Ev::Rider);
+    log_stub!(0x115a30, Ev::ClearAi);
+    log_stub!(0x180848, Ev::MoveLeader);
+    log_stub!(0x164fc0, Ev::CheckRecords);
+    log_stub!(0x1ef990, Ev::OpenMenu);
+    log_stub!(0x193c68, Ev::ReplaySounds);
+    log_stub!(0x180a10, Ev::Restart);
+    let x = w.clone();
+    let id = idx.clone();
+    r.stub(0x11afa8, move |c, _| x.borrow_mut().log.push(Ev::Freeze(id(c.gpr(4) as u32))));
+    // the results overlay: +0x42c → +0x18 busy
+    let overlay = r.mem.alloc(0x500);
+    let overlay_in = r.mem.alloc(0x40);
+    r.mem.write_u32(overlay + 0x42c, overlay_in);
+    r.stub(0x1a7be0, move |c, _| c.set_gpr(2, overlay as u64));
     let x = w.clone();
     r.stub(0x1814a8, move |c, _| {
         x.borrow_mut().log.push(Ev::Rider);
@@ -345,7 +422,7 @@ fn prerace_is_the_original() {
         x.borrow_mut().log.push(Ev::Device(i));
         c.set_gpr(2, (pads + 0x40 * i as u32) as u64);
     });
-    for a in [0x112848u32, 0x110f28, 0x112af0, 0x110980, 0x1109b0, 0x110a40, 0x110ab8, 0x1699a0, 0x169b60, 0x169bb8, 0x164840, 0x164288, 0x164318, 0x167010, 0x166550] {
+    for a in [0x112848u32, 0x110f28, 0x112af0, 0x110980, 0x1109b0, 0x110a40, 0x110ab8, 0x1699a0, 0x169b60, 0x169bb8, 0x164840, 0x164288, 0x164318, 0x167010, 0x166550, 0x16baa8, 0x16ba60, 0x166fa0, 0x166fe0, 0x166580, 0x164330] {
         r.allow(a);
     }
     // the game's objects
@@ -373,6 +450,7 @@ fn prerace_is_the_original() {
         r.mem.write_u32(race + 0xc4 + 4 * k as u32, *rd);
     }
     let handler = r.mem.alloc(0x10);
+    let mut ends = [0u32; 0x11];
     let mut g = Rng(0x9e7a_ce00_0000_0001);
     let mut states = [0u32; 0x16];
     for case in 0..4000 {
@@ -400,6 +478,16 @@ fn prerace_is_the_original() {
         c.w32(0x325c, g.below(4));
         for i in 0..SCENES {
             c.w32(0x2b18 + 100 * i, if g.below(4) == 0 { 0x39 } else { g.below(58) });
+        }
+        c.w32(0x30f4, g.below(n as u32));
+        c.w32(0x2b08, g.below(9000));
+        c.w32(0x3910, if g.below(2) == 0 { u32::MAX } else { g.below(4) });
+        // the circuit's unlock list
+        let unlocks: Vec<tricky_game::circuit::Unlock> =
+            (0..g.below(3)).map(|_| tricky_game::circuit::Unlock { who: 0, kind: if g.below(2) == 0 { 7 } else { g.below(10) }, value: 0 }).collect();
+        r.mem.write_u32(0x3353f8, unlocks.len() as u32);
+        for (i, u) in unlocks.iter().enumerate() {
+            r.mem.write_u32(0x335404 + 12 * i as u32, u.kind);
         }
         r.mem.write(CAREER_BASE, &c.bytes).unwrap();
         // the scene object, as the selection left it
@@ -436,10 +524,25 @@ fn prerace_is_the_original() {
             r.mem.write_u8(entries[k] + 0x65, players[k] as u8);
         }
         let mut ours_handler = PreRace::default();
+        let mut ours_end = EndRace::default();
+        let mut clock = g.below(1000) as f32 / 7.0;
+        r.mem.write_f32(race + 0x14, clock);
         {
             let mut x = w.borrow_mut();
             *x = World { players: players.clone(), rider0: riders[0], ..Default::default() };
             x.frames = (0..12).filter_map(|cl| if g.below(4) != 0 { Some((cl, g.below(5) as i32)) } else { None }).collect();
+            for i in 0..6 {
+                for j in 0..6 {
+                    x.counts[i][j] = g.below(6) as i32;
+                    r.mem.write_u32(riders[i] + 0x5c + 0x20 * j as u32, x.counts[i][j] as u32);
+                }
+                x.place[i] = g.below(6) as i32;
+                x.time[i] = g.below(12000) as i32;
+                x.score[i] = g.below(600_000) as i32;
+                r.mem.write_u32(riders[i] + 0x110, x.place[i] as u32);
+                r.mem.write_u32(riders[i] + 0x418, x.time[i] as u32);
+                r.mem.write_u32(riders[i] + 0x5910, x.score[i] as u32);
+            }
         }
         let mut ours = w.borrow().clone();
         let mut car = c.clone();
@@ -455,7 +558,19 @@ fn prerace_is_the_original() {
                 x.devices = g.below(5) as i32;
                 x.pressed = (0..8).map(|_| g.below(3) == 0).collect();
                 x.pads = (0..8).map(|_| (g.next() & 0xffff, g.next() & 0xffff, g.next())).collect();
+                x.results_shown = g.below(4) == 0;
+                x.results_busy = g.below(4) == 0;
                 x.log.clear();
+            }
+            r.mem.write_u32(racectl + 0x54, w.borrow().results_shown as u32);
+            r.mem.write_u32(overlay_in + 0x18, w.borrow().results_busy as u32);
+            // (the race's control object for the results: always there after a race)
+            if post {
+                r.mem.write_u32(game + 0x40, racectl);
+            }
+            // the results menu sets 0xb / 0xc now and then
+            if post && 0 < f && g.below(10) == 0 {
+                ours_end.state = [0xbu32, 0xc][g.below(2) as usize];
             }
             for (i, p) in w.borrow().pads.iter().enumerate() {
                 let at = pads + 0x40 * i as u32;
@@ -474,11 +589,43 @@ fn prerace_is_the_original() {
                 ours.devices = x.devices;
                 ours.pressed = x.pressed.clone();
                 ours.pads = x.pads.clone();
+                ours.results_shown = x.results_shown;
+                ours.results_busy = x.results_busy;
                 ours.log.clear();
             }
-            r.mem.write_u32(handler + 4, ours_handler.state);
+            if post {
+                r.mem.write_u32(handler + 4, ours_end.state);
+                r.mem.write_u32(handler + 8, ours_end.first);
+                r.mem.write_u32(handler + 0xc, ours_end.second);
+            } else {
+                r.mem.write_u32(handler + 4, ours_handler.state);
+            }
             r.cpu.set_gpr(4, handler as u64);
             r.cpu.set_gpr(5, race as u64);
+            if post {
+                if f == 0 {
+                    r.call(0x113e10).unwrap();
+                    ours_end.enter(&mut ours, &mut car);
+                } else if f <= frames {
+                    r.call(0x1141e0).unwrap();
+                    ours_end.update(&mut ours, &car, &view, &mut scene, &mut clock, &unlocks);
+                } else {
+                    r.call(0x1146a8).unwrap();
+                }
+                let what = format!("case {case} frame {f} (end state {:#x})", ours_end.state);
+                assert_eq!(w.borrow().log, ours.log, "{what}: calls");
+                assert_eq!((r.mem.read_u32(handler + 4), r.mem.read_u32(handler + 8), r.mem.read_u32(handler + 0xc)), (ours_end.state, ours_end.first, ours_end.second), "{what}: state");
+                assert_eq!(r.mem.read_u32(race + 0x14), clock.to_bits(), "{what}: clock");
+                assert_eq!(read_scene(&mut r), scene, "{what}: scene");
+                let mut block = vec![0u8; CAREER_SIZE];
+                r.mem.read(CAREER_BASE, &mut block).unwrap();
+                assert!(block == car.bytes, "{what}: career");
+                ends[ours_end.state.min(0x10) as usize] += 1;
+                if f == 0 {
+                    ends[0x10] += (ours_end.first != 0x10) as u32;
+                }
+                continue;
+            }
             if f == 0 {
                 r.call(0x112b88).unwrap();
                 ours_handler.enter(&mut ours, &mut car, &view);
@@ -503,6 +650,6 @@ fn prerace_is_the_original() {
             states[ours_handler.state as usize] += 1;
         }
     }
-    eprintln!("states after a frame {states:?}");
+    eprintln!("states after a frame {states:?}; post-race {ends:?}");
     let _ = read_string;
 }

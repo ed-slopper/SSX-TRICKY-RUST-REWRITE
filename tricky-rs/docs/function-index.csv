@@ -182,9 +182,9 @@ address,size,name,system,status
 0x113c60,136,RaceMenu_Restart,race?,not started
 0x113ce8,112,RaceMenu_GoToState12,race?,not started
 0x113d58,180,RaceMenu_EndRace,race?,not started
-0x113e10,932,cEndRaceHandler::Enter,race,not started
-0x1141e0,1224,cEndRaceHandler::Update,race,ported
-0x1146a8,8,cEndRaceHandler::Exit,race,not started
+0x113e10,932,cEndRaceHandler::Enter,race,checked
+0x1141e0,1224,cEndRaceHandler::Update,race,checked
+0x1146a8,8,cEndRaceHandler::Exit,race,checked
 0x1146b0,128,cPreAI::vf1_1146b0,boarder?,not started
 0x114730,196,cPostAI::vf1_114730,boarder?,not started
 0x1147f8,212,Replay_RefreshRiders,camera?,not started
@@ -216,7 +216,7 @@ address,size,name,system,status
 0x1150a8,8,cSelectLessonHandler::Enter,game,not started
 0x1150b0,80,cSelectLessonHandler::__tf,runtime,host
 0x115100,2352,Race_UpdatePlacingsAndRubberBand,race,ported
-0x115a30,76,Race_ClearAiTargets,race,not started
+0x115a30,76,Race_ClearAiTargets,race,ported
 0x115a80,616,Race_UpdatePairDistances,race,ported
 0x115db8,8,thunk_FUN_00115df0,runtime,host
 0x115dc0,40,Game_ResetWorld,game,not started
@@ -270,7 +270,7 @@ address,size,name,system,status
 0x11a7b0,32,Boarder_LaunchFromGate,boarder,not started
 0x11a7d0,108,Boarder_SetStartState,boarder,ported
 0x11a840,1892,Boarder_PlaceAtStart,boarder,ported
-0x11afa8,60,Boarder_Freeze,boarder,not started
+0x11afa8,60,Boarder_Freeze,boarder,ported
 0x11afe8,48,Boarder_StartLessonWait,boarder,ported
 0x11b018,476,Boarder_AddMeter,boarder,checked
 0x11b1f8,336,Boarder_DrainMeter,boarder,ported
@@ -1454,7 +1454,7 @@ address,size,name,system,status
 0x16e408,96,CmlFile_FirstOfType,camera?,not started
 0x16e468,88,CmlFile_NextOfType,camera?,not started
 0x16e4c0,84,Cml_LoadIfExists,camera?,ported
-0x16e518,112,Cml_FindObject,camera?,not started
+0x16e518,112,Cml_FindObject,camera?,ported
 0x16e588,168,Cml_FindObjectInScope,camera?,not started
 0x16e630,124,StaticInit_Cml,camera?,not started
 0x16e6b0,60,CamDirector::CamDirector,camera?,not started
@@ -1470,9 +1470,9 @@ address,size,name,system,status
 0x1703b8,8,FUN_001703b8,camera?,not started
 0x1703c0,124,StaticInit_Camera,camera,not started
 0x170440,44,Vec4_Scale,camera?,ported
-0x170470,60,CamPath::CamPath,camera?,not started
+0x170470,60,CamPath::CamPath,camera?,ported
 0x1704b0,96,Math_Hermite,camera?,checked
-0x170510,252,CamPath_EvalStart,camera?,not started
+0x170510,252,CamPath_EvalStart,camera?,ported
 0x170610,724,CamPath_SegmentPoint,camera?,ported
 0x1708e8,960,CamPath_SegmentAngles,camera?,ported
 0x170ca8,1620,CamPath_Eval,camera?,ported
@@ -1523,9 +1523,9 @@ address,size,name,system,status
 0x174d28,1832,CamScript_BlendLinear,camera?,ported
 0x175450,1464,CamScript_BlendOrbit,camera?,ported
 0x175a08,404,CamScript_Blend,camera?,ported
-0x175ba0,208,CamScript_StartPath,camera?,not started
-0x175c70,60,CamScript_EndPath,race?,not started
-0x175cb0,300,CamScript_UpdatePath,camera?,not started
+0x175ba0,208,CamScript_StartPath,camera?,ported
+0x175c70,60,CamScript_EndPath,race?,ported
+0x175cb0,300,CamScript_UpdatePath,camera?,ported
 0x175de0,108,CamScript_Start,race?,ported
 0x175e50,56,CamScript_IsRunning,common?,ported
 0x175e88,48,CamScript_SetName,race?,not started
@@ -1542,7 +1542,7 @@ address,size,name,system,status
 0x1777d0,488,Cam_StageAreaToWorld,camera,ported
 0x1779b8,660,World_GetStageAreaMarker,world,not started
 0x177d48,80,CamRegion::__tf,runtime,host
-0x177db0,28,Camera_Cut,camera,not started
+0x177db0,28,Camera_Cut,camera,ported
 0x177dd8,232,cBxCamera::~cBxCamera,camera,not started
 0x177ec0,64,cBxCamera::__tf,runtime,host
 0x177f00,80,CamScene::__tf,runtime,host
@@ -1758,7 +1758,7 @@ address,size,name,system,status
 0x180518,584,Game_AssignCameraRiders,camera,not started
 0x180760,232,Game_GetLeadingPlayer,game,ported
 0x180848,456,Game_MoveLeaderToSlot0,game,ported
-0x180a10,324,Game_RestartRace,game,not started
+0x180a10,324,Game_RestartRace,game,ported
 0x180b58,276,Game_ResetCameras,camera,not started
 0x180c70,152,cGame::Restart,game,not started
 0x180d08,228,cGame::vf4_180d08,game,not started
@@ -2173,7 +2173,7 @@ address,size,name,system,status
 0x193ad8,36,ReplayPin_SetEnd,camera?,not started
 0x193b00,208,Highlight_Save,save,not started
 0x193bd0,148,Highlight_Load,camera?,not started
-0x193c68,44,Replay_StartRiderSounds,audio,not started
+0x193c68,44,Replay_StartRiderSounds,audio,ported
 0x193c98,72,Replay_Abort,race?,not started
 0x193ce0,80,Camera_IsFocusRider,camera,not started
 0x193d30,104,Replay_SaveCurrentKeyframe,save,not started
@@ -2402,7 +2402,7 @@ address,size,name,system,status
 0x1a7ad0,96,cOverlayMan::vf1_1a7ad0,frontend,not started
 0x1a7b30,88,OverlayMan_CallAllVf10,frontend,not started
 0x1a7b88,88,OverlayMan_CallAllVf11,frontend,not started
-0x1a7be0,44,OverlayMan_CallReplayVf1,frontend,not started
+0x1a7be0,44,OverlayMan_CallReplayVf1,frontend,ported
 0x1a7c10,44,OverlayMan_CallPopFinishVf4,frontend,not started
 0x1a7c40,8,OverlayMan_GetReplayControl,frontend,not started
 0x1a7c48,8,OverlayMan_GetLesson,frontend,not started
@@ -3200,7 +3200,7 @@ address,size,name,system,status
 0x1ef750,156,RaceMenuOverlay_UpdateSave,save,not started
 0x1ef7f0,292,RaceMenuOverlay_BeginSaveReplay,save,not started
 0x1ef918,116,RaceMenuOverlay_EndSaveReplay,save,not started
-0x1ef990,1056,RaceMenuOverlay_SetState,frontend,not started
+0x1ef990,1056,RaceMenuOverlay_SetState,frontend,ported
 0x1efdb0,132,RaceMenuOverlay_HandleInput,frontend,not started
 0x1efe38,184,RaceMenuOverlay_Draw,frontend,not started
 0x1efef0,468,RaceMenuOverlay_UpdateReplayMenu,frontend,not started
@@ -3487,7 +3487,7 @@ address,size,name,system,status
 0x20c2a0,104,SndSys_StopBankSound,audio,not started
 0x20c308,120,BankInstances_CountPlaying,audio?,not started
 0x20c380,104,BankInstances_CountUsed,audio?,not started
-0x20c3e8,60,BankMonitor_ResetTimers,frontend?,not started
+0x20c3e8,60,BankMonitor_ResetTimers,frontend?,ported
 0x20c468,80,cBankMonitor::__tf,runtime,host
 0x20c560,172,BankSys_Init,audio?,not started
 0x20c610,108,cBankSys::~cBankSys,audio?,not started
@@ -4665,7 +4665,7 @@ address,size,name,system,status
 0x25ecc8,28,VisList_Add,other,not started
 0x25ece8,136,cCourseResolve::cCourseResolve,race,not started
 0x25ed70,128,World_Destruct,world,not started
-0x25edf0,1704,Course_LoadRenderData,race,not started
+0x25edf0,1704,Course_LoadRenderData,race,ported
 0x25f498,252,Course_Unload,race,not started
 0x25f598,1960,Course_LoadSphereTrees,race,ported
 0x25fd40,308,Course_FreeCollision,race,not started
@@ -4675,10 +4675,10 @@ address,size,name,system,status
 0x260108,368,World_CellDeactivate,world,ported
 0x260278,480,World_VisitCellsNear,world,not started
 0x260458,668,World_CullVisibility,world,not started
-0x2606f8,412,Course_RemapTextures,race,not started
-0x260898,264,Course_RemapLightmapTextures,race,not started
+0x2606f8,412,Course_RemapTextures,race,ported
+0x260898,264,Course_RemapLightmapTextures,race,ported
 0x2609b0,28,RailNode_GetSpline,boarder,not started
-0x2609d0,328,World_LoadTextures,world,not started
+0x2609d0,328,World_LoadTextures,world,ported
 0x260b18,144,WorldGrid_CellAtPos,world?,not started
 0x260ba8,248,WorldGrid_CellAt,world?,ported
 0x260ca0,24,World_GetInstanceSphTree,world,not started
