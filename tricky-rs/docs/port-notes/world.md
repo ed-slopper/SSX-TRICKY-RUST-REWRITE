@@ -446,6 +446,30 @@ Part of the port notes (index: [README.md](README.md)); units and wording as des
   the world's answers scripted and the shapes handed over compared, whole updates, hits, both pushes, the
   constructor, pairs of rollers) and in tests/walls.rs (3,700 rider passes with a roller): every field and call.
 
+## The app's knockables (row E8c3; `tricky_game::knockables`, `CourseGround::knock`, tests/knockables.rs)
+
+- Proven: the riding rider's `Boarder_InstanceCollisions` 0x125088 queries the objects with `cWorldBoarder`(rider+0x470,
+  1) (`World_QueryInstances`); a hit (t ≥ 0) makes the contact record (point, unit velocity, normal, speed in; the
+  normal turned off the ground in mode 2) and calls `Instance_OnPlayerContact` 0x13bd40(object, rider, contact, cast
+  record), then `Boarder_InstanceBounce` for flag 0x80 and `Sfx_InstanceCollision`. The contact runs the object's
+  event-1 script when it has no controller, or its controller says yes to vf 0x64 (a roller: asleep).
+- Proven: the touch objects' event-1 scripts (23 of them in the test's first three per course) spawn the roller
+  with op 0 sub-type 0 (`TriggerScript_Op0_SpawnController` 0x13c5d0): an asleep roller on the object is woken, an
+  awake one left, else `cRollerNode::cRollerNode` on the cast record's sphere tree (+0x30) or, with a velocity in the
+  op, the object's group's (`World_GetInstanceSphTree` 0x260ca0). The object's flags lose 0x20, so the rider's
+  query no longer finds it; the rider then meets it only in the rollers' loop (`roller::rider_kick`).
+- The port: `CourseGround` keeps the flags (now changeable), the `.ssf` and a `Knockables` (rollers newest first,
+  waiting script threads, the knocks for the sound). `GroundEnv::instance_collisions` (rider/ground_tick.rs) runs
+  `walls::instance_collisions` and the rollers' loop on the course; `CollisionWorld::tick_knockables` runs every
+  roller's update, the pairs (`Roller_CheckCollision`) and the waiting threads once per 60 Hz frame, from the app's
+  props loop and the `TRICKY_SIM` self-test; a knockable prop is drawn where its roller is (`knockable`).
+- STANDINs: the rider's pairs and the rollers' pairs are boxes that meet (for the race's broadphase); the body is
+  the bind pose's (G5); the rider's handle 1 / 2; the thread's rider velocity is the one at its start; only op 0
+  sub-type 0 and new threads are done by these threads (the port's `logic.rs` does the rest, E9b2); no other
+  controller is kept (E7b2), so a touched object is never `controller` in `Touched`; the air's
+  `Boarder_InstanceCollisions` is not called (the app's air is not `AirMotion_Update` yet, E8p). Without the course's files the old ball props stay.
+- Inferred: the pairs' order and pass in the frame (rollers, then pairs, then threads) is our choice.
+
 ## Keyframed objects (`cAnimObjectNode` 0x198810, `cMeshAnimFrame::vf1` 0x1cb498, `AnimCurve_FindSegment` 0x1cb770)
 
 - Model objects with an Animation: base pose U1..U6 (tx, ty, tz cm; rx, ry, rz degrees), AnimationAction a mask

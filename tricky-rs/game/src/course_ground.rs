@@ -16,8 +16,9 @@ type V4 = [f32; 4];
 pub struct CourseGround {
     /// the world, whose objects' flags +0xe8 bit 0x20 (solid) the port switches (see [`CourseGround::ray_cast`])
     world: Mutex<World>,
-    /// each object's flags as the course loaded them
-    flags: Vec<u32>,
+    /// each object's flags (+0xe8): as the course loaded them, then as its controllers set them
+    /// ([`CourseGround::set_flags`])
+    flags: Mutex<Vec<u32>>,
     /// each patch's coefficients (+0x50)
     coeffs: Vec<[V4; 16]>,
     /// STANDIN: every patch tessellated stays (about 7 KB each), for the game's fixed-size cache and its eviction
@@ -25,6 +26,14 @@ pub struct CourseGround {
     cache: Mutex<HashMap<usize, PatchGrid>>,
     /// the keyframed objects' animated parts' frames as their clocks stand ([`CourseGround::pose`])
     poses: Mutex<HashMap<usize, Vec<[V4; 4]>>>,
+    /// the course's `.ssf` (its scripts, physics records and sphere trees)
+    pub ssf: tricky_data::ssf::Ssf,
+    /// the knockable objects that are moving and the script threads the riders' contacts started (row E8c3)
+    pub knock: Mutex<crate::knockables::Knockables>,
+    /// STANDIN: the objects whose persistent script spawns a controller other than a roller (op 0 sub-type not 0:
+    /// animated doors, boosts...), which the port does not run (row E7b2); the rider's instance query passes
+    /// through them unless the port poses them ([`CourseGround::pose`]), as the app did before row E8c3
+    driven: Vec<bool>,
 }
 
 struct Env<'a> {
@@ -55,8 +64,12 @@ impl CourseGround {
         let ssf = tricky_data::ssf::Ssf::parse(ssf_bytes, pbd.instances.len() as u32).ok()?;
         let coeffs = pbd.patches.iter().map(|r| tricky_data::pbd::PatchRec::parse(r).map_or([[0.0; 4]; 16], |p| p.coeffs)).collect();
         let world = World::from_course(pbd_bytes, &pbd, ltg_bytes, &ltg, &ssf);
-        let flags = world.objects.iter().map(|o| o.flags).collect();
-        Some(CourseGround { world: Mutex::new(world), flags, coeffs, cache: Mutex::new(HashMap::new()), poses: Mutex::new(HashMap::new()) })
+        let flags = Mutex::new(world.objects.iter().map(|o| o.flags).collect());
+        let knock = Mutex::new(crate::knockables::Knockables::default());
+        let driven = (0..world.objects.len())
+            .map(|o| ssf.effects.get(ssf.event_script(o, 0) as usize).is_some_and(|ops| ops.iter().any(|op| op.op == 0 && op.args.first().is_some_and(|&t| t != 0))))
+            .collect();
+        Some(CourseGround { world: Mutex::new(world), flags, coeffs, cache: Mutex::new(HashMap::new()), poses: Mutex::new(HashMap::new()), ssf, knock, driven })
     }
 
     /// `World_RayCast` 0x25aff8 on the course: the distance along the query (−1 for nothing) and what was hit.
@@ -66,7 +79,7 @@ impl CourseGround {
     /// and opened objects), for the game's own switching of an instance (scripts, glass, doors; row E9b2).
     pub fn ray_cast(&self, q: &mut dyn Shape, show_off: bool, last: Option<&mut LastHit>, skip: &dyn Fn(u32) -> bool) -> (f32, Option<CastHit>) {
         let mut world = self.world.lock().unwrap_or_else(|e| e.into_inner());
-        for (i, (o, f)) in world.objects.iter_mut().zip(&self.flags).enumerate() {
+        for (i, (o, f)) in world.objects.iter_mut().zip(self.flags.lock().unwrap_or_else(|e| e.into_inner()).iter()).enumerate() {
             o.flags = if f & 0x20 != 0 && skip(i as u32) { f & !0x20 } else { *f };
         }
         let mut cache = self.cache.lock().unwrap_or_else(|e| e.into_inner());
@@ -79,18 +92,26 @@ impl CourseGround {
     /// `skip` as [`CourseGround::ray_cast`]'s.
     pub fn query_instances(&self, q: &mut dyn Shape, show_off: bool, skip: &dyn Fn(u32) -> bool) -> (f32, Option<CastHit>) {
         let mut world = self.world.lock().unwrap_or_else(|e| e.into_inner());
-        for (i, (o, f)) in world.objects.iter_mut().zip(&self.flags).enumerate() {
-            o.flags = if f & 0x20 != 0 && skip(i as u32) { f & !0x20 } else { *f };
+        let poses = self.poses.lock().unwrap_or_else(|e| e.into_inner());
+        for (i, (o, f)) in world.objects.iter_mut().zip(self.flags.lock().unwrap_or_else(|e| e.into_inner()).iter()).enumerate() {
+            let skip = skip(i as u32) || self.driven[i] && !poses.contains_key(&i);
+            o.flags = if f & 0x20 != 0 && skip { f & !0x20 } else { *f };
         }
         let mut cache = self.cache.lock().unwrap_or_else(|e| e.into_inner());
-        let poses = self.poses.lock().unwrap_or_else(|e| e.into_inner());
         let mut env = Env { coeffs: &self.coeffs, cache: &mut cache, poses: &poses };
         world.query_instances(q, show_off, &mut env)
     }
 
-    /// An object's flags (+0xe8) as the course's data gives them (0 for none).
+    /// An object's flags (+0xe8) as they stand (0 for none).
     pub fn object_flags(&self, object: usize) -> u32 {
-        self.flags.get(object).copied().unwrap_or(0)
+        self.flags.lock().unwrap_or_else(|e| e.into_inner()).get(object).copied().unwrap_or(0)
+    }
+
+    /// An object's flags (+0xe8) set (by its controller).
+    pub fn set_flags(&self, object: usize, flags: u32) {
+        if let Some(f) = self.flags.lock().unwrap_or_else(|e| e.into_inner()).get_mut(object) {
+            *f = flags;
+        }
     }
 
     /// `WorldNode_RayCast` 0x13aad0 = `World_RayCastInstance` 0x25bf48 on the course for one object (instance):

@@ -243,6 +243,29 @@ impl CollisionWorld {
             if m.pose() { pose_on(self.course.as_deref(), m); }
         }
     }
+    /// The course's knockable objects' frames for `dt` seconds (`knockables::Knockables::tick`, row E8c3); nothing
+    /// without the course's files.
+    pub fn tick_knockables(&self, dt: f32) {
+        if let Some(c) = &self.course {
+            c.knock.lock().unwrap_or_else(|e| e.into_inner()).tick(c, self.showoff, &|i| self.course_skips(i), dt);
+        }
+    }
+
+    /// A knockable object that is moving: where it is (port units: metres, y up) and its rotation, and the knocks
+    /// (`Sfx_InstanceCollision`) it took since the last call.
+    pub fn knockable(&self, inst: usize) -> Option<(Vec3, glam::Quat)> {
+        let c = self.course.as_ref()?;
+        let (p, q) = c.knock.lock().unwrap_or_else(|e| e.into_inner()).frame(inst as u32)?;
+        Some((Vec3::new(p[0], p[2], -p[1]) * 0.01, glam::Quat::from_xyzw(q[1], q[3], -q[2], q[0])))
+    }
+
+    /// The knocks (`Sfx_InstanceCollision` 0x216c50) since the last call: the object and the rider's speed (m/s).
+    pub fn take_knocks(&self) -> Vec<(usize, f32)> {
+        let Some(c) = &self.course else { return Vec::new() };
+        let mut k = c.knock.lock().unwrap_or_else(|e| e.into_inner());
+        k.knocks.drain(..).map(|(o, s)| (o as usize, s * 0.01)).collect()
+    }
+
     /// Give the course's collision every keyframed object's pose (once it is set, row E7c3b).
     pub fn pose_course(&self) {
         for m in &self.movers { pose_on(self.course.as_deref(), m); }

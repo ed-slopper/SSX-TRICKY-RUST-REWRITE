@@ -928,6 +928,38 @@ pub(super) fn wall_cast(world: &CollisionWorld, course: &crate::course_ground::C
     (t, rec)
 }
 
+/// The rider's handle for the scripts and sounds. STANDIN: 1 for the human, 2 for the others, for the rider's address.
+fn rider_id(r: &Rider) -> u32 {
+    if r.ai { 2 } else { 1 }
+}
+
+/// What a rider's rollers ask of the world while the rider kicks them (`roller::rider_kick`).
+impl crate::roller::RollerEnv for WallGlue<'_> {
+    fn ray_cast(&mut self, q: &crate::sphtree::WorldSphTree) -> (f32, V4, V4) {
+        let world = self.world;
+        let (t, h) = self.course.ray_cast(&mut q.clone(), world.showoff, None, &|i| world.course_skips(i));
+        h.map_or((t, [0.0; 4], [0.0; 4]), |h| (t, h.pos, h.normal))
+    }
+    fn query_instances(&mut self, q: &crate::sphtree::WorldSphTree) -> (f32, V4, V4) {
+        let world = self.world;
+        let (t, h) = self.course.query_instances(&mut q.clone(), world.showoff, &|i| world.course_skips(i));
+        h.map_or((t, [0.0; 4], [0.0; 4]), |h| (t, h.pos, h.normal))
+    }
+    /// STANDIN: nothing, for the race's broadphase (`Broadphase_MoveBox` 0x14fe68).
+    fn move_box(&mut self, _: V4, _: V4) {}
+    fn event_script(&self, object: u32, event: u32) -> i32 {
+        self.course.ssf.event_script(object as usize, event as usize)
+    }
+    fn start_script(&mut self, script: i32, object: u32) {
+        self.starts.push((script, object));
+    }
+    /// `Sfx_InstanceCollision` 0x216c50 (the rider's hit on a roller).
+    fn sfx(&mut self, _: u32, object: u32) {
+        let v = to_game(self.r.vel, 100.0, 0.0);
+        self.course.knock.lock().unwrap_or_else(|e| e.into_inner()).knocks.push((object, dot(v, v).sqrt()));
+    }
+}
+
 /// What `Boarder_WallCollide` calls (`walls::WallEnv`), answered on the course and the port's rider.
 struct WallGlue<'a> {
     r: &'a mut Rider,
@@ -935,6 +967,10 @@ struct WallGlue<'a> {
     world: &'a CollisionWorld,
     course: &'a crate::course_ground::CourseGround,
     body: crate::collbody::CollBody,
+    /// the sphere tree the last object query hit (the record's +0x30)
+    tree: Option<(usize, usize)>,
+    /// scripts the rollers the rider hit started (`cScriptNode`(3, script, object))
+    starts: Vec<(i32, u32)>,
 }
 
 impl crate::walls::WallEnv for WallGlue<'_> {
@@ -942,9 +978,27 @@ impl crate::walls::WallEnv for WallGlue<'_> {
     fn cast_walls(&mut self, r: &crate::walls::WallRider) -> (f32, crate::walls::CastRecord) {
         wall_cast(self.world, self.course, &self.body, r.ground)
     }
-    /// Not called by `Boarder_WallCollide`.
+    /// `World_QueryInstances` 0x25bdc4 with `cWorldBoarder`(the body, 1): t, the record and the object (its index;
+    /// its flags, its physics record's mass and bounce). STANDIN: no object has a controller here, for the course's
+    /// controllers (row E7b2); the rollers have left the casts (their flags lose 0x20).
     fn query_objects(&mut self, _: &crate::walls::WallRider) -> (f32, crate::walls::CastRecord, crate::walls::Touched) {
-        (0.0, Default::default(), Default::default())
+        let mut q = crate::worldboarder::WorldBoarder::new(&self.body, 1);
+        let world = self.world;
+        let (t, h) = self.course.query_instances(&mut q, world.showoff, &|i| world.course_skips(i));
+        let Some(h) = h else { return (t, Default::default(), Default::default()) };
+        let o = h.object.unwrap_or(0);
+        self.tree = h.tree;
+        let ssf = &self.course.ssf;
+        let phys = ssf.object_physics.get(o).and_then(|p| ssf.physics.get(*p as usize));
+        let rec = crate::walls::CastRecord { pos: h.pos, normal: h.normal, object: o as u32 + 1 };
+        let touched = crate::walls::Touched {
+            id: o as u32,
+            flags: self.course.object_flags(o),
+            mass: phys.map_or(0.0, |p| p.mass()),
+            bounce: phys.map_or(0.0, |p| p.bounce()),
+            controller: None,
+        };
+        (t, rec, touched)
     }
     /// `Boarder_AccumulateImpact` 0x125c48: +0x2e4 += 1 − max(n · +0x2f0, 0), +0x2f0 = n. STANDIN: nothing, the port
     /// keeps neither (nothing ported reads them yet).
@@ -984,13 +1038,23 @@ impl crate::walls::WallEnv for WallGlue<'_> {
     fn stumble(&mut self, _: &mut crate::walls::WallRider, _: V4, _: u32) {
         self.r.stumble_by(true);
     }
-    /// Not called by `Boarder_WallCollide`.
+    /// `Boarder_GetSpeedStat` 0x11d7b0.
     fn speed_stat(&mut self, _: &crate::walls::WallRider) -> f32 {
-        0.0
+        self.r.speed_stat()
     }
     fn knock(&mut self, _: &mut crate::walls::WallRider, _: f32) {}
-    fn contact(&mut self, _: u32, _: &mut crate::walls::WallRider, _: &crate::walls::Contact, _: &crate::walls::CastRecord) {}
-    fn sfx_object(&mut self, _: &crate::walls::WallRider, _: u32) {}
+    /// `Instance_OnPlayerContact` 0x13bd40 (`knockables::Knockables::contact`).
+    fn contact(&mut self, object: u32, r: &mut crate::walls::WallRider, c: &crate::walls::Contact, rec: &crate::walls::CastRecord) {
+        let rider = crate::knockables::Rider { id: rider_id(self.r), human: !self.r.ai, vel: r.vel };
+        let record = crate::knockables::record_context(rec.pos, rec.normal, self.tree);
+        let mut k = self.course.knock.lock().unwrap_or_else(|e| e.into_inner());
+        k.contact(self.course, object, rider, c, record);
+    }
+    /// `Sfx_InstanceCollision` 0x216c50: the object and the rider's speed, for the app's sound.
+    fn sfx_object(&mut self, r: &crate::walls::WallRider, object: u32) {
+        let speed = dot(r.vel, r.vel).sqrt();
+        self.course.knock.lock().unwrap_or_else(|e| e.into_inner()).knocks.push((object, speed));
+    }
     /// `Sfx_OnWallHit` 0x2162f0: the port's wall sound takes the hardest knock of the tick.
     fn sfx_wall(&mut self, r: &crate::walls::WallRider) {
         let (at, speed) = (to_port(r.pos, 0.01), to_port(r.vel, 0.01).length());
@@ -1070,7 +1134,7 @@ impl gm::Env for GroundEnv<'_> {
         if let Some(course) = self.world.course.clone() {
             let mut wr = crate::walls::WallRider { pos: g.p.pos, vel: g.vel, ground: g.p.normal, knocks: 0.0, mode: 2, state: g.state, up: g.board_up };
             let body = wall_body(g);
-            let mut glue = WallGlue { r: &mut *self.r, g: &mut *g, world: self.world, course: &course, body };
+            let mut glue = WallGlue { r: &mut *self.r, g: &mut *g, world: self.world, course: &course, body, tree: None, starts: Vec::new() };
             let hit = crate::walls::wall_collide(&mut wr, &mut glue);
             g.p.pos = wr.pos;
             g.vel = wr.vel;
@@ -1149,8 +1213,37 @@ impl gm::Env for GroundEnv<'_> {
     /// STANDIN: nothing while riding, for `Rail_TryCapture` 0x125cb8 (row G1b); the port captures a rail from the air.
     fn rail_try_capture(&mut self, _g: &mut gm::Rider) {}
 
-    /// STANDIN: nothing, for `Boarder_InstanceCollisions` 0x125088 (row E8b).
-    fn instance_collisions(&mut self, _g: &mut gm::Rider) {}
+    /// `Boarder_InstanceCollisions` 0x125088 on the course (row E8c3): the touch objects (`walls::instance_collisions`),
+    /// then the rider's rollers (`roller::rider_kick`).
+    /// STANDIN: the rider's pairs are the rollers whose boxes meet the body's, for the race's broadphase (rider+0x700);
+    /// the pairs' other nodes (types 0x100..0x103: the boost pads) are `Rider::apply_pads`'. The body is the bind
+    /// pose's ([`Rider::bind_body`], mask −1, row G5). Without the course's files: nothing.
+    fn instance_collisions(&mut self, g: &mut gm::Rider) {
+        let Some(course) = self.world.course.clone() else { return };
+        let mut wr = crate::walls::WallRider { pos: g.p.pos, vel: g.vel, ground: g.p.normal, knocks: 0.0, mode: 2, state: g.state, up: g.board_up };
+        let body = bind_body_at(g.p.pos, g.p.fwd, g.board_up, g.p.stat60);
+        let id = rider_id(self.r);
+        let mut glue = WallGlue { r: &mut *self.r, g: &mut *g, world: self.world, course: &course, body, tree: None, starts: Vec::new() };
+        crate::walls::instance_collisions(&mut wr, &mut glue);
+        let mut rollers = std::mem::take(&mut course.knock.lock().unwrap_or_else(|e| e.into_inner()).rollers);
+        let (c, rad) = (glue.body.center, glue.body.radius);
+        let (lo, hi) = ([c[0] - rad, c[1] - rad, c[2] - rad, 0.0], [c[0] + rad, c[1] + rad, c[2] + rad, 0.0]);
+        for k in rollers.iter_mut().filter(|k| crate::knockables::overlap(k.body.lo, k.body.hi, lo, hi)) {
+            let body = glue.body;
+            crate::roller::rider_kick(&mut k.body, k.object, &mut wr, id, &body, &mut glue);
+        }
+        let starts = std::mem::take(&mut glue.starts);
+        {
+            let mut kn = course.knock.lock().unwrap_or_else(|e| e.into_inner());
+            rollers.append(&mut kn.rollers);
+            kn.rollers = rollers;
+            kn.start_scripts(&course, &starts);
+        }
+        g.p.pos = wr.pos;
+        g.vel = wr.vel;
+        self.r.pos = to_port(g.p.pos, 0.01);
+        self.r.vel = to_port(g.vel, 0.01);
+    }
 }
 
 /// What `Boarder_TakeOff` calls, for a rider that leaves the snow without a jump.

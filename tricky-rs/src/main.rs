@@ -1973,7 +1973,15 @@ fn ride(
                 for other in tail { props::bump(&mut head[i].rider, &mut other.rider); }
             }
             let mut thrown: Vec<(usize, Vec3)> = Vec::new();
+            // the course's knockables (row E8c3): the riders kicked them in their ground ticks; their frames
+            world.0.tick_knockables(dt);
+            let knocks = world.0.take_knocks();
             for p in props.0.iter_mut() {
+                if world.0.course.is_some() && p.kind == props::Kind::Knock {
+                    if let Some((at, q)) = world.0.knockable(p.inst) { (p.pos, p.rot) = (at, q); }
+                    if let Some(&(_, s)) = knocks.iter().find(|k| k.0 == p.inst) { p.knock = Some(s); }
+                    continue;
+                }
                 p.hit_by(r);
                 if let Some(pieces) = p.touched_by(r) { thrown.extend(pieces.into_iter().map(|i| (i, r.vel))); }
                 for o in opponents.0.iter_mut() {

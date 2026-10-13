@@ -22,6 +22,7 @@ pub mod control;
 pub mod controls;
 pub mod controllers;
 pub mod course_ground;
+pub mod knockables;
 pub mod courses;
 pub mod debris;
 pub mod finish;
