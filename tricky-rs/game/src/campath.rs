@@ -351,3 +351,80 @@ pub fn eval(p: &mut PathState, owner: &Owner, env: &mut dyn KeyEnv) -> (Angles, 
     let at = PathAt { idx, count };
     (segment_angles(at, tt, &slots[0], &slots[1], &slots[2], &slots[3]), ended)
 }
+
+/// The camera object's wanted record (`obj + 0x484`, 0x58 bytes, 22 words) and the two copies
+/// `CamScript_BlendLinear` keeps in statics (0x3cda78 "from" and 0x3cdad0 "to"), each with its filled flag
+/// (0x336648 / 0x33664c).
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct BlendState {
+    pub from: [u32; 22],
+    pub to: [u32; 22],
+    pub from_set: bool,
+    pub to_set: bool,
+}
+
+/// What `CamScript_BlendLinear` calls: the two cameras it builds on the stack (slot 0 from the first argument, slot 1
+/// from the second), the position and look-at evaluation of a camera into a record, the smoothing of the object, the
+/// hand-over to `CamScript_UpdateCutFade`, and the destructors.
+pub trait BlendEnv {
+    fn build(&mut self, slot: u32, arg: u32);
+    /// `CamCamera_EvalPosition` then `CamCamera_EvalLookAt` for this camera into `rec`; `flag` is the fourth argument
+    /// (`obj[1]` for the first camera, "t <= 0" for the second); `out` is the float they pass between them.
+    fn eval(&mut self, slot: u32, rec: &mut [u32; 22], obj: &[u32], flag: u32, out: &mut f32);
+    fn smooth(&mut self, obj: &mut [u32]);
+    fn hand_over(&mut self, slot: u32, obj: &mut [u32]);
+    fn done(&mut self, slot: u32);
+}
+
+const REC: usize = 0x484 / 4;
+
+/// `CamScript_BlendLinear` 0x174d28: blend the camera object `obj` from camera `arg0`'s view to camera `arg1`'s as `t`
+/// goes 0 → 1 (position and look-at point linearly, the three angles by the short way round, the lens linearly).
+/// Returns true once `t >= 1` (the object then takes the second camera's record whole).
+pub fn blend_linear(s: &mut BlendState, obj: &mut [u32], t: f32, arg0: u32, arg1: u32, env: &mut dyn BlendEnv) -> bool {
+    if !s.from_set {
+        s.from.copy_from_slice(&obj[REC..REC + 22]);
+        s.from_set = true;
+    }
+    if !s.to_set {
+        s.to.copy_from_slice(&obj[REC..REC + 22]);
+        s.to_set = true;
+    }
+    let first = t <= 0.0;
+    if first {
+        s.from.copy_from_slice(&obj[REC..REC + 22]);
+        s.to.copy_from_slice(&obj[REC..REC + 22]);
+    }
+    let mut out = 0.0f32;
+    env.build(0, arg0);
+    env.eval(0, &mut s.from, obj, obj[1], &mut out);
+    env.build(1, arg1);
+    env.eval(1, &mut s.to, obj, first as u32, &mut out);
+    let f = |w: u32| f32::from_bits(w);
+    if t >= 1.0 {
+        obj[REC..REC + 22].copy_from_slice(&s.to);
+        obj[0x4b4 / 4] = 0;
+        env.smooth(obj);
+        env.hand_over(1, obj);
+        obj[0x18 / 4] = 1;
+        env.done(1);
+        env.done(0);
+        true
+    } else {
+        for i in 0..3 {
+            let d = sb(f(s.to[i]), f(s.from[i]));
+            obj[REC + i] = ad(m(d, t), f(s.from[i])).to_bits();
+        }
+        for i in 3..6 {
+            let d = angle_diff(f(s.to[i]), f(s.from[i]));
+            obj[REC + i] = ad(f(s.from[i]), m(d, t)).to_bits();
+        }
+        obj[0x4b4 / 4] = 0;
+        obj[0x49c / 4] = ad(f(s.from[6]), m(sb(f(s.to[6]), f(s.from[6])), t)).to_bits();
+        env.smooth(obj);
+        env.hand_over(0, obj);
+        env.done(1);
+        env.done(0);
+        false
+    }
+}
