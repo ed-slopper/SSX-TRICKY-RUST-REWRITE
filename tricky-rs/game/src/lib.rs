@@ -86,4 +86,5 @@ pub mod brakefx;
 pub mod boardtrail;
 pub mod effects;
 pub mod emitter;
+pub mod impact;
 pub mod surfacespray;
