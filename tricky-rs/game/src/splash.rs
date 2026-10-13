@@ -14,6 +14,8 @@ pub const RINGS: usize = 5;
 pub struct Splash {
     pub last: [f32; 4],
     pub gathered: f32,
+    /// +0x14: the brake fan's timer
+    pub timer: f32,
     pub count: i32,
     pub slot: i32,
     pub rings: [[u32; RING_WORDS]; RINGS],
@@ -21,7 +23,7 @@ pub struct Splash {
 
 impl Default for Splash {
     fn default() -> Self {
-        Splash { last: [0.0; 4], gathered: 0.0, count: 0, slot: 0, rings: [[0; RING_WORDS]; RINGS] }
+        Splash { last: [0.0; 4], gathered: 0.0, timer: 0.0, count: 0, slot: 0, rings: [[0; RING_WORDS]; RINGS] }
     }
 }
 

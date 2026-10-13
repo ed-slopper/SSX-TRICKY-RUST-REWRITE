@@ -43,6 +43,7 @@ fn load(r: &mut Runner, this: u32, s: &Splash) {
         r.mem.write_f32(this + 4 * k, s.last[k as usize]);
     }
     r.mem.write_f32(this + 0x10, s.gathered);
+    r.mem.write_f32(this + 0x14, s.timer);
     r.mem.write_u32(this + 0x18, s.count as u32);
     r.mem.write_u32(this + 0x1c, s.slot as u32);
     for (i, ring) in s.rings.iter().enumerate() {
@@ -57,6 +58,7 @@ fn check(r: &mut Runner, this: u32, s: &Splash, what: &str) {
         assert_eq!(r.mem.read_u32(this + 4 * k), s.last[k as usize].to_bits(), "{what} last {k}");
     }
     assert_eq!(r.mem.read_u32(this + 0x10), s.gathered.to_bits(), "{what} gathered");
+    assert_eq!(r.mem.read_u32(this + 0x14), s.timer.to_bits(), "{what} timer");
     assert_eq!(r.mem.read_u32(this + 0x18) as i32, s.count, "{what} count");
     assert_eq!(r.mem.read_u32(this + 0x1c) as i32, s.slot, "{what} slot");
     for (i, ring) in s.rings.iter().enumerate() {
@@ -94,6 +96,7 @@ fn splash_matches_the_original() {
             s.slot = (gen.next() % 5) as i32;
             s.gathered = [0.0, 0.1, 0.29, 0.3, 0.31, 2.0][(gen.next() % 6) as usize];
         }
+        s.timer = gen.f();
         if case % 4 == 0 {
             // a ring already there, so the ones the next call leaves alone are not blank
             for ring in s.rings.iter_mut() {

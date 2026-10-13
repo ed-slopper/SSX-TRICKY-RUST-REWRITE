@@ -82,3 +82,4 @@ pub mod brakespray;
 pub mod splash;
 pub mod boardtrack;
 pub mod puff;
+pub mod brakefx;
