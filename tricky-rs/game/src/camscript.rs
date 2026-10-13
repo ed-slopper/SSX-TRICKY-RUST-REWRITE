@@ -229,3 +229,263 @@ pub fn is_running(obj: &[u32]) -> u32 {
     }
     obj[0x34 / 4]
 }
+
+/// One 0x2c-byte step of a camera director script: +0 the camera name, +0x10 the kind, +0x14 and +0x18 the
+/// arguments (a mode and a speed), +0x1c a float, +0x20 and +0x24 the start and end times, +0x28 a word.
+#[derive(Clone, Debug, Default)]
+pub struct Step {
+    pub name: Vec<u8>,
+    pub kind: u32,
+    pub a: u32,
+    pub b: f32,
+    pub c: f32,
+    pub start: f32,
+    pub end: f32,
+    pub w28: u32,
+}
+
+/// What `CamScript_Update` calls. A director is `CamDirector::CamDirector` 0x16e6b0 on the script's name: `dp` is
+/// the data pointer it hands back (0 when the script is missing), `i` a step of it.
+pub trait UpdateEnv: ScriptEnv {
+    fn director_open(&mut self, name: &[u8]) -> u32;
+    fn director_close(&mut self, dp: u32);
+    fn step(&mut self, dp: u32, i: i32) -> Step;
+    /// The director's step count (`dp + 0x370`).
+    fn count(&mut self, dp: u32) -> i32;
+    /// `FUN_00230ff8(DAT_00343050)`.
+    fn wait(&mut self) -> u32;
+    /// `Rand_Fx` 0x23d4a8.
+    fn rand(&mut self) -> u32;
+    /// `CamScript_CutTo` 0x174c98 to the current camera name (+0x24) or to a step.
+    fn cut_to_current(&mut self, obj: &mut [u32]);
+    fn cut_to_step(&mut self, obj: &mut [u32], dp: u32, i: i32);
+    /// `CamScript_Blend` 0x175a08 (returns whether the step is done).
+    #[allow(clippy::too_many_arguments)]
+    fn blend(&mut self, obj: &mut [u32], dp: u32, i: i32, mode: u32, orbit: u32, flip: u32, start: f32, now: f32, end: f32) -> u32;
+    /// `CamScript_StartPath` 0x175ba0 given the step.
+    fn start_path_step(&mut self, obj: &mut [u32], dp: u32, i: i32, mode: u32, speed: f32);
+    /// `Camera_SetMode` 0x1776d0.
+    fn set_mode(&mut self, obj: &mut [u32], mode: u32);
+    /// `CamScript_StartScene` 0x176850.
+    fn start_scene(&mut self, obj: &mut [u32], dp: u32, i: i32);
+    /// `IsRiderAnimDone` 0x16db88 on the rider animation struct (+0x220).
+    fn rider_anim_done(&mut self) -> u32;
+    /// The sound manager's calls: 0x214e08 and 0x214e00 (kinds 0x11 and 0x12), 0x2312b0 (is it busy), 0x230ee0 with
+    /// a word, and 0x2310c8 with the list pointer and 0, 2 or 1.
+    fn sound_a(&mut self);
+    fn sound_b(&mut self);
+    fn sound_busy(&mut self) -> u32;
+    fn sound_set(&mut self, w: u32);
+    fn sound_list(&mut self, list: u32, mode: u32);
+    /// The three statics at 0x3365f8, 0x3365fc and 0x336600 that kind 0x17 sets (1, 0 and 0.5).
+    fn set_statics(&mut self);
+    /// `World_RunScript` 0x13bad8 on "CameraScript_%d".
+    fn run_script(&mut self, name: &[u8]);
+    /// The race player's flag (`*(gApp + 0x730) + 0x4c`).
+    fn race_flag(&mut self, v: u32);
+    /// A word of the list (obj +0x4e8) record: +0x114.
+    fn list_flag(&mut self, list: u32) -> u32;
+}
+
+const ELAPSED: usize = 0x4c / 4;
+
+/// `CamScript_Update` 0x175f50: one tick of the camera script. Time advances 1/60; the director's steps whose start
+/// has passed run one after another (each kind by its own rule), a finished step moves on to the next and the end of
+/// a script pops the stack of scripts or stops.
+pub fn update(obj: &mut [u32], env: &mut dyn UpdateEnv) {
+    let old = f32::from_bits(obj[ELAPSED]);
+    obj[0x3c / 4] = 0;
+    if obj[0x34 / 4] != 1 || obj[RUNNING] != 0 {
+        return;
+    }
+    let time = |obj: &[u32]| f32::from_bits(obj[ELAPSED]);
+    obj[ELAPSED] = (old + f32::from_bits(0x3c888889)).to_bits();
+    let dp = env.director_open(&name_at(obj, SCRIPT_NAME));
+    if dp == 0 {
+        stop(obj, true, env);
+        env.director_close(dp);
+        return;
+    }
+    let i = obj[0x60 / 4] as i32;
+    if !(env.step(dp, i).start < time(obj)) {
+        env.director_close(dp);
+        return;
+    }
+    let mut advanced = false;
+    loop {
+        let mut done = false;
+        if obj[0x44 / 4] != 0 {
+            done = env.wait() != 0;
+            if done {
+                obj[0x44 / 4] = 0;
+            }
+        }
+        if !done {
+            let i = obj[0x60 / 4] as i32;
+            let st = env.step(dp, i);
+            match st.kind {
+                0 => {
+                    if advanced || (i == 0 && old == 0.0) {
+                        if name_at(obj, CURRENT_NAME) != st.name {
+                            camera_cut(obj, env);
+                        }
+                    }
+                    env.cut_to_step(obj, dp, i);
+                }
+                1 | 28 | 2 | 3 => {
+                    let (orbit, flip) = match st.kind {
+                        2 => (1, 0),
+                        3 => (1, 1),
+                        _ => (0, 0),
+                    };
+                    done = env.blend(obj, dp, i, st.a, orbit, flip, st.start, time(obj), st.end) != 0;
+                }
+                4 => {
+                    if advanced || (i == 0 && old == 0.0) {
+                        env.start_path_step(obj, dp, i, st.a, st.b);
+                        env.director_close(dp);
+                        return;
+                    }
+                }
+                5 => env.set_mode(obj, 4),
+                6 => env.set_mode(obj, 5),
+                7 => {
+                    obj[0x3c / 4] = 1;
+                    obj[0x40 / 4] = 1;
+                    env.cut_to_current(obj);
+                    env.director_close(dp);
+                    return;
+                }
+                8 => obj[0x38 / 4] = 1,
+                9 => obj[0x38 / 4] = 0,
+                10 => {
+                    let r = env.rand() % 100;
+                    if (r as f32) < st.c.abs() {
+                        set_name(obj, &st.name);
+                        update(obj, env);
+                        env.director_close(dp);
+                        return;
+                    }
+                }
+                11 => {
+                    let depth = obj[0x48 / 4] as i32;
+                    if depth >= 0x10 {
+                        stop(obj, true, env);
+                        env.director_close(dp);
+                        return;
+                    }
+                    let at = 0x64 / 4 + depth as usize * 6;
+                    for k in 0..6 {
+                        obj[at + k] = obj[ELAPSED + k];
+                    }
+                    obj[0x48 / 4] = (depth + 1) as u32;
+                    set_name(obj, &st.name);
+                    update(obj, env);
+                    env.director_close(dp);
+                    return;
+                }
+                12 => {
+                    if obj[0x38 / 4] == 0 {
+                        env.cut_to_current(obj);
+                    }
+                }
+                13 => camera_cut(obj, env),
+                14 => env.start_scene(obj, dp, i),
+                15 => reset_actor_anims(obj, env),
+                17 => env.sound_a(),
+                18 => env.sound_b(),
+                22 => {
+                    obj[0x420 / 4] = 1;
+                    obj[0x424 / 4] = st.c.to_bits();
+                }
+                23 => env.set_statics(),
+                24 => obj[0xeac / 4] = 1,
+                25 => obj[0xeac / 4] = 0,
+                27 => {
+                    let list = obj[0x4e8 / 4];
+                    if list != 0 && env.list_flag(list) == 0 {
+                        stop(obj, true, env);
+                        env.director_close(dp);
+                        return;
+                    }
+                }
+                30 => obj[0xeb0 / 4] = 1,
+                31 => {
+                    if env.rider_anim_done() == 0 {
+                        obj[0x40 / 4] = 0;
+                        obj[0x3c / 4] = 1;
+                        env.cut_to_current(obj);
+                        env.director_close(dp);
+                        return;
+                    }
+                }
+                32 => {
+                    obj[0x34 / 4] = 0;
+                    stop(obj, true, env);
+                    env.director_close(dp);
+                    return;
+                }
+                33 => {
+                    if env.sound_busy() == 0 {
+                        env.sound_set(st.w28);
+                    }
+                }
+                34 => env.audio_stop(),
+                37 => {
+                    env.run_script(format!("CameraScript_{}", st.w28 as i32).as_bytes());
+                }
+                38 => env.race_flag(1),
+                39 => env.race_flag(0),
+                40 => obj[0x44 / 4] = 1,
+                41 => env.sound_list(obj[0x4e8 / 4], 0),
+                42 => env.sound_list(obj[0x4e8 / 4], 2),
+                43 => env.sound_list(obj[0x4e8 / 4], 1),
+                _ => {}
+            }
+        }
+        let i = obj[0x60 / 4] as i32;
+        if env.step(dp, i).end <= time(obj) {
+            done = true;
+        }
+        if !done {
+            env.director_close(dp);
+            return;
+        }
+        if obj[0xc / 4] == 3 {
+            obj[0xc / 4] = 0;
+        }
+        advanced = true;
+        if i < env.count(dp) - 1 {
+            obj[0x60 / 4] = (i + 1) as u32;
+            if env.step(dp, i + 1).start < time(obj) {
+                continue;
+            }
+            env.director_close(dp);
+            return;
+        }
+        // the end of the script: back to the script that started this one, or stop
+        loop {
+            let depth = obj[0x48 / 4] as i32;
+            if depth == 0 {
+                stop(obj, false, env);
+                env.director_close(dp);
+                return;
+            }
+            let at = ELAPSED + depth as usize * 6;
+            for k in 0..6 {
+                obj[ELAPSED + k] = obj[at + k];
+            }
+            obj[0x48 / 4] = (depth - 1) as u32;
+            let dp2 = env.director_open(&name_at(obj, SCRIPT_NAME));
+            let j = obj[0x60 / 4] as i32;
+            obj[0x60 / 4] = (j + 1) as u32;
+            if j < env.count(dp2) - 1 {
+                update(obj, env);
+                env.director_close(dp2);
+                env.director_close(dp);
+                return;
+            }
+            env.director_close(dp2);
+        }
+    }
+}
