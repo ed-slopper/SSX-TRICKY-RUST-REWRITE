@@ -11,6 +11,7 @@ pub mod anim_names;
 pub mod big;
 pub mod character;
 pub mod compress;
+pub mod huffenc;
 pub mod course;
 pub mod disc;
 pub mod ini;

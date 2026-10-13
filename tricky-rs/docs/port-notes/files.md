@@ -74,8 +74,47 @@ Proven (ported in `tricky-data/src/compress.rs`):
   - Checked in the runner (`tests/compress.rs`): the game's decoder and ours give the same bytes on the Huffman
     test's streams, 1,500 of them plus the long runs, with half of each type's streams marked with bit 7. The
     helpers were checked on 20,000 random headers.
-  - The encoder half of the set (`Compress_Block` 0x243a60 .. `Huff_Encode`, used to save replays) is not
-    ported yet.
+  - The encoder half (row G12c; `tricky_data::huffenc`, checked: `tricky-game/tests/huffenc.rs`):
+    - `Compress_Block` 0x243a60(src, size, dst, options) is what the replay save calls. The options' first word
+      is the delta mode: 1 delta-codes a copy once (`Delta_Encode` 0x241e48: each byte less the one before), 2
+      does it twice. The type it writes, 0x32fb or 0x34fb, makes the decoder sum the bytes back. It then calls
+      `Huff_Encode` on a new 0x31ec-byte context from `Compress_Alloc`, which is not cleared.
+    - `Huff_Encode` 0x2438c0 writes the header: the type, then the size in 24 bits. When the unpacked size
+      differs, the type is 0x31fb / 0x33fb / 0x35fb and both sizes are written. A mode outside 0..2 writes type
+      0. Then come `Huff_Analyze` (flags 0x39, codes up to 15 bits) and `Huff_WriteTable`.
+    - `Huff_Analyze` 0x2426f8, the first pass, counts each byte, each delta from the one before, and each repeat
+      run (a run of a byte equal to the last, up to 30,000 more).
+    - It then picks the clue, the escape: the start of the longest run of unused byte values. The values after
+      it stand for repeat runs of 1, 2, ... Flag 0x20 makes the rarest byte the clue when every value is used.
+      Flag 2 clear keeps one clue value, and flag 1 then none. Flag 4 clear would also give the second-longest
+      run of free values to near deltas (a byte as a small step from the last).
+    - It builds the tree, then drops each run symbol that saves less than half its run in bits
+      (`Huff_RunCost` 0x242210: the cheapest split of a run over the run symbols, or the clue and a number).
+    - The second pass counts again the way the table will be written. Each repeat run goes to the cheapest of:
+      the byte repeated, the clue and a number, or the run symbols. The tree is built again
+      (`Huff_BuildTree` 0x241ff8: the two lightest joined each time, depths by `Huff_AssignDepths` 0x241f78).
+    - Codes over 15 bits are cut down. The two last found at the deepest level go to one past the deepest code
+      still under 15, which moves down with them, and the other deepest goes up one level. Canonical codes
+      follow, by length then value.
+    - `Huff_WriteTable` 0x243368 writes the clue in 8 bits, then the code count for each length as a number
+      (`Huff_WriteVarNum` 0x242320: a 1 after b zeros, then the value less its base in b + 2 bits). For each code
+      it writes how many free values to step past. Then the bytes: runs, near deltas, plain codes, and the clue's
+      own value escaped (`Huff_WriteClueSymbol` 0x2424d0: the clue, 0, then a 0 bit and the byte). It ends with
+      the clue, 0, a 1 bit and padding.
+    - `Huff_WriteBits` 0x241e88 collects bits from bit 23 of a word downwards.
+    - Nothing it reads is left over from the uncleared context except one word: the second clue (+0x2dd0) takes
+      the old clue word, and only the near deltas use it. `Encoder::new` takes the starting bytes.
+    - An empty block has one code, the clue, one bit long. The decoder then keeps reading code lengths past the
+      end, in the game as in our decoder.
+  - Checked in the runner:
+    - `Huff_Encode`: 1,200 blocks and the long runs, on contexts full of leftovers. The stream, the bytes
+      written and all 0x31ec context bytes match, and the streams decode back.
+    - `Compress_Block`: 400 blocks in every delta mode.
+    - `Huff_Analyze`: 1,500 cases with other flags and code limits, every context byte compared. The 12 the
+      port declines are flag sets the game never passes, where a near symbol reads the function's own locals.
+    - `Huff_BuildTree` and `Huff_RunCost`: 3,000 random count tables.
+    - This found a runner bug: `mult`/`multu`/`div`/`divu` cleared LO1/HI1. The analysis keeps a cost in LO1
+      across a `mult`. The runner now keeps them and has learnt `madd1` / `maddu1`.
 - `File_LoadAndUnpack` 0x2c8938 (via `File_Load` 0x2c8a70): opens with mode 1 (so the archives are searched),
   reads the file, and if `Compress_UnpackedSize` is not 0 decodes it into a buffer of that size.
 - Every packed file on the disc is RefPack 0x10 (the four character archives, the course archives, `PS2LOAD`,

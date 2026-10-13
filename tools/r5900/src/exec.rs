@@ -134,25 +134,25 @@ fn step(r: &mut Runner, pc: u32) -> Result<Next, Error> {
                     return Ok(Next::Seq);
                 }
                 24 => {
-                    // mult: on the EE it also writes rd
+                    // mult: on the EE it also writes rd; LO1 / HI1 (the upper halves) are kept
                     let p = (a as u32 as i32 as i64) * (b as u32 as i32 as i64);
-                    c.lo = sext32(p as u32) as u128;
-                    c.hi = sext32((p >> 32) as u32) as u128;
+                    c.lo = (c.lo >> 64) << 64 | sext32(p as u32) as u128;
+                    c.hi = (c.hi >> 64) << 64 | sext32((p >> 32) as u32) as u128;
                     sext32(p as u32)
                 }
                 25 => {
                     // multu: as mult, unsigned
                     let p = (a as u32 as u64) * (b as u32 as u64);
-                    c.lo = sext32(p as u32) as u128;
-                    c.hi = sext32((p >> 32) as u32) as u128;
+                    c.lo = (c.lo >> 64) << 64 | sext32(p as u32) as u128;
+                    c.hi = (c.hi >> 64) << 64 | sext32((p >> 32) as u32) as u128;
                     sext32(p as u32)
                 }
                 26 => {
                     // div
                     let (n, d) = (a as u32 as i32, b as u32 as i32);
                     if d != 0 {
-                        c.lo = sext32(n.wrapping_div(d) as u32) as u128;
-                        c.hi = sext32(n.wrapping_rem(d) as u32) as u128;
+                        c.lo = (c.lo >> 64) << 64 | sext32(n.wrapping_div(d) as u32) as u128;
+                        c.hi = (c.hi >> 64) << 64 | sext32(n.wrapping_rem(d) as u32) as u128;
                     }
                     return Ok(Next::Seq);
                 }
@@ -160,8 +160,8 @@ fn step(r: &mut Runner, pc: u32) -> Result<Next, Error> {
                     // divu
                     let (n, d) = (a as u32, b as u32);
                     if d != 0 {
-                        c.lo = sext32(n / d) as u128;
-                        c.hi = sext32(n % d) as u128;
+                        c.lo = (c.lo >> 64) << 64 | sext32(n / d) as u128;
+                        c.hi = (c.hi >> 64) << 64 | sext32(n % d) as u128;
                     }
                     return Ok(Next::Seq);
                 }
@@ -872,10 +872,29 @@ mod tests {
         assert_eq!(rn.cpu.gpr(7), (p >> 32) as u32 as i32 as i64 as u64);
         assert_eq!(rn.cpu.gpr(8), 0x1234, "LO0 untouched");
     }
+
+    #[test]
+    fn mult_keeps_lo1_and_madd1_adds_to_it() {
+        let mut rn = Runner::empty();
+        // mtlo1 r4; mult r3, r5, r6; madd1 r7, r5, r6; mflo1 r8; mflo r9; jr ra; nop
+        let mmi = |rs: u32, rt: u32, rd: u32, f: u32| 28 << 26 | rs << 21 | rt << 16 | rd << 11 | f;
+        let mult = 5 << 21 | 6 << 16 | 3 << 11 | 24;
+        for (i, w) in [mmi(4, 0, 0, 0x13), mult, mmi(5, 6, 7, 0x20), mmi(0, 0, 8, 0x12), 18 | 9 << 11, 31 << 21 | 8, 0].iter().enumerate() {
+            rn.mem.write_u32(CODE + 4 * i as u32, *w);
+        }
+        rn.cpu.set_gpr(4, 32000);
+        rn.cpu.set_gpr(5, 7);
+        rn.cpu.set_gpr(6, 6);
+        rn.call(CODE).unwrap();
+        assert_eq!(rn.cpu.gpr(3), 42);
+        assert_eq!(rn.cpu.gpr(9), 42, "LO0 from mult");
+        assert_eq!(rn.cpu.gpr(7), 32042, "madd1 on LO1 kept through mult");
+        assert_eq!(rn.cpu.gpr(8), 32042);
+    }
 }
 
 /// The MMI instructions implemented so far: the pipeline-1 multiply and divide (`mult1`, `multu1`, `div1`,
-/// `divu1`) and their HI1/LO1 moves; HI1 and LO1 are the upper 64 bits of HI and LO.
+/// `divu1`, `madd1`, `maddu1`) and their HI1/LO1 moves; HI1 and LO1 are the upper 64 bits of HI and LO.
 fn mmi(r: &mut Runner, pc: u32, w: u32, rs: usize, rt: usize, rd: usize, fun: u32) -> Result<Next, Error> {
     let c = &mut r.cpu;
     let (a, b) = (c.gpr(rs), c.gpr(rt));
@@ -890,6 +909,15 @@ fn mmi(r: &mut Runner, pc: u32, w: u32, rs: usize, rt: usize, rd: usize, fun: u3
             let keep = |x: u128| (x >> 64) << 64;
             c.lo = keep(c.lo) | sext32(t as u32) as u128;
             c.hi = keep(c.hi) | sext32((t >> 32) as u32) as u128;
+            c.set_gpr(rd, sext32(t as u32));
+        }
+        0x20 | 0x21 => {
+            // madd1 / maddu1: as madd / maddu on HI1, LO1
+            let acc = (((c.hi >> 64) as u64 as u32 as u64) << 32 | (c.lo >> 64) as u64 as u32 as u64) as i64;
+            let p = if fun == 0x20 { (a as u32 as i32 as i64).wrapping_mul(b as u32 as i32 as i64) } else { ((a as u32 as u64) * (b as u32 as u64)) as i64 };
+            let t = acc.wrapping_add(p) as u64;
+            set_lo1(c, sext32(t as u32));
+            set_hi1(c, sext32((t >> 32) as u32));
             c.set_gpr(rd, sext32(t as u32));
         }
         0x10 => c.set_gpr(rd, (c.hi >> 64) as u64), // mfhi1
