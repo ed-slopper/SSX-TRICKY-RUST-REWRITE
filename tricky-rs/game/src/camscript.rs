@@ -489,3 +489,67 @@ pub fn update(obj: &mut [u32], env: &mut dyn UpdateEnv) {
         }
     }
 }
+
+/// What `CamScript_CutTo` calls: the camera class record of a named camera (`CamClass` 0x16dd68 / dtor 0x16ded0:
+/// `cls` is the data pointer), its position evaluation 0x16e900 and angle evaluation 0x1722e8 into the object's wanted
+/// record (+0x484, with +0xb68 the second record).
+pub trait CutEnv: ScriptEnv {
+    fn class_open(&mut self, name: &[u8]) -> u32;
+    fn class_close(&mut self, cls: u32);
+    /// The class record's words at +0x170 and +0x168.
+    fn class_word_170(&mut self, cls: u32) -> u32;
+    fn class_f168(&mut self, cls: u32) -> f32;
+    /// `0x16e900(.., obj + 0x484, obj + 0xb68, flag, 0)`: writes the record's position; returns its result.
+    fn eval_pos(&mut self, obj: &mut [u32], flag: u32) -> u32;
+    /// `0x1722e8(.., obj + 0x484, obj + 0xb68, flag, obj + 0x10, obj[0xeac], t2, 0.0)`: writes the record's angles.
+    fn eval_ang(&mut self, obj: &mut [u32], flag: u32, eac: u32, t2: u32);
+}
+
+/// `Camera_GotoNamed` 0x174888: the wanted record for the named camera. An uncut object (+4 clear) first blends the
+/// new position with the old by `1 - obj[8]` (or does nothing when +0x1c is set).
+pub fn goto_named(obj: &mut [u32], name: &[u8], env: &mut dyn CutEnv) {
+    let cls = env.class_open(name);
+    if obj[1] != 0 {
+        let f = obj[1];
+        env.eval_pos(obj, f);
+    } else {
+        if obj[7] != 0 {
+            env.class_close(cls);
+            return;
+        }
+        let old = [f32::from_bits(obj[REC]), f32::from_bits(obj[REC + 1]), f32::from_bits(obj[REC + 2])];
+        let r = env.eval_pos(obj, 0);
+        obj[0xeb4 / 4] = r;
+        let w = 1.0f32 - f32::from_bits(obj[8]);
+        for k in 0..3 {
+            let new = f32::from_bits(obj[REC + k]);
+            obj[REC + k] = (old[k] + (new - old[k]) * w).to_bits();
+        }
+    }
+    let mode = obj[0x428 / 4] as i32;
+    let t2 = (mode < 7 && mode >= 2) as u32;
+    let (f, eac) = (obj[1], obj[0xeac / 4]);
+    env.eval_ang(obj, f, eac, t2);
+    env.smooth(obj);
+    env.class_close(cls);
+}
+
+/// `CamScript_CutTo` 0x174c98(object, name): the name becomes the current camera, the cut counter (+0xc, up to 3)
+/// counts a class with +0x170 set (else clears), the camera goes there and the fade level (+0x448) takes the class's.
+pub fn cut_to(obj: &mut [u32], name: &[u8], env: &mut dyn CutEnv) {
+    copy_name(obj, CURRENT_NAME, name);
+    let cls = env.class_open(name);
+    if env.class_word_170(cls) == 0 {
+        obj[0xc / 4] = 0;
+    } else {
+        let v = (obj[0xc / 4] as i32).wrapping_add(1);
+        obj[0xc / 4] = v as u32;
+        if !(v < 4) {
+            obj[0xc / 4] = 3;
+        }
+    }
+    goto_named(obj, name, env);
+    obj[0x448 / 4] = env.class_f168(cls).to_bits();
+    env.cut_fade(obj);
+    env.class_close(cls);
+}
