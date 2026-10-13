@@ -164,3 +164,56 @@ pub fn update_air(q: &mut Queue, level: f32, rider_id: i64, r: &AirRider, env: &
     let id = surface * 8 + if own { 1 } else { 5 };
     queue_sound(q, 1, id, vol, r.emitter, env);
 }
+
+/// The speed fraction of a rider's impact for the volume: `impact * 127 / 1000` through a float.
+fn impact_volume(impact: i32) -> i32 {
+    let q = (impact << 7).wrapping_sub(impact) / 1000;
+    (q as f32) as i32
+}
+
+pub trait AirEnterEnv: QueueEnv {
+    /// 0x233950 (no arguments), called when the rider's +0x57f4 is above 5.
+    fn big_landing(&mut self);
+    /// 0x235170 (the audio system, the rider, the caller's third argument).
+    fn on_air_enter_prelude(&mut self);
+    fn replay_is_playing(&mut self) -> bool;
+    fn listener_rider(&mut self, who: u32) -> i64;
+    /// 0x2210a8 (the audio system, who), when +0x57f4 is above 2.
+    fn crowd_stop(&mut self, who: u32);
+    /// 0x225768 (the audio system, 0), when +0x57f4 is above 1.5.
+    fn crowd_clear(&mut self);
+    /// `Sfx_ImpactSpeed` 0x21a6a8 (the rider).
+    fn impact_speed(&mut self) -> i32;
+    fn surface_sound_type(&mut self) -> u32;
+}
+
+/// `Sfx_OnAirEnter` 0x2174f8: a rider leaves the ground: the crowd reacts to how high it went (`height`, the rider's
+/// +0x57f4), and for the listener's rider a landing-out sound is queued whose volume follows the impact speed (at
+/// least 64, at most 127: the original evaluates `clamp` as nested conditionals that come to this).
+pub fn on_air_enter(q: &mut Queue, height: f32, rider_id: i64, r: &AirRider, env: &mut dyn AirEnterEnv) {
+    if 5.0 < height {
+        env.big_landing();
+    }
+    env.on_air_enter_prelude();
+    let mut who = 0xffff_ffffu32;
+    if !env.replay_is_playing() {
+        if r.flag_41c == 1 {
+            who = r.player;
+        }
+    } else {
+        who = 0;
+    }
+    if env.listener_rider(who) != rider_id {
+        return;
+    }
+    if 2.0 < height {
+        env.crowd_stop(who);
+    }
+    if 1.5 < height {
+        env.crowd_clear();
+    }
+    let x = impact_volume(env.impact_speed());
+    let vol = if x < 0x40 { 0x40 } else if x < 0x7f { x } else { 0x7f };
+    let surface = env.surface_sound_type();
+    queue_sound(q, 1, surface * 8 + 2, vol as i64, r.emitter, env);
+}
