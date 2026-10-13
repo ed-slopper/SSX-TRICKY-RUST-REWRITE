@@ -313,6 +313,17 @@ Part of the port notes (index: [README.md](README.md)); units and wording as des
   its line (x −217, z −247, 35 m up). Not a lift (row E7c3b found no keyframed object there): an upward boost
   pad ((−221..−212, −147..−138, −251..−241) port m, direction up, target 50) on surface 18 that leaves a
   grounded rider on the floor, with the course's landing and with the old one alike (row E7c3g).
+- Megaplex's boost pads (row E7c3g): the pad does lift a grounded rider. `cBoostNode`'s push (vf27 0x140838,
+  `boosts.rs`) only adds speed along its direction; off the powder the ground tick bleeds 40 % of the speed
+  along the normal and keeps the speed, the rider rises, and once the probe's height passes the surface's word
+  6 (2.6 cm on surface 18) `GroundMotion_Update` 0x10a0d8 takes off. The port never pushed there: the app
+  dropped every boost pad on a course with the tube (megaplex's 37 are all plain `cBoostNode`s, sub-type 7;
+  the tube's own are the lap, Z and tube-end controllers, other sub-types) and the self-test (TRICKY_SIM) never
+  applied any pad. `Rider::apply_pads` (game crate, moved from `src/main.rs`) now runs in both, with the pads
+  kept. TRICKY_SIM=600 over the 11 disc courses: stuck / falls 18 / 32 → 11 / 34 (megaplex 10 / 10 → 4 / 12:
+  further down the course, 9,255 m against 8,392; three of its falls are the tube's put-backs). STANDIN: the
+  pad is our box round the body point, not the controller's own touch test, and no push while down (row
+  E7c3h).
 - Keyframed objects in the casts (row E7c3b): each `Mover` (`collide.rs`) gives the course its animated parts'
   local matrices (`Mover::frames`, `ObjAnim::local` = `cMeshAnimFrame::vf1` 0x1cb498, in part order) whenever its
   clock moves (`CollisionWorld::tick_movers`, `set_mover_time`, and once when the course is set,

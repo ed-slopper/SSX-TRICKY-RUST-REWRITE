@@ -256,8 +256,6 @@ fn open_level(dir: &Path) -> Result<Loaded, String> {
     let lines = level.race_lines();
     let paths = level.ai_paths();
     let tube = props::Tube::find(&level);
-    // Tokyo Megaplex's tube boosts are handled by the tube itself
-    if tube.is_some() { world.pads.retain(|p| !matches!(p.kind, collide::PadKind::Boost { .. })); }
     println!("level scripts: {} objects switched by event, {} script resets, {} spline riders, {} boost pads, {} teleports, {} pickups, {} doors, {} glass pieces",
         level.switchable.len(), level.logic.resets.len(), level.logic.movers.len(), world.pads.iter().filter(|p| matches!(p.kind, collide::PadKind::Boost { .. })).count(), level.logic.teleports.len(), world.pads.iter().filter(|p| matches!(p.kind, collide::PadKind::Pickup { .. })).count(), world.gates.len(), level.glass().len());
     // the course's camera files from the player's disc (TRICKY_DISC, row E5c), else the level folder's copies
@@ -1113,27 +1111,6 @@ fn spawn_terrain(
 #[derive(Component, Clone, Copy)]
 struct TrickOnly;
 /// Show-off ramps (trick-only patches) appear, and are solid, only in show-off events.
-/// The level scripts' boosts (`cBoostNode`: speed along the pad's direction pulled up to its target
-/// at its rate, never slowed) and teleports (op 0x18). Returns true on a teleport.
-fn apply_pads(world: &CollisionWorld, r: &mut Rider, dt: f32) -> bool {
-    let body = r.pos + Vec3::Y * 0.8;
-    for p in &world.pads {
-        if body.cmplt(p.lo - 0.3).any() || body.cmpgt(p.hi + 0.3).any() { continue; }
-        match p.kind {
-            collide::PadKind::Boost { dir, target, gain } => {
-                let d = target - r.vel.dot(dir);
-                if d > 0.0 && r.crashed <= 0.0 { r.vel += dir * (d * gain * dt).min(d); }
-            }
-            collide::PadKind::Teleport { to, yaw } => { r.respawn((to, yaw)); return true; }
-            collide::PadKind::Pickup { mult, speed, spin } => {
-                if let Some(m) = mult { if r.multiplier < m as u32 { r.pick_multiplier(m as u32); } }
-                if let Some(s) = speed { if r.speed_timer < s - 0.5 { r.pick_speed(s); } }
-                if let Some(s) = spin { if r.spin_timer < s - 0.5 { r.pick_spin(s); } }
-            }
-        }
-    }
-    false
-}
 
 fn trick_only_ramps(game: Res<ui::Game>, mut world: ResMut<World>, mut rails: ResMut<RailsRes>, mut props: ResMut<Props>, mut q: Query<&mut Visibility, With<TrickOnly>>, mut last: Local<Option<(ui::Event, usize)>>) {
     let on = game.event == ui::Event::ShowOff;
@@ -1841,7 +1818,7 @@ fn ride(
         let input = r.finish_input(input);
         r.step(&world.0, &rails.0, input, dt);
         r.finish_after(dt);
-        apply_pads(&world.0, r, dt);
+        r.apply_pads(&world.0, dt);
         if held { r.vel = Vec3::new(0.0, r.vel.y.min(0.0), 0.0); }
         if let Some(t) = &race.0.tube { if t.apply(r, race.0.prog.laps, dt) { if let Some(d) = auto.as_mut() { d.reroute(); } } }
         if waiting { r.vel = Vec3::new(0.0, r.vel.y.min(0.0), 0.0); }
@@ -1931,7 +1908,7 @@ fn ride(
             let ai = o.rider.finish_input(ai);
             o.rider.step(&world.0, &rails.0, ai, dt * o.driver.time_scale);
             o.rider.finish_after(dt);
-            if apply_pads(&world.0, &mut o.rider, dt) { o.driver.reroute(); }
+            if o.rider.apply_pads(&world.0, dt) { o.driver.reroute(); }
             if held { o.rider.vel = Vec3::new(0.0, o.rider.vel.y.min(0.0), 0.0); }
             if let Some(t) = &race.0.tube { if t.apply(&mut o.rider, o.prog.laps, dt) { o.driver.reroute(); } }
             if waiting { o.rider.vel = Vec3::new(0.0, o.rider.vel.y.min(0.0), 0.0); }

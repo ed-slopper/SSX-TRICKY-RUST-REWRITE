@@ -656,6 +656,32 @@ impl Rider {
         self.last_trick = "TRICK BOOST".into();
         self.trick_timer = 2.0;
     }
+    /// The level scripts' boosts, teleports (op 0x18) and pickups; true on a teleport. A boost is `cBoostNode`'s
+    /// push (vf27 0x140838, `boosts.rs`): `d` = target − v·dir, when positive v += dir·d·rate per second (the
+    /// game's d·rate/60 a frame), never slowed; nothing else lifts a rider off the ground: the ground tick's
+    /// height test takes off (`GroundMotion_Update` 0x10a0d8, row E7c3g). STANDIN: our pad boxes round the body
+    /// point and no push while down, for the controller's own touch test (`WorldNode_RayCast` of the rider's
+    /// shape, rows E9f, E8b).
+    pub fn apply_pads(&mut self, world: &CollisionWorld, dt: f32) -> bool {
+        use crate::collide::PadKind;
+        let body = self.pos + Vec3::Y * 0.8;
+        for p in &world.pads {
+            if body.cmplt(p.lo - 0.3).any() || body.cmpgt(p.hi + 0.3).any() { continue; }
+            match p.kind {
+                PadKind::Boost { dir, target, gain } => {
+                    let d = target - self.vel.dot(dir);
+                    if d > 0.0 && self.crashed <= 0.0 { self.vel += dir * (d * gain * dt); }
+                }
+                PadKind::Teleport { to, yaw } => { self.respawn((to, yaw)); return true; }
+                PadKind::Pickup { mult, speed, spin } => {
+                    if let Some(m) = mult { if self.multiplier < m as u32 { self.pick_multiplier(m as u32); } }
+                    if let Some(s) = speed { if self.speed_timer < s - 0.5 { self.pick_speed(s); } }
+                    if let Some(s) = spin { if self.spin_timer < s - 0.5 { self.pick_spin(s); } }
+                }
+            }
+        }
+        false
+    }
     /// Script op 0xf (`Pickup_Meter` 0x11e958): straight onto the meter, in show-off only.
     pub fn pick_boost(&mut self, amount: f32) { if self.showoff { self.add_meter(amount); } }
     /// Six landed uber tricks spell TRICKY: boost no longer runs out.

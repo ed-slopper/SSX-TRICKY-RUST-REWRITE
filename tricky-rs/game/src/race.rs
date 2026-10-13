@@ -707,6 +707,7 @@ pub fn self_test(world: &mut CollisionWorld, rails: &Rails, line: &[Vec3], cours
         if std::env::var("TRICKY_RESETS").is_ok() { for (g, s) in world.gates.iter().zip(shut) { if s && g.t.is_some() { println!("  t {t:.1}: door {} opens (open {:.1}..{:.1} s of {:.1})", g.inst, g.open.0, g.open.1, g.len); } } }
         world.tick_gates(dt);
         r.step(world, rails, input, dt);
+        if r.apply_pads(world, dt) { ai.reroute(); }
         if let Some(tb) = tube { if tb.apply(&mut r, prog.laps, dt) { ai.reroute(); tube_t = t; println!("  t {t:.1}: up the tube, {} laps to go", prog.laps); } }
         if std::env::var("TRICKY_TUBE").is_ok() && ((t > tube_t - 2.0 && t < tube_t) || (t - tube_t < 3.0 && t >= tube_t)) && ((t * 10.0) as i32) != (((t - dt) * 10.0) as i32) { println!("    t {t:.1} pos {:.1?} vel {:.1?} grounded {} class {} down {:.1}", r.pos, r.vel, r.grounded, r.tube_class, r.crashed); }
         if std::env::var("TRICKY_RESETS").is_ok() && (r.pos - before).length() > 3.0 { println!("put back at t {t:.1}: was at {:.1?} (line point {} at {:.1?}), air {:.1} s, {}", before, ai.idx, line[ai.idx.min(line.len() - 1)], air_before, if air_before > 8.9 { "in the air too long" } else if before.y < world.min_y - 29.0 { "below the world" } else { "reset zone or autopilot" }); }
