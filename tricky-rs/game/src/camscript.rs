@@ -553,3 +553,20 @@ pub fn cut_to(obj: &mut [u32], name: &[u8], env: &mut dyn CutEnv) {
     env.cut_fade(obj);
     env.class_close(cls);
 }
+
+/// What `IsRiderAnimDone` calls: `Race_GetRider(race, i)` 0x1814a8 (0 when there is none) and the rider's animation
+/// control's progress (0x15fe70 on `rider + 0x46c0` with 0).
+pub trait RiderEnv {
+    fn rider(&mut self, i: u32) -> u32;
+    fn anim_progress(&mut self, rider: u32) -> f32;
+}
+
+/// `IsRiderAnimDone` 0x16db88 on the rider animation struct (its word 3 the rider's index): done when the rider is
+/// gone or its animation has reached 1.0.
+pub fn is_rider_anim_done(index: u32, env: &mut dyn RiderEnv) -> u32 {
+    let r = env.rider(index);
+    if r == 0 {
+        return 1;
+    }
+    (!(env.anim_progress(r) < 1.0)) as u32
+}
