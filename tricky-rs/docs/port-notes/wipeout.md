@@ -65,8 +65,8 @@ Part of the port notes (index: [README.md](README.md)); units and wording as des
 - Clip ids: 0x2dc BUTTSLIDE, 0x2dd FACESLIDE, 0x2de F_FALLINGCYCLE, 0x2df CC_CRUNCHCYCLE, 0x2e0 CT_CRUNCH2STRETCH,
   0x2e1–6 cmCI_ and 0x2e8–d cmI_ (BUTT FACE FEET HEAD LEFT RIGHT), 0x224 A_FALLRECOVER, 0x250/1 CT_CRUNCH/STRETCH2BASE.
 - Mass: sphere masses 4,2,2,2,2,2,2,2,4,4,2,2,2,2,3,3,3,3 (0x3a3f68); inverse inertia 0.8·(1.2·I)⁻¹ of the point
-  masses. The spheres are where the skeleton puts them (`CollBody_UpdateFromBones`, row E8d2); the app still uses
-  a 1.7 m stand-in (rider/wipeout.rs, row G6c).
+  masses. The spheres are where the skeleton puts them (`CollBody_UpdateFromBones`, row E8d2); the app poses them
+  from the bind pose (rider/wipeout.rs, row G6c, below).
 
 ## The wipe-out body, exactly (board row G6a; `tricky_game::ragdoll`, checked: `tests/ragdoll.rs`)
 
@@ -147,6 +147,31 @@ Part of the port notes (index: [README.md](README.md)); units and wording as des
 - Checked in the runner on 40,000 cases (enter, update, the get-up start, impact clips, exit, the get-up motion;
   the animation, probes, predictions and sounds scripted): the rider, the body, the timers and every call bit for
   bit.
+
+## The app's wipe-out (board row G6c, with E7c3e's wipe-out half; `tricky-rs/game/src/rider/wipeout.rs`)
+
+- Proven (read from code): `Boarder_Wipeout` 0x11d830 copies the contact's point and normal into the body (+0x510,
+  +0x530 of the rider's motion object), then state 0x13, motion 5. `GetUpState_Update` 0x108198 ends the get-up on
+  clips 0x1ff/0x221 (state 3) and 0x202 (state 5), and asks `Boarder_RequestReset` whenever the surface under the
+  rider (+0x290) is 0. The masks: 0x31d310 = 0xfc3 (rider+0x494 during the wipe-out's walls), 0x31d314 = 0x273c3
+  (the spheres `Ragdoll_Contacts` casts). `Boarder_Translate` 0x1267a0 moves the collision body, +0x6e0/+0x6f0 and
+  the broadphase box. `AirPredict_Tick` 0x123ec8: +0x4c += 1/60, +8 = +0x44 − it, +0x50 = +0x48 − it.
+- The app runs `wipeout_motion` (motion 5) and `get_up_update` (motion 6) a 60 Hz game tick at a time in the game's
+  units (cm, z up). The casts go to the course (`CollisionWorld::course`): the body's `cWorldBoarder`(body, 0) through
+  `World_RayCast` and `World_QueryInstances`, the probe's `cWorldLine`(0.5, …, 2) through the rider's last-hit record,
+  the body's line `cWorldLine`(0.5, …, 1), the flight prediction's `cWorldLine`(0, …, 0), and the walls through
+  `walls::wall_collide` with `cWorldBoarder`(body, 1) under the mask 0xfc3. Without the course (a levels folder) the
+  drawn mesh stands in.
+- `WipeEnv::sync` is ours: the game's `Ragdoll_Step` hands `Boarder_UpdateOrientation` the whole rider, so the
+  motion reads the forward and side it wrote; the port's motion keeps them in `WipeRider`, which the glue updates.
+- STANDIN, inferred or left: the collision body re-posed from the bind pose each tick (for the skeleton, G5); the
+  hip 91.7 cm over the root; the clip clock, chaining (impacts → crunch cycle, crunch-to-stretch → falling) and the
+  get-up's end after 2n − 1 ticks (the animation controller, G5); no clip displacement (G5); no rollers handed to
+  the body (E8c3); during the wipe-out's walls, no `Boarder_Wipeout` re-entry, crash score, stumble, impact
+  accumulation, object contact or sounds, nor `Boarder_InstanceCollisions` (rows G6d, E8b, G10).
+- Sims (`TRICKY_SIM=600`, the 11 disc courses): stuck 12 → 8, falls 26 → 30. Aloha's extra falls are wipe-outs
+  sliding onto surface 0 and reset there, as `GetUpState_Update` does (the sim counts each reset twice: the
+  wipe-out's and the autopilot's rejoin).
 
 ## Rider hits, exactly (board row E8d1, checked: `tests/hit.rs`; `tricky-rs/game/src/hit.rs`)
 

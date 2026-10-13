@@ -511,16 +511,16 @@ pub fn game_dir(v: Vec3) -> V4 {
 const HALF_PI: f32 = std::f32::consts::FRAC_PI_2;
 
 /// A port vector (m, y up) as a game vector (cm, z up); `w` is 1 for a point, 0 for a direction.
-fn to_game(v: Vec3, k: f32, w: f32) -> V4 {
+pub(super) fn to_game(v: Vec3, k: f32, w: f32) -> V4 {
     [v.x * k, -v.z * k, v.y * k, w]
 }
 
 /// A game vector (cm, z up) as a port vector (m, y up) (`k` = 0.01), or a direction (`k` = 1).
-fn to_port(v: V4, k: f32) -> Vec3 {
+pub(super) fn to_port(v: V4, k: f32) -> Vec3 {
     Vec3::new(v[0] * k, v[2] * k, -v[1] * k)
 }
 
-fn unit(v: V4) -> V4 {
+pub(super) fn unit(v: V4) -> V4 {
     scale(v, 1.0 / dot(v, v).sqrt())
 }
 
@@ -560,7 +560,7 @@ impl GroundCache {
 }
 
 /// A rotation matrix with columns `x`, `y`, `z` as a unit quaternion (w, x, y, z).
-fn quat_of(x: V4, y: V4, z: V4) -> V4 {
+pub(super) fn quat_of(x: V4, y: V4, z: V4) -> V4 {
     let (m00, m10, m20) = (x[0], x[1], x[2]);
     let (m01, m11, m21) = (y[0], y[1], y[2]);
     let (m02, m12, m22) = (z[0], z[1], z[2]);
@@ -897,10 +897,16 @@ impl Rider {
     /// the position (root 91.7 cm up, x along the board's forward), times stats+0x60, for the animated
     /// skeleton (row G5).
     pub fn bind_body(&self) -> crate::collbody::CollBody {
-        let k = self.stats.scale;
         let (up, fwd) = (to_game(self.board_up(), 1.0, 0.0), to_game(self.forward(), 1.0, 0.0));
+        bind_body_at(to_game(self.pos, 100.0, 1.0), fwd, up, self.stats.scale)
+    }
+}
+
+/// [`Rider::bind_body`] at `pos` (game units) with the board's forward and up and the body scale `k` (stats+0x60).
+pub(super) fn bind_body_at(pos: V4, fwd: V4, up: V4, k: f32) -> crate::collbody::CollBody {
+    {
         let side = cross(up, fwd);
-        let root = add(to_game(self.pos, 100.0, 1.0), scale(up, 91.7 * k));
+        let root = add(pos, scale(up, 91.7 * k));
         let mut bones = [[0.0, 0.0, 0.0, 1.0]; 19];
         for (b, [x, y, z]) in BIND {
             bones[b] = add(root, add(scale(fwd, x * k), add(scale(side, y * k), scale(up, z * k))));
@@ -910,6 +916,16 @@ impl Rider {
         body.update_from_bones(&bones);
         body
     }
+}
+
+/// `Boarder_WallCollide`'s cast: `World_RayCast` 0x25aff8 with `cWorldBoarder`(the body, 1), its ground normal set
+/// (+0x2e0, +0x2d0 = 1).
+pub(super) fn wall_cast(world: &CollisionWorld, course: &crate::course_ground::CourseGround, body: &crate::collbody::CollBody, ground: V4) -> (f32, crate::walls::CastRecord) {
+    let mut q = crate::worldboarder::WorldBoarder::new(body, 1);
+    q.reject = Some(ground);
+    let (t, h) = course.ray_cast(&mut q, world.showoff, None, &|i| world.course_skips(i));
+    let rec = h.map_or(Default::default(), |h| crate::walls::CastRecord { pos: h.pos, normal: h.normal, object: h.object.map_or(0, |o| o as u32 + 1) });
+    (t, rec)
 }
 
 /// What `Boarder_WallCollide` calls (`walls::WallEnv`), answered on the course and the port's rider.
@@ -924,12 +940,7 @@ struct WallGlue<'a> {
 impl crate::walls::WallEnv for WallGlue<'_> {
     /// `World_RayCast` 0x25aff8 with `cWorldBoarder`(the body, 1), its ground normal set (+0x2e0, +0x2d0 = 1).
     fn cast_walls(&mut self, r: &crate::walls::WallRider) -> (f32, crate::walls::CastRecord) {
-        let mut q = crate::worldboarder::WorldBoarder::new(&self.body, 1);
-        q.reject = Some(r.ground);
-        let world = self.world;
-        let (t, h) = self.course.ray_cast(&mut q, world.showoff, None, &|i| world.course_skips(i));
-        let rec = h.map_or(Default::default(), |h| crate::walls::CastRecord { pos: h.pos, normal: h.normal, object: h.object.map_or(0, |o| o as u32 + 1) });
-        (t, rec)
+        wall_cast(self.world, self.course, &self.body, r.ground)
     }
     /// Not called by `Boarder_WallCollide`.
     fn query_objects(&mut self, _: &crate::walls::WallRider) -> (f32, crate::walls::CastRecord, crate::walls::Touched) {

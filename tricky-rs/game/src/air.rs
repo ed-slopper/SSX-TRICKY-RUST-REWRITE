@@ -96,6 +96,15 @@ pub struct Predict {
     pub x50: f32,
 }
 
+impl Predict {
+    /// `AirPredict_Tick` 0x123ec8: +0x4c += 1/60; +8 = +0x44 − it, +0x50 = +0x48 − it.
+    pub fn tick(&mut self) {
+        self.x4c += 0.016666668;
+        self.t = self.t_land - self.x4c;
+        self.x50 = self.t_top - self.x4c;
+    }
+}
+
 /// `AirPredict_AtTakeoff` 0x123b10, from the rider's position (+0x140), velocity (+0x150) and normal (+0x2a0):
 /// - rising: the time to the top by halving (from 2 s between 0 and 4, whole flights of [`integrate_rk4`] without
 ///   substeps; at most 10 tries, or until the bracket is under 0.01);

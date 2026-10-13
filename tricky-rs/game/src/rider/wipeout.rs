@@ -1,61 +1,559 @@
-//! The wipe-out as the original does it: `WipeoutMotion_Update` 0x10c2f0 (motion 5, state 0x13)
-//! and `GetUpMotion_Update` 0x1102c8 (motion 6, state 0x14).
+//! The app's wipe-out on the game's (board row G6c): `WipeoutMotion_Update` 0x10c2f0 (motion 5, state 0x13) and
+//! `GetUpMotion_Update` 0x1102c8 (motion 6, state 0x14) as `crate::wipeout_motion` ports them, on the wipe-out body
+//! `crate::ragdoll` (`Ragdoll_Step` 0x10dca8, `Ragdoll_Contacts` 0x10e190, `Ragdoll_GroundProbe` 0x10fd58), each
+//! 60 Hz tick in the game's units (cm, z up), its casts on the course's collision (`CollisionWorld::course`, rows
+//! E7c3 and E7c3e).
 //!
-//! The rider becomes one rigid body (`Ragdoll_InitFromBoarder` 0x10dad8) that tumbles under
-//! gravity and drag (`Ragdoll_Step` 0x10dca8) and bounces off the world (`Ragdoll_Contacts`
-//! 0x10e190). In the air it rights itself toward where it will land and can come out of it
-//! (xA_FALLRECOVER); on the snow it rolls onto its back or front and slides (cmCC_BUTTSLIDE /
-//! FACESLIDE) until slow and flat, then gets up on the spot (`Wipeout_StartGetUp` 0x10f178) with
-//! one of six clips chosen by how it lies and where the course is, turning toward the course as
-//! it does. Coming to rest upright with the board along the course it simply rides on.
-//!
-//! The body frame is the boarder's: X the board's nose (Bevy local -Z), Y its left (local -X),
-//! Z up (local +Y). Units here are metres; the original's cm constants are divided by 100 (and
-//! torques, which are angular momentum per mass, by 100^2).
+//! What the motion asks of the rest of the game is answered here ([`Glue`]); the stand-ins among it are marked.
 use super::*;
+use super::ground_tick::{bind_body_at, quat_of, to_game, to_port, wall_cast};
+use crate::air::{self, Predict, RayHit};
+use crate::collbody::CollBody;
+use crate::orient::{self, Orient};
+use crate::probe::{cross, dot, scale};
+use crate::ragdoll::{CastOut, RagEnv, RagRider};
+use crate::roller::RollerEnv;
+use crate::sphtree::WorldSphTree;
+use crate::terrain::LastHit;
+use crate::walls::{CastRecord, Contact, Touched, WallEnv, WallRider};
+use crate::wipeout_motion::{self as wm, WipeEnv, WipeRider, Wipeout};
+use crate::worldboarder::WorldBoarder;
+use crate::worldline::WorldLine;
 use glam::{Mat3, Quat};
-use std::sync::OnceLock;
 
-/// STANDIN: spheres placed on a 1.7 m rider, for each character's own collision spheres.
-/// `CollBody_PointMassInertia` 0x236530 weighs the
-/// spheres 4,2,2,2,2,2,2,2,4,4,2,2,2,2,3,3 (table 0x3a3f68, 40 in all); where they sit comes from
-/// each character's model, which we do not have, so these are placed on a 1.7 m rider standing
-/// on a 1.5 m board: (mass, centre in the body frame in Bevy axes (x right, y up, z tail), radius).
-const RAG: [(f32, [f32; 3], f32); 16] = [
-    (4.0, [0.0, 0.95, 0.0], 0.18),   // pelvis
-    (2.0, [0.0, 1.20, 0.0], 0.17),   // belly
-    (2.0, [0.0, 1.42, 0.0], 0.18),   // chest
-    (2.0, [0.0, 1.68, 0.0], 0.13),   // head
-    (2.0, [-0.22, 1.30, 0.0], 0.08), // arms
-    (2.0, [0.22, 1.30, 0.0], 0.08),
-    (2.0, [-0.28, 1.00, 0.0], 0.07), // hands
-    (2.0, [0.28, 1.00, 0.0], 0.07),
-    (4.0, [0.0, 0.50, -0.20], 0.11), // knees (feet across the board, along its length)
-    (4.0, [0.0, 0.50, 0.20], 0.11),
-    (2.0, [0.0, 0.12, -0.25], 0.08), // feet
-    (2.0, [0.0, 0.12, 0.25], 0.08),
-    (2.0, [0.0, 0.05, -0.48], 0.06), // board
-    (2.0, [0.0, 0.05, 0.48], 0.06),
-    (3.0, [0.0, 0.06, -0.75], 0.06), // nose and tail
-    (3.0, [0.0, 0.06, 0.75], 0.06),
-];
+type V4 = [f32; 4];
 
-/// Mass, centre of mass in the body frame, and the inverse inertia the original uses:
-/// `Ragdoll_ComputeMassProps` 0x10d6f8 takes the point-mass inertia ×1.2, inverts it and scales
-/// the inverse by 0.8 (so 1.5× the point masses').
-struct RagProps { m: f32, c: Vec3, inv_i: Mat3 }
-fn rag() -> &'static RagProps {
-    static P: OnceLock<RagProps> = OnceLock::new();
-    P.get_or_init(|| {
-        let m: f32 = RAG.iter().map(|s| s.0).sum();
-        let c = RAG.iter().map(|s| Vec3::from(s.1) * s.0).sum::<Vec3>() / m;
-        let mut i = Mat3::ZERO;
-        for s in RAG {
-            let r = Vec3::from(s.1) - c;
-            i += (Mat3::IDENTITY * r.length_squared() - Mat3::from_cols(r * r.x, r * r.y, r * r.z)) * s.0;
-        }
-        RagProps { m, c, inv_i: (i * 1.2).inverse() * 0.8 }
+/// The word at 0x31d314 (0x273c3, the data's): the body's spheres `Ragdoll_Contacts` casts.
+const RAG_MASK: i32 = 0x273c3;
+/// The word at 0x31d310 (0xfc3, the data's): rider+0x494 while the wipe-out's walls run.
+const WALL_MASK: i32 = 0xfc3;
+/// One game tick (s)
+const TICK: f32 = 1.0 / 60.0;
+
+/// The wipe-out while it runs: the motion (+0x4f0 of the rider's motion object), the rider's fields it works on
+/// and what the glue keeps for it.
+#[derive(Clone, Debug)]
+pub struct Wipe {
+    /// the body's orientation for drawing (Bevy: local −Z the board's nose, +Y its up, +X its right)
+    pub q: Quat,
+    /// seconds down
+    pub t: f32,
+    /// the clip playing (the original's id) and seconds into it
+    pub clip: u16,
+    pub clip_t: f32,
+    motion: Wipeout,
+    rag: RagRider,
+    wr: WipeRider,
+    s: State,
+    /// seconds not yet run as game ticks
+    acc: f32,
+}
+
+/// What the glue keeps between calls: the motion and control state the motion set, the clip (STANDIN: our clip
+/// clock, for the animation controller rider+0x46c0, row G5), the board's forward and side and the heading as
+/// `Boarder_UpdateOrientation` last wrote them (+0x180, +0x190, +0x1b0), the probe's +0x330 and +0x29c, the flight
+/// prediction (rider+0x57b0).
+#[derive(Clone, Debug, Default)]
+struct State {
+    motion: u32,
+    state: u32,
+    clip: u16,
+    clip_t: f32,
+    fwd: V4,
+    side: V4,
+    yaw: f32,
+    probe_side: V4,
+    surface_ticks: u32,
+    predict: Predict,
+}
+
+/// What the motion calls, answered on the course and the port's rider.
+struct Glue<'a> {
+    world: &'a CollisionWorld,
+    last: &'a mut LastHit,
+    s: &'a mut State,
+    /// stats+0x60 and rider+0x244 (the probe's start to the side)
+    k: f32,
+    lean: f32,
+}
+
+/// The cast's record as the motion reads it: +0x34 the surface, +0x38 the object (index + 1, 0 none).
+fn out_of(h: Option<crate::world::CastHit>) -> CastOut {
+    h.map_or(CastOut { kind: 3, ..Default::default() }, |h| CastOut {
+        kind: h.kind,
+        pos: h.pos,
+        normal: h.normal,
+        x30: [0, h.surface as u32, h.object.map_or(0, |o| o as u32 + 1)],
     })
+}
+
+impl Glue<'_> {
+    /// `World_RayCast` 0x25aff8 on the course with a `cWorldLine`(target, from, to, kind).
+    fn line(&mut self, target: f32, from: V4, to: V4, kind: u32, last: bool) -> (f32, CastOut) {
+        let world = self.world;
+        let Some(course) = &world.course else { return mesh_line(world, from, to) };
+        let mut q = WorldLine::new(target, from, to, kind);
+        let last = if last { Some(&mut *self.last) } else { None };
+        let (t, h) = course.ray_cast(&mut q, world.showoff, last, &|i| world.course_skips(i));
+        (t, out_of(h.filter(|_| t >= 0.0)))
+    }
+}
+
+/// STANDIN: the drawn mesh's ground across the middle of the line, for a level without the course's collision
+/// (a levels folder; row E3a4c).
+fn mesh_line(world: &CollisionWorld, from: V4, to: V4) -> (f32, CastOut) {
+    let (a, b) = (to_port(from, 0.01), to_port(to, 0.01));
+    let mid = (a + b) * 0.5;
+    let half = (a.y - b.y).abs() * 0.5 + 0.5;
+    match world.ground(mid, half, half) {
+        Some(h) => {
+            let at = Vec3::new(mid.x, h.y, mid.z);
+            let t = ((at - a).length() / (b - a).length().max(1e-6)).clamp(0.0, 1.0);
+            (t, CastOut { kind: 0, pos: to_game(at, 100.0, 1.0), normal: to_game(h.normal, 1.0, 0.0), x30: [0, h.surface as u32, 0] })
+        }
+        None => (-1.0, CastOut { kind: 3, ..Default::default() }),
+    }
+}
+
+/// STANDIN: the deepest of the body's spheres (those in its +0x24 mask) in the drawn mesh's walls and ground, for a
+/// level without the course's collision (row E3a4c).
+fn mesh_body(world: &CollisionWorld, body: &CollBody) -> (f32, CastOut) {
+    let mut best: Option<(f32, Vec3, Vec3, u8)> = None;
+    for (i, &(c, r)) in body.spheres.iter().enumerate().take(body.count.max(0) as usize) {
+        if body.x24 & (1 << i) == 0 {
+            continue;
+        }
+        let (c, r) = (to_port(c, 0.01), r * 0.01);
+        if let Some(h) = world.ground(c, r + 0.5, r + 0.5) {
+            let d = (c.y - h.y) * h.normal.y;
+            if d < r && best.is_none_or(|b| r - d > b.0) {
+                best = Some((r - d, h.normal, c - h.normal * d, h.surface));
+            }
+        }
+        let (c2, ns) = world.push_out(c, r);
+        let depth = (c2 - c).length();
+        if !ns.is_empty() && depth > 1e-5 && best.is_none_or(|b| depth > b.0) {
+            let n = (c2 - c) / depth;
+            best = Some((depth, n, c - n * (r - depth), 10));
+        }
+    }
+    best.map_or((-1.0, CastOut { kind: 3, ..Default::default() }), |(d, n, at, surface)| {
+        (d * 100.0, CastOut { kind: 0, pos: to_game(at, 100.0, 1.0), normal: to_game(n, 1.0, 0.0), x30: [0, surface as u32, 0] })
+    })
+}
+
+impl RollerEnv for Glue<'_> {
+    /// STANDIN: no rollers are handed to the wipe-out body (the port's rolling objects are `props`, row E8c3), so
+    /// none of these is called.
+    fn ray_cast(&mut self, _: &WorldSphTree) -> (f32, V4, V4) {
+        (-1.0, [0.0; 4], [0.0; 4])
+    }
+    fn query_instances(&mut self, _: &WorldSphTree) -> (f32, V4, V4) {
+        (-1.0, [0.0; 4], [0.0; 4])
+    }
+    fn move_box(&mut self, _: V4, _: V4) {}
+    fn event_script(&self, _: u32, _: u32) -> i32 {
+        -1
+    }
+    fn start_script(&mut self, _: i32, _: u32) {}
+    fn sfx(&mut self, _: u32, _: u32) {}
+}
+
+impl RagEnv for Glue<'_> {
+    fn mask(&self) -> i32 {
+        RAG_MASK
+    }
+    /// `World_RayCast` 0x25aff8 with the body's `cWorldBoarder`(+0x470, 0).
+    fn cast_body(&mut self, q: &WorldBoarder) -> (f32, CastOut) {
+        let world = self.world;
+        let Some(course) = &world.course else { return mesh_body(world, &q.rider) };
+        let mut q = q.clone();
+        let (t, h) = course.ray_cast(&mut q, world.showoff, None, &|i| world.course_skips(i));
+        (t, out_of(h.filter(|_| t > 0.0)))
+    }
+    /// `World_QueryInstances` 0x25bdc4 with it (nothing without the course's collision).
+    fn query_body(&mut self, q: &WorldBoarder) -> (f32, CastOut) {
+        let world = self.world;
+        let Some(course) = &world.course else { return (-1.0, CastOut { kind: 3, ..Default::default() }) };
+        let mut q = q.clone();
+        let (t, h) = course.query_instances(&mut q, world.showoff, &|i| world.course_skips(i));
+        (t, out_of(h.filter(|_| t > 0.0)))
+    }
+    /// `World_RayCast` 0x25aff8 with a `cWorldLine`(0.5, from, to, 1).
+    fn cast_line(&mut self, from: V4, to: V4) -> (f32, CastOut) {
+        self.line(0.5, from, to, 1, false)
+    }
+    /// STANDIN: nothing, as the ground tick's walls (`Boarder_AccumulateImpact` 0x125c48: the port keeps neither
+    /// +0x2e4 nor +0x2f0).
+    fn accumulate_impact(&mut self, _: V4) {}
+    /// STANDIN: nothing, for the rider's virtual +0x64 (not ported).
+    fn rider_contact(&mut self, _: V4, _: V4, _: V4) {}
+    fn object_flags(&self, object: u32) -> u32 {
+        match (&self.world.course, object) {
+            (Some(c), 1..) => c.object_flags(object as usize - 1),
+            _ => 0,
+        }
+    }
+    /// STANDIN: nothing, for `Instance_OnPlayerContact` 0x13bd40 (the objects' scripts, row E9).
+    fn player_contact(&mut self, _: u32, _: &Contact, _: &CastOut) {}
+    /// `Boarder_UpdateOrientation` 0x129008 (`orient::update_orientation`).
+    fn update_orientation(&mut self, r: &mut RagRider) {
+        let mut o = Orient { q: r.q, fwd: self.s.fwd, side: self.s.side, up: r.up, yaw: self.s.yaw };
+        orient::update_orientation(&mut o);
+        (r.q, r.up, self.s.fwd, self.s.side, self.s.yaw) = (o.q, o.up, o.fwd, o.side, o.yaw);
+    }
+}
+
+impl WipeEnv for Glue<'_> {
+    fn clip(&self) -> u32 {
+        self.s.clip as u32
+    }
+    /// The clip's type: 0x11 the curled ones (category 17), else 0x12.
+    fn clip_type(&self) -> u32 {
+        if category(self.s.clip) == 17 { 0x11 } else { 0x12 }
+    }
+    fn play_clip(&mut self, clip: u32) {
+        self.s.clip = clip as u16;
+        self.s.clip_t = 0.0;
+    }
+    fn blend_out_all(&mut self) {}
+    /// STANDIN: no displacement, for the clip's (`AnimCtl_GetClipDisplacement`, row G5).
+    fn displacement(&mut self) -> V4 {
+        [0.0; 4]
+    }
+    /// `Boarder_ProbeGround` 0x128ae8 (`probe::probe`) down `probe::line`, a `cWorldLine`(0.5, from, to, 2) through
+    /// the rider's last-hit record (rider+0x430).
+    fn probe_ground(&mut self, r: &mut RagRider, w: &mut WipeRider) -> bool {
+        let mut p = crate::probe::Rider {
+            pos: r.pos,
+            fwd: w.fwd,
+            normal: r.ground,
+            ground: r.ground_at,
+            plane_fwd: r.side,
+            side: self.s.probe_side,
+            fall: r.fall,
+            x244: self.lean,
+            stat60: self.k,
+            height: r.height,
+            surface: r.surface,
+            surface_ticks: self.s.surface_ticks,
+            kind: r.ground_kind,
+        };
+        let (from, to) = crate::probe::line(&p);
+        let (t, out) = self.line(0.5, from, to, 2, true);
+        let hit = (t >= 0.0).then_some(crate::probe::Hit { kind: out.kind, point: out.pos, normal: out.normal, surface: out.x30[1] });
+        let on = crate::probe::probe(&mut p, hit);
+        (r.ground, r.ground_at, r.side, r.fall, r.height, r.surface, r.ground_kind) = (p.normal, p.ground, p.plane_fwd, p.fall, p.height, p.surface, p.kind);
+        (self.s.probe_side, self.s.surface_ticks) = (p.side, p.surface_ticks);
+        on
+    }
+    /// `Boarder_RotateAboutAxis` 0x128e90 (`orient::rotate_about_axis`).
+    fn rotate_about_axis(&mut self, r: &mut RagRider, w: &mut WipeRider, angle: f32, axis: V4) {
+        let mut o = Orient { q: r.q, fwd: w.fwd, side: w.side, up: r.up, yaw: self.s.yaw };
+        orient::rotate_about_axis(&mut o, angle, axis);
+        (r.q, r.up, w.fwd, w.side, self.s.yaw) = (o.q, o.up, o.fwd, o.side, o.yaw);
+        (self.s.fwd, self.s.side) = (o.fwd, o.side);
+    }
+    /// The surface table's gravity (+0x00).
+    fn surface_g(&self, surface: u32) -> f32 {
+        crate::surface::surf(surface as usize, 0)
+    }
+    /// `Boarder_WallCollide` 0x126250 (`walls::wall_collide`) with the body's `cWorldBoarder` under the mask 0xfc3.
+    /// STANDIN: `Boarder_InstanceCollisions` 0x125088 is not run, as in the ground tick (row E8b).
+    fn collide_world(&mut self, r: &mut RagRider, w: &mut WipeRider) {
+        let _ = w;
+        let mut body = r.body;
+        body.x24 = WALL_MASK;
+        let mut wr = WallRider { pos: r.pos, vel: r.vel, ground: r.ground, knocks: 0.0, mode: self.s.motion, state: self.s.state, up: r.up };
+        let mut walls = Walls { world: self.world, body };
+        crate::walls::wall_collide(&mut wr, &mut walls);
+        (r.pos, r.vel) = (wr.pos, wr.vel);
+        r.body = walls.body;
+        r.body.x24 = -1;
+    }
+    /// `Boarder_Translate` 0x1267a0: the collision body moved (the broadphase box the port does not keep).
+    fn translate(&mut self, r: &mut RagRider, d: V4) {
+        r.body.translate(d);
+    }
+    /// `AirPredict_AtTakeoff` 0x123b10 (`air::predict_at_takeoff`, its rays `cWorldLine`(0, …, 0) on the course) or
+    /// `AirPredict_Tick` 0x123ec8; the motion reads the prediction's +8, +0x20, +0x30 and +0x40.
+    fn predict(&mut self, r: &RagRider, w: &mut WipeRider, takeoff: bool) {
+        if takeoff {
+            let mut ray = |a: V4, b: V4| {
+                let (t, o) = self.line(0.0, a, b, 0, false);
+                (t, RayHit { point: o.pos, normal: o.normal, word: o.x30[1] })
+            };
+            let p = air::predict_at_takeoff(r.pos, r.vel, r.ground, &mut ray);
+            self.s.predict = p;
+        } else {
+            self.s.predict.tick();
+        }
+        let p = &self.s.predict;
+        (w.t_land, w.land_v, w.land_n, w.land_surface) = (p.t, p.vel, p.normal, p.word);
+    }
+    /// `AirPredict_ClearLandTime` 0x123f00
+    fn predict_reset(&mut self) {
+        self.s.predict.t_land = 0.0;
+    }
+    fn set_motion(&mut self, m: u32) {
+        self.s.motion = m;
+    }
+    fn set_state(&mut self, s: u32) {
+        self.s.state = s;
+    }
+    /// STANDIN: the wipe-out's sounds are the port's own (`boardsound`), for `Sfx_*` (rows G10).
+    fn sfx_enter(&mut self) {}
+    fn sfx_impact(&mut self) {}
+    fn sfx_slide(&mut self) {}
+    fn sfx_stop(&mut self) {}
+    fn sfx_leave(&mut self) {}
+    fn rider_leave(&mut self) {}
+    fn sync(&mut self, w: &mut WipeRider) {
+        (w.fwd, w.side) = (self.s.fwd, self.s.side);
+    }
+}
+
+/// What `Boarder_WallCollide` calls during the wipe-out.
+struct Walls<'a> {
+    world: &'a CollisionWorld,
+    body: CollBody,
+}
+
+impl WallEnv for Walls<'_> {
+    fn cast_walls(&mut self, r: &WallRider) -> (f32, CastRecord) {
+        match &self.world.course {
+            Some(course) => wall_cast(self.world, course, &self.body, r.ground),
+            None => {
+                let (t, o) = mesh_body(self.world, &self.body);
+                (t, CastRecord { pos: o.pos, normal: o.normal, object: 0 })
+            }
+        }
+    }
+    fn query_objects(&mut self, _: &WallRider) -> (f32, CastRecord, Touched) {
+        (0.0, Default::default(), Default::default())
+    }
+    fn accumulate_impact(&mut self, _: &mut WallRider, _: V4) {}
+    fn translate(&mut self, _: &mut WallRider, by: V4) {
+        self.body.translate(by);
+    }
+    /// Only in motion 2.
+    fn turn_from_wall(&mut self, _: &mut WallRider, _: V4) {}
+    /// Already down: `Boarder_Wipeout` 0x11d830 would start the motion again; STANDIN: nothing (unread so far).
+    fn wipeout(&mut self, _: &mut WallRider, _: &Contact) {}
+    fn score_crash(&mut self, _: &mut WallRider) -> f32 {
+        0.0
+    }
+    fn add_meter(&mut self, _: &mut WallRider, _: f32) {}
+    fn stumble(&mut self, _: &mut WallRider, _: V4, _: u32) {}
+    fn speed_stat(&mut self, _: &WallRider) -> f32 {
+        0.0
+    }
+    fn knock(&mut self, _: &mut WallRider, _: f32) {}
+    fn contact(&mut self, _: u32, _: &mut WallRider, _: &Contact, _: &CastRecord) {}
+    fn sfx_object(&mut self, _: &WallRider, _: u32) {}
+    fn sfx_wall(&mut self, _: &WallRider) {}
+}
+
+/// How a tick of the motion ended.
+enum Out {
+    Down,
+    /// out of it through the air (xA_FALLRECOVER, motion 1 state 0xd) or on the snow (motion 2 state 3; the get-up's
+    /// end), with the clip that brings the body back to its base pose (0 for none)
+    Air(u16),
+    Ride(u16),
+    /// the time-out's reset request (+0x2e4 = 1e6)
+    Reset,
+}
+
+impl Wipe {
+    /// One game tick of motion 5 or 6.
+    fn tick(&mut self, world: &CollisionWorld, last: &mut LastHit, k: f32, lean: f32, kind: u8) -> Out {
+        let was = self.s.motion;
+        let mut glue = Glue { world, last, s: &mut self.s, k, lean };
+        if was == 5 {
+            self.motion.update(&mut self.rag, &mut self.wr, &mut [], &mut glue);
+        } else {
+            wm::get_up_update(&mut self.rag, &mut self.wr, &mut glue);
+        }
+        let now = glue.s.motion;
+        if now != was && was == 5 {
+            self.motion.exit(now, &mut glue);
+        }
+        // STANDIN: the collision body re-posed from the bind pose where the rider now is, for
+        // `CollBody_UpdateFromBones` 0x2361b0 on the animated skeleton (row G5)
+        self.rag.body = bind_body_at(self.rag.pos, self.wr.fwd, self.rag.up, k);
+        self.s.clip_t += TICK;
+        if self.wr.stuck >= 1e6 {
+            return Out::Reset;
+        }
+        match now {
+            1 => Out::Air(self.s.clip),
+            2 => Out::Ride(self.s.clip),
+            // STANDIN: the get-up ends with its clip, 2n − 1 ticks for an n-frame clip, for the animation's end
+            // action (row G5)
+            6 if self.s.clip_t >= (2.0 * clip_frames(self.s.clip, kind) - 1.0) / 60.0 => Out::Ride(0),
+            _ => Out::Down,
+        }
+    }
+
+    /// The body's orientation for drawing, from the board's side, forward and up (Bevy: +X right, +Y up, −Z nose).
+    fn draw_q(&self) -> Quat {
+        let (x, y, z) = (to_port(self.wr.side, 1.0), to_port(self.rag.up, 1.0), to_port(self.wr.fwd, 1.0));
+        Quat::from_mat3(&Mat3::from_cols(x, y, -z)).normalize()
+    }
+}
+
+impl Rider {
+    /// `Boarder_Wipeout` 0x11d830's motion change: the crash's point and normal into the body (+0x20, +0x40 of the
+    /// body, from the contact's +0 and +0x20), then `WipeoutMotion_Enter` 0x10c198 on the rider as it is.
+    fn wipe_enter(&mut self, world: &CollisionWorld) -> Wipe {
+        let k = self.stats.scale;
+        let o = match self.att {
+            Some((a, yaw)) if yaw == self.yaw => a,
+            _ => {
+                let up = to_game(self.board_up(), 1.0, 0.0);
+                let h = to_game(heading(self.yaw), 1.0, 0.0);
+                let fwd = super::ground_tick::unit(crate::probe::sub(h, scale(up, dot(h, up))));
+                let mut o = Orient { q: quat_of(cross(fwd, up), fwd, up), ..Orient::default() };
+                orient::update_orientation(&mut o);
+                o
+            }
+        };
+        let pos = to_game(self.pos, 100.0, 1.0);
+        let ground = if self.grounded { to_game(self.normal, 1.0, 0.0) } else { [0.0, 0.0, 1.0, 0.0] };
+        let (course, course8) = self.course_pts.map_or((pos, pos), |(a, b)| (to_game(a, 100.0, 1.0), to_game(b, 100.0, 1.0)));
+        let mut rag = RagRider {
+            id: 0,
+            pos,
+            vel: to_game(self.vel, 100.0, 0.0),
+            q: o.q,
+            up: o.up,
+            height: 0.0,
+            surface: self.surface as u32,
+            ground,
+            fall: crate::probe::fall_line(ground, o.up),
+            ground_at: pos,
+            ground_kind: if self.grounded { 0 } else { 3 },
+            crash_n: [0.0; 4],
+            side: o.fwd,
+            course,
+            body: bind_body_at(pos, o.fwd, o.up, k),
+            // STANDIN: the hip bone (rider+0x44d8's) at the bind pose's root, 91.7 cm up (row G5)
+            hip: [0.0, 0.0, 91.7 * k, 0.0],
+        };
+        let mut wr = WipeRider {
+            time_scale: 1.0,
+            fwd: o.fwd,
+            side: o.side,
+            x294: self.band.0 * 100.0,
+            course8,
+            player: if self.ai { 0 } else { -1 },
+            x420: self.stats.kind as u32,
+            x464: self.data.goofy,
+            ..Default::default()
+        };
+        let mut motion = Wipeout::default();
+        let (at, n) = self.crash_at.take().unwrap_or((self.pos, self.normal));
+        (motion.rag.crash_at, motion.rag.crash_n) = (to_game(at, 100.0, 1.0), to_game(n, 1.0, 0.0));
+        let mut s = State { motion: 5, state: 0x13, clip: CLIP_CRUNCH, fwd: o.fwd, side: o.side, yaw: o.yaw, probe_side: o.side, ..Default::default() };
+        let mut glue = Glue { world, last: &mut self.last_hit, s: &mut s, k, lean: self.lean[0] };
+        motion.enter(&mut rag, &mut wr, &mut glue);
+        self.switch = false;
+        self.clear_air();
+        self.air_time = 0.0;
+        let mut w = Wipe { q: Quat::IDENTITY, t: 0.0, clip: s.clip, clip_t: 0.0, motion, rag, wr, s, acc: 0.0 };
+        w.q = w.draw_q();
+        w
+    }
+
+    /// Motion 5 / 6 (`WipeoutMotion_Update` 0x10c2f0, `GetUpMotion_Update` 0x1102c8) a game tick at a time.
+    pub(super) fn wipe_step(&mut self, world: &CollisionWorld, dt: f32) {
+        let mut w = match self.wipe.take() {
+            Some(w) => w,
+            None => self.wipe_enter(world),
+        };
+        self.down_t += dt;
+        w.t += dt;
+        // STANDIN: clips that end chain on (end actions 5 and 6: impacts → crunch cycle, crunch-to-stretch →
+        // falling), for the animation controller (row G5)
+        if w.s.motion == 5 && w.s.clip_t >= (clip_frames(w.s.clip, self.stats.kind) - 1.0) / 30.0 {
+            match w.s.clip {
+                0x2e1..=0x2ed => (w.s.clip, w.s.clip_t) = (CLIP_CRUNCH, 0.0),
+                CLIP_CRUNCH2STRETCH => (w.s.clip, w.s.clip_t) = (CLIP_FALLING, 0.0),
+                _ => {}
+            }
+        }
+        // states 0x13 / 0x14 (`GetUpState_Update` 0x108198): out of bounds (surface 0) is a reset at once
+        if self.surface == 0 {
+            let at = self.safe;
+            self.respawn(at);
+            return;
+        }
+        if let Some((near, ahead)) = self.course_pts {
+            (w.rag.course, w.wr.course8) = (to_game(near, 100.0, 1.0), to_game(ahead, 100.0, 1.0));
+        }
+        let dbg = std::env::var("TRICKY_WIPEDBG").is_ok();
+        w.acc += dt;
+        let mut out = Out::Down;
+        while w.acc >= TICK * 0.999 && matches!(out, Out::Down) {
+            w.acc -= TICK;
+            let was = w.s.clip;
+            out = w.tick(world, &mut self.last_hit, self.stats.scale, self.lean[0], self.stats.kind);
+            if dbg && (w.s.clip != was || !matches!(out, Out::Down)) {
+                println!("    wipe t {:.2} motion {} clip {} air {:.2} ground {:.2} speed {:.1} kind {} surf {} pos {:.1?}", w.t, w.s.motion, clip_name(w.s.clip), w.motion.rag.t_air, w.motion.t_ground,
+                    to_port(w.rag.vel, 0.01).length(), w.rag.ground_kind, w.rag.surface, to_port(w.rag.pos, 0.01));
+            }
+        }
+        self.pos = to_port(w.rag.pos, 0.01);
+        self.vel = to_port(w.rag.vel, 0.01);
+        self.normal = to_port(w.rag.ground, 1.0);
+        self.surface = w.rag.surface.min(19) as u8;
+        self.grounded = w.rag.ground_kind != 3;
+        let f = to_port(w.wr.fwd, 1.0);
+        if Vec3::new(f.x, 0.0, f.z).length() > 0.2 {
+            self.yaw = f32::atan2(-f.x, -f.z);
+        }
+        (w.q, w.clip, w.clip_t) = (w.draw_q(), w.s.clip, w.s.clip_t);
+        self.getup = if w.s.motion == 6 { w.s.clip_t } else { -1.0 };
+        match out {
+            Out::Down => {}
+            Out::Air(clip) => return self.end_wipe(clip, false),
+            Out::Ride(clip) => return self.end_wipe(clip, true),
+            Out::Reset => {
+                let at = self.safe;
+                self.respawn(at);
+                return;
+            }
+        }
+        self.wipe = Some(w);
+        // out of the world, or into one of the course's out-of-bounds boxes
+        if self.pos.y < world.min_y - 30.0 || world.in_reset(self.pos + Vec3::Y * 0.8, BODY_RADIUS) {
+            let at = self.safe;
+            self.respawn(at);
+        }
+    }
+
+    /// Back to riding (on the snow) or to an ordinary jump, with the clip that brings the body back to its base
+    /// pose (0 for none).
+    fn end_wipe(&mut self, clip: u16, on_snow: bool) {
+        self.crashed = 0.0;
+        self.getup = -1.0;
+        self.wipe = None;
+        self.grounded = on_snow;
+        self.spin = 0.0;
+        self.flip = 0.0;
+        self.clear_air();
+        self.air_time = 0.0;
+        self.charge = 0.0;
+        if on_snow {
+            let n = self.normal;
+            self.vel -= n * self.vel.dot(n).min(0.0);
+        } else {
+            self.normal = Vec3::Y;
+        }
+        self.cap = SPEED_CAP.max(self.vel.length());
+        self.recover = if clip != 0 { Some((clip, 0.0)) } else { None };
+    }
 }
 
 // the original's clip ids for the wipe-out (game clip id → name via `AnimClip_ResolveAnmIndex`)
@@ -110,423 +608,6 @@ pub fn clip_frames(id: u16, kind: u8) -> f32 {
 /// Clip category (descriptor table 0x325fa8): 17 the curled-up ("crunch") clips, 18 the
 /// stretched-out ones.
 fn category(id: u16) -> u8 { if matches!(id, CLIP_CRUNCH | CLIP_CRUNCH2STRETCH | 0x2e1..=0x2e6) { 17 } else { 18 } }
-
-/// The body while down.
-#[derive(Clone, Debug)]
-pub struct Wipe {
-    /// orientation (Bevy: local -Z the board's nose, +Y up) and angular momentum (per the body's units)
-    pub q: Quat,
-    pub l: Vec3,
-    /// seconds down, since the body last touched anything, and in contact with the snow
-    pub t: f32,
-    pub t_air: f32,
-    pub t_ground: f32,
-    /// the original's clip id playing and seconds into it
-    pub clip: u16,
-    pub clip_t: f32,
-    /// the last ground normal (probe or contact) and whether the probe found ground
-    n: Vec3,
-    probe: bool,
-    /// getting up: the get-up clip and seconds into it
-    pub getup: Option<(u16, f32)>,
-}
-
-/// A frame from the board's nose and up.
-fn frame(fwd: Vec3, up: Vec3) -> Quat {
-    let up = up.normalize_or(Vec3::Y);
-    let f = (fwd - up * fwd.dot(up)).normalize_or(up.any_orthonormal_vector());
-    let back = -f;
-    Quat::from_mat3(&Mat3::from_cols(up.cross(back), up, back)).normalize()
-}
-fn ax_x(q: Quat) -> Vec3 { q * Vec3::NEG_Z }
-fn ax_y(q: Quat) -> Vec3 { q * Vec3::NEG_X }
-fn ax_z(q: Quat) -> Vec3 { q * Vec3::Y }
-fn omega(q: Quat, l: Vec3) -> Vec3 {
-    let w = q * (rag().inv_i * (q.inverse() * l));
-    // |ω| is held to 23.56 rad/s (`RigidBody_UpdateDerived`)
-    let s = w.length();
-    if s > 23.56 { w * (23.56 / s) } else { w }
-}
-/// `RigidBody_ContactImpulse` 0x153ee8: restitution `e` and friction `mu` at `point`, normal `n`
-/// pointing out of what was hit; only if the point is moving into it.
-fn contact_impulse(com: Vec3, v: &mut Vec3, q: Quat, l: &mut Vec3, point: Vec3, n: Vec3, e: f32, mu: f32) -> bool {
-    let p = rag();
-    let r = point - com;
-    let w = omega(q, *l);
-    let vp = *v + w.cross(r);
-    let vn = vp.dot(n);
-    if vn >= 0.0 { return false; }
-    let inv_iw = |x: Vec3| q * (p.inv_i * (q.inverse() * x));
-    let k = |d: Vec3| 1.0 / p.m + d.dot(inv_iw(r.cross(d)).cross(r));
-    let jn = -(1.0 + e) * vn / k(n);
-    let mut j = n * jn;
-    let vt = vp - n * vn;
-    if vt.length() > 1e-4 && mu > 0.0 {
-        let t = vt.normalize();
-        j -= t * (vt.length() / k(t)).min(mu * jn);
-    }
-    *v += j / p.m;
-    *l += r.cross(j);
-    true
-}
-
-impl Rider {
-    /// `WipeoutMotion_Enter` 0x10c198 with `Ragdoll_InitFromBoarder` 0x10dad8: the body takes the
-    /// rider's velocity and no spin, then one bounce off what was hit (e 0.15) sets it turning;
-    /// the surface is taken as 10 until something is touched, and an impact clip plays (cmI_*).
-    pub(super) fn wipe_enter(&mut self) {
-        let up = if self.grounded { self.normal } else { Vec3::Y };
-        let q = frame(heading(self.yaw), up) * Quat::from_rotation_x(-self.flip);
-        let (point, n) = self.crash_at.take().unwrap_or((self.pos, self.normal));
-        let p = rag();
-        let com = self.pos + q * p.c;
-        let mut v = self.vel;
-        let mut l = Vec3::ZERO;
-        contact_impulse(com, &mut v, q, &mut l, point, n, 0.15, 0.0);
-        self.vel = v;
-        self.switch = false;
-        self.surface = 10;
-        self.clear_air();
-        self.air_time = 0.0;
-        let mut w = Wipe { q, l, t: 0.0, t_air: 0.0, t_ground: 0.0, clip: CLIP_CRUNCH, clip_t: 0.0, n, probe: self.grounded, getup: None };
-        w.clip = impact_clip(&w, n, false);
-        self.wipe = Some(w);
-    }
-
-    /// One step of motion 5 / 6 (`WipeoutMotion_Update` 0x10c2f0, `GetUpState_Update` 0x108198).
-    pub(super) fn wipe_step(&mut self, world: &CollisionWorld, dt: f32) {
-        if self.wipe.is_none() { self.wipe_enter(); }
-        let Some(mut w) = self.wipe.take() else { return };
-        self.down_t += dt;
-        w.t += dt;
-        w.clip_t += dt;
-        // clips that end chain on (end actions 5 and 6: impacts → crunch cycle, crunch-to-stretch → falling)
-        if w.getup.is_none() && w.clip_t >= (clip_frames(w.clip, self.stats.kind) - 1.0) / 30.0 {
-            match w.clip {
-                0x2e1..=0x2ed => { w.clip = CLIP_CRUNCH; w.clip_t = 0.0; }
-                CLIP_CRUNCH2STRETCH => { w.clip = CLIP_FALLING; w.clip_t = 0.0; }
-                _ => {}
-            }
-        }
-        // state 0x13 / 0x14 (`GetUpState_Update` 0x108198): out of bounds (surface 0) is a reset at once
-        if self.surface == 0 { let at = self.safe; self.respawn(at); return; }
-        let (was_clip, dbg) = (w.clip, std::env::var("TRICKY_WIPEDBG").is_ok());
-        let keep = if w.getup.is_some() { self.getup_tick(&mut w, world, dt) }
-            else if matches!(w.clip, CLIP_BUTTSLIDE | CLIP_FACESLIDE) { self.slide_tick(&mut w, world, dt) }
-            else { self.tumble_tick(&mut w, world, dt) };
-        if dbg && (w.clip != was_clip || !keep || ((w.t * 4.0) as i32) != (((w.t - dt) * 4.0) as i32)) {
-            println!("    wipe t {:.2} clip {} air {:.2} ground {:.2} speed {:.1} grounded {} spin {:.1} up.n {:.2} surf {} pos {:.1?}{}", w.t, clip_name(w.clip), w.t_air, w.t_ground, self.vel.length(), self.grounded,
-                omega(w.q, w.l).length(), ax_z(w.q).dot(w.n), self.surface, self.pos, if keep { "" } else { "  -> out" });
-        }
-        if !keep { return; }
-        let f = ax_x(w.q);
-        let flat = Vec3::new(f.x, 0.0, f.z);
-        if flat.length() > 0.2 { self.yaw = f32::atan2(-flat.x, -flat.z); }
-        self.wipe = Some(w);
-        // out of the world, or into one of the course's out-of-bounds boxes
-        if self.pos.y < world.min_y - 30.0 || world.in_reset(self.pos + Vec3::Y * 0.8, BODY_RADIUS) { let at = self.safe; self.respawn(at); }
-    }
-
-    /// The tumble (`WipeoutMotion_Update` 0x10c2f0, any clip but the slides; `RigidBody_Integrate` 0x153c50,
-    /// `Ragdoll_GroundProbe` 0x10fd58, `Ragdoll_Step` 0x10dca8, `Ragdoll_Contacts` 0x10e190). Returns false once
-    /// the rider is out of the wipe-out.
-    fn tumble_tick(&mut self, w: &mut Wipe, world: &CollisionWorld, dt: f32) -> bool {
-        let p = rag();
-        let ticks = dt * 60.0;
-        let mut com = self.pos + w.q * p.c;
-        let mut v = self.vel;
-        // ---- Ragdoll_Step: gravity, drag of half the momentum a second (and of the spin), and
-        // for 0.15 s after touching anything a pull of 6 m/s² toward the race line along the snow
-        let mut a = Vec3::NEG_Y * 19.0084 - v * 0.5;
-        if w.t_air < 0.15 {
-            if let Some((near, _)) = self.course_pts {
-                let d = near - com;
-                let d = d - w.n * d.dot(w.n);
-                if d.length() > 1e-3 { a += d.normalize() * 6.0; }
-            }
-        }
-        // RigidBody_Integrate 0x153c50: explicit Euler, position and orientation from the old rates
-        let om = omega(w.q, w.l);
-        com += v * dt;
-        w.q = (w.q + Quat::from_xyzw(om.x, om.y, om.z, 0.0) * w.q * (0.5 * dt)).normalize();
-        v += a * dt;
-        w.l -= w.l * (0.5 * dt);
-        // ---- Ragdoll_Contacts: the deepest touch, twice; e = 0.8 - 0.7|n.up| and mu = 0.15|n.up|
-        // (both 0 under 1 m/s), then momentum and spin ×0.95
-        let mut contact: Option<(Vec3, u8)> = None;
-        for _ in 0..2 {
-            let mut best: Option<(f32, Vec3, Vec3, Vec3, u8)> = None; // depth, push, normal, point, surface
-            for s in RAG {
-                let c = com + w.q * (Vec3::from(s.1) - p.c);
-                if let Some(h) = world.ground(c, s.2 + 0.5, s.2 + 0.5) {
-                    let d = (c.y - h.y) * h.normal.y;
-                    if d < s.2 && best.is_none_or(|b| s.2 - d > b.0) { best = Some((s.2 - d, h.normal * (s.2 - d), h.normal, c - h.normal * d, h.surface)); }
-                }
-                let (c2, ns) = world.push_out(c, s.2);
-                if !ns.is_empty() {
-                    let push = c2 - c;
-                    let depth = push.length();
-                    if depth > 1e-5 && best.is_none_or(|b| depth > b.0) { let n = push / depth; best = Some((depth, push, n, c - n * (s.2 - depth), 10)); }
-                }
-            }
-            let Some((_, push, n, point, surface)) = best else { break };
-            com += push;
-            let (e, mu) = if v.length() >= 1.0 { (0.8 - 0.7 * n.y.abs(), 0.15 * n.y.abs()) } else { (0.0, 0.0) };
-            if contact_impulse(com, &mut v, w.q, &mut w.l, point, n, e, mu) {
-                let k = 0.95f32.powf(ticks);
-                v *= k;
-                w.l *= k;
-            }
-            if contact.is_none_or(|c| n.y > c.0.y) { contact = Some((n, surface)); }
-        }
-        self.pos = com - w.q * p.c;
-        self.vel = v;
-        // ---- Ragdoll_GroundProbe 0x10fd58: straight down through the hips
-        let hip = com + w.q * (Vec3::from(RAG[0].1) - p.c);
-        let probe = world.ground(hip, 0.5, 4.0);
-        w.probe = probe.is_some();
-        match probe { Some(h) => { w.n = h.normal; self.surface = h.surface; } None => w.n = Vec3::Y }
-        let bad = |s: u8| s == 6 || s == 10;
-        match contact {
-            None => {
-                self.grounded = false;
-                if w.t_air > 0.1 {
-                    // in the air: curled up turns to stretched out (cmCT_CRUNCH2STRETCH) and the body
-                    // rights itself toward where it will land unless that is under 0.1 s away
-                    if w.clip == CLIP_CRUNCH { w.clip = CLIP_CRUNCH2STRETCH; w.clip_t = 0.0; }
-                    match predict_landing(world, com, v) {
-                        Some((tl, nl, vl, sl)) if tl > 0.1 && !bad(sl) => {
-                            let (x, z) = (ax_x(w.q), ax_z(w.q));
-                            let d = vl - nl * vl.dot(nl);
-                            let d = d.normalize_or(x);
-                            // Z toward the landing normal (2509.5 m²/s² per unit mass), the board's
-                            // nose (or tail) toward the way it will slide (1254.8)
-                            let along = if x.dot(d) > 0.0 { d } else { -d };
-                            w.l += (z.cross(nl) * 25.095134 + x.cross(along) * 12.547567) * p.m * dt;
-                            w.l *= 1.0 - 3.3475056 * dt;
-                            if z.dot(nl) > 0.9 && omega(w.q, w.l).length() < 4.0 {
-                                // xA_FALLRECOVER: back to an ordinary jump (state 0xD), landed as usual
-                                self.end_wipe(w.clone(), CLIP_FALLRECOVER, false);
-                                return false;
-                            }
-                            w.t_ground = 0.0;
-                        }
-                        _ => { w.t_ground = 0.0; w.l *= 1.0 - 3.3475056 * dt; }
-                    }
-                } else {
-                    if w.probe { w.t_ground += dt; } else { w.t_ground = 0.0; }
-                    w.l *= 1.0 - 3.3475056 * dt;
-                }
-                w.t_air += dt;
-            }
-            Some((cn, cs)) => {
-                self.grounded = true;
-                if !w.probe || cn.y < w.n.y { w.n = cn; }
-                self.surface = cs;
-                // landing from a tumble plays an impact clip: curled (cmCI_*) or stretched (cmI_*)
-                if (w.t_ground == 0.0 && w.clip == CLIP_CRUNCH) || w.clip == CLIP_FALLING || w.clip == CLIP_CRUNCH2STRETCH {
-                    w.clip = impact_clip(w, w.n, category(w.clip) == 17);
-                    w.clip_t = 0.0;
-                }
-                w.t_air = 0.0;
-                w.t_ground += dt;
-                w.l *= 1.0 - 3.3475056 * dt;
-            }
-        }
-        self.normal = w.n;
-        let n = w.n;
-        if w.probe && w.t_ground > 0.25 && !bad(self.surface) && n.y > 0.34906584 {
-            // after a quarter second on the snow: onto the back (nose up) or the front and slide,
-            // or roll over until one or the other (40 m²/s² per unit mass)
-            let xn = ax_x(w.q).dot(n);
-            if xn > 0.75 { w.clip = CLIP_BUTTSLIDE; w.clip_t = 0.0; }
-            else if xn < -0.75 { w.clip = CLIP_FACESLIDE; w.clip_t = 0.0; }
-            else { w.l += ax_x(w.q).cross(n) * (40.0 * xn.signum() * p.m * dt); }
-        }
-        // come to rest upright with the board along the course: ride on (bxCT_CRUNCH2BASE / STRETCH2BASE)
-        if w.t > 0.5 && w.t_ground > 0.1 && !bad(self.surface) && omega(w.q, w.l).length() < 7.0 && n.y > 0.34906584 {
-            let d = self.course_pts.map(|(_, ahead)| (ahead - self.pos).normalize_or_zero()).unwrap_or(heading(self.yaw));
-            if ax_x(w.q).dot(d).abs() > 0.8 && ax_z(w.q).dot(n) > 0.85 && world.ground(self.pos, 1.0, 1.0).is_some() {
-                let clip = if category(w.clip) == 17 { 0x250 } else { 0x251 };
-                self.end_wipe(w.clone(), clip, true);
-                return false;
-            }
-        }
-        // too long: three seconds on the snow or seven down. A computer rider gets up where it
-        // is; the player is put back on the course.
-        if w.t_ground >= 3.0 || w.t > 7.0 {
-            if self.ai {
-                w.clip = if ax_x(w.q).dot(n) > 0.0 { CLIP_BUTTSLIDE } else { CLIP_FACESLIDE };
-                self.start_getup(w);
-            } else { let at = self.safe; self.respawn(at); return false; }
-        }
-        true
-    }
-
-    /// The slide (clips 0x2dc / 0x2dd): the boarder slides on the snow under gravity, losing
-    /// 1/60 of its speed a tick, and lies down flat; slow and flat enough it gets up.
-    fn slide_tick(&mut self, w: &mut Wipe, world: &CollisionWorld, dt: f32) -> bool {
-        w.t_ground += dt;
-        self.slide_physics(world, dt);
-        let Some(h) = world.ground(self.pos, 2.0, 4.0).filter(|h| h.normal.y >= 0.3 && h.surface != 6 && h.surface != 10) else {
-            // off the edge or onto something unskiable: tumble again (cmF_FALLINGCYCLE), the
-            // body re-made with a bounce off the snow
-            w.clip = CLIP_FALLING;
-            w.clip_t = 0.0;
-            let p = rag();
-            let com = self.pos + w.q * p.c;
-            let mut v = self.vel;
-            w.l = Vec3::ZERO;
-            contact_impulse(com, &mut v, w.q, &mut w.l, self.pos, w.n, 0.15, 0.0);
-            self.vel = v;
-            self.grounded = false;
-            return true;
-        };
-        w.n = h.normal;
-        self.normal = h.normal;
-        self.surface = h.surface;
-        self.grounded = true;
-        // lie flat: the nose (butt slide) or the tail (face slide) to the snow's normal, 1/12 a tick
-        let x = if w.clip == CLIP_FACESLIDE { -ax_x(w.q) } else { ax_x(w.q) };
-        let a = x.cross(w.n);
-        let s = a.length();
-        if s > 1e-5 {
-            let ang = s.min(0.99999).asin() * (1.0 - (11.0f32 / 12.0).powf(dt * 60.0));
-            w.q = (Quat::from_axis_angle(a / s, ang) * w.q).normalize();
-        }
-        // up when flat and slower than min(80 km/h, 30 km/h + 25 km/h for each second sliding)
-        let lim = (8.333333 + 6.944444 * w.t_ground).min(22.222222);
-        if s < 0.1 && self.vel.length() < lim && ax_x(w.q).dot(w.n).abs() > 0.9 { self.start_getup(w); }
-        true
-    }
-
-    /// The slide's motion, shared by the get-up: position on, gravity along the slope, ×0.98333
-    /// a tick, held to the snow (at most 8.3 cm a tick), nothing into the snow; walls stop it.
-    fn slide_physics(&mut self, world: &CollisionWorld, dt: f32) {
-        let ticks = dt * 60.0;
-        let g = SURFACES[(self.surface as usize).min(19)][0] * 0.01;
-        let n = self.normal;
-        self.pos += self.vel * dt;
-        self.vel += Vec3::new(n.x * n.y * g, n.y * g - g, n.z * n.y * g) * dt;
-        self.vel *= 0.98333335f32.powf(ticks);
-        if let Some(h) = world.ground(self.pos, 2.0, 4.0) {
-            let d = ((self.pos.y - h.y) * h.normal.y).clamp(-0.08333333 * ticks, 0.08333333 * ticks);
-            self.pos -= h.normal * d;
-            self.normal = h.normal;
-        }
-        let n = self.normal;
-        self.vel -= n * self.vel.dot(n);
-        let lift = Vec3::Y * 0.35;
-        let (c, contacts) = world.push_out(self.pos + lift, 0.3);
-        self.pos = c - lift;
-        for n in contacts { let vn = self.vel.dot(n); if vn < 0.0 { self.vel -= n * vn; } }
-    }
-
-    /// `Wipeout_StartGetUp` 0x10f178: stand the body up where it lies and pick the get-up by
-    /// which side it lies on and where the course is (the point 8 m ahead): head toward it → roll
-    /// back over (CT_ROLLBWD2BASE) or push up forwards (GU_FROMFACEFWD); feet toward it → sit up
-    /// (GU_FROMBUTTFWD) or GU_FROMFACEBWD; off to a side → GU_FROM*RIGHT, ending switch when the
-    /// course is to the left (alpine boards have their own *2FAKIE clips for that).
-    fn start_getup(&mut self, w: &mut Wipe) {
-        let d = self.course_pts.map(|(_, ahead)| (ahead - self.pos).normalize_or_zero()).unwrap_or(heading(self.yaw));
-        let (y, z) = (ax_y(w.q), ax_z(w.q));
-        let (f, r) = (z.dot(d), y.dot(d));
-        let face = w.clip == CLIP_FACESLIDE;
-        // stand up: Z to where the nose (butt) or tail (face) points
-        let up_to = if face { -ax_x(w.q) } else { ax_x(w.q) };
-        let a = z.cross(up_to);
-        if a.length() > 1e-5 { w.q = (Quat::from_axis_angle(a.normalize(), z.angle_between(up_to)) * w.q).normalize(); }
-        let zz = ax_z(w.q);
-        let half = |w: &mut Wipe, ang: f32| w.q = (Quat::from_axis_angle(zz, ang) * w.q).normalize();
-        let alpine = self.stats.kind == 2;
-        let clip = if f > std::f32::consts::FRAC_1_SQRT_2 {
-            if face { 0x24e } else { half(w, std::f32::consts::PI); 0x24a }
-        } else if r > std::f32::consts::FRAC_1_SQRT_2 {
-            if !alpine { self.switch = true; }
-            if alpine { if face { 0x253 } else { 0x252 } } else if face { 0x24f } else { 0x24c }
-        } else if f < -std::f32::consts::FRAC_1_SQRT_2 {
-            if face { half(w, std::f32::consts::PI); 0x24d } else { 0x24b }
-        } else if face { 0x24f } else { 0x24c };
-        // the board's nose turned a quarter toward the course for the side get-ups
-        if matches!(clip, 0x24c | 0x24f | 0x252 | 0x253) {
-            let x0 = ax_x(w.q);
-            let ql = Quat::from_axis_angle(zz, std::f32::consts::FRAC_PI_2) * w.q;
-            let qr = Quat::from_axis_angle(zz, -std::f32::consts::FRAC_PI_2) * w.q;
-            w.q = if ax_x(ql).dot(d) >= ax_x(qr).dot(d) { ql } else { qr }.normalize();
-            let _ = x0;
-        }
-        w.getup = Some((clip, 0.0));
-        w.clip = clip;
-        w.clip_t = 0.0;
-        self.getup = 0.0;
-    }
-
-    /// `GetUpMotion_Update` 0x1102c8: the slide's motion while the get-up clip plays, the body
-    /// turning (1/12 a tick) to stand on the snow facing the point 8 m along the course; riding
-    /// resumes 2n - 1 ticks after the n-frame clip starts, at the speed left.
-    fn getup_tick(&mut self, w: &mut Wipe, world: &CollisionWorld, dt: f32) -> bool {
-        self.slide_physics(world, dt);
-        self.grounded = true;
-        if let Some(h) = world.ground(self.pos, 2.0, 4.0) { self.surface = h.surface; w.n = h.normal; }
-        let d = self.course_pts.map(|(_, ahead)| ahead - self.pos).unwrap_or(heading(self.yaw));
-        let target = frame(d, self.normal);
-        w.q = w.q.slerp(target, 1.0 - (11.0f32 / 12.0).powf(dt * 60.0)).normalize();
-        let (clip, t) = w.getup.unwrap_or((0x24e, 0.0));
-        let t = t + dt;
-        w.getup = Some((clip, t));
-        self.getup = t;
-        if t >= (2.0 * clip_frames(clip, self.stats.kind) - 1.0) / 60.0 {
-            self.end_wipe(w.clone(), 0, true);
-            return false;
-        }
-        true
-    }
-
-    /// Back to riding (on the snow) or to an ordinary jump, with the clip that brings the body
-    /// back to its base pose (0 for none).
-    fn end_wipe(&mut self, w: Wipe, clip: u16, on_snow: bool) {
-        let f = ax_x(w.q);
-        let flat = Vec3::new(f.x, 0.0, f.z);
-        if flat.length() > 1e-3 { self.yaw = f32::atan2(-flat.x, -flat.z); }
-        self.crashed = 0.0;
-        self.getup = -1.0;
-        self.wipe = None;
-        self.grounded = on_snow;
-        self.spin = 0.0;
-        self.flip = 0.0;
-        self.clear_air();
-        self.air_time = 0.0;
-        self.charge = 0.0;
-        if on_snow { self.normal = w.n; self.vel -= w.n * self.vel.dot(w.n).min(0.0); }
-        self.cap = SPEED_CAP.max(self.vel.length());
-        self.recover = if clip != 0 { Some((clip, 0.0)) } else { None };
-    }
-}
-
-/// `Wipeout_PlayImpactClip` 0x10f9a0: which way the body meets the snow (feet, head, a side,
-/// back or front), curled (cmCI_*) or stretched (cmI_*).
-fn impact_clip(w: &Wipe, n: Vec3, crunch: bool) -> u16 {
-    let (x, y, z) = (ax_x(w.q).dot(n), ax_y(w.q).dot(n), ax_z(w.q).dot(n));
-    let i = if z < -0.7 { 3 } else if z > 0.7 { 2 } else if y > 0.7 { 4 } else if y < -0.7 { 5 } else if x > 0.0 { 0 } else { 1 };
-    if crunch { 0x2e1 + i } else { 0x2e8 + i }
-}
-
-/// `AirPredict_Tick` 0x123ec8: where a body thrown from `p` at `v` (gravity, drag 0.5/s) comes
-/// down: (seconds, ground normal, velocity, surface).
-fn predict_landing(world: &CollisionWorld, mut p: Vec3, mut v: Vec3) -> Option<(f32, Vec3, Vec3, u8)> {
-    let h = 1.0 / 20.0;
-    let mut t = 0.0;
-    while t < 4.0 {
-        v += (Vec3::NEG_Y * 19.0084 - v * 0.5) * h;
-        let q = p + v * h;
-        t += h;
-        if let Some(g) = world.ground(q, (q.y - p.y).abs() + 0.6, 0.6) {
-            if g.y >= q.y - 0.5 { return Some((t, g.normal, v, g.surface)); }
-        }
-        p = q;
-    }
-    None
-}
 
 /// The nearest point of a polyline course to `pos` (searched near `idx`) and the point 8 m
 /// further along it (the original's 0x350 / 0x360, `fn 0x119d30`).

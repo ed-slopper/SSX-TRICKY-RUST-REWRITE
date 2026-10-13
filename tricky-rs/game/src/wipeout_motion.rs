@@ -107,6 +107,12 @@ pub trait WipeEnv: RagEnv {
     fn sfx_stop(&mut self);
     fn sfx_leave(&mut self);
     fn rider_leave(&mut self);
+    /// Not a call of the game's: the rider's forward and side (+0x180, +0x190) as `Boarder_UpdateOrientation` 0x129008
+    /// last wrote them inside `Ragdoll_Step` (which hands it only the [`RagRider`]), into the motion's copy. The game
+    /// reads those fields where they are; a host that keeps them apart copies them here. Nothing by default.
+    fn sync(&mut self, w: &mut WipeRider) {
+        let _ = w;
+    }
 }
 
 const HALF_PI: f32 = f32::from_bits(0x3fc9_0fdb);
@@ -270,6 +276,7 @@ impl Wipeout {
         }
         let mut rec = CastOut::default();
         self.rag.step(dt.0, r, &mut rec, rollers, env);
+        env.sync(w);
         if F(0.0) < lift {
             env.translate(r, st(scale(up, F(-1.0))));
         }
@@ -512,5 +519,6 @@ pub fn get_up_update(r: &mut RagRider, w: &mut WipeRider, env: &mut impl WipeEnv
     let q2 = rotate_vec_to_vec(q1, st(y), st(d));
     r.q = slerp(f32::from_bits(0x3daa_aaab), r.q, q2);
     env.update_orientation(r);
+    env.sync(w);
     env.collide_world(r, w);
 }

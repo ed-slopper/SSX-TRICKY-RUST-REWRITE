@@ -75,6 +75,24 @@ impl CourseGround {
         world.ray_cast(q, show_off, last, &mut env)
     }
 
+    /// `World_QueryInstances` 0x25bdc4 on the course: the objects only, the deepest touch (−1 for nothing).
+    /// `skip` as [`CourseGround::ray_cast`]'s.
+    pub fn query_instances(&self, q: &mut dyn Shape, show_off: bool, skip: &dyn Fn(u32) -> bool) -> (f32, Option<CastHit>) {
+        let mut world = self.world.lock().unwrap_or_else(|e| e.into_inner());
+        for (i, (o, f)) in world.objects.iter_mut().zip(&self.flags).enumerate() {
+            o.flags = if f & 0x20 != 0 && skip(i as u32) { f & !0x20 } else { *f };
+        }
+        let mut cache = self.cache.lock().unwrap_or_else(|e| e.into_inner());
+        let poses = self.poses.lock().unwrap_or_else(|e| e.into_inner());
+        let mut env = Env { coeffs: &self.coeffs, cache: &mut cache, poses: &poses };
+        world.query_instances(q, show_off, &mut env)
+    }
+
+    /// An object's flags (+0xe8) as the course's data gives them (0 for none).
+    pub fn object_flags(&self, object: usize) -> u32 {
+        self.flags.get(object).copied().unwrap_or(0)
+    }
+
     /// `WorldNode_RayCast` 0x13aad0 = `World_RayCastInstance` 0x25bf48 on the course for one object (instance):
     /// the distance along the query (> 0 when it hits) and what was hit.
     pub fn ray_cast_instance(&self, q: &mut dyn Shape, object: usize) -> (f32, Option<CastHit>) {
