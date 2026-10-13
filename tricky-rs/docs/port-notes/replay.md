@@ -1,8 +1,9 @@
 # Instant replay
 
 How the game records and plays back a race. Ported so far: the byte streams and the pad streams (board row G12a;
-`tricky_game::replay`, checked: `tests/replay_streams.rs`), the replay codec (G12b, G12c: files.md), and the keyframe
-list, seeking and playlists (G12d; `tricky_game::replaymgr`, checked: `tests/replaymgr.rs`). Keyframes, the node save and restore, pins and
+`tricky_game::replay`, checked: `tests/replay_streams.rs`), the replay codec (G12b, G12c: files.md), the keyframe
+list, seeking and playlists (G12d; `tricky_game::replaymgr`, checked: `tests/replaymgr.rs`), and the highlights
+and pins (G12e; the same module, checked: `tests/replay_highlights.rs`). Keyframes, the node save and restore, pins and
 highlights, camera tracks, `Replay_Update` and the memory-card save are the rest of G12.
 
 ## The replay control
@@ -105,4 +106,49 @@ frames of a message), +0x4c and +0x50 hold recording, +0x58 a stream overflowed.
 - **Checked in the runner:** 3,000 random managers (lists, free lists, pins, highlights, playlists, camera tracks
   and pad streams), with 30 random calls each over the 32 entry points. Every result and all the memory was
   compared after each call. The 57 walks that never ended were checked to run past the game's step limit too.
+
+## Highlights and pins (G12e)
+
+- **Highlights.** A highlight is a moment worth showing again: a keyframe, a length in frames, a kind (1 or 2), a
+  score for each kind (floats) and a rider. There is a pool of 0x1c-byte records at +0x3968, with a free list from
+  +0x3964. Each rider keeps up to ten, in frame order.
+- **Inserting and removing.** `Replay_InsertHighlight` puts a free record into the rider's list at its frame. It
+  refuses a frame that already has one, and an eleventh. `Replay_RemoveHighlight` unpins its keyframe (freeing the
+  keyframe if it may be: `Replay_TryFreeKeyframe`), clears its keyframe word, and takes it out of the list and back
+  to the free pool. `Replay_FindHighlight` gives the rider's highlight starting at a frame.
+- **Adding one.** `Replay_CanAddHighlight` returns -1 at the end frame. It returns 1 inside one of the rider's
+  highlights, and otherwise whether the rider has fewer than ten.
+- **Recording.** +0x395c is the highlight being recorded, and +0x3960 the frame it started at.
+  - `Replay_BeginHighlight`, inside one of the rider's highlights (or up to 11 frames past one), carries that one
+    on. Otherwise it inserts a new one at the frame on the keyframe there. When that keyframe is not at the frame
+    it records one (`Replay_RecordKeyframe`, a call into the env here; if that fails, the highlight is dropped).
+    The keyframe is pinned.
+  - `Replay_EndHighlight` adds the frames since the start to the length. The rider's other highlights that start
+    inside it are merged in: what they run past its end is added to its length, their pin slots are cleared, and
+    they are removed.
+  - `Replay_DropCurrentHighlight` removes the rider's first highlight that the frame is not past the end of. It is
+    measured from the highlight's start with no lower bound, so an earlier highlight counts too.
+- **Pins.** Each rider has a pin (+0x3920, four of them), which keeps a rider's best moments for the replay. It
+  holds the highlight being made, four slots of kept highlights and a pinned keyframe. +0x3940 says how many slots
+  are used (2 or 4), and +0x3944 / +0x3948 are the quotas for kinds 1 and 2.
+  - `ReplayPin_Begin` runs while recording: +0x40 clear, mode 0 or past 9, and not frozen. It pins the keyframe
+    before the newest and begins a highlight of the kind at that keyframe's frame.
+  - `ReplayPin_End` does nothing while a replay plays (modes 1..9). While recording, it gives the highlight a
+    length from its keyframe to +0x2c plus 60 frames, and commits it.
+  - `ReplayPin_Commit` keeps the highlight in the slot picked (removing the one already there) on the pinned
+    keyframe. A highlight with no kind or no slot is released instead.
+  - `ReplayPin_PickSlot` takes an empty slot first. If there is none, a kind under its quota less one takes the
+    other kind's worst slot, but only when the other kind is at its quota. A kind at its quota takes its own worst
+    slot, unless the new highlight scores lower. A kind-1 highlight scoring 0 or less is never kept.
+- **Releasing, freezing and adding.**
+  - `ReplayPin_Release` lets go of the pinned keyframe and removes the highlight being made.
+  - `ReplayPin_Clear` also removes every kept highlight.
+  - `Replay_Freeze` releases all the pins the first time, then marks the replay frozen (+0x50).
+  - `Replay_AddPin` and `Replay_RemovePin` allocate and delete a pin; the allocator is a call into the env here.
+  - Where the game finds its manager through gApp (gApp+0x730 -> +0x40), the port is handed the manager.
+- **Not ported yet.** `Highlight_Save` / `_Load` and `ReplayPin_Save` / `_Load` go with the memory-card save. When a
+  highlight has no keyframe, its saved record's second word is whatever was on the stack.
+- **Checked in the runner:** 3,000 random managers (keyframes, the pool and the riders' lists, pins), with 25 random
+  calls each over the 26 entry points. Every result and all the memory were compared after each call. Highlights
+  begun, inserted and dropped, slots picked and commits that kept their highlight all happen many times.
 

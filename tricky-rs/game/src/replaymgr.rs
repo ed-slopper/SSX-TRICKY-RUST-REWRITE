@@ -504,3 +504,541 @@ pub fn cam_track_seek_back(m: &mut Mem, t: u32, frame: u32) -> bool {
     m.w32(t + 4, 0);
     true
 }
+
+// Highlights (board row G12e): 0x1c-byte records in a pool at +0x3968 (free list from +0x3964 through +0x14):
+// +0 the keyframe, +4 the length in frames, +8 the kind (1, 2: the two kinds of moment a pin keeps), +0xc / +0x10
+// the two kinds' scores (floats), +0x14 next free, +0x18 the rider. Each rider keeps up to ten in frame order
+// (+0x394c the count, +0x3dc8 the pointers). +0x395c the highlight being recorded and +0x3960 the frame it started.
+// Pins (the four at +0x3920, one per rider, 0x1c bytes): +0 the rider, +4 the highlight being made, +8 four slots of
+// kept highlights (+0x3940 how many are used: 2 or 4; +0x3944 / +0x3948 the quota for kinds 1 and 2), +0x18 the
+// keyframe it pins.
+
+pub mod hl {
+    pub const KEYFRAME: u32 = 0;
+    pub const LEN: u32 = 4;
+    pub const KIND: u32 = 8;
+    pub const SCORE1: u32 = 0xc;
+    pub const SCORE2: u32 = 0x10;
+    pub const NEXT_FREE: u32 = 0x14;
+    pub const RIDER: u32 = 0x18;
+}
+pub mod pin {
+    pub const RIDER: u32 = 0;
+    pub const MAKING: u32 = 4;
+    pub const SLOTS: u32 = 8;
+    pub const KEYFRAME: u32 = 0x18;
+}
+pub const PINS: u32 = 0x3920;
+pub const SLOT_COUNT: u32 = 0x3940;
+pub const QUOTA1: u32 = 0x3944;
+pub const QUOTA2: u32 = 0x3948;
+pub const RECORDING_HL: u32 = 0x395c;
+pub const RECORDING_FROM: u32 = 0x3960;
+pub const HL_FREE: u32 = 0x3964;
+
+fn count_at(mgr: u32, rider: u32) -> u32 {
+    mgr + HIGHLIGHT_COUNT + rider.wrapping_mul(4)
+}
+fn list_at(mgr: u32, rider: u32, i: u32) -> u32 {
+    mgr + HIGHLIGHTS + i.wrapping_mul(4) + rider.wrapping_mul(0x28)
+}
+
+/// `ReplayPin_InitSlot` 0x193a78 (and its jump 0x1956c0): a highlight cleared, its rider -1
+pub fn highlight_reset(m: &mut Mem, h: u32) {
+    m.w32(h + 8, 0);
+    m.w32(h + 0x18, u32::MAX);
+    m.w32(h + 0xc, 0);
+    m.w32(h + 0x10, 0);
+    m.w32(h + 4, 0);
+    m.w32(h, 0);
+    m.w32(h + 0x14, 0);
+}
+
+fn take_highlight(m: &mut Mem, mgr: u32, rider: u32) -> u32 {
+    let h = m.r32(mgr + HL_FREE);
+    m.w32(mgr + HL_FREE, m.r32(h + hl::NEXT_FREE));
+    highlight_reset(m, h);
+    m.w32(h + hl::RIDER, rider);
+    h
+}
+
+/// `Replay_InsertHighlight` 0x191eb0(frame, rider): a free highlight put in the rider's list in frame order; 0 when
+/// the rider has ten or one starts at that frame
+pub fn insert_highlight(m: &mut Mem, mgr: u32, frame: u32, rider: u32) -> u32 {
+    let n = m.r32(count_at(mgr, rider)) as i32;
+    if n > 9 {
+        return 0;
+    }
+    for i in 0..n.max(0) {
+        let f = m.r32(m.r32(m.r32(list_at(mgr, rider, i as u32))) + kf::FRAME);
+        if f == frame {
+            return 0;
+        }
+        if frame <= f {
+            let h = take_highlight(m, mgr, rider);
+            let mut j = m.r32(count_at(mgr, rider)) as i32 - 1;
+            while i <= j {
+                m.w32(list_at(mgr, rider, (j + 1) as u32), m.r32(list_at(mgr, rider, j as u32)));
+                j -= 1;
+            }
+            m.w32(count_at(mgr, rider), m.r32(count_at(mgr, rider)).wrapping_add(1));
+            m.w32(list_at(mgr, rider, i as u32), h);
+            return h;
+        }
+    }
+    let h = take_highlight(m, mgr, rider);
+    let n = m.r32(count_at(mgr, rider));
+    m.w32(count_at(mgr, rider), n.wrapping_add(1));
+    m.w32(list_at(mgr, rider, n), h);
+    h
+}
+
+/// `Replay_RemoveHighlight` 0x192058(rider, highlight): its keyframe unpinned (and freed if it may be), then out of
+/// the rider's list and back on the free list
+pub fn remove_highlight(m: &mut Mem, mgr: u32, rider: u32, h: u32) {
+    let k = m.r32(h + hl::KEYFRAME);
+    if k != 0 {
+        m.w32(k + kf::PINS, m.r32(k + kf::PINS).wrapping_sub(1));
+        try_free_keyframe(m, mgr, k);
+    }
+    m.w32(h, 0);
+    let n = m.r32(count_at(mgr, rider)) as i32;
+    for i in 0..n.max(0) {
+        if m.r32(list_at(mgr, rider, i as u32)) == h {
+            let last = m.r32(count_at(mgr, rider)) as i32 - 1;
+            m.w32(h + hl::NEXT_FREE, m.r32(mgr + HL_FREE));
+            m.w32(mgr + HL_FREE, h);
+            let mut j = i;
+            while j < last {
+                m.w32(list_at(mgr, rider, j as u32), m.r32(list_at(mgr, rider, j as u32 + 1)));
+                j += 1;
+            }
+            m.w32(count_at(mgr, rider), m.r32(count_at(mgr, rider)).wrapping_sub(1));
+            return;
+        }
+    }
+}
+
+/// `Replay_FindHighlight` 0x192178(rider, frame): the rider's highlight starting at the frame, or 0
+pub fn find_highlight(m: &Mem, mgr: u32, rider: u32, frame: u32) -> u32 {
+    let n = m.r32(count_at(mgr, rider)) as i32;
+    for i in 0..n.max(0) {
+        let h = m.r32(list_at(mgr, rider, i as u32));
+        if m.r32(m.r32(h) + kf::FRAME) == frame {
+            return h;
+        }
+    }
+    0
+}
+
+/// `Replay_CanAddHighlight` 0x1921e0: -1 at the end frame, 1 inside one of the rider's highlights, else whether the
+/// rider has fewer than ten
+pub fn can_add_highlight(m: &Mem, mgr: u32) -> u32 {
+    let frame = m.r32(mgr + FRAME);
+    if frame == m.r32(mgr + END) {
+        return u32::MAX;
+    }
+    let rider = m.r32(mgr + RIDER);
+    let n = m.r32(count_at(mgr, rider)) as i32;
+    for i in 0..n.max(0) {
+        let h = m.r32(list_at(mgr, rider, i as u32));
+        let d = frame.wrapping_sub(m.r32(m.r32(h) + kf::FRAME)) as i32;
+        if d >= 0 && d <= m.r32(h + hl::LEN) as i32 {
+            return 1;
+        }
+    }
+    (n < 10) as u32
+}
+
+/// `Replay_BeginHighlight` 0x1922a8(record: `Replay_RecordKeyframe`(frame, 0), the keyframe it saved or 0): not while
+/// one is recorded or at the end frame. Inside (or up to 11 frames past) one of the rider's highlights, that one goes
+/// on from its start; else a new one is inserted at the frame, on the keyframe there (one recorded when the
+/// keyframe found is not at the frame; none recorded drops it) and pins it.
+pub fn begin_highlight(m: &mut Mem, mgr: u32, record: &mut dyn FnMut(&mut Mem, u32) -> u32) -> bool {
+    if m.r32(mgr + RECORDING_HL) != 0 {
+        return false;
+    }
+    let frame = m.r32(mgr + FRAME);
+    if frame == m.r32(mgr + END) {
+        return false;
+    }
+    let rider = m.r32(mgr + RIDER);
+    let n = m.r32(count_at(mgr, rider)) as i32;
+    for i in 0..n.max(0) {
+        let h = m.r32(list_at(mgr, rider, i as u32));
+        let d = frame.wrapping_sub(m.r32(m.r32(h) + kf::FRAME)) as i32;
+        if d >= 0 && d <= (m.r32(h + hl::LEN) as i32).wrapping_add(0xb) {
+            m.w32(mgr + RECORDING_FROM, frame);
+            m.w32(mgr + RECORDING_HL, h);
+            m.w32(h + hl::LEN, frame.wrapping_sub(m.r32(m.r32(h) + kf::FRAME)));
+            return true;
+        }
+    }
+    let h = insert_highlight(m, mgr, frame, m.r32(mgr + RIDER));
+    if h == 0 {
+        return false;
+    }
+    m.w32(mgr + RECORDING_HL, h);
+    m.w32(mgr + RECORDING_FROM, m.r32(mgr + FRAME));
+    let k = find_keyframe(m, mgr, m.r32(mgr + FRAME));
+    let from = m.r32(mgr + RECORDING_FROM);
+    m.w32(h, k);
+    if m.r32(k + kf::FRAME) != from {
+        let k2 = record(m, from);
+        m.w32(h, k2);
+        if k2 == 0 {
+            m.w32(mgr + RECORDING_HL, 0);
+            remove_highlight(m, mgr, m.r32(mgr + RIDER), h);
+            return false;
+        }
+    }
+    m.w32(h + 0xc, 0);
+    let k = m.r32(h);
+    let pins = m.r32(k + kf::PINS);
+    m.w32(h + 0x10, 0);
+    m.w32(k + kf::PINS, pins.wrapping_add(1));
+    m.w32(h + hl::LEN, 0);
+    m.w32(h + hl::RIDER, m.r32(mgr + RIDER));
+    true
+}
+
+/// `Replay_EndHighlight` 0x1924a0: the highlight being recorded runs to the frame; the rider's other highlights that
+/// start inside it are merged in (what they run past it added to its length, their pins' slots cleared) and
+/// removed
+pub fn end_highlight(m: &mut Mem, mgr: u32) {
+    let mut h = m.r32(mgr + RECORDING_HL);
+    if h != 0 {
+        let rider = m.r32(h + hl::RIDER);
+        let now = m.r32(mgr + FRAME);
+        m.w32(h + hl::LEN, m.r32(h + hl::LEN).wrapping_add(now.wrapping_sub(m.r32(mgr + RECORDING_FROM))));
+        let start = m.r32(m.r32(h) + kf::FRAME);
+        if m.r32(count_at(mgr, rider)) as i32 > 0 {
+            let mut i = 0i32;
+            loop {
+                let slot = list_at(mgr, rider, i as u32);
+                let o = m.r32(slot);
+                if o != h {
+                    let f = m.r32(m.r32(o) + kf::FRAME);
+                    if start <= f && f < now {
+                        let extra = m.r32(o + hl::LEN).wrapping_sub(now.wrapping_sub(f)) as i32;
+                        if extra > 0 {
+                            m.w32(h + hl::LEN, m.r32(h + hl::LEN).wrapping_add(extra as u32));
+                        }
+                        let p = m.r32(mgr + PINS + rider.wrapping_mul(4));
+                        if p != 0 {
+                            pin_clear_highlight_ref(m, p, m.r32(slot));
+                        }
+                        i -= 1;
+                        let o = m.r32(slot);
+                        remove_highlight(m, mgr, rider, o);
+                    }
+                }
+                i += 1;
+                if m.r32(count_at(mgr, rider)) as i32 <= i {
+                    break;
+                }
+                h = m.r32(mgr + RECORDING_HL);
+            }
+        }
+    }
+    m.w32(mgr + RECORDING_HL, 0);
+}
+
+/// `Replay_DropCurrentHighlight` 0x1925f8: the rider's first highlight the frame is not past the end of (taken
+/// from its start, without a lower bound) is removed, and its pin's slot cleared
+pub fn drop_current_highlight(m: &mut Mem, mgr: u32) -> bool {
+    let mut rider = m.r32(mgr + RIDER);
+    let n = m.r32(count_at(mgr, rider)) as i32;
+    for i in 0..n.max(0) {
+        let h = m.r32(list_at(mgr, rider, i as u32));
+        let d = m.r32(mgr + FRAME).wrapping_sub(m.r32(m.r32(h) + kf::FRAME)) as i32;
+        if d <= m.r32(h + hl::LEN) as i32 {
+            let p = m.r32(mgr + PINS + rider.wrapping_mul(4));
+            if p != 0 {
+                pin_clear_highlight_ref(m, p, h);
+                rider = m.r32(mgr + RIDER);
+            }
+            let h = m.r32(list_at(mgr, rider, i as u32));
+            remove_highlight(m, mgr, rider, h);
+            return true;
+        }
+    }
+    false
+}
+
+/// `Replay_ReleaseAllPins` 0x192458
+pub fn release_all_pins(m: &mut Mem, mgr: u32) {
+    for r in 0..4 {
+        let p = m.r32(mgr + PINS + 4 * r);
+        if p != 0 {
+            pin_release(m, mgr, p);
+        }
+    }
+}
+
+/// `Replay_Freeze` 0x191230: the pins released the first time (+0x50 and +0x4c clear), then frozen (+0x50)
+pub fn freeze(m: &mut Mem, mgr: u32) {
+    if m.r32(mgr + 0x50) == 0 && m.r32(mgr + 0x4c) == 0 {
+        release_all_pins(m, mgr);
+    }
+    m.w32(mgr + 0x50, 1);
+}
+
+/// `Replay_AddPin` 0x191a18(rider; `alloc`: `MemPool_Alloc` of 0x1c bytes): in the first empty pin place, a new pin
+/// (filled with 0xdeadc0de, then set up); 0 when all four are taken
+pub fn add_pin(m: &mut Mem, mgr: u32, rider: u32, alloc: &mut dyn FnMut(&mut Mem) -> u32) -> u32 {
+    for r in 0..4 {
+        let at = mgr + PINS + 4 * r;
+        if m.r32(at) == 0 {
+            let p = alloc(m);
+            if p != 0 {
+                for w in 0..7 {
+                    m.w32(p + 4 * w, 0xdead_c0de);
+                }
+            }
+            pin_init(m, p, rider);
+            m.w32(at, p);
+            return p;
+        }
+    }
+    0
+}
+
+/// `Replay_RemovePin` 0x191ac0(pin; `delete`: `Mem_Delete`): its place emptied, the pin cleared and deleted
+pub fn remove_pin(m: &mut Mem, mgr: u32, p: u32, delete: &mut dyn FnMut(&mut Mem, u32)) {
+    for r in 0..4 {
+        let at = mgr + PINS + 4 * r;
+        let q = m.r32(at);
+        if q == p {
+            if q != 0 {
+                pin_clear(m, mgr, q);
+                delete(m, q);
+            }
+            m.w32(at, 0);
+            return;
+        }
+    }
+}
+
+/// `ReplayPin_Init` 0x193118(rider) and `ReplayPin_Reset` 0x193198
+pub fn pin_init(m: &mut Mem, p: u32, rider: u32) {
+    m.w32(p, rider);
+    pin_reset(m, p);
+}
+pub fn pin_reset(m: &mut Mem, p: u32) {
+    m.w32(p + 4, 0);
+    m.w32(p + 0x18, 0);
+    for off in [0x14, 0x10, 0xc, 8] {
+        m.w32(p + off, 0);
+    }
+}
+
+/// `ReplayPin_Clear` 0x1931d0 (and its jump 0x1932e8): released, and every kept highlight removed
+pub fn pin_clear(m: &mut Mem, mgr: u32, p: u32) {
+    pin_release(m, mgr, p);
+    for s in 0..4 {
+        let at = p + pin::SLOTS + 4 * s;
+        let h = m.r32(at);
+        if h != 0 {
+            remove_highlight(m, mgr, m.r32(p), h);
+            m.w32(at, 0);
+        }
+    }
+}
+
+/// `FUN_00193250`: the quota of a kind (1: +0x3944, 2: +0x3948, else 0)
+pub fn pin_quota(m: &Mem, mgr: u32, kind: u32) -> i32 {
+    match kind {
+        1 => m.r32(mgr + QUOTA1) as i32,
+        2 => m.r32(mgr + QUOTA2) as i32,
+        _ => 0,
+    }
+}
+
+/// `ReplayPin_CountForRider` 0x1932a8(kind): the kept highlights of that kind
+pub fn pin_count_kind(m: &Mem, p: u32, kind: u32) -> i32 {
+    (0..4)
+        .filter(|s| {
+            let h = m.r32(p + pin::SLOTS + 4 * s);
+            h != 0 && m.r32(h + hl::KIND) == kind
+        })
+        .count() as i32
+}
+
+/// `ReplayPin_Release` 0x1932f8 (and its jump `ReplayPin_ReleaseThunk` 0x1932f0): the pinned keyframe let go (freed
+/// if it may be), the highlight being made removed
+pub fn pin_release(m: &mut Mem, mgr: u32, p: u32) {
+    let k = m.r32(p + pin::KEYFRAME);
+    if k != 0 {
+        m.w32(k + kf::PINS, m.r32(k + kf::PINS).wrapping_sub(1));
+        try_free_keyframe(m, mgr, k);
+        m.w32(p + pin::KEYFRAME, 0);
+    }
+    m.w32(p + pin::KEYFRAME, 0);
+    let h = m.r32(p + pin::MAKING);
+    if h != 0 {
+        remove_highlight(m, mgr, m.r32(p), h);
+        m.w32(p + pin::MAKING, 0);
+    }
+}
+
+/// `ReplayPin_Begin` 0x193370(kind): while recording (+0x40 clear, mode 0 or past 9, not frozen): the keyframe
+/// before the newest pinned and a highlight of the kind begun at its frame
+pub fn pin_begin(m: &mut Mem, mgr: u32, p: u32, kind: u32) {
+    let mode = m.r32(mgr + MODE) as i32;
+    if m.r32(mgr + 0x40) == 0 && (mode == 0 || mode > 9) && m.r32(mgr + 0x50) == 0 {
+        pin_release(m, mgr, p);
+        let k = keyframe_before_latest(m, mgr);
+        let frame = m.r32(k + kf::FRAME);
+        m.w32(k + kf::PINS, m.r32(k + kf::PINS).wrapping_add(1));
+        m.w32(p + pin::KEYFRAME, k);
+        let h = insert_highlight(m, mgr, frame, m.r32(p));
+        m.w32(p + pin::MAKING, h);
+        if h == 0 {
+            pin_release(m, mgr, p);
+            return;
+        }
+        m.w32(h + hl::KIND, kind);
+    }
+}
+
+/// `FUN_00193ad8`(highlight, frame): its length from the frame to the manager's +0x2c, plus 60
+pub fn pin_set_length(m: &mut Mem, mgr: u32, h: u32, frame: u32) {
+    m.w32(h + hl::LEN, m.r32(mgr + 0x2c).wrapping_sub(frame).wrapping_add(0x3c));
+}
+
+/// `ReplayPin_End` 0x193448: nothing while a replay plays (modes 1..9); recording, the highlight being made gets its
+/// length and is committed (released when it has no keyframe); otherwise released
+pub fn pin_end(m: &mut Mem, mgr: u32, p: u32) {
+    let mode = m.r32(mgr + MODE) as i32;
+    if mode != 0 && mode < 10 {
+        return;
+    }
+    if m.r32(mgr + 0x40) == 0 {
+        let h = m.r32(p + pin::MAKING);
+        if h != 0 {
+            let k = m.r32(p + pin::KEYFRAME);
+            if k == 0 {
+                pin_release(m, mgr, p);
+                return;
+            }
+            pin_set_length(m, mgr, h, m.r32(k + kf::FRAME));
+        }
+        pin_commit(m, mgr, p);
+        return;
+    }
+    pin_release(m, mgr, p);
+}
+
+fn score(m: &Mem, h: u32, kind: u32) -> f32 {
+    match kind {
+        1 => f32::from_bits(m.r32(h + hl::SCORE1)),
+        2 => f32::from_bits(m.r32(h + hl::SCORE2)),
+        _ => 0.0,
+    }
+}
+
+/// `ReplayPin_FindWorstSlot` 0x1934f0(kind): of the slots in use (+0x3940), the kept highlight with the lowest score
+/// of the kind (under 1e10); -1 for none
+pub fn pin_find_worst_slot(m: &Mem, mgr: u32, p: u32, kind: u32) -> i32 {
+    let (mut best, mut low) = (-1, 1e10f32);
+    let mut i = 0i32;
+    while i < m.r32(mgr + SLOT_COUNT) as i32 {
+        let h = m.r32(p + pin::SLOTS + 4 * i as u32);
+        if h != 0 && score(m, h, kind) < low {
+            low = score(m, h, kind);
+            best = i;
+        }
+        i += 1;
+    }
+    best
+}
+
+/// `ReplayPin_PickSlot` 0x1935d8(highlight): an empty slot; else, under the kind's quota (less one), the worst of
+/// the other kind when that kind is at its quota; at it, the worst of this kind unless the new one scores lower;
+/// -1 for none (and for a kind-1 highlight scoring 0 or less)
+pub fn pin_pick_slot(m: &Mem, mgr: u32, p: u32, h: u32) -> i32 {
+    let kind = m.r32(h + hl::KIND);
+    if kind == 1 && score(m, h, 1) <= 0.0 {
+        return -1;
+    }
+    let slots = m.r32(mgr + SLOT_COUNT) as i32;
+    let mut found = -1i32;
+    if slots > 0 {
+        if m.r32(p + pin::SLOTS) == 0 {
+            found = 0;
+        } else {
+            let mut i = 0;
+            loop {
+                i += 1;
+                found = -1;
+                if slots <= i {
+                    break;
+                }
+                found = i;
+                if m.r32(p + pin::SLOTS + 4 * i as u32) == 0 {
+                    break;
+                }
+            }
+        }
+    }
+    if found < 0 {
+        let n = pin_count_kind(m, p, kind);
+        let q = pin_quota(m, mgr, kind);
+        if n < q - 1 {
+            let other = match kind {
+                1 => Some(2),
+                2 => Some(1),
+                _ => None,
+            };
+            if let Some(o) = other {
+                if pin_quota(m, mgr, o) <= pin_count_kind(m, p, o) {
+                    found = pin_find_worst_slot(m, mgr, p, o);
+                }
+            }
+        } else {
+            found = pin_find_worst_slot(m, mgr, p, kind);
+            if found >= 0 {
+                let worst = m.r32(p + pin::SLOTS + 4 * found as u32);
+                if score(m, h, kind) < score(m, worst, kind) {
+                    found = -1;
+                }
+            }
+        }
+    }
+    found
+}
+
+/// `ReplayPin_Commit` 0x1937d0: the highlight being made (of a kind) kept in the slot picked (the highlight there
+/// removed), on the pinned keyframe; released when it has no kind or no slot
+pub fn pin_commit(m: &mut Mem, mgr: u32, p: u32) {
+    let h = m.r32(p + pin::MAKING);
+    if h != 0 && m.r32(h + hl::KIND) != 0 {
+        let rider = m.r32(h + hl::RIDER);
+        let s = pin_pick_slot(m, mgr, p, h);
+        if s >= 0 {
+            let at = p + pin::SLOTS + 4 * s as u32;
+            let old = m.r32(at);
+            if old != 0 {
+                remove_highlight(m, mgr, rider, old);
+            }
+            let k = m.r32(p + pin::KEYFRAME);
+            m.w32(at, m.r32(p + pin::MAKING));
+            let h = m.r32(p + pin::MAKING);
+            m.w32(p + pin::MAKING, 0);
+            m.w32(h, k);
+            m.w32(p + pin::KEYFRAME, 0);
+            return;
+        }
+    }
+    pin_release(m, mgr, p);
+}
+
+/// `ReplayPin_ClearHighlightRef` 0x1938a0(highlight): the slots holding it emptied
+pub fn pin_clear_highlight_ref(m: &mut Mem, p: u32, h: u32) {
+    for s in 0..4 {
+        if m.r32(p + pin::SLOTS + 4 * s) == h {
+            m.w32(p + pin::SLOTS + 4 * s, 0);
+        }
+    }
+}

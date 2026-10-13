@@ -2097,28 +2097,29 @@ address,size,name,system,status
 0x191100,144,Replay_SeekToKeyframe,camera?,checked
 0x191190,80,Replay_StepForward,camera?,checked
 0x1911e0,80,Replay_StepBack,camera?,checked
-0x191230,72,Replay_Freeze,camera?,not started
+0x191230,72,Replay_Freeze,camera?,checked
 0x191278,28,Replay_SetMode11From10,camera?,checked
 0x191298,1168,Replay_Update,camera?,not started
 0x191728,76,Replay_TryFreeKeyframe,camera?,checked
 0x191778,168,Replay_PruneKeyframes,camera?,checked
 0x191820,16,FUN_00191820,camera?,checked
 0x191830,488,Replay_DoCommand,camera?,not started
-0x191a18,168,Replay_AddPin,camera?,not started
-0x191ac0,88,Replay_RemovePin,camera?,not started
+0x191a18,168,Replay_AddPin,camera?,checked
+0x191ac0,88,Replay_RemovePin,camera?,checked
 0x191b18,72,Replay_SetPlaylist,camera?,not started
 0x191b60,128,Replay_StartPlayback,camera?,not started
 0x191be0,188,Replay_StopPlayback,camera?,not started
 0x191ca0,140,Replay_AddInputStream,camera?,not started
 0x191d30,88,Replay_RemoveInputStream,camera?,not started
 0x191d88,296,Replay_GetStatus,frontend?,not started
-0x191eb0,420,Replay_InsertHighlight,other,not started
-0x192058,288,Replay_RemoveHighlight,camera?,not started
-0x192178,104,Replay_FindHighlight,camera?,not started
-0x1922a8,432,Replay_BeginHighlight,ai?,not started
-0x192458,72,Replay_ReleaseAllPins,camera?,not started
-0x1924a0,340,Replay_EndHighlight,camera?,not started
-0x1925f8,244,Replay_DropCurrentHighlight,camera?,not started
+0x191eb0,420,Replay_InsertHighlight,other,checked
+0x192058,288,Replay_RemoveHighlight,camera?,checked
+0x192178,104,Replay_FindHighlight,camera?,checked
+0x1921e0,196,Replay_CanAddHighlight,camera?,checked
+0x1922a8,432,Replay_BeginHighlight,ai?,checked
+0x192458,72,Replay_ReleaseAllPins,camera?,checked
+0x1924a0,340,Replay_EndHighlight,camera?,checked
+0x1925f8,244,Replay_DropCurrentHighlight,camera?,checked
 0x1926f0,40,ReplayInput_Init,camera?,checked
 0x192718,28,ReplayInput_Delete,camera?,not started
 0x192738,24,ReplayInput_Reset,camera?,checked
@@ -2151,27 +2152,27 @@ address,size,name,system,status
 0x193060,8,FUN_00193060,ai?,not started
 0x193068,28,ReplayKeyframe_Reset,ai?,checked
 0x193088,144,Replay_LoadKeyframe,ai?,not started
-0x193118,44,ReplayPin_Init,camera?,not started
-0x193148,76,ReplayPin_Delete,camera?,not started
-0x193198,52,ReplayPin_Reset,camera?,not started
-0x1931d0,124,ReplayPin_Clear,camera?,not started
-0x193250,88,ReplayPin_GetQuota,camera?,not started
-0x1932a8,60,ReplayPin_CountForRider,camera?,not started
-0x1932e8,8,thunk_FUN_001931d0,runtime,host
-0x1932f0,8,ReplayPin_ReleaseThunk,camera?,not started
-0x1932f8,120,ReplayPin_Release,camera?,not started
-0x193370,216,ReplayPin_Begin,camera?,not started
-0x193448,164,ReplayPin_End,camera?,not started
-0x1934f0,228,ReplayPin_FindWorstSlot,camera?,not started
-0x1935d8,500,ReplayPin_PickSlot,camera?,not started
-0x1937d0,208,ReplayPin_Commit,camera?,not started
-0x1938a0,40,ReplayPin_ClearHighlightRef,camera?,not started
+0x193118,44,ReplayPin_Init,camera?,checked
+0x193148,76,ReplayPin_Delete,camera?,checked
+0x193198,52,ReplayPin_Reset,camera?,checked
+0x1931d0,124,ReplayPin_Clear,camera?,checked
+0x193250,88,ReplayPin_GetQuota,camera?,checked
+0x1932a8,60,ReplayPin_CountForRider,camera?,checked
+0x1932e8,8,thunk_FUN_001931d0,runtime,checked
+0x1932f0,8,ReplayPin_ReleaseThunk,camera?,checked
+0x1932f8,120,ReplayPin_Release,camera?,checked
+0x193370,216,ReplayPin_Begin,camera?,checked
+0x193448,164,ReplayPin_End,camera?,checked
+0x1934f0,228,ReplayPin_FindWorstSlot,camera?,checked
+0x1935d8,500,ReplayPin_PickSlot,camera?,checked
+0x1937d0,208,ReplayPin_Commit,camera?,checked
+0x1938a0,40,ReplayPin_ClearHighlightRef,camera?,checked
 0x1938c8,212,ReplayPin_Save,save,not started
 0x1939a0,212,ReplayPin_Load,camera?,not started
-0x193a78,36,ReplayPin_InitSlot,camera?,not started
-0x193aa0,48,ReplayPin_GetHighlight,camera?,not started
-0x193ad0,8,ReplayPin_ZeroStart,camera?,not started
-0x193ad8,36,ReplayPin_SetEnd,camera?,not started
+0x193a78,36,ReplayPin_InitSlot,camera?,checked
+0x193aa0,48,ReplayPin_GetHighlight,camera?,checked
+0x193ad0,8,ReplayPin_ZeroStart,camera?,checked
+0x193ad8,36,ReplayPin_SetEnd,camera?,checked
 0x193b00,208,Highlight_Save,save,not started
 0x193bd0,148,Highlight_Load,camera?,not started
 0x193c68,44,Replay_StartRiderSounds,audio,ported
@@ -2222,7 +2223,7 @@ address,size,name,system,status
 0x1955e0,8,ReplayPlaylist_SetCurrent,camera?,checked
 0x195690,28,ReplayPlaylist_Clear,frontend?,checked
 0x1956b0,12,ReplayStatus_Clear,frontend?,not started
-0x1956c0,8,thunk_FUN_00193a78,runtime,host
+0x1956c0,8,thunk_FUN_00193a78,runtime,checked
 0x1956c8,40,Replay_ClearPins,frontend?,not started
 0x1956f0,28,FUN_001956f0,frontend?,not started
 0x195710,28,FUN_00195710,frontend?,not started
