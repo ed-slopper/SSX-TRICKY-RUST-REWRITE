@@ -2118,34 +2118,34 @@ address,size,name,system,status
 0x192458,72,Replay_ReleaseAllPins,camera?,not started
 0x1924a0,340,Replay_EndHighlight,camera?,not started
 0x1925f8,244,Replay_DropCurrentHighlight,camera?,not started
-0x1926f0,40,ReplayInput_Init,camera?,not started
+0x1926f0,40,ReplayInput_Init,camera?,checked
 0x192718,28,ReplayInput_Delete,camera?,not started
-0x192738,24,ReplayInput_Reset,camera?,not started
+0x192738,24,ReplayInput_Reset,camera?,checked
 0x192750,8,thunk_FUN_00192738,runtime,host
-0x192758,124,ReplayInput_SeekFrame,camera?,not started
-0x1927d8,164,Replay_RecordOrPlayInput,boarder?,not started
-0x192880,108,Replay_PushInput,boarder?,not started
-0x1928f0,164,Replay_RecordInput,boarder?,not started
-0x192998,164,Replay_ReadInput,boarder?,not started
-0x192a40,224,ReplayInput_Load,world?,not started
+0x192758,124,ReplayInput_SeekFrame,camera?,checked
+0x1927d8,164,Replay_RecordOrPlayInput,boarder?,checked
+0x192880,108,Replay_PushInput,boarder?,checked
+0x1928f0,164,Replay_RecordInput,boarder?,checked
+0x192998,164,Replay_ReadInput,boarder?,checked
+0x192a40,224,ReplayInput_Load,world?,checked
 0x192b20,24,FUN_00192b20,game?,not started
-0x192b38,112,Replay_AllocStream,game?,not started
-0x192ba8,68,Replay_FreeStream,render?,not started
-0x192bf0,12,Replay_RewindRead,ai?,not started
-0x192c00,16,Replay_ResetWrite,ai?,not started
-0x192c10,140,Replay_Write,world?,not started
-0x192ca0,68,Replay_Read,ai?,not started
-0x192ce8,52,Replay_Peek,ai?,not started
-0x192d20,64,Replay_PeekNodeType,ai?,not started
-0x192d60,140,Replay_UnpackBlock,ai?,not started
-0x192df0,76,Replay_ReadNodeRef,ai?,not started
-0x192e40,124,Replay_ReadLink,ai?,not started
-0x192ec0,52,Replay_ReadOffset,ai?,not started
-0x192ef8,52,Replay_ReadOffset2,ai?,not started
-0x192f30,72,Replay_WriteNodeRef,world?,not started
-0x192f78,108,Replay_WriteLink,world?,not started
-0x192fe8,52,Replay_WriteOffset2,world?,not started
-0x193020,52,Replay_WriteOffset,world?,not started
+0x192b38,112,Replay_AllocStream,game?,checked
+0x192ba8,68,Replay_FreeStream,render?,checked
+0x192bf0,12,Replay_RewindRead,ai?,checked
+0x192c00,16,Replay_ResetWrite,ai?,checked
+0x192c10,140,Replay_Write,world?,checked
+0x192ca0,68,Replay_Read,ai?,checked
+0x192ce8,52,Replay_Peek,ai?,checked
+0x192d20,64,Replay_PeekNodeType,ai?,checked
+0x192d60,140,Replay_UnpackBlock,ai?,checked
+0x192df0,76,Replay_ReadNodeRef,ai?,checked
+0x192e40,124,Replay_ReadLink,ai?,checked
+0x192ec0,52,Replay_ReadOffset,ai?,checked
+0x192ef8,52,Replay_ReadOffset2,ai?,checked
+0x192f30,72,Replay_WriteNodeRef,world?,checked
+0x192f78,108,Replay_WriteLink,world?,checked
+0x192fe8,52,Replay_WriteOffset2,world?,checked
+0x193020,52,Replay_WriteOffset,world?,checked
 0x193058,8,FUN_00193058,ai?,not started
 0x193060,8,FUN_00193060,ai?,not started
 0x193068,28,ReplayKeyframe_Reset,ai?,not started
