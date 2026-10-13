@@ -796,5 +796,41 @@ animation files).
   spray +0x4b60, board track +0x8020, brake spray +0x99b0, speed dust +0xb600); `BoarderRender_DestructEffects`
   0x136f88 runs `Fx_SpeedDust_Destruct` 0x12f490 and `Fx_BoardPuff_Destruct` 0x12ec78 (both empty) and frees it.
   `BoarderRender_CopyBoarderMatrix` 0x136e38 copies the rider's 4 × 4 matrix at rider+0x5760 (from `BoarderRender_Draw`).
-  Not named yet: render+0x3e4 (0x260 bytes, built by 0x133808/0x133890, set each tick by 0x133940 from bone at +0x130 of
-  the skeleton) and render+0x3e8 (0x150 bytes, 0x134288).
+- render+0x3e4 is the split-screen player marker (0x260 bytes). Proven: `PlayerMarker_Construct` 0x133808 builds it
+  (`EaseRecord_Init` on +0x254, then `PlayerMarker_Reset` 0x133890: 8 records with +0x40.. = (0,0,0,1) and stride-0x30
+  scale 1.0; +0x240 = 20000.0, +0x244 = −130.9, +0x248 = 132.54, +0x24c = 50.5, +0x250 = 300.13).
+  `PlayerMarker_Update` 0x133940 (from `cBoarderRender::vf7` 0x1356f8, human riders only, rider+0x41c == 1) places 4
+  points above bone +0x130 (skeleton at rider+0x4494 → +4); colour (0x80,0,0), or (0x80,0x6e,0) when stats+0x65 (pad
+  port) ≠ 0; a size eased between 20 and 40 at 45.19/s × 1/60 is written as an int to the 4 records (it pulses).
+  `PlayerMarker_Draw` 0x133c20 is called by `BoarderRender_Draw` only with 2 players (gApp+0x730 → +0x298 > 1 and mode
+  +0x1c → +0x7c > 1), for a human rider that is not the focus of the current viewport's camera (`Camera_GetFocusRider`).
+  Inferred: the marker over the other player in split screen.
+- render+0x3e8 is the rival attitude icon (0x150 bytes, `AttitudeIcon_Construct` 0x134288). Proven:
+  `AttitudeIcon_Update` 0x1343d0 runs for non-human riders in game modes (0x32de8c) 2 and 4; for each human player
+  (`Career_FindRiderOfPlayer`) a 0x80 slot gets +0x50 = level from the pair attitude a (rider+0x50 + 0x20·i):
+  a < 60 → a/60; a < 80.98926 → 1 + (a − 60)/20.989258; else 2 + (a − 80.98926)/40. A flash (+0xa0/+0xa4, +0.016386366
+  per tick) starts when the grudge level (rider+0x124; grudge +0x118 against +0x120) changes, another (+0xac/+0xb0,
+  +0.016652344) when anger (pair+0x13) rises; +0xb8 ping-pongs by ±0.066181876. Position = bone +0x130 + up
+  (rider+0x4ac0) × 95.9087. `AttitudeIcon_Draw` 0x134830 is drawn by `BoarderRender_Draw` for non-human riders.
+- Boost streaks. Proven: `BoarderRender_RecordStreaks` 0x136148 (from vf7) records every 3rd frame (mode+0x18 % 3)
+  while boost level rider+0x130 > 0 or boost timer +0x134 > 0: colour 0x3bc230 / 0x3bc240 / 0x3bc250 by level
+  (≤ 0.33362994, ≤ 0.66599226, else; the timer uses 0x3bc250) into render+0x1e8, and
+  `BoarderRender_GetHandStreakPoints` 0x136c48 (bone 0x1f0 → 0x230 extended 15.0 cm past 0x230 plus bone 0x1b0; same for
+  0x2f0 → 0x330 and 0x2b0) into a 7-slot ring at render+0x20 (index +0x1e0, count +0x1e4); otherwise the count decays.
+  In control state rider+0x428 == 0x10 the rider matrix is copied (`BoarderRender_CopyBoarderMatrix`) into a second
+  7-slot ring at render+0x200 (+0x3c0 index, +0x3c4 count). `Streak_Draw` 0x1f08d0 draws a ring (7 × 0x40-byte
+  records) as two strips (points 0/1 and 2/3), newest to oldest, colour ring+0x1c8, alpha table 0x33f398 × 128;
+  `BoarderRender_Draw` draws each ring with count > 1, the board ring only when stats+0x78 == 0.
+- Also from `BoarderRender_Draw`: `BoarderShadow_Update` 0x1c7e90 (inferred from the call: shadow render+8, feet
+  midpoint (bone 0x3f0 + 0x4b0)/2, rider+0x1a0, direction (0,0,−1), rider+0x4ae0, rider+0x5760; then
+  `BoarderShadow_Draw`), and `Career_IsPlayerOutfit6` 0x167038 (`Career_GetPlayerOutfit() == 6`, passed to renderer
+  vtable +0x2bc when the pad port ≠ −1).
+- Controls set-up (proven): `cAI::vf11` 0x110bf8 calls `Input_InitDefaults` 0x179238 for each human rider with
+  `Input_GetDevice(gApp+0x24)`: device stored, dev+0x2c = 0, dev+0xc |= dev+0x10; buttons 0..0x28 bound to −1 except
+  0x1b 0x800, 0x1d 0x40, 0x1e 0x20, 0x1f 0x800, 0x20 0x10, 0x25 0x100, 0x28 0x40; axes 0..0xf bound (0: 0x20020 inv,
+  1: 0x10010, 2: 0x1001 inv, 3: 0x8008 inv, 4: 0x1001, 5: 0x40, 6: 0x200, 10: 0x1001, 11: 0x8008, 13: 0x1001 inv,
+  14: 0x8008 inv, 15: 0x8008, rest 0). `Pad_SetupVibration` 0x152770 uses `Input_SetShownButton` 0x179850
+  (cInput+0x1cc[i] = v), `Vibration_Construct` 0x150a70 (8 bytes {device, 0}, kept at player[0x21d]) and
+  `PadCfg_Destruct` 0x14f550 (empty, deleting).
+- `AIComputer_CrossedEvent1b` 0x139210 (no callers): true if any path event (rider+0x57a4, cPath vtable +0xc) between
+  +0x340 and +0x344 has type 0x1b. `SplinePathNode_IsVisible` 0x251a98: renderer vtable +0x284 cull test on +0x5c.
