@@ -225,7 +225,8 @@ the same unchecked way, and port that 1:1 (the bug included), noting it here.
   the high scores emptied (`HighScore_Reset`: each entry's character `Rand_Fx` % 12, unsigned: 195 draws of the
   effects stream) then the 165 default entries (SOZ 22500, PONCH 24000 ...); the unlocks; per character 13
   course words; the sound options synced from and back to the sound manager; +0x2b14, +0x3714, +4 cleared;
-  `FUN_00166c70` numbers the 13 character records.
+  `Profile_NumberCharacterRecords` 0x166c70 numbers the 13 character records (+0x114 = i, +0x118 = +0x11c = 0,
+  0x1c4 apart).
 - Checked in the runner on 24 blocks of random bytes (each language, with and without a sound manager, the
   relations table made or not): every byte of the block, the effects stream and the sound calls.
 
@@ -292,7 +293,11 @@ count 0x3353f8, the riders out 0x335664 + 0x10 · character). The heats' rider s
   0.167), past third it is out; riders past third are out; it goes on while the heat is not the last; at the last
   heat a player not out keeps the rider points (`Circuit_SaveRiderPoints` 0x16c328: the set ones into +0x168, 8
   apart). `Circuit_AdvanceEvent` 0x16c3b0: a race going on takes the next heat (4); else the heat back to 0 (2).
-  `FUN_0016c228`: the last player rider's view of the others (the race object's table) into the rider points.
+  `Circuit_StoreRiderAttitudes` 0x16c228 (proven; from `Career_StoreCircuitAttitudes` 0x114f70, which `cAI::vf17`
+  0x111820 calls after the results in game mode 4 with career +0x27dc count and +0x27e0 entries): finds the last
+  human entry (+0x65 ≥ 0, entries 0x84 apart) and stores, per rider i, `circuit+0x1c[entry+0x38 character]` = that
+  rider's attitude to the player (race rider list +0xc4[i] → +0x50 + 0x20 · player). So the "rider points" are the
+  rivals' attitudes. `Circuit_ResetHeat` 0x16bca8: circuit+0x14 = 0 (from `Career_ClearAllPlayerFlags` 0x161840).
 - The lookups: `Circuit_FindEntry` / `Circuit_GetMedalThresholds` give 8 for a course not in the order (and the
   last entry's address), `Circuit_IsFinalEvent` is the seventh.
 - Checked in the runner: 20,000 random careers (players in slots, races in every mode, medals, trick books, flags,
