@@ -32,8 +32,9 @@ Part of the port notes (index: [README.md](README.md)); units and wording as des
   input (SLIP 0, DIG 1, LEAN 2, BOARD 3, BEND 4; another word: the 0 alone, and the next byte is then the input),
   LOADCONST 1, MAP 2, SQUARE 3, SQRT 4, LOG 5, ADD 6, SUB 7, MUL 8, DIV 9 (operands: `sscanf` "%d" words, 4 bytes
   little-endian), NEG 10, ABS 11, BOUND 12 lo hi, PUSH 13, POP 14, SADD 15, SSUB 16, SMUL 17, SDIV 18, ASSIGNVOL 19,
-  ASSIGNBEND 20; unknown words skipped; 0x7f ends. The interpreter that runs them is not found yet (the programs are
-  reached through pointers copied elsewhere); the app's is ours.
+  ASSIGNBEND 20; unknown words skipped; 0x7f ends. The interpreter is `FUN_0021ae90` (state words: program ptr, stack at [1..], pc [0x11], sp [0x12], acc [0x13];
+  LOAD n calls 0x21a6a8, 0x21a6f0, 0x21a710, 0x21a740, 0x21a788 on the sound object); ported as
+  `sfxcalc::run_snow_program`, runner-checked (tests/sfxprog.rs).
 - Scrape: vol curve (10,0)(60,127)(200,100)(300,0), bend (10,0)(30,30)(500,80)(900,127) of LOAD. Takeoff vol
   clamp(LOAD·127/1000, 64, 127); landing vol by impact (100,22)(300,60)(800,100)(1200,127); crash zbxsfx 48–50
   (64 in powder) by impact (100,80)(800,90)(1200,105)(1600,127), slide loop 51.
