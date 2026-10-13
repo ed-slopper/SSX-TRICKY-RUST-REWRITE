@@ -355,6 +355,9 @@ impl Shape for WorldBoarder {
             None
         }
     }
+    fn patch(&self, grid: &mut crate::terrain::PatchGrid, id: u32, last: Option<&mut crate::terrain::LastHit>) -> Option<crate::terrain::PatchHit> {
+        crate::terrain::patch_test(self, grid, id, last)
+    }
 }
 
 impl crate::terrain::TriQuery for WorldBoarder {

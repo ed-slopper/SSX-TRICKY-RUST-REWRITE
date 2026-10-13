@@ -208,10 +208,19 @@ fn open_level(dir: &Path) -> Result<Loaded, String> {
     let from_disc = std::env::var("TRICKY_DISC").ok().and_then(|p| {
         let mut files = tricky_data::big::Files::new(tricky_data::disc::Disc::open(&p).ok()?);
         let folder = dir.file_name()?.to_string_lossy().to_string();
-        Level::from_disc(&mut files, &folder, Some(dir)).map_err(|e| eprintln!("level {folder} from the disc: {e}")).ok()
+        let level = Level::from_disc(&mut files, &folder, Some(dir)).map_err(|e| eprintln!("level {folder} from the disc: {e}")).ok()?;
+        // the course's own collision, for the casts (row E7c3): its .pbd, .ltg and .ssf as `World_RayCast` 0x25aff8 reads them
+        let name = tricky_data::aip::big_name(&folder)?;
+        let mut get = |ext: &str| files.load(&format!("|data/models/{name}.{ext}")).ok().flatten();
+        let course = match (get("pbd"), get("ltg"), get("ssf")) {
+            (Some(p), Some(l), Some(s)) => tricky_game::course_ground::CourseGround::new(&p, &l, &s),
+            _ => None,
+        };
+        if course.is_none() { eprintln!("{folder}: the course's collision did not load; the ground is the drawn mesh's"); }
+        Some((level, course))
     });
     let from_disc_ok = from_disc.is_some();
-    let mut level = match from_disc { Some(l) => { println!("level from the disc"); l } None => Level::load(dir)? };
+    let (mut level, course) = match from_disc { Some((l, c)) => { println!("level from the disc"); (l, c) } None => (Level::load(dir)?, None) };
     // the course's AI paths and race lines from the player's disc (TRICKY_DISC, row E3d: its .aip as
     // `AIP_LoadPathsFromFile` reads it), else the level folder's AIP.json
     if let Some(ai) = std::env::var("TRICKY_DISC").ok().filter(|_| !from_disc_ok).and_then(|p| {
@@ -222,6 +231,7 @@ fn open_level(dir: &Path) -> Result<Loaded, String> {
         level.ai = tricky_data::level::AiFile::from_aip(&ai);
     }
     let mut world = build_collision(&level);
+    world.course = course.map(std::sync::Arc::new);
     let mut rails = Rails(level.splines.iter().enumerate().filter_map(|(si, sp)| {
         let mut pts: Vec<Vec3> = Vec::new();
         for seg in sp.segments.iter().filter(|s| s.points.len() >= 4) {

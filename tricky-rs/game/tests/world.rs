@@ -315,6 +315,21 @@ fn world_casts_match_the_original() {
         let trees = ssf.sphere_trees.iter().map(|g| g.iter().map(tricky_game::sphtree::SphereTree::new).collect()).collect();
         let world = World { trees, origin: [m.read_f32(grid + 4), m.read_f32(grid + 8)], size: m.read_f32(grid + 0x28), width, height, nodes_per_cell: per, cells, patches, objects, models, collision };
 
+        // `World::from_course` (row E7c3a) builds the same course from the files; the objects' boxes and
+        // controllers are this test's own, and models are numbered by first use here, by id there
+        let ltg = tricky_data::ltg::Ltg::parse(&lb).unwrap();
+        let ours = World::from_course(&pb, &pbd, &lb, &ltg, &ssf);
+        assert_eq!((ours.origin, ours.size, ours.width, ours.height, ours.nodes_per_cell), (world.origin, world.size, world.width, world.height, world.nodes_per_cell), "{c}: grid");
+        assert!(ours.cells == world.cells, "{c}: cells");
+        assert!(ours.patches == world.patches, "{c}: patches");
+        assert!(ours.collision == world.collision, "{c}: collision");
+        assert!(ours.trees == world.trees, "{c}: sphere trees");
+        assert_eq!(ours.objects.len(), world.objects.len());
+        for (i, (a, b)) in ours.objects.iter().zip(&world.objects).enumerate() {
+            assert_eq!((a.rows, a.flags, a.surface, a.mode, a.group), (b.rows, b.flags, b.surface, b.mode, b.group), "{c}: object {i}");
+            assert_eq!(ours.models[a.model], world.models[b.model], "{c}: object {i}'s model");
+        }
+
         // the casts' stubs: the patch cache and a patch's own test
         let salt = Rc::new(std::cell::Cell::new(0u32));
         let asked: Rc<RefCell<Vec<usize>>> = Rc::new(RefCell::new(vec![]));

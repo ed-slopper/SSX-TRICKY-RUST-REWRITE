@@ -223,6 +223,32 @@ Part of the port notes (index: [README.md](README.md)); units and wording as des
   unit(∂P/∂v × ∂P/∂u); its t is not changed. A degenerate patch's determinant can be 0: the PS2's x/0 = MAX and
   clamped sums keep it finite (`ps2f::F`).
 
+## The app's ground on the course (row E7c3; `tricky_game::course_ground`, `World::from_course`)
+
+- Proven: `World::from_course` builds the course object from the `.pbd`, `.ltg` and `.ssf` alone, the same as the
+  game's loaders leave it (grid, cells, INode lists, patches, collision meshes, sphere trees, each object's rows,
+  flags, surface, mode, group and model); `tests/world.rs` compares it with what the game builds in the function
+  runner on every course.
+- With `TRICKY_DISC` the app loads them (`|data/models/<course>.pbd/.ltg/.ssf`, from the course's `.big`) into
+  `CollisionWorld::course`. The ground probe (`GroundEnv::ray_cast`) is then the game's: `cWorldLine`(0.5, from,
+  to, 2) along the normal and `World_RayCast` with the rider's last-patch record (`Rider::last_hit`, rider+0x430).
+  A folder level (no course files) keeps the drawn mesh.
+- `CollisionWorld::ground` (the landing, wipe-outs, props, the sim's autopilot and camera) casts down a vertical
+  `cWorldLine`(0, top, bottom, 2) on the course and takes the first hit that faces up at least `GROUND_MIN_Y`,
+  casting again from under any other (STANDIN: a vertical query for the rays along the rider's normal, rows
+  G20c3c and E8b). The keyframed objects still come from the drawn mesh.
+- Proven: a patch faces the way its tessellation does (`unit((p11 − p10) × (p10 − p01))`), and some faces down
+  where the drawn mesh (two-sided normals from the folder) has ground: aloha 24 of 127 patches hit by
+  vertical test lines (19 of them surface 5), elysium 36 of 162 (14 surface 10). The probe takes them as the game
+  does; the vertical ground query skips them (the game's landing, `AirMotion_Update` 0x108378, takes only a surface
+  the rider moves into).
+- STANDINs left: the patch cache keeps every patch it tessellates (no fixed size, no eviction: speed only); an
+  object's box (+0xcc..+0xe0) is its parts' mesh boxes through its matrices (row E7a6); objects with no
+  controller (E7b2); keyframed objects (`cAnimObjectNode`) and switched-off, broken or open ones are left out of
+  the course's casts by clearing their bit 0x20 for the cast (row E7c3b: pose them as `World_RayCastInstance`
+  does); the walls are still `CollisionWorld::push_out` on the drawn mesh (row E8b wiring).
+- TRICKY_SIM=600 from the disc, before (drawn mesh) and after: falls out of the world 46 to 28 over the 11 courses (alaska 16 to 10, megaplex 20 to 8, aloha 2 to 6: row E7c3d), stuck 20 to 29 (walls on the mesh: row E7c3c).
+
 ## Walls and objects (row E8b; `tricky_game::walls`, checked: `tests/walls.rs`)
 
 - `Boarder_WallCollide` 0x126250: `World_RayCast` with `cWorldBoarder`(rider+0x470, 1) given the ground normal

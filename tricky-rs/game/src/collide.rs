@@ -181,6 +181,8 @@ pub struct CollisionWorld {
     pub movers: Vec<Mover>,
     /// the trigger boxes that play a keyframed object's clip (box, instance), for the sim
     pub mover_triggers: Vec<(Vec3, Vec3, u32)>,
+    /// the course's own collision (row E7c3): when there, the ground probe casts on it, not on these triangles
+    pub course: Option<std::sync::Arc<crate::course_ground::CourseGround>>,
 }
 
 /// A door opened by a keyframed clip (`cAnimObjectNode`, sub-type 256 mode 0, played once): the
@@ -217,6 +219,11 @@ impl CollisionWorld {
     /// Run the keyframed objects' own clocks and pose their collision.
     pub fn tick_movers(&mut self, dt: f32) {
         for m in self.movers.iter_mut() { m.tick(dt); m.pose(); }
+    }
+    /// Instance `inst` is left out of the course's casts: switched off, broken, an open door, or keyframed
+    /// (STANDIN: a keyframed object's collision is not posed on the course yet, row E7c3b).
+    pub fn course_skips(&self, inst: u32) -> bool {
+        self.gone(inst) || self.movers.iter().any(|m| m.inst == inst)
     }
     #[inline]
     fn gone(&self, owner: u32) -> bool {
@@ -303,8 +310,40 @@ impl CollisionWorld {
     }
 
     /// Highest rideable surface under/around `pos` whose height lies in [pos.y - down, pos.y + up].
+    ///
+    /// With the course's collision (row E7c3) the course's: `World_RayCast` 0x25aff8 down a vertical
+    /// `cWorldLine`(0, top, bottom, 2), the hit nearest the top, again from just under it while what it hit faces
+    /// down or is steeper than [`GROUND_MIN_Y`] (a patch faces the way its tessellation does, `terrain::patch_test`,
+    /// and the game's landing takes only a surface the rider moves into, `AirMotion_Update` 0x108378); the
+    /// keyframed objects are still the drawn mesh's. STANDIN: a vertical query, for the game's rays along the
+    /// rider's normal (the probe, the landing, rows E7c3 and G20c3c).
     pub fn ground(&self, pos: Vec3, up: f32, down: f32) -> Option<GroundHit> {
-        let ids = self.grid.get(&(cell(pos.x), cell(pos.z))).map_or(&[][..], |v| &v[..]);
+        let Some(course) = &self.course else { return self.mesh_ground(pos, up, down, false) };
+        let game = |v: Vec3| [v.x * 100.0, -v.z * 100.0, v.y * 100.0, 1.0];
+        let bottom = pos.y - down;
+        let mut top = pos.y + up;
+        let mut best = None;
+        for _ in 0..8 {
+            if top <= bottom { break; }
+            let mut q = crate::worldline::WorldLine::new(0.0, game(Vec3::new(pos.x, top, pos.z)), game(Vec3::new(pos.x, bottom, pos.z)), 2);
+            let (t, h) = course.ray_cast(&mut q, self.showoff, None, &|i| self.course_skips(i));
+            let Some(h) = h.filter(|_| t >= 0.0) else { break };
+            let (y, normal) = (h.pos[2] * 0.01, Vec3::new(h.normal[0], h.normal[2], -h.normal[1]));
+            if normal.y >= GROUND_MIN_Y {
+                best = Some(GroundHit { y, normal, surface: h.surface.clamp(0, 19) as u8 });
+                break;
+            }
+            top = top.min(y) - 0.01;
+        }
+        match (best, self.mesh_ground(pos, up, down, true)) {
+            (Some(a), Some(b)) => Some(if b.y > a.y { b } else { a }),
+            (a, b) => a.or(b),
+        }
+    }
+
+    /// [`CollisionWorld::ground`] on the drawn mesh's triangles (only the keyframed objects': `movers_only`).
+    fn mesh_ground(&self, pos: Vec3, up: f32, down: f32, movers_only: bool) -> Option<GroundHit> {
+        let ids = if movers_only { &[][..] } else { self.grid.get(&(cell(pos.x), cell(pos.z))).map_or(&[][..], |v| &v[..]) };
         let mut best: Option<GroundHit> = None;
         let near = self.movers_in(pos - Vec3::Y * down, pos + Vec3::Y * up);
         for t in ids.iter().map(|&id| &self.tris[id as usize]).chain(near) {

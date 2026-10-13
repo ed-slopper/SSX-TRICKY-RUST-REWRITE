@@ -877,9 +877,19 @@ impl gm::Env for GroundEnv<'_> {
         hit
     }
 
-    /// STANDIN: a vertical query of the drawn mesh 2 m over to 1 m under the probe point (a third of the way up the
-    /// line), for `World_RayCast` along the ground's normal over the game's collision (row E7).
+    /// `cWorldLine::cWorldLine`(0.5, from, to, 2) and `World_RayCast` 0x25aff8 on the course (row E7c3), with the
+    /// rider's last-patch record; nothing when the distance is negative.
+    ///
+    /// STANDIN (without the course's files, a folder level): a vertical query of the drawn mesh 2 m over to 1 m
+    /// under the probe point (a third of the way up the line).
     fn ray_cast(&mut self, _g: &mut gm::Rider, from: V4, to: V4) -> Option<Hit> {
+        if let Some(course) = &self.world.course {
+            let mut q = crate::worldline::WorldLine::new(0.5, from, to, 2);
+            let world = self.world;
+            let (t, h) = course.ray_cast(&mut q, world.showoff, Some(&mut self.r.last_hit), &|i| world.course_skips(i));
+            let h = h.filter(|_| t >= 0.0)?;
+            return Some(Hit { kind: h.kind, point: h.pos, normal: h.normal, surface: h.surface as u32 });
+        }
         let top = [from[0] + (to[0] - from[0]) / 3.0, from[1] + (to[1] - from[1]) / 3.0, from[2] + (to[2] - from[2]) / 3.0, 1.0];
         let at = to_port(top, 0.01);
         let hit = self.world.ground(at, 2.0, 1.0)?;

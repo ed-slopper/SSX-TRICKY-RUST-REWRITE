@@ -7,6 +7,7 @@
 
 pub use crate::terrain::LastHit;
 use crate::sphtree::SphereTree;
+use crate::terrain::{PatchGrid, PatchHit};
 use crate::worldline::{Hit, WorldLine};
 
 type V4 = [f32; 4];
@@ -31,6 +32,8 @@ pub trait Shape {
     fn sphere_tree(&self, tree: &SphereTree) -> Option<Hit>;
     /// `World_RayCastMeshTris` with this shape's +0x28 / +0x30
     fn mesh(&self, m: &CollMesh, either_side: bool) -> Option<Hit>;
+    /// +0x48: a patch's own test on its cache entry (`terrain::patch_test`, row E7c1); `id` is what `last` notes
+    fn patch(&self, grid: &mut PatchGrid, id: u32, last: Option<&mut LastHit>) -> Option<PatchHit>;
 }
 
 impl Shape for WorldLine {
@@ -63,6 +66,9 @@ impl Shape for WorldLine {
     }
     fn mesh(&self, m: &CollMesh, either_side: bool) -> Option<Hit> {
         WorldLine::mesh(self, &m.tris, &m.verts, &m.planes, either_side)
+    }
+    fn patch(&self, grid: &mut PatchGrid, id: u32, last: Option<&mut LastHit>) -> Option<PatchHit> {
+        crate::terrain::patch_test(self, grid, id, last)
     }
 }
 
@@ -407,4 +413,154 @@ impl World {
         }
         (-1.0, None)
     }
+}
+
+fn word(b: &[u8], at: usize) -> u32 {
+    b.get(at..at + 4).map_or(0, |w| u32::from_le_bytes([w[0], w[1], w[2], w[3]]))
+}
+fn f4_at(b: &[u8], at: usize) -> V4 {
+    [0, 1, 2, 3].map(|k| f32::from_bits(word(b, at + 4 * k)))
+}
+
+impl World {
+    /// The course object (0x346488) as the game's loaders leave it, from the course's files: `ResolveDataHeader`
+    /// 0x255630 (the `.pbd`: patches, objects, models), `ResolveTGroupHeader` 0x252470 (the `.ltg` grid: an INode's
+    /// lists are runs of its TGroup's, at offsets from the TGroup), the `.ssf` loader 0x25f598 (each object's
+    /// physics record, the collision meshes) and `Course_LoadSphereTrees`; each object's flags (+0xe8) reset as a
+    /// course start leaves them (the defaults in the upper half copied down, `controllers::restore_flags`). A
+    /// part's matrix of −1 is the identity (0x346440). Checked against what the game builds in the function runner
+    /// (`tests/world.rs`).
+    /// STANDIN: an object's box (+0xcc..+0xe0, zero in the file and filled at run time by code not yet found, row
+    /// E7a6) is its parts' mesh boxes put through the parts' and the object's matrices; and no object has an
+    /// animated controller (+0xe4), for the course's controllers (row E7b2).
+    pub fn from_course(pbd_bytes: &[u8], pbd: &tricky_data::pbd::Pbd, ltg_bytes: &[u8], ltg: &tricky_data::ltg::Ltg, ssf: &tricky_data::ssf::Ssf) -> World {
+        use tricky_data::pbd::{InstanceRec, PatchRec};
+        let patches = pbd
+            .patches
+            .iter()
+            .map(|r| {
+                let p = PatchRec::parse(r).unwrap_or_else(|| PatchRec::parse(&[0; 0x1c0]).unwrap());
+                Patch { show_off: p.showoff_only(), surface: p.surface as i32, min: [p.bbox[0], p.bbox[1], p.bbox[2]], max: [p.bbox[3], p.bbox[4], p.bbox[5]] }
+            })
+            .collect();
+        let models: Vec<Vec<Part>> = pbd
+            .models
+            .iter()
+            .map(|m| {
+                m.nodes
+                    .iter()
+                    .map(|n| {
+                        let at = n.offset as usize;
+                        let mesh = n.words[1];
+                        Part {
+                            parent: n.words[0] as i32,
+                            animated: n.words[4] != 0,
+                            matrix: match n.words[5] {
+                                0 => None,
+                                u32::MAX => Some(IDENTITY),
+                                o => Some([0, 1, 2, 3].map(|k| f4_at(pbd_bytes, at + o as usize + 16 * k))),
+                            },
+                            mesh: (mesh != 0).then(|| {
+                                let ma = at + mesh as usize;
+                                PartMesh { lo: f4_at(pbd_bytes, ma + 4), hi: f4_at(pbd_bytes, ma + 0x10), flags: word(pbd_bytes, ma + 0x1c) }
+                            }),
+                        }
+                    })
+                    .collect()
+            })
+            .collect();
+        let objects = pbd
+            .instances
+            .iter()
+            .enumerate()
+            .map(|(i, w)| {
+                let r = InstanceRec::from_words(w);
+                let phys = ssf.object_physics.get(i).and_then(|&k| ssf.physics.get(k as usize)).copied().unwrap_or(tricky_data::ssf::Physics([0; 6]));
+                let model = r.model.max(0) as usize;
+                let (min, max) = object_box(r.matrix, models.get(model).map_or(&[][..], |v| &v[..]));
+                Object {
+                    rows: r.matrix,
+                    min,
+                    max,
+                    model,
+                    flags: crate::controllers::restore_flags(phys.flags(), 0xffff_0000),
+                    surface: phys.surface(),
+                    mode: phys.collision_mode(),
+                    group: phys.group(),
+                    controller: None,
+                }
+            })
+            .collect();
+        let per = ltg.inode_num.max(0) as usize;
+        let cells = ltg
+            .tgroups
+            .iter()
+            .map(|t| {
+                let (off, tg) = t.as_ref()?;
+                let list = |o: u32, n: i16| -> Vec<usize> { (0..n.max(0) as usize).map(|j| word(ltg_bytes, (off + o) as usize + 4 * j) as usize).collect() };
+                let nodes = tg
+                    .inodes
+                    .iter()
+                    .take(per)
+                    .map(|n| {
+                        let c = n.counts;
+                        let n_obj = c[1].max(c[2]);
+                        Node {
+                            min: n.bbox.min,
+                            max: n.bbox.max,
+                            patches: list(n.offsets[0], c[0]),
+                            objects: list(n.offsets[1], n_obj),
+                            n_objects: c[1],
+                            n_objects_showoff: c[2],
+                            blank: c[0] == 0 && c[1] == 0 && c[2] == 0 && c[3] == 0 && c[4] == 0 && n.offsets[5] == 0,
+                        }
+                    })
+                    .collect();
+                Some(Cell { min: tg.bbox.min, max: tg.bbox.max, nodes })
+            })
+            .collect();
+        let collision = ssf.collision.iter().map(|g| g.iter().map(|m| CollMesh { tris: m.tris.clone(), verts: m.verts.clone(), planes: m.planes.clone() }).collect()).collect();
+        let trees = ssf.sphere_trees.iter().map(|g| g.iter().map(SphereTree::new).collect()).collect();
+        World {
+            trees,
+            origin: [ltg.bbox.min[0], ltg.bbox.min[1]],
+            size: ltg.tgroup_size,
+            width: ltg.width,
+            height: ltg.height,
+            nodes_per_cell: ltg.inode_num,
+            cells,
+            patches,
+            objects,
+            models,
+            collision,
+        }
+    }
+}
+
+/// STANDIN: an object's box from its parts' mesh boxes through the parts' (parent first) and the object's
+/// matrices, for the game's run-time box (row E7a6); the object's position when it has no mesh.
+fn object_box(rows: [V4; 4], parts: &[Part]) -> ([f32; 3], [f32; 3]) {
+    let mut world: Vec<[V4; 4]> = Vec::with_capacity(parts.len());
+    let (mut lo, mut hi) = ([f32::MAX; 3], [f32::MIN; 3]);
+    for (k, p) in parts.iter().enumerate() {
+        let own = p.matrix.unwrap_or(IDENTITY);
+        let parent = usize::try_from(p.parent).ok().filter(|&i| i < k).map_or(rows, |i| world[i]);
+        let m = through(parent, own);
+        world.push(m);
+        let Some(mesh) = p.mesh else { continue };
+        let (a, b) = ([mesh.lo[0], mesh.lo[1], mesh.lo[2]], [mesh.hi[0], mesh.hi[1], mesh.hi[2]]);
+        for c in 0..8 {
+            let v = [if c & 1 == 0 { a[0] } else { b[0] }, if c & 2 == 0 { a[1] } else { b[1] }, if c & 4 == 0 { a[2] } else { b[2] }, 1.0];
+            let w = apply(m, v);
+            for i in 0..3 {
+                lo[i] = lo[i].min(w[i]);
+                hi[i] = hi[i].max(w[i]);
+            }
+        }
+    }
+    if lo[0] > hi[0] {
+        let p = [rows[3][0], rows[3][1], rows[3][2]];
+        return (p, p);
+    }
+    (lo, hi)
 }
