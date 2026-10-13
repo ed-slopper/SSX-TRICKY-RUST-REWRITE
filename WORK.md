@@ -779,9 +779,6 @@ matches the original.
 - 2026-10-12 trailrig/heron: claim E11f (camera script machine).
 - 2026-10-12 irregulur/lynx: F1c stopped (released): batch 11, +18 names, notes in the row.
 - 2026-10-12 trailrig/heron: E11f1 done (CamScript_Blend vs the original).
-<<<<<<< HEAD
 - 2026-10-12 irregulur/lynx: claim F1c (batch 12).
 - 2026-10-12 irregulur/lynx: F1c stopped (released): batch 12, +26 names, notes in the row.
-=======
 - 2026-10-12 trailrig/heron: E11f2 done (camera script path steps vs the original).
->>>>>>> 8cfcf21 (E11f2: camera script path steps checked against the original)
