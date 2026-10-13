@@ -132,3 +132,15 @@ Part of the port notes (index: [README.md](README.md)); units and wording as des
 ## The trick book check (row C15)
 
 `Career::trick_book_check` ports `Score_TrickBookCheck` 0x1579e0 (the real start; the board's older 0x157a00 is mid-function), checked in the runner (`game/tests/trick_book.rs`, 60,000 random states). A landed trick's id words match a book entry when word 0 is equal and word 1 agrees under 0x07000f00 (`FUN_00157c18`). With a tutorial lesson running (`(gApp+0x730)+0x34`) it only compares the lesson's trick and sets the lesson's +0x64; otherwise each of the 30 entries that matches, is neither done (+4) nor forced (+8), and is on the first page not yet complete (`FUN_001640a8`: five a page, against `TrickBook_CountCompletePages`) is forced and flagged in the slot's race flags (+0x310c). Forcing counts as done, so one landing ticks at most the entries of one page, and a page finishing in the loop moves the gate on to the next within the same pass. Any tick gives one message (`Scoring_PushMessage(1.2, 0x11)`) and `Sfx_OnTrickBookDone`. Skipped while the race object's `+0x40` has a lesson mode between 1 and 9, or when the rider's player byte is negative. The app's `src/book.rs` keeps its own name-based book until it moves onto this (row C15b).
+
+## Grades and the trick list's helpers (board row G4l; `tricky_game::grade`, checked: `tests/aipad.rs`)
+
+- `Score_GetGradeForPoints` 0x155588: `Score_CalcPoints` of the score's +0x24 units and +0x28 multiplier against
+  the rider's level (the character entry's +0x74): grade 0..3 at the level's four thresholds (`grade::GRADES`:
+  level 0 50000 / 40000 / 30000 / 20000, each level 2000 less), 4 for any points from 0, 5 below 0 or for a level
+  out of 0..9. Level 2's grade-2 test asks for 36000, which its grade 1 already took, so level 2 skips grade 2.
+- `Score_PointsToIconTier` (4000 / 8000 / 12000 / 16000 → 2..5, else 0), `TrickId_Matches` (the first word and the
+  second's 0x7000f00 bits), `FUN_00155538` (the first of the twelve entries at +0x15c of kind 8 or 7),
+  `Score_ClearTrickEntries`, `Scoring_MsgCheckpointTime` (kind 10 for 5 s with the time negated when ahead, 11 for
+  2.5 s behind), `RelTable_GetTolerance` / `_GetAttitudeCap` (the pair's words +0 / +8).
+- Checked in the runner on 60,000 cases each, every grade reached.

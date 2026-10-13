@@ -4,6 +4,7 @@
 pub mod air;
 pub mod air_motion;
 pub mod aicomp;
+pub mod aipad;
 pub mod aipath;
 pub mod boarder;
 pub mod boarder_misc;
@@ -25,6 +26,7 @@ pub mod debris;
 pub mod finish;
 pub mod fxrand;
 pub mod gate;
+pub mod grade;
 pub mod aictl;
 pub mod progress;
 pub mod ridercol;

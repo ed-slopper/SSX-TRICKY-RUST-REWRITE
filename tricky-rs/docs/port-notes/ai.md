@@ -245,3 +245,20 @@ Part of the port notes (index: [README.md](README.md)); units and wording as des
   signed / 31), lean anim (bits 23..24, 25..26 → −1/0/1); pad bit 0 clear on the ground: ride off (motion 2, state
   3) unless clip 0x1fd; else +0x304 = !bit 0 and a reset at 101.46 (0x42caebe0). State 0x13 does the same inline
   without the steering.
+
+## The computer rider's pad word (board row G4l; `tricky_game::aipad`, checked: `tests/aipad.rs`)
+
+- `cComputer::GetControls` 0x1384b8: the pad word from zero; the rider's time scale (+0x12c) toward
+  `AI_RubberBandSpeedScale` by at most 0.008446 a tick; by the control state (+0x428): 2, 3, 4, 7, 0xb, 0xc, 0x12
+  `AIComputer_ControlsDispatch`; 5 the crouch field full (0x3e0); 8 the countdown; 9 and 0x11 the stick's x full
+  (0x1f); 10 nothing (`FUN_001389c0` returns at once); 0xd turn around; 0xe ride; 0xf air; 0x10 the air trick
+  input; 0x13 idle; 0x14 bit 0 the stuck check; then `AIComputer_UpdateSkillScale`.
+- `AIComputer_ControlsRide` 0x1387e8: the rider's path object (+0x57a4, virtual +0xc) is asked for the events
+  from the rider's +0x340 to its distance +0x344 plus 50; the first event 25 with the answer's flag 0x2000000
+  brakes (bit 1) and, slower than the computer's +0x868 less 138.89 (|v| by the VU), tucks (bit 3). Then
+  `AIComputer_SteerTowards`(+0x360) into bits 17..22, the computer's crouch (+0x888) into 5..10, its brake (+0x88c)
+  into 11..16 (each · 31 truncated, six bits). `AIComputer_CrossedEvent1b` 0x139210 asks with no look-ahead for
+  an event 0x1b.
+- `FUN_001371e0`(point): the point less its part along the rider's frame axis +0x4aa0, normalised (VU rsqrt), along
+  +0x4ab0; times skill / 7.8941293 when the skill scale (+0x86c) is not 1.
+- Checked in the runner: 40,000 rides, event queries and line offsets; 30,000 dispatches over every control state.
