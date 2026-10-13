@@ -148,6 +148,9 @@ impl ControlEnv for World {
     fn cam_start(&mut self, index: i32, script: &str) {
         self.log.push(Ev::Cam(index, script.to_string()));
     }
+    fn run_control(&mut self, _r: &mut Rider, _control: u32) {
+        unreachable!("the updates do not dispatch")
+    }
 }
 
 /// The rider's fields at their offsets (words), the board object's at +0x5ae0's
@@ -245,6 +248,7 @@ fn random_rider(g: &mut Rng) -> Rider {
         b76c: g.next(),
         b770: g.next(),
         b798: g.next(),
+        ..Default::default()
     };
     for k in 0..8 {
         r.dist[k] = g.f(0.0, 3000.0);

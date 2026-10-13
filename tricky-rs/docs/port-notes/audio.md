@@ -183,9 +183,33 @@ the port keeps the same bytes at the same addresses (`pf::Mem`).
   target's column has the top bit, high half the target).
 - Checked in the runner on all 21 songs of MUSIC.BIG (TRICKY_MUSIC_DIR): registration, then 3000 random calls a song
   on random track records, the song table, the graph, the tracks and the marker calls compared (a small graph's
-  lookups read past its end; the test gives both sides the same bytes there). Still to port: the scheduler
-  (`FUN_002bf508` the next segment, `FUN_002bfe28`, `FUN_002c00d0`, `FUN_002bfbb8`, the stream callbacks
-  `FUN_002c0488` / `FUN_002c0898`) and the controls (`PathX_LoadSong`, events, volume, fades, stops).
+  lookups read past its end; the test gives both sides the same bytes there).
+- The scheduler (`pf::PfEnv` the stream library under it: `PathX_TimeMs`, `PathX_GetPositionMs`,
+  `StreamSlot_Play` / `_Stop` / `_Fade` / `_IsDone` / `_GetPosition`, `FUN_00223a90`, and `FUN_00223b70` the volume,
+  which is empty in this build). A track record (0xd8 bytes): +0 its number, +1 its path variable, +4 its volume, +5
+  the loop count, +6 the beat counter, +8 / +9 its handle ring's size and place (+0xd4 the ring: node, beat, handle),
+  +10 the stream latency (under 50 ms a beat-counted track), +0xc the looping node, +0xe the event it waits on,
+  +0x10 its marker, +0x14 the event entry's volume, +0x15 flags, +0x16 its node, +0x18 the saved entry, +0x19 /
+  +0x1a what to do when released, +0x20 the beat length, +0x24 / +0x28 when to start, +0x2c the stream slot, +0x30
+  the handle, +0x34 the name. The song record: +0 the lead track, +0x34 the pending event (below 0: the complement of
+  a node to walk to), +0x37 immediate, +0x3c / +0x40 the earliest / latest start, +0x44 the tracks done this pass.
+- `FUN_002bfe28` starts a track's node on its stream (a beat-counted track counts beats and times the next, rounded
+  to 10 ms; a longer one starts at its time when the stream is idle) and keeps the handle in its ring; a track with no
+  node stops and releases the tracks waiting on its event (`FUN_002bfa78`: their volume, then walked on or stopped).
+  `FUN_002bfbb8` advances a track at its segment's end (the same node within its beats, else the branch walked on;
+  restored when the start fails). `FUN_002bf508` takes the song's event for a track (or walks a pending node): the
+  entry's volume and waits, a move synced to the lead track by `FUN_002c00d0` (the 0x7f marker: the lead's position
+  less the segment, wrapped by the lead's length; the −1 marker: the next beat of the target; else the next bar at the
+  lead's tempo, computed in soft-float doubles as the game's libgcc does); a track that cannot move stops or waits
+  (restored). `PathX_CountActiveTracks`, `FUN_002bef08` (volumes over 500 ms or fades), `FUN_002befd8` (a node's
+  segment offset).
+- Where the game crashes or hangs on bad data the port panics instead, saying so: a division by zero (its traps),
+  a lead segment or bar of no length (an endless loop), a released track whose walk ends nowhere (endless
+  recursion). Checked in the runner on all 21 songs: 2500 random calls a song over random tracks, events, leads and
+  stream answers; results, every stream call, the song table, the graph and the tracks compared; traps, endless
+  loops and recursions agree. The runner learnt `multu`, `dsllv`, `dsrlv` and `dsrav` (libgcc's `__muldi3`). Still
+  to port: the stream callbacks `FUN_002c0488` / `FUN_002c0898` and the controls (`PathX_LoadSong`, events, volume,
+  fades, stops).
 
 ## Front-end sounds (`cFE3DSound` → `Audio_PlayFE*`, F1c)
 

@@ -3767,21 +3767,21 @@ address,size,name,system,status
 0x222fe8,176,PathX_LoadBank,audio?,not started
 0x223098,140,PathX_ReadFile,audio?,not started
 0x223128,44,FUN_00223128,audio?,not started
-0x223158,76,PathX_TimeMs,audio?,not started
+0x223158,76,PathX_TimeMs,audio?,ported
 0x2231a8,44,FUN_002231a8,audio?,not started
 0x2231d8,532,PathX_OpenSong,audio?,not started
 0x223450,140,PathX_FreeTrack,audio?,not started
-0x2234e0,192,StreamSlot_IsDone,audio?,not started
-0x2235a0,164,PathX_GetPositionMs,audio?,not started
+0x2234e0,192,StreamSlot_IsDone,audio?,ported
+0x2235a0,164,PathX_GetPositionMs,audio?,ported
 0x223648,200,PathX_Init,audio?,not started
 0x223710,112,PathX_StopDriver,audio?,not started
-0x223780,464,StreamSlot_GetPosition,audio?,not started
-0x223950,320,StreamSlot_Play,audio?,not started
-0x223a90,48,FUN_00223a90,audio?,not started
-0x223ac0,172,StreamSlot_Fade,audio?,not started
-0x223b70,8,FUN_00223b70,audio?,not started
+0x223780,464,StreamSlot_GetPosition,audio?,ported
+0x223950,320,StreamSlot_Play,audio?,ported
+0x223a90,48,FUN_00223a90,audio?,ported
+0x223ac0,172,StreamSlot_Fade,audio?,ported
+0x223b70,8,FUN_00223b70,audio?,ported
 0x223b78,196,StreamSlot_SetPitch,audio?,not started
-0x223c40,104,StreamSlot_Stop,audio?,not started
+0x223c40,104,StreamSlot_Stop,audio?,ported
 0x223ca8,184,Music_CreatePathfinder,audio,not started
 0x223d60,1536,Music_LoadPathfinder,audio,not started
 0x224368,128,Song_Delete,audio?,not started
@@ -6072,19 +6072,19 @@ address,size,name,system,status
 0x2bed58,92,PathX_SelectSong,audio?,checked
 0x2bedb8,52,FUN_002bedb8,audio?,not started
 0x2bedf0,148,FUN_002bedf0,audio?,not started
-0x2bee88,128,PathX_CountActiveTracks,audio?,not started
-0x2bef08,204,FUN_002bef08,audio?,not started
-0x2befd8,96,FUN_002befd8,audio?,not started
+0x2bee88,128,PathX_CountActiveTracks,audio?,checked
+0x2bef08,204,FUN_002bef08,audio?,checked
+0x2befd8,96,FUN_002befd8,audio?,checked
 0x2bf038,200,FUN_002bf038,audio?,checked
 0x2bf108,388,FUN_002bf108,audio?,checked
 0x2bf290,144,FUN_002bf290,audio?,checked
 0x2bf320,364,FUN_002bf320,audio?,checked
 0x2bf490,116,FUN_002bf490,audio?,checked
-0x2bf508,1388,FUN_002bf508,audio?,not started
-0x2bfa78,316,FUN_002bfa78,audio?,not started
-0x2bfbb8,620,FUN_002bfbb8,audio?,not started
-0x2bfe28,676,FUN_002bfe28,audio?,not started
-0x2c00d0,952,FUN_002c00d0,audio?,not started
+0x2bf508,1388,FUN_002bf508,audio?,checked
+0x2bfa78,316,FUN_002bfa78,audio?,checked
+0x2bfbb8,620,FUN_002bfbb8,audio?,checked
+0x2bfe28,676,FUN_002bfe28,audio?,checked
+0x2c00d0,952,FUN_002c00d0,audio?,checked
 0x2c0488,1040,FUN_002c0488,audio?,not started
 0x2c0898,588,FUN_002c0898,audio?,not started
 0x2c0b08,424,PathX_RegisterSong,audio?,checked

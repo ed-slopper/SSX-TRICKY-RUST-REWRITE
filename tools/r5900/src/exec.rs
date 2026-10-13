@@ -99,6 +99,9 @@ fn step(r: &mut Runner, pc: u32) -> Result<Next, Error> {
                 4 => sext32((b as u32) << (a & 31)),             // sllv
                 6 => sext32((b as u32) >> (a & 31)),             // srlv
                 7 => sext32(((b as u32 as i32) >> (a & 31)) as u32), // srav
+                20 => b << (a & 63),                             // dsllv
+                22 => b >> (a & 63),                             // dsrlv
+                23 => ((b as i64) >> (a & 63)) as u64,           // dsrav
                 8 => return Ok(Next::Branch(a as u32)),          // jr
                 9 => {
                     // jalr
@@ -133,6 +136,13 @@ fn step(r: &mut Runner, pc: u32) -> Result<Next, Error> {
                 24 => {
                     // mult: on the EE it also writes rd
                     let p = (a as u32 as i32 as i64) * (b as u32 as i32 as i64);
+                    c.lo = sext32(p as u32) as u128;
+                    c.hi = sext32((p >> 32) as u32) as u128;
+                    sext32(p as u32)
+                }
+                25 => {
+                    // multu: as mult, unsigned
+                    let p = (a as u32 as u64) * (b as u32 as u64);
                     c.lo = sext32(p as u32) as u128;
                     c.hi = sext32((p >> 32) as u32) as u128;
                     sext32(p as u32)
