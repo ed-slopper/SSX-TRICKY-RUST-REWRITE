@@ -667,7 +667,7 @@ flag): the quaternion, the three axes and the heading.
 
 ### Who calls `Boarder_PlaceAt`, and with which heading (row G20c3b; proven from the decompiler)
 
-`Boarder_PlaceAt`(f12 heading, f13 height, a0 rider, a1 &place, a2 &velocity, a3 flag). Six callers:
+`Boarder_PlaceAt`(f12 heading, f13 height, a0 rider, a1 &place, a2 &velocity, a3 flag). Six callers (the node `Update` 0x141cd8 and `CamScript_StartScene` read in row G20c3b3a):
 
 | caller | heading | place, velocity, flag |
 |---|---|---|
@@ -676,7 +676,8 @@ flag): the quaternion, the three axes and the heading.
 | the start line, `cBoarder::vf8` 0x116ab8 (0x116d88) | atan2(dir.y, dir.x) of the path's direction at distance 0 | path point (+0xc) + dir × `Boarder_StartLineOffset` 0x11ea00 (stats+0x60 · 90 − 90 cm), velocity 0, height 0, flag 0 |
 | `Boarder_TeleportToInstance` 0x11a098 (0x11a2fc) | atan2 of the instance matrix's y row (x, y) after `Matrix_Transform` | the matrix's translation + 300 cm along an offset chosen by rider+0x460, velocity 0, height 0, flag 0 |
 | `RaceScene_UpdateCastClip` 0x16daa8 (0x16db00) | the scene's own float (+0x30) | the scene's place (+0x20), velocity 0, flag 1 (no ray, no `AnimCtl_Reset`) |
-| 0x141e90 and 0x176ea0 (`CamScript_StartScene`) | not read | (gap, row G20c3b3) |
+| the node `Update` 0x141cd8 (0x141e90): while a rider's flag byte (node +0x64 + j) is set and the rider is in state 5 (rider+0x424) | the rider's own heading (rider+0x1b0) | place rider+0x140, velocity rider+0x150 (its own, copied), height 0, flag 0: re-places the rider where it is; the rider's timer (+0x148) must have run out first |
+| `CamScript_StartScene` 0x176850 (0x176ea0), for an actor record with +0x18 set | the record's heading (+0x2c), or for a record whose position comes from the scene (+0x1c) `Math_AngleDiff(heading + the scene's offset, 0)` | place the record's position (+0x20..+0x28, w 1.0) or the scene's point (`0x172100`), velocity (0, 0, 0, 0), height 0, flag 1 (no ray); `0x16da10` then starts the actor's animation with the same position and heading |
 
 Every heading read is the same inline atan2 (±π/2 on the y axis, `Math_Atan` 0x2510f8 over y/x, ±π by the sign of x):
 in (−π, π], and with the approximate `Math_Atan`, **not** `f32::atan2`. Compared with `Rider::respawn(at: (pos, yaw))`:
