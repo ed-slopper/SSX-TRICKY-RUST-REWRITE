@@ -3768,19 +3768,19 @@ address,size,name,system,status
 0x223098,140,PathX_ReadFile,audio?,not started
 0x223128,44,FUN_00223128,audio?,not started
 0x223158,76,PathX_TimeMs,audio?,ported
-0x2231a8,44,FUN_002231a8,audio?,not started
-0x2231d8,532,PathX_OpenSong,audio?,not started
-0x223450,140,PathX_FreeTrack,audio?,not started
+0x2231a8,44,FUN_002231a8,audio?,ported
+0x2231d8,532,PathX_OpenSong,audio?,ported
+0x223450,140,PathX_FreeTrack,audio?,ported
 0x2234e0,192,StreamSlot_IsDone,audio?,ported
 0x2235a0,164,PathX_GetPositionMs,audio?,ported
-0x223648,200,PathX_Init,audio?,not started
-0x223710,112,PathX_StopDriver,audio?,not started
+0x223648,200,PathX_Init,audio?,ported
+0x223710,112,PathX_StopDriver,audio?,ported
 0x223780,464,StreamSlot_GetPosition,audio?,ported
 0x223950,320,StreamSlot_Play,audio?,ported
 0x223a90,48,FUN_00223a90,audio?,ported
 0x223ac0,172,StreamSlot_Fade,audio?,ported
 0x223b70,8,FUN_00223b70,audio?,ported
-0x223b78,196,StreamSlot_SetPitch,audio?,not started
+0x223b78,196,StreamSlot_SetPitch,audio?,ported
 0x223c40,104,StreamSlot_Stop,audio?,ported
 0x223ca8,184,Music_CreatePathfinder,audio,not started
 0x223d60,1536,Music_LoadPathfinder,audio,not started
@@ -3792,7 +3792,7 @@ address,size,name,system,status
 0x224488,8,FUN_00224488,audio?,not started
 0x224498,288,Song_UpdateVolume,audio?,not started
 0x2245b8,104,Song_FadeOut,audio?,not started
-0x224620,52,PathX_GetSongState,audio?,not started
+0x224620,52,PathX_GetSongState,audio?,ported
 0x224658,80,FUN_00224658,audio?,ported
 0x2246a8,192,Song_RandomSegmentMs,audio?,ported
 0x224768,36,FUN_00224768,audio?,not started
@@ -6070,8 +6070,8 @@ address,size,name,system,status
 0x2bec68,56,FUN_002bec68,audio?,not started
 0x2beca0,180,Path_Init,audio?,checked
 0x2bed58,92,PathX_SelectSong,audio?,checked
-0x2bedb8,52,FUN_002bedb8,audio?,not started
-0x2bedf0,148,FUN_002bedf0,audio?,not started
+0x2bedb8,52,FUN_002bedb8,audio?,checked
+0x2bedf0,148,FUN_002bedf0,audio?,checked
 0x2bee88,128,PathX_CountActiveTracks,audio?,checked
 0x2bef08,204,FUN_002bef08,audio?,checked
 0x2befd8,96,FUN_002befd8,audio?,checked
@@ -6085,26 +6085,26 @@ address,size,name,system,status
 0x2bfbb8,620,FUN_002bfbb8,audio?,checked
 0x2bfe28,676,FUN_002bfe28,audio?,checked
 0x2c00d0,952,FUN_002c00d0,audio?,checked
-0x2c0488,1040,FUN_002c0488,audio?,not started
-0x2c0898,588,FUN_002c0898,audio?,not started
+0x2c0488,1040,FUN_002c0488,audio?,checked
+0x2c0898,588,FUN_002c0898,audio?,checked
 0x2c0b08,424,PathX_RegisterSong,audio?,checked
-0x2c0cb0,872,PathX_LoadSong,audio?,not started
-0x2c1018,80,FUN_002c1018,audio?,not started
-0x2c1068,200,FUN_002c1068,audio?,not started
-0x2c1130,52,FUN_002c1130,audio?,not started
-0x2c1168,40,FUN_002c1168,audio?,not started
-0x2c1190,244,FUN_002c1190,audio?,not started
-0x2c1288,248,FUN_002c1288,audio?,not started
-0x2c1380,176,FUN_002c1380,audio?,not started
-0x2c1430,208,FUN_002c1430,audio?,not started
-0x2c1500,196,FUN_002c1500,audio?,not started
-0x2c15c8,708,FUN_002c15c8,audio?,not started
-0x2c1890,420,FUN_002c1890,audio?,not started
-0x2c1a38,348,PathX_StopTracks,audio?,not started
-0x2c1b98,296,FUN_002c1b98,audio?,not started
-0x2c1cc0,248,PathX_StopSong,audio?,not started
-0x2c1db8,340,PathX_SetVolume,audio?,not started
-0x2c1f10,304,PathX_FadeTracks,audio?,not started
+0x2c0cb0,872,PathX_LoadSong,audio?,checked
+0x2c1018,80,FUN_002c1018,audio?,checked
+0x2c1068,200,FUN_002c1068,audio?,checked
+0x2c1130,52,FUN_002c1130,audio?,checked
+0x2c1168,40,FUN_002c1168,audio?,checked
+0x2c1190,244,FUN_002c1190,audio?,checked
+0x2c1288,248,FUN_002c1288,audio?,checked
+0x2c1380,176,FUN_002c1380,audio?,checked
+0x2c1430,208,FUN_002c1430,audio?,checked
+0x2c1500,196,FUN_002c1500,audio?,checked
+0x2c15c8,708,FUN_002c15c8,audio?,checked
+0x2c1890,420,FUN_002c1890,audio?,checked
+0x2c1a38,348,PathX_StopTracks,audio?,checked
+0x2c1b98,296,FUN_002c1b98,audio?,checked
+0x2c1cc0,248,PathX_StopSong,audio?,checked
+0x2c1db8,340,PathX_SetVolume,audio?,checked
+0x2c1f10,304,PathX_FadeTracks,audio?,checked
 0x2c2040,72,FUN_002c2040,audio?,ported
 0x2c2088,652,Shape_UnpackBlocks,lib-shape?,not started
 0x2c2318,524,Shape_Unpack,lib-shape?,ported

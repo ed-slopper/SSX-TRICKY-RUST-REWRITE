@@ -7,7 +7,7 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 use r5900::Runner;
-use tricky_game::pf::{Mem, Pf, PfEnv, AUTHOR, GLOBALS, SONGS, SONG_SIZE};
+use tricky_game::pf::{Mem, Pf, PfDriver, PfEnv, AUTHOR, GLOBALS, SONGS, SONG_SIZE};
 
 struct Rng(u64);
 impl Rng {
@@ -240,9 +240,9 @@ impl PfEnv for Streams {
         self.log.push(Sv::Done(slot));
         self.done
     }
-    fn get_position(&mut self, slot: u32) -> (i32, i32) {
+    fn get_position(&mut self, slot: u32) -> (i32, i32, i32) {
         self.log.push(Sv::GetPos(slot));
-        self.getpos
+        (self.handle, self.getpos.0, self.getpos.1)
     }
     fn release(&mut self, slot: u32) {
         self.log.push(Sv::Release(slot));
@@ -300,6 +300,8 @@ fn scheduler_is_the_original() {
         let (a, b) = x.getpos;
         m.write_u32(c.gpr(5) as u32, a as u32);
         m.write_u32(c.gpr(6) as u32, b as u32);
+        let h = x.handle;
+        c.set_gpr(2, h as i64 as u64)
     });
     s!(0x223a90, |c, _m, x| x.log.push(Sv::Release(c.gpr(4) as u32)));
     let vol_log = w.clone();
@@ -528,4 +530,475 @@ fn scheduler_is_the_original() {
     }
     eprintln!("ops {ops:?}, {traps} traps and {endless} endless recursions on both sides, {slow} syncs past the step limit
 {seen:?}");
+}
+
+#[derive(Clone, Debug, PartialEq)]
+enum Dv {
+    S(Sv),
+    Free(u32),
+    StopDriver,
+    Pitch(u32, u8),
+    FadeTo(u32, i32, u64),
+    Overhead,
+    Init,
+    Open(u32, u32, i32, u32, u32, i32),
+}
+
+#[derive(Clone, Default)]
+struct Driver {
+    s: Streams,
+    overhead: i32,
+    slot: i32,
+    log: Vec<Dv>,
+}
+
+impl PfEnv for Driver {
+    fn time_ms(&mut self) -> u32 {
+        self.log.push(Dv::S(Sv::Time));
+        self.s.now
+    }
+    fn position_ms(&mut self, slot: u32) -> i32 {
+        self.log.push(Dv::S(Sv::Pos(slot)));
+        self.s.pos[slot as usize % self.s.pos.len()]
+    }
+    fn play(&mut self, slot: u32, start: i64, name: u32, offset: u32, volume: u8, beat: u8, immediate: u8) -> i32 {
+        self.log.push(Dv::S(Sv::Play(slot, start, name, offset, volume, beat, immediate)));
+        self.s.handle
+    }
+    fn stop(&mut self, slot: u32) {
+        self.log.push(Dv::S(Sv::Stop(slot)));
+    }
+    fn fade(&mut self, slot: u32) {
+        self.log.push(Dv::S(Sv::Fade(slot)));
+    }
+    fn set_volume(&mut self, slot: u32, volume: i32, ms: Option<i32>) {
+        self.log.push(Dv::S(match ms {
+            Some(m) => Sv::VolMs(slot, volume, m),
+            None => Sv::Vol(slot, volume),
+        }));
+    }
+    fn is_done(&mut self, slot: u32) -> bool {
+        self.log.push(Dv::S(Sv::Done(slot)));
+        self.s.done
+    }
+    fn get_position(&mut self, slot: u32) -> (i32, i32, i32) {
+        self.log.push(Dv::S(Sv::GetPos(slot)));
+        (self.s.handle, self.s.getpos.0, self.s.getpos.1)
+    }
+    fn release(&mut self, slot: u32) {
+        self.log.push(Dv::S(Sv::Release(slot)));
+    }
+}
+
+impl PfDriver for Driver {
+    fn free_track(&mut self, slot: u32) {
+        self.log.push(Dv::Free(slot));
+    }
+    fn stop_driver(&mut self) {
+        self.log.push(Dv::StopDriver);
+    }
+    fn set_pitch(&mut self, slot: u32, pitch: u8) {
+        self.log.push(Dv::Pitch(slot, pitch));
+    }
+    fn fade_to(&mut self, slot: u32, volume: i32, ms: u64) {
+        self.log.push(Dv::FadeTo(slot, volume, ms));
+    }
+    fn track_overhead(&mut self) -> i32 {
+        self.log.push(Dv::Overhead);
+        self.overhead
+    }
+    fn init_driver(&mut self) {
+        self.log.push(Dv::Init);
+    }
+    fn open_song(&mut self, name: u32, a: u32, n: i32, b: u32, buffer: u32, size: i32) -> i32 {
+        self.log.push(Dv::Open(name, a, n, b, buffer, size));
+        self.slot
+    }
+}
+
+#[test]
+fn callbacks_and_controls_are_the_original() {
+    let Some(mut r) = Runner::from_env() else { return };
+    let Ok(dir) = std::env::var("TRICKY_MUSIC_DIR") else { return };
+    let mut songs: Vec<(String, Vec<u8>)> = std::fs::read_dir(&dir)
+        .unwrap()
+        .filter_map(|e| e.ok())
+        .filter(|e| e.path().extension().is_some_and(|x| x == "mpf"))
+        .map(|e| (e.file_name().to_string_lossy().into_owned(), std::fs::read(e.path()).unwrap()))
+        .collect();
+    songs.sort();
+    let w = Rc::new(RefCell::new(Driver::default()));
+    let fade_has_args: Rc<RefCell<bool>> = Rc::new(RefCell::new(false));
+    macro_rules! s {
+        ($addr:expr, |$c:ident, $m:ident, $x:ident| $body:expr) => {{
+            let w = w.clone();
+            r.stub($addr, move |$c, $m| {
+                let mut $x = w.borrow_mut();
+                $body
+            });
+        }};
+    }
+    s!(0x223158, |c, _m, x| {
+        x.log.push(Dv::S(Sv::Time));
+        let v = x.s.now;
+        c.set_gpr(2, v as u64)
+    });
+    s!(0x2235a0, |c, _m, x| {
+        let slot = c.gpr(4) as u32;
+        x.log.push(Dv::S(Sv::Pos(slot)));
+        let v = x.s.pos[slot as usize % x.s.pos.len()];
+        c.set_gpr(2, v as i64 as u64)
+    });
+    s!(0x223950, |c, _m, x| {
+        x.log.push(Dv::S(Sv::Play(c.gpr(4) as u32, c.gpr(5) as i64, c.gpr(6) as u32, c.gpr(7) as u32, c.gpr(8) as u8, c.gpr(9) as u8, c.gpr(10) as u8)));
+        let v = x.s.handle;
+        c.set_gpr(2, v as i64 as u64)
+    });
+    s!(0x223c40, |c, _m, x| x.log.push(Dv::S(Sv::Stop(c.gpr(4) as u32))));
+    let fa = fade_has_args.clone();
+    s!(0x223ac0, |c, _m, x| {
+        let ev = if *fa.borrow() { Dv::FadeTo(c.gpr(4) as u32, c.gpr(5) as i32, c.gpr(6)) } else { Dv::S(Sv::Fade(c.gpr(4) as u32)) };
+        x.log.push(ev)
+    });
+    s!(0x2234e0, |c, _m, x| {
+        x.log.push(Dv::S(Sv::Done(c.gpr(4) as u32)));
+        let v = x.s.done;
+        c.set_gpr(2, v as u64)
+    });
+    s!(0x223780, |c, m, x| {
+        x.log.push(Dv::S(Sv::GetPos(c.gpr(4) as u32)));
+        let (a, b) = x.s.getpos;
+        m.write_u32(c.gpr(5) as u32, a as u32);
+        m.write_u32(c.gpr(6) as u32, b as u32);
+        let h = x.s.handle;
+        c.set_gpr(2, h as i64 as u64)
+    });
+    s!(0x223a90, |c, _m, x| x.log.push(Dv::S(Sv::Release(c.gpr(4) as u32))));
+    // (FUN_00223b70 is also called with a third argument, 500, when the volumes ease in)
+    s!(0x223b70, |c, _m, x| {
+        let ev = if c.gpr(6) == 500 { Sv::VolMs(c.gpr(4) as u32, c.gpr(5) as i32, 500) } else { Sv::Vol(c.gpr(4) as u32, c.gpr(5) as i32) };
+        x.log.push(Dv::S(ev))
+    });
+    s!(0x223450, |c, _m, x| x.log.push(Dv::Free(c.gpr(4) as u32)));
+    s!(0x223710, |_c, _m, x| x.log.push(Dv::StopDriver));
+    s!(0x223b78, |c, _m, x| x.log.push(Dv::Pitch(c.gpr(4) as u32, c.gpr(5) as u8)));
+    s!(0x2231a8, |c, _m, x| {
+        x.log.push(Dv::Overhead);
+        let v = x.overhead;
+        c.set_gpr(2, v as i64 as u64)
+    });
+    s!(0x223648, |_c, _m, x| x.log.push(Dv::Init));
+    s!(0x2231d8, |c, m, x| {
+        let size = m.read_u32(c.gpr(29) as u32 + 0) as i32;
+        let _ = size;
+        x.log.push(Dv::Open(c.gpr(4) as u32, c.gpr(5) as u32, c.gpr(6) as i32, c.gpr(7) as u32, c.gpr(8) as u32, c.gpr(9) as i32));
+        let v = x.slot;
+        c.set_gpr(2, v as i64 as u64)
+    });
+    // the C library: strcpy, strlen, sprintf("%-8s")
+    r.stub(0x2fd14c, |c, m| {
+        let (d, s) = (c.gpr(4) as u32, c.gpr(5) as u32);
+        for k in 0.. {
+            let b = (m.read_u32((s + k) & !3) >> (8 * ((s + k) & 3))) as u8;
+            m.write_u8(d + k, b);
+            if b == 0 {
+                break;
+            }
+        }
+        c.set_gpr(2, d as u64);
+    });
+    r.stub(0x2fd260, |c, m| {
+        let s = c.gpr(4) as u32;
+        let mut n = 0;
+        while (m.read_u32((s + n) & !3) >> (8 * ((s + n) & 3))) as u8 != 0 {
+            n += 1;
+        }
+        c.set_gpr(2, n as u64);
+    });
+    r.stub(0x2fca28, |c, m| {
+        let (d, s) = (c.gpr(4) as u32, c.gpr(6) as u32);
+        let mut v = vec![];
+        for k in 0.. {
+            let b = (m.read_u32((s + k) & !3) >> (8 * ((s + k) & 3))) as u8;
+            if b == 0 {
+                break;
+            }
+            v.push(b);
+        }
+        while v.len() < 8 {
+            v.push(b' ');
+        }
+        for (k, b) in v.iter().enumerate() {
+            m.write_u8(d + k as u32, *b);
+        }
+        m.write_u8(d + v.len() as u32, 0);
+        c.set_gpr(2, v.len() as u64);
+    });
+    for a in [0x2beca0u32, 0x2bed58, 0x2bf038, 0x2bf108, 0x2bf290, 0x2bf320, 0x2bf490, 0x2befd8, 0x2bfa78, 0x2bfe28, 0x2c00d0, 0x2bfbb8, 0x2bf508, 0x2bee88, 0x2bef08, 0x2bedf0, 0x2c1cc0, 0x2c1b98, 0x2c1a38] {
+        r.allow(a);
+    }
+    for a in [0x2f5480u32, 0x2f54e8, 0x2f5ab8, 0x2f5be8, 0x2f5c88, 0x2f5ec8, 0x2f5f20, 0x2f5f88, 0x2f6230, 0x2f6398, 0x2f64b0, 0x2f6500, 0x2f65b8, 0x2f6650, 0x2f66f0, 0x2f6728] {
+        r.allow(a);
+    }
+    let graph_at = r.mem.alloc(0x40000);
+    let tracks_at = r.mem.alloc(TRACK_BLOCK * 24);
+    let spare = r.mem.alloc(0x400);
+    let author = r.mem.read_u32(AUTHOR);
+    let table_len = SONGS + 4 * SONG_SIZE - GLOBALS + 4;
+    let mut g = Rng(0xc0_47_801_7000_0001);
+    let mut ops = [0u32; 19];
+    let mut odd = 0;
+    for (name, data) in &songs {
+        r.mem.write(GLOBALS, &vec![0u8; (table_len - 4) as usize]).unwrap();
+        r.mem.write_u8(GLOBALS + 0xb, 0xff);
+        r.mem.write(graph_at, &vec![0u8; 0x40000]).unwrap();
+        r.mem.write(graph_at, data).unwrap();
+        r.cpu.set_gpr(4, graph_at as u64);
+        r.call(0x2c0b08).unwrap();
+        let slot = data[0xc] as u32;
+        let rec = SONGS + slot * SONG_SIZE;
+        let nodes = u16::from_le_bytes([data[0x12], data[0x13]]) as u32;
+        let (ntracks, rows) = (data[0xd] as u32, data[0xf] as u32);
+        for case in 0..1500 {
+            for k in 0..24u32 {
+                let t = tracks_at + TRACK_BLOCK * k;
+                let mut b: Vec<u8> = (0..TRACK_BLOCK).map(|_| g.next() as u8).collect();
+                b[0] = k as u8;
+                b[2] = if g.below(6) == 0 { 1 } else { 0 };
+                b[4] = [100u8, 50, 127, 0][g.below(4) as usize];
+                b[5] = g.below(4) as u8;
+                b[6] = [0u8, 1, 2, 3][g.below(4) as usize];
+                b[8] = 1 + g.below(8) as u8;
+                b[9] = g.below(b[8] as u32) as u8;
+                let lat = [0u16, 30, 49, 50, 200][g.below(5) as usize];
+                b[10..12].copy_from_slice(&lat.to_le_bytes());
+                let lp = if g.below(2) == 0 { 0xffff } else { g.below(nodes) as u16 };
+                b[0xc..0xe].copy_from_slice(&lp.to_le_bytes());
+                let ev = if g.below(2) == 0 { 0xffff } else { g.below(nodes) as u16 };
+                b[0xe..0x10].copy_from_slice(&ev.to_le_bytes());
+                let marker = if g.below(3) == 0 { 0 } else { graph_at + 0x24 };
+                b[0x10..0x14].copy_from_slice(&marker.to_le_bytes());
+                b[0x15] &= 0x3f;
+                let cur = if g.below(5) == 0 { 0xffff } else { g.below(nodes) as u16 };
+                b[0x16..0x18].copy_from_slice(&cur.to_le_bytes());
+                let tgt = g.below(nodes) as u16;
+                b[0x1a..0x1c].copy_from_slice(&tgt.to_le_bytes());
+                let at = [0i32, 0, 100, -5][g.below(4) as usize];
+                b[0x24..0x28].copy_from_slice(&at.to_le_bytes());
+                let at2 = [0i32, 0, 50, 900000][g.below(4) as usize];
+                b[0x28..0x2c].copy_from_slice(&at2.to_le_bytes());
+                b[0x2c..0x30].copy_from_slice(&g.below(6).to_le_bytes());
+                b[0x34..0x3c].copy_from_slice(b"track\0\0\0");
+                let ring = t + 0xd8;
+                b[0xd4..0xd8].copy_from_slice(&ring.to_le_bytes());
+                // ring handles that the stream can name
+                for q in 0..8usize {
+                    let h = g.below(6) as i32 - 1;
+                    b[0xd8 + 0xc * q + 8..0xd8 + 0xc * q + 12].copy_from_slice(&h.to_le_bytes());
+                }
+                r.mem.write(t, &b).unwrap();
+                let present = k < ntracks.max(1) || g.below(6) == 0;
+                r.mem.write_u32(rec + 0x174 + 4 * k, if present { t } else { 0 });
+            }
+            // the song record's event queue
+            for j in 0..16u32 {
+                let e = rec + 0x34 + 0x14 * j;
+                let ev: i32 = if g.below(4) == 0 { !(g.below(nodes) as i32) } else { g.below(rows.max(1)) as i32 };
+                r.mem.write_u16(e, ev as u16);
+                r.mem.write_u8(e + 2, g.below(4) as u8);
+                r.mem.write_u8(e + 3, (g.below(3) == 0) as u8);
+                r.mem.write_u32(e + 4, g.below(25));
+                r.mem.write_u32(e + 8, g.below(5000));
+                r.mem.write_u32(e + 0xc, g.below(5000));
+                let filled = j < g.below(17);
+                r.mem.write_u32(e + 0x10, if filled { if g.below(3) == 0 { u32::MAX } else { g.next() | 1 } } else { 0 });
+            }
+            r.mem.write_u32(rec, g.below(ntracks.max(1) + 1).wrapping_sub(1));
+            r.mem.write_u8(GLOBALS + 8, if g.below(12) == 0 { 0 } else { 1 });
+            r.mem.write_u8(GLOBALS + 9, if g.below(6) == 0 { 1 } else { 0 });
+            r.mem.write_u8(GLOBALS + 0xa, g.below(101) as u8);
+            r.mem.write_u8(GLOBALS + 0xb, if g.below(12) == 0 { slot as u8 } else { 0xff });
+            r.mem.write_u32(GLOBALS, 0);
+            r.mem.write_u32(GLOBALS + 4, 0);
+            {
+                let mut x = w.borrow_mut();
+                *x = Driver {
+                    s: Streams {
+                        now: g.below(100_000),
+                        pos: (0..6).map(|_| [0i32, -1, 500, 3000][g.below(4) as usize]).collect(),
+                        handle: if g.below(4) == 0 { -1 } else { g.below(5) as i32 },
+                        done: g.below(2) == 0,
+                        getpos: ([-1i32, 0, 400, 2000][g.below(4) as usize], [-1i32, 0, 300, 5000][g.below(4) as usize]),
+                        log: vec![],
+                    },
+                    overhead: g.below(0x400) as i32,
+                    slot: g.below(6) as i32 - 1,
+                    log: vec![],
+                };
+            }
+            let regions = |r: &mut Runner| Mem {
+                regions: vec![
+                    (GLOBALS, read(r, GLOBALS, table_len)),
+                    (graph_at, read(r, graph_at, 0x40000)),
+                    (tracks_at, read(r, tracks_at, TRACK_BLOCK * 24)),
+                    (spare, read(r, spare, 0x400)),
+                    (author & !3, read(r, author & !3, 8)),
+                    // (a track with no marker has the sync read its fields at address 0)
+                    (0, read(r, 0, 0x100)),
+                ],
+            };
+            let mut pf = Pf { mem: regions(&mut r), marker: None };
+            let mut ours = w.borrow().clone();
+            let op = g.below(19) as usize;
+            ops[op] += 1;
+            *fade_has_args.borrow_mut() = op == 16;
+            let what = format!("{name} case {case} op {op}");
+            let songmask = if g.below(4) == 0 { 0x0f00_0000 } else { 0x0100_0000 << if g.below(3) == 0 { g.below(4) } else { slot } };
+            let trackmask = if g.below(3) == 0 { 0xff_ffff } else { g.next() & 0xff_ffff };
+            let mask = if g.below(8) == 0 { u32::MAX } else { songmask | trackmask };
+            let id = (0x0100_0000 << if g.below(4) == 0 { g.below(4) } else { slot }) | (1 << g.below(24));
+            let out = spare;
+            macro_rules! go {
+                ($f:expr, [$($a:expr),*], $ours:expr) => {{
+                    // (the game's callers pass ints: sign-extended in the registers)
+                    let args: &[u64] = &[$($a as i32 as i64 as u64),*];
+                    for (k, a) in args.iter().enumerate() {
+                        r.cpu.set_gpr(4 + k, *a);
+                    }
+                    let res = r.call($f).map(|_| r.cpu.gpr(2));
+                    let o = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| $ours));
+                    (res, o)
+                }};
+            }
+            let (theirs, oursr): (Result<u64, r5900::Error>, std::thread::Result<i64>) = match op {
+                0 => go!(0x2c0488, [], {
+                    pf.update(&mut ours);
+                    0
+                }),
+                1 => go!(0x2c0898, [], {
+                    pf.beat(&mut ours);
+                    0
+                }),
+                2 => {
+                    let (a, b) = (g.below(200), g.below(50));
+                    go!(0x2c1068, [mask, a, b], {
+                        pf.set_lookahead(mask, a, b);
+                        0
+                    })
+                }
+                3 => {
+                    let lat = g.below(300) as u16;
+                    go!(0x2c1130, [id, lat], pf.set_latency(id, lat) as i64)
+                }
+                4 => go!(0x2c1168, [id], pf.slot_of(id) as i64),
+                5 => go!(0x2c1190, [id, out], pf.playing(&mut ours, id, out) as i64),
+                6 => {
+                    let v = g.below(200) as u64;
+                    go!(0x2c1288, [mask, v], pf.set_variable(mask, v) as i64)
+                }
+                7 => go!(0x2c1380, [mask], {
+                    pf.clear_events(mask);
+                    0
+                }),
+                8 => go!(0x2c1430, [mask], pf.queued_events(mask) as i64),
+                9 => {
+                    let o = if g.below(2) == 0 { 0 } else { out };
+                    go!(0x2c1500, [mask, o], pf.current_event(mask, if o == 0 { None } else { Some(o) }) as i64)
+                }
+                10 => {
+                    let ev = ((if g.below(4) == 0 { g.below(4) } else { slot }) << 8 | g.below(rows.max(1) + 1)) as i16;
+                    let prio = [-1i8, 0, 1, 2, 3][g.below(5) as usize];
+                    go!(0x2c15c8, [trackmask, ev as i64, prio as i64], pf.post_event(&mut ours, trackmask, ev, prio) as i64)
+                }
+                11 => {
+                    let node = if g.below(6) == 0 { -1i64 } else { g.below(nodes + 2) as i64 };
+                    let only = songmask | (1 << g.below(ntracks.max(1)));
+                    let imm = g.below(2) as u8;
+                    go!(0x2c1890, [only, node, imm], pf.jump_to(only, node, imm) as i64)
+                }
+                12 => go!(0x2c1a38, [mask], pf.stop_tracks(&mut ours, mask) as i32 as i64),
+                13 => {
+                    let p = g.below(3) as u8;
+                    go!(0x2c1b98, [mask, p], {
+                        pf.set_pitch(&mut ours, mask, p);
+                        0
+                    })
+                }
+                14 => go!(0x2c1cc0, [mask], {
+                    pf.stop_song(&mut ours, mask);
+                    0
+                }),
+                15 => {
+                    let v = [-5i8, 0, 50, 100, 120][g.below(5) as usize];
+                    go!(0x2c1db8, [mask, v as i64], {
+                        pf.set_volume(&mut ours, mask, v);
+                        0
+                    })
+                }
+                16 => {
+                    let (v, ms) = (g.below(128) as i32, g.below(2000) as u64);
+                    go!(0x2c1f10, [mask, v, ms], {
+                        pf.fade_to(&mut ours, mask, v, ms);
+                        0
+                    })
+                }
+                18 => go!(0x2bedb8, [], {
+                    pf.shut_down(&mut ours);
+                    0
+                }),
+                _ => {
+                    // a song's track loaded into a spare record (in the last track's block)
+                    let track = g.below(24);
+                    if g.below(2) == 0 {
+                        r.mem.write_u32(rec + 0x174 + 4 * track, 0);
+                        pf.mem.w32(rec + 0x174 + 4 * track, 0);
+                    }
+                    let nm: &[u8] = [&b"data\\audio\\smart.bomb.mus\0"[..], b"x.mus\0", b"a:b/c\\longername.mus\0", b"plain\0"][g.below(4) as usize];
+                    let name_at = spare + 0x300;
+                    r.mem.write(name_at, nm).unwrap();
+                    for (k, b) in nm.iter().enumerate() {
+                        pf.mem.w8(name_at + k as u32, *b);
+                    }
+                    let recp = spare;
+                    let (lat, a, n, b, size) = (g.below(300), g.next(), 1 + g.below(8) as i32, g.next(), 0x300 + g.below(0x400) as i32);
+                    r.mem.write_u32(0x01ff_0000, size as u32);
+                    let song = if g.below(4) == 0 { g.below(5) } else { slot };
+                    go!(0x2c0cb0, [song, track, name_at, lat, a, n, b, recp], pf.load_song(&mut ours, song, track, name_at, nm, lat as u16, a, n, b, recp, size) as i64)
+                }
+            };
+            match (theirs, oursr) {
+                (Ok(a), Ok(b)) => {
+                    let a = match op {
+                        3 | 4 | 5 | 6 | 8 | 10 | 11 | 12 | 17 => a as i32 as i64,
+                        9 => a as u16 as i64,
+                        _ => 0,
+                    };
+                    assert_eq!(a, b, "{what}: result");
+                }
+                (Err(_), Err(_)) => {
+                    odd += 1;
+                    continue;
+                }
+                (Err(r5900::Error::TooLong { .. }), Ok(_)) => {
+                    odd += 1;
+                    continue;
+                }
+                (a, b) => panic!("{what}: game {a:?}, ours {}", if b.is_ok() { "ok" } else { "panicked" }),
+            }
+            assert_eq!(w.borrow().log, ours.log, "{what}: driver calls");
+            let after = regions(&mut r);
+            if after != pf.mem {
+                let mut d = vec![];
+                for ((b, x), (_, y)) in after.regions.iter().zip(&pf.mem.regions) {
+                    for (k, (p, q)) in x.iter().zip(y).enumerate() {
+                        if p != q && d.len() < 12 {
+                            d.push(format!("{:#x}: game {p:#x} ours {q:#x}", b + k as u32));
+                        }
+                    }
+                }
+                panic!("{what}: memory\n{}", d.join("\n"));
+            }
+        }
+    }
+    eprintln!("ops {ops:?}, {odd} traps / hangs on both sides");
 }

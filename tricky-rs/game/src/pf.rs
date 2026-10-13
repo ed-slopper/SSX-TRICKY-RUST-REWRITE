@@ -318,9 +318,10 @@ pub trait PfEnv {
     fn fade(&mut self, slot: u32);
     /// `FUN_00223b70`(slot, volume, ms): the volume (empty in this build: it returns 0)
     fn set_volume(&mut self, slot: u32, volume: i32, ms: Option<i32>);
-    /// `StreamSlot_IsDone` 0x2234e0, `StreamSlot_GetPosition` 0x223780 (played, total), `FUN_00223a90`(slot, 0)
+    /// `StreamSlot_IsDone` 0x2234e0, `StreamSlot_GetPosition` 0x223780 (its answer: the handle playing; played,
+    /// total), `FUN_00223a90`(slot, 0)
     fn is_done(&mut self, slot: u32) -> bool;
-    fn get_position(&mut self, slot: u32) -> (i32, i32);
+    fn get_position(&mut self, slot: u32) -> (i32, i32, i32);
     fn release(&mut self, slot: u32);
 }
 
@@ -566,7 +567,7 @@ impl Pf<'_> {
         let bc = self.seg_word(n, 1);
         let (n4, n5) = (self.mem.r8(n + 4) as i32, self.mem.r8(n + 5) as i32);
         let v8 = if n5 != 0 { bc / (n5 * n4) } else { bc };
-        let (mut b0, mut ac) = env.get_position(self.mem.r32(lead + 0x2c));
+        let (_, mut b0, mut ac) = env.get_position(self.mem.r32(lead + 0x2c));
         if b0 < 0 || ac < 0 {
             return 0;
         }
@@ -746,5 +747,665 @@ impl Pf<'_> {
             self.restore(t, &save);
         }
         0xffff
+    }
+}
+
+/// The stream driver's calls the controls make
+pub trait PfDriver: PfEnv {
+    /// `PathX_FreeTrack` 0x223450, `PathX_StopDriver` 0x223710
+    fn free_track(&mut self, slot: u32);
+    fn stop_driver(&mut self);
+    /// `StreamSlot_SetPitch` 0x223b78(slot, pitch)
+    fn set_pitch(&mut self, slot: u32, pitch: u8);
+    /// `StreamSlot_Fade` 0x223ac0(slot, volume, ms)
+    fn fade_to(&mut self, slot: u32, volume: i32, ms: u64);
+    /// `FUN_002231a8`: the driver's own bytes a track needs
+    fn track_overhead(&mut self) -> i32;
+    /// `PathX_Init` 0x223648(the update callbacks 0x2c0488 / 0x2c0898, the stop 0x2bedb8)
+    fn init_driver(&mut self);
+    /// `PathX_OpenSong` 0x2231d8(name, a, ring size, b, buffer, its size): the stream slot (below 0 failed)
+    fn open_song(&mut self, name: u32, a: u32, n: i32, b: u32, buffer: u32, size: i32) -> i32;
+}
+
+impl Pf<'_> {
+    fn started(&self) -> bool {
+        self.mem.r8(GLOBALS + 8) != 0
+    }
+    fn unselect(&mut self) {
+        self.mem.w32(GLOBALS, 0);
+        self.mem.w8(GLOBALS + 0xb, 0xff);
+    }
+    fn busy(&self) -> bool {
+        !self.started() || 0 <= self.song_index()
+    }
+    /// The songs a mask names (bits 24..27) that are loaded, each selected in turn
+    fn songs_in(&mut self, mask: u32, mut f: impl FnMut(&mut Self)) {
+        for i in 0..4u32 {
+            if mask & (0x0100_0000 << i) != 0 && 0 <= self.select(i as u64) {
+                f(self);
+            }
+        }
+    }
+
+    /// `FUN_002c0488` (the driver's update): for each song, the lead track (the longest latency among those at a
+    /// node with a marker); then each unpaused track: a pending event not yet taken by it, due within the look-ahead
+    /// (+8), takes it (`next_segment`); a playing track whose stream is done: (taking an event) the song's earliest
+    /// start (+0x3c, +0x38 the track that set it) from its position; when its time is near (the look-ahead, or +0xc
+    /// for a beat-counted track) or its position past its latency, the next segment (`advance`, or the event's);
+    /// a track waiting to start (+0x28) is released at its time. All tracks done with the event (+0x44 all set) and
+    /// past its latest start: the volumes eased in and the event queue moves up one
+    pub fn update(&mut self, env: &mut dyn PfEnv) {
+        if !self.started() || self.mem.r8(GLOBALS + 9) != 0 || 0 <= self.song_index() {
+            return;
+        }
+        let mut now = 0u32;
+        for i in 0..4u64 {
+            if self.select(i) < 0 {
+                continue;
+            }
+            let c = self.cur();
+            self.lead_track();
+            for k in 0..24u32 {
+                let t = self.track(k);
+                if t == 0 || self.mem.r8(t + 2) != 0 {
+                    continue;
+                }
+                now = env.time_ms();
+                let lat = self.mem.r16(t + 10) as u32;
+                let due = now.wrapping_add(lat) as i32;
+                let mut go = 0 <= self.mem.s16(t + 0x16) && self.mem.r32(t + 0x10) != 0;
+                let mask = self.mem.r32(c + 0x44);
+                let taking = mask != 0 && (mask as i32 >> k) & 1 == 0;
+                if taking && (self.mem.r8(c + 0x37) != 0 || self.mem.r32(c + 0x3c) != 0) {
+                    let at = self.mem.r32(c + 0x3c);
+                    let d = if at == 0 { 0 } else { at.wrapping_sub(due as u32) as i32 };
+                    if d <= self.i32_at(c + 8) {
+                        go = true;
+                        if (self.next_segment(env, k as i32) as i16) < 0 {
+                            continue;
+                        }
+                    }
+                }
+                if !go {
+                    continue;
+                }
+                if self.i32_at(t + 0x28) == 0 {
+                    if !env.is_done(self.mem.r32(t + 0x2c)) {
+                        continue;
+                    }
+                    let pos = env.position_ms(self.mem.r32(t + 0x2c));
+                    if taking && self.mem.r8(c + 0x37) == 0 {
+                        let mut p = pos;
+                        if self.i32_at(t + 0x20) != 0 && self.mem.r8(t + 6) != 0 {
+                            let n = self.node(self.mem.s16(t + 0x16) as i32);
+                            p = (self.mem.r8(n + 5) as i32 + 1 - self.c8(t + 6)) * self.i32_at(t + 0x20) + pos;
+                        }
+                        let v = now.wrapping_add(p as u32);
+                        let earliest = self.mem.r32(c + 0x3c);
+                        let set = self.mem.r32(c + 0x38) == k
+                            || v < earliest
+                            || (earliest == 0 && self.mem.r32(c) == k);
+                        if set {
+                            self.mem.w32(c + 0x3c, v);
+                            self.mem.w32(c + 0x38, k);
+                        }
+                    }
+                    let at = self.i32_at(t + 0x24);
+                    let wait = if at < 1 {
+                        (lat as i32) < pos
+                    } else {
+                        let ahead = if lat < 0x32 { self.mem.r32(c + 0xc) } else { self.mem.r32(c + 8) };
+                        due.wrapping_add(ahead as i32) < at
+                    };
+                    if !wait
+                        && (!taking
+                            || (self.mem.r8(t + 6) != 0 && self.i32_at(t + 0x20) != 0)
+                            || (self.next_segment(env, k as i32) as i16) < 0)
+                    {
+                        self.advance(env, k);
+                    }
+                } else if self.i32_at(t + 0x28) <= now as i32 {
+                    env.release(self.mem.r32(t + 0x2c));
+                    self.mem.w32(t + 0x28, 0);
+                }
+            }
+            let c = self.cur();
+            if self.mem.r32(c + 0x44) == u32::MAX && self.mem.r32(c + 0x40) < now {
+                self.fade_tracks(env, 0xff_ffff);
+                for j in 0..15u32 {
+                    for w in 0..5u32 {
+                        let v = self.mem.r32(c + 0x34 + 0x14 * (j + 1) + 4 * w);
+                        self.mem.w32(c + 0x34 + 0x14 * j + 4 * w, v);
+                    }
+                }
+                self.mem.w32(c + 0x170, 0);
+            }
+        }
+        self.unselect();
+    }
+
+    /// Both callbacks first find the lead track: the longest latency (+10) among the unpaused tracks at a node
+    /// with a marker (+0: its number, +4: the latency)
+    fn lead_track(&mut self) {
+        let c = self.cur();
+        self.mem.w32(c + 4, 0);
+        self.mem.w32(c, u32::MAX);
+        for k in 0..24u32 {
+            let t = self.track(k);
+            if t != 0 && self.mem.r8(t + 2) == 0 && 0 <= self.mem.s16(t + 0x16) && self.mem.r32(t + 0x10) != 0 {
+                let lat = self.mem.r16(t + 10) as i32;
+                if self.i32_at(c + 4) < lat {
+                    self.mem.w32(c + 4, lat as u32);
+                    self.mem.w32(c, k);
+                }
+            }
+        }
+    }
+
+    /// `FUN_002c0898` (the driver's beat callback): the lead track; each unpaused beat-counted track (latency under
+    /// 50) not about to take a pending event advances once its start time (+0x24) has passed (or, with none, its
+    /// position its latency)
+    pub fn beat(&mut self, env: &mut dyn PfEnv) {
+        if !self.started() || self.mem.r8(GLOBALS + 9) != 0 || 0 <= self.song_index() {
+            return;
+        }
+        for i in 0..4u64 {
+            if self.select(i) < 0 {
+                continue;
+            }
+            let c = self.cur();
+            self.lead_track();
+            for k in 0..24u32 {
+                let t = self.mem.r32(self.cur() + 0x174 + 4 * k);
+                if t == 0 || self.mem.r8(t + 2) != 0 || 0x32 <= self.mem.r16(t + 10) {
+                    continue;
+                }
+                let now = env.time_ms();
+                let lat = self.mem.r16(t + 10) as u32;
+                let due = now.wrapping_add(lat) as i32;
+                let playing = 0 <= self.mem.s16(t + 0x16) && self.mem.r32(t + 0x10) != 0;
+                let mask = self.mem.r32(self.cur() + 0x44);
+                let taking = mask != 0 && (mask >> k) & 1 == 0;
+                if taking && (self.mem.r8(c + 0x37) != 0 || self.mem.r32(c + 0x3c) != 0) {
+                    let at = self.i32_at(c + 0x3c);
+                    let d = if at == 0 { 0 } else { at.wrapping_sub(due) };
+                    if d <= self.i32_at(self.cur() + 8) {
+                        continue;
+                    }
+                }
+                if playing {
+                    let pos = env.position_ms(self.mem.r32(t + 0x2c)) as i64;
+                    let mut wait = due < self.i32_at(t + 0x24);
+                    if self.i32_at(t + 0x24) < 1 {
+                        wait = (lat as i64) < pos;
+                    }
+                    if !wait {
+                        self.advance(env, k);
+                    }
+                }
+            }
+        }
+        self.unselect();
+    }
+
+    /// `FUN_002c1018`(ring size): the bytes a track record needs (the driver's, 0xd8, the ring), to 16 past
+    pub fn track_bytes(env: &mut dyn PfDriver, n: i32) -> i32 {
+        let v = env.track_overhead() + 0xd8 + n * 0xc;
+        (v / 16) * 16 + 0x10
+    }
+
+    /// `FUN_002bedb8` (the driver's stop callback): every track freed (`PathX_StopTracks`(−1)), none selected, not
+    /// started
+    pub fn shut_down(&mut self, env: &mut dyn PfDriver) {
+        self.stop_tracks(env, u32::MAX);
+        self.mem.w8(GLOBALS + 0xb, 0xff);
+        self.mem.w8(GLOBALS + 8, 0);
+    }
+
+    /// `FUN_002c1068`(songs, look-ahead, beat look-ahead): +8 and +0xc of each
+    pub fn set_lookahead(&mut self, mask: u32, a: u32, b: u32) {
+        if !self.started() || 0 <= self.song_index() {
+            return;
+        }
+        self.songs_in(mask, |p| {
+            let c = p.cur();
+            p.mem.w32(c + 0xc, b);
+            p.mem.w32(c + 8, a);
+        });
+        self.unselect();
+    }
+
+    /// `FUN_002bedf0`(id: one song bit in 24..27, one track bit below): that track's record, or 0
+    pub fn track_of(&self, id: u32) -> u32 {
+        for i in 0..4u32 {
+            if 0x0100_0000 << i == id & 0x0f00_0000 && self.mem.r32(SONGS + i * SONG_SIZE + 0x14) != 0 {
+                for k in 0..24u32 {
+                    if 1 << k == id & 0xff_ffff {
+                        return self.mem.r32(SONGS + i * SONG_SIZE + 0x174 + 4 * k);
+                    }
+                }
+            }
+        }
+        0
+    }
+
+    /// `FUN_002c1130`(id, latency): the track's latency (+10); −8 for no track
+    pub fn set_latency(&mut self, id: u32, lat: u16) -> i32 {
+        let t = self.track_of(id);
+        if t == 0 {
+            return -8;
+        }
+        self.mem.w16(t + 10, lat);
+        0
+    }
+
+    /// `FUN_002c1168`(id) (`PathX_GetSongState`): the track's stream slot (+0x2c); −8 for no track
+    pub fn slot_of(&self, id: u32) -> i32 {
+        let t = self.track_of(id);
+        if t == 0 {
+            return -8;
+        }
+        self.i32_at(t + 0x2c)
+    }
+
+    /// `FUN_002c1190`(id, out: five words): what the track is playing: the node and beat of the stream's handle in
+    /// its ring (−1 when not found, the ring's entry dropped when the stream reports none), the position (played +
+    /// total, total), the current node; the stream's answer (−8 for no track)
+    pub fn playing(&mut self, env: &mut dyn PfEnv, id: u32, out: u32) -> i32 {
+        self.mem.w32(out + 4, 0);
+        self.mem.w32(out + 8, 0);
+        self.mem.w32(out, u32::MAX);
+        let t = self.track_of(id);
+        if t == 0 {
+            return -8;
+        }
+        let (h, played, total) = env.get_position(self.mem.r32(t + 0x2c));
+        if h < 0 {
+            return h;
+        }
+        self.mem.w32(out + 8, total as u32);
+        self.mem.w32(out + 4, played.wrapping_add(total) as u32);
+        let node = self.mem.s16(t + 0x16) as i32;
+        self.mem.w32(out + 0x10, node as u32);
+        let mut q = 0u32;
+        while q < self.mem.r8(t + 8) as u32 {
+            let e = self.mem.r32(t + 0xd4) + 0xc * q;
+            if self.i32_at(e + 8) == h {
+                if 0 <= total {
+                    let (a, b) = (self.mem.r32(e), self.mem.r32(e + 4));
+                    self.mem.w32(out, a);
+                    self.mem.w32(out + 0xc, b);
+                    return h;
+                }
+                self.mem.w32(e + 8, u32::MAX);
+            }
+            q += 1;
+        }
+        h
+    }
+
+    /// `FUN_002c1288`(songs, variable): every track's path variable (+1), for a variable under 128; −0x12 when busy
+    pub fn set_variable(&mut self, mask: u32, var: u64) -> i32 {
+        if self.busy() {
+            return -0x12;
+        }
+        if var < 0x80 {
+            self.songs_in(mask, |p| {
+                for k in 0..24u32 {
+                    let t = p.track(k);
+                    if t != 0 {
+                        p.mem.w8(t + 1, var as u8);
+                    }
+                }
+            });
+        }
+        self.unselect();
+        0
+    }
+
+    /// `FUN_002c1380`(songs): the event queue's sixteen masks cleared
+    pub fn clear_events(&mut self, mask: u32) {
+        self.songs_in(mask, |p| {
+            let c = p.cur();
+            for j in 0..16u32 {
+                p.mem.w32(c + 0x44 + 0x14 * j, 0);
+            }
+        });
+        self.unselect();
+    }
+
+    /// `FUN_002c1430`(songs): the events queued in the first loaded song named
+    pub fn queued_events(&mut self, mask: u32) -> i32 {
+        for i in 0..4u32 {
+            if mask & (0x0100_0000 << i) != 0 && 0 <= self.select(i as u64) {
+                let c = self.cur();
+                let n = (0..16u32).filter(|j| self.mem.r32(c + 0x44 + 0x14 * j) != 0).count() as i32;
+                self.unselect();
+                return n;
+            }
+        }
+        self.unselect();
+        0
+    }
+
+    /// `FUN_002c1500`(songs, out): the first named song with an event under way: its event (and its earliest start
+    /// into `out` when given); 0xffff none
+    pub fn current_event(&mut self, mask: u32, out: Option<u32>) -> u16 {
+        for i in 0..4u32 {
+            if mask & (0x0100_0000 << i) != 0 && 0 <= self.select(i as u64) && self.mem.r32(self.cur() + 0x44) != 0 {
+                let c = self.cur();
+                if let Some(o) = out {
+                    let v = self.mem.r32(c + 0x3c);
+                    self.mem.w32(o, v);
+                }
+                let e = self.mem.r16(c + 0x34);
+                self.unselect();
+                return e;
+            }
+        }
+        self.unselect();
+        0xffff
+    }
+
+    /// `FUN_002c15c8`(tracks, event (song in bits 8..11), priority): an event for the named tracks of a song, queued
+    /// by priority (behind those of the same or higher); its mask the tracks not named (−1 less each), immediate when
+    /// any of their entries is a stop (0x80 in its second byte); priority below 0 releases those waiting on it
+    /// instead; priority 2 is immediate at priority 1 and, at the head, stops the song and unpauses
+    pub fn post_event(&mut self, env: &mut dyn PfDriver, tracks: u32, event: i16, prio: i8) -> i32 {
+        if self.busy() {
+            return -0x12;
+        }
+        let ev = event as i32 as u32 & 0xff;
+        let song = ((event as i32 as u32) & 0xf00) >> 8;
+        if 0 <= self.select(song as u64) && ev < self.mem.r8(self.graph() + 0xf) as u32 {
+            let c = self.cur();
+            let g = self.graph();
+            let (rows, cols) = (self.mem.r8(g + 0xf) as u32, self.mem.r8(g + 0xe) as u32);
+            let mut mask = u32::MAX;
+            let mut imm = 0u8;
+            for k in 0..24u32 {
+                if self.track(k) != 0 && (tracks as i32 >> k) & 1 != 0 {
+                    let cell = self.mem.r8(self.mem.r32(c + 0x20) + (k * rows + ev) * cols) as u32;
+                    let entry = self.mem.r32(cell * 4 + self.mem.r32(c + 0x24));
+                    mask = mask.wrapping_sub(1 << k);
+                    if (entry >> 8) as u8 & 0x80 != 0 {
+                        imm = 1;
+                    }
+                }
+            }
+            if prio < 0 {
+                self.release_waiting(env, ev as i16);
+            } else {
+                let mut j = 0u32;
+                while j < 16 && self.mem.r32(c + 0x44 + 0x14 * j) != 0 && prio as i32 <= self.c8(c + 0x36 + 0x14 * j) {
+                    j += 1;
+                }
+                if j < 16 {
+                    let mut i = 15u32;
+                    while j < i {
+                        i -= 1;
+                        for w in 0..5u32 {
+                            let v = self.mem.r32(c + 0x34 + 0x14 * i + 4 * w);
+                            self.mem.w32(c + 0x34 + 0x14 * (i + 1) + 4 * w, v);
+                        }
+                    }
+                    let e = c + 0x34 + 0x14 * j;
+                    self.mem.w16(e, ev as u16);
+                    self.mem.w8(e + 2, prio as u8);
+                    self.mem.w8(e + 3, imm);
+                    self.mem.w32(e + 4, 0);
+                    self.mem.w32(e + 8, 0);
+                    self.mem.w32(e + 0xc, 0);
+                    self.mem.w32(e + 0x10, mask);
+                    if prio == 2 {
+                        self.mem.w8(e + 3, 1);
+                        self.mem.w8(e + 2, 1);
+                        if j == 0 {
+                            self.unselect();
+                            self.stop_song(env, u32::MAX);
+                            self.set_pitch(env, u32::MAX, 0);
+                        }
+                    }
+                }
+            }
+        }
+        self.unselect();
+        0
+    }
+
+    /// `FUN_002c1890`(songs and tracks, node, immediate): a jump of the named track to a node at the head of the
+    /// queue (−1 − node; the other tracks' bits set; +0x58 cleared), when the node is the track's
+    pub fn jump_to(&mut self, mask: u32, node: i64, imm: u8) -> i32 {
+        if self.busy() {
+            return -0x12;
+        }
+        'songs: for i in 0..4u32 {
+            if mask & (0x0100_0000 << i) == 0 || self.select(i as u64) < 0 {
+                continue;
+            }
+            if node < 0 || (self.mem.r16(self.graph() + 0x12) as i64) < node {
+                break;
+            }
+            for k in 0..24u32 {
+                let bit = 1u32 << k;
+                if mask & bit != 0 {
+                    let n = self.node(node as i32);
+                    if n == 0 {
+                        break 'songs;
+                    }
+                    let b = 1u32 << (self.mem.r8(n + 2) & 31);
+                    if b != bit {
+                        break 'songs;
+                    }
+                    let c = self.cur();
+                    self.mem.w16(c + 0x34, (-1 - node) as u16);
+                    self.mem.w8(c + 0x36, 1);
+                    self.mem.w8(c + 0x37, imm);
+                    self.mem.w32(c + 0x38, b);
+                    self.mem.w32(c + 0x3c, 0);
+                    self.mem.w32(c + 0x40, 0);
+                    self.mem.w32(c + 0x44, !b);
+                    self.mem.w32(c + 0x58, 0);
+                }
+            }
+        }
+        self.unselect();
+        0
+    }
+
+    /// `PathX_StopTracks` 0x2c1a38(songs and tracks): the first named track found is freed (a song left with none
+    /// loses its graph); the driver stopped once no song has tracks; the last track word read
+    pub fn stop_tracks(&mut self, env: &mut dyn PfDriver, mask: u32) -> u32 {
+        if self.busy() {
+            return 0;
+        }
+        let mut last = 0u32;
+        'songs: for i in 0..4u32 {
+            if mask & (0x0100_0000 << i) == 0 || self.select(i as u64) < 0 {
+                continue;
+            }
+            for k in 0..24u32 {
+                let at = self.cur() + 0x174 + 4 * k;
+                last = self.mem.r32(at);
+                if last != 0 && (mask as i32 >> k) & 1 != 0 {
+                    let slot = self.mem.r32(last + 0x2c);
+                    self.mem.w32(at, 0);
+                    env.free_track(slot);
+                    if self.count_active_tracks(0x0100_0000 << i) == 0 {
+                        let c = self.cur();
+                        self.mem.w32(c + 0x14, 0);
+                    }
+                    break 'songs;
+                }
+            }
+        }
+        if self.started() && self.count_active_tracks(0x0f00_0000) == 0 {
+            env.stop_driver();
+        }
+        self.unselect();
+        last
+    }
+
+    /// `FUN_002c1b98`(songs and tracks, pitch): each named track's pitch (+2: 0 runs, else paused); all songs' also
+    /// the pause flag (0x3495d1)
+    pub fn set_pitch(&mut self, env: &mut dyn PfDriver, mask: u32, pitch: u8) {
+        if !self.started() || 0 <= self.song_index() {
+            return;
+        }
+        if mask == u32::MAX {
+            self.mem.w8(GLOBALS + 9, pitch);
+        }
+        self.songs_in(mask, |p| {
+            for k in 0..24u32 {
+                let t = p.track(k);
+                if t != 0 && (mask as i32 >> k) & 1 != 0 {
+                    env.set_pitch(p.mem.r32(t + 0x2c), pitch);
+                    p.mem.w8(t + 2, pitch);
+                }
+            }
+        });
+        self.unselect();
+    }
+
+    /// `PathX_StopSong` 0x2c1cc0(songs): every track's stream stopped and its node cleared
+    pub fn stop_song(&mut self, env: &mut dyn PfDriver, mask: u32) {
+        if !self.started() || 0 <= self.song_index() {
+            return;
+        }
+        self.songs_in(mask, |p| {
+            for k in 0..24u32 {
+                let t = p.track(k);
+                if t != 0 {
+                    env.stop(p.mem.r32(t + 0x2c));
+                    p.mem.w16(t + 0x16, 0xffff);
+                }
+            }
+        });
+        self.unselect();
+    }
+
+    /// `PathX_SetVolume` 0x2c1db8(songs and tracks, volume 0..100): each named track's (+4) and its stream's; all
+    /// songs' also the default (0x3495d2)
+    pub fn set_volume(&mut self, env: &mut dyn PfDriver, mask: u32, volume: i8) {
+        if !self.started() || 0 <= self.song_index() {
+            return;
+        }
+        let v = (volume as i32).clamp(0, 100);
+        if mask == u32::MAX {
+            self.mem.w8(GLOBALS + 0xa, v as u8);
+        }
+        self.songs_in(mask, |p| {
+            for k in 0..24u32 {
+                let t = p.track(k);
+                if t != 0 && (mask as i32 >> k) & 1 != 0 {
+                    p.mem.w8(t + 4, v as u8);
+                    env.set_volume(p.mem.r32(t + 0x2c), p.c8(t + 0x14) * v / 100, None);
+                }
+            }
+        });
+        self.unselect();
+    }
+
+    /// `PathX_FadeTracks` 0x2c1f10(songs and tracks, volume, ms): each named track's stream faded to the volume times
+    /// its own
+    pub fn fade_to(&mut self, env: &mut dyn PfDriver, mask: u32, volume: i32, ms: u64) {
+        if !self.started() || 0 <= self.song_index() {
+            return;
+        }
+        self.songs_in(mask, |p| {
+            for k in 0..24u32 {
+                let t = p.track(k);
+                if t != 0 && (mask as i32 >> k) & 1 != 0 {
+                    env.fade_to(p.mem.r32(t + 0x2c), volume * p.c8(t + 4) / 100, ms);
+                }
+            }
+        });
+        self.unselect();
+    }
+
+    /// `PathX_LoadSong` 0x2c0cb0(song, track, the file's name at `name`, latency, a, ring size, b, the track record,
+    /// its bytes): the track record set up (its number, the song's +0x10, the default volume, the latency, the ring,
+    /// cleared state, the name and its base name as "%-8s" with every '.' cut), the driver started with the first
+    /// track, the stream opened in the rest of the record's bytes (16-aligned after the ring); the id (song bit
+    /// 24 + n, track bit), −0xd for a track in use, −0x12 when busy, or the driver's error
+    #[allow(clippy::too_many_arguments)]
+    pub fn load_song(&mut self, env: &mut dyn PfDriver, song: u32, track: u32, name_at: u32, name: &[u8], lat: u16, a: u32, n: i32, b: u32, rec: u32, size: i32) -> i32 {
+        if !self.started() || 0 <= self.song_index() {
+            return -0x12;
+        }
+        let mut out = -1;
+        if 0 <= self.select(song as u64) {
+            out = -0xd;
+            let c = self.cur();
+            if self.mem.r32(c + 0x174 + 4 * track) == 0 {
+                let ring = rec + 0xd8;
+                self.mem.w32(rec + 0xd4, ring);
+                for q in 0..n.max(0) as u32 {
+                    self.mem.w32(ring + 0xc * q + 8, u32::MAX);
+                    self.mem.w32(ring + 0xc * q, 0);
+                    self.mem.w32(ring + 0xc * q + 4, 0);
+                }
+                self.mem.w8(rec, track as u8);
+                self.mem.w8(rec + 2, 0);
+                let x10 = self.mem.r8(c + 0x10);
+                self.mem.w8(rec + 1, x10);
+                self.mem.w16(rec + 10, lat);
+                let dv = self.mem.r8(GLOBALS + 0xa);
+                self.mem.w8(rec + 4, dv);
+                self.mem.w32(rec + 0x10, 0);
+                self.mem.w8(rec + 8, n as u8);
+                self.mem.w32(rec + 0x14, 0xffff_00ff);
+                self.mem.w8(rec + 0x14, 0x7f);
+                self.mem.w32(rec + 0x18, 0xffff_00ff);
+                self.mem.w32(rec + 0x1c, 0xffff_00ff);
+                self.mem.w8(rec + 6, 0);
+                self.mem.w8(rec + 7, 0);
+                self.mem.w8(rec + 5, 0);
+                self.mem.w32(rec + 0x24, 0);
+                self.mem.w32(rec + 0x20, 0);
+                self.mem.w32(rec + 0x28, 0);
+                self.mem.w32(rec + 0x30, 0);
+                self.mem.w8(rec + 9, 0);
+                self.mem.w16(rec + 0xc, 0xffff);
+                self.mem.w16(rec + 0xe, 0xffff);
+                // the name (strcpy) and its base name ("%-8s", then every '.' cut)
+                let len = name.iter().position(|b| *b == 0).unwrap_or(name.len());
+                for (q, ch) in name[..len].iter().enumerate() {
+                    self.mem.w8(rec + 0x34 + q as u32, *ch);
+                }
+                self.mem.w8(rec + 0x34 + len as u32, 0);
+                let sep = |ch: u8| ch == 0x5c || ch == b'/' || ch == b':';
+                let base: &[u8] = match name[..len].iter().rposition(|ch| sep(*ch)) {
+                    Some(p) => &name[p + 1..len],
+                    None => &name[..len],
+                };
+                let mut s: Vec<u8> = base.to_vec();
+                while s.len() < 8 {
+                    s.push(b' ');
+                }
+                for (q, ch) in s.iter().enumerate() {
+                    self.mem.w8(rec + 0xb4 + q as u32, if *ch == b'.' { 0 } else { *ch });
+                }
+                self.mem.w8(rec + 0xb4 + s.len() as u32, 0);
+                self.mem.w32(c + 0x174 + 4 * track, rec);
+                if self.count_active_tracks(0x0f00_0000) == 1 {
+                    env.init_driver();
+                }
+                let off = 0xd8 + n * 0xc;
+                let buf = rec.wrapping_add(((off / 16) * 16 + 0x10) as u32);
+                let slot = env.open_song(name_at, a, n, b, buf, size - (buf.wrapping_sub(rec)) as i32);
+                self.mem.w32(rec + 0x2c, slot as u32);
+                if slot < 0 {
+                    let c = self.cur();
+                    self.mem.w32(c + 0x174 + 4 * track, 0);
+                    out = slot;
+                } else {
+                    self.mem.w32(rec + 0x30, u32::MAX);
+                    out = ((0x0100_0000u32 << (song & 31)).wrapping_add(1 << (track & 31))) as i32;
+                }
+            }
+        }
+        self.unselect();
+        out
     }
 }

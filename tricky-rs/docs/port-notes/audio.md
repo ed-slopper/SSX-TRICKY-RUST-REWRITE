@@ -207,9 +207,30 @@ the port keeps the same bytes at the same addresses (`pf::Mem`).
   a lead segment or bar of no length (an endless loop), a released track whose walk ends nowhere (endless
   recursion). Checked in the runner on all 21 songs: 2500 random calls a song over random tracks, events, leads and
   stream answers; results, every stream call, the song table, the graph and the tracks compared; traps, endless
-  loops and recursions agree. The runner learnt `multu`, `dsllv`, `dsrlv` and `dsrav` (libgcc's `__muldi3`). Still
-  to port: the stream callbacks `FUN_002c0488` / `FUN_002c0898` and the controls (`PathX_LoadSong`, events, volume,
-  fades, stops).
+  loops and recursions agree. The runner learnt `multu`, `dsllv`, `dsrlv` and `dsrav` (libgcc's `__muldi3`).
+- The driver's callbacks (`PathX_Init` takes them): `FUN_002c0488` (the update) finds each song's lead track (the
+  longest latency among those at a node with a marker); a track not yet done with the head event takes it when due
+  within the look-ahead (+8; `next_segment`); a track whose stream is done sets the song's earliest start (+0x3c, the
+  track at +0x38) from its position and, when its time is near (+8, or +0xc for a beat-counted track) or its
+  position past its latency, advances (or takes the event); a track waiting to start (+0x28) is released at its time.
+  When every track is done with the event (+0x44 all set) and its latest start has passed, the volumes ease in and
+  the event queue (sixteen entries of 0x14 from +0x34: the event, its priority, immediate, the lead, the earliest and
+  latest start, the tracks' mask) moves up one. `FUN_002c0898` (the beat) advances the beat-counted tracks at their
+  time. `FUN_002bedb8` (the stop) frees every track.
+- The controls: `PathX_LoadSong` 0x2c0cb0 (a track record set up: number, variable, default volume (0x3495d2),
+  latency, the handle ring, the name and its base name as "%-8s" with every '.' cut, the driver started with the
+  first track, the stream opened in the record's rest, 16-aligned after the ring; the id song bit 24 + n | track bit),
+  `FUN_002c15c8` (an event for some tracks queued by priority; −1 releases those waiting; priority 2 is immediate,
+  and at the head stops the song and unpauses), `FUN_002c1890` (a track's jump to a node at the head), `FUN_002c1288`
+  (the path variable, under 128), `FUN_002c1068` (the look-aheads), `PathX_SetVolume` (0..100; all songs: the
+  default), `PathX_FadeTracks`, `PathX_StopSong`, `PathX_StopTracks` (frees the first named track; the driver
+  stopped with none left), `FUN_002c1b98` (pitch / pause), `FUN_002c1130` (latency), `FUN_002c1168` (the stream
+  slot), `FUN_002c1190` (what a track plays: its ring entry for the stream's handle), `FUN_002c1380` /
+  `FUN_002c1430` / `FUN_002c1500` (the queue cleared, counted, its head). A mask of −1 is compared as a 64-bit −1:
+  the callers pass ints.
+- Checked in the runner on all 21 songs: 1500 random calls a song over the nineteen callbacks and controls, with the
+  song queue, tracks, pause, volumes and driver answers random; results, every driver call and all memory compared
+  (a track with no marker has the sync read address 0's bytes: compared too).
 
 ## Front-end sounds (`cFE3DSound` → `Audio_PlayFE*`, F1c)
 
