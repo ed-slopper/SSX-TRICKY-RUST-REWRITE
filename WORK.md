@@ -111,7 +111,7 @@ state machine and the renderer are ours. Nothing has been checked against the or
 | G10 | Audio engine (includes EA's sound library, `lib-snd` in the function index: 408 functions): EA BNK voices (`SND_ParsePTLayer` 0x2d5410, `SNDVoice_CalcPitchMult` 0x2d5288), 3D voices, mixing and volumes, decoded from the disc at run time | unowned | E2b | | [repo] Today `.wav` exported by vgmstream; README: stream picks "by length, looping and tone"; with it the config loaders that feed the engine (BANKS, CROWD, CHANT, SPEECH, narration, NASCRIPT, jukebox: `Audio_LoadInGameConfig` 0x211098, `Audio_LoadFEConfig` 0x20f160, `Speech_LoadEvents` 0x227d70) on `tricky_data::ini` |
 | G4k | The cAI virtuals that are object glue: `vf11_110bf8` (creates the controllers and riders), `vf16_111560` (start of race), `vf13_110fa0` (tear down), `Race_UpdateLookBack` 0x113a88, `cCountdownHandler::Update` 0x113600, `cEndRaceHandler::Enter` 0x113e10: allocation and virtual calls, so they belong with the app wiring (E1b2r) — port when the loader exists. Gap of G4j | unowned | G4 | | Gap of G4j |
 | G10a2 | The rest of G10a: `BoardIn_*`, `Voice_Update3D`, `WorldEmitter_Update` 0x22bf60, the snow sound programs' interpreter (not found yet: `Sfx_LoadSurfaceConfig` 0x210c38 / `Sfx_LoadBoardConfig` 0x21a7c8 compile them), `Sfx_UpdateAir` 0x217d50 and the other `Sfx_On*` handlers; runner-checked against the original with the audio engine's calls logged. Gap of G10a | any | G10 | | trailrig/heron (2026-10-12) | Gap of G10a |
-| G10b | Music: Pathfinder (`PF_*` 0x2bec00–0x2c2040) decoded at run time, song names from `music.inf` / `musicmap.inf` | unowned | G10 | | [repo] "Unresolved: song names"; `pathmusic.rs` |
+| G10b | Music: Pathfinder (`PF_*` 0x2bec00–0x2c2040) decoded at run time, song names from `music.inf` / `musicmap.inf` | unowned | G10 | ed-slopper/puffin (2026-10-11)
 | G10c | Announcer (DJ Atomika) and rider voices: when each line is picked and played | unowned | G10 | | [est] |
 | G11 | Pre- and post-race scenes: `cPreRaceHandler`, `cEndRaceHandler_Update` 0x1141e0, scripts table 0x32f380, row filters | unowned | E11, G5 | | [repo] `intro.rs`; "Unresolved: post-race scene row filters" |
 | G11a | Movies: the disc's video files (EA logo, intro, unlock videos) | unowned | E2 | | [est] Find the format first |
@@ -798,3 +798,4 @@ matches the original.
 - 2026-10-12 ed-slopper/puffin: G1g done.
 - 2026-10-12 ed-slopper/puffin: add and claim G4l.
 - 2026-10-12 ed-slopper/puffin: G4l done.
+- 2026-10-11 ed-slopper/puffin: claim G10b.
