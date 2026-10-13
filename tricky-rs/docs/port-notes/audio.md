@@ -259,3 +259,12 @@ Proven (live Ghidra):
   `CrowdSoundList_Add` 0x21ed30 appends a loaded file (max 5), returns 1 when added.
 
 Inferred: the sound ids are entries of the front-end bank; what each one sounds like is not checked.
+
+## The pending-sound queue (`sndqueue.rs`)
+
+Every `Sfx_On*` handler and `Sfx_UpdateAir` inline the same entry: `++count` (+0x20) indexes parallel arrays of the audio
+system (record copy of +0x08..0x20 via +0x24, emitter inline at +0x28, +0x38, volume +0x3c, slot +0x40, 8 bytes inline at
++0x44, +0x64, listener +0x68, +0x6c, +0x70, 16-byte rows +0x74 = 100/0/0x5a/0x32, +0x78, +0x7c, kind +0xa40, sound id
++0xa44), then `SndMgr_GetSlot(4)`, `Audio_GetRiderListener`, `SndSys_PlayPending`. The inline arrays at +0x44 would run
+into the pointers at +0x64 from the fourth entry, so the queue never holds more than three. `queue_sound` is that entry;
+`update_air` is `Sfx_UpdateAir` (tests/sndqueue.rs).

@@ -33,6 +33,7 @@ pub mod aictl;
 pub mod progress;
 pub mod ridercol;
 pub mod sfxcalc;
+pub mod sndqueue;
 pub mod worldemitter;
 pub mod hit;
 pub mod taunt;
