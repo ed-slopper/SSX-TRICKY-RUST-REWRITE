@@ -154,3 +154,150 @@ fn camera_path_matches_the_original() {
         assert_eq!(r.mem.read_u32(0x3365fc), f.t.to_bits(), "case {case} t");
     }
 }
+
+struct Table {
+    keys: Vec<Key>,
+    owner: u32,
+    cur: i32,
+    log: Vec<i32>,
+}
+
+#[test]
+fn camera_path_eval_matches_the_original() {
+    use std::cell::RefCell;
+    use std::rc::Rc;
+    let Some(mut r) = Runner::from_env() else { return };
+    r.float_rules = Rules::parse("add=n,mul=n,div=n,cvt=n").unwrap();
+    for a in [0x137140u32, 0x1741d0, 0x1704b0, 0x170610, 0x1708e8, 0x170ca8] {
+        r.allow(a);
+    }
+    let out = r.mem.alloc(0x100);
+    let path = r.mem.alloc(0x40);
+    let owner = r.mem.alloc(0x400);
+    let flag = r.mem.alloc(0x10);
+    let rider = r.mem.alloc(0x10);
+    let tab = Rc::new(RefCell::new(Table { keys: vec![], owner, cur: -1, log: vec![] }));
+    let t = tab.clone();
+    r.stub(0x16dd68, move |c, _| {
+        let mut t = t.borrow_mut();
+        let off = c.gpr(5) as u32 - t.owner;
+        assert_eq!(off % 15, 0, "key pointer");
+        t.cur = (off / 15) as i32;
+        let k = t.cur;
+        t.log.push(k);
+        c.set_gpr(2, c.gpr(4));
+    });
+    r.stub(0x16dda8, move |c, _| c.set_gpr(2, 0x60_0000));
+    r.stub(0x16ddb8, move |c, _| c.set_gpr(2, 0x60_0100));
+    let t = tab.clone();
+    r.stub(0x16e900, move |c, m| {
+        let t = t.borrow();
+        let k = &t.keys[t.cur as usize];
+        for i in 0..3u32 {
+            m.write_f32(c.gpr(5) as u32 + 4 * i, k.pos[i as usize]);
+        }
+    });
+    let t = tab.clone();
+    r.stub(0x1722e8, move |c, m| {
+        let t = t.borrow();
+        let k = &t.keys[t.cur as usize];
+        for i in 0..3u32 {
+            m.write_f32(c.gpr(5) as u32 + 0xc + 4 * i, k.ang[i as usize]);
+        }
+        m.write_f32(c.gpr(5) as u32 + 0x18, k.w);
+    });
+    r.stub(0x16ded0, move |_, _| {});
+    struct E {
+        t: Rc<RefCell<Table>>,
+    }
+    impl KeyEnv for E {
+        fn key(&mut self, i: i32) -> Key {
+            let mut t = self.t.borrow_mut();
+            t.log.push(-1000 - i);
+            t.keys[i as usize]
+        }
+    }
+    let mut g = Rng(0x170c_a8e5_71b2_9d03);
+    let (mut ticks, mut ended, mut moved, mut eased) = (0, 0, 0, 0);
+    for seq in 0..400 {
+        let count = [1i32, 2, 2, 3, 3, 4, 6, 8][(g.next() % 8) as usize];
+        let keys: Vec<Key> = (0..count)
+            .map(|i| Key {
+                pos: [i as f32 * 300.0 + g.f() * 2.0, g.f() * 3.0, g.f() * 3.0],
+                ang: [g.ang() * 0.3, g.ang() * 0.3, g.ang() * 0.3],
+                w: (g.next() % 1500) as f32 / 1000.0 + 0.5,
+            })
+            .collect();
+        tab.borrow_mut().keys = keys.clone();
+        let own = Owner { count, speed: [600.0f32, 1500.0, 3000.0][(g.next() % 3) as usize] };
+        r.mem.write_u32(owner + 0x12c, count as u32);
+        r.mem.write_f32(owner + 0x130, own.speed);
+        r.mem.write_u32(path + 0x24, owner);
+        let mut p = PathState {
+            idx: 0,
+            t: 0.0,
+            dt: 0.05,
+            last: [0.0; 3],
+            speed: [0.0f32, 0.0, 400.0, 1200.0, 6000.0][(g.next() % 5) as usize],
+            mode: [0i32, 1, 2, 3, 4, -1][(g.next() % 6) as usize],
+        };
+        let mut done = false;
+        for tick in 0..2000 {
+            if done {
+                break;
+            }
+            r.mem.write_u32(path + 4, p.idx as u32);
+            r.mem.write_f32(path + 8, p.t);
+            r.mem.write_f32(path + 0xc, p.dt);
+            for k in 0..3 {
+                r.mem.write_f32(path + 0x10 + 4 * k, p.last[k as usize]);
+            }
+            r.mem.write_f32(path + 0x1c, p.speed);
+            r.mem.write_u32(path + 0x20, p.mode as u32);
+            for k in 0..0x16 {
+                r.mem.write_u32(out + 4 * k, 0xdead_beef);
+            }
+            r.mem.write_u32(flag, 0x5555_5555);
+            tab.borrow_mut().log.clear();
+            r.cpu.set_gpr(4, out as u64);
+            r.cpu.set_gpr(5, path as u64);
+            r.cpu.set_gpr(6, rider as u64);
+            r.cpu.set_gpr(7, flag as u64);
+            r.call(0x170ca8).unwrap();
+            let want_log: Vec<i32> = std::mem::take(&mut tab.borrow_mut().log);
+            let before = p;
+            let (a, end) = eval(&mut p, &own, &mut E { t: tab.clone() });
+            let got_log: Vec<i32> = tab.borrow().log.iter().map(|v| if *v <= -1000 { -1000 - *v } else { *v }).collect();
+            let want_keys: Vec<i32> = want_log.iter().filter(|v| **v >= 0).cloned().collect();
+            let got_keys: Vec<i32> = got_log;
+            assert_eq!(want_keys, got_keys, "seq {seq} tick {tick} key order");
+            let want = [a.pos[0], a.pos[1], a.pos[2], a.ang[0], a.ang[1], a.ang[2], a.w, 100.0];
+            for (k, w) in want.iter().enumerate() {
+                assert_eq!(r.mem.read_u32(out + 4 * k as u32), w.to_bits(), "seq {seq} tick {tick} out word {k} before {before:?} after {p:?} count {count}");
+            }
+            for k in [8u32, 12, 21] {
+                assert_eq!(r.mem.read_u32(out + 4 * k), 0, "seq {seq} tick {tick} zero word {k}");
+            }
+            assert_eq!(r.mem.read_u32(flag), end as u32, "seq {seq} tick {tick} flag");
+            assert_eq!(r.mem.read_u32(path + 4), p.idx as u32, "seq {seq} tick {tick} idx");
+            assert_eq!(r.mem.read_u32(path + 8), p.t.to_bits(), "seq {seq} tick {tick} t");
+            assert_eq!(r.mem.read_u32(path + 0xc), p.dt.to_bits(), "seq {seq} tick {tick} dt");
+            for k in 0..3u32 {
+                assert_eq!(r.mem.read_u32(path + 0x10 + 4 * k), p.last[k as usize].to_bits(), "seq {seq} tick {tick} last {k}");
+            }
+            ticks += 1;
+            if p.idx != before.idx {
+                moved += 1;
+            }
+            if p.mode != 0 && (p.idx == 0 || p.idx >= count - 2) {
+                eased += 1;
+            }
+            if end {
+                ended += 1;
+                done = true;
+            }
+        }
+    }
+    eprintln!("ticks {ticks} ended {ended} moved {moved} eased {eased}");
+    assert!(ended > 100 && moved > 500);
+}

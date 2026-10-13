@@ -199,3 +199,155 @@ pub fn update_cut_fade(f: &mut CutFade) -> f32 {
     }
     level
 }
+
+/// What the camera path keeps between ticks: the segment `idx` (+4), the position along it `t` (+8) and its last
+/// step `dt` (+0xc), the last point (+0x10), the wanted speed in cm/s (+0x1c; 0 takes the owner's +0x130) and the
+/// easing `mode` (+0x20: 1 eases in, 2 in and out, 3 out, by the number of keys).
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct PathState {
+    pub idx: i32,
+    pub t: f32,
+    pub dt: f32,
+    pub last: [f32; 3],
+    pub speed: f32,
+    pub mode: i32,
+}
+
+/// The path's owner: its keyframe count (+0x12c) and default speed (+0x130).
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct Owner {
+    pub count: i32,
+    pub speed: f32,
+}
+
+/// The camera at one keyframe, evaluated (`CamCamera::CamCamera`, `CamCamera_EvalPosition`, `CamCamera_EvalLookAt`).
+pub trait KeyEnv {
+    fn key(&mut self, i: i32) -> Key;
+}
+
+/// A neighbour that does not exist: the position and angles zero, the fourth value 1.6.
+pub fn missing_key() -> Key {
+    Key { pos: [0.0; 3], ang: [0.0; 3], w: f32::from_bits(0x3fcc_cccd) }
+}
+
+/// `CamPath_Eval` 0x170ca8: advances the path by one tick of arc length (`speed / 60` cm, found by a secant search
+/// on the parameter, moving to the next segment at 1.0) and answers the eased point and angles, and whether the path
+/// has ended.
+pub fn eval(p: &mut PathState, owner: &Owner, env: &mut dyn KeyEnv) -> (Angles, bool) {
+    let count = owner.count;
+    if count < 2 {
+        let k = missing_key();
+        return (Angles { pos: [0.0; 3], ang: [0.0; 3], w: k.w }, true);
+    }
+    let mut ended = false;
+    let mut first = true;
+    let mut point = [0.0f32; 3];
+    let mut slots: [Key; 4];
+    let mut f21;
+    let mut guard = 0u32;
+    loop {
+        slots = [missing_key(); 4];
+        for i in 0..4i32 {
+            let k = p.idx + i - 1;
+            if k < 0 || k >= count {
+                continue;
+            }
+            slots[i as usize] = env.key(k);
+        }
+        let at = PathAt { idx: p.idx, count };
+        if first {
+            first = false;
+            let (pt, _) = segment_point(at, p.t, &slots[0], &slots[1], &slots[2], &slots[3]);
+            p.last = pt;
+        }
+        f21 = ad(p.t, p.dt);
+        let mut f22 = p.dt;
+        let mut f23 = f22.abs();
+        let mut s6 = false;
+        let mut f25 = 0.0f32;
+        let mut done = false;
+        loop {
+            guard += 1;
+            assert!(guard < 1_000_000, "camera path search runs away");
+            if 1.0 < f21 {
+                f21 = 1.0;
+            } else if f21 < 0.0 {
+                f21 = 0.0;
+            }
+            if f23 < f32::from_bits(0x3586_37bd) {
+                done = true;
+                break;
+            }
+            let at = PathAt { idx: p.idx, count };
+            let (pt, _) = segment_point(at, f21, &slots[0], &slots[1], &slots[2], &slots[3]);
+            point = pt;
+            let mut f20 = p.speed;
+            if f20 == 0.0 {
+                f20 = owner.speed;
+            }
+            let d = diff(pt, p.last);
+            let dist = len(d);
+            let step = ps2_div(f20, 60.0);
+            let err = sb(dist, step);
+            let tol = ps2_div(step, 10.0);
+            if !(tol < err.abs()) {
+                done = true;
+                break;
+            }
+            if 0.0 < err {
+                s6 = true;
+                f22 = m(-f23, 0.5);
+                f23 = f22.abs();
+                f21 = ad(f21, f22);
+                f25 = err;
+                continue;
+            }
+            if !(f21 < 1.0) {
+                break;
+            }
+            if !s6 {
+                f21 = ad(f21, f22);
+                f25 = err;
+                continue;
+            }
+            let f0 = ps2_div(m(err, f22), sb(err, f25));
+            f22 = f0.abs();
+            f23 = f22.abs();
+            f21 = ad(f21, f22);
+            f25 = err;
+        }
+        if done {
+            break;
+        }
+        if p.idx < count - 2 {
+            p.idx += 1;
+            p.dt = f32::from_bits(0x3d4c_cccd);
+            p.t = 0.0;
+            continue;
+        }
+        ended = true;
+        f21 = 1.0;
+        break;
+    }
+    let dt = sb(f21, p.t);
+    p.dt = dt;
+    p.t = f21;
+    p.last = point;
+    // the easing at the ends
+    let idx = p.idx;
+    let mode = p.mode;
+    let mut tt = f21;
+    if idx != 0 {
+        if !(idx < count - 2) && (2..4).contains(&mode) {
+            tt = hermite(0.0, 1.0, 1.0, 0.0, f21);
+        }
+    } else if mode == 1 {
+        tt = hermite(0.0, 1.0, 0.0, 1.0, f21);
+    } else if mode == 2 {
+        tt = if count >= 3 { hermite(0.0, 1.0, 0.0, 1.0, f21) } else { hermite(0.0, 1.0, 0.0, 0.0, f21) };
+    } else if mode == 3 && count < 3 {
+        tt = hermite(0.0, 1.0, 1.0, 0.0, f21);
+    }
+    let at = PathAt { idx, count };
+    (segment_angles(at, tt, &slots[0], &slots[1], &slots[2], &slots[3]), ended)
+}
