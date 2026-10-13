@@ -98,3 +98,123 @@ pub fn music_state_to_mode(state: i32) -> u32 {
         _ => 5,
     }
 }
+
+/// A snow sound program stopped by a zero divisor (the original's `break 7`).
+#[derive(Debug, PartialEq, Eq)]
+pub struct Trap;
+
+/// The program state the interpreter keeps in its own words: [0] the program, [1..] the stack (the top at
+/// `[sp]`, growing up from `[1]`), [0x11] the program counter, [0x12] the stack pointer, [0x13] the accumulator.
+pub const PC: usize = 0x11;
+pub const SP: usize = 0x12;
+pub const ACC: usize = 0x13;
+
+/// The operand of an instruction: four bytes, little-endian.
+fn word(prog: &[u8], w: &mut [i32]) -> i32 {
+    let mut v = 0u32;
+    for k in 0..4 {
+        v |= (prog[w[PC] as usize] as u32) << (8 * k);
+        w[PC] += 1;
+    }
+    v as i32
+}
+
+/// `FUN_0021ae90` 0x21ae90: the interpreter of the snow sound programs `Sfx_LoadBoardConfig` compiles from SNOW.INF
+/// (`tricky_data::snowsfx`). It starts at the first byte with an empty stack (the accumulator keeps what it was) and
+/// runs to the 0x7f byte; `input(n)` reads the five inputs (LOAD n, the functions 0x21a6a8, 0x21a6f0, 0x21a710,
+/// 0x21a740, 0x21a788 on the rider's sound object); ASSIGNVOL and ASSIGNBEND (0x13, 0x14) write the accumulator to
+/// `vol` and `bend`. A byte with no instruction (LOG 5, 0x15.., 0x80..) does nothing. `w` is the state (see above).
+pub fn run_snow_program(prog: &[u8], w: &mut [i32], input: &mut dyn FnMut(u32) -> i32, vol: &mut i32, bend: &mut i32) -> Result<(), Trap> {
+    w[PC] = 0;
+    w[SP] = 0;
+    loop {
+        let op = prog[w[PC] as usize];
+        w[PC] += 1;
+        if op >= 0x80 {
+            continue;
+        }
+        match op {
+            0 => {
+                let n = prog[w[PC] as usize];
+                w[PC] += 1;
+                if n < 5 {
+                    w[ACC] = input(n as u32);
+                }
+            }
+            1 => w[ACC] = word(prog, w),
+            2 => {
+                let n = word(prog, w);
+                if n == 0 {
+                    return Err(Trap);
+                }
+                let q = w[ACC].wrapping_mul(127).wrapping_div(n);
+                let x = (q as f32) as i32;
+                w[ACC] = x.clamp(0, 0x7f);
+            }
+            3 => w[ACC] = w[ACC].wrapping_mul(w[ACC]),
+            4 => w[ACC] = ((w[ACC] as f32).abs().sqrt()) as i32,
+            6 => {
+                let n = word(prog, w);
+                w[ACC] = w[ACC].wrapping_add(n);
+            }
+            7 => {
+                let n = word(prog, w);
+                w[ACC] = w[ACC].wrapping_sub(n);
+            }
+            8 => {
+                let n = word(prog, w);
+                w[ACC] = w[ACC].wrapping_mul(n);
+            }
+            9 => {
+                let n = word(prog, w);
+                if n == 0 {
+                    return Err(Trap);
+                }
+                w[ACC] = w[ACC].wrapping_div(n);
+            }
+            10 => w[ACC] = w[ACC].wrapping_neg(),
+            11 => {
+                if w[ACC] < 0 {
+                    w[ACC] = w[ACC].wrapping_neg();
+                }
+            }
+            12 => {
+                let lo = word(prog, w);
+                let hi = word(prog, w);
+                w[ACC] = lo.max(w[ACC].min(hi));
+            }
+            13 => {
+                let sp = w[SP];
+                w[(1 + sp) as usize] = w[ACC];
+                w[SP] = sp + 1;
+            }
+            14 => {
+                let sp = w[SP];
+                w[SP] = sp - 1;
+                w[ACC] = w[sp as usize];
+            }
+            15..=18 => {
+                let sp = w[SP];
+                let top = w[sp as usize];
+                let second = w[(sp - 1) as usize];
+                let r = match op {
+                    15 => top.wrapping_add(second),
+                    16 => top.wrapping_sub(second),
+                    17 => top.wrapping_mul(second),
+                    _ => {
+                        if second == 0 {
+                            return Err(Trap);
+                        }
+                        top.wrapping_div(second)
+                    }
+                };
+                w[(sp - 1) as usize] = r;
+                w[SP] = sp - 1;
+            }
+            0x13 => *vol = w[ACC],
+            0x14 => *bend = w[ACC],
+            0x7f => return Ok(()),
+            _ => {}
+        }
+    }
+}
