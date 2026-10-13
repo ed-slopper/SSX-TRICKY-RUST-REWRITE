@@ -652,3 +652,53 @@ fn planted_take_off_bugs_are_caught() {
     }
     assert!(caught >= 200, "motion 2 instead of 1 was caught in only {caught} of 400 cases");
 }
+
+/// `Boarder_TurnFromWall` 0x1257a0 against `orient::turn_from_wall`: attitudes from the original's own
+/// `Boarder_UpdateOrientation`, wall normals of every kind (along the up, flat, facing up or down, zero).
+#[test]
+fn turn_from_wall_is_the_originals() {
+    let Some(mut w) = world() else { return };
+    w.r.allow(0x128e90);
+    let mut g = Rng(0xe7_c3_0c00_0000_0001);
+    let (mut turned, mut kept) = (0u32, 0u32);
+    for n in 0..30000 {
+        let mut o = Orient { q: g.unit4(), ..Default::default() };
+        tricky_game::orient::update_orientation(&mut o);
+        let wall = match g.next() % 8 {
+            0 => o.up,
+            1 => [0.0; 4],
+            2 => {
+                let k = g.f(-1.0, 1.0);
+                [o.fwd[0] * k, o.fwd[1] * k, o.fwd[2] * k, 0.0]
+            }
+            _ => {
+                let v = [g.f(-1.0, 1.0), g.f(-1.0, 1.0), g.f(-1.0, 1.0)];
+                let l = (v[0] * v[0] + v[1] * v[1] + v[2] * v[2]).sqrt().max(1e-3);
+                [v[0] / l, v[1] / l, v[2] / l, if g.next() % 4 == 0 { g.f(-1.0, 1.0) } else { 0.0 }]
+            }
+        };
+        w.noise(&mut g);
+        for (off, v) in [(0x170, o.q), (0x180, o.fwd), (0x190, o.side), (0x1a0, o.up)] {
+            w.put4(off, v);
+        }
+        w.r.mem.write_f32(w.rd + 0x1b0, o.yaw);
+        for (k, x) in wall.iter().enumerate() {
+            w.r.mem.write_f32(w.axis + 4 * k as u32, *x);
+        }
+        let snap = w.block();
+        w.r.cpu.set_gpr(4, w.rd as u64);
+        w.r.cpu.set_gpr(5, w.axis as u64);
+        w.r.call(0x1257a0).unwrap_or_else(|e| panic!("case {n}: {e}"));
+        let game = w.block();
+        let before = o;
+        tricky_game::orient::turn_from_wall(&mut o, wall);
+        diff(&game, &with_orient(&snap, &o)).unwrap_or_else(|e| panic!("case {n} q {:?} n {wall:?}: {e}", before.q));
+        if o == before {
+            kept += 1;
+        } else {
+            turned += 1;
+        }
+    }
+    eprintln!("Boarder_TurnFromWall: 30000 cases, all bit-identical; {turned} turned, {kept} kept");
+    assert!(turned > 3000 && kept > 3000, "{turned} {kept}");
+}

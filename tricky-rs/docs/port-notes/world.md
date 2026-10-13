@@ -270,6 +270,23 @@ Part of the port notes (index: [README.md](README.md)); units and wording as des
   and bounces at max(b·v_in + v_in, v_in + 55.555553) (b the record's bounce; wall turn in mode 2); a moving one
   shares it: k = 1/(speed stat/mass + 1), a = v_in·k, s = √max(a² − (1 − b)·k, 0) − a. Then the rider's virtual
   +0x6c (0.0012·v_in), v += s·n, the impact check at s with the contact record.
+- `Boarder_TurnFromWall` 0x1257a0(rider, n) (proven; `orient::turn_from_wall`, checked bit for bit in
+  `tests/orient.rs`, 30,000 cases): a = unit(up × n) (up = +0x1a0, the board's), θ = atan2(fwd · a, fwd · (up × a))
+  (fwd = +0x180, the inline atan2 round `Math_Atan`); f = 1.9198622 − θ held to [0, 0.34906584] when θ > 0, else
+  −1.9198622 − θ held to [−0.34906584, 0]; f ≠ 0 turns the board by −f about its up (`Boarder_RotateAboutAxis`).
+  So at most 20° a tick, until the forward is 110° from up × n.
+- The collision body for walls (row E7c3c): `cBoarder` vf8 0x116ab8 sets it up with `CollBody_SetSkeleton` and
+  `CollBody_InitRider`(stats+0x60, body): the bounding radius is the body scale × 100 cm (0.7 to 1.0 m). While
+  `Boarder_WallCollide` runs the mask (+0x494) is 3: only spheres 0 and 1, on bones 2 and 4, which the riders'
+  `_body.mpf` skeleton (the same for all riders) names `upper_back` and `head` (radii 25 and 20 cm); the legs and
+  the board are not in it. In the bind pose (standing straight) they are 23.0 and 52.8 cm over the hips, the feet
+  89.5 to 91.8 cm under them.
+- Wiring (row E7c3c, proven only for the calls; the body's place is ours): with `TRICKY_DISC` the ground tick's
+  `wall_collide` runs `walls::wall_collide` on `CourseGround` (`WallGlue` in `rider/ground_tick.rs`). STANDIN: the
+  body is the bind pose standing straight up the board's up from the position, × stats+0x60 (upper back 114.7 cm,
+  head 144.5 cm, bounding centre at the hips 91.7 cm), for `CollBody_UpdateFromBones` on the animated skeleton
+  (G5). `Boarder_AccumulateImpact` 0x125c48 (+0x2e4 += 1 − max(n · +0x2f0, 0), +0x2f0 = n) is not kept (nothing
+  ported reads them). The air's walls (row E8o) and the keyframed objects (E7c3b) stay on the drawn mesh.
 
 ## Live cells (row E7b; `tricky_game::cells`, checked: `tests/cells.rs`)
 

@@ -802,6 +802,103 @@ impl Rider {
     }
 }
 
+/// The rider's collision body (rider+0x470) as `Boarder_WallCollide` uses it: `CollBody_InitRider` 0x236050 with
+/// the bounding radius stats+0x60 m (`cBoarder` vf8 0x116ab8), the mask [`gm::WALL_MASK`] (spheres 0 and 1: the
+/// upper back and the head, 25 and 20 cm). STANDIN: the spheres on the skeleton's bind pose standing straight up
+/// the board's up from the position (upper back 114.7 cm, head 144.5 cm, the bounding centre at the hips 91.7 cm,
+/// read from the riders' `_body.mpf`, all riders alike, times stats+0x60), for `CollBody_UpdateFromBones` 0x2361b0
+/// on the animated skeleton (row G5).
+fn wall_body(g: &gm::Rider) -> crate::collbody::CollBody {
+    let mut b = crate::collbody::CollBody::new();
+    b.init_rider(g.p.stat60);
+    let at = |h: f32| add(g.p.pos, scale(g.board_up, h * g.p.stat60));
+    b.center = at(91.7);
+    for s in b.spheres.iter_mut() {
+        s.0 = b.center;
+    }
+    b.spheres[0].0 = at(114.7);
+    b.spheres[1].0 = at(144.5);
+    b.x24 = gm::WALL_MASK as i32;
+    b
+}
+
+/// What `Boarder_WallCollide` calls (`walls::WallEnv`), answered on the course and the port's rider.
+struct WallGlue<'a> {
+    r: &'a mut Rider,
+    g: &'a mut gm::Rider,
+    world: &'a CollisionWorld,
+    course: &'a crate::course_ground::CourseGround,
+    body: crate::collbody::CollBody,
+}
+
+impl crate::walls::WallEnv for WallGlue<'_> {
+    /// `World_RayCast` 0x25aff8 with `cWorldBoarder`(the body, 1), its ground normal set (+0x2e0, +0x2d0 = 1).
+    fn cast_walls(&mut self, r: &crate::walls::WallRider) -> (f32, crate::walls::CastRecord) {
+        let mut q = crate::worldboarder::WorldBoarder::new(&self.body, 1);
+        q.reject = Some(r.ground);
+        let world = self.world;
+        let (t, h) = self.course.ray_cast(&mut q, world.showoff, None, &|i| world.course_skips(i));
+        let rec = h.map_or(Default::default(), |h| crate::walls::CastRecord { pos: h.pos, normal: h.normal, object: h.object.map_or(0, |o| o as u32 + 1) });
+        (t, rec)
+    }
+    /// Not called by `Boarder_WallCollide`.
+    fn query_objects(&mut self, _: &crate::walls::WallRider) -> (f32, crate::walls::CastRecord, crate::walls::Touched) {
+        (0.0, Default::default(), Default::default())
+    }
+    /// `Boarder_AccumulateImpact` 0x125c48: +0x2e4 += 1 − max(n · +0x2f0, 0), +0x2f0 = n. STANDIN: nothing, the port
+    /// keeps neither (nothing ported reads them yet).
+    fn accumulate_impact(&mut self, _: &mut crate::walls::WallRider, _: V4) {}
+    /// `Boarder_Translate` 0x1267a0: `CollBody_Translate` 0x236448 on the body (the broadphase box, +0x6e0/+0x6f0, the
+    /// port does not keep).
+    fn translate(&mut self, _: &mut crate::walls::WallRider, by: V4) {
+        self.body.translate(by);
+    }
+    /// `Boarder_TurnFromWall` 0x1257a0 (`orient::turn_from_wall`) on the game-side rider's attitude.
+    fn turn_from_wall(&mut self, _: &mut crate::walls::WallRider, n: V4) {
+        let g = &mut *self.g;
+        let mut o = Orient { q: g.quat, fwd: g.p.fwd, side: g.board_side, up: g.board_up, yaw: g.yaw };
+        orient::turn_from_wall(&mut o, n);
+        (g.quat, g.p.fwd, g.board_side, g.board_up, g.yaw) = (o.q, o.fwd, o.side, o.up, o.yaw);
+    }
+    /// `Boarder_Wipeout` 0x11d830 with the contact: the port's wipe-out (not inside the Megaplex tube, as the
+    /// ground tick's; the side the wall was on is the crash's kind, 2 or 3).
+    fn wipeout(&mut self, r: &mut crate::walls::WallRider, c: &crate::walls::Contact) {
+        if self.r.tube_class != u8::MAX {
+            return;
+        }
+        self.r.pos = to_port(r.pos, 0.01);
+        self.r.vel = to_port(r.vel, 0.01);
+        let n = to_port(c.normal, 1.0);
+        self.r.crash_kind = if n.dot(Vec3::new(self.r.yaw.cos(), 0.0, -self.r.yaw.sin())) > 0.0 { 2 } else { 3 };
+        self.r.cause = "wall";
+        self.r.crash_at = Some((to_port(c.pos, 0.01), n));
+        self.r.wipe_out();
+    }
+    /// `Rider::go_down` does `Score_Crash` and `Boarder_AddMeter` itself.
+    fn score_crash(&mut self, _: &mut crate::walls::WallRider) -> f32 {
+        0.0
+    }
+    fn add_meter(&mut self, _: &mut crate::walls::WallRider, _: f32) {}
+    /// `Boarder_Stumble` 0x124dd0: the port's stumble.
+    fn stumble(&mut self, _: &mut crate::walls::WallRider, _: V4, _: u32) {
+        self.r.stumble_by(true);
+    }
+    /// Not called by `Boarder_WallCollide`.
+    fn speed_stat(&mut self, _: &crate::walls::WallRider) -> f32 {
+        0.0
+    }
+    fn knock(&mut self, _: &mut crate::walls::WallRider, _: f32) {}
+    fn contact(&mut self, _: u32, _: &mut crate::walls::WallRider, _: &crate::walls::Contact, _: &crate::walls::CastRecord) {}
+    fn sfx_object(&mut self, _: &crate::walls::WallRider, _: u32) {}
+    /// `Sfx_OnWallHit` 0x2162f0: the port's wall sound takes the hardest knock of the tick.
+    fn sfx_wall(&mut self, r: &crate::walls::WallRider) {
+        let (at, speed) = (to_port(r.pos, 0.01), to_port(r.vel, 0.01).length());
+        if self.r.wall_hit.is_none_or(|w| w.1 < speed) {
+            self.r.wall_hit = Some((at, speed));
+        }
+    }
+}
+
 /// What the ground tick calls, answered by the port.
 struct GroundEnv<'a> {
     r: &'a mut Rider,
@@ -865,7 +962,22 @@ impl gm::Env for GroundEnv<'_> {
         g.state = cur;
     }
 
+    /// `Boarder_WallCollide` 0x126250 (`walls::wall_collide`) on the course's collision (row E7c3c), with the
+    /// body [`wall_body`] gives; without the course's files (a folder level) the port's sphere against the drawn
+    /// mesh ([`Rider::walls`], STANDIN). The keyframed objects (row E7c3b) and the air's walls (row E8o) are
+    /// still the drawn mesh's.
     fn wall_collide(&mut self, g: &mut gm::Rider) -> bool {
+        if let Some(course) = self.world.course.clone() {
+            let mut wr = crate::walls::WallRider { pos: g.p.pos, vel: g.vel, ground: g.p.normal, knocks: 0.0, mode: 2, state: g.state, up: g.board_up };
+            let body = wall_body(g);
+            let mut glue = WallGlue { r: &mut *self.r, g: &mut *g, world: self.world, course: &course, body };
+            let hit = crate::walls::wall_collide(&mut wr, &mut glue);
+            g.p.pos = wr.pos;
+            g.vel = wr.vel;
+            self.r.pos = to_port(g.p.pos, 0.01);
+            self.r.vel = to_port(g.vel, 0.01);
+            return hit;
+        }
         self.give(g);
         let mut p = self.r.pos;
         let (pushed, hit) = self.r.walls(self.world, &mut p);

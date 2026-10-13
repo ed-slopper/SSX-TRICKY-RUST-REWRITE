@@ -102,6 +102,34 @@ pub fn rotate_about_axis(o: &mut Orient, angle: f32, axis: V4) {
     update_orientation(o);
 }
 
+/// `Boarder_TurnFromWall` 0x1257a0(rider, n): with a = unit(up × n) and the forward's angle
+/// θ = atan2(fwd · a, fwd · (up × a)) (`jump::atan2_inline`), the board turns about its up (+0x1a0) by −f, where
+/// f = 1.9198622 − θ held to [0, 0.34906584] when θ > 0, else −1.9198622 − θ held to [−0.34906584, 0]: at most
+/// 20° a call, until the forward is 110° from the wall's direction.
+pub fn turn_from_wall(o: &mut Orient, n: V4) {
+    // vopmula/vopmsub, the w lane cleared; dots as vmul and (x + y) + 1·z + 1·w
+    let cross = |a: V4, b: V4| [a[1] * b[2] - b[1] * a[2], a[2] * b[0] - b[2] * a[0], a[0] * b[1] - b[0] * a[1], 0.0];
+    let dot = |a: V4, b: V4| ((a[0] * b[0] + a[1] * b[1]) + 1.0 * (a[2] * b[2])) + 1.0 * (a[3] * b[3]);
+    let c = cross(o.up, n);
+    let s = dot(c, c);
+    let k = if s == 0.0 { f32::MAX } else { 1.0 / s.sqrt() };
+    let a = c.map(|x| x * k);
+    let x = dot(o.fwd, cross(o.up, a));
+    let y = dot(o.fwd, a);
+    let t = crate::jump::atan2_inline(y, x);
+    let f = if 0.0 < t {
+        let f = 1.919_862_2 - t;
+        if 0.0 <= f { f.min(0.349_065_84) } else { 0.0 }
+    } else {
+        let f = -1.919_862_2 - t;
+        if -0.349_065_84 <= f { if 0.0 < f { 0.0 } else { f } } else { -0.349_065_84 }
+    };
+    if f != 0.0 {
+        let axis = o.up;
+        rotate_about_axis(o, -f, axis);
+    }
+}
+
 /// `Boarder_ResetOrientation` 0x128e20: the quaternion set to (1, 0, 0, 0) (`Vec4_Set` 0x10c120), then turned by
 /// −π/2 (`0xbfc90fdb`) about z with `Boarder_RotateAboutAxis`: the board lies flat and points along +x (heading 0).
 pub fn reset_orientation(o: &mut Orient) {
