@@ -294,6 +294,8 @@ pub struct Level {
     pub logic: crate::logic::LevelLogic,
     /// instances the event scripts switch on and off
     pub switchable: std::collections::HashSet<usize>,
+    /// The meshes read from the disc (`from_disc`), by the path the folder would have them at; empty for a folder.
+    pub meshes: std::collections::HashMap<PathBuf, ObjMesh>,
 }
 
 impl Level {
@@ -303,17 +305,7 @@ impl Level {
         // An object "dies" on contact when its collision script (or the trigger it fires) contains
         // effect type 0 / sub-type 5 ("dead node"). Type 7 effects name other instances to set off.
         let logic = read::<LogicFile>(&dir.join("SSFLogic.json")).unwrap_or_else(|e| { eprintln!("level scripts not read: {e}"); LogicFile::default() });
-        let mut touch: std::collections::HashMap<usize, Vec<usize>> = std::collections::HashMap::new();
-        for (i, inst) in instances.iter().enumerate() {
-            let Some(slot) = logic.effect_slots.get(inst.effect_slot_index.max(0) as usize).filter(|_| inst.effect_slot_index >= 0) else { continue };
-            let effects: Vec<&Effect> = [slot.collision_effect_slot, slot.effect_trigger_slot].iter()
-                .filter_map(|h| logic.effect_headers.get((*h).max(0) as usize).filter(|_| *h >= 0)).flat_map(|h| h.effects.iter()).collect();
-            if effects.iter().any(|e| e.main_type == 0 && e.type0.as_ref().is_some_and(|t| t.sub_type == 5)) {
-                let linked = effects.iter().filter(|e| e.main_type == 7).filter_map(|e| e.instance.as_ref())
-                    .map(|r| r.instance_index).filter(|r| *r >= 0 && (*r as usize) < instances.len() && *r as usize != i).map(|r| r as usize).collect();
-                touch.insert(i, linked);
-            }
-        }
+        let touch = touch_effects(&instances, &logic);
         let slot_of: Vec<i32> = instances.iter().map(|i| i.effect_slot_index).collect();
         let logic = crate::logic::LevelLogic::load(dir, &slot_of);
         let switchable = logic.switchable();
@@ -328,6 +320,120 @@ impl Level {
             sky: ModelSet::load(&dir.join("Skybox")),
             splines: read::<SplineFile>(&dir.join("Splines.json")).map(|f| f.splines).unwrap_or_default(),
             ai: read::<AiFile>(&dir.join("AIP.json")).unwrap_or_default(),
+            meshes: Default::default(),
+        })
+    }
+    /// A mesh by its path in the level (`<dir>/Meshes/<n>.obj`, `<dir>/Skybox/Meshes/<n>.obj`,
+    /// `<dir>/Collision/<n>.obj`): the disc's when the level came from it, else the folder's file.
+    pub fn mesh(&self, path: &Path) -> ObjMesh {
+        self.meshes.get(path).cloned().unwrap_or_else(|| load_obj(path))
+    }
+
+    /// The level from the player's disc (row E3a4), as `Course_LoadRenderData` 0x25edf0 names its files: the
+    /// course's archive `data/models/<file>.big` mounted, then `|data/models/<file>.pbd` (`tricky_data::pbd`, row
+    /// E3a), `.ssf` (the objects' physics records and collision meshes, rows E3c1 / E3a5), `.aip` (the paths, row
+    /// E3d), `<file>_sky.pbd` (`Course_LoadSkies` 0x185b18) and the `.map` (the tools' names; the game never reads
+    /// it). The records are put in the folder's form, field for field what SSX-Library exported from the same files
+    /// (checked: tests/level_disc.rs), and the meshes are kept under the paths the folder has them at.
+    ///
+    /// `scripts`: STANDIN: a levels folder's SSFLogic.json for what the scripts do (`logic`, `touch`), until the
+    /// app runs the `.ssf`'s scripts itself (row E9b2); without one the level has no scripted behaviour.
+    pub fn from_disc(files: &mut crate::big::Files, folder: &str, scripts: Option<&Path>) -> Result<Self, String> {
+        let name = crate::aip::big_name(folder).ok_or_else(|| format!("{folder}: not a course"))?;
+        files.mount(&format!("data/models/{name}.big")).map_err(|e| e.to_string())?;
+        let mut get = |ext: &str| files.load(&format!("|data/models/{name}{ext}")).map_err(|e| e.to_string())?.ok_or_else(|| format!("{name}{ext}: not on the disc"));
+        let pbd_bytes = get(".pbd")?;
+        let ssf_bytes = get(".ssf")?;
+        let sky_bytes = get("_sky.pbd")?;
+        let map = crate::map::Map::parse(&String::from_utf8_lossy(&get(".map").unwrap_or_default()));
+        let pbd = crate::pbd::Pbd::parse(&pbd_bytes).ok_or("the .pbd does not parse")?;
+        let sky = crate::pbd::Pbd::parse(&sky_bytes).ok_or("the sky's .pbd does not parse")?;
+        let ssf = crate::ssf::Ssf::parse(&ssf_bytes, pbd.instances.len() as u32).map_err(|e| format!("the .ssf: {e:?}"))?;
+        let ai = crate::aip::from_disc(files, folder, "aip").map(|a| AiFile::from_aip(&a)).unwrap_or_default();
+        let dir = scripts.map(Path::to_path_buf).unwrap_or_else(|| PathBuf::from(format!("disc:{folder}")));
+        let named = |section: &str, k: usize| map.name(section, k).unwrap_or_default().to_string();
+
+        let patches = pbd.patches.iter().enumerate().map(|(k, raw)| {
+            let p = crate::pbd::PatchRec::parse(raw).ok_or("a patch record is short")?;
+            Ok(Patch {
+                patch_name: named("PATCHES", k),
+                light_map_point: p.lightmap,
+                uv_points: p.uv.map(|c| [c[0], c[1]]),
+                points: p.bezier().to_vec(),
+                surface_type: p.surface as i32,
+                trick_only_patch: p.showoff_only(),
+                texture_path: format!("{:04}.png", p.texture),
+                lightmap_id: p.lightmap_page as usize,
+            })
+        }).collect::<Result<Vec<_>, String>>()?;
+
+        // the collision meshes, numbered as the folder's Collision/<n>.obj: group by group, mesh by mesh
+        let mut meshes = std::collections::HashMap::new();
+        let mut first_of_group = vec![];
+        for g in &ssf.collision {
+            first_of_group.push(meshes.len());
+            for m in g {
+                let mut o = ObjMesh::default();
+                for (t, pl) in m.tris.iter().zip(&m.planes) {
+                    for i in t {
+                        let v = m.verts[*i as usize];
+                        o.positions.push([v[0], v[1], v[2]]);
+                        o.normals.push([pl[0], pl[1], pl[2]]);
+                        o.uvs.push([0.0, 1.0]);
+                    }
+                }
+                meshes.insert(dir.join("Collision").join(format!("{}.obj", meshes.len())), o);
+            }
+        }
+        let instances = pbd.instances.iter().enumerate().map(|(k, w)| {
+            let i = crate::pbd::InstanceRec::from_words(w);
+            let p = ssf.physics[ssf.object_physics[k] as usize];
+            let d = p.defaults();
+            // the folder keeps the matrix as a location, a rotation and a scale (equal to float noise)
+            let (scale, rot, loc) = Mat4::from_cols_array_2d(&i.matrix).to_scale_rotation_translation();
+            let lv = |n: usize| { let v = i.light_dir(n); [v[0], v[1], v[2], 0.0] };
+            let group = (p.collision_mode() != 3).then_some(p.group()).filter(|g| *g >= 0).map(|g| g as usize);
+            Instance {
+                instance_name: named("INTERNAL INSTANCES", k),
+                location: loc.into(),
+                rotation: rot.into(),
+                scale: scale.into(),
+                light_vector1: lv(0),
+                light_vector2: lv(1),
+                light_vector3: lv(2),
+                light_colour1: i.light_colours[0],
+                light_colour2: i.light_colours[1],
+                light_colour3: i.light_colours[2],
+                ambent_light_colour: i.ambient,
+                model_id: i.model,
+                visable: d & 1 != 0,
+                player_collision: d & 0x20 != 0,
+                player_bounce: d & 0x80 != 0,
+                collsion_mode: p.collision_mode() as i32,
+                collsion_model_paths: group.map(|g| (0..ssf.collision[g].len()).map(|j| format!("{}.obj", first_of_group[g] + j)).collect()),
+                u0: p.mass(),
+                effect_slot_index: p.slot() as i32,
+                surface_type: p.surface(),
+            }
+        }).collect::<Vec<_>>();
+
+        let world = model_set(&pbd, &pbd_bytes, &map, dir.clone(), &mut meshes)?;
+        let sky = model_set(&sky, &sky_bytes, &crate::map::Map::default(), dir.join("Skybox"), &mut meshes)?;
+        let splines = pbd.splines.iter().enumerate().map(|(k, w)| {
+            let s = crate::pbd::SplineRec(*w);
+            let segments = (0..s.segments() as usize).map(|n| Segment { points: crate::pbd::SegmentRec(pbd.segments[s.first() as usize + n]).bezier().to_vec() }).collect();
+            Spline { spline_name: named("SPLINES", k), segments }
+        }).collect();
+
+        // the scripts' part, as `load` does it (STANDIN: from the folder's SSFLogic.json, see above)
+        let logic_file = scripts.and_then(|d| read::<LogicFile>(&d.join("SSFLogic.json")).ok()).unwrap_or_default();
+        let touch = touch_effects(&instances, &logic_file);
+        let slot_of: Vec<i32> = instances.iter().map(|i| i.effect_slot_index).collect();
+        let logic = scripts.map(|d| crate::logic::LevelLogic::load(d, &slot_of)).unwrap_or_default();
+        let switchable = logic.switchable();
+        Ok(Self {
+            pieces: touch.values().flatten().copied().filter(|i| !instances[*i].visable).collect(),
+            logic, switchable, dir, patches, instances, touch, world, sky, splines, ai, meshes,
         })
     }
     /// Instances that move, break or get picked up: handled one by one, not as static scenery.
@@ -425,6 +531,103 @@ impl Level {
         let p = self.patches.first().map(|p| Vec3::from(p.points[0])).unwrap_or(Vec3::ZERO);
         (p + Vec3::Z * 500.0, Vec3::Y)
     }
+}
+
+/// An object "dies" on contact when its collision script (or the trigger it fires) contains effect type 0 / sub-type
+/// 5 ("dead node"). Type 7 effects name other instances to set off.
+fn touch_effects(instances: &[Instance], logic: &LogicFile) -> std::collections::HashMap<usize, Vec<usize>> {
+    let mut touch = std::collections::HashMap::new();
+    for (i, inst) in instances.iter().enumerate() {
+        let Some(slot) = logic.effect_slots.get(inst.effect_slot_index.max(0) as usize).filter(|_| inst.effect_slot_index >= 0) else { continue };
+        let effects: Vec<&Effect> = [slot.collision_effect_slot, slot.effect_trigger_slot].iter()
+            .filter_map(|h| logic.effect_headers.get((*h).max(0) as usize).filter(|_| *h >= 0)).flat_map(|h| h.effects.iter()).collect();
+        if effects.iter().any(|e| e.main_type == 0 && e.type0.as_ref().is_some_and(|t| t.sub_type == 5)) {
+            let linked = effects.iter().filter(|e| e.main_type == 7).filter_map(|e| e.instance.as_ref())
+                .map(|r| r.instance_index).filter(|r| *r >= 0 && (*r as usize) < instances.len() && *r as usize != i).map(|r| r as usize).collect();
+            touch.insert(i, linked);
+        }
+    }
+    touch
+}
+
+/// A `.pbd`'s models and materials in the folder's form (row E3a4): each model's name (the `.map`), animation time
+/// (+0x14) and hierarchy nodes: parent, the high-detail mesh's contexts (each one mesh, `<dir>/Meshes/<n>.obj`
+/// numbered context by context through all the models, its material the model's material block's entry for the
+/// context's +4), the node's matrix (−1 none) as a position, rotation and scale, and its animation (base pose, the
+/// channel mask, each channel's cubic segments: count, offset from the channel, then a, b, c, d, start, end).
+fn model_set(pbd: &crate::pbd::Pbd, b: &[u8], map: &crate::map::Map, dir: PathBuf, meshes: &mut std::collections::HashMap<PathBuf, ObjMesh>) -> Result<ModelSet, String> {
+    let f = |at: usize| b.get(at..at + 4).map(|w| f32::from_le_bytes([w[0], w[1], w[2], w[3]])).ok_or("past the end of the .pbd");
+    let u = |at: usize| f(at).map(f32::to_bits);
+    let vif = pbd.header.offset(0x84) as usize;
+    let mut k = 0usize;
+    let mut models = vec![];
+    for (mi, m) in pbd.models.iter().enumerate() {
+        let scale = [6, 7, 8].map(|i| f32::from_bits(m.head[i]));
+        let block = pbd.material_blocks.get(m.head[3] as usize);
+        let mut objects = vec![];
+        for n in &m.nodes {
+            let mut mesh_data = None;
+            if n.words[1] != 0 {
+                let mesh = m.meshes.iter().find(|x| x.offset == n.offset + n.words[1]).ok_or("a node's mesh is missing")?;
+                let mut parts = vec![];
+                for cx in &mesh.contexts {
+                    let strips = crate::pbd::context_strips(b, vif + cx.words[3] as usize, scale).map_err(|e| format!("model {mi}: {e}"))?;
+                    let mut o = ObjMesh::default();
+                    for s in &strips {
+                        for t in crate::pbd::strip_triangles(s.len()) {
+                            for i in t {
+                                o.positions.push(s[i].pos);
+                                o.uvs.push(s[i].uv);
+                                o.normals.push(s[i].nrm);
+                            }
+                        }
+                    }
+                    let path = format!("{k}.obj");
+                    meshes.insert(dir.join("Meshes").join(&path), o);
+                    parts.push(MeshRef { mesh_path: path, material_id: block.and_then(|bl| bl.get(cx.words[1] as usize)).map_or(-1, |x| *x as i32) });
+                    k += 1;
+                }
+                mesh_data = Some(parts);
+            }
+            let (mut position, mut rotation, mut scale) = (None, None, None);
+            if n.words[5] != u32::MAX {
+                let at = (n.offset + n.words[5]) as usize;
+                let mut c = [0f32; 16];
+                for (j, x) in c.iter_mut().enumerate() { *x = f(at + 4 * j)?; }
+                let (s, r, t) = Mat4::from_cols_array(&c).to_scale_rotation_translation();
+                (position, rotation, scale) = (Some(t.into()), Some(r.into()), Some(s.into()));
+            }
+            let animation = match &n.animation {
+                None => None,
+                Some(a) => {
+                    let h = a.head.map(f32::from_bits);
+                    let mut entries = vec![];
+                    for (c, _) in &a.channels {
+                        let c = *c as usize;
+                        let (count, first) = (u(c)? as usize, c + u(c + 4)? as usize);
+                        let segs = (0..count).map(|s| {
+                            let v = |j: usize| f(first + 24 * s + 4 * j);
+                            Ok(crate::anim::AnimSeg { a: v(0)?, b: v(1)?, c: v(2)?, d: v(3)?, t0: v(4)?, t1: v(5)? })
+                        }).collect::<Result<Vec<_>, &str>>()?;
+                        entries.push(crate::anim::AnimEntry { segs });
+                    }
+                    Some(ObjAnim { u1: h[0], u2: h[1], u3: h[2], u4: h[3], u5: h[4], u6: h[5], action: a.head[6], entries })
+                }
+            };
+            objects.push(ModelObject { parent_id: n.words[0] as i32, mesh_data, position, rotation, scale, animation });
+        }
+        models.push(Model { model_name: map.name("MODELS", mi).unwrap_or_default().to_string(), anim_time: f32::from_bits(m.head[5]), model_objects: objects });
+    }
+    let materials = pbd.materials.iter().enumerate().map(|(k, w)| {
+        let m = crate::pbd::MaterialRec(*w);
+        let name = |t: u32| format!("{t:04}.png");
+        Material {
+            material_name: map.name("MATERIALS", k).unwrap_or_default().to_string(),
+            texture_path: if m.texture() == 0xffff { String::new() } else { name(m.texture() as u32) },
+            texture_flipbook: usize::try_from(m.flip()).ok().and_then(|x| pbd.texture_flips.get(x)).map(|v| v.iter().map(|t| name(*t)).collect()),
+        }
+    }).collect();
+    Ok(ModelSet { dir, models, materials })
 }
 
 fn read<T: for<'de> Deserialize<'de>>(path: &Path) -> Result<T, String> {

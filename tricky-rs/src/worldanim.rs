@@ -9,7 +9,7 @@
 //! when a rider touches the object, from the EffectTriggerSlot when a counter or crack reaches
 //! its goal, and StartCountDown when the countdown starts. Controllers tick at 60 Hz as in the game.
 
-use crate::level::{load_obj, quat4, Level, ObjMesh};
+use crate::level::{quat4, Level, ObjMesh};
 use crate::logic::{FlagDef, FlipDef, ScrollDef, WOp, WorldScript};
 use crate::props::Kind;
 use crate::rider::RaceState;
@@ -194,9 +194,9 @@ impl WorldAnim {
         let model = set.models.get(inst.model_id.max(0) as usize)?;
         let inst_m = Mat4::from_scale_rotation_translation(inst.scale.into(), quat4(inst.rotation), inst.location.into());
         let (obj_m, path, mid) = model.model_objects.iter().zip(set.object_matrices(model)).find_map(|(o, m)| {
-            o.mesh_data.iter().flatten().find(|p| quad(&set.dir.join("Meshes").join(&p.mesh_path)).is_some()).map(|p| (m, p.mesh_path.clone(), p.material_id.max(0) as usize))
+            o.mesh_data.iter().flatten().find(|p| quad(level, &set.dir.join("Meshes").join(&p.mesh_path)).is_some()).map(|p| (m, p.mesh_path.clone(), p.material_id.max(0) as usize))
         })?;
-        let (v, uv) = quad(&set.dir.join("Meshes").join(&path))?;
+        let (v, uv) = quad(level, &set.dir.join("Meshes").join(&path))?;
         let k = parts.iter().position(|p| p.1 == path)?;
         let col = parts[k].2.col.first().copied().unwrap_or([1.0; 4]);
         let lerp = |a: usize, b: usize, c: usize| (v[a] + (v[b] - v[a]) * c as f32 / 7.0, uv[a] + (uv[b] - uv[a]) * c as f32 / 7.0);
@@ -491,8 +491,14 @@ fn impact(vel: Vec3, normal: Vec3) -> f32 {
     if l < 1e-3 { 0.0 } else { (v / l).dot(normal) * v.dot(normal) }
 }
 
-/// The 4 vertices (in file order) and their uvs of a one-quad OBJ, or None.
-fn quad(path: &std::path::Path) -> Option<([Vec3; 4], [Vec2; 4])> {
+/// The 4 vertices (in file order) and their uvs of a one-quad OBJ, or None. A mesh from the disc: one strip of 4
+/// (its triangles 0 1 2 and 3 2 1, the file's order).
+fn quad(level: &Level, path: &std::path::Path) -> Option<([Vec3; 4], [Vec2; 4])> {
+    if let Some(m) = level.meshes.get(path) {
+        let p = &m.positions;
+        if p.len() != 6 || p[4] != p[2] || p[5] != p[1] { return None; }
+        return Some((std::array::from_fn(|k| Vec3::from(p[k])), std::array::from_fn(|k| Vec2::from(m.uvs[k]))));
+    }
     let text = std::fs::read_to_string(path).ok()?;
     let (mut v, mut vt, mut map) = (Vec::new(), Vec::new(), [usize::MAX; 4]);
     for line in text.lines() {
@@ -525,7 +531,7 @@ fn bounds(level: &Level, i: usize, cache: &mut HashMap<std::path::PathBuf, ObjMe
     }
     let mut b = (Vec3::MAX, Vec3::MIN);
     for (key, m) in parts {
-        let mesh = cache.entry(key.clone()).or_insert_with(|| load_obj(&key));
+        let mesh = cache.entry(key.clone()).or_insert_with(|| level.mesh(&key));
         for p in &mesh.positions { let v = g2b(m.transform_point3(Vec3::from(*p))); b.0 = b.0.min(v); b.1 = b.1.max(v); }
     }
     (b.0.x <= b.1.x).then_some(b)

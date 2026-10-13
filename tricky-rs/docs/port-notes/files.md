@@ -318,3 +318,12 @@ there (no rewind); a level is the value / 100 when 0..200 (the duck 0..100), els
   quadwords a vertex), then per vertex (masked, `STCYCL` 1/3) V2-16 UVs (4.12; the exports write 1 − v), V3-16
   normals (1.15) and V3-16 positions (1.15 times the model's vertex scale, model head +0x18). Each strip is drawn
   as a triangle strip, every other triangle reversed. gari is not compared (its export is of another build).
+- The app from the disc (row E3a4; `Level::from_disc`, checked: `tricky-data/tests/level_disc.rs` against all 11
+  levels folders: 28,835 patches, 25,128 instances, 8,325 world and 275 sky meshes, 12,388 collision meshes, 1,540
+  splines). Proven: `Course_LoadRenderData` 0x25edf0 mounts `data/models/<file>.big` and reads `<file>.pbd`, `.ssf`,
+  `.aip`; `Course_LoadSkies` 0x185b18 reads `<file>_sky.pbd`. The `.map` (names only) is read by no code in the game;
+  the port takes the names from it to keep the folders' names. A model node's matrix (+0x14, -1 none) is split into
+  position, rotation and scale; its animation keeps the head's six floats, the action word and each channel's cubic
+  segments (count at the channel, then the offset to the first). The textures, lightmaps and scripts still come from
+  the levels folder (rows E3a7, E9b2); with `TRICKY_SIM=600` elysium and aloha ride the same from the disc as from
+  the folder (distance, speed, airtime, falls within a few percent; the folder's numbers are rounded to 6 digits).

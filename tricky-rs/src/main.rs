@@ -202,10 +202,19 @@ struct BodyPart { part: usize, board: bool }
 struct Loaded { level: Level, world: CollisionWorld, rails: Rails, line: Vec<Vec3>, start: Vec3, yaw: f32, course: rider::AiCourse, lines: course::Lines, paths: course::AiPaths, tube: Option<props::Tube>, cml: Option<std::sync::Arc<intro::Cml>>, stage: Option<(Vec3, Quat)>, finish_area: Option<(Vec3, Quat)> }
 
 fn open_level(dir: &Path) -> Result<Loaded, String> {
-    let mut level = Level::load(dir)?;
+    // the level from the player's disc (TRICKY_DISC, row E3a4: the course's .pbd, .ssf, .aip and sky as the game
+    // loads them), else the level folder; the folder still gives the textures (row E3a4b) and the scripts (STANDIN,
+    // see `Level::from_disc`)
+    let from_disc = std::env::var("TRICKY_DISC").ok().and_then(|p| {
+        let mut files = tricky_data::big::Files::new(tricky_data::disc::Disc::open(&p).ok()?);
+        let folder = dir.file_name()?.to_string_lossy().to_string();
+        Level::from_disc(&mut files, &folder, dir.join("SSFLogic.json").exists().then_some(dir)).map_err(|e| eprintln!("level {folder} from the disc: {e}")).ok()
+    });
+    let from_disc_ok = from_disc.is_some();
+    let mut level = match from_disc { Some(l) => { println!("level from the disc"); l } None => Level::load(dir)? };
     // the course's AI paths and race lines from the player's disc (TRICKY_DISC, row E3d: its .aip as
     // `AIP_LoadPathsFromFile` reads it), else the level folder's AIP.json
-    if let Some(ai) = std::env::var("TRICKY_DISC").ok().and_then(|p| {
+    if let Some(ai) = std::env::var("TRICKY_DISC").ok().filter(|_| !from_disc_ok).and_then(|p| {
         let mut files = tricky_data::big::Files::new(tricky_data::disc::Disc::open(&p).ok()?);
         tricky_data::aip::from_disc(&mut files, &dir.file_name()?.to_string_lossy(), "aip")
     }) {
@@ -689,7 +698,7 @@ fn spawn_animated(
             let mut bufs: HashMap<String, MeshBuf> = HashMap::new();
             for part in obj.mesh_data.iter().flatten() {
                 let Some(mat) = set.materials.get(part.material_id.max(0) as usize) else { continue };
-                let src = load_obj(&set.dir.join("Meshes").join(&part.mesh_path));
+                let src = level.mesh(&set.dir.join("Meshes").join(&part.mesh_path));
                 let buf = bufs.entry(mat.texture_path.clone()).or_default();
                 for ((p, n), uv) in src.positions.iter().zip(&src.normals).zip(&src.uvs) {
                     let n_world = (rot_g * Vec3::from(*n)).normalize_or(Vec3::Z);
@@ -850,7 +859,7 @@ fn spawn_props(
             let m = Mat4::from_scale(inst.scale.into()) * obj_m;
             for part in obj.mesh_data.iter().flatten() {
                 let Some(mat) = set.materials.get(part.material_id.max(0) as usize) else { continue };
-                let src = load_obj(&set.dir.join("Meshes").join(&part.mesh_path));
+                let src = level.mesh(&set.dir.join("Meshes").join(&part.mesh_path));
                 let buf = bufs.entry((mat.texture_path.clone(), if own { part.material_id.max(0) as usize } else { usize::MAX })).or_default();
                 for ((p, n), uv) in src.positions.iter().zip(&src.normals).zip(&src.uvs) {
                     let local = g2b(m.transform_point3(Vec3::from(*p)));
@@ -1125,7 +1134,7 @@ fn bilinear(img: &image::RgbaImage, x: f32, y: f32) -> [f32; 3] {
 }
 
 /// One static instance's meshes in Bevy space with its lights baked in: (material, mesh file, mesh).
-fn bake_instance(set: &ModelSet, inst: &Instance, objs: &mut HashMap<String, ObjMesh>) -> Vec<(usize, String, MeshBuf)> {
+fn bake_instance(level: &Level, set: &ModelSet, inst: &Instance, objs: &mut HashMap<String, ObjMesh>) -> Vec<(usize, String, MeshBuf)> {
     let mut out = Vec::new();
     let Some(model) = set.models.get(inst.model_id.max(0) as usize).filter(|_| inst.model_id >= 0) else { return out };
     let inst_m = Mat4::from_scale_rotation_translation(inst.scale.into(), quat4(inst.rotation), inst.location.into());
@@ -1140,7 +1149,7 @@ fn bake_instance(set: &ModelSet, inst: &Instance, objs: &mut HashMap<String, Obj
         let m = inst_m * obj_m;
         let normal_m = Mat3::from_mat4(m).inverse().transpose();
         for part in parts {
-            let src = objs.entry(part.mesh_path.clone()).or_insert_with(|| load_obj(&set.dir.join("Meshes").join(&part.mesh_path)));
+            let src = objs.entry(part.mesh_path.clone()).or_insert_with(|| level.mesh(&set.dir.join("Meshes").join(&part.mesh_path)));
             if src.positions.is_empty() || set.materials.get(part.material_id.max(0) as usize).is_none() { continue; }
             let mut buf = MeshBuf::default();
             for ((p, n), uv) in src.positions.iter().zip(&src.normals).zip(&src.uvs) {
@@ -1174,7 +1183,7 @@ fn spawn_instances(
     let mut chunks: Chunks = HashMap::new();
     for (index, inst) in level.instances.iter().enumerate() {
         if !inst.visable || inst.model_id < 0 || level.is_dynamic(index) || level.switchable.contains(&index) || animated(level, index) { continue; }
-        let parts = bake_instance(set, inst, &mut objs);
+        let parts = bake_instance(level, set, inst, &mut objs);
         // flipped, scrolled or waving: drawn on its own with its own materials
         if wa.owns(level, index) { wa.spawn_static(commands, level, index, parts, meshes, images, materials, &mut tex); continue; }
         let (cx, cz) = chunk_of(g2b(inst.location.into()));
@@ -1199,7 +1208,7 @@ fn spawn_sky(
     for model in &set.models {
         for (obj, obj_m) in model.model_objects.iter().zip(set.object_matrices(model)) {
             for part in obj.mesh_data.iter().flatten() {
-                let src = load_obj(&set.dir.join("Meshes").join(&part.mesh_path));
+                let src = level.mesh(&set.dir.join("Meshes").join(&part.mesh_path));
                 for p in &src.positions { radius = radius.max(obj_m.transform_point3(Vec3::from(*p)).length()); }
                 parts.push((src, obj_m, part.material_id));
             }
@@ -1337,7 +1346,7 @@ fn make_mover(level: &Level, index: usize, parts: &[(Option<usize>, PathBuf)], s
     let model = level.world.models.get(usize::try_from(inst.model_id).ok()?)?;
     let mut local: Vec<(usize, Vec<[Vec3; 3]>)> = Vec::new();
     for (k, key) in parts {
-        let mesh = cache.entry(key.to_string_lossy().to_string()).or_insert_with(|| load_obj(key));
+        let mesh = cache.entry(key.to_string_lossy().to_string()).or_insert_with(|| level.mesh(key));
         local.push((k.unwrap_or(0), mesh.positions.as_chunks::<3>().0.iter().map(|t| [Vec3::from(t[0]), Vec3::from(t[1]), Vec3::from(t[2])]).collect()));
     }
     let objs = model.model_objects.iter().map(|o| collide::MoverObj {
@@ -1422,7 +1431,7 @@ fn build_collision(level: &Level) -> CollisionWorld {
             }
             for (k, key) in parts {
                 let m = at(k);
-                let mesh = cache.entry(key.to_string_lossy().to_string()).or_insert_with(|| load_obj(&key));
+                let mesh = cache.entry(key.to_string_lossy().to_string()).or_insert_with(|| level.mesh(&key));
                 for t in mesh.positions.as_chunks::<3>().0 {
                     let v = |i: usize| g2b(m.transform_point3(Vec3::from(t[i])));
                     world.add_reset([v(0), v(1), v(2)]);
@@ -1446,7 +1455,7 @@ fn build_collision(level: &Level) -> CollisionWorld {
         for (k, path) in parts {
             let m = at(k);
             let key = path.to_string_lossy().to_string();
-            let mesh = cache.entry(key).or_insert_with(|| load_obj(&path));
+            let mesh = cache.entry(key).or_insert_with(|| level.mesh(&path));
             for t in mesh.positions.as_chunks::<3>().0 {
                 let v = |i: usize| g2b(m.transform_point3(Vec3::from(t[i])));
                 for k in 0..3 { bounds.0 = bounds.0.min(v(k)); bounds.1 = bounds.1.max(v(k)); }
@@ -1499,7 +1508,7 @@ fn build_collision(level: &Level) -> CollisionWorld {
             }
         }
         for (key, m) in parts {
-            let mesh = cache.entry(key.to_string_lossy().to_string()).or_insert_with(|| load_obj(&key));
+            let mesh = cache.entry(key.to_string_lossy().to_string()).or_insert_with(|| level.mesh(&key));
             for p in &mesh.positions { let v = g2b(m.transform_point3(Vec3::from(*p))); b.0 = b.0.min(v); b.1 = b.1.max(v); }
         }
         (b.0.x <= b.1.x).then_some(b)
@@ -1553,7 +1562,7 @@ fn gate_window(level: &Level, i: usize) -> Option<(f32, (f32, f32))> {
     // how far each animated part's mesh has moved from where it rests
     let parts: Vec<(&level::ObjAnim, Vec<Vec3>)> = model.model_objects.iter().filter_map(|o| {
         let an = o.animation.as_ref()?;
-        let pts = o.mesh_data.iter().flatten().flat_map(|m| load_obj(&level.dir.join("Meshes").join(&m.mesh_path)).positions.into_iter().map(Vec3::from)).collect();
+        let pts = o.mesh_data.iter().flatten().flat_map(|m| level.mesh(&level.dir.join("Meshes").join(&m.mesh_path)).positions.into_iter().map(Vec3::from)).collect();
         Some((an, pts))
     }).collect();
     let moved = |t: f32| parts.iter().map(|(an, pts)| {

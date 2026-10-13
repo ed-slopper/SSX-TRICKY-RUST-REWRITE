@@ -8,7 +8,7 @@ level project folder extracted from your own disc (see `../notes/level-editing.m
 ```
 tricky-rs.exe                      loads ..\levels\gari and the characters in ..\chars
 tricky-rs.exe D:\path\to\level     any folder containing Patches.json
-set TRICKY_DISC=D:\SSX Tricky.iso    then tricky-rs.exe: the riders' and boards' models, animations and textures come from your own disc (an image, or the drive \\.\E:)
+set TRICKY_DISC=D:\SSX Tricky.iso    then tricky-rs.exe: the riders' and boards' models, animations and textures, and the course's patches, objects, models, splines, sky and AI paths come from your own disc (an image, or the drive \\.\E:); the level folder still gives the course's textures and scripts
 ```
 
 You ride one of the twelve characters from the disc (Mac by default) against three computer riders.
