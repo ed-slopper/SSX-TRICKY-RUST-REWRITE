@@ -92,6 +92,7 @@ state machine and the renderer are ours. Nothing has been checked against the or
 | G2 | Tricks and scoring checked: `Score_*` 0x155410–0x157490, `Score_BuildTrickId` 0x157490, `Score_FormatTrickName` 0x1551c0, repeats, chains, multipliers, uber timer, TRICKY | any | F4a | | [repo] Ported in `rider.rs`/`trickdata.rs` Split: G2a, G2b |
 | G3 | Rider attributes and progression: stats per rider and level, training points, boards per rider and their unlock points, outfits | unowned | E12 | | [repo] `trickdata.rs` has the tables; rookie/master is our menu |
 | G4 | AI checked: path following 0x1375c8 / 0x1372f8, rubber band 0x115100 / 0x13a0f0, skill pairs, tricks 0x139d58 / 0x138d60, resets, shoves | any | F4a, E1b | | [repo] Ported in `rider.rs`/`main.rs`. Split: G4a, G4b, G4c, G4d, G4e, G4f |
+| G4k1 | The race-flow glue with decisions in it (`tricky_game::prerace`): `cCountdownHandler::Enter` / `Update` (StartCountdown / EndCountdown, the 300-frame count, the beeps, GO), the race menu (`RaceMenu_EndRace`, `_Restart`, `_GoToState11` / `12` and their four forwards), `Race_UpdateLookBack`, `cAI::vf12` (the mode's start script), `vf18`, `vf19` (the freeze), checked in the runner; the allocating virtuals (`vf8`, `vf10`, `vf11`, `vf13`, `vf16`) stay G4k | unowned | G11d | ed-slopper/puffin (2026-10-12) | Split of G4k |
 | G4a | Rivals and vendettas checked: `RelTable_Init` 0x167208, `Rider_OnKnockedDownBy`, `AI_StartVendetta`, `AI_CoolVendetta` | any | F4a | | [repo] `rivals.rs` Split: G4a1, G4a2 |
 | G4e | The app's computer riders ride with `aicomp::Ai::ride` (the four modes, the shove, the target choice) on the course's own jump markers and speed hints (`AIComputer_FindJumpMarker` 0x1392a8 / `AIComputer_FindSpeedHint` 0x1393e0 over the AI paths, E3d) and the line point (+0x360), replacing `AiDriver`'s steering and throttle | any | G4d, E3d, G4f | | Split of G4 (wiring; needs a play test) |
 | G5 | Animation: the game's own animation state machine and blending for all 248 `bxanim` clips (plus cmanim, ps2anim, ubers), clip markers, replacing our choice of clip | unowned | F1, E4 | | [repo] README: "Which clip plays when is my state logic". Split by state before claiming |
@@ -801,3 +802,4 @@ matches the original.
 - 2026-10-12 ed-slopper/puffin: G4l done.
 - 2026-10-11 ed-slopper/puffin: claim G10b.
 - 2026-10-12 ed-slopper/puffin: G10b done; added G10b2 (the app on it).
+- 2026-10-12 ed-slopper/puffin: add and claim G4k1 (split of G4k).
