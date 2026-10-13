@@ -159,6 +159,34 @@ by voice 0..11 a bit of 0xfff, 0 past them) and call `SpeechSys_Trigger` at the 
   the checkpoint counts, the big-score ring and the end flags compared. `Speech_OnScriptCue47` / `48`, despite
   the names, fill a sound manager's slot (`SndMgr_GetSlot`, `SndSys_PlayPending`) before their one post: G10.
 
+## Pathfinder's graph as the engine walks it (board row G10b; `tricky_game::pf`, checked: `tests/pf.rs`)
+
+The engine keeps four song records from 0x3495e0 (0x1d4 each; the selected one's address at 0x3495c8, its number at
+0x3495d3, the marker callback at 0x3495cc) and works on the `.mpf` graph and the 24 track records through pointers;
+the port keeps the same bytes at the same addresses (`pf::Mem`).
+
+- `PathX_RegisterSong` 0x2c0b08: the graph ("xDFP" = 0x50464478, version 0x103) goes to the slot its +0xc names when
+  free; the record's tables: +0x18 the node offsets (shorts from graph +0x24, +0x12 of them), +0x1c after them, +0x20
+  the event grid (after the last node's branches: tracks (+0xd) × rows (+0xf) × columns (+0xe) bytes, rounded to 4),
+  +0x24 its entries (+0x10 words), +0x28 the router table, +0x2c / +0x30; +8 = 50 (ms of look-ahead), +0xc = 10.
+  `Path_Init` clears the four records, `PathX_SelectSong` picks one.
+- A node (graph + offset · 4): +0 its audio (below 1 none: 0 a marker, −1 a loop start), +2 its track, +3 the event
+  grid column (top bit: the target has one), +9 a loop count, +10 its router, +0xb the branch count, from +0xc four
+  bytes a branch (low, high as signed bytes, the target).
+- `FUN_002bf038` the branch by the path variable (0..255): on a looping node (the track's +0xc) the loop count (+5)
+  is the variable, counted down per pass (the node forgotten at −1). `FUN_002bf290` the router: the pairs (high half
+  → low half) between the router table's entry and the one before it remap a node. `FUN_002bf108` walks from a node
+  past every node without audio, telling the callback of markers (and keeping the marker in the track's +0x10),
+  starting loop counts, branching each step; the node reached goes through the router once more.
+  `FUN_002bf320` / `FUN_002bf490`: an event's grid cell (track · rows · columns + event · columns + the current
+  node's column, or the first track's with one) and its entry (low byte the action, 0x300 moves, 0x400 set when the
+  target's column has the top bit, high half the target).
+- Checked in the runner on all 21 songs of MUSIC.BIG (TRICKY_MUSIC_DIR): registration, then 3000 random calls a song
+  on random track records, the song table, the graph, the tracks and the marker calls compared (a small graph's
+  lookups read past its end; the test gives both sides the same bytes there). Still to port: the scheduler
+  (`FUN_002bf508` the next segment, `FUN_002bfe28`, `FUN_002c00d0`, `FUN_002bfbb8`, the stream callbacks
+  `FUN_002c0488` / `FUN_002c0898`) and the controls (`PathX_LoadSong`, events, volume, fades, stops).
+
 ## Front-end sounds (`cFE3DSound` → `Audio_PlayFE*`, F1c)
 
 Proven (live Ghidra):

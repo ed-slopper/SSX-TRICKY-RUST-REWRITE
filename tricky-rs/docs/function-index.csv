@@ -6068,18 +6068,18 @@ address,size,name,system,status
 0x2bebb0,52,SpeechLib_GetTime,lib-snd?,not started
 0x2bebe8,128,FUN_002bebe8,lib-snd?,not started
 0x2bec68,56,FUN_002bec68,audio?,not started
-0x2beca0,180,Path_Init,audio?,not started
-0x2bed58,92,PathX_SelectSong,audio?,not started
+0x2beca0,180,Path_Init,audio?,checked
+0x2bed58,92,PathX_SelectSong,audio?,checked
 0x2bedb8,52,FUN_002bedb8,audio?,not started
 0x2bedf0,148,FUN_002bedf0,audio?,not started
 0x2bee88,128,PathX_CountActiveTracks,audio?,not started
 0x2bef08,204,FUN_002bef08,audio?,not started
 0x2befd8,96,FUN_002befd8,audio?,not started
-0x2bf038,200,FUN_002bf038,audio?,not started
-0x2bf108,388,FUN_002bf108,audio?,not started
-0x2bf290,144,FUN_002bf290,audio?,not started
-0x2bf320,364,FUN_002bf320,audio?,not started
-0x2bf490,116,FUN_002bf490,audio?,not started
+0x2bf038,200,FUN_002bf038,audio?,checked
+0x2bf108,388,FUN_002bf108,audio?,checked
+0x2bf290,144,FUN_002bf290,audio?,checked
+0x2bf320,364,FUN_002bf320,audio?,checked
+0x2bf490,116,FUN_002bf490,audio?,checked
 0x2bf508,1388,FUN_002bf508,audio?,not started
 0x2bfa78,316,FUN_002bfa78,audio?,not started
 0x2bfbb8,620,FUN_002bfbb8,audio?,not started
@@ -6087,7 +6087,7 @@ address,size,name,system,status
 0x2c00d0,952,FUN_002c00d0,audio?,not started
 0x2c0488,1040,FUN_002c0488,audio?,not started
 0x2c0898,588,FUN_002c0898,audio?,not started
-0x2c0b08,424,PathX_RegisterSong,audio?,not started
+0x2c0b08,424,PathX_RegisterSong,audio?,checked
 0x2c0cb0,872,PathX_LoadSong,audio?,not started
 0x2c1018,80,FUN_002c1018,audio?,not started
 0x2c1068,200,FUN_002c1068,audio?,not started

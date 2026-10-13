@@ -50,6 +50,7 @@ pub mod lesson;
 pub mod math;
 pub mod objanim;
 pub mod orient;
+pub mod pf;
 pub mod pickup;
 pub mod pose;
 pub mod rail_control;
