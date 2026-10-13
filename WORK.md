@@ -212,6 +212,7 @@ matches the original.
 | G10a2b | The world emitters' small functions in `worldemitter.rs`: `WorldEmitter_Clear`, `_Matches`, `_FindFree`, `_Find`, `_Falloff`, `_Stop`, `_StopAll`, `_UpdateAll`, against the original with the voice-stop and update calls logged (tests/worldemitter.rs). Gap of G10a2 | P2 | trailrig/heron | 2026-10-13 | fee62bb |
 | G10a2c | `SndVoice_DistanceVolume` 0x20aab8 and `SndVoice_DopplerPitch` 0x20ab48 in `sfxcalc.rs`, against the original (tests/sfxcalc.rs; the 1-ulp clamp survivors are absorbed by the sum). Gap of G10a2 | P2 | trailrig/heron | 2026-10-13 | f935342 |
 | G10a2d | The audio system's pending-sound queue entry (`sndqueue::queue_sound`, inlined in every handler) and `Sfx_UpdateAir` 0x217d50 (`update_air`), against the original with the engine's calls logged (tests/sndqueue.rs). Gap of G10a2 | P2 | trailrig/heron | 2026-10-13 | e9f7d59 |
+| G10a2e | `Sfx_OnAirEnter` 0x2174f8 (`sndqueue::on_air_enter`; the compiler's nested clamp is `clamp(x, 64, 127)` on `impact * 127 / 1000`), against the original (tests/sndqueue.rs). Gap of G10a2 | P2 | trailrig/heron | 2026-10-13 | 2bf30c6 |
 | G4i | `racemisc.rs`: `Game_GetLeadingPlayer`, `Game_MoveLeaderToSlot0`, `Race_FindPlayerRiders`, `Game_IsLeadOrFocusRider` against the original (tests/racemisc.rs, 40,000 cases); the shell sort and `FUN_0016c228` were already in roster.rs / circuit.rs | P2 | trailrig/heron | 2026-10-12 | 59e9b3c |
 | G4j | `results.rs`: `cAI::vf17_111820`, the race results (times, stat blocks, show-off point thresholds, the human columns, career best-stats calls, ranking) against the original with the career/boarder calls logged (tests/results.rs, 30,000 cases) | P2 | trailrig/heron | 2026-10-12 | 3824ca2 |
 | E11a | `camera.rs`: `CamCamera_EvalPosition` 0x16e900 (orbit offset from the target's direction and matrices, the two eased angles, two axis-angle rotations, stage area, collision call, shake table) against the original with the stage and collision calls logged (tests/camera.rs, 60,000 cases; seven mutations of the port all fail the test) | P2 | trailrig/heron | 2026-10-12 | bab3175 |
@@ -871,3 +872,4 @@ matches the original.
 - 2026-10-13 ed-slopper/puffin: claim G12f (split of G12).
 - 2026-10-13 trailrig/heron: G10a2d done (sound queue entry and Sfx_UpdateAir vs the original).
 - 2026-10-13 irregulur/lynx: claim G6d.
+- 2026-10-13 trailrig/heron: G10a2e done (Sfx_OnAirEnter vs the original).
