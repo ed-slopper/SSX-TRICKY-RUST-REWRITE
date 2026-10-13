@@ -725,3 +725,92 @@ fn camera_blend_orbit_matches_the_original() {
     }
     eprintln!("orbit: {n} cases, {full} finished, {flipped} flipped");
 }
+
+#[test]
+fn camera_script_blend_matches_the_original() {
+    use std::cell::RefCell;
+    use std::rc::Rc;
+    let Some(mut r) = Runner::from_env() else { return };
+    r.float_rules = Rules::parse("add=n,mul=n,div=n,cvt=n").unwrap();
+    for a in [0x1704b0u32, 0x175a08] {
+        r.allow(a);
+    }
+    let log: Rc<RefCell<Vec<Vec<u64>>>> = Rc::new(RefCell::new(vec![]));
+    let l = log.clone();
+    r.stub(0x174d28, move |c, _| {
+        l.borrow_mut().push(vec![1, c.f(12).to_bits() as u64, c.gpr(4), c.gpr(5), c.gpr(6)]);
+        c.set_gpr(2, 0x1_0000_0000 | c.gpr(4) & 1);
+    });
+    let l = log.clone();
+    r.stub(0x175450, move |c, _| {
+        l.borrow_mut().push(vec![2, c.f(12).to_bits() as u64, c.gpr(4), c.gpr(5), c.gpr(6), c.gpr(7)]);
+        c.set_gpr(2, 0x2_0000_0000 | c.gpr(5) & 1);
+    });
+    let l = log.clone();
+    r.stub(0x2fd14c, move |c, _| {
+        l.borrow_mut().push(vec![3, c.gpr(4), c.gpr(5)]);
+    });
+    struct C {
+        log: Rc<RefCell<Vec<Vec<u64>>>>,
+        a: [u64; 3],
+        flip: u64,
+    }
+    impl BlendCalls for C {
+        fn linear(&mut self, t: f32) -> u64 {
+            self.log.borrow_mut().push(vec![1, t.to_bits() as u64, self.a[0], self.a[1], self.a[2]]);
+            0x1_0000_0000 | self.a[0] & 1
+        }
+        fn orbit(&mut self, t: f32, flip: u32) -> u64 {
+            assert_eq!(flip as u64, self.flip);
+            self.log.borrow_mut().push(vec![2, t.to_bits() as u64, self.a[0], self.a[1], self.a[2], flip as u64]);
+            0x2_0000_0000 | self.a[1] & 1
+        }
+        fn copy_name(&mut self) {
+            self.log.borrow_mut().push(vec![3, self.a[0] + 0x24, self.a[2]]);
+        }
+    }
+    let mut g = Rng(0x175a_08c3_77d1_4e9b);
+    let (mut n, mut mid, mut done) = (0, 0, 0);
+    for case in 0..40_000 {
+        let start = g.f() * 10.0;
+        let span = [0.0f32, 0.5, 1.0, 3.0, 8.0][(g.next() % 5) as usize];
+        let end = start + span;
+        let now = match g.next() % 6 {
+            0 => start - g.f().abs(),
+            1 => end + g.f().abs(),
+            2 => start,
+            3 => end,
+            _ => start + span * (g.next() % 1001) as f32 / 1000.0,
+        };
+        let mode = [0i32, 1, 2, 3, 4, -1, 2][(g.next() % 7) as usize];
+        let orbit = g.next() % 2 == 0;
+        let flip = (g.next() % 4) as u64;
+        let obj = 0x7000_0000u64 + (g.next() as u64 & 0xff_fff0);
+        let (a1, a2) = (g.next() as u64, g.next() as u64);
+        log.borrow_mut().clear();
+        r.cpu.set_f(12, start);
+        r.cpu.set_f(13, now);
+        r.cpu.set_f(14, end);
+        r.cpu.set_gpr(4, obj);
+        r.cpu.set_gpr(5, a1);
+        r.cpu.set_gpr(6, a2);
+        r.cpu.set_gpr(7, mode as i64 as u64);
+        r.cpu.set_gpr(8, orbit as u64 * (1 + g.next() as u64 % 3));
+        r.cpu.set_gpr(9, flip);
+        r.call(0x175a08).unwrap();
+        let want = std::mem::take(&mut *log.borrow_mut());
+        let want_ret = r.cpu.gpr(2);
+        let mut c = C { log: log.clone(), a: [obj, a1, a2], flip };
+        let ret = script_blend(start, now, end, mode, orbit, flip as u32, &mut c);
+        let got = std::mem::take(&mut *log.borrow_mut());
+        assert_eq!(want, got, "case {case}: {start} {now} {end} mode {mode}");
+        assert_eq!(want_ret, ret, "case {case} return");
+        n += 1;
+        if got.len() == 2 {
+            done += 1
+        } else if f32::from_bits(got[0][1] as u32) > 0.0 {
+            mid += 1
+        }
+    }
+    eprintln!("script blend: {n} cases, {mid} part way, {done} finished");
+}

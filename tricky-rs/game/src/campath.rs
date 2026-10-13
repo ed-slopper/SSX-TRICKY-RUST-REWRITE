@@ -501,3 +501,41 @@ pub fn blend_orbit(
     env.done(0);
     end
 }
+
+/// What `CamScript_Blend` calls once it has the blend fraction.
+pub trait BlendCalls {
+    /// `CamScript_BlendLinear` (0x174d28) or `CamScript_BlendOrbit` (0x175450, with `flip`); returns its result.
+    fn linear(&mut self, t: f32) -> u64;
+    fn orbit(&mut self, t: f32, flip: u32) -> u64;
+    /// `strcpy` of the target camera's name over the current one.
+    fn copy_name(&mut self);
+}
+
+/// `CamScript_Blend` 0x175a08: the fraction of the way from `start` to `end` at time `now` (clamped to the step),
+/// eased by `mode` (1: ease-out, 2: ease in and out, 3: ease-in; other: straight), then one of the two blends;
+/// once the fraction reaches 1 the target camera's name becomes the current one. Returns what the blend returned.
+pub fn script_blend(start: f32, now: f32, end: f32, mode: i32, orbit: bool, flip: u32, calls: &mut dyn BlendCalls) -> u64 {
+    let mut now = now;
+    if now < start {
+        now = start;
+    } else if end < now {
+        now = end;
+    }
+    let mut t = ps2_div(sb(now, start), sb(end, start));
+    if 0.0 < t && t < 1.0 {
+        t = match mode {
+            1 => hermite(0.0, 1.0, 0.0, 1.0, t),
+            2 => hermite(0.0, 1.0, 0.0, 0.0, t),
+            3 => hermite(0.0, 1.0, 1.0, 0.0, t),
+            _ => t,
+        };
+    }
+    if 1.0 < t {
+        t = 1.0;
+    }
+    let ret = if orbit { calls.orbit(t, flip) } else { calls.linear(t) };
+    if 1.0 <= t {
+        calls.copy_name();
+    }
+    ret
+}
