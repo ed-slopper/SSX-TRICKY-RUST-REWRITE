@@ -331,3 +331,157 @@ pub fn board_track(t: &mut Trail, r: &TrackIn) {
     }
     t.w[0x1950 / 4] = 1;
 }
+
+/// One vertex of the strip the draw builds (0x30 bytes; the word at +0xc is never written): +0 and +4 the texture
+/// coordinates (u, and 0 or 1 alternating), +8 1.0, +0x10..0x18 the colour 0x80, +0x1c the shade weight, +0x20 the
+/// position relative to the camera's origin.
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct Vertex {
+    pub u: f32,
+    pub v: f32,
+    pub one: f32,
+    pub rgb: [u32; 3],
+    pub w: u32,
+    pub pos: V4,
+}
+
+/// What `Fx_BoardTrack_Draw` calls on the renderer (`gApp + 0x724`): its virtual functions by vtable offset, with
+/// the arguments the draw sets (the ones it leaves are not passed).
+pub trait DrawEnv {
+    /// The virtual call at vtable offset `off` (0x1c0..0x1f8 the state setters, 0x1d8 the one that returns the
+    /// state to restore); the renderer is its `this`.
+    fn vcall(&mut self, off: u32, a1: Option<u32>, a2: Option<u32>, f12: Option<f32>) -> u32;
+    /// `gApp[0x30] + 0x5c`.
+    fn view_word(&mut self) -> u32;
+    /// The call at 0xf8, then the quad at +0x20 of what it returns.
+    fn origin_quad(&mut self) -> V4;
+    /// The call at 0x220: `count` vertices as a strip.
+    fn draw_strip(&mut self, verts: &[Vertex]);
+}
+
+fn cvt_clamped(f: f32) -> i32 {
+    let i = f as i32;
+    if i <= -1 {
+        0
+    } else {
+        i
+    }
+}
+
+/// 0x1333c0(trail, flag): the strip as vertices, two a point from the open end then each laid point newest first,
+/// the flag choosing the shade scale (0x80 or -0x40) and the weight of each vertex; a point that starts a strip
+/// (+0x38) ends the one being built, and the shade turning from one edge to the other zeroes the last pair's weights.
+fn strip(t: &Trail, flag: bool, env: &mut dyn DrawEnv) {
+    let origin = scale(env.origin_quad(), 10.0);
+    let scale_to = if flag { 0x80 } else { -0x40 };
+    let f20 = scale_to as f32;
+    let mut s3: i32 = -1;
+    let mut t0 = 0usize;
+    let mut s6 = false;
+    let mut verts = [Vertex::default(); 208];
+    let (mut p1, mut p2) = (0usize, 0usize);
+    let one = |u: f32, v: bool, w: i32, pos: V4| Vertex { u, v: if v { 1.0 } else { 0.0 }, one: 1.0, rgb: [0x80; 3], w: w as u32, pos };
+    if t.w[0x1950 / 4] != 0 {
+        let t1 = cvt_clamped(t.f(0x30) * f20);
+        let a3 = cvt_clamped(t.f(0x2c) * f20);
+        let (f1, f2);
+        if t1 < a3 {
+            s3 = 0;
+            f2 = 0.0;
+            f1 = t.f(0x3c);
+        } else {
+            s3 = 1;
+            f2 = t.f(0x3c);
+            f1 = 0.0;
+        }
+        verts[0] = one(f2, false, a3, sub(t.v(0), origin));
+        verts[1] = one(f1, false, t1, sub(t.v(0x10), origin));
+        t0 = 2;
+        s6 = true;
+        p1 = 0;
+        p2 = 1;
+    }
+    let mut s0 = t.head() - 1;
+    if t.count() - 1 > 0 {
+        for _ in 0..t.count() - 1 {
+            if s0 <= -1 {
+                s0 += 100;
+            }
+            let e = (s0 as usize) << 6;
+            let mut a2 = cvt_clamped(t.f(e + 0x6c) * f20);
+            let mut a3 = cvt_clamped(t.f(e + 0x70) * f20);
+            let (f1, f2);
+            if a3 < a2 {
+                f2 = 0.0;
+                f1 = t.f(e + 0x7c);
+                if s3 != 0 {
+                    if s3 != -1 {
+                        a3 = 0;
+                        a2 = 0;
+                        verts[p1].w = 0;
+                        verts[p2].w = 0;
+                    }
+                    s3 = 0;
+                }
+            } else {
+                f1 = 0.0;
+                f2 = t.f(e + 0x7c);
+                if s3 != 1 {
+                    if s3 != -1 {
+                        a3 = 0;
+                        a2 = 0;
+                        verts[p1].w = 0;
+                        verts[p2].w = 0;
+                    }
+                    s3 = 1;
+                }
+            }
+            verts[t0] = one(f2, s6, a2, sub(t.v(e + 0x40), origin));
+            let k = t0;
+            t0 += 1;
+            verts[t0] = one(f1, s6, a3, sub(t.v(e + 0x50), origin));
+            s6 = !s6;
+            p1 = k;
+            p2 = k + 1;
+            t0 += 1;
+            if t.w[(e + 0x78) / 4] != 0 {
+                if t0 >= 3 {
+                    env.draw_strip(&verts[..t0]);
+                }
+                t0 = 0;
+            }
+            s0 -= 1;
+        }
+    }
+    if t0 >= 3 {
+        env.draw_strip(&verts[..t0]);
+    }
+}
+
+/// `Fx_BoardTrack_Draw` 0x1331a8(trail): with two or more points, the renderer's state set for the shaded strip
+/// (blend, depth, texture), the strip drawn twice (the shade scales -0x40 and 0x80, the state 4 then 8) and the
+/// state put back.
+pub fn board_track_draw(t: &Trail, env: &mut dyn DrawEnv) {
+    if t.count() < 2 {
+        return;
+    }
+    let f20 = f32::from_bits(0x3da3d70a);
+    let s2 = env.vcall(0x1d8, None, None, None);
+    env.vcall(0x1d0, Some(2), None, None);
+    let v = env.view_word();
+    env.vcall(0x1f0, Some(v), Some(0), None);
+    env.vcall(0x1c8, Some(0), Some(0), Some(f20));
+    env.vcall(0x1c0, Some(1), None, None);
+    env.vcall(0x1e8, Some(2), Some(0), None);
+    env.vcall(0x1f8, Some(1), Some(0), None);
+    env.vcall(0x1e0, Some(4), None, None);
+    strip(t, false, env);
+    env.vcall(0x1e0, Some(8), None, None);
+    strip(t, true, env);
+    env.vcall(0x1c8, Some(0), Some(2), Some(f20));
+    env.vcall(0x1c0, Some(0), None, None);
+    env.vcall(0x1e8, Some(0), Some(0), None);
+    env.vcall(0x1e0, Some(3), None, None);
+    env.vcall(0x1f8, Some(0), Some(0), None);
+    env.vcall(0x1d0, Some(s2), None, None);
+}
