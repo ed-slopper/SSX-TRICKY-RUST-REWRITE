@@ -4,7 +4,9 @@
 //! 0x2c2de0 and by `tricky_data::compress`, byte for byte.
 
 use r5900::Runner;
-use tricky_data::compress::{btree_decode, decode18, huff_decode};
+use tricky_data::compress::{
+    btree_decode, bytes_read_be, decode18, huff_block_is_compressed, huff_block_unpacked_size, huff_decode, huff_decode_block,
+};
 
 struct Rng(u64);
 impl Rng {
@@ -266,6 +268,85 @@ fn huffman_matches_the_original() {
         let (_, theirs) = game(&mut r, &src, ours.len());
         assert!(theirs == ours, "long run {run}: the game differs");
         bytes += ours.len();
+    }
+    eprintln!("{bytes} bytes compared");
+}
+
+/// `Huff_DecodeBlock` 0x240ef8(src, dst) in the runner: its result and `n` bytes of the buffer
+fn game_block(g: &mut Game, src: &[u8], n: usize) -> (u32, Vec<u8>) {
+    #[allow(non_snake_case)]
+    let (r, SRC, DST) = (&mut g.r, g.src, g.dst);
+    r.mem.write(SRC, src).unwrap();
+    r.mem.write(DST, &vec![0u8; n + 64]).unwrap();
+    r.cpu.set_gpr(4, SRC as u64);
+    r.cpu.set_gpr(5, 0);
+    r.cpu.set_gpr(6, DST as u64);
+    // through Decompress_Block 0x241e28(src, 0, dst), as the replay calls it
+    r.call(0x241e28).unwrap();
+    let mut out = vec![0u8; n];
+    r.mem.read(DST, &mut out).unwrap();
+    (r.cpu.gpr(2) as u32, out)
+}
+
+/// Row G12b: the replay's older copy of the decoder, on the same streams; the types with bit 7 encoded without
+/// the 4-byte size (the older copy has none), so they decode as their plain types but never sum
+#[test]
+fn huffman_block_matches_the_original() {
+    let Some(mut r) = runner() else { return };
+    r.r.allow(0x240ef8);
+    let mut g = Rng(0x4875_6666_0000_0b0c);
+    let mut bytes = 0;
+    for case in 0..1500 {
+        let ty = [0x30u8, 0x31, 0x32, 0x33, 0x34, 0x35][case % 6];
+        let n = [0usize, 1, 2, 7, 100, 1000, 5000][g.below(7) as usize];
+        let data = sample(&mut g, n);
+        let (runs, esc) = (g.below(3) != 0, [0, 0, 3, 50][g.below(4) as usize]);
+        let mut src = huff_encode(&mut g, ty, &data, runs, esc);
+        if case % 12 >= 6 {
+            src[0] |= 0x80;
+        }
+        let mut ours = vec![];
+        let size = huff_decode_block(&src, &mut ours);
+        assert_eq!(size as usize, data.len(), "case {case}");
+        if src[0] & 0xfe == 0x30 || src[0] & 0x80 != 0 {
+            assert_eq!(ours, data, "case {case}: our decode of our own stream");
+        }
+        let (ret, theirs) = game_block(&mut r, &src, ours.len().max(size as usize));
+        assert_eq!(ret, size, "case {case}: type {:#x}", src[0]);
+        assert_eq!(theirs, ours, "case {case}: type {:#x}, {n} bytes", src[0]);
+        bytes += ours.len();
+    }
+    for (case, run) in [131_072usize, 200_000, 262_139, 530_000, 700_000].into_iter().enumerate() {
+        let mut data = sample(&mut g, 50);
+        data.extend(std::iter::repeat_n(7u8, run));
+        data.extend(sample(&mut g, 50));
+        let src = huff_encode(&mut g, 0x30, &data, true, 0);
+        let mut ours = vec![];
+        huff_decode_block(&src, &mut ours);
+        assert_eq!(ours, data, "long {case}");
+        let (_, theirs) = game_block(&mut r, &src, ours.len());
+        assert!(theirs == ours, "long run {run}: the game differs");
+        bytes += ours.len();
+    }
+    // its header helpers: Bytes_ReadBE 0x241cf0, Huff_IsCompressed 0x241d28, Huff_GetUnpackedSize 0x241dd8
+    r.r.allow(0x241cf0);
+    for case in 0..20_000 {
+        let mut b: Vec<u8> = (0..8).map(|_| g.next() as u8).collect();
+        if g.below(2) == 0 {
+            b[0] = 0x2f + g.below(8) as u8;
+            b[1] = if g.below(4) == 0 { g.next() as u8 } else { 0xfb };
+        }
+        r.r.mem.write(r.src, &b).unwrap();
+        let k = g.below(7) as usize;
+        let mut call = |f: u32, a1: u64| {
+            r.r.cpu.set_gpr(4, r.src as u64);
+            r.r.cpu.set_gpr(5, a1);
+            r.r.call(f).unwrap();
+            r.r.cpu.gpr(2) as u32
+        };
+        assert_eq!(call(0x241cf0, k as u64), bytes_read_be(&b, k), "case {case}: read {k}");
+        assert_eq!(call(0x241d28, 0), huff_block_is_compressed(&b), "case {case}: {b:x?}");
+        assert_eq!(call(0x241dd8, 0), huff_block_unpacked_size(&b), "case {case}: {b:x?}");
     }
     eprintln!("{bytes} bytes compared");
 }

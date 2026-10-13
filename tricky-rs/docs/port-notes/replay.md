@@ -64,4 +64,5 @@ frames of a message), +0x4c and +0x50 hold recording, +0x58 a stream overflowed.
   - Compared after every call: the stream's pointers, the control, the pad stream's words, every value read and
     every node touched. The whole buffer and the pad stream are compared every 100 calls.
   - Pad streams filled, full runs recorded over and stream overflows each happen.
-  - `Huff_DecodeBlock` is a stand-in on both sides; the codec is its own row.
+  - `Huff_DecodeBlock` is a stand-in on both sides of this test; the codec itself is `compress::huff_decode_block`
+    (G12b, files.md).

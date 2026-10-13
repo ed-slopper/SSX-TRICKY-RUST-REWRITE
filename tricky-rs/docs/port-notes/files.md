@@ -66,6 +66,16 @@ Proven (ported in `tricky-data/src/compress.rs`):
   `Huff_IsCompressed` 0x241d28 returns 100 for the headers 0x30fb–0x35fb and 0 for anything else;
   `Huff_GetUnpackedSize` 0x241dd8 reads the 3-byte big-endian size at +2 (+5 when header bit 0x100 is set). Nothing
   calls either directly (inferred: they sit in a codec table).
+  - The replays use this set (`Decompress_Block` 0x241e28 -> `Huff_DecodeBlock` 0x240ef8; row G12b). This is
+    the newer `Huff_Decode`'s code without the 4-byte size, so a type with bit 7 reads its size from the bit
+    stream like the others. Bit 7 only stops 0xb2 and 0xb4 from summing. The port is
+    `compress::huff_decode_block`, with `bytes_read_be`, `huff_block_is_compressed` and
+    `huff_block_unpacked_size` for the three header helpers.
+  - Checked in the runner (`tests/compress.rs`): the game's decoder and ours give the same bytes on the Huffman
+    test's streams, 1,500 of them plus the long runs, with half of each type's streams marked with bit 7. The
+    helpers were checked on 20,000 random headers.
+  - The encoder half of the set (`Compress_Block` 0x243a60 .. `Huff_Encode`, used to save replays) is not
+    ported yet.
 - `File_LoadAndUnpack` 0x2c8938 (via `File_Load` 0x2c8a70): opens with mode 1 (so the archives are searched),
   reads the file, and if `Compress_UnpackedSize` is not 0 decodes it into a buffer of that size.
 - Every packed file on the disc is RefPack 0x10 (the four character archives, the course archives, `PS2LOAD`,

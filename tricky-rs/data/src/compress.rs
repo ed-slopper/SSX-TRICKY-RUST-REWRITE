@@ -203,12 +203,38 @@ impl HuffBits<'_> {
 /// length's last code (from length 9). Type 0x32fb then sums the bytes (each the sum of those up to it), 0x34fb
 /// twice; the types with bit 7 are compared whole, so 0xb2 and 0xb4 skip this.
 pub fn huff_decode(src: &[u8], out: &mut Vec<u8>) -> u32 {
+    huff_decode_with(src, out, true)
+}
+
+/// The older copy of the decoder the replays use (`Huff_DecodeBlock` 0x240ef8, through `Decompress_Block`
+/// 0x241e28; board row G12b): the same code without the 4-byte size, so bit 7 of the type only keeps 0xb2 / 0xb4
+/// from summing.
+pub fn huff_decode_block(src: &[u8], out: &mut Vec<u8>) -> u32 {
+    huff_decode_with(src, out, false)
+}
+
+/// `Bytes_ReadBE` 0x241cf0(bytes, n): n bytes big-endian (wrapping past 4)
+pub fn bytes_read_be(src: &[u8], n: usize) -> u32 {
+    src[..n].iter().fold(0u32, |v, &c| v.wrapping_mul(0x100).wrapping_add(c as u32))
+}
+
+/// `Huff_IsCompressed` 0x241d28, beside `Huff_DecodeBlock`: 100 for the types 0x30fb..0x35fb, else 0
+pub fn huff_block_is_compressed(src: &[u8]) -> u32 {
+    if (0x30fb..=0x35fb).step_by(0x100).any(|t| bytes_read_be(src, 2) == t) { 100 } else { 0 }
+}
+
+/// `Huff_GetUnpackedSize` 0x241dd8: the 3-byte size at +2, or at +5 when the type's bit 0x100 is set
+pub fn huff_block_unpacked_size(src: &[u8]) -> u32 {
+    if bytes_read_be(src, 2) & 0x100 == 0 { bytes_read_be(&src[2..], 3) } else { bytes_read_be(&src[5..], 3) }
+}
+
+fn huff_decode_with(src: &[u8], out: &mut Vec<u8>, long_size: bool) -> u32 {
     let start = out.len();
     let b0 = src[0];
     let mut r = HuffBits { src, p: 4, acc: be(src, 2, 2), win: 0, bits: 0 };
     r.win = r.acc << 16;
     let size;
-    if b0 & 0x80 == 0 {
+    if b0 & 0x80 == 0 || !long_size {
         if b0 & 1 != 0 {
             r.bits = 8;
             r.p = 8;
