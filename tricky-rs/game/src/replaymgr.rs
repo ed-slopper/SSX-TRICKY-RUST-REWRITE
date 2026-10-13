@@ -395,12 +395,12 @@ pub fn seek_to_keyframe(m: &mut Mem, mgr: u32) {
 /// `Replay_StepForward` 0x191190 / `Replay_StepBack` 0x1911e0: to the next (previous) keyframe; nothing while a
 /// playlist plays
 pub fn step_forward(m: &mut Mem, mgr: u32) {
-    step(m, mgr, true)
+    step_keyframes(m, mgr, true)
 }
 pub fn step_back(m: &mut Mem, mgr: u32) {
-    step(m, mgr, false)
+    step_keyframes(m, mgr, false)
 }
-fn step(m: &mut Mem, mgr: u32, forward: bool) {
+fn step_keyframes(m: &mut Mem, mgr: u32, forward: bool) {
     if m.r32(mgr + PLAYLIST) != 0 {
         return;
     }
@@ -1306,5 +1306,710 @@ pub fn next_cut(m: &mut Mem, env: &mut dyn CamEnv, mgr: u32, frame: u32) -> bool
 pub fn generate_camera_tracks(m: &mut Mem, env: &mut dyn CamEnv, mgr: u32) {
     for r in 0..4 {
         cam_track_generate(m, env, mgr + CAM_TRACKS + r * CAM_TRACK_SIZE, r);
+    }
+}
+
+// Playback control and the manager's life (board row G12g). The manager also has: +0x28 the command (from the
+// overlay), +0x2c the race frame recorded, +0x38 every how many frames a keyframe is kept for good, +0x3c a
+// countdown, +0x40 recording held (the pad streams full), +0x44, +0x4c / +0x50 frozen, +0x54 the replay shown after
+// the race (looping), +0x58 a stream overflowed. The game's state is reached through gApp (0x337c58) +0x730.
+
+/// gApp
+pub const GAPP: u32 = 0x337c58;
+
+/// The world and camera calls playback makes (the camera's through [`CamEnv`])
+pub trait ReplayEnv: CamEnv {
+    /// `Game_IsMenuOrOverlayActive` 0x17f0f8
+    fn menu_active(&mut self) -> bool;
+    /// `Broadphase_SortAll` 0x14fe18 and `Contact_SortPairs` 0x150428 (on gApp+0x730 → +0x30)
+    fn broadphase_sort(&mut self);
+    fn contact_sort(&mut self);
+    /// `Replay_SaveKeyframe` 0x18f448(keyframe, frame, flag): the world's snapshot into the keyframe's stream (sets
+    /// +0x58 when it overflows)
+    fn save_keyframe(&mut self, m: &mut Mem, mgr: u32, k: u32, frame: u32, flag: u32);
+    /// `Replay_RestoreKeyframe` 0x18f5c8(keyframe): the world put back from it
+    fn restore_keyframe(&mut self, m: &mut Mem, mgr: u32, k: u32);
+    /// `HUD_HideItem` 0x1a7860(the HUD, item, -1)
+    fn hud_hide(&mut self, item: u32);
+    /// `Race_ResetRiderRenders` 0x1128b8, `Replay_RefreshRiders` 0x1147f8, `Camera_StartCutFade` 0x174c30,
+    /// `CamScript_Stop` 0x175eb8(the camera, 1), `Audio_CancelRaceEvents` 0x210b50
+    fn reset_rider_renders(&mut self);
+    fn refresh_riders(&mut self);
+    fn start_cut_fade(&mut self);
+    fn cam_script_stop(&mut self);
+    fn cancel_race_events(&mut self);
+    /// `BxList_DeleteAll` 0x17da50(the node lists, list), `FUN_00115df0` and `World_ResetInstances` 0x115fe8 on the
+    /// world
+    fn delete_nodes(&mut self, list: u32);
+    fn world_reset_a(&mut self);
+    fn world_reset_instances(&mut self);
+    /// `EAMem_Alloc` 0x2ccf70(size), `Mem_Free` 0x14a040, `Mem_Delete` 0x114f80
+    fn alloc(&mut self, m: &mut Mem, size: u32) -> u32;
+    fn free(&mut self, m: &mut Mem, p: u32);
+    fn delete(&mut self, m: &mut Mem, p: u32);
+}
+
+fn game(m: &Mem) -> u32 {
+    m.r32(m.r32(GAPP) + 0x730)
+}
+
+/// A rider's chase-camera target: its player's (race +0x8c) boarder's +0x460 (address 0x460 for no player)
+fn rider_target(m: &Mem, rider: u32) -> u32 {
+    let race = m.r32(game(m) + 0x1c);
+    let player = m.r32(race.wrapping_add(rider.wrapping_mul(4)).wrapping_add(0x8c));
+    let boarder = if player != 0 { m.r32(player) } else { 0 };
+    m.r32(boarder.wrapping_add(0x460))
+}
+
+fn chase_to(m: &Mem, env: &mut dyn ReplayEnv, rider: u32) {
+    let target = rider_target(m, rider);
+    let c = env.chase_params();
+    env.set_chase_params([c[0], c[1], c[2], c[3], target], 0);
+}
+
+fn sort(env: &mut dyn ReplayEnv) {
+    env.broadphase_sort();
+    env.contact_sort();
+}
+
+/// `EAMem_Set` on memory (as `replay::ea_mem_set`)
+fn mem_set(m: &mut Mem, at: u32, value: u32, n: u32) {
+    let mut b = vec![0u8; n as usize];
+    crate::replay::ea_mem_set(&mut b, at, value);
+    for (k, v) in b.iter().enumerate() {
+        m.w8(at + k as u32, *v);
+    }
+}
+
+/// `Replay_Step` 0x190878(jump): playing on, a frame forward: at the end of a playlist entry the next one (at the
+/// last, the looping replay starts again on the focused rider; else mode 3); the camera cut advanced; every 60
+/// frames the riders refreshed, every 10 the contacts sorted. With `jump` (or at the end of a looping replay) the
+/// world is put back at the keyframe for the frame and the camera set for it.
+pub fn step(m: &mut Mem, env: &mut dyn ReplayEnv, mgr: u32, mut jump: bool) {
+    loop {
+        if jump {
+            break;
+        }
+        let frame = m.r32(mgr + FRAME);
+        if frame < m.r32(mgr + END) {
+            let pl = m.r32(mgr + PLAYLIST);
+            if pl != 0 && frame >= playlist_current_end(m, pl) {
+                if !playlist_next(m, pl) {
+                    if m.r32(mgr + 0x54) != 0 {
+                        let r = m.r32(game(m) + 0x68) as i32;
+                        m.w32(mgr + RIDER, r as u32);
+                        if r < 0 {
+                            m.w32(mgr + RIDER, 0);
+                        }
+                        m.w32(mgr + PLAYLIST, 0);
+                        m.w32(mgr + FRAME, 0);
+                        seek_start(m, mgr);
+                        step(m, env, mgr, true);
+                        chase_to(m, env, m.r32(mgr + RIDER));
+                        return;
+                    }
+                    m.w32(mgr + MODE, 3);
+                    return;
+                }
+                seek_start(m, mgr);
+                step(m, env, mgr, true);
+            }
+            let t = rider_cam_track(m, mgr);
+            if cam_track_advance(m, t, m.r32(mgr + FRAME)) {
+                apply_camera_cut(m, env, mgr);
+            }
+            let f = m.r32(mgr + FRAME);
+            if f % 60 == 0 {
+                env.refresh_riders();
+            } else if f % 10 == 0 {
+                sort(env);
+            }
+            m.w32(mgr + FRAME, m.r32(mgr + FRAME).wrapping_add(1));
+            return;
+        }
+        if m.r32(mgr + 0x54) == 0 {
+            m.w32(mgr + FRAME, m.r32(mgr + END));
+            m.w32(mgr + MODE, 3);
+            return;
+        }
+        m.w32(mgr + PLAYLIST, 0);
+        m.w32(mgr + FRAME, 0);
+        seek_start(m, mgr);
+        jump = true;
+    }
+    let pl = m.r32(mgr + PLAYLIST);
+    let k = if pl == 0 { find_keyframe(m, mgr, m.r32(mgr + FRAME)) } else { playlist_current_keyframe(m, pl) };
+    m.w32(mgr + PLAYING, k);
+    m.w32(mgr + FRAME, m.r32(k + kf::FRAME));
+    seek_inputs(m, mgr, m.r32(mgr + FRAME));
+    env.restore_keyframe(m, mgr, m.r32(mgr + PLAYING));
+    env.hud_hide(7);
+    env.hud_hide(4);
+    env.reset_rider_renders();
+    if m.r32(mgr + 0x54) != 0 && m.r32(mgr + PLAYLIST) != 0 {
+        let h = playlist_current(m, mgr + 0x38ec);
+        chase_to(m, env, m.r32(h + hl::RIDER));
+        env.select_preset(7);
+    } else {
+        let t = rider_cam_track(m, mgr);
+        cam_track_seek_frame(m, t, m.r32(mgr + FRAME));
+        apply_camera_cut(m, env, mgr);
+    }
+    if m.r32(mgr + PLAYLIST) != 0 {
+        env.start_cut_fade();
+    }
+    env.refresh_riders();
+}
+
+fn jumped(m: &mut Mem, env: &mut dyn ReplayEnv, mgr: u32) {
+    let mode = if m.r32(mgr + FRAME) == 0 { 6 } else { 5 };
+    m.w32(mgr + MODE, mode);
+    env.start_cut_fade();
+    m.w32(mgr + 0x28, 0);
+}
+
+/// `Replay_DoCommand` 0x191830: the overlay's command (+0x28): 1 to the start, 2 to the end, 3 a keyframe back, 4 a
+/// keyframe on (each paused there, mode 5, or 6 at frame 0, with a cut fade), 5 one frame (mode 4), 6 pause /
+/// play, 7 pause, 8 slow, 9 and 10 restart (mode 5); none plays a frame unless paused. The command is then cleared.
+pub fn do_command(m: &mut Mem, env: &mut dyn ReplayEnv, mgr: u32) {
+    match m.r32(mgr + 0x28) {
+        1 => {
+            m.w32(mgr + PLAYLIST, 0);
+            seek_start(m, mgr);
+            step(m, env, mgr, true);
+            jumped(m, env, mgr);
+            return;
+        }
+        2 => {
+            m.w32(mgr + PLAYLIST, 0);
+            seek_end(m, mgr);
+            step(m, env, mgr, true);
+            jumped(m, env, mgr);
+            return;
+        }
+        3 => {
+            m.w32(mgr + PLAYLIST, 0);
+            let frame = m.r32(mgr + FRAME);
+            let k = find_keyframe(m, mgr, frame);
+            m.w32(mgr + PLAYING, k);
+            let next = m.r32(k + kf::NEXT);
+            if frame == m.r32(k + kf::FRAME) || (next != 0 && m.r32(next + kf::FRAME) == frame) {
+                step_back(m, mgr);
+            }
+            step(m, env, mgr, true);
+            jumped(m, env, mgr);
+            return;
+        }
+        4 => {
+            m.w32(mgr + PLAYLIST, 0);
+            if m.r32(m.r32(mgr + PLAYING) + kf::NEXT) == 0 {
+                m.w32(mgr + 0x28, 0);
+                return;
+            }
+            step_forward(m, mgr);
+            step(m, env, mgr, true);
+            m.w32(mgr + MODE, 5);
+            env.start_cut_fade();
+            m.w32(mgr + 0x28, 0);
+            return;
+        }
+        5 => {
+            m.w32(mgr + PLAYLIST, 0);
+            step(m, env, mgr, false);
+            m.w32(mgr + MODE, 4);
+        }
+        6 => {
+            let mode = if m.r32(mgr + MODE) == 3 { 1 } else { 3 };
+            m.w32(mgr + MODE, mode);
+        }
+        7 => m.w32(mgr + MODE, 3),
+        8 => m.w32(mgr + MODE, 2),
+        9 | 10 => {
+            seek_start(m, mgr);
+            step(m, env, mgr, true);
+            m.w32(mgr + MODE, 5);
+        }
+        _ => {
+            if m.r32(mgr + MODE) != 3 {
+                m.w32(mgr + PLAYING_ON, 1);
+                step(m, env, mgr, false);
+            }
+        }
+    }
+    m.w32(mgr + 0x28, 0);
+}
+
+/// `Replay_SetPlaylist` 0x191b18(playlist): set; a playlist starts from its first entry
+pub fn set_playlist(m: &mut Mem, env: &mut dyn ReplayEnv, mgr: u32, pl: u32) {
+    m.w32(mgr + PLAYLIST, pl);
+    if pl != 0 {
+        seek_start(m, mgr);
+        step(m, env, mgr, true);
+    }
+}
+
+/// `Replay_RecordKeyframe` 0x18f328(frame, flag): a keyframe taken (evicting if need be) and linked after the last
+/// one at or before the frame (the first keyframe is never compared), the world saved into it; freed again (0)
+/// when its stream overflowed, else the newest when last
+pub fn record_keyframe(m: &mut Mem, env: &mut dyn ReplayEnv, mgr: u32, frame: u32, flag: u32) -> u32 {
+    let k = alloc_keyframe(m, mgr);
+    if m.r32(mgr + 0x10) == 0 {
+        m.w32(mgr + FIRST, k);
+    } else {
+        let mut prev = m.r32(mgr + FIRST);
+        let mut cur = m.r32(prev + kf::NEXT);
+        let mut steps = 0u32;
+        if cur == 0 {
+            m.w32(k + kf::NEXT, 0);
+        } else {
+            let mut linked = false;
+            while m.r32(cur + kf::FRAME) <= frame {
+                guard(&mut steps);
+                let n2 = m.r32(cur + kf::NEXT);
+                prev = cur;
+                if n2 == 0 {
+                    m.w32(k + kf::NEXT, 0);
+                    linked = true;
+                    break;
+                }
+                cur = n2;
+            }
+            if !linked {
+                m.w32(cur + kf::PREV, k);
+                m.w32(k + kf::NEXT, m.r32(prev + kf::NEXT));
+            }
+        }
+        m.w32(prev + kf::NEXT, k);
+        m.w32(k + kf::PREV, prev);
+    }
+    env.save_keyframe(m, mgr, k, frame, flag);
+    sort(env);
+    if m.r32(mgr + 0x58) == 0 {
+        if m.r32(k + kf::NEXT) == 0 {
+            m.w32(mgr + 0x10, k);
+        }
+        k
+    } else {
+        free_keyframe(m, mgr, k);
+        0
+    }
+}
+
+/// `Replay_StartPlayback` 0x191b60(playlist): the pins released; the race's frame kept as a keyframe (once, unless
+/// frozen); playing (mode 7) from the start
+pub fn start_playback(m: &mut Mem, env: &mut dyn ReplayEnv, mgr: u32, pl: u32) {
+    release_all_pins(m, mgr);
+    if m.r32(mgr + 0x4c) == 0 && m.r32(mgr + WRITING) == 0 {
+        let k = record_keyframe(m, env, mgr, m.r32(mgr + 0x2c), 1);
+        m.w32(mgr + WRITING, k);
+    }
+    m.w32(mgr + PLAYLIST, pl);
+    m.w32(mgr + 0x28, 0);
+    m.w32(mgr + 0x54, 0);
+    m.w32(mgr + MODE, 7);
+    seek_start(m, mgr);
+    step(m, env, mgr, true);
+}
+
+/// `Replay_StopPlayback` 0x191be0: the looping replay's camera back to rider 0; the pins released; unless frozen
+/// (+0x4c), the race put back from its kept keyframe, that keyframe freed (when not +0x50) and the riders
+/// refreshed; mode 0 (13 with +0x50)
+pub fn stop_playback(m: &mut Mem, env: &mut dyn ReplayEnv, mgr: u32) {
+    if m.r32(mgr + 0x54) != 0 {
+        m.w32(mgr + RIDER, 0);
+        env.set_replay_mode(0, 0);
+    }
+    m.w32(mgr + 0x54, 0);
+    release_all_pins(m, mgr);
+    if m.r32(mgr + 0x4c) != 0 {
+        return;
+    }
+    m.w32(mgr + PLAYLIST, 0);
+    if m.r32(mgr + WRITING) != 0 {
+        env.restore_keyframe(m, mgr, m.r32(mgr + WRITING));
+    }
+    if m.r32(mgr + 0x50) == 0 {
+        let k = m.r32(mgr + WRITING);
+        if k != 0 {
+            free_keyframe(m, mgr, k);
+            m.w32(mgr + WRITING, 0);
+        }
+        env.refresh_riders();
+        m.w32(mgr + MODE, 0);
+    } else {
+        env.refresh_riders();
+        m.w32(mgr + MODE, 0xd);
+    }
+}
+
+/// `Replay_Abort` 0x193c98: a looping replay stopped (and the race's sound events cancelled); mode 13
+pub fn abort(m: &mut Mem, env: &mut dyn ReplayEnv, mgr: u32) {
+    if m.r32(mgr + 0x54) != 0 {
+        stop_playback(m, env, mgr);
+        env.cancel_race_events();
+    }
+    m.w32(mgr + MODE, 0xd);
+}
+
+/// `Replay_SaveCurrentKeyframe` 0x193d30: before saving to the card: the highlight ended and the race's frame kept as
+/// a keyframe, once (unless frozen)
+pub fn save_current_keyframe(m: &mut Mem, env: &mut dyn ReplayEnv, mgr: u32) {
+    m.w32(mgr + PLAYLIST, 0);
+    if m.r32(mgr + WRITING) == 0 && m.r32(m.r32(game(m) + 0x40) + 0x4c) == 0 {
+        end_highlight(m, mgr);
+        let k = record_keyframe(m, env, mgr, m.r32(mgr + 0x2c), 1);
+        m.w32(mgr + WRITING, k);
+    }
+}
+
+/// `Replay_GetStatus` 0x191d88(out, 0x78 bytes): the keyframe count, the end frame, each keyframe's frame (unpinned or
+/// the kept one; each keeps its place), the rider's highlights and its camera track
+pub fn get_status(m: &mut Mem, mgr: u32, out: u32) {
+    for k in 0..0x78 / 4 {
+        m.w32(out + 4 * k, 0);
+    }
+    let n = keyframe_count(m, mgr);
+    m.w32(out, n as u32);
+    m.w32(out + 4, m.r32(mgr + END));
+    let mut k = m.r32(mgr + FIRST);
+    let mut i = 0u32;
+    let mut steps = 0u32;
+    while k != 0 {
+        guard(&mut steps);
+        if m.r32(k + kf::PINS) == 0 || k == m.r32(mgr + WRITING) {
+            m.w32(out + 8 + 4 * i, m.r32(k + kf::FRAME));
+        }
+        k = m.r32(k + kf::NEXT);
+        i += 1;
+    }
+    m.w32(out + 0x48, 0);
+    let rider = m.r32(mgr + RIDER);
+    let mut j = 0;
+    while (j as i32) < m.r32(count_at(mgr, rider)) as i32 {
+        let c = m.r32(out + 0x48);
+        m.w32(out + 0x4c + 4 * c, m.r32(list_at(mgr, rider, j)));
+        m.w32(out + 0x48, c + 1);
+        j += 1;
+    }
+    m.w32(out + 0x74, mgr + CAM_TRACKS + rider.wrapping_mul(CAM_TRACK_SIZE));
+}
+
+/// `Replay_Update` 0x191298, each frame (not under a menu): recording (modes 0, 12) a keyframe every 60 race frames
+/// (every +0x38-th kept for good), the contacts sorted every 10, the end frame and race frame counted; frozen, one
+/// last keyframe kept and mode 13. Mode 2 begins a highlight every 10 frames; 3 ends it; 4..7 pause (3); 8 runs the
+/// command then pauses; 9 builds the looping replay's playlist (the focused rider's pinned kind-1 highlights, then the
+/// other's, then the kind-2 ones) and starts it; 11 resets the world for a replay (mode 12). The others run the
+/// command.
+pub fn update(m: &mut Mem, env: &mut dyn ReplayEnv, mgr: u32) {
+    if env.menu_active() {
+        return;
+    }
+    let c = m.r32(mgr + 0x3c) as i32;
+    if c > 0 {
+        m.w32(mgr + 0x3c, (c - 1) as u32);
+    }
+    m.w32(mgr + PLAYING_ON, 0);
+    if m.r32(mgr + 0x28) == 7 {
+        m.w32(mgr + MODE, 3);
+    }
+    match m.r32(mgr + MODE) {
+        0 | 12 => {
+            m.w32(mgr + MODE, 0);
+            m.w32(mgr + WRITING, 0);
+            if m.r32(mgr + 0x50) != 0 {
+                if m.r32(mgr + 0x4c) != 0 {
+                    return;
+                }
+                prune_keyframes(m, mgr, true);
+                let k = record_keyframe(m, env, mgr, m.r32(mgr + 0x2c), 0);
+                if k != 0 {
+                    m.w32(k + kf::USED, m.r32(k + kf::USED).wrapping_add(1));
+                }
+                m.w32(mgr + MODE, 0xd);
+                return;
+            }
+            let held = m.r32(mgr + 0x40);
+            let rf = m.r32(mgr + 0x2c);
+            if held == 0 && rf % 60 == 0 {
+                prune_keyframes(m, mgr, false);
+                let k = record_keyframe(m, env, mgr, m.r32(mgr + 0x2c), 0);
+                let every = m.r32(mgr + 0x38);
+                assert!(every != 0, "Replay_Update: the game traps (a keyframe interval of 0)");
+                if m.r32(mgr + 0x2c) % every == 0 && k != 0 {
+                    m.w32(k + kf::USED, m.r32(k + kf::USED).wrapping_add(1));
+                }
+            } else if rf % 10 == 0 {
+                sort(env);
+            }
+            if m.r32(mgr + 0x40) == 0 {
+                m.w32(mgr + END, m.r32(mgr + END).wrapping_add(1));
+            }
+            m.w32(mgr + 0x2c, m.r32(mgr + 0x2c).wrapping_add(1));
+        }
+        2 => {
+            if m.r32(mgr + FRAME) % 10 == 0 {
+                let ok = begin_highlight(m, mgr, &mut |m, frame| record_keyframe(m, &mut *env, mgr, frame, 0));
+                m.w32(mgr + MODE, if ok { 1 } else { 3 });
+            }
+            do_command(m, env, mgr);
+        }
+        3 => {
+            end_highlight(m, mgr);
+            do_command(m, env, mgr);
+        }
+        4..=7 => m.w32(mgr + MODE, 3),
+        8 => {
+            do_command(m, env, mgr);
+            m.w32(mgr + MODE, 3);
+        }
+        9 => build_looping_replay(m, env, mgr),
+        10 | 13 => {}
+        11 => {
+            env.delete_nodes(3);
+            env.delete_nodes(0xd);
+            env.delete_nodes(4);
+            env.world_reset_a();
+            env.world_reset_instances();
+            generate_camera_tracks(m, env, mgr);
+            m.w32(mgr + MODE, 0xc);
+        }
+        _ => do_command(m, env, mgr),
+    }
+}
+
+fn build_looping_replay(m: &mut Mem, env: &mut dyn ReplayEnv, mgr: u32) {
+    let pl = mgr + 0x38ec;
+    env.cam_script_stop();
+    playlist_clear(m, pl);
+    let r = m.r32(game(m) + 0x68) as i32;
+    m.w32(mgr + RIDER, r as u32);
+    if r < 0 {
+        m.w32(mgr + RIDER, 0);
+    }
+    let rider = m.r32(mgr + RIDER);
+    let own = mgr + PINS + rider * 4;
+    let other = if rider != 0 { mgr + PINS } else { mgr + PINS + 4 };
+    let mut added = 0;
+    for (at, kind1) in [(own, true), (other, true), (own, false), (other, false)] {
+        if m.r32(at) == 0 {
+            continue;
+        }
+        for s in 0..4 {
+            let h = m.r32(m.r32(at) + pin::SLOTS + 4 * s);
+            if h != 0 && (m.r32(h + hl::KIND) == 1) == kind1 {
+                added += 1;
+                playlist_add(m, pl, h);
+            }
+        }
+    }
+    generate_camera_tracks(m, env, mgr);
+    env.set_replay_mode(1, m.r32(mgr + RIDER));
+    start_playback(m, env, mgr, if added < 1 { 0 } else { pl });
+    m.w32(mgr + 0x54, 1);
+    m.w32(mgr + MODE, 1);
+}
+
+/// `ReplayMgr_Init` 0x18e850(stream kilobytes, two players, seconds): the camera tracks and playlist cleared, the 16
+/// keyframes' streams emptied; a stream of 0x8000 + 0xc00 per unit, as many keyframes as fit in 0xc9800 bytes (at
+/// most 16), a keyframe kept for good every (seconds × 3600 / (keyframes − 10)) frames, rounded down to 10; the
+/// pins' slots and quotas (two players 4 / 3 / 1, else 2 / 1 / 1); then `Replay_Init`
+pub fn mgr_init(m: &mut Mem, env: &mut dyn ReplayEnv, mgr: u32, units: i32, two: i64, secs: i32) {
+    for t in 0..4 {
+        cam_track_init(m, mgr + CAM_TRACKS + t * CAM_TRACK_SIZE);
+    }
+    playlist_clear(m, mgr + 0x38ec);
+    for i in 0..16 {
+        let k = mgr + 0x3e68 + 0x24 * i;
+        for w in 0..4 {
+            m.w32(k + 4 * w, 0);
+        }
+        m.w32(k + 0x18, 0);
+        m.w32(k + 0x1c, 0);
+    }
+    let size = units.wrapping_mul(0xc00).wrapping_add(0x8000);
+    m.w32(mgr + 0xc, size as u32);
+    assert!(size != 0, "ReplayMgr_Init: the game traps (a stream of 0 bytes)");
+    let mut n = 0xc9800i32.wrapping_div(size);
+    m.w32(mgr + 8, n as u32);
+    if n > 0x10 {
+        n = 0x10;
+        m.w32(mgr + 8, 0x10);
+    }
+    let d = n - 10;
+    assert!(d != 0, "ReplayMgr_Init: the game traps (ten keyframes)");
+    m.w32(mgr + 0x38, ((secs.wrapping_mul(0xe10).wrapping_div(d)) as u32 / 10) * 10);
+    if two == 1 {
+        m.w32(mgr + SLOT_COUNT, 4);
+        m.w32(mgr + QUOTA1, 3);
+        m.w32(mgr + QUOTA2, 1);
+    } else {
+        m.w32(mgr + QUOTA2, 1);
+        m.w32(mgr + SLOT_COUNT, 2);
+        m.w32(mgr + QUOTA1, 1);
+    }
+    init(m, env, mgr);
+}
+
+/// `Replay_Init` 0x18eac8: lists, pins, pads and highlights emptied, each keyframe's stream allocated
+/// (`Replay_AllocStream`: filled with 0xdeadc0ed), then `Replay_Clear`
+pub fn init(m: &mut Mem, env: &mut dyn ReplayEnv, mgr: u32) {
+    m.w32(mgr + RECORDING_FROM, u32::MAX);
+    m.w32(mgr + FIRST, 0);
+    m.w32(mgr + FREE, 0);
+    m.w32(mgr + 0x10, 0);
+    m.w32(mgr + RIDER, 0);
+    m.w32(mgr + RECORDING_HL, 0);
+    m.w32(mgr + HL_FREE, 0);
+    for r in 0..4 {
+        m.w32(mgr + INPUTS + 4 * r, 0);
+        m.w32(mgr + PINS + 4 * r, 0);
+        m.w32(mgr + HIGHLIGHT_COUNT + 4 * r, 0);
+        for i in 0..10 {
+            m.w32(list_at(mgr, r, i), 0);
+        }
+    }
+    let n = m.r32(mgr + 8) as i32;
+    for i in 0..n.max(0) as u32 {
+        let k = mgr + 0x3e68 + 0x24 * i;
+        let size = m.r32(mgr + 0xc);
+        let p = env.alloc(m, size);
+        if p != 0 {
+            mem_set(m, p, 0xdead_c0ed, size);
+        }
+        m.w32(k + 8, p);
+        m.w32(k, p);
+        m.w32(k + 4, p);
+        m.w32(k + 0xc, 0);
+    }
+    clear(m, mgr);
+}
+
+/// `Replay_Clear` 0x18ebd0: back to recording from nothing: mode 10, every count, frame and flag zeroed (the
+/// save's words at +0x40a8.. too), the pads rewound, the pins cleared, the highlights emptied, the keyframes reset
+/// and all free (the last first), the camera tracks cleared, and ten highlight records free (the 9th first)
+pub fn clear(m: &mut Mem, mgr: u32) {
+    m.w32(mgr + MODE, 10);
+    m.w32(mgr + RECORDING_FROM, u32::MAX);
+    for off in [
+        0x28, 0x54, 0x4c, 0x40, 0x3c, 0x2c, 0x30, 0x34, 0x48, 0x44, 0x1c, 0x391c, 0x10, 0x14, 0x18, 0x395c, 0x50, 0x40a8,
+        0x40ac, 0x40b0, 0x40b4, 0x40c0, 0x40c4, 0x40c8, 0x40cc, 0x40d0, 0x40dc, 0x40e0, 0x40e4, 0x40e8, 0x40f0, 0x40f8,
+        0x40d4, 0x40d8,
+    ] {
+        m.w32(mgr + off, 0);
+    }
+    for r in 0..4 {
+        let input = m.r32(mgr + INPUTS + 4 * r);
+        if input != 0 {
+            m.w32(input + 0x8008, 0);
+            m.w32(input + 0x8000, 0);
+            m.w32(input + 0x8004, 0);
+        }
+        let p = m.r32(mgr + PINS + 4 * r);
+        if p != 0 {
+            pin_clear(m, mgr, p);
+        }
+        let mut i = 0;
+        while (i as i32) < m.r32(count_at(mgr, r)) as i32 {
+            let h = m.r32(list_at(mgr, r, i));
+            m.w32(h, 0);
+            highlight_reset(m, h);
+            m.w32(list_at(mgr, r, i), 0);
+            i += 1;
+        }
+        m.w32(count_at(mgr, r), 0);
+    }
+    let mut k = m.r32(mgr + FIRST);
+    let mut steps = 0u32;
+    while k != 0 {
+        guard(&mut steps);
+        keyframe_reset(m, k);
+        k = m.r32(k + kf::NEXT);
+    }
+    let n = m.r32(mgr + 8) as i32;
+    m.w32(mgr + FIRST, 0);
+    m.w32(mgr + FREE, 0);
+    for i in 0..n.max(0) as u32 {
+        let k = mgr + 0x3e68 + 0x24 * i;
+        m.w32(k + kf::PREV, 0);
+        m.w32(k + kf::NEXT, m.r32(mgr + FREE));
+        m.w32(mgr + FREE, k);
+    }
+    for t in 0..4 {
+        let t = mgr + CAM_TRACKS + t * CAM_TRACK_SIZE;
+        cam_track_init(m, t);
+        cam_track_seek_frame(m, t, 0);
+    }
+    let first = mgr + 0x3968;
+    m.w32(mgr + HL_FREE, first);
+    m.w32(first + hl::NEXT_FREE, 0);
+    for i in 1..10 {
+        let h = first + 0x1c * i;
+        m.w32(h + hl::NEXT_FREE, m.r32(mgr + HL_FREE));
+        m.w32(mgr + HL_FREE, h);
+    }
+}
+
+/// `Replay_FreeAll` 0x18f208: the pins cleared, the highlights' keyframe words zeroed and the lists emptied, each
+/// keyframe's stream freed (`Replay_FreeStream`), no first keyframe
+pub fn free_all(m: &mut Mem, env: &mut dyn ReplayEnv, mgr: u32) {
+    for r in 0..4 {
+        let p = m.r32(mgr + PINS + 4 * r);
+        if p != 0 {
+            pin_clear(m, mgr, p);
+        }
+        let mut i = 0;
+        while (i as i32) < m.r32(count_at(mgr, r)) as i32 {
+            m.w32(m.r32(list_at(mgr, r, i)), 0);
+            i += 1;
+        }
+        m.w32(count_at(mgr, r), 0);
+    }
+    let n = m.r32(mgr + 8) as i32;
+    for i in 0..n.max(0) as u32 {
+        let k = mgr + 0x3e68 + 0x24 * i;
+        let p = m.r32(k);
+        if p != 0 {
+            env.free(m, p);
+        }
+        m.w32(k + 0xc, 0);
+        m.w32(k, 0);
+        m.w32(k + 4, 0);
+        m.w32(k + 8, 0);
+    }
+    m.w32(mgr + FIRST, 0);
+}
+
+/// `Replay_AddInputStream` 0x191ca0: in the first empty pad place, a new pad stream (0x800c bytes filled with
+/// 0xdeadc0de, then reset); 0 when all four are taken
+pub fn add_input_stream(m: &mut Mem, env: &mut dyn ReplayEnv, mgr: u32) -> u32 {
+    for r in 0..4 {
+        let at = mgr + INPUTS + 4 * r;
+        if m.r32(at) == 0 {
+            let p = env.alloc(m, 0x800c);
+            if p != 0 {
+                mem_set(m, p, 0xdead_c0de, 0x800c);
+            }
+            m.w32(p + 0x8008, 0);
+            m.w32(p + 0x8000, 0);
+            m.w32(p + 0x8004, 0);
+            m.w32(at, p);
+            return p;
+        }
+    }
+    0
+}
+
+/// `Replay_RemoveInputStream` 0x191d30(stream): its place emptied and the stream deleted
+pub fn remove_input_stream(m: &mut Mem, env: &mut dyn ReplayEnv, mgr: u32, s: u32) {
+    for r in 0..4 {
+        let at = mgr + INPUTS + 4 * r;
+        let q = m.r32(at);
+        if q == s {
+            if q != 0 {
+                env.delete(m, q);
+            }
+            m.w32(at, 0);
+            return;
+        }
     }
 }

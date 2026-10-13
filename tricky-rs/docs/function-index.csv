@@ -2059,11 +2059,11 @@ address,size,name,system,status
 0x18e718,8,cBoolMenuItem::~cBoolMenuItem,debugmenu,not started
 0x18e748,64,cMenu::__tf,runtime,host
 0x18e798,64,cMenuItem::__tf,runtime,host
-0x18e850,404,ReplayMgr_Init,game?,not started
+0x18e850,404,ReplayMgr_Init,game?,checked
 0x18e9e8,224,ReplayMgr_Free,game?,not started
-0x18eac8,252,Replay_Init,game?,not started
-0x18ebc8,8,FUN_0018ebc8,game?,not started
-0x18ebd0,664,Replay_Clear,game?,ported
+0x18eac8,252,Replay_Init,game?,checked
+0x18ebc8,8,FUN_0018ebc8,game?,checked
+0x18ebd0,664,Replay_Clear,game?,checked
 0x18ee68,84,Replay_AllocKeyframe,camera?,checked
 0x18eec0,96,Replay_FindEvictableKeyframe,camera?,checked
 0x18ef20,128,Replay_EvictKeyframe,camera?,checked
@@ -2071,8 +2071,8 @@ address,size,name,system,status
 0x18f020,184,Replay_IsAtEnd,camera?,checked
 0x18f0d8,144,Replay_SeekStart,camera?,checked
 0x18f168,160,Replay_SeekEnd,camera?,checked
-0x18f208,284,Replay_FreeAll,render?,not started
-0x18f328,288,Replay_RecordKeyframe,ai?,not started
+0x18f208,284,Replay_FreeAll,render?,checked
+0x18f328,288,Replay_RecordKeyframe,ai?,checked
 0x18f448,384,Replay_SaveKeyframe,save,not started
 0x18f5c8,8,thunk_FUN_0018f6c0,runtime,host
 0x18f5d0,236,Replay_SaveNodeList,save,not started
@@ -2081,7 +2081,7 @@ address,size,name,system,status
 0x18f8a8,3508,Replay_RestoreNode,world?,not started
 0x190660,284,Replay_SaveObjRefs,save,not started
 0x190780,244,Replay_LoadDeadNodes,ai?,not started
-0x190878,940,Replay_Step,camera?,not started
+0x190878,940,Replay_Step,camera?,checked
 0x190c28,24,Replay_ApplyCameraCut,camera,checked
 0x190c40,44,ReplayCam_InsertCut,camera?,checked
 0x190c70,24,Replay_UpdateCamTrack,frontend?,checked
@@ -2101,19 +2101,19 @@ address,size,name,system,status
 0x1911e0,80,Replay_StepBack,camera?,checked
 0x191230,72,Replay_Freeze,camera?,checked
 0x191278,28,Replay_SetMode11From10,camera?,checked
-0x191298,1168,Replay_Update,camera?,not started
+0x191298,1168,Replay_Update,camera?,checked
 0x191728,76,Replay_TryFreeKeyframe,camera?,checked
 0x191778,168,Replay_PruneKeyframes,camera?,checked
 0x191820,16,FUN_00191820,camera?,checked
-0x191830,488,Replay_DoCommand,camera?,not started
+0x191830,488,Replay_DoCommand,camera?,checked
 0x191a18,168,Replay_AddPin,camera?,checked
 0x191ac0,88,Replay_RemovePin,camera?,checked
-0x191b18,72,Replay_SetPlaylist,camera?,not started
-0x191b60,128,Replay_StartPlayback,camera?,not started
-0x191be0,188,Replay_StopPlayback,camera?,not started
-0x191ca0,140,Replay_AddInputStream,camera?,not started
-0x191d30,88,Replay_RemoveInputStream,camera?,not started
-0x191d88,296,Replay_GetStatus,frontend?,not started
+0x191b18,72,Replay_SetPlaylist,camera?,checked
+0x191b60,128,Replay_StartPlayback,camera?,checked
+0x191be0,188,Replay_StopPlayback,camera?,checked
+0x191ca0,140,Replay_AddInputStream,camera?,checked
+0x191d30,88,Replay_RemoveInputStream,camera?,checked
+0x191d88,296,Replay_GetStatus,frontend?,checked
 0x191eb0,420,Replay_InsertHighlight,other,checked
 0x192058,288,Replay_RemoveHighlight,camera?,checked
 0x192178,104,Replay_FindHighlight,camera?,checked
@@ -2123,7 +2123,7 @@ address,size,name,system,status
 0x1924a0,340,Replay_EndHighlight,camera?,checked
 0x1925f8,244,Replay_DropCurrentHighlight,camera?,checked
 0x1926f0,40,ReplayInput_Init,camera?,checked
-0x192718,28,ReplayInput_Delete,camera?,not started
+0x192718,28,ReplayInput_Delete,camera?,checked
 0x192738,24,ReplayInput_Reset,camera?,checked
 0x192750,8,thunk_FUN_00192738,runtime,host
 0x192758,124,ReplayInput_SeekFrame,camera?,checked
@@ -2132,7 +2132,7 @@ address,size,name,system,status
 0x1928f0,164,Replay_RecordInput,boarder?,checked
 0x192998,164,Replay_ReadInput,boarder?,checked
 0x192a40,224,ReplayInput_Load,world?,checked
-0x192b20,24,FUN_00192b20,game?,not started
+0x192b20,24,FUN_00192b20,game?,checked
 0x192b38,112,Replay_AllocStream,game?,checked
 0x192ba8,68,Replay_FreeStream,render?,checked
 0x192bf0,12,Replay_RewindRead,ai?,checked
@@ -2178,9 +2178,9 @@ address,size,name,system,status
 0x193b00,208,Highlight_Save,save,not started
 0x193bd0,148,Highlight_Load,camera?,not started
 0x193c68,44,Replay_StartRiderSounds,audio,ported
-0x193c98,72,Replay_Abort,race?,not started
+0x193c98,72,Replay_Abort,race?,checked
 0x193ce0,80,Camera_IsFocusRider,camera,not started
-0x193d30,104,Replay_SaveCurrentKeyframe,save,not started
+0x193d30,104,Replay_SaveCurrentKeyframe,save,checked
 0x193d98,220,ReplaySave_Init,save,not started
 0x193e78,152,ReplaySave_FlushChunk,save,not started
 0x193f10,96,ReplaySave_SetChunk,save,not started
@@ -2225,9 +2225,9 @@ address,size,name,system,status
 0x1955b8,40,ReplayPlaylist_Add,other,checked
 0x1955e0,8,ReplayPlaylist_SetCurrent,camera?,checked
 0x195690,28,ReplayPlaylist_Clear,frontend?,checked
-0x1956b0,12,ReplayStatus_Clear,frontend?,not started
+0x1956b0,12,ReplayStatus_Clear,frontend?,checked
 0x1956c0,8,thunk_FUN_00193a78,runtime,checked
-0x1956c8,40,Replay_ClearPins,frontend?,not started
+0x1956c8,40,Replay_ClearPins,frontend?,checked
 0x1956f0,28,FUN_001956f0,frontend?,not started
 0x195710,28,FUN_00195710,frontend?,not started
 0x1957b0,40,TextBox_Init,render,not started

@@ -3,8 +3,9 @@
 How the game records and plays back a race. Ported so far: the byte streams and the pad streams (board row G12a;
 `tricky_game::replay`, checked: `tests/replay_streams.rs`), the replay codec (G12b, G12c: files.md), the keyframe
 list, seeking and playlists (G12d; `tricky_game::replaymgr`, checked: `tests/replaymgr.rs`), the highlights
-and pins (G12e; the same module, checked: `tests/replay_highlights.rs`), and the camera tracks (G12f; checked:
-`tests/replay_camtracks.rs`). Keyframes, the node save and restore, pins and
+and pins (G12e; the same module, checked: `tests/replay_highlights.rs`), the camera tracks (G12f; checked:
+`tests/replay_camtracks.rs`), and playback control and the manager's life (G12g; checked:
+`tests/replay_playback.rs`). Keyframes, the node save and restore, pins and
 highlights, camera tracks, `Replay_Update` and the memory-card save are the rest of G12.
 
 ## The replay control
@@ -183,4 +184,82 @@ frames of a message), +0x4c and +0x50 hold recording, +0x58 a stream overflowed.
 - **Camera calls.** The port makes them through `CamEnv`.
 - **Checked in the runner:** 2,000 random sets of tracks (0 to 128 cuts, shared frames, the flag on and off), with
   30 random calls each over the 16 entry points. Every result, every camera call and all the memory were compared.
+
+## Playback control and the manager's life (G12g)
+
+- **More manager fields.** +0x28 the overlay's command, +0x2c the race frame recorded, +0x38 every how many race
+  frames a keyframe is kept for good, +0x3c a countdown, +0x40 recording held (the pad streams are full), +0x4c /
+  +0x50 frozen, +0x54 the looping replay shown after the race, +0x58 a stream overflowed. Words +0x40a8.. belong to
+  the card save. The world, HUD and camera calls go through `ReplayEnv`. The game's state is read through gApp
+  (0x337c58) +0x730: +0x68 the focused rider, and +0x1c the race, whose +0x8c players' boarders' +0x460 is the
+  chase camera's target. A missing player reads address 0x460.
+- **`Replay_Update`, each frame** (not while a menu or overlay is up). It counts the countdown down and clears
+  playing-on; command 7 forces mode 3. Then by mode:
+  - **0 and 12 (recording):**
+    - Not frozen: every 60 race frames (unsigned) it prunes and records a keyframe, and every +0x38-th one is
+      marked in use, kept for good. An interval of 0 traps. Otherwise every 10 frames it sorts the contacts. While
+      not held, it counts the end frame; it always counts the race frame.
+    - Frozen (unless +0x4c): one last keyframe after pruning everything, then mode 13.
+  - **2:** every 10 frames (unsigned) it begins a highlight (mode 1, or 3 when it can't), then runs the command.
+  - **3:** ends the highlight, then runs the command.
+  - **4 to 7:** set mode 3.
+  - **8:** runs the command, then mode 3.
+  - **9 (the looping replay):** stops the camera script, clears the manager's own playlist and takes the focused
+    rider. The playlist gets the kind-1 highlights from that rider's pin and then from the other pin (pin 0, or
+    pin 1 when the focused rider is 0), then the other kinds the same way. It builds the camera tracks, puts the
+    camera in replay mode and starts playing the playlist (or everything when it is empty). +0x54 is set and the
+    mode goes to 1.
+  - **11:** deletes node lists 3, 13 and 4, resets the world and builds the camera tracks; mode 12.
+  - **10 and 13:** nothing. **Any other mode** runs the command.
+- **`Replay_DoCommand`** (the command is cleared afterwards):
+  - 1 / 2 go to the start / end;
+  - 3 goes a keyframe back (two when the frame sits on one);
+  - 4 goes a keyframe on, with nothing past the last;
+  - after 1 to 4 the replay pauses there (mode 5, or 6 at frame 0) with a cut fade;
+  - 5 plays one frame (mode 4);
+  - 6 toggles pause (3) and play (1); 7 pauses; 8 slows (2);
+  - 9 and 10 restart (mode 5);
+  - none plays a frame unless paused (and sets playing-on).
+- **`Replay_Step(jump)`** plays a frame on. At the end of a playlist entry it goes to the next. After the last
+  entry the looping replay starts again on the focused rider; otherwise the mode goes to 3. It advances the camera
+  cut. Every 60 frames it refreshes the riders, otherwise every 10 it sorts the contacts.
+  - Past the end: a looping replay restarts from frame 0; otherwise it stops at the end frame (mode 3).
+  - With a jump, the world is put back from the keyframe for the frame, HUD items 7 and 4 are hidden and the
+    riders' renders reset. The camera follows the playlist entry's rider (preset 7) in the looping replay, and
+    otherwise seeks its track and applies the cut. A playlist gets a cut fade.
+- **Starting and stopping.**
+  - `Replay_StartPlayback(playlist)` releases the pins and keeps the race's frame as a keyframe (+0x1c; once,
+    unless frozen), then plays from the start (mode 7).
+  - `Replay_StopPlayback` puts the camera back on rider 0 for a looping replay and releases the pins. Unless
+    frozen it puts the race back from the kept keyframe, frees that keyframe (when +0x50 is clear), refreshes the
+    riders, and sets mode 0 (13 with +0x50).
+  - `Replay_Abort` also cancels the race's sound events.
+- **Recording and status.**
+  - `Replay_RecordKeyframe(frame, flag)` links a new keyframe after the last one at or before the frame. The first
+    keyframe is never compared. It saves the world into it (`Replay_SaveKeyframe`, in the env) and sorts the
+    contacts. If the stream overflowed, it frees the keyframe again and answers 0.
+  - `Replay_SaveCurrentKeyframe` ends the highlight and keeps the race's frame before a card save.
+  - `Replay_GetStatus` fills a 0x78-byte status: the keyframe count, the end frame, the frames of the unpinned
+    keyframes (or the kept one; each keeps its place in the list), the rider's highlights and its camera track.
+- **The manager's life.**
+  - `ReplayMgr_Init(units, two players, seconds)`:
+    - a stream of 0x8000 + 0xc00 per unit;
+    - as many keyframes as fit in 0xc9800 bytes, up to 16;
+    - a keyframe kept every seconds × 3600 / (keyframes - 10) race frames, rounded down to 10 (ten keyframes
+      traps);
+    - pin slots and quotas of 4 / 3 / 1 with two players, else 2 / 1 / 1.
+  - `Replay_Init` allocates each keyframe's stream (filled with 0xdeadc0ed).
+  - `Replay_Clear` goes back to recording from nothing:
+    - mode 10, and every count, frame and flag zeroed;
+    - the pad streams rewound and the pins cleared;
+    - the highlights emptied, and only the first ten highlight records put on the free list (the 9th first);
+    - the keyframes reset and all free (the last first);
+    - the camera tracks cleared.
+  - `Replay_FreeAll` frees the streams. `Replay_AddInputStream` / `_RemoveInputStream` add a pad stream (0x800c
+    bytes, filled with 0xdeadc0de) or delete one.
+- **Checked in the runner.**
+  - Playback: 1,500 random managers, with 12 random calls each over 16 entry points. Every result, every world,
+    HUD and camera call, and all the memory were compared. Every mode and command occurs. The 17 cases where the
+    game traps or never ends stop on both sides.
+  - Set-up: 200 random cases, 76 of them through `ReplayMgr_Init`.
 
