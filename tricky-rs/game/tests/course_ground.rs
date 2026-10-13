@@ -56,3 +56,22 @@ fn posed_objects_move_in_the_casts() {
     println!("{checked} keyframed objects moved");
     assert!(checked > 0 || pdir.is_empty());
 }
+
+/// Megaplex's upward boost pad (instance 1213, row E7c3h): `cBoostNode`'s touch test (`WorldNode_RayCast` 0x13aad0
+/// of `cWorldBoarder`(the rider's body, 1)) hits a rider standing on the floor under it, and not one 20 m above it.
+#[test]
+fn boost_pad_touches_the_rider_on_its_floor() {
+    let (Ok(pdir), Ok(ldir), Ok(sdir)) = (std::env::var("TRICKY_PBD_DIR"), std::env::var("TRICKY_LTG_DIR"), std::env::var("TRICKY_SSF_DIR")) else { return };
+    let read = |d: &str, e: &str| std::fs::read(format!("{d}/megaple.{e}")).unwrap();
+    let cg = CourseGround::new(&read(&pdir, "pbd"), &read(&ldir, "ltg"), &read(&sdir, "ssf")).unwrap();
+    let touch = |y: f32| {
+        let mut r = tricky_game::rider::Rider::new(glam::Vec3::new(-216.6, y, -246.0), 0.0);
+        r.grounded = true;
+        r.normal = glam::Vec3::Y;
+        let body = r.bind_body();
+        let mut q = tricky_game::worldboarder::WorldBoarder::new(&body, 1);
+        cg.ray_cast_instance(&mut q, 1213).0
+    };
+    assert!(touch(-146.33) > 0.0, "on the floor");
+    assert!(touch(-126.33) <= 0.0, "20 m up");
+}

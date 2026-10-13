@@ -869,6 +869,49 @@ fn wall_body(g: &gm::Rider) -> crate::collbody::CollBody {
     b
 }
 
+/// The bones `CollBody_UpdateFromBones` 0x2361b0 reads (`collbody::BONES`, bones 0 to 18), in the skeleton's bind
+/// pose, cm from the root (hips): x along the board (foot to foot), y across it, z up, read from the riders'
+/// `_body.mpf` (`Body3000`; brodi, elise, jp, kaori, zoe: luther, marisol, psymon, seeiah, moby differ by 2 cm at
+/// the calves and feet).
+const BIND: [(usize, [f32; 3]); 14] = [
+    (2, [0.0, 4.7, 23.0]),
+    (4, [0.0, -5.9, 52.8]),
+    (6, [18.2, -2.5, 38.4]),
+    (10, [-18.2, -2.5, 38.4]),
+    (7, [44.0, 0.6, 22.3]),
+    (11, [-44.0, 0.5, 22.3]),
+    (8, [63.5, -6.0, 8.7]),
+    (12, [-63.5, -6.0, 8.8]),
+    (13, [11.8, -4.9, -13.0]),
+    (16, [-11.8, -4.9, -13.0]),
+    (14, [11.7, -15.7, -50.1]),
+    (17, [-12.0, -15.7, -50.1]),
+    (15, [13.1, 2.8, -91.8]),
+    (18, [-13.7, 2.7, -91.8]),
+];
+
+impl Rider {
+    /// The rider's collision body (rider+0x470, game units) with every sphere (mask −1, as `GroundMotion_Update`
+    /// 0x10a0d8 leaves +0x494 after the walls), as the boosts' touch test takes it (`cWorldBoarder`(+0x470, 1)).
+    /// STANDIN: `CollBody_UpdateFromBones` 0x2361b0 on the bind pose ([`BIND`]) standing on the board's up from
+    /// the position (root 91.7 cm up, x along the board's forward), times stats+0x60, for the animated
+    /// skeleton (row G5).
+    pub fn bind_body(&self) -> crate::collbody::CollBody {
+        let k = self.stats.scale;
+        let (up, fwd) = (to_game(self.board_up(), 1.0, 0.0), to_game(self.forward(), 1.0, 0.0));
+        let side = cross(up, fwd);
+        let root = add(to_game(self.pos, 100.0, 1.0), scale(up, 91.7 * k));
+        let mut bones = [[0.0, 0.0, 0.0, 1.0]; 19];
+        for (b, [x, y, z]) in BIND {
+            bones[b] = add(root, add(scale(fwd, x * k), add(scale(side, y * k), scale(up, z * k))));
+        }
+        let mut body = crate::collbody::CollBody::new();
+        body.init_rider(k);
+        body.update_from_bones(&bones);
+        body
+    }
+}
+
 /// What `Boarder_WallCollide` calls (`walls::WallEnv`), answered on the course and the port's rider.
 struct WallGlue<'a> {
     r: &'a mut Rider,

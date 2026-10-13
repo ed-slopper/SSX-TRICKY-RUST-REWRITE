@@ -657,27 +657,44 @@ impl Rider {
         self.trick_timer = 2.0;
     }
     /// The level scripts' boosts, teleports (op 0x18) and pickups; true on a teleport. A boost is `cBoostNode`'s
-    /// push (vf27 0x140838, `boosts.rs`): `d` = target − v·dir, when positive v += dir·d·rate per second (the
-    /// game's d·rate/60 a frame), never slowed; nothing else lifts a rider off the ground: the ground tick's
-    /// height test takes off (`GroundMotion_Update` 0x10a0d8, row E7c3g). STANDIN: our pad boxes round the body
-    /// point and no push while down, for the controller's own touch test (`WorldNode_RayCast` of the rider's
-    /// shape, rows E9f, E8b).
+    /// Update (0x140688): a rider whose collision body its object's mesh hits (`cWorldBoarder`(rider+0x470, 1),
+    /// `WorldNode_RayCast` 0x13aad0 > 0, on the course's collision, [`Rider::bind_body`]) gets its push (vf27
+    /// 0x140838, `boosts.rs`): `d` = target − v·dir, when positive v += dir·d·rate per second (the game's d·rate/60
+    /// a frame), never slowed, whatever the rider is doing. Nothing else lifts a rider off the ground: the ground
+    /// tick's height test takes off (`GroundMotion_Update` 0x10a0d8, row E7c3g).
+    /// STANDIN: the broadphase is the pad's box (round the object's meshes) against the body's bounding sphere's,
+    /// for the boost's box in the game's broadphase (+0x70); without the course, the pad's box round the body
+    /// point. Teleports and pickups are the pad's box round the body point, for their controllers (rows E9b2, E9c).
     pub fn apply_pads(&mut self, world: &CollisionWorld, dt: f32) -> bool {
         use crate::collide::PadKind;
-        let body = self.pos + Vec3::Y * 0.8;
+        let point = self.pos + Vec3::Y * 0.8;
+        let near = |p: &crate::collide::Pad| !(point.cmplt(p.lo - 0.3).any() || point.cmpgt(p.hi + 0.3).any());
+        let mut body = None;
         for p in &world.pads {
-            if body.cmplt(p.lo - 0.3).any() || body.cmpgt(p.hi + 0.3).any() { continue; }
             match p.kind {
-                PadKind::Boost { dir, target, gain } => {
+                PadKind::Boost { dir, target, gain, inst } => {
+                    let touching = match (&world.course, inst) {
+                        (Some(course), Some(o)) => {
+                            let b = body.get_or_insert_with(|| self.bind_body());
+                            let (c, r) = (Vec3::new(b.center[0], b.center[2], -b.center[1]) * 0.01, b.radius * 0.01);
+                            let overlap = !(c.cmplt(p.lo - r).any() || c.cmpgt(p.hi + r).any());
+                            overlap && {
+                                let mut q = crate::worldboarder::WorldBoarder::new(b, 1);
+                                course.ray_cast_instance(&mut q, o as usize).0 > 0.0
+                            }
+                        }
+                        _ => near(p),
+                    };
                     let d = target - self.vel.dot(dir);
-                    if d > 0.0 && self.crashed <= 0.0 { self.vel += dir * (d * gain * dt); }
+                    if touching && d > 0.0 { self.vel += dir * (d * gain * dt); }
                 }
-                PadKind::Teleport { to, yaw } => { self.respawn((to, yaw)); return true; }
-                PadKind::Pickup { mult, speed, spin } => {
+                PadKind::Teleport { to, yaw } if near(p) => { self.respawn((to, yaw)); return true; }
+                PadKind::Pickup { mult, speed, spin } if near(p) => {
                     if let Some(m) = mult { if self.multiplier < m as u32 { self.pick_multiplier(m as u32); } }
                     if let Some(s) = speed { if self.speed_timer < s - 0.5 { self.pick_speed(s); } }
                     if let Some(s) = spin { if self.spin_timer < s - 0.5 { self.pick_spin(s); } }
                 }
+                _ => {}
             }
         }
         false

@@ -75,6 +75,19 @@ impl CourseGround {
         world.ray_cast(q, show_off, last, &mut env)
     }
 
+    /// `WorldNode_RayCast` 0x13aad0 = `World_RayCastInstance` 0x25bf48 on the course for one object (instance):
+    /// the distance along the query (> 0 when it hits) and what was hit.
+    pub fn ray_cast_instance(&self, q: &mut dyn Shape, object: usize) -> (f32, Option<CastHit>) {
+        let world = self.world.lock().unwrap_or_else(|e| e.into_inner());
+        if object >= world.objects.len() {
+            return (-1.0, None);
+        }
+        let mut cache = self.cache.lock().unwrap_or_else(|e| e.into_inner());
+        let poses = self.poses.lock().unwrap_or_else(|e| e.into_inner());
+        let mut env = Env { coeffs: &self.coeffs, cache: &mut cache, poses: &poses };
+        world.ray_cast_instance(q, object, &mut env)
+    }
+
     /// The world as it stands (for tests and tools).
     pub fn with_world<R>(&self, f: impl FnOnce(&World) -> R) -> R {
         f(&self.world.lock().unwrap_or_else(|e| e.into_inner()))

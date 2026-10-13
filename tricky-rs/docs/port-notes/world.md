@@ -324,6 +324,19 @@ Part of the port notes (index: [README.md](README.md)); units and wording as des
   further down the course, 9,255 m against 8,392; three of its falls are the tube's put-backs). STANDIN: the
   pad is our box round the body point, not the controller's own touch test, and no push while down (row
   E7c3h).
+- The boosts' touch test (row E7c3h): `cBoostNode` Update 0x140688 walks the objects in its broadphase box
+  (+0x70), and for each rider (object type 0x3ef) builds `cWorldBoarder`(rider+0x470, 1) and calls
+  `WorldNode_RayCast` 0x13aad0 = `World_RayCastInstance` 0x25bf48 on the course for the boost's own instance
+  (node+0x28); > 0 pushes (vf +0xe4), with no check of what the rider is doing (down riders are pushed too).
+  `Rider::apply_pads` does that on `CourseGround::ray_cast_instance` with `Rider::bind_body`: all 18 spheres
+  (mask −1) from `CollBody_UpdateFromBones` 0x2361b0 on the riders' bind pose (`Body3000` bones, cm from the
+  hips, x foot to foot: upper back 23.0 up, head 52.8, thighs −13.0, feet −91.8; the hips 91.7 cm over the
+  board), along the board's forward, up and side. STANDINs: the bind pose for the animated skeleton (G5), the
+  pad's box against the body's bounding sphere for the broadphase. (The walls' body, `wall_body`, puts the
+  bounding centre at the hips, 91.7 cm; the bind pose puts it between the thighs, 78.7 cm.) Teleports and
+  pickups still use the box round the body point. `tests/course_ground.rs`: megaplex's up pad (instance 1213)
+  touches a rider on its floor, not one 20 m up. TRICKY_SIM=600 over the 11 disc courses: stuck / falls 11 / 34
+  → 12 / 26 (megaplex 4 / 12 → 5 / 4; the three pads touched are instances 1213, 1214 and 1256).
 - Keyframed objects in the casts (row E7c3b): each `Mover` (`collide.rs`) gives the course its animated parts'
   local matrices (`Mover::frames`, `ObjAnim::local` = `cMeshAnimFrame::vf1` 0x1cb498, in part order) whenever its
   clock moves (`CollisionWorld::tick_movers`, `set_mover_time`, and once when the course is set,

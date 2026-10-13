@@ -1526,7 +1526,7 @@ fn build_collision(level: &Level) -> CollisionWorld {
     for (&i, bd) in &level.logic.boosts {
         if let Some((lo, hi)) = boxes(i) {
             let d = Vec3::from(bd.dir);
-            world.pads.push(collide::Pad { lo, hi, kind: collide::PadKind::Boost { dir: Vec3::new(d.x, d.z, -d.y).normalize_or_zero(), target: bd.target * 0.01, gain: bd.gain } });
+            world.pads.push(collide::Pad { lo, hi, kind: collide::PadKind::Boost { dir: Vec3::new(d.x, d.z, -d.y).normalize_or_zero(), target: bd.target * 0.01, gain: bd.gain, inst: u32::try_from(i).ok() } });
         }
     }
     // multiplier gems, speed and spin boosts (the gems stay; touching again does nothing more)

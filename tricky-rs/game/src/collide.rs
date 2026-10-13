@@ -158,7 +158,7 @@ fn pose_on(course: Option<&CourseGround>, m: &Mover) {
 
 /// A box the level scripts act on when a rider is in it: a boost or a teleport.
 #[derive(Clone, Copy, Debug)]
-pub enum PadKind { Boost { dir: Vec3, target: f32, gain: f32 }, Teleport { to: Vec3, yaw: f32 }, Pickup { mult: Option<f32>, speed: Option<f32>, spin: Option<f32> } }
+pub enum PadKind { Boost { dir: Vec3, target: f32, gain: f32, /** the boost's object (instance) */ inst: Option<u32> }, Teleport { to: Vec3, yaw: f32 }, Pickup { mult: Option<f32>, speed: Option<f32>, spin: Option<f32> } }
 #[derive(Clone, Copy, Debug)]
 pub struct Pad { pub lo: Vec3, pub hi: Vec3, pub kind: PadKind }
 
