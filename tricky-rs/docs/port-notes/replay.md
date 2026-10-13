@@ -1,7 +1,8 @@
 # Instant replay
 
 How the game records and plays back a race. Ported so far: the byte streams and the pad streams (board row G12a;
-`tricky_game::replay`, checked: `tests/replay_streams.rs`). Keyframes, the node save and restore, pins and
+`tricky_game::replay`, checked: `tests/replay_streams.rs`), the replay codec (G12b, G12c: files.md), and the keyframe
+list, seeking and playlists (G12d; `tricky_game::replaymgr`, checked: `tests/replaymgr.rs`). Keyframes, the node save and restore, pins and
 highlights, camera tracks, `Replay_Update` and the memory-card save are the rest of G12.
 
 ## The replay control
@@ -66,3 +67,42 @@ frames of a message), +0x4c and +0x50 hold recording, +0x58 a stream overflowed.
   - Pad streams filled, full runs recorded over and stream overflows each happen.
   - `Huff_DecodeBlock` is a stand-in on both sides of this test; the codec itself is `compress::huff_decode_block`
     (G12b, files.md).
+
+## The keyframe list, seeking and playlists (G12d)
+
+- The manager's fields are documented at the head of `replaymgr.rs`. The port works on the game's bytes at their
+  addresses (`pf::Mem`), because the manager, its keyframes, highlights and playlists all point at each other.
+- **Keyframes.** There are 16 of them, 0x24 bytes each from +0x3e68: a stream, next / previous links, a pin count,
+  an in-use flag and the frame. They form a list from +0 in frame order and a free list from +4.
+- **Allocating.** `Replay_AllocKeyframe` takes the first free keyframe. When none is free it first evicts one
+  (`Replay_EvictKeyframe`). The keyframe evicted is the first unpinned one, after the keyframe at +0x18, that has
+  another unpinned one somewhere after it (`Replay_FindEvictableKeyframe`). If there is none, the search starts
+  again from the second keyframe. +0x18 then moves past the evicted keyframe. The game also walks on past pinned
+  keyframes and drops what it finds.
+- **Freeing.** `Replay_FreeKeyframe` unlinks a keyframe, resets it and puts it first on the free list. If it was the
+  newest (+0x10), the newest moves back to the one before it. `Replay_TryFreeKeyframe` frees only a keyframe with
+  one before it and two after it, not in use and not pinned. `Replay_PruneKeyframes` frees every such keyframe from
+  the second on. Without its argument it keeps the last.
+- **Finding.** `Replay_FindKeyframe(frame)` gives the keyframe at the frame, or the last one before it, among those
+  unpinned or starting one of the current rider's (+0x24) highlights. It gives the last keyframe when none fits.
+  Next / previous step from that keyframe to the next usable one. `Replay_KeyframeIndex` and `_CountUsed` skip the
+  keyframe being written (+0x1c). The counts are 0 until there is a newest keyframe.
+- **Seeking.** Seeking sets the frame (+0x34) and the keyframe playing (+0x14), and seeks every rider's pad stream.
+  The start is frame 0 at the first keyframe. The end is the last keyframe (`Replay_FindKeyframe` of 100,000,000).
+  Stepping goes to the next or previous keyframe, and does nothing while a playlist plays. When a playlist plays
+  (+0x391c), its current entry gives the keyframe and frame instead.
+- **At the end.** `Replay_IsAtEnd` is true:
+  - in modes 1, 2 and 7: at or past the end frame (+0x30), or no longer playing (+0x48), or past the playlist
+    entry's end;
+  - in modes 3, 5, 6, 8 and 9: always;
+  - in mode 4: at or past the end frame.
+- **Playlists.** A playlist is a count (up to 10), the entry playing and the entries. Each entry is a highlight: its
+  keyframe and its length in frames.
+- **Camera tracks.** A track's cuts are found by frame: forward, the first cut after the frame; back, the cut before
+  a cut at the frame, or the last cut before it.
+- **Walks that never end.** On a circular list the game's walks never end. The port panics after a million steps
+  with a message saying so.
+- **Checked in the runner:** 3,000 random managers (lists, free lists, pins, highlights, playlists, camera tracks
+  and pad streams), with 30 random calls each over the 32 entry points. Every result and all the memory was
+  compared after each call. The 57 walks that never ended were checked to run past the game's step limit too.
+

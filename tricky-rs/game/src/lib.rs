@@ -54,6 +54,7 @@ pub mod objanim;
 pub mod orient;
 pub mod pf;
 pub mod replay;
+pub mod replaymgr;
 pub mod pickup;
 pub mod pose;
 pub mod rail_control;
