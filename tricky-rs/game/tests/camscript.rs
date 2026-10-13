@@ -47,6 +47,7 @@ struct E {
     owner: Owner,
     owner_ptr: u32,
     q: Rc<RefCell<VecDeque<u32>>>,
+    count: i32,
 }
 impl KeyEnv for E {
     fn key(&mut self, i: i32) -> Key {
@@ -75,6 +76,15 @@ impl ScriptEnv for E {
     fn find_owner(&mut self) -> u32 {
         self.log.borrow_mut().push(vec![7, 3]);
         self.owner_ptr
+    }
+    fn audio_stop(&mut self) {
+        self.log.borrow_mut().push(vec![9]);
+    }
+    fn entry_count(&mut self) -> i32 {
+        self.count
+    }
+    fn reset_rider_anim(&mut self, j: i32) {
+        self.log.borrow_mut().push(vec![10, j as u32]);
     }
     fn first_position(&mut self, owner: u32) -> [f32; 3] {
         assert_eq!(owner, self.owner_ptr);
@@ -217,7 +227,7 @@ fn camera_path_steps_match_the_original() {
         tab.borrow_mut().log.clear();
 
         *q.borrow_mut() = words.iter().cloned().collect();
-        let mut e = E { t: tab.clone(), log: log.clone(), owner: own, owner_ptr: owner, q: q.clone() };
+        let mut e = E { t: tab.clone(), log: log.clone(), owner: own, owner_ptr: owner, q: q.clone(), count: 0 };
         match which {
             0 | 2 => update_path(&mut o, &mut e),
             1 => end_path(&mut o, &mut e),
@@ -253,4 +263,150 @@ fn camera_path_steps_match_the_original() {
         empty += (which == 3 && own.count <= 0) as i32;
     }
     eprintln!("path steps: {ran} ticks, {idle} idle, {ended} cuts, {started} starts ({empty} without keys)");
+}
+
+#[test]
+fn camera_script_state_matches_the_original() {
+    let Some(mut r) = Runner::from_env() else { return };
+    r.float_rules = Rules::parse("add=n,mul=n,div=n,cvt=n").unwrap();
+    for a in [0x175e88u32, 0x175de0, 0x175eb8, 0x175e50, 0x176f38, 0x175c70, 0x177db0] {
+        r.allow(a);
+    }
+    let obj = r.mem.alloc(0xf00);
+    let names = r.mem.alloc(0x100);
+    let app = r.mem.alloc(0x800);
+    let racepl = 0x5555_0000u32;
+    r.mem.write_u32(0x337c58, app);
+    r.mem.write_u32(app + 0x730, racepl);
+    let log: Rc<RefCell<Vec<Vec<u32>>>> = Rc::new(RefCell::new(vec![]));
+    const RIDER: u32 = 0x4000_0000;
+    const STRIDE: u32 = 0x8000;
+    r.stub(0x2fd14c, move |c, m| {
+        let (d, s) = (c.gpr(4) as u32, c.gpr(5) as u32);
+        let mut i = 0;
+        loop {
+            let b = (m.read_u32((s + i) & !3) >> (8 * ((s + i) & 3))) as u8;
+            let w = m.read_u32((d + i) & !3);
+            let sh = 8 * ((d + i) & 3);
+            m.write_u32((d + i) & !3, (w & !(0xff << sh)) | (b as u32) << sh);
+            if b == 0 {
+                break;
+            }
+            i += 1;
+        }
+        c.set_gpr(2, d as u64);
+    });
+    r.stub(0x2fd008, move |c, m| {
+        let rd = |m: &mut r5900::Mem, a: u32| {
+            let mut v = vec![];
+            loop {
+                let b = (m.read_u32((a + v.len() as u32) & !3) >> (8 * ((a + v.len() as u32) & 3))) as u8;
+                if b == 0 {
+                    return v;
+                }
+                v.push(b);
+            }
+        };
+        let (a, b) = (rd(m, c.gpr(4) as u32), rd(m, c.gpr(5) as u32));
+        c.set_gpr(2, if a == b { 0 } else { 1 });
+    });
+    let l = log.clone();
+    r.stub(0x231318, move |_, _| l.borrow_mut().push(vec![9]));
+    let l = log.clone();
+    r.stub(0x20c3e8, move |_, _| l.borrow_mut().push(vec![6]));
+    r.stub(0x1814a8, move |c, _| {
+        assert_eq!(c.gpr(4) as u32, racepl);
+        c.set_gpr(2, (RIDER + STRIDE * c.gpr(5) as u32) as u64);
+    });
+    let l = log.clone();
+    r.stub(0x15ee30, move |c, _| {
+        let a = c.gpr(4) as u32 - 0x46c0 - RIDER;
+        assert_eq!(a % STRIDE, 0);
+        l.borrow_mut().push(vec![10, a / STRIDE]);
+    });
+    for (k, nm) in [&b"chase near"[..], b"chase far", b"intro 1", b"", b"a", b"fifteen chars x"].iter().enumerate() {
+        let a = names + 0x10 * k as u32;
+        for i in 0..4 {
+            r.mem.write_u32(a + 4 * i, 0);
+        }
+        for (i, b) in nm.iter().enumerate() {
+            let w = r.mem.read_u32((a + i as u32) & !3);
+            let sh = 8 * ((a + i as u32) & 3);
+            r.mem.write_u32((a + i as u32) & !3, w | (*b as u32) << sh);
+        }
+    }
+    let list: [&[u8]; 6] = [b"chase near", b"chase far", b"intro 1", b"", b"a", b"fifteen chars x"];
+
+    let tab = Rc::new(RefCell::new(Table { keys: vec![], owner: 0, cur: -1, log: vec![] }));
+    let mut g = Rng(0x175e_88a1_c4d3_0b27);
+    let mut counts = [0u32; 5];
+    for case in 0..30_000 {
+        let which = (g.next() % 5) as usize; // start, stop, set_name, is_running, reset
+        let mut o: Vec<u32> = (0..OBJ_WORDS).map(|_| g.next() % 4).collect();
+        // the current name
+        let cur = list[(g.next() % 6) as usize];
+        copy_name(&mut o, 0x24, cur);
+        o[0x34 / 4] = [0u32, 1, 1, 2][(g.next() % 4) as usize];
+        o[0x428 / 4] = [4u32, 4, 3, 0][(g.next() % 4) as usize];
+        o[0x1e4 / 4] = [1u32, 0, 2][(g.next() % 3) as usize];
+        o[0x210 / 4] = g.next() % 2;
+        for i in 0..8 {
+            o[(0x230 + 0x40 * i) / 4] = g.next() % 3;
+        }
+        let count = [0i32, 1, 2, 3, 6][(g.next() % 5) as usize];
+        r.mem.write_u32(0x32db6c, count as u32);
+        let nm_i = (g.next() % 6) as usize;
+        let flag = g.next() % 3 != 0;
+        for (i, w) in o.iter().enumerate() {
+            r.mem.write_u32(obj + 4 * i as u32, *w);
+        }
+        log.borrow_mut().clear();
+        r.cpu.set_gpr(4, obj as u64);
+        let mut want_ret = None;
+        match which {
+            0 => {
+                r.cpu.set_gpr(5, (names + 0x10 * nm_i as u32) as u64);
+                r.cpu.set_gpr(6, flag as u64);
+                r.call(0x175de0).unwrap()
+            }
+            1 => {
+                r.cpu.set_gpr(5, flag as u64);
+                r.call(0x175eb8).unwrap()
+            }
+            2 => {
+                r.cpu.set_gpr(5, (names + 0x10 * nm_i as u32) as u64);
+                r.call(0x175e88).unwrap()
+            }
+            3 => {
+                r.call(0x175e50).unwrap();
+                want_ret = Some(r.cpu.gpr(2) as u32);
+            }
+            _ => r.call(0x176f38).unwrap(),
+        }
+        let want = std::mem::take(&mut *log.borrow_mut());
+        let mut e = E {
+            t: tab.clone(),
+            log: log.clone(),
+            owner: Owner { count: 0, speed: 0.0 },
+            owner_ptr: 0,
+            q: Rc::new(RefCell::new(VecDeque::new())),
+            count,
+        };
+        let mut got_ret = None;
+        match which {
+            0 => start(&mut o, list[nm_i], flag, &mut e),
+            1 => stop(&mut o, flag, &mut e),
+            2 => set_name(&mut o, list[nm_i]),
+            3 => got_ret = Some(is_running(&o)),
+            _ => reset_actor_anims(&mut o, &mut e),
+        }
+        let got = std::mem::take(&mut *log.borrow_mut());
+        assert_eq!(want, got, "case {case} calls (which {which}, count {count})");
+        assert_eq!(want_ret, got_ret, "case {case} return");
+        for (i, w) in o.iter().enumerate() {
+            assert_eq!(r.mem.read_u32(obj + 4 * i as u32), *w, "case {case} word {:#x} (which {which})", i * 4);
+        }
+        counts[which] += 1;
+    }
+    eprintln!("script state: {counts:?}");
 }
