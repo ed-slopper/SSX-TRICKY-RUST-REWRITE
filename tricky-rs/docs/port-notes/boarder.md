@@ -868,3 +868,33 @@ helpers. Most end alike: off the course (+0x290 = 0) or with bit 0, +0x304 = !bi
   0x221, state 3, motion 2 and a push of 416.67 along the board; brake and crouch cleared every frame.
 - Checked in the runner on 80,000 random riders, pads and clips: every field, the state objects and every call with
   its arguments (and the clip filter when a clip starts) compared; every branch reached.
+
+## The control dispatch, event bits and rumble (board row G1g; `tricky_game::control`, checked: `tests/control_misc.rs`)
+
+- `Boarder_UpdateControl` 0x11c9a0: by the control state (+0x428) the state's update on its object in the boarder
+  handler (2 bump, 3 cruise, 4 fakie change, 6 finish, 7..9 the gate, 10 jump, 0xb / 0xc landings, 0xd natural air,
+  0xe prewind, 0xf rail, 0x10 spin, 0x11 / 0x12 sitting, 0x14 get-up, 0x16 reset); 0x13 only the reset check; 1,
+  0x15 and the rest nothing. 5, the fakie cruise, runs inline: the slide-out clips (0x203 / 0x204) slow the
+  velocity by 1%; on the turn clip (0x202) the stick (full right for a computer rider, turned for a goofy one, the
+  character entry's +0x40) picks the way round unless near centre and the board already faces the velocity: the
+  stance flips (+0x1b4, its copy +0x46d4, the facing +0x46e0 as π or 0), then clip 0x203 (> 0.5), 0x204 (< −0.5)
+  or a half turn (`Boarder_RotateAboutAxis` π) and 0x201; 0x1ff / 0x221 to cruise.
+- `cBoarder::vf10` 0x11a348 (an event: its bit in +0x388 this tick against +0x384 last tick, and an argument):
+  turning on during a lesson (gApp+0x730 → +0x34), 0x10 goes to the lesson and 10 ends it; else 10 is
+  `Boarder_Finish` (no multipliers left, +0x114), 0xd a multiplier (+0x114 − 1), 0xc a player's checkpoint
+  (`Speech_OnCheckpoint`, `Boarder_HitCheckpoint`); still on, 0xc's checkpoint speech again and the place line
+  (+0x10c ← +0x110); for the lead or focus rider the music events (1 → 0, 9, 10 and 0x12 → 10 with a cheer) and the
+  speech lines (0x13 / 0x14 / 0x15 / 0x16); the event's sound on. Turning off, its sound off. 0xe / 0x17 / 0x18
+  queue event sound 0 / 1 / 2 on, stop it off.
+- Rumble (`Vibration_Construct` 0x150a70: the pad device and a float level): `Rumble_Add`(amount) above 0.5 (unless
+  the race control's +0x20 is 1..9) pulses the pad for amount · 1.67 s held to 0.02..0.1, in frames (device virtual
+  +0x24(1, n)); the level rises to amount + 0.8 (at most 2, never down). `Rumble_Update`: a level above 0 runs the
+  motor (+0x2c(min(level, 1), 2)), then decays (· 0.9833 − 0.025) and stops it at 0; held off or empty, the motor
+  off (0, −1).
+- Helpers: `Boarder_SetTimeScaleRateLimited` (+0x12c toward the target by at most 0.008446), `Boarder_IsDoneFinishing`
+  (a computer rider in state 1, or 6 with its finish line (board object +0x670) at phase 4),
+  `FinishLineControl_IsDone` (past phase 1 and 240 ticks), `Boarder_StartLineOffset` (character +0x60 · 90 − 90),
+  `Boarder_TickSfxFadeIn` (+0x5af0 down to 0), `FUN_0011f488` (+0x1ec above 0, or +0x1e8 = 4 past half its clip),
+  `Boarder_LaunchFromGate` (8 → 9), `Boarder_AddSpeedSample` (+0xdc += speed · 0.036, +0xe0 += 1).
+- Checked in the runner: 40,000 dispatches over every state (the update called with its object), 60,000 event bits,
+  40,000 rumbles and helpers: fields and every call compared.

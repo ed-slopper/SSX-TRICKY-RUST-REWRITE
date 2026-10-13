@@ -64,8 +64,8 @@ address,size,name,system,status
 0x106480,124,StaticInit_GateLaunchControl,boarder?,not started
 0x106500,60,LessonWaitControl_Enter,boarder?,ported
 0x106548,124,StaticInit_LessonWaitControl,boarder?,not started
-0x1065c8,36,FinishLineControl_IsDone,boarder?,not started
-0x1065f0,16,FinishLineControl_IsPhase4,boarder?,not started
+0x1065c8,36,FinishLineControl_IsDone,boarder?,checked
+0x1065f0,16,FinishLineControl_IsPhase4,boarder?,checked
 0x106600,100,FinishLineControl_Enter,boarder?,ported
 0x106668,916,FinishState_Update,boarder,checked
 0x106a00,40,FinishLineControl_SaveSnapshot,save,not started
@@ -263,11 +263,11 @@ address,size,name,system,status
 0x119d30,752,Boarder_FindNearestLine,boarder,ported
 0x11a020,116,Race_FindLineAhead,race,not started
 0x11a098,688,Boarder_TeleportToInstance,boarder,ported
-0x11a348,1100,cBoarder::vf10_11a348,boarder,not started
+0x11a348,1100,cBoarder::vf10_11a348,boarder,checked
 0x11a798,8,cBoarder::EmitBrakeSpray,boarder,ported
 0x11a7a0,8,cBoarder::vf12_11a7a0,boarder,not started
 0x11a7a8,8,Boarder_ResetRender,boarder,ported
-0x11a7b0,32,Boarder_LaunchFromGate,boarder,not started
+0x11a7b0,32,Boarder_LaunchFromGate,boarder,checked
 0x11a7d0,108,Boarder_SetStartState,boarder,ported
 0x11a840,1892,Boarder_PlaceAtStart,boarder,ported
 0x11afa8,60,Boarder_Freeze,boarder,ported
@@ -282,10 +282,10 @@ address,size,name,system,status
 0x11c7d8,100,Boarder_ChangeControlState,boarder,ported
 0x11c840,168,Boarder_ExitControlState,boarder,ported
 0x11c8e8,184,Boarder_EnterControlState,boarder,ported
-0x11c9a0,232,Boarder_UpdateControl,boarder,not started
+0x11c9a0,232,Boarder_UpdateControl,boarder,checked
 0x11ca88,52,Boarder_GetCamera,camera,ported
 0x11cae8,1284,Boarder_PlaceAt,boarder,ported
-0x11cff0,68,Boarder_SetTimeScaleRateLimited,boarder,not started
+0x11cff0,68,Boarder_SetTimeScaleRateLimited,boarder,checked
 0x11d038,812,Boarder_UpdateBoost,boarder,checked
 0x11d368,108,AIComputer_RandomTrick,ai,ported
 0x11d3d8,92,AIComputer_RandomEasyTrick,ai,ported
@@ -294,7 +294,7 @@ address,size,name,system,status
 0x11d7b0,124,Boarder_GetSpeedStat,boarder,ported
 0x11d830,360,Boarder_Wipeout,boarder,ported
 0x11d998,68,Boarder_IsFinishedAndStopped,boarder,ported
-0x11d9e0,92,Boarder_IsDoneFinishing,boarder,not started
+0x11d9e0,92,Boarder_IsDoneFinishing,boarder,checked
 0x11da40,192,Boarder_Finish,boarder,ported
 0x11db00,2824,SpinControl_CalcLandingAlign,boarder,ported
 0x11e608,88,Pickup_Points,boarder?,ported
@@ -307,7 +307,7 @@ address,size,name,system,status
 0x11e988,20,Boarder_ScoreCrash,boarder,ported
 0x11e9a0,52,Boarder_ScoreKnockdown,boarder,ported
 0x11e9d8,40,Boarder_GetGateStartTimer,boarder,ported
-0x11ea00,28,Boarder_StartLineOffset,boarder,not started
+0x11ea00,28,Boarder_StartLineOffset,boarder,checked
 0x11ea20,8,Boarder_GetCourseLength,boarder,ported
 0x11ea28,68,Boarder_GetRaceTime,boarder,ported
 0x11ea70,136,Rivals_OnBump,audio?,ported
@@ -324,8 +324,8 @@ address,size,name,system,status
 0x11f3f8,56,Boarder_StartDisappointed,boarder,checked
 0x11f430,16,Boarder_IsTricky,boarder,checked
 0x11f440,36,Boarder_SetSfxMuted,boarder,ported
-0x11f468,28,Boarder_TickSfxFadeIn,boarder,not started
-0x11f488,92,FUN_0011f488,boarder?,not started
+0x11f468,28,Boarder_TickSfxFadeIn,boarder,checked
+0x11f488,92,FUN_0011f488,boarder?,checked
 0x11f4e8,284,StaticInit_Boarder,boarder?,not started
 0x11f608,8,Boarder_SetState,boarder,ported
 0x11f610,8,Boarder_SetMotion,boarder,ported
@@ -945,8 +945,8 @@ address,size,name,system,status
 0x14d6e0,240,Lesson_HandleMenuInput,game?,ported
 0x14d7d0,200,Lesson_ResetScene,game?,ported
 0x14d898,140,Lesson_RestartRider,game?,ported
-0x14d928,8,FUN_0014d928,game?,not started
-0x14d930,24,FUN_0014d930,game?,not started
+0x14d928,8,FUN_0014d928,game?,ported
+0x14d930,24,FUN_0014d930,game?,ported
 0x14d948,124,Lesson_SetupTrickMenu,game?,not started
 0x14d9c8,108,Lesson_SetupMenu3A,game?,not started
 0x14da38,108,Lesson_SetupMenu3B,game?,not started
@@ -1045,10 +1045,10 @@ address,size,name,system,status
 0x1507e8,44,BroadphaseProxy_SetBox,world?,not started
 0x150818,44,BroadphaseProxy_SetBoxB,world?,not started
 0x150848,536,Contact_SortBodyPairList,world?,not started
-0x150a70,16,Vibration_Construct,boarder?,not started
+0x150a70,16,Vibration_Construct,boarder?,ported
 0x150a80,360,Rumble_Impact,boarder?,ported
-0x150be8,304,Rumble_Add,boarder?,not started
-0x150d18,284,Rumble_Update,boarder?,not started
+0x150be8,304,Rumble_Add,boarder?,checked
+0x150d18,284,Rumble_Update,boarder?,checked
 0x150e38,580,Race_CreateBoarders,race,not started
 0x151080,460,cPlayer::~cPlayer,boarder?,not started
 0x151250,5408,cPlayer::GetControls,boarder?,ported
@@ -1097,11 +1097,11 @@ address,size,name,system,status
 0x155b10,164,Score_AddPickupPoints,scoring,ported
 0x155bb8,168,Score_AddPickupTime,scoring,ported
 0x155c60,64,Scoring_MsgCheckpointTime,scoring?,not started
-0x155ca0,40,Scoring_MsgMultiplier,scoring?,not started
+0x155ca0,40,Scoring_MsgMultiplier,scoring?,ported
 0x155cc8,8,FUN_00155cc8,scoring?,not started
 0x155cd0,196,Score_SetPickupMultiplier,scoring,ported
 0x155d98,44,Scoring_MsgKnockdown,scoring?,ported
-0x155dc8,52,Boarder_AddSpeedSample,boarder,not started
+0x155dc8,52,Boarder_AddSpeedSample,boarder,checked
 0x155e00,100,Score_UpdateSpin,scoring,checked
 0x155e68,128,Score_UpdateFlip,scoring,checked
 0x155ee8,356,Score_StartGrab,scoring,checked
@@ -3634,7 +3634,7 @@ address,size,name,system,status
 0x21bfd0,60,Replay_IsPlaying,audio?,ported
 0x21c010,100,Audio_GetRiderPos,audio,not started
 0x21c078,36,Audio_RiderCount,audio,not started
-0x21c0a0,716,FUN_0021c0a0,audio?,not started
+0x21c0a0,716,FUN_0021c0a0,audio?,ported
 0x21c4d0,64,Music_EndTricky,audio,not started
 0x21c510,224,Audio_LoadGlobalBankList,audio,not started
 0x21c610,176,Audio_TrickyTrigger,audio,ported
@@ -3652,9 +3652,9 @@ address,size,name,system,status
 0x21cf38,104,Jukebox_Open,audio?,not started
 0x21cfa0,124,Jukebox_PlayTrack,audio?,not started
 0x21d078,56,Music_StopStreamAndFade,audio,not started
-0x21d0b0,16,Audio_QueueEventSound,audio,not started
+0x21d0b0,16,Audio_QueueEventSound,audio,ported
 0x21d0c0,1284,Audio_LoadAmbientBanks,audio,not started
-0x21d5c8,72,Audio_StopEventSound,audio,not started
+0x21d5c8,72,Audio_StopEventSound,audio,ported
 0x21d610,112,Audio_SetMusicState,audio,not started
 0x21d680,812,FUN_0021d680,audio?,not started
 0x21d9b0,812,FUN_0021d9b0,audio?,not started
@@ -3664,7 +3664,7 @@ address,size,name,system,status
 0x21e248,592,FUN_0021e248,audio?,not started
 0x21e498,40,FUN_0021e498,audio?,not started
 0x21e4f0,44,Audio_ResumeAfterSpeech,audio,not started
-0x21e528,108,Audio_CheerForRider,audio,not started
+0x21e528,108,Audio_CheerForRider,audio,ported
 0x21e688,8,FUN_0021e688,frontend?,ported
 0x21e690,28,FUN_0021e690,frontend?,not started
 0x21e6c0,28,cBXAudio::vf3_21e6c0,audio,ported
@@ -4128,7 +4128,7 @@ address,size,name,system,status
 0x233a18,148,Speech_OnRiderReset,audio?,checked
 0x233ab0,56,FUN_00233ab0,audio?,not started
 0x233b70,48,Speech_WipeoutChance,audio?,checked
-0x233ba0,276,FUN_00233ba0,audio?,not started
+0x233ba0,276,FUN_00233ba0,audio?,ported
 0x233cb8,128,Speech_OnRiderCollision,audio?,checked
 0x233d38,216,Speech_OnWipeout,audio?,checked
 0x233e10,104,FUN_00233e10,audio?,checked

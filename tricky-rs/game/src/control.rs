@@ -59,6 +59,12 @@ pub struct Rider {
     pub trick: i32,
     pub trick_words: [i32; 8],
     pub filter: u32,
+    /// the control state (+0x428), the stance's copy (+0x46d4) and the facing (+0x46e0), goofy (the character
+    /// entry +0x464 → +0x40)
+    pub control: u32,
+    pub x46d4: u32,
+    pub facing: f32,
+    pub goofy: bool,
     /// the board object (+0x5ae0): +0x718, +0x76c, +0x770, +0x798
     pub b718: u32,
     pub b76c: u32,
@@ -105,6 +111,10 @@ pub trait ControlEnv {
     fn race_state(&mut self) -> i32;
     /// `CamScript_Start`(the rider's camera (race index · 0x80 + gApp+0x730 + 0xa0), script, 0)
     fn cam_start(&mut self, index: i32, script: &str);
+    /// The control state's own update (its object in the boarder handler: `BumpControl_Update`, `Cruise…`,
+    /// `FinishState_Update`, the gate's, `JumpControl_Update`, the landings, the air, `PrewindState_Update`,
+    /// `RailSlideControl_Update`, `SpinState_Update`, the sit, `GetUpState_Update`, `ResetState_Update`)
+    fn run_control(&mut self, r: &mut Rider, control: u32);
 }
 
 /// A stick field of the pad word: six signed bits at `shl` from the top, over 31
@@ -458,4 +468,285 @@ pub fn getup_from_sit(env: &mut dyn ControlEnv, r: &mut Rider) {
     r.brake_target = 0.0;
     r.brake = 0.0;
     r.brake_rate = 0.0;
+}
+
+/// `Boarder_UpdateControl` 0x11c9a0: the control state's update by +0x428 (each its own state object in the boarder
+/// handler: [`ControlEnv::run_control`]); 5 (the fakie cruise) and 0x13 (only the reset check) run here
+pub fn update_control(env: &mut dyn ControlEnv, pad: u32, r: &mut Rider) {
+    match r.control {
+        5 => fakie_cruise(env, pad, r),
+        0x13 => reset_check(env, pad, r),
+        2..=4 | 6..=0x12 | 0x14 | 0x16 => env.run_control(r, r.control),
+        _ => {}
+    }
+}
+
+/// The fakie cruise (state 5, inline in `Boarder_UpdateControl`): on the slide-out clips (0x203 / 0x204) the velocity
+/// slows by 1%; on the turn clip (0x202) the stick (full for a computer rider; turned for a goofy rider) picks the
+/// way round unless the board already faces its way: the stance flips (+0x1b4, +0x46d4, the facing +0x46e0 as π or 0
+/// wrapped), then clip 0x203 (right), 0x204 (left) or, near centre, a half turn and 0x201; the landing clips go to
+/// cruise; the reset check
+pub fn fakie_cruise(env: &mut dyn ControlEnv, pad: u32, r: &mut Rider) {
+    let clip = env.clip(0);
+    if (clip as u32).wrapping_sub(0x203) < 2 {
+        r.vel = st(scale(ld(r.vel), F(f32::from_bits(0x3f7d70a4))));
+    } else if clip == 0x202 {
+        let mut s = stick(pad, 0x15);
+        if 0 <= r.controller {
+            s = 1.0;
+        }
+        if s.abs() <= 0.5 && 0.0 <= dot(ld(r.board), ld(r.vel)).0 {
+            return reset_check(env, pad, r);
+        }
+        r.stance ^= 1;
+        let a = if r.stance != 0 { F(std::f32::consts::PI) } else { F(0.0) };
+        let f = a * F(0.15915494) + F(0.5);
+        let mut fl = F(f.0 as i32 as f32);
+        if f.0 < fl.0 {
+            fl = fl - F(1.0);
+        }
+        r.x46d4 = r.stance;
+        r.facing = (a - fl * F(6.2831855)).0;
+        if r.goofy {
+            s = -s;
+        }
+        if 0.5 < s {
+            env.play_clip(r, 0x203);
+        } else if -0.5 <= s {
+            env.rotate_about_axis(r, std::f32::consts::PI);
+            env.play_clip(r, 0x201);
+        } else {
+            env.play_clip(r, 0x204);
+        }
+    } else if clip == 0x1ff || clip == 0x221 {
+        env.set_state(r, 3);
+    }
+    reset_check(env, pad, r);
+}
+
+/// `Boarder_SetTimeScaleRateLimited` 0x11cff0: the time scale (+0x12c) toward `v` by at most 0.008446341
+pub fn set_time_scale_rate_limited(v: f32, scale: &mut f32) {
+    let step = F(0.008446341);
+    let cur = F(*scale);
+    *scale = if (F(v) + step).0 < cur.0 {
+        (cur - step).0
+    } else if cur.0 < (F(v) - step).0 {
+        (cur + step).0
+    } else {
+        v
+    };
+}
+
+/// `Boarder_IsDoneFinishing` 0x11d9e0: a computer rider in control state 1, or in 6 with its finish line at phase 4
+/// (`FinishLineControl_IsPhase4` 0x1065f0 on the board object's +0x670)
+pub fn is_done_finishing(controller: i32, control: u32, finish_phase: i32) -> bool {
+    if controller < 0 {
+        return false;
+    }
+    control == 1 || (control == 6 && finish_phase == 4)
+}
+
+/// `FinishLineControl_IsDone` 0x1065c8: past phase 1 and 240 ticks
+pub fn finish_line_done(phase: i32, ticks: i32) -> bool {
+    1 < phase && 0xf0 < ticks
+}
+
+/// `Boarder_StartLineOffset` 0x11ea00: the character entry's +0x60 · 90 − 90
+pub fn start_line_offset(x60: f32) -> f32 {
+    (F(x60) * F(90.0) - F(90.0)).0
+}
+
+/// `Boarder_TickSfxFadeIn` 0x11f468: +0x5af0 counted down, its old value (0 once there)
+pub fn tick_sfx_fade_in(n: &mut i32) -> i32 {
+    let v = *n;
+    if 0 < v {
+        *n = v - 1;
+        v
+    } else {
+        0
+    }
+}
+
+/// `FUN_0011f488`(+0x1ec, +0x1e8, the layer-0 phase when asked): +0x1ec above 0, or +0x1e8 = 4 past half its clip
+pub fn x1ec_or_half(x1ec: i32, x1e8: i32, phase: &mut dyn FnMut() -> f32) -> bool {
+    if 0 < x1ec {
+        return true;
+    }
+    x1e8 == 4 && 0.5 <= phase()
+}
+
+/// `Boarder_LaunchFromGate` 0x11a7b0: from the gate's anticipation (8) to its launch (9)
+pub fn launch_from_gate(env: &mut dyn ControlEnv, r: &mut Rider) {
+    if r.control == 8 {
+        env.set_state(r, 9);
+    }
+}
+
+/// `Boarder_AddSpeedSample` 0x155dc8(speed): the sum (+0xdc, ·0.036) and the count (+0xe0)
+pub fn add_speed_sample(speed: f32, sum: &mut f32, count: &mut f32) {
+    *sum = (F(*sum) + F(speed) * F(0.036000002)).0;
+    *count = (F(*count) + F(1.0)).0;
+}
+
+/// The vibration a player's pad gets (`Vibration_Construct` 0x150a70: the device, 0): its level
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct Rumble {
+    pub level: f32,
+}
+
+/// The pad's motors (the device's virtuals +0x24 and +0x2c) and whether the race holds them off (the race control
+/// +0x40 → +0x20 between 1 and 9)
+pub trait RumbleEnv {
+    fn held_off(&mut self) -> bool;
+    /// +0x24(1, frames): a pulse
+    fn pulse(&mut self, frames: i32);
+    /// +0x2c(strength, mode): 2 on, −1 off
+    fn motor(&mut self, strength: f32, mode: i64);
+}
+
+impl Rumble {
+    /// `Rumble_Add` 0x150be8(amount): above 0.5 (and not held off) a pulse of amount·1.67 s (0.02..0.1) in frames;
+    /// the level up to amount + 0.8 (at most 2, never down)
+    pub fn add(&mut self, env: &mut dyn RumbleEnv, amount: f32) {
+        if 0.5 < amount && !env.held_off() {
+            let t = F(amount) * F(1.6666666);
+            let d = if t.0 < 0.02 { F(0.02) } else if 0.1 < t.0 { F(0.1) } else { t };
+            env.pulse((d * F(60.0)).0 as i32);
+        }
+        let v = (F(amount) + F(0.8)).0;
+        self.level = if v < self.level { self.level } else if 2.0 < v { 2.0 } else { v };
+    }
+
+    /// `Rumble_Update` 0x150d18: a level runs the motor (at most 1) and decays (·0.9833 − 0.025), stopping it at 0;
+    /// held off or at 0, the motor off
+    pub fn update(&mut self, env: &mut dyn RumbleEnv) {
+        if 0.0 < self.level && !env.held_off() {
+            env.motor(if 1.0 < self.level { 1.0 } else { self.level }, 2);
+            let v = F(self.level) * F(0.98333335) - F(0.025);
+            self.level = v.0;
+            if v.0 <= 0.0 {
+                env.motor(0.0, -1);
+            }
+        } else {
+            env.motor(0.0, -1);
+        }
+    }
+}
+
+/// What the event bits read of the rider: +0x384 last tick's bits, +0x388 this tick's, +0x114 the multipliers to
+/// give, +0x418 the controller, +0x10c / +0x110 the place before and now, +0x460 the slot
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct EventRider {
+    pub prev: u32,
+    pub cur: u32,
+    pub mult: i32,
+    pub controller: i32,
+    pub place_prev: i32,
+    pub place: i32,
+    pub slot: i32,
+}
+
+impl EventRider {
+    fn on(&self, e: u32) -> bool {
+        ((self.cur & !self.prev) as i32 >> (e & 31)) & 1 != 0
+    }
+    fn off(&self, e: u32) -> bool {
+        ((!self.cur & self.prev) as i32 >> (e & 31)) & 1 != 0
+    }
+}
+
+/// The game the event bits tell
+pub trait EventEnv {
+    /// a lesson running (gApp+0x730 → +0x34): its event 0x10 (`FUN_0014d928`, the arg) and its end (`FUN_0014d930`)
+    fn lesson(&mut self) -> bool;
+    fn lesson_event(&mut self, arg: u32);
+    fn lesson_end(&mut self);
+    /// `Boarder_Finish`, `Scoring_MsgMultiplier`(+0x5820), `Speech_OnCheckpoint`, `Boarder_HitCheckpoint`(arg),
+    /// `FUN_00233ba0`(the places), `Game_IsLeadOrFocusRider`(slot), `Audio_MusicEvent`, `Audio_CheerForRider`, the
+    /// speech lines `FUN_00234558`(k), `FUN_00234610`(0), `FUN_00233740`; the event sound `FUN_0021c0a0`(event, on);
+    /// `Audio_QueueEventSound` 0x21d0b0(kind) / `Audio_StopEventSound` 0x21d5c8
+    fn finish(&mut self, r: &mut EventRider);
+    fn msg_multiplier(&mut self, r: &mut EventRider);
+    fn on_checkpoint(&mut self, r: &mut EventRider);
+    fn hit_checkpoint(&mut self, r: &mut EventRider, arg: u32);
+    fn placing(&mut self, r: &mut EventRider, before: i32, now: i32);
+    fn is_lead(&mut self, slot: i32) -> bool;
+    fn music_event(&mut self, e: u32);
+    fn cheer(&mut self, r: &mut EventRider);
+    fn local_line(&mut self, r: &mut EventRider, k: u32);
+    fn local_line2(&mut self, r: &mut EventRider);
+    fn listener_line(&mut self, r: &mut EventRider);
+    fn event_sound(&mut self, r: &mut EventRider, event: [u32; 2], on: bool);
+    fn queue_event_sound(&mut self, kind: u32);
+    fn stop_event_sound(&mut self);
+}
+
+/// `cBoarder::vf10` 0x11a348(event: its bit and argument): a bit turning on during a lesson goes to the lesson (0x10,
+/// and 10 its end); else 10 finishes (no multipliers left), 0xd gives a multiplier, 0xc counts a player's
+/// checkpoint; still on (the flags read again), 0xc's speech and place line, and for the lead or focus rider the
+/// music events (1 → 0, 9, 10 / 0x12 with a cheer) and speech lines (0x13..0x16); the event's sound on; a bit
+/// turning off its sound off; 0xe / 0x17 / 0x18 queue the event sound 0 / 1 / 2 on, stop it off
+pub fn event_bits(env: &mut dyn EventEnv, r: &mut EventRider, event: [u32; 2]) {
+    let e = event[0];
+    if r.on(e) {
+        if env.lesson() {
+            if e == 0x10 {
+                env.lesson_event(event[1]);
+            }
+            if e == 10 {
+                env.lesson_end();
+            }
+            return;
+        }
+        if e == 10 && r.mult == 0 {
+            env.finish(r);
+        }
+        if e == 0xd && 0 < r.mult {
+            env.msg_multiplier(r);
+            r.mult -= 1;
+        }
+        if e == 0xc && r.controller < 0 {
+            env.on_checkpoint(r);
+            env.hit_checkpoint(r, event[1]);
+        }
+        if r.on(e) {
+            if e == 0xc {
+                env.on_checkpoint(r);
+                let (b, n) = (r.place_prev, r.place);
+                env.placing(r, b, n);
+                r.place_prev = r.place;
+            }
+            if env.is_lead(r.slot) {
+                match e {
+                    1 => env.music_event(0),
+                    9 => env.music_event(9),
+                    10 if r.mult == 0 => env.music_event(10),
+                    0x12 if r.mult == 0 => {
+                        env.music_event(10);
+                        env.cheer(r);
+                    }
+                    0x13 => env.local_line(r, 0),
+                    0x14 => env.local_line(r, 1),
+                    0x15 => env.local_line2(r),
+                    0x16 => env.listener_line(r),
+                    _ => {}
+                }
+            }
+            if r.on(e) {
+                env.event_sound(r, event, true);
+            }
+        }
+    }
+    if r.off(e) {
+        env.event_sound(r, event, false);
+    }
+    for (bit, kind) in [(0xe, 0), (0x17, 1), (0x18, 2)] {
+        if e == bit {
+            if r.on(bit) {
+                env.queue_event_sound(kind);
+            } else if r.off(bit) {
+                env.stop_event_sound();
+            }
+        }
+    }
 }
