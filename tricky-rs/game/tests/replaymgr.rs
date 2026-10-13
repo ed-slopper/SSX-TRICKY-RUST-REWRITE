@@ -120,7 +120,7 @@ fn build(g: &mut Rng, r: &mut Runner, w: &World) -> Mem {
         m.w32(pl + 8 + 4 * i, recs[g.below(recs.len() as u32) as usize].0);
     }
     m.w32(mgr + rm::PLAYLIST, if g.below(3) == 0 { pl } else { 0 });
-    // a camera track: cuts in frame order
+    // a second playlist (for the seeks): entries in frame order
     let t = mgr + 0x5c;
     let mut cuts: Vec<(u32, u32)> = (0..g.below(6)).map(|_| recs[g.below(recs.len() as u32) as usize]).collect();
     cuts.sort_by_key(|&(_, k)| m.r32(k + kf::FRAME));
@@ -303,8 +303,8 @@ fn replay_keyframes_and_seeking_are_the_original() {
                         rm::playlist_set_current(m, pl, frame % 4);
                         None
                     }
-                    30 => Some(rm::cam_track_seek_forward(m, t, frame) as u32),
-                    _ => Some(rm::cam_track_seek_back(m, t, frame) as u32),
+                    30 => Some(rm::playlist_seek_forward(m, t, frame) as u32),
+                    _ => Some(rm::playlist_seek_back(m, t, frame) as u32),
                 };
                 (v, m.clone())
             }));

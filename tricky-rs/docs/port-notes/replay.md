@@ -2,8 +2,9 @@
 
 How the game records and plays back a race. Ported so far: the byte streams and the pad streams (board row G12a;
 `tricky_game::replay`, checked: `tests/replay_streams.rs`), the replay codec (G12b, G12c: files.md), the keyframe
-list, seeking and playlists (G12d; `tricky_game::replaymgr`, checked: `tests/replaymgr.rs`), and the highlights
-and pins (G12e; the same module, checked: `tests/replay_highlights.rs`). Keyframes, the node save and restore, pins and
+list, seeking and playlists (G12d; `tricky_game::replaymgr`, checked: `tests/replaymgr.rs`), the highlights
+and pins (G12e; the same module, checked: `tests/replay_highlights.rs`), and the camera tracks (G12f; checked:
+`tests/replay_camtracks.rs`). Keyframes, the node save and restore, pins and
 highlights, camera tracks, `Replay_Update` and the memory-card save are the rest of G12.
 
 ## The replay control
@@ -99,8 +100,9 @@ frames of a message), +0x4c and +0x50 hold recording, +0x58 a stream overflowed.
   - in mode 4: at or past the end frame.
 - **Playlists.** A playlist is a count (up to 10), the entry playing and the entries. Each entry is a highlight: its
   keyframe and its length in frames.
-- **Camera tracks.** A track's cuts are found by frame: forward, the first cut after the frame; back, the cut before
-  a cut at the frame, or the last cut before it.
+- **Seeking a playlist by frame** (`ReplayPlaylist_SeekForward` 0x1954b8 / `_SeekBack` 0x195510, for the overlay's
+  scrubbing; G12d first named them as camera-track functions): forward, the first entry after the frame; back, the
+  entry before one at the frame, or the last entry before it.
 - **Walks that never end.** On a circular list the game's walks never end. The port panics after a million steps
   with a message saying so.
 - **Checked in the runner:** 3,000 random managers (lists, free lists, pins, highlights, playlists, camera tracks
@@ -151,4 +153,34 @@ frames of a message), +0x4c and +0x50 hold recording, +0x58 a stream overflowed.
 - **Checked in the runner:** 3,000 random managers (keyframes, the pool and the riders' lists, pins), with 25 random
   calls each over the 26 entry points. Every result and all the memory were compared after each call. Highlights
   begun, inserted and dropped, slots picked and commits that kept their highlight all happen many times.
+
+## Camera tracks (G12f)
+
+- **Layout.** Each rider has a camera track: four at +0x5c, 0xe24 apart. A track holds a cut count (up to 128),
+  the cut playing (-1 for none), a default cut at +8, and the cuts from +0x24. Each cut is 0x1c bytes: the five
+  chase-camera words, a preset and a frame.
+- **The cuts flag.** The flag at 0x32ca4c switches the cuts on; when it is off, only the default cut is used.
+- **Building a track.** `ReplayCamTrack_Generate` builds a track fresh. It switches the camera to replay mode for
+  the rider (`Camera_SetReplayMode`), takes the camera's view as the cut at frame 0 and seeks to frame 0.
+  `ReplayCamTrack_Insert(frame)` stores the camera's chase words and preset as a cut:
+  - at frame 0 it also becomes the default;
+  - a cut already at the frame is overwritten, and the call answers false;
+  - otherwise the new cut goes in after the last cut before the frame;
+  - when no cut is before the frame, it goes at the end, not at the front;
+  - with 128 cuts it answers false.
+- **Changing a track.** `_UpdateCurrent(frame)` writes the camera into the last cut at or before the frame (the
+  default when the flag is off). `_RemoveAt(frame)` removes the first cut at or past the frame, but never the first
+  cut, and only with the flag on and more than one cut.
+- **Playing a track.**
+  - `_SeekFrame(frame)` finds the last cut at or before the frame. When there is none it takes the count less one,
+    and with the flag off it takes 0.
+  - `_Advance(frame)` moves to the next cut once the frame reaches it.
+  - `_Apply` selects the playing cut's preset (the default's with the flag off) and sets its chase words. They are
+    passed to `Camera_SetChaseParams` as four float registers, the fifth word, and 1.
+- **The manager's wrappers** act on the current rider's (+0x24) track. `ReplayCam_NextCut(frame)` removes a cut at
+  the frame, then advances and applies the next one when the frame has reached it. `Replay_GenerateCameraTracks`
+  builds all four tracks.
+- **Camera calls.** The port makes them through `CamEnv`.
+- **Checked in the runner:** 2,000 random sets of tracks (0 to 128 cuts, shared frames, the flag on and off), with
+  30 random calls each over the 16 entry points. Every result, every camera call and all the memory were compared.
 

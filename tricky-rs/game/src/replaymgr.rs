@@ -466,11 +466,10 @@ pub fn playlist_clear(m: &mut Mem, pl: u32) {
     }
 }
 
-// A camera track (the three at +0x5c, 0xe24 apart): +0 the count, +4 the cut playing, +8 the cuts (each a pointer
-// to a word holding its keyframe)
+// More on playlists: seeking by frame (the overlay's scrubbing)
 
-/// `ReplayCamTrack_SeekForward` 0x1954b8(frame): the first cut whose keyframe is after the frame
-pub fn cam_track_seek_forward(m: &mut Mem, t: u32, frame: u32) -> bool {
+/// `ReplayPlaylist_SeekForward` 0x1954b8(frame): the first entry whose keyframe is after the frame
+pub fn playlist_seek_forward(m: &mut Mem, t: u32, frame: u32) -> bool {
     let n = m.r32(t) as i32;
     for i in 0..n.max(0) as u32 {
         if frame < m.r32(m.r32(m.r32(t + 8 + 4 * i)) + kf::FRAME) {
@@ -481,9 +480,9 @@ pub fn cam_track_seek_forward(m: &mut Mem, t: u32, frame: u32) -> bool {
     false
 }
 
-/// `ReplayCamTrack_SeekBack` 0x195510(frame): from the last cut back, the one before a cut at the frame, or the
-/// last cut before it; the first when the frame is past the first cut's
-pub fn cam_track_seek_back(m: &mut Mem, t: u32, frame: u32) -> bool {
+/// `ReplayPlaylist_SeekBack` 0x195510(frame): from the last entry back, the one before an entry at the frame, or
+/// the last entry before it; the first when the frame is past the first entry's
+pub fn playlist_seek_back(m: &mut Mem, t: u32, frame: u32) -> bool {
     let mut i = (m.r32(t) as i32).wrapping_sub(1);
     let at = |m: &Mem, i: i32| m.r32(m.r32(m.r32(t + 8 + 4 * i as u32)) + kf::FRAME);
     while i >= 1 {
@@ -1040,5 +1039,272 @@ pub fn pin_clear_highlight_ref(m: &mut Mem, p: u32, h: u32) {
         if m.r32(p + pin::SLOTS + 4 * s) == h {
             m.w32(p + pin::SLOTS + 4 * s, 0);
         }
+    }
+}
+
+// Camera tracks (board row G12f): one per rider at +0x5c, 0xe24 apart: +0 the cut count (up to 128), +4 the cut
+// playing (-1 none), +8 the default cut, +0x24 the cuts (0x1c each: the five chase-camera words, the preset, the
+// frame). The flag at 0x32ca4c (the edited tracks in use) picks the cuts over the default.
+
+/// The flag at 0x32ca4c
+pub const CUTS_ON: u32 = 0x32ca4c;
+pub const CAM_TRACKS: u32 = 0x5c;
+pub const CAM_TRACK_SIZE: u32 = 0xe24;
+pub const MAX_CUTS: i32 = 0x80;
+
+/// The camera calls the tracks make
+pub trait CamEnv {
+    /// `Camera_GetChaseParams` 0x178968: the five chase words
+    fn chase_params(&mut self) -> [u32; 5];
+    /// `Camera_GetPreset` 0x1786c0
+    fn preset(&mut self) -> u32;
+    /// `Camera_SelectPreset` 0x1786d0
+    fn select_preset(&mut self, p: u32);
+    /// `Camera_SetChaseParams` 0x178a28(the five words, 1)
+    fn set_chase_params(&mut self, c: [u32; 5], snap: u32);
+    /// `Camera_SetReplayMode` 0x1785c0(on, rider)
+    fn set_replay_mode(&mut self, on: u32, rider: u32);
+}
+
+fn cut(t: u32, i: i32) -> u32 {
+    t.wrapping_add(0x24).wrapping_add((i as u32).wrapping_mul(0x1c))
+}
+fn cut_frame(m: &Mem, t: u32, i: i32) -> u32 {
+    m.r32(cut(t, i) + 0x18)
+}
+fn write_cut(m: &mut Mem, at: u32, c: [u32; 5], preset: u32) {
+    for (k, v) in c.iter().enumerate() {
+        m.w32(at + 4 * k as u32, *v);
+    }
+    m.w32(at + 0x14, preset);
+}
+fn cuts_on(m: &Mem) -> bool {
+    m.r32(CUTS_ON) != 0
+}
+
+/// `ReplayCamTrack_Init` 0x194cc0 (and its jump 0x194d10): no cuts, the default zeroed, none playing
+pub fn cam_track_init(m: &mut Mem, t: u32) {
+    for k in 0..0xe00 / 4 {
+        m.w32(t + 0x24 + 4 * k, 0);
+    }
+    for k in 0..7 {
+        m.w32(t + 8 + 4 * k, 0);
+    }
+    m.w32(t, 0);
+    m.w32(t + 4, u32::MAX);
+}
+
+/// `ReplayCamTrack_Generate` 0x194d18(rider): set up afresh with the replay camera's view of the rider at frame 0
+pub fn cam_track_generate(m: &mut Mem, env: &mut dyn CamEnv, t: u32, rider: u32) {
+    cam_track_init(m, t);
+    env.set_replay_mode(1, rider);
+    cam_track_insert(m, env, t, 0);
+    env.set_replay_mode(0, rider);
+    cam_track_seek_frame(m, t, 0);
+}
+
+/// `ReplayCamTrack_Insert` 0x194d78(frame): the camera now as a cut at the frame (at frame 0 also the default); a
+/// cut already at the frame is replaced (false), else one goes in after the last cut before the frame, or at the
+/// end when none is before it; false when full
+pub fn cam_track_insert(m: &mut Mem, env: &mut dyn CamEnv, t: u32, frame: u32) -> bool {
+    let c = env.chase_params();
+    if frame == 0 {
+        let p = env.preset();
+        write_cut(m, t + 8, c, p);
+    }
+    let n = m.r32(t) as i32;
+    for i in 0..n.max(0) {
+        if cut_frame(m, t, i) == frame {
+            let p = env.preset();
+            write_cut(m, cut(t, i), c, p);
+            cam_track_seek_frame(m, t, frame);
+            return false;
+        }
+    }
+    if n >= MAX_CUTS {
+        return false;
+    }
+    let mut i = n - 1;
+    while i >= 0 {
+        if cut_frame(m, t, i) < frame {
+            let mut j = n;
+            loop {
+                j -= 1;
+                if j <= i {
+                    break;
+                }
+                for k in 0..7 {
+                    m.w32(cut(t, j + 1) + 4 * k, m.r32(cut(t, j) + 4 * k));
+                }
+            }
+            let p = env.preset();
+            write_cut(m, cut(t, i + 1), c, p);
+            m.w32(cut(t, i + 1) + 0x18, frame);
+            m.w32(t, m.r32(t).wrapping_add(1));
+            cam_track_seek_frame(m, t, frame);
+            return true;
+        }
+        i -= 1;
+    }
+    let p = env.preset();
+    let n = m.r32(t) as i32;
+    write_cut(m, cut(t, n), c, p);
+    m.w32(cut(t, n) + 0x18, frame);
+    m.w32(t, (n + 1) as u32);
+    cam_track_seek_frame(m, t, frame);
+    true
+}
+
+/// `ReplayCamTrack_UpdateCurrent` 0x1950b8(frame): the camera now into the last cut at or before the frame (with the
+/// cuts on), else into the default
+pub fn cam_track_update_current(m: &mut Mem, env: &mut dyn CamEnv, t: u32, frame: u32) {
+    let c = env.chase_params();
+    if !cuts_on(m) {
+        let p = env.preset();
+        write_cut(m, t + 8, c, p);
+        return;
+    }
+    let mut i = m.r32(t) as i32;
+    loop {
+        i -= 1;
+        if i < 0 {
+            return;
+        }
+        if frame >= cut_frame(m, t, i) {
+            break;
+        }
+    }
+    let p = env.preset();
+    write_cut(m, cut(t, i), c, p);
+}
+
+/// `FUN_001951d0`: with the cuts on, whether another cut fits
+pub fn cam_track_can_insert(m: &Mem, t: u32) -> bool {
+    cuts_on(m) && (m.r32(t) as i32) < MAX_CUTS
+}
+
+/// `ReplayCamTrack_RemoveAt` 0x1951f8(frame): with the cuts on and more than one, the first cut at or past the frame
+/// is removed (never the first cut)
+pub fn cam_track_remove_at(m: &mut Mem, t: u32, frame: u32) -> bool {
+    if !cuts_on(m) {
+        return false;
+    }
+    let n = m.r32(t) as i32;
+    if n <= 1 {
+        return false;
+    }
+    let mut i = 1;
+    while i < n {
+        if frame <= cut_frame(m, t, i) {
+            let mut n = m.r32(t) as i32;
+            while i < n - 1 {
+                for k in 0..7 {
+                    m.w32(cut(t, i) + 4 * k, m.r32(cut(t, i + 1) + 4 * k));
+                }
+                i += 1;
+                n = m.r32(t) as i32;
+            }
+            m.w32(t, (n - 1) as u32);
+            return true;
+        }
+        i += 1;
+    }
+    false
+}
+
+/// `ReplayCamTrack_SeekFrame` 0x1952d8(frame): the last cut at or before the frame (the count less one when none;
+/// 0 with the cuts off)
+pub fn cam_track_seek_frame(m: &mut Mem, t: u32, frame: u32) {
+    if !cuts_on(m) {
+        m.w32(t + 4, 0);
+        return;
+    }
+    let n = m.r32(t) as i32;
+    let mut i = n;
+    loop {
+        i -= 1;
+        if i < 0 {
+            m.w32(t + 4, (n - 1) as u32);
+            return;
+        }
+        if frame >= cut_frame(m, t, i) {
+            m.w32(t + 4, i as u32);
+            return;
+        }
+    }
+}
+
+/// `ReplayCamTrack_Advance` 0x195340(frame): on to the next cut when the frame has reached it
+pub fn cam_track_advance(m: &mut Mem, t: u32, frame: u32) -> bool {
+    if !cuts_on(m) {
+        return false;
+    }
+    let n = m.r32(t) as i32;
+    let next = (m.r32(t + 4) as i32).wrapping_add(1);
+    if n < 1 || n <= next {
+        return false;
+    }
+    if cut_frame(m, t, next) <= frame {
+        m.w32(t + 4, next as u32);
+        return true;
+    }
+    false
+}
+
+/// `FUN_001953a0`(i): a cut's frame (0 with the cuts off)
+pub fn cam_track_cut_frame(m: &Mem, t: u32, i: u32) -> u32 {
+    if cuts_on(m) {
+        m.r32(i.wrapping_mul(0x1c).wrapping_add(t).wrapping_add(0x3c))
+    } else {
+        0
+    }
+}
+
+/// `ReplayCamTrack_Apply` 0x1953c8: the cut playing (the default with the cuts off) to the camera
+pub fn cam_track_apply(m: &Mem, env: &mut dyn CamEnv, t: u32) {
+    let at = if cuts_on(m) { cut(t, m.r32(t + 4) as i32) } else { t + 8 };
+    env.select_preset(m.r32(at + 0x14));
+    let c = [m.r32(at), m.r32(at + 4), m.r32(at + 8), m.r32(at + 0xc), m.r32(at + 0x10)];
+    env.set_chase_params(c, 1);
+}
+
+/// The rider's (+0x24) camera track
+pub fn rider_cam_track(m: &Mem, mgr: u32) -> u32 {
+    mgr + CAM_TRACKS + m.r32(mgr + RIDER).wrapping_mul(CAM_TRACK_SIZE)
+}
+
+/// `Replay_ApplyCameraCut` 0x190c28, `ReplayCam_InsertCut` 0x190c40(frame), `Replay_UpdateCamTrack` 0x190c70(frame),
+/// `FUN_00190c88`: the same on the rider's track
+pub fn apply_camera_cut(m: &Mem, env: &mut dyn CamEnv, mgr: u32) {
+    cam_track_apply(m, env, rider_cam_track(m, mgr));
+}
+pub fn insert_cut(m: &mut Mem, env: &mut dyn CamEnv, mgr: u32, frame: u32) -> bool {
+    let t = rider_cam_track(m, mgr);
+    cam_track_insert(m, env, t, frame)
+}
+pub fn update_cam_track(m: &mut Mem, env: &mut dyn CamEnv, mgr: u32, frame: u32) {
+    let t = rider_cam_track(m, mgr);
+    cam_track_update_current(m, env, t, frame)
+}
+pub fn can_insert_cut(m: &Mem, mgr: u32) -> bool {
+    cam_track_can_insert(m, rider_cam_track(m, mgr))
+}
+
+/// `ReplayCam_NextCut` 0x190cb8(frame): a cut removed at the frame, then on to the next and applied when reached;
+/// false when none was removed
+pub fn next_cut(m: &mut Mem, env: &mut dyn CamEnv, mgr: u32, frame: u32) -> bool {
+    if !cam_track_remove_at(m, rider_cam_track(m, mgr), frame) {
+        return false;
+    }
+    if cam_track_advance(m, rider_cam_track(m, mgr), frame) {
+        apply_camera_cut(m, env, mgr);
+    }
+    true
+}
+
+/// `Replay_GenerateCameraTracks` 0x190d40: each of the four riders' tracks generated
+pub fn generate_camera_tracks(m: &mut Mem, env: &mut dyn CamEnv, mgr: u32) {
+    for r in 0..4 {
+        cam_track_generate(m, env, mgr + CAM_TRACKS + r * CAM_TRACK_SIZE, r);
     }
 }
