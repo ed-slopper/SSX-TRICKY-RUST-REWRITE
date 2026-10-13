@@ -61,7 +61,7 @@ pub trait QueueEnv {
     /// `Audio_GetRiderListener` 0x20fc60 (the audio system, the rider).
     fn rider_listener(&mut self) -> u32;
     /// `SndSys_PlayPending` 0x20c948.
-    fn play_pending(&mut self);
+    fn play_pending(&mut self) -> u64;
 }
 
 /// The entry every handler builds (inlined in each): a default record with the `kind` (+0xa40) and sound `id`
@@ -69,6 +69,21 @@ pub trait QueueEnv {
 /// `emitter` when the sound is the rider's (its pointer is stored and the listener asked for); then the slot the
 /// manager gives. The caller plays the pending sounds (`update_air` and the others do it here, `play`).
 pub fn queue_sound(q: &mut Queue, kind: u32, id: u32, volume: Option<i64>, emitter: Option<u32>, env: &mut dyn QueueEnv) {
+    let i = queue_begin(q, kind, id, volume);
+    let slot = env.get_slot(4);
+    if let Some(e) = emitter {
+        q.emitter[i] = e;
+        q.a40[i] = slot;
+        let l = env.rider_listener();
+        q.a68[i] = l;
+    } else {
+        q.a40[i] = slot;
+    }
+    env.play_pending();
+}
+
+/// The part of the entry before the sound manager is asked for a slot: the new entry's index.
+pub fn queue_begin(q: &mut Queue, kind: u32, id: u32, volume: Option<i64>) -> usize {
     q.count += 1;
     let i = q.count as usize;
     q.record[i] = q.header;
@@ -94,16 +109,7 @@ pub fn queue_sound(q: &mut Queue, kind: u32, id: u32, volume: Option<i64>, emitt
         let v = volume as i32;
         q.record[i][0] = if v < 0 { 0 } else if v < 0x7f { v as u8 } else { 0x7f };
     }
-    let slot = env.get_slot(4);
-    if let Some(e) = emitter {
-        q.emitter[i] = e;
-        q.a40[i] = slot;
-        let l = env.rider_listener();
-        q.a68[i] = l;
-    } else {
-        q.a40[i] = slot;
-    }
-    env.play_pending();
+    i
 }
 
 /// The rider values `Sfx_UpdateAir` reads.
@@ -329,4 +335,48 @@ pub fn on_trick_book_done(env: &mut dyn TrickBookEnv) {
     env.schedule(500, g, slot);
     let slot = env.get_slot();
     env.schedule(0x2ee, g, slot);
+}
+
+pub trait WallHitEnv: QueueEnv {
+    /// 0x2154e0 (the audio system, the rider): non-zero while a wall hit sound is already queued.
+    fn is_queued(&mut self) -> bool;
+    /// `SndSys_SetPendingVolume` 0x226dd8 (40.0, -1.0, the audio system).
+    fn set_pending_volume(&mut self, a: f32, b: f32);
+    /// `Audio_IsNearerPlayer2` 0x20fb68 (the audio system, the emitter): which player's listener.
+    fn is_nearer_player2(&mut self, emitter: u32) -> u32;
+    /// `SndSys_QueueSounds` 0x215998 (the audio system, the rider, what `play_pending` returned, `word_80 + 0x32`, 0).
+    fn queue_sounds(&mut self, played: u64, id: u32);
+}
+
+/// `Sfx_OnWallHit` 0x2162f0: a rider hits a wall: unless a hit sound is already queued, the scrape (id 0x31, no
+/// volume of its own, the manager's pending volume set to 40, -1) for whichever player is nearer, played at once,
+/// then the follow-up sounds queued after it. `word_80` is the audio system's +0x80.
+pub fn on_wall_hit(q: &mut Queue, word_80: u32, emitter: u32, env: &mut dyn WallHitEnv) {
+    if env.is_queued() {
+        return;
+    }
+    let i = queue_begin(q, 0, 0x31, None);
+    let slot = env.get_slot(4);
+    q.a40[i] = slot;
+    env.set_pending_volume(40.0, -1.0);
+    let l = env.is_nearer_player2(emitter);
+    q.a68[i] = l;
+    q.emitter[i] = emitter;
+    let played = env.play_pending();
+    env.queue_sounds(played, word_80.wrapping_add(0x32));
+}
+
+pub trait CollisionEnv: QueueEnv {
+    /// The audio system's random function (its object's virtual +0x24).
+    fn random(&mut self) -> u32;
+}
+
+/// `Sfx_OnRiderCollision` 0x216960: two riders bump (one of them the player's): at most one bump sound per 30 frames
+/// (`last_bump` is the global at 0x343118, `frame` the app's +0x10), id 0x5a or 0x5b by chance, at the first rider.
+pub fn on_rider_collision(q: &mut Queue, last_bump: &mut i32, frame: i32, flag_a: u32, flag_b: u32, emitter: u32, env: &mut dyn CollisionEnv) {
+    if (flag_a == 1 || flag_b == 1) && 0x1e < frame.wrapping_sub(*last_bump) {
+        let u = env.random();
+        queue_sound(q, 0, ((u & 0x7fff) << 1) / 0x7fff + 0x5a, None, Some(emitter), env);
+        *last_bump = frame;
+    }
 }

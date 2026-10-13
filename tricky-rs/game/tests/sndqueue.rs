@@ -40,8 +40,9 @@ impl QueueEnv for TEnv {
     fn rider_listener(&mut self) -> u32 {
         self.0.borrow_mut().take("rl", 0, 0) as u32
     }
-    fn play_pending(&mut self) {
+    fn play_pending(&mut self) -> u64 {
         self.0.borrow_mut().log.push(("pp", 0, 0));
+        0
     }
 }
 impl AirEnv for TEnv {
@@ -213,8 +214,9 @@ impl QueueEnv for EnterEnv {
     fn rider_listener(&mut self) -> u32 {
         self.o.borrow_mut().take("rl", 0, 0) as u32
     }
-    fn play_pending(&mut self) {
+    fn play_pending(&mut self) -> u64 {
         self.o.borrow_mut().log.push(("pp", 0, 0));
+        0
     }
 }
 impl AirEnterEnv for EnterEnv {
@@ -439,8 +441,9 @@ impl QueueEnv for ImpactEnv {
     fn rider_listener(&mut self) -> u32 {
         self.o.borrow_mut().take("rl", 0, 0) as u32
     }
-    fn play_pending(&mut self) {
+    fn play_pending(&mut self) -> u64 {
         self.o.borrow_mut().log.push(("pp", 0, 0));
+        0
     }
 }
 impl WipeoutImpactEnv for ImpactEnv {
@@ -535,8 +538,9 @@ impl QueueEnv for ResetEnv {
     fn rider_listener(&mut self) -> u32 {
         panic!("no listener")
     }
-    fn play_pending(&mut self) {
+    fn play_pending(&mut self) -> u64 {
         self.0.borrow_mut().log.push(("pp", 0, 0));
+        0
     }
 }
 impl RiderResetEnv for ResetEnv {
@@ -634,5 +638,170 @@ fn on_trick_book_done_matches_the_original() {
         on_trick_book_done(&mut BookEnv(or.clone(), glob));
         let mine = std::mem::take(&mut or.borrow_mut().log);
         assert_eq!(orig, mine, "case {case}");
+    }
+}
+
+// ---- OnWallHit ----
+
+struct WallEnv(Rc<RefCell<Or>>);
+impl QueueEnv for WallEnv {
+    fn get_slot(&mut self, which: u32) -> u32 {
+        self.0.borrow_mut().take("slot", which as u64, 0) as u32
+    }
+    fn rider_listener(&mut self) -> u32 {
+        panic!("not used")
+    }
+    fn play_pending(&mut self) -> u64 {
+        self.0.borrow_mut().take("pp", 0, 0) as u64
+    }
+}
+impl WallHitEnv for WallEnv {
+    fn is_queued(&mut self) -> bool {
+        self.0.borrow_mut().take("queued", 0, 0) != 0
+    }
+    fn set_pending_volume(&mut self, a: f32, b: f32) {
+        self.0.borrow_mut().log.push(("spv", a.to_bits() as u64, b.to_bits() as u64));
+    }
+    fn is_nearer_player2(&mut self, emitter: u32) -> u32 {
+        self.0.borrow_mut().take("near2", emitter as u64, 0) as u32
+    }
+    fn queue_sounds(&mut self, played: u64, id: u32) {
+        self.0.borrow_mut().log.push(("qs", played, id as u64));
+    }
+}
+
+#[test]
+fn on_wall_hit_matches_the_original() {
+    let Some(mut r) = runner() else { return };
+    let or: Rc<RefCell<Or>> = Rc::new(RefCell::new(Or::default()));
+    let (rider, sys, l) = setup(&mut r, 0x900);
+    for (a, name) in [(0x2154e0u32, "queued"), (0x211f38, "slot"), (0x20fb68, "near2"), (0x20c948, "pp")] {
+        let o = or.clone();
+        r.stub(a, move |c, _| {
+            let x = match name {
+                "slot" => c.gpr(5) as u32 as u64,
+                "near2" => c.gpr(5) as u32 as u64,
+                "queued" => {
+                    assert_eq!((c.gpr(4) as u32, c.gpr(5) as u32), (sys, rider));
+                    0
+                }
+                _ => 0,
+            };
+            let v = o.borrow_mut().take(name, x, 0);
+            c.set_gpr(2, v as u64);
+        });
+    }
+    let o = or.clone();
+    r.stub(0x226dd8, move |c, _| o.borrow_mut().log.push(("spv", c.f(12).to_bits() as u64, c.f(13).to_bits() as u64)));
+    let o = or.clone();
+    r.stub(0x215998, move |c, _| {
+        assert_eq!((c.gpr(4) as u32, c.gpr(5) as u32, c.gpr(8)), (sys, rider, 0));
+        o.borrow_mut().log.push(("qs", c.gpr(6), c.gpr(7) as u32 as u64))
+    });
+    let mut g = Rng(0xdead_beef_0bad_f00d);
+    for case in 0..30_000 {
+        fill(&mut r, sys, &l, &mut g);
+        let w80 = r.mem.read_u32(sys + 0x80);
+        let vals: Vec<i64> = vec![
+            (g.next() % 2) as i64,
+            (g.next() % 100) as i64,
+            (g.next() % 3) as i64,
+            ((g.next() as i64) << 32) | g.next() as i64,
+        ];
+        let before = read(&mut r, &l);
+        or.borrow_mut().vals = vals.clone();
+        or.borrow_mut().log.clear();
+        r.cpu.set_gpr(4, sys as u64);
+        r.cpu.set_gpr(5, rider as u64);
+        r.call(0x2162f0).unwrap_or_else(|e| panic!("case {case}: {e}"));
+        let orig = std::mem::take(&mut or.borrow_mut().log);
+        let after = read(&mut r, &l);
+        let mut q = before.clone();
+        or.borrow_mut().vals = vals;
+        on_wall_hit(&mut q, w80, rider + 0x140, &mut WallEnv(or.clone()));
+        let mine = std::mem::take(&mut or.borrow_mut().log);
+        assert_eq!(orig, mine, "case {case}");
+        assert_eq!(after, q, "case {case} state");
+    }
+}
+
+// ---- OnRiderCollision ----
+
+struct CollEnv(Rc<RefCell<Or>>);
+impl QueueEnv for CollEnv {
+    fn get_slot(&mut self, which: u32) -> u32 {
+        self.0.borrow_mut().take("slot", which as u64, 0) as u32
+    }
+    fn rider_listener(&mut self) -> u32 {
+        self.0.borrow_mut().take("rl", 0, 0) as u32
+    }
+    fn play_pending(&mut self) -> u64 {
+        self.0.borrow_mut().log.push(("pp", 0, 0));
+        0
+    }
+}
+impl CollisionEnv for CollEnv {
+    fn random(&mut self) -> u32 {
+        self.0.borrow_mut().take("rand", 0, 0) as u32
+    }
+}
+
+#[test]
+fn on_rider_collision_matches_the_original() {
+    let Some(mut r) = runner() else { return };
+    let or: Rc<RefCell<Or>> = Rc::new(RefCell::new(Or::default()));
+    let (rider, sys, l) = setup(&mut r, 0x900);
+    let other = r.mem.alloc(0x900);
+    let vt = r.mem.alloc(0x40);
+    let rand_fn = 0x0030_0000u32;
+    for (a, name) in [(0x211f38u32, "slot"), (0x20fc60, "rl"), (rand_fn, "rand")] {
+        let o = or.clone();
+        r.stub(a, move |c, _| {
+            let x = if name == "slot" { c.gpr(5) as u32 as u64 } else { 0 };
+            let v = o.borrow_mut().take(name, x, 0);
+            c.set_gpr(2, v as u64);
+        });
+    }
+    r.mem.write_u32(vt + 0x20, 0);
+    r.mem.write_u32(vt + 0x24, rand_fn);
+    let o = or.clone();
+    r.stub(0x20c948, move |_, _| o.borrow_mut().log.push(("pp", 0, 0)));
+    let app = r.mem.alloc(0x40);
+    r.mem.write_u32(0x337c58, app);
+    let mut g = Rng(0x7e57_0000_c011_1d3);
+    for case in 0..30_000 {
+        fill(&mut r, sys, &l, &mut g);
+        r.mem.write_u32(sys + 4, vt);
+        let fa = [0u32, 1, 1, 2][g.next() as usize % 4];
+        let fb = [0u32, 1, 2][g.next() as usize % 3];
+        r.mem.write_u32(rider + 0x41c, fa);
+        r.mem.write_u32(other + 0x41c, fb);
+        let last = g.next() as i32 / 4;
+        let frame = [last + 29, last + 30, last + 31, last + 32, last - 5, last + 1000, g.next() as i32 / 4, i32::MAX, i32::MIN][g.next() as usize % 9];
+        r.mem.write_u32(app + 0x10, frame as u32);
+        r.mem.write_u32(0x343118, last as u32);
+        let vals: Vec<i64> = vec![
+            [0i64, 1, 0x7fff, 0x8000, 0x7ffe, 0x3fff, 0x4000, 0xffff_ffff, 0x5555][g.next() as usize % 9],
+            (g.next() % 100) as i64,
+            (g.next() % 100) as i64,
+        ];
+        let before = read(&mut r, &l);
+        or.borrow_mut().vals = vals.clone();
+        or.borrow_mut().log.clear();
+        r.cpu.set_gpr(4, sys as u64);
+        r.cpu.set_gpr(5, rider as u64);
+        r.cpu.set_gpr(6, other as u64);
+        r.call(0x216960).unwrap_or_else(|e| panic!("case {case}: {e}"));
+        let orig = std::mem::take(&mut or.borrow_mut().log);
+        let after = read(&mut r, &l);
+        let new_last = r.mem.read_u32(0x343118) as i32;
+        let mut q = before.clone();
+        or.borrow_mut().vals = vals;
+        let mut lb = last;
+        on_rider_collision(&mut q, &mut lb, frame, fa, fb, rider + 0x140, &mut CollEnv(or.clone()));
+        let mine = std::mem::take(&mut or.borrow_mut().log);
+        assert_eq!(orig, mine, "case {case} fa {fa} fb {fb} last {last} frame {frame}");
+        assert_eq!(after, q, "case {case} state");
+        assert_eq!(new_last, lb, "case {case} last bump");
     }
 }
