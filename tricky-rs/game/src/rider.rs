@@ -1069,10 +1069,17 @@ impl Rider {
         if handled {
             // the ground tick did the probe (and the walls)
         } else if !jumped {
-            // landing: snow at or above our feet, and moving into it
-            if let Some(hit) = world.ground(p, 1.2, 0.02) {
+            // landing: the game's down ray and probe on the course's collision (`Rider::course_landing`); without it
+            // (a folder level) STANDIN: snow at or above our feet, and moving into it
+            let found = if world.course.is_some() {
+                // STANDIN: the keyframed objects from the drawn mesh (row E7c3b)
+                self.course_landing(world, &mut p).or_else(|| world.mover_ground(p, 1.2, 0.02).filter(|h| self.vel.dot(h.normal) <= 0.5))
+            } else {
+                world.ground(p, 1.2, 0.02).filter(|h| self.vel.dot(h.normal) <= 0.5)
+            };
+            if let Some(hit) = found {
                 let vn = self.vel.dot(hit.normal);
-                if vn <= 0.5 {
+                {
                     p.y = hit.y;
                     let impact = vn;
                     self.vel -= hit.normal * vn.min(0.0);

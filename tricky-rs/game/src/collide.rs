@@ -309,6 +309,19 @@ impl CollisionWorld {
         self.tris.push(t);
     }
 
+    /// `World_RayCast` 0x25aff8 on the course with a `cWorldLine`(target, from, to, kind) (port metres, y up),
+    /// through the caller's last-hit record: the hit's point, normal and surface, `None` without the course's
+    /// collision or when the cast answers below 0.
+    pub fn course_line(&self, target: f32, from: Vec3, to: Vec3, kind: u32, last: Option<&mut crate::terrain::LastHit>) -> Option<(Vec3, Vec3, u32)> {
+        let course = self.course.as_ref()?;
+        let game = |v: Vec3| [v.x * 100.0, -v.z * 100.0, v.y * 100.0, 1.0];
+        let mut q = crate::worldline::WorldLine::new(target, game(from), game(to), kind);
+        let (t, h) = course.ray_cast(&mut q, self.showoff, last, &|i| self.course_skips(i));
+        let h = h.filter(|_| t >= 0.0)?;
+        let port = |v: [f32; 4], k: f32| Vec3::new(v[0], v[2], -v[1]) * k;
+        Some((port(h.pos, 0.01), port(h.normal, 1.0), h.surface as u32))
+    }
+
     /// Highest rideable surface under/around `pos` whose height lies in [pos.y - down, pos.y + up].
     ///
     /// With the course's collision (row E7c3) the course's: `World_RayCast` 0x25aff8 down a vertical
@@ -339,6 +352,12 @@ impl CollisionWorld {
             (Some(a), Some(b)) => Some(if b.y > a.y { b } else { a }),
             (a, b) => a.or(b),
         }
+    }
+
+    /// [`CollisionWorld::ground`] on the keyframed objects' drawn triangles only. STANDIN: the drawn mesh, for the
+    /// course's casts posing them (row E7c3b).
+    pub fn mover_ground(&self, pos: Vec3, up: f32, down: f32) -> Option<GroundHit> {
+        self.mesh_ground(pos, up, down, true)
     }
 
     /// [`CollisionWorld::ground`] on the drawn mesh's triangles (only the keyframed objects': `movers_only`).

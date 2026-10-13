@@ -287,6 +287,30 @@ Part of the port notes (index: [README.md](README.md)); units and wording as des
   head 144.5 cm, bounding centre at the hips 91.7 cm), for `CollBody_UpdateFromBones` on the animated skeleton
   (G5). `Boarder_AccumulateImpact` 0x125c48 (+0x2e4 += 1 − max(n · +0x2f0, 0), +0x2f0 = n) is not kept (nothing
   ported reads them). The air's walls (row E8o) and the keyframed objects (E7c3b) stay on the drawn mesh.
+- The landing of `AirMotion_Update` 0x108378 (proven, 0x108554..0x1089bc): P = the board frame (+0x4aa0) times
+  minus the pivot bone's position (bone +0x44d8, its +0x8c8), U = the frame's up row (+0x4ac0); `cWorldLine`(0.5,
+  P − 100·U, P + 200·U, 1) and `World_RayCast` with the rider's last-hit record (+0x430). On a hit the normal
+  (+0x2a0) is the hit's; when v · n < 0 the position and quaternion are saved, the position moved by the pivot
+  turned by half the spin (+0x1d0) and half the flip (+0x1d4), `Boarder_ProbeGround` run, the position put back;
+  when the probe hits, vn = n′ · v and the rider has landed if the height (+0x1bc) is under half the surface's
+  word 6 (+0x18 of its row); below 0 the position becomes the ground point (+0x2d0) minus that offset and the
+  height 0. Landing on surface 0, 6 or 10 is a crash (`Landing_CheckAngles` early out), and the get-up of a rider
+  on surface 0 is a reset (air.md): the game puts a rider who lands off the course back, as the port does.
+- Wiring (row E7c3d): with `TRICKY_DISC` `Rider::course_landing` (`rider/ground_tick.rs`) is the port's landing
+  test, through `CollisionWorld::course_line`. STANDINs: P is the position (no frame, no pivot bone: G5) and the
+  probe runs from it (no predicted attitude); the down ray's normal is kept only when the rider lands (row
+  G20c2b); the side is n × the heading in n's plane; the keyframed objects come from the drawn mesh
+  (`CollisionWorld::mover_ground`, E7c3b). What follows the landing (speed, crash test) is still the port's own
+  (row E8r).
+- TRICKY_SIM=600 over the 11 disc courses, "fell out of the world" / "autopilot stuck": E7c3 28 / 29, E7c3c 40 /
+  11, E7c3d 30 / 18 (megaplex 4 / 11, mesablanca 8 / 1, aloha 8 / 0). The count of falls is twice the falls: each
+  one is the rider's reset plus the autopilot's rejoin (`race.rs`, both through `Rider::respawn`). Every fall
+  traced (aloha, alaska, elysium, megaplex, mesablanca) is the game's own reset: a landing or get-up on a surface-0
+  patch off the course (aloha 4 of 4: the slope's side at (35, 453, 8), (210, 386, 30), (−35, 141, 306),
+  (−127, −216, −152) port m), a crash on surface 10, or the course's reset boxes (megaplex (−206, −123,
+  −167)); none comes from the walls (their pushes are under 2 cm). Which ones the game's riders would also
+  reach is the autopilot's line (ours), not the ground. Megaplex's new stucks wait under a vertical stretch of
+  its line (x −217, z −247, 35 m up): a keyframed lift, row E7c3b.
 
 ## Live cells (row E7b; `tricky_game::cells`, checked: `tests/cells.rs`)
 
