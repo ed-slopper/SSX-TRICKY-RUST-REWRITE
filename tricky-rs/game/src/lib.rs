@@ -85,6 +85,7 @@ pub mod puff;
 pub mod brakefx;
 pub mod boardtrail;
 pub mod campath;
+pub mod camscript;
 pub mod camera_update;
 pub mod effects;
 pub mod emitter;
