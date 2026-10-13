@@ -164,6 +164,31 @@ Part of the port notes (index: [README.md](README.md)); units and wording as des
 - Checked in the runner with the pre-race test: 4,000 random careers and races through Enter and up to 14 frames,
   the menu's 0xb / 0xc thrown in: the states, the clock, the career block, the scene object and every call compared.
 
+## The countdown, looking back and the race menu (board row G4k1; `tricky_game::prerace`, checked: `tests/raceglue.rs`)
+
+- `cCountdownHandler::Enter` 0x113520: with a start gate, the world script "StartCountdown", the race's virtual
+  +0x6c and, outside the tutorial, the race clock (+0x14) at -300 with HUD item 4; every rider (+0x88 of them, from
+  +0xc4) to its start state (`Boarder_SetStartState`, the gate flag).
+- `cCountdownHandler::Update` 0x113600: the clock up by 2 a frame. At 0 or over: the race's state 4, with a gate
+  "EndCountdown" and +0x6c, then `Audio_OnRaceGo` unless a replay holds the race (the replay control at gApp+0x730
+  -> +0x40, its +0x20 non-zero and under 10). Before 0, unless a replay holds: a beep each time the clock, truncated,
+  is a multiple of 60.
+- `Race_UpdateLookBack` 0x113a88: in the race (the game's state 4) with no replay holding, each player (+0x7c) whose
+  latch (+0xe4) is set and still holds the look combo (0x1f) looks back; otherwise its latch becomes whether the combo
+  was just pressed and it looks ahead.
+- `cAI::vf12` 0x112550 runs the start script by mode: "RaceMode" (0, 2, 4, 7, 9), "ShowoffMode" (3, 5), else
+  "FreerideMode". `vf18` 0x111708 sets the race's state 2. `vf19` 0x111738: with a replay, `Replay_Freeze` first; a
+  replay whose +0x4c is set then gives state 0xb, else the race's +0x94 (the argument) and state 5.
+- The race menu on the post-race handler (+4 the state): `RaceMenu_GoToState11` 0x113bf0 / `_GoToState12` 0x113ce8
+  abort the replay, set 0xb / 0xc and start the PreLoad camera; `RaceMenu_Restart` 0x113c60 aborts the replay, clears
+  every player's flags, prepares the race again, resets the cameras and starts PreLoad; `RaceMenu_EndRace` 0x113d58
+  sets 0xe, aborts, PreLoad, `Career_FinishRace`, then resets the cameras for another heat (career +0x3260 is 4) or
+  sets the game's +0x54 (the results shown).
+  The race menu's own four (0x113bb0 / bc0 / bd0 / be0) are tail calls to EndRace / GoToState11 / Restart /
+  GoToState12 with its +0x38, the handler.
+- Checked in the runner: 40,000 random cases over the nine functions (careers, modes, clocks, replays, pads,
+  latches, tutorial): every call, the clock, the latches, the handler's state and the results flag compared.
+
 ## Rank catch-up: the unchecked list walk
 
 Proven on the PS2: `Race_UpdatePlacingsAndRubberBand` 0x115100 runs every 6 ticks (`race+0x18 % 6`), over

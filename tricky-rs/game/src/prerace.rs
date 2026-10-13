@@ -566,3 +566,174 @@ impl EndRace {
         }
     }
 }
+
+/// The world scripts the countdown runs ("StartCountdown" 0x364638, "EndCountdown" 0x364648) and the race's
+/// start scripts by mode ("RaceMode" 0x364508, "FreerideMode" 0x3644f8, "ShowoffMode" 0x364518)
+pub const START_COUNTDOWN: &str = "StartCountdown";
+pub const END_COUNTDOWN: &str = "EndCountdown";
+pub const RACE_MODE: &str = "RaceMode";
+pub const FREERIDE_MODE: &str = "FreerideMode";
+pub const SHOWOFF_MODE: &str = "ShowoffMode";
+
+/// The engine's calls the race-flow glue makes
+pub trait GlueEnv {
+    /// `World_RunScript`, the race's virtual +0x6c, +0x54(state), +0x94(arg)
+    fn run_world_script(&mut self, name: &str);
+    fn race_entered(&mut self);
+    fn set_state(&mut self, state: u32);
+    fn race_vf94(&mut self, arg: u64);
+    /// `Game_IsTutorial` 0x1148d0
+    fn is_tutorial(&mut self) -> bool;
+    /// `HUD_ShowItem`, `Boarder_SetStartState` 0x11a7d0(rider, gate)
+    fn hud_show(&mut self, item: u32);
+    fn set_start_state(&mut self, rider: usize, gate: bool);
+    /// The replay control (gApp+0x730 → +0x40): present, its +0x20 (a replay holding the race when 1..9), +0x4c
+    fn replay(&mut self) -> Option<(i32, u32)>;
+    /// `Audio_OnRaceGo`, `Audio_PlayCountdownBeep`
+    fn on_race_go(&mut self);
+    fn countdown_beep(&mut self);
+    /// `Input_ComboPressed` / `Input_ComboHeld`(player k's device, 0x1f); `Camera_SetLookBack`(player k's, on)
+    fn combo_pressed(&mut self, k: usize) -> u32;
+    fn combo_held(&mut self, k: usize) -> bool;
+    fn set_look_back(&mut self, k: usize, on: bool);
+    /// `Replay_Abort`, `Replay_Freeze`, `CamScript_Stop` / `_Start`(PreLoad), `Game_ResetCameras`
+    fn replay_abort(&mut self);
+    fn replay_freeze(&mut self);
+    fn cam_preload(&mut self);
+    fn reset_cameras(&mut self);
+    /// `Career_ClearAllPlayerFlags`, `Career_PrepareRace`, `Career_FinishRace` on the career
+    fn clear_all_player_flags(&mut self);
+    fn prepare_race(&mut self);
+    fn finish_race(&mut self);
+    /// The game's +0x54 (the results shown)
+    fn show_results(&mut self);
+    /// The game's state (gApp+0x730 → +0x1c → +0x1c)
+    fn race_state(&mut self) -> i32;
+}
+
+/// A replay holding the race (its +0x20 set and under 10)
+fn replay_holds(env: &mut dyn GlueEnv) -> bool {
+    matches!(env.replay(), Some((n, _)) if n != 0 && n < 10)
+}
+
+/// `cCountdownHandler::Enter` 0x113520: with a start gate, "StartCountdown", the race's +0x6c and (outside the
+/// tutorial) the count from −300 with HUD item 4; every rider to its start state
+pub fn countdown_enter(env: &mut dyn GlueEnv, c: &Career, race: &RaceView, clock: &mut f32) {
+    let gate = has_start_gate(c);
+    if gate {
+        env.run_world_script(START_COUNTDOWN);
+        env.race_entered();
+        if !env.is_tutorial() {
+            *clock = -300.0;
+            env.hud_show(4);
+        }
+    }
+    for i in 0..race.riders.max(0) as usize {
+        env.set_start_state(i, gate);
+    }
+}
+
+/// `cCountdownHandler::Update` 0x113600: the clock up by 2 a frame; at 0 the race's state 4, "EndCountdown" with a
+/// gate, GO (unless a replay holds); before it a beep every 60 (unless a replay holds)
+pub fn countdown_update(env: &mut dyn GlueEnv, c: &Career, clock: &mut f32) {
+    let t = (crate::ps2f::F(*clock) + crate::ps2f::F(2.0)).0;
+    *clock = t;
+    if 0.0 <= t {
+        env.set_state(4);
+        if has_start_gate(c) {
+            env.run_world_script(END_COUNTDOWN);
+            env.race_entered();
+        }
+        if !replay_holds(env) {
+            env.on_race_go();
+        }
+    } else {
+        if replay_holds(env) {
+            return;
+        }
+        if (*clock as i32) % 0x3c == 0 {
+            env.countdown_beep();
+        }
+    }
+}
+
+/// `Race_UpdateLookBack` 0x113a88(the players' latches +0xe4): in the race (state 4, no replay holding), each
+/// player still holding the look combo (0x1f) since pressing it looks back; else its latch is whether it was just
+/// pressed, looking ahead
+pub fn update_look_back(env: &mut dyn GlueEnv, players: usize, latches: &mut [u32]) {
+    if env.race_state() != 4 || replay_holds(env) {
+        return;
+    }
+    for k in 0..players {
+        if latches[k] != 0 && env.combo_held(k) {
+            env.set_look_back(k, true);
+        } else {
+            latches[k] = env.combo_pressed(k);
+            env.set_look_back(k, false);
+        }
+    }
+}
+
+/// `cAI::vf12` 0x112550: the race's start script by mode (races 0, 2, 4, 7, 9; show-offs 3, 5; else freeride)
+pub fn start_script(c: &Career) -> &'static str {
+    match c.r32(0x2afc) {
+        0 | 2 | 4 | 7 | 9 => RACE_MODE,
+        3 | 5 => SHOWOFF_MODE,
+        _ => FREERIDE_MODE,
+    }
+}
+
+/// `cAI::vf18` 0x111708: the race's state 2
+pub fn race_to_state_2(env: &mut dyn GlueEnv) {
+    env.set_state(2);
+}
+
+/// `cAI::vf19` 0x111738(arg): with no replay, or a replay frozen that was not single (+0x4c), the race's +0x94 and
+/// state 5; a single replay frozen, state 0xb
+pub fn race_freeze(env: &mut dyn GlueEnv, arg: u64) {
+    let single = match env.replay() {
+        None => false,
+        Some(_) => {
+            env.replay_freeze();
+            env.replay().is_some_and(|(_, s)| s != 0)
+        }
+    };
+    if single {
+        env.set_state(0xb);
+    } else {
+        env.race_vf94(arg);
+        env.set_state(5);
+    }
+}
+
+/// The race menu's choices on the post-race handler: `RaceMenu_GoToState11` 0x113bf0 (0xb, the restart) and
+/// `RaceMenu_GoToState12` 0x113ce8 (0xc, the results menu): the replay aborted, the PreLoad camera
+pub fn menu_to_state(env: &mut dyn GlueEnv, end: &mut EndRace, state: u32) {
+    env.replay_abort();
+    end.state = state;
+    env.cam_preload();
+}
+
+/// `RaceMenu_Restart` 0x113c60: the replay aborted, the race's flags cleared and the race prepared again, the cameras
+/// reset, the PreLoad camera
+pub fn menu_restart(env: &mut dyn GlueEnv) {
+    env.replay_abort();
+    env.clear_all_player_flags();
+    env.prepare_race();
+    env.reset_cameras();
+    env.cam_preload();
+}
+
+/// `RaceMenu_EndRace` 0x113d58: the post-race handler to 0xe, the replay aborted, the PreLoad camera,
+/// `Career_FinishRace`; another heat (the next screen +0x3260 is 4) resets the cameras, else the results are shown
+pub fn menu_end_race(env: &mut dyn GlueEnv, end: &mut EndRace, c: &Career) {
+    end.state = 0xe;
+    env.replay_abort();
+    env.cam_preload();
+    env.finish_race();
+    if c.r32(0x3260) == 4 {
+        env.reset_cameras();
+    } else {
+        env.show_results();
+    }
+}

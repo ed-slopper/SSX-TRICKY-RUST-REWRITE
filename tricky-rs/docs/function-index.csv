@@ -148,11 +148,11 @@ address,size,name,system,status
 0x111108,964,cAI::vf14_111108,ai,ported
 0x1114d0,144,cAI::vf15_1114d0,ai,ported
 0x111560,424,cAI::vf16_111560,ai,not started
-0x111708,44,cAI::vf18_111708,ai,not started
-0x111738,180,cAI::vf19_111738,ai,not started
+0x111708,44,cAI::vf18_111708,ai,checked
+0x111738,180,cAI::vf19_111738,ai,checked
 0x1117f0,44,FUN_001117f0,game?,ported
 0x111820,3376,cAI::vf17_111820,ai,ported
-0x112550,56,cAI::vf12_112550,ai,not started
+0x112550,56,cAI::vf12_112550,ai,checked
 0x1125a0,40,cAI::vf9_1125a0,ai,ported
 0x1125c8,292,Race_CreateHandlers,race,ported
 0x1126f0,160,cAI::vf1_1126f0,ai,ported
@@ -168,20 +168,20 @@ address,size,name,system,status
 0x113478,68,cStartRaceHandler::Enter,game,not started
 0x1134a0,48,cStartRaceHandler::Update,game,not started
 0x1134d0,80,cStartRaceHandler::Exit,game,not started
-0x113520,224,cCountdownHandler::Enter,game,not started
-0x113600,312,cCountdownHandler::Update,game,not started
+0x113520,224,cCountdownHandler::Enter,game,checked
+0x113600,312,cCountdownHandler::Update,game,checked
 0x113738,8,cCountdownHandler::Exit,game,not started
 0x113740,224,cRaceHandler::Enter,race,ported
 0x113820,612,cRaceHandler::Update,race,ported
-0x113a88,292,Race_UpdateLookBack,race,not started
-0x113bb0,12,RaceMenu_OnEndRace,frontend?,not started
-0x113bc0,12,RaceMenu_OnState11,race?,not started
-0x113bd0,12,RaceMenu_OnRestart,race?,not started
-0x113be0,12,RaceMenu_OnState12,race?,not started
-0x113bf0,112,RaceMenu_GoToState11,race?,not started
-0x113c60,136,RaceMenu_Restart,race?,not started
-0x113ce8,112,RaceMenu_GoToState12,race?,not started
-0x113d58,180,RaceMenu_EndRace,race?,not started
+0x113a88,292,Race_UpdateLookBack,race,checked
+0x113bb0,12,RaceMenu_OnEndRace,frontend?,checked
+0x113bc0,12,RaceMenu_OnState11,race?,checked
+0x113bd0,12,RaceMenu_OnRestart,race?,checked
+0x113be0,12,RaceMenu_OnState12,race?,checked
+0x113bf0,112,RaceMenu_GoToState11,race?,checked
+0x113c60,136,RaceMenu_Restart,race?,checked
+0x113ce8,112,RaceMenu_GoToState12,race?,checked
+0x113d58,180,RaceMenu_EndRace,race?,checked
 0x113e10,932,cEndRaceHandler::Enter,race,checked
 0x1141e0,1224,cEndRaceHandler::Update,race,checked
 0x1146a8,8,cEndRaceHandler::Exit,race,checked
