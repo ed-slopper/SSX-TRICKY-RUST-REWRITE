@@ -333,3 +333,306 @@ fn on_air_enter_matches_the_original() {
         assert_eq!(after, q, "case {case} state impact {imp}");
     }
 }
+
+fn fill(r: &mut Runner, sys: u32, l: &Layout, g: &mut Rng) {
+    for k in 0..0xb00 / 4 {
+        r.mem.write_u32(sys + 4 * k as u32, g.next());
+    }
+    for (k, p) in PTRS.iter().enumerate().take(13) {
+        r.mem.write_u32(sys + p, l.arr[k]);
+    }
+    for k in 0..13 {
+        for j in 0..(24 * N as u32 / 4) {
+            r.mem.write_u32(l.arr[k] + 4 * j, g.next());
+        }
+    }
+    r.mem.write_u32(sys + 0x20, g.next() % 3);
+}
+
+fn setup(r: &mut Runner, rider_size: u32) -> (u32, u32, Layout) {
+    let rider = r.mem.alloc(rider_size);
+    let sys = r.mem.alloc(0xb00);
+    let mut l = Layout { sys, arr: [0; 16] };
+    for k in 0..13 {
+        l.arr[k] = r.mem.alloc(24 * N as u32);
+    }
+    r.allow(0x2fb468);
+    (rider, sys, l)
+}
+
+// ---- OnWipeout ----
+
+struct WipeEnv(Rc<RefCell<Or>>);
+impl WipeoutEnv for WipeEnv {
+    fn replay_is_playing(&mut self) -> bool {
+        self.0.borrow_mut().take("replay", 0, 0) != 0
+    }
+    fn listener_rider(&mut self, who: u32) -> i64 {
+        self.0.borrow_mut().take("lr", who as u64, 0)
+    }
+    fn crowd_off(&mut self, who: u32) {
+        self.0.borrow_mut().log.push(("off", who as u64, 0));
+    }
+    fn crowd_level(&mut self, level: u32, who: u32) {
+        self.0.borrow_mut().log.push(("lvl", level as u64, who as u64));
+    }
+    fn wipeout_voice(&mut self) {
+        self.0.borrow_mut().log.push(("voice", 0, 0));
+    }
+}
+
+#[test]
+fn on_wipeout_matches_the_original() {
+    let Some(mut r) = runner() else { return };
+    let or: Rc<RefCell<Or>> = Rc::new(RefCell::new(Or::default()));
+    let (rider, sys, _) = setup(&mut r, 0x900);
+    for (a, name) in [(0x21bfd0u32, "replay"), (0x20ed20, "lr")] {
+        let o = or.clone();
+        r.stub(a, move |c, _| {
+            let x = if name == "lr" { c.gpr(5) as u32 as u64 } else { 0 };
+            let v = o.borrow_mut().take(name, x, 0);
+            c.set_gpr(2, v as u64);
+        });
+    }
+    let o = or.clone();
+    r.stub(0x2210c8, move |c, _| o.borrow_mut().log.push(("off", c.gpr(5) as u32 as u64, 0)));
+    let o = or.clone();
+    r.stub(0x221088, move |c, _| o.borrow_mut().log.push(("lvl", c.gpr(5) as u32 as u64, c.gpr(6) as u32 as u64)));
+    let o = or.clone();
+    r.stub(0x233d38, move |c, _| {
+        assert_eq!(c.gpr(5) as u32, rider);
+        o.borrow_mut().log.push(("voice", 0, 0))
+    });
+    let mut g = Rng(0x1111_2222_3333_4444);
+    for case in 0..20_000 {
+        let flag = [0u32, 1, 1, 2][g.next() as usize % 4];
+        let player = g.next() % 4;
+        r.mem.write_u32(rider + 0x41c, flag);
+        r.mem.write_u32(rider + 0x38, player);
+        let level = [0.0f32, -1.0, 0.1, 0.25, 0.3, 0.65, 0.649, 0.9, 5.0, f32::from_bits(0x3f26_6666), f32::from_bits(0x3f26_6665)][g.next() as usize % 11];
+        let rid = rider as i64;
+        let vals: Vec<i64> = vec![(g.next() % 2) as i64, if g.next() % 3 != 0 { rid } else { rid + 4 }];
+        or.borrow_mut().vals = vals.clone();
+        or.borrow_mut().log.clear();
+        r.cpu.set_f(12, level);
+        r.cpu.set_gpr(4, sys as u64);
+        r.cpu.set_gpr(5, rider as u64);
+        r.call(0x2181e8).unwrap_or_else(|e| panic!("case {case}: {e}"));
+        let orig = std::mem::take(&mut or.borrow_mut().log);
+        or.borrow_mut().vals = vals;
+        let ar = AirRider { flag_41c: flag, player, air: 0.0, emitter: 0 };
+        on_wipeout(level, rid, &ar, &mut WipeEnv(or.clone()));
+        let mine = std::mem::take(&mut or.borrow_mut().log);
+        assert_eq!(orig, mine, "case {case} level {level} flag {flag}");
+    }
+}
+
+// ---- OnWipeoutImpact ----
+
+struct ImpactEnv {
+    o: Rc<RefCell<Or>>,
+}
+impl QueueEnv for ImpactEnv {
+    fn get_slot(&mut self, which: u32) -> u32 {
+        self.o.borrow_mut().take("slot", which as u64, 0) as u32
+    }
+    fn rider_listener(&mut self) -> u32 {
+        self.o.borrow_mut().take("rl", 0, 0) as u32
+    }
+    fn play_pending(&mut self) {
+        self.o.borrow_mut().log.push(("pp", 0, 0));
+    }
+}
+impl WipeoutImpactEnv for ImpactEnv {
+    fn prelude(&mut self) {
+        self.o.borrow_mut().log.push(("pre", 0, 0));
+    }
+    fn find_rider_near(&mut self, radius: f32, emitter: u32) -> i64 {
+        self.o.borrow_mut().take("near", radius.to_bits() as u64, emitter as u64)
+    }
+    fn eval_curve(&mut self, slot: u32, x: i32) -> i64 {
+        self.o.borrow_mut().take("curve", slot as u64, x as u32 as u64)
+    }
+    fn random(&mut self) -> u32 {
+        self.o.borrow_mut().take("rand", 0, 0) as u32
+    }
+}
+
+#[test]
+fn on_wipeout_impact_matches_the_original() {
+    let Some(mut r) = runner() else { return };
+    let or: Rc<RefCell<Or>> = Rc::new(RefCell::new(Or::default()));
+    let (rider, sys, l) = setup(&mut r, 0x900);
+    let vt = r.mem.alloc(0x40);
+    let rand_fn = 0x0030_0000u32;
+    for (a, name) in [(0x20f9b0u32, "near"), (0x20d928, "curve"), (0x211f38, "slot"), (0x20fc60, "rl"), (rand_fn, "rand")] {
+        let o = or.clone();
+        r.stub(a, move |c, _| {
+            let (x, y) = match name {
+                "near" => (c.f(12).to_bits() as u64, c.gpr(5) as u32 as u64),
+                "curve" => (c.gpr(4) as u32 as u64, c.gpr(5) as u32 as u64),
+                "slot" => (c.gpr(5) as u32 as u64, 0),
+                "rand" => {
+                    assert_eq!(c.gpr(4) as u32, sys);
+                    (0, 0)
+                }
+                _ => (0, 0),
+            };
+            let v = o.borrow_mut().take(name, x, y);
+            c.set_gpr(2, v as u64);
+        });
+    }
+    r.mem.write_u32(vt + 0x20, 0);
+    r.mem.write_u32(vt + 0x24, rand_fn);
+    for (a, name) in [(0x235090u32, "pre"), (0x20c948, "pp")] {
+        let o = or.clone();
+        r.stub(a, move |_, _| o.borrow_mut().log.push((name, 0, 0)));
+    }
+    let mut g = Rng(0x5555_6666_7777_8888);
+    for case in 0..30_000 {
+        fill(&mut r, sys, &l, &mut g);
+        r.mem.write_u32(sys + 4, vt);
+        let flag = [0u32, 1, 1, 2][g.next() as usize % 4];
+        let st = [0u32, 1, 2, 3, 4, 5, 0xffff_ffff, 3, 4][g.next() as usize % 9];
+        let air = [0.0f32, 12.5, -3.0, 400.0, 1e-3, 77.0][g.next() as usize % 6];
+        r.mem.write_u32(rider + 0x41c, flag);
+        r.mem.write_u32(rider + 0x310, st);
+        r.mem.write_f32(rider + 0x798, air);
+        let vals: Vec<i64> = vec![
+            [-1i64, 0, 3][g.next() as usize % 3],
+            [-5i64, 0, 50, 126, 127, 128, 500, -1 << 40, 1 << 40, -1][g.next() as usize % 10],
+            [0i64, 1, 0x7fff, 0x8000, 0x7ffe, 0xffff_ffff, 0x5555, 0x2aaa, 0x2aab][g.next() as usize % 9],
+            (g.next() % 100) as i64,
+            (g.next() % 100) as i64,
+            (g.next() % 100) as i64,
+        ];
+        // the original asks the random function only when +0x310 is not 3 or 4: the oracle order is the same in both
+        let before = read(&mut r, &l);
+        or.borrow_mut().vals = vals.clone();
+        or.borrow_mut().log.clear();
+        r.cpu.set_gpr(4, sys as u64);
+        r.cpu.set_gpr(5, rider as u64);
+        r.call(0x218328).unwrap_or_else(|e| panic!("case {case}: {e}"));
+        let orig = std::mem::take(&mut or.borrow_mut().log);
+        let after = read(&mut r, &l);
+        let mut q = before.clone();
+        or.borrow_mut().vals = vals;
+        let ar = AirRider { flag_41c: flag, player: 0, air, emitter: rider + 0x140 };
+        on_wipeout_impact(&mut q, st, &ar, &mut ImpactEnv { o: or.clone() });
+        let mine = std::mem::take(&mut or.borrow_mut().log);
+        assert_eq!(orig, mine, "case {case} flag {flag} st {st:#x}");
+        assert_eq!(after, q, "case {case} state st {st:#x}");
+    }
+}
+
+// ---- OnRiderReset ----
+
+struct ResetEnv(Rc<RefCell<Or>>);
+impl QueueEnv for ResetEnv {
+    fn get_slot(&mut self, which: u32) -> u32 {
+        self.0.borrow_mut().take("slot", which as u64, 0) as u32
+    }
+    fn rider_listener(&mut self) -> u32 {
+        panic!("no listener")
+    }
+    fn play_pending(&mut self) {
+        self.0.borrow_mut().log.push(("pp", 0, 0));
+    }
+}
+impl RiderResetEnv for ResetEnv {
+    fn prelude(&mut self) {
+        self.0.borrow_mut().log.push(("pre", 0, 0));
+    }
+    fn stop_stream(&mut self, which: u32) {
+        self.0.borrow_mut().log.push(("stream", which as u64, 0));
+    }
+    fn after_a(&mut self) {
+        self.0.borrow_mut().log.push(("a", 0, 0));
+    }
+    fn after_b(&mut self) {
+        self.0.borrow_mut().log.push(("b", 0, 0));
+    }
+}
+
+#[test]
+fn on_rider_reset_matches_the_original() {
+    let Some(mut r) = runner() else { return };
+    let or: Rc<RefCell<Or>> = Rc::new(RefCell::new(Or::default()));
+    let (_, sys, l) = setup(&mut r, 0x10);
+    let o = or.clone();
+    r.stub(0x211f38, move |c, _| {
+        let v = o.borrow_mut().take("slot", c.gpr(5) as u32 as u64, 0);
+        c.set_gpr(2, v as u64);
+    });
+    for (a, name) in [(0x233a18u32, "pre"), (0x20c948, "pp"), (0x21c4d0, "a"), (0x21d5c8, "b")] {
+        let o = or.clone();
+        r.stub(a, move |_, _| o.borrow_mut().log.push((name, 0, 0)));
+    }
+    let o = or.clone();
+    r.stub(0x229fa0, move |c, _| o.borrow_mut().log.push(("stream", c.gpr(5) as u32 as u64, 0)));
+    let mut g = Rng(0x9999_aaaa_bbbb_cccc);
+    for case in 0..20_000 {
+        fill(&mut r, sys, &l, &mut g);
+        let vals = vec![(g.next() % 100) as i64];
+        let before = read(&mut r, &l);
+        or.borrow_mut().vals = vals.clone();
+        or.borrow_mut().log.clear();
+        r.cpu.set_gpr(4, sys as u64);
+        r.call(0x218eb0).unwrap_or_else(|e| panic!("case {case}: {e}"));
+        let orig = std::mem::take(&mut or.borrow_mut().log);
+        let after = read(&mut r, &l);
+        let mut q = before.clone();
+        or.borrow_mut().vals = vals;
+        on_rider_reset(&mut q, &mut ResetEnv(or.clone()));
+        let mine = std::mem::take(&mut or.borrow_mut().log);
+        assert_eq!(orig, mine, "case {case}");
+        assert_eq!(after, q, "case {case} state");
+    }
+}
+
+// ---- OnTrickBookDone ----
+
+struct BookEnv(Rc<RefCell<Or>>, u64);
+impl TrickBookEnv for BookEnv {
+    fn get_slot(&mut self) -> u32 {
+        self.0.borrow_mut().take("slot", 4, 0) as u32
+    }
+    fn global(&mut self) -> u64 {
+        self.1
+    }
+    fn schedule(&mut self, delay: u32, global: u64, slot: u32) {
+        self.0.borrow_mut().log.push(("sched", delay as u64, global ^ ((slot as u64) << 7)));
+    }
+}
+
+#[test]
+fn on_trick_book_done_matches_the_original() {
+    let Some(mut r) = runner() else { return };
+    let or: Rc<RefCell<Or>> = Rc::new(RefCell::new(Or::default()));
+    let o = or.clone();
+    r.stub(0x211f38, move |c, _| {
+        let v = o.borrow_mut().take("slot", c.gpr(5) as u32 as u64, 0);
+        c.set_gpr(2, v as u64);
+    });
+    let o = or.clone();
+    r.stub(0x222cc0, move |c, _| {
+        assert_eq!((c.gpr(8), c.gpr(9), c.gpr(10), c.gpr(11)), (0, 0x5f, 0x7f, 0));
+        o.borrow_mut().log.push(("sched", c.gpr(5) as u32 as u64, c.gpr(6) ^ ((c.gpr(7) as u32 as u64) << 7)));
+    });
+    let mut g = Rng(0x0123_4567_89ab_cdef);
+    for case in 0..2_000 {
+        let glob = ((g.next() as u64) << 32) | g.next() as u64;
+        r.mem.write_u32(0x39ecf0, glob as u32);
+        r.mem.write_u32(0x39ecf4, (glob >> 32) as u32);
+        let vals: Vec<i64> = (0..3).map(|_| (g.next() % 100) as i64).collect();
+        or.borrow_mut().vals = vals.clone();
+        or.borrow_mut().log.clear();
+        r.cpu.set_gpr(4, 0x1234);
+        r.call(0x2190f0).unwrap_or_else(|e| panic!("case {case}: {e}"));
+        let orig = std::mem::take(&mut or.borrow_mut().log);
+        or.borrow_mut().vals = vals;
+        on_trick_book_done(&mut BookEnv(or.clone(), glob));
+        let mine = std::mem::take(&mut or.borrow_mut().log);
+        assert_eq!(orig, mine, "case {case}");
+    }
+}

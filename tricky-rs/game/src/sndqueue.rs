@@ -64,10 +64,11 @@ pub trait QueueEnv {
     fn play_pending(&mut self);
 }
 
-/// The entry every handler builds (inlined in each): a default record with `volume` (clamped to the byte 0..127),
-/// the `kind` (+0xa40) and sound `id` (+0xa44), the `emitter` pointer and the slot and listener the manager gives,
-/// then plays the pending sounds.
-pub fn queue_sound(q: &mut Queue, kind: u32, id: u32, volume: i64, emitter: u32, env: &mut dyn QueueEnv) {
+/// The entry every handler builds (inlined in each): a default record with the `kind` (+0xa40) and sound `id`
+/// (+0xa44); `volume` (clamped to the byte 0..127 into the record and kept in +0x3c) when the handler gives one;
+/// `emitter` when the sound is the rider's (its pointer is stored and the listener asked for); then the slot the
+/// manager gives. The caller plays the pending sounds (`update_air` and the others do it here, `play`).
+pub fn queue_sound(q: &mut Queue, kind: u32, id: u32, volume: Option<i64>, emitter: Option<u32>, env: &mut dyn QueueEnv) {
     q.count += 1;
     let i = q.count as usize;
     q.record[i] = q.header;
@@ -88,14 +89,20 @@ pub fn queue_sound(q: &mut Queue, kind: u32, id: u32, volume: i64, emitter: u32,
     q.kind[i] = kind;
     q.a7c[i] = 1;
     q.id[i] = id;
-    q.a3c[i] = volume as u32;
-    let v = volume as i32;
-    q.record[i][0] = if v < 0 { 0 } else if v < 0x7f { v as u8 } else { 0x7f };
+    if let Some(volume) = volume {
+        q.a3c[i] = volume as u32;
+        let v = volume as i32;
+        q.record[i][0] = if v < 0 { 0 } else if v < 0x7f { v as u8 } else { 0x7f };
+    }
     let slot = env.get_slot(4);
-    q.emitter[i] = emitter;
-    q.a40[i] = slot;
-    let l = env.rider_listener();
-    q.a68[i] = l;
+    if let Some(e) = emitter {
+        q.emitter[i] = e;
+        q.a40[i] = slot;
+        let l = env.rider_listener();
+        q.a68[i] = l;
+    } else {
+        q.a40[i] = slot;
+    }
     env.play_pending();
 }
 
@@ -162,7 +169,7 @@ pub fn update_air(q: &mut Queue, level: f32, rider_id: i64, r: &AirRider, env: &
     }
     let surface = env.surface_sound_type();
     let id = surface * 8 + if own { 1 } else { 5 };
-    queue_sound(q, 1, id, vol, r.emitter, env);
+    queue_sound(q, 1, id, Some(vol), Some(r.emitter), env);
 }
 
 /// The speed fraction of a rider's impact for the volume: `impact * 127 / 1000` through a float.
@@ -215,5 +222,111 @@ pub fn on_air_enter(q: &mut Queue, height: f32, rider_id: i64, r: &AirRider, env
     let x = impact_volume(env.impact_speed());
     let vol = if x < 0x40 { 0x40 } else if x < 0x7f { x } else { 0x7f };
     let surface = env.surface_sound_type();
-    queue_sound(q, 1, surface * 8 + 2, vol as i64, r.emitter, env);
+    queue_sound(q, 1, surface * 8 + 2, Some(vol as i64), Some(r.emitter), env);
+}
+
+pub trait WipeoutEnv {
+    fn replay_is_playing(&mut self) -> bool;
+    fn listener_rider(&mut self, who: u32) -> i64;
+    /// 0x2210c8 (the audio system, who).
+    fn crowd_off(&mut self, who: u32);
+    /// `CrowdSys_StartBoxCheer` 0x221088 (the audio system, level 0..2, who).
+    fn crowd_level(&mut self, level: u32, who: u32);
+    /// 0x233d38 (the audio system, the rider).
+    fn wipeout_voice(&mut self);
+}
+
+/// `Sfx_OnWipeout` 0x2181e8: the crowd's cheer for the listener's rider after a wipeout, by `level` (f12).
+pub fn on_wipeout(level: f32, rider_id: i64, r: &AirRider, env: &mut dyn WipeoutEnv) {
+    let mut who = 0xffff_ffffu32;
+    if !env.replay_is_playing() {
+        if r.flag_41c == 1 {
+            who = r.player;
+        }
+    } else {
+        who = 0;
+    }
+    if env.listener_rider(who) == rider_id {
+        if level <= 0.0 {
+            env.crowd_off(who);
+        } else if level < 0.25 {
+            env.crowd_level(0, who);
+        } else if level < f32::from_bits(0x3f26_6666) {
+            env.crowd_level(1, who);
+        } else {
+            env.crowd_level(2, who);
+        }
+        env.wipeout_voice();
+    }
+}
+
+pub trait WipeoutImpactEnv: QueueEnv {
+    /// 0x235090 (no arguments).
+    fn prelude(&mut self);
+    fn find_rider_near(&mut self, radius: f32, emitter: u32) -> i64;
+    fn eval_curve(&mut self, slot: u32, x: i32) -> i64;
+    /// The audio system's random function (its object's virtual +0x24).
+    fn random(&mut self) -> u32;
+}
+
+/// `Sfx_OnWipeoutImpact` 0x218328: the thud of a wipeout, volume from curve 7 of the rider's air speed, the sound one of
+/// three picked at random (0x30..0x32) unless the rider's +0x310 is 3 or 4 (then 0x40).
+pub fn on_wipeout_impact(q: &mut Queue, state_310: u32, r: &AirRider, env: &mut dyn WipeoutImpactEnv) {
+    env.prelude();
+    if r.flag_41c != 1 && env.find_rider_near(40.0, r.emitter) < 0 {
+        return;
+    }
+    let curve = env.eval_curve(7, r.air as i32);
+    let mut vol = if curve < 0x80 { curve } else { 0x7f };
+    if vol <= -1 {
+        vol = 0;
+    }
+    let id = if state_310.wrapping_sub(3) < 2 {
+        0x40
+    } else {
+        let u = env.random();
+        ((u & 0x7fff) * 3) / 0x7fff + 0x30
+    };
+    queue_sound(q, 0, id, Some(vol), Some(r.emitter), env);
+}
+
+pub trait RiderResetEnv: QueueEnv {
+    /// 0x233a18 (no arguments).
+    fn prelude(&mut self);
+    /// `StreamSys_StopStream` (the audio system, 3).
+    fn stop_stream(&mut self, which: u32);
+    /// 0x21c4d0 (the audio system).
+    fn after_a(&mut self);
+    /// 0x21d5c8 (the audio system).
+    fn after_b(&mut self);
+}
+
+/// `Sfx_OnRiderReset` 0x218eb0: a rider is put back on the course: the reset sound (id 0x7b, no emitter), then the
+/// streams and voices of the old run are stopped.
+pub fn on_rider_reset(q: &mut Queue, env: &mut dyn RiderResetEnv) {
+    env.prelude();
+    queue_sound(q, 0, 0x7b, None, None, env);
+    env.stop_stream(3);
+    env.after_a();
+    env.after_b();
+}
+
+pub trait TrickBookEnv {
+    /// `SndMgr_GetSlot` (the audio system, 4).
+    fn get_slot(&mut self) -> u32;
+    /// The global at 0x39ecf0.
+    fn global(&mut self) -> u64;
+    /// `SndSys_ScheduleEvent` (the audio system, `delay`, `global`, `slot`, 0, 0x5f, 0x7f, 0).
+    fn schedule(&mut self, delay: u32, global: u64, slot: u32);
+}
+
+/// `Sfx_OnTrickBookDone` 0x2190f0: the trick book fanfare, three events 250, 500 and 750 ms later.
+pub fn on_trick_book_done(env: &mut dyn TrickBookEnv) {
+    let slot = env.get_slot();
+    let g = env.global();
+    env.schedule(0xfa, g, slot);
+    let slot = env.get_slot();
+    env.schedule(500, g, slot);
+    let slot = env.get_slot();
+    env.schedule(0x2ee, g, slot);
 }
