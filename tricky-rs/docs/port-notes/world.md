@@ -310,7 +310,23 @@ Part of the port notes (index: [README.md](README.md)); units and wording as des
   (−127, −216, −152) port m), a crash on surface 10, or the course's reset boxes (megaplex (−206, −123,
   −167)); none comes from the walls (their pushes are under 2 cm). Which ones the game's riders would also
   reach is the autopilot's line (ours), not the ground. Megaplex's new stucks wait under a vertical stretch of
-  its line (x −217, z −247, 35 m up): a keyframed lift, row E7c3b.
+  its line (x −217, z −247, 35 m up). Not a lift (row E7c3b found no keyframed object there): an upward boost
+  pad ((−221..−212, −147..−138, −251..−241) port m, direction up, target 50) on surface 18 that leaves a
+  grounded rider on the floor, with the course's landing and with the old one alike (row E7c3g).
+- Keyframed objects in the casts (row E7c3b): each `Mover` (`collide.rs`) gives the course its animated parts'
+  local matrices (`Mover::frames`, `ObjAnim::local` = `cMeshAnimFrame::vf1` 0x1cb498, in part order) whenever its
+  clock moves (`CollisionWorld::tick_movers`, `set_mover_time`, and once when the course is set,
+  `pose_course`); `CourseGround::pose` keeps them for `WorldEnv::frame` (`MeshAnimNode_GetFrameMatrix`
+  0x1998d0), sets the object's controller animated (+0x14 bit 0x100) so `World_RayCastInstance` poses the
+  parts with them, and puts its box (+0xcc) round the posed parts' mesh boxes (`world::object_box` with frames).
+  The keyframed objects are no longer skipped, and `ground`, the landing and the walls take them from the
+  course's own collision meshes, not the drawn triangles. STANDINs: the controller is only that bit (row E7b2),
+  the box is ours (row E7a6), and the clocks are the port's (`Mover`, `src/worldanim.rs`). The objects' INode
+  lists stay where the course put them (the game's do too). `tests/course_ground.rs`: 8 objects over the 11
+  courses whose meshes all move with an animated part are hit at rest, the same once posed at rest, and not
+  once lifted 1 km. In the sims the casts hit animated parts (kind 2) on mesablanca (object 1444, over 2,400
+  hits), megaplex (1139) and elysium (154). TRICKY_SIM=600 over the 11 disc courses: falls / stuck 30 / 18 →
+  32 / 18; the counts include each lap's put-back to line point 0 (megaplex 4 of 10).
 
 ## Live cells (row E7b; `tricky_game::cells`, checked: `tests/cells.rs`)
 

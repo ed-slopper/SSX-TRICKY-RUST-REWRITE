@@ -1011,8 +1011,7 @@ impl gm::Env for GroundEnv<'_> {
 
     /// `Boarder_WallCollide` 0x126250 (`walls::wall_collide`) on the course's collision (row E7c3c), with the
     /// body [`wall_body`] gives; without the course's files (a folder level) the port's sphere against the drawn
-    /// mesh ([`Rider::walls`], STANDIN). The keyframed objects (row E7c3b) and the air's walls (row E8o) are
-    /// still the drawn mesh's.
+    /// mesh ([`Rider::walls`], STANDIN). The air's walls (row E8o) are still the drawn mesh's.
     fn wall_collide(&mut self, g: &mut gm::Rider) -> bool {
         if let Some(course) = self.world.course.clone() {
             let mut wr = crate::walls::WallRider { pos: g.p.pos, vel: g.vel, ground: g.p.normal, knocks: 0.0, mode: 2, state: g.state, up: g.board_up };

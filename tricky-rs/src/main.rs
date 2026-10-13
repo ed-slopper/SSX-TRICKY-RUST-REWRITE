@@ -232,6 +232,7 @@ fn open_level(dir: &Path) -> Result<Loaded, String> {
     }
     let mut world = build_collision(&level);
     world.course = course.map(std::sync::Arc::new);
+    world.pose_course();
     let mut rails = Rails(level.splines.iter().enumerate().filter_map(|(si, sp)| {
         let mut pts: Vec<Vec3> = Vec::new();
         for seg in sp.segments.iter().filter(|s| s.points.len() >= 4) {

@@ -1072,8 +1072,7 @@ impl Rider {
             // landing: the game's down ray and probe on the course's collision (`Rider::course_landing`); without it
             // (a folder level) STANDIN: snow at or above our feet, and moving into it
             let found = if world.course.is_some() {
-                // STANDIN: the keyframed objects from the drawn mesh (row E7c3b)
-                self.course_landing(world, &mut p).or_else(|| world.mover_ground(p, 1.2, 0.02).filter(|h| self.vel.dot(h.normal) <= 0.5))
+                self.course_landing(world, &mut p)
             } else {
                 world.ground(p, 1.2, 0.02).filter(|h| self.vel.dot(h.normal) <= 0.5)
             };

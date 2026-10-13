@@ -477,7 +477,7 @@ impl World {
                 let r = InstanceRec::from_words(w);
                 let phys = ssf.object_physics.get(i).and_then(|&k| ssf.physics.get(k as usize)).copied().unwrap_or(tricky_data::ssf::Physics([0; 6]));
                 let model = r.model.max(0) as usize;
-                let (min, max) = object_box(r.matrix, models.get(model).map_or(&[][..], |v| &v[..]));
+                let (min, max) = object_box(r.matrix, models.get(model).map_or(&[][..], |v| &v[..]), &[]);
                 Object {
                     rows: r.matrix,
                     min,
@@ -539,11 +539,18 @@ impl World {
 
 /// STANDIN: an object's box from its parts' mesh boxes through the parts' (parent first) and the object's
 /// matrices, for the game's run-time box (row E7a6); the object's position when it has no mesh.
-fn object_box(rows: [V4; 4], parts: &[Part]) -> ([f32; 3], [f32; 3]) {
+/// `frames`: the animated parts' frames (as [`WorldEnv::frame`]), none for the rest pose.
+pub fn object_box(rows: [V4; 4], parts: &[Part], frames: &[[V4; 4]]) -> ([f32; 3], [f32; 3]) {
     let mut world: Vec<[V4; 4]> = Vec::with_capacity(parts.len());
     let (mut lo, mut hi) = ([f32::MAX; 3], [f32::MIN; 3]);
+    let mut n = 0;
     for (k, p) in parts.iter().enumerate() {
-        let own = p.matrix.unwrap_or(IDENTITY);
+        let own = if p.animated && !frames.is_empty() {
+            n += 1;
+            frames.get(n - 1).copied().unwrap_or(IDENTITY)
+        } else {
+            p.matrix.unwrap_or(IDENTITY)
+        };
         let parent = usize::try_from(p.parent).ok().filter(|&i| i < k).map_or(rows, |i| world[i]);
         let m = through(parent, own);
         world.push(m);

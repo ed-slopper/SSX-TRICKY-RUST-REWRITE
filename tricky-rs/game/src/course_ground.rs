@@ -23,11 +23,14 @@ pub struct CourseGround {
     /// STANDIN: every patch tessellated stays (about 7 KB each), for the game's fixed-size cache and its eviction
     /// (`World_LookupCollCache`), which only change how fast a cast is, not what it hits
     cache: Mutex<HashMap<usize, PatchGrid>>,
+    /// the keyframed objects' animated parts' frames as their clocks stand ([`CourseGround::pose`])
+    poses: Mutex<HashMap<usize, Vec<[V4; 4]>>>,
 }
 
 struct Env<'a> {
     coeffs: &'a [[V4; 16]],
     cache: &'a mut HashMap<usize, PatchGrid>,
+    poses: &'a HashMap<usize, Vec<[V4; 4]>>,
 }
 
 impl WorldEnv for Env<'_> {
@@ -38,9 +41,9 @@ impl WorldEnv for Env<'_> {
         let grid = self.cache.entry(i).or_insert_with(|| PatchGrid::new(&coeffs[i]));
         q.patch(grid, i as u32 + 1, last).map(|h| h.hit)
     }
-    /// STANDIN: the rest pose; the keyframed objects are left out of the port's casts (row E7c3b)
-    fn frame(&mut self, _: usize, _: usize) -> [V4; 4] {
-        [[1.0, 0.0, 0.0, 0.0], [0.0, 1.0, 0.0, 0.0], [0.0, 0.0, 1.0, 0.0], [0.0, 0.0, 0.0, 1.0]]
+    /// `MeshAnimNode_GetFrameMatrix` 0x1998d0: the frame [`CourseGround::pose`] last gave (the identity for none).
+    fn frame(&mut self, object: usize, n: usize) -> [V4; 4] {
+        self.poses.get(&object).and_then(|f| f.get(n)).copied().unwrap_or([[1.0, 0.0, 0.0, 0.0], [0.0, 1.0, 0.0, 0.0], [0.0, 0.0, 1.0, 0.0], [0.0, 0.0, 0.0, 1.0]])
     }
 }
 
@@ -53,22 +56,43 @@ impl CourseGround {
         let coeffs = pbd.patches.iter().map(|r| tricky_data::pbd::PatchRec::parse(r).map_or([[0.0; 4]; 16], |p| p.coeffs)).collect();
         let world = World::from_course(pbd_bytes, &pbd, ltg_bytes, &ltg, &ssf);
         let flags = world.objects.iter().map(|o| o.flags).collect();
-        Some(CourseGround { world: Mutex::new(world), flags, coeffs, cache: Mutex::new(HashMap::new()) })
+        Some(CourseGround { world: Mutex::new(world), flags, coeffs, cache: Mutex::new(HashMap::new()), poses: Mutex::new(HashMap::new()) })
     }
 
     /// `World_RayCast` 0x25aff8 on the course: the distance along the query (−1 for nothing) and what was hit.
     /// `show_off` for the show-off modes (3, 5); `last` the caller's last-patch record.
     ///
-    /// STANDIN: `skip(instance)` clears a solid object's bit 0x20 for this cast (the port's switched-off, broken,
-    /// opened and keyframed objects), for the game's own switching of an instance (scripts, glass, doors; rows
-    /// E9b2, E7c3b).
+    /// STANDIN: `skip(instance)` clears a solid object's bit 0x20 for this cast (the port's switched-off, broken
+    /// and opened objects), for the game's own switching of an instance (scripts, glass, doors; row E9b2).
     pub fn ray_cast(&self, q: &mut dyn Shape, show_off: bool, last: Option<&mut LastHit>, skip: &dyn Fn(u32) -> bool) -> (f32, Option<CastHit>) {
         let mut world = self.world.lock().unwrap_or_else(|e| e.into_inner());
         for (i, (o, f)) in world.objects.iter_mut().zip(&self.flags).enumerate() {
             o.flags = if f & 0x20 != 0 && skip(i as u32) { f & !0x20 } else { *f };
         }
         let mut cache = self.cache.lock().unwrap_or_else(|e| e.into_inner());
-        let mut env = Env { coeffs: &self.coeffs, cache: &mut cache };
+        let poses = self.poses.lock().unwrap_or_else(|e| e.into_inner());
+        let mut env = Env { coeffs: &self.coeffs, cache: &mut cache, poses: &poses };
         world.ray_cast(q, show_off, last, &mut env)
+    }
+
+    /// The world as it stands (for tests and tools).
+    pub fn with_world<R>(&self, f: impl FnOnce(&World) -> R) -> R {
+        f(&self.world.lock().unwrap_or_else(|e| e.into_inner()))
+    }
+
+    /// A keyframed object's (`cAnimObjectNode`) animated parts are at `frames` (the n-th animated part's local
+    /// matrix, game units, `MeshAnimNode_GetFrameMatrix` 0x1998d0): its controller (+0xe4) animated (+0x14 bit
+    /// 0x100), so `World_RayCastInstance` poses those parts with them.
+    /// STANDIN: the object's box (+0xcc) is its parts' mesh boxes in that pose, for the game's run-time box (row
+    /// E7a6); the controller is only its animated bit, for the course's controllers (row E7b2).
+    pub fn pose(&self, object: u32, frames: Vec<[V4; 4]>) {
+        let o = object as usize;
+        let mut world = self.world.lock().unwrap_or_else(|e| e.into_inner());
+        let Some(obj) = world.objects.get(o) else { return };
+        let (rows, model) = (obj.rows, obj.model);
+        let (min, max) = crate::world::object_box(rows, world.models.get(model).map_or(&[][..], |v| &v[..]), &frames);
+        let obj = &mut world.objects[o];
+        (obj.min, obj.max, obj.controller) = (min, max, Some(0x100));
+        self.poses.lock().unwrap_or_else(|e| e.into_inner()).insert(o, frames);
     }
 }

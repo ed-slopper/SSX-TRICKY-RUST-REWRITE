@@ -4,6 +4,8 @@
 use glam::{Mat4, Vec3, Vec4};
 use std::collections::HashMap;
 
+use crate::course_ground::CourseGround;
+
 /// Faces at least this upright (normal.y) can be ridden; anything steeper is a wall. The same for
 /// terrain and for objects with a surface type of their own (`World_RayCast` treats both alike).
 pub const GROUND_MIN_Y: f32 = 0.42;
@@ -118,8 +120,14 @@ impl Mover {
             _ => { let span = (c.len - c.start).max(1e-3); if self.t > c.len || self.t < c.start { self.t = c.start + (self.t - c.start).rem_euclid(span); } }
         }
     }
-    fn pose(&mut self) {
-        if self.posed == Some(self.t) { return; }
+    /// The animated parts' local matrices at the clock's time (game units, rows), in part order: what
+    /// `MeshAnimNode_GetFrameMatrix` 0x1998d0 gives `World_RayCastInstance`.
+    pub fn frames(&self) -> Vec<[[f32; 4]; 4]> {
+        self.objs.iter().filter_map(|o| o.anim.as_ref()).map(|a| a.local(self.t).to_cols_array_2d()).collect()
+    }
+    /// Pose the triangles at the clock's time; false when they already were.
+    fn pose(&mut self) -> bool {
+        if self.posed == Some(self.t) { return false; }
         self.posed = Some(self.t);
         // game (cm, Z up) -> Bevy (m, Y up)
         let a = Mat4::from_cols(Vec4::new(0.01, 0.0, 0.0, 0.0), Vec4::new(0.0, 0.0, -0.01, 0.0), Vec4::new(0.0, 0.01, 0.0, 0.0), Vec4::W);
@@ -137,6 +145,14 @@ impl Mover {
             }
         }
         (self.lo, self.hi) = (lo, hi);
+        true
+    }
+}
+
+/// A keyframed object's pose on the course's collision (not a reset zone's: those are the port's own).
+fn pose_on(course: Option<&CourseGround>, m: &Mover) {
+    if let Some(c) = course.filter(|_| !m.reset) {
+        c.pose(m.inst, m.frames());
     }
 }
 
@@ -214,16 +230,26 @@ impl CollisionWorld {
     }
     /// The game's keyframed object `inst` is at `t` (s) on its clip.
     pub fn set_mover_time(&mut self, inst: u32, t: f32) {
-        for m in self.movers.iter_mut().filter(|m| m.inst == inst) { m.external = true; m.t = t; m.pose(); }
+        for m in self.movers.iter_mut().filter(|m| m.inst == inst) {
+            m.external = true;
+            m.t = t;
+            if m.pose() { pose_on(self.course.as_deref(), m); }
+        }
     }
     /// Run the keyframed objects' own clocks and pose their collision.
     pub fn tick_movers(&mut self, dt: f32) {
-        for m in self.movers.iter_mut() { m.tick(dt); m.pose(); }
+        for m in self.movers.iter_mut() {
+            m.tick(dt);
+            if m.pose() { pose_on(self.course.as_deref(), m); }
+        }
     }
-    /// Instance `inst` is left out of the course's casts: switched off, broken, an open door, or keyframed
-    /// (STANDIN: a keyframed object's collision is not posed on the course yet, row E7c3b).
+    /// Give the course's collision every keyframed object's pose (once it is set, row E7c3b).
+    pub fn pose_course(&self) {
+        for m in &self.movers { pose_on(self.course.as_deref(), m); }
+    }
+    /// Instance `inst` is left out of the course's casts: switched off, broken or an open door.
     pub fn course_skips(&self, inst: u32) -> bool {
-        self.gone(inst) || self.movers.iter().any(|m| m.inst == inst)
+        self.gone(inst)
     }
     #[inline]
     fn gone(&self, owner: u32) -> bool {
@@ -327,11 +353,11 @@ impl CollisionWorld {
     /// With the course's collision (row E7c3) the course's: `World_RayCast` 0x25aff8 down a vertical
     /// `cWorldLine`(0, top, bottom, 2), the hit nearest the top, again from just under it while what it hit faces
     /// down or is steeper than [`GROUND_MIN_Y`] (a patch faces the way its tessellation does, `terrain::patch_test`,
-    /// and the game's landing takes only a surface the rider moves into, `AirMotion_Update` 0x108378); the
-    /// keyframed objects are still the drawn mesh's. STANDIN: a vertical query, for the game's rays along the
+    /// and the game's landing takes only a surface the rider moves into, `AirMotion_Update` 0x108378), the
+    /// keyframed objects posed (row E7c3b). STANDIN: a vertical query, for the game's rays along the
     /// rider's normal (the probe, the landing, rows E7c3 and G20c3c).
     pub fn ground(&self, pos: Vec3, up: f32, down: f32) -> Option<GroundHit> {
-        let Some(course) = &self.course else { return self.mesh_ground(pos, up, down, false) };
+        let Some(course) = &self.course else { return self.mesh_ground(pos, up, down) };
         let game = |v: Vec3| [v.x * 100.0, -v.z * 100.0, v.y * 100.0, 1.0];
         let bottom = pos.y - down;
         let mut top = pos.y + up;
@@ -348,21 +374,12 @@ impl CollisionWorld {
             }
             top = top.min(y) - 0.01;
         }
-        match (best, self.mesh_ground(pos, up, down, true)) {
-            (Some(a), Some(b)) => Some(if b.y > a.y { b } else { a }),
-            (a, b) => a.or(b),
-        }
+        best
     }
 
-    /// [`CollisionWorld::ground`] on the keyframed objects' drawn triangles only. STANDIN: the drawn mesh, for the
-    /// course's casts posing them (row E7c3b).
-    pub fn mover_ground(&self, pos: Vec3, up: f32, down: f32) -> Option<GroundHit> {
-        self.mesh_ground(pos, up, down, true)
-    }
-
-    /// [`CollisionWorld::ground`] on the drawn mesh's triangles (only the keyframed objects': `movers_only`).
-    fn mesh_ground(&self, pos: Vec3, up: f32, down: f32, movers_only: bool) -> Option<GroundHit> {
-        let ids = if movers_only { &[][..] } else { self.grid.get(&(cell(pos.x), cell(pos.z))).map_or(&[][..], |v| &v[..]) };
+    /// [`CollisionWorld::ground`] on the drawn mesh's triangles (a level without the course's collision).
+    fn mesh_ground(&self, pos: Vec3, up: f32, down: f32) -> Option<GroundHit> {
+        let ids = self.grid.get(&(cell(pos.x), cell(pos.z))).map_or(&[][..], |v| &v[..]);
         let mut best: Option<GroundHit> = None;
         let near = self.movers_in(pos - Vec3::Y * down, pos + Vec3::Y * up);
         for t in ids.iter().map(|&id| &self.tris[id as usize]).chain(near) {
