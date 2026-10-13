@@ -65,6 +65,7 @@ state machine and the renderer are ours. Nothing has been checked against the or
 | E11 | Camera: named cameras `cBxCamera_EvalNamedCam` 0x174888 (ported), director scripts `cBxCamera_RunDirectorScript`, replay and finish cameras, camera collision | any | | | [repo] Chase cam ported in `rider.rs`; free camera is ours (keep, tag) |
 | E11e | The CamCamera helpers `CamPath_Eval` / the scripts call: `CamCamera::CamCamera` / `GetView` / `GetLens` / destructor, 0x16dd68, 0x16dda8, 0x16ddb8, 0x16ded0, 0x1704b0, 0x170610, 0x1708e8, `FUN_00174c58`. Gap of E11c | any | E11a | | Gap of E11c; E11e1 did the path helpers and the cut fade, the constructor / GetView / GetLens / destructor are plumbing for the loader |
 | E11d | Replace `race.rs`'s `ChaseCam` stand-in with the exact camera (E11a–c) in the app: the named cameras' parameter blocks from COMMONOB.CML, the rider list entries built from our riders. Of E11 | any | E11c | | Split of E11 |
+| E11f | The camera script machine: `CamScript_Blend` 0x175a08 (the easing before the two blends), `CamScript_CutTo` 0x174c98, `CamScript_StartPath` 0x175ba0 / `UpdatePath` 0x175cb0 / `EndPath` 0x175c70, `Start` 0x175de0 / `Stop` 0x175eb8 / `SetName` 0x175e88 / `IsRunning` 0x175e50, `Update` 0x175f50 (the director's 0x2c-byte steps: cut, blends, path, modes, random jump, push/pop, scene, audio and world-script calls through an env), `StartScene` 0x176850, `ResetActorAnims` 0x176f38, `IsRiderAnimDone` 0x16db88; runner-checked with the calls logged. Of E11 | any | E11c | trailrig/heron (2026-10-12) | Split of E11 |
 | E10c3 | The app's input through the game's layers: Bevy gamepad/keys to a libpad word and sticks, `Ps2Pad::play`, the disc's `BTNMAP<n>.DAT` through `input::parse_button_map`/`bind` and `controls::Mapper` (not `ButtonMap::btnmap`), the "shown" buttons (cInput +0x1cc) and the vibration object `Pad_SetupVibration` makes | any | E10c | | Gap of E10c |
 
 ## P2 Gameplay systems
@@ -773,3 +774,4 @@ matches the original.
 - 2026-10-12 trailrig/heron: E11c9 done (CamScript_BlendOrbit vs the original).
 - 2026-10-12 irregulur/lynx: claim F1c (batch 11); split the F1c and F4c rows back onto their own lines.
 - 2026-10-12 trailrig/heron: E11c done: E11c10 (Game_UpdateCameras vs the original); runner learns four 128-bit shuffles.
+- 2026-10-12 trailrig/heron: claim E11f (camera script machine).
