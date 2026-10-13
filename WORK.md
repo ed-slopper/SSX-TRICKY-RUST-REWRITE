@@ -51,7 +51,7 @@ state machine and the renderer are ours. Nothing has been checked against the or
 | E7a6 | Find what fills an object's box (+0xcc..+0xe0; zero in the `.pbd`, read by every cast) at run time and port it (static searches for writers found none; PINE on a running game would show the values) | unowned | E7a5 | | Gap of E7a5 |
 | E7b2 | The app on `cells`: `AiCells::tick` each frame with the course's objects, their controllers and the trigger scripts (the scripts themselves are the trigger-script rows) | unowned | E7b, E7c3 | | Gap of E7b |
 | E8c3 | The app's knockable objects on `roller` (the course's roller objects from the disc, E3a4; the broadphase's pairs, `Broadphase_*`, and the caller of `Roller_CheckCollision`) replacing the ball physics in `props.rs`; the rider loop's other nodes (types 0x100..0x103, `WorldNode_RayCast`) | unowned | E8c2, E3a4 | | Gap of E8c2 |
-| E7c3b | Keyframed objects (`cAnimObjectNode`) in the course's casts: `WorldEnv::frame` posing their parts as `World_RayCastInstance` 0x25bf48 does, instead of leaving them out (`CollisionWorld::course_skips`) and taking their ground from the drawn mesh | unowned | E7c3 | | Gap of E7c3 |
+| E7c3b | Keyframed objects (`cAnimObjectNode`) in the course's casts: `WorldEnv::frame` posing their parts as `World_RayCastInstance` 0x25bf48 does, instead of leaving them out (`CollisionWorld::course_skips`) and taking their ground from the drawn mesh | unowned | E7c3 | irregulur/lynx (2026-10-13) | Gap of E7c3 |
 | E7c3e | The wipe-out and the props on the course's rays: `Ragdoll_GroundProbe` 0x10fd58 and `Ragdoll_Contacts` 0x10e190 (`rider/wipeout.rs`) and the props' ground (`props.rs`) casting as the game does instead of `CollisionWorld::ground`'s vertical query (STANDIN) | unowned | E7c3 | | Gap of E7c3d |
 | E7c3f | TRICKY_SIM's "fell out of the world" counts each fall twice (the rider's reset and the autopilot's rejoin, both `Rider::respawn`, `race.rs`): count the falls once | unowned | | | Gap of E7c3d |
 | E8 | Physics: check the ported boarder motion against the original once F4 exists: ground `cBoarder_GroundMotion_Update` 0x10a0d8, drag 0x109cb8, side friction 0x109ef8, thrust 0x109950, spring 0x109878, probe 0x128ae8, surface table `SurfaceTable_Init` 0x256188 | any | F4a | | [repo] Ported in `rider.rs`; README still says some constants at the top of `rider.rs` are guesswork: find which. Split: E8f–E8i |
@@ -817,3 +817,4 @@ matches the original.
 - 2026-10-13 irregulur/lynx: E7c3c done; note on E7c3d.
 - 2026-10-13 irregulur/lynx: claim E7c3d.
 - 2026-10-13 irregulur/lynx: E7c3d done (the landing; the wipe-out and props split to E7c3e); added E7c3e, E7c3f; note on E8r.
+- 2026-10-13 irregulur/lynx: claim E7c3b.
