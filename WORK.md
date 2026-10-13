@@ -110,6 +110,7 @@ state machine and the renderer are ours. Nothing has been checked against the or
 | G10b | Music: Pathfinder (`PF_*` 0x2bec00–0x2c2040) decoded at run time, song names from `music.inf` / `musicmap.inf` | unowned | G10 | | [repo] "Unresolved: song names"; `pathmusic.rs` |
 | G10c | Announcer (DJ Atomika) and rider voices: when each line is picked and played | unowned | G10 | | [est] |
 | G11 | Pre- and post-race scenes: `cPreRaceHandler`, `cEndRaceHandler_Update` 0x1141e0, scripts table 0x32f380, row filters | unowned | E11, G5 | | [repo] `intro.rs`; "Unresolved: post-race scene row filters" |
+| G11d | The post-race sequence (`tricky_game::prerace::EndRace`): `cEndRaceHandler::Enter` 0x113e10 (the rival and win/lose scenes, the best time or score, the riders frozen) and `Update` 0x1141e0 (the two scenes, the results screens, restart), checked in the runner with the engine's calls scripted | unowned | G11c | ed-slopper/puffin (2026-10-12) | Split of G11 |
 | G11a | Movies: the disc's video files (EA logo, intro, unlock videos) | unowned | E2 | | [est] Find the format first |
 | G12 | Instant replay | unowned | E1, E11 | | [repo] in the debug menu (findings.md) |
 | G15 | Spray, trail and splashes per surface from the real table (`tricky_game::surface`): `surf()` in `tricky-rs/src/spray.rs` is rounded and guesses which surfaces spray; the game sprays from words [13..21] on every surface but 9, 13, 18, 19 (those spark, `Fx_SurfaceSpray` 0x1311b0) and uses [22..24] for the trail and splashes (port-notes/effects.md) | any | E8f | | Gap of E8f; corrected by E13 |
@@ -787,3 +788,4 @@ matches the original.
 - 2026-10-12 irregulur/lynx: E3a4 done (the course from the disc); added E3a7 (course textures from the disc, no levels folder).
 - 2026-10-12 irregulur/lynx: claim E3a7 (asked by irregulur).
 - 2026-10-12 irregulur/lynx: E3a7 done (course textures from the disc, no levels folder needed).
+- 2026-10-12 ed-slopper/puffin: add and claim G11d (split of G11).
