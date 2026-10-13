@@ -812,9 +812,36 @@ mod tests {
     #[test]
     fn unknown_instructions_say_so() {
         let mut rn = Runner::empty();
-        rn.mem.write_u32(CODE, 28 << 26); // an MMI instruction
+        rn.mem.write_u32(CODE, (28 << 26) | 0x04); // an MMI instruction not implemented (plzcw)
         let e = rn.call(CODE).unwrap_err();
         assert!(e.to_string().contains("MMI"), "{e}");
+    }
+
+    #[test]
+    fn the_128_bit_shuffles() {
+        // pextlw / pextuw / pcpyld / pcpyud r8, r4, r5 (rs = r4, rt = r5)
+        let mmi = |fun: u32, sa: u32| (28 << 26) | (4 << 21) | (5 << 16) | (8 << 11) | (sa << 6) | fun;
+        let rs = 0x0000_0033_0000_0022_0000_0011_0000_0000u128 | 0xaaaa;
+        let rt = 0x0000_00cc_0000_00bb_0000_00aa_0000_0000u128 | 0x5555;
+        for (w, want) in [
+            // rt0, rs0, rt1, rs1
+            (mmi(0x08, 0x12), 0x0000_0011_0000_00aa_0000_aaaa_0000_5555u128),
+            // rt2, rs2, rt3, rs3
+            (mmi(0x28, 0x12), 0x0000_0033_0000_00cc_0000_0022_0000_00bbu128),
+            // rt low, rs low
+            (mmi(0x09, 0x0e), (rt as u64 as u128) | (rs as u64 as u128) << 64),
+            // rs high, rt high
+            (mmi(0x29, 0x0e), (rs >> 64) | (rt >> 64) << 64),
+        ] {
+            let mut rn = Runner::empty();
+            rn.cpu.gpr[4] = rs;
+            rn.cpu.gpr[5] = rt;
+            rn.mem.write_u32(CODE, w);
+            rn.mem.write_u32(CODE + 4, r(0, 31, 0, 0, 0, 8));
+            rn.mem.write_u32(CODE + 8, NOP);
+            rn.call(CODE).unwrap();
+            assert_eq!(rn.cpu.gpr[8], want, "{w:#x}");
+        }
     }
 
     #[test]
@@ -878,6 +905,24 @@ fn mmi(r: &mut Runner, pc: u32, w: u32, rs: usize, rt: usize, rd: usize, fun: u3
             if d != 0 {
                 set_lo1(c, sext32(n / d));
                 set_hi1(c, sext32(n % d));
+            }
+        }
+        // the 128-bit shuffles (MMI0 / MMI1 / MMI2 / MMI3 groups, the operation in the sa field)
+        0x08 | 0x28 | 0x09 | 0x29 if matches!((fun, (w >> 6) & 0x1f), (0x08 | 0x28, 0x12) | (0x09 | 0x29, 0x0e)) => {
+            let (s, t) = (r.cpu.gpr[rs], r.cpu.gpr[rt]);
+            let word = |v: u128, i: u32| (v >> (32 * i)) as u32 as u128;
+            let v = match fun {
+                // pextlw: rt0, rs0, rt1, rs1
+                0x08 => word(t, 0) | word(s, 0) << 32 | word(t, 1) << 64 | word(s, 1) << 96,
+                // pextuw: rt2, rs2, rt3, rs3
+                0x28 => word(t, 2) | word(s, 2) << 32 | word(t, 3) << 64 | word(s, 3) << 96,
+                // pcpyld: low = rt low, high = rs low
+                0x09 => (t as u64 as u128) | (s as u64 as u128) << 64,
+                // pcpyud: low = rs high, high = rt high
+                _ => (s >> 64) | (t >> 64) << 64,
+            };
+            if rd != 0 {
+                r.cpu.gpr[rd] = v;
             }
         }
         _ => return Err(Error::Unimplemented { pc, word: w, what: format!("MMI {fun:#x}") }),

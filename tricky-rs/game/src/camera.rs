@@ -129,7 +129,7 @@ pub struct PosResult {
 pub const IDENT3: [f32; 9] = [1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0];
 
 /// The axis-angle matrix the camera builds (sin and cos of `angle` from `Math_SinCos`), nine floats row by row.
-fn rot9(ax: f32, ay: f32, az: f32, angle: f32) -> [f32; 9] {
+pub(crate) fn rot9(ax: f32, ay: f32, az: f32, angle: f32) -> [f32; 9] {
     let (s, c) = sin_cos(angle);
     let t = 1.0 - c;
     let f1 = t * az;
@@ -911,7 +911,7 @@ pub trait RegionEnv {
 }
 
 /// `m(i, j)` of the product `b` · `r` as the camera adds it (the same products `rot_apply` takes).
-fn mat_prod(b: [f32; 9], r: [f32; 9]) -> [f32; 9] {
+pub(crate) fn mat_prod(b: [f32; 9], r: [f32; 9]) -> [f32; 9] {
     let m = |i: usize, j: usize| (b[j] * r[i * 3] + b[3 + j] * r[i * 3 + 1]) + b[6 + j] * r[i * 3 + 2];
     [m(0, 0), m(0, 1), m(0, 2), m(1, 0), m(1, 1), m(1, 2), m(2, 0), m(2, 1), m(2, 2)]
 }
