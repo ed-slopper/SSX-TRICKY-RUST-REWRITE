@@ -570,3 +570,197 @@ pub fn is_rider_anim_done(index: u32, env: &mut dyn RiderEnv) -> u32 {
     }
     (!(env.anim_progress(r) < 1.0)) as u32
 }
+
+/// One 0x30-byte actor record of a camera scene: +0x10 in use, +0x14 the kind (which rider), +0x18 whether the rider
+/// is placed first, +0x1c whether the position comes from the scene, +0x20 the position, +0x2c the heading.
+#[derive(Clone, Debug, Default)]
+pub struct SceneRec {
+    pub in_use: u32,
+    pub kind: u32,
+    pub place: u32,
+    pub from_scene: u32,
+    pub pos: [u32; 3],
+    pub heading: u32,
+}
+
+/// What `0x16d9d0` / `0x16d990` build for an actor: the words copied into its slot (words 1 to 5, 8 to 11 and 12).
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct ActorLocal {
+    pub w: [u32; 5],
+    pub q: [u32; 4],
+    pub f: u32,
+}
+
+/// The scene's own position for an actor (`0x172100`): whether it has one, the point and the heading offset.
+#[derive(Clone, Copy, Debug, Default)]
+pub struct ScenePoint {
+    pub ok: bool,
+    pub vec: [u32; 4],
+    pub out: f32,
+}
+
+/// What `CamScript_StartScene` calls.
+pub trait SceneEnv: ScriptEnv {
+    /// `0x1720c0` (scene made from the step) then `0x172238`: the words it leaves at +0x218 and +0x21c.
+    fn scene_open(&mut self, step: u32) -> [u32; 2];
+    fn scene_rec(&mut self, ptr: u32, i: usize) -> SceneRec;
+    /// `[[race + 0x1c] + 0x88]`, the riders in the race.
+    fn rider_count(&mut self) -> i32;
+    /// For `Race_GetRider(race, j)`: the rider's word at +0x38, and the word at +0x38 of the record at its +0x464.
+    fn rider_slot(&mut self, j: i32) -> u32;
+    fn rider_char(&mut self, j: i32) -> u32;
+    /// The pointer at `0x336650 + 4 * char`.
+    fn actor_name(&mut self, ch: u32) -> u32;
+    /// `0x16d9d0(local, rec, name)` (name set) or `0x16d990(local, rec)`, and `0x16dcb8(local, 2)`.
+    fn actor_init(&mut self, name: u32, ptr: u32, i: usize) -> ActorLocal;
+    fn actor_close(&mut self);
+    /// `0x172100(obj + 0x214, i, vec, out)`.
+    fn scene_point(&mut self, i: i32) -> ScenePoint;
+    /// `Race_GetRider` then `0x11cae8(rider, pos, zero, 1, heading, 0)`.
+    fn place_rider(&mut self, j: i32, pos: [u32; 4], zero: [u32; 4], heading: f32);
+    /// `0x16da10(slot, j, placed, pos, heading)`.
+    fn start_anim(&mut self, slot: usize, j: i32, placed: u32, pos: [u32; 4], heading: f32);
+}
+
+/// `0x176720`: the riders by their slot (+0x38): the last with 0, the last with 1, the one before the first and the
+/// one after it (-1 for none).
+fn find_riders(env: &mut dyn SceneEnv) -> [i32; 4] {
+    let mut p = [-1i32; 4];
+    let count = env.rider_count();
+    if count > 0 {
+        for i in 0..count {
+            if env.rider_slot(i) == 0 {
+                p[0] = i;
+            }
+            if env.rider_slot(i) == 1 {
+                p[1] = i;
+            }
+        }
+    }
+    let count = env.rider_count();
+    if p[0] > 0 {
+        p[2] = p[0] - 1;
+    }
+    if p[0] < count - 1 {
+        p[3] = p[0] + 1;
+    }
+    p
+}
+
+/// The first rider whose character (kind - 14) matches, or -1.
+fn find_char(id: u32, env: &mut dyn SceneEnv) -> i32 {
+    if env.rider_count() > 0 {
+        let mut j = 0;
+        loop {
+            if env.rider_char(j) == id {
+                return j;
+            }
+            j += 1;
+            if j >= env.rider_count() {
+                return -1;
+            }
+        }
+    }
+    -1
+}
+
+/// `CamScript_StartScene` 0x176850(object, step): the actors of a camera scene. The old actors are cleared and the
+/// scene's records read from the step; each record names a rider (the first or second slot, its neighbours, a
+/// character, or the next one no record named) and that rider's actor slot (0x40 bytes from +0x220) is built, the
+/// rider placed first when the record says so, and its animation started at the record's position and heading.
+pub fn start_scene(obj: &mut [u32], step: u32, env: &mut dyn SceneEnv) {
+    reset_actor_anims(obj, env);
+    let old = obj[0x214 / 4];
+    obj[0x210 / 4] = 1;
+    let [w1, w2] = env.scene_open(step);
+    obj[0x218 / 4] = w1;
+    obj[0x21c / 4] = w2;
+    obj[0x214 / 4] = old;
+    let p = find_riders(env);
+    // the stack's two tables of eight: the riders no record named (list `a`, then marks `b`); a mark at -1 lands on
+    // the last of `a`
+    let mut t = [-1i32; 16];
+    for k in 8..16 {
+        t[k] = 0;
+    }
+    let ptr = w2;
+    for i in 0..8 {
+        let rec = env.scene_rec(ptr, i);
+        if rec.in_use == 0 {
+            continue;
+        }
+        let ix = match rec.kind {
+            0 => p[0],
+            10 => p[1],
+            11 => p[2],
+            12 => p[3],
+            14..=25 => find_char(rec.kind - 14, env),
+            _ => -1,
+        };
+        if ix != -1 || rec.kind == 0 {
+            t[(8 + ix) as usize] = 1;
+        }
+    }
+    let count = env.rider_count();
+    if count > 0 {
+        let mut cur = 0;
+        for k in 0..count {
+            if t[8 + k as usize] == 0 {
+                t[cur] = k;
+                cur += 1;
+            }
+        }
+    }
+    let (mut cursor, mut n) = (0usize, 1usize);
+    for i in 0..8 {
+        let rec = env.scene_rec(ptr, i);
+        if rec.in_use == 0 {
+            obj[(0x230 + i * 0x40) / 4] = 0;
+            continue;
+        }
+        let s5 = match rec.kind {
+            0 => p[0],
+            10 => p[1],
+            11 => p[2],
+            12 => p[3],
+            13 => {
+                let v = t[cursor / 4];
+                if v != -1 {
+                    cursor = n * 4;
+                    n += 1;
+                }
+                v
+            }
+            14..=25 => find_char(rec.kind - 14, env),
+            _ => -1,
+        };
+        if s5 == -1 {
+            obj[(0x230 + i * 0x40) / 4] = 0;
+            continue;
+        }
+        let ch = env.rider_char(s5);
+        let name = env.actor_name(ch);
+        let local = env.actor_init(name, ptr, i);
+        let slot = (0x220 + i * 0x40) / 4;
+        obj[slot + 1..slot + 6].copy_from_slice(&local.w);
+        obj[slot + 8..slot + 12].copy_from_slice(&local.q);
+        obj[slot + 12] = local.f;
+        env.actor_close();
+        let rec = env.scene_rec(ptr, i);
+        let mut heading = f32::from_bits(rec.heading);
+        let own = [rec.pos[0], rec.pos[1], rec.pos[2], 1.0f32.to_bits()];
+        let mut vec = own;
+        if rec.from_scene != 0 {
+            let sp = env.scene_point(i as i32);
+            if sp.ok {
+                vec = sp.vec;
+            }
+            heading = crate::math::angle_diff(heading + sp.out, 0.0);
+        }
+        let rec = env.scene_rec(ptr, i);
+        if rec.place != 0 {
+            env.place_rider(s5, vec, [0; 4], heading);
+        }
+        env.start_anim(i, s5, (rec.place != 0) as u32, vec, heading);
+    }
+}
