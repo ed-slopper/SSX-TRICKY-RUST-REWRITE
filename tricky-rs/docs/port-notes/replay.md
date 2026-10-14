@@ -376,8 +376,8 @@ frames of a message), +0x4c and +0x50 hold recording, +0x58 a stream overflowed.
 - **The base.** `cControllerNode` 0x13a888 brings back the sorted node and its instance by the link. The link
   re-points the instance at the node when it was the node's, and restores the instance's +0xe8 half word.
 - **The world set-up each class calls:**
-  - the rail enables or disables itself by +0x3c. In the assembly a set word calls 0x1403c0 (named
-    `RailNode_Disable` in the index) and a clear one 0x140400; the decompile shows it the other way round;
+  - the rail enables itself (`RailNode_Enable` 0x1403c0) when +0x3c is set, else disables itself
+    (`RailNode_Disable` 0x140400);
   - the boosts and the trick trigger make their box, set it from the instance's corners and fit it into the
     broadphase; the trick trigger also finds its rider (`Race_GetRider`);
   - the UV scroll reads its data offset and registers itself;

@@ -483,8 +483,7 @@ pub fn load_by_address(m: &mut Mem, env: &mut dyn LoadEnv, addr: u32, node: u32,
         0x13fe50 => plain(m, node, l, s, vt::TIMER, 0x2c, 0x10),
         0x1401a0 => {
             plain(m, node, l, s, vt::RAIL, 0x2c, 0x14);
-            // +0x3c set calls 0x1403c0 (named `RailNode_Disable` in the index), clear 0x140400 (`RailNode_Enable`):
-            // the assembly's order; the decompile shows it the other way round
+            // +0x3c set: `RailNode_Enable` 0x1403c0; clear: `RailNode_Disable` 0x140400
             let f = if m.r32(node + 0x3c) != 0 { 0x1403c0 } else { 0x140400 };
             env.call(m, f, &[node]);
         }
