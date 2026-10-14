@@ -498,6 +498,33 @@ Part of the port notes (index: [README.md](README.md)); units and wording as des
   `Boarder_InstanceCollisions` is not called (the app's air is not `AirMotion_Update` yet, E8p). Without the course's files the old ball props stay.
 - Inferred: the pairs' order and pass in the frame (rollers, then pairs, then threads) is our choice.
 
+## Bouncy fixed objects in a race, checked live (row E8c4; PINE, 2026-10-13)
+
+What the game's computer riders do at the fixed bouncy touch objects the app's autopilot sticks on (flags 0x80 and 0x20,
+SurfaceType −1, mass 1e30, bounce 0.5), read over PINE in a race (course object `gWorld` 0x346488: +4 the course
+header, header +0xc the instance count, +0x48 the instances, 0x100 bytes each; rider +0x140 position, +0x150
+velocity, +0x424 motion, +0x428 state, +0x2e4 impact counter; recordings kept on the PC).
+
+- Proven (live): elysium `HalfPipeThing_Metal` 3403 / 3604 are in the race (not hidden): flags 0xa100a3, no
+  controller, mass 1e30, bounce 0.5, mode 1, group 154, and their boxes (+0xcc / +0xd8) equal the port's
+  (`World::from_course`) to the centimetre.
+- Proven (live): 3 of the 6 computer riders ran into 3403 in one lap (one in the air, motion 1; two riding, motion
+  2) and were bounced along the frame's face normal (±(0.643, −0.766, 0), its matrix's first row) by
+  (1 + 0.5)·v_in: Δv 2311 against 1.5 × 1541 cm/s, and 2242 against 1.5 × 1491; then `Boarder_Wipeout` (motion 5,
+  state 0x13, impact counter +0.94..1.0). They got up (motion 6) and rode on 2 to 5 s later, slower than 3 m/s for
+  up to 2 s, with no reset (counter at most 4.15). The other three passed beside it or flew over. So the port's
+  bounce (`walls::instance_bounce`, runner-checked in E8c2) is the game's; the port's body (bind pose, G5) meets
+  3403 on the same tick as the game's within one.
+- Proven (live): megaplex `Pinball_FlipperL` 75: matrix as the port's, flags 0x10a110a3 (0x10a111a3 while its
+  cell is active, `World_CellActivate_RunPersistant` 0x25fed0; no cast reads 0x100), mass 1e30, mode 3 (sphere
+  tree), group 2. Its box is the game's (−16774, −23326, −38619)..(−16142, −21389, −37906); the port's estimate
+  (E7a6) is up to 2 m bigger (broadphase only). Twice in 10 minutes a controller was attached for exactly 300
+  ticks (flags …a3 → …a5, matrix and box unchanged: the parts are posed by the controller, `World_RayCastInstance`),
+  and two riders went through its box during one. At rest, the computer riders went round its tip
+  (y > −21700, the paddle's long axis is its y) 18 times in 3 laps: one touch without a wipe-out, one wipe-out.
+- Interpretation (inferred): the app's stucks at these objects are the autopilot's (`AiDriver`, our steering,
+  row G4e) and the flipper never flipping (no controllers in the port, row E7b2), not the bounce.
+
 ## Keyframed objects (`cAnimObjectNode` 0x198810, `cMeshAnimFrame::vf1` 0x1cb498, `AnimCurve_FindSegment` 0x1cb770)
 
 - Model objects with an Animation: base pose U1..U6 (tx, ty, tz cm; rx, ry, rz degrees), AnimationAction a mask
