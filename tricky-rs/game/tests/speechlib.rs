@@ -95,7 +95,7 @@ fn world() -> Option<World> {
     r.stub(0x2bc200, move |c, _| l.borrow_mut().released.push(c.gpr(4) as u32 as i32));
     let l = log.clone();
     r.stub(0x2baed0, move |_, _| l.borrow_mut().stopped += 1);
-    for a in [0x2bb078, 0x2bb110, 0x2bb430, 0x2bb610, 0x2bb650, 0x2bb7a0, 0x2be678, 0x2be768, 0x2be7d8, 0x2be880] {
+    for a in [0x2bb078, 0x2bb110, 0x2bb430, 0x2bb610, 0x2bb650, 0x2bb7a0, 0x2be678, 0x2be768, 0x2be7d8, 0x2be880, 0x2be908] {
         r.allow(a);
     }
     let table = r.mem.alloc(0x40);
@@ -243,6 +243,8 @@ fn build(g: &mut Rng, w: &World) -> Image {
         rec[7] = if g.below(6) == 0 { 0xff } else { g.below(8) as u8 };
         let st: u16 = if g.below(3) == 0 { g.next() as u16 } else { 0 };
         rec[8..10].copy_from_slice(&st.to_le_bytes());
+        let next: u16 = if g.below(4) == 0 { 0xffff } else { g.below(18) as u16 };
+        rec[10..12].copy_from_slice(&next.to_le_bytes());
         rec[0xc..0x10].copy_from_slice(&w.sounds[g.below(4) as usize].to_le_bytes());
         put(&mut img, r, &rec);
     }
@@ -476,4 +478,28 @@ fn event_queue() {
         |m, _, a| { queue_event(m, a[0] as u32, a[1] as i32, a[2] as u32, a[3] as u32, a[4] as u8, a[5] as u32); 0 },
         0,
     );
+}
+
+#[test]
+fn free_voice_pending_shuffle() {
+    run(80, 40_000, |g, _| vec![[0u64, 1, 2, 5, 7, 8, 12, 15, 16, 20][g.below(10) as usize]], 0x2bc200, |m, _, a| { free_voice(m, a[0] as u32); 0 }, 0);
+    run(81, 3000, |g, _| vec![g.next() as u64, g.next() as u64], 0x2bc750, |m, _, a| { set_pending(m, a[0] as u32, a[1] as u32); 0 }, 0);
+    run(82, 6000, |g, _| vec![[0xffff_ffffu64, 1, 2, 3][g.below(4) as usize]], 0x2bc768, |m, _, a| pending(m, a[0] as u32) as u64, 0xffff_ffff);
+    run(83, 3000, |_, _| vec![], 0x2bc788, |m, _, _| { clear_pending(m); 0 }, 0);
+    run(84, 6000, |g, w| vec![w.q6 as u64, g.below(41) as u64], 0x2bd198, |m, _, a| { shuffle(m, a[0] as u32, a[1] as i32); 0 }, 0);
+    let Some(mut w) = world() else { return };
+    let mut g = Rng(85);
+    let mut sm = SM::default();
+    for case in 0..3000 {
+        let img = build(&mut g, &w);
+        apply(&mut w, &mut sm, &img);
+        w.r.mem.write_u32(w.scratch, 0xdead_beef);
+        w.r.mem.write_u32(w.scratch + 4, 0xdead_beef);
+        w.r.cpu.set_gpr(4, w.q4 as u64);
+        w.r.cpu.set_gpr(5, w.scratch as u64);
+        w.r.cpu.set_gpr(6, (w.scratch + 4) as u64);
+        w.r.call(0x2bc738).unwrap();
+        let (a, b) = bank_kinds(&sm, w.q4);
+        assert_eq!((a, b), (w.r.mem.read_u32(w.scratch), w.r.mem.read_u32(w.scratch + 4)), "case {case}");
+    }
 }

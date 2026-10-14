@@ -658,3 +658,101 @@ pub fn queue_event(m: &mut dyn Mem, list: u32, id: i32, a: u32, bank: u32, flag:
     }
     m.w32(Q_COUNT, new_count as u32);
 }
+
+// ---- freeing a voice, the shuffle and the pending event (0x2bc200, 0x2bc738..0x2bc788, 0x2bd198)
+
+const PENDING_ID: u32 = 0x348dc0;
+const PENDING_VAL: u32 = 0x348dc4;
+
+/// 0x2bc200: free voice `i` (when it is below 16 and its state is 0): not in use, no longer the group's kept slot
+/// in either limit array, the voices chained after it (record +0xa, a signed short; stops at the first with a
+/// state or not in use, or an index of 16 or more) freed too, and the group's count down by one (not below 0).
+pub fn free_voice(m: &mut dyn Mem, i: u32) {
+    if 0x10 <= i || m.r16(0x348eb4 + 0x60 * i) != 0 {
+        return;
+    }
+    let rec = 0x60 * i;
+    let group = m.r8(0x348eb3 + rec) as u32;
+    m.w8(0x348eb2 + rec, 0);
+    if i == m.r32(LIMIT_B + 4 * group) {
+        m.w32(LIMIT_B + 4 * group, 0xffff_ffff);
+    }
+    if i == m.r32(LIMIT_A + 4 * group) {
+        m.w32(LIMIT_A + 4 * group, 0xffff_ffff);
+    }
+    let next = |m: &dyn Mem, at: u32| m.r16(0x348eb6 + at) as i16 as i64 as u64;
+    let mut u = next(m, rec);
+    if u != u64::MAX && u < 0x10 {
+        let mut j = u as u32;
+        loop {
+            let at = j * 0x60;
+            if m.r16(0x348eb4 + at) == 0 || m.r8(0x348eb2 + at) == 0 {
+                u = u64::MAX;
+            } else {
+                if u == m.r32(LIMIT_A + 4 * group) as i32 as i64 as u64 {
+                    m.w32(LIMIT_A + 4 * group, 0xffff_ffff);
+                }
+                u = next(m, at);
+                m.w8(0x348eb2 + at, 0);
+            }
+            if u == u64::MAX || 0x10 <= u {
+                break;
+            }
+            j = u as u32;
+        }
+    }
+    if m.r16(0x348eb4 + rec) == 0 {
+        let c = m.r32(GROUPS + 4 * group).wrapping_sub(1);
+        m.w32(GROUPS + 4 * group, c);
+    }
+    if (m.r32(GROUPS + 4 * group) as i32) < 0 {
+        m.w32(GROUPS + 4 * group, 0);
+    }
+}
+
+/// 0x2bc738: the bytes at +8 and +9.
+pub fn bank_kinds(m: &dyn Mem, p: u32) -> (u32, u32) {
+    (m.r8(p + 8) as u32, m.r8(p + 9) as u32)
+}
+
+/// 0x2bc750: remember a pending (id, value).
+pub fn set_pending(m: &mut dyn Mem, id: u32, val: u32) {
+    m.w32(PENDING_ID, id);
+    m.w32(PENDING_VAL, val);
+}
+
+/// 0x2bc768: the pending value when `id` is the pending id, else 0.
+pub fn pending(m: &dyn Mem, id: u32) -> u32 {
+    if m.r32(PENDING_ID) == id {
+        m.r32(PENDING_VAL)
+    } else {
+        0
+    }
+}
+
+/// 0x2bc788: nothing pending (id -1, value 0).
+pub fn clear_pending(m: &mut dyn Mem) {
+    m.w32(PENDING_ID, 0xffff_ffff);
+    m.w32(PENDING_VAL, 0);
+}
+
+/// 0x2bd198: shuffle `count` bytes at `p`: `count / 2` times, swap the next byte with the one `pick_variant(count,
+/// count)` names.
+pub fn shuffle(m: &mut dyn Mem, p: u32, count: i32) {
+    let mut left = count / 2;
+    let mut at = p;
+    if 0 < left {
+        loop {
+            let j = pick_variant(m, count, count as u16);
+            left -= 1;
+            let a = m.r8(at);
+            let b = m.r8(p.wrapping_add(j));
+            m.w8(at, b);
+            m.w8(p.wrapping_add(j), a);
+            at = at.wrapping_add(1);
+            if left == 0 {
+                break;
+            }
+        }
+    }
+}
