@@ -461,3 +461,53 @@ frames of a message), +0x4c and +0x50 hold recording, +0x58 a stream overflowed.
   value, and every call and all the memory were compared.
 - **Every world node type a keyframe holds can now be made again.**
 
+
+## The replay's controls and the race menu's replay page (G12n)
+
+`tricky_game::replayui`, on the game's bytes. The drawing is not ported yet.
+
+- **`cReplayControlOverlay::Update`** runs each frame while a replay plays:
+  - the panel slides 6 a frame towards its mode's y: 480, +0x354 or +0x358 (`ReplayControl_Slide` 0x1ec728);
+  - a message is held for 60 frames, then fades by 0.016 a frame; the slide offset +0x474 goes back to 0 by 5;
+  - nothing more while it is hidden (+0x49c), paused (mode 7) or highlighting (mode 2).
+- **The pad** (`DAT_003381e0`: +0x10 held, +0xc last frame):
+  - up / down change the panel's mode, up to +0x48c, with the scroll sound;
+  - the four held bits 0x200000..0x1000000 turn the chase camera (`Camera_AdjustChase` 1.0, 6/2, 7/3, 8/0, 9/1;
+    the first number with 0x200 held), only in preset 8;
+  - with 0x200 held, L1 / R1 jump to the start (command 1) / the end (2);
+  - otherwise L1 / R1 step back (3) / forward (4) and 0x400 fast-forwards (5). These repeat while held: the
+    button is kept in +0x494, and the count in +0x490 lets it act again only after 15 frames;
+  - 0x800 pauses (6); 0x100 is the next camera preset (twice past preset 8 without the full controls); 0xc cuts
+    the camera to the next / previous rider (with two or more riders);
+  - only with the full controls (+0x4a8, `ReplayCam` cuts on at 0x32ca4c): 0x20 removes a cut (message 0x14f, or
+    0x15b at frame 0), 0x40 begins a highlight (8; message 0x16d when there are already ten),
+    0x10 drops one (0x16c), 0x100000 / 0x80000 go to the highlight before (10) / after (9), 0x20000 plays the
+    highlights not yet ended (6, the overlay's own playlist +0x430), 0x40000 goes back to the plain replay, and
+    0x8000 inserts a cut (0x149, or 0x153 when it is full);
+  - a command that needs the replay paused (mode 3) gives 7 (pause) instead.
+- **After the pad:** the command goes to the manager's +0x28. The sound stops on 6 and resumes otherwise (with no
+  command, only when paused). The status is read into +0x378, and the end frame shown is capped at 1800 (scale
+  180).
+- **`Reset`:** the full controls follow the cuts flag. The replay follows the rider whose pad is the replay's,
+  unless it is a loaded one (+0x4c). Its cut is applied, the status read, and the command set to 1. The panel is put
+  at mode 1 (full) or 0.
+- **The race menu's replay page:**
+  - three items: watch, save (state 4 for a loaded replay, else 5) and back;
+  - `RaceMenuOverlay_BeginSaveReplay` keeps the current keyframe and the focused rider, then starts the card's
+    save of 0x80000 bytes. `_EndSaveReplay` puts the views and the rider back.
+- **`cReplayOverlay` (the card save's page):**
+  - vf3 `SaveBegin` takes the settings block's CRC (0x32db6c, 0x920 bytes, with its own word at 0x32dea0 zeroed
+    first) and names the file `%s-%s%04d`: the game code, then REP and the slot +0x38 plus one, or SET and 1;
+  - vf4 `SaveNext` writes each `ReplaySave_Step` chunk;
+  - vf6 and vf5 end and abort the save.
+- **The two replay sounds** 0x214428 / 0x214650 queue ids 0x7d / 0x7f (`sndqueue`). What `SndSys_PlayPending`
+  returns is kept in +0x6e48.
+- **Checked in the runner** on random memory, with every call out logged on both sides and all memory compared:
+  - the pad and the replay states: 60,000 updates;
+  - 5,000 resets, 5,000 save begins, 3,000 save ends and 20,000 menu updates;
+  - the card page: 200 begins, 2,000 chunks, and 300 each of done and abort;
+  - 10,000 sounds;
+  - the replay manager's calls are logged stand-ins with scripted answers (they were checked in G12d–G12g). The
+    overlay's own playlist runs the game's code;
+  - the tests caught every mutant tried except two that cannot change the result: the second `SeekBack`, and the
+    slide's `<` vs `<=`.
