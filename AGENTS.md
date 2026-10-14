@@ -22,9 +22,22 @@ Every address in this repo, in code, notes, the board and commit messages, belon
 | Load | one segment, file offset 0x1000 → 0x00100000 (file offset = address − 0xFF000) |
 | Functions | 7,425 (Ghidra 12.1.4 with the Emotion Engine extension, language `r5900:LE:32:default`) |
 
-Other versions exist (PAL and Japanese PS2, GameCube, Xbox). **Never mix their addresses with these.** If you
-ever read another version, write its name next to every address you take from it and keep it out of the port
-until the humans decide (board row F7). If the md5 of your `SLUS_203.26` differs, stop and tell the human.
+Other versions exist (PAL and Japanese PS2, GameCube, Xbox). **`SLUS_203.26` is the reference and the only
+port source** (decided by the humans, board row F7, 2026-10-13). Always work from it first.
+
+**The Xbox build as a fallback.** If a question takes longer than it should to settle from the PS2 binary (code
+Ghidra can't follow, VU microcode, data whose meaning won't show), you may read the Xbox build instead:
+OpenTricky (github.com/GiZcesi/OpenTricky) recompiles the Xbox `default.xbe` into a native PC program that can
+be read and traced (setup: row F7a). Rules:
+
+- Use it for behaviour and leads only. OpenTricky is GPL-3: copy **no** code from it into the repo.
+- Tag every address or name taken from it `xbox:` (`xbox:0x1a2b3c`), in code, notes, the board and commits.
+  Keep them out of `ghidra/symbols.txt` and `tricky-rs/docs/function-index.csv`.
+- Then find the same thing in `SLUS_203.26` and port that, with its PS2 address. If it can't be found there, port
+  it with `// STANDIN: from the Xbox build (xbox:0x…), not found in SLUS_203.26` and add a row to find it.
+- Say in the port notes which facts came from the Xbox build; the two versions can differ.
+
+**Never mix their addresses with these.** If the md5 of your `SLUS_203.26` differs, stop and tell the human.
 
 ## 3. When to self-assign
 
