@@ -1445,19 +1445,19 @@ address,size,name,system,status
 0x16de80,80,CamCamera::__tf,runtime,host
 0x16ded0,8,CamCamera::~CamCamera,camera,not started
 0x16df00,64,cOfflineObject::__tf,runtime,host
-0x16df80,76,Cml_HashName,camera?,not started
-0x16dfd0,12,Cml_ResolveOffset,camera?,not started
-0x16dfe0,180,CmlFile_FindNodeRec,camera?,not started
-0x16e098,204,CmlFile_FindScopeRec,camera?,not started
-0x16e168,112,CmlFile_FindNode,camera?,not started
-0x16e1d8,112,CmlFile_FindScope,camera?,not started
-0x16e248,204,CmlFile_FindObject,camera?,not started
-0x16e318,236,CmlFile_FindObjectInScope,camera?,not started
-0x16e408,96,CmlFile_FirstOfType,camera?,not started
-0x16e468,88,CmlFile_NextOfType,camera?,not started
+0x16df80,76,Cml_HashName,camera,checked
+0x16dfd0,12,Cml_ResolveOffset,camera,checked
+0x16dfe0,180,CmlFile_FindNodeRec,camera,checked
+0x16e098,204,CmlFile_FindScopeRec,camera,checked
+0x16e168,112,CmlFile_FindNode,camera,checked
+0x16e1d8,112,CmlFile_FindScope,camera,checked
+0x16e248,204,CmlFile_FindObject,camera,checked
+0x16e318,236,CmlFile_FindObjectInScope,camera,checked
+0x16e408,96,CmlFile_FirstOfType,camera,checked
+0x16e468,88,CmlFile_NextOfType,camera,checked
 0x16e4c0,84,Cml_LoadIfExists,camera?,ported
-0x16e518,112,Cml_FindObject,camera?,ported
-0x16e588,168,Cml_FindObjectInScope,camera?,not started
+0x16e518,112,Cml_FindObject,camera,checked
+0x16e588,168,Cml_FindObjectInScope,camera,checked
 0x16e630,124,StaticInit_Cml,camera?,not started
 0x16e6b0,60,CamDirector::CamDirector,camera?,not started
 0x16e6f0,124,StaticInit_CamDirector,camera?,not started

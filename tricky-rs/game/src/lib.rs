@@ -102,6 +102,7 @@ pub mod boardtrail;
 pub mod campath;
 pub mod camscript;
 pub mod camera_ctl;
+pub mod cml;
 pub mod camera_update;
 pub mod effects;
 pub mod emitter;

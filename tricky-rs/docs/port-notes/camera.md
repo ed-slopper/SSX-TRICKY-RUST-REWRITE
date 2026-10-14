@@ -158,3 +158,29 @@ camera.
   plus the set-up, teardown, assignment and helpers. Every call and all memory were compared. The tests caught 10 of
   11 mutants; the one left (`<` vs `<=` at the 0.98 cap) writes the same value.
 - **Left:** `Game_ResetCameras` 0x180b58 (a race reset beyond the cameras), the destructors and the CML loading.
+
+## The camera files' lookups (E11i)
+
+`tricky_game::cml` follows the game's own lookups on the loaded files. `tricky_data::intro`'s `Cml::find` (a
+case-insensitive walk of a kind's list) stays for the app's intro until it moves to these.
+
+- **A handle** is a word holding a loaded file's base, or 0. The game keeps three: the course's (0x336688),
+  `commonob` (0x336690) and `scripts` (0x336698). All offsets are from the base (`Cml_ResolveOffset`).
+- **The file's +4 + 4 × kind** is its first record of the kind (-1 none). Kind 6 (+0x1c) is the root of the node and
+  scope trees.
+- **A record** is a 0x20-byte header: +0 the next of the kind, +8 the body, +0xc the name's hash, +0x10 the name.
+  `CmlFile_FirstOfType` / `_NextOfType` give bodies; the next is read from the header at body − 0x20.
+- **`Cml_HashName`:** for each character, signed, the hash becomes (hash << 23) ^ (hash >> 7, arithmetic) ^ the
+  character. An optional limit caps the count.
+- **Trees** are searched depth first, left, right, then the node:
+  - a node by its hash at +0x10;
+  - a scope by its hash at +0xc and its name at +0x24.
+
+  Neither search checks for a missing file.
+- **A scope's objects** are listed from its +8: each has +4 the next, +8 the body, +0xc the hash, +0x10 the name.
+- **`Cml_FindObject`** (name, kind) tries the three files in order. `Cml_FindObjectInScope` (name, scope, kind) tries
+  each file's scope, then falls back to `Cml_FindObject` with the kind.
+- **Checked in the runner:** 20,000 cases of three random files, one sometimes missing. They had random records,
+  trees and scope lists, and names with right and wrong hashes, one with high bytes. Every lookup's result was
+  compared. `strcmp` is stubbed by a byte compare: the runner lacks its `PSUBW`, and these callers only test for 0.
+  The tests caught the 8 mutants tried.
