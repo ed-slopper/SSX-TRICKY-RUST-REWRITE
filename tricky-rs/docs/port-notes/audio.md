@@ -348,3 +348,27 @@ Ported: `row_info` 0x2bea48 (a row of a bank described in sixteen bytes: the wei
 
 Things that are true of the game's code and show in the port: the word at 0x348ea8 (not 0x3488a8) is the flag that raises the slot count; the bit number bytes are read with `sllv`, so numbers of 32 and up wrap; the part counts above four would read the saved registers of the frame (the real events never have them: `masks_agree` refuses five); `find_combo` on an event without parts never ends (the odometer reads the record before the first); the callback block's eighth word is whatever the frame held.
 
+
+## The crowd boxes' voice requests (G10m2, `tricky_game::crowdbox`)
+
+`CrowdBox_Update` 0x21efb0 (frame 0x130), `_StartSound` 0x21fc98, `_SetSlotValue` 0x21fc68, `_PlayCheer` 0x2203a8 and
+`_StartCheer` 0x220538. Every one builds its request inline in the audio object's queue (the new entry `++count`, then the
+parallel arrays; `sndqueue.rs` has the same entry on structs). The order that matters: defaults (record copy of the header
+at +8, +0x3c = the first byte, a memset call on the +0x44 row, +0x74 row 100 / 0 / 0x5a / 0x32, +0x7c = 1), then the caller
+sets the kind (+0xa40), the id (+0xa44), the emitter, the volume (+0x3c whole, record byte 0 clamped to 0..127), +0x40 =
+box+0x17c, **+0x78 = 1**, the 8 bytes at 0x39fbd8 into the +0x44 row, then +0x64 = the box, +0x7c = 0, +0x68 = the
+listener (box+0), and 0x20c948 plays the pending sounds; its answer is the voice. The cheers do not push: 0x222160 begins
+the entry and the box fills in the newest one before 0x222358 plays it.
+
+- Update blends the slots (15 of three words: the position pointer, the weight, the sound entry): the box position is a
+  running weighted mean, `p += (s - p) * w / (max + w)`, with `max` the largest weight so far and the smaller ones
+  added in as a quarter each (`sum`); the box's loudness is `max + sum`. With two or more voices the same mean is kept
+  per voice (the entry's +0x20 is its index, the weight kept is the largest, the quarters of the others are summed).
+  One voice: the last slot's entry gets the position and, when its monitor (0x20c200) is gone, a new request with the
+  loudness; several voices: each entry in use does the same with its own loudness.
+- The cheer part calls the audio object's virtual function (vtable at audio+4, the `this` shift a halfword at +0x80, the
+  function at +0x84) with the listener and the addresses of two frame words that start at 0x1000 (a scale for the
+  volume and for the monitor's own call); its answer 1 or 2 is kept in box+0x18c; with the cheer armed (1) and the answer
+  not 3 a new cheer is picked from the list at audio+0x3760+0x54*answer and played (state 2).
+- `lq` / `sq` ignore the low four bits of the address; the port does too.
+- Not reached by the game and not tested: the slot / entry scans running off their ends (they would read address 0).
