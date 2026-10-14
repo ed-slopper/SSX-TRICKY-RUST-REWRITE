@@ -1468,7 +1468,7 @@ address,size,name,system,status
 0x16e900,4616,CamCamera_EvalPosition,camera,ported
 0x16fb08,856,Camera_CollidePush,camera,ported
 0x16fe60,1340,Camera_CollideWorld,camera,ported
-0x1703a0,20,FUN_001703a0,camera?,not started
+0x1703a0,20,FUN_001703a0,camera?,checked
 0x1703b8,8,FUN_001703b8,camera?,not started
 0x1703c0,124,StaticInit_Camera,camera,not started
 0x170440,44,Vec4_Scale,camera?,ported
@@ -1495,12 +1495,12 @@ address,size,name,system,status
 0x172238,8,CamScene::~CamScene,camera?,not started
 0x172268,64,cOfflineObject::__tf,runtime,host
 0x1722e8,3540,CamCamera_EvalLookAt,camera,ported
-0x1730c0,24,FUN_001730c0,camera?,not started
+0x1730c0,24,FUN_001730c0,camera?,checked
 0x1730e0,124,StaticInit_CamCamera2,camera,not started
 0x1731f8,116,Camera_ResetRiderTrack,camera,checked
 0x173270,1456,Camera_TrackRider,camera,ported
-0x173820,460,BxCamera_Init,camera,not started
-0x1739f0,108,FUN_001739f0,camera?,not started
+0x173820,460,BxCamera_Init,camera,checked
+0x1739f0,108,Camera_FocusFromMainPath,camera?,checked
 0x173a60,36,Camera_CutForReset,camera,ported
 0x173a88,12,CamControl_Reset,boarder?,checked
 0x173a98,384,Camera_Reset,camera,checked
@@ -1537,7 +1537,7 @@ address,size,name,system,status
 0x176850,1768,CamScript_StartScene,race?,not started
 0x176f38,232,CamScript_ResetActorAnims,race?,not started
 0x177020,84,RaceScene_UpdateCastClips,boarder?,not started
-0x177078,1308,cBxCamera::vf1_177078,camera,not started
+0x177078,1308,cBxCamera::Update,camera,checked
 0x1776d0,28,Camera_SetMode,camera,checked
 0x1776f0,100,Camera_SetLookBack,camera,checked
 0x177758,120,Cam_Shake,camera,ported
@@ -1554,7 +1554,7 @@ address,size,name,system,status
 0x1780b8,44,FUN_001780b8,,not started
 0x1781c0,124,cCamControl::cCamControl,boarder,not started
 0x178240,100,cCamControl::~cCamControl,boarder,not started
-0x1782a8,40,Game_RegisterCamera,camera,not started
+0x1782a8,40,Game_RegisterCamera,camera,checked
 0x1782d0,60,Camera_LoadCmlOnce,camera,not started
 0x178310,12,Camera_GetCommonCmlName,camera,ported
 0x178320,12,Camera_GetScriptsCmlName,camera,ported
@@ -1753,12 +1753,12 @@ address,size,name,system,status
 0x17f190,16,Game_GetViewportMode,game,not started
 0x17f1a0,80,Game_SetViewportMode,game,not started
 0x17f1f0,308,Game_IsLeadOrFocusRider,game,ported
-0x17f328,100,Game_CutAllCameras,camera,not started
+0x17f328,100,Game_CutAllCameras,camera,checked
 0x17f390,3232,Game_UpdateCameras,camera,ported
-0x180030,644,Game_CreateCameras,camera,not started
-0x1802b8,148,Game_DeleteCameras,camera,not started
+0x180030,644,Game_CreateCameras,camera,checked
+0x1802b8,148,Game_DeleteCameras,camera,checked
 0x180350,452,Game_LayoutViewports,game,not started
-0x180518,584,Game_AssignCameraRiders,camera,not started
+0x180518,584,Game_AssignCameraRiders,camera,checked
 0x180760,232,Game_GetLeadingPlayer,game,ported
 0x180848,456,Game_MoveLeaderToSlot0,game,ported
 0x180a10,324,Game_RestartRace,game,ported
@@ -1767,12 +1767,12 @@ address,size,name,system,status
 0x180d08,228,cGame::vf4_180d08,game,not started
 0x180e00,928,Game_UpdateOrShowResults,game,not started
 0x1811a0,716,cGame::vf6_1811a0,game,not started
-0x181470,52,Game_GetCamera,camera,not started
+0x181470,52,Game_GetCamera,camera,checked
 0x1814a8,20,Race_GetRider,race,ported
 0x1814c0,220,Game_UpdateObjectLists,game,not started
 0x1815a0,148,Game_CanPause,game,not started
 0x181638,572,cGame::Update,game,not started
-0x181878,68,Game_UpdateCamerasStep,camera,not started
+0x181878,68,Game_UpdateCamerasStep,camera,checked
 0x1818c0,72,FUN_001818c0,,not started
 0x1819b0,8,cVideoLoadModule::vf6_1819b0,video,not started
 0x1819b8,8,cVideoLoadModule::vf5_1819b8,video,not started

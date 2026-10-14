@@ -97,3 +97,64 @@ camera.
   named cameras' blocks, riders and characters were random, with every call (find, cut, script stop, rider, track,
   cut-to) and all memory compared. The tests caught 11 of 12 mutants; the one left (`<` vs `<=` at exactly 300)
   recomputes the same ratio.
+
+## The camera's frame and the game's cameras (E11h)
+
+`tricky_game::camera_ctl` (`CamFrameEnv`, `CamLifeEnv`).
+
+- **`cBxCamera::Update`** (vf1, 0x177078), each frame:
+  1. The rider tracks are updated.
+  2. **At a cut** (+0xea8 1, +0xeb0 clear) the region scan runs. It goes through the camera files 0x336688,
+     0x336690 and 0x336698; in each, the first region of kind 4 that passes all of these starts a script:
+     - the region is on (+0x164; or, with the replay's camera, +0x168 while the mode is 7);
+     - its rider (slot +0x154) isn't held back. Each of these holds it: +0x16c with the rider's +0x418 negative,
+       +0x170 with the rider's +0x114 zero, +0x172 with 0x11f488 false. A missing rider isn't held;
+     - its trigger fires (`CamRegion_CheckTrigger` with the slots and last frame's).
+
+     Trigger kind 0 (+0x15c) starts the script named at +0x120, kind 1 (+0x158) the one at +0x12f. Kind 2 (+0x160)
+     starts the one at +0x13e, when not already running, unless the camera's script is running under that name
+     (`strcmp` with +0x50). Either way, that ends the file's scan.
+  3. The clock (+0x10) goes on by 1/60.
+  4. The script, its path and the cast's clips are stepped. While a replay is paused or at its end with no cut
+     pending, only the cut fade runs instead.
+  5. If a script was running and has started another this frame, nothing more.
+  6. **The look-back ease** (+0x20), when not in mode 1 or the replay's camera: unless the focus rider's +0x428 is
+     0x12, it rises by 0.029 to 0.98 while the rider's motion is 5 or 6 (and +0xeb4 is clear). Otherwise it falls by
+     0.003 to 0. +0xeb4 is cleared outside motions 5 and 6.
+  7. **The mode's named camera** is cut to when idle:
+     - modes 1..6: the preset's (or "replay cam" with the replay's camera);
+     - mode 8: "replay cam";
+     - mode 10: "manual target", first given the focus point of the camera at 0x3365f0 (its view's +0x3c / +0x68 /
+       +0x94, and its lens's +0x20 from the point's seventh word);
+     - modes 7, 9 and anything else: "chase far".
+
+     The focus rider is read without a null check, as the game does.
+- **`Game_CreateCameras`:**
+  - one camera for one player, two for two or three (+0x298, copied to +0x294);
+  - the camera control (12 bytes, `cCamControl` with 9) at +0x84;
+  - each camera: allocated (0xec0 bytes, zeroed) and set up (`BxCamera_Init`); the players' saved mode indexes
+    (0x32ca38 / 0x32ca3c) set; registered (0x337780 counts the list at 0x337788);
+  - each camera given its rider. A player's camera takes the rider with the smallest player slot (below 4) above
+    the previous camera's. The others count back from the end of the race's list at +0xc4;
+  - the rider's +0x38 set to the camera's number, and the camera focused;
+  - then the viewports are laid out.
+  - When the first camera finds no player slot, the game stores whatever a register held. The port uses 0
+    (STANDIN), and the test keeps every player's slot in 0..3.
+- **`Game_AssignCameraRiders`** swaps the viewport chosen at +0x68 into the first. That is the 0x7c bytes from +0x90,
+  less +0xa8 / +0xac. It then numbers and focuses each camera's rider the same way, without the player-slot search,
+  and clears +0x68.
+- **`BxCamera_Init`:**
+  - sets the vtables: the camera 0x3830a8, its path 0x3814c0, its scene 0x382180, the eight animations 0x37ee70;
+  - sets both records' 1.6 and 100.0 (+0x444 / +0x448, +0x49c / +0x4a0);
+  - clears the three slot sets' trackers and the globals 0x3365f4..0x336600;
+  - then runs `CamControl_Reset`.
+- **The rest:**
+  - `Game_DeleteCameras` runs each camera's and the control's virtual destructor with 3.
+  - `Game_CutAllCameras`, `Game_GetCamera` (0 past +0x294) and `Game_RegisterCamera` do what their names say.
+  - 0x1739f0 sets the focus record from the main AI path's start.
+  - `Game_UpdateCamerasStep` updates the camera nodes (`BxList_UpdateAll` 0x337c60, 9) and the cameras, then
+    counts the frame (+0x50).
+- **Checked in the runner** on 39,000 cases: 20,000 frames over random cameras, regions, riders and replay states,
+  plus the set-up, teardown, assignment and helpers. Every call and all memory were compared. The tests caught 10 of
+  11 mutants; the one left (`<` vs `<=` at the 0.98 cap) writes the same value.
+- **Left:** `Game_ResetCameras` 0x180b58 (a race reset beyond the cameras), the destructors and the CML loading.

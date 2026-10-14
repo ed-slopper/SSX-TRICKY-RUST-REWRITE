@@ -184,8 +184,8 @@ impl CamCtlEnv for Ours {
     fn track_rider(&mut self, _m: &mut Mem, slot: u32, cut: u32) {
         self.0.borrow_mut().push(("track", slot, cut));
     }
-    fn cut_to(&mut self, _m: &mut Mem, cam: u32) {
-        self.0.borrow_mut().push(("cutto", cam, 0));
+    fn cut_to(&mut self, _m: &mut Mem, cam: u32, name: &str) {
+        self.0.borrow_mut().push(("cutto", cam, block_of(name)));
     }
 }
 
@@ -215,7 +215,10 @@ fn setup(r: &mut Runner, l: &L, a: &At) {
     let l2 = l.clone();
     r.stub(0x173270, move |c, _| l2.borrow_mut().push(("track", arg(c, 4), arg(c, 5))));
     let l2 = l.clone();
-    r.stub(0x174c98, move |c, _| l2.borrow_mut().push(("cutto", arg(c, 4), 0)));
+    r.stub(0x174c98, move |c, m| {
+        let n = cstr(m, arg(c, 5));
+        l2.borrow_mut().push(("cutto", arg(c, 4), block_of(&n)));
+    });
 }
 
 /// One function on both sides from the same random game: `regs` sets the runner's arguments, `ours` runs the port
@@ -384,9 +387,12 @@ fn camera_control_matches_the_original() {
     check(&mut r, &a, &l, &mut g, 1_000, 0x174c70, "chase if idle", move |r, g| {
         let c = pick_cam(g);
         r.cpu.set_gpr(4, c as u64);
-        vec![c as u64]
+        // "chase far" (0x382e48) or "replay cam" (0x382e78)
+        let n = [0x382e48u32, 0x382e78][g.below(2) as usize];
+        r.cpu.set_gpr(5, n as u64);
+        vec![c as u64, n as u64]
     }, |m, e, a| {
-        chase_if_idle(m, e, a[0] as u32);
+        chase_if_idle(m, e, a[0] as u32, if a[1] == 0x382e48 { "chase far" } else { "replay cam" });
         None
     });
     check(&mut r, &a, &l, &mut g, 1_000, 0x173a98, "reset", move |r, g| {
