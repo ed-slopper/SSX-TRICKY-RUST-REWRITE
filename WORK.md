@@ -119,6 +119,7 @@ state machine and the renderer are ours. Nothing has been checked against the or
 | G4k | The cAI virtuals that are object glue: `vf11_110bf8` (creates the controllers and riders), `vf16_111560` (start of race), `vf13_110fa0` (tear down), `vf8`, `vf10`: allocation and virtual calls, so they belong with the app wiring (E1b2r) — port when the loader exists (`Race_UpdateLookBack`, `cCountdownHandler` went in G4k1, `cEndRaceHandler::Enter` in G11d). Gap of G4j | unowned | G4 | | Gap of G4j |
 | G10b2 | The app's music on `tricky_game::pf` instead of `pathmusic.rs`'s own graph walk: the songs' `.mpf` loaded and registered, the driver's update and beat callbacks each frame, `Music_SetPathVar` / events through the controls, the stream calls (`PfEnv` / `PfDriver`) on the app's decoded segments; song names from `music.inf` / `musicmap.inf` | unowned | G10b | | Gap of G10b |
 | G10c | Announcer (DJ Atomika) and rider voices: when each line is picked and played | unowned | G10 | | [est] |
+| G10i | The crowd, chant and narration config loaders in `tricky_data::audiocfg`, against the originals on generated text: `Audio_LoadCrowd` 0x2209c8 with `Sfx_LoadTrickConfig` 0x220ce8 (CROWD.INF), `Audio_LoadGlobalBankList` 0x21c510 (CHANT.INF), `Speech_LoadNarration` 0x230a00 (NASCRIPT.INF). Gap of G10 | any | G10 | trailrig/heron (2026-10-13) | Gap of G10; `Speech_LoadEvents` 0x227d70 stays |
 | G10g2 | `boardsound.rs` on the game's interpreter: replace `Programs::run` (ours, floats) with `sfxcalc::run_snow_program` and `board_input`, feeding the rider fields (+0x320 normal, +0x150 velocity, +0x160, +0x214) from the port's rider, then the volume and bend the game gives (the outputs of ASSIGNVOL / ASSIGNBEND). Gap of G10g | any | G10g | | `run` is STANDIN in `src/boardsound.rs`; the port's rider needs those four fields named first |
 | G11 | Pre- and post-race scenes: `cPreRaceHandler`, `cEndRaceHandler_Update` 0x1141e0, scripts table 0x32f380, row filters | unowned | E11, G5 | | [repo] `intro.rs`; "Unresolved: post-race scene row filters" |
 | G11a | Movies: the disc's video files (EA logo, intro, unlock videos) | unowned | E2 | | [est] Find the format first |
@@ -903,3 +904,4 @@ matches the original.
 - 2026-10-13 trailrig/heron: claim G10h (BANKS.INF parsing of the two audio config loaders).
 - 2026-10-13 ed-slopper/puffin: claim G12h (split of G12).
 - 2026-10-13 trailrig/heron: G10h done (BANKS.INF parsing of the two audio config loaders vs the originals).
+- 2026-10-13 trailrig/heron: claim G10i (crowd, chant and narration loaders).
