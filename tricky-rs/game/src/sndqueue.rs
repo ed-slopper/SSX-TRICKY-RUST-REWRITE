@@ -84,8 +84,8 @@ pub fn queue_sound(q: &mut Queue, kind: u32, id: u32, volume: Option<i64>, emitt
     env.play_pending();
 }
 
-/// The part of the entry before the sound manager is asked for a slot: the new entry's index.
-pub fn queue_begin(q: &mut Queue, kind: u32, id: u32, volume: Option<i64>) -> usize {
+/// `SndSys_PushEntry` 0x2210e8: a new default entry (no kind or id yet): the new entry's index.
+pub fn queue_push(q: &mut Queue) -> usize {
     q.count += 1;
     let i = q.count as usize;
     q.record[i] = q.header;
@@ -103,13 +103,24 @@ pub fn queue_begin(q: &mut Queue, kind: u32, id: u32, volume: Option<i64>) -> us
     q.a74[i][2] = 0x5a;
     q.a74[i][3] = 0x32;
     q.a78[i] = 0;
-    q.kind[i] = kind;
     q.a7c[i] = 1;
+    i
+}
+
+/// The entry's volume: kept whole in +0x3c, clamped to the byte 0..127 into the record.
+pub fn queue_volume(q: &mut Queue, i: usize, volume: i64) {
+    q.a3c[i] = volume as u32;
+    let v = volume as i32;
+    q.record[i][0] = if v < 0 { 0 } else if v < 0x7f { v as u8 } else { 0x7f };
+}
+
+/// The part of the entry before the sound manager is asked for a slot: the new entry's index.
+pub fn queue_begin(q: &mut Queue, kind: u32, id: u32, volume: Option<i64>) -> usize {
+    let i = queue_push(q);
+    q.kind[i] = kind;
     q.id[i] = id;
     if let Some(volume) = volume {
-        q.a3c[i] = volume as u32;
-        let v = volume as i32;
-        q.record[i][0] = if v < 0 { 0 } else if v < 0x7f { v as u8 } else { 0x7f };
+        queue_volume(q, i, volume);
     }
     i
 }

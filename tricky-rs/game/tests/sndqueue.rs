@@ -1167,3 +1167,295 @@ fn instance_collision_matches_the_original() {
         assert_eq!(orig, mine, "case {case} vel {vel:?}");
     }
 }
+
+// ---- WorldEmitter_Update ----
+
+use tricky_game::worldemitter as we;
+
+/// The oracle for `update`: every external call logs and takes a value from the case's own generator, so the
+/// original and the port see the same answers in the same order.
+struct Or2 {
+    g: Rng,
+    log: Vec<(&'static str, u64, u64)>,
+    bank: u32,
+}
+impl Or2 {
+    fn take(&mut self, name: &'static str, a: u64, b: u64) -> i64 {
+        self.log.push((name, a, b));
+        let n = self.g.next() as usize;
+        let big = self.g.next() as i64;
+        match name {
+            "slot" | "pp" | "res1" => big & 0xffff_ffff,
+            "known" => [0, 1, 1, 0x1_0000_0000][n % 4],
+            "resolve" => [0, 1, 1, 1, 1, 0x1_0000_0000][n % 6],
+            "res0" => [6, 6, 6, 6, 0, 1, 2, 5, 7][n % 9],
+            "grid" => [0, 0, 0, 1][n % 4],
+            "lrider" => [-1, 0, 1, 2, 3, 0x1_0000_0001][n % 6],
+            "amb" => [0, 0, 0, 1][n % 4],
+            "trig" => [0, 1, 1, 1][n % 4],
+            "trigbank" => [0xffff_ffff, 1, 2, big & 0xffff_ffff][n % 4],
+            "ambload" => [1, 1, 1, 0, -1, 2, 0x1_0000_0001][n % 7],
+            "hasq" | "othq" => (n % 2) as i64,
+            "vstart" => [-1, -5, 0, 7, big & 0x7f_ffff, big as i32 as i64, (1 << 40) | 3][n % 7],
+            "bank" => [0, self.bank as i64, self.bank as i64][n % 3],
+            _ => panic!("{name}"),
+        }
+    }
+}
+
+struct UEnv {
+    or: Rc<RefCell<Or2>>,
+    riders: Vec<i32>,
+    table: u32,
+    pokes: Vec<(u32, u32)>,
+}
+impl QueueEnv for UEnv {
+    fn get_slot(&mut self, which: u32) -> u32 {
+        self.or.borrow_mut().take("slot", which as u64, 0) as u32
+    }
+    fn rider_listener(&mut self) -> u32 {
+        panic!("not used")
+    }
+    fn play_pending(&mut self) -> u64 {
+        self.or.borrow_mut().take("pp", 0, 0) as u64
+    }
+}
+impl we::UpdateEnv for UEnv {
+    fn engine_volume(&mut self, handle: i32, volume: i32) {
+        self.or.borrow_mut().log.push(("eng", handle as i64 as u64, volume as u32 as u64));
+    }
+    fn bank_find(&mut self, handle: i32) -> u32 {
+        self.or.borrow_mut().take("bank", handle as i64 as u64, 1) as u32
+    }
+    fn poke(&mut self, addr: u32, v: u32) {
+        self.pokes.push((addr, v));
+    }
+    fn key_known(&mut self, addr: u32, key: u32) -> bool {
+        self.or.borrow_mut().take("known", addr as u64, key as u64) != 0
+    }
+    fn resolve(&mut self, addr: u32, key: u32, rider: u32) -> Option<(u32, u32)> {
+        let mut o = self.or.borrow_mut();
+        let f = o.take("resolve", addr as u64, (key as u64) << 32 | rider as u64);
+        let a = o.take("res0", 0, 0) as u32;
+        let b = o.take("res1", 0, 0) as u32;
+        if f != 0 {
+            Some((a, b))
+        } else {
+            None
+        }
+    }
+    fn grid_blocks(&mut self, a: u32, b: u32, addr: u32) -> bool {
+        self.or.borrow_mut().take("grid", (a as u64) << 32 | b as u64, addr as u64) != 0
+    }
+    fn rider_bank(&mut self, rider: u32) -> i32 {
+        self.riders[rider as usize]
+    }
+    fn listener_rider(&mut self) -> i64 {
+        self.or.borrow_mut().take("lrider", u64::MAX, 0)
+    }
+    fn ambient_blocked(&mut self, key: u32) -> bool {
+        self.or.borrow_mut().take("amb", key as u64, 0) != 0
+    }
+    fn load_trigger_banks(&mut self, addr: u32, key: u32, bank: &mut u32) -> bool {
+        let mut o = self.or.borrow_mut();
+        let f = o.take("trig", addr as u64, key as u64);
+        *bank = o.take("trigbank", 0, 0) as u32;
+        f != 0
+    }
+    fn load_ambient_bank(&mut self, bank: u32) -> i64 {
+        self.or.borrow_mut().take("ambload", bank as u64, 0)
+    }
+    fn has_queued(&mut self, key: u32) -> bool {
+        self.or.borrow_mut().take("hasq", key as u64, 0) != 0
+    }
+    fn is_queued_other(&mut self, a: u32) -> bool {
+        self.or.borrow_mut().take("othq", a as u64, 0) != 0
+    }
+    fn voice_table(&mut self) -> u32 {
+        self.table
+    }
+    fn voice_start(&mut self, entry: u32, arg: u32) -> i64 {
+        self.or.borrow_mut().take("vstart", entry as u64, arg as u64)
+    }
+}
+
+#[test]
+fn world_emitter_update_matches_the_original() {
+    let Some(mut r) = runner() else { return };
+    let or: Rc<RefCell<Or2>> = Rc::new(RefCell::new(Or2 { g: Rng(1), log: vec![], bank: 0 }));
+    let (_, sys, l) = setup(&mut r, 0x100);
+    let e = r.mem.alloc(0x50);
+    let grid = 0x0123_4560u32;
+    let app = r.mem.alloc(0x800);
+    let riders_at = r.mem.alloc(8 * 0x80 + 0x100);
+    let bank = r.mem.alloc(0x100);
+    or.borrow_mut().bank = bank;
+    r.mem.write_u32(0x343050, sys);
+    r.mem.write_u32(0x34370c, grid);
+    r.mem.write_u32(0x337c58, app);
+    r.mem.write_u32(app + 0x730, riders_at);
+    for a in [0x2212a0u32, 0x2210e8, 0x22d080] {
+        r.allow(a);
+    }
+    macro_rules! stub {
+        ($addr:expr, $body:expr) => {{
+            let o = or.clone();
+            let f: fn(&mut Rc<RefCell<Or2>>, &mut r5900::Cpu, &mut r5900::Mem) = $body;
+            r.stub($addr, move |c, m| {
+                let mut o = o.clone();
+                f(&mut o, c, m)
+            });
+        }};
+    }
+    stub!(0x221000, |o, c, _| {
+        assert_eq!(c.gpr(4) as u32, 0x343050 - 0x343050 + c.gpr(4) as u32);
+        o.borrow_mut().log.push(("eng", c.gpr(5), c.gpr(6) as u32 as u64));
+    });
+    stub!(0x20c200, |o, c, _| {
+        let v = o.borrow_mut().take("bank", c.gpr(5), c.gpr(6));
+        c.set_gpr(2, v as u64);
+    });
+    stub!(0x22c638, |o, c, _| {
+        let v = o.borrow_mut().take("known", c.gpr(4) as u32 as u64, c.gpr(5) as u32 as u64);
+        c.set_gpr(2, v as u64);
+    });
+    stub!(0x22c610, |o, c, m| {
+        let mut o = o.borrow_mut();
+        let f = o.take("resolve", c.gpr(4) as u32 as u64, (c.gpr(5) as u32 as u64) << 32 | c.gpr(8) as u32 as u64);
+        let a = o.take("res0", 0, 0) as u32;
+        let b = o.take("res1", 0, 0) as u32;
+        m.write_u32(c.gpr(6) as u32, a);
+        m.write_u32(c.gpr(7) as u32, b);
+        c.set_gpr(2, f as u64);
+    });
+    stub!(0x22dc88, |o, c, _| {
+        assert_eq!(c.gpr(4) as u32, 0x0123_4560);
+        let v = o.borrow_mut().take("grid", (c.gpr(5) as u32 as u64) << 32 | c.gpr(6) as u32 as u64, c.gpr(7) as u32 as u64);
+        c.set_gpr(2, v as u64);
+    });
+    stub!(0x20ed20, |o, c, _| {
+        let v = o.borrow_mut().take("lrider", c.gpr(5), 0);
+        c.set_gpr(2, v as u64);
+    });
+    stub!(0x22dc38, |o, c, _| {
+        assert_eq!(c.gpr(4) as u32, 0x0123_4560);
+        let v = o.borrow_mut().take("amb", c.gpr(5) as u32 as u64, 0);
+        c.set_gpr(2, v as u64);
+    });
+    stub!(0x22c648, |o, c, m| {
+        let mut o = o.borrow_mut();
+        let f = o.take("trig", c.gpr(4) as u32 as u64, c.gpr(5) as u32 as u64);
+        let b = o.take("trigbank", 0, 0) as u32;
+        assert_eq!(c.gpr(6) as u32, c.gpr(4) as u32 + 0x40);
+        m.write_u32(c.gpr(6) as u32, b);
+        c.set_gpr(2, f as u64);
+    });
+    stub!(0x21a548, |o, c, _| {
+        let v = o.borrow_mut().take("ambload", c.gpr(5) as u32 as u64, 0);
+        c.set_gpr(2, v as u64);
+    });
+    stub!(0x22e240, |o, c, _| {
+        assert_eq!(c.gpr(4) as u32, 0x0123_4560);
+        let v = o.borrow_mut().take("hasq", c.gpr(5) as u32 as u64, 0);
+        c.set_gpr(2, v as u64);
+    });
+    stub!(0x22e270, |o, c, _| {
+        assert_eq!(c.gpr(4) as u32, 0x0123_4560);
+        let v = o.borrow_mut().take("othq", c.gpr(5) as u32 as u64, 0);
+        c.set_gpr(2, v as u64);
+    });
+    stub!(0x211f38, |o, c, _| {
+        let v = o.borrow_mut().take("slot", c.gpr(5) as u32 as u64, 0);
+        c.set_gpr(2, v as u64);
+    });
+    stub!(0x20c948, |o, c, _| {
+        let v = o.borrow_mut().take("pp", 0, 0);
+        c.set_gpr(2, v as u64);
+    });
+    stub!(0x21fc98, |o, c, _| {
+        let v = o.borrow_mut().take("vstart", c.gpr(4) as u32 as u64, c.gpr(6) as u32 as u64);
+        c.set_gpr(2, v as u64);
+    });
+    let mut g = Rng(0x7e57_ab1e_0dd5_1de5);
+    let mut seen = [0u32; 8];
+    for case in 0..40_000 {
+        fill(&mut r, sys, &l, &mut g);
+        r.mem.write_u32(sys + 4, 0);
+        let table = if g.next() % 4 == 0 { 0 } else { 0x0010_0000 + g.next() % 0x1000 };
+        r.mem.write_u32(sys + 0x372c, table);
+        let riders: Vec<i32> = (0..8).map(|_| [-1, 0, 1, 2, 3][g.next() as usize % 5]).collect();
+        for (k, v) in riders.iter().enumerate() {
+            r.mem.write_u32(riders_at + 0x80 * k as u32 + 0xa4, *v as u32);
+        }
+        let vol = [
+            0.0f32,
+            1.0,
+            0.5,
+            -0.5,
+            0.3,
+            1.7,
+            100.0,
+            1.0e10,
+            -1.0e10,
+            f32::NAN,
+            f32::INFINITY,
+            f32::from_bits(g.next()),
+            (g.next() % 400) as f32 / 100.0 - 1.0,
+        ][g.next() as usize % 13];
+        let handle = [0xffff_ffffu32, 0xffff_ffff, 0xffff_ffff, 0xffff_ffff, 0, 5, 0x8000_0001, g.next()][g.next() as usize % 8];
+        let words: Vec<u32> = (0..20)
+            .map(|k| match k {
+                0 => 1,
+                1 | 2 | 3 => g.next() % 4,
+                4 => vol.to_bits(),
+                5 => [0, 1, g.next()][g.next() as usize % 3],
+                0xc => handle,
+                0xe => [0, 1, 2][g.next() as usize % 3],
+                0xf => g.next() % 8,
+                0x10 => [0xffff_ffff, 0xffff_ffff, 7, g.next()][g.next() as usize % 4],
+                _ => g.next(),
+            })
+            .collect();
+        for (k, w) in words.iter().enumerate() {
+            r.mem.write_u32(e + 4 * k as u32, *w);
+        }
+        r.mem.write_u32(bank + 0x64, 0xdead_beef);
+        let before = read(&mut r, &l);
+        let seed = g.next() as u64 | 1;
+        or.borrow_mut().g = Rng(seed);
+        or.borrow_mut().log.clear();
+        r.cpu.set_gpr(4, e as u64);
+        r.call(0x22bf60).unwrap_or_else(|er| panic!("case {case}: {er}"));
+        let orig = std::mem::take(&mut or.borrow_mut().log);
+        let after = read(&mut r, &l);
+        let ew: Vec<u32> = (0..20).map(|k| r.mem.read_u32(e + 4 * k)).collect();
+        let bw = r.mem.read_u32(bank + 0x64);
+        let mut q = before.clone();
+        let mut m = words.clone();
+        or.borrow_mut().g = Rng(seed);
+        let mut env = UEnv { or: or.clone(), riders: riders.clone(), table, pokes: vec![] };
+        we::update(&mut m, e, &mut q, &mut env);
+        let mine = std::mem::take(&mut or.borrow_mut().log);
+        assert_eq!(orig, mine, "case {case} words {words:x?}");
+        assert_eq!(ew, m, "case {case} record {words:x?}");
+        assert_eq!(after, q, "case {case} queue {words:x?}");
+        let want = env.pokes.last().map(|p| p.1).unwrap_or(0xdead_beef);
+        assert!(env.pokes.iter().all(|p| p.0 == bank + 0x64));
+        assert_eq!(bw, want, "case {case} poke");
+        // which path
+        let path = if handle != 0xffff_ffff {
+            if words[0xe] != 0 { 0 } else if mine.iter().any(|x| x.0 == "bank" && x.1 != 0) { 1 } else { 2 }
+        } else if mine.iter().any(|x| x.0 == "vstart") {
+            3
+        } else if mine.iter().any(|x| x.0 == "pp") {
+            4
+        } else if ew[0xc] == 0xffff_ffff && ew[0] == 0 {
+            5
+        } else {
+            6
+        };
+        seen[path] += 1;
+    }
+    eprintln!("update paths {seen:?}");
+    assert!(seen[..7].iter().all(|n| *n > 100), "{seen:?}");
+}

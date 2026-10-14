@@ -241,3 +241,150 @@ pub fn gather_for_listener(m: &dyn Mem, sys: u32, listener: u32, arg3: u64, env:
         node = m.u32(node + 4);
     }
 }
+
+/// The game's `(int)(v * 127.0)` (`mul.s`, `cvt.w.s`: toward zero, out of range or NaN by the sign).
+fn volume_int(v: f32) -> i32 {
+    let f = v * 127.0;
+    let bits = f.to_bits();
+    if (bits >> 23) & 0xff >= 158 {
+        if bits >> 31 != 0 {
+            i32::MIN
+        } else {
+            i32::MAX
+        }
+    } else {
+        f as i32
+    }
+}
+
+/// What `WorldEmitter_Update` calls out to.
+pub trait UpdateEnv: crate::sndqueue::QueueEnv {
+    /// 0x221000 (the audio system, the handle, the volume).
+    fn engine_volume(&mut self, handle: i32, volume: i32);
+    /// `BankMonitor_Find` 0x20c200 (the audio system, the handle, 1): the monitor or 0.
+    fn bank_find(&mut self, handle: i32) -> u32;
+    /// A word stored to the monitor.
+    fn poke(&mut self, addr: u32, v: u32);
+    /// 0x22c638 (the record, its key).
+    fn key_known(&mut self, addr: u32, key: u32) -> bool;
+    /// 0x22c610 (the record, its key, two out words, the rider): the two words when it finds the sound.
+    fn resolve(&mut self, addr: u32, key: u32, rider: u32) -> Option<(u32, u32)>;
+    /// 0x22dc88 (the grid at 0x34370c, +4, +8, the record).
+    fn grid_blocks(&mut self, a: u32, b: u32, addr: u32) -> bool;
+    /// `*(gApp[0x730] + rider * 0x80 + 0xa4)`.
+    fn rider_bank(&mut self, rider: u32) -> i32;
+    /// `Audio_GetListenerRider` 0x20ed20 (the audio system, -1).
+    fn listener_rider(&mut self) -> i64;
+    /// 0x22dc38 (the grid, the key).
+    fn ambient_blocked(&mut self, key: u32) -> bool;
+    /// 0x22c648 (the record, the key, the record's +0x40): the bank written through the pointer.
+    fn load_trigger_banks(&mut self, addr: u32, key: u32, bank: &mut u32) -> bool;
+    /// `Audio_LoadAmbientBank` 0x21a548 (the audio system, the bank).
+    fn load_ambient_bank(&mut self, bank: u32) -> i64;
+    /// 0x22e240 (the grid, the key).
+    fn has_queued(&mut self, key: u32) -> bool;
+    /// 0x22e270 (the grid, +4).
+    fn is_queued_other(&mut self, a: u32) -> bool;
+    /// The audio system's +0x372c.
+    fn voice_table(&mut self) -> u32;
+    /// 0x21fc98 (the table entry, the audio system, the second word).
+    fn voice_start(&mut self, entry: u32, arg: u32) -> i64;
+}
+
+/// 0x2212a0: start the voice of the last queued entry and drop the entry; the handle (-1 without a table).
+fn finish_voice(q: &mut crate::sndqueue::Queue, env: &mut dyn UpdateEnv, arg: u32) -> u32 {
+    let table = env.voice_table();
+    if table == 0 {
+        return 0xffff_ffff;
+    }
+    let i = q.count as usize;
+    let r = env.voice_start(q.a68[i].wrapping_mul(400).wrapping_add(table), arg);
+    let mut v = r as u32;
+    if r >= 0 {
+        v = (r as u32) << 8 | q.a68[i];
+    }
+    q.count -= 1;
+    v
+}
+
+/// `WorldEmitter_Update` 0x22bf60: keep a record's voice going. With a voice handle: pass the volume on to the
+/// engine it is in. Without one: look the sound up and either put a voice on the queue (the engine kind, at once)
+/// or queue a sound (the other kind, behind the grid's checks and the ambient bank for kind 6), or free the
+/// record when anything refuses. `addr` is the record's address.
+pub fn update(e: &mut [u32], addr: u32, q: &mut crate::sndqueue::Queue, env: &mut dyn UpdateEnv) {
+    use crate::sndqueue::{queue_begin, queue_push, queue_volume};
+    let handle = e[0xc];
+    if handle != 0xffff_ffff {
+        let v = volume_int(f32::from_bits(e[4]));
+        if e[0xe] != 0 {
+            env.engine_volume(handle as i32, v);
+            return;
+        }
+        let b = env.bank_find(handle as i32);
+        if b != 0 {
+            env.poke(b.wrapping_add(0x64), v as u32);
+        }
+        return;
+    }
+    if env.key_known(addr, e[3]) {
+        let Some((_, arg)) = env.resolve(addr, e[3], e[0xf]) else {
+            clear(e);
+            return;
+        };
+        e[0xe] = 1;
+        let i = queue_push(q);
+        queue_volume(q, i, volume_int(f32::from_bits(e[4])) as i64);
+        q.a40[i] = env.get_slot(4);
+        if e[5] != 0 {
+            q.a78[i] = 1;
+            q.emitter[i] = addr.wrapping_add(0x20);
+            q.a7c[i] = 0;
+        }
+        q.a68[i] = e[0xf];
+        e[0xc] = finish_voice(q, env, arg);
+        return;
+    }
+    if env.grid_blocks(e[1], e[2], addr) {
+        clear(e);
+        return;
+    }
+    let Some((kind, id)) = env.resolve(addr, e[3], e[0xf]) else {
+        clear(e);
+        return;
+    };
+    e[0xe] = 0;
+    let mut loaded: i64 = -1;
+    if kind == 6 {
+        let mine = env.rider_bank(e[0xf]) as i64;
+        let listener = env.listener_rider();
+        if mine != listener || env.ambient_blocked(e[3]) {
+            clear(e);
+            return;
+        }
+        if e[0x10] == 0xffff_ffff {
+            let mut bank = e[0x10];
+            let ok = env.load_trigger_banks(addr, e[3], &mut bank);
+            e[0x10] = bank;
+            if !ok {
+                clear(e);
+                return;
+            }
+        }
+        loaded = env.load_ambient_bank(e[0x10]);
+    }
+    if env.has_queued(e[3]) && !env.is_queued_other(e[1]) {
+        clear(e);
+        return;
+    }
+    if kind == 6 && loaded != 1 {
+        return;
+    }
+    let i = queue_begin(q, kind, id, Some(volume_int(f32::from_bits(e[4])) as i64));
+    q.a40[i] = env.get_slot(4);
+    if e[5] != 0 {
+        q.a78[i] = 1;
+        q.emitter[i] = addr.wrapping_add(0x20);
+        q.a7c[i] = 0;
+    }
+    e[0xc] = env.play_pending() as u32;
+}

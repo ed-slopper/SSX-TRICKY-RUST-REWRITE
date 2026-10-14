@@ -268,3 +268,11 @@ system (record copy of +0x08..0x20 via +0x24, emitter inline at +0x28, +0x38, vo
 +0xa44), then `SndMgr_GetSlot(4)`, `Audio_GetRiderListener`, `SndSys_PlayPending`. The inline arrays at +0x44 would run
 into the pointers at +0x64 from the fourth entry, so the queue never holds more than three. `queue_sound` is that entry;
 `update_air` is `Sfx_UpdateAir` (tests/sndqueue.rs).
+
+`WorldEmitter_Update` 0x22bf60 (`worldemitter::update`, tests/sndqueue.rs) keeps one emitter record's voice going. With a
+handle (+0x30): the volume `(int)(v * 127.0)` goes to 0x221000 when +0x38 is set, else into the bank monitor
+(`BankMonitor_Find`) at +0x64. Without one, and the key known (0x22c638): the entry is pushed (0x2210e8, the same default
+entry as above with no kind or id), 0x2212a0 starts the voice and drops the entry again (count is left alone when the
+audio system has no voice table at +0x372c), and the handle becomes `handle << 8 | rider`. Otherwise the grid may refuse
+(0x22dc88), kind 6 needs the rider to be the listener's, the trigger banks and the ambient bank loaded (it only queues when
+that returns 1), and a full entry is queued whose `PlayPending` result is the handle; any refusal frees the record.
