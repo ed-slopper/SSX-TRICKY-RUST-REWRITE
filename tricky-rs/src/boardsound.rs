@@ -13,83 +13,49 @@ use crate::{ui, LevelRes, Mode, RiderRes};
 use bevy::audio::{PlaybackMode, Volume};
 use bevy::prelude::*;
 use std::collections::HashMap;
+use tricky_game::sfxcalc::{board_input, run_snow_program, BoardIn};
 
-#[derive(Clone, Debug)]
-enum Op { Load(String), Num(f32), Map(f32), Square, Sqrt, Add(f32), Sub(f32), Mul(f32), Div(f32), Bound(f32, f32), Push, Pop, SAdd, SSub, SMul, SDiv, Neg, Abs, Vol, Bend, Nop }
-
-/// The snow sound programs: per surface section name, per sub-section (GLIDE, AIGLIDE, CARVE).
+/// The snow sound programs as `Sfx_LoadSurfaceConfig` compiles them (`tricky_data::snowsfx`): per surface section
+/// name, per sub-section (GLIDE, AIGLIDE, CARVE), the game's own bytes, run by `sfxcalc::run_snow_program`.
 #[derive(Default)]
-struct Programs(HashMap<(String, String), Vec<Op>>);
+struct Programs(HashMap<(String, String), Vec<u8>>);
 
 impl Programs {
-    /// The programs as the game compiles SNOW.INF (`Sfx_LoadSurfaceConfig` / `Sfx_LoadBoardConfig`, row E5b2:
-    /// `tricky_data::snowsfx`), read back into instructions for `run`. STANDIN: `run` is ours (the game's interpreter
-    /// is not found yet); a LOAD of an input past 4 and LOG run as nothing.
     fn parse(text: &str) -> Self {
-        use tricky_data::snowsfx::{compile_all, decode, Op as G, MODES, SURFACES};
+        use tricky_data::snowsfx::{compile_all, MODES, SURFACES};
         let mut out = HashMap::new();
-        for (mi, progs) in compile_all(text.as_bytes()).iter().enumerate() {
-            for (si, p) in progs.iter().enumerate() {
-                let ops = decode(p).into_iter().map(|g| match g {
-                    G::Load(i) => match i { 0 => Op::Load("slip".into()), 1 => Op::Load("dig".into()), 2 => Op::Load("lean".into()), 3 => Op::Load("board".into()), 4 => Op::Load("bend".into()), _ => Op::Nop },
-                    G::LoadConst(n) => Op::Num(n as f32),
-                    G::Map(n) => Op::Map(n as f32),
-                    G::Square => Op::Square,
-                    G::Sqrt => Op::Sqrt,
-                    G::Log => Op::Nop,
-                    G::Add(n) => Op::Add(n as f32),
-                    G::Sub(n) => Op::Sub(n as f32),
-                    G::Mul(n) => Op::Mul(n as f32),
-                    G::Div(n) => Op::Div(n as f32),
-                    G::Neg => Op::Neg,
-                    G::Abs => Op::Abs,
-                    G::Bound(lo, hi) => Op::Bound(lo as f32, hi as f32),
-                    G::Push => Op::Push,
-                    G::Pop => Op::Pop,
-                    G::SAdd => Op::SAdd,
-                    G::SSub => Op::SSub,
-                    G::SMul => Op::SMul,
-                    G::SDiv => Op::SDiv,
-                    G::AssignVol => Op::Vol,
-                    G::AssignBend => Op::Bend,
-                }).collect();
-                out.insert((SURFACES[si].to_string(), MODES[mi].to_string()), ops);
+        for (mi, progs) in compile_all(text.as_bytes()).into_iter().enumerate() {
+            for (si, p) in progs.into_iter().enumerate() {
+                out.insert((SURFACES[si].to_string(), MODES[mi].to_string()), p);
             }
         }
         Self(out)
     }
-    /// Run a program: (volume, bend), both 0..127 (bend 64 = no change).
-    fn run(&self, surface: &str, part: &str, inp: &Inputs) -> Option<(f32, f32)> {
-        let ops = self.0.get(&(surface.to_string(), part.to_string()))?;
-        let (mut acc, mut st, mut vol, mut bend) = (0.0f32, Vec::<f32>::new(), 0.0f32, 64.0f32);
-        for op in ops {
-            match op {
-                Op::Load(n) => acc = match n.as_str() { "slip" => inp.slip, "dig" => inp.dig, "lean" => inp.lean, "board" | "load" => inp.load, "bend" => inp.bend, _ => 0.0 },
-                Op::Num(v) => acc = *v,
-                Op::Map(k) => acc = if *k != 0.0 { (acc * 127.0 / k).clamp(0.0, 127.0) } else { 0.0 },
-                Op::Square => acc *= acc,
-                Op::Sqrt => acc = acc.max(0.0).sqrt(),
-                Op::Add(v) => acc += v, Op::Sub(v) => acc -= v, Op::Mul(v) => acc *= v,
-                Op::Div(v) => if *v != 0.0 { acc /= v },
-                Op::Bound(a, b) => acc = acc.clamp(a.min(*b), b.max(*a)),
-                Op::Push => st.push(acc),
-                Op::Pop => acc = st.pop().unwrap_or(0.0),
-                Op::SAdd | Op::SSub | Op::SMul | Op::SDiv => {
-                    let (b, a) = (st.pop().unwrap_or(0.0), st.pop().unwrap_or(0.0));
-                    st.push(match op { Op::SAdd => a + b, Op::SSub => a - b, Op::SMul => a * b, _ => if b != 0.0 { a / b } else { 0.0 } });
-                }
-                Op::Neg => acc = -acc, Op::Abs => acc = acc.abs(),
-                Op::Vol => vol = acc, Op::Bend => bend = acc,
-                Op::Nop => {}
-            }
-        }
-        Some((vol.clamp(0.0, 127.0), bend.clamp(0.0, 127.0)))
+    /// Run a program as the game's interpreter does (`FUN_0021ae90` 0x21ae90): (volume, bend), both 0..127
+    /// (bend 64 = no change). A program that divides by zero stops there (the original's `break 7`) and gives nothing.
+    fn run(&self, surface: &str, part: &str, b: &BoardIn) -> Option<(f32, f32)> {
+        let prog = self.0.get(&(surface.to_string(), part.to_string()))?;
+        let mut w = [0i32; 0x14];
+        let (mut vol, mut bend) = (0i32, 64i32);
+        run_snow_program(prog, &mut w, &mut |n| board_input(n, b), &mut vol, &mut bend).ok()?;
+        Some(((vol as f32).clamp(0.0, 127.0), (bend as f32).clamp(0.0, 127.0)))
     }
 }
 
-/// The game values the programs read (`BoardIn_*`), in cm/s and cm/s².
-#[derive(Default, Clone, Copy)]
-struct Inputs { load: f32, slip: f32, dig: f32, lean: f32, bend: f32 }
+/// The rider fields the programs read (`BoardIn_*`): the game-side rider's forward in the ground plane (+0x320),
+/// velocity (+0x150, cm/s), forward drag (+0x160) and steer (+0x214); before the first ground tick, the port's.
+fn board_in(r: &Rider) -> BoardIn {
+    match &r.gm {
+        Some(c) => {
+            let g = c.rider();
+            BoardIn { normal: g.p.plane_fwd, vel: g.vel, f160: g.drag, f214: g.steer }
+        }
+        None => {
+            let (f, v) = (r.forward(), r.vel * 100.0);
+            BoardIn { normal: [f.x, f.y, f.z, 0.0], vel: [v.x, v.y, v.z, 0.0], f160: 0.0, f214: r.input.steer }
+        }
+    }
+}
 
 /// The surface groups (`Audio_SurfaceGroup`) and their snow.inf sections.
 fn group(surface: u8) -> (usize, &'static str) {
@@ -172,7 +138,7 @@ pub fn setup_board_sound(mut commands: Commands, level: Res<LevelRes>, mut asset
 
 /// What changed since last frame.
 #[derive(Default)]
-pub struct Last { vel: Vec3, grounded: bool, crashed: bool, grab: u8, boosting: bool, mult: u32, speed_t: f32, spin_t: f32, respawns: u32, uber: bool, group: Option<usize>, fwd_speed: f32, slip: f32 }
+pub struct Last { vel: Vec3, grounded: bool, crashed: bool, grab: u8, boosting: bool, mult: u32, speed_t: f32, spin_t: f32, respawns: u32, uber: bool, group: Option<usize> }
 
 #[allow(clippy::too_many_arguments)]
 pub fn board_sound(
@@ -192,13 +158,7 @@ pub fn board_sound(
     // the game values, in cm/s
     let fwd = r.forward();
     let load = r.vel.dot(fwd).abs() * 100.0;
-    // slip: how hard the snow is slowing the board along its length (the forward drag)
-    let decel = ((last.fwd_speed - load) / dt).max(0.0);
-    last.slip += (decel - last.slip) * (1.0 - (-dt * 20.0).exp());
-    last.fwd_speed = load;
-    let dig = r.input.steer.abs() * 127.0;
-    let lean = load / 4.0 + 2.0 * last.slip;
-    let inp = Inputs { load, slip: last.slip, dig, lean, bend: lean + load };
+    let inp = board_in(r);
     let on_ground = (r.grounded || r.rail.is_some()) && r.crashed <= 0.0;
     // on a rail: the RAIL programs and samples (group 6)
     let (g, sect) = if r.rail.is_some() { (6, "RAIL") } else { group(r.surface) };
@@ -269,7 +229,7 @@ pub fn board_sound(
         if r.boost <= 0.0 { play(&mut commands, "sfx_108", 0.8, 1.0); }
     }
     *last = Last { vel: r.vel, grounded: r.grounded || r.rail.is_some(), crashed: r.crashed > 0.0, grab: r.grab, boosting: r.boosting, mult: r.multiplier, speed_t: r.speed_timer, spin_t: r.spin_timer,
-        respawns: r.respawns, uber: r.uber_ready(), group: last.group, fwd_speed: last.fwd_speed, slip: last.slip };
+        respawns: r.respawns, uber: r.uber_ready(), group: last.group };
 }
 
 #[cfg(test)]
@@ -279,9 +239,11 @@ mod tests {
     fn snow_inf() {
         let text = "[PACK]\n[ICE]\n    [GLIDE]\n        Load Dig\n        Map 127\n        AssignVol\n        Load 64\n        AssignBend\n[POWDER]\n    [GLIDE]\n        Load Slip\n        Bound 0, 10\n        AssignVol\n";
         let p = Programs::parse(text);
-        let inp = Inputs { dig: 100.0, slip: 50.0, ..Default::default() };
-        assert_eq!(p.run("ICE", "GLIDE", &inp), Some((100.0, 64.0)));
-        assert_eq!(p.run("PACK", "GLIDE", &inp), Some((100.0, 64.0)));
-        assert_eq!(p.run("POWDER", "GLIDE", &inp).map(|v| v.0), Some(10.0));
+        let b = BoardIn { normal: [1.0, 0.0, 0.0, 0.0], vel: [300.0, 0.0, 0.0, 0.0], f160: -50.0, f214: 0.5 };
+        let ice = p.run("ICE", "GLIDE", &b).unwrap();
+        let pow = p.run("POWDER", "GLIDE", &b).unwrap();
+        assert_eq!(ice.1, 64.0);
+        assert!(ice.0 >= 0.0 && ice.0 <= 127.0);
+        assert!(pow.0 <= 10.0);
     }
 }
