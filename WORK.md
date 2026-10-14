@@ -239,6 +239,7 @@ matches the original.
 | G10k | The speech library's bank and event tables (`tricky_game::speechlib`: 0x2bb018–0x2bba50, 28 functions, six tests, 160,000 random memory images, 11 mutants killed) | P2 | trailrig/heron | 2026-10-13 | 30dd975 |
 | G10l1 | The speech library's random numbers and variant history (`speechlib`: `rand`, `seed_rand`, `init_history`, `push_history`, `find_in_history`, `pick_variant`, `mask_match`; 0x2be650–0x2be908; 70,000 cases, 12 mutants killed, the rest equivalent) | P2 | trailrig/heron | 2026-10-13 | d812f6e |
 | G10l2 | The speech library's event queue and bit test (`speechlib`: `queue_event` 0x2bdb68, `clear_queue`, `has_queued`, `clear_flags`, `test_bit`; 40,000 cases, 13 mutants killed bar one equivalent) | P2 | trailrig/heron | 2026-10-13 | f368c00 |
+| G10l3 | The speech library's free voice, shuffle and pending event (`speechlib`: `free_voice` 0x2bc200, `shuffle` 0x2bd198, 0x2bc738..0x2bc788; 55,000 cases, 7 of 8 mutants killed, the other a boundary) | P2 | trailrig/heron | 2026-10-13 | 757bea9 |
 | G4i | `racemisc.rs`: `Game_GetLeadingPlayer`, `Game_MoveLeaderToSlot0`, `Race_FindPlayerRiders`, `Game_IsLeadOrFocusRider` against the original (tests/racemisc.rs, 40,000 cases); the shell sort and `FUN_0016c228` were already in roster.rs / circuit.rs | P2 | trailrig/heron | 2026-10-12 | 59e9b3c |
 | G4j | `results.rs`: `cAI::vf17_111820`, the race results (times, stat blocks, show-off point thresholds, the human columns, career best-stats calls, ranking) against the original with the career/boarder calls logged (tests/results.rs, 30,000 cases) | P2 | trailrig/heron | 2026-10-12 | 3824ca2 |
 | E11a | `camera.rs`: `CamCamera_EvalPosition` 0x16e900 (orbit offset from the target's direction and matrices, the two eased angles, two axis-angle rotations, stage area, collision call, shake table) against the original with the stage and collision calls logged (tests/camera.rs, 60,000 cases; seven mutations of the port all fail the test) | P2 | trailrig/heron | 2026-10-12 | bab3175 |
@@ -942,3 +943,4 @@ matches the original.
 - 2026-10-13 ed-slopper/puffin: G12l done.
 
 - 2026-10-13 trailrig/heron: G10l2 done (speech library queue; a ninth event leaves the count at nine).
+- 2026-10-13 trailrig/heron: G10l3 done (free voice, shuffle, pending event). G10l left: the service loop 0x2bc548 / 0x2bc5e0, the voice start 0x2bbdd0..0x2bd928 and the rest, all entangled with the SPU calls.
