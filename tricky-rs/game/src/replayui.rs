@@ -1,7 +1,7 @@
 //! The instant replay's on-screen controls and the race menu's replay page (board rows G12n, G12o), on the game's
 //! bytes (`pf::Mem`), checked in the function runner (`tests/replayui.rs`). The drawing is the draw calls the game
-//! makes (`DrawEnv`); the panel's four larger drawings (0x1edef0, 0x1ed490, 0x1eee00, `HUD_DrawStartSelectPrompt`)
-//! and the constructors' fonts and strings are not here yet.
+//! makes (`DrawEnv`, `PanelEnv`). The constructors' fonts and strings and the renderer's screen-space switch
+//! (0x1ee660 / 0x1ee6e8) are not here yet.
 //!
 //! `cReplayControlOverlay` (the controls shown while a replay plays, a `cBackdropOverlay`):
 //! - +0x350 the panel's y (sliding to its mode's), +0x354 / +0x358 the y for modes 1 / 2 (480.0 for 0),
@@ -843,9 +843,6 @@ pub trait DrawEnv {
     fn chase_index(&mut self) -> i32;
     /// `Camera_GetPreset` 0x1786c0
     fn camera_preset(&mut self) -> u32;
-    /// The panel's other drawings, not ported yet: 0x1edef0, 0x1ed490, 0x1eee00 (full controls) and
-    /// `HUD_DrawStartSelectPrompt` 0x1ee720
-    fn sub_draw(&mut self, func: u32, o: u32);
     /// `Backdrop_DrawFrame` 0x1a9bb8 (y, the backdrop, 15)
     fn backdrop_frame(&mut self, y: f32, b: u32, a1: u32);
     /// `Overlay_DrawMenuList` 0x1aa630 (x, y, scale, the backdrop, 12, 0, the items' strings, 3, the selection,
@@ -865,7 +862,7 @@ const TENTH: u32 = 0x3dcccccd;
 /// off (+0x498). The panel, when it moves or is up: a dark box over the screen below it (all of the screen, darker,
 /// when hidden), and its frame from sprite 0x37 scaled to 340 wide in two halves. The up / down arrows (sprites 0x61,
 /// then 0x65 at the top mode or 0x64) left of "more" / "less". Then the camera's line and the other parts.
-pub fn draw(m: &mut Mem, env: &mut dyn DrawEnv, o: u32) {
+pub fn draw(m: &mut Mem, env: &mut dyn PanelEnv, o: u32) {
     if m.r32(race(m) + 0x34) != 0 || m.r32(o + 0x498) != 0 {
         return;
     }
@@ -934,13 +931,13 @@ pub fn draw(m: &mut Mem, env: &mut dyn DrawEnv, o: u32) {
     }
     env.renderer(0x1d4, 13, 0);
     if m.r32(o + at::FULL) != 0 {
-        env.sub_draw(0x1edef0, o);
-        env.sub_draw(0x1ed490, o);
+        draw_strip(m, env, o);
+        draw_timeline(m, env, o);
         cam_info(m, env, o);
-        env.sub_draw(0x1eee00, o);
+        draw_key(m, env, o);
     } else {
         cam_info(m, env, o);
-        env.sub_draw(0x1ee720, o);
+        draw_prompt(m, env, o);
     }
     env.renderer(0x1c4, 1, 0);
 }
@@ -1119,4 +1116,520 @@ pub fn set_replay_mode(m: &mut Mem, env: &mut dyn MiscEnv, on: u32, rider: u32) 
     let target = m.r32(m.r32(m.r32(w + i.wrapping_mul(4) + 0x8c)) + 0x460);
     env.set_chase_params(target);
     env.select_preset(7);
+}
+
+// ---- the panel's larger drawings (G12p) ----
+
+/// What the panel's larger drawings call out to besides `DrawEnv`
+pub trait PanelEnv: DrawEnv {
+    /// `HUD_DrawBar` 0x1a9f80 (x, y, w, h, the overlay, 1 the fill or 2 the frame)
+    #[allow(clippy::too_many_arguments)]
+    fn bar(&mut self, x: f32, y: f32, w: f32, h: f32, o: u32, kind: u32);
+    /// `Draw_Line` 0x19c1e8 (x0, y0, x1, y1, the font colour 0x337fe8)
+    fn line(&mut self, x0: f32, y0: f32, x1: f32, y1: f32);
+    /// 0x19b108 (x, y, w, h, the font colour): a filled rectangle
+    fn fill_rect(&mut self, x: f32, y: f32, w: f32, h: f32);
+    /// 0x1ee660 / 0x1ee6e8 (the overlay): the renderer into and out of screen space (its virtuals +0x8c, +0xb4 with
+    /// 0, 0, 512, 448, 0, 1000, and +0x10c; then +0x94)
+    fn screen_space(&mut self, begin: bool, o: u32);
+}
+
+/// A word converted to a float as unsigned (the halve-and-double the compiler emits for the top bit)
+fn u2f(v: u32) -> F {
+    if (v as i32) >= 0 {
+        F(v as i32 as f32)
+    } else {
+        let h = F(((v >> 1) | (v & 1)) as i32 as f32);
+        h + h
+    }
+}
+fn i2f(v: u32) -> F {
+    F(v as i32 as f32)
+}
+fn fword(m: &Mem, a: u32) -> F {
+    F(fl(m, a))
+}
+
+/// The whole replay as a strip 409.6 wide (0x1edef0, full controls, while the panel moves or is up): the strip, the
+/// cuts as ticks (the one at the frame in green-white when paused), the highlights as bars (clipped at the end), the
+/// highlight being made, the frame, and the playing head (sprite 42) at the frame
+pub fn draw_strip(m: &mut Mem, env: &mut dyn PanelEnv, o: u32) {
+    if m.r32(o + at::MOVED) == 0 && m.r32(o + at::MODE) == 0 {
+        return;
+    }
+    env.screen_space(true, o);
+    let p4 = f32::from_bits(P4);
+    let hidden = m.r32(o + at::HIDDEN) != 0;
+    let c0 = if hidden { [1.0, p4, p4, p4] } else { [1.0; 4] };
+    let c1 = [f32::from_bits(0x3f333333), 1.0, 1.0, 0.0];
+    let c2 = if hidden { [1.0, p4, 0.0, 0.0] } else { [f32::from_bits(0x3f4ccccd), 1.0, 0.0, 0.0] };
+    let c3 = if hidden { [0.5, p4, 0.0, 0.0] } else { [0.5, 1.0, 0.0, 0.0] };
+    let c4 = if hidden { [1.0, p4, p4, 0.0] } else { [1.0, 1.0, f32::from_bits(0x3f60e0e1), f32::from_bits(0x3e0c8c8d)] };
+    let frame = i2f(m.r32(mgr(m) + rm::FRAME));
+    let end = u2f(m.r32(o + at::END_FRAME));
+    let x0 = (fword(m, o + 0x36c) * fb(0x3f4ccccd) - fb(0x434ccccd)).0;
+    let y = (fword(m, o + at::Y) * fb(0x3f6eeeef) + fb(0x41d05f41)).0;
+    let wide = fb(0x43cccccd);
+    env.renderer(0x1e4, 3, 0);
+    env.set_color(c0);
+    env.bar(x0, y, wide.0, 9.0, o, 1);
+    env.renderer(0x1f4, u32::MAX, 0);
+    let head = frame / end;
+    if m.r32(o + at::FULL) != 0 {
+        let t = m.r32(o + 0x3ec);
+        let mut i = 1u32;
+        while (i as i32) < m.r32(t) as i32 {
+            let c = rm::cam_track_cut_frame(m, t, i);
+            let g = mgr(m);
+            if m.r32(g + rm::MODE) == 3 && c == m.r32(g + rm::FRAME) {
+                env.set_color(c1);
+            } else {
+                m.w32(FONT_COLOR + 0xc, 0);
+                m.w32(FONT_COLOR, 0x3f4ccccd);
+                m.w32(FONT_COLOR + 4, 1.0f32.to_bits());
+                m.w32(FONT_COLOR + 8, 0);
+            }
+            i += 1;
+            let x = F(x0) + i2f(c) / end * wide;
+            let top = (F(y) - F(6.0)).0;
+            env.line(x.0, top, x.0, y);
+            let x = x + F(1.0);
+            env.line(x.0, top, x.0, y);
+        }
+    }
+    env.set_color(c4);
+    let mut on_head = false;
+    let mut i = 0u32;
+    while (i as i32) < m.r32(o + at::HL_COUNT) as i32 {
+        let h = m.r32(o + at::HL + 4 * i);
+        let start = u2f(m.r32(m.r32(h) + 0x20));
+        let mut len = u2f(m.r32(h + 4));
+        let at_x = start / end * wide;
+        if u2f(m.r32(o + at::END_FRAME)).0 < (start + len).0 {
+            len = u2f(m.r32(o + at::END_FRAME)) - start;
+        }
+        env.bar((F(x0) + at_x).0, y, (len / end * wide).0, 9.0, o, 1);
+        if i2f(m.r32(m.r32(m.r32(o + at::HL + 4 * i)) + 0x20)).0 == frame.0 {
+            on_head = true;
+        }
+        i += 1;
+    }
+    if m.r32(o + at::FULL) != 0 && m.r32(o + at::HIGHLIGHTING) != 0 {
+        env.set_color(c3);
+        let from = m.r32(o + at::HL_FROM);
+        let x = F(x0) + i2f(from) / end * wide;
+        let w = i2f(m.r32(mgr(m) + rm::FRAME).wrapping_sub(from)) / end * wide;
+        env.bar(x.0, y, w.0, 9.0, o, 1);
+    }
+    env.set_color(c0);
+    env.bar(x0, y, wide.0, 9.0, o, 2);
+    env.set_color(if on_head { c1 } else { c2 });
+    let hx = F(x0) + head * wide;
+    let r = env.sprite_rect(m.r32(o), 42);
+    let w = F(5.0) / fword(m, r + 4);
+    env.sprite((hx - F(2.0)).0, (F(y) - F(4.0)).0, w.0, f32::from_bits(0x3f19999a), o, 42, 0);
+    env.screen_space(false, o);
+}
+
+/// The zoomed timeline (0x1ed490, while the panel moves or is up): a window of +0x460 frames from +0x464 (plus the
+/// slide +0x474) that follows the frame, jumping by the window and sliding back; the highlights inside it as
+/// bars, the highlight being made, the cuts as marked ticks (full controls), the keyframes as ticks, the frame, and
+/// the playing head when the frame is inside
+pub fn draw_timeline(m: &mut Mem, env: &mut dyn PanelEnv, o: u32) {
+    if m.r32(o + at::MOVED) == 0 && m.r32(o + at::MODE) == 0 {
+        return;
+    }
+    env.screen_space(true, o);
+    let p4 = f32::from_bits(P4);
+    let p7 = f32::from_bits(0x3f333333);
+    let hidden = m.r32(o + at::HIDDEN) != 0;
+    let c0 = if hidden { [1.0, p4, p4, p4] } else { [1.0; 4] };
+    let c1 = if hidden { [p7, p4, 0.0, 0.0] } else { [p7, 1.0, 0.0, 0.0] };
+    let c2 = if hidden { [p7, p4, p4, 0.0] } else { [p7, 1.0, 1.0, 0.0] };
+    let c3 = if hidden { [1.0, p4, p4, 0.0] } else { [1.0, 1.0, f32::from_bits(0x3f60e0e1), f32::from_bits(0x3e0c8c8d)] };
+    let fifth = f32::from_bits(0x3e4ccccd);
+    let c4 = [1.0, fifth, fifth, fifth];
+    let c5 = if hidden { [0.5, p4, 0.0, 0.0] } else { [0.5, 1.0, 0.0, 0.0] };
+    let frame = m.r32(mgr(m) + rm::FRAME) as i32;
+    env.renderer(0x1e4, 3, 0);
+    env.renderer(0x1fc, 1, 0);
+    // the window
+    let w = m.r32(o + at::SHOWN_END) as i32;
+    let mut start = m.r32(o + 0x464) as i32;
+    let scale = m.r32(o + at::SCALE) as i32;
+    if start.wrapping_add(w) < frame {
+        start = frame.wrapping_sub(w.wrapping_sub(scale));
+        m.w32(o + at::SLIDE, 1i32.wrapping_sub(scale) as u32);
+        m.w32(o + 0x464, start as u32);
+    } else if frame < start {
+        start = frame.wrapping_sub(scale);
+        m.w32(o + at::SLIDE, scale.wrapping_sub(1) as u32);
+        m.w32(o + 0x464, start as u32);
+    }
+    let last = (m.r32(o + at::END_FRAME) as i32).wrapping_sub(w);
+    if last < start {
+        m.w32(o + 0x464, last as u32);
+        start = last;
+        m.w32(o + at::SLIDE, 0);
+    }
+    if start < 0 {
+        m.w32(o + 0x464, 0);
+        start = 0;
+        m.w32(o + at::SLIDE, 0);
+    }
+    let s2 = start.wrapping_add(m.r32(o + at::SLIDE) as i32);
+    // the bar's place
+    let p8 = fb(0x3f4ccccd);
+    let r = env.sprite_rect(m.r32(o), 42);
+    let off = fb(0x43333333);
+    let h = fword(m, r + 8) * fb(0x3f59999a);
+    let x0 = (fword(m, o + 0x36c) * p8 + F(15.0)) - off;
+    let y = fword(m, o + at::Y) * fb(0x3f6eeeef) + fb(0x4289d89e);
+    let half = h * F(0.5);
+    let tick = half - F(1.0);
+    env.set_color(c0);
+    let bx = fword(m, o + 0x36c) * p8 - off;
+    env.bar(bx.0, (y - half).0, f32::from_bits(0x43b33333), h.0, o, 1);
+    env.renderer(0x1f4, u32::MAX, 0);
+    env.set_color(c3);
+    let span = fb(0x43a43333);
+    let before = frame < s2;
+    let mut on_head = false;
+    let mut i = 0u32;
+    while (i as i32) < m.r32(o + at::HL_COUNT) as i32 {
+        let hl = m.r32(o + at::HL + 4 * i);
+        let w = m.r32(o + at::SHOWN_END) as i32;
+        let a = m.r32(m.r32(hl) + 0x20) as i32;
+        let b = a.wrapping_add(m.r32(hl + 4) as i32);
+        let wend = s2.wrapping_add(w);
+        if s2 < b && a < wend {
+            let from = if s2 < a { a } else { s2 };
+            let to = if b < wend { b } else { wend };
+            let wf = i2f(w as u32);
+            let x = x0 + i2f(from.wrapping_sub(s2) as u32) / wf * span;
+            let ww = i2f(to.wrapping_sub(from) as u32) / wf * span;
+            env.bar(x.0, (y - h * F(0.5)).0, ww.0, h.0, o, 1);
+        }
+        if m.r32(m.r32(m.r32(o + at::HL + 4 * i)) + 0x20) as i32 == frame {
+            on_head = true;
+        }
+        i += 1;
+    }
+    if m.r32(o + at::FULL) != 0 {
+        if m.r32(o + at::HIGHLIGHTING) != 0 {
+            env.set_color(c5);
+            let hf = m.r32(o + at::HL_FROM) as i32;
+            let from = if s2 < hf { hf } else { s2 };
+            let w = m.r32(o + at::SHOWN_END) as i32;
+            let f = m.r32(mgr(m) + rm::FRAME) as i32;
+            let wend = s2.wrapping_add(w);
+            let to = if f < wend { f } else { wend };
+            let wf = i2f(w as u32);
+            let x = x0 + i2f(from.wrapping_sub(s2) as u32) / wf * span;
+            let ww = i2f(to.wrapping_sub(from) as u32) / wf * span;
+            env.bar(x.0, (y - h * F(0.5)).0, ww.0, h.0, o, 1);
+        }
+        env.renderer(0x1f4, u32::MAX, 0);
+        let mut i = 0u32;
+        loop {
+            let t = m.r32(o + 0x3ec);
+            if (i as i32) >= m.r32(t) as i32 {
+                break;
+            }
+            let c = rm::cam_track_cut_frame(m, t, i) as i32;
+            let w = m.r32(o + at::SHOWN_END) as i32;
+            if s2.wrapping_add(w) < c {
+                break;
+            }
+            if c < s2 {
+                i += 1;
+                continue;
+            }
+            let g = mgr(m);
+            if m.r32(g + rm::MODE) == 3 && m.r32(g + rm::FRAME) as i32 == c {
+                env.set_color(c2);
+            } else {
+                m.w32(FONT_COLOR, 0x3f4ccccd);
+                m.w32(FONT_COLOR + 4, 1.0f32.to_bits());
+                m.w32(FONT_COLOR + 8, 0);
+                m.w32(FONT_COLOR + 0xc, 0);
+            }
+            let bottom = y - tick;
+            let up = tick + F(6.0);
+            let top = y - up;
+            let x = x0 + i2f(c.wrapping_sub(s2) as u32) / i2f(w as u32) * span;
+            let x = F(x.0 as i32 as f32);
+            env.line(x.0, top.0, x.0, bottom.0);
+            let x1 = x + F(1.0);
+            env.line(x1.0, top.0, x1.0, bottom.0);
+            let up = up + F(4.0);
+            env.fill_rect((x - F(1.0)).0, (y - up).0, 4.0, 4.0);
+            i += 1;
+        }
+    }
+    env.set_color(c4);
+    let n = m.r32(o + 0x378) as i32;
+    let mut i = 0;
+    while i < n {
+        let k = m.r32(o + 0x380 + 4 * i as u32) as i32;
+        if s2.wrapping_add(m.r32(o + at::SHOWN_END) as i32) < k {
+            break;
+        }
+        if k >= s2 {
+            let x = x0 + i2f(k.wrapping_sub(s2) as u32) / i2f(m.r32(o + at::SHOWN_END)) * span;
+            let (top, bottom) = ((y - tick).0, (y + tick).0);
+            env.line(x.0, top, x.0, bottom);
+            let x1 = x + F(1.0);
+            env.line(x1.0, top, x1.0, bottom);
+        }
+        i += 1;
+    }
+    env.set_color(c0);
+    env.bar(bx.0, (y - h * F(0.5)).0, f32::from_bits(0x43b33333), h.0, o, 2);
+    if !before && frame <= s2.wrapping_add(m.r32(o + at::SHOWN_END) as i32) {
+        let x = x0 + (i2f(frame as u32) - i2f(s2 as u32)) / i2f(m.r32(o + at::SHOWN_END)) * span;
+        env.set_color(if on_head { c2 } else { c1 });
+        let x = x - F(2.0);
+        let yy = y - (tick + F(2.0));
+        let r = env.sprite_rect(m.r32(o), 42);
+        let w = F(7.0) / fword(m, r + 4);
+        env.sprite((x - F(1.0)).0, (yy - F(4.0)).0, w.0, f32::from_bits(0x3f99999a), o, 42, 0);
+    }
+    env.screen_space(false, o);
+}
+
+/// The start / select legend (`HUD_DrawStartSelectPrompt` 0x1ee720, without the full controls): the buttons'
+/// sprites in two rows 35 and 83 below the panel, their names (0x1a9, 0x1b4, 0x1b3, 0x1b7, 0x1b2, 0x1b1) right of
+/// x 125, 340 and 568, and the "SELECT" / "START" words (0x394048 / 0x394050). With the game's +0x58 at 4 the
+/// columns are closer.
+pub fn draw_prompt(m: &mut Mem, env: &mut dyn DrawEnv, o: u32) {
+    let hidden = m.r32(o + at::HIDDEN) != 0;
+    let (c0, c1) = if hidden {
+        let c = [f32::from_bits(0x3e4ccccd), f32::from_bits(0x3f4ccccd), f32::from_bits(0x3f4ccccd), f32::from_bits(0x3f4ccccd)];
+        (c, c)
+    } else {
+        ([f32::from_bits(0x3eb33333), 1.0, 1.0, 1.0], [1.0; 4])
+    };
+    let one = F(1.0);
+    let (mut a, mut b, mut c) = (F(340.0), F(568.0), F(154.0));
+    env.renderer(0x1d4, 14, 0);
+    let (mut d, mut e) = (F(381.0), F(593.0));
+    env.renderer(0x1e4, 3, 0);
+    env.set_color(c1);
+    let font = m.r32(o + 0x348);
+    let mut half = i2f(m.r32(font + 0xc)) * F(0.5);
+    if m.r32(m.r32(GAPP) + 0x58) == 4 {
+        half = half - one;
+        a = F(190.0);
+        b = F(450.0);
+        c = F(150.0);
+        d = F(375.0);
+        e = F(570.0);
+    }
+    let y = fword(m, o + at::Y);
+    let r1 = y + F(35.0);
+    let r2 = y + F(83.0);
+    env.sprite(c.0, r1.0, 1.0, 1.0, o, 116, 96);
+    env.sprite(c.0, r2.0, 1.0, 1.0, o, 107, 96);
+    env.sprite(d.0, (r1 - one).0, 1.0, 1.0, o, 106, 96);
+    env.sprite((d - F(10.0)).0, r2.0, 1.0, 1.0, o, 98, 96);
+    env.sprite((d + F(10.0)).0, r2.0, 1.0, 1.0, o, 99, 96);
+    env.sprite(e.0, (r1 + one).0, 1.0, 1.0, o, 113, 96);
+    let t1 = r1 - half;
+    env.sprite(e.0, (r2 + one).0, 1.0, 1.0, o, 111, 96);
+    env.set_color(c0);
+    env.sprite(d.0, r2.0, 1.0, 1.0, o, 97, 96);
+    let t2 = r2 - half;
+    env.set_color(c1);
+    env.renderer(0x1d4, 13, 0);
+    let s85 = f32::from_bits(0x3f59999a);
+    for (id, x, ty) in [(0x1a9, F(125.0), t1), (0x1b4, F(125.0), t2), (0x1b3, a, t1), (0x1b7, a, t2), (0x1b2, b, t1), (0x1b1, b, t2)] {
+        let s = env.loc(id);
+        let w = env.measure_wide(s85, font, s);
+        let x = x - F(w as f32);
+        let s = env.loc(id);
+        env.print(0x19d568, s85, x.0, ty.0, font, s);
+    }
+    let s7 = f32::from_bits(0x3f333333);
+    let w = env.measure_ascii(s7, font, 0x394048);
+    env.print(0x19d3f0, s7, (c - F(w as f32) * F(0.5)).0, (t2 + F(20.0)).0, font, 0x394048);
+    let w = env.measure_ascii(f32::from_bits(0x3f4ccccd), font, 0x394050);
+    env.print(0x19d3f0, s7, (d - F(w as f32) * F(0.5)).0, (t1 + F(20.0)).0, font, 0x394050);
+}
+
+/// The button key's pad sprites (0x33f0b0: x and y from the screen's middle and the key's top, the sprite)
+pub const KEY_SPRITES: [(f32, f32, u32); 13] = [
+    (18.0, 155.0, 0x6b),
+    (-18.0, 155.0, 0x6a),
+    (28.0, 185.0, 0x6c),
+    (-28.0, 185.0, 0x6c),
+    (-68.0, 155.0, 0x61),
+    (56.0, 155.0, 0x75),
+    (94.0, 155.0, 0x72),
+    (75.0, 136.0, 0x73),
+    (75.0, 175.0, 0x74),
+    (-64.0, 42.0, 0x6f),
+    (-64.0, 72.0, 0x6e),
+    (75.0, 42.0, 0x71),
+    (75.0, 72.0, 0x70),
+];
+
+/// One of the button key's labels (0x33f150, 0x20 bytes each)
+#[derive(Clone, Copy, Debug)]
+pub struct KeyLine {
+    /// +0, +4: from the screen's middle and the key's top
+    pub x: f32,
+    pub y: f32,
+    /// +8: the string
+    pub text: u32,
+    /// +0xc: 0 centred with a line down, 1 left of x with a line left, 2 right of x with a line right
+    pub kind: u32,
+    /// +0x10: the line's length (none when not positive); +0x14: a bend up (negative) or down at its end
+    pub len: f32,
+    pub bend: f32,
+    /// +0x18: a sprite beside the text (-1 none) and its corner (+0x1c)
+    pub sprite: i32,
+    pub corner: u32,
+}
+
+const fn kl(x: f32, y: f32, text: u32, kind: u32, len: f32, bend: f32, sprite: i32, corner: u32) -> KeyLine {
+    KeyLine { x, y, text, kind, len, bend, sprite, corner }
+}
+
+/// The button key's labels (0x33f150)
+pub const KEY_LINES: [KeyLine; 18] = [
+    kl(-108.0, 64.0, 0x1a5, 2, 20.0, 0.0, -1, 0),
+    kl(118.0, 64.0, 0x1b0, 1, 21.0, 0.0, -1, 0),
+    kl(-108.0, 36.0, 0x1b1, 2, 20.0, 0.0, -1, 0),
+    kl(118.0, 36.0, 0x1b2, 1, 21.0, 0.0, -1, 0),
+    kl(-108.0, 92.0, 0x1b3, 2, 85.0, 48.0, -1, 0),
+    kl(16.0, 101.0, 0x1b4, 0, 26.0, 0.0, -1, 0),
+    kl(-108.0, 120.0, 0x1b5, 2, 35.0, 7.0, -1, 0),
+    kl(-108.0, 176.0, 0x1b6, 2, 38.0, -7.0, -1, 0),
+    kl(-108.0, 148.0, 0x1b7, 2, 13.0, 0.0, -1, 0),
+    kl(-108.0, 232.0, 0x1a6, 2, 77.0, -34.0, 0x2f, 0x10),
+    kl(118.0, 187.0, 0x1a7, 1, 62.0, -29.0, -1, 0),
+    kl(118.0, 114.0, 0x1aa, 1, 42.0, 4.0, -1, 0),
+    kl(118.0, 139.0, 0x1a8, 1, 11.0, 0.0, -1, 0),
+    kl(118.0, 163.0, 0x1a9, 1, 29.0, 0.0, -1, 0),
+    kl(55.0, 211.0, 0x1ab, 1, 28.0, -16.0, -1, 0),
+    kl(-108.0, 204.0, 0x1ad, 2, 20.0, 28.0, 0x2f, 0),
+    kl(55.0, 235.0, 0x1ae, 1, 28.0, -22.0, 0x2f, 0x10),
+    kl(55.0, 259.0, 0x1af, 1, 28.0, -21.0, 0x2f, 0),
+];
+
+/// The button key (0x1eee00, full controls, while the panel is above its +0x354): the pad's sprites, the labels
+/// (scale 0.9; 0.7605 with the game's +0x58 at 2 or 3) and their lines 3 wide from the text to the button, with a bend
+/// at the end and a sprite beside some
+pub fn draw_key(m: &mut Mem, env: &mut dyn DrawEnv, o: u32) {
+    if fl(m, o + 0x354) <= fl(m, o + at::Y) {
+        return;
+    }
+    let (c0, c1, c2) = if m.r32(o + at::HIDDEN) != 0 {
+        let p8 = f32::from_bits(0x3f4ccccd);
+        let c = [f32::from_bits(0x3e4ccccd), p8, p8, p8];
+        (c, c, c)
+    } else {
+        ([1.0; 4], [1.0; 4], [1.0; 4])
+    };
+    let mid = F(320.0);
+    let mut scale = F(f32::from_bits(0x3f666666));
+    env.renderer(0x1d4, 13, 0);
+    env.renderer(0x1e4, 3, 0);
+    env.set_color(c2);
+    let top = fword(m, o + at::Y) + F(70.0);
+    let mode = m.r32(m.r32(GAPP) + 0x58);
+    if mode == 2 || mode == 3 {
+        scale = fb(0x3f42b021);
+    }
+    for (x, y, id) in KEY_SPRITES {
+        env.renderer(0x1d4, 14, 0);
+        env.sprite((mid + F(x)).0, (top + F(y)).0, 1.0, 1.0, o, id as i32, 0x60);
+    }
+    env.renderer(0x1d4, 13, 0);
+    env.renderer(0x1e4, 3, 0);
+    let font = m.r32(o + 0x348);
+    for l in KEY_LINES {
+        let s = env.loc(l.text);
+        let mut w = F(env.measure_wide(scale.0, font, s) as f32);
+        if l.kind == 0 {
+            w = w * F(0.5);
+        } else if l.kind == 1 {
+            w = F(0.0);
+        }
+        env.set_color(c1);
+        let x = (mid + F(l.x)) - w;
+        let y = top + F(l.y);
+        let s = env.loc(l.text);
+        env.print(0x19d568, scale.0, x.0, y.0, font, s);
+    }
+    env.renderer(0x1e4, 3, 0);
+    env.set_color(c0);
+    let three = F(3.0);
+    let label = F(f32::from_bits(0x3f266666));
+    for l in KEY_LINES {
+        let len = F(l.len);
+        if !(0.0 < len.0) {
+            continue;
+        }
+        let fh = i2f(m.r32(m.r32(o + 0x348) + 0xc));
+        let (end_x, end_y);
+        if l.kind == 0 {
+            let x = mid + F(l.x);
+            end_x = x + len;
+            end_y = ((top + F(l.y)) + fh * scale) + F(5.0);
+            env.sprite(x.0, end_y.0, 3.0, len.0, o, -5, 0);
+        } else if l.kind == 1 {
+            let x = (mid + F(l.x)) - F(2.0);
+            end_x = x - len;
+            end_y = (top + F(l.y)) + fh * scale * fb(P4);
+            env.sprite(x.0, end_y.0, len.0, three.0, o, -5, 8);
+            if l.sprite != -1 {
+                let s = env.loc(l.text);
+                let w = F(env.measure_wide(scale.0, m.r32(o + 0x348), s) as f32);
+                let r = env.sprite_rect(m.r32(o), l.sprite as u32);
+                let (sx, sy) = if l.corner == 0 {
+                    ((mid + F(l.x)) + (w + F(7.0)), (top + F(l.y)) + F(2.0))
+                } else {
+                    let fh = i2f(m.r32(m.r32(o + 0x348) + 0xc));
+                    ((mid + F(l.x)) + (w + F(7.0)), ((top + F(l.y)) + fh * F(0.5)) - fword(m, r + 8) * F(0.5))
+                };
+                env.sprite(sx.0, sy.0, label.0, label.0, o, l.sprite, l.corner);
+            }
+        } else {
+            let x = (mid + F(l.x)) + F(4.0);
+            end_x = x + len;
+            end_y = (top + F(l.y)) + fh * scale * fb(P4);
+            env.sprite(x.0, end_y.0, len.0, three.0, o, -5, 0);
+            if l.sprite != -1 {
+                let s = env.loc(l.text);
+                let w = F(env.measure_wide(scale.0, m.r32(o + 0x348), s) as f32);
+                let r = env.sprite_rect(m.r32(o), l.sprite as u32);
+                let (sx, sy) = if l.corner == 0 {
+                    let off = (w + fword(m, r + 4) * fb(P4)) + F(10.0);
+                    ((mid + F(l.x)) - off, (top + F(l.y)) + F(4.0))
+                } else {
+                    let off = (w + fword(m, r + 8) * fb(P4)) + F(10.0);
+                    let fh = i2f(m.r32(m.r32(o + 0x348) + 0xc));
+                    ((mid + F(l.x)) - off, ((top + F(l.y)) + fh * F(0.5)) - fword(m, r + 8) * F(0.5))
+                };
+                env.sprite(sx.0, sy.0, label.0, label.0, o, l.sprite, l.corner);
+            }
+        }
+        let bend = F(l.bend);
+        if bend.0 == 0.0 {
+            continue;
+        }
+        let abs = F(bend.0.abs());
+        if bend.0 < 0.0 {
+            let y = end_y + bend;
+            if l.kind == 2 {
+                env.sprite((end_x - three).0, y.0, abs.0, three.0, o, -5, 17);
+            } else {
+                env.sprite(end_x.0, y.0, abs.0, three.0, o, -5, 16);
+            }
+        } else {
+            env.sprite(end_x.0, end_y.0, abs.0, three.0, o, -5, 16);
+        }
+    }
 }

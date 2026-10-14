@@ -558,3 +558,50 @@ computed as the game computes it.
   - 400 frees, 3,000 rider refreshes and 3,000 replay-mode switches, with all memory compared;
   - the floats follow the port's PS2 type: the runner rounds to nearest, as the other runner tests set it (F4c);
   - the tests caught every mutant tried.
+
+## The replay panel's larger drawings (G12p)
+
+`tricky_game::replayui`: the four drawings `Draw` hands on to, as their draw calls (`PanelEnv` adds the bar, the line,
+the filled rectangle and the renderer's screen-space switch 0x1ee660 / 0x1ee6e8, which is left as a call). With the
+full controls `Draw` runs the strip, the timeline, the camera line and the key; without them, the camera line and
+the start / select legend.
+
+- **The strip (0x1edef0, `ReplayControl_DrawStrip`)** shows the whole replay, 409.6 wide and 9 high. Its x is
+  (+0x36c × 0.8) − 204.8 and its y is (the panel's y × 0.9333) + 26.0465. It draws:
+  - each camera cut from the second as a 6-high tick (two lines); the one at the frame while paused is in
+    0.7 / 1 / 1, the others are written straight into the font colour (0.8, 1, 0, 0);
+  - the rider's highlights as bars, clipped at the end frame;
+  - the highlight being made;
+  - the frame around it, and the playing head (sprite 42, 5 over its width wide) at the frame, coloured when a
+    highlight starts there.
+  - The end frame and the highlights' frames and lengths are converted as **unsigned** words (the halve-and-double
+    for the top bit); the frame is converted as signed.
+- **The timeline (0x1ed490, `ReplayControl_DrawTimeline`)** shows a window of +0x460 frames.
+  - It starts at +0x464 plus the slide +0x474, which `Update` takes back to 0 by 5 a frame.
+  - When the frame runs past the window's end, the window jumps to end there less +0x468, and the slide is set to
+    1 − +0x468. Before the window's start it starts at the frame less +0x468, with the slide +0x468 − 1.
+  - It is kept within the end frame and above 0.
+  - The bar is 328.4 wide inside a 358.4 frame. Its x is ((+0x36c × 0.8) + 15) − 179.2 and its y is (y × 0.9333) +
+    68.923. Its height is 0.85 of sprite 42's.
+  - It draws the highlights inside the window, the highlight being made, and the cuts (full controls) as ticks
+    marked by a 4 × 4 square. Their x is truncated to a whole pixel (`cvt.w.s`). It also draws the keyframes as
+    ticks, and the head (7 over the sprite's width) while the frame is inside the window.
+- **The key (0x1eee00, `ReplayControl_DrawKey`)** is drawn while the panel is above its +0x354, 70 below it. It has
+  13 pad sprites from the table at 0x33f0b0 (`KEY_SPRITES`) and 18 labels from 0x33f150 (`KEY_LINES`: x, y, the
+  string, the kind, the line's length, a bend, a sprite and its corner).
+  - Kind 0 is centred with a line down.
+  - Kind 1 sits left of x with a line left.
+  - Kind 2 sits right of x with a line right.
+  - Some labels have a sprite beside the text (0x2f) and a bend at the line's end.
+  - The text scale is 0.9, or 0.7605 when the game's +0x58 is 2 or 3. The lines are 3 wide.
+- **`HUD_DrawStartSelectPrompt`:**
+  - two rows of button sprites, 35 and 83 below the panel;
+  - the six names right-aligned at 125, 340 and 568, raised by half the font's height;
+  - "SELECT" and "START" (0x394048 / 0x394050) centred under the first and second columns (scale 0.7; the second
+    is measured at 0.8);
+  - with the game's +0x58 at 4 the columns are 190 / 450 and the sprites 150 / 375 / 570.
+- **Checked in the runner:** 30,000 strips, 30,000 timelines, 10,000 keys and 10,000 legends. `Draw` and the camera
+  line run them all for real. The memory is random: windows and scales, end frames with the top bit set, highlights
+  across the window's edges, camera tracks, and the font's height. Every draw call's floats were compared bit for
+  bit. The tests caught 11 of 12 mutants; the one left (`<` vs `<=` on the strip's end clip) cannot change a
+  result.

@@ -3201,13 +3201,13 @@ address,size,name,system,status
 0x1ec7d8,44,cReplayControlOverlay::vf16_1ec7d8,frontend,checked
 0x1ec808,1684,cReplayControlOverlay::Draw,frontend,checked
 0x1ecea0,1516,HUD_DrawReplayCamInfo,hud,checked
-0x1ed490,2616,FUN_001ed490,frontend?,not started
+0x1ed490,2616,ReplayControl_DrawTimeline,frontend?,checked
 0x1eded0,28,ReplayControl_ShowMessage,frontend,checked
-0x1edef0,1904,FUN_001edef0,frontend?,not started
+0x1edef0,1904,ReplayControl_DrawStrip,frontend?,checked
 0x1ee660,136,Gfx_BeginScreenSpace,render,not started
 0x1ee6e8,52,Gfx_EndScreenSpace,render,not started
-0x1ee720,1760,HUD_DrawStartSelectPrompt,hud,not started
-0x1eee00,2060,FUN_001eee00,hud?,not started
+0x1ee720,1760,HUD_DrawStartSelectPrompt,hud,checked
+0x1eee00,2060,ReplayControl_DrawKey,hud?,checked
 0x1ef610,320,ReplayOverlay_Init,frontend,not started
 0x1ef750,156,RaceMenuOverlay_UpdateSave,save,not started
 0x1ef7f0,292,RaceMenuOverlay_BeginSaveReplay,save,checked

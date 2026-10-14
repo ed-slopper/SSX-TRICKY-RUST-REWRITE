@@ -67,7 +67,7 @@ fn status_word(v: u32, i: u32) -> u32 {
 
 // ---- the layout ----
 
-const ARENA: u32 = 0x4a00;
+const ARENA: u32 = 0x4c00;
 struct At {
     b: u32,
     extra: Vec<(u32, u32)>,
@@ -194,7 +194,7 @@ fn build(g: &mut Rng, r: &mut Runner, a: &At) {
     }
     w(r, a.race() + 0x34, (g.below(6) == 0) as u32);
     w(r, a.game() + 0x10, a.b + 0x4800);
-    for slot in [0x1c4u32, 0x1d4, 0x1e4, 0x1fc] {
+    for slot in [0x1c4u32, 0x1d4, 0x1e4, 0x1f4, 0x1fc] {
         r.mem.write_u16(a.b + 0x4800 + slot - 4, 0);
         w(r, a.b + 0x4800 + slot, RENDERER + slot);
     }
@@ -248,6 +248,37 @@ fn build(g: &mut Rng, r: &mut Runner, a: &At) {
     w(r, o + 0x4a0, g.below(2));
     w(r, o + 0x4a4, g.below(2));
     w(r, o + 0x498, (g.below(8) == 0) as u32);
+    // the timeline: the window, the end frame, the keyframes, the camera track, the font
+    let fr = |g: &mut Rng| [g.below(40), g.below(400), g.below(2000)][g.below(3) as usize];
+    w(r, o + 0x460, [0x708, 300, 60, 1, g.below(500)][g.below(5) as usize]);
+    w(r, o + 0x464, fr(g).wrapping_sub(20));
+    w(r, o + 0x468, [1, 0xb4, 0, 7][g.below(4) as usize]);
+    w(r, o + 0x37c, if g.below(10) == 0 { 0x8000_0000 | g.next() } else { fr(g) + 1 });
+    w(r, o + 0x46c, fr(g));
+    w(r, o + 0x378, g.below(17));
+    let mut k = g.below(30);
+    for i in 0..16 {
+        w(r, o + 0x380 + 4 * i, k);
+        k += g.below(90);
+    }
+    w(r, a.mgr() + 0x34, fr(g));
+    for i in 0..12 {
+        w(r, a.kf(i) + 0x20, fr(g));
+        w(r, a.hl(i) + 4, [g.below(5), g.below(100), g.below(800), 0xffff_fff0][g.below(4) as usize]);
+    }
+    let t = a.b + 0x4a00;
+    w(r, o + 0x3ec, t);
+    w(r, t, g.below(7));
+    let mut c = g.below(50);
+    for i in 0..8 {
+        w(r, t + 0x3c + 0x1c * i, c);
+        c += g.below(120);
+    }
+    w(r, o + 0x348, a.b + 0x4b80);
+    w(r, a.b + 0x4b8c, 10 + g.below(20));
+    w(r, a.app() + 0x58, [0, 2, 3, 4][g.below(4) as usize]);
+    w(r, o + 0x354, fpick(g, &ys));
+    w(r, o + 0x36c, fpick(g, &[320.0, 400.0, 0.0, 512.5]));
     w(r, o + 0x47c, g.below(3));
     w(r, o + 0x488, g.below(4));
     w(r, o + 0x48c, g.below(4));
@@ -905,6 +936,14 @@ impl Log {
         self.push("color", fbits(c[0]), fbits(c[1]));
         self.push("color", fbits(c[2]), fbits(c[3]));
     }
+    fn bar(&mut self, x: f32, y: f32, w: f32, h: f32, o: u32, kind: u32) {
+        self.quad("bar", x, y, w, h);
+        self.push("bar", o, kind);
+    }
+    fn quad(&mut self, name: &'static str, a: f32, b: f32, c: f32, d: f32) {
+        self.push(name, fbits(a), fbits(b));
+        self.push(name, fbits(c), fbits(d));
+    }
     fn print(&mut self, func: u32, scale: f32, x: f32, y: f32, font: u32, s: u32) {
         self.push("print", func, fbits(scale));
         self.push("print xy", fbits(x), fbits(y));
@@ -920,6 +959,20 @@ fn width(v: u32) -> i32 {
 }
 
 struct Draw(L, u32);
+impl PanelEnv for Draw {
+    fn bar(&mut self, x: f32, y: f32, w: f32, h: f32, o: u32, kind: u32) {
+        self.0.borrow_mut().bar(x, y, w, h, o, kind);
+    }
+    fn line(&mut self, x0: f32, y0: f32, x1: f32, y1: f32) {
+        self.0.borrow_mut().quad("line", x0, y0, x1, y1);
+    }
+    fn fill_rect(&mut self, x: f32, y: f32, w: f32, h: f32) {
+        self.0.borrow_mut().quad("fill", x, y, w, h);
+    }
+    fn screen_space(&mut self, begin: bool, o: u32) {
+        self.0.borrow_mut().push("screen", begin as u32, o);
+    }
+}
 impl DrawEnv for Draw {
     fn renderer(&mut self, slot: u32, a1: u32, a2: u32) {
         self.0.borrow_mut().push("rend", slot, a1 | a2 << 16);
@@ -966,9 +1019,6 @@ impl DrawEnv for Draw {
         l.push("preset", 0, 0);
         l.take() % 12
     }
-    fn sub_draw(&mut self, func: u32, o: u32) {
-        self.0.borrow_mut().push("sub", func, o);
-    }
     fn backdrop_frame(&mut self, y: f32, b: u32, a1: u32) {
         let mut l = self.0.borrow_mut();
         l.push("frame", fbits(y), b);
@@ -987,10 +1037,10 @@ impl DrawEnv for Draw {
 
 fn stub_draw(r: &mut Runner, l: &L) {
     r.allow(0x1ecea0);
-    for slot in [0x1c4u32, 0x1d4, 0x1e4, 0x1fc] {
+    for slot in [0x1c4u32, 0x1d4, 0x1e4, 0x1f4, 0x1fc] {
         let l2 = l.clone();
         r.stub(RENDERER + slot, move |c, _| {
-            let a2 = if slot == 0x1fc { arg(c, 6) } else { 0 };
+            let a2 = if slot == 0x1fc || slot == 0x1f4 { arg(c, 6) } else { 0 };
             l2.borrow_mut().push("rend", slot, arg(c, 5) | a2 << 16)
         });
     }
@@ -1044,9 +1094,21 @@ fn stub_draw(r: &mut Runner, l: &L) {
         m.write_u32(arg(c, 8), v);
     });
     answer(r, l, 0x1786c0, "preset", 0, |v| v % 12);
-    for addr in [0x1edef0u32, 0x1ed490, 0x1eee00, 0x1ee720] {
+    for addr in [0x1edef0u32, 0x1ed490, 0x1eee00, 0x1ee720, 0x1953a0] {
+        r.allow(addr);
+    }
+    let l2 = l.clone();
+    r.stub(0x1a9f80, move |c, _| l2.borrow_mut().bar(c.f(12), c.f(13), c.f(14), c.f(15), arg(c, 4), arg(c, 5)));
+    for (addr, name) in [(0x19c1e8u32, "line"), (0x19b108, "fill")] {
         let l2 = l.clone();
-        r.stub(addr, move |c, _| l2.borrow_mut().push("sub", addr, arg(c, 4)));
+        r.stub(addr, move |c, _| {
+            assert_eq!(arg(c, 4), FONT_COLOR);
+            l2.borrow_mut().quad(name, c.f(12), c.f(13), c.f(14), c.f(15));
+        });
+    }
+    for (addr, begin) in [(0x1ee660u32, 1u32), (0x1ee6e8, 0)] {
+        let l2 = l.clone();
+        r.stub(addr, move |c, _| l2.borrow_mut().push("screen", begin, arg(c, 4)));
     }
     let l2 = l.clone();
     r.stub(0x1a9bb8, move |c, _| {
@@ -1087,6 +1149,10 @@ fn drawing_matches_the_original() {
     check(&mut r, &a, &l, &mut g, 30_000, 0x1ec808, "draw", &mut |m, l| draw(m, &mut Draw(l.clone(), rect), o));
     check(&mut r, &a, &l, &mut g, 30_000, 0x1ecea0, "cam info", &mut |m, l| cam_info(m, &mut Draw(l.clone(), rect), o));
     check(&mut r, &a, &l, &mut g, 2_000, 0x1f01e8, "menu", &mut |m, l| draw_menu(m, &mut Draw(l.clone(), rect), o));
+    check(&mut r, &a, &l, &mut g, 30_000, 0x1edef0, "strip", &mut |m, l| draw_strip(m, &mut Draw(l.clone(), rect), o));
+    check(&mut r, &a, &l, &mut g, 30_000, 0x1ed490, "timeline", &mut |m, l| draw_timeline(m, &mut Draw(l.clone(), rect), o));
+    check(&mut r, &a, &l, &mut g, 10_000, 0x1eee00, "key", &mut |m, l| draw_key(m, &mut Draw(l.clone(), rect), o));
+    check(&mut r, &a, &l, &mut g, 10_000, 0x1ee720, "prompt", &mut |m, l| draw_prompt(m, &mut Draw(l.clone(), rect), o));
 }
 
 // ---- the leftovers ----
