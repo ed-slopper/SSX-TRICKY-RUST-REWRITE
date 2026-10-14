@@ -67,7 +67,7 @@ impl Calls for TC {
 }
 
 const G0: u32 = 0x348dc8;
-const G1: u32 = 0x349530;
+const G1: u32 = 0x3495d0;
 
 struct World {
     r: Runner,
@@ -90,7 +90,7 @@ fn world() -> Option<World> {
     r.stub(0x2bc200, move |c, _| l.borrow_mut().released.push(c.gpr(4) as u32 as i32));
     let l = log.clone();
     r.stub(0x2baed0, move |_, _| l.borrow_mut().stopped += 1);
-    for a in [0x2bb078, 0x2bb110, 0x2bb430, 0x2bb610, 0x2bb650, 0x2bb7a0] {
+    for a in [0x2bb078, 0x2bb110, 0x2bb430, 0x2bb610, 0x2bb650, 0x2bb7a0, 0x2be678, 0x2be768, 0x2be7d8, 0x2be880] {
         r.allow(a);
     }
     let table = r.mem.alloc(0x40);
@@ -240,6 +240,24 @@ fn build(g: &mut Rng, w: &World) -> Image {
         rec[0xc..0x10].copy_from_slice(&w.sounds[g.below(4) as usize].to_le_bytes());
         put(&mut img, r, &rec);
     }
+    // the generator (some words about to carry) and the variant history
+    let rw: Vec<u32> = (0..6).map(|_| [g.next(), 0xffff_ffff, 0xffff_fffe, 0, g.next()][g.below(5) as usize]).collect();
+    put(&mut img, 0x349528, &u32s(&rw));
+    let hp = g.below(32);
+    put(&mut img, 0x349540, &u32s(&[hp]));
+    let mut he = Vec::new();
+    let wide = g.below(2) == 0;
+    for k in 0..64 {
+        let v = if wide {
+            if k % 2 == 0 { g.below(40) } else if g.below(8) == 0 { g.below(3) } else { 0 }
+        } else if g.below(6) == 0 {
+            0xffffu32
+        } else {
+            g.below(5)
+        };
+        he.extend((v as u16).to_le_bytes());
+    }
+    put(&mut img, 0x349548, &he);
     put(&mut img, 0x3494f0, &u32s(&[if g.below(3) == 0 { g.next() } else { g.below(40) }]));
     img
 }
@@ -394,4 +412,22 @@ fn alloc_voice_matches() {
         |m, c, a| alloc_voice(m, c, a[0], a[1], a[2] as i64) as i64 as u64,
         0xffff_ffff,
     );
+}
+
+#[test]
+fn random_and_history() {
+    run(60, 8000, |_, _| vec![], 0x2be678, |m, _, _| rand(m) as u64, 0xffff_ffff);
+    run(61, 4000, |g, _| vec![g.next() as u64], 0x2be768, |m, _, a| { seed_rand(m, a[0] as i32); 0 }, 0);
+    run(62, 4000, |g, _| vec![g.next() as u64], 0x2be8c8, |m, _, a| { init_history(m, a[0] as i32); 0 }, 0);
+    run(63, 4000, |g, _| vec![g.below(5) as u64, g.below(5) as u64], 0x2be880, |m, _, a| { push_history(m, a[0] as u16, a[1] as u16); 0 }, 0);
+    run(
+        64,
+        12000,
+        |g, _| vec![g.below(40) as u64 | if g.below(6) == 0 { 0xffff_0000 } else { 0 }, [0u64, 3, 10, 32, 40, (-16i64) as u64][g.below(6) as usize], g.below(3) as u64],
+        0x2be7d8,
+        |m, _, a| find_in_history(m, a[0] as i16, a[1] as i32, a[2] as i16) as i64 as u64,
+        0xffff_ffff,
+    );
+    run(65, 30000, |g, _| vec![[1u64, 2, 3, 5, 8, 20, 40, 40, 20][g.below(9) as usize], g.below(3) as u64], 0x2be908, |m, _, a| pick_variant(m, a[0] as i32, a[1] as u16) as u64, 0xffff_ffff);
+    run(66, 4000, |g, w| vec![g.below(256) as u64, g.below(256) as u64, w.sounds[g.below(4) as usize] as u64], 0x2be650, |m, _, a| mask_match(m, a[0] as u8, a[1] as u8, a[2] as u32) as u64, 0xff);
 }

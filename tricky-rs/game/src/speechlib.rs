@@ -414,3 +414,144 @@ pub fn shutdown(m: &mut dyn Mem, c: &mut dyn Calls) {
 pub fn shl2(v: i32) -> i32 {
     v << 2
 }
+
+// ---- the library's random numbers and the variant history (0x2be650..0x2be908)
+
+const RAND: u32 = 0x349528;
+const HIST_POS: u32 = 0x349540;
+const HIST: u32 = 0x349548;
+
+/// 0x2be650: `((mask_value[2] ^ a) & mask_value[1] & !b) == 0` on bytes (`p` the record).
+pub fn mask_match(m: &dyn Mem, a: u8, b: u8, p: u32) -> bool {
+    (m.r8(p + 2) ^ a) & m.r8(p + 1) & !b == 0
+}
+
+/// 0x2be678: the generator's step: six words at 0x349528..0x34953c added along with their carries (the last word
+/// counts up by one, rolling over into the others); returns the first word.
+pub fn rand(m: &mut dyn Mem) -> u32 {
+    let w = |m: &dyn Mem, k: u32| m.r32(RAND + 4 * k);
+    let (a, b, c, d, e, f) = (w(m, 0), w(m, 1), w(m, 2), w(m, 3), w(m, 4), w(m, 5));
+    let u1 = f.wrapping_add(e);
+    let carry = (u1 < f || u1 < e) as u32;
+    let u2 = u1.wrapping_add(d).wrapping_add(carry);
+    let u3 = u2.wrapping_add(c).wrapping_add((u2 < d) as u32);
+    let f2 = f.wrapping_add(1);
+    let u4 = u3.wrapping_add(b).wrapping_add((u3 < c) as u32);
+    let mut a2 = u4.wrapping_add(a).wrapping_add((u4 < b) as u32);
+    let (mut b2, mut c2, mut d2, mut e2) = (u4, u3, u2, u1);
+    if f2 == 0 {
+        e2 = u1.wrapping_add(1);
+        if e2 == 0 {
+            d2 = u2.wrapping_add(1);
+            if d2 == 0 {
+                c2 = u3.wrapping_add(1);
+                if c2 == 0 {
+                    b2 = u4.wrapping_add(1);
+                    if b2 == 0 {
+                        a2 = a2.wrapping_add(1);
+                    }
+                }
+            }
+        }
+    }
+    for (k, v) in [a2, b2, c2, d2, e2, f2].into_iter().enumerate() {
+        m.w32(RAND + 4 * k as u32, v);
+    }
+    a2
+}
+
+/// 0x2be768: seed the generator.
+pub fn seed_rand(m: &mut dyn Mem, seed: i32) {
+    let k = [-0xdd2f1aai32, -0x77ced917, -0x39db22d1, 0x702c49c, -0x61cac083, 0x6fdf3b64];
+    for (i, d) in k.into_iter().enumerate() {
+        m.w32(RAND + 4 * i as u32, seed.wrapping_add(d) as u32);
+    }
+}
+
+/// 0x2be880: remember (id, tag) in the ring of 32.
+pub fn push_history(m: &mut dyn Mem, id: u16, tag: u16) {
+    let mut pos = (m.r32(HIST_POS) as i32).wrapping_add(1);
+    if 0x1f < pos {
+        pos = 0;
+    }
+    m.w32(HIST_POS, pos as u32);
+    m.w16(HIST.wrapping_add((pos as u32).wrapping_mul(4)), id);
+    m.w16(HIST.wrapping_add((pos as u32).wrapping_mul(4)).wrapping_add(2), tag);
+}
+
+/// 0x2be8c8: empty the ring (every id and tag 0xffff) and seed the generator with `seed · 0x10001`.
+pub fn init_history(m: &mut dyn Mem, seed: i32) {
+    for k in 0..32 {
+        m.w16(HIST + 4 * k, 0xffff);
+        m.w16(HIST + 4 * k + 2, 0xffff);
+    }
+    m.w32(HIST_POS, 0);
+    seed_rand(m, seed.wrapping_mul(0x10001));
+}
+
+/// 0x2be7d8: how many entries back (of the last `span`, at most 32, counting only those with this tag) `id` was
+/// picked, or -1.
+pub fn find_in_history(m: &dyn Mem, id: i16, span: i32, tag: i16) -> i32 {
+    let limit = span.min(0x20);
+    let mut result = -1;
+    let mut count = 0;
+    let mut iter = 0;
+    let mut done = false;
+    let mut idx = m.r32(HIST_POS) as i32;
+    loop {
+        let at = HIST.wrapping_add((idx as u32).wrapping_mul(4));
+        let mut next = count;
+        if count < limit {
+            if m.r16(at + 2) as i16 == tag {
+                next = count + 1;
+                if m.r16(at) as i16 == id {
+                    done = true;
+                    result = count;
+                }
+            }
+        } else {
+            done = true;
+        }
+        count = next;
+        iter += 1;
+        if 0x20 < iter {
+            done = true;
+        }
+        let prev = idx - 1;
+        idx = if prev < 0 { idx + 0x1f } else { prev };
+        if done {
+            return result;
+        }
+    }
+}
+
+/// 0x2be908: a variant number below `n`, drawn so that it was not heard lately for this `tag`: up to 32 draws
+/// (`(rand >> 16) · n >> 16`), keeping the one that was heard longest ago, stopping at one not in the last `n / 2`
+/// (at most 10); the pick is pushed on the ring. Returns the last draw.
+pub fn pick_variant(m: &mut dyn Mem, n: i32, tag: u16) -> u32 {
+    let span = (n / 2).min(10);
+    let mut best: i64 = -1;
+    let mut done = false;
+    let mut tries = 0;
+    let mut keep = ((rand(m) >> 16).wrapping_mul(n as u32)) >> 16;
+    loop {
+        let draw = ((rand(m) >> 16).wrapping_mul(n as u32)) >> 16;
+        let found = find_in_history(m, draw as i16, span, tag as i16) as i64;
+        if found == -1 {
+            // not heard lately: keep this draw (the best stays as it was)
+            done = true;
+            keep = draw;
+        } else if best < found {
+            best = found;
+            keep = draw;
+        }
+        tries += 1;
+        if 0x1f < tries {
+            done = true;
+        }
+        if done {
+            push_history(m, keep as u16, tag);
+            return draw;
+        }
+    }
+}
