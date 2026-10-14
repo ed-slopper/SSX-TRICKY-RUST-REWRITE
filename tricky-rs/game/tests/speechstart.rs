@@ -268,10 +268,10 @@ fn event(g: &mut Rng, maxparts: u32) -> Vec<u8> {
 }
 
 /// An event header: rows (their headers further in the blob), records, the parameter word and the row masks.
-fn evblob(g: &mut Rng) -> (Vec<u8>, u32) {
+fn evblob(g: &mut Rng, may_be_empty: bool) -> (Vec<u8>, u32) {
     let mut o: Vec<u8> = (0..EVSZ).map(|_| g.next() as u8).collect();
-    let rows = 1 + g.below(3);
-    let n7 = g.below(7);
+    let rows = if may_be_empty && g.below(8) == 0 { 0 } else { 1 + g.below(3) };
+    let n7 = g.below(9);
     put(&mut o, 0, &(g.below(4) as u16).to_le_bytes());
     o[6] = rows as u8;
     o[7] = n7 as u8;
@@ -283,7 +283,7 @@ fn evblob(g: &mut Rng) -> (Vec<u8>, u32) {
     for r in 0..n7 {
         let at = (rec0 + 3 * r) as usize;
         o[at] = g.below(4) as u8;
-        o[at + 1] = if g.below(5) == 0 { 0 } else { 1 + g.below(0x13) as u8 };
+        o[at + 1] = if g.below(5) == 0 { 0 } else { 1 + g.below(0x15) as u8 };
         o[at + 2] = g.below(6) as u8;
     }
     let w = rec0 + ((n7 * 3 + 3) & !3);
@@ -310,7 +310,7 @@ fn image(w: &mut W, sm: &mut SM, g: &mut Rng, maxparts: u32) {
     img.push((w.e, event(g, maxparts)));
     let mut rows = [0u32; 2];
     for k in 0..2 {
-        let (o, r) = evblob(g);
+        let (o, r) = evblob(g, k == 1);
         rows[k] = r;
         img.push((w.ev[k], o));
     }
@@ -360,9 +360,16 @@ fn image(w: &mut W, sm: &mut SM, g: &mut Rng, maxparts: u32) {
     for (off, t) in [(0x20u32, CB0T), (0x24, CB1T), (0x28, CB2T), (0x30, CB4T)] {
         put(&mut cbr, off, &(if g.below(6) == 0 { 0 } else { t }).to_le_bytes());
     }
-    put(&mut cbr, 0, &g.below(3).to_le_bytes());
+    put(&mut cbr, 0, &[0xffff_ffffu32, g.below(3)][g.below(2) as usize].to_le_bytes());
     img.push((CBR.0, cbr));
     let mut vo = rnd(VOICE.1, g);
+    for k in 0..VOICE.1 / 4 {
+        match g.below(6) {
+            0 | 1 => put(&mut vo, 4 * k, &[0; 4]),
+            2 => put(&mut vo, 4 * k, &[0xff; 4]),
+            _ => {}
+        }
+    }
     put(&mut vo, 0x60, &[0u32, 1, 1, 2][g.below(4) as usize].to_le_bytes());
     img.push((VOICE.0, vo));
     let mut rh = rnd(RH.1, g);
@@ -381,12 +388,13 @@ fn image(w: &mut W, sm: &mut SM, g: &mut Rng, maxparts: u32) {
     }
     for k in 0..8u32 {
         let at = 0x18c + 0x5c * k;
-        let which = g.below(2) as usize;
+        let which = if rows[1] == 0 { 0 } else { g.below(2) as usize };
         let rw = g.below(rows[which]);
         put(&mut q, at, &w.ev[which].to_le_bytes());
         put(&mut q, at + 4, &(w.ev[which] + 0x200 * (rw + 1)).to_le_bytes());
         q[(at + 8) as usize] = rw as u8;
         q[(at + 9) as usize] = 1;
+        put(&mut q, at + 0xc, &(g.below(3) as u16).to_le_bytes());
     }
     img.push((QR.0, q));
     FRAMES.with(|f| {
@@ -473,6 +481,34 @@ const LIB: [u32; 46] = [
     0x2bc768, 0x2bd198, 0x2bb2d8, 0x2bc938, 0x2bdc70, 0x2bdae0, 0x2bdad0, 0x2bdb68, 0x2bcfd8, 0x2bcf48,
 ];
 
+fn poke(w: &mut W, sm: &mut SM, a: u32, v: &[u8]) {
+    w.r.mem.write(a, v).unwrap();
+    for (k, x) in v.iter().enumerate() {
+        sm.0.insert(a + k as u32, *x);
+    }
+}
+
+/// Makes some of the events' row masks equal what the parameters of the key at `keyp` give.
+fn fix_masks(w: &mut W, sm: &mut SM, g: &mut Rng, keyp: u32) {
+    for ev in w.ev {
+        let rows = sm.r8(ev + 6) as u32;
+        let n7 = sm.r8(ev + 7) as i8 as i32 as u32;
+        let at = ev + ((rows * 2 + 3) & 0x3fc) + 0xc + ((n7 * 3 + 3) & !3);
+        let (s7, mut bit, mut mask) = (sm.r32(at), 1u32, 0u32);
+        for i in 0..0x14u32 {
+            if param_test(s7, sm.r32(keyp + 4 + 4 * i), i) != 0 {
+                mask |= bit;
+            }
+            bit = (bit << 1) & 0xfffe;
+        }
+        for k in 0..rows {
+            if g.below(2) == 0 {
+                poke(w, sm, at + 4 + 2 * k, &(mask as u16).to_le_bytes());
+            }
+        }
+    }
+}
+
 /// A random event header (pointer) from the world: 0 or `which` 1 then the row header k of it.
 fn evhdr(w: &W, g: &mut Rng) -> u32 {
     w.ev[g.below(2) as usize]
@@ -523,6 +559,9 @@ fn record_callback_matches() {
         let which = g.below(2) as usize;
         let ev = w.ev[which];
         let rows = sm.r8(ev + 6) as u32;
+        if rows == 0 {
+            continue;
+        }
         let i = g.below(rows);
         check(&mut w, &mut sm, case, seed, 0x2be310, &|r| {
             r.cpu.set_gpr(4, ctx as u64);
@@ -616,6 +655,11 @@ fn select_row_matches() {
             continue;
         }
         let part = e + 4 * sm.r8(e + 4 + g.below(nparts)) as u32;
+        if g.below(6) == 0 {
+            let n = [0x63u8, 0x64, 0x65, 0x66, 0x70][g.below(5) as usize];
+            poke(&mut w, &mut sm, ent + 5, &[n]);
+            poke(&mut w, &mut sm, ent + 4, &[g.below(12) as u8]);
+        }
         check(&mut w, &mut sm, case, seed, 0x2bd430, &|r| {
             r.cpu.set_gpr(4, ctx as u64);
             r.cpu.set_gpr(5, part as u64);
@@ -678,14 +722,18 @@ fn start_rec_matches() {
     let Some(mut w) = world(&START_STUBS, &LIB) else { return };
     let (mut g, mut sm) = (Rng(29), SM::default());
     frames(&[(SP0 - 0x210, 0x170)]);
-    let mut started = 0;
+    let (mut started, mut none) = (0, 0);
     for case in 0..cases(40_000) {
         image(&mut w, &mut sm, &mut g, 4);
         let seed = g.next() as u64 | 1;
         let keyp = KEYS + 0x60 * g.below(8);
+        fix_masks(&mut w, &mut sm, &mut g, keyp);
         check(&mut w, &mut sm, case, seed, 0x2bde40, &|r| r.cpu.set_gpr(4, keyp as u64), &|sm, env| start_rec(sm, env, SP0 - 0x210, keyp), true);
         started += (w.r.cpu.gpr(2) as u32 == 1) as u32;
+        none += (w.r.cpu.gpr(2) as u32 == 0xffff_ffff) as u32;
     }
+    eprintln!("started {started} none {none}");
+    assert!(none > 0);
     assert!(started > 500 / div(), "{started}");
 }
 
@@ -700,6 +748,7 @@ fn start_entry_matches() {
         image(&mut w, &mut sm, &mut g, 4);
         let seed = g.next() as u64 | 1;
         let i = g.below(8);
+        fix_masks(&mut w, &mut sm, &mut g, KEYS + 0x60 * i);
         check(&mut w, &mut sm, case, seed, 0x2be140, &|r| r.cpu.set_gpr(4, i as u64), &|sm, env| start_entry(sm, env, SP0 - 0x60, i), true);
     }
 }
