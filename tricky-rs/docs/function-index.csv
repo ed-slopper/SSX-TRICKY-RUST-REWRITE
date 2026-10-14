@@ -3,15 +3,15 @@ address,size,name,system,status
 0x1000a8,8,Crt_Exit,other,not started
 0x1000b8,36,NaturalAirControl_Enter,boarder?,ported
 0x1000e0,1140,NaturalAirControl_Update,boarder?,checked
-0x100558,40,NaturalAirControl_SaveSnapshot,save,not started
-0x100580,20,NaturalAirControl_LoadSnapshot,ai?,not started
+0x100558,40,NaturalAirControl_SaveSnapshot,save,checked
+0x100580,20,NaturalAirControl_LoadSnapshot,ai?,checked
 0x100598,876,SpinControl_Enter,boarder,ported
 0x100908,6224,SpinState_Update,boarder,ported
 0x102158,1704,SpinState_StartFromStick,boarder,checked
 0x102800,464,SpinState_PlayExitClip,boarder,ported
 0x1029d0,1008,SpinControl_Exit,boarder,ported
-0x102dc0,40,SpinControl_SaveSnapshot,save,not started
-0x102de8,20,SpinControl_LoadSnapshot,boarder,not started
+0x102dc0,40,SpinControl_SaveSnapshot,save,checked
+0x102de8,20,SpinControl_LoadSnapshot,boarder,checked
 0x102e80,208,Quat_Multiply,boarder?,ported
 0x102f50,44,Vec4_Scale,common?,ported
 0x102f80,44,Vec3_Scale,common?,ported
@@ -21,16 +21,16 @@ address,size,name,system,status
 0x1033d0,656,CruiseControl_LookBack,boarder?,checked
 0x103660,1316,Ride_AITauntCheck,boarder?,ported
 0x103b88,752,CruiseControl_RandomFlourish,boarder?,ported
-0x103e78,40,CruiseControl_SaveSnapshot,save,not started
-0x103ea0,20,CruiseControl_LoadSnapshot,ai?,not started
+0x103e78,40,CruiseControl_SaveSnapshot,save,checked
+0x103ea0,20,CruiseControl_LoadSnapshot,ai?,checked
 0x103eb8,376,ChangeFakieControl_Enter,boarder?,ported
 0x104030,324,ChangeFakieControl_Update,boarder?,checked
 0x104178,24,ChangeFakieControl_Exit,boarder?,ported
 0x104190,28,BumpControl_Enter,boarder?,ported
 0x1041b0,472,BumpControl_Update,boarder?,checked
 0x104388,48,BumpControl_Exit,boarder?,ported
-0x1043b8,40,BumpControl_SaveSnapshot,save,not started
-0x1043e0,20,BumpControl_LoadSnapshot,ai?,not started
+0x1043b8,40,BumpControl_SaveSnapshot,save,checked
+0x1043e0,20,BumpControl_LoadSnapshot,ai?,checked
 0x104688,40,FakieCruiseControl_Exit,boarder?,ported
 0x1046b0,204,JumpControl_Update,boarder?,ported
 0x104790,108,LandHardControl_Exit,boarder?,ported
@@ -39,15 +39,15 @@ address,size,name,system,status
 0x1049f8,1088,LandNormalControl_Enter,boarder?,ported
 0x104e38,44,LandNormalControl_Exit,boarder?,ported
 0x104e68,452,LandNormalControl_Update,boarder?,checked
-0x105030,40,LandNormalControl_SaveSnapshot,save,not started
-0x105058,20,LandNormalControl_LoadSnapshot,ai?,not started
+0x105030,40,LandNormalControl_SaveSnapshot,save,checked
+0x105058,20,LandNormalControl_LoadSnapshot,ai?,checked
 0x105070,120,PrewindControl_Enter,boarder,ported
 0x1050e8,1212,PrewindState_Update,boarder,checked
 0x1055a8,68,PrewindControl_Exit,boarder,ported
 0x1055f0,1136,PrewindState_UpdateWindClip,boarder,checked
 0x105a60,112,PrewindState_SetWindTarget,boarder,checked
-0x105ad0,40,PrewindControl_SaveSnapshot,save,not started
-0x105af8,20,PrewindControl_LoadSnapshot,boarder,not started
+0x105ad0,40,PrewindControl_SaveSnapshot,save,checked
+0x105af8,20,PrewindControl_LoadSnapshot,boarder,checked
 0x105b10,124,StaticInit_PrewindControl,other,not started
 0x105b90,44,Vec4_ScaleCopy1,other,not started
 0x105bc0,160,SitAndWaitControl_Update,boarder?,checked
@@ -57,8 +57,8 @@ address,size,name,system,status
 0x105f48,16,GateAnticipateControl_Enter,boarder,checked
 0x105f58,484,GateAnticipateControl_Update,boarder,checked
 0x106140,168,GateAnticipateControl_Exit,boarder,checked
-0x1061e8,40,GateAnticipateControl_SaveSnapshot,save,not started
-0x106210,20,GateAnticipateControl_LoadSnapshot,boarder,not started
+0x1061e8,40,GateAnticipateControl_SaveSnapshot,save,checked
+0x106210,20,GateAnticipateControl_LoadSnapshot,boarder,checked
 0x106228,132,GateLaunchControl_Enter,boarder?,checked
 0x1062b0,464,GateLaunchControl_Update,boarder?,checked
 0x106480,124,StaticInit_GateLaunchControl,boarder?,not started
@@ -68,12 +68,12 @@ address,size,name,system,status
 0x1065f0,16,FinishLineControl_IsPhase4,boarder?,checked
 0x106600,100,FinishLineControl_Enter,boarder?,ported
 0x106668,916,FinishState_Update,boarder,checked
-0x106a00,40,FinishLineControl_SaveSnapshot,save,not started
-0x106a28,20,FinishLineControl_LoadSnapshot,ai?,not started
+0x106a00,40,FinishLineControl_SaveSnapshot,save,checked
+0x106a28,20,FinishLineControl_LoadSnapshot,ai?,checked
 0x106a48,60,ResetWaitControl_Exit,game?,ported
 0x106a90,580,ResetState_Update,boarder,ported
-0x106cd8,40,ResetWaitControl_SaveSnapshot,save,not started
-0x106d00,20,ResetWaitControl_LoadSnapshot,ai?,not started
+0x106cd8,40,ResetWaitControl_SaveSnapshot,save,checked
+0x106d00,20,ResetWaitControl_LoadSnapshot,ai?,checked
 0x106dc0,8,Boarder_OnClipQueued,boarder,ported
 0x106dc8,1560,RailSlideControl_Enter,boarder,ported
 0x1073e0,524,RailSlideControl_Update,boarder,ported
@@ -81,8 +81,8 @@ address,size,name,system,status
 0x107628,260,RailSlideControl_PlayQueuedClip,boarder,ported
 0x107730,2200,RailSlideControl_CommitQuarterTurn,boarder,ported
 0x107fc8,132,RailSlideControl_SwitchStance,boarder,ported
-0x108050,40,RailSlideControl_SaveSnapshot,save,not started
-0x108078,20,RailSlideControl_LoadSnapshot,boarder,not started
+0x108050,40,RailSlideControl_SaveSnapshot,save,checked
+0x108078,20,RailSlideControl_LoadSnapshot,boarder,checked
 0x108110,44,WipeOutControl_Enter,boarder?,ported
 0x108198,228,GetUpState_Update,wipeout,ported
 0x108280,12,WipeOutRecoverControl_Exit,boarder?,ported
@@ -90,8 +90,8 @@ address,size,name,system,status
 0x108368,16,AirMotion_Exit,boarder,ported
 0x108378,3980,AirMotion_Update,boarder,ported
 0x109308,864,Landing_ChooseState,boarder,checked
-0x109668,40,AirMotion_SaveSnapshot,save,not started
-0x109690,20,AirMotion_LoadSnapshot,boarder,not started
+0x109668,40,AirMotion_SaveSnapshot,save,checked
+0x109690,20,AirMotion_LoadSnapshot,boarder,checked
 0x1097f8,44,Vec4_ScaleCopy2,other,not started
 0x109858,32,GroundMotion_Enter,boarder,ported
 0x109878,212,Boarder_GroundSpringForce,boarder,checked
@@ -100,15 +100,15 @@ address,size,name,system,status
 0x109ef8,476,Boarder_SideFriction,boarder,checked
 0x10a0d8,3568,GroundMotion_Update,boarder,checked
 0x10aec8,12,GroundMotion_Exit,boarder,ported
-0x10aed8,40,GroundMotion_SaveSnapshot,save,not started
-0x10af00,20,GroundMotion_LoadSnapshot,boarder,not started
+0x10aed8,40,GroundMotion_SaveSnapshot,save,checked
+0x10af00,20,GroundMotion_LoadSnapshot,boarder,checked
 0x10afb0,44,Vec4_ScaleCopy3,other,not started
 0x10afe8,124,StaticInit_GroundMotion2,other,not started
 0x10b068,40,RailSlideMotion_Enter,boarder,ported
 0x10b090,60,RailSlideMotion_Exit,boarder,ported
 0x10b0d0,3984,RailSlideMotion_Update,boarder,ported
-0x10c060,40,RailSlideMotion_SaveSnapshot,save,not started
-0x10c088,20,RailSlideMotion_LoadSnapshot,boarder,not started
+0x10c060,40,RailSlideMotion_SaveSnapshot,save,checked
+0x10c088,20,RailSlideMotion_LoadSnapshot,boarder,checked
 0x10c120,24,Vec4_Set,boarder?,ported
 0x10c138,44,Vec4_ScaleCopy14,other,not started
 0x10c198,340,WipeoutMotion_Enter,wipeout,ported
@@ -124,13 +124,13 @@ address,size,name,system,status
 0x10f178,2088,Wipeout_StartGetUp,wipeout,ported
 0x10f9a0,740,Wipeout_PlayImpactClip,wipeout,ported
 0x10fd58,1124,Ragdoll_GroundProbe,wipeout,ported
-0x1101c0,88,WipeoutMotion_SaveSnapshot,save,not started
-0x110218,68,WipeoutMotion_LoadSnapshot,wipeout,not started
+0x1101c0,88,WipeoutMotion_SaveSnapshot,save,checked
+0x110218,68,WipeoutMotion_LoadSnapshot,wipeout,checked
 0x110260,44,WipeOutRecoverMotion_Enter,boarder?,ported
 0x110290,56,WipeOutRecoverMotion_Exit,boarder?,ported
 0x1102c8,1192,GetUpMotion_Update,wipeout,ported
-0x110770,40,WipeOutRecoverMotion_SaveSnapshot,save,not started
-0x110798,20,WipeOutRecoverMotion_LoadSnapshot,ai?,not started
+0x110770,40,WipeOutRecoverMotion_SaveSnapshot,save,checked
+0x110798,20,WipeOutRecoverMotion_LoadSnapshot,ai?,checked
 0x110830,8,Body_Translate,other,ported
 0x110838,16,Obj_HasId,world?,not started
 0x110860,8,FUN_00110860,world?,not started
@@ -156,8 +156,8 @@ address,size,name,system,status
 0x1125a0,40,cAI::vf9_1125a0,ai,ported
 0x1125c8,292,Race_CreateHandlers,race,ported
 0x1126f0,160,cAI::vf1_1126f0,ai,ported
-0x112790,76,cAI::SaveSnapshot,save,not started
-0x1127e0,100,cAI::vf8_1127e0,ai,not started
+0x112790,76,cAI::SaveSnapshot,save,checked
+0x1127e0,100,cAI::vf8_1127e0,ai,checked
 0x112848,108,Race_HasStartGate,race,checked
 0x1128b8,104,Race_ResetRiderRenders,race,ported
 0x112920,460,Race_UpdateRiderStreaming,race,ported
@@ -229,8 +229,8 @@ address,size,name,system,status
 0x1162f8,164,AIWorld_UpdateActiveCells,ai,ported
 0x1163a0,128,AIWorld_ReleaseActiveCells,ai,ported
 0x116420,160,AIWorld_MarkCellActive,ai,ported
-0x1164c0,20,cAIWorld::SaveSnapshot,save,not started
-0x1164d8,236,cAIWorld::vf8_1164d8,ai,not started
+0x1164c0,20,cAIWorld::SaveSnapshot,save,checked
+0x1164d8,236,cAIWorld::vf8_1164d8,ai,checked
 0x1165c8,124,StaticInit_AIWorld,ai?,not started
 0x116648,8,thunk_FUN_00115dc0,runtime,host
 0x116650,20,cAIWorld::~cAIWorld,ai,not started
@@ -248,8 +248,8 @@ address,size,name,system,status
 0x117180,16,Boarder_UpdateAnimLayers,boarder,not started
 0x117190,8,Boarder_FlushEndedClips,boarder,not started
 0x117198,2952,cBoarder::vf7_117198,boarder,ported
-0x117d20,412,Boarder_SaveSnapshot,save,not started
-0x117ec0,424,Boarder_LoadSnapshot,boarder,not started
+0x117d20,412,Boarder_SaveSnapshot,save,checked
+0x117ec0,424,Boarder_LoadSnapshot,boarder,checked
 0x118068,36,Boarder_SetRestartPoint,boarder,ported
 0x118090,516,Boarder_UpdatePathAhead,boarder,ported
 0x118298,888,Boarder_UpdateRaceLineProgress,boarder,ported
@@ -435,8 +435,8 @@ address,size,name,system,status
 0x123b10,948,AirPredict_AtTakeoff,boarder,ported
 0x123ec8,52,AirPredict_Tick,boarder,ported
 0x123f00,8,AirPredict_ClearLandTime,boarder,ported
-0x123f08,40,AirPredict_SaveSnapshot,save,not started
-0x123f30,20,AirPredict_LoadSnapshot,boarder,not started
+0x123f08,40,AirPredict_SaveSnapshot,save,checked
+0x123f30,20,AirPredict_LoadSnapshot,boarder,checked
 0x123fc8,2392,Boarder_RiderCollisions,boarder,ported
 0x124920,1200,Boarder_RiderHit,boarder,ported
 0x124dd0,696,Boarder_Stumble,boarder,ported
@@ -586,7 +586,8 @@ address,size,name,system,status
 0x13a0f0,304,AI_RubberBandSpeedScale,ai,ported
 0x13a220,144,AIComputer_UpdateSkillScale,ai,ported
 0x13a2b0,424,AI_InitSkill,ai,ported
-0x13a460,84,cComputer::SaveSnapshot,save,not started
+0x13a460,84,cComputer::SaveSnapshot,save,checked
+0x13a4b8,104,cComputer::LoadSnapshot,save,checked
 0x13a520,124,StaticInit_Computer,other,not started
 0x13a5c8,92,cComputer::__tf,runtime,host
 0x13a628,304,cComputer::~cComputer,boarder?,not started
@@ -1056,7 +1057,8 @@ address,size,name,system,status
 0x153130,236,Boarder_UpdateSlopeTimeScale,boarder,ported
 0x1532c0,144,cPlayer::vf11_1532c0,boarder?,ported
 0x153390,104,cPlayer::vf7_153390,boarder?,not started
-0x1533f8,84,cPlayer::SaveSnapshot,save,not started
+0x1533f8,84,cPlayer::SaveSnapshot,save,checked
+0x153450,60,cPlayer::LoadSnapshot,save,checked
 0x153668,92,cPlayer::__tf,runtime,host
 0x153758,116,cPlayerState::__tf,runtime,host
 0x1537d0,52,RigidBody_Construct,world,not started
@@ -1066,7 +1068,7 @@ address,size,name,system,status
 0x153ee8,1104,RigidBody_ContactImpulse,world,ported
 0x154338,328,RigidBody_AddImpulse,world,ported
 0x154480,40,Snapshot_WriteHeader,world?,checked
-0x1544a8,20,Snapshot_ReadHeader,ai?,not started
+0x1544a8,20,Snapshot_ReadHeader,ai?,checked
 0x154548,44,Vec4_ScaleCopy17,other,not started
 0x154580,56,TrickDef_Load,other,ported
 0x1545b8,12,FUN_001545b8,,not started
@@ -1124,8 +1126,8 @@ address,size,name,system,status
 0x157330,352,Scoring_PushMessage,scoring?,ported
 0x157490,1252,Score_BuildTrickId,scoring,ported
 0x157978,8,FUN_00157978,,ported
-0x157980,40,Score_SaveSnapshot,save,not started
-0x1579a8,56,Score_LoadSnapshot,scoring,not started
+0x157980,40,Score_SaveSnapshot,save,checked
+0x1579a8,56,Score_LoadSnapshot,scoring,checked
 0x1579e0,572,Score_TrickBookCheck,scoring,ported
 0x157c18,52,TrickId_Matches,scoring?,checked
 0x157c50,92,Score_IsFocusPlayer,scoring,ported
@@ -1177,16 +1179,16 @@ address,size,name,system,status
 0x15a030,764,AnimClip_Advance,animation,ported
 0x15a330,116,AnimClip_SetEndBlendOut,animation,not started
 0x15a3a8,48,cBoarderSequence::vf2_15a3a8,boarder,not started
-0x15a3d8,212,cBoarderSequence::SaveSnapshot,save,not started
-0x15a4b0,332,cBoarderSequence::vf4_15a4b0,boarder,not started
+0x15a3d8,212,cBoarderSequence::SaveSnapshot,save,checked
+0x15a4b0,332,cBoarderSequence::vf4_15a4b0,boarder,checked
 0x15a600,84,AnimLayer_BlendOutAll,animation,not started
 0x15a658,52,AnimLayer_Turn,animation,not started
 0x15a690,52,FUN_0015a690,boarder?,not started
 0x15a6c8,56,AnimLayer_FindClip,animation,not started
 0x15a700,96,BdrSeq_Create,render?,not started
 0x15a760,52,AnimLayer_ClearCurrentFlags,animation,not started
-0x15a798,128,AnimLayer_SaveSnapshot,save,not started
-0x15a818,168,AnimLayer_LoadSnapshot,animation,not started
+0x15a798,128,AnimLayer_SaveSnapshot,save,checked
+0x15a818,168,AnimLayer_LoadSnapshot,animation,checked
 0x15a8c0,192,AnimData_Destruct,animation,not started
 0x15a980,16,StaticDtor_AnimLayer,files?,not started
 0x15abe8,92,cBoarderSequence::__tf,runtime,host
@@ -1221,8 +1223,8 @@ address,size,name,system,status
 0x15ff40,116,AnimCtl_IsClipAtEnd,animation,ported
 0x15ffb8,80,AnimCtl_TestClipFlag,animation,ported
 0x160008,80,AnimCtl_TestClipBit,animation,not started
-0x160058,120,AnimCtl_SaveSnapshot,save,not started
-0x1600d0,112,AnimCtl_LoadSnapshot,animation,not started
+0x160058,120,AnimCtl_SaveSnapshot,save,checked
+0x1600d0,112,AnimCtl_LoadSnapshot,animation,checked
 0x160140,140,AnimMode_BoardClassFrame,animation,not started
 0x1601d0,976,AnimMode_DirectionBlend,animation,not started
 0x1605a0,224,AnimMode_CrouchBlend,animation,not started
@@ -3344,8 +3346,8 @@ address,size,name,system,status
 0x2029d8,292,PoseBlend_EvalCurves,animation?,not started
 0x202b00,3904,FUN_00202b00,animation?,not started
 0x203a40,92,cSkelSequence::vf2_203a40,render,not started
-0x203aa0,40,cSkelSequence::SaveSnapshot,save,not started
-0x203ac8,20,cSkelSequence::vf4_203ac8,render,not started
+0x203aa0,40,cSkelSequence::SaveSnapshot,save,checked
+0x203ac8,20,cSkelSequence::vf4_203ac8,render,checked
 0x203ae0,28,ClipList_Insert,animation?,not started
 0x203b00,72,ClipList_RemoveAndDestroy,other,not started
 0x203b48,24,ClipList_Init,other,not started

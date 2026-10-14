@@ -657,3 +657,262 @@ pub fn spline_path_load(m: &mut Mem, env: &mut dyn LoadEnv, node: u32, l: u32, s
     read_into(m, s, p, n << 5);
     spline_load(m, env, node + 0x64, s);
 }
+
+// The riders' and the AI's snapshots (board row G12l). A rider (`cPlayer` / `cComputer`, a pointer to its boarder data
+// first) saves its boarder data's 0x450-byte block, its animation, air prediction and score, then each of its motions
+// and controls (each a small block tagged by class), then its AI path and line as indices. The AI saves its handlers'
+// state and the node counters, the AI world its 0x6c cell slots. World calls go through `LoadEnv::call`.
+
+/// The motions' and controls' blocks: (their offset in the rider, length, tag), in the order saved
+pub const RIDER_PARTS: [(u32, u32, u32); 15] = [
+    (0x480, 0x20, 0xdead_bef0), // AirMotion
+    (0x4b0, 0xc, 0xdead_bf09),  // GroundMotion
+    (0x4c0, 0x10, 0xdead_bf15), // RailSlideMotion
+    (0x4f0, 0x60, 0xdead_bf24), // WipeoutMotion (and its 0x90-byte header at +0x70)
+    (0x5f0, 0xc, 0xdead_bf25),  // WipeOutRecoverMotion
+    (0x610, 0x10, 0xdead_bf06), // BumpControl
+    (0x630, 0x14, 0xdead_bf07), // CruiseControl
+    (0x670, 0x10, 0xdead_bf0a), // FinishLineControl
+    (0x6a0, 0x14, 0xdead_bf08), // GateAnticipateControl
+    (0x6f0, 0xc, 0xdead_bf0c),  // LandNormalControl
+    (0x700, 0xc, 0xdead_bf0f),  // NaturalAirControl
+    (0x710, 0xc, 0xdead_bf12),  // PrewindControl
+    (0x720, 0x14, 0xdead_bf14), // RailSlideControl
+    (0x740, 0x70, 0xdead_bf19), // SpinControl
+    (0x810, 0x18, 0xdead_bf0b), // ResetWaitControl
+];
+
+/// A part's save (`*_SaveSnapshot`: the tag, then the length, then the block) and load (`*_LoadSnapshot`)
+pub fn part_save(m: &mut Mem, p: u32, len: u32, tag: u32, s: u32) {
+    m.w32(p + 4, tag);
+    m.w32(p, len);
+    stream_write_mem(m, s, p, len);
+}
+pub fn part_load(m: &mut Mem, p: u32, len: u32, s: u32) {
+    read_into(m, s, p, len);
+}
+
+/// `AnimLayer_SaveSnapshot` 0x15a798(layer): the clip count (`ClipList_Count` 0x203b98), then each sequence of the
+/// layer's ring (from +0x64 through +0x2c) saving itself (its vtable at +0x34, slot +0x24)
+pub fn anim_layer_save(m: &mut Mem, env: &mut dyn LoadEnv, layer: u32, s: u32) {
+    let n = env.call(m, 0x203b98, &[layer]);
+    words(m, s, &[n]);
+    let mut q = m.r32(layer + 0x64);
+    while q != layer {
+        let vtab = m.r32(q + 0x34);
+        let this = q.wrapping_add(m.r16(vtab + 0x20) as i16 as i32 as u32);
+        let f = m.r32(vtab + 0x24);
+        env.call(m, f, &[this, s]);
+        q = m.r32(q + 0x2c);
+    }
+}
+
+/// `AnimLayer_LoadSnapshot` 0x15a818(layer): as many sequences as saved, each made (`BdrSeq_Create` 0x15a700), loading
+/// itself (slot +0x2c) and put last in the layer's ring
+pub fn anim_layer_load(m: &mut Mem, env: &mut dyn LoadEnv, layer: u32, s: u32) {
+    let [n] = read_words::<1>(m, s);
+    for _ in 0..(n as i32).max(0) {
+        let q = env.call(m, BDR_SEQ_CREATE, &[layer]);
+        let vtab = m.r32(q + 0x34);
+        let this = q.wrapping_add(m.r16(vtab + 0x28) as i16 as i32 as u32);
+        let f = m.r32(vtab + 0x2c);
+        env.call(m, f, &[this, s]);
+        m.w32(q + 0x2c, layer);
+        m.w32(q + 0x30, m.r32(layer + 0x30));
+        let tail = m.r32(layer + 0x30);
+        m.w32(tail + 0x2c, q);
+        m.w32(layer + 0x30, q);
+    }
+}
+
+/// `BdrSeq_Create`
+pub const BDR_SEQ_CREATE: u32 = 0x15a700;
+
+/// `AnimCtl_SaveSnapshot` 0x160058 / `AnimCtl_LoadSnapshot` 0x1600d0: 0x24 bytes tagged 0xdeadbef6, then its three
+/// layers (+0x28, 0x70 apart; on load each emptied first, `ClipList_DestroyAll` 0x203c20)
+pub fn anim_ctl_save(m: &mut Mem, env: &mut dyn LoadEnv, p: u32, s: u32) {
+    part_save(m, p, 0x24, 0xdead_bef6, s);
+    for i in 0..3 {
+        anim_layer_save(m, env, p + 0x28 + 0x70 * i, s);
+    }
+}
+pub fn anim_ctl_load(m: &mut Mem, env: &mut dyn LoadEnv, p: u32, s: u32) {
+    read_into(m, s, p, 0x24);
+    for i in 0..3 {
+        let layer = p + 0x28 + 0x70 * i;
+        env.call(m, 0x203c20, &[layer]);
+        anim_layer_load(m, env, layer, s);
+    }
+}
+
+/// `Boarder_SaveSnapshot` 0x117d20(rider): the boarder data's (the rider's first word) 0x450 bytes at +0x10 tagged
+/// 0xdeadbef8, a 1 and a word the game never sets (STANDIN: 0 here), its animation (+0x46c0), air prediction
+/// (+0x57b0, 0x60 tagged 0xdeadbef9) and score (+0x5820, 0x24c tagged 0xdeadbf1f), the rider's motions and controls,
+/// then its AI path and line (+0x57a0 / +0x57a4) as indices (`AIP_GetPathIndex` / `AIP_GetLineIndex` on 0x337fb8)
+pub fn boarder_save(m: &mut Mem, env: &mut dyn LoadEnv, rider: u32, s: u32) {
+    let d = m.r32(rider);
+    part_save(m, d + 0x10, 0x450, 0xdead_bef8, s);
+    words(m, s, &[1, 0]);
+    let d = m.r32(rider);
+    anim_ctl_save(m, env, d + 0x46c0, s);
+    let d = m.r32(rider);
+    part_save(m, d + 0x57b0, 0x60, 0xdead_bef9, s);
+    let d = m.r32(rider);
+    part_save(m, d + 0x5820, 0x24c, 0xdead_bf1f, s);
+    for (off, len, tag) in RIDER_PARTS {
+        part_save(m, rider + off, len, tag, s);
+        if off == 0x4f0 {
+            crate::snapshot::header_save(m, rider + off + 0x70, s);
+        }
+    }
+    let d = m.r32(rider);
+    let path = env.call(m, 0x198688, &[0x337fb8, m.r32(d + 0x57a0)]);
+    let line = env.call(m, 0x1986d8, &[0x337fb8, m.r32(d + 0x57a4)]);
+    let b = [(path as u16).to_le_bytes(), (line as u16).to_le_bytes()].concat();
+    crate::replaymgr::stream_write_bytes(m, s, &b);
+}
+
+/// `Boarder_LoadSnapshot` 0x117ec0(rider): the same back; the boarder's +0x430 found again from its three shorts at
+/// +0x440 (`FUN_00260cb8` on 0x346488), the score's trick name made again (`Score_FormatTrickName`), the AI path and
+/// line from their indices (0x337fc4 + path × 0x3c, 0x337fbc + line × 0x40)
+pub fn boarder_load(m: &mut Mem, env: &mut dyn LoadEnv, rider: u32, s: u32) {
+    let d = m.r32(rider);
+    read_into(m, s, d + 0x10, 0x450);
+    let _ = read_words::<2>(m, s);
+    let d = m.r32(rider);
+    anim_ctl_load(m, env, d + 0x46c0, s);
+    let d = m.r32(rider);
+    read_into(m, s, d + 0x57b0, 0x60);
+    let d = m.r32(rider);
+    read_into(m, s, d + 0x5820, 0x24c);
+    env.call(m, SCORE_FORMAT_TRICK_NAME, &[d + 0x5820 + 0x250, d + 0x5820 + 0x6c]);
+    let d = m.r32(rider);
+    let sh = |m: &Mem, a: u32| m.r16(a) as u32;
+    let v = env.call(m, 0x260cb8, &[0x346488, sh(m, d + 0x440), sh(m, d + 0x442), sh(m, d + 0x444)]);
+    m.w32(d + 0x430, v);
+    for (off, len, _) in RIDER_PARTS {
+        read_into(m, s, rider + off, len);
+        if off == 0x4f0 {
+            read_into(m, s, rider + off + 0x70, 0x90);
+        }
+    }
+    let at = m.r32(s + 8);
+    let (path, line) = (m.r16(at) as i16 as i32, m.r16(at + 2) as i16 as i32);
+    m.w32(s + 8, at.wrapping_add(4));
+    let (lines, paths) = (m.r32(0x337fbc), m.r32(0x337fc4));
+    let d = m.r32(rider);
+    m.w32(d + 0x57a0, paths.wrapping_add((path * 0x3c) as u32));
+    m.w32(d + 0x57a4, lines.wrapping_add((line * 0x40) as u32));
+}
+
+/// `Score_FormatTrickName`
+pub const SCORE_FORMAT_TRICK_NAME: u32 = 0x1551c0;
+
+/// `cPlayer::SaveSnapshot` 0x1533f8 / its load 0x153450: the boarder, then 0xc bytes at +0x860 tagged 0xdeadbf11
+pub fn player_save(m: &mut Mem, env: &mut dyn LoadEnv, rider: u32, s: u32) {
+    boarder_save(m, env, rider, s);
+    part_save(m, rider + 0x860, 0xc, 0xdead_bf11, s);
+}
+pub fn player_load(m: &mut Mem, env: &mut dyn LoadEnv, rider: u32, s: u32) {
+    boarder_load(m, env, rider, s);
+    read_into(m, s, rider + 0x860, 0xc);
+}
+
+/// `cComputer::SaveSnapshot` 0x13a460 / its load 0x13a4b8: the boarder, then 0x40 bytes at +0x860 tagged 0xdeadbefd;
+/// on load its 8 bytes at +0x8a0 taken again from the table at 0x31d318 by its +0x89c
+pub fn computer_save(m: &mut Mem, env: &mut dyn LoadEnv, rider: u32, s: u32) {
+    boarder_save(m, env, rider, s);
+    part_save(m, rider + 0x860, 0x40, 0xdead_befd, s);
+}
+pub fn computer_load(m: &mut Mem, env: &mut dyn LoadEnv, rider: u32, s: u32) {
+    boarder_load(m, env, rider, s);
+    read_into(m, s, rider + 0x860, 0x40);
+    let i = m.r16(rider + 0x89c) as i16 as i32;
+    let from = 0x31d318u32.wrapping_add((i * 8) as u32);
+    for k in 0..8 {
+        let b = m.r8(from + k);
+        m.w8(rider + 0x8a0 + k, b);
+    }
+    m.w16(rider + 0x89c, i as u16);
+}
+
+/// `cSkelSequence::SaveSnapshot` 0x203aa0 / its load 0x203ac8: 0x2c bytes tagged 0xdeadbf18
+/// `cBoarderSequence::SaveSnapshot` 0x15a3d8: the skeleton sequence, 0x40 bytes at +0x38 tagged 0xdeadbef7, then each
+/// of its +0x44 trees' (+0x78) two first words
+pub fn boarder_sequence_save(m: &mut Mem, this: u32, s: u32) {
+    part_save(m, this, 0x2c, 0xdead_bf18, s);
+    part_save(m, this + 0x38, 0x40, 0xdead_bef7, s);
+    let mut i = 0;
+    while (i as i32) < m.r32(this + 0x44) as i32 {
+        let t = m.r32(this + 0x78 + 4 * i);
+        let (a, b) = (m.r32(t), m.r32(t + 4));
+        words(m, s, &[a]);
+        words(m, s, &[b]);
+        i += 1;
+    }
+}
+
+/// `cBoarderSequence`'s load 0x15a4b0: its trees destroyed (`SkelAnim_DestroyTree` 0x159a80), the skeleton sequence's
+/// 0x2c bytes and its 0x40 back, then each tree made again (`SkelAnim_CreateTree` 0x158dc0 on 0x3211a8) from the two
+/// words' low halves (first << 16 | second)
+pub fn boarder_sequence_load(m: &mut Mem, env: &mut dyn LoadEnv, this: u32, s: u32) {
+    let mut i = 0;
+    while (i as i32) < m.r32(this + 0x44) as i32 {
+        let t = m.r32(this + 0x78 + 4 * i);
+        env.call(m, 0x159a80, &[t]);
+        i += 1;
+    }
+    read_into(m, s, this, 0x2c);
+    read_into(m, s, this + 0x38, 0x40);
+    let mut i = 0;
+    while (i as i32) < m.r32(this + 0x44) as i32 {
+        let [a, b] = read_words::<2>(m, s);
+        let key = (a & 0xffff) << 16 | (b & 0xffff);
+        let t = env.call(m, 0x158dc0, &[0x3211a8, key]);
+        m.w32(this + 0x78 + 4 * i, t);
+        i += 1;
+    }
+}
+
+/// `cAI::SaveSnapshot` 0x112790 / its load 0x1127e0: 0x18 bytes at +0xc tagged 0xdeadbef1 and the node counters; on
+/// load the handlers made again (`Race_CreateHandlers` 0x1125c8) for +0x20 and then the old +0x1c, +0x60 from +0x64
+pub fn ai_save(m: &mut Mem, this: u32, s: u32) {
+    part_save(m, this + 0xc, 0x18, 0xdead_bef1, s);
+    crate::bxlist::save_counters(m, s);
+}
+pub fn ai_load(m: &mut Mem, env: &mut dyn LoadEnv, this: u32, s: u32) {
+    read_into(m, s, this + 0xc, 0x18);
+    crate::bxlist::load_counters(m, s);
+    let u = m.r32(this + 0x1c);
+    env.call(m, 0x1125c8, &[this, m.r32(this + 0x20)]);
+    m.w32(this + 0x60, m.r32(this + 100));
+    env.call(m, 0x1125c8, &[this, u]);
+}
+
+/// `cAIWorld::SaveSnapshot` 0x1164c0 / its load 0x1164d8: its 0x1b0 bytes of cell numbers (+0x36c); on load the active
+/// cells released (0x1163a0) and the instances reset (`World_ResetInstances` 0x115fe8) first, then each of the 0x6c
+/// slots (+0xc, 8 bytes) set from its number: -1 empty, else the course's cell (0xffff none) marked in use and
+/// woken (`FUN_00260060` on 0x346488)
+pub fn ai_world_save(m: &mut Mem, this: u32, s: u32) {
+    stream_write_mem(m, s, this + 0x36c, 0x1b0);
+}
+pub fn ai_world_load(m: &mut Mem, env: &mut dyn LoadEnv, this: u32, s: u32) {
+    env.call(m, 0x1163a0, &[this]);
+    env.call(m, 0x115fe8, &[this]);
+    read_into(m, s, this + 0x36c, 0x1b0);
+    for k in 0..0x6cu32 {
+        let v = m.r32(this + 0x36c + 4 * k);
+        let out = this + 0xc + 8 * k;
+        if v == u32::MAX {
+            m.w32(out, 0);
+            m.w16(out + 4, 0);
+            m.w16(out + 6, 0);
+        } else {
+            let cell = if v != 0xffff { m.r32(m.r32(m.r32(0x346488) + 0x4c).wrapping_add(v.wrapping_mul(4))) } else { 0 };
+            m.w16(out + 4, 1);
+            m.w32(out, cell);
+            env.call(m, 0x260060, &[0x346488, cell]);
+            m.w16(out + 6, 0);
+        }
+    }
+}

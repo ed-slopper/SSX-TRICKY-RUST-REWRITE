@@ -7,8 +7,8 @@ and pins (G12e; the same module, checked: `tests/replay_highlights.rs`), the cam
 `tests/replay_camtracks.rs`), playback control and the manager's life (G12g; checked:
 `tests/replay_playback.rs`), the save to the card and the load (G12h; checked: `tests/replay_save.rs`), the world snapshot's
 orchestration (G12i; checked: `tests/replay_snapshot.rs`), the world nodes' snapshot saves (G12j;
-`tricky_game::snapshot`, checked: `tests/snapshot_saves.rs`), and their load constructors (G12k; checked:
-`tests/snapshot_loads.rs`). Keyframes, the node save and restore, pins and
+`tricky_game::snapshot`, checked: `tests/snapshot_saves.rs`), their load constructors (G12k; checked:
+`tests/snapshot_loads.rs`), and the riders' and AI's snapshots (G12l; checked: `tests/snapshot_riders.rs`). Keyframes, the node save and restore, pins and
 highlights, camera tracks, `Replay_Update` and the memory-card save are the rest of G12.
 
 ## The replay control
@@ -400,4 +400,35 @@ frames of a message), +0x4c and +0x50 hold recording, +0x58 a stream overflowed.
 - **Checked in the runner:** 12,000 random cases. A node of each class was saved by our checked save and loaded
   into a fresh node by the game's constructor and ours, about 400 per class. The set-up was logging stand-ins, and
   every call and all the memory were compared.
+
+## The riders' and AI's snapshots (G12l)
+
+- **A rider** (`cPlayer` / `cComputer`; its first word points at its boarder data) saves:
+  - the boarder data's 0x450 bytes at +0x10 (0xdeadbef8);
+  - two words: 1, and a stack word the game never sets (STANDIN: the port writes 0);
+  - its animation controller (+0x46c0: 0x24 bytes, 0xdeadbef6, then three layers);
+  - its air prediction (+0x57b0: 0x60, 0xdeadbef9) and its score (+0x5820: 0x24c, 0xdeadbf1f);
+  - fifteen motion and control blocks, each tagged by its class (`snapshot::RIDER_PARTS`). The wipe-out motion adds
+    its 0x90-byte header;
+  - its AI path and line as indices (`AIP_GetPathIndex` / `AIP_GetLineIndex`, two shorts);
+  - its own part at +0x860: the player 0xc bytes (0xdeadbf11), the computer 0x40 (0xdeadbefd).
+- **Loading a rider** reads the same back. It also:
+  - remakes the score's trick name (`Score_FormatTrickName`);
+  - looks up +0x430 again from the boarder's three unsigned shorts at +0x440 (`FUN_00260cb8`);
+  - turns the path and line back into pointers (0x337fc4 + path × 0x3c, 0x337fbc + line × 0x40);
+  - for the computer, takes its 8 bytes at +0x8a0 from the table at 0x31d318 by its +0x89c (the decompile hides
+    this).
+- **An animation layer** saves its clip count and lets each sequence on its ring save itself (vtable at +0x34, slot
+  +0x24). The load empties the layer, then makes each sequence (`BdrSeq_Create`), has it load itself (slot +0x2c)
+  and puts it last on the ring.
+- **A boarder sequence** saves the skeleton sequence's 0x2c bytes (0xdeadbf18), then its 0x40 (0xdeadbef7), then
+  each tree's two words. The load destroys its trees and remakes each one (`SkelAnim_CreateTree` on 0x3211a8) from
+  the two words' low halves: (first << 16) | second.
+- **The AI** saves 0x18 bytes (0xdeadbef1) and the node counters. The load makes its handlers again
+  (`Race_CreateHandlers`) for +0x20 and then the old +0x1c.
+- **The AI world** saves its 0x6c cell numbers. The load releases the active cells and resets the instances, then
+  sets each slot: -1 empty, otherwise the course's cell (0xffff for none), marked in use and woken.
+- **Checked in the runner:** 1,500 random cases, about 300 of each kind, saved and then loaded back on both sides.
+  The fake animation sequences' virtuals log, as do the world calls. Every call and all the memory were compared,
+  except the stack word, which is taken from the game.
 
