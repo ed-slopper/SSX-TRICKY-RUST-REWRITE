@@ -76,3 +76,25 @@ direct calls, the heap, the pads).
   and `last | (held & !last)` = `last | held`).
 - **The runner stubs must return sign-extended words,** as the EE's 32-bit results are. The viewport size is
   converted signed or unsigned by the 64-bit register's sign.
+
+## The backdrop's animation (G8c)
+
+`tricky_game::overlays`. A backdrop overlay moves in three parts, each with a set of bits (1 still, 2 fading in, 4
+/ 8 from the right / left, 16 / 32 from below / above, 64 opening).
+
+- **The frame** (+0x60):
+  - its alpha +0x50 rises by +0x54 (0.034 a frame) to +0x58;
+  - its x +0x38 starts at ±640 and moves by +0x3c (∓90), which itself changes by +0x40 (∓5) and is held at +0x44
+    (±10);
+  - its y +0x48 starts at ∓480 and moves by ±20;
+  - each stops at 0;
+  - after a delay of +0x5c frames, its width +0x2c grows from 60 by 13 to 500.
+- **Its contents** (+0x7c): after a delay of +0x78 frames, the alpha +0x70 rises by 0.034 to 1.0 and the x +0x64
+  slides in. From the left it starts at -640 moving 10. From the right it starts at 640 moving -90, slowing by 5.
+  The x goes to both fonts' +0x20, the first font's as it stood after the stop test.
+- **The edges** (+0x90): two offsets, -850 rising by 25 and -680 rising by 16, each to 0.
+- **`cBackdropOverlay::Update`** steps the screen animation (`ScreenAnim_Update` at +0x94), then each part not
+  still. `cBackdropOverlay::Reset` and `cScreenOverlay::Update` are empty.
+- **Checked in the runner** on 60,000 random backdrops, over every start and step with random bits and values around
+  each limit, with all memory compared. The tests caught 6 of 8 mutants; the two left cannot change a result (a
+  reload of the value just stored, and `<=` at a limit writing the same value).

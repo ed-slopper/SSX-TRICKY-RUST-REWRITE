@@ -490,3 +490,244 @@ pub fn new_buttons(m: &mut Mem, env: &mut dyn OverlayManEnv, o: u32, pad: i32) -
     m.w32(PAD, d);
     new
 }
+
+// ---- the backdrop's animation (G8c) ----
+//
+// A backdrop moves in three parts, each with its own bits (1 still, 2 fading in, 4 / 8 from the right / left, 16 /
+// 32 from below / above, 64 opening):
+// - the frame (+0x60 the bits): +0x50 its alpha rising by +0x54 to +0x58; +0x38 its x moving by +0x3c, itself
+//   accelerating by +0x40 up to +0x44; +0x48 its y by +0x4c; +0x2c its width growing by +0x30 to +0x34 after a delay
+//   of +0x5c frames
+// - its contents (+0x7c): +0x70 the alpha by +0x74 to 1.0 after a delay of +0x78 frames; +0x64 the x by +0x68
+//   (accelerating by +0x6c), written to both fonts' +0x20
+// - the edges (+0x90): +0x80 / +0x88 two offsets by +0x84 / +0x8c, to 0
+
+use crate::ps2f::F;
+
+fn fget(m: &Mem, a: u32) -> F {
+    F(f32::from_bits(m.r32(a)))
+}
+fn fput(m: &mut Mem, a: u32, v: F) {
+    m.w32(a, v.0.to_bits());
+}
+const RATE: u32 = 0x3d0b4396;
+
+/// `Backdrop_StartFrameAnim` 0x1a89b0 (the bits added, the alpha to reach or the opening's delay)
+pub fn start_frame_anim(m: &mut Mem, o: u32, bits: u32, v: f32) {
+    let fl = m.r32(o + 0x60) | bits;
+    m.w32(o + 0x60, fl);
+    if fl & 2 != 0 {
+        m.w32(o + 0x50, 0);
+        m.w32(o + 0x54, RATE);
+        m.w32(o + 0x58, v.to_bits());
+    }
+    let fl = m.r32(o + 0x60);
+    let slide = if fl & 8 != 0 {
+        Some([-640.0f32, 90.0, -5.0, 10.0])
+    } else if fl & 4 != 0 {
+        Some([640.0, -90.0, 5.0, -10.0])
+    } else {
+        None
+    };
+    if let Some(s) = slide {
+        for (k, x) in s.iter().enumerate() {
+            m.w32(o + 0x38 + 4 * k as u32, x.to_bits());
+        }
+    }
+    let rise = if fl & 16 != 0 {
+        Some((-480.0f32, 20.0f32))
+    } else if fl & 32 != 0 {
+        Some((480.0, -20.0))
+    } else {
+        None
+    };
+    if let Some((y, dy)) = rise {
+        m.w32(o + 0x48, y.to_bits());
+        m.w32(o + 0x4c, dy.to_bits());
+    }
+    if fl & 64 != 0 {
+        m.w32(o + 0x5c, v.to_bits());
+        m.w32(o + 0x2c, 60.0f32.to_bits());
+        m.w32(o + 0x30, 13.0f32.to_bits());
+        m.w32(o + 0x34, 500.0f32.to_bits());
+    }
+}
+
+/// `Backdrop_StartChildSlide` 0x1a8ad8 (the bits added, the delay)
+pub fn start_child_slide(m: &mut Mem, o: u32, bits: u32, delay: f32) {
+    m.w32(o + 0x78, delay.to_bits());
+    let fl = m.r32(o + 0x7c) | bits;
+    m.w32(o + 0x7c, fl);
+    if fl & 2 != 0 {
+        m.w32(o + 0x70, 0);
+        m.w32(o + 0x74, RATE);
+    }
+    let fl = m.r32(o + 0x7c);
+    if fl & 8 != 0 {
+        m.w32(o + 0x64, (-640.0f32).to_bits());
+        m.w32(o + 0x68, 10.0f32.to_bits());
+        m.w32(o + 0x6c, 0);
+    } else if fl & 4 != 0 {
+        m.w32(o + 0x64, 640.0f32.to_bits());
+        m.w32(o + 0x6c, 5.0f32.to_bits());
+        m.w32(o + 0x68, (-90.0f32).to_bits());
+    }
+}
+
+/// `Backdrop_StartEdgeSlide` 0x1a8b70 (the bits added)
+pub fn start_edge_slide(m: &mut Mem, o: u32, bits: u32) {
+    let fl = m.r32(o + 0x90) | bits;
+    m.w32(o + 0x90, fl);
+    if fl & 2 != 0 {
+        m.w32(o + 0x80, 0xc4548000);
+        m.w32(o + 0x84, 25.0f32.to_bits());
+    }
+    if m.r32(o + 0x90) & 4 != 0 {
+        m.w32(o + 0x88, (-680.0f32).to_bits());
+        m.w32(o + 0x8c, 16.0f32.to_bits());
+    }
+}
+
+/// `Backdrop_UpdateFrameAnim` 0x1a8c50
+pub fn update_frame_anim(m: &mut Mem, o: u32) {
+    let fl = m.r32(o + 0x60);
+    let zero = F(0.0);
+    if fl & 2 != 0 {
+        let a = fget(m, o + 0x50) + fget(m, o + 0x54);
+        fput(m, o + 0x50, a);
+        if a.0 < 0.0 {
+            fput(m, o + 0x50, zero);
+            fput(m, o + 0x54, zero);
+        }
+        let top = fget(m, o + 0x58);
+        if top.0 < fget(m, o + 0x50).0 {
+            fput(m, o + 0x50, top);
+            fput(m, o + 0x54, zero);
+        }
+    }
+    let v = fget(m, o + 0x3c);
+    let x = fget(m, o + 0x38) + v;
+    let nv = v + fget(m, o + 0x40);
+    fput(m, o + 0x38, x);
+    fput(m, o + 0x3c, nv);
+    if fl & 8 != 0 {
+        if 0.0 < x.0 {
+            for k in [0x40, 0x38, 0x3c] {
+                fput(m, o + k, zero);
+            }
+        }
+        let (v, lim) = (fget(m, o + 0x3c), fget(m, o + 0x44));
+        if v.0 < lim.0 {
+            fput(m, o + 0x3c, lim);
+        }
+    } else if fl & 4 != 0 {
+        if x.0 < 0.0 {
+            for k in [0x40, 0x38, 0x3c] {
+                fput(m, o + k, zero);
+            }
+        }
+        let (v, lim) = (fget(m, o + 0x3c), fget(m, o + 0x44));
+        if lim.0 < v.0 {
+            fput(m, o + 0x3c, lim);
+        }
+    }
+    if fl & 16 != 0 || fl & 32 != 0 {
+        let y = fget(m, o + 0x48) + fget(m, o + 0x4c);
+        fput(m, o + 0x48, y);
+        let done = if fl & 16 != 0 { 0.0 < y.0 } else { y.0 < 0.0 };
+        if done {
+            fput(m, o + 0x4c, zero);
+            fput(m, o + 0x48, zero);
+        }
+    }
+    let delay = fget(m, o + 0x5c);
+    if 0.0 < delay.0 {
+        fput(m, o + 0x5c, delay - F(1.0));
+        return;
+    }
+    if fl & 64 != 0 {
+        let w = fget(m, o + 0x2c) + fget(m, o + 0x30);
+        fput(m, o + 0x2c, w);
+        let top = fget(m, o + 0x34);
+        if top.0 < w.0 {
+            fput(m, o + 0x2c, top);
+        }
+    }
+}
+
+/// `Backdrop_UpdateChildSlide` 0x1a8e10: after the delay, the alpha and the slide; the x to both fonts' +0x20
+pub fn update_child_slide(m: &mut Mem, o: u32) {
+    let zero = F(0.0);
+    let delay = fget(m, o + 0x78);
+    let mut out;
+    if 0.0 < delay.0 {
+        fput(m, o + 0x70, zero);
+        fput(m, o + 0x78, delay - F(1.0));
+        out = fget(m, o + 0x64);
+    } else {
+        let fl = m.r32(o + 0x7c);
+        if fl & 2 != 0 {
+            let a = fget(m, o + 0x70) + fget(m, o + 0x74);
+            fput(m, o + 0x70, a);
+            if a.0 < 0.0 {
+                fput(m, o + 0x70, zero);
+                fput(m, o + 0x74, zero);
+            }
+            if 1.0 < fget(m, o + 0x70).0 {
+                fput(m, o + 0x70, F(1.0));
+                fput(m, o + 0x74, zero);
+            }
+        }
+        let v = fget(m, o + 0x68);
+        let x = fget(m, o + 0x64) + v;
+        let nv = v + fget(m, o + 0x6c);
+        fput(m, o + 0x64, x);
+        fput(m, o + 0x68, nv);
+        out = x;
+        let mut stop = fl & 8 != 0 && 0.0 < x.0;
+        if !stop {
+            out = fget(m, o + 0x64);
+            stop = fl & 4 != 0 && out.0 < 0.0;
+        }
+        if stop {
+            out = zero;
+            for k in [0x64, 0x68, 0x6c] {
+                fput(m, o + k, zero);
+            }
+        }
+    }
+    let (a, b) = (m.r32(o + 4), m.r32(o + 8));
+    fput(m, a + 0x20, out);
+    let x = fget(m, o + 0x64);
+    fput(m, b + 0x20, x);
+}
+
+/// `Backdrop_UpdateEdgeSlide` 0x1a8f28: each edge offset in, to 0
+pub fn update_edge_slide(m: &mut Mem, o: u32) {
+    let fl = m.r32(o + 0x90);
+    for (bit, at) in [(2u32, 0x80u32), (4, 0x88)] {
+        if fl & bit != 0 {
+            let a = fget(m, o + at) + fget(m, o + at + 4);
+            fput(m, o + at, a);
+            if 0.0 < a.0 {
+                m.w32(o + at + 4, 0);
+                m.w32(o + at, 0);
+            }
+        }
+    }
+}
+
+/// `cBackdropOverlay::Update` 0x1a8bd8: the screen animation (`ScreenAnim_Update` 0x1f12d0 at +0x94), then each part
+/// not still (bits 1)
+pub fn backdrop_update(m: &mut Mem, env: &mut dyn OverlayManEnv, o: u32) {
+    env.call(m, 0x1f12d0, &[o + 0x94]);
+    if m.r32(o + 0x60) != 1 {
+        update_frame_anim(m, o);
+    }
+    if m.r32(o + 0x7c) != 1 {
+        update_child_slide(m, o);
+    }
+    if m.r32(o + 0x90) != 1 {
+        update_edge_slide(m, o);
+    }
+}

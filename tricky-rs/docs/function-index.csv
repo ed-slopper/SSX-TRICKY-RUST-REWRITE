@@ -2436,15 +2436,15 @@ address,size,name,system,status
 0x1a8678,12,Overlay_PlayErrorSound,frontend,not started
 0x1a8688,280,Overlay_GetNewButtons,frontend,checked
 0x1a87a0,340,PauseMenu_PollRepeatButton,frontend?,not started
-0x1a88f8,8,cScreenOverlay::Update,frontend,not started
+0x1a88f8,8,cScreenOverlay::Update,frontend,checked
 0x1a8900,172,BackdropOverlay_Init,frontend,checked
-0x1a89b0,292,Backdrop_StartFrameAnim,frontend?,not started
-0x1a8ad8,152,Backdrop_StartChildSlide,frontend?,not started
-0x1a8b70,104,Backdrop_StartEdgeSlide,frontend?,not started
-0x1a8bd8,120,cBackdropOverlay::Update,frontend,not started
-0x1a8c50,444,Backdrop_UpdateFrameAnim,frontend?,not started
-0x1a8e10,276,Backdrop_UpdateChildSlide,frontend?,not started
-0x1a8f28,116,Backdrop_UpdateEdgeSlide,frontend?,not started
+0x1a89b0,292,Backdrop_StartFrameAnim,frontend?,checked
+0x1a8ad8,152,Backdrop_StartChildSlide,frontend?,checked
+0x1a8b70,104,Backdrop_StartEdgeSlide,frontend?,checked
+0x1a8bd8,120,cBackdropOverlay::Update,frontend,checked
+0x1a8c50,444,Backdrop_UpdateFrameAnim,frontend?,checked
+0x1a8e10,276,Backdrop_UpdateChildSlide,frontend?,checked
+0x1a8f28,116,Backdrop_UpdateEdgeSlide,frontend?,checked
 0x1a8fa0,552,Rivals_DrawAttitudeLabel,hud?,not started
 0x1a91c8,1880,HUD_DrawScoreDelta,hud,not started
 0x1a9928,656,HUD_DrawLabelBox,hud,not started
@@ -2452,7 +2452,7 @@ address,size,name,system,status
 0x1a9f80,268,HUD_DrawBar,hud,not started
 0x1aa090,472,Dialog_Set,frontend?,ported
 0x1aa268,956,Dialog_Draw,hud?,not started
-0x1aa628,8,cBackdropOverlay::Reset,frontend,not started
+0x1aa628,8,cBackdropOverlay::Reset,frontend,checked
 0x1aa630,1492,Overlay_DrawMenuList,frontend,not started
 0x1aac08,168,Dialog_PollButtons,frontend?,ported
 0x1aacb0,352,ResultsOverlay_Init,frontend,not started

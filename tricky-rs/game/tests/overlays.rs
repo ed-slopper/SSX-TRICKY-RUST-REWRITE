@@ -398,3 +398,63 @@ fn overlay_manager_matches_the_original() {
         Some(blk)
     });
 }
+
+// ---- the backdrop's animation (G8c) ----
+
+const FL: [f32; 12] = [0.0, 1.0, -1.0, 0.5, 0.034, -0.02, 10.0, -10.0, 640.0, -640.0, 499.0, 2.5];
+
+fn backdrop(g: &mut Rng, r: &mut Runner, o: u32, fonts: u32) {
+    for k in 0..0x24 {
+        let v = FL[g.below(FL.len() as u32) as usize];
+        r.mem.write_u32(o + 0x2c + 4 * k, v.to_bits());
+    }
+    for at in [0x60u32, 0x7c, 0x90] {
+        r.mem.write_u32(o + at, if g.below(5) == 0 { 1 } else { g.below(128) });
+    }
+    r.mem.write_u32(o + 4, fonts);
+    r.mem.write_u32(o + 8, fonts + 0x40);
+}
+
+#[test]
+fn backdrop_animation_matches_the_original() {
+    let Some(mut r) = runner() else { return };
+    let a = At { b: r.mem.alloc(ARENA) };
+    let l: L = Rc::new(RefCell::new(Log::default()));
+    setup(&mut r, &l, &a);
+    let l2 = l.clone();
+    r.stub(0x1f12d0, move |c, _| l2.borrow_mut().calls.push((0x1f12d0, 0, vec![c.gpr(4) as u32])));
+    for f in [0x1a8c50, 0x1a8e10, 0x1a8f28] {
+        r.allow(f);
+    }
+    let mut g = Rng(0x1a89_b0aa_8c8c_0002);
+    let o = a.block(0);
+    let fonts = a.block(1);
+    for case in 0..60_000u32 {
+        build(&mut g, &mut r, &a);
+        backdrop(&mut g, &mut r, o, fonts);
+        let which = g.below(7);
+        let bits = g.below(128);
+        let v = FL[g.below(FL.len() as u32) as usize];
+        r.cpu.set_gpr(4, o as u64);
+        r.cpu.set_gpr(5, bits as u64);
+        r.cpu.set_f(12, v);
+        let mut m = snapshot(&mut r, &a);
+        l.borrow_mut().calls.clear();
+        let addr = [0x1a89b0u32, 0x1a8ad8, 0x1a8b70, 0x1a8c50, 0x1a8e10, 0x1a8f28, 0x1a8bd8][which as usize];
+        r.call(addr).unwrap_or_else(|e| panic!("case {case}: {e}"));
+        let theirs = std::mem::take(&mut l.borrow_mut().calls);
+        let mut e = Ours(l.clone(), a.b);
+        match which {
+            0 => start_frame_anim(&mut m, o, bits, v),
+            1 => start_child_slide(&mut m, o, bits, v),
+            2 => start_edge_slide(&mut m, o, bits),
+            3 => update_frame_anim(&mut m, o),
+            4 => update_child_slide(&mut m, o),
+            5 => update_edge_slide(&mut m, o),
+            _ => backdrop_update(&mut m, &mut e, o),
+        }
+        let mine = std::mem::take(&mut l.borrow_mut().calls);
+        assert_eq!(theirs, mine, "case {case} ({which}): calls");
+        compare(&mut r, &a, &m, &format!("case {case} ({which})"));
+    }
+}
