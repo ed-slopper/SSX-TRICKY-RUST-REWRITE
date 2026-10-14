@@ -297,3 +297,15 @@ section `FE`: `MAIN` into slot 0, `CHARSPCH<n>` into slot 7. The game compares t
 `BASEPATH` value has overwritten, so a section whose base path is "MAIN" loads a bank. A key without a readable value uses
 the file name left from before, and the first one the stack's: the `_checked` functions say when that happened (the
 tests skip it). The disc's own BANKS.INF is not in this repo, so the tests run the originals on generated text.
+
+## CROWD.INF, CHANT.INF, NASCRIPT.INF (`tricky_data::audiocfg`)
+
+`Audio_LoadCrowd` reads CROWD.INF's `[GLOBAL]` and then the course's section through `Sfx_LoadTrickConfig`: keys
+`TRICK1..3`, `FALL1..3`, `ANTICIPATE1..3` add a file name (at most five per list) to the set `n - 1` at +0x3730 + 0x54 × (n - 1)
+(+0x18 per list), `ATTACK`, `DECAY`, `MAXBEND` set the three floats. `Audio_LoadGlobalBankList` appends every `[GLOBAL]` value of
+CHANT.INF to the swap list. `Speech_LoadNarration` reads NASCRIPT.INF's `[<course>]` then `[<course>_ENG|_GER|_FRE|_JAP]`
+(by the app's language word +0x58; English twice at 0 and 1): each line's key is the line's id (`sscanf %d`), its value
+comma-separated words (`b` is -1, a non-number 0) into a 0x7c-byte record that holds fifteen lines in all. A line whose `=` does not
+read uses the value before it (the stack's, for the first), so a line without `=` repeats the last one's words; the `_checked`
+and tuple results say when that was the stack's. A float key without a number leaves the stack word in the game, so the tests do
+not use one.

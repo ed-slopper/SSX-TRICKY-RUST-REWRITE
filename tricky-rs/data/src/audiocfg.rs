@@ -3,7 +3,7 @@
 //! `DATA/CONFIG/INTROMUS.INF` (`Music_StartCourseSong` 0x214e60). Checked against the game's own functions in the
 //! function runner (`tricky-game/tests/ini.rs`).
 
-use crate::ini::IniReader;
+use crate::ini::{scan_int, IniReader};
 
 /// The mix levels (0x343054..0x34306c): SFX, music, rider speech, announcer, jukebox, uber, and how far the intro
 /// music ducks.
@@ -195,6 +195,150 @@ pub fn fe_banks_checked(bytes: &[u8], speech: i32) -> (Vec<BankLoad>, bool) {
                 stale |= !have_file;
                 out.push(BankLoad { slot: 7, path: [base.as_slice(), &file].concat() });
             }
+        }
+    }
+    (out, stale)
+}
+
+/// One crowd sound set of CROWD.INF (`Audio_LoadCrowd` 0x2209c8 keeps three, at the audio system's +0x3730 + 0x54 × n):
+/// up to five file names each for `TRICK`, `FALL` and `ANTICIPATE`, and the `ATTACK`, `DECAY` and `MAXBEND` floats.
+#[derive(Clone, Debug, PartialEq, Default)]
+pub struct CrowdSet {
+    pub trick: Vec<Vec<u8>>,
+    pub fall: Vec<Vec<u8>>,
+    pub anticipate: Vec<Vec<u8>>,
+    pub attack: f32,
+    pub decay: f32,
+    pub max_bend: f32,
+}
+
+/// `Sfx_LoadTrickConfig` 0x220ce8: the section's keys `<NAME><n>` (n 1 to 3, each key once) into set n - 1; a name
+/// goes to the end of its list unless the list holds five; a float key without a number leaves the float. `stale` is
+/// set when a name is used whose `=` did not read before any had (the game then uses its stack's).
+fn load_crowd_section(r: &mut IniReader, sets: &mut [CrowdSet; 3], value: &mut Vec<u8>, have: &mut bool, stale: &mut bool) {
+    while !r.at_section_end() {
+        let tok = r.read_token();
+        for n in 1..=3 {
+            let i = n - 1;
+            let is = |name: &str| tok.eq_ignore_ascii_case(format!("{name}{n}").as_bytes());
+            let mut name = |r: &mut IniReader, list: &mut Vec<Vec<u8>>| {
+                if let Some(s) = r.read_string(&tok) {
+                    *value = s;
+                    *have = true;
+                }
+                *stale |= !*have;
+                if list.len() < 5 {
+                    list.push(value.clone());
+                }
+            };
+            if is("TRICK") {
+                name(r, &mut sets[i].trick);
+                break;
+            } else if is("FALL") {
+                name(r, &mut sets[i].fall);
+                break;
+            } else if is("ANTICIPATE") {
+                name(r, &mut sets[i].anticipate);
+                break;
+            } else if is("ATTACK") {
+                if let Some(Some(f)) = r.read_float(&tok) {
+                    sets[i].attack = f;
+                }
+                break;
+            } else if is("DECAY") {
+                if let Some(Some(f)) = r.read_float(&tok) {
+                    sets[i].decay = f;
+                }
+                break;
+            } else if is("MAXBEND") {
+                if let Some(Some(f)) = r.read_float(&tok) {
+                    sets[i].max_bend = f;
+                }
+                break;
+            }
+        }
+    }
+}
+
+/// `Audio_LoadCrowd` 0x2209c8, its CROWD.INF half: the `GLOBAL` section, then the course's (`course` as the caller
+/// passes it, any case), into the three sets. The bool: see [`load_crowd_section`] (a name used before any value read).
+pub fn crowd_config(bytes: &[u8], course: &[u8]) -> ([CrowdSet; 3], bool) {
+    let mut r = IniReader::new(bytes);
+    let mut sets: [CrowdSet; 3] = Default::default();
+    let (mut value, mut have, mut stale) = (Vec::new(), false, false);
+    if r.find_section(b"GLOBAL") {
+        load_crowd_section(&mut r, &mut sets, &mut value, &mut have, &mut stale);
+    }
+    r.rewind();
+    if r.find_section(course) {
+        load_crowd_section(&mut r, &mut sets, &mut value, &mut have, &mut stale);
+    }
+    (sets, stale)
+}
+
+/// `Audio_LoadGlobalBankList` 0x21c510, its CHANT.INF half: every key of `[GLOBAL]` adds its value (a bank file
+/// name) to the audio system's swap list. The bool: a key's `=` did not read before any value had.
+pub fn global_bank_list(bytes: &[u8]) -> (Vec<Vec<u8>>, bool) {
+    let mut r = IniReader::new(bytes);
+    let mut out = Vec::new();
+    let (mut value, mut have, mut stale) = (Vec::new(), false, false);
+    if r.find_section(b"GLOBAL") {
+        while !r.at_section_end() {
+            let tok = r.read_token();
+            if let Some(s) = r.read_string(&tok) {
+                value = s;
+                have = true;
+            }
+            stale |= !have;
+            out.push(value.clone());
+        }
+    }
+    (out, stale)
+}
+
+/// One narration line of NASCRIPT.INF: the id (the key's number) and the words of its value (`b` is -1, a word that
+/// is not a number is 0), as the game keeps them: an id, the words, then a 0 (a record is 0x7c bytes).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Narration {
+    pub id: i32,
+    pub words: Vec<i32>,
+}
+
+/// `Speech_LoadNarration` 0x230a00: the course's section, then `<course><suffix>` for the language (`_ENG`, `_ENG`,
+/// `_GER`, `_FRE`, `_JAP`), each line `<id> = "<w>, <w>, ..."`. The bool: a line's value did not read before any had.
+pub fn narration_script(bytes: &[u8], course: &[u8], language: usize) -> (Vec<Narration>, bool) {
+    const SUFFIX: [&[u8]; 5] = [b"_ENG", b"_ENG", b"_GER", b"_FRE", b"_JAP"];
+    let mut r = IniReader::new(bytes);
+    let mut out = Vec::new();
+    let (mut value, mut have, mut stale) = (Vec::new(), false, false);
+    for pass in 0..2 {
+        let name = if pass == 0 { course.to_vec() } else { [course, SUFFIX[language]].concat() };
+        r.rewind();
+        if !r.find_section(&name) {
+            continue;
+        }
+        while !r.at_section_end() {
+            let tok = r.read_token();
+            let id = scan_int(&tok).unwrap_or(0);
+            if let Some(s) = r.read_string(&tok) {
+                value = s;
+                have = true;
+            }
+            stale |= !have;
+            let mut words: Vec<i32> = Vec::new();
+            let mut word: Vec<u8> = Vec::new();
+            // the value and the NUL after it, a word ending at each comma and at the NUL
+            for c in value.iter().copied().chain(std::iter::once(0)) {
+                match c {
+                    b' ' | b'\t' => {}
+                    b',' | 0 => {
+                        words.push(if word.len() == 1 && (word[0] == b'b' || word[0] == b'B') { -1 } else { scan_int(&word).unwrap_or(0) });
+                        word.clear();
+                    }
+                    c => word.push(c),
+                }
+            }
+            out.push(Narration { id, words });
         }
     }
     (out, stale)

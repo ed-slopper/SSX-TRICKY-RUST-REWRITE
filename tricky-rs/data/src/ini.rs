@@ -24,7 +24,7 @@ fn eq_ignore_case(a: &[u8], b: &[u8]) -> bool {
 }
 
 /// `sscanf("%d")`: optional spaces and sign, then digits; `None` when there are none.
-fn scan_int(s: &[u8]) -> Option<i32> {
+pub fn scan_int(s: &[u8]) -> Option<i32> {
     let t = std::str::from_utf8(s).ok()?.trim_start();
     let mut end = 0;
     let b = t.as_bytes();
