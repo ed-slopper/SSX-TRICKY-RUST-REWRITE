@@ -2401,43 +2401,43 @@ address,size,name,system,status
 0x1a6ba0,236,HUD_FormatTime,hud,not started
 0x1a6c90,168,HUD_FormatTimeSigned,hud,not started
 0x1a6d38,636,Font_PrintWrapped,hud,not started
-0x1a6fb8,1792,OverlayMan_Init,frontend,not started
-0x1a76b8,156,cOverlayMan::~cOverlayMan,frontend,not started
-0x1a7758,76,Overlay_HideAll,frontend,ported
-0x1a77a8,80,OverlayMan_IsAnyVisible,frontend,ported
-0x1a77f8,80,OverlayMan_IsAnyActive,frontend,not started
+0x1a6fb8,1792,OverlayMan_Init,frontend,checked
+0x1a76b8,156,cOverlayMan::~cOverlayMan,frontend,checked
+0x1a7758,76,Overlay_HideAll,frontend,checked
+0x1a77a8,80,OverlayMan_IsAnyVisible,frontend,checked
+0x1a77f8,80,OverlayMan_IsAnyActive,frontend,checked
 0x1a7848,20,HUD_ShowItem,hud,ported
 0x1a7860,20,HUD_HideItem,hud,ported
-0x1a7878,72,Overlay_SetPlayerPad,frontend,not started
-0x1a78c0,524,cOverlayMan::vf2_1a78c0,frontend,not started
-0x1a7ad0,96,cOverlayMan::vf1_1a7ad0,frontend,not started
-0x1a7b30,88,OverlayMan_CallAllVf10,frontend,not started
-0x1a7b88,88,OverlayMan_CallAllVf11,frontend,not started
-0x1a7be0,44,OverlayMan_CallReplayVf1,frontend,ported
-0x1a7c10,44,OverlayMan_CallPopFinishVf4,frontend,not started
-0x1a7c40,8,OverlayMan_GetReplayControl,frontend,not started
-0x1a7c48,8,OverlayMan_GetLesson,frontend,not started
-0x1a7c58,44,OverlayMan_CallPauseMenuVf2,frontend,not started
-0x1a7c88,44,OverlayMan_CallResultsVf3,frontend,not started
-0x1a7cb8,44,OverlayMan_CallPointDistributionVf5,frontend,not started
-0x1a7ce8,44,OverlayMan_CallSelectNextEventVf6,frontend,not started
-0x1a7d18,44,OverlayMan_CallNextRaceVf8,frontend,not started
-0x1a7d48,44,OverlayMan_CallSelectNextVenueVf7,frontend,not started
-0x1a7d78,60,ScreenOverlay_Init,frontend,not started
+0x1a7878,72,Overlay_SetPlayerPad,frontend,checked
+0x1a78c0,524,cOverlayMan::Draw,frontend,checked
+0x1a7ad0,96,cOverlayMan::Update,frontend,checked
+0x1a7b30,88,OverlayMan_CallAllVf10,frontend,checked
+0x1a7b88,88,OverlayMan_CallAllVf11,frontend,checked
+0x1a7be0,44,OverlayMan_CallReplayVf1,frontend,checked
+0x1a7c10,44,OverlayMan_CallPopFinishVf4,frontend,checked
+0x1a7c40,8,OverlayMan_GetReplayControl,frontend,checked
+0x1a7c48,8,OverlayMan_GetLesson,frontend,checked
+0x1a7c58,44,OverlayMan_CallPauseMenuVf2,frontend,checked
+0x1a7c88,44,OverlayMan_CallResultsVf3,frontend,checked
+0x1a7cb8,44,OverlayMan_CallPointDistributionVf5,frontend,checked
+0x1a7ce8,44,OverlayMan_CallSelectNextEventVf6,frontend,checked
+0x1a7d18,44,OverlayMan_CallNextRaceVf8,frontend,checked
+0x1a7d48,44,OverlayMan_CallSelectNextVenueVf7,frontend,checked
+0x1a7d78,60,ScreenOverlay_Init,frontend,checked
 0x1a7db8,180,HUDItem_Show,game?,not started
-0x1a7e70,204,Overlay_HideForPlayer,frontend,not started
-0x1a7f40,460,Overlay_DrawItemForView,frontend,not started
-0x1a8110,460,Overlay_DrawTextForView,frontend,not started
+0x1a7e70,204,Overlay_HideForPlayer,frontend,checked
+0x1a7f40,460,Overlay_DrawItemForView,frontend,checked
+0x1a8110,460,Overlay_DrawTextForView,frontend,checked
 0x1a82e8,832,HUD_DrawNumber,hud,not started
 0x1a8638,12,Overlay_PlayTickSound,frontend,not started
 0x1a8648,12,Overlay_PlayMoveSound,frontend,not started
 0x1a8658,12,Overlay_PlayBackSound,frontend,not started
 0x1a8668,12,Overlay_PlaySelectSound,frontend,not started
 0x1a8678,12,Overlay_PlayErrorSound,frontend,not started
-0x1a8688,280,Overlay_GetNewButtons,frontend,not started
+0x1a8688,280,Overlay_GetNewButtons,frontend,checked
 0x1a87a0,340,PauseMenu_PollRepeatButton,frontend?,not started
 0x1a88f8,8,cScreenOverlay::Update,frontend,not started
-0x1a8900,172,BackdropOverlay_Init,frontend,not started
+0x1a8900,172,BackdropOverlay_Init,frontend,checked
 0x1a89b0,292,Backdrop_StartFrameAnim,frontend?,not started
 0x1a8ad8,152,Backdrop_StartChildSlide,frontend?,not started
 0x1a8b70,104,Backdrop_StartEdgeSlide,frontend?,not started

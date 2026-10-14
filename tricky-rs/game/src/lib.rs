@@ -59,6 +59,7 @@ pub mod orient;
 pub mod pf;
 pub mod replay;
 pub mod replaymgr;
+pub mod overlays;
 pub mod replayui;
 pub mod bxlist;
 pub mod snapshot;

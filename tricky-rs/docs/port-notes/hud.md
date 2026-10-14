@@ -26,3 +26,53 @@ Part of the port notes (index: [README.md](README.md)); units and wording as des
 - Width for alignment (`Font_MeasureA`) is the glyph boxes' extent, not the advances.
 - `Font_PrintfShadowedA` 0x19d568: black copy at +2,+2 (screen units, not scaled), same alpha, one layer below.
 - In-race text (`HUD_DrawPlayerText` 0x1a4f70, 640x480): place number title x1.9 right-aligned at (66,27), suffix x0.7 at (71,30), gold (.953,.729,.106) in the lead; time x0.9 at (26,460) anchored at its bottom; points x1.1 right-aligned at (620,24); speed x0.9 right-aligned at x 90, y 430 with " km/h" at x0.7; multiplier "xN" x1.9 centred at (320,110) - x2 gold, x3 orange, x5 red; trick names in MENU font, centred at x 320, bottom 38 above the screen's foot, gold (1,.866,0), wrapped at 0.4 of the screen width, lines stacking upward.
+
+## The overlay manager (G8b)
+
+`tricky_game::overlays`, on the game's bytes (`OverlayManEnv`: virtual calls with their integer and float arguments,
+direct calls, the heap, the pads).
+
+- **`cOverlayMan`** holds nineteen overlays at +0x10..+0x58. In order: the HUD, results, high-score record, next
+  race, countdown, the replay's controls, pause, pop finish, pop async load, the replay save page, lesson, view high
+  scores, black fade, unlocked, lesson controller, point distribution, next venue, next event, race help.
+- **Every overlay starts as a `cScreenOverlay`** (vtable 0x38fc10):
+  - +0 the sprite set (the game's +0x728), +4 / +8 the fonts (+0x60 / +0x5c);
+  - +0xc the players it shows for: a bit each, or -1 for all;
+  - +0x10 drawn with the HUD, +0x14 active, +0x18 cleared on hiding, +0x1c / +0x20 the repeat timers.
+
+  `cBackdropOverlay` (0x38fb78) adds its animation at +0x94 and its defaults.
+- **`OverlayMan_Init`** builds each overlay in turn:
+  1. allocates it from the manager's heap (name 0x38e2b0) and fills it with 0xdeadc0de;
+  2. constructs it: by its constructor, or as a screen / backdrop overlay with its own vtable;
+  3. takes the overlay at the object's +0, +4 → +0x42c or +0x42c, depending on the class;
+  4. sets its two flags.
+
+  The three save pages (point distribution, next venue, next event) build their backdrop inside themselves, then
+  the save overlay, then their two vtables. Last come the HUD's sprite rectangles and the overlays' textures: 0x2ca
+  in game mode 6 (0x32de8c), else 0x2cb.
+- **Hiding** (`Overlay_HideForPlayer`): the player's bit goes off.
+  - An overlay that hides itself (its +0x94 true) gets its +0x8c call when the bit was on.
+  - Any other gets it when no players are left.
+  - +0x18 is cleared.
+
+  `Overlay_HideAll` and the destructor hide them all; the destructor then deletes each (its +0xc with 3).
+- **Drawing** (vf2):
+  1. The renderer's state is kept (+0x1dc), and the renderer goes into screen space at 640 × 480. The font's fifth
+     word (0x337ff8) is set to 0.15, and its +0x1cc gets 0.08 with 2, 2.
+  2. Every overlay's items (layer 4), then every overlay's text (layer 9).
+  3. An overlay draws when its bit for the view being drawn (the race's +0x290) is set. One shown for all players
+     (-1) draws only in the last view, across the whole screen. The viewport takes the renderer's size: its +0x5c /
+     +0x64, converted as unsigned.
+  4. The renderer goes back.
+- **Updating** (vf1) runs each shown overlay's +0x7c. The `OverlayMan_Call*` wrappers each call one overlay's
+  virtual; `_CallAllVf10` / `_CallAllVf11` call every overlay's +0x5c / +0x64.
+- **`Overlay_GetNewButtons`** (a pad, or -1 for the first player pad with a button down):
+  - returns the buttons newly down and marks them as held;
+  - a new press restarts the overlay's repeat timers;
+  - the pad becomes the one the overlays read (0x3381e0).
+- **Checked in the runner** on 36,000 cases: a manager over random overlays on fake vtables, with two different
+  `this` adjustments. Every virtual and direct call, its integer and float arguments, and all memory were compared.
+  The tests caught 6 of 8 mutants; the two left cannot change a result (bit 0 of an arithmetic or a logical shift,
+  and `last | (held & !last)` = `last | held`).
+- **The runner stubs must return sign-extended words,** as the EE's 32-bit results are. The viewport size is
+  converted signed or unsigned by the 64-bit register's sign.
