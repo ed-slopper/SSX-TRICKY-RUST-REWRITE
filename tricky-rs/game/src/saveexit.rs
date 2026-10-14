@@ -229,7 +229,6 @@ pub fn save_before_exit_a(m: &mut dyn Mem, e: &mut dyn LoadEnv, sp: u32, p: u32)
                     let r = race(m);
                     m.w32(r + 0x54, 1);
                     m.w32(CAREER + 0x3708, 1);
-                    back = false;
                     finish_a(m, e, p, s5);
                     return;
                 }

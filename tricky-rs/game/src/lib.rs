@@ -43,6 +43,7 @@ pub mod chantload;
 pub mod pausemenu;
 pub mod crowdbox;
 pub mod saveexit;
+pub mod speechplay;
 pub mod worldemitter;
 pub mod hit;
 pub mod taunt;
