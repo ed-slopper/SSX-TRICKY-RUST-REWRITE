@@ -916,3 +916,241 @@ pub fn ai_world_load(m: &mut Mem, env: &mut dyn LoadEnv, this: u32, s: u32) {
         }
     }
 }
+
+// The last load constructors (board row G12m): the roller (its rigid body, sphere tree and box) and the anim objects
+// (their overlap box and key frames).
+
+/// What the roller and the anim objects need beyond `LoadEnv::call`
+pub trait LoadEnv2: LoadEnv {
+    /// `MemPool_Alloc` 0x23d3b0 with its flags (the anim objects' frames ask 0x50000000)
+    fn pool_alloc_flags(&mut self, m: &mut Mem, size: u32, flags: u32, name: u32) -> u32;
+    /// `RollerNode_PlaceFromBody` 0x13e6a0(out, node): the roller's position and orientation (8 words)
+    fn roller_place(&mut self, m: &mut Mem, node: u32) -> [u32; 8];
+    /// `Mat4_FromPosQuat` 0x250428(out, in): the matrix (16 words) of a position and orientation
+    fn mat4_from_pos_quat(&mut self, m: &mut Mem, pq: [u32; 8]) -> [u32; 16];
+    /// `SphTree_SetTransform` 0x239d60(tree, matrix)
+    fn sph_tree_set_transform(&mut self, m: &mut Mem, tree: u32, mat: [u32; 16]);
+}
+
+fn vu(a: [u32; 4], b: [u32; 4], add: bool) -> [u32; 4] {
+    use crate::ps2f::F;
+    let mut o = [0u32; 4];
+    for k in 0..4 {
+        let (x, y) = (F(f32::from_bits(a[k])), F(f32::from_bits(b[k])));
+        o[k] = if add { (x + y).0.to_bits() } else { (x - y).0.to_bits() };
+    }
+    o
+}
+
+fn quad(m: &Mem, at: u32) -> [u32; 4] {
+    [m.r32(at), m.r32(at + 4), m.r32(at + 8), m.r32(at + 12)]
+}
+
+fn put_quad(m: &mut Mem, at: u32, q: [u32; 4]) {
+    for (k, v) in q.iter().enumerate() {
+        m.w32(at + 4 * k as u32, *v);
+    }
+}
+
+/// `cRollerNode` 0x13dee8(list, stream): the controller back, the rigid body (+0x30, `RigidBody_Construct` 0x1537d0),
+/// the sphere tree (+0x150, `SphereTree::SphereTree` 0x239ba8, then the `bxSphereTree` vtable 0x3a4018) and the box
+/// (+0x2c0, `BroadphaseProxy_Init`) made; its 0x90 bytes at +0xc0 and the body's 0x90-byte header back; the instance's
+/// sphere tree copied (`World_GetInstanceSphTree` 0x260ca0, `SphTree_Copy` 0x2391e8) and placed where the body is;
+/// the box from +0x1e0 less and plus the tree's radius three times over (PS2 floats), fitted into the broadphase
+pub fn roller_load(m: &mut Mem, env: &mut dyn LoadEnv2, node: u32, l: u32, s: u32) {
+    controller_load(m, node, l, s);
+    env.call(m, 0x1537d0, &[node + 0x30]);
+    m.w32(node + 8, 0x36d790);
+    env.call(m, 0x239ba8, &[node + 0x150]);
+    m.w32(node + 0x150, 0x3a4018);
+    env.call(m, 0x150670, &[node + 0x2c0]);
+    read_into(m, s, node + 0xc0, 0x90);
+    read_into(m, s, node + 0x30, 0x90);
+    let p = env.call(m, 0x260ca0, &[0x346488, m.r32(node + 0x28)]);
+    let tree = m.r32(p);
+    env.call(m, 0x2391e8, &[node + 0x150, tree]);
+    let place = env.roller_place(m, node);
+    let mat = env.mat4_from_pos_quat(m, place);
+    env.sph_tree_set_transform(m, node + 0x150, mat);
+    for (add, out) in [(false, 0x2a0u32), (true, 0x2b0)] {
+        let r1 = env.call(m, 0x239c50, &[node + 0x150]);
+        let r2 = env.call(m, 0x239c50, &[node + 0x150]);
+        let r3 = env.call(m, 0x239c50, &[node + 0x150]);
+        let v = vu(quad(m, node + 0x1e0), [r1, r2, r3, 0], add);
+        put_quad(m, node + out, v);
+    }
+    m.w32(node + 0x344, node);
+    env.call(m, 0x123098, &[node + 0x2c0, node + 0x2a0]);
+    let bp = broadphase(m);
+    env.call(m, 0x14fa70, &[bp, node + 0x2c0]);
+}
+
+/// `AnimObjectNode_CreateOverlap` 0x1999e8(node): a 0xe0-byte overlap (+0x64) on the node's instance (+0x58): an
+/// identity rotation, a cube around the instance's position whose half side is the largest of the instance's box
+/// corners' distances (each axis, both corners, at least 1e-10), its box (+0x40) set to the cube and fitted into the
+/// broadphase; the instance's +0xe8 bits 5 and 6 cleared
+pub fn create_overlap(m: &mut Mem, env: &mut dyn LoadEnv2, node: u32) {
+    let o = env.pool_alloc_flags(m, 0xe0, 0x4000_0000, 0x38c348);
+    if o != 0 {
+        crate::replaymgr::mem_set_pub(m, o, 0xdead_c0de, 0xe0);
+    }
+    env.call(m, 0x150670, &[o + 0x40]);
+    m.w32(node + 100, o);
+    let inst = m.r32(node + 0x58);
+    let one = 1f32.to_bits();
+    let pos = quad(m, inst + 0x30);
+    let d1 = vu([m.r32(inst + 0xcc), m.r32(inst + 0xd0), m.r32(inst + 0xd4), one], pos, false);
+    let d2 = vu([m.r32(inst + 0xd8), m.r32(inst + 0xdc), m.r32(inst + 0xe0), one], pos, false);
+    let mut r = 1e-10f32;
+    for v in [d1[0], d2[0], d1[1], d2[1], d1[2], d2[2]] {
+        let a = f32::from_bits(v).abs();
+        if r < a {
+            r = a;
+        }
+    }
+    let (rb, nb) = (r.to_bits(), (-r).to_bits());
+    put_quad(m, o, [0, 0, 0, one]);
+    let ov = m.r32(node + 100);
+    m.w32(ov + 200, 0);
+    m.w32(ov + 204, 0);
+    m.w32(ov + 208, 0);
+    put_quad(m, ov + 0x10, [rb, rb, rb, 0]);
+    let pos = quad(m, m.r32(node + 0x58) + 0x30);
+    let lo = vu(pos, [nb, nb, nb, 0], true);
+    put_quad(m, m.r32(node + 100) + 0x20, lo);
+    let pos = quad(m, m.r32(node + 0x58) + 0x30);
+    let hi = vu(pos, [rb, rb, rb, 0], true);
+    put_quad(m, m.r32(node + 100) + 0x30, hi);
+    let ov = m.r32(node + 100);
+    m.w32(ov + 0x40 + 132, node + 0x30);
+    env.call(m, 0x1507e8, &[ov + 0x40, ov + 0x20, ov + 0x30]);
+    let bp = broadphase(m);
+    let ov = m.r32(node + 100);
+    env.call(m, 0x14fa70, &[bp, ov + 0x40]);
+    let inst = m.r32(node + 0x58);
+    m.w32(inst + 0xe8, m.r32(inst + 0xe8) & 0xffff_ff9f);
+}
+
+/// `AnimObjectNode_LoadState` 0x1cb210: 0x48 bytes back, its key from the course's keys
+pub fn anim_state_load(m: &mut Mem, p: u32, s: u32) {
+    read_into(m, s, p, 0x48);
+    let [v] = read_words::<1>(m, s);
+    m.w32(p + 0x48, m.r32(m.r32(COURSE) + 0x6c).wrapping_add(v));
+}
+
+/// `AnimFrame_Clear` 0x1cb150 / `AnimFrame_SetIdentity` 0x1cb960 (the identity matrix at 0x346440 into +0x90)
+pub fn anim_frame_clear(m: &mut Mem, f: u32) {
+    for k in 0..16 {
+        m.w32(f + 8 + 4 * k, 0);
+        m.w32(f + 0x4c + 4 * k, 0);
+    }
+    m.w32(f + 0x48, 0);
+}
+pub fn anim_frame_set_identity(m: &mut Mem, f: u32) {
+    for k in 0..16 {
+        m.w32(f + 0x90 + 4 * k, m.r32(0x346440 + 4 * k));
+    }
+}
+
+/// `cAnimObjectNode` 0x198b48(list, stream): the controller at +0x30 and the vtable (+0x38); its 0x30 bytes; an
+/// overlap made and read back when it had one; a frame (0xd0 bytes, from a pool block of n × 0xd0 + 0x10 holding n)
+/// for each of its model's animated parts (the instance +0xc0: +4 parts, +8 their 0x18-byte records, animated with
+/// +0x10), each cleared, made identity and keyed (`AnimFrame_SetKey` 0x1cb0d8: the frame, the part's key, the node's +0x24),
+/// then their saved states;
+/// the frames applied (`MeshAnim_ApplyFrames` 0x199258)
+pub fn anim_object_load(m: &mut Mem, env: &mut dyn LoadEnv2, node: u32, l: u32, s: u32) {
+    controller_load(m, node + 0x30, l, s);
+    m.w32(node + 0x38, 0x38c650);
+    read_into(m, s, node, 0x30);
+    m.w32(node + 100, 0);
+    let [flag] = read_words::<1>(m, s);
+    if flag != 0 {
+        create_overlap(m, env, node);
+        let ov = m.r32(node + 100);
+        read_into(m, s, ov, 0x10);
+        read_into(m, s, ov + 200, 0xc);
+    }
+    let model = m.r32(m.r32(node + 0x58) + 0xc0);
+    let parts = m.r32(model + 8);
+    m.w32(node + 0x5c, 0);
+    let mut count = m.r32(model + 4) as i32;
+    let mut n = 0u32;
+    for i in 0..count.max(0) as u32 {
+        if m.r32(parts + 0x18 * i + 0x10) != 0 {
+            n += 1;
+            m.w32(node + 0x5c, n);
+            count = m.r32(model + 4) as i32;
+        }
+    }
+    if n == 0 {
+        m.w32(node + 0x60, 0);
+    } else {
+        let size = n * 0xd0 + 0x10;
+        let p = env.pool_alloc_flags(m, size, 0x5000_0000, 0x38c338);
+        if p != 0 {
+            crate::replaymgr::mem_set_pub(m, p, 0xdead_c0ed, size);
+        }
+        m.w32(p, n);
+        for k in 0..n {
+            let f = p + 0x10 + 0xd0 * k;
+            m.w32(f + 0x8c, 0x391b10);
+            anim_frame_clear(m, f);
+            m.w32(f + 0x8c, 0x391af8);
+            anim_frame_set_identity(m, f);
+        }
+        m.w32(node + 0x60, p + 0x10);
+        count = m.r32(model + 4) as i32;
+    }
+    let mut j = 0u32;
+    for i in 0..count.max(0) as u32 {
+        let key = m.r32(parts + 0x18 * i + 0x10);
+        if key != 0 {
+            // (the frame, the part's key, and the node's +0x24 as a float in f12)
+            let t = m.r32(node + 0x24);
+            env.call(m, 0x1cb0d8, &[m.r32(node + 0x60) + j, key, t]);
+            j += 0xd0;
+            count = m.r32(model + 4) as i32;
+            let _ = count;
+        }
+    }
+    let n = m.r32(node + 0x5c) as i32;
+    for k in 0..n.max(0) as u32 {
+        let f = m.r32(node + 0x60) + 0xd0 * k;
+        anim_state_load(m, f, s);
+    }
+    env.call(m, 0x199258, &[node]);
+}
+
+/// `cAnimComboNode` 0x19a0a8: the anim object at +0x1c, its vtable (+0x54), 0x1c bytes, then a pool block of +0x78 ×
+/// 64 bytes (+0x84) read back
+pub fn anim_combo_load(m: &mut Mem, env: &mut dyn LoadEnv2, node: u32, l: u32, s: u32) {
+    anim_object_load(m, env, node + 0x1c, l, s);
+    m.w32(node + 0x54, 0x38c460);
+    read_into(m, s, node, 0x1c);
+    let n = m.r32(node + 0x78);
+    let p = env.pool_alloc_flags(m, n << 6, 0x4000_0000, 0x38c358);
+    if p != 0 {
+        crate::replaymgr::mem_set_pub(m, p, 0xdead_c0ed, n << 6);
+    }
+    m.w32(node + 0x84, p);
+    let n = m.r32(node + 0x78);
+    read_into(m, s, p, n << 6);
+}
+
+/// `cAnimDeltaNode` 0x199d68: the anim object, its vtable (0x38c558) and the word at +0x68
+pub fn anim_delta_load(m: &mut Mem, env: &mut dyn LoadEnv2, node: u32, l: u32, s: u32) {
+    anim_object_load(m, env, node, l, s);
+    m.w32(node + 0x38, 0x38c558);
+    read_into(m, s, node + 0x68, 4);
+}
+
+/// `cAnimTexFlipNode` 0x19a700: the anim object at +0x18, its vtable (+0x50), its tex flip (+0x80) made, 0x18 bytes,
+/// the tex flip started
+pub fn anim_tex_flip_load(m: &mut Mem, env: &mut dyn LoadEnv2, node: u32, l: u32, s: u32) {
+    anim_object_load(m, env, node + 0x18, l, s);
+    m.w32(node + 0x50, 0x38c368);
+    env.call(m, 0x142ac8, &[node + 0x80]);
+    read_into(m, s, node, 0x18);
+    let (a, b) = (m.r32(node + 0x70), m.r32(node + 0x10));
+    env.call(m, 0x142af0, &[node + 0x80, a, b]);
+}

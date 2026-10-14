@@ -8,7 +8,8 @@ and pins (G12e; the same module, checked: `tests/replay_highlights.rs`), the cam
 `tests/replay_playback.rs`), the save to the card and the load (G12h; checked: `tests/replay_save.rs`), the world snapshot's
 orchestration (G12i; checked: `tests/replay_snapshot.rs`), the world nodes' snapshot saves (G12j;
 `tricky_game::snapshot`, checked: `tests/snapshot_saves.rs`), their load constructors (G12k; checked:
-`tests/snapshot_loads.rs`), and the riders' and AI's snapshots (G12l; checked: `tests/snapshot_riders.rs`). Keyframes, the node save and restore, pins and
+`tests/snapshot_loads.rs`), the riders' and AI's snapshots (G12l; checked: `tests/snapshot_riders.rs`), and the last load constructors
+(G12m; checked: `tests/snapshot_last.rs`). Keyframes, the node save and restore, pins and
 highlights, camera tracks, `Replay_Update` and the memory-card save are the rest of G12.
 
 ## The replay control
@@ -395,8 +396,7 @@ frames of a message), +0x4c and +0x50 hold recording, +0x58 a stream overflowed.
     `Spline_GetLength`).
 - **`cDeadNode` 0x13af38(instance, flag)** is a controller on list 13 (type 5) for an object that has gone. It
   clears its instance's +0xe8 bits 1 and 4 to 7, sets bit 2, and sets 0x800 with the flag.
-- **Not ported yet.** The roller and the anim objects (object, combo, delta, tex flip) are left. They need the
-  sphere tree and transforms, and the overlap's box.
+- **The roller and the anim objects:** G12m, below.
 - **Checked in the runner:** 12,000 random cases. A node of each class was saved by our checked save and loaded
   into a fresh node by the game's constructor and ours, about 400 per class. The set-up was logging stand-ins, and
   every call and all the memory were compared.
@@ -431,4 +431,33 @@ frames of a message), +0x4c and +0x50 hold recording, +0x58 a stream overflowed.
 - **Checked in the runner:** 1,500 random cases, about 300 of each kind, saved and then loaded back on both sides.
   The fake animation sequences' virtuals log, as do the world calls. Every call and all the memory were compared,
   except the stack word, which is taken from the game.
+
+## The last load constructors (G12m)
+
+- **The roller:**
+  - brings its controller back and makes its rigid body (+0x30), its sphere tree (+0x150, with the `bxSphereTree`
+    vtable) and its box (+0x2c0);
+  - reads its 0x90 bytes at +0xc0 and the body's 0x90-byte header back;
+  - copies the instance's sphere tree and places it where the body is (`RollerNode_PlaceFromBody`, then
+    `Mat4_FromPosQuat`, then `SphTree_SetTransform`, which pass values through stack buffers; the port's env
+    passes the values);
+  - sets its box from +0x1e0 less and plus the tree's radius, asked three times for each (PS2 floats), and fits it
+    into the broadphase.
+- **The anim object:**
+  - brings its controller back at +0x30 and reads its 0x30 bytes;
+  - when it had an overlap, makes it (`AnimObjectNode_CreateOverlap`) and reads it back;
+  - gives each animated part of its instance's model a key frame: a pool block of n × 0xd0 + 0x10 bytes holding n,
+    with each frame cleared, made identity from 0x346440 and keyed;
+  - reads each frame's saved state back and applies the frames.
+- **The overlap** is 0xe0 bytes with an identity rotation and a cube around the instance's position. The cube's half
+  side is the largest distance from the position to the instance's box corners, on each axis (at least 1e-10). Its
+  box goes into the broadphase, and the instance's +0xe8 bits 5 and 6 are cleared.
+- **`AnimFrame_SetKey`** gets (the frame, the part's key) and the node's +0x24 as a float in f12. The decompile shows
+  the arguments wrongly.
+- **The combo, delta and tex flip** build on the anim object: the combo's array (+0x78 × 64 bytes), the delta's
+  word, and the tex flip's `cTexFlip`.
+- **Checked in the runner:** 6,000 random nodes, about 1,200 per class. Each was saved by our checked save, then
+  loaded on both sides. Instances' models had 0 to 4 parts, some animated. The stack-buffer calls were compared by
+  value, and every call and all the memory were compared.
+- **Every world node type a keyframe holds can now be made again.**
 

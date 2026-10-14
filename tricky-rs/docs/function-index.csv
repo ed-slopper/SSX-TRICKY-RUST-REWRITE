@@ -668,7 +668,7 @@ address,size,name,system,status
 0x13d6c0,1316,cRollerNode::cRollerNode,world,ported
 0x13dbe8,344,RollerNode_PushWithVelocity,world?,ported
 0x13dd40,424,RollerNode_PushFromContact,world?,ported
-0x13dee8,464,cRollerNode::cRollerNode,world,ported
+0x13dee8,464,cRollerNode::cRollerNode,world,checked
 0x13e0b8,136,cRollerNode::~cRollerNode,world,not started
 0x13e140,1372,RollerNode_UpdateTransform,world?,ported
 0x13e6a0,448,RollerNode_PlaceFromBody,world?,ported
@@ -2291,7 +2291,7 @@ address,size,name,system,status
 0x198738,24,Mem_Copy4,files?,not started
 0x198750,24,FUN_00198750,files?,not started
 0x198810,820,cAnimObjectNode::cAnimObjectNode,animation,ported
-0x198b48,604,cAnimObjectNode::cAnimObjectNode,animation,ported
+0x198b48,604,cAnimObjectNode::cAnimObjectNode,animation,checked
 0x198da8,272,cAnimObjectNode::~cAnimObjectNode,animation,not started
 0x198eb8,260,cAnimObjectNode::OnContact,animation,ported
 0x198fc0,112,AnimObjectNode_RefitBox,animation,ported
@@ -2303,20 +2303,20 @@ address,size,name,system,status
 0x199320,1328,cAnimObjectNode::vf28_199320,animation,not started
 0x1998d0,36,MeshAnimNode_GetFrameMatrix,render,ported
 0x1998f8,240,cAnimObjectNode::SaveSnapshot,save,checked
-0x1999e8,736,AnimObjectNode_CreateOverlap,animation,not started
+0x1999e8,736,AnimObjectNode_CreateOverlap,animation,checked
 0x199d10,84,cAnimDeltaNode::cAnimDeltaNode,animation,ported
-0x199d68,80,cAnimDeltaNode::cAnimDeltaNode,animation,not started
+0x199d68,80,cAnimDeltaNode::cAnimDeltaNode,animation,checked
 0x199db8,244,cAnimDeltaNode::Update,animation,ported
 0x199ee0,60,cAnimComboNode::vf38_199ee0,animation,checked
 0x199f20,392,AnimComboNode_Init,animation,ported
-0x19a0a8,256,cAnimComboNode::cAnimComboNode,animation,not started
+0x19a0a8,256,cAnimComboNode::cAnimComboNode,animation,checked
 0x19a1a8,112,cAnimComboNode::~cAnimComboNode,animation,not started
 0x19a218,184,cAnimComboNode::Update,animation,ported
 0x19a390,128,cAnimComboNode::Kill,animation,ported
 0x19a410,104,cAnimComboNode::SaveSnapshot,save,checked
 0x19a478,304,AnimComboNode_ApplyFrames,animation,ported
 0x19a5a8,344,cAnimTexFlipNode::cAnimTexFlipNode,animation,ported
-0x19a700,120,cAnimTexFlipNode::cAnimTexFlipNode,animation,not started
+0x19a700,120,cAnimTexFlipNode::cAnimTexFlipNode,animation,checked
 0x19a778,312,cAnimTexFlipNode::Update,animation,ported
 0x19a8b0,64,cAnimTexFlipNode::Draw,animation,not started
 0x19a8f0,76,cAnimTexFlipNode::vf28_19a8f0,animation,not started
@@ -2744,9 +2744,9 @@ address,size,name,system,status
 0x1caef8,212,EffectsLoader_LoadTextures,frontend?,not started
 0x1cb078,92,AnimFrame_Init,animation,not started
 0x1cb0d8,116,AnimFrame_SetKey,animation,not started
-0x1cb150,68,AnimFrame_Clear,animation,not started
+0x1cb150,68,AnimFrame_Clear,animation,checked
 0x1cb198,120,AnimObjectNode_SaveState,save,checked
-0x1cb210,100,AnimObjectNode_LoadState,animation,not started
+0x1cb210,100,AnimObjectNode_LoadState,animation,checked
 0x1cb278,136,cMeshAnimFrame::cMeshAnimFrame,animation,not started
 0x1cb300,404,cAnimFrame::vf1_1cb300,animation,not started
 0x1cb498,448,cMeshAnimFrame::vf1_1cb498,animation,ported
@@ -2756,7 +2756,7 @@ address,size,name,system,status
 0x1cb770,192,AnimCurve_FindSegment,animation,not started
 0x1cb8b0,20,cCamAnimFrame::~cCamAnimFrame,animation?,not started
 0x1cb908,80,cCamAnimFrame::__tf,runtime,host
-0x1cb960,48,AnimFrame_SetIdentity,animation,not started
+0x1cb960,48,AnimFrame_SetIdentity,animation,checked
 0x1cb990,20,cMeshAnimFrame::~cMeshAnimFrame,animation,not started
 0x1cb9f0,80,cMeshAnimFrame::__tf,runtime,host
 0x1cba40,36,cAnimFrame::~cAnimFrame,animation,not started
