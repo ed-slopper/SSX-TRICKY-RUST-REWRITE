@@ -99,3 +99,7 @@ the text `Loc_Load` 0x17c0a8 allocates); `Career_GetPendingVideo` 0x163f08 (care
 switches to `cVideoLoadModule` when set, pairs with `Career_SetPendingVideo` 0x163f10); `AnimData_Destruct` 0x15a8c0
 (the global at 0x3211a8: 446 `AnimFile_Destruct` 0x15ac48 records 0x18 apart from +0x724, the big file at +0x710,
 `AnimMemBank_Destruct` 0x157e10).
+
+## Memory card overlay (G9m, `game/src/mcoverlay.rs`)
+
+The state machine at 0x1cf040 runs one function per state (state-2 indexes the table; 0x1f calls the owner's +0x6c, 0x12 and 0x20 wait for a press on statics 0x33efd4 / 0x33eff0). The card system (`o+0x224`) and the owner (`o+0x428`, second vtable) are reached only through virtual calls, so the port takes a `CardEnv` that answers by vtable offset; the state is changed through owner +0x1bc and the pad is owner +0x1c. After the dispatch a closing match on the state issues owner +0x15c / +0x164. The slot status records are 0x58 bytes from o+0x168, so only slots 0 and 1 fit before the card pointer at +0x224. Test: fake vtables with a this-adjust halfword, a shared seeded oracle, 686 mutants killed.

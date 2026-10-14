@@ -36,6 +36,7 @@ pub mod sfxcalc;
 pub mod sndqueue;
 pub mod sndlib;
 pub mod speechlib;
+pub mod mcoverlay;
 pub mod worldemitter;
 pub mod hit;
 pub mod taunt;
