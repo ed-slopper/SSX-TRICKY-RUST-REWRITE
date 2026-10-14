@@ -24,12 +24,12 @@ struct Trail { pts: std::collections::VecDeque<Point>, last_heading: Vec3, strip
 #[derive(Resource)]
 pub struct Tracks { trails: Vec<Trail>, mesh: Handle<Mesh> }
 
-/// How strongly each surface takes a track (row 21 of the surface table), as an opacity.
+/// How strongly each surface takes a track, the game's own constants (`Fx_BoardTrack` 0x132648, `boardtrack::board_track`).
 fn depth(surface: u8) -> Option<f32> {
     match surface {
-        1 | 2 | 8 | 15 | 16 => Some(0.0286),
-        3 | 4 => Some(0.0167),
-        5 => Some(0.1997),
+        1 | 2 | 8 | 15 | 16 => Some(f32::from_bits(0x3ce9_f4f6)),
+        3 | 4 => Some(f32::from_bits(0x3c88_7d2b)),
+        5 => Some(f32::from_bits(0x3e4c_8aae)),
         _ => None,
     }
 }
