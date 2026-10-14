@@ -119,6 +119,7 @@ state machine and the renderer are ours. Nothing has been checked against the or
 | G4k | The cAI virtuals that are object glue: `vf11_110bf8` (creates the controllers and riders), `vf16_111560` (start of race), `vf13_110fa0` (tear down), `vf8`, `vf10`: allocation and virtual calls, so they belong with the app wiring (E1b2r) — port when the loader exists (`Race_UpdateLookBack`, `cCountdownHandler` went in G4k1, `cEndRaceHandler::Enter` in G11d). Gap of G4j | unowned | G4 | | Gap of G4j |
 | G10b2 | The app's music on `tricky_game::pf` instead of `pathmusic.rs`'s own graph walk: the songs' `.mpf` loaded and registered, the driver's update and beat callbacks each frame, `Music_SetPathVar` / events through the controls, the stream calls (`PfEnv` / `PfDriver`) on the app's decoded segments; song names from `music.inf` / `musicmap.inf` | unowned | G10b | | Gap of G10b |
 | G10c | Announcer (DJ Atomika) and rider voices: when each line is picked and played | unowned | G10 | | [est] |
+| G10d | EA's sound library pieces that are pure calculation, against the original: `SNDVoice_CalcPitchMult` 0x2d5288 and the `SndVoice_*` helpers around it (`tricky_game::sndlib`). Gap of G10 | any | G10 | trailrig/heron (2026-10-13) | Gap of G10 |
 | G11 | Pre- and post-race scenes: `cPreRaceHandler`, `cEndRaceHandler_Update` 0x1141e0, scripts table 0x32f380, row filters | unowned | E11, G5 | | [repo] `intro.rs`; "Unresolved: post-race scene row filters" |
 | G11a | Movies: the disc's video files (EA logo, intro, unlock videos) | unowned | E2 | | [est] Find the format first |
 | G12 | Instant replay. Split: G12a (the streams), G12b (the older Huffman set's decoder), G12c (its encoder), G12d (the keyframe list, seeking, playlists), G12e (highlights and pins), G12f (camera tracks), G12g (playback control and the manager's life), the rest (keyframes and node save/restore, pins and highlights, camera tracks and playlist, `Replay_Update` / `DoCommand`, the save to the memory card `ReplaySave_*`, the overlays) later | unowned | E1, E11 | | [repo] in the debug menu (findings.md) |
@@ -891,3 +892,4 @@ matches the original.
 - 2026-10-13 trailrig/heron: G10a2j done (Sfx_InstanceCollision vs the original).
 - 2026-10-13 trailrig/heron: G10a2k done (WorldEmitter_GatherForListener vs the original).
 - 2026-10-13 trailrig/heron: G10a2l done (WorldEmitter_Update vs the original); G10a2 closed (BoardIn_* and Voice_Update3D not found by name).
+- 2026-10-13 trailrig/heron: claim G10d (sound library calculations).
