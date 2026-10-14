@@ -106,3 +106,138 @@ pub fn update_all(t: &mut [u32], env: &mut dyn Env) {
         }
     }
 }
+
+/// Reads of the game's memory by address (a word at a time), for the functions that walk the emitter grid.
+pub trait Mem {
+    fn u32(&self, addr: u32) -> u32;
+    fn f32(&self, addr: u32) -> f32 {
+        f32::from_bits(self.u32(addr))
+    }
+}
+
+/// `WorldEmitter_GatherForListener`'s call out: `FUN_0022d260` (the volume the falloff gave, the object at 0x34370c (`global`),
+/// the instance, the record's index, the caller's third argument, the record's word +4, 1 for a faded sound or 0, the
+/// sound's centre).
+pub trait GatherEnv {
+    fn add_sound(&mut self, volume: f32, global: u32, instance: u32, index: u32, arg3: u64, record_word_1: u32, faded: u32, centre: [f32; 3]);
+}
+
+/// `Vec3_Dot` 0x137140.
+fn dot3(a: [f32; 3], b: [f32; 3]) -> f32 {
+    a[0] * b[0] + a[1] * b[1] + a[2] * b[2]
+}
+
+/// `WorldEmitter_GatherForListener` 0x22b370: the emitters near a listener at `listener` (the address of its three
+/// floats) in the grid of the emitter manager at `sys` (+0x10 width, +0x14 height, +0x18 the cells of 0x14 bytes
+/// whose +0x10 heads a list of {instance group, next}, +0x1c / +0x20 the grid's origin, +0x24 the cell size). Each
+/// group is an instance (position at +0x30) and a block of records (count at +4, records from +8: kind 0 a sphere,
+/// 1 a box, 2 a cone, 3 a plain radius; of 0x1c, 0x30, 0x30 and 0x18 bytes). A record the listener is inside gives
+/// one `add_sound` with the volume the record's falloff curve gives. The pointers to the records are kept on the
+/// original's stack four to a group: more than four records in a group is not modelled.
+pub fn gather_for_listener(m: &dyn Mem, sys: u32, listener: u32, arg3: u64, env: &mut dyn GatherEnv) {
+    let cell = m.f32(sys + 0x24);
+    let lis = [m.f32(listener), m.f32(listener + 4), m.f32(listener + 8)];
+    let w = m.u32(sys + 0x10) as i32;
+    let yy = (((lis[1] - m.f32(sys + 0x20)) + cell) / cell) as i32;
+    let xx = (((lis[0] - m.f32(sys + 0x1c)) + cell) / cell) as i32;
+    let idx = w.wrapping_mul(yy.wrapping_sub(1)).wrapping_add(xx.wrapping_sub(1));
+    if idx < 0 || idx >= w.wrapping_mul(m.u32(sys + 0x14) as i32) {
+        return;
+    }
+    let mut node = m.u32((idx as u32).wrapping_mul(0x14).wrapping_add(m.u32(sys + 0x18)) + 0x10);
+    if node == 0 {
+        return;
+    }
+    let global = m.u32(0x34370c);
+    let half_pi = f32::from_bits(0x3fc9_0fdb);
+    while node != 0 {
+        let group = m.u32(node);
+        let inst = m.u32(group);
+        let p = [m.f32(inst + 0x30), m.f32(inst + 0x34), m.f32(inst + 0x38)];
+        let block = m.u32(group + 4);
+        let count = m.u32(block + 4) as i32;
+        // the records' addresses, by their kinds' sizes
+        let mut recs = Vec::new();
+        let mut at = block + 8;
+        for _ in 0..count.max(0) {
+            recs.push(at);
+            at = at.wrapping_add(match m.u32(at) {
+                0 => 0x1c,
+                1 | 2 => 0x30,
+                3 => 0x18,
+                _ => 0,
+            });
+        }
+        for (i, &r) in recs.iter().enumerate() {
+            let i = i as u32;
+            let off = [m.f32(r + 8), m.f32(r + 0xc), m.f32(r + 0x10)];
+            let c = [p[0] + off[0], p[1] + off[1], p[2] + off[2]];
+            let d = [lis[0] - c[0], lis[1] - c[1], lis[2] - c[2]];
+            let kind = m.u32(r);
+            match kind {
+                0 => {
+                    let dist = dot3(d, d).sqrt().abs();
+                    let rad = m.f32(r + 0x14);
+                    if dist < rad {
+                        let f = super::worldemitter::falloff(m.f32(r + 0x18), dist / rad, 0.0);
+                        env.add_sound(f, global, inst, i, arg3, m.u32(r + 4), 1, c);
+                    }
+                }
+                1 => {
+                    let a = [m.f32(r + 0x20), m.f32(r + 0x24), m.f32(r + 0x28)];
+                    // up x a, normalised, then a x that
+                    let u = [0.0f32, 0.0, 1.0];
+                    let r0 = u[1] * a[2] - u[2] * a[1];
+                    let r1 = u[2] * a[0] - u[0] * a[2];
+                    let r2 = u[0] * a[1] - u[1] * a[0];
+                    let q = dot3([r0, r1, r2], [r0, r1, r2]).sqrt();
+                    let inv = 1.0 / q;
+                    let (n0, n1, n2) = (r0 * inv, r1 * inv, r2 * inv);
+                    let s0 = a[1] * n2 - a[2] * n1;
+                    let s1 = a[2] * n0 - a[0] * n2;
+                    let s2 = a[0] * n1 - a[1] * n0;
+                    let e5 = m.f32(r + 0x14);
+                    let e6 = m.f32(r + 0x18);
+                    let e7 = m.f32(r + 0x1c);
+                    let sd = (s0 * d[0] + s1 * d[1]) + s2 * d[2];
+                    let ad = (a[0] * d[0] + a[1] * d[1]) + a[2] * d[2];
+                    let nd = (n0 * d[0] + n1 * d[1]) + n2 * d[2];
+                    let t_a = if e5 == 0.0 { 0.0 } else { (ad * ad) / (e5 * e5) };
+                    let t_n = if e6 == 0.0 { 0.0 } else { (nd * nd) / (e6 * e6) };
+                    let t_s = if e7 == 0.0 { 0.0 } else { (sd * sd) / (e7 * e7) };
+                    let total = (t_a + t_n) + t_s;
+                    if total < 1.0 {
+                        let f = super::worldemitter::falloff(m.f32(r + 0x2c), total, 0.0);
+                        env.add_sound(f, global, inst, i, arg3, m.u32(r + 4), 1, c);
+                    }
+                }
+                2 => {
+                    let dist = dot3(d, d).sqrt().abs();
+                    let rad = m.f32(r + 0x14);
+                    if dist < rad {
+                        let inv = 1.0 / dist;
+                        let dn = [d[0] * inv, d[1] * inv, d[2] * inv];
+                        let dir = [m.f32(r + 0x18), m.f32(r + 0x1c), m.f32(r + 0x20)];
+                        let cosine = (dn[0] * dir[0] + dn[1] * dir[1]) + dn[2] * dir[2];
+                        let cone = m.f32(r + 0x28);
+                        if cone < cosine {
+                            let f1 = super::worldemitter::falloff(m.f32(r + 0x24), dist / rad, 0.0);
+                            let wide = half_pi - crate::math::asin(cone);
+                            let ang = half_pi - crate::math::asin(cosine);
+                            let f2 = super::worldemitter::falloff(m.f32(r + 0x2c), ang / wide, 0.0);
+                            env.add_sound(f1 * f2, global, inst, i, arg3, m.u32(r + 4), 1, c);
+                        }
+                    }
+                }
+                3 => {
+                    let dist = dot3(d, d).sqrt().abs();
+                    if dist < m.f32(r + 0x14) {
+                        env.add_sound(1.0, global, inst, i, arg3, m.u32(r + 4), 0, c);
+                    }
+                }
+                _ => {}
+            }
+        }
+        node = m.u32(node + 4);
+    }
+}

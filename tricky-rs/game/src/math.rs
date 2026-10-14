@@ -69,25 +69,25 @@ pub fn sin_cos(x: f32) -> (f32, f32) {
     }
 }
 
-/// `Math_Asin` 0x250fd0
+/// `Math_Asin` 0x250fd0 (an argument beyond 1 gives the square root of the absolute value, as the vector unit's does)
 pub fn asin(x: f32) -> f32 {
     if x < -0.707_106_77 {
         let t = 1.0 - x * x;
-        return t.sqrt() * (asin_poly(t) + 1.0) + -HALF_PI;
+        return t.abs().sqrt() * (asin_poly(t) + 1.0) + -HALF_PI;
     }
     let x2 = x * x;
     if x <= 0.707_106_77 {
         return asin_poly(x2) * x + x;
     }
     let t = 1.0 - x2;
-    HALF_PI - t.sqrt() * (asin_poly(t) + 1.0)
+    HALF_PI - t.abs().sqrt() * (asin_poly(t) + 1.0)
 }
 
 /// `Math_Atan` 0x2510f8
 pub fn atan(x: f32) -> f32 {
     if x < -1.0 {
         let t = 1.0 / (x * x + 1.0);
-        return t.sqrt() * (asin_poly(t) + 1.0) + -HALF_PI;
+        return t.abs().sqrt() * (asin_poly(t) + 1.0) + -HALF_PI;
     }
     let x2 = x * x;
     if 1.0 < x {
