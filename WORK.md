@@ -125,6 +125,7 @@ state machine and the renderer are ours. Nothing has been checked against the or
 | G7g | Rider shading and shadows, board reflections (env materials) | unowned | G7, E4 | | [est] |
 | G7h | World animations checked: `cTexFlipNode` 0x142e90, `cUVScrollNode` 0x141ff0, `cAnimDeltaNode` 0x199d10, `cFlagNode` 0x144938, `cAnimObjectNode` 0x198810 | any | E9 | | [repo] `worldanim.rs` |
 | G8 | HUD: `HUD_DrawPlayerSprites` 0x1a2c40, `HUD_DrawPlayerText` 0x1a4f70, `HUD_DrawSprite` 0x1c0068, all of it at 640×480, with the game's text from `american.loc` | unowned | E5 | | [repo] `hudsprites.rs`, `sfnfont.rs` partly done |
+| G8b | The overlay manager (`tricky_game::overlays`): `OverlayMan_Init` 0x1a6fb8, `~cOverlayMan`, its vf1 / vf2 (draw / update), `OverlayMan_IsAnyActive`, `Overlay_SetPlayerPad`, `Overlay_HideForPlayer`, the `OverlayMan_Call*` / `_Get*` wrappers, `Overlay_GetNewButtons` 0x1a8688, the overlay sounds, `BackdropOverlay_Init`, checked in the runner | unowned | G12q | ed-slopper/puffin (2026-10-13) | Split of G8 |
 | G9 | Front end: title, main menu, mode select, rider / outfit / board select, options, records, trick book screens, unlock screens, music player, loading screens (`gApp+0x734`) | unowned | E1, E5 | | [repo] `ui.rs` is ours. Split by screen before claiming |
 | G9a | Pause menu and in-race options; the leftover `cDebugMenu` (0x187850) kept as a dev menu | unowned | G9 | | [repo] findings.md |
 | G9m | The memory card overlay's state machine as `tricky_game::mcoverlay` through a `CardEnv` (the card system's and the owner's virtual calls by vtable offset): `MCOverlay_RunState` 0x1cf040 and its 33 states (`MCOverlay_State02..32`, `_CheckCard`, `_PickStateFromCard`, `_WaitTimer`), `MemCardOp_Update` / `_Restart` / `_IsDone` / `_GetResult`, checked in the runner with fake vtables | any | G9 | trailrig/heron (2026-10-13) | Not on the board before; drawing (`MemCardMsg_Draw*`, `MCOverlay_DrawState`) and the strings (`MemCardUI_SetMessage`) are separate |
@@ -975,3 +976,4 @@ matches the original.
 - 2026-10-13 ed-slopper/puffin: E11h done.
 - 2026-10-13 ed-slopper/puffin: claim E11i (split of E11).
 - 2026-10-13 ed-slopper/puffin: E11i done.
+- 2026-10-13 ed-slopper/puffin: claim G8b (split of G8).
