@@ -33,6 +33,41 @@ pub fn input_of(pad: u32) -> Input {
     }
 }
 
+/// A course's AI paths as the game keeps them, from the level's form of its `.aip` (`level::AiFile`, folder or disc):
+/// each point's offset as a unit direction and length, each event's file code as its place in the event table
+/// (`aip::EVENT_TYPES`). STANDIN: the directions renormalised from the folder form's offsets, for the `.aip`'s own
+/// (row G4e3 may keep the `.aip`).
+pub fn paths_of(ai: &tricky_data::level::AiFile) -> Vec<Path> {
+    ai.ai_paths
+        .iter()
+        .map(|p| Path {
+            start: p.path_pos,
+            min: [0.0; 3],
+            max: [0.0; 3],
+            points: p.path_points.iter().map(|o| { let l = (o[0] * o[0] + o[1] * o[1] + o[2] * o[2]).sqrt(); (if l == 0.0 { [0.0; 3] } else { [o[0] / l, o[1] / l, o[2] / l] }, l) }).collect(),
+            u3: p.u3 as u32,
+            respawnable: p.respawnable as u32,
+            events: p.path_events.iter().map(|e| (tricky_data::aip::EVENT_TYPES.iter().position(|t| *t == e.event_type).unwrap_or(0) as u32, e.event_value as u32, e.event_start, e.event_end)).collect(),
+        })
+        .map(|mut p| { bounds(&mut p); p })
+        .collect()
+}
+
+/// The path's box (`cPath` +0x1c, +0x28) round its points
+fn bounds(p: &mut Path) {
+    let mut at = p.start;
+    let (mut lo, mut hi) = (at, at);
+    for (d, l) in &p.points {
+        for k in 0..3 {
+            at[k] += d[k] * l;
+            lo[k] = lo[k].min(at[k]);
+            hi[k] = hi[k].max(at[k]);
+        }
+    }
+    p.min = lo;
+    p.max = hi;
+}
+
 /// A port position (m, y up) as the game's (cm, z up)
 fn game_pos(v: Vec3) -> V4 {
     [v.x * 100.0, -v.z * 100.0, v.y * 100.0, 1.0]

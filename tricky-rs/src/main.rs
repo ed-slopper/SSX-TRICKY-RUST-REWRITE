@@ -379,7 +379,7 @@ fn main() {
         return;
     }
     if let Ok(secs) = std::env::var("TRICKY_SIM") {
-        rider::self_test(&mut loaded.world, &loaded.rails, &loaded.line, &loaded.course, &loaded.lines, &loaded.paths, loaded.tube.as_ref(), loaded.yaw, secs.parse().unwrap_or(300.0));
+        rider::self_test(&mut loaded.world, &loaded.rails, &loaded.line, &loaded.course, &loaded.lines, &loaded.paths, &tricky_game::aiglue::paths_of(&loaded.level.ai), loaded.tube.as_ref(), loaded.yaw, secs.parse().unwrap_or(300.0));
         return;
     }
     // TRICKY_CAM=x,y,z,yaw,pitch flies; x,y,z,tx,ty,tz is a fixed camera while the race runs (chase_camera)

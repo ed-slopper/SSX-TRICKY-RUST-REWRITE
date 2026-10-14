@@ -281,3 +281,21 @@ Part of the port notes (index: [README.md](README.md)); units and wording as des
 - `FUN_001371e0`(point): the point less its part along the rider's frame axis +0x4aa0, normalised (VU rsqrt), along
   +0x4ab0; times skill / 7.8941293 when the skill scale (+0x86c) is not 1.
 - Checked in the runner: 40,000 rides, event queries and line offsets; 30,000 dispatches over every control state.
+
+## TRICKY_SIM on the ported computer rider (board row G4e2)
+
+- `race::self_test` runs `aiglue::AiRider::tick` at 60 Hz (its own accumulator; the sim steps at 1/120 s) on the
+  course's AI paths (`aiglue::paths_of`, from the level's `AiFile`, folder or disc). While the rider is on the snow
+  (grounded, not on a rail, not crashed, not finished) the ported modes' steer, tuck, brake, jump and boost replace
+  `AiDriver`'s; in the air, on rails and for tricks `AiDriver` still drives (STANDIN, rows G4e3 / G4g).
+- `course_dir` / `course_pts` come from the ported path follower (`follow.near`, `follow.ahead`). `AiDriver` stays as
+  the harness: its route index follows the rider (nearest point ahead within 200 points and 30 m), its stuck clock
+  resets while the follower makes way, and its rejoin / finish / lap logic is unchanged. A put-back restarts the
+  follower at the new position.
+- STANDIN: an LCG for `Rand_Game` (the path choice's keep roll); no other riders (no grudges, pairs, race place).
+- `TRICKY_OLDAI=1` rides on `AiDriver` alone, for comparing.
+- 11 disc courses, `TRICKY_SIM=600`, same build (stuck / falls): ported 7 / 48, `AiDriver` 18 / 46. Distance 54,877 m
+  against 49,665 m. Elysium's falls (20 against 8) are 10 put-backs counted twice (row E7c3f), 4 of them at the
+  half-pipe frames (x 430–540, z −1285 to −1410, t 299–322) after wall wipe-outs; megaplex 1 stuck (was 6).
+- The `aipath` runner tests fail with `TRICKY_AIP_DIR` pointing at a folder holding only some courses' `.aip`
+  (they need every course); leave it unset for them.

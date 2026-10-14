@@ -520,7 +520,7 @@ impl ChaseCam {
 
 
 /// Headless check: ride the course on autopilot along the race line and report what happens.
-pub fn self_test(world: &mut CollisionWorld, rails: &Rails, line: &[Vec3], course: &AiCourse, lines: &tricky_data::course::Lines, paths: &tricky_data::course::AiPaths, tube: Option<&crate::props::Tube>, start_yaw: f32, seconds: f32) {
+pub fn self_test(world: &mut CollisionWorld, rails: &Rails, line: &[Vec3], course: &AiCourse, lines: &tricky_data::course::Lines, paths: &tricky_data::course::AiPaths, ai_paths: &[crate::aipath::Path], tube: Option<&crate::props::Tube>, start_yaw: f32, seconds: f32) {
     if std::env::var("TRICKY_TRICKTEST").is_ok() {
         let Some(&start) = line.first() else { return };
         let tau = std::f32::consts::TAU;
@@ -674,13 +674,51 @@ pub fn self_test(world: &mut CollisionWorld, rails: &Rails, line: &[Vec3], cours
     let lane: Vec<f32> = std::env::var("TRICKY_LANE").ok().map(|v| v.split(',').filter_map(|x| x.parse().ok()).collect()).unwrap_or_default();
     let mut ai = AiDriver::new(lane.first().copied().unwrap_or(0.0), lane.get(1).copied().unwrap_or(1.0));
     let crash_at: Option<f32> = std::env::var("TRICKY_CRASHAT").ok().and_then(|v| v.parse().ok());
+    // row G4e2: on the snow the ported computer rider's modes ride (`aiglue`, at 60 Hz); `AiDriver` stays for the air,
+    // the rails, the tricks and as the harness (stuck, rejoin, finish). TRICKY_OLDAI: `AiDriver` alone.
+    let mut port_ai = (!ai_paths.is_empty() && std::env::var("TRICKY_OLDAI").is_err()).then(|| crate::aiglue::AiRider::new(ai_paths, r.pos, 1.0));
+    let (mut ai_acc, mut ai_tick, mut ai_input, mut ai_seen) = (0.0f32, 0i32, Input::default(), r.respawns);
+    // STANDIN: an LCG for `Rand_Game` (the path choice's keep roll), row G4e3
+    let mut seed = 0x2545_f491u32;
+    let mut rand = move || { seed = seed.wrapping_mul(1_103_515_245).wrapping_add(12345); (seed >> 16) as i32 & 0x7fff };
     while t < seconds {
+        if let Some(a) = port_ai.as_mut() {
+            if r.respawns != ai_seen || ai.idx == 0 && ai.route.is_empty() {
+                *a = crate::aiglue::AiRider::new(ai_paths, r.pos, 1.0);
+                ai_seen = r.respawns;
+            }
+            ai_acc += dt;
+            if ai_acc >= 1.0 / 60.0 - 1e-6 {
+                ai_acc -= 1.0 / 60.0;
+                let (path, last) = (a.follow.path, a.follow.along);
+                let view = crate::aiglue::RaceView { me: 0, others: &[], recs: &[], tick: ai_tick, practice: false };
+                ai_input = a.tick(&r, ai_paths, &view, &mut rand);
+                ai_tick += 1;
+                // the harness's stuck clock runs only while the ported rider makes no way along its paths
+                if a.follow.path != path || a.follow.along > last + 1.0 { ai.stuck_for = 0.0; }
+            }
+            // the harness's place on its route: the nearest point ahead (within 200 points and 30 m) to wherever the
+            // ported rider's paths took it
+            let l: &[Vec3] = if ai.route.len() > 2 { &ai.route } else { line };
+            let hi = (ai.idx + 200).min(l.len());
+            if let Some(k) = (ai.idx..hi).min_by(|&i, &j| (l[i] - r.pos).length_squared().total_cmp(&(l[j] - r.pos).length_squared())) {
+                if (l[k] - r.pos).length() < 30.0 { ai.idx = k; ai.last_idx = ai.last_idx.max(k); }
+            }
+            let port = |v: [f32; 4]| Vec3::new(v[0], v[2], -v[1]) * 0.01;
+            let (near, ahead) = (port(a.follow.near), port(a.follow.ahead));
+            r.course_dir = Some((ahead - near).normalize_or_zero());
+            r.course_pts = Some((near, ahead));
+        } else {
         r.course_dir = { let l: &[Vec3] = if ai.route.len() > 2 { &ai.route } else { line }; let i = ai.idx.min(l.len().saturating_sub(2)); let j = (i + 4).min(l.len() - 1); Some((l[j] - l[i]).normalize_or_zero()) };
         r.course_pts = { let l: &[Vec3] = if ai.route.len() > 2 { &ai.route } else { line }; course_points(l, ai.idx, r.pos) };
+        }
         if crash_at.is_some_and(|c| t <= c && t + dt > c) && r.crashed <= 0.0 { r.force_wipe(); }
         // TRICKY_LINE: follow the race line instead of the AI path network
         let input = if std::env::var("TRICKY_LINE").is_ok() { ai.learn(world, line); ai.drive(&mut r, world, line, course, dt) }
             else { ai.drive_paths(&mut r, world, paths, line, course, 2, dt) };
+        let input = if port_ai.is_some() && r.grounded && r.rail.is_none() && r.crashed <= 0.0 && ai.finished.is_none() {
+            Input { steer: ai_input.steer, tuck: ai_input.tuck, brake: ai_input.brake, jump: ai_input.jump, boost: ai_input.boost, ..input }
+        } else { input };
         if r.crashed > 0.0 && !was_down { crashes += 1; println!("  wiped out at t {t:.1} ({}) speed {:.0} km/h", r.cause, r.vel.length() * 3.6); }
         if r.crashed > 0.0 && !was_down && std::env::var("TRICKY_AIDBG").is_ok() { println!("    flip {:.2} spin {:.2} air {:.2}", r.flip, r.spin, r.air_time); }
         if was_down && r.crashed <= 0.0 { println!("    back up after {:.1} s at {:.0} km/h", r.down_t, r.vel.length() * 3.6); }
