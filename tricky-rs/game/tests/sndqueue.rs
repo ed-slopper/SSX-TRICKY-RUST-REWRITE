@@ -1069,3 +1069,101 @@ fn script_sound_play_matches_the_original() {
         assert_eq!(after, q, "case {case} state mode {mode} id {id:#x}");
     }
 }
+
+// ---- InstanceCollision ----
+
+struct InstEnv(Rc<RefCell<Or>>);
+impl InstanceCollisionEnv for InstEnv {
+    fn find_rider_near(&mut self, radius: f32) -> i64 {
+        self.0.borrow_mut().take("near", radius.to_bits() as u64, 0)
+    }
+    fn is_queued(&mut self) -> bool {
+        self.0.borrow_mut().take("queued", 0, 0) != 0
+    }
+    fn eval_curve(&mut self, slot: u32, x: i32) -> i64 {
+        self.0.borrow_mut().take("curve", slot as u64, x as u32 as u64)
+    }
+    fn start_instance_sound(&mut self, sound: u32, volume: i64) -> i64 {
+        self.0.borrow_mut().take("start", sound as u64, volume as u64)
+    }
+    fn queue_sounds(&mut self, started: i64, id: u32) {
+        self.0.borrow_mut().log.push(("qs", started as u64, id as u64));
+    }
+}
+
+#[test]
+fn instance_collision_matches_the_original() {
+    let Some(mut r) = runner() else { return };
+    let or: Rc<RefCell<Or>> = Rc::new(RefCell::new(Or::default()));
+    let sys = r.mem.alloc(0x100);
+    let rider = r.mem.alloc(0x200);
+    let node = r.mem.alloc(0x100);
+    let rec = r.mem.alloc(0x10);
+    let rec2 = r.mem.alloc(0x10);
+    r.mem.write_u32(0x34370c, 0x5eed_0000);
+    for (a, name) in [(0x20f9b0u32, "near"), (0x2154e0, "queued"), (0x20d928, "curve"), (0x22d508, "start")] {
+        let o = or.clone();
+        r.stub(a, move |c, _| {
+            let (x, y) = match name {
+                "near" => {
+                    assert_eq!((c.gpr(4) as u32, c.gpr(5) as u32), (sys, rider + 0x140));
+                    (c.f(12).to_bits() as u64, 0)
+                }
+                "queued" => {
+                    assert_eq!((c.gpr(4) as u32, c.gpr(5) as u32), (sys, node));
+                    (0, 0)
+                }
+                "curve" => (c.gpr(4) as u32 as u64, c.gpr(5) as u32 as u64),
+                _ => {
+                    assert_eq!((c.gpr(4) as u32, c.gpr(5) as u32, c.gpr(7) as u32), (0x5eed_0000, node, rider));
+                    (c.gpr(6) as u32 as u64, c.gpr(8))
+                }
+            };
+            let v = o.borrow_mut().take(name, x, y);
+            c.set_gpr(2, v as u64);
+        });
+    }
+    let o = or.clone();
+    r.stub(0x215998, move |c, _| {
+        assert_eq!((c.gpr(4) as u32, c.gpr(5) as u32, c.gpr(8)), (sys, node, 0));
+        o.borrow_mut().log.push(("qs", c.gpr(6), c.gpr(7) as u32 as u64))
+    });
+    let mut g = Rng(0x4141_5959_7373_1e1e);
+    for case in 0..40_000 {
+        let w80 = g.next();
+        r.mem.write_u32(sys + 0x80, w80);
+        let have = g.next() % 8 != 0;
+        let sound = if g.next() % 6 == 0 { 0 } else { g.next() };
+        r.mem.write_u32(node + 0xf4, if have { rec } else { 0 });
+        r.mem.write_u32(rec + 4, rec2);
+        r.mem.write_u32(rec2, sound);
+        let vel: [f32; 4] = std::array::from_fn(|_| match g.next() % 6 {
+            0 => 0.0,
+            1 => 1e15,
+            2 => -1e15,
+            3 => (g.next() % 100_000) as f32 / 10.0 - 5000.0,
+            4 => (g.next() % 100) as f32 / 10.0,
+            _ => (g.next() % 100_000) as f32 - 50_000.0,
+        });
+        for (k, v) in vel.iter().enumerate() {
+            r.mem.write_f32(rider + 0x150 + 4 * k as u32, *v);
+        }
+        let vals: Vec<i64> = vec![
+            [-1i64, 0, 3][g.next() as usize % 3],
+            (g.next() % 3 == 0) as i64,
+            [-5i64, 0, 50, 126, 127, 128, 500, -1 << 40, 1 << 40, -1][g.next() as usize % 10],
+            [-1i64, 0, 5, 1 << 40, -(1 << 40), 0x7fff_ffff, 0xffff_ffff][g.next() as usize % 7],
+        ];
+        or.borrow_mut().vals = vals.clone();
+        or.borrow_mut().log.clear();
+        r.cpu.set_gpr(4, sys as u64);
+        r.cpu.set_gpr(5, rider as u64);
+        r.cpu.set_gpr(6, node as u64);
+        r.call(0x216c50).unwrap_or_else(|e| panic!("case {case}: {e}"));
+        let orig = std::mem::take(&mut or.borrow_mut().log);
+        or.borrow_mut().vals = vals;
+        instance_collision(vel, if have { Some(sound) } else { None }, w80, &mut InstEnv(or.clone()));
+        let mine = std::mem::take(&mut or.borrow_mut().log);
+        assert_eq!(orig, mine, "case {case} vel {vel:?}");
+    }
+}

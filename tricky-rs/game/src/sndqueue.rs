@@ -6,6 +6,8 @@
 //! 0x3c (volume), 0x40 (the sound manager's slot), 0x44 (8 bytes each, inline), 0x64, 0x68 (the listener), 0x6c,
 //! 0x70, 0x74 (16-byte rows), 0x78, 0x7c, 0xa40 (the kind), 0xa44 (the sound id).
 
+use crate::jump::dot;
+
 /// The queue arrays, each indexed by the entry.
 #[derive(Clone, Debug, PartialEq, Default)]
 pub struct Queue {
@@ -477,4 +479,43 @@ pub fn script_sound_play(q: &mut Queue, word_80: u32, mode_is_4: bool, id: i64, 
     q.a68[i] = l;
     let played = env.play_pending();
     env.queue_sounds(played, word_80.wrapping_add(0x32));
+}
+
+
+pub trait InstanceCollisionEnv {
+    /// `Audio_FindRiderNear` 0x20f9b0 (40.0, the audio system, the rider's position): negative when none.
+    fn find_rider_near(&mut self, radius: f32) -> i64;
+    /// 0x2154e0 (the audio system, the instance): non-zero while its sound is already queued.
+    fn is_queued(&mut self) -> bool;
+    /// `Sfx_EvalCurve` 0x20d928 (2, the speed as an integer).
+    fn eval_curve(&mut self, slot: u32, x: i32) -> i64;
+    /// 0x22d508 (the object at 0x34370c, the instance, its sound's word, the rider, the volume): the sound started,
+    /// negative for none.
+    fn start_instance_sound(&mut self, sound: u32, volume: i64) -> i64;
+    /// `SndSys_QueueSounds` 0x215998 (the audio system, the instance, what was started, `word_80 + 0x32`, 0).
+    fn queue_sounds(&mut self, started: i64, id: u32);
+}
+
+/// `Sfx_InstanceCollision` 0x216c50: a rider hits a world instance that has a sound (`sound`, the word its +0xf4
+/// record points to; `None` for no record): the volume follows the rider's speed (curve 2, 0..127), and the sound is
+/// started and its follow-ups queued unless a rider is out of earshot or the instance's sound is already queued.
+pub fn instance_collision(vel: [f32; 4], sound: Option<u32>, word_80: u32, env: &mut dyn InstanceCollisionEnv) {
+    let Some(sound) = sound else { return };
+    if env.find_rider_near(40.0) < 0 {
+        return;
+    }
+    if env.is_queued() {
+        return;
+    }
+    let speed = dot(vel, vel).sqrt();
+    let curve = env.eval_curve(2, speed as i32);
+    let mut vol = if curve < 0x80 { curve } else { 0x7f };
+    if vol <= -1 {
+        vol = 0;
+    }
+    let started = env.start_instance_sound(sound, vol);
+    if started < 0 {
+        return;
+    }
+    env.queue_sounds(started, word_80.wrapping_add(0x32));
 }
