@@ -126,6 +126,7 @@ state machine and the renderer are ours. Nothing has been checked against the or
 | G7g | Rider shading and shadows, board reflections (env materials) | unowned | G7, E4 | | [est] |
 | G7h | World animations checked: `cTexFlipNode` 0x142e90, `cUVScrollNode` 0x141ff0, `cAnimDeltaNode` 0x199d10, `cFlagNode` 0x144938, `cAnimObjectNode` 0x198810 | any | E9 | | [repo] `worldanim.rs` |
 | G8 | HUD: `HUD_DrawPlayerSprites` 0x1a2c40, `HUD_DrawPlayerText` 0x1a4f70, `HUD_DrawSprite` 0x1c0068, all of it at 640×480, with the game's text from `american.loc` | unowned | E5 | | [repo] `hudsprites.rs`, `sfnfont.rs` partly done |
+| G8c | The backdrop overlay's animation (`tricky_game::overlays`): `Backdrop_StartFrameAnim` 0x1a89b0, `_StartChildSlide`, `_StartEdgeSlide`, `cBackdropOverlay::Update` 0x1a8bd8, `Backdrop_UpdateFrameAnim` / `_UpdateChildSlide` / `_UpdateEdgeSlide`, `cBackdropOverlay::Reset`, `cScreenOverlay::Update`, checked in the runner | unowned | G8b | ed-slopper/puffin (2026-10-13) | Split of G8 |
 | G9 | Front end: title, main menu, mode select, rider / outfit / board select, options, records, trick book screens, unlock screens, music player, loading screens (`gApp+0x734`) | unowned | E1, E5 | | [repo] `ui.rs` is ours. Split by screen before claiming |
 | G9a | Pause menu and in-race options; the leftover `cDebugMenu` (0x187850) kept as a dev menu | unowned | G9 | | [repo] findings.md |
 | G10 | Audio engine (includes EA's sound library, `lib-snd` in the function index: 408 functions): EA BNK voices (`SND_ParsePTLayer` 0x2d5410, `SNDVoice_CalcPitchMult` 0x2d5288), 3D voices, mixing and volumes, decoded from the disc at run time | unowned | E2b | | [repo] Today `.wav` exported by vgmstream; README: stream picks "by length, looping and tone"; with it the config loaders that feed the engine (BANKS, CROWD, CHANT, SPEECH, narration, NASCRIPT, jukebox: `Audio_LoadInGameConfig` 0x211098, `Audio_LoadFEConfig` 0x20f160, `Speech_LoadEvents` 0x227d70) on `tricky_data::ini` |
@@ -979,3 +980,4 @@ matches the original.
 - 2026-10-13 ed-slopper/puffin: claim G8b (split of G8).
 - 2026-10-13 ed-slopper/puffin: G8b done.
 - 2026-10-14 trailrig/heron: G9m done (memory card overlay state machine, 686 mutants killed). Drawing and strings still separate.
+- 2026-10-13 ed-slopper/puffin: claim G8c (split of G8).
