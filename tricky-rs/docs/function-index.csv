@@ -187,7 +187,7 @@ address,size,name,system,status
 0x1146a8,8,cEndRaceHandler::Exit,race,checked
 0x1146b0,128,cPreAI::vf1_1146b0,boarder?,not started
 0x114730,196,cPostAI::vf1_114730,boarder?,not started
-0x1147f8,212,Replay_RefreshRiders,camera?,not started
+0x1147f8,212,Replay_RefreshRiders,camera?,checked
 0x1148d0,20,Game_IsTutorial,game,not started
 0x1148e8,96,Race_FindRiderByPlayer,race,not started
 0x114948,284,StaticInit_PostAI,other,not started
@@ -203,13 +203,13 @@ address,size,name,system,status
 0x114e38,80,cStartRaceHandler::__tf,runtime,host
 0x114e88,80,cCountdownHandler::__tf,runtime,host
 0x114ed8,80,cPreRaceHandler::__tf,runtime,host
-0x114f28,8,cReplayEndRaceHandler::Exit,game,not started
+0x114f28,8,cReplayEndRaceHandler::Exit,game,checked
 0x114f30,64,cAIStateHandler::__tf,runtime,host
 0x114f70,16,Career_StoreCircuitAttitudes,game?,not started
 0x114f80,60,Mem_Delete,game?,not started
 0x114fc0,116,cAIState::__tf,runtime,host
-0x115038,8,cReplayEndRaceHandler::Update,game,not started
-0x115040,8,cReplayEndRaceHandler::Enter,game,not started
+0x115038,8,cReplayEndRaceHandler::Update,game,checked
+0x115040,8,cReplayEndRaceHandler::Enter,game,checked
 0x115048,80,cReplayEndRaceHandler::__tf,runtime,host
 0x115098,8,cSelectLessonHandler::Update,game,not started
 0x1150a0,8,cSelectLessonHandler::Exit,game,not started
@@ -1561,7 +1561,7 @@ address,size,name,system,status
 0x178330,184,Camera_GetCourseCmlName,camera,ported
 0x1783e8,228,Camera_LoadCmlFiles,camera,ported
 0x1784d0,240,cCamControl::vf1_1784d0,boarder,not started
-0x1785c0,188,Camera_SetReplayMode,camera,not started
+0x1785c0,188,Camera_SetReplayMode,camera,checked
 0x1786c0,12,Camera_GetPreset,camera,not started
 0x1786d0,660,Camera_SelectPreset,camera,not started
 0x178968,188,Camera_GetChaseParams,camera,not started
@@ -2062,7 +2062,7 @@ address,size,name,system,status
 0x18e748,64,cMenu::__tf,runtime,host
 0x18e798,64,cMenuItem::__tf,runtime,host
 0x18e850,404,ReplayMgr_Init,game?,checked
-0x18e9e8,224,ReplayMgr_Free,game?,not started
+0x18e9e8,224,ReplayMgr_Free,game?,checked
 0x18eac8,252,Replay_Init,game?,checked
 0x18ebc8,8,FUN_0018ebc8,game?,checked
 0x18ebd0,664,Replay_Clear,game?,checked
@@ -2230,8 +2230,8 @@ address,size,name,system,status
 0x1956b0,12,ReplayStatus_Clear,frontend?,checked
 0x1956c0,8,thunk_FUN_00193a78,runtime,checked
 0x1956c8,40,Replay_ClearPins,frontend?,checked
-0x1956f0,28,FUN_001956f0,frontend?,not started
-0x195710,28,FUN_00195710,frontend?,not started
+0x1956f0,28,FUN_001956f0,frontend?,checked
+0x195710,28,FUN_00195710,frontend?,checked
 0x1957b0,40,TextBox_Init,render,not started
 0x1957d8,620,TextBox_Draw,render,not started
 0x195a48,572,FUN_00195a48,hud?,not started
@@ -3199,8 +3199,8 @@ address,size,name,system,status
 0x1ec548,476,cReplayControlOverlay::Reset,frontend,checked
 0x1ec728,176,ReplayControl_Slide,frontend,checked
 0x1ec7d8,44,cReplayControlOverlay::vf16_1ec7d8,frontend,checked
-0x1ec808,1684,cReplayControlOverlay::Draw,frontend,not started
-0x1ecea0,1516,HUD_DrawReplayCamInfo,hud,not started
+0x1ec808,1684,cReplayControlOverlay::Draw,frontend,checked
+0x1ecea0,1516,HUD_DrawReplayCamInfo,hud,checked
 0x1ed490,2616,FUN_001ed490,frontend?,not started
 0x1eded0,28,ReplayControl_ShowMessage,frontend,checked
 0x1edef0,1904,FUN_001edef0,frontend?,not started
@@ -3217,7 +3217,7 @@ address,size,name,system,status
 0x1efe38,184,RaceMenuOverlay_Draw,frontend,not started
 0x1efef0,468,RaceMenuOverlay_UpdateReplayMenu,frontend,checked
 0x1f00c8,288,RaceMenuOverlay_UpdateConfirm,frontend,not started
-0x1f01e8,284,RaceMenuOverlay_DrawReplayMenu,frontend,not started
+0x1f01e8,284,RaceMenuOverlay_DrawReplayMenu,frontend,checked
 0x1f0308,248,cReplayOverlay::SaveBegin,frontend,checked
 0x1f0400,100,cReplayOverlay::SaveNext,frontend,checked
 0x1f0468,20,cReplayOverlay::SaveDone,frontend,checked

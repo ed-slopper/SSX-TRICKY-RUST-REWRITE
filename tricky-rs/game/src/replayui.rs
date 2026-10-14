@@ -1,6 +1,7 @@
-//! The instant replay's on-screen controls and the race menu's replay page (board row G12n), on the game's bytes
-//! (`pf::Mem`), checked in the function runner (`tests/replayui.rs`). The drawing (`cReplayControlOverlay::Draw`,
-//! `HUD_DrawReplayCamInfo`) and the constructors' fonts and strings are not here.
+//! The instant replay's on-screen controls and the race menu's replay page (board rows G12n, G12o), on the game's
+//! bytes (`pf::Mem`), checked in the function runner (`tests/replayui.rs`). The drawing is the draw calls the game
+//! makes (`DrawEnv`); the panel's four larger drawings (0x1edef0, 0x1ed490, 0x1eee00, `HUD_DrawStartSelectPrompt`)
+//! and the constructors' fonts and strings are not here yet.
 //!
 //! `cReplayControlOverlay` (the controls shown while a replay plays, a `cBackdropOverlay`):
 //! - +0x350 the panel's y (sliding to its mode's), +0x354 / +0x358 the y for modes 1 / 2 (480.0 for 0),
@@ -808,4 +809,314 @@ pub fn save_next(m: &mut Mem, env: &mut dyn SaveOverlayEnv, o: u32, n: u32) -> b
 pub fn save_finish(m: &mut Mem, env: &mut dyn SaveOverlayEnv, abort: bool) {
     let g = mgr(m);
     env.after_save(m, g, if abort { 0x1948c0 } else { 0x194870 });
+}
+
+// ---- the drawing (G12o) ----
+
+/// The font colour the HUD's text and sprites take (`Font_SetColorV` 0x14eee8 sets it from four floats)
+pub const FONT_COLOR: u32 = 0x337fe8;
+
+/// What the drawing calls out to. Floats are passed as the game computes them (PS2 rounding).
+pub trait DrawEnv {
+    /// The renderer's virtual at `slot` (+0x1c4 / +0x1d4 / +0x1e4 / +0x1fc of the object at the game's +0x724,
+    /// through its vtable at +0x10)
+    fn renderer(&mut self, slot: u32, a1: u32, a2: u32);
+    /// `SpriteSet_GetRect` 0x1f9e50 (the sprite set, the sprite): the rectangle (+4 width, +8 height)
+    fn sprite_rect(&mut self, set: u32, id: u32) -> u32;
+    /// `HUD_DrawSprite` 0x1c0068 (x, y, w, h, the overlay, the sprite or -5 for a box, the corner)
+    #[allow(clippy::too_many_arguments)]
+    fn sprite(&mut self, x: f32, y: f32, w: f32, h: f32, o: u32, id: i32, corner: u32);
+    /// `Font_SetColorV` 0x14eee8 (0x337fe8, the four floats)
+    fn set_color(&mut self, c: [f32; 4]);
+    /// `Loc_GetString` 0x2c5160 (the game's string table, the id)
+    fn loc(&mut self, id: u32) -> u32;
+    /// `Font_MeasureWide` 0x19dc78 (scale, the font, the string, 0): the width
+    fn measure_wide(&mut self, scale: f32, font: u32, s: u32) -> i32;
+    /// `Font_MeasureAscii` 0x19da30 (scale, the font, the string, 0)
+    fn measure_ascii(&mut self, scale: f32, font: u32, s: u32) -> i32;
+    /// `HUD_DrawLabelBox` 0x1a9928 (y, the overlay, the string, the style)
+    fn label_box(&mut self, y: f32, o: u32, s: u32, style: u32);
+    /// The text printers (scale, x, y, the font, the string): `Font_PrintfShadowed` 0x19d3f0,
+    /// `Font_PrintfShadowedA` 0x19d568, `Font_PrintfShadowedCentered` 0x19d6e0, `Font_PrintShadowedRight` 0x19d868
+    fn print(&mut self, func: u32, scale: f32, x: f32, y: f32, font: u32, s: u32);
+    /// `Camera_GetChaseParams` 0x178968: its fifth output (the chase camera's index)
+    fn chase_index(&mut self) -> i32;
+    /// `Camera_GetPreset` 0x1786c0
+    fn camera_preset(&mut self) -> u32;
+    /// The panel's other drawings, not ported yet: 0x1edef0, 0x1ed490, 0x1eee00 (full controls) and
+    /// `HUD_DrawStartSelectPrompt` 0x1ee720
+    fn sub_draw(&mut self, func: u32, o: u32);
+    /// `Backdrop_DrawFrame` 0x1a9bb8 (y, the backdrop, 15)
+    fn backdrop_frame(&mut self, y: f32, b: u32, a1: u32);
+    /// `Overlay_DrawMenuList` 0x1aa630 (x, y, scale, the backdrop, 12, 0, the items' strings, 3, the selection,
+    /// 116, 1, then on the stack 1 and the items' enabled flags)
+    #[allow(clippy::too_many_arguments)]
+    fn menu_list(&mut self, x: f32, y: f32, scale: f32, b: u32, items: [u32; 3], sel: u32, enabled: [u32; 3]);
+}
+
+fn fb(bits: u32) -> F {
+    F(f32::from_bits(bits))
+}
+
+const P4: u32 = 0x3ecccccd;
+const TENTH: u32 = 0x3dcccccd;
+
+/// `cReplayControlOverlay::Draw` 0x1ec808: nothing during a cut-scene (the race's +0x34) or while the overlay is
+/// off (+0x498). The panel, when it moves or is up: a dark box over the screen below it (all of the screen, darker,
+/// when hidden), and its frame from sprite 0x37 scaled to 340 wide in two halves. The up / down arrows (sprites 0x61,
+/// then 0x65 at the top mode or 0x64) left of "more" / "less". Then the camera's line and the other parts.
+pub fn draw(m: &mut Mem, env: &mut dyn DrawEnv, o: u32) {
+    if m.r32(race(m) + 0x34) != 0 || m.r32(o + 0x498) != 0 {
+        return;
+    }
+    env.renderer(0x1e4, 3, 0);
+    env.renderer(0x1fc, 1, 0);
+    env.renderer(0x1c4, 0, 0);
+    let one = 1.0f32;
+    let p4 = f32::from_bits(P4);
+    let hidden = m.r32(o + at::HIDDEN) != 0;
+    let (c0, c1) = if hidden {
+        ([0.25, p4, p4, p4], [0.5, p4, p4, p4])
+    } else {
+        ([f32::from_bits(0x3edc28f6), one, one, one], [one; 4])
+    };
+    if m.r32(o + at::MOVED) != 0 || m.r32(o + at::MODE) != 0 {
+        let w = fl(m, env.sprite_rect(m.r32(o), 0x37) + 4);
+        let h = fl(m, env.sprite_rect(m.r32(o), 0x37) + 8);
+        let scale = F(340.0) / F(w);
+        let y = fl(m, o + at::Y);
+        let top = (F(y) - F(26.0)).0;
+        let h21 = F(h) * fb(0x3e570a3d);
+        let full = scale * F(w);
+        let h26 = F(h) * fb(0x3e851eb8);
+        let left = full * fb(0x3ee8f5c3);
+        env.renderer(0x1d4, 10, 0);
+        if hidden {
+            m.w32(FONT_COLOR, 0x3f4ccccd);
+            for k in [0xc, 4, 8] {
+                m.w32(FONT_COLOR + k, TENTH);
+            }
+            env.sprite(0.0, 0.0, 640.0, 480.0, o, -5, 0);
+            for k in [0xc, 0, 4, 8] {
+                m.w32(FONT_COLOR + k, 0x3f000000);
+            }
+        } else {
+            let tenth = f32::from_bits(TENTH);
+            env.set_color([f32::from_bits(0x3f6147ae), tenth, tenth, tenth]);
+            env.sprite(fl(m, o + 0x35c), y, fl(m, o + 0x364), (F(480.0) - F(y)).0, o, -5, 0);
+            let rest = full - left;
+            env.sprite((left + F(-20.0)).0, (F(top) + h26).0, (rest + rest).0, ((F(h) - h21) - h26).0, o, -5, 0);
+            env.set_color([one; 4]);
+        }
+        env.renderer(0x1d4, 12, 0);
+        env.sprite(-20.0, top, scale.0, 1.0, o, 0x37, 2);
+        env.sprite(320.0, top, scale.0, 1.0, o, 0x37, 3);
+    }
+    env.renderer(0x1d4, 13, 0);
+    if m.r32(o + at::MOVED) == 0 {
+        let at_max = m.r32(o + at::MODE) == m.r32(o + at::MAX_MODE);
+        let s = env.loc(if at_max { 0x16a } else { 0x16b });
+        let w = env.measure_wide(1.0, m.r32(o + 0x348), s) as f32;
+        env.renderer(0x1d4, 14, 0);
+        env.set_color(c0);
+        let x = F(fl(m, o + 0x360)) - F(w);
+        let y = fl(m, o + at::Y);
+        env.sprite((x - F(42.0)).0, (F(y) - F(43.0)).0, 1.0, 1.0, o, 0x61, 0x60);
+        env.renderer(0x1d4, 15, 0);
+        env.set_color(c1);
+        let x = F(fl(m, o + 0x360)) - F(w);
+        let y = fl(m, o + at::Y);
+        if at_max {
+            env.sprite((x - F(42.0)).0, (F(y) - F(33.0)).0, 1.0, 1.0, o, 0x65, 0x60);
+        } else {
+            env.sprite((x - F(41.0)).0, (F(y) - F(52.0)).0, 1.0, 1.0, o, 100, 0x60);
+        }
+    }
+    env.renderer(0x1d4, 13, 0);
+    if m.r32(o + at::FULL) != 0 {
+        env.sub_draw(0x1edef0, o);
+        env.sub_draw(0x1ed490, o);
+        cam_info(m, env, o);
+        env.sub_draw(0x1eee00, o);
+    } else {
+        cam_info(m, env, o);
+        env.sub_draw(0x1ee720, o);
+    }
+    env.renderer(0x1c4, 1, 0);
+}
+
+/// The camera presets' names (`Camera_GetPreset` 1..10; 10 the "Artist" format at 0x394010, the others 0x14d)
+pub fn preset_name(p: u32) -> i32 {
+    match p {
+        1 => 0x152,
+        2 => 0x14a,
+        3 => 0x14b,
+        5 => 0x14c,
+        6 => 0x14e,
+        7 => 0x150,
+        8 => 0x151,
+        10 => -1,
+        _ => 0x14d,
+    }
+}
+
+/// `HUD_DrawReplayCamInfo` 0x1ecea0. The label box: "end of replay" (0xeba) at the end, else the overlay's +0x3f0.
+/// While the panel moves or is up: the preset's name and the chase camera's (0x32db74 + 0x84 each). Then
+/// "highlighting" (0xdec), the message fading, and "more" / "less" (0x16a / 0x16b) at the right.
+pub fn cam_info(m: &mut Mem, env: &mut dyn DrawEnv, o: u32) {
+    if m.r32(race(m) + 0x34) != 0 {
+        return;
+    }
+    env.renderer(0x1e4, 3, 0);
+    let one = 1.0f32;
+    let (c0, c1, c2) = if m.r32(o + at::HIDDEN) != 0 {
+        let p4 = f32::from_bits(P4);
+        ([0.5, p4, p4, p4], [0.5, p4, p4, 0.0], [0.5, p4, 0.0, 0.0])
+    } else {
+        let c1 = [one, f32::from_bits(0x3f73f7cf), f32::from_bits(0x3f3a9fbe), f32::from_bits(0x3dd91687)];
+        ([one; 4], c1, [one, one, 0.0, 0.0])
+    };
+    if at_end(m) {
+        let s = env.loc(0xeba);
+        env.label_box(18.0, o, s, 6);
+    } else {
+        env.label_box(18.0, o, o + 0x3f0, 6);
+    }
+    let small = f32::from_bits(0x3f2147ae);
+    if m.r32(o + at::MOVED) != 0 || m.r32(o + at::MODE) != 0 {
+        let name = preset_name(env.camera_preset());
+        env.set_color(c0);
+        let y = (F(fl(m, o + at::Y)) + F(-47.0)).0;
+        env.set_color(c1);
+        env.renderer(0x1d4, 0x11, 0);
+        if name == -1 {
+            env.print(0x19d3f0, small, 20.0, y, m.r32(o + 0x34c), 0x394010);
+        } else {
+            let s = env.loc(name as u32);
+            env.print(0x19d568, small, 20.0, y, m.r32(o + 0x34c), s);
+        }
+        let i = env.chase_index();
+        let s = (i.wrapping_mul(0x84) as u32).wrapping_add(0x32db74);
+        env.measure_ascii(small, m.r32(o + 0x34c), s);
+        env.print(0x19d6e0, small, 320.0, y, m.r32(o + 0x34c), s);
+    }
+    if m.r32(o + at::HIGHLIGHTING) != 0 {
+        env.set_color(c2);
+        let x = ((F(fl(m, o + 0x35c)) + F(fl(m, o + 0x364))) - F(71.0)).0;
+        let y = (F(fl(m, o + at::Y)) - F(28.0)).0;
+        let f = m.r32(m.r32(GAPP) + 0x60);
+        let s = env.loc(0xdec);
+        env.print(0x19d568, f32::from_bits(0x3f666666), x, y, f, s);
+    }
+    let a = fl(m, o + at::MSG_ALPHA);
+    if 0.0 < a {
+        m.w32(FONT_COLOR, a.to_bits());
+        for k in [0xc, 4, 8] {
+            m.w32(FONT_COLOR + k, one.to_bits());
+        }
+        let s = env.loc(m.r32(o + at::MSG));
+        let w = env.measure_wide(1.0, m.r32(o + 0x348), s) as f32;
+        let l = fl(m, o + 0x35c);
+        let half = (F(fl(m, o + 0x360)) - F(l)) * F(0.5);
+        let y = (F(fl(m, o + at::Y)) + F(-2.0)).0;
+        let s = env.loc(m.r32(o + at::MSG));
+        let x = ((F(l) + half) - F(w) * F(0.5)).0;
+        env.print(0x19d568, one, x, y, m.r32(o + 0x348), s);
+    }
+    if m.r32(o + at::MOVED) == 0 {
+        env.set_color(c1);
+        let id = if m.r32(o + at::MODE) == m.r32(o + at::MAX_MODE) { 0x16a } else { 0x16b };
+        let x = (F(fl(m, o + 0x360)) - F(20.0)).0;
+        let y = (F(fl(m, o + at::Y)) - F(49.0)).0;
+        let s = env.loc(id);
+        env.print(0x19d868, one, x, y, m.r32(o + 0x348), s);
+    }
+}
+
+/// `RaceMenuOverlay_DrawReplayMenu` 0x1f01e8: the frame, the three items (watch 0x187, save 0x161, back 0x1db; all
+/// enabled, from 0x3940b8) and the title box (0xe53)
+pub fn draw_menu(m: &Mem, env: &mut dyn DrawEnv, o: u32) {
+    let items = [env.loc(0x187), env.loc(0x161), env.loc(0x1db)];
+    let b = m.r32(o + 0x42c);
+    env.backdrop_frame(165.0, b, 15);
+    env.menu_list(320.0, 240.0, f32::from_bits(0x3f6b851f), b, items, m.r32(o + 0x43c), [1, 1, 1]);
+    let s = env.loc(0xe53);
+    env.label_box(155.0, b, s, 17);
+}
+
+// ---- the leftovers ----
+
+/// What the replay's leftovers call out to
+pub trait MiscEnv {
+    /// `Replay_FreeAll` 0x18f208
+    fn free_all(&mut self, m: &mut Mem, mgr: u32);
+    /// `Mem_Delete` 0x114f80
+    fn delete(&mut self, p: u32);
+    /// `Race_GetRider` 0x1814a8 (the race, i)
+    fn rider(&mut self, i: u32) -> u32;
+    /// `AnimCtl_BlendPose` 0x15f7c8 (the rider + 0x46c0)
+    fn blend_pose(&mut self, ctl: u32);
+    /// `Boarder_UpdatePose` 0x129628
+    fn update_pose(&mut self, rider: u32);
+    /// `Boarder_UpdateBroadphase` 0x126748
+    fn update_broadphase(&mut self, rider: u32);
+    /// `Broadphase_SortAll` 0x14fe18 (the race's +0x30)
+    fn broadphase_sort(&mut self, b: u32);
+    /// `Contact_SortPairs` 0x150428 (the race's +0x30)
+    fn contact_sort(&mut self, b: u32);
+    /// `CamControl_Reset` 0x173a88 (0x3368b0)
+    fn cam_control_reset(&mut self);
+    /// `Camera_SetChaseParams` 0x178a28 (0, 0, 10.0, 1.0, the rider's camera target, 0)
+    fn set_chase_params(&mut self, target: u32);
+    /// `Camera_SelectPreset` 0x1786d0
+    fn select_preset(&mut self, p: u32);
+}
+
+/// `ReplayMgr_Free` 0x18e9e8: everything freed (0x18ebc8 before it does nothing, and so do the keyframe and
+/// highlight arrays' destructors 0x195710 / 0x1956f0 called with 0); the manager deleted with flag 1
+pub fn mgr_free(m: &mut Mem, env: &mut dyn MiscEnv, mgr: u32, flags: u32) {
+    env.free_all(m, mgr);
+    if flags & 1 != 0 {
+        env.delete(mgr);
+    }
+}
+
+/// `Replay_RefreshRiders` 0x1147f8: each rider's pose blended (when its +0x46b0 is set) and its broadphase box
+/// updated, +0x42c from +0x16c; then the broadphase and the contacts sorted
+pub fn refresh_riders(m: &mut Mem, env: &mut dyn MiscEnv) {
+    let mut i = 0u32;
+    while (i as i32) < m.r32(m.r32(race(m) + 0x1c) + 0x88) as i32 {
+        let r = env.rider(i);
+        if m.r32(r + 0x46b0) != 0 {
+            env.blend_pose(r + 0x46c0);
+            env.update_pose(r);
+        }
+        env.update_broadphase(r);
+        i += 1;
+        m.w32(r + 0x42c, m.r32(r + 0x16c));
+    }
+    let b = m.r32(race(m) + 0x30);
+    env.broadphase_sort(b);
+    env.contact_sort(m.r32(race(m) + 0x30));
+}
+
+/// The camera's replay flag and the word cleared with it
+pub const CAM_REPLAY: u32 = 0x337774;
+pub const CAM_REPLAY_B: u32 = 0x337770;
+
+/// `Camera_SetReplayMode` 0x1785c0 (on, the rider): the camera control reset; when on, the chase camera on the
+/// rider (the first one when past the riders and the extra entries, +0x7c plus +0x84) and preset 7
+pub fn set_replay_mode(m: &mut Mem, env: &mut dyn MiscEnv, on: u32, rider: u32) {
+    m.w32(CAM_REPLAY, on);
+    env.cam_control_reset();
+    m.w32(CAM_REPLAY_B, 0);
+    if on == 0 {
+        return;
+    }
+    let w = m.r32(race(m) + 0x1c);
+    let n = m.r32(w + 0x7c).wrapping_add(m.r32(w + 0x84)) as i32;
+    let i = if (rider as i32) < n { rider } else { 0 };
+    let target = m.r32(m.r32(m.r32(w + i.wrapping_mul(4) + 0x8c)) + 0x460);
+    env.set_chase_params(target);
+    env.select_preset(7);
 }

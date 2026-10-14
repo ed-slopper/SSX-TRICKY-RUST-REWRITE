@@ -67,9 +67,10 @@ fn status_word(v: u32, i: u32) -> u32 {
 
 // ---- the layout ----
 
-const ARENA: u32 = 0x4600;
+const ARENA: u32 = 0x4a00;
 struct At {
     b: u32,
+    extra: Vec<(u32, u32)>,
 }
 impl At {
     fn o(&self) -> u32 {
@@ -123,6 +124,9 @@ fn regions(a: &At) -> Vec<(u32, u32)> {
     for g in GLOBALS {
         v.push((g, 4));
     }
+    v.push((FONT_COLOR, 16));
+    v.push((CAM_REPLAY_B, 8));
+    v.extend(a.extra.iter().copied());
     v
 }
 
@@ -184,8 +188,21 @@ fn build(g: &mut Rng, r: &mut Runner, a: &At) {
     let n = g.below(5);
     w(r, a.world() + 0x7c, n);
     w(r, a.world() + 0x88, g.below(4));
+    w(r, a.world() + 0x84, g.below(5));
+    for i in 4..8 {
+        w(r, a.world() + 0x8c + 4 * i, a.rider(i - 4));
+    }
+    w(r, a.race() + 0x34, (g.below(6) == 0) as u32);
+    w(r, a.game() + 0x10, a.b + 0x4800);
+    for slot in [0x1c4u32, 0x1d4, 0x1e4, 0x1fc] {
+        r.mem.write_u16(a.b + 0x4800 + slot - 4, 0);
+        w(r, a.b + 0x4800 + slot, RENDERER + slot);
+    }
+    w(r, a.b + 0x4704, fpick(g, &[128.0, 200.0, 340.0, 3.5]));
+    w(r, a.b + 0x4708, fpick(g, &[32.0, 64.0, 47.5]));
     for i in 0..4 {
         w(r, a.world() + 0x8c + 4 * i, a.rider(i));
+        w(r, a.rider(i), a.rider(i));
         w(r, a.rider(i) + 0x870, a.cell(i));
         w(r, a.cell(i), if g.below(3) == 0 { a.pad() } else { g.next() });
     }
@@ -225,6 +242,12 @@ fn build(g: &mut Rng, r: &mut Runner, a: &At) {
     w(r, o + 0x470, g.below(62));
     w(r, o + 0x474, g.below(25).wrapping_sub(12));
     w(r, o + 0x478, fpick(g, &[0.0, 0.01, 0.016, 0.5, 1.0, -0.25]));
+    w(r, o + 0x35c, fpick(g, &ys));
+    w(r, o + 0x360, fpick(g, &[640.0, 600.5, 320.0]));
+    w(r, o + 0x364, fpick(g, &[640.0, 600.5, 320.0]));
+    w(r, o + 0x4a0, g.below(2));
+    w(r, o + 0x4a4, g.below(2));
+    w(r, o + 0x498, (g.below(8) == 0) as u32);
     w(r, o + 0x47c, g.below(3));
     w(r, o + 0x488, g.below(4));
     w(r, o + 0x48c, g.below(4));
@@ -402,11 +425,12 @@ thread_local! {
 fn runner() -> Option<Runner> {
     let mut r = Runner::from_env()?;
     r.step_limit = 200_000;
+    r.float_rules = r5900::ps2float::Rules::parse("add=n,mul=n,div=n,cvt=n").unwrap();
     Some(r)
 }
 
 fn setup(r: &mut Runner) -> (At, L) {
-    let a = At { b: r.mem.alloc(ARENA) };
+    let a = At { b: r.mem.alloc(ARENA), extra: vec![] };
     let l: L = Rc::new(RefCell::new(Log::default()));
     stub_all(r, &l);
     let audio = r.mem.read_u32(0x343050);
@@ -857,5 +881,346 @@ fn replay_sounds_match_the_original() {
         assert_eq!(theirs, mine, "case {case}");
         assert_eq!(after, q, "case {case} queue");
         assert_eq!(r.mem.read_u32(sys + 0x6e48), v as u32, "case {case} +0x6e48");
+    }
+}
+
+// ---- the drawing (G12o) ----
+
+/// Where the renderer's virtuals point (fake addresses the runner stubs)
+const RENDERER: u32 = 0x7f0000;
+
+fn fbits(f: f32) -> u32 {
+    f.to_bits()
+}
+
+/// The log entries each draw call makes, the same from the runner's registers and from our env
+impl Log {
+    #[allow(clippy::too_many_arguments)]
+    fn sprite(&mut self, x: f32, y: f32, w: f32, h: f32, o: u32, id: i32, corner: u32) {
+        self.push("sprite xy", fbits(x), fbits(y));
+        self.push("sprite wh", fbits(w), fbits(h));
+        self.push("sprite", o ^ (id as u32).rotate_left(8), corner);
+    }
+    fn color(&mut self, c: [f32; 4]) {
+        self.push("color", fbits(c[0]), fbits(c[1]));
+        self.push("color", fbits(c[2]), fbits(c[3]));
+    }
+    fn print(&mut self, func: u32, scale: f32, x: f32, y: f32, font: u32, s: u32) {
+        self.push("print", func, fbits(scale));
+        self.push("print xy", fbits(x), fbits(y));
+        self.push("print", font, s);
+    }
+}
+
+fn loc_ptr(id: u32) -> u32 {
+    0x0100_0000 ^ id
+}
+fn width(v: u32) -> i32 {
+    (v % 400) as i32 - 20
+}
+
+struct Draw(L, u32);
+impl DrawEnv for Draw {
+    fn renderer(&mut self, slot: u32, a1: u32, a2: u32) {
+        self.0.borrow_mut().push("rend", slot, a1 | a2 << 16);
+    }
+    fn sprite_rect(&mut self, set: u32, id: u32) -> u32 {
+        self.0.borrow_mut().push("rect", set, id);
+        self.1
+    }
+    fn sprite(&mut self, x: f32, y: f32, w: f32, h: f32, o: u32, id: i32, corner: u32) {
+        self.0.borrow_mut().sprite(x, y, w, h, o, id, corner);
+    }
+    fn set_color(&mut self, c: [f32; 4]) {
+        self.0.borrow_mut().color(c);
+    }
+    fn loc(&mut self, id: u32) -> u32 {
+        self.0.borrow_mut().push("loc", id, 0);
+        loc_ptr(id)
+    }
+    fn measure_wide(&mut self, scale: f32, font: u32, s: u32) -> i32 {
+        let mut l = self.0.borrow_mut();
+        l.push("wide", fbits(scale), font ^ s.rotate_left(3));
+        width(l.take())
+    }
+    fn measure_ascii(&mut self, scale: f32, font: u32, s: u32) -> i32 {
+        let mut l = self.0.borrow_mut();
+        l.push("ascii", fbits(scale), font ^ s.rotate_left(3));
+        width(l.take())
+    }
+    fn label_box(&mut self, y: f32, o: u32, s: u32, style: u32) {
+        let mut l = self.0.borrow_mut();
+        l.push("label", fbits(y), o);
+        l.push("label", s, style);
+    }
+    fn print(&mut self, func: u32, scale: f32, x: f32, y: f32, font: u32, s: u32) {
+        self.0.borrow_mut().print(func, scale, x, y, font, s);
+    }
+    fn chase_index(&mut self) -> i32 {
+        let mut l = self.0.borrow_mut();
+        l.push("chaseparams", 0, 0);
+        (l.take() % 9) as i32
+    }
+    fn camera_preset(&mut self) -> u32 {
+        let mut l = self.0.borrow_mut();
+        l.push("preset", 0, 0);
+        l.take() % 12
+    }
+    fn sub_draw(&mut self, func: u32, o: u32) {
+        self.0.borrow_mut().push("sub", func, o);
+    }
+    fn backdrop_frame(&mut self, y: f32, b: u32, a1: u32) {
+        let mut l = self.0.borrow_mut();
+        l.push("frame", fbits(y), b);
+        l.push("frame", a1, 0);
+    }
+    fn menu_list(&mut self, x: f32, y: f32, scale: f32, b: u32, items: [u32; 3], sel: u32, enabled: [u32; 3]) {
+        let mut l = self.0.borrow_mut();
+        l.push("list xy", fbits(x), fbits(y));
+        l.push("list", fbits(scale), b);
+        for (s, e) in items.iter().zip(enabled) {
+            l.push("item", *s, e);
+        }
+        l.push("list sel", sel, 0);
+    }
+}
+
+fn stub_draw(r: &mut Runner, l: &L) {
+    r.allow(0x1ecea0);
+    for slot in [0x1c4u32, 0x1d4, 0x1e4, 0x1fc] {
+        let l2 = l.clone();
+        r.stub(RENDERER + slot, move |c, _| {
+            let a2 = if slot == 0x1fc { arg(c, 6) } else { 0 };
+            l2.borrow_mut().push("rend", slot, arg(c, 5) | a2 << 16)
+        });
+    }
+    let l2 = l.clone();
+    r.stub(0x1f9e50, move |c, _| {
+        l2.borrow_mut().push("rect", arg(c, 4), arg(c, 5));
+        let b = RECT.with(|x| *x.borrow());
+        c.set_gpr(2, b as u64);
+    });
+    let l2 = l.clone();
+    r.stub(0x1c0068, move |c, _| {
+        l2.borrow_mut().sprite(c.f(12), c.f(13), c.f(14), c.f(15), arg(c, 4), arg(c, 5) as i32, arg(c, 6));
+    });
+    let l2 = l.clone();
+    r.stub(0x14eee8, move |c, m| {
+        assert_eq!(arg(c, 4), FONT_COLOR);
+        let p = arg(c, 5);
+        let v = [m.read_f32(p), m.read_f32(p + 4), m.read_f32(p + 8), m.read_f32(p + 12)];
+        l2.borrow_mut().color(v);
+    });
+    let l2 = l.clone();
+    r.stub(0x2c5160, move |c, _| {
+        l2.borrow_mut().push("loc", arg(c, 5), 0);
+        c.set_gpr(2, loc_ptr(arg(c, 5)) as u64);
+    });
+    for (addr, name) in [(0x19dc78u32, "wide"), (0x19da30, "ascii")] {
+        let l2 = l.clone();
+        r.stub(addr, move |c, _| {
+            let mut l = l2.borrow_mut();
+            assert_eq!(arg(c, 6), 0);
+            l.push(name, fbits(c.f(12)), arg(c, 4) ^ arg(c, 5).rotate_left(3));
+            let v = width(l.take());
+            c.set_gpr(2, v as i64 as u64);
+        });
+    }
+    let l2 = l.clone();
+    r.stub(0x1a9928, move |c, _| {
+        let mut l = l2.borrow_mut();
+        l.push("label", fbits(c.f(12)), arg(c, 4));
+        l.push("label", arg(c, 5), arg(c, 6));
+    });
+    for addr in [0x19d3f0u32, 0x19d568, 0x19d6e0, 0x19d868] {
+        let l2 = l.clone();
+        r.stub(addr, move |c, _| l2.borrow_mut().print(addr, c.f(12), c.f(13), c.f(14), arg(c, 4), arg(c, 5)));
+    }
+    let l2 = l.clone();
+    r.stub(0x178968, move |c, m| {
+        let mut l = l2.borrow_mut();
+        l.push("chaseparams", 0, 0);
+        let v = l.take() % 9;
+        m.write_u32(arg(c, 8), v);
+    });
+    answer(r, l, 0x1786c0, "preset", 0, |v| v % 12);
+    for addr in [0x1edef0u32, 0x1ed490, 0x1eee00, 0x1ee720] {
+        let l2 = l.clone();
+        r.stub(addr, move |c, _| l2.borrow_mut().push("sub", addr, arg(c, 4)));
+    }
+    let l2 = l.clone();
+    r.stub(0x1a9bb8, move |c, _| {
+        let mut l = l2.borrow_mut();
+        l.push("frame", fbits(c.f(12)), arg(c, 4));
+        l.push("frame", arg(c, 5), 0);
+    });
+    let l2 = l.clone();
+    r.stub(0x1aa630, move |c, m| {
+        // the fixed arguments, then the items and the stack's two
+        assert_eq!((arg(c, 5), arg(c, 6), arg(c, 8), arg(c, 10), arg(c, 11)), (12, 0, 3, 116, 1));
+        let sp = arg(c, 29);
+        assert_eq!(m.read_u32(sp), 1);
+        let flags = m.read_u32(sp + 8);
+        let mut l = l2.borrow_mut();
+        l.push("list xy", fbits(c.f(12)), fbits(c.f(13)));
+        l.push("list", fbits(c.f(14)), arg(c, 4));
+        for k in 0..3 {
+            l.push("item", m.read_u32(arg(c, 7) + 4 * k), m.read_u32(flags + 4 * k));
+        }
+        l.push("list sel", arg(c, 9), 0);
+    });
+}
+
+thread_local! {
+    static RECT: RefCell<u32> = const { RefCell::new(0) };
+}
+
+#[test]
+fn drawing_matches_the_original() {
+    let Some(mut r) = runner() else { return };
+    let (a, l) = setup(&mut r);
+    stub_draw(&mut r, &l);
+    RECT.with(|x| *x.borrow_mut() = a.b + 0x4700);
+    let o = a.o();
+    let rect = a.b + 0x4700;
+    let mut g = Rng(0x1ec8_0811_7777_0007);
+    check(&mut r, &a, &l, &mut g, 30_000, 0x1ec808, "draw", &mut |m, l| draw(m, &mut Draw(l.clone(), rect), o));
+    check(&mut r, &a, &l, &mut g, 30_000, 0x1ecea0, "cam info", &mut |m, l| cam_info(m, &mut Draw(l.clone(), rect), o));
+    check(&mut r, &a, &l, &mut g, 2_000, 0x1f01e8, "menu", &mut |m, l| draw_menu(m, &mut Draw(l.clone(), rect), o));
+}
+
+// ---- the leftovers ----
+
+struct Misc(L, u32);
+impl MiscEnv for Misc {
+    fn free_all(&mut self, _m: &mut Mem, mgr: u32) {
+        self.0.borrow_mut().push("freeall", mgr, 0);
+    }
+    fn delete(&mut self, p: u32) {
+        self.0.borrow_mut().push("delete", p, 0);
+    }
+    fn rider(&mut self, i: u32) -> u32 {
+        self.0.borrow_mut().push("rider", i, 0);
+        self.1 + (i % 4) * 0x4700
+    }
+    fn blend_pose(&mut self, ctl: u32) {
+        self.0.borrow_mut().push("blend", ctl, 0);
+    }
+    fn update_pose(&mut self, rider: u32) {
+        self.0.borrow_mut().push("pose", rider, 0);
+    }
+    fn update_broadphase(&mut self, rider: u32) {
+        self.0.borrow_mut().push("bp", rider, 0);
+    }
+    fn broadphase_sort(&mut self, b: u32) {
+        self.0.borrow_mut().push("bpsort", b, 0);
+    }
+    fn contact_sort(&mut self, b: u32) {
+        self.0.borrow_mut().push("contacts", b, 0);
+    }
+    fn cam_control_reset(&mut self) {
+        self.0.borrow_mut().push("camreset", 0, 0);
+    }
+    fn set_chase_params(&mut self, target: u32) {
+        let mut l = self.0.borrow_mut();
+        l.push("chase", target, 0);
+        l.push("chase f", fbits(10.0), fbits(1.0));
+    }
+    fn select_preset(&mut self, p: u32) {
+        self.0.borrow_mut().push("select", p, 0);
+    }
+}
+
+#[test]
+fn leftovers_match_the_original() {
+    let Some(mut r) = runner() else { return };
+    let (mut a, l) = setup(&mut r);
+    let big = r.mem.alloc(4 * 0x4700);
+    a.extra.push((big, 4 * 0x4700));
+    log(&mut r, &l, 0x18f208, "freeall", 1);
+    log(&mut r, &l, 0x114f80, "delete", 1);
+    for f in [0x18ebc8, 0x195710, 0x1956f0] {
+        r.allow(f);
+    }
+    let l2 = l.clone();
+    r.stub(0x1814a8, move |c, _| {
+        l2.borrow_mut().push("rider", arg(c, 5), 0);
+        c.set_gpr(2, (big + (arg(c, 5) % 4) * 0x4700) as u64);
+    });
+    log(&mut r, &l, 0x15f7c8, "blend", 1);
+    log(&mut r, &l, 0x129628, "pose", 1);
+    log(&mut r, &l, 0x126748, "bp", 1);
+    log(&mut r, &l, 0x14fe18, "bpsort", 1);
+    log(&mut r, &l, 0x150428, "contacts", 1);
+    let l2 = l.clone();
+    r.stub(0x173a88, move |c, _| {
+        assert_eq!(arg(c, 4), 0x3368b0);
+        l2.borrow_mut().push("camreset", 0, 0);
+    });
+    let l2 = l.clone();
+    r.stub(0x178a28, move |c, _| {
+        assert_eq!((fbits(c.f(12)), fbits(c.f(13)), arg(c, 5)), (0, 0, 0));
+        let mut l = l2.borrow_mut();
+        l.push("chase", arg(c, 4), 0);
+        l.push("chase f", fbits(c.f(14)), fbits(c.f(15)));
+    });
+    log(&mut r, &l, 0x1786d0, "select", 1);
+    let mut g = Rng(0x18e9_e822_8888_0008);
+    let fill = |r: &mut Runner, g: &mut Rng| {
+        for k in 0..4 * 0x4700 / 4 {
+            r.mem.write_u32(big + 4 * k, g.below(4));
+        }
+    };
+    let o = a.o();
+    let mgr = a.mgr();
+    for case in 0..400u32 {
+        let flags = g.next();
+        build(&mut g, &mut r, &a);
+        let mut m = snapshot(&mut r, &a);
+        *l.borrow_mut() = Log::default();
+        r.cpu.set_gpr(4, mgr as u64);
+        r.cpu.set_gpr(5, flags as u64);
+        r.call(0x18e9e8).unwrap();
+        let theirs = std::mem::take(&mut l.borrow_mut().calls);
+        mgr_free(&mut m, &mut Misc(l.clone(), big), mgr, flags);
+        let mine = std::mem::take(&mut l.borrow_mut().calls);
+        assert_eq!(theirs, mine, "free {case}");
+        compare(&mut r, &a, &m, &format!("free {case}"));
+    }
+    for case in 0..3_000u32 {
+        build(&mut g, &mut r, &a);
+        fill(&mut r, &mut g);
+        let mut m = snapshot(&mut r, &a);
+        *l.borrow_mut() = Log::default();
+        r.call(0x1147f8).unwrap();
+        let theirs = std::mem::take(&mut l.borrow_mut().calls);
+        refresh_riders(&mut m, &mut Misc(l.clone(), big));
+        let mine = std::mem::take(&mut l.borrow_mut().calls);
+        assert_eq!(theirs, mine, "refresh {case}");
+        compare(&mut r, &a, &m, &format!("refresh {case}"));
+    }
+    for case in 0..3_000u32 {
+        build(&mut g, &mut r, &a);
+        let on = [0, 1, 2][g.below(3) as usize];
+        let rider = g.below(10);
+        let mut m = snapshot(&mut r, &a);
+        *l.borrow_mut() = Log::default();
+        r.cpu.set_gpr(4, on as u64);
+        r.cpu.set_gpr(5, rider as i32 as i64 as u64);
+        r.call(0x1785c0).unwrap();
+        let theirs = std::mem::take(&mut l.borrow_mut().calls);
+        set_replay_mode(&mut m, &mut Misc(l.clone(), big), on, rider);
+        let mine = std::mem::take(&mut l.borrow_mut().calls);
+        assert_eq!(theirs, mine, "replay mode {case}");
+        compare(&mut r, &a, &m, &format!("replay mode {case}"));
+    }
+    // cReplayEndRaceHandler's Exit / Update / Enter do nothing
+    for f in [0x114f28, 0x115038, 0x115040] {
+        build(&mut g, &mut r, &a);
+        let m = snapshot(&mut r, &a);
+        r.cpu.set_gpr(4, o as u64);
+        r.call(f).unwrap();
+        assert!(l.borrow().calls.is_empty());
+        compare(&mut r, &a, &m, "end race handler");
     }
 }

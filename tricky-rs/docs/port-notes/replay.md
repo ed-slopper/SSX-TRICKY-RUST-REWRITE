@@ -511,3 +511,50 @@ frames of a message), +0x4c and +0x50 hold recording, +0x58 a stream overflowed.
     overlay's own playlist runs the game's code;
   - the tests caught every mutant tried except two that cannot change the result: the second `SeekBack`, and the
     slide's `<` vs `<=`.
+
+## The replay's drawing and leftovers (G12o)
+
+`tricky_game::replayui`. The drawing is ported as the draw calls the game makes (`DrawEnv`), with every float
+computed as the game computes it.
+
+- **`cReplayControlOverlay::Draw`** draws nothing during a cut-scene (the race's +0x34) or while the overlay is off
+  (+0x498). It sets the renderer's state with three of its virtuals (the object at the game's +0x724, +0x10 vtable,
+  slots +0x1e4, +0x1fc, +0x1c4), then:
+  - **while the panel moves or is up:** sprite 0x37 gives the frame's scale, 340 over its width.
+    - Not hidden: a dark box (0.88 / 0.1) from the panel's y down to 480, and a box inside the frame (from 0.455 of
+      its width less 20, between 0.26 and 0.79 of its height).
+    - Hidden: one darker box over the whole screen, set through the font colour words at 0x337fe8 directly.
+    - Then the frame's two halves at x -20 and 320, 26 above the panel's y.
+  - **while the panel is still:** the up arrow (sprite 0x61) and the down arrow (0x65 at the top mode, else 0x64),
+    left of "more" / "less" (0x16a / 0x16b). Their x is 42 (or 41) left of that word's width.
+  - **then** the camera line (`HUD_DrawReplayCamInfo`) with the panel's other drawings. With the full controls:
+    0x1edef0, 0x1ed490, the camera line, 0x1eee00. Without: the camera line, then `HUD_DrawStartSelectPrompt`.
+    Those four are not ported yet.
+- **`HUD_DrawReplayCamInfo`:**
+  - the label box at y 18 (style 6): "end of replay" (0xeba) at the end, else the overlay's title (+0x3f0);
+  - while the panel moves or is up, the camera preset's name 47 above the panel. The names are 1: 0x152, 2: 0x14a,
+    3: 0x14b, 5: 0x14c, 6: 0x14e, 7: 0x150, 8: 0x151, 10: the "Artist" format at 0x394010, others: 0x14d. The chase
+    camera's name (0x32db74 + 0x84 × the index `Camera_GetChaseParams` gives) is centred at 320;
+  - "highlighting" (0xdec, scale 0.9) while a highlight is being made;
+  - the fading message, centred in the panel, its alpha written to 0x337fe8;
+  - "more" / "less" right-aligned at the panel's right less 20.
+  - Hidden, its three colours are greyed.
+- **`RaceMenuOverlay_DrawReplayMenu`:** the frame at 165 (style 15) and the three items (0x187, 0x161, 0x1db, all
+  enabled, from 0x3940b8). The list is at (320, 240), scale 0.92, with the selection +0x43c. Then the title box
+  (0xe53) at 155.
+- **`ReplayMgr_Free`:** `Replay_FreeAll`, then the manager deleted with flag 1. The call before it (0x18ebc8) and
+  the two arrays' destructors (0x195710 over 16 records of 0x24 at +0x3e68, 0x1956f0 over 40 of 0x1c at +0x3968,
+  both with 0) do nothing.
+- **`Replay_RefreshRiders`:** each rider's pose is blended and updated when its +0x46b0 is set, its broadphase box is
+  updated, and +0x42c is set from +0x16c. Then the broadphase and the contacts are sorted.
+- **`Camera_SetReplayMode`** (on, rider):
+  - the flag goes to 0x337774, the camera control 0x3368b0 is reset and 0x337770 is cleared;
+  - when on: the chase camera goes on the rider's camera target (0, 0, 10.0, 1.0). That is rider 0 when the index is
+    not below the race's +0x7c plus +0x84. Then preset 7.
+- **`cReplayEndRaceHandler`'s Enter / Update / Exit** are empty.
+- **Checked in the runner:**
+  - 30,000 draws, 30,000 camera lines and 2,000 menu pages, every draw call compared with its float arguments bit
+    for bit;
+  - 400 frees, 3,000 rider refreshes and 3,000 replay-mode switches, with all memory compared;
+  - the floats follow the port's PS2 type: the runner rounds to nearest, as the other runner tests set it (F4c);
+  - the tests caught every mutant tried.
