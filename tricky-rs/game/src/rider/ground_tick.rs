@@ -511,6 +511,12 @@ pub fn game_dir(v: Vec3) -> V4 {
 
 const HALF_PI: f32 = std::f32::consts::FRAC_PI_2;
 
+/// The port's heading (about y, forward (−sin, 0, −cos)) as the game's yaw (+0x1b0), the other way of the ground
+/// tick's `wrap(g.yaw − π/2)`.
+pub fn game_yaw(yaw: f32) -> f32 {
+    super::wrap(yaw + HALF_PI)
+}
+
 /// A port vector (m, y up) as a game vector (cm, z up); `w` is 1 for a point, 0 for a direction.
 pub(super) fn to_game(v: Vec3, k: f32, w: f32) -> V4 {
     [v.x * k, -v.z * k, v.y * k, w]

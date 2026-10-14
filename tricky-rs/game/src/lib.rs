@@ -4,6 +4,7 @@
 pub mod air;
 pub mod air_motion;
 pub mod aicomp;
+pub mod aiglue;
 pub mod aipad;
 pub mod aipath;
 pub mod boarder;

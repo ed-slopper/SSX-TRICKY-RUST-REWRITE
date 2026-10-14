@@ -167,6 +167,25 @@ Part of the port notes (index: [README.md](README.md)); units and wording as des
   `AIComputer_FindSpeedHint` 0x1393e0: to 600 cm past; the first speed hint (event 101): value × 27.777777 cm/s,
   inside already.
 
+## The riding modes on the port's rider (board row G4e1; `tricky_game::aiglue`, test `tests/aiglue.rs`)
+
+- `aiglue::AiRider` keeps the computer's mode, target and speed to ride at (cComputer +0x89c, +0x890, +0x868) and the
+  rider's place on its path (`aipath::Follow`). Each 60 Hz tick: `Boarder_UpdatePathAhead` 0x118090, then an
+  `aicomp::Ai` filled from the port's `Rider` in game units (position ×100, z up; heading +0x1b0 = port yaw + π/2;
+  +0x348 how far off the path; +0x360 the point 800 ahead; +0x370 the path's heading), `Ai::ride` with the jump
+  marker and speed hint queries on the path's events from +0x340 to +0x344, and the pad word into the port's `Input`.
+- Proven (`aicomp::steer_towards`, `Boarder_UpdatePose` 0x129628): the frame's first row (+0x4aa0, `Frame::fwd` in
+  `aicomp`) is the board's x axis, its right, and the second (+0x4ab0, `Frame::side`) its nose: the steer is 0 for a
+  point straight along the second row and full (0.9705659) a few degrees off it (× 6.2897024 a radian). Feeding the
+  nose as the first row gives a steer stuck at full; `aiglue` passes the right as `fwd` and the nose as `side`.
+- The pad word as `CruiseControl_Update` 0x102fc8 reads it (`control.rs`): bit 1 jump, bit 3 boost, bits 5..10 steer
+  (the game's sign is the port's negated), 11..16 crouch, 17..22 brake.
+- STANDIN (row G4e2/G4e3): no grudge, the path preference always kept (rider virtual +0x74 = 1), place 0, the port's
+  digital input for the crouch and brake sticks, `AIComputer_PlanJumpTrick` not called (the calls are kept in
+  `AiRider::calls`), the rubber band's time scale (`AI_RubberBandSpeedScale`) not applied, a plain LCG for
+  `Rand_Game` in the test.
+- Elysium, from 50 m down its first path, one rider alone, 60 s: 939 m along the paths, at most 11.9 m off them.
+
 ## The AI paths' geometry, exactly (row G4f, checked on every course's paths: `tests/aipath.rs`; `aipath.rs`)
 
 - `AIP_GetPathLength` 0x197b50: the segment lengths added in order. `AIP_GetPositionAtDistance` 0x1979f8: walk the
