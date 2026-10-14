@@ -167,11 +167,30 @@ Part of the port notes (index: [README.md](README.md)); units and wording as des
 - STANDIN, inferred or left: the collision body re-posed from the bind pose each tick (for the skeleton, G5); the
   hip 91.7 cm over the root; the clip clock, chaining (impacts → crunch cycle, crunch-to-stretch → falling) and the
   get-up's end after 2n − 1 ticks (the animation controller, G5); no clip displacement (G5); no rollers handed to
-  the body (E8c3); during the wipe-out's walls, no `Boarder_Wipeout` re-entry, crash score, stumble, impact
-  accumulation, object contact or sounds, nor `Boarder_InstanceCollisions` (rows G6d, E8b, G10).
+  the body (E8c3); the wipe-out's walls' callbacks (done with G6d, below).
 - Sims (`TRICKY_SIM=600`, the 11 disc courses): stuck 12 → 8, falls 26 → 30. Aloha's extra falls are wipe-outs
   sliding onto surface 0 and reset there, as `GetUpState_Update` does (the sim counts each reset twice: the
   wipe-out's and the autopilot's rejoin).
+
+### The wipe-out's walls and contacts (board row G6d)
+
+- Proven: during motions 5 and 6 `Boarder_WallCollide` 0x126250 and `Boarder_InstanceCollisions` 0x125088 run with
+  the mask 0xfc3; their callbacks are `Boarder_Wipeout` 0x11d830 (from the get-up only: motion 5's impact check
+  returns first), `Score_Crash` 0x156de0 then `Boarder_AddMeter` 0x11b018, `Boarder_Stumble` 0x124dd0 (outside
+  state 2 and without its flag: −0.02 to the meter; the stumble itself only in states 3 and 0xe, so never here),
+  `Boarder_AccumulateImpact` 0x125c48 (+0x2e4 += 1 − max(n · +0x2f0, 0), +0x2f0 = n), `Instance_OnPlayerContact`
+  0x13bd40 and the rider's controller's virtuals +0x64 / +0x6c (a human's: `cPlayer::vf11` 0x1532c0 = brake spray
+  then `Rumble_Impact`, `cPlayer::vf12` 0x153350 = `Rumble_Add`). `Ragdoll_Contacts` adds its own impacts and
+  object contacts. cBoarder's update (vf7 0x117198) multiplies +0x2e4 by 0.95603746 each tick and above 4.492007
+  calls `Boarder_RequestReset` 0x118f10: a body wedged against walls is put back.
+- The app does all of these on the course's collision (touch objects through `walls::instance_collisions`, rollers
+  through `roller::rider_kick`, contacts through `knockables`); the rider-side calls (crash score, meter, spray,
+  wipe-out again) run on the port's rider after the tick.
+- STANDIN: +0x2e4/+0x2f0 start from 0 at each wipe-out (the riding walls' accumulation and the decay outside the
+  wipe-out are not ported, row G6e); no rumble; no `Sfx_OnWipeout` / `Sfx_OnWallHit` (rows G10); rollers paired by
+  box overlap (the race's broadphase).
+- Sims (`TRICKY_SIM=600`, the 11 disc courses, same build without/with G6d): stuck 19 → 22, falls 30 → 32. The
+  extra put-backs are the reset above (untracked t 67: a wipe-out wedged at 1 km/h against a wall).
 
 ## Rider hits, exactly (board row E8d1, checked: `tests/hit.rs`; `tricky-rs/game/src/hit.rs`)
 

@@ -6,7 +6,7 @@
 //!
 //! What the motion asks of the rest of the game is answered here ([`Glue`]); the stand-ins among it are marked.
 use super::*;
-use super::ground_tick::{bind_body_at, quat_of, to_game, to_port, wall_cast};
+use super::ground_tick::{bind_body_at, kick_rollers, quat_of, rider_id, roller_cast, to_game, to_port, touch_query, wall_cast};
 use crate::air::{self, Predict, RayHit};
 use crate::collbody::CollBody;
 use crate::orient::{self, Orient};
@@ -65,6 +65,49 @@ struct State {
     probe_side: V4,
     surface_ticks: u32,
     predict: Predict,
+    /// +0x2f0: the last impact's normal (`Boarder_AccumulateImpact`)
+    impact_n: V4,
+    /// what this tick's impacts add to +0x2e4 (folded into the motion's copy after the tick)
+    impact: f32,
+    /// the rider's speed this tick (cm/s), for the knock sounds
+    speed: f32,
+    /// the sphere tree the last object query hit (the record's +0x30) and the object a contact was last for
+    tree: Option<(usize, usize)>,
+    contact_obj: u32,
+    /// scripts the rollers the body hit started (`cScriptNode`(3, script, object))
+    starts: Vec<(i32, u32)>,
+    /// `Boarder_Wipeout` 0x11d830 again from the walls during the get-up: its contact
+    rewipe: Option<Contact>,
+    /// what the rider itself does after the tick
+    calls: Vec<Call>,
+}
+
+/// What the walls ask of the rider during the wipe-out, done after the tick on the port's rider.
+#[derive(Clone, Copy, Debug)]
+enum Call {
+    /// `Boarder_Wipeout` 0x11d830's scoring side, then `Score_Crash` 0x156de0 and `Boarder_AddMeter` 0x11b018 with
+    /// its answer (the walls' impact check)
+    Crash,
+    /// `Boarder_AddMeter` 0x11b018
+    Meter(f32),
+    /// the rider's controller's virtual +0x64 (`cBoarder::EmitBrakeSpray` 0x11a798: point, velocity, normal)
+    Spray(V4, V4, V4),
+}
+
+/// The rider as the scripts, the rollers and the walls see it: its handle (`rider_id`), human or not, and
+/// `Boarder_GetSpeedStat` 0x11d7b0.
+#[derive(Clone, Copy, Debug, Default)]
+struct Who {
+    id: u32,
+    human: bool,
+    speed_stat: f32,
+}
+
+/// `Boarder_AccumulateImpact` 0x125c48: +0x2e4 += 1 − max(n · +0x2f0, 0), +0x2f0 = n.
+fn accumulate(s: &mut State, n: V4) {
+    let d = dot(n, s.impact_n);
+    s.impact += if 0.0 < d { 1.0 - d } else { 1.0 };
+    s.impact_n = n;
 }
 
 /// What the motion calls, answered on the course and the port's rider.
@@ -75,6 +118,7 @@ struct Glue<'a> {
     /// stats+0x60 and rider+0x244 (the probe's start to the side)
     k: f32,
     lean: f32,
+    who: Who,
 }
 
 /// The cast's record as the motion reads it: +0x34 the surface, +0x38 the object (index + 1, 0 none).
@@ -142,21 +186,37 @@ fn mesh_body(world: &CollisionWorld, body: &CollBody) -> (f32, CastOut) {
     })
 }
 
+/// What the rollers the body hits ask of the world (`Ragdoll_HitRoller` 0x10ed68 waking them, `roller::on_hit`).
 impl RollerEnv for Glue<'_> {
-    /// STANDIN: no rollers are handed to the wipe-out body (the port's rolling objects are `props`, row E8c3), so
-    /// none of these is called.
-    fn ray_cast(&mut self, _: &WorldSphTree) -> (f32, V4, V4) {
-        (-1.0, [0.0; 4], [0.0; 4])
+    fn ray_cast(&mut self, q: &WorldSphTree) -> (f32, V4, V4) {
+        match &self.world.course {
+            Some(c) => roller_cast(self.world, c, q, false),
+            None => (-1.0, [0.0; 4], [0.0; 4]),
+        }
     }
-    fn query_instances(&mut self, _: &WorldSphTree) -> (f32, V4, V4) {
-        (-1.0, [0.0; 4], [0.0; 4])
+    fn query_instances(&mut self, q: &WorldSphTree) -> (f32, V4, V4) {
+        match &self.world.course {
+            Some(c) => roller_cast(self.world, c, q, true),
+            None => (-1.0, [0.0; 4], [0.0; 4]),
+        }
     }
+    /// STANDIN: nothing, for the race's broadphase (`Broadphase_MoveBox` 0x14fe68).
     fn move_box(&mut self, _: V4, _: V4) {}
-    fn event_script(&self, _: u32, _: u32) -> i32 {
-        -1
+    fn event_script(&self, object: u32, event: u32) -> i32 {
+        self.world.course.as_ref().map_or(-1, |c| c.ssf.event_script(object as usize, event as usize))
     }
-    fn start_script(&mut self, _: i32, _: u32) {}
-    fn sfx(&mut self, _: u32, _: u32) {}
+    fn start_script(&mut self, script: i32, object: u32) {
+        self.s.starts.push((script, object));
+    }
+    /// `Sfx_InstanceCollision` 0x216c50: the object (a roller's index, or the contact's object, index + 1) and the
+    /// rider's speed, for the app's sound.
+    fn sfx(&mut self, _: u32, object: u32) {
+        let o = if object != 0 && object == self.s.contact_obj { object - 1 } else { object };
+        self.s.contact_obj = 0;
+        if let Some(c) = &self.world.course {
+            c.knock.lock().unwrap_or_else(|e| e.into_inner()).knocks.push((o, self.s.speed));
+        }
+    }
 }
 
 impl RagEnv for Glue<'_> {
@@ -177,25 +237,38 @@ impl RagEnv for Glue<'_> {
         let Some(course) = &world.course else { return (-1.0, CastOut { kind: 3, ..Default::default() }) };
         let mut q = q.clone();
         let (t, h) = course.query_instances(&mut q, world.showoff, &|i| world.course_skips(i));
+        self.s.tree = h.as_ref().and_then(|h| h.tree);
         (t, out_of(h.filter(|_| t > 0.0)))
     }
     /// `World_RayCast` 0x25aff8 with a `cWorldLine`(0.5, from, to, 1).
     fn cast_line(&mut self, from: V4, to: V4) -> (f32, CastOut) {
         self.line(0.5, from, to, 1, false)
     }
-    /// STANDIN: nothing, as the ground tick's walls (`Boarder_AccumulateImpact` 0x125c48: the port keeps neither
-    /// +0x2e4 nor +0x2f0).
-    fn accumulate_impact(&mut self, _: V4) {}
-    /// STANDIN: nothing, for the rider's virtual +0x64 (not ported).
-    fn rider_contact(&mut self, _: V4, _: V4, _: V4) {}
+    /// `Boarder_AccumulateImpact` 0x125c48.
+    fn accumulate_impact(&mut self, n: V4) {
+        accumulate(self.s, n);
+    }
+    /// The rider's controller's virtual +0x64 (a human's: `cPlayer::vf11` 0x1532c0, `cBoarder::EmitBrakeSpray`
+    /// 0x11a798, then `Rumble_Impact` 0x150a80): the spray kept in `crash_spray`, as the ground tick's. STANDIN: no
+    /// rumble (the port drives no pad motors).
+    fn rider_contact(&mut self, point: V4, vel: V4, n: V4) {
+        self.s.calls.push(Call::Spray(point, vel, n));
+    }
     fn object_flags(&self, object: u32) -> u32 {
         match (&self.world.course, object) {
             (Some(c), 1..) => c.object_flags(object as usize - 1),
             _ => 0,
         }
     }
-    /// STANDIN: nothing, for `Instance_OnPlayerContact` 0x13bd40 (the objects' scripts, row E9).
-    fn player_contact(&mut self, _: u32, _: &Contact, _: &CastOut) {}
+    /// `Instance_OnPlayerContact` 0x13bd40 (`knockables::Knockables::contact`): the object (index + 1), the rider at
+    /// the contact's velocity, the record with the tree the query hit. Without the course's collision: nothing.
+    fn player_contact(&mut self, object: u32, c: &Contact, out: &CastOut) {
+        self.s.contact_obj = object;
+        let (Some(course), 1..) = (&self.world.course, object) else { return };
+        let rider = crate::knockables::Rider { id: self.who.id, human: self.who.human, vel: scale(c.dir, c.speed_in) };
+        let record = crate::knockables::record_context(out.pos, out.normal, self.s.tree);
+        course.knock.lock().unwrap_or_else(|e| e.into_inner()).contact(course, object - 1, rider, c, record);
+    }
     /// `Boarder_UpdateOrientation` 0x129008 (`orient::update_orientation`).
     fn update_orientation(&mut self, r: &mut RagRider) {
         let mut o = Orient { q: r.q, fwd: self.s.fwd, side: self.s.side, up: r.up, yaw: self.s.yaw };
@@ -258,14 +331,19 @@ impl WipeEnv for Glue<'_> {
     fn surface_g(&self, surface: u32) -> f32 {
         crate::surface::surf(surface as usize, 0)
     }
-    /// `Boarder_WallCollide` 0x126250 (`walls::wall_collide`) with the body's `cWorldBoarder` under the mask 0xfc3.
-    /// STANDIN: `Boarder_InstanceCollisions` 0x125088 is not run, as in the ground tick (row E8b).
+    /// With the mask 0xfc3 in the body: `Boarder_InstanceCollisions` 0x125088 (the touch objects,
+    /// `walls::instance_collisions`, then the rollers, as the ground tick's) and `Boarder_WallCollide` 0x126250
+    /// (`walls::wall_collide`). Without the course's collision only the walls (on the drawn mesh).
     fn collide_world(&mut self, r: &mut RagRider, w: &mut WipeRider) {
         let _ = w;
         let mut body = r.body;
         body.x24 = WALL_MASK;
         let mut wr = WallRider { pos: r.pos, vel: r.vel, ground: r.ground, knocks: 0.0, mode: self.s.motion, state: self.s.state, up: r.up };
-        let mut walls = Walls { world: self.world, body };
+        let mut walls = Walls { world: self.world, body, s: &mut *self.s, who: self.who };
+        if let Some(course) = self.world.course.clone() {
+            crate::walls::instance_collisions(&mut wr, &mut walls);
+            kick_rollers(&course, &mut wr, self.who.id, &mut walls, |w| w.body);
+        }
         crate::walls::wall_collide(&mut wr, &mut walls);
         (r.pos, r.vel) = (wr.pos, wr.vel);
         r.body = walls.body;
@@ -313,10 +391,12 @@ impl WipeEnv for Glue<'_> {
     }
 }
 
-/// What `Boarder_WallCollide` calls during the wipe-out.
+/// What `Boarder_InstanceCollisions` and `Boarder_WallCollide` call during the wipe-out and the get-up.
 struct Walls<'a> {
     world: &'a CollisionWorld,
     body: CollBody,
+    s: &'a mut State,
+    who: Who,
 }
 
 impl WallEnv for Walls<'_> {
@@ -329,29 +409,96 @@ impl WallEnv for Walls<'_> {
             }
         }
     }
+    /// `touch_query` (only with the course's collision).
     fn query_objects(&mut self, _: &WallRider) -> (f32, CastRecord, Touched) {
-        (0.0, Default::default(), Default::default())
+        let Some(course) = &self.world.course else { return (0.0, Default::default(), Default::default()) };
+        let (t, rec, touched, tree) = touch_query(self.world, course, &self.body);
+        self.s.tree = tree;
+        (t, rec, touched)
     }
-    fn accumulate_impact(&mut self, _: &mut WallRider, _: V4) {}
+    /// `Boarder_AccumulateImpact` 0x125c48.
+    fn accumulate_impact(&mut self, _: &mut WallRider, n: V4) {
+        accumulate(self.s, n);
+    }
     fn translate(&mut self, _: &mut WallRider, by: V4) {
         self.body.translate(by);
     }
     /// Only in motion 2.
     fn turn_from_wall(&mut self, _: &mut WallRider, _: V4) {}
-    /// Already down: `Boarder_Wipeout` 0x11d830 would start the motion again; STANDIN: nothing (unread so far).
-    fn wipeout(&mut self, _: &mut WallRider, _: &Contact) {}
+    /// `Boarder_Wipeout` 0x11d830 again (only the get-up gets here: motion 5's impact check stops first): the motion
+    /// starts over from this contact, after the tick.
+    fn wipeout(&mut self, _: &mut WallRider, c: &Contact) {
+        self.s.rewipe = Some(*c);
+    }
+    /// `Score_Crash` 0x156de0(rider+0x5820, 0), done on the port's rider after the tick with the meter it returns;
+    /// so the `Boarder_AddMeter` after it adds nothing here.
     fn score_crash(&mut self, _: &mut WallRider) -> f32 {
+        self.s.calls.push(Call::Crash);
         0.0
     }
-    fn add_meter(&mut self, _: &mut WallRider, _: f32) {}
-    fn stumble(&mut self, _: &mut WallRider, _: V4, _: u32) {}
+    fn add_meter(&mut self, _: &mut WallRider, amount: f32) {
+        if amount != 0.0 {
+            self.s.calls.push(Call::Meter(amount));
+        }
+    }
+    /// `Boarder_Stumble` 0x124dd0: not in state 2 and without the flag, −0.02 to the meter (0xbca3f553); the
+    /// stumble itself only in states 3 and 0xe, never during the wipe-out (0x13) or the get-up (0x14).
+    fn stumble(&mut self, _: &mut WallRider, _: V4, flag: u32) {
+        if self.s.state != 2 && flag == 0 {
+            self.s.calls.push(Call::Meter(f32::from_bits(0xbca3_f553)));
+        }
+    }
     fn speed_stat(&mut self, _: &WallRider) -> f32 {
-        0.0
+        self.who.speed_stat
     }
+    /// The rider's controller's virtual +0x6c (a human's: `cPlayer::vf12` 0x153350, `Rumble_Add`). STANDIN: nothing
+    /// (no pad motors), as the ground tick's.
     fn knock(&mut self, _: &mut WallRider, _: f32) {}
-    fn contact(&mut self, _: u32, _: &mut WallRider, _: &Contact, _: &CastRecord) {}
-    fn sfx_object(&mut self, _: &WallRider, _: u32) {}
+    /// `Instance_OnPlayerContact` 0x13bd40 (`knockables::Knockables::contact`).
+    fn contact(&mut self, object: u32, r: &mut WallRider, c: &Contact, rec: &CastRecord) {
+        let Some(course) = &self.world.course else { return };
+        let rider = crate::knockables::Rider { id: self.who.id, human: self.who.human, vel: r.vel };
+        let record = crate::knockables::record_context(rec.pos, rec.normal, self.s.tree);
+        course.knock.lock().unwrap_or_else(|e| e.into_inner()).contact(course, object, rider, c, record);
+    }
+    /// `Sfx_InstanceCollision` 0x216c50: the object and the rider's speed, for the app's sound.
+    fn sfx_object(&mut self, r: &WallRider, object: u32) {
+        if let Some(c) = &self.world.course {
+            c.knock.lock().unwrap_or_else(|e| e.into_inner()).knocks.push((object, dot(r.vel, r.vel).sqrt()));
+        }
+    }
+    /// STANDIN: nothing, for `Sfx_OnWallHit` 0x2162f0 (the port's wall sound is its own, rows G10).
     fn sfx_wall(&mut self, _: &WallRider) {}
+}
+
+/// What the rollers the body kicks ask of the world (`roller::rider_kick`).
+impl RollerEnv for Walls<'_> {
+    fn ray_cast(&mut self, q: &WorldSphTree) -> (f32, V4, V4) {
+        match &self.world.course {
+            Some(c) => roller_cast(self.world, c, q, false),
+            None => (-1.0, [0.0; 4], [0.0; 4]),
+        }
+    }
+    fn query_instances(&mut self, q: &WorldSphTree) -> (f32, V4, V4) {
+        match &self.world.course {
+            Some(c) => roller_cast(self.world, c, q, true),
+            None => (-1.0, [0.0; 4], [0.0; 4]),
+        }
+    }
+    /// STANDIN: nothing, for the race's broadphase (`Broadphase_MoveBox` 0x14fe68).
+    fn move_box(&mut self, _: V4, _: V4) {}
+    fn event_script(&self, object: u32, event: u32) -> i32 {
+        self.world.course.as_ref().map_or(-1, |c| c.ssf.event_script(object as usize, event as usize))
+    }
+    fn start_script(&mut self, script: i32, object: u32) {
+        self.s.starts.push((script, object));
+    }
+    /// `Sfx_InstanceCollision` 0x216c50 (the body's kick on a roller).
+    fn sfx(&mut self, _: u32, object: u32) {
+        if let Some(c) = &self.world.course {
+            c.knock.lock().unwrap_or_else(|e| e.into_inner()).knocks.push((object, self.s.speed));
+        }
+    }
 }
 
 /// How a tick of the motion ended.
@@ -367,11 +514,20 @@ enum Out {
 
 impl Wipe {
     /// One game tick of motion 5 or 6.
-    fn tick(&mut self, world: &CollisionWorld, last: &mut LastHit, k: f32, lean: f32, kind: u8) -> Out {
+    fn tick(&mut self, world: &CollisionWorld, last: &mut LastHit, k: f32, lean: f32, kind: u8, who: Who) -> Out {
         let was = self.s.motion;
-        let mut glue = Glue { world, last, s: &mut self.s, k, lean };
+        self.s.speed = dot(self.rag.vel, self.rag.vel).sqrt();
+        // the rollers among the rider's broadphase pairs, for `Ragdoll_Contacts`. STANDIN: those whose boxes meet
+        // the body's, for the race's broadphase (rider+0x700)
+        let course = world.course.clone();
+        let mut all = course.as_ref().map_or(Vec::new(), |c| std::mem::take(&mut c.knock.lock().unwrap_or_else(|e| e.into_inner()).rollers));
+        let (c, rad) = (self.rag.body.center, self.rag.body.radius);
+        let (lo, hi) = ([c[0] - rad, c[1] - rad, c[2] - rad, 0.0], [c[0] + rad, c[1] + rad, c[2] + rad, 0.0]);
+        let near: Vec<usize> = (0..all.len()).filter(|&i| crate::knockables::overlap(all[i].body.lo, all[i].body.hi, lo, hi)).collect();
+        let mut pairs: Vec<(u32, crate::roller::RollerBody)> = near.iter().map(|&i| (all[i].object, all[i].body.clone())).collect();
+        let mut glue = Glue { world, last, s: &mut self.s, k, lean, who };
         if was == 5 {
-            self.motion.update(&mut self.rag, &mut self.wr, &mut [], &mut glue);
+            self.motion.update(&mut self.rag, &mut self.wr, &mut pairs, &mut glue);
         } else {
             wm::get_up_update(&mut self.rag, &mut self.wr, &mut glue);
         }
@@ -379,11 +535,34 @@ impl Wipe {
         if now != was && was == 5 {
             self.motion.exit(now, &mut glue);
         }
+        // the get-up's walls called `Boarder_Wipeout` 0x11d830: the contact into the body (+0x510, +0x530), state
+        // 0x13, `Boarder_SetMotion`(5) (`WipeoutMotion_Enter` 0x10c198)
+        if let Some(c) = glue.s.rewipe.take() {
+            (self.motion.rag.crash_at, self.motion.rag.crash_n) = (c.pos, c.normal);
+            (glue.s.motion, glue.s.state) = (5, 0x13);
+            self.motion.enter(&mut self.rag, &mut self.wr, &mut glue);
+        }
+        if let Some(c) = &course {
+            for (&i, (_, b)) in near.iter().zip(pairs) {
+                all[i].body = b;
+            }
+            let starts = std::mem::take(&mut self.s.starts);
+            let mut kn = c.knock.lock().unwrap_or_else(|e| e.into_inner());
+            let mut new = std::mem::take(&mut kn.rollers);
+            new.append(&mut all);
+            kn.rollers = new;
+            kn.start_scripts(c, &starts);
+        }
+        self.wr.stuck += std::mem::take(&mut self.s.impact);
         // STANDIN: the collision body re-posed from the bind pose where the rider now is, for
         // `CollBody_UpdateFromBones` 0x2361b0 on the animated skeleton (row G5)
         self.rag.body = bind_body_at(self.rag.pos, self.wr.fwd, self.rag.up, k);
         self.s.clip_t += TICK;
-        if self.wr.stuck >= 1e6 {
+        // cBoarder's update (vf7 0x117198) after the motion: +0x2e4 decays (× 0.95603746); above 4.492007,
+        // `Boarder_RequestReset` 0x118f10 and 0 (the motion's time-out sets 1e6)
+        self.wr.stuck *= 0.956_037_46;
+        if 4.492_007 < self.wr.stuck {
+            self.wr.stuck = 0.0;
             return Out::Reset;
         }
         match now {
@@ -450,13 +629,17 @@ impl Rider {
             player: if self.ai { 0 } else { -1 },
             x420: self.stats.kind as u32,
             x464: self.data.goofy,
+            // STANDIN: +0x2e4 (and +0x2f0) from 0 at each wipe-out, for the riding ticks' own (the riding walls'
+            // `Boarder_AccumulateImpact` and the decay outside the wipe-out are not ported, row G6e)
+            stuck: 0.0,
             ..Default::default()
         };
         let mut motion = Wipeout::default();
         let (at, n) = self.crash_at.take().unwrap_or((self.pos, self.normal));
         (motion.rag.crash_at, motion.rag.crash_n) = (to_game(at, 100.0, 1.0), to_game(n, 1.0, 0.0));
         let mut s = State { motion: 5, state: 0x13, clip: CLIP_CRUNCH, fwd: o.fwd, side: o.side, yaw: o.yaw, probe_side: o.side, ..Default::default() };
-        let mut glue = Glue { world, last: &mut self.last_hit, s: &mut s, k, lean: self.lean[0] };
+        let who = self.who();
+        let mut glue = Glue { world, last: &mut self.last_hit, s: &mut s, k, lean: self.lean[0], who };
         motion.enter(&mut rag, &mut wr, &mut glue);
         self.switch = false;
         self.clear_air();
@@ -498,7 +681,11 @@ impl Rider {
         while w.acc >= TICK * 0.999 && matches!(out, Out::Down) {
             w.acc -= TICK;
             let was = w.s.clip;
-            out = w.tick(world, &mut self.last_hit, self.stats.scale, self.lean[0], self.stats.kind);
+            let who = self.who();
+            out = w.tick(world, &mut self.last_hit, self.stats.scale, self.lean[0], self.stats.kind, who);
+            for c in std::mem::take(&mut w.s.calls) {
+                self.wipe_call(c);
+            }
             if dbg && (w.s.clip != was || !matches!(out, Out::Down)) {
                 println!("    wipe t {:.2} motion {} clip {} air {:.2} ground {:.2} speed {:.1} kind {} surf {} pos {:.1?}", w.t, w.s.motion, clip_name(w.s.clip), w.motion.rag.t_air, w.motion.t_ground,
                     to_port(w.rag.vel, 0.01).length(), w.rag.ground_kind, w.rag.surface, to_port(w.rag.pos, 0.01));
@@ -530,6 +717,29 @@ impl Rider {
         if self.pos.y < world.min_y - 30.0 || world.in_reset(self.pos + Vec3::Y * 0.8, BODY_RADIUS) {
             let at = self.safe;
             self.respawn(at);
+        }
+    }
+
+    fn who(&self) -> Who {
+        Who { id: rider_id(self), human: !self.ai, speed_stat: self.speed_stat() }
+    }
+
+    /// What the wipe-out's walls asked of the rider.
+    fn wipe_call(&mut self, c: Call) {
+        match c {
+            Call::Crash => {
+                // `Boarder_Wipeout` 0x11d830: with a multiplier, a running uber window and not "tricky", the meter
+                // cut to two thirds (0.66599226) and the window closed; STANDIN: no `Sfx_OnWipeout` (rows G10)
+                if 0.0 < crate::score::get_multiplier(self.sc.units) && 0.0 < self.uber_timer && !self.tricky() {
+                    self.boost = self.boost.min(0.665_992_26);
+                    self.uber_timer = 0.0;
+                }
+                let (m, calls) = self.sc.crash(false);
+                self.show(&calls);
+                self.add_meter(m);
+            }
+            Call::Meter(m) => self.add_meter(m),
+            Call::Spray(p, v, n) => self.crash_spray = Some((to_port(p, 0.01), to_port(v, 0.01), to_port(n, 1.0))),
         }
     }
 

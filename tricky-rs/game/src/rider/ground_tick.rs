@@ -27,7 +27,8 @@
 //!   angle and [`rail_normal`], from the board's frame, right, up, velocity and the motion's time, blend and angle) are
 //!   exact and checked, but `Rider::rail_step` does not call them yet: the port has no world grid (STANDIN, row
 //!   G20c2c1) and no attitude quaternion through a rail (row G20c2c3)
-//! - rail capture (row G1b) and `Boarder_InstanceCollisions` 0x125088 (row E8b): not done while riding, as before
+//! - rail capture (row G1b): not done while riding, as before; `Boarder_InstanceCollisions` 0x125088 only with the
+//!   course's collision (row E8c3)
 
 use super::{wrap, Rider};
 use crate::collide::CollisionWorld;
@@ -929,21 +930,69 @@ pub(super) fn wall_cast(world: &CollisionWorld, course: &crate::course_ground::C
 }
 
 /// The rider's handle for the scripts and sounds. STANDIN: 1 for the human, 2 for the others, for the rider's address.
-fn rider_id(r: &Rider) -> u32 {
+pub(super) fn rider_id(r: &Rider) -> u32 {
     if r.ai { 2 } else { 1 }
+}
+
+/// `World_QueryInstances` 0x25bdc4 with `cWorldBoarder`(the body, 1): t, the record (object = index + 1), the object
+/// (its index; its flags, its physics record's mass and bounce) and the sphere tree hit (the record's +0x30).
+/// STANDIN: no object has a controller here, for the course's controllers (row E7b2); the rollers have left the
+/// casts (their flags lose 0x20).
+pub(super) fn touch_query(world: &CollisionWorld, course: &crate::course_ground::CourseGround, body: &crate::collbody::CollBody) -> (f32, crate::walls::CastRecord, crate::walls::Touched, Option<(usize, usize)>) {
+    let mut q = crate::worldboarder::WorldBoarder::new(body, 1);
+    let (t, h) = course.query_instances(&mut q, world.showoff, &|i| world.course_skips(i));
+    let Some(h) = h else { return (t, Default::default(), Default::default(), None) };
+    let o = h.object.unwrap_or(0);
+    let ssf = &course.ssf;
+    let phys = ssf.object_physics.get(o).and_then(|p| ssf.physics.get(*p as usize));
+    let rec = crate::walls::CastRecord { pos: h.pos, normal: h.normal, object: o as u32 + 1 };
+    let touched = crate::walls::Touched {
+        id: o as u32,
+        flags: course.object_flags(o),
+        mass: phys.map_or(0.0, |p| p.mass()),
+        bounce: phys.map_or(0.0, |p| p.bounce()),
+        controller: None,
+    };
+    (t, rec, touched, h.tree)
+}
+
+/// A roller's sphere tree cast on the course (`World_RayCast` 0x25aff8, or `World_QueryInstances` 0x25bdc4 with
+/// `query`): t, the point and the normal.
+pub(super) fn roller_cast(world: &CollisionWorld, course: &crate::course_ground::CourseGround, q: &crate::sphtree::WorldSphTree, query: bool) -> (f32, V4, V4) {
+    let (t, h) = if query {
+        course.query_instances(&mut q.clone(), world.showoff, &|i| world.course_skips(i))
+    } else {
+        course.ray_cast(&mut q.clone(), world.showoff, None, &|i| world.course_skips(i))
+    };
+    h.map_or((t, [0.0; 4], [0.0; 4]), |h| (t, h.pos, h.normal))
+}
+
+/// The rollers among the rider's broadphase pairs kicked by its body (`roller::rider_kick`, in
+/// `Boarder_InstanceCollisions` 0x125088 after the touch objects). STANDIN: the pairs are the rollers whose boxes
+/// meet the body's, for the race's broadphase (rider+0x700). `body` reads the body as the kicks so far moved it.
+pub(super) fn kick_rollers<E: crate::walls::WallEnv + crate::roller::RollerEnv>(course: &crate::course_ground::CourseGround, wr: &mut crate::walls::WallRider, id: u32, env: &mut E, body: fn(&E) -> crate::collbody::CollBody) {
+    let start = body(env);
+    let mut rollers = std::mem::take(&mut course.knock.lock().unwrap_or_else(|e| e.into_inner()).rollers);
+    let (c, rad) = (start.center, start.radius);
+    let (lo, hi) = ([c[0] - rad, c[1] - rad, c[2] - rad, 0.0], [c[0] + rad, c[1] + rad, c[2] + rad, 0.0]);
+    for k in rollers.iter_mut().filter(|k| crate::knockables::overlap(k.body.lo, k.body.hi, lo, hi)) {
+        let b = body(env);
+        crate::roller::rider_kick(&mut k.body, k.object, wr, id, &b, env);
+    }
+    // the rollers the kicks started go first, as `knockables` keeps them (newest first)
+    let mut kn = course.knock.lock().unwrap_or_else(|e| e.into_inner());
+    let mut new = std::mem::take(&mut kn.rollers);
+    new.append(&mut rollers);
+    kn.rollers = new;
 }
 
 /// What a rider's rollers ask of the world while the rider kicks them (`roller::rider_kick`).
 impl crate::roller::RollerEnv for WallGlue<'_> {
     fn ray_cast(&mut self, q: &crate::sphtree::WorldSphTree) -> (f32, V4, V4) {
-        let world = self.world;
-        let (t, h) = self.course.ray_cast(&mut q.clone(), world.showoff, None, &|i| world.course_skips(i));
-        h.map_or((t, [0.0; 4], [0.0; 4]), |h| (t, h.pos, h.normal))
+        roller_cast(self.world, self.course, q, false)
     }
     fn query_instances(&mut self, q: &crate::sphtree::WorldSphTree) -> (f32, V4, V4) {
-        let world = self.world;
-        let (t, h) = self.course.query_instances(&mut q.clone(), world.showoff, &|i| world.course_skips(i));
-        h.map_or((t, [0.0; 4], [0.0; 4]), |h| (t, h.pos, h.normal))
+        roller_cast(self.world, self.course, q, true)
     }
     /// STANDIN: nothing, for the race's broadphase (`Broadphase_MoveBox` 0x14fe68).
     fn move_box(&mut self, _: V4, _: V4) {}
@@ -978,26 +1027,10 @@ impl crate::walls::WallEnv for WallGlue<'_> {
     fn cast_walls(&mut self, r: &crate::walls::WallRider) -> (f32, crate::walls::CastRecord) {
         wall_cast(self.world, self.course, &self.body, r.ground)
     }
-    /// `World_QueryInstances` 0x25bdc4 with `cWorldBoarder`(the body, 1): t, the record and the object (its index;
-    /// its flags, its physics record's mass and bounce). STANDIN: no object has a controller here, for the course's
-    /// controllers (row E7b2); the rollers have left the casts (their flags lose 0x20).
+    /// [`touch_query`]; the tree kept for the contact's record.
     fn query_objects(&mut self, _: &crate::walls::WallRider) -> (f32, crate::walls::CastRecord, crate::walls::Touched) {
-        let mut q = crate::worldboarder::WorldBoarder::new(&self.body, 1);
-        let world = self.world;
-        let (t, h) = self.course.query_instances(&mut q, world.showoff, &|i| world.course_skips(i));
-        let Some(h) = h else { return (t, Default::default(), Default::default()) };
-        let o = h.object.unwrap_or(0);
-        self.tree = h.tree;
-        let ssf = &self.course.ssf;
-        let phys = ssf.object_physics.get(o).and_then(|p| ssf.physics.get(*p as usize));
-        let rec = crate::walls::CastRecord { pos: h.pos, normal: h.normal, object: o as u32 + 1 };
-        let touched = crate::walls::Touched {
-            id: o as u32,
-            flags: self.course.object_flags(o),
-            mass: phys.map_or(0.0, |p| p.mass()),
-            bounce: phys.map_or(0.0, |p| p.bounce()),
-            controller: None,
-        };
+        let (t, rec, touched, tree) = touch_query(self.world, self.course, &self.body);
+        self.tree = tree;
         (t, rec, touched)
     }
     /// `Boarder_AccumulateImpact` 0x125c48: +0x2e4 += 1 − max(n · +0x2f0, 0), +0x2f0 = n. STANDIN: nothing, the port
@@ -1225,20 +1258,9 @@ impl gm::Env for GroundEnv<'_> {
         let id = rider_id(self.r);
         let mut glue = WallGlue { r: &mut *self.r, g: &mut *g, world: self.world, course: &course, body, tree: None, starts: Vec::new() };
         crate::walls::instance_collisions(&mut wr, &mut glue);
-        let mut rollers = std::mem::take(&mut course.knock.lock().unwrap_or_else(|e| e.into_inner()).rollers);
-        let (c, rad) = (glue.body.center, glue.body.radius);
-        let (lo, hi) = ([c[0] - rad, c[1] - rad, c[2] - rad, 0.0], [c[0] + rad, c[1] + rad, c[2] + rad, 0.0]);
-        for k in rollers.iter_mut().filter(|k| crate::knockables::overlap(k.body.lo, k.body.hi, lo, hi)) {
-            let body = glue.body;
-            crate::roller::rider_kick(&mut k.body, k.object, &mut wr, id, &body, &mut glue);
-        }
+        kick_rollers(&course, &mut wr, id, &mut glue, |g| g.body);
         let starts = std::mem::take(&mut glue.starts);
-        {
-            let mut kn = course.knock.lock().unwrap_or_else(|e| e.into_inner());
-            rollers.append(&mut kn.rollers);
-            kn.rollers = rollers;
-            kn.start_scripts(&course, &starts);
-        }
+        course.knock.lock().unwrap_or_else(|e| e.into_inner()).start_scripts(&course, &starts);
         g.p.pos = wr.pos;
         g.vel = wr.vel;
         self.r.pos = to_port(g.p.pos, 0.01);
