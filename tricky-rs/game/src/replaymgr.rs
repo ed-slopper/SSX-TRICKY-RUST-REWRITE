@@ -2597,3 +2597,31 @@ pub fn load_from_buffer(m: &mut Mem, env: &mut dyn SaveEnv, career: u32) {
         free_buffer(m, env, career);
     }
 }
+
+/// `EAMem_Set` on memory, for the other modules
+pub fn mem_set_pub(m: &mut Mem, at: u32, value: u32, n: u32) {
+    mem_set(m, at, value, n)
+}
+
+/// `Replay_Write` 0x192c10 on a stream in memory (as `replay::Stream::write`; the control through gApp): nothing once
+/// a stream overflowed; too much for the control's stream size marks the overflow
+pub fn stream_write_mem(m: &mut Mem, s: u32, src: u32, n: u32) {
+    let ctl = m.r32(game(m) + 0x40);
+    if m.r32(ctl + 0x58) != 0 {
+        return;
+    }
+    let used = m.r32(s + 4).wrapping_sub(m.r32(s));
+    if (m.r32(ctl + 0xc).wrapping_sub(used) as i32) < n as i32 {
+        m.w32(ctl + 0x58, 1);
+        return;
+    }
+    copy_out(m, m.r32(s + 4), src, n);
+    m.w32(s + 4, m.r32(s + 4).wrapping_add(n));
+    m.w32(s + 0xc, m.r32(s + 0xc).wrapping_add(n));
+}
+
+/// `Replay_Read` 0x192ca0 on a stream in memory: no check against what was written
+pub fn stream_read_mem(m: &mut Mem, s: u32, dst: u32, n: u32) {
+    copy_out(m, dst, m.r32(s + 8), n);
+    m.w32(s + 8, m.r32(s + 8).wrapping_add(n));
+}

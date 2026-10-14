@@ -50,6 +50,34 @@ Part of the port notes (index: [README.md](README.md)); units and wording as des
   `BxList_MergePending` 0x17d548 inserts in order with the nodes' vf3
   (does the new node go before this one?) and vf4 (if set, the new node takes the found one's place and the old one
   is deleted).
+- Ported (board row E9k; `tricky_game::bxlist` on the game's bytes, `pf::Mem`, checked: `tests/bxlist.rs`):
+  - **Layout.** A list is 0x34 bytes: the flags, the live list's head and tail sentinels (+4, +0x10), and the
+    pending list's (+0x1c, +0x28). The sentinels are `cBxObjNode`s (vtable 0x386520).
+  - **Adding.** `BxList_Add` links a node at the head, on the pending list when the list is sorted.
+  - **Walking.** `First` / `NextOrNull` walk head to tail; `SortedFirst` / `SortedNextOrNull` tail to head;
+    `PendingFirst` / `PendingNextOrNull` walk the pending list.
+  - **Merging.** `MergePending` takes each pending node from first to last. It walks the live list back from the
+    tail to the first node it goes before (vf3). It links in after that node, or takes its place when it replaces
+    it (vf4; the old node's links are cleared and its vf0 called with 3). With no such node it goes at the head.
+  - **Moving and removing.** `Unlink` (only a node linked both ways), `Remove`, `Move`, `MoveAll` (merged when the
+    target is sorted).
+  - **Every node.** `UpdateAll` (vf1, taking the next first), `DrawAll` (vf2, taking the next after), `DeleteAll`
+    (vf0 with 3).
+  - **Making and freeing.** `Init(n)` allocates n lists after a 0x10-byte header holding n (filled with 0xdeadc0ed)
+    and links them empty. `Free` deletes every node, then destroys the sentinels from the last list back.
+    `~cBxObjNode` always unlinks from the world's set at 0x337c60.
+  - **Node constructors.**
+    - `cBxObjNode(list)` sets its vtable and adds itself to the world's set.
+    - `cBxTypeObjNode(list, type)` keeps the type at +0x14 (vtable 0x3864c0).
+    - `cBxSortObjNode(list, type)` (vtable 0x386460) numbers itself from 0x337c68 (type 5) or 0x337c6c (the
+      others) at +0x20. It keeps the race's +0x18 at +0x24, or 0 with no game.
+    - The constructors taking a replay stream read +0xc..+0x18 and +0x18..+0x28 back.
+  - **Snapshots.** The `SaveSnapshot`s tag their headers (length, 0xdeadbefc / 0xdeadbefb) and write them.
+    `BxList_SaveCounters` / `_LoadCounters` keep the two counters.
+  - **Checked in the runner:** 1,500 random sets (up to six lists, some sorted) with 24 fake nodes whose vtables
+    point at stand-ins: vf3 compares a key word and vf4 reads a flag. 40 random calls per set over 26 entry
+    points, then the free. Every result, every virtual call and all the memory were compared. 2,672 ordering
+    questions were asked in merges, and 154 nodes were replaced.
 - vf21 `Finish`(runScript): unless the instance has a "finished" event script to run (`Controller_RunFinishScript`
   0x13a9f8, event 3), marks the instance done (flag 2) and deletes the node (vf0 with 3). vf22 `Kill`: the same
   without the script. vf23 `OnMessage`(value, kind): the base handles 7 (clear instance flag 0x800) and 8 (set it);

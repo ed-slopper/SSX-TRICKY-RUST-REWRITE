@@ -1682,36 +1682,36 @@ address,size,name,system,status
 0x17ce00,52,WStr_Append,frontend?,not started
 0x17ce38,52,WStr_Format,frontend?,not started
 0x17ce70,168,WStr_FormatAscii,frontend?,not started
-0x17cf50,68,cBxObjNode::cBxObjNode,world,not started
-0x17cf98,68,cBxObjNode::cBxObjNode,world,not started
-0x17cfe0,100,cBxObjNode::~cBxObjNode,world,not started
-0x17d048,68,cBxTypeObjNode::cBxTypeObjNode,world,not started
-0x17d090,80,cBxTypeObjNode::cBxTypeObjNode,world,not started
-0x17d0e0,152,cBxSortObjNode::cBxSortObjNode,world,not started
-0x17d178,80,cBxSortObjNode::cBxSortObjNode,world,not started
-0x17d1c8,8,FUN_0017d1c8,world?,not started
-0x17d1d8,44,cBxTypeObjNode::SaveSnapshot,save,not started
-0x17d208,84,cBxSortObjNode::SaveSnapshot,save,not started
-0x17d260,64,BxList_SaveCounters,save,not started
-0x17d2a0,64,BxList_LoadCounters,ai?,not started
-0x17d2f0,332,BxList_Init,other,not started
-0x17d440,164,BxList_Free,other,not started
-0x17d4e8,92,BxList_Add,world?,not started
-0x17d548,404,BxList_MergePending,world?,not started
-0x17d6e0,48,BxList_Unlink,world?,not started
-0x17d710,44,BxList_Remove,world?,not started
-0x17d740,72,BxList_Move,world?,not started
-0x17d788,216,BxList_MoveAll,world?,not started
-0x17d860,36,BxList_First,ai?,not started
-0x17d888,36,BxList_SortedFirst,world?,not started
-0x17d8b0,36,BxList_NextOrNull,ai?,not started
-0x17d8d8,36,BxList_SortedNextOrNull,world?,not started
-0x17d900,36,BxList_PendingFirst,world?,not started
-0x17d928,36,BxList_PendingNextOrNull,world?,not started
-0x17d950,132,BxList_UpdateAll,game?,not started
-0x17d9d8,116,BxList_DrawAll,ai?,not started
-0x17da50,140,BxList_DeleteAll,ai?,not started
-0x17dae0,32,BxList_SetSorted,ai?,not started
+0x17cf50,68,cBxObjNode::cBxObjNode,world,checked
+0x17cf98,68,cBxObjNode::cBxObjNode,world,checked
+0x17cfe0,100,cBxObjNode::~cBxObjNode,world,checked
+0x17d048,68,cBxTypeObjNode::cBxTypeObjNode,world,checked
+0x17d090,80,cBxTypeObjNode::cBxTypeObjNode,world,checked
+0x17d0e0,152,cBxSortObjNode::cBxSortObjNode,world,checked
+0x17d178,80,cBxSortObjNode::cBxSortObjNode,world,checked
+0x17d1c8,8,FUN_0017d1c8,world?,ported
+0x17d1d8,44,cBxTypeObjNode::SaveSnapshot,save,checked
+0x17d208,84,cBxSortObjNode::SaveSnapshot,save,checked
+0x17d260,64,BxList_SaveCounters,save,checked
+0x17d2a0,64,BxList_LoadCounters,ai?,checked
+0x17d2f0,332,BxList_Init,other,checked
+0x17d440,164,BxList_Free,other,checked
+0x17d4e8,92,BxList_Add,world?,checked
+0x17d548,404,BxList_MergePending,world?,checked
+0x17d6e0,48,BxList_Unlink,world?,checked
+0x17d710,44,BxList_Remove,world?,checked
+0x17d740,72,BxList_Move,world?,checked
+0x17d788,216,BxList_MoveAll,world?,checked
+0x17d860,36,BxList_First,ai?,checked
+0x17d888,36,BxList_SortedFirst,world?,checked
+0x17d8b0,36,BxList_NextOrNull,ai?,checked
+0x17d8d8,36,BxList_SortedNextOrNull,world?,checked
+0x17d900,36,BxList_PendingFirst,world?,checked
+0x17d928,36,BxList_PendingNextOrNull,world?,checked
+0x17d950,132,BxList_UpdateAll,game?,checked
+0x17d9d8,116,BxList_DrawAll,ai?,checked
+0x17da50,140,BxList_DeleteAll,ai?,checked
+0x17dae0,32,BxList_SetSorted,ai?,checked
 0x17db00,264,BxList_CullToCount,ai?,not started
 0x17dc60,8,cCounterNode::vf6_17dc60,world,not started
 0x17dc68,8,cCounterNode::vf5_17dc68,world,not started
@@ -1727,7 +1727,7 @@ address,size,name,system,status
 0x17ddb8,8,cBxTypeObjNode::Update,world,not started
 0x17ddc0,20,cBxTypeObjNode::~cBxTypeObjNode,world,not started
 0x17ddf8,92,cBxTypeObjNode::__tf,runtime,host
-0x17de58,120,BxList_DestroySlot,world?,not started
+0x17de58,120,BxList_DestroySlot,world?,checked
 0x17ded0,8,cCounterNode::vf8_17ded0,world,not started
 0x17ded8,8,cLessonMan::vf7_17ded8,tutorial,not started
 0x17dee0,8,cAI::vf6_17dee0,ai,not started
