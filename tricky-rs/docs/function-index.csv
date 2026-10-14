@@ -308,7 +308,7 @@ address,size,name,system,status
 0x11e9a0,52,Boarder_ScoreKnockdown,boarder,ported
 0x11e9d8,40,Boarder_GetGateStartTimer,boarder,ported
 0x11ea00,28,Boarder_StartLineOffset,boarder,checked
-0x11ea20,8,Boarder_GetCourseLength,boarder,ported
+0x11ea20,8,Boarder_GetCourseLength,boarder,checked
 0x11ea28,68,Boarder_GetRaceTime,boarder,ported
 0x11ea70,136,Rivals_OnBump,audio?,ported
 0x11eaf8,252,Rivals_OnHit,audio?,ported
@@ -1748,9 +1748,9 @@ address,size,name,system,status
 0x17ecf8,896,cGame::vf0_17ecf8,game,not started
 0x17f078,124,cGame::IsPaused,game,not started
 0x17f0f8,96,Game_IsMenuOrOverlayActive,frontend,not started
-0x17f158,12,Game_GetHudOption,game,not started
+0x17f158,12,Game_GetHudOption,game,checked
 0x17f168,40,Game_SetHudOption,game,not started
-0x17f190,16,Game_GetViewportMode,game,not started
+0x17f190,16,Game_GetViewportMode,game,checked
 0x17f1a0,80,Game_SetViewportMode,game,not started
 0x17f1f0,308,Game_IsLeadOrFocusRider,game,ported
 0x17f328,100,Game_CutAllCameras,camera,checked
@@ -2383,18 +2383,18 @@ address,size,name,system,status
 0x19e7a0,160,Score_GetRankForPoints,scoring,ported
 0x19e840,68,Score_GetRankColour,scoring,not started
 0x19e888,12492,HudOverlay_InitTables,frontend,not started
-0x1a1958,8,cHUDOverlay::Reset,frontend,not started
-0x1a1960,8,cHUDOverlay::vf16_1a1960,frontend,not started
-0x1a1968,1252,HUD_BuildSplitList,hud,not started
-0x1a1e50,96,HUD_HasSplitAt,hud,not started
-0x1a1eb0,100,HUD_ApplyHudOption,hud,not started
-0x1a1f18,2232,cHUDOverlay::Update,frontend,not started
-0x1a27d0,556,cHUDOverlay::Draw,frontend,not started
-0x1a2a00,572,cHUDOverlay::DrawText,frontend,not started
+0x1a1958,8,cHUDOverlay::Reset,frontend,checked
+0x1a1960,8,cHUDOverlay::vf16_1a1960,frontend,checked
+0x1a1968,1252,HUD_BuildSplitList,hud,checked
+0x1a1e50,96,HUD_HasSplitAt,hud,checked
+0x1a1eb0,100,HUD_ApplyHudOption,hud,checked
+0x1a1f18,2232,cHUDOverlay::Update,frontend,checked
+0x1a27d0,556,cHUDOverlay::Draw,frontend,checked
+0x1a2a00,572,cHUDOverlay::DrawText,frontend,checked
 0x1a2c40,9004,HUD_DrawPlayerSprites,hud,ported
 0x1a4f70,6380,HUD_DrawPlayerText,hud,ported
-0x1a6860,152,HUD_SetViewLayout,hud,not started
-0x1a68f8,160,HUD_WobbleOffset,hud,not started
+0x1a6860,152,HUD_SetViewLayout,hud,checked
+0x1a68f8,160,HUD_WobbleOffset,hud,checked
 0x1a6998,284,StaticInit_HUD,other,not started
 0x1a6b20,20,cHUDOverlay::~cHUDOverlay,frontend,not started
 0x1a6b38,80,cHUDOverlay::__tf,runtime,host

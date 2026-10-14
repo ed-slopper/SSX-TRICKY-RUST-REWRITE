@@ -132,3 +132,42 @@ direct calls, the heap, the pads).
   and between the integers), counters near the repeat's thresholds and every call compared, plus the backdrop test
   with its animation run for real. The tests caught 7 of 8 mutants; the one left (≥ 60 for ≥ 61) cannot change a
   result, since 60 is a multiple of 12.
+
+## The HUD overlay's state (G8e)
+
+`tricky_game::hudstate`: what feeds `HUD_DrawPlayerSprites` / `HUD_DrawPlayerText`.
+
+- **The split markers** (`HUD_BuildSplitList` 0x1a1968; `cHUDOverlay::Reset` and vf16 both jump to it):
+  - entry 0 is the start (kind 1 at distance 0);
+  - each race path's markers of kind 12 (shown as kind 0) and 13 (kind 2) sit at the path's length less the
+    marker's distance;
+  - in lap mode 8 they repeat for three laps of the main path: laps 0..2 for kind 12, 1..2 for kind 13;
+  - a marker within 500 of one of the same kind is skipped (`HUD_HasSplitAt`).
+
+  Each player's 0x140-byte block is then set up: the band colours unlit, the fades at 1.0, the markers' distances
+  ahead from its rider's course length (+0x380).
+- **The update** (`cHUDOverlay::Update` 0x1a1f18), after the HUD's flags from the HUD option (0x32ca40), and
+  nothing while an overlay is active:
+  - in time trials and races (modes 3 / 5) each of the last ten whole seconds beeps once, with the tenth spoken,
+    for the first player still racing;
+  - the blink counts 0..53 and is on from 19 (while the rider is in state 19 or not finished);
+  - the score shown rolls up to the points in steps of 50, with a tick each time its hundreds roll over (HUD flag
+    0x10000). The old score goes through a float and back for that test;
+  - the meter and the multiplier shown ease toward the rider's by 0.005 a frame;
+  - the meter's 14 bands each blend from unlit to lit as the meter (else the multiplier plus the meter) fills
+    them, a 14th each. In the tutorial's fifth lesson the meter is the rider's and, from 20 up, every band is lit;
+  - the wobble (+0x84 / +0x88) comes from a running trick timer (kinds 2 / 3 of the rider's twelve at +0x597c):
+    `HUD_WobbleOffset` is sin(4π x) × (1 − x) / 2 × 1.4 over the first quarter;
+  - the speed flash fires when the speed reaches 3319.44. The speed is the length of the 4-word velocity at
+    +0x150, w included, computed on VU0 (x² + y², then + z², then + w², then the square root);
+  - the riders' progress bars and the markers ahead ease toward the rider's progress by a 36th;
+  - the HUD fades in by 1/180; the lap change shows; and in time trials the three medal times each start a flash
+    as the rider's checkpoint count passes them, in order.
+- **`Draw` / `DrawText`** draw nothing while the replay page, results or pause are up, or during a cut-scene other
+  than 5, 7 or 8. Otherwise each view is scaled to 640 × 480 (the renderer's size, as unsigned) and its player's
+  sprites / text are drawn, the text on layer 5. `HUD_SetViewLayout` picks the layout: 0 for one view, 1 / 2 for
+  two side by side.
+- **Checked in the runner** on 40,000 random cases over the reset, update and draws, with every call (floats bit
+  for bit) and all memory compared. The tests caught the 10 mutants tried.
+- **The test fills its float fields with real floats.** The EE reads a denormal as 0, so random small integers in
+  a float field make `0 < x` differ from Rust's; no HUD or rider float is ever denormal.
