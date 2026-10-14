@@ -855,6 +855,33 @@ mod tests {
     }
 
     #[test]
+    fn the_128_bit_lanes_and_logic() {
+        // paddw / psubw / paddb / psubb / pand / pxor / por / pnor r8, r4, r5
+        let mmi = |fun: u32, sa: u32| (28 << 26) | (4 << 21) | (5 << 16) | (8 << 11) | (sa << 6) | fun;
+        let rs = 0x0000_0001_ffff_ffff_8000_0000_0102_03ffu128;
+        let rt = 0x0000_0002_0000_0001_8000_0000_0101_0101u128;
+        for (w, want) in [
+            (mmi(0x08, 0x00), 0x0000_0003_0000_0000_0000_0000_0203_0500u128),
+            (mmi(0x08, 0x01), 0xffff_ffff_ffff_fffe_0000_0000_0001_02feu128),
+            (mmi(0x08, 0x08), 0x0000_0003_ffff_ff00_0000_0000_0203_0400u128),
+            (mmi(0x08, 0x09), 0x0000_00ff_ffff_fffe_0000_0000_0001_02feu128),
+            (mmi(0x09, 0x12), rs & rt),
+            (mmi(0x09, 0x13), rs ^ rt),
+            (mmi(0x29, 0x12), rs | rt),
+            (mmi(0x29, 0x13), !(rs | rt)),
+        ] {
+            let mut rn = Runner::empty();
+            rn.cpu.gpr[4] = rs;
+            rn.cpu.gpr[5] = rt;
+            rn.mem.write_u32(CODE, w);
+            rn.mem.write_u32(CODE + 4, r(0, 31, 0, 0, 0, 8));
+            rn.mem.write_u32(CODE + 8, NOP);
+            rn.call(CODE).unwrap();
+            assert_eq!(rn.cpu.gpr[8], want, "{w:#x}");
+        }
+    }
+
+    #[test]
     fn mult1_uses_the_second_pipeline() {
         let mut rn = Runner::empty();
         // mult1 r3, r4, r5; mflo1 r6; mfhi1 r7; mflo r8; jr ra; nop
@@ -894,7 +921,9 @@ mod tests {
 }
 
 /// The MMI instructions implemented so far: the pipeline-1 multiply and divide (`mult1`, `multu1`, `div1`,
-/// `divu1`, `madd1`, `maddu1`) and their HI1/LO1 moves; HI1 and LO1 are the upper 64 bits of HI and LO.
+/// `divu1`, `madd1`, `maddu1`) and their HI1/LO1 moves (HI1 and LO1 are the upper 64 bits of HI and LO); the
+/// lanes' add and subtract (`paddw`, `psubw`, `paddb`, `psubb`) and the 128-bit logic (`pand`, `pxor`, `por`,
+/// `pnor`, as libc's `strcmp` uses them); `pextlw`, `pextuw`, `pcpyld`, `pcpyud`.
 fn mmi(r: &mut Runner, pc: u32, w: u32, rs: usize, rt: usize, rd: usize, fun: u32) -> Result<Next, Error> {
     let c = &mut r.cpu;
     let (a, b) = (c.gpr(rs), c.gpr(rt));
@@ -943,6 +972,28 @@ fn mmi(r: &mut Runner, pc: u32, w: u32, rs: usize, rt: usize, rd: usize, fun: u3
             if d != 0 {
                 set_lo1(c, sext32(n / d));
                 set_hi1(c, sext32(n % d));
+            }
+        }
+        // the 128-bit lane arithmetic and logic: paddw / psubw / paddb / psubb (MMI0), pand / pxor (MMI2),
+        // por / pnor (MMI3)
+        0x08 | 0x09 | 0x29 if matches!((fun, (w >> 6) & 0x1f), (0x08, 0x00 | 0x01 | 0x08 | 0x09) | (0x09, 0x12 | 0x13) | (0x29, 0x12 | 0x13)) => {
+            let (s, t) = (r.cpu.gpr[rs], r.cpu.gpr[rt]);
+            let lanes = |bits: u32, f: &dyn Fn(u128, u128) -> u128| -> u128 {
+                let mask = (1u128 << bits) - 1;
+                (0..128 / bits).fold(0u128, |acc, i| acc | (f((s >> (bits * i)) & mask, (t >> (bits * i)) & mask) & mask) << (bits * i))
+            };
+            let v = match (fun, (w >> 6) & 0x1f) {
+                (0x08, 0x00) => lanes(32, &|x, y| x.wrapping_add(y)),
+                (0x08, 0x01) => lanes(32, &|x, y| x.wrapping_sub(y)),
+                (0x08, 0x08) => lanes(8, &|x, y| x.wrapping_add(y)),
+                (0x08, 0x09) => lanes(8, &|x, y| x.wrapping_sub(y)),
+                (0x09, 0x12) => s & t,
+                (0x09, 0x13) => s ^ t,
+                (0x29, 0x12) => s | t,
+                _ => !(s | t),
+            };
+            if rd != 0 {
+                r.cpu.gpr[rd] = v;
             }
         }
         // the 128-bit shuffles (MMI0 / MMI1 / MMI2 / MMI3 groups, the operation in the sa field)

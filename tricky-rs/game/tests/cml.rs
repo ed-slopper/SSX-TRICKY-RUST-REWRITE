@@ -138,27 +138,9 @@ fn runner() -> Option<Runner> {
 fn camera_file_lookups_match_the_original() {
     let Some(mut r) = runner() else { return };
     let a = At { b: r.mem.alloc(At::len()) };
-    for f in [0x16df80, 0x16dfd0, 0x16dfe0, 0x16e098, 0x16e168, 0x16e1d8, 0x16e248, 0x16e318, 0x16e408, 0x16e468, 0x16e518, 0x16e588] {
+    for f in [0x16df80, 0x16dfd0, 0x16dfe0, 0x16e098, 0x16e168, 0x16e1d8, 0x16e248, 0x16e318, 0x16e408, 0x16e468, 0x16e518, 0x16e588, 0x2fd008] {
         r.allow(f);
     }
-    // strcmp (the runner lacks its PSUBW): a byte compare, the callers only test for zero
-    r.stub(0x2fd008, |c, m| {
-        let (mut a, mut b) = (c.gpr(4) as u32, c.gpr(5) as u32);
-        let v = loop {
-            let (mut x, mut y) = ([0u8], [0u8]);
-            m.read(a, &mut x).unwrap();
-            m.read(b, &mut y).unwrap();
-            if x[0] != y[0] {
-                break x[0] as i64 - y[0] as i64;
-            }
-            if x[0] == 0 {
-                break 0;
-            }
-            a += 1;
-            b += 1;
-        };
-        c.set_gpr(2, v as u64);
-    });
     r.step_limit = 2_000_000;
     let mut g = Rng(0x16df_80cc_e11b_0001);
     for case in 0..20_000u32 {
