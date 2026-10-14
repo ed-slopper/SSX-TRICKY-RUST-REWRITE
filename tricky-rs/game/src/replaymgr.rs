@@ -2841,3 +2841,23 @@ pub fn load_dead_nodes(m: &mut Mem, env: &mut dyn SnapshotEnv, k: u32) {
         env.construct(m, 0x13af38, &[p, inst, 0]);
     }
 }
+
+/// `Replay_Write` on memory of bytes held elsewhere (the game's stack): the same checks, then the bytes
+pub fn stream_write_bytes(m: &mut Mem, s: u32, b: &[u8]) {
+    let ctl = m.r32(game(m) + 0x40);
+    if m.r32(ctl + 0x58) != 0 {
+        return;
+    }
+    let n = b.len() as u32;
+    let used = m.r32(s + 4).wrapping_sub(m.r32(s));
+    if (m.r32(ctl + 0xc).wrapping_sub(used) as i32) < n as i32 {
+        m.w32(ctl + 0x58, 1);
+        return;
+    }
+    let at = m.r32(s + 4);
+    for (i, v) in b.iter().enumerate() {
+        m.w8(at + i as u32, *v);
+    }
+    m.w32(s + 4, at.wrapping_add(n));
+    m.w32(s + 0xc, m.r32(s + 0xc).wrapping_add(n));
+}

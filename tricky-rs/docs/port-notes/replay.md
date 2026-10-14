@@ -5,8 +5,9 @@ How the game records and plays back a race. Ported so far: the byte streams and 
 list, seeking and playlists (G12d; `tricky_game::replaymgr`, checked: `tests/replaymgr.rs`), the highlights
 and pins (G12e; the same module, checked: `tests/replay_highlights.rs`), the camera tracks (G12f; checked:
 `tests/replay_camtracks.rs`), playback control and the manager's life (G12g; checked:
-`tests/replay_playback.rs`), the save to the card and the load (G12h; checked: `tests/replay_save.rs`), and the world snapshot's
-orchestration (G12i; checked: `tests/replay_snapshot.rs`). Keyframes, the node save and restore, pins and
+`tests/replay_playback.rs`), the save to the card and the load (G12h; checked: `tests/replay_save.rs`), the world snapshot's
+orchestration (G12i; checked: `tests/replay_snapshot.rs`), and the world nodes' snapshot saves (G12j;
+`tricky_game::snapshot`, checked: `tests/snapshot_saves.rs`). Keyframes, the node save and restore, pins and
 highlights, camera tracks, `Replay_Update` and the memory-card save are the rest of G12.
 
 ## The replay control
@@ -329,4 +330,41 @@ frames of a message), +0x4c and +0x50 hold recording, +0x58 a stream overflowed.
   and overflowing. Restores (whole keyframes, node lists, single nodes and dead nodes) were checked from made-up
   streams holding every node type, with unknown types in the single restore. The load constructors were stand-ins
   that log and take their record. Every call and all the memory were compared.
+
+## The world nodes' snapshot saves (G12j)
+
+- **The common pattern.** Each class writes its parent's part, then a block of its own words. Before writing, the
+  block's first two words are set to its length and a tag, so the tags end up in the node too. References follow:
+  - instances as numbers (`Replay_WriteNodeRef`);
+  - a link to the node's own instance: the instance number, its +0xe8 half word, and whether its +0xe4 is this
+    node (`Replay_WriteLink`);
+  - data as offsets from 0x34649c.
+- **The base chain.** `cBxTypeObjNode` (0xc bytes, 0xdeadbefc) and `cBxSortObjNode` (0x10, 0xdeadbefb) come first.
+  The dead node (`cDeadNode`, `cRestoreNode`, `cMovieNode`) adds its instance link.
+- **One block on top of the dead node's part** (offset, length, tag in `snapshot::SIMPLE`): counter 0x2c / 0x10 /
+  0xdeadbefe, timer 0xdeadbf21, rail 0xdeadbf13, the boosts at +0x30 (0x40 bytes: 0xdeadbefa, lap 0xdeadbf0d,
+  z 0xdeadbf26), tex flip 0xdeadbf1d, cracked 0xdeadbeff, crowd box 0xdeadbf00, mesh anim 0xdeadbf10, trick
+  trigger 0xdeadbf20.
+  - The roller adds a 0x90-byte header (`Snapshot_WriteHeader`, 0xdeadbf17).
+  - The UV scroll adds its data as an offset.
+  - The random boost's block (+0x100, 0x90, 0xdeadbf16) sits on the boost's part.
+  - The tube end's block (+0x100, 0xc0, 0xdeadbf29) adds the 0x18 bytes at 0x31d338, which all tube ends share.
+- **Others:**
+  - the debounce adds one word;
+  - the fence and the flag write their data offset before their block;
+  - the UV-scroll tex flip saves the UV scroll at +0x24 first;
+  - the emitter and the collide emitter (on the typed node) write their instance and data, then the particles'
+    state (`ParticleNode_SaveState`: two words);
+  - the rail manager writes 0x200 bytes of rail states;
+  - the script writes 0xb0 bytes with its program counter made an offset from 0x3464a0 for the write (and put back
+    after), then its rider's +0x460 (or -1), its data offset and its instance;
+  - the anim object (its dead node at +0x30) writes whether it has an overlap (then 0x10 and 0xc bytes of it), then
+    each key state (`AnimObjectNode_SaveState`: 0x48 bytes, 0xdeadbef2, and its key as an offset from the
+    course's +0x6c);
+  - the anim combo, delta and tex flip build on the anim object. The combo writes its +0x78 × 64 bytes; the delta
+    and the tex flip use the saves at 0x199ee0 and 0x19a940;
+  - the spline path writes its block, instance and +0x30 × 32 bytes, then its spline (`Spline_SaveSnapshot`).
+- **Checked in the runner:** 20,000 random nodes, about 600 for each of the 32 save functions, with their pointers
+  aimed at real places. The streams were sometimes nearly full or already overflowed (3,989 ended overflowed). The
+  stream, the node and the control were compared byte for byte. The load constructors come next.
 

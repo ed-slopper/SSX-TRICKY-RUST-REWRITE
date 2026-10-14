@@ -60,6 +60,7 @@ pub mod pf;
 pub mod replay;
 pub mod replaymgr;
 pub mod bxlist;
+pub mod snapshot;
 pub mod pickup;
 pub mod pose;
 pub mod rail_control;
