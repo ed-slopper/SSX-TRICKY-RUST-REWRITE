@@ -591,8 +591,8 @@ address,size,name,system,status
 0x13a5c8,92,cComputer::__tf,runtime,host
 0x13a628,304,cComputer::~cComputer,boarder?,not started
 0x13a7c8,116,cComputerState::__tf,runtime,host
-0x13a840,72,cControllerNode::cControllerNode,world,not started
-0x13a888,84,cControllerNode::cControllerNode,world,not started
+0x13a840,72,cControllerNode::cControllerNode,world,checked
+0x13a888,84,cControllerNode::cControllerNode,world,checked
 0x13a8e0,72,cControllerNode::~cControllerNode,world,not started
 0x13a928,84,cRestoreNode::Kill,world,ported
 0x13a980,116,cControllerNode::Finish,world,ported
@@ -604,14 +604,14 @@ address,size,name,system,status
 0x13abf0,148,Controller_ReplaceWithDead,world?,ported
 0x13ac88,624,TriggerScript_ApplyControllerOp,world,ported
 0x13aef8,64,cDeadNode::SaveSnapshot,save,checked
-0x13af38,128,cDeadNode::cDeadNode,world,ported
+0x13af38,128,cDeadNode::cDeadNode,world,checked
 0x13afb8,60,cDeadNode::~cDeadNode,world,ported
 0x13aff8,104,cRestoreNode::cRestoreNode,world,ported
 0x13b060,20,cRestoreNode::~cRestoreNode,world,not started
-0x13b078,52,cRestoreNode::cRestoreNode,world,ported
+0x13b078,52,cRestoreNode::cRestoreNode,world,checked
 0x13b0b0,8,cRestoreNode::SaveSnapshot,save,checked
 0x13b0b8,108,cCounterNode::cCounterNode,world,ported
-0x13b128,80,cCounterNode::cCounterNode,world,not started
+0x13b128,80,cCounterNode::cCounterNode,world,checked
 0x13b178,156,cCounterNode::Update,world,ported
 0x13b218,96,cCounterNode::Kill,world,not started
 0x13b278,116,cCounterNode::Finish,world,ported
@@ -657,7 +657,7 @@ address,size,name,system,status
 0x13c5d0,2788,TriggerScript_Op0_SpawnController,world,ported
 0x13d0b8,116,TriggerOp_SpawnCameraNode,camera,ported
 0x13d130,452,TriggerOp_SpawnEffect,world?,ported
-0x13d2f8,224,cScriptNode::cScriptNode,world,not started
+0x13d2f8,224,cScriptNode::cScriptNode,world,checked
 0x13d3d8,220,cScriptNode::SaveSnapshot,save,checked
 0x13d4b8,124,StaticInit_ScriptNode,world?,not started
 0x13d538,144,TriggerScript_Spawn,world,ported
@@ -681,20 +681,20 @@ address,size,name,system,status
 0x13f9f8,404,cRollerNode::Draw,world,not started
 0x13fb90,92,cRollerNode::SaveSnapshot,save,checked
 0x13fbf0,104,cDebounceNode::cDebounceNode,world,not started
-0x13fc58,80,cDebounceNode::cDebounceNode,world,not started
+0x13fc58,80,cDebounceNode::cDebounceNode,world,checked
 0x13fca8,68,cDebounceNode::Update,world,not started
 0x13fcf0,64,cDebounceNode::Kill,world,not started
 0x13fd30,92,cDebounceNode::Finish,world,not started
 0x13fd90,60,cDebounceNode::SaveSnapshot,save,checked
 0x13fdd0,124,cTimerNode::cTimerNode,world,not started
-0x13fe50,80,cTimerNode::cTimerNode,world,not started
+0x13fe50,80,cTimerNode::cTimerNode,world,checked
 0x13fea0,264,cTimerNode::Update,world,not started
 0x13ffa8,64,cTimerNode::Kill,world,not started
 0x13ffe8,92,cTimerNode::Finish,world,not started
 0x140048,52,cTimerNode::OnMessage,world,not started
 0x140080,84,cTimerNode::SaveSnapshot,save,checked
 0x1400d8,196,cRailNode::cRailNode,world,ported
-0x1401a0,116,cRailNode::cRailNode,world,not started
+0x1401a0,116,cRailNode::cRailNode,world,checked
 0x140218,152,cRailNode::~cRailNode,world,ported
 0x1402b0,68,cRailNode::Update,world,ported
 0x1402f8,64,cRailNode::Kill,world,ported
@@ -704,14 +704,14 @@ address,size,name,system,status
 0x140400,60,RailNode_Disable,boarder,ported
 0x140440,84,cRailNode::SaveSnapshot,save,checked
 0x140498,248,cBoostNode::cBoostNode,world,ported
-0x140590,160,cBoostNode::cBoostNode,world,not started
+0x140590,160,cBoostNode::cBoostNode,world,checked
 0x140630,88,cBoostNode::~cBoostNode,world,not started
 0x140688,428,cTubeEndBoostNode::Update,world,ported
 0x140838,148,cBoostNode::vf27_140838,world,ported
 0x1408d0,28,cTubeEndBoostNode::OnMessage,world,ported
 0x1408f0,84,cBoostNode::SaveSnapshot,save,checked
 0x140948,336,cLapBoostNode::cLapBoostNode,world,ported
-0x140a98,160,cLapBoostNode::cLapBoostNode,world,ported
+0x140a98,160,cLapBoostNode::cLapBoostNode,world,checked
 0x140b38,88,cLapBoostNode::~cLapBoostNode,world,not started
 0x140b90,1528,cLapBoostNode::Update,world,ported
 0x141188,8,cLapBoostNode::Draw,world,not started
@@ -719,24 +719,24 @@ address,size,name,system,status
 0x141198,24,cLapBoostNode::Finish,world,not started
 0x1411b0,84,cLapBoostNode::SaveSnapshot,save,checked
 0x141208,220,cRandomBoostNode::cRandomBoostNode,world,not started
-0x1412e8,116,cRandomBoostNode::cRandomBoostNode,world,not started
+0x1412e8,116,cRandomBoostNode::cRandomBoostNode,world,checked
 0x141360,572,cRandomBoostNode::vf27_141360,world,ported
 0x1415a0,16,cRandomBoostNode::vf28_1415a0,world,not started
 0x1415b0,124,cRandomBoostNode::vf29_1415b0,world,not started
 0x141630,84,cRandomBoostNode::SaveSnapshot,save,checked
 0x141688,372,cTubeEndBoostNode::cTubeEndBoostNode,world,not started
-0x141800,168,cTubeEndBoostNode::cTubeEndBoostNode,world,not started
+0x141800,168,cTubeEndBoostNode::cTubeEndBoostNode,world,checked
 0x1418a8,336,cTubeEndBoostNode::BoostRider,world,ported
 0x1419f8,16,cTubeEndBoostNode::vf28_1419f8,world,not started
 0x141a08,124,cTubeEndBoostNode::vf29_141a08,world,not started
 0x141a88,104,cTubeEndBoostNode::SaveSnapshot,save,checked
 0x141af0,236,cZBoostNode::cZBoostNode,world,ported
-0x141be0,160,cZBoostNode::cZBoostNode,world,not started
+0x141be0,160,cZBoostNode::cZBoostNode,world,checked
 0x141c80,88,cZBoostNode::~cZBoostNode,world,not started
 0x141cd8,700,cZBoostNode::Update,world,ported
 0x141f98,84,cZBoostNode::SaveSnapshot,save,checked
 0x141ff0,196,cUVScrollNode::cUVScrollNode,world,ported
-0x1420b8,112,cUVScrollNode::cUVScrollNode,world,ported
+0x1420b8,112,cUVScrollNode::cUVScrollNode,world,checked
 0x142128,124,cUVScrollNode::~cUVScrollNode,world,not started
 0x1421a8,116,UVScrollNode_Init,world?,ported
 0x142220,188,UVScrollNode_Register,world?,ported
@@ -752,7 +752,7 @@ address,size,name,system,status
 0x142d40,100,TexFlip_ApplyFrame,render,not started
 0x142da8,228,TexFlip_Draw,render,not started
 0x142e90,428,cTexFlipNode::cTexFlipNode,world,ported
-0x143040,116,cTexFlipNode::cTexFlipNode,world,ported
+0x143040,116,cTexFlipNode::cTexFlipNode,world,checked
 0x1430b8,704,cTexFlipNode::Update,world,ported
 0x143378,60,cTexFlipNode::OnContact,world,ported
 0x1433b8,28,cTexFlipNode::Draw,world,not started
@@ -761,7 +761,7 @@ address,size,name,system,status
 0x143550,492,cFenceNode::cFenceNode,world,ported
 0x143740,188,cFenceNode::cFenceNode,world,ported
 0x143800,108,cFenceNode::~cFenceNode,world,not started
-0x143870,184,cFenceNode::cFenceNode,world,not started
+0x143870,184,cFenceNode::cFenceNode,world,checked
 0x143928,476,Fence_SpawnWobble,world?,ported
 0x143b08,92,Fence_Swing,world?,ported
 0x143b68,356,cFenceNode::Update,world,ported
@@ -772,7 +772,7 @@ address,size,name,system,status
 0x144578,408,cFenceNode::Draw,world,not started
 0x144710,100,cFenceNode::SaveSnapshot,save,checked
 0x144778,152,cFlagNode::cFlagNode,world,ported
-0x144810,184,cFlagNode::cFlagNode,world,not started
+0x144810,184,cFlagNode::cFlagNode,world,checked
 0x1448c8,108,cFlagNode::~cFlagNode,world,not started
 0x144938,1296,cFlagNode::Init,world,ported
 0x144e48,128,cFlagNode::Update,world,ported
@@ -780,7 +780,7 @@ address,size,name,system,status
 0x145258,408,cFlagNode::Draw,world,not started
 0x1453f0,100,cFlagNode::SaveSnapshot,save,checked
 0x145458,208,cCrackedNode::cCrackedNode,world,ported
-0x145528,116,cCrackedNode::cCrackedNode,world,ported
+0x145528,116,cCrackedNode::cCrackedNode,world,checked
 0x1455a0,288,cCrackedNode::Update,world,ported
 0x1456c0,128,cCrackedNode::Finish,world,ported
 0x145740,96,cCrackedNode::Kill,world,ported
@@ -792,18 +792,18 @@ address,size,name,system,status
 0x1458e0,520,Crowd_LoadTexturesRandomize,world,ported
 0x145ae8,60,FUN_00145ae8,world?,not started
 0x145b28,128,cCrowdBoxNode::cCrowdBoxNode,world,ported
-0x145ba8,88,cCrowdBoxNode::cCrowdBoxNode,world,ported
+0x145ba8,88,cCrowdBoxNode::cCrowdBoxNode,world,checked
 0x145c00,136,cCrowdBoxNode::Init,world,ported
 0x145c88,380,cCrowdBoxNode::Update,world,ported
 0x145e08,436,cCrowdBoxNode::StepCells,world,ported
 0x145fc0,216,cCrowdBoxNode::Draw,world,not started
 0x146098,84,cCrowdBoxNode::SaveSnapshot,save,checked
 0x1460f0,356,cUVScrollTexFlipNode::cUVScrollTexFlipNode,world,ported
-0x146258,120,cUVScrollTexFlipNode::cUVScrollTexFlipNode,world,not started
+0x146258,120,cUVScrollTexFlipNode::cUVScrollTexFlipNode,world,checked
 0x1462d0,636,cUVScrollTexFlipNode::Update,world,ported
 0x146660,84,cUVScrollTexFlipNode::SaveSnapshot,save,checked
 0x1466b8,1876,cMeshAnimNode::cMeshAnimNode,animation,ported
-0x146e10,224,cMeshAnimNode::cMeshAnimNode,animation,ported
+0x146e10,224,cMeshAnimNode::cMeshAnimNode,animation,checked
 0x146ef0,80,cMeshAnimNode::~cMeshAnimNode,animation,not started
 0x146f40,752,MeshAnimNode_Start,render,ported
 0x147230,620,cMeshAnimNode::Update,animation,ported
@@ -811,18 +811,18 @@ address,size,name,system,status
 0x147518,896,cMeshAnimNode::Draw,animation,not started
 0x147898,84,cMeshAnimNode::SaveSnapshot,save,checked
 0x1478f0,220,cTrickTriggerNode::cTrickTriggerNode,world,not started
-0x1479d0,176,cTrickTriggerNode::cTrickTriggerNode,world,not started
+0x1479d0,176,cTrickTriggerNode::cTrickTriggerNode,world,checked
 0x147a80,88,cTrickTriggerNode::~cTrickTriggerNode,world,not started
 0x147ad8,456,cTrickTriggerNode::Update,world,not started
 0x147ca0,84,cTrickTriggerNode::SaveSnapshot,save,checked
 0x147cf8,128,cEmitterNode::cEmitterNode,world,not started
-0x147d78,152,cEmitterNode::cEmitterNode,world,not started
+0x147d78,152,cEmitterNode::cEmitterNode,world,checked
 0x147e10,76,cEmitterNode::~cEmitterNode,world,not started
 0x147e60,196,cEmitterNode::Update,world,not started
 0x147f28,8,cEmitterNode::Draw,world,not started
 0x147f30,88,cEmitterNode::SaveSnapshot,save,checked
 0x147f88,160,cParticleNode::cParticleNode,world,ported
-0x148028,136,cParticleNode::cParticleNode,world,ported
+0x148028,136,cParticleNode::cParticleNode,world,checked
 0x1480b0,76,cParticleNode::~cParticleNode,world,not started
 0x148100,132,cParticleNode::Update,world,ported
 0x148188,64,cParticleNode::OnMessage,world,ported
@@ -833,7 +833,7 @@ address,size,name,system,status
 0x148350,292,CamAnim_SetShot,frontend?,not started
 0x148478,76,cCollideEmitterNode::vf12_148478,world,not started
 0x148560,284,cCollideEmitterNode::cCollideEmitterNode,world,not started
-0x148680,196,cCollideEmitterNode::cCollideEmitterNode,world,not started
+0x148680,196,cCollideEmitterNode::cCollideEmitterNode,world,checked
 0x148748,328,CollideEmitterNode_CreateParticles,world?,not started
 0x148890,108,cCollideEmitterNode::~cCollideEmitterNode,world,not started
 0x148900,72,CollideEmitterNode_RiderHasRoom,world?,ported
@@ -841,14 +841,14 @@ address,size,name,system,status
 0x1489e8,8,cCollideEmitterNode::Draw,world,not started
 0x1489f0,128,cCollideEmitterNode::SaveSnapshot,save,checked
 0x148a70,96,cMovieNode::cMovieNode,world,not started
-0x148ad0,88,cMovieNode::cMovieNode,world,not started
+0x148ad0,88,cMovieNode::cMovieNode,world,checked
 0x148b28,416,MovieNode_OpenJumbotronVideo,world?,ported
 0x148cc8,88,cMovieNode::~cMovieNode,world,not started
 0x148d20,8,cMovieNode::Update,world,not started
 0x148d28,152,cMovieNode::Draw,world,not started
 0x148dc0,8,cMovieNode::SaveSnapshot,save,checked
 0x148dc8,112,cRailManNode::cRailManNode,world,not started
-0x148e38,156,cRailManNode::cRailManNode,world,not started
+0x148e38,156,cRailManNode::cRailManNode,world,checked
 0x148ed8,148,RailMan_ApplyRailState,boarder,ported
 0x148f70,188,cRailManNode::~cRailManNode,world,not started
 0x149030,296,RailMan_SetRail,boarder,ported
@@ -2954,7 +2954,7 @@ address,size,name,system,status
 0x1d8b20,164,ParticleNode_Update,world?,ported
 0x1d8bc8,384,ParticleSys_Draw,world?,not started
 0x1d8d48,56,ParticleNode_SaveState,save,checked
-0x1d8d80,64,ParticleSys_ReadReplay,ai?,not started
+0x1d8d80,64,ParticleSys_ReadReplay,ai?,checked
 0x1d8dc0,44,FUN_001d8dc0,,not started
 0x1d8e30,288,ParticleMan_Init,frontend?,ported
 0x1d8f50,132,cParticleMan::~cParticleMan,render,not started
@@ -3256,7 +3256,7 @@ address,size,name,system,status
 0x1f9ee8,76,FUN_001f9ee8,frontend?,not started
 0x1f9f38,340,HUD_CreateDummyTextures,hud,not started
 0x1fa108,884,SplineModelNode_Create,ai?,ported
-0x1fa480,448,cSplinePathNode::cSplinePathNode,world,not started
+0x1fa480,448,cSplinePathNode::cSplinePathNode,world,checked
 0x1fa640,92,cSplinePathNode::~cSplinePathNode,world,not started
 0x1fa6a0,404,cSplinePathNode::Update,world,not started
 0x1fa838,160,SplinePathNode_PlaceAll,boarder?,not started
@@ -4518,7 +4518,7 @@ address,size,name,system,status
 0x251748,540,SplinePathNode_DrawPath,world?,not started
 0x251968,68,Spline_GetLength,world?,not started
 0x2519b0,120,Spline_SaveSnapshot,save,checked
-0x251a28,112,SplinePathNode_Load,ai?,not started
+0x251a28,112,SplinePathNode_Load,ai?,checked
 0x251a98,136,SplinePathNode_IsVisible,world?,not started
 0x251b20,124,StaticInit_Spline,other,not started
 0x251ba0,36,cBxCache::cBxCache,race?,not started
@@ -4575,7 +4575,7 @@ address,size,name,system,status
 0x254678,48,cCourseResolve_Common::vf33_254678,race,not started
 0x2546a8,708,cCourseResolve_Common::ResolveHashTable,race,ported
 0x2549f8,44,Course_GetPatch,race,not started
-0x254a28,40,Course_GetInstance,race,ported
+0x254a28,40,Course_GetInstance,race,checked
 0x254a50,44,Course_GetParticleInstance,race,not started
 0x254a80,44,Course_GetLight,race,not started
 0x254af0,44,Course_GetMaterial,race,not started

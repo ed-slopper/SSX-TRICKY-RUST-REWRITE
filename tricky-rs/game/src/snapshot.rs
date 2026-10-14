@@ -295,3 +295,366 @@ pub fn save_by_address(m: &mut Mem, addr: u32, this: u32, s: u32) -> bool {
     }
     true
 }
+
+// The world nodes' load constructors (board row G12k): each builds its parent from the stream, sets its vtable,
+// reads its words back and calls the world's set-up (boxes into the broadphase, texture flips, particles, the rail
+// manager's rails...) through the env. The roller and the anim objects are not here yet.
+
+/// The world calls the load constructors make: the function at `func` with `args` (its answer, when it has one:
+/// `Race_GetRider` a rider, `Spline_GetLength` a float's bits)
+pub trait LoadEnv {
+    fn call(&mut self, m: &mut Mem, func: u32, args: &[u32]) -> u32;
+    /// `MemPool_Alloc` 0x23d3b0(the node pool, size, 0x40000000, name, 0, 0)
+    fn pool_alloc(&mut self, m: &mut Mem, size: u32, name: u32) -> u32;
+}
+
+/// The classes' vtables
+pub mod vt {
+    pub const CONTROLLER: u32 = 0x36b388;
+    pub const DEAD: u32 = 0x36b2a8;
+    pub const RESTORE: u32 = 0x36b1c8;
+    pub const COUNTER: u32 = 0x36b0e8;
+    pub const DEBOUNCE: u32 = 0x36caf8;
+    pub const TIMER: u32 = 0x36d6b0;
+    pub const RAIL: u32 = 0x36d5d0;
+    pub const BOOST: u32 = 0x36d4d8;
+    pub const LAP_BOOST: u32 = 0x36d3f8;
+    pub const RANDOM_BOOST: u32 = 0x36d300;
+    pub const TUBE_END: u32 = 0x36d208;
+    pub const Z_BOOST: u32 = 0x36d128;
+    pub const UV_SCROLL: u32 = 0x36d048;
+    pub const TEX_FLIP: u32 = 0x36cf58;
+    pub const FENCE: u32 = 0x36cd98;
+    pub const FLAG: u32 = 0x36ccb8;
+    pub const CRACKED: u32 = 0x36cbd8;
+    pub const CROWD_BOX: u32 = 0x36ca18;
+    pub const UV_SCROLL_TEX_FLIP: u32 = 0x36ce78;
+    pub const MESH_ANIM: u32 = 0x36c938;
+    pub const TRICK_TRIGGER: u32 = 0x36c858;
+    pub const EMITTER: u32 = 0x36c7f8;
+    pub const PARTICLE: u32 = 0x36c718;
+    pub const COLLIDE_EMITTER: u32 = 0x36c650;
+    pub const MOVIE: u32 = 0x36c570;
+    pub const RAIL_MAN: u32 = 0x36c510;
+    pub const SCRIPT: u32 = 0x36bc20;
+    pub const SPLINE_PATH: u32 = 0x39a710;
+}
+
+fn read_into(m: &mut Mem, s: u32, dst: u32, n: u32) {
+    crate::replaymgr::stream_read_mem(m, s, dst, n);
+}
+
+fn read_words<const N: usize>(m: &mut Mem, s: u32) -> [u32; N] {
+    let at = m.r32(s + 8);
+    let mut w = [0u32; N];
+    for (i, v) in w.iter_mut().enumerate() {
+        *v = m.r32(at + 4 * i as u32);
+    }
+    m.w32(s + 8, at.wrapping_add(4 * N as u32));
+    w
+}
+
+fn game(m: &Mem) -> u32 {
+    m.r32(m.r32(0x337c58) + 0x730)
+}
+
+/// `Course_GetInstance` 0x254a28 on the course: an instance, 0 at or past the count
+pub fn course_instance(m: &Mem, i: i32) -> u32 {
+    let w = m.r32(COURSE);
+    if i < m.r32(w + 0xc) as i32 { m.r32(w + 0x48).wrapping_add((i as u32) << 8) } else { 0 }
+}
+
+/// `Replay_ReadNodeRef` 0x192df0 on memory: an instance number back (0 for -1)
+pub fn read_node_ref(m: &mut Mem, s: u32) -> u32 {
+    let [v] = read_words::<1>(m, s);
+    if (v as i32) < 0 { 0 } else { course_instance(m, v as i32) }
+}
+
+/// `Replay_ReadLink` 0x192e40 on memory(owner): the instance back; when the link was the owner's, the instance's +0xe4
+/// is the owner again and the low half of +0xe8 the saved half word
+pub fn read_link(m: &mut Mem, s: u32, owner: u32) -> u32 {
+    let [i, hw] = read_words::<2>(m, s);
+    if (i as i32) < 0 {
+        return 0;
+    }
+    let node = course_instance(m, i as i32);
+    if hw >> 16 != 0 {
+        m.w32(node + 0xe4, owner);
+        m.w32(node + 0xe8, m.r32(node + 0xe8) & 0xffff_0000 | (hw & 0xffff));
+    }
+    node
+}
+
+/// `Replay_ReadOffset` 0x192ec0 / `_ReadOffset2` 0x192ef8 on memory
+pub fn read_offset(m: &mut Mem, s: u32) -> u32 {
+    let [v] = read_words::<1>(m, s);
+    m.r32(DATA).wrapping_add(v)
+}
+
+/// `ParticleSys_ReadReplay` 0x1d8d80: two words back into +0 and +0x18
+pub fn particle_state_load(m: &mut Mem, p: u32, s: u32) {
+    let [a, b] = read_words::<2>(m, s);
+    m.w32(p, a);
+    m.w32(p + 0x18, b);
+}
+
+/// `SplinePathNode_Load` 0x251a28: 0xc bytes, the spline from the course's splines, its length (`Spline_GetLength`
+/// 0x251968) at +0x10
+pub fn spline_load(m: &mut Mem, env: &mut dyn LoadEnv, p: u32, s: u32) {
+    read_into(m, s, p, 0xc);
+    let [v] = read_words::<1>(m, s);
+    m.w32(p + 0xc, m.r32(m.r32(COURSE) + 0x5c).wrapping_add(v));
+    let len = env.call(m, 0x251968, &[p]);
+    m.w32(p + 0x10, len);
+}
+
+/// `cControllerNode::cControllerNode` 0x13a840(list, type, instance): a sorted node on the instance (each pointing at
+/// the other)
+pub fn controller_new(m: &mut Mem, node: u32, l: u32, ty: u32, inst: u32) {
+    crate::bxlist::sort_node_new(m, node, l, ty);
+    m.w32(inst + 0xe4, node);
+    m.w32(node + 0x28, inst);
+    m.w32(node + 8, vt::CONTROLLER);
+}
+
+/// `cControllerNode::cControllerNode` 0x13a888(list, stream): the sorted node back, its instance by its link
+pub fn controller_load(m: &mut Mem, node: u32, l: u32, s: u32) {
+    crate::bxlist::sort_node_load(m, node, l, s);
+    m.w32(node + 8, vt::CONTROLLER);
+    let inst = read_link(m, s, node);
+    m.w32(node + 0x28, inst);
+}
+
+/// `cDeadNode::cDeadNode` 0x13af38(instance, flag): a controller on list 13 (type 5); the instance's +0xe8 bits 1,
+/// 4..7 cleared and bit 2 set (and 0x800 with the flag)
+pub fn dead_new(m: &mut Mem, node: u32, inst: u32, flag: u32) {
+    controller_new(m, node, 0xd, 5, inst);
+    let i = m.r32(node + 0x28);
+    let v = m.r32(i + 0xe8) & 0xffff_ff0d;
+    m.w32(node + 8, vt::DEAD);
+    m.w32(i + 0xe8, v | 4);
+    if flag != 0 {
+        m.w32(i + 0xe8, v | 0x804);
+    }
+}
+
+fn plain(m: &mut Mem, node: u32, l: u32, s: u32, vtable: u32, at: u32, n: u32) {
+    controller_load(m, node, l, s);
+    m.w32(node + 8, vtable);
+    if n != 0 {
+        read_into(m, s, node + at, n);
+    }
+}
+
+fn broadphase(m: &Mem) -> u32 {
+    m.r32(game(m) + 0x30)
+}
+
+/// The boosts' load (`cBoostNode` 0x140590, `cLapBoostNode` 0x140a98, `cZBoostNode` 0x141be0): the controller, the
+/// vtable, the box (+0x70) made, 0x40 bytes at +0x30, the box's owner, its extent from the instance, fitted into the
+/// broadphase
+pub fn boost_load(m: &mut Mem, env: &mut dyn LoadEnv, node: u32, l: u32, s: u32, vtable: u32) {
+    controller_load(m, node, l, s);
+    m.w32(node + 8, vtable);
+    env.call(m, 0x150670, &[node + 0x70]);
+    read_into(m, s, node + 0x30, 0x40);
+    m.w32(node + 0xf4, node);
+    let inst = m.r32(node + 0x28);
+    env.call(m, 0x150818, &[node + 0x70, inst.wrapping_add(0xcc), inst.wrapping_add(0xd8)]);
+    let bp = broadphase(m);
+    env.call(m, 0x14fa70, &[bp, node + 0x70]);
+}
+
+/// `cUVScrollNode` 0x1420b8 (also the base of `cUVScrollTexFlipNode`)
+pub fn uv_scroll_load(m: &mut Mem, env: &mut dyn LoadEnv, node: u32, l: u32, s: u32) {
+    plain(m, node, l, s, vt::UV_SCROLL, 0x2c, 0x24);
+    let o = read_offset(m, s);
+    m.w32(node + 0x50, o);
+    env.call(m, 0x1421a8, &[node]);
+    env.call(m, 0x142220, &[node]);
+}
+
+/// A world node's load constructor by its address (the `NODE_TYPES` table's): false for the ones not ported yet
+pub fn load_by_address(m: &mut Mem, env: &mut dyn LoadEnv, addr: u32, node: u32, l: u32, s: u32) -> bool {
+    match addr {
+        0x13b078 => plain(m, node, l, s, vt::RESTORE, 0, 0),
+        0x13b128 => plain(m, node, l, s, vt::COUNTER, 0x2c, 0x10),
+        0x13fc58 => plain(m, node, l, s, vt::DEBOUNCE, 0x2c, 4),
+        0x13fe50 => plain(m, node, l, s, vt::TIMER, 0x2c, 0x10),
+        0x1401a0 => {
+            plain(m, node, l, s, vt::RAIL, 0x2c, 0x14);
+            // +0x3c set calls 0x1403c0 (named `RailNode_Disable` in the index), clear 0x140400 (`RailNode_Enable`):
+            // the assembly's order; the decompile shows it the other way round
+            let f = if m.r32(node + 0x3c) != 0 { 0x1403c0 } else { 0x140400 };
+            env.call(m, f, &[node]);
+        }
+        0x140590 => boost_load(m, env, node, l, s, vt::BOOST),
+        0x140a98 => boost_load(m, env, node, l, s, vt::LAP_BOOST),
+        0x141be0 => boost_load(m, env, node, l, s, vt::Z_BOOST),
+        0x1412e8 => {
+            boost_load(m, env, node, l, s, vt::BOOST);
+            m.w32(node + 8, vt::RANDOM_BOOST);
+            read_into(m, s, node + 0x100, 0x90);
+        }
+        0x141800 => {
+            boost_load(m, env, node, l, s, vt::BOOST);
+            m.w32(node + 8, vt::TUBE_END);
+            read_into(m, s, node + 0x100, 0xc0);
+            read_into(m, s, 0x31d338, 0x18);
+        }
+        0x1420b8 => uv_scroll_load(m, env, node, l, s),
+        0x143040 => {
+            plain(m, node, l, s, vt::TEX_FLIP, 0, 0);
+            env.call(m, 0x142ac8, &[node + 0x58]);
+            read_into(m, s, node + 0x2c, 0x2c);
+            let (a, b) = (m.r32(node + 0x28), m.r32(node + 0x48));
+            env.call(m, 0x142af0, &[node + 0x58, a, b]);
+        }
+        0x143870 | 0x144810 => {
+            let (vtable, at, init, n) = if addr == 0x143870 { (vt::FENCE, 0x50, 0x143ff8, 0x1c) } else { (vt::FLAG, 0x48, 0x144938, 0xc) };
+            plain(m, node, l, s, vtable, 0, 0);
+            let o = read_offset(m, s);
+            m.w32(node + at, o);
+            env.call(m, init, &[node]);
+            read_into(m, s, node + 0x2c, n);
+        }
+        0x145528 => {
+            plain(m, node, l, s, vt::CRACKED, 0, 0);
+            env.call(m, 0x142ac8, &[node + 0x40]);
+            read_into(m, s, node + 0x2c, 0x14);
+            let a = m.r32(node + 0x28);
+            env.call(m, 0x142af0, &[node + 0x40, a, u32::MAX]);
+        }
+        0x145ba8 => {
+            plain(m, node, l, s, vt::CROWD_BOX, 0x2c, 0x14);
+            env.call(m, 0x145c00, &[node]);
+        }
+        0x146258 => {
+            uv_scroll_load(m, env, node + 0x24, l, s);
+            m.w32(node + 0x2c, vt::UV_SCROLL_TEX_FLIP);
+            env.call(m, 0x142ac8, &[node + 0x90]);
+            read_into(m, s, node, 0x24);
+            let (a, b) = (m.r32(node + 0x4c), m.r32(node + 0x10));
+            env.call(m, 0x142af0, &[node + 0x90, a, b]);
+        }
+        0x146e10 => {
+            plain(m, node, l, s, vt::MESH_ANIM, 0x2c, 0xc);
+            m.w32(node + 0x6cc, 0);
+            m.w32(node + 0x6c0, 0);
+        }
+        0x1479d0 => {
+            plain(m, node, l, s, vt::TRICK_TRIGGER, 0, 0);
+            env.call(m, 0x150670, &[node + 0x50]);
+            read_into(m, s, node + 0x2c, 0x20);
+            let g = game(m);
+            let rider = env.call(m, 0x1814a8, &[g, m.r32(node + 0x40)]);
+            m.w32(node + 0xd4, node);
+            m.w32(node + 0x4c, rider);
+            let inst = m.r32(node + 0x28);
+            env.call(m, 0x150818, &[node + 0x50, inst.wrapping_add(0xcc), inst.wrapping_add(0xd8)]);
+            let bp = broadphase(m);
+            env.call(m, 0x14fa70, &[bp, node + 0x50]);
+        }
+        0x147d78 => {
+            crate::bxlist::type_node_load(m, node, l, s);
+            m.w32(node + 8, vt::EMITTER);
+            env.call(m, 0x1d8488, &[node + 0x20]);
+            let r = read_node_ref(m, s);
+            m.w32(node + 0x18, r);
+            let o = read_offset(m, s);
+            m.w32(node + 0x1c, o);
+            particle_state_load(m, node + 0x20, s);
+            let d = m.r32(node + 0x1c);
+            let data = if d == 0 { 0 } else { d + 0xc };
+            let inst = m.r32(node + 0x18);
+            env.call(m, 0x1d8490, &[node + 0x20, inst, data]);
+        }
+        0x148028 => {
+            plain(m, node, l, s, vt::PARTICLE, 0, 0);
+            env.call(m, 0x1d8488, &[node + 0x30]);
+            let o = read_offset(m, s);
+            m.w32(node + 0x2c, o);
+            particle_state_load(m, node + 0x30, s);
+            let d = m.r32(node + 0x2c);
+            let data = if d == 0 { 0 } else { d + 0xc };
+            let inst = m.r32(node + 0x28);
+            env.call(m, 0x1d8490, &[node + 0x30, inst, data]);
+        }
+        0x148680 => {
+            crate::bxlist::type_node_load(m, node, l, s);
+            m.w32(node + 8, vt::COLLIDE_EMITTER);
+            env.call(m, 0x1d8488, &[node + 0x70]);
+            read_into(m, s, node + 0x20, 0x40);
+            let r = read_node_ref(m, s);
+            m.w32(node + 0x60, r);
+            let o = read_offset(m, s);
+            m.w32(node + 0x64, o);
+            particle_state_load(m, node + 0x70, s);
+            env.call(m, 0x148748, &[node]);
+            let at = 0x31d498u32.wrapping_add(m.r32(node + 0x50).wrapping_mul(4));
+            m.w32(at, m.r32(at).wrapping_add(1));
+        }
+        0x148ad0 => {
+            plain(m, node, l, s, vt::MOVIE, 0, 0);
+            env.call(m, 0x148b28, &[node]);
+            let i = m.r32(node + 0x28);
+            m.w32(i + 0xe8, m.r32(i + 0xe8) & 0xffff_fffd | 4);
+        }
+        0x148e38 => {
+            crate::bxlist::sort_node_load(m, node, l, s);
+            m.w32(0x31d4b0, node);
+            m.w32(node + 8, vt::RAIL_MAN);
+            read_into(m, s, node + 0x28, 0x200);
+            for i in 0..0x80u32 {
+                if m.r16(node + 0x28 + 4 * i) as i16 != -1 {
+                    env.call(m, 0x148ed8, &[node, i]);
+                }
+            }
+        }
+        0x13d2f8 => {
+            crate::bxlist::sort_node_load(m, node, l, s);
+            m.w32(node + 8, vt::SCRIPT);
+            read_into(m, s, node + 0x30, 0xb0);
+            m.w32(node + 0xc0, m.r32(SCRIPTS).wrapping_add(m.r32(node + 0xc0)));
+            let [rider, data] = read_words::<2>(m, s);
+            m.w32(node + 0xe0, m.r32(DATA).wrapping_add(data));
+            let r = if rider == u32::MAX { 0 } else { m.r32(m.r32(game(m) + 0x1c).wrapping_add(rider.wrapping_mul(4)).wrapping_add(0xc4)) };
+            m.w32(node + 0xe8, r);
+            let inst = read_node_ref(m, s);
+            m.w32(node + 0xe4, inst);
+        }
+        0x1fa480 => spline_path_load(m, env, node, l, s),
+        _ => return false,
+    }
+    true
+}
+
+/// `cSplinePathNode` 0x1fa480: the sorted node, 0x3c bytes at +0x28, its instance, the instance's box corners less its
+/// position (w 1.0 less its w) at +0x80 / +0x90, a pool array of +0x30 × 32 bytes read back (+0x7c), its spline
+pub fn spline_path_load(m: &mut Mem, env: &mut dyn LoadEnv, node: u32, l: u32, s: u32) {
+    use crate::ps2f::F;
+    crate::bxlist::sort_node_load(m, node, l, s);
+    m.w32(node + 0x70, 0);
+    m.w32(node + 8, vt::SPLINE_PATH);
+    read_into(m, s, node + 0x28, 0x3c);
+    let inst = read_node_ref(m, s);
+    m.w32(node + 0x78, inst);
+    let n = m.r32(node + 0x30);
+    for (corner, out) in [(0xccu32, 0x80u32), (0xd8, 0x90)] {
+        for k in 0..4u32 {
+            let a = if k < 3 { m.r32(inst.wrapping_add(corner + 4 * k)) } else { 0x3f80_0000 };
+            let b = m.r32(inst.wrapping_add(0x30 + 4 * k));
+            let v = (F(f32::from_bits(a)) - F(f32::from_bits(b))).0.to_bits();
+            m.w32(node + out + 4 * k, v);
+        }
+    }
+    let size = n << 5;
+    let p = env.pool_alloc(m, size, 0x39a6f8);
+    if p != 0 {
+        crate::replaymgr::mem_set_pub(m, p, 0xdead_c0ed, size);
+    }
+    m.w32(node + 0x7c, p);
+    let n = m.r32(node + 0x30);
+    read_into(m, s, p, n << 5);
+    spline_load(m, env, node + 0x64, s);
+}

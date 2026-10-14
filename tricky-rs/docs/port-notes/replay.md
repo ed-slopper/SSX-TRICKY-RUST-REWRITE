@@ -6,8 +6,9 @@ list, seeking and playlists (G12d; `tricky_game::replaymgr`, checked: `tests/rep
 and pins (G12e; the same module, checked: `tests/replay_highlights.rs`), the camera tracks (G12f; checked:
 `tests/replay_camtracks.rs`), playback control and the manager's life (G12g; checked:
 `tests/replay_playback.rs`), the save to the card and the load (G12h; checked: `tests/replay_save.rs`), the world snapshot's
-orchestration (G12i; checked: `tests/replay_snapshot.rs`), and the world nodes' snapshot saves (G12j;
-`tricky_game::snapshot`, checked: `tests/snapshot_saves.rs`). Keyframes, the node save and restore, pins and
+orchestration (G12i; checked: `tests/replay_snapshot.rs`), the world nodes' snapshot saves (G12j;
+`tricky_game::snapshot`, checked: `tests/snapshot_saves.rs`), and their load constructors (G12k; checked:
+`tests/snapshot_loads.rs`). Keyframes, the node save and restore, pins and
 highlights, camera tracks, `Replay_Update` and the memory-card save are the rest of G12.
 
 ## The replay control
@@ -366,5 +367,37 @@ frames of a message), +0x4c and +0x50 hold recording, +0x58 a stream overflowed.
   - the spline path writes its block, instance and +0x30 × 32 bytes, then its spline (`Spline_SaveSnapshot`).
 - **Checked in the runner:** 20,000 random nodes, about 600 for each of the 32 save functions, with their pointers
   aimed at real places. The streams were sometimes nearly full or already overflowed (3,989 ended overflowed). The
-  stream, the node and the control were compared byte for byte. The load constructors come next.
+  stream, the node and the control were compared byte for byte. 
+
+## The world nodes' load constructors (G12k)
+
+- **The common pattern.** Each builds its parent from the stream, sets its vtable, reads its words back over the
+  saved block, and calls the world's set-up. The set-up calls go through `LoadEnv`, with the exact arguments.
+- **The base.** `cControllerNode` 0x13a888 brings back the sorted node and its instance by the link. The link
+  re-points the instance at the node when it was the node's, and restores the instance's +0xe8 half word.
+- **The world set-up each class calls:**
+  - the rail enables or disables itself by +0x3c. In the assembly a set word calls 0x1403c0 (named
+    `RailNode_Disable` in the index) and a clear one 0x140400; the decompile shows it the other way round;
+  - the boosts and the trick trigger make their box, set it from the instance's corners and fit it into the
+    broadphase; the trick trigger also finds its rider (`Race_GetRider`);
+  - the UV scroll reads its data offset and registers itself;
+  - the tex flips (tex flip, cracked, UV-scroll tex flip) make and start their `cTexFlip`;
+  - the fence and the flag read their data offset before their shape is made;
+  - the crowd box starts itself;
+  - the emitters and the particle node make their particle systems (`ParticleSys_ReadReplay`: two words back);
+  - the collide emitter counts itself in the table at 0x31d498 by its kind (+0x50);
+  - the movie opens its video and sets its instance's +0xe8 bit 2 (clearing bit 1);
+  - the rail manager makes itself the one at 0x31d4b0 and applies each of its 0x80 rail states not -1;
+  - the script puts its program counter back from 0x3464a0, its data back from 0x34649c, and its rider from the
+    race's riders (+0xc4) by number (-1 none);
+  - the spline path computes its instance's box corners less its position (PS2 floats, w 1.0 less the position's
+    w), allocates and reads its point array, then its spline (`SplinePathNode_Load`, which asks
+    `Spline_GetLength`).
+- **`cDeadNode` 0x13af38(instance, flag)** is a controller on list 13 (type 5) for an object that has gone. It
+  clears its instance's +0xe8 bits 1 and 4 to 7, sets bit 2, and sets 0x800 with the flag.
+- **Not ported yet.** The roller and the anim objects (object, combo, delta, tex flip) are left. They need the
+  sphere tree and transforms, and the overlap's box.
+- **Checked in the runner:** 12,000 random cases. A node of each class was saved by our checked save and loaded
+  into a fresh node by the game's constructor and ours, about 400 per class. The set-up was logging stand-ins, and
+  every call and all the memory were compared.
 
