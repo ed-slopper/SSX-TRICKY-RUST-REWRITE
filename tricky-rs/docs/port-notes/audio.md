@@ -309,3 +309,10 @@ comma-separated words (`b` is -1, a non-number 0) into a 0x7c-byte record that h
 read uses the value before it (the stack's, for the first), so a line without `=` repeats the last one's words; the `_checked`
 and tuple results say when that was the stack's. A float key without a number leaves the stack word in the game, so the tests do
 not use one.
+
+## Speech library tables (0x2bb018..0x2bba50; `tricky_game::speechlib`)
+The effect player's own state, all at fixed addresses: the bank table (0x348dcc pointer, 0x348dd0 count), eight event-bank slots (0x348e08, two words each), per-group voice counts and two limit arrays (0x348e48, 0x348e68, 0x348e88) and sixteen 0x60-byte voice records from 0x348eac (+0 start time, +6 in use, +7 group, +8 state, +0xc the playing sound whose +2 is the minimum age and +4 the size).
+- A bank: +0 and +2 ids, +4 flags (low nibble: bytes an entry less two; bits 4..6: header bytes in eighths; bit 7: a bitmap of one bit an entry), +5 entries, +6 history length, +8/+9 event-bank kinds, +10 sound count (0xffff none), +0x10 u16 event count, +0x14 size, +0x18 offsets (in words) of the event entries.
+- The history ring sits after the entries, header and bitmap: first byte the write position, then `bank[6]` bytes; `register_bank` only takes a bank whose ring is clean (position 0, every byte 0xff) and, with bit 7, stirs the bitmap first (`stir_bitmap`: the divisions by the entry count are unsigned, with the number at 0x3494f0).
+- `alloc_voice(size, group, limited)`: a free record; else the first whose state is 0, whose sound has a minimum age and is older than it, and is not the group's kept slot (released first); else a record of the same group with a sound at most `size` big, taken over; else -1.
+- `reset_voices` ends with a halfword store at 0x349520.
