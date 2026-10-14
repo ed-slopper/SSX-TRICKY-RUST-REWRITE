@@ -353,7 +353,7 @@ fn fill(r: &mut Runner, sys: u32, l: &Layout, g: &mut Rng) {
 
 fn setup(r: &mut Runner, rider_size: u32) -> (u32, u32, Layout) {
     let rider = r.mem.alloc(rider_size);
-    let sys = r.mem.alloc(0xb00);
+    let sys = r.mem.alloc(0x6f00);
     let mut l = Layout { sys, arr: [0; 16] };
     for k in 0..13 {
         l.arr[k] = r.mem.alloc(24 * N as u32);
@@ -803,5 +803,160 @@ fn on_rider_collision_matches_the_original() {
         assert_eq!(orig, mine, "case {case} fa {fa} fb {fb} last {last} frame {frame}");
         assert_eq!(after, q, "case {case} state");
         assert_eq!(new_last, lb, "case {case} last bump");
+    }
+}
+
+// ---- StopWipeoutLoop, PlayMenuSelect, UpdateBoost ----
+
+struct LoopEnv(Rc<RefCell<Or>>);
+impl WipeoutLoopEnv for LoopEnv {
+    fn stop_voice(&mut self, fade: f32, handle: u32) {
+        self.0.borrow_mut().log.push(("stop", fade.to_bits() as u64, handle as u64));
+    }
+}
+
+#[test]
+fn stop_wipeout_loop_matches_the_original() {
+    let Some(mut r) = runner() else { return };
+    let or: Rc<RefCell<Or>> = Rc::new(RefCell::new(Or::default()));
+    let rider = r.mem.alloc(0x5c00);
+    let o = or.clone();
+    r.stub(0x20c2a0, move |c, _| {
+        assert_eq!((c.gpr(4) as u32, c.gpr(6)), (0x1234_5678, 1));
+        o.borrow_mut().log.push(("stop", c.f(12).to_bits() as u64, c.gpr(5) as u32 as u64))
+    });
+    r.mem.write_u32(0x343050, 0x1234_5678);
+    let mut g = Rng(0x4242_4242_4242_4242);
+    for case in 0..5_000 {
+        let h = [-1i32, 0, 1, 77, i32::MIN, i32::MAX, -2, g.next() as i32][g.next() as usize % 8];
+        r.mem.write_u32(rider + 0x5ae8, h as u32);
+        or.borrow_mut().log.clear();
+        r.cpu.set_gpr(4, 0);
+        r.cpu.set_gpr(5, rider as u64);
+        r.call(0x218b20).unwrap();
+        let orig = std::mem::take(&mut or.borrow_mut().log);
+        let after = r.mem.read_u32(rider + 0x5ae8) as i32;
+        let mut hh = h;
+        stop_wipeout_loop(&mut hh, &mut LoopEnv(or.clone()));
+        let mine = std::mem::take(&mut or.borrow_mut().log);
+        assert_eq!(orig, mine, "case {case} handle {h}");
+        assert_eq!(after, hh, "case {case} handle {h}");
+    }
+}
+
+#[test]
+fn play_menu_select_matches_the_original() {
+    let Some(mut r) = runner() else { return };
+    let or: Rc<RefCell<Or>> = Rc::new(RefCell::new(Or::default()));
+    let (_, sys, l) = setup(&mut r, 0x10);
+    let o = or.clone();
+    r.stub(0x211f38, move |c, _| {
+        let v = o.borrow_mut().take("slot", c.gpr(5) as u32 as u64, 0);
+        c.set_gpr(2, v as u64);
+    });
+    let o = or.clone();
+    r.stub(0x20c948, move |c, _| {
+        let v = o.borrow_mut().take("pp", 0, 0);
+        c.set_gpr(2, v as u64);
+    });
+    let mut g = Rng(0x2468_ace0_1357_9bdf);
+    for case in 0..20_000 {
+        fill(&mut r, sys, &l, &mut g);
+        let w = g.next();
+        r.mem.write_u32(sys + 0x6e48, w);
+        let vals = vec![(g.next() % 100) as i64, g.next() as i64];
+        let before = read(&mut r, &l);
+        or.borrow_mut().vals = vals.clone();
+        or.borrow_mut().log.clear();
+        r.cpu.set_gpr(4, sys as u64);
+        r.call(0x2138f0).unwrap_or_else(|e| panic!("case {case}: {e}"));
+        let orig = std::mem::take(&mut or.borrow_mut().log);
+        let after = read(&mut r, &l);
+        let aw = r.mem.read_u32(sys + 0x6e48);
+        let mut q = before.clone();
+        or.borrow_mut().vals = vals;
+        let mut w2 = w;
+        play_menu_select(&mut q, &mut w2, &mut BoostE(or.clone()));
+        let mine = std::mem::take(&mut or.borrow_mut().log);
+        assert_eq!(orig, mine, "case {case}");
+        assert_eq!(after, q, "case {case} state");
+        assert_eq!(aw, w2, "case {case} 6e48");
+    }
+}
+
+struct BoostE(Rc<RefCell<Or>>);
+impl QueueEnv for BoostE {
+    fn get_slot(&mut self, which: u32) -> u32 {
+        self.0.borrow_mut().take("slot", which as u64, 0) as u32
+    }
+    fn rider_listener(&mut self) -> u32 {
+        panic!("not used")
+    }
+    fn play_pending(&mut self) -> u64 {
+        self.0.borrow_mut().take("pp", 0, 0) as u64
+    }
+}
+impl BoostEnv for BoostE {
+    fn replay_is_playing(&mut self) -> bool {
+        self.0.borrow_mut().take("replay", 0, 0) != 0
+    }
+    fn cancel_events(&mut self) {
+        self.0.borrow_mut().log.push(("cancel", 0, 0));
+    }
+}
+
+#[test]
+fn update_boost_matches_the_original() {
+    let Some(mut r) = runner() else { return };
+    let or: Rc<RefCell<Or>> = Rc::new(RefCell::new(Or::default()));
+    let (rider, sys, l) = setup(&mut r, 0x900);
+    for (a, name) in [(0x21bfd0u32, "replay"), (0x211f38, "slot"), (0x20c948, "pp")] {
+        let o = or.clone();
+        r.stub(a, move |c, _| {
+            let x = if name == "slot" { c.gpr(5) as u32 as u64 } else { 0 };
+            let v = o.borrow_mut().take(name, x, 0);
+            c.set_gpr(2, v as u64);
+        });
+    }
+    let glob = 0x0123_4567_89ab_cdefu64;
+    r.mem.write_u32(0x39eb58, glob as u32);
+    r.mem.write_u32(0x39eb5c, (glob >> 32) as u32);
+    let o = or.clone();
+    r.stub(0x222df0, move |c, _| {
+        assert_eq!((c.gpr(4) as u32, c.gpr(5)), (sys, glob));
+        o.borrow_mut().log.push(("cancel", 0, 0))
+    });
+    let mut g = Rng(0x8888_7777_6666_5555);
+    for case in 0..30_000 {
+        fill(&mut r, sys, &l, &mut g);
+        r.mem.write_u32(sys + 0x20, g.next() % 2); // two entries must stay within the inline arrays
+        let w38 = g.next();
+        let w3c = [0u32, 0, 1, 2, 0xffff_ffff][g.next() as usize % 5];
+        r.mem.write_u32(sys + 0x6e38, w38);
+        r.mem.write_u32(sys + 0x6e3c, w3c);
+        let flag = [0u32, 1, 1, 1, 2][g.next() as usize % 5];
+        let boost = [0.0f32, 0.3, 0.33362994, 0.3337, 0.5, 0.66599226, 0.666, 0.667, 1.0, f32::from_bits(0x3eaa_d18b), f32::from_bits(0x3eaa_d18c), f32::from_bits(0x3f2a_7e78), f32::from_bits(0x3f2a_7e79)][g.next() as usize % 13];
+        r.mem.write_u32(rider + 0x41c, flag);
+        r.mem.write_f32(rider + 0x1c, boost);
+        let extra = g.next() % 2 == 0;
+        let vals = vec![(g.next() % 2) as i64, (g.next() % 100) as i64, g.next() as i64, (g.next() % 100) as i64, g.next() as i64];
+        let before = read(&mut r, &l);
+        or.borrow_mut().vals = vals.clone();
+        or.borrow_mut().log.clear();
+        r.cpu.set_gpr(4, sys as u64);
+        r.cpu.set_gpr(5, rider as u64);
+        r.cpu.set_gpr(6, if extra { 0x1_0000_0001 } else { 0 });
+        r.call(0x2192a8).unwrap_or_else(|e| panic!("case {case}: {e}"));
+        let orig = std::mem::take(&mut or.borrow_mut().log);
+        let after = read(&mut r, &l);
+        let (a38, a3c) = (r.mem.read_u32(sys + 0x6e38), r.mem.read_u32(sys + 0x6e3c));
+        let mut q = before.clone();
+        or.borrow_mut().vals = vals;
+        let (mut m38, mut m3c) = (w38, w3c);
+        update_boost(&mut q, &mut m38, &mut m3c, flag, boost, extra, &mut BoostE(or.clone()));
+        let mine = std::mem::take(&mut or.borrow_mut().log);
+        assert_eq!(orig, mine, "case {case} flag {flag} boost {boost}");
+        assert_eq!(after, q, "case {case} state");
+        assert_eq!((a38, a3c), (m38, m3c), "case {case} words");
     }
 }

@@ -380,3 +380,63 @@ pub fn on_rider_collision(q: &mut Queue, last_bump: &mut i32, frame: i32, flag_a
         *last_bump = frame;
     }
 }
+
+pub trait WipeoutLoopEnv {
+    /// 0x20c2a0 (0.75, the global at 0x343050, the handle, 1): stop a voice with a fade.
+    fn stop_voice(&mut self, fade: f32, handle: u32);
+}
+
+/// `Sfx_StopWipeoutLoop` 0x218b20: stop the rider's wipeout loop voice (the handle at the rider's +0x5ae8, negative
+/// for none) and forget it.
+pub fn stop_wipeout_loop(handle: &mut i32, env: &mut dyn WipeoutLoopEnv) {
+    if -1 < *handle {
+        env.stop_voice(f32::from_bits(0x3f40_0000), *handle as u32);
+        *handle = -1;
+    }
+}
+
+/// `Sfx_PlayMenuSelect` 0x2138f0: the menu click (id 0x70, byte 1 of the record 0x5c); the sound it started is kept in
+/// the audio system's +0x6e48.
+pub fn play_menu_select(q: &mut Queue, w6e48: &mut u32, env: &mut dyn QueueEnv) {
+    let i = queue_begin(q, 0, 0x70, None);
+    let slot = env.get_slot(4);
+    q.a40[i] = slot;
+    q.record[i][1] = 0x5c;
+    *w6e48 = env.play_pending() as u32;
+}
+
+pub trait BoostEnv: QueueEnv {
+    fn replay_is_playing(&mut self) -> bool;
+    /// `SndSys_CancelEvents` 0x222df0 (the audio system, the global at 0x39eb58).
+    fn cancel_events(&mut self);
+}
+
+/// `Sfx_UpdateBoost` 0x2192a8: each tick of a player's boost: the earlier boost events are cancelled, and on the
+/// first tick (`w6e3c` 0) the boost start sound (id 0x78 at over two thirds of the boost bar, 0x79 over one third, else
+/// 0x7a) is queued and its handle kept in `w6e38`; with `extra` (the caller's third argument) a second, 0x30 lower,
+/// sound goes with it every tick. `w6e3c` counts the ticks.
+pub fn update_boost(q: &mut Queue, w6e38: &mut u32, w6e3c: &mut u32, flag_41c: u32, boost: f32, extra: bool, env: &mut dyn BoostEnv) {
+    if env.replay_is_playing() || flag_41c != 1 {
+        return;
+    }
+    env.cancel_events();
+    let mut id = 0x7a;
+    if f32::from_bits(0x3f2a_7e78) < boost {
+        id = 0x78;
+    } else if f32::from_bits(0x3eaa_d18b) < boost {
+        id = 0x79;
+    }
+    if *w6e3c == 0 {
+        let i = queue_begin(q, 0, id, None);
+        let slot = env.get_slot(4);
+        q.a40[i] = slot;
+        *w6e38 = env.play_pending() as u32;
+    }
+    if extra {
+        let i = queue_begin(q, 0, id - 0x30, None);
+        let slot = env.get_slot(4);
+        q.a40[i] = slot;
+        env.play_pending();
+    }
+    *w6e3c = w6e3c.wrapping_add(1);
+}
