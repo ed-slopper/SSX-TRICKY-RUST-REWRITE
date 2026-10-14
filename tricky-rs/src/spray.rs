@@ -7,17 +7,14 @@ use bevy::prelude::*;
 
 const COUNT: usize = 900;
 
-/// Per-surface spray (`SurfaceTable_Init` 0x256188 rows 13..16): rate factor, flake size (cm), life (s).
+/// Per-surface ground spray from the game's own table (`SurfaceTable_Init` 0x256188 words 13..16, `tricky_game::surface`):
+/// rate factor, flake size (cm), the two lives (s). Surfaces 9, 13, 18 and 19 throw sparks instead of snow
+/// (`Fx_SurfaceSpray` 0x1311b0), which this does not draw, so their rate is 0.
 fn surf(kind: u8) -> (f32, f32, f32, f32) {
-    match kind {
-        1 => (0.075, 3.0, 0.136, 0.243),
-        2 => (0.159, 4.3, 0.30, 0.45),
-        3 => (0.505, 7.85, 0.36, 0.58),
-        5 => (0.200, 1.2, 0.10, 0.27),
-        18 => (1.854, 2.56, 0.10, 0.27),
-        6 | 10 | 17 => (1.0, 2.0, 0.4, 0.6),
-        _ => (0.0, 2.0, 0.4, 0.6),
-    }
+    use tricky_game::surface::surf as word;
+    let k = kind as usize;
+    let rate = if matches!(kind, 9 | 13 | 18 | 19) { 0.0 } else { word(k, 13) };
+    (rate, word(k, 14), word(k, 15), word(k, 16))
 }
 
 #[derive(Clone, Copy, Default)]
