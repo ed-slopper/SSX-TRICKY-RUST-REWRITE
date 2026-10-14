@@ -98,3 +98,37 @@ direct calls, the heap, the pads).
 - **Checked in the runner** on 60,000 random backdrops, over every start and step with random bits and values around
   each limit, with all memory compared. The tests caught 6 of 8 mutants; the two left cannot change a result (a
   reload of the value just stored, and `<=` at a limit writing the same value).
+
+## The screen animation, the menu sounds and the repeat poll (G8d)
+
+`tricky_game::overlays`.
+
+- **A screen animation** (`ScreenAnim`, in a backdrop at +0x94) is a frame counter and twenty tracks.
+  - Header: +0 the frame, +4 the tracks still running, +8 the tracks set up, +0xc done, +0x10 the last frame.
+  - Each track: +0 id (-1 free), +4 the start frame, +8 a counter, +0xc the target, +0x10 the rate, +0x14 the
+    value, +0x18 the base, +0x1c the kind.
+- **A step** adds to the value:
+  - by one every `rate` frames for rates above 1;
+  - by the truncated 1 / rate each frame for rates in 0..1;
+  - by one each frame for kinds 2 and 3.
+
+  It reports when the value reaches the target.
+- **The kinds evaluate as:**
+  - 0 base + value; 1 base − value;
+  - 2: halfway between base and target (in thousandths), plus half their difference times sin(value / rate
+    turns), with `Math_Sin`; 0 while the value is 0;
+  - 3: base to target as the value runs up to the rate, held after.
+- **The update** runs the set-up tracks: kinds 2 and 3 from their start frame on, the others only on it, counting
+  off the running ones as they finish. When none is running and the animation isn't done, it moves to the next
+  frame, starts the tracks on it, and marks done once past the last frame with nothing running. The backdrop's set-up
+  and update now run this port.
+- **The menu sounds** (`Overlay_PlayTickSound` .. `_PlayErrorSound`) are tail calls into the audio system (0x343050):
+  tick 0x213b38, move 0x213d60, back 0x213f88, select 0x2138f0, error 0x2141d0.
+- **`PauseMenu_PollRepeatButton`** gives the held button: when it changes, then every 12 frames, then every other
+  frame past 60.
+  - With pad −1 it searches the player pads. A `beq` delay slot records every pad found with a button held, so the
+    pad holding the last button wins, and otherwise the last pad found.
+- **Checked in the runner** on 60,000 cases over every function, with random animations (kinds 0..4, rates around
+  and between the integers), counters near the repeat's thresholds and every call compared, plus the backdrop test
+  with its animation run for real. The tests caught 7 of 8 mutants; the one left (≥ 60 for ≥ 61) cannot change a
+  result, since 60 is a multiple of 12.

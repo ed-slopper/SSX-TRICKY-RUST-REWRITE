@@ -56,7 +56,7 @@ const OV_SLOTS: [u32; 17] = [0xc, 0x14, 0x1c, 0x24, 0x2c, 0x34, 0x3c, 0x44, 0x4c
 const R_SLOTS: [u32; 12] = [0x5c, 0x64, 0x8c, 0x94, 0x9c, 0xb4, 0x10c, 0x1c4, 0x1cc, 0x1d4, 0x1dc, 0x1e4];
 
 /// The direct calls the port makes and the arguments each takes
-const CALLS_N: [(u32, usize); 16] = [
+const CALLS_N: [(u32, usize); 15] = [
     (0x17cf50, 1),
     (0x19e888, 1),
     (0x1af470, 2),
@@ -71,7 +71,6 @@ const CALLS_N: [(u32, usize); 16] = [
     (0x1bd190, 2),
     (0x1f4440, 1),
     (0x1f99f8, 3),
-    (0x1f10c0, 1),
     (0x17cfe0, 2),
 ];
 
@@ -114,7 +113,7 @@ impl At {
 }
 
 fn regions(a: &At) -> Vec<(u32, u32)> {
-    vec![(0x32de8c, 4), (0x337fe8, 0x14), (PAD, 4), (GAPP, 4), (a.b, ARENA)]
+    vec![(0x32de8c, 4), (0x337fe8, 0x14), (PAD, 4), (GAPP, 4), (0x343050, 4), (a.b, ARENA)]
 }
 
 fn snapshot(r: &mut Runner, a: &At) -> Mem {
@@ -235,7 +234,7 @@ impl OverlayManEnv for Ours {
 }
 
 fn setup(r: &mut Runner, l: &L, a: &At) {
-    for f in [0x1a7e70, 0x1a7f40, 0x1a8110, 0x1a7d78, 0x1a8900, 0x2cc808] {
+    for f in [0x1a7e70, 0x1a7f40, 0x1a8110, 0x1a7d78, 0x1a8900, 0x2cc808, 0x1f10c0, 0x1f0e58, 0x1f1258, 0x1f12d0, 0x1f0e80, 0x1f13b0] {
         r.allow(f);
     }
     for s in OV_SLOTS {
@@ -393,8 +392,8 @@ fn overlay_manager_matches_the_original() {
         Some(new_buttons(m, e, ov0, a[1] as i32))
     });
     let blk = a.block(0);
-    check(&mut r, &a, &l, &mut g, 500, 0x1a8900, "backdrop", move |r, _| set(r, &[blk]), move |m, e, _| {
-        backdrop_init(m, e, blk);
+    check(&mut r, &a, &l, &mut g, 500, 0x1a8900, "backdrop", move |r, _| set(r, &[blk]), move |m, _e, _| {
+        backdrop_init(m, blk);
         Some(blk)
     });
 }
@@ -413,6 +412,28 @@ fn backdrop(g: &mut Rng, r: &mut Runner, o: u32, fonts: u32) {
     }
     r.mem.write_u32(o + 4, fonts);
     r.mem.write_u32(o + 8, fonts + 0x40);
+    anim(g, r, o + 0x94);
+}
+
+/// A random screen animation: small frames and counts, the four kinds and an unknown one, rates around 1
+fn anim(g: &mut Rng, r: &mut Runner, a: u32) {
+    let w = |r: &mut Runner, at: u32, v: u32| r.mem.write_u32(at, v);
+    w(r, a, g.below(6));
+    w(r, a + 4, g.below(3));
+    w(r, a + 8, g.below(21));
+    w(r, a + 0xc, (g.below(4) == 0) as u32);
+    w(r, a + 0x10, g.below(8));
+    for i in 0..20 {
+        let t = a + 0x14 + 0x20 * i;
+        w(r, t, if g.below(4) == 0 { u32::MAX } else { g.below(6) });
+        w(r, t + 4, g.below(7));
+        w(r, t + 8, g.below(30));
+        w(r, t + 0xc, [0, 3, 10, 1000, 500][g.below(5) as usize]);
+        w(r, t + 0x10, [0.0f32, 0.25, 0.5, 1.0, 2.0, 3.0, 12.0, -1.0, 0.3, 0.7, 2.6, 0.4, 0.28][g.below(13) as usize].to_bits());
+        w(r, t + 0x14, g.below(12));
+        w(r, t + 0x18, [0, 250, 1000, 7][g.below(4) as usize]);
+        w(r, t + 0x1c, g.below(5));
+    }
 }
 
 #[test]
@@ -421,8 +442,6 @@ fn backdrop_animation_matches_the_original() {
     let a = At { b: r.mem.alloc(ARENA) };
     let l: L = Rc::new(RefCell::new(Log::default()));
     setup(&mut r, &l, &a);
-    let l2 = l.clone();
-    r.stub(0x1f12d0, move |c, _| l2.borrow_mut().calls.push((0x1f12d0, 0, vec![c.gpr(4) as u32])));
     for f in [0x1a8c50, 0x1a8e10, 0x1a8f28] {
         r.allow(f);
     }
@@ -443,7 +462,6 @@ fn backdrop_animation_matches_the_original() {
         let addr = [0x1a89b0u32, 0x1a8ad8, 0x1a8b70, 0x1a8c50, 0x1a8e10, 0x1a8f28, 0x1a8bd8][which as usize];
         r.call(addr).unwrap_or_else(|e| panic!("case {case}: {e}"));
         let theirs = std::mem::take(&mut l.borrow_mut().calls);
-        let mut e = Ours(l.clone(), a.b);
         match which {
             0 => start_frame_anim(&mut m, o, bits, v),
             1 => start_child_slide(&mut m, o, bits, v),
@@ -451,7 +469,78 @@ fn backdrop_animation_matches_the_original() {
             3 => update_frame_anim(&mut m, o),
             4 => update_child_slide(&mut m, o),
             5 => update_edge_slide(&mut m, o),
-            _ => backdrop_update(&mut m, &mut e, o),
+            _ => backdrop_update(&mut m, o),
+        }
+        let mine = std::mem::take(&mut l.borrow_mut().calls);
+        assert_eq!(theirs, mine, "case {case} ({which}): calls");
+        compare(&mut r, &a, &m, &format!("case {case} ({which})"));
+    }
+}
+
+// ---- the screen animation, the menu sounds and the repeat poll (G8d) ----
+
+#[test]
+fn screen_animation_sounds_and_repeat_match_the_original() {
+    let Some(mut r) = runner() else { return };
+    let a = At { b: r.mem.alloc(ARENA) };
+    let l: L = Rc::new(RefCell::new(Log::default()));
+    setup(&mut r, &l, &a);
+    for f in [0x1f0f48, 0x1f1448, 0x1f1488, 0x250d60] {
+        r.allow(f);
+    }
+    for (_, f) in MENU_SOUNDS {
+        let l2 = l.clone();
+        r.stub(f, move |c, _| l2.borrow_mut().calls.push((f, 0, vec![c.gpr(4) as u32])));
+    }
+    let mut g = Rng(0x1f12_d0aa_8d8d_0003);
+    let an = a.block(0) + 0x94;
+    let o = a.ov(0);
+    for case in 0..60_000u32 {
+        build(&mut g, &mut r, &a);
+        anim(&mut g, &mut r, an);
+        let which = g.below(11);
+        let t = an + 0x14 + 0x20 * g.below(20);
+        let id = g.below(7).wrapping_sub(1);
+        let pad = g.below(6).wrapping_sub(2);
+        let snd = MENU_SOUNDS[g.below(5) as usize];
+        let answers: Vec<u32> = (0..64).map(|_| g.below(3)).collect();
+        let (addr, args): (u32, Vec<u32>) = match which {
+            0 => (0x1f1258, vec![an]),
+            1 => (0x1f10c0, vec![an]),
+            2 => (0x1f0e80, vec![t]),
+            3 | 4 => (0x1f0f48, vec![t]),
+            5 => (0x1f12d0, vec![an]),
+            6 => (0x1f1448, vec![an, id]),
+            7 => (0x1f1488, vec![an, id]),
+            8 => (snd.0, vec![]),
+            _ => (0x1a87a0, vec![o, pad]),
+        };
+        for (k, v) in args.iter().enumerate() {
+            r.cpu.set_gpr(4 + k, *v as i32 as i64 as u64);
+        }
+        // the repeat's counter near its thresholds, its button sometimes the one held
+        r.mem.write_u32(o + 0x1c, [0, 11, 12, 23, 59, 60, 61, 62][g.below(8) as usize]);
+        if g.below(2) == 0 {
+            let held = r.mem.read_u32(a.pad(g.below(4)) + 0x10);
+            r.mem.write_u32(o + 0x20, held);
+        }
+        let mut m = snapshot(&mut r, &a);
+        *l.borrow_mut() = Log { answers: answers.clone(), ..Log::default() };
+        r.call(addr).unwrap_or_else(|e| panic!("case {case} ({which}): {e}"));
+        let theirs = std::mem::take(&mut l.borrow_mut().calls);
+        let (v0, f0) = (r.cpu.gpr(2) as u32, r.cpu.f(0).to_bits());
+        *l.borrow_mut() = Log { answers, ..Log::default() };
+        let mut e = Ours(l.clone(), a.b);
+        match which {
+            0 => screen_anim_reset(&mut m, an),
+            1 => assert_eq!(v0, screen_anim_init(&mut m, an), "case {case}: init"),
+            2 => assert_eq!(v0, screen_anim_step(&mut m, t) as u32, "case {case}: step"),
+            3 | 4 => assert_eq!(f0, screen_anim_track_eval(&m, t).to_bits(), "case {case}: eval"),
+            5 => screen_anim_update(&mut m, an),
+            6 => assert_eq!(v0, screen_anim_value(&m, an, id), "case {case}: value"),
+            7 => assert_eq!(f0, screen_anim_eval(&m, an, id).to_bits(), "case {case}: eval by id"),
+            8 => menu_sound(&mut m, &mut e, snd.1),
+            _ => assert_eq!(v0, poll_repeat(&mut m, &mut e, o, pad as i32), "case {case}: repeat"),
         }
         let mine = std::mem::take(&mut l.borrow_mut().calls);
         assert_eq!(theirs, mine, "case {case} ({which}): calls");

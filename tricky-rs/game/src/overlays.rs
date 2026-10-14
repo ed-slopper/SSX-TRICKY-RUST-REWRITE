@@ -84,12 +84,12 @@ pub fn screen_overlay_init(m: &mut Mem, o: u32) {
     m.w32(o + 0x18, 0);
 }
 
-/// `BackdropOverlay_Init` 0x1a8900: a screen overlay with the backdrop's vtable, its animation (`ScreenAnim_Init`
-/// 0x1f10c0 at +0x94) and defaults (+0x50 / +0x58 0.65, +0x70 1.0, +0x60 / +0x7c / +0x90 1)
-pub fn backdrop_init(m: &mut Mem, env: &mut dyn OverlayManEnv, o: u32) {
+/// `BackdropOverlay_Init` 0x1a8900: a screen overlay with the backdrop's vtable, its animation (`screen_anim_init`
+/// at +0x94) and defaults (+0x50 / +0x58 0.65, +0x70 1.0, +0x60 / +0x7c / +0x90 1)
+pub fn backdrop_init(m: &mut Mem, o: u32) {
     screen_overlay_init(m, o);
     m.w32(o + 0x28, VT_BACKDROP);
-    env.call(m, 0x1f10c0, &[o + 0x94]);
+    screen_anim_init(m, o + 0x94);
     m.w32(o + 0x58, 0x3f266666);
     m.w32(o + 0x70, 0x3f800000);
     m.w32(o + 0x90, 1);
@@ -130,7 +130,7 @@ fn flags(m: &mut Mem, o: u32, drawn: u32, active: u32) {
 fn save_page(m: &mut Mem, env: &mut dyn OverlayManEnv, size: u32, backdrop_at: u32, clear: Option<u32>, vts: (u32, u32)) -> u32 {
     let p = alloc(m, env, size);
     m.w32(p + 0x42c, p + backdrop_at);
-    backdrop_init(m, env, p + backdrop_at);
+    backdrop_init(m, p + backdrop_at);
     env.call(m, 0x1b8568, &[p, 0]);
     if let Some(c) = clear {
         m.w32(p + c, 0);
@@ -219,7 +219,7 @@ pub fn man_init(m: &mut Mem, env: &mut dyn OverlayManEnv, man: u32) {
     m.w32(o + 0x10, 0);
     // lesson
     let o = alloc(m, env, 0x348);
-    backdrop_init(m, env, o);
+    backdrop_init(m, o);
     flags(m, o, 1, 0);
     m.w32(man + 0x38, o);
     m.w32(o + 0x28, VT_LESSON);
@@ -246,7 +246,7 @@ pub fn man_init(m: &mut Mem, env: &mut dyn OverlayManEnv, man: u32) {
     m.w32(o + 0x10, 1);
     // lesson controller
     let o = alloc(m, env, 0x348);
-    backdrop_init(m, env, o);
+    backdrop_init(m, o);
     m.w32(o + 0x14, 0);
     m.w32(man + 0x48, o);
     m.w32(o + 0x10, 0);
@@ -717,10 +717,10 @@ pub fn update_edge_slide(m: &mut Mem, o: u32) {
     }
 }
 
-/// `cBackdropOverlay::Update` 0x1a8bd8: the screen animation (`ScreenAnim_Update` 0x1f12d0 at +0x94), then each part
+/// `cBackdropOverlay::Update` 0x1a8bd8: the screen animation (`screen_anim_update` at +0x94), then each part
 /// not still (bits 1)
-pub fn backdrop_update(m: &mut Mem, env: &mut dyn OverlayManEnv, o: u32) {
-    env.call(m, 0x1f12d0, &[o + 0x94]);
+pub fn backdrop_update(m: &mut Mem, o: u32) {
+    screen_anim_update(m, o + 0x94);
     if m.r32(o + 0x60) != 1 {
         update_frame_anim(m, o);
     }
@@ -730,4 +730,197 @@ pub fn backdrop_update(m: &mut Mem, env: &mut dyn OverlayManEnv, o: u32) {
     if m.r32(o + 0x90) != 1 {
         update_edge_slide(m, o);
     }
+}
+
+// ---- the screen animation, the menu sounds and the repeat poll (G8d) ----
+//
+// A screen animation (`ScreenAnim`, 0x294 bytes in a backdrop at +0x94): +0 the frame, +4 the tracks still running,
+// +8 the tracks set up, +0xc done, +0x10 the last frame; then twenty tracks of 0x20 bytes from +0x14: +0 the id
+// (-1 free), +4 the frame it starts on, +8 a counter, +0xc the target, +0x10 the rate, +0x14 the value, +0x18 the
+// base, +0x1c the kind (0 counting up from the base, 1 down, 2 a sine ease, 3 a ramp; 2 and 3 run alongside the
+// others and don't hold the animation).
+
+const TRACKS: u32 = 20;
+fn track(a: u32, i: u32) -> u32 {
+    a + 0x14 + 0x20 * i
+}
+
+/// `ScreenAnim_Reset` 0x1f1258
+pub fn screen_anim_reset(m: &mut Mem, a: u32) {
+    m.w32(a + 0xc, 1);
+    m.w32(a + 8, 0);
+    m.w32(a, 0);
+    m.w32(a + 0x10, 0);
+    m.w32(a + 4, 0);
+    for i in 0..TRACKS {
+        let t = track(a, i);
+        m.w32(t, u32::MAX);
+        for k in [4, 8, 0xc, 0x10, 0x14] {
+            m.w32(t + k, 0);
+        }
+    }
+}
+
+/// `ScreenAnim_Init` 0x1f10c0 (the tracks' constructor 0x1f0e58 does nothing)
+pub fn screen_anim_init(m: &mut Mem, a: u32) -> u32 {
+    screen_anim_reset(m, a);
+    a
+}
+
+/// `ScreenAnim_Step` 0x1f0e80 (a track): the value on by one every `rate` frames (rates above 1), by 1 / rate a
+/// frame (rates in 0..1), by one for kinds 2 and 3; whether it reached the target
+pub fn screen_anim_step(m: &mut Mem, t: u32) -> bool {
+    let rate = f32::from_bits(m.r32(t + 0x10));
+    let count = m.r32(t + 8).wrapping_add(1);
+    m.w32(t + 8, count);
+    let mut n = if 1.0 < rate {
+        let d = rate as i32;
+        ((count as i32).wrapping_rem(d) == 0) as i32
+    } else if 0.0 < rate {
+        (crate::ps2f::F(1.0) / crate::ps2f::F(rate)).0 as i32
+    } else {
+        0
+    };
+    let kind = m.r32(t + 0x1c);
+    if kind.wrapping_sub(2) <= 1 {
+        n = 1;
+    }
+    for _ in 0..n.max(0) {
+        m.w32(t + 0x14, m.r32(t + 0x14).wrapping_add(1));
+    }
+    !((m.r32(t + 0x14) as i32) < m.r32(t + 0xc) as i32)
+}
+
+/// `ScreenAnimTrack_Eval` 0x1f0f48: kind 0 the base plus the value, 1 the base less the value, 2 halfway between
+/// the base and the target (both in thousandths) plus half the difference times the sine of the value over the rate
+/// turns (0 before it starts), 3 from the base to the target as the value runs to the rate; others 0
+pub fn screen_anim_track_eval(m: &Mem, t: u32) -> f32 {
+    use crate::ps2f::F;
+    let i = |k: u32| m.r32(t + k) as i32;
+    match m.r32(t + 0x1c) {
+        0 => i(0x18).wrapping_add(i(0x14)) as f32,
+        1 => i(0x18).wrapping_sub(i(0x14)) as f32,
+        2 => {
+            let rate = F(f32::from_bits(m.r32(t + 0x10)));
+            let x = F(i(0x14) as f32) / rate;
+            let hi = F(i(0xc) as f32) / F(1000.0);
+            let lo = F(i(0x18) as f32) / F(1000.0);
+            let s = crate::math::sin((x * F(f32::from_bits(0x40c90fd0))).0);
+            let mid = (hi + lo) * F(0.5);
+            let half = hi - mid;
+            let v = mid + F(s) * half;
+            if i(0x14) == 0 { 0.0 } else { v.0 }
+        }
+        3 => {
+            let rate = F(f32::from_bits(m.r32(t + 0x10)));
+            let hi = F(i(0xc) as f32) / F(1000.0);
+            let lo = F(i(0x18) as f32) / F(1000.0);
+            let v = F(i(0x14) as f32);
+            let mut u = v / rate;
+            let span = hi - lo;
+            if rate.0 < v.0 {
+                u = F(1.0);
+            }
+            (lo + span * u).0
+        }
+        _ => 0.0,
+    }
+}
+
+/// `ScreenAnim_Update` 0x1f12d0: each set-up track stepped (kinds 2 and 3 from their start frame on, the others on
+/// it, counting off the running ones as they finish); then (0x1f13b0) when none is running and it isn't done, the
+/// next frame: the tracks starting on it running, and done once past the last frame with none
+pub fn screen_anim_update(m: &mut Mem, a: u32) {
+    let mut i = 0u32;
+    while (i as i32) < m.r32(a + 8) as i32 {
+        let t = track(a, i);
+        let kind = m.r32(t + 0x1c);
+        let frame = m.r32(a) as i32;
+        let start = m.r32(t + 4) as i32;
+        if kind == 2 || kind == 3 {
+            if frame >= start {
+                screen_anim_step(m, t);
+            }
+        } else if frame == start && screen_anim_step(m, t) {
+            m.w32(a + 4, m.r32(a + 4).wrapping_sub(1));
+        }
+        i += 1;
+    }
+    let mut running = m.r32(a + 4);
+    if running != 0 || m.r32(a + 0xc) != 0 {
+        return;
+    }
+    let frame = m.r32(a).wrapping_add(1);
+    m.w32(a, frame);
+    for k in 0..TRACKS {
+        let t = track(a, k);
+        if m.r32(t + 4) == frame && m.r32(t + 0x1c).wrapping_sub(2) >= 2 {
+            running = running.wrapping_add(1);
+            m.w32(a + 4, running);
+        }
+    }
+    if running == 0 && (m.r32(a + 0x10) as i32) < frame as i32 {
+        m.w32(a + 0xc, 1);
+    }
+}
+
+/// `ScreenAnim_GetValue` 0x1f1448 (the id): the track's value, or 0
+pub fn screen_anim_value(m: &Mem, a: u32, id: u32) -> u32 {
+    (0..TRACKS).find(|&i| m.r32(track(a, i)) == id).map(|i| m.r32(track(a, i) + 0x14)).unwrap_or(0)
+}
+
+/// `ScreenAnim_Eval` 0x1f1488 (the id): the track's evaluation, or 0
+pub fn screen_anim_eval(m: &Mem, a: u32, id: u32) -> f32 {
+    (0..TRACKS).find(|&i| m.r32(track(a, i)) == id).map(|i| screen_anim_track_eval(m, track(a, i))).unwrap_or(0.0)
+}
+
+/// The menu sounds (`Overlay_PlayTickSound` 0x1a8638 .. `_PlayErrorSound` 0x1a8678): each the audio system's
+/// (0x343050) sound function
+pub const MENU_SOUNDS: [(u32, u32); 5] = [(0x1a8638, 0x213b38), (0x1a8648, 0x213d60), (0x1a8658, 0x213f88), (0x1a8668, 0x2138f0), (0x1a8678, 0x2141d0)];
+pub fn menu_sound(m: &mut Mem, env: &mut dyn OverlayManEnv, func: u32) {
+    let audio = m.r32(0x343050);
+    env.call(m, func, &[audio]);
+}
+
+/// `PauseMenu_PollRepeatButton` 0x1a8688 (the pad, or -1): the held button, repeated. Pad -1 takes a player pad
+/// with a button held: the one holding the overlay's last button (+0x20), else the last found (the game notes each
+/// in a branch's delay slot). The button counts as pressed when it is new, then every 12 frames, then every other
+/// frame after 60 (+0x1c counts); 0 when none is held
+pub fn poll_repeat(m: &mut Mem, env: &mut dyn OverlayManEnv, o: u32, pad: i32) -> u32 {
+    let mut pad = pad;
+    if pad < 0 {
+        let mut i = 0;
+        while i < m.r32(m.r32(m.r32(GAPP) + 0x24) + 0x14) as i32 {
+            if env.is_player_pad(i as u32) {
+                let d = env.device(i as u32);
+                let held = m.r32(d + 0x10);
+                if held != 0 {
+                    pad = i;
+                    if m.r32(o + 0x20) == held {
+                        break;
+                    }
+                }
+            }
+            i += 1;
+        }
+        if pad < 0 {
+            m.w32(o + 0x20, 0);
+            m.w32(o + 0x1c, 0);
+            return 0;
+        }
+    }
+    let d = env.device(pad as u32);
+    let held = m.r32(d + 0x10);
+    let out = if held == 0 || m.r32(o + 0x20) != held {
+        m.w32(o + 0x20, held);
+        m.w32(o + 0x1c, 0);
+        held
+    } else {
+        let n = m.r32(o + 0x1c).wrapping_add(1);
+        m.w32(o + 0x1c, n);
+        let quiet = if (n as i32) >= 61 { n & 1 != 0 } else { (n as i32) % 12 != 0 };
+        if quiet { 0 } else { held }
+    };
+    m.w32(PAD, d);
+    out
 }

@@ -2429,13 +2429,13 @@ address,size,name,system,status
 0x1a7f40,460,Overlay_DrawItemForView,frontend,checked
 0x1a8110,460,Overlay_DrawTextForView,frontend,checked
 0x1a82e8,832,HUD_DrawNumber,hud,not started
-0x1a8638,12,Overlay_PlayTickSound,frontend,not started
-0x1a8648,12,Overlay_PlayMoveSound,frontend,not started
-0x1a8658,12,Overlay_PlayBackSound,frontend,not started
-0x1a8668,12,Overlay_PlaySelectSound,frontend,not started
-0x1a8678,12,Overlay_PlayErrorSound,frontend,not started
+0x1a8638,12,Overlay_PlayTickSound,frontend,checked
+0x1a8648,12,Overlay_PlayMoveSound,frontend,checked
+0x1a8658,12,Overlay_PlayBackSound,frontend,checked
+0x1a8668,12,Overlay_PlaySelectSound,frontend,checked
+0x1a8678,12,Overlay_PlayErrorSound,frontend,checked
 0x1a8688,280,Overlay_GetNewButtons,frontend,checked
-0x1a87a0,340,PauseMenu_PollRepeatButton,frontend?,not started
+0x1a87a0,340,PauseMenu_PollRepeatButton,frontend?,checked
 0x1a88f8,8,cScreenOverlay::Update,frontend,checked
 0x1a8900,172,BackdropOverlay_Init,frontend,checked
 0x1a89b0,292,Backdrop_StartFrameAnim,frontend?,checked
@@ -3230,17 +3230,17 @@ address,size,name,system,status
 0x1f0780,84,cReplayOverlay::__tf,runtime,host
 0x1f0808,80,cReplayControlOverlay::__tf,runtime,host
 0x1f08d0,1412,Streak_Draw,frontend?,not started
-0x1f0e58,8,ScreenAnimTrack_Construct,frontend?,not started
+0x1f0e58,8,ScreenAnimTrack_Construct,frontend?,checked
 0x1f0e60,28,ScreenAnimTrack_Delete,frontend?,not started
-0x1f0e80,200,ScreenAnim_Step,frontend?,not started
-0x1f0f48,372,ScreenAnimTrack_Eval,frontend?,not started
-0x1f10c0,100,ScreenAnim_Init,frontend?,not started
+0x1f0e80,200,ScreenAnim_Step,frontend?,checked
+0x1f0f48,372,ScreenAnimTrack_Eval,frontend?,checked
+0x1f10c0,100,ScreenAnim_Init,frontend?,checked
 0x1f1128,148,ScreenAnim_Delete,game?,not started
 0x1f11c0,148,LoadScreen_AddStatBar,race?,not started
-0x1f1258,120,ScreenAnim_Reset,other,not started
-0x1f12d0,372,ScreenAnim_Update,game?,not started
-0x1f1448,60,ScreenAnim_GetValue,game?,not started
-0x1f1488,84,ScreenAnim_Eval,game?,not started
+0x1f1258,120,ScreenAnim_Reset,other,checked
+0x1f12d0,372,ScreenAnim_Update,game?,checked
+0x1f1448,60,ScreenAnim_GetValue,game?,checked
+0x1f1488,84,ScreenAnim_Eval,game?,checked
 0x1f1580,11964,FUN_001f1580,,not started
 0x1f4440,15076,SpriteSet_InitHudGameRects,hud,ported
 0x1f7f28,3436,LoadScreen_InitSpriteTable,game?,not started
