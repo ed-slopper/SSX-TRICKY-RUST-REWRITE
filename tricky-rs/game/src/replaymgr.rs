@@ -2013,3 +2013,587 @@ pub fn remove_input_stream(m: &mut Mem, env: &mut dyn ReplayEnv, mgr: u32, s: u3
         }
     }
 }
+
+// The save to the memory card and the load (board row G12h). The writer's state is the manager's +0x40a8..: +0x40a8
+// the 16 KB chunk going out, +0x40ac where it is written, +0x40b0 a 0xc800-byte scratch buffer, +0x40b4 / +0x40c0
+// the piece being copied out and what is left of it, +0x40b8 / +0x40bc the bytes written and their sum (signed
+// bytes; saved last as the checksum), +0x40c4 the stage, +0x40c8 the chunk's fill, +0x40cc / +0x40d0 an index and
+// its end, +0x40d4 everything written, +0x40d8 the padding left, +0x40dc the next keyframe, +0x40e0 / +0x40e4 its
+// stream to compress, +0x40e8.. / +0x40f0.. a pad stream's words and runs to compress, +0x40f8 its header.
+
+/// The world calls the load makes, and `EAMem_Free`
+pub trait SaveEnv: ReplayEnv {
+    /// `Race_GetRider` 0x1814a8(i) then `BoarderRender_UpdateLighting` 0x135eb8 on its +0x5ae0
+    fn update_lighting(&mut self, rider: u32);
+    /// `EAMem_Free` 0x2ccfc0
+    fn ea_free(&mut self, m: &mut Mem, p: u32);
+}
+
+fn region_rest(m: &Mem, at: u32) -> Vec<u8> {
+    for (base, v) in &m.regions {
+        if *base <= at && at < base + v.len() as u32 {
+            return v[(at - base) as usize..].to_vec();
+        }
+    }
+    panic!("replay: {at:#x} is outside the memory given");
+}
+
+fn copy_out(m: &mut Mem, to: u32, from: u32, n: u32) {
+    for k in 0..n {
+        let b = m.r8(from + k);
+        m.w8(to + k, b);
+    }
+}
+
+/// `Compress_Block`(src, n, dst, mode 0) on memory: the bytes written
+fn compress_mem(m: &mut Mem, src: u32, n: u32, dst: u32) -> u32 {
+    let data: Vec<u8> = (0..n).map(|k| m.r8(src + k)).collect();
+    let mut out = tricky_data::huffenc::Out::default();
+    let len = tricky_data::huffenc::compress_block(&data, src, &mut out, Some(0), vec![0; tricky_data::huffenc::at::LEN]);
+    for k in 0..len {
+        m.w8(dst + k, out.buf[k as usize]);
+    }
+    len
+}
+
+/// `Decompress_Block`(src, dst) on memory: the size the block says
+fn decompress_mem(m: &mut Mem, src: u32, dst: u32) -> u32 {
+    let rest = region_rest(m, src);
+    let mut out = vec![];
+    let size = tricky_data::compress::huff_decode_block(&rest, &mut out);
+    for (k, b) in out.iter().enumerate() {
+        m.w8(dst + k as u32, *b);
+    }
+    size
+}
+
+const SAVE: u32 = 0x40a8;
+
+/// `ReplaySave_Init` 0x193d98: the chunk (0x4000, filled 0xdeadc0de) and the scratch (0xc800, 0xdeadc0ed) allocated,
+/// the state zeroed and the sum started at 0xdeadbeef
+pub fn save_init(m: &mut Mem, env: &mut dyn SaveEnv, mgr: u32) {
+    let p = env.alloc(m, 0x4000);
+    if p != 0 {
+        mem_set(m, p, 0xdead_c0de, 0x4000);
+    }
+    m.w32(mgr + SAVE, p);
+    let p = env.alloc(m, 0xc800);
+    if p != 0 {
+        mem_set(m, p, 0xdead_c0ed, 0xc800);
+    }
+    m.w32(mgr + 0x40b0, p);
+    m.w32(mgr + 0x40c4, 0);
+    m.w32(mgr + 0x40bc, 0xdead_beef);
+    for off in [0x40b4, 0x40c0, 0x40c8, 0x40ac, 0x40cc, 0x40d0, 0x40dc, 0x40e0, 0x40e4, 0x40e8, 0x40f0, 0x40f8, 0x40d4, 0x40d8, 0x40b8] {
+        m.w32(mgr + off, 0);
+    }
+}
+
+/// `FUN_00194870` / `FUN_001948c0` (the same): the chunk and scratch freed
+pub fn save_free(m: &mut Mem, env: &mut dyn SaveEnv, mgr: u32) {
+    let p = m.r32(mgr + SAVE);
+    if p != 0 {
+        env.free(m, p);
+    }
+    let q = m.r32(mgr + 0x40b0);
+    if q != 0 {
+        env.free(m, q);
+    }
+    m.w32(mgr + 0x40b0, 0);
+    m.w32(mgr + SAVE, 0);
+}
+
+/// `ReplaySave_FlushChunk` 0x193e78: as much of the piece as fits copied into the chunk
+pub fn save_flush_chunk(m: &mut Mem, mgr: u32) {
+    let src = m.r32(mgr + 0x40b4);
+    let left = m.r32(mgr + 0x40c0) as i32;
+    if src == 0 || left <= 0 {
+        return;
+    }
+    let n = (0x4000 - m.r32(mgr + 0x40c8) as i32).min(left);
+    if n > 0 {
+        copy_out(m, m.r32(mgr + 0x40ac), src, n as u32);
+        m.w32(mgr + 0x40ac, m.r32(mgr + 0x40ac).wrapping_add(n as u32));
+        m.w32(mgr + 0x40b4, src.wrapping_add(n as u32));
+        m.w32(mgr + 0x40c8, m.r32(mgr + 0x40c8).wrapping_add(n as u32));
+        m.w32(mgr + 0x40c0, (left - n) as u32);
+    }
+}
+
+/// `ReplaySave_SetChunk` 0x193f10(src, n): the next piece; its bytes counted and summed (signed)
+pub fn save_set_chunk(m: &mut Mem, mgr: u32, src: u32, n: i32) {
+    m.w32(mgr + 0x40b8, m.r32(mgr + 0x40b8).wrapping_add(n as u32));
+    for k in 0..n.max(0) as u32 {
+        let b = m.r8(src + k) as i8 as i32;
+        m.w32(mgr + 0x40bc, m.r32(mgr + 0x40bc).wrapping_add(b as u32));
+    }
+    m.w32(mgr + 0x40b4, src);
+    m.w32(mgr + 0x40d4, m.r32(mgr + 0x40d4).wrapping_add(n as u32));
+    m.w32(mgr + 0x40c0, n as u32);
+}
+
+fn next_stage(m: &mut Mem, mgr: u32) {
+    m.w32(mgr + 0x40c4, m.r32(mgr + 0x40c4).wrapping_add(1));
+}
+fn no_piece_next(m: &mut Mem, mgr: u32) {
+    m.w32(mgr + 0x40b4, 0);
+    m.w32(mgr + 0x40c0, 0);
+    next_stage(m, mgr);
+}
+
+fn riders(m: &Mem) -> u32 {
+    m.r32(m.r32(game(m) + 0x1c) + 0x7c)
+}
+
+/// `ReplaySave_Step` 0x193f70: the next 16 KB chunk (its address and length; `None` when done): the stages fill it
+/// until full or done: 0 the header (0x12300003, the keyframes, +0x38, +0x40, +0x2c, +0x30, the riders, the highlight
+/// counts, the rider; 0x44 bytes), 2..3 each rider's camera track, 4..5 the keyframes (a record, then the stream
+/// compressed), 7 the highlights, 8..9 the pad streams (a header, the words and the runs compressed), 11 the pins,
+/// 12..13 zeros up to 0x7f6d8 bytes, 15 the count and the sum
+pub fn save_step(m: &mut Mem, env: &mut dyn SaveEnv, mgr: u32) -> Option<(u32, u32)> {
+    if m.r32(mgr + 0x40c4) == 0x11 {
+        return None;
+    }
+    m.w32(mgr + 0x40c8, 0);
+    m.w32(mgr + 0x40ac, m.r32(mgr + SAVE));
+    loop {
+        save_flush_chunk(m, mgr);
+        if m.r32(mgr + 0x40c8) as i32 > 0x3fff {
+            break;
+        }
+        match m.r32(mgr + 0x40c4) {
+            0 => save_write_header(m, mgr),
+            1 => {
+                save_set_chunk(m, mgr, m.r32(mgr + 0x40b0), 0x44);
+                next_stage(m, mgr);
+            }
+            2 => {
+                m.w32(mgr + 0x40cc, 0);
+                m.w32(mgr + 0x40b4, 0);
+                next_stage(m, mgr);
+                m.w32(mgr + 0x40d0, riders(m));
+                m.w32(mgr + 0x40c0, 0);
+            }
+            3 => {
+                let i = m.r32(mgr + 0x40cc) as i32;
+                if m.r32(mgr + 0x40d0) as i32 <= i {
+                    no_piece_next(m, mgr);
+                } else {
+                    m.w32(mgr + 0x40cc, (i + 1) as u32);
+                    save_set_chunk(m, mgr, (i as u32).wrapping_mul(CAM_TRACK_SIZE).wrapping_add(mgr + CAM_TRACKS), 0xe24);
+                }
+            }
+            4 => {
+                let first = m.r32(mgr + FIRST);
+                m.w32(mgr + 0x40dc, first);
+                if first != 0 && first == m.r32(mgr + WRITING) {
+                    m.w32(mgr + 0x40dc, m.r32(first + kf::NEXT));
+                }
+                m.w32(mgr + 0x40e0, 0);
+                m.w32(mgr + 0x40b4, 0);
+                next_stage(m, mgr);
+                m.w32(mgr + 0x40c0, 0);
+            }
+            5 => save_emit_keyframe(m, mgr),
+            6 | 10 | 14 => no_piece_next(m, mgr),
+            7 => {
+                let scratch = m.r32(mgr + 0x40b0);
+                let mut cur = scratch;
+                for r in 0..4 {
+                    let mut i = 0;
+                    while (i as i32) < m.r32(count_at(mgr, r)) as i32 {
+                        highlight_save(m, mgr, m.r32(list_at(mgr, r, i)), &mut cur);
+                        i += 1;
+                    }
+                }
+                save_set_chunk(m, mgr, scratch, cur.wrapping_sub(scratch) as i32);
+                next_stage(m, mgr);
+            }
+            8 => {
+                m.w32(mgr + 0x40d0, 4);
+                m.w32(mgr + 0x40cc, 0);
+                next_stage(m, mgr);
+                for off in [0x40f8, 0x40f0, 0x40e8, 0x40ec, 0x40f4, 0x40b4, 0x40c0] {
+                    m.w32(mgr + off, 0);
+                }
+            }
+            9 => save_emit_input(m, mgr),
+            0xb => {
+                let scratch = m.r32(mgr + 0x40b0);
+                let mut cur = scratch;
+                for r in 0..4 {
+                    let p = m.r32(mgr + PINS + 4 * r);
+                    if p != 0 {
+                        pin_save(m, mgr, p, &mut cur);
+                    }
+                }
+                save_set_chunk(m, mgr, scratch, cur.wrapping_sub(scratch) as i32);
+                next_stage(m, mgr);
+            }
+            0xc => {
+                let scratch = m.r32(mgr + 0x40b0);
+                mem_set(m, scratch, 0, 0xc800);
+                next_stage(m, mgr);
+                m.w32(mgr + 0x40d8, 0x7f6d8u32.wrapping_sub(m.r32(mgr + 0x40d4)));
+            }
+            0xd => {
+                let left = m.r32(mgr + 0x40d8) as i32;
+                if left < 1 {
+                    next_stage(m, mgr);
+                } else {
+                    let n = left.min(0x4000);
+                    save_set_chunk(m, mgr, m.r32(mgr + 0x40b0), n);
+                    m.w32(mgr + 0x40d8, (left - n) as u32);
+                }
+            }
+            0xf => {
+                let scratch = m.r32(mgr + 0x40b0);
+                copy_out(m, scratch, mgr + 0x40b8, 8);
+                save_set_chunk(m, mgr, scratch, 8);
+                next_stage(m, mgr);
+            }
+            0x10 => next_stage(m, mgr),
+            _ => {}
+        }
+        if m.r32(mgr + 0x40c8) as i32 >= 0x4000 || m.r32(mgr + 0x40c4) == 0x11 {
+            break;
+        }
+    }
+    let _ = env;
+    Some((m.r32(mgr + SAVE), m.r32(mgr + 0x40c8)))
+}
+
+fn save_write_header(m: &mut Mem, mgr: u32) {
+    let h = m.r32(mgr + 0x40b0);
+    let used = keyframe_count_used(m, mgr) as u32;
+    m.w32(h + 4, used);
+    m.w32(h + 0xc, m.r32(mgr + 0x40));
+    m.w32(h + 8, m.r32(mgr + 0x38));
+    m.w32(h + 0x10, m.r32(mgr + 0x2c));
+    m.w32(h + 0x14, m.r32(mgr + END));
+    m.w32(h, 0x1230_0003);
+    m.w32(h + 0x18, riders(m));
+    m.w32(h + 0x2c, m.r32(mgr + RIDER));
+    for r in 0..4 {
+        m.w32(h + 0x1c + 4 * r, m.r32(count_at(mgr, r)));
+    }
+    m.w32(mgr + 0x40b4, 0);
+    m.w32(mgr + 0x40c0, 0);
+    next_stage(m, mgr);
+}
+
+fn save_emit_keyframe(m: &mut Mem, mgr: u32) {
+    let scratch = m.r32(mgr + 0x40b0);
+    if m.r32(mgr + 0x40e0) != 0 {
+        let n = compress_mem(m, m.r32(mgr + 0x40e0), m.r32(mgr + 0x40e4), scratch + 4);
+        m.w32(scratch, n);
+        save_set_chunk(m, mgr, scratch, (n + 4) as i32);
+        m.w32(mgr + 0x40e0, 0);
+        return;
+    }
+    let k = m.r32(mgr + 0x40dc);
+    if k == 0 {
+        no_piece_next(m, mgr);
+        return;
+    }
+    m.w32(scratch, 0x1111_1113);
+    m.w32(scratch + 8, m.r32(k + kf::FRAME));
+    m.w32(scratch + 4, m.r32(k + 0xc));
+    m.w32(scratch + 0xc, m.r32(k + kf::PINS));
+    m.w32(scratch + 0x14, 0x1111_1111);
+    m.w32(scratch + 0x10, m.r32(k + kf::USED));
+    save_set_chunk(m, mgr, scratch, 0x18);
+    let next = m.r32(k + kf::NEXT);
+    m.w32(mgr + 0x40e0, m.r32(k));
+    m.w32(mgr + 0x40e4, m.r32(k + 0xc));
+    m.w32(mgr + 0x40dc, next);
+    if next != 0 && next == m.r32(mgr + WRITING) {
+        m.w32(mgr + 0x40dc, m.r32(next + kf::NEXT));
+    }
+}
+
+fn save_emit_input(m: &mut Mem, mgr: u32) {
+    let scratch = m.r32(mgr + 0x40b0);
+    if m.r32(mgr + 0x40f8) != 0 {
+        save_set_chunk(m, mgr, m.r32(mgr + 0x40f8), 8);
+        m.w32(mgr + 0x40f8, 0);
+        return;
+    }
+    if m.r32(mgr + 0x40e8) != 0 {
+        let n = compress_mem(m, m.r32(mgr + 0x40e8), m.r32(mgr + 0x40ec), scratch + 4);
+        m.w32(scratch, n);
+        save_set_chunk(m, mgr, scratch, (n + 4) as i32);
+        m.w32(mgr + 0x40e8, 0);
+        return;
+    }
+    if m.r32(mgr + 0x40f0) != 0 {
+        let n = compress_mem(m, m.r32(mgr + 0x40f0), m.r32(mgr + 0x40f4), scratch + 4);
+        m.w32(scratch, n);
+        save_set_chunk(m, mgr, scratch, (n + 4) as i32);
+        m.w32(mgr + 0x40f0, 0);
+        return;
+    }
+    let i = m.r32(mgr + 0x40cc) as i32;
+    if i >= m.r32(mgr + 0x40d0) as i32 {
+        no_piece_next(m, mgr);
+        return;
+    }
+    let s = m.r32(mgr + INPUTS + 4 * i as u32);
+    for off in [0x40e8, 0x40f0, 0x40f8, 0x40ec, 0x40f4] {
+        m.w32(mgr + off, 0);
+    }
+    if s == 0 {
+        m.w32(mgr + 0x40b4, 0);
+        m.w32(mgr + 0x40cc, (i + 1) as u32);
+        m.w32(mgr + 0x40c0, 0);
+        return;
+    }
+    m.w32(mgr + 0x40ec, 0x6664);
+    m.w32(mgr + 0x40f4, 0x1999);
+    m.w32(scratch, 0x1111_1112);
+    m.w32(mgr + 0x40e8, s);
+    m.w32(mgr + 0x40f0, s + 0x6664);
+    m.w32(scratch + 4, m.r32(s + 0x8000));
+    m.w32(mgr + 0x40f8, scratch);
+    m.w32(mgr + 0x40cc, m.r32(mgr + 0x40cc).wrapping_add(1));
+}
+
+/// `Highlight_Save` 0x193b00(highlight, cursor): 0x20 bytes: 0x11111115, the kind, its keyframe's frame, the length,
+/// the two scores, the keyframe's place, the rider; for no keyframe, the kind set to 0 and -1 / 0 / 0 / 0 / -1 / 0.
+/// (STANDIN: with no keyframe the game's second word is a stack word it never set; the port writes 0.)
+pub fn highlight_save(m: &mut Mem, mgr: u32, h: u32, cur: &mut u32) {
+    let at = *cur;
+    *cur = at.wrapping_add(0x20);
+    let k = m.r32(h);
+    let rec: [u32; 8] = if k == 0 {
+        m.w32(h + hl::KIND, 0);
+        [0x1111_1115, 0, u32::MAX, 0, 0, 0, u32::MAX, 0]
+    } else {
+        [
+            0x1111_1115,
+            m.r32(h + hl::KIND),
+            m.r32(k + kf::FRAME),
+            m.r32(h + hl::LEN),
+            m.r32(h + hl::SCORE1),
+            m.r32(h + hl::SCORE2),
+            keyframe_index(m, mgr, k) as u32,
+            m.r32(h + hl::RIDER),
+        ]
+    };
+    for (i, v) in rec.iter().enumerate() {
+        m.w32(at + 4 * i as u32, *v);
+    }
+}
+
+/// `Highlight_Load` 0x193bd0(highlight, cursor): back from its 0x20 bytes (the keyframe by its place)
+pub fn highlight_load(m: &mut Mem, mgr: u32, h: u32, cur: &mut u32) {
+    let at = *cur;
+    *cur = at.wrapping_add(0x20);
+    let rec: Vec<u32> = (0..8).map(|i| m.r32(at + 4 * i)).collect();
+    let k = if rec[6] == u32::MAX { 0 } else { keyframe_at(m, mgr, rec[6]) };
+    m.w32(h, k);
+    m.w32(h + hl::KIND, rec[1]);
+    m.w32(h + hl::RIDER, rec[7]);
+    m.w32(h + hl::LEN, rec[3]);
+    m.w32(h + hl::SCORE1, rec[4]);
+    m.w32(h + hl::SCORE2, rec[5]);
+}
+
+/// `ReplayPin_Save` 0x1938c8(pin, cursor): 0x18 bytes (0x11111114, how many kept, their keyframes' frames), then each
+/// kept highlight. (STANDIN: the game leaves the frames' unused words as its stack held them; the port writes 0.)
+pub fn pin_save(m: &mut Mem, mgr: u32, p: u32, cur: &mut u32) {
+    let at = *cur;
+    *cur = at.wrapping_add(0x18);
+    let mut rec = [0x1111_1114u32, 0, 0, 0, 0, 0];
+    for s in 0..4 {
+        let h = m.r32(p + pin::SLOTS + 4 * s);
+        if h != 0 {
+            let n = rec[1] as usize;
+            rec[2 + n] = m.r32(m.r32(h) + kf::FRAME);
+            rec[1] += 1;
+        }
+    }
+    for (i, v) in rec.iter().enumerate() {
+        m.w32(at + 4 * i as u32, *v);
+    }
+    for s in 0..4 {
+        let h = m.r32(p + pin::SLOTS + 4 * s);
+        if h != 0 {
+            highlight_save(m, mgr, h, cur);
+        }
+    }
+}
+
+/// `ReplayPin_Load` 0x1939a0(pin, cursor): each kept highlight found by its frame among the rider's and loaded; none
+/// being made
+pub fn pin_load(m: &mut Mem, mgr: u32, p: u32, cur: &mut u32) -> bool {
+    let at = *cur;
+    *cur = at.wrapping_add(0x18);
+    let n = m.r32(at + 4) as i32;
+    for i in 0..n.max(0) as u32 {
+        let frame = m.r32(at + 8 + 4 * i);
+        let h = find_highlight(m, mgr, m.r32(p), frame);
+        m.w32(p + pin::SLOTS + 4 * i, h);
+        highlight_load(m, mgr, h, cur);
+    }
+    m.w32(p + pin::MAKING, 0);
+    true
+}
+
+/// `Replay_LoadKeyframe` 0x193088(keyframe, cursor): its record (written count, frame, pins, use) and its stream
+/// unpacked (`Replay_UnpackBlock`)
+pub fn load_keyframe(m: &mut Mem, k: u32, cur: &mut u32) {
+    let at = *cur;
+    *cur = at.wrapping_add(0x18);
+    m.w32(k + 0xc, m.r32(at + 4));
+    m.w32(k + kf::FRAME, m.r32(at + 8));
+    m.w32(k + kf::PINS, m.r32(at + 0xc));
+    m.w32(k + kf::USED, m.r32(at + 0x10));
+    let size = m.r32(*cur);
+    *cur = cur.wrapping_add(4);
+    let n = decompress_mem(m, *cur, m.r32(k));
+    *cur = cur.wrapping_add(size);
+    m.w32(k + 4, m.r32(k).wrapping_add(n));
+    m.w32(k + 8, m.r32(k));
+}
+
+/// `ReplayInput_Load` 0x192a40 on memory (as `replay::Input::load`)
+pub fn input_load(m: &mut Mem, s: u32, cur: &mut u32) {
+    let at = *cur;
+    m.w32(s + 0x8000, m.r32(at + 4));
+    *cur = at.wrapping_add(8);
+    let size = m.r32(*cur);
+    *cur = cur.wrapping_add(4);
+    decompress_mem(m, *cur, s);
+    *cur = cur.wrapping_add(size);
+    let size = m.r32(*cur);
+    *cur = cur.wrapping_add(4);
+    decompress_mem(m, *cur, s + 0x6664);
+    *cur = cur.wrapping_add(size);
+}
+
+/// `Replay_LoadStream` 0x194910(cursor): a saved replay back (false when its rider count is not the race's): frozen,
+/// the header's numbers, the camera tracks, the keyframes in order, the highlights, the pad streams and pins of the
+/// riders, then the command 1 and mode 8, and each rider's lighting updated
+pub fn load_stream(m: &mut Mem, env: &mut dyn SaveEnv, mgr: u32, cur: &mut u32) -> bool {
+    let h = *cur;
+    if m.r32(h + 0x18) != riders(m) {
+        return false;
+    }
+    m.w32(mgr + 0x4c, 1);
+    m.w32(mgr + 0x38, m.r32(h + 8));
+    m.w32(mgr + 0x2c, m.r32(h + 0x10));
+    m.w32(mgr + 0x40, (m.r32(h + 0xc) != 0) as u32);
+    m.w32(mgr + END, m.r32(h + 0x14));
+    for r in (0..4).rev() {
+        m.w32(mgr + HIGHLIGHT_COUNT + 4 * r, 0);
+    }
+    m.w32(mgr + FRAME, 0);
+    *cur = h.wrapping_add(0x44);
+    m.w32(mgr + 0x10, 0);
+    m.w32(mgr + RIDER, m.r32(h + 0x2c));
+    m.w32(mgr + WRITING, 0);
+    let mut i = 0;
+    while (i as i32) < riders(m) as i32 {
+        copy_out(m, mgr + CAM_TRACKS + i * CAM_TRACK_SIZE, *cur, 0xe24);
+        *cur = cur.wrapping_add(0xe24);
+        i += 1;
+    }
+    for _ in 0..(m.r32(h + 4) as i32).max(0) {
+        let k = alloc_keyframe(m, mgr);
+        let last = m.r32(mgr + 0x10);
+        if last == 0 {
+            m.w32(mgr + FIRST, k);
+        } else {
+            m.w32(last + kf::NEXT, k);
+            m.w32(k + kf::PREV, last);
+        }
+        m.w32(mgr + 0x10, k);
+        load_keyframe(m, k, cur);
+    }
+    for r in 0..4 {
+        m.w32(count_at(mgr, r), 0);
+        let want = m.r32(h + 0x1c + 4 * r) as i32;
+        if want > 0 {
+            loop {
+                let c = m.r32(count_at(mgr, r));
+                let rec = m.r32(mgr + HL_FREE);
+                m.w32(list_at(mgr, r, c), rec);
+                m.w32(mgr + HL_FREE, m.r32(rec + hl::NEXT_FREE));
+                highlight_reset(m, m.r32(list_at(mgr, r, c)));
+                let c = m.r32(count_at(mgr, r));
+                highlight_load(m, mgr, m.r32(list_at(mgr, r, c)), cur);
+                let c = m.r32(count_at(mgr, r));
+                m.w32(count_at(mgr, r), c + 1);
+                if c as i32 + 1 >= want {
+                    break;
+                }
+            }
+        }
+    }
+    let mut n = m.r32(h + 0x18) as i32;
+    let mut i = 0;
+    while i < n {
+        let s = m.r32(mgr + INPUTS + 4 * i as u32);
+        if s != 0 {
+            input_load(m, s, cur);
+            n = m.r32(h + 0x18) as i32;
+        }
+        i += 1;
+    }
+    let mut i = 0;
+    while i < n {
+        let p = m.r32(mgr + PINS + 4 * i as u32);
+        if p != 0 {
+            pin_load(m, mgr, p, cur);
+            n = m.r32(h + 0x18) as i32;
+        }
+        i += 1;
+    }
+    m.w32(mgr + 0x28, 1);
+    m.w32(mgr + MODE, 8);
+    m.w32(mgr + PLAYLIST, 0);
+    let race = m.r32(game(m) + 0x1c);
+    let mut i = 0;
+    while (i as i32) < m.r32(race + 0x88) as i32 {
+        env.update_lighting(i);
+        i += 1;
+    }
+    true
+}
+
+// The career's replay buffer (the career block's +0x36fc, its size +0x3700, +0x3710 a replay's race set up; a
+// replay from the card starts with its race's set-up, 0x920 bytes for the career's +0x27dc)
+
+/// `Replay_AllocBuffer` 0x166800: 0x80000 bytes
+pub fn alloc_buffer(m: &mut Mem, env: &mut dyn SaveEnv, career: u32) {
+    m.w32(career + 0x3700, 0x80000);
+    let p = env.alloc(m, 0x80000);
+    m.w32(career + 0x36fc, p);
+}
+
+/// `Replay_FreeBuffer` 0x166840
+pub fn free_buffer(m: &mut Mem, env: &mut dyn SaveEnv, career: u32) {
+    let p = m.r32(career + 0x36fc);
+    env.ea_free(m, p);
+    m.w32(career + 0x36fc, 0);
+}
+
+/// `Replay_LoadRiderSetup` 0x166870 (first named `Replay_SaveRiderSetup`): the race's set-up taken back from the
+/// buffer's start (a replay from the card brings its race with it); +0x3710 set
+pub fn load_rider_setup(m: &mut Mem, career: u32) {
+    m.w32(career + 0x3710, 1);
+    let from = m.r32(career + 0x36fc);
+    copy_out(m, career + 0x27dc, from, 0x920);
+}
+
+/// `Replay_LoadFromBuffer` 0x1668a0: the replay after the set-up loaded into the game's manager, the buffer freed
+pub fn load_from_buffer(m: &mut Mem, env: &mut dyn SaveEnv, career: u32) {
+    let p = m.r32(career + 0x36fc);
+    if p != 0 {
+        let mut cur = p + 0x920;
+        let mgr = m.r32(game(m) + 0x40);
+        load_stream(m, env, mgr, &mut cur);
+        free_buffer(m, env, career);
+    }
+}

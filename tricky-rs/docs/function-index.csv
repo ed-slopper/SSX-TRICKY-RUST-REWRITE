@@ -1335,10 +1335,10 @@ address,size,name,system,status
 0x166580,20,Career_GetPlayerId,race?,ported
 0x166598,100,Career_FindRiderOfPlayer,race?,ported
 0x166600,508,Career_InitCharacterRecord,race?,ported
-0x166800,64,Replay_AllocBuffer,race?,not started
-0x166840,44,Replay_FreeBuffer,race?,not started
-0x166870,48,Replay_SaveRiderSetup,save,not started
-0x1668a0,80,Replay_LoadFromBuffer,race?,not started
+0x166800,64,Replay_AllocBuffer,race?,checked
+0x166840,44,Replay_FreeBuffer,race?,checked
+0x166870,48,Replay_LoadRiderSetup,save,checked
+0x1668a0,80,Replay_LoadFromBuffer,race?,checked
 0x1668f0,116,HighScore_Reset,race?,ported
 0x166968,240,HighScore_Insert,race?,ported
 0x166a58,536,Career_UpdateAttributes,race?,ported
@@ -2150,10 +2150,10 @@ address,size,name,system,status
 0x192f78,108,Replay_WriteLink,world?,checked
 0x192fe8,52,Replay_WriteOffset2,world?,checked
 0x193020,52,Replay_WriteOffset,world?,checked
-0x193058,8,FUN_00193058,ai?,not started
-0x193060,8,FUN_00193060,ai?,not started
+0x193058,8,FUN_00193058,ai?,checked
+0x193060,8,FUN_00193060,ai?,checked
 0x193068,28,ReplayKeyframe_Reset,ai?,checked
-0x193088,144,Replay_LoadKeyframe,ai?,not started
+0x193088,144,Replay_LoadKeyframe,ai?,checked
 0x193118,44,ReplayPin_Init,camera?,checked
 0x193148,76,ReplayPin_Delete,camera?,checked
 0x193198,52,ReplayPin_Reset,camera?,checked
@@ -2169,41 +2169,41 @@ address,size,name,system,status
 0x1935d8,500,ReplayPin_PickSlot,camera?,checked
 0x1937d0,208,ReplayPin_Commit,camera?,checked
 0x1938a0,40,ReplayPin_ClearHighlightRef,camera?,checked
-0x1938c8,212,ReplayPin_Save,save,not started
-0x1939a0,212,ReplayPin_Load,camera?,not started
+0x1938c8,212,ReplayPin_Save,save,checked
+0x1939a0,212,ReplayPin_Load,camera?,checked
 0x193a78,36,ReplayPin_InitSlot,camera?,checked
 0x193aa0,48,ReplayPin_GetHighlight,camera?,checked
 0x193ad0,8,ReplayPin_ZeroStart,camera?,checked
 0x193ad8,36,ReplayPin_SetEnd,camera?,checked
-0x193b00,208,Highlight_Save,save,not started
-0x193bd0,148,Highlight_Load,camera?,not started
+0x193b00,208,Highlight_Save,save,checked
+0x193bd0,148,Highlight_Load,camera?,checked
 0x193c68,44,Replay_StartRiderSounds,audio,ported
 0x193c98,72,Replay_Abort,race?,checked
 0x193ce0,80,Camera_IsFocusRider,camera,not started
 0x193d30,104,Replay_SaveCurrentKeyframe,save,checked
-0x193d98,220,ReplaySave_Init,save,not started
-0x193e78,152,ReplaySave_FlushChunk,save,not started
-0x193f10,96,ReplaySave_SetChunk,save,not started
-0x193f70,456,ReplaySave_Step,save,not started
-0x194138,188,ReplaySave_WriteHeader,save,not started
-0x1941f8,56,ReplaySave_EmitHeader,save,not started
-0x194230,52,ReplaySave_Reset,save,not started
-0x194268,72,ReplaySave_EmitCamTracks,save,not started
-0x1942b0,60,ReplaySave_BeginKeyframes,save,not started
-0x1942f0,268,ReplaySave_EmitKeyframe,save,not started
-0x194400,24,ReplaySave_Stage6,save,not started
-0x194418,256,ReplaySave_EmitHighlights,save,not started
-0x194518,56,ReplaySave_BeginInputs,save,not started
-0x194550,356,ReplaySave_EmitInputStream,save,not started
-0x1946b8,24,ReplaySave_Stage10,save,not started
-0x1946d0,128,ReplaySave_EmitPins,save,not started
-0x194750,80,ReplaySave_BeginPadding,save,not started
-0x1947a0,100,ReplaySave_EmitPadding,save,not started
-0x194808,24,ReplaySave_Stage14,save,not started
-0x194820,76,ReplaySave_EmitChecksum,save,not started
-0x194870,80,FUN_00194870,render?,not started
-0x1948c0,80,FUN_001948c0,render?,not started
-0x194910,888,Replay_LoadStream,world?,not started
+0x193d98,220,ReplaySave_Init,save,checked
+0x193e78,152,ReplaySave_FlushChunk,save,checked
+0x193f10,96,ReplaySave_SetChunk,save,checked
+0x193f70,456,ReplaySave_Step,save,checked
+0x194138,188,ReplaySave_WriteHeader,save,checked
+0x1941f8,56,ReplaySave_EmitHeader,save,checked
+0x194230,52,ReplaySave_Reset,save,checked
+0x194268,72,ReplaySave_EmitCamTracks,save,checked
+0x1942b0,60,ReplaySave_BeginKeyframes,save,checked
+0x1942f0,268,ReplaySave_EmitKeyframe,save,checked
+0x194400,24,ReplaySave_Stage6,save,checked
+0x194418,256,ReplaySave_EmitHighlights,save,checked
+0x194518,56,ReplaySave_BeginInputs,save,checked
+0x194550,356,ReplaySave_EmitInputStream,save,checked
+0x1946b8,24,ReplaySave_Stage10,save,checked
+0x1946d0,128,ReplaySave_EmitPins,save,checked
+0x194750,80,ReplaySave_BeginPadding,save,checked
+0x1947a0,100,ReplaySave_EmitPadding,save,checked
+0x194808,24,ReplaySave_Stage14,save,checked
+0x194820,76,ReplaySave_EmitChecksum,save,checked
+0x194870,80,FUN_00194870,render?,checked
+0x1948c0,80,FUN_001948c0,render?,checked
+0x194910,888,Replay_LoadStream,world?,checked
 0x194cc0,76,ReplayCamTrack_Init,game?,checked
 0x194d10,8,thunk_FUN_00194cc0,runtime,checked
 0x194d18,92,ReplayCamTrack_Generate,camera?,checked

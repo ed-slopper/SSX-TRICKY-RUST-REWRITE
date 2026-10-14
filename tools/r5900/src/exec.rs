@@ -3,7 +3,7 @@
 //! with `Error::Unimplemented` naming the instruction, which is the cue to add it here with a test.
 
 use crate::ps2float as pf;
-use crate::{Error, Runner, RETURN_SENTINEL, STEP_LIMIT};
+use crate::{Error, Runner, RETURN_SENTINEL};
 
 fn sext16(imm: u32) -> u64 {
     imm as u16 as i16 as i64 as u64
@@ -26,7 +26,7 @@ pub(crate) fn run(r: &mut Runner, on_step: &mut dyn FnMut(u32, &crate::Cpu)) -> 
     let mut pending: Option<u32> = None;
     while r.cpu.pc != RETURN_SENTINEL {
         r.steps += 1;
-        if r.steps > STEP_LIMIT {
+        if r.steps > r.step_limit {
             return Err(Error::TooLong { pc: r.cpu.pc });
         }
         let pc = r.cpu.pc;

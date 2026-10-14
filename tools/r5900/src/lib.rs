@@ -182,6 +182,8 @@ pub struct Runner {
     names: HashMap<u32, String>,
     /// Instructions run by the last `call`.
     pub steps: u64,
+    /// The most instructions a `call` may run before it fails with `TooLong` (5,000,000 unless a test raises it).
+    pub step_limit: u64,
     /// How floats are rounded (`ps2float::Rules`); the default is what matched the game in PCSX2.
     pub float_rules: ps2float::Rules,
 }
@@ -244,6 +246,7 @@ impl Runner {
             allowed: HashSet::new(),
             names: HashMap::new(),
             steps: 0,
+            step_limit: STEP_LIMIT,
             float_rules: ps2float::Rules::default(),
         }
     }

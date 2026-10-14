@@ -4,8 +4,8 @@ How the game records and plays back a race. Ported so far: the byte streams and 
 `tricky_game::replay`, checked: `tests/replay_streams.rs`), the replay codec (G12b, G12c: files.md), the keyframe
 list, seeking and playlists (G12d; `tricky_game::replaymgr`, checked: `tests/replaymgr.rs`), the highlights
 and pins (G12e; the same module, checked: `tests/replay_highlights.rs`), the camera tracks (G12f; checked:
-`tests/replay_camtracks.rs`), and playback control and the manager's life (G12g; checked:
-`tests/replay_playback.rs`). Keyframes, the node save and restore, pins and
+`tests/replay_camtracks.rs`), playback control and the manager's life (G12g; checked:
+`tests/replay_playback.rs`), and the save to the card and the load (G12h; checked: `tests/replay_save.rs`). Keyframes, the node save and restore, pins and
 highlights, camera tracks, `Replay_Update` and the memory-card save are the rest of G12.
 
 ## The replay control
@@ -149,8 +149,7 @@ frames of a message), +0x4c and +0x50 hold recording, +0x58 a stream overflowed.
   - `Replay_Freeze` releases all the pins the first time, then marks the replay frozen (+0x50).
   - `Replay_AddPin` and `Replay_RemovePin` allocate and delete a pin; the allocator is a call into the env here.
   - Where the game finds its manager through gApp (gApp+0x730 -> +0x40), the port is handed the manager.
-- **Not ported yet.** `Highlight_Save` / `_Load` and `ReplayPin_Save` / `_Load` go with the memory-card save. When a
-  highlight has no keyframe, its saved record's second word is whatever was on the stack.
+- **Saving and loading** highlights and pins: G12h, below.
 - **Checked in the runner:** 3,000 random managers (keyframes, the pool and the riders' lists, pins), with 25 random
   calls each over the 26 entry points. Every result and all the memory were compared after each call. Highlights
   begun, inserted and dropped, slots picked and commits that kept their highlight all happen many times.
@@ -262,4 +261,43 @@ frames of a message), +0x4c and +0x50 hold recording, +0x58 a stream overflowed.
     HUD and camera call, and all the memory were compared. Every mode and command occurs. The 17 cases where the
     game traps or never ends stop on both sides.
   - Set-up: 200 random cases, 76 of them through `ReplayMgr_Init`.
+
+## The save to the card and the load (G12h)
+
+- **The writer's state** is kept in the manager from +0x40a8 (see `replaymgr.rs`). `ReplaySave_Init` allocates two
+  buffers: a 16 KB chunk (filled with 0xdeadc0de) and a 0xc800-byte scratch buffer (filled with 0xdeadc0ed). It
+  starts the sum at 0xdeadbeef.
+- **`ReplaySave_Step`** fills the next 16 KB chunk and returns its address and length; when it is done it returns 0.
+  Each stage hands over a piece (`ReplaySave_SetChunk`), which adds the piece's length to a byte count and its
+  signed bytes to the sum. `ReplaySave_FlushChunk` copies as much of the piece as fits into the chunk. The stages:
+  - 0-1: the 0x44-byte header: 0x12300003, the keyframes (not counting the one being written), +0x38, +0x40,
+    +0x2c, +0x30, the race's riders (race +0x7c), the four highlight counts and the rider;
+  - 2-3: each rider's camera track (0xe24 bytes);
+  - 4-5: each keyframe except the one being written. First a 0x18-byte record (0x11111113, the bytes written, the
+    frame, pins, use, 0x11111111), then its stream compressed (`Compress_Block` mode 0) after its length;
+  - 7: every rider's highlights (`Highlight_Save`, 0x20 bytes each: 0x11111115, kind, the keyframe's frame,
+    length, the two scores, the keyframe's place in the list, rider);
+  - 8-9: each pad stream: an 8-byte header (0x11111112, the count), then the 0x6664 bytes of words and the 0x1999
+    bytes of runs, each compressed after its length;
+  - 11: the pins (`ReplayPin_Save`: 0x11111114, how many highlights are kept, their keyframes' frames, then those
+    highlights);
+  - 12-13: zeros up to 0x7f6d8 bytes;
+  - 15: the byte count and the sum. A save is always 0x7f6e0 bytes.
+- **The load.** `Replay_LoadStream` refuses a save whose rider count is not the race's. Otherwise it reads back,
+  frozen (+0x4c): the header's numbers, the camera tracks, the keyframes in order (`Replay_LoadKeyframe`: the record,
+  then the stream unpacked), the highlights from the free pool (each keyframe found by its place), the riders' pad
+  streams (`ReplayInput_Load`), and the pins (each kept highlight found by its frame). It then sets command 1 and
+  mode 8, and updates each rider's lighting.
+- **The career's replay buffer** is 0x80000 bytes at the career block's +0x36fc. `Replay_LoadRiderSetup`
+  (0x166870; first named `Replay_SaveRiderSetup`) copies the race's set-up from the buffer's first 0x920 bytes into
+  the career's +0x27dc: `EAMem_Copy` takes the destination first. `Replay_LoadFromBuffer` loads the replay that
+  follows the set-up and frees the buffer.
+- **STANDIN.** In two places the game writes stack words it never set, and the port writes 0:
+  - a highlight with no keyframe saves its second word from the stack;
+  - a pin with fewer than four kept highlights leaves the unused frame words as the stack held them.
+- **Checked in the runner:** 12 random managers (with every pin slot filled and every highlight on a keyframe).
+  Each save was compared chunk by chunk (384 chunks), with the writer's state and all the memory after each step.
+  The game's saved bytes were then loaded back on both sides, directly or (every other save) through the career's
+  buffer, and compared again; then the buffers were freed. The runner's step limit is now set per runner
+  (`step_limit`), because the game's compression of a pad stream runs past five million instructions.
 
