@@ -66,6 +66,8 @@ impl Calls for TC {
     }
 }
 
+const Q0: u32 = 0x348950;
+const Q1: u32 = 0x348dc8;
 const G0: u32 = 0x348dc8;
 const G1: u32 = 0x3495d0;
 
@@ -77,6 +79,9 @@ struct World {
     ev: u32,
     sounds: [u32; 4],
     scratch: u32,
+    q1: u32,
+    q4: u32,
+    q6: u32,
     log: Rc<RefCell<Log>>,
 }
 
@@ -99,7 +104,8 @@ fn world() -> Option<World> {
     let ev = r.mem.alloc(0x10);
     let sounds = [(); 4].map(|_| r.mem.alloc(0x20));
     let scratch = r.mem.alloc(0x10);
-    Some(World { r, table, banks, evbanks, ev, sounds, scratch, log })
+    let (q1, q4, q6) = (r.mem.alloc(0x200), r.mem.alloc(0x10), r.mem.alloc(0x50));
+    Some(World { r, table, banks, evbanks, ev, sounds, scratch, q1, q4, q6, log })
 }
 
 type Image = Vec<(u32, Vec<u8>)>;
@@ -240,6 +246,26 @@ fn build(g: &mut Rng, w: &World) -> Image {
         rec[0xc..0x10].copy_from_slice(&w.sounds[g.below(4) as usize].to_le_bytes());
         put(&mut img, r, &rec);
     }
+    // the event queue
+    let mut qn = vec![0u8; (Q1 - Q0) as usize];
+    for b in qn.iter_mut() {
+        *b = g.next() as u8;
+    }
+    put(&mut img, Q0, &qn);
+    put(&mut img, Q0, &u32s(&[[0xffff_ffff, 1, 2, 3][g.below(4) as usize], g.below(10), g.below(20)]));
+    let mut q1b = vec![0u8; 0x200];
+    for b in q1b.iter_mut() {
+        *b = g.next() as u8;
+    }
+    put(&mut img, w.q1, &q1b);
+    let mut q4b = vec![0u8; 0x10];
+    for b in q4b.iter_mut() {
+        *b = g.next() as u8;
+    }
+    q4b[3] = ((g.below(6) << 2) | g.below(4)) as u8;
+    put(&mut img, w.q4, &q4b);
+    let q6b: Vec<u8> = (0..0x50).map(|_| g.next() as u8).collect();
+    put(&mut img, w.q6, &q6b);
     // the generator (some words about to carry) and the variant history
     let rw: Vec<u32> = (0..6).map(|_| [g.next(), 0xffff_ffff, 0xffff_fffe, 0, g.next()][g.below(5) as usize]).collect();
     put(&mut img, 0x349528, &u32s(&rw));
@@ -275,12 +301,15 @@ fn apply(w: &mut World, sm: &mut SM, img: &Image) {
 fn dump(w: &mut World) -> Vec<u8> {
     let mut out = vec![0u8; (G1 - G0) as usize];
     w.r.mem.read(G0, &mut out).unwrap();
+    let mut q = vec![0u8; (Q1 - Q0) as usize];
+    w.r.mem.read(Q0, &mut q).unwrap();
+    out.extend(q);
     for &(a, n) in w
         .banks
         .iter()
         .map(|b| (*b, 0x100usize))
         .chain(w.evbanks.iter().map(|b| (*b, 0x100)))
-        .chain([(w.table, 0x40usize)])
+        .chain([(w.table, 0x40usize), (w.q1, 0x200)])
         .collect::<Vec<_>>()
         .iter()
     {
@@ -293,12 +322,13 @@ fn dump(w: &mut World) -> Vec<u8> {
 
 fn dump_sm(w: &World, sm: &SM) -> Vec<u8> {
     let mut out: Vec<u8> = (G0..G1).map(|a| sm.r8(a)).collect();
+    out.extend((Q0..Q1).map(|a| sm.r8(a)));
     for &(a, n) in w
         .banks
         .iter()
         .map(|b| (*b, 0x100u32))
         .chain(w.evbanks.iter().map(|b| (*b, 0x100)))
-        .chain([(w.table, 0x40u32)])
+        .chain([(w.table, 0x40u32), (w.q1, 0x200)])
         .collect::<Vec<_>>()
         .iter()
     {
@@ -336,7 +366,7 @@ fn run(seed: u64, n: u32, mut args: impl FnMut(&mut Rng, &World) -> Vec<u64>, ad
         let mine_mem = dump_sm(&w, &sm);
         if mine_mem != theirs {
             let at = mine_mem.iter().zip(&theirs).position(|(x, y)| x != y).unwrap();
-            panic!("{addr:#x} case {case} memory differs at +{at:#x} (of {:#x}): port {:#x} game {:#x}, args {a:x?}", G0 + at as u32, mine_mem[at], theirs[at]);
+            panic!("{addr:#x} case {case} memory differs at +{at:#x}: port {:#x} game {:#x}, args {a:x?}", mine_mem[at], theirs[at]);
         }
         let mine = log.borrow();
         assert_eq!((&mine.released, mine.stopped), (&their_log.released, their_log.stopped), "case {case} calls");
@@ -430,4 +460,20 @@ fn random_and_history() {
     );
     run(65, 30000, |g, _| vec![[1u64, 2, 3, 5, 8, 20, 40, 40, 20][g.below(9) as usize], g.below(3) as u64], 0x2be908, |m, _, a| pick_variant(m, a[0] as i32, a[1] as u16) as u64, 0xffff_ffff);
     run(66, 4000, |g, w| vec![g.below(256) as u64, g.below(256) as u64, w.sounds[g.below(4) as usize] as u64], 0x2be650, |m, _, a| mask_match(m, a[0] as u8, a[1] as u8, a[2] as u32) as u64, 0xff);
+}
+
+#[test]
+fn event_queue() {
+    run(70, 3000, |_, _| vec![], 0x2bdae0, |m, _, _| { clear_queue(m); 0 }, 0);
+    run(71, 3000, |g, _| vec![[0xffff_ffffu64 as i32 as i64 as u64, 1, 2, 3, 7][g.below(5) as usize]], 0x2bdc70, |m, _, a| has_queued(m, a[0] as i32) as u64, 0xff);
+    run(72, 3000, |g, w| vec![w.q1 as u64 + 32, (g.below(200) as i64 - 20) as u64, 0], 0x2bc9a0, |m, _, a| test_bit(m, a[0] as u32, a[1] as i32) as u64, 0xffff_ffff);
+    run(73, 3000, |_, w| vec![w.q1 as u64], 0x2bdad0, |m, _, a| { clear_flags(m, a[0] as u32); 0 }, 0);
+    run(
+        74,
+        20000,
+        |g, w| vec![w.q1 as u64, [0xffff_ffffu64 as i32 as i64 as u64, 1, 2, 3][g.below(4) as usize], g.next() as u64, w.q4 as u64, g.next() as u8 as u64, w.q6 as u64],
+        0x2bdb68,
+        |m, _, a| { queue_event(m, a[0] as u32, a[1] as i32, a[2] as u32, a[3] as u32, a[4] as u8, a[5] as u32); 0 },
+        0,
+    );
 }

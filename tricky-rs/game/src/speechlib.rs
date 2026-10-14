@@ -555,3 +555,106 @@ pub fn pick_variant(m: &mut dyn Mem, n: i32, tag: u16) -> u32 {
         }
     }
 }
+
+// ---- the event queue (0x2bdad0..0x2bdc70): up to eight events waiting for one sound system id
+
+const Q_ID: u32 = 0x348950;
+const Q_COUNT: u32 = 0x348954;
+const Q_ENTRIES: u32 = 0x348958;
+const Q_RECS: u32 = 0x348adc;
+
+/// 0x2bc9a0: bit `n` of the bytes at `p`, as the byte it is in (0 when clear).
+pub fn test_bit(m: &dyn Mem, p: u32, n: i32) -> u32 {
+    let mut k = n.wrapping_add(7);
+    if -1 < n {
+        k = n;
+    }
+    let byte = m.r8(p.wrapping_add((k >> 3) as u32)) as u32;
+    byte & (1u32 << ((n.wrapping_add((k >> 3).wrapping_mul(-8))) as u32 & 0x1f)) & 0xff
+}
+
+/// 0x2bdad0: clear the two flag bytes at +0x60 and +0x61 of `p`.
+pub fn clear_flags(m: &mut dyn Mem, p: u32) {
+    m.w8(p + 0x60, 0);
+    m.w8(p + 0x61, 0);
+}
+
+/// 0x2bdae0: empty the queue: no id (-1), nothing queued, the eight 0x5c-byte records' flags cleared and the 48
+/// entries (two ids 0xffff, two words 0).
+pub fn clear_queue(m: &mut dyn Mem) {
+    m.w32(Q_ID, 0xffff_ffff);
+    m.w32(Q_COUNT, 0);
+    m.w32(Q_ENTRIES, 0);
+    m.w32(Q_RECS, 0);
+    let mut p = Q_ID;
+    loop {
+        m.w32(p + 400, 0);
+        m.w8(p + 0x194, 0);
+        m.w8(p + 0x195, 0);
+        m.w8(p + 0x197, 0);
+        if 0x348c2f < (p + 0x5c) as i32 {
+            break;
+        }
+        m.w32(p + 0x1e8, 0);
+        p += 0x5c;
+    }
+    let mut q = 0x348962u32;
+    for _ in 0..48 {
+        m.w16(q - 6, 0xffff);
+        m.w16(q - 4, 0xffff);
+        m.w16(q - 2, 0);
+        m.w16(q, 0);
+        q += 8;
+    }
+}
+
+/// 0x2bdc70: events are queued for the id `id`.
+pub fn has_queued(m: &dyn Mem, id: i32) -> bool {
+    m.r32(Q_ID) as i32 == id && 0 < m.r32(Q_COUNT) as i32
+}
+
+/// 0x2bdb68: queue an event for sound system id `id` (the queue takes one id at a time, up to eight events; a ninth
+/// bumps the count to nine without storing). `list` is the sound's entry list (u16 triples and a byte index), `a`
+/// the word kept at +0, `bank` the sound header (its byte +3 / 4 entries are copied), `flag` the byte at +8 and
+/// `words` twenty words kept at +0xc.
+pub fn queue_event(m: &mut dyn Mem, list: u32, id: i32, a: u32, bank: u32, flag: u8, words: u32) {
+    let count = m.r32(Q_COUNT) as i32;
+    let cur = m.r32(Q_ID) as i32;
+    let mut new_count = count;
+    if cur < 0 || cur == id {
+        new_count = count.wrapping_add(1);
+        if count < 8 {
+            let rec = Q_RECS.wrapping_add((count as u32).wrapping_mul(0x5c));
+            m.w32(Q_ID, id as u32);
+            m.w32(Q_COUNT, count.wrapping_add(1) as u32);
+            m.w32(rec, a);
+            m.w32(rec + 4, bank);
+            m.w8(rec + 8, flag);
+            for k in 0..20 {
+                let v = m.r32(words + 4 * k);
+                m.w32(rec + 0xc + 4 * k, v);
+            }
+            m.w8(rec + 9, 1);
+            let n = (m.r8(bank + 3) >> 2) as u32;
+            if n != 0 {
+                let base = Q_ENTRIES.wrapping_add(8).wrapping_add((m.r32(Q_ENTRIES)).wrapping_mul(8));
+                let mut out = base;
+                let mut src = list;
+                for _ in 0..n {
+                    let (x, y) = (m.r16(src), m.r16(src + 2));
+                    m.w16(out - 4, x);
+                    m.w16(out - 2, y);
+                    let idx = m.r8(src + 6) as u32;
+                    let v = m.r8(list.wrapping_add(idx).wrapping_add(0x62)) as u16;
+                    m.w16(out, v);
+                    src += 8;
+                    out += 8;
+                }
+            }
+            let total = m.r32(Q_ENTRIES).wrapping_add(n);
+            m.w32(Q_ENTRIES, total);
+            new_count = m.r32(Q_COUNT) as i32;
+        }
+    }
+    m.w32(Q_COUNT, new_count as u32);
+}
