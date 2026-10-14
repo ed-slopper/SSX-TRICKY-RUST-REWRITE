@@ -39,7 +39,22 @@ BATCH = 4096  # commands per message, well under PINE's buffer
 
 class Pine:
     def __init__(self, port=PORT):
-        self.sock = socket.create_connection(("127.0.0.1", port), timeout=5)
+        if sys.platform == "win32":
+            self.sock = socket.create_connection(("127.0.0.1", port), timeout=5)
+            return
+        # Linux and macOS: a Unix socket in the runtime folder (pcsx2.sock, or pcsx2.sock.<slot> off the default);
+        # the Flatpak build's runtime folder is seen from outside under .flatpak/net.pcsx2.PCSX2/xdg-run
+        import os
+        name = "pcsx2.sock" if port == PORT else f"pcsx2.sock.{port}"
+        run = os.environ.get("XDG_RUNTIME_DIR") or os.environ.get("TMPDIR") or "/tmp"
+        paths = [os.path.join(run, name), os.path.join(run, ".flatpak", "net.pcsx2.PCSX2", "xdg-run", name)]
+        for path in paths:
+            if os.path.exists(path):
+                self.sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+                self.sock.settimeout(5)
+                self.sock.connect(path)
+                return
+        raise ConnectionError(f"no PINE socket at {' or '.join(paths)} (is PCSX2 running with PINE on?)")
 
     def _recv(self, n):
         out = b""
