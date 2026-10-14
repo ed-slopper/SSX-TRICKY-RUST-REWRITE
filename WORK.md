@@ -109,7 +109,7 @@ state machine and the renderer are ours. Nothing has been checked against the or
 | G7c | Sky, fog, distance culling, `.ltg` grid use | unowned | G7, E3e | | [est] |
 | G7d | Lights and halos, glows, lens flares | unowned | G7 | | [repo] "lights/halos" not done |
 | G7e | Particles as the VU1 microcode draws them (0x31c288), spark and dust sprites | unowned | G7 | | [repo] "Unresolved: spark and dust sprite rendering"; `particles.rs` has the emitters |
-| G7f2 | The app's `tracks.rs` on `boardtrack::board_track` (the strip object with the game's lit side, fade-in and 90-point fade-out; the port's `Trail::update` has its own rules: a point every 110 cm, 5.1 degrees, 10 cm of width) and the game's depth per surface (1, 2, 8, 15, 16: 0.0286; 3, 4: 0.0167; 5: 0.1997) | any | G7f1 | | Gap of G7f |
+| G7f2 | The app's `tracks.rs` on `boardtrack::board_track` (the strip object with the game's lit side, fade-in and 90-point fade-out; the port's `Trail::update` has its own rules: a point every 110 cm, 5.1 degrees, 10 cm of width) and the game's depth per surface (1, 2, 8, 15, 16: 0.0286; 3, 4: 0.0167; 5: 0.1997) | any | G7f1 | trailrig/heron (2026-10-13) | Gap of G7f |
 | G7g | Rider shading and shadows, board reflections (env materials) | unowned | G7, E4 | | [est] |
 | G7h | World animations checked: `cTexFlipNode` 0x142e90, `cUVScrollNode` 0x141ff0, `cAnimDeltaNode` 0x199d10, `cFlagNode` 0x144938, `cAnimObjectNode` 0x198810 | any | E9 | | [repo] `worldanim.rs` |
 | G8 | HUD: `HUD_DrawPlayerSprites` 0x1a2c40, `HUD_DrawPlayerText` 0x1a4f70, `HUD_DrawSprite` 0x1c0068, all of it at 640×480, with the game's text from `american.loc` | unowned | E5 | | [repo] `hudsprites.rs`, `sfnfont.rs` partly done |
