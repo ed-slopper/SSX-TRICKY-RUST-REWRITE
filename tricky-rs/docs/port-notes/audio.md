@@ -286,3 +286,14 @@ reads the same table from the end). `SndVoice_SetVolume` 0x20ae28 scales the vol
 to 0..127, and sends it to the voice's engine (1 and 2 under the sound lock, 3 the stream) unless within four of the last
 one sent; -1 means stop. The scale is read as the hardware does (a denormal is zero; an exponent of 255 is a big number,
 not a NaN, so tests keep it out). `SndVoice_IsDone` 0x20a8e0 asks the engine the voice is in.
+
+## BANKS.INF (`tricky_data::audiocfg::{ingame_banks, fe_banks}`)
+
+`Audio_LoadInGameConfig` reads `[GLOBAL]` for the last `BASEPATH`, then every section whose name contains the course's
+upper-cased name (`strstr` on the section name, so case matters and an empty course matches all): `BASEPATH` changes the
+base path for the rest of the section, `MAIN` / `BOARD` / `BANK` / `CROWD` / `AUX` / `TRICKY` load `base + file` into slots
+0 to 5 (`BankManager_LoadIfChanged`), `SWAP` appends to the swap list at +0x38e0. `Audio_LoadFEConfig` does the same for
+section `FE`: `MAIN` into slot 0, `CHARSPCH<n>` into slot 7. The game compares the reader's token buffer, which a read
+`BASEPATH` value has overwritten, so a section whose base path is "MAIN" loads a bank. A key without a readable value uses
+the file name left from before, and the first one the stack's: the `_checked` functions say when that happened (the
+tests skip it). The disc's own BANKS.INF is not in this repo, so the tests run the originals on generated text.
