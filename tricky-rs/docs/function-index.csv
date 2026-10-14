@@ -1438,8 +1438,8 @@ address,size,name,system,status
 0x16dcc0,36,cOfflineObject::~cOfflineObject,game?,not started
 0x16dce8,64,cOfflineObject::__tf,runtime,host
 0x16dd68,60,CamCamera::CamCamera,camera,ported
-0x16dda8,16,CamCamera::GetView,camera,not started
-0x16ddb8,20,CamCamera::GetLens,camera,not started
+0x16dda8,16,CamCamera::GetView,camera,checked
+0x16ddb8,20,CamCamera::GetLens,camera,checked
 0x16ddd0,56,FUN_0016ddd0,camera?,not started
 0x16de00,124,StaticInit_CamCamera,camera,not started
 0x16de80,80,CamCamera::__tf,runtime,host
@@ -1497,22 +1497,22 @@ address,size,name,system,status
 0x1722e8,3540,CamCamera_EvalLookAt,camera,ported
 0x1730c0,24,FUN_001730c0,camera?,not started
 0x1730e0,124,StaticInit_CamCamera2,camera,not started
-0x1731f8,116,Camera_ResetRiderTrack,camera,not started
+0x1731f8,116,Camera_ResetRiderTrack,camera,checked
 0x173270,1456,Camera_TrackRider,camera,ported
 0x173820,460,BxCamera_Init,camera,not started
 0x1739f0,108,FUN_001739f0,camera?,not started
 0x173a60,36,Camera_CutForReset,camera,ported
-0x173a88,12,CamControl_Reset,boarder?,not started
-0x173a98,384,Camera_Reset,camera,not started
-0x173c18,44,Camera_GetFocusPoint,camera,not started
-0x173c50,440,Camera_SetFocusRider,camera,not started
-0x173e08,104,Camera_GetModeIndex,camera,not started
-0x173e70,60,Camera_CycleMode,camera,not started
-0x173eb0,8,Camera_SetModeIndex,camera,not started
-0x173eb8,168,Camera_ApplyModeIndex,camera,not started
-0x173f60,164,Camera_RiderSlotIndex,camera,not started
-0x174008,8,Camera_GetFocusRider,camera,not started
-0x174010,444,Camera_UpdateRiderTracks,camera,not started
+0x173a88,12,CamControl_Reset,boarder?,checked
+0x173a98,384,Camera_Reset,camera,checked
+0x173c18,44,Camera_GetFocusPoint,camera,checked
+0x173c50,440,Camera_SetFocusRider,camera,checked
+0x173e08,104,Camera_GetModeIndex,camera,checked
+0x173e70,60,Camera_CycleMode,camera,checked
+0x173eb0,8,Camera_SetModeIndex,camera,checked
+0x173eb8,168,Camera_ApplyModeIndex,camera,checked
+0x173f60,164,Camera_RiderSlotIndex,camera,checked
+0x174008,8,Camera_GetFocusRider,camera,checked
+0x174010,444,Camera_UpdateRiderTracks,camera,checked
 0x1741d0,104,Math_AngleDiff,camera?,checked
 0x174238,1612,Camera_SmoothOutput,camera,ported
 0x174888,684,cBxCamera::EvalNamedCam,camera,ported
@@ -1520,7 +1520,7 @@ address,size,name,system,status
 0x174c30,24,Camera_StartCutFade,camera,not started
 0x174c48,16,Camera_ForceCutFade,camera,ported
 0x174c58,20,CamScript_UpdateCutFade,camera?,ported
-0x174c70,40,Camera_ChaseIfIdle,camera,not started
+0x174c70,40,Camera_ChaseIfIdle,camera,checked
 0x174c98,144,CamScript_CutTo,camera?,not started
 0x174d28,1832,CamScript_BlendLinear,camera?,ported
 0x175450,1464,CamScript_BlendOrbit,camera?,ported
@@ -1538,8 +1538,8 @@ address,size,name,system,status
 0x176f38,232,CamScript_ResetActorAnims,race?,not started
 0x177020,84,RaceScene_UpdateCastClips,boarder?,not started
 0x177078,1308,cBxCamera::vf1_177078,camera,not started
-0x1776d0,28,Camera_SetMode,camera,not started
-0x1776f0,100,Camera_SetLookBack,camera,not started
+0x1776d0,28,Camera_SetMode,camera,checked
+0x1776f0,100,Camera_SetLookBack,camera,checked
 0x177758,120,Cam_Shake,camera,ported
 0x1777d0,488,Cam_StageAreaToWorld,camera,ported
 0x1779b8,660,World_GetStageAreaMarker,world,not started
@@ -1562,11 +1562,12 @@ address,size,name,system,status
 0x1783e8,228,Camera_LoadCmlFiles,camera,ported
 0x1784d0,240,cCamControl::vf1_1784d0,boarder,not started
 0x1785c0,188,Camera_SetReplayMode,camera,checked
-0x1786c0,12,Camera_GetPreset,camera,not started
-0x1786d0,660,Camera_SelectPreset,camera,not started
-0x178968,188,Camera_GetChaseParams,camera,not started
-0x178a28,448,Camera_SetChaseParams,camera,not started
-0x178be8,472,Camera_AdjustChase,camera,not started
+0x178680,60,Camera_NextPreset,camera,checked
+0x1786c0,12,Camera_GetPreset,camera,checked
+0x1786d0,660,Camera_SelectPreset,camera,checked
+0x178968,188,Camera_GetChaseParams,camera,checked
+0x178a28,448,Camera_SetChaseParams,camera,checked
+0x178be8,472,Camera_AdjustChase,camera,checked
 0x178dc0,8,cCamControl::vf2_178dc0,boarder,not started
 0x178dc8,116,Camera_StaticDtor,camera,not started
 0x178f50,80,cCamControl::__tf,runtime,host
@@ -2181,7 +2182,7 @@ address,size,name,system,status
 0x193bd0,148,Highlight_Load,camera?,checked
 0x193c68,44,Replay_StartRiderSounds,audio,ported
 0x193c98,72,Replay_Abort,race?,checked
-0x193ce0,80,Camera_IsFocusRider,camera,not started
+0x193ce0,80,Camera_IsFocusRider,camera,checked
 0x193d30,104,Replay_SaveCurrentKeyframe,save,checked
 0x193d98,220,ReplaySave_Init,save,checked
 0x193e78,152,ReplaySave_FlushChunk,save,checked
