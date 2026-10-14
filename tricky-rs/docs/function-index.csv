@@ -3193,8 +3193,8 @@ address,size,name,system,status
 0x1eab90,1300,cPS2LensFXObjNode::vf12_1eab90,world,not started
 0x1eb0a8,1236,cPS2LensFXObjNode::vf13_1eb0a8,world,not started
 0x1eb580,80,cPS2LensFXObjNode::__tf,runtime,host
-0x1eb5d0,232,cReplayControlOverlay::cReplayControlOverlay,frontend,not started
-0x1eb6b8,20,cReplayControlOverlay::~cReplayControlOverlay,frontend,not started
+0x1eb5d0,232,cReplayControlOverlay::cReplayControlOverlay,frontend,checked
+0x1eb6b8,20,cReplayControlOverlay::~cReplayControlOverlay,frontend,checked
 0x1eb6d0,3700,cReplayControlOverlay::Update,frontend,checked
 0x1ec548,476,cReplayControlOverlay::Reset,frontend,checked
 0x1ec728,176,ReplayControl_Slide,frontend,checked
@@ -3205,10 +3205,12 @@ address,size,name,system,status
 0x1eded0,28,ReplayControl_ShowMessage,frontend,checked
 0x1edef0,1904,ReplayControl_DrawStrip,frontend?,checked
 0x1ee660,136,Gfx_BeginScreenSpace,render,not started
+0x1ee660,136,Gfx_BeginScreenSpace,render,checked
 0x1ee6e8,52,Gfx_EndScreenSpace,render,not started
+0x1ee6e8,56,Gfx_EndScreenSpace,render,checked
 0x1ee720,1760,HUD_DrawStartSelectPrompt,hud,checked
 0x1eee00,2060,ReplayControl_DrawKey,hud?,checked
-0x1ef610,320,ReplayOverlay_Init,frontend,not started
+0x1ef610,320,ReplayOverlay_Init,frontend,checked
 0x1ef750,156,RaceMenuOverlay_UpdateSave,save,not started
 0x1ef7f0,292,RaceMenuOverlay_BeginSaveReplay,save,checked
 0x1ef918,116,RaceMenuOverlay_EndSaveReplay,save,checked
@@ -3223,7 +3225,7 @@ address,size,name,system,status
 0x1f0468,20,cReplayOverlay::SaveDone,frontend,checked
 0x1f0480,20,cReplayOverlay::SaveAbort,frontend,checked
 0x1f0498,32,cReplayOverlay::vf2_1f0498,frontend,not started
-0x1f05a0,476,cReplayOverlay::~cReplayOverlay,frontend,not started
+0x1f05a0,476,cReplayOverlay::~cReplayOverlay,frontend,checked
 0x1f0780,84,cReplayOverlay::__tf,runtime,host
 0x1f0808,80,cReplayControlOverlay::__tf,runtime,host
 0x1f08d0,1412,Streak_Draw,frontend?,not started

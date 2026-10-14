@@ -194,7 +194,7 @@ fn build(g: &mut Rng, r: &mut Runner, a: &At) {
     }
     w(r, a.race() + 0x34, (g.below(6) == 0) as u32);
     w(r, a.game() + 0x10, a.b + 0x4800);
-    for slot in [0x1c4u32, 0x1d4, 0x1e4, 0x1f4, 0x1fc] {
+    for slot in [0x8cu32, 0x94, 0xb4, 0x10c, 0x1c4, 0x1d4, 0x1e4, 0x1f4, 0x1fc] {
         r.mem.write_u16(a.b + 0x4800 + slot - 4, 0);
         w(r, a.b + 0x4800 + slot, RENDERER + slot);
     }
@@ -275,6 +275,8 @@ fn build(g: &mut Rng, r: &mut Runner, a: &At) {
         c += g.below(120);
     }
     w(r, o + 0x348, a.b + 0x4b80);
+    w(r, a.app() + 0x60, a.b + 0x4b80);
+    w(r, o + 0x42c, o + 0x44c);
     w(r, a.b + 0x4b8c, 10 + g.below(20));
     w(r, a.app() + 0x58, [0, 2, 3, 4][g.below(4) as usize]);
     w(r, o + 0x354, fpick(g, &ys));
@@ -969,13 +971,18 @@ impl PanelEnv for Draw {
     fn fill_rect(&mut self, x: f32, y: f32, w: f32, h: f32) {
         self.0.borrow_mut().quad("fill", x, y, w, h);
     }
-    fn screen_space(&mut self, begin: bool, o: u32) {
-        self.0.borrow_mut().push("screen", begin as u32, o);
-    }
 }
 impl DrawEnv for Draw {
     fn renderer(&mut self, slot: u32, a1: u32, a2: u32) {
         self.0.borrow_mut().push("rend", slot, a1 | a2 << 16);
+    }
+    fn renderer_this(&mut self, slot: u32) {
+        self.0.borrow_mut().push("rend this", slot, 0);
+    }
+    fn renderer_view(&mut self, _slot: u32, v: [f32; 6]) {
+        let mut l = self.0.borrow_mut();
+        l.quad("view", v[0], v[1], v[2], v[3]);
+        l.push("view", fbits(v[4]), fbits(v[5]));
     }
     fn sprite_rect(&mut self, set: u32, id: u32) -> u32 {
         self.0.borrow_mut().push("rect", set, id);
@@ -1037,6 +1044,16 @@ impl DrawEnv for Draw {
 
 fn stub_draw(r: &mut Runner, l: &L) {
     r.allow(0x1ecea0);
+    for slot in [0x8cu32, 0x94, 0x10c] {
+        let l2 = l.clone();
+        r.stub(RENDERER + slot, move |_, _| l2.borrow_mut().push("rend this", slot, 0));
+    }
+    let l2 = l.clone();
+    r.stub(RENDERER + 0xb4, move |c, _| {
+        let mut l = l2.borrow_mut();
+        l.quad("view", c.f(12), c.f(13), c.f(14), c.f(15));
+        l.push("view", fbits(c.f(16)), fbits(c.f(17)));
+    });
     for slot in [0x1c4u32, 0x1d4, 0x1e4, 0x1f4, 0x1fc] {
         let l2 = l.clone();
         r.stub(RENDERER + slot, move |c, _| {
@@ -1106,10 +1123,8 @@ fn stub_draw(r: &mut Runner, l: &L) {
             l2.borrow_mut().quad(name, c.f(12), c.f(13), c.f(14), c.f(15));
         });
     }
-    for (addr, begin) in [(0x1ee660u32, 1u32), (0x1ee6e8, 0)] {
-        let l2 = l.clone();
-        r.stub(addr, move |c, _| l2.borrow_mut().push("screen", begin, arg(c, 4)));
-    }
+    r.allow(0x1ee660);
+    r.allow(0x1ee6e8);
     let l2 = l.clone();
     r.stub(0x1a9bb8, move |c, _| {
         let mut l = l2.borrow_mut();
@@ -1288,5 +1303,96 @@ fn leftovers_match_the_original() {
         r.call(f).unwrap();
         assert!(l.borrow().calls.is_empty());
         compare(&mut r, &a, &m, "end race handler");
+    }
+}
+
+// ---- the overlays' constructors and destructors (G12q) ----
+
+/// The runner's stack top (`r5900`'s `STACK_TOP`, 0x1ff0000): `~cReplayOverlay` takes 384 bytes and stores its stack
+/// pointer, where its copy of the construction vtable lies
+const DTOR_SP: u32 = 0x01ff_0000 - 384;
+
+struct Life(L);
+impl LifeEnv for Life {
+    fn backdrop_init(&mut self, _m: &mut Mem, b: u32) {
+        self.0.borrow_mut().push("backdrop", b, 0);
+    }
+    fn save_overlay_init(&mut self, _m: &mut Mem, o: u32) {
+        self.0.borrow_mut().push("save", o, 0);
+    }
+    fn loc(&mut self, id: u32) -> u32 {
+        self.0.borrow_mut().push("loc", id, 0);
+        loc_ptr(id)
+    }
+    fn wstr_copy(&mut self, _m: &mut Mem, dst: u32, s: u32) {
+        self.0.borrow_mut().push("wstr", dst, s);
+    }
+    fn measure_box(&mut self, font: u32, s: u32) -> u32 {
+        let mut l = self.0.borrow_mut();
+        l.push("box", font, s);
+        l.take()
+    }
+    fn backdrop_destroy(&mut self, _m: &mut Mem, b: u32, flags: u32) {
+        self.0.borrow_mut().push("~backdrop", b, flags);
+    }
+    fn mc_manager_destroy(&mut self, _m: &mut Mem, o: u32) {
+        self.0.borrow_mut().push("~mc", o, 0);
+    }
+    fn delete(&mut self, p: u32) {
+        self.0.borrow_mut().push("delete", p, 0);
+    }
+    fn stack_vtable(&mut self) -> u32 {
+        DTOR_SP
+    }
+}
+
+#[test]
+fn constructors_and_destructors_match_the_original() {
+    let Some(mut r) = runner() else { return };
+    let (a, l) = setup(&mut r);
+    r.allow(0x195690);
+    log(&mut r, &l, 0x1a8900, "backdrop", 1);
+    log(&mut r, &l, 0x1b8568, "save", 1);
+    let l2 = l.clone();
+    r.stub(0x2c5160, move |c, _| {
+        l2.borrow_mut().push("loc", arg(c, 5), 0);
+        c.set_gpr(2, loc_ptr(arg(c, 5)) as u64);
+    });
+    log(&mut r, &l, 0x17cc80, "wstr", 2);
+    let l2 = l.clone();
+    r.stub(0x19dc78, move |c, m| {
+        assert_eq!(c.f(12), 1.0);
+        let mut l = l2.borrow_mut();
+        l.push("box", arg(c, 4), arg(c, 5));
+        let v = l.take();
+        m.write_u32(arg(c, 6) + 8, v);
+    });
+    let l2 = l.clone();
+    r.stub(0x1bff78, move |c, _| l2.borrow_mut().push("~backdrop", arg(c, 4), arg(c, 5)));
+    let l2 = l.clone();
+    r.stub(0x1ce580, move |c, _| {
+        assert_eq!(arg(c, 5), 0);
+        l2.borrow_mut().push("~mc", arg(c, 4), 0);
+    });
+    log(&mut r, &l, 0x114f80, "delete", 1);
+    let o = a.o();
+    let mut g = Rng(0x1eb5_d0ff_9999_0009);
+    check(&mut r, &a, &l, &mut g, 500, 0x1eb5d0, "control new", &mut |m, l| control_new(m, &mut Life(l.clone()), o));
+    for case in 0..500u32 {
+        let flags = g.below(4);
+        check_with_a1(&mut r, &a, &l, &mut g, flags, 0x1eb6b8, "control destroy", &mut |m, l| {
+            control_destroy(m, &mut Life(l.clone()), o, flags)
+        });
+        let _ = case;
+    }
+    for _ in 0..500 {
+        check_with_a1(&mut r, &a, &l, &mut g, 1, 0x1ef610, "replay new", &mut |m, l| replay_overlay_new(m, &mut Life(l.clone()), o));
+    }
+    for _ in 0..500u32 {
+        let flags = g.below(4);
+        // the backdrop the destructor works on: the overlay's own, as the constructor sets it
+        check_with_a1(&mut r, &a, &l, &mut g, flags, 0x1f05a0, "replay destroy", &mut |m, l| {
+            replay_overlay_destroy(m, &mut Life(l.clone()), o, flags)
+        });
     }
 }

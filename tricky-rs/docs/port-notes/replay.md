@@ -605,3 +605,36 @@ the start / select legend.
   across the window's edges, camera tracks, and the font's height. Every draw call's floats were compared bit for
   bit. The tests caught 11 of 12 mutants; the one left (`<` vs `<=` on the strip's end clip) cannot change a
   result.
+
+## The overlays' constructors, destructors and the screen-space switch (G12q)
+
+`tricky_game::replayui` (`LifeEnv` for the bases' constructors and destructors).
+
+- **`Gfx_BeginScreenSpace`** 0x1ee660 and **`Gfx_EndScreenSpace`** 0x1ee6e8 (inside 0x1edef0's range in the index
+  until now) call the renderer's virtuals with only the renderer:
+  - begin: +0x8c, then +0xb4 with the view (0, 0, 512, 448, 0, 1000) in f12..f17, then +0x10c;
+  - end: +0x94.
+
+  The strip and the timeline now run them.
+- **`cReplayControlOverlay::cReplayControlOverlay`** 0x1eb5d0:
+  - the backdrop is set up with the control's vtable (0x394338) and its playlist is cleared;
+  - the title (0xeb8) is copied to +0x3f0 and measured (the box's third word to +0x370);
+  - the fonts are the game's +0x60 and +0x5c (+0x348 / +0x34c), with the first's height at +0x374;
+  - the rider is -1, the mode 1 of 1, and the rest 0.
+
+  Its destructor puts its vtable back and runs the backdrop's.
+- **`ReplayOverlay_Init`** 0x1ef610: the backdrop at +0x44c (+0x42c), the save overlay set up, the vtables
+  (0x394170, and the backdrop's 0x3940d8), five items, and no slot.
+  - Its only caller (the overlay manager, 0x1a72d4) passes 1, the complete object. With 0 the game would point the
+    backdrop at a copy of a construction vtable on its own stack.
+- **`~cReplayOverlay`** 0x1f05a0: the vtables go back through the save overlay's (0x38f9b0 / 0x38f918).
+  - Then, whatever the flags, the backdrop's vtable pointer is left at the destructor's stack copy of a construction
+    vtable (`sw sp` at 0x1f072c), before the memory-card manager's destructor. The backdrop's destructor (flag 2) and
+    the delete (flag 1) follow. The overlay manager passes 3.
+  - The port takes that stack address from the env. That is a STANDIN for the address only; the runner's is its
+    stack top less 384.
+- **Checked in the runner:** 500 of each constructor and destructor (the destructors with flags 0..3), with every
+  call and all memory compared. The drawing test now runs the screen-space pair for real. The tests caught the 4
+  mutants tried.
+- **With this, every G12 split is done:** the instant replay from its byte streams to its last overlay is ported and
+  checked.

@@ -1,7 +1,6 @@
 //! The instant replay's on-screen controls and the race menu's replay page (board rows G12n, G12o), on the game's
 //! bytes (`pf::Mem`), checked in the function runner (`tests/replayui.rs`). The drawing is the draw calls the game
-//! makes (`DrawEnv`, `PanelEnv`). The constructors' fonts and strings and the renderer's screen-space switch
-//! (0x1ee660 / 0x1ee6e8) are not here yet.
+//! makes (`DrawEnv`, `PanelEnv`). With G12q the overlays' constructors and destructors (`LifeEnv`) are here too.
 //!
 //! `cReplayControlOverlay` (the controls shown while a replay plays, a `cBackdropOverlay`):
 //! - +0x350 the panel's y (sliding to its mode's), +0x354 / +0x358 the y for modes 1 / 2 (480.0 for 0),
@@ -821,6 +820,10 @@ pub trait DrawEnv {
     /// The renderer's virtual at `slot` (+0x1c4 / +0x1d4 / +0x1e4 / +0x1fc of the object at the game's +0x724,
     /// through its vtable at +0x10)
     fn renderer(&mut self, slot: u32, a1: u32, a2: u32);
+    /// The renderer's virtual at `slot` given only the renderer
+    fn renderer_this(&mut self, slot: u32);
+    /// The renderer's virtual at `slot` with six floats (f12..f17)
+    fn renderer_view(&mut self, slot: u32, v: [f32; 6]);
     /// `SpriteSet_GetRect` 0x1f9e50 (the sprite set, the sprite): the rectangle (+4 width, +8 height)
     fn sprite_rect(&mut self, set: u32, id: u32) -> u32;
     /// `HUD_DrawSprite` 0x1c0068 (x, y, w, h, the overlay, the sprite or -5 for a box, the corner)
@@ -1129,9 +1132,6 @@ pub trait PanelEnv: DrawEnv {
     fn line(&mut self, x0: f32, y0: f32, x1: f32, y1: f32);
     /// 0x19b108 (x, y, w, h, the font colour): a filled rectangle
     fn fill_rect(&mut self, x: f32, y: f32, w: f32, h: f32);
-    /// 0x1ee660 / 0x1ee6e8 (the overlay): the renderer into and out of screen space (its virtuals +0x8c, +0xb4 with
-    /// 0, 0, 512, 448, 0, 1000, and +0x10c; then +0x94)
-    fn screen_space(&mut self, begin: bool, o: u32);
 }
 
 /// A word converted to a float as unsigned (the halve-and-double the compiler emits for the top bit)
@@ -1157,7 +1157,7 @@ pub fn draw_strip(m: &mut Mem, env: &mut dyn PanelEnv, o: u32) {
     if m.r32(o + at::MOVED) == 0 && m.r32(o + at::MODE) == 0 {
         return;
     }
-    env.screen_space(true, o);
+    screen_begin(env);
     let p4 = f32::from_bits(P4);
     let hidden = m.r32(o + at::HIDDEN) != 0;
     let c0 = if hidden { [1.0, p4, p4, p4] } else { [1.0; 4] };
@@ -1228,7 +1228,7 @@ pub fn draw_strip(m: &mut Mem, env: &mut dyn PanelEnv, o: u32) {
     let r = env.sprite_rect(m.r32(o), 42);
     let w = F(5.0) / fword(m, r + 4);
     env.sprite((hx - F(2.0)).0, (F(y) - F(4.0)).0, w.0, f32::from_bits(0x3f19999a), o, 42, 0);
-    env.screen_space(false, o);
+    screen_end(env);
 }
 
 /// The zoomed timeline (0x1ed490, while the panel moves or is up): a window of +0x460 frames from +0x464 (plus the
@@ -1239,7 +1239,7 @@ pub fn draw_timeline(m: &mut Mem, env: &mut dyn PanelEnv, o: u32) {
     if m.r32(o + at::MOVED) == 0 && m.r32(o + at::MODE) == 0 {
         return;
     }
-    env.screen_space(true, o);
+    screen_begin(env);
     let p4 = f32::from_bits(P4);
     let p7 = f32::from_bits(0x3f333333);
     let hidden = m.r32(o + at::HIDDEN) != 0;
@@ -1395,7 +1395,7 @@ pub fn draw_timeline(m: &mut Mem, env: &mut dyn PanelEnv, o: u32) {
         let w = F(7.0) / fword(m, r + 4);
         env.sprite((x - F(1.0)).0, (yy - F(4.0)).0, w.0, f32::from_bits(0x3f99999a), o, 42, 0);
     }
-    env.screen_space(false, o);
+    screen_end(env);
 }
 
 /// The start / select legend (`HUD_DrawStartSelectPrompt` 0x1ee720, without the full controls): the buttons'
@@ -1631,5 +1631,119 @@ pub fn draw_key(m: &mut Mem, env: &mut dyn DrawEnv, o: u32) {
         } else {
             env.sprite(end_x.0, end_y.0, abs.0, three.0, o, -5, 16);
         }
+    }
+}
+
+// ---- the renderer's screen space and the overlays' life (G12q) ----
+
+/// 0x1ee660: the renderer into screen space: its virtuals +0x8c, +0xb4 (0, 0, 512, 448, 0, 1000: the view) and
+/// +0x10c, each given only the renderer
+pub fn screen_begin(env: &mut dyn DrawEnv) {
+    env.renderer_this(0x8c);
+    env.renderer_view(0xb4, [0.0, 0.0, 512.0, 448.0, 0.0, 1000.0]);
+    env.renderer_this(0x10c);
+}
+
+/// 0x1ee6e8: back out of screen space (the renderer's +0x94)
+pub fn screen_end(env: &mut dyn DrawEnv) {
+    env.renderer_this(0x94);
+}
+
+/// `cReplayControlOverlay`'s vtable (0x394338), `cReplayOverlay`'s (0x394170), the `cBackdropOverlay` part's while it
+/// is a `cReplayOverlay`'s (0x3940d8), and the `cSaveOverlay` ones its destructor goes back to (0x38f9b0, 0x38f918)
+pub const VT_CONTROL: u32 = 0x394338;
+pub const VT_REPLAY: u32 = 0x394170;
+pub const VT_REPLAY_BACKDROP: u32 = 0x3940d8;
+pub const VT_SAVE: u32 = 0x38f9b0;
+pub const VT_SAVE_BACKDROP: u32 = 0x38f918;
+
+/// What the overlays' constructors and destructors call out to
+pub trait LifeEnv {
+    /// `BackdropOverlay_Init` 0x1a8900
+    fn backdrop_init(&mut self, m: &mut Mem, b: u32);
+    /// `SaveOverlay_Init` 0x1b8568 (the overlay, 0)
+    fn save_overlay_init(&mut self, m: &mut Mem, o: u32);
+    /// `Loc_GetString` 0x2c5160
+    fn loc(&mut self, id: u32) -> u32;
+    /// `WStr_Copy` 0x17cc80 (the destination, the string)
+    fn wstr_copy(&mut self, m: &mut Mem, dst: u32, s: u32);
+    /// `Font_MeasureWide` 0x19dc78 (1.0, the font, the string, an output box): the box's third word
+    fn measure_box(&mut self, font: u32, s: u32) -> u32;
+    /// `cBackdropOverlay::~cBackdropOverlay` 0x1bff78 (the backdrop, the flags)
+    fn backdrop_destroy(&mut self, m: &mut Mem, b: u32, flags: u32);
+    /// `cMCOverlayManager::~cMCOverlayManager` 0x1ce580 (the overlay, 0)
+    fn mc_manager_destroy(&mut self, m: &mut Mem, o: u32);
+    /// `Mem_Delete` 0x114f80
+    fn delete(&mut self, p: u32);
+    /// Where the destructor's copy of a construction vtable lies on its stack: the game stores that address in the
+    /// backdrop (+0x28) before the bases' destructors run (STANDIN for the address only: the port has no such stack)
+    fn stack_vtable(&mut self) -> u32;
+}
+
+/// `cReplayControlOverlay::cReplayControlOverlay` 0x1eb5d0: a backdrop with the control's vtable, its playlist
+/// cleared, its title (0xeb8) copied to +0x3f0 and measured (+0x370), the fonts (+0x348 the game's +0x60, +0x34c
+/// its +0x5c) and the first's height (+0x374); no rider (-1), modes 1 of 1, the rest zero
+pub fn control_new(m: &mut Mem, env: &mut dyn LifeEnv, o: u32) {
+    env.backdrop_init(m, o);
+    m.w32(o + 0x28, VT_CONTROL);
+    rm::playlist_clear(m, o + at::PLAYLIST);
+    let s = env.loc(0xeb8);
+    env.wstr_copy(m, o + 0x3f0, s);
+    let app = m.r32(GAPP);
+    let font = m.r32(app + 0x60);
+    m.w32(o + 0x348, font);
+    m.w32(o + 0x34c, m.r32(app + 0x5c));
+    let w = env.measure_box(font, o + 0x3f0);
+    m.w32(o + 0x370, w);
+    m.w32(o + at::MOVED, 0);
+    m.w32(o + at::RIDER, u32::MAX);
+    m.w32(o + 0x374, m.r32(m.r32(o + 0x348) + 0xc));
+    m.w32(o + at::MAX_MODE, 1);
+    m.w32(o + 0x464, 0);
+    m.w32(o + at::MODE, 1);
+    for k in [at::REPEAT, at::REPEAT_MASK, at::HL_FROM, at::BLINK, at::MSG_ALPHA, at::MSG_HOLD, at::MSG, at::FULL] {
+        m.w32(o + k, 0);
+    }
+}
+
+/// `cReplayControlOverlay::~cReplayControlOverlay` 0x1eb6b8: its vtable back, then the backdrop's destructor
+pub fn control_destroy(m: &mut Mem, env: &mut dyn LifeEnv, o: u32, flags: u32) {
+    m.w32(o + 0x28, VT_CONTROL);
+    env.backdrop_destroy(m, o, flags);
+}
+
+/// `ReplayOverlay_Init` 0x1ef610 (the complete object: its only caller, the overlay manager at 0x1a72d4, passes 1;
+/// with 0 the game would point the backdrop at a copy of its vtable on the stack): the backdrop at +0x44c (+0x42c),
+/// the save overlay, the vtables, five items (+0x438), no slot (+0x440 and +0x448 -1, +0x444 0)
+pub fn replay_overlay_new(m: &mut Mem, env: &mut dyn LifeEnv, o: u32) {
+    m.w32(o + 0x42c, o + 0x44c);
+    env.backdrop_init(m, o + 0x44c);
+    env.save_overlay_init(m, o);
+    m.w32(m.r32(o + 0x42c) + 0x28, VT_REPLAY_BACKDROP);
+    m.w32(o + 0x428, VT_REPLAY);
+    m.w32(o + 0x438, 5);
+    m.w32(o + 0x448, u32::MAX);
+    m.w32(o + 0x440, u32::MAX);
+    m.w32(o + 0x444, 0);
+}
+
+/// `cReplayOverlay::~cReplayOverlay` 0x1f05a0 (the flags: 1 delete, 2 the backdrop too; the overlay manager passes
+/// 3): the vtables back through the save overlay's, the backdrop pointed at the stack's construction vtable, the
+/// memory-card manager's destructor, then the backdrop's (flag 2) and the delete (flag 1). With flags 0 the game
+/// first points the backdrop at another stack copy (a temporary, overwritten after).
+pub fn replay_overlay_destroy(m: &mut Mem, env: &mut dyn LifeEnv, o: u32, flags: u32) {
+    m.w32(o + 0x428, VT_REPLAY);
+    let b = m.r32(o + 0x42c);
+    m.w32(b + 0x28, VT_REPLAY_BACKDROP);
+    m.w32(o + 0x428, VT_SAVE);
+    m.w32(b + 0x28, VT_SAVE_BACKDROP);
+    let sv = env.stack_vtable();
+    m.w32(b + 0x28, sv);
+    env.mc_manager_destroy(m, o);
+    if flags & 2 != 0 {
+        env.backdrop_destroy(m, m.r32(o + 0x42c), 0);
+    }
+    if flags & 1 != 0 {
+        env.delete(o);
     }
 }
