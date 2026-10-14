@@ -182,5 +182,5 @@ case-insensitive walk of a kind's list) stays for the app's intro until it moves
   each file's scope, then falls back to `Cml_FindObject` with the kind.
 - **Checked in the runner:** 20,000 cases of three random files, one sometimes missing. They had random records,
   trees and scope lists, and names with right and wrong hashes, one with high bytes. Every lookup's result was
-  compared. `strcmp` is stubbed by a byte compare: the runner lacks its `PSUBW`, and these callers only test for 0.
+  compared. The game's own `strcmp` runs too; the runner learnt its `PSUBW` / `PSUBB` / `PNOR` / `PAND` for it.
   The tests caught the 8 mutants tried.
