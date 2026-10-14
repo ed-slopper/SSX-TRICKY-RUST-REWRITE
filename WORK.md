@@ -118,7 +118,7 @@ state machine and the renderer are ours. Nothing has been checked against the or
 | G4 | AI checked: path following 0x1375c8 / 0x1372f8, rubber band 0x115100 / 0x13a0f0, skill pairs, tricks 0x139d58 / 0x138d60, resets, shoves | any | F4a, E1b | | [repo] Ported in `rider.rs`/`main.rs`. Split: G4a, G4b, G4c, G4d, G4e, G4f |
 | G4a | Rivals and vendettas checked: `RelTable_Init` 0x167208, `Rider_OnKnockedDownBy`, `AI_StartVendetta`, `AI_CoolVendetta` | any | F4a | | [repo] `rivals.rs` Split: G4a1, G4a2 |
 | G4e | The app's computer riders ride with `aicomp::Ai::ride` (the four modes, the shove, the target choice) on the course's own jump markers and speed hints (`AIComputer_FindJumpMarker` 0x1392a8 / `AIComputer_FindSpeedHint` 0x1393e0 over the AI paths, E3d) and the line point (+0x360), replacing `AiDriver`'s steering and throttle | any | G4d, E3d, G4f | | Split of G4 (wiring; needs a play test); E8c4: the game's computer riders go round megaplex's flipper tip and recover from elysium's half-pipe frames in 2–5 s; the autopilot sticks there. Split: G4e1, G4e2, G4e3 |
-| G4e2 | `TRICKY_SIM`'s autopilot (`race.rs` `self_test`) rides with G4e1 instead of `AiDriver::drive_paths`; compare the 11-course totals (18 stuck / 46 falls after G6e) and elysium's half-pipe frames / megaplex's flipper (E8c4) | any | G4e1 | | Split of G4e |
+| G4e2 | `TRICKY_SIM`'s autopilot (`race.rs` `self_test`) rides with G4e1 instead of `AiDriver::drive_paths`; compare the 11-course totals (18 stuck / 46 falls after G6e) and elysium's half-pipe frames / megaplex's flipper (E8c4) | any | G4e1 | irregulur/lynx (2026-10-13) | Split of G4e |
 | G4e3 | The app's computer riders (`src/main.rs` opponents' loop) ride with G4e1; `AiDriver` kept only for the player's autopilot until it goes too; play test | any | G4e1 | | Split of G4e |
 | G5 | Animation: the game's own animation state machine and blending for all 248 `bxanim` clips (plus cmanim, ps2anim, ubers), clip markers, replacing our choice of clip | unowned | F1, E4 | | [repo] README: "Which clip plays when is my state logic". Split by state before claiming |
 | G7 | Rendering, as the PS2 renderer does it. Split before claiming: | unowned | E3a, E3b | | [repo] |
@@ -1003,3 +1003,4 @@ matches the original.
 - 2026-10-13 irregulur/lynx: claim G4e1.
 - 2026-10-13 irregulur/lynx: G4e1 done (f015a5b).
 - 2026-10-14 trailrig/heron: G9n done (card operation starts, save-before-exit menus A and B, results list; ~550 mutants killed, 3 equivalent).
+- 2026-10-13 irregulur/lynx: claim G4e2.
