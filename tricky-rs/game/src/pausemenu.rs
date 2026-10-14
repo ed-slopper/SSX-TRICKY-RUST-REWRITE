@@ -237,3 +237,174 @@ pub fn update_main_page(m: &mut dyn Mem, e: &mut dyn LoadEnv, p: u32) {
         _ => {}
     }
 }
+
+pub const VOL_UP: u32 = 0x211f68;
+pub const VOL_DOWN: u32 = 0x211f90;
+pub const GET_VOL: u32 = 0x211f20;
+pub const VOL_CHANGED: u32 = 0x212e98;
+pub const SONG_SETUP: u32 = 0x213d60;
+pub const START_MUSIC: u32 = 0x215220;
+pub const PREV_SONG: u32 = 0x225618;
+pub const NEXT_SONG: u32 = 0x225660;
+pub const SET_BRIGHT: u32 = 0x17b980;
+pub const SET_MODE: u32 = 0x17f168;
+pub const SET_VIEWPORT: u32 = 0x17f1a0;
+pub const GET_CAMERA: u32 = 0x181470;
+pub const CAM_STEP: u32 = 0x173e70;
+pub const CAM_GET: u32 = 0x173e08;
+pub const GET_HELD: u32 = 0x1a87a0;
+
+/// Where the volume of each channel is kept for the profile.
+const VOLUME_AT: [u32; 5] = [0x32c9e8, 0x32c9ec, 0x32c9f0, 0x32c9f8, 0x32c9fc];
+const CAM_A: u32 = 0x32ca38;
+const CAM_B: u32 = 0x32ca3c;
+
+/// One volume item (kinds 0xe, 0xf, 0x10, 0x15, 0x13 for channels 0, 1, 2, 3, 4): step the volume, show the whole
+/// number it comes to and keep the volume for the profile.
+fn volume_item(m: &mut dyn Mem, e: &mut dyn LoadEnv, item: u32, ch: u32, held: u32) {
+    let s = m.r32(SYS);
+    e.call(m, if held & 0x8_0004 != 0 { VOL_UP } else { VOL_DOWN }, &[s, ch]);
+    let s = m.r32(SYS);
+    let v = f32::from_bits(e.call(m, GET_VOL, &[s, ch]));
+    let scaled = crate::sndlib::cvt_w((crate::ps2f::F(v) * crate::ps2f::F(50.0)).0);
+    let s = m.r32(SYS);
+    if m.r32(item + 8) as i32 != scaled {
+        e.call(m, VOL_CHANGED, &[s, ch]);
+    }
+    m.w32(item + 8, scaled as u32);
+    let s = m.r32(SYS);
+    let v = e.call(m, GET_VOL, &[s, ch]);
+    m.w32(VOLUME_AT[ch as usize], v);
+}
+
+/// 0x1add28: one tick of the options page. Its items are 0x18 bytes from +0x58c (kind, value at +8, count at +0xc,
+/// wrap flag at +0x10), the selection is +0x584 and the count +0x588.
+pub fn update_options_page(m: &mut dyn Mem, e: &mut dyn LoadEnv, p: u32) {
+    let o = m.r32(p + 0x42c);
+    let b = e.call(m, GET_BUTTONS, &[o, 0xffff_ffff]);
+    let o = m.r32(p + 0x42c);
+    let held = e.call(m, GET_HELD, &[o, 0xffff_ffff]);
+    if b & 0x20 != 0 {
+        let o = m.r32(p + 0x42c);
+        e.call(m, SOUND_BACK, &[o]);
+        pop_level(m, e, p);
+        return;
+    }
+    if b & 0x100 != 0 {
+        let o = m.r32(p + 0x42c);
+        e.call(m, SOUND_BACK, &[o]);
+        while m.r32(p + 0x7e8) as i32 >= 0 {
+            pop_level(m, e, p);
+        }
+        return;
+    }
+    if held & 0x18_000c == 0 {
+        if b & 0x2_0001 != 0 {
+            let o = m.r32(p + 0x42c);
+            e.call(m, SOUND_MOVE, &[o]);
+            let v = (m.r32(p + 0x584) as i32).wrapping_sub(1);
+            m.w32(p + 0x584, v as u32);
+            if v < 0 {
+                let c = m.r32(p + 0x588).wrapping_sub(1);
+                m.w32(p + 0x584, c);
+            }
+        } else if b & 0x4_0002 != 0 {
+            let o = m.r32(p + 0x42c);
+            e.call(m, SOUND_MOVE, &[o]);
+            let v = m.r32(p + 0x584).wrapping_add(1);
+            m.w32(p + 0x584, v);
+            if v == m.r32(p + 0x588) {
+                m.w32(p + 0x584, 0);
+            }
+        }
+        return;
+    }
+    let sel = m.r32(p + 0x584);
+    let item = p.wrapping_add(sel.wrapping_mul(0x18)).wrapping_add(0x58c);
+    let max = m.r32(item + 0xc) as i32;
+    let kind = if max < 1 {
+        m.r32(item)
+    } else {
+        let up = held & 0x8_0004 != 0;
+        let v = m.r32(item + 8) as i32;
+        if m.r32(item + 0x10) == 0 {
+            if up {
+                if v < max {
+                    m.w32(item + 8, (v + 1) as u32);
+                }
+            } else if v > 0 {
+                m.w32(item + 8, (v - 1) as u32);
+            }
+        } else if up {
+            if v < max - 1 {
+                m.w32(item + 8, (v + 1) as u32);
+            } else {
+                m.w32(item + 8, 0);
+            }
+        } else if v > 0 {
+            m.w32(item + 8, (v - 1) as u32);
+        } else {
+            m.w32(item + 8, (max - 1) as u32);
+        }
+        m.r32(item)
+    };
+    let sound = |m: &mut dyn Mem, e: &mut dyn LoadEnv| {
+        let o = m.r32(p + 0x42c);
+        e.call(m, SOUND_SELECT, &[o]);
+    };
+    match kind {
+        8 => {
+            let g = m.r32(GAPP);
+            let v = crate::ps2f::F(m.r32(item + 8) as i32 as f32) / crate::ps2f::F(50.0);
+            e.call(m, SET_BRIGHT, &[g, v.0.to_bits()]);
+            sound(m, e);
+        }
+        9 => {
+            let g = m.r32(GAPP);
+            let race = m.r32(g.wrapping_add(0x730));
+            let v = m.r32(item + 8);
+            e.call(m, SET_MODE, &[race, v]);
+            sound(m, e);
+        }
+        10 => {
+            let g = m.r32(GAPP);
+            let race = m.r32(g.wrapping_add(0x730));
+            let v = (m.r32(item + 8) != 0) as u32;
+            e.call(m, SET_VIEWPORT, &[race, v]);
+            sound(m, e);
+        }
+        0xb | 0xc => {
+            let which = (kind == 0xc) as u32;
+            let cam = e.call(m, GET_CAMERA, &[which]);
+            e.call(m, CAM_STEP, &[cam, (held & 0x8_0004 == 0) as u32]);
+            let cam = e.call(m, GET_CAMERA, &[which]);
+            let vt = m.r32(cam.wrapping_add(0xeb8));
+            let adj = sext16(m.r16(vt.wrapping_add(0x10)) as u32);
+            let f = m.r32(vt.wrapping_add(0x14));
+            e.call(m, f, &[cam.wrapping_add(adj)]);
+            let cam = e.call(m, GET_CAMERA, &[which]);
+            let v = e.call(m, CAM_GET, &[cam]);
+            m.w32(item + 8, v);
+            if m.r32(item) == 0xb {
+                m.w32(CAM_A, v);
+            } else if m.r32(item) == 0xc {
+                m.w32(CAM_B, v);
+            }
+            sound(m, e);
+        }
+        0xd => {
+            let s = m.r32(SYS);
+            e.call(m, SONG_SETUP, &[s]);
+            let s = m.r32(SYS);
+            e.call(m, if held & 0x8_0004 != 0 { NEXT_SONG } else { PREV_SONG }, &[s]);
+            let s = m.r32(SYS);
+            e.call(m, START_MUSIC, &[s]);
+        }
+        0xe => volume_item(m, e, item, 0, held),
+        0xf => volume_item(m, e, item, 1, held),
+        0x10 => volume_item(m, e, item, 2, held),
+        0x13 => volume_item(m, e, item, 4, held),
+        0x15 => volume_item(m, e, item, 3, held),
+        _ => sound(m, e),
+    }
+}

@@ -101,13 +101,15 @@ impl Mem for RM2<'_> {
 
 
 const FA: [u32; 4] = [0x90_0000, 0x90_0010, 0x90_0020, 0x90_0030];
-const STATIC_TARGETS: [u32; 15] = [
+const STATIC_TARGETS: [u32; 30] = [
+    VOL_UP, VOL_DOWN, GET_VOL, VOL_CHANGED, SONG_SETUP, START_MUSIC, PREV_SONG, NEXT_SONG, SET_BRIGHT, SET_MODE, SET_VIEWPORT, GET_CAMERA, CAM_STEP, CAM_GET,
     LOC_GET, GET_BUTTONS, SOUND_MOVE, SOUND_BACK, SOUND_SELECT, DIALOG_SET, GET_TRICKBOOK, COUNT_PAGES, PAGE_FIRST, SYNC_AUDIO, HIDE_ITEM,
-    RESUME_ALL, PLAY_PAUSE, STOP_ALL, STOP_SONG,
+    RESUME_ALL, PLAY_PAUSE, STOP_ALL, STOP_SONG, GET_HELD,
 ];
 
 struct Oracle {
     g: Rng,
+    cam: u32,
     log: Vec<(u32, Vec<u32>)>,
 }
 
@@ -118,6 +120,10 @@ impl Oracle {
         const BTN: [u32; 16] = [0, 0, 0x120, 0x20, 0x100, 0x20001, 0x1, 0x40002, 0x2, 0x800, 0x800, 0x100008, 0x8, 0x80004, 0x4, 0x30000];
         match t {
             GET_BUTTONS => BTN[self.g.below(16) as usize],
+            GET_HELD => [0u32, 0x4, 0x80000, 0x80004, 0x8, 0x100000, 0x1, 0x40000][self.g.below(8) as usize],
+            GET_CAMERA => self.cam,
+            CAM_GET => self.g.below(40),
+            GET_VOL => [0.0f32, 0.5, 0.52, 0.499, 1.0, 0.02, 0.3333, 0.2, 0.7][self.g.below(9) as usize].to_bits(),
             COUNT_PAGES => self.g.below(8),
             PAGE_FIRST => self.g.below(30),
             SYNC_AUDIO => self.g.below(2),
@@ -144,6 +150,7 @@ struct W {
     g: u32,
     race: u32,
     q: u32,
+    cam: u32,
     oracle: Rc<RefCell<Oracle>>,
 }
 
@@ -157,16 +164,25 @@ fn world() -> Option<W> {
     let g = r.mem.alloc(G);
     let race = r.mem.alloc(0x80);
     let q = r.mem.alloc(0x20);
-    let oracle = Rc::new(RefCell::new(Oracle { g: Rng(1), log: vec![] }));
+    let cam = r.mem.alloc(0x1000);
+    let oracle = Rc::new(RefCell::new(Oracle { g: Rng(1), cam, log: vec![] }));
     for t in STATIC_TARGETS.iter().chain(FA.iter()).copied() {
         let l = oracle.clone();
         r.stub(t, move |c, m| {
             let args = [c.gpr(4) as u32, c.gpr(5) as u32, c.gpr(6) as u32, c.gpr(7) as u32, c.gpr(8) as u32, c.gpr(9) as u32];
+            let mut args = args;
+            if t == SET_BRIGHT {
+                args[1] = c.f(12).to_bits();
+            }
             let v = l.borrow_mut().call(&mut RM2(m), t, &args);
-            c.set_gpr(2, v as i32 as i64 as u64);
+            if t == GET_VOL {
+                c.set_f(0, f32::from_bits(v));
+            } else {
+                c.set_gpr(2, v as i32 as i64 as u64);
+            }
         });
     }
-    Some(W { r, p, tab, g, race, q, oracle })
+    Some(W { r, p, tab, g, race, q, cam, oracle })
 }
 
 /// A random menu; `deep` allows the stack to be one page deeper.
@@ -188,6 +204,15 @@ fn image(w: &mut W, sm: &mut SM, g: &mut Rng, resume_only: bool) {
         set(0x454 + k * 0x18, [0, 1, 4, 5, 6, 7, 2][g.below(7) as usize]);
     }
     set(0x100, w.tab);
+    set(0x584, g.below(5));
+    set(0x588, 1 + g.below(5));
+    for k in 0..5 {
+        let at = 0x58c + k * 0x18;
+        set(at, [0, 8, 9, 10, 0xb, 0xc, 0xd, 0xe, 0xf, 0x10, 0x11, 0x13, 0x15, 7][g.below(14) as usize]);
+        set(at + 8, g.below(60));
+        set(at + 0xc, [0u32, 0xffff_ffff, 1, 2, 5, 100][g.below(6) as usize]);
+        set(at + 0x10, g.below(2));
+    }
     for j in 0..3u32 {
         let rec = 0x438 + j * 0x138;
         for (adj, idx, tbl) in [(0x128u32, 0x12au32, 0x12cu32), (0x130, 0x132, 0x134)] {
@@ -221,6 +246,12 @@ fn image(w: &mut W, sm: &mut SM, g: &mut Rng, resume_only: bool) {
     img.push((0x337c58, st1));
     img.push((0x343050, g.next().to_le_bytes().to_vec()));
     img.push((0x38e328, (0..16).map(|_| g.next() as u8).collect()));
+    let mut cam: Vec<u8> = (0..0x1000).map(|_| g.next() as u8).collect();
+    cam[0xeb8..0xebc].copy_from_slice(&(w.cam + 0x800).to_le_bytes());
+    cam[0x810..0x812].copy_from_slice(&[0x10, 0x00]);
+    cam[0x814..0x818].copy_from_slice(&FA[g.below(4) as usize].to_le_bytes());
+    img.push((w.cam, cam));
+    img.push((0x32c9e0, (0..0x60).map(|_| g.next() as u8).collect()));
     for (a, v) in &img {
         w.r.mem.write(*a, v).unwrap();
         for (k, x) in v.iter().enumerate() {
@@ -230,7 +261,7 @@ fn image(w: &mut W, sm: &mut SM, g: &mut Rng, resume_only: bool) {
 }
 
 fn regions(w: &W) -> Vec<(u32, u32)> {
-    vec![(w.p, P), (w.g, G), (w.race, 0x80), (w.q, 0x20)]
+    vec![(w.p, P), (w.g, G), (w.race, 0x80), (w.q, 0x20), (0x32c9e0, 0x60)]
 }
 
 fn check(w: &mut W, sm: &mut SM, case: u32, seed: u64, addr: u32, a1: Option<u32>, port: &dyn Fn(&mut SM, &mut PortEnv)) {
@@ -251,7 +282,7 @@ fn check(w: &mut W, sm: &mut SM, case: u32, seed: u64, addr: u32, a1: Option<u32
         w.r.mem.read(a, &mut b).unwrap();
         theirs.extend(b);
     }
-    let mine = Rc::new(RefCell::new(Oracle { g: Rng(seed), log: vec![] }));
+    let mine = Rc::new(RefCell::new(Oracle { g: Rng(seed), cam: w.cam, log: vec![] }));
     let mut env = PortEnv(mine.clone());
     port(sm, &mut env);
     let my_calls = std::mem::take(&mut mine.borrow_mut().log);
@@ -324,5 +355,20 @@ fn update_matches() {
         let seed = g.next() as u64 | 1;
         let p = w.p;
         check(&mut w, &mut sm, case, seed, 0x1ace00, None, &|sm, env| update_main_page(sm, env, p));
+    }
+}
+
+#[test]
+fn options_update_matches() {
+    let Some(mut w) = world() else { return };
+    let (mut g, mut sm) = (Rng(8), SM::default());
+    for case in 0..60_000 {
+        image(&mut w, &mut sm, &mut g, true);
+        if (sm.r32(w.p + 0x7e8) as i32) < -1 {
+            continue;
+        }
+        let seed = g.next() as u64 | 1;
+        let p = w.p;
+        check(&mut w, &mut sm, case, seed, 0x1add28, None, &|sm, env| update_options_page(sm, env, p));
     }
 }
