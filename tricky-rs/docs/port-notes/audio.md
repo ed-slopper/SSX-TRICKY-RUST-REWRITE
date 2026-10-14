@@ -276,3 +276,13 @@ entry as above with no kind or id), 0x2212a0 starts the voice and drops the entr
 audio system has no voice table at +0x372c), and the handle becomes `handle << 8 | rider`. Otherwise the grid may refuse
 (0x22dc88), kind 6 needs the rider to be the listener's, the trigger banks and the ambient bank loaded (it only queues when
 that returns 1), and a full entry is queued whose `PlayPending` result is the handle; any refusal frees the record.
+
+## EA's sound library pieces (`sndlib.rs`)
+
+`SNDVoice_CalcPitchMult` 0x2d5288 works a voice's pitch ratio (base cents bent by the note and by a table at a position,
+`(byte - 0x40) * depth >> 6` each) through 0x2d51f8: whole octaves of 1200 cents shift 0x1000, the rest goes through a
+256-byte table at 0x351288 (about `256 * 2^(i/256) - 256`, not exactly a formula, so the bytes are kept; the negative side
+reads the same table from the end). `SndVoice_SetVolume` 0x20ae28 scales the volume by the voice's float at +0x90, clamps
+to 0..127, and sends it to the voice's engine (1 and 2 under the sound lock, 3 the stream) unless within four of the last
+one sent; -1 means stop. The scale is read as the hardware does (a denormal is zero; an exponent of 255 is a big number,
+not a NaN, so tests keep it out). `SndVoice_IsDone` 0x20a8e0 asks the engine the voice is in.
