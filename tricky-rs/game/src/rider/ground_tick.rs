@@ -1033,9 +1033,10 @@ impl crate::walls::WallEnv for WallGlue<'_> {
         self.tree = tree;
         (t, rec, touched)
     }
-    /// `Boarder_AccumulateImpact` 0x125c48: +0x2e4 += 1 − max(n · +0x2f0, 0), +0x2f0 = n. STANDIN: nothing, the port
-    /// keeps neither (nothing ported reads them yet).
-    fn accumulate_impact(&mut self, _: &mut crate::walls::WallRider, _: V4) {}
+    /// `Boarder_AccumulateImpact` 0x125c48: +0x2e4 += 1 − max(n · +0x2f0, 0), +0x2f0 = n.
+    fn accumulate_impact(&mut self, _: &mut crate::walls::WallRider, n: V4) {
+        accumulate_impact(&mut self.r.impact, &mut self.r.impact_n, n);
+    }
     /// `Boarder_Translate` 0x1267a0: `CollBody_Translate` 0x236448 on the body (the broadphase box, +0x6e0/+0x6f0, the
     /// port does not keep).
     fn translate(&mut self, _: &mut crate::walls::WallRider, by: V4) {
@@ -1165,10 +1166,11 @@ impl gm::Env for GroundEnv<'_> {
     /// mesh ([`Rider::walls`], STANDIN). The air's walls (row E8o) are still the drawn mesh's.
     fn wall_collide(&mut self, g: &mut gm::Rider) -> bool {
         if let Some(course) = self.world.course.clone() {
-            let mut wr = crate::walls::WallRider { pos: g.p.pos, vel: g.vel, ground: g.p.normal, knocks: 0.0, mode: 2, state: g.state, up: g.board_up };
+            let mut wr = crate::walls::WallRider { pos: g.p.pos, vel: g.vel, ground: g.p.normal, knocks: self.r.knocks, mode: 2, state: g.state, up: g.board_up };
             let body = wall_body(g);
             let mut glue = WallGlue { r: &mut *self.r, g: &mut *g, world: self.world, course: &course, body, tree: None, starts: Vec::new() };
             let hit = crate::walls::wall_collide(&mut wr, &mut glue);
+            self.r.knocks = wr.knocks;
             g.p.pos = wr.pos;
             g.vel = wr.vel;
             self.r.pos = to_port(g.p.pos, 0.01);
@@ -1253,7 +1255,7 @@ impl gm::Env for GroundEnv<'_> {
     /// pose's ([`Rider::bind_body`], mask −1, row G5). Without the course's files: nothing.
     fn instance_collisions(&mut self, g: &mut gm::Rider) {
         let Some(course) = self.world.course.clone() else { return };
-        let mut wr = crate::walls::WallRider { pos: g.p.pos, vel: g.vel, ground: g.p.normal, knocks: 0.0, mode: 2, state: g.state, up: g.board_up };
+        let mut wr = crate::walls::WallRider { pos: g.p.pos, vel: g.vel, ground: g.p.normal, knocks: self.r.knocks, mode: 2, state: g.state, up: g.board_up };
         let body = bind_body_at(g.p.pos, g.p.fwd, g.board_up, g.p.stat60);
         let id = rider_id(self.r);
         let mut glue = WallGlue { r: &mut *self.r, g: &mut *g, world: self.world, course: &course, body, tree: None, starts: Vec::new() };
@@ -1261,6 +1263,7 @@ impl gm::Env for GroundEnv<'_> {
         kick_rollers(&course, &mut wr, id, &mut glue, |g| g.body);
         let starts = std::mem::take(&mut glue.starts);
         course.knock.lock().unwrap_or_else(|e| e.into_inner()).start_scripts(&course, &starts);
+        self.r.knocks = wr.knocks;
         g.p.pos = wr.pos;
         g.vel = wr.vel;
         self.r.pos = to_port(g.p.pos, 0.01);
@@ -1517,4 +1520,11 @@ pub fn rail_try_capture(world: &RailWorld, i: &CaptureIn, clip_type: &mut dyn Fn
         1
     };
     Some(Capture { vel, kind, word: hit.word })
+}
+
+/// `Boarder_AccumulateImpact` 0x125c48: +0x2e4 += 1 − max(n · +0x2f0, 0), +0x2f0 = n.
+pub(super) fn accumulate_impact(impact: &mut f32, last: &mut V4, n: V4) {
+    let d = dot(n, *last);
+    *impact += if 0.0 < d { 1.0 - d } else { 1.0 };
+    *last = n;
 }

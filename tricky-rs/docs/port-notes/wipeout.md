@@ -186,11 +186,32 @@ Part of the port notes (index: [README.md](README.md)); units and wording as des
 - The app does all of these on the course's collision (touch objects through `walls::instance_collisions`, rollers
   through `roller::rider_kick`, contacts through `knockables`); the rider-side calls (crash score, meter, spray,
   wipe-out again) run on the port's rider after the tick.
-- STANDIN: +0x2e4/+0x2f0 start from 0 at each wipe-out (the riding walls' accumulation and the decay outside the
-  wipe-out are not ported, row G6e); no rumble; no `Sfx_OnWipeout` / `Sfx_OnWallHit` (rows G10); rollers paired by
+- No rumble; no `Sfx_OnWipeout` / `Sfx_OnWallHit` (rows G10); rollers paired by
   box overlap (the race's broadphase).
 - Sims (`TRICKY_SIM=600`, the 11 disc courses, same build without/with G6d): stuck 19 → 22, falls 30 → 32. The
   extra put-backs are the reset above (untracked t 67: a wipe-out wedged at 1 km/h against a wall).
+
+### The impact counter outside the wipe-out (board row G6e)
+
+- Proven: `Boarder_AccumulateImpact` 0x125c48 has three callers (`Boarder_WallCollide` 0x126250,
+  `Boarder_InstanceBounce` 0x125a00, `Ragdoll_Contacts` 0x10e190), so +0x2e4 fills in every motion with walls.
+  cBoarder's update (vf7 0x117198), each tick after the motion: +0x2f0 × 0.98 (0x3f7ae148), +0x2e4 × 0.95603746 (over
+  4.492007: +0x304 = 1, `Boarder_RequestReset` 0x118f10, +0x2e4 = 0), +0x300 × 0.9782825 (over 12.002146: the same,
+  +0x300 = 0), and the same reset when +0x148 is 100 m under gWorld+0xc. +0x300 grows only in
+  `Boarder_WallImpactCheck` 0x1265c8 (motion 1). vf8 0x116ab8 zeroes +0x2e4, +0x300 and +0x304; `Boarder_PlaceAt`
+  clears +0x304.
+- Checked live over PINE (2 minutes of riding into walls on stock PCSX2, 6,924 ticks, none missed): the decays per
+  tick 0.95605 / 0.98000 / 0.97828; over 100 impacts each add `1 − max(n · +0x2f0, 0)` with the stored normal
+  shrinking from unit; impacts while riding (motion 2), on a rail (3), in the air (1), wiped out (5) and getting up
+  (6); +0x300 rose only in the air (to 6.2); one reset when an impact took +0x2e4 from 3.72 over 4.492: zeroed, motion
+  4 / state 0x16 and +0x304 = 1 in the same tick.
+- The app: `Rider::impact`, `impact_n`, `knocks` carried through the ground tick's walls and touch objects and the
+  wipe-out (`rider::impact_tick` after each tick; the wipe-out runs it a game tick at a time).
+- STANDIN: at the port's variable step the factors are raised to the step's 60 Hz ticks; the air's and the rail's
+  walls do not accumulate (the port's air walls are the drawn mesh's, row E8o); `Boarder_RequestReset`'s own checks
+  (+0x418, `AIP_CanResetAt`) and the 100 m reset are not ported (the port's `min_y` check stands in).
+- Sims (`TRICKY_SIM=600`, the 11 disc courses): stuck 22 → 18, falls 32 → 46. The new put-backs are this reset: the
+  autopilot pressing on walls (elysium t 252–276, three resets while riding).
 
 ## Rider hits, exactly (board row E8d1, checked: `tests/hit.rs`; `tricky-rs/game/src/hit.rs`)
 

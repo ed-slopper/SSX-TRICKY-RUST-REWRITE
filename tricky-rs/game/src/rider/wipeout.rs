@@ -69,6 +69,8 @@ struct State {
     impact_n: V4,
     /// what this tick's impacts add to +0x2e4 (folded into the motion's copy after the tick)
     impact: f32,
+    /// +0x300: the air's wall knocks
+    knocks: f32,
     /// the rider's speed this tick (cm/s), for the knock sounds
     speed: f32,
     /// the sphere tree the last object query hit (the record's +0x30) and the object a contact was last for
@@ -103,11 +105,9 @@ struct Who {
     speed_stat: f32,
 }
 
-/// `Boarder_AccumulateImpact` 0x125c48: +0x2e4 += 1 − max(n · +0x2f0, 0), +0x2f0 = n.
+/// `Boarder_AccumulateImpact` 0x125c48 (+0x2e4's part of this tick kept apart while the motion holds +0x2e4).
 fn accumulate(s: &mut State, n: V4) {
-    let d = dot(n, s.impact_n);
-    s.impact += if 0.0 < d { 1.0 - d } else { 1.0 };
-    s.impact_n = n;
+    super::ground_tick::accumulate_impact(&mut s.impact, &mut s.impact_n, n);
 }
 
 /// What the motion calls, answered on the course and the port's rider.
@@ -338,7 +338,7 @@ impl WipeEnv for Glue<'_> {
         let _ = w;
         let mut body = r.body;
         body.x24 = WALL_MASK;
-        let mut wr = WallRider { pos: r.pos, vel: r.vel, ground: r.ground, knocks: 0.0, mode: self.s.motion, state: self.s.state, up: r.up };
+        let mut wr = WallRider { pos: r.pos, vel: r.vel, ground: r.ground, knocks: self.s.knocks, mode: self.s.motion, state: self.s.state, up: r.up };
         let mut walls = Walls { world: self.world, body, s: &mut *self.s, who: self.who };
         if let Some(course) = self.world.course.clone() {
             crate::walls::instance_collisions(&mut wr, &mut walls);
@@ -347,6 +347,7 @@ impl WipeEnv for Glue<'_> {
         crate::walls::wall_collide(&mut wr, &mut walls);
         (r.pos, r.vel) = (wr.pos, wr.vel);
         r.body = walls.body;
+        self.s.knocks = wr.knocks;
         r.body.x24 = -1;
     }
     /// `Boarder_Translate` 0x1267a0: the collision body moved (the broadphase box the port does not keep).
@@ -558,11 +559,8 @@ impl Wipe {
         // `CollBody_UpdateFromBones` 0x2361b0 on the animated skeleton (row G5)
         self.rag.body = bind_body_at(self.rag.pos, self.wr.fwd, self.rag.up, k);
         self.s.clip_t += TICK;
-        // cBoarder's update (vf7 0x117198) after the motion: +0x2e4 decays (× 0.95603746); above 4.492007,
-        // `Boarder_RequestReset` 0x118f10 and 0 (the motion's time-out sets 1e6)
-        self.wr.stuck *= 0.956_037_46;
-        if 4.492_007 < self.wr.stuck {
-            self.wr.stuck = 0.0;
+        // cBoarder's update (vf7 0x117198) after the motion (the motion's time-out sets +0x2e4 to 1e6)
+        if super::impact_tick(&mut self.wr.stuck, &mut self.s.impact_n, &mut self.s.knocks, 1.0) {
             return Out::Reset;
         }
         match now {
@@ -629,15 +627,13 @@ impl Rider {
             player: if self.ai { 0 } else { -1 },
             x420: self.stats.kind as u32,
             x464: self.data.goofy,
-            // STANDIN: +0x2e4 (and +0x2f0) from 0 at each wipe-out, for the riding ticks' own (the riding walls'
-            // `Boarder_AccumulateImpact` and the decay outside the wipe-out are not ported, row G6e)
-            stuck: 0.0,
+            stuck: self.impact,
             ..Default::default()
         };
         let mut motion = Wipeout::default();
         let (at, n) = self.crash_at.take().unwrap_or((self.pos, self.normal));
         (motion.rag.crash_at, motion.rag.crash_n) = (to_game(at, 100.0, 1.0), to_game(n, 1.0, 0.0));
-        let mut s = State { motion: 5, state: 0x13, clip: CLIP_CRUNCH, fwd: o.fwd, side: o.side, yaw: o.yaw, probe_side: o.side, ..Default::default() };
+        let mut s = State { motion: 5, state: 0x13, clip: CLIP_CRUNCH, fwd: o.fwd, side: o.side, yaw: o.yaw, probe_side: o.side, impact_n: self.impact_n, knocks: self.knocks, ..Default::default() };
         let who = self.who();
         let mut glue = Glue { world, last: &mut self.last_hit, s: &mut s, k, lean: self.lean[0], who };
         motion.enter(&mut rag, &mut wr, &mut glue);
@@ -691,6 +687,7 @@ impl Rider {
                     to_port(w.rag.vel, 0.01).length(), w.rag.ground_kind, w.rag.surface, to_port(w.rag.pos, 0.01));
             }
         }
+        (self.impact, self.impact_n, self.knocks) = (w.wr.stuck, w.s.impact_n, w.s.knocks);
         self.pos = to_port(w.rag.pos, 0.01);
         self.vel = to_port(w.rag.vel, 0.01);
         self.normal = to_port(w.rag.ground, 1.0);

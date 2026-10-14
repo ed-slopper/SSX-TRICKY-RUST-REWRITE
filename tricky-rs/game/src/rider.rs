@@ -402,6 +402,12 @@ pub struct Rider {
     pub att: Option<(Orient, f32)>,
     /// the last patch the ground probe hit (rider+0x430), for `World_RayCast` on the course (row E7c3)
     pub last_hit: crate::terrain::LastHit,
+    /// +0x2e4: the walls' impacts (`Boarder_AccumulateImpact` 0x125c48), decaying each tick ([`Rider::impact_tick`])
+    pub impact: f32,
+    /// +0x2f0: the last impact's normal, shrinking each tick
+    pub impact_n: [f32; 4],
+    /// +0x300: the air's wall knocks (`Boarder_WallImpactCheck` 0x1265c8 in motion 1), decaying each tick
+    pub knocks: f32,
     /// ticks before this rider can be hit by another again (`Boarder_RiderCollisions`: three ticks)
     pub hit_wait: u8,
 }
@@ -424,7 +430,7 @@ impl Rider {
                last_trick: String::new(), trick_timer: 0.0, crashed: 0.0, hard_land: 0.0, crouch_v: 0.0, brake_v: 0.0, jump_c: 0.0, jump_delay: 0.0, height: 0.0,
                course_dir: None, course_pts: None, wipe: None, crash_at: None, gm: None, crash_spray: None, lean: [0.0; 3], up: [0.0, 0.0, 1.0, 0.0], recover: None, ai: false, down_t: 0.0, getup: -1.0, stumble: 0.0, wall_hit: None, speed_timer: 0.0, spin_timer: 0.0, spin_used: false, tube_class: u8::MAX, gate_p: 0.0, gate_hi: 0.0, gate_lo: 0.0, gate_still: 0.0, gate_target: 0.0, gate_speed: 0.0, gate_state: 8, gate_rock_dir: 0, band: (0.005, 0.0250417), spin_base: 0.0, flip_base: 0.0, late: false, cause: "", spin_ax: Axis::default(), flip_ax: Axis::default(), air_mode2: false, rail_off: 0.0, rail_time: 0.0, rail_halves: 0, boost_was: false, chain: 0,
                ubers: Vec::new(), uber: 0.0, uber_id: 0, uber_done: false, letters: 0, multiplier: 1,
-               sc: new_score(), tick_acc: 0.0, full_count: 0, rail_kind: 0, rail_lean: 0.0, rail_goal0: 0.0, rail_committed: 0.0, show_parts: Vec::new(), grab_scored: false, grab_tw: false, hit_wait: 0, att: None, last_hit: Default::default() };
+               sc: new_score(), tick_acc: 0.0, full_count: 0, rail_kind: 0, rail_lean: 0.0, rail_goal0: 0.0, rail_committed: 0.0, show_parts: Vec::new(), grab_scored: false, grab_tw: false, hit_wait: 0, att: None, last_hit: Default::default(), impact: 0.0, impact_n: [0.0; 4], knocks: 0.0 };
         // the start line's `Boarder_PlaceAt` 0x11cae8 (`cBoarder::vf8` 0x116ab8: heading from the path's direction)
         r.att = Some((orient::placed_attitude(placed_heading(yaw), None), yaw));
         r
@@ -953,6 +959,11 @@ impl Rider {
         // and is aimed again from this tick's steer and speed at its end (`Boarder_UpdateLeanTargets` 0x129500)
         self.lean_ease(dt);
         self.step_tick(world, rails, input, dt);
+        // the wipe-out runs these a game tick at a time itself
+        if self.crashed <= 0.0 && impact_tick(&mut self.impact, &mut self.impact_n, &mut self.knocks, dt * 60.0) {
+            let at = self.safe;
+            self.respawn(at);
+        }
         self.lean_aim();
     }
     fn step_tick(&mut self, world: &CollisionWorld, rails: &Rails, input: Input, dt: f32) {
@@ -1640,4 +1651,30 @@ pub fn grab_clip(name: &str) -> u32 {
     let first = ((t::GRAB - t::BASE) / 4) as usize;
     let Some(id) = (0..0x66u32).find(|k| t::WORDS.get(first + *k as usize).copied().flatten() == Some(want.as_str())) else { return 0 };
     (0x278..0x2dc).find(|c| crate::score::grab_of_clip(*c).0 == id).unwrap_or(0)
+}
+
+/// `cBoarder::vf7` 0x117198 after the motion: +0x2f0 × 0.98; +0x2e4 × 0.95603746, over 4.492007 0 and
+/// `Boarder_RequestReset` 0x118f10; +0x300 × 0.9782825, over 12.002146 the same. Returns whether a reset is asked.
+/// `ticks` is the number of 60 Hz ticks (the factors raised to it: STANDIN for the port's variable step, exact at
+/// one). Not ported: +0x304 = 1 with each reset, the reset's own checks (+0x418, `AIP_CanResetAt`), and the third
+/// reset under the world (+0x148 under gWorld+0xc − 10000, the port's `min_y` check stands in).
+pub fn impact_tick(impact: &mut f32, n: &mut [f32; 4], knocks: &mut f32, ticks: f32) -> bool {
+    let one = ticks == 1.0;
+    let f = |k: f32| if one { k } else { k.powf(ticks) };
+    let shrink = f(f32::from_bits(0x3f7a_e148));
+    for c in n.iter_mut() {
+        *c *= shrink;
+    }
+    let mut reset = false;
+    *impact *= f(0.956_037_46);
+    if 4.492_007 < *impact {
+        *impact = 0.0;
+        reset = true;
+    }
+    *knocks *= f(0.978_282_5);
+    if 12.002_146 < *knocks {
+        *knocks = 0.0;
+        reset = true;
+    }
+    reset
 }
