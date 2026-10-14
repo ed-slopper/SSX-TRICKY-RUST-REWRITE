@@ -272,3 +272,248 @@ pub fn find_key(m: &dyn Mem, bank: u32, kind: u32) -> i32 {
     }
     -1
 }
+
+// ---- the voice picker (0x2bbdd0..0x2bc5e0)
+
+pub const CLOCK: u32 = 0x2bebb0;
+pub const FREE_VOICE: u32 = 0x2bc200;
+pub const FIND_EVENT_BANK: u32 = 0x2bb650;
+pub const CONTAINS: u32 = 0x2bbd78;
+pub const FIND_EVENT: u32 = 0x2bb6b0;
+pub const FIND_VICTIM: u32 = 0x2bbdd0;
+pub const CLEAR_PAIR: u32 = 0x2bbd68;
+pub const PICK_VOICE: u32 = 0x2bc048;
+pub const CLAIM: u32 = 0x2bc320;
+pub const CALLBACK_CHECK: u32 = 0x2bc490;
+pub const GROUP_LIMITS: u32 = 0x2bba50;
+pub const CLEAR_QUEUE: u32 = 0x2bdae0;
+pub const START_ONE: u32 = 0x2be140;
+pub const QUEUED_NOW: u32 = 0x2bdc70;
+pub const QUEUE_RUN: u32 = 0x2bdc98;
+pub const START_VOICE: u32 = 0x2bc5e0;
+pub const TRY_START: u32 = 0x2bc548;
+
+const CLOCK_BASE: u32 = 0x349518;
+const BUSY: u32 = 0x348900;
+const LIMIT_B: u32 = 0x348e88;
+
+fn rec(i: u32) -> u32 {
+    GROUPS + 0x60 * i
+}
+
+/// 0x2bbdd0: the voice of group `group` to take over for a new sound (the filter list, when there is one, names
+/// the sound ids that may be replaced): a voice that is in use, in the group and idle is looked at; one past its
+/// minimum age is released on the spot; otherwise the one whose sound is largest (+4) wins, then the oldest, then the
+/// one with the larger +0x68. -1 for none. `sp` is the frame (the sound key goes at its start, the bank slot
+/// pointer at +0x10).
+pub fn find_victim(m: &mut dyn Mem, e: &mut dyn LoadEnv, sp: u32, filter: u32, group: u32) -> i32 {
+    let now = e.call(m, CLOCK, &[]).wrapping_add(m.r32(CLOCK_BASE));
+    let slot_at = SLOTS.wrapping_add(group << 2);
+    let mut best_idx: i32 = -1;
+    let mut best_size: u32 = 0;
+    let mut best_tie: u32 = 0;
+    let mut best_age: u64 = u64::MAX;
+    for i in 0..16u32 {
+        let r = rec(i);
+        if m.r8(r + 0x6a) == 0 || m.r8(r + 0x6b) as u32 != group || m.r16(r + 0x6c) as i16 != 0 {
+            continue;
+        }
+        let s0 = m.r32(r + 0x70);
+        let fp = if filter != 0 {
+            let id = m.r16(s0) as u32;
+            e.call(m, CONTAINS, &[id, filter])
+        } else {
+            1
+        };
+        let age = now.wrapping_sub(m.r32(r + 0x64)) as i32 as i64 as u64;
+        let min_age = m.r16(s0 + 2) as u64;
+        let s4 = min_age != 0 && min_age < age;
+        let s3 = m.r32(slot_at);
+        let mut s2 = 0u32;
+        if s3 == 1 && m.r8(s0 + 0xa) & 1 != 0 {
+            let key = m.r32(r + 0x74);
+            m.w32(sp, key);
+            if e.call(m, FIND_EVENT_BANK, &[sp, sp + 0x10]) != 0 {
+                let a1 = m.r32(sp + 0x10);
+                let v0 = m.r32(a1);
+                s2 = (m.r16(s0 + 4) < m.r16(v0.wrapping_add(0x16))) as u32;
+            }
+        }
+        if s4 {
+            e.call(m, FREE_VOICE, &[i]);
+            continue;
+        }
+        if fp == 0 || s2 != 0 {
+            continue;
+        }
+        let v1 = m.r16(s0 + 4) as u32;
+        let take = if (best_size as i32) < v1 as i32 {
+            true
+        } else if v1 == best_size {
+            if age < best_age {
+                true
+            } else if age != best_age {
+                false
+            } else {
+                best_tie < m.r16(r + 0x68) as u32
+            }
+        } else {
+            false
+        };
+        if take {
+            best_idx = i as i32;
+            best_size = v1;
+            best_age = age;
+            best_tie = m.r16(r + 0x68) as u32;
+        }
+    }
+    best_idx
+}
+
+/// 0x2bc048: a voice for a new sound of group `group`: the event record in table 0x3494b0 (id 0xffff for none)
+/// gives the sound whose header (flag 0x10 of +0xa) may name a filter list of ids; with one, [`find_victim`] tries
+/// it first and then without. `sp` is the frame (the list object, count then pointer, at its start).
+pub fn pick_voice(m: &mut dyn Mem, e: &mut dyn LoadEnv, sp: u32, group: u32) -> i32 {
+    e.call(m, CLEAR_PAIR, &[sp]);
+    let en = ENTRIES.wrapping_add(group << 3);
+    let mut has = false;
+    if m.r16(en) != 0xffff {
+        let a2 = e.call(m, FIND_EVENT, &[en]);
+        if a2 != 0 {
+            let t1 = m.r8(a2 + 0xa) as u32;
+            if (t1 >> 4) & 1 != 0 {
+                let n6 = m.r8(a2 + 6) as u32;
+                let n7 = m.r8(a2 + 7) as i8 as i32 as u32;
+                let t0 = n6 << 1;
+                let a0 = (t0.wrapping_add(3) & !3).wrapping_add(0xc);
+                let v0 = n7.wrapping_mul(3).wrapping_add(3) & !3;
+                let mut a1 = a2.wrapping_add(a0).wrapping_add(v0);
+                if (t1 >> 3) & 1 != 0 {
+                    a1 = a1.wrapping_add(t0.wrapping_add(7) & !3);
+                }
+                let v1 = m.r8(a1) as u32;
+                m.w32(sp + 4, a1.wrapping_add(2));
+                m.w32(sp, v1);
+                has = true;
+            }
+        }
+    }
+    let mut v = e.call(m, FIND_VICTIM, &[if has { sp } else { 0 }, group]) as i32;
+    if has && v < 0 {
+        v = e.call(m, FIND_VICTIM, &[0, group]) as i32;
+    }
+    v
+}
+
+/// 0x2bc320: voice `i` is about to start: the flag word at 0x348ea8 is cleared, then every other idle voice of the
+/// same group that started later (or at the same time with a smaller +0x68) is released unless its sound's +0xa has
+/// bit 2, and a voice whose start is not earlier and whose sound's byte +9 is 100 raises the flag.
+pub fn claim_voice(m: &mut dyn Mem, e: &mut dyn LoadEnv, i: u32) {
+    let r0 = rec(i);
+    let group = m.r8(r0 + 0x6b);
+    let start = m.r32(r0 + 0x64);
+    let prio = m.r16(r0 + 0x68) as u32;
+    m.w32(GROUPS + 0x60, 0);
+    for j in 0..16u32 {
+        if j == i {
+            continue;
+        }
+        let r = rec(j);
+        if m.r8(r + 0x6a) == 0 || m.r8(r + 0x6b) != group || m.r16(r + 0x6c) as i16 != 0 {
+            continue;
+        }
+        let a0 = m.r32(r + 0x64);
+        let v1 = m.r16(r + 0x68) as u32;
+        if a0 < start || (a0 == start && v1 < prio) {
+            let s = m.r32(r + 0x70);
+            if (m.r8(s + 0xa) >> 2) & 1 == 0 {
+                e.call(m, FREE_VOICE, &[j]);
+            }
+            continue;
+        }
+        let s = m.r32(r + 0x70);
+        if m.r8(s + 9) as i8 as i32 == 0x64 && m.r8(r + 0x6b) == group {
+            m.w32(GROUPS + 0x60, 1);
+        }
+    }
+}
+
+/// 0x2bc4c0: when the group's limits allow, its kept voice (the second limit) is started and freed, and the queue
+/// is run for the group.
+pub fn run_group(m: &mut dyn Mem, e: &mut dyn LoadEnv, group: u32) {
+    if e.call(m, GROUP_LIMITS, &[group]) == 0 {
+        return;
+    }
+    let s1 = m.r32(LIMIT_B.wrapping_add(group << 2));
+    e.call(m, CLEAR_QUEUE, &[]);
+    let s0 = e.call(m, START_ONE, &[s1]);
+    e.call(m, FREE_VOICE, &[s1]);
+    if s0 != 0 {
+        e.call(m, QUEUE_RUN, &[group]);
+    }
+}
+
+/// 0x2bc548: run the queue for `id` once at a time (the word at 0x348900 guards it): a queued event or a started
+/// voice lets the queue run.
+pub fn try_start(m: &mut dyn Mem, e: &mut dyn LoadEnv, id: u32) -> u32 {
+    if m.r32(BUSY) != 0 {
+        m.w32(BUSY, 0);
+        return 0;
+    }
+    m.w32(BUSY, 1);
+    let mut r = 0;
+    if e.call(m, QUEUED_NOW, &[id]) != 0 || e.call(m, START_VOICE, &[id]) != 0 {
+        r = e.call(m, QUEUE_RUN, &[id]);
+    }
+    m.w32(BUSY, 0);
+    r
+}
+
+/// 0x2bc5d8: [`try_start`] for 0.
+pub fn try_start_zero(m: &mut dyn Mem, e: &mut dyn LoadEnv) -> u32 {
+    try_start_call(m, e, 0)
+}
+
+fn try_start_call(m: &mut dyn Mem, e: &mut dyn LoadEnv, id: u32) -> u32 {
+    e.call(m, TRY_START, &[id])
+}
+
+/// 0x2bc700: [`start_voice`] for group 0.
+pub fn start_voice_zero(m: &mut dyn Mem, e: &mut dyn LoadEnv) -> u32 {
+    e.call(m, START_VOICE, &[0])
+}
+
+/// 0x2bc5e0: start a voice for group `id` when it has any: pick one (its callback check must pass, else it is
+/// freed and another picked), claim it, empty the queue and start it and the voices chained after it. `sp` is the
+/// frame (the sound key goes at its start). Returns the last start's answer.
+pub fn start_voice(m: &mut dyn Mem, e: &mut dyn LoadEnv, sp: u32, id: u32) -> u32 {
+    if m.r32(GROUPS.wrapping_add(id << 2)) == 0 {
+        return 0;
+    }
+    let mut s1;
+    loop {
+        s1 = e.call(m, PICK_VOICE, &[id]) as i32;
+        if s1 < 0 {
+            return 0;
+        }
+        let key = m.r32(rec(s1 as u32) + 0x74);
+        m.w32(sp, key);
+        if e.call(m, CALLBACK_CHECK, &[sp]) == 1 {
+            break;
+        }
+        e.call(m, FREE_VOICE, &[s1 as u32]);
+    }
+    e.call(m, CLAIM, &[s1 as u32]);
+    e.call(m, CLEAR_QUEUE, &[]);
+    let mut s0 = s1;
+    let mut s3;
+    loop {
+        s3 = e.call(m, START_ONE, &[s0 as u32]);
+        s0 = m.r16(rec(s0 as u32) + 0x6e) as i16 as i32;
+        if s0 == -1 || s3 == 0 {
+            break;
+        }
+    }
+    e.call(m, FREE_VOICE, &[s1 as u32]);
+    s3
+}
