@@ -2073,14 +2073,14 @@ address,size,name,system,status
 0x18f168,160,Replay_SeekEnd,camera?,checked
 0x18f208,284,Replay_FreeAll,render?,checked
 0x18f328,288,Replay_RecordKeyframe,ai?,checked
-0x18f448,384,Replay_SaveKeyframe,save,not started
-0x18f5c8,8,thunk_FUN_0018f6c0,runtime,host
-0x18f5d0,236,Replay_SaveNodeList,save,not started
-0x18f6c0,320,Replay_RestoreKeyframe,ai?,not started
-0x18f800,164,Replay_RestoreNodes,ai?,not started
-0x18f8a8,3508,Replay_RestoreNode,world?,not started
-0x190660,284,Replay_SaveObjRefs,save,not started
-0x190780,244,Replay_LoadDeadNodes,ai?,not started
+0x18f448,384,Replay_SaveKeyframe,save,checked
+0x18f5c8,8,thunk_FUN_0018f6c0,runtime,checked
+0x18f5d0,236,Replay_SaveNodeList,save,checked
+0x18f6c0,320,Replay_RestoreKeyframe,ai?,checked
+0x18f800,164,Replay_RestoreNodes,ai?,checked
+0x18f8a8,3508,Replay_RestoreNode,world?,checked
+0x190660,284,Replay_SaveObjRefs,save,checked
+0x190780,244,Replay_LoadDeadNodes,ai?,checked
 0x190878,940,Replay_Step,camera?,checked
 0x190c28,24,Replay_ApplyCameraCut,camera,checked
 0x190c40,44,ReplayCam_InsertCut,camera?,checked
@@ -4278,8 +4278,8 @@ address,size,name,system,status
 0x23d4d8,32,Rand_Game,world?,checked
 0x23d4f8,100,Rand_GameRange,world?,checked
 0x23d560,76,Rand_GameJitter,world?,checked
-0x23d5b0,16,Rand_SaveGameSnapshot,save,ported
-0x23d5c0,16,FUN_0023d5c0,ai?,not started
+0x23d5b0,16,Rand_SaveGameSnapshot,save,checked
+0x23d5c0,16,FUN_0023d5c0,ai?,checked
 0x23d5d0,40,Debug_Printf,common?,ported
 0x23d5f8,44,StaticInit_MemCard,save,not started
 0x23d628,84,MemCard_AsciiToSjis,save,not started
@@ -4369,8 +4369,8 @@ address,size,name,system,status
 0x2400f8,36,cMemCard::~cMemCard,save,not started
 0x240120,64,cMemCard::__tf,runtime,host
 0x2401a0,16,FUN_002401a0,,not started
-0x2401b0,20,Rand_SaveSnapshot,save,ported
-0x2401c8,20,FUN_002401c8,ai?,not started
+0x2401b0,20,Rand_SaveSnapshot,save,checked
+0x2401c8,20,FUN_002401c8,ai?,checked
 0x2401e0,220,Rand_Next,world?,checked
 0x2402c0,172,Rand_Seed,world?,checked
 0x2403a8,204,Dma_SendGif,render?,not started

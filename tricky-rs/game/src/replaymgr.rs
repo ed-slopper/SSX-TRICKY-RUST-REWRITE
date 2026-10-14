@@ -2625,3 +2625,219 @@ pub fn stream_read_mem(m: &mut Mem, s: u32, dst: u32, n: u32) {
     copy_out(m, dst, m.r32(s + 8), n);
     m.w32(s + 8, m.r32(s + 8).wrapping_add(n));
 }
+
+// The world snapshot's orchestration (board row G12i): which nodes go into a keyframe and how they come back. Each
+// class's own snapshot (vf at +0x44), load (+0x4c) and object (+0x5c) and its load constructor are the env's
+// (their own rows); this is the order and the bookkeeping around them.
+
+/// The lists whose nodes save and load themselves (0x38aac0): the rider, camera, AI and effect lists
+pub const SNAPSHOT_LISTS: [u32; 4] = [2, 5, 7, 8];
+/// The game's random generator's state (24 bytes, `Rand_SaveGameSnapshot` 0x23d5b0)
+pub const RAND_GAME: u32 = 0x345e70;
+/// `MemPool_Alloc`'s pool for nodes
+pub const NODE_POOL: u32 = 0x345e48;
+
+/// The snapshot's calls beyond the node lists'
+pub trait SnapshotEnv: crate::bxlist::NodeEnv {
+    /// `MemPool_Alloc` 0x23d3b0(the node pool, size, 0x40000000, name, 0, 0)
+    fn pool_alloc(&mut self, m: &mut Mem, size: u32, name: u32) -> u32;
+    /// A constructor at `func` called with `args` (a node class's load constructor (node, list, stream);
+    /// `cDeadNode::cDeadNode` 0x13af38 (node, instance, 0))
+    fn construct(&mut self, m: &mut Mem, func: u32, args: &[u32]);
+}
+
+/// The node types a snapshot can hold: (type, size, its pool name, the load constructor)
+pub const NODE_TYPES: [(i32, u32, u32, u32); 31] = [
+    (0x0, 0x350, 0x38a138, 0x13dee8),   // cRollerNode
+    (0x2, 0x30, 0x38a128, 0x13fc58),    // cDebounceNode
+    (0x6, 0x3c, 0x38a170, 0x13b128),    // cCounterNode
+    (0x7, 0x100, 0x38a188, 0x140590),   // cBoostNode
+    (0x8, 0x3c, 0x38a198, 0x13fe50),    // cTimerNode
+    (0x9, 0x40, 0x38a1a0, 0x1401a0),    // cRailNode
+    (0xa, 0x6c, 0x38a1a8, 0x1420b8),    // cUVScrollNode
+    (0xb, 0x2d4, 0x38a1b8, 0x143040),   // cTexFlipNode
+    (0xc, 0x1b8, 0x38a1d0, 0x143870),   // cFenceNode
+    (0xd, 0x19c, 0x38a1d8, 0x144810),   // cFlagNode
+    (0xe, 0x2b8, 0x38a1e0, 0x145528),   // cCrackedNode
+    (0xf, 0x100, 0x38a1e8, 0x140a98),   // cLapBoostNode
+    (0x10, 400, 0x38a1f8, 0x1412e8),    // cRandomBoostNode
+    (0x11, 0x104, 0x38a208, 0x145ba8),  // cCrowdBoxNode
+    (0x12, 0x100, 0x38a218, 0x141be0),  // cZBoostNode
+    (0x13, 0x330, 0x38a1c0, 0x146258),  // cUVScrollTexFlipNode
+    (0x14, 0x6e0, 0x38a230, 0x146e10),  // cMeshAnimNode
+    (0x15, 0xd8, 0x38a240, 0x1479d0),   // cTrickTriggerNode
+    (0x16, 0x1a0, 0x38a250, 0x148028),  // cParticleNode
+    (0x17, 0x30, 0x38a270, 0x148ad0),   // cMovieNode
+    (0x18, 0x1c0, 0x38a278, 0x141800),  // cTubeEndBoostNode
+    (0x100, 0x68, 0x38a140, 0x198b48),  // cAnimObjectNode
+    (0x101, 0x6c, 0x38a150, 0x199d68),  // cAnimDeltaNode
+    (0x102, 0x88, 0x38a160, 0x19a0a8),  // cAnimComboNode
+    (0x103, 0x2f8, 0x38a220, 0x19a700), // cAnimTexFlipNode
+    (0x3e9, 0xf0, 0x38a0a0, 0x13d2f8),  // cScriptNode
+    (0x3ea, 0xa0, 0x38a178, 0x1fa480),  // cSplinePathNode
+    (0x3eb, 400, 0x38a190, 0x147d78),   // cEmitterNode
+    (0x3ec, 0x1e0, 0x38a260, 0x148680), // cCollideEmitterNode
+    (0x3ed, 0x228, 0x38a288, 0x148e38), // cRailManNode
+    (0x3ee, 0x2c, 0x38a290, 0x13b078),  // cRestoreNode
+];
+
+fn pool_new(m: &mut Mem, env: &mut dyn SnapshotEnv, size: u32, name: u32) -> u32 {
+    let p = env.pool_alloc(m, size, name);
+    if p != 0 {
+        mem_set(m, p, 0xdead_c0de, size);
+    }
+    p
+}
+
+/// `Replay_SaveKeyframe` 0x18f448(keyframe, frame, flag): the stream emptied, the game's random state, the frame;
+/// the nodes of lists 2, 5, 7, 8 save themselves (vf +0x44); with the flag lists 3 and 4 emptied first; lists 3 and
+/// 4 saved with their counts (`Replay_SaveNodeList`), then the dead objects' references
+pub fn save_keyframe(m: &mut Mem, env: &mut dyn SnapshotEnv, mgr: u32, k: u32, frame: u32, flag: u32) {
+    use crate::bxlist as bx;
+    m.w32(mgr + 0x58, 0);
+    m.w32(k + 0xc, 0);
+    m.w32(k + 4, m.r32(k));
+    stream_write_mem(m, k, RAND_GAME, 24);
+    m.w32(k + kf::FRAME, frame);
+    for l in SNAPSHOT_LISTS {
+        let mut n = bx::first(m, bx::WORLD, l);
+        while n != 0 {
+            bx::call_virtual(m, env, n, 0x44, &[k]);
+            n = bx::next_or_null(m, bx::WORLD, n, l);
+        }
+    }
+    if flag != 0 {
+        bx::delete_all(m, env, bx::WORLD, 3);
+        bx::delete_all(m, env, bx::WORLD, 4);
+    }
+    save_node_list(m, env, k, 3);
+    save_node_list(m, env, k, 4);
+    save_obj_refs(m, env, k);
+}
+
+/// `Replay_SaveNodeList` 0x18f5d0(keyframe, list): the count (and a zero word), then each node's snapshot
+pub fn save_node_list(m: &mut Mem, env: &mut dyn SnapshotEnv, k: u32, l: u32) {
+    use crate::bxlist as bx;
+    let mut count = 0u32;
+    let mut n = bx::first(m, bx::WORLD, l);
+    while n != 0 {
+        count += 1;
+        n = bx::next_or_null(m, bx::WORLD, n, l);
+    }
+    write_words(m, k, &[count, 0]);
+    if count as i32 > 0 {
+        let mut n = bx::first(m, bx::WORLD, l);
+        while n != 0 {
+            bx::call_virtual(m, env, n, 0x44, &[k]);
+            n = bx::next_or_null(m, bx::WORLD, n, l);
+        }
+    }
+}
+
+/// A few words written from a scratch place (the game's stack): through the low memory the port keeps for it
+fn write_words(m: &mut Mem, k: u32, words: &[u32]) {
+    let ctl = m.r32(game(m) + 0x40);
+    if m.r32(ctl + 0x58) != 0 {
+        return;
+    }
+    let n = 4 * words.len() as u32;
+    let used = m.r32(k + 4).wrapping_sub(m.r32(k));
+    if (m.r32(ctl + 0xc).wrapping_sub(used) as i32) < n as i32 {
+        m.w32(ctl + 0x58, 1);
+        return;
+    }
+    let at = m.r32(k + 4);
+    for (i, w) in words.iter().enumerate() {
+        m.w32(at + 4 * i as u32, *w);
+    }
+    m.w32(k + 4, at.wrapping_add(n));
+    m.w32(k + 0xc, m.r32(k + 0xc).wrapping_add(n));
+}
+
+fn read_words<const N: usize>(m: &mut Mem, k: u32) -> [u32; N] {
+    let at = m.r32(k + 8);
+    let mut w = [0u32; N];
+    for (i, v) in w.iter_mut().enumerate() {
+        *v = m.r32(at + 4 * i as u32);
+    }
+    m.w32(k + 8, at.wrapping_add(4 * N as u32));
+    w
+}
+
+/// `Replay_SaveObjRefs` 0x190660(keyframe): list 13's count (and a zero word), then each node's object (vf +0x5c) as
+/// an instance number
+pub fn save_obj_refs(m: &mut Mem, env: &mut dyn SnapshotEnv, k: u32) {
+    use crate::bxlist as bx;
+    let mut count = 0u32;
+    let mut n = bx::first(m, bx::WORLD, 0xd);
+    while n != 0 {
+        count += 1;
+        n = bx::next_or_null(m, bx::WORLD, n, 0xd);
+    }
+    write_words(m, k, &[count, 0]);
+    if count as i32 > 0 {
+        let mut n = bx::first(m, bx::WORLD, 0xd);
+        while n != 0 {
+            let obj = bx::call_virtual(m, env, n, 0x5c, &[]);
+            let course = m.r32(0x34648c);
+            let idx = (obj.wrapping_sub(m.r32(course + 0x48)) as i32) >> 8;
+            write_words(m, k, &[idx as u32]);
+            n = bx::next_or_null(m, bx::WORLD, n, 0xd);
+        }
+    }
+}
+
+/// `Replay_RestoreKeyframe` 0x18f5c8 (0x18f6c0)(keyframe): lists 3, 13 and 4 emptied, the stream rewound, the game's
+/// random state back; the nodes of lists 2, 5, 7, 8 load themselves (vf +0x4c); lists 3 and 4 made again
+/// (`Replay_RestoreNodes`), then the dead objects (`Replay_LoadDeadNodes`)
+pub fn restore_keyframe(m: &mut Mem, env: &mut dyn SnapshotEnv, mgr: u32, k: u32) {
+    use crate::bxlist as bx;
+    bx::delete_all(m, env, bx::WORLD, 3);
+    bx::delete_all(m, env, bx::WORLD, 0xd);
+    bx::delete_all(m, env, bx::WORLD, 4);
+    m.w32(k + 8, m.r32(k));
+    stream_read_mem(m, k, RAND_GAME, 24);
+    for l in SNAPSHOT_LISTS {
+        let mut n = bx::first(m, bx::WORLD, l);
+        while n != 0 {
+            bx::call_virtual(m, env, n, 0x4c, &[k]);
+            n = bx::next_or_null(m, bx::WORLD, n, l);
+        }
+    }
+    restore_nodes(m, env, mgr, k, 3);
+    restore_nodes(m, env, mgr, k, 4);
+    load_dead_nodes(m, env, k);
+}
+
+/// `Replay_RestoreNodes` 0x18f800(keyframe, list): as many nodes as saved made again, then the list's pending ones
+/// merged
+pub fn restore_nodes(m: &mut Mem, env: &mut dyn SnapshotEnv, mgr: u32, k: u32, l: u32) {
+    let [count, _] = read_words::<2>(m, k);
+    for _ in 0..(count as i32).max(0) {
+        restore_node(m, env, mgr, k, l);
+    }
+    crate::bxlist::merge_pending(m, env, crate::bxlist::WORLD, l);
+}
+
+/// `Replay_RestoreNode` 0x18f8a8(keyframe, list): the saved node's type (the header's third word, peeked) picks its
+/// size, pool name and load constructor; an unknown type makes nothing (and reads nothing)
+pub fn restore_node(m: &mut Mem, env: &mut dyn SnapshotEnv, _mgr: u32, k: u32, l: u32) {
+    let at = m.r32(k + 8);
+    let ty = m.r32(at + 8) as i32;
+    if let Some(&(_, size, name, ctor)) = NODE_TYPES.iter().find(|t| t.0 == ty) {
+        let p = pool_new(m, env, size, name);
+        env.construct(m, ctor, &[p, l, k]);
+    }
+}
+
+/// `Replay_LoadDeadNodes` 0x190780(keyframe): for each saved reference a dead node (0x2c bytes) on its instance
+pub fn load_dead_nodes(m: &mut Mem, env: &mut dyn SnapshotEnv, k: u32) {
+    let [count, _] = read_words::<2>(m, k);
+    for _ in 0..(count as i32).max(0) {
+        let [idx] = read_words::<1>(m, k);
+        let p = pool_new(m, env, 0x2c, 0x38a298);
+        let course = m.r32(0x346488 + 4);
+        let inst = if (idx as i32) < m.r32(course + 0xc) as i32 { m.r32(course + 0x48).wrapping_add(idx << 8) } else { 0 };
+        env.construct(m, 0x13af38, &[p, inst, 0]);
+    }
+}

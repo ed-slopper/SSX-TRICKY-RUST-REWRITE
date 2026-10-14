@@ -5,7 +5,8 @@ How the game records and plays back a race. Ported so far: the byte streams and 
 list, seeking and playlists (G12d; `tricky_game::replaymgr`, checked: `tests/replaymgr.rs`), the highlights
 and pins (G12e; the same module, checked: `tests/replay_highlights.rs`), the camera tracks (G12f; checked:
 `tests/replay_camtracks.rs`), playback control and the manager's life (G12g; checked:
-`tests/replay_playback.rs`), and the save to the card and the load (G12h; checked: `tests/replay_save.rs`). Keyframes, the node save and restore, pins and
+`tests/replay_playback.rs`), the save to the card and the load (G12h; checked: `tests/replay_save.rs`), and the world snapshot's
+orchestration (G12i; checked: `tests/replay_snapshot.rs`). Keyframes, the node save and restore, pins and
 highlights, camera tracks, `Replay_Update` and the memory-card save are the rest of G12.
 
 ## The replay control
@@ -300,4 +301,32 @@ frames of a message), +0x4c and +0x50 hold recording, +0x58 a stream overflowed.
   The game's saved bytes were then loaded back on both sides, directly or (every other save) through the career's
   buffer, and compared again; then the buffers were freed. The runner's step limit is now set per runner
   (`step_limit`), because the game's compression of a pad stream runs past five million instructions.
+
+## The world snapshot's orchestration (G12i)
+
+- **What this covers.** The order and bookkeeping of a keyframe's snapshot, on the world's node lists (E9k). Each
+  node class's own snapshot (its virtual at +0x44), load (+0x4c), object (+0x5c) and load constructor go through
+  `SnapshotEnv` and are left to their own rows.
+- **`Replay_SaveKeyframe(keyframe, frame, flag)`:**
+  - clears the overflow flag (+0x58) and empties the stream;
+  - writes the game's random state (24 bytes at 0x345e70: `Rand_SaveGameSnapshot`) and sets the frame;
+  - lets each node of lists 2, 5, 7 and 8 save itself (the table at 0x38aac0);
+  - with the flag, first deletes the nodes of lists 3 and 4;
+  - saves lists 3 and 4 (`Replay_SaveNodeList`: a count and a zero word, then each node), then the dead objects
+    (`Replay_SaveObjRefs`: list 13's count, then each node's object as an instance number).
+- **`Replay_RestoreKeyframe`:**
+  - deletes the nodes of lists 3, 13 and 4, rewinds the stream and reads the random state back;
+  - lets the nodes of lists 2, 5, 7 and 8 load themselves;
+  - makes lists 3 and 4 again (`Replay_RestoreNodes`: the count, each node, then the list's pending nodes merged);
+  - makes the dead objects again (`Replay_LoadDeadNodes`: a 0x2c-byte `cDeadNode` on each saved instance; 0 past
+    the course's count).
+- **`Replay_RestoreNode`** peeks the saved type (the header's third word). The type picks the size, the pool name
+  and the class's load constructor, called as (node, list, stream) on a pool node filled with 0xdeadc0de. There
+  are 31 types, from cRollerNode (0) to cRestoreNode (0x3ee); the table is `replaymgr::NODE_TYPES`. An unknown type
+  makes nothing and reads nothing, so the rest of the stream is then read out of step, in the game too.
+- **Checked in the runner:** 2,000 random cases on the world's 14 lists, with fake nodes whose virtuals are
+  logging stand-ins. Saves, node-list saves, object references and merges were checked with the stream filling up
+  and overflowing. Restores (whole keyframes, node lists, single nodes and dead nodes) were checked from made-up
+  streams holding every node type, with unknown types in the single restore. The load constructors were stand-ins
+  that log and take their record. Every call and all the memory were compared.
 
