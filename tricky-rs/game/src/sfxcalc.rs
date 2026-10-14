@@ -50,6 +50,34 @@ pub fn impact_speed(normal: V4, vel: V4) -> i32 {
     if v < 0 { v.wrapping_neg() } else { v }
 }
 
+/// The rider fields the snow sound programs' inputs read: the ground normal (+0x320), the velocity (+0x150), the
+/// float at +0x160 and the one at +0x214.
+#[derive(Clone, Copy, Debug)]
+pub struct BoardIn {
+    pub normal: V4,
+    pub vel: V4,
+    pub f160: f32,
+    pub f214: f32,
+}
+
+/// The snow sound programs' input `n` (`LOAD n`; the functions 0x21a6a8, 0x21a6f0, 0x21a710, 0x21a740, 0x21a788):
+/// 0 the impact speed, 1 |(int)f160|, 2 |(int)(f214 · 127)|, 3 a quarter of the impact speed plus twice input 1, 4 input
+/// 3 plus the impact speed. Other numbers read nothing (0).
+pub fn board_input(n: u32, b: &BoardIn) -> i32 {
+    let abs = |v: i32| if v < 0 { v.wrapping_neg() } else { v };
+    let impact = || impact_speed(b.normal, b.vel);
+    let one = || abs(crate::sndlib::cvt_w(b.f160));
+    let three = || (impact() >> 2).wrapping_add(one().wrapping_mul(2));
+    match n {
+        0 => impact(),
+        1 => one(),
+        2 => abs(crate::sndlib::cvt_w(b.f214 * 127.0)),
+        3 => three(),
+        4 => three().wrapping_add(impact()),
+        _ => 0,
+    }
+}
+
 /// `Audio_AnyRiderNearAhead`: whether any rider (`riders`, their positions in the audio system's list) is within
 /// `radius` metres of `at` (cm, ×100) and above it (z).
 pub fn any_rider_near_ahead(radius: f32, at: [f32; 3], riders: &[[f32; 3]]) -> bool {

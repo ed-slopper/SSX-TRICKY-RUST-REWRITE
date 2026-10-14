@@ -251,3 +251,34 @@ fn voice_distance_volume_and_doppler_match_the_original() {
         assert_eq!(r.cpu.f(0).to_bits(), voice_doppler_pitch(speed, unit).to_bits(), "case {case} speed {speed} unit {unit}");
     }
 }
+
+#[test]
+fn snow_program_inputs_match_the_original() {
+    let Some(mut r) = runner() else { return };
+    let rider = r.mem.alloc(0x500);
+    let mut g = Rng(0x1234_5678_9abc_def1);
+    let addrs = [0x21a6a8u32, 0x21a6f0, 0x21a710, 0x21a740, 0x21a788];
+    for case in 0..40_000 {
+        let n = [g.f(-1.0, 1.0), g.f(-1.0, 1.0), g.f(-1.0, 1.0), 0.0];
+        let v = [g.f(-3000.0, 3000.0), g.f(-3000.0, 3000.0), g.f(-3000.0, 3000.0), 0.0];
+        let wide = |g: &mut Rng| match g.next() % 6 {
+            0 => g.f(-5000.0, 5000.0),
+            1 => g.f(-2.0, 2.0),
+            2 => f32::from_bits(g.next() & 0xbfff_ffff),
+            3 => 1.0e12,
+            4 => -1.0e12,
+            _ => g.f(-100.0, 100.0),
+        };
+        let (f160, f214) = (wide(&mut g), wide(&mut g));
+        put4(&mut r.mem, rider + 800, n);
+        put4(&mut r.mem, rider + 0x150, v);
+        r.mem.write_u32(rider + 0x160, f160.to_bits());
+        r.mem.write_u32(rider + 0x214, f214.to_bits());
+        let b = BoardIn { normal: n, vel: v, f160, f214 };
+        for (k, a) in addrs.iter().enumerate() {
+            r.cpu.set_gpr(4, rider as u64);
+            r.call(*a).unwrap();
+            assert_eq!(r.cpu.gpr(2) as i32, board_input(k as u32, &b), "input {k} case {case}: {b:?}");
+        }
+    }
+}
