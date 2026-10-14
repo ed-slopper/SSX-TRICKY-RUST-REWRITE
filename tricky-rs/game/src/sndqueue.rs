@@ -440,3 +440,41 @@ pub fn update_boost(q: &mut Queue, w6e38: &mut u32, w6e3c: &mut u32, flag_41c: u
     }
     *w6e3c = w6e3c.wrapping_add(1);
 }
+
+pub trait ScriptSoundEnv: QueueEnv {
+    /// 0x2154e0 (the audio system, the node): non-zero while its sound is already queued.
+    fn is_queued(&mut self) -> bool;
+    /// The audio system's virtual +0x6c (the audio system, 2, 0x7a): the special play for sound 0x7a.
+    fn play_special(&mut self) -> u64;
+    /// `SndSys_SetPendingVolume` 0x226dd8 (31.0, -1.0, the audio system).
+    fn set_pending_volume(&mut self, a: f32, b: f32);
+    /// `Audio_IsNearerPlayer2` 0x20fb68 (the audio system, the position): which player's listener.
+    fn is_nearer_player2(&mut self, pos: [u32; 4]) -> u32;
+    /// `SndSys_QueueSounds` 0x215998 (the audio system, the node, what was played, `word_80 + 0x32`, 0).
+    fn queue_sounds(&mut self, played: u64, id: u32);
+}
+
+/// `Sfx_ScriptSoundPlay` 0x2165c8: a trigger script plays sound `id` at a node's position `pos` (its +0x30..0x40): unless the
+/// node's sound is already queued, either (in game mode 4, for sound 0x7a) a special play, or a queue entry
+/// (kind 2, flag +0x38 = 1) whose emitter is a copy of the position on the caller's stack (`local`), with the
+/// pending volume set to 31, -1 and the listener of the nearer player; then the follow-up sounds are queued.
+pub fn script_sound_play(q: &mut Queue, word_80: u32, mode_is_4: bool, id: i64, pos: [u32; 4], local: u32, env: &mut dyn ScriptSoundEnv) {
+    if env.is_queued() {
+        return;
+    }
+    if mode_is_4 && id == 0x7a {
+        let played = env.play_special();
+        env.queue_sounds(played, word_80.wrapping_add(0x32));
+        return;
+    }
+    let i = queue_begin(q, 2, id as u32, None);
+    let slot = env.get_slot(4);
+    q.a40[i] = slot;
+    q.a38[i] = 1;
+    q.emitter[i] = local;
+    env.set_pending_volume(f32::from_bits(0x41f0_0000), -1.0);
+    let l = env.is_nearer_player2(pos);
+    q.a68[i] = l;
+    let played = env.play_pending();
+    env.queue_sounds(played, word_80.wrapping_add(0x32));
+}

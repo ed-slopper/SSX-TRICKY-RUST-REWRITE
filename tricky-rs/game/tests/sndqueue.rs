@@ -960,3 +960,112 @@ fn update_boost_matches_the_original() {
         assert_eq!((a38, a3c), (m38, m3c), "case {case} words");
     }
 }
+
+// ---- ScriptSoundPlay ----
+
+struct ScriptEnv(Rc<RefCell<Or>>);
+impl QueueEnv for ScriptEnv {
+    fn get_slot(&mut self, which: u32) -> u32 {
+        self.0.borrow_mut().take("slot", which as u64, 0) as u32
+    }
+    fn rider_listener(&mut self) -> u32 {
+        panic!("not used")
+    }
+    fn play_pending(&mut self) -> u64 {
+        self.0.borrow_mut().take("pp", 0, 0) as u64
+    }
+}
+impl ScriptSoundEnv for ScriptEnv {
+    fn is_queued(&mut self) -> bool {
+        self.0.borrow_mut().take("queued", 0, 0) != 0
+    }
+    fn play_special(&mut self) -> u64 {
+        self.0.borrow_mut().take("special", 2, 0x7a) as u64
+    }
+    fn set_pending_volume(&mut self, a: f32, b: f32) {
+        self.0.borrow_mut().log.push(("spv", a.to_bits() as u64, b.to_bits() as u64));
+    }
+    fn is_nearer_player2(&mut self, pos: [u32; 4]) -> u32 {
+        let h = pos.iter().fold(0u64, |a, w| a.wrapping_mul(0x1_0000_0001).wrapping_add(*w as u64));
+        self.0.borrow_mut().take("near2", h, 0) as u32
+    }
+    fn queue_sounds(&mut self, played: u64, id: u32) {
+        self.0.borrow_mut().log.push(("qs", played, id as u64));
+    }
+}
+
+#[test]
+fn script_sound_play_matches_the_original() {
+    let Some(mut r) = runner() else { return };
+    let or: Rc<RefCell<Or>> = Rc::new(RefCell::new(Or::default()));
+    let (node, sys, l) = setup(&mut r, 0x100);
+    let vt = r.mem.alloc(0x100);
+    let special = 0x0030_0000u32;
+    for (a, name) in [(0x2154e0u32, "queued"), (0x211f38, "slot"), (0x20c948, "pp"), (special, "special")] {
+        let o = or.clone();
+        r.stub(a, move |c, _| {
+            let x = if name == "slot" { c.gpr(5) as u32 as u64 } else if name == "special" { assert_eq!((c.gpr(4) as u32, c.gpr(5), c.gpr(6)), (sys, 2, 0x7a)); 2 } else { 0 };
+            let y = if name == "special" { 0x7a } else { 0 };
+            let v = o.borrow_mut().take(name, x, y);
+            c.set_gpr(2, v as u64);
+        });
+    }
+    r.mem.write_u32(vt + 0x68, 0);
+    r.mem.write_u32(vt + 0x6c, special);
+    let o = or.clone();
+    let emit = Rc::new(RefCell::new(0u32));
+    let e2 = emit.clone();
+    r.stub(0x20fb68, move |c, m| {
+        let p = c.gpr(5) as u32;
+        *e2.borrow_mut() = p;
+        let pos: Vec<u32> = (0..4).map(|k| m.read_u32(p + 4 * k)).collect();
+        let h = pos.iter().fold(0u64, |a, w| a.wrapping_mul(0x1_0000_0001).wrapping_add(*w as u64));
+        let v = o.borrow_mut().take("near2", h, 0);
+        c.set_gpr(2, v as u64);
+    });
+    let o = or.clone();
+    r.stub(0x226dd8, move |c, _| o.borrow_mut().log.push(("spv", c.f(12).to_bits() as u64, c.f(13).to_bits() as u64)));
+    let o = or.clone();
+    r.stub(0x215998, move |c, _| {
+        assert_eq!((c.gpr(4) as u32, c.gpr(5) as u32, c.gpr(8)), (sys, node, 0));
+        o.borrow_mut().log.push(("qs", c.gpr(6), c.gpr(7) as u32 as u64))
+    });
+    let mut g = Rng(0x0f1e_2d3c_4b5a_6978);
+    for case in 0..30_000 {
+        fill(&mut r, sys, &l, &mut g);
+        r.mem.write_u32(sys + 4, vt);
+        let w80 = r.mem.read_u32(sys + 0x80);
+        let mode = [4u32, 4, 4, 3, 0][g.next() as usize % 5];
+        r.mem.write_u32(0x32de88, mode);
+        let pos: [u32; 4] = std::array::from_fn(|_| g.next());
+        for (k, w) in pos.iter().enumerate() {
+            r.mem.write_u32(node + 0x30 + 4 * k as u32, *w);
+        }
+        let id: i64 = [0x7a, 0x7a, 0x7b, 0x79, 5, -1, 0x1_0000_007a, 0x7a_i64 << 32][g.next() as usize % 8];
+        let vals: Vec<i64> = vec![
+            (g.next() % 3 == 0) as i64,
+            (g.next() % 100) as i64,
+            (g.next() % 100) as i64,
+            g.next() as i64,
+            (g.next() % 100) as i64,
+            g.next() as i64,
+        ];
+        let before = read(&mut r, &l);
+        or.borrow_mut().vals = vals.clone();
+        or.borrow_mut().log.clear();
+        r.cpu.set_gpr(4, sys as u64);
+        r.cpu.set_gpr(5, node as u64);
+        r.cpu.set_gpr(6, id as u64);
+        *emit.borrow_mut() = 0;
+        r.call(0x2165c8).unwrap_or_else(|e| panic!("case {case}: {e}"));
+        let orig = std::mem::take(&mut or.borrow_mut().log);
+        let after = read(&mut r, &l);
+        let local = *emit.borrow();
+        let mut q = before.clone();
+        or.borrow_mut().vals = vals;
+        script_sound_play(&mut q, w80, mode == 4, id, pos, local, &mut ScriptEnv(or.clone()));
+        let mine = std::mem::take(&mut or.borrow_mut().log);
+        assert_eq!(orig, mine, "case {case} mode {mode} id {id:#x}");
+        assert_eq!(after, q, "case {case} state mode {mode} id {id:#x}");
+    }
+}
