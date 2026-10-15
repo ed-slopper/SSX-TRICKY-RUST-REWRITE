@@ -171,3 +171,30 @@ direct calls, the heap, the pads).
   for bit) and all memory compared. The tests caught the 10 mutants tried.
 - **The test fills its float fields with real floats.** The EE reads a denormal as 0, so random small integers in
   a float field make `0 < x` differ from Rust's; no HUD or rider float is ever denormal.
+
+## The menus' shared drawing (G8f)
+
+`tricky_game::menudraw`: the frame, the list and the label box every menu overlay draws, as their draw calls.
+
+- **`Backdrop_DrawFrame`** (the height, the backdrop, the layer):
+  - stores the height at +0x2c (or +0x34 while the frame opens);
+  - draws three dark panels (the frame's alpha +0x50, grey 0.1): one 680 wide behind it, and two inside between
+    0.26 and 0.79 of sprite 55's height, from 0.455 of the scaled width;
+  - draws the four corners of sprite 55, scaled to 340 wide, at the backdrop's x (+0x38) ± and y (+0x48);
+  - the font's fifth word goes to 0.15 first.
+- **`Overlay_DrawMenuList`** (x, y, the scale; the backdrop, the alignment, the title, the items, their count, the
+  selection, the pointer sprite; on the stack: the pulse on, the items' enabled flags):
+  - the line height is the font's height × scale + 4;
+  - flags 2 / 8 put the list above / centred on y, counting the title (its height × 1.2 + 9) when there is one;
+  - flags 1 / 4 put it right of / centred on x by the widest item;
+  - the title is centred at scale 1.2; the pointer sprite sits 16 left of the selection, at 0.9 scale;
+  - items are white, dimmed to 0.4 when disabled. The selection is gold and pulses: its scale bounces between 0.99
+    and 1.1 (0x338208, stepping by 0x33820c), keeping its centre;
+  - each text's alpha is the contents' (+0x70).
+- **`HUD_DrawLabelBox`** (y, the backdrop, the string, the layer): sprites 62 / 63 / 64 at the backdrop's edge
+  offsets (+0x80, +0x88 plus y). The middle one is stretched to the text's width + 8 at scale 0.79. The text sits 2
+  left of the middle and 7 down, on layer + 2.
+- **Checked in the runner** on 40,000 random frames, lists (every alignment, with and without a title, pointer
+  and pulse) and labels, with every draw call (floats bit for bit) and all memory compared. The tests caught 5 of
+  8 mutants; the three left cannot change a result for these inputs (an equal width, (w − 2) + 10 for integer
+  widths, and selection 0's offset of 0).
