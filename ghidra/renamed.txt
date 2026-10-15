@@ -650,3 +650,9 @@
 2576a8 FUN_002576a8 Vu0_RunPatchProgram
 1fece8 VideoStream_Update FE3DTransition_Update
 251d70 FUN_00251d70 PatchCache_Age
+1117f0 FUN_001117f0 Race_GoToEndLesson
+14d930 FUN_0014d930 Lesson_SetAttemptDone
+14d928 FUN_0014d928 Lesson_OnBoarderEvent
+17d1c8 FUN_0017d1c8 BxObjNode_FromLink
+191820 FUN_00191820 ReplayMgr_GetKeyframeBeforeLatest
+1953a0 FUN_001953a0 ReplayCamTrack_GetCutFrame

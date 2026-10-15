@@ -269,6 +269,10 @@ clears the layer's "current" flags (`AnimLayer_ClearCurrentFlags` 0x15a760, clip
 `AnimCtl_FindFirstMarkerFrame` 0x15fb08 (from `RaceScene_Select`): the frame of the clip's first marker of types 0–3,
 −1 if none. `Euler_Lerp` 0x202758: a + t·(shortest delta to b), per angle; `Euler_LerpArray` 0x2027f0 does it in place
 on n pairs (pose blending).
+`AnimLayer_SetStance` 0x15a690 (F1c, proven): every clip in a layer gets clip+0x64 = the value; `AnimCtl_SetAllLayersStance`
+0x15ef48 does it for the three layers (ctl+0x28, 0x70 apart), as `AnimCtl_TurnAllLayers` does the facing. clip+0x64 is
+the controller's +0x14 (rider+0x46d4, the animation's stance) copied by `AnimCtl_BeginClip` and handed to
+`PoseBlend_Add`; the rail control's quarter turn calls it with 0 after clearing +0x46d4.
 
 ## Meter, boost, crouch and wind-up helpers (proven, G1d; exact in `tricky-rs/game/src/boarder.rs`)
 

@@ -111,6 +111,9 @@ state change). In the tutorial:
 - RestartLesson (8): Enter puts the lesson in Intro (2); Update moves the race to 9. The lesson's retry choices call it.
 - Countdown (3): what `set_mode(3)` is: the race clock counts up 2.0 a tick (to 0), then Race (4) and the rider rides.
 - EndLesson (10): clears the pad device's +0x2c; Update adds 1/60 to the race clock.
+- Names (F1c, proven): `Race_GoToEndLesson` 0x1117f0 is the race object's state change (vtable +0x54) to 10, from the
+  three lesson end handlers' Enter. `Lesson_SetAttemptDone` 0x14d930 sets the lesson's +0x54 to 1 when it is 0, on the
+  rider's finish event (10, `cBoarder::vf10`); `Lesson_OnBoarderEvent` 0x14d928 (event 0x10) is empty.
 
 ## Checked against the original (row C11b3)
 

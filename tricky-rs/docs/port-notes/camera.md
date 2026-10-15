@@ -180,6 +180,10 @@ case-insensitive walk of a kind's list) stays for the app's intro until it moves
 - **A scope's objects** are listed from its +8: each has +4 the next, +8 the body, +0xc the hash, +0x10 the name.
 - **`Cml_FindObject`** (name, kind) tries the three files in order. `Cml_FindObjectInScope` (name, scope, kind) tries
   each file's scope, then falls back to `Cml_FindObject` with the kind.
+- **`Cml_FreeHandle`** 0x179068 (F1c, proven): `Mem_Delete` of the handle's word; `~cCamControl` calls it on the three.
+- **Setters** (F1c, proven): `CamView_SetTarget` 0x1703a0 writes x, y, z to the view's +0x3c / +0x68 / +0x94 (through its
+  self pointer +0x11c); `CamLens_SetHeight` 0x1730c0 writes +0x14..+0x1c and the height ratio +0x20 (through +0x44).
+  They are the "manual target" set-up's two calls (0x1775ac, 0x1775c4).
 - **Checked in the runner:** 20,000 cases of three random files, one sometimes missing. They had random records,
   trees and scope lists, and names with right and wrong hashes, one with high bytes. Every lookup's result was
   compared. The game's own `strcmp` runs too; the runner learnt its `PSUBW` / `PSUBB` / `PNOR` / `PAND` for it.
