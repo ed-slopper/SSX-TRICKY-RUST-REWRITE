@@ -946,6 +946,8 @@ pub(super) fn rider_id(r: &Rider) -> u32 {
 /// casts (their flags lose 0x20).
 pub(super) fn touch_query(world: &CollisionWorld, course: &crate::course_ground::CourseGround, body: &crate::collbody::CollBody) -> (f32, crate::walls::CastRecord, crate::walls::Touched, Option<(usize, usize)>) {
     let mut q = crate::worldboarder::WorldBoarder::new(body, 1);
+    // `Boarder_InstanceCollisions` sets the shape's +0x2f0 to 1 after making it: front faces only (row G4e6)
+    q.front_only = true;
     let (t, h) = course.query_instances(&mut q, world.showoff, &|i| world.course_skips(i));
     let Some(h) = h else { return (t, Default::default(), Default::default(), None) };
     let o = h.object.unwrap_or(0);

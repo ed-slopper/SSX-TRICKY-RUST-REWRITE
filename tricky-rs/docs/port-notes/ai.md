@@ -347,3 +347,13 @@ Part of the port notes (index: [README.md](README.md)); units and wording as des
 - Inferred: what differs is how the port's grounded rider keeps its speed along the frame between the two faces
   (ground motion on the half-pipe, or the AI's steer holding it into the gap), not the bounce (E8c2/E8c4 checked) or
   the counter (G6e checked). Row G4e6 records the player wedged there with PINE to find which.
+
+## The frames' touch only takes front faces (board row G4e6)
+
+- Proven (PINE, the player riding into the frames, elysium): the game's grounded frame hits are single clean bounces
+  (one hit, the wall normal does not flip back next tick).
+- Proven (`Boarder_InstanceCollisions` 0x125088): after `cWorldBoarder`(rider+0x470, 1) it sets the shape's +0x2f0
+  to 1 before `World_QueryInstances`, so the touch tests front faces only. The port's `touch_query`
+  (`rider/ground_tick.rs`) left it off: a body already past the frame's thin plate was pushed out through the far face,
+  the next tick back again, the normal flipping each tick and the counter filling in five ticks. With
+  `front_only` set, TRICKY_SIM=600 elysium: 6 falls (was 20), the 11 courses 2 stuck / 50 falls (was 2 / 54).
