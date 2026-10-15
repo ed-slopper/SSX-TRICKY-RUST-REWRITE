@@ -87,8 +87,11 @@ pub struct AiRider {
 }
 
 /// What a tick reads of the race: the riders' positions (+0x140) and velocities (+0x150) in the game's units, the
-/// pair records of this rider (distance, bearing; `hit::pair_distances`), the race's tick, knockdown practice.
+/// pair records of this rider (distance, bearing; `hit::pair_distances`), the race's tick, knockdown practice, the
+/// rider's grudge (rider+0x118..+0x128, `rivals::Grudge::of`) and its place in the race (+0x110, 0 for first; row G4e5).
 pub struct RaceView<'a> {
+    pub grudge: GrudgeOf,
+    pub place: i32,
     pub me: i32,
     pub others: &'a [(V4, V4)],
     pub recs: &'a [[f32; 2]],
@@ -116,7 +119,7 @@ impl AiRider {
     pub fn tick(&mut self, r: &Rider, paths: &[Path], race: &RaceView, rand: &mut dyn FnMut() -> i32) -> Input {
         let pos = game_pos(r.pos);
         let vel = game_dir(r.vel * 100.0);
-        let c = Chooser { pos, vel, x41c: 0, class: r.stats.kind as u32, place: 0, meter: r.boost, keep: 1.0 };
+        let c = Chooser { pos, vel, x41c: 0, class: r.stats.kind as u32, place: race.place, meter: r.boost, keep: 1.0 };
         aipath::update_path_ahead(paths, &mut self.follow, true, race.tick, &c, rand);
         let up = game_dir(r.normal);
         let fwd0 = game_dir(crate::rider::heading(r.yaw));
@@ -140,7 +143,7 @@ impl AiRider {
             meter: r.boost,
             me: race.me,
             recs: race.recs.to_vec(),
-            grudge: GrudgeOf::default(),
+            grudge: race.grudge,
         };
         let events: Vec<PathEvent> = paths[self.follow.path].events.iter().map(|&(kind, value, start, end)| PathEvent { kind, value, start, end }).collect();
         let (from, at) = (self.follow.last, self.follow.along);

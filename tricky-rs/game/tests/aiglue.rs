@@ -43,7 +43,7 @@ fn computer_rider_rides_its_path() {
     };
     let (mut worst, mut far, mut gone) = (0.0f32, 0, 0.0f32);
     for tick in 0..3600 {
-        let view = RaceView { me: 0, others: &[], recs: &[], tick, practice: false };
+        let view = RaceView { grudge: Default::default(), place: 0, me: 0, others: &[], recs: &[], tick, practice: false };
         let path = ai.follow.path;
         let input = ai.tick(&r, &paths, &view, &mut rand);
         // the way made along the path (none on the tick it changes path)

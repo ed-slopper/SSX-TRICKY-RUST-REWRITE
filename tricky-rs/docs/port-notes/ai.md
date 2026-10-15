@@ -180,7 +180,8 @@ Part of the port notes (index: [README.md](README.md)); units and wording as des
   nose as the first row gives a steer stuck at full; `aiglue` passes the right as `fwd` and the nose as `side`.
 - The pad word as `CruiseControl_Update` 0x102fc8 reads it (`control.rs`): bit 1 jump, bit 3 boost, bits 5..10 steer
   (the game's sign is the port's negated), 11..16 crouch, 17..22 brake.
-- STANDIN (row G4e2/G4e3): no grudge, the path preference always kept (rider virtual +0x74 = 1), place 0, the port's
+- STANDIN (row G4e2/G4e3; the grudge and place are filled in the app since G4e5, `TRICKY_SIM` keeps none and 0): the
+  path preference always kept (rider virtual +0x74 = 1), the port's
   digital input for the crouch and brake sticks, `AIComputer_PlanJumpTrick` not called (the calls are kept in
   `AiRider::calls`), the rubber band's time scale (`AI_RubberBandSpeedScale`) not applied, a plain LCG for
   `Rand_Game` in the test.
@@ -317,3 +318,16 @@ Part of the port notes (index: [README.md](README.md)); units and wording as des
   twice, row E7c3f, so 27 against 24). Play test (elysium, megaplex, 90 s): all five opponents on the ported riders,
   racing in a pack (megaplex: 79-148 m from the finish at 90 s). `TRICKY_OLDAI=1` turns the ported riders off in the app too.
 - Play test: `TRICKY_SCREEN=play TRICKY_AUTOPLAY=1 TRICKY_NOINTRO=1` (without `TRICKY_SCREEN=play` the app waits on its menu).
+
+## Grudge and place for the ported computer riders (board row G4e5)
+
+- `aiglue::RaceView` carries the rider's grudge (`GrudgeOf`, rider+0x118..+0x128, from `rivals::Grudge::of`) into
+  `Ai::grudge` and its place (+0x110, 0 for first: `AIPath_ChoosePreference` reads 0 as leading) into `Chooser::place`.
+  The app fills both per opponent (place = riders closer to the finish); `TRICKY_SIM` rides alone (no grudge, place 0).
+- With them the ported rival mode does the chase: `AIComputer_PickTargetRider` takes a hostile grudge's target as a
+  rival (`is_rival_target`) and `AIComputer_RideAtRival` 0x137a18 rides at it. The app's own `attack` (STANDIN) now runs
+  only with `TRICKY_OLDAI`.
+- Race test (elysium, `TRICKY_GRUDGE=1`, 90 s, every 2 s): the opponent with the grudge picked the player (target 0)
+  and rode in rival mode at 3 to 27 m from them, between line and jump stretches; the others rode the line or near
+  other riders (targets 2 and 5). 11-course `TRICKY_SIM=600`: 2 stuck / 54 falls (G4e3: 1 / 54; the sim has no
+  grudge or place, so only run-to-run differences).

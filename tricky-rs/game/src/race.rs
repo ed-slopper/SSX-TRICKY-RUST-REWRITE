@@ -736,7 +736,7 @@ pub fn self_test(world: &mut CollisionWorld, rails: &Rails, line: &[Vec3], cours
     let mut port = PortAi::default();
     while t < seconds {
         if use_port {
-            let view = crate::aiglue::RaceView { me: 0, others: &[], recs: &[], tick: (t * 60.0) as i32, practice: false };
+            let view = crate::aiglue::RaceView { grudge: Default::default(), place: 0, me: 0, others: &[], recs: &[], tick: (t * 60.0) as i32, practice: false };
             port.frame(&mut r, &mut ai, ai_paths, line, 1.0, dt, &view, &mut || crate::rand::rand_game() as i32);
         } else {
         r.course_dir = { let l: &[Vec3] = if ai.route.len() > 2 { &ai.route } else { line }; let i = ai.idx.min(l.len().saturating_sub(2)); let j = (i + 4).min(l.len() - 1); Some((l[j] - l[i]).normalize_or_zero()) };

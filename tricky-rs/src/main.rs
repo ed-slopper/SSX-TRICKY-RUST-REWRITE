@@ -121,6 +121,7 @@ fn make_opponents(start: Vec3, yaw: f32, player_char: usize, n_chars: usize, cou
 
 /// Going after the player (`AIComputer_AttackTarget`): ahead of us, steer for a spot 3 m along
 /// their way and tuck (and boost when lined up); behind us and close, ease off to let them come.
+/// STANDIN: our own chase, for `AIComputer_RideAtRival` 0x137a18; used only with TRICKY_OLDAI (row G4e5).
 fn attack(mut ai: Input, me: &Rider, them: &Rider) -> Input {
     if !me.grounded || me.rail.is_some() || them.crashed > 0.0 { return ai; }
     let to = them.pos - me.pos;
@@ -1878,15 +1879,16 @@ fn ride(
                 o.driver.drive_paths(&mut o.rider, &world.0, &race.0.paths, &race.0.line, &race.0.course, place, dt)
             };
             let ai = if port_ai && !waiting {
-                let view = tricky_game::aiglue::RaceView { me: oi as i32 + 1, others: &seen, recs: &recs[oi + 1], tick: (race.0.time * 60.0) as i32, practice: false };
+                let view = tricky_game::aiglue::RaceView { grudge: o.grudge.as_ref().map(|g| g.of()).unwrap_or_default(), place: place as i32, me: oi as i32 + 1, others: &seen, recs: &recs[oi + 1], tick: (race.0.time * 60.0) as i32, practice: false };
                 let skill = o.driver.skill;
                 o.port.frame(&mut o.rider, &mut o.driver, &race.0.ai_paths, &race.0.line, skill, dt, &view, &mut || tricky_game::rand::rand_game() as i32);
                 o.port.input(&o.rider, &o.driver, ai)
             } else { ai };
             let g = o.grudge.as_mut().unwrap();
             g.tick(race.0.time);
-            // a rider with a grudge goes after the player (AIComputer_AttackTarget)
-            let ai = if !waiting && g.hostile() && race.0.state == RaceState::Running && o.driver.finished.is_none() && game.event == ui::Event::Race {
+            // a rider with a grudge goes after the player: the ported riders in their own rival mode
+            // (`AIComputer_RideAtRival`, row G4e5); `attack` only with TRICKY_OLDAI
+            let ai = if !port_ai && !waiting && g.hostile() && race.0.state == RaceState::Running && o.driver.finished.is_none() && game.event == ui::Event::Race {
                 attack(ai, &o.rider, r)
             } else { ai };
             // and taunts the player when close and off to one side (AIComputer_Taunt)
