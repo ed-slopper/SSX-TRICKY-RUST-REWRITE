@@ -299,3 +299,21 @@ Part of the port notes (index: [README.md](README.md)); units and wording as des
   half-pipe frames (x 430–540, z −1285 to −1410, t 299–322) after wall wipe-outs; megaplex 1 stuck (was 6).
 - The `aipath` runner tests fail with `TRICKY_AIP_DIR` pointing at a folder holding only some courses' `.aip`
   (they need every course); leave it unset for them.
+
+## The app's computer riders on the ported computer rider (board row G4e3)
+
+- `race::PortAi` (shared by the app and `TRICKY_SIM`): restarts `aiglue::AiRider` on its paths after each put-back,
+  ticks it at 60 Hz (at most 4 ticks a frame; STANDIN: the frame clocks), sets `course_dir` / `course_pts` from its
+  follower, keeps `AiDriver`'s route index and stuck clock up with it; `PortAi::input` takes the ported steer, tuck,
+  brake, jump and boost on the snow and `AiDriver`'s elsewhere (STANDIN, row G4g).
+- `Race::ai_paths` holds the course's paths (`aiglue::paths_of`), filled where the app makes its `Race`.
+- In `src/main.rs` each opponent has a `PortAi`; every frame the riders' positions and velocities (player first, game
+  units) and the pair records (`hit::pair_distances`) go to `RaceView` (`me` = opponent + 1), so the ported modes see
+  the other riders (near-rider and rival modes, the shove). The grudge (`rivals::Grudge`) and `attack` still run
+  after it on `AiDriver`'s input (STANDIN: `Ai::grudge` empty, row G4e5).
+- The path choice's keep roll now draws on `rand::rand_game` (the game's `Rand_Game` stream) in both the app and the
+  sim, instead of G4e2's LCG.
+- `TRICKY_SIM=600`, 11 disc courses: stuck 1, falls 54 (G4e2: 7 / 48 with its LCG; the falls are put-backs counted
+  twice, row E7c3f, so 27 against 24). Play test (elysium, megaplex, 90 s): all five opponents on the ported riders,
+  racing in a pack (megaplex: 79-148 m from the finish at 90 s). `TRICKY_OLDAI=1` turns the ported riders off in the app too.
+- Play test: `TRICKY_SCREEN=play TRICKY_AUTOPLAY=1 TRICKY_NOINTRO=1` (without `TRICKY_SCREEN=play` the app waits on its menu).

@@ -95,7 +95,9 @@ struct PropVisual(usize);
 
 /// Computer-controlled opponents.
 struct Opponent { rider: Rider, driver: AiDriver, character: usize, prog: course::Progress, /// its grudge against the player (made once the characters are known)
-    grudge: Option<rivals::Grudge>, taunt_wait: f32 }
+    grudge: Option<rivals::Grudge>, taunt_wait: f32,
+    /// the ported computer rider driving it on the snow (row G4e3)
+    port: rider::PortAi }
 #[derive(Resource, Default)]
 struct Opponents(Vec<Opponent>);
 
@@ -112,7 +114,7 @@ fn make_opponents(start: Vec3, yaw: f32, player_char: usize, n_chars: usize, cou
             driver: AiDriver::new(lane * 1.5, skill),
             character: (player_char + 1 + i * if n_chars > 6 { 2 } else { 1 }) % n_chars,
             prog: Default::default(),
-            grudge: None, taunt_wait: 1.0,
+            grudge: None, taunt_wait: 1.0, port: Default::default(),
         }
     }).collect())
 }
@@ -361,7 +363,7 @@ fn main() {
     if std::env::var("TRICKY_GATETEST").is_ok() {
         // line six riders up as a race does and see who gets away
         let mut field = make_opponents(loaded.start, loaded.yaw, 0, 12, 5, 0);
-        field.0.push(Opponent { rider: Rider::new(loaded.start + Vec3::Y * 0.5, loaded.yaw), driver: AiDriver::new(0.0, 0.9), character: 0, prog: Default::default(), grudge: None, taunt_wait: 1.0 });
+        field.0.push(Opponent { rider: Rider::new(loaded.start + Vec3::Y * 0.5, loaded.yaw), driver: AiDriver::new(0.0, 0.9), character: 0, prog: Default::default(), grudge: None, taunt_wait: 1.0, port: Default::default() });
         println!("start {:.1?} yaw {:.2} line[0] {:.1?} line[1] {:.1?}", loaded.start, loaded.yaw, loaded.line[0], loaded.line[1]);
         let from: Vec<Vec3> = field.0.iter().map(|o| o.rider.pos).collect();
         let (mut t, dt) = (0.0f32, 1.0 / 120.0);
@@ -399,6 +401,7 @@ fn main() {
     if dirs.is_empty() { dirs.push(full.clone()); }
     let current = dirs.iter().position(|d| *d == full).unwrap_or(0);
     let Loaded { level, world, rails, line, start, yaw: start_yaw, course, lines, paths, tube, cml, stage, finish_area } = loaded;
+    let ai_paths = tricky_game::aiglue::paths_of(&level.ai);
     // TRICKY_SPAWN=x,y,z,yaw (Bevy metres, radians): start the run there instead (for checks)
     let (start, start_yaw) = std::env::var("TRICKY_SPAWN").ok().map(|v| v.split(',').filter_map(|x| x.parse::<f32>().ok()).collect::<Vec<_>>())
         .filter(|v| v.len() == 4).map_or((start, start_yaw), |v| (Vec3::new(v[0], v[1], v[2]), v[3]));
@@ -415,7 +418,7 @@ fn main() {
     .insert_resource(RiderRes(Rider::new(start + Vec3::Y * 0.5, start_yaw)))
     .insert_resource(mode)
     .insert_resource(RailsRes(rails))
-    .insert_resource(RaceRes(Race { course, lines, paths, tube, cml, stage, finish_area, ..Race::new(line) }))
+    .insert_resource(RaceRes(Race { ai_paths, course, lines, paths, tube, cml, stage, finish_area, ..Race::new(line) }))
     .insert_resource(LevelList { dirs, current })
     .init_resource::<CamRes>()
     .init_resource::<editor::Editor>()
@@ -1041,7 +1044,7 @@ fn switch_level(
     commands.insert_resource(make_opponents(loaded.start, loaded.yaw, lib.player, lib.chars.len(), 0, 0));
     commands.insert_resource(World(loaded.world));
     commands.insert_resource(RailsRes(loaded.rails));
-    commands.insert_resource(RaceRes(Race { course: loaded.course, lines: loaded.lines, paths: loaded.paths, tube: loaded.tube, cml: loaded.cml, stage: loaded.stage, finish_area: loaded.finish_area, ..Race::new(loaded.line) }));
+    commands.insert_resource(RaceRes(Race { ai_paths: tricky_game::aiglue::paths_of(&loaded.level.ai), course: loaded.course, lines: loaded.lines, paths: loaded.paths, tube: loaded.tube, cml: loaded.cml, stage: loaded.stage, finish_area: loaded.finish_area, ..Race::new(loaded.line) }));
     commands.insert_resource(LevelRes(loaded.level));
     let mode = cam.0.mode;
     cam.0 = ChaseCam::default();
@@ -1853,6 +1856,13 @@ fn ride(
         let dtfs: Vec<f32> = std::iter::once(race.0.prog.dtf).chain(opponents.0.iter().map(|o| o.prog.dtf)).collect();
         let me_idx = rivals::index(lib.chars.get(lib.player).map_or("", |c| c.name.as_str()));
         let opponents_len = opponents.0.len();
+        // what the ported computer riders see of the race (row G4e3): every rider's position and velocity in the
+        // game's units (the player first) and the pair records (`hit::pair_distances`)
+        let game_v4 = |v: Vec3, w: f32| [v.x * 100.0, -v.z * 100.0, v.y * 100.0, w];
+        let seen: Vec<([f32; 4], [f32; 4])> = std::iter::once(&*r).chain(opponents.0.iter().map(|o| &o.rider)).map(|x| (game_v4(x.pos, 1.0), game_v4(x.vel, 0.0))).collect();
+        let mut recs = vec![vec![[0.0f32; 2]; seen.len()]; seen.len()];
+        tricky_game::hit::pair_distances(&seen.iter().map(|s| s.0).collect::<Vec<_>>(), &mut recs);
+        let port_ai = !race.0.ai_paths.is_empty() && std::env::var("TRICKY_OLDAI").is_err();
         for (oi, o) in opponents.0.iter_mut().enumerate() {
             if o.grudge.is_none() {
                 let them = rivals::index(lib.chars.get(o.character).map_or("", |c| c.name.as_str()));
@@ -1867,6 +1877,12 @@ fn ride(
             let ai = if waiting { Input::default() } else {
                 o.driver.drive_paths(&mut o.rider, &world.0, &race.0.paths, &race.0.line, &race.0.course, place, dt)
             };
+            let ai = if port_ai && !waiting {
+                let view = tricky_game::aiglue::RaceView { me: oi as i32 + 1, others: &seen, recs: &recs[oi + 1], tick: (race.0.time * 60.0) as i32, practice: false };
+                let skill = o.driver.skill;
+                o.port.frame(&mut o.rider, &mut o.driver, &race.0.ai_paths, &race.0.line, skill, dt, &view, &mut || tricky_game::rand::rand_game() as i32);
+                o.port.input(&o.rider, &o.driver, ai)
+            } else { ai };
             let g = o.grudge.as_mut().unwrap();
             g.tick(race.0.time);
             // a rider with a grudge goes after the player (AIComputer_AttackTarget)
