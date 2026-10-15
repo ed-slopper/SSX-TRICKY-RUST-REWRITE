@@ -198,3 +198,72 @@ direct calls, the heap, the pads).
   and pulse) and labels, with every draw call (floats bit for bit) and all memory compared. The tests caught 5 of
   8 mutants; the three left cannot change a result for these inputs (an equal width, (w − 2) + 10 for integer
   widths, and selection 0's offset of 0).
+
+## A player's HUD sprites (G8g)
+
+`tricky_game::hudsprites`: `HUD_DrawPlayerSprites` 0x1a2c40 (the view's top and left, its width; the HUD, the
+player), every sprite, number and caption of one view as the game's draw calls.
+
+- **Placement.** Everything is placed from the view's layout table: 0x424 bytes per view from 0x33ca40, filled at
+  run time by `HudOverlay_InitTables`. An entry reads +0 x, +4 y, +8 the corner, +0xc / +0x10 the scales.
+- **Alpha.** The alpha is 1.0 while no overlay is visible and the rider is racing (+0x418 < 0), else 0.5. Layer 6,
+  then each part is gated by a HUD flag (+0x104).
+- **The meter and the parts drawn with it:**
+  - **0x1000000:** the speed wobble's sprite (+0x94 + 38), grown by `HUD_WobbleOffset` at 0.7.
+  - **0x1000, the meter:**
+    - drawn on layer 8;
+    - fourteen bands (the table at 0x338008, 20 bytes each: +8 the lit sprite, +0xc / +0x10 the offset). A band is
+      sprite 21 when unlit; when lit it is its own sprite, scaled by the wobble scale (+0x84);
+    - a band's height is its colour (+0xc + 8k), and its width is that times the scale;
+    - the whole meter is at 0.5 alpha when band 0 sits at the table's unlit value;
+    - then the end cap (sprite 23).
+  - **0x2000, the tricky orb** (sprites 37 / 38), drawn while the rider's tricky (+0x24) is above 0:
+    - it rises 40 × (the tricky / 19.3, or within 0.7 of 20, (20 − tricky) / 0.7), kept at +0xac;
+    - its width swings through +0xb0, which falls by 0.15 × (1 − rise / 40) each racing frame and folds back past
+      −1 / −2 / −3;
+    - it marks +0xa8.
+  - **0x8000, the six TRICKY letters:** the letter entries are at 0x338198 (12 bytes each: the layout entry, the
+    unlit sprite, the lit sprite). The first (rider +0x58a8) letters are lit; +0xc0 marks them shown.
+  - **0x4000, the combo stars:** one to five stars (sprites 13–17, the switch falling through) for
+    (+0x88 × 14) mod 7. They are drawn only when neither the orb nor the letters showed. Their colour follows the
+    last lit band's sprite: 0x12 red, 0x13 orange, else yellow.
+- **0x80** the lap sprite (24) while +0xa4 is set.
+- **0x100, the progress track:**
+  - on layer 10; the track is sprite 3 for views 0 / 1 and sprite 2 for view 2;
+  - other riders' dots sit at the bar (+0xc4) / 20000 × 150 along it. When a rider's +0x374 < 0, the dot uses the
+    *drawing* rider's `Boarder_GetRaceProgress` (the game passes its own rider);
+  - a dot fades over the last half of the range;
+  - the sprite and layer depend on the rider's character byte +0x65: layer 8, sprite 5 / 6 when it is negative;
+    otherwise layer 9, sprite 1 / 4 (none in view 0);
+  - then the split markers (layer 7) by kind: 1 is sprite 7 and never ahead, 0 / 2 are sprite 8. A marker fades
+    from 0.25 ahead or 0.5 behind;
+  - then the three medal sprites (9 / 10 / 9) when their width is positive.
+- **After `OverlayMan_IsAnyActive`, the captions.** These come from the rider's twelve score entries at +0x597c
+  (20 bytes: kind, points, time shown, time so far, rank points), each faded by 1 − time so far / time shown:
+  - **kind 15 (0x4000000):** the tier name (Loc 0xeb3–0xeb6 for tiers 2 / 3 / 4 / 5+; tiers 0–1 print whatever is
+    left in the buffer) and the points ("%d" at 0x38da30), centred at 175 / 225 down, in gold;
+  - **kind 16 (0x8000000):** Loc 0xe94 and the points, 100 lower when a kind-15 caption showed;
+  - **kind 4 (0x10000000)**, unless both of those showed: Loc 0xe93 at 210 (300 after either);
+  - **kind 17 (0x40000000):** sprite 53 at its own layout entry, with no view offset.
+- **0x10000, the score number** (`HUD_DrawNumber`):
+  - with flag 0x2000000 it sits in a rank frame: the tiled middle 58 and the ends 56 / 57, coloured by
+    `Score_GetRankForPoints`;
+  - when the rank changes the number swells (+0xb8, up to 0.8 × its scale over 18 frames and back over 36);
+  - points ≤ 0 reset the rank to −1;
+  - while racing, the trick scores of kinds 2 / 3 fly from the score toward the layout's +0x50 entry along
+    r² + r, shrinking. Kind 3 is pink. They get their own rank frames;
+  - kind 1 is a plain number that fades; kind 14 is the caption Loc 0xe41 growing by 0.75.
+- **0x400000:** captions of kinds 11 (Loc 0xe59, cyan) and 10 (Loc 0xe40) over the first half of their time.
+- **0x800000:** the countdown (the world's +0x14 between 1 and 11) as a number in red, its alpha and growth from
+  the fraction, unless the rider has finished and stopped or is not racing.
+- **Checked in the runner** on 30,000 random cases:
+  - the inputs: every view layout, flag word, HUD block, rider and score entry;
+  - compared: every call (floats bit for bit), and all memory, including the frame's colour vector and buffers.
+
+  - every draw call also logs the font colour it would read.
+
+  The tests caught 77 of 82 mutants. The five left cannot change a result:
+  - 20 − tricky can never be exactly 0.7 as a float;
+  - at s = −1 both of the width's folds agree;
+  - at n = 5 the star count is 5 either way;
+  - at a dot's or a marker's fade edges (0 and 1) both alphas agree.

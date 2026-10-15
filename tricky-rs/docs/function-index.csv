@@ -2391,7 +2391,7 @@ address,size,name,system,status
 0x1a1f18,2232,cHUDOverlay::Update,frontend,checked
 0x1a27d0,556,cHUDOverlay::Draw,frontend,checked
 0x1a2a00,572,cHUDOverlay::DrawText,frontend,checked
-0x1a2c40,9004,HUD_DrawPlayerSprites,hud,ported
+0x1a2c40,9004,HUD_DrawPlayerSprites,hud,checked
 0x1a4f70,6380,HUD_DrawPlayerText,hud,ported
 0x1a6860,152,HUD_SetViewLayout,hud,checked
 0x1a68f8,160,HUD_WobbleOffset,hud,checked

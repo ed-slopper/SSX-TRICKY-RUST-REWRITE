@@ -67,6 +67,7 @@ pub mod orient;
 pub mod pf;
 pub mod replay;
 pub mod replaymgr;
+pub mod hudsprites;
 pub mod hudstate;
 pub mod menudraw;
 pub mod overlays;
