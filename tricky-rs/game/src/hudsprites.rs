@@ -53,23 +53,23 @@ const RANK: u32 = 0x19e7a0;
 /// The captions' gold (after the alpha)
 const GOLD: [u32; 3] = [0x3f73f7cf, 0x3f3a9fbe, 0x3dd91687];
 
-fn fl(m: &Mem, a: u32) -> F {
+pub(crate) fn fl(m: &Mem, a: u32) -> F {
     F(f32::from_bits(m.r32(a)))
 }
-fn put(m: &mut Mem, a: u32, v: F) {
+pub(crate) fn put(m: &mut Mem, a: u32, v: F) {
     m.w32(a, v.0.to_bits());
 }
-fn int(v: u32) -> F {
+pub(crate) fn int(v: u32) -> F {
     F(v as i32 as f32)
 }
-fn bits(b: u32) -> F {
+pub(crate) fn bits(b: u32) -> F {
     F(f32::from_bits(b))
 }
 /// The view's layout table (`DAT_003381e4` × 0x424 from 0x33ca40) plus `off`
-fn lay(m: &Mem, off: u32) -> u32 {
+pub(crate) fn lay(m: &Mem, off: u32) -> u32 {
     m.r32(VIEW_LAYOUT).wrapping_mul(0x424).wrapping_add(LAYOUTS).wrapping_add(off)
 }
-fn colour(m: &mut Mem, c: [F; 4]) {
+pub(crate) fn colour(m: &mut Mem, c: [F; 4]) {
     for (k, v) in c.into_iter().enumerate() {
         put(m, FONT_COLOR + 4 * k as u32, v);
     }
@@ -82,7 +82,7 @@ fn colour_v(m: &mut Mem, sp: u32, c: [F; 4]) {
     let c = [fl(m, sp), fl(m, sp + 4), fl(m, sp + 8), fl(m, sp + 12)];
     colour(m, c);
 }
-fn white(a: F) -> [F; 4] {
+pub(crate) fn white(a: F) -> [F; 4] {
     [a, F(1.0), F(1.0), F(1.0)]
 }
 #[allow(clippy::too_many_arguments)]
@@ -103,7 +103,7 @@ fn layer_now(m: &mut Mem, env: &mut dyn SpritesEnv) -> u32 {
 fn font(m: &Mem) -> u32 {
     m.r32(m.r32(GAPP) + 0x5c)
 }
-fn text(m: &mut Mem, env: &mut dyn SpritesEnv, id: u32) -> u32 {
+pub(crate) fn text(m: &mut Mem, env: &mut dyn SpritesEnv, id: u32) -> u32 {
     let loc = m.r32(m.r32(GAPP) + 0x50);
     env.call(m, LOC, &[loc, id], &[]).0
 }

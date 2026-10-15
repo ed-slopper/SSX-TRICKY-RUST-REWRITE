@@ -68,6 +68,7 @@ pub mod pf;
 pub mod replay;
 pub mod replaymgr;
 pub mod hudsprites;
+pub mod hudtext;
 pub mod hudstate;
 pub mod menudraw;
 pub mod overlays;

@@ -267,3 +267,62 @@ player), every sprite, number and caption of one view as the game's draw calls.
   - at s = −1 both of the width's folds agree;
   - at n = 5 the star count is 5 either way;
   - at a dot's or a marker's fade edges (0 and 1) both alphas agree.
+
+## A player's HUD text (G8h)
+
+`tricky_game::hudtext`: `HUD_DrawPlayerText` 0x1a4f70 (the view's top, left, width and height; the HUD, the
+player). It draws every number and caption of one view as the game's calls, on layer 7. Text is placed from the same
+layout tables as the sprites; a text entry's +8 flags 0x20 / 0x40 centre it on x / y by its measured size.
+
+- **The alpha** is 1.0 while no overlay is visible and the rider is racing, else 0.35. The sprites use 0.5 here.
+- **0x200, the lap:**
+  - the lap number (+0x110 + 1) via `HUD_DrawNumber`, gold on the first lap;
+  - its ordinal, Loc 0xe44 / 0xe54 / 0xe58 / 0xe45 for 1st–4th. These ids are copied to the frame from 0x38da60 and
+    capped at the 4th.
+- **0x1, the race time** (`HUD_FormatTime` of `Boarder_GetRaceTime`), hidden in game state 3:
+  - in view 1 a rider who has finished shows the other player's time if it is longer;
+  - the alpha is full while that player still races and no overlay is visible.
+- **0x20000000, the gap** (views 0 / 1): the clock at 0x32de98 less the leading player's race time, signed
+  (`HUD_FormatTimeSigned`):
+  - green while ahead, red otherwise;
+  - in the last ten seconds it pulses, by 0.7 × a triangle wave of the second's fraction;
+  - in view 0 it is hidden once the player finishes.
+- **0x800, the speed:**
+  - the velocity's length as in G8e (VU0: x² + y², then + z², then + w², square-rooted);
+  - × 0.0224 for mph (0x32ca10 set; suffix at 0x38da70), else × 0.036 for km/h (0x38da78);
+  - the number is right-aligned against its unit, and both grow with the speed flash's wobble (scale 1.5).
+- **0x200 without 0x1000000:** "/" and the riders' count as one byte ("/4").
+- **0x400:** the first kind-13 score entry, as Loc 0x115 (place 2) or Loc 0x116 formatted with place − 1.
+- **0x8:** the multiplier (rider +0x5910) scaled by the wobble scale (+0x84), green unless that is exactly 1;
+  right-aligned when the entry's flag 8 is set.
+- **0x100000:** the first kind-12 entry as "X" and its digit, coloured for 2 / 3 / 5.
+- **0x20000:**
+  - the trick message from `FUN_00155538`, wrapped (`Font_PrintWrapped`) to 0.4 of the view's width;
+  - with no message, no cut-scene, tricky above 0, a career level of 8 or more and the rider racing: the tricky
+    prompt. That is Loc 0xdf2 when the world's flags have 0x20, then the tricky meter object's two virtuals (via
+    0x1a7c58 + 0x7f8: set up, then draw at the view's centre). The meter is placed 0.16 / 0.09 of the height up, or
+    0.2 / 0.14 in two-player races. Its alpha is the tricky / 5 (full while tricky).
+- **0x400000:** the first kind-11 or kind-10 entry, over the second half of its time:
+  - kind 11: Loc 0xe29 with the points, in green;
+  - kind 10: the split time with a "+" (green) or "−" (red).
+- **0x100, the split markers' names** (Loc 0xe22 / 0xe23 / 0xe27 for kinds 0 / 1 / 2):
+  - faded as the markers' sprites are;
+  - left of the track in view 0 (20) and view 1 (their width + 3), right of it in view 2;
+  - their y is the track's layout offsets alone. The game leaves out the view's top here, and the port keeps that.
+- **0x1000000** (time trials, one rider): the medal text:
+  - Loc 0xe28; the next medal's name and time (0xe32 / 0xe26 and the HUD's +0xfc; 0xe3b / 0xe25 and +0xf8; 0xe35
+    for the last), or the gold time (+0x100);
+  - shown wobbling (0.7) while its flash runs, else placed at the layout's +0x2f8 / +0x30c entries.
+- **The pause prompt** (Loc 0x1b8) is shown 30 above the view's bottom, centred, while the race's +0x40 object is
+  live, not done and counting.
+- **Checked in the runner** on 30,000 random cases:
+  - the inputs: every view, flag word, layout, rider, score entry and race state;
+  - compared: every call (floats bit for bit; the font colour and the string's first bytes with each print and
+    measure) and all memory, the frame's strings, sizes and colour vectors included.
+
+  The tests caught 68 of 72 mutants. Of the four left:
+  - two cannot change a result: lap 4 caps the same either way, and re-reading +0x84 returns the same value;
+  - two change a constant's last bit (the mph factor, the two-player meter height), which rounding absorbs.
+    Coarser changes to both are caught.
+- **Float fields in the test hold real floats.** The layout tables' flag words are floats with their low bits set:
+  a small integer there would be a denormal, which the EE reads as 0.
