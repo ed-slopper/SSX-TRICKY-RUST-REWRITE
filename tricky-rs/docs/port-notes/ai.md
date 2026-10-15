@@ -331,3 +331,19 @@ Part of the port notes (index: [README.md](README.md)); units and wording as des
   and rode in rival mode at 3 to 27 m from them, between line and jump stretches; the others rode the line or near
   other riders (targets 2 and 5). 11-course `TRICKY_SIM=600`: 2 stuck / 54 falls (G4e3: 1 / 54; the sim has no
   grudge or place, so only run-to-run differences).
+
+## Elysium's half-pipe frames under the ported computer rider (board row G4e4)
+
+- Proven (TRICKY_SIM=600 with put-back prints, elysium): all 4 put-backs at the frames (port x 436–570, z −1254 to
+  −1412) are the impact counter's reset (G6e, over 4.492007 while riding, `rider.rs` after the tick), not a reset zone,
+  a fall or the autopilot. The rider is grounded on the ported AI (not `AiDriver`, which drives only in the air and on
+  rails), wedged between two faces of a frame: the wall normal flips every tick ((0.64, −0.76, 0.09) and its negative),
+  so each hit adds the full 1 (`1 − max(n·last, 0)`) and five ticks reach the limit. Its speed stays about 9 m/s along
+  the frame while it steers at full lock.
+- Proven (E8c4's PINE recording, 6 CPU riders through the same spot, game x 41500–50000, y 135000–145000): the game's
+  riders go through it too and also wedge with alternating hits (one from 0.80 to 4.15 in 22 ticks, four hits of about
+  +0.96; another to 3.46), but none crossed the limit: wedged, they lose their speed within about 20 ticks
+  (826 → 356 → 46 → 3 cm/s) and the next hits are small. 3 of 6 wiped out there, none was reset.
+- Inferred: what differs is how the port's grounded rider keeps its speed along the frame between the two faces
+  (ground motion on the half-pipe, or the AI's steer holding it into the gap), not the bounce (E8c2/E8c4 checked) or
+  the counter (G6e checked). Row G4e6 records the player wedged there with PINE to find which.
