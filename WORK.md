@@ -209,7 +209,7 @@ matches the original.
 | ID | Task | Section | Who | Date | Commit |
 |---|---|---|---|---|---|
 | F7 | Reference binary decided by ed-slopper: `SLUS_203.26` (PS2 NTSC-U) stays the reference and the only port source. When a question takes longer than it should to settle from the PS2 binary, the Xbox build (OpenTricky's recompile of `default.xbe`) may be read as a fallback for behaviour and leads, tagged `xbox:`, with no code taken from it; rules in AGENTS.md section 2. Gap: F7a | P0 | ed-slopper | 2026-10-13 | d995484 |
-| G4e3 | The app's computer riders (`src/main.rs` opponents' loop) ride with G4e1; `AiDriver` kept only for the player's autopilot until it goes too; play test | P1 | irregulur/lynx | 2026-10-14 | a45c67f |
+| G4e3 | The app's computer riders (`src/main.rs` opponents' loop) ride with G4e1; `AiDriver` kept only for the player's autopilot until it goes too; play test | P1 | irregulur/lynx | 2026-10-14 | c690ffd |
 | G4e2 | `TRICKY_SIM`'s autopilot (`race.rs` `self_test`) rides with G4e1 instead of `AiDriver::drive_paths`; compare the 11-course totals (18 stuck / 46 falls after G6e) and elysium's half-pipe frames / megaplex's flipper (E8c4) | P1 | irregulur/lynx | 2026-10-13 | 589d1c3 |
 | G4e1 | The glue for `aicomp::Ai::ride`: an `Ai` built each tick from the port's `Rider` (frame, velocity +0x150, line point +0x360, travel heading +0x370, heading +0x1b0, +0x348, meter, pair records, grudge) and a `World` whose `jump_marker` / `speed_hint` walk the course's AI path events (`aicomp::find_jump_marker` / `find_speed_hint`, `aipath.rs`), the pad word it returns turned into the port's `Input` (`aipad`, G4l); a unit test on one course | P1 | irregulur/lynx | 2026-10-13 | f015a5b |
 | E7c3h | Boost pads' touch: the controllers' own test (`WorldNode_RayCast` of the rider's shape against the pad object's mesh, `boosts.rs` `touching`) instead of `Rider::apply_pads`'s box round the body point, and the push also while down if the game does it | P1 | irregulur/lynx | 2026-10-13 | 9765058 |
@@ -1027,4 +1027,4 @@ matches the original.
 - 2026-10-14 ed-slopper/puffin: G8g done.
 - 2026-10-14 ed-slopper/puffin: claim G8h (split of G8).
 - 2026-10-14 ed-slopper/puffin: G8h done.
-- 2026-10-14 irregulur/lynx: G4e3 done (a45c67f); add G4e5.
+- 2026-10-14 irregulur/lynx: G4e3 done (c690ffd); add G4e5.
