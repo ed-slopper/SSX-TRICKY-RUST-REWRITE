@@ -188,7 +188,7 @@ fn band(m: &mut Mem, race: u32, sp: u32, mode: u32, n: i32) {
         if mode == 4 {
             match level {
                 0 => (keep, scale) = (F(1.0), F(f32::from_bits(0x3f19a14c))),
-                1 => (keep, scale) = (F(0.5), F(f32::from_bits(0x3ecccc_c0))),
+                1 => (keep, scale) = (F(0.5), F(f32::from_bits(0x3ecc_ccc0))),
                 2 => (keep, scale) = (zero, F(f32::from_bits(0x3eb377dd))),
                 _ => {}
             }
