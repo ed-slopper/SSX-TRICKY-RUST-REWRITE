@@ -5623,7 +5623,7 @@ address,size,name,system,status
 0x2ac178,108,List_DeleteAll,frontend?,checked
 0x2ac1e8,52,List_Count,frontend?,checked
 0x2ac220,104,cList::vf1_2ac220,frontend?,not started
-0x2ac288,192,cFE3DThing::vf5_2ac288,frontend,not started
+0x2ac288,192,cFE3DThing::vf5_2ac288,frontend,checked
 0x2ac348,104,FE3DThing_SetTweenStart,frontend?,checked
 0x2ac3b0,120,FE3DThing_StartTween,frontend?,checked
 0x2ac428,76,cFE3DThing::vf6_2ac428,frontend,not started
@@ -5679,26 +5679,26 @@ address,size,name,system,status
 0x2ad178,80,cListFE3DSkipActivityOp::__tf,runtime,host
 0x2ad1c8,52,FUN_002ad1c8,,not started
 0x2ad200,80,cListFE3DOffsetOp::__tf,runtime,host
-0x2ad250,108,cFE3DWidget::vf5_2ad250,frontend,not started
-0x2ad2c0,188,cFE3DWidget::vf7_2ad2c0,frontend,not started
-0x2ad380,936,cFE3DWidget::vf8_2ad380,frontend,not started
-0x2ad7d0,8,cFE3DWidget::vf39_2ad7d0,frontend,not started
-0x2ad7d8,8,cFE3DWidget::vf15_2ad7d8,frontend,not started
-0x2ad7e8,60,FUN_002ad7e8,frontend?,not started
-0x2ad828,12,cFE3DWidget::vf38_2ad828,frontend,not started
-0x2ad838,12,cFE3DWidget::vf37_2ad838,frontend,not started
-0x2ad848,156,cFE3DWidget::vf36_2ad848,frontend,not started
-0x2ad8e8,40,cFE3DWidget::vf35_2ad8e8,frontend,not started
-0x2ad910,40,cFE3DWidget::vf34_2ad910,frontend,not started
-0x2ad938,40,cFE3DWidget::vf33_2ad938,frontend,not started
-0x2ad960,40,cFE3DWidget::vf32_2ad960,frontend,not started
-0x2ad988,148,FE3DWidget_UpdateColor,frontend?,not started
-0x2ada20,8,cFE3DWidget::vf31_2ada20,frontend,not started
-0x2ada28,8,cFE3DWidget::vf30_2ada28,frontend,not started
-0x2ada30,8,cFE3DWidget::vf29_2ada30,frontend,not started
-0x2ada58,68,FUN_002ada58,frontend?,not started
-0x2adaa0,8,cFE3DWidget::vf28_2adaa0,frontend,not started
-0x2adaa8,20,cFE3DWidget::~cFE3DWidget,frontend,not started
+0x2ad250,108,cFE3DWidget::vf5_2ad250,frontend,checked
+0x2ad2c0,188,cFE3DWidget::vf7_2ad2c0,frontend,checked
+0x2ad380,936,cFE3DWidget::vf8_2ad380,frontend,checked
+0x2ad7d0,8,cFE3DWidget::vf39_2ad7d0,frontend,checked
+0x2ad7d8,8,cFE3DWidget::vf15_2ad7d8,frontend,checked
+0x2ad7e8,60,FUN_002ad7e8,frontend?,checked
+0x2ad828,12,cFE3DWidget::vf38_2ad828,frontend,checked
+0x2ad838,12,cFE3DWidget::vf37_2ad838,frontend,checked
+0x2ad848,156,cFE3DWidget::vf36_2ad848,frontend,checked
+0x2ad8e8,40,cFE3DWidget::vf35_2ad8e8,frontend,checked
+0x2ad910,40,cFE3DWidget::vf34_2ad910,frontend,checked
+0x2ad938,40,cFE3DWidget::vf33_2ad938,frontend,checked
+0x2ad960,40,cFE3DWidget::vf32_2ad960,frontend,checked
+0x2ad988,148,FE3DWidget_UpdateColor,frontend?,checked
+0x2ada20,8,cFE3DWidget::vf31_2ada20,frontend,checked
+0x2ada28,8,cFE3DWidget::vf30_2ada28,frontend,checked
+0x2ada30,8,cFE3DWidget::vf29_2ada30,frontend,checked
+0x2ada58,68,FUN_002ada58,frontend?,checked
+0x2adaa0,8,cFE3DWidget::vf28_2adaa0,frontend,checked
+0x2adaa8,20,cFE3DWidget::~cFE3DWidget,frontend,checked
 0x2adc68,80,cFE3DWidget::__tf,runtime,host
 0x2adcb8,44,FUN_002adcb8,frontend?,not started
 0x2adce8,200,cFE3DIcon::vf11_2adce8,frontend,not started
@@ -5754,15 +5754,15 @@ address,size,name,system,status
 0x2b1008,100,FE3DText_SetupTextBox,frontend?,not started
 0x2b1070,84,FE3DText_LoadStringId,frontend?,not started
 0x2b10c8,112,FE3DText_Layout,frontend?,not started
-0x2b1138,496,cFE3DWSingleLineText::cFE3DWSingleLineText,frontend,not started
-0x2b1328,20,cFE3DWSingleLineText::~cFE3DWSingleLineText,frontend,not started
-0x2b1340,68,cFE3DWSingleLineText::vf39_2b1340,frontend,not started
-0x2b1388,300,cFE3DWSingleLineText::vf11_2b1388,frontend,not started
-0x2b14b8,40,cFE3DWSingleLineText::vf12_2b14b8,frontend,not started
-0x2b14e0,240,cFE3DWSingleLineText::vf37_2b14e0,frontend,not started
-0x2b15d0,24,cFE3DWSingleLineText::vf40_2b15d0,frontend,not started
-0x2b15e8,76,cFE3DWSingleLineText::vf41_2b15e8,frontend,not started
-0x2b1638,20,cFE3DWSingleLineText::vf42_2b1638,frontend,not started
+0x2b1138,496,cFE3DWSingleLineText::cFE3DWSingleLineText,frontend,checked
+0x2b1328,20,cFE3DWSingleLineText::~cFE3DWSingleLineText,frontend,checked
+0x2b1340,68,cFE3DWSingleLineText::vf39_2b1340,frontend,checked
+0x2b1388,300,cFE3DWSingleLineText::vf11_2b1388,frontend,checked
+0x2b14b8,40,cFE3DWSingleLineText::vf12_2b14b8,frontend,checked
+0x2b14e0,240,cFE3DWSingleLineText::vf37_2b14e0,frontend,checked
+0x2b15d0,24,cFE3DWSingleLineText::vf40_2b15d0,frontend,checked
+0x2b15e8,76,cFE3DWSingleLineText::vf41_2b15e8,frontend,checked
+0x2b1638,20,cFE3DWSingleLineText::vf42_2b1638,frontend,checked
 0x2b1650,60,cFE3DWBufferedSingleLineText::vf40_2b1650,frontend,not started
 0x2b1690,12,cFE3DWBufferedSingleLineText::vf41_2b1690,frontend,not started
 0x2b16a0,60,cFE3DWBufferedSingleLineText::vf42_2b16a0,frontend,not started
@@ -5828,7 +5828,7 @@ address,size,name,system,status
 0x2b4948,20,cFE3DWBufferedSingleLineText::~cFE3DWBufferedSingleLineText,frontend,not started
 0x2b4998,64,cFE3DWBufferedSingleLineText::cFE3DWBufferedSingleLineText,frontend,not started
 0x2b49d8,80,cFE3DWBufferedSingleLineText::__tf,runtime,host
-0x2b4a28,8,cFE3DWSingleLineText::vf43_2b4a28,frontend,not started
+0x2b4a28,8,cFE3DWSingleLineText::vf43_2b4a28,frontend,checked
 0x2b4ab0,436,FUN_002b4ab0,frontend?,not started
 0x2b4c68,80,cFE3DWSingleLineText::__tf,runtime,host
 0x2b4cb8,8,cFE3DWText::vf24_2b4cb8,frontend,not started

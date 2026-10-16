@@ -45,6 +45,7 @@ pub mod fe_characcept;
 pub mod fe_hintbook;
 pub mod fe_video;
 pub mod fe_widgets;
+pub mod fe_widget;
 pub mod fe_custombody;
 pub mod fe_charmodify;
 pub mod fe_charselect;

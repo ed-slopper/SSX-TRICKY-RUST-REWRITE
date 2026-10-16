@@ -865,6 +865,55 @@ help bars, and any button bits). When an allocation fails, the button's entry an
 the entry is coloured through the icon's vtable; the test stubs that slot too. 33 of 34 mutants are caught. The survivor drops the
 `bit == 0` test, which is equivalent: a zero bit never meets the mask.
 
+### The widget and its text ported (row G9b2c; `game/src/fe_widget.rs`, checked: `tests/fe_widget.rs`)
+
+A thing's tween has these fields:
+- +0x18 running, +0x1c its start taken;
+- +0x20 the track: 1 position, 2 position by an offset, 3 size, 4 size by a factor, 5 colour;
+- +0x24 the frame, +0x28 the frames;
+- +0x2c the mode (0 once, 2 back and forth), +0x30 running backwards;
+- +0x40 the start, +0x50 the end.
+
+A widget's colour comes from two flags, +0xa0 (chosen) and +0xa8 (enabled), and four colour sets: +0xac chosen,
++0xbc enabled, +0xcc disabled, +0xdc chosen while disabled.
+- **The tween's start from where the thing is (0x2ac288):** for tracks 1 and 2 the position, 3 and 6 zero, 4 (1, 1, 1,
+  0), 5 the colour. The widget's own start (vf5 0x2ad250) takes its size (+0x130) for the size tracks.
+- **The start (vf7 0x2ad2c0):** an offset becomes a move to start + offset (a VU add) and a factor becomes a size of
+  start × factor; then the tween runs from frame 0, forwards, and takes its first step. On the offset track the end's w
+  (+0x5c) takes the VU register's leftover w, which the port can't know; it leaves the word as it was (STANDIN) and
+  the test skips it.
+- **The step (vf8 0x2ad380):**
+  - the start is taken first (or the tween started);
+  - the fraction is frame / frames, with the PS2's divide;
+  - position: moved to the blend, start × (1 - t) + end × t, through the VU (the scale is 0x102f50);
+  - size: set to that blend (its w is again the VU's leftover, so the test logs three words);
+  - colour: each part blended on the FPU and kept in 0..1;
+  - then the next frame. At the end, mode 0 hides the widget and mode 2 turns its direction.
+- **The colour update (`FE3DWidget_UpdateColor` 0x2ad988):** picks the set from the flags unless a colour tween is
+  running. Its three setters (vf29..vf31) store a flag first; the four colour-set copies (vf32..vf35) store a set.
+- **Small parts:**
+  - the bounds (vf36: the position, and position + size);
+  - the vector at +0x100 (vf37 / vf38, quadword moves);
+  - the size from four floats (0x2ad7e8);
+  - the owner, flag and parent getters;
+  - an event posted through the record at 0x347e10 (0x2ada58);
+  - vf15 answers 1, vf28 answers 0;
+  - the destructor (the widget's vtable, then the thing's 0x2acd10).
+- **The single-line text (`cFE3DWSingleLineText`):**
+  - its fields: +0x110 the font, +0x114 a 2-unit border, +0x118 the scale, +0x11c wide, +0x120 the text id (-1
+    none), +0x124 the string;
+  - the constructor (0x2b1138, the `TEXT_CTOR` every screen calls) is the widget's init, then those fields and the
+    vtable 0x3b73a8;
+  - the draw (vf11): the renderer's layer raised by +0x70, the drawer's colour, one of four font calls (wide or
+    narrow, with or without the border: with it the scale goes first), then the layer put back;
+  - the size (vf37): the font's width at the scale and its height × the scale, both 2 more with the border, and (0,
+    0, 0, 1) for no string;
+  - the string setters (vf40 wide, vf41 by id through the localiser, vf42 narrow); a text from an id fetched again on
+    layout (vf39).
+
+Checked in the runner on 40,000 random widgets and texts (about 1,150 for each of 34 functions), with the colour
+update stubbed there and run on its own over 4,000 in a second runner. All 46 mutants are caught.
+
 ## The 3D transition and fade record (F1c; ported in row G9b2e, `game/src/fe_transition.rs`, checked: `tests/fe_transition.rs`)
 
 One record drives both the screen fades and a blend of four renderer values (read by the renderer's virtual +0x134,
