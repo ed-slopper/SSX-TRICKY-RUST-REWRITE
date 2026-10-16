@@ -67,6 +67,7 @@ pub mod orient;
 pub mod pf;
 pub mod replay;
 pub mod replaymgr;
+pub mod font;
 pub mod fontprint;
 pub mod hudsprites;
 pub mod hudtext;

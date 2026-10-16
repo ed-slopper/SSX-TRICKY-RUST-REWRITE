@@ -59,10 +59,6 @@ fn vh(y: f32) -> Val { Val::Vh(y / 480.0 * 100.0) }
 impl SfnFonts {
     /// Whether the fonts are loaded.
     pub fn ready(&self) -> bool { !self.fonts.is_empty() }
-    /// A string's width in a font (0 TITLE, 1 MENU) at a scale, in 640 units.
-    pub fn width(&self, font: usize, text: &str, scale: f32) -> f32 { self.fonts.get(font).map(|f| f.width(text, scale)).unwrap_or(0.0) }
-    /// A font's line height times its own vertical scale, in 640 units.
-    pub fn line(&self, font: usize) -> f32 { self.fonts.get(font).map(|f| f.line * f.sy).unwrap_or(0.0) }
 }
 
 impl Font {

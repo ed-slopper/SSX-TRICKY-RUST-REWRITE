@@ -5,7 +5,8 @@
 //! The memory is the game's own where it can be: the HUD's static tables (the meter's bands, the font colour, the
 //! view layouts' initialisers, the number and time formats) come from the executable on the player's disc
 //! (`TRICKY_DISC`, `/SLUS_203.26`), the strings from `DATA/LANG/AMERICAN.LOC`, the sprites' rectangles from
-//! `chars/hud/sprites.json` (what `SpriteSet_InitHudGameRects` 0x1f4440 builds) and the fonts from `sfnfont`.
+//! `chars/hud/sprites.json` (what `SpriteSet_InitHudGameRects` 0x1f4440 builds) and the fonts from the disc's SFN
+//! files (parsed and measured by `tricky_game::font`; their glyphs drawn by `sfnfont`).
 //! The rider, race and world fields the HUD reads are filled from the app's own race every frame: those fields
 //! are STANDINs where the app does not keep the game's value (each says so).
 //!
@@ -35,13 +36,18 @@ const PATH: u32 = ARENA + 0x2e00;
 const FONT1: u32 = ARENA + 0x2f00;
 const FONT2: u32 = ARENA + 0x2f40;
 const SET: u32 = ARENA + 0x3000;
+/// The two fonts' glyph tables (`Font_ParseGlyphs` allocates them)
+const FONT1_GLYPHS: u32 = ARENA + 0x4800;
+const FONT2_GLYPHS: u32 = ARENA + 0x6400;
 const RIDERS: u32 = ARENA + 0x8000;
 const RIDER_SIZE: u32 = 0x6000;
 const STRINGS: u32 = ARENA + 0x2_0000;
 const STACK_TOP: u32 = ARENA + 0x4_0000;
 /// The game's ranges copied from the executable: the HUD's globals (bands, colour, tables), the view layouts
-/// (bss), the layouts' initialisers and the formats, the settings the constructor reads
-const ELF_RANGES: [(u32, u32); 5] = [(0x337fe8, 0x200), (0x33ca40, 4 * 0x424), (0x38d000, 0x1400), (0x32ca10, 0x40), (0x32db6c, 0x340)];
+/// (bss), the layouts' initialisers and the formats, the settings the constructor reads, the audio object the
+/// update's sounds are handed (the app plays none of them)
+const ELF_RANGES: [(u32, u32); 6] =
+    [(0x337fe8, 0x200), (0x33ca40, 4 * 0x424), (0x38d000, 0x1400), (0x32ca10, 0x40), (0x32db6c, 0x340), (0x343050, 4)];
 
 /// One thing the game drew
 enum Cmd {
@@ -170,7 +176,6 @@ fn format(fmt: &str, args: &[u32]) -> String {
 
 /// What the ported code calls out to: answered from the app, drawing recorded
 struct Env<'a> {
-    fonts: &'a SfnFonts,
     loc: Option<&'a tricky_data::loc::LocFile>,
     cmds: Vec<Cmd>,
     layer: u32,
@@ -178,8 +183,9 @@ struct Env<'a> {
     low: u32,
     strings: &'a mut HashMap<u32, u32>,
     next_string: &'a mut u32,
-    /// the race time in hundredths (`Boarder_GetRaceTime` 0x11ea28)
+    /// the race time in hundredths (`Boarder_GetRaceTime` 0x11ea28), and whether the rider has finished
     race_time: u32,
+    finished: bool,
 }
 
 impl Env<'_> {
@@ -197,18 +203,6 @@ impl Env<'_> {
         let r = f(self, at);
         self.low = at;
         r
-    }
-    fn measure(&self, m: &mut Mem, font: u32, text: &str, scale: f32, out: u32) -> u32 {
-        let fi = Self::font_index(font);
-        // STANDIN: the app's SFN measure (glyph boxes) for `Font_MeasureAscii` / `_MeasureWide`
-        let w = self.fonts.width(fi, text, scale).round() as i32;
-        let h = (self.fonts.line(fi) * scale).round() as i32;
-        if out != 0 {
-            for (k, v) in [0, 0, w, h].into_iter().enumerate() {
-                m.w32(out + 4 * k as u32, v as u32);
-            }
-        }
-        w as u32
     }
 }
 
@@ -256,14 +250,7 @@ impl SpritesEnv for Env<'_> {
                 let rgba = Self::colour(m);
                 self.cmds.push(Cmd::Text { font: Self::font_index(a(0)), text, x: f(0), y: f(1), scale: f(2), rgba, layer: self.layer });
             }
-            0x19da30 => {
-                let s = ascii(m, a(1));
-                return (self.measure(m, a(0), &s, f(0), a(2)), 0.0);
-            }
-            0x19dc78 => {
-                let s = wide(m, a(1));
-                return (self.measure(m, a(0), &s, f(0), a(2)), 0.0);
-            }
+            0x19da30 | 0x19dc78 => return (tricky_game::font::measure(m, func == 0x19dc78, f(0), a(0), a(1), a(2)) as u32, 0.0),
             // the strings
             0x2c5160 => {
                 let id = a(1);
@@ -283,7 +270,8 @@ impl SpritesEnv for Env<'_> {
                 let s = format(&ascii(m, a(1)), &ints[2.min(ints.len())..]);
                 put_ascii(m, a(0), &s);
             }
-            // STANDIN: `vsprintf` / `WStr_VFormat` without the caller's variable arguments (the HUD formats first)
+            // `vsprintf` / `WStr_VFormat` without the caller's variable arguments: none of the HUD's printed strings
+            // holds a `%` (the two loc strings that do, 0x116 and 0xe29, are formatted by `WStr_Format` first)
             0x301ca0 => {
                 let s = format(&ascii(m, a(1)), &[]);
                 put_ascii(m, a(0), &s);
@@ -312,14 +300,23 @@ impl SpritesEnv for Env<'_> {
                 let s = ascii(m, a(1));
                 put_wide(m, a(0), &s);
             }
-            // the race, from the app (STANDINs: no overlays, the path and progress unkept, no ranks or tiers)
+            // the race, from the app (STANDIN: the main path an empty record, the race's path set not built; G8l)
             0x197ef0 => return (PATH, 0.0),
             0x11ea28 => return (self.race_time, 0.0),
+            0x11d998 => return (self.finished as u32, 0.0),
+            // `Score_GetRankForPoints`: the rank (`score::rank_for_points`) and its colour, the rank's record at
+            // 0x338120 (+4..+16; rank 0's below every threshold)
             0x19e7a0 => {
-                for k in 0..4 {
-                    m.w32(a(1) + 4 * k, 1.0f32.to_bits());
+                let rank = tricky_game::score::rank_for_points(a(0) as i32) as u32;
+                if a(1) != 0 {
+                    for k in 0..4 {
+                        let v = m.r32(0x338120 + 20 * rank + 4 + 4 * k);
+                        m.w32(a(1) + 4 * k, v);
+                    }
                 }
+                return (rank, 0.0);
             }
+            0x156900 => return (tricky_game::grade::icon_tier(a(1) as i32), 0.0),
             _ => {}
         }
         (0, 0.0)
@@ -335,14 +332,22 @@ impl SpritesEnv for Env<'_> {
     }
 }
 
-/// The HUD state's calls: the overlay manager idle, the score from the app, no sounds
+/// The HUD state's calls: the overlay manager idle (the HUD only draws while the app's race plays), the score from
+/// the rider's trick in progress (+0x24 units, +0x28 multiplier) through the ported score functions, no sounds
 struct StateEnv {
-    points: u32,
+    units: f32,
+    mult: f32,
 }
 impl HudEnv for StateEnv {
-    fn call(&mut self, _m: &mut Mem, func: u32, args: &[u32]) -> u32 {
+    fn call(&mut self, m: &mut Mem, func: u32, args: &[u32]) -> u32 {
         match func {
-            0x155440 | 0x1554c0 => self.points,
+            // `ScreenOverlay_Init`, the HUD overlay's base: the sprite set (gApp+0x728) and the two fonts
+            0x1a7d78 => {
+                tricky_game::overlays::screen_overlay_init(m, args.first().copied().unwrap_or(0));
+                0
+            }
+            0x155440 => tricky_game::score::calc_points(self.units, self.mult) as u32,
+            0x1554c0 => tricky_game::score::calc_base_points(self.units) as u32,
             0x197ef0 => PATH,
             0x1814a8 => {
                 let k = args.get(1).copied().unwrap_or(0);
@@ -352,8 +357,7 @@ impl HudEnv for StateEnv {
         }
     }
     fn multiplier(&mut self, _m: &mut Mem, _score: u32) -> f32 {
-        // STANDIN: `Score_GetMultiplier` not kept by the app
-        0.0
+        tricky_game::score::get_multiplier(self.units)
     }
     fn progress(&mut self, _m: &mut Mem, _rider: u32) -> f32 {
         // STANDIN: `Boarder_GetRaceProgress` not kept by the app
@@ -370,7 +374,7 @@ impl HudEnv for StateEnv {
 }
 
 /// The game's memory for the HUD, from the executable's bytes and the sprite rectangles
-fn build(elf: &[u8], rects: &[(u32, [f32; 7])]) -> Mem {
+fn build(elf: &[u8], rects: &[(u32, [f32; 7])], title: &[u8], menu: &[u8]) -> Mem {
     let mut m = Mem::default();
     for (at, n) in ELF_RANGES {
         m.regions.push((at, elf_bytes(elf, at, n)));
@@ -380,6 +384,8 @@ fn build(elf: &[u8], rects: &[(u32, [f32; 7])]) -> Mem {
     m.w32(GAPP, APP);
     m.w32(APP + 0x5c, FONT1);
     m.w32(APP + 0x60, FONT2);
+    // the HUD's sprite set (`SpriteSet_InitHudGameRects` 0x1f4440 fills it), which `ScreenOverlay_Init` hands on
+    m.w32(APP + 0x728, SET);
     m.w32(APP + 0x724, 0);
     m.w32(APP + 0x730, RACE);
     m.w32(RACE + 0x1c, WORLD);
@@ -394,6 +400,14 @@ fn build(elf: &[u8], rects: &[(u32, [f32; 7])]) -> Mem {
         for k in 1..7 {
             m.w32(at + 4 * k as u32, r[k].to_bits());
         }
+    }
+    // the fonts as `cGame::Init` 0x17e148 loads them (`Font_ParseSfn` 0x19c858: no added advance or origin, the
+    // scales 1.0; then the title font's 1.4 x 1.3 and the menu font's 1.8 x 1.4)
+    for (font, glyphs, file, (sx, sy)) in [(FONT1, FONT1_GLYPHS, title, tricky_data::sfn::TITLE_SCALE), (FONT2, FONT2_GLYPHS, menu, tricky_data::sfn::MENU_SCALE)] {
+        m.w32(font, 0);
+        tricky_game::font::parse_glyphs(&mut m, font, file, 0, 0, glyphs);
+        m.w32(font + 0x18, sx.to_bits());
+        m.w32(font + 0x1c, sy.to_bits());
     }
     let rd = RIDERS;
     m.w32(rd + 0x464, rd + 0x500);
@@ -412,6 +426,9 @@ fn load(hud: &mut GameHud, lib: &CharLib, images: &mut Assets<Image>) -> Option<
     let mut disc = tricky_data::disc::Disc::open(&p).map_err(|e| eprintln!("game hud: disc {p}: {e}")).ok()?;
     let elf = disc.read_path("/SLUS_203.26").ok()??;
     hud.loc = disc.read_path("/DATA/LANG/AMERICAN.LOC").ok().flatten().map(tricky_data::loc::LocFile::new);
+    let mut files = tricky_data::big::Files::new(disc);
+    let title = files.load("data/fonts/title.sfn").ok()??;
+    let menu = files.load("data/fonts/menu.sfn").ok()??;
     let dir = lib.dir.join("hud");
     let mut sheets = Vec::new();
     for n in ["map1", "map4", "hud1"] {
@@ -443,7 +460,7 @@ fn load(hud: &mut GameHud, lib: &CharLib, images: &mut Assets<Image>) -> Option<
             Some((g("id") as u32, [sheet, dw, dh, y, x, x + w, y + h]))
         })
         .collect();
-    hud.mem = Some(build(&elf, &rects));
+    hud.mem = Some(build(&elf, &rects, &title, &menu));
     hud.sheets = sheets;
     Some(())
 }
@@ -512,10 +529,7 @@ pub fn game_hud(
     if *built != Some((game_mode, course)) {
         m.w32(hudstate::GAME_MODE, game_mode);
         m.w32(hudstate::LAP_MODE, course);
-        hudstate::hud_overlay_new(m, &mut StateEnv { points: 0 }, HUD);
-        // STANDIN: `ScreenOverlay_Init` 0x1a7d78 is not run; the HUD's sprite set and font as the game's HUD keeps
-        m.w32(HUD, SET);
-        m.w32(HUD + 8, FONT1);
+        hudstate::hud_overlay_new(m, &mut StateEnv { units: 0.0, mult: 0.0 }, HUD);
         hudstate::set_view_layout(m, 0);
         *built = Some((game_mode, course));
     }
@@ -554,9 +568,7 @@ pub fn game_hud(
             m.w32(o + 0x418, if racing { u32::MAX } else { 0 });
         }
     }
-    m.w32(FONT1 + 0xc, fonts.line(0).round() as u32);
-    m.w32(FONT2 + 0xc, fonts.line(1).round() as u32);
-    let mut state = StateEnv { points: r.score };
+    let mut state = StateEnv { units: r.sc.units, mult: r.sc.mult };
     *tick += time.delta_secs();
     let mut n = 0;
     while *tick >= 1.0 / 60.0 && n < 4 {
@@ -568,7 +580,6 @@ pub fn game_hud(
         *tick = 0.0;
     }
     let mut env = Env {
-        fonts: &fonts,
         loc: loc.as_ref(),
         cmds: Vec::new(),
         layer: 0,
@@ -577,6 +588,7 @@ pub fn game_hud(
         strings,
         next_string,
         race_time: (race.time * 100.0) as u32,
+        finished: !racing,
     };
     if riding {
         hudsprites::draw_player_sprites(m, &mut env, 0.0, 0.0, 640.0, HUD, 0, STACK_TOP - 0x200);

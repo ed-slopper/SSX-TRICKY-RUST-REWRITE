@@ -2350,8 +2350,8 @@ address,size,name,system,status
 0x19c808,76,Font_Delete,hud,not started
 0x19c858,116,Font_ParseSfn,hud,ported
 0x19c8d0,60,Font_Free,hud,not started
-0x19c910,764,Font_ParseGlyphs,hud,ported
-0x19cc10,148,Font_FindGlyph,hud,not started
+0x19c910,764,Font_ParseGlyphs,hud,checked
+0x19cc10,148,Font_FindGlyph,hud,checked
 0x19cca8,712,Font_BuildTexture,hud,ported
 0x19cf70,332,Font_DrawStringRaw,hud,ported
 0x19d0c0,332,Font_DrawStringA,hud,ported
@@ -2369,8 +2369,8 @@ address,size,name,system,status
 0x19d960,128,Font_DrawfWide,hud,not started
 0x19d9e0,40,Font_GetGlyphWidth,hud,not started
 0x19da08,40,Font_GlyphAdvance,hud,not started
-0x19da30,584,Font_MeasureAscii,hud,ported
-0x19dc78,584,Font_MeasureWide,hud,ported
+0x19da30,584,Font_MeasureAscii,hud,checked
+0x19dc78,584,Font_MeasureWide,hud,checked
 0x19dec0,12,TextStyle_Init,render,not started
 0x19ded0,28,TextStyle_Destruct,render,not started
 0x19def0,156,Font_DrawAlignedAscii,hud,not started

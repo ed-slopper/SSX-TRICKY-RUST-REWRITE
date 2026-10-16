@@ -496,9 +496,50 @@ stays.
 and free ride (`courses::Mode` 4, 5 and 7), and the course number is found in the game's course table by the level
 folder's name.
 
-**STANDINs** (each marked in the code), where the app does not keep the game's value:
-- `ScreenOverlay_Init` not run, with the HUD's sprite set and font placed by hand;
-- the app's SFN measure for `Font_MeasureAscii` / `_MeasureWide`;
-- no format arguments through `vsprintf`;
-- no overlays, race path, progress, multiplier fraction, ranks or tiers;
-- the opponents only as racing or not.
+**STANDINs left** (each marked in the code; row G8l): the race's progress (`Boarder_GetRaceProgress`), its path set
+(0x337fb8: the split markers and the riders' dots), and the opponents' fields beyond racing or not. G8k replaced
+the rest with the game's own code (below).
+
+## The fonts in memory, and the HUD's last stand-ins (G8k)
+
+`tricky_game::font`: the font object as the game builds and measures it.
+
+- **`Font_ParseGlyphs`** (the font, the SFN file, an advance added to every glyph, a y added to the origin):
+  - copies the records (11 bytes before version 200, 12 from it) into a 12-byte glyph table: code, w, h, texture
+    place, advance, x and y offsets;
+  - sets the object's count, table, origin (+0x10 / +0x14), and line height (+0xc: the tallest h + y offset, the
+    height the HUD reads);
+  - notes the run of consecutive codes from the first glyph (+0x28..+0x2c).
+
+  `Font_ParseSfn` then sets the scales to 1.0, and `cGame::Init` sets the title font's to 1.4 × 1.3 and the menu
+  font's to 1.8 × 1.4.
+- **`Font_FindGlyph`** looks a code up directly inside that run, by a binary search past it, and finds nothing
+  below it.
+- **`Font_MeasureAscii` / `_MeasureWide`** move the pen from the origin by each glyph's advance. Each glyph's box is
+  floored at its left and top and ceiled at its right and bottom, in the font's scales times the caller's, into a
+  box that starts at 0. The size is (left, top, width, height), and the width is returned.
+- **Checked in the runner** (tests/font.rs) on 20,000 random SFN files:
+  - the inputs: both record sizes, versions 100 / 199 / 200 / 201, runs and gaps of codes, and random strings in
+    both widths at random scales;
+  - compared: the object, the table, the sizes, and every glyph lookup;
+  - the tests caught 15 of 17 mutants (two of them by hanging the search). The two left cannot change a result: at
+    the first glyph its code can't be the first + 1, and at the run's last code the direct lookup and the search find
+    the same glyph.
+
+**In the app's HUD (`src/gamehud.rs`):**
+- the two fonts are parsed from the disc into the copy of memory and measured with the port;
+- `ScreenOverlay_Init` (the G8b port) sets the HUD's sprite set (gApp+0x728) and fonts;
+- the trick points and base points, the meter's share, the rank and its colour (the rank's record at 0x338120) and
+  the icon tier all come through the ported score functions (`score.rs`, `grade.rs`), from the rider's trick in
+  progress;
+- finished-and-stopped comes from the app's race.
+
+**`vsprintf`'s missing arguments change nothing:** of the HUD's strings in `american.loc`, only 0x116 ("%d LAPS TO
+GO") and 0xe29 ("%d seconds") hold a `%`, and both go through `WStr_Format` with their argument before any print.
+
+**What is left (G8l)** needs the race model rather than the HUD:
+- the race's path set at 0x337fb8 (its 0x3c-byte records: the AI notes have +0x38 as the preference, while
+  `HUD_BuildSplitList` uses it as the length its marker distances are taken from; the loader decides);
+- each rider's race progress (`Boarder_GetRaceProgress` on +0x110 / +0x114 / +0x374 / +0x37c);
+- the opponents' fields.
+
