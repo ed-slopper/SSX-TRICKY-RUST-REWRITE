@@ -16,6 +16,11 @@
 //!
 //! Data: `audio/pf/<song>/{song.ogg, graph.json, loops/}` and `audio/pf/songs.json`, made by
 //! tools/music/musicbig.py + pack.py. Without them the plain songs in `sound.rs` play.
+//!
+//! With the player's disc (TRICKY_DISC, row G10b2c1) the song runs on the game's own Pathfinder
+//! (`tricky_game::pfplay`: its `.mpf` graph from MUSIC.BIG, the track loaded as `Music_LoadPathfinder` does, the
+//! events and the path variable posted, `update` every frame) over the port's stream driver, which plays the decoded
+//! segments; the walk below (STANDIN) is kept for a levels folder without the disc.
 
 use crate::rider::RaceState;
 use crate::{ui, LevelList, Mode, Opponents, RaceRes, RiderRes};
@@ -38,6 +43,8 @@ pub struct Song {
     events: Vec<Vec<usize>>,
     actions: Vec<(u8, i32)>,
     routers: Vec<Vec<(i32, i32)>>,
+    /// the song's `.mpf` graph from the disc (BASEPATH + the song's name), for the game's Pathfinder
+    graph: Option<Vec<u8>>,
 }
 
 /// What the game tells the playing song, and what it reports back.
@@ -113,13 +120,75 @@ impl Song {
         let rate = int(&v["rate"]) as u32;
         let total = int(&v["total"]) as usize;
         if pcm.len() / (ch as usize) < total { println!("music: {} decoded short ({} of {total} frames)", dir.display(), pcm.len() / ch as usize); }
-        Some(Song { rate, ch, pcm, segs, nodes, events, actions, routers })
+        let graph = std::env::var("TRICKY_DISC").ok().and_then(|disc| {
+            let mut files = tricky_data::big::Files::new(tricky_data::disc::Disc::open(&disc).ok()?);
+            files.mount_game_archives().ok()?;
+            let inf = files.load("data/config/music.inf").ok().flatten()?;
+            let base = String::from_utf8_lossy(&tricky_data::music::music_table(&inf).base).to_string();
+            files.load(&format!("{base}{}.mpf", dir.file_name()?.to_string_lossy())).ok().flatten()
+        });
+        Some(Song { rate, ch, pcm, segs, nodes, events, actions, routers, graph })
     }
 }
 
 /// The playing song, as an audio source.
 #[derive(Asset, TypePath, Clone)]
-pub struct PfStream { song: Arc<Song>, shared: Arc<Shared> }
+pub struct PfStream { song: Arc<Song>, shared: Arc<Shared>, driver: Option<Arc<Mutex<tricky_game::pfplay::Driver>>> }
+
+/// The game's engine playing: the frames the driver hands out, `chunk` at a time
+pub struct EngineDecoder { song: Arc<Song>, shared: Arc<Shared>, driver: Arc<Mutex<tricky_game::pfplay::Driver>>, buf: VecDeque<i16> }
+
+impl Iterator for EngineDecoder {
+    type Item = i16;
+    fn next(&mut self) -> Option<i16> {
+        if self.buf.is_empty() {
+            let ch = self.song.ch as usize;
+            let mut d = self.driver.lock().unwrap();
+            let parts = d.pull(256);
+            let mut got = 0;
+            for (start, n, vol) in parts {
+                let g = if vol <= 127 { vol as f32 / 127.0 } else { 1.0 };
+                for f in start..start + n {
+                    for c in 0..ch {
+                        let x = self.song.pcm.get(f * ch + c).copied().unwrap_or(0) as f32 * g;
+                        self.buf.push_back(x as i16);
+                    }
+                }
+                got += n;
+            }
+            // silence for what the driver had nothing for
+            for _ in got * ch..256 * ch {
+                self.buf.push_back(0);
+            }
+            self.shared.node_pos.store(d.cur.map_or(0, |c| c.1 as u32), Ordering::Relaxed);
+        }
+        self.buf.pop_front()
+    }
+}
+
+impl Source for EngineDecoder {
+    fn current_frame_len(&self) -> Option<usize> { None }
+    fn channels(&self) -> u16 { self.song.ch }
+    fn sample_rate(&self) -> u32 { self.song.rate }
+    fn total_duration(&self) -> Option<std::time::Duration> { None }
+}
+
+/// The stream's decoder: the walk or the engine
+pub enum AnyDecoder { Walk(PfDecoder), Engine(EngineDecoder) }
+
+impl Iterator for AnyDecoder {
+    type Item = i16;
+    fn next(&mut self) -> Option<i16> {
+        match self { AnyDecoder::Walk(d) => d.next(), AnyDecoder::Engine(d) => d.next() }
+    }
+}
+
+impl Source for AnyDecoder {
+    fn current_frame_len(&self) -> Option<usize> { None }
+    fn channels(&self) -> u16 { match self { AnyDecoder::Walk(d) => d.channels(), AnyDecoder::Engine(d) => d.channels() } }
+    fn sample_rate(&self) -> u32 { match self { AnyDecoder::Walk(d) => d.sample_rate(), AnyDecoder::Engine(d) => d.sample_rate() } }
+    fn total_duration(&self) -> Option<std::time::Duration> { None }
+}
 
 pub struct PfDecoder { song: Arc<Song>, shared: Arc<Shared>, walk: Walk, cur: i32, next: Option<i32>, pos: usize, len: usize, start: usize, chan: u16, frame: usize, stopped: bool }
 
@@ -190,8 +259,17 @@ impl Source for PfDecoder {
 
 impl Decodable for PfStream {
     type DecoderItem = i16;
-    type Decoder = PfDecoder;
-    fn decoder(&self) -> PfDecoder {
+    type Decoder = AnyDecoder;
+    fn decoder(&self) -> AnyDecoder {
+        if let Some(driver) = &self.driver {
+            return AnyDecoder::Engine(EngineDecoder { song: self.song.clone(), shared: self.shared.clone(), driver: driver.clone(), buf: VecDeque::new() });
+        }
+        AnyDecoder::Walk(self.walk_decoder())
+    }
+}
+
+impl PfStream {
+    fn walk_decoder(&self) -> PfDecoder {
         // event 0 starts the song (PF_ApplyEvent: an immediate go-to the first node)
         let var = self.shared.var.load(Ordering::Relaxed);
         let mut d = PfDecoder { song: self.song.clone(), shared: self.shared.clone(), walk: Walk { loop_node: -1, loop_cnt: 0 }, cur: -1, next: None, pos: 0, len: 0, start: 0, chan: 0, frame: 1, stopped: false };
@@ -227,6 +305,8 @@ pub struct PathMusic {
     /// the air-loop layer: (phrase, next beat index, seconds to the next beat, beats left for Tricky)
     air: Option<(u32, u32, f32, i32)>,
     tricky_was: bool,
+    /// the game's Pathfinder playing the song, and its driver (shared with the audio thread)
+    engine: Option<(tricky_game::pfplay::Player, Arc<Mutex<tricky_game::pfplay::Driver>>)>,
 }
 
 #[derive(Component)]
@@ -280,6 +360,7 @@ pub fn path_music(
     // stop the song on a change of song or a new run
     if want != pm.want || new_run {
         if let Some(e) = pm.playing.take() { commands.entity(e).try_despawn(); }
+        pm.engine = None;
         pm.finished_sent = false;
         pm.air = None;
     }
@@ -316,14 +397,36 @@ pub fn path_music(
         shared.var.store(var, Ordering::Relaxed);
         pm.shared = shared.clone();
         let song = pm.song.as_ref().unwrap().1.clone();
-        let h = streams.add(PfStream { song, shared });
+        // the game's Pathfinder when the song's graph came from the disc: the track loaded, the variable set, the
+        // start event (0) posted (`Audio_StartRaceMusic` 0x215220)
+        pm.engine = song.graph.as_ref().and_then(|g| {
+            let segs: HashMap<i16, (usize, usize)> = song.segs.iter().map(|(k, v)| (*k as i16, *v)).collect();
+            let mut d = tricky_game::pfplay::Driver::new(song.rate, HashMap::new());
+            let mut p = tricky_game::pfplay::Player::load(g, format!("{want}.mus\0").as_bytes(), &segs, &mut d)?;
+            p.set_var(var);
+            p.event(&mut d, 0);
+            p.update(&mut d);
+            Some((p, Arc::new(Mutex::new(d))))
+        });
+        if pm.engine.is_some() { println!("music: {want} on the game's Pathfinder"); }
+        let driver = pm.engine.as_ref().map(|e| e.1.clone());
+        let h = streams.add(PfStream { song, shared, driver });
         let e = commands.spawn((AudioPlayer::<PfStream>(h), PlaybackSettings { mode: PlaybackMode::Once, volume: Volume::Linear(0.0), ..default() }, PfPlayer)).id();
         pm.playing = Some(e);
     }
     // the finish: the outro
     if st == RaceState::Finished && !pm.finished_sent && !menu {
         pm.finished_sent = true;
-        pm.shared.events.lock().unwrap().push_back(10);
+        match &mut pm.engine {
+            Some((p, d)) => { let mut d = d.lock().unwrap(); p.event(&mut d, 10); }
+            None => pm.shared.events.lock().unwrap().push_back(10),
+        }
+    }
+    // the game's engine: the path variable (`Music_SetPathVar`) and the driver's update, every frame
+    if let Some((p, d)) = &mut pm.engine {
+        let mut d = d.lock().unwrap();
+        p.set_var(var);
+        p.update(&mut d);
     }
     // volume: the music level, PathLevel, and the big-air duck (Audio_BigAirMusicDuck)
     let air = if !r.grounded && r.rail.is_none() && r.crashed <= 0.0 { r.air_time } else { 0.0 };
@@ -383,8 +486,8 @@ mod tests {
         let song = Arc::new(Song::load(std::path::Path::new(&dir)).expect("song"));
         let shared = Arc::new(Shared::default());
         shared.var.store(80, Ordering::Relaxed);
-        let s = PfStream { song: song.clone(), shared: shared.clone() };
-        let mut d = s.decoder();
+        let s = PfStream { song: song.clone(), shared: shared.clone(), driver: None };
+        let mut d = s.walk_decoder();
         let mut path = vec![d.cur];
         let secs = 400;
         for i in 0..(song.rate as usize * secs * song.ch as usize) {

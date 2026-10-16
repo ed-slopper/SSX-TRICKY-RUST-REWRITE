@@ -493,3 +493,23 @@ the entry and the box fills in the newest one before 0x222358 plays it.
   (round the +0x36e0 songs to an enabled one), `Music_CountEnabledSongs` (those among the first +0x36e8).
 - Checked in the runner on 40,000 random systems over all 33 functions with the song functions running as the
   original underneath; 20 of 20 mutants caught.
+
+## The race songs on the game's Pathfinder (G10b2c1, `game/src/pfplay.rs`, `src/pathmusic.rs`; checked: `tests/pfplay.rs`)
+
+- With the disc, each race song runs on `tricky_game::pf` itself: its `.mpf` graph read from MUSIC.BIG (MUSIC.INF's
+  BASEPATH `|data\audio\` + the song's name, with the game's archives mounted), registered, and its track loaded as
+  `Music_LoadPathfinder` calls `PathX_LoadSong` (song 0, track 0, latency 500, ring 2, 0x96, the track record in a
+  0x37000-byte buffer); the start event (0) and the finish (10) posted as `Song_MusicEvent` does, the path variable as
+  `Song_SetPathVar`, and the engine's `update` run every frame (the game runs it as a poll task, `Sys_AddPollTask`).
+  The engine's memory starts with no song selected (the byte at 0x3495d3 is 0xff in the game's data).
+- The stream driver beneath is the port's (STANDIN for the PS2's `StreamSlot_*` / EA's `SndStream_*`), built on what
+  the EE side asks: a play queues a request at the segment's offset (purging first when immediate), held when its
+  start is −1 until released; `StreamSlot_IsDone` means at most one request outstanding and read in full (so the
+  engine queues the next once the one playing is past the latency, and it follows sample-exact); the position is the
+  request playing's ms; the clock is the frames played. The decoded segments (the tools' `song.ogg`) are found by the
+  graph's own offsets (`Pf::node_segment`, `segment_offset`).
+- Checked headless on bassinvader and kingbeat (`tests/pfplay.rs`): every request follows the last with no gap; the
+  segments played match the port's earlier walk (the first 40 of bassinvader and the 181 in all, with the finish at
+  300 s). In the app the first segment starts at the latency (0.5 s) and the rest follow every bar.
+- Without the disc the earlier walk of `pathmusic.rs` plays (STANDIN). The music system's layers, its scheduler and
+  the air loops on it are row G10b2c2.

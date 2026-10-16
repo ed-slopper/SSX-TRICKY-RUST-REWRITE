@@ -382,6 +382,15 @@ impl Pf<'_> {
         }
     }
 
+    /// The selected song's node count (the graph's +0x12) and a node's segment number (its record's first short; 0
+    /// or below for a node without audio): for a caller mapping `segment_offset`'s offsets back to segments
+    pub fn node_count(&self) -> u32 {
+        self.mem.r16(self.graph() + 0x12) as u32
+    }
+    pub fn node_segment(&self, node: u32) -> i16 {
+        self.mem.s16(self.node(node as i32))
+    }
+
     /// `FUN_002befd8`(node): the segment's offset in the song's audio (0 for none or a node without audio)
     pub fn segment_offset(&self, node: i64) -> u32 {
         if node < 0 || node >= self.mem.r16(self.graph() + 0x12) as i64 {

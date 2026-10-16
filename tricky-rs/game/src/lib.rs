@@ -128,3 +128,4 @@ pub mod speechsys;
 pub mod teleport;
 pub mod musicsong;
 pub mod musicsys;
+pub mod pfplay;

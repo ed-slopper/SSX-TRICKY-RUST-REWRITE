@@ -15,3 +15,5 @@ serde = { version = "1", features = ["derive"] }
 [dev-dependencies]
 # the function runner, to check our functions against the original (row F4d; its tests skip without TRICKY_ELF)
 r5900 = { path = "../../tools/r5900" }
+# reading the app's decoded songs in tests/pfplay.rs
+serde_json = "1"

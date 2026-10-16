@@ -112,6 +112,7 @@ dependencies = [
  "glam",
  "r5900",
  "serde",
+ "serde_json",
  "tricky-data",
 ]
 
