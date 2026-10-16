@@ -769,20 +769,52 @@ At load every rail is on, as the port's `Rails` are (STANDIN: in the game they a
 
 The board bone's frame (rider+0x4a60..+0x4a90) is not the board's pose frame (+0x4aa0, `pose::board_frame`).
 `Boarder_UpdateSkeleton` 0x12ae18 copies it from the skeleton's board bone, and the skeleton is not run (row G5).
-The rail code fixes how its rows are read:
-- the kind is the tangent's angle from the x row toward the z row, so x is along the board and z across it;
-- the board is held 30 cm along the y row from the rail, under the board, so y points down.
+The rail code fixes how its rows are read: the kind is the tangent's angle from the x row toward the z row, so x
+is along the board and z across it. The y row's sign comes from the rail tick (row G20c2c3):
+`RailSlideMotion_Update` holds the bone on the rail itself. With y up, the capture's window (30 cm along y, ± 45 ×
+0.9) takes a board from 15 cm over the rail to 75 cm under it, and a board falling onto the rail passes the "not
+past it" test (offset · velocity ≥ −0.2). With y down, it would catch boards up to 75 cm over the rail, which the
+tick then lowers at most 8.3 cm a tick, and refuse falling ones.
 
-`Rider::board_bone_frame` is therefore the pose frame's rows reordered (STANDIN): x = its forward (y),
-y = −its up (z), z = −its side (x), at its position, with the trick's spin and flip left out. One part of this is
-a convention: the z row's sign only decides which of kinds 3 and 4 a board turned across is. The test cannot tell
-that without the skeleton (that mutant survives).
+`Rider::board_bone_frame` is therefore the pose frame's rows reordered (STANDIN): x = its forward (y), y = its up
+(z), z = its side (x), at its position, with the trick's spin and flip left out. Two parts are a convention: the z
+row's sign only decides which of kinds 3 and 4 a board turned across is, and the y sign was chosen as above. The
+test cannot settle either without the skeleton.
 
-Checked on gari's spline 7 from the disc: a rider in the air 30 cm over the rail's middle, flying along it at
-15 m/s, is caught along (kind 1) with the game's velocity: the speed along it (at most the speed, at least
-555.56 cm/s if that is more), z × 0.1. Turned across it is kind 4, turned round it is kind 2. A metre over it, or
-with the rail switched off, it is not caught. Mutants: the bone's y sign, the clip gate, the kind, the velocity and
-the switch are all caught.
+Checked on gari's spline 7 from the disc: a rider in the air 10 cm over the rail's middle, flying along it at
+15 m/s and falling at 3 m/s, is caught along (kind 1) with the game's velocity: the speed along it (at most the
+speed, at least 555.56 cm/s if that is more), z × 0.1. Turned across it is kind 3, turned round it is kind 2.
+40 cm over it, or with the rail switched off, it is not caught. Mutants: the bone's y sign, the clip gate, the
+kind, the velocity and the switch are all caught.
+
+### The slide on the grid (row G20c2c3; checked: `tests/rail_capture.rs`)
+
+A rider caught by the game's capture (`Rider::rail_grid`) runs each rail tick as `RailSlideMotion_Update` 0x10b0d0
+itself (`Rider::rail_step_grid` → `ground_tick::rail_slide_motion`), on the course's grid. It is given the rider's
+position and velocity (cm, z up), the kept attitude and its axes (+0x170..), the board bone's frame
+(`board_bone_frame`, as for the capture), the rail kind, the fall-off blend (+0x284), the normal (+0x2a0), the last
+rail point and word (+0x2d0, +0x290), the tick (`dt` · 60), the steer (+0x214), the lean angle and the time on the
+rail. Everything it leaves goes back to the rider; the attitude is now the game's through the rail, and the yaw
+comes from its heading. When it takes off (no rail in reach, or outside the fall-off limits after the push away),
+the rider leaves as before.
+
+What runs around it is still the port's (STANDIN, the rail control `RailSlideControl_Update` 0x1073e0 is row G1):
+- boost pressed or held is the push +0x130, at the boost level, spending the meter as before;
+- held boost with left or right turns the drawn body a quarter (`rail_twist`) and scores the spin;
+- a released crouch hops off along the attitude's up.
+
+`rail_lateral` and the port's polyline are used only for a rail caught without the course.
+
+Checked on gari's spline 7:
+- After a capture 10 cm over the rail, 20 ticks with nothing held stay on the rail. The bone is held on it within
+  0.01 cm (0.9 cm aside).
+- The blend is 1 and the time counts 20/60 s. The board's forward turns to the rail's slope (z 0.059 against
+  0.068), and the normal is up.
+- It travels 384 cm (the speed × 20 ticks).
+- Held steer balances it off after 46 ticks. Nothing held drifts off after 59: the pull to the middle ends at
+  0.6 s, as in the game.
+- Mutants: the tick length, the steer, the position, the motion's time, the attitude, the take-off and the switch
+  to this tick are all caught.
 
 ### The other respawns at the game's reset place (row G20c3b5; checked: `tests/reset_place.rs`)
 

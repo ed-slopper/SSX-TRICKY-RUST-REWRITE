@@ -449,6 +449,10 @@ pub struct Rider {
     pub rail_blend: f32,
     /// +0x290: the rail's word the capture found (its owner's +0x24)
     pub rail_word: u32,
+    /// on a rail of the course's grid (caught by the game's capture): the rail tick is `RailSlideMotion_Update`
+    /// (row G20c2c3), and +0x2d0 the last rail point it found
+    pub rail_grid: bool,
+    pub rail_hit: [f32; 4],
     /// ticks before this rider can be hit by another again (`Boarder_RiderCollisions`: three ticks)
     pub hit_wait: u8,
 }
@@ -471,7 +475,7 @@ impl Rider {
                last_trick: String::new(), trick_timer: 0.0, crashed: 0.0, hard_land: 0.0, crouch_v: 0.0, brake_v: 0.0, jump_c: 0.0, jump_delay: 0.0, height: 0.0,
                course_dir: None, course_pts: None, wipe: None, crash_at: None, gm: None, crash_spray: None, lean: [0.0; 3], up: [0.0, 0.0, 1.0, 0.0], recover: None, ai: false, down_t: 0.0, getup: -1.0, stumble: 0.0, wall_hit: None, speed_timer: 0.0, spin_timer: 0.0, spin_used: false, tube_class: u8::MAX, gate_p: 0.0, gate_hi: 0.0, gate_lo: 0.0, gate_still: 0.0, gate_target: 0.0, gate_speed: 0.0, gate_state: 8, gate_rock_dir: 0, band: (0.005, 0.0250417), spin_base: 0.0, flip_base: 0.0, late: false, cause: "", spin_ax: Axis::default(), flip_ax: Axis::default(), air_mode2: false, rail_off: 0.0, rail_time: 0.0, rail_halves: 0, boost_was: false, chain: 0,
                ubers: Vec::new(), uber: 0.0, uber_id: 0, uber_done: false, letters: 0, multiplier: 1,
-               sc: new_score(), tick_acc: 0.0, full_count: 0, rail_kind: 0, rail_lean: 0.0, rail_goal0: 0.0, rail_committed: 0.0, show_parts: Vec::new(), grab_scored: false, grab_tw: false, hit_wait: 0, att: None, last_hit: Default::default(), impact: 0.0, impact_n: [0.0; 4], knocks: 0.0, slot: 0, place_ray: None, hit_kind: 0, land_time: 0.0, takeoffs: 0, rail_blend: 0.0, rail_word: 0 };
+               sc: new_score(), tick_acc: 0.0, full_count: 0, rail_kind: 0, rail_lean: 0.0, rail_goal0: 0.0, rail_committed: 0.0, show_parts: Vec::new(), grab_scored: false, grab_tw: false, hit_wait: 0, att: None, last_hit: Default::default(), impact: 0.0, impact_n: [0.0; 4], knocks: 0.0, slot: 0, place_ray: None, hit_kind: 0, land_time: 0.0, takeoffs: 0, rail_blend: 0.0, rail_word: 0, rail_grid: false, rail_hit: [0.0; 4] };
         // the start line's `Boarder_PlaceAt` 0x11cae8 (`cBoarder::vf8` 0x116ab8: heading from the path's direction)
         r.att = Some((orient::placed_attitude(placed_heading(yaw), None), yaw));
         r
@@ -1117,7 +1121,10 @@ impl Rider {
 
         // ---- grinding a rail
         if self.rail.is_some() {
-            self.rail_step(rails, input, dt);
+            match &world.course {
+                Some(course) if self.rail_grid => self.rail_step_grid(course, input, dt),
+                _ => self.rail_step(rails, input, dt),
+            }
             return;
         }
 
@@ -1305,6 +1312,7 @@ impl Rider {
                 while tw < -std::f32::consts::PI { tw += std::f32::consts::TAU; }
                 self.pos = rp;
                 self.rail = Some((ri, d, along));
+                self.rail_grid = true;
                 self.charge = 0.0;
                 self.rail_kind = cap.kind;
                 self.rail_word = cap.word;
@@ -1340,6 +1348,7 @@ impl Rider {
                     // the original keeps your speed along the rail, and at least 20 km/h of it
                     let along = along.signum() * s.min(along.abs().max(5.56));
                     self.rail = Some((ri, d, along));
+                    self.rail_grid = false;
                     self.charge = 0.0;
                     // `Rail_TryCapture`: how the board sits on the rail (STANDIN: the angle's sign as ours)
                     let deg30 = 0.5235988;
@@ -1558,12 +1567,12 @@ impl Rider {
     /// `Boarder_UpdateSkeleton` 0x12ae18 copies from the skeleton and `Rail_TryCapture` / `RailSlideMotion_Update` read.
     /// STANDIN until the skeleton runs (row G5): the board's frame ([`Rider::board_frame`]) with its rows as the rail
     /// code reads the bone's: x along the board (the frame's y, forward: the kind is the tangent's angle from x toward
-    /// z), y down (minus its z: the rail is 30 cm along y from the bone, under the board), z across (minus its x, so
-    /// the rows stay right-handed)
+    /// z), y up (its z), z across (its x). (The y row's sign as the rail tick shows it: `RailSlideMotion_Update` holds
+    /// the bone on the rail, and with y up `Rail_TryCapture`'s window, 30 cm along y ± 45, takes a board from 15 cm
+    /// over the rail to 75 cm under it, and one falling onto it passes its "not passed" test)
     pub fn board_bone_frame(&self) -> [[f32; 4]; 4] {
         let f = self.board_frame();
-        let neg = |v: [f32; 4]| [-v[0], -v[1], -v[2], v[3]];
-        [f[1], neg(f[2]), neg(f[0]), f[3]]
+        [f[1], f[2], f[0], f[3]]
     }
     pub fn capture_gated(&self) -> bool { !self.grab_safe() || (self.uber > 0.0 && !self.uber_done) }
     /// Is the board free to land (no grab clip short of its safe marker)?
@@ -1582,6 +1591,102 @@ impl Rider {
     /// off one side unless you lean against it, and too far off you fall off (not a crash). Boost
     /// held with left / right turns the board a quarter turn (regular, sideways, fakie). There is
     /// no friction and no speed limit: a slow rider on an uphill rail rolls back.
+    /// A rail tick on the course's grid (row G20c2c3): `RailSlideMotion_Update` 0x10b0d0 itself
+    /// ([`ground_tick::rail_slide_motion`]) on the rider's state: the position, velocity, attitude and its axes, the
+    /// board bone's frame, the rail kind, the fall-off blend, the normal, the last rail point and word, the steer
+    /// (+0x214), the lean angle and time on the rail; it moves the rider along the rail, balances it, leans and turns
+    /// the board, and says when it comes off. STANDIN (the rail control, `RailSlideControl_Update`, row G1): the port's
+    /// own control around it: boost held or pressed is the push (+0x130, the boost level), its quarter turns turn the
+    /// drawn body (`rail_twist`) and score the spin, and a released crouch hops off as before.
+    pub fn rail_step_grid(&mut self, course: &crate::course_ground::CourseGround, input: Input, dt: f32) {
+        use std::f32::consts::FRAC_PI_2 as Q;
+        let Some((ri, d, _)) = self.rail else { return };
+        let o = match &self.att {
+            Some((o, _)) => *o,
+            None => orient::placed_attitude(placed_heading(self.yaw), None),
+        };
+        // boost: the push along the rail, the meter spent as before
+        let pressed = input.boost && !self.boost_was;
+        let mut push = 0.0;
+        if self.boost > 0.0 && (pressed || (input.boost && self.charge > 0.0)) {
+            push = self.boost_level();
+            if !self.tricky() { self.boost = (self.boost - if pressed { 0.00075 } else { dt / BOOST_SECONDS }).max(0.0); }
+            self.boosting = true;
+        }
+        self.boost_was = input.boost;
+        let f = self.board_bone_frame();
+        let mut m = ground_tick::RailMotion {
+            pos: ground_tick::to_game(self.pos, 100.0, 1.0),
+            vel: ground_tick::to_game(self.vel, 100.0, 0.0),
+            orient: o,
+            frame: [f[0], f[1], f[2]],
+            board_pos: f[3],
+            kind: self.rail_kind,
+            blend: self.rail_blend,
+            normal: ground_tick::game_dir(self.normal),
+            hit_point: self.rail_hit,
+            hit_word: self.rail_word,
+            ticks: dt * 60.0,
+            push,
+            steer: if input.boost { 0.0 } else { self.steer },
+            x218: 0.0,
+            x21c: 0.0,
+            lean: self.rail_lean,
+            time: self.rail_time,
+        };
+        let end = {
+            let rw = course.rails.lock().unwrap_or_else(|e| e.into_inner());
+            ground_tick::rail_slide_motion(&rw, &mut m)
+        };
+        self.pos = ground_tick::port_dir(m.pos) * 0.01;
+        self.vel = ground_tick::port_dir(m.vel) * 0.01;
+        self.normal = ground_tick::port_dir(m.normal);
+        (self.rail_blend, self.rail_lean, self.rail_time, self.rail_hit, self.rail_word) = (m.blend, m.lean, m.time, m.hit_point, m.hit_word);
+        self.att = Some((m.orient, self.yaw));
+        // the port's quarter turns (STANDIN): boost held with left / right turns the drawn body a quarter
+        let want = input.boost && input.steer.abs() > 0.5 && self.charge <= 0.0;
+        let arrived = (self.rail_goal - self.rail_twist).abs() < 0.03;
+        if want && (!self.rail_held || arrived) { self.rail_goal = (self.rail_goal / Q).round() * Q + input.steer.signum() * Q; }
+        self.rail_held = want;
+        let turn = (self.rail_goal - self.rail_twist).clamp(-RAIL_TWIST * dt, RAIL_TWIST * dt);
+        self.rail_twist += turn;
+        self.rail_spun += turn.abs();
+        if (self.rail_goal - self.rail_twist).abs() < 1e-4 && self.rail_goal != self.rail_committed {
+            self.rail_committed = self.rail_goal;
+            self.sc.update_spin(((self.rail_goal - self.rail_goal0).to_degrees().round()) as i32);
+        }
+        self.rail_side_signed += self.rail_twist.sin() * dt;
+        if self.rail_twist.sin().abs() > 0.7 { self.rail_side += dt; }
+        // the board's heading (+0x1b0) as the port's yaw, the quarter turn on top for the drawn body
+        self.yaw = wrap(m.orient.yaw - Q - self.rail_twist);
+        if let Some(a) = &mut self.att { a.1 = self.yaw; }
+        self.grounded = false;
+        self.air_time = 0.0;
+        self.grind_time += dt;
+        let hop = !input.jump && self.charge > 0.0;
+        if input.jump { self.prewind(&input, dt); self.charge = self.crouch_v; }
+        if hop || end == ground_tick::RailEnd::TakeOff {
+            if hop {
+                // `Jump_ApplyImpulse` on a rail along the board's up as the motion left it
+                let c = self.charge;
+                let up = ground_tick::port_dir(m.orient.up);
+                self.apply_jump(c, self.normal, self.forward(), up, true);
+                self.release_windup();
+            }
+            self.steer = m.steer;
+            let fakie = self.rail_twist.cos() < -0.5;
+            self.take_off();
+            if fakie { self.switch_takeoff = true; self.set_switch(true); }
+            self.rail = None;
+            self.rail_grid = false;
+            self.rail_cooldown = 0.45;
+            self.end_grind();
+        } else {
+            let s = self.vel.length() * if self.vel.dot(self.forward()) < 0.0 { -1.0 } else { 1.0 };
+            self.rail = Some((ri, d, s));
+        }
+    }
+
     pub fn rail_step(&mut self, rails: &Rails, input: Input, dt: f32) {
         use std::f32::consts::FRAC_PI_2 as Q;
         let Some((ri, mut d, mut s)) = self.rail else { return };
