@@ -634,14 +634,18 @@ impl Rider {
             surface: self.surface as u32,
             ..Default::default()
         };
+        // the probe's `cWorldLine`(0.5, from, to, 2) cast in the game's space, its hit's kind (+0x2e0) kept
         let (from, to) = probe::line(&pr);
-        let hit = world
-            .course_line(0.5, to_port(from, 0.01), to_port(to, 0.01), 2, Some(&mut self.last_hit))
-            .map(|(at, n, surface)| Hit { kind: 0, point: to_game(at, 100.0, 1.0), normal: game_dir(n), surface });
+        let hit = world.course.as_ref().and_then(|course| {
+            let mut q = crate::worldline::WorldLine::new(0.5, from, to, 2);
+            let (t, h) = course.ray_cast(&mut q, world.showoff, Some(&mut self.last_hit), &|i| world.course_skips(i));
+            h.filter(|_| t >= 0.0).map(|h| Hit { kind: h.kind, point: h.pos, normal: h.normal, surface: h.surface as u32 })
+        });
         if !probe::probe(&mut pr, hit) {
             return None;
         }
         let surface = (pr.surface as usize).min(19);
+        self.hit_kind = pr.kind;
         if !(pr.height < SURFACE_TABLE[surface][6] * 0.5) {
             return None;
         }
@@ -688,7 +692,7 @@ impl Rider {
                 height,
                 surface: self.surface as u32,
                 surface_ticks: 0,
-                kind: 0,
+                kind: self.hit_kind,
             },
             up: self.up,
             board_up: o.up,
@@ -717,6 +721,7 @@ impl Rider {
         self.normal = to_port(g.p.normal, 1.0);
         self.height = g.p.height * 0.01;
         self.surface = g.p.surface.min(19) as u8;
+        self.hit_kind = g.p.kind;
         self.switch = g.switch != 0;
         self.steer = -g.steer;
         self.lean[0] = g.p.x244;

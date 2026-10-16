@@ -729,6 +729,11 @@ respawns (the safe point, the wipe-outs' return points) still pass the port's ya
   and time as before; after the runs part, the autopilot (the port's own) loses the line more often on aloha (4 → 10
   falls), megaplex (2 → 6) and elysium (2 → 6), less on mesablanca (4 → 2), the same elsewhere. The extra falls are 100
   to 350 m off the line, where the autopilot has gone, not at the landings.
+- The self-test is not exactly repeatable (megaplex gave 5220 m and 5030 m on two runs of one build), so fall counts
+  differ between runs of the same code; with G20c3d's hit kind as well, aloha fell 4 times and megaplex 4.
+- The ground probe's hit kind (+0x2e0: 0 terrain, 1 an object with no surface, 2 a moving object, 3 none) is
+  `Rider::hit_kind` (row G20c3d): the landing's probe casts in the game's space and keeps it, the seed of the
+  game-side rider takes it, and each ground tick writes it back (it had been 0 at every landing).
 
 ### The teleport and the cast clips in the port (row G20c3b3; checked: `tests/teleport.rs`)
 
