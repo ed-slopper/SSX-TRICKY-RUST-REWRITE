@@ -7,8 +7,8 @@
 //! (`TRICKY_DISC`, `/SLUS_203.26`), the strings from `DATA/LANG/AMERICAN.LOC`, the sprites' rectangles from
 //! `chars/hud/sprites.json` (what `SpriteSet_InitHudGameRects` 0x1f4440 builds) and the fonts from the disc's SFN
 //! files (parsed and measured by `tricky_game::font`; their glyphs drawn by `sfnfont`).
-//! The rider, race and world fields the HUD reads are filled from the app's own race every frame: those fields
-//! are STANDINs where the app does not keep the game's value (each says so).
+//! The rider, race and world fields the HUD reads are filled from the app's own race every frame, and the race's
+//! path set, placings and progress run the game's own code on them.
 //!
 //! Without the disc, the sheets or the fonts, the app's own HUD (`ui::hud`, `hudsprites`, `sfnfont`) stays.
 
@@ -48,9 +48,16 @@ const PATH_SET: u32 = 0x337fb8;
 const EVENT_PATHS: u32 = ARENA + 0x4_0000;
 /// The game's ranges copied from the executable: the HUD's globals (bands, colour, tables), the view layouts
 /// (bss), the layouts' initialisers and the formats, the settings the constructor reads, the audio object the
-/// update's sounds are handed (the app plays none of them)
-const ELF_RANGES: [(u32, u32); 6] =
-    [(0x337fe8, 0x200), (0x33ca40, 4 * 0x424), (0x38d000, 0x1400), (0x32ca10, 0x40), (0x32db6c, 0x340), (0x343050, 4)];
+/// update's sounds are handed (the app plays none of them), the placings' rubber band tables
+const ELF_RANGES: [(u32, u32); 7] = [
+    (0x337fe8, 0x200),
+    (0x33ca40, 4 * 0x424),
+    (0x38d000, 0x1400),
+    (0x32ca10, 0x40),
+    (0x32db6c, 0x340),
+    (0x343050, 4),
+    (0x365060, 0x60),
+];
 
 /// One thing the game drew
 enum Cmd {
@@ -421,6 +428,14 @@ fn build_paths(m: &mut Mem, aip: &tricky_data::aip::Aip) {
     }
 }
 
+impl tricky_game::placing::PlacingEnv for StateEnv {
+    fn progress(&mut self, _m: &mut Mem, rider: u32) -> f32 {
+        self.progress.get((rider.wrapping_sub(RIDERS) / RIDER_SIZE) as usize).copied().unwrap_or(0.0)
+    }
+    /// `Sfx_OnPlacingChange`: the app plays no placing sounds
+    fn placing_sound(&mut self, _m: &mut Mem, _args: [u32; 6]) {}
+}
+
 /// The game's memory for the HUD, from the executable's bytes and the sprite rectangles
 fn build(elf: &[u8], rects: &[(u32, [f32; 7])], title: &[u8], menu: &[u8]) -> Mem {
     let mut m = Mem::default();
@@ -561,6 +576,16 @@ pub fn game_hud(
     // (+0x374: the race line's distance less how far along it), from the app's race lines (metres back to cm; 0
     // before the start, when the app has none)
     let cm = |d: f32| if d.is_finite() && d < 1.0e7 { d * 100.0 } else { 0.0 };
+    // the finishing times (+0x418: the race time in hundredths at the line, −1 until then)
+    let mut finish = [u32::MAX; 4];
+    if race.state == tricky_game::race::RaceState::Finished {
+        finish[0] = (race.time * 100.0) as u32;
+    }
+    for (k, o) in opponents.0.iter().take(3).enumerate() {
+        if let Some(t) = o.driver.finished {
+            finish[k + 1] = (t * 100.0) as u32;
+        }
+    }
     let mut progress = [0.0f32; 4];
     let mut along = [0.0f32; 4];
     let mut laps = [0i32; 4];
@@ -615,7 +640,8 @@ pub fn game_hud(
         // the game's velocity is in centimetres a second
         m.w32(rd + 0x150 + 4 * k as u32, (v * 100.0).to_bits());
     }
-    m.w32(rd + 0x418, if racing { u32::MAX } else { 0 });
+    m.w32(rd + 0x418, finish[0]);
+    m.w32(rd + 0x41c, 1);
     m.w32(rd + 0x5820 + 0x88, r.letters as u32);
     m.w32(rd + 0x5910, r.multiplier);
     for (k, (kind, life, age)) in r.sc.timed.iter().enumerate() {
@@ -639,29 +665,14 @@ pub fn game_hud(
         let p = tricky_game::progress::Progress { laps: laps[k], along: along[k], line: lap_line, ..Default::default() };
         progress[k] = tricky_game::progress::race_progress(&p, lap_len);
     }
-    // the race place (+0x110, 0 first) in the app's standings order (`standings`: finished riders first by their
-    // time, then the rest by that progress, the least to go first). STANDIN: the game places them in
-    // `Race_UpdatePlacingsAndRubberBand` 0x115100 every 6 ticks, not run by the app (row G8m)
-    let others = opponents.0.len().min(3);
-    let mut done = [None::<f32>; 4];
-    done[0] = (race.state == tricky_game::race::RaceState::Finished).then_some(race.time);
-    for (k, o) in opponents.0.iter().take(3).enumerate() {
-        done[k + 1] = o.driver.finished;
-    }
-    let ahead = |j: usize, k: usize| match (done[j], done[k]) {
-        (Some(a), Some(b)) => a < b,
-        (Some(_), None) => true,
-        (None, Some(_)) => false,
-        (None, None) => progress[j] < progress[k],
-    };
-    for k in 0..=others {
-        let place = (0..=others).filter(|&j| j != k && ahead(j, k)).count() as u32;
-        m.w32(RIDERS + RIDER_SIZE * k as u32 + 0x110, place);
-    }
-    // the riders: the player, then up to three opponents (their progress, +0x374 / +0x380; STANDIN: otherwise only
-    // whether each is still racing)
+    // the riders: the player, then up to three opponents: what the HUD reads of them (their progress, +0x374 /
+    // +0x380, finishing time, player number, human or not; the rubber band's +0x378 is not kept, and the HUD reads
+    // none of the band's results)
     let others = opponents.0.len().min(3) as u32;
     m.w32(WORLD + 0x88, 1 + others);
+    // the race object's players and computer riders, for `Race_UpdatePlacingsAndRubberBand`
+    m.w32(WORLD + 0x7c, 1);
+    m.w32(WORLD + 0x80, others);
     for k in 0..=others {
         let o = RIDERS + RIDER_SIZE * k;
         m.w32(WORLD + 0xc4 + 4 * k, o);
@@ -674,7 +685,8 @@ pub fn game_hud(
         if k > 0 {
             m.w32(o + 0x464, o + 0x500);
             m.w32(o + 0x290, 1);
-            m.w32(o + 0x418, if racing { u32::MAX } else { 0 });
+            m.w32(o + 0x418, finish[k as usize]);
+            m.w32(o + 0x41c, 0);
         }
     }
     let mut state = StateEnv { units: r.sc.units, mult: r.sc.mult, progress };
@@ -682,6 +694,10 @@ pub fn game_hud(
     let mut n = 0;
     while *tick >= 1.0 / 60.0 && n < 4 {
         *tick -= 1.0 / 60.0;
+        // the race's tick, and its placings (every 6th: the riders' places, +0x110) as the game keeps them
+        let tick = m.r32(WORLD + 0x18).wrapping_add(1);
+        m.w32(WORLD + 0x18, tick);
+        tricky_game::placing::update(m, &mut state, WORLD, STACK_TOP - 0x800);
         hudstate::update(m, &mut state, HUD);
         n += 1;
     }
@@ -717,7 +733,8 @@ pub fn game_hud(
         let main = m.r32(PATH_SET + 0x10);
         let b = HUD + 0x114;
         println!(
-            "hud paths {} main {:#x} length {} markers {} progress {:?} ahead {:?} bars {:?}",
+            "hud places {:?} paths {} main {:#x} length {} markers {} progress {:?} ahead {:?} bars {:?}",
+            (0..4).map(|k| m.r32(RIDERS + RIDER_SIZE * k + 0x110)).collect::<Vec<_>>(),
             m.r32(PATH_SET + 8),
             main,
             f32::from_bits(m.r32(main + 0x38)),

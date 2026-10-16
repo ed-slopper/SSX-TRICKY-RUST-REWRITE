@@ -215,7 +215,7 @@ address,size,name,system,status
 0x1150a0,8,cSelectLessonHandler::Exit,game,not started
 0x1150a8,8,cSelectLessonHandler::Enter,game,not started
 0x1150b0,80,cSelectLessonHandler::__tf,runtime,host
-0x115100,2352,Race_UpdatePlacingsAndRubberBand,race,ported
+0x115100,2352,Race_UpdatePlacingsAndRubberBand,race,checked
 0x115a30,76,Race_ClearAiTargets,race,ported
 0x115a80,616,Race_UpdatePairDistances,race,ported
 0x115db8,8,thunk_FUN_00115df0,runtime,host

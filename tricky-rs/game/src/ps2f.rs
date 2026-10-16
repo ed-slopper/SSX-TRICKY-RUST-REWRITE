@@ -77,6 +77,12 @@ impl Neg for F {
 }
 
 impl F {
+    /// The value as the EE reads it for a comparison (`c.lt.s` / `c.le.s` / `c.eq.s`): a denormal is zero, exponent
+    /// 255 the largest float
+    pub fn ee(self) -> f32 {
+        load(self.0)
+    }
+
     pub fn sqrt(self) -> F {
         F(cut((load(self.0).abs() as f64).sqrt()))
     }

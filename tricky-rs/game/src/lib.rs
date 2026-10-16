@@ -74,6 +74,7 @@ pub mod hudtext;
 pub mod hudstate;
 pub mod menudraw;
 pub mod overlays;
+pub mod placing;
 pub mod replayui;
 pub mod bxlist;
 pub mod snapshot;

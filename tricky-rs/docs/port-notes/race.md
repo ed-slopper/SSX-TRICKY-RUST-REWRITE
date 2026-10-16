@@ -199,8 +199,15 @@ Lead from another version (Xbox `default.xbe`, not `SLUS_203.26`; from the OpenT
 player list (4 slots) and an AI list (6 slots) on its stack, then walks the AI list up to the AI count fixed when
 the race was built and gives each AI a target from the player list, with no check of how many entries either
 list really got. When the counts disagree, it reads stack leftovers as a rider index (a crash was seen once on
-the Xbox). Not yet checked on the PS2: whoever ports this function should read whether 0x115100 walks its lists
-the same unchecked way, and port that 1:1 (the bug included), noting it here.
+the Xbox).
+
+**Checked on the PS2 (G8m, `tricky_game::placing`, tests/placing.rs):** 0x115100 walks its lists the same unchecked
+way. The riders split by +0x41c into two lists in its stack frame (8 slots at +0xc0 for +0x41c = 0, 4 at +0xe0 for the
+rest). The first walks to the race's +0x80, and the second's index steps every n / players, neither checked against
+how many each list got; past them it reads the frame's leftovers (stale indices). The port keeps the lists in the
+game's frame and reads them the same way, the bug included. It compares floats as the EE does (a stale index read as
+a float is a denormal, so zero). The test keeps the second walk inside its four slots, because past them the game reads
+its saved registers.
 
 ## The finish state (proven, G1c1; exact in `tricky-rs/game/src/finish.rs`)
 

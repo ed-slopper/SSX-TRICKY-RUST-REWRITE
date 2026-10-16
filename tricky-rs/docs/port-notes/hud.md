@@ -496,9 +496,7 @@ stays.
 and free ride (`courses::Mode` 4, 5 and 7), and the course number is found in the game's course table by the level
 folder's name.
 
-**STANDINs left** (each marked in the code; row G8m): the race place, ranked by the app's standings rather than by
-`Race_UpdatePlacingsAndRubberBand`, and the opponents' fields beyond their progress, place and racing or not. G8k
-and G8l replaced the rest with the game's own code and data (below).
+**No STANDINs are left.** G8k, G8l and G8m replaced them with the game's own code and data (below).
 
 ## The fonts in memory, and the HUD's last stand-ins (G8k)
 
@@ -580,4 +578,26 @@ AI notes' "+0x38 the preference" is the other class, `cAIPath`.
 - the opponents' dots move along the track;
 - the first checkpoint's name slides down beside the track as the rider reaches it, fading in and out as the game's
   edges have it.
+
+## The race's placings in the app's HUD (G8m)
+
+`tricky_game::placing`: `Race_UpdatePlacingsAndRubberBand` 0x115100, exactly (race.md has the whole function).
+
+- **What it does:** every 6th tick, each rider gets a key by game mode, the keys are shell-sorted, and the new places
+  go to +0x110 (with `Sfx_OnPlacingChange` where they change). In races it is the negated progress plus place × 20,
+  or 0x7fffffff − the finishing time once a rider has one.
+- **Then the rubber band:** the bounds and targets of the computer riders.
+- **Checked in the runner** (tests/placing.rs) on 40,000 random races:
+  - the inputs: every mode, course and difficulty, AI counts that agree with the lists and ones that do not, finish
+    times, and places;
+  - compared: every call and all memory, the stack frame's order, keys, tables and lists included;
+  - the tests caught 18 of 20 mutants. The two left cannot change a result: adding 0 × the lag, and dividing it by
+    1.
+- **`F::ee()` (`ps2f`)** gives a float as the EE reads it for a comparison (a denormal as zero). The port needs it
+  where the unchecked walk reads stale indices as floats.
+
+**In the app's HUD:** the copy of memory runs the placing at the game's 60 ticks on the world object (+0x18 its tick,
++0x7c one player, +0x80 the computer riders, +0x88 and +0xc4 the riders). Each rider carries its finishing time
+(+0x418: the race time in hundredths at the line, −1 until then) and whether it is human (+0x41c). The places the HUD
+shows are therefore the game's own, ordered by the same progress and updated every sixth tick.
 
