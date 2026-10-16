@@ -330,6 +330,63 @@ player sits at +0x154 with its vtable at +0. +0x15c is the screen pushed when th
 Checked in the runner on 20,000 random screens. 9 of 9 mutants are caught. The row's other functions are the
 destructor and runtime type entries.
 
+### The character modify ported (row G9k; `game/src/fe_charmodify.rs`, checked: `tests/fe_charmodify.rs`)
+
+`cFE3DStateCharacterModify` has six items: 0 is "done", and 1..5 open the screens that change the rider.
+- **`CreateNextState`,** by the item:
+  - **0 (done), for the last player:** by the game type, 4 gives the venue select, 3 gives the 3D scene's +0x60 and
+    +0x10(-1) and the race set up (no screen), any other gives the event select;
+  - **0 (done), for any other player:** the front end's next screen for the next player, with that player in its
+    +0x2e, its rider slot set (0x164950) and its +0x2d (-2 after a +0x2d of 1, else the bits flipped);
+  - **1..5:** the 3D scene's camera (0x1e, 0x1f, 0x20, 0x22, 0x23) and the item's screen, with the three bytes
+    handed on:
+    - 1: the custom body (0x58 bytes, vtable 0x3afe70);
+    - 2: the custom board (its constructor 0x28c690);
+    - 3: a 0x50c-byte screen (vtable 0x3b0110);
+    - 4: a 0x114-byte screen (vtable 0x3b01f0, its +0x68 list set up);
+    - 5: the user name screen.
+- **The builder:** the title (0x274278: 314.0; 0xdae or 0xdaf by player), six white items (the texts at
+  0x3af688), the backdrop, and no fade in.
+- **`Activate`:**
+  - back from a screen answering 7 from its +0x70, in game type 3 with that screen's +0xf4 clear, it only sets up
+    the race;
+  - otherwise: the modify music, the selected rider set and the overlay's rider shot of the player's pick;
+  - after another player's screen: all twelve riders' choices restored when that screen answers 4, then the pick's
+    rider shown with 2. This index is not taken mod 12;
+  - the base's `Activate`.
+- **vf20:** leaving on "done" as the last player, outside game type 3: the 3D scene's +0x58(0) and the music's
+  0x262b78.
+- **vf22:** the base's, then the help line by the coming item:
+  - 0: the 3D scene's +0x10(-1) and text 0xca8;
+  - 1..5: texts 0xcaa, 0xcb2, 0xcbe, 0xcc4 and 0xcc6 with the item's line (0x261f20..0x262020).
+
+  Then the line's +0x140.
+- **vf26:** the fade out only for "done", then the base's.
+
+Checked in the runner on 20,000 random screens. Picks include 12 and 13, which reach the rider index the code
+doesn't take mod 12. All 20 mutants are caught (one after picks 12 and 13 were added).
+
+### The custom body ported (row G9m; `game/src/fe_custombody.rs`, checked: `tests/fe_custombody.rs`)
+
+`cFE3DStateCustomBody` picks one of the player's rider's seven outfits. The rider is the front end's +0x20 list at
+(the player's pick) mod 12, using C's signed remainder. +0x54 keeps the outfit the screen opened on.
+- **The builder:** the title (0x274208: 105.0, text 0xb6, 0x200a), then seven items. Each item gets its number, the
+  word at 0x3ae520, the outfit's name from the rider's set (0x332c88 + 0x38 × set + 8 × outfit), and whether it is
+  available (0x267cc0) to +0x100. Then the backdrop and no fade in; the rider's outfit (its +0x159) is kept and the
+  menu set on it.
+- **`Activate`:** the menu set on the rider's outfit, the help line, the overlay's rider view off (0x26bcb8), the
+  custom screens' music (0x262300), the base's.
+- **vf18:** the rider view on.
+- **vf21:** the rider put back in the outfit the screen opened on (0x267c48), then the base's vf21.
+- **vf22:** the base's; the rider tries the coming outfit on; the help line.
+- **vf26:** the rider saves its selection with the first byte of the player's career slot (0x266190), then the
+  base's vf21 (the accept).
+- **The help line (0x28de90):** 0xcab for a locked item; otherwise the texts at 0x3afba0 for outfits 1..6, and 0xcab
+  for any other; then the line's +0x140.
+
+Checked in the runner on 20,000 random screens, with the help line on its own over 2,000. All 13 mutants are caught
+(the slot byte's sign once the test had slot bytes past 0x7f).
+
 ## The 3D transition and fade record (F1c, proven from the code, not ported)
 
 One record drives both the screen fades and a blend of four renderer values (read by the renderer's virtual +0x134,

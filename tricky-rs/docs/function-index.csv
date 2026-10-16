@@ -5240,12 +5240,12 @@ address,size,name,system,status
 0x2791c8,36,cFE3DStateCharacterSelect::vf18_2791c8,frontend,not started
 0x2791f0,292,cFE3DStateCharacterSelect::vf22_2791f0,frontend,not started
 0x279318,336,cFE3DStateCharacterSelect::vf26_279318,frontend,not started
-0x279468,1180,cFE3DStateCharacterModify::CreateNextState,frontend,not started
-0x279908,376,cFE3DStateCharacterModify::vf11_279908,frontend,not started
-0x279a80,396,cFE3DStateCharacterModify::Activate,frontend,not started
-0x279c10,152,cFE3DStateCharacterModify::vf20_279c10,frontend,not started
-0x279ca8,364,cFE3DStateCharacterModify::vf22_279ca8,frontend,not started
-0x279e18,20,cFE3DStateCharacterModify::vf26_279e18,frontend,not started
+0x279468,1180,cFE3DStateCharacterModify::CreateNextState,frontend,checked
+0x279908,376,cFE3DStateCharacterModify::vf11_279908,frontend,checked
+0x279a80,396,cFE3DStateCharacterModify::Activate,frontend,checked
+0x279c10,152,cFE3DStateCharacterModify::vf20_279c10,frontend,checked
+0x279ca8,364,cFE3DStateCharacterModify::vf22_279ca8,frontend,checked
+0x279e18,20,cFE3DStateCharacterModify::vf26_279e18,frontend,checked
 0x279e30,140,cFE3DStateCharacterAccept::CreateNextState,frontend,checked
 0x279ec0,316,cFE3DStateCharacterAccept::vf11_279ec0,frontend,checked
 0x27a000,156,cFE3DStateCharacterAccept::Activate,frontend,checked
@@ -5286,13 +5286,13 @@ address,size,name,system,status
 0x28d570,92,cFE3DStateCustomBoard::vf22_28d570,frontend,not started
 0x28d5d0,152,cFE3DStateCustomBoard::vf26_28d5d0,frontend,not started
 0x28d668,856,FE3D_FillProgressText,frontend?,not started
-0x28d9c0,500,cFE3DStateCustomBody::vf11_28d9c0,frontend,not started
-0x28dbb8,232,cFE3DStateCustomBody::Activate,frontend,not started
-0x28dca0,24,cFE3DStateCustomBody::vf18_28dca0,frontend,not started
-0x28dcb8,152,cFE3DStateCustomBody::vf21_28dcb8,frontend,not started
-0x28dd50,164,cFE3DStateCustomBody::vf22_28dd50,frontend,not started
-0x28ddf8,152,cFE3DStateCustomBody::vf26_28ddf8,frontend,not started
-0x28de90,196,FECustomBody_UpdateDesc,frontend?,not started
+0x28d9c0,500,cFE3DStateCustomBody::vf11_28d9c0,frontend,checked
+0x28dbb8,232,cFE3DStateCustomBody::Activate,frontend,checked
+0x28dca0,24,cFE3DStateCustomBody::vf18_28dca0,frontend,checked
+0x28dcb8,152,cFE3DStateCustomBody::vf21_28dcb8,frontend,checked
+0x28dd50,164,cFE3DStateCustomBody::vf22_28dd50,frontend,checked
+0x28ddf8,152,cFE3DStateCustomBody::vf26_28ddf8,frontend,checked
+0x28de90,196,FECustomBody_UpdateDesc,frontend?,checked
 0x28e020,8,FUN_0028e020,frontend?,not started
 0x28e040,80,cFE3DTextIcon::__tf,runtime,host
 0x28e108,20,cFE3DStateCustomBody::~cFE3DStateCustomBody,frontend,not started
