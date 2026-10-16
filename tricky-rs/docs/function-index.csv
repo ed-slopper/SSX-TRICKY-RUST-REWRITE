@@ -3520,7 +3520,7 @@ address,size,name,system,status
 0x20dad0,68,Audio_DeleteSystem,audio,not started
 0x20db18,660,cBXAudio::cBXAudio,audio,not started
 0x20ddb0,340,cBXAudio::~cBXAudio,audio,not started
-0x20df08,1316,cBXAudio::vf13_20df08,audio,not started
+0x20df08,1316,Music_AirLoopBeat,audio,checked
 0x20e430,768,cBXAudio::vf14_20e430,audio,not started
 0x20e730,776,cBXAudio::vf8_20e730,audio,not started
 0x20ea38,180,cBXAudio::vf15_20ea38,audio,not started
@@ -3653,7 +3653,7 @@ address,size,name,system,status
 0x21c4d0,64,Music_EndTricky,audio,ported
 0x21c510,224,Audio_LoadGlobalBankList,audio,ported
 0x21c610,176,Audio_TrickyTrigger,audio,ported
-0x21c6c0,12,Music_CancelTricky,audio,not started
+0x21c6c0,12,Music_CancelTricky,audio,checked
 0x21c6d0,308,Music_UpdateMeterCues,audio,not started
 0x21c808,92,Audio_PlayFEHeld20And00,audio,not started
 0x21c868,64,Audio_PlayFEHeld01,audio,not started
@@ -3808,8 +3808,8 @@ address,size,name,system,status
 0x224498,288,Song_UpdateVolume,audio?,checked
 0x2245b8,104,Song_FadeOut,audio?,checked
 0x224620,52,PathX_GetSongState,audio?,checked
-0x224658,80,SongBank_PickVariant,audio?,ported
-0x2246a8,192,Song_RandomSegmentMs,audio?,ported
+0x224658,80,SongBank_PickVariant,audio?,checked
+0x2246a8,192,Song_RandomSegmentMs,audio?,checked
 0x224768,36,FUN_00224768,audio?,checked
 0x224790,48,Song_GetStreamStatus,audio?,checked
 0x2247c0,52,Song_GetStatus,audio?,checked
@@ -3821,6 +3821,7 @@ address,size,name,system,status
 0x224918,92,Song_MsToNextBeat,audio?,checked
 0x224978,68,Song_CurrentBeat,audio?,checked
 0x2249c0,144,FUN_002249c0,audio?,checked
+0x224a50,68,Song_SetSoundDelay,audio,checked
 0x224a98,496,MusicSys_Init,audio,ported
 0x224c90,100,cMusicSys::~cMusicSys,audio?,checked
 0x224cf8,360,MusicSys_LoadMusicMap,audio,ported
@@ -3842,7 +3843,7 @@ address,size,name,system,status
 0x2256c0,168,MusicSys_LoadSongBank,audio,checked
 0x225768,112,Music_ScheduleBreak,audio,checked
 0x2257d8,120,Music_CancelBreak,audio,checked
-0x225850,40,FUN_00225850,audio?,checked
+0x225850,40,Music_AirLoopEvent,audio?,checked
 0x225878,208,Music_ScheduleAirLoop,audio,checked
 0x225948,12,FUN_00225948,audio?,checked
 0x225958,116,Music_TryScheduleAirLoop,audio,checked

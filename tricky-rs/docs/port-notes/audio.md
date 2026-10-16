@@ -548,3 +548,57 @@ the entry and the box fills in the newest one before 0x222358 plays it.
 - Checked headless on Bassinvaders: the section's numbers as MUSIC.INF gives them (BPM 142, 4, 2, PathLevel 90,
   AsyncLevel 90), 181 segments with no gap through the finish at 300 s, the stream volume 114 (127 × 0.9). In the
   app the first segment starts at the latency and smartbomb's stream volume is 101 (PathLevel 80).
+
+## The air loop's beat on the game's code (G10b2c2c1, `game/src/musicsys.rs`, `game/src/musichost.rs`; checked: `tests/musicsys.rs`, `tests/musichost.rs`)
+
+- The chain:
+  - A break (`Music_ScheduleBreak`) fires the break event. Its callback `Music_TryScheduleAirLoop` schedules the
+    air loop at the song's next beat once the song's LOOPDATA bank is loaded.
+  - The air-loop event's callback is 0x225850. It calls the audio object's virtual at +0x74 (this adjusted by
+    +0x70) and passes the event on in a1; the port dropped the event until now. On the game's object that virtual
+    is `cBXAudio::vf13` 0x20df08 (`air_loop_beat`).
+  - The event's words are: +0x18 the song, +0x1c the loop's first program, +0x20 the beat, +0x24 a beat's ms.
+- `air_loop_beat`:
+  - **Past the phrase's beats** (song +0x114 BeatsPerPhrase): the beat goes back to 0, and the break flag +0x3710
+    is cleared with Tricky on. The exception is Tricky on with no break asked and the word at 0x34308c clear; then
+    `Music_CancelTricky` 0x21c6c0 runs (+0x6e7c cleared, `Music_StopTricky`) and nothing plays.
+  - **Otherwise:** the beat is brought into the phrase (negative beats wrap) and a sound is queued:
+    - It goes in the next stream index, set up in the same order of loads and stores as `MusicSys_PlaySong`.
+    - Its kind (+0xa40) is the song's bank and its id (+0xa44) is the program plus the beat.
+    - With Tricky on, its volume is the Tricky volume +0x6e84. It is then scaled by AsyncLevel (+0x130) / 100,
+      truncated and held to 0..127.
+    - Its slot is +0x389c. 0x224a50 copies the song's DelayCount, DelayFeedback and DelayTime (+0x11c, +0x120,
+      +0x124) into words 1, 2 and 0 of its effect row.
+  - Then `SndSys_PlayPending` runs, the beat goes up one, and the event's period becomes a beat's ms.
+- `Song_RandomSegmentMs` 0x2246a8 picks the loop's first program, as a phrase × PhraseAlign (+0x118):
+  - With Tricky: the bank's last phrase, PhrasesPerbank (+0x10c) − 1.
+  - Otherwise: a random number's unsigned remainder by PhrasesPerbank − 1, or, with the phrase set +0x3704, by
+    +0x110 counted after the bank's phrases.
+- 0x224658 picks which LOOPDATA bank to load: a random number's remainder by +0xf8.
+- Both take their random number from the game's random object (`[0x3436f8]`, its virtual +0x24 adjusted by +0x20).
+- Checked in the runner inside the musicsys test (40,000 random systems; queue indices up to 5, whose +0x28 stores
+  reach the table pointers).
+- Mutants: 16 of 21 are caught (all 5 on the phrase pick). The 5 that survive are equivalent while the tables do
+  not overlap, as in the game:
+  - the t64 index read again;
+  - the < 127 guard on the first product;
+  - < against <= 127 (127 truncates to 127 either way);
+  - the +0x3c table pointer read again after the slot store;
+  - the period taken from +0x24 at the end.
+- The host:
+  - It frees the scheduler's 48 events at start (`SndEvent_Init`). Before this none were free, so nothing could be
+    scheduled.
+  - It gives the audio object its vtable (+0x74 → vf13), a random object answered by its own generator, the kind
+    and id tables, and room up to +0x8000.
+  - It sets the loop slot +0x389c to 1.0.
+  - It answers vf13, `Song_RandomSegmentMs` and the variant pick with the ported functions.
+  - STANDIN for `BankManager_Load`: the bank is marked loaded (state 1) and its path kept (`loop_bank`).
+  - STANDIN for `SndSys_PlayPending`: the queue's top sound is taken (volume times its slot, held to 0..127) and
+    kept for the app (`take_loops`), without the play or the delay's echoes, and the index goes down one.
+- Checked on Bassinvaders, from the disc (bank `basslpz.bnk`, 8 beats a phrase, 4 phrases, align 16, AsyncLevel 90):
+  - Nothing plays before a break.
+  - After one, a sound comes every beat (422 ms ± 10). The programs run from the song's next beat in a phrase of the
+    first three, through 8 and round. The volume is 114.
+  - The forced cancel stops it.
+  - Tricky plays phrase 3 (programs 48..). Its volume is 0 here, because the Tricky volume +0x6e84 is set by the
+    Tricky trigger, which is not ported (G10b2c2c2).

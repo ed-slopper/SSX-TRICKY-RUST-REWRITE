@@ -2,7 +2,8 @@
 //! without it): random music systems (their stream tables, the song or none, its bank's state, a fade, Tricky, the
 //! song list), every function run on both sides with the same answers from the calls out (the scheduler, Pathfinder,
 //! the stream library, the banks), the calls logged in order (floats bit for bit) and the memory compared. The song
-//! functions (`musicsong`) run as the original underneath.
+//! functions (`musicsong`) run as the original underneath. With the air loop's beat (row G10b2c2c1: `cBXAudio::vf13`
+//! 0x20df08 on a random air-loop event, `Music_CancelTricky` 0x21c6c0, 0x224a50).
 
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -31,6 +32,9 @@ const SYS: u32 = ARENA;
 const SONG: u32 = ARENA + 0x8000;
 const TABLES: u32 = ARENA + 0x10000;
 const SCALE: u32 = ARENA + 0x11000;
+const EVT: u32 = ARENA + 0x9000;
+const RNG: u32 = ARENA + 0x9100;
+const V_RAND: u32 = 0x7f_0200;
 const V_74: u32 = 0x7f_0000;
 const V_24: u32 = 0x7f_0100;
 const FLOATS: [f32; 8] = [120.0, 90.0, 140.5, 60.0, 0.5, 1.0, 87.25, 133.0];
@@ -116,10 +120,11 @@ const LEAVES: &[(u32, usize, bool)] = &[
     (song::SND_UNLOCK, 0, false), (song::SND_HANDLE_STATE, 1, false), (song::STREAM_STATUS, 1, true), (song::HANDLE_STATE, 1, true),
     (song::STREAM_SET_VOLUME, 2, false), (song::STREAM_FADE, 3, false), (song::STREAM_SET_PITCH, 2, false), (song::FMODF, 0, false),
     (SCHEDULE, 8, false), (CANCEL, 2, false), (MEMSET, 3, false), (BANK_LOAD, 4, false), (PICK_VARIANT, 1, false),
-    (RANDOM_SEGMENT, 3, false), (INI_CLOSE, 2, false), (STREAM_SYS_DTOR, 2, false), (V_74, 1, false), (V_24, 1, false),
+    (RANDOM_SEGMENT, 3, false), (INI_CLOSE, 2, false), (STREAM_SYS_DTOR, 2, false), (V_74, 2, false), (V_24, 1, false),
+    (PLAY_PENDING, 1, false), (V_RAND, 1, false),
 ];
 
-const REGIONS: [(u32, u32); 4] = [(ARENA, 0x1_2000), (0x343050, 0x200), (0x39ff00, 0x200), (0, 0x400)];
+const REGIONS: [(u32, u32); 5] = [(ARENA, 0x1_2000), (0x343050, 0x200), (0x39ff00, 0x200), (0, 0x400), (0x3436f0, 0x10)];
 
 fn snap(r: &mut Runner) -> Mem {
     let mut m = Mem::default();
@@ -172,7 +177,8 @@ fn music_system_matches_the_original() {
     for f in [
         song::STRICMP, 0x223ca8, 0x223d60, 0x224368, 0x2243e8, 0x224420, 0x224458, 0x224470, 0x224488, 0x224490, 0x224498,
         0x2245b8, 0x224620, 0x224790, 0x2247c0, 0x2247f8, 0x224898, 0x224918, 0x224978, 0x225090, 0x225260, 0x225280,
-        0x225318, 0x225448, 0x225660, 0x2256c0, 0x225768, 0x2257d8, 0x225878, 0x225948,
+        0x225318, 0x225448, 0x225660, 0x2256c0, 0x225768, 0x2257d8, 0x225878, 0x225948, 0x225ca8, 0x225e40, 0x224a50,
+        0x21c6c0, 0x2246a8, 0x224658,
     ] {
         r.allow(f);
     }
@@ -226,7 +232,33 @@ fn music_system_matches_the_original() {
         r.mem.write_u16(vt + 0x20, [0u16, 4][g.below(2) as usize]);
         r.mem.write_u32(song::MUSIC_SYS, SYS);
         r.mem.write_f32(song::MASTER_VOLUME, 1.0);
-        let which = g.below(28);
+        let which = g.below(33);
+        // the random number generator's object, and the song's phrase counts (no remainder by 0)
+        r.mem.write_u32(RAND_OBJ, RNG);
+        r.mem.write_u32(RNG + 4, RNG + 0x40);
+        r.mem.write_u32(RNG + 0x40 + 0x24, V_RAND);
+        r.mem.write_u16(RNG + 0x40 + 0x20, [0u16, 0x10][g.below(2) as usize]);
+        r.mem.write_u32(SONG + 0x10c, 2 + g.below(5));
+        r.mem.write_u32(SONG + 0x110, 1 + g.below(3));
+        r.mem.write_u32(SONG + 0x118, [16u32, 8, 32, 0][g.below(4) as usize]);
+        // the air loop's beat: its event, the sound tables' kind and id, the Tricky volume, the restart word, and
+        // indices up to 5 (whose +0x28 stores reach the table pointers)
+        r.mem.write_u32(EVT + 0x18, SONG);
+        r.mem.write_u32(EVT + 0x1c, g.next() % 5000);
+        r.mem.write_u32(EVT + 0x20, (g.below(24) as i32 - 10) as u32);
+        r.mem.write_u32(EVT + 0x24, g.next() % 2000);
+        r.mem.write_u32(SONG + 0x114, 1 + g.below(8));
+        r.mem.write_u32(SONG + 0x130, [0i32, 50, 90, 100, 150, 37, 255, -20][g.below(8) as usize] as u32);
+        r.mem.write_u32(SYS + 0xa40, TABLES + 0xd00);
+        r.mem.write_u32(SYS + 0xa44, TABLES + 0xd80);
+        r.mem.write_u32(SYS + 0x6e84, [0i32, 64, 127, 200, -5, 100, 90, 300][g.below(8) as usize] as u32);
+        r.mem.write_u32(AIR_LOOP_RESTART, g.below(2));
+        if which == 31 {
+            r.mem.write_u32(SONG + 0xf8, 1 + g.below(3));
+        }
+        if which >= 28 {
+            r.mem.write_u32(SYS + 0x20, g.below(6));
+        }
         let x = [g.next(), g.next(), g.next()];
         let secs = [0.5f32, 1.0, 2.5, 4.0][g.below(4) as usize];
         let fe = g.below(6);
@@ -267,12 +299,17 @@ fn music_system_matches_the_original() {
             19 => (0x2256c0, vec![SYS]),
             20 => (0x225768, vec![SYS, g.below(2)]),
             21 => (0x2257d8, vec![SYS, g.below(2)]),
-            22 => (0x225850, vec![SYS]),
+            22 => (0x225850, vec![SYS, EVT]),
             23 => (0x225958, vec![SYS]),
             24 => (0x2259d0, vec![SYS]),
             25 => (fe_addr, vec![SYS]),
             26 => (if g.below(2) == 0 { 0x225c40 } else { 0x225ca8 }, vec![SYS, x[0]]),
-            _ => (if g.below(2) == 0 { 0x225ce0 } else { 0x225c30 }, vec![SYS]),
+            27 => (if g.below(2) == 0 { 0x225ce0 } else { 0x225c30 }, vec![SYS]),
+            28 => (0x20df08, vec![SYS, EVT]),
+            29 => (0x21c6c0, vec![SYS]),
+            30 => (0x2246a8, vec![SONG, g.below(2), g.below(2)]),
+            31 => (0x224658, vec![SONG]),
+            _ => (0x224a50, vec![SONG, SYS]),
         };
         // a song for the calls that do not check it
         if matches!(which, 13 | 23 | 24) {
@@ -315,12 +352,17 @@ fn music_system_matches_the_original() {
             19 => { load_song_bank(&mut m, e, SYS, STACK_TOP - 0x130); None }
             20 => { schedule_break(&mut m, e, SYS, args[1]); None }
             21 => { cancel_break(&mut m, e, SYS, args[1]); None }
-            22 => Some(virtual_74(&mut m, e, SYS)),
+            22 => Some(virtual_74(&mut m, e, SYS, EVT)),
             23 => Some(try_schedule_air_loop(&mut m, e, SYS)),
             24 => Some(reload_bank(&mut m, e, SYS, STACK_TOP - 0x40)),
             25 => { set_fe_event(&mut m, e, SYS, [0, 1, 2, 3, 4, 5][fe as usize]); None }
             26 => { if addr == 0x225c40 { start_tricky(&mut m, e, SYS, x[0]) } else { stop_tricky(&mut m, e, SYS) } None }
-            _ => if addr == 0x225ce0 { Some(count_enabled_songs(&m, SYS)) } else { fade_out_4s(&mut m, e, SYS); None },
+            27 => if addr == 0x225ce0 { Some(count_enabled_songs(&m, SYS)) } else { fade_out_4s(&mut m, e, SYS); None },
+            28 => Some(air_loop_beat(&mut m, e, SYS, EVT)),
+            29 => { cancel_tricky(&mut m, e, SYS); None }
+            30 => Some(random_segment(&mut m, e, SONG, args[1], args[2])),
+            31 => Some(pick_variant(&mut m, e, SONG)),
+            _ => { song_delay_to_sound(&mut m, SONG, SYS); None }
         };
         let mine = std::mem::take(&mut a.borrow_mut().log);
         assert_eq!(theirs, mine, "case {case}: {addr:#x} calls");

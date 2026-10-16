@@ -8,7 +8,13 @@
 //! ("%s%s"), `stricmp`, the ini reader (`tricky_data::ini::IniReader`, the game's own, over MUSIC.INF; its token
 //! buffer kept in memory as the game's is, so the loader's note-length compare sees the latest token), the file
 //! loader (the disc), Pathfinder's functions, the stream library (the driver: volume, fade, pitch, status) and the
-//! scheduler. STANDIN: the banks (LOOPDATA) are not loaded here (their state is "not loaded"), row G10b2c2c.
+//! scheduler. The air loop (row G10b2c2c1) runs on the game's code: the break's event, `Music_ScheduleAirLoop`, the
+//! air-loop event's callback through the audio object's vtable (`cBXAudio::vf13` 0x20df08, `musicsys::air_loop_beat`)
+//! queueing a sound of the LOOPDATA bank a beat, `Song_RandomSegmentMs` and the bank's variant on the game's random
+//! number object (answered here from the host's own generator). STANDIN: the bank is not loaded here (its load is
+//! marked done and its path kept, [`MusicHost::loop_bank`]) and `SndSys_PlayPending` does not play: the queued sound
+//! (bank, program, volume as it makes it) is kept for the app ([`MusicHost::take_loops`]) without the delay's echoes
+//! (row G10b2c2c2).
 
 use crate::musicsong::{self as song, SongEnv};
 use crate::musicsys as sys;
@@ -19,7 +25,7 @@ use tricky_data::ini::IniReader;
 
 /// Where the host keeps things in the engine's memory
 pub const SYS: u32 = 0x0108_0000;
-pub const SYS_SIZE: u32 = 0x4000;
+pub const SYS_SIZE: u32 = 0x8000;
 pub const TABLES: u32 = 0x010c_0000;
 pub const HEAP: u32 = 0x0110_0000;
 pub const HEAP_SIZE: u32 = 0x0010_0000;
@@ -57,12 +63,37 @@ fn with_pf<R>(m: &mut Mem, f: impl FnOnce(&mut Pf) -> R) -> R {
     r
 }
 
+/// The audio object's vtable (its +0x70 / +0x74 the air loop's beat), the random number object and its vtable, and
+/// the function the host answers for its random number
+const VTABLE: u32 = TABLES + 0x3800;
+const RAND_AT: u32 = TABLES + 0x3900;
+const HOST_RAND: u32 = 0x007f_0200;
+
+/// A sound of the song's LOOPDATA bank the air loop queued: the bank (the queue's kind, +0xa40), the program (its id,
+/// +0xa44) and the volume (0..127) `SndSys_PlayPending` plays it at
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct LoopPlay {
+    pub bank: u32,
+    pub program: u32,
+    pub volume: u8,
+}
+
+/// What the host keeps for the app
+#[derive(Clone, Debug, Default)]
+pub struct HostOut {
+    pub loops: Vec<LoopPlay>,
+    /// the LOOPDATA bank's file the song asked for (`BankManager_Load`)
+    pub bank_path: Option<String>,
+}
+
 /// What the layers and the scheduler call out to, answered (see the module)
 pub struct HostEnv<'a> {
     pub ini: &'a mut IniReader,
     pub files: &'a mut dyn FnMut(&str) -> Option<Vec<u8>>,
     pub heap: &'a mut u32,
     pub d: &'a mut Driver,
+    pub rng: &'a mut u32,
+    pub out: &'a mut HostOut,
 }
 
 impl HostEnv<'_> {
@@ -193,8 +224,46 @@ impl SongEnv for HostEnv<'_> {
                 ev::cancel(m, a[0], [a[1], a[2]]);
                 0
             }
-            // the banks: not loaded here (STANDIN, row G10b2c2c)
-            song::BANK_HANDLE | song::SND_HANDLE_STATE | sys::PICK_VARIANT | sys::RANDOM_SEGMENT => 0,
+            0x20df08 => sys::air_loop_beat(m, self, a[0], a[1]),
+            sys::RANDOM_SEGMENT => sys::random_segment(m, self, a[0], a[1], a[2]),
+            sys::PICK_VARIANT => sys::pick_variant(m, self, a[0]),
+            HOST_RAND => {
+                let mut x = *self.rng;
+                x ^= x << 13;
+                x ^= x >> 17;
+                x ^= x << 5;
+                *self.rng = x;
+                x >> 1
+            }
+            // STANDIN (row G10b2c2c2): the bank (`BankManager_Load`: the system, the bank, its path) marked loaded
+            // (state 1, the handle its number) and its path kept for the app
+            sys::BANK_LOAD => {
+                let at = a[1].wrapping_mul(0x60).wrapping_add(m.r32(a[0] + 0xa3c));
+                m.w32(at, 1);
+                m.w32(at + 4, a[1]);
+                self.out.bank_path = Some(String::from_utf8_lossy(&cstr(m, a[2])).to_string());
+                0
+            }
+            // STANDIN (row G10b2c2c2): `SndSys_PlayPending` (the system) takes the queue's top sound: its volume times
+            // its slot's scale when it has one (0 for an emitter's), held to 0..127; kept for the app, not played
+            // (`SND_PlayProgram`) and no echoes scheduled; the index down one
+            sys::PLAY_PENDING => {
+                let s = a[0];
+                let i = m.r32(s + 0x20);
+                let w = |m: &Mem, o: u32| m.r32(i.wrapping_mul(4).wrapping_add(m.r32(s + o)));
+                let mut v = w(m, 0x3c) as i32;
+                if m.r32(s.wrapping_add(0x28).wrapping_add(i.wrapping_mul(4))) != 0 {
+                    v = 0;
+                } else if w(m, 0x40) != 0 {
+                    let f = v as f32 * f32::from_bits(m.r32(w(m, 0x40)));
+                    v = if f < 0.0 { 0 } else if 127.0 <= f { 0x7f } else { f as i32 };
+                }
+                let volume = v.clamp(0, 0x7f) as u8;
+                self.out.loops.push(LoopPlay { bank: w(m, 0xa40), program: w(m, 0xa44), volume });
+                m.w32(s + 0x20, i.wrapping_sub(1));
+                0
+            }
+            song::BANK_HANDLE | song::SND_HANDLE_STATE => 0,
             _ => 0,
         }
     }
@@ -228,9 +297,9 @@ impl EventEnv for HostEnv<'_> {
     fn call(&mut self, m: &mut Mem, target: u32, this: u32, _event: u32) -> u32 {
         match target {
             0x225958 => sys::try_schedule_air_loop(m, self, this),
+            0x225850 => sys::virtual_74(m, self, this, _event),
             0x2259d0 => sys::reload_bank(m, self, this, STACK_TOP - 0x40),
             0x2254f8 => sys::fade_step(m, this),
-            // the air loop's callback (the audio system's vtable +0x74): row G10b2c2c; done
             _ => 1,
         }
     }
@@ -246,6 +315,9 @@ pub struct MusicHost {
     pub heap: u32,
     /// the 10 ms the scheduler has not yet ticked
     pub acc_ms: f32,
+    /// the host's random numbers (for the game's `Rand_Fx` object)
+    pub rng: u32,
+    pub out: HostOut,
 }
 
 impl MusicHost {
@@ -281,20 +353,35 @@ impl MusicHost {
         mem.w32(SYS + 0x20, u32::MAX);
         mem.w8(SYS + 8, 0x7f);
         mem.w32(SYS + 0x385c, 1.0f32.to_bits());
+        // the air loop's sounds' volume slot (+0x389c) 1.0 too
+        mem.w32(SYS + 0x389c, 1.0f32.to_bits());
         for (k, o) in [0x24u32, 0x38, 0x3c, 0x40, 0x64, 0x68, 0x6c, 0x70, 0x74, 0x78, 0x7c].iter().enumerate() {
             mem.w32(SYS + o, TABLES + 0x200 * k as u32);
         }
         mem.w32(SYS + 0xa3c, TABLES + 0x2000);
+        mem.w32(SYS + 0xa40, TABLES + 0x1600);
+        mem.w32(SYS + 0xa44, TABLES + 0x1800);
+        // the scheduler's events free, as the monitor's constructor makes them (`SndEvent_Init`)
+        for i in 0..ev::COUNT {
+            ev::event_init(&mut mem, SYS + ev::EVENTS + ev::EVENT_SIZE * i);
+        }
+        // the audio object's vtable: +0x74 `cBXAudio::vf13`, its adjust (+0x70) 0
+        mem.w32(SYS + 4, VTABLE);
+        mem.w32(VTABLE + 0x74, 0x20df08);
+        // the random number object
+        mem.w32(sys::RAND_OBJ, RAND_AT);
+        mem.w32(RAND_AT + 4, RAND_AT + 0x40);
+        mem.w32(RAND_AT + 0x40 + 0x24, HOST_RAND);
         mem.w32(song::MUSIC_SYS, SYS);
         mem.w32(song::MASTER_VOLUME, 1.0f32.to_bits());
         let paths = table.songs.iter().map(|s| s.path_data.clone()).collect();
-        MusicHost { mem, paths, ini: IniReader::new(inf), files, heap: HEAP, acc_ms: 0.0 }
+        MusicHost { mem, paths, ini: IniReader::new(inf), files, heap: HEAP, acc_ms: 0.0, rng: 0x2468_ace1, out: HostOut::default() }
     }
 
     fn env<'a>(&'a mut self, d: &'a mut Driver) -> (&'a mut Mem, HostEnv<'a>) {
-        let MusicHost { mem, ini, files, heap, .. } = self;
+        let MusicHost { mem, ini, files, heap, rng, out, .. } = self;
         let files: &mut dyn FnMut(&str) -> Option<Vec<u8>> = files.as_mut();
-        (mem, HostEnv { ini, files, heap, d })
+        (mem, HostEnv { ini, files, heap, d, rng, out })
     }
 
     /// The song of MUSIC.INF named `section` (its index), if there is one
@@ -356,6 +443,34 @@ impl MusicHost {
     pub fn music_event(&mut self, d: &mut Driver, event: u32) {
         let (m, mut e) = self.env(d);
         sys::music_event(m, &mut e, SYS, event);
+    }
+
+    /// `Music_ScheduleBreak` (asked: as the Tricky trigger asks it)
+    pub fn schedule_break(&mut self, d: &mut Driver, asked: bool) {
+        let (m, mut e) = self.env(d);
+        sys::schedule_break(m, &mut e, SYS, asked as u32);
+    }
+
+    /// `Music_CancelBreak` (forced: even with Tricky on)
+    pub fn cancel_break(&mut self, d: &mut Driver, forced: bool) {
+        let (m, mut e) = self.env(d);
+        sys::cancel_break(m, &mut e, SYS, forced as u32);
+    }
+
+    /// `Music_StartTricky`
+    pub fn start_tricky(&mut self, d: &mut Driver, word: u32) {
+        let (m, mut e) = self.env(d);
+        sys::start_tricky(m, &mut e, SYS, word);
+    }
+
+    /// The air loop's sounds queued since the last call
+    pub fn take_loops(&mut self) -> Vec<LoopPlay> {
+        std::mem::take(&mut self.out.loops)
+    }
+
+    /// The song's LOOPDATA bank file, once asked for
+    pub fn loop_bank(&self) -> Option<&str> {
+        self.out.bank_path.as_deref()
     }
 
     /// `MusicSys_StopSong`

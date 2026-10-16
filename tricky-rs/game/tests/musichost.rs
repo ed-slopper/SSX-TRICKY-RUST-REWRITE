@@ -68,3 +68,71 @@ fn a_race_song_on_the_music_system() {
     // `Song_UpdateVolume`: 0x7f × PathLevel 90 % × the music volume 1.0 × the master 1.0
     assert_eq!(d.volume, (127.0f32 * 0.9) as u8);
 }
+
+/// The air loop on the game's code (row G10b2c2c1): the song's LOOPDATA bank asked for at the start; a break (as big
+/// air asks one) fires the break event, which schedules the air loop at the song's next beat; then one sound of the
+/// bank a beat, the programs from that beat of the loop's phrase up through it (BeatsPerPhrase) and round, at the volume
+/// AsyncLevel % gives; Tricky takes the bank's last phrase; the forced cancel stops it.
+#[test]
+fn the_air_loop_plays_a_beat_at_a_time() {
+    let Some(mut files) = disc_files() else { return };
+    let Some((rate, segs)) = segments("bassinvader") else { return };
+    let inf = files.load("data/config/music.inf").ok().flatten().expect("MUSIC.INF");
+    let mut host = MusicHost::new(&inf, Box::new(move |p: &str| files.load(p).ok().flatten()));
+    let index = host.song_index(b"Bassinvaders").expect("the song's section");
+    let mut d = Driver::new(rate, HashMap::new());
+    host.start_race_music(&mut d, index);
+    host.map_segments(&mut d, &segs);
+    let s = host.song().unwrap();
+    let m = &host.mem;
+    let (beats, phrases, align, level) = (m.r32(s + 0x114), m.r32(s + 0x10c), m.r32(s + 0x118), m.r32(s + 0x130));
+    let beat_ms = 60000.0 / f32::from_bits(m.r32(s + 0x100));
+    println!("bank {:?}; {beats} beats a phrase, {phrases} phrases, align {align}, AsyncLevel {level}, a beat {beat_ms} ms", host.loop_bank());
+    assert!(host.loop_bank().is_some_and(|p| p.to_ascii_lowercase().ends_with(".bnk")), "the song's LOOPDATA bank");
+    // a few seconds of the song, then the break
+    let step = rate as usize / 100;
+    let mut t = 0u32;
+    let mut run = |host: &mut MusicHost, d: &mut Driver, ms: u32, out: &mut Vec<(u32, tricky_game::musichost::LoopPlay)>| {
+        for _ in 0..ms / 10 {
+            d.pull(step);
+            host.frame(d, 0.01);
+            t += 10;
+            out.extend(host.take_loops().into_iter().map(|l| (t, l)));
+        }
+    };
+    let mut got = Vec::new();
+    run(&mut host, &mut d, 3000, &mut got);
+    assert!(got.is_empty(), "no air loop before a break");
+    host.schedule_break(&mut d, false);
+    run(&mut host, &mut d, 8000, &mut got);
+    println!("{} loop sounds: {:?}", got.len(), &got[..got.len().min(12)]);
+    let n = (8000.0 / beat_ms) as usize;
+    assert!(got.len() + 2 >= n && got.len() <= n + 1, "one a beat: {} in 8 s", got.len());
+    // the loop's first program a phrase's start (of the bank's first PhrasesPerbank − 1), the first sound on the
+    // song's next beat into it
+    let first = got[0].1.program - got[0].1.program % align;
+    assert!(first / align < phrases - 1, "a phrase of the bank's first PhrasesPerbank − 1");
+    for w in got.windows(2) {
+        let dt = w[1].0 - w[0].0;
+        assert!((dt as f32 - beat_ms).abs() <= 10.0, "a beat apart: {dt} ms");
+    }
+    for (k, (_, l)) in got.iter().enumerate() {
+        assert_eq!(l.volume, (127.0 * level as f32 / 100.0) as u8);
+        assert_eq!(l.bank, host.mem.r32(s + 8));
+        // the program: the loop's first one plus the beat in the phrase, round again
+        let k0 = (got[0].1.program - first) as usize;
+        assert_eq!(l.program - first, ((k0 + k) % beats as usize) as u32, "sound {k}");
+    }
+    // the forced cancel stops it
+    host.cancel_break(&mut d, true);
+    let mut after = Vec::new();
+    run(&mut host, &mut d, 2000, &mut after);
+    assert!(after.is_empty(), "stopped");
+    // Tricky: the bank's last phrase
+    host.start_tricky(&mut d, 0);
+    let mut tricky = Vec::new();
+    run(&mut host, &mut d, 3000, &mut tricky);
+    println!("Tricky: {:?}", &tricky[..tricky.len().min(4)]);
+    assert!(!tricky.is_empty());
+    assert_eq!(tricky[0].1.program - tricky[0].1.program % align, (phrases - 1) * align, "the last phrase");
+}
