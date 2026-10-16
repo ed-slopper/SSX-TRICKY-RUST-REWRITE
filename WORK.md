@@ -158,6 +158,7 @@ matches the original.
 
 | ID | Task | Section | Who | Date | Commit |
 |---|---|---|---|---|---|
+| G3a | The player's riding fractions (edging, speed, stability, tricks) from the career's group levels mixed with the board as the stat bytes are (`Stats::of_levels`), checked equal to the starting ones at a new career | P2 | ed-slopper/puffin | 2026-10-16 | bc19f7c |
 | G10b2c2b | The race songs on the game's music system (`tricky_game::musichost`: a cMusicSys with the ported layers on Pathfinder, `Audio_StartRaceMusic`, MUSIC.INF through the game's ini reader, the scheduler every 10 ms, the driver beneath), checked headless in tests/musichost.rs | P2 | ed-slopper/puffin | 2026-10-16 | abcb1ec |
 | G10b2c2a | The sound system's scheduler (`tricky_game::sndevents`: cMonitor's 48 events, schedule, cancel, the 10 ms tick and the firing), checked in tests/sndevents.rs | P2 | ed-slopper/puffin | 2026-10-16 | 022e1e3 |
 | G10b2c1 | The race songs on the game's Pathfinder (`tricky_game::pfplay`: the graph from MUSIC.BIG registered, the track loaded as `Music_LoadPathfinder` does, events and variable posted, update every frame) over the port's stream driver on the decoded segments; checked headless in tests/pfplay.rs | P2 | ed-slopper/puffin | 2026-10-16 | 951735a |
@@ -1103,3 +1104,4 @@ matches the original.
 - 2026-10-16 ed-slopper/puffin: G10b2c2b done (claimed and done in one; the music system on the layers).
 - 2026-10-16 ed-slopper/puffin: G10b2c2c notes: the air loop's path through the game read (cBXAudio::vf13, SndSys_PlayPending).
 - 2026-10-16 ed-slopper/puffin: add and claim G3a (split of G3: the player's riding fractions from the career levels).
+- 2026-10-16 ed-slopper/puffin: G3a done.
