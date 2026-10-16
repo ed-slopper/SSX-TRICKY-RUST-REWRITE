@@ -32,3 +32,4 @@ pub mod ssh;
 pub mod trick_names;
 pub mod trick_slots;
 pub mod trickdef;
+pub mod video;

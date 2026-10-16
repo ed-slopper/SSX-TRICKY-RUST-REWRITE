@@ -477,7 +477,7 @@ pub fn decode18(src: &[u8], out: &mut Vec<u8>) -> u32 {
 }
 
 /// `Compress_Decode18Rows` 0x2c2bf8.
-fn decode18_rows(src: &[u8], out: &mut Vec<u8>, width: i32, size: i32, mode: i32) {
+pub fn decode18_rows(src: &[u8], out: &mut Vec<u8>, width: i32, size: i32, mode: i32) {
     let start = out.len();
     let (step, skip) = if mode == 3 || mode == 5 { (16, 8) } else { (8, 0) };
     let (mut s, mut o) = (skip, 0usize);

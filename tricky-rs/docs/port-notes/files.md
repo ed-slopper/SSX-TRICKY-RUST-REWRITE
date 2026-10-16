@@ -388,3 +388,32 @@ there (no rewind); a level is the value / 100 when 0..200 (the duck 0..100), els
   (`Course_LoadRenderData` 0x25edf0: `elysiu_L`), the sky's `<file>_sky.ssh`. The exports kept the lightmaps' stored
   alpha (0-0x80); the app reads only their colour. With the disc the app needs no levels folder: the course list is
   the 11 courses, and a course's folder, if there is one, gives only the scripts.
+
+## The small films (row G11a1; `data/src/video.rs`, checked: `game/tests/video.rs`)
+
+The disc's videos come in two kinds:
+- **`.MPC` (the intro, the extras, the characters' films):** they interleave MPEG-2 video (`MPCh` chunks, one picture
+  each, 512 × 448) with EA's streamed audio (`SCHl`, `SCCl`, `SCDl`, `SCEl`). `cVideoModule` plays them on the PS2's
+  MPEG decoder; that is row G11a2.
+- **`.SSS` (the courses' previews, and the trick book's films in `DATA/VIDEO/TB/TB_*.BIG`):** small films that
+  `cVideoStreamMan` plays.
+
+An `.SSS` film is a run of chunks, each an 8-byte head (the tag `SSSF`, then the chunk's size with the head) and one
+frame. The frame is a shape of type 0x60 (DXT1), 128 × 64 or 128 × 128. The playback goes:
+- `VideoStream_Open` 0x1ff990 sets the rate: 60 / the frames a second, kept to 1..30;
+- `VideoStreamMan_UpdateFrame` 0x1ffa88 takes the stream's next chunk at that rate;
+- `VideoStreamMan_DecodeFrame` 0x1ff928 sets the frame's type byte to 0x60, unpacks it, copies the pixels past the
+  16-byte header into the film's texture (+0x94, its size at +0x98) and frees the unpacked shape.
+
+`Shape_Unpack` 0x2c2318 handles the converted types:
+- 0x60 is DXT1. 0x61 and 0x62 are the same colour blocks 16 bytes apart (DXT3 and DXT5 with their alpha skipped);
+- the output keeps the 16-byte header with its type byte set to `Shape_PixelFormatIndex(0xf)`, which is 3;
+- the pixels are 16-bit PS2 ones from `Compress_Decode18Rows` 0x2c2bf8, already ported in `compress.rs`;
+- its buffer is the width × 2 (0x60) or × 4 (0x61, 0x62) × the height. For 0x61 and 0x62 only the first half is
+  written, and the rest is whatever the allocator gave (the port zeros it, STANDIN).
+
+Checked in the runner on 3,000 random shapes of the converted types and others, through `Shape_Unpack` and
+`DecodeFrame`. With `TRICKY_DISC`, every film on the disc decodes: 406 films, 28,894 frames. 8 of 9 mutants are caught
+(two by the data crate's unit tests of the chunk walk). The survivor turns 0x62's mode 5 into 3, which the block
+decoder treats alike.
+

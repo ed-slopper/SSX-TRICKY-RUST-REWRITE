@@ -3296,7 +3296,7 @@ address,size,name,system,status
 0x1ff6f0,300,VideoStream_Init,audio?,not started
 0x1ff820,112,VideoStreamMan_Destroy,audio?,not started
 0x1ff890,148,VideoStream_CreateFrameTexture,audio?,not started
-0x1ff928,96,VideoStreamMan_DecodeFrame,audio?,not started
+0x1ff928,96,VideoStreamMan_DecodeFrame,audio?,checked
 0x1ff988,8,VideoStreamMan_FreeFrameBuffer,audio?,not started
 0x1ff990,128,VideoStream_Open,audio?,not started
 0x1ffa10,40,VideoStream_Stop,audio?,not started
@@ -6124,7 +6124,7 @@ address,size,name,system,status
 0x2c1f10,304,PathX_FadeTracks,audio?,checked
 0x2c2040,72,FUN_002c2040,audio?,ported
 0x2c2088,652,Shape_UnpackBlocks,lib-shape?,not started
-0x2c2318,524,Shape_Unpack,lib-shape?,ported
+0x2c2318,524,Shape_Unpack,lib-shape?,checked
 0x2c2528,200,Shape_FindByName,lib-shape?,ported
 0x2c25f0,28,FUN_002c25f0,lib-shape?,not started
 0x2c2610,80,Shape_GetLongName,lib-shape?,ported
