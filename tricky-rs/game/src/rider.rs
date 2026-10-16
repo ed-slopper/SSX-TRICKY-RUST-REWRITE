@@ -529,6 +529,16 @@ impl Rider {
     /// announcer gets), its bonuses, and its points when they come in.
     fn show(&mut self, calls: &[ScoreCall]) {
         for c in calls {
+            // `Scoring_PushMessage` 0x157330: every message into the score's timed entries
+            if let ScoreCall::Message(life, kind, value, extra) = *c {
+                self.sc.push_message(life, kind, value, extra);
+            }
+            // `Score_AnnounceTrick` 0x157088: the id kept and its message
+            if let ScoreCall::Announce(id, repeat) = *c {
+                if let ScoreCall::Message(life, kind, value, extra) = self.sc.announce_trick(id, repeat) {
+                    self.sc.push_message(life, kind, value, extra);
+                }
+            }
             match *c {
                 ScoreCall::Announce(id, _) => {
                     let def = tricky_data::trickdef::TrickDef { words: id, flip: 0, spin: 0, rail: 0, plus: [0; 2], slot: [0; 2] };

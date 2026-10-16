@@ -1099,15 +1099,15 @@ address,size,name,system,status
 0x155b10,164,Score_AddPickupPoints,scoring,checked
 0x155bb8,168,Score_AddPickupTime,scoring,checked
 0x155c60,64,Scoring_MsgCheckpointTime,scoring?,checked
-0x155ca0,40,Scoring_MsgMultiplier,scoring?,ported
-0x155cc8,8,FUN_00155cc8,scoring?,not started
+0x155ca0,40,Scoring_MsgMultiplier,scoring?,checked
+0x155cc8,8,FUN_00155cc8,scoring?,checked
 0x155cd0,196,Score_SetPickupMultiplier,scoring,checked
-0x155d98,44,Scoring_MsgKnockdown,scoring?,ported
+0x155d98,44,Scoring_MsgKnockdown,scoring?,checked
 0x155dc8,52,Boarder_AddSpeedSample,boarder,checked
 0x155e00,100,Score_UpdateSpin,scoring,checked
 0x155e68,128,Score_UpdateFlip,scoring,checked
 0x155ee8,356,Score_StartGrab,scoring,checked
-0x156050,244,SpinState_SetTrickClipRate,boarder,ported
+0x156050,244,SpinState_SetTrickClipRate,boarder,checked
 0x156148,1056,Scoring_OnTrickEvent,scoring?,checked
 0x156568,176,Score_CommitAndRestartChain,scoring,checked
 0x156618,636,Score_StartTrickChain,scoring,checked
@@ -1118,12 +1118,12 @@ address,size,name,system,status
 0x156de0,156,Score_Crash,scoring,checked
 0x156e80,392,Score_Tick,scoring,checked
 0x157008,128,Scoring_ResetCombo,scoring?,checked
-0x157088,268,Score_AnnounceTrick,scoring,ported
+0x157088,268,Score_AnnounceTrick,scoring,checked
 0x157198,68,Score_RoundSpinTo180,scoring,checked
 0x1571e0,128,Score_AddGrab,scoring,checked
 0x157268,160,Score_CountRecentRepeats,scoring,checked
 0x157308,40,Score_ClearTrickEntries,scoring,checked
-0x157330,352,Scoring_PushMessage,scoring?,ported
+0x157330,352,Scoring_PushMessage,scoring?,checked
 0x157490,1252,Score_BuildTrickId,scoring,checked
 0x157978,8,FUN_00157978,,ported
 0x157980,40,Score_SaveSnapshot,save,checked
@@ -3625,7 +3625,7 @@ address,size,name,system,status
 0x2192a8,1208,Sfx_UpdateBoost,audio?,ported
 0x219760,120,Sfx_UpdateBoostStop,audio?,ported
 0x2197d8,624,Sfx_OnBoost,audio?,ported
-0x219a48,808,Sfx_OnPlacingChange,audio?,not started
+0x219a48,808,Sfx_OnPlacingChange,audio?,ported
 0x219d70,592,Sfx_PickupMultiplier,audio?,ported
 0x219fc0,592,Sfx_PickupTime,audio?,ported
 0x21a210,600,Audio_PlayScoreTick,audio,ported

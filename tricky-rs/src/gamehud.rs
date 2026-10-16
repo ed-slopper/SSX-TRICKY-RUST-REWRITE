@@ -644,11 +644,13 @@ pub fn game_hud(
     m.w32(rd + 0x41c, 1);
     m.w32(rd + 0x5820 + 0x88, r.letters as u32);
     m.w32(rd + 0x5910, r.multiplier);
-    for (k, (kind, life, age)) in r.sc.timed.iter().enumerate() {
+    for (k, t) in r.sc.timed.iter().enumerate() {
         let e = rd + 0x597c + 20 * k as u32;
-        m.w32(e, *kind);
-        m.w32(e + 8, life.to_bits());
-        m.w32(e + 12, age.to_bits());
+        m.w32(e, t.kind);
+        m.w32(e + 4, t.value as u32);
+        m.w32(e + 8, t.life.to_bits());
+        m.w32(e + 12, t.age.to_bits());
+        m.w32(e + 16, t.extra as u32);
     }
     // `Boarder_GetRaceProgress` (`progress::race_progress`): with laps to go (+0x114, the app's count) their laps of
     // the main path's length on top, the lap line (+0x37c) its length less its lap event's (0xd) distance

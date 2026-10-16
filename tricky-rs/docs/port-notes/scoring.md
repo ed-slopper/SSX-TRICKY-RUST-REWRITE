@@ -144,3 +144,26 @@ Part of the port notes (index: [README.md](README.md)); units and wording as des
   `Score_ClearTrickEntries`, `Scoring_MsgCheckpointTime` (kind 10 for 5 s with the time negated when ahead, 11 for
   2.5 s behind), `RelTable_GetTolerance` / `_GetAttitudeCap` (the pair's words +0 / +8).
 - Checked in the runner on 60,000 cases each, every grade reached.
+
+## The score's messages (board row G2; `tricky_game::score`, checked: `tests/score_msg.rs`)
+
+- The twelve timed entries at the score's +0x15c (20 bytes: the kind, 0 free; the value; how long, seconds; the
+  age; an extra word) are what the HUD's score messages draw from. `Scoring_PushMessage` 0x157330 (the life in f12;
+  the kind, the value, the extra) picks a slot: kinds 7 and 8 (a trick, a repeated trick) reuse the first entry
+  holding 7 or 8, kind 12 the first holding 12; otherwise, or with none, the first free entry, and with all twelve
+  taken the last whose age / life is under 1. With no slot at all the game writes the entry one before the first
+  (the score's +0x148); the port leaves that write out. It always ends in `Speech_OnScoreMessage` 0x233220 (the
+  rider at +0x24c, the kind, the value).
+- `Scoring_MsgMultiplier` 0x155ca0: kind 13 for 2.5 s with the multiplier, only above 1. `Scoring_MsgKnockdown`
+  0x155d98: +0xbc counts one more and kind 4 for 2.1 s. 0x155cc8 is an empty function.
+- `Score_AnnounceTrick` 0x157088 (the id, a repeat): keeps the id at +0x6c (so the grab list at +0x60 is three
+  words), formats its name into +0x250, has the focus player's announcer say the trick with its points
+  (`Speech_AnnounceTrick`) when it is no repeat or in the tutorial, else `Speech_OnTrickLanded`, then a 3 s
+  (0x404004da) message, kind 8 for a repeat and 7 otherwise.
+- `SpinState_SetTrickClipRate` 0x156050 sets the spin state's +0x2c from a 100-entry jump table (0x370e30) that gives
+  each clip 0x278..0x2db the same rate `Score_StartGrab` does; other clips leave it.
+- Checked in the runner: 60,000 random sets of entries (all kinds, lives and ages around their end, all twelve
+  taken), 2,000 announcements over every mode, repeat and focus case, every clip 0x200..0x2ff; 20 of 21 mutants
+  caught (the survivor, kind 12 keeping a slot found for 7 / 8, cannot happen).
+- The app's `Rider::show` pushes every message and announcement into the entries, which `gamehud` copies to the
+  rider's +0x597c for the HUD. The announcer side (speech) is not wired yet.

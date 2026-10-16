@@ -42,12 +42,16 @@ fn put(r: &mut Runner, at: u32, s: &Score) {
     for (k, g) in s.grabs.iter().enumerate() {
         m.write_u32(at + 0x60 + 4 * k as u32, *g);
     }
+    m.write_u32(at + 0x6c, s.trick_id[0]);
+    m.write_u32(at + 0x70, s.trick_id[1]);
     m.write_u32(at + 0xf0, s.xf0);
     for (k, e) in s.timed.iter().enumerate() {
         let b = at + 0x15c + 20 * k as u32;
-        m.write_u32(b, e.0);
-        m.write_f32(b + 8, e.1);
-        m.write_f32(b + 12, e.2);
+        m.write_u32(b, e.kind);
+        m.write_u32(b + 4, e.value as u32);
+        m.write_f32(b + 8, e.life);
+        m.write_f32(b + 12, e.age);
+        m.write_u32(b + 16, e.extra as u32);
     }
 }
 
@@ -63,13 +67,14 @@ fn get(r: &mut Runner, at: u32) -> Score {
     s.x44 = i(m, 0x44);
     s.spin_scored = i(m, 0x48);
     s.flip_scored = i(m, 0x4c);
-    for k in 0..4 {
+    for k in 0..3 {
         s.grabs[k] = m.read_u32(at + 0x60 + 4 * k as u32);
     }
+    s.trick_id = [m.read_u32(at + 0x6c), m.read_u32(at + 0x70)];
     s.xf0 = m.read_u32(at + 0xf0);
     for k in 0..12 {
         let b = at + 0x15c + 20 * k as u32;
-        s.timed[k] = (m.read_u32(b), m.read_f32(b + 8), m.read_f32(b + 12));
+        s.timed[k] = tricky_game::score::Timed { kind: m.read_u32(b), value: m.read_u32(b + 4) as i32, life: m.read_f32(b + 8), age: m.read_f32(b + 12), extra: m.read_u32(b + 16) as i32 };
     }
     s
 }
@@ -91,11 +96,11 @@ fn random_score(g: &mut Rng) -> Score {
         xf0: g.next(),
         ..Score::default()
     };
-    for k in 0..4 {
+    for k in 0..3 {
         s.grabs[k] = if g.next() % 2 == 0 { 0 } else { 1 };
     }
     for e in s.timed.iter_mut() {
-        *e = (g.next() % 2, g.f(-0.1, 2.0), g.f(0.0, 2.0));
+        *e = tricky_game::score::Timed { kind: g.next() % 2, value: g.next() as i32, life: g.f(-0.1, 2.0), age: g.f(0.0, 2.0), extra: g.next() as i32 };
     }
     s
 }

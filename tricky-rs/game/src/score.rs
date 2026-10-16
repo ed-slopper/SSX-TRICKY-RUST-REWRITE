@@ -24,11 +24,13 @@ pub struct Score {
     pub spin_scored: i32,
     pub flip_scored: i32,
     /// +0x60..+0x6c: the grabs done this jump (nonzero = done)
-    pub grabs: [u32; 4],
+    pub grabs: [u32; 3],
+    /// +0x6c: the last trick announced (`Score_AnnounceTrick`)
+    pub trick_id: [u32; 2],
     /// +0xf0
     pub xf0: u32,
-    /// +0x15c: twelve timed entries of five words: [0] live, [2] lifetime, [3] age (seconds)
-    pub timed: [(u32, f32, f32); 12],
+    /// +0x15c: twelve timed entries (the score's messages, `Scoring_PushMessage`)
+    pub timed: [Timed; 12],
     /// +0x10 switch (the chain began riding switch), +0x14, +0x18 (no repeat check), +0x1c (the chain had points
     /// when it began), +0x20 the chain's kind (0 none; set from `Score_StartTrickChain`'s second argument and
     /// `Score_LandTrick`'s rail flag; 4 mirrors the flip)
@@ -188,10 +190,10 @@ impl Score {
             self.x40 = self.x40.wrapping_add(1);
         }
         for e in self.timed.iter_mut() {
-            if e.0 != 0 && 0.0 < e.1 {
-                e.2 += 0.016_666_668;
-                if e.1 <= e.2 {
-                    e.0 = 0;
+            if e.kind != 0 && 0.0 < e.life {
+                e.age += 0.016_666_668;
+                if e.life <= e.age {
+                    e.kind = 0;
                 }
             }
         }
@@ -342,8 +344,8 @@ impl Score {
         self.grabs[1] = 0;
         self.grabs[2] = 0;
         for e in self.timed.iter_mut() {
-            if e.0 == 0xc {
-                e.0 = 0;
+            if e.kind == 0xc {
+                e.kind = 0;
             }
         }
     }
@@ -766,17 +768,100 @@ impl Score {
         };
         self.best_points = -1;
         for (k, e) in self.timed.iter_mut().enumerate() {
-            *e = (0, keep.timed[k].1, keep.timed[k].2);
+            *e = Timed { kind: 0, ..keep.timed[k] };
         }
         self.grab_rate = 1.0;
         self.mult = 1.0;
     }
 }
 
+/// One of the score's timed entries (20 bytes from +0x15c): +0 the kind (0 free), +4 the value, +8 how long it
+/// lasts (seconds; 0 or less for ever), +0xc its age, +0x10 an extra word. The HUD draws from them.
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct Timed {
+    pub kind: u32,
+    pub value: i32,
+    pub life: f32,
+    pub age: f32,
+    pub extra: i32,
+}
+
+/// `SpinState_SetTrickClipRate` 0x156050: the trick clip's playback rate (the spin state's +0x2c) for the clips
+/// that have their own (0x278..0x2db), none for the rest; its jump table (0x370e30) gives the same rates as
+/// `Score_StartGrab`'s
+pub fn trick_clip_rate(clip: u32) -> Option<f32> {
+    grab_rate(clip)
+}
+
 impl Score {
+    /// `Scoring_PushMessage` 0x157330 (how long, as a float's bits; the kind, the value, an extra word): a slot of the
+    /// timed entries, then the entry written (the age 0). The slot: for kinds 7 and 8 the first holding a 7 or an 8; for
+    /// kind 12 the first holding a 12; otherwise (or none found) the first free one, else, all twelve taken, the last
+    /// whose age is under its life. With none of those either the game writes the entry before the first (the score's
+    /// +0x148): left out here. `Speech_OnScoreMessage` 0x233220 (the rider at +0x24c, the kind, the value) follows in
+    /// every case; the caller makes that call (`speech::Speech::on_score_message`)
+    pub fn push_message(&mut self, life: u32, kind: u32, value: i32, extra: i32) {
+        let mut slot = -1i32;
+        if kind.wrapping_sub(7) < 2 {
+            slot = (0..12).find(|&i| self.timed[i].kind == 7 || self.timed[i].kind == 8).map_or(-1, |i| i as i32);
+        }
+        if kind == 0xc {
+            slot = (0..12).find(|&i| self.timed[i].kind == 0xc).map_or(slot, |i| i as i32);
+        }
+        if slot < 0 {
+            if self.timed[0].kind == 0 {
+                slot = 0;
+            } else {
+                let mut last = slot;
+                let mut i = 0;
+                loop {
+                    let e = self.timed[i];
+                    if (crate::ps2f::F(e.age) / crate::ps2f::F(e.life)).ee() < 1.0 {
+                        last = i as i32;
+                    }
+                    i += 1;
+                    slot = last;
+                    if i >= 12 {
+                        break;
+                    }
+                    if self.timed[i].kind == 0 {
+                        slot = i as i32;
+                        break;
+                    }
+                }
+            }
+        }
+        if slot < 0 {
+            return;
+        }
+        self.timed[slot as usize] = Timed { kind, value, life: f32::from_bits(life), age: 0.0, extra };
+    }
+
+    /// `Scoring_MsgMultiplier` 0x155ca0 (the multiplier): a 2.5 s message of kind 13 for one over 1
+    pub fn msg_multiplier(&mut self, n: i32) -> Option<ScoreCall> {
+        (1 < n).then_some(ScoreCall::Message(0x4020_0000, 0xd, n, 0))
+    }
+
+    /// `Score_AnnounceTrick` 0x157088 (the trick's id, a repeat): the id kept (+0x6c), its name formatted into the
+    /// score's +0x250 (`Score_FormatTrickName` 0x1551c0; the caller's), and a 3 s message, kind 8 for a repeat and 7
+    /// otherwise. Between those, for the focus player (`Score_IsFocusPlayer` 0x157c50) the announcer: the trick with
+    /// its points (`Speech_AnnounceTrick` 0x232498; the rider at +0x24c, the id, `Score_CalcPoints`) when it is no
+    /// repeat or in the tutorial (mode 6), else `Speech_OnTrickLanded` 0x2333e0 (the rider); see
+    /// `announce_speaks_trick`
+    pub fn announce_trick(&mut self, id: [u32; 2], repeat: u32) -> ScoreCall {
+        self.trick_id = id;
+        ScoreCall::Message(0x4040_04da, if repeat != 0 { 8 } else { 7 }, 0, 0)
+    }
+
     /// `Scoring_MsgKnockdown` 0x155d98: one more rider knocked down (+0xbc) and a 2.1 s message of kind 4.
     pub fn msg_knockdown(&mut self) -> ScoreCall {
         self.xbc = self.xbc.wrapping_add(1);
         ScoreCall::Message(0x4006_6666, 4, 0, 0)
     }
+}
+
+/// Which announcer call `Score_AnnounceTrick` 0x157088 makes for a player: the trick (true) when it is no repeat or
+/// the game mode is the tutorial (6), else the repeat
+pub fn announce_speaks_trick(repeat: u32, mode: u32) -> bool {
+    repeat == 0 || mode == 6
 }

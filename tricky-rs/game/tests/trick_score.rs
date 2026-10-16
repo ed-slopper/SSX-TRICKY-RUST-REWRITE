@@ -67,9 +67,11 @@ fn put(m: &mut r5900::Mem, at: u32, rider: u32, s: &Score) {
     ] {
         m.write_u32(at + o, v as u32);
     }
-    for k in 0..4 {
+    for k in 0..3 {
         m.write_u32(at + 0x60 + 4 * k as u32, s.grabs[k]);
     }
+    m.write_u32(at + 0x6c, s.trick_id[0]);
+    m.write_u32(at + 0x70, s.trick_id[1]);
     for k in 0..6 {
         m.write_u32(at + 0xf8 + 4 * k as u32, s.ranks[k] as u32);
     }
@@ -79,9 +81,11 @@ fn put(m: &mut r5900::Mem, at: u32, rider: u32, s: &Score) {
     }
     for (k, e) in s.timed.iter().enumerate() {
         let b = at + 0x15c + 20 * k as u32;
-        m.write_u32(b, e.0);
-        m.write_f32(b + 8, e.1);
-        m.write_f32(b + 12, e.2);
+        m.write_u32(b, e.kind);
+        m.write_u32(b + 4, e.value as u32);
+        m.write_f32(b + 8, e.life);
+        m.write_f32(b + 12, e.age);
+        m.write_u32(b + 16, e.extra as u32);
     }
     m.write_u32(at + RIDER, rider);
     m.write_u32(rider + 0x418, s.rider_418 as u32);
@@ -135,9 +139,10 @@ fn get(m: &mut r5900::Mem, at: u32, rider: u32) -> Score {
         rider_418: m.read_u32(rider + 0x418) as i32,
         ..Score::default()
     };
-    for k in 0..4 {
+    for k in 0..3 {
         s.grabs[k] = u(m, 0x60 + 4 * k as u32);
     }
+    s.trick_id = [u(m, 0x6c), u(m, 0x70)];
     for k in 0..6 {
         s.ranks[k] = i(m, 0xf8 + 4 * k as u32);
     }
@@ -146,7 +151,7 @@ fn get(m: &mut r5900::Mem, at: u32, rider: u32) -> Score {
     }
     for k in 0..12 {
         let b = at + 0x15c + 20 * k as u32;
-        s.timed[k] = (m.read_u32(b), m.read_f32(b + 8), m.read_f32(b + 12));
+        s.timed[k] = tricky_game::score::Timed { kind: m.read_u32(b), value: m.read_u32(b + 4) as i32, life: m.read_f32(b + 8), age: m.read_f32(b + 12), extra: m.read_u32(b + 16) as i32 };
     }
     s
 }
@@ -167,9 +172,10 @@ fn new_trick(g: &mut Rng, s: &mut Score) {
         _ => half(g, 9),
     };
     let ng = g.next() % 5;
-    for k in 0..4 {
+    for k in 0..3 {
         s.grabs[k] = if (k as u32) < ng { g.i(1, 0x1ff) as u32 } else { 0 };
     }
+    s.trick_id = [if 3 < ng { g.i(1, 0x1ff) as u32 } else { 0 }, g.next()];
     if g.b(6) == 1 {
         s.grabs[0] = 0;
     }
@@ -200,7 +206,7 @@ fn fresh(g: &mut Rng) -> Score {
     s.xd8 = g.f(0.0, 5.0);
     s.recent_at = g.i(0, 4);
     for k in 0..12 {
-        s.timed[k] = ([0, 1, 0xc, 3][g.next() as usize % 4], g.f(0.0, 3.0), g.f(0.0, 3.0));
+        s.timed[k] = tricky_game::score::Timed { kind: [0, 1, 0xc, 3][g.next() as usize % 4], value: g.next() as i32, life: g.f(0.0, 3.0), age: g.f(0.0, 3.0), extra: g.next() as i32 };
     }
     s
 }
@@ -246,7 +252,7 @@ fn trick_scoring_matches_the_original() {
     let mut g = Rng(0x7e1c_5c0e_2b5a_9d31);
     let mut s = fresh(&mut g);
     let mut hit = [0u32; 16];
-    let mut last = (0, 0, [0u32; 4]);
+    let mut last = (0, 0, [0u32; 3]);
     for case in 0..60_000 {
         if g.b(8) == 1 {
             s = fresh(&mut g);
