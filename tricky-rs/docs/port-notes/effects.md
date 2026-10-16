@@ -15,6 +15,36 @@ Part of the port notes (index: [README.md](README.md)); units and wording as des
 - Landing: clamp(0.0009·|vn|, 2, 8) puffs; a 25-point splash ring when |vn| > 549 cm/s. Carve dust, powder puffs,
   brake puffs and a 100-point board track (new point every 110 cm, fading by count) as well.
 
+### The board track in the app (row G7f3b; `src/tracks.rs`)
+
+Each rider's track is now the game's own code. `Fx_BoardTrack` 0x132648 (`boardtrack::board_track`, checked in
+G7f) runs every frame on the rider's state:
+- the surface, motion and hit kind;
+- the board's four corners (`pose::board_corners` on `Rider::board_bone_frame`, row G7f3a);
+- the velocity (+0x150), the normal (+0x2a0) and the ground point (+0x2d0);
+- the brake (+0x1fc) and the steer (+0x214).
+
+`Fx_BoardTrack_Draw` 0x1331a8 (`board_track_draw`) draws the strips into two meshes, chosen by the blend state
+the draw sets:
+- state 4, the shade scale −0x40: weights only where the shading is negative, so the side away from the light is
+  darkened (black at the weight / 128);
+- state 8, the scale 0x80: the lit side, added on.
+
+The meshes sit at the player, because the draw takes the origin quad × 10 from every point. That makes the
+vertices relative to the player, as the old mesh's were.
+
+STANDINs:
+- the ground point is the rider's place;
+- in motions 5 and 6 the two skeleton vectors are the board's middle corners (row G5);
+- the light set is a fixed sun with ambient 0.25 and one light of weight 0.5 from up and to one side (the rider's
+  lights, row G7b);
+- the strip is untextured (the track texture's u and v unused), so the lit pass is added at a fifth.
+
+Seen on gari (autoplay, 34 s in): the player's and the leader's tracks, about 1,200 vertices a pass. The dark
+pass's weights reach 0.4 and the lit pass's 0.96, and the strip reads as a groove behind the board. The old
+hand-written trail (a point every 110 cm, 5.1°, 10 cm of width, our fade) is gone. `TRICKY_TRACKDBG` prints the
+player's strip state and both passes' counts every frame.
+
 ## Particle emitters (`Emitter_InitFromRecord`, `PBurst_*`, VU1 microcode at 0x31c288)
 
 - type2Sub0: U0 N particles born evenly over U2 s (U2 < 0: continuous, recycled every T = U5 + U7/2, pre-warmed);
