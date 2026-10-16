@@ -36,6 +36,7 @@ pub mod ridercol;
 pub mod sfxcalc;
 pub mod fe3dstate;
 pub mod fe_title;
+pub mod fe_numplayers;
 pub mod sndplay;
 pub mod sndqueue;
 pub mod sndlib;

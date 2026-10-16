@@ -114,6 +114,26 @@ Checked in the runner on 20,000 random screens (the base's `Activate` and `Deact
 the calls in order, with colours and positions by value, the answers and the memory all equal the original's.
 10 of 10 mutants are caught.
 
+### The number-of-players screen ported (row G9d; `game/src/fe_numplayers.rs`, checked: `tests/fe_numplayers.rs`)
+
+`cFE3DStateNumPlayers` has a menu of two items (one player, two). +0x4c is its help line.
+- **`CreateNextState`:** the players set (0x263670 with the item + 1 as a signed byte), then the front end's next
+  screen for them (0x265970).
+- **The builder:** the base widgets with the title (0x274278: 194.0, text 0xdac, 0x200a). Then the two items: the
+  texts at 0x3b2a80, +0x118 the word at 0x3ae520, the highlight colour (1, 0.953, 0.729, 0.106) at +0x108, white at
+  +0x110 and +0x50. Then the backdrop; no fade in, and the pause overlay allowed.
+- **`Activate`:** the overlay's mode 2, the base's `Activate`, the fade out 1. If the game booted here, the menu's
+  +0x160 by the profile's player count (0x164288 on 0x32b390), the base's vf22 from the first item to the chosen
+  one, and the screen's +0x40. Then the help line.
+- **vf19:** the menu music (0x262cd8) and the 3D scene's +0x10(0xd).
+- **vf20:** both players reset (0x263270 on the front end's +0x7c and +0x7e), the front end's mode (0, 1, 4), the
+  overlay's mode 6 and the scene's +0x78(1).
+- **vf22:** the base's, then the one- or two-player music cue (0x2628e0 / 0x262920) when an item goes, then the help
+  line 0x29ad28 (`highlight`: the text 0xca6 for one player, 0xca7 for two, via 0x2b0f68).
+
+Checked in the runner on 20,000 random screens, with `highlight` on its own over 2,000. 8 of 8 mutants are caught,
+including the byte's sign once the test had items past 0x7f.
+
 ## The 3D transition and fade record (F1c, proven from the code, not ported)
 
 One record drives both the screen fades and a blend of four renderer values (read by the renderer's virtual +0x134,

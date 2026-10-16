@@ -5431,12 +5431,12 @@ address,size,name,system,status
 0x29a6b0,248,cFE3DStateModeSelect::vf22_29a6b0,frontend,not started
 0x29a7a8,88,FEModeSelect_UpdateDesc,frontend?,not started
 0x29a800,196,cFE3DStateModeSelect::vf26_29a800,frontend,not started
-0x29a8c8,96,cFE3DStateNumPlayers::CreateNextState,frontend,not started
-0x29a928,544,cFE3DStateNumPlayers::vf11_29a928,frontend,not started
-0x29ab48,264,cFE3DStateNumPlayers::Activate,frontend,not started
-0x29ac50,88,cFE3DStateNumPlayers::vf19_29ac50,frontend,not started
-0x29ac68,20,cFE3DStateNumPlayers::vf20_29ac68,frontend,not started
-0x29ac80,128,cFE3DStateNumPlayers::vf22_29ac80,frontend,not started
+0x29a8c8,96,cFE3DStateNumPlayers::CreateNextState,frontend,checked
+0x29a928,544,cFE3DStateNumPlayers::vf11_29a928,frontend,checked
+0x29ab48,264,cFE3DStateNumPlayers::Activate,frontend,checked
+0x29ac50,88,cFE3DStateNumPlayers::vf19_29ac50,frontend,checked
+0x29ac68,20,cFE3DStateNumPlayers::vf20_29ac68,frontend,checked
+0x29ac80,128,cFE3DStateNumPlayers::vf22_29ac80,frontend,checked
 0x29ad00,40,cFE3DStateNumPlayers::vf26_29ad00,frontend,not started
 0x29ad28,28,FE3DNumPlayers_SetPromptText,frontend?,not started
 0x29ad48,216,cFE3DStateEventSel::CreateNextState,frontend,ported
