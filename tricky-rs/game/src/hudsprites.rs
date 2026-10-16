@@ -849,3 +849,87 @@ pub fn draw_anchored(m: &mut Mem, env: &mut dyn SpritesEnv, rect: u32, flags: u3
     let func = if turned { 0x19bdf8 } else { 0x19b730 };
     env.call(m, func, &[FONT_COLOR], &[x.0, y.0, sw.0, sh.0, a.0, b.0, c.0, d.0]);
 }
+
+/// `Sprite_DrawTiled` 0x1fc728 (the rectangle, the flags; x, y, w, h, the columns, the rows): the rectangle's texture
+/// repeated over w × h, `cols` × `rows` times. Whole tiles first, row by row; a last part column and a last part row
+/// take the fraction left of the texture's coordinates. Flags 1 / 2 flip the coordinates; 4 / 8 anchor the whole by
+/// its bottom / right, 0x20 / 0x40 centre it; with 0x10 every tile goes to `Sprite_SubmitQuad` 0x19bdf8 (turned,
+/// its part tiles cut along the other coordinates) instead of `Draw_TexturedRect` 0x19b730. Nothing for no columns
+/// or rows
+#[allow(clippy::too_many_arguments)]
+pub fn draw_tiled(m: &mut Mem, env: &mut dyn SpritesEnv, rect: u32, flags: u32, x: f32, y: f32, w: f32, h: f32, cols: f32, rows: f32) {
+    env.renderer(m, 0x1f4, &[m.r32(rect), 0], &[]);
+    let (w, h, cols, rows) = (F(w), F(h), F(cols), F(rows));
+    if cols.0 <= 0.0 || rows.0 <= 0.0 {
+        return;
+    }
+    let (mut v0, mut u0, mut u1, mut v1) = (fl(m, rect + 12), fl(m, rect + 16), fl(m, rect + 20), fl(m, rect + 24));
+    let tw = w / cols;
+    let mut th = h / rows;
+    if flags & 1 != 0 {
+        std::mem::swap(&mut u0, &mut u1);
+    }
+    if flags & 2 != 0 {
+        std::mem::swap(&mut v0, &mut v1);
+    }
+    let (mut x0, mut y0) = (F(x), F(y));
+    if flags & 4 != 0 {
+        y0 = y0 - h;
+    }
+    if flags & 8 != 0 {
+        x0 = x0 - w;
+    }
+    if flags & 0x20 != 0 {
+        x0 = x0 - w * F(0.5);
+    }
+    if flags & 0x40 != 0 {
+        y0 = y0 - h * F(0.5);
+    }
+    let (nrows, ncols) = (rows.0 as i32, cols.0 as i32);
+    let turned = flags & 16 != 0;
+    let func = if turned { 0x19bdf8 } else { 0x19b730 };
+    let mut quad = |m: &mut Mem, x: F, y: F, w: F, h: F, uv: [F; 4]| {
+        env.call(m, func, &[FONT_COLOR], &[x.0, y.0, w.0, h.0, uv[0].0, uv[1].0, uv[2].0, uv[3].0]);
+    };
+    let mut ty = y0;
+    let whole_rows = if nrows == 0 { F(0.0) } else { F(nrows as f32) };
+    let fcols = F(ncols as f32);
+    if nrows > 0 {
+        for _ in 0..nrows {
+            let next = ty + th;
+            let mut tx = x0;
+            for _ in 0..ncols.max(0) {
+                quad(m, tx, ty, tw, th, [v0, u0, u1, v1]);
+                tx = tx + tw;
+            }
+            if fcols.0 != cols.0 {
+                let pw = (x0 + w) - tx;
+                let uv = if turned { [v0, u0, u1, v0 + (v1 - v0) * (cols - fcols)] } else { [v0, u0, u0 + (u1 - u0) * (cols - fcols), v1] };
+                quad(m, tx, ty, pw, th, uv);
+            }
+            ty = next;
+        }
+    }
+    if whole_rows.0 != rows.0 {
+        th = (y0 + h) - ty;
+        let (v0r, u0r, v1r) = if turned {
+            (v0, u0 + (u1 - u0) * (F(1.0) - (rows - whole_rows)), v1)
+        } else {
+            (v0, u0, v0 + (v1 - v0) * (rows - whole_rows))
+        };
+        let mut tx = x0;
+        for _ in 0..ncols.max(0) {
+            quad(m, tx, ty, tw, th, [v0r, u0r, u1, v1r]);
+            tx = tx + tw;
+        }
+        if fcols.0 != cols.0 {
+            let pw = (x0 + w) - tx;
+            let uv = if turned {
+                [v0r, u0r, u1, v0r + (v1r - v0r) * (cols - fcols)]
+            } else {
+                [v0r, u0r, u0r + (u1 - u0r) * (cols - fcols), v1r]
+            };
+            quad(m, tx, ty, pw, th, uv);
+        }
+    }
+}

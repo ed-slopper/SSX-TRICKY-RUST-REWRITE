@@ -3281,7 +3281,7 @@ address,size,name,system,status
 0x1fbe98,736,Tex_Swizzle,render,not started
 0x1fc178,440,Sprite_DrawAnchored,frontend?,checked
 0x1fc330,1012,Sprite_DrawAnchoredGradient,frontend?,not started
-0x1fc728,1436,Sprite_DrawTiled,frontend?,ported
+0x1fc728,1436,Sprite_DrawTiled,frontend?,checked
 0x1fccc8,7716,Sprite_DrawTiledGradient,frontend?,not started
 0x1feaf0,412,HUD_DrawSpriteAnchored,hud,not started
 0x1fecc8,32,FE3DTransition_Construct,game?,not started

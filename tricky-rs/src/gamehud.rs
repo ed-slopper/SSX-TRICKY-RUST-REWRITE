@@ -45,7 +45,10 @@ const ELF_RANGES: [(u32, u32); 5] = [(0x337fe8, 0x200), (0x33ca40, 4 * 0x424), (
 
 /// One thing the game drew
 enum Cmd {
-    Quad { sheet: u32, uv: [f32; 4], x: f32, y: f32, w: f32, h: f32, rgba: [f32; 4], layer: u32 },
+    /// `turned`: `Sprite_SubmitQuad` 0x19bdf8, the texture a quarter turn anticlockwise (its right edge on top).
+    /// The HUD never turns one (no layout entry's corner and no corner its code passes has 0x10), so it is shown as
+    /// drawn
+    Quad { sheet: u32, uv: [f32; 4], x: f32, y: f32, w: f32, h: f32, rgba: [f32; 4], layer: u32, turned: bool },
     Text { font: usize, text: String, x: f32, y: f32, scale: f32, rgba: [f32; 4], layer: u32 },
 }
 
@@ -218,11 +221,10 @@ impl SpritesEnv for Env<'_> {
             0x1c0068 => hudsprites::draw_sprite(m, self, f(0), f(1), f(2), f(3), a(0), a(1), a(2)),
             0x14eed0 => hudsprites::draw_rect_scaled(m, self, a(0), a(1), f(0), f(1), f(2), f(3)),
             0x1fc178 => hudsprites::draw_anchored(m, self, a(0), a(1), f(0), f(1), f(2), f(3)),
-            // STANDIN: `Sprite_DrawTiled` 0x1fc728 (the rank frame's middle) drawn as one stretched quad
-            0x1fc728 => hudsprites::draw_anchored(m, self, a(0), a(1), f(0), f(1), f(2), f(3)),
+            0x1fc728 => hudsprites::draw_tiled(m, self, a(0), a(1), f(0), f(1), f(2), f(3), f(4), f(5)),
             0x19b730 | 0x19bdf8 => {
                 let rgba = Self::colour(m);
-                self.cmds.push(Cmd::Quad { sheet: self.sheet, uv: [f(4), f(5), f(6), f(7)], x: f(0), y: f(1), w: f(2), h: f(3), rgba, layer: self.layer });
+                self.cmds.push(Cmd::Quad { sheet: self.sheet, uv: [f(4), f(5), f(6), f(7)], x: f(0), y: f(1), w: f(2), h: f(3), rgba, layer: self.layer, turned: func == 0x19bdf8 });
             }
             0x1f9e50 => return (hudsprites::sprite_rect(a(0), a(1) as i32), 0.0),
             0x1a82e8 => {
@@ -585,7 +587,7 @@ pub fn game_hud(
     if std::env::var("TRICKY_HUDDBG").is_ok() && (time.elapsed_secs() * 1.0).fract() < time.delta_secs() {
         for c in &cmds {
             match c {
-                Cmd::Quad { sheet, uv, x, y, w, h, rgba, layer } => println!("hud quad sheet {sheet} uv {uv:?} at ({x}, {y}) {w}x{h} rgba {rgba:?} layer {layer}"),
+                Cmd::Quad { sheet, uv, x, y, w, h, rgba, layer, turned } => println!("hud quad sheet {sheet} uv {uv:?} at ({x}, {y}) {w}x{h} rgba {rgba:?} layer {layer} turned {turned}"),
                 Cmd::Text { font, text, x, y, scale, rgba, layer } => println!("hud text {font} {text:?} at ({x}, {y}) x{scale} rgba {rgba:?} layer {layer}"),
             }
         }
@@ -611,7 +613,7 @@ pub fn game_hud(
     }
     let z = |layer: u32, order: usize| GlobalZIndex(1000 + layer as i32 * 1000 + order as i32);
     for (i, order, c) in want_q.iter() {
-        let Cmd::Quad { sheet, uv, x, y, w, h, rgba, layer } = c else { continue };
+        let Cmd::Quad { sheet, uv, x, y, w, h, rgba, layer, .. } = c else { continue };
         let (u0, u1, v0, v1) = (uv[1], uv[2], uv[0], uv[3]);
         let img = ImageNode {
             image: sheets.get(*sheet as usize).cloned().unwrap_or_default(),

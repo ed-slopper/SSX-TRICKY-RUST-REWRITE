@@ -1,5 +1,5 @@
-//! `hudsprites::draw_rect_scaled` / `draw_anchored` (board row G8j) against `Sprite_DrawRectScaled` 0x14eed0 and
-//! `Sprite_DrawAnchored` 0x1fc178 in the function runner (TRICKY_ELF; skipped without it): random rectangles, flags
+//! `hudsprites::draw_rect_scaled` / `draw_anchored` / `draw_tiled` (board row G8j) against `Sprite_DrawRectScaled`
+//! 0x14eed0, `Sprite_DrawAnchored` 0x1fc178 and `Sprite_DrawTiled` 0x1fc728 in the function runner (TRICKY_ELF; skipped without it): random rectangles, flags
 //! and placements, the texture bind and the quad submitted logged on both sides (floats bit for bit).
 
 use std::cell::RefCell;
@@ -72,14 +72,18 @@ fn sprite_quads_match_the_original() {
         }
         let flags = g.next() & 0x7f;
         let v: Vec<f32> = (0..4).map(|_| F[g.below(F.len() as u32) as usize]).collect();
-        let scaled = g.below(2) == 0;
+        let which = g.below(3);
+        let counts = [1.0f32, 2.0, 2.5, 0.3, 3.0, 0.0, -1.0, 4.75, -0.5];
+        let (cols, rows) = (counts[g.below(9) as usize], counts[g.below(9) as usize]);
+        r.cpu.set_f(16, cols);
+        r.cpu.set_f(17, rows);
         for (k, x) in v.iter().enumerate() {
             r.cpu.set_f(12 + k, *x);
         }
         r.cpu.set_gpr(4, rect as u64);
         r.cpu.set_gpr(5, flags as u64);
         l.borrow_mut().clear();
-        r.call(if scaled { 0x14eed0 } else { 0x1fc178 }).unwrap_or_else(|e| panic!("case {case}: {e}"));
+        r.call([0x14eed0, 0x1fc178, 0x1fc728][which as usize]).unwrap_or_else(|e| panic!("case {case}: {e}"));
         let theirs = std::mem::take(&mut *l.borrow_mut());
         let mut m = Mem::default();
         let mut b = vec![0u8; 0x400];
@@ -89,12 +93,12 @@ fn sprite_quads_match_the_original() {
         r.mem.read(GAPP, &mut gb).unwrap();
         m.regions.push((GAPP, gb));
         let e = &mut Ours(l.clone());
-        if scaled {
-            draw_rect_scaled(&mut m, e, rect, flags, v[0], v[1], v[2], v[3]);
-        } else {
-            draw_anchored(&mut m, e, rect, flags, v[0], v[1], v[2], v[3]);
+        match which {
+            0 => draw_rect_scaled(&mut m, e, rect, flags, v[0], v[1], v[2], v[3]),
+            1 => draw_anchored(&mut m, e, rect, flags, v[0], v[1], v[2], v[3]),
+            _ => draw_tiled(&mut m, e, rect, flags, v[0], v[1], v[2], v[3], cols, rows),
         }
         let mine = std::mem::take(&mut *l.borrow_mut());
-        assert_eq!(theirs, mine, "case {case} (flags {flags:#x}, scaled {scaled})");
+        assert_eq!(theirs, mine, "case {case} (flags {flags:#x}, which {which}, {cols} x {rows})");
     }
 }

@@ -425,8 +425,19 @@ What a HUD sprite call means as a quad, in `tricky_game::hudsprites`:
   - 0x20 / 0x40 centre it on x / y.
 
   An unturned quad goes to `Draw_TexturedRect` 0x19b730, a turned one to `Sprite_SubmitQuad` 0x19bdf8.
-- **Checked in the runner** (tests/spritequad.rs) on 60,000 random rectangles, flags and placements: the bind and
-  the quad, floats bit for bit. The tests caught all 11 mutants.
+- **`Sprite_DrawTiled`** (the rectangle, the flags; x, y, w, h, the columns, the rows) repeats the texture over
+  w × h, cols × rows times, row by row:
+  - the whole tiles come first; a last part column and a last part row take the fraction of the texture's
+    coordinates that is left;
+  - the anchors are as above, but over the whole area;
+  - with 0x10 every tile is turned, and its part tiles are cut along the other coordinates;
+  - nothing is drawn for no columns or no rows.
+
+  The rank frames use it with one row and as many columns as the frame is wide.
+- **Checked in the runner** (tests/spritequad.rs) on 60,000 random rectangles, flags and placements, with whole,
+  part, zero and negative columns and rows. Compared: the bind and the quads, floats bit for bit. The tests caught
+  all 11 mutants of the first two functions and 13 of 14 for the tiles; the one left gives the same 0 rows either
+  way.
 
 ## The shadowed prints (G8j)
 
@@ -469,7 +480,10 @@ end in. The memory comes from:
 - the quads are shown as image nodes and the strings as `SfnText` runs, stacked by the renderer layer they were
   drawn on, then in the order drawn.
 
-Rotated quads are shown unrotated.
+**Turned quads never happen in the HUD.** The layout entries' corners in the executable are only 0, 3, 8, 0x20,
+0x23, 0x40, 0x60, 0xa0 and 0xe0, and the code's own corners are 0, 1, 8, 0x20, 0x40, 0x48 and 0x60, so the quarter
+turn (0x10) is never asked for. `Sprite_SubmitQuad` would show the texture turned anticlockwise (its right edge on
+top).
 
 **The constructor re-runs when the app's event changes**, since it sets the HUD's flags by the game mode.
 `TRICKY_HUDDBG=1` prints what was drawn once a second. Without the disc, the sheets or the fonts, the app's own HUD
@@ -486,6 +500,5 @@ folder's name.
 - `ScreenOverlay_Init` not run, with the HUD's sprite set and font placed by hand;
 - the app's SFN measure for `Font_MeasureAscii` / `_MeasureWide`;
 - no format arguments through `vsprintf`;
-- `Sprite_DrawTiled` drawn as one stretched quad;
 - no overlays, race path, progress, multiplier fraction, ranks or tiers;
 - the opponents only as racing or not.
