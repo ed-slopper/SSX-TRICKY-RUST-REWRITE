@@ -31,17 +31,17 @@ pub fn track_key(list: &LevelList) -> String { list.dirs.get(list.current).and_t
 /// riders in a race heat, the player included; the first three go through
 pub const HEAT: usize = 6;
 
-/// Best results per track, kept in `tricky-save.json` next to the program.
-#[derive(serde::Serialize, serde::Deserialize, Default, Clone)]
-pub struct Record { pub time: Option<f32>, pub score: u32, pub race: Option<usize>, pub showoff: Option<usize> }
-#[derive(Resource, Default)]
-pub struct Records(pub std::collections::HashMap<String, Record>);
+/// The results the app kept before the career block held them (`tricky-save.json` next to the program): read once,
+/// carried into the career, then renamed (row E12d2).
+#[derive(serde::Deserialize, Default, Clone)]
+struct OldRecord { race: Option<usize>, showoff: Option<usize> }
 fn save_path() -> std::path::PathBuf {
     std::env::current_exe().ok().and_then(|p| p.parent().map(|p| p.to_path_buf())).unwrap_or_default().join("tricky-save.json")
 }
 /// The game's own career block (row E12d), kept as the memory card's image in `tricky-career.sav` next to the
-/// program: loaded when its CRC is right, else a new game. The medals above still live in `tricky-save.json` until
-/// the race results are written into this block (row E12d2).
+/// program: loaded when its CRC is right, else a new game. The medals, best times and scores and what is unlocked
+/// live in it (row E12d2): the player is slot 0 on the chosen character, whose character record holds its World
+/// Circuit medals, points and boards.
 #[derive(Resource)]
 pub struct CareerRes(pub tricky_game::career::Career);
 fn career_path() -> std::path::PathBuf {
@@ -51,40 +51,111 @@ impl CareerRes {
     pub fn load() -> Self {
         let file = std::fs::read(career_path()).ok();
         let seed = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map_or(1, |d| d.as_nanos() as u32);
-        let (career, _) = tricky_game::career::CareerFile::open(file.as_deref(), 0, seed, None);
+        let (mut career, _) = tricky_game::career::CareerFile::open(file.as_deref(), 0, seed, None);
+        // the player slots are not in the card's part: no one in them until the menus put the player in slot 0
+        for k in 0..4 { career.clear_player_slot(k); }
         Self(career)
     }
     pub fn save(&mut self) {
         let image = self.0.save_image(None);
         let _ = std::fs::write(career_path(), image);
     }
+    /// The game's number of a character (`rivals::NAMES`: Eddie 0 .. Marisol 11)
+    pub fn character(name: &str) -> u32 {
+        tricky_game::rivals::NAMES.iter().position(|n| n.eq_ignore_ascii_case(name)).unwrap_or(0) as u32
+    }
+    /// The course number of a level folder (its archive name in the course table)
+    pub fn course(key: &str) -> Option<u32> {
+        tricky_data::aip::big_name(key).and_then(tricky_game::courses::by_file).map(|c| c.number)
+    }
+    /// The game mode of an event: a World Circuit race (4) or show-off (5), or freeride (7)
+    pub fn mode(event: Event) -> u32 {
+        match event { Event::Race => 4, Event::ShowOff => 5, Event::FreeRide => 7 }
+    }
+    /// The character in slot 0, if a player is in it
+    fn slot_character(&self) -> Option<u32> {
+        (0 <= self.0.bytes[0x30fc] as i8 && self.0.r32(0x3114) != 0).then(|| ((self.0.ptr(0x3114) - 0x100) / 0x1c4) as u32)
+    }
+    /// Player 0 in slot 0 on character `c` (`Career_AssignPlayerRider`), unless it is there already
+    pub fn ensure_player(&mut self, c: u32) {
+        if self.slot_character() != Some(c) {
+            self.0.assign_player_rider(0, 0, c as i32, &tricky_game::cheats::Cheats::default());
+        }
+    }
+    /// `Career_IsCharacterUnlocked`
+    pub fn char_open(&self, name: &str) -> bool {
+        self.0.is_character_unlocked(Self::character(name), &tricky_game::cheats::Cheats::default())
+    }
+    /// `Career_IsCourseUnlocked` for the event (a folder not in the course table is open)
+    pub fn course_open(&self, event: Event, key: &str) -> bool {
+        Self::course(key).is_none_or(|c| tricky_game::courses::course_unlocked(&self.0.unlocks(), Self::mode(event), c, false))
+    }
+    /// `Career_IsUnlockBitSet`: the slot's board bits (record +0x58)
+    pub fn board_open(&self, board: usize) -> bool {
+        self.slot_character().is_some() && self.0.is_board_unlocked(0, board as u32, &tricky_game::cheats::Cheats::default())
+    }
+    /// The slot's medal points (record +4 race, +8 show-off), what the boards and the levels go by
+    pub fn points(&self) -> u32 {
+        if self.slot_character().is_none() { return 0; }
+        let rec = self.0.ptr(0x3114);
+        self.0.r32(rec + 4).wrapping_add(self.0.r32(rec + 8))
+    }
+    /// `Career_GetCourseMedal`: 0 gold, 1 silver, 2 bronze
+    pub fn medal(&self, event: Event, key: &str) -> Option<usize> {
+        let c = Self::course(key)?;
+        let m = self.0.course_medal(Self::mode(event) as i32, c as i32);
+        (m < 3).then_some(m as usize)
+    }
+    /// The character's best time (s) and score on the course (`Career_RecordBestTime` / `_RecordBestScore`'s words)
+    pub fn best(&self, key: &str) -> (Option<f32>, u32) {
+        let (Some(c), Some(ch)) = (Self::course(key), self.slot_character()) else { return (None, 0) };
+        let t = self.0.r32(0x1fc + 4 * c as usize + 0x1c4 * ch as usize) as i32;
+        let s = self.0.r32(0x230 + 4 * c as usize + 0x1c4 * ch as usize) as i32;
+        ((t > 0).then(|| t as f32 / 100.0), s.max(0) as u32)
+    }
+    /// The old `tricky-save.json`'s medals into the slot's character record (not the game's: a one-time move of the
+    /// app's own earlier save): each better medal with its points (as `Circuit_ProcessRaceResult` adds them) and the
+    /// next course of its event opened, then the file renamed
+    fn carry_old(&mut self) {
+        let path = save_path();
+        let Some(old) = std::fs::read_to_string(&path).ok().and_then(|s| serde_json::from_str::<std::collections::HashMap<String, OldRecord>>(&s).ok()) else { return };
+        if self.slot_character().is_none() { return; }
+        let rec = self.0.ptr(0x3114);
+        let showoff_order = tricky_game::courses::MEDALS.map(|x| x.0);
+        for (key, r) in old {
+            let Some(c) = Self::course(&key) else { continue };
+            for (m, byte, pts, open, order) in [(r.race, 0x25, 4, 0x26, &tricky_game::courses::CIRCUIT[..]), (r.showoff, 0x24, 8, 0x27, &showoff_order[..])] {
+                let Some(m) = m.filter(|m| *m < 3) else { continue };
+                let at = rec + 4 * c as usize + byte;
+                let was = (self.0.bytes[at] as usize).min(3);
+                if m < was {
+                    let d = tricky_game::circuit::MEDAL_POINTS[m] - tricky_game::circuit::MEDAL_POINTS[was];
+                    self.0.bytes[at] = m as u8;
+                    self.0.w32(rec + pts, self.0.r32(rec + pts).wrapping_add(d as u32));
+                    self.0.w32(rec, self.0.r32(rec).wrapping_add(d as u32));
+                }
+                if let Some(next) = order.iter().position(|k| *k == c).and_then(|i| order.get(i + 1)) {
+                    self.0.bytes[rec + 4 * *next as usize + open] = 1;
+                    self.0.w32(8, self.0.r32(8) | 1 << next);
+                }
+            }
+        }
+        self.0.update_attributes(&tricky_game::cheats::Cheats::default());
+        let _ = std::fs::rename(&path, path.with_extension("json.carried"));
+        self.save();
+    }
 }
+
+/// What `Career_CheckNewRecords` asks: which race rider is the player, and the circuit's result
+struct RecordsRun<'a> { player: usize, circuit: &'a mut tricky_game::circuit::Circuit }
+impl tricky_game::career::RecordsEnv for RecordsRun<'_> {
+    fn rider_is_human(&self, i: usize) -> bool { i == self.player }
+    fn circuit_race_result(&mut self, career: &mut tricky_game::career::Career) { self.circuit.process_race_result(career); }
+}
+
 
 /// Board unlock costs in career points (0x332148 table): the original's twelve boards per rider.
 pub const BOARD_POINTS: [u32; 12] = [0, 0, 5, 20, 35, 60, 90, 120, 160, 200, 240, 999];
-/// The circuit's track order (0x3352f0): a medal on one opens the next. Garibaldi, Snowdream and
-/// Elysium are open from the start (`Profile_ResetNewGame`: tracks 0x407); a race medal on Alaska
-/// opens Untracked, a show-off medal there opens Pipedream.
-pub const TRACK_ORDER: [&str; 8] = ["gari", "snowdream", "elysium", "mesablanca", "merqury", "megaplex", "aloha", "alaska"];
-/// Riders open at the start (Mac, Moby, Elise, Eddie), then one more for every gold, in this order.
-pub const CHAR_START: [&str; 4] = ["mac", "moby", "elise", "eddie"];
-pub const CHAR_NEXT: [&str; 8] = ["brodi", "zoe", "jp", "kaori", "marisol", "psymon", "seeiah", "luther"];
-impl Records {
-    fn medal(&self, key: &str) -> (bool, bool) { self.0.get(key).map_or((false, false), |r| (r.race.is_some(), r.showoff.is_some())) }
-    pub fn golds(&self) -> usize { self.0.values().map(|r| (r.race == Some(0)) as usize + (r.showoff == Some(0)) as usize).sum() }
-    pub fn track_open(&self, key: &str) -> bool {
-        match TRACK_ORDER.iter().position(|k| *k == key) {
-            Some(i) if i < 3 => true,
-            Some(i) => { let (r, s) = self.medal(TRACK_ORDER[i - 1]); r || s }
-            None => match key { "untracked" => self.medal("alaska").0, "pipedream" => self.medal("alaska").1, _ => true },
-        }
-    }
-    pub fn char_open(&self, name: &str) -> bool {
-        let n = name.to_ascii_lowercase();
-        CHAR_START.contains(&n.as_str()) || CHAR_NEXT.iter().take(self.golds()).any(|c| *c == n)
-    }
-}
-
 /// Career rank by points (`Career_BoardTierFromPoints`): 240 is Master.
 pub const RANKS: [(u32, &str); 10] = [(240, "MASTER"), (200, "rank 1"), (160, "rank 2"), (120, "rank 3"), (90, "rank 4"), (60, "rank 5"), (35, "rank 6"), (20, "rank 7"), (5, "rank 8"), (0, "rank 9")];
 pub fn rank(points: u32) -> &'static str { RANKS.iter().find(|r| points >= r.0).map_or("rank 9", |r| r.1) }
@@ -92,40 +163,115 @@ impl Game {
     /// how far the riders are trained: fully when "master" is picked, else by career points
     pub fn training(&self) -> f32 { if self.master { 1.0 } else { (self.points as f32 / 240.0).min(1.0) } }
 }
-impl Records {
-    /// World Circuit points (`Circuit_AwardMedalPoints`): gold 15, silver 10, bronze 5, per track
-    /// and event, counting the best medal only.
-    pub fn points(&self) -> u32 {
-        let p = |m: Option<usize>| m.map_or(0, |m| [15, 10, 5].get(m).copied().unwrap_or(0));
-        self.0.values().map(|r| p(r.race) + p(r.showoff)).sum()
+/// When a run ends, into the career block (`CareerRes::record_run`), and saved.
+pub fn records(mut game: ResMut<Game>, race: Res<RaceRes>, rider: Res<RiderRes>, list: Res<LevelList>, lib: Res<CharLib>, mut career: ResMut<CareerRes>, mut was: Local<bool>, mut carried: Local<bool>) {
+    let me = lib.chars.get(lib.player).map(|c| c.name.clone()).unwrap_or_default();
+    career.ensure_player(CareerRes::character(&me));
+    if !*carried {
+        *carried = true;
+        career.carry_old();
     }
-    pub fn load() -> Self { Self(std::fs::read_to_string(save_path()).ok().and_then(|s| serde_json::from_str(&s).ok()).unwrap_or_default()) }
-    fn save(&self) { if let Ok(s) = serde_json::to_string_pretty(&self.0) { let _ = std::fs::write(save_path(), s); } }
-}
-
-/// When a run ends, keep what was better than before.
-pub fn records(mut game: ResMut<Game>, race: Res<RaceRes>, rider: Res<RiderRes>, list: Res<LevelList>, mut recs: ResMut<Records>, mut career: ResMut<CareerRes>, mut was: Local<bool>) {
-    game.points = recs.points();
-    let done = race.0.state == RaceState::Finished && game.screen != Screen::Menu;
+    game.points = career.points();
+    let done = game.screen == Screen::Results || (game.event == Event::FreeRide && race.0.state == RaceState::Finished && game.screen != Screen::Menu);
     if done && !*was {
-        let track = list.dirs.get(list.current).and_then(|d| d.file_name()).map(|n| n.to_string_lossy().to_string()).unwrap_or_default();
-        let rec = recs.0.entry(track).or_default();
-        let better = |old: Option<usize>, new: usize| Some(old.map_or(new, |o| o.min(new)));
-        match game.event {
-            Event::Race => {
-                rec.time = Some(rec.time.map_or(race.0.time, |t| t.min(race.0.time)));
-                if game.round + 1 >= ROUNDS.len() && game.place < 3 { rec.race = better(rec.race, game.place); }
-            }
-            Event::ShowOff => {
-                rec.score = rec.score.max(rider.0.score);
-                if let Some(m) = showoff(&track_key(&list)).0.iter().position(|s| rider.0.score >= *s) { rec.showoff = better(rec.showoff, m); }
-            }
-            Event::FreeRide => { rec.time = Some(rec.time.map_or(race.0.time, |t| t.min(race.0.time))); rec.score = rec.score.max(rider.0.score); }
+        // the riders as they finished: the standings, or the player alone
+        let table = if game.table.is_empty() || game.event == Event::FreeRide { vec![(me.clone(), Some(race.0.time), true)] } else { game.table.clone() };
+        if career.record_run(game.event, game.round, &track_key(&list), &me, &table, rider.0.score) {
+            game.points = career.points();
+            career.save();
         }
-        recs.save();
-        career.save();
     }
     *was = done;
+}
+
+impl CareerRes {
+    /// A finished run into the block as the game's end of race does it: the race's riders, places, times (hundredths)
+    /// and scores in the career's race area (+0x27dc: per rider +0x3c the character, +0x69 the player; the places
+    /// +0x3264, the times +0x327c, the score blocks +0x3294), the mode, course and heat; then `Career_CheckNewRecords`
+    /// (the course's high-score tables and, in the World Circuit, `Circuit_ProcessRaceResult`: medals, points,
+    /// unlocks) and the character's best time or score. False for a folder not in the course table.
+    /// STANDIN: the race area filled from our standings (names, times) for the game's own race objects (its riders'
+    /// +0x418, `cAI::vf17_111820`'s tables, row G4j).
+    pub fn record_run(&mut self, event: Event, round: usize, key: &str, me: &str, table: &[(String, Option<f32>, bool)], score: u32) -> bool {
+        let Some(course) = Self::course(key) else { return false };
+        let ch = Self::character(me);
+        self.ensure_player(ch);
+        let c = &mut self.0;
+        let player = table.iter().position(|t| t.2).unwrap_or(0);
+        c.w32(0x2afc, Self::mode(event));
+        c.w32(0x2af8, course);
+        c.w32(0x27dc, table.len() as u32);
+        for (i, (name, time, mine)) in table.iter().enumerate() {
+            let r = 0x27dc + 0x84 * i;
+            c.bytes[r + 0x69] = if *mine { 0 } else { 0xff };
+            c.w32(r + 0x3c, if *mine { ch } else { Self::character(name) });
+            c.w32(0x3264 + 4 * i, i as u32);
+            c.w32(0x327c + 4 * i, time.map_or(i32::MAX, |t| (t * 100.0) as i32) as u32);
+            c.w32(0x3294 + 0xbc * i + 0x7c, if *mine { score } else { 0 });
+        }
+        // the heat (`RiderSetup` +0x14): the circuit's race medal comes at the final
+        c.w32(0x320c + 0x14, round as u32);
+        let mut circuit = tricky_game::circuit::Circuit::default();
+        c.check_new_records(&mut RecordsRun { player, circuit: &mut circuit }, &tricky_game::cheats::Cheats::default());
+        match event {
+            Event::ShowOff => c.record_best_score(ch as usize, course as usize, score as i32),
+            _ => {
+                if let Some(t) = table[player].1 { c.record_best_time(ch as usize, course as usize, (t * 100.0) as i32); }
+                if event == Event::FreeRide { c.record_best_score(ch as usize, course as usize, score as i32); }
+            }
+        }
+        true
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn fresh() -> CareerRes {
+        let (career, _) = tricky_game::career::CareerFile::open(None, 0, 1, None);
+        CareerRes(career)
+    }
+
+    #[test]
+    fn a_final_won_is_gold_and_opens_the_next() {
+        let mut c = fresh();
+        c.ensure_player(CareerRes::character("mac"));
+        assert!(c.char_open("mac") && !c.char_open("brodi"));
+        assert!(c.course_open(Event::Race, "gari") && !c.course_open(Event::Race, "snowdream"));
+        assert_eq!(c.medal(Event::Race, "gari"), None);
+        let table = |me: usize| (0..6).map(|i| (if i == me { "Mac".to_string() } else { tricky_game::rivals::NAMES[i + 4].to_string() }, Some(100.0 + i as f32), i == me)).collect::<Vec<_>>();
+        // a heat won is no medal yet
+        assert!(c.record_run(Event::Race, 0, "gari", "mac", &table(0), 0));
+        assert_eq!(c.medal(Event::Race, "gari"), None);
+        assert_eq!(c.best("gari").0, Some(100.0));
+        // the final won: gold, its 15 points, the next course of the circuit and the next rider open
+        assert!(c.record_run(Event::Race, 2, "gari", "mac", &table(0), 0));
+        assert_eq!(c.medal(Event::Race, "gari"), Some(0));
+        assert_eq!(c.points(), 15);
+        assert!(c.course_open(Event::Race, "snowdream"));
+        let next = tricky_game::rivals::NAMES[tricky_game::circuit::CHARACTER_ORDER.iter().map(|&k| k as usize).find(|&k| !["Mac", "Moby", "Elise", "Eddie"].contains(&tricky_game::rivals::NAMES[k])).unwrap()];
+        assert!(c.char_open(next), "{next} opens with the gold");
+        assert!(c.board_open(2) && !c.board_open(3), "boards up to 5 points");
+        // a worse final keeps the gold
+        assert!(c.record_run(Event::Race, 2, "gari", "mac", &table(2), 0));
+        assert_eq!(c.medal(Event::Race, "gari"), Some(0));
+        assert_eq!(c.points(), 15);
+        // medals are the character's: another rider starts with none
+        c.ensure_player(CareerRes::character("moby"));
+        assert_eq!(c.medal(Event::Race, "gari"), None);
+        assert_eq!(c.points(), 0);
+    }
+
+    #[test]
+    fn a_showoff_scores_its_medal() {
+        let mut c = fresh();
+        let gold = showoff("gari").0[0];
+        assert!(c.record_run(Event::ShowOff, 0, "gari", "elise", &[("Elise".into(), None, true)], gold));
+        assert_eq!(c.medal(Event::ShowOff, "gari"), Some(0));
+        assert_eq!(c.best("gari").1, gold);
+        assert!(!c.record_run(Event::Race, 2, "nowhere", "elise", &[("Elise".into(), Some(1.0), true)], 0));
+    }
 }
 
 #[derive(Resource)]
@@ -227,7 +373,7 @@ pub fn trick_book(mut rider: ResMut<RiderRes>, lib: Res<CharLib>, mut book: ResM
 }
 
 /// Menu and results input. Riding input is read in `ride`.
-pub fn menus(keys: Res<ButtonInput<KeyCode>>, pads: Query<&Gamepad>, time: Res<Time>, mut game: ResMut<Game>, mut lib: ResMut<CharLib>, mode: Res<Mode>, recs: Res<Records>, list: Res<LevelList>, book: Res<crate::book::Book>) {
+pub fn menus(keys: Res<ButtonInput<KeyCode>>, pads: Query<&Gamepad>, time: Res<Time>, mut game: ResMut<Game>, mut lib: ResMut<CharLib>, mode: Res<Mode>, career: Res<CareerRes>, list: Res<LevelList>, book: Res<crate::book::Book>) {
     game.since += time.delta_secs();
     if *mode != Mode::Ride { return; }
     let pad = |b: GamepadButton| pads.iter().any(|p| p.just_pressed(b));
@@ -256,7 +402,8 @@ pub fn menus(keys: Res<ButtonInput<KeyCode>>, pads: Query<&Gamepad>, time: Res<T
             game.event = [Event::Race, Event::ShowOff, Event::FreeRide][game.cursor];
             // locked riders, boards and tracks can't be picked (master unlocks everything, as the cheat)
             let me = lib.chars.get(lib.player).map(|c| c.name.clone()).unwrap_or_default();
-            let open = game.master || (recs.char_open(&me) && recs.track_open(&track_key(&list)) && (BOARD_POINTS[game.board.min(11)] <= recs.points() || (game.board == 11 && book.complete(&me))));
+            // (the uber board also by our trick book, which is not on the career block yet: row C15b)
+            let open = game.master || (career.char_open(&me) && career.course_open(game.event, &track_key(&list)) && (career.board_open(game.board.min(11)) || (game.board == 11 && book.complete(&me))));
             if ok && game.since > 0.2 && open { game.round = 0; game.screen = Screen::Playing; game.since = 0.0; game.lineup = true; }
         }
         Screen::Playing => {
@@ -292,7 +439,7 @@ fn ordinal(i: usize) -> &'static str { ["1st", "2nd", "3rd", "4th", "5th", "6th"
 
 pub fn hud(
     game: Res<Game>, race: Res<RaceRes>, list: Res<LevelList>, time: Res<Time>, smooth: Res<SmoothDt>, rider: Res<RiderRes>,
-    opponents: Res<Opponents>, lib: Res<CharLib>, mode: Res<Mode>, (recs, book): (Res<Records>, Res<crate::book::Book>),
+    opponents: Res<Opponents>, lib: Res<CharLib>, mode: Res<Mode>, (career, book): (Res<CareerRes>, Res<crate::book::Book>),
     mut texts: Query<(&mut Text, &HudItem, &mut TextColor)>, mut segs: Query<(&mut Node, &mut BackgroundColor, &BoostSeg)>, mut shown: Local<f32>,
     mut panel: Single<&mut Visibility, (With<PanelBox>, Without<HudRoot>)>, mut root: Single<&mut Visibility, (With<HudRoot>, Without<PanelBox>)>,
     mut fps: Local<(f32, f32, u32)>,
@@ -391,16 +538,14 @@ pub fn hud(
             HudItem::Panel => match game.screen {
                 Screen::Menu => {
                     let key = list.dirs.get(list.current).and_then(|d| d.file_name()).map(|n| n.to_string_lossy().to_string()).unwrap_or_default();
-                    let best = match recs.0.get(&key) {
-                        Some(rec) => {
-                            let mut parts = Vec::new();
-                            if let Some(t) = rec.time { parts.push(format!("best time {}", clock(t))); }
-                            if rec.score > 0 { parts.push(format!("best score {}", rec.score)); }
-                            if let Some(m) = rec.race { parts.push(format!("race {}", MEDALS[m.min(2)].to_lowercase())); }
-                            if let Some(m) = rec.showoff { parts.push(format!("show-off {}", MEDALS[m.min(2)].to_lowercase())); }
-                            if parts.is_empty() { "no results yet".to_string() } else { parts.join("   ") }
-                        }
-                        None => "no results yet".to_string(),
+                    let best = {
+                        let mut parts = Vec::new();
+                        let (time, score) = career.best(&key);
+                        if let Some(t) = time { parts.push(format!("best time {}", clock(t))); }
+                        if score > 0 { parts.push(format!("best score {score}")); }
+                        if let Some(m) = career.medal(Event::Race, &key) { parts.push(format!("race {}", MEDALS[m].to_lowercase())); }
+                        if let Some(m) = career.medal(Event::ShowOff, &key) { parts.push(format!("show-off {}", MEDALS[m].to_lowercase())); }
+                        if parts.is_empty() { "no results yet".to_string() } else { parts.join("   ") }
                     };
                     let data = crate::trickdata::RIDERS.iter().position(|d| d.name.eq_ignore_ascii_case(&me)).unwrap_or(0);
                     let board = &crate::trickdata::BOARDS[data][game.board.min(11)];
@@ -409,12 +554,12 @@ pub fn hud(
                     let line = |i: usize, label: &str, value: String| if game.row == i { format!(">  {label}   <  {value}  >") } else { format!("{label}   {value}") };
                     format!("S S X   T R I C K Y\ntricky-rs\n\n{}\n{}\n{}\n{}\n{}\n\nedging {:.0}  speed {:.0}  stability {:.0}  tricks {:.0}\n{best}\ncareer points {}\n{}\n\nUp / Down: row    Left / Right: change    Enter: start",
                         line(0, "Event", ["World Circuit - Race", "World Circuit - Show-off", "Free Ride"][game.cursor.min(2)].to_string()),
-                        line(1, "Rider", format!("{me}{}", if game.master || recs.char_open(&me) { String::new() } else { format!("  - locked ({} golds to go)", CHAR_NEXT.iter().position(|c| c.eq_ignore_ascii_case(&me)).map_or(0, |i| i + 1 - recs.golds().min(i + 1))) })),
+                        line(1, "Rider", format!("{me}{}", if game.master || career.char_open(&me) { String::new() } else { "  - locked (each gold opens the next rider)".to_string() })),
                         line(2, "Board", format!("{} of 12  {}  ({kind}){}", game.board + 1, board.name,
-                            { let need = BOARD_POINTS[game.board.min(11)]; if need > recs.points() { format!("  - unlocks at {need} pts") } else { String::new() } })),
-                        line(3, "Track", format!("{track}{}", if game.master || recs.track_open(&track_key(&list)) { "" } else { "  - locked (medal on the track before)" })),
+                            { let need = BOARD_POINTS[game.board.min(11)]; if !career.board_open(game.board.min(11)) { format!("  - unlocks at {need} pts") } else { String::new() } })),
+                        line(3, "Track", format!("{track}{}", if game.master || career.course_open(game.event, &track_key(&list)) { "" } else { "  - locked (medal on the track before)" })),
                         line(4, "Training", if game.master { "master (fully trained)".to_string() } else { format!("career - {} ({} of 240 pts)", rank(game.points), game.points) }),
-                        st.edging * 100.0, st.speed * 100.0, st.stability * 100.0, st.tricks * 100.0, recs.points(), book.summary(&me))
+                        st.edging * 100.0, st.speed * 100.0, st.stability * 100.0, st.tricks * 100.0, career.points(), book.summary(&me))
                 }
                 Screen::Playing => String::new(),
                 Screen::Paused => {

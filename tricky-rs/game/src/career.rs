@@ -813,6 +813,27 @@ impl Career {
         3
     }
 
+    /// What `Career_IsCourseUnlocked` 0x163bb8 reads (`courses::course_unlocked`): +8 the single events' course bits,
+    /// the first slot's player byte (+0x30fc) and its character record's circuit bytes (+0x3114 → +0x26 / +0x27 by
+    /// course)
+    pub fn unlocks(&self) -> crate::courses::Unlocks {
+        let slot = self.bytes[0x30fc] as i8;
+        let mut circuit = [[0u8; 2]; 12];
+        if 0 <= slot {
+            let rec = self.ptr(0x3114);
+            for (k, c) in circuit.iter_mut().enumerate() {
+                *c = [self.bytes[rec + 4 * k + 0x26], self.bytes[rec + 4 * k + 0x27]];
+            }
+        }
+        crate::courses::Unlocks { bits: self.r32(8), career_slot: slot, circuit }
+    }
+
+    /// The character record of character `c` (the 0x1c4-byte records from +0x100 that `Career_AssignPlayerRider`
+    /// points a slot at)
+    pub fn character_record(c: u32) -> usize {
+        0x100 + 0x1c4 * c as usize
+    }
+
     /// `Career_ResetPlayerRecord` 0x163e70(player): the player's character record made new, its profile the short
     /// record, `Career_UpdateAttributes`
     pub fn reset_player_record(&mut self, p: i8, cheats: &crate::cheats::Cheats) {

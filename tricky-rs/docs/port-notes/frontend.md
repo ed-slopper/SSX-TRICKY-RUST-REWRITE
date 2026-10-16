@@ -125,3 +125,25 @@ The options page is the record at +0x570 (selection +0x584, count +0x588); its i
 - `Vec4_ScaleCopy18` 0x239930 (the same VU scale-and-store as the others).
 - Still unclear: 0x262b78..0x262ca0 (calls on gApp+0x734 → +0xa4), 0x2661e8 (+0xa1), 0x2663e8, 0x269be8, 0x26ce58 /
   0x26ce68 (type 0x61 / 99 tests), 0x26cf28, 0x26f688 / 0x26f698, 0x265758, 0x263270, 0x265bb8.
+
+## The app's results on the career block (E12d2, `src/ui.rs`)
+
+- The app keeps its medals, best times and scores and unlocks in the game's career block (`tricky-career.sav`), as
+  the game does: the player is slot 0 on the chosen character (`Career_AssignPlayerRider`), so the World Circuit's
+  medals, points and boards are that character's (its record at +0x100 + 0x1c4 · character: +0x24 / +0x25 the show-off
+  / race medal by course, +0x26 / +0x27 the course open in each, +4 / +8 the points, +0x58 the boards).
+- The menus ask the block: `Career_IsCharacterUnlocked` for the rider, `Career_IsCourseUnlocked` for the track in
+  the event's mode (the app's race is a World Circuit race, 4; its show-off a circuit show-off, 5; free ride 7, on the
+  single events' course bits +8), `Career_IsUnlockBitSet` for the board (plus the app's own trick book for the uber
+  board until C15b), `Career_GetCourseMedal` and the character's best time / score words for the panel.
+- At a run's end `CareerRes::record_run` fills the career's race area from the app's standings (the riders'
+  characters and player bytes, places, times in hundredths, the player's score in its stats block), the mode, course
+  and heat, and runs `Career_CheckNewRecords` (high-score tables; in the circuit `Circuit_ProcessRaceResult`, which
+  gives the medal at the final heat and its unlocks), then `Career_RecordBestTime` / `_RecordBestScore`. The race area
+  comes from the app's standings, not the game's race objects (STANDIN, G4j's `cAI::vf17` tables).
+- The slots are not in the card's part, so they are cleared at load and filled when the menus pick a rider. The old
+  `tricky-save.json` (the app's own earlier save) is read once into the current character's record (medals, their
+  points, the next course opened) and renamed `.json.carried`.
+- Checked by unit tests (`ui::tests`: a won final gives gold, 15 points, the next course and rider, the boards to 5
+  points; a worse final keeps the gold; another rider starts with none; a show-off's medal) and a run of the app on
+  a carried save.
