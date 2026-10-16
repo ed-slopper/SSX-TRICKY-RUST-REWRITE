@@ -93,7 +93,6 @@ state machine and the renderer are ours. Nothing has been checked against the or
 | G10b2 | The app's music on `tricky_game::pf` instead of `pathmusic.rs`'s own graph walk: the songs' `.mpf` loaded and registered, the driver's update and beat callbacks each frame, `Music_SetPathVar` / events through the controls, the stream calls (`PfEnv` / `PfDriver`) on the app's decoded segments; song names from `music.inf` / `musicmap.inf` | unowned | G10b | | Gap of G10b Split: G10b2a, G10b2b, G10b2c |
 | G10b2c | The app's music on them: `tricky_game::pf` and the G10b2a/b layer driving the race songs (the `.mpf` graphs from the disc's MUSIC.BIG registered, the driver's update and beat each frame, `Music_SetPathVar` and the events through the controls) with the stream calls (`PfEnv` / `PfDriver`) playing the app's decoded segments (the segment found by the graph's own offset table), in place of `pathmusic.rs`'s own walk | any | G10b2b | | Split of G10b2 Split: G10b2c1, G10b2c2 |
 | G10b2c2 | The rest of G10b2c: the music system's layers (`musicsong`, `musicsys`) between the app and Pathfinder (MUSIC.INF through the ini reader, the song's volume, `MusicSys_FadeTo`), the scheduler (`SndSys_ScheduleEvent`: the break, the air loop, the fade step) and the air loops from the LOOPDATA banks on it, in place of `pathmusic.rs`'s own | any | G10b2c1 | | Split of G10b2c Split: G10b2c2a, G10b2c2b, G10b2c2c |
-| G10b2c2b | The app's music on the music system's layers and the scheduler: a `cMusicSys` in the engine's memory (MUSIC.INF through the ini reader, `Audio_StartRaceMusic` 0x215220: `MusicSys_PlaySong`, the section, the path variable 80), `Music_SetPathVar` / `Audio_MusicEvent` / `Audio_UpdateSongVolume` / `MusicSys_FadeTo` from the game's callers, the scheduler ticked every 10 ms firing the break, fade and bank events | any | G10b2c2a | | Split of G10b2c2 |
 | G10b2c2c | The air loops on the game's machinery: the air-loop event's callback (the audio system's vtable +0x74 through 0x225850) playing the LOOPDATA bank's program at its beat, in place of `pathmusic.rs`'s own loops | any | G10b2c2b | | Split of G10b2c2 |
 | G10c | Announcer (DJ Atomika) and rider voices: when each line is picked and played | unowned | G10 | | [est] Split: G10c1, G10c2 |
 | G11 | Pre- and post-race scenes: `cPreRaceHandler`, `cEndRaceHandler_Update` 0x1141e0, scripts table 0x32f380, row filters | unowned | E11, G5 | | [repo] `intro.rs`; "Unresolved: post-race scene row filters" |
@@ -159,6 +158,7 @@ matches the original.
 
 | ID | Task | Section | Who | Date | Commit |
 |---|---|---|---|---|---|
+| G10b2c2b | The race songs on the game's music system (`tricky_game::musichost`: a cMusicSys with the ported layers on Pathfinder, `Audio_StartRaceMusic`, MUSIC.INF through the game's ini reader, the scheduler every 10 ms, the driver beneath), checked headless in tests/musichost.rs | P2 | ed-slopper/puffin | 2026-10-16 | abcb1ec |
 | G10b2c2a | The sound system's scheduler (`tricky_game::sndevents`: cMonitor's 48 events, schedule, cancel, the 10 ms tick and the firing), checked in tests/sndevents.rs | P2 | ed-slopper/puffin | 2026-10-16 | 022e1e3 |
 | G10b2c1 | The race songs on the game's Pathfinder (`tricky_game::pfplay`: the graph from MUSIC.BIG registered, the track loaded as `Music_LoadPathfinder` does, events and variable posted, update every frame) over the port's stream driver on the decoded segments; checked headless in tests/pfplay.rs | P2 | ed-slopper/puffin | 2026-10-16 | 951735a |
 | G10b2b | The music system's song control (`tricky_game::musicsys`: play, start, stop, events, fades, breaks and air loops, the front end's events, the song list), checked in tests/musicsys.rs | P2 | ed-slopper/puffin | 2026-10-16 | 2cb9c78 |
@@ -1100,3 +1100,4 @@ matches the original.
 - 2026-10-16 ed-slopper/puffin: G10b2c1 done.
 - 2026-10-16 ed-slopper/puffin: split G10b2c2 into G10b2c2a (claimed), G10b2c2b, G10b2c2c.
 - 2026-10-16 ed-slopper/puffin: G10b2c2a done.
+- 2026-10-16 ed-slopper/puffin: G10b2c2b done (claimed and done in one; the music system on the layers).
