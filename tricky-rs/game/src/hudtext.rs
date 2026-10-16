@@ -3,7 +3,7 @@
 //! (`tests/hudtext.rs`). The calls go through `hudsprites::SpritesEnv`; the layout tables and the score entries are
 //! as described in `hudsprites.rs`.
 //!
-//! By the HUD's flags (+0x104): 0x200 the lap (number and its ordinal), 0x1 the race time, 0x20000000 the gap to the
+//! By the HUD's flags (+0x104): 0x200 the race place (+0x110 + 1 and its ordinal), 0x1 the race time, 0x20000000 the gap to the
 //! other player, 0x800 the speed, 0x200 without 0x1000000 "/" and the riders' count, 0x400 the kind-13 caption, 0x8
 //! the multiplier, 0x100000 the kind-12 "X" bonus, 0x20000 the trick messages or the tricky prompt, 0x400000 the
 //! kind-11 / 10 bonus and split, 0x100 the split markers' names, 0x1000000 the show-off's medal text; then the
@@ -38,8 +38,8 @@ const RACE_TIME: u32 = 0x11ea28;
 pub const INT_FORMAT: u32 = 0x38d020;
 pub const MPH: u32 = 0x38da70;
 pub const KMH: u32 = 0x38da78;
-/// The lap ordinals' strings (1st .. 4th), copied to the frame
-pub const LAP_NAMES: [u32; 4] = [0xe44, 0xe54, 0xe58, 0xe45];
+/// The place ordinals' strings ("st" / "nd" / "rd" / "th" for 1st .. 4th), copied to the frame
+pub const PLACE_NAMES: [u32; 4] = [0xe44, 0xe54, 0xe58, 0xe45];
 /// The time the gap counts from, the speed units (0 km/h), the career
 pub const GAP_CLOCK: u32 = 0x32de98;
 pub const UNITS: u32 = 0x32ca10;
@@ -108,23 +108,23 @@ pub fn draw_player_text(m: &mut Mem, env: &mut dyn SpritesEnv, top: f32, left: f
     let flags = |m: &Mem| m.r32(hud + 0x104);
     if flags(m) & 0x200 != 0 {
         let (s1, v1) = (lay(m, 0x28), lay(m, 0x14));
-        for (k, id) in LAP_NAMES.iter().enumerate() {
+        for (k, id) in PLACE_NAMES.iter().enumerate() {
             m.w32(sp + 4 * k as u32, *id);
         }
-        let laps = m.r32(rider + 0x110);
-        let mut lap = laps.wrapping_add(1);
-        if laps == 0 {
+        let place = m.r32(rider + 0x110);
+        let mut shown = place.wrapping_add(1);
+        if place == 0 {
             colour(m, [alpha, bits(0x3f73f3f4), bits(0x3f3ababb), bits(0x3dd8d8d9)]);
         } else {
             colour(m, white(alpha));
         }
         let (x, y, sc, corner) = (left + fl(m, v1), top + fl(m, v1 + 4), fl(m, v1 + 12), m.r32(v1 + 8));
-        env.call(m, 0x1a82e8, &[hud, lap, corner], &[x.0, y.0, sc.0, 0.0]);
-        if (lap as i32) >= 5 {
-            lap = 4;
+        env.call(m, 0x1a82e8, &[hud, shown, corner], &[x.0, y.0, sc.0, 0.0]);
+        if (shown as i32) >= 5 {
+            shown = 4;
         }
         let (x, y) = (left + fl(m, s1), top + fl(m, s1 + 4));
-        let id = m.r32(sp.wrapping_add(lap.wrapping_sub(1).wrapping_mul(4)));
+        let id = m.r32(sp.wrapping_add(shown.wrapping_sub(1).wrapping_mul(4)));
         let s = text(m, env, id);
         print(m, env, PRINT_A, font, s, fl(m, s1 + 12), x, y);
     }

@@ -26,13 +26,12 @@ const GAPP: u32 = 0x337c58;
 const FONT_COLOR: u32 = 0x337fe8;
 /// The fake objects, in one block above the game's memory
 const ARENA: u32 = 0x0100_0000;
-const ARENA_SIZE: u32 = 0x4_0000;
+const ARENA_SIZE: u32 = 0x6_0000;
 const HUD: u32 = ARENA;
 const APP: u32 = ARENA + 0x1000;
 const RACE: u32 = ARENA + 0x2000;
 const WORLD: u32 = ARENA + 0x2400;
 const MAN: u32 = ARENA + 0x2500;
-const PATH: u32 = ARENA + 0x2e00;
 const FONT1: u32 = ARENA + 0x2f00;
 const FONT2: u32 = ARENA + 0x2f40;
 const SET: u32 = ARENA + 0x3000;
@@ -43,6 +42,10 @@ const RIDERS: u32 = ARENA + 0x8000;
 const RIDER_SIZE: u32 = 0x6000;
 const STRINGS: u32 = ARENA + 0x2_0000;
 const STACK_TOP: u32 = ARENA + 0x4_0000;
+/// The race's path set (`AIP_LoadPathsFromFile` 0x197da0 fills it): +8 the event paths' count, +0xc their records,
+/// +0x10 the main one; its event paths' records and events are kept from here
+const PATH_SET: u32 = 0x337fb8;
+const EVENT_PATHS: u32 = ARENA + 0x4_0000;
 /// The game's ranges copied from the executable: the HUD's globals (bands, colour, tables), the view layouts
 /// (bss), the layouts' initialisers and the formats, the settings the constructor reads, the audio object the
 /// update's sounds are handed (the app plays none of them)
@@ -75,6 +78,8 @@ pub struct GameHud {
     tick: f32,
     /// the game mode and course the HUD overlay was built for
     mode: Option<(u32, u32)>,
+    /// the disc, for the courses' `.aip`
+    disc: String,
     quads: usize,
     texts: usize,
 }
@@ -186,6 +191,7 @@ struct Env<'a> {
     /// the race time in hundredths (`Boarder_GetRaceTime` 0x11ea28), and whether the rider has finished
     race_time: u32,
     finished: bool,
+    progress: [f32; 4],
 }
 
 impl Env<'_> {
@@ -300,8 +306,10 @@ impl SpritesEnv for Env<'_> {
                 let s = ascii(m, a(1));
                 put_wide(m, a(0), &s);
             }
-            // the race, from the app (STANDIN: the main path an empty record, the race's path set not built; G8l)
-            0x197ef0 => return (PATH, 0.0),
+            // the race: the main event path of the course's path set, the app's race time and finish
+            0x197ef0 => return (m.r32(PATH_SET + 0x10), 0.0),
+            // `Boarder_GetRaceProgress` 0x1170d0 for the drawing rider
+            0x1170d0 => return (0, self.progress[0]),
             0x11ea28 => return (self.race_time, 0.0),
             0x11d998 => return (self.finished as u32, 0.0),
             // `Score_GetRankForPoints`: the rank (`score::rank_for_points`) and its colour, the rank's record at
@@ -337,6 +345,8 @@ impl SpritesEnv for Env<'_> {
 struct StateEnv {
     units: f32,
     mult: f32,
+    /// each rider's race progress (`Boarder_GetRaceProgress`): its distance to the finish (+0x374), cm
+    progress: [f32; 4],
 }
 impl HudEnv for StateEnv {
     fn call(&mut self, m: &mut Mem, func: u32, args: &[u32]) -> u32 {
@@ -348,7 +358,12 @@ impl HudEnv for StateEnv {
             }
             0x155440 => tricky_game::score::calc_points(self.units, self.mult) as u32,
             0x1554c0 => tricky_game::score::calc_base_points(self.units) as u32,
-            0x197ef0 => PATH,
+            0x197ef0 => m.r32(PATH_SET + 0x10),
+            // `HUD_BuildSplitList` (the constructor's) on the race's path set
+            0x1a1968 => {
+                hudstate::reset(m, self, args.first().copied().unwrap_or(HUD));
+                0
+            }
             0x1814a8 => {
                 let k = args.get(1).copied().unwrap_or(0);
                 RIDERS + RIDER_SIZE * k
@@ -359,9 +374,8 @@ impl HudEnv for StateEnv {
     fn multiplier(&mut self, _m: &mut Mem, _score: u32) -> f32 {
         tricky_game::score::get_multiplier(self.units)
     }
-    fn progress(&mut self, _m: &mut Mem, _rider: u32) -> f32 {
-        // STANDIN: `Boarder_GetRaceProgress` not kept by the app
-        0.0
+    fn progress(&mut self, _m: &mut Mem, rider: u32) -> f32 {
+        self.progress.get((rider.wrapping_sub(RIDERS) / RIDER_SIZE) as usize).copied().unwrap_or(0.0)
     }
     fn renderer(&mut self, _m: &mut Mem, slot: u32, _args: &[u32]) -> u32 {
         match slot {
@@ -373,6 +387,40 @@ impl HudEnv for StateEnv {
     fn draw_player(&mut self, _m: &mut Mem, _func: u32, _x: f32, _y: f32, _w: f32, _h: f32, _hud: u32, _i: u32) {}
 }
 
+/// The race's event paths as `AIP_LoadEventPaths` 0x1983d0 / `AIPath_Load` 0x196f28 lay them out, from the course's
+/// `.aip`: the count and records (0x3c bytes: +0 the events' count, +4 the events, +8 the points' count, +0xc the
+/// start, +0x1c / +0x28 the box, +0x38 parameter 0, the distance to the finish at the start), each event 16 bytes
+/// (the type's place in the table, the value, the start, the end), and the main path. The points themselves are not
+/// kept (nothing the HUD calls reads them)
+fn build_paths(m: &mut Mem, aip: &tricky_data::aip::Aip) {
+    let n = aip.event_paths.len() as u32;
+    m.w32(PATH_SET + 8, n);
+    m.w32(PATH_SET + 0xc, EVENT_PATHS);
+    m.w32(PATH_SET + 0x10, EVENT_PATHS + 0x3c * aip.main_event_path);
+    let mut events = EVENT_PATHS + 0x3c * n;
+    for (k, p) in aip.event_paths.iter().enumerate() {
+        let r = EVENT_PATHS + 0x3c * k as u32;
+        if events + 16 * p.events.len() as u32 > EVENT_PATHS + 0x2_0000 {
+            break;
+        }
+        m.w32(r, p.events.len() as u32);
+        m.w32(r + 4, events);
+        m.w32(r + 8, p.points.len() as u32);
+        for (i, v) in p.start.iter().chain(p.v1.iter()).chain(p.v2.iter()).enumerate() {
+            let at = [0xc, 0x10, 0x14, 0x1c, 0x20, 0x24, 0x28, 0x2c, 0x30][i];
+            m.w32(r + at, v.to_bits());
+        }
+        m.w32(r + 0x38, p.param(0).unwrap_or(0));
+        for e in &p.events {
+            m.w32(events, e.kind);
+            m.w32(events + 4, e.value);
+            m.w32(events + 8, e.start.to_bits());
+            m.w32(events + 12, e.end.to_bits());
+            events += 16;
+        }
+    }
+}
+
 /// The game's memory for the HUD, from the executable's bytes and the sprite rectangles
 fn build(elf: &[u8], rects: &[(u32, [f32; 7])], title: &[u8], menu: &[u8]) -> Mem {
     let mut m = Mem::default();
@@ -380,6 +428,7 @@ fn build(elf: &[u8], rects: &[(u32, [f32; 7])], title: &[u8], menu: &[u8]) -> Me
         m.regions.push((at, elf_bytes(elf, at, n)));
     }
     m.regions.push((GAPP, vec![0; 4]));
+    m.regions.push((PATH_SET, vec![0; 0x30]));
     m.regions.push((ARENA, vec![0; ARENA_SIZE as usize]));
     m.w32(GAPP, APP);
     m.w32(APP + 0x5c, FONT1);
@@ -423,6 +472,7 @@ fn build(elf: &[u8], rects: &[(u32, [f32; 7])], title: &[u8], menu: &[u8]) -> Me
 /// Load the disc's executable and strings, the sheets and the rectangles, and run the HUD overlay's constructor
 fn load(hud: &mut GameHud, lib: &CharLib, images: &mut Assets<Image>) -> Option<()> {
     let p = std::env::var("TRICKY_DISC").ok()?;
+    hud.disc = p.clone();
     let mut disc = tricky_data::disc::Disc::open(&p).map_err(|e| eprintln!("game hud: disc {p}: {e}")).ok()?;
     let elf = disc.read_path("/SLUS_203.26").ok()??;
     hud.loc = disc.read_path("/DATA/LANG/AMERICAN.LOC").ok().flatten().map(tricky_data::loc::LocFile::new);
@@ -507,8 +557,21 @@ pub fn game_hud(
     }
     let r = &rider.0;
     let race = &race.0;
+    // each rider's race progress as `Boarder_GetRaceProgress` gives it with no lap done: its distance to the finish
+    // (+0x374: the race line's distance less how far along it), from the app's race lines (metres back to cm; 0
+    // before the start, when the app has none)
+    let cm = |d: f32| if d.is_finite() && d < 1.0e7 { d * 100.0 } else { 0.0 };
+    let mut progress = [0.0f32; 4];
+    let mut along = [0.0f32; 4];
+    let mut laps = [0i32; 4];
+    along[0] = cm(race.prog.dtf);
+    laps[0] = race.prog.laps as i32;
+    for (k, o) in opponents.0.iter().take(3).enumerate() {
+        along[k + 1] = cm(o.prog.dtf);
+        laps[k + 1] = o.prog.laps as i32;
+    }
     let riding = *mode == Mode::Ride && game.screen == ui::Screen::Playing;
-    let GameHud { mem, loc, sheets, tick, mode: built, quads: nq, texts: nt, .. } = &mut *hud;
+    let GameHud { mem, loc, sheets, tick, mode: built, disc, quads: nq, texts: nt, .. } = &mut *hud;
     let Some(m) = mem.as_mut() else { return };
     // the game mode for the app's event (its menu's "World Circuit - Race" / "- Show-off" / "Free Ride":
     // `courses::Mode` CircuitRace 4, CircuitShowoff 5, Freeride 7) and the course's number from the game's course
@@ -529,7 +592,14 @@ pub fn game_hud(
     if *built != Some((game_mode, course)) {
         m.w32(hudstate::GAME_MODE, game_mode);
         m.w32(hudstate::LAP_MODE, course);
-        hudstate::hud_overlay_new(m, &mut StateEnv { units: 0.0, mult: 0.0 }, HUD);
+        // the course's path set from its `.aip` on the disc (none: an empty set)
+        m.w32(PATH_SET + 8, 0);
+        m.w32(PATH_SET + 0x10, EVENT_PATHS);
+        let aip = tricky_data::disc::Disc::open(&*disc).ok().and_then(|d| tricky_data::aip::from_disc(&mut tricky_data::big::Files::new(d), &folder, "aip"));
+        if let Some(aip) = aip {
+            build_paths(m, &aip);
+        }
+        hudstate::hud_overlay_new(m, &mut StateEnv { units: 0.0, mult: 0.0, progress }, HUD);
         hudstate::set_view_layout(m, 0);
         *built = Some((game_mode, course));
     }
@@ -541,7 +611,6 @@ pub fn game_hud(
     let racing = race.state != tricky_game::race::RaceState::Finished;
     m.w32(rd + 0x1c, r.boost.clamp(0.0, 1.0).to_bits());
     m.w32(rd + 0x24, r.uber_timer.to_bits());
-    m.w32(rd + 0x110, if race.lines.has_laps() { race.prog.laps.min(4) } else { 0 });
     for (k, v) in [r.vel.x, r.vel.y, r.vel.z, 0.0].iter().enumerate() {
         // the game's velocity is in centimetres a second
         m.w32(rd + 0x150 + 4 * k as u32, (v * 100.0).to_bits());
@@ -555,20 +624,60 @@ pub fn game_hud(
         m.w32(e + 8, life.to_bits());
         m.w32(e + 12, age.to_bits());
     }
-    // the riders: the player, then up to three opponents (STANDIN: only whether each is still racing)
+    // `Boarder_GetRaceProgress` (`progress::race_progress`): with laps to go (+0x114, the app's count) their laps of
+    // the main path's length on top, the lap line (+0x37c) its length less its lap event's (0xd) distance
+    let main = m.r32(PATH_SET + 0x10);
+    let lap_len = f32::from_bits(m.r32(main + 0x38));
+    let mut lap_line = 0.0f32;
+    for k in 0..m.r32(main) {
+        let e = m.r32(main + 4) + 16 * k;
+        if m.r32(e) == 0xd {
+            lap_line = lap_len - f32::from_bits(m.r32(e + 8));
+        }
+    }
+    for k in 0..4 {
+        let p = tricky_game::progress::Progress { laps: laps[k], along: along[k], line: lap_line, ..Default::default() };
+        progress[k] = tricky_game::progress::race_progress(&p, lap_len);
+    }
+    // the race place (+0x110, 0 first) in the app's standings order (`standings`: finished riders first by their
+    // time, then the rest by that progress, the least to go first). STANDIN: the game places them in
+    // `Race_UpdatePlacingsAndRubberBand` 0x115100 every 6 ticks, not run by the app (row G8m)
+    let others = opponents.0.len().min(3);
+    let mut done = [None::<f32>; 4];
+    done[0] = (race.state == tricky_game::race::RaceState::Finished).then_some(race.time);
+    for (k, o) in opponents.0.iter().take(3).enumerate() {
+        done[k + 1] = o.driver.finished;
+    }
+    let ahead = |j: usize, k: usize| match (done[j], done[k]) {
+        (Some(a), Some(b)) => a < b,
+        (Some(_), None) => true,
+        (None, Some(_)) => false,
+        (None, None) => progress[j] < progress[k],
+    };
+    for k in 0..=others {
+        let place = (0..=others).filter(|&j| j != k && ahead(j, k)).count() as u32;
+        m.w32(RIDERS + RIDER_SIZE * k as u32 + 0x110, place);
+    }
+    // the riders: the player, then up to three opponents (their progress, +0x374 / +0x380; STANDIN: otherwise only
+    // whether each is still racing)
     let others = opponents.0.len().min(3) as u32;
     m.w32(WORLD + 0x88, 1 + others);
     for k in 0..=others {
         let o = RIDERS + RIDER_SIZE * k;
         m.w32(WORLD + 0xc4 + 4 * k, o);
         m.w32(RACE + 0xa4 + 0x80 * k, if k == 0 { o } else { 0 });
+        m.w32(o + 0x374, progress[k as usize].to_bits());
+        m.w32(o + 0x380, progress[k as usize].to_bits());
+        // the profile's player number (+0x65): the player's 0, a computer rider's −1 (as `Career_GetPlayerLevel` and
+        // `Race_FindRiderByPlayer` take it, and the progress dots read its sign)
+        m.w8(o + 0x500 + 0x65, if k == 0 { 0 } else { 0xff });
         if k > 0 {
             m.w32(o + 0x464, o + 0x500);
             m.w32(o + 0x290, 1);
             m.w32(o + 0x418, if racing { u32::MAX } else { 0 });
         }
     }
-    let mut state = StateEnv { units: r.sc.units, mult: r.sc.mult };
+    let mut state = StateEnv { units: r.sc.units, mult: r.sc.mult, progress };
     *tick += time.delta_secs();
     let mut n = 0;
     while *tick >= 1.0 / 60.0 && n < 4 {
@@ -589,6 +698,7 @@ pub fn game_hud(
         next_string,
         race_time: (race.time * 100.0) as u32,
         finished: !racing,
+        progress,
     };
     if riding {
         hudsprites::draw_player_sprites(m, &mut env, 0.0, 0.0, 640.0, HUD, 0, STACK_TOP - 0x200);
@@ -604,6 +714,18 @@ pub fn game_hud(
             }
         }
         println!("hud flags {:#x}", m.r32(HUD + 0x104));
+        let main = m.r32(PATH_SET + 0x10);
+        let b = HUD + 0x114;
+        println!(
+            "hud paths {} main {:#x} length {} markers {} progress {:?} ahead {:?} bars {:?}",
+            m.r32(PATH_SET + 8),
+            main,
+            f32::from_bits(m.r32(main + 0x38)),
+            m.r32(HUD + 0x2c),
+            progress,
+            (0..m.r32(HUD + 0x2c).min(6)).map(|k| f32::from_bits(m.r32(b + 0xdc + 4 * k))).collect::<Vec<_>>(),
+            (0..4).map(|k| f32::from_bits(m.r32(b + 0xc4 + 4 * k))).collect::<Vec<_>>()
+        );
     }
     // show what it drew: a pool of quads and of strings under our root
     let (mut qi, mut ti) = (0usize, 0usize);

@@ -275,9 +275,9 @@ player). It draws every number and caption of one view as the game's calls, on l
 layout tables as the sprites; a text entry's +8 flags 0x20 / 0x40 centre it on x / y by its measured size.
 
 - **The alpha** is 1.0 while no overlay is visible and the rider is racing, else 0.35. The sprites use 0.5 here.
-- **0x200, the lap:**
-  - the lap number (+0x110 + 1) via `HUD_DrawNumber`, gold on the first lap;
-  - its ordinal, Loc 0xe44 / 0xe54 / 0xe58 / 0xe45 for 1st–4th. These ids are copied to the frame from 0x38da60 and
+- **0x200, the race place:**
+  - the place (+0x110, 0 first, + 1) via `HUD_DrawNumber`, gold in the lead;
+  - its ordinal, Loc 0xe44 / 0xe54 / 0xe58 / 0xe45 ("st" / "nd" / "rd" / "th") for 1st–4th. These ids are copied to the frame from 0x38da60 and
     capped at the 4th.
 - **0x1, the race time** (`HUD_FormatTime` of `Boarder_GetRaceTime`), hidden in game state 3:
   - in view 1 a rider who has finished shows the other player's time if it is longer;
@@ -496,9 +496,9 @@ stays.
 and free ride (`courses::Mode` 4, 5 and 7), and the course number is found in the game's course table by the level
 folder's name.
 
-**STANDINs left** (each marked in the code; row G8l): the race's progress (`Boarder_GetRaceProgress`), its path set
-(0x337fb8: the split markers and the riders' dots), and the opponents' fields beyond racing or not. G8k replaced
-the rest with the game's own code (below).
+**STANDINs left** (each marked in the code; row G8m): the race place, ranked by the app's standings rather than by
+`Race_UpdatePlacingsAndRubberBand`, and the opponents' fields beyond their progress, place and racing or not. G8k
+and G8l replaced the rest with the game's own code and data (below).
 
 ## The fonts in memory, and the HUD's last stand-ins (G8k)
 
@@ -542,4 +542,42 @@ GO") and 0xe29 ("%d seconds") hold a `%`, and both go through `WStr_Format` with
   `HUD_BuildSplitList` uses it as the length its marker distances are taken from; the loader decides);
 - each rider's race progress (`Boarder_GetRaceProgress` on +0x110 / +0x114 / +0x374 / +0x37c);
 - the opponents' fields.
+
+## The race's path set, progress and place in the app's HUD (G8l)
+
+**The path set at 0x337fb8**, as `AIP_LoadPathsFromFile` 0x197da0 leaves it:
+- +0 the AI paths' count and +4 their 0x40-byte `cAIPath` records (+0x38 the preference, parameter 100);
+- +8 the event paths' count, +0xc their 0x3c-byte `cEventPath` records, +0x10 the main one.
+
+An event path (`AIPath_Load` 0x196f28):
+- +0 its events' count and +4 the events;
+- +8 the points' count, +0xc the start, +0x18 the points, +0x1c / +0x28 its box;
+- +0x38 parameter 0, its distance to the finish at its start.
+
+An event is 16 bytes: its type's place in the table at 0x337e70 (0 if absent), the value, the start, the end. So
+the "length" `HUD_BuildSplitList` takes the markers' distances from is the event path's distance to the finish. The
+AI notes' "+0x38 the preference" is the other class, `cAIPath`.
+
+**What the app now does:**
+- builds the event paths from the course's `.aip` on the disc (`aip::from_disc`, with its main index and the
+  events' table places), without the points, which nothing the HUD calls reads;
+- runs the real `HUD_BuildSplitList` from the constructor (the course's checkpoint markers, kinds 12 / 13);
+- feeds each rider's race progress through `progress::race_progress` (`Boarder_GetRaceProgress`):
+  - +0x374, the distance to the finish (the race line's distance less how far along it, per the AI notes), from the
+    app's race lines in centimetres;
+  - +0x114, the laps to go: the app's own count, the same convention;
+  - the lap line, the main path's length less its lap event's (0xd) distance.
+
+**Two findings from feeding it:**
+- **+0x110 is the race place** (0 first), as `progress.rs` has it. `HUD_DrawPlayerText`'s flag 0x200 prints it with
+  its ordinal (Loc 0xe44 / 0xe54 / 0xe58 / 0xe45: "st" / "nd" / "rd" / "th"), so that item is the place, not the lap
+  (G8h's notes said lap; corrected above).
+- **A rider's profile byte +0x65 is its player number**, −1 for a computer rider. The progress dots are drawn (in
+  view 0) only for the negative ones, which is why the opponents need −1 there.
+
+**Seen in the app on Garibaldi:**
+- the path set has 14 event paths, the main one 460,747 cm long, and 4 split markers;
+- the opponents' dots move along the track;
+- the first checkpoint's name slides down beside the track as the rider reaches it, fading in and out as the game's
+  edges have it.
 
