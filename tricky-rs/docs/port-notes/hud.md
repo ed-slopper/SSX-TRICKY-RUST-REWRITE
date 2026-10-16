@@ -475,13 +475,15 @@ Rotated quads are shown unrotated.
 `TRICKY_HUDDBG=1` prints what was drawn once a second. Without the disc, the sheets or the fonts, the app's own HUD
 stays.
 
+**The fonts** are the game's own: `gApp+0x5c` is TITLE.SFN and `+0x60` MENU.SFN (`Font_ParseSfn` called at
+0x17e934 / 0x17e964, which also sets the title font's scales).
+
 **The game mode and course** are the game's own: the app's events are its menu's World Circuit race and show-off
 and free ride (`courses::Mode` 4, 5 and 7), and the course number is found in the game's course table by the level
 folder's name.
 
 **STANDINs** (each marked in the code), where the app does not keep the game's value:
 - `ScreenOverlay_Init` not run, with the HUD's sprite set and font placed by hand;
-- `gApp+0x5c` taken as TITLE.SFN and `+0x60` as MENU.SFN;
 - the app's SFN measure for `Font_MeasureAscii` / `_MeasureWide`;
 - no format arguments through `vsprintf`;
 - `Sprite_DrawTiled` drawn as one stretched quad;

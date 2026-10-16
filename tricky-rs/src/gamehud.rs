@@ -184,7 +184,7 @@ impl Env<'_> {
         [0, 4, 8, 12].map(|k| f32::from_bits(m.r32(FONT_COLOR + k)))
     }
     fn font_index(font: u32) -> usize {
-        // STANDIN: gApp+0x5c taken as TITLE.SFN and +0x60 as MENU.SFN
+        // gApp+0x5c holds TITLE.SFN and +0x60 MENU.SFN (`Font_ParseSfn` 0x19c858 at 0x17e934 / 0x17e964)
         if font == FONT2 { 1 } else { 0 }
     }
     /// A frame below the current one for a ported function that builds one
