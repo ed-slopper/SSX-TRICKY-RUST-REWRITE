@@ -47,6 +47,7 @@ pub mod fe_video;
 pub mod fe_widgets;
 pub mod fe_widget;
 pub mod fe_manager;
+pub mod fe_flow;
 pub mod fe_custombody;
 pub mod fe_charmodify;
 pub mod fe_charselect;

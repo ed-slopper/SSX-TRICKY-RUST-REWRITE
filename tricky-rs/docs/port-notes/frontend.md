@@ -958,6 +958,39 @@ The set-up and tear-down (the constructors 0x263280 / 0x265ca0, the destructor, 
 objects, load its fonts, models and sounds, and play the boot films. They are object glue, which row G9b2d2 leaves to
 the app, as G4k does for the AI's.
 
+### The front end's screen flow as a model (row G9u1; `game/src/fe_flow.rs`, unit-tested)
+
+The app's menus (G9u2) follow the game's screens through a model made from the ports, until the game's own widgets
+are drawn. `Flow` is a stack of screens, each with its cursor and the player it is for. Its items carry the game's
+text ids (the strings in `DATA/LANG/AMERICAN.LOC`); courses and riders carry their numbers. Each pick does what that
+screen's `CreateNextState` makes:
+- **The title:** "Start Game" opens the mode select, "DVD Content" the extras.
+- **The mode select:** highlighting an item sets the game type (its vf22): Practice 1, Single Event 0, World
+  Circuit 2. Picking Practice opens the event select; Single Event the players (two pads) or one player and the
+  rider select; World Circuit one player and the rider select.
+- **The event select:** lists by the game type (Single Event: Race, Showoff, Time Challenge; Practice: Freeride,
+  Trick Tutorial; World Circuit: Race, Showoff) and sets the game mode word:
+  - Time Challenge: 7, game type 0;
+  - Freeride: 1, game type 4, then the players;
+  - Race: 2 with the difficulty select, or 4 in the World Circuit;
+  - Showoff: 3, or 5 in the World Circuit;
+  - Trick Tutorial: 6, game type 3, one player.
+
+  Every pick except Freeride and the Trick Tutorial then opens the venue select (Race only after the difficulty).
+- **The difficulty** sets its word, then the venue select. **The venue select** picks the course from its order
+  (the bytes at 0x3a8af0) and leaves for the race.
+- **The rider select** lists the twelve riders in the front end's order (0x3470b8) and opens the user name in the
+  World Circuit, otherwise the accept; then the character modify.
+- **The modify:**
+  - Continue: the next player's rider select, or, for the last player, the venue (freeride), straight into the
+    game (the tutorial), or the event select;
+  - Outfit, Board, Rider Profile, Trick Book, User Name: their screens. An outfit or board picked is kept and the
+    screen closes.
+- **Back** pops the stack.
+
+The app sets the career's locks (riders, courses) and the pads in; locked items can't be picked. Five tests walk the
+World Circuit race, a two-player single-event race, both practice paths, the modify screens with back, and the locks.
+
 ## The 3D transition and fade record (F1c; ported in row G9b2e, `game/src/fe_transition.rs`, checked: `tests/fe_transition.rs`)
 
 One record drives both the screen fades and a blend of four renderer values (read by the renderer's virtual +0x134,
