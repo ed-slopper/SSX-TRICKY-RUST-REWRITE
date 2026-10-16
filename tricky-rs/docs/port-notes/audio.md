@@ -444,3 +444,25 @@ the entry and the box fills in the newest one before 0x222358 plays it.
 - Checked in the runner on 40,000 random systems over all 23 entry points, every call out logged with the same
   answers on both sides; 26 of 28 mutants caught (the two left cannot happen: equal times are 30 ms apart, and
   nothing the slot calls changes its bank count).
+
+## The music system's song objects (G10b2a, `game/src/musicsong.rs`; checked: `tests/musicsong.rs`)
+
+- A song (0x7134 bytes) is made by `Music_CreatePathfinder` 0x223ca8 and `Music_LoadPathfinder` 0x223d60 from its
+  `MUSIC.INF` section: the defaults (BPM 120, 4 beats a bar, 2 bars, ...), a 0x37000-byte stream buffer, then the
+  section read with the ini reader at the music system's +0xa54 while tokens last: PATHDATA (+0x18), MUSDATA (+0x38),
+  BPM (+0x100, a float), eleven numbers (+0x104..+0x130), and LOOPDATA banks (+0x58, 0x20 each, counted at +0xf8). A
+  token naming a note length ("Sixteenth", "Eighth", "Quarter", "Whole"; `stricmp`, so case does not matter) sets
+  +0x124 to that note's milliseconds at the BPM. The graph (base path + PATHDATA) is loaded into +0x134 and registered
+  with Pathfinder; the music system's volume for the song (its table at +0x3c, index +0x20) is scaled by the song's
+  percent (+0x12c) and held to 0..127, the track record's byte (+0x24 + 0x18 · index) set from it; the track is
+  loaded (`PathX_LoadSong`: base path + MUSDATA, latency 500, the record, 2, 0x96, the buffer) and its id kept at +0.
+- `Song_Pause` / `_Resume` set the stream's pitch (0 / 0x1000); `_MusicEvent` / `_SetSection` post an event (priority
+  0 / 1); `_SetPathVar` and 0x224490 set Pathfinder's variable and the track's latency; `_UpdateVolume` (not while
+  fading) gives the stream volume byte × percent (× the scale) × the master volume (0x343058), held to 0..127;
+  `_FadeOut` fades over the seconds × 1000 and sets +0x14; `Song_Delete` cancels the bank, stops the track and frees
+  the buffer. The song's stream is the word at 0x343158 + 0x3c · its Pathfinder slot.
+- Timing: a beat is 60 / BPM × 1000 ms, the song's length beat × beats × bars; the play position and length come from
+  the stream handle's state when it plays (state 2); `Song_MsToNextBeat` is a beat less `fmodf`(position, beat),
+  `Song_CurrentBeat` the position over a beat. 0x2249c0 says whether the song's bank is ready.
+- Checked in the runner on 30,000 random songs, music systems and ini sections over every function (the ini's answers,
+  upper- and mixed-case tokens, allocations failing); 18 of 18 mutants caught.

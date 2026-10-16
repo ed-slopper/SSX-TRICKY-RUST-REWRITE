@@ -3432,7 +3432,7 @@ address,size,name,system,status
 0x208c48,104,AsyncSys_Shutdown,audio?,not started
 0x208cb0,552,AsyncSys_StartNext,audio?,not started
 0x208ed8,432,AsyncSys_QueueLoad,audio?,not started
-0x209088,896,AsyncSys_CancelBank,audio?,not started
+0x209088,896,AsyncSys_CancelBank,audio?,ported
 0x209408,1676,AsyncSys_Update,audio?,not started
 0x209a98,8,FUN_00209a98,frontend?,not started
 0x209aa0,8,FUN_00209aa0,audio?,not started
@@ -3463,7 +3463,7 @@ address,size,name,system,status
 0x20a640,20,cBankManager::vf9_20a640,audio,not started
 0x20a658,48,cBankManager::vf10_20a658,audio,not started
 0x20a688,40,cBankManager::vf11_20a688,audio,not started
-0x20a6b0,48,BankManager_GetHandle,audio?,not started
+0x20a6b0,48,BankManager_GetHandle,audio?,ported
 0x20a6e0,128,BankManager_IsSlotLoaded,audio?,not started
 0x20a7b8,80,cBankManager::__tf,runtime,host
 0x20a888,56,BankInstance_Init,audio?,not started
@@ -3797,30 +3797,30 @@ address,size,name,system,status
 0x223b70,8,StreamSlot_SetVolume,audio?,ported
 0x223b78,196,StreamSlot_SetPitch,audio?,ported
 0x223c40,104,StreamSlot_Stop,audio?,ported
-0x223ca8,184,Music_CreatePathfinder,audio,not started
-0x223d60,1536,Music_LoadPathfinder,audio,not started
-0x224368,128,Song_Delete,audio?,not started
-0x2243e8,56,Song_Pause,audio?,not started
-0x224420,56,Song_Resume,audio?,not started
-0x224458,20,Song_MusicEvent,audio?,not started
-0x224470,20,Song_SetSection,audio?,not started
-0x224488,8,Song_SetPathVar,audio?,not started
-0x224498,288,Song_UpdateVolume,audio?,not started
-0x2245b8,104,Song_FadeOut,audio?,not started
-0x224620,52,PathX_GetSongState,audio?,ported
+0x223ca8,184,Music_CreatePathfinder,audio,checked
+0x223d60,1536,Music_LoadPathfinder,audio,checked
+0x224368,128,Song_Delete,audio?,checked
+0x2243e8,56,Song_Pause,audio?,checked
+0x224420,56,Song_Resume,audio?,checked
+0x224458,20,Song_MusicEvent,audio?,checked
+0x224470,20,Song_SetSection,audio?,checked
+0x224488,8,Song_SetPathVar,audio?,checked
+0x224498,288,Song_UpdateVolume,audio?,checked
+0x2245b8,104,Song_FadeOut,audio?,checked
+0x224620,52,PathX_GetSongState,audio?,checked
 0x224658,80,SongBank_PickVariant,audio?,ported
 0x2246a8,192,Song_RandomSegmentMs,audio?,ported
-0x224768,36,FUN_00224768,audio?,not started
-0x224790,48,Song_GetStreamStatus,audio?,not started
-0x2247c0,52,Song_GetStatus,audio?,not started
-0x2247f8,68,Song_GetPlayPosMs,audio?,not started
-0x224840,84,Song_GetLengthMs,audio?,not started
-0x224898,32,Song_BeatMs,audio?,not started
-0x2248b8,60,Song_LengthMs,audio?,not started
-0x2248f8,28,FUN_002248f8,audio?,not started
-0x224918,92,Song_MsToNextBeat,audio?,not started
-0x224978,68,Song_CurrentBeat,audio?,not started
-0x2249c0,144,FUN_002249c0,audio?,not started
+0x224768,36,FUN_00224768,audio?,checked
+0x224790,48,Song_GetStreamStatus,audio?,checked
+0x2247c0,52,Song_GetStatus,audio?,checked
+0x2247f8,68,Song_GetPlayPosMs,audio?,checked
+0x224840,84,Song_GetLengthMs,audio?,checked
+0x224898,32,Song_BeatMs,audio?,checked
+0x2248b8,60,Song_LengthMs,audio?,checked
+0x2248f8,28,FUN_002248f8,audio?,checked
+0x224918,92,Song_MsToNextBeat,audio?,checked
+0x224978,68,Song_CurrentBeat,audio?,checked
+0x2249c0,144,FUN_002249c0,audio?,checked
 0x224a98,496,MusicSys_Init,audio,ported
 0x224c90,100,cMusicSys::~cMusicSys,audio?,not started
 0x224cf8,360,MusicSys_LoadMusicMap,audio,ported
@@ -6226,7 +6226,7 @@ address,size,name,system,status
 0x2c8178,112,File_LoadAllocSize,files,not started
 0x2c81e8,108,File_ReadWhole,files,not started
 0x2c8258,152,File_LoadIntoCb,files,not started
-0x2c82f0,84,File_LoadInto,files,not started
+0x2c82f0,84,File_LoadInto,files,ported
 0x2c8348,80,FUN_002c8348,lib-file?,host
 0x2c8398,148,File_LoadManyCb,files,not started
 0x2c8430,108,File_LoadMany,files,not started
@@ -6446,7 +6446,7 @@ address,size,name,system,status
 0x2d13d8,80,FUN_002d13d8,lib-snd?,not started
 0x2d1428,28,FUN_002d1428,lib-snd?,not started
 0x2d1448,136,FUN_002d1448,lib-snd?,not started
-0x2d14d0,160,FUN_002d14d0,lib-snd?,not started
+0x2d14d0,160,FUN_002d14d0,lib-snd?,ported
 0x2d1570,268,FUN_002d1570,lib-snd?,not started
 0x2d1680,152,FUN_002d1680,lib-snd?,not started
 0x2d1718,152,SND_PlayBankSound,audio,not started
@@ -6473,15 +6473,15 @@ address,size,name,system,status
 0x2d2968,284,SndStream_Stop,lib-snd?,not started
 0x2d2a88,52,FUN_002d2a88,lib-snd?,not started
 0x2d2ac0,68,SndStream_CalcMemSize,lib-snd?,not started
-0x2d2b08,264,SndStream_GetStatus,lib-snd?,not started
+0x2d2b08,264,SndStream_GetStatus,lib-snd?,ported
 0x2d2c10,320,SndHandle_GetState,lib-snd?,ported
 0x2d2d50,96,FUN_002d2d50,lib-snd?,not started
 0x2d2db0,36,FUN_002d2db0,lib-snd?,not started
 0x2d2dd8,56,FUN_002d2dd8,lib-snd?,not started
-0x2d2e10,64,SndStream_SetVolume,lib-snd?,not started
-0x2d2e50,104,SndStream_FadeVolume,lib-snd?,not started
+0x2d2e10,64,SndStream_SetVolume,lib-snd?,ported
+0x2d2e50,104,SndStream_FadeVolume,lib-snd?,ported
 0x2d2eb8,84,FUN_002d2eb8,lib-snd?,not started
-0x2d2f10,64,SndStream_SetPitch,lib-snd?,not started
+0x2d2f10,64,SndStream_SetPitch,lib-snd?,ported
 0x2d2f50,60,FUN_002d2f50,lib-snd?,not started
 0x2d2f90,180,FUN_002d2f90,lib-snd?,not started
 0x2d3048,188,SndHandle_Fade,lib-snd?,not started
@@ -6951,7 +6951,7 @@ address,size,name,system,status
 0x2f26a0,200,FUN_002f26a0,sdk?,host
 0x2f2768,280,FUN_002f2768,sdk?,host
 0x2f2880,136,tanf,libc?,host
-0x2f2908,316,fmodf,libc?,host
+0x2f2908,316,fmodf,libc?,ported
 0x2f2a48,328,logf,libc?,host
 0x2f2b90,592,__ieee754_fmodf,runtime,host
 0x2f2de0,804,__ieee754_logf,runtime,host
