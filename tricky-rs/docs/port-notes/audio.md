@@ -372,3 +372,22 @@ the entry and the box fills in the newest one before 0x222358 plays it.
   not 3 a new cheer is picked from the list at audio+0x3760+0x54*answer and played (state 2).
 - `lq` / `sq` ignore the low four bits of the address; the port does too.
 - Not reached by the game and not tested: the slot / entry scans running off their ends (they would read address 0).
+
+## Names from F1c batch 14 (proven from the code, live Ghidra)
+
+- Snow sound programs: `Sfx_RunSnowProgram` 0x21ae90 is the interpreter (`sfxcalc.rs`); its inputs 1, 3 and 4 are
+  `Sfx_GetDragAmount` 0x21a6f0 (|(int) rider+0x160|, the drag), `Sfx_GetSnowInput3` 0x21a740 (impact / 4 + 2 × drag)
+  and `Sfx_GetSnowInput4` 0x21a788 (input 3 + impact).
+- `Audio_SetVolumePreset` 0x21bca8: audio+0x3834 = preset, then one of six cases (jump table 0x39f0b0) sets the volumes;
+  the sound volume menu's item 9 (`cSoundVolumeMenu::vf3`) and `cFE3DSound::vf40` call it, the constructor with 0.
+- `Music_CancelTricky` 0x21c6c0: clears the Tricky rider (+0x6e7c) and `Music_StopTricky`; from `Music_UpdateMeterCues`.
+- `Audio_SetVoiceVolume` 0x221000 (handle, volume): the voice table (+0x372c, 400 bytes a bank) slot's +0x24, through
+  `VoiceTable_SetSlotVolume` 0x21fc68 (only when the slot's +0x20 is set); `WorldEmitter_Update` passes v × 127.
+- `Song_MusicEvent` 0x224458 / `Song_SetSection` 0x224470: `FUN_002c15c8`(song, event, 0 / 1); `Song_SetPathVar`
+  0x224488 jumps to `FUN_002c1288`; `Song_GetStreamStatus` 0x224790; `SongBank_PickVariant` 0x224658 (`fxrand.rs`).
+- `StreamSlot_SetVolume` 0x223b70 is empty (returns 0). `Audio_PlayTextCursorSound` 0x214dd0: `PlayFESound`(bank 0xd,
+  sound 0x10), from `Font_DrawWithCursor`. `BankInstance_DistanceVolume` 0x20ab28 wraps `SndVoice_DistanceVolume`.
+  `Sfx_OnGrabHeld` 0x218e20 (empty; each tick a grab clip holds, `SpinState_UpdateTrickClips`). `Debug_Printf2`
+  0x188990 is a second empty printf (bank monitor and speech messages).
+- Still unclear: 0x212270 / 0x21e688 set / get audio+0x3844 (profile +0x1674, the presets set it; `Sfx_SpinTrickStart`
+  reads it); 0x21e498 (schedules event 0xfa, callback 0x21e4c0); 0x225948 (music+0xfc = 0, from `Music_CancelBreak`).

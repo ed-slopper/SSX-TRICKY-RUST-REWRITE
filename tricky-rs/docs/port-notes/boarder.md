@@ -249,7 +249,7 @@ clip id at clip+0x40), then fires the clip's sound markers (`AnimCtl_FireClipSou
 
 | mode | function | driven by |
 |---|---|---|
-| 0-3 | `AnimMode_Advance` 0x161340 (and three copies) | time |
+| 0-3 | `AnimMode_Advance` 0x161340 (and three copies, `AnimMode_Advance1..3` 0x161348 / 0x161350 / 0x161358) | time |
 | 4 | `AnimMode_BrakeBlend` 0x160680 | brake (rider+0x1fc) and rider+0x268, two sources per board class (tables at 0x3791e8) |
 | 5 | `AnimMode_CrouchBlend` 0x1605a0 | crouch (rider+0x208), sources per board class at 0x3791d0 |
 | 6 | `AnimMode_CrouchFrame` 0x161300 | frame = (1 - crouch) × length |
@@ -273,6 +273,9 @@ on n pairs (pose blending).
 0x15ef48 does it for the three layers (ctl+0x28, 0x70 apart), as `AnimCtl_TurnAllLayers` does the facing. clip+0x64 is
 the controller's +0x14 (rider+0x46d4, the animation's stance) copied by `AnimCtl_BeginClip` and handed to
 `PoseBlend_Add`; the rail control's quarter turn calls it with 0 after clearing +0x46d4.
+`AnimCtl_GetMarkerPhase` 0x15fde0 (ctl, n, layer; F1c, proven): the phase of marker n − 1 of the clip playing in the
+layer (`AnimData_GetMarkerPhase` on the clip's entry at 0x3218cc); the start gate's anticipate (n 1) and launch (n 2)
+controls compare the gate lean (rider+0x238) with it.
 
 ## Meter, boost, crouch and wind-up helpers (proven, G1d; exact in `tricky-rs/game/src/boarder.rs`)
 

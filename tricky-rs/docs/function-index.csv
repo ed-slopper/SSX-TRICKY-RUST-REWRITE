@@ -1217,7 +1217,7 @@ address,size,name,system,status
 0x15fbb8,320,RaceScene_SetClipMarker,animation?,not started
 0x15fcf8,216,AnimCtl_PlayClip,animation,ported
 0x15fdd0,16,AnimCtl_GetClip,animation,ported
-0x15fde0,144,FUN_0015fde0,animation?,ported
+0x15fde0,144,AnimCtl_GetMarkerPhase,animation,ported
 0x15fe70,84,AnimCtl_GetLayerPhase,animation,ported
 0x15fec8,116,AnimCtl_GetClipDuration,animation,not started
 0x15ff40,116,AnimCtl_IsClipAtEnd,animation,ported
@@ -1234,9 +1234,9 @@ address,size,name,system,status
 0x161118,484,AnimMode_CrouchSteerBlend,animation,not started
 0x161300,60,AnimMode_CrouchFrame,animation,not started
 0x161340,8,AnimMode_Advance,animation,not started
-0x161348,8,FUN_00161348,animation?,not started
-0x161350,8,FUN_00161350,animation?,not started
-0x161358,8,FUN_00161358,animation?,not started
+0x161348,8,AnimMode_Advance1,animation,not started
+0x161350,8,AnimMode_Advance2,animation,not started
+0x161358,8,AnimMode_Advance3,animation,not started
 0x161360,60,AnimCtl_EndActionPlay202,animation,not started
 0x1613a0,96,AnimCtl_EndActionToBase,animation,not started
 0x161400,296,AnimCtl_EndActionChain,animation,not started
@@ -1678,7 +1678,7 @@ address,size,name,system,status
 0x17cbc8,64,cAppMan::__tf,runtime,host
 0x17cc48,52,WStr_Count,race?,not started
 0x17cc80,52,WStr_Copy,common?,ported
-0x17ccb8,60,WStr_SetAscii,race?,not started
+0x17ccb8,60,WStr_SetAscii,race?,ported
 0x17ccf8,56,WStr_ToAscii,other,ported
 0x17cd30,60,WStr_CopyN,frontend?,not started
 0x17cdb8,68,WStr_ToAsciiN,hud?,not started
@@ -1899,7 +1899,7 @@ address,size,name,system,status
 0x1887f8,188,cResolutionMenu::~cResolutionMenu,debugmenu,not started
 0x1888b8,80,cBezierOptionsMenu::__tf,runtime,host
 0x188908,136,cBezierOptionsMenu::~cBezierOptionsMenu,debugmenu,not started
-0x188990,40,FUN_00188990,audio?,not started
+0x188990,40,Debug_Printf2,audio?,not started
 0x1889b8,32,cMenuItem::cMenuItem,debugmenu,not started
 0x1889d8,36,cMenuItem::~cMenuItem,debugmenu,not started
 0x188a00,124,cMenuItem::HandleInput,debugmenu,not started
@@ -2261,8 +2261,8 @@ address,size,name,system,status
 0x1969d8,128,cEventPath::vf1_1969d8,ai,not started
 0x196ac8,80,cEventPath::__tf,runtime,host
 0x196f28,516,AIPath_Load,ai,ported
-0x197130,60,FUN_00197130,files?,not started
-0x197170,224,FUN_00197170,files?,not started
+0x197130,60,AIPath_LoadPoint,ai,not started
+0x197170,224,AIPath_LoadEvent,ai,not started
 0x197250,548,AIP_ProjectOntoPath,ai,ported
 0x197478,700,AIP_ProjectOntoPathFrom,ai,ported
 0x197738,104,AIP_GetDirectionAtDistance,ai,ported
@@ -2288,9 +2288,9 @@ address,size,name,system,status
 0x198518,364,AIP_LoadAIPaths,files,ported
 0x198688,76,AIP_GetPathIndex,ai,ported
 0x1986d8,72,AIP_GetLineIndex,ai,ported
-0x198720,24,FUN_00198720,files?,not started
+0x198720,24,Vec3_Assign,files?,not started
 0x198738,24,Mem_Copy4,files?,not started
-0x198750,24,FUN_00198750,files?,not started
+0x198750,24,Float_Assign,files?,not started
 0x198810,820,cAnimObjectNode::cAnimObjectNode,animation,ported
 0x198b48,604,cAnimObjectNode::cAnimObjectNode,animation,checked
 0x198da8,272,cAnimObjectNode::~cAnimObjectNode,animation,not started
@@ -2336,10 +2336,10 @@ address,size,name,system,status
 0x19b108,404,Draw_FilledRect,render,ported
 0x19b2a0,564,FUN_0019b2a0,render?,not started
 0x19b4d8,596,Sprite_SubmitGradientQuad,frontend?,not started
-0x19b730,404,Draw_TexturedRect,render,not started
+0x19b730,404,Draw_TexturedRect,render,ported
 0x19b8c8,640,Sprite_DrawRotatedQuad,boarder?,not started
 0x19bb48,688,Sprite_DrawRotatedTexQuad,boarder?,not started
-0x19bdf8,404,Sprite_SubmitQuad,frontend?,not started
+0x19bdf8,404,Sprite_SubmitQuad,frontend?,ported
 0x19bf90,596,Sprite_SubmitGradientQuadRotated,frontend?,not started
 0x19c1e8,292,Draw_Line,render,ported
 0x19c310,324,FUN_0019c310,,not started
@@ -2353,7 +2353,7 @@ address,size,name,system,status
 0x19c910,764,Font_ParseGlyphs,hud,ported
 0x19cc10,148,Font_FindGlyph,hud,not started
 0x19cca8,712,Font_BuildTexture,hud,ported
-0x19cf70,332,Font_DrawStringRaw,hud,not started
+0x19cf70,332,Font_DrawStringRaw,hud,ported
 0x19d0c0,332,Font_DrawStringA,hud,ported
 0x19d210,100,Font_DrawCenteredAscii,hud,not started
 0x19d278,144,Font_DrawCentered,hud,not started
@@ -2424,7 +2424,7 @@ address,size,name,system,status
 0x1a7d18,44,OverlayMan_CallNextRaceVf8,frontend,checked
 0x1a7d48,44,OverlayMan_CallSelectNextVenueVf7,frontend,checked
 0x1a7d78,60,ScreenOverlay_Init,frontend,checked
-0x1a7db8,180,HUDItem_Show,game?,not started
+0x1a7db8,180,HUDItem_Show,game?,ported
 0x1a7e70,204,Overlay_HideForPlayer,frontend,checked
 0x1a7f40,460,Overlay_DrawItemForView,frontend,checked
 0x1a8110,460,Overlay_DrawTextForView,frontend,checked
@@ -3472,7 +3472,7 @@ address,size,name,system,status
 0x20a9d8,72,BankInstance_Reset,audio?,not started
 0x20aa20,88,BankInstance_IsFree,audio?,not started
 0x20aab8,112,SndVoice_DistanceVolume,audio?,ported
-0x20ab28,28,FUN_0020ab28,audio?,not started
+0x20ab28,28,BankInstance_DistanceVolume,audio?,not started
 0x20ab48,92,SndVoice_DopplerPitch,audio?,ported
 0x20aba8,12,FUN_0020aba8,audio?,not started
 0x20abb8,64,FUN_0020abb8,audio?,not started
@@ -3584,7 +3584,7 @@ address,size,name,system,status
 0x214910,1024,Audio_PlayLoadScreenLoop,audio,not started
 0x214d10,100,Audio_StopLoadScreenLoop,audio,not started
 0x214d78,88,Audio_UnloadLoadScreenBank,audio,not started
-0x214dd0,48,FUN_00214dd0,hud?,not started
+0x214dd0,48,Audio_PlayTextCursorSound,audio,not started
 0x214e00,8,Audio_SetMusicMode4,audio,ported
 0x214e08,88,Audio_StopIntroStream,audio,ported
 0x214e60,872,Music_StartCourseSong,audio,ported
@@ -3616,7 +3616,7 @@ address,size,name,system,status
 0x218b20,72,Sfx_StopWipeoutLoop,frontend?,ported
 0x218b68,12,Sfx_UnmuteRiderLoops,audio?,ported
 0x218b78,676,Sfx_SpinTrickStart,audio?,not started
-0x218e20,8,FUN_00218e20,audio?,not started
+0x218e20,8,Sfx_OnGrabHeld,audio?,not started
 0x218e28,136,Sfx_SpinTrickStop,audio?,not started
 0x218eb0,576,Sfx_OnRiderReset,audio?,ported
 0x2190f0,200,Sfx_OnTrickBookDone,audio?,ported
@@ -3634,18 +3634,18 @@ address,size,name,system,status
 0x21a548,248,Audio_LoadAmbientBank,audio,ported
 0x21a640,100,Audio_FindBankName,audio,not started
 0x21a6a8,68,Sfx_ImpactSpeed,audio?,ported
-0x21a6f0,32,FUN_0021a6f0,audio?,ported
+0x21a6f0,32,Sfx_GetDragAmount,audio?,ported
 0x21a710,48,Sfx_GetSteerAmount,audio?,ported
-0x21a740,68,FUN_0021a740,audio?,ported
-0x21a788,60,FUN_0021a788,audio?,ported
+0x21a740,68,Sfx_GetSnowInput3,audio?,ported
+0x21a788,60,Sfx_GetSnowInput4,audio?,ported
 0x21a7c8,1736,Sfx_LoadBoardConfig,audio?,ported
-0x21ae90,1448,FUN_0021ae90,audio?,ported
+0x21ae90,1448,Sfx_RunSnowProgram,audio?,ported
 0x21b440,196,FUN_0021b440,audio?,not started
 0x21b628,236,FUN_0021b628,audio?,not started
 0x21b718,272,FUN_0021b718,audio?,not started
 0x21b828,1076,Audio_BigAirMusicDuck,audio,ported
 0x21bc60,8,cBXAudio::vf2_21bc60,audio,not started
-0x21bca8,88,FUN_0021bca8,audio?,not started
+0x21bca8,88,Audio_SetVolumePreset,audio,not started
 0x21bfd0,60,Replay_IsPlaying,audio?,ported
 0x21c010,100,Audio_GetRiderPos,audio,not started
 0x21c078,36,Audio_RiderCount,audio,not started
@@ -3653,7 +3653,7 @@ address,size,name,system,status
 0x21c4d0,64,Music_EndTricky,audio,ported
 0x21c510,224,Audio_LoadGlobalBankList,audio,ported
 0x21c610,176,Audio_TrickyTrigger,audio,ported
-0x21c6c0,12,FUN_0021c6c0,audio?,not started
+0x21c6c0,12,Music_CancelTricky,audio,not started
 0x21c6d0,308,Music_UpdateMeterCues,audio,not started
 0x21c808,92,Audio_PlayFEHeld20And00,audio,not started
 0x21c868,64,Audio_PlayFEHeld01,audio,not started
@@ -3703,7 +3703,7 @@ address,size,name,system,status
 0x21ee70,232,CrowdBox_Init,world,ported
 0x21ef58,88,FUN_0021ef58,frontend?,not started
 0x21efb0,3252,CrowdBox_Update,world,ported
-0x21fc68,44,FUN_0021fc68,audio?,ported
+0x21fc68,44,VoiceTable_SetSlotVolume,audio,ported
 0x21fc98,1368,CrowdBox_StartSound,audio,ported
 0x2201f8,316,CrowdBox_StopSlot,world,ported
 0x220338,108,CrowdBox_StopAll,world,ported
@@ -3720,7 +3720,7 @@ address,size,name,system,status
 0x220ce8,656,Sfx_LoadTrickConfig,audio?,ported
 0x220f80,20,SoundId_Split,audio,not started
 0x220f98,100,WorldEmitter_StopById,audio,ported
-0x221000,100,FUN_00221000,audio?,ported
+0x221000,100,Audio_SetVoiceVolume,audio,ported
 0x221068,32,Audio_PlayCrowdCheer,audio,ported
 0x221088,32,CrowdSys_StartBoxCheer,world,ported
 0x2210a8,32,Audio_ArmCrowdBox,audio,ported
@@ -3794,7 +3794,7 @@ address,size,name,system,status
 0x223950,320,StreamSlot_Play,audio?,ported
 0x223a90,48,FUN_00223a90,audio?,ported
 0x223ac0,172,StreamSlot_Fade,audio?,ported
-0x223b70,8,FUN_00223b70,audio?,ported
+0x223b70,8,StreamSlot_SetVolume,audio?,ported
 0x223b78,196,StreamSlot_SetPitch,audio?,ported
 0x223c40,104,StreamSlot_Stop,audio?,ported
 0x223ca8,184,Music_CreatePathfinder,audio,not started
@@ -3802,16 +3802,16 @@ address,size,name,system,status
 0x224368,128,Song_Delete,audio?,not started
 0x2243e8,56,Song_Pause,audio?,not started
 0x224420,56,Song_Resume,audio?,not started
-0x224458,20,FUN_00224458,audio?,not started
-0x224470,20,FUN_00224470,audio?,not started
-0x224488,8,FUN_00224488,audio?,not started
+0x224458,20,Song_MusicEvent,audio?,not started
+0x224470,20,Song_SetSection,audio?,not started
+0x224488,8,Song_SetPathVar,audio?,not started
 0x224498,288,Song_UpdateVolume,audio?,not started
 0x2245b8,104,Song_FadeOut,audio?,not started
 0x224620,52,PathX_GetSongState,audio?,ported
-0x224658,80,FUN_00224658,audio?,ported
+0x224658,80,SongBank_PickVariant,audio?,ported
 0x2246a8,192,Song_RandomSegmentMs,audio?,ported
 0x224768,36,FUN_00224768,audio?,not started
-0x224790,48,FUN_00224790,audio?,not started
+0x224790,48,Song_GetStreamStatus,audio?,not started
 0x2247c0,52,Song_GetStatus,audio?,not started
 0x2247f8,68,Song_GetPlayPosMs,audio?,not started
 0x224840,84,Song_GetLengthMs,audio?,not started
@@ -4259,7 +4259,7 @@ address,size,name,system,status
 0x23c370,36,cAsyncBigFile::vf11_23c370,files,not started
 0x23c398,548,cAsyncBigFile::vf12_23c398,files,not started
 0x23c5c0,516,cAsyncBigFile::vf13_23c5c0,files,not started
-0x23c7c8,76,FUN_0023c7c8,files?,not started
+0x23c7c8,76,File_GetUnpackedSize,files,not started
 0x23c818,184,File_DecompressBuffer,files,not started
 0x23c8d0,252,cAsyncBigFile::vf10_23c8d0,files,not started
 0x23c9d0,56,cMemoryBigFile::cMemoryBigFile,files,not started
@@ -4349,7 +4349,7 @@ address,size,name,system,status
 0x23fb60,344,cPS2MemCard::vf13_23fb60,save,not started
 0x23fcb8,236,FUN_0023fcb8,save?,not started
 0x23fda8,140,cPS2MemCard::vf11_23fda8,save,not started
-0x23fe38,12,FUN_0023fe38,save?,not started
+0x23fe38,12,MemCard_IsErrorCode,save,not started
 0x23fe48,92,cPS2MemCard::vf59_23fe48,save,not started
 0x23fea8,24,cPS2MemCard::vf32_23fea8,save,not started
 0x23fec0,8,cPS2MemCard::vf48_23fec0,save,not started
@@ -4363,7 +4363,7 @@ address,size,name,system,status
 0x23ff68,8,cPS2MemCard::vf42_23ff68,save,not started
 0x23ff70,44,cPS2MemCard::vf43_23ff70,save,not started
 0x23ffa0,8,cPS2MemCard::vf21_23ffa0,save,not started
-0x23ffb0,28,FUN_0023ffb0,save?,not started
+0x23ffb0,28,MemCard_GetCurrentSlotError,save,not started
 0x23ffd0,8,cPS2MemCard::vf58_23ffd0,save,not started
 0x23ffd8,8,cPS2MemCard::vf57_23ffd8,save,not started
 0x23ffe0,244,cPS2MemCard::vf53_23ffe0,save,not started
@@ -6146,7 +6146,7 @@ address,size,name,system,status
 0x2c44d8,44,Fmt_WriteAbsDigits,lib-text?,not started
 0x2c4508,216,FUN_002c4508,lib-text?,not started
 0x2c45e0,772,FUN_002c45e0,lib-text?,not started
-0x2c48e8,716,WStr_VFormat,lib-text?,not started
+0x2c48e8,716,WStr_VFormat,lib-text?,ported
 0x2c4e90,68,WStr_Sprintf,lib-text?,not started
 0x2c50b0,172,Loc_MapId,lib-text?,ported
 0x2c5160,404,Loc_GetString,lib-text?,ported
@@ -7177,7 +7177,7 @@ address,size,name,system,status
 0x300fb0,224,exponent,libc?,host
 0x301090,2824,__svfscanf_r,runtime,host
 0x301b98,260,__sccl,runtime,host
-0x301ca0,84,vsprintf,libc?,host
+0x301ca0,84,vsprintf,libc?,ported
 0x301cf8,96,_write_r,libc?,host
 0x301d58,268,__swsetup,runtime,host
 0x301e68,88,_close_r,libc?,host

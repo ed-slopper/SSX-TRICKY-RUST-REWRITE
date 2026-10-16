@@ -656,3 +656,7 @@
 17d1c8 FUN_0017d1c8 BxObjNode_FromLink
 191820 FUN_00191820 ReplayMgr_GetKeyframeBeforeLatest
 1953a0 FUN_001953a0 ReplayCamTrack_GetCutFrame
+15fde0 FUN_0015fde0 AnimCtl_GetMarkerPhase
+21ae90 FUN_0021ae90 Sfx_RunSnowProgram
+223b70 FUN_00223b70 StreamSlot_SetVolume
+224658 FUN_00224658 SongBank_PickVariant

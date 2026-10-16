@@ -244,6 +244,9 @@ Our level folder to course id mapping (`intro::course_of_folder`) is a stand-in 
   length), events of (type, value, start, end), the type kept as its place in the table at 0x337e70 (−1, 0..23,
   100..105, 300).
 - The game keeps the points and events where they lie in the loaded file (only the event types rewritten in place).
+- Names (F1c, proven): `AIPath_LoadPoint` 0x197130 (the direction, `Vec3_Assign` 0x198720, then the length,
+  `Float_Assign` 0x198750: copies of 12 and 4 bytes unless source and target are the same) and `AIPath_LoadEvent`
+  0x197170 (the type looked up in the 0x337e70 table, 32 entries, 0 if absent; then value, start, end).
 - The app reads the course's `.aip` from the disc with TRICKY_DISC (`aip::from_disc`, `AiFile::from_aip`), else
   the level folder's AIP.json (SSX-Library's export: the same paths, its points direction × length).
 
