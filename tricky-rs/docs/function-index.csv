@@ -4789,24 +4789,24 @@ address,size,name,system,status
 0x263270,12,FUN_00263270,frontend?,not started
 0x263280,332,cFE3D::cFE3D,frontend,not started
 0x2633d0,672,cFE3D::~cFE3D,frontend,not started
-0x263670,224,FE3D_SetNumPlayers,frontend?,not started
-0x263750,76,cFE3D::vf2_263750,frontend,not started
+0x263670,224,FE3D_SetNumPlayers,frontend?,checked
+0x263750,76,cFE3D::vf2_263750,frontend,checked
 0x2637a0,908,cFE3D::vf4_2637a0,frontend,not started
 0x263b30,5288,cFE3D::vf1_263b30,frontend,not started
-0x264fd8,960,cFE3D::vf6_264fd8,frontend,not started
-0x265398,956,cFE3D::vf5_265398,frontend,ported
-0x265758,44,FUN_00265758,frontend?,not started
-0x265788,28,FE3D_GetSlotChar,frontend?,not started
-0x2657a8,200,FE_SetupRaceFromMenu,frontend,not started
-0x265870,120,FE3D_CountJoinedPlayers,frontend?,not started
-0x2658e8,136,FE3D_FindCharSlot,frontend?,not started
-0x265970,232,FE3D_CreateCharSelectState,frontend?,not started
-0x265a58,160,FE3D_CreateNumPlayersState,frontend?,not started
-0x265af8,20,FE_IsSinglePlayerMode,frontend,not started
-0x265bb8,12,FUN_00265bb8,frontend?,not started
-0x265bc8,28,FUN_00265bc8,frontend?,not started
-0x265c28,36,FE3D_IsMultiplayer,frontend?,not started
-0x265c68,8,cFE3D::vf3_265c68,frontend,not started
+0x264fd8,960,cFE3D::vf6_264fd8,frontend,checked
+0x265398,956,cFE3D::vf5_265398,frontend,checked
+0x265758,44,FUN_00265758,frontend?,checked
+0x265788,28,FE3D_GetSlotChar,frontend?,checked
+0x2657a8,200,FE_SetupRaceFromMenu,frontend,checked
+0x265870,120,FE3D_CountJoinedPlayers,frontend?,checked
+0x2658e8,136,FE3D_FindCharSlot,frontend?,checked
+0x265970,232,FE3D_CreateCharSelectState,frontend?,checked
+0x265a58,160,FE3D_CreateNumPlayersState,frontend?,checked
+0x265af8,20,FE_IsSinglePlayerMode,frontend,checked
+0x265bb8,12,FUN_00265bb8,frontend?,checked
+0x265bc8,28,FUN_00265bc8,frontend?,checked
+0x265c28,36,FE3D_IsMultiplayer,frontend?,checked
+0x265c68,8,cFE3D::vf3_265c68,frontend,checked
 0x265ca0,176,cFE3D::cFE3D,frontend,not started
 0x265d50,80,cFE3D::__tf,runtime,host
 0x265da0,28,FUN_00265da0,frontend?,not started

@@ -913,6 +913,50 @@ A widget's colour comes from two flags, +0xa0 (chosen) and +0xa8 (enabled), and 
 
 Checked in the runner on 40,000 random widgets and texts (about 1,150 for each of 34 functions), with the colour
 update stubbed there and run on its own over 4,000 in a second runner. All 46 mutants are caught.
+### The front end manager's per-frame logic ported (row G9b2d1; `game/src/fe_manager.rs`, checked: `tests/fe_manager.rs`)
+
+The manager (gApp+0x734) keeps:
+- +4 the players, +6 its state (0 the menus, 1 leaving for the game, 2 left);
+- +0x74 / +0x78 the two players, +0x7c their picks;
+- +0x80 a list of things drawn and updated;
+- +0xa4 the 3D scene, +0xa8 the screen stack;
+- +0xf0 the game type, +0xf4 the idle frames, +0xf8 the attract film;
+- +0x124 the video manager.
+
+The functions:
+- **vf5 0x265398 (the frame's update):**
+  - the transition and the video manager are ticked;
+  - in the menus: each player's cheats, the drawn list, the sound bank's channels 3 and 4. With no attract film, any
+    pad's input resets the idle count; otherwise, unless the top screen answers its +0x70, the attract film (a video
+    screen playing 0x3a8d48) is pushed after 0xe11 idle frames. Then the finished screens are closed and the music
+    ticks once;
+  - leaving: the game is made by the career's state (0x24c748 for +0x3710, 0x24d7f8 for +0x2afc 6, 0x247a60 for two
+    players, else 0x245840) and handed to the app, then state 2;
+  - after the menus: two music ticks.
+- **vf6 0x264fd8 (the frame's draw):**
+  - the attract film, or a film screen on top, is drawn alone;
+  - otherwise: the fade, then in the menus the scene. That is the renderer's set-up; with a course loaded, its camera
+    and the drawn list over it; the 640 × 480 projection; the drawn list; then the frame's end.
+- **The player count (0x263670):** fewer players clear the slots from the new count up; more seat each new one.
+- **vf2:** the 3D scene's +0x128 clears +8. **vf3:** +8.
+- **The small helpers:**
+  - the character order (0x265788, the bytes at 0x3470b8) and a character's place in it (0x2658e8);
+  - the pads in (0x265870) and two or more (0x265c28);
+  - the career set for the game (0x2657a8, by its mode word: the tutorial, the trick book, or the players);
+  - the character select made with the players not yet picked (0x265970), or after the players' screen (0x265a58)
+    a 0x54-byte screen for two pads;
+  - the light presets (0x265b10), an alternating value (0x265758), a conditional free (0x265bc8);
+  - the picks, game type, idle count, vector and state accessors.
+
+Checked in the runner on 40,000 random managers (about 1,400 for each of 28 functions); the update always has a screen
+on the stack, as in the game. 44 of 45 mutants are caught, seven after the test was widened: bytes past 0x7f, the career word 2, an
+idle count one short, and stub answers mixed by multiplying. A xorshift alone kept a call's successive answers in a
+fixed relation, so the two pads were never one in and one out. The survivor passes 1 to the game constructors that
+take one argument, which is equivalent.
+
+The set-up and tear-down (the constructors 0x263280 / 0x265ca0, the destructor, vf1 and vf4) make the front end's
+objects, load its fonts, models and sounds, and play the boot films. They are object glue, which row G9b2d2 leaves to
+the app, as G4k does for the AI's.
 
 ## The 3D transition and fade record (F1c; ported in row G9b2e, `game/src/fe_transition.rs`, checked: `tests/fe_transition.rs`)
 
