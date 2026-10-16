@@ -452,3 +452,190 @@ pub fn draw(m: &mut Mem, env: &mut dyn HudEnv, hud: u32, text: bool) {
         i += 1;
     }
 }
+
+/// The view layout tables `HUD_DrawPlayerSprites` / `HUD_DrawPlayerText` place everything from: three views of
+/// fifty-three 20-byte entries (+0 x, +4 y, +8 the corner or flags, +0xc / +0x10 the scales) from 0x33ca40
+pub const LAYOUTS: u32 = 0x33ca40;
+pub const LAYOUT_SIZE: u32 = 0x424;
+/// The HUD overlay's vtable
+pub const HUD_OVERLAY_VTABLE: u32 = 0x38da80;
+
+/// The layout entries the constructor copies from the game's static tables (24 bytes apart there), as runs:
+/// (the entry's offset in the tables, its source, how many), in the constructor's order. Between the first and the
+/// second the view 0 table is copied to views 1 and 2; two entries are zeroed between the second and the third.
+const LAYOUT_RUNS: [&[(u32, u32, u32)]; 4] = [
+    &[(0x0, 0x38d060, 34), (0x2a8, 0x38d060, 1), (0x2bc, 0x38d390, 18)],
+    &[
+        (0x438, 0x38d540, 7),
+        (0x514, 0x38d5e8, 3),
+        (0x5dc, 0x38d630, 1),
+        (0x5f0, 0x38d288, 1),
+        (0x604, 0x38d648, 14),
+        (0x71c, 0x38d780, 1),
+        (0x730, 0x38d780, 3),
+        (0x7bc, 0x38d7c8, 5),
+        (0x834, 0x38d840, 1),
+        (0x85c, 0x38d858, 4),
+    ],
+    &[(0x8c0, 0x38d8b8, 2)],
+    &[
+        (0x938, 0x38d8e8, 3),
+        (0xa00, 0x38d630, 1),
+        (0xa14, 0x38d288, 1),
+        (0xa28, 0x38d648, 12),
+        (0xb18, 0x38d930, 1),
+        (0xb2c, 0x38d780, 1),
+        (0xb40, 0x38d780, 1),
+        (0xb54, 0x38d780, 3),
+        (0xbe0, 0x38d948, 5),
+        (0xc58, 0x38d9c0, 1),
+    ],
+];
+
+fn copy_entry(m: &mut Mem, to: u32, from: u32) {
+    for k in [0u32, 4, 8, 12, 16] {
+        let v = m.r32(from + k);
+        m.w32(to + k, v);
+    }
+}
+
+/// `HudOverlay_InitTables` 0x19e888, the HUD overlay's constructor (`ScreenOverlay_Init` 0x1a7d78 first): the
+/// vtable; the meter's fourteen bands (each a 14th: sprite 20 to a third, 19 to two thirds, then 18; each 18 above
+/// the one below, 28 where the colour changes, the first at 288); the split markers (`HUD_BuildSplitList`); the race
+/// clock (+0x614); the view layout tables; the time trial's medal times by course (+0xf8 / +0xfc / +0x100); the
+/// HUD's flags for each HUD option (+0x108 / +0x10c / +0x110) by the game mode, the course and the players
+pub fn hud_overlay_new(m: &mut Mem, env: &mut dyn HudEnv, hud: u32) -> u32 {
+    env.call(m, 0x1a7d78, &[hud]);
+    m.w32(hud + 0x28, HUD_OVERLAY_VTABLE);
+    m.w32(BANDS + 8, 20);
+    put(m, BANDS + 16, F(288.0));
+    let step = F(f32::from_bits(0x3d924925));
+    let (two_thirds, third) = (f32::from_bits(0x3f2a7e78), f32::from_bits(0x3eaad08b));
+    let mut prev = step;
+    for i in 1..14u32 {
+        let next = prev + step;
+        let e = BANDS + 20 * i;
+        let below = fl(m, e - 20 + 16);
+        let (id, gap) = if two_thirds <= next.0 {
+            (18, if two_thirds <= prev.0 { 18.0 } else { 28.0 })
+        } else if third <= next.0 {
+            (19, if third <= prev.0 { 18.0 } else { 28.0 })
+        } else {
+            (20, 18.0)
+        };
+        m.w32(e + 8, id);
+        put(m, e + 16, below - F(gap));
+        prev = next;
+    }
+    env.call(m, 0x1a1968, &[hud]);
+    let world = m.r32(race(m) + 0x1c);
+    let clock = m.r32(world + 0x14);
+    m.w32(hud + 0x614, clock);
+    for (n, runs) in LAYOUT_RUNS.iter().enumerate() {
+        for &(to, from, count) in runs.iter() {
+            for k in 0..count {
+                copy_entry(m, LAYOUTS + to + 20 * k, from + 24 * k);
+            }
+        }
+        match n {
+            0 => {
+                for k in 0..53 {
+                    let e = LAYOUTS + 20 * k;
+                    copy_entry(m, e + LAYOUT_SIZE, e);
+                    copy_entry(m, e + 2 * LAYOUT_SIZE, e);
+                }
+            }
+            1 => {
+                for k in [0u32, 4, 8, 12, 16] {
+                    m.w32(LAYOUTS + 0x8ac + k, 0);
+                }
+            }
+            2 => {
+                for k in [0u32, 4, 8, 12, 16] {
+                    m.w32(LAYOUTS + 0x8fc + k, if k == 8 { 0x20 } else { 0 });
+                }
+            }
+            _ => {}
+        }
+    }
+    let (mode, course) = (m.r32(GAME_MODE), m.r32(LAP_MODE));
+    let medals = if mode == 3 && course == 6 {
+        Some([800000, 500000, 250000])
+    } else {
+        let mut set = None;
+        for (c, t) in [
+            (0, [55000, 40000, 25000]),
+            (1, [95000, 65000, 35000]),
+            (2, [225000, 150000, 75000]),
+            (3, [225000, 150000, 75000]),
+            (4, [275000, 175000, 125000]),
+            (8, [350000, 225000, 100000]),
+            (5, [175000, 115000, 75000]),
+            (11, [500000, 300000, 150000]),
+        ] {
+            if course == c {
+                set = Some(t);
+            }
+        }
+        set
+    };
+    if let Some(t) = medals {
+        for (k, v) in t.into_iter().enumerate() {
+            m.w32(hud + 0xf8 + 4 * k as u32, v);
+        }
+    }
+    m.w32(hud + 0x108, 0xb000);
+    m.w32(hud + 0x10c, 0x4002b9c0);
+    m.w32(hud + 0x104, 0);
+    m.w32(hud + 0x110, 0);
+    if course == 8 {
+        m.w32(hud + 0x108, 0xb400);
+        m.w32(hud + 0x10c, 0x4002bdc0);
+    }
+    let or = |m: &mut Mem, at: u32, set: u32, clear: u32| {
+        let v = (m.r32(hud + at) & !clear) | set;
+        m.w32(hud + at, v);
+    };
+    if (m.r32(PLAYERS) as i32) > 1 {
+        or(m, 0x108, 0x200, 0);
+        or(m, 0x10c, 0x300, 0);
+    }
+    if mode == 6 {
+        or(m, 0x108, 0, 0x40000000);
+        or(m, 0x10c, 0, 0x40000000);
+    }
+    match mode {
+        1 | 6 => {
+            or(m, 0x110, 0, 0x300);
+            or(m, 0x108, 0x10000000, 0x300);
+            or(m, 0x10c, 0x10000000, 0x300);
+        }
+        2 | 4 | 9 => {
+            or(m, 0x108, 0x1c410009, 0);
+            or(m, 0x10c, 0x1c410009, 0);
+        }
+        3 | 5 => {
+            or(m, 0x108, 0x1cd10009, 0);
+            let world = m.r32(race(m) + 0x1c);
+            let two = m.r32(world + 0x7c).wrapping_add(m.r32(world + 0x84)) == 2;
+            or(m, 0x10c, if two { 0x1cd10009 } else { 0x1dd10009 }, 0);
+        }
+        7 => {
+            or(m, 0x108, 0x30000000, 0x100);
+            or(m, 0x10c, 0x30000000, 0x100);
+        }
+        8 => {
+            for at in [0x10c, 0x110, 0x108] {
+                m.w32(hud + at, 0x80000);
+            }
+        }
+        _ => {}
+    }
+    for at in [0x108, 0x10c, 0x110] {
+        or(m, at, 0x2000000, 0);
+    }
+    hud
+}
+
+/// The players in the race (`DAT_0032db6c`)
+pub const PLAYERS: u32 = 0x32db6c;

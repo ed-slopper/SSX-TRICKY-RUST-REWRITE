@@ -2382,7 +2382,7 @@ address,size,name,system,status
 0x19e6a0,124,StaticInit_Font,other,not started
 0x19e7a0,160,Score_GetRankForPoints,scoring,ported
 0x19e840,68,Score_GetRankColour,scoring,not started
-0x19e888,12492,HudOverlay_InitTables,frontend,ported
+0x19e888,12492,HudOverlay_InitTables,frontend,checked
 0x1a1958,8,cHUDOverlay::Reset,frontend,checked
 0x1a1960,8,cHUDOverlay::vf16_1a1960,frontend,checked
 0x1a1968,1252,HUD_BuildSplitList,hud,checked

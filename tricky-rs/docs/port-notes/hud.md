@@ -356,3 +356,54 @@ In `tricky_game::hudsprites`, under the two big draws:
 
   The tests caught 25 of 26 mutants. The one left cannot change a result: a tie in the widest digit keeps the same
   width either way.
+
+## The HUD overlay's constructor (G8j)
+
+`tricky_game::hudstate::hud_overlay_new`: `HudOverlay_InitTables` 0x19e888 (named for what most of it does; it is
+`cHUDOverlay`'s constructor, called from `OverlayMan_Init`).
+
+- **The base and the vtable:** `ScreenOverlay_Init` first, then the vtable 0x38da80.
+- **The meter's fourteen bands** (0x338008, 20 bytes each):
+  - each band is a 14th, summed in floats;
+  - it is sprite 20 below a third (0.3336), 19 below two thirds (0.6660), then 18;
+  - the first is at 288, each next one 18 above the last, or 28 where the colour changes.
+- **The split markers** (`HUD_BuildSplitList`) and the race clock (+0x614, the world's +0x14).
+- **The view layout tables** (three views of fifty-three 20-byte entries from 0x33ca40) are copied from static
+  initialisers in the executable (24 bytes apart, from 0x38d060). The order is:
+  - view 0;
+  - view 0 copied whole to views 1 and 2;
+  - view 1's differences;
+  - two entries zeroed through a stack temporary (one with +8 = 0x20);
+  - view 2's differences.
+
+  The port keeps them as 26 runs of (entry, source, count) and reads the sources from the game's memory.
+- **The time trial's medal times** (+0xf8 / +0xfc / +0x100, hundredths) by course (`DAT_0032de88`). A course without
+  times keeps whatever was there:
+
+  | Course | +0xf8 | +0xfc | +0x100 |
+  |---|---|---|---|
+  | 0 | 550 s | 400 s | 250 s |
+  | 1 | 950 s | 650 s | 350 s |
+  | 2 / 3 | 2250 s | 1500 s | 750 s |
+  | 4 | 2750 s | 1750 s | 1250 s |
+  | 5 | 1750 s | 1150 s | 750 s |
+  | 8 | 3500 s | 2250 s | 1000 s |
+  | 11 | 5000 s | 3000 s | 1500 s |
+  | 6 in game mode 3 | 8000 s | 5000 s | 2500 s |
+
+- **The HUD's flags for the three HUD options** (+0x108 / +0x10c / +0x110):
+  - they start at 0xb000 / 0x4002b9c0 / 0 (0xb400 / 0x4002bdc0 on course 8);
+  - more than one player adds 0x200 / 0x300;
+  - the tutorial (mode 6) clears 0x40000000;
+  - by game mode:
+    - 1 / 6 clear the lap bits and add 0x10000000;
+    - 2 / 4 / 9 add 0x1c410009;
+    - 3 / 5 add 0x1cd10009, or 0x1dd10009 on +0x10c unless the world's +0x7c and +0x84 sum to 2;
+    - 7 swaps bit 0x100 for 0x30000000;
+    - 8 sets all three to 0x80000;
+  - every option then gets 0x2000000 (the rank frames).
+- **Checked in the runner** (tests/hudinit.rs) on 20,000 random game modes, courses, player counts, source tables
+  and starting memory, with every call and all memory compared:
+  - the game's `memset` is stubbed, because its PCPYH isn't in the runner; it only touches the stack temporary;
+  - the tests caught 20 of 26 mutants. The six left cannot change a result: the band thresholds act on a constant
+    sum; views 1 and 2's last entry is rewritten later; and the bits the last two clear are always zero by then.
