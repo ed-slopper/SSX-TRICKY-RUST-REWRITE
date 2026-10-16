@@ -330,6 +330,110 @@ player sits at +0x154 with its vtable at +0. +0x15c is the screen pushed when th
 Checked in the runner on 20,000 random screens. 9 of 9 mutants are caught. The row's other functions are the
 destructor and runtime type entries.
 
+### The widgets the builders make in place (`game/src/fe_widgets.rs`)
+
+The bigger builders (the character select's, the custom board's, the rider profile's, the options') don't call the
+widget constructors: the compiler put the constructors' bodies in place, so the builders write each widget's words
+themselves. `fe_widgets` has those bodies, each writing what the game writes and leaving the rest of the object
+alone:
+- **`widget_init`** (`cFE3DThing` then `cFE3DWidget`, as 0x267f58 has them out of line). It writes:
+  - the thing's links: +0 -1, +4 and +8 the object;
+  - its flags: +0x14 and +0x28 1, the rest 0;
+  - its vectors: +0x40 and +0x50 zero, +0x60 white, +0x80 (0, 0, 0, 1), +0x90 zero;
+  - its colours: the highlight (1, 0.953, 0.729, 0.106) at +0xac, white at +0xbc, two half greys at +0xcc and
+    +0xdc;
+  - the widget's vtable 0x3b5e18, +0xa8 1, its owner at +0xec, its parent at +0xf0, and its position (0, 0, 0, 1)
+    at +0x100.
+
+  Then it calls the colour update (0x2ad988). +0x34..+0x3c, +0x78, +0x9c and +0xf4..+0xfc are left as they were.
+- **`group_init`:** the widget, then the group's vtable 0x3a9e98 and its list set up (0x2abfb0 on +0x110).
+- **`text_entry_init`:** the widget, then the entry's fields: no text or second widget (+0x110, +0x114), +0x118
+  15.0, +0x11c 2, (0, 0, 0, 1) at +0x120 and +0x140, +0x130 6. Its vtable ends as the text entry's, 0x3ae7f0.
+- **`progress_init`:** the widget, then the bar's colours (+0x110..+0x14c), its range (100, 0, -9999, -9999) and
+  value fields, its three sprites none (-1), and its vtable 0x3b6cf8.
+- **`icon_init`:** the widget, the icon's vtable 0x3b6f88, no sprite (+0x110 -1), +0x114 0.
+- **`vcall_class`:** a virtual call through a class's vtable named in the code (the builders size a widget they
+  have just made through its class's table, not the object's).
+
+The tests give these objects the game's own vtables, so the functions behind the slots the builders call (read from
+those vtables at start) are stubbed by address. 10 of 11 mutants of the helpers are caught, through the character
+select's and the user name's tests. The survivor changes the progress bar's third sprite (+0x174); the character
+select, the only builder with progress bars, always overwrites it.
+
+### The character select ported (row G9i; `game/src/fe_charselect.rs`, checked: `tests/fe_charselect.rs`)
+
+`cFE3DStateCharacterSelect` lists the twelve riders in the front end's character order (0x265788). +0x2e is the
+player (a signed byte). Beside the menu it keeps a stats panel (+0x120):
+- four stat rows, each a text entry holding the stat's name, a progress bar (+0xc8) and a number (+0xd8);
+- the rider's name (+0xec) and a heading entry (+0xe8);
+- ten rank icons (+0xf0) and a rank marker (+0x118);
+- a profile line (+0x11c).
+
++0xc4 times the panel's swap between the stats and the rank.
+- **The constructor:** the base constructor, the vtable 0x3b0490, the bars and numbers cleared, the stats' text ids
+  (0x25, 0x27, 0x28, 0x29), no panel.
+- **`CreateNextState`:** for the World Circuit (game type 2), the user name screen (0x78 bytes: +0x68 1, +0x6c 1,
+  +0x70 0). Otherwise the character accept (0x54 bytes). The three bytes are handed on.
+- **The locks (0x276d78):** each item's +0x100 says whether its character is unlocked (0x163b10).
+- **The builder:**
+  - the twelve riders' items (no parent; the rider's name, the record kept at +0x84), then the locks;
+  - the panel, a group under the help bar;
+  - each stat row:
+    - its entry at (170, 45 + 15k);
+    - the name at 0.7 height;
+    - a bar 100 × 30 with sprites 0x1f / 0x1e / 0x1d, placed at (250, 10);
+    - a buffered number at (450, centred on the row by the small font's height);
+  - the rider's name: 0.8 height, above the heading, hidden;
+  - the heading entry: text 0xdd, at (250 − the sprite's width − 6, 75), hidden;
+  - the ten rank icons: sprite 0x1c, spaced by the sprite's width + 6 from x 250, hidden;
+  - the rank marker: sprite -5, hidden;
+  - the profile line on the help bar, then the backdrop.
+- **`Activate`** (the screen before as its second argument):
+  - the locks; the pause overlay off;
+  - the player's rider: booted, from the player's slot's profile (0x164330, 0x2658e8); otherwise the player's pick;
+  - the menu set on that rider, the selected rider set (0x261b38), the stats panel;
+  - the overlay's shot: the rider shot when booted, else the camera shot;
+  - after a screen answering 6 from its +0x70 whose player is lower, every rider's choice restored for this player;
+  - each rider shown (0x2661e8): 1 for the pick when booted, else 0;
+  - the 3D scene's +0x58(1); when not booted, the select's music start; the base's `Activate`; when booted, +0x40.
+- **`LayoutWidgets`:** the base's, then the stats panel.
+- **The stats panel (0x278840),** by the item:
+  - **an unlocked rider:**
+    - marked seen (0x1635b8);
+    - the four stats for the player's slot and the rider's outfit (0x1646b0). Each bar is sized to its maximum × 5
+      and given its range and value, and each number is printed (value + bonus, format 0x3af5d0);
+    - the rank icons get sprite 0x1b at the rank and 0x1c elsewhere. The marker moves to the rank's icon, and the
+      rank's name is centred over it, then again over icon 9 − rank;
+    - icons up to 9 − rank are shaded by tenths from the highlight towards (1, 1, 0, 0), with sprite 0x1b; the rest
+      are white with 0x1c. The marker goes to the last shaded icon;
+    - the panel shown; the help line's string 0x3af5c8;
+  - **a locked rider:** the panel hidden; the help line the locked text for the rider's place in 0x3352c0 (the eight
+    words at 0x3af5d8 for places 4..11). Places 0..3 would read the game's stack below the table; the port gives 0
+    there (STANDIN). Those places are the starting riders 3, 4, 7 and 0, which are never locked;
+  - then the help line's +0x140, and the profile line's text by the character's kind: 1 gives 0x14, 2 gives 0x12,
+    any other 0x13. The 0x13 sits in a plain branch's delay slot, so it is the default.
+- **`Update`:** while the panel is shown, the timer counts down. At zero, the rider name, heading, icons and marker
+  swap places with the stat rows, for 0x10e frames when the name was shown and 0x78 otherwise. Then the base's
+  `Update`.
+- **vf18:** for the first player, the music's 0x262c20.
+- **vf22:**
+  - the base's; the coming item's +0x20(1) and the going one's +0x20(0);
+  - the timer restarted (0x78 with the name shown, else 0x10e);
+  - when an item goes: the selected rider set, the stats panel, the rider's line (0x261ee0) and the overlay's pan
+    (0x26b4e8).
+- **vf26:**
+  - each player pressing (0x26ce08) becomes the chooser: +0x2c is the player + 1, the career's rider slot is set,
+    +0x2d 0, and the player is added (0x271888);
+  - the 3D scene's +0x10(-1); the pause overlay on;
+  - this player's pick (+0x7c + 2 × player) becomes the item; the rider at the other byte's pick (+0x7d) is shown;
+  - the rider shot, then the screen's +0x30.
+
+Checked in the runner on 6,000 random screens with the locks and the stats panel stubbed, and those two on their own
+in a second runner over 20,000 cases. The base's `Activate`, vf22, `LayoutWidgets` and `Update` run as the original;
+the base update's phase is 0 with no overlay, so it runs only its first call. 33 of 34 mutants are caught (the
+pan's signed byte once the test had item words past 0x7f). The survivor is the rank icons' first sprite pass, which
+is equivalent: the shading loops rewrite every icon's sprite afterwards, whatever the second rank call answers.
+
 ### The character modify ported (row G9k; `game/src/fe_charmodify.rs`, checked: `tests/fe_charmodify.rs`)
 
 `cFE3DStateCharacterModify` has six items: 0 is "done", and 1..5 open the screens that change the rider.
@@ -386,6 +490,214 @@ doesn't take mod 12. All 20 mutants are caught (one after picks 12 and 13 were a
 
 Checked in the runner on 20,000 random screens, with the help line on its own over 2,000. All 13 mutants are caught
 (the slot byte's sign once the test had slot bytes past 0x7f).
+
+### The custom board ported (row G9l; `game/src/fe_customboard.rs`, checked: `tests/fe_customboard.rs`)
+
+`cFE3DStateCustomBoard` picks one of the player's rider's twelve boards. The rider is the front end's +0x20 list at
+(the player's pick) mod 12; +0x54 keeps the board the screen opened on. Like the character select it has a stats
+panel (+0x8c) of four rows (+0x58 the text ids, +0x68 the bars, +0x78 the numbers) and a profile line (+0x88).
+- **The constructor (0x28c690):** the base constructor, +0x54 0, no profile line or panel, the bars and numbers
+  cleared, the stats' text ids (0x25, 0x27, 0x28, 0x29).
+- **The builder:**
+  - the title (0x274208: 105.0, text 0xb5, 0x200a);
+  - twelve items, each numbered, with the word at 0x3ae520, the board's name from the rider's character's table, and
+    whether the board is unlocked (0x267c70) in +0x100;
+  - the stats panel, built as the character select's, except that each text's colour is set before its id and its
+    +0x70 is 4;
+  - the help bar laid out (0x2755e8) with the float at 0x348024 in f12, the profile line, the backdrop, no fade in;
+  - the board the rider has kept, stored in +0x54, with the menu set on it and the panel filled for it.
+- **`Activate`:** the overlay's board view off (0x26bb38), the board music (0x2622c8), the base's.
+- **vf18:** the board view on. **vf21:** the rider put back on the board the screen opened on (0x267c20), then the
+  base's vf21. **vf22:** the base's, then the panel for the coming item when one goes. **vf26:** the rider saves its
+  selection with the first byte of the player's career slot, then the base's vf21.
+- **The panel (0x28d668):**
+  - the rider tries the board on;
+  - an unlocked board (+0xa8) gets its four stats (0x1646b0) as bars and numbers, the panel shown, and the help line
+    0x3af5c8;
+  - a locked board hides the panel and puts the locked text on the help line (ten words at 0x3afb78 for boards
+    2..11). Boards 0 and 1 would read the game's stack below that table; the port gives 0 (STANDIN). Those are the
+    starting boards, which are never locked;
+  - then the help line's +0x140, and the profile line's text by the board's kind: 1 gives 0x14, 2 gives 0x12, any
+    other 0x13.
+
+Checked in the runner on 8,000 random screens, with the panel on its own over 20,000. 19 of 20 mutants are caught.
+The survivor turns the board number passed to the try-on call from a signed byte into a word. That is equivalent:
+the boards are 0..11, which are the same either way.
+
+### The rider profile ported (row G9n; `game/src/fe_riderprofile.rs`, checked: `tests/fe_riderprofile.rs`)
+
+`cFE3DStateRiderProfile` has five items, each with a panel (a widget group at +0x4f0 + 4k) shown while it is chosen.
++0x4ec is a picture whose sprite follows the item, +0x504 the rank list and +0x508 its marker. +0x54 is set once the
+rider's textures are in. The panels themselves are made and filled by the front end's own builders (0x27e918, then
+0x27f600, 0x284f60, 0x282d30, 0x285230, 0x284c70), which stay calls out.
+- **The builder:**
+  - the title (0x274208: 105.0, text 0xda6, 12), the help bar's layout 12, no back;
+  - the panels' builder, then five items (the texts at 0x3afac0, numbered), each given its panel (a group with no
+    parent, +0x70 4);
+  - the five fillers; each panel laid out and hidden, the first shown;
+  - the title's +0x70 4, the help bar's and backdrop's 8, the help line sized 420 × 40, the backdrop.
+- **`Update`:** waits for the textures (0x1f9d28) and sets +0x54, then the base's.
+- **`CreateNextState`:** asks the help bar's fourth button (0x271848), then makes a video screen (0x160 bytes: +0x158
+  1, +0x154 and +0x15c 0) playing the rider's film ("data/video/rr_" and the name at the character record's +8).
+- **`Activate`:**
+  - the 3D scene's +0xa8;
+  - until the textures are in, the character's profile textures loaded (0x1f9c18; pictures from 0x11 by character).
+    Characters past 11 would pass a leftover register; the port uses 0x11 (STANDIN);
+  - the rank list set on the slot's rank and opened;
+  - the marker placed level with the chosen line: the line's y, plus half the difference of the line's height and
+    the list's +0x174, less 2;
+  - the base's.
+- **vf26:** the third item (the film) is picked only while the help bar's fourth button is enabled, then the base's.
+  **vf21:** backing out once the textures are in.
+- **vf22:**
+  - the base's; every panel hidden and closed;
+  - the help bar's layout: 12 on the third item, with its fourth button enabled while the rank list is on its first
+    line; otherwise 8;
+  - for items 0..4: the help text 0xcbf + item, the picture white (half dark for item 2) with sprite 0x7c, 0x7d,
+    0x7d, 0x7e or 0x7f, and the item's panel shown and opened;
+  - the help line's +0x140.
+
+Checked in the runner on 14,000 random screens. All 23 mutants are caught.
+
+### The options ported (row G9o; `game/src/fe_options.rs`, checked: `tests/fe_options.rs`)
+
+`cFE3DStateOptions` lists five pages in its menu; each page has a text id (+0x7c + 12k), a page widget (+0x80) and
+a group (+0x84). +0x78 is the page open (-1 for none). Page 3 (+0xa4) is the one whose choice opens another screen.
+An item whose first word is 0xabcd1234 is a page's "accept" line. The pages' own builders, layouts and value
+handlers are calls out.
+- **The constructor (0x29e920)** and **vf12 (0x2a9208):** no page open, no back, the pages' widgets and groups
+  cleared (vf12 after the base's).
+- **The builder:**
+  - the title (0x274278: 450.0, text 0xda5, 10) coloured (0.88, 0.1, 0.1, 0.1), with its extras (0x2a8520);
+  - the pages' text ids (0xe18, 0xb0, 0xba, 0xcc, 0xb4); the menu's +0x114 and +0x115 bytes -1;
+  - per page: its menu item; its group (no parent, +0x70 1, hidden then opened, under the title) holding the page's
+    title centred at (320, 60); its page widget (0x26d3b8; +0x114 and +0x115 -1, +0x158 1; page 3's +0x154 0);
+  - the five page builders; each page placed below the title (centred, with page-specific x and y for pages 1, 3
+    and 4), laid out and its group closed; the backdrop; no fade in.
+- **`Activate`:** nothing while the front end's +6 is set. Otherwise the base's, the open page's group opened, the
+  values read back (0x29fb40), then either the screen's +0x48 (back from the memory card screen, whose +0x70 answers
+  0xd) or the options music, and page 1's line chosen.
+- **`CreateNextState`:** on page 3 only, the memory card screen (0x2c84 bytes, 16-aligned; 0x28f260 with (1, 1) for
+  line 0, (1, 0) for line 1, else (0, 0)), returning its +0x42c, or none when it failed.
+- **vf22:**
+  - the base's; the going item's control's arrows hidden and the coming one's shown (a slider's through 0x26d8c8, a
+    list's through 0x2ae3c0);
+  - the help line (0x2aa998); the help bar's second button enabled only on an accept line with no page or page 3
+    open;
+  - with a page open, an item without a control moves the page's own way (0x2a9720.. by page), and on page 1 the
+    line is chosen.
+- **vf23 (a value changed):** on page 0, lines 2..6 set the 3D scene's +0x158, +0x178, +0x198, +0x168 or +0x1a8
+  from the item's +0x160, each with a cue on its +0x50 (0x12, 0x13, 0x15, none, 0x16); on page 2, line 5 sets the
+  sound volume.
+- **vf26 (picking):**
+  - with no page open: the page opens, the widgets reset onto it, its cue and opener run (page 1 also chooses its
+    line; page 4 opens the screen's +0xb4 and disables the second button), the menu is closed and the group opened;
+  - on page 3: the screen's +0x30 and +0x48;
+  - on another page's accept line: the page's values kept (0x29f178, 0x29f508, or the display's for page 2; page 4
+    keeps nothing), the control's arrows hidden, the page closed, none open, the widgets reset onto the menu.
+- **vf21 (backing out):** with no page open, the base's. Otherwise the page closed without keeping its values (its
+  closer, then its values put back), the control's arrows hidden, the group closed with the 3D scene's +0x10(0x24),
+  none open.
+- **`LayoutWidgets`:** the base's, each page title centred across 640, the pages' layout (0x2a9488), and page 3
+  centred by the help bar's extent.
+- **The display's apply (0x29f720):** the display page's six lines into the career's settings (words at
+  0x32ca10..0x32ca4c): widescreen, the screen mode (which also sets the display's mode and resets its picture
+  offset), two flags, a 2..6 choice, and the sound volume. Unsigned words become floats as the game converts them.
+
+Checked in the runner on 20,000 random screens, with the display's apply on its own in a second runner. 37 of 39 mutants are caught, four of them after the test was widened: page answers that differ from the pages the
+screen already holds, the scene's cue logged as a value rather than read as a vector, display words whose top bit is
+set and whose dropped bits tie, and display lines that reach the screen modes 9..11. The two survivors are
+equivalent. The game writes the screen mode's word twice, so the first value never shows. And when a page item's own
+list is missing, the game calls through it unchecked, which the test can't reach without the game crashing.
+
+### The user name ported (row G9r; `game/src/fe_username.rs`, checked: `tests/fe_username.rs`)
+
+`cFE3DStateUserName` edits the player's name with an on-screen keyboard. +0x54 holds the name (up to nine
+characters and its end), +0x70 the keyboard, +0x74 the name's text. +0x68 is set while the stored name shows, so the
+first key typed replaces it. +0x6c is set for the World Circuit, where "done" goes on to the character accept.
+- **`CreateNextState`:** for the World Circuit, the character accept (0x54 bytes) with the three bytes handed on;
+  otherwise none.
+- **The builder:**
+  - the title (0x274208: 300.0, text 0xdb1, 0x200a) and one menu item (text 0xe1c);
+  - the keyboard (no parent; +0x114 14, +0x118 1.0, white, keys up to 0x65), centred 73 above y 300 by its size,
+    +0x70 2, its bytes +0x120 0xc and +0x121 / +0x122 0xd;
+  - its cursor icon: sprite 0x2a sized 1.1 × the sprite, its colours and frames, opened, +0x114 0x60, +0x70 -1, kept
+    at the keyboard's +0x11c;
+  - the name's text (under the title, 0.7 high, highlighted, at (320, 100));
+  - the name box (245 × 30 at (320, 94)) with its two ends (sprite 0x2c at x 197.5 and 442.5);
+  - the keyboard under the title, the backdrop, the widgets reset onto the keyboard.
+- **`Activate`:** the stored name (0x164918) loaded and centred, +0x68 set, the base's, then the screen's +0x40 when
+  booted. **vf21:** the stored name loaded back, then the base's vf21.
+- **vf26 (a key):**
+  - delete (0x64) drops the last character;
+  - done (0x65) stores the name for the player's slot (0x164968) and leaves: +0x30 for the World Circuit, else +0x28;
+  - any other key is typed after the name while it is under nine characters, onto an empty name while the stored
+    one shows;
+  - the name re-centred after an edit.
+- **0x29d7a8:** sets the World Circuit flag.
+
+Checked in the runner on 12,000 random screens. All 23 mutants are caught.
+
+### The trick book ported (row G9p; `game/src/fe_trickbook.rs`, checked: `tests/fe_trickbook.rs`)
+
+`cFE3DStateTrickBook` shows the six chapters of the rider's trick book in its menu (items 0..5) and a chapter's five
+tricks in a trick list (+0x104, items 7..11). The screen keeps:
+- +0x54 the textures' state: 2 while the book's load, 1 while a chapter's load, 0 when ready;
+- +0x58 the tricks on a page (5), +0x5c the chapter's first sprite, +0x60 the chapter shown (-1 none);
+- +0x64 the trick film playing (-1 none), +0x68 the films' archive, +0xf4 set when backing out;
+- +0xf8 the trick page, +0xfc the picture, +0x100 the rank colour bar, +0x108 the page count, +0x10c the trick's
+  name box, +0x110 the book's cover.
+
+The methods:
+- **The builder (0x27a5b8):** most of its 14 KB is widgets made in place:
+  - the title (0x274208: 105.0, text 0xdb0, 0x800e), the menu's bytes 4, the help bar's layout 0x800a, no back, the
+    six chapter items (the texts at 0x3af6f0);
+  - a backdrop icon (640 × 480, tinted); the page band, a tiled icon (vtable 0x3b6e40, sprite 0x3c, 640 × 80 at y
+    320);
+  - the cover (195 × 195 at y 150, its colour cycle, sprite -5 until the book is in), with the character's name
+    centred over it;
+  - the rank colour bar (sprite 0x2b at (480, 105)), the trick name box (0x2b0b90, 150 × 175 at (460, 142), scaled
+    0.85), the picture (257 × 158 at (320, 205)) and its frame of eight pieces of sprite 0x29;
+  - the trick page, a group at y 305 holding: three lines of sprite 0x29; the trick list (made by 0x26d3b8, vtable
+    0x3b7fe0, at (68, 10), its arrows at x 29 and 563) with five trick icons numbered 7..11; the list's cursor
+    (sprite 0x2e); and the page count (a buffered text under the help bar, at y 65);
+  - no chapter shown; the backdrop; the cursor moved onto the list's first line, less 5 on x and y; the widgets
+    reset off.
+- **Choosing a chapter (0x27a288):** for a chapter that isn't shown, the widgets reset off, and for chapters 0..5:
+  the chapter's textures loaded (the character's first sprite from a table of twelve, plus the chapter), state 1,
+  the picture and the five trick lines blanked (sprite -5) and closed, the rank colour bar's colour (0x19e840), the
+  page count. Characters past 11 would use a leftover register; the port uses the first character's (STANDIN).
+- **The page count (0x27a4a8):** string 0xe6b with the chapter's tricks done and the tricks on a page, centred
+  across 640.
+- **`Update`:**
+  - a film that has finished is released and the picture goes back to the chosen line's sprite;
+  - state 2, once the textures are in: the cover gets sprite 0x86 and turns white, then chapter 0 is chosen;
+  - state 1, once the textures are in: each trick line is opened, enabled when the trick is done, and given sprite
+    0x7c + k; the list is centred by its line width (+0x15c + 90) with its arrows either side; the picture takes the
+    chosen line's sprite and colour; the widgets reset onto the menu unless the screen is fading out;
+  - then the base's.
+- **`Activate`:** the 3D scene's +0xa8, the trick definitions loaded (0x154580); the book's textures loaded on the
+  first visit (the cover still -5; the set by character, state 2), otherwise chapter 0 chosen if none is shown; the
+  films' archive opened ("data/video/tb/tb_" and the character's name); the chapters up to the complete pages
+  opened and the rest closed; the menu laid out; the base's.
+- **`Deactivate`:** the trick definitions freed, a film playing stopped, all films released, the archive closed, the
+  base's.
+- **vf21 (backing out):** nothing while loading; from a trick back to the chapters (the widgets reset onto the menu,
+  the picture back, the name box's string 0x3af5c8); otherwise +0xf4 set and the base's vf21.
+- **vf26 (picking):** nothing while loading. A chapter is chosen if it isn't shown, and the widgets reset onto the
+  trick list. A trick opens its film (the character's name and chapter × 5 + trick, 128 × 128) unless one is
+  playing, and puts the film's texture on the picture's sprite 0x7b. Anything else goes to the base's vf26.
+- **vf22 (the item that comes):** a film playing stopped. For a chapter: its page count, the help layout 0x800a, the
+  chapter chosen once the book is in, the help text 0xdd9. For a trick: the picture on its sprite and colour, its
+  name printed (0x154638, 0x1551c0), the rank colour, the help layout 0x800c with the fourth button enabled for a done
+  trick, the help text 0xdda.
+- **vf24 (leaving for a lesson):** the players' slots cleared (the second player's rider marked seen first), game
+  mode 6, the 3D scene's +0x10(-1), the front end's game type 3, the screen's +0x28(3) and +0x48.
+- **The destructor (0x28e360):** the vtable, the archive deleted, the base's destructor.
+
+Checked in the runner on 8,000 random screens covering all eleven methods (about 700 each). The builder's icons,
+group, list and page count carry the game's own vtables, so the functions behind the 26 slots it calls are stubbed by
+the addresses read from those vtables. All 46 mutants are caught.
 
 ## The 3D transition and fade record (F1c, proven from the code, not ported)
 
