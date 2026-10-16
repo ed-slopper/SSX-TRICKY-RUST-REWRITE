@@ -64,8 +64,8 @@ pub struct GameHud {
     loc: Option<tricky_data::loc::LocFile>,
     sheets: Vec<Handle<Image>>,
     tick: f32,
-    /// the game mode the HUD overlay was built for
-    mode: Option<u32>,
+    /// the game mode and course the HUD overlay was built for
+    mode: Option<(u32, u32)>,
     quads: usize,
     texts: usize,
 }
@@ -396,8 +396,8 @@ fn build(elf: &[u8], rects: &[(u32, [f32; 7])]) -> Mem {
     let rd = RIDERS;
     m.w32(rd + 0x464, rd + 0x500);
     m.w32(rd + 0x290, 1);
-    // the game's settings: one player, view 0, the HUD option 0 (STANDINs for the mode and the course, set per
-    // frame)
+    // the game's settings: one player, view 0, the HUD option 0 (the mode and the course are set with the
+    // constructor)
     m.w32(hudstate::PLAYERS, 1);
     m.w32(hudstate::HUD_OPTION, 0);
     m.w32(hudstate::VIEW_MODE, 0);
@@ -450,7 +450,7 @@ fn load(hud: &mut GameHud, lib: &CharLib, images: &mut Assets<Image>) -> Option<
 /// and show what it drew
 #[allow(clippy::too_many_arguments)]
 pub fn game_hud(
-    mut commands: Commands, lib: Res<CharLib>, (rider, race, opponents): (Res<RiderRes>, Res<crate::RaceRes>, Res<crate::Opponents>), game: Res<ui::Game>, mode: Res<Mode>, time: Res<Time>,
+    mut commands: Commands, lib: Res<CharLib>, (rider, race, opponents, list): (Res<RiderRes>, Res<crate::RaceRes>, Res<crate::Opponents>, Res<crate::LevelList>), game: Res<ui::Game>, mode: Res<Mode>, time: Res<Time>,
     fonts: Res<SfnFonts>, mut hud: ResMut<GameHud>, mut images: ResMut<Assets<Image>>, root: Query<Entity, With<ui::HudRoot>>,
     mine: Query<Entity, With<GameHudRoot>>,
     mut quads: Query<(&QuadNode, &mut Node, &mut ImageNode, &mut Visibility, &mut GlobalZIndex), Without<TextNode>>,
@@ -491,18 +491,31 @@ pub fn game_hud(
     let riding = *mode == Mode::Ride && game.screen == ui::Screen::Playing;
     let GameHud { mem, loc, sheets, tick, mode: built, quads: nq, texts: nt, .. } = &mut *hud;
     let Some(m) = mem.as_mut() else { return };
-    // STANDINs: the game mode from the app's event (race 5, show-off 2, free ride 1), course 0. The HUD overlay is
-    // built (its constructor sets the HUD's flags by the mode) whenever the event changes, as entering a race does
-    let game_mode = match game.event { ui::Event::Race => 5, ui::Event::ShowOff => 2, ui::Event::FreeRide => 1 };
-    if *built != Some(game_mode) {
+    // the game mode for the app's event (its menu's "World Circuit - Race" / "- Show-off" / "Free Ride":
+    // `courses::Mode` CircuitRace 4, CircuitShowoff 5, Freeride 7) and the course's number from the game's course
+    // table by the level folder (the table's file names are the folders' starts: "snow", "mesa", "megaple"; Merqury
+    // City's is "merquer"). The HUD overlay is built (its constructor sets the HUD's flags by the mode, the medals by
+    // the course) whenever either changes, as entering an event does
+    let game_mode = match game.event {
+        ui::Event::Race => tricky_game::courses::Mode::CircuitRace,
+        ui::Event::ShowOff => tricky_game::courses::Mode::CircuitShowoff,
+        ui::Event::FreeRide => tricky_game::courses::Mode::Freeride,
+    } as u32;
+    let folder = list.dirs.get(list.current).and_then(|d| d.file_name()).map(|n| n.to_string_lossy().to_lowercase()).unwrap_or_default();
+    let course = tricky_game::courses::COURSES
+        .iter()
+        .find(|c| folder.starts_with(c.file) || (folder.len() >= 4 && c.file.starts_with(&folder[..4])))
+        .map(|c| c.number)
+        .unwrap_or(0);
+    if *built != Some((game_mode, course)) {
         m.w32(hudstate::GAME_MODE, game_mode);
-        m.w32(hudstate::LAP_MODE, 0);
+        m.w32(hudstate::LAP_MODE, course);
         hudstate::hud_overlay_new(m, &mut StateEnv { points: 0 }, HUD);
         // STANDIN: `ScreenOverlay_Init` 0x1a7d78 is not run; the HUD's sprite set and font as the game's HUD keeps
         m.w32(HUD, SET);
         m.w32(HUD + 8, FONT1);
         hudstate::set_view_layout(m, 0);
-        *built = Some(game_mode);
+        *built = Some((game_mode, course));
     }
     if *next_string == 0 {
         *next_string = STRINGS;

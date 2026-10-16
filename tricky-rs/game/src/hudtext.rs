@@ -6,7 +6,7 @@
 //! By the HUD's flags (+0x104): 0x200 the lap (number and its ordinal), 0x1 the race time, 0x20000000 the gap to the
 //! other player, 0x800 the speed, 0x200 without 0x1000000 "/" and the riders' count, 0x400 the kind-13 caption, 0x8
 //! the multiplier, 0x100000 the kind-12 "X" bonus, 0x20000 the trick messages or the tricky prompt, 0x400000 the
-//! kind-11 / 10 bonus and split, 0x100 the split markers' names, 0x1000000 the time trial's medal text; then the
+//! kind-11 / 10 bonus and split, 0x100 the split markers' names, 0x1000000 the show-off's medal text; then the
 //! race's pause prompt.
 
 use crate::hudsprites::{bits, colour, fl, int, lay, put, text, white, SpritesEnv};

@@ -3,14 +3,14 @@
 //! `hudsprites.rs`); here is what feeds them.
 //!
 //! The HUD overlay (0x618 bytes): +0x2c the split markers' count, +0x30 their course distances (25), +0x94 their kinds
-//! (0 a checkpoint, 1 the start, 2 a second kind; -1 free), +0xf8 / +0xfc / +0x100 the time trial's three medal
-//! times, +0x104 the HUD's flags (from +0x108 / +0x10c / +0x110 by the HUD option), +0x114 four players' blocks of
+//! (0 a checkpoint, 1 the start, 2 a second kind; -1 free), +0xf8 / +0xfc / +0x100 the show-off's three medal
+//! scores, +0x104 the HUD's flags (from +0x108 / +0x10c / +0x110 by the HUD option), +0x114 four players' blocks of
 //! 0x140 bytes, +0x614 the race clock last frame (whole seconds).
 //!
 //! A player's block: +0 the fade-in (0..1), +4 the score shown (rolling up to the points), +8 the base points, +0xc
 //! fourteen colour pairs (the meter's bands: +0xc the colour, +0x10 lit), +0x7c the meter shown, +0x80 the multiplier
 //! shown, +0x84 the wobble scale, +0x88 the wobble's progress, +0x8c / +0x90 the speed flash (on, its time), +0x94 /
-//! +0x98 the time trial's medal flash (the medals passed, its time), +0x9c the blink counter (0..53), +0xa0 the blink
+//! +0x98 the show-off's medal flash (the medals passed, its time), +0x9c the blink counter (0..53), +0xa0 the blink
 //! on, +0xa4 the lap changed, +0xb4 -1, +0xc4 the riders' progress bars, +0xdc the split markers' distances ahead.
 
 use crate::pf::Mem;
@@ -21,7 +21,8 @@ use crate::replaymgr::GAPP;
 pub const BANDS: u32 = 0x338008;
 /// The race paths (`AIPathSet` at 0x337fb8: +8 the count, +0xc the paths of 0x3c bytes)
 pub const PATHS: u32 = 0x337fb8;
-/// The game mode (3 / 5 time trial and race with the countdown, 6 the tutorial), the lap mode (8 three laps)
+/// The game mode (`courses::Mode`: 3 / 5 the show-offs, against the clock; 6 the tutorial) and the course
+/// (`courses::COURSES`' number)
 pub const GAME_MODE: u32 = 0x32de8c;
 pub const LAP_MODE: u32 = 0x32de88;
 /// The HUD option (`Game_GetHudOption` 0x17f158) and the split-screen layout (`Game_GetViewportMode` 0x17f190)
@@ -195,12 +196,12 @@ fn ease(shown: F, target: F) -> F {
     }
 }
 
-/// `cHUDOverlay::Update` 0x1a1f18: the HUD's flags; nothing more while an overlay is active. In time trials and
-/// races the last ten seconds beep (the tenth spoken) for a player still racing; then for each player: the blink,
+/// `cHUDOverlay::Update` 0x1a1f18: the HUD's flags; nothing more while an overlay is active. In show-offs (modes
+/// 3 / 5) the last ten seconds beep (the tenth spoken) for a player still racing; then for each player: the blink,
 /// the score rolling up by 50s (a tick when its hundreds roll over, with the HUD's 0x10000 flag), the meter and the
 /// multiplier eased, the meter's band colours (in the tutorial's fifth lesson the meter jumps and, from 20 up, all
 /// bands lit), the wobble from a trick timer running, the speed flash over 3319.44, the progress bars and the
-/// markers ahead eased by a 36th, the fade-in, the lap change, and the time trial's medal flashes
+/// markers ahead eased by a 36th, the fade-in, the lap change, and the show-off's medal flashes
 pub fn update(m: &mut Mem, env: &mut dyn HudEnv, hud: u32) {
     apply_hud_option(m, hud);
     let man = m.r32(race(m) + 0x38);
@@ -369,7 +370,7 @@ pub fn update(m: &mut Mem, env: &mut dyn HudEnv, hud: u32) {
         if m.r32(r + 0x1b4) != m.r32(m.r32(r + 0x464) + 0x40) {
             m.w32(b + 0xa4, 1);
         }
-        // the time trial's medal flashes
+        // the show-off's medal flashes (modes 3 / 5)
         let mode = m.r32(GAME_MODE);
         if mode == 3 || mode == 5 {
             let t = fl(m, b + 0x98);
@@ -502,7 +503,7 @@ fn copy_entry(m: &mut Mem, to: u32, from: u32) {
 /// `HudOverlay_InitTables` 0x19e888, the HUD overlay's constructor (`ScreenOverlay_Init` 0x1a7d78 first): the
 /// vtable; the meter's fourteen bands (each a 14th: sprite 20 to a third, 19 to two thirds, then 18; each 18 above
 /// the one below, 28 where the colour changes, the first at 288); the split markers (`HUD_BuildSplitList`); the race
-/// clock (+0x614); the view layout tables; the time trial's medal times by course (+0xf8 / +0xfc / +0x100); the
+/// clock (+0x614); the view layout tables; the show-off's medal scores by course (+0xf8 / +0xfc / +0x100); the
 /// HUD's flags for each HUD option (+0x108 / +0x10c / +0x110) by the game mode, the course and the players
 pub fn hud_overlay_new(m: &mut Mem, env: &mut dyn HudEnv, hud: u32) -> u32 {
     env.call(m, 0x1a7d78, &[hud]);

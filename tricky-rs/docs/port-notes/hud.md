@@ -148,7 +148,7 @@ direct calls, the heap, the pads).
   ahead from its rider's course length (+0x380).
 - **The update** (`cHUDOverlay::Update` 0x1a1f18), after the HUD's flags from the HUD option (0x32ca40), and
   nothing while an overlay is active:
-  - in time trials and races (modes 3 / 5) each of the last ten whole seconds beeps once, with the tenth spoken,
+  - in show-offs (modes 3 / 5, which run against the clock) each of the last ten whole seconds beeps once, with the tenth spoken,
     for the first player still racing;
   - the blink counts 0..53 and is on from 19 (while the rider is in state 19 or not finished);
   - the score shown rolls up to the points in steps of 50, with a tick each time its hundreds roll over (HUD flag
@@ -161,7 +161,7 @@ direct calls, the heap, the pads).
   - the speed flash fires when the speed reaches 3319.44. The speed is the length of the 4-word velocity at
     +0x150, w included, computed on VU0 (x² + y², then + z², then + w², then the square root);
   - the riders' progress bars and the markers ahead ease toward the rider's progress by a 36th;
-  - the HUD fades in by 1/180; the lap change shows; and in time trials the three medal times each start a flash
+  - the HUD fades in by 1/180; the lap change shows; and in show-offs (modes 3 / 5) the three medal scores each start a flash
     as the rider's checkpoint count passes them, in order.
 - **`Draw` / `DrawText`** draw nothing while the replay page, results or pause are up, or during a cut-scene other
   than 5, 7 or 8. Otherwise each view is scaled to 640 × 480 (the renderer's size, as unsigned) and its player's
@@ -309,7 +309,7 @@ layout tables as the sprites; a text entry's +8 flags 0x20 / 0x40 centre it on x
   - faded as the markers' sprites are;
   - left of the track in view 0 (20) and view 1 (their width + 3), right of it in view 2;
   - their y is the track's layout offsets alone. The game leaves out the view's top here, and the port keeps that.
-- **0x1000000** (time trials, one rider): the medal text:
+- **0x1000000** (show-offs, one rider): the medal text:
   - Loc 0xe28; the next medal's name and time (0xe32 / 0xe26 and the HUD's +0xfc; 0xe3b / 0xe25 and +0xf8; 0xe35
     for the last), or the gold time (+0x100);
   - shown wobbling (0.7) while its flash runs, else placed at the layout's +0x2f8 / +0x30c entries.
@@ -377,19 +377,19 @@ In `tricky_game::hudsprites`, under the two big draws:
   - view 2's differences.
 
   The port keeps them as 26 runs of (entry, source, count) and reads the sources from the game's memory.
-- **The time trial's medal times** (+0xf8 / +0xfc / +0x100, hundredths) by course (`DAT_0032de88`). A course without
-  times keeps whatever was there:
+- **The show-off medals' points** (+0xf8 / +0xfc / +0x100: gold, silver, bronze; the same as `courses::MEDALS`) by
+  course (`DAT_0032de88`). A course without them keeps whatever was there:
 
-  | Course | +0xf8 | +0xfc | +0x100 |
+  | Course | Gold | Silver | Bronze |
   |---|---|---|---|
-  | 0 | 550 s | 400 s | 250 s |
-  | 1 | 950 s | 650 s | 350 s |
-  | 2 / 3 | 2250 s | 1500 s | 750 s |
-  | 4 | 2750 s | 1750 s | 1250 s |
-  | 5 | 1750 s | 1150 s | 750 s |
-  | 8 | 3500 s | 2250 s | 1000 s |
-  | 11 | 5000 s | 3000 s | 1500 s |
-  | 6 in game mode 3 | 8000 s | 5000 s | 2500 s |
+  | 0 Garibaldi | 55,000 | 40,000 | 25,000 |
+  | 1 Snowdream | 95,000 | 65,000 | 35,000 |
+  | 2 / 3 Elysium Alps / Mesablanca | 225,000 | 150,000 | 75,000 |
+  | 4 Merqury City | 275,000 | 175,000 | 125,000 |
+  | 5 Aloha Ice Jam | 175,000 | 115,000 | 75,000 |
+  | 8 Tokyo Megaplex | 350,000 | 225,000 | 100,000 |
+  | 11 Alaska | 500,000 | 300,000 | 150,000 |
+  | 6 Pipedream in a show-off (mode 3) | 800,000 | 500,000 | 250,000 |
 
 - **The HUD's flags for the three HUD options** (+0x108 / +0x10c / +0x110):
   - they start at 0xb000 / 0x4002b9c0 / 0 (0xb400 / 0x4002bdc0 on course 8);
@@ -475,8 +475,11 @@ Rotated quads are shown unrotated.
 `TRICKY_HUDDBG=1` prints what was drawn once a second. Without the disc, the sheets or the fonts, the app's own HUD
 stays.
 
+**The game mode and course** are the game's own: the app's events are its menu's World Circuit race and show-off
+and free ride (`courses::Mode` 4, 5 and 7), and the course number is found in the game's course table by the level
+folder's name.
+
 **STANDINs** (each marked in the code), where the app does not keep the game's value:
-- the game mode from the app's event (race 5, show-off 2, free ride 1), and course 0;
 - `ScreenOverlay_Init` not run, with the HUD's sprite set and font placed by hand;
 - `gApp+0x5c` taken as TITLE.SFN and `+0x60` as MENU.SFN;
 - the app's SFN measure for `Font_MeasureAscii` / `_MeasureWide`;
