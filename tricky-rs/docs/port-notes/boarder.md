@@ -343,6 +343,10 @@ computer riders.
   `gate::k`, byte · 0.71808594 / 255 + 0.4875571) are read from the bytes in the port's prewind and gate, in place of
   the rounded fraction forms (0.812 + 0.329 · wind-up, 0.4875571 + 0.71808594 · gate). The port's fractions (edging,
   speed, stability, tricks) still drive its own riding formulas that have no stat byte yet.
+- since G3a: the port's own riding fractions (edging, speed, stability, tricks) for the player come from the same
+  career levels: each group's level mixed 80% with the board's 20% over 100 (`Stats::of_levels`), equal to the old
+  training-fraction ones at a new career (checked for every rider and board, `tests/stats.rs`); the app's "master"
+  keeps the fully trained ones. The computer riders' fractions and the attribute points' spending stay in row G3.
 
 ## The probe's sideways offset: stats+0x60 and rider+0x244 (board row G20b)
 

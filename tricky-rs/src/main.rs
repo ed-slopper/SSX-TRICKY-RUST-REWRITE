@@ -1703,7 +1703,11 @@ fn ride(
     let mine = data_of(lib.player);
     r.data = mine;
     let row_of = |d: &trickdata::RiderData| trickdata::RIDERS.iter().position(|x| std::ptr::eq(x, d)).unwrap_or(0);
-    r.stats = rider::Stats::of(mine, game.training(), &trickdata::BOARDS[row_of(mine)][game.board.min(11)]);
+    // the player's fractions from the career's levels (master: fully trained, the max-attributes cheat)
+    r.stats = match game.levels.filter(|_| !game.master) {
+        Some(levels) => rider::Stats::of_levels(mine, levels, &trickdata::BOARDS[row_of(mine)][game.board.min(11)]),
+        None => rider::Stats::of(mine, game.training(), &trickdata::BOARDS[row_of(mine)][game.board.min(11)]),
+    };
     // the stat bytes as `Career_SetupPlayerRider` 0x16a9d8 makes them: the base bytes moved toward 100 by the
     // career's group levels, a fifth the board's (master: the caps, as the max-attributes cheat)
     if let Some(levels) = game.levels {

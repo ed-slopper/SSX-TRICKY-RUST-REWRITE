@@ -161,6 +161,15 @@ impl Stats {
                jump: d.jump as f32 / 100.0, windup: d.windup as f32 / 100.0, weight: d.weight as f32, alpine: board.kind == 2, kind: board.kind, meter_leak: 0.5,
                gate: match d.name { "Kaori" | "Marisol" => 0.80, "Luther" => 0.64, "Mac" => 0.85, "Moby" | "Seeiah" => 0.75, "Zoe" => 0.82, "JP" => 0.88, _ => 0.70 } }
     }
+    /// The player's rider from the career: each group's fraction is the rider's level (the career record's +0xc..+0xf,
+    /// as `Career_SetupPlayerRider` reads them for the stat bytes) mixed 80% with the board's 20%, the same mix the
+    /// stat bytes are made with
+    pub fn of_levels(d: &RiderData, levels: [u8; 4], board: &crate::trickdata::Board) -> Self {
+        let mut s = Self::of(d, 0.0, board);
+        let f = |g: usize| (0.8 * levels[g] as f32 + 0.2 * board.bonus[g] as f32) / 100.0;
+        (s.edging, s.speed, s.stability, s.tricks) = (f(0), f(1), f(2), f(3));
+        s
+    }
     pub fn drag_linear(&self) -> f32 { if self.alpine { 0.7076 - 0.3020 * self.speed } else { 1.0650 - 0.3085 * self.speed } }
     pub fn drag_cubic(&self) -> f32 { 1.2848 - 0.2904 * self.speed }
     pub fn push(&self) -> f32 { if self.alpine { 1.2050 + 0.3050 * self.speed } else { 0.7381 + 0.2769 * self.speed } }

@@ -490,3 +490,21 @@ fn lean_ease_is_the_originals() {
     assert!(wrong.is_empty(), "{} differ:\n{}", wrong.len(), wrong.join("\n"));
     assert!(up > 1000 && down > 1000 && near > 1000, "up {up}, down {down}, within a step {near}");
 }
+
+/// Row G3a: the player's fractions from the career's levels are the old training-fraction ones at the start: a new
+/// career's levels are each group's average of the base bytes, which are the riders' starting attributes, for every
+/// rider and board.
+#[test]
+fn career_levels_at_the_start_give_the_starting_fractions() {
+    use tricky_game::rider::Stats;
+    use tricky_game::trickdata::{BOARDS, RIDERS};
+    for (i, d) in RIDERS.iter().enumerate() {
+        let levels = tricky_game::stats::average_groups(&tricky_game::stats::BASE[i]);
+        for b in &BOARDS[i] {
+            let (a, c) = (Stats::of_levels(d, levels, b), Stats::of(d, 0.0, b));
+            for (x, y, what) in [(a.edging, c.edging, "edging"), (a.speed, c.speed, "speed"), (a.stability, c.stability, "stability"), (a.tricks, c.tricks, "tricks")] {
+                assert!((x - y).abs() < 1e-6, "{} {what}: {x} vs {y}", d.name);
+            }
+        }
+    }
+}
