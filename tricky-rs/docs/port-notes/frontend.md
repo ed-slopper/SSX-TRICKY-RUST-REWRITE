@@ -177,6 +177,48 @@ Checked in the runner on 20,000 random screens (about 2,500 per method; the game
 and -1), with the help line on its own over 2,000. The base's `Activate`, vf22 and vf26 run as the original. 22 of 22
 mutants are caught.
 
+### The event select ported (row G9f; `game/src/fe_eventsel.rs`, checked: `tests/fe_eventsel.rs`)
+
+`cFE3DStateEventSel` lists the items that the game type allows. The game type is the front end's +0xf0, which the
+mode select sets:
+- type 0: items 2, 3, 0 (0x3b2ad0);
+- type 1: items 1, 4 (0x3b2ae0);
+- type 2: items 2, 3 (0x3b2ae8);
+- any other type: no items.
+
+Each item is numbered 0..4 and has its own text (0xe85, 0xe04, 0xe05, 0xe06, 0xe07), help line (0xccc, 0xca4,
+0xcc7, 0xccb, 0xca5), music cue and camera. Items 4 and 1 (the latter only with fewer than two players joined) are
+the ones that leave the front end's 3D scene.
+
+- **`CreateNextState`:** the 3D scene's +0x10 with the item's camera. Then, by the item (the game type read first):
+
+  | item | camera | game mode (0x32de8c) | game type | next screen |
+  |---|---|---|---|---|
+  | 0 | 0xc | 7 | 0 | — |
+  | 1 | 10 | 1 | 4 | number of players (0x265a58) |
+  | 2 | 8 | 2 for type 0, 4 for type 2 | kept | type 0: the difficulty select (0x54 bytes, vtable 0x3b2ef0) |
+  | 3 | 9 | 3 for type 0, 5 for type 2 | kept | — |
+  | 4 | 0xb | 6 | 3 | one player set, then the front end's next screen (0x265970) |
+
+  When no screen was made by then (including when the heap or a call answered none), the venue select (0x7c bytes,
+  vtable 0x3b2e10).
+- **The builder:** the base widgets with the title (0x274278: 224.0 for three items, else 194.0; text 0xdaa,
+  0x200a). Each item: +0x118 1.0, the highlight colour (1, 0.953, 0.729, 0.106) at +0x108, white at +0x110 and
+  +0x50, and the item's own number at +0. Then the backdrop.
+- **`Activate`** (the screen before as its second argument):
+  - the overlay's mode 2 when the chosen item leaves the scene;
+  - no fade in (+0x20 0) when the screen before answers 1 from its +0x70;
+  - the event select's music (0x262388), the base's `Activate`, and the help line.
+- **vf18:** for game types 0 and 2, the music's 0x262c60.
+- **vf20:** leaving on an item that leaves the scene, the music's 0x262ad0.
+- **vf22:** the base's, then the coming item's cue when an item goes (0x262160, 0x2620e0, 0x262060, 0x2620a0,
+  0x262120 for items 0..4), then the help line 0x29b5d0.
+- **vf26:** the fade out (+0x24) only for an item that leaves the scene, then the base's.
+
+Checked in the runner on 20,000 random screens (about 2,850 per method; game types 0..3 and -1, items 0..5 and -1,
+the number-of-players and next-screen calls answering none half the time), with the help line on its own over 2,000. 22 of 22 mutants
+are caught.
+
 ## The 3D transition and fade record (F1c, proven from the code, not ported)
 
 One record drives both the screen fades and a blend of four renderer values (read by the renderer's virtual +0x134,

@@ -5439,14 +5439,14 @@ address,size,name,system,status
 0x29ac80,128,cFE3DStateNumPlayers::vf22_29ac80,frontend,checked
 0x29ad00,40,cFE3DStateNumPlayers::vf26_29ad00,frontend,not started
 0x29ad28,28,FE3DNumPlayers_SetPromptText,frontend?,checked
-0x29ad48,216,cFE3DStateEventSel::CreateNextState,frontend,ported
-0x29b000,708,cFE3DStateEventSel::vf11_29b000,frontend,not started
-0x29b2c8,224,cFE3DStateEventSel::Activate,frontend,not started
-0x29b3a8,48,cFE3DStateEventSel::vf18_29b3a8,frontend,not started
-0x29b3d8,128,cFE3DStateEventSel::vf20_29b3d8,frontend,not started
-0x29b458,248,cFE3DStateEventSel::vf22_29b458,frontend,not started
-0x29b550,128,cFE3DStateEventSel::vf26_29b550,frontend,not started
-0x29b5d0,112,FEEventSel_UpdateDesc,frontend?,not started
+0x29ad48,216,cFE3DStateEventSel::CreateNextState,frontend,checked
+0x29b000,708,cFE3DStateEventSel::vf11_29b000,frontend,checked
+0x29b2c8,224,cFE3DStateEventSel::Activate,frontend,checked
+0x29b3a8,48,cFE3DStateEventSel::vf18_29b3a8,frontend,checked
+0x29b3d8,128,cFE3DStateEventSel::vf20_29b3d8,frontend,checked
+0x29b458,248,cFE3DStateEventSel::vf22_29b458,frontend,checked
+0x29b550,128,cFE3DStateEventSel::vf26_29b550,frontend,checked
+0x29b5d0,112,FEEventSel_UpdateDesc,frontend?,checked
 0x29b640,100,cFE3DStateDifficultSel::CreateNextState,frontend,not started
 0x29b6a8,544,cFE3DStateDifficultSel::vf11_29b6a8,frontend,not started
 0x29b8c8,88,cFE3DStateDifficultSel::Activate,frontend,not started

@@ -38,6 +38,7 @@ pub mod fe3dstate;
 pub mod fe_title;
 pub mod fe_numplayers;
 pub mod fe_modeselect;
+pub mod fe_eventsel;
 pub mod sndplay;
 pub mod sndqueue;
 pub mod sndlib;
