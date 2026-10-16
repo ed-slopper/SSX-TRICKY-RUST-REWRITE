@@ -219,6 +219,117 @@ Checked in the runner on 20,000 random screens (about 2,850 per method; game typ
 the number-of-players and next-screen calls answering none half the time), with the help line on its own over 2,000. 22 of 22 mutants
 are caught.
 
+### The venue select ported (row G9g; `game/src/fe_venuesel.rs`, checked: `tests/fe_venuesel.rs`)
+
+`cFE3DStateVenueSel` lists the ten courses in the order of the signed byte table at 0x3a8af0. An item's number is its
+place in that table, and the screen keeps the ten text widgets at +0x54..+0x7c. The help line (+0x4c) carries the
+event's title.
+- **`CreateNextState`:** the chosen course (the table's byte at the item) goes to 0x32de88, and the race is set up
+  from the menu (0x2657a8). There is no next screen.
+- **The locks (0x29baa0):** for each of the ten courses, whether it is unlocked in the current game mode (0x163bb8)
+  goes to its widget's +0x100. Its marker on the front end's +0xfc list fades to 1.0 if unlocked, else 0 (0x269be8,
+  f12 the level, then 2).
+- **The builder:** the base widgets with the title (0x274208: 105.0, text 0xdad, 0x200a), and the menu's layout
+  bytes as in the mode select, with +0x158 1. Each course's item has:
+  - its name as text (+0x158; the word at the course table 0x332f28 + 0x1c × course + 4);
+  - +0x118 the word at 0x3ae520;
+  - +0x74 the name's hash (0x240ed8);
+  - its number.
+
+  Then the locks, the backdrop, the menu set on the overlay's venue (its +0x185, a signed byte) and no pause
+  overlay.
+- **`Activate`** (the screen before as its second argument): the locks, the medals shown (0x262d80 with 1), and a
+  fade in only after a screen that answers 6 from its +0x70. Then the base's `Activate` and the event title. When an
+  item is chosen, its video (0x263000 with its signed first byte and +0xa8). Then the venue select's music (0x2624b8).
+- **`Deactivate`:** the medals hidden, ten "no video" calls (-1, 0), then the base's.
+- **vf18:** for game type 4, the music's 0x262c60.
+- **`LayoutWidgets`:** the event title, then the base's.
+- **vf22:** the base's. When an item goes, the overlay's camera moves to the coming item's venue: the "next" move
+  (0x26c1a8) when the coming item is one on from the going one, or 9 to 0; otherwise a pan (0x26c090). Then the
+  coming item's video and the event title.
+- **The event title (0x29c010):**
+  - a World Circuit item (+0xa8 set): the career's event title id (0x16b8e0) as the text;
+  - courses 6 and 7: while locked for mode 1, the course's name (0x16b860); once unlocked, string 0xde7 or 0xde8.
+    The chosen string is copied wide (0x17cc80);
+  - other courses, by the game mode: 1 and 7 format the name with string 0xd31, 2 and 4 with 0x31, 3 and 5 with
+    0x32 (0x17ce38); any other mode leaves the line alone.
+
+  The wide text then goes to the help line (0x2b0f18).
+- **vf26:** the overlay's shot of the venue (0x26c2c0) and the venue chosen (0x263150), each with the item's signed
+  first byte. Then a transition (0x1ff648: 1.0, 10.0, 0, gApp+0x72c, a zero vector, 3), then the base's vf26.
+
+Checked in the runner on 20,000 random screens (about 2,500 per method; the base's `Activate`, `Deactivate`, vf22,
+vf26 and `LayoutWidgets` run as the original). The locks and the event title are stubbed there, and run on their own
+in a second runner over 20,000 cases. Items include places past the table, signed bytes past 0x7f, and the one-on and
+9-to-0 moves. The order table is restored each case, with a byte past 0x7f planted past its ten courses half the
+time. 22 of 23 mutants are caught; the survivor drops `a < b` from the "next" test, which `a == b - 1` already
+implies.
+
+### The difficulty select ported (row G9h; `game/src/fe_difficultsel.rs`, checked: `tests/fe_difficultsel.rs`)
+
+`cFE3DStateDifficultSel` has three items: difficulties 0, 1 and 2.
+- **`CreateNextState`:** always the venue select (0x7c bytes, vtable 0x3b2e10).
+- **The builder:** the base widgets with the title (0x274278: 224.0, text 0xda9, 0x200a). Then the three items
+  (texts 0xe03, 0xe09, 0xe08; +0x118 1.0; the highlight colour at +0x108, white at +0x110 and +0x50; numbered),
+  the backdrop, and no fade in.
+- **`Activate`:** the difficulty select's music (0x262338), the base's `Activate`, and the help line.
+- **vf22:** the base's. When an item goes, the coming item's cue (0x2631b0, 0x2631f0, 0x263230) plays and the
+  difficulty word 0x32dea4 is set to it. Then the help line.
+- **The help line (0x29b9f8):** text 0xcc8, 0xcc9 or 0xcca for items 0..2; none for any other item.
+
+Checked in the runner on 20,000 random screens, with the help line on its own over 2,000. 11 of 11 mutants are
+caught. The other three of the row's seven functions are the destructor and runtime type entries.
+
+### The character accept ported (row G9j; `game/src/fe_characcept.rs`, checked: `tests/fe_characcept.rs`)
+
+`cFE3DStateCharacterAccept` confirms one player's rider. +0x2e is the player (a signed byte); +0x2c and +0x2d are
+handed on through the character screens.
+- **`CreateNextState`:** the character modify screen (0x54 bytes, vtable 0x3b03b0), with the three bytes copied.
+- **The builder:** the base widgets with the title (0x274208: 105.0; text 0xdae for the first player, 0xdaf for the
+  second). One item (the text word at 0x3af6b8, +0x118 1.0), the backdrop, and a fade in.
+- **`Activate`:** the accept music (0x262228), the 3D scene's +0x58(1), the help line, and the base's `Activate`.
+  If the profile word 0x32e5f0 is 0x10, it becomes 2.
+- **`Deactivate`:** the player's rider is found on the front end's +0x20 list at (the player's pick at +0x7d +
+  2 × player) mod 12, with C's signed remainder. It saves its selection (0x266190) with the first byte of the
+  player's career slot (0x164318). Then the 3D scene's +0x58(0) and the base's `Deactivate`.
+- **vf22:** the help line, then the base's.
+- **vf26:** the player's career slot is asked for (the answer is unused). For the last player (the front end's
+  count at +4 minus 1), the players' records are merged (0x1637f8) and the profile's audio applied (0x161a98). Then
+  the base's vf26.
+- **The help line (0x27a240):** text 0xca9, then the line's +0x140.
+
+Checked in the runner on 20,000 random screens (players 0, 1 and -1; picks including 12, 13 and negative bytes;
+career slot bytes past 0x7f), with the help line on its own over 2,000. 13 of 13 mutants are caught (the slot
+byte's sign once the test had slot bytes past 0x7f).
+
+### The hint book ported (row G9q; `game/src/fe_hintbook.rs`, checked: `tests/fe_hintbook.rs`)
+
+- **The builder:** the base widgets with the title (0x274208: 105.0, text 0xe19, 0x200a), one item (the text word at
+  0x3afb58, +0x118 1.0, numbered 0), and the backdrop.
+- **vf26:** the screen's +0x30, as the base's.
+
+Checked in the runner on 20,000 random screens. 5 of 5 mutants are caught. The row's other two functions are the
+destructor and the runtime type entry.
+
+### The video screen ported (row G9s; `game/src/fe_video.rs`, checked: `tests/fe_video.rs`)
+
+`cFE3DStateVideo` plays one movie: +0x54 is its name, and +0x158 a word the player starts with (set by 0x2aba70). The
+player sits at +0x154 with its vtable at +0. +0x15c is the screen pushed when the movie ends.
+- **`Update`:**
+  - with no player yet: one is made (0x2b9fd8), started (+0x10 with +0x54 and +0x158), and the screen becomes the
+    front end's video screen (+0xf8);
+  - otherwise: the player steps (+0x18), and when it answers finished (+0x28) the screen's +0x68 runs.
+- **vf12** (the end):
+  - the player is asked +0x30, the front end's video screen cleared, and the player released (+8 with 3);
+  - when the player answered, the 3D scene's +0x50(6);
+  - the screen stack is popped (0x275b90), and the following screen pushed if there is one;
+  - the screen releases itself (+8 with 3).
+- **`Activate` / `Deactivate`:** the 3D scene's +0x108 / +0x110; `Deactivate` also clears the front end's +0xf4.
+- **vf27:** the player's +0x20(-1). **vf11** is empty.
+
+Checked in the runner on 20,000 random screens. 9 of 9 mutants are caught. The row's other functions are the
+destructor and runtime type entries.
+
 ## The 3D transition and fade record (F1c, proven from the code, not ported)
 
 One record drives both the screen fades and a blend of four renderer values (read by the renderer's virtual +0x134,
