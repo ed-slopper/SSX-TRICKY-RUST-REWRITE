@@ -346,7 +346,9 @@ computer riders.
 - since G3a: the port's own riding fractions (edging, speed, stability, tricks) for the player come from the same
   career levels: each group's level mixed 80% with the board's 20% over 100 (`Stats::of_levels`), equal to the old
   training-fraction ones at a new career (checked for every rider and board, `tests/stats.rs`); the app's "master"
-  keeps the fully trained ones. The computer riders' fractions and the attribute points' spending stay in row G3.
+  keeps the fully trained ones. Since G3b the computer riders' fractions come from their rival value as their stat
+  bytes do (`Stats::of_rival`: each group's base average moved toward 100 by a quarter of the value, at most all the
+  way, no board, as `Career_SetupAIRider`). The attribute points' spending (the front end's rider screen) stays in G3.
 
 ## The probe's sideways offset: stats+0x60 and rider+0x244 (board row G20b)
 

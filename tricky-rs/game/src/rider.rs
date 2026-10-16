@@ -170,6 +170,19 @@ impl Stats {
         (s.edging, s.speed, s.stability, s.tricks) = (f(0), f(1), f(2), f(3));
         s
     }
+    /// A computer rider from the career: `Career_SetupAIRider`'s groups, each the base bytes' average moved toward 100
+    /// by a quarter of the rival value (at most all the way), with no board
+    pub fn of_rival(d: &RiderData, rider: usize, value: i32, board: &crate::trickdata::Board) -> Self {
+        let mut s = Self::of(d, 0.0, board);
+        let avg = crate::stats::average_groups(&crate::stats::BASE[rider]);
+        let f = |g: usize| {
+            let a = avg[g] as f32;
+            let frac = if avg[g] == 100 { 0.0 } else { (value as f32 * 0.25 / (100.0 - a)).min(1.0) };
+            (a + frac * (100.0 - a)) / 100.0
+        };
+        (s.edging, s.speed, s.stability, s.tricks) = (f(0), f(1), f(2), f(3));
+        s
+    }
     pub fn drag_linear(&self) -> f32 { if self.alpine { 0.7076 - 0.3020 * self.speed } else { 1.0650 - 0.3085 * self.speed } }
     pub fn drag_cubic(&self) -> f32 { 1.2848 - 0.2904 * self.speed }
     pub fn push(&self) -> f32 { if self.alpine { 1.2050 + 0.3050 * self.speed } else { 0.7381 + 0.2769 * self.speed } }

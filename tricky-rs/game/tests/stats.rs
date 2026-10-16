@@ -508,3 +508,24 @@ fn career_levels_at_the_start_give_the_starting_fractions() {
         }
     }
 }
+
+/// Row G3b: a computer rider's fractions from the rival value as `Career_SetupAIRider` makes its groups: a value of 0
+/// leaves each group's average of the base bytes, a value of 4 × (100 − average) or more takes it to 100, and between
+/// the two a quarter of the value moves it up; no board.
+#[test]
+fn rival_values_move_the_computer_riders_groups() {
+    use tricky_game::rider::Stats;
+    use tricky_game::trickdata::{BOARDS, RIDERS};
+    for (i, d) in RIDERS.iter().enumerate() {
+        let avg = tricky_game::stats::average_groups(&tricky_game::stats::BASE[i]);
+        let of = |v: i32| { let s = Stats::of_rival(d, i, v, &BOARDS[i][0]); [s.edging, s.speed, s.stability, s.tricks] };
+        for g in 0..4 {
+            let a = avg[g] as f32;
+            assert!((of(0)[g] - a / 100.0).abs() < 1e-6, "{} group {g} at 0", d.name);
+            assert!((of(400)[g] - 1.0).abs() < 1e-6, "{} group {g} at 400", d.name);
+            let v = 20;
+            let want = (a + (v as f32 * 0.25 / (100.0 - a)).min(1.0) * (100.0 - a)) / 100.0;
+            assert!((of(v)[g] - want).abs() < 1e-6, "{} group {g} at {v}", d.name);
+        }
+    }
+}

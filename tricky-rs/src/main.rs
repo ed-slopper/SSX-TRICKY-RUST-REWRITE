@@ -1719,7 +1719,11 @@ fn ride(
         let d = data_of(o.character);
         o.rider.data = d;
         // rivals ride their first board as rookies and the best one as masters
-        o.rider.stats = rider::Stats::of(d, game.training(), &trickdata::BOARDS[row_of(d)][if game.master { 11 } else { 0 }]);
+        // their fractions from the rival value as their stat bytes (master: fully trained)
+        o.rider.stats = match game.rivals.filter(|_| !game.master) {
+            Some(rivals) => rider::Stats::of_rival(d, row_of(d), rivals[row_of(d)], &trickdata::BOARDS[row_of(d)][0]),
+            None => rider::Stats::of(d, game.training(), &trickdata::BOARDS[row_of(d)][if game.master { 11 } else { 0 }]),
+        };
         // `Career_SetupAIRider` 0x16ae68's bytes: the base moved toward 100 by a quarter of how much the rider
         // dislikes the player's character (no board; master: the caps)
         if let Some(rivals) = game.rivals {
