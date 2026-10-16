@@ -596,9 +596,9 @@ address,size,name,system,status
 0x13a888,84,cControllerNode::cControllerNode,world,checked
 0x13a8e0,72,cControllerNode::~cControllerNode,world,not started
 0x13a928,84,cRestoreNode::Kill,world,ported
-0x13a980,116,cControllerNode::Finish,world,ported
-0x13a9f8,76,Controller_RunFinishScript,world?,ported
-0x13aa48,72,cControllerNode::OnMessage,world,ported
+0x13a980,116,cControllerNode::Finish,world,checked
+0x13a9f8,76,Controller_RunFinishScript,world?,checked
+0x13aa48,72,cControllerNode::OnMessage,world,checked
 0x13aab0,28,Instance_DetachController,world,not started
 0x13aad0,36,WorldNode_RayCast,world?,ported
 0x13aaf8,244,Controller_RunContactScript,world?,ported
@@ -736,28 +736,28 @@ address,size,name,system,status
 0x141c80,88,cZBoostNode::~cZBoostNode,world,not started
 0x141cd8,700,cZBoostNode::Update,world,ported
 0x141f98,84,cZBoostNode::SaveSnapshot,save,checked
-0x141ff0,196,cUVScrollNode::cUVScrollNode,world,ported
+0x141ff0,196,cUVScrollNode::cUVScrollNode,world,checked
 0x1420b8,112,cUVScrollNode::cUVScrollNode,world,checked
 0x142128,124,cUVScrollNode::~cUVScrollNode,world,not started
-0x1421a8,116,UVScrollNode_Init,world?,ported
-0x142220,188,UVScrollNode_Register,world?,ported
-0x1422e0,944,cUVScrollNode::Update,world,ported
-0x142690,60,cUVScrollNode::OnContact,world,ported
+0x1421a8,116,UVScrollNode_Init,world?,checked
+0x142220,188,UVScrollNode_Register,world?,checked
+0x1422e0,944,cUVScrollNode::Update,world,checked
+0x142690,60,cUVScrollNode::OnContact,world,checked
 0x1426d0,232,cUVScrollNode::Draw,world,not started
 0x1427b8,396,UVScrollNode_DrawMesh,world?,not started
-0x142948,276,cUVScrollNode::OnMessage,world,ported
+0x142948,276,cUVScrollNode::OnMessage,world,checked
 0x142a60,100,cUVScrollNode::SaveSnapshot,save,checked
 0x142ac8,36,cTexFlip::cTexFlip,render,ported
-0x142af0,392,TexFlip_Init,render,ported
-0x142c78,200,TexFlip_SetFrame,render,ported
+0x142af0,392,TexFlip_Init,render,checked
+0x142c78,200,TexFlip_SetFrame,render,checked
 0x142d40,100,TexFlip_ApplyFrame,render,not started
 0x142da8,228,TexFlip_Draw,render,not started
-0x142e90,428,cTexFlipNode::cTexFlipNode,world,ported
+0x142e90,428,cTexFlipNode::cTexFlipNode,world,checked
 0x143040,116,cTexFlipNode::cTexFlipNode,world,checked
-0x1430b8,704,cTexFlipNode::Update,world,ported
-0x143378,60,cTexFlipNode::OnContact,world,ported
+0x1430b8,704,cTexFlipNode::Update,world,checked
+0x143378,60,cTexFlipNode::OnContact,world,checked
 0x1433b8,28,cTexFlipNode::Draw,world,not started
-0x1433d8,288,cTexFlipNode::OnMessage,world,ported
+0x1433d8,288,cTexFlipNode::OnMessage,world,checked
 0x1434f8,84,cTexFlipNode::SaveSnapshot,save,checked
 0x143550,492,cFenceNode::cFenceNode,world,ported
 0x143740,188,cFenceNode::cFenceNode,world,ported
@@ -772,11 +772,11 @@ address,size,name,system,status
 0x1444d0,168,FenceNode_AddSwing,world?,ported
 0x144578,408,cFenceNode::Draw,world,not started
 0x144710,100,cFenceNode::SaveSnapshot,save,checked
-0x144778,152,cFlagNode::cFlagNode,world,ported
+0x144778,152,cFlagNode::cFlagNode,world,checked
 0x144810,184,cFlagNode::cFlagNode,world,checked
 0x1448c8,108,cFlagNode::~cFlagNode,world,not started
-0x144938,1296,cFlagNode::Init,world,ported
-0x144e48,128,cFlagNode::Update,world,ported
+0x144938,1296,cFlagNode::Init,world,checked
+0x144e48,128,cFlagNode::Update,world,checked
 0x144ec8,908,cFlagNode::BuildStrip,world,ported
 0x145258,408,cFlagNode::Draw,world,not started
 0x1453f0,100,cFlagNode::SaveSnapshot,save,checked
@@ -799,9 +799,9 @@ address,size,name,system,status
 0x145e08,436,cCrowdBoxNode::StepCells,world,ported
 0x145fc0,216,cCrowdBoxNode::Draw,world,not started
 0x146098,84,cCrowdBoxNode::SaveSnapshot,save,checked
-0x1460f0,356,cUVScrollTexFlipNode::cUVScrollTexFlipNode,world,ported
+0x1460f0,356,cUVScrollTexFlipNode::cUVScrollTexFlipNode,world,checked
 0x146258,120,cUVScrollTexFlipNode::cUVScrollTexFlipNode,world,checked
-0x1462d0,636,cUVScrollTexFlipNode::Update,world,ported
+0x1462d0,636,cUVScrollTexFlipNode::Update,world,checked
 0x146660,84,cUVScrollTexFlipNode::SaveSnapshot,save,checked
 0x1466b8,1876,cMeshAnimNode::cMeshAnimNode,animation,ported
 0x146e10,224,cMeshAnimNode::cMeshAnimNode,animation,checked
@@ -2291,32 +2291,32 @@ address,size,name,system,status
 0x198720,24,Vec3_Assign,files?,not started
 0x198738,24,Mem_Copy4,files?,not started
 0x198750,24,Float_Assign,files?,not started
-0x198810,820,cAnimObjectNode::cAnimObjectNode,animation,ported
+0x198810,820,cAnimObjectNode::cAnimObjectNode,animation,checked
 0x198b48,604,cAnimObjectNode::cAnimObjectNode,animation,checked
 0x198da8,272,cAnimObjectNode::~cAnimObjectNode,animation,not started
-0x198eb8,260,cAnimObjectNode::OnContact,animation,ported
+0x198eb8,260,cAnimObjectNode::OnContact,animation,checked
 0x198fc0,112,AnimObjectNode_RefitBox,animation,ported
-0x199030,36,AnimNode_TickDelay,animation,ported
-0x199058,424,cAnimObjectNode::Update,animation,ported
-0x199200,88,cAnimObjectNode::Kill,animation,ported
+0x199030,36,AnimNode_TickDelay,animation,checked
+0x199058,424,cAnimObjectNode::Update,animation,checked
+0x199200,88,cAnimObjectNode::Kill,animation,checked
 0x199258,132,MeshAnim_ApplyFrames,render,ported
 0x1992e0,64,cAnimComboNode::Draw,animation,not started
 0x199320,1328,cAnimObjectNode::vf28_199320,animation,not started
 0x1998d0,36,MeshAnimNode_GetFrameMatrix,render,ported
 0x1998f8,240,cAnimObjectNode::SaveSnapshot,save,checked
 0x1999e8,736,AnimObjectNode_CreateOverlap,animation,checked
-0x199d10,84,cAnimDeltaNode::cAnimDeltaNode,animation,ported
+0x199d10,84,cAnimDeltaNode::cAnimDeltaNode,animation,checked
 0x199d68,80,cAnimDeltaNode::cAnimDeltaNode,animation,checked
-0x199db8,244,cAnimDeltaNode::Update,animation,ported
+0x199db8,244,cAnimDeltaNode::Update,animation,checked
 0x199ee0,60,cAnimComboNode::vf38_199ee0,animation,checked
-0x199f20,392,AnimComboNode_Init,animation,ported
+0x199f20,392,AnimComboNode_Init,animation,checked
 0x19a0a8,256,cAnimComboNode::cAnimComboNode,animation,checked
 0x19a1a8,112,cAnimComboNode::~cAnimComboNode,animation,not started
 0x19a218,184,cAnimComboNode::Update,animation,ported
-0x19a390,128,cAnimComboNode::Kill,animation,ported
+0x19a390,128,cAnimComboNode::Kill,animation,checked
 0x19a410,104,cAnimComboNode::SaveSnapshot,save,checked
 0x19a478,304,AnimComboNode_ApplyFrames,animation,ported
-0x19a5a8,344,cAnimTexFlipNode::cAnimTexFlipNode,animation,ported
+0x19a5a8,344,cAnimTexFlipNode::cAnimTexFlipNode,animation,checked
 0x19a700,120,cAnimTexFlipNode::cAnimTexFlipNode,animation,checked
 0x19a778,312,cAnimTexFlipNode::Update,animation,ported
 0x19a8b0,64,cAnimTexFlipNode::Draw,animation,not started
