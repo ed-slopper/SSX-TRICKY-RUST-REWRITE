@@ -27,5 +27,6 @@ One file per system (board row F6, split from the former `original-rules.md`):
 
 ## Unresolved
 
-Ragdoll sphere places (masses known); song names (music.inf / musicmap.inf); post-race scene row filters; spark and dust
-sprite rendering; HUD text: the strings are read now (`tricky-data::loc`, E5a), the HUD's ids still to wire.
+Ragdoll sphere places (masses known); song names (music.inf / musicmap.inf); spark and dust
+sprite rendering; HUD text: the strings are read now (`tricky-data::loc`, E5a), the HUD's ids still to wire. (The post-race scene row filters, once listed here, are `PreRaceSel_MatchRow` and its
+callers, ported in `roster.rs`.)
