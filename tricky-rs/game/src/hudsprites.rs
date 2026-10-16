@@ -803,3 +803,49 @@ pub fn show_item(m: &mut Mem, env: &mut dyn SpritesEnv, o: u32, k: u32, player: 
     let item = m.r32(o.wrapping_add(16).wrapping_add(k.wrapping_mul(4)));
     env.call(m, if show { 0x1a7db8 } else { 0x1a7e70 }, &[item, player], &[]);
 }
+
+/// `Sprite_DrawRectScaled` 0x14eed0 (the rectangle, the flags; x, y, the scales): `Sprite_DrawAnchored` at the
+/// rectangle's draw size (+4 / +8) times the scales
+#[allow(clippy::too_many_arguments)]
+pub fn draw_rect_scaled(m: &mut Mem, env: &mut dyn SpritesEnv, rect: u32, flags: u32, x: f32, y: f32, sx: f32, sy: f32) {
+    let w = fl(m, rect + 4) * F(sx);
+    let h = fl(m, rect + 8) * F(sy);
+    draw_anchored(m, env, rect, flags, x, y, w.0, h.0);
+}
+
+/// `Sprite_DrawAnchored` 0x1fc178 (the rectangle, the flags; x, y, w, h): the rectangle's texture (+0) bound
+/// (renderer +0x1f4), then its texture coordinates (+0xc..+0x18) drawn as a quad in the font colour. The flags: 1 / 2
+/// flip the coordinates' pairs, 0x10 turns it a quarter (w and h swap places), 4 / 8 anchor it at its bottom / right,
+/// 0x20 / 0x40 centre it on x / y. Unturned it goes to `Draw_TexturedRect` 0x19b730, turned to
+/// `Sprite_SubmitQuad` 0x19bdf8 (the colour vector, x, y, the two sides, the four coordinates)
+#[allow(clippy::too_many_arguments)]
+pub fn draw_anchored(m: &mut Mem, env: &mut dyn SpritesEnv, rect: u32, flags: u32, x: f32, y: f32, w: f32, h: f32) {
+    let (mut x, mut y, w, h) = (F(x), F(y), F(w), F(h));
+    env.renderer(m, 0x1f4, &[m.r32(rect), 0], &[]);
+    let (mut a, mut b, mut c, mut d) = (fl(m, rect + 12), fl(m, rect + 16), fl(m, rect + 20), fl(m, rect + 24));
+    if flags & 1 != 0 {
+        std::mem::swap(&mut b, &mut c);
+    }
+    if flags & 2 != 0 {
+        std::mem::swap(&mut a, &mut d);
+    }
+    let turned = flags & 16 != 0;
+    if flags & 4 != 0 {
+        y = y - if turned { w } else { h };
+    }
+    if flags & 8 != 0 {
+        x = x - if turned { h } else { w };
+    }
+    if flags & 0x60 != 0 {
+        let (across, down) = if turned { (h, w) } else { (w, h) };
+        if flags & 0x20 != 0 {
+            x = x - across * F(0.5);
+        }
+        if flags & 0x40 != 0 {
+            y = y - down * F(0.5);
+        }
+    }
+    let (sw, sh) = if turned { (h, w) } else { (w, h) };
+    let func = if turned { 0x19bdf8 } else { 0x19b730 };
+    env.call(m, func, &[FONT_COLOR], &[x.0, y.0, sw.0, sh.0, a.0, b.0, c.0, d.0]);
+}

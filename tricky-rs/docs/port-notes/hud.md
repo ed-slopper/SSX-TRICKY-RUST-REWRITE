@@ -407,3 +407,23 @@ In `tricky_game::hudsprites`, under the two big draws:
   - the game's `memset` is stubbed, because its PCPYH isn't in the runner; it only touches the stack temporary;
   - the tests caught 20 of 26 mutants. The six left cannot change a result: the band thresholds act on a constant
     sum; views 1 and 2's last entry is rewritten later; and the bits the last two clear are always zero by then.
+
+## A sprite on screen (G8j)
+
+What a HUD sprite call means as a quad, in `tricky_game::hudsprites`:
+
+- **`Sprite_DrawRectScaled`** (the rectangle, the flags; x, y, the scales) scales the rectangle's draw size (+4 / +8)
+  and hands it to `Sprite_DrawAnchored`.
+- **`Sprite_DrawAnchored`** (the rectangle, the flags; x, y, w, h):
+  - binds the rectangle's texture (+0) through the renderer's +0x1f4;
+  - takes its four texture coordinates (+0xc..+0x18);
+  - draws them as a quad in the font colour (0x337fe8).
+- **The flags:**
+  - 1 / 2 swap the coordinates' middle pair / outer pair, flipping the image;
+  - 0x10 turns it a quarter, so w and h trade places;
+  - 4 / 8 anchor it by its bottom / right edge;
+  - 0x20 / 0x40 centre it on x / y.
+
+  An unturned quad goes to `Draw_TexturedRect` 0x19b730, a turned one to `Sprite_SubmitQuad` 0x19bdf8.
+- **Checked in the runner** (tests/spritequad.rs) on 60,000 random rectangles, flags and placements: the bind and
+  the quad, floats bit for bit. The tests caught all 11 mutants.

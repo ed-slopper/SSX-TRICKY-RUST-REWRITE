@@ -986,7 +986,7 @@ address,size,name,system,status
 0x14ed68,32,cEndLessonHandler::Update,game,ported
 0x14ed88,36,Lesson_GetString,game?,not started
 0x14edb0,284,StaticInit_Lesson,game?,not started
-0x14eed0,24,Sprite_DrawRectScaled,game?,ported
+0x14eed0,24,Sprite_DrawRectScaled,game?,checked
 0x14eee8,20,Font_SetColorV,hud,ported
 0x14ef70,92,cLessonMan::__tf,runtime,host
 0x14efd0,80,cLessonExitHandler::__tf,runtime,host
@@ -3279,7 +3279,7 @@ address,size,name,system,status
 0x1fb920,652,FUN_001fb920,render?,not started
 0x1fbbb0,744,FUN_001fbbb0,render?,not started
 0x1fbe98,736,Tex_Swizzle,render,not started
-0x1fc178,440,Sprite_DrawAnchored,frontend?,ported
+0x1fc178,440,Sprite_DrawAnchored,frontend?,checked
 0x1fc330,1012,Sprite_DrawAnchoredGradient,frontend?,not started
 0x1fc728,1436,Sprite_DrawTiled,frontend?,ported
 0x1fccc8,7716,Sprite_DrawTiledGradient,frontend?,not started
