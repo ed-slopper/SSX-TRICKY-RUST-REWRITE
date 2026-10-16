@@ -12,9 +12,9 @@
 //! air-loop event's callback through the audio object's vtable (`cBXAudio::vf13` 0x20df08, `musicsys::air_loop_beat`)
 //! queueing a sound of the LOOPDATA bank a beat, `Song_RandomSegmentMs` and the bank's variant on the game's random
 //! number object (answered here from the host's own generator). STANDIN: the bank is not loaded here (its load is
-//! marked done and its path kept, [`MusicHost::loop_bank`]) and `SndSys_PlayPending` does not play: the queued sound
-//! (bank, program, volume as it makes it) is kept for the app ([`MusicHost::take_loops`]) without the delay's echoes
-//! (row G10b2c2c2).
+//! marked done and its path kept, [`MusicHost::loop_bank`]); `SndSys_PlayPending` runs as the game's (row
+//! G10b2c2c2b: the volume, the delay's echoes through the scheduler) but `SND_PlayBankSound` does not play: each sound
+//! and echo (bank, program, volume) is kept for the app ([`MusicHost::take_loops`]).
 
 use crate::musicsong::{self as song, SongEnv};
 use crate::musicsys as sys;
@@ -71,8 +71,8 @@ const HOST_RAND: u32 = 0x007f_0200;
 /// The listened rider's record (STANDIN: only its +0x418, the finish time, −1 racing)
 const RIDER_AT: u32 = TABLES + 0x3a00;
 
-/// A sound of the song's LOOPDATA bank the air loop queued: the bank (the queue's kind, +0xa40), the program (its id,
-/// +0xa44) and the volume (0..127) `SndSys_PlayPending` plays it at
+/// A sound of the song's LOOPDATA bank the air loop played (or one of its echoes): the bank's handle (here its
+/// number), the program and the volume (0..127) `SND_PlayBankSound` is given
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct LoopPlay {
     pub bank: u32,
@@ -246,25 +246,15 @@ impl SongEnv for HostEnv<'_> {
                 self.out.bank_path = Some(String::from_utf8_lossy(&cstr(m, a[2])).to_string());
                 0
             }
-            // STANDIN (row G10b2c2c2): `SndSys_PlayPending` (the system) takes the queue's top sound: its volume times
-            // its slot's scale when it has one (0 for an emitter's), held to 0..127; kept for the app, not played
-            // (`SND_PlayProgram`) and no echoes scheduled; the index down one
-            sys::PLAY_PENDING => {
-                let s = a[0];
-                let i = m.r32(s + 0x20);
-                let w = |m: &Mem, o: u32| m.r32(i.wrapping_mul(4).wrapping_add(m.r32(s + o)));
-                let mut v = w(m, 0x3c) as i32;
-                if m.r32(s.wrapping_add(0x28).wrapping_add(i.wrapping_mul(4))) != 0 {
-                    v = 0;
-                } else if w(m, 0x40) != 0 {
-                    let f = v as f32 * f32::from_bits(m.r32(w(m, 0x40)));
-                    v = if f < 0.0 { 0 } else if 127.0 <= f { 0x7f } else { f as i32 };
-                }
-                let volume = v.clamp(0, 0x7f) as u8;
-                self.out.loops.push(LoopPlay { bank: w(m, 0xa40), program: w(m, 0xa44), volume });
-                m.w32(s + 0x20, i.wrapping_sub(1));
-                0
+            // `SndSys_PlayPending` as the game runs it (the volume, the bank monitor, the delay's echoes, row
+            // G10b2c2c2b); STANDIN: `SND_PlayBankSound` (the bank's handle, the program, the record) does not play,
+            // the sound is kept for the app (the record's first byte its volume) with a handle of its own
+            sys::PLAY_PENDING => crate::sndplay::play_pending(m, self, a[0]),
+            crate::sndplay::SND_PLAY_BANK_SOUND => {
+                self.out.loops.push(LoopPlay { bank: a[0], program: a[1], volume: m.r8(a[2]) });
+                self.out.loops.len() as u32
             }
+            crate::sndplay::SND_LOCK | crate::sndplay::SND_UNLOCK | crate::sndplay::ADD_INSTANCE => 0,
             // one player, no replay, the one rider listened to; the Tricky speech is the speech system's (STANDIN)
             sys::REPLAY_IS_PLAYING | sys::SPEECH_ON_TRICKY => 0,
             sys::LISTENER_RIDER => RIDER_AT,
@@ -303,6 +293,7 @@ impl EventEnv for HostEnv<'_> {
         match target {
             0x225958 => sys::try_schedule_air_loop(m, self, this),
             0x225850 => sys::virtual_74(m, self, this, _event),
+            0x20c680 => crate::sndplay::echo(m, self, _event),
             0x2259d0 => sys::reload_bank(m, self, this, STACK_TOP - 0x40),
             0x2254f8 => sys::fade_step(m, this),
             _ => 1,
@@ -334,6 +325,9 @@ impl MusicHost {
         mem.regions.push((GLOBALS_AT, vec![0; 0xb00]));
         mem.regions.push((0x343050, vec![0; 0x700]));
         mem.regions.push((CONSTANTS, vec![0; 0x200]));
+        // `gAudio` and the echo's event
+        mem.regions.push((0x342c40, vec![0; 0x10]));
+        mem.regions.push((0x39e860, vec![0; 0x20]));
         mem.regions.push((SYS, vec![0; SYS_SIZE as usize]));
         mem.regions.push((TABLES, vec![0; 0x4000]));
         mem.regions.push((HEAP, vec![0; HEAP_SIZE as usize]));
@@ -360,6 +354,9 @@ impl MusicHost {
         mem.w32(SYS + 0x385c, 1.0f32.to_bits());
         // the air loop's sounds' volume slot (+0x389c) 1.0 too
         mem.w32(SYS + 0x389c, 1.0f32.to_bits());
+        mem.w32(crate::sndplay::AUDIO, SYS);
+        mem.w32(crate::sndplay::EV_ECHO, 0xffff_0000);
+        mem.w32(crate::sndplay::EV_ECHO + 4, 0x20c680);
         // music on (+0x3844)
         mem.w32(SYS + 0x3844, 1);
         for (k, o) in [0x24u32, 0x38, 0x3c, 0x40, 0x64, 0x68, 0x6c, 0x70, 0x74, 0x78, 0x7c].iter().enumerate() {

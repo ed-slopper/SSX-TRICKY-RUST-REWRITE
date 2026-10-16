@@ -632,3 +632,38 @@ the entry and the box fills in the newest one before 0x222358 plays it.
 - Seen on gari (`TRICKY_LOOPLOG`, autoplay, 90 s): 33 take-offs. The first one predicted over 1.5 s (2.26 s,
   44 s in) starts the loop on the next beat. From then on it plays one program a beat (about 0.44 s apart on
   smartbomb) at 114, through the phrase and round, for the rest of the run, as the game's loop does.
+
+## The queued sound's play and the delay's echoes (G10b2c2c2b, `game/src/sndplay.rs`; checked: `tests/musicsys.rs`, `tests/musichost.rs`)
+
+- `SndSys_PlayPending` 0x20c948 (the system) plays the queue's top sound:
+  - **Volume:**
+    - A rider's sound (+0x28 set) gets 0.
+    - Otherwise, with a slot (+0x40), the volume is multiplied by the slot's float, truncated and held to 0..127.
+      With no slot it is left as it is.
+    - The record's first byte gets the volume held to the byte.
+  - **Play:** with the sound library locked, `SND_PlayBankSound` 0x2d1718 runs with the kind's bank handle (state
+    1: its +4; else −1), the id and the record.
+  - **Bank monitor:** a sound that played, or one that failed without +0x7c set, goes to `BankMonitor_AddInstance`
+    0x20bd68 (the system, the sound, the volume before the scaling, 1). 0x20aba8 then runs on its answer, with the
+    handle and the id.
+  - **Echoes:** while the effect row (+0x74: DelayTime, the count, DelayFeedback %, DelayLevel %) has a count left,
+    each echo is scheduled with the event at 0x39e870 (callback 0x20c680). Each lands DelayTime further on and
+    carries the slot, the kind, the id and its volume. The first echo's volume is the volume × level % ×
+    feedback %; each later one is the last × feedback % (integer divisions, held to 0..127). It stops when the
+    count runs out or the volume reaches 0.
+  - Finally the index goes down one, and the sound's handle is returned.
+- The echo callback 0x20c680 (the event: +0x18 the slot, +0x1c the kind, +0x20 the id, +0x24 the volume) queues a
+  sound on `gAudio` (0x342c48):
+  - It is set up as `MusicSys_PlaySong`'s stream is, with those words; its effect row is the default (no echoes).
+  - It then calls `SndSys_PlayPending` and returns 1, which clears the event.
+- Checked in the runner inside the musicsys test, with the real `SndSys_PlayPending` now running under vf13 too.
+  14 of 15 mutants are caught; the survivor (< 0x80 against < 0x7f in the clamp) gives 0x7f either way.
+- **In the game's music, echoes never sound.** MUSIC.INF gives every race song a DelayCount (2 or 4) but
+  `DELAYFEEDBACK = 0`, so the first echo's volume is 0 and nothing is scheduled. Two more details:
+  - 0x224a50 copies the song's count, feedback and time into the row, but not its DelayLevel, so the row keeps
+    its default 50.
+  - The host test checks both: no echoes on Bassinvaders as it is. With the song's feedback set to 90, two echoes
+    of the same program come 295 ms apart at 51 and 45 (114 × 50 % × 90 %, then × 90 %).
+- The host now runs this function. The only STANDIN left is `SND_PlayBankSound`, which keeps each sound for the
+  app (its record byte as the volume) instead of playing it. The sound library and the bank monitor's own
+  functions are G10.

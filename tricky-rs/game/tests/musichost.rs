@@ -144,3 +144,54 @@ fn the_air_loop_plays_a_beat_at_a_time() {
     let k0 = (tricky[0].1.program % align) as usize;
     assert_eq!(tricky.len() + rest.len(), beats as usize - k0 + beats as usize, "to the phrase's end, then once again");
 }
+
+/// The delay's echoes (row G10b2c2c2b): every race song's MUSIC.INF section sets a DelayCount but DelayFeedback 0, so
+/// the first echo's volume (the volume × DelayLevel % × DelayFeedback %) is 0 and `SndSys_PlayPending` schedules none,
+/// as in the game. With the feedback set to 90 in the song (as a section could), an air loop sound is followed by
+/// its echoes through the scheduler (the echo callback 0x20c680): the same program, DelayTime apart, at the volume ×
+/// 50 % (the row's level: the song's DelayLevel is not copied) × 90 %, then × 90 % each.
+#[test]
+fn the_air_loop_echoes_as_its_song_says() {
+    let Some(mut files) = disc_files() else { return };
+    let inf = files.load("data/config/music.inf").ok().flatten().expect("MUSIC.INF");
+    let mut host = MusicHost::new(&inf, Box::new(move |p: &str| files.load(p).ok().flatten()));
+    let mut d = Driver::new(44100, HashMap::new());
+    let index = host.song_index(b"Bassinvaders").expect("the song's section");
+    host.start_race_music(&mut d, index);
+    let s = host.song().unwrap();
+    let (count, fb, time, level, async_level) = (host.mem.r32(s + 0x11c) as i32, host.mem.r32(s + 0x120) as i32, host.mem.r32(s + 0x124), host.mem.r32(s + 0x128) as i32, host.mem.r32(s + 0x130));
+    println!("DelayCount {count} DelayFeedback {fb} DelayTime {time} DelayLevel {level}");
+    assert_eq!((count, fb), (2, 0), "MUSIC.INF's delay: two echoes at feedback 0");
+    let collect = |host: &mut MusicHost, d: &mut Driver, ms: u32| {
+        let mut got = Vec::new();
+        for t in (10..=ms).step_by(10) {
+            host.frame(d, 0.01);
+            got.extend(host.take_loops().into_iter().map(|l| (t, l)));
+        }
+        got
+    };
+    host.schedule_break(&mut d, false);
+    let got = collect(&mut host, &mut d, 3000);
+    let beat = got[1].0 - got[0].0;
+    assert!(got.windows(2).all(|w| w[1].0 - w[0].0 + 10 >= beat), "no echoes between the beats: {got:?}");
+    // the feedback at 90: the echoes
+    host.cancel_break(&mut d, true);
+    collect(&mut host, &mut d, 1000);
+    host.mem.w32(s + 0x120, 90);
+    host.schedule_break(&mut d, false);
+    let got = collect(&mut host, &mut d, 2000);
+    let (start, first) = got[0];
+    let echoes: Vec<_> = got.iter().skip(1).filter(|(_, l)| l.program == first.program).collect();
+    println!("first {first:?} at {start}; echoes {echoes:?}");
+    let v0 = (127.0 * async_level as f32 / 100.0) as i32;
+    // (the row's DelayLevel is its default 50: 0x224a50 copies the song's count, feedback and time, not its level)
+    let _ = level;
+    let mut v = (v0 * 50 / 100 * 90 / 100).clamp(0, 0x7f);
+    assert_eq!(echoes.len(), count as usize);
+    for (k, (at, l)) in echoes.iter().enumerate() {
+        assert_eq!(l.volume as i32, v, "echo {k}'s volume");
+        let want = start + time * (k as u32 + 1);
+        assert!(at.abs_diff(want) <= 20, "echo {k} at {at} ms, wanted {want}");
+        v = (v * 90 / 100).clamp(0, 0x7f);
+    }
+}

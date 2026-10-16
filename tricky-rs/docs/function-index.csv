@@ -3506,7 +3506,8 @@ address,size,name,system,status
 0x20c468,80,cBankMonitor::__tf,runtime,host
 0x20c560,172,BankSys_Init,audio?,not started
 0x20c610,108,cBankSys::~cBankSys,audio?,not started
-0x20c948,1124,SndSys_PlayPending,audio?,ported
+0x20c680,712,SndSys_EchoCallback,audio,checked
+0x20c948,1124,SndSys_PlayPending,audio?,checked
 0x20cdb0,124,StaticInit_SndSys,audio?,not started
 0x20ce30,672,FUN_0020ce30,audio?,not started
 0x20d0d0,520,cBankSys::vf12_20d0d0,audio?,not started

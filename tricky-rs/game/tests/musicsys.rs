@@ -12,6 +12,7 @@ use r5900::Runner;
 use tricky_game::musicsong::{self as song, SongEnv};
 use tricky_game::musicsys::*;
 use tricky_game::pf::Mem;
+use tricky_game::sndplay;
 
 struct Rng(u64);
 impl Rng {
@@ -75,6 +76,8 @@ impl Answers {
             V_24 => g.below(8),
             LISTENER_RIDER => [RIDER, 0, ARENA][g.below(3) as usize],
             REPLAY_IS_PLAYING => g.below(2),
+            sndplay::SND_PLAY_BANK_SOUND => [5u32, u32::MAX, 0x7fff_ffff, 0x8000_0001][g.below(4) as usize],
+            sndplay::ADD_INSTANCE => [0u32, ARENA + 0x9400][g.below(2) as usize],
             _ => g.next(),
         }
     }
@@ -95,6 +98,10 @@ type A = Rc<RefCell<Answers>>;
 struct Ours(A);
 impl SongEnv for Ours {
     fn call(&mut self, m: &mut Mem, target: u32, args: &[u32]) -> u32 {
+        // `SndSys_PlayPending` runs as ported on our side (the original runs in the runner)
+        if target == PLAY_PENDING {
+            return sndplay::play_pending(m, self, args[0]);
+        }
         if target == song::STRICMP {
             let s = |a: u32| (0..).map(|k| m.r8(a + k)).take_while(|b| *b != 0).collect::<Vec<u8>>();
             return !s(args[0]).eq_ignore_ascii_case(&s(args[1])) as u32;
@@ -124,11 +131,12 @@ const LEAVES: &[(u32, usize, bool)] = &[
     (song::STREAM_SET_VOLUME, 2, false), (song::STREAM_FADE, 3, false), (song::STREAM_SET_PITCH, 2, false), (song::FMODF, 0, false),
     (SCHEDULE, 8, false), (CANCEL, 2, false), (MEMSET, 3, false), (BANK_LOAD, 4, false), (PICK_VARIANT, 1, false),
     (RANDOM_SEGMENT, 3, false), (INI_CLOSE, 2, false), (STREAM_SYS_DTOR, 2, false), (V_74, 2, false), (V_24, 1, false),
-    (PLAY_PENDING, 1, false), (V_RAND, 1, false), (REPLAY_IS_PLAYING, 1, false), (LISTENER_RIDER, 2, false),
-    (SPEECH_ON_TRICKY, 2, false),
+    (V_RAND, 1, false), (REPLAY_IS_PLAYING, 1, false), (LISTENER_RIDER, 2, false),
+    (SPEECH_ON_TRICKY, 2, false), (sndplay::SND_LOCK, 0, false), (sndplay::SND_PLAY_BANK_SOUND, 3, false),
+    (sndplay::SND_UNLOCK, 0, false), (sndplay::ADD_INSTANCE, 4, false), (sndplay::INSTANCE_SET, 3, false),
 ];
 
-const REGIONS: [(u32, u32); 5] = [(ARENA, 0x1_2000), (0x343050, 0x200), (0x39ff00, 0x200), (0, 0x400), (0x3436f0, 0x10)];
+const REGIONS: [(u32, u32); 7] = [(ARENA, 0x1_2000), (0x343050, 0x200), (0x39ff00, 0x200), (0, 0x400), (0x3436f0, 0x10), (0x342c40, 0x10), (0x39e860, 0x20)];
 
 fn snap(r: &mut Runner) -> Mem {
     let mut m = Mem::default();
@@ -182,7 +190,7 @@ fn music_system_matches_the_original() {
         song::STRICMP, 0x223ca8, 0x223d60, 0x224368, 0x2243e8, 0x224420, 0x224458, 0x224470, 0x224488, 0x224490, 0x224498,
         0x2245b8, 0x224620, 0x224790, 0x2247c0, 0x2247f8, 0x224898, 0x224918, 0x224978, 0x225090, 0x225260, 0x225280,
         0x225318, 0x225448, 0x225660, 0x2256c0, 0x225768, 0x2257d8, 0x225878, 0x225948, 0x225ca8, 0x225e40, 0x224a50,
-        0x21c6c0, 0x2246a8, 0x224658, 0x21c610, 0x225c40,
+        0x21c6c0, 0x2246a8, 0x224658, 0x21c610, 0x225c40, 0x20c948, 0x20c680,
     ] {
         r.allow(f);
     }
@@ -236,7 +244,26 @@ fn music_system_matches_the_original() {
         r.mem.write_u16(vt + 0x20, [0u16, 4][g.below(2) as usize]);
         r.mem.write_u32(song::MUSIC_SYS, SYS);
         r.mem.write_f32(song::MASTER_VOLUME, 1.0);
-        let which = g.below(34);
+        let which = g.below(36);
+        // the play of the queued sound: the audio system, the echo's event, the kinds' banks, the effect rows
+        // (DelayTime, DelayCount, DelayFeedback, DelayLevel), +0x7c, a sound's event
+        r.mem.write_u32(sndplay::AUDIO, SYS);
+        r.mem.write_u32(sndplay::EV_ECHO, 0xffff_0000);
+        r.mem.write_u32(sndplay::EV_ECHO + 4, 0x20c680);
+        if which >= 28 {
+            r.mem.write_u32(SONG + 0x11c, g.below(6));
+            r.mem.write_u32(SONG + 0x120, [0u32, 50, 90, 100, 150][g.below(5) as usize]);
+            r.mem.write_u32(SONG + 0x124, g.below(500));
+            for k in 0..8 {
+                r.mem.write_u32(TABLES + 0xd00 + 4 * k, g.below(4));
+                let row = TABLES + 0x800 + 0x10 * k;
+                r.mem.write_u32(row, g.below(500));
+                r.mem.write_u32(row + 4, g.below(6));
+                r.mem.write_u32(row + 8, [0u32, 50, 90, 100, 150][g.below(5) as usize]);
+                r.mem.write_u32(row + 0xc, [0u32, 50, 100, 127][g.below(4) as usize]);
+                r.mem.write_u32(TABLES + 0xa00 + 4 * k, g.below(2));
+            }
+        }
         r.mem.write_u32(RIDER + 0x418, [-1i32, 0, 3][g.below(3) as usize] as u32);
         r.mem.write_u32(SYS + 0x6e50, g.below(2));
         // the random number generator's object, and the song's phrase counts (no remainder by 0)
@@ -264,6 +291,12 @@ fn music_system_matches_the_original() {
         }
         if which >= 28 {
             r.mem.write_u32(SYS + 0x20, g.below(6));
+        }
+        // the echo's event: the slot, the kind, the volume
+        if which == 34 {
+            r.mem.write_u32(EVT + 0x18, if g.below(2) == 0 { 0 } else { SCALE });
+            r.mem.write_u32(EVT + 0x1c, g.below(4));
+            r.mem.write_u32(EVT + 0x24, [0i32, 64, 127, 200, -5][g.below(5) as usize] as u32);
         }
         let x = [g.next(), g.next(), g.next()];
         let secs = [0.5f32, 1.0, 2.5, 4.0][g.below(4) as usize];
@@ -316,6 +349,8 @@ fn music_system_matches_the_original() {
             30 => (0x2246a8, vec![SONG, g.below(2), g.below(2)]),
             31 => (0x224658, vec![SONG]),
             32 => (0x21c610, vec![SYS, RIDER]),
+            33 => (0x20c948, vec![SYS]),
+            34 => (0x20c680, vec![g.next(), EVT]),
             _ => (0x224a50, vec![SONG, SYS]),
         };
         // a song for the calls that do not check it
@@ -370,6 +405,8 @@ fn music_system_matches_the_original() {
             30 => Some(random_segment(&mut m, e, SONG, args[1], args[2])),
             31 => Some(pick_variant(&mut m, e, SONG)),
             32 => { tricky_trigger(&mut m, e, SYS, RIDER); None }
+            33 => Some(sndplay::play_pending(&mut m, e, SYS)),
+            34 => Some(sndplay::echo(&mut m, e, EVT)),
             _ => { song_delay_to_sound(&mut m, SONG, SYS); None }
         };
         let mine = std::mem::take(&mut a.borrow_mut().log);
