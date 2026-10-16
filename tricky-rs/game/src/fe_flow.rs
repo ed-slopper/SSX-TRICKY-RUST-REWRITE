@@ -145,6 +145,8 @@ pub struct Flow {
     /// locks, set by the app
     pub locked_riders: [bool; 12],
     pub locked_courses: [bool; 12],
+    /// the boards that can't be picked yet (the custom board's 0x267c70)
+    pub locked_boards: [bool; 12],
     /// the pads in (the manager's 0x265870)
     pub pads: u32,
 }
@@ -163,6 +165,7 @@ impl Flow {
             choices: Choices { players: 1, ..Choices::default() },
             locked_riders: [false; 12],
             locked_courses: [false; 12],
+            locked_boards: [false; 12],
             pads: 1,
         }
     }
@@ -229,11 +232,12 @@ impl Flow {
         }
     }
 
-    /// Whether an item can be picked: a locked rider or course can't (the screens' +0x100 enabled flag)
+    /// Whether an item can be picked: a locked rider, course or board can't (the screens' +0x100 enabled flag)
     pub fn enabled(&self, item: &Item) -> bool {
         match item.label {
             Label::Rider(r) => !self.locked_riders.get(r as usize).copied().unwrap_or(true),
             Label::Course(c) => !self.locked_courses.get(c as usize).copied().unwrap_or(true),
+            Label::Board(b) => !self.locked_boards.get(b as usize).copied().unwrap_or(true),
             _ => true,
         }
     }
@@ -515,6 +519,9 @@ mod tests {
         assert_eq!(pick(&mut f, 5), Outcome::Closed);
         assert_eq!(f.choices.outfit[0], 5);
         assert_eq!(pick(&mut f, 2), Outcome::Opened(Screen::CustomBoard));
+        f.locked_boards[11] = true;
+        assert_eq!(pick(&mut f, 11), Outcome::Stay);
+        f.locked_boards[11] = false;
         assert_eq!(pick(&mut f, 11), Outcome::Closed);
         assert_eq!(f.choices.board[0], 11);
         assert_eq!(f.back(), Outcome::Closed);

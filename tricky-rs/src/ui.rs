@@ -317,9 +317,13 @@ pub struct Game {
     pub row: usize,
     pub board: usize,
     pub track_step: i32,
+    /// the front end's screens as the game's (row G9u), and the game's strings for them (once read from the disc)
+    pub flow: tricky_game::fe_flow::Flow,
+    pub menu_text: Option<tricky_data::loc::LocFile>,
+    pub menu_text_tried: bool,
 }
 impl Default for Game {
-    fn default() -> Self { Self { screen: Screen::Menu, event: Event::Race, round: 0, points: 0, levels: None, rivals: None, attitude: Default::default(), lineup: true, since: 0.0, table: Vec::new(), place: 0, master: false, cursor: 0, pause_cursor: 0, row: 0, board: std::env::var("TRICKY_BOARD").ok().and_then(|b| b.parse().ok()).unwrap_or(0), track_step: 0 } }
+    fn default() -> Self { Self { screen: Screen::Menu, event: Event::Race, round: 0, points: 0, levels: None, rivals: None, attitude: Default::default(), lineup: true, since: 0.0, table: Vec::new(), place: 0, master: false, cursor: 0, pause_cursor: 0, row: 0, board: std::env::var("TRICKY_BOARD").ok().and_then(|b| b.parse().ok()).unwrap_or(0), track_step: 0, flow: tricky_game::fe_flow::Flow::new(), menu_text: None, menu_text_tried: false } }
 }
 impl Game {
     pub fn opponents(&self) -> usize { if self.screen != Screen::Menu && self.event != Event::Race { 0 } else { HEAT - 1 } }
@@ -400,30 +404,47 @@ pub fn menus(keys: Res<ButtonInput<KeyCode>>, pads: Query<&Gamepad>, time: Res<T
     let back = keys.just_pressed(KeyCode::Escape) || pad(GamepadButton::East);
     let up = keys.just_pressed(KeyCode::ArrowUp) || keys.just_pressed(KeyCode::KeyW) || pad(GamepadButton::DPadUp);
     let down = keys.just_pressed(KeyCode::ArrowDown) || keys.just_pressed(KeyCode::KeyS) || pad(GamepadButton::DPadDown);
-    let left = keys.just_pressed(KeyCode::ArrowLeft) || keys.just_pressed(KeyCode::KeyA) || pad(GamepadButton::DPadLeft);
-    let right = keys.just_pressed(KeyCode::ArrowRight) || keys.just_pressed(KeyCode::KeyD) || pad(GamepadButton::DPadRight);
     match game.screen {
         Screen::Menu => {
-            // five rows: Up / Down picks the row, Left / Right changes what is on it
-            if up { game.row = (game.row + 4) % 5; }
-            if down { game.row = (game.row + 1) % 5; }
-            let step = right as i32 - left as i32;
-            let turn = |v: usize, n: usize| ((v as i32 + step).rem_euclid(n.max(1) as i32)) as usize;
-            if step != 0 {
-                match game.row {
-                    0 => game.cursor = turn(game.cursor, 3),
-                    1 => { lib.player = turn(lib.player, lib.chars.len()); game.lineup = true; }
-                    2 => game.board = turn(game.board, 12),
-                    3 => game.track_step = step,
-                    _ => { game.master = !game.master; game.lineup = true; }
+            // the game's strings for the screens, read once from the disc (TRICKY_DISC, as the HUD reads it)
+            if !game.menu_text_tried {
+                game.menu_text_tried = true;
+                game.menu_text = std::env::var("TRICKY_DISC").ok()
+                    .and_then(|p| tricky_data::disc::Disc::open(&p).ok())
+                    .and_then(|mut d| d.read_path("/DATA/LANG/AMERICAN.LOC").ok().flatten())
+                    .map(tricky_data::loc::LocFile::new);
+            }
+            // the career's locks and the pads in, for the screens (M: fully trained, everything open, as the cheat)
+            if keys.just_pressed(KeyCode::KeyM) { game.master = !game.master; game.lineup = true; }
+            let master = game.master;
+            let event = event_of(game.flow.choices.game_mode);
+            for (k, d) in crate::trickdata::RIDERS.iter().enumerate() { game.flow.locked_riders[k] = !master && !career.char_open(d.name); }
+            // the boards by career points, the uber board also by our trick book (row C15b)
+            let who = crate::trickdata::RIDERS[(game.flow.choices.rider[(game.flow.player().max(0) as usize).min(1)] as usize).min(11)].name;
+            for k in 0..12 { game.flow.locked_boards[k] = !master && !(career.board_open(k) || (k == 11 && book.complete(who))); }
+            for c in tricky_game::courses::COURSES.iter() {
+                let open = course_dir(&list, c.number).is_some_and(|i| master || career.course_open(event, &list.dirs[i].file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_default()));
+                game.flow.locked_courses[c.number as usize] = !open;
+            }
+            game.flow.pads = (pads.iter().count() as u32).max(1);
+            if up { game.flow.step(-1); }
+            if down { game.flow.step(1); }
+            if back && game.since > 0.2 { game.flow.back(); game.since = 0.0; }
+            else if ok && game.since > 0.2 {
+                game.since = 0.0;
+                if let tricky_game::fe_flow::Outcome::Race(c) = game.flow.accept() {
+                    // the choices handed to the app (row G9u3): the event, the course, the first player's rider and board
+                    game.event = event_of(c.game_mode);
+                    game.cursor = match game.event { Event::Race => 0, Event::ShowOff => 1, Event::FreeRide => 2 };
+                    let name = crate::trickdata::RIDERS[(c.rider[0] as usize).min(11)].name;
+                    if let Some(k) = lib.chars.iter().position(|ch| ch.name.eq_ignore_ascii_case(name)) { lib.player = k; }
+                    game.board = (c.board[0] as usize).min(11);
+                    if let Some(i) = course_dir(&list, c.course as u32) { game.track_step = i as i32 - list.current as i32; }
+                    game.round = 0;
+                    game.screen = Screen::Playing;
+                    game.lineup = true;
                 }
             }
-            game.event = [Event::Race, Event::ShowOff, Event::FreeRide][game.cursor];
-            // locked riders, boards and tracks can't be picked (master unlocks everything, as the cheat)
-            let me = lib.chars.get(lib.player).map(|c| c.name.clone()).unwrap_or_default();
-            // (the uber board also by our trick book, which is not on the career block yet: row C15b)
-            let open = game.master || (career.char_open(&me) && career.course_open(game.event, &track_key(&list)) && (career.board_open(game.board.min(11)) || (game.board == 11 && book.complete(&me))));
-            if ok && game.since > 0.2 && open { game.round = 0; game.screen = Screen::Playing; game.since = 0.0; game.lineup = true; }
         }
         Screen::Playing => {
             if back { game.screen = Screen::Paused; game.since = 0.0; game.pause_cursor = 0; }
@@ -452,6 +473,25 @@ pub fn menus(keys: Res<ButtonInput<KeyCode>>, pads: Query<&Gamepad>, time: Res<T
             }
         }
     }
+}
+
+/// The app's event for the game mode word (0x32de8c): freeride and the trick tutorial ride free, the show-offs show off,
+/// the races and the time challenge race
+pub fn event_of(game_mode: u32) -> Event {
+    match game_mode {
+        1 | 6 => Event::FreeRide,
+        3 | 5 => Event::ShowOff,
+        _ => Event::Race,
+    }
+}
+
+/// The level folder of a course (by the course table's file name, as the HUD finds it)
+pub fn course_dir(list: &LevelList, number: u32) -> Option<usize> {
+    let c = tricky_game::courses::COURSES.iter().find(|c| c.number == number)?;
+    list.dirs.iter().position(|d| {
+        let folder = d.file_name().map(|n| n.to_string_lossy().to_lowercase()).unwrap_or_default();
+        folder.starts_with(c.file) || (folder.len() >= 4 && c.file.starts_with(&folder[..4]))
+    })
 }
 
 fn ordinal(i: usize) -> &'static str { ["1st", "2nd", "3rd", "4th", "5th", "6th", "7th", "8th"][i.min(7)] }
@@ -566,19 +606,41 @@ pub fn hud(
                         if let Some(m) = career.medal(Event::ShowOff, &key) { parts.push(format!("show-off {}", MEDALS[m].to_lowercase())); }
                         if parts.is_empty() { "no results yet".to_string() } else { parts.join("   ") }
                     };
-                    let data = crate::trickdata::RIDERS.iter().position(|d| d.name.eq_ignore_ascii_case(&me)).unwrap_or(0);
-                    let board = &crate::trickdata::BOARDS[data][game.board.min(11)];
-                    let kind = ["BX", "freestyle", "alpine"][(board.kind as usize).min(2)];
                     let st = r.stats;
-                    let line = |i: usize, label: &str, value: String| if game.row == i { format!(">  {label}   <  {value}  >") } else { format!("{label}   {value}") };
-                    format!("S S X   T R I C K Y\ntricky-rs\n\n{}\n{}\n{}\n{}\n{}\n\nedging {:.0}  speed {:.0}  stability {:.0}  tricks {:.0}\n{best}\ncareer points {}\n{}\n\nUp / Down: row    Left / Right: change    Enter: start",
-                        line(0, "Event", ["World Circuit - Race", "World Circuit - Show-off", "Free Ride"][game.cursor.min(2)].to_string()),
-                        line(1, "Rider", format!("{me}{}", if game.master || career.char_open(&me) { String::new() } else { "  - locked (each gold opens the next rider)".to_string() })),
-                        line(2, "Board", format!("{} of 12  {}  ({kind}){}", game.board + 1, board.name,
-                            { let need = BOARD_POINTS[game.board.min(11)]; if !career.board_open(game.board.min(11)) { format!("  - unlocks at {need} pts") } else { String::new() } })),
-                        line(3, "Track", format!("{track}{}", if game.master || career.course_open(game.event, &track_key(&list)) { "" } else { "  - locked (medal on the track before)" })),
-                        line(4, "Training", if game.master { "master (fully trained)".to_string() } else { format!("career - {} ({} of 240 pts)", rank(game.points), game.points) }),
-                        st.edging * 100.0, st.speed * 100.0, st.stability * 100.0, st.tricks * 100.0, career.points(), book.summary(&me))
+                    // the screen on top of the game's flow (row G9u2): its title and items in the game's strings
+                    let f = &game.flow;
+                    let say = |id: u32| game.menu_text.as_ref().and_then(|l| l.get(id)).unwrap_or_else(|| format!("#{id:x}"));
+                    let rider = f.choices.rider[(f.player().max(0) as usize).min(1)] as usize;
+                    let label = |it: &tricky_game::fe_flow::Item| match it.label {
+                        tricky_game::fe_flow::Label::Text(id) => say(id),
+                        tricky_game::fe_flow::Label::Course(c) => tricky_game::courses::COURSES.iter().find(|x| x.number == c as u32).map_or(format!("course {c}"), |x| x.name.to_string()),
+                        tricky_game::fe_flow::Label::Rider(r) => crate::trickdata::RIDERS[(r as usize).min(11)].name.to_string(),
+                        tricky_game::fe_flow::Label::Outfit(k) => format!("Outfit {}", k + 1),
+                        tricky_game::fe_flow::Label::Board(k) => crate::trickdata::BOARDS[rider.min(11)][(k as usize).min(11)].name.to_string(),
+                    };
+                    let mut menu = match tricky_game::fe_flow::title_text(f.screen(), f.player()) { Some(t) => say(t), None => "S S X   T R I C K Y".to_string() };
+                    menu += "
+
+";
+                    for (k, it) in f.items().iter().enumerate() {
+                        let shut = match it.label {
+                            _ if f.enabled(it) => String::new(),
+                            tricky_game::fe_flow::Label::Board(k) => format!("  (unlocks at {} pts)", BOARD_POINTS[(k as usize).min(11)]),
+                            _ => "  (locked)".to_string(),
+                        };
+                        menu += &if k == f.cursor() { format!(">  {}{shut}  <
+", label(it)) } else { format!("{}{shut}
+", label(it)) };
+                    }
+                    format!("{menu}
+edging {:.0}  speed {:.0}  stability {:.0}  tricks {:.0}
+{best}
+career points {}
+{}
+
+Up / Down, Enter: pick    Esc: back    M: {}",
+                        st.edging * 100.0, st.speed * 100.0, st.stability * 100.0, st.tricks * 100.0, career.points(), book.summary(&me),
+                        if game.master { "master (fully trained)".to_string() } else { format!("career - {} ({} of 240 pts)", rank(game.points), game.points) })
                 }
                 Screen::Playing => String::new(),
                 Screen::Paused => {

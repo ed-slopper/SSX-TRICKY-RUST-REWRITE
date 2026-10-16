@@ -149,7 +149,11 @@ per-character stats, the other snow types (ice, powder), rail speeds and trick s
 
 ## The game around the riding
 
-The game opens on a menu (Up / Down event, Left / Right rider, Enter start, Esc back to it at any time):
+The game opens on its own front end's screens, in the game's words (read from your disc with `TRICKY_DISC`), and they
+lead where the game's do: Start Game, then the mode (Practice, Single Event, World Circuit), the players, the rider,
+the rider's setup (Continue, Outfit, Board, Rider Profile, Trick Book, User Name), the event, the difficulty for a
+single race, and the venue. Up / Down moves, Enter picks, Esc goes back a screen, and Esc during a run comes back to
+them. The app's events behind the game's:
 
 - **World Circuit - Race**: six riders in the gate, three heats (quarter-final, semi-final, final). The first
   three go through; the final gives gold, silver or bronze. The opponents get better each heat, do spins and
@@ -172,8 +176,8 @@ Read out of the game's executable:
 
 - **Rider stats.** Each of the twelve riders has the game's own edging, speed, stability and tricks numbers,
   jump and wind-up strength, weight and board type; they feed the same formulas the game uses (drag, braking,
-  spin and flip speed, jump height, how crooked a landing can be, how fast the meter fills). In the menu, L
-  switches between **rookie** (as a new game starts) and **master** (fully trained, best board).
+  spin and flip speed, jump height, how crooked a landing can be, how fast the meter fills). In the menu, M
+  switches between **rookie** (as a new game starts) and **master** (fully trained, best board, everything open).
 - **Tricks.** The four grab keys J, L, U, O stand for L1, R1, L2, R2. Alone and together they give each rider's
   own fifteen grabs. K (or Shift) while holding a grab tweaks it for double points, and when uber tricks are
   available it starts that grab's uber trick instead (only the first four or five grabs have one).
@@ -292,9 +296,9 @@ not editable yet. Picking goes by each object's origin, so aim at the base of a 
 
 ## Boards
 
-Every rider's twelve boards are in, with their real names, graphics, shapes and stat bonuses. In the menu, Up /
-Down picks a row (Event, Rider, Board, Track, Training) and Left / Right changes it. The board row shows the
-board's name and kind; the stats line under it changes with the board (the game mixes 80% rider with 20% board).
+Every rider's twelve boards are in, with their real names, graphics, shapes and stat bonuses. The rider's setup's
+Board screen lists them (a locked one shows the points it unlocks at); the stats line under the menu changes with
+the board (the game mixes 80% rider with 20% board).
 
 - **Shapes:** BX, freestyle and alpine boards are three different models (2.0 m, 1.7 m and 2.6 m long), from
   `board.mpf` in `DATA/CHAR/BRDPS2.BIG`: `chars/board_bx.json`, `board_fr.json`, `board_al.json` (and the goofy
