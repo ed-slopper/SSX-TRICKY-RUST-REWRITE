@@ -416,3 +416,31 @@ the entry and the box fills in the newest one before 0x222358 plays it.
   type, from `AnimCtl_PlayClip`).
 - Still unclear: 0x22e1b8 / 0x22e240 (four values from 0x22baf8 tested for 0x1c, 0x10, 0x39), 0x22e388 / 0x22e3f0 (id
   ranges for `SoundId_ToBankProgram`), 0x233ab0 (jump table 0x3a2e30), 0x235e70.
+
+## The speech system's glue (G10c2, `game/src/speechsys.rs`; checked: `tests/speechsys.rs`)
+
+- `cSpeechSys` is the stream system (`MusicSys_Init` builds it) with two speech slots: `SpeechSys_Init` 0x228728 sets
+  `gSpeechSys` 0x343700 to it and makes the slots' table (+0x3718, two words); `SpeechSys_AddBank` 0x228a00 makes a
+  slot (0x36c bytes) through `SpeechBank_Init` 0x227cb8, which opens its stream (`StreamSys_Open`, 0x20000) and loads
+  its events (`Speech_LoadEvents`). A slot holds its stream (+0), the stream it follows (+4, −1 none) and its banks
+  (+0xec count, +0xf0 list; a bank's +0 is its id). `SpeechSys_FreeBanks` / `_FreeAll` undo it, taking the slot's
+  banks off the loaded count (0x343704).
+- `Speech_InitLibrary` 0x228830 starts the speech library (`SpeechLib_Init` 0x2baf38) with a tenth of a second of
+  22050 Hz 16-bit sound as its buffer (0x2bae08: rate × width bits in bytes, a tenth for kind 1, two sevenths for
+  kind 2) and gives it 300 event slots.
+- `SpeechSys_UpdateAll` services each slot whose stream is idle (`SpeechSys_IsIdle`: no stream, or playing with
+  under 500 ms left).
+- `Speech_PlayEvent` 0x228400 finds the first bank with the event's id and has the stream system play the line
+  (named after the bank). A slot that follows another stream (+0x348 set) times its line to that stream's end: the
+  line starts at once and is scheduled (`SndSys_ScheduleEvent`) for the other's time left less 30 ms, plus its play
+  time when that is under 300 ms. While the slot's own stream is busy this holds only when it is playing; with 300
+  ms or more left on the other, the line is played as usual unless the two times left are 40 ms or more apart, and
+  the play time is then added only when the other's time less 30 ms is under the slot's own.
+- `Speech_PlayFELine` 0x22e5a8 posts a front-end line (two words from 0x343710, the game mode's bit from
+  `Speech_GetFEModeMask`: 1, 2 race, 8 mode 3, 4 mode 4) and services the slots. `Speech_FreeNarration`,
+  `SpeechSys_IsCharScriptReady` (1 unless a script's slot has a stream, then `StreamSys_HasReached` at 500 ms), the
+  stream getters (state, time left, play time, playing; 0 or 0.0 with no stream) and the library's fatal stop
+  0x2bebe8 are in the same module.
+- Checked in the runner on 40,000 random systems over all 23 entry points, every call out logged with the same
+  answers on both sides; 26 of 28 mutants caught (the two left cannot happen: equal times are 30 ms apart, and
+  nothing the slot calls changes its bank count).

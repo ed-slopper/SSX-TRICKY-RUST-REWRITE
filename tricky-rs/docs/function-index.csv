@@ -1899,7 +1899,7 @@ address,size,name,system,status
 0x1887f8,188,cResolutionMenu::~cResolutionMenu,debugmenu,not started
 0x1888b8,80,cBezierOptionsMenu::__tf,runtime,host
 0x188908,136,cBezierOptionsMenu::~cBezierOptionsMenu,debugmenu,not started
-0x188990,40,Debug_Printf2,audio?,not started
+0x188990,40,Debug_Printf2,audio?,ported
 0x1889b8,32,cMenuItem::cMenuItem,debugmenu,not started
 0x1889d8,36,cMenuItem::~cMenuItem,debugmenu,not started
 0x188a00,124,cMenuItem::HandleInput,debugmenu,not started
@@ -3437,7 +3437,7 @@ address,size,name,system,status
 0x209a98,8,FUN_00209a98,frontend?,not started
 0x209aa0,8,FUN_00209aa0,audio?,not started
 0x209af0,80,cAsyncSys::__tf,runtime,host
-0x209b40,88,FUN_00209b40,audio?,not started
+0x209b40,88,FUN_00209b40,audio?,ported
 0x209c18,48,BankSlot_Init,audio?,not started
 0x209c48,92,BankSlot_Destroy,audio?,not started
 0x209ca8,80,BankInstance_UnloadChain,audio?,not started
@@ -3886,37 +3886,37 @@ address,size,name,system,status
 0x227a80,64,cSoundSys::__tf,runtime,host
 0x227b38,228,SpeechBank_Load,audio?,not started
 0x227c20,28,SpeechBank_Clear,audio?,not started
-0x227c40,100,SpeechBank_Delete,audio?,not started
-0x227ca8,16,SpeechBank_HasId,audio?,not started
-0x227cb8,184,SpeechBank_Init,audio?,not started
+0x227c40,100,SpeechBank_Delete,audio?,checked
+0x227ca8,16,SpeechBank_HasId,audio?,checked
+0x227cb8,184,SpeechBank_Init,audio?,checked
 0x227d70,1012,Speech_LoadEvents,audio?,ported
-0x228168,372,SpeechSys_FreeBanks,audio?,not started
-0x2282e0,144,SpeechSys_IsIdle,audio?,not started
-0x228370,56,SpeechSys_ServiceIfIdle,audio?,not started
+0x228168,372,SpeechSys_FreeBanks,audio?,checked
+0x2282e0,144,SpeechSys_IsIdle,audio?,checked
+0x228370,56,SpeechSys_ServiceIfIdle,audio?,checked
 0x2283a8,88,SpeechSys_LoadBank,audio?,ported
-0x228400,724,Speech_PlayEvent,audio?,not started
-0x2286e8,20,SpeechSys_StopStream,audio?,not started
-0x228700,40,SpeechSlot_IsPlaying,audio?,not started
-0x228728,172,SpeechSys_Init,audio?,not started
+0x228400,724,Speech_PlayEvent,audio?,checked
+0x2286e8,20,SpeechSys_StopStream,audio?,checked
+0x228700,40,SpeechSlot_IsPlaying,audio?,checked
+0x228728,172,SpeechSys_Init,audio?,checked
 0x2287d8,88,cSpeechSys::~cSpeechSys,render?,not started
-0x228830,168,Speech_InitLibrary,audio?,not started
-0x2288d8,128,SpeechSys_FreeAll,audio?,not started
+0x228830,168,Speech_InitLibrary,audio?,checked
+0x2288d8,128,SpeechSys_FreeAll,audio?,checked
 0x228958,60,SpeechSys_CanPlay,audio?,ported
-0x228998,100,SpeechSys_UpdateAll,frontend?,not started
-0x228a00,188,SpeechSys_AddBank,audio?,not started
-0x228ac0,40,Speech_LoadEventsForSlot,audio?,not started
+0x228998,100,SpeechSys_UpdateAll,frontend?,checked
+0x228a00,188,SpeechSys_AddBank,audio?,checked
+0x228ac0,40,Speech_LoadEventsForSlot,audio?,checked
 0x228ae8,156,FUN_00228ae8,audio?,not started
 0x228b88,48,FUN_00228b88,audio?,not started
 0x228bb0,48,SpeechSys_SetSlotHold,audio?,ported
 0x228bd8,168,SpeechSys_Trigger,audio?,ported
 0x228c80,144,FUN_00228c80,frontend?,not started
 0x228d10,188,SpeechSys_ClearEvent,frontend?,ported
-0x228dd0,60,SpeechSys_IsSlotPlaying,audio?,not started
+0x228dd0,60,SpeechSys_IsSlotPlaying,audio?,checked
 0x228e10,40,SpeechSys_GetBankId,audio?,ported
 0x228e38,124,StaticInit_SpeechSys,audio?,not started
 0x228eb8,80,cSpeechSys::__tf,runtime,host
 0x228fb0,668,Stream_Init,audio?,not started
-0x229268,128,Stream_Delete,render?,not started
+0x229268,128,Stream_Delete,render?,ported
 0x2292e8,96,Stream_Open,audio?,not started
 0x229348,76,FUN_00229348,audio?,not started
 0x229398,8,Stream_SetVolume,audio?,ported
@@ -3925,40 +3925,40 @@ address,size,name,system,status
 0x229490,72,Stream_GetStatus,audio?,not started
 0x2294d8,88,Stream_GetPlayInfo,audio?,not started
 0x229530,72,Stream_GetPlayedMs,audio?,not started
-0x229578,72,Stream_GetTimeLeftMs,audio?,not started
-0x2295c0,52,Stream_HasReached,audio?,not started
+0x229578,72,Stream_GetTimeLeftMs,audio?,ported
+0x2295c0,52,Stream_HasReached,audio?,ported
 0x2295f8,44,Stream_IsQueued,audio?,not started
-0x229628,44,Stream_IsPlaying,audio?,not started
+0x229628,44,Stream_IsPlaying,audio?,ported
 0x229658,40,FUN_00229658,audio?,not started
 0x229680,44,Stream_GetHandle,audio?,not started
 0x2296b0,12,FUN_002296b0,audio?,not started
-0x2296c0,80,Stream_GetPlayTime,audio?,not started
+0x2296c0,80,Stream_GetPlayTime,audio?,ported
 0x229710,48,Stream_Resume,audio?,not started
 0x229740,48,Stream_Pause,audio?,not started
 0x229770,128,Stream_PlayFile,audio?,not started
 0x2297f0,116,Stream_OpenInBig,audio?,not started
 0x229868,8,Stream_Stop,audio?,ported
-0x229870,32,Stream_GetState,audio?,not started
+0x229870,32,Stream_GetState,audio?,ported
 0x229890,184,StreamSys_Init,audio?,not started
 0x229948,172,cStreamSys::~cStreamSys,render?,not started
 0x2299f8,240,StreamSys_CreateStream,audio?,not started
-0x229ae8,556,SndSys_OpenStream,audio?,not started
+0x229ae8,556,SndSys_OpenStream,audio?,ported
 0x229d18,40,StreamSys_SetFile,audio?,ported
-0x229d40,84,StreamSys_DestroyStream,audio?,not started
+0x229d40,84,StreamSys_DestroyStream,audio?,checked
 0x229d98,104,StreamSys_StopAll,audio?,not started
 0x229e00,104,StreamSys_ResumeAll,audio?,not started
 0x229e68,104,StreamSys_PauseAll,audio?,not started
 0x229ed0,72,StreamSys_PlayFile,audio?,not started
 0x229f18,72,StreamSys_Play,audio?,not started
-0x229f60,60,StreamSys_GetSlotState,audio?,not started
+0x229f60,60,StreamSys_GetSlotState,audio?,checked
 0x229fa0,40,StreamSys_StopStream,audio?,ported
-0x229fc8,60,StreamSys_GetSlotTimeLeftMs,audio?,not started
-0x22a008,60,StreamSys_GetPlayTime,audio?,not started
-0x22a048,60,StreamSys_HasReached,audio?,not started
+0x229fc8,60,StreamSys_GetSlotTimeLeftMs,audio?,checked
+0x22a008,60,StreamSys_GetPlayTime,audio?,checked
+0x22a048,60,StreamSys_HasReached,audio?,checked
 0x22a088,60,StreamSys_IsSlotQueued,audio?,not started
 0x22a0c8,88,SndHandle_IsDone,audio?,ported
 0x22a120,84,SndHandle_IsPlaying,audio?,not started
-0x22a178,60,StreamSys_IsSlotPlaying,audio?,not started
+0x22a178,60,StreamSys_IsSlotPlaying,audio?,checked
 0x22a1e0,40,FUN_0022a1e0,audio?,not started
 0x22a228,40,StreamSys_SetVolume,audio?,not started
 0x22a278,60,StreamSys_GetSlotHandle,audio?,ported
@@ -4013,8 +4013,8 @@ address,size,name,system,status
 0x22e400,32,FUN_0022e400,race?,ported
 0x22e420,124,StaticInit_WorldTriggerMgr,other,not started
 0x22e4e0,108,Speech_PostFEEvent,frontend?,checked
-0x22e550,88,Speech_GetFEModeMask,frontend?,not started
-0x22e5a8,124,Speech_PlayFELine,frontend?,not started
+0x22e550,88,Speech_GetFEModeMask,frontend?,checked
+0x22e5a8,124,Speech_PlayFELine,frontend?,checked
 0x22e628,124,StaticInit_WorldTriggerMgr2,other,not started
 0x22e6a8,208,SpeechEvt_Post100200f,audio?,checked
 0x22e778,72,SpeechEvt_Post1002010,audio?,checked
@@ -4112,7 +4112,7 @@ address,size,name,system,status
 0x230910,132,Speech_CurrentCourseMask,race?,checked
 0x2309a8,88,Speech_GetModeMask,common?,checked
 0x230a00,884,Speech_LoadNarration,audio?,ported
-0x230d78,84,Speech_FreeNarration,audio?,not started
+0x230d78,84,Speech_FreeNarration,audio?,checked
 0x230dd0,268,Speech_QueueCamScriptLine,race?,checked
 0x230ee0,276,Speech_QueueCamScriptLines,race?,checked
 0x230ff8,204,FUN_00230ff8,audio?,checked
@@ -4171,7 +4171,7 @@ address,size,name,system,status
 0x2355c8,216,Speech_InitCharScriptSamples,audio?,ported
 0x2356a0,76,Speech_FreeCharScriptSamples,audio?,ported
 0x2356f0,32,Speech_CheckBigScore,audio?,checked
-0x235710,104,SpeechSys_IsCharScriptReady,audio?,not started
+0x235710,104,SpeechSys_IsCharScriptReady,audio?,checked
 0x235778,8,Sfx_OnClipPlay,audio?,not started
 0x235780,1008,Sfx_PlayClipSound,audio,not started
 0x235b70,56,SpeechSys_StopCharScript,frontend?,ported
@@ -5990,10 +5990,10 @@ address,size,name,system,status
 0x2bad70,48,FUN_002bad70,audio?,ported
 0x2bada0,28,FUN_002bada0,audio?,not started
 0x2badc0,72,FUN_002badc0,audio?,ported
-0x2bae08,124,FUN_002bae08,audio?,not started
-0x2baeb8,24,FUN_002baeb8,audio?,not started
+0x2bae08,124,FUN_002bae08,audio?,checked
+0x2baeb8,24,FUN_002baeb8,audio?,ported
 0x2baed0,24,FUN_002baed0,audio?,ported
-0x2baf38,220,SpeechLib_Init,audio?,not started
+0x2baf38,220,SpeechLib_Init,audio?,checked
 0x2bb018,68,SpeechLib_Shutdown,lib-snd?,ported
 0x2bb060,20,FUN_002bb060,lib-snd?,ported
 0x2bb078,20,FUN_002bb078,lib-snd?,ported
@@ -6081,8 +6081,8 @@ address,size,name,system,status
 0x2bea20,40,FUN_002bea20,lib-snd?,ported
 0x2bea48,360,row_info,lib-snd?,ported
 0x2bebb0,52,SpeechLib_GetTime,lib-snd?,ported
-0x2bebe8,128,FUN_002bebe8,lib-snd?,not started
-0x2bec68,56,FUN_002bec68,audio?,not started
+0x2bebe8,128,FUN_002bebe8,lib-snd?,checked
+0x2bec68,56,FUN_002bec68,audio?,checked
 0x2beca0,180,Path_Init,audio?,checked
 0x2bed58,92,PathX_SelectSong,audio?,checked
 0x2bedb8,52,FUN_002bedb8,audio?,checked
@@ -6986,7 +6986,7 @@ address,size,name,system,status
 0x2f4d58,816,FUN_002f4d58,libc?,host
 0x2f5088,468,__throw,runtime,host
 0x2f5268,476,__rethrow,runtime,host
-0x2f5450,48,exit,libc?,host
+0x2f5450,48,exit,libc?,ported
 0x2f5480,96,__muldi3,runtime,host
 0x2f54e0,8,cPadDevice::vf8_2f54e0,input,not started
 0x2f54e8,1484,__divdi3,runtime,host

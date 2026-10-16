@@ -124,3 +124,4 @@ pub mod effects;
 pub mod emitter;
 pub mod impact;
 pub mod surfacespray;
+pub mod speechsys;
