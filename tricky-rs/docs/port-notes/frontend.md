@@ -785,7 +785,7 @@ buttons' icons apart from the objects the captions write later, and a nonzero wo
 be read). The survivor turns the swap's `!(0.5 <= t)` into `t < 0.5`, which only differs for a NaN, and the PS2's
 divide never makes one.
 
-## The 3D transition and fade record (F1c, proven from the code, not ported)
+## The 3D transition and fade record (F1c; ported in row G9b2e, `game/src/fe_transition.rs`, checked: `tests/fe_transition.rs`)
 
 One record drives both the screen fades and a blend of four renderer values (read by the renderer's virtual +0x134,
 written back each tick by virtual +0x12c; probably the fog settings): +0 active, +4 mode (0 blend in, 1 blend out,
@@ -799,6 +799,32 @@ the saved values, +0x30..+0x40 the current ones, +0x44..+0x60 targets and deltas
   (0.125, 0.75, 0.75, 0.75), type 1 (the saved values), or type 2 (mixed). `FE3DTransition_StartOut` 0x1ff4c8
   (`cPreRaceHandler::Update`, `cEndRaceHandler::Update`): blends back to the saved values. `FE3DTransition_StopFade`
   0x1ff6a0 (also from `cFE3D::~cFE3D`): clears active when the mode is 2 or 3.
+
+Ported on the game's bytes (row G9b2e):
+- **`Update`:** the clock steps by 1/60 each tick. Each blend tick starts again from the saved values, then adds
+  t × delta (blend in) or takes the targets less (1 - t) × delta (blend out). A finished blend lands on the targets;
+  a finished blend out also clears +0x64. The values go back to the renderer through its +0x128.
+- **The fade's phases** each hand their overshoot on to the next.
+- **`StartIn`:** while +0x64 holds the blend's values, it only turns round a running blend out, keeping the values.
+  Otherwise it stops any fade, saves the renderer's values (+0x130) and uses them as the current ones. The targets
+  depend on the saved kind word:
+  - 0: everything toward (0.125, 0.75, 0.75, 0.75);
+  - 1: the saved values, unchanged;
+  - 2: the first two toward (0.125, 0.75), the last two kept.
+- **`StartOut`:** leaves a running fade alone; any other active mode except a blend in is stopped as a fade first.
+- **0x1ff590 and 0x1ff608:** hand the renderer the saved values (with the second 0 and the third 1.0) or the current
+  ones, while +0x64 is set.
+- **The fade's draw 0x1ff000** (indexed as `VideoStream_Draw`) sets the renderer up for a full-screen quad:
+  - the viewport from the renderer's size; its unsigned words converted as the game does;
+  - the 640 × 480 projection with depths 0..1000, then states 0x13, 1, (2, 0, 0.08) and the fade's blend word;
+  - then it draws the quad in the fade's colour and alpha through the drawer at 0x337fe8 (0x18df60, 0x19b108).
+- **The arithmetic** is the PS2 FPU's (`ps2f::F`): no infinities (a result too large is the largest float), and
+  division by zero gives the largest float. The comparisons read the values as the EE does (`c.ole.s`).
+
+Checked in the runner on 40,000 random records, including infinite, largest, denormal and one-tick-short-of-0
+times. 35 of 37 mutants are caught, one after those values were added. The two survivors are equivalent:
+- stopping a fade on a record that isn't active changes nothing;
+- `StartOut`'s stop only clears the active word, which it sets again straight after.
 
 ## Screen value tracks (`ScreenAnim_*` 0x1f0e58–0x1f14e0; F1c, proven from the code, not ported)
 
