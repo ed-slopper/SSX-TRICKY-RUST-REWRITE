@@ -235,6 +235,9 @@ pub struct Rider {
     pub safe_timer: f32,
     /// the safe spot is kept by the course (the AI path network), not by the rider
     pub safe_external: bool,
+    /// the game's heading for the safe spot, when the host keeps it where the game's reset places the rider
+    /// (`aiglue::reset_place`; row G20c3b5): the respawn there is at that heading (`respawn_heading`)
+    pub safe_heading: Option<f32>,
     pub respawns: u32,
     /// grinding: (rail index, distance along it, signed speed along it)
     pub rail: Option<(usize, f32, f32)>,
@@ -455,7 +458,7 @@ pub fn placed_heading(yaw: f32) -> f32 { wrap(yaw + std::f32::consts::FRAC_PI_2)
 impl Rider {
     pub fn new(pos: Vec3, yaw: f32) -> Self {
         let mut r = Self { pos, vel: Vec3::ZERO, yaw, grounded: false, normal: Vec3::Y, charge: 0.0, air_time: 0.0,
-               spawn: (pos, yaw), safe: (pos, yaw), safe_timer: 0.0, safe_external: false, respawns: 0, rail: None, rail_cooldown: 0.0, input: Input::default(),
+               spawn: (pos, yaw), safe: (pos, yaw), safe_timer: 0.0, safe_external: false, safe_heading: None, respawns: 0, rail: None, rail_cooldown: 0.0, input: Input::default(),
                spin: 0.0, flip: 0.0, flip_dir: 0.0, wind: 0.0, wind_flip: 0.0, cap: SPEED_CAP, steer: 0.0, grab: 0, grab_hold: 0.0, grab_out: None, grab_done: [false; 16], grab_tweaked: [false; 16], ubers_done: 0, switch_takeoff: false, from_rail: false, uber_timer: 0.0, stats: Stats::default(), data: &RIDERS[0], surface: 1, grind_time: 0.0, rail_twist: 0.0, rail_spun: 0.0, rail_side: 0.0, rail_entry: 0.0, rail_goal: 0.0, rail_held: false, rail_side_signed: 0.0, shove: 0.0, shove_side: 1.0, taunt: -1.0, taunt_clip: String::new(), fin: None, showoff: false, landed: Vec::new(), crash_kind: 0, land_kind: 0, switch: false, score: 0, boost: 0.0, boosting: false, body_height: 0.0,
                last_trick: String::new(), trick_timer: 0.0, crashed: 0.0, hard_land: 0.0, crouch_v: 0.0, brake_v: 0.0, jump_c: 0.0, jump_delay: 0.0, height: 0.0,
                course_dir: None, course_pts: None, wipe: None, crash_at: None, gm: None, crash_spray: None, lean: [0.0; 3], up: [0.0, 0.0, 1.0, 0.0], recover: None, ai: false, down_t: 0.0, getup: -1.0, stumble: 0.0, wall_hit: None, speed_timer: 0.0, spin_timer: 0.0, spin_used: false, tube_class: u8::MAX, gate_p: 0.0, gate_hi: 0.0, gate_lo: 0.0, gate_still: 0.0, gate_target: 0.0, gate_speed: 0.0, gate_state: 8, gate_rock_dir: 0, band: (0.005, 0.0250417), spin_base: 0.0, flip_base: 0.0, late: false, cause: "", spin_ax: Axis::default(), flip_ax: Axis::default(), air_mode2: false, rail_off: 0.0, rail_time: 0.0, rail_halves: 0, boost_was: false, chain: 0,
@@ -468,6 +471,13 @@ impl Rider {
     /// `Boarder_Respawn`: dropped a metre above the snow, already moving down the course at 30 km/h.
     pub fn respawn(&mut self, at: (Vec3, f32)) {
         self.place(at.0, at.1, placed_heading(at.1));
+    }
+    /// Back to the safe spot: at the game's heading where the host keeps it (row G20c3b5), else the port's yaw
+    pub fn respawn_safe(&mut self) {
+        match self.safe_heading {
+            Some(h) => self.respawn_heading(self.safe.0, h),
+            None => self.respawn(self.safe),
+        }
     }
     /// A respawn at the game's own heading (`Boarder_PlaceAt`'s f12, as its callers make it: the inline atan2 of a
     /// direction in the game's space, `jump::atan2_inline`), kept exact on the rider; the port's yaw follows from it
@@ -1028,8 +1038,7 @@ impl Rider {
         self.step_tick(world, rails, input, dt);
         // the wipe-out runs these a game tick at a time itself
         if self.crashed <= 0.0 && impact_tick(&mut self.impact, &mut self.impact_n, &mut self.knocks, dt * 60.0) {
-            let at = self.safe;
-            self.respawn(at);
+            self.respawn_safe();
         }
         self.lean_aim();
     }
@@ -1227,7 +1236,7 @@ impl Rider {
         // unskiable) and 10 (wall) put the rider down (BoarderState3_Ride_Input, ground motion)
         if self.grounded && self.crashed <= 0.0 && self.rail.is_none() {
             match self.surface {
-                0 => { let at = self.safe; self.respawn(at); return; }
+                0 => { self.respawn_safe(); return; }
                 6 | 10 if self.tube_class == u8::MAX => { self.cause = "surface"; self.crash_kind = 0; self.wipe_out(); }
                 _ => {}
             }
@@ -1294,12 +1303,11 @@ impl Rider {
         // remember somewhere sane to come back to, and come back if we fall out of the world
         if self.grounded && s > 3.0 {
             self.safe_timer += dt;
-            if self.safe_timer > 1.5 && !self.safe_external && self.surface != 0 { self.safe = (self.pos, self.yaw); self.safe_timer = 0.0; }
+            if self.safe_timer > 1.5 && !self.safe_external && self.surface != 0 { self.safe = (self.pos, self.yaw); self.safe_heading = None; self.safe_timer = 0.0; }
         }
         // out of the world, or into one of the course's out-of-bounds boxes: back to the last good spot
         if self.pos.y < world.min_y - 30.0 || (!self.grounded && self.air_time > 9.0) || (self.rail.is_none() && world.in_reset(self.pos + Vec3::Y * 0.8, BODY_RADIUS)) {
-            let at = self.safe;
-            self.respawn(at);
+            self.respawn_safe();
         }
     }
 

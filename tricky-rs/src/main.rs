@@ -1666,7 +1666,7 @@ fn ride(
         if let Some(mut wa) = wa { wa.restart = true; }
     }
     // a reset you ask for costs 0.12 of the meter (Score_ManualReset)
-    if unstick { let at = r.safe; r.respawn(at); r.add_meter(-0.12); }
+    if unstick { r.respawn_safe(); r.add_meter(-0.12); }
     // F: shove whoever is alongside. Knocking a rival down is worth boost, as in the original.
     let shove = keys.just_pressed(KeyCode::KeyF) || pads.iter().any(|p| p.just_pressed(GamepadButton::RightThumb) || p.just_pressed(GamepadButton::LeftThumb));
     if shove && playing && r.crashed <= 0.0 && race.0.state == RaceState::Running {
@@ -1809,17 +1809,26 @@ fn ride(
     // resets go back onto the course's AI paths, as the original places riders, from wherever
     // the rider last was on the snow and riding
     {
-        let paths = &race.0.paths;
-        let keep = |rr: &mut Rider| {
-            if paths.is_empty() || !rr.grounded || rr.crashed > 0.0 || rr.rail.is_some() { return; }
+        let (paths, ai_paths) = (&race.0.paths, &race.0.ai_paths);
+        let keep = |rr: &mut Rider, follow: Option<&tricky_game::aipath::Follow>| {
+            if !rr.grounded || rr.crashed > 0.0 || rr.rail.is_some() { return; }
+            // the game's reset place on the rider's path, at the game's heading (row G20c3b5)
+            if !ai_paths.is_empty() {
+                let at = match follow { Some(f) => tricky_game::aiglue::reset_place(ai_paths, f), None => tricky_game::aiglue::reset_place_near(ai_paths, rr.pos) };
+                if let Some((p, h)) = at {
+                    (rr.safe, rr.safe_heading, rr.safe_external) = ((p, rider::wrap(h - std::f32::consts::FRAC_PI_2)), Some(h), true);
+                    return;
+                }
+            }
+            if paths.is_empty() { return; }
             if let Some((p, yaw)) = paths.respawn_point(rr.pos) {
                 let ground = world.0.ground(p + Vec3::Y * 3.0, 3.0, 20.0).map_or(p.y, |h| h.y);
-                rr.safe = (Vec3::new(p.x, ground, p.z), yaw);
+                (rr.safe, rr.safe_heading) = ((Vec3::new(p.x, ground, p.z), yaw), None);
                 rr.safe_external = true;
             }
         };
-        keep(r);
-        for o in opponents.0.iter_mut() { keep(&mut o.rider); }
+        keep(r, None);
+        for o in opponents.0.iter_mut() { let f = o.port.ai.as_ref().map(|a| a.follow); keep(&mut o.rider, f.as_ref()); }
     }
     for o in opponents.0.iter_mut() {
         o.rider.course_dir = if o.driver.route.is_empty() { dir_at(&race.0.line, o.driver.idx) } else { dir_at(&o.driver.route, o.driver.idx) };

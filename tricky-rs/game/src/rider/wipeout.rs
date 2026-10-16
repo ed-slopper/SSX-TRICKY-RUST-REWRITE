@@ -664,8 +664,7 @@ impl Rider {
         }
         // states 0x13 / 0x14 (`GetUpState_Update` 0x108198): out of bounds (surface 0) is a reset at once
         if self.surface == 0 {
-            let at = self.safe;
-            self.respawn(at);
+            self.respawn_safe();
             return;
         }
         if let Some((near, ahead)) = self.course_pts {
@@ -704,16 +703,14 @@ impl Rider {
             Out::Air(clip) => return self.end_wipe(clip, false),
             Out::Ride(clip) => return self.end_wipe(clip, true),
             Out::Reset => {
-                let at = self.safe;
-                self.respawn(at);
+                self.respawn_safe();
                 return;
             }
         }
         self.wipe = Some(w);
         // out of the world, or into one of the course's out-of-bounds boxes
         if self.pos.y < world.min_y - 30.0 || world.in_reset(self.pos + Vec3::Y * 0.8, BODY_RADIUS) {
-            let at = self.safe;
-            self.respawn(at);
+            self.respawn_safe();
         }
     }
 

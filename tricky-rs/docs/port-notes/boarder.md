@@ -751,6 +751,33 @@ respawns (the safe point, the wipe-outs' return points) still pass the port's ya
 - Seen on elysium with the disc: the race line's respawns (1 m above the line) hit and stand on the course with its
   normal; a respawn at the port's safe point recorded mid-air (22 m up) finds nothing within 2 m, as the game's would.
 
+### The other respawns at the game's reset place (row G20c3b5; checked: `tests/reset_place.rs`)
+
+In the game every respawn that is not the start line, a teleport or a cast clip goes through the reset state.
+`ResetState_Update` calls `ResetState_PlaceRider`, which places the rider at the respawn point on its own path
+(`ResetState_GetRespawnPos`) with the inline atan2 of the path's direction there. The port's resets have their own
+causes and timing. These include the safe spot, the wipe-outs' surface-0 and out-of-the-world returns, the stuck
+rider, and the unstick button. G1c3's ported reset state is not wired yet. What the port now does take from the
+game is the place and its heading:
+- `aiglue::reset_place(paths, follow)` is `place_rider` with no spread on the rider's own place on its path.
+- The hosts (the app's `keep` and the race self-test) keep `Rider::safe` at that place and `Rider::safe_heading`
+  at its heading while the rider rides the snow. For computer riders they use the ported path following
+  (`PortAi`). For the player, a STANDIN projects the rider onto the nearest respawnable path
+  (`reset_place_near`), because the port does not track the player along the paths as `Boarder_UpdatePathAhead`
+  does.
+- Every respawn to the safe spot is `Rider::respawn_safe`, which calls `respawn_heading` with the game's heading.
+- Without the AI paths (a levels folder), the old walker (`AiPaths::respawn_point`) and the port's yaw are kept.
+- The race harness's rejoin on its own line after a respawn now runs only when there is no game place.
+
+Checked on all ten courses' paths from the disc, 40 places along every path (37,280 places):
+- `reset_place`'s heading is `place_rider`'s (itself checked against the original in `tests/reset.rs`) and the
+  atan2 of `direction_at` at `respawn_at`'s point, bit for bit.
+- Its point is that respawn point, within the conversion's rounding.
+- A rider sent back with `respawn_safe` is placed exactly as by `respawn_heading`.
+
+All the mutants are caught (the axes, the heading, the branch). The race self-test on gari is about as before
+(line point 223 against 204, 6 wipe-outs against 7; these runs are not exactly repeatable).
+
 ### The normal in the air (row G20c2b)
 
 - `AirMotion_Update` 0x108378 stores its down ray's normal at +0x2a0 at every hit (t ≥ 0, 0x108588), before it

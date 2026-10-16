@@ -255,7 +255,8 @@ impl AiDriver {
         }
         // sent back by a reset zone or a fall: rejoin on the racing line, not wherever the trouble started
         if r.respawns != self.seen_respawns {
-            if self.clock > 1.0 {
+            // not where the rider came back at the game's reset place (row G20c3b5)
+            if self.clock > 1.0 && r.safe_heading.is_none() {
                 self.clear_of_resets(world, line);
                 let nxt = line[(self.idx + 1).min(line.len() - 1)] - line[self.idx];
                 r.respawn_heading(line[self.idx] + Vec3::Y * 1.0, crate::jump::atan2_inline(-nxt.z, nxt.x));
@@ -762,10 +763,16 @@ pub fn self_test(world: &mut CollisionWorld, rails: &Rails, line: &[Vec3], cours
         let best = (idx, (line[idx.min(line.len() - 1)] - r.pos).length_squared());
         let before = r.pos;
         let air_before = r.air_time;
-        if !paths.is_empty() && r.grounded && r.crashed <= 0.0 && r.rail.is_none() {
+        // where the game's reset would place the rider on its path, at the game's heading (row G20c3b5)
+        let game_place = if r.grounded && r.crashed <= 0.0 && r.rail.is_none() && !ai_paths.is_empty() {
+            match port.ai.as_ref() { Some(a) => crate::aiglue::reset_place(ai_paths, &a.follow), None => crate::aiglue::reset_place_near(ai_paths, r.pos) }
+        } else { None };
+        if let Some((p, h)) = game_place {
+            (r.safe, r.safe_heading, r.safe_external) = ((p, wrap(h - std::f32::consts::FRAC_PI_2)), Some(h), true);
+        } else if !paths.is_empty() && r.grounded && r.crashed <= 0.0 && r.rail.is_none() {
             if let Some((p, yaw)) = paths.respawn_point(r.pos) {
                 let ground = world.ground(p + Vec3::Y * 3.0, 3.0, 20.0).map_or(p.y, |h| h.y);
-                r.safe = (Vec3::new(p.x, ground, p.z), yaw);
+                (r.safe, r.safe_heading) = ((Vec3::new(p.x, ground, p.z), yaw), None);
                 r.safe_external = true;
             }
         }

@@ -73,6 +73,31 @@ fn game_pos(v: Vec3) -> V4 {
     [v.x * 100.0, -v.z * 100.0, v.y * 100.0, 1.0]
 }
 
+/// Where a reset puts a rider on its path (row G20c3b5): `ResetState_PlaceRider` 0x119220 with no spread (as
+/// `ResetState_Update` calls it), the respawn point on `f`'s path at its place there (`ResetState_GetRespawnPos`) and
+/// the game's heading (the inline atan2 of the path's direction there); the point in the port's units
+pub fn reset_place(paths: &[Path], f: &Follow) -> Option<(Vec3, f32)> {
+    let mut f = *f;
+    let mut r = aipath::RacePlace { line: 0, to_finish: 0.0, best: 0.0, cache: aipath::Cache::default() };
+    let mut out = Vec::new();
+    // without the spread no race line, other rider or ray is read
+    aipath::place_rider(paths, &aipath::RaceLines::default(), &mut f, &mut r, 0, false, 0.0, &[], &mut |_, _| -1.0, &mut out);
+    let p = out.first()?;
+    Some((Vec3::new(p.pos[0], p.pos[2], -p.pos[1]) * 0.01, p.heading))
+}
+
+/// [`reset_place`] for a rider the port does not follow along its paths (the player). STANDIN: the respawnable path
+/// nearest `pos` (`AIP_SortLinesByDistance`) projected, where the game keeps the rider's own place on its path every
+/// tick (`Boarder_UpdatePathAhead`; row G20c3b5)
+pub fn reset_place_near(paths: &[Path], pos: Vec3) -> Option<(Vec3, f32)> {
+    let p = game_pos(pos);
+    let path = *aipath::sort_by_distance(paths, p, 1, true).first()?;
+    let mut f = Follow { path, last: 0.0, along: 0.0, off: 0.0, near: [0.0; 4], ahead: [0.0; 4], heading: 0.0, cache: aipath::Cache::default() };
+    let (d, _) = paths[path].project_from(p, &mut f.near, &mut f.cache);
+    f.along = d;
+    reset_place(paths, &f)
+}
+
 /// A computer rider's AI: the computer's mode and target (cComputer +0x868 speed, +0x86c skill, +0x890 target,
 /// +0x89c mode) and the rider's place on its path.
 #[derive(Clone, Debug)]
