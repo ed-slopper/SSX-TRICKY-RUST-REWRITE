@@ -699,6 +699,92 @@ Checked in the runner on 8,000 random screens covering all eleven methods (about
 group, list and page count carry the game's own vtables, so the functions behind the 26 slots it calls are stubbed by
 the addresses read from those vtables. All 46 mutants are caught.
 
+### The DVD extras ported (row G9t; `game/src/fe_dvdcontent.rs`, checked: `tests/fe_dvdcontent.rs`)
+
+`cFE3DStateDVDContent` is the extras menu. Its menu (+0x3c) has nine items. Items 4, 7 and 8 open a sub-menu: the
+characters (+0x68, which leads on to their demos, +0x6c), the jukebox (+0x70, two columns of songs) and the promos
+(+0x74). The other items play a film. A menu swap runs as a state in +0xa8 (0 for none), stepping through the
+items of the list going or coming (+0x94) until each is half through its slide. The screen also keeps:
+- three cursors: the menu's (+0x54, a group of five pieces), the jukebox's (+0x98) and its marker (+0x9c);
+- two captions (+0x58, +0x5c), the description (+0x60, with texts at +0x110 and +0x114) and its heading (+0x64);
+- two pictures (+0x78 for the characters, +0x7c for the menu; their next sprites in +0xac and +0xb0) and four
+  decorations (+0x80..+0x8c);
+- the song's title and artist (+0xa0, +0xa4) and the song playing (+0xb4).
+
+The four sub-menus are built by the front end's own builders (0x296870, 0x297178, 0x297fa0, 0x298368), which stay
+calls out; vf24 and vf25 do nothing.
+- **The builder (0x293e10):**
+  - a backdrop (sprite 0x2f) and the help bar's buttons (0xe; buttons 2, 4 and 8 white), the help layout 10, and
+    the bar moved to y 425;
+  - the logo (sprite 0x30, 145 × 85 at (15, 10));
+  - the two captions (text 0xcfc, the first in the small font, the second in the large one at 0.2 alpha), sliding
+    in from x 1250 to y 20;
+  - the four decorations (sprites 0x31..0x34) along the bottom, each growing from half size in turn;
+  - the base widgets and the nine menu items (texts 0xcfb, 0xcf7, 0xcf6, 0xcf9, 0xcf8, 0xcfa, 0xcf5, 0xcfc, 0xcfd at
+    0x3b2420; 0.9 high, red highlight, sliding in from x 740), the menu at (-640, 132);
+  - the menu picture (262 × 224 at (355, 124)) and the characters' picture (297 × 283 at (349, 133)), hidden;
+  - the menu's cursor: five pieces of sprite 0x35 side by side, each starting its pulse 12 frames later;
+  - the jukebox's cursor (sprite 0x35) and marker (sprite 0x37);
+  - the description (two texts at 0.8 high, tinted (1, 1, 0.533, 0), at (-620, 440), sliding in from x 640), then
+    the sub-menus' builders;
+  - the heading (string 0x3b24f0 at (90, 94), hidden);
+  - then swap state 1 from the menu's first item, the menu laid out, the widgets reset off, the cursor hidden, and
+    +0x20 2.
+- **`CreateNextState`:** a video screen (0x160 bytes) playing the chosen film: a menu item's (evolve, tricks,
+  tracks, charactr, music, audio for items 0, 1, 2, 3, 5, 6), a character's (`data/video/cv_` and the character's
+  name), or a promo's (sled2pr, nbapromo). Any other choice gives the screen with no film.
+- **`Update`:**
+  - **during a swap:** the step widget waits until it is half through its slide. The FPU's divide by zero gives
+    the largest float, not NaN, so a widget with no frames counts as through. At the list's end, the state's work
+    runs:
+    - 1: the menu is in once the textures are, with its caption 0xcf3 and the decorations;
+    - 2: the menu goes out to the item's sub-menu (states 3, 8 or 10, each with its music cue);
+    - 3, 8, 10: a sub-menu is in, with its caption (0xcf8, 0xcfc, 0xcfd). The jukebox also shows its song texts,
+      calls the scene's +0xe0 and shows the chosen song;
+    - 4 and 7: between the characters and their demos;
+    - 6: the demos are in, captioned with the character's demo string;
+    - 5, 9, 11: back to the menu.
+
+    Otherwise the next widget in the list takes over (in states 8 and 9, the second column's line at the same place
+    too);
+  - **with no swap:**
+    - on the jukebox, when the song ends (the scene's +0xf8), the next of the 21 songs is found in either column and
+      shown;
+    - on the characters or the menu, the picture swaps to its next sprite once the textures are in, or once its fade
+      has finished;
+  - **then:** the cursors are hidden and the active list's one is put on its line: the menu's cursor 80 to the left,
+    the jukebox's 5 to the left with the marker shown; none on the demos. Then the base's `Update`.
+- **`Activate`:** unless back from a film (the screen before answers 0xc), the start cue and the textures (2); the
+  base's. **`Deactivate`:** asks whether the textures are in (the answer unused), then the base's.
+- **vf22:**
+  - the base's;
+  - on the characters, the coming character's sound (the scene's +0x10) and picture (0x71..0x7a, none for 1 and 6),
+    with the description 0xdd0 and the character's text;
+  - on the demos, the character's text and its record's second string;
+  - on the menu, the item's sound (0x3a..0x42) and picture (0x68..0x70);
+  - on the jukebox, a column coming takes the going column's line, stepping back past lines it lacks, and the
+    description 0xdd4 shows the song's artist.
+
+  A picture that is fading is moved to two frames before its end.
+- **vf26:** nothing during a swap. On the menu, items 4, 7 and 8 start the swap out, any other item below 9 a film
+  (the base's vf26). On the characters, their demos open (state 4, the help layout 12). On the jukebox, the song is
+  shown. On the demos and the promos, the base's vf26.
+- **vf21:** on the menu, the base's. On a sub-menu, its swap back: state 5, 7, 9 or 11 (the jukebox first calls the
+  scene's +0x100), then the widgets reset off.
+- **The helpers:**
+  - 0x299338 shows a song: the scene plays it (+0xe8), the marker goes to its line, and the title and artist come
+    from the 21-song table at 0x3480c8;
+  - 0x2994c8 and 0x2995a8 set the captions' text by id or by string, unless the first caption is moving;
+  - 0x299688 shows both captions.
+- **vf13:** answers 0xb. **The destructor:** the vtable 0x3b3270, then the base's.
+
+Checked in the runner on 16,000 random screens over the ten methods, with the four helpers stubbed there and run on
+their own over 4,000 in a second runner. The test positions are real floats: the VU's subtract treats a denormal as
+0, which the port's arithmetic doesn't copy. 63 of 64 mutants are caught (two after the test was widened: the help
+buttons' icons apart from the objects the captions write later, and a nonzero word where a missing list's line would
+be read). The survivor turns the swap's `!(0.5 <= t)` into `t < 0.5`, which only differs for a NaN, and the PS2's
+divide never makes one.
+
 ## The 3D transition and fade record (F1c, proven from the code, not ported)
 
 One record drives both the screen fades and a blend of four renderer values (read by the renderer's virtual +0x134,

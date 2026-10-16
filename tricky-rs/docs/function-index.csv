@@ -5404,22 +5404,22 @@ address,size,name,system,status
 0x293b18,104,cFE3DStateTitle::vf20_293b18,frontend,checked
 0x293b80,32,cFE3DStateTitle::vf26_293b80,frontend,checked
 0x293ba0,128,cFE3DStateTitle::LayoutWidgets,frontend,checked
-0x293c20,496,cFE3DStateDVDContent::CreateNextState,frontend,not started
-0x293e10,10848,cFE3DStateDVDContent::vf11_293e10,frontend,not started
+0x293c20,496,cFE3DStateDVDContent::CreateNextState,frontend,checked
+0x293e10,10848,cFE3DStateDVDContent::vf11_293e10,frontend,checked
 0x296870,2192,FE_BuildDvdCharacterList,frontend,not started
 0x297178,3624,FE_BuildDvdJukebox,frontend,not started
 0x297fa0,968,FE_BuildDvdCharacterMenu,frontend,not started
 0x298368,856,FE_BuildDvdDemoMenu,frontend,not started
-0x2986c0,2988,cFE3DStateDVDContent::Update,frontend,not started
-0x299270,128,cFE3DStateDVDContent::Activate,frontend,not started
-0x2992f0,68,cFE3DStateDVDContent::Deactivate,frontend,not started
-0x299338,400,FEJukebox_ShowSong,frontend?,not started
-0x2994c8,224,FUN_002994c8,frontend?,not started
-0x2995a8,224,FUN_002995a8,frontend?,not started
-0x299688,116,FUN_00299688,frontend?,not started
-0x299700,1808,cFE3DStateDVDContent::vf22_299700,frontend,not started
-0x299e10,480,cFE3DStateDVDContent::vf26_299e10,frontend,not started
-0x299ff0,600,cFE3DStateDVDContent::vf21_299ff0,frontend,not started
+0x2986c0,2988,cFE3DStateDVDContent::Update,frontend,checked
+0x299270,128,cFE3DStateDVDContent::Activate,frontend,checked
+0x2992f0,68,cFE3DStateDVDContent::Deactivate,frontend,checked
+0x299338,400,FEJukebox_ShowSong,frontend?,checked
+0x2994c8,224,FUN_002994c8,frontend?,checked
+0x2995a8,224,FUN_002995a8,frontend?,checked
+0x299688,116,FUN_00299688,frontend?,checked
+0x299700,1808,cFE3DStateDVDContent::vf22_299700,frontend,checked
+0x299e10,480,cFE3DStateDVDContent::vf26_299e10,frontend,checked
+0x299ff0,600,cFE3DStateDVDContent::vf21_299ff0,frontend,checked
 0x29a248,8,cFE3DStateDVDContent::vf25_29a248,frontend,not started
 0x29a250,8,cFE3DStateDVDContent::vf24_29a250,frontend,not started
 0x29a258,216,cFE3DStateModeSelect::CreateNextState,frontend,checked
@@ -5485,8 +5485,8 @@ address,size,name,system,status
 0x29db08,20,cFE3DStateModeSelect::~cFE3DStateModeSelect,frontend,not started
 0x29db58,8,cFE3DStateModeSelect::vf13_29db58,frontend,not started
 0x29db60,80,cFE3DStateModeSelect::__tf,runtime,host
-0x29dbb0,20,cFE3DStateDVDContent::~cFE3DStateDVDContent,frontend,not started
-0x29dc30,8,cFE3DStateDVDContent::vf13_29dc30,frontend,not started
+0x29dbb0,20,cFE3DStateDVDContent::~cFE3DStateDVDContent,frontend,checked
+0x29dc30,8,cFE3DStateDVDContent::vf13_29dc30,frontend,checked
 0x29dc38,80,cFE3DStateDVDContent::__tf,runtime,host
 0x29dc88,20,cFE3DStateTitle::~cFE3DStateTitle,frontend,not started
 0x29dca0,8,cFE3DStateTitle::vf13_29dca0,frontend,not started
