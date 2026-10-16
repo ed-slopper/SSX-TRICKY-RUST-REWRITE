@@ -262,7 +262,7 @@ address,size,name,system,status
 0x119c90,160,Boarder_StartResetAt,boarder,ported
 0x119d30,752,Boarder_FindNearestLine,boarder,ported
 0x11a020,116,Race_FindLineAhead,race,not started
-0x11a098,688,Boarder_TeleportToInstance,boarder,ported
+0x11a098,688,Boarder_TeleportToInstance,boarder,checked
 0x11a348,1100,cBoarder::vf10_11a348,boarder,checked
 0x11a798,8,cBoarder::EmitBrakeSpray,boarder,ported
 0x11a7a0,8,cBoarder::vf12_11a7a0,boarder,not started
@@ -1380,7 +1380,7 @@ address,size,name,system,status
 0x1699a0,444,RaceScene_Select,race?,checked
 0x169b60,84,RaceScene_GetCast,race?,checked
 0x169bb8,48,RaceScene_GetScriptName,race?,checked
-0x169be8,316,RaceScene_PlayCastClip,race?,not started
+0x169be8,316,RaceScene_PlayCastClip,race?,ported
 0x169d28,48,StaticDtor_RaceScene,race?,not started
 0x169e38,2876,Career_InitStaticTables,race?,checked
 0x16a978,28,Circuit_Destruct,race,not started
@@ -1430,7 +1430,7 @@ address,size,name,system,status
 0x16d990,60,CamAnimation::CamAnimation,race?,ported
 0x16d9d0,60,CamAnimation_InitScoped,race?,ported
 0x16da10,148,RaceScene_StartCastClip,race?,ported
-0x16daa8,224,RaceScene_UpdateCastClip,boarder?,not started
+0x16daa8,224,RaceScene_UpdateCastClip,boarder?,checked
 0x16db88,88,CamScript_IsRiderAnimDone,boarder?,ported
 0x16dbe8,124,StaticInit_CamScript,other,not started
 0x16dc68,80,CamAnimation::__tf,runtime,host
@@ -1536,7 +1536,7 @@ address,size,name,system,status
 0x176720,304,Race_FindPlayerRiders,race,ported
 0x176850,1768,CamScript_StartScene,race?,ported
 0x176f38,232,CamScript_ResetActorAnims,race?,ported
-0x177020,84,RaceScene_UpdateCastClips,boarder?,ported
+0x177020,84,RaceScene_UpdateCastClips,boarder?,checked
 0x177078,1308,cBxCamera::vf1_177078,camera,checked
 0x1776d0,28,Camera_SetMode,camera,checked
 0x1776f0,100,Camera_SetLookBack,camera,checked

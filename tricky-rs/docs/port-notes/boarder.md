@@ -692,6 +692,25 @@ the port's yaw is `atan2(−x, −z)` of its own line (`race.rs`), so `placed_he
 1.3e-5 rad (the game's `Math_Atan` error; measured on 20,000 directions, `tests/placement.rs`), exactly the same
 only when the yaw is made with `jump::atan2_inline` from the game's direction (gap, row G20c3b2).
 
+### The teleport and the cast clips in the port (row G20c3b3; checked: `tests/teleport.rs`)
+
+- `teleport::teleport_target` is `Boarder_TeleportToInstance` 0x11a098 up to its `Boarder_PlaceAt` call: the side
+  vector by the rider's slot (+0x460: 0 (−1, 0), 1 (−1, 1), 2 (0, 1), 3 (1, 1), 4 (1, 0), any other none) through
+  the object's matrix, ×300 cm, on the object's position (all four lanes, the vector unit's multiply-adds row by
+  row), and the heading the inline atan2 of the matrix's y row. Then `Boarder_PlaceAt` with height 0, velocity 0,
+  flag 0, and for a player's rider (+0x38, its player number, ≥ 0) 0x177db0 on that player's word (+0xa0 + 0x80·player). Checked
+  on 60,000 random matrices and slots, bit for bit.
+- The app's teleport pads (script op 24's objects) carry the six places and the heading from the object's matrix
+  (the disc's instance record, `Instance::matrix`; the folder's location, rotation and scale put back together
+  otherwise); `Rider::slot` is +0x460 (0 the player, the computer riders after it) and the pad places the rider with
+  no velocity. On merqury's one teleport the heading equals the old `atan2` of the object's forward and the places
+  sit 3 m to either side by slot.
+- `camscript::update_cast_clip` is `RaceScene_UpdateCastClip` 0x16daa8: `Race_GetRider` (not checked for none), the
+  rider held at the struct's place and heading (+0x20, +0x30; flag 1) when +0x14 is set, and once its clip's
+  progress reaches 1.0 the next clip of the list at +4 (back to the first at a negative entry, `0x169be8`).
+  `update_cast_clips` is `RaceScene_UpdateCastClips` 0x177020 (eight structs of 0x40 from +0x220 while +0x210 is
+  set). The app does not play race scenes yet (G11), so nothing calls them there.
+
 ### The attitude kept through the air (row G20c3b; checked: `tests/placement.rs`)
 
 The game keeps the placed quaternion (rider+0x170) while the rider drops: the trick's spin and flip are separate

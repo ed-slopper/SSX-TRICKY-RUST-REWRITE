@@ -571,6 +571,49 @@ pub fn is_rider_anim_done(index: u32, env: &mut dyn RiderEnv) -> u32 {
     (!(env.anim_progress(r) < 1.0)) as u32
 }
 
+/// What `RaceScene_UpdateCastClip` calls besides [`RiderEnv`]
+pub trait CastClipEnv: RiderEnv {
+    /// `Boarder_PlaceAt` 0x11cae8 (the heading, height 0; the rider, the place, a zero velocity, flag 1)
+    fn place_at(&mut self, rider: u32, heading: f32, place: [u32; 4]);
+    /// 0x169be8 (0x32edc0, the rider, the clip)
+    fn play_clip(&mut self, rider: u32, clip: u32);
+}
+
+/// `RaceScene_UpdateCastClip` 0x16daa8 on a rider animation struct (+4 its clip list, ending below 0; +8 the clip
+/// playing; +0xc the rider's index; +0x14 hold the rider in place; +0x20 the place; +0x30 the heading): the rider
+/// (`Race_GetRider`, not checked for none) held at the place when asked, and once its clip has played through
+/// (progress 1.0) the next clip of the list, back to the first past its end
+pub fn update_cast_clip(m: &mut crate::pf::Mem, env: &mut dyn CastClipEnv, s: u32) {
+    let r = env.rider(m.r32(s + 0xc));
+    if m.r32(s + 0x14) != 0 {
+        let place = [m.r32(s + 0x20), m.r32(s + 0x24), m.r32(s + 0x28), m.r32(s + 0x2c)];
+        env.place_at(r, f32::from_bits(m.r32(s + 0x30)), place);
+    }
+    if 1.0 <= env.anim_progress(r) {
+        let i = m.r32(s + 8).wrapping_add(1);
+        m.w32(s + 8, i);
+        if (m.r32(m.r32(s + 4).wrapping_add(i.wrapping_mul(4))) as i32) < 0 {
+            m.w32(s + 8, 0);
+        }
+        let clip = m.r32(m.r32(s + 4).wrapping_add(m.r32(s + 8).wrapping_mul(4)));
+        env.play_clip(r, clip);
+    }
+}
+
+/// `RaceScene_UpdateCastClips` 0x177020 (the camera script): with its cast on (+0x210), each of its eight rider
+/// animation structs (0x40 bytes from +0x220) in use (+0x10) updated by [`update_cast_clip`]
+pub fn update_cast_clips(m: &mut crate::pf::Mem, env: &mut dyn CastClipEnv, cam: u32) {
+    if m.r32(cam + 0x210) == 0 {
+        return;
+    }
+    for k in 0..8 {
+        let s = cam + 0x220 + 0x40 * k;
+        if m.r32(s + 0x10) != 0 {
+            update_cast_clip(m, env, s);
+        }
+    }
+}
+
 /// One 0x30-byte actor record of a camera scene: +0x10 in use, +0x14 the kind (which rider), +0x18 whether the rider
 /// is placed first, +0x1c whether the position comes from the scene, +0x20 the position, +0x2c the heading.
 #[derive(Clone, Debug, Default)]

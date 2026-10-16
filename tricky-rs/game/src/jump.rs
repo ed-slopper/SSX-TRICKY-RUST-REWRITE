@@ -140,7 +140,7 @@ pub fn takeoff_spin_rates(s: &TakeoffState) -> Takeoff {
 
 /// atan2 as the game's code writes it inline around `Math_Atan` (`crate::math::atan`): y over x, ±π/2 on the y
 /// axis, 0 at the origin.
-pub(crate) fn atan2_inline(y: f32, x: f32) -> f32 {
+pub fn atan2_inline(y: f32, x: f32) -> f32 {
     if x == 0.0 {
         if y != 0.0 {
             if 0.0 <= y { std::f32::consts::FRAC_PI_2 } else { -std::f32::consts::FRAC_PI_2 }

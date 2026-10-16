@@ -111,7 +111,7 @@ fn make_opponents(start: Vec3, yaw: f32, player_char: usize, n_chars: usize, cou
         let lane = [-1.0f32, 1.0, -2.0, 2.0, -3.0, 3.0][i % 6];
         let skill = ([0.84f32, 0.76, 0.68, 0.60, 0.52, 0.5][i % 6] + round as f32 * 0.08).min(0.98);
         Opponent {
-            rider: { let mut r = Rider::new(start + side * lane * 1.5 + Vec3::Y * 0.5, yaw); r.ai = true; r },
+            rider: { let mut r = Rider::new(start + side * lane * 1.5 + Vec3::Y * 0.5, yaw); r.ai = true; r.slot = i as u32 + 1; r },
             driver: AiDriver::new(lane * 1.5, skill),
             character: (player_char + 1 + i * if n_chars > 6 { 2 } else { 1 }) % n_chars,
             prog: Default::default(),
@@ -1560,9 +1560,18 @@ fn build_collision(level: &Level) -> CollisionWorld {
     }
     for (&i, &to) in &level.logic.teleports {
         let (Some((lo, hi)), Some(t)) = (boxes(i), level.instances.get(to)) else { continue };
-        let fwd = quat4(t.rotation) * Vec3::Y;
-        let f = Vec3::new(fwd.x, fwd.z, -fwd.y);
-        world.pads.push(collide::Pad { lo, hi, kind: collide::PadKind::Teleport { to: g2b(t.location.into()), yaw: f32::atan2(-f.x, -f.z) } });
+        // `Boarder_TeleportToInstance` 0x11a098 on the object's matrix (the disc's record; the folder's location,
+        // rotation and scale put back together), for each slot; its heading as our yaw (`rider::placed_heading`'s
+        // inverse)
+        let m = t.matrix.unwrap_or_else(|| Mat4::from_scale_rotation_translation(Vec3::from(t.scale), quat4(t.rotation), Vec3::from(t.location)).to_cols_array_2d());
+        let mut places = [Vec3::ZERO; 6];
+        let mut yaw = 0.0;
+        for (s, p) in places.iter_mut().enumerate() {
+            let (at, h) = tricky_game::teleport::teleport_target(&m, s as u32);
+            *p = g2b(Vec3::new(at[0], at[1], at[2]));
+            yaw = h - std::f32::consts::FRAC_PI_2;
+        }
+        world.pads.push(collide::Pad { lo, hi, kind: collide::PadKind::Teleport { places, yaw } });
     }
     world
 }

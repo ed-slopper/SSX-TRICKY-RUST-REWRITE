@@ -69,6 +69,9 @@ pub struct Instance {
     /// is never ground, only bounced off (PlayerBounce) or touched
     #[serde(default = "minus_one")]
     pub surface_type: i32,
+    /// The instance record's matrix (rows: its axes scaled, then its position) when it comes from the disc's .pbd
+    #[serde(skip)]
+    pub matrix: Option<[[f32; 4]; 4]>,
 }
 fn minus_one() -> i32 { -1 }
 
@@ -419,6 +422,7 @@ impl Level {
                 u0: p.mass(),
                 effect_slot_index: p.slot() as i32,
                 surface_type: p.surface(),
+                matrix: Some(i.matrix),
             }
         }).collect::<Vec<_>>();
 
