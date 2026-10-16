@@ -1765,7 +1765,11 @@ impl Rider {
             ..Default::default()
         };
         let before = self.spin;
-        let calls = crate::spin::spin_update(word, &mut st, &mut r, &crate::spin::Anim::default());
+        // `SpinState_StartFromStick` 0x102158's answer, for the state to ask (row G1a5b3b2)
+        let start = crate::jump::spin_start_from_stick(word, self.stats.bytes[12], self.switch != self.data.goofy);
+        let anim = crate::spin::Anim { start_from_stick: start.is_some() as u32, ..Default::default() };
+        let calls = crate::spin::spin_update(word, &mut st, &mut r, &anim);
+        let started = start.filter(|_| calls.contains(&crate::spin::SpinCall::StartFromStick));
         for c in calls {
             match c {
                 crate::spin::SpinCall::ScoreSpin(d) => self.sc.update_spin(d),
@@ -1781,6 +1785,44 @@ impl Rider {
         self.yaw -= self.spin - before;
         self.flip_dir = if st.w_flip.abs() > 0.05 { st.w_flip.signum() } else { 0.0 };
         self.att = Some((o2, self.yaw));
+        self.spin_st = Some(st);
+        // (the AI driver plans with the port's axes: theirs mirror the spin object's rates and bands)
+        (self.spin_ax.w, self.spin_ax.hi, self.spin_ax.lo, self.spin_ax.floor) = (st.w_spin, st.spin_hi, st.spin_lo, st.spin_floor);
+        (self.flip_ax.w, self.flip_ax.hi, self.flip_ax.lo, self.flip_ax.floor) = (st.w_flip, st.flip_hi, st.flip_lo, st.flip_floor);
+        self.air_mode2 = st.mode == 2;
+        if let Some(s) = started {
+            self.late_start(s);
+        }
+    }
+
+    /// A late trick started from the stick (row G1a5b3b2), as `SpinState_StartFromStick` 0x102158 finishes it: the
+    /// rates written (+0x2c, +0x30) and the object's +0x58 set, the trick so far scored and the meter given
+    /// (`Score_CommitAndRestartChain` 0x156568, `Boarder_AddMeter`: [`Rider::bank_late`]), then state 1 and 0x10
+    /// again: `SpinControl_Exit` (the spin and flip so far into the attitude) and `SpinControl_Enter` on the new
+    /// rates. STANDIN: its clip (0x226..0x22d by the direction) not played, taken as of type 0xb (row G5)
+    fn late_start(&mut self, s: crate::jump::SpinStart) {
+        let Some(mut st) = self.spin_st else { return };
+        st.w_spin = s.spin;
+        st.w_flip = s.flip;
+        st.x58 = 1;
+        self.bank_late();
+        self.end_spin();
+        self.spin = 0.0;
+        self.flip = 0.0;
+        let o = match &self.att {
+            Some((o, _)) => *o,
+            None => orient::placed_attitude(placed_heading(self.yaw), None),
+        };
+        let mut e = crate::spin::SpinEnterRider {
+            x138: if self.spin_used { 1.0 } else { 0.0 },
+            switch: (self.switch != self.data.goofy) as u32,
+            stance: self.data.goofy as u32,
+            kind: self.rail_kind,
+            up_z: o.up[2],
+            ..Default::default()
+        };
+        let a = crate::spin::AlignRider { slope_kind: self.land_word, slope: self.land_normal, fwd: o.fwd, quat: o.q, class: self.stats.kind as u32 };
+        crate::spin::spin_enter(&mut st, &mut e, &a, 0xb);
         self.spin_st = Some(st);
     }
 

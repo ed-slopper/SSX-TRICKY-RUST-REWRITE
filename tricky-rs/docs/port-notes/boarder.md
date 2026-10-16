@@ -919,7 +919,20 @@ STANDINs:
   and the state starts on the stick (mode 0) as after the game's launch clips. Its other answers are 0, and the
   clips and lean the state asks for are not played (row G5).
 - **The pivot bone:** at the hips' height, 91.7 cm × stats+0x60. There is no half-pipe.
-- **The wind-ups:** the port's own prewind's (row G1a5b3b2).
+- **The wind-ups:** the port's own prewind's (row G1a5b3b2b).
+
+Late tricks (row G1a5b3b2a) work the same way, through `SpinState_StartFromStick` 0x102158
+(`jump::spin_start_from_stick`). It is worked out on the tick's pad word before the state runs, so it can answer
+when the state asks. When it starts:
+- the rates go to the object (+0x2c, +0x30) and +0x58 is set;
+- the trick so far is scored and the meter given (`Score_CommitAndRestartChain` 0x156568, `Boarder_AddMeter`:
+  `Rider::bank_late`);
+- states 1 and 0x10 follow: `SpinControl_Exit`, then `SpinControl_Enter` on the new rates, in `Rider::late_start`.
+  The start's clip (0x226..0x22d by the direction) is not played and counts as of type 0xb.
+
+Glue: the AI driver plans with the port's spin axes, so `spin_ax` and `flip_ax` and `air_mode2` mirror the spin
+object's rates, bands and mode each tick. Checked: a straight jump with the stick pressed at its 12th tick in the
+air starts the late spin at the 13th, on the stick (+0x58 set) at 2.86 rad/s, the trick banked.
 
 Checked on a test slope: a jump with a spin wound up crouching takes off with the prediction 0.909 s and the rate
 4.79 rad/s on the stick (mode 0). The state runs every tick in the air. Held for a third of a second, it turns

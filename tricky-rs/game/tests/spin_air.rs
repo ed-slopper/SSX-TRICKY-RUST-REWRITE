@@ -69,3 +69,43 @@ fn a_spun_jump_runs_the_games_spin_state() {
     assert!(1.2 < spun_held.abs() && spun_held.abs() < 1.7, "turning while the stick is held: {spun_held}");
     assert!(r.spin_st.is_none() && r.att.is_some(), "the landing ends the state, the attitude kept");
 }
+
+/// A late trick (row G1a5b3b2): a straight jump (no wind-up: the state completes from the start), then the stick
+/// pressed in the air: `SpinState_StartFromStick` starts a spin on the stick, the trick so far is banked (`late`),
+/// and the rider turns.
+#[test]
+fn a_late_trick_starts_from_the_stick() {
+    let world = slope();
+    let rails = Rails::default();
+    let mut r = Rider::new(Vec3::new(0.0, 0.05, -2.0), 0.0);
+    r.grounded = true;
+    r.vel = Vec3::new(0.0, 0.0, -12.0);
+    let tick = |r: &mut Rider, i: Input| r.step(&world, &rails, i, 1.0 / 60.0);
+    for _ in 0..20 {
+        tick(&mut r, Input::default());
+    }
+    for _ in 0..40 {
+        tick(&mut r, Input { jump: true, ..Input::default() });
+    }
+    let mut air = 0;
+    let mut first = None;
+    for _ in 0..240 {
+        let steer = if (12..40).contains(&air) { 1.0 } else { 0.0 };
+        tick(&mut r, Input { steer, ..Input::default() });
+        if r.grounded && 0 < air {
+            break;
+        }
+        if !r.grounded {
+            air += 1;
+            if first.is_none() && r.late {
+                first = Some((air, r.spin_st.map(|s| (s.mode, s.x58, s.w_spin))));
+            }
+        }
+    }
+    println!("in the air {air} ticks; the late start at {first:?}; spin left at the landing {:.3}", r.spin);
+    let (at, st) = first.expect("a late start");
+    assert!((12..20).contains(&at), "started from the stick soon after it was pressed: tick {at}");
+    let (mode, x58, w) = st.expect("the spin state");
+    assert!(x58 == 1 || mode == 0, "on the stick");
+    assert!(w.abs() > 1.0, "with the start's rate: {w}");
+}
