@@ -453,6 +453,15 @@ pub struct Rider {
     /// (row G20c2c3), and +0x2d0 the last rail point it found
     pub rail_grid: bool,
     pub rail_hit: [f32; 4],
+    /// the spin state on the game's code (row G1a5b3b1): `SpinState_Update`'s object while the rider is in the air
+    /// after a take-off (state 0x10), and the pad the game reads (the device the mapper reads, its button map)
+    pub spin_st: Option<crate::spin::SpinObj>,
+    pub pad_dev: crate::controls::PadDevice,
+    /// the take-off's flight prediction: the landing's surface word and normal (+0x57f0, +0x57e0)
+    pub land_word: u32,
+    pub land_normal: [f32; 4],
+    /// the wind-ups the last take-off left the snow with (rider+0x220, +0x22c, before `Takeoff_SetSpinRates` clears them)
+    pub takeoff_wind: (f32, f32),
     /// ticks before this rider can be hit by another again (`Boarder_RiderCollisions`: three ticks)
     pub hit_wait: u8,
 }
@@ -475,7 +484,7 @@ impl Rider {
                last_trick: String::new(), trick_timer: 0.0, crashed: 0.0, hard_land: 0.0, crouch_v: 0.0, brake_v: 0.0, jump_c: 0.0, jump_delay: 0.0, height: 0.0,
                course_dir: None, course_pts: None, wipe: None, crash_at: None, gm: None, crash_spray: None, lean: [0.0; 3], up: [0.0, 0.0, 1.0, 0.0], recover: None, ai: false, down_t: 0.0, getup: -1.0, stumble: 0.0, wall_hit: None, speed_timer: 0.0, spin_timer: 0.0, spin_used: false, tube_class: u8::MAX, gate_p: 0.0, gate_hi: 0.0, gate_lo: 0.0, gate_still: 0.0, gate_target: 0.0, gate_speed: 0.0, gate_state: 8, gate_rock_dir: 0, band: (0.005, 0.0250417), spin_base: 0.0, flip_base: 0.0, late: false, cause: "", spin_ax: Axis::default(), flip_ax: Axis::default(), air_mode2: false, rail_off: 0.0, rail_time: 0.0, rail_halves: 0, boost_was: false, chain: 0,
                ubers: Vec::new(), uber: 0.0, uber_id: 0, uber_done: false, letters: 0, multiplier: 1,
-               sc: new_score(), tick_acc: 0.0, full_count: 0, rail_kind: 0, rail_lean: 0.0, rail_goal0: 0.0, rail_committed: 0.0, show_parts: Vec::new(), grab_scored: false, grab_tw: false, hit_wait: 0, att: None, last_hit: Default::default(), impact: 0.0, impact_n: [0.0; 4], knocks: 0.0, slot: 0, place_ray: None, hit_kind: 0, land_time: 0.0, takeoffs: 0, rail_blend: 0.0, rail_word: 0, rail_grid: false, rail_hit: [0.0; 4] };
+               sc: new_score(), tick_acc: 0.0, full_count: 0, rail_kind: 0, rail_lean: 0.0, rail_goal0: 0.0, rail_committed: 0.0, show_parts: Vec::new(), grab_scored: false, grab_tw: false, hit_wait: 0, att: None, last_hit: Default::default(), impact: 0.0, impact_n: [0.0; 4], knocks: 0.0, slot: 0, place_ray: None, hit_kind: 0, land_time: 0.0, takeoffs: 0, rail_blend: 0.0, rail_word: 0, rail_grid: false, rail_hit: [0.0; 4], spin_st: None, pad_dev: Default::default(), land_word: u32::MAX, land_normal: [0.0, 0.0, 1.0, 0.0], takeoff_wind: (0.0, 0.0) };
         // the start line's `Boarder_PlaceAt` 0x11cae8 (`cBoarder::vf8` 0x116ab8: heading from the path's direction)
         r.att = Some((orient::placed_attitude(placed_heading(yaw), None), yaw));
         r
@@ -539,6 +548,7 @@ impl Rider {
         self.respawns += 1;
     }
     pub fn clear_air(&mut self) {
+        self.end_spin();
         self.spin = 0.0;
         self.flip = 0.0;
         self.spin_base = 0.0;
@@ -1031,6 +1041,7 @@ impl Rider {
         self.flip_ax = Axis::start(w_f);
         self.air_mode2 = false;
         self.switch_takeoff = self.switch;
+        self.takeoff_wind = (self.wind, self.wind_flip);
         self.wind = 0.0;
         self.wind_flip = 0.0;
         self.charge = 0.0;
@@ -1103,7 +1114,7 @@ impl Rider {
         // the lean record moves toward the target the last tick left (`cBoarder::vf7` 0x117198, before the motion),
         // and is aimed again from this tick's steer and speed at its end (`Boarder_UpdateLeanTargets` 0x129500)
         self.lean_ease(dt);
-        let on_snow = self.grounded && self.rail.is_none() && self.crashed <= 0.0;
+        let on_snow = (self.grounded || self.rail.is_some()) && self.crashed <= 0.0;
         self.step_tick(world, rails, input, dt);
         // a take-off from the snow: the air motion's enter (0x108310) predicts the flight on the course
         // (`AirPredict_AtTakeoff` 0x123b10, its rays `cWorldLine`(0, …, 0)) before `Sfx_OnAirEnter` reads it
@@ -1124,7 +1135,9 @@ impl Rider {
                 };
                 let p = crate::air::predict_at_takeoff(ground_tick::to_game(self.pos, 100.0, 1.0), ground_tick::to_game(self.vel, 100.0, 0.0), ground_tick::game_dir(self.normal), &mut ray);
                 self.land_time = p.t_land;
+                (self.land_word, self.land_normal) = (p.word, p.normal);
                 self.takeoffs = self.takeoffs.wrapping_add(1);
+                self.spin_enter_game();
             }
         }
         // the wipe-out runs these a game tick at a time itself
@@ -1273,14 +1286,16 @@ impl Rider {
                 self.begin_chain(0, steep);
                 jumped = true;
             }
-            self.air_rotation(&input, dt);
+            if self.spin_st.is_some() { self.spin_tick(&input, dt) } else { self.air_rotation(&input, dt) }
             // the landing alignment of a spin or flip is `SpinState_Update`'s (G20c3c2, G1a5b3b): until then only a jump
             // or a drop without either keeps the game's attitude (G20c3c, G20c3b)
-            if self.spin != 0.0 || self.flip != 0.0 { self.att = None; }
-            // `SpinState_Update` 0x100908: the spin (rider+0x1d0, mirrored for stats+0x40) and flip in degrees
-            let m = if self.data.goofy { -1.0 } else { 1.0 };
-            self.sc.update_spin((-(self.spin - self.spin_base) * m * 57.295776) as i32);
-            self.sc.update_flip(((self.flip - self.flip_base) * 57.295776) as i32);
+            if self.spin_st.is_none() {
+                if self.spin != 0.0 || self.flip != 0.0 { self.att = None; }
+                // `SpinState_Update` 0x100908: the spin (rider+0x1d0, mirrored for stats+0x40) and flip in degrees
+                let m = if self.data.goofy { -1.0 } else { 1.0 };
+                self.sc.update_spin((-(self.spin - self.spin_base) * m * 57.295776) as i32);
+                self.sc.update_flip(((self.flip - self.flip_base) * 57.295776) as i32);
+            }
             self.air_grabs(&input, dt);
             if input.jump { self.charge = self.crouch_v; }
         }
@@ -1634,6 +1649,141 @@ impl Rider {
             pivot_z: 0.0,
         })
     }
+    /// The take-off into the spin state as the game makes it (row G1a5b3b1): `Takeoff_SetSpinRates` 0x126e30
+    /// ([`crate::jump::takeoff_spin_rates`]) from the wind-ups and the tricks stat, then `SpinControl_Enter` 0x100598
+    /// ([`crate::spin::spin_enter`]): the rates scaled, the bands, and the turn toward the predicted landing's slope
+    /// ([`crate::spin::landing_align`]) on the kept attitude. STANDIN: no take-off clip (the spin from the wind-ups
+    /// always, and the launch clip's type 0xb when it spins or flips, row G5), the wind-ups the port's own prewind's
+    /// (`wind`, `wind_flip`)
+    fn spin_enter_game(&mut self) {
+        let o = match &self.att {
+            Some((o, _)) => *o,
+            None => orient::placed_attitude(placed_heading(self.yaw), None),
+        };
+        let t = crate::jump::takeoff_spin_rates(&crate::jump::TakeoffState {
+            clip: 0,
+            x208: self.crouch_v,
+            tricks_stat: self.stats.bytes[12],
+            wind_spin: self.takeoff_wind.0,
+            wind_flip: self.takeoff_wind.1,
+            class: self.stats.kind as u32,
+            fakie: self.switch,
+        });
+        let mut st = crate::spin::SpinObj { w_spin: t.spin, w_flip: t.flip, ..Default::default() };
+        let mut e = crate::spin::SpinEnterRider {
+            x138: if self.spin_used { 1.0 } else { 0.0 },
+            switch: (self.switch != self.data.goofy) as u32,
+            stance: self.data.goofy as u32,
+            kind: self.rail_kind,
+            up_z: o.up[2],
+            ..Default::default()
+        };
+        let a = crate::spin::AlignRider { slope_kind: self.land_word, slope: self.land_normal, fwd: o.fwd, quat: o.q, class: self.stats.kind as u32 };
+        // STANDIN (row G5): the launch clip (`Takeoff_PlayLaunchClip`) taken as of type 0xb when the take-off has a
+        // spin or flip, so the state starts on the stick (mode 0) as after the game's launch clips
+        let clip_type = if t.launch_clip && (t.spin != 0.0 || t.flip != 0.0) { 0xb } else { 0 };
+        crate::spin::spin_enter(&mut st, &mut e, &a, clip_type);
+        self.spin_st = Some(st);
+        self.att = Some((o, self.yaw));
+    }
+
+    /// The spin state ended (`SpinControl_Exit` 0x1029d0, [`crate::spin::spin_exit`]): any spin or flip left turned
+    /// into the kept attitude, the position moved so the pivot bone stays put
+    fn end_spin(&mut self) {
+        if self.spin_st.take().is_none() {
+            return;
+        }
+        let Some((o, y)) = self.att else { return };
+        let mut r = crate::spin::SpinRider {
+            quat: o.q,
+            spin: self.spin,
+            flip: self.flip,
+            pos: ground_tick::to_game(self.pos, 100.0, 1.0),
+            bone: [0.0, 0.0, 91.7 * self.stats.scale],
+            ..Default::default()
+        };
+        if let Some(o2) = crate::spin::spin_exit(&mut r) {
+            self.att = Some((o2, y));
+            self.pos = ground_tick::port_dir(r.pos) * 0.01;
+        }
+    }
+
+    /// The pad as the game reads it this tick, from the port's input (STANDIN: the keys and pad as a PS2 pad: the
+    /// left stick's x the steer and its y the flip (forward up), the d-pad the same past half (button map 0 spins
+    /// and flips on the d-pad), cross the jump, square the boost; libpad's bits)
+    fn read_pad(&mut self, input: &Input) {
+        let byte = |v: f32| ((v.clamp(-1.0, 1.0) * 127.5) + 127.5).round().clamp(0.0, 255.0) as u8;
+        // (the word as libpad hands it over, its bytes swapped: up 0x1000, down 0x4000, right 0x2000, left 0x8000,
+        // square 0x80, cross 0x40; `controls::PS2_BITS`)
+        let mut ps2 = 0u16;
+        if input.jump { ps2 |= 0x40; }
+        if input.boost { ps2 |= 0x80; }
+        if 0.5 < input.steer { ps2 |= 0x2000; }
+        if input.steer < -0.5 { ps2 |= 0x8000; }
+        if 0.5 < input.flip { ps2 |= 0x1000; }
+        if input.flip < -0.5 { ps2 |= 0x4000; }
+        self.pad_dev.read(ps2, Some([byte(input.steer), byte(-input.flip), 128, 128]));
+    }
+
+    /// An air tick of the spin state on the game's code (row G1a5b3b1): the pad word `cPlayer::GetControls` makes
+    /// for state 0x10 ([`crate::controls::get_controls`]), then `SpinState_Update` 0x100908
+    /// ([`crate::spin::spin_update`]) on the kept attitude and the spin and flip so far: the turn toward the landing,
+    /// the stick-driven rates in their bands, the auto-complete, the scored degrees. STANDIN: the animation's answers
+    /// (no clip, type 0, phase 0), no half-pipe, the pivot bone at the hips' height (91.7 cm), the clips and lean it
+    /// asks for not played (row G5)
+    fn spin_tick(&mut self, input: &Input, dt: f32) {
+        let Some(mut st) = self.spin_st else { return };
+        self.read_pad(input);
+        let map = crate::controls::ButtonMap::btnmap(0, [0; 15]);
+        let mut trick = 0x1a;
+        let mut slope = false;
+        let word = crate::controls::get_controls(
+            crate::controls::ControlsIn { state: 0x10, paused: false },
+            &mut crate::controls::Mapper { map: &map, pad: &self.pad_dev },
+            &mut trick,
+            &mut || 0,
+            &mut slope,
+        );
+        let o = match &self.att {
+            Some((o, _)) => *o,
+            None => orient::placed_attitude(placed_heading(self.yaw), None),
+        };
+        let mut r = crate::spin::SpinRider {
+            timescale: dt * 60.0,
+            land: (self.land_time - self.air_time).max(0.0),
+            quat: o.q,
+            spin: self.spin,
+            flip: self.flip,
+            tricks: self.stats.bytes[12],
+            stat10: self.stats.bytes[2],
+            mirror: self.data.goofy as u32,
+            switch: (self.switch != self.data.goofy) as u32,
+            class: self.stats.kind as u32,
+            vel: ground_tick::to_game(self.vel, 100.0, 0.0),
+            pos: ground_tick::to_game(self.pos, 100.0, 1.0),
+            bone: [0.0, 0.0, 91.7 * self.stats.scale],
+            ..Default::default()
+        };
+        let before = self.spin;
+        let calls = crate::spin::spin_update(word, &mut st, &mut r, &crate::spin::Anim::default());
+        for c in calls {
+            match c {
+                crate::spin::SpinCall::ScoreSpin(d) => self.sc.update_spin(d),
+                crate::spin::SpinCall::ScoreFlip(d) => self.sc.update_flip(d),
+                _ => {}
+            }
+        }
+        let mut o2 = o;
+        o2.q = r.quat;
+        orient::update_orientation(&mut o2);
+        self.spin = r.spin;
+        self.flip = r.flip;
+        self.yaw -= self.spin - before;
+        self.flip_dir = if st.w_flip.abs() > 0.05 { st.w_flip.signum() } else { 0.0 };
+        self.att = Some((o2, self.yaw));
+        self.spin_st = Some(st);
+    }
+
     /// The air's wall on the course (row G20c3c3): `AirMotion_Update` 0x108378's wall ray, `World_RayCast` with
     /// `cWorldBoarder`(the body, 0) and the body's mask 0xcf (rider+0x494), then its push out of the wall and, moving
     /// into it, the glancing bump that turns the kept attitude toward the wall and takes the velocity's part into it

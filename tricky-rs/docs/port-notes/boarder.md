@@ -888,6 +888,44 @@ the snow first. That is also why the unclean-roll crash cannot be staged here, a
 own `ok` is covered by `tests/landing.rs`). The clip-length mutant survives too, because every landing clip falls to
 the same default.
 
+### The spin state on the game's code (rows G1a5b3b1, G20c3c2; checked: `tests/spin_air.rs`)
+
+A take-off into the air now runs the game's spin state. The take-off is detected after the rider's step, where the
+flight prediction is made, from the snow or from a rail. Then:
+- **Rates:** `Takeoff_SetSpinRates` 0x126e30 (`jump::takeoff_spin_rates`) from the wind-ups the take-off left the
+  snow with (`Rider::takeoff_wind`) and the tricks stat (stats+0x1a).
+- **Enter:** `SpinControl_Enter` 0x100598 (`spin::spin_enter`). It scales the rates (× 1.6 on a spin boost, × 0.8
+  riding against the natural stance) and sets the bands. It also sets the turn toward the predicted landing's slope
+  (`spin::landing_align` with the prediction's surface word and normal, `land_word`, `land_normal`) on the kept
+  attitude.
+- **Each air tick:** the pad word `cPlayer::GetControls` 0x151250 makes for state 0x10 (`controls::get_controls`,
+  on a `PadDevice` read through button map 0), then `SpinState_Update` 0x100908 (`spin::spin_update`). That turns
+  the kept attitude toward the landing, runs the spin and flip in their bands on the stick, auto-completes them
+  once it is let go, and scores the degrees (`Score_UpdateSpin` / `_UpdateFlip`).
+- **Landing:** any landing or placement ends the state (`SpinControl_Exit` 0x1029d0, `spin::spin_exit`). Whatever
+  spin and flip are left turn into the attitude, and the position moves so the pivot stays put.
+
+The attitude is therefore the game's through spins and flips too (row G20c3c2), and `land_as_game` uses it at the
+landing. As in the game, the landing check reads the attitude's own axes (+0x180, +0x1a0), before the exit folds
+in what is left. The port's own spin (`air_rotation`, its axes and banking) and its scoring of the angles run only
+for a rider that never entered the state.
+
+STANDINs:
+- **The pad:** our input as a PS2 pad, in the word libpad hands over with its bytes swapped (`controls::PS2_BITS`):
+  the steer and flip on the left stick and, past half, on the d-pad (up 0x1000, down 0x4000, right 0x2000, left
+  0x8000: button map 0 spins and flips on the d-pad), cross 0x40 the jump, square 0x80 the boost. Button map 0 has
+  no trick slots.
+- **The animation:** no take-off clip, so the launch clip counts as of type 0xb when the take-off spins or flips,
+  and the state starts on the stick (mode 0) as after the game's launch clips. Its other answers are 0, and the
+  clips and lean the state asks for are not played (row G5).
+- **The pivot bone:** at the hips' height, 91.7 cm × stats+0x60. There is no half-pipe.
+- **The wind-ups:** the port's own prewind's (row G1a5b3b2).
+
+Checked on a test slope: a jump with a spin wound up crouching takes off with the prediction 0.909 s and the rate
+4.79 rad/s on the stick (mode 0). The state runs every tick in the air. Held for a third of a second, it turns
+1.42 rad; let go, it is completing (mode 2). It landed after 61 ticks at 2.58 rad, short of the half turn, which
+the exit folded into the attitude. The state ended.
+
 ### The other respawns at the game's reset place (row G20c3b5; checked: `tests/reset_place.rs`)
 
 In the game every respawn that is not the start line, a teleport or a cast clip goes through the reset state.
