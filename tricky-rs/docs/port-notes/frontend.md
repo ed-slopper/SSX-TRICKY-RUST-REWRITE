@@ -85,6 +85,35 @@ an overlay or none, the players' masks, the widget list and the title's size. Al
 fade's colour and the vectors by value, the size getter's answers written alike on both sides), and the memory
 equal the original's. 10 of 10 mutants are caught.
 
+### The title screen ported (row G9c; `game/src/fe_title.rs`, checked: `tests/fe_title.rs`)
+
+`cFE3DStateTitle` (0x5c bytes, vtable 0x3b3350) adds to the base +0x48 the press-start prompt, +0x54 the EA logo
+and +0x58 the copyright line. Its menu is the title text (+0x3c): two items, "start" and "extras", with the chosen
+one in the first word of its +0x140.
+- **Constructor:** the base built, then accept and back off.
+- **`CreateNextState`:** "start" makes the mode select (0x54 bytes, vtable 0x3b3190). "Extras" makes the DVD
+  content screen (0xb8 bytes, vtable 0x3b3270, its fields cleared, the 3D scene's +0xc0 and +0x88). Anything
+  else makes none.
+- **The builder (vf11):** the base widgets (0x274108), then the menu (+0x154 = 2) with its two items, built by the
+  text widget's constructor 0x2b1138 with the font word at gApp+0x5c, their texts the pair of ids at 0x3b2108.
+  Then two widgets with the font at gApp+0x60, each white, +0x118 0.8, +0x114 1, sized and placed:
+  - the EA logo, text 0x6b, at (38, 410);
+  - the copyright line, text 0xdd8, at (20, 428).
+
+  Then the help bar's two buttons; the prompt at (its x, 428), its button's +0x118 0.8; the backdrop; the menu at
+  (20, 330).
+- **`Activate`:** both players' +0x38 set, the title music on (0x262438), the menu, logo and line taking input,
+  the base's `Activate`. If the game booted to the title (0x265af8), the menu's +0x160(0) and the screen's +0x40.
+- **`Deactivate`:** the players' +0x38 cleared, the group's input off, then the base's.
+- **vf19:** the 3D scene's +0x10(0).
+- **vf20:** the group's input off, and the music off (0x262a68) when "start" was chosen.
+- **vf26:** the fade out 2 for "extras", then the screen's +0x30.
+- **`LayoutWidgets`:** the logo's, line's, menu's and prompt's +0x140.
+
+Checked in the runner on 20,000 random screens (the base's `Activate` and `Deactivate` running as the original):
+the calls in order, with colours and positions by value, the answers and the memory all equal the original's.
+10 of 10 mutants are caught.
+
 ## The 3D transition and fade record (F1c, proven from the code, not ported)
 
 One record drives both the screen fades and a blend of four renderer values (read by the renderer's virtual +0x134,

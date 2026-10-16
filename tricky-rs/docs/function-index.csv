@@ -5395,15 +5395,15 @@ address,size,name,system,status
 0x293318,8,cFE3DIconEntry::vf19_293318,frontend,not started
 0x293320,20,cFE3DIconEntry::~cFE3DIconEntry,frontend,not started
 0x293338,80,cFE3DIconEntry::__tf,runtime,host
-0x293390,60,cFE3DStateTitle::cFE3DStateTitle,frontend,not started
-0x2933d0,340,cFE3DStateTitle::CreateNextState,frontend,not started
-0x293528,1040,cFE3DStateTitle::vf11_293528,frontend,not started
-0x293938,284,cFE3DStateTitle::Activate,frontend,not started
-0x293a58,128,cFE3DStateTitle::Deactivate,frontend,not started
-0x293ad8,60,cFE3DStateTitle::vf19_293ad8,frontend,not started
-0x293b18,104,cFE3DStateTitle::vf20_293b18,frontend,not started
-0x293b80,32,cFE3DStateTitle::vf26_293b80,frontend,not started
-0x293ba0,128,cFE3DStateTitle::LayoutWidgets,frontend,not started
+0x293390,60,cFE3DStateTitle::cFE3DStateTitle,frontend,checked
+0x2933d0,340,cFE3DStateTitle::CreateNextState,frontend,checked
+0x293528,1040,cFE3DStateTitle::vf11_293528,frontend,checked
+0x293938,284,cFE3DStateTitle::Activate,frontend,checked
+0x293a58,128,cFE3DStateTitle::Deactivate,frontend,checked
+0x293ad8,60,cFE3DStateTitle::vf19_293ad8,frontend,checked
+0x293b18,104,cFE3DStateTitle::vf20_293b18,frontend,checked
+0x293b80,32,cFE3DStateTitle::vf26_293b80,frontend,checked
+0x293ba0,128,cFE3DStateTitle::LayoutWidgets,frontend,checked
 0x293c20,496,cFE3DStateDVDContent::CreateNextState,frontend,not started
 0x293e10,10848,cFE3DStateDVDContent::vf11_293e10,frontend,not started
 0x296870,2192,FE_BuildDvdCharacterList,frontend,not started
