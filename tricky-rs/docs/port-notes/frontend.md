@@ -46,6 +46,45 @@ Part of the port notes (index: [README.md](README.md)); units and wording as des
   vf10 `PollAssetLoad`.
 - Overlays (`cScreenOverlay` and every `c*Overlay`): vf12 `Draw` (sprites), vf13 `DrawText`, vf14 `Update` (per tick), vf15 `Reset` (at race start).
 
+### The screen base ported (row G9b; `game/src/fe3dstate.rs`, checked: `tests/fe3dstate.rs`)
+
+The screen's fields beyond the phase:
+- +0x14 the next screen, +0x18 back allowed, +0x1c accept allowed;
+- +0x20 / +0x24 the fade in and out (1 half a second, 2 1.5 s out), +0x28 the pause overlay allowed;
+- +0x30 its menu, +0x34 its widget group, +0x38 the title widget, +0x3c the title text, +0x40 the help bar, +0x44
+  the backdrop.
+
+The front end (`gApp` 0x337c58 → +0x734):
+- +5 the player who accepted, +0x50 the overlay up;
+- +0x74 the two players (+0 connected, +0x3c their input mask for the screen);
+- +0xa4 the 3D scene (its vtable at +0, the others' at +0xc), +0xa8 the screen stack.
+
+A virtual is an 8-byte entry: the `this` adjust (a halfword), then the function.
+
+Ported: `Hide`, `TransitionIn`, `TransitionOut`, `Finish`, vf8, `UpdateTransition`, `Activate`, `Deactivate`,
+`LayoutWidgets`, `Update`, vf21, vf22, vf26, vf6 and vf12. Every call goes through `FeEnv`: the virtuals, the
+front end's pad queries 0x26ce08 (pause), 0x26ce30 (accept), 0x26ce58 (back) and 0x26cef8 (any input), the fade
+(`FE3DTransition_Start` 0x1ff648: three floats, the renderer word gApp+0x72c, a colour, 3), the heap, the "back"
+screen's constructor 0x29e920 and the screen stack (0x275b10 push, 0x275c10 pop, 0x2ac030 top). Notes:
+- `Update` gives the pause button to the overlay when one is up and not closing (it closes it, the 3D scene's +0x90
+  and a half-second fade to black). Active, per player:
+  - back (when allowed) makes and pushes the "back" screen and returns;
+  - accept (when allowed) goes to the menu's +0xe8 with the player;
+  - any input with an input mask goes there too, unless it was taken, noting the player at the front end's +5.
+
+  Done with a next screen, it pushes it.
+- `LayoutWidgets` gives every widget in the group's list whose +0x80 answers its +0x140. It centres the title text
+  on 640, moving it by (640 − width) / 2 − x, and its two halves the other way. The help bar's second widget goes
+  20 past the first's width, at its own height, and the third likewise at its own +0x84 (w 1).
+- `Activate`'s call of the screen's own +0x20 takes no argument; a1 still holds the 1 from the group's call before it.
+- The slot +0xe8 is the menu's input (with the player) but the overlay's "closing?" query (no argument). +0x28 is
+  the widget group's input switch (a flag) but a plain call on a screen.
+
+Checked in the runner on 30,000 random screens: their phases, flags and widgets (and whether those still animate),
+an overlay or none, the players' masks, the widget list and the title's size. All 15 methods' calls, in order (the
+fade's colour and the vectors by value, the size getter's answers written alike on both sides), and the memory
+equal the original's. 10 of 10 mutants are caught.
+
 ## The 3D transition and fade record (F1c, proven from the code, not ported)
 
 One record drives both the screen fades and a blend of four renderer values (read by the renderer's virtual +0x134,

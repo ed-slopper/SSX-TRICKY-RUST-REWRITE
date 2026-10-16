@@ -34,6 +34,7 @@ pub mod aictl;
 pub mod progress;
 pub mod ridercol;
 pub mod sfxcalc;
+pub mod fe3dstate;
 pub mod sndplay;
 pub mod sndqueue;
 pub mod sndlib;

@@ -5139,7 +5139,7 @@ address,size,name,system,status
 0x2714b8,8,cFE3DSoundBase::vf1_2714b8,frontend,not started
 0x2715c8,468,FE3D_CreateStateGroup,frontend?,not started
 0x2717a0,68,cFE3DState::~cFE3DState,frontend,not started
-0x2717e8,92,cFE3DState::vf12_2717e8,frontend,not started
+0x2717e8,92,cFE3DState::vf12_2717e8,frontend,checked
 0x271848,32,FE3DButtonBar_FindButton,frontend?,not started
 0x271868,32,FE3DState_HasFlag,frontend?,not started
 0x271888,52,FE3DState_AddPlayer,frontend?,not started
@@ -5152,23 +5152,23 @@ address,size,name,system,status
 0x274208,112,FE3D_BuildDialogScreen,frontend?,not started
 0x274278,112,FE3D_BuildDialogScreen2,frontend?,not started
 0x2742e8,1216,FUN_002742e8,frontend?,not started
-0x2747b0,200,cFE3DState::Hide,frontend,not started
-0x274878,376,cFE3DState::TransitionIn,frontend,not started
-0x2749f0,340,cFE3DState::TransitionOut,frontend,not started
-0x274b48,152,cFE3DState::Finish,frontend,not started
-0x274be0,152,cFE3DState::vf8_274be0,frontend,not started
-0x274c78,376,cFE3DState::UpdateTransition,frontend,not started
-0x274df0,204,cFE3DState::Activate,frontend,not started
-0x274ec0,88,cFE3DState::Deactivate,frontend,not started
-0x274f18,556,cFE3DState::LayoutWidgets,frontend,not started
-0x275148,800,cFE3DState::Update,frontend,not started
+0x2747b0,200,cFE3DState::Hide,frontend,checked
+0x274878,376,cFE3DState::TransitionIn,frontend,checked
+0x2749f0,340,cFE3DState::TransitionOut,frontend,checked
+0x274b48,152,cFE3DState::Finish,frontend,checked
+0x274be0,152,cFE3DState::vf8_274be0,frontend,checked
+0x274c78,376,cFE3DState::UpdateTransition,frontend,checked
+0x274df0,204,cFE3DState::Activate,frontend,checked
+0x274ec0,88,cFE3DState::Deactivate,frontend,checked
+0x274f18,556,cFE3DState::LayoutWidgets,frontend,checked
+0x275148,800,cFE3DState::Update,frontend,checked
 0x275468,108,FEList_SetFocused,frontend?,not started
 0x2754d8,268,FUN_002754d8,frontend?,not started
 0x2755e8,372,FUN_002755e8,frontend?,not started
 0x275760,296,FUN_00275760,frontend?,not started
-0x275888,56,cFE3DState::vf21_275888,frontend,not started
-0x2758c0,220,cFE3DState::vf22_2758c0,frontend,not started
-0x2759a0,40,cFE3DState::vf26_2759a0,frontend,not started
+0x275888,56,cFE3DState::vf21_275888,frontend,checked
+0x2758c0,220,cFE3DState::vf22_2758c0,frontend,checked
+0x2759a0,40,cFE3DState::vf26_2759a0,frontend,checked
 0x2759c8,36,FE_GetSpriteRect,frontend,not started
 0x2759f0,124,FUN_002759f0,frontend?,not started
 0x275a70,80,FUN_00275a70,frontend?,not started
@@ -5207,7 +5207,7 @@ address,size,name,system,status
 0x276430,8,cFE3DState::vf13_276430,frontend,not started
 0x276460,8,cFE3DState::vf11_276460,frontend,not started
 0x2764a0,8,cFE3DState::CreateNextState,frontend,not started
-0x2764a8,12,cFE3DState::vf6_2764a8,frontend,not started
+0x2764a8,12,cFE3DState::vf6_2764a8,frontend,checked
 0x2764e0,80,cFE3DState::__tf,runtime,host
 0x2766b8,80,cListFE3DGetExtentOp::__tf,runtime,host
 0x276708,64,FUN_00276708,frontend?,not started
