@@ -1044,6 +1044,23 @@ ranges. Row E8s made `grab_safe` strict (`f > m4`, the game's `marker < time`; i
 the uber clips' flag 4 is the port's `uber_done` (the same mechanism, but the uber clips' marker frames are in the
 animation files).
 
+### The board's corners (row G7f3a; `pose::board_corners`, checked: `tests/pose.rs`)
+
+After `Boarder_UpdateSkeleton`, `Boarder_UpdatePose` 0x129628 lays out the board's four corners for the board
+track: rider+0x5760 front left, +0x5770 front right, +0x5780 back left, +0x5790 back right. They come from the
+board bone's position (+0x4a90), its x row (+0x4a60, along the board) and its z row (+0x4a80, across). That fits
+the rail code's reading of the bone. The lengths and half width depend on the board class (+0x420):
+
+| class | to the front end | to the back end | half width |
+|---|---|---|---|
+| 0 | 96.09368 cm | 98.02858 cm | 16.22651 cm |
+| 1 | 84.922966 cm | 84.07263 cm | 16.232784 cm |
+| other | 114.15547 cm | 124.23839 cm | 15.998993 cm |
+
+The two lengths swap for the other natural stance (stats+0x40), and everything is scaled by stats+0x60
+(`Vec4_Scale`, all four lanes). Checked in the runner: the skeleton stub leaves a random bone, and the four corners
+equal the original's bit for bit over the 40,000 pose cases. 5 of 5 mutants are caught.
+
 ## Skeleton pose helpers (F1c names, not ported)
 
 - `Boarder_PoseBonesFromAngles` 0x205a78 (only from `Boarder_BuildBoneMatrices` 0x2083f8; proven): copies the root

@@ -44,6 +44,8 @@ fn board_frame_matches_the_original() {
     r.mem.write_u32(rider + 0x464, stats);
     // every other call of the function returns 0; the skeleton call records the frame
     let frame: Rc<RefCell<Option<[u32; 16]>>> = Rc::default();
+    // the board bone the skeleton call leaves (+0x4a60..+0x4a9c), for the corners after it
+    let bone: Rc<RefCell<[f32; 16]>> = Rc::default();
     let mut jals = std::collections::BTreeSet::new();
     for k in 0..(0x1400 / 4) {
         let w = r.mem.read_u32(0x129628 + 4 * k);
@@ -57,12 +59,16 @@ fn board_frame_matches_the_original() {
         }
         if a == 0x12ae18 {
             let fr = frame.clone();
+            let bn = bone.clone();
             r.stub(a, move |_c, m| {
                 let mut w = [0u32; 16];
                 for (i, x) in w.iter_mut().enumerate() {
                     *x = m.read_u32(rider + 0x4aa0 + 4 * i as u32);
                 }
                 *fr.borrow_mut() = Some(w);
+                for (i, x) in bn.borrow().iter().enumerate() {
+                    m.write_f32(rider + 0x4a60 + 4 * i as u32, *x);
+                }
             });
         } else {
             r.stub(a, |c, _| c.set_gpr(2, 0));
@@ -93,8 +99,12 @@ fn board_frame_matches_the_original() {
             flip: [0.0, g.f(-12.0, 12.0)][g.next() as usize % 2],
             pivot_z: g.f(0.0, 120.0),
         };
-        let bone = g.next() % 8;
+        let bone_ix = g.next() % 8;
+        let bn: [f32; 16] = std::array::from_fn(|i| if i % 4 == 3 && i < 12 { [0.0, g.f(-1.0, 1.0)][g.next() as usize % 2] } else if i < 12 { g.f(-1.0, 1.0) } else if i < 15 { g.f(-9000.0, 9000.0) } else { 1.0 });
+        *bone.borrow_mut() = bn;
+        let stance = g.next() % 2;
         let m = &mut r.mem;
+        m.write_u32(stats + 0x40, stance);
         put4(m, rider + 0x170, p.quat);
         m.write_f32(rider + 0x214, p.steer);
         m.write_u32(rider + 0x424, p.motion);
@@ -107,8 +117,8 @@ fn board_frame_matches_the_original() {
         m.write_f32(stats + 0x60, p.lean_scale);
         m.write_f32(rider + 0x1d0, p.spin);
         m.write_f32(rider + 0x1d4, p.flip);
-        m.write_u32(rider + 0x44d8, bone);
-        m.write_f32(rider + bone * 0x394 + 0x8d0, p.pivot_z);
+        m.write_u32(rider + 0x44d8, bone_ix);
+        m.write_f32(rider + bone_ix * 0x394 + 0x8d0, p.pivot_z);
         m.write_u32(stats + 0x78, 0);
         *frame.borrow_mut() = None;
         r.cpu.set_gpr(4, rider as u64);
@@ -116,6 +126,12 @@ fn board_frame_matches_the_original() {
         let theirs = frame.borrow().expect("the skeleton call");
         let ours: Vec<u32> = board_frame(&p).iter().flat_map(|row| row.map(f32::to_bits)).collect();
         assert_eq!(theirs.to_vec(), ours, "case {case}: {p:?}");
+        // the board's corners from the bone the skeleton left (row G7f3)
+        let rows: [[f32; 4]; 4] = std::array::from_fn(|k| std::array::from_fn(|c| bn[4 * k + c]));
+        let corners = tricky_game::pose::board_corners(rows, p.class, stance, p.lean_scale);
+        let theirs: Vec<u32> = (0..16).map(|i| r.mem.read_u32(rider + 0x5760 + 4 * i)).collect();
+        let ours: Vec<u32> = corners.iter().flat_map(|row| row.map(f32::to_bits)).collect();
+        assert_eq!(theirs, ours, "case {case}: the corners");
         tilted += (p.steer != 0.0 && p.motion != 3) as u32;
     }
     assert!(tilted > 5000, "{tilted}");

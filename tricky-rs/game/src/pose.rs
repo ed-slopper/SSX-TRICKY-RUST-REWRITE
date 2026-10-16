@@ -123,3 +123,26 @@ pub fn ease_body_height(height: f32, motion: u32, surface_word10: f32) -> f32 {
         target
     }
 }
+
+/// The board's four corners (rider+0x5760 front left, +0x5770 front right, +0x5780 back left, +0x5790 back right, as
+/// the board track reads them) as `Boarder_UpdatePose` 0x129628 makes them after `Boarder_UpdateSkeleton`: from the
+/// board bone's position (`bone[3]`, +0x4a90), its x row (+0x4a60, along the board) and z row (+0x4a80, across), the
+/// board class (+0x420: 0 96.09368 / 98.02858 cm to the ends and 16.22651 half wide, 1 84.922966 / 84.07263 /
+/// 16.232784, else 114.15547 / 124.23839 / 15.998993; the two lengths swapped for the other
+/// natural stance, stats+0x40) times stats+0x60 (`Vec4_Scale` 0x102f50: all four lanes)
+pub fn board_corners(bone: [V4; 4], class: u32, natural_stance: u32, scale: f32) -> [V4; 4] {
+    let (a, b, w) = match class {
+        0 => (f32::from_bits(0x42c0_2ff7), f32::from_bits(0x42c4_0ea2), f32::from_bits(0x4181_cfe4)),
+        1 => (f32::from_bits(0x42a9_d88f), f32::from_bits(0x42a8_2530), f32::from_bits(0x4181_dcbe)),
+        _ => (f32::from_bits(0x42e4_4f9a), f32::from_bits(0x42f8_7a0e), f32::from_bits(0x417f_fbe0)),
+    };
+    let (front, back) = if natural_stance != 0 { (b, a) } else { (a, b) };
+    let mul = |v: V4, k: f32| [v[0] * k, v[1] * k, v[2] * k, v[3] * k];
+    let add = |p: V4, q: V4| [p[0] + q[0], p[1] + q[1], p[2] + q[2], p[3] + q[3]];
+    let sub = |p: V4, q: V4| [p[0] - q[0], p[1] - q[1], p[2] - q[2], p[3] - q[3]];
+    let pos = bone[3];
+    let fwd = add(pos, mul(bone[0], front * scale));
+    let rear = sub(pos, mul(bone[0], back * scale));
+    let half = mul(bone[2], w * scale);
+    [add(fwd, half), sub(fwd, half), add(rear, half), sub(rear, half)]
+}
