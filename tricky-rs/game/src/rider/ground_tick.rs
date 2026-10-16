@@ -194,6 +194,8 @@ pub struct RailCurve {
     pub owner: Option<RailOwner>,
     /// curve+0x5c..0x73: the box (min x, y, z, then max x, y, z)
     pub bbox: [f32; 6],
+    /// the owner's number in the course's spline table (the port's, for [`RailWorld::set_live`])
+    pub spline: Option<u32>,
 }
 
 impl RailCurve {
@@ -344,6 +346,20 @@ fn curve_search(c: &RailCurve, pos: V4) -> (V4, f32, f32) {
 }
 
 impl RailWorld {
+    /// A rail switched on or off: the live bit (+0x18 bit 0) of every curve whose owner is spline `spline`, as
+    /// `cRailNode`'s 0x1403c0 / vf23 and `RailMan_ApplyRailState` set it on the spline record
+    pub fn set_live(&mut self, spline: u32, on: bool) {
+        for c in self.cells.iter_mut().flatten() {
+            for p in &mut c.patches {
+                for k in p.curves.iter_mut().filter(|k| k.spline == Some(spline)) {
+                    if let Some(o) = &mut k.owner {
+                        o.flags = if on { o.flags | 1 } else { o.flags & !1 };
+                    }
+                }
+            }
+        }
+    }
+
     /// `Rail_ClosestPoint` 0x259330 (`world` = the grid at `gWorld`, `pos` = the query point, all four lanes; the third
     /// argument is not read). Walks the cells from two before the point's cell to its own (clamped into the grid) in
     /// x, y, skipping what is more than 300 cm from the point (cell, patch and curve boxes), and in each curve that is

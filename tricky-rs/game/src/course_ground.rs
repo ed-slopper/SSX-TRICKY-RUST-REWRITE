@@ -30,6 +30,8 @@ pub struct CourseGround {
     pub ssf: tricky_data::ssf::Ssf,
     /// the knockable objects that are moving and the script threads the riders' contacts started (row E8c3)
     pub knock: Mutex<crate::knockables::Knockables>,
+    /// the world grid as `Rail_ClosestPoint` 0x259330 walks it (row G20c2c1a, [`rail_world`])
+    pub rails: crate::rider::ground_tick::RailWorld,
     /// STANDIN: the objects whose persistent script spawns a controller other than a roller (op 0 sub-type not 0:
     /// animated doors, boosts...), which the port does not run (row E7b2); the rider's instance query passes
     /// through them unless the port poses them ([`CourseGround::pose`]), as the app did before row E8c3
@@ -69,7 +71,8 @@ impl CourseGround {
         let driven = (0..world.objects.len())
             .map(|o| ssf.effects.get(ssf.event_script(o, 0) as usize).is_some_and(|ops| ops.iter().any(|op| op.op == 0 && op.args.first().is_some_and(|&t| t != 0))))
             .collect();
-        Some(CourseGround { world: Mutex::new(world), flags, coeffs, cache: Mutex::new(HashMap::new()), poses: Mutex::new(HashMap::new()), ssf, knock, driven })
+        let rails = rail_world(&world, ltg_bytes, &ltg, &pbd);
+        Some(CourseGround { world: Mutex::new(world), flags, coeffs, cache: Mutex::new(HashMap::new()), poses: Mutex::new(HashMap::new()), ssf, knock, driven, rails })
     }
 
     /// `World_RayCast` 0x25aff8 on the course: the distance along the query (−1 for nothing) and what was hit.
@@ -147,4 +150,52 @@ impl CourseGround {
         (obj.min, obj.max, obj.controller) = (min, max, Some(0x100));
         self.poses.lock().unwrap_or_else(|e| e.into_inner()).insert(o, frames);
     }
+}
+
+/// The world grid `Rail_ClosestPoint` 0x259330 walks (row G20c2c1a), from the course as the game resolves it: the same
+/// grid as `World_RayCast`'s (the world's origin, cell side and size), each cell a `.ltg` TGroup (its box) whose 16
+/// INodes are the patch records (their box; the in-use words +0x24, +0x28, the halfword +0x2c and the word +0x48 as the
+/// file has them, nonzero where the game's are), each INode's spline list (+0x2a count, +0x3c offset from its TGroup)
+/// the `.pbd` spline segments it holds (checked on gari: every entry a segment index whose box meets the INode's).
+/// A curve is the segment's four rows (+0x00..+0x3c: the cubic's coefficients), its box (+0x5c) and its spline (+0x58)
+/// as the owner: the spline record's +0x18 (bit 0, the rail switched on: clear in the file, set when the rail's
+/// `cRailNode` comes on, [`crate::rider::ground_tick::RailWorld::set_live`]) and +0x24. The game turns the indices
+/// into pointers after loading; the port keeps the records.
+pub fn rail_world(world: &World, ltg_bytes: &[u8], ltg: &tricky_data::ltg::Ltg, pbd: &tricky_data::pbd::Pbd) -> crate::rider::ground_tick::RailWorld {
+    use crate::rider::ground_tick::{RailCell, RailCurve, RailOwner, RailPatch, RailWorld};
+    let f = |w: u32| f32::from_bits(w);
+    let curve = |k: u32| -> Option<RailCurve> {
+        let s = pbd.segments.get(k as usize)?;
+        let row = |r: usize| [f(s[4 * r]), f(s[4 * r + 1]), f(s[4 * r + 2]), f(s[4 * r + 3])];
+        let spline = tricky_data::pbd::SegmentRec(*s).spline();
+        let owner = pbd.splines.get(spline as usize).map(|sp| RailOwner { flags: sp[6], tag: sp[9] });
+        Some(RailCurve { m: [row(0), row(1), row(2), row(3)], owner, bbox: [f(s[0x17]), f(s[0x18]), f(s[0x19]), f(s[0x1a]), f(s[0x1b]), f(s[0x1c])], spline: Some(spline) })
+    };
+    let word = |at: usize| ltg_bytes.get(at..at + 4).map_or(0, |b| u32::from_le_bytes([b[0], b[1], b[2], b[3]]));
+    let cells = ltg
+        .tgroups
+        .iter()
+        .map(|g| {
+            g.as_ref().map(|(off, g)| RailCell {
+                bbox: [g.bbox.min[0], g.bbox.min[1], g.bbox.min[2], g.bbox.max[0], g.bbox.max[1], g.bbox.max[2]],
+                patches: g
+                    .inodes
+                    .iter()
+                    .map(|n| {
+                        let at = *off as usize + n.offsets[2] as usize;
+                        let curves = (0..n.counts[3].max(0) as usize).filter_map(|k| curve(word(at + 4 * k))).collect();
+                        RailPatch {
+                            bbox: [n.bbox.min[0], n.bbox.min[1], n.bbox.min[2], n.bbox.max[0], n.bbox.max[1], n.bbox.max[2]],
+                            x24: (n.counts[0] as u16 as u32) | (n.counts[1] as u16 as u32) << 16,
+                            x28: n.counts[2] as u16,
+                            x2c: n.counts[4],
+                            x48: n.offsets[5],
+                            curves,
+                        }
+                    })
+                    .collect(),
+            })
+        })
+        .collect();
+    RailWorld { x0: world.origin[0], y0: world.origin[1], cell: world.size, nx: world.width, ny: world.height, cells }
 }

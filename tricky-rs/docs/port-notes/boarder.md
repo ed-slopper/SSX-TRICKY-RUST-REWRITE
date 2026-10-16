@@ -521,6 +521,33 @@ ports it, G20c2c3 wires it with the attitude across a landing, G20c3). The rest 
 blended to the tangent at 30 per second, gravity along it, the balance, the push off the rail outside the limits,
 the take-off call chain) is hand-written in `rail_step`: G20c2c4, with G1b.
 
+### The grid from the course (row G20c2c1a; `course_ground::rail_world`, checked: `tests/railgrid.rs`)
+
+`CourseGround::rails` is the grid `Rail_ClosestPoint` walks, built from the course's files at load. It uses the same
+origin, cell side and size as `World_RayCast`'s grid. Its parts:
+- **Cells:** each cell is a `.ltg` TGroup, with that TGroup's box.
+- **Patches:** each TGroup's 16 INodes are the patch records, with the INode's box and its in-use words (+0x24,
+  +0x28, +0x2c, +0x48) as the file has them.
+- **Curves:** each INode's spline list (count at +0x2a, offset from its TGroup at +0x3c) gives indices of `.pbd`
+  spline segments. A curve is that segment's 16 words (the cubic's rows), its box (words 0x17..0x1c) and its spline
+  (+0x58) as the owner (the spline record's +0x18 and +0x24).
+
+The game turns these indices into pointers after loading; the port keeps the records. The rail's on bit (+0x18
+bit 0) is clear in every spline record on the disc; `cRailNode` (0x1403c0) sets it at run time when the rail comes
+on. In the port, `RailWorld::set_live(spline, on)` does that. Each curve carries its spline's number for it.
+
+Checked on the disc on gari and elysium:
+- Every INode spline-list entry is a segment index whose box meets the INode's box.
+- With every rail switched on, `RailWorld::closest_point` finds points at t = 0.1, 0.5 and 0.9 on every segment
+  within 2 cm (1626 of 1626 on gari, 1326 of 1326 on elysium).
+
+Mutants: the offset, count, box words, row order, grid size and origin, and the on bit are all caught. Zeroing the
+in-use words survives, and those mutants are equivalent: the walk skips a patch only when the words are zero *and*
+it has no curves, and a patch with no curves finds nothing either way.
+
+Not done here (G20c2c1b): comparing this grid with the one the game's own loader resolves in the runner, and
+wiring it into the rider's rail capture and slide in place of `Rails::nearest`.
+
 ## State changes (row G18; `states.rs`, checked: `tests/states.rs`)
 
 `Boarder_SetMotion` 0x11f610 and `Boarder_SetState` 0x11f608 are one-instruction jumps to

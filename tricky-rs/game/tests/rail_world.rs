@@ -165,7 +165,7 @@ fn random_world(g: &mut Rng) -> (RailWorld, Vec<[V4; 4]>, u32) {
                     }
                 }
                 let flags = if g.below(6) == 0 { g.next() & !1 } else { g.next() | 1 };
-                curves.push(RailCurve { m, owner: Some(RailOwner { flags, tag: g.next() }), bbox });
+                curves.push(RailCurve { m, owner: Some(RailOwner { flags, tag: g.next() }), bbox, spline: None });
                 cps.push(p);
             }
             let mut bbox = if curves.is_empty() { [0.0; 6] } else { union(curves.iter().map(|c| c.bbox)) };
