@@ -754,6 +754,7 @@ impl Score {
             spin_scored: keep.spin_scored,
             flip_scored: keep.flip_scored,
             grabs: keep.grabs,
+            trick_id: keep.trick_id,
             x10: keep.x10,
             x14: keep.x14,
             x18: keep.x18,
