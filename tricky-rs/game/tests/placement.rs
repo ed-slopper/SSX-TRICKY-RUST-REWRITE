@@ -315,6 +315,28 @@ fn respawn_seeds_the_ground_tick_with_the_real_attitude() {
     }
 }
 
+/// Row G20c3b2: a respawn at the game's own heading (`Rider::respawn_heading`, as the race's resets and the teleport
+/// pads make it) keeps that heading exact: the attitude the ground tick starts from is the real `Boarder_PlaceAt`'s for
+/// that very heading, with no trip through the port's yaw.
+#[test]
+fn respawn_at_a_heading_keeps_it_exact() {
+    let Some(mut w) = world() else { return };
+    let mut g = Rng(0x6_20c3_b200_0001);
+    let mut r = Rider::new(Vec3::new(0.0, 0.0, 0.0), 0.0);
+    let mut off = 0;
+    for n in 0..3000usize {
+        // headings as the callers make them: the inline atan2 of a direction
+        let (x, y) = (g.f(-1.0, 1.0), g.f(-1.0, 1.0));
+        let heading = atan2_inline(y, x);
+        r.respawn_heading(Vec3::new(g.f(-50.0, 50.0), g.f(-5.0, 5.0), g.f(-50.0, 50.0)), heading);
+        let game = game_attitude(&mut w, heading, None, false);
+        assert_eq!(game, seed_words(&r.seed_ground()), "case {n}: heading {heading}");
+        // through the port's yaw it would not always be
+        off += (game_attitude(&mut w, placed_heading(wrap(heading - std::f32::consts::FRAC_PI_2)), None, false) != game) as u32;
+    }
+    assert!(off > 0, "the yaw's round trip never moved the heading");
+}
+
 /// The comparison can tell: the rebuilt attitude (no `att`) is not the game's.
 #[test]
 fn the_rebuilt_attitude_was_not() {

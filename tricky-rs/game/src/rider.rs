@@ -439,6 +439,15 @@ impl Rider {
     }
     /// `Boarder_Respawn`: dropped a metre above the snow, already moving down the course at 30 km/h.
     pub fn respawn(&mut self, at: (Vec3, f32)) {
+        self.place(at.0, at.1, placed_heading(at.1));
+    }
+    /// A respawn at the game's own heading (`Boarder_PlaceAt`'s f12, as its callers make it: the inline atan2 of a
+    /// direction in the game's space, `jump::atan2_inline`), kept exact on the rider; the port's yaw follows from it
+    pub fn respawn_heading(&mut self, pos: Vec3, heading: f32) {
+        self.place(pos, wrap(heading - std::f32::consts::FRAC_PI_2), heading);
+    }
+    fn place(&mut self, pos: Vec3, yaw: f32, game_heading: f32) {
+        let at = (pos, yaw);
         self.pos = at.0 + Vec3::Y * 1.0146;
         self.yaw = at.1;
         self.fin = None;
@@ -470,7 +479,7 @@ impl Rider {
         self.up = ground_tick::game_dir(self.normal);
         // and its attitude (G20c3b), which the game keeps through the drop: the quaternion is only turned by the
         // placement's ray (STANDIN: no ray hit here either, row E7), the heading and nothing else
-        self.att = Some((orient::placed_attitude(placed_heading(at.1), None), self.yaw));
+        self.att = Some((orient::placed_attitude(game_heading, None), self.yaw));
         // `Boarder_PlaceAt` 0x11cae8: the chain banked, its meter change (−0.12) applied
         let (m, calls) = self.sc.bank_points();
         self.show(&calls);
@@ -708,8 +717,8 @@ impl Rider {
                 }
                 // `Boarder_TeleportToInstance` 0x11a098 (`teleport::teleport_target`): the place by the rider's
                 // slot, then `Boarder_PlaceAt` with no velocity
-                PadKind::Teleport { places, yaw } if near(p) => {
-                    self.respawn((places[self.slot.min(5) as usize], yaw));
+                PadKind::Teleport { places, heading } if near(p) => {
+                    self.respawn_heading(places[self.slot.min(5) as usize], heading);
                     self.vel = Vec3::ZERO;
                     return true;
                 }

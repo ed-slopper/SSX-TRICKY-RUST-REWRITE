@@ -1561,17 +1561,16 @@ fn build_collision(level: &Level) -> CollisionWorld {
     for (&i, &to) in &level.logic.teleports {
         let (Some((lo, hi)), Some(t)) = (boxes(i), level.instances.get(to)) else { continue };
         // `Boarder_TeleportToInstance` 0x11a098 on the object's matrix (the disc's record; the folder's location,
-        // rotation and scale put back together), for each slot; its heading as our yaw (`rider::placed_heading`'s
-        // inverse)
+        // rotation and scale put back together), for each slot, and its heading (kept exact: `Rider::respawn_heading`)
         let m = t.matrix.unwrap_or_else(|| Mat4::from_scale_rotation_translation(Vec3::from(t.scale), quat4(t.rotation), Vec3::from(t.location)).to_cols_array_2d());
         let mut places = [Vec3::ZERO; 6];
-        let mut yaw = 0.0;
+        let mut heading = 0.0;
         for (s, p) in places.iter_mut().enumerate() {
             let (at, h) = tricky_game::teleport::teleport_target(&m, s as u32);
             *p = g2b(Vec3::new(at[0], at[1], at[2]));
-            yaw = h - std::f32::consts::FRAC_PI_2;
+            heading = h;
         }
-        world.pads.push(collide::Pad { lo, hi, kind: collide::PadKind::Teleport { places, yaw } });
+        world.pads.push(collide::Pad { lo, hi, kind: collide::PadKind::Teleport { places, heading } });
     }
     world
 }

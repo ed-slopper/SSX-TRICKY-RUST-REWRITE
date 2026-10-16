@@ -691,6 +691,12 @@ in (−π, π], and with the approximate `Math_Atan`, **not** `f32::atan2`. Comp
 the port's yaw is `atan2(−x, −z)` of its own line (`race.rs`), so `placed_heading(yaw)` is the same angle to within
 1.3e-5 rad (the game's `Math_Atan` error; measured on 20,000 directions, `tests/placement.rs`), exactly the same
 only when the yaw is made with `jump::atan2_inline` from the game's direction (gap, row G20c3b2).
+Row G20c3b2 takes that route: `Rider::respawn_heading(pos, heading)` places the rider at the game's own heading and
+keeps it exact (the attitude `Rider::att` is made from it; the port's yaw is only derived), and the race's resets
+(`race.rs`: the inline atan2 of the line's direction in the game's axes, x and −z) and the teleport pads (G20c3b3's
+heading) call it. `tests/placement.rs` (`respawn_at_a_heading_keeps_it_exact`) checks the seeded attitude against the
+real `Boarder_PlaceAt` for 3,000 headings, and that the old trip through the yaw does move some of them. The other
+respawns (the safe point, the wipe-outs' return points) still pass the port's yaw.
 
 ### The teleport and the cast clips in the port (row G20c3b3; checked: `tests/teleport.rs`)
 

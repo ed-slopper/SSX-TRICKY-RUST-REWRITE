@@ -244,8 +244,10 @@ impl AiDriver {
             if std::env::var("TRICKY_RESETS").is_ok() { println!("stuck at t {:.0}: pos {:.1?} speed {:.1} grounded {} line point {} at {:.1?}, next {:.1?}", self.clock, r.pos, r.vel.length(), r.grounded, self.idx, line[self.idx], line[(self.idx + 1).min(line.len() - 1)]); }
             self.idx = (self.idx + 2).min(line.len() - 1);
             self.clear_of_resets(world, line);
+            // the heading as `ResetState_PlaceRider` makes it: the inline atan2 of the direction in the game's axes (x,
+            // −z here)
             let nxt = line[(self.idx + 1).min(line.len() - 1)] - line[self.idx];
-            r.respawn((line[self.idx] + Vec3::Y * 1.0, f32::atan2(-nxt.x, -nxt.z)));
+            r.respawn_heading(line[self.idx] + Vec3::Y * 1.0, crate::jump::atan2_inline(-nxt.z, nxt.x));
             self.stuck += 1;
             self.stuck_for = 0.0;
             self.slow_for = 0.0;
@@ -256,7 +258,7 @@ impl AiDriver {
             if self.clock > 1.0 {
                 self.clear_of_resets(world, line);
                 let nxt = line[(self.idx + 1).min(line.len() - 1)] - line[self.idx];
-                r.respawn((line[self.idx] + Vec3::Y * 1.0, f32::atan2(-nxt.x, -nxt.z)));
+                r.respawn_heading(line[self.idx] + Vec3::Y * 1.0, crate::jump::atan2_inline(-nxt.z, nxt.x));
             }
             self.seen_respawns = r.respawns;
         }
