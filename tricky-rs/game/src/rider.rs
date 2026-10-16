@@ -838,6 +838,62 @@ impl Rider {
         if off > 25f32.to_radians() { self.land_kind = 3; }
         self.vel *= 1.0643 - 0.2454 * off.clamp(15f32.to_radians(), 50f32.to_radians());
     }
+    /// The landing as `AirMotion_Update` 0x108378 decides it (row G20c3), for a rider whose attitude was kept through
+    /// the air: `Landing_CheckAngles` 0x12ba78 ([`crate::landing::check_angles`]) on the board's forward and up
+    /// (+0x180, +0x1a0), the velocity going in, the snow's normal and surface and the stability byte (stats+0x16);
+    /// refused (a grab, tweak or uber clip short of its safe point, surface 0, 6 or 10) or not clean (the roll out of
+    /// its range): a crash (false). Else `Landing_ChooseState` 0x109308 ([`crate::landing::choose_state`]): a hard
+    /// landing (state 0xb) holds the rider in it for its landing clip (`LandHardControl_Update` 0x104800 leaves it
+    /// at the clip's end); the speed scaled down by the roll (15°..50°: × 1.0643 − 0.2454 · it) and then by the
+    /// angle to the travel (25°..80°: × 1.1136 − 0.2603 · it); landing backwards rides switch. STANDIN: the clip type
+    /// as the port's grab and uber (0xe while short of safe), the port's sloppy-landing kind (`land_kind`) from the two
+    /// angles, and the landing clips' length (`wipeout::clip_frames`' 30-frame default: which clips the ids name is
+    /// row G5).
+    fn land_as_game(&mut self, o: Orient, v_in: Vec3, n: Vec3, surface: u8, vn: f32) -> bool {
+        use std::f32::consts::{FRAC_PI_2, PI};
+        let k = |b: u32| f32::from_bits(b);
+        let clip_type = if !self.grab_safe() || (self.uber > 0.0 && !self.uber_done) { 0xe } else { 0 };
+        let st = crate::landing::LandingState {
+            clip_type,
+            clip_flag4: false,
+            surface: surface as u32,
+            board: o.fwd,
+            vel: ground_tick::to_game(v_in, 100.0, 0.0),
+            up: o.up,
+            stability: self.stats.bytes[8],
+        };
+        let Some(l) = crate::landing::check_angles(&st, ground_tick::game_dir(n)).filter(|l| l.ok) else {
+            self.crash_kind = 0;
+            self.cause = if clip_type != 0 { "grab" } else { "landing angle" };
+            self.wipe_out();
+            return false;
+        };
+        let stance = self.data.goofy as u32;
+        let c = crate::landing::choose_state(
+            &crate::landing::ChooseState { clip_type, class: self.stats.kind as u32, switch: (self.switch != self.data.goofy) as u32, stance },
+            l.pitch,
+            l.roll,
+            vn * 100.0,
+        );
+        let (lo, hi) = (k(0x3e86_0a92), k(0x3f5f_66f3));
+        let g = l.roll.abs().clamp(lo, hi);
+        if lo < g {
+            self.vel *= g * k(0xbe7b_4efa) + k(0x3f88_395b);
+        }
+        let (lo, hi) = (k(0x3edf_66f3), k(0x3fb2_b8c2));
+        let g = l.pitch.abs().clamp(lo, hi);
+        if lo < g {
+            self.vel *= g * k(0xbe85_4942) + k(0x3f8e_8a0d);
+        }
+        if FRAC_PI_2 < l.pitch.abs() {
+            self.set_switch(!self.switch);
+            self.yaw = wrap(self.yaw + PI);
+        }
+        let deg25 = 25f32.to_radians();
+        self.land_kind = if deg25 < l.roll.abs() { 3 } else if deg25 < l.pitch.abs() && l.pitch.abs() < PI - deg25 { 1 } else { 0 };
+        self.hard_land = if c.state == 0xb { crate::rider::wipeout::clip_frames(c.clip as u16, self.stats.kind as u8) / 30.0 } else { 0.0 };
+        true
+    }
     /// Shoved over by another rider: `dv` the velocity change of the shove (m/s). A knock-down is scored as
     /// `Boarder_ScoreCrash` does (the trick banked; the meter only with `lose_meter`). Returns true if it put the
     /// rider down.
@@ -1246,6 +1302,7 @@ impl Rider {
             };
             if let Some(hit) = found {
                 let vn = self.vel.dot(hit.normal);
+                let v_in = self.vel;
                 {
                     p.y = hit.y;
                     let impact = vn;
@@ -1257,15 +1314,24 @@ impl Rider {
                     self.surface = hit.surface;
                     self.height = 0.0;
                     self.grounded = true;
+                    let mut down = false;
                     if self.air_time > 0.15 {
-                        self.touch_down();
-                        // a hard landing: too nose-down or too fast into the snow
-                        let tau = std::f32::consts::TAU;
-                        let r = self.flip - tau * (self.flip / tau).round();
-                        if r < -std::f32::consts::FRAC_PI_4 || impact < -27.77 { self.hard_land = 0.5; }
+                        // on the course with the attitude kept through the air: the game's own landing (row G20c3)
+                        match self.att.filter(|_| world.course.is_some()) {
+                            Some((o, _)) => down = !self.land_as_game(o, v_in, hit.normal, hit.surface, impact),
+                            None => {
+                                self.touch_down();
+                                // a hard landing: too nose-down or too fast into the snow
+                                let tau = std::f32::consts::TAU;
+                                let r = self.flip - tau * (self.flip / tau).round();
+                                if r < -std::f32::consts::FRAC_PI_4 || impact < -27.77 { self.hard_land = 0.5; }
+                            }
+                        }
                     }
-                    self.land(None);
-                    self.steer = 0.0;
+                    if !down {
+                        self.land(None);
+                        self.steer = 0.0;
+                    }
                 }
             }
         }

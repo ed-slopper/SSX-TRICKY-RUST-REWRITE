@@ -851,6 +851,43 @@ Checked on gari:
 - **Mutants:** the push, the glance's attitude and velocity, the crash and the switch to this path are caught. The
   mask survives, because both sets of spheres reach that wall.
 
+### The landing as the game decides it (row G20c3e; checked: `tests/landing_game.rs`)
+
+The landing branch of `AirMotion_Update` 0x108378 is the exact form of the port's hand-written landing. Its two
+speed losses use the same constants as `touch_down`, and its roll range is `Stats::crash_pitch`'s limit. In order:
+- `Landing_CheckAngles` 0x12ba78. A refusal (the clip early out, or surface 0, 6 or 10) or an unclean roll returns
+  0, and the rider crashes.
+- Otherwise `Landing_ChooseState` 0x109308 runs with the check's two angles: the angle from the board to the travel
+  (its "pitch", 0..π) and the roll about the normal.
+- Then the speed is scaled by the roll (clamped 15°..50°: × 1.0643 − 0.2454 · it) and by the angle to the travel
+  (25°..80°: × 1.1136 − 0.2603 · it). Landing backwards (angle over π/2) rides switch.
+
+`Rider::land_as_game` runs these for a rider landing on the course with its attitude kept through the air. It reads
+the board's forward and up (+0x180, +0x1a0), the velocity going in, the snow's normal and surface, and the stability
+byte stats+0x16 (`bytes[8]`). A hard landing (state 0xb) holds the rider in it (`hard_land`, so no jump or tuck,
+and the ground tick's control state is 0xb) until its landing clip ends, as `LandHardControl_Update` 0x104800
+leaves it.
+
+STANDINs:
+- the clip type is the port's grab or uber: 0xe while short of its safe point;
+- `land_kind` comes from the two angles;
+- the landing clips' length is `wipeout::clip_frames`' 30-frame default: which clips the ids 0x1ff and 0x23e..0x243
+  name is row G5.
+
+A rider with no kept attitude (after a spin or flip, row G20c3c2) still lands by the port's rules.
+
+Checked on gari's flat snow:
+- level and forwards: clean;
+- turned round: clean too (soft and slow enough, as `Landing_ChooseState` has it), riding switch;
+- nose up 50° (the roll under −π/4): hard (clip 0x242);
+- falling 30 m/s into the snow (over 27.77): hard (clip 0x23e);
+- an uber cut short (a clip of type 0xe without flag 4): refused, down.
+
+Leaning back 60° or nose down 120° puts the rider down by the air wall instead, as the game would: the body reaches
+the snow first. That is also why the unclean-roll crash cannot be staged here, and its mutant survives (the check's
+own `ok` is covered by `tests/landing.rs`). The clip-length mutant survives too, because every landing clip falls to
+the same default.
+
 ### The other respawns at the game's reset place (row G20c3b5; checked: `tests/reset_place.rs`)
 
 In the game every respawn that is not the start line, a teleport or a cast clip goes through the reset state.
