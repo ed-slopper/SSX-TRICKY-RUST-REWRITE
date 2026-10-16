@@ -391,3 +391,28 @@ the entry and the box fills in the newest one before 0x222358 plays it.
   0x188990 is a second empty printf (bank monitor and speech messages).
 - Still unclear: 0x212270 / 0x21e688 set / get audio+0x3844 (profile +0x1674, the presets set it; `Sfx_SpinTrickStart`
   reads it); 0x21e498 (schedules event 0xfa, callback 0x21e4c0); 0x225948 (music+0xfc = 0, from `Music_CancelBreak`).
+
+## Names from F1c batch 15 (proven from the code, live Ghidra)
+
+- Stream state (`SndHandle_GetState` 0x2d2c10 fills four words: state 0 waiting, 1 queued, 2 playing, 3 done or no
+  request; the ms played, req+0x14 × 1000 / rate; the ms left, (req+0x18 − req+0x14) × 1000 / rate; req+0x1c in ms):
+  `Stream_GetPlayedMs` 0x229530 and `Stream_GetTimeLeftMs` 0x229578 (0 unless playing), `Stream_IsQueued` 0x2295f8
+  (state 1), `StreamSys_GetSlotTimeLeftMs` 0x229fc8 and `StreamSys_IsSlotQueued` 0x22a088 (the slot table at +0xa50),
+  `SndHandle_IsDone` 0x22a0c8 (state 3 or an error), `SndHandle_IsPlaying` 0x22a120 (state 2, no error).
+  `SpeechSys_IsIdle` counts a playing slot as idle when under 500 ms are left.
+- Speech slots: `SpeechSlot_IsPlaying` 0x228700, `SpeechSys_IsSlotPlaying` 0x228dd0 (slot table +0x3718),
+  `SpeechSys_SetSlotHold` 0x228bb0 (+0x34c, the big-score hold above). `SndPlayOpts_InitCurrent` 0x227708
+  (`SndPlayOpts_Init` on the entry +0x24 + [+0x20] × 0x18).
+- World trigger manager (0x34370c, 40 emitter records of 0x50): `WorldTriggerMgr_Destroy` 0x22be88 (no callers found;
+  deletes it and clears the pointer) and `WorldTriggerMgr_Destruct` 0x22d168, `WorldEmitter_Construct` 0x22bec0 (the
+  record's defaults; +0x2c = 1.0, +0x30 and +0x40 = −1), `WorldTriggerMgr_ToBankProgram` 0x22c610
+  (`SoundId_ToBankProgram` on the manager), `WorldEmitter_IsSpecialKey` 0x22c638 (keys 0x61..0x63),
+  `WorldTriggerMgr_StopKey` 0x22d480 (stops every active record with that key), `WorldTriggerMgr_OtherKeyPlaying`
+  0x22dc38 (an active record with a voice, +0x40 ≠ −1, of another key), `WorldTriggerMgr_HasSameSound` 0x22dc88 (another
+  active record with the same +4, +8). These are the calls `worldemitter.rs` lists by address.
+- `Speech_GetFEModeMask` 0x22e550 (gApp+0x58: 0/1 → 1, 2 → 2, 3 → 8, 4 → 4, else 1; for `Speech_PlayFELine`).
+  `Speech_OnTimeUp` 0x234058 (`cRaceHandler::Update`, modes 3 and 5: when the clock runs out with a rider unfinished,
+  rider+0x418 < 0; roll 0xd, not mode 6, not in a replay: 0x1002037). `Sfx_OnClipPlay` 0x235778 is empty (the clip's
+  type, from `AnimCtl_PlayClip`).
+- Still unclear: 0x22e1b8 / 0x22e240 (four values from 0x22baf8 tested for 0x1c, 0x10, 0x39), 0x22e388 / 0x22e3f0 (id
+  ranges for `SoundId_ToBankProgram`), 0x233ab0 (jump table 0x3a2e30), 0x235e70.

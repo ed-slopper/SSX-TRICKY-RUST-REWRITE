@@ -3878,7 +3878,7 @@ address,size,name,system,status
 0x226e58,44,FUN_00226e58,audio?,not started
 0x227350,440,FUN_00227350,audio?,not started
 0x227508,428,FUN_00227508,audio?,not started
-0x227708,24,FUN_00227708,audio?,not started
+0x227708,24,SndPlayOpts_InitCurrent,audio?,not started
 0x2278d0,80,cSndPlayOpts::__tf,runtime,host
 0x227960,100,cSoundSys::cSoundSys,audio,not started
 0x2279c8,128,cSoundSys::~cSoundSys,audio,not started
@@ -3896,7 +3896,7 @@ address,size,name,system,status
 0x2283a8,88,SpeechSys_LoadBank,audio?,ported
 0x228400,724,Speech_PlayEvent,audio?,not started
 0x2286e8,20,SpeechSys_StopStream,audio?,not started
-0x228700,40,FUN_00228700,audio?,not started
+0x228700,40,SpeechSlot_IsPlaying,audio?,not started
 0x228728,172,SpeechSys_Init,audio?,not started
 0x2287d8,88,cSpeechSys::~cSpeechSys,render?,not started
 0x228830,168,Speech_InitLibrary,audio?,not started
@@ -3907,11 +3907,11 @@ address,size,name,system,status
 0x228ac0,40,Speech_LoadEventsForSlot,audio?,not started
 0x228ae8,156,FUN_00228ae8,audio?,not started
 0x228b88,48,FUN_00228b88,audio?,not started
-0x228bb0,48,FUN_00228bb0,audio?,ported
+0x228bb0,48,SpeechSys_SetSlotHold,audio?,ported
 0x228bd8,168,SpeechSys_Trigger,audio?,ported
 0x228c80,144,FUN_00228c80,frontend?,not started
 0x228d10,188,SpeechSys_ClearEvent,frontend?,ported
-0x228dd0,60,FUN_00228dd0,audio?,not started
+0x228dd0,60,SpeechSys_IsSlotPlaying,audio?,not started
 0x228e10,40,SpeechSys_GetBankId,audio?,ported
 0x228e38,124,StaticInit_SpeechSys,audio?,not started
 0x228eb8,80,cSpeechSys::__tf,runtime,host
@@ -3924,10 +3924,10 @@ address,size,name,system,status
 0x2293e0,176,Stream_UpdateVolume,audio?,not started
 0x229490,72,Stream_GetStatus,audio?,not started
 0x2294d8,88,Stream_GetPlayInfo,audio?,not started
-0x229530,72,FUN_00229530,audio?,not started
-0x229578,72,FUN_00229578,audio?,not started
+0x229530,72,Stream_GetPlayedMs,audio?,not started
+0x229578,72,Stream_GetTimeLeftMs,audio?,not started
 0x2295c0,52,Stream_HasReached,audio?,not started
-0x2295f8,44,FUN_002295f8,audio?,not started
+0x2295f8,44,Stream_IsQueued,audio?,not started
 0x229628,44,Stream_IsPlaying,audio?,not started
 0x229658,40,FUN_00229658,audio?,not started
 0x229680,44,Stream_GetHandle,audio?,not started
@@ -3952,12 +3952,12 @@ address,size,name,system,status
 0x229f18,72,StreamSys_Play,audio?,not started
 0x229f60,60,StreamSys_GetSlotState,audio?,not started
 0x229fa0,40,StreamSys_StopStream,audio?,ported
-0x229fc8,60,FUN_00229fc8,audio?,not started
+0x229fc8,60,StreamSys_GetSlotTimeLeftMs,audio?,not started
 0x22a008,60,StreamSys_GetPlayTime,audio?,not started
 0x22a048,60,StreamSys_HasReached,audio?,not started
-0x22a088,60,FUN_0022a088,audio?,not started
-0x22a0c8,88,FUN_0022a0c8,audio?,ported
-0x22a120,84,FUN_0022a120,audio?,not started
+0x22a088,60,StreamSys_IsSlotQueued,audio?,not started
+0x22a0c8,88,SndHandle_IsDone,audio?,ported
+0x22a120,84,SndHandle_IsPlaying,audio?,not started
 0x22a178,60,StreamSys_IsSlotPlaying,audio?,not started
 0x22a1e0,40,FUN_0022a1e0,audio?,not started
 0x22a228,40,StreamSys_SetVolume,audio?,not started
@@ -3980,27 +3980,27 @@ address,size,name,system,status
 0x22bc40,296,WorldEmitter_Falloff,audio,ported
 0x22bd68,124,StaticInit_WorldEmitter,audio?,not started
 0x22be18,108,WorldTriggerMgr_Create,audio?,not started
-0x22be88,56,FUN_0022be88,audio?,not started
-0x22bec0,76,FUN_0022bec0,audio?,not started
+0x22be88,56,WorldTriggerMgr_Destroy,audio?,not started
+0x22bec0,76,WorldEmitter_Construct,audio,not started
 0x22bf30,44,WorldEmitter_Matches,audio,ported
 0x22bf60,1600,WorldEmitter_Update,audio,ported
 0x22c5a0,108,WorldEmitter_Stop,audio,ported
-0x22c610,36,FUN_0022c610,audio?,ported
-0x22c638,12,FUN_0022c638,audio?,ported
+0x22c610,36,WorldTriggerMgr_ToBankProgram,audio?,ported
+0x22c638,12,WorldEmitter_IsSpecialKey,audio,ported
 0x22c648,2616,Audio_LoadWorldTriggerBanks,audio,ported
 0x22d080,24,WorldEmitter_Clear,audio,ported
 0x22d098,204,WorldTriggerMgr_Init,audio?,not started
-0x22d168,28,FUN_0022d168,audio?,not started
+0x22d168,28,WorldTriggerMgr_Destruct,audio?,not started
 0x22d188,48,WorldEmitter_FindFree,audio,ported
 0x22d1b8,164,WorldEmitter_Find,audio,ported
 0x22d260,272,WorldEmitter_Acquire,audio,not started
 0x22d370,152,WorldEmitter_UpdateAll,audio,ported
 0x22d408,116,WorldEmitter_StopAll,audio,ported
-0x22d480,136,FUN_0022d480,frontend?,not started
+0x22d480,136,WorldTriggerMgr_StopKey,frontend?,not started
 0x22d508,928,Sfx_PlayInstanceHit,audio?,ported
 0x22d8a8,912,SoundId_ToBankProgram,audio,not started
-0x22dc38,80,FUN_0022dc38,audio?,ported
-0x22dc88,88,FUN_0022dc88,audio?,ported
+0x22dc38,80,WorldTriggerMgr_OtherKeyPlaying,audio?,ported
+0x22dc88,88,WorldTriggerMgr_HasSameSound,audio,ported
 0x22dce0,1228,Audio_LoadChantBanks,audio,ported
 0x22e1b8,136,FUN_0022e1b8,audio?,not started
 0x22e240,44,FUN_0022e240,audio?,ported
@@ -4013,7 +4013,7 @@ address,size,name,system,status
 0x22e400,32,FUN_0022e400,race?,ported
 0x22e420,124,StaticInit_WorldTriggerMgr,other,not started
 0x22e4e0,108,Speech_PostFEEvent,frontend?,checked
-0x22e550,88,FUN_0022e550,frontend?,not started
+0x22e550,88,Speech_GetFEModeMask,frontend?,not started
 0x22e5a8,124,Speech_PlayFELine,frontend?,not started
 0x22e628,124,StaticInit_WorldTriggerMgr2,other,not started
 0x22e6a8,208,SpeechEvt_Post100200f,audio?,checked
@@ -4150,7 +4150,7 @@ address,size,name,system,status
 0x233e78,104,Speech_OnBoost,audio?,checked
 0x233ee0,272,Speech_OnCheckpoint,boarder?,checked
 0x233ff0,100,Speech_OnTenSecondsLeft,audio?,checked
-0x234058,92,FUN_00234058,audio?,checked
+0x234058,92,Speech_OnTimeUp,audio?,checked
 0x2340b8,592,Speech_OnScriptCue47,audio?,ported
 0x234308,588,Speech_OnScriptCue48,audio?,ported
 0x234558,180,FUN_00234558,audio?,checked
@@ -4172,7 +4172,7 @@ address,size,name,system,status
 0x2356a0,76,Speech_FreeCharScriptSamples,audio?,ported
 0x2356f0,32,Speech_CheckBigScore,audio?,checked
 0x235710,104,SpeechSys_IsCharScriptReady,audio?,not started
-0x235778,8,FUN_00235778,audio?,not started
+0x235778,8,Sfx_OnClipPlay,audio?,not started
 0x235780,1008,Sfx_PlayClipSound,audio,not started
 0x235b70,56,SpeechSys_StopCharScript,frontend?,ported
 0x235ba8,432,Speech_OnBigScore,audio?,checked
@@ -4209,7 +4209,7 @@ address,size,name,system,status
 0x2396f8,84,SphTree_ForEachLeaf,render?,not started
 0x239750,400,SphTree_ForEachLeafRecurse,render?,not started
 0x2398e0,80,bxSphereTree::__tf,runtime,host
-0x239930,44,FUN_00239930,render?,not started
+0x239930,44,Vec4_ScaleCopy18,render?,not started
 0x239960,448,Rle_Encode,render?,not started
 0x239b20,136,SphTree_RleDecode,render?,ported
 0x239ba8,144,SphereTree::SphereTree,world?,ported
@@ -4794,7 +4794,7 @@ address,size,name,system,status
 0x264fd8,960,cFE3D::vf6_264fd8,frontend,not started
 0x265398,956,cFE3D::vf5_265398,frontend,ported
 0x265758,44,FUN_00265758,frontend?,not started
-0x265788,28,FUN_00265788,frontend?,not started
+0x265788,28,FE3D_GetSlotChar,frontend?,not started
 0x2657a8,200,FE_SetupRaceFromMenu,frontend,not started
 0x265870,120,FE3D_CountJoinedPlayers,frontend?,not started
 0x2658e8,136,FE3D_FindCharSlot,frontend?,not started
@@ -4822,7 +4822,7 @@ address,size,name,system,status
 0x2663f8,2556,cFE3DCharacter::vf10_2663f8,frontend,not started
 0x266df8,680,cFE3DCharacter::vf12_266df8,frontend,not started
 0x2670a0,64,FE3DCharacter_LoadRider,game?,not started
-0x2670e0,8,FUN_002670e0,frontend?,not started
+0x2670e0,8,FE3DCharacter_SetSelected,frontend?,not started
 0x2670e8,784,FE3DCharacter_UpdateLighting,frontend?,not started
 0x2673f8,272,FE3DCharacter_FillLightsA,frontend?,not started
 0x267508,360,FE3DCharacter_FillLightsB,frontend?,not started
@@ -4963,7 +4963,7 @@ address,size,name,system,status
 0x26cef8,44,FEPlayer_IsPadConnected,frontend?,ported
 0x26cf28,56,FUN_0026cf28,frontend?,not started
 0x26cf60,608,cCheatCodes::Update,input,ported
-0x26d1c0,8,FUN_0026d1c0,frontend?,not started
+0x26d1c0,8,FE_SetRumbleEnabled,frontend,not started
 0x26d1c8,136,FE_RumblePad,frontend,ported
 0x26d3b8,668,cFE3DMenu::cFE3DMenu,frontend,not started
 0x26d658,8,cFE3DMenu::vf40_26d658,frontend,not started
@@ -5011,7 +5011,7 @@ address,size,name,system,status
 0x26fe50,92,FE3DWorld_FindByHash,frontend?,not started
 0x26feb0,8,thunk_FUN_002ac178,runtime,host
 0x26feb8,136,FUN_0026feb8,frontend?,not started
-0x26ff40,68,FUN_0026ff40,frontend?,not started
+0x26ff40,68,FE3DTextList_RenderAll,frontend?,not started
 0x26ff88,68,FE3D_UpdateAll,frontend?,not started
 0x270008,44,FUN_00270008,frontend?,not started
 0x270038,80,cListFE3DUpdateOp::__tf,runtime,host

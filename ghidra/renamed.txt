@@ -660,3 +660,6 @@
 21ae90 FUN_0021ae90 Sfx_RunSnowProgram
 223b70 FUN_00223b70 StreamSlot_SetVolume
 224658 FUN_00224658 SongBank_PickVariant
+22a0c8 FUN_0022a0c8 SndHandle_IsDone
+228bb0 FUN_00228bb0 SpeechSys_SetSlotHold
+234058 FUN_00234058 Speech_OnTimeUp

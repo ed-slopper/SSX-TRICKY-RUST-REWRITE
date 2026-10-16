@@ -115,3 +115,13 @@ The options page is the record at +0x570 (selection +0x584, count +0x588); its i
 ## Save-before-exit menus and card operation starts (G9n, `game/src/saveexit.rs`)
 
 `MemCardOp_StartSave` 0x1ce778 and `StartLoad` 0x1ce5b0 are one routine (save sets o+8 to 1, load to 0): the mode goes to o+0, owner vcall +0x1c4 (second vtable at o+0x428) with 1, then the card (o+0x224) vcall +0x84 with 0x80000 for the first operation (state o+0x2c = 4) or 0x27d4 (state 1), and the title string is built with sprintf into o+0x98 from two frame buffers. The three menus share a tick: overlay tick 0x1a8bd8, and while the operation state p+0x430 is 2 the operation is updated; once done its result becomes the "leave" flag and the state is cleared (the results list instead applies the career updates 0x161a98 / 0x161840 and leaves the state alone on success). A dialog answer (0x1aac08) of 2 cancels, of 1 with state 1 restarts the operation with the 0x1c4 prompt, anything else leaves. Menu A (0x1bbb30) selects among p+0x438 items skipping the separator at count-2, the last item opens the save dialog (state 1 when the profile has something to save), the others start a race by career fields. Menu B (0x1bc8a0) has five fixed items (0 and 1 set the career's pending action 0x3818 / 0x381c, 2 only when p+0x454, 3 a notice, 4 the save dialog); leaving with item 3 or 4 starts the race (0x113bb0) with career +0x3260 = 0x10 or 2. The results list (0x1b32c0) keeps a count at list+0x34 (zero when the race base +0x4f8 is set) and eight-byte entries (kind at +0xc): kind 0 depends on the career mode (1, 5, 4 each flag the HUD items differently), 1 / 2 / 5 call the race object, 3 the save dialog, 4 swaps HUD items. Test: seeded oracle, fake vtables with this-adjust halfwords, 30k cases over the five entry points.
+
+## Names from F1c batch 15 (proven from the code, live Ghidra)
+
+- `FE3D_GetSlotChar` 0x265788: the character byte of a slot (table 0x3470b8); `FE3D_FindCharSlot` searches it.
+- `FE3DCharacter_SetSelected` 0x2670e0 (+0x154): `FE3DCharSel_SetSelected` clears it on all twelve and sets the chosen one.
+- `FE_SetRumbleEnabled` 0x26d1c0 (pad object +0x48, which `FE_RumblePad` checks); 0x2a9848 sets it, rumbles, clears it.
+- `FE3DTextList_RenderAll` 0x26ff40: runs a `cListFE3DRenderTextOp` over the list (from cFE3D vf6 0x264fd8).
+- `Vec4_ScaleCopy18` 0x239930 (the same VU scale-and-store as the others).
+- Still unclear: 0x262b78..0x262ca0 (calls on gApp+0x734 → +0xa4), 0x2661e8 (+0xa1), 0x2663e8, 0x269be8, 0x26ce58 /
+  0x26ce68 (type 0x61 / 99 tests), 0x26cf28, 0x26f688 / 0x26f698, 0x265758, 0x263270, 0x265bb8.
