@@ -16,6 +16,11 @@ pub const EDGING: usize = 3; // +0x11
 pub const GRIP: usize = 5; // +0x13
 pub const JUMP: usize = 9; // +0x17
 pub const CUBIC: usize = 11; // +0x19
+/// The stability byte (+0x12: `Boarder_GetSpeedStat`, the shove), the meter drain's (+0x1b: `Boarder_DrainMeter`)
+/// and the meter gain's (+0x1d: `Boarder_AddMeter`)
+pub const STABILITY: usize = 4; // +0x12
+pub const LEAK: usize = 13; // +0x1b
+pub const METER: usize = 15; // +0x1d
 
 /// The four groups' byte positions (map at 0x335260: counts 2, 2, 2, 3): edging, speed, stability, tricks.
 pub const GROUPS: [&[usize]; 4] = [&[3, 5], &[0, 11], &[4, 8], &[6, 12, 15]];

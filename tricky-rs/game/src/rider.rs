@@ -136,7 +136,7 @@ impl Default for Stats {
     /// a body scale of 1 (no rider's)
     fn default() -> Self {
         let mut bytes = [0u8; 16];
-        for (i, f) in [(crate::stats::SPEED, 0.5), (crate::stats::EDGING, 0.5), (crate::stats::GRIP, 0.5), (crate::stats::CUBIC, 0.5), (crate::stats::JUMP, 0.75)] {
+        for (i, f) in [(crate::stats::SPEED, 0.5), (crate::stats::EDGING, 0.5), (crate::stats::GRIP, 0.5), (crate::stats::CUBIC, 0.5), (crate::stats::JUMP, 0.75), (crate::stats::STABILITY, 0.5), (crate::stats::LEAK, 0.5), (crate::stats::METER, 0.5)] {
             bytes[i] = stat_byte(f);
         }
         Self { edging: 0.5, speed: 0.5, stability: 0.5, tricks: 0.5, jump: 0.75, windup: 0.75, weight: 75.0, alpine: false, kind: 1, meter_leak: 0.5, gate: 0.7, bytes, scale: 1.0 }
@@ -506,7 +506,7 @@ impl Rider {
     /// gain at a full meter (re)opens the twenty-second uber window.
     pub fn add_meter(&mut self, units: f32) {
         let mut f = crate::boarder::Fields { meter: self.boost, uber_timer: self.uber_timer, full_count: self.full_count, ..Default::default() };
-        crate::boarder::add_meter(units, stat_byte(self.stats.tricks), &mut f);
+        crate::boarder::add_meter(units, self.stats.bytes[crate::stats::METER], &mut f);
         self.boost = f.meter;
         self.uber_timer = f.uber_timer;
         self.full_count = f.full_count;
@@ -526,7 +526,7 @@ impl Rider {
             let mut f = crate::boarder::Fields { meter: self.boost, uber_timer: self.uber_timer, full_count: self.full_count, ..Default::default() };
             // STANDIN: rider+0x424 = 1 taken as "in the air"; the drain stat (stats+0x1b) is our meter_leak
             let air = !self.grounded && self.rail.is_none();
-            crate::boarder::drain_meter(air, self.fin.is_none(), stat_byte(self.stats.meter_leak), self.tricky(), &mut f);
+            crate::boarder::drain_meter(air, self.fin.is_none(), self.stats.bytes[crate::stats::LEAK], self.tricky(), &mut f);
             self.boost = f.meter;
             self.uber_timer = f.uber_timer;
         }
@@ -846,7 +846,7 @@ impl Rider {
     /// `Boarder_GetSpeedStat` 0x11d7b0: the rider's weight in a collision: weight × (0.79599 + 2.145779 × the
     /// stability byte / 255), × (1 + 8 × the boost level).
     pub fn speed_stat(&self) -> f32 {
-        let m = stat_byte_w(self.stats.weight) as f32 * (stat_byte(self.stats.stability) as f32 * 2.145_779 * 0.003_921_569 + 0.795_99);
+        let m = stat_byte_w(self.stats.weight) as f32 * (self.stats.bytes[crate::stats::STABILITY] as f32 * 2.145_779 * 0.003_921_569 + 0.795_99);
         let lvl = if self.boosting { self.boost_level() } else { 0.0 };
         lvl * 7.999_995 * m + m
     }
@@ -900,7 +900,7 @@ impl Rider {
             crouch: c,
             x208: 0.0,
             vel: g(self.vel, 100.0),
-            jump_stat: stat_byte(self.stats.jump),
+            jump_stat: self.stats.bytes[crate::stats::JUMP],
             motion: if rail { 3 } else { 0 },
             up: g(up, 1.0),
             normal: g(normal, 1.0),

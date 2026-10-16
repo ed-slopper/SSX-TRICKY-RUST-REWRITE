@@ -1704,6 +1704,12 @@ fn ride(
     r.data = mine;
     let row_of = |d: &trickdata::RiderData| trickdata::RIDERS.iter().position(|x| std::ptr::eq(x, d)).unwrap_or(0);
     r.stats = rider::Stats::of(mine, game.training(), &trickdata::BOARDS[row_of(mine)][game.board.min(11)]);
+    // the stat bytes as `Career_SetupPlayerRider` 0x16a9d8 makes them: the base bytes moved toward 100 by the
+    // career's group levels, a fifth the board's (master: the caps, as the max-attributes cheat)
+    if let Some(levels) = game.levels {
+        let i = row_of(mine);
+        r.stats.bytes = tricky_game::stats::player_bytes(&tricky_game::stats::BASE[i], &tricky_game::stats::CAPS[i], trickdata::BOARDS[i][game.board.min(11)].bonus, levels, game.master);
+    }
     r.showoff = game.event == ui::Event::ShowOff;
     for o in opponents.0.iter_mut() {
         let d = data_of(o.character);

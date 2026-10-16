@@ -331,9 +331,13 @@ computer riders.
 - last, both: every byte b becomes b·255/100 (integers): 70 → 178, so the jump stat is 178, not our rounded 179.
 - checked: both set-ups run in the function runner on 20,000 random riders, boards, levels, cheats and modes each, the 16
   bytes bit for bit; the tables (groups, bases, caps, weights, 144 board bonuses, trickdata's attributes) equal the exe's.
-- not done: where the career's level bytes come from (training points; row G3 — the port feeds the training fraction
-  between each group's start and cap, STANDIN), the computer riders' value (their rival level, row G20a2), and the stat
-  bytes other code still takes from the port's floats (tricks → `Boarder_AddMeter`, wind-up, gate, stability).
+- since G20a2a: the app's player has the bytes from the career (`Career_SetupPlayerRider`'s levels are the slot's
+  character record +0xc..+0xf, the block E12d2 keeps: `ui::CareerRes::levels`, `Game::levels`; the app's "master" is
+  the max-attribute path, the caps), and `Boarder_AddMeter` (+0x1d), `Boarder_DrainMeter` (+0x1b), `Boarder_GetSpeedStat`
+  and the shove (stability +0x12) and the jump (+0x17) read `Stats::bytes` (`stats::METER`, `LEAK`, `STABILITY`, `JUMP`).
+  `Stats::default` sets those bytes from its fractions for the tests' neutral rider.
+- not done (row G20a2b): the computer riders' value (their rival level), and the wind-up (+0x18) and gate (+0x15)
+  stats, which the port still takes from its floats.
 
 ## The probe's sideways offset: stats+0x60 and rider+0x244 (board row G20b)
 

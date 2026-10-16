@@ -305,7 +305,7 @@ pub fn shove_push(from: &Rider, to: &Rider) -> Option<Vec3> {
         at: g(from.pos, 100.0, 1.0),
         heading: if from.shove_side >= 0.0 { 0.0 } else { std::f32::consts::PI },
         speed_stat: from.speed_stat(),
-        stability: crate::rider::stat_byte(from.stats.stability),
+        stability: from.stats.bytes[crate::stats::STABILITY],
     };
     let other = crate::hit::ShoveRider { pos: g(to.pos, 100.0, 1.0), vel: g(to.vel, 100.0, 0.0), at: g(to.pos, 100.0, 1.0), speed_stat: to.speed_stat(), ..me };
     let (speed, n) = crate::hit::shove(&me, &other, false)?;
