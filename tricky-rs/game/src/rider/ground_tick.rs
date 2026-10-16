@@ -498,6 +498,20 @@ pub fn rail_attitude(q: V4, normal: V4, travel: V4, lean: f32) -> V4 {
     orient::slerp(f32::from_bits(0x3daa_aaab), q, target)
 }
 
+/// `Boarder_PlaceAt` 0x11cae8's placement ray (flag 0): `World_RayCast` 0x25aff8 on the course with a `cWorldLine`
+/// (0, the place less (height + 200) cm in z, the place plus 200, kind 2), height 0 as the respawns pass it. On a hit
+/// (t > 0) the rider's position (+0x140) becomes the hit's point and its normal the hit's: both, in the game's space.
+/// None without the course's collision (a levels folder) or with no hit.
+pub fn placement_ray(world: &CollisionWorld, place: Vec3) -> Option<(V4, V4)> {
+    let course = world.course.as_ref()?;
+    let p = to_game(place, 100.0, 1.0);
+    let from = [p[0], p[1], p[2] - 200.0, p[3]];
+    let to = [p[0], p[1], p[2] + 200.0, p[3]];
+    let mut q = crate::worldline::WorldLine::new(0.0, from, to, 2);
+    let (t, h) = course.ray_cast(&mut q, world.showoff, None, &|i| world.course_skips(i));
+    h.filter(|_| 0.0 < t).map(|h| (h.pos, h.normal))
+}
+
 /// A game direction (z up) as a port direction (y up), the other way of [`game_dir`].
 pub fn port_dir(v: V4) -> Vec3 {
     to_port(v, 1.0)

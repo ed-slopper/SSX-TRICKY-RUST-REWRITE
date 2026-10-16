@@ -410,6 +410,9 @@ pub struct Rider {
     pub knocks: f32,
     /// +0x460: the rider's index in the race (0 the player, the computer riders after it)
     pub slot: u32,
+    /// a placement's ray still to cast (`Boarder_PlaceAt`: the place, the game's heading): the respawn has no world,
+    /// so the rider's next step casts it
+    pub place_ray: Option<(Vec3, f32)>,
     /// ticks before this rider can be hit by another again (`Boarder_RiderCollisions`: three ticks)
     pub hit_wait: u8,
 }
@@ -432,7 +435,7 @@ impl Rider {
                last_trick: String::new(), trick_timer: 0.0, crashed: 0.0, hard_land: 0.0, crouch_v: 0.0, brake_v: 0.0, jump_c: 0.0, jump_delay: 0.0, height: 0.0,
                course_dir: None, course_pts: None, wipe: None, crash_at: None, gm: None, crash_spray: None, lean: [0.0; 3], up: [0.0, 0.0, 1.0, 0.0], recover: None, ai: false, down_t: 0.0, getup: -1.0, stumble: 0.0, wall_hit: None, speed_timer: 0.0, spin_timer: 0.0, spin_used: false, tube_class: u8::MAX, gate_p: 0.0, gate_hi: 0.0, gate_lo: 0.0, gate_still: 0.0, gate_target: 0.0, gate_speed: 0.0, gate_state: 8, gate_rock_dir: 0, band: (0.005, 0.0250417), spin_base: 0.0, flip_base: 0.0, late: false, cause: "", spin_ax: Axis::default(), flip_ax: Axis::default(), air_mode2: false, rail_off: 0.0, rail_time: 0.0, rail_halves: 0, boost_was: false, chain: 0,
                ubers: Vec::new(), uber: 0.0, uber_id: 0, uber_done: false, letters: 0, multiplier: 1,
-               sc: new_score(), tick_acc: 0.0, full_count: 0, rail_kind: 0, rail_lean: 0.0, rail_goal0: 0.0, rail_committed: 0.0, show_parts: Vec::new(), grab_scored: false, grab_tw: false, hit_wait: 0, att: None, last_hit: Default::default(), impact: 0.0, impact_n: [0.0; 4], knocks: 0.0, slot: 0 };
+               sc: new_score(), tick_acc: 0.0, full_count: 0, rail_kind: 0, rail_lean: 0.0, rail_goal0: 0.0, rail_committed: 0.0, show_parts: Vec::new(), grab_scored: false, grab_tw: false, hit_wait: 0, att: None, last_hit: Default::default(), impact: 0.0, impact_n: [0.0; 4], knocks: 0.0, slot: 0, place_ray: None };
         // the start line's `Boarder_PlaceAt` 0x11cae8 (`cBoarder::vf8` 0x116ab8: heading from the path's direction)
         r.att = Some((orient::placed_attitude(placed_heading(yaw), None), yaw));
         r
@@ -448,6 +451,7 @@ impl Rider {
     }
     fn place(&mut self, pos: Vec3, yaw: f32, game_heading: f32) {
         let at = (pos, yaw);
+        self.place_ray = Some((pos, game_heading));
         self.pos = at.0 + Vec3::Y * 1.0146;
         self.yaw = at.1;
         self.fin = None;
@@ -474,11 +478,12 @@ impl Rider {
         // `Boarder_PlaceAt` 0x11cae8 zeroes the lean record (+0x244, +0x248, +0x24c)
         self.lean = [0.0; 3];
         // `Boarder_PlaceAt` 0x11cae8 sets the normal (+0x2a0) to the ray hit's under the spawn, (0,0,1,0) when it hits
-        // nothing, and copies it to the rider's up (+0x2c0). STANDIN: no ray hit (`World_RayCast` 0x25aff8, row E7)
+        // nothing, and copies it to the rider's up (+0x2c0): flat here, and the hit's when the next step casts the ray
+        // (`place_ray`; row G20c3b4)
         self.normal = ground_tick::port_dir(ground_tick::placed_normal(None));
         self.up = ground_tick::game_dir(self.normal);
         // and its attitude (G20c3b), which the game keeps through the drop: the quaternion is only turned by the
-        // placement's ray (STANDIN: no ray hit here either, row E7), the heading and nothing else
+        // placement's ray (cast on the next step, `place_ray`), the heading and nothing else
         self.att = Some((orient::placed_attitude(game_heading, None), self.yaw));
         // `Boarder_PlaceAt` 0x11cae8: the chain banked, its meter change (−0.12) applied
         let (m, calls) = self.sc.bank_points();
@@ -979,6 +984,16 @@ impl Rider {
     /// `Boarder_GroundThrust` 0x109950, `Boarder_ForwardDrag` 0x109cb8, `Boarder_SideFriction` 0x109ef8), in the
     /// air `Air_IntegrateRK4` 0x12b340, on a rail `RailSlideMotion_Update` 0x10b0d0.
     pub fn step(&mut self, world: &CollisionWorld, rails: &Rails, input: Input, dt: f32) {
+        // `Boarder_PlaceAt`'s ray under the last placement: on a hit the rider stands at the hit point, and the board
+        // and its normal (+0x2a0, +0x2c0) are tipped to the hit's normal (else the port's drop from 1 m, flat)
+        if let Some((at, heading)) = self.place_ray.take() {
+            if let Some((p, n)) = ground_tick::placement_ray(world, at) {
+                self.pos = ground_tick::port_dir(p) * 0.01;
+                self.up = ground_tick::placed_normal(Some(n));
+                self.normal = ground_tick::port_dir(self.up);
+                self.att = Some((orient::placed_attitude(heading, Some(n)), self.yaw));
+            }
+        }
         // `cBoarder::vf7` 0x117198, before the tick's motion: the body's height eases toward the surface's (row G16)
         let motion = if self.crashed > 0.0 { 5 } else if self.rail.is_some() { 3 } else if self.grounded { 2 } else { 1 };
         self.body_height = crate::pose::ease_body_height(self.body_height, motion, crate::surface::SURFACE_TABLE[(self.surface as usize).min(19)][10]);

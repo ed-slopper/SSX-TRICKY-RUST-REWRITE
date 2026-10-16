@@ -707,6 +707,17 @@ heading) call it. `tests/placement.rs` (`respawn_at_a_heading_keeps_it_exact`) c
 real `Boarder_PlaceAt` for 3,000 headings, and that the old trip through the yaw does move some of them. The other
 respawns (the safe point, the wipe-outs' return points) still pass the port's yaw.
 
+### The placement's ray at a respawn (row G20c3b4)
+
+- `Boarder_PlaceAt` with flag 0 casts `World_RayCast` with a `cWorldLine` (0, the place less (height + 200) cm in z, the
+  place plus 200, kind 2) and, when it hits (t > 0), puts the rider at the hit point (+0x140) and takes the hit's
+  normal for +0x2a0 / +0x2c0 and the board's tip (`orient::placed_attitude`'s hit). `Rider::respawn` has no world,
+  so it leaves `Rider::place_ray` (the place, the game's heading) and the rider's next `step` casts it on the course
+  (`ground_tick::placement_ray`). With no hit, or no course (a levels folder), the port keeps its own placement: 1.0146
+  m above the place, flat, dropping (the game keeps the place itself there).
+- Seen on elysium with the disc: the race line's respawns (1 m above the line) hit and stand on the course with its
+  normal; a respawn at the port's safe point recorded mid-air (22 m up) finds nothing within 2 m, as the game's would.
+
 ### The teleport and the cast clips in the port (row G20c3b3; checked: `tests/teleport.rs`)
 
 - `teleport::teleport_target` is `Boarder_TeleportToInstance` 0x11a098 up to its `Boarder_PlaceAt` call: the side
