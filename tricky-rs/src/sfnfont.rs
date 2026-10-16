@@ -56,6 +56,15 @@ struct GlyphNode;
 fn vw(x: f32) -> Val { Val::Vw(x / 640.0 * 100.0) }
 fn vh(y: f32) -> Val { Val::Vh(y / 480.0 * 100.0) }
 
+impl SfnFonts {
+    /// Whether the fonts are loaded.
+    pub fn ready(&self) -> bool { !self.fonts.is_empty() }
+    /// A string's width in a font (0 TITLE, 1 MENU) at a scale, in 640 units.
+    pub fn width(&self, font: usize, text: &str, scale: f32) -> f32 { self.fonts.get(font).map(|f| f.width(text, scale)).unwrap_or(0.0) }
+    /// A font's line height times its own vertical scale, in 640 units.
+    pub fn line(&self, font: usize) -> f32 { self.fonts.get(font).map(|f| f.line * f.sy).unwrap_or(0.0) }
+}
+
 impl Font {
     /// A font's glyphs (what `Font_ParseSfn` 0x19c858 reads, from our export).
     fn load(dir: &std::path::Path, name: &str, images: &mut Assets<Image>) -> Option<Font> {
@@ -198,8 +207,12 @@ pub fn sfn_text(
         if *t != n { *t = n; }
     }
 
-    // build the glyphs of what changed
-    for (e, _, t, kids) in slots.iter_mut() {
+}
+
+/// Lay out the glyphs of every `SfnText` that changed (the HUD's slots and the game-driven HUD's runs).
+pub fn sfn_glyphs(mut commands: Commands, fonts: Res<SfnFonts>, texts: Query<(Entity, Ref<SfnText>, Option<&Children>)>) {
+    if fonts.fonts.is_empty() { return; }
+    for (e, t, kids) in texts.iter() {
         if !t.is_changed() { continue; }
         if let Some(kids) = kids { for k in kids.iter() { commands.entity(k).try_despawn(); } }
         let Some(f) = fonts.fonts.get(t.font) else { continue };

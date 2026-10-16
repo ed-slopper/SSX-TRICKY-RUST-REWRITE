@@ -445,3 +445,42 @@ What a HUD sprite call means as a quad, in `tricky_game::hudsprites`:
 - **Checked in the runner** (tests/fontprint.rs) on 40,000 random cases:
   - compared: every call (floats bit for bit, with the font colour each draw sees) and the font colour after;
   - the tests caught all 12 mutants.
+
+## The app's HUD from the game's code (G8j)
+
+`src/gamehud.rs` draws the in-race HUD with the ported code (the HUD overlay's constructor and update,
+`draw_player_sprites` and `draw_player_text`) on a copy of the game's memory, and shows the quads and strings they
+end in. The memory comes from:
+
+- **The executable on the player's disc** (`TRICKY_DISC`, `/SLUS_203.26`): the HUD's globals (the bands, the font
+  colour, the combo and rank tables), the layouts' initialisers, the number and time formats, and the settings the
+  constructor reads.
+- **`DATA/LANG/AMERICAN.LOC`**: the localised strings, written into the copy as `Loc_GetString` hands them out.
+- **`chars/hud/sprites.json`**: the sprite rectangles, as `SpriteSet_InitHudGameRects` lays them out (texture,
+  draw size, v0, u0, u1, v1).
+- **`sfnfont`**: the fonts. Its glyph layout is now its own system (`sfn_glyphs`), used by the app's slots and by
+  the game-drawn strings alike.
+
+**Each frame:**
+- the app's race goes into the game's fields: the meter, the tricky timer, the laps, the velocity (cm/s), racing or
+  not, the TRICKY letters, the multiplier, the timed score entries, and the riders' count;
+- the HUD state updates at the game's 60 ticks a second;
+- both draws run;
+- the quads are shown as image nodes and the strings as `SfnText` runs, stacked by the renderer layer they were
+  drawn on, then in the order drawn.
+
+Rotated quads are shown unrotated.
+
+**The constructor re-runs when the app's event changes**, since it sets the HUD's flags by the game mode.
+`TRICKY_HUDDBG=1` prints what was drawn once a second. Without the disc, the sheets or the fonts, the app's own HUD
+stays.
+
+**STANDINs** (each marked in the code), where the app does not keep the game's value:
+- the game mode from the app's event (race 5, show-off 2, free ride 1), and course 0;
+- `ScreenOverlay_Init` not run, with the HUD's sprite set and font placed by hand;
+- `gApp+0x5c` taken as TITLE.SFN and `+0x60` as MENU.SFN;
+- the app's SFN measure for `Font_MeasureAscii` / `_MeasureWide`;
+- no format arguments through `vsprintf`;
+- `Sprite_DrawTiled` drawn as one stretched quad;
+- no overlays, race path, progress, multiplier fraction, ranks or tiers;
+- the opponents only as racing or not.

@@ -21,6 +21,7 @@ mod tracks;
 mod book;
 mod particles;
 mod boardsound;
+mod gamehud;
 mod hudsprites;
 mod worldsound;
 mod sfnfont;
@@ -428,6 +429,7 @@ fn main() {
     .insert_resource(ui::CareerRes::load())
     .init_resource::<book::Book>()
     .init_resource::<hudsprites::HudSprites>()
+    .init_resource::<gamehud::GameHud>()
     .init_resource::<sfnfont::SfnFonts>()
     .init_resource::<coursemusic::CourseMusic>()
     .add_plugins(pathmusic::plugin)
@@ -444,7 +446,7 @@ fn main() {
         ui::menus,
         (trick_only_ramps, ride, rider_model, sync_visuals, animate_visuals, chase_camera).chain().run_if(|m: Res<Mode>| *m == Mode::Ride),
         fly_camera.run_if(|m: Res<Mode>| *m == Mode::Fly),
-        (switch_level, move_movers, (worldanim::world_anim, animate_objects).chain(), move_props, sky_follow, draw_rails, toggles, ui::records, ui::trick_book, (ui::hud, hudsprites::hud_sprites, sfnfont::sfn_text).chain(), (sound::course_music, coursemusic::course_music, pathmusic::path_music, sound::sound).chain(), boardsound::board_sound, (particles::particles, worldsound::world_sound).chain(), spray::spray, tracks::tracks, editor::editor, screenshot),
+        (switch_level, move_movers, (worldanim::world_anim, animate_objects).chain(), move_props, sky_follow, draw_rails, toggles, ui::records, ui::trick_book, (ui::hud, hudsprites::hud_sprites, sfnfont::sfn_text, gamehud::game_hud, sfnfont::sfn_glyphs).chain(), (sound::course_music, coursemusic::course_music, pathmusic::path_music, sound::sound).chain(), boardsound::board_sound, (particles::particles, worldsound::world_sound).chain(), spray::spray, tracks::tracks, editor::editor, screenshot),
     ).chain());
     if let Ok(path) = std::env::var("TRICKY_SHOT") {
         app.insert_resource(Shot { path, frame: 0 });
