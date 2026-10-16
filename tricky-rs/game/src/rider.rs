@@ -423,7 +423,7 @@ pub struct Rider {
     /// the landing; `seed_ground` starts the ground tick from it while the port left the yaw alone, spin and flip at
     /// zero. Dropped by the first ground tick (the game-side rider's own quaternion takes over) and by any spin or
     /// flip in the air (their landing alignment is `SpinState_Update`, rows G20c3c2 and G1a5b3b); only the wall bump
-    /// of `AirMotion_Update` 0x108378 would turn it besides (row G20c3c3: the port's air walls do not).
+    /// of `AirMotion_Update` 0x108378 turns it besides, on the course (row G20c3c3, `Rider::air_wall`).
     pub att: Option<(Orient, f32)>,
     /// the last patch the ground probe hit (rider+0x430), for `World_RayCast` on the course (row E7c3)
     pub last_hit: crate::terrain::LastHit,
@@ -1381,9 +1381,14 @@ impl Rider {
         // branch of `walls` has no original in the air (row E8o, new gap). Not after a landing (grounded: the next tick's
         // ground tick has the walls) and not for a rider already down.
         if !handled && !self.grounded && self.crashed <= 0.0 {
-            let mut q = self.pos;
-            self.walls(world, &mut q);
-            self.pos = q;
+            match &world.course {
+                Some(course) => self.air_wall(world, course),
+                None => {
+                    let mut q = self.pos;
+                    self.walls(world, &mut q);
+                    self.pos = q;
+                }
+            }
         }
 
         self.boost_was = input.boost;
@@ -1563,6 +1568,54 @@ impl Rider {
             pivot_z: 0.0,
         })
     }
+    /// The air's wall on the course (row G20c3c3): `AirMotion_Update` 0x108378's wall ray, `World_RayCast` with
+    /// `cWorldBoarder`(the body, 0) and the body's mask 0xcf (rider+0x494), then its push out of the wall and, moving
+    /// into it, the glancing bump that turns the kept attitude toward the wall and takes the velocity's part into it
+    /// away ([`crate::air_motion::wall_push`], [`crate::air_motion::wall_bump`]), or the crash. STANDIN: the body
+    /// on the bind pose ([`Rider::bind_body`]'s, row G5), and the crash as the port's air-wall wipe-out
+    fn air_wall(&mut self, world: &CollisionWorld, course: &crate::course_ground::CourseGround) {
+        let o = match &self.att {
+            Some((o, _)) => *o,
+            None => orient::placed_attitude(placed_heading(self.yaw), None),
+        };
+        let up = self.board_frame()[2];
+        let mut body = ground_tick::bind_body_at(ground_tick::to_game(self.pos, 100.0, 1.0), o.fwd, up, self.stats.scale);
+        body.x24 = 0xcf;
+        let mut q = crate::worldboarder::WorldBoarder::new(&body, 0);
+        let (t, h) = course.ray_cast(&mut q, world.showoff, None, &|i| world.course_skips(i));
+        let Some(h) = h.filter(|_| 0.0 < t) else { return };
+        self.air_wall_hit(&crate::air_motion::Ray { frac: t, point: h.pos, normal: h.normal, word: h.surface as u32 });
+    }
+
+    /// What the air's wall ray hitting `wall` does to the rider (the second half of [`Rider::air_wall`]): the push out
+    /// of it, then the glance (the kept attitude turned toward the wall, the velocity's part into it gone) or the crash
+    pub fn air_wall_hit(&mut self, wall: &crate::air_motion::Ray) {
+        let mut o = match &self.att {
+            Some((o, _)) => *o,
+            None => orient::placed_attitude(placed_heading(self.yaw), None),
+        };
+        let up = self.board_frame()[2];
+        let wall = *wall;
+        self.pos += ground_tick::port_dir(crate::air_motion::wall_push(&wall)) * 0.01;
+        let mut vel = ground_tick::to_game(self.vel, 100.0, 0.0);
+        match crate::air_motion::wall_bump(&mut vel, &mut o, up, &wall) {
+            None => {
+                self.vel = ground_tick::port_dir(vel) * 0.01;
+                self.att = Some((o, self.yaw));
+            }
+            Some(_) => {
+                let n = ground_tick::port_dir(wall.normal);
+                if self.wall_hit.is_none_or(|w| w.1 < self.vel.length()) {
+                    self.wall_hit = Some((self.pos, self.vel.length()));
+                }
+                self.crash_kind = if n.dot(Vec3::new(self.yaw.cos(), 0.0, -self.yaw.sin())) > 0.0 { 2 } else { 3 };
+                self.crash_at = Some((ground_tick::port_dir(wall.point) * 0.01, n));
+                self.cause = "air wall";
+                self.wipe_out();
+            }
+        }
+    }
+
     /// The board bone's world matrix (rider+0x4a60..+0x4a90: its x, y, z rows and its position), which
     /// `Boarder_UpdateSkeleton` 0x12ae18 copies from the skeleton and `Rail_TryCapture` / `RailSlideMotion_Update` read.
     /// STANDIN until the skeleton runs (row G5): the board's frame ([`Rider::board_frame`]) with its rows as the rail

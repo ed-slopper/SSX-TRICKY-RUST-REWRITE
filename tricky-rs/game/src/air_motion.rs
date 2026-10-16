@@ -163,6 +163,42 @@ fn crash(r: &mut AirRider, env: &mut dyn AirEnv, point: V4, normal: V4, along: f
     env.add_meter(r, s);
 }
 
+/// The air's wall ray hit (0x108a2c on, the fraction > 0): the push out of the wall, its normal × 1.1 × the fraction
+pub fn wall_push(wall: &Ray) -> V4 {
+    scale(scale(wall.normal, k(0x3f8c_cccd)), wall.frac)
+}
+
+/// Then, moving into the wall (normal · velocity `vn` < 0): a glancing hit (the wall's normal · the board's up `up`,
+/// the frame's third row, over 0.6 + 0.3 · (−vn · 0.00045), at most 0.9) turns the attitude toward the wall's normal
+/// (about up × normal, by asin of its length, at most 0x3dd67750 rad) and takes the part into the wall off the
+/// velocity; a square one is a crash: `Some(vn)` (the caller's `Boarder_Wipeout` record)
+pub fn wall_bump(vel: &mut V4, orient: &mut Orient, up: V4, wall: &Ray) -> Option<f32> {
+    let vn2 = dot(wall.normal, *vel);
+    if vn2 < 0.0 {
+        let x = vn2 * k(0xb9eb_edfb);
+        let lim = if 1.0 < x { k(0x3f66_6667) } else { x * k(0x3e99_999a) + k(0x3f19_999a) };
+        if lim < dot(wall.normal, up) {
+            let c = cross(up, wall.normal);
+            let len = dot(c, c).sqrt();
+            if k(0x3727_c5ac) < len.abs() {
+                let inv = 1.0 / len;
+                let axis = [c[0] * inv, c[1] * inv, c[2] * inv, c[3] * inv];
+                let mut a = crate::math::asin(len);
+                if k(0x3dd6_7750) < a {
+                    a = k(0x3dd6_7750);
+                }
+                let (s, co) = crate::math::sin_cos(a * 0.5);
+                orient.q = quat_multiply([co, s * axis[0], s * axis[1], s * axis[2]], orient.q);
+                update_orientation(orient);
+            }
+            *vel = sub(*vel, scale(wall.normal, vn2));
+        } else {
+            return Some(vn2);
+        }
+    }
+    None
+}
+
 /// `AirMotion_Update` 0x108378 on `r`, with the surface table `table` (`crate::surface::SURFACE_TABLE`).
 pub fn update(r: &mut AirRider, table: &[[f32; 25]; 20], env: &mut dyn AirEnv) {
     crate::air::integrate_rk4(r.timescale * k(0x3c88_8889), &mut r.pos, &mut r.vel, false);
@@ -217,31 +253,11 @@ pub fn update(r: &mut AirRider, table: &[[f32; 25]; 20], env: &mut dyn AirEnv) {
         r.mask = 0xcf;
         let wall = env.wall_ray(r);
         if 0.0 < wall.frac {
-            let push = scale(scale(wall.normal, k(0x3f8c_cccd)), wall.frac);
+            let push = wall_push(&wall);
             env.translate(r, push);
             r.pos = add(r.pos, push);
-            let vn2 = dot(wall.normal, r.vel);
-            if vn2 < 0.0 {
-                let x = vn2 * k(0xb9eb_edfb);
-                let lim = if 1.0 < x { k(0x3f66_6667) } else { x * k(0x3e99_999a) + k(0x3f19_999a) };
-                if lim < dot(wall.normal, up) {
-                    let c = cross(up, wall.normal);
-                    let len = dot(c, c).sqrt();
-                    if k(0x3727_c5ac) < len.abs() {
-                        let inv = 1.0 / len;
-                        let axis = [c[0] * inv, c[1] * inv, c[2] * inv, c[3] * inv];
-                        let mut a = crate::math::asin(len);
-                        if k(0x3dd6_7750) < a {
-                            a = k(0x3dd6_7750);
-                        }
-                        let (s, co) = crate::math::sin_cos(a * 0.5);
-                        r.orient.q = quat_multiply([co, s * axis[0], s * axis[1], s * axis[2]], r.orient.q);
-                        update_orientation(&mut r.orient);
-                    }
-                    r.vel = sub(r.vel, scale(wall.normal, vn2));
-                } else {
-                    crash(r, env, wall.point, wall.normal, vn2);
-                }
+            if let Some(vn2) = wall_bump(&mut r.vel, &mut r.orient, up, &wall) {
+                crash(r, env, wall.point, wall.normal, vn2);
             }
         }
         r.mask = 0xffff_ffff;

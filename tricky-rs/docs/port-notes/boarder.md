@@ -816,6 +816,32 @@ Checked on gari's spline 7:
 - Mutants: the tick length, the steer, the position, the motion's time, the attitude, the take-off and the switch
   to this tick are all caught.
 
+### The air's wall on the course (row G20c3c3; checked: `tests/air_wall.rs`, `tests/air_motion.rs`)
+
+The wall part of `AirMotion_Update` 0x108378 is now two functions, `air_motion::wall_push` and
+`air_motion::wall_bump`; `update` calls them, and its runner test still matches. They do this:
+- on a hit (fraction > 0) the rider is pushed out by the wall's normal × 1.1 × the fraction;
+- moving into the wall, a glance (normal · the board's up, the pose frame's z row, over 0.6 + 0.3 · (−vn ·
+  0.00045), at most 0.9) turns the attitude about up × normal by asin of its length, at most 0x3dd67750 rad
+  (0.1047), and removes the velocity's part into the wall;
+- anything else is a crash.
+
+With the course loaded, `Rider::step`'s air wall is now the game's (`Rider::air_wall`). It casts the rider's body
+(`cWorldBoarder`(body, 0), mask 0xcf as rider+0x494) at the course and hands any hit to `Rider::air_wall_hit`. That
+pushes the rider, then turns the kept attitude (`Rider::att`) and the velocity on a glance, or puts the rider down
+as the port's air-wall wipe-out on a crash. The port's sphere on the drawn mesh (`walls`) stays only without the
+course. STANDIN: the body is on the bind pose (`bind_body`, row G5).
+
+Checked on gari:
+- **A real wall:** an upright rider flying into one of its walls is put down ("air wall") by the body's real cast.
+- **A glance:** a slope (normal z 0.83) hit 5 cm deep, handed to `air_wall_hit`, pushes the rider 5.5 cm along the
+  normal. The attitude turns 0.1047 rad toward it (0.5891 → 0.4844 rad off the normal) and the part into it goes.
+- **Why the glance is handed in:** over a plane slope the body's lowest spheres are nearest the slope, and the
+  board lands (the down ray) before the 0xcf spheres reach it. A searched grid of 4,500 flights found no natural
+  glance; one needs an edge or a lip.
+- **Mutants:** the push, the glance's attitude and velocity, the crash and the switch to this path are caught. The
+  mask survives, because both sets of spheres reach that wall.
+
 ### The other respawns at the game's reset place (row G20c3b5; checked: `tests/reset_place.rs`)
 
 In the game every respawn that is not the start line, a teleport or a cast clip goes through the reset state.
