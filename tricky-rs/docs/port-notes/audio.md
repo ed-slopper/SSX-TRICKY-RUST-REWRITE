@@ -513,3 +513,17 @@ the entry and the box fills in the newest one before 0x222358 plays it.
   300 s). In the app the first segment starts at the latency (0.5 s) and the rest follow every bar.
 - Without the disc the earlier walk of `pathmusic.rs` plays (STANDIN). The music system's layers, its scheduler and
   the air loops on it are row G10b2c2.
+
+## The sound system's scheduler (G10b2c2a, `game/src/sndevents.rs`; checked: `tests/sndevents.rs`)
+
+- `cMonitor` (part of the audio system) keeps 48 events of 0x2c bytes from +0x90: in use, a period, a countdown, the
+  callback as a doubleword (a this-adjust, a vtable index or −1 for a direct call, the function or the object's
+  vtable field) and five words. `SndSys_ScheduleEvent` takes the free event at the scheduling depth (+0x88, so a
+  callback that schedules gets the next free one) and sets it (the delay as both period and countdown);
+  `SndSys_CancelEvents` clears every event with the same vtable index and, for a direct call or a differing low half,
+  the same function word.
+- Every 10 ms (`cController::vf4` 0x21eb10, unless paused at +0x8c) the tick count (+0x80) goes up and each event's
+  countdown drops by 10; under 5 its callback runs with the adjusted object and the event, a nonzero answer clearing
+  it, zero rearming it by its period. The music system's events are direct callbacks: the break 0x225958, the air loop
+  0x225850, the bank reload 0x2259d0, the fade step 0x2254f8 (the doublewords at 0x3a0090..0x3a00a8).
+- Checked in the runner on 30,000 random event tables over every function; 14 of 14 mutants caught.

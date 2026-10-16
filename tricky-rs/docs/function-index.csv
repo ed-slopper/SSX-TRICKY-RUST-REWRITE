@@ -3691,8 +3691,8 @@ address,size,name,system,status
 0x21e8d8,20,cController::~cController,audio?,not started
 0x21e8f0,220,BankInstance_Update,audio?,not started
 0x21e9d0,116,cController::vf7_21e9d0,audio?,not started
-0x21ea48,196,FUN_0021ea48,audio?,not started
-0x21eb10,96,cController::vf4_21eb10,audio?,not started
+0x21ea48,196,FUN_0021ea48,audio?,checked
+0x21eb10,96,cController::vf4_21eb10,audio?,checked
 0x21eb70,100,Audio_UpdateSystems,audio,not started
 0x21ec58,80,cController::__tf,runtime,host
 0x21eca8,52,CrowdSoundList_Construct,audio,ported
@@ -3761,22 +3761,22 @@ address,size,name,system,status
 0x222798,240,FUN_00222798,audio?,not started
 0x222888,124,StaticInit_MidiSys,audio?,not started
 0x222908,80,cMidiSys::__tf,runtime,host
-0x222998,20,SndEvent_Init,audio?,not started
-0x2229b0,28,FUN_002229b0,audio?,not started
-0x2229d0,168,SndEvent_Set,audio?,not started
-0x222a78,16,SndEvent_IsFree,audio?,not started
-0x222a88,44,SndEvent_Clear,audio?,not started
-0x222ab8,12,FUN_00222ab8,audio?,not started
-0x222ac8,12,SndEvent_Enable,audio?,not started
-0x222ad8,8,SndEvent_Disable,audio?,not started
+0x222998,20,SndEvent_Init,audio?,checked
+0x2229b0,28,FUN_002229b0,audio?,checked
+0x2229d0,168,SndEvent_Set,audio?,checked
+0x222a78,16,SndEvent_IsFree,audio?,checked
+0x222a88,44,SndEvent_Clear,audio?,checked
+0x222ab8,12,FUN_00222ab8,audio?,checked
+0x222ac8,12,SndEvent_Enable,audio?,checked
+0x222ad8,8,SndEvent_Disable,audio?,checked
 0x222ae0,48,FUN_00222ae0,audio?,not started
 0x222b10,144,cMonitor::cMonitor,audio?,not started
 0x222ba0,144,cMonitor::~cMonitor,audio?,not started
-0x222c30,32,cMonitor::vf4_222c30,audio?,not started
-0x222c50,108,SndSys_FindFreeEvent,audio?,not started
-0x222cc0,212,SndSys_ScheduleEvent,audio?,ported
-0x222db0,64,SndSys_CancelAllEvents,audio?,not started
-0x222df0,164,SndSys_CancelEvents,audio?,ported
+0x222c30,32,cMonitor::vf4_222c30,audio?,checked
+0x222c50,108,SndSys_FindFreeEvent,audio?,checked
+0x222cc0,212,SndSys_ScheduleEvent,audio?,checked
+0x222db0,64,SndSys_CancelAllEvents,audio?,checked
+0x222df0,164,SndSys_CancelEvents,audio?,checked
 0x222ef8,80,cMonitor::__tf,runtime,host
 0x222fb0,56,PathX_FindFreeSlot,audio?,not started
 0x222fe8,176,PathX_LoadBank,audio?,not started
