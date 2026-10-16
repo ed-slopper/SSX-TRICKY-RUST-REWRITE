@@ -1118,3 +1118,30 @@ The options page is the record at +0x570 (selection +0x584, count +0x588); its i
 - Checked by unit tests (`ui::tests`: a won final gives gold, 15 points, the next course and rider, the boards to 5
   points; a worse final keeps the gold; another rider starts with none; a show-off's medal) and a run of the app on
   a carried save.
+
+### The character select's board and outfit choices (row G3c; `game/src/fe_character.rs`, checked: `tests/fe_character.rs`)
+
+The 3D character (`cFE3DCharacter`) keeps its rider at +0xb0, and its board and outfit at +0x158 and +0x159. When
+either changes, a flag is set (+0x15c, +0x160). That is all `FE3DCharacter_SetBoard` 0x267c20 and `_SetOutfit`
+0x267c48 do. A "slot k" below is the career's player slot (`Career_GetPlayerSlot` 0x164318: +0x30fc, 0x44 each, any
+k), whose first byte names the player there. A player "on this rider" has a profile rider (profile word 0) equal to
++0xb0.
+- **Blocked (0x267858; player p, player q, outfit):** q wears that outfit on this rider, or p doesn't have the outfit
+  unlocked (`Career_IsUnlocked`, the record's +0x5c).
+- **Taken (0x267910; _, q, outfit):** the first half of the above alone. Its second argument is not read.
+- **Available (0x267cc0; n, outfit):** none of slots 0..n's players blocks slot n's player from the outfit, and
+  that player has it unlocked.
+- **A free outfit (0x2679a0; n, outfit, start):**
+  - With n ≤ 0: the outfit when slot n's player has it unlocked, else 0.
+  - Otherwise, when no player in slots 0..n is on this rider: the outfit as given, unchecked.
+  - Otherwise: (start + 7) mod 7 when one of those players wears outfit 0 on this rider, else 0. It doesn't look
+    for another free outfit; the result depends only on outfit 0.
+- **The choice restored (0x267b18; n):** slot n's player's board and outfit when they're on this rider, else 0 and
+  0. Each is kept only if unlocked for that player (the board by `Career_IsUnlockBitSet`, the record's +0x58). The
+  outfit then goes through the free-outfit pick with start 1, and both are set.
+- **A custom board unlocked (0x267c70; _, n, board):** the board's bit for slot n's player. The object isn't read.
+
+All of these read the unlock-everything cheat (0x3352a0) through the career's two bit tests. Checked in the runner
+on 30,000 random careers (the slots' players, profile and record pointers into the block, small profile words) and
+characters, about 3,700 calls for each of the eight functions. The answer and the character's bytes were compared.
+21 of 21 mutants were caught.

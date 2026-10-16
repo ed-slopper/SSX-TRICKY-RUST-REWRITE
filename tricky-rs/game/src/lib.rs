@@ -35,6 +35,7 @@ pub mod progress;
 pub mod ridercol;
 pub mod sfxcalc;
 pub mod fe3dstate;
+pub mod fe_character;
 pub mod fe_title;
 pub mod fe_numplayers;
 pub mod fe_modeselect;

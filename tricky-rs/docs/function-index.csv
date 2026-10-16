@@ -1289,7 +1289,7 @@ address,size,name,system,status
 0x1641f8,92,TrickBook_FirstUndoneTrick,scoring,ported
 0x164258,44,TrickBook_IsTrickDone,scoring,ported
 0x164288,140,Career_CountProfiles,frontend?,ported
-0x164318,20,Career_GetPlayerSlot,frontend?,not started
+0x164318,20,Career_GetPlayerSlot,frontend?,checked
 0x164330,56,Career_GetPlayerProfile,frontend?,ported
 0x164368,48,Career_GetAttributePoints,race?,ported
 0x164398,332,Career_SpendAttributePoint,race?,ported
@@ -4829,14 +4829,14 @@ address,size,name,system,status
 0x2673f8,272,FE3DCharacter_FillLightsA,frontend?,not started
 0x267508,360,FE3DCharacter_FillLightsB,frontend?,not started
 0x267670,488,FE3DLighting_Lerp,frontend?,not started
-0x267858,180,FE3DCharSel_IsOutfitBlocked,frontend?,not started
-0x267910,140,FE3DCharSel_IsOutfitTakenBy,frontend?,not started
-0x2679a0,376,FE3DCharSel_PickFreeOutfit,frontend?,not started
-0x267b18,260,FE3DCharSel_RestoreChoice,frontend?,not started
-0x267c20,36,FE3DCharacter_SetBoard,frontend?,not started
-0x267c48,36,FE3DCharacter_SetOutfit,frontend?,not started
-0x267c70,76,CustomBoard_IsUnlocked,frontend?,not started
-0x267cc0,200,FE3DCharSel_IsOutfitAvailable,frontend?,not started
+0x267858,180,FE3DCharSel_IsOutfitBlocked,frontend?,checked
+0x267910,140,FE3DCharSel_IsOutfitTakenBy,frontend?,checked
+0x2679a0,376,FE3DCharSel_PickFreeOutfit,frontend?,checked
+0x267b18,260,FE3DCharSel_RestoreChoice,frontend?,checked
+0x267c20,36,FE3DCharacter_SetBoard,frontend?,checked
+0x267c48,36,FE3DCharacter_SetOutfit,frontend?,checked
+0x267c70,76,CustomBoard_IsUnlocked,frontend?,checked
+0x267cc0,200,FE3DCharSel_IsOutfitAvailable,frontend?,checked
 0x267e50,80,cFE3DCharacter::__tf,runtime,host
 0x267ec8,64,cBdrLoad::__tf,runtime,host
 0x267f08,12,FUN_00267f08,frontend?,not started
