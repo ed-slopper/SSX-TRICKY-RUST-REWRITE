@@ -466,3 +466,30 @@ the entry and the box fills in the newest one before 0x222358 plays it.
   `Song_CurrentBeat` the position over a beat. 0x2249c0 says whether the song's bank is ready.
 - Checked in the runner on 30,000 random songs, music systems and ini sections over every function (the ini's answers,
   upper- and mixed-case tokens, allocations failing); 18 of 18 mutants caught.
+
+## The music system's song control (G10b2b, `game/src/musicsys.rs`; checked: `tests/musicsys.rs`)
+
+- `cMusicSys` keeps one song (+0x36f0). `MusicSys_PlaySong` 0x224e68 opens a new stream index (+0x20 up one: its
+  record copied from the settings at +8, its tables cleared, its volume the record's first byte, the defaults 100,
+  90, 50, 1, the volume scale) around `MusicSys_StartSong` 0x225090, which stops the old song, scales the stream's
+  volume (held to 0..127, the record's byte from it), clears the front end's event and creates the song
+  (`Music_CreatePathfinder` with the base path +0x1260, the name or the chosen song's +0x12e0 + 0x20 · +0x36e8, the
+  volume as it was before the scale), loads its LOOPDATA bank and marks it playing. `MusicSys_StopSong` cancels its
+  three scheduled events, its bank, resumes and deletes it.
+- PlaySong's store at +0x28 + 4 · index reaches the table pointers from +0x38 on for an index of 4 or more; the game
+  read them first, and the port keeps the machine code's order of loads and stores so it does the same.
+- Events: `Audio_MusicEvent` / `MusicSys_SetSection` pass an event to the song (the end, 10, only while playing,
+  and it stops it playing); `Music_SetPathVar`, 0x225408 (latency), `Audio_SetSongVolume`, 0x225448 / 0x225c30
+  (fade out, 4 s), `Audio_UpdateSongVolume`, `MusicSys_StopCurrent` / `Audio_ResumeSong` (pause, resume) forward to the
+  song; the front end's `Music_SetFEEvent0..5` post their event when it changes (+0x3714).
+- `MusicSys_FadeTo` sets a fade (target, the volume now, a step of a twenty-fifth of the way over the seconds) and
+  schedules its step (40 ms); the step 0x2254f8 moves the volume, writes it truncated to the song's volume byte while
+  short of the target (rising or falling), else the target's (done).
+- Breaks and air loops: `Music_ScheduleBreak` (a song not in a break; with Tricky on only when asked), its cancel,
+  `Music_ScheduleAirLoop` (at the next beat: the song, the loop program from `Song_RandomSegmentMs` with the phrase
+  +0x3704 and Tricky +0x3708, the next beat's number, a beat's ms), `Music_TryScheduleAirLoop` by the bank's state,
+  0x2259d0 (the bank reloaded unless loaded), `Music_StartTricky` / `_StopTricky`.
+- The song list: `MusicSys_CountEnabled` (+0x36ec's bits), `_SelectSong`, `Music_PrevSong`, `_NextEnabledSong`
+  (round the +0x36e0 songs to an enabled one), `Music_CountEnabledSongs` (those among the first +0x36e8).
+- Checked in the runner on 40,000 random systems over all 33 functions with the song functions running as the
+  original underneath; 20 of 20 mutants caught.

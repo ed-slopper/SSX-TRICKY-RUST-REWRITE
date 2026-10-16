@@ -3455,7 +3455,7 @@ address,size,name,system,status
 0x20a3d0,144,cBankManager::~cBankManager,audio,not started
 0x20a460,164,BankManager_LoadIfChanged,audio?,ported
 0x20a508,20,BankManager_UnloadBank,audio?,not started
-0x20a520,176,BankManager_LoadBank,audio?,not started
+0x20a520,176,BankManager_LoadBank,audio?,ported
 0x20a5d0,32,BankManager_AllocStatic,audio?,not started
 0x20a5f0,20,BankManager_FreeSlot,game?,not started
 0x20a608,28,BankManager_LinkSlots,audio?,not started
@@ -3822,40 +3822,40 @@ address,size,name,system,status
 0x224978,68,Song_CurrentBeat,audio?,checked
 0x2249c0,144,FUN_002249c0,audio?,checked
 0x224a98,496,MusicSys_Init,audio,ported
-0x224c90,100,cMusicSys::~cMusicSys,audio?,not started
+0x224c90,100,cMusicSys::~cMusicSys,audio?,checked
 0x224cf8,360,MusicSys_LoadMusicMap,audio,ported
-0x224e68,548,MusicSys_PlaySong,audio,not started
-0x225090,428,MusicSys_StartSong,audio,not started
-0x225240,28,MusicSys_StopCurrent,audio,ported
-0x225260,28,Audio_ResumeSong,audio,not started
-0x225280,148,MusicSys_StopSong,audio,not started
-0x225318,100,Audio_MusicEvent,audio,ported
-0x225380,100,MusicSys_SetSection,audio,not started
-0x2253e8,28,Music_SetPathVar,audio,ported
-0x225428,28,Audio_SetSongVolume,audio,not started
-0x225468,140,MusicSys_FadeTo,audio,not started
-0x225588,52,MusicSys_CountEnabled,audio,ported
-0x2255c0,84,MusicSys_SelectSong,audio,ported
-0x225618,68,Music_PrevSong,audio,ported
-0x225660,64,MusicSys_NextEnabledSong,audio,ported
-0x2256a0,28,Audio_UpdateSongVolume,audio,not started
-0x2256c0,168,MusicSys_LoadSongBank,audio,ported
-0x225768,112,Music_ScheduleBreak,audio,ported
-0x2257d8,120,Music_CancelBreak,audio,not started
-0x225850,40,FUN_00225850,audio?,not started
-0x225878,208,Music_ScheduleAirLoop,audio,ported
-0x225948,12,FUN_00225948,audio?,not started
-0x225958,116,Music_TryScheduleAirLoop,audio,not started
-0x2259d0,188,FUN_002259d0,audio?,not started
-0x225a90,56,Music_SetFEEvent0,audio,not started
-0x225ac8,68,Music_SetFEEvent1,audio,not started
-0x225b10,68,Music_SetFEEvent2,audio,not started
-0x225b58,68,Music_SetFEEvent3,audio,not started
-0x225ba0,68,Music_SetFEEvent5,audio,not started
-0x225be8,68,Music_SetFEEvent4,audio,not started
-0x225c40,100,Music_StartTricky,audio,not started
-0x225ca8,56,Music_StopTricky,audio,not started
-0x225ce0,60,Music_CountEnabledSongs,audio,not started
+0x224e68,548,MusicSys_PlaySong,audio,checked
+0x225090,428,MusicSys_StartSong,audio,checked
+0x225240,28,MusicSys_StopCurrent,audio,checked
+0x225260,28,Audio_ResumeSong,audio,checked
+0x225280,148,MusicSys_StopSong,audio,checked
+0x225318,100,Audio_MusicEvent,audio,checked
+0x225380,100,MusicSys_SetSection,audio,checked
+0x2253e8,28,Music_SetPathVar,audio,checked
+0x225428,28,Audio_SetSongVolume,audio,checked
+0x225468,140,MusicSys_FadeTo,audio,checked
+0x225588,52,MusicSys_CountEnabled,audio,checked
+0x2255c0,84,MusicSys_SelectSong,audio,checked
+0x225618,68,Music_PrevSong,audio,checked
+0x225660,64,MusicSys_NextEnabledSong,audio,checked
+0x2256a0,28,Audio_UpdateSongVolume,audio,checked
+0x2256c0,168,MusicSys_LoadSongBank,audio,checked
+0x225768,112,Music_ScheduleBreak,audio,checked
+0x2257d8,120,Music_CancelBreak,audio,checked
+0x225850,40,FUN_00225850,audio?,checked
+0x225878,208,Music_ScheduleAirLoop,audio,checked
+0x225948,12,FUN_00225948,audio?,checked
+0x225958,116,Music_TryScheduleAirLoop,audio,checked
+0x2259d0,188,FUN_002259d0,audio?,checked
+0x225a90,56,Music_SetFEEvent0,audio,checked
+0x225ac8,68,Music_SetFEEvent1,audio,checked
+0x225b10,68,Music_SetFEEvent2,audio,checked
+0x225b58,68,Music_SetFEEvent3,audio,checked
+0x225ba0,68,Music_SetFEEvent5,audio,checked
+0x225be8,68,Music_SetFEEvent4,audio,checked
+0x225c40,100,Music_StartTricky,audio,checked
+0x225ca8,56,Music_StopTricky,audio,checked
+0x225ce0,60,Music_CountEnabledSongs,audio,checked
 0x225d80,124,StaticInit_Music,audio?,not started
 0x225e98,48,Audio_GetSongState,audio,not started
 0x225ed0,80,cMusicSys::__tf,runtime,host
@@ -3940,7 +3940,7 @@ address,size,name,system,status
 0x229868,8,Stream_Stop,audio?,ported
 0x229870,32,Stream_GetState,audio?,ported
 0x229890,184,StreamSys_Init,audio?,not started
-0x229948,172,cStreamSys::~cStreamSys,render?,not started
+0x229948,172,cStreamSys::~cStreamSys,render?,ported
 0x2299f8,240,StreamSys_CreateStream,audio?,not started
 0x229ae8,556,SndSys_OpenStream,audio?,ported
 0x229d18,40,StreamSys_SetFile,audio?,ported

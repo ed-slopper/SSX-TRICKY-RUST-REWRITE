@@ -127,3 +127,4 @@ pub mod surfacespray;
 pub mod speechsys;
 pub mod teleport;
 pub mod musicsong;
+pub mod musicsys;
