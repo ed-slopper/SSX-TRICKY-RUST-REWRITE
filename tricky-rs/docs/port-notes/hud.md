@@ -326,3 +326,33 @@ layout tables as the sprites; a text entry's +8 flags 0x20 / 0x40 centre it on x
     Coarser changes to both are caught.
 - **Float fields in the test hold real floats.** The layout tables' flag words are floats with their low bits set:
   a small integer there would be a denormal, which the EE reads as 0.
+
+## The HUD's drawing helpers (G8i)
+
+In `tricky_game::hudsprites`, under the two big draws:
+
+- **`HUD_DrawSprite`** (x, y, the scales; the HUD, the sprite, the corner) draws the HUD's sprite set's (+0)
+  rectangle with `Sprite_DrawRectScaled`. `SpriteSet_GetRect` hands out the 28-byte rectangle at +8 + 28 × id, or
+  0x3d2060 for a negative id. `HUD_GetSpriteRect` is that on the HUD's set.
+- **`HUD_DrawBar`:**
+  - flag 1 stretches sprite 42 to w × (h − 0.5);
+  - flag 2 raises the renderer's layer by one.
+- **`HUD_DrawNumber`** (x, y, the scale, the roll; the HUD, the number, the flags) returns its width. It prints with
+  the HUD's font (+8):
+  - flags 0x20 / 0x40 centre it on x / y; otherwise 8 / 4 right- / bottom-align it;
+  - with flag 0x80 it measures each digit, and draws them in equal cells of the widest (each centred in its cell).
+    Each digit drops 200 × the roll × (2 + its place xor its digit, halved past 4), so rolling digits stagger.
+- **`HUD_FormatTime`** (hundredths) gives:
+  - Loc 0x15d for exactly 50000 (500 s, no time);
+  - Loc 0x18c when negative;
+  - the no-time string (0x38e280) from an hour up;
+  - else m:ss.cc.
+
+  **`HUD_FormatTimeSigned`** uses the same rules, with a minus format for a negative time.
+- **`HUD_ShowItem` / `_HideItem`** forward to the item at +0x10 + 4k.
+- **Checked in the runner** (tests/hudhelpers.rs) on 60,000 random calls:
+  - the inputs: inexact floats, negative and out-of-range ids, every flag, and boundary times and numbers;
+  - compared: every call out, the results, and all memory including `HUD_DrawNumber`'s frame.
+
+  The tests caught 25 of 26 mutants. The one left cannot change a result: a tie in the widest digit keeps the same
+  width either way.

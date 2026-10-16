@@ -2398,16 +2398,16 @@ address,size,name,system,status
 0x1a6998,284,StaticInit_HUD,other,not started
 0x1a6b20,20,cHUDOverlay::~cHUDOverlay,frontend,not started
 0x1a6b38,80,cHUDOverlay::__tf,runtime,host
-0x1a6ba0,236,HUD_FormatTime,hud,ported
-0x1a6c90,168,HUD_FormatTimeSigned,hud,ported
+0x1a6ba0,236,HUD_FormatTime,hud,checked
+0x1a6c90,168,HUD_FormatTimeSigned,hud,checked
 0x1a6d38,636,Font_PrintWrapped,hud,ported
 0x1a6fb8,1792,OverlayMan_Init,frontend,checked
 0x1a76b8,156,cOverlayMan::~cOverlayMan,frontend,checked
 0x1a7758,76,Overlay_HideAll,frontend,checked
 0x1a77a8,80,OverlayMan_IsAnyVisible,frontend,checked
 0x1a77f8,80,OverlayMan_IsAnyActive,frontend,checked
-0x1a7848,20,HUD_ShowItem,hud,ported
-0x1a7860,20,HUD_HideItem,hud,ported
+0x1a7848,20,HUD_ShowItem,hud,checked
+0x1a7860,20,HUD_HideItem,hud,checked
 0x1a7878,72,Overlay_SetPlayerPad,frontend,checked
 0x1a78c0,524,cOverlayMan::vf2_1a78c0,frontend,checked
 0x1a7ad0,96,cOverlayMan::vf1_1a7ad0,frontend,checked
@@ -2428,7 +2428,7 @@ address,size,name,system,status
 0x1a7e70,204,Overlay_HideForPlayer,frontend,checked
 0x1a7f40,460,Overlay_DrawItemForView,frontend,checked
 0x1a8110,460,Overlay_DrawTextForView,frontend,checked
-0x1a82e8,832,HUD_DrawNumber,hud,ported
+0x1a82e8,832,HUD_DrawNumber,hud,checked
 0x1a8638,12,Overlay_PlayTickSound,frontend,checked
 0x1a8648,12,Overlay_PlayMoveSound,frontend,checked
 0x1a8658,12,Overlay_PlayBackSound,frontend,checked
@@ -2449,7 +2449,7 @@ address,size,name,system,status
 0x1a91c8,1880,HUD_DrawScoreDelta,hud,not started
 0x1a9928,656,HUD_DrawLabelBox,hud,checked
 0x1a9bb8,968,Backdrop_DrawFrame,frontend?,checked
-0x1a9f80,268,HUD_DrawBar,hud,ported
+0x1a9f80,268,HUD_DrawBar,hud,checked
 0x1aa090,472,Dialog_Set,frontend?,ported
 0x1aa268,956,Dialog_Draw,hud?,not started
 0x1aa628,8,cBackdropOverlay::Reset,frontend,checked
@@ -2613,13 +2613,13 @@ address,size,name,system,status
 0x1bff08,92,cSaveOverlay::__tf,runtime,host
 0x1bff78,76,cBackdropOverlay::~cBackdropOverlay,frontend,ported
 0x1bffc8,80,cBackdropOverlay::__tf,runtime,host
-0x1c0020,28,HUD_GetSpriteRect,hud,not started
+0x1c0020,28,HUD_GetSpriteRect,hud,checked
 0x1c0040,8,cScreenOverlay::vf17_1c0040,frontend,not started
 0x1c0048,8,cScreenOverlay::vf16_1c0048,frontend,not started
 0x1c0050,8,cScreenOverlay::Reset,frontend,not started
 0x1c0058,8,cScreenOverlay::DrawText,frontend,not started
 0x1c0060,8,cScreenOverlay::Draw,frontend,not started
-0x1c0068,108,HUD_DrawSprite,hud,ported
+0x1c0068,108,HUD_DrawSprite,hud,checked
 0x1c0148,56,FUN_001c0148,,not started
 0x1c0180,12,cScreenOverlay::vf11_1c0180,frontend,not started
 0x1c0190,12,cScreenOverlay::vf10_1c0190,frontend,not started
@@ -3259,7 +3259,7 @@ address,size,name,system,status
 0x1f9c18,136,RiderProfile_LoadTextures,hud?,not started
 0x1f9ca0,136,LoadScreen_LoadTexturePack,frontend?,not started
 0x1f9d28,292,SpriteSet_PollLoad,hud,not started
-0x1f9e50,36,SpriteSet_GetRect,hud,ported
+0x1f9e50,36,SpriteSet_GetRect,hud,checked
 0x1f9ee8,76,FUN_001f9ee8,frontend?,not started
 0x1f9f38,340,HUD_CreateDummyTextures,hud,not started
 0x1fa108,884,SplineModelNode_Create,ai?,ported

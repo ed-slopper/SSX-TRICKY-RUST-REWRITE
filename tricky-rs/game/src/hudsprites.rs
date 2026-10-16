@@ -50,6 +50,8 @@ const PRINT: u32 = 0x19d770;
 const PRINTF: u32 = 0x19d6e0;
 const RECT: u32 = 0x1f9e50;
 const RANK: u32 = 0x19e7a0;
+const SPRINTF: u32 = 0x2fca28;
+const MEASURE_ASCII: u32 = 0x19da30;
 /// The captions' gold (after the alpha)
 const GOLD: [u32; 3] = [0x3f73f7cf, 0x3f3a9fbe, 0x3dd91687];
 
@@ -637,4 +639,167 @@ pub fn draw_player_sprites(m: &mut Mem, env: &mut dyn SpritesEnv, top: f32, left
             env.call(m, DRAW_NUMBER, &[hud, n as u32, corner], &[x.0, y.0, sc.0, 0.0]);
         }
     }
+}
+
+/// The rectangle a sprite set hands out for a negative id
+pub const NO_RECT: u32 = 0x3d2060;
+/// The number formats: "%d", the times "%d:%02d.%02d" / "-%d:%02d.%02d", the time past an hour ("--:--.--")
+pub const DIGIT_FORMAT: u32 = 0x38e200;
+pub const TIME_FORMAT: u32 = 0x38e290;
+pub const NEGATIVE_TIME_FORMAT: u32 = 0x38e2a0;
+pub const NO_TIME: u32 = 0x38e280;
+
+/// `SpriteSet_GetRect` 0x1f9e50 (the set, the id): its 28-byte rectangle from +8, or `NO_RECT` for a negative id
+pub fn sprite_rect(set: u32, id: i32) -> u32 {
+    if id >= 0 {
+        set.wrapping_add(8).wrapping_add((id as u32).wrapping_mul(28))
+    } else {
+        NO_RECT
+    }
+}
+
+/// `HUD_DrawSprite` 0x1c0068 (x, y, the scales; the HUD, the sprite, the corner): `Sprite_DrawRectScaled` 0x14eed0
+/// of the HUD's sprite set's (+0) rectangle (`HUD_GetSpriteRect` 0x1c0020)
+#[allow(clippy::too_many_arguments)]
+pub fn draw_sprite(m: &mut Mem, env: &mut dyn SpritesEnv, x: f32, y: f32, sx: f32, sy: f32, hud: u32, id: u32, corner: u32) {
+    let r = sprite_rect(m.r32(hud), id as i32);
+    env.call(m, 0x14eed0, &[r, corner], &[x, y, sx, sy]);
+}
+
+/// `HUD_DrawBar` 0x1a9f80 (x, y, w, h; the HUD, the flags): the blend state, then with flag 1 sprite 42 stretched to
+/// w × (h − 0.5), with flag 2 the layer up by one
+#[allow(clippy::too_many_arguments)]
+pub fn draw_bar(m: &mut Mem, env: &mut dyn SpritesEnv, x: f32, y: f32, w: f32, h: f32, hud: u32, flags: u32) {
+    env.renderer(m, 0x1e4, &[3], &[]);
+    let r = sprite_rect(m.r32(hud), 42);
+    if flags & 1 != 0 {
+        let sx = F(w) / fl(m, r + 4);
+        let sy = (F(h) - F(0.5)) / fl(m, r + 8);
+        draw_sprite(m, env, x, y, sx.0, sy.0, hud, 42, 0);
+    }
+    if flags & 2 != 0 {
+        let l = layer_now(m, env);
+        layer(m, env, l.wrapping_add(1));
+    }
+}
+
+/// `HUD_DrawNumber` 0x1a82e8 (x, y, the scale, the roll; the HUD, the number, the flags): its width. In the HUD's
+/// font (+8), aligned by the flags (0x20 / 0x40 centred on x / y, else 8 / 4 right / bottom). With flag 0x80 the
+/// digits are drawn one by one in equal cells of the widest, each bouncing down by 200 × the roll × its height
+/// (2 + its place xor its digit, halved past 4). `sp` is the game's frame there: the digits at +0, the size at
+/// +0x30, the strings at +0x40 / +0x50
+#[allow(clippy::too_many_arguments)]
+pub fn draw_number(m: &mut Mem, env: &mut dyn SpritesEnv, x: f32, y: f32, scale: f32, roll: f32, hud: u32, n: u32, flags: u32, sp: u32) -> f32 {
+    let (mut x, mut y) = (F(x), F(y));
+    let font = |m: &Mem| m.r32(hud + 8);
+    let rolling = flags & 0x80 != 0;
+    m.w32(sp + 56, 0);
+    m.w32(sp + 60, 0);
+    let (mut cell, mut tall, width);
+    let mut count = 0u32;
+    if rolling {
+        cell = F(0.0);
+        tall = F(0.0);
+        let mut v = n as i32;
+        loop {
+            let (q, r) = (v.wrapping_div(10), v.wrapping_rem(10));
+            v = q;
+            env.call(m, SPRINTF, &[sp + 64, DIGIT_FORMAT, r as u32], &[]);
+            let f = font(m);
+            env.call(m, MEASURE_ASCII, &[f, sp + 64, sp + 48], &[scale]);
+            let w = int(m.r32(sp + 56));
+            if cell.0 < w.0 {
+                cell = w;
+            }
+            let h = int(m.r32(sp + 60));
+            if tall.0 < h.0 {
+                tall = h;
+            }
+            m.w32(sp + 4 * count, r as u32);
+            count += 1;
+            if v <= 0 {
+                break;
+            }
+        }
+        width = int(count) * cell;
+    } else {
+        env.call(m, SPRINTF, &[sp + 80, DIGIT_FORMAT, n], &[]);
+        let f = font(m);
+        env.call(m, MEASURE_ASCII, &[f, sp + 80, sp + 48], &[scale]);
+        width = int(m.r32(sp + 56));
+        tall = int(m.r32(sp + 60));
+        cell = F(0.0);
+    }
+    if flags & 0x60 != 0 {
+        if flags & 0x20 != 0 {
+            x = x - width * F(0.5);
+        }
+        if flags & 0x40 != 0 {
+            y = y - tall * F(0.5);
+        }
+    } else {
+        if flags & 8 != 0 {
+            x = x - width;
+        }
+        if flags & 4 != 0 {
+            y = y - tall;
+        }
+    }
+    if rolling {
+        for k in 0..count {
+            let d = m.r32(sp + 4 * (count - k - 1));
+            let mut b = int(k ^ d) + F(2.0);
+            if 4.0 < b.0 {
+                b = b * F(0.5);
+            }
+            let dy = y + (b * F(200.0)) * F(roll);
+            env.call(m, SPRINTF, &[sp + 64, DIGIT_FORMAT, d], &[]);
+            let f = font(m);
+            let w = int(env.call(m, MEASURE_ASCII, &[f, sp + 64, 0], &[scale]).0);
+            let dx = x + (cell - w) * F(0.5);
+            x = x + cell;
+            let f = font(m);
+            env.call(m, 0x19d3f0, &[f, sp + 64], &[scale, dx.0, dy.0]);
+        }
+    } else {
+        env.call(m, SPRINTF, &[sp + 64, DIGIT_FORMAT, n], &[]);
+        let f = font(m);
+        env.call(m, 0x19d3f0, &[f, sp + 64], &[scale, x.0, y.0]);
+    }
+    width.0
+}
+
+/// `HUD_FormatTime` 0x1a6ba0 (hundredths, the buffer): 50000 is Loc 0x15d, a negative time Loc 0x18c, an hour or
+/// more `NO_TIME`, else m:ss.cc (`WStr_FormatAscii` 0x17ce70)
+pub fn format_time(m: &mut Mem, env: &mut dyn SpritesEnv, t: u32, buf: u32) {
+    let t = t as i32;
+    if t == 50000 || t < 0 {
+        let s = text(m, env, if t == 50000 { 0x15d } else { 0x18c });
+        env.call(m, 0x17ce38, &[buf, s], &[]);
+    } else if t > 359999 {
+        env.call(m, 0x17ccb8, &[buf, NO_TIME], &[]);
+    } else {
+        let secs = t / 100;
+        env.call(m, 0x17ce70, &[buf, TIME_FORMAT, (secs / 60) as u32, (secs % 60) as u32, (t % 100) as u32], &[]);
+    }
+}
+
+/// `HUD_FormatTimeSigned` 0x1a6c90 (hundredths, the buffer): an hour or more `NO_TIME`, else m:ss.cc, with a minus
+/// when negative
+pub fn format_time_signed(m: &mut Mem, env: &mut dyn SpritesEnv, t: u32, buf: u32) {
+    let t = t as i32;
+    if t > 359999 {
+        env.call(m, 0x17ccb8, &[buf, NO_TIME], &[]);
+        return;
+    }
+    let (fmt, a) = if t < 0 { (NEGATIVE_TIME_FORMAT, t.wrapping_neg()) } else { (TIME_FORMAT, t) };
+    let secs = a / 100;
+    env.call(m, 0x17ce70, &[buf, fmt, (secs / 60) as u32, (secs % 60) as u32, (a % 100) as u32], &[]);
+}
+
+/// `HUD_ShowItem` 0x1a7848 / `HUD_HideItem` 0x1a7860 (the HUD, the item, the player): the item's (+0x10 + 4k)
+/// `0x1a7db8` / `0x1a7e70`
+pub fn show_item(m: &mut Mem, env: &mut dyn SpritesEnv, o: u32, k: u32, player: u32, show: bool) {
+    let item = m.r32(o.wrapping_add(16).wrapping_add(k.wrapping_mul(4)));
+    env.call(m, if show { 0x1a7db8 } else { 0x1a7e70 }, &[item, player], &[]);
 }
