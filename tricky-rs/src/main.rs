@@ -1716,6 +1716,12 @@ fn ride(
         o.rider.data = d;
         // rivals ride their first board as rookies and the best one as masters
         o.rider.stats = rider::Stats::of(d, game.training(), &trickdata::BOARDS[row_of(d)][if game.master { 11 } else { 0 }]);
+        // `Career_SetupAIRider` 0x16ae68's bytes: the base moved toward 100 by a quarter of how much the rider
+        // dislikes the player's character (no board; master: the caps)
+        if let Some(rivals) = game.rivals {
+            let i = row_of(d);
+            o.rider.stats.bytes = tricky_game::stats::ai_bytes(&tricky_game::stats::BASE[i], &tricky_game::stats::CAPS[i], Some(rivals[i]), game.master);
+        }
     }
     if game.screen == ui::Screen::Menu { race.0.restart(); }
     // paused: nothing moves

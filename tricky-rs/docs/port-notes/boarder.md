@@ -336,8 +336,13 @@ computer riders.
   the max-attribute path, the caps), and `Boarder_AddMeter` (+0x1d), `Boarder_DrainMeter` (+0x1b), `Boarder_GetSpeedStat`
   and the shove (stability +0x12) and the jump (+0x17) read `Stats::bytes` (`stats::METER`, `LEAK`, `STABILITY`, `JUMP`).
   `Stats::default` sets those bytes from its fractions for the tests' neutral rider.
-- not done (row G20a2b): the computer riders' value (their rival level), and the wind-up (+0x18) and gate (+0x15)
-  stats, which the port still takes from its floats.
+- since G20a2b: the computer riders' bytes are `stats::ai_bytes` with the value `Career_BuildRaceRiders` 0x165cf0
+  passes `Career_SetupAIRider`: the last player's character record's word at +0x164 + 8 · the computer rider's
+  character (how much that rider dislikes the player's; `ui::CareerRes::rivals`, `Game::rivals`), with no board. The
+  wind-up (+0x18: `boarder::windup_factor`, byte · 0.32901537 / 255 + 0.8124317) and the gate start (+0x15:
+  `gate::k`, byte · 0.71808594 / 255 + 0.4875571) are read from the bytes in the port's prewind and gate, in place of
+  the rounded fraction forms (0.812 + 0.329 · wind-up, 0.4875571 + 0.71808594 · gate). The port's fractions (edging,
+  speed, stability, tricks) still drive its own riding formulas that have no stat byte yet.
 
 ## The probe's sideways offset: stats+0x60 and rider+0x244 (board row G20b)
 

@@ -21,6 +21,9 @@ pub const CUBIC: usize = 11; // +0x19
 pub const STABILITY: usize = 4; // +0x12
 pub const LEAK: usize = 13; // +0x1b
 pub const METER: usize = 15; // +0x1d
+/// The gate start's byte (+0x15: `GateAnticipateControl_*`, `gate::k`) and the wind-up's (+0x18: `PrewindState_Update`)
+pub const START: usize = 7; // +0x15
+pub const WINDUP: usize = 10; // +0x18
 
 /// The four groups' byte positions (map at 0x335260: counts 2, 2, 2, 3): edging, speed, stability, tricks.
 pub const GROUPS: [&[usize]; 4] = [&[3, 5], &[0, 11], &[4, 8], &[6, 12, 15]];

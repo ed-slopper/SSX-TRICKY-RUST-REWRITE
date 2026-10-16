@@ -136,7 +136,7 @@ impl Default for Stats {
     /// a body scale of 1 (no rider's)
     fn default() -> Self {
         let mut bytes = [0u8; 16];
-        for (i, f) in [(crate::stats::SPEED, 0.5), (crate::stats::EDGING, 0.5), (crate::stats::GRIP, 0.5), (crate::stats::CUBIC, 0.5), (crate::stats::JUMP, 0.75), (crate::stats::STABILITY, 0.5), (crate::stats::LEAK, 0.5), (crate::stats::METER, 0.5)] {
+        for (i, f) in [(crate::stats::SPEED, 0.5), (crate::stats::EDGING, 0.5), (crate::stats::GRIP, 0.5), (crate::stats::CUBIC, 0.5), (crate::stats::JUMP, 0.75), (crate::stats::STABILITY, 0.5), (crate::stats::LEAK, 0.5), (crate::stats::METER, 0.5), (crate::stats::WINDUP, 0.75), (crate::stats::START, 0.7)] {
             bytes[i] = stat_byte(f);
         }
         Self { edging: 0.5, speed: 0.5, stability: 0.5, tricks: 0.5, jump: 0.75, windup: 0.75, weight: 75.0, alpine: false, kind: 1, meter_leak: 0.5, gate: 0.7, bytes, scale: 1.0 }
@@ -167,7 +167,7 @@ impl Stats {
     pub fn brake(&self) -> f32 { 1.7513 * (0.615 + 0.918 * self.edging) }
     pub fn spin_scale(&self) -> f32 { 0.5449 + 0.6742 * self.tricks }
     pub fn spin_decay(&self) -> f32 { (0.99301 + 0.00201 * self.tricks).powi(60) }
-    pub fn wind_time(&self) -> f32 { 1.0 / (2.0005 * (0.812 + 0.329 * self.windup)) }
+    pub fn wind_time(&self) -> f32 { 1.0 / (2.0005 * crate::boarder::windup_factor(self.bytes[crate::stats::WINDUP])) }
     pub fn jump(&self, crouch: f32, speed: f32) -> f32 {
         // `Jump_ApplyImpulse` 0x1284e0, in m/s: S = 0.8809335·v + 24.678448 cm/s below 993.4801 cm/s, else 899.86835
         let by_speed = if speed < 9.934801 { 0.24678448 + 0.8809335 * speed } else { f32::from_bits(0x4460_f793) * 0.01 };
@@ -943,7 +943,7 @@ impl Rider {
     /// at the original's rates.
     pub fn prewind(&mut self, input: &Input, dt: f32) {
         // twice as quick on a rail (0x40800846 = 4.001 there)
-        let rate = if self.rail.is_some() { 4.001 } else { 2.0005 } * (0.812 + 0.329 * self.stats.windup);
+        let rate = if self.rail.is_some() { 4.001 } else { 2.0005 } * crate::boarder::windup_factor(self.stats.bytes[crate::stats::WINDUP]);
         let slew = |cur: &mut f32, target: f32| { let step = (target - *cur).abs() * rate * dt; *cur += (target - *cur).clamp(-step, step); };
         slew(&mut self.wind, input.wind.unwrap_or(input.steer));
         slew(&mut self.wind_flip, input.flip);
@@ -1526,7 +1526,7 @@ impl Rider {
         if self.gate_p == self.gate_target || self.gate_rock_dir == 0 { self.gate_rock_dir = if self.gate_p > 0.0 { -1 } else { 1 }; }
         self.gate_rock_dir
     }
-    pub fn gate_k(&self) -> f32 { (0.4875571 + 0.71808594 * self.stats.gate) * 4.437673 }
+    pub fn gate_k(&self) -> f32 { crate::gate::k(self.stats.bytes[crate::stats::START]) * 4.437673 }
     pub fn gate_move(&mut self, rate: f32, dt: f32) {
         let step = rate * dt;
         let (t, p) = (self.gate_target, self.gate_p);
@@ -1554,7 +1554,7 @@ impl Rider {
             let x = (self.gate_hi - self.gate_lo) * 20.248037 * (1.0 - self.gate_p) / (self.gate_still * 60.0 + 1.0);
             if x >= s { s = x; }
         }
-        self.gate_speed = s * (0.4875571 + 0.71808594 * self.stats.gate);
+        self.gate_speed = s * crate::gate::k(self.stats.bytes[crate::stats::START]);
         self.gate_state = 9;
         self.gate_target = 1.0;
     }

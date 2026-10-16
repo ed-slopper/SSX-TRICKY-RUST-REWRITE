@@ -105,6 +105,12 @@ impl CareerRes {
         let rec = self.0.ptr(0x3114);
         self.slot_character().map(|_| [self.0.bytes[rec + 0xc], self.0.bytes[rec + 0xd], self.0.bytes[rec + 0xe], self.0.bytes[rec + 0xf]])
     }
+    /// The slot's character record's +0x164 + 8 · character: the value `Career_BuildRaceRiders` passes
+    /// `Career_SetupAIRider` for each computer rider (`*param_3`, from the last player's record)
+    pub fn rivals(&self) -> Option<[i32; 12]> {
+        let rec = self.0.ptr(0x3114);
+        self.slot_character().map(|_| std::array::from_fn(|c| self.0.r32(rec + 0x164 + 8 * c) as i32))
+    }
     /// `Career_GetCourseMedal`: 0 gold, 1 silver, 2 bronze
     pub fn medal(&self, event: Event, key: &str) -> Option<usize> {
         let c = Self::course(key)?;
@@ -178,6 +184,7 @@ pub fn records(mut game: ResMut<Game>, race: Res<RaceRes>, rider: Res<RiderRes>,
     }
     game.points = career.points();
     game.levels = career.levels();
+    game.rivals = career.rivals();
     let done = game.screen == Screen::Results || (game.event == Event::FreeRide && race.0.state == RaceState::Finished && game.screen != Screen::Menu);
     if done && !*was {
         // the riders as they finished: the standings, or the player alone
@@ -299,6 +306,9 @@ pub struct Game {
     /// the player's character's four group levels in the career (its record's +0xc..+0xf), which its stat bytes are
     /// made from (`Career_SetupPlayerRider`)
     pub levels: Option<[u8; 4]>,
+    /// how much each character dislikes the player's (its record's +0x164 + 8 · character), the value
+    /// `Career_SetupAIRider` makes a computer rider's stat bytes with
+    pub rivals: Option<[i32; 12]>,
     /// how each computer rider (by character) feels about the player after the last heat
     pub attitude: std::collections::HashMap<usize, f32>,
     pub cursor: usize,
@@ -309,7 +319,7 @@ pub struct Game {
     pub track_step: i32,
 }
 impl Default for Game {
-    fn default() -> Self { Self { screen: Screen::Menu, event: Event::Race, round: 0, points: 0, levels: None, attitude: Default::default(), lineup: true, since: 0.0, table: Vec::new(), place: 0, master: false, cursor: 0, pause_cursor: 0, row: 0, board: std::env::var("TRICKY_BOARD").ok().and_then(|b| b.parse().ok()).unwrap_or(0), track_step: 0 } }
+    fn default() -> Self { Self { screen: Screen::Menu, event: Event::Race, round: 0, points: 0, levels: None, rivals: None, attitude: Default::default(), lineup: true, since: 0.0, table: Vec::new(), place: 0, master: false, cursor: 0, pause_cursor: 0, row: 0, board: std::env::var("TRICKY_BOARD").ok().and_then(|b| b.parse().ok()).unwrap_or(0), track_step: 0 } }
 }
 impl Game {
     pub fn opponents(&self) -> usize { if self.screen != Screen::Menu && self.event != Event::Race { 0 } else { HEAT - 1 } }

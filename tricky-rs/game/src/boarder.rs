@@ -82,6 +82,11 @@ pub fn set_crouch_target(target: f32, f: &mut Fields) {
 
 /// `PrewindState_SetWindTarget` 0x105a60 on a wind-up `[now, rate, target]` (rider+0x220 or +0x22c): the target
 /// `v` (negated when `flip`), reached at `rate` × the distance, scaled by the wind-up stat (stats+0x18).
+/// The wind-up stat's factor (stats+0x18): byte · 0.32901537 / 255 + 0.8124317
+pub(crate) fn windup_factor(windup_stat: u8) -> f32 {
+    windup_stat as f32 * 0.329_015_37 * 0.003_921_569 + 0.812_431_7
+}
+
 pub fn set_wind_target(v: f32, rate: f32, flip: bool, windup_stat: u8, wind: &mut [f32; 3]) {
     let v = if flip { -v } else { v };
     wind[2] = v;

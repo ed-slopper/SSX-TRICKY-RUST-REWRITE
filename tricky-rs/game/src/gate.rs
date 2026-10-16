@@ -30,7 +30,7 @@ pub struct Rock {
     pub high: f32,
 }
 
-fn k(start_stat: u8) -> f32 {
+pub(crate) fn k(start_stat: u8) -> f32 {
     start_stat as f32 * 0.718_085_94 * 0.003_921_569 + 0.487_557_1
 }
 
