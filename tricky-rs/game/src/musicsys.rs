@@ -35,6 +35,11 @@ pub const INI_CLOSE: u32 = 0x221788;
 pub const STREAM_SYS_DTOR: u32 = 0x229948;
 /// `SndSys_PlayPending` 0x20c948 (the system): the queued sounds played
 pub const PLAY_PENDING: u32 = 0x20c948;
+/// `Replay_IsPlaying` 0x21bfd0 (the system), `Audio_GetListenerRider` 0x20ed20 (the system, −1), `Speech_OnTricky`
+/// 0x2337c8 (the system, the rider)
+pub const REPLAY_IS_PLAYING: u32 = 0x21bfd0;
+pub const LISTENER_RIDER: u32 = 0x20ed20;
+pub const SPEECH_ON_TRICKY: u32 = 0x2337c8;
 /// A word the air loop's beat reads when a Tricky phrase runs out (clear: Tricky cancelled; set: the loop starts over)
 pub const AIR_LOOP_RESTART: u32 = 0x34308c;
 
@@ -465,6 +470,29 @@ pub fn random_segment(m: &mut Mem, e: &mut dyn SongEnv, s: u32, alt: u32, tricky
         let n = m.r32(s.wrapping_add(0x110));
         (r % n).wrapping_add(m.r32(s.wrapping_add(0x10c))).wrapping_mul(align(m))
     }
+}
+
+/// `Audio_TrickyTrigger` 0x21c610 (the system, a rider): with music on (+0x3844), a song, playing (+0x3700), no
+/// replay, the rider not finished (its +0x418 negative) and the one listened to: the rider kept (+0x6e7c), the Tricky
+/// volume (+0x6e84) 0x7f (0x5a with +0x6e50 set), `Music_StartTricky` with the rider, then `Speech_OnTricky`
+pub fn tricky_trigger(m: &mut Mem, e: &mut dyn SongEnv, sys: u32, rider: u32) {
+    if m.r32(sys + 0x3844) == 0 || cur(m, sys) == 0 || m.r32(sys + 0x3700) == 0 {
+        return;
+    }
+    if e.call(m, REPLAY_IS_PLAYING, &[sys]) != 0 {
+        return;
+    }
+    if 0 <= m.r32(rider.wrapping_add(0x418)) as i32 {
+        return;
+    }
+    if e.call(m, LISTENER_RIDER, &[sys, u32::MAX]) != rider {
+        return;
+    }
+    let quiet = m.r32(sys + 0x6e50) != 0;
+    m.w32(sys + 0x6e7c, rider);
+    m.w32(sys + 0x6e84, if quiet { 0x5a } else { 0x7f });
+    start_tricky(m, e, sys, rider);
+    e.call(m, SPEECH_ON_TRICKY, &[sys, rider]);
 }
 
 /// `Music_CancelTricky` 0x21c6c0: +0x6e7c cleared, then `Music_StopTricky`

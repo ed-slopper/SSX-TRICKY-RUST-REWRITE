@@ -145,7 +145,7 @@ impl Glue<'_> {
 
 /// STANDIN: the drawn mesh's ground across the middle of the line, for a level without the course's collision
 /// (a levels folder; row E3a4c).
-fn mesh_line(world: &CollisionWorld, from: V4, to: V4) -> (f32, CastOut) {
+pub(crate) fn mesh_line(world: &CollisionWorld, from: V4, to: V4) -> (f32, CastOut) {
     let (a, b) = (to_port(from, 0.01), to_port(to, 0.01));
     let mid = (a + b) * 0.5;
     let half = (a.y - b.y).abs() * 0.5 + 0.5;

@@ -441,6 +441,10 @@ pub struct Rider {
     /// +0x2e0: the kind of the ground probe's last hit (0 terrain, 1 an object with no surface, 2 a moving one), kept
     /// from the landing's probe into the ground tick and back
     pub hit_kind: u32,
+    /// +0x57f4: the flight's landing time `AirPredict_AtTakeoff` 0x123b10 predicts at a take-off from the snow (0
+    /// with no landing found), and the take-offs it was made for (row G10b2c2c2: what `Sfx_OnAirEnter` reads)
+    pub land_time: f32,
+    pub takeoffs: u32,
     /// ticks before this rider can be hit by another again (`Boarder_RiderCollisions`: three ticks)
     pub hit_wait: u8,
 }
@@ -463,7 +467,7 @@ impl Rider {
                last_trick: String::new(), trick_timer: 0.0, crashed: 0.0, hard_land: 0.0, crouch_v: 0.0, brake_v: 0.0, jump_c: 0.0, jump_delay: 0.0, height: 0.0,
                course_dir: None, course_pts: None, wipe: None, crash_at: None, gm: None, crash_spray: None, lean: [0.0; 3], up: [0.0, 0.0, 1.0, 0.0], recover: None, ai: false, down_t: 0.0, getup: -1.0, stumble: 0.0, wall_hit: None, speed_timer: 0.0, spin_timer: 0.0, spin_used: false, tube_class: u8::MAX, gate_p: 0.0, gate_hi: 0.0, gate_lo: 0.0, gate_still: 0.0, gate_target: 0.0, gate_speed: 0.0, gate_state: 8, gate_rock_dir: 0, band: (0.005, 0.0250417), spin_base: 0.0, flip_base: 0.0, late: false, cause: "", spin_ax: Axis::default(), flip_ax: Axis::default(), air_mode2: false, rail_off: 0.0, rail_time: 0.0, rail_halves: 0, boost_was: false, chain: 0,
                ubers: Vec::new(), uber: 0.0, uber_id: 0, uber_done: false, letters: 0, multiplier: 1,
-               sc: new_score(), tick_acc: 0.0, full_count: 0, rail_kind: 0, rail_lean: 0.0, rail_goal0: 0.0, rail_committed: 0.0, show_parts: Vec::new(), grab_scored: false, grab_tw: false, hit_wait: 0, att: None, last_hit: Default::default(), impact: 0.0, impact_n: [0.0; 4], knocks: 0.0, slot: 0, place_ray: None, hit_kind: 0 };
+               sc: new_score(), tick_acc: 0.0, full_count: 0, rail_kind: 0, rail_lean: 0.0, rail_goal0: 0.0, rail_committed: 0.0, show_parts: Vec::new(), grab_scored: false, grab_tw: false, hit_wait: 0, att: None, last_hit: Default::default(), impact: 0.0, impact_n: [0.0; 4], knocks: 0.0, slot: 0, place_ray: None, hit_kind: 0, land_time: 0.0, takeoffs: 0 };
         // the start line's `Boarder_PlaceAt` 0x11cae8 (`cBoarder::vf8` 0x116ab8: heading from the path's direction)
         r.att = Some((orient::placed_attitude(placed_heading(yaw), None), yaw));
         r
@@ -1035,7 +1039,30 @@ impl Rider {
         // the lean record moves toward the target the last tick left (`cBoarder::vf7` 0x117198, before the motion),
         // and is aimed again from this tick's steer and speed at its end (`Boarder_UpdateLeanTargets` 0x129500)
         self.lean_ease(dt);
+        let on_snow = self.grounded && self.rail.is_none() && self.crashed <= 0.0;
         self.step_tick(world, rails, input, dt);
+        // a take-off from the snow: the air motion's enter (0x108310) predicts the flight on the course
+        // (`AirPredict_AtTakeoff` 0x123b10, its rays `cWorldLine`(0, …, 0)) before `Sfx_OnAirEnter` reads it
+        if on_snow && !self.grounded && self.rail.is_none() && self.crashed <= 0.0 {
+            // (STANDIN without the course's collision, a levels folder: the drawn mesh's ground, as the wipe-out's)
+            {
+                let mut ray = |a: [f32; 4], b: [f32; 4]| match &world.course {
+                    Some(course) => {
+                        let mut q = crate::worldline::WorldLine::new(0.0, a, b, 0);
+                        let (t, h) = course.ray_cast(&mut q, world.showoff, None, &|i| world.course_skips(i));
+                        let h = h.filter(|_| t >= 0.0);
+                        (t, crate::air::RayHit { point: h.as_ref().map_or([0.0; 4], |h| h.pos), normal: h.as_ref().map_or([0.0; 4], |h| h.normal), word: h.as_ref().map_or(0, |h| h.surface as u32) })
+                    }
+                    None => {
+                        let (t, o) = wipeout::mesh_line(world, a, b);
+                        (t, crate::air::RayHit { point: o.pos, normal: o.normal, word: o.x30[1] })
+                    }
+                };
+                let p = crate::air::predict_at_takeoff(ground_tick::to_game(self.pos, 100.0, 1.0), ground_tick::to_game(self.vel, 100.0, 0.0), ground_tick::game_dir(self.normal), &mut ray);
+                self.land_time = p.t_land;
+                self.takeoffs = self.takeoffs.wrapping_add(1);
+            }
+        }
         // the wipe-out runs these a game tick at a time itself
         if self.crashed <= 0.0 && impact_tick(&mut self.impact, &mut self.impact_n, &mut self.knocks, dt * 60.0) {
             self.respawn_safe();

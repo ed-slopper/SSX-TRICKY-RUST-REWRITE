@@ -297,6 +297,8 @@ pub struct PathMusic {
     /// the air-loop layer: (phrase, next beat index, seconds to the next beat, beats left for Tricky)
     air: Option<(u32, u32, f32, i32)>,
     tricky_was: bool,
+    /// the rider's take-offs the music system has heard of (`Rider::takeoffs`)
+    takeoffs: u32,
     /// the game's music system playing the song, and the driver (shared with the audio thread)
     engine: Option<(tricky_game::musichost::MusicHost, Arc<Mutex<tricky_game::pfplay::Driver>>)>,
 }
@@ -440,7 +442,36 @@ pub fn path_music(
         s.set_volume(Volume::Linear(now + (vol - now) * (1.0 - (-10.0 * time.delta_secs()).exp())));
     }
 
-    // the air loops, one sample a beat in time with the song
+    // the air loops on the game's music system (row G10b2c2c2): a take-off whose predicted landing is over 1.5 s
+    // away asks a break (`Sfx_OnAirEnter` 0x2174f8 → `Music_ScheduleBreak`), the Tricky trigger starts Tricky
+    // (`Audio_TrickyTrigger` 0x21c610), and the sounds the air loop queues play: the LOOPDATA bank's program at
+    // the volume `SndSys_PlayPending` gives it
+    let tricky_on = r.tricky();
+    let (took_off, tricky_now) = (r.takeoffs != pm.takeoffs, tricky_on && !pm.tricky_was);
+    let loops = pm.engine.as_mut().map(|(h, d)| {
+        let mut d = d.lock().unwrap();
+        if took_off && std::env::var("TRICKY_LOOPLOG").is_ok() { println!("take-off: predicted landing in {:.2} s", r.land_time); }
+        if took_off && !menu && game.screen == ui::Screen::Playing && 1.5 < r.land_time {
+            h.schedule_break(&mut d, false);
+        }
+        if tricky_now && !menu {
+            h.tricky_trigger(&mut d, st == RaceState::Finished);
+        }
+        h.take_loops()
+    });
+    if let Some(loops) = loops {
+        pm.takeoffs = r.takeoffs;
+        pm.tricky_was = tricky_on;
+        if menu || game.screen != ui::Screen::Playing { return; }
+        for l in loops {
+            if std::env::var("TRICKY_LOOPLOG").is_ok() { println!("air loop: program {} volume {} at race time {:.2}", l.program, l.volume, race.0.time); }
+            let name = format!("{want}/loops/loops_{}.wav", l.program);
+            let h = match pm.loops.get(&name) { Some(h) => Some(h.clone()), None => std::fs::read(pm.dir.join(&name)).ok().map(|b| { let h = audio.add(AudioSource { bytes: b.into() }); pm.loops.insert(name.clone(), h.clone()); h }) };
+            if let Some(h) = h { commands.spawn((AudioPlayer::new(h), PlaybackSettings { mode: PlaybackMode::Despawn, volume: Volume::Linear(base * l.volume as f32 / 127.0), ..default() })); }
+        }
+        return;
+    }
+    // STANDIN without the disc: the app's own air loops, one sample a beat in time with the song
     if menu || pm.playing.is_none() || game.screen != ui::Screen::Playing { pm.air = None; return; }
     let beat = 60.0 / params.bpm.max(30.0);
     // Tricky: its phrase twice through when the meter fills (Audio_TrickyTrigger), longer in big air

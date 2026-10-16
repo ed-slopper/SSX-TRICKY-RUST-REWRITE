@@ -128,11 +128,19 @@ fn the_air_loop_plays_a_beat_at_a_time() {
     let mut after = Vec::new();
     run(&mut host, &mut d, 2000, &mut after);
     assert!(after.is_empty(), "stopped");
-    // Tricky: the bank's last phrase
-    host.start_tricky(&mut d, 0);
+    // Tricky through its trigger (row G10b2c2c2a): the bank's last phrase at the Tricky volume 0x7f × 90 %
+    host.tricky_trigger(&mut d, false);
     let mut tricky = Vec::new();
     run(&mut host, &mut d, 3000, &mut tricky);
     println!("Tricky: {:?}", &tricky[..tricky.len().min(4)]);
     assert!(!tricky.is_empty());
     assert_eq!(tricky[0].1.program - tricky[0].1.program % align, (phrases - 1) * align, "the last phrase");
+    assert!(tricky.iter().all(|(_, l)| l.volume == (127.0 * level as f32 / 100.0) as u8), "the Tricky volume");
+    // its phrase out and once again (the break it asked), then `Music_CancelTricky`: no more
+    let mut rest = Vec::new();
+    run(&mut host, &mut d, 10000, &mut rest);
+    println!("Tricky {} + {} sounds", tricky.len(), rest.len());
+    // (from the song's next beat to the phrase's end, then once through again)
+    let k0 = (tricky[0].1.program % align) as usize;
+    assert_eq!(tricky.len() + rest.len(), beats as usize - k0 + beats as usize, "to the phrase's end, then once again");
 }

@@ -3652,7 +3652,7 @@ address,size,name,system,status
 0x21c0a0,716,FUN_0021c0a0,audio?,ported
 0x21c4d0,64,Music_EndTricky,audio,ported
 0x21c510,224,Audio_LoadGlobalBankList,audio,ported
-0x21c610,176,Audio_TrickyTrigger,audio,ported
+0x21c610,176,Audio_TrickyTrigger,audio,checked
 0x21c6c0,12,Music_CancelTricky,audio,checked
 0x21c6d0,308,Music_UpdateMeterCues,audio,not started
 0x21c808,92,Audio_PlayFEHeld20And00,audio,not started

@@ -602,3 +602,33 @@ the entry and the box fills in the newest one before 0x222358 plays it.
   - The forced cancel stops it.
   - Tricky plays phrase 3 (programs 48..). Its volume is 0 here, because the Tricky volume +0x6e84 is set by the
     Tricky trigger, which is not ported (G10b2c2c2).
+
+## The app's air loop on the music system (G10b2c2c2a, `src/pathmusic.rs`, `game/src/rider.rs`; checked: `tests/musicsys.rs`, `tests/musichost.rs`)
+
+- `Audio_TrickyTrigger` 0x21c610 (`musicsys::tricky_trigger`) runs only when all of these hold: music is on
+  (+0x3844), there is a song, it is playing (+0x3700), no replay is playing (`Replay_IsPlaying` 0x21bfd0), the
+  rider is not finished (+0x418 negative) and it is the rider listened to (`Audio_GetListenerRider` 0x20ed20 with −1).
+  It then:
+  - keeps the rider in +0x6e7c;
+  - sets the Tricky volume +0x6e84 to 0x7f, or 0x5a when +0x6e50 is set;
+  - calls `Music_StartTricky` with the rider, then `Speech_OnTricky` 0x2337c8.
+- Checked in the runner inside the musicsys test. 6 of 6 mutants are caught.
+- The host's STANDINs for it: music on, no replay, its one rider record (only +0x418) as the listened rider, and the
+  speech call answered with nothing. With the trigger, Bassinvaders' Tricky plays the bank's last phrase at 114
+  (0x7f × AsyncLevel 90 %). It plays from the song's next beat to the phrase's end, then once through again (the
+  break it asked clears +0x3710 at the first wrap), then `Music_CancelTricky` stops it.
+- The break at take-off: the air motion's enter 0x108310 predicts the flight (`AirPredict_AtTakeoff` 0x123b10 on
+  rider+0x57b0), then calls `Sfx_OnAirEnter` 0x2174f8. For the listened rider, that asks `Music_ScheduleBreak`(audio,
+  0) when the predicted landing time is over 1.5 s. The prediction's landing time is +0x57f4, the prediction's +0x44.
+  - `sndqueue::on_air_enter` already had this call, under the misleading name `crowd_clear`.
+  - The port's rider now makes the prediction when it leaves the snow in `step` (`Rider::land_time`,
+    `Rider::takeoffs`), with the course's rays `cWorldLine`(0, …, 0). STANDIN: in a levels folder with no course
+    collision, it uses the drawn mesh's ground instead (as the wipe-out does).
+- The app: with the disc's music system, `pathmusic` handles three things itself (the app's own beat-timed loops
+  are kept only without the disc, as a STANDIN):
+  - it asks the break on such a take-off;
+  - it calls the Tricky trigger when the rider's Tricky starts;
+  - it plays each sound the host queued: `loops_<program>.wav` at the music level × its volume / 127.
+- Seen on gari (`TRICKY_LOOPLOG`, autoplay, 90 s): 33 take-offs. The first one predicted over 1.5 s (2.26 s,
+  44 s in) starts the loop on the next beat. From then on it plays one program a beat (about 0.44 s apart on
+  smartbomb) at 114, through the phrase and round, for the rest of the run, as the game's loop does.

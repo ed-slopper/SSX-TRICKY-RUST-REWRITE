@@ -35,6 +35,7 @@ const SCALE: u32 = ARENA + 0x11000;
 const EVT: u32 = ARENA + 0x9000;
 const RNG: u32 = ARENA + 0x9100;
 const V_RAND: u32 = 0x7f_0200;
+const RIDER: u32 = ARENA + 0x9200;
 const V_74: u32 = 0x7f_0000;
 const V_24: u32 = 0x7f_0100;
 const FLOATS: [f32; 8] = [120.0, 90.0, 140.5, 60.0, 0.5, 1.0, 87.25, 133.0];
@@ -72,6 +73,8 @@ impl Answers {
             song::SND_HANDLE_STATE => g.below(3),
             PICK_VARIANT => g.below(3),
             V_24 => g.below(8),
+            LISTENER_RIDER => [RIDER, 0, ARENA][g.below(3) as usize],
+            REPLAY_IS_PLAYING => g.below(2),
             _ => g.next(),
         }
     }
@@ -121,7 +124,8 @@ const LEAVES: &[(u32, usize, bool)] = &[
     (song::STREAM_SET_VOLUME, 2, false), (song::STREAM_FADE, 3, false), (song::STREAM_SET_PITCH, 2, false), (song::FMODF, 0, false),
     (SCHEDULE, 8, false), (CANCEL, 2, false), (MEMSET, 3, false), (BANK_LOAD, 4, false), (PICK_VARIANT, 1, false),
     (RANDOM_SEGMENT, 3, false), (INI_CLOSE, 2, false), (STREAM_SYS_DTOR, 2, false), (V_74, 2, false), (V_24, 1, false),
-    (PLAY_PENDING, 1, false), (V_RAND, 1, false),
+    (PLAY_PENDING, 1, false), (V_RAND, 1, false), (REPLAY_IS_PLAYING, 1, false), (LISTENER_RIDER, 2, false),
+    (SPEECH_ON_TRICKY, 2, false),
 ];
 
 const REGIONS: [(u32, u32); 5] = [(ARENA, 0x1_2000), (0x343050, 0x200), (0x39ff00, 0x200), (0, 0x400), (0x3436f0, 0x10)];
@@ -178,7 +182,7 @@ fn music_system_matches_the_original() {
         song::STRICMP, 0x223ca8, 0x223d60, 0x224368, 0x2243e8, 0x224420, 0x224458, 0x224470, 0x224488, 0x224490, 0x224498,
         0x2245b8, 0x224620, 0x224790, 0x2247c0, 0x2247f8, 0x224898, 0x224918, 0x224978, 0x225090, 0x225260, 0x225280,
         0x225318, 0x225448, 0x225660, 0x2256c0, 0x225768, 0x2257d8, 0x225878, 0x225948, 0x225ca8, 0x225e40, 0x224a50,
-        0x21c6c0, 0x2246a8, 0x224658,
+        0x21c6c0, 0x2246a8, 0x224658, 0x21c610, 0x225c40,
     ] {
         r.allow(f);
     }
@@ -232,7 +236,9 @@ fn music_system_matches_the_original() {
         r.mem.write_u16(vt + 0x20, [0u16, 4][g.below(2) as usize]);
         r.mem.write_u32(song::MUSIC_SYS, SYS);
         r.mem.write_f32(song::MASTER_VOLUME, 1.0);
-        let which = g.below(33);
+        let which = g.below(34);
+        r.mem.write_u32(RIDER + 0x418, [-1i32, 0, 3][g.below(3) as usize] as u32);
+        r.mem.write_u32(SYS + 0x6e50, g.below(2));
         // the random number generator's object, and the song's phrase counts (no remainder by 0)
         r.mem.write_u32(RAND_OBJ, RNG);
         r.mem.write_u32(RNG + 4, RNG + 0x40);
@@ -309,6 +315,7 @@ fn music_system_matches_the_original() {
             29 => (0x21c6c0, vec![SYS]),
             30 => (0x2246a8, vec![SONG, g.below(2), g.below(2)]),
             31 => (0x224658, vec![SONG]),
+            32 => (0x21c610, vec![SYS, RIDER]),
             _ => (0x224a50, vec![SONG, SYS]),
         };
         // a song for the calls that do not check it
@@ -362,6 +369,7 @@ fn music_system_matches_the_original() {
             29 => { cancel_tricky(&mut m, e, SYS); None }
             30 => Some(random_segment(&mut m, e, SONG, args[1], args[2])),
             31 => Some(pick_variant(&mut m, e, SONG)),
+            32 => { tricky_trigger(&mut m, e, SYS, RIDER); None }
             _ => { song_delay_to_sound(&mut m, SONG, SYS); None }
         };
         let mine = std::mem::take(&mut a.borrow_mut().log);

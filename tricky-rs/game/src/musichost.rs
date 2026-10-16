@@ -68,6 +68,8 @@ fn with_pf<R>(m: &mut Mem, f: impl FnOnce(&mut Pf) -> R) -> R {
 const VTABLE: u32 = TABLES + 0x3800;
 const RAND_AT: u32 = TABLES + 0x3900;
 const HOST_RAND: u32 = 0x007f_0200;
+/// The listened rider's record (STANDIN: only its +0x418, the finish time, −1 racing)
+const RIDER_AT: u32 = TABLES + 0x3a00;
 
 /// A sound of the song's LOOPDATA bank the air loop queued: the bank (the queue's kind, +0xa40), the program (its id,
 /// +0xa44) and the volume (0..127) `SndSys_PlayPending` plays it at
@@ -263,6 +265,9 @@ impl SongEnv for HostEnv<'_> {
                 m.w32(s + 0x20, i.wrapping_sub(1));
                 0
             }
+            // one player, no replay, the one rider listened to; the Tricky speech is the speech system's (STANDIN)
+            sys::REPLAY_IS_PLAYING | sys::SPEECH_ON_TRICKY => 0,
+            sys::LISTENER_RIDER => RIDER_AT,
             song::BANK_HANDLE | song::SND_HANDLE_STATE => 0,
             _ => 0,
         }
@@ -355,6 +360,8 @@ impl MusicHost {
         mem.w32(SYS + 0x385c, 1.0f32.to_bits());
         // the air loop's sounds' volume slot (+0x389c) 1.0 too
         mem.w32(SYS + 0x389c, 1.0f32.to_bits());
+        // music on (+0x3844)
+        mem.w32(SYS + 0x3844, 1);
         for (k, o) in [0x24u32, 0x38, 0x3c, 0x40, 0x64, 0x68, 0x6c, 0x70, 0x74, 0x78, 0x7c].iter().enumerate() {
             mem.w32(SYS + o, TABLES + 0x200 * k as u32);
         }
@@ -461,6 +468,13 @@ impl MusicHost {
     pub fn start_tricky(&mut self, d: &mut Driver, word: u32) {
         let (m, mut e) = self.env(d);
         sys::start_tricky(m, &mut e, SYS, word);
+    }
+
+    /// `Audio_TrickyTrigger` for the listened rider (finished or racing)
+    pub fn tricky_trigger(&mut self, d: &mut Driver, finished: bool) {
+        self.mem.w32(RIDER_AT + 0x418, if finished { 0 } else { u32::MAX });
+        let (m, mut e) = self.env(d);
+        sys::tricky_trigger(m, &mut e, SYS, RIDER_AT);
     }
 
     /// The air loop's sounds queued since the last call
