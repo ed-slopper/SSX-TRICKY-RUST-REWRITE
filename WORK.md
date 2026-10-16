@@ -1044,3 +1044,4 @@ matches the original.
 - 2026-10-15 ed-slopper/puffin: G8i done (finished and committed before the release above landed, so recorded rather than redone); G8 closed (all its splits checked; the app side opened as G8j).
 - 2026-10-15 ed-slopper/puffin: claim G8j (follow-on of G8).
 - 2026-10-15 ed-slopper/puffin: G8j done.
+- 2026-10-15 ed-slopper/puffin: the G8i release above was part of ed-slopper's sweep of claims left in progress by unfinished chats (not a request to stop or redo G8i); its work was finished and stays recorded as done.
