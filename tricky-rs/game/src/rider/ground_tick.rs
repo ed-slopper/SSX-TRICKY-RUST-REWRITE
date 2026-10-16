@@ -609,11 +609,13 @@ impl Rider {
     /// 6, put onto the hit point when the height is below 0. The hit for the port's landing, with `p` moved.
     /// STANDIN: P is the position, for the board frame times minus the pivot bone (rider+0x4aa0, the bone's
     /// +0x8c8; G5), and the probe runs from the position, for the pivot turned by half the spin and flip
-    /// (0x1085a8..0x108960); the down ray's normal is kept only on a landing (the game stores it at every hit,
-    /// row G20c2b); the side is the normal × the board's forward in its plane, for rider+0x330.
+    /// (0x1085a8..0x108960); the side is the normal × the board's forward in its plane, for rider+0x330. The down
+    /// ray's normal is the rider's at every hit (0x108588, row G20c2b).
     pub(super) fn course_landing(&mut self, world: &CollisionWorld, p: &mut Vec3) -> Option<crate::collide::GroundHit> {
         let u = self.board_up();
         let (_, n, _) = world.course_line(0.5, *p - u * 1.0, *p + u * 2.0, 1, Some(&mut self.last_hit))?;
+        // any hit's normal becomes the rider's (+0x2a0, stored at 0x108588 before the velocity is tested; row G20c2b)
+        self.normal = n;
         if self.vel.dot(n) >= 0.0 {
             return None;
         }
@@ -801,10 +803,10 @@ impl Rider {
     /// The lean record aimed for the next tick and the rider's up moved toward the normal (`Boarder_UpdateLeanTargets`
     /// 0x129500), after the tick's motion: from the steer as it is now (the game's sign: the port's is the other way),
     /// the velocity in cm/s and the normal the tick ended with.
-    /// STANDIN: in the air the normal (+0x2a0) is the port's own: the game's `AirMotion_Update` 0x108378 takes it from its
-    /// down ray whenever that hits (0x108588, `World_RayCast` 0x25aff8, rows G20c2b and E7). On a rail it is
-    /// `RailSlideMotion_Update`'s ([`rail_normal`]) and at a respawn `Boarder_PlaceAt`'s ([`placed_normal`], its ray
-    /// hit apart), row G20c2.
+    /// In the air the normal (+0x2a0) is `AirMotion_Update` 0x108378's down ray's whenever that hits ([`Rider::course_landing`],
+    /// row G20c2b; a levels folder without the course's collision keeps the port's own, STANDIN). On a rail it is
+    /// `RailSlideMotion_Update`'s ([`rail_normal`]) and at a respawn `Boarder_PlaceAt`'s ([`placed_normal`] and its ray,
+    /// [`placement_ray`]), row G20c2.
     pub fn lean_aim(&mut self) {
         let (rate, target) = lean_targets(self.lean_motion(), -self.steer, to_game(self.vel, 100.0, 0.0));
         self.lean[1] = rate;

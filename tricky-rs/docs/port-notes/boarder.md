@@ -718,6 +718,18 @@ respawns (the safe point, the wipe-outs' return points) still pass the port's ya
 - Seen on elysium with the disc: the race line's respawns (1 m above the line) hit and stand on the course with its
   normal; a respawn at the port's safe point recorded mid-air (22 m up) finds nothing within 2 m, as the game's would.
 
+### The normal in the air (row G20c2b)
+
+- `AirMotion_Update` 0x108378 stores its down ray's normal at +0x2a0 at every hit (t ≥ 0, 0x108588), before it
+  tests the velocity against it for a landing; `Rider::course_landing` now does the same on the course (a levels
+  folder keeps the port's own normal in the air). With the placement's ray (G20c3b4) the respawn's normal is the
+  game's too. The normal feeds the lean record's up (`lean_aim`), a late jump's impulse and the rider hits, as +0x2a0
+  does in the game.
+- Measured with the race self-test (`TRICKY_SIM=240`, disc) on eight courses: the first fall comes at the same place
+  and time as before; after the runs part, the autopilot (the port's own) loses the line more often on aloha (4 → 10
+  falls), megaplex (2 → 6) and elysium (2 → 6), less on mesablanca (4 → 2), the same elsewhere. The extra falls are 100
+  to 350 m off the line, where the autopilot has gone, not at the landings.
+
 ### The teleport and the cast clips in the port (row G20c3b3; checked: `tests/teleport.rs`)
 
 - `teleport::teleport_target` is `Boarder_TeleportToInstance` 0x11a098 up to its `Boarder_PlaceAt` call: the side
