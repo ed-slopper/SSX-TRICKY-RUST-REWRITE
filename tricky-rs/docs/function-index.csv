@@ -5422,15 +5422,15 @@ address,size,name,system,status
 0x299ff0,600,cFE3DStateDVDContent::vf21_299ff0,frontend,not started
 0x29a248,8,cFE3DStateDVDContent::vf25_29a248,frontend,not started
 0x29a250,8,cFE3DStateDVDContent::vf24_29a250,frontend,not started
-0x29a258,216,cFE3DStateModeSelect::CreateNextState,frontend,not started
-0x29a330,432,cFE3DStateModeSelect::vf11_29a330,frontend,not started
-0x29a4e0,288,cFE3DStateModeSelect::Activate,frontend,not started
-0x29a600,20,cFE3DStateModeSelect::vf18_29a600,frontend,not started
-0x29a618,20,cFE3DStateModeSelect::vf19_29a618,frontend,not started
-0x29a630,128,cFE3DStateModeSelect::vf20_29a630,frontend,not started
-0x29a6b0,248,cFE3DStateModeSelect::vf22_29a6b0,frontend,not started
-0x29a7a8,88,FEModeSelect_UpdateDesc,frontend?,not started
-0x29a800,196,cFE3DStateModeSelect::vf26_29a800,frontend,not started
+0x29a258,216,cFE3DStateModeSelect::CreateNextState,frontend,checked
+0x29a330,432,cFE3DStateModeSelect::vf11_29a330,frontend,checked
+0x29a4e0,288,cFE3DStateModeSelect::Activate,frontend,checked
+0x29a600,20,cFE3DStateModeSelect::vf18_29a600,frontend,checked
+0x29a618,20,cFE3DStateModeSelect::vf19_29a618,frontend,checked
+0x29a630,128,cFE3DStateModeSelect::vf20_29a630,frontend,checked
+0x29a6b0,248,cFE3DStateModeSelect::vf22_29a6b0,frontend,checked
+0x29a7a8,88,FEModeSelect_UpdateDesc,frontend?,checked
+0x29a800,196,cFE3DStateModeSelect::vf26_29a800,frontend,checked
 0x29a8c8,96,cFE3DStateNumPlayers::CreateNextState,frontend,checked
 0x29a928,544,cFE3DStateNumPlayers::vf11_29a928,frontend,checked
 0x29ab48,264,cFE3DStateNumPlayers::Activate,frontend,checked
@@ -5438,7 +5438,7 @@ address,size,name,system,status
 0x29ac68,20,cFE3DStateNumPlayers::vf20_29ac68,frontend,checked
 0x29ac80,128,cFE3DStateNumPlayers::vf22_29ac80,frontend,checked
 0x29ad00,40,cFE3DStateNumPlayers::vf26_29ad00,frontend,not started
-0x29ad28,28,FE3DNumPlayers_SetPromptText,frontend?,not started
+0x29ad28,28,FE3DNumPlayers_SetPromptText,frontend?,checked
 0x29ad48,216,cFE3DStateEventSel::CreateNextState,frontend,ported
 0x29b000,708,cFE3DStateEventSel::vf11_29b000,frontend,not started
 0x29b2c8,224,cFE3DStateEventSel::Activate,frontend,not started

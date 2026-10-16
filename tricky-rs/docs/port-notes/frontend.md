@@ -134,6 +134,49 @@ the calls in order, with colours and positions by value, the answers and the mem
 Checked in the runner on 20,000 random screens, with `highlight` on its own over 2,000. 8 of 8 mutants are caught,
 including the byte's sign once the test had items past 0x7f.
 
+### The mode select ported (row G9e; `game/src/fe_modeselect.rs`, checked: `tests/fe_modeselect.rs`)
+
+`cFE3DStateModeSelect` has a menu of three items (0, 1, 2). +0x4c is its help line.
+- **`CreateNextState`:**
+  - item 0: the event select (0x54 bytes from the heap, the base constructor, vtable 0x3b2fd0);
+  - item 1: the front end's number-of-players screen (0x265a58);
+  - item 2: one player set (0x263670), then the front end's next screen (0x265970, the character select);
+  - any other item: none.
+- **The builder (vf11):** the base widgets with the title (0x274208: 105.0, text 0xdab, 0x200a). Then the menu's
+  layout bytes +0x110..+0x116 (3, 0, 1, 2, 1, 1, 3) and the three items (texts 0xe0a, 0xe0b, 0xe0c; +0x118 1.0;
+  numbered). Then the backdrop, the pause overlay off (+0x28 0), and the menu's +0x160(1).
+- **`Activate`:** the mode select's music (0x2623d8), then the base's `Activate`. If the game booted here (0x265af8),
+  the game mode word 0x32de8c picks the item the menu opens on, then the screen's +0x40 runs:
+  - modes 1 and 6: item 0;
+  - modes 2, 3 and 7: item 1;
+  - modes 4 and 5: item 2;
+  - any other mode: the menu is left alone.
+
+  Then the screen's +0xb8 with the chosen item twice, and the help line.
+- **vf18 / vf19:** tail calls into the music: 0x262bd0, and the menu music 0x262cd8.
+- **vf20:** on item 2, or on item 1 with fewer than two players joined (0x265870), the music's 0x262ad0.
+- **vf22:**
+  - with no item going: item 1's cue (0x262840), and the front end's +0xf0 0;
+  - otherwise by the item coming:
+    - item 0: +0xf0 1, the overlay's mode 4, cue 0x2627f0;
+    - item 1: +0xf0 0, mode 5, cue 0x262840;
+    - item 2: +0xf0 2, mode 3, cue 0x262890.
+
+  Then the help line, then the base's vf22.
+- **vf26:**
+  - item 1: the fade out (+0x24) and the pause overlay (+0x28) are each on with fewer than two players joined (the
+    count is asked twice);
+  - item 0: no fade out;
+  - item 2: both on.
+
+  Then the base's vf26.
+- **The help line (0x29a7a8):** text 0xca3 for item 0, 0xca1 for item 1, 0xca2 for item 2 (via 0x2b0f68); none for
+  any other item.
+
+Checked in the runner on 20,000 random screens (about 2,500 per method; the game mode drawn from 0..9; items 0..3
+and -1), with the help line on its own over 2,000. The base's `Activate`, vf22 and vf26 run as the original. 22 of 22
+mutants are caught.
+
 ## The 3D transition and fade record (F1c, proven from the code, not ported)
 
 One record drives both the screen fades and a blend of four renderer values (read by the renderer's virtual +0x134,
