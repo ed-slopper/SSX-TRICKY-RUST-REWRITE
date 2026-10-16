@@ -545,8 +545,17 @@ Mutants: the offset, count, box words, row order, grid size and origin, and the 
 in-use words survives, and those mutants are equivalent: the walk skips a patch only when the words are zero *and*
 it has no curves, and a patch with no curves finds nothing either way.
 
-Not done here (G20c2c1b): comparing this grid with the one the game's own loader resolves in the runner, and
-wiring it into the rider's rail capture and slide in place of `Rails::nearest`.
+Compared with the game's own (row G20c2c1b2, `tests/railgrid_game.rs`): `Course_LoadRenderData` 0x25edf0 resolves
+the loaded files through the course object's (0x346488, vtable 0x3a7d50) virtual +0x2c,
+`cCourseResolve_Common::Resolve` 0x252350(object, `.ltg`, `.pbd`). Its virtuals +0x5c and +0x3c resolve the `.pbd`
+and then the `.ltg` against it (headers, materials, models, meshes, animations, instances, splines, segments,
+cameras, the hash table, the TGroups and their INodes), turning the offsets into pointers in place.
+
+Run in the function runner on gari's and elysium's own files, with every spline switched on, the real
+`Rail_ClosestPoint` 0x259330 on that resolved world equals `RailWorld::closest_point` on this grid. Three points
+were taken on each rail segment, spread 40 cm (or 300 cm); all 1,626 queries on gari and 1,326 on elysium match
+bit for bit (point, tangent, word). The builder's mutants are caught, except the four equivalent in-use words.
+The wiring into the capture and slide is rows G20c2c1b1 and G20c2c3.
 
 ## State changes (row G18; `states.rs`, checked: `tests/states.rs`)
 
