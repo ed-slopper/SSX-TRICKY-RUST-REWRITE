@@ -527,3 +527,24 @@ the entry and the box fills in the newest one before 0x222358 plays it.
   it, zero rearming it by its period. The music system's events are direct callbacks: the break 0x225958, the air loop
   0x225850, the bank reload 0x2259d0, the fade step 0x2254f8 (the doublewords at 0x3a0090..0x3a00a8).
 - Checked in the runner on 30,000 random event tables over every function; 14 of 14 mutants caught.
+
+## The race songs on the game's music system (G10b2c2b, `game/src/musichost.rs`, `src/pathmusic.rs`; checked: `tests/musichost.rs`)
+
+- With the disc the app's race song runs through the ported music system: a `cMusicSys` in the engine's memory
+  (MUSIC.INF's base path, song names and enabled songs, as `MusicSys_Init` leaves them; the stream index none yet; the
+  stream settings' volume 0x7f; the music volume's slot 1.0), and `Audio_StartRaceMusic` 0x215220 as the game calls
+  it: `MusicSys_PlaySong` with the chosen song (the app's pick, found by its PATHDATA), the bank (the enabled songs'
+  count + 8) and the music volume's slot (`SndMgr_GetSlot` 0x211f38: +0x3850 + 0xc · 1), then the section 0 and the
+  path variable 80. The song's section is read by the game's loader through the game's ini reader (BPM, the beats,
+  PathLevel ...), its graph loaded from MUSIC.BIG and registered, its track loaded.
+- Every frame: `Music_SetPathVar`, `Audio_UpdateSongVolume` (the stream volume: 0x7f × PathLevel × the music volume ×
+  the master; the app's own sink no longer applies PathLevel), the scheduler's 10 ms ticks (the break, the bank reload
+  and the fade step fire as the game's callbacks), and Pathfinder's update; the finish is `Audio_MusicEvent` 10.
+- The host answers the layers' calls: a bump heap, `memset`, `sprintf` ("%s%s"), `stricmp`, the ini reader with its
+  token buffer in memory (the loader compares the note names against that buffer after its reads, so "DelaySwitch =
+  EIGHTH" sets the delay from the token two reads on, as in the game), the disc's files, Pathfinder, the driver
+  (volume, fade, pitch as pause, status and handle state) and the scheduler. STANDIN: the banks (LOOPDATA) are not
+  loaded (row G10b2c2c).
+- Checked headless on Bassinvaders: the section's numbers as MUSIC.INF gives them (BPM 142, 4, 2, PathLevel 90,
+  AsyncLevel 90), 181 segments with no gap through the finish at 300 s, the stream volume 114 (127 × 0.9). In the
+  app the first segment starts at the latency and smartbomb's stream volume is 101 (PathLevel 80).

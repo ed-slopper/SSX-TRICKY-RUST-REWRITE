@@ -130,3 +130,4 @@ pub mod musicsong;
 pub mod musicsys;
 pub mod pfplay;
 pub mod sndevents;
+pub mod musichost;

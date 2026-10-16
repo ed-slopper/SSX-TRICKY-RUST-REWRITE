@@ -53,11 +53,16 @@ pub struct Driver {
     pub started: Vec<(u64, u32)>,
     offsets: HashMap<i32, u32>,
     pub stopped: bool,
+    /// the stream's volume (`SndStream_SetVolume`, 0..127), paused (`SndStream_SetPitch` 0), a fade out (the volume
+    /// it started from, the frames it lasts, the frames done)
+    pub volume: u8,
+    pub paused: bool,
+    pub fade: Option<(u8, u64, u64)>,
 }
 
 impl Driver {
     pub fn new(rate: u32, segments: HashMap<u32, (usize, usize)>) -> Driver {
-        Driver { rate, segments, next_handle: 1, ..Default::default() }
+        Driver { rate, segments, next_handle: 1, volume: 0x7f, ..Default::default() }
     }
     fn ms(&self, frames: usize) -> i32 {
         (frames as u64 * 1000 / self.rate.max(1) as u64) as i32
@@ -66,6 +71,22 @@ impl Driver {
     /// clock moves by `n` frames either way
     pub fn pull(&mut self, n: usize) -> Vec<(usize, usize, u8)> {
         let mut out = Vec::new();
+        if self.paused {
+            return out;
+        }
+        // the stream's volume over the request's: the fade's, else the stream's
+        let stream = match &mut self.fade {
+            Some((from, len, done)) => {
+                *done += n as u64;
+                let v = (*from as u64 * len.saturating_sub(*done) / (*len).max(1)) as u8;
+                if *done >= *len {
+                    self.queue.clear();
+                    self.cur = None;
+                }
+                v
+            }
+            None => self.volume,
+        };
         let mut left = n;
         while left > 0 {
             if self.cur.is_none() {
@@ -81,7 +102,8 @@ impl Driver {
             }
             let (r, pos) = self.cur.unwrap();
             let k = left.min(r.len - pos);
-            out.push((r.start + pos, k, r.volume));
+            let v = if r.volume <= 0x7f { (r.volume as u32 * stream as u32 / 0x7f) as u8 } else { stream };
+            out.push((r.start + pos, k, v));
             left -= k;
             if pos + k >= r.len {
                 self.cur = None;
@@ -91,6 +113,28 @@ impl Driver {
         }
         self.frames += n as u64;
         out
+    }
+}
+
+impl Driver {
+    /// `SndStream_FadeVolume` to 0 over `ms`
+    pub fn fade_out(&mut self, ms: i32) {
+        self.fade = Some((self.volume, ms.max(1) as u64 * self.rate as u64 / 1000, 0));
+    }
+    /// `SndStream_GetStatus`'s first two words: the requests on the stream, the handle playing (−1 none)
+    pub fn requests(&self) -> usize {
+        self.queue.len() + self.cur.is_some() as usize
+    }
+    pub fn handle_playing(&self) -> i32 {
+        self.cur.map_or(self.queue.front().map_or(-1, |r| r.handle), |c| c.0.handle)
+    }
+    /// `SndHandle_GetState`: (2 playing with its ms played and its length; 1 waiting; 3 done)
+    pub fn handle_state(&self, h: i32) -> (u32, i32, i32) {
+        match self.cur {
+            Some((r, p)) if r.handle == h => (2, self.ms(p), self.ms(r.len)),
+            _ if self.queue.iter().any(|r| r.handle == h) => (1, 0, 0),
+            _ => (3, 0, 0),
+        }
     }
 }
 

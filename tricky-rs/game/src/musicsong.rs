@@ -7,9 +7,11 @@
 //!
 //! A song: +0 its Pathfinder track id (−1 none), +4 the stream buffer (0x37000 bytes), +8 its bank, +0xc a volume
 //! scale (a float's address, or 0), +0x10 its volume (a signed byte), +0x14 fading out, +0x18 PATHDATA (the graph's
-//! file), +0x38 the stream's file, +0x58 the names (0x20 each, +0xf8 their count), +0xfc, +0x100 the tempo (beats a
-//! minute, 120), +0x104 / +0x108 beats a bar and bars (4, 2), +0x10c..+0x130 the section's other numbers, +0x12c its
-//! own volume (percent), +0x134 the graph (0x7000 bytes).
+//! file), +0x38 MUSDATA (the stream's file), +0x58 the LOOPDATA banks (0x20 each, +0xf8 their count), +0xfc in a
+//! break, +0x100 BPM (120), +0x104 BeatsPerMeasure (4), +0x108 MeasuresPerBar (2), +0x10c PhrasesPerbank, +0x114
+//! BeatsPerPhrase, +0x118 PhraseAlign, +0x11c DelayCount, +0x120 DelayFeedback, +0x124 DelayTime (or a note length's
+//! ms), +0x128 DelayLevel, +0x12c PathLevel (the song's volume, percent), +0x130 AsyncLevel, +0x134 the graph (0x7000
+//! bytes).
 
 use crate::pf::Mem;
 use crate::ps2f::F;
