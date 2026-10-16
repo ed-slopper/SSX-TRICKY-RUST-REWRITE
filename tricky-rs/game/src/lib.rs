@@ -53,6 +53,8 @@ pub mod fe_riderprofile;
 pub mod fe_options;
 pub mod fe_dvdcontent;
 pub mod fe_transition;
+pub mod fe_helpers;
+pub mod fe_builders;
 pub mod fe_trickbook;
 pub mod fe_username;
 pub mod sndplay;

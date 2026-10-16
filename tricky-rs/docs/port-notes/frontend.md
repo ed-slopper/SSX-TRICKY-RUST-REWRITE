@@ -785,6 +785,86 @@ buttons' icons apart from the objects the captions write later, and a nonzero wo
 be read). The survivor turns the swap's `!(0.5 <= t)` into `t < 0.5`, which only differs for a NaN, and the PS2's
 divide never makes one.
 
+### The front end's small helpers ported (row G9b2a; `game/src/fe_helpers.rs`, checked: `tests/fe_helpers.rs`)
+
+The front end's lists are intrusive. A node keeps its previous node at +4, its next at +8 and its vtable at +0xc;
++0 is the node's id, which the widgets use as their item number. A list is a head node with a tail node at +0x10
+(both with id -1) and the list's vtable (0x3b5ae8) at +0x20. The head's next is the first entry and the tail's
+previous is the last. The head points back at itself and the tail on to itself, which is how a walk knows it has
+reached an end (`ListNode_IsSentinel` 0x2abf10).
+- **The node:**
+  - `ListNode_Index` 0x2abec0 counts the steps back to the head, so the head is -1;
+  - `ListNode_Unlink` 0x2abf38 joins the neighbours, leaving one that is the node itself or none alone, and points
+    the node at itself both ways;
+  - `cListNode` vf2 0x2abf80 hands the node to an object's +0x10 (that object's vtable is at its +0).
+- **The list:**
+  - `List_Init` 0x2abfb0 and `List_Reset` 0x2ac160 set up and empty the list;
+  - `List_First` 0x2ac018 and `List_Last` 0x2ac030 give 0 for an empty list;
+  - `FE3DGroup_GetChild` 0x2ac048 gives the k-th entry (k below 1 gives the first) or 0 past the end;
+  - `FE3DGroup_FindById` 0x2ac0c0 gives the first entry with an id (the code the options port called the k-th by
+    number);
+  - `List_PushFront` 0x2ac120, `List_PushBack` 0x2ac140, `List_Count` 0x2ac1e8, and `List_DeleteAll` 0x2ac178
+    (each entry's +8(3), then reset);
+  - `cFE3DGroup` vf12 0x2abe60: while shown, an event (vtable 0x3a9fe0) taken from the group's +0xa0 (0x2ac220),
+    the group's +0x48, then the event destroyed.
+- **The thing's tweens:** the routines our ports call `ICON_COLOUR` / `ICON_FRAMES` are `FE3DThing_SetTweenStart`
+  0x2ac348 and `FE3DThing_StartTween` 0x2ac3b0. For tracks 1..6 they set the tween's start (+0x40), or its end
+  (+0x50) with the track (+0x20), frames (+0x28) and mode (+0x2c), clearing +0x18, +0x24 and +0x30. Track 5 copies
+  its vector at any alignment; the others with the quadword load and store, which take the addresses down to 16.
+- **A widget's place** (`FE3DWidget_SetWorldPos` 0x2acb20): the widget's move (+0x70) by the position less its own
+  (the VU's subtract on x, y, z; w 1).
+- **The screen stack** (the list at the front end's stacks, the finished screens at +0x24):
+  - each screen's +0x88 (0x275a70);
+  - the top's +0x90, then the finished deleted (0x275ac8);
+  - `FE_PushState` 0x275b10: the old top told of the new (+0x80), which is told of the old (+0x78);
+  - `FE_PopState` 0x275b90: the same in reverse; it answers the screen taken off;
+  - `FE_FinishState` 0x275c10: pop, +0x68, then onto the finished list;
+  - `FEStateStack_Clear` 0x275c60.
+- **The screen's players** (bits in +0x2d): `FE3DState_HasFlag` 0x271868, `FE3DState_AddPlayer` 0x271888 (a player
+  below 0 sets every bit; the bit is made as the game makes it, 0x01000000 shifted and brought down by 24) and the
+  bit cleared (0x2718c0, not in the index).
+- **The help bar's buttons:** `FE3DButtonBar_FindButton` 0x271848 (by id), and `FE3DButtonBar_SetVisible` 0x2718f0,
+  which shows each button whose id meets the mask, taking its bits off the mask as it goes, then lays the bar out.
+- **The pad's key queries** (0x26ce08..0x26cee8): accept is 0x64 or 0xd, back 0x62 or 0x1b; the others test one
+  code each (0x61, 0x63, up 0x4800, down 0x5000, left 0x4b00, right 0x4d00, 0x72, 0x52, 0x6c, 0x4c). The pad
+  record's +4 (`FEPlayer_IsPadConnected` 0x26cef8) and +8 set (0x26cf28) go through 0x17a830.
+- **0x2763f0** (`FE3D_AddToWorldList`): the widget added to the screen's world list (+0x34, 0x2abc68).
+
+Checked in the runner on 40,000 random lists (well formed, empty, or with stray links between nodes), things,
+screens and key events, about 900 for each of the 44 helpers. All 46 mutants are caught, two of them after the test added null links and an
+unaligned position. Five of the 40,000 random lists loop with no end, which the game walks forever; the test skips
+those.
+
+### The front end's shared builders ported (row G9b2b; `game/src/fe_builders.rs`, checked: `tests/fe_builders.rs`)
+
+- **`FE_CreateList2` 0x274108 (the screen's menu):** a list (0x1b0 bytes, made by 0x26d3b8, the list's vtable):
+  +0x150, +0x190 and +0x158 1, +0x15c 4.0, +0x194..+0x1a0, +0x13c and +0x154 cleared, placed at (320, 93), +0x70 1.
+- **0x2742e8 (the screen's widgets laid out and slid in; the constant our ports call `BACKDROP`):**
+  - the menu (+0x3c) is laid out and centred on its size: moved by -0.5 × +0x170, through the VU's multiply;
+  - with arrows (+0x144), the left and right arrows go to x 138 and 485, level with the menu: its y, plus half its
+    height less the arrow's, plus 2;
+  - when the items slide in (+0x150 is 1), each item not already moving fades from white to the highlight (track
+    5, 30 frames, mode 2) and is hidden;
+  - the menu is shown and the widgets reset onto it;
+  - the title (+0x38) is put above the top by its height;
+  - the prompt (+0x40) is put below by its extent and slid back up (track 1, 30 frames);
+  - the help bar (+0x44) is laid out (0x2755e8 with sprite 7's height + 75), put at y 480 and slid up by its
+    extent;
+  - finally the world group and the screen are shown.
+- **`FE3D_BuildButtonBar` 0x2719c0 (the help bar):** with any bits, the bar (+0x48: a list made by 0x26d3b8, its
+  +0xf8(1)) gets one button for each bit of the 17-row table at 0x347f20 (the bit, a sprite, a text id). Each
+  button is:
+  - an entry (15.0 high) with its text in the small font and its icon (15 × 15);
+  - given the help button's vtable 0x3ae690, its sprite and text (0x2ae230), and its bit as its id;
+  - white, with its text's +0x114 1, added to the bar.
+
+  Then the bar's spacing is 2.0, laid out and placed at (595, 37).
+
+Checked in the runner on 20,000 random screens (menus with and without arrows and sliding items, titles, prompts,
+help bars, and any button bits). When an allocation fails, the button's entry and icon both land at address 0, so
+the entry is coloured through the icon's vtable; the test stubs that slot too. 33 of 34 mutants are caught. The survivor drops the
+`bit == 0` test, which is equivalent: a zero bit never meets the mask.
+
 ## The 3D transition and fade record (F1c; ported in row G9b2e, `game/src/fe_transition.rs`, checked: `tests/fe_transition.rs`)
 
 One record drives both the screen fades and a blend of four renderer values (read by the renderer's virtual +0x134,
