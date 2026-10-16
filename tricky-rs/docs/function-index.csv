@@ -2359,12 +2359,12 @@ address,size,name,system,status
 0x19d278,144,Font_DrawCentered,hud,not started
 0x19d308,100,Font_DrawRightAscii,hud,not started
 0x19d370,124,Font_DrawRightAligned,hud,not started
-0x19d3f0,376,Font_PrintfShadowed,hud,ported
-0x19d568,376,Font_PrintfShadowedA,hud,ported
-0x19d6e0,140,Font_PrintfShadowedCentered,hud,ported
-0x19d770,140,Font_PrintShadowedCentered,hud,ported
-0x19d800,100,Font_PrintAsciiShadowedRight,hud,not started
-0x19d868,120,Font_PrintShadowedRight,hud,ported
+0x19d3f0,376,Font_PrintfShadowed,hud,checked
+0x19d568,376,Font_PrintfShadowedA,hud,checked
+0x19d6e0,140,Font_PrintfShadowedCentered,hud,checked
+0x19d770,140,Font_PrintShadowedCentered,hud,checked
+0x19d800,100,Font_PrintAsciiShadowedRight,hud,checked
+0x19d868,120,Font_PrintShadowedRight,hud,checked
 0x19d8e0,128,Font_DrawfRaw,hud,not started
 0x19d960,128,Font_DrawfWide,hud,not started
 0x19d9e0,40,Font_GetGlyphWidth,hud,not started

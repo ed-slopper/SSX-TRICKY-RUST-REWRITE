@@ -427,3 +427,21 @@ What a HUD sprite call means as a quad, in `tricky_game::hudsprites`:
   An unturned quad goes to `Draw_TexturedRect` 0x19b730, a turned one to `Sprite_SubmitQuad` 0x19bdf8.
 - **Checked in the runner** (tests/spritequad.rs) on 60,000 random rectangles, flags and placements: the bind and
   the quad, floats bit for bit. The tests caught all 11 mutants.
+
+## The shadowed prints (G8j)
+
+`tricky_game::fontprint`: every HUD text goes through these.
+
+- **`Font_PrintfShadowed` (ASCII) / `Font_PrintfShadowedA` (wide)** (the font, the format; the scale, x, y):
+  - format the string into the frame (`vsprintf` / `WStr_VFormat`);
+  - draw it twice through `Font_DrawStringRaw` / `Font_DrawStringA`: first a shadow 2 right and 2 down, in black
+    with the font colour's alpha kept, one layer below the renderer's current layer (never under 0); then the text
+    in its own colour, on the layer above the shadow's.
+- **The centred forms** (`Font_PrintfShadowedCentered` / `Font_PrintShadowedCentered`) measure the string (its
+  size written to their frame) and start half its width left of x.
+- **The right-aligned form** (`Font_PrintShadowedRight`) ends at x. `Font_PrintAsciiShadowedRight` makes the
+  ASCII string wide first.
+- What is left for a renderer to supply: the formatting, the measures and the two string draws.
+- **Checked in the runner** (tests/fontprint.rs) on 40,000 random cases:
+  - compared: every call (floats bit for bit, with the font colour each draw sees) and the font colour after;
+  - the tests caught all 12 mutants.
