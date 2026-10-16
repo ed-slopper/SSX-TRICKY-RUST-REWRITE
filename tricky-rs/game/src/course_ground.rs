@@ -30,8 +30,9 @@ pub struct CourseGround {
     pub ssf: tricky_data::ssf::Ssf,
     /// the knockable objects that are moving and the script threads the riders' contacts started (row E8c3)
     pub knock: Mutex<crate::knockables::Knockables>,
-    /// the world grid as `Rail_ClosestPoint` 0x259330 walks it (row G20c2c1a, [`rail_world`])
-    pub rails: crate::rider::ground_tick::RailWorld,
+    /// the world grid as `Rail_ClosestPoint` 0x259330 walks it (row G20c2c1a, [`rail_world`]); its rails' on bits
+    /// as the course's scripts leave them ([`CourseGround::set_rail_live`])
+    pub rails: Mutex<crate::rider::ground_tick::RailWorld>,
     /// STANDIN: the objects whose persistent script spawns a controller other than a roller (op 0 sub-type not 0:
     /// animated doors, boosts...), which the port does not run (row E7b2); the rider's instance query passes
     /// through them unless the port poses them ([`CourseGround::pose`]), as the app did before row E8c3
@@ -71,8 +72,19 @@ impl CourseGround {
         let driven = (0..world.objects.len())
             .map(|o| ssf.effects.get(ssf.event_script(o, 0) as usize).is_some_and(|ops| ops.iter().any(|op| op.op == 0 && op.args.first().is_some_and(|&t| t != 0))))
             .collect();
-        let rails = rail_world(&world, ltg_bytes, &ltg, &pbd);
+        // STANDIN: every rail on at load, as the port's `Rails` are (the game's are off in the file and their
+        // `cRailNode`s switch them on, row E7b2); the event's scripts switch some off ([`CourseGround::set_rail_live`])
+        let mut rails = rail_world(&world, ltg_bytes, &ltg, &pbd);
+        for k in 0..pbd.splines.len() as u32 {
+            rails.set_live(k, true);
+        }
+        let rails = Mutex::new(rails);
         Some(CourseGround { world: Mutex::new(world), flags, coeffs, cache: Mutex::new(HashMap::new()), poses: Mutex::new(HashMap::new()), ssf, knock, driven, rails })
+    }
+
+    /// A rail (the course's spline `spline`) switched on or off (`RailWorld::set_live`)
+    pub fn set_rail_live(&self, spline: u32, on: bool) {
+        self.rails.lock().unwrap_or_else(|e| e.into_inner()).set_live(spline, on);
     }
 
     /// `World_RayCast` 0x25aff8 on the course: the distance along the query (−1 for nothing) and what was hit.

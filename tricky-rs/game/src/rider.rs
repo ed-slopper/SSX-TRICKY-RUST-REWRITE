@@ -445,6 +445,10 @@ pub struct Rider {
     /// with no landing found), and the take-offs it was made for (row G10b2c2c2: what `Sfx_OnAirEnter` reads)
     pub land_time: f32,
     pub takeoffs: u32,
+    /// +0x284: the rail's fall-off blend, as the last rail tick left it (read by `Rail_TryCapture`)
+    pub rail_blend: f32,
+    /// +0x290: the rail's word the capture found (its owner's +0x24)
+    pub rail_word: u32,
     /// ticks before this rider can be hit by another again (`Boarder_RiderCollisions`: three ticks)
     pub hit_wait: u8,
 }
@@ -467,7 +471,7 @@ impl Rider {
                last_trick: String::new(), trick_timer: 0.0, crashed: 0.0, hard_land: 0.0, crouch_v: 0.0, brake_v: 0.0, jump_c: 0.0, jump_delay: 0.0, height: 0.0,
                course_dir: None, course_pts: None, wipe: None, crash_at: None, gm: None, crash_spray: None, lean: [0.0; 3], up: [0.0, 0.0, 1.0, 0.0], recover: None, ai: false, down_t: 0.0, getup: -1.0, stumble: 0.0, wall_hit: None, speed_timer: 0.0, spin_timer: 0.0, spin_used: false, tube_class: u8::MAX, gate_p: 0.0, gate_hi: 0.0, gate_lo: 0.0, gate_still: 0.0, gate_target: 0.0, gate_speed: 0.0, gate_state: 8, gate_rock_dir: 0, band: (0.005, 0.0250417), spin_base: 0.0, flip_base: 0.0, late: false, cause: "", spin_ax: Axis::default(), flip_ax: Axis::default(), air_mode2: false, rail_off: 0.0, rail_time: 0.0, rail_halves: 0, boost_was: false, chain: 0,
                ubers: Vec::new(), uber: 0.0, uber_id: 0, uber_done: false, letters: 0, multiplier: 1,
-               sc: new_score(), tick_acc: 0.0, full_count: 0, rail_kind: 0, rail_lean: 0.0, rail_goal0: 0.0, rail_committed: 0.0, show_parts: Vec::new(), grab_scored: false, grab_tw: false, hit_wait: 0, att: None, last_hit: Default::default(), impact: 0.0, impact_n: [0.0; 4], knocks: 0.0, slot: 0, place_ray: None, hit_kind: 0, land_time: 0.0, takeoffs: 0 };
+               sc: new_score(), tick_acc: 0.0, full_count: 0, rail_kind: 0, rail_lean: 0.0, rail_goal0: 0.0, rail_committed: 0.0, show_parts: Vec::new(), grab_scored: false, grab_tw: false, hit_wait: 0, att: None, last_hit: Default::default(), impact: 0.0, impact_n: [0.0; 4], knocks: 0.0, slot: 0, place_ray: None, hit_kind: 0, land_time: 0.0, takeoffs: 0, rail_blend: 0.0, rail_word: 0 };
         // the start line's `Boarder_PlaceAt` 0x11cae8 (`cBoarder::vf8` 0x116ab8: heading from the path's direction)
         r.att = Some((orient::placed_attitude(placed_heading(yaw), None), yaw));
         r
@@ -1275,7 +1279,54 @@ impl Rider {
         // `WipeoutMotion_Update` 0x10c2f0 never captures, row E8m) and not one the landing probe put down: those never
         // get here. The air wall comes AFTER the capture (row E8o): a rider over a rail that hits a wall on the same
         // tick is captured (`Score_LandTrick` for the rail, `rail_kind` set) and then put down by the wall
-        if !self.grounded && self.crashed <= 0.0 && !jumped && self.rail_cooldown <= 0.0 && self.air_time > 0.08 && self.vel.y < 2.5 && !self.capture_gated() {
+        // On the course (row G20c2c1b1) the capture is the game's: `Rail_TryCapture` 0x125cb8 on its rail grid from the
+        // board's frame, every air tick; it decides whether, the rail kind and the velocity. The slide then runs on the
+        // port's polyline of that rail (STANDIN, row G20c2c3).
+        let game_capture = match &world.course {
+            Some(course) if !self.grounded && self.crashed <= 0.0 && !jumped => {
+                let f = self.board_bone_frame();
+                let ci = ground_tick::CaptureIn { vel: ground_tick::to_game(self.vel, 100.0, 0.0), board_pos: f[3], frame: [f[0], f[1], f[2]], blend: self.rail_blend };
+                // (the clip gate as the port keeps it: a grab short of its safe marker or an uber is a clip of type
+                // 0xe without flag 4, row E8n)
+                let gated = self.capture_gated();
+                let rw = course.rails.lock().unwrap_or_else(|e| e.into_inner());
+                Some(ground_tick::rail_try_capture(&rw, &ci, &mut || if gated { 0xe } else { 0 }, &mut || false))
+            }
+            _ => None,
+        };
+        if let Some(Some(cap)) = game_capture {
+            if let Some((ri, d, _)) = rails.nearest(self.pos, RAIL_REACH) {
+                let (rp, tan) = rails.0[ri].at(d);
+                self.vel = ground_tick::port_dir(cap.vel) * 0.01;
+                let along = self.vel.dot(tan);
+                let travel = tan * if along < 0.0 { -1.0 } else { 1.0 };
+                let mut tw = f32::atan2(-travel.x, -travel.z) - self.facing();
+                while tw > std::f32::consts::PI { tw -= std::f32::consts::TAU; }
+                while tw < -std::f32::consts::PI { tw += std::f32::consts::TAU; }
+                self.pos = rp;
+                self.rail = Some((ri, d, along));
+                self.charge = 0.0;
+                self.rail_kind = cap.kind;
+                self.rail_word = cap.word;
+                self.rail_lean = 0.0;
+                self.land(Some(self.rail_kind));
+                self.sc.update_spin(0);
+                self.rail_twist = tw;
+                self.rail_goal = (tw / std::f32::consts::FRAC_PI_2).round() * std::f32::consts::FRAC_PI_2;
+                self.rail_goal0 = self.rail_goal;
+                self.rail_committed = self.rail_goal;
+                self.rail_held = true;
+                self.rail_side_signed = 0.0;
+                self.set_switch(false);
+                self.rail_entry = along.abs();
+                self.rail_spun = 0.0;
+                self.rail_side = 0.0;
+                self.rail_off = 0.0;
+                self.rail_time = 0.0;
+                self.rail_halves = 0;
+            }
+        }
+        if game_capture.is_none() && !self.grounded && self.crashed <= 0.0 && !jumped && self.rail_cooldown <= 0.0 && self.air_time > 0.08 && self.vel.y < 2.5 && !self.capture_gated() {
             if let Some((ri, d, _)) = rails.nearest(self.pos, RAIL_REACH) {
                 let (rp, tan) = rails.0[ri].at(d);
                 let along = self.vel.dot(tan);
@@ -1477,6 +1528,43 @@ impl Rider {
     /// fourth marker, row E8s) is not set. The port keeps no clip ids in the air, so this is its form of that test: the same one it makes for `Landing_CheckAngles` 0x12ba78 in [`Rider::land`]
     /// (a grab held or still playing out short of its fourth marker, an uber trick not yet done). The fall-recover clip
     /// 0x224 and the spin and flip clips are not in those ranges (0x224 is type 0): they never gate.
+    /// The board's frame (rider+0x4aa0..: its x, y and z rows and the position it is drawn at) as `Boarder_UpdatePose`
+    /// builds it ([`crate::pose::board_frame`]) from the kept attitude (or the one placed from the yaw), the steer, the
+    /// rider's up and body height and the lean. STANDIN: the board's side on the ground (+0x330) is the attitude's,
+    /// and the trick's spin and flip are left out (they turn the frame about the pivot bone: rows G5, G20c3c2)
+    pub fn board_frame(&self) -> [[f32; 4]; 4] {
+        let o = match &self.att {
+            Some((o, _)) => *o,
+            None => orient::placed_attitude(placed_heading(self.yaw), None),
+        };
+        let motion = if self.crashed > 0.0 { 5 } else if self.rail.is_some() { 3 } else if self.grounded { 2 } else { 1 };
+        crate::pose::board_frame(&crate::pose::PoseIn {
+            quat: o.q,
+            steer: self.steer,
+            motion,
+            class: self.stats.kind as u32,
+            pos: ground_tick::to_game(self.pos, 100.0, 1.0),
+            up: self.up,
+            height: self.body_height,
+            side: o.side,
+            lean: self.lean[0],
+            lean_scale: self.stats.scale,
+            spin: 0.0,
+            flip: 0.0,
+            pivot_z: 0.0,
+        })
+    }
+    /// The board bone's world matrix (rider+0x4a60..+0x4a90: its x, y, z rows and its position), which
+    /// `Boarder_UpdateSkeleton` 0x12ae18 copies from the skeleton and `Rail_TryCapture` / `RailSlideMotion_Update` read.
+    /// STANDIN until the skeleton runs (row G5): the board's frame ([`Rider::board_frame`]) with its rows as the rail
+    /// code reads the bone's: x along the board (the frame's y, forward: the kind is the tangent's angle from x toward
+    /// z), y down (minus its z: the rail is 30 cm along y from the bone, under the board), z across (minus its x, so
+    /// the rows stay right-handed)
+    pub fn board_bone_frame(&self) -> [[f32; 4]; 4] {
+        let f = self.board_frame();
+        let neg = |v: [f32; 4]| [-v[0], -v[1], -v[2], v[3]];
+        [f[1], neg(f[2]), neg(f[0]), f[3]]
+    }
     pub fn capture_gated(&self) -> bool { !self.grab_safe() || (self.uber > 0.0 && !self.uber_done) }
     /// Is the board free to land (no grab clip short of its safe marker)?
     pub fn grab_safe(&self) -> bool {

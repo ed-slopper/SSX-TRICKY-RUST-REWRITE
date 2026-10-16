@@ -1129,6 +1129,8 @@ fn trick_only_ramps(game: Res<ui::Game>, mut world: ResMut<World>, mut rails: Re
         world.0.off = world.0.mode_off[k].clone();
         let sw = rails.0.1[k].clone();
         for r in rails.0.0.iter_mut() { r.on = sw.get(&r.spline).copied().unwrap_or(true); }
+        // the course's rail grid too (row G20c2c1b1): the capture runs on it
+        if let Some(c) = &world.0.course { for r in rails.0.0.iter().filter(|r| r.spline != usize::MAX) { c.set_rail_live(r.spline as u32, r.on); } }
     }
     for p in props.0.iter_mut().filter(|p| p.kind == props::Kind::Static) { p.hidden = world.0.mode_off[k].contains(&(p.inst as u32)); }
     for mut v in &mut q { let want = if on { Visibility::Inherited } else { Visibility::Hidden }; if *v != want { *v = want; } }

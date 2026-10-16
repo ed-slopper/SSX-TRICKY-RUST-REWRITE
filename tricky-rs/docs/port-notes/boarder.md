@@ -751,6 +751,39 @@ respawns (the safe point, the wipe-outs' return points) still pass the port's ya
 - Seen on elysium with the disc: the race line's respawns (1 m above the line) hit and stand on the course with its
   normal; a respawn at the port's safe point recorded mid-air (22 m up) finds nothing within 2 m, as the game's would.
 
+### The air's rail capture on the grid (row G20c2c1b1; checked: `tests/rail_capture.rs`)
+
+With the course loaded, `Rider::step`'s air capture is the game's `Rail_TryCapture` 0x125cb8
+(`ground_tick::rail_try_capture`), run every air tick on `CourseGround::rails`. It reads the rider's velocity, the
+board bone's frame and position, and the fall-off blend the last rail left (`Rider::rail_blend`, +0x284). It decides
+whether the rider is caught, the rail kind (`rail_kind`, +0x1dc), the new velocity and the rail's word
+(`rail_word`, +0x290).
+
+The port's old gates stay only without the course: the cooldown, the time in the air, the upward speed and the
+reach. After a capture the slide still runs on the port's polyline of the rail (the nearest point,
+`Rails::nearest`; STANDIN, row G20c2c3).
+
+The grid's on bits follow the event's scripts: the app copies each rail's `on` into `CourseGround::set_rail_live`.
+At load every rail is on, as the port's `Rails` are (STANDIN: in the game they are off in the file and their
+`cRailNode`s switch them on, row E7b2).
+
+The board bone's frame (rider+0x4a60..+0x4a90) is not the board's pose frame (+0x4aa0, `pose::board_frame`).
+`Boarder_UpdateSkeleton` 0x12ae18 copies it from the skeleton's board bone, and the skeleton is not run (row G5).
+The rail code fixes how its rows are read:
+- the kind is the tangent's angle from the x row toward the z row, so x is along the board and z across it;
+- the board is held 30 cm along the y row from the rail, under the board, so y points down.
+
+`Rider::board_bone_frame` is therefore the pose frame's rows reordered (STANDIN): x = its forward (y),
+y = −its up (z), z = −its side (x), at its position, with the trick's spin and flip left out. One part of this is
+a convention: the z row's sign only decides which of kinds 3 and 4 a board turned across is. The test cannot tell
+that without the skeleton (that mutant survives).
+
+Checked on gari's spline 7 from the disc: a rider in the air 30 cm over the rail's middle, flying along it at
+15 m/s, is caught along (kind 1) with the game's velocity: the speed along it (at most the speed, at least
+555.56 cm/s if that is more), z × 0.1. Turned across it is kind 4, turned round it is kind 2. A metre over it, or
+with the rail switched off, it is not caught. Mutants: the bone's y sign, the clip gate, the kind, the velocity and
+the switch are all caught.
+
 ### The other respawns at the game's reset place (row G20c3b5; checked: `tests/reset_place.rs`)
 
 In the game every respawn that is not the start line, a teleport or a cast clip goes through the reset state.

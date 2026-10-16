@@ -42,7 +42,7 @@ fn the_grid_finds_its_curves_points() {
         let c = tricky_game::course_ground::CourseGround::new(&pbd_b, &ltg_b, &ssf_b).expect("the course");
         let pbd = tricky_data::pbd::Pbd::parse(&pbd_b).unwrap();
         // every rail switched on, as their rail nodes do when they come on
-        let mut rails = c.rails.clone();
+        let mut rails = c.rails.lock().unwrap().clone();
         for k in 0..pbd.splines.len() as u32 {
             rails.set_live(k, true);
         }
