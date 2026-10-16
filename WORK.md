@@ -69,7 +69,6 @@ state machine and the renderer are ours. Nothing has been checked against the or
 
 | ID | Task | Area | Needs | Who | Notes |
 |---|---|---|---|---|---|
-| E12d2 | The app's medals, times and scores on the career block instead of `tricky-save.json`: the race results through `Career::check_new_records` / `record_best_time` / `record_best_score` (a `RecordsEnv`, the app's character and course indices), the menus' unlocks (`is_character_unlocked`, `is_board_unlocked`, tracks) read from the block, the old json read once to carry medals over | any | E12d | ed-slopper/puffin (2026-10-15) | Gap of E12d |
 | G1 | Boarder state machine: every state (0x00–0x14) and motion (0–6), their enter/update/exit, `cBoarder` vtable, in the original's order per tick | unowned | F1 | | [repo] Many states ported one by one; the dispatch is ours |
 | G1a | Prewind, jump, takeoff, spin and flip control (`PrewindState_Update` 0x1050e8, `Jump_ApplyImpulse` 0x1284e0, `Takeoff_SetSpinRates` 0x126e30, `SpinState_Update` 0x100908, `SpinState_StartFromStick` 0x102158) checked | any | F4a | | [repo] Ported, unchecked Split: G1a1, G1a2 |
 | G1a5b | The rest of G1a5: `Rider::step` (`tricky-rs/game/src/rider.rs`) calls the exact prewind, jump, take-off, spin start and spin (`boarder::prewind_update`, `jump::jump_impulse`, `jump::takeoff_spin_rates`, `jump::spin_start_from_stick`, `spin::spin_update`, all checked) on the rider's own fields (cm, z up), replacing `Rider::air_rotation` and the hand-written prewind and jump | any | G1a5a | | Split of G1a5 (wiring; needs a play test). Split: G1a5b1, G1a5b2, G1a5b3 (the exact functions read the game's pad word, built per boarder state by `cPlayer::GetControls`) |
@@ -159,6 +158,7 @@ matches the original.
 
 | ID | Task | Section | Who | Date | Commit |
 |---|---|---|---|---|---|
+| E12d2 | The app's medals, times, scores and unlocks on the career block (`ui::CareerRes`: the player in slot 0 on its character, the menus on the career's unlock and medal functions, each run through `Career_CheckNewRecords` and the circuit's result; the old json carried once); unit tests in `ui::tests` | P2 | ed-slopper/puffin | 2026-10-15 | 645af7e |
 | G20c3b2 | The respawn at the game's own heading: `Rider::respawn_heading` (the attitude from the exact heading), used by the race's resets (inline atan2 of the line in the game's axes) and the teleport pads; checked in tests/placement.rs | P2 | ed-slopper/puffin | 2026-10-15 | 6a47376 |
 | G20c3b3 | The teleport and the race scenes' cast clips: `teleport::teleport_target` (`Boarder_TeleportToInstance` 0x11a098) on the app's teleport pads by `Rider::slot`, `camscript::update_cast_clip(s)` (0x16daa8, 0x177020; the app plays no race scenes yet, G11), checked in tests/teleport.rs | P2 | ed-slopper/puffin | 2026-10-15 | 5e2b1ce |
 | G10c2 | The speech system's glue ported 1:1 and checked in the runner: `SpeechSys_Init` 0x228728, `Speech_InitLibrary` 0x228830, `SpeechSys_AddBank` 0x228a00 with `SpeechBank_Init` / `_Delete` / `_HasId`, `SpeechSys_FreeBanks` / `_FreeAll`, `SpeechSys_IsIdle` / `_ServiceIfIdle` / `_UpdateAll`, `Speech_PlayEvent` 0x228400 (which bank, when the line starts against the stream playing), `SpeechSys_StopStream`, `_IsSlotPlaying`, `Speech_LoadEventsForSlot`, the stream getters they read (0x229f60, 0x229fc8, 0x22a008, 0x22a178), the front end's `Speech_GetFEModeMask` / `_PlayFELine`, `Speech_FreeNarration`, `SpeechSys_IsCharScriptReady`, `SpeechLib_Init` 0x2baf38 | P2 | ed-slopper/puffin | 2026-10-15 | 7cf5e4f |
@@ -1070,3 +1070,4 @@ matches the original.
 - 2026-10-15 ed-slopper/puffin: claim G20c3b2.
 - 2026-10-15 ed-slopper/puffin: G2 fix (Score_Reset keeps the trick id). G20c3b2 done; added G20c3b5 (gap of G20c3b2).
 - 2026-10-15 ed-slopper/puffin: claim E12d2.
+- 2026-10-15 ed-slopper/puffin: E12d2 done.
