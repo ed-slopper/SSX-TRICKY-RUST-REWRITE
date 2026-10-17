@@ -2955,7 +2955,7 @@ address,size,name,system,status
 0x1d8ac8,52,ParticleNode_SetLifetime,world?,ported
 0x1d8b00,28,ParticleNode_FreeMem,world?,not started
 0x1d8b20,164,ParticleNode_Update,world?,ported
-0x1d8bc8,384,ParticleSys_Draw,world?,not started
+0x1d8bc8,384,ParticleSys_Draw,world?,checked
 0x1d8d48,56,ParticleNode_SaveState,save,checked
 0x1d8d80,64,ParticleSys_ReadReplay,ai?,checked
 0x1d8dc0,44,FUN_001d8dc0,,not started
@@ -3061,8 +3061,8 @@ address,size,name,system,status
 0x1e1f28,68,FUN_001e1f28,render?,not started
 0x1e1f70,2516,cPS2GraphicsMan::DrawModel,render,checked
 0x1e2948,280,cPS2GraphicsMan::vf85_1e2948,render,not started
-0x1e2a60,1024,cPS2GraphicsMan::vf74_1e2a60,render,not started
-0x1e2e60,1024,cPS2GraphicsMan::vf75_1e2e60,render,not started
+0x1e2a60,1024,cPS2GraphicsMan::vf74_1e2a60,render,checked
+0x1e2e60,1024,cPS2GraphicsMan::vf75_1e2e60,render,checked
 0x1e3260,2100,cPS2GraphicsMan::vf70_1e3260,render,not started
 0x1e3a98,1292,cPS2GraphicsMan::vf76_1e3a98,render,not started
 0x1e3fa8,52,Gfx_VblankStartHandler,render,not started
@@ -3127,7 +3127,7 @@ address,size,name,system,status
 0x1e91e8,52,cPS2GraphicsMan::vf63_1e91e8,render,not started
 0x1e9338,60,cPS2GraphicsMan::vf62_1e9338,render,not started
 0x1e9378,60,cPS2GraphicsMan::SetTexture,render,not started
-0x1e93e8,48,cPS2GraphicsMan::vf60_1e93e8,render,not started
+0x1e93e8,48,cPS2GraphicsMan::vf60_1e93e8,render,checked
 0x1e9418,48,cPS2GraphicsMan::vf59_1e9418,render,not started
 0x1e9448,12,cPS2GraphicsMan::vf58_1e9448,render,not started
 0x1e9458,32,cPS2GraphicsMan::vf57_1e9458,render,not started

@@ -1566,3 +1566,33 @@ calls match the game at the four reachable entries (0, 0x28, 0x80, 0x180): 629,3
 a clipped polygon. 42 of 43 mutants were caught. The one left changes the inner grid's second handler's return
 place: it lives only in vi14, which the edges' code overwrites before the program ends in every case run (masked,
 not strictly equivalent).
+
+## The particle systems' draw, EE side (G7e1, `particledraw.rs`)
+
+`ParticleSys_Draw` 0x1d8bc8 and the renderer's virtuals it uses: +0x1e0 0x1e93e8 (the blend) and the two particle
+packets, +0x250 0x1e2a60 (VU1 program 6) and +0x258 0x1e2e60 (program 7).
+
+- **The draw** returns at once when the renderer's box test (+0x280, on the system's box at +0x150 / +0x160)
+  answers 1. Otherwise it brackets the system's draw (+0x258 with its block at +0x10) with +0x1c0(1) / (0) and
+  the depth bias +0x1c8(0, 0, 0.08) / (0, 2, 0.08). Between them come the blend for the kind (+8, held to 0..10,
+  looked up in the table at 0x392cf8) and the texture from the app's table (+0x30) at +4.
+- **The blend** (+0x1e0) sets the texture state's blend byte (+0xe) and its half at +4, and marks the state
+  changed (+0x474) only when either differs. The half is compared at full width, so a word above 0xffff always
+  counts as a change.
+- **The two packets** differ only in the program, the block's size (9 quadwords for 7, 20 for 6) and so the tag's
+  count (0xc, 0x17). The program is set in the texture state (clearing its word 0) around a +0x1e8(2, 0) /
+  +0x1e8(0, 0) pair, and cleared again at the end in the same way.
+  - The packet is a `cnt` tag. Its VIF stream is: no-ops, UNPACK V4-32 to address 0 (flagged), the block copied
+    by doublewords, MSCAL 0 and FLUSHA. The submit is told the end at the FLUSHA quadword's end; the buffer place
+    is left 0x10 beyond it.
+  - The frame's matrices are made in between (`cull::frame_matrices`, the same code inlined), when +0x17d0 is
+    clear. The game reads +0x17d0 before it writes the packet. The port does too, and `frame_matrices` then reads
+    it again, which only matters if the packet overlaps the renderer.
+- **The +0x1e0 call** in the draw passes only the blend. The second word is whatever +0x1c8 left in a2, so the
+  port logs one word there (as `drawmodel` does).
+
+Checked in the runner (`tests/particledraw.rs`) with 5000 draws (every kind from −2 to 12 and beyond, both box
+answers, the vtable's this-shifts) and 9000 blend and packet cases. The texture state was set to the program or
+not, its word 0 clear or not, the matrices made or not, and the second +0x1e8 sometimes left another program or
+word 0 behind. 28 of 30 mutants were caught, one of them only after that +0x1e8 change. The two left are
+equivalent: one reads +0x17d0 as 0 (`frame_matrices` checks it itself), and one re-clamps the kind.
