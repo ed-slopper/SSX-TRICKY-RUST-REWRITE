@@ -78,7 +78,7 @@ impl Io for r5900::Mem {
     }
 }
 
-const STANDINS: [u32; 10] = [tx::STRNCMP, tx::STRNCPY, tx::POOL_ALLOC, tx::ALLOC, tx::MEM_SET, tx::MEM_COPY, tx::PRINTF, tx::LOGF, tx::FREE, tx::TEX_SWIZZLE];
+const STANDINS: [u32; 12] = [tx::STRNCMP, tx::STRNCPY, tx::POOL_ALLOC, tx::ALLOC, tx::MEM_SET, tx::MEM_COPY, tx::PRINTF, tx::LOGF, tx::FREE, tx::TEX_SWIZZLE, tx::FLUSH_CACHE, tx::DMA_SEND];
 
 /// A stand-in's work and answer (and, for `logf`, a float), and its log. `fails` makes the heaps answer 0;
 /// `taken` counts what they have handed out in this call.
@@ -123,6 +123,15 @@ fn standin(io: &mut dyn Io, func: u32, w: &[u32], f: &[u32], fails: bool, taken:
         }
         tx::TEX_SWIZZLE => {
             log.extend(&w[..5]);
+            0
+        }
+        tx::DMA_SEND => {
+            log.extend([w[0], w[1]]);
+            0
+        }
+        tx::FLUSH_CACHE => {
+            // (only a0 is set)
+            log.push(w[0]);
             0
         }
         tx::PRINTF | tx::FREE => {
@@ -380,7 +389,7 @@ fn manager(g: &mut Rng) -> Mem {
 
 #[test]
 fn uploads_match_the_original() {
-    let Some((mut r, log, _, _)) = runner() else { return };
+    let Some((mut r, log, _, taken)) = runner() else { return };
     for f in [0x1c1ab8u32, 0x1c1bd0, 0x1c1d58] {
         r.allow(f);
     }
@@ -388,6 +397,7 @@ fn uploads_match_the_original() {
     let (mut swizzled, mut palettes) = (0usize, 0usize);
     for case in 0..6000u32 {
         let mut m = manager(&mut g);
+        taken.set(0);
         let n = g.below(4);
         if case % 3 == 0 {
             // (the draw-into packet reads its slot unchecked: one there)
@@ -404,4 +414,141 @@ fn uploads_match_the_original() {
     }
     println!("{swizzled} swizzled, {palettes} palettes");
     assert!(swizzled > 100 && palettes > 100);
+}
+
+const BLOCKS: u32 = ARENA + 0x800;
+const NODES: u32 = ARENA + 0x900;
+
+/// The manager's VRAM blocks (three of 0x18 bytes, from +0x40 to +0x2c; their slots a list of nodes: +4 the
+/// record or −1, +8 the slot, +0xc the next), its slots (+0x3c: four of 0x14 bytes and the one before), its CLUT
+/// slots (+0x6c: three of 16 and the one before), the records' uses (+0x58) and slots, the course's settings
+fn slotted(g: &mut Rng, m: &mut Mem) {
+    m.w32(TM + 0x3c, SLOTS);
+    m.w32(TM + 0x6c, CLUTS);
+    m.w32(TM + 0x34, BLOCKS);
+    m.w32(TM + 0x40, g.pick(&[0u32, 0, 1, 3]));
+    m.w32(TM + 0x2c, g.pick(&[0u32, 2, 3, 3]));
+    m.w32(TM + 0x68, g.pick(&[0u32, 1, 3, 3]));
+    m.w32(TM + 0xc, g.pick(&[0u32, 2, 4, 4]));
+    m.w32(TM + 0x70, g.pick(&[0u32, 1, 0xffff_ffff]));
+    m.w32(TM + 0x74, g.pick(&[2u32, 3, 0xffff_ffff]));
+    for b in 0..3u32 {
+        let blk = BLOCKS + 0x18 * b;
+        m.w32(blk + 4, g.pick(&[1u32, 2, 4, 8]));
+        m.w32(blk + 8, g.pick(&[1u32, 2, 3]));
+        m.w32(blk + 0x14, if g.below(5) == 0 { 0 } else { NODES + 0x40 * b });
+        for k in 0..3u32 {
+            let node = NODES + 0x40 * b + 0x10 * k;
+            m.w32(node + 4, if g.below(6) == 0 { 0xffff_ffff } else { g.below(4) });
+            m.w32(node + 8, g.below(4));
+            m.w32(node + 0xc, if k < 2 && g.below(4) != 0 { node + 0x10 } else { 0 });
+        }
+    }
+    for k in 0..5u32 {
+        let s = SLOTS - 0x14 + 0x14 * k;
+        m.w32(s, g.below(0x4000));
+        m.w32(s + 4, g.below(4));
+    }
+    for k in 0..4u32 {
+        let c = CLUTS - 0x10 + 0x10 * k;
+        m.w32(c, g.below(0x4000));
+        m.w32(c + 0xc, if g.below(6) == 0 { 0xffff_ffff } else { g.below(4) });
+    }
+    for n in 0..4u32 {
+        let r = TABLE + 0x5c * n;
+        wf(m, r + 0x58, g.pick(&[0.0f32, 1.0, 0.5, 3.0, 0.25]));
+        m.w32(r + 0xc, g.pick(&[1u32, 2, 4, 8]));
+        m.w32(r + 0x24, g.pick(&[0u32, 1, 2, 3, 0xffff_ffff, 0xffff_ffff]));
+        m.w32(r + 0x30, g.pick(&[0u32, 1, 2, 0xffff_ffff]));
+        m.w32(r + 0x40, g.below(2));
+        m.w32(r + 0x44, g.below(3));
+        m.w32(r + 0x48, g.pick(&[0u32, 1, 2, 3, 0xffff_ffff]));
+        m.w32(r + 0x20, g.pick(&[0u32, 1, 2, 0x13, 0x13, 0x1b, 0x14, 0xffff_ffff]));
+        // (and one of 2^31 bytes or more)
+        let huge = g.below(10) == 0;
+        m.w32(r + 0x10, if huge { 0x10000 } else { g.pick(&[8u32, 64, 100, 256, 512]) });
+        m.w32(r + 0x18, if huge { 0x8000 } else { g.pick(&[8u32, 64, 32, 512]) });
+        m.w32(r + 0x14, g.below(10));
+        m.w32(r + 0x1c, g.below(10));
+    }
+    m.w32(0x337c58, APPOBJ);
+    m.w32(APPOBJ + 0x730, g.pick(&[0u32, GAME, GAME]));
+    m.w32(GAME + 0x2c, g.pick(&[0u32, SET, SET]));
+    m.w32(GAME + 0x298, g.pick(&[1u32, 2]));
+    m.w32(TM + 0x78, g.pick(&[1u32, 2]));
+    m.w32(SET + 0x68, 1);
+    let d = g.f(1.0, 3000.0);
+    wf(m, SET + 0x6c, d);
+    wf(m, SET + 0x74, d * 2.0);
+    m.w32(SET + 0x70, g.below(3));
+    m.w32(SET + 0x78, g.below(3));
+}
+
+#[test]
+fn slots_and_binds_match_the_original() {
+    let Some((mut r, log, fails, taken)) = runner() else { return };
+    let funcs = [0x1c3348u32, 0x1c3480, 0x1c3560, 0x1c3650, 0x1c3760, 0x1c3818, 0x1c3ba8, 0x1c3d88, 0x1c3f68];
+    for f in funcs.into_iter().chain([0x1c0da8]) {
+        r.allow(f);
+    }
+    let data: Vec<Vec<u8>> = DATA
+        .iter()
+        .map(|&(at, n)| {
+            let mut b = vec![0u8; n as usize];
+            r.mem.read(at, &mut b).unwrap();
+            b
+        })
+        .collect();
+    let mut g = Rng(0x7e70_2000_0000_0001);
+    let mut seen = [0usize; 9];
+    let (mut uploads, mut evictions, mut free_found) = (0usize, 0usize, 0usize);
+    for case in 0..9 * 1500u32 {
+        let mut m = manager(&mut g);
+        for (k, &(at, _)) in DATA.iter().enumerate() {
+            m.regions.push((at, data[k].clone()));
+        }
+        m.regions.push((tx::SPR, vec![0; 0xb0]));
+        slotted(&mut g, &mut m);
+        fails.set(false);
+        taken.set(0);
+        let which = (case % 9) as usize;
+        seen[which] += 1;
+        let func = funcs[which];
+        let n = g.below(4);
+        let (a, b) = (g.pick(&[1u32, 2, 4, 8]), g.pick(&[0u32, 1, 2, 3, 0xffff_ffff]));
+        let flags = g.pick(&[0u32, 0x10, 0x4000_0000, 0x8000_0010]);
+        let vram = g.below(0x4000);
+        let mut ours = 0u32;
+        let regs: Vec<u32> = match which {
+            0 => vec![TM],
+            1 => vec![TM, flags],
+            2 => vec![TM],
+            3 => vec![TM, a, b],
+            4 => vec![TM, b],
+            5 => vec![TM, n, g.pick(&[1u32, 2]), PLACE],
+            6 => vec![TM, n, vram],
+            7 => vec![TM, n, PLACE, vram],
+            _ => vec![TM, n, PLACE, vram],
+        };
+        let regs2 = regs.clone();
+        let theirs = compare(&mut r, &log, &mut m, case, func, &regs, |m, o| match which {
+            0 => tx::update_lod(m, o, TM),
+            1 => tx::init_load_nodes(m, o, TM, regs2[1]),
+            2 => tx::free_all(m, o, TM),
+            3 => ours = tx::find_vram_slot(m, TM, regs2[1], regs2[2]),
+            4 => ours = tx::find_clut_slot(m, TM, regs2[1]),
+            5 => ours = tx::bind(m, TM, regs2[1], regs2[2], PLACE),
+            6 => tx::upload_texture(m, o, TM, regs2[1], regs2[2]),
+            7 => tx::vram_packet(m, TM, regs2[1], PLACE, regs2[3]),
+            _ => tx::clut_packet(m, TM, regs2[1], PLACE, regs2[3]),
+        });
+        let answer = r.cpu.gpr(2) as u32;
+        assert!(!matches!(which, 3..=5) || answer == ours, "case {case} {func:#x}: answer theirs {answer:#x} ours {ours:#x}");
+        uploads += (which == 5 && ours == 2) as usize;
+        evictions += (matches!(which, 3 | 4) && (ours as i32) >= 0) as usize;
+        free_found += theirs.len();
+    }
+    println!("{uploads} binds that uploaded, {evictions} slots found");
+    assert!(uploads > 200 && evictions > 1000);
+    let _ = free_found;
 }

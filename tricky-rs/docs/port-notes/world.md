@@ -2375,3 +2375,38 @@ The packets' 64-bit fields come from sign-extended words, as the EE builds them.
 Checked in the runner (`tests/texman.rs`): 6000 cases over four records of random sizes (powers of two, 8192,
 and past 2^31), formats and slots. 29 of 30 mutants were caught. The one left halves the width unsigned, which
 differs only in bit 31, and the shift by 4 drops that bit.
+
+## The texture manager: slots, binds and uploads (G7q4, `texman`)
+
+A record's +0x24 is its VRAM slot, +0x30 its CLUT slot, +0x3c whether its pixels are swizzled, +0x40 / +0x44
+its mipmaps, and +0x58 how much it has been used lately.
+
+- **`TexMan_UpdateLod`** 0x1c3348 decays every record's use × 0.8 each call. When the race's player count changes
+  it works out the detail levels again and hands them out: the world's and players' records (levels 0 and 1)
+  take the manager's three parameters, the others (2) take 1 and 0.
+- **`TexMan_InitLoadNodes`** 0x1c3480 empties the load list and takes its table (`mLoadTexNodes`) with the flags
+  but bit 4 turned over. **`TexMan_FreeAll`** 0x1c3560 frees every record's pixels and palette and resets the
+  slots.
+- **`TexMan_FindVramSlot`** 0x1c3650(pages, avoid) looks through the VRAM blocks (from +0x40 to +0x2c) that are
+  that size, or bigger and holding two or more slots. Each block's slots are a list. An empty slot is taken at
+  once. Otherwise it takes the one whose texture was used least (its use × the block's size), never `avoid`,
+  and lets that texture go. **`TexMan_FindClutSlot`** 0x1c3760 does the same over the CLUT slots, by use alone.
+  With nothing found, both let go the entry just before the first: the game's own edge.
+- **The bind** (`FUN_001c3818`, n, context) is what a draw calls for each texture:
+  - It marks the texture used (+1). It answers 0 if the texture is already that context's.
+  - The slot it must not take is the one held by the other context's texture.
+  - With no VRAM slot it finds one and sends the pixels (`FUN_001c3d88`), answering 2 instead of 1. An 8-bit
+    texture gets a CLUT slot and its palette sent the same way (`FUN_001c3f68`, 16 × 16).
+  - Then it writes TEX1 (the lod, mipmaps × 4, linear filtering, L at 19, K at 32) and TEX0 (the slot, the
+    buffer width at 14, the format at 20, the log2 sizes at 26 and 30, colour with alpha, the CLUT at 37, load
+    at 61), and with mipmaps MIPTBP1, as A+D for context 1 or 2.
+- **The VRAM upload** (`FUN_001c3d88`) is BITBLTBUF, TRXPOS, TRXREG and TRXDIR as A+D, then an IMAGE tag and a
+  DMA `ref` to the pixels. **An 8-bit texture goes up as 32-bit at half the width and height**, the usual PS2
+  trick (the swizzle at load makes the bytes line up). `TexMan_UploadTexture` 0x1c3ba8 builds the same transfer
+  in the scratchpad (0x70000000), flushes the cache and sends it. Its bytes per pixel come from a table at
+  0x3909d0: 4 for formats 0 and 1, 2 for 2, 1 for 0x13 and 0x1b, 0 otherwise.
+
+Checked in the runner (`tests/texman.rs`): 1500 cases of each over random blocks, slot lists (empty and
+holding textures), CLUT slots, uses, formats (and a texture of 2^31 bytes or more), contexts and mipmaps. 64 of
+66 mutants were caught. The two left are equivalent: a block size of `<` vs `<=` after the equal case is already
+taken, and a width floor of 64 vs `> 64`.
