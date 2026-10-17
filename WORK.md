@@ -80,8 +80,7 @@ state machine and the renderer are ours. Nothing has been checked against the or
 | G5d | The app's rider animation on G5a..c, replacing its own choice of clip (README: "Which clip plays when is my state logic") | any | G5a, G5b, G5c, G1 | | Split of G5 (needs a play test); the clip plays come from the boarder states (`ControlEnv::play_clip` and the like), which the app runs only once G1 puts the game's state machine in it |
 | G7 | Rendering, as the PS2 renderer does it. Split before claiming: | unowned | E3a, E3b | | [repo] |
 | G7e | (umbrella: G7e1, G7e2, G7e3, G7e4) Particles as the VU1 microcode draws them (0x31c288), spark and dust sprites | unowned | G7 | | [repo] "Unresolved: spark and dust sprite rendering"; `particles.rs` has the emitters |
-| G7e1 | The particles' draw on the EE: `ParticleSys_Draw` 0x1d8bc8 (the box test, the blend by kind from 0x392cf8, the texture, the renderer's particle draw), the renderer's vf60 0x1e93e8 (the blend), vf75 0x1e2e60 (VU1 program 7's packet: the system's eight quadwords, the frame's matrices made inline) and vf74 0x1e2a60 (program 6's) | ed-slopper/puffin | G7 | | Split of G7e 2026-10-17 |
-| G7e2 | The VU1 particle program 7 (chain 0x31c790, 89 instructions) ported and checked call by call against the game's in the runner, the particles run whole as original code | any | G7e1, G7i | | Split of G7e |
+| G7e2 | The VU1 particle program 7 (chain 0x31c790, 89 instructions) ported and checked call by call against the game's in the runner, the particles run whole as original code | ed-slopper/puffin | G7e1, G7i | | Split of G7e |
 | G7e3 | The VU1 particle program 6 (chain 0x31c260, 152 instructions), drawn by vf74 (find its callers first: none read slot +0x250 directly) | any | G7e1, G7i | | Split of G7e |
 | G7e4 | The spray, speed dust and spark sprites' draws: `Fx_Spray_DrawParticles` 0x12d890, `Fx_SpeedDust_Draw` 0x12fb40, `Fx_SurfaceSpray_Draw`, `Sprite_DrawRotatedQuad` / `_DrawRotatedTexQuad` 0x19b8c8 / 0x19bb48 | any | G7e1 | | Split of G7e |
 | G7g | Rider shading and shadows, board reflections (env materials) | unowned | G7, E4 | | [est] |
@@ -155,6 +154,7 @@ matches the original.
 
 | ID | Task | Section | Who | Date | Commit |
 |---|---|---|---|---|---|
+| G7e1 | ParticleSys_Draw, the blend (+0x1e0) and the program 6/7 packets (+0x250/+0x258) in particledraw.rs; runner-checked, 28/30 mutants (2 equivalent) | P2 | ed-slopper/puffin | 2026-10-17 | 6c8b344 |
 | G7a | Terrain patches: all its parts done (G7a1 the terrain's draw and each edge's LOD, G7a2 the visible TGroups, G7a3 the Bezier manager's queue, draw and tables, G7a4 the VU1 patch programs: tessellation, the textured and subtractive lightmap passes, the view passes, the clipper) | P2 | ed-slopper/puffin | 2026-10-17 | 35e202c |
 | G7a4 | The patch micro programs on VU1: all its parts done (G7a4a the patch draw run whole in the runner; G7a4b..d the 4-, 6- and 8-step programs as one port over N; G7a4e the mixed program), each checked call by call against the game's programs | P2 | ed-slopper/puffin | 2026-10-17 | 35e202c |
 | G7a4e | The mixed patch VU1 program (chain 0x314620): `patchvu::run_mixed`: the inner 6 x 6 grid on the 6-step code, each edge's points at its own steps, the zipper joining each edge to the grid's border with its four clip handlers, the edges' lightmap rewrite, the view pass; checked call by call against the game's program (tests/vu1patch.rs: 1224 calls under nine cameras and nine step combinations, 629,303 GS quadwords the same); 42 of 43 mutants caught, one masked | P2 | ed-slopper/puffin | 2026-10-17 | 35e202c |
@@ -1259,3 +1259,4 @@ matches the original.
 - 2026-10-17 ed-slopper/puffin: G7a4e done 35e202c (the mixed patch program vs the game's, call by call); G7a4 and G7a closed.
 - 2026-10-17 ed-slopper/puffin: the draw-list rows renamed G7j, G7j1..3: G7h was already the world animations row (done 2026-10-15). Their commits (b72e6e2, 409a6db, 8a89cc8) say G7h1..3.
 - 2026-10-17 ed-slopper/puffin: G7e split into G7e1 (the particles' draw on the EE; claimed), G7e2 / G7e3 (VU1 particle programs 7 and 6), G7e4 (the spray, dust and spark sprites).
+- 2026-10-17 ed-slopper/puffin: G7e1 done (6c8b344): `particledraw.rs`, ParticleSys_Draw and the renderer's blend and program 6/7 packets, checked in the runner. G7e2 claimed.
