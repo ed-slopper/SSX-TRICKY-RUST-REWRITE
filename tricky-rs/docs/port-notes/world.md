@@ -974,3 +974,22 @@ a fade capped at exactly 3) and three exact boundaries (the view's near value eq
 exactly on the screen's edge, an angle exactly 0). The flares: 27 of 29 caught. The two left are a depth exactly at
 half the limit (1 either way) and a colour length of exactly 0.
 
+## The lens FX callback (row G7d2d; `lensfx::callback`)
+
+- **0x1cdc78** (a jump to 0x1cdc80) is what the node registers with the renderer (+0x318). It works on the half
+  last finished (+0x10; none while −1).
+  - First pass: for the sun's block (when on) and for each kept flare entry with a non-zero +0 (flags 0 skipped),
+    it asks the node's own +0x50. The arguments are the sprite box clamped (+0x34) and not (+0x24), and f12 the
+    depth (+0x20); the float answer goes to +0x44. Any non-zero answer (the FPU's compare, so −0 counts as 0)
+    means something shows.
+  - Then, only if something shows: +0x58. For each view: +0x60 with the view's block +0x30, the sun's +0x70 (when
+    on), +0x68 for **every** kept flare (shown or not, +0 not checked), +0x78. Then +0x80.
+  - The base class's slots there are pure virtuals. They are the PS2 node's (vtable 0x393ea8, row G7d2e): +0x50
+    0x1ea520, +0x58 0x1ea990, +0x60 0x1eaa68, +0x68 0x1eab90, +0x70 0x1eb0a8, +0x78 0x1eab88 (empty), +0x80
+    0x1eaa40.
+- 0x1cdfc0 sets the colour scale (+0x2fd8) clamped to 0..1; 0x1ce000 reads it. 0x1ce058, 0x1ce088 and 0x1ce0c0 are
+  copies of `Vec4_Scale`, `Vec3_Div` and `Vec3_Dot`.
+
+Checked in the runner (`tests/lensfx.rs`, 826 callbacks drawing, answers of 0 and −0 among them). 14 of 15 mutants
+were caught; the one left is equivalent (a scale of exactly 1).
+

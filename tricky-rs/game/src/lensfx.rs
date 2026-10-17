@@ -1,7 +1,8 @@
 //! The lens flares' node (board row G7d2a): `cLensFXObjNode` 0x1cbbc8..0x1cc088, `LensFX_AddFlare` 0x1cc088 and
 //! the world's `LensFX_Draw` 0x2006e8 that offers it the course's flaring lights. On the bytes at their addresses
-//! ([`Mem`]); the base object and the renderer's virtuals are calls out ([`LensEnv`]). The sun's part (0x1cd040, row
-//! G7d2b) is [`sun_part`], the flares' (0x1cc190, G7d2c) [`flares_part`]. Checked in the function runner
+//! ([`Mem`]); the base object, the renderer's virtuals and the node's own drawing virtuals (the PS2 node's, row
+//! G7d2e) are calls out ([`LensEnv`]). The sun's part (0x1cd040, row G7d2b) is [`sun_part`], the flares' (0x1cc190,
+//! G7d2c) [`flares_part`], the renderer's callback that draws them (0x1cdc78, G7d2d) [`callback`]. Checked in the function runner
 //! (`tests/lensfx.rs`).
 //!
 //! **The node** (0x2fdc bytes): +0xc the frame's half (0 / 1, flipped on view 0), +0x10 the half ready to draw,
@@ -38,6 +39,8 @@ pub trait LensEnv {
     fn hidden(&mut self, m: &mut Mem, func: u32, this: u32, p: [u32; 4]) -> u32;
     /// The renderer's +0x278: a point (a quad) projected to the screen (a quad, through a pointer)
     fn project(&mut self, m: &mut Mem, func: u32, this: u32, p: [u32; 4]) -> [u32; 4];
+    /// The node's own virtual (the PS2 node's drawing, row G7d2e) with these words and f12; its float answer's bits
+    fn node_vcall(&mut self, m: &mut Mem, func: u32, this: u32, args: &[u32], f12: u32) -> u32;
 }
 
 fn rf(m: &Mem, a: u32) -> F {
@@ -637,4 +640,118 @@ pub fn flares_part(m: &mut Mem, env: &mut dyn LensEnv, node: u32, sizes: [F; 2])
         }
         k += 1;
     }
+}
+
+/// The node's own virtual at `off` (its vtable at +8; the PS2 node's, row G7d2e)
+fn node_vfn(m: &Mem, node: u32, off: u32) -> (u32, u32) {
+    let vt = m.r32(node + 8);
+    (node.wrapping_add(m.r16(vt + off) as i16 as i32 as u32), m.r32(vt + off + 4))
+}
+
+/// The renderer's lens FX callback 0x1cdc78 (a jump to 0x1cdc80)(node): with a half ready (+0x10 not negative):
+/// how much of the sun and of each kept flare shows, by the node's +0x50 (its sprite box clamped and not, its depth;
+/// the answer to +0x44); when any shows: +0x58, then for each view +0x60 (the view's block +0x30), the sun's +0x70,
+/// each flare's +0x68 and +0x78; then +0x80
+pub fn callback(m: &mut Mem, env: &mut dyn LensEnv, node: u32) {
+    let h = m.r32(node + 0x10);
+    if (h as i32) < 0 {
+        return;
+    }
+    let views = |m: &Mem| m.r32((node + 0x20).wrapping_add(h.wrapping_mul(4))) as i32;
+    let count = |m: &Mem, v: u32| m.r32(node.wrapping_add(0x1b0).wrapping_add(v.wrapping_mul(4)).wrapping_add(h.wrapping_mul(8))) as i32;
+    let sun_at = |v: u32| node.wrapping_add(h.wrapping_mul(0x6c0)).wrapping_add(0x2240).wrapping_add(v.wrapping_mul(0x360));
+    let flare_at = |v: u32, k: u32| {
+        node.wrapping_add(h.wrapping_mul(0x1040)).wrapping_add(0x1c0).wrapping_add(v.wrapping_mul(0x820)).wrapping_add(k.wrapping_mul(0xd0))
+    };
+    let shows = |m: &mut Mem, env: &mut dyn LensEnv, at: u32| {
+        let (t, f) = node_vfn(m, node, 0x50);
+        let depth = m.r32(at + 0x20);
+        let v = env.node_vcall(m, f, t, &[at + 0x34, at + 0x24], depth);
+        m.w32(at + 0x44, v);
+        F(f32::from_bits(v)).ee() != 0.0
+    };
+    let mut any = false;
+    let mut v = 0u32;
+    while (v as i32) < views(m) {
+        let s = sun_at(v);
+        if m.r32(s) != 0 && shows(m, env, s) {
+            any = true;
+        }
+        let mut k = 0u32;
+        while (k as i32) < count(m, v) {
+            let e = flare_at(v, k);
+            if m.r32(e) != 0 && shows(m, env, e) {
+                any = true;
+            }
+            k += 1;
+        }
+        v += 1;
+    }
+    if !any {
+        return;
+    }
+    let call = |m: &mut Mem, env: &mut dyn LensEnv, off: u32, args: &[u32]| {
+        let (t, f) = node_vfn(m, node, off);
+        env.node_vcall(m, f, t, args, 0);
+    };
+    call(m, env, 0x58, &[]);
+    let mut v = 0u32;
+    while (v as i32) < views(m) {
+        call(m, env, 0x60, &[node.wrapping_add(h.wrapping_mul(0xc0)).wrapping_add(0x30).wrapping_add(v.wrapping_mul(0x60))]);
+        let s = sun_at(v);
+        if m.r32(s) != 0 {
+            call(m, env, 0x70, &[s]);
+        }
+        let mut k = 0u32;
+        while (k as i32) < count(m, v) {
+            call(m, env, 0x68, &[flare_at(v, k)]);
+            k += 1;
+        }
+        call(m, env, 0x78, &[]);
+        v += 1;
+    }
+    call(m, env, 0x80, &[]);
+}
+
+/// 0x1cdfc0(node, k): the colour scale (+0x2fd8) set, clamped to 0..1
+pub fn set_scale(m: &mut Mem, node: u32, k: F) {
+    let v = if k.ee() < 0.0 {
+        F(0.0)
+    } else if 1.0 < k.ee() {
+        F(1.0)
+    } else {
+        k
+    };
+    m.w32(node + 0x2fd8, v.0.to_bits());
+}
+
+/// 0x1ce000(node): the colour scale
+pub fn scale(m: &Mem, node: u32) -> F {
+    rf(m, node + 0x2fd8)
+}
+
+/// 0x1ce058(out, v, k): v × k, all four lanes (as `Vec4_Scale` 0x102f50); out
+pub fn vec4_scale(m: &mut Mem, out: u32, v: u32, k: F) -> u32 {
+    let q = rq(m, v).map(|x| x * k);
+    for j in 0..4 {
+        m.w32((out & !15) + 4 * j, q[j as usize].0.to_bits());
+    }
+    out
+}
+
+/// 0x1ce088(out, v, d): v's x, y, z × (1 ÷ d) (as `Vec3_Div` 0x137108); out
+pub fn vec3_div(m: &mut Mem, out: u32, v: u32, d: F) -> u32 {
+    let k = div(F(1.0), d);
+    let z = rf(m, v + 8) * k;
+    let x = rf(m, v) * k;
+    let y = rf(m, v + 4) * k;
+    m.w32(out + 8, z.0.to_bits());
+    m.w32(out, x.0.to_bits());
+    m.w32(out + 4, y.0.to_bits());
+    out
+}
+
+/// 0x1ce0c0(a, b): (a.x b.x + a.y b.y) + a.z b.z (as `Vec3_Dot` 0x137140)
+pub fn vec3_dot(m: &Mem, a: u32, b: u32) -> F {
+    (rf(m, a) * rf(m, b) + rf(m, a + 4) * rf(m, b + 4)) + rf(m, a + 8) * rf(m, b + 8)
 }
