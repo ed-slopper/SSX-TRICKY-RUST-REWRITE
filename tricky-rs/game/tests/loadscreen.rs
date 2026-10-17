@@ -48,16 +48,16 @@ const WIDGETS: (u32, u32) = (0x3b5a00, 0x1800);
 /// The progress bar's virtual at its table's 0x13c
 const BAR_SIZE: u32 = 0x2ad828;
 const ARENA: u32 = 0x0100_0000;
-const SIZE: u32 = 0x5000;
+const SIZE: u32 = 0x6000;
 const THIS: u32 = ARENA;
-const RENDER: u32 = ARENA + 0x1800;
-const RVT: u32 = ARENA + 0x1900;
-const SVT: u32 = ARENA + 0x1b00;
-const APPOBJ: u32 = ARENA + 0x1c00;
-const PICS: u32 = ARENA + 0x1d00;
-const SHEETS: u32 = ARENA + 0x2000;
+const RENDER: u32 = ARENA + 0x2400;
+const RVT: u32 = ARENA + 0x2500;
+const SVT: u32 = ARENA + 0x2700;
+const APPOBJ: u32 = ARENA + 0x2800;
+const PICS: u32 = ARENA + 0x2900;
+const SHEETS: u32 = ARENA + 0x3000;
 /// The sprite set (the screen's +4: its +0x15e8.. sheets)
-const SET: u32 = ARENA + 0x3000;
+const SET: u32 = ARENA + 0x4000;
 /// The packed pictures' buffer
 const HEAP: (u32, u32) = (0x0110_0000, 0x12000);
 const SCRATCH: u32 = 0x01f8_0000;
@@ -178,6 +178,8 @@ fn arity(func: u32) -> (usize, usize) {
         ls::GRADIENT_RECT => (5, 4),
         ls::DRAW_STRING | ls::DRAW_CENTRED => (2, 3),
         ls::MEASURE_WIDE => (3, 1),
+        ls::FIND_RIDER | ls::FORMAT_RACE_TIME => (2, 0),
+        ls::SHADOWED_CENTRED => (2, 3),
         _ => panic!("no arity for {func:#x}"),
     }
 }
@@ -196,7 +198,7 @@ fn standin(io: &mut dyn Io, func: u32, w: &[u32], f: &[u32], ans: &Answers) -> (
     if matches!(
         func,
         ls::SPRITE_RECT | ls::FILLED_RECT | ls::SPRITE_TILED | ls::SPRITE_ANCHORED | ls::DRAW_RIGHT | ls::PRINTF_SHADOWED_A | ls::DRAW_ALIGNED | ls::DRAW_CURSOR
-            | ls::GRADIENT_RECT | ls::DRAW_STRING | ls::DRAW_CENTRED
+            | ls::GRADIENT_RECT | ls::DRAW_STRING | ls::DRAW_CENTRED | ls::SHADOWED_CENTRED
     ) {
         log.extend((0..4).map(|k| io.r32(ls::DRAW_COLOUR + 4 * k)));
     }
@@ -235,6 +237,7 @@ fn standin(io: &mut dyn Io, func: u32, w: &[u32], f: &[u32], ans: &Answers) -> (
         ls::UNPACKED_SIZE => r % 2,
         ls::BANK_POLL | ls::SPRITES_POLL => [0u32, 1, 1, 7][(r % 4) as usize],
         ls::PLAYER_PROFILE => r % 12,
+        ls::FIND_RIDER => r % 6,
         ls::ATTRIBUTES => {
             // four attributes of four words (the bars read +4, +8, +0xc)
             if stack(w[2]) || mapped(w[2], 0x40) {
@@ -295,6 +298,8 @@ fn loading_screens_match_the_original() {
         0x245840, 0x245958,
         0x2459b0, 0x245a48, 0x245b68, 0x245cb8, 0x245ec0, 0x246700, 0x246f18, 0x246f50, 0x246f88, 0x246fe0, 0x2473d8,
         0x247a60, 0x247b78, 0x247bd0, 0x247d58, 0x2485f8, 0x248a60, 0x248a98, 0x248ad0, 0x248b18, 0x249250, 0x2493e0,
+        0x249758, 0x249870, 0x2498c8, 0x249900, 0x249948, 0x24a188, 0x24a930, 0x24a988, 0x24aa70, 0x24b028, 0x24b140,
+        0x24b198, 0x24b320, 0x24bb60, 0x24bb98, 0x24bbd0, 0x24c278, 0x24c2d0, 0x24c428,
     ];
     for f in funcs.into_iter().chain([0x250e98]) {
         r.allow(f);
@@ -312,7 +317,7 @@ fn loading_screens_match_the_original() {
         ls::COURSE_DROP, ls::COURSE_LENGTH, ls::MAP_X, ls::MAP_Y, ls::ANIM_VALUE, ls::TS_INIT, ls::TS_CONSTRUCT,
         ls::TS_SET_FONT, ls::TS_DESTRUCT_THUNK, ls::TS_DESTRUCT, ls::DRAW_ALIGNED, ls::DRAW_CURSOR, ls::SET_COPY_RECT,
         ls::ATTRIBUTES, ls::WIDGET_COLOUR, ls::WIDGET_POS, ls::WIDGET_VALUE, ls::BAR_DRAW, ls::BAR_DELETE, ls::GRADIENT_RECT,
-        ls::DRAW_STRING, ls::DRAW_CENTRED, ls::MEASURE_WIDE, BAR_SIZE,
+        ls::DRAW_STRING, ls::DRAW_CENTRED, ls::MEASURE_WIDE, BAR_SIZE, ls::FIND_RIDER, ls::FORMAT_RACE_TIME, ls::SHADOWED_CENTRED,
     ];
     stubs.extend(ROFFS.map(rv));
     stubs.extend(SOFFS.map(sv));
@@ -414,6 +419,16 @@ fn loading_screens_match_the_original() {
         wf(&mut m, THIS + 0xb34, g.f(1.0, 300.0));
         wf(&mut m, THIS + 0xb38, g.f(1.0, 300.0));
         m.w32(THIS + 0xe24, g.below(2));
+        // the front end loads' flags and pictures, the race's stats blocks
+        m.w32(THIS + 0xf14, g.below(2));
+        m.w32(THIS + 0x116c, g.below(2));
+        for i in 0..2 {
+            m.w32(THIS + 0x1170 + 0x34 * i, g.pick(&[0u32, 1, 1, 2]));
+        }
+        for at in (ls::CAREER + 0x3294..ls::CAREER + 0x3294 + 6 * 0xbc).step_by(4) {
+            let (v, w) = (g.next(), g.f(0.0, 500.0).to_bits());
+            m.w32(at, g.pick(&[v, w]));
+        }
         // the two-player load's pictures and its ids' table
         for i in 0..2 {
             m.w32(THIS + 0xcfc + 0x34 * i, g.pick(&[0u32, 1, 1, 2]));
@@ -590,6 +605,67 @@ fn loading_screens_match_the_original() {
                 ls::track2_draw_overlay(&mut m, e, THIS, SCRATCH);
                 none
             }
+            0x249758 => ls::fe1_new(&mut m, e, THIS),
+            0x249870 => {
+                ls::fe1_delete(&mut m, e, THIS, flags);
+                none
+            }
+            0x2498c8 => {
+                ls::fe1_vf4(&mut m, e, THIS, SCRATCH);
+                none
+            }
+            0x249900 => {
+                ls::fe1_start(&mut m, e, THIS);
+                none
+            }
+            0x249948 => ls::fe1_poll(&mut m, e, THIS),
+            0x24a188 => {
+                ls::fill_race_summary_1p(&mut m, e, THIS);
+                none
+            }
+            0x24a930 => {
+                ls::fe1_vf5(&mut m, e, THIS);
+                none
+            }
+            0x24a988 => {
+                ls::fe1_draw_background(&mut m, e, THIS, SCRATCH);
+                none
+            }
+            0x24aa70 => {
+                ls::fe1_draw_overlay(&mut m, e, THIS, SCRATCH);
+                none
+            }
+            0x24b028 => ls::fe2_new(&mut m, e, THIS),
+            0x24b140 => {
+                ls::fe2_delete(&mut m, e, THIS, flags);
+                none
+            }
+            0x24b198 => {
+                ls::fe2_start(&mut m, e, THIS);
+                none
+            }
+            0x24b320 => ls::fe2_poll(&mut m, e, THIS),
+            0x24bb60 => {
+                ls::fe2_vf4(&mut m, e, THIS, SCRATCH);
+                none
+            }
+            0x24bb98 => ls::fe2_vf3(&mut m, e, THIS, SCRATCH),
+            0x24bbd0 => {
+                ls::fill_race_summary_2p(&mut m, e, THIS);
+                none
+            }
+            0x24c278 => {
+                ls::fe2_vf5(&mut m, e, THIS);
+                none
+            }
+            0x24c2d0 => {
+                ls::fe2_draw_background(&mut m, e, THIS, SCRATCH);
+                none
+            }
+            0x24c428 => {
+                ls::fe2_draw_overlay(&mut m, e, THIS, SCRATCH);
+                none
+            }
             _ => unreachable!(),
         };
         if func == 0x243f00 && (step as usize) < 5 {
@@ -610,7 +686,7 @@ fn loading_screens_match_the_original() {
             0x244540 => vec![THIS, SHEETS, done],
             0x2447a8 => vec![THIS, 0, SHEETS, text, tex],
             0x2449f8 | 0x244fc8 => vec![THIS, SHEETS],
-            0x245958 | 0x247b78 => vec![THIS, flags],
+            0x245958 | 0x247b78 | 0x249870 | 0x24b140 => vec![THIS, flags],
             0x2459b0 | 0x245a48 | 0x245b68 => vec![pick, SCRATCH],
             _ => vec![THIS],
         };

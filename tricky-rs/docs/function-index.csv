@@ -4463,25 +4463,25 @@ address,size,name,system,status
 0x248b18,1848,c2PTrackLoad::DrawBackground,race,checked
 0x249250,396,FUN_00249250,race?,checked
 0x2493e0,888,c2PTrackLoad::DrawOverlay,frontend,checked
-0x249758,280,c1PFELoad::c1PFELoad,game,not started
-0x249870,88,c1PFELoad::~c1PFELoad,game,not started
-0x2498c8,52,c1PFELoad::vf4_2498c8,game,not started
-0x249900,72,c1PFELoad::StartAssetLoad,game,not started
-0x249948,2112,c1PFELoad::PollAssetLoad,game,not started
-0x24a188,1960,FE_FillRaceSummary1P,frontend,not started
-0x24a930,88,c1PFELoad::vf5_24a930,game,not started
-0x24a988,228,c1PFELoad::DrawBackground,game,not started
-0x24aa70,1464,c1PFELoad::DrawOverlay,frontend,not started
-0x24b028,280,c2PFELoad::c2PFELoad,race,not started
-0x24b140,88,c2PFELoad::~c2PFELoad,race,not started
-0x24b198,388,c2PFELoad::StartAssetLoad,race,not started
-0x24b320,2112,c2PFELoad::PollAssetLoad,race,not started
-0x24bb60,52,c2PFELoad::vf4_24bb60,race,not started
-0x24bb98,56,c2PFELoad::vf3_24bb98,race,not started
-0x24bbd0,1704,FE_FillRaceSummary2P,frontend,not started
-0x24c278,88,c2PFELoad::vf5_24c278,race,not started
-0x24c2d0,340,c2PFELoad::DrawBackground,race,not started
-0x24c428,800,c2PFELoad::DrawOverlay,frontend,not started
+0x249758,280,c1PFELoad::c1PFELoad,frontend,checked
+0x249870,88,c1PFELoad::~c1PFELoad,frontend,checked
+0x2498c8,52,c1PFELoad::vf4_2498c8,frontend,checked
+0x249900,72,c1PFELoad::StartAssetLoad,frontend,checked
+0x249948,2112,c1PFELoad::PollAssetLoad,frontend,checked
+0x24a188,1960,FE_FillRaceSummary1P,frontend,checked
+0x24a930,88,c1PFELoad::vf5_24a930,frontend,checked
+0x24a988,228,c1PFELoad::DrawBackground,frontend,checked
+0x24aa70,1464,c1PFELoad::DrawOverlay,frontend,checked
+0x24b028,280,c2PFELoad::c2PFELoad,frontend,checked
+0x24b140,88,c2PFELoad::~c2PFELoad,frontend,checked
+0x24b198,388,c2PFELoad::StartAssetLoad,frontend,checked
+0x24b320,2112,c2PFELoad::PollAssetLoad,frontend,checked
+0x24bb60,52,c2PFELoad::vf4_24bb60,frontend,checked
+0x24bb98,56,c2PFELoad::vf3_24bb98,frontend,checked
+0x24bbd0,1704,FE_FillRaceSummary2P,frontend,checked
+0x24c278,88,c2PFELoad::vf5_24c278,frontend,checked
+0x24c2d0,340,c2PFELoad::DrawBackground,frontend,checked
+0x24c428,800,c2PFELoad::DrawOverlay,frontend,checked
 0x24c748,300,cFELoadFromQuit::cFELoadFromQuit,frontend,ported
 0x24c878,100,cFELoadFromQuit::~cFELoadFromQuit,frontend,not started
 0x24c8e0,72,cFELoadFromQuit::vf9_24c8e0,frontend,not started

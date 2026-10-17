@@ -1492,3 +1492,30 @@ which the first pass already did.
 
 The same runner test, now 13,800 cases over the 46 functions. 58 of 59 mutants were caught; the one left drops
 the bar's `this` adjustment, which is 0 in the table.
+
+### The front end loads (G9w4)
+
+- **`c1PFELoad`** (table 0x3a51b8) and **`c2PFELoad`** (0x3a5158) are shown when going back to the front end after
+  a race. Both start the same way as the other loading screens: the base, an animation at +0x40c, 28 sprite records
+  (at +0xc04 for one player, +0xe5c for two), the fade's colours. The port shares that start and the matching end
+  as `screen_new` and `screen_delete`.
+- **`FE_FillRaceSummary1P` 0x24a188** fills the lines from the race just run:
+  - the mode's heading (0xe7d free ride, 0xe7e race, show-off and time challenge, 0xe7f modes 4 and 5) and line;
+  - the course's name and ten labels;
+  - the player's character, level and trick book pages;
+  - four counts from the rider's stats block (`Career_FindRider` 0x166598 picks the block, 0xbc each from the
+    career's +0x3294) and three times, each a float · 100 made whole and passed to the race time format 0x243b88.
+
+  It then adds the animation's bars, one per line.
+- **`FE_FillRaceSummary2P` 0x24bbd0** fills the same lines for both players and adds no bars. Mode 7's line is
+  0xe2c here, not the one-player screen's. The two-player screen also loads both riders' pictures ("ldr1",
+  "ldr2") and draws them in tip boxes at 23 and 360.
+- **The overlays:**
+  - the one-player overlay types the values in at 475, with the cursor on the animation's current line;
+  - the two-player overlay draws a centred column of labels with the players' values right-aligned at 210 and
+    left-aligned at 430. It uses a centred shadowed print (0x19d770), and sets the drawer's colour directly
+    instead of through the colour call.
+
+The runner test now has 19,500 cases over 65 functions. 45 of 46 mutants were caught. The one left gives the
+one-player destructor the two-player table; the base's destructor overwrites that word straight after, so the
+mutant is equivalent.
