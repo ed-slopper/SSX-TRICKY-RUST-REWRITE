@@ -1,5 +1,5 @@
-//! `tricky_game::drawlist`'s flush (board row G7h2) against the original in the function runner (TRICKY_ELF;
-//! skipped without it). Every case is a fresh list filled by the (checked) G7h1 port: random packets under a few
+//! `tricky_game::drawlist`'s flush (board row G7j2) against the original in the function runner (TRICKY_ELF;
+//! skipped without it). Every case is a fresh list filled by the (checked) G7j1 port: random packets under a few
 //! states, texture pages (negative words too), views and words, some following. Then one of:
 //! - the flush;
 //! - one batch's state changes against a random current state;
@@ -97,7 +97,7 @@ fn draw_flush_matches_the_original() {
         m.w32(APPOBJ + 0xc0 + 0x24, ASK);
         m.w32(app + 0x30, APPOBJ + 0x140);
         *ask.borrow_mut() = g.below(2);
-        // the list: empty, then filled by G7h1's port
+        // the list: empty, then filled by G7j1's port
         for k in 0..0x200 {
             m.w32(D + 0x3224 + 4 * k, 0);
         }

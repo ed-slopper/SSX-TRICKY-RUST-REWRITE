@@ -1,7 +1,7 @@
-//! The renderer's draw lists (board row G7h1): `PS2Draw_*` 0x1c4220..0x1c4638 and 0x1c4d30..0x1c4fdc,
+//! The renderer's draw lists (board row G7j1): `PS2Draw_*` 0x1c4220..0x1c4638 and 0x1c4d30..0x1c4fdc,
 //! 0x1c6f98..0x1c720c, and `PS2Render_Submit` / `_FlushState` 0x1e8838 / 0x1e88c8. Every packet the draws hand the
 //! renderer (`PS2Render_Submit`) is put in a batch under the state it is drawn with; the batches are found by
-//! texture page and state, and sorted by a key before the flush (row G7h2) writes them out. On the bytes at their
+//! texture page and state, and sorted by a key before the flush (row G7j2) writes them out. On the bytes at their
 //! addresses ([`Mem`]); the sort is a call out ([`DrawListEnv`]). Checked in the function runner
 //! (`tests/drawlist.rs`).
 //!
@@ -319,11 +319,11 @@ pub fn flush_state(m: &mut Mem, r: u32) {
     flush(m, r);
 }
 
-// ---- The flush (row G7h2) ----
+// ---- The flush (row G7j2) ----
 
 /// The texture upload 0x1c3818(cache, texture, context, &packet)
 pub const UPLOAD: u32 = 0x1c3818;
-/// `PS2Draw_WriteTexState` 0x1c5c88(list, program, how, word, &packet) (row G7h3)
+/// `PS2Draw_WriteTexState` 0x1c5c88(list, program, how, word, &packet) (row G7j3)
 pub const WRITE_TEX_STATE: u32 = 0x1c5c88;
 /// `BxList_DrawAll` 0x17d9d8(lists, list)
 pub const DRAW_ALL: u32 = 0x17d9d8;
@@ -683,7 +683,7 @@ pub fn game_draw_lists(m: &mut Mem, env: &mut dyn DrawListEnv) {
     }
 }
 
-// ---- The VU1 program upload (row G7h3) ----
+// ---- The VU1 program upload (row G7j3) ----
 
 /// The VU1 chains `write_tex_state` calls, by program (0 and 10 none; 8 and 9 share one)
 pub const CHAINS: [u32; 11] = [0, 0x312af0, 0x3110f0, 0x30f960, 0x314620, 0x319e30, 0x31c260, 0x31c790, 0x318080, 0x318080, 0];

@@ -1,4 +1,4 @@
-//! `tricky_game::drawlist` (board row G7h1) against the original in the function runner (TRICKY_ELF; skipped
+//! `tricky_game::drawlist` (board row G7j1) against the original in the function runner (TRICKY_ELF; skipped
 //! without it): every case a fresh list (its arrays and the rest random, its hash heads and counts empty, nothing
 //! found) and a renderer, then a run of random steps on both: states set from a few (some alike but for one field)
 //! or bound, texture pages (negative and past 512 too), the renderer's submits and flushes with their pending

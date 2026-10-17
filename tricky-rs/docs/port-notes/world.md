@@ -1277,10 +1277,10 @@ allocator answering 0 or a place. 26 of 29 mutants were caught. The three left a
 - the two multiplies regrouped: by 2⁻⁷ it is exact while normal, and both sides flush to 0 otherwise;
 - the +0x530 clear, overwritten before it is read.
 
-## The renderer's draw lists (row G7h1; `game/src/drawlist.rs`, checked: `tests/drawlist.rs`)
+## The renderer's draw lists (row G7j1; `game/src/drawlist.rs`, checked: `tests/drawlist.rs`)
 
 `PS2Render_Submit` 0x1e8838 doesn't send a packet. It puts the packet in the draw list at the renderer's +0x480,
-under the state it is drawn with, and the flush (row G7h2) writes the lists out later in sort order.
+under the state it is drawn with, and the flush (row G7j2) writes the lists out later in sort order.
 
 - **The pending state:**
   - When the renderer's +0x474 is set, `PS2Draw_SetState` 0x1c4d68 takes the texture state (+0x470) into the
@@ -1326,7 +1326,7 @@ compared after every step. The states are a few, some alike but for one field. T
 and ≥ 512 words, and the renderer's pending flags are random. 69 of 70 mutants were caught. The one left is
 equivalent: copying the state with or without +0xfa40, since +0x18 gets its old word back straight after.
 
-## The draw lists' flush (row G7h2; `drawlist::flush_buckets` and the GS writers, checked: `tests/drawflush.rs`)
+## The draw lists' flush (row G7j2; `drawlist::flush_buckets` and the GS writers, checked: `tests/drawflush.rs`)
 
 - **`PS2Draw_FlushBuckets` 0x1c4fe0**(list, &packet) answers the packet's start. In order:
   1. It clears the two words (+0xfa5c, +0xfa60 to −1), sets the current state to the default, writes the full
@@ -1343,7 +1343,7 @@ equivalent: copying the state with or without +0xfa40, since +0x18 gets its old 
   GIF tag (1 << 60). Its registers start 0x30 into the packet: a builder of {count, next place, start}, which the
   game keeps on its stack (the port uses a scratch area: STANDIN).
 - **`PS2Draw_WriteFullState` 0x1c51f0** writes the default state. First the VU1 program (`PS2Draw_WriteTexState`,
-  row G7h3: program 0, how 0, the state's word). Then, for context 1 and context 2: the clamp, the alpha, the
+  row G7j3: program 0, how 0, the state's word). Then, for context 1 and context 2: the clamp, the alpha, the
   z buffer (base +0xfa68, format +0xfa64, the state's +0x11) and the test.
 - **`PS2Draw_WriteStateChanges` 0x1c5368**(list, batch, word, view, &packet) writes what differs from the list's
   current state, taking it over.
@@ -1372,12 +1372,12 @@ equivalent: copying the state with or without +0xfa40, since +0x18 gets its old 
   - Any other how does nothing.
 - **`Game_DrawLists` 0x1c7290** runs `BxList_DrawAll` on 0x337c60 for each of the thirteen lists at 0x33d7d8.
 
-Checked in the runner (`tests/drawflush.rs`, 4000 cases). Each case builds a list with G7h1's port, then runs the
+Checked in the runner (`tests/drawflush.rs`, 4000 cases). Each case builds a list with G7j1's port, then runs the
 flush, one batch's changes, the full state, a GS writer or close (on a random builder, every how), or
 `Game_DrawLists`. The VU1 program write, the upload, the sort, the lists' draw and the app's question are logging
 stand-ins. All 70 mutants were caught.
 
-## The VU1 program upload (row G7h3; `drawlist::write_tex_state`, checked: `tests/texstate.rs`)
+## The VU1 program upload (row G7j3; `drawlist::write_tex_state`, checked: `tests/texstate.rs`)
 
 **`PS2Draw_WriteTexState` 0x1c5c88**(list, program, how, word, &packet) writes the packet that sets up a batch's
 VU1 program. The index's 100 bytes are wrong: the function runs 4872 bytes, to 0x1c6f94, as a switch over 11

@@ -1,4 +1,4 @@
-//! `tricky_game::drawlist::write_tex_state` (board row G7h3) against the original in the function runner
+//! `tricky_game::drawlist::write_tex_state` (board row G7j3) against the original in the function runner
 //! (TRICKY_ELF; skipped without it): every case a fresh list (its matrix sets random, any floats; which is
 //! current), a Bezier manager behind the renderer's +0x20 (a logging stand-in answering it), then
 //! `PS2Draw_WriteTexState` with any program (past 10 too), how (−1..3) and word (0 or not). The memory and the
