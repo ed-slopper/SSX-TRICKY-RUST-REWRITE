@@ -172,3 +172,4 @@ pub mod musichost;
 pub mod sky;
 pub mod cull;
 pub mod worldgrid;
+pub mod lights;

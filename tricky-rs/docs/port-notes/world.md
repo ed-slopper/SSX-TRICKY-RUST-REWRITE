@@ -853,3 +853,45 @@ its copy at +0x490). `BxList_CullToCount` in the list test's random sequences (1
 shared): 6 of 6 caught. `WorldGrid_CellAtPos`: 5 of 6 caught. The one left (the INode size not made whole) is
 equivalent on the game's courses, whose sizes are already whole numbers.
 
+## The lights (row G7d1; `game/src/lights.rs`, checked: `tests/lights.rs`)
+
+- **A light** is listed by each `.ltg` INode it touches (+0x44 its list, +0x2e the count). Its fields: +0 the kind
+  (0 directional, 1 spot, 2 point, 3 ambient), +4 flags (0x100 local, 0x200 not dimmed), +0x10 r, g, b, +0x1c the
+  direction, +0x28 the position, +0x4c the spot's cone (a cosine), +0x50 the falloff, +0x54 the spot's power (made a
+  whole number toward zero).
+- **The falloff** with distance d (VU0's `vsqrt` of all four lanes squared, so the point's w counts) is 1 below 100,
+  else 100/d, 10⁴/d² or 10⁶/d³ for kinds 1, 2 and 3 (any other kind: 1). All three are exactly 1 at d = 100. A spot
+  lights only where the cone (+0x4c) is below −(the way to the light · its direction). It is then × that value to its
+  power, by repeated squaring: 1 for power 0, of 1/value for a negative power, 0 for a value of 0.
+- **`World_GetLightsAt` 0x25a160**(world, pos, ambient, colours, dirs):
+  - It starts with the ambient (1, 0, 0, 0) and three dark lights: colours 0, directions (1, 0, 0, 0), strengths 0.
+  - The TGroup is (p − corner + size) / size − 1 per axis, clamped. With none, that is the answer. The INode is
+    `World_GetCellAt` 0x260d08 of p's offset from the middle of the **unclamped** cell: n × (d + size/2) / size,
+    clamped to 0..n−1.
+  - Pass 1, the local lights (flag 0x100), point and spot only: their colour × falloff (× the spot's part) summed.
+    With any found, each of r, g, b becomes clamp(sum + 1, 0, 1). Local lights only ever dim the rest, when their
+    colours are negative.
+  - Pass 2, every other light. An ambient one is added to the ambient's r, g, b. Directional (the direction
+    negated), point and spot (the normalised way to the light) become colour quads (0, r, g, b) × falloff (× the
+    spot's part) for `Lights_InsertStrongest`.
+  - With local lights found, a light without flag 0x200 is first dimmed by the clamped sum. For an ambient light it
+    is the whole ambient, again after each one is added.
+  - The point's x and y are read as words, its quad (`lqc2`) at the address rounded down to 16.
+- **`Lights_InsertStrongest` 0x25a028**(strengths, colours, dirs, dir, colour): the strength is |(r + g) + b| (the
+  colour quad's last three). The three kept are in ascending order. A light only stronger than the weakest replaces
+  it; one stronger than more of them moves those down a place. On a tie the old light stays.
+- **`Lights_Build` 0x1ce140**(out, ambient, d0, c0, d1, c1, d2, c2) makes the renderer's block. +0 is a matrix with
+  the three directions as its columns (w row (0, 0, 0, 1)). +0x40 holds four rows: the colours as (r, g, b, quad x)
+  for c0, c1, c2 and the ambient, all × 128. `Lights_Clear` 0x1ce278: no lights, an ambient row of 128s, the
+  matrix's w 1.
+- `Mat4_RotateBy` 0x1ce310(a, b): a = b × a (b's rows through a's), its last row set to (0, 0, 0, 1).
+- `cLightMan` 0x1ce0f0 keeps itself at 0x33efb8 (0x1ce400 answers it; the destructor clears it). Its vtable is
+  0x391e20 and its four small virtuals do nothing.
+
+Checked in the runner on 40,000 random cases: grids of 3 × 3 TGroups (some missing) with 2 × 2 INodes listing 24
+lights of every kind, flag, falloff and power; points off 16-byte alignment, whole-number points with lights exactly
+100 away. About 8,000 gatherings kept 7,500 lights. 35 of 42 mutants were caught. Five of the rest are equivalent:
+the falloff boundary at 100, the clamp at exactly 1, the clamp without local lights (never used), a 0 base in the
+power (it differs only for −0), and the ambient's × 1. Two are exact boundaries the random data does not reach: the
+INode division's rounding, and a cone exactly at its cosine.
+
