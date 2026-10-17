@@ -277,6 +277,35 @@ pub fn delete_all(m: &mut Mem, env: &mut dyn NodeEnv, set: u32, l: u32) {
     }
 }
 
+/// `BxList_CullToCount` 0x17db00(set, l, n): while the live list holds n nodes or more, the one with the least vf6
+/// (+0x3c, unsigned; the last of equal ones) is deleted (vf0 with 3) and the list walked again. Nothing in the game
+/// calls it
+pub fn cull_to_count(m: &mut Mem, env: &mut dyn NodeEnv, set: u32, l: u32, n: i32) {
+    loop {
+        let mut count = 0i32;
+        let mut least = first(m, set, l);
+        let mut node = least;
+        while node != 0 {
+            count += 1;
+            let key = call_virtual(m, env, node, 0x3c, &[]);
+            let least_key = call_virtual(m, env, least, 0x3c, &[]);
+            if least_key >= key {
+                least = node;
+            }
+            node = next_or_null(m, set, node, l);
+        }
+        if count < n {
+            return;
+        }
+        if least != 0 {
+            call_virtual(m, env, least, 0xc, &[3]);
+        }
+        if count - 1 < n {
+            return;
+        }
+    }
+}
+
 /// `BxList_SetSorted` 0x17dae0
 pub fn set_sorted(m: &mut Mem, set: u32, l: u32) {
     let at = list(m, set, l);

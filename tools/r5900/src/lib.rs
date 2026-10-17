@@ -129,7 +129,7 @@ impl Mem {
     }
 }
 
-/// The registers: 128-bit GPRs, the FPU, and VU0 as the core sees it in macro mode.
+/// The registers: 128-bit GPRs, the FPU, and VU0 as the core sees it in macro mode (and runs it in micro mode).
 #[derive(Clone)]
 pub struct Cpu {
     pub gpr: [u128; 32],
@@ -143,6 +143,9 @@ pub struct Cpu {
     pub vi: [u16; 16],
     pub acc: [f32; 4],
     pub q: f32,
+    /// VU0's clip flags (four tests of six bits, the latest lowest) and CMSAR0 (`vcallmsr`'s start, in 8 bytes)
+    pub clip: u32,
+    pub cmsar0: u16,
     pub pc: u32,
 }
 
@@ -150,7 +153,7 @@ impl Cpu {
     fn new() -> Cpu {
         let mut vf = [[0.0; 4]; 32];
         vf[0] = [0.0, 0.0, 0.0, 1.0];
-        Cpu { gpr: [0; 32], hi: 0, lo: 0, fpr: [0; 32], fcc: false, vf, vi: [0; 16], acc: [0.0; 4], q: 0.0, pc: 0 }
+        Cpu { gpr: [0; 32], hi: 0, lo: 0, fpr: [0; 32], fcc: false, vf, vi: [0; 16], acc: [0.0; 4], q: 0.0, clip: 0, cmsar0: 0, pc: 0 }
     }
 
     pub fn gpr(&self, r: usize) -> u64 {
@@ -186,6 +189,8 @@ pub struct Runner {
     pub step_limit: u64,
     /// How floats are rounded (`ps2float::Rules`); the default is what matched the game in PCSX2.
     pub float_rules: ps2float::Rules,
+    /// VU0's micro memory (4 KiB) for `vcallms` / `vcallmsr`: empty until a test loads it (`load_vu0_chain`).
+    pub vu0_micro: Vec<u8>,
 }
 
 impl Runner {
@@ -248,7 +253,48 @@ impl Runner {
             steps: 0,
             step_limit: STEP_LIMIT,
             float_rules: ps2float::Rules::default(),
+            vu0_micro: vec![0; 4096],
         }
+    }
+
+    /// VU0's micro memory as the game uploads it: the DMA chain from `tadr` in this memory (`cnt` tags, ended by
+    /// an `end` tag), its words read as VIF codes, each `MPG` placing its instructions. The other codes carry no
+    /// data here; `UNPACK` or another tag kind is an error. The number of instructions placed
+    pub fn load_vu0_chain(&mut self, tadr: u32) -> Result<usize, String> {
+        let mut stream = Vec::new();
+        let mut at = tadr;
+        loop {
+            let lo = self.mem.read_u32(at);
+            let (qwc, id) = (lo & 0xffff, (lo >> 28) & 7);
+            let mut b = vec![0u8; 8 + 16 * qwc as usize];
+            self.mem.read(at + 8, &mut b).ok_or("chain outside memory")?;
+            stream.extend(b);
+            match id {
+                7 => break,
+                1 => at += 16 + 16 * qwc,
+                _ => return Err(format!("DMA tag kind {id} at {at:#x}")),
+            }
+        }
+        let (mut i, mut placed) = (0usize, 0usize);
+        while i + 4 <= stream.len() {
+            let w = u32::from_le_bytes(stream[i..i + 4].try_into().unwrap());
+            i += 4;
+            let (cmd, num, imm) = ((w >> 24) & 0x7f, (w >> 16) & 0xff, (w & 0xffff) as usize);
+            match cmd {
+                0x4a => {
+                    let n = if num == 0 { 256 } else { num as usize };
+                    i += i % 8; // the program is 64-bit aligned in the stream
+                    let to = imm * 8;
+                    let code = stream.get(i..i + 8 * n).ok_or("MPG past the chain's end")?;
+                    self.vu0_micro.get_mut(to..to + 8 * n).ok_or("MPG past micro memory")?.copy_from_slice(code);
+                    i += 8 * n;
+                    placed += n;
+                }
+                0x60..=0x7f => return Err(format!("VIF UNPACK {w:#x} in the chain")),
+                _ => {}
+            }
+        }
+        Ok(placed)
     }
 
     /// `$gp` as the start-up code sets it: it builds the value in a register with `lui`/`addiu` and copies it

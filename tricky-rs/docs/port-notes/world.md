@@ -818,3 +818,38 @@ Checked in the runner on 16,000 random sky sets, about 1,000 calls for each of 1
 as the original and names differing only in case). 340 layers were loaded, 1,669 sky boxes drawn, and 817 found
 their sky. 37 of 38 mutants were caught. The one left is equivalent (the count lowered to `i` inside the test that
 `i` is the last one).
+
+## The renderer's box test, the list cull and the grid lookup (row G7c4; `game/src/cull.rs`, `bxlist.rs`, `worldgrid.rs`)
+
+- **`cPS2GraphicsMan::CullBox` 0x1e1b10** (the renderer's slot +0x280, which the snow's and the fog's walks call):
+  - The first test of a frame (+0x17d0 clear; it is then set) makes the frame's matrices: +0x1770 the camera's
+    (+0x3f4) times +0x1730; +0x490 a copy of the camera's; +0x510 that times +0x4d0; +0x5b0 that times +0x570. Then
+    0x1c4650(+0x480) and 0x1c4c38(+0x480, +0x610).
+  - The test itself is VU0 micro program 0x320 (byte address; `vcallmsr` with CMSAR0 0x64) in the game's
+    215-instruction upload. It makes the box's eight corners from its min and max quads (each corner's w is
+    min.w), puts each one through +0x5b0's rows, and `vclipw.xyz`s it against its own w. Each `fcget` reads its
+    corner's flags (four instructions after the clip, when they are ready). The flags are OR-ed and AND-ed into vi1
+    and vi2 and masked to 6 bits.
+  - The answer is 1 when every corner is beyond one same plane (AND not 0), 0 when no corner is beyond any (OR
+    0), else 2. A flag is set for x > |w| or x < −|w| (the same for y and z), so a corner exactly on a plane is
+    inside.
+  - The runner now has a VU0 micro mode for this (`docs/checking.md`). The test loads the program from the game's
+    own upload chain (0x31cac0) and runs the original.
+- **`BxList_CullToCount` 0x17db00**(set, list, n): while the live list holds n nodes or more, it deletes the one with
+  the least vf6 (+0x3c; unsigned; of equal ones the last) with vf0(3), then walks the list again. Nothing in the
+  game calls it. With a negative n it never ends once the list is empty.
+- **`WorldGrid_CellAtPos` 0x260b18**(&grid, p, &x, &y): with no grid, 0, and the coordinates are not written.
+  Otherwise an INode's size is the TGroup size (+0x28) over the INodes a side (+0x44), made a whole number. The
+  coordinates are (p − the grid's corner (+4, +8)) over that size, toward zero (the EE's division and
+  conversions). They are written out, and the INode there is `WorldGrid_CellAt`'s (`data::ltg::Ltg::inode_at`).
+  Checked on all twelve courses' grids at 4,000 points each, some exactly on INode corners.
+- The other users of the `.ltg` grid are the world's walks over its cells. The snow's and the fog's are ported
+  (G7c1, G7c2) and the line queries' too (E7a). Drawing the terrain and the objects belongs to G7a and G7b.
+
+Checked in the runner. `CullBox` on 30,000 random renderers and boxes (all three answers well represented; a
+third of them make the frame's matrices, some with −0 in the camera's and an exact identity clip matrix with
+corners on the planes): 16 of 17 mutants caught, the one left equivalent (+0x510 from the camera's matrix instead of
+its copy at +0x490). `BxList_CullToCount` in the list test's random sequences (1,232 nodes culled, keys often
+shared): 6 of 6 caught. `WorldGrid_CellAtPos`: 5 of 6 caught. The one left (the INode size not made whole) is
+equivalent on the game's courses, whose sizes are already whole numbers.
+

@@ -1715,7 +1715,7 @@ address,size,name,system,status
 0x17d9d8,116,BxList_DrawAll,ai?,checked
 0x17da50,140,BxList_DeleteAll,ai?,checked
 0x17dae0,32,BxList_SetSorted,ai?,checked
-0x17db00,264,BxList_CullToCount,ai?,not started
+0x17db00,264,BxList_CullToCount,ai?,checked
 0x17dc60,8,cCounterNode::vf6_17dc60,world,not started
 0x17dc68,8,cCounterNode::vf5_17dc68,world,not started
 0x17dc70,64,cCounterNode::vf4_17dc70,world,not started
@@ -3054,7 +3054,7 @@ address,size,name,system,status
 0x1e16f0,28,cPS2GraphicsMan::vf49_1e16f0,render,not started
 0x1e1710,28,cPS2GraphicsMan::vf50_1e1710,render,not started
 0x1e1730,988,cPS2GraphicsMan::vf78_1e1730,render,not started
-0x1e1b10,768,cPS2GraphicsMan::CullBox,render,not started
+0x1e1b10,768,cPS2GraphicsMan::CullBox,render,checked
 0x1e1e10,88,cPS2GraphicsMan::vf80_1e1e10,render,not started
 0x1e1e68,92,cPS2GraphicsMan::vf81_1e1e68,render,not started
 0x1e1ec8,96,FUN_001e1ec8,render?,not started
@@ -4696,7 +4696,7 @@ address,size,name,system,status
 0x260898,264,Course_RemapLightmapTextures,race,ported
 0x2609b0,28,RailNode_GetSpline,boarder,not started
 0x2609d0,328,World_LoadTextures,world,ported
-0x260b18,144,WorldGrid_CellAtPos,world?,not started
+0x260b18,144,WorldGrid_CellAtPos,world?,checked
 0x260ba8,248,WorldGrid_CellAt,world?,ported
 0x260ca0,24,World_GetInstanceSphTree,world,ported
 0x260cb8,72,WorldGrid_GetCellItem,world?,ported

@@ -469,17 +469,19 @@ fn set_vf(c: &mut crate::Cpu, reg: usize, dest: u32, v: [f32; 4]) {
 }
 
 #[allow(clippy::too_many_arguments)]
-fn cop2(r: &mut Runner, pc: u32, w: u32, rs: usize, rt: usize, rd: usize, sa: u32, fun: u32) -> Result<Next, Error> {
+fn cop2(r: &mut Runner, pc: u32, w: u32, rs: usize, rt: usize, rd: usize, _sa: u32, fun: u32) -> Result<Next, Error> {
     let c = &mut r.cpu;
     let unimpl = |what: String| Err(Error::Unimplemented { pc, word: w, what });
     if rs & 16 == 0 {
         match rs {
             1 => c.gpr[rt] = u128::from_le_bytes(vf_to_quad(c.vf[rd])), // qmfc2
             2 => {
-                // cfc2: VI0-15, Q (22); flags and the rest are not modelled yet
+                // cfc2: VI0-15, the clip flags (18), Q (22), CMSAR0 (27); the other flags are not modelled yet
                 let v = match rd {
                     0..=15 => c.vi[rd] as u32,
+                    18 => c.clip,
                     22 => c.q.to_bits(),
+                    27 => c.cmsar0 as u32,
                     _ => return unimpl(format!("cfc2 from control register {rd}")),
                 };
                 c.set_gpr(rt, sext32(v));
@@ -488,11 +490,35 @@ fn cop2(r: &mut Runner, pc: u32, w: u32, rs: usize, rt: usize, rd: usize, sa: u3
                 let q = c.gpr[rt].to_le_bytes(); // qmtc2
                 set_vf(c, rd, 0b1111, quad_to_vf(&q));
             }
+            6 => {
+                // ctc2: VI1-15, the clip flags (18), CMSAR0 (27)
+                let v = c.gpr(rt) as u32;
+                match rd {
+                    1..=15 => c.vi[rd] = v as u16,
+                    0 => {}
+                    18 => c.clip = v & 0xff_ffff,
+                    27 => c.cmsar0 = v as u16,
+                    _ => return unimpl(format!("ctc2 to control register {rd}")),
+                }
+            }
             _ => return unimpl(format!("cop2 rs {rs}")),
         }
         return Ok(Next::Seq);
     }
-    // VU0 macro mode: dest bits 24..21 (x..w), ft 20..16, fs 15..11, fd 10..6, broadcast in the low two bits
+    // vcallms imm15 (its start in 8 bytes, bits 6..20) / vcallmsr (CMSAR0): the micro program, run to its end
+    if fun == 56 || fun == 57 {
+        let start = if fun == 56 { (w >> 6) & 0x7fff } else { c.cmsar0 as u32 };
+        vu0_micro(r, pc, start * 8)?;
+        return Ok(Next::Seq);
+    }
+    vu_upper(c, w).map_err(|what| Error::Unimplemented { pc, word: w, what })?;
+    Ok(Next::Seq)
+}
+
+/// A VU upper op (macro mode's special1 / special2; micro mode's upper word has the same fields): dest bits
+/// 24..21 (x..w), ft 20..16, fs 15..11, fd 10..6, broadcast in the low two bits
+fn vu_upper(c: &mut crate::Cpu, w: u32) -> Result<(), String> {
+    let (rt, rd, sa, fun) = (((w >> 16) & 31) as usize, ((w >> 11) & 31) as usize, (w >> 6) & 31, w & 63);
     let dest = (w >> 21) & 15;
     let (ft, fs, fd) = (rt, rd, sa as usize);
     let (s, t) = (c.vf[fs], c.vf[ft]);
@@ -514,10 +540,10 @@ fn cop2(r: &mut Runner, pc: u32, w: u32, rs: usize, rt: usize, rd: usize, sa: u3
                 let p = [pf::mul(s[1], t[2]), pf::mul(s[2], t[0]), pf::mul(s[0], t[1])];
                 [pf::sub(c.acc[0], p[0]), pf::sub(c.acc[1], p[1]), pf::sub(c.acc[2], p[2]), c.acc[3]]
             }
-            _ => return unimpl(format!("vu0 macro funct {fun}")),
+            _ => return Err(format!("vu0 funct {fun}")),
         };
         set_vf(c, fd, dest, v);
-        return Ok(Next::Seq);
+        return Ok(());
     }
     let fsf = ((w >> 21) & 3) as usize;
     let ftf = ((w >> 23) & 3) as usize;
@@ -556,11 +582,28 @@ fn cop2(r: &mut Runner, pc: u32, w: u32, rs: usize, rt: usize, rd: usize, sa: u3
         // vmtir it, fs.fsf: the lane's low 16 bits to the integer register (it is ft's field)
         60 => {
             if ft != 0 {
-                c.vi[ft] = s[fsf].to_bits() as u16;
+                c.vi[ft & 15] = s[fsf].to_bits() as u16;
             }
             None
         }
-        x => return unimpl(format!("vu0 macro special2 {x}")),
+        // vclipw.xyz fs, ft: the clip flags shifted up six and this test's below: x > |ft.w| 1, x < −|ft.w| 2,
+        // then y 4 / 8, z 0x10 / 0x20
+        31 => {
+            let lim = t[3].abs();
+            let mut f = 0;
+            for k in 0..3 {
+                if s[k] > lim {
+                    f |= 1 << (2 * k);
+                }
+                if s[k] < -lim {
+                    f |= 2 << (2 * k);
+                }
+            }
+            c.clip = ((c.clip << 6) | f) & 0xff_ffff;
+            None
+        }
+        47 => None, // vnop
+        x => return Err(format!("vu0 special2 {x}")),
     };
     if let Some(v) = to_acc {
         for (i, x) in v.into_iter().enumerate() {
@@ -569,7 +612,100 @@ fn cop2(r: &mut Runner, pc: u32, w: u32, rs: usize, rt: usize, rd: usize, sa: u3
             }
         }
     }
-    Ok(Next::Seq)
+    Ok(())
+}
+
+/// VU0 micro mode (`vcallms` / `vcallmsr`): the program in `Runner::vu0_micro` from byte `start` until the
+/// instruction after the one with the E bit. Each pair's upper and lower read the registers as they were before it;
+/// results are there for the next pair (no pipeline: a program that reads a result before its latency is up, or
+/// relies on a flag's delay, would differ). The upper ops are the macro ones; the lower ones are the integer ops,
+/// `fcget`, `move`, and the branches.
+fn vu0_micro(r: &mut Runner, call_pc: u32, start: u32) -> Result<(), Error> {
+    let mut pc = start & 0xff8;
+    let (mut ending, mut branch): (bool, Option<u32>) = (false, None);
+    for _ in 0..100_000 {
+        let at = pc as usize;
+        if at + 8 > r.vu0_micro.len() {
+            return Err(Error::Unimplemented { pc: call_pc, word: pc, what: "vu0 micro program outside micro memory".into() });
+        }
+        let lo = u32::from_le_bytes(r.vu0_micro[at..at + 4].try_into().unwrap());
+        let hi = u32::from_le_bytes(r.vu0_micro[at + 4..at + 8].try_into().unwrap());
+        let unimpl = |what: String| Error::Unimplemented { pc: call_pc, word: hi, what: format!("vu0 micro {pc:#x}: {what}") };
+        // (the I bit, an immediate in the lower word, is not modelled; M, D and T change nothing here)
+        if hi >> 31 != 0 {
+            return Err(unimpl("the I bit".into()));
+        }
+        let before = r.cpu.clone();
+        vu_upper(&mut r.cpu, hi).map_err(unimpl)?;
+        let mut next = pc + 8;
+        if let Some(t) = branch.take() {
+            next = t;
+        }
+        if let Some(t) = vu0_lower(&before, &mut r.cpu, lo, pc).map_err(unimpl)? {
+            branch = Some(t);
+        }
+        if ending {
+            return Ok(());
+        }
+        if hi >> 30 & 1 != 0 {
+            ending = true;
+        }
+        pc = next & 0xff8;
+    }
+    Err(Error::Unimplemented { pc: call_pc, word: start, what: "vu0 micro program never ended".into() })
+}
+
+/// A micro lower op, reading `s` (the registers before the pair) and writing `c`; a branch's target
+fn vu0_lower(s: &crate::Cpu, c: &mut crate::Cpu, w: u32, pc: u32) -> Result<Option<u32>, String> {
+    let op = w >> 25;
+    let (it, is, id) = (((w >> 16) & 15) as usize, ((w >> 11) & 15) as usize, ((w >> 6) & 15) as usize);
+    let imm11 = w & 0x7ff;
+    let simm11 = if imm11 & 0x400 != 0 { imm11 as i32 - 0x800 } else { imm11 as i32 };
+    let target = pc.wrapping_add(8).wrapping_add((simm11 * 8) as u32);
+    let imm15 = ((w & 0x7ff) | ((w >> 21) & 0xf) << 11) as u16;
+    let set = |c: &mut crate::Cpu, r: usize, v: u16| {
+        if r != 0 {
+            c.vi[r] = v;
+        }
+    };
+    let (a, b) = (s.vi[is], s.vi[it]);
+    match op {
+        0x40 => {
+            let f = w & 0x3f;
+            if f >= 0x3c {
+                let k = ((w >> 6) & 0x1f) << 2 | (w & 3);
+                match k {
+                    // move ft, fs (the NOP is `move` with no fields)
+                    0x30 => set_vf(c, ((w >> 16) & 31) as usize, (w >> 21) & 15, s.vf[((w >> 11) & 31) as usize]),
+                    _ => return Err(format!("lower special {k:#x}")),
+                }
+                return Ok(None);
+            }
+            match f {
+                0x30 => set(c, id, a.wrapping_add(b)), // iadd
+                0x31 => set(c, id, a.wrapping_sub(b)), // isub
+                0x32 => {
+                    let i5 = ((w >> 6) & 31) as i32;
+                    set(c, it, a.wrapping_add((if i5 & 16 != 0 { i5 - 32 } else { i5 }) as u16)) // iaddi
+                }
+                0x34 => set(c, id, a & b), // iand
+                0x35 => set(c, id, a | b), // ior
+                _ => return Err(format!("lower {f:#x}")),
+            }
+        }
+        0x08 => set(c, it, a.wrapping_add(imm15)), // iaddiu
+        0x09 => set(c, it, a.wrapping_sub(imm15)), // isubiu
+        0x1c => set(c, it, (s.clip & 0xfff) as u16), // fcget
+        0x20 => return Ok(Some(target)),           // b
+        0x28 => return Ok((b == a).then_some(target)), // ibeq
+        0x29 => return Ok((b != a).then_some(target)), // ibne
+        0x2c => return Ok(((a as i16) < 0).then_some(target)),
+        0x2d => return Ok(((a as i16) > 0).then_some(target)),
+        0x2e => return Ok(((a as i16) <= 0).then_some(target)),
+        0x2f => return Ok(((a as i16) >= 0).then_some(target)),
+        _ => return Err(format!("lower op {op:#x}")),
+    }
+    Ok(None)
 }
 
 #[cfg(test)]
@@ -763,6 +899,44 @@ mod tests {
         assert_eq!(c.vf[3][3], 200.0, "clamped into 0..vf5.x");
         assert_eq!(c.vf[4].map(|x| x.to_bits() as i32), [2, -2, i32::MAX, 0], "toward zero, saturating");
         assert_eq!(c.vi[1], 200f32.to_bits() as u16, "vmtir takes the lane's low 16 bits");
+    }
+
+    #[test]
+    fn vu0_micro_mode() {
+        // a program at micro byte 0x40: vclipw.xyz with iaddiu, a nop, fcget, ior on the E pair, an add in the
+        // pair after it (run), and one more (not run); called by vcallms and again by ctc2 CMSAR0 + vcallmsr
+        let nop_lo = 0x8000_033c;
+        let vnop = 0x2ff;
+        let prog: [(u32, u32); 6] = [
+            ((0b1110 << 21) | (1 << 16) | (1 << 11) | 0x1ff, (0x08 << 25) | (2 << 16) | 5), // vclipw.xyz vf1, vf1 | iaddiu vi2, vi0, 5
+            (vnop, nop_lo),
+            (vnop, (0x1c << 25) | (1 << 16)),                                            // fcget vi1
+            ((1 << 30) | vnop, (0x40 << 25) | (2 << 16) | (1 << 11) | (3 << 6) | 0x35),  // [E] | ior vi3, vi1, vi2
+            ((8 << 21) | (2 << 6) | 3, nop_lo),                                          // vaddw.x vf2, vf0, vf0w
+            ((4 << 21) | (2 << 6) | 3, nop_lo),                                          // vaddw.y (after the end)
+        ];
+        let rn = run(
+            &[
+                (18 << 26) | (1 << 25) | (8 << 6) | 56,  // vcallms 0x40
+                (18 << 26) | (2 << 21) | (2 << 16) | (3 << 11), // cfc2 $v0, vi3
+                (18 << 26) | (6 << 21) | (4 << 16) | (27 << 11), // ctc2 $a0, CMSAR0
+                (18 << 26) | (1 << 25) | (27 << 11) | 57, // vcallmsr
+                (18 << 26) | (2 << 21) | (3 << 16) | (3 << 11), // cfc2 $v1, vi3
+            ],
+            |rn| {
+                for (k, (hi, lo)) in prog.iter().enumerate() {
+                    rn.vu0_micro[0x40 + 8 * k..0x44 + 8 * k].copy_from_slice(&lo.to_le_bytes());
+                    rn.vu0_micro[0x44 + 8 * k..0x48 + 8 * k].copy_from_slice(&hi.to_le_bytes());
+                }
+                rn.cpu.vf[1] = [2.0, -3.0, 0.5, -1.0];
+                rn.cpu.set_gpr(4, 8);
+            },
+        );
+        let c = &rn.cpu;
+        assert_eq!(c.gpr(2), 9 | 5, "x beyond +|w| (1), y beyond −|w| (8), with vi2");
+        assert_eq!(c.gpr(3), (9 << 6) | 9 | 5, "fcget takes the last two tests (12 bits)");
+        assert_eq!(c.clip, (9 << 6) | 9);
+        assert_eq!((c.vf[2][0], c.vf[2][1]), (1.0, 0.0), "the pair after the E bit runs, the next does not");
     }
 
     #[test]

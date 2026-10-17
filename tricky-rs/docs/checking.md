@@ -97,8 +97,9 @@ targets, each function on its own (`--depth 0`): `Boarder_GroundSpringForce` 0x1
 | Branches and jumps (with delay slots; the `l` forms skip the slot when not taken) | `beq` `bne` `beql` `bnel` `blez` `bgtz` `bgtzl` `bltz` `bgez` `jal` `jr`, and `nop` (counted apart from `sll`) |
 | Loads and stores | `lw` `sw` `lbu` `sb` `ld` `sd` `lq` `sq` (128-bit, address rounded down to 16) |
 | FPU | `lwc1` `swc1` `mtc1` `mfc1` `add.s` `sub.s` `mul.s` `div.s` `abs.s` `neg.s` `mov.s` `cvt.s.w` `cvt.w.s` `c.lt.s` `c.le.s` `bc1f` `bc1t` `bc1fl` `bc1tl` |
-| COP2 transfers | `lqc2` `sqc2` `qmtc2` `qmfc2` `cfc2` |
-| VU0 macro mode | `vadd` `vaddw` `vsub` `vmul` `vmulx` `vmulq` `vadday` `vmaddaz` `vmaddw` `vdiv` `vsqrt` `vrsqrt` `vwaitq` |
+| COP2 transfers | `lqc2` `sqc2` `qmtc2` `qmfc2` `cfc2` `ctc2` (VI, the clip flags, CMSAR0) |
+| VU0 macro mode | `vadd` `vaddw` `vsub` `vmul` `vmulx` `vmulq` `vadday` `vmaddaz` `vmaddw` `vdiv` `vsqrt` `vrsqrt` `vwaitq` `vmax`/`vmini` (bc) `vftoi` `vmtir` `vmove` `vopmula`/`vopmsub` `vclipw` `vnop` |
+| VU0 micro mode (`vcallms`, `vcallmsr`; the program from `Runner::vu0_micro`, which `load_vu0_chain` fills from the game's upload chain) | the macro upper ops; lower `iadd` `isub` `iaddi` `iaddiu` `isubiu` `iand` `ior` `fcget` `move`, the branches with their delay slot, the E bit's one more pair. Each pair reads the registers as they were before it and its results are there for the next (no pipeline or flag delays, so a program that reads a result early would differ) |
 
 None of these ten makes an indirect call. Followed through every call, they reach 265 functions and 130 kinds of
 instruction (the scoring code calls into sound, and that into `sprintf`), which is why the runner stubs calls rather

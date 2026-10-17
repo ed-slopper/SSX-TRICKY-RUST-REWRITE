@@ -38,13 +38,15 @@ for i in range(0,n,4):
         off=off-0x10000 if off&0x8000 else off
         print("%08x: %-8s vf%d, %s($%s)"%(a+i,"lqc2" if op==0x36 else "sqc2",rt,hex(off) if off>=0 else "-"+hex(-off),R[rs])); continue
     if op==0x12:
-        if rs&16==0 and rs in (1,2,5):
-            nm={1:"qmfc2",2:"cfc2",5:"qmtc2"}[rs]
-            print("%08x: %-8s $%s, %s%d"%(a+i,nm,R[rt],"vi" if rs==2 else "vf",rdd)); continue
+        if rs&16==0 and rs in (1,2,5,6):
+            nm={1:"qmfc2",2:"cfc2",5:"qmtc2",6:"ctc2"}[rs]
+            print("%08x: %-8s $%s, %s%d"%(a+i,nm,R[rt],"vi" if rs in (2,6) else "vf",rdd)); continue
         if rs&16:
             dest=''.join(c for k,c in enumerate("xyzw") if (w>>21)&15&(8>>k))
             ft,fs,fd,sa=rt,rdd,(w>>6)&31,(w>>6)&31
             bc="xyzw"[fn&3]
+            if fn==56: print("%08x: vcallms  %s"%(a+i,hex(((w>>6)&0x7fff)*8))); continue
+            if fn==57: print("%08x: vcallmsr vi27 (CMSAR0)"%(a+i)); continue
             if fn<60:
                 m={40:"vadd",42:"vmul",44:"vsub",46:"vopmsub",28:"vmulq"}.get(fn)
                 if m is None and fn<4: m="vadd"+bc
@@ -64,6 +66,8 @@ for i in range(0,n,4):
                 if m is None and 24<=k<28: m="vmula"+"xyzw"[k-24]
                 if m:
                     print("%08x: %-8s ACC, vf%d, vf%d"%(a+i,m+"."+dest,fs,ft)); continue
+                if k==31: print("%08x: %-8s vf%d, vf%d.w"%(a+i,"vclipw."+dest,fs,ft)); continue
+                if k==47: print("%08x: vnop"%(a+i)); continue
                 if k==48: print("%08x: %-8s vf%d, vf%d"%(a+i,"vmove."+dest,ft,fs)); continue
                 if k in (56,58): print("%08x: %-8s Q, vf%d.%s, vf%d.%s"%(a+i,{56:"vdiv",58:"vrsqrt"}[k],fs,fsf,ft,ftf)); continue
                 if k==57: print("%08x: %-8s Q, vf%d.%s"%(a+i,"vsqrt",ft,ftf)); continue

@@ -2,7 +2,8 @@
 //! player's disc with `disc_load "|data/models/<c>.ltg" <c>.ltg data/models/<c>.big`; skipped without it or
 //! TRICKY_ELF) resolved by `cCourseResolve_Common::ResolveTGroupHeader` 0x252470 in the function runner (which walks
 //! every TGroup and INode), the `.pbd` lookups stubbed to tag each index with its kind; then every pointer and list
-//! it leaves compared with `tricky_data::ltg`, and `WorldGrid_CellAt` asked about every INode.
+//! it leaves compared with `tricky_data::ltg`, `WorldGrid_CellAt` asked about every INode, and `WorldGrid_CellAtPos`
+//! (`tricky_game::worldgrid`, row G7c4) about points over the grid and past its edges.
 
 use r5900::Runner;
 use tricky_data::ltg::Ltg;
@@ -99,6 +100,57 @@ fn ltg_files_resolve_as_the_game_resolves_them() {
                 asked += 1;
             }
         }
+        // WorldGrid_CellAtPos(&world grid, p, &x, &y) at points over the grid and a little past its edges, some on
+        // INode corners exactly
+        let (p, ox, oy) = (r.mem.alloc(8), r.mem.alloc(4), r.mem.alloc(4));
+        let mut seed = 0x9e37_79b9u32 ^ file;
+        let mut rnd = move || {
+            seed ^= seed << 13;
+            seed ^= seed >> 17;
+            seed ^= seed << 5;
+            seed
+        };
+        let (cx0, cy0) = (ltg.bbox.min[0], ltg.bbox.min[1]);
+        let (w, h) = (ltg.tgroup_size * ltg.width as f32, ltg.tgroup_size * ltg.height as f32);
+        let step = (ltg.tgroup_size / n as f32) as i32 as f32;
+        let mut found = 0;
+        for k in 0..4000 {
+            let u = |v: u32| (v >> 8) as f32 / (1u32 << 24) as f32;
+            let (x, y) = if k % 4 == 0 {
+                (cx0 + step * (rnd() % (ltg.width * n + 2) as u32) as f32, cy0 + step * (rnd() % (ltg.height * n + 2) as u32) as f32)
+            } else {
+                (cx0 - 0.05 * w + 1.1 * w * u(rnd()), cy0 - 0.05 * h + 1.1 * h * u(rnd()))
+            };
+            r.mem.write_f32(p, x);
+            r.mem.write_f32(p + 4, y);
+            r.mem.write_u32(ox, 0xdead_0001);
+            r.mem.write_u32(oy, 0xdead_0002);
+            for (i, v) in [gp, p, ox, oy].into_iter().enumerate() {
+                r.cpu.set_gpr(4 + i, v as u64);
+            }
+            r.call(0x260b18).unwrap();
+            let ((ix, iy), cell) = tricky_game::worldgrid::cell_at_pos(Some(&ltg), x, y).unwrap();
+            assert_eq!((r.mem.read_u32(ox) as i32, r.mem.read_u32(oy) as i32), (ix, iy), "{c}: coordinates of {x}, {y}");
+            let want = cell.map(|i| {
+                let (off, t) = ltg.tgroups[((iy / n) * ltg.width + ix / n) as usize].as_ref().unwrap();
+                let k = t.inodes.iter().position(|j| std::ptr::eq(j, i)).unwrap() as u32;
+                file + off + 0x54 + 0x4c * k
+            });
+            assert_eq!(r.cpu.gpr(2) as u32, want.unwrap_or(0), "{c}: cell under {x}, {y}");
+            found += want.is_some() as u32;
+        }
+        eprintln!("{c}: {found} of 4000 points over an INode");
+        assert!(found > 100, "{c}: points over INodes");
+        // with no grid: 0, the coordinates left alone
+        r.mem.write_u32(gp, 0);
+        r.mem.write_u32(ox, 0xdead_0001);
+        for (i, v) in [gp, p, ox, oy].into_iter().enumerate() {
+            r.cpu.set_gpr(4 + i, v as u64);
+        }
+        r.call(0x260b18).unwrap();
+        r.mem.write_u32(gp, file);
+        assert_eq!((r.cpu.gpr(2), r.mem.read_u32(ox)), (0, 0xdead_0001), "{c}: no grid");
+        assert!(tricky_game::worldgrid::cell_at_pos(None, 0.0, 0.0).is_none());
         eprintln!("{c}: {}×{} TGroups ({} used), {} cells asked", ltg.width, ltg.height, ltg.used, asked);
     }
 }
