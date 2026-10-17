@@ -1502,3 +1502,28 @@ The cases later grew to nine cameras (one inside a patch looking along it, two w
 1224 calls, 146,456 quadwords, 77 clipped. 51 of 54 mutants were caught. The three left are equivalent:
 - two lanes of the t = 0 weight, which is (0, 0, 0, 1) in y and z;
 - entry 0x80's closing `xtop`, after its own `xtop` has already set vi1.
+
+## The 6- and 8-step patch programs (rows G7a4c, G7a4d; `patchvu::run6`, `run8`)
+
+The 6-step chain (0x3110f0, 821 instructions; lists' kind 2) and the 8-step one (0x312af0, 860; kind 1) are the
+4-step program at other sizes. The port is one program over N (`patchvu::Steps`). With N points a row:
+- **Weights and grid:** the weights start at 25 (4 steps), 19 (6) or 11 (8), and the grid is N × N from the grid
+  table at 29.
+- **Strips:** N − 1 of them, split N/2 then N/2 − 1, each of 2N vertices; the two packets' NLOOPs are N² and
+  N(N − 2). Rows start at 177 / 245 / 93 plus N a row, the second pass from N²/2 on.
+- **Unrolled loops:** the row's points are unrolled N to a row, and the strip's inner count is N − 1.
+- **The lightmap rewrite** works on vertex pairs, N to a strip. Pair j sits in vf7/8, vf9/10, then vf11/12,
+  vf13/14, vf15/16 in turn, and the packet's place moves on after the strip's third pair from last.
+- **The view transform** goes N points at a time: point k in vf(5 + k), its result in vf(10 + k) for 4 steps and
+  vf(13 + k) for 6 and 8 (which overwrites vf18, the programs' vector of ones, until the next strip pass sets it).
+- **The far plane.** The 4-step handler sends a triangle back to its strip when any point is past the far plane.
+  The 6- and 8-step handlers do so only when all three are past it, and their clipper cuts by the far plane as a
+  sixth plane (z ≤ w), so the polygon ends in 314 rather than 341.
+- **Return places:** the clip handlers return to 376 / 422 (4 steps), 394 / 440 (6) and 413 / 459 (8).
+
+Checked against the game's programs as the 4-step one is (`tests/vu1patch.rs`, the same nine cameras), 1224 calls
+of each, all four reachable entries:
+- 6 steps: 352,924 GS quadwords, 43 calls with a triangle clipped;
+- 8 steps: 644,191 quadwords, 42 clipped.
+
+All 22 mutants of the parts that differ by N were caught.
