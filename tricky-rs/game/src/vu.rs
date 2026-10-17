@@ -35,6 +35,11 @@ fn sub(a: f32, b: f32) -> f32 {
 fn mul(a: f32, b: f32) -> f32 {
     (F(a) * F(b)).0
 }
+/// The order `max` and `mini` compare in: the bits as a sign and a magnitude
+fn key(x: f32) -> i64 {
+    let b = x.to_bits();
+    if b >> 31 != 0 { -((b & 0x7fff_ffff) as i64) - 1 } else { b as i64 }
+}
 
 /// VU1's state: the registers, 16 KiB of data memory (as quadwords), TOP, and what was sent to the GS
 #[derive(Clone)]
@@ -47,6 +52,11 @@ pub struct Vu {
     pub clip: u32,
     /// The random number register R: 1.0 to 2.0, a 23-bit shift register in the mantissa
     pub r: u32,
+    /// The I register (an I bit's immediate)
+    pub i: f32,
+    /// The MAC flags as the program's flag reads see them (see [`Vu::mac_flags`]): set by a port where its
+    /// program reads them and at its end
+    pub mac: u32,
     pub mem: Vec<[u32; 4]>,
     pub top: u32,
     pub gs: Vec<[u32; 4]>,
@@ -58,7 +68,7 @@ impl Vu {
     pub fn new() -> Vu {
         let mut vf = [[0.0; 4]; 32];
         vf[0] = [0.0, 0.0, 0.0, 1.0];
-        Vu { vf, vi: [0; 16], acc: [0.0; 4], q: 0.0, clip: 0, r: 0x3f80_0000, mem: vec![[0; 4]; 0x400], top: 0, gs: Vec::new(), kicks: Vec::new() }
+        Vu { vf, vi: [0; 16], acc: [0.0; 4], q: 0.0, clip: 0, r: 0x3f80_0000, i: 0.0, mac: 0, mem: vec![[0; 4]; 0x400], top: 0, gs: Vec::new(), kicks: Vec::new() }
     }
 
     /// A register written in the lanes of `dest` (vf0 stays (0, 0, 0, 1))
@@ -114,6 +124,43 @@ impl Vu {
     pub fn mul_bc(&mut self, fd: usize, fs: usize, ft: usize, bc: usize, dest: u32) {
         let (s, b) = (self.vf[fs], self.vf[ft][bc]);
         self.set(fd, dest, Self::lanes(|i| mul(s[i], b)));
+    }
+    /// fd = fs + I
+    pub fn add_i(&mut self, fd: usize, fs: usize, dest: u32) {
+        let (s, i) = (self.vf[fs], self.i);
+        self.set(fd, dest, Self::lanes(|k| add(s[k], i)));
+    }
+    /// fd = the larger of fs and ft's lane `bc` (as the VU compares: the floats' bits as sign and magnitude)
+    pub fn max_bc(&mut self, fd: usize, fs: usize, ft: usize, bc: usize, dest: u32) {
+        let (s, b) = (self.vf[fs], self.vf[ft][bc]);
+        self.set(fd, dest, Self::lanes(|k| if key(s[k]) >= key(b) { s[k] } else { b }));
+    }
+    /// fd = the smaller of fs and I
+    pub fn mini_i(&mut self, fd: usize, fs: usize, dest: u32) {
+        let (s, i) = (self.vf[fs], self.i);
+        self.set(fd, dest, Self::lanes(|k| if key(s[k]) <= key(i) { s[k] } else { i }));
+    }
+    /// The MAC flags an op with result `v` sets in the lanes of `dest` (zero 1, sign 0x10, underflow 0x100,
+    /// overflow 0x1000, each shifted by 3 for x .. 0 for w; as PCSX2: ±0 zero, a denormal underflow and zero,
+    /// exponent 255 overflow)
+    pub fn mac_flags(v: [f32; 4], dest: u32) -> u32 {
+        let mut f = 0;
+        for (k, x) in v.iter().enumerate() {
+            if dest & (8 >> k) == 0 {
+                continue;
+            }
+            let (sh, b) = (3 - k, x.to_bits());
+            if b >> 31 != 0 {
+                f |= 0x10 << sh;
+            }
+            match (b & 0x7fff_ffff, b >> 23 & 0xff) {
+                (0, _) => f |= 1 << sh,
+                (_, 0) => f |= 0x101 << sh,
+                (_, 255) => f |= 0x1000 << sh,
+                _ => {}
+            }
+        }
+        f
     }
     /// fd = fs · Q
     pub fn mul_q(&mut self, fd: usize, fs: usize, dest: u32) {
@@ -226,6 +273,11 @@ impl Vu {
     pub fn mfir(&mut self, ft: usize, is: usize, dest: u32) {
         let v = f32::from_bits(self.vi[is] as i16 as i32 as u32);
         self.set(ft, dest, [v; 4]);
+    }
+    /// `move`: ft = fs in the lanes of `dest`
+    pub fn mov(&mut self, ft: usize, fs: usize, dest: u32) {
+        let s = self.vf[fs];
+        self.set(ft, dest, s);
     }
     /// ft = fs turned one lane (fs's y, z, w, x), in the lanes of `dest`
     pub fn mr32(&mut self, ft: usize, fs: usize, dest: u32) {

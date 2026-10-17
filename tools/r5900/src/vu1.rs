@@ -5,8 +5,10 @@
 //!
 //! The model is the VU0 micro one: no pipeline (each pair's upper and lower read the registers as they were
 //! before it, and results are there for the next pair), so `div` is ready at once and `waitq` waits for nothing.
-//! The MAC and status flags, the EFU (`esin` and the others, `mfp`), the random unit and the I bit's integer uses
-//! are not modelled: a program that reaches one fails with the instruction's place.
+//! The exception is the MAC flags: an upper op's flags are seen from the fourth pair after it (the FMAC's
+//! latency, with no stalls modelled), as the game's programs are scheduled for. An I bit's immediate is loaded
+//! after its pair's upper op (which sees the I before). The status flags, the EFU (`esin` and the others, `mfp`)
+//! and the I bit's integer uses are not modelled: a program that reaches one fails with the instruction's place.
 
 use crate::exec::{set_vf, vu_upper};
 use crate::ps2float as pf;
@@ -374,16 +376,25 @@ impl Vu1 {
     pub fn exec(&mut self, start: u32) -> Result<(), String> {
         let mut pc = start & 0x3ff8;
         let (mut ending, mut branch): (bool, Option<u32>) = (false, None);
+        let (mut pairs, mut pending): (usize, Vec<(usize, u32)>) = (0, Vec::new());
         for _ in 0..1_000_000 {
             let at = pc as usize;
             let lo = rd32(&self.micro, at);
             let hi = rd32(&self.micro, at + 4);
             let err = |what: String| format!("vu1 micro {pc:#x}: {what}");
+            // the MAC flags of the upper ops four pairs back and earlier
+            while pending.first().is_some_and(|&(at, _)| at <= pairs) {
+                self.regs.mac = pending.remove(0).1;
+            }
             let before = self.regs.clone();
+            vu_upper(&mut self.regs, hi).map_err(err)?;
             if hi >> 31 != 0 {
                 self.regs.i = f32::from_bits(lo);
             }
-            vu_upper(&mut self.regs, hi).map_err(err)?;
+            if let Some(f) = mac_flags(hi, &self.regs) {
+                pending.push((pairs + 4, f));
+            }
+            pairs += 1;
             let mut next = pc + 8;
             if let Some(t) = branch.take() {
                 next = t;
@@ -398,6 +409,9 @@ impl Vu1 {
             }
             if ending {
                 self.tpc = next & 0x3ff8;
+                if let Some(&(_, f)) = pending.last() {
+                    self.regs.mac = f;
+                }
                 return Ok(());
             }
             if hi >> 30 & 1 != 0 {
@@ -539,6 +553,18 @@ impl Vu1 {
             0x12 => set(c, 1, (s.clip & imm24 != 0) as u16),           // fcand
             0x13 => set(c, 1, (((s.clip | imm24) & 0xff_ffff) == 0xff_ffff) as u16), // fcor
             0x1c => set(c, it, (s.clip & 0xfff) as u16),               // fcget
+            0x18 | 0x1a | 0x1b => {
+                // fmeq / fmand / fmor it, is
+                if s.mac > 0xffff {
+                    return Err("the MAC flags of a result put in vf0 (not kept)".into());
+                }
+                let m = s.mac as u16;
+                set(c, it, match op {
+                    0x18 => (m == a) as u16,
+                    0x1a => m & a,
+                    _ => ((m | a) == 0xffff) as u16,
+                });
+            }
             0x20 => return Ok(Some(target)),                           // b
             0x21 => {
                 set(c, it, link); // bal
@@ -647,14 +673,15 @@ mod tests {
     #[test]
     fn lower_ops_and_kick() {
         let mut v = Vu1::default();
-        // vi1 = 5 (iaddiu); lqi vf2, (vi1++); vf3 = vf2 * I (I = 2); sqi vf3, (vi2++); div Q = vf2.x / vf2.y;
+        // vi1 = 5 (iaddiu); lqi vf2, (vi1++); I = 2; vf3 = vf2 * I; sqi vf3, (vi2++); div Q = vf2.x / vf2.y;
         // vf4 = vf2 * Q; bal vi15 to +2 (skipping one pair after the delay slot); xgkick vi3
         let two = 2f32.to_bits();
         let pairs = [
             (NOP_U, lower_i(0x08, 0, 1, 0, 5)),
             (NOP_U, lower_i(0x08, 0, 2, 0, 9)),
             (NOP_U, lower_special(15, 2, 1, 0x34)),
-            (upper(15, 0, 2, 3, 30) | (1 << 31), two),
+            (NOP_U | (1 << 31), two),
+            (upper(15, 0, 2, 3, 30), NOP_L),
             (NOP_U, lower_special(15, 2, 3, 0x35)),
             (NOP_U, lower_special(4, 2, 2, 0x38)),
             (upper(15, 0, 2, 4, 28), lower_i(0x21, 0, 15, 0, 2)),
@@ -677,10 +704,69 @@ mod tests {
         assert_eq!(v.regs.vi[2], 10);
         assert_eq!(v.regs.q, 4.0, "div Q = 8 / 2");
         assert_eq!(v.regs.vf[4], [32.0, 8.0, 0.0, 0.0], "mulq");
-        assert_eq!(v.regs.vi[15], 8, "bal links past the delay slot");
+        assert_eq!(v.regs.vi[15], 9, "bal links past the delay slot");
         assert_eq!(v.regs.vi[6], 0, "the pair bal jumps over");
         assert_eq!(v.gs, vec![[0x8001, 1 << 28, 0xe, 0], [7, 7, 7, 7]]);
         assert_eq!(v.kicks, vec![(0x20, 0)]);
+    }
+
+    #[test]
+    fn the_i_bit_loads_after_its_pair() {
+        let mut v = Vu1::default();
+        // I = 3; then vf1 = vf0.w + I with the I bit loading 5 in the same pair; then vf2 = vf0.w + I [E]
+        let (three, five) = (3f32.to_bits(), 5f32.to_bits());
+        program(&mut v, 0, &[(NOP_U | (1 << 31), three), (upper(15, 0, 0, 1, 0x22) | (1 << 31), five), (upper(15, 0, 0, 2, 0x22) | (1 << 30), NOP_L), (NOP_U, NOP_L)]);
+        v.exec(0).unwrap();
+        assert_eq!(v.regs.vf[1][3], 4.0, "the pair's upper op sees the I before");
+        assert_eq!(v.regs.vf[2][3], 6.0);
+    }
+
+    #[test]
+    fn mac_flags_four_pairs_late() {
+        let mut v = Vu1::default();
+        // vi7 = 0x3ff; vf1.z = vf0.z − vf0.z (z's zero flag), then vf2.x = vf0.x + vf0.x (x's), each pair also
+        // fmand vi1..vi6, vi7: an op's flags seen from the fourth pair after it, the later op's replacing them
+        let fmand = |it: u32| lower_i(0x1a, 0, it, 7, 0);
+        let mut pairs = vec![(NOP_U, lower_i(0x08, 0, 7, 0, 0x3ff)), (upper(2, 0, 0, 1, 0x2c), fmand(1)), (upper(8, 0, 0, 2, 0x28), fmand(2))];
+        for it in 3..=6 {
+            pairs.push((NOP_U, fmand(it)));
+        }
+        pairs.push((NOP_U | (1 << 30), NOP_L));
+        pairs.push((NOP_U, NOP_L));
+        program(&mut v, 0, &pairs);
+        v.exec(0).unwrap();
+        assert_eq!(&v.regs.vi[1..7], &[0, 0, 0, 0, 2, 8], "z's zero flag from the fourth pair, then x's");
+        assert_eq!(v.regs.mac, 8);
+    }
+
+    #[test]
+    fn mac_flags_which_ops_and_lanes() {
+        let mut v = Vu1::default();
+        // vf1.z = vf0.z − vf0.z (z's zero flag alone: the other lanes clear); then max, max x, mini w, ftoi0,
+        // ftoi15 and clip, which set none: fmand on pairs 7..10 sees vf1's flags still; then vf5.w = vf0.w −
+        // vf0.w (w's) and vf4.x = vf0.x + vf0.x [E] (x's): the last flags kept at the end
+        let fmand = |it: u32| lower_i(0x1a, 0, it, 7, 0);
+        let special = |dest: u32, ft: u32, fs: u32, sop: u32| (dest << 21) | (ft << 16) | (fs << 11) | ((sop >> 2) << 6) | 0x3c | (sop & 3);
+        let pairs = [
+            (NOP_U, lower_i(0x08, 0, 7, 0, 0x3ff)),
+            (upper(2, 0, 0, 1, 0x2c), NOP_L),
+            (upper(15, 0, 0, 2, 0x2b), NOP_L),
+            (upper(15, 0, 0, 2, 0x10), NOP_L),
+            (upper(15, 0, 0, 2, 0x17), NOP_L),
+            (special(15, 3, 0, 0x14), NOP_L),
+            (special(15, 3, 0, 0x17), NOP_L),
+            (special(14, 0, 0, 0x1f), NOP_L),
+            (NOP_U, fmand(1)),
+            (NOP_U, fmand(2)),
+            (NOP_U, fmand(3)),
+            (upper(1, 0, 0, 5, 0x2c), fmand(4)),
+            (upper(8, 0, 0, 4, 0x28) | (1 << 30), NOP_L),
+            (NOP_U, NOP_L),
+        ];
+        program(&mut v, 0, &pairs);
+        v.exec(0).unwrap();
+        assert_eq!(&v.regs.vi[1..5], &[2, 2, 2, 2], "only vf1's flags, its z lane's");
+        assert_eq!(v.regs.mac, 8, "the latest op's flags at the end");
     }
 
     #[test]
@@ -779,4 +865,44 @@ mod tests {
         assert_eq!((v.qw(0x10), v.qw(0x11)), ([21, 22, 23, 24], [25, 26, 27, 28]));
         assert_eq!((v.qw(0), v.qw(1), v.qw(2)), ([1, 2, 3, 4], [5, 6, 7, 8], [9, 10, 11, 12]), "cnt, ref, refs");
     }
+}
+
+/// The MAC flags an upper op sets, from its result (in the lanes of its dest; the others' flags clear), when it
+/// sets them: not the max / mini, ftoi / itof, abs, clip and nop ops. As PCSX2: zero for ±0, sign for the sign
+/// bit, underflow and zero for a denormal, overflow for exponent 255.
+fn mac_flags(hi: u32, c: &Cpu) -> Option<u32> {
+    let op = hi & 0x3f;
+    let dest = (hi >> 21) & 15;
+    let v = if op < 0x3c {
+        if matches!(op, 0x10..=0x17 | 0x1d | 0x1f | 0x2b | 0x2f | 0x30..=0x3b) {
+            return None;
+        }
+        match ((hi >> 6) & 31) as usize {
+            0 => return Some(0x1_0000),
+            fd => c.vf[fd],
+        }
+    } else {
+        let sop = ((hi >> 6) & 0x1f) << 2 | (hi & 3);
+        if matches!(sop, 0x10..=0x17 | 0x1d | 0x1f | 0x2f) {
+            return None;
+        }
+        c.acc
+    };
+    let mut f = 0;
+    for (i, x) in v.iter().enumerate() {
+        if dest & (8 >> i) == 0 {
+            continue;
+        }
+        let (sh, b) = (3 - i, x.to_bits());
+        if b >> 31 != 0 {
+            f |= 0x10 << sh;
+        }
+        match (b & 0x7fff_ffff, b >> 23 & 0xff) {
+            (0, _) => f |= 1 << sh,
+            (_, 0) => f |= 0x101 << sh,
+            (_, 255) => f |= 0x1000 << sh,
+            _ => {}
+        }
+    }
+    Some(f)
 }

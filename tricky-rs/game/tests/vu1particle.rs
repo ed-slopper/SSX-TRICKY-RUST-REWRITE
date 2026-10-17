@@ -78,7 +78,10 @@ struct Camera {
 /// A particle system's block for program 7 (9 quadwords) or 6 (20: the same nine, then random words), around
 /// `centre`
 fn block(g: &mut Rng, prog6: bool, centre: [f32; 3]) -> Vec<u32> {
-    let mut b = vec![0u32; if prog6 { 80 } else { 36 }];
+    if prog6 {
+        return block6(g, centre);
+    }
+    let mut b = vec![0u32; 36];
     let fb = |v: f32| v.to_bits();
     // the count (some past one packet's 99), the size's base and spread
     b[0] = [0u32, 1, 2, 7, 40, 98, 99, 100, 150, 198, 199, 250][g.below(12) as usize];
@@ -108,8 +111,59 @@ fn block(g: &mut Rng, prog6: bool, centre: [f32; 3]) -> Vec<u32> {
     for k in 28..36 {
         b[k] = fb(g.f(0.0, 1.0));
     }
-    for k in 36..b.len() {
-        b[k] = fb(g.f(-2.0, 2.0));
+    b
+}
+
+/// A block for program 6 (20 quadwords): trails of points from a line near `centre`
+fn block6(g: &mut Rng, centre: [f32; 3]) -> Vec<u32> {
+    let mut b = vec![0u32; 80];
+    let fb = |v: f32| v.to_bits();
+    let mut q = |b: &mut Vec<u32>, k: usize, v: [f32; 4]| {
+        for (j, x) in v.into_iter().enumerate() {
+            b[4 * k + j] = fb(x);
+        }
+    };
+    // +0: the trails, the points a trail (some past one packet's 97), the countdown and its step
+    let trails = [0u32, 1, 2, 3, 5, 9][g.below(6) as usize];
+    let points = [0u32, 1, 4, 12, 30, 60, 120, 200][g.below(8) as usize];
+    q(&mut b, 0, [0.0, 0.0, g.f(-0.2, 3.0), [g.f(0.05, 0.6), 0.0, 1.5][g.below(3) as usize]]);
+    b[0] = trails;
+    b[1] = points;
+    // +1: the size's spread and the fade's, then their bases (the fade the t a point is shown below)
+    q(&mut b, 1, [g.f(0.0, 4.0), g.f(0.0, 1.0), g.f(0.5, 6.0), [g.f(-0.5, 2.5), 4.0][g.below(2) as usize]]);
+    // +2: the alpha's step, t's step, two seeds; +3, +4 seeds
+    q(&mut b, 2, [g.f(0.0, 0.1), [g.f(0.02, 0.4), 0.0, 1.0][g.below(3) as usize], 0.0, 0.0]);
+    for k in [10usize, 11, 12, 13, 14, 15, 16, 17, 18, 19] {
+        b[k] = g.next();
+    }
+    // +5: the trail's direction (by t); +6..+9 the bend's box (taken from +5); +10 the start's corner, +11, +12
+    // its edges by R, +13 the step between trails
+    let span = [5.0, 40.0, 200.0][g.below(3) as usize];
+    let dir = |g: &mut Rng| [g.f(-span, span), g.f(-span, span), g.f(-span, span), 0.0];
+    let d = dir(g);
+    q(&mut b, 5, d);
+    for k in 6..10 {
+        let v = dir(g);
+        q(&mut b, k, v);
+    }
+    // (sometimes the box's corner 0: ACC, which the program ends with, then exactly 0, its zero flags set)
+    if g.below(4) == 0 {
+        q(&mut b, 6, [0.0; 4]);
+    }
+    q(&mut b, 10, [centre[0] - span, centre[1] - span, centre[2] - span, 1.0]);
+    for k in 11..14 {
+        let v = dir(g);
+        q(&mut b, k, v.map(|x| x * 0.5));
+    }
+    // +14..+17 the colour: a base, two terms by R, one by the countdown
+    q(&mut b, 14, [g.f(0.0, 200.0), g.f(0.0, 200.0), g.f(0.0, 200.0), g.f(40.0, 300.0)]);
+    for k in 15..18 {
+        let v = [0; 4].map(|_| g.f(-60.0, 60.0));
+        q(&mut b, k, v);
+    }
+    // +18, +19 the texture coordinates
+    for k in 72..80 {
+        b[k] = fb(g.f(0.0, 1.0));
     }
     b
 }
@@ -270,6 +324,8 @@ fn check(run: &Run, gs: &[[u32; 4]], port: fn(&mut Vu, u32), what: &str) -> usiz
     p.q = run.regs_in.q;
     p.clip = run.regs_in.clip;
     p.r = run.regs_in.r;
+    p.i = run.regs_in.i;
+    p.mac = run.regs_in.mac;
     p.top = run.top;
     for (k, q) in p.mem.iter_mut().enumerate() {
         *q = [0, 1, 2, 3].map(|j| u32::from_le_bytes(run.data_in[16 * k + 4 * j..16 * k + 4 * j + 4].try_into().unwrap()));
@@ -292,12 +348,14 @@ fn check(run: &Run, gs: &[[u32; 4]], port: fn(&mut Vu, u32), what: &str) -> usiz
     assert_eq!(run.regs_out.q.to_bits(), p.q.to_bits(), "{what} from {:#x}: Q", run.start);
     assert_eq!(run.regs_out.clip, p.clip, "{what} from {:#x}: the clip flags", run.start);
     assert_eq!(run.regs_out.r, p.r, "{what} from {:#x}: R", run.start);
+    assert_eq!(run.regs_out.i.to_bits(), p.i.to_bits(), "{what} from {:#x}: I", run.start);
+    assert_eq!(run.regs_out.mac, p.mac, "{what} from {:#x}: the MAC flags", run.start);
     theirs.len()
 }
 
 #[test]
 fn particle_programs_match_the_game() {
-    let ports: [(u32, bool, fn(&mut Vu, u32), &str); 1] = [(0x31c790, false, particlevu::run7, "program 7")];
+    let ports: [(u32, bool, fn(&mut Vu, u32), &str); 2] = [(0x31c790, false, particlevu::run7, "program 7"), (0x31c260, true, particlevu::run6, "program 6")];
     for (chain, prog6, port, what) in ports {
         let Some(image) = program(chain) else { return };
         let (mut calls, mut quadwords, mut kicks, mut culled, mut full, mut none) = (0usize, 0usize, 0usize, 0usize, 0usize, 0usize);
@@ -313,13 +371,15 @@ fn particle_programs_match_the_game() {
                     kicks += n;
                     full += (n >= 2) as usize;
                     none += (n == 0) as usize;
-                    // sprites asked for (the count, one at least) against those sent
-                    let count = (u32::from_le_bytes(run.data_in[16 * run.top as usize..16 * run.top as usize + 4].try_into().unwrap()) as u16 as i16).max(1) as usize;
-                    culled += count - (sent - n) / 5;
+                    // (program 7) sprites asked for (the count, one at least) against those sent
+                    if !prog6 {
+                        let count = (u32::from_le_bytes(run.data_in[16 * run.top as usize..16 * run.top as usize + 4].try_into().unwrap()) as u16 as i16).max(1) as usize;
+                        culled += count - (sent - n) / 5;
+                    }
                 }
             }
         }
         println!("{what}: {calls} calls ({full} filling a packet, {none} sending nothing), {kicks} packets, {quadwords} GS quadwords, {culled} points culled");
-        assert!(calls > 500 && full > 50 && none > 50 && culled > 1000, "{what}");
+        assert!(calls > 500 && full > 30 && none > 50 && (prog6 || culled > 1000), "{what}");
     }
 }

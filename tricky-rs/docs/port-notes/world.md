@@ -1637,3 +1637,48 @@ equivalent or masked:
 - in `vu.rs`, `rinit` and `rnext` without their masks (the next step's shift and mask drop those bits; bit 23 is
   always set);
 - `rnext` to vf0 stepping R (no program does it).
+
+## The VU1 particle program 6 (G7e3, `particlevu.rs`)
+
+The program loaded by chain 0x31c260 (152 instructions, called at 0 by the program-6 packet, the renderer's
++0x250 0x1e2a60). The only code that reads the renderer's +0x250 is `Font_DrawStringA` 0x19d0c0. It passes the
+font as the block, and the string and floats that +0x250 ignores; this looks like a leftover of another
+renderer's text draw. No particle code reaches +0x250 directly.
+
+The program draws trails of sprites. `run6`'s doc has the block's layout; in short:
+- Each trail starts on a line (a corner, two edges by R, and a step per trail), bends by a random point of a box,
+  and has one colour, size and fade.
+- Each point steps t down from a countdown. Its place is the start, plus the direction times t, plus the bend
+  times −0.73 m + 0.113 m² (m = min(t, 2.7)). Its alpha falls per point.
+- A point is drawn only when t is below the trail's fade and the point is inside the frustum.
+
+**Flags.** It is the first of the game's programs to read the MAC flags. `fmand` with 0x20 picks the z lane's
+sign flag. The reads are scheduled for the FMAC's latency: each sees the op four pairs back, not the latest.
+- At 0x2d0 the test is t less the fade (0x2b0 / 0x3c8), which decides whether the point is shown.
+- At 0x2e0 it is t less its step (0x2c0 / 0x3d8), which ends the trail.
+- At 0x408 it is the countdown less its step (0x3e8), which ends them all.
+The latest op at 0x2d0 is the other subtraction, so a model without the latency reads the wrong flag.
+
+**I.** The I bit's immediates are −0.73 and 0.113 (the bend's terms), 2.7 (its limit) and 255 (the colour's
+top). Within a pair the upper op sees the I from before the pair: 0x160 adds −0.73 to vf12.x in the same pair
+that loads 0.113. The runner had loaded I first; it now loads it after the upper op. No earlier program used I.
+
+**The runner** gains the MAC flags (`Cpu::mac`), computed as PCSX2 computes them and seen from the fourth pair
+after the op (no stalls modelled; none falls in this program's flag windows), plus `fmeq`, `fmand` and `fmor`.
+`checking.md` has the details. Its unit tests cover the latency, which ops set flags (not max, mini, ftoi,
+itof, abs or clip), the masked lanes and the flags kept at the end.
+
+Checked against the game's program (`tests/vu1particle.rs`) as program 7 is: 240 draws of 40 systems through the
+real packet (+0x250), submit, flush and `WriteTexState`, all 960 calls matching (GS packets, data memory,
+registers, R, I and the MAC flags). The blocks have 0..9 trails of 0..200 points, the countdown starting below
+0 or not, and t's step 0 or not; some bend boxes start at 0, so that the ACC the program ends on is exactly 0.
+49 of the program's 52 mutants were caught. The three left are equivalent:
+- loading all of vf7 (rewritten before its z and w matter);
+- vf14's z and w (0 from the frame's word);
+- the end test's flags in all lanes (only z's sign is read).
+
+Of the six `vu.rs` mutants, the zero flag's was caught once some boxes start at 0. The two left are
+equivalent here: `max` comparing as floats, and `mini`'s ≤ as <. They differ only on ±0 or equal values,
+which `ftoi0` or the same value hide. Of twelve mutants of the runner's new code, eleven were caught by this
+check and the runner's unit tests together. The twelfth, a latency of 3, is equivalent for these programs:
+the ops three pairs before each read set no flags.
