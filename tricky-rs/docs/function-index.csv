@@ -487,8 +487,8 @@ address,size,name,system,status
 0x12c7e0,1256,Fx_Splash_EmitAtPoint,boarder,ported
 0x12ccc8,1088,Fx_LandingSplash,boarder,ported
 0x12d108,1464,Fx_BrakeFan_Update,boarder,ported
-0x12d6c0,464,Fx_Spray_ComputeParticle,boarder,not started
-0x12d890,1736,Fx_Spray_DrawParticles,boarder,not started
+0x12d6c0,464,Fx_Spray_ComputeParticle,boarder,checked
+0x12d890,1736,Fx_Spray_DrawParticles,boarder,checked
 0x12df58,116,Fx_BrakeSpray_Init,boarder,not started
 0x12dfd0,56,Fx_BrakeSpray_Reset,boarder,not started
 0x12e008,220,Fx_BrakeSpray_Emit,boarder,ported
@@ -505,7 +505,7 @@ address,size,name,system,status
 0x12f490,28,Fx_SpeedDust_Destruct,boarder,not started
 0x12f4b0,12,Fx_SpeedDust_Reset,boarder,not started
 0x12f4c0,1660,Fx_SpeedDust_Update,boarder,ported
-0x12fb40,776,Fx_SpeedDust_Draw,boarder,not started
+0x12fb40,776,Fx_SpeedDust_Draw,boarder,checked
 0x12fe48,140,Fx_BoardTrail_Init,boarder,not started
 0x12fed8,24,Fx_BoardTrail_Reset,boarder,not started
 0x12fef0,1976,Fx_BoardTrail_Update,boarder,ported
@@ -515,7 +515,7 @@ address,size,name,system,status
 0x131110,80,Fx_SurfaceSpray_Init,boarder,not started
 0x131160,76,Fx_SurfaceSpray_Reset,boarder,not started
 0x1311b0,4440,Fx_SurfaceSpray,boarder,ported
-0x132308,448,Fx_SurfaceSpray_Draw,boarder,not started
+0x132308,448,Fx_SurfaceSpray_Draw,boarder,checked
 0x1324c8,80,Fx_BoardTrack_Init,boarder,not started
 0x132518,160,Fx_BoardTrack_Reset,boarder,not started
 0x1325b8,140,Fx_BoardTrack_GetLight,boarder,ported
@@ -2337,8 +2337,8 @@ address,size,name,system,status
 0x19b2a0,564,FUN_0019b2a0,render?,not started
 0x19b4d8,596,Sprite_SubmitGradientQuad,frontend?,not started
 0x19b730,404,Draw_TexturedRect,render,ported
-0x19b8c8,640,Sprite_DrawRotatedQuad,boarder?,not started
-0x19bb48,688,Sprite_DrawRotatedTexQuad,boarder?,not started
+0x19b8c8,640,Sprite_DrawRotatedQuad,boarder?,checked
+0x19bb48,688,Sprite_DrawRotatedTexQuad,boarder?,checked
 0x19bdf8,404,Sprite_SubmitQuad,frontend?,ported
 0x19bf90,596,Sprite_SubmitGradientQuadRotated,frontend?,not started
 0x19c1e8,292,Draw_Line,render,ported

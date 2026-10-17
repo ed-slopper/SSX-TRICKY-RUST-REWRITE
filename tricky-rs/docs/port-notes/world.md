@@ -2076,3 +2076,63 @@ trails of 0, 1, 2, 3, 75 and random lengths with breaks.
 answer); not reading the puff count again (nothing in a draw changes it); two changes to the trail's alpha (its
 grouping, and 0.9 an ulp off), which the cast to a whole number after × 128 hides; and the break's "3 or more" as
 "4 or more" (the count is always even).
+
+## The spray, speed dust and ground spray draws, and the turned quads (G7e4, `fxdraw`)
+
+These are the rest of the rider's effect draws (`boardfx` has the list that runs them). Each sets the
+renderer's state, hands it what to draw, and puts back +0x1c8(0, 2, 0.08), +0x1c0(0), +0x1e8(0, 0) and blend 3.
+The spray's ribbons do +0x1c0 before +0x1c8; the others do it the other way round.
+
+- **The ground spray** (`Fx_SurfaceSpray_Draw` 0x132308) is a ring of 40 emitters of 0x150 bytes from +0x40.
+  +0 is how many there are and +4 the oldest. An emitter is live while its first word (its block's count) is
+  not 0. Each live one is a +0x258 draw (VU1 program 6) with its sprite (+0x140) as the texture and its blend
+  (+0x144). The count is read again after each draw.
+- **The speed dust** (`Fx_SpeedDust_Draw` 0x12fb40) is the board puffs' draw over a ring of 64 puffs of 0x34
+  bytes from +0x50 (+0xd50 how many, +0xd54 the oldest), with the same size and alpha rules. The alpha is
+  written to the dust's +0x40, not the puff. The place is built from the dust's frame: its +0 + its +0x10 ×
+  (+0x14 − 200 × age) + its +0x20 × +0x18 + its +0x30 × half the size.
+- **The spray's ribbons** (`Fx_Spray_DrawParticles` 0x12d890) draw nothing while the count (+0x18) is 0.
+  Otherwise they use texture 3 and go over a ring of 5 entries of 0x3c0 bytes from +0x20 (+0x1c the oldest).
+  - An entry is skipped when its age (+0x3b8) is past its life (+0x3bc), or when the box test (+0x280, the
+    entry's place ± 1000 in x, y, z) answers 1.
+  - **Its colour** is +0x3a8..+0x3b0, each moved 0.7504 of the way to their mean, plus 0.5286, held to
+    0..1.994, × 128 as integers.
+  - **Its ribbon** starts with the entry's points (+0x3b4 of them) at t = 0. Then come four strips (+0x220),
+    strip j joining the points at t = (j − 1)/4 and j/4. A point's u is 3k/4; v is 1 − t of each edge (0 on the
+    first strip's earlier edge).
+  - **Its alpha** is (life − age) × the point's width (+0x340 + 4k) × 128 / 0.995, as an integer. It is 0 on
+    the first strip's earlier edge.
+  - **A point** (`Fx_Spray_ComputeParticle` 0x12d6c0) at t is the entry's place (+0x320) plus the point's
+    offset (+16k), plus its velocity (+0x190 + 16k) × t × (1 − 1/p⁴), plus a fall of (0, 0, −55.56) × t ×
+    (0.2 t + 0.8) × age. p is a polynomial in 1.25 × age (1 + x/4 + x²/32 + …), so 1/p⁴ falls from 1 much
+    as e^−x does.
+  - The count is read again after each entry.
+- **The turned quads** (`Sprite_DrawRotatedQuad` 0x19b8c8, `Sprite_DrawRotatedTexQuad` 0x19bb48) turn the
+  quad (x, y, w, h) by the angle in degrees about its centre. They hand it to +0x220 as four vertices: (x, y),
+  (x + w, y), (x, y + h), (x + w, y + h), with u, v from 0 to 1, or the given rectangle for the textured one.
+  The colour is four floats × 128 as integers, stored in the order 1, 2, 3, 0; the quad's z is at +0x10.
+
+What the game builds on its stack, the port builds in a caller's scratch area (STANDIN: the same bytes): 0x20
+bytes for the dust, 0xb30 for the ribbons, 0xc0 for a quad.
+
+**Why this row once ended the session.** In the first test the ring entries before the ring (the oldest place
+−2 reaches two of them) were filled after the ring's header. The one just before the ring has its age and life
+exactly on the count and the oldest place. The count became a float's bits (about a billion), both the game and
+the port ran that many entries, and the call logs grew until memory ran out. The test now writes the header last
+and keeps the count at 1 or less when the oldest place is −2, so only the entry two before is read.
+
+Checked in the runner (`tests/fxdraw.rs`): the ground spray (29,046 draws), the speed dust (57,937 puffs), the
+ribbons (1500 cases, 4424 strips, 2443 box tests) and the quads.
+
+65 of 73 mutants were caught. The eight left:
+- Not reading the counts again (the ground spray's and the dust's): nothing in a draw changes them.
+- The ribbon colour's five changes (the mean's and pull's constants an ulp off, the offset an ulp off, and the
+  clamp's two `<` as `<=`), which the cast to a whole number after × 128 hides.
+- The u's 0.25 × 3 as 0.75 (exact for these whole numbers).
+
+Two more lived in the first run and showed weak test data:
+- The dust's size grouping lived because every life was a power of two, so both groupings divided exactly.
+- The size's z lane lived because the frame was written before the entries over it, leaving a tiny number
+  that the EE reads as 0.
+
+The test now adds a random life and writes the frame last (bar the two texture numbers those entries read).
