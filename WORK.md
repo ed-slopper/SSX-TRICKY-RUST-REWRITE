@@ -81,7 +81,11 @@ state machine and the renderer are ours. Nothing has been checked against the or
 | G7 | Rendering, as the PS2 renderer does it. Split before claiming: | unowned | E3a, E3b | | [repo] |
 | G7a | Terrain patches: the game's tessellation and LOD, subtractive lightmaps | unowned | G7 | | [repo] README "What the viewer taught us" |
 | G7b | Objects: per-instance lights (ambient + 3 directional, 128 = 1.0), materials, the PS2 blend modes for transparent materials | unowned | G7 | | [repo] "exact PS2 blending modes" not done |
-| G7c | Sky, fog, distance culling, `.ltg` grid use | unowned | G7, E3e | | [est] |
+| G7c | (umbrella: G7c1, G7c2, G7c3, G7c4) Sky, fog, distance culling, `.ltg` grid use | unowned | G7, E3e | | [est] Split 2026-10-16 |
+| G7c1 | The falling snow: `cSnowFallMan` 0x1c8db8..0x1c9ae8 (the constructor, `SnowFall_InitLayers` / `_SetDensity` / `_SetScale` / `_SetRange` / `_SnapOrigin`, its per-frame virtuals and the layer helpers 0x1c9310 / 0x1c9388), the draw calls out | any | G7 | ed-slopper/puffin | Split of G7c |
+| G7c2 | Fog: `cFogObjMan` 0x1c9b20..0x1ca2c0 (`FogObjMan_Build` / `_DeleteAll`, its virtuals) and `cFogVolume` / `cPS2FogVolume` 0x1ca2c8..0x1cad68 | any | G7 | | Split of G7c |
+| G7c3 | The sky: `Sky_*` 0x1859c0..0x186078 (layers, `Course_RemapSkyTextures`) and `cSkyBoxObjNode` 0x1c7900..0x1c7d00 | any | G7 | | Split of G7c |
+| G7c4 | Distance culling and the `.ltg` grid: `cPS2GraphicsMan::CullBox` 0x1e1b10, `BxList_CullToCount` 0x17db00 and the world's use of the light grid | any | G7, E3e | | Split of G7c |
 | G7d | Lights and halos, glows, lens flares | unowned | G7 | | [repo] "lights/halos" not done |
 | G7e | Particles as the VU1 microcode draws them (0x31c288), spark and dust sprites | unowned | G7 | | [repo] "Unresolved: spark and dust sprite rendering"; `particles.rs` has the emitters |
 | G7g | Rider shading and shadows, board reflections (env materials) | unowned | G7, E4 | | [est] |
@@ -1195,3 +1199,4 @@ matches the original.
 - 2026-10-16 ed-slopper/puffin: G5c2 done.
 - 2026-10-16 ed-slopper/puffin: claim G5c4.
 - 2026-10-16 ed-slopper/puffin: G5c4 done; G5c done (all its parts).
+- 2026-10-16 ed-slopper/puffin: split G7c into G7c1..G7c4; claim G7c1.
