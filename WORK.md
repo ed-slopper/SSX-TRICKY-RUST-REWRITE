@@ -154,7 +154,7 @@ matches the original.
 |---|---|---|---|---|---|
 | G7g2 | BoarderShadow_Update as shadow::update (camera, box of 6 bones + 4 points, 3 matrices), runner-checked, 28/31 mutants (3 equivalent) | P2 | ed-slopper/puffin | 2026-10-17 | 6b07701 |
 | G7g3 | The rider's skinning: `RiderSkin_SkinMatrices` 0x207c30, `_SetBoardMatrix` 0x207f18, `_CopyBoneMatrices` 0x208400, checked in the runner | ed-slopper/puffin | G7g | | Split of G7g |
-| G7g4 | The rider's draw: `BoarderRender_Draw` 0x1364d0 with `_PickLod` 0x136370, `_GetHandStreakPoints` 0x136c48, `_CopyBoarderMatrix` 0x136e38, `Career_IsPlayerOutfit6` 0x167038, checked in the runner | any | G7g3 | | Split of G7g |
+| G7g4 | The rider's draw: `BoarderRender_Draw` 0x1364d0 with `_PickLod` 0x136370, `_GetHandStreakPoints` 0x136c48, `_CopyBoarderMatrix` 0x136e38, `Career_IsPlayerOutfit6` 0x167038, checked in the runner | ed-slopper/puffin | G7g3 | | Split of G7g |
 | G7g5 | The rider's overlays: `Streak_Draw` 0x1f08d0, `PlayerMarker_Draw` 0x133c20, `AttitudeIcon_Draw` 0x134830, checked in the runner | any | G7g4 | | Split of G7g |
 | G7e5 | The rest of the rider's effect draws: `BoarderRender_DrawEffects` 0x135170, `Fx_Spray_Draw` 0x12e918, `Fx_BoardPuff_Draw` 0x12f178, `Fx_BoardTrail_Draw` 0x130b98 | any | G7e4 | | Split of G7e (found under the rider's draw) |
 | G7g1 | BoarderShadow_Init/_AllocTexture/_Draw in shadow.rs, runner-checked, 11/11 mutants | P2 | ed-slopper/puffin | 2026-10-17 | 3fb959b |
@@ -1271,3 +1271,4 @@ matches the original.
 - 2026-10-17 ed-slopper/puffin: G7e4 unclaimed: its runner test run kept ending the session; a draft (fxdraw.rs: all five draws plus Fx_Spray_ComputeParticle; the quads and the surface spray matched before the crashes) is kept outside the repo. G7g claimed.
 - 2026-10-17 ed-slopper/puffin: G7g split (G7g1 set-up and draw, G7g2 the update); G7g1 done (3fb959b): shadow.rs. A one-rider race gets a 256 × 256 shadow, else 128 × 128.
 - 2026-10-17 ed-slopper/puffin: G7g2 done (6b07701): the shadow's camera and matrices. Its box ignores z; when the light is straight along up the side axes are kept from the last frame and the way nudged.
+- 2026-10-17 ed-slopper/puffin: G7g3 done (1f50f2b): skin.rs (with SkinPart_CopyBoneMatrices 0x206818). G7g4 claimed.
