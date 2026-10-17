@@ -2491,6 +2491,7 @@ address,size,name,system,status
 0x1af320,336,cBlackFadeOverlay::Draw,frontend,not started
 0x1af470,684,OverlayMan_CreateOverlays,frontend,ported
 0x1af720,544,Results_BuildPages,frontend?,checked
+0x1af940,16,Results_ClearSpeechEvent,frontend?,checked
 0x1af950,2100,Results_BuildCareerPage,race?,checked
 0x1b0188,1644,Results_BuildStandingsPage,race?,not started
 0x1b07f8,412,Results_BuildTimeChallengePage,frontend?,not started
@@ -2601,11 +2602,17 @@ address,size,name,system,status
 0x1bf580,820,cViewHiScoresOverlay::vf19_1bf580,frontend,not started
 0x1bf8b8,92,cRaceResultsOverlay::__tf,runtime,host
 0x1bf918,100,Results_SetCellFloat,frontend?,checked
+0x1bf980,88,Results_SetCellFloatPlain,frontend?,checked
+0x1bf9d8,48,Results_SetCellIntSuffix,frontend?,checked
 0x1bfa08,40,Results_SetCellInt,frontend?,checked
 0x1bfa30,32,Results_SetCellText,race?,checked
 0x1bfa50,32,Results_SetCellAscii,race?,checked
+0x1bfa70,28,Results_GetCell,frontend?,checked
+0x1bfa90,28,Results_GetCellB,frontend?,checked
 0x1bfab0,24,Results_SetRowName,race?,checked
 0x1bfac8,24,Results_SetRowNameAscii,race?,checked
+0x1bfae0,24,Results_GetRowName,frontend?,checked
+0x1bfaf8,24,Results_GetRowNameB,frontend?,checked
 0x1bfb10,12,Results_SetTitle,race?,checked
 0x1bfb20,12,Results_SetTitleAscii,race?,checked
 0x1bfc70,256,cResultsOverlay::vf0_1bfc70,frontend,not started
