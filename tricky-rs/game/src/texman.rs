@@ -277,3 +277,157 @@ pub fn lock(m: &mut Mem, env: &mut dyn TextBoxEnv, tm: u32, w: u32, h: u32, form
     m.w32(tm + 0x28, k);
     n
 }
+
+pub const TEX_SWIZZLE: u32 = 0x1fbe98;
+
+fn w64(m: &mut Mem, a: u32, v: u64) {
+    m.w32(a, v as u32);
+    m.w32(a + 4, (v >> 32) as u32);
+}
+/// A word as the EE holds it: sign-extended to 64 bits
+fn sx(v: u32) -> i64 {
+    v as i32 as i64
+}
+/// The record `n` of the table (+0x10) the uploads use
+fn slot_record(m: &Mem, tm: u32, n: u32) -> u32 {
+    m.r32(tm + 0x10).wrapping_add(n.wrapping_mul(RECORD))
+}
+
+/// `FUN_001c1ab8`(tm, n, &packet): at the packet place (moved on by 0x60) a `cnt` of 5 and A+D settings that draw
+/// into texture `n` at its VRAM slot (+0x3c's 0x14-byte slots, the record's +0x24): FRAME (the slot's address /
+/// 32, the width / 64 at 16, the format at 24), SCISSOR (width − 1 at 16, height − 1 at 48) and XYOFFSET (the
+/// offset 2048 less half the size, × 16), after a DIRECT-less header (0x9800 << 45, the `cnt`'s VIF word
+/// 0x50000004 << 32) and the GIF tag (NLOOP 3, EOP, A+D)
+pub fn draw_into_packet(m: &mut Mem, tm: u32, n: u32, place: u32) {
+    let p = m.r32(place);
+    let r = slot_record(m, tm, n);
+    let (w, h, psm) = (m.r32(r + 0x10), m.r32(r + 0x18), m.r32(r + 0x20));
+    let slot = m.r32(tm + 0x3c).wrapping_add(m.r32(r + 0x24).wrapping_mul(0x14));
+    let frame = (sx(m.r32(slot)) >> 5) | ((sx(w) >> 6) << 16) | (sx(psm) << 24);
+    let scissor = (sx(w.wrapping_sub(1)) << 16) | (sx(h.wrapping_sub(1)) << 48);
+    let ox = sx(0x800u32.wrapping_sub((w as i32 >> 1) as u32) << 4);
+    let oy = sx(0x800u32.wrapping_sub((h as i32 >> 1) as u32) << 4);
+    let offset = ox | (oy << 32);
+    w64(m, p, 0x1000_0005);
+    let q = p + 8;
+    let words: [u64; 11] = [
+        0,
+        0x9800u64 << 45,
+        0x5000_0004u64 << 32,
+        0x1000_0000_0000_8003,
+        0xe,
+        frame as u64,
+        0x4c,
+        scissor as u64,
+        0x40,
+        offset as u64,
+        0x18,
+    ];
+    for (k, v) in words.into_iter().enumerate() {
+        w64(m, q + 8 * k as u32, v);
+    }
+    m.w32(place, q + 0x58);
+}
+
+/// `FUN_001c1bd0`(tm, n, colour, &packet): at the packet place (moved on by 0x70) a `cnt` of 6, the VIF's DIRECT of
+/// 5, and a sprite filling texture `n` in the colour (the floats at +4, +8, +0xc, +0 × 128 as R, G, B, A; Q 1):
+/// its corners the offset 2048 less and plus half the size (× 16, z 1), then SCISSOR (width − 2 at 16, height − 2
+/// at 48, and 1 at 0 and 32)
+pub fn fill_packet(m: &mut Mem, tm: u32, n: u32, colour: u32, place: u32) {
+    let p = m.r32(place);
+    let k = |m: &Mem, o: u32| crate::sndlib::cvt_w((rf(m, colour + o) * F(128.0)).0) as u32;
+    let (red, blue, green, alpha) = (k(m, 4), k(m, 0xc), k(m, 8), k(m, 0));
+    let rgbaq = sx(red) | (sx(1f32.to_bits()) << 32) | (sx(blue) << 16) | (sx(green) << 8) | (sx(alpha) << 24);
+    let rec = slot_record(m, tm, n);
+    let (h, w) = (m.r32(rec + 0x18), m.r32(rec + 0x10));
+    let (hh, hw) = (h as i32 >> 1, w as i32 >> 1);
+    let y0 = sx(0x800u32.wrapping_sub(hh as u32) << 4);
+    let y1 = sx((hh as u32).wrapping_add(0x801) << 4);
+    let x0 = sx(0x800u32.wrapping_sub(hw as u32) << 4);
+    let x1 = sx((hw as u32).wrapping_add(0x801) << 4);
+    let z = 1i64 << 32;
+    let lo = x0 | (y0 << 16) | z;
+    let hi = x1 | (y1 << 16) | z;
+    let scissor = (sx(w.wrapping_sub(2)) << 16) | (sx(h.wrapping_sub(2)) << 48) | (1i64 << 32 | 1);
+    w64(m, p, 0x1000_0006);
+    let q = p + 8;
+    let words: [u64; 13] = [
+        0,
+        0,
+        0x5000_0005u64 << 32,
+        0x4400_0000_0000_0001,
+        0x5510,
+        0x10e,
+        rgbaq as u64,
+        lo as u64,
+        hi as u64,
+        0x1000_0000_0000_8001,
+        0xe,
+        scissor as u64,
+        0x40,
+    ];
+    for (k, v) in words.into_iter().enumerate() {
+        w64(m, q + 8 * k as u32, v);
+    }
+    m.w32(place, q + 0x68);
+}
+
+/// `TexMan_UploadPixels` 0x1c1d58(tm, pixels, palette, n): texture `n`'s pixels replaced (copied in: 32-bit 4
+/// bytes a pixel, 16-bit 2; 8-bit 1, or swizzled into place by `Tex_Swizzle` 0x1fbe98 when the record's +0x3c is
+/// set; others not); it no longer the one being uploaded (+0x70 −1 if it was), its VRAM slot (if any, above 0)
+/// let go; an 8-bit one's palette copied in too (as `register` does) and its CLUT slot (+0x6c's 16-byte ones)
+/// let go
+pub fn upload_pixels(m: &mut Mem, env: &mut dyn TextBoxEnv, tm: u32, pixels: u32, palette: u32, n: u32) {
+    let r = slot_record(m, tm, n);
+    let (w, h, at) = (m.r32(r + 0x10), m.r32(r + 0x18), m.r32(r + 0x2c));
+    match m.r32(r + 0x20) {
+        0 => {
+            env.call(m, MEM_COPY, &[at, pixels, w.wrapping_mul(h) << 2], &[]);
+        }
+        2 => {
+            env.call(m, MEM_COPY, &[at, pixels, w.wrapping_mul(h) << 1], &[]);
+        }
+        0x13 => {
+            if m.r32(r + 0x3c) != 0 {
+                env.call(m, TEX_SWIZZLE, &[tm, w, h, pixels, at], &[]);
+            } else {
+                env.call(m, MEM_COPY, &[at, pixels, w.wrapping_mul(h)], &[]);
+            }
+        }
+        _ => {}
+    }
+    if m.r32(tm + 0x70) == n {
+        m.w32(tm + 0x70, 0xffff_ffff);
+    }
+    let slots = m.r32(tm + 0x3c);
+    if slots != 0 {
+        let r = slot_record(m, tm, n);
+        let s = m.r32(r + 0x24);
+        if s as i32 > 0 {
+            m.w32(slots.wrapping_add(s.wrapping_mul(0x14)) + 4, 0xffff_ffff);
+            m.w32(r + 0x24, 0xffff_ffff);
+        }
+    }
+    let r = slot_record(m, tm, n);
+    if m.r32(r + 0x20) != 0x13 {
+        return;
+    }
+    let (mut d, mut s) = (m.r32(r + 0x38), palette);
+    for _ in 0..8 {
+        env.call(m, MEM_COPY, &[d, s, 0x20], &[]);
+        env.call(m, MEM_COPY, &[d + 0x20, s + 0x40, 0x20], &[]);
+        env.call(m, MEM_COPY, &[d + 0x40, s + 0x20, 0x20], &[]);
+        env.call(m, MEM_COPY, &[d + 0x60, s + 0x60, 0x20], &[]);
+        s += 0x80;
+        d += 0x80;
+    }
+    let cluts = m.r32(tm + 0x6c);
+    if cluts != 0 {
+        let r = slot_record(m, tm, n);
+        let c = m.r32(r + 0x30);
+        if (c as i32) >= 0 {
+            m.w32(cluts.wrapping_add(c << 4) + 0xc, 0xffff_ffff);
+            m.w32(r + 0x30, 0xffff_ffff);
+        }
+    }
+}

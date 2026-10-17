@@ -78,7 +78,7 @@ impl Io for r5900::Mem {
     }
 }
 
-const STANDINS: [u32; 9] = [tx::STRNCMP, tx::STRNCPY, tx::POOL_ALLOC, tx::ALLOC, tx::MEM_SET, tx::MEM_COPY, tx::PRINTF, tx::LOGF, tx::FREE];
+const STANDINS: [u32; 10] = [tx::STRNCMP, tx::STRNCPY, tx::POOL_ALLOC, tx::ALLOC, tx::MEM_SET, tx::MEM_COPY, tx::PRINTF, tx::LOGF, tx::FREE, tx::TEX_SWIZZLE];
 
 /// A stand-in's work and answer (and, for `logf`, a float), and its log. `fails` makes the heaps answer 0;
 /// `taken` counts what they have handed out in this call.
@@ -119,6 +119,10 @@ fn standin(io: &mut dyn Io, func: u32, w: &[u32], f: &[u32], fails: bool, taken:
         }
         tx::MEM_SET | tx::MEM_COPY => {
             log.extend([w[0], w[1], w[2]]);
+            0
+        }
+        tx::TEX_SWIZZLE => {
+            log.extend(&w[..5]);
             0
         }
         tx::PRINTF | tx::FREE => {
@@ -287,4 +291,117 @@ fn texture_manager_matches_the_original() {
     }
     println!("{records} records, {palettes} with palettes, {shared} shared");
     assert!(records > 1000 && palettes > 100 && shared > 50);
+}
+
+/// The runner with the stand-ins, their log and their switches
+fn runner() -> Option<(Runner, Rc<RefCell<Vec<Call>>>, Rc<Cell<bool>>, Rc<Cell<u32>>)> {
+    let mut r = Runner::from_env()?;
+    let log: Rc<RefCell<Vec<Call>>> = Rc::default();
+    let fails = Rc::new(Cell::new(false));
+    let taken = Rc::new(Cell::new(0u32));
+    for func in STANDINS {
+        let (l, fl, tk) = (log.clone(), fails.clone(), taken.clone());
+        r.stub(func, move |c, mem| {
+            let w: Vec<u32> = (4..12).map(|k| c.gpr(k) as u32).collect();
+            let f: Vec<u32> = (12..16).map(|k| c.fpr[k]).collect();
+            let (a, call) = standin(mem, func, &w, &f, fl.get(), &tk);
+            l.borrow_mut().push(call);
+            c.set_gpr(2, a as i32 as i64 as u64);
+            c.fpr[0] = a;
+        });
+    }
+    Some((r, log, fails, taken))
+}
+
+/// Runs both and compares the calls and the memory
+fn compare(r: &mut Runner, log: &Rc<RefCell<Vec<Call>>>, m: &mut Mem, case: u32, func: u32, regs: &[u32], ours: impl FnOnce(&mut Mem, &mut Ours)) -> Vec<Call> {
+    for (at, b) in &m.regions {
+        r.mem.write(*at, b).unwrap();
+    }
+    log.borrow_mut().clear();
+    let mut o = Ours { calls: Vec::new(), fails: false, taken: Cell::new(0) };
+    ours(m, &mut o);
+    for (k, &v) in regs.iter().enumerate() {
+        r.cpu.set_gpr(4 + k, v as i32 as i64 as u64);
+    }
+    r.call(func).unwrap_or_else(|e| panic!("case {case} {func:#x}: {e}"));
+    let theirs = log.borrow().clone();
+    if theirs != o.calls {
+        let i = theirs.iter().zip(&o.calls).position(|(a, b)| a != b).unwrap_or(theirs.len().min(o.calls.len()));
+        let show = |c: Option<&Call>| c.map(|c| format!("{:x} {:x?}", c.0, &c.1[..c.1.len().min(12)])).unwrap_or_default();
+        panic!("case {case} {func:#x}: call {i} of {}/{}: theirs {} ours {}", theirs.len(), o.calls.len(), show(theirs.get(i)), show(o.calls.get(i)));
+    }
+    for (at, b) in &m.regions {
+        let mut th = vec![0u8; b.len()];
+        r.mem.read(*at, &mut th).unwrap();
+        if &th != b {
+            let i = th.iter().zip(b).position(|(x, y)| x != y).unwrap() & !3;
+            let w = |v: &[u8]| u32::from_le_bytes(v[i..i + 4].try_into().unwrap());
+            panic!("case {case} {func:#x}: memory at {:#x}: theirs {:#x} ours {:#x}", at + i as u32, w(&th), w(b));
+        }
+    }
+    theirs
+}
+
+const TABLE: u32 = ARENA + 0x100;
+const SLOTS: u32 = ARENA + 0x600;
+const CLUTS: u32 = ARENA + 0x700;
+const PACKET: u32 = ARENA + 0x1400;
+const PLACE: u32 = ARENA + 0x1600;
+const COLOUR: u32 = ARENA + 0x1700;
+
+/// A manager with four records in its table (sizes, formats, slots), its VRAM and CLUT slots
+fn manager(g: &mut Rng) -> Mem {
+    let mut m = Mem { regions: vec![(ARENA, vec![0; SIZE as usize])] };
+    for k in 0..SIZE / 4 {
+        m.w32(ARENA + 4 * k, g.next());
+    }
+    m.w32(TM + 0x10, TABLE);
+    m.w32(TM + 0x3c, g.pick(&[0u32, SLOTS, SLOTS]));
+    m.w32(TM + 0x6c, g.pick(&[0u32, CLUTS, CLUTS]));
+    m.w32(TM + 0x70, g.below(5));
+    m.w32(PLACE, PACKET + 8 * g.below(4));
+    for n in 0..4u32 {
+        let r = TABLE + 0x5c * n;
+        m.w32(r + 0x10, g.pick(&[1u32, 16, 64, 128, 512, 1000, 0x2000, 0x7fff_fff0, 0x8000_0010]));
+        m.w32(r + 0x18, g.pick(&[1u32, 32, 256, 513, 2]));
+        m.w32(r + 0x20, g.pick(&[0u32, 2, 0x13, 0x13, 1, 0x14]));
+        m.w32(r + 0x24, g.pick(&[0u32, 1, 3, 0xffff_ffff, 0xffff_fffe]));
+        m.w32(r + 0x30, g.pick(&[0u32, 2, 0xffff_ffff]));
+        m.w32(r + 0x3c, g.below(2));
+        m.w32(r + 0x2c, ARENA + 0x1800);
+        m.w32(r + 0x38, ARENA + 0x1900);
+    }
+    for k in 0..4 {
+        wf(&mut m, COLOUR + 4 * k, g.pick(&[0.0f32, 1.0, 0.5, -0.5, 2.0]));
+    }
+    m
+}
+
+#[test]
+fn uploads_match_the_original() {
+    let Some((mut r, log, _, _)) = runner() else { return };
+    for f in [0x1c1ab8u32, 0x1c1bd0, 0x1c1d58] {
+        r.allow(f);
+    }
+    let mut g = Rng(0x7e70_1000_0000_0001);
+    let (mut swizzled, mut palettes) = (0usize, 0usize);
+    for case in 0..6000u32 {
+        let mut m = manager(&mut g);
+        let n = g.below(4);
+        if case % 3 == 0 {
+            // (the draw-into packet reads its slot unchecked: one there)
+            m.w32(TM + 0x3c, SLOTS);
+            m.w32(TABLE + 0x5c * n + 0x24, g.below(4));
+        }
+        let theirs = match case % 3 {
+            0 => compare(&mut r, &log, &mut m, case, 0x1c1ab8, &[TM, n, PLACE], |m, _| tx::draw_into_packet(m, TM, n, PLACE)),
+            1 => compare(&mut r, &log, &mut m, case, 0x1c1bd0, &[TM, n, COLOUR, PLACE], |m, _| tx::fill_packet(m, TM, n, COLOUR, PLACE)),
+            _ => compare(&mut r, &log, &mut m, case, 0x1c1d58, &[TM, PIXELS, PALETTE, n], |m, o| tx::upload_pixels(m, o, TM, PIXELS, PALETTE, n)),
+        };
+        swizzled += theirs.iter().filter(|c| c.0 == tx::TEX_SWIZZLE).count();
+        palettes += (theirs.iter().filter(|c| c.0 == tx::MEM_COPY).count() > 30) as usize;
+    }
+    println!("{swizzled} swizzled, {palettes} palettes");
+    assert!(swizzled > 100 && palettes > 100);
 }

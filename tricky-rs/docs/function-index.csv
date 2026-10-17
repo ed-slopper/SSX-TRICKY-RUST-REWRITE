@@ -2655,9 +2655,9 @@ address,size,name,system,status
 0x1c0e78,124,FUN_001c0e78,render?,checked
 0x1c0ef8,2244,TexMan_RegisterTexture,render,checked
 0x1c17c0,760,TexMan_LockTexture,render,checked
-0x1c1ab8,280,FUN_001c1ab8,render?,not started
-0x1c1bd0,392,FUN_001c1bd0,render?,not started
-0x1c1d58,500,TexMan_UploadPixels,render,not started
+0x1c1ab8,280,FUN_001c1ab8,render?,checked
+0x1c1bd0,392,FUN_001c1bd0,render?,checked
+0x1c1d58,500,TexMan_UploadPixels,render,checked
 0x1c1f50,5112,TexMan_UploadTextures,render,not started
 0x1c3348,308,TexMan_UpdateLod,render,not started
 0x1c3480,220,TexMan_InitLoadNodes,render,not started

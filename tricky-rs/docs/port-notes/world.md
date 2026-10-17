@@ -2351,3 +2351,27 @@ and ones that make no record; sizes that are powers of two and not, and one whos
 word; heap flags with and without the pool and the clearing bits; allocations that fail; and courses with and
 without settings. The C library and heap stand-ins do their work on both sides. 52 of 53 mutants were caught.
 The one left multiplies by 1/ln 2 instead of dividing by ln 2, which the cast to an integer hides.
+
+## The texture manager: pixel uploads (G7q2, `texman`)
+
+The manager's own records are in its table at +0x10 (count +0xc). The load list's records (G7q1) are at +0x24.
+
+- **0x1c1ab8** (the draw-into packet) points drawing at texture n's VRAM slot (+0x3c's 0x14-byte slots, the
+  record's +0x24). After a `cnt` of 5 it writes A+D settings:
+  - FRAME: the slot's address / 32, the width / 64 at 16, the format at 24;
+  - SCISSOR: width − 1 at 16, height − 1 at 48;
+  - XYOFFSET: 2048 less half the size, × 16, so the texture is centred on the GS's usual offset.
+- **0x1c1bd0** (the fill packet) clears the texture with a sprite in a colour: R, G, B, A from +4, +8, +0xc, +0
+  × 128, with Q 1. The sprite runs from 2048 less half the size to 2048 plus half plus 1 (× 16, z 1), then
+  SCISSOR to two pixels in.
+- **`TexMan_UploadPixels`** 0x1c1d58 replaces a texture's pixels:
+  - 32-bit and 16-bit are copied in. 8-bit is copied, or swizzled into place (`Tex_Swizzle` 0x1fbe98) when the
+    record's +0x3c is set. Other formats are not copied.
+  - It stops being the context-1 texture, and its VRAM slot (if above 0) is let go.
+  - An 8-bit texture's palette is copied in the GS's block order and its CLUT slot let go.
+
+The packets' 64-bit fields come from sign-extended words, as the EE builds them.
+
+Checked in the runner (`tests/texman.rs`): 6000 cases over four records of random sizes (powers of two, 8192,
+and past 2^31), formats and slots. 29 of 30 mutants were caught. The one left halves the width unsigned, which
+differs only in bit 31, and the shift by 4 drops that bit.
