@@ -182,3 +182,74 @@ pub fn sprite(m: &mut Mem, env: &mut dyn RiderDrawEnv, r: u32, place: u32, size:
     m.w32(r + 0x680, t + 0x70);
     env.call(m, SUBMIT, &[r, t, t + 0x60, 0]);
 }
+
+/// The renderer's +0x2f0 0x1dfe30(r, _, _, matrix, a, b): VU1 program 9's data (the shadow on the rider, from
+/// `RiderSkin_SetBoardMatrix`): at the packet place a `ret` tag of 7 quadwords (FLUSHE, an UNPACK of 6 to VU1 0)
+/// with the matrix and the two vectors (as doublewords), the place moved on 0x80; the texture state's program
+/// set to 9 with that packet as its word 0 (marked changed if either differed). Nothing is submitted.
+pub fn program9_data(m: &mut Mem, r: u32, matrix: u32, a: u32, b: u32) {
+    let p = m.r32(r + 0x680);
+    w64(m, p, 0x6000_0007);
+    w64(m, p + 8, 0);
+    w64(m, p + 0x10, 0x8000u64 << 45);
+    w64(m, p + 0x18, 0xd80cu64 << 47);
+    let mut at = p + 0x20;
+    for (from, n) in [(matrix, 8u32), (a, 2), (b, 2)] {
+        for k in 0..n {
+            let v = m.r32(from + 8 * k) as u64 | (m.r32(from + 8 * k + 4) as u64) << 32;
+            w64(m, at, v);
+            at += 8;
+        }
+    }
+    m.w32(r + 0x680, p + 0x80);
+    let ts = m.r32(r + 0x470);
+    if m.r8(ts + 0x10) != 9 || m.r32(ts) != p {
+        m.w32(ts, p);
+        m.w32(r + 0x474, 1);
+        m.w8(ts + 0x10, 9);
+    }
+}
+
+/// The renderer's +0x310 0x1e7ac0(r, matrices, table, bones, n, out): the skin's blend. For each of the `n`
+/// bones (12 bytes each: +0 its influences, +4 them, 4 bytes each: a weight half, then a byte of bone and one of
+/// part), its matrix at `out` (r + 0x3f8 when `out` is 0) is the sum over its influences of the influence's matrix
+/// (`matrices` at (the part's base in `table` + the bone) × 0x40) times its weight / 100, from the first on.
+pub fn skin_blend(m: &mut Mem, r: u32, matrices: u32, table: u32, bones: u32, n: u32, out: u32) {
+    use crate::ps2f::F;
+    let out = if out == 0 { m.r32(r + 0x3f8) } else { out };
+    let src = |m: &Mem, e: u32| {
+        let k = m.r32(table.wrapping_add((m.r8(e + 3) as u32) << 2)).wrapping_add(m.r8(e + 2) as u32);
+        matrices.wrapping_add(k << 6)
+    };
+    let weight = |m: &Mem, e: u32| crate::animseq::div(crate::animseq::cvt_s_w(m.r16(e) as i16 as i32), F(100.0));
+    let rows = |m: &Mem, at: u32| [0, 1, 2, 3].map(|i| [0, 1, 2, 3].map(|j| rf(m, at + 0x10 * i + 4 * j)));
+    let put = |m: &mut Mem, at: u32, x: [[F; 4]; 4]| {
+        for a in 0..4u32 {
+            for b in 0..4u32 {
+                m.w32(at + 0x10 * a + 4 * b, x[a as usize][b as usize].0.to_bits());
+            }
+        }
+    };
+    let mut i = 0i32;
+    while i < n as i32 {
+        let d = bones.wrapping_add((i as u32).wrapping_mul(12));
+        let mut e = m.r32(d + 4);
+        let to = out.wrapping_add((i as u32) << 6);
+        // the first influence copied to its place and scaled there
+        let first = rows(m, src(m, e));
+        put(m, to, first);
+        let w = weight(m, e);
+        let scaled = rows(m, to).map(|r| r.map(|x| x * w));
+        put(m, to, scaled);
+        let mut k = 1i32;
+        while k < m.r32(d) as i32 {
+            e += 4;
+            let w = weight(m, e);
+            let more = rows(m, src(m, e)).map(|r| r.map(|x| x * w));
+            let sum = rows(m, to);
+            put(m, to, [0, 1, 2, 3].map(|a| [0, 1, 2, 3].map(|b| sum[a][b] + more[a][b])));
+            k += 1;
+        }
+        i += 1;
+    }
+}

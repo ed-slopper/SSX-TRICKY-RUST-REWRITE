@@ -1941,3 +1941,19 @@ Checked in the runner (`tests/renderdraw.rs`): 6000 cases on screen, off each si
 - the w flip with 0x3f (behind is culled either way);
 - the far bit as the near's (both corners have the same z);
 - the y half size re-associated (lost in the truncation to whole units).
+
+## The rider's shadow data and the skin blend (G7l, `renderdraw::program9_data`, `skin_blend`)
+
+- **+0x2f0 0x1dfe30(r, _, _, matrix, a, b)** is what `RiderSkin_SetBoardMatrix` calls to cast the shadow onto
+  the rider. At the packet place it builds a `ret` tag of 7 quadwords: FLUSHE, an UNPACK of 6 to VU1 0, the
+  matrix and the two vectors. That packet becomes the texture state's word 0, with VU1 program 9. Nothing is
+  submitted: the program's data rides with the state.
+- **+0x310 0x1e7ac0(r, matrices, table, bones, n, out)** is the skin's blend (from `RiderSkin_SkinMatrices`).
+  For each of the LOD's `n` bones (12-byte descriptors: an influence count, then 4-byte influences: a weight
+  half, a bone byte, a part byte), its matrix is the sum of its influences' skinned matrices. Each one is at
+  (the part's base in the table + the bone) × 0x40, times weight / 100. The output is r + 0x3f8 when `out` is 0.
+  Like the game, it builds the sum in the output's memory: the first influence is copied there and scaled, then
+  each next one is added.
+
+Checked in the runner (`tests/renderdraw.rs`): 4000 cases (7015 bones blended, weights round and random, the
+counts 0..12 and −1). All 15 mutants were caught.

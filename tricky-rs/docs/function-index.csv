@@ -3030,7 +3030,7 @@ address,size,name,system,status
 0x1df120,436,cPS2GraphicsMan::vf101_1df120,render,not started
 0x1df2d8,416,cPS2GraphicsMan::vf100_1df2d8,render,not started
 0x1df478,2480,cPS2GraphicsMan::vf91_1df478,render,not started
-0x1dfe30,344,cPS2GraphicsMan::vf93_1dfe30,render,not started
+0x1dfe30,344,cPS2GraphicsMan::vf93_1dfe30,render,checked
 0x1dff88,1328,cPS2GraphicsMan::vf94_1dff88,render,not started
 0x1e04b8,280,Render_FormatVramStats,render,not started
 0x1e05d0,140,Render_CalcTexVramSize,render,not started
@@ -3089,7 +3089,7 @@ address,size,name,system,status
 0x1e7298,592,FUN_001e7298,render?,not started
 0x1e74e8,1480,FUN_001e74e8,render?,not started
 0x1e7ab0,12,cPS2GraphicsMan::vf98_1e7ab0,render,not started
-0x1e7ac0,564,cPS2GraphicsMan::vf97_1e7ac0,render,not started
+0x1e7ac0,564,cPS2GraphicsMan::vf97_1e7ac0,render,checked
 0x1e7cf8,64,GridMesh_PackUV,render?,not started
 0x1e7d38,100,GridMesh_PackNormal,render?,not started
 0x1e7da0,100,Vec3_PackShort,render?,not started

@@ -212,3 +212,80 @@ fn sprite_matches_the_original() {
     println!("{drawn} drawn");
     assert!(drawn > 500 && drawn < 5900);
 }
+
+#[test]
+fn program9_data_and_skin_blend_match_the_original() {
+    let Some(mut r) = Runner::from_env() else { return };
+    r.allow(0x1dfe30);
+    r.allow(0x1e7ac0);
+    const MATS: u32 = ARENA + 0x8000;
+    const TABLE: u32 = ARENA + 0x9800;
+    const BONES: u32 = ARENA + 0x9900;
+    const ENTRIES: u32 = ARENA + 0x9c00;
+    const OUT: u32 = ARENA + 0xa000;
+    const MAT: u32 = ARENA + 0x3000;
+    let mut g = Rng(0x5791_2000_0000_0001);
+    let mut blended = 0usize;
+    for case in 0..4000u32 {
+        let mut m = Mem { regions: vec![(ARENA, vec![0; SIZE as usize])] };
+        for k in 0..SIZE / 4 {
+            m.w32(ARENA + 4 * k, g.next());
+        }
+        m.w32(R + 0x470, TS);
+        m.w32(R + 0x680, PKT + 0x10 * g.below(16));
+        m.w8(TS + 0x10, [0u8, 9, 9, 5][g.below(4) as usize]);
+        if g.below(3) == 0 {
+            let p = m.r32(R + 0x680);
+            m.w32(TS, p);
+        }
+        m.w32(R + 0x3f8, OUT + 0x800);
+        for k in 0..0x1800 / 4 {
+            wf(&mut m, MATS + 4 * k, g.f(-50.0, 50.0));
+        }
+        for k in 0..8 {
+            m.w32(TABLE + 4 * k, g.below(20));
+        }
+        let n = [0u32, 1, 2, 5, 12, 0xffff_ffff][g.below(6) as usize];
+        for b in 0..12u32 {
+            m.w32(BONES + 12 * b, [1u32, 1, 2, 3, 4, 0][g.below(6) as usize]);
+            m.w32(BONES + 12 * b + 4, ENTRIES + 0x10 * b);
+            for e in 0..4u32 {
+                let at = ENTRIES + 0x10 * b + 4 * e;
+                let w = g.below(101) as u16;
+                m.w16(at, [100u16, 50, 25, 0, 33, 0xffce, w, w][g.below(8) as usize]);
+                m.w8(at + 2, g.below(4) as u8);
+                m.w8(at + 3, g.below(8) as u8);
+            }
+        }
+        let out = if g.below(2) == 0 { 0 } else { OUT };
+        for (at, b) in &m.regions {
+            r.mem.write(*at, b).unwrap();
+        }
+        let prog9 = case % 2 == 0;
+        if prog9 {
+            rd::program9_data(&mut m, R, MAT, MAT + 0x40, MAT + 0x50);
+            for (k, v) in [R, 0x19, 0, MAT, MAT + 0x40, MAT + 0x50].into_iter().enumerate() {
+                r.cpu.set_gpr(4 + k, v as u64);
+            }
+            r.call(0x1dfe30).unwrap_or_else(|e| panic!("case {case}: {e}"));
+        } else {
+            rd::skin_blend(&mut m, R, MATS, TABLE, BONES, n, out);
+            for (k, v) in [R, MATS, TABLE, BONES, n, out].into_iter().enumerate() {
+                r.cpu.set_gpr(4 + k, v as i32 as i64 as u64);
+            }
+            r.call(0x1e7ac0).unwrap_or_else(|e| panic!("case {case}: {e}"));
+            blended += (n as i32).max(0) as usize;
+        }
+        for (at, b) in &m.regions {
+            let mut th = vec![0u8; b.len()];
+            r.mem.read(*at, &mut th).unwrap();
+            if &th != b {
+                let i = th.iter().zip(b).position(|(x, y)| x != y).unwrap() & !3;
+                let w = |v: &[u8]| u32::from_le_bytes(v[i..i + 4].try_into().unwrap());
+                panic!("case {case} ({}): memory at {:#x}: theirs {:#x} ours {:#x}", if prog9 { "program 9" } else { "blend" }, at + i as u32, w(&th), w(b));
+            }
+        }
+    }
+    println!("{blended} bones blended");
+    assert!(blended > 5000);
+}
