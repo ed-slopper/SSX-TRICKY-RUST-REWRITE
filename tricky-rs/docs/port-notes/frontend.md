@@ -1245,3 +1245,45 @@ and the port's scratch log as one token.
 53 of 55 mutants were caught:
 - starting the "advance" loop at 0 instead of 1 is equivalent, since its first check reads the same word;
 - the career-mode test (4 against 3) can only be told apart once the medal page (mode 3) is ported (G9v3).
+
+### The standings, the time challenge and the players' stats (G9v2)
+
+- **`Results_BuildStandingsPage` 0x1b0188** has two layouts, chosen by the number of profiles:
+  - one player: x + 79, rows 18 apart, five columns, row names on rows 0 to 3;
+  - more: x + 87, rows 16 apart, six columns, row names on rows 0, 1 and 4.
+
+  It sets the page's numbers (4 or 5, and the race's riders), the menu (0xdb5, 0x191, retry, save, 0x18e) and the
+  title 0xe57. Each finisher's row has the place, the rider's own name and the time (fourth cell for one player,
+  fifth for more), then the verdict as on the career page.
+- **`Results_BuildTimeChallengePage` 0x1b07f8** is laid out from x + 119 with rows 3 apart. It has no numbers, a
+  four-item menu and the title 0xe9c.
+- **The race table is part of the career.** It starts at the career's +0x27dc, so:
+  - a race rider's +4 is the index of its stats block (0xbc bytes at the career's +0x3294, the results' 0x32e624);
+  - the career's +0x327c is the times table (0x32e60c);
+  - the career's mode (+0x2afc) is the event's +0x320, which the medal verdict reads.
+- **`Results_BuildRiderStatsRows` 0x1b0998**(this, who): `who` holds a player (+0) and a row (+4). The row gets
+  six labels and the next row the player's stats:
+  - the block's +0x7c;
+  - +0 / 180 and +4 / 360 (whole-number divides);
+  - +8 and +0xc;
+  - the time at +0x5c × 100, made whole.
+
+  It returns 6.
+- **`Results_AddRiderStats` 0x1b1278**(this, who, col) does the same from column `col`, with ten labels. The
+  values are:
+  - the speed: +0x68 / +0x6c (the FPU's divide), times 0.6214 for miles when the career's +0x1680 is set,
+    formatted with `sprintf` "%d%s" and the unit (0x38e438 / 0x38e440);
+  - +0x10 and +0x1c;
+  - four times (+0x5c, +0x50, +0x54, +0x58);
+  - the fixed narrow string;
+  - the race time from the times table.
+
+  It first copies the narrow string's first byte into the buffer it then formats into (dead: the format writes
+  over it). It returns the column after the last.
+
+The same runner test covers them: 7200 cases over the 24 functions so far. It first got the career's mode wrong:
+the test set the event's +0x320 after the mode, which is the same word, so `BuildPages` never saw a real mode. With
+that fixed, G9v1's mode test is caught too (54 of 55).
+
+44 of 45 mutants were caught. The one left changes the miles factor by a bit, which the truncation to a whole speed
+does not show.

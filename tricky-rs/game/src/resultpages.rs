@@ -11,7 +11,7 @@
 //!
 //! Where the game formats on its stack, the port formats in `scratch` (STANDIN: the place differs, not the bytes).
 
-use crate::animseq::cvt_s_w;
+use crate::animseq::{cvt_s_w, div};
 use crate::pf::Mem;
 use crate::ps2f::F;
 use crate::textbox::TextBoxEnv;
@@ -69,6 +69,12 @@ pub const CLAMP_RANK: u32 = 0x16bb58;
 pub const FORMAT_TIME: u32 = 0x1a6ba0;
 pub const SPEECH_END: u32 = 0x231c50;
 pub const SPEECH_CLEAR: u32 = 0x228d10;
+pub const COUNT_PROFILES: u32 = 0x164288;
+pub const FIND_RIDER: u32 = 0x166598;
+pub const SPRINTF: u32 = 0x2fca28;
+/// The speed's units: miles and kilometres an hour
+pub const UNIT_MPH: u32 = 0x38e438;
+pub const UNIT_KMH: u32 = 0x38e440;
 
 fn call(m: &mut Mem, env: &mut dyn TextBoxEnv, func: u32, args: &[u32]) -> u32 {
     env.call(m, func, args, &[])
@@ -220,7 +226,9 @@ pub fn build_pages(m: &mut Mem, env: &mut dyn TextBoxEnv, this: u32, scratch: u3
         m.w32(ROW_IDS + 4 * k, 0xffff_ffff);
     }
     match m.r32(CAREER + 0x2afc) {
+        2 | 9 => standings_page(m, env, this, scratch),
         4 => career_page(m, env, this, scratch),
+        7 => time_challenge_page(m, env, this),
         _ => {}
     }
     let page = m.r32(this);
@@ -395,4 +403,199 @@ pub fn medal_verdict(m: &mut Mem, env: &mut dyn TextBoxEnv, this: u32) {
         other
     };
     call(m, env, WSTR_COPY, &[this + 0x20, s]);
+}
+
+/// The finishers' rows of the career and standings pages: each place ("%d%s" with "st", "nd", "rd", "th" into
+/// `scratch`), the rider's row-rider mark (−1 for one that is not a player's, else 0)
+fn place_cell(m: &mut Mem, env: &mut dyn TextBoxEnv, i: u32, scratch: u32) {
+    let place = i + 1;
+    let suffix = match place {
+        1 => 0xe44,
+        2 => 0xe54,
+        3 => 0xe58,
+        _ => 0xe45,
+    };
+    let s = loc(m, env, suffix);
+    call(m, env, WSTR_FORMAT_ASCII, &[scratch, FMT_DS, place, s]);
+    set_cell_text(m, env, 0, i, scratch);
+}
+
+/// A rider's row's verdict: with the verdict shown and the rider a player's, the rank of the place set and the
+/// verdict made
+fn row_verdict(m: &mut Mem, env: &mut dyn TextBoxEnv, this: u32, r: u32, i: u32) {
+    if m.r32(this + 0xc4) != 0 && m.r8(r.wrapping_mul(0x84).wrapping_add(RACE) + 0x69) as i8 >= 0 {
+        let rank = call(m, env, CLAMP_RANK, &[i]);
+        m.w32(this + 0x1c, rank);
+        medal_verdict(m, env, this);
+    }
+}
+
+/// `Results_BuildStandingsPage` 0x1b0188(this): laid out for one player (from the sprite's x + 79, rows 18 apart;
+/// five columns, the rows' names 0xe75, 0xe5d, 0xe5c, 0xe61) or for more (x + 87, 16 apart; six columns, names on
+/// rows 0, 1 and 4); the page's numbers (4 or 5 and the race's riders); the menu "continue" (0xdb5), 0x191,
+/// 0x190, 0x193, 0x18e; the title 0xe57. Then each finisher's row: its place, its own name, its time (in the fourth
+/// cell for one player, the fifth for more), the verdict.
+pub fn standings_page(m: &mut Mem, env: &mut dyn TextBoxEnv, this: u32, scratch: u32) {
+    let hud = m.r32(this + 4);
+    let sprites = m.r32(m.r32(hud + 0x42c));
+    let r = call(m, env, GET_RECT, &[sprites, 0x37]);
+    let x0 = rf(m, r + 8) + F(10.0);
+    let one = call(m, env, COUNT_PROFILES, &[CAREER]) == 1;
+    let page = m.r32(this);
+    if one {
+        set_row_layout(m, page, ((x0 + F(7.0)) + F(23.0)) + F(39.0), F(18.0));
+    } else {
+        set_row_layout(m, page, (((x0 + F(7.0)) + F(23.0)) + F(39.0)) + F(8.0), F(16.0));
+    }
+    let kind = if call(m, env, COUNT_PROFILES, &[CAREER]) == 1 {
+        m.w32(COL_ALIGN + 0xc, 2);
+        for (i, v) in [0x42a2_0000u32, 0x4324_0000, 0x4392_0000, 0x43f6_0000, 0x4411_8000].into_iter().enumerate() {
+            m.w32(COL_RIGHT + 4 * i as u32, v);
+        }
+        m.w32(COL_ALIGN, 0);
+        let page = m.r32(this);
+        m.w32(page + 0x50, 1);
+        m.w32(COL_ALIGN + 4, 0);
+        m.w32(COL_ALIGN + 8, 0);
+        for (row, id) in [(0u32, 0xe75u32), (1, 0xe5d), (2, 0xe5c), (3, 0xe61)] {
+            let s = loc(m, env, id);
+            set_row_name(m, env, row, s);
+        }
+        4
+    } else {
+        m.w32(COL_ALIGN + 0x10, 2);
+        for (i, v) in [0x4248_0000u32, 0x4305_0000, 0x4382_8000, 0x43be_8000, 0x43f5_8000, 0x4411_4000].into_iter().enumerate() {
+            m.w32(COL_RIGHT + 4 * i as u32, v);
+        }
+        m.w32(COL_ALIGN, 0);
+        let page = m.r32(this);
+        m.w32(page + 0x50, 1);
+        for o in [4, 8, 0xc] {
+            m.w32(COL_ALIGN + o, 0);
+        }
+        for (row, id) in [(0u32, 0xe75u32), (1, 0xe5d), (4, 0xe61)] {
+            let s = loc(m, env, id);
+            set_row_name(m, env, row, s);
+        }
+        5
+    };
+    let page = m.r32(this);
+    m.w32(page + 8, kind);
+    m.w32(page + 4, m.r32(RACE));
+    for (kind, id) in [(0u32, 0xdb5u32), (2, 0x191), (1, 0x190), (4, 0x193), (3, 0x18e)] {
+        let s = loc(m, env, id);
+        add_item(m, this, kind, s);
+    }
+    let t = loc(m, env, 0xe57);
+    set_title(m, env, t);
+    let mut i = 0u32;
+    while (i as i32) < m.r32(RACE) as i32 {
+        let r = m.r32(ORDER + 4 * i);
+        place_cell(m, env, i, scratch);
+        let e = r.wrapping_mul(0x84).wrapping_add(RACE);
+        let player = m.r8(e + 0x69) as i8;
+        m.w32(ROW_RIDERS + 4 * i, if player == -1 { player as i32 as u32 } else { 0 });
+        set_cell_ascii(m, env, 1, i, e + 8);
+        let t = m.r32((r << 2).wrapping_add(TIMES));
+        let row = if call(m, env, COUNT_PROFILES, &[CAREER]) == 1 { 3 } else { 4 };
+        call(m, env, FORMAT_TIME, &[t, cell(row, i)]);
+        row_verdict(m, env, this, r, i);
+        i += 1;
+    }
+}
+
+/// `Results_BuildTimeChallengePage` 0x1b07f8(this): laid out from the sprite's x + 119 (rows 3 apart), no numbers,
+/// the menu "continue" (0xdb5), 0x191, 0x190, 0x18e, the title 0xe9c
+pub fn time_challenge_page(m: &mut Mem, env: &mut dyn TextBoxEnv, this: u32) {
+    let hud = m.r32(this + 4);
+    let sprites = m.r32(m.r32(hud + 0x42c));
+    let r = call(m, env, GET_RECT, &[sprites, 0x37]);
+    let x = (((rf(m, r + 8) + F(50.0)) + F(7.0)) + F(23.0)) + F(39.0);
+    set_row_layout(m, m.r32(this), x, F(3.0));
+    let page = m.r32(this);
+    m.w32(page + 8, 0);
+    m.w32(page + 4, 0);
+    for (kind, id) in [(0u32, 0xdb5u32), (2, 0x191), (1, 0x190), (3, 0x18e)] {
+        let s = loc(m, env, id);
+        add_item(m, this, kind, s);
+    }
+    let t = loc(m, env, 0xe9c);
+    set_title(m, env, t);
+}
+
+/// A player's stats block (0xbc bytes): the career's +0x3294, by the rider's index at the career's +0x27e0 (0x84
+/// apart)
+fn stats_block(m: &Mem, rider: u32) -> u32 {
+    let idx = m.r32(rider.wrapping_mul(0x84).wrapping_add(CAREER) + 0x27e0);
+    idx.wrapping_mul(0xbc).wrapping_add(CAREER) + 0x3294
+}
+
+/// A float × 100 made whole (`cvt.w.s`), as a time's argument
+fn hundredths(v: F) -> u32 {
+    crate::sndlib::cvt_w((v * F(100.0)).0) as u32
+}
+
+/// `Results_BuildRiderStatsRows` 0x1b0998(this, who): `who` is a player (+0) and a row (+4). The row gets the
+/// labels 0xdc4, 0x1f6, 0x1fb, 0x1fc, 0x1fe, 0x1fa; the next row the player's stats (the block's +0x7c, +0 / 180,
+/// +4 / 360, +8, +0xc, and the time +0x5c). 6
+pub fn rider_stats_rows(m: &mut Mem, env: &mut dyn TextBoxEnv, this: u32, who: u32) -> u32 {
+    let row = m.r32(who + 4);
+    let rider = call(m, env, FIND_RIDER, &[CAREER, m.r32(who)]);
+    let blk = stats_block(m, rider);
+    let _ = this;
+    for (col, id) in [0xdc4u32, 0x1f6, 0x1fb, 0x1fc, 0x1fe, 0x1fa].into_iter().enumerate() {
+        let s = loc(m, env, id);
+        set_cell_text(m, env, row, col as u32, s);
+    }
+    let row = row.wrapping_add(1);
+    set_cell_int(m, env, row, 0, m.r32(blk + 0x7c));
+    set_cell_int(m, env, row, 1, (m.r32(blk) as i32).wrapping_div(180) as u32);
+    set_cell_int(m, env, row, 2, (m.r32(blk + 4) as i32).wrapping_div(360) as u32);
+    set_cell_int(m, env, row, 3, m.r32(blk + 8));
+    set_cell_int(m, env, row, 4, m.r32(blk + 0xc));
+    call(m, env, FORMAT_TIME, &[hundredths(rf(m, blk + 0x5c)), cell(row, 5)]);
+    6
+}
+
+/// `Results_AddRiderStats` 0x1b1278(this, who, col): from column `col` on, the row gets the labels 0xde6, 0x1f8,
+/// 0x202, 0x203, 0x1fa, 0x1f7, 0x1fd, 0x1ff, the cell string, 0x201; the next row the player's stats: the block's
+/// +0x7c, its speed (+0x68 / +0x6c, × 0.6214 in miles when the career's +0x1680 is set; "%d%s" with the unit), +0x10,
+/// +0x1c, four times (+0x5c, +0x50, +0x54, +0x58), the cell string, and the race time of the rider's character (the
+/// career's +0x327c by the race rider's +4). The column after the last.
+pub fn add_rider_stats(m: &mut Mem, env: &mut dyn TextBoxEnv, this: u32, who: u32, col: u32, scratch: u32) -> u32 {
+    let _ = this;
+    let rider = call(m, env, FIND_RIDER, &[CAREER, m.r32(who)]);
+    let row = m.r32(who + 4);
+    let blk = stats_block(m, rider);
+    let labels = [0xde6u32, 0x1f8, 0x202, 0x203, 0x1fa, 0x1f7, 0x1fd, 0x1ff];
+    for (k, id) in labels.into_iter().enumerate() {
+        let s = loc(m, env, id);
+        set_cell_text(m, env, row, col.wrapping_add(k as u32), s);
+    }
+    set_cell_ascii(m, env, row, col.wrapping_add(8), CAREER_CELL2);
+    let s = loc(m, env, 0x201);
+    set_cell_text(m, env, row, col.wrapping_add(9), s);
+    let row = row.wrapping_add(1);
+    set_cell_int(m, env, row, col, m.r32(blk + 0x7c));
+    let first = m.r8(CAREER_CELL2);
+    m.w8(scratch, first);
+    let speed = div(rf(m, blk + 0x68), rf(m, blk + 0x6c));
+    if m.r32(CAREER + 0x1680) != 0 {
+        let v = crate::sndlib::cvt_w((speed * k(0x3f1e_f9db)).0) as u32;
+        call(m, env, SPRINTF, &[scratch, FMT_DS, v, UNIT_MPH]);
+    } else {
+        let v = crate::sndlib::cvt_w(speed.0) as u32;
+        call(m, env, SPRINTF, &[scratch, FMT_DS, v, UNIT_KMH]);
+    }
+    set_cell_ascii(m, env, row, col.wrapping_add(1), scratch);
+    set_cell_int(m, env, row, col.wrapping_add(2), m.r32(blk + 0x10));
+    set_cell_int(m, env, row, col.wrapping_add(3), m.r32(blk + 0x1c));
+    for (k, o) in [0x5cu32, 0x50, 0x54, 0x58].into_iter().enumerate() {
+        call(m, env, FORMAT_TIME, &[hundredths(rf(m, blk + o)), cell(row, col.wrapping_add(4 + k as u32))]);
+    }
+    set_cell_ascii(m, env, row, col.wrapping_add(8), CAREER_CELL2);
+    let ch = m.r32(rider.wrapping_mul(0x84).wrapping_add(RACE) + 4);
+    let t = m.r32((ch << 2).wrapping_add(CAREER) + 0x327c);
+    call(m, env, FORMAT_TIME, &[t, cell(row, col.wrapping_add(9))]);
+    col.wrapping_add(10)
 }

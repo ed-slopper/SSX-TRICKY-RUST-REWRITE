@@ -2493,11 +2493,11 @@ address,size,name,system,status
 0x1af720,544,Results_BuildPages,frontend?,checked
 0x1af940,16,Results_ClearSpeechEvent,frontend?,checked
 0x1af950,2100,Results_BuildCareerPage,race?,checked
-0x1b0188,1644,Results_BuildStandingsPage,race?,not started
-0x1b07f8,412,Results_BuildTimeChallengePage,frontend?,not started
-0x1b0998,544,Results_BuildRiderStatsRows,ai?,not started
+0x1b0188,1644,Results_BuildStandingsPage,race?,checked
+0x1b07f8,412,Results_BuildTimeChallengePage,frontend?,checked
+0x1b0998,544,Results_BuildRiderStatsRows,ai?,checked
 0x1b0bb8,1728,Results_BuildMedalPage,race?,not started
-0x1b1278,1144,Results_AddRiderStats,race?,not started
+0x1b1278,1144,Results_AddRiderStats,race?,checked
 0x1b16f0,952,Results_BuildStatsPage,race?,not started
 0x1b1aa8,256,Results_BuildLessonPage,race?,not started
 0x1b1ba8,324,Results_SetMedalVerdict,race?,checked
