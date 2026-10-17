@@ -4452,17 +4452,17 @@ address,size,name,system,status
 0x246f88,88,c1PTrackLoad::vf5_246f88,game,checked
 0x246fe0,1016,c1PTrackLoad::DrawBackground,game,checked
 0x2473d8,1668,c1PTrackLoad::DrawOverlay,frontend,checked
-0x247a60,280,c2PTrackLoad::c2PTrackLoad,race,ported
-0x247b78,88,c2PTrackLoad::~c2PTrackLoad,race,not started
-0x247bd0,388,c2PTrackLoad::StartAssetLoad,race,not started
-0x247d58,2208,c2PTrackLoad::PollAssetLoad,race,not started
-0x2485f8,1128,LoadScreen_FillEventText,frontend?,not started
-0x248a60,52,c2PTrackLoad::vf4_248a60,race,not started
-0x248a98,56,c2PTrackLoad::vf3_248a98,race,not started
-0x248ad0,68,c2PTrackLoad::vf5_248ad0,race,not started
-0x248b18,1848,c2PTrackLoad::DrawBackground,race,not started
-0x249250,396,FUN_00249250,race?,not started
-0x2493e0,888,c2PTrackLoad::DrawOverlay,frontend,not started
+0x247a60,280,c2PTrackLoad::c2PTrackLoad,race,checked
+0x247b78,88,c2PTrackLoad::~c2PTrackLoad,race,checked
+0x247bd0,388,c2PTrackLoad::StartAssetLoad,race,checked
+0x247d58,2208,c2PTrackLoad::PollAssetLoad,race,checked
+0x2485f8,1128,LoadScreen_FillEventText,frontend?,checked
+0x248a60,52,c2PTrackLoad::vf4_248a60,race,checked
+0x248a98,56,c2PTrackLoad::vf3_248a98,race,checked
+0x248ad0,68,c2PTrackLoad::vf5_248ad0,race,checked
+0x248b18,1848,c2PTrackLoad::DrawBackground,race,checked
+0x249250,396,FUN_00249250,race?,checked
+0x2493e0,888,c2PTrackLoad::DrawOverlay,frontend,checked
 0x249758,280,c1PFELoad::c1PFELoad,game,not started
 0x249870,88,c1PFELoad::~c1PFELoad,game,not started
 0x2498c8,52,c1PFELoad::vf4_2498c8,game,not started

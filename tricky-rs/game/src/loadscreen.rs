@@ -1179,3 +1179,490 @@ pub fn track1_draw_overlay(m: &mut Mem, env: &mut dyn TextBoxEnv, this: u32, scr
     call(m, env, TS_DESTRUCT_THUNK, &[b, 2]);
     call(m, env, TS_DESTRUCT, &[a, 2]);
 }
+
+// --- G9w3: the two-player track load ---
+
+pub const TRACK2_VTABLE: u32 = 0x3a5218;
+/// The two players' pictures' shape names, "ldr1" and "ldr2"
+pub const SHAPE_R1: u32 = 0x3a4f78;
+pub const SHAPE_R2: u32 = 0x3a4f80;
+/// The four labels' ids the two-player summary uses (0xe81..0xe84, written there by it)
+pub const TRACK2_LABELS: u32 = 0x3463f8;
+/// The progress bar's tables (a widget built on the stack): the thing's, the sprite's, the bar's
+pub const VT_THING: u32 = 0x3b5a00;
+pub const VT_SPRITE: u32 = 0x3b5e18;
+pub const VT_BAR: u32 = 0x3b6cf8;
+pub const SET_COPY_RECT: u32 = 0x1f9e90;
+pub const ATTRIBUTES: u32 = 0x164638;
+pub const WIDGET_COLOUR: u32 = 0x2ad988;
+pub const WIDGET_POS: u32 = 0x2acb20;
+pub const WIDGET_VALUE: u32 = 0x2b3950;
+pub const BAR_DRAW: u32 = 0x2ae880;
+pub const BAR_DELETE: u32 = 0x2b3a20;
+pub const GRADIENT_RECT: u32 = 0x19b2a0;
+pub const DRAW_STRING: u32 = 0x19d0c0;
+pub const DRAW_CENTRED: u32 = 0x19d278;
+pub const MEASURE_WIDE: u32 = 0x19dc78;
+
+/// `c2PTrackLoad::c2PTrackLoad` 0x247a60(this): as the one-player's, its animation at +0x410 and its 28 records at
+/// +0x9ec, the summary from `LoadScreen_FillEventText`
+pub fn track2_new(m: &mut Mem, env: &mut dyn TextBoxEnv, this: u32) -> u32 {
+    init(m, env, this);
+    m.w32(this, TRACK2_VTABLE);
+    call(m, env, ANIM_INIT, &[this + 0x410]);
+    for i in 0..28 {
+        let r = this + 0x9ec + 0x1c * i;
+        m.w32(r, 0xffff_ffff);
+        wf(m, r + 4, ONE);
+        wf(m, r + 8, ONE);
+        m.w32(r + 0xc, 0);
+        m.w32(r + 0x10, 0);
+        wf(m, r + 0x14, ONE);
+        wf(m, r + 0x18, ONE);
+    }
+    put4(m, this + 0x94, [ONE, ZERO, ZERO, ZERO]);
+    put4(m, this + 0xa4, [ONE, ZERO, ZERO, ZERO]);
+    for i in (0..28).rev() {
+        m.w32(this + 0x9ec + 0x1c * i, 0xffff_ffff);
+    }
+    fill_event_text(m, env, this);
+    this
+}
+
+/// `c2PTrackLoad::~c2PTrackLoad` 0x247b78(this, flags)
+pub fn track2_delete(m: &mut Mem, env: &mut dyn TextBoxEnv, this: u32, flags: u32) {
+    m.w32(this, TRACK2_VTABLE);
+    call(m, env, BANK_UNLOAD, &[m.r32(SPEECH)]);
+    call(m, env, ANIM_DELETE, &[this + 0x410, 2]);
+    delete(m, env, this, flags);
+}
+
+/// `c2PTrackLoad::StartAssetLoad` 0x247bd0(this): as the one-player's, with two pictures (+0xcfc): each player's
+/// rider
+pub fn track2_start(m: &mut Mem, env: &mut dyn TextBoxEnv, this: u32) {
+    let list = this + 0xcfc;
+    call(m, env, BANK_LOAD, &[m.r32(SPEECH)]);
+    call(m, env, SPRITES_INIT, &[m.r32(this + 4)]);
+    call(m, env, LOAD_ICONS, &[m.r32(this + 4), 0x2cc, 1]);
+    m.w32(this + 0x40c, 0);
+    for i in 0..2u32 {
+        let e = list + 0x34 * i;
+        m.w32(e, 0);
+        m.w8(e + 4, 0);
+        m.w8(e + 0x29, 0);
+        m.w32(e + 0x30, 0xffff_ffff);
+        let id = call(m, env, PLAYER_ID, &[CAREER, i]);
+        let p = call(m, env, PLAYER_PROFILE, &[CAREER, id]);
+        rider_pic_name(m, env, p, e + 4);
+        put_shape_name(m, e, if i == 0 { SHAPE_R1 } else { SHAPE_R2 });
+    }
+    load_pics(m, env, this, list, 2);
+}
+
+/// `c2PTrackLoad::PollAssetLoad` 0x247d58(this): as [`poll_sprites`] but with its own table (the records at +0x9ec,
+/// the flag +0x40c), then six records of the sprite set copied over others (0xc7 ← 0x11, 0xc6 ← 0x12, 0xc5 ←
+/// 0x13, 0xc4 ← 0x19, 0xc3 ← 0x1a, 0xc2 ← 0x1b)
+pub fn track2_poll(m: &mut Mem, env: &mut dyn TextBoxEnv, this: u32) -> u32 {
+    if call(m, env, BANK_POLL, &[m.r32(SPEECH)]) == 0 {
+        return 0;
+    }
+    if call(m, env, SPRITES_POLL, &[m.r32(this + 4)]) == 0 {
+        return 0;
+    }
+    let set = m.r32(this + 4);
+    for s in TRACK2_TABLE {
+        match s {
+            K(o, v) | Int(o, v) => m.w32(this + o, v),
+            Sheet(o, w) => m.w32(this + o, m.r32(set + w)),
+        }
+    }
+    for (to, from) in [(0xc7u32, 0x11u32), (0xc6, 0x12), (0xc5, 0x13), (0xc4, 0x19), (0xc3, 0x1a), (0xc2, 0x1b)] {
+        call(m, env, SET_COPY_RECT, &[m.r32(this + 4), to, from]);
+    }
+    1
+}
+
+/// `LoadScreen_FillEventText` 0x2485f8(this): the two-player summary: the labels' ids 0xe81..0xe84 kept at 0x3463f8;
+/// the mode's heading (+0x6a4) and line (+0x6e0) as the one-player's (nothing more for modes 8 and 9); the two
+/// players' characters (+0x884, +0x8c0); the labels 0x120 (+0x71c), 0x123 (+0x848) and the four kept ones (+0x758..
+/// 0x3c apart); the players' levels (+0x8fc, +0x938) and trick book pages (+0x974, +0x9b0)
+pub fn fill_event_text(m: &mut Mem, env: &mut dyn TextBoxEnv, this: u32) {
+    let mode = event_mode(m);
+    m.w32(TRACK2_LABELS + 0xc, 0xe84);
+    m.w32(TRACK2_LABELS, 0xe81);
+    m.w32(TRACK2_LABELS + 4, 0xe82);
+    m.w32(TRACK2_LABELS + 8, 0xe83);
+    let heading = match mode {
+        1 | 6 => 0xe2b,
+        2 | 3 | 7 => 0xe71,
+        8 | 9 => return,
+        _ => 0xe2f,
+    };
+    copy_loc(m, env, this + 0x6a4, heading);
+    let line = match mode {
+        2 | 4 => 0xe2c,
+        3 | 5 => 0xe2d,
+        6 => 0xe2e,
+        7 => 0xe72,
+        _ => 0xe2a,
+    };
+    copy_loc(m, env, this + 0x6e0, line);
+    let id = call(m, env, PLAYER_ID, &[CAREER, 0]);
+    let p0 = call(m, env, PLAYER_PROFILE, &[CAREER, id]);
+    let id = call(m, env, PLAYER_ID, &[CAREER, 1]);
+    let p1 = call(m, env, PLAYER_PROFILE, &[CAREER, id]);
+    for (o, p) in [(0x884u32, p0), (0x8c0, p1)] {
+        let name = m.r32(p.wrapping_mul(0x38).wrapping_add(CHARACTERS) + 4);
+        call(m, env, WSTR_SET_ASCII, &[this + o, name]);
+    }
+    copy_loc(m, env, this + 0x71c, 0x120);
+    copy_loc(m, env, this + 0x848, 0x123);
+    for (k, o) in [0x758u32, 0x794, 0x7d0, 0x80c].into_iter().enumerate() {
+        let id = m.r32(TRACK2_LABELS + 4 * k as u32);
+        copy_loc(m, env, this + o, id);
+    }
+    for (o, p) in [(0x8fcu32, 0u32), (0x938, 1)] {
+        let id = call(m, env, PLAYER_ID, &[CAREER, p]);
+        let lv = call(m, env, LEVEL_NAME, &[CAREER, id]);
+        call(m, env, WSTR_COPY, &[this + o, lv]);
+    }
+    let mut pages = [0u32; 2];
+    for (p, slot) in pages.iter_mut().enumerate() {
+        let id = call(m, env, PLAYER_ID, &[CAREER, p as u32]);
+        let book = call(m, env, TRICK_BOOK, &[CAREER, id]);
+        *slot = call(m, env, COMPLETE_PAGES, &[book]);
+    }
+    for (o, n) in [(0x974u32, pages[0]), (0x9b0, pages[1])] {
+        if n == 6 {
+            let f = loc(m, env, 0xc9e);
+            call(m, env, WSTR_FORMAT, &[this + o, f]);
+        } else {
+            call(m, env, WSTR_FORMAT_ASCII, &[this + o, FMT_D, n.wrapping_add(1)]);
+        }
+    }
+}
+
+/// vf4 0x248a60(this): the loading loop played, then the bars started
+pub fn track2_vf4(m: &mut Mem, env: &mut dyn TextBoxEnv, this: u32, scratch: u32) {
+    track1_vf4(m, env, this, scratch);
+}
+
+/// vf3 0x248a98(this): as the one-player's
+pub fn track2_vf3(m: &mut Mem, env: &mut dyn TextBoxEnv, this: u32, scratch: u32) -> u32 {
+    track1_vf3(m, env, this, scratch)
+}
+
+/// vf5 0x248ad0(this): the base's tick, and the loading loop stopped once the app's +8 reaches 8
+pub fn track2_vf5(m: &mut Mem, env: &mut dyn TextBoxEnv, this: u32) {
+    tick(m, env, this);
+    if (m.r32(m.r32(APP) + 8) as i32) >= 8 {
+        call(m, env, LOOP_STOP, &[m.r32(SPEECH), 1]);
+    }
+}
+
+fn wu(m: &mut Mem, a: u32, v: u32) {
+    m.w32(a, v);
+}
+
+/// The bar's virtual at its table's 0x138 (its size or place set from four floats at `v`)
+fn bar_call(m: &mut Mem, env: &mut dyn TextBoxEnv, bar: u32, v: u32) {
+    let vt = m.r32(bar + 0xc);
+    let me = bar.wrapping_add(m.r16(vt + 0x138) as i16 as u32);
+    let func = m.r32(vt + 0x13c);
+    env.call(m, func, &[me, v], &[]);
+}
+
+/// `c2PTrackLoad::DrawBackground` 0x248b18(this): once the sprites are in, the bars and the ticker; then a progress
+/// bar built in place on the stack (`scratch`: a `cFE3DThing` made a sprite and then a `cFE3DProgressBar`, 0x190
+/// bytes, gold, 100 by 30) and, for each of the four attributes of the two players (`Career_GetPlayerAttributes`),
+/// it is sized (its +0xc · 3.75 wide), given its value (+4, out of +0xc), placed (215 − the width for the first,
+/// 425 for the second; rows from 237, its height + 10 apart) and drawn; the players' pictures in tip boxes at 23
+/// and 360; the flakes; the bar deleted
+pub fn track2_draw_background(m: &mut Mem, env: &mut dyn TextBoxEnv, this: u32, scratch: u32) {
+    if m.r32(this + 0x40c) == 0 {
+        return;
+    }
+    let sp = scratch;
+    let recs = this + 0x9ec;
+    draw_bars(m, env, this, recs, scratch + 0x400);
+    draw_ticker(m, env, recs, scratch + 0x400);
+    let one = ONE.0.to_bits();
+    let half = 0x3f00_0000u32;
+    let gold = [0x3f80_0000u32, 0x3f73_f7cf, 0x3f3a_9fbe, 0x3dd9_1687];
+    // the thing
+    wu(m, sp, 0xffff_ffff);
+    wu(m, sp + 0x40, 0);
+    wu(m, sp + 0xc, VT_THING);
+    wu(m, sp + 4, sp);
+    wu(m, sp + 8, sp);
+    for (o, v) in [(0x10u32, 0u32), (0x14, 1), (0x18, 0), (0x1c, 0), (0x20, 0), (0x24, 0), (0x28, 1), (0x2c, 0), (0x30, 0)] {
+        wu(m, sp + o, v);
+    }
+    for o in [0x4cu32, 0x44, 0x48, 0x50, 0x5c, 0x54, 0x58] {
+        wu(m, sp + o, 0);
+    }
+    for o in [0x60u32, 0x6c, 0x64, 0x68] {
+        wu(m, sp + o, one);
+    }
+    wu(m, sp + 0x234, 3);
+    for o in [0x190u32, 0x194, 0x198, 0x70, 0x74] {
+        wu(m, sp + o, 0);
+    }
+    wu(m, sp + 0x19c, one);
+    for k in 0..4 {
+        let v = m.r32(sp + 0x190 + 4 * k);
+        wu(m, sp + 0x80 + 4 * k, v);
+    }
+    for o in [0x190u32, 0x198, 0x194] {
+        wu(m, sp + o, 0);
+    }
+    for o in [0x90u32, 0x94, 0x98] {
+        wu(m, sp + o, 0);
+    }
+    for (k, v) in [(0xacu32, gold[0]), (0xb8, gold[3]), (0xb0, gold[1]), (0xb4, gold[2])] {
+        wu(m, sp + k, v);
+    }
+    for o in [0xbcu32, 0xc8, 0xc0, 0xc4, 0xcc] {
+        wu(m, sp + o, one);
+    }
+    for o in [0xd8u32, 0xd0, 0xd4] {
+        wu(m, sp + o, half);
+    }
+    wu(m, sp + 0xdc, one);
+    for o in [0xe8u32, 0xe0, 0xe4] {
+        wu(m, sp + o, half);
+    }
+    // the sprite
+    wu(m, sp + 0xc, VT_SPRITE);
+    wu(m, sp + 0xa8, 1);
+    for o in [0xa0u32, 0xa4, 0xec, 0xf0, 0x100, 0x104, 0x108] {
+        wu(m, sp + o, 0);
+    }
+    wu(m, sp + 0x10c, one);
+    call(m, env, WIDGET_COLOUR, &[sp]);
+    // the bar
+    for (o, v) in [(0x110u32, one), (0x11c, 0), (0x114, one), (0x118, one), (0x120, one), (0x12c, 0), (0x124, one), (0x128, one), (0x130, one)] {
+        wu(m, sp + o, v);
+    }
+    let fifth = 0x3e4c_cccdu32;
+    for o in [0x13cu32, 0x134, 0x138] {
+        wu(m, sp + o, fifth);
+    }
+    wu(m, sp + 0x140, one);
+    let far = 0xc61c_3c00u32;
+    for (o, v) in [(0x14cu32, 0), (0x144, one), (0x148, 0), (0x15c, far), (0x174, 0xffff_ffff), (0x158, far), (0x16c, 0xffff_ffff), (0x170, 0xffff_ffff)] {
+        wu(m, sp + o, v);
+    }
+    wu(m, sp + 0xc, VT_BAR);
+    let hundred = F(100.0).0.to_bits();
+    for (o, v) in [(0x150u32, hundred), (0x154, 0), (0x160, 0), (0x164, one), (0x168, 0), (0x178, one), (0x17c, one), (0x180, one), (0x184, one), (0x188, 0), (0x18c, 0)] {
+        wu(m, sp + o, v);
+    }
+    for (o, v) in [(0x1a0u32, hundred), (0x1a4, F(30.0).0.to_bits()), (0x1a8, 0), (0x1ac, 0)] {
+        wu(m, sp + o, v);
+    }
+    bar_call(m, env, sp, sp + 0x1a0);
+    // its colours
+    for (o, v) in [(0x110u32, [one; 4]), (0x120, [one, one, 0x3ef1_26e9, 0x3d1f_be77]), (0x140, [one, one, 0, 0])] {
+        for (k, w) in v.into_iter().enumerate() {
+            wu(m, sp + 0x190 + 4 * k as u32, w);
+        }
+        for k in 0..4 {
+            let w = m.r32(sp + 0x190 + 4 * k);
+            wu(m, sp + o + 4 * k, w);
+        }
+    }
+    for (p, at) in [(0u32, 0x1b0u32), (1, 0x1f0)] {
+        let id = call(m, env, PLAYER_ID, &[CAREER, p]);
+        call(m, env, ATTRIBUTES, &[CAREER, id, sp + at]);
+    }
+    let x0 = m.r32(sp + 0x100);
+    for (o, v) in [(0x190u32, x0), (0x194, F(10.0).0.to_bits()), (0x19c, 0), (0x198, 0)] {
+        wu(m, sp + o, v);
+    }
+    bar_call(m, env, sp, sp + 0x190);
+    let mut y = k(0x436d_0000);
+    let scale = k(0x4070_0000);
+    for row in 0..4u32 {
+        let a = sp + 0x1b0 + 0x10 * row;
+        let b = sp + 0x1f0 + 0x10 * row;
+        // the first player's bar
+        for (o, v) in [(0x16cu32, 0xc3u32), (0x174, 0xc4), (0x170, 0xc2), (0x168, 1)] {
+            wu(m, sp + o, v);
+        }
+        let w = cvt_s(m.r32(a + 0xc)) * scale;
+        let h = m.r32(sp + 0x104);
+        wu(m, sp + 0x194, h);
+        wu(m, sp + 0x198, 0);
+        wu(m, sp + 0x19c, 0);
+        wf(m, sp + 0x190, w);
+        bar_call(m, env, sp, sp + 0x190);
+        wf(m, sp + 0x150, cvt_s(m.r32(a + 0xc)));
+        fcall(m, env, WIDGET_VALUE, &[sp], &[cvt_s(m.r32(a + 4))]);
+        let total = cvt_s(m.r32(a + 4)) + cvt_s(m.r32(a + 8));
+        wf(m, sp + 0x184, ONE);
+        wf(m, sp + 0x194, y);
+        wf(m, sp + 0x190, F(215.0) - w);
+        wf(m, sp + 0x180, cvt_s(m.r32(a + 0xc)));
+        wf(m, sp + 0x158, total);
+        wu(m, sp + 0x198, 0);
+        wf(m, sp + 0x19c, ONE);
+        call(m, env, WIDGET_POS, &[sp, sp + 0x190]);
+        call(m, env, BAR_DRAW, &[sp]);
+        // the second's
+        for (o, v) in [(0x174u32, 0xc7u32), (0x16c, 0xc6), (0x170, 0xc5), (0x168, 0)] {
+            wu(m, sp + o, v);
+        }
+        let w = cvt_s(m.r32(b + 0xc)) * scale;
+        let h = m.r32(sp + 0x104);
+        wu(m, sp + 0x194, h);
+        wu(m, sp + 0x198, 0);
+        wu(m, sp + 0x19c, 0);
+        wf(m, sp + 0x190, w);
+        bar_call(m, env, sp, sp + 0x190);
+        wf(m, sp + 0x150, cvt_s(m.r32(b + 0xc)));
+        fcall(m, env, WIDGET_VALUE, &[sp], &[cvt_s(m.r32(b + 4))]);
+        let total = cvt_s(m.r32(b + 4)) + cvt_s(m.r32(b + 8));
+        wf(m, sp + 0x184, ONE);
+        wf(m, sp + 0x194, y);
+        wf(m, sp + 0x190, k(0x43d4_8000));
+        wf(m, sp + 0x180, cvt_s(m.r32(b + 0xc)));
+        wu(m, sp + 0x198, 0);
+        wf(m, sp + 0x158, total);
+        wf(m, sp + 0x19c, ONE);
+        call(m, env, WIDGET_POS, &[sp, sp + 0x190]);
+        call(m, env, BAR_DRAW, &[sp]);
+        let step = rf(m, sp + 0x104) + F(10.0);
+        y = y + step;
+        wu(m, sp + 0x234, 2u32.wrapping_sub(row));
+    }
+    for i in 0..2u32 {
+        let e = this + 0xcfc + 0x34 * i;
+        if m.r32(e) != 1 {
+            continue;
+        }
+        let x = if i == 0 { F(23.0) } else { F(360.0) };
+        draw_tip_box(m, env, this, m.r32(e + 0x30), 0, 7, x, F(100.0), ONE, scratch + 0x400);
+    }
+    let n = m.r32(m.r32(APP) + 8);
+    draw_flakes(m, env, recs, n as i32);
+    call(m, env, BAR_DELETE, &[sp, 2]);
+}
+
+fn cvt_s(v: u32) -> F {
+    crate::animseq::cvt_s_w(v as i32)
+}
+
+/// 0x249250(this; x, y, w, h): a divider: two rects from x − w/2 and x, w/2 wide, black fading out to their
+/// outer sides (the corners' colours on the stack)
+pub fn draw_divider(m: &mut Mem, env: &mut dyn TextBoxEnv, x: F, y: F, w: F, h: F, scratch: u32) {
+    rcall(m, env, 0x1f0, &[0xffff_ffff, 0], &[]);
+    let half = w * F(0.5);
+    let sp = scratch;
+    let one = ONE.0.to_bits();
+    let mut c = [0u32; 16];
+    c[4] = one;
+    c[12] = one;
+    for (k, v) in c.into_iter().enumerate() {
+        m.w32(sp + 4 * k as u32, v);
+    }
+    fcall(m, env, GRADIENT_RECT, &[DRAW_COLOUR, sp, sp + 0x10, sp + 0x20, sp + 0x30], &[x - half, y, half, h]);
+    let mut c = [0u32; 16];
+    c[0] = one;
+    c[8] = one;
+    for (k, v) in c.into_iter().enumerate() {
+        m.w32(sp + 4 * k as u32, v);
+    }
+    fcall(m, env, GRADIENT_RECT, &[DRAW_COLOUR, sp, sp + 0x10, sp + 0x20, sp + 0x30], &[x, y, half, h]);
+}
+
+/// `c2PTrackLoad::DrawOverlay` 0x2493e0(this): on texture 6 (nothing more in modes 8 and 9): the heading in gold in
+/// the title font (30, 30, 1.2; measured too), then in black the dividers (600 wide at 197, 227, 317, 347) and
+/// between them the centred lines in the title font at 0.7 (0x71c, the four labels, 0x848), and the players' levels
+/// and pages in the menu font at 140 and 490
+pub fn track2_draw_overlay(m: &mut Mem, env: &mut dyn TextBoxEnv, this: u32, scratch: u32) {
+    let mode = event_mode(m);
+    rcall(m, env, 0x1d0, &[6], &[]);
+    if !((mode as i32) >= 10 || (mode as i32) < 8) {
+        return;
+    }
+    let (title, menu) = (this + 0x48, this + 0xc);
+    put4(m, scratch, [ONE, k(0x3f73_f7cf), k(0x3f3a_9fbe), k(0x3dd9_1687)]);
+    call(m, env, SET_COLOUR, &[DRAW_COLOUR, scratch]);
+    let big = k(0x3f99_999a);
+    fcall(m, env, DRAW_STRING, &[title, this + 0x6a4], &[F(30.0), F(30.0), big]);
+    fcall(m, env, MEASURE_WIDE, &[title, this + 0x6a4, 0], &[big]);
+    put4(m, scratch, [ONE, ZERO, ZERO, ZERO]);
+    call(m, env, SET_COLOUR, &[DRAW_COLOUR, scratch]);
+    let (cx, w, h) = (F(320.0), F(600.0), F(2.0));
+    let s = k(0x3f33_3333);
+    draw_divider(m, env, cx, k(0x4345_0000), w, h, scratch + 0x40);
+    fcall(m, env, DRAW_CENTRED, &[title, this + 0x71c], &[cx, k(0x434d_0000), s]);
+    draw_divider(m, env, cx, k(0x4363_0000), w, h, scratch + 0x40);
+    for (o, y) in [(0x758u32, 0x436b_0000u32), (0x794, 0x437f_0000), (0x7d0, 0x4389_8000), (0x80c, 0x4393_8000)] {
+        fcall(m, env, DRAW_CENTRED, &[title, this + o], &[cx, k(y), s]);
+    }
+    draw_divider(m, env, cx, k(0x439e_8000), w, h, scratch + 0x40);
+    fcall(m, env, DRAW_CENTRED, &[title, this + 0x848], &[cx, k(0x43a2_8000), s]);
+    draw_divider(m, env, cx, k(0x43ad_8000), w, h, scratch + 0x40);
+    wf(m, DRAW_COLOUR, ONE);
+    wf(m, DRAW_COLOUR + 0xc, ZERO);
+    wf(m, DRAW_COLOUR + 4, ZERO);
+    wf(m, DRAW_COLOUR + 8, ZERO);
+    for (o, x, y) in [(0x8fcu32, 140.0f32, 0x434d_0000u32), (0x974, 140.0, 0x43a2_8000), (0x938, 490.0, 0x434d_0000), (0x9b0, 490.0, 0x43a2_8000)] {
+        fcall(m, env, DRAW_CENTRED, &[menu, this + o], &[F(x), k(y), ONE]);
+    }
+}
+
+/// The two-player track load's stores (from `this`)
+const TRACK2_TABLE: [Store; 197] = [
+    Sheet(0x09ec, 0x15e8), Sheet(0x0a08, 0x15e8), Sheet(0x0a24, 0x15e8), Int(0x040c, 1), K(0x0a04, 0x3ee30000),
+    K(0x09f0, 0x43320000), K(0x09f4, 0x42e40000), K(0x0a14, 0x3f418000), K(0x0a18, 0x3e850000),
+    K(0x0a1c, 0x3f608000), K(0x0a0c, 0x431f0000), K(0x0a10, 0x427c0000), K(0x0a30, 0x3cb00000),
+    K(0x0a3c, 0x3e0e0000), K(0x0a34, 0x3f5c8000), K(0x0a38, 0x3f7c8000), Sheet(0x0a40, 0x15e8),
+    K(0x0a4c, 0x3f158000), K(0x0a54, 0x3e810000), K(0x0a44, 0x42820000), K(0x0a00, 0x3f318000),
+    K(0x0a28, 0x42040000), K(0x0a2c, 0x41f80000), K(0x09f8, 0x3b000000), K(0x09fc, 0x3b000000),
+    K(0x0a20, 0x3f7f8000), K(0x0a58, 0x3f7f8000), K(0x0a50, 0x3b000000), K(0x0a48, 0x42d60000),
+    Sheet(0x0a5c, 0x15e8), Sheet(0x0a78, 0x15e8), Sheet(0x0a94, 0x15ec), Sheet(0x0ab0, 0x15ec),
+    K(0x0a74, 0x3f2d8000), K(0x0a6c, 0x3ef50000), K(0x0a70, 0x3f0c8000), K(0x0a60, 0x41980000),
+    K(0x0a64, 0x41a00000), K(0x0a90, 0x3f318000), K(0x0a88, 0x3e9b0000), K(0x0a8c, 0x3ec70000),
+    K(0x0a7c, 0x41b80000), K(0x0aac, 0x3f3b8000), K(0x0aa4, 0x3cd00000), K(0x0aa8, 0x3e320000),
+    K(0x0a9c, 0x41d80000), K(0x0abc, 0x3f1e8000), K(0x0ac0, 0x3e620000), K(0x0ac4, 0x3ead0000),
+    K(0x0ab4, 0x41f80000), K(0x0a68, 0x3f1a8000), K(0x0a84, 0x3f198000), K(0x0a80, 0x41c80000),
+    K(0x0aa0, 0x3f218000), K(0x0a98, 0x421c0000), K(0x0ab8, 0x41e00000), K(0x0ac8, 0x3f398000),
+    Sheet(0x0acc, 0x15ec), Sheet(0x0ae8, 0x15ec), Sheet(0x0b04, 0x15ec), Sheet(0x0b20, 0x15ec),
+    K(0x0ad8, 0x3f218000), K(0x0ae4, 0x3f3c8000), K(0x0adc, 0x3ec50000), K(0x0ae0, 0x3f0a8000),
+    K(0x0ad0, 0x42240000), K(0x0ad4, 0x41e00000), K(0x0b00, 0x3f3a8000), K(0x0af8, 0x3f1a8000),
+    K(0x0af0, 0x41c80000), K(0x0b10, 0x3f198000), K(0x0b1c, 0x3f458000), K(0x0b08, 0x42040000),
+    K(0x0b0c, 0x42340000), K(0x0b2c, 0x3f408000), K(0x0b38, 0x3f668000), K(0x0b30, 0x3d380000),
+    K(0x0b34, 0x3e120000), K(0x0b24, 0x41d00000), Sheet(0x0b3c, 0x15ec), K(0x0b48, 0x3f428000),
+    K(0x0afc, 0x3f458000), K(0x0b18, 0x3f718000), K(0x0b28, 0x421c0000), K(0x0af4, 0x3f228000),
+    K(0x0aec, 0x42300000), K(0x0b14, 0x3f518000), K(0x0b54, 0x3f718000), Sheet(0x0b58, 0x15ec),
+    Sheet(0x0b74, 0x15ec), Sheet(0x0b90, 0x15ec), K(0x0b4c, 0x3e5a0000), K(0x0b50, 0x3eb90000),
+    K(0x0b40, 0x421c0000), K(0x0b64, 0x3f438000), K(0x0b70, 0x3f748000), K(0x0b68, 0x3ed50000),
+    K(0x0b6c, 0x3f118000), K(0x0b5c, 0x42200000), K(0x0b60, 0x42480000), K(0x0b80, 0x3f4b8000),
+    K(0x0b8c, 0x3f7b8000), K(0x0b78, 0x423c0000), K(0x0b7c, 0x42440000), K(0x0b9c, 0x3f4d8000),
+    K(0x0ba4, 0x3f728000), K(0x0b94, 0x42080000), Sheet(0x0bac, 0x15ec), K(0x0bb8, 0x3c200000),
+    K(0x0bc4, 0x3f1b8000), K(0x0bbc, 0x3bc00000), K(0x0ba0, 0x3f518000), K(0x0b98, 0x42300000),
+    K(0x0b44, 0x42400000), K(0x0b84, 0x3f188000), K(0x0b88, 0x3f468000), K(0x0ba8, 0x3f788000),
+    K(0x0bc0, 0x3f804000), Sheet(0x0bc8, 0x15e8), Sheet(0x0be4, 0x15e8), Sheet(0x0c00, 0x15e8),
+    K(0x0bb4, 0x431a0000), Sheet(0x0c1c, 0x15f0), K(0x0c20, 0x43800000), K(0x0bb0, 0x43800000),
+    K(0x0c2c, 0x3b000000), K(0x0bd4, 0x3f188000), K(0x0be0, 0x3f228000), K(0x0bd8, 0x3f6f8000),
+    K(0x0bdc, 0x3f778000), K(0x0bcc, 0x41100000), K(0x0bd0, 0x41300000), K(0x0bf0, 0x3f188000),
+    K(0x0bfc, 0x3f228000), K(0x0bf4, 0x3f788000), K(0x0bf8, 0x3f788000), K(0x0be8, 0x3f800000),
+    K(0x0bec, 0x41300000), K(0x0c0c, 0x3f188000), K(0x0c18, 0x3f228000), K(0x0c10, 0x3f798000),
+    K(0x0c14, 0x3f7f8000), K(0x0c04, 0x40e00000), K(0x0c08, 0x41300000), K(0x0c28, 0x3b000000),
+    K(0x0c34, 0x3f398000), K(0x0c30, 0x3f7f8000), K(0x0c24, 0x433a0000), Sheet(0x0c38, 0x15e8),
+    Sheet(0x0c54, 0x15e8), Sheet(0x0c70, 0x15e8), Sheet(0x0c8c, 0x15e8), K(0x0c44, 0x3f088000),
+    K(0x0c50, 0x3f378000), K(0x0c48, 0x3f138000), K(0x0c4c, 0x3f388000), K(0x0c60, 0x3f0e8000),
+    K(0x0c6c, 0x3f338000), K(0x0c64, 0x3f398000), K(0x0c68, 0x3f688000), K(0x0c58, 0x42400000),
+    K(0x0c5c, 0x42180000), K(0x0c80, 0x3f618000), K(0x0c98, 0x3ee50000), K(0x0ca4, 0x3f098000),
+    K(0x0c9c, 0x3f468000), K(0x0ca0, 0x3f5d8000), K(0x0c94, 0x41c00000), K(0x0c3c, 0x42180000),
+    K(0x0c40, 0x42400000), K(0x0c7c, 0x3ee50000), K(0x0c88, 0x3f098000), K(0x0c84, 0x3f788000),
+    K(0x0c74, 0x41c00000), K(0x0c78, 0x41c00000), K(0x0c90, 0x41c00000), Sheet(0x0ca8, 0x15e8),
+    K(0x0cb8, 0x3f778000), Sheet(0x0cc4, 0x15e8), K(0x0cbc, 0x3f6f8000), K(0x0cac, 0x41100000),
+    K(0x0cd8, 0x3f788000), K(0x0cc8, 0x3f800000), Sheet(0x0ce0, 0x15e8), K(0x0cec, 0x3f188000),
+    K(0x0cf8, 0x3f228000), K(0x0cf0, 0x3f7f8000), K(0x0cf4, 0x3f798000), K(0x0ce4, 0x40e00000),
+    K(0x0ce8, 0x41300000), K(0x0cb4, 0x3f188000), K(0x0cc0, 0x3f228000), K(0x0cb0, 0x41300000),
+    K(0x0cd0, 0x3f188000), K(0x0cdc, 0x3f228000), K(0x0cd4, 0x3f788000), K(0x0ccc, 0x41300000),
+];

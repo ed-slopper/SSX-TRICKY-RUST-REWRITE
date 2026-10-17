@@ -42,6 +42,11 @@ const DATA: (u32, u32) = (0x328000, 0x18000);
 const RODATA: (u32, u32) = (0x3a4b00, 0xa00);
 /// The speech's pointer (the sound banks are on it)
 const SPEECH_AT: (u32, u32) = (0x343000, 0x100);
+/// The two-player summary's labels' ids, and the front end's widgets' tables
+const LABELS: (u32, u32) = (0x3463f0, 0x20);
+const WIDGETS: (u32, u32) = (0x3b5a00, 0x1800);
+/// The progress bar's virtual at its table's 0x13c
+const BAR_SIZE: u32 = 0x2ad828;
 const ARENA: u32 = 0x0100_0000;
 const SIZE: u32 = 0x5000;
 const THIS: u32 = ARENA;
@@ -101,7 +106,7 @@ impl Io for r5900::Mem {
     }
 }
 fn mapped(a: u32, n: u32) -> bool {
-    [DATA, RODATA, SPEECH_AT, (ARENA, SIZE), HEAP].iter().any(|&(at, s)| a >= at && a as u64 + n as u64 <= (at + s) as u64)
+    [DATA, RODATA, SPEECH_AT, LABELS, WIDGETS, (ARENA, SIZE), HEAP].iter().any(|&(at, s)| a >= at && a as u64 + n as u64 <= (at + s) as u64)
 }
 fn stack(a: u32) -> bool {
     (0x01f0_0000..0x01ff_0000).contains(&a)
@@ -156,7 +161,9 @@ fn arity(func: u32) -> (usize, usize) {
         ls::SPRITE_ANCHORED => (2, 4),
         ls::SET_FADE => (1, 1),
         ls::LOC => (2, 0),
-        ls::SPRINTF | ls::LOAD_ICONS | ls::WSTR_FORMAT | ls::WSTR_FORMAT_ASCII | ls::EVENT_MEDAL => (3, 0),
+        ls::SPRINTF | ls::LOAD_ICONS | ls::WSTR_FORMAT_ASCII | ls::EVENT_MEDAL => (3, 0),
+        // (the "all done" format takes no argument: the two-player summary leaves a register's old value there)
+        ls::WSTR_FORMAT => (2, 0),
         ls::BANK_LOAD | ls::BANK_POLL | ls::BANK_UNLOAD | ls::SPRITES_INIT | ls::SPRITES_POLL | ls::WSTR_COUNT => (1, 0),
         ls::COMPLETE_PAGES | ls::TS_INIT | ls::TS_CONSTRUCT => (1, 0),
         ls::LOOP_PLAY | ls::LOOP_STOP | ls::WSTR_COPY | ls::WSTR_SET_ASCII | ls::PLAYER_ID | ls::PLAYER_PROFILE => (2, 0),
@@ -164,6 +171,13 @@ fn arity(func: u32) -> (usize, usize) {
         ls::COURSE_DROP | ls::COURSE_LENGTH | ls::MAP_X | ls::MAP_Y | ls::ANIM_VALUE | ls::TS_SET_FONT => (2, 0),
         ls::TS_DESTRUCT_THUNK | ls::TS_DESTRUCT => (2, 0),
         ls::DRAW_ALIGNED | ls::DRAW_CURSOR => (6, 3),
+        ls::SET_COPY_RECT | ls::ATTRIBUTES => (3, 0),
+        ls::WIDGET_COLOUR | ls::BAR_DRAW => (1, 0),
+        ls::WIDGET_POS | ls::BAR_DELETE | BAR_SIZE => (2, 0),
+        ls::WIDGET_VALUE => (1, 1),
+        ls::GRADIENT_RECT => (5, 4),
+        ls::DRAW_STRING | ls::DRAW_CENTRED => (2, 3),
+        ls::MEASURE_WIDE => (3, 1),
         _ => panic!("no arity for {func:#x}"),
     }
 }
@@ -182,8 +196,21 @@ fn standin(io: &mut dyn Io, func: u32, w: &[u32], f: &[u32], ans: &Answers) -> (
     if matches!(
         func,
         ls::SPRITE_RECT | ls::FILLED_RECT | ls::SPRITE_TILED | ls::SPRITE_ANCHORED | ls::DRAW_RIGHT | ls::PRINTF_SHADOWED_A | ls::DRAW_ALIGNED | ls::DRAW_CURSOR
+            | ls::GRADIENT_RECT | ls::DRAW_STRING | ls::DRAW_CENTRED
     ) {
         log.extend((0..4).map(|k| io.r32(ls::DRAW_COLOUR + 4 * k)));
+    }
+    // the widget on the stack: all of it, as it stands at each of its calls; a vector's four words
+    if matches!(func, ls::WIDGET_COLOUR | ls::WIDGET_POS | ls::WIDGET_VALUE | ls::BAR_DRAW | ls::BAR_DELETE | BAR_SIZE) {
+        log.extend((0..0x64).map(|k| token(io.r32(w[0] + 4 * k))));
+    }
+    if matches!(func, ls::WIDGET_POS | BAR_SIZE) {
+        log.extend((0..4).map(|k| io.r32(w[1] + 4 * k)));
+    }
+    if func == ls::GRADIENT_RECT {
+        for c in 1..5 {
+            log.extend((0..4).map(|k| io.r32(w[c] + 4 * k)));
+        }
     }
     if func == ls::DRAW_ALIGNED || func == ls::DRAW_CURSOR {
         // (the text style's +4, set by hand)
@@ -208,6 +235,15 @@ fn standin(io: &mut dyn Io, func: u32, w: &[u32], f: &[u32], ans: &Answers) -> (
         ls::UNPACKED_SIZE => r % 2,
         ls::BANK_POLL | ls::SPRITES_POLL => [0u32, 1, 1, 7][(r % 4) as usize],
         ls::PLAYER_PROFILE => r % 12,
+        ls::ATTRIBUTES => {
+            // four attributes of four words (the bars read +4, +8, +0xc)
+            if stack(w[2]) || mapped(w[2], 0x40) {
+                for k in 0..0x10 {
+                    io.w32(w[2] + 4 * k, (r >> (k % 8)) % 100);
+                }
+            }
+            0
+        }
         // (six pages in the book; 7 too, past it)
         ls::COMPLETE_PAGES => r % 8,
         ls::EVENT_MEDAL => r % 4,
@@ -258,6 +294,7 @@ fn loading_screens_match_the_original() {
         0x2449f8, 0x244b20, 0x244ee8, 0x244fc8, 0x245598, 0x2455c0, 0x245668, 0x245680, 0x2456b8, 0x245760, 0x245838,
         0x245840, 0x245958,
         0x2459b0, 0x245a48, 0x245b68, 0x245cb8, 0x245ec0, 0x246700, 0x246f18, 0x246f50, 0x246f88, 0x246fe0, 0x2473d8,
+        0x247a60, 0x247b78, 0x247bd0, 0x247d58, 0x2485f8, 0x248a60, 0x248a98, 0x248ad0, 0x248b18, 0x249250, 0x2493e0,
     ];
     for f in funcs.into_iter().chain([0x250e98]) {
         r.allow(f);
@@ -273,7 +310,9 @@ fn loading_screens_match_the_original() {
         ls::WSTR_SET_ASCII, ls::WSTR_FORMAT, ls::WSTR_FORMAT_ASCII, ls::PLAYER_ID, ls::PLAYER_PROFILE, ls::LEVEL_NAME,
         ls::TRICK_BOOK, ls::COMPLETE_PAGES, ls::EVENT_MEDAL, ls::COURSE_NAME, ls::COURSE_DIFFICULTY, ls::COURSE_LOCATION,
         ls::COURSE_DROP, ls::COURSE_LENGTH, ls::MAP_X, ls::MAP_Y, ls::ANIM_VALUE, ls::TS_INIT, ls::TS_CONSTRUCT,
-        ls::TS_SET_FONT, ls::TS_DESTRUCT_THUNK, ls::TS_DESTRUCT, ls::DRAW_ALIGNED, ls::DRAW_CURSOR,
+        ls::TS_SET_FONT, ls::TS_DESTRUCT_THUNK, ls::TS_DESTRUCT, ls::DRAW_ALIGNED, ls::DRAW_CURSOR, ls::SET_COPY_RECT,
+        ls::ATTRIBUTES, ls::WIDGET_COLOUR, ls::WIDGET_POS, ls::WIDGET_VALUE, ls::BAR_DRAW, ls::BAR_DELETE, ls::GRADIENT_RECT,
+        ls::DRAW_STRING, ls::DRAW_CENTRED, ls::MEASURE_WIDE, BAR_SIZE,
     ];
     stubs.extend(ROFFS.map(rv));
     stubs.extend(SOFFS.map(sv));
@@ -298,6 +337,7 @@ fn loading_screens_match_the_original() {
     };
     let data = read(&mut r, DATA);
     let rodata = read(&mut r, RODATA);
+    let widgets = read(&mut r, WIDGETS);
     let mut g = Rng(0x5ce1_6000_0000_0001);
     let (mut steps, mut pics, mut fades, mut filled) = ([0usize; 5], 0usize, 0usize, 0usize);
     let per = 300u32;
@@ -308,9 +348,11 @@ fn loading_screens_match_the_original() {
                 (DATA.0, data.clone()),
                 (RODATA.0, rodata.clone()),
                 (SPEECH_AT.0, vec![0; SPEECH_AT.1 as usize]),
+                (LABELS.0, vec![0; LABELS.1 as usize]),
+                (WIDGETS.0, widgets.clone()),
                 (ARENA, vec![0; SIZE as usize]),
                 (HEAP.0, vec![0; HEAP.1 as usize]),
-                (SCRATCH, vec![0; 0x200]),
+                (SCRATCH, vec![0; 0x800]),
             ],
         };
         for k in 0..SIZE / 4 {
@@ -372,6 +414,10 @@ fn loading_screens_match_the_original() {
         wf(&mut m, THIS + 0xb34, g.f(1.0, 300.0));
         wf(&mut m, THIS + 0xb38, g.f(1.0, 300.0));
         m.w32(THIS + 0xe24, g.below(2));
+        // the two-player load's pictures and its ids' table
+        for i in 0..2 {
+            m.w32(THIS + 0xcfc + 0x34 * i, g.pick(&[0u32, 1, 1, 2]));
+        }
         m.w32(THIS + 0x40c, g.below(11));
         for i in 0..3 {
             m.w32(THIS + 0xe28 + 0x34 * i, g.pick(&[0u32, 1, 1, 2]));
@@ -387,6 +433,7 @@ fn loading_screens_match_the_original() {
         let (fx, fa) = (g.f(0.0, 640.0), g.f(0.0, 1.0));
         let fy = { let a = g.f(0.0, 480.0); let b = g.f(2e7, 2e8); g.pick(&[a, a, b]) };
         let flags = g.below(4);
+        let fw = g.f(0.0, 40.0);
         let pick = g.below(14);
         for (at, b) in &m.regions {
             r.mem.write(*at, b).unwrap();
@@ -508,6 +555,41 @@ fn loading_screens_match_the_original() {
                 ls::track1_draw_overlay(&mut m, e, THIS, SCRATCH);
                 none
             }
+            0x247a60 => ls::track2_new(&mut m, e, THIS),
+            0x247b78 => {
+                ls::track2_delete(&mut m, e, THIS, flags);
+                none
+            }
+            0x247bd0 => {
+                ls::track2_start(&mut m, e, THIS);
+                none
+            }
+            0x247d58 => ls::track2_poll(&mut m, e, THIS),
+            0x2485f8 => {
+                ls::fill_event_text(&mut m, e, THIS);
+                none
+            }
+            0x248a60 => {
+                ls::track2_vf4(&mut m, e, THIS, SCRATCH);
+                none
+            }
+            0x248a98 => ls::track2_vf3(&mut m, e, THIS, SCRATCH),
+            0x248ad0 => {
+                ls::track2_vf5(&mut m, e, THIS);
+                none
+            }
+            0x248b18 => {
+                ls::track2_draw_background(&mut m, e, THIS, SCRATCH);
+                none
+            }
+            0x249250 => {
+                ls::draw_divider(&mut m, e, F(fx), F(fy), F(fa), F(fw), SCRATCH);
+                none
+            }
+            0x2493e0 => {
+                ls::track2_draw_overlay(&mut m, e, THIS, SCRATCH);
+                none
+            }
             _ => unreachable!(),
         };
         if func == 0x243f00 && (step as usize) < 5 {
@@ -528,7 +610,7 @@ fn loading_screens_match_the_original() {
             0x244540 => vec![THIS, SHEETS, done],
             0x2447a8 => vec![THIS, 0, SHEETS, text, tex],
             0x2449f8 | 0x244fc8 => vec![THIS, SHEETS],
-            0x245958 => vec![THIS, flags],
+            0x245958 | 0x247b78 => vec![THIS, flags],
             0x2459b0 | 0x245a48 | 0x245b68 => vec![pick, SCRATCH],
             _ => vec![THIS],
         };
@@ -538,6 +620,7 @@ fn loading_screens_match_the_original() {
         r.cpu.set_f(12, fx);
         r.cpu.set_f(13, fy);
         r.cpu.set_f(14, fa);
+        r.cpu.set_f(15, fw);
         r.call(func).unwrap_or_else(|e| panic!("case {case} {func:#x}: {e}"));
         if ours != none {
             assert_eq!(r.cpu.gpr(2) as u32, ours, "case {case} {func:#x}: the answer");

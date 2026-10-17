@@ -1459,3 +1459,36 @@ The same runner test, now 10,500 cases over the 35 functions. Its draw stand-ins
 (0x337fe8) as it stands when they draw. Without that, a wrong colour that a later draw overwrote went unseen. 58 of
 59 mutants were caught; the one left is the constructor's second pass setting the records' first words to −1,
 which the first pass already did.
+
+### The two-player track load (G9w3)
+
+- **`c2PTrackLoad`** (table 0x3a5218) has the animation at +0x410, 28 records at +0x9ec with its loaded flag at
+  +0x40c, and two pictures at +0xcfc: each player's rider (shapes "ldr1", "ldr2").
+- **Its poll** (0x247d58) has its own 197 stores; the last one sits in the delay slot of the first call after
+  them. It then makes six copies of sprite records within the sprite set (0x1f9e90: 0xc7 ← 0x11, 0xc6 ← 0x12,
+  0xc5 ← 0x13, 0xc4 ← 0x19, 0xc3 ← 0x1a, 0xc2 ← 0x1b).
+- **`LoadScreen_FillEventText` 0x2485f8** writes four label ids (0xe81..0xe84) into a table at 0x3463f8 and reads
+  them back for its lines:
+  - the mode's heading and line as the one-player load's;
+  - both players' characters, levels and trick book pages, and two more labels.
+
+  For "all pages done" the format is passed an a2 the function never sets (a value left from earlier). The format
+  takes no argument, so it doesn't matter, and the test does not log it.
+- **`DrawBackground` 0x248b18** builds a `cFE3DProgressBar` on its stack, then uses it for every bar:
+  - it fills the thing's fields, switches the table to the sprite's and refreshes its colour, then switches to the
+    bar's (0x3b6cf8) and sets its size through its virtual (0x2ad828);
+  - its three colours are written through a buffer, and both players' attributes fetched
+    (`Career_GetPlayerAttributes`, four of four words each);
+  - for each attribute, the bar is sized (its +0xc · 3.75 wide), given its value (+4 out of +0xc) and placed (the
+    first player's to end at 215, the second's at 425; rows from 237, the bar's height + 10 apart), then drawn
+    (vf11);
+  - afterwards come the pictures in tip boxes and the flakes, and the bar is deleted.
+
+  The port builds the same object in its scratch. The test's widget stand-ins log the whole object (0x190 bytes,
+  its stack addresses as a token) at every call, so every field is checked as it stands at each step.
+- **0x249250** draws a divider: two half-width gradient rects fading black out to both sides.
+  **`DrawOverlay` 0x2493e0** draws the heading (also measured, though the width is never used), four dividers, the
+  centred lines between them, and the two players' levels and pages. It draws nothing in modes 8 and 9.
+
+The same runner test, now 13,800 cases over the 46 functions. 58 of 59 mutants were caught; the one left drops
+the bar's `this` adjustment, which is 0 in the table.
