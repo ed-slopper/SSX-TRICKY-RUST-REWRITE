@@ -993,3 +993,44 @@ half the limit (1 either way) and a colour length of exactly 0.
 Checked in the runner (`tests/lensfx.rs`, 826 callbacks drawing, answers of 0 and −0 among them). 14 of 15 mutants
 were caught; the one left is equivalent (a scale of exactly 1).
 
+## The PS2 lens FX node (row G7d2e; `game/src/ps2lensfx.rs`, checked: `tests/ps2lensfx.rs`)
+
+- **`LensFX_Create` 0x1ea408**(a0, flags) gets 0x33c0 bytes. With flag 0x4000_0000 they come from the pool
+  (0x23d3b0 with 0x345e48, the size, the flags, the class name 0x393ea0, 0, 0); otherwise from `EAMem_Alloc` with
+  the low 26 bits of the flags. They are filled with 0 (flag bit 31) or 0xdeadc0de. The node is then constructed
+  with a0 even when nothing was got (its vtable written at address 8). `cPS2LensFXObjNode` is the lens FX node with
+  vtable 0x393ea8.
+- **The packets** go into the renderer's buffer (+0x694), kept at the node's +0x3350 with doublewords counted at
+  +0x3354. Screen positions are 12.4 fixed point about 2048 − half the screen (+0x698, +0x69c). The 32-bit sums
+  and shifts are sign-extended into the 64-bit fields, as the EE does.
+  - begin (+0x58): `cnt` 5, `DIRECT` 4, A+D TEST_1 0x30000, ZBUF_1 (+0x1710 | (+0x6a4 − 0x30) << 24 | the mask
+    bit), ALPHA_1 0x48.
+  - set view (+0x60): the view's block kept at +0x3360..; `cnt` 3, FLUSHE, `DIRECT` 2, SCISSOR_1 from its box.
+  - a flare (+0x68): `cnt` 15. Two textured blended sprites (PRIM 0x156) for its glow boxes, then a four-corner
+    strip (PRIM 0x154) for its streak (corners in order 0, 1, 3, 2). The colour is +0x4c.. × 128 with Q 1. The
+    alphas are +0x48 × the part showing × the colour scales +0x2fc4, +0x2fc8, +0x2fcc × 128. The glows sit at the
+    flare's depth, the streak at 1.
+  - the sun (+0x70): its glow sprite, then a PRIM tag and a fan of untextured Gouraud triangles (PRIM 0x14b), one
+    per neighbouring pair of outline points: the centre and the two points. The alphas are the part showing ×
+    +0x2fd4 × 128 × the first point's length, × each point's fade at the points. The headers are written even
+    with fewer than two points.
+  - end view (+0x78) does nothing; end (+0x80) writes the DMA `end` tag.
+- **The visibility (+0x50, 0x1ea520)** reads the depth buffer back:
+  1. a FINISH packet (+0x2fe0) and a BITBLTBUF/TRXPOS/TRXREG/TRXDIR packet (+0x3000) for the flare's box, from the
+     depth buffer (+0x1710, and the frame's +0x80 and +0x8c of +0x654 + 0x94 × +0x650);
+  2. `FlushCache`, then waits until DMA channels 1 and 2, VIF1 and the GS FIFO are idle;
+  3. FINISH sent and waited for, then the transfer packet sent;
+  4. VIF1's FIFO and the GS bus turned toward the EE, channel 1 into +0x3050 for w × 3h ÷ 16 quadwords, waited
+     for, and turned back.
+  - It then counts the box's 24-bit depths inside the clamped box that are not nearer than the flare's own
+    (`__fixunssfsi` of its depth). When the clamped box is the whole box, the answer is that share. Otherwise it is
+    (n − half the box) ÷ half, at least 0.
+  - The runner treats the hardware registers as plain memory, and a DMA start finishes at once (the test supplies
+    the pixels the read-back would bring). The port does its register reads and writes through the env.
+
+Checked in the runner on 20,000 cases: all ten functions, packets under way, NaN and huge depths, negative frame
+widths, ZBUF formats below 0x30, boxes of no size, views off 16-byte alignment. 28 of 34 mutants were caught. Five
+of the rest are equivalent: sign bits a shift of 32 or 48 drops, an all-ones GIF tag either way, the node's matrix
+always on 16 bytes, a width's arithmetic shift whose top bits the next shift drops. One is unreached: the sign of a
+read-back size beyond 2³¹.
+

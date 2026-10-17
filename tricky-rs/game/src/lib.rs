@@ -174,3 +174,4 @@ pub mod cull;
 pub mod worldgrid;
 pub mod lights;
 pub mod lensfx;
+pub mod ps2lensfx;

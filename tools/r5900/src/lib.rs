@@ -62,22 +62,40 @@ impl fmt::Display for Error {
 
 impl std::error::Error for Error {}
 
-/// EE RAM (32 MB, also seen through the uncached mirrors) and the 16 KB scratchpad.
+/// EE RAM (32 MB, also seen through the uncached mirrors), the 16 KB scratchpad, and the EE's hardware registers
+/// (0x1000_0000..0x1001_0000) and the GS's privileged ones (0x1200_0000..0x1200_2000) as plain memory: what a test
+/// writes there is what the code reads (a status bit a polling loop waits for), and the code's writes stay to be
+/// looked at. Nothing behind them runs (no GS, and a DMA channel's start bit clears as it is written: the transfer
+/// is done at once, moving nothing).
 pub struct Mem {
     ram: Vec<u8>,
     spr: Vec<u8>,
+    io: Vec<u8>,
+    gs: Vec<u8>,
     heap: u32,
 }
 
+/// The EE's hardware registers and the GS's privileged ones (see [`Mem`])
+pub const IO_REGS: u32 = 0x1000_0000;
+pub const GS_REGS: u32 = 0x1200_0000;
+
 impl Mem {
     fn new() -> Mem {
-        Mem { ram: vec![0; RAM_SIZE], spr: vec![0; SCRATCHPAD_SIZE], heap: HEAP_BASE }
+        Mem { ram: vec![0; RAM_SIZE], spr: vec![0; SCRATCHPAD_SIZE], io: vec![0; 0x1_0000], gs: vec![0; 0x2000], heap: HEAP_BASE }
     }
 
     fn slice(&mut self, addr: u32, len: usize) -> Option<&mut [u8]> {
         if (SCRATCHPAD..SCRATCHPAD + SCRATCHPAD_SIZE as u32).contains(&addr) {
             let o = (addr - SCRATCHPAD) as usize;
             return self.spr.get_mut(o..o + len);
+        }
+        if (IO_REGS..IO_REGS + 0x1_0000).contains(&addr) {
+            let o = (addr - IO_REGS) as usize;
+            return self.io.get_mut(o..o + len);
+        }
+        if (GS_REGS..GS_REGS + 0x2000).contains(&addr) {
+            let o = (addr - GS_REGS) as usize;
+            return self.gs.get_mut(o..o + len);
         }
         let phys = match addr >> 28 {
             0 | 2 | 3 => addr & 0x0FFF_FFFF,   // kuseg, uncached, uncached accelerated
@@ -95,6 +113,14 @@ impl Mem {
 
     pub fn write(&mut self, addr: u32, data: &[u8]) -> Option<()> {
         self.slice(addr, data.len())?.copy_from_slice(data);
+        // a DMA channel started (STR, bit 8 of its CHCR at 0x1000_8000 + 0x1000 × channel) is done at once: the
+        // bit clears (nothing is moved; a test puts what the transfer would bring)
+        if (0x1000_8000..0x1000_f000).contains(&addr) && addr & 0xfff == 0 && !data.is_empty() {
+            let o = (addr - IO_REGS) as usize;
+            if data.len() >= 2 {
+                self.io[o + 1] &= !1;
+            }
+        }
         Some(())
     }
 

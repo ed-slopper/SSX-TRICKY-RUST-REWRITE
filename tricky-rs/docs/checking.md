@@ -99,6 +99,7 @@ targets, each function on its own (`--depth 0`): `Boarder_GroundSpringForce` 0x1
 | FPU | `lwc1` `swc1` `mtc1` `mfc1` `add.s` `sub.s` `mul.s` `div.s` `abs.s` `neg.s` `mov.s` `cvt.s.w` `cvt.w.s` `c.lt.s` `c.le.s` `bc1f` `bc1t` `bc1fl` `bc1tl` |
 | COP2 transfers | `lqc2` `sqc2` `qmtc2` `qmfc2` `cfc2` `ctc2` (VI, the clip flags, CMSAR0) |
 | VU0 macro mode | `vadd` `vaddw` `vsub` `vmul` `vmulx` `vmulq` `vadday` `vmaddaz` `vmaddw` `vdiv` `vsqrt` `vrsqrt` `vwaitq` `vmax`/`vmini` (bc) `vftoi` `vmtir` `vmove` `vopmula`/`vopmsub` `vclipw` `vnop` |
+| Hardware registers | the EE's 0x1000_0000..0x1001_0000 and the GS's 0x1200_0000..0x1200_2000 as plain memory (a test sets the status bits a loop waits for); a DMA channel's start bit (CHCR bit 8) clears as it is written: the transfer is taken as done, nothing moved |
 | VU0 micro mode (`vcallms`, `vcallmsr`; the program from `Runner::vu0_micro`, which `load_vu0_chain` fills from the game's upload chain) | the macro upper ops; lower `iadd` `isub` `iaddi` `iaddiu` `isubiu` `iand` `ior` `fcget` `move`, the branches with their delay slot, the E bit's one more pair. Each pair reads the registers as they were before it and its results are there for the next (no pipeline or flag delays, so a program that reads a result early would differ) |
 
 None of these ten makes an indirect call. Followed through every call, they reach 265 functions and 130 kinds of

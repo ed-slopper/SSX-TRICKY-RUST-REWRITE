@@ -3183,16 +3183,16 @@ address,size,name,system,status
 0x1ea310,8,cGraphicsMan::vf13_1ea310,render,not started
 0x1ea318,64,cGraphicsMan::__tf,runtime,host
 0x1ea358,44,FUN_001ea358,,not started
-0x1ea408,200,LensFX_Create,frontend?,not started
-0x1ea4d0,52,cPS2LensFXObjNode::cPS2LensFXObjNode,world,not started
-0x1ea508,20,cPS2LensFXObjNode::~cPS2LensFXObjNode,world,not started
-0x1ea520,1136,cPS2LensFXObjNode::vf9_1ea520,world,not started
-0x1ea990,176,cPS2LensFXObjNode::vf10_1ea990,world,not started
-0x1eaa40,40,cPS2LensFXObjNode::vf15_1eaa40,world,not started
-0x1eaa68,288,cPS2LensFXObjNode::vf11_1eaa68,world,not started
-0x1eab88,8,cPS2LensFXObjNode::vf14_1eab88,world,not started
-0x1eab90,1300,cPS2LensFXObjNode::vf12_1eab90,world,not started
-0x1eb0a8,1236,cPS2LensFXObjNode::vf13_1eb0a8,world,not started
+0x1ea408,200,LensFX_Create,frontend?,checked
+0x1ea4d0,52,cPS2LensFXObjNode::cPS2LensFXObjNode,world,checked
+0x1ea508,20,cPS2LensFXObjNode::~cPS2LensFXObjNode,world,checked
+0x1ea520,1136,cPS2LensFXObjNode::vf9_1ea520,world,checked
+0x1ea990,176,cPS2LensFXObjNode::vf10_1ea990,world,checked
+0x1eaa40,40,cPS2LensFXObjNode::vf15_1eaa40,world,checked
+0x1eaa68,288,cPS2LensFXObjNode::vf11_1eaa68,world,checked
+0x1eab88,8,cPS2LensFXObjNode::vf14_1eab88,world,checked
+0x1eab90,1300,cPS2LensFXObjNode::vf12_1eab90,world,checked
+0x1eb0a8,1236,cPS2LensFXObjNode::vf13_1eb0a8,world,checked
 0x1eb580,80,cPS2LensFXObjNode::__tf,runtime,host
 0x1eb5d0,232,cReplayControlOverlay::cReplayControlOverlay,frontend,checked
 0x1eb6b8,20,cReplayControlOverlay::~cReplayControlOverlay,frontend,checked
