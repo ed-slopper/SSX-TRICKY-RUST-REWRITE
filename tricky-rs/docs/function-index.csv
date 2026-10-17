@@ -1349,7 +1349,7 @@ address,size,name,system,status
 0x166fa0,60,Career_RecordBestTime,race?,ported
 0x166fe0,48,Career_RecordBestScore,race?,ported
 0x167010,40,Career_CountCourseStart,race?,ported
-0x167038,36,Career_IsPlayerOutfit6,frontend?,not started
+0x167038,36,Career_IsPlayerOutfit6,frontend?,checked
 0x167060,272,Career_SelectSoloRider,frontend?,ported
 0x167170,16,StaticDtor_Career,race?,not started
 0x167208,2960,RelTable_Init,ai,checked
