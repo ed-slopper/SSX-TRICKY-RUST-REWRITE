@@ -177,3 +177,4 @@ pub mod lensfx;
 pub mod ps2lensfx;
 pub mod objdraw;
 pub mod drawmodel;
+pub mod terraindraw;

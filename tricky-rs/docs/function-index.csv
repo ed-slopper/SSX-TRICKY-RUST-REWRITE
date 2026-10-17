@@ -2694,7 +2694,7 @@ address,size,name,system,status
 0x1c7210,64,tPS2DrawState::__tf,runtime,host
 0x1c7290,88,Game_DrawLists,game,not started
 0x1c72e8,1320,Game_DrawFrame,game,not started
-0x1c7810,220,cTerrainObjNode::Draw,world,not started
+0x1c7810,220,cTerrainObjNode::Draw,world,checked
 0x1c78f0,12,cModelsObjNode::Draw,world,not started
 0x1c7900,204,cSkyBoxObjNode::cSkyBoxObjNode,world,checked
 0x1c79d0,20,cSkyBoxObjNode::~cSkyBoxObjNode,world,checked
@@ -3320,7 +3320,7 @@ address,size,name,system,status
 0x200390,748,Instance_DrawVisibleCells,world,checked
 0x200680,100,Instance_Draw,world,checked
 0x2006e8,524,LensFX_Draw,world?,checked
-0x2008f8,1820,Patch_DrawVisibleCells,world?,ported
+0x2008f8,1820,Patch_DrawVisibleCells,world?,checked
 0x201018,124,StaticInit_Instance,other,not started
 0x201098,44,FUN_00201098,,not started
 0x2010c8,80,BdrLoad_LoadRider,render?,not started

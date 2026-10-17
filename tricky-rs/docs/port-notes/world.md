@@ -1121,3 +1121,30 @@ matrix, negative bone counts, given bones, scrolls and fog caps beyond 16 bits. 
 three left are equivalent: one bone posed at the world's identity matrix gives the same scaled matrix whether or
 not the bones are built; skipping a mesh with no batches only saves the matrix work; and a w of exactly 0 clamps to
 0 either way.
+
+## The terrain's draw (row G7a1; `game/src/terraindraw.rs`, checked: `tests/terraindraw.rs`)
+
+- **`cTerrainObjNode::Draw` 0x1c7810** sets the draw distance: 30000, or the course's (game+0x2c) +0x60, or +0x64
+  with two views or more. Without a game it still reads the course from address 0x2c. It visits the TGroups near
+  the camera (`World_VisitCellsNear` 0x260278 with (distance − 1) ÷ 10000 + 1, G7a2), then their visibility
+  (`World_CullVisibility` 0x260458), then tail-calls `Patch_DrawVisibleCells`.
+- **`Patch_DrawVisibleCells` 0x2008f8**(world):
+  - The LOD line comes from the Bezier manager (the renderer's +0x20 object; its +0x30 and +0x38 the near and far
+    distances): k = −2 ÷ (2 far² − 2 near²) (the EE's division), base = 3 − k × 2 near².
+  - The camera's place in its own frame is the camera matrix's rows times its last row negated (`Vec4_Scale`).
+    Then the renderer's +0x2c0.
+  - It walks the live cells and the slots their masks name. Each slot's patches are +0x24 of them, listed at +0x34.
+    Show-off patches (+0x1ac negative) are drawn only in show-off modes 3 and 5. Each patch is box-tested (+0x150,
+    +0x15c) unless the cell's +0x32 bit says the slot is wholly in view: 1 skips it; 2 asks +0x290, clipped when
+    that is non-zero; 3 counts as clipped.
+  - Each edge's LOD is base + k × (the two corners' distances² from the camera; corners at +0x168 + 0x10 k),
+    clamped to 1..3 and made whole (toward zero). The edges go in the order 0–1, 2–3, 0–2, 1–3. The steps come
+    from the 4-byte table 0x39afb8: 4, 4, 6, 8.
+  - The renderer's patch draw +0x2d0 (G7a3) gets the patch, the four steps, its two shorts +0x1b0 and +0x1b2
+    (sign-extended) and the clipped flag.
+
+Checked in the runner on 20,000 random worlds and cameras (44,000 patches, edges at all three steps). 19 of 23
+mutants were caught. Two of the rest are equivalent (the clamps at exactly 1 and exactly 3). Two are exact
+boundaries: the division rounded to nearest, and the distance summed in another order, move the LOD by an ulp,
+which matters only at a whole number.
+
