@@ -1573,3 +1573,14 @@ Checked in the runner on 8,000 random banks, about 800 calls for each of 10 func
 asked for or neither; random name hashes; rosters of humans and computers with repeats; and a BIG file with a fake
 vtable. The file and BIG reads were stand-ins writing generated `.afl` images; `sprintf` was a one-`%s` stand-in.
 27 of 29 mutants were caught. The other 2 are equivalent: a load "now" falling through to the async path (the file is loaded by then, so that path returns at once), and indexing after an async open (the reset leaves nothing loaded to index).
+
+**Ported (row G5c4; `game/src/animids.rs`, checked: `tests/animids.rs`).** The init reads nothing; three runs of
+the original over different random memory leave the same bytes. So its effect is a fixed image, and the port keeps
+the numbers it stores:
+- the 767 lookup modes;
+- 1,411 words in 14 runs;
+- 16 single 16-bit stores (the high halves of words whose low halves it leaves alone).
+
+These are the clip-to-animation tables `AnimClip_ResolveAnmIndex` reads, often as triples (one animation per board
+class). The runner check fills the whole ranges, gaps included, at random, runs both, and compares every byte; 4 of
+4 mutants were caught. `AnimCtl_Construct`'s port still calls the init out (`IDS_INIT`).

@@ -1196,7 +1196,7 @@ address,size,name,system,status
 0x15ad18,80,cBoarderSequenceState::__tf,runtime,host
 0x15ad68,64,cReplayRecordHeader::__tf,runtime,host
 0x15ada8,280,AnimClip_ResolveAnmIndex,animation,ported
-0x15aec0,16040,AnimIds_Init,animation,not started
+0x15aec0,16040,AnimIds_Init,animation,checked
 0x15ed68,200,AnimCtl_Construct,animation,checked
 0x15ee30,140,AnimCtl_Reset,animation,checked
 0x15eec0,56,AnimCtl_GetClipType,animation,checked
