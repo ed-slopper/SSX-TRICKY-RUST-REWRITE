@@ -1721,3 +1721,29 @@ straight, random or zero, and the way random, zero, up or −up (1235 parallel).
 - a zero root as negative (1/0 is the largest float, so a zero vector stays zero);
 - up's x read back from the shadow;
 - the box's `<` as `≤` (equal values).
+
+## The rider's skinning (G7g3, `skin.rs`)
+
+- **`RiderSkin_SkinMatrices` 0x207c30(skin, lod)** walks the model's parts (+0x3f18; 0x48 bytes each). Each
+  part's bones follow the bones of the parts before it, so part p starts at base(p). Bone k of part p is the
+  skin's bone base(p) + k (+0x3d80) times the part's k-th bind matrix. The result goes to the buffer at
+  0x341fc0, at the same index.
+  - A 32-word table (cleared with `memset`) records base(p) at the slot of the part's mesh (+0x4a).
+  - The renderer's +0x310 gets the buffer, the table, the LOD's data (model + 0x5900 × lod + 0x54), that
+    LOD's word at +0x50, and 0. Then +0x2e0 gets the LOD and the bones.
+  - A part whose bone count is negative would move the next part's base backwards; no real mesh has one.
+- **`RiderSkin_SetBoardMatrix` 0x207f18(skin, board, a, b)** does nothing unless the board is drawn (+0x3f20).
+  Otherwise it calls the renderer's +0x2f0 with 0x19, the bones, and copies of the board's matrix (+0x110) and
+  its +0x150 / +0x160 vectors (built on the stack). Then +0x2f8 gets whether a and b have the same y, 0, the
+  skin and b.
+- **`RiderSkin_CopyBoneMatrices` 0x208400(skin)** runs `SkinPart_CopyBoneMatrices` 0x206818 for each of the 15
+  parts there are (+0x3d00), with the skeleton list at +0x3cf8. Each of a part's bones:
+  - copies its skeleton bone's matrix (bone +0x12 of skeleton +0x10, through the list);
+  - then becomes that matrix times its own turn and shift. The turn is made from three angles with
+    `Math_SinCos` and taken in x, y, z order; the shift is the offset 0x108 bytes on.
+
+Checked in the runner (`tests/skin.rs`): 2000 cases of 0..8 parts with 0..6 bones, slots, LODs, the board
+drawn or not, a and b with the same y or not, and skin parts copying from either skeleton, with angles at 0,
+a quarter, a half turn and random. `Math_SinCos` has to be the EE-rule port (`animcurve::sin_cos`, its square
+root toward zero); the host-rule `math::sin_cos` is an ulp off. All 27 mutants were caught; one only once the
+scratch started with old words.
