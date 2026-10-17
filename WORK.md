@@ -81,8 +81,7 @@ state machine and the renderer are ours. Nothing has been checked against the or
 | G7 | Rendering, as the PS2 renderer does it. Split before claiming: | unowned | E3a, E3b | | [repo] |
 | G7a | (umbrella: G7a1, G7a2, G7a3) Terrain patches: the game's tessellation and LOD, subtractive lightmaps | unowned | G7 | | [repo] README "What the viewer taught us"; split 2026-10-17 |
 | G7a3 | (umbrella: G7a3a, G7a3b, G7a3c) The renderer's patch draw (+0x2d0) and the Bezier manager: tessellation by LOD, the lightmaps | unowned | G7a1 | | Split of G7a; split again 2026-10-17 |
-| G7a3b | The queue drawn: `cPS2BezierMan` vf15 0x1d9f58 (1644 bytes) and the patch's VU1 packet 0x1da5c8 (2948 bytes) | ed-slopper/puffin | G7a3a | | Split of G7a3 |
-| G7a3c | The Bezier tables: `Render_BuildBezierTables` 0x1db1e8, `Render_FillBezierWeights` 0x1db530, `StaticInit_Render` 0x1db640 | any | G7a3a | | Split of G7a3 |
+| G7a3c | The Bezier tables: `Render_BuildBezierTables` 0x1db1e8, `Render_FillBezierWeights` 0x1db530, `StaticInit_Render` 0x1db640 | ed-slopper/puffin | G7a3a | | Split of G7a3 |
 | G7e | Particles as the VU1 microcode draws them (0x31c288), spark and dust sprites | unowned | G7 | | [repo] "Unresolved: spark and dust sprite rendering"; `particles.rs` has the emitters |
 | G7g | Rider shading and shadows, board reflections (env materials) | unowned | G7, E4 | | [est] |
 | G9 | Front end: title, main menu, mode select, rider / outfit / board select, options, records, trick book screens, unlock screens, music player, loading screens (`gApp+0x734`) | unowned | E1, E5 | | [repo] `ui.rs` is ours. Split (2026-10-16): G9b the shared machinery, G9c–G9t the screens (logic ported and checked in the runner, widgets as calls out), G9u the app's menus on them |
@@ -155,6 +154,7 @@ matches the original.
 
 | ID | Task | Section | Who | Date | Commit |
 |---|---|---|---|---|---|
+| G7a3b | The Bezier queue drawn: `bezier::draw` (vf15 0x1d9f58: the lists laid out with their programs, the frame's matrices, each patch's textures bound and packet sent, the close) and `bezier::draw_views` (0x1da5c8: each patch box-tested in each view, drawn and given a pass per view that sees it, then taken out of its list), checked in the runner on 20,000 random queues (tests/bezierdraw.rs); 60 of 61 mutants caught, the last a redundant break now removed | P2 | ed-slopper/puffin | 2026-10-17 | 75b03ff |
 | G7a3a | The Bezier manager's queue: `tricky_game::bezier` (`cPS2BezierMan`'s constructor, destructor, init with `RendPatch_Alloc`, shut-down, accessors, begin, the patch queue into the lists for 4, 6 and 8 steps and the mixed one, the views; `cBezierMan`'s destructor; the renderer's +0x20 / +0x2c0 / +0x2d0), checked in the runner on 40,000 random managers (tests/bezier.rs); 46 of 49 mutants caught, the rest equivalent | P2 | ed-slopper/puffin | 2026-10-17 | 39bb88c |
 | G7a2 | The visible list of TGroups: `terraindraw::visit_cells_near` (`World_VisitCellsNear`: the square about the camera's TGroup, clamped, put in the list), `cull_visibility` (`World_CullVisibility`: each TGroup's and slot's box tests to the shown and in-view marks), `vis_clear` / `vis_add` (`VisList_Clear` / `_Add`, `CellList_*`), checked in the runner on their own and in the terrain's draw (tests/terraindraw.rs); 16 of 17 mutants caught, one equivalent | P2 | ed-slopper/puffin | 2026-10-16 | 286964d |
 | G7a1 | The terrain's draw: `tricky_game::terraindraw` (`cTerrainObjNode::Draw`: the draw distance, the cell visits; `Patch_DrawVisibleCells`: the LOD line from the Bezier manager, the camera in its frame, the patches by cell with show-off and box tests, each edge's LOD from its corners' distances as 4, 6 or 8 steps, the renderer's patch draw), checked in the runner on 20,000 random worlds (tests/terraindraw.rs); 19 of 23 mutants caught, the rest equivalent or ulp boundaries | P2 | ed-slopper/puffin | 2026-10-16 | 9f705b4 |
@@ -1231,3 +1231,4 @@ matches the original.
 - 2026-10-17 ed-slopper/puffin: G7a1 done 9f705b4 (the terrain's draw vs the original); G7a2 claimed.
 - 2026-10-17 ed-slopper/puffin: G7a2 done 286964d (the visible list vs the original); G7a3 split into G7a3a (the Bezier manager's queue; claimed), G7a3b (the queue drawn), G7a3c (the tables).
 - 2026-10-17 ed-slopper/puffin: G7a3a done 39bb88c (the Bezier manager's queue vs the original); G7a3b claimed.
+- 2026-10-17 ed-slopper/puffin: G7a3b done 75b03ff (the Bezier queue drawn vs the original); G7a3c claimed.
