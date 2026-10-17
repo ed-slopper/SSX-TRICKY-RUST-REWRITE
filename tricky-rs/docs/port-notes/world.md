@@ -2410,3 +2410,60 @@ Checked in the runner (`tests/texman.rs`): 1500 cases of each over random blocks
 holding textures), CLUT slots, uses, formats (and a texture of 2^31 bytes or more), contexts and mipmaps. 64 of
 66 mutants were caught. The two left are equivalent: a block size of `<` vs `<=` after the equal case is already
 taken, and a width floor of 64 vs `> 64`.
+
+## The texture manager: the level's upload (G7q3, `texman`)
+
+`TexMan_UploadTextures` 0x1c1f50(tm, vram, pages, high8_vram, high8_pages) runs when a level loads. It decides
+which textures get a place in the GS's memory, lays the memory out, and sends what has to be there from the
+start. The manager and its load list are one object, so it takes its own list over.
+
+1. **The load list taken over.** The list's records are copied into the table (+0x10), and their counts move
+   to +0xc / +0x14. The list is freed and emptied. With no records there is nothing to do.
+2. **The groups.** A group list (16 bytes per record, named `Buckets`, filled with 0xdeadc0ed) is taken, and the
+   CLUTs' room is set aside: one slot per 8-bit texture, at most 80, 4 pages each, at the end of `pages`. The
+   remaining pages are the budget.
+   - Each record is given no slots and no use, and joins the first group of its size and flags. If there is
+     none, a new group is put in before the first larger one, so the list is sorted by size.
+   - The flags are: kept 0x21, drawn into 4, locked 2, 8-bit 8, a player's 0x20. A 0x1b texture becomes 0x13.
+3. **The high8 area** (with `high8_pages`, a quarter of them in its units). This is where 8-bit textures live
+   in the top byte of a 32-bit buffer (the GS's PSMT8H, format 0x1b):
+   - the locked 8-bit groups that fit whole go there (0x10; the debug message "Assigning locked high8 to high8
+     area");
+   - then the other 8-bit groups that fit whole;
+   - then as many of each remaining 8-bit group as fit, split off into new groups. What these take comes off
+     the total.
+4. **Merging.** Plain groups (none of 0x17) of one size are merged.
+5. **The budget.** While the total is over the budget, one plain slot is taken away. The candidates are groups
+   with 2 or more slots, leaving out the last group when it has only one. The pick has the lowest sum, over
+   every group, of the textures left without slots so far divided by the slots (counting the candidate one
+   down). With no candidate the game takes from the word before the list, its own edge. Then, while the
+   smallest group fits in what is left, every group short of slots gets one more, again and again until none
+   does.
+6. **The layout.** The special groups (any of 0x17) move to the front; how many is kept at +0x40. The blocks
+   (0x18 bytes) are laid out at 0x3ce820, followed by their slots (0x14 bytes, each block's linked both ways).
+   The total slots are kept at +0x38. A block's flags are 2 high8, 4 kept, 8 locked, 0x10 drawn into.
+   - High8 blocks get VRAM in the high8 area, 4 per page.
+   - From `vram`: the drawn-into blocks, the kept ones, the plain ones. Locked blocks outside the high8 area get
+     none.
+7. **The uploads.** First the GS is waited on (the renderer's +0x78 until it answers yes).
+   - Locked 8-bit textures fill the high8 locked blocks, and plain 8-bit ones (not a player's) fill the high8
+     plain blocks. Each becomes format 0x1b (PSMT8H) and is sent (`TexMan_UploadTexture`). The locked ones
+     count down the kept textures.
+   - While kept textures are left: drawn-into ones (kind 3) are given a slot in a drawn-into block of their
+     size (no pixels to send), and kept ones (kind 1) a slot in a kept block, then sent.
+8. **The CLUT slots** go at 0x3d0820 (16 bytes each), 4 apart, from the end of the budget. The detail levels
+   are worked out and handed out. With a race, the three mipmap textures' places (+0x50 / +0x58 / +0x60: the
+   slot and the buffer width at 14) are made. The world's and players' textures are mipmapped (+0x40 1; +0x44
+   by format: 8-bit 1, 32-bit 2, 0x1b 0) and the others not.
+9. **Swizzling.** Every 8-bit texture is swizzled into place (+0x3c 1, `Tex_Swizzle`) through a buffer as big
+   as the biggest (`EAMem_Free`'d after). Then the group list is freed.
+
+Checked in the runner (`tests/texman.rs`): 3000 cases of 1 to 12 textures, from the load list or already in the
+table. They mix sizes, kinds, formats and levels, with budgets from below the CLUTs' room to 2000 pages, kept
+high8 pages 0 to 400, and with and without a race. The copy stand-ins really move memory here (the group list is
+shuffled with `memmove` / `memcpy`). The word before the group list is a large page count, as the game reads
+it when no group can give up a slot. Running it first without the load list copied showed the cost of a wrong
+total: hundreds of thousands of rounds of step 5, the same on both sides.
+
+56 of 57 mutants were caught. The one left reads the last group's texture count instead of its slot count when
+deciding whether it is a lone slot; a group of one slot nearly always has one texture.

@@ -54,10 +54,17 @@ const DATA: [(u32, u32); 2] = [(0x337c00, 0x100), (0x390900, 0x100)];
 #[derive(Clone, Debug, PartialEq)]
 struct Call(u32, Vec<u32>);
 
+thread_local! {
+    /// Where this test's stand-in heap hands out from, and how often the GS has been asked if it is idle
+    static HEAP_AT: Cell<u32> = const { Cell::new(HEAP) };
+    static ASKED: Cell<u32> = const { Cell::new(0) };
+}
+
 /// What the stand-ins need of a memory
 trait Io {
     fn r8(&mut self, a: u32) -> u8;
     fn w8(&mut self, a: u32, v: u8);
+    fn mapped(&mut self, a: u32, n: u32) -> bool;
 }
 impl Io for Mem {
     fn r8(&mut self, a: u32) -> u8 {
@@ -65,6 +72,9 @@ impl Io for Mem {
     }
     fn w8(&mut self, a: u32, v: u8) {
         Mem::w8(self, a, v)
+    }
+    fn mapped(&mut self, a: u32, n: u32) -> bool {
+        self.regions.iter().any(|(at, b)| *at <= a && a as u64 + n as u64 <= *at as u64 + b.len() as u64)
     }
 }
 impl Io for r5900::Mem {
@@ -76,9 +86,18 @@ impl Io for r5900::Mem {
     fn w8(&mut self, a: u32, v: u8) {
         self.write_u8(a, v)
     }
+    fn mapped(&mut self, a: u32, n: u32) -> bool {
+        let mut b = vec![0u8; n as usize];
+        self.read(a, &mut b).is_some()
+    }
 }
 
-const STANDINS: [u32; 12] = [tx::STRNCMP, tx::STRNCPY, tx::POOL_ALLOC, tx::ALLOC, tx::MEM_SET, tx::MEM_COPY, tx::PRINTF, tx::LOGF, tx::FREE, tx::TEX_SWIZZLE, tx::FLUSH_CACHE, tx::DMA_SEND];
+const STANDINS: [u32; 15] = [
+    tx::STRNCMP, tx::STRNCPY, tx::POOL_ALLOC, tx::ALLOC, tx::MEM_SET, tx::MEM_COPY, tx::PRINTF, tx::LOGF, tx::FREE, tx::TEX_SWIZZLE,
+    tx::FLUSH_CACHE, tx::DMA_SEND, tx::MEM_MOVE, tx::EAMEM_FREE, IDLE,
+];
+/// The renderer's +0x78 (is the GS idle)
+const IDLE: u32 = 0x01ff_0078;
 
 /// A stand-in's work and answer (and, for `logf`, a float), and its log. `fails` makes the heaps answer 0;
 /// `taken` counts what they have handed out in this call.
@@ -115,11 +134,36 @@ fn standin(io: &mut dyn Io, func: u32, w: &[u32], f: &[u32], fails: bool, taken:
             let k = taken.get();
             taken.set(k + 1);
             // an address that differs by call and is not always on a 128-byte boundary
-            if fails { 0 } else { HEAP + 0x10000 * k + 0x10 * (w[1] % 7) }
+            if fails { 0 } else { HEAP_AT.get() + 0x10000 * k + 0x10 * (w[1] % 7) }
         }
-        tx::MEM_SET | tx::MEM_COPY => {
+        tx::MEM_SET => {
             log.extend([w[0], w[1], w[2]]);
             0
+        }
+        tx::MEM_COPY | tx::MEM_MOVE => {
+            log.extend([w[0], w[1], w[2]]);
+            // (moved for real in the upload test when small and both ends are memory both sides have: its group
+            // list, the load list into the table)
+            let inside = |a: u32, lo: u32, hi: u32| (lo..hi).contains(&a) && (lo..=hi).contains(&a.wrapping_add(w[2]));
+            let shared = |a: u32| HEAP_AT.get() == HEAP2 && (inside(a, HEAP2 - 0x100, HEAP2 + 0x30000) || inside(a, ARENA, ARENA + SIZE));
+            if w[2] <= 0x4000 && shared(w[0]) && shared(w[1]) && io.mapped(w[0], w[2]) && io.mapped(w[1], w[2]) {
+                let b: Vec<u8> = (0..w[2]).map(|k| io.r8(w[1] + k)).collect();
+                for (k, c) in b.into_iter().enumerate() {
+                    io.w8(w[0] + k as u32, c);
+                }
+            }
+            0
+        }
+        tx::EAMEM_FREE => {
+            log.push(w[0]);
+            0
+        }
+        IDLE => {
+            log.push(w[0]);
+            // busy the first time asked in a call, then idle
+            let k = ASKED.get();
+            ASKED.set(k + 1);
+            (k > 0) as u32
         }
         tx::TEX_SWIZZLE => {
             log.extend(&w[..5]);
@@ -551,4 +595,110 @@ fn slots_and_binds_match_the_original() {
     println!("{uploads} binds that uploaded, {evictions} slots found");
     assert!(uploads > 200 && evictions > 1000);
     let _ = free_found;
+}
+
+const LIST: u32 = ARENA + 0x1600;
+const RENDER: u32 = ARENA + 0x1b00;
+const RVT: u32 = ARENA + 0x1c00;
+const PIX: u32 = 0x01b0_0000;
+/// The upload test's heap: memory both sides have. The words before the group list are a big page count: when no
+/// group can give up a slot the game takes one from the word before the list (else it would never get under
+/// budget).
+const HEAP2: u32 = 0x01c0_0000;
+
+#[test]
+fn upload_textures_matches_the_original() {
+    let Some((mut r, log, _, taken)) = runner() else { return };
+    for f in [0x1c1f50u32, 0x1c0da8, 0x1c3ba8] {
+        r.allow(f);
+    }
+    HEAP_AT.set(HEAP2);
+    r.step_limit = 100_000_000;
+    let mut tables = vec![0u8; 0x2800];
+    r.mem.read(tx::BLOCK_TABLE, &mut tables).unwrap();
+    let data: Vec<Vec<u8>> = DATA
+        .iter()
+        .map(|&(at, n)| {
+            let mut b = vec![0u8; n as usize];
+            r.mem.read(at, &mut b).unwrap();
+            b
+        })
+        .collect();
+    let mut g = Rng(0x7e70_3000_0000_0001);
+    let (mut sent, mut swizzled) = (0usize, 0usize);
+    for case in 0..3000u32 {
+        let mut m = Mem {
+            regions: vec![
+                (ARENA, vec![0; SIZE as usize]),
+                (tx::BLOCK_TABLE, tables.clone()),
+                (tx::SPR, vec![0; 0xb0]),
+                (PIX, vec![0; 0x4000]),
+                (HEAP2 - 0x100, vec![0; 0x30200]),
+            ],
+        };
+        for (k, &(at, _)) in DATA.iter().enumerate() {
+            m.regions.push((at, data[k].clone()));
+        }
+        for k in 0..SIZE / 4 {
+            m.w32(ARENA + 4 * k, g.next());
+        }
+        for k in 0..0x80 {
+            m.w32(HEAP2 - 0x100 + 4 * k, 0x1000);
+        }
+        let n = g.pick(&[1u32, 3, 8, 12]);
+        // the load list (or the table already filled)
+        let from_list = g.below(4) != 0;
+        let recs = if from_list { LIST } else { TABLE };
+        m.w32(TM + 0x10, TABLE);
+        m.w32(TM + 0x24, if from_list { LIST } else { 0 });
+        m.w32(TM + 0x1c, n);
+        m.w32(TM + 0xc, if from_list { 0 } else { n });
+        m.w32(TM + 0x20, g.pick(&[0u32, 3, 100]));
+        m.w32(TM + 0x14, g.pick(&[0u32, 3, 100]));
+        m.w32(TM + 0x28, g.pick(&[0u32, 1, 3, 6]));
+        m.w32(TM + 0x2c, g.below(2));
+        m.w32(TM + 0x6c, g.below(2));
+        for o in [0x44u32, 0x48, 0x4c] {
+            m.w32(TM + o, if g.below(3) == 0 { 0xffff_ffff } else { g.below(n) });
+        }
+        for k in 0..n {
+            let rec = recs + 0x5c * k;
+            m.w32(rec + 0xc, g.pick(&[1u32, 2, 4, 8, 16]));
+            m.w32(rec, g.pick(&[0u32, 0, 1, 2, 3]));
+            m.w32(rec + 0x20, g.pick(&[0u32, 2, 0x13, 0x13, 0x1b]));
+            m.w32(rec + 0x48, g.pick(&[0u32, 1, 2, 2, 0xffff_ffff]));
+            let (w, h) = (g.pick(&[8u32, 16, 32, 64]), g.pick(&[8u32, 16, 32, 64]));
+            m.w32(rec + 0x10, w);
+            m.w32(rec + 0x18, h);
+            m.w32(rec + 0x2c, PIX + 0x1000 * g.below(3));
+        }
+        m.w32(0x337c58, APPOBJ);
+        m.w32(APPOBJ + 0x730, g.pick(&[0u32, GAME, GAME]));
+        m.w32(APPOBJ + 0x724, RENDER);
+        m.w32(RENDER + 0x10, RVT);
+        m.w16(RVT + 0x78, g.pick(&[0u16, 0x10]));
+        m.w32(RVT + 0x7c, IDLE);
+        m.w32(GAME + 0x2c, SET);
+        m.w32(GAME + 0x298, 1);
+        m.w32(SET + 0x68, 1);
+        wf(&mut m, SET + 0x6c, 100.0);
+        m.w32(SET + 0x70, 1);
+        let vram = g.below(0x2000);
+        let pages = g.pick(&[8u32, 30, 80, 400, 2000]);
+        let high8_vram = g.below(0x3000);
+        let high8_pages = g.pick(&[0u32, 16, 64, 400]);
+        taken.set(0);
+        ASKED.set(0);
+        let regs = [TM, vram, pages, high8_vram, high8_pages];
+        let theirs = compare(&mut r, &log, &mut m, case, 0x1c1f50, &regs, |m, o| {
+            tx::upload_textures(m, o, TM, vram, pages, high8_vram, high8_pages);
+            // (the game's side asks afresh)
+            ASKED.set(0);
+        });
+        sent += theirs.iter().filter(|c| c.0 == tx::DMA_SEND).count();
+        swizzled += theirs.iter().filter(|c| c.0 == tx::TEX_SWIZZLE).count();
+    }
+    HEAP_AT.set(HEAP);
+    println!("{sent} sent, {swizzled} swizzled");
+    assert!(sent > 1000 && swizzled > 1000);
 }

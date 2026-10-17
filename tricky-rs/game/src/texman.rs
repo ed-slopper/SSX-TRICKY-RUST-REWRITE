@@ -782,3 +782,565 @@ pub fn bind(m: &mut Mem, tm: u32, n: u32, context: u32, place: u32) -> u32 {
     }
     answer
 }
+
+pub const MEM_MOVE: u32 = 0x2ce228;
+pub const EAMEM_FREE: u32 = 0x2ccfc0;
+pub const GROUPS_NAME: u32 = 0x390968;
+pub const UPLOAD_MESSAGE: u32 = 0x390970;
+pub const KEPT_MESSAGE: u32 = 0x390988;
+pub const SWIZZLE_NAME: u32 = 0x3909b0;
+/// Where the manager's VRAM blocks (then their slots) and CLUT slots are laid out
+pub const BLOCK_TABLE: u32 = 0x3ce820;
+pub const CLUT_TABLE: u32 = 0x3d0820;
+
+/// A group ("bucket") of the upload's plan (16 bytes): +0 its textures' pages, +4 its kind's flags (0x21 kept, 4
+/// drawn into, 2 locked, 8 eight-bit, 0x20 a player's, 0x10 in the high8 area), +8 how many textures, +0xc how many
+/// slots
+fn grp(groups: u32, k: u32) -> u32 {
+    groups.wrapping_add(k << 4)
+}
+fn kind_flags(kind: u32) -> u32 {
+    match kind {
+        1 => 0x21,
+        3 => 4,
+        2 => 2,
+        _ => 0,
+    }
+}
+/// The first slot of a block's list with no texture
+fn free_node(m: &Mem, blk: u32) -> u32 {
+    let mut node = m.r32(blk + 0x14);
+    while node != 0 && (m.r32(node + 4) as i32) >= 0 {
+        node = m.r32(node + 0xc);
+    }
+    node
+}
+
+/// `TexMan_UploadTextures` 0x1c1f50(tm, vram, pages, high8_vram, high8_pages): the level's textures given VRAM and
+/// uploaded; `high8_*` is the area 8-bit textures share as the top bytes of a 32-bit buffer (PSMT8H, 0x1b). (The
+/// steps as in the port notes, G7q3.)
+pub fn upload_textures(m: &mut Mem, env: &mut dyn TextBoxEnv, tm: u32, vram: u32, pages: u32, high8_vram: u32, high8_pages: u32) {
+    // the load list taken over
+    let list = m.r32(tm + 0x24);
+    if list != 0 {
+        let n = m.r32(tm + 0x1c);
+        m.w32(tm + 0x14, m.r32(tm + 0x20));
+        m.w32(tm + 0xc, n);
+        env.call(m, MEM_COPY, &[m.r32(tm + 0x10), list, n.wrapping_mul(RECORD)], &[]);
+        let list = m.r32(tm + 0x24);
+        if list != 0 {
+            env.call(m, FREE, &[list], &[]);
+        }
+        m.w32(tm + 0x24, 0);
+        m.w32(tm + 0x1c, 0);
+        m.w32(tm + 0x20, 0);
+    }
+    let n = m.r32(tm + 0xc);
+    if n == 0 {
+        return;
+    }
+    if m.r32(m.r32(APP) + 0x730) == 0 {
+        for o in (0x50..0x68).step_by(4) {
+            m.w32(tm + o, 0);
+        }
+        for o in [0x4c, 0x44, 0x48] {
+            m.w32(tm + o, 0xffff_ffff);
+        }
+    }
+    if m.r32(tm + 0x2c) != 0 {
+        for o in [0x30, 0x34, 0x3c, 0x2c, 0x38] {
+            m.w32(tm + o, 0);
+        }
+    }
+    if m.r32(tm + 0x6c) != 0 {
+        m.w32(tm + 0x6c, 0);
+    }
+    let groups = env.call(m, ALLOC, &[GROUPS_NAME, n << 4, 0x10], &[]);
+    if groups != 0 {
+        env.call(m, MEM_SET, &[groups, 0xdead_c0ed, n << 4], &[]);
+    }
+    let mut count = 0u32;
+    let mut total = 0u32;
+    let cluts = (m.r32(tm + 0x14) as i32).min(0x50) as u32;
+    m.w32(tm + 0x68, cluts);
+    let budget = pages.wrapping_sub(cluts << 2);
+    let clut_vram = vram.wrapping_add(budget);
+    env.call(m, PRINTF, &[UPLOAD_MESSAGE], &[]);
+
+    // each texture into its group (by pages, ascending; then its kind's flags)
+    let mut i = 0u32;
+    while (i as i32) < m.r32(tm + 0xc) as i32 {
+        let r = slot_record(m, tm, i);
+        m.w32(r + 0x30, 0xffff_ffff);
+        m.w32(r + 0x24, 0xffff_ffff);
+        total = total.wrapping_add(m.r32(r + 0xc));
+        m.w32(r + 0x58, 0);
+        let mut k = 0u32;
+        loop {
+            let g = grp(groups, k);
+            let r = slot_record(m, tm, i);
+            let rp = m.r32(r + 0xc);
+            if (rp as i32) < m.r32(g) as i32 || k == count {
+                // a new group here
+                env.call(m, MEM_MOVE, &[g + 0x10, g, count.wrapping_sub(k) << 4], &[]);
+                let r = slot_record(m, tm, i);
+                m.w32(g, m.r32(r + 0xc));
+                m.w32(g + 4, 0);
+                let f = kind_flags(m.r32(r));
+                if f != 0 {
+                    m.w32(g + 4, f);
+                }
+                if m.r32(r + 0x20) == 0x13 {
+                    m.w32(g + 4, m.r32(g + 4) | 8);
+                }
+                if m.r32(r + 0x20) == 0x1b {
+                    m.w32(r + 0x20, 0x13);
+                    m.w32(g + 4, m.r32(g + 4) | 8);
+                }
+                if m.r32(r + 0x48) == 1 {
+                    m.w32(g + 4, m.r32(g + 4) | 0x20);
+                }
+                m.w32(g + 0xc, 1);
+                count += 1;
+                m.w32(g + 8, 1);
+                break;
+            }
+            let mut f = kind_flags(m.r32(r));
+            let psm = m.r32(r + 0x20);
+            if psm == 0x13 {
+                f |= 8;
+            }
+            if psm == 0x1b {
+                m.w32(r + 0x20, 0x13);
+                f |= 8;
+            }
+            if m.r32(r + 0x48) == 1 {
+                f |= 0x20;
+            }
+            if m.r32(r + 0xc) == m.r32(g) && f == m.r32(g + 4) {
+                m.w32(g + 8, m.r32(g + 8).wrapping_add(1));
+                m.w32(g + 0xc, m.r32(g + 0xc).wrapping_add(1));
+                break;
+            }
+            k += 1;
+        }
+        i += 1;
+    }
+
+    // the high8 area: the locked eight-bit groups that fit whole, then the other eight-bit ones, whole or in part
+    if high8_pages != 0 {
+        let mut left = high8_pages >> 2;
+        let start = left;
+        for k in 0..count {
+            let g = grp(groups, k);
+            let f = m.r32(g + 4);
+            if f & 0x3a == 0xa {
+                let need = m.r32(g + 8).wrapping_mul(m.r32(g));
+                if (need as i32) < left as i32 {
+                    left = left.wrapping_sub(need);
+                    m.w32(g + 4, f | 0x10);
+                    env.call(m, PRINTF, &[KEPT_MESSAGE], &[]);
+                }
+            }
+        }
+        for k in 0..count {
+            let g = grp(groups, k);
+            let f = m.r32(g + 4);
+            if f & 0x38 == 8 {
+                let need = m.r32(g + 8).wrapping_mul(m.r32(g));
+                if (need as i32) < left as i32 {
+                    left = left.wrapping_sub(need);
+                    m.w32(g + 4, f | 0x10);
+                }
+            }
+        }
+        if count as i32 > 0 && left != 0 {
+            let mut at = grp(groups, count);
+            let mut k = 0u32;
+            loop {
+                let g = grp(groups, k);
+                if m.r32(g + 4) & 0x38 == 8 {
+                    let fit = (left as i32).wrapping_div(m.r32(g) as i32);
+                    if fit > 0 {
+                        for o in [0u32, 4, 8, 0xc] {
+                            m.w32(at + o, m.r32(g + o));
+                        }
+                        left = left.wrapping_sub((fit as u32).wrapping_mul(m.r32(g)));
+                        count += 1;
+                        m.w32(at + 8, fit as u32);
+                        m.w32(at + 0xc, fit as u32);
+                        m.w32(at + 4, m.r32(at + 4) | 0x10);
+                        at += 0x10;
+                        m.w32(g + 8, m.r32(g + 8).wrapping_sub(fit as u32));
+                        m.w32(g + 0xc, m.r32(g + 0xc).wrapping_sub(fit as u32));
+                    }
+                }
+                k += 1;
+                if !((k as i32) < count as i32) || left == 0 {
+                    break;
+                }
+            }
+        }
+        total = total.wrapping_sub(start.wrapping_sub(left));
+    }
+
+    // the plain groups of a size merged
+    let mut s = 0u32;
+    while (s as i32) < count as i32 {
+        let g = grp(groups, s);
+        if m.r32(g + 4) & 0x17 == 0 && m.r32(g + 8) != 0 {
+            loop {
+                let mut hit = None;
+                for a in 0..count {
+                    if a == s {
+                        continue;
+                    }
+                    let o = grp(groups, a);
+                    if m.r32(o + 4) & 0x17 != 0 {
+                        continue;
+                    }
+                    let g = grp(groups, s);
+                    if m.r32(o) == m.r32(g) {
+                        m.w32(g + 8, m.r32(g + 8).wrapping_add(m.r32(o + 8)));
+                        m.w32(g + 0xc, m.r32(g + 0xc).wrapping_add(m.r32(o + 0xc)));
+                        m.w32(o + 0xc, 0);
+                        m.w32(o + 8, 0);
+                        hit = Some(a);
+                        break;
+                    }
+                }
+                let Some(a) = hit else { break };
+                count -= 1;
+                env.call(m, MEM_COPY, &[grp(groups, a), grp(groups, a) + 0x10, count.wrapping_sub(a) << 4], &[]);
+            }
+        }
+        s += 1;
+    }
+
+    // slots taken away while over the budget: from the group whose loss costs least
+    while (budget as i32) < total as i32 {
+        let last_single = m.r32(grp(groups, count).wrapping_sub(4)) == 1;
+        let ends = count.wrapping_sub(last_single as u32);
+        let mut best = 0xffff_ffffu32;
+        let mut least = F(0.0);
+        for a in 0..(ends as i32).max(0) as u32 {
+            let g = grp(groups, a);
+            if (m.r32(g + 0xc) as i32) < 2 || m.r32(g + 4) & 0x17 != 0 {
+                continue;
+            }
+            let mut sum = 0i32;
+            let mut score = F(0.0);
+            for b in 0..count {
+                let o = grp(groups, b);
+                let slots = m.r32(o + 0xc).wrapping_sub((a == b) as u32);
+                sum = sum.wrapping_add(m.r32(o + 8).wrapping_sub(slots) as i32);
+                if slots != 0 {
+                    score = score + crate::animseq::div(crate::animseq::cvt_s_w(sum), crate::animseq::cvt_s_w(slots as i32));
+                }
+            }
+            if (best as i32) < 0 || score < least {
+                best = a;
+                least = score;
+            }
+        }
+        let g = grp(groups, best);
+        total = total.wrapping_sub(m.r32(g));
+        m.w32(g + 0xc, m.r32(g + 0xc).wrapping_sub(1));
+    }
+    // and given back while they fit
+    loop {
+        let mut grew = false;
+        if count as i32 > 0 && (m.r32(groups) as i32) < budget.wrapping_sub(total) as i32 {
+            let mut a = 0u32;
+            loop {
+                let g = grp(groups, a);
+                if (m.r32(g + 0xc) as i32) < m.r32(g + 8) as i32 {
+                    grew = true;
+                    m.w32(g + 0xc, m.r32(g + 0xc).wrapping_add(1));
+                    total = total.wrapping_add(m.r32(g));
+                }
+                a += 1;
+                if !((a as i32) < count as i32) {
+                    break;
+                }
+                if !((m.r32(grp(groups, a)) as i32) < budget.wrapping_sub(total) as i32) {
+                    break;
+                }
+            }
+        }
+        if !grew {
+            break;
+        }
+    }
+
+    // the special groups (kept, drawn into, locked, high8) to the front
+    let mut front = 0u32;
+    for s in 0..count {
+        let g = grp(groups, s);
+        if m.r32(g + 4) & 0x17 == 0 {
+            continue;
+        }
+        if s > 0 && front < s {
+            let held = [0u32, 4, 8, 0xc].map(|o| m.r32(g + o));
+            env.call(m, MEM_MOVE, &[groups + 0x10, groups, s << 4], &[]);
+            for (k, v) in held.into_iter().enumerate() {
+                m.w32(groups + 4 * k as u32, v);
+            }
+        }
+        front += 1;
+    }
+    m.w32(tm + 0x40, front);
+    m.w32(tm + 0x38, 0);
+    for k in 0..count {
+        let v = m.r32(tm + 0x38).wrapping_add(m.r32(grp(groups, k) + 0xc));
+        m.w32(tm + 0x38, v);
+    }
+
+    // the blocks (0x18 bytes) and their slots (0x14: +0 the VRAM, +4 the texture, +8 the number, +0xc / +0x10 the
+    // next / last)
+    m.w32(tm + 0x30, BLOCK_TABLE);
+    m.w32(tm + 0x34, BLOCK_TABLE);
+    m.w32(tm + 0x2c, count);
+    m.w32(tm + 0x3c, BLOCK_TABLE.wrapping_add(count.wrapping_mul(0x18)));
+    let mut number = 0u32;
+    let mut b = 0u32;
+    while (b as i32) < m.r32(tm + 0x2c) as i32 {
+        let blk = m.r32(tm + 0x34).wrapping_add(b.wrapping_mul(0x18));
+        let g = grp(groups, b);
+        m.w32(blk + 4, m.r32(g));
+        m.w32(blk, 0);
+        m.w32(blk + 8, m.r32(g + 0xc));
+        let f = m.r32(g + 4);
+        if f & 0x10 != 0 {
+            m.w32(blk, 2);
+        }
+        let f = m.r32(g + 4);
+        let extra = if f & 1 != 0 { 4 } else if f & 2 != 0 { 8 } else if f & 4 != 0 { 0x10 } else { 0 };
+        if extra != 0 {
+            m.w32(blk, m.r32(blk) | extra);
+        }
+        let first = m.r32(tm + 0x3c).wrapping_add(number.wrapping_mul(0x14));
+        m.w32(blk + 0x14, first);
+        m.w32(blk + 0xc, first);
+        m.w32(blk + 0x10, first);
+        let mut k = 0u32;
+        while (k as i32) < m.r32(blk + 8) as i32 {
+            let s = first.wrapping_add(k.wrapping_mul(0x14));
+            m.w32(s + 8, number);
+            m.w32(s + 4, 0xffff_ffff);
+            number += 1;
+            m.w32(s, 0xffff_ffff);
+            if k == 0 {
+                m.w32(first + 0x10, 0);
+            } else {
+                m.w32(s + 0x10, s - 0x14);
+            }
+            if k == m.r32(blk + 8).wrapping_sub(1) {
+                m.w32(s + 0xc, 0);
+            } else {
+                m.w32(s + 0xc, s + 0x14);
+            }
+            k += 1;
+        }
+        b += 1;
+    }
+    // their VRAM (a block's flags: 2 high8, 4 kept, 8 locked, 0x10 drawn into): the high8 ones in the high8 area
+    // (4 to the page), then from the start the drawn-into ones, the kept ones, the plain ones (locked ones outside
+    // the high8 area get none)
+    let mut at = high8_vram;
+    for (mask, want, scale, from_start) in [(2u32, 2u32, 2u32, false), (0x10, 0x10, 0, true), (4, 4, 0, false), (0x1e, 0, 0, false)] {
+        if from_start {
+            at = vram;
+        }
+        for b in 0..m.r32(tm + 0x2c) {
+            let blk = m.r32(tm + 0x34).wrapping_add(b.wrapping_mul(0x18));
+            let f = m.r32(blk) & mask;
+            if (want == 0 && f != 0) || (want != 0 && f == 0) {
+                continue;
+            }
+            let mut node = m.r32(blk + 0x14);
+            while node != 0 {
+                m.w32(node, at);
+                node = m.r32(node + 0xc);
+                at = at.wrapping_add(m.r32(blk + 4) << scale);
+            }
+        }
+    }
+
+    // the GS idle, then the uploads into the slots
+    loop {
+        let r = m.r32(m.r32(APP) + 0x724);
+        let vt = m.r32(r + 0x10);
+        let this = r.wrapping_add(m.r16(vt + 0x78) as i16 as i32 as u32);
+        let func = m.r32(vt + 0x7c);
+        if env.call(m, func, &[this], &[]) != 0 {
+            break;
+        }
+    }
+    let mut kept_left = m.r32(tm + 0x28);
+    for (want, kind) in [(0xau32, 2u32), (2, 0)] {
+        for b in 0..m.r32(tm + 0x2c) {
+            let blk = m.r32(tm + 0x34).wrapping_add(b.wrapping_mul(0x18));
+            if m.r32(blk) & 0xa != want {
+                continue;
+            }
+            let mut node = m.r32(blk + 0x14);
+            while node != 0 {
+                let mut i = 0u32;
+                while (i as i32) < m.r32(tm + 0xc) as i32 {
+                    let r = slot_record(m, tm, i);
+                    let fits = (m.r32(r + 0x24) as i32) < 0
+                        && m.r32(r + 0xc) == m.r32(m.r32(tm + 0x34).wrapping_add(b.wrapping_mul(0x18)) + 4)
+                        && m.r32(r + 0x20) == 0x13
+                        && m.r32(r) == kind
+                        && (kind != 0 || m.r32(r + 0x48) != 1);
+                    if fits {
+                        m.w32(node + 4, i);
+                        m.w32(r + 0x20, 0x1b);
+                        m.w32(r + 0x24, m.r32(node + 8));
+                        if kind == 2 {
+                            kept_left = kept_left.wrapping_sub(1);
+                        }
+                        let v = m.r32(node);
+                        upload_texture(m, env, tm, i, v);
+                        break;
+                    }
+                    i += 1;
+                }
+                node = m.r32(node + 0xc);
+            }
+        }
+    }
+    let mut i = 0u32;
+    while (i as i32) < m.r32(tm + 0xc) as i32 && kept_left != 0 {
+        let r = slot_record(m, tm, i);
+        if m.r32(r) == 3 {
+            kept_left = kept_left.wrapping_sub(1);
+            for b in 0..m.r32(tm + 0x2c) {
+                let blk = m.r32(tm + 0x34).wrapping_add(b.wrapping_mul(0x18));
+                if m.r32(blk) & 0x10 == 0 || m.r32(blk + 4) != m.r32(slot_record(m, tm, i) + 0xc) {
+                    continue;
+                }
+                let node = free_node(m, blk);
+                if node != 0 {
+                    m.w32(node + 4, i);
+                    let r = slot_record(m, tm, i);
+                    m.w32(r + 0x24, m.r32(node + 8));
+                    break;
+                }
+            }
+        }
+        let r = slot_record(m, tm, i);
+        if m.r32(r) == 1 {
+            kept_left = kept_left.wrapping_sub(1);
+            for b in 0..m.r32(tm + 0x2c) {
+                let blk = m.r32(tm + 0x34).wrapping_add(b.wrapping_mul(0x18));
+                if m.r32(blk) & 4 == 0 || m.r32(blk + 4) != m.r32(slot_record(m, tm, i) + 0xc) {
+                    continue;
+                }
+                let node = free_node(m, blk);
+                if node != 0 {
+                    m.w32(node + 4, i);
+                    let r = slot_record(m, tm, i);
+                    m.w32(r + 0x24, m.r32(node + 8));
+                    let v = m.r32(node);
+                    upload_texture(m, env, tm, i, v);
+                    break;
+                }
+            }
+        }
+        i += 1;
+    }
+
+    // the CLUT slots, 4 to a slot after the budget
+    m.w32(tm + 0x6c, CLUT_TABLE);
+    let mut at = clut_vram;
+    let mut k = 0u32;
+    while (k as i32) < m.r32(tm + 0x68) as i32 {
+        let e = CLUT_TABLE + (k << 4);
+        m.w32(e, at);
+        m.w32(e + 0xc, 0xffff_ffff);
+        m.w32(e + 4, 4);
+        k += 1;
+        at = at.wrapping_add(4);
+    }
+    // the detail levels
+    calc_lod_params(m, env, tm);
+    let mut i = 0u32;
+    while (i as i32) < m.r32(tm + 0xc) as i32 {
+        let r = slot_record(m, tm, i);
+        let level = m.r32(r + 0x48) as i32;
+        if (0..2).contains(&level) {
+            m.w32(r + 0x4c, m.r32(tm));
+            m.w32(r + 0x50, m.r32(tm + 4));
+            m.w32(r + 0x54, m.r32(tm + 8));
+        } else if level == 2 {
+            m.w32(r + 0x54, 0);
+            m.w32(r + 0x4c, 1);
+        }
+        i += 1;
+    }
+    // with a race, the three mipmap textures' places (+0x50 / +0x58 / +0x60: the slot and the buffer width at 14)
+    // and the world's and players' textures mipmapped (+0x40 1, by format which mipmap +0x44: 8-bit 1, 32-bit 2,
+    // 0x1b 0), the others not
+    if m.r32(m.r32(APP) + 0x730) != 0 {
+        for (o, d) in [(0x44u32, 0x50u32), (0x48, 0x58), (0x4c, 0x60)] {
+            let idx = m.r32(tm + o);
+            if (idx as i32) >= 0 {
+                let r = slot_record(m, tm, idx);
+                let slot = m.r32(tm + 0x3c).wrapping_add(m.r32(r + 0x24).wrapping_mul(0x14));
+                let tbw = (m.r32(r + 0x10) as i32 >> 6).max(1);
+                w64(m, tm + d, (sx(m.r32(slot)) | (sx(tbw as u32) << 14)) as u64);
+            }
+        }
+        let mut i = 0u32;
+        while (i as i32) < m.r32(tm + 0xc) as i32 {
+            let r = slot_record(m, tm, i);
+            let level = m.r32(r + 0x48) as i32;
+            if (0..2).contains(&level) {
+                m.w32(r + 0x40, 1);
+                match m.r32(r + 0x20) {
+                    0x13 => m.w32(r + 0x44, 1),
+                    0 => m.w32(r + 0x44, 2),
+                    0x1b => m.w32(r + 0x44, 0),
+                    _ => {}
+                }
+            } else if level == 2 {
+                m.w32(r + 0x40, 0);
+            }
+            i += 1;
+        }
+    }
+    // every eight-bit texture swizzled into place (through a buffer as big as the biggest)
+    let mut most = 0i32;
+    let mut i = 0u32;
+    while (i as i32) < m.r32(tm + 0xc) as i32 {
+        let r = slot_record(m, tm, i);
+        i += 1;
+        if m.r32(r + 0x20) == 0x13 {
+            let a = m.r32(r + 0x10).wrapping_mul(m.r32(r + 0x18)) as i32;
+            if most < a {
+                most = a;
+            }
+        }
+    }
+    if most != 0 {
+        let buf = env.call(m, ALLOC, &[SWIZZLE_NAME, most as u32, 0x10], &[]);
+        let mut i = 0u32;
+        while (i as i32) < m.r32(tm + 0xc) as i32 {
+            let r = slot_record(m, tm, i);
+            if m.r32(r + 0x20) == 0x13 {
+                m.w32(r + 0x3c, 1);
+                let (w, h, at) = (m.r32(r + 0x10), m.r32(r + 0x18), m.r32(r + 0x2c));
+                env.call(m, MEM_COPY, &[buf, at, w.wrapping_mul(h)], &[]);
+                let r = slot_record(m, tm, i);
+                env.call(m, TEX_SWIZZLE, &[tm, m.r32(r + 0x10), m.r32(r + 0x18), buf, m.r32(r + 0x2c)], &[]);
+            }
+            i += 1;
+        }
+        env.call(m, EAMEM_FREE, &[buf], &[]);
+    }
+    if groups != 0 {
+        env.call(m, FREE, &[groups], &[]);
+    }
+}
