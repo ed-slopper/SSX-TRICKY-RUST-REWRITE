@@ -189,5 +189,6 @@ pub mod streak;
 pub mod marker;
 pub mod attitude;
 pub mod renderstate;
+pub mod renderdraw;
 pub mod particledraw;
 pub mod particlevu;

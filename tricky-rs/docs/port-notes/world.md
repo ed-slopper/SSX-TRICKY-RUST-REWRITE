@@ -1894,3 +1894,26 @@ as asked or not, and the depths fell inside, at and beyond ±1. 43 of 47 mutants
 
 The test sets each argument sign-extended to its 64-bit register, as the EE holds a 32-bit value: `SetTexture`'s
 `lh` compares all 64 bits.
+
+## The renderer's strip draw (G7l, `renderdraw::strips`)
+
++0x220 0x1de7c8(r, n, vertices) draws the streaks', the quads' and the spray ribbons' vertices as one strip on
+VU1 program 5. The texture state's program is set to 5 around it, as the particle packets set theirs, and the
+matrices are made.
+- **Chunks.** The first chunk takes up to 73 vertices. Each later one takes up to 71 more, after the last two
+  of the chunk before again, so the strip carries on.
+- **Each chunk**, at the packet place, is:
+  - a `cnt` of 3 × vertices + 4 quadwords;
+  - an UNPACK (V4-32 to 0, flagged) of a GIF tag: NLOOP the vertices, EOP, PRE with primitive 0x5c (textured)
+    or 0x4c (when the first texture, +8, is below 0), three registers 0x412 or 0x41f;
+  - the vertex count × 3;
+  - the vertices, all 12 words, including the one the draws leave unwritten;
+  - MSCAL 0x5e0.
+
+  The whole is submitted once.
+
+Checked in the runner (`tests/renderdraw.rs`): 2000 cases with counts 0..250 at and around the chunk bounds.
+The submit's stand-in logs the texture state as it is then, so the reset at the end can't hide the program
+byte. 14 of 17 mutants were caught. The three left are equivalent:
+- the chunk bounds (< 74 / < 72) as one less: exactly 73 or 71 give the same count either way;
+- the end's reset without its word-0 check: word 0 was just cleared.
