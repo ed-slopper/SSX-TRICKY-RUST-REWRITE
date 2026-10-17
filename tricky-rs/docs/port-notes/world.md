@@ -1248,3 +1248,31 @@ Checked in the runner (`tests/bezierdraw.rs`, 20,000 cases). The random lists ar
 up to eight views each have a texture. The box test answers by a hash of what it is given. A submit also logs the
 texture state, since the close would hide it otherwise. 60 of 61 mutants were caught; the last one pointed at a
 redundant `break` on the loop's final pass, which is now gone.
+
+## The Bezier tables (row G7a3c; `bezier::build_tables`, `fill_weights`, `static_init`, checked: `tests/beziertables.rs`)
+
+- **`Render_BuildBezierTables` 0x1db1e8**(this) is what the manager's init calls last.
+  - It frees the old tables (+0x530, then 0) and asks the allocator for 0xe00 bytes under the name at 0x392fc8,
+    filling them with 0xdeadc0ed when it gets them.
+  - It keeps the start at +0x530 and the four parts at +0x534 (the start), +0x538 (+0x220), +0x53c (+0x580) and
+    +0x540 (+0xaa0).
+  - Each part is a copy of the weights followed by a grid of (u, v, 1, 1). The grids are 4 × 4 points d = +0x28 ÷
+    128 ÷ 3 apart, 6 × 6 at ÷ 5, 8 × 8 at ÷ 7, and the 6 × 6 inside of the 8 (from d, not 0).
+  - Each u and v is summed step by step, and d is the two multiplies in that order. With the default +0x28 of 8.0,
+    d is 1/48, 1/80 and 1/112.
+  - The place it fills from is a word on the game's stack; the port takes it as an argument (STANDIN).
+- **`Render_FillBezierWeights` 0x1db530**(this, &at) writes, at the place `at` holds, the cubic's powers (t³, t²,
+  t, 1). t runs from 0 in steps of 1/7 (8 values), then 1/5 (6) and 1/3 (4), summed, with t² = t·t and t³ = t²·t.
+  It then moves `at` on by 0x120. `this` is not used.
+- **`StaticInit_Render` 0x1db640** fills the four lists' VU1 program tables (0x3d0f58, 0x3d0f40, 0x3d0f28,
+  0x3d0f10) with micro program places in 8-byte units: 0xa, 0, 0x10, 0xd, 5, and 0x1c (0x30 for the mixed list's
+  table).
+  - Where a record's clip kind 0 or 3 indexes them, the patch draws at +1 use 0 or 5, and the view passes at +2 use
+    0x10 or 0x1c / 0x30.
+  - The manager's init still reaches the tables' build as a call out (`BUILD_TABLES`), as its own test checks.
+
+Checked in the runner (`tests/beziertables.rs`, 6000 cases), with +0x28 any float (denormal, huge, NaN bits) and the
+allocator answering 0 or a place. 26 of 29 mutants were caught. The three left are equivalent:
+- t²·t as t·t²;
+- the two multiplies regrouped: by 2⁻⁷ it is exact while normal, and both sides flush to 0 otherwise;
+- the +0x530 clear, overwritten before it is read.

@@ -536,3 +536,95 @@ pub fn draw_views(m: &mut Mem, env: &mut dyn BezierEnv, this: u32, r: u32, scrat
     }
     finish(m, env, r);
 }
+
+// ---- The tables (row G7a3c) ----
+
+/// The tables' name for the allocator
+pub const TABLES_NAME: u32 = 0x392fc8;
+
+/// `Render_FillBezierWeights` 0x1db530(this, &at): the cubic's powers (t³, t², t, 1) for t from 0 by 1/7 (8 of
+/// them), by 1/5 (6) and by 1/3 (4), t summed; `at` moved on past them (0x120 bytes)
+pub fn fill_weights(m: &mut Mem, at: u32) {
+    let p0 = m.r32(at);
+    let mut p = p0;
+    for (step, n) in [(0x3e12_4925u32, 8), (0x3e4c_cccd, 6), (0x3eaa_aaab, 4)] {
+        let mut t = F(0.0);
+        for _ in 0..n {
+            let t2 = t * t;
+            let t3 = t2 * t;
+            m.w32(p, t3.0.to_bits());
+            m.w32(p + 8, t.0.to_bits());
+            m.w32(p + 4, t2.0.to_bits());
+            t = t + F(f32::from_bits(step));
+            m.w32(p + 0xc, 1f32.to_bits());
+            p = p.wrapping_add(0x10);
+        }
+    }
+    m.w32(at, p0.wrapping_add(0x120));
+}
+
+/// A grid of (u, v, 1, 1) from `at`: `n` × `n` points `d` apart (+0x28 ÷ 128 ÷ `div`), from `start` (0, or `d`
+/// for the inside of 8), each summed
+fn grid(m: &mut Mem, this: u32, at: u32, n: u32, div: u32, inside: bool) {
+    let d = F(f32::from_bits(m.r32(this + 0x28))) * F(1.0 / 128.0) * F(f32::from_bits(div));
+    let mut p = m.r32(at);
+    let mut u = if inside { d } else { F(0.0) };
+    for _ in 0..n {
+        let next = u + d;
+        let mut v = if inside { d } else { F(0.0) };
+        for _ in 0..n {
+            m.w32(p, u.0.to_bits());
+            m.w32(p + 4, v.0.to_bits());
+            m.w32(p + 8, 1f32.to_bits());
+            v = v + d;
+            m.w32(p + 0xc, 1f32.to_bits());
+            p = p.wrapping_add(0x10);
+        }
+        u = next;
+    }
+}
+
+/// `Render_BuildBezierTables` 0x1db1e8(this): the old tables freed; 0xe00 bytes (filled with 0xdeadc0ed when got)
+/// at +0x530, cut into the weights and the (u, v) grids of 4 (+0x534), 6 (+0x538), 8 (+0x53c) and the inside of 8
+/// (+0x540), each pair from its start. The place it fills from is kept at `at` (the game's stack: STANDIN).
+pub fn build_tables(m: &mut Mem, env: &mut dyn BezierEnv, this: u32, at: u32) {
+    let t = m.r32(this + 0x530);
+    if t != 0 {
+        env.call(m, MEM_FREE, &[t]);
+        m.w32(this + 0x530, 0);
+    }
+    let s = env.call(m, ALLOC, &[TABLES_NAME, 0xe00, 0]);
+    if s != 0 {
+        env.call(m, MEM_SET, &[s, 0xdead_c0ed, 0xe00]);
+    }
+    m.w32(this + 0x530, s);
+    m.w32(this + 0x538, s.wrapping_add(0x220));
+    m.w32(this + 0x534, s);
+    m.w32(this + 0x53c, s.wrapping_add(0x580));
+    m.w32(at, s);
+    m.w32(this + 0x540, s.wrapping_add(0xaa0));
+    for (k, (n, div, inside)) in [(4, 0x3eaa_aaab, false), (6, 0x3e4c_cccd, false), (8, 0x3e12_4925, false), (6, 0x3e12_4925, true)].into_iter().enumerate() {
+        if k > 0 {
+            let next = m.r32(this + 0x534 + 4 * k as u32);
+            m.w32(at, next);
+        }
+        fill_weights(m, at);
+        grid(m, this, at, n, div, inside);
+    }
+}
+
+/// `StaticInit_Render` 0x1db640: the four lists' VU1 program tables ([`PROGRAMS`]): the six words 0xa, 0, 0x10,
+/// 0xd, 5, 0x1c (the mixed list's last 0x30), the micro programs' places in 8 bytes
+pub fn static_init(m: &mut Mem) {
+    for (k, v) in [0xa, 0, 0x10, 0xd].into_iter().enumerate() {
+        for t in PROGRAMS {
+            m.w32(t + 4 * k as u32, v);
+        }
+    }
+    for t in PROGRAMS {
+        m.w32(t + 0x14, if t == PROGRAMS[3] { 0x30 } else { 0x1c });
+    }
+    for t in PROGRAMS {
+        m.w32(t + 0x10, 5);
+    }
+}

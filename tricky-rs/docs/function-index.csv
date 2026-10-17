@@ -2984,10 +2984,10 @@ address,size,name,system,status
 0x1da5c8,2948,FUN_001da5c8,render?,checked
 0x1db150,116,RendPatch_Alloc,render?,checked
 0x1db1c8,28,FUN_001db1c8,render?,checked
-0x1db1e8,780,Render_BuildBezierTables,render,not started
+0x1db1e8,780,Render_BuildBezierTables,render,checked
 0x1db4f8,56,FUN_001db4f8,render?,checked
-0x1db530,268,Render_FillBezierWeights,render,not started
-0x1db640,508,StaticInit_Render,render?,not started
+0x1db530,268,Render_FillBezierWeights,render,checked
+0x1db640,508,StaticInit_Render,render?,checked
 0x1db840,8,cPS2BezierMan::vf13_1db840,render,checked
 0x1db848,8,cPS2BezierMan::vf12_1db848,render,checked
 0x1db850,8,cPS2BezierMan::vf11_1db850,render,checked
