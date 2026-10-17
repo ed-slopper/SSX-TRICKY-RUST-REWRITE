@@ -2650,11 +2650,11 @@ address,size,name,system,status
 0x1c09d0,396,Gfx_SaveFpRegs,save,not started
 0x1c0b60,268,Gfx_RestoreFpRegs,render,not started
 0x1c0c70,100,Gfx_Vif1Interrupt,render,not started
-0x1c0cd8,204,TexMan_Init,render,not started
-0x1c0da8,208,TexMan_CalcLodParams,render,not started
-0x1c0e78,124,FUN_001c0e78,render?,not started
-0x1c0ef8,2244,TexMan_RegisterTexture,render,not started
-0x1c17c0,760,TexMan_LockTexture,render,not started
+0x1c0cd8,204,TexMan_Init,render,checked
+0x1c0da8,208,TexMan_CalcLodParams,render,checked
+0x1c0e78,124,FUN_001c0e78,render?,checked
+0x1c0ef8,2244,TexMan_RegisterTexture,render,checked
+0x1c17c0,760,TexMan_LockTexture,render,checked
 0x1c1ab8,280,FUN_001c1ab8,render?,not started
 0x1c1bd0,392,FUN_001c1bd0,render?,not started
 0x1c1d58,500,TexMan_UploadPixels,render,not started

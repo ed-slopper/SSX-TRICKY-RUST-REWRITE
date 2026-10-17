@@ -2321,3 +2321,33 @@ the quads, each first waits in an empty loop.
 
 Checked in the runner (`tests/quad2d.rs`): 1000 cases of each, with ends at 0 and random places.
 All 16 mutants were caught.
+
+## The texture manager: set-up and records (G7q1, `texman`)
+
+The texture manager (the renderer's +0x47c) keeps a 0x5c-byte record per texture. It finds each one room in
+the GS's memory, uploads it, and picks its detail level. G7q1 covers its set-up and how records are made.
+
+- **`TexMan_Init`** 0x1c0cd8 takes its 0xb800-byte table (named `mTexNodes`, filled with 0xdeadc0ed) and clears
+  the rest. It prints "Init Tex Man", then works out the detail levels on itself.
+- **`TexMan_CalcLodParams`** 0x1c0da8 reads the course's detail settings (the game's +0x2c, while its +0x68 is
+  set). With one player it uses the distance at +0x6c and the shift at +0x70; otherwise +0x74 and +0x78. The
+  level is −16 × log2(distance) × 2^shift as an integer (`logf` / ln 2, the divide chopped). With no game,
+  course or settings the parameters are 1, 0, 0.
+- **`FUN_001c0e78`** is the tear-down: it drops an upload under way, clears the slots, and frees the table.
+- **`TexMan_RegisterTexture`** 0x1c0ef8 adds a record to a load list:
+  - Its name sets its detail level: `wrld` (the world's) 0, `plr` (the players') 1, others 2. Levels 0 and 1
+    take the manager's parameters.
+  - Formats 0 (32-bit) and 2 (16-bit) are stored as given. 4 (8-bit, GS format 0x13) only with a palette kind
+    of 1; any other format makes no record, but the count still moves on.
+  - The pixels are taken from the list's heap (the pool or `EAMem_Alloc` by bit 30 of its flags; cleared to 0
+    by bit 31, else 0xdeadc0ed) with 0x7f spare and copied in on a 128-byte boundary.
+  - An 8-bit texture's 256-colour palette goes in a 0x47f-byte block. It is copied 0x20 bytes at a time with
+    each 0x80's middle two blocks swapped, which is the order the GS keeps palettes in.
+- **`TexMan_LockTexture`** 0x1c17c0 adds a record with no pixels for a texture to draw into, named `LOCK`
+  (32-bit or 16-bit only). It counts as kept either way.
+
+Checked in the runner (`tests/texman.rs`): 2000 cases of each, with names on and off the prefixes; every format
+and ones that make no record; sizes that are powers of two and not, and one whose byte count is negative as a
+word; heap flags with and without the pool and the clearing bits; allocations that fail; and courses with and
+without settings. The C library and heap stand-ins do their work on both sides. 52 of 53 mutants were caught.
+The one left multiplies by 1/ln 2 instead of dividing by ln 2, which the cast to an integer hides.

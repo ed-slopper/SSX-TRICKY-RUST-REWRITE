@@ -190,6 +190,7 @@ pub mod fxdraw;
 pub mod quad2d;
 pub mod textbox;
 pub mod fontdraw;
+pub mod texman;
 pub mod streak;
 pub mod marker;
 pub mod attitude;
