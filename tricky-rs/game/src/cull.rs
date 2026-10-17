@@ -58,31 +58,38 @@ fn clip(v: [F; 4]) -> u32 {
     c
 }
 
+/// The frame's matrices, made by the frame's first box test or model draw (`CullBox`, `DrawModel`): with +0x17d0
+/// clear (it is set), +0x1770 the camera's (+0x3f4) times +0x1730; +0x490 a copy of the camera's; +0x510 that times
+/// +0x4d0; +0x5b0 that times +0x570; then 0x1c4650 and 0x1c4c38 with +0x480 (and +0x610)
+pub fn frame_matrices<E: CullEnv + ?Sized>(m: &mut Mem, env: &mut E, r: u32) {
+    if m.r32(r + 0x17d0) != 0 {
+        return;
+    }
+    m.w32(r + 0x17d0, 1);
+    let cam = m.r32(r + 0x3f4);
+    mat_mul(m, r + 0x1770, r + 0x1730, cam);
+    let cam = m.r32(r + 0x3f4);
+    for k in 0..4 {
+        let row = rq(m, cam + 0x10 * k);
+        wq(m, r + 0x490 + 0x10 * k, row);
+    }
+    mat_mul(m, r + 0x510, r + 0x4d0, r + 0x490);
+    mat_mul(m, r + 0x5b0, r + 0x570, r + 0x490);
+    let v = m.r32(r + 0x480);
+    env.call(m, VIEW_UPDATE, &[v]);
+    let v = m.r32(r + 0x480);
+    env.call(m, VIEW_PLANES, &[v, r + 0x610]);
+}
+
 /// `cPS2GraphicsMan::CullBox` 0x1e1b10(r, min, max): the box's eight corners through the renderer's clip matrix
 /// (+0x5b0): 1 when every corner is beyond the same side, 0 when none is beyond any, else 2.
 ///
-/// The first test of a frame (+0x17d0 clear; it is set) makes the matrices: +0x1770 the camera's (+0x3f4) times
-/// +0x1730; +0x490 a copy of the camera's; +0x510 that times +0x4d0; +0x5b0 that times +0x570; then 0x1c4650 and
-/// 0x1c4c38 with +0x480 (and +0x610). The corners (VU0 micro program 0x320: the box's w for each) are min and max
-/// mixed in the order (min min min), (min min max), (min max min), (min max max), (max min min), (max min max),
-/// (max max min), (max max max); each one's clip flags (`vclipw`) OR-ed and AND-ed.
+/// The first test of a frame makes the frame's matrices ([`frame_matrices`]). The corners (VU0 micro program
+/// 0x320: the box's w for each) are min and max mixed in the order (min min min), (min min max), (min max min),
+/// (min max max), (max min min), (max min max), (max max min), (max max max); each one's clip flags (`vclipw`)
+/// OR-ed and AND-ed.
 pub fn cull_box(m: &mut Mem, env: &mut dyn CullEnv, r: u32, min: u32, max: u32) -> u32 {
-    if m.r32(r + 0x17d0) == 0 {
-        m.w32(r + 0x17d0, 1);
-        let cam = m.r32(r + 0x3f4);
-        mat_mul(m, r + 0x1770, r + 0x1730, cam);
-        let cam = m.r32(r + 0x3f4);
-        for k in 0..4 {
-            let row = rq(m, cam + 0x10 * k);
-            wq(m, r + 0x490 + 0x10 * k, row);
-        }
-        mat_mul(m, r + 0x510, r + 0x4d0, r + 0x490);
-        mat_mul(m, r + 0x5b0, r + 0x570, r + 0x490);
-        let v = m.r32(r + 0x480);
-        env.call(m, VIEW_UPDATE, &[v]);
-        let v = m.r32(r + 0x480);
-        env.call(m, VIEW_PLANES, &[v, r + 0x610]);
-    }
+    frame_matrices(m, env, r);
     let (lo, hi) = (rq(m, min), rq(m, max));
     let clip_rows = rows(m, r + 0x5b0);
     let (mut any, mut all) = (0u32, 63u32);

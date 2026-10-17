@@ -1083,3 +1083,40 @@ mutants caught. The one left is equivalent: x × 2z against z × 2x, both exact.
 - `ParticleNode_InitMem` 0x1d8488 (the identity constructor that pairs with `ParticleNode_FreeMem`),
   `SplinePathNode_FreeMem` 0x1fb3c8.
 - Not settled: the empty 0x259028, 0x2520a0; draws 0x1ab028, 0x244ee8, 0x249250.
+## The renderer's model draw (row G7b2; `game/src/drawmodel.rs`, checked: `tests/drawmodel.rs`)
+
+- **`cPS2GraphicsMan::DrawModel` 0x1e1f70**(r, model, part, matrix, lights, bones, scroll) is the renderer's
+  +0x2a8. It begins with the frame's matrices, shared with `CullBox` (`cull::frame_matrices`). It resets the texture
+  state cache (+0x470: its +0x10 byte to 5 and +0 to 0, with +0x474 1) unless it is already so, and calls +0x1e0
+  (3).
+- **The matrices**:
+  - Without bones: the matrix with its rows scaled by the model's scale (+0x18, +0x1c, +0x20, and 1 for the last
+    row). Unless the model has fewer than two bones and its first is posed at the world's matrix 0x346440, it also
+    builds bones from the bind poses (+0x14 of each 0x18-byte record), each times its parent's (+0 the parent,
+    −1 none).
+  - With bones (given or built), for each bone with a mesh: the matrix times that bone with its rows scaled.
+- **Each batch** of a bone's mesh (+0x20 of them, listed at +0x28):
+  - The texture (+0x1f0 with the id at +0 of the part's texture, the batch's +4 into the part's table at +4, and
+    0).
+  - The blend (+0x1e8):
+    - fogged (texture flags 0x40000) with fog on (+0x640): (2, the fog value). The matrix's place goes through the
+      clip matrix +0x5b0 after the renderer's matrix update (0x1e85b0); its w × +0x630's w, clamped to 0..+0x630's
+      x, made whole, low 16 bits.
+    - fogged with fog off: (2, 1).
+    - the second blend (0x20000): (1, 0).
+    - otherwise: (0, 0).
+  - With a scroll, the batch's own packet (+0x10) gets the VIF code 0x3000_0000_0500_0001 and the scroll × 4096 as
+    two integers. The first is sign-extended into the doubleword, as the EE does.
+  - The packet at the renderer's +0x680:
+    - `cnt` 12, then UNPACK (0x6c0b_8000) of the matrix (4 quads) and of the light block's rows 0..2 and 4..7
+      (the directions' matrix without its last row, the colours);
+    - a DMA `call` (0x5000_0000 | the batch's packet +0xc << 32);
+    - submitted (0x1e8838 with the renderer, the packet, its end + 0xe0, 0), and the place moved on 0xf0.
+- The material's blend is only the mode given to +0x1e8. The GS's ALPHA registers come from that virtual and from
+  the models' own prebuilt packets.
+
+Checked in the runner on 20,000 cases: 55,000 packets and 13,500 fogged blends, with bind poses at the world's
+matrix, negative bone counts, given bones, scrolls and fog caps beyond 16 bits. 23 of 26 mutants were caught. The
+three left are equivalent: one bone posed at the world's identity matrix gives the same scaled matrix whether or
+not the bones are built; skipping a mesh with no batches only saves the matrix work; and a w of exactly 0 clamps to
+0 either way.

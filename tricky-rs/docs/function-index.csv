@@ -3059,7 +3059,7 @@ address,size,name,system,status
 0x1e1e68,92,cPS2GraphicsMan::vf81_1e1e68,render,not started
 0x1e1ec8,96,FUN_001e1ec8,render?,not started
 0x1e1f28,68,FUN_001e1f28,render?,not started
-0x1e1f70,2516,cPS2GraphicsMan::DrawModel,render,ported
+0x1e1f70,2516,cPS2GraphicsMan::DrawModel,render,checked
 0x1e2948,280,cPS2GraphicsMan::vf85_1e2948,render,not started
 0x1e2a60,1024,cPS2GraphicsMan::vf74_1e2a60,render,not started
 0x1e2e60,1024,cPS2GraphicsMan::vf75_1e2e60,render,not started
