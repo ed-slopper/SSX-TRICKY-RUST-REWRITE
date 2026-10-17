@@ -2500,3 +2500,36 @@ empty names, textures of 0 and −1), files whose shapes are found or not, buffe
 with ids below 0 and each flag. The `strncmp`, copy and fill stand-ins do their work. All 43 mutants were caught.
 Four of them needed the data widened first: a size of −129, a bank at 0xffffff00, a failed buffer, and a texture
 of 0.
+
+## The rider skin: parts and LODs (G7r2, `skinpart`)
+
+A skin part (0x48 bytes) is one piece of the rider's model; a LOD holds the parts for one level of detail.
+
+- **`SkinPart_Load`** 0x205080 copies the part's 0x50-byte header into one of its two banks (the second for a
+  header kind of 1). The data follows it (`memcpy`), and every offset in the data becomes a pointer:
+  - the materials at the data's start (32 bytes each), the bones (0x54), points, bone ids, and the two lists;
+  - each batch's sub-batch list, each sub-batch's layer records, and each record's packet. A record's second
+    word is counted on from its packet's new address.
+- **`SkinPart_Scale`** scales the bones' offsets and the points once (+0x3c), keeping the scale.
+- **`SkinPart_ResolveTextureNames`** puts the materials' five names into the outfit's shape list.
+- **`SkinPart_ResolveMaterials`** works through the batches, unless the part is scaled:
+  - a `boot` material is flagged 0x8000;
+  - the strength is the material's +0x14 (negated by its +0x10 flag, 0 with neither) × 127, as an integer;
+  - the material number is replaced by its texture.
+- **`SkinPart_SetChildMatrices`** 0x2057a0 gives each child bone of a parent the parent's matrix times its own,
+  then recurses into that bone's children. The bone's own matrix is the rotation of its three angles (x, y, z,
+  through `Math_SinCos`) with its offset. The product is the VU0 macro's row sums, in lane order.
+- **The LOD.**
+  - `SkinLod_AddPart` loads a part into its kind's slot (+8 + the kind × 4); with none, it uses the first part
+    with no header, which may be one past the last. It then collects the materials again.
+  - `SkinLod_CollectMaterials` keeps one 12-byte entry per distinct material list over the parts up to the first
+    with no header, and gives each matrix list its entry's number.
+  - `SkinLod_AllocParts` takes the parts from the LOD's bank and marks all 17 kind slots empty.
+  - `SkinLod_Scale` and the two resolves run the part functions over every part.
+
+Checked in the runner (`tests/skinpart.rs`): 900 cases of each of 16 functions, on parts laid out as the
+game's (bones with parents among earlier bones only, batches with sub-batches and records), random angles and
+matrices, LODs with parts with and without headers, and material lists that repeat whole or in half. Tests that
+read a part with no header need the runner's low memory, so the test copies it in. 52 of 53 mutants were caught.
+The one left takes 0x4c for the header instead of 0x50, which the bank rounds to the same 128 bytes. Two were
+caught only after the materials moved to the data's start and half-equal materials were added.

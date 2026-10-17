@@ -3383,25 +3383,25 @@ address,size,name,system,status
 0x204598,160,SkinTexList_Find,render?,checked
 0x2049b0,460,FUN_002049b0,,not started
 0x204f28,240,FUN_00204f28,,not started
-0x205018,76,SkinPart_Delete,game?,not started
-0x205068,24,SkinPart_Reset,other,not started
-0x205080,1092,SkinPart_Load,render?,ported
-0x2054f0,204,SkinPart_Scale,render?,not started
-0x2055c0,176,SkinPart_ResolveTextureNames,render?,ported
-0x205670,300,SkinPart_ResolveMaterials,render?,ported
-0x2057a0,600,SkinPart_SetChildMatrices,boarder?,not started
+0x205018,76,SkinPart_Delete,game?,checked
+0x205068,24,SkinPart_Reset,other,checked
+0x205080,1092,SkinPart_Load,render?,checked
+0x2054f0,204,SkinPart_Scale,render?,checked
+0x2055c0,176,SkinPart_ResolveTextureNames,render?,checked
+0x205670,300,SkinPart_ResolveMaterials,render?,checked
+0x2057a0,600,SkinPart_SetChildMatrices,boarder?,checked
 0x2059f8,124,Skel_GetBoneWorldPos,boarder?,not started
 0x205a78,1056,Boarder_PoseBonesFromAngles,boarder,not started
 0x205e98,2428,Boarder_SolveLimbIk,boarder,not started
 0x206818,648,SkinPart_CopyBoneMatrices,other,checked
-0x206ac0,160,SkinLod_AddPart,render?,ported
-0x206b60,40,SkinLod_MaterialEquals,render?,not started
-0x206b88,136,SkinLod_MaterialListEquals,render?,not started
-0x206c10,344,SkinLod_CollectMaterials,render?,not started
-0x206d68,200,SkinLod_AllocParts,render?,not started
-0x206e30,112,SkinLod_Scale,render?,not started
-0x206ea0,112,SkinLod_ResolveTextureNames,render?,not started
-0x206f10,112,SkinLod_ResolveMaterials,render?,not started
+0x206ac0,160,SkinLod_AddPart,render?,checked
+0x206b60,40,SkinLod_MaterialEquals,render?,checked
+0x206b88,136,SkinLod_MaterialListEquals,render?,checked
+0x206c10,344,SkinLod_CollectMaterials,render?,checked
+0x206d68,200,SkinLod_AllocParts,render?,checked
+0x206e30,112,SkinLod_Scale,render?,checked
+0x206ea0,112,SkinLod_ResolveTextureNames,render?,checked
+0x206f10,112,SkinLod_ResolveMaterials,render?,checked
 0x206f80,192,RiderSkin_Init,render?,not started
 0x207040,100,RiderSkin_Delete,render?,not started
 0x2070a8,60,RiderSkin_Reset,render?,not started
