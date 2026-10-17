@@ -3402,22 +3402,22 @@ address,size,name,system,status
 0x206e30,112,SkinLod_Scale,render?,checked
 0x206ea0,112,SkinLod_ResolveTextureNames,render?,checked
 0x206f10,112,SkinLod_ResolveMaterials,render?,checked
-0x206f80,192,RiderSkin_Init,render?,not started
-0x207040,100,RiderSkin_Delete,render?,not started
-0x2070a8,60,RiderSkin_Reset,render?,not started
-0x2070e8,172,RiderSkin_ClearParts,render?,not started
-0x207198,2488,RiderSkin_Bind,render?,not started
-0x207b58,216,RiderSkin_AllocLods,render?,not started
+0x206f80,192,RiderSkin_Init,render?,checked
+0x207040,100,RiderSkin_Delete,render?,checked
+0x2070a8,60,RiderSkin_Reset,render?,checked
+0x2070e8,172,RiderSkin_ClearParts,render?,checked
+0x207198,2488,RiderSkin_Bind,render?,checked
+0x207b58,216,RiderSkin_AllocLods,render?,checked
 0x207c30,544,RiderSkin_SkinMatrices,render?,checked
-0x207e50,196,FUN_00207e50,render?,not started
+0x207e50,196,FUN_00207e50,render?,checked
 0x207f18,248,RiderSkin_SetBoardMatrix,render?,checked
-0x208010,524,RiderSkin_SkinMatricesFE,render?,not started
-0x208220,152,RiderSkin_Scale,render?,not started
-0x2082b8,112,RiderSkin_ResolveTextureNames,render?,not started
-0x208328,112,RiderSkin_ResolveMaterials,render?,not started
+0x208010,524,RiderSkin_SkinMatricesFE,render?,checked
+0x208220,152,RiderSkin_Scale,render?,checked
+0x2082b8,112,RiderSkin_ResolveTextureNames,render?,checked
+0x208328,112,RiderSkin_ResolveMaterials,render?,checked
 0x208398,60,Boarder_GetBoneWorldPos,boarder,not started
-0x2083d8,16,RiderSkin_SetRootMatrix,boarder?,not started
-0x2083e8,16,Boarder_SetSkinChildMatrices,boarder,not started
+0x2083d8,16,RiderSkin_SetRootMatrix,boarder?,checked
+0x2083e8,16,Boarder_SetSkinChildMatrices,boarder,checked
 0x2083f8,8,Boarder_BuildBoneMatrices,boarder,not started
 0x208400,100,RiderSkin_CopyBoneMatrices,boarder?,checked
 0x208468,32,MpfFile_Open,boarder?,ported

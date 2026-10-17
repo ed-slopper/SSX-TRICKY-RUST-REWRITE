@@ -2533,3 +2533,35 @@ matrices, LODs with parts with and without headers, and material lists that repe
 read a part with no header need the runner's low memory, so the test copies it in. 52 of 53 mutants were caught.
 The one left takes 0x4c for the header instead of 0x50, which the bank rounds to the same 128 bytes. Two were
 caught only after the materials moved to the data's start and half-equal materials were added.
+
+## The rider skin itself (G7r3, `riderskin`)
+
+The rider skin holds two banks, up to 17 bone entries (0x394 bytes each: a scale, a kind, the bones, how many,
+where its matrices start), the part and the entry of each kind, the base matrices, and its LODs.
+
+- **`RiderSkin_Init`** sets up the two banks and 17 entries: scale 1, no kind, each after two empty wait loops.
+  `Delete`, `Reset` and `ClearParts` (reset each LOD's kind-1 part) empty it and realign the banks.
+  `RiderSkin_AllocLods` takes the LODs (0x5900 bytes) from the first bank.
+- **`RiderSkin_Bind`** 0x207198(base; scale), for each LOD:
+  - Each part with bones (or a +0x48) takes the entry of its kind, adding one at the end if it is new. Its
+    matrices go after the bones of the entries before it: +4 in `base`, +8 in the LOD's store from +0x4c70.
+  - Each unscaled part's bones get a matrix of their angles and offset. Each bone attached (+0x10, a kind) is
+    then multiplied by its parent bone's matrix in that kind's part.
+  - The bind pose's inverse: the first time, all 50 of the LOD's matrices; after that only the 20th (+0x5130).
+    Each is transposed, its offset turned back through it, and the result premultiplied by the bind matrix
+    (0x346440, its rows × (scale, scale, scale, 1)).
+- **`RiderSkin_SkinMatricesFE`** 0x208010 (the front end's skinning, unless told to skip):
+  - each of the first LOD's parts' bones gets the base matrix times its own, into the shared skinned table
+    (0x341fc0);
+  - a table of where each kind's bones start is built on the stack;
+  - both go to the renderer's +0x310 (with the LOD's material lists) and +0x2e0.
+- **0x207e50** draws a LOD's parts that have a +0x48 through the renderer's +0x2e8.
+- **`Scale`** sets all 17 entries' scale and scales every LOD. The resolves run per LOD.
+- **`SetRootMatrix`** and `Boarder_SetSkinChildMatrices` pose the kind-1 or kind-0 part from a matrix.
+
+Checked in the runner (`tests/riderskin.rs`). There are 500 cases of each of 13 functions on skins built by the
+port's own G7r1/G7r2 functions: one or two LODs, one to four parts of random kinds, bones attached across parts,
+some parts scaled, banks and the bind matrix full of random values, and bound once already or not. 50 of 51
+mutants were caught. The one left drops the inverse offset's w × 0 term, which only matters when the rest of
+the sum is exactly −0. Eight were caught only after the test filled the banks and the bind matrix with random
+values. With zeros there, the inverse pose's results come out the same whatever the code does.

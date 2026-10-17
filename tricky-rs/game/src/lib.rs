@@ -193,6 +193,7 @@ pub mod fontdraw;
 pub mod texman;
 pub mod bdrload;
 pub mod skinpart;
+pub mod riderskin;
 pub mod streak;
 pub mod marker;
 pub mod attitude;
