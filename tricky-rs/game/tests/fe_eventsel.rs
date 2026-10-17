@@ -28,6 +28,13 @@ impl Rng {
     }
 }
 
+fn mix(mut z: u64) -> u64 {
+    z = z.wrapping_add(0x9e37_79b9_7f4a_7c15);
+    z = (z ^ (z >> 30)).wrapping_mul(0xbf58_476d_1ce4_e5b9);
+    z = (z ^ (z >> 27)).wrapping_mul(0x94d0_49bb_1331_11eb);
+    (z ^ (z >> 31)) | 1
+}
+
 const ARENA: u32 = 0x0100_0000;
 const APP: u32 = ARENA;
 const FE: u32 = ARENA + 0x1000;
@@ -64,7 +71,8 @@ impl Answers {
                 0
             }
         };
-        let mut g = Rng(self.seed ^ (target as u64) << 20 ^ (n as u64 + 1).wrapping_mul(0x9e37_79b9_7f4a_7c15));
+        // (a multiplying mix: xorshift alone keeps successive answers of one call in a fixed relation)
+        let mut g = Rng(mix(self.seed ^ (target as u64) << 16 ^ n as u64));
         for _ in 0..3 {
             g.next();
         }

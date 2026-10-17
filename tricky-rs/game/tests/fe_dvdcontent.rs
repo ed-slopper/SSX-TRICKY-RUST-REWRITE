@@ -34,6 +34,13 @@ impl Rng {
     }
 }
 
+fn mix(mut z: u64) -> u64 {
+    z = z.wrapping_add(0x9e37_79b9_7f4a_7c15);
+    z = (z ^ (z >> 30)).wrapping_mul(0xbf58_476d_1ce4_e5b9);
+    z = (z ^ (z >> 27)).wrapping_mul(0x94d0_49bb_1331_11eb);
+    (z ^ (z >> 31)) | 1
+}
+
 const ARENA: u32 = 0x0100_0000;
 const APP: u32 = ARENA;
 const FE: u32 = ARENA + 0x1000;
@@ -95,7 +102,8 @@ impl Answers {
                 0
             }
         };
-        let mut g = Rng(self.seed ^ (target as u64) << 20 ^ (n as u64 + 1).wrapping_mul(0x9e37_79b9_7f4a_7c15));
+        // (a multiplying mix: xorshift alone keeps successive answers of one call in a fixed relation)
+        let mut g = Rng(mix(self.seed ^ (target as u64) << 16 ^ n as u64));
         for _ in 0..3 {
             g.next();
         }
@@ -103,13 +111,9 @@ impl Answers {
             TEXT_CTOR | LIST_NTH => MADE[n as usize % MADE.len()],
             LIST_AT => [0, MADE[g.below(6) as usize]][g.below(2) as usize],
             LIST_INDEX => [0u32, 1, 2, u32::MAX][g.below(4) as usize],
-            ALLOC => {
-                if g.below(16) == 0 {
-                    0
-                } else {
-                    HEAP + 0x400 * (n % 64)
-                }
-            }
+            // (never null: the game builds its widgets in place without checking, so a failed allocation is not a
+            // case the original handles)
+            ALLOC => HEAP + 0x400 * (n % 64),
             HELP_BUTTON => BUTTONS[n as usize % BUTTONS.len()],
             SPRITE_RECT => RECT,
             t if t == V_BASE + 0x70 + 4 => [0xcu32, 0, 1][g.below(3) as usize],

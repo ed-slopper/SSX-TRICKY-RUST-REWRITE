@@ -24,6 +24,13 @@ impl Rng {
     }
 }
 
+fn mix(mut z: u64) -> u64 {
+    z = z.wrapping_add(0x9e37_79b9_7f4a_7c15);
+    z = (z ^ (z >> 30)).wrapping_mul(0xbf58_476d_1ce4_e5b9);
+    z = (z ^ (z >> 27)).wrapping_mul(0x94d0_49bb_1331_11eb);
+    (z ^ (z >> 31)) | 1
+}
+
 const ARENA: u32 = 0x0100_0000;
 const APP: u32 = ARENA;
 /// the list under test (its tail at +0x10) and a second (the finished screens at +0x24 of the first)
@@ -73,7 +80,8 @@ fn log_call(a: &A, read: &mut dyn FnMut(u32) -> u32, target: u32, mut v: Vec<u32
     let mut b = a.borrow_mut();
     b.log.push((target, v));
     b.n += 1;
-    let mut g = Rng(b.seed ^ (target as u64) << 16 ^ b.n as u64);
+    // (a multiplying mix: xorshift alone keeps successive answers of one call in a fixed relation)
+    let mut g = Rng(mix(b.seed ^ (target as u64) << 16 ^ b.n as u64));
     g.next();
     match target {
         PAD_RECORD => PADS + 0x10 * g.below(4),
