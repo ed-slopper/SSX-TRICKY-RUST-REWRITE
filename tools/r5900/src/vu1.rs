@@ -473,6 +473,23 @@ impl Vu1 {
                             // iswr.dest it, (is)
                             self.set_qw(a as u32, dest, [b as u32; 4]);
                         }
+                        0x40 => {
+                            // rnext.dest ft: R stepped (bit 0 the XOR of bits 4 and 22, shifted in), then copied
+                            // to ft; nothing at all for vf0 (as PCSX2)
+                            if ft != 0 {
+                                let x = (c.r >> 4 ^ c.r >> 22) & 1;
+                                c.r = (c.r << 1 ^ x) & 0x7f_ffff | 0x3f80_0000;
+                                set_vf(c, ft, dest, [f32::from_bits(c.r); 4]);
+                            }
+                        }
+                        0x41 => {
+                            // rget.dest ft
+                            if ft != 0 {
+                                set_vf(c, ft, dest, [f32::from_bits(c.r); 4]);
+                            }
+                        }
+                        0x42 => c.r = s.vf[fs][fsf].to_bits() & 0x7f_ffff | 0x3f80_0000, // rinit R, fs.fsf
+                        0x43 => c.r = (c.r ^ s.vf[fs][fsf].to_bits()) & 0x7f_ffff | 0x3f80_0000, // rxor R, fs.fsf
                         0x68 => set(c, it, self.top as u16),  // xtop
                         0x69 => set(c, it, self.itop as u16), // xitop
                         0x6c => {

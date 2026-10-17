@@ -1596,3 +1596,44 @@ answers, the vtable's this-shifts) and 9000 blend and packet cases. The texture 
 not, its word 0 clear or not, the matrices made or not, and the second +0x1e8 sometimes left another program or
 word 0 behind. 28 of 30 mutants were caught, one of them only after that +0x1e8 change. The two left are
 equivalent: one reads +0x17d0 as 0 (`frame_matrices` checks it itself), and one re-clamps the kind.
+
+## The VU1 particle program 7 (G7e2, `particlevu.rs`)
+
+The program loaded by chain 0x31c790 (89 instructions, called at 0 by the program-7 packet). It scatters a
+system's particles at random in a box and sends each one as a two-vertex sprite.
+
+- **What it reads.** The frame's words at VU1 0..6 (from `PS2Draw_WriteTexState`'s particle words): the clip
+  matrix, the screen's scale and offset, and the sprites' x/y scale (the projection's two scales). The system's
+  block at TOP: the count in x (one particle is drawn even when it is 0 or less, since the loop tests after), the
+  size's base and spread in y/z, the seed, the box's corner and three edges, the colour, and two texture
+  coordinates (their z set to 1).
+- **Each particle's place.** The corner plus each edge times a random 1.0..2.0. The four random lanes come from
+  the VU's R register: each lane is started (`rinit`) from its last value and stepped once (`rnext`), in the
+  order x, z, w, y. The size is the base plus the spread times the y lane, times the sprite scale.
+- **A quirk.** The loop steps the x lane from R as the previous particle's y step left it, not from its own last
+  value (its `rinit` comes at the loop's end). So from the second particle on, the x and y lanes are the same
+  number: a particle's offset along the first edge and its size move together. The `rinit` at the loop's end
+  then changes nothing.
+- **The pipeline.** The program finishes one particle while it makes the next. The corners are the point ∓ the
+  half size, times 1/w, then scaled and offset, then ×16 as integers. A point beyond any of the six planes (the
+  previous point's clip test) is not stored.
+- **The output.** Five quadwords a sprite (ST, colour, corner, ST, corner) in two buffers at 25 and 521, whose
+  GIF tags come from the chain. A buffer is sent at 99 sprites with NLOOP | EOP put in its tag, and the other one
+  is filled next. What is left is sent at the end, unless the buffer is empty.
+
+The runner's VU1 now has the random unit (`rinit`, `rnext`, `rget`, `rxor`; see `checking.md`), stepped as PCSX2
+does. That step is the model both sides use; the real chip's step is not checked.
+
+Checked against the game's program (`tests/vu1particle.rs`). The whole particle draw runs as original code:
+`ParticleSys_Draw`, the packet, the submit and the flush with `WriteTexState`, under four cameras with 40 systems
+each, six seeds a camera. The blocks have counts from 0 to 250, boxes ahead of, beside and behind the camera, and
+the VU registers start random. All 960 calls match: 198,312 GS quadwords; 172 calls fill a whole packet and 491
+send nothing. 38 of 45 mutants were caught (39 in the program, 6 in `vu.rs`'s new ops). The seven left are
+equivalent or masked:
+- the second load of the seed;
+- loading all of vf30 (its z and w are 0 either way);
+- the loop-end `rinit` (the quirk above);
+- the clipped path's extra `div` (the same w);
+- in `vu.rs`, `rinit` and `rnext` without their masks (the next step's shift and mask drop those bits; bit 23 is
+  always set);
+- `rnext` to vf0 stepping R (no program does it).

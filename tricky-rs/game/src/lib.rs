@@ -183,3 +183,4 @@ pub mod drawlist;
 pub mod vu;
 pub mod patchvu;
 pub mod particledraw;
+pub mod particlevu;

@@ -16,6 +16,7 @@ pub const W: u32 = 1;
 pub const XY: u32 = X | Y;
 pub const XYZ: u32 = X | Y | Z;
 pub const ZW: u32 = Z | W;
+pub const YZ: u32 = Y | Z;
 pub const YZW: u32 = Y | Z | W;
 pub const XYZW: u32 = 15;
 
@@ -44,6 +45,8 @@ pub struct Vu {
     pub q: f32,
     /// The clip flags: four tests of six bits, the latest lowest
     pub clip: u32,
+    /// The random number register R: 1.0 to 2.0, a 23-bit shift register in the mantissa
+    pub r: u32,
     pub mem: Vec<[u32; 4]>,
     pub top: u32,
     pub gs: Vec<[u32; 4]>,
@@ -55,7 +58,7 @@ impl Vu {
     pub fn new() -> Vu {
         let mut vf = [[0.0; 4]; 32];
         vf[0] = [0.0, 0.0, 0.0, 1.0];
-        Vu { vf, vi: [0; 16], acc: [0.0; 4], q: 0.0, clip: 0, mem: vec![[0; 4]; 0x400], top: 0, gs: Vec::new(), kicks: Vec::new() }
+        Vu { vf, vi: [0; 16], acc: [0.0; 4], q: 0.0, clip: 0, r: 0x3f80_0000, mem: vec![[0; 4]; 0x400], top: 0, gs: Vec::new(), kicks: Vec::new() }
     }
 
     /// A register written in the lanes of `dest` (vf0 stays (0, 0, 0, 1))
@@ -223,6 +226,25 @@ impl Vu {
     pub fn mfir(&mut self, ft: usize, is: usize, dest: u32) {
         let v = f32::from_bits(self.vi[is] as i16 as i32 as u32);
         self.set(ft, dest, [v; 4]);
+    }
+    /// ft = fs turned one lane (fs's y, z, w, x), in the lanes of `dest`
+    pub fn mr32(&mut self, ft: usize, fs: usize, dest: u32) {
+        let s = self.vf[fs];
+        self.set(ft, dest, [s[1], s[2], s[3], s[0]]);
+    }
+    /// `rinit`: R = fs's lane's mantissa (as 1.0 to 2.0)
+    pub fn rinit(&mut self, fs: usize, fsf: usize) {
+        self.r = self.vf[fs][fsf].to_bits() & 0x7f_ffff | 0x3f80_0000;
+    }
+    /// `rnext`: R stepped (shifted up one, the XOR of its bits 4 and 22 shifted in), then ft = R in the lanes of
+    /// `dest`; for vf0 nothing at all (as PCSX2, the runner's model)
+    pub fn rnext(&mut self, ft: usize, dest: u32) {
+        if ft == 0 {
+            return;
+        }
+        let x = (self.r >> 4 ^ self.r >> 22) & 1;
+        self.r = (self.r << 1 ^ x) & 0x7f_ffff | 0x3f80_0000;
+        self.set(ft, dest, [f32::from_bits(self.r); 4]);
     }
     /// The integer register = fs's lane's low half
     pub fn mtir(&mut self, it: usize, fs: usize, fsf: usize) {
