@@ -82,7 +82,6 @@ state machine and the renderer are ours. Nothing has been checked against the or
 | G7e | (umbrella: G7e1..G7e5) Particles as the VU1 microcode draws them (0x31c288), spark and dust sprites | unowned | G7 | | [repo] "Unresolved: spark and dust sprite rendering"; `particles.rs` has the emitters |
 | G7e4 | The spray, speed dust and spark sprites' draws: `Fx_Spray_DrawParticles` 0x12d890, `Fx_SpeedDust_Draw` 0x12fb40, `Fx_SurfaceSpray_Draw`, `Sprite_DrawRotatedQuad` / `_DrawRotatedTexQuad` 0x19b8c8 / 0x19bb48 | any | G7e1 | | Split of G7e |
 | G7g | (umbrella: G7g1..G7g5; the rider's lights are `Lights_Build`, done in G7d) Rider shading and shadows, board reflections (env materials) | unowned | G7, E4 | | [est] |
-| G7g5 | The rider's overlays: `Streak_Draw` 0x1f08d0, `PlayerMarker_Draw` 0x133c20, `AttitudeIcon_Draw` 0x134830, checked in the runner | ed-slopper/puffin | G7g4 | | Split of G7g |
 | G7e5 | The rest of the rider's effect draws: `BoarderRender_DrawEffects` 0x135170, `Fx_Spray_Draw` 0x12e918, `Fx_BoardPuff_Draw` 0x12f178, `Fx_BoardTrail_Draw` 0x130b98 | any | G7e4 | | Split of G7e (found under the rider's draw) |
 | G9 | Front end: title, main menu, mode select, rider / outfit / board select, options, records, trick book screens, unlock screens, music player, loading screens (`gApp+0x734`) | unowned | E1, E5 | | [repo] `ui.rs` is ours. Split (2026-10-16): G9b the shared machinery, G9c–G9t the screens (logic ported and checked in the runner, widgets as calls out), G9u the app's menus on them |
 | G9b | (umbrella: G9b1, G9b2) The front end's shared machinery: `cFE3D` (the manager, its per-frame update and the screen it runs), the `cFE3DState` base (the phases, `TransitionIn` / `Out`, `Finish` and `CreateNextState`, `UpdateTransition`, `Activate`, `LayoutWidgets`), the widgets they drive and the 3D transition record (`FE3DTransition_*`, notes in frontend.md) | any | G9 | | Split of G9 |
@@ -154,6 +153,7 @@ matches the original.
 
 | ID | Task | Section | Who | Date | Commit |
 |---|---|---|---|---|---|
+| G7g5 | Streak_Draw (streak.rs), PlayerMarker_Draw (marker.rs), AttitudeIcon_Draw (attitude.rs), runner-checked | P2 | ed-slopper/puffin | 2026-10-17 | 23adbeb, f8391e0, 456d942 |
 | G7g4 | BoarderRender_Draw + _PickLod/_GetHandStreakPoints/_CopyBoarderMatrix/Career_IsPlayerOutfit6 in riderdraw.rs, runner-checked, 46/49 mutants (3 equivalent/boundary) | P2 | ed-slopper/puffin | 2026-10-17 | 88f7abd |
 | G7g2 | BoarderShadow_Update as shadow::update (camera, box of 6 bones + 4 points, 3 matrices), runner-checked, 28/31 mutants (3 equivalent) | P2 | ed-slopper/puffin | 2026-10-17 | 6b07701 |
 | G7g3 | RiderSkin_SkinMatrices/_SetBoardMatrix/_CopyBoneMatrices + SkinPart_CopyBoneMatrices in skin.rs, runner-checked, 27/27 mutants | P2 | ed-slopper/puffin | 2026-10-17 | 1f50f2b |
@@ -1273,3 +1273,4 @@ matches the original.
 - 2026-10-17 ed-slopper/puffin: G7g2 done (6b07701): the shadow's camera and matrices. Its box ignores z; when the light is straight along up the side axes are kept from the last frame and the way nudged.
 - 2026-10-17 ed-slopper/puffin: G7g3 done (1f50f2b): skin.rs (with SkinPart_CopyBoneMatrices 0x206818). G7g4 claimed.
 - 2026-10-17 ed-slopper/puffin: G7g4 done (88f7abd): riderdraw.rs. The shadow is cast onto the rider through RiderSkin_SetBoardMatrix (its 'board' is the shadow). Found: the EE FPU has no NaN, so a NaN-bits float compares as a huge number (Rust's compare doesn't); real data never has one. G7g5 claimed.
+- 2026-10-17 ed-slopper/puffin: G7g5 done (23adbeb, f8391e0, 456d942): the streaks, the player marker and the attitude icon. With G7g1..5 done, G7g is closed (the rider's lights are G7d's Lights_Build).
