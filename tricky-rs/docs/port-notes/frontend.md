@@ -1158,8 +1158,8 @@ decompiled bodies match the live functions token for token. The copies sit at 0x
 |---|---|---|
 | `FE3DWGroup_FreeChildren` | `cFE3DWGroup::vf1` 0x2691c8 | deletes the child list (+0x110), then `cListNode::vf1` |
 | `FE3DWGroup_SkipActivity` / `_ResetActivity` / `_UpdateActivity` | vf6 / vf7 / vf8 | that op over the children, then the base class's vf |
-| `FE3DWGroup_Render` / `_RenderText` | vf10 / vf11 | when visible (+0x14), the render op over the children with the depth raised by +0x70 |
-| `FE3DWGroup_Update` | vf12 | the update op, then its own vf at +0x48 when +0x10 is set |
+| `FE3DWGroup_Render` / `_RenderText` | vf10 / vf11 | when +0x14 is set: the renderer's (gApp+0x724) value from its vf +0x1dc raised by +0x70 through vf +0x1d4, the op over the children, the value put back |
+| `FE3DWGroup_Update` | vf12 | when +0x10 is set: the update op, then its own vf at +0x48 |
 | `FE3DWGroup_Offset` | vf13 | the offset op, then +0x80 += the offset |
 | `FE3DWGroup_OnInput` | vf28 | when +0xa4 is 0: 1 if a child took the input |
 | `FE3DWGroup_Format` | vf39 | the format op |
