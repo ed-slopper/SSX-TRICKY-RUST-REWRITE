@@ -2604,3 +2604,85 @@ straight).
 - `<` vs `<=` at the 0.2 floor;
 - the 0.99999 cap on the turn, which a cross product of two unit vectors exceeds only when they are within
   0.00001 of perpendicular.
+
+## The race's broadphase and its contacts (E7d, `broadphase`)
+
+The race keeps one broadphase (its +0x30). Every box in it is a `BroadphaseProxy`: the course's boost pads,
+knockables and the riders fit one. The broadphase pairs boxes by sweeping sorted lists of their ends on x, y and
+z. Two boxes are a pair while they overlap on all three axes.
+
+- **The broadphase** (`ContactMgr_Init` 0x14f960) holds at most 0x100 boxes:
+  - +4 is a stack of free ids;
+  - +0x10 is a pool of 0x100 pairs of 32 bytes, with a free list through each pair's +0x18;
+  - +0x20 / +0x24 are the oldest and newest live pairs (a pair's newer neighbour is at +0x18, its older one at
+    +0x1c);
+  - +0x28 is the pair table, 0x1fe00 bytes, cleared;
+  - +0x2c holds the three axes' lists of ends (head and tail each).
+
+  The init leaves the live list and the axes' lists alone, so whoever makes the broadphase clears them. All three
+  allocations are filled with 0xdeadc0ed first, as the game's allocations are. The destructor (0x14fa00) frees
+  the table and the two arrays, and frees itself when its flags have bit 0. The pool's and the ids' destructors
+  (0x14f6c8, 0x14f8c8) are the same code.
+- **The pair table** has one word for each two ids i < j, at i(n − 1) − i(i + 1)/2 + j − 1
+  (`Broadphase_PairIndex` 0x1503b0; `_GetPairFlags` 0x1503e0 takes the ids in either order). Its low three bits
+  say on which axes the two overlap. Bits 3..15 hold the pair's place in the pool while all three are set.
+- **A box** (`BroadphaseProxy_Init` 0x150670, `_SetBox` 0x1507e8; `_SetBoxB` 0x150818 is the same code):
+  - +0 / +4 are the last and first of its pairs;
+  - each axis has a low end (+8 + 0x14·axis) and a high end (+0x44 + 0x14·axis). An end holds its box, a pointer
+    to its value (the corner's x, y or z), 1 for a low end, and its next and previous ends on the axis;
+  - +0x80 is its id and +0x84 its owner.
+
+  `Broadphase_FitBox` 0x14fa70 gives the box an id, puts its six ends on the tails of the lists, and moves it into
+  place. (It also spins an empty three-step loop, which does nothing.)
+- **The sweep** is insertion sorts on linked lists. Whenever an end passes another end and one of the two is a
+  low end and the other a high end, that axis's bit is toggled for the two boxes (`Broadphase_ToggleOverlap`
+  0x150248). Ends of the same kind pass without a toggle.
+  - When the toggle completes all three bits, a pair is taken from the pool, made the newest live pair, given the
+    two boxes and linked first into both boxes' lists (`Contact_AllocPair` 0x14fdb8, `_LinkToNode` 0x1506d8).
+  - When the toggle clears one of three, the pair is unlinked from both boxes and freed (`_UnlinkFromNode`
+    0x150740, `_FreePair` 0x14fd80).
+  - `Broadphase_SortAxis` 0x14fec8 works from the end before the tail back to the head, carrying each end on
+    past every later end with a smaller value.
+  - `Broadphase_MoveBoxOnAxis` 0x14ffc8 moves one box in four steps: its high end on past smaller values, its
+    low end back past larger ones, then the high end back and the low end on.
+  - `Broadphase_SortAll` / `_MoveBox` (0x14fe18, 0x14fe68) do the three axes.
+
+  All the compares are strict, so equal values never swap.
+- **A pair's links.** Each pair is in both of its boxes' lists. The links it uses depend on which side of the
+  pair the box is (`Obj_HasId` 0x110838: whether the box is the pair's +4): +8 / +0xc are the previous pair, and
+  +0x10 / +0x14 the next.
+- **`Contact_RemoveAllForNode` 0x14fb38** takes a box out:
+  - it walks the box's table words, first with every lower id (down the column) and then every higher one (along
+    the row);
+  - for each word with all three bits set, it unlinks the pair from the other box and frees it;
+  - it clears every word's bits, whether or not a pair was freed;
+  - it takes the six ends off the lists and gives the id back.
+
+  It does not unlink the pairs from the box itself, whose list is left stale.
+- **The sorts by owner** use a virtual on the owner (+0x84), the second word pair of the table at the owner's +8
+  (+0x30 adjusts `this`, +0x34 is the function), which returns a key.
+  - `Contact_SortBodyPairList` 0x150848 sorts one box's list. From the box's second pair on, each pair is
+    carried towards the first past every pair whose other box has a smaller key.
+  - `Contact_SortPairs` 0x150428 first runs that on every box with a low end on axis 0 (in the axis's order).
+    Then it sorts the live list from the pair before the newest back to the oldest, carrying each pair towards
+    the newest past every pair with a smaller key.
+  - A pair's key is its two owners' keys as one 64-bit number: the smaller key high, the larger low, compared
+    unsigned.
+
+Checked in the runner (`tests/broadphase.rs`): 300 cases of each of the 34 functions (the 32 in the index and the
+two it lacked: the pool's free 0x14f740 and the ids' push 0x14f940). Each case builds a broadphase with the port's
+own functions:
+- `init`, with the lists cleared;
+- 2 to 13 boxes, with random corners near each other (some on whole numbers, so ends tie) and owners with random
+  keys, fitted;
+- up to two boxes taken out again and up to three moved;
+- the pairs sorted in half the cases.
+
+Before the sorts, values are moved and keys changed. The cases saw 37,060 live pairs; 2133 changed an axis's
+order and 183 pair sorts moved pairs. The allocator, the fill, the frees and the owners' key are stand-ins on both
+sides. The calls, the answers and the memory matched on the first run.
+
+69 of 70 mutants were caught. A mutant that breaks a list into a cycle made the first version of the test
+walk it without end (22 GB). The test's walks and call logs are now bounded, so such a mutant fails at once. The
+pool's index of a pair below the pool (a signed shift) needed its own cases. The one left masks the pair's place
+with 0xfff instead of 0x1fff, which cannot matter while the pool has 0x100 pairs.

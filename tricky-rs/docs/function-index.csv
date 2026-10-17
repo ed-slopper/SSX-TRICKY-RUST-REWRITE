@@ -132,7 +132,7 @@ address,size,name,system,status
 0x110770,40,WipeOutRecoverMotion_SaveSnapshot,save,checked
 0x110798,20,WipeOutRecoverMotion_LoadSnapshot,ai?,checked
 0x110830,8,Body_Translate,other,ported
-0x110838,16,Obj_HasId,world?,not started
+0x110838,16,Obj_HasId,world?,checked
 0x110860,8,Quat_Construct,world?,not started
 0x110868,44,Vec4_ScaleCopy8,world?,not started
 0x110898,8,Vec4_Construct,world?,not started
@@ -1015,37 +1015,39 @@ address,size,name,system,status
 0x14f550,28,PadCfg_Destruct,game?,not started
 0x14f5b0,64,cLessonManState::__tf,runtime,host
 0x14f5f0,20,Vec4_Set,other,ported
-0x14f608,188,ContactPool_Init,render?,not started
-0x14f6c8,88,FUN_0014f6c8,render?,not started
-0x14f720,28,FUN_0014f720,render?,not started
-0x14f760,16,ContactPool_Get,render?,not started
-0x14f770,16,ContactPool_IndexOf,render?,not started
-0x14f780,36,Contact_ListAppend,render?,not started
-0x14f7a8,52,Contact_ListRemove,render?,not started
-0x14f7e0,64,Broadphase_SwapWithPrev,render?,not started
-0x14f820,164,ContactIndex_Init,render?,not started
-0x14f8c8,88,FUN_0014f8c8,render?,not started
-0x14f920,32,FUN_0014f920,render?,not started
-0x14f960,156,ContactMgr_Init,render?,not started
-0x14fa00,112,FUN_0014fa00,render?,not started
-0x14fa70,196,Broadphase_FitBox,world?,ported
-0x14fb38,616,Contact_RemoveAllForNode,world?,not started
-0x14fd80,84,Contact_FreePair,other,not started
-0x14fdb8,96,Contact_AllocPair,render?,not started
-0x14fe18,76,Broadphase_SortAll,camera?,ported
-0x14fe68,92,Broadphase_MoveBox,boarder?,ported
-0x14fec8,256,Broadphase_SortAxis,render?,not started
-0x14ffc8,636,Broadphase_MoveBoxOnAxis,render?,not started
-0x150248,360,Broadphase_ToggleOverlap,render?,not started
-0x1503b0,48,Broadphase_PairIndex,render?,not started
-0x1503e0,68,Broadphase_GetPairFlags,render?,not started
-0x150428,456,Contact_SortPairs,camera?,ported
-0x150670,104,BroadphaseProxy_Init,world?,ported
-0x1506d8,100,Contact_LinkToNode,render?,not started
-0x150740,164,Contact_UnlinkFromNode,other,not started
-0x1507e8,44,BroadphaseProxy_SetBox,world?,ported
-0x150818,44,BroadphaseProxy_SetBoxB,world?,ported
-0x150848,536,Contact_SortBodyPairList,world?,not started
+0x14f608,188,ContactPool_Init,render?,checked
+0x14f6c8,88,FUN_0014f6c8,render?,checked
+0x14f720,28,FUN_0014f720,render?,checked
+0x14f740,28,ContactPool_Free,world?,checked
+0x14f760,16,ContactPool_Get,render?,checked
+0x14f770,16,ContactPool_IndexOf,render?,checked
+0x14f780,36,Contact_ListAppend,render?,checked
+0x14f7a8,52,Contact_ListRemove,render?,checked
+0x14f7e0,64,Broadphase_SwapWithPrev,render?,checked
+0x14f820,164,ContactIndex_Init,render?,checked
+0x14f8c8,88,FUN_0014f8c8,render?,checked
+0x14f920,32,FUN_0014f920,render?,checked
+0x14f940,32,ContactIndex_Push,world?,checked
+0x14f960,156,ContactMgr_Init,render?,checked
+0x14fa00,112,FUN_0014fa00,render?,checked
+0x14fa70,196,Broadphase_FitBox,world?,checked
+0x14fb38,616,Contact_RemoveAllForNode,world?,checked
+0x14fd80,84,Contact_FreePair,other,checked
+0x14fdb8,96,Contact_AllocPair,render?,checked
+0x14fe18,76,Broadphase_SortAll,camera?,checked
+0x14fe68,92,Broadphase_MoveBox,boarder?,checked
+0x14fec8,256,Broadphase_SortAxis,render?,checked
+0x14ffc8,636,Broadphase_MoveBoxOnAxis,render?,checked
+0x150248,360,Broadphase_ToggleOverlap,render?,checked
+0x1503b0,48,Broadphase_PairIndex,render?,checked
+0x1503e0,68,Broadphase_GetPairFlags,render?,checked
+0x150428,456,Contact_SortPairs,camera?,checked
+0x150670,104,BroadphaseProxy_Init,world?,checked
+0x1506d8,100,Contact_LinkToNode,render?,checked
+0x150740,164,Contact_UnlinkFromNode,other,checked
+0x1507e8,44,BroadphaseProxy_SetBox,world?,checked
+0x150818,44,BroadphaseProxy_SetBoxB,world?,checked
+0x150848,536,Contact_SortBodyPairList,world?,checked
 0x150a70,16,Vibration_Construct,boarder?,ported
 0x150a80,360,Rumble_Impact,boarder?,ported
 0x150be8,304,Rumble_Add,boarder?,checked
