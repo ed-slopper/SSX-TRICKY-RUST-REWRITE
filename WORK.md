@@ -81,8 +81,7 @@ state machine and the renderer are ours. Nothing has been checked against the or
 | G7 | Rendering, as the PS2 renderer does it. Split before claiming: | unowned | E3a, E3b | | [repo] |
 | G21 | **The rider stutters back and forth the whole run** (play test by bredclan, 2026-10-17, tricky-rs.2026-10-17.exe from 3580b5f). To find: whether it is the port (our stand-ins between the exact pieces: the rider's step, its control state, the app's camera or its frame timing fighting the game's fixed tick) or something the decompiling will fix once the boarder state machine (G1) runs whole. First step: log the rider's place and heading each tick in a run (`TRICKY_SIM`) and see which one goes back and forth, and on which frames | any | | | Play test 2026-10-17 |
 | G9a4 | (umbrella: G9a4a..G9a4d) The leftover `cDebugMenu` (0x187850) kept as a dev menu: 168 functions 0x186bb0..0x18e718 | ed-slopper/puffin | G9a | | Split of G9a |
-| G9a4a | The debug menu's framework: `cMenuItem`, `cMenu` (items, selection, layout and draw vf4) and `cMenuManager`, 0x1889b8..0x189898, as `tricky_game::debugmenu`, checked in the runner | ed-slopper/puffin | G9a4 | | Split of G9a4 |
-| G9a4b | The debug menu's item kinds: bool, enum, sub, pop, command, null, space, int, float, angle, string, colour, expand, RGB items and the error menu, 0x189948..0x18c1c8 | any | G9a4a | | Split of G9a4 |
+| G9a4b | The debug menu's item kinds: bool, enum, sub, pop, command, null, space, int, float, angle, string, colour, expand, RGB items and the error menu, 0x189948..0x18c1c8 | ed-slopper/puffin | G9a4a | | Split of G9a4 |
 | G9a4c | The debug menu's drawing: `DebugMenu_BeginDraw` / `EndDraw` / `DrawBox` / the arrows / `DrawItemBox`, `MenuItem_MeasureLabel` / `DrawLabel`, the string, colour and RGB items' measures and draws, the destructors, 0x18c288..0x18e718 | any | G9a4a | | Split of G9a4 |
 | G9a4d | The debug menus themselves: `cDebugMenu`, `cResolutionMenu`, `cRenderOptionsMenu`, `cBezierOptionsMenu`, `cGameOptionsMenu`, `cSoundVolumeMenu` and their destructors, 0x186bb0..0x188908 | any | G9a4b | | Split of G9a4 |
 | G9 | Front end: title, main menu, mode select, rider / outfit / board select, options, records, trick book screens, unlock screens, music player, loading screens (`gApp+0x734`) | unowned | E1, E5 | | [repo] `ui.rs` is ours. Split (2026-10-16): G9b the shared machinery, G9c–G9t the screens (logic ported and checked in the runner, widgets as calls out), G9u the app's menus on them |
@@ -155,6 +154,7 @@ matches the original.
 
 | ID | Task | Section | Who | Date | Commit |
 |---|---|---|---|---|---|
+| G9a4a | The debug menu's framework (`cMenuItem`, `cMenu` with its layout and draw, `cMenuManager`) as `tricky_game::debugmenu`, checked in the runner (tests/debugmenu.rs, 22,000 cases over 44 functions), 60 of 64 mutants caught (4 equivalent) | P2 | ed-slopper/puffin | 2026-10-17 | 129532f |
 | G9a3 | `PauseMenu_DrawMainPage`, `PauseMenu_DrawMusicList` (the options page's items), `PauseMenu_DrawOptionsPage` and `cPauseMenuOverlay`'s constructor as `tricky_game::pausedraw`, checked in the runner (tests/pausedraw.rs, 12,000 cases), 63 of 63 mutants caught | P2 | ed-slopper/puffin | 2026-10-17 | d93f442 |
 | G9w | The loading screens (G9w1..G9w5): `cFlakeSpinnerLoad`, the first load, the track loads, the front end loads, the load from quit, the trick tutorial and rider ranking loads, 0x243c78..0x250018, all in `tricky_game::loadscreen` and checked in the runner | P2 | ed-slopper/puffin | 2026-10-17 | f8afa8b |
 | G9w5 | `cFELoadFromQuit` (with `LoadScreen_SetupTips`), `cTrickTutorialLoad` and `cRiderRankingLoad` (with `FE_FillCareerSummary`) and the two static helpers after them in `tricky_game::loadscreen`, checked in the runner (tests/loadscreen.rs, 28,200 cases), 55 of 55 mutants caught | P2 | ed-slopper/puffin | 2026-10-17 | f8afa8b |
@@ -1345,3 +1345,4 @@ matches the original.
 - 2026-10-17 ed-slopper/puffin: closed G9w4 (d952c1c), claimed G9w5
 - 2026-10-17 ed-slopper/puffin: closed G9w5 (f8afa8b) and the G9w umbrella; split G9a into G9a3 (draws, ctor) and G9a4 (debug menu), claimed G9a3
 - 2026-10-17 ed-slopper/puffin: closed G9a3 (d93f442); split G9a4 (the debug menu) into G9a4a..d, claimed G9a4a
+- 2026-10-17 ed-slopper/puffin: closed G9a4a (129532f), claimed G9a4b
