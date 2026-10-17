@@ -186,5 +186,6 @@ pub mod shadow;
 pub mod skin;
 pub mod riderdraw;
 pub mod streak;
+pub mod marker;
 pub mod particledraw;
 pub mod particlevu;

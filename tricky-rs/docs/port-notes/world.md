@@ -1801,3 +1801,21 @@ One more, the 26.02 threshold's `<` as `≤`, needs a depth of exactly 26.02 (a 
 
 Checked in the runner (`tests/streak.rs`): 5000 cases of 0..7 live entries anywhere in the ring, the app with
 a texture or not; 90,036 vertices. All 15 mutants were caught.
+
+## The player marker (G7g5, `marker.rs`)
+
+`PlayerMarker_Draw` 0x133c20(marker), drawn over another rider in a race of two or more players, is a strip of
+eight corners facing the camera.
+- **Its size** comes from its depth: the third point (+0x20) through the view's third row. The size is 76.49
+  at or behind the camera, 76.49 + 63.37 × z / 31128.5 in between, and 139.86 from 31128.5 on. So a far
+  marker grows instead of shrinking to nothing.
+- **The axes**: the view's first column times the size, and its third column times the marker's height
+  (+0x24c), each with w 0. The game builds them as (1, 0, 0, 0) and (0, 0, 1, 0) through the view's rows, the
+  zero terms included (they can change the sign of a zero).
+- **The corners**: each of the four points (+0..+0x30), less then plus the first axis, plus the second, is
+  written into the marker's own vertices (+0xe0, +0x110, … every 0x30). The renderer's +0x220 gets the eight.
+- **State**: texture app +0x30 → +0x84, the depth bias, blend 3, put back after.
+
+Checked in the runner (`tests/marker.rs`): 5000 cases with the marker behind, between and past the far
+depth, some lanes ±0. 13 of 15 mutants were caught. The two left are boundary-equivalent: depth 0 and depth
+31128.5 give the same size by either branch.

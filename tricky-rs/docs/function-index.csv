@@ -525,7 +525,7 @@ address,size,name,system,status
 0x133808,132,PlayerMarker_Construct,boarder?,not started
 0x133890,172,PlayerMarker_Reset,boarder?,not started
 0x133940,736,PlayerMarker_Update,boarder?,not started
-0x133c20,1636,PlayerMarker_Draw,boarder?,not started
+0x133c20,1636,PlayerMarker_Draw,boarder?,checked
 0x134288,328,AttitudeIcon_Construct,boarder?,not started
 0x1343d0,1120,AttitudeIcon_Update,boarder?,not started
 0x134830,2192,AttitudeIcon_Draw,boarder?,not started
