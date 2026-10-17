@@ -2705,9 +2705,9 @@ address,size,name,system,status
 0x1c7df0,20,cTerrainObjNode::~cTerrainObjNode,world,not started
 0x1c7e40,80,cTerrainObjNode::__tf,runtime,host
 0x1c7e90,3384,BoarderShadow_Update,camera?,not started
-0x1c8bc8,112,BoarderShadow_Draw,render?,not started
-0x1c8c38,52,BoarderShadow_Init,boarder?,not started
-0x1c8c70,92,BoarderShadow_AllocTexture,boarder?,not started
+0x1c8bc8,112,BoarderShadow_Draw,render?,checked
+0x1c8c38,52,BoarderShadow_Init,boarder?,checked
+0x1c8c70,92,BoarderShadow_AllocTexture,boarder?,checked
 0x1c8cd0,124,StaticInit_TerrainObjNode,other,not started
 0x1c8db8,268,cSnowFallMan::cSnowFallMan,render,checked
 0x1c8ec8,512,SnowFall_InitLayers,world?,checked

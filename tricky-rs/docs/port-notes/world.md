@@ -1682,3 +1682,15 @@ equivalent here: `max` comparing as floats, and `mini`'s ≤ as <. They differ o
 which `ftoi0` or the same value hide. Of twelve mutants of the runner's new code, eleven were caught by this
 check and the runner's unit tests together. The twelfth, a latency of 3, is equivalent for these programs:
 the ops three pairs before each read set no flags.
+
+## The rider's shadow: set-up and draw (G7g1, `shadow.rs`)
+
+- **`BoarderShadow_Init` 0x1c8c38** starts with no texture (+0x170 = −1). The texture is 256 × 256 when the race
+  has one rider (`gRace_EntryCount` 0x32db6c is 1), else 128 × 128 (+0x174, +0x178). It hands the shadow back.
+- **`BoarderShadow_AllocTexture` 0x1c8c70** makes the texture once: while +0x170 is below 0, it calls the
+  renderer's +0x170 (width, height, 2) and keeps the answer.
+- **`BoarderShadow_Draw` 0x1c8bc8** calls the renderer's +0x2d8 with the shadow's place (+0xc, w = 1, built on
+  the stack), its +0x90 and +0xd0 blocks, the texture and 1.0.
+
+Checked in the runner (`tests/shadow.rs`): 6000 cases of the race size, the texture none yet or one, and the
+vtable's this-shifts. All 11 mutants were caught.

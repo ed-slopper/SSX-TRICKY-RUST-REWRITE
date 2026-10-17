@@ -182,5 +182,6 @@ pub mod bezier;
 pub mod drawlist;
 pub mod vu;
 pub mod patchvu;
+pub mod shadow;
 pub mod particledraw;
 pub mod particlevu;
