@@ -150,7 +150,7 @@ matches the original.
 
 | ID | Task | Section | Who | Date | Commit |
 |---|---|---|---|---|---|
-| E7d | The race's broadphase and contacts: `tricky_game::broadphase` (the pair pool and ids, `ContactMgr_Init`, the axes' lists, the boxes, the sweep with its overlap toggles, the pairs' links, `Contact_SortPairs` / `_SortBodyPairList`; 34 functions) checked in the runner on 10,200 cases (tests/broadphase.rs), 69 of 70 mutants caught | P2 | ed-slopper/puffin | 2026-10-17 | 5e97647 |
+| E7d | The race's broadphase and contacts: `tricky_game::broadphase` (the pair pool and ids, `ContactMgr_Init`, the axes' lists, the boxes, the sweep with its overlap toggles, the pairs' links, `Contact_SortPairs` / `_SortBodyPairList`; 34 functions) checked in the runner on 10,200 cases (tests/broadphase.rs), 69 of 70 mutants caught | P1 | ed-slopper/puffin | 2026-10-17 | 5e97647 |
 | G7r | (umbrella) the rider skin: G7r1..G7r4 | P2 | ed-slopper/puffin | 2026-10-17 | G7r1..G7r4 |
 | G7r4 | limbik.rs: bone positions, posing from angles and the legs' two-bone IK; runner-checked, 39/44 mutants (5 boundaries) | P2 | ed-slopper/puffin | 2026-10-17 | 68e125e |
 | G7r3 | riderskin.rs: the rider skin (bind with the inverse bind pose, the front end's skinning, the LOD draw, the rest); runner-checked, 50/51 mutants | P2 | ed-slopper/puffin | 2026-10-17 | 830b123 |
