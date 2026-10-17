@@ -78,7 +78,6 @@ state machine and the renderer are ours. Nothing has been checked against the or
 | G1a5b3b2b | The rest of G1a5b3b2: the wind-ups through `boarder::prewind_update` (the crouch state 0xe on its pad word, the game's per-tick crouch and wind-up, the release to state 10) and the button map from the rider's own BTNMAP and trick slots | any | G1a5b3b1 | | Split from G1a5b3b2 (needs a play test); looked at 2026-10-16: the port's prewind already uses `PrewindState_SetWindTarget`'s target and rate (`set_wind_target`, the stat18 factor) and the release's snapping; the now/rate/target triples are 12-byte objects (constructed by 0x122f10 at rider+0x1e0..+0x274) whose per-tick step is still to find (not a plain store; look for the class's method among the motions' and `cBoarder::vf7`'s callees) |
 | G5 | (umbrella: G5a, G5b, G5c, G5d) Animation: the game's own animation state machine and blending for all 248 `bxanim` clips (plus cmanim, ps2anim, ubers), clip markers, replacing our choice of clip | unowned | F1, E4 | | [repo] README: "Which clip plays when is my state logic". Split 2026-10-16 |
 | G5c | (umbrella: G5c1, G5c2, G5c3, G5c4) The clip data: `AnimData_*` / `AnimFile_*` / `AnimFileList_*` 0x1586c0..0x15ac48 (the clip table, markers, root offsets, the BIG and file list loads) and `AnimCurve_*` / `AnimCtl_BlendPose` (the pose from the curves) | any | G5 | | Split of G5; split 2026-10-16 |
-| G5c2 | The clip data's loads: `AnimData_OpenBig` 0x158ea0 / `_PollLoad` / `_LoadClipTable` 0x159150 / `_LoadFileList` / `_IndexAllClips`, `AnimFile_*` / `AnimFileList_*` 0x158908..0x158c10 (the BIG file object's calls out) | any | ed-slopper/puffin | | Split of G5c |
 | G5c4 | `AnimIds_Init` 0x15aec0 (16,040 bytes: the clip ids and key table set up) and `AnimClip_ResolveAnmIndex`'s checks against it | any | G5c1 | | Split of G5c |
 | G5d | The app's rider animation on G5a..c, replacing its own choice of clip (README: "Which clip plays when is my state logic") | any | G5a, G5b, G5c, G1 | | Split of G5 (needs a play test); the clip plays come from the boarder states (`ControlEnv::play_clip` and the like), which the app runs only once G1 puts the game's state machine in it |
 | G7 | Rendering, as the PS2 renderer does it. Split before claiming: | unowned | E3a, E3b | | [repo] |
@@ -158,6 +157,7 @@ matches the original.
 
 | ID | Task | Section | Who | Date | Commit |
 |---|---|---|---|---|---|
+| G5c2 | The animation bank's loads: `tricky_game::animload` (`AnimData_OpenBig` / `_LoadClipTable` with the shared and uber files by roster / `_LoadFileList` / `_PollLoad` / `_IndexAllClips`, `AnimFileList_Load` / `_Load2`, `AnimFile_PollLoad` / `_Bind` / `_IndexClipNames`; file and BIG reads called out), checked in the runner on 8,000 random banks (tests/animload.rs) | P2 | ed-slopper/puffin | 2026-10-16 | d557385 |
 | G5c3 | The pose (umbrella: G5c3a, G5c3b, G5c3c): all its parts done | P2 | ed-slopper/puffin | 2026-10-16 | d13d1f7 |
 | G5c3c | `AnimCtl_GetClipDisplacement` 0x15fa40 as `animctl::clip_displacement` (the root offset × the rider's scale on VU0), checked in the runner on 20,000 random controllers (tests/animdisp.rs) | P2 | ed-slopper/puffin | 2026-10-16 | d13d1f7 |
 | G5c3b | The pose blend: `tricky_game::animpose` (`AnimCtl_BlendPose`, `PoseBlend_Begin` / `_Add` / `_Finish` / `_EvalCurves`, the curve binding 0x159910, the skeleton blend `FUN_00202b00` with its root turn on VU0), checked in the runner on 12,000 random worlds (tests/animpose.rs) | P2 | ed-slopper/puffin | 2026-10-16 | 02c677b |
@@ -1192,3 +1192,4 @@ matches the original.
 - 2026-10-16 ed-slopper/puffin: G5c3a done; claim G5c3b.
 - 2026-10-16 ed-slopper/puffin: G5c3b, G5c3c done; G5c3 done (all its parts).
 - 2026-10-16 ed-slopper/puffin: G5d needs G1 (noted); AnimIds_Init's writes found (boarder.md); claim G5c2.
+- 2026-10-16 ed-slopper/puffin: G5c2 done.
