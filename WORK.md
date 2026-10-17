@@ -79,7 +79,10 @@ state machine and the renderer are ours. Nothing has been checked against the or
 | G5 | (umbrella: G5a, G5b, G5c, G5d) Animation: the game's own animation state machine and blending for all 248 `bxanim` clips (plus cmanim, ps2anim, ubers), clip markers, replacing our choice of clip | unowned | F1, E4 | | [repo] README: "Which clip plays when is my state logic". Split 2026-10-16 |
 | G5d | The app's rider animation on G5a..c, replacing its own choice of clip (README: "Which clip plays when is my state logic") | any | G5a, G5b, G5c, G1 | | Split of G5 (needs a play test); the clip plays come from the boarder states (`ControlEnv::play_clip` and the like), which the app runs only once G1 puts the game's state machine in it |
 | G7 | Rendering, as the PS2 renderer does it. Split before claiming: | unowned | E3a, E3b | | [repo] |
-| G7a | Terrain patches: the game's tessellation and LOD, subtractive lightmaps | unowned | G7 | | [repo] README "What the viewer taught us" |
+| G7a | (umbrella: G7a1, G7a2, G7a3) Terrain patches: the game's tessellation and LOD, subtractive lightmaps | unowned | G7 | | [repo] README "What the viewer taught us"; split 2026-10-17 |
+| G7a1 | The terrain's draw: `cTerrainObjNode::Draw` 0x1c7810 (the draw distance) and `Patch_DrawVisibleCells` 0x2008f8 (each visible patch's box test, its four edges' LOD from the camera's distance to its corners, the renderer's patch draw +0x2d0) | ed-slopper/puffin | G7 | | Split of G7a |
+| G7a2 | The cells around the camera: `World_VisitCellsNear` 0x260278 and `World_CullVisibility` 0x260458 | any | G7a1 | | Split of G7a |
+| G7a3 | The renderer's patch draw (+0x2d0) and the Bezier manager: `Render_BuildBezierTables` 0x1db1e8, `Render_FillBezierWeights` 0x1db530, `cPS2BezierMan`, the tessellation by LOD (0x1da5c8 and the renderer's patch virtuals), the lightmaps | any | G7a1 | | Split of G7a |
 | G7e | Particles as the VU1 microcode draws them (0x31c288), spark and dust sprites | unowned | G7 | | [repo] "Unresolved: spark and dust sprite rendering"; `particles.rs` has the emitters |
 | G7g | Rider shading and shadows, board reflections (env materials) | unowned | G7, E4 | | [est] |
 | G9 | Front end: title, main menu, mode select, rider / outfit / board select, options, records, trick book screens, unlock screens, music player, loading screens (`gApp+0x734`) | unowned | E1, E5 | | [repo] `ui.rs` is ours. Split (2026-10-16): G9b the shared machinery, G9c–G9t the screens (logic ported and checked in the runner, widgets as calls out), G9u the app's menus on them |
@@ -1221,3 +1224,4 @@ matches the original.
 - 2026-10-16 ed-slopper/puffin: G7d2e done de422b8 (the PS2 lens FX node vs the original; the runner has the hardware registers); G7d2 and G7d closed; G7b split into G7b1 (the objects' draws, claimed) and G7b2 (DrawModel).
 - 2026-10-16 ed-slopper/puffin: G7b1 done e262217 (the objects' draws vs the original); G7b2 claimed.
 - 2026-10-16 ed-slopper/puffin: G7b2 done 287df93 (DrawModel vs the original); G7b closed.
+- 2026-10-17 ed-slopper/puffin: G7a split into G7a1 (the terrain's draw and patch walk; claimed), G7a2 (the cells near), G7a3 (the patch draw and Bezier manager).
