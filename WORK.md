@@ -82,7 +82,6 @@ state machine and the renderer are ours. Nothing has been checked against the or
 | G7e | (umbrella: G7e1, G7e2, G7e3, G7e4) Particles as the VU1 microcode draws them (0x31c288), spark and dust sprites | unowned | G7 | | [repo] "Unresolved: spark and dust sprite rendering"; `particles.rs` has the emitters |
 | G7e4 | The spray, speed dust and spark sprites' draws: `Fx_Spray_DrawParticles` 0x12d890, `Fx_SpeedDust_Draw` 0x12fb40, `Fx_SurfaceSpray_Draw`, `Sprite_DrawRotatedQuad` / `_DrawRotatedTexQuad` 0x19b8c8 / 0x19bb48 | any | G7e1 | | Split of G7e |
 | G7g | (umbrella: G7g1, G7g2; the rider's shading and the board's reflections still to find) Rider shading and shadows, board reflections (env materials) | unowned | G7, E4 | | [est] |
-| G7g2 | The rider's shadow each frame: `BoarderShadow_Update` 0x1c7e90 (3384 bytes), checked in the runner | ed-slopper/puffin | G7g1 | | Split of G7g |
 | G9 | Front end: title, main menu, mode select, rider / outfit / board select, options, records, trick book screens, unlock screens, music player, loading screens (`gApp+0x734`) | unowned | E1, E5 | | [repo] `ui.rs` is ours. Split (2026-10-16): G9b the shared machinery, G9c–G9t the screens (logic ported and checked in the runner, widgets as calls out), G9u the app's menus on them |
 | G9b | (umbrella: G9b1, G9b2) The front end's shared machinery: `cFE3D` (the manager, its per-frame update and the screen it runs), the `cFE3DState` base (the phases, `TransitionIn` / `Out`, `Finish` and `CreateNextState`, `UpdateTransition`, `Activate`, `LayoutWidgets`), the widgets they drive and the 3D transition record (`FE3DTransition_*`, notes in frontend.md) | any | G9 | | Split of G9 |
 | G9b2 | (umbrella: G9b2a, G9b2b, G9b2c, G9b2d, G9b2e) The rest of G9b: `cFE3D` (the manager: its per-frame update, the screen stack 0x275b10 / 0x275c10 / 0x2ac030, the players and their pad queries 0x26ce08..0x26cef8), the widgets the screens build (the constructor 0x2b1138 and its virtuals, the list 0x2ac018 / 0x2ac048, the place 0x2acb20, the screen helpers 0x274108, 0x2763f0, 0x2719c0, 0x2718f0, 0x271848, 0x2742e8) and the 3D transition record (`FE3DTransition_*`) | any | G9b1 | | Split from G9b; split (2026-10-16) |
@@ -153,6 +152,7 @@ matches the original.
 
 | ID | Task | Section | Who | Date | Commit |
 |---|---|---|---|---|---|
+| G7g2 | BoarderShadow_Update as shadow::update (camera, box of 6 bones + 4 points, 3 matrices), runner-checked, 28/31 mutants (3 equivalent) | P2 | ed-slopper/puffin | 2026-10-17 | 6b07701 |
 | G7g1 | BoarderShadow_Init/_AllocTexture/_Draw in shadow.rs, runner-checked, 11/11 mutants | P2 | ed-slopper/puffin | 2026-10-17 | 3fb959b |
 | G7e3 | VU1 particle program 6 (chain 0x31c260: trails) in particlevu.rs, all 960 calls match in the runner; runner VU1 has the MAC flags (4 pairs late), fmand/fmeq/fmor, I loaded after the upper op | P2 | ed-slopper/puffin | 2026-10-17 | f73d222 |
 | G7e2 | VU1 particle program 7 (chain 0x31c790) in particlevu.rs, all 960 calls match the game in the runner (tests/vu1particle.rs); runner VU1 has the random unit | P2 | ed-slopper/puffin | 2026-10-17 | 723bb58 |
@@ -1266,3 +1266,4 @@ matches the original.
 - 2026-10-17 ed-slopper/puffin: G7e3 done (f73d222): program 6 (trails of bending, fading sprites). Its flag reads need the FMAC latency (the runner now models MAC flags four pairs late), and its I bits showed the runner loaded I one op too early (fixed). The only +0x250 caller is Font_DrawStringA (a leftover: the font as the block).
 - 2026-10-17 ed-slopper/puffin: G7e4 unclaimed: its runner test run kept ending the session; a draft (fxdraw.rs: all five draws plus Fx_Spray_ComputeParticle; the quads and the surface spray matched before the crashes) is kept outside the repo. G7g claimed.
 - 2026-10-17 ed-slopper/puffin: G7g split (G7g1 set-up and draw, G7g2 the update); G7g1 done (3fb959b): shadow.rs. A one-rider race gets a 256 × 256 shadow, else 128 × 128.
+- 2026-10-17 ed-slopper/puffin: G7g2 done (6b07701): the shadow's camera and matrices. Its box ignores z; when the light is straight along up the side axes are kept from the last frame and the way nudged.
