@@ -80,8 +80,7 @@ state machine and the renderer are ours. Nothing has been checked against the or
 | G5c | (umbrella: G5c1, G5c2, G5c3, G5c4) The clip data: `AnimData_*` / `AnimFile_*` / `AnimFileList_*` 0x1586c0..0x15ac48 (the clip table, markers, root offsets, the BIG and file list loads) and `AnimCurve_*` / `AnimCtl_BlendPose` (the pose from the curves) | any | G5 | | Split of G5; split 2026-10-16 |
 | G5c2 | The clip data's loads: `AnimData_OpenBig` 0x158ea0 / `_PollLoad` / `_LoadClipTable` 0x159150 / `_LoadFileList` / `_IndexAllClips`, `AnimFile_*` / `AnimFileList_*` 0x158908..0x158c10 (the BIG file object's calls out) | any | G5c1 | | Split of G5c |
 | G5c3 | (umbrella: G5c3a, G5c3b, G5c3c) The pose: `AnimCtl_BlendPose` 0x15f7c8, `PoseBlend_*` 0x202868..0x202b00 (with `FUN_00202b00`), `Euler_Lerp*`, `AnimCurve_Eval` / `_EvalPiece` 0x157ed8, `AnimData_GetRootOffset` 0x1586c0, `AnimCtl_GetClipDisplacement` 0x15fa40 (VU0) | any | G5c1 | | Split of G5c; split 2026-10-16 |
-| G5c3a | The animation curves and angle helpers: `AnimCurve_Eval` 0x157ed8 / `_EvalPiece` 0x158030 (the eight piece kinds, 24-bit floats), `AnimData_GetRootOffset` 0x1586c0, the angle wrap 0x202520, `Euler_Lerp` 0x202758 / `_LerpArray` 0x2027f0, `Vec3_Scale` 0x102f80, the sine and cosine 0x250c10 | any | G5c1 | ed-slopper/puffin | Split of G5c3 |
-| G5c3b | The pose blend: `AnimCtl_BlendPose` 0x15f7c8, `PoseBlend_Begin` / `_Add` / `_Finish` / `_EvalCurves` 0x202868..0x2029d8, the curve binding 0x159910 and the skeleton blend `FUN_00202b00` | any | G5c3a | | Split of G5c3 |
+| G5c3b | The pose blend: `AnimCtl_BlendPose` 0x15f7c8, `PoseBlend_Begin` / `_Add` / `_Finish` / `_EvalCurves` 0x202868..0x2029d8, the curve binding 0x159910 and the skeleton blend `FUN_00202b00` | any | ed-slopper/puffin | | Split of G5c3 |
 | G5c3c | `AnimCtl_GetClipDisplacement` 0x15fa40 (the clip's root offset through VU0) | any | G5c3a | | Split of G5c3 |
 | G5c4 | `AnimIds_Init` 0x15aec0 (16,040 bytes: the clip ids and key table set up) and `AnimClip_ResolveAnmIndex`'s checks against it | any | G5c1 | | Split of G5c |
 | G5d | The app's rider animation on G5a..c, replacing its own choice of clip (README: "Which clip plays when is my state logic") | any | G5a, G5b, G5c | | Split of G5 (needs a play test) |
@@ -162,6 +161,7 @@ matches the original.
 
 | ID | Task | Section | Who | Date | Commit |
 |---|---|---|---|---|---|
+| G5c3a | The animation curves and angle helpers: `tricky_game::animcurve` (`AnimCurve_Eval` / `_EvalPiece` with the eight piece kinds, `AnimData_GetRootOffset`, the Euler delta 0x202520, `Euler_Lerp` / `_LerpArray`, `Vec3_Scale`, the sine and cosine 0x250c10), checked in the runner on 60,000 random cases (tests/animcurve.rs) | P2 | ed-slopper/puffin | 2026-10-16 | c180341 |
 | G5c1 | The animation bank's bookkeeping: `tricky_game::animdata` (`AnimMemBank_*`, `AnimFile_Reset` / `_Destruct`, `AnimData_Construct` / `_Clear` / `_Init` / `_Reset` / `_Destruct` / `_GetClipId` / `_GetMarkerPhase` / `_GetMarkerFrame` / `_SetMarker`, `StaticInit_AnimNameHashes`, `Name_Hash`), checked in the runner on 30,000 random banks (tests/animdata.rs) | P2 | ed-slopper/puffin | 2026-10-16 | 735d45f |
 | G5b | The motion-driven update modes: `tricky_game::animmode` (`AnimMode_BoardClassFrame` / `_DirectionBlend` / `_CrouchBlend` / `_BrakeBlend` / `_GateLeanFrame` / `_WindUpBlend` / `_CrouchSteerBlend` / `_CrouchFrame`, the exe's tables), checked in the runner on 60,000 random riders (tests/animmode.rs); `math::atan_with` for the EE's rounding | P2 | ed-slopper/puffin | 2026-10-16 | a105258 |
 | G5a | The rider's animation controller (umbrella: G5a1, G5a2): all its parts done | P2 | ed-slopper/puffin | 2026-10-16 | d30610b |
@@ -1189,3 +1189,4 @@ matches the original.
 - 2026-10-16 ed-slopper/puffin: split G5c into G5c1..G5c4; claim G5c1.
 - 2026-10-16 ed-slopper/puffin: G5c1 done.
 - 2026-10-16 ed-slopper/puffin: split G5c3 into G5c3a..c; claim G5c3a.
+- 2026-10-16 ed-slopper/puffin: G5c3a done; claim G5c3b.
