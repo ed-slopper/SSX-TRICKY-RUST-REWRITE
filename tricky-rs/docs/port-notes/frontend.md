@@ -1145,3 +1145,24 @@ All of these read the unlock-everything cheat (0x3352a0) through the career's tw
 on 30,000 random careers (the slots' players, profile and record pointers into the block, small profile words) and
 characters, about 3,700 calls for each of the eight functions. The answer and the character's bytes were compared.
 21 of 21 mutants were caught.
+
+## Unused copies of the FE3D group virtuals (F1c batch 16, proven)
+
+Four translation units each carry an out-of-line copy of `cFE3DWGroup`'s virtuals and of the list ops' `vf1`, which
+nothing calls: no code reference, and no word anywhere in 0x380000..0x3c0000 (the vtables) holds their addresses. Their
+decompiled bodies match the live functions token for token. The copies sit at 0x275e38..0x276b20, 0x28e640..0x28f198,
+0x29dd00..0x29e858 and 0x2aac40..0x2ab798 (one more `cListFE3DFormatOp::vf1` and `cListFE3DUpdateOp::vf1` at 0x26fa70 /
+0x270008). They are named after the op each one runs (numbered by address) and need no port:
+
+| copy names (1..4) | live original | what it does |
+|---|---|---|
+| `FE3DWGroup_FreeChildren` | `cFE3DWGroup::vf1` 0x2691c8 | deletes the child list (+0x110), then `cListNode::vf1` |
+| `FE3DWGroup_SkipActivity` / `_ResetActivity` / `_UpdateActivity` | vf6 / vf7 / vf8 | that op over the children, then the base class's vf |
+| `FE3DWGroup_Render` / `_RenderText` | vf10 / vf11 | when visible (+0x14), the render op over the children with the depth raised by +0x70 |
+| `FE3DWGroup_Update` | vf12 | the update op, then its own vf at +0x48 when +0x10 is set |
+| `FE3DWGroup_Offset` | vf13 | the offset op, then +0x80 += the offset |
+| `FE3DWGroup_OnInput` | vf28 | when +0xa4 is 0: 1 if a child took the input |
+| `FE3DWGroup_Format` | vf39 | the format op |
+| `ListFE3D<Op>Op_Apply` (Format and Update 1..5) | `cListFE3D<Op>Op::vf1` | calls the child's matching virtual (`cList::vf1` 0x2ac220 runs it on each node until one returns non-zero) |
+
+The batch 13 "no xrefs" list's 0x2761c0, 0x28e9c8, 0x29e088 and 0x2aafc8 are the four `FE3DWGroup_FreeChildren`.
