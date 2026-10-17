@@ -1083,6 +1083,7 @@ mutants caught. The one left is equivalent: x × 2z against z × 2x, both exact.
 - `ParticleNode_InitMem` 0x1d8488 (the identity constructor that pairs with `ParticleNode_FreeMem`),
   `SplinePathNode_FreeMem` 0x1fb3c8.
 - Not settled: the empty 0x259028, 0x2520a0; draws 0x1ab028, 0x244ee8, 0x249250.
+
 ## The renderer's model draw (row G7b2; `game/src/drawmodel.rs`, checked: `tests/drawmodel.rs`)
 
 - **`cPS2GraphicsMan::DrawModel` 0x1e1f70**(r, model, part, matrix, lights, bones, scroll) is the renderer's

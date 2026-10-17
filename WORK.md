@@ -80,8 +80,6 @@ state machine and the renderer are ours. Nothing has been checked against the or
 | G5d | The app's rider animation on G5a..c, replacing its own choice of clip (README: "Which clip plays when is my state logic") | any | G5a, G5b, G5c, G1 | | Split of G5 (needs a play test); the clip plays come from the boarder states (`ControlEnv::play_clip` and the like), which the app runs only once G1 puts the game's state machine in it |
 | G7 | Rendering, as the PS2 renderer does it. Split before claiming: | unowned | E3a, E3b | | [repo] |
 | G7a | Terrain patches: the game's tessellation and LOD, subtractive lightmaps | unowned | G7 | | [repo] README "What the viewer taught us" |
-| G7b | (umbrella: G7b1, G7b2) Objects: per-instance lights (ambient + 3 directional, 128 = 1.0), materials, the PS2 blend modes for transparent materials | unowned | G7 | | [repo] "exact PS2 blending modes" not done; split 2026-10-16 |
-| G7b2 | The renderer's model draw `cPS2GraphicsMan::DrawModel` 0x1e1f70 (+0x2a8, 2516 bytes): materials, the blend modes, the light block, the VU1 packets | ed-slopper/puffin | G7b1 | | Split of G7b |
 | G7e | Particles as the VU1 microcode draws them (0x31c288), spark and dust sprites | unowned | G7 | | [repo] "Unresolved: spark and dust sprite rendering"; `particles.rs` has the emitters |
 | G7g | Rider shading and shadows, board reflections (env materials) | unowned | G7, E4 | | [est] |
 | G9 | Front end: title, main menu, mode select, rider / outfit / board select, options, records, trick book screens, unlock screens, music player, loading screens (`gApp+0x734`) | unowned | E1, E5 | | [repo] `ui.rs` is ours. Split (2026-10-16): G9b the shared machinery, G9c–G9t the screens (logic ported and checked in the runner, widgets as calls out), G9u the app's menus on them |
@@ -154,6 +152,8 @@ matches the original.
 
 | ID | Task | Section | Who | Date | Commit |
 |---|---|---|---|---|---|
+| G7b | Objects: all its parts done (G7b1 the objects' draws with their own lights, G7b2 the renderer's model draw with materials and blends) | P2 | ed-slopper/puffin | 2026-10-16 | 287df93 |
+| G7b2 | The renderer's model draw: `tricky_game::drawmodel` (`cPS2GraphicsMan::DrawModel`: the frame's matrices shared with `CullBox`, the texture cache, the scaled matrix or per-bone matrices with bind-pose bones built, each batch's texture and blend (fogged by the clip matrix, the second blend, none), the UV scroll and the DMA packet with the matrix and light block for VU1 and a call of the batch's packet), checked in the runner on 20,000 cases (tests/drawmodel.rs); 23 of 26 mutants caught, 3 equivalent | P2 | ed-slopper/puffin | 2026-10-16 | 287df93 |
 | G7b1 | The objects' draws: `tricky_game::objdraw` (`Instance_DrawVisibleCells` by cell with the box tests and show-off counts, `Instance_Draw`, `cRollerNode::Draw`, `cMeshAnimNode::Draw` with its quaternion bones, `cAnimObjectNode` vf28 with its animated and bind-pose bones; each lit by its own block or the lights where it is), checked in the runner on 12,000 random worlds with the light gathering as the original (tests/objdraw.rs); 26 of 27 mutants caught, one equivalent | P2 | ed-slopper/puffin | 2026-10-16 | e262217 |
 | G7d | Lights and halos, glows, lens flares: all its parts done (G7d1 the lights, G7d2 the lens flares) | P2 | ed-slopper/puffin | 2026-10-16 | de422b8 |
 | G7d2 | Lens flares and glows: all its parts done (G7d2a the node, G7d2b the sun, G7d2c the flares, G7d2d the callback, G7d2e the PS2 drawing) | P2 | ed-slopper/puffin | 2026-10-16 | de422b8 |
@@ -1220,3 +1220,4 @@ matches the original.
 - 2026-10-16 ed-slopper/puffin: G7d2d done 40133f5 (the lens FX callback vs the original); G7d2e claimed.
 - 2026-10-16 ed-slopper/puffin: G7d2e done de422b8 (the PS2 lens FX node vs the original; the runner has the hardware registers); G7d2 and G7d closed; G7b split into G7b1 (the objects' draws, claimed) and G7b2 (DrawModel).
 - 2026-10-16 ed-slopper/puffin: G7b1 done e262217 (the objects' draws vs the original); G7b2 claimed.
+- 2026-10-16 ed-slopper/puffin: G7b2 done 287df93 (DrawModel vs the original); G7b closed.
