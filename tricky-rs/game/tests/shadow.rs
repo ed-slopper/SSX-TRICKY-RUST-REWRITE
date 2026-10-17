@@ -149,3 +149,96 @@ fn shadow_set_up_and_draw_match_the_original() {
     println!("{allocated} textures asked for, {big} large");
     assert!(allocated > 1500 && big > 300);
 }
+
+fn wf(m: &mut Mem, at: u32, v: f32) {
+    m.w32(at, v.to_bits());
+}
+impl Rng {
+    fn f(&mut self, lo: f32, hi: f32) -> f32 {
+        lo + (hi - lo) * (self.next() >> 8) as f32 / (1u32 << 24) as f32
+    }
+}
+
+#[test]
+fn shadow_update_matches_the_original() {
+    let Some(mut r) = Runner::from_env() else { return };
+    for f in [0x1c7e90u32, 0x137108, 0x137140] {
+        r.allow(f);
+    }
+    let mut tables = vec![0u8; 0x28];
+    r.mem.read(s::BONES, &mut tables).unwrap();
+    const POS: u32 = ARENA + 0x200;
+    const DIR: u32 = ARENA + 0x210;
+    const UP: u32 = ARENA + 0x220;
+    const BONES: u32 = ARENA + 0x1200;
+    const POINTS: u32 = ARENA + 0x1700;
+    let mut g = Rng(0x5ad1_0000_0000_0001);
+    let mut parallel = 0usize;
+    for case in 0..5000u32 {
+        let mut m = Mem { regions: vec![(ARENA, vec![0; SIZE as usize]), (s::BONES, tables.clone())] };
+        for k in 0..SIZE / 4 {
+            m.w32(ARENA + 4 * k, g.next());
+        }
+        // the shadow's words: the floats it keeps from before (side, third axis) real; its texture's size
+        for k in 0..0x180 / 4 {
+            wf(&mut m, SHADOW + 4 * k, g.f(-2.0, 2.0));
+        }
+        m.w32(SHADOW + 0x174, [0x80u32, 0x100][g.below(2) as usize]);
+        m.w32(SHADOW + 0x178, [0x80u32, 0x100][g.below(2) as usize]);
+        let mut c = [g.f(-3000.0, 3000.0), g.f(-3000.0, 3000.0), g.f(-500.0, 500.0)];
+        // (sometimes a lane −0: the eye is the place less up × 0, which then shows)
+        if g.below(4) == 0 {
+            c[g.below(3) as usize] = -0.0;
+        }
+        for k in 0..4 {
+            wf(&mut m, POS + 4 * k, if k < 3 { c[k as usize] } else { 1.0 });
+        }
+        let up = match g.below(4) {
+            0 => [0.0, 0.0, 1.0],
+            1 => [0.0, 0.0, 0.0],
+            _ => [g.f(-1.0, 1.0), g.f(-1.0, 1.0), g.f(0.2, 2.0)],
+        };
+        let dir = match g.below(6) {
+            0 => up,
+            1 => up.map(|x| -x),
+            2 => [0.0, 0.0, 0.0],
+            3 => [0.3, 0.2, -1.0],
+            _ => [g.f(-1.0, 1.0), g.f(-1.0, 1.0), g.f(-2.0, -0.1)],
+        };
+        for k in 0..3 {
+            wf(&mut m, UP + 4 * k, up[k as usize]);
+            wf(&mut m, DIR + 4 * k, dir[k as usize]);
+        }
+        // the rider's bones' places and the board's points about the rider
+        for b in 0..20u32 {
+            for k in 0..4 {
+                wf(&mut m, BONES + 0x40 * b + 0x30 + 4 * k, if k < 3 { c[k as usize] + g.f(-60.0, 60.0) } else { 1.0 });
+            }
+        }
+        for p in 0..4u32 {
+            for k in 0..4 {
+                wf(&mut m, POINTS + 0x10 * p + 4 * k, if k < 3 { c[k as usize] + g.f(-80.0, 80.0) } else { 1.0 });
+            }
+        }
+        for (at, b) in &m.regions {
+            r.mem.write(*at, b).unwrap();
+        }
+        s::update(&mut m, SHADOW, POS, DIR, UP, BONES, POINTS);
+        for (i, v) in [SHADOW, POS, DIR, UP, BONES, POINTS].into_iter().enumerate() {
+            r.cpu.set_gpr(4 + i, v as u64);
+        }
+        r.call(0x1c7e90).unwrap_or_else(|e| panic!("case {case}: {e}"));
+        parallel += (up != [0.0; 3] && (dir == up || dir == up.map(|x: f32| -x))) as usize;
+        for (at, b) in &m.regions {
+            let mut th = vec![0u8; b.len()];
+            r.mem.read(*at, &mut th).unwrap();
+            if &th != b {
+                let i = th.iter().zip(b).position(|(x, y)| x != y).unwrap() & !3;
+                let w = |v: &[u8]| u32::from_le_bytes(v[i..i + 4].try_into().unwrap());
+                panic!("case {case}: memory at {:#x} (shadow +{:#x}): theirs {:#x} ours {:#x}", at + i as u32, (at + i as u32).wrapping_sub(SHADOW), w(&th), w(b));
+            }
+        }
+    }
+    println!("{parallel} parallel");
+    assert!(parallel > 500);
+}

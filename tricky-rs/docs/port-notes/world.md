@@ -1694,3 +1694,30 @@ the ops three pairs before each read set no flags.
 
 Checked in the runner (`tests/shadow.rs`): 6000 cases of the race size, the texture none yet or one, and the
 vtable's this-shifts. All 11 mutants were caught.
+
+## The rider's shadow each frame (G7g2, `shadow::update`)
+
+`BoarderShadow_Update` 0x1c7e90(shadow, pos, dir, up, bones, points) makes the shadow's camera and the three
+matrices its draw uses. It calls only `Vec3_Dot` and `Vec3_Div`, to make vectors units; a zero vector is left
+as it is.
+- **The camera.** The light's way (+0) and up (+0x18) are made units. The eye (+0xc) is `pos` less up × 0
+  (written that way: it differs from `pos` only for a −0 lane), and +0x24 is −up · eye. The side (+0x34) is
+  way × up and the third axis (+0x28) up × side, both made units. When the way equals up or −up, those two keep
+  their old values, and the way's x is nudged by 0.01 for the next frame.
+- **The view** (+0x50): rows side, third, up, each with −(row · eye) as its w, then (0, 0, 0, 1).
+- **The box.** Bones 4, 8, 12, 15, 18 and 0 (the table at 0x391590; each bone's place at +0x30) and points 0..3
+  (0x3915a8) go through the view, starting from ±f32::MAX. Their x and y ranges, widened by 20, are kept at
+  +0x40 / +0x44 (x) and +0x4c / +0x48 (y, bottom / top). Their z is never used.
+- **The matrices**, each a projection of the box times the view, then transposed in place by MMI
+  (`pextlw` / `pextuw` / `pcpyld` / `pcpyud`, a plain 4 × 4 transpose):
+  - +0x90 is the clip one: x and y to −1..1, and z by the fixed 0.000645 and −0.9355.
+  - +0xd0 maps to the texture's 0..1, with y down.
+  - +0x110 maps to −1..1, with y down.
+- **The texture's place**: +0x150 half the texture's width and height (then 0, 0), +0x160 (2048, 2048, 0, 0).
+
+Checked in the runner (`tests/shadow.rs`): 5000 cases with the rider about random places (some lanes −0), up
+straight, random or zero, and the way random, zero, up or −up (1235 parallel). All match.
+28 of 31 mutants were caught. The three left are equivalent:
+- a zero root as negative (1/0 is the largest float, so a zero vector stays zero);
+- up's x read back from the shadow;
+- the box's `<` as `≤` (equal values).

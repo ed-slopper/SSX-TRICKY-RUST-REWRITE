@@ -2704,7 +2704,7 @@ address,size,name,system,status
 0x1c7da0,80,cModelsObjNode::__tf,runtime,host
 0x1c7df0,20,cTerrainObjNode::~cTerrainObjNode,world,not started
 0x1c7e40,80,cTerrainObjNode::__tf,runtime,host
-0x1c7e90,3384,BoarderShadow_Update,camera?,not started
+0x1c7e90,3384,BoarderShadow_Update,camera?,checked
 0x1c8bc8,112,BoarderShadow_Draw,render?,checked
 0x1c8c38,52,BoarderShadow_Init,boarder?,checked
 0x1c8c70,92,BoarderShadow_AllocTexture,boarder?,checked
