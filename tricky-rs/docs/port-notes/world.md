@@ -777,3 +777,44 @@ from random definitions; renderers had random matrices, a clip box about a sprit
 world had holes in its cell list. About 700 packets were built. 33 of 40 mutants were caught. The other 7 are
 equivalent (the w < 0 outcode, since a sprite's w is 1/depth; the delete's flags 3 or 1) or boundaries (depth
 exactly 500 or 2601.95, z on the clip plane, distance exactly 12500.37 or 20000.09).
+
+## The sky (row G7c3; `game/src/sky.rs`, checked: `tests/sky.rs`)
+
+Ported on the bytes at their addresses. The models' own functions, the files, the course info, the texture table's
+build, `Lights_Build` and the renderer are calls out. This adds to the F1c section "Skies" above.
+
+- **The sky set** (0x337ce8): +0 the course sky table's row count; +4 ten layers (models of 0x14 bytes, the vtable
+  at +0x10, the loaded data at +4); +0xcc the layers loaded; +0xd0 twelve layer numbers by sky id.
+  - `Sky_InitLayers` 0x1859c0 resets each layer (slot +0x10) and counts none. `Sky_FreeLayer` 0x185a78 frees the
+    layer's data (`Mem_Free`) if any, resets it, and lowers the count when it was the last one counted.
+    `Sky_FreeLayers` 0x185a28 does that for 9 down to 0, then counts none.
+  - `Sky_GetModelByIndex` 0x185d68 answers 0 for a negative layer number. An id of −1 reads +0xcc, the count, as its
+    layer number: `cSkyBoxObjNode` hands it −1 when no name matches.
+  - The static set-up 0x185f90 makes the ten layers (0x2555a8, then the layer vtable 0x388350), counts the table's
+    rows by their **count** word (+4) up to a −1, and fills +0xd0 with −1. 0x185f80 is its destructor
+    (`Sky_Delete` with 2).
+  - `Sky_Delete` 0x186078 calls slot +8 with 0 on layers 9..0, then deletes the set with flag bit 0.
+- **The loads:**
+  - `Course_LoadSkies` 0x185b18 finds the course's row by its **course** word (+0) up to a negative one; the row
+    count is re-read each pass and the id re-read after the load.
+  - `Course_LoadSky` 0x185c28 formats both paths first ("data/models/%s%s" with ".pbd" and ".ssh"). With 10 layers
+    or no such file it answers −1. Otherwise the loaded file goes to the next layer's slot +0x30. A non-zero answer
+    there leaves the count as it was but still answers the layer's number. On 0 the textures are remapped, the
+    layer counted, and the file released (0x255df0).
+  - `Course_RemapSkyTextures` 0x185dd0: 0x2609d0 (the world 0x346488, the .ssh path, a word it fills) gives the
+    table. Nothing is done when it answers 0. Each part's four shorts (not negative) take the low half of their
+    table word. Each word of its +0x44 list (count first) takes its table word, and then the part's first short is
+    set to the low half of the list's first word. A material's four shorts at +0x1b0 are looked up unless their
+    3-bit field of +0x1ac is 5. The table is freed when it is not 0.
+- **`cSkyBoxObjNode`:**
+  - The constructor 0x1c7900 compares "<course info>_sky" with the 12 names using `stricmp` (case ignored).
+  - The draw 0x1c79e8 needs a model at +0xc. The matrix is 0x346440's three rows plus the camera's position (the
+    game's +0xb0 + 0x80 × camera). The lights are an ambient (1, 1.99, 1.99, 1.99) and three all-zero lights. The
+    renderer's state is set around the model's draw (+0x2a8 with the model, its +0xc, the matrix, the lights, 0, 0)
+    and put back after, the fog value 0.08 with it.
+  - The static set-up 0x1c7c58 writes the light constants at 0x3d0d20..0x3d0d6c.
+
+Checked in the runner on 16,000 random sky sets, about 1,000 calls for each of 16 functions (with `stricmp` running
+as the original and names differing only in case). 340 layers were loaded, 1,669 sky boxes drawn, and 817 found
+their sky. 37 of 38 mutants were caught. The one left is equivalent (the count lowered to `i` inside the test that
+`i` is the last one).

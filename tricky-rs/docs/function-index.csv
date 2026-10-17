@@ -1836,17 +1836,17 @@ address,size,name,system,status
 0x185430,1164,cStartScreenSingle::vf7_185430,game,not started
 0x185968,80,cStartScreenSingle::__tf,runtime,host
 0x1859b8,8,cStartScreenSingle::~cStartScreenSingle,game,not started
-0x1859c0,104,Sky_InitLayers,render?,not started
-0x185a28,80,Sky_FreeLayers,render?,not started
-0x185a78,156,Sky_FreeLayer,render?,not started
-0x185b18,268,Course_LoadSkies,race,ported
-0x185c28,296,Course_LoadSky,race,ported
-0x185d50,20,Sky_GetLayer,render?,not started
-0x185d68,76,Sky_GetModelByIndex,race?,not started
-0x185dc0,8,Sky_GetLayerCount,other,not started
-0x185dc8,8,Sky_SetLayerCount,render?,not started
-0x185dd0,428,Course_RemapSkyTextures,race,not started
-0x186078,160,Sky_Delete,game?,not started
+0x1859c0,104,Sky_InitLayers,render?,checked
+0x185a28,80,Sky_FreeLayers,render?,checked
+0x185a78,156,Sky_FreeLayer,render?,checked
+0x185b18,268,Course_LoadSkies,race,checked
+0x185c28,296,Course_LoadSky,race,checked
+0x185d50,20,Sky_GetLayer,render?,checked
+0x185d68,76,Sky_GetModelByIndex,race?,checked
+0x185dc0,8,Sky_GetLayerCount,other,checked
+0x185dc8,8,Sky_SetLayerCount,render?,checked
+0x185dd0,428,Course_RemapSkyTextures,race,checked
+0x186078,160,Sky_Delete,game?,checked
 0x186118,80,cCourseResolve::__tf,runtime,host
 0x186168,8,cCourseResolve::~cCourseResolve,race,not started
 0x1861f0,40,FUN_001861f0,frontend?,not started
@@ -2696,9 +2696,9 @@ address,size,name,system,status
 0x1c72e8,1320,Game_DrawFrame,game,not started
 0x1c7810,220,cTerrainObjNode::Draw,world,not started
 0x1c78f0,12,cModelsObjNode::Draw,world,not started
-0x1c7900,204,cSkyBoxObjNode::cSkyBoxObjNode,world,not started
-0x1c79d0,20,cSkyBoxObjNode::~cSkyBoxObjNode,world,not started
-0x1c79e8,620,cSkyBoxObjNode::Draw,world,not started
+0x1c7900,204,cSkyBoxObjNode::cSkyBoxObjNode,world,checked
+0x1c79d0,20,cSkyBoxObjNode::~cSkyBoxObjNode,world,checked
+0x1c79e8,620,cSkyBoxObjNode::Draw,world,checked
 0x1c7d00,80,cSkyBoxObjNode::__tf,runtime,host
 0x1c7d50,20,cModelsObjNode::~cModelsObjNode,world,not started
 0x1c7da0,80,cModelsObjNode::__tf,runtime,host
