@@ -81,8 +81,7 @@ state machine and the renderer are ours. Nothing has been checked against the or
 | G7 | Rendering, as the PS2 renderer does it. Split before claiming: | unowned | E3a, E3b | | [repo] |
 | G21 | **The rider stutters back and forth the whole run** (play test by bredclan, 2026-10-17, tricky-rs.2026-10-17.exe from 3580b5f). To find: whether it is the port (our stand-ins between the exact pieces: the rider's step, its control state, the app's camera or its frame timing fighting the game's fixed tick) or something the decompiling will fix once the boarder state machine (G1) runs whole. First step: log the rider's place and heading each tick in a run (`TRICKY_SIM`) and see which one goes back and forth, and on which frames | any | | | Play test 2026-10-17 |
 | G9v | (umbrella: G9v1..G9v4) The results screens' pages as `tricky_game::resultpages`: what `cResultsOverlay` shows after a race, built into the results table (0x3385c0) | ed-slopper/puffin | G9 | | Split of G9 |
-| G9v2 | `Results_BuildStandingsPage` 0x1b0188, `_BuildTimeChallengePage` 0x1b07f8, `_BuildRiderStatsRows` 0x1b0998, `_AddRiderStats` 0x1b1278 | ed-slopper/puffin | G9v1 | | Split of G9v |
-| G9v3 | `Results_BuildMedalPage` 0x1b0bb8, `_BuildStatsPage` 0x1b16f0, `_BuildLessonPage` 0x1b1aa8 (C11d's) | any | G9v1 | | Split of G9v |
+| G9v3 | `Results_BuildMedalPage` 0x1b0bb8, `_BuildStatsPage` 0x1b16f0, `_BuildLessonPage` 0x1b1aa8 (C11d's) | ed-slopper/puffin | G9v1 | | Split of G9v |
 | G9v4 | `Results_DrawBestTrick` 0x1b2158, `Results_DrawVersusPage` 0x1b2428 | any | G9v1 | | Split of G9v |
 | G9 | Front end: title, main menu, mode select, rider / outfit / board select, options, records, trick book screens, unlock screens, music player, loading screens (`gApp+0x734`) | unowned | E1, E5 | | [repo] `ui.rs` is ours. Split (2026-10-16): G9b the shared machinery, G9c–G9t the screens (logic ported and checked in the runner, widgets as calls out), G9u the app's menus on them |
 | G9b | (umbrella: G9b1, G9b2) The front end's shared machinery: `cFE3D` (the manager, its per-frame update and the screen it runs), the `cFE3DState` base (the phases, `TransitionIn` / `Out`, `Finish` and `CreateNextState`, `UpdateTransition`, `Activate`, `LayoutWidgets`), the widgets they drive and the 3D transition record (`FE3DTransition_*`, notes in frontend.md) | any | G9 | | Split of G9 |
@@ -154,6 +153,7 @@ matches the original.
 
 | ID | Task | Section | Who | Date | Commit |
 |---|---|---|---|---|---|
+| G9v2 | The standings and time challenge pages, `Results_BuildRiderStatsRows` and `Results_AddRiderStats` in `tricky_game::resultpages`, checked in the runner (tests/resultpages.rs), 44 of 45 mutants caught | P2 | ed-slopper/puffin | 2026-10-17 | d744909 |
 | G9v1 | The results table's setters, `Results_SetRowLayout` / `_ClearText`, `Results_BuildPages`, the career page and the medal verdict as `tricky_game::resultpages`, checked in the runner on 6000 cases (tests/resultpages.rs), 53 of 55 mutants caught | P2 | ed-slopper/puffin | 2026-10-17 | ab1b442 |
 | E7d | The race's broadphase and contacts: `tricky_game::broadphase` (the pair pool and ids, `ContactMgr_Init`, the axes' lists, the boxes, the sweep with its overlap toggles, the pairs' links, `Contact_SortPairs` / `_SortBodyPairList`; 34 functions) checked in the runner on 10,200 cases (tests/broadphase.rs), 69 of 70 mutants caught | P1 | ed-slopper/puffin | 2026-10-17 | 5e97647 |
 | G7r | (umbrella) the rider skin: G7r1..G7r4 | P2 | ed-slopper/puffin | 2026-10-17 | G7r1..G7r4 |
@@ -1324,3 +1324,4 @@ matches the original.
 - 2026-10-17 ed-slopper/puffin: G7r4 done (68e125e) and the G7r umbrella with it: the rider skin is ported whole (bdrload.rs, skinpart.rs, riderskin.rs, limbik.rs; 50 functions, 4 runner tests). Math_Asin's sqrt is the EE's chopped one: math::asin_ee added; other math::asin callers flagged for a check.
 - 2026-10-17 ed-slopper/puffin: E7d done (5e97647): the race's broadphase and contacts ported whole (broadphase.rs, 34 functions incl. the two the index lacked, 0x14f740 and 0x14f940), 10,200 runner cases, 69/70 mutants. The knockables' and ground tick's broadphase STANDINs can now call it.
 - 2026-10-17 ed-slopper/puffin: G9v1 done (ab1b442): the results table's setters, the pages' builder, the career page and the medal verdict (resultpages.rs, 20 functions, 7 of them new to the index). Claim G9v2.
+- 2026-10-17 ed-slopper/puffin: G9v2 done (d744909): the standings, time challenge and players' stats pages. Claim G9v3.
