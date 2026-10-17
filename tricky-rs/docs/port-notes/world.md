@@ -1325,3 +1325,54 @@ Checked in the runner (`tests/drawlist.rs`, 1500 cases): each case is 40 random 
 compared after every step. The states are a few, some alike but for one field. The texture pages include negative
 and ≥ 512 words, and the renderer's pending flags are random. 69 of 70 mutants were caught. The one left is
 equivalent: copying the state with or without +0xfa40, since +0x18 gets its old word back straight after.
+
+## The draw lists' flush (row G7h2; `drawlist::flush_buckets` and the GS writers, checked: `tests/drawflush.rs`)
+
+- **`PS2Draw_FlushBuckets` 0x1c4fe0**(list, &packet) answers the packet's start. In order:
+  1. It clears the two words (+0xfa5c, +0xfa60 to −1), sets the current state to the default, writes the full
+     state, and sorts.
+  2. For each sorted batch, and each batch hung off it (+0x38): when its page differs from the last one, it uploads
+     the page's two texture words with 0x1c3818 (cache = the renderer's +0x47c, word, context 1 / 2, &packet),
+     skipping negative words.
+  3. It then writes the batch's state changes, closes the batch's packets with a DMA `ret` (0x60000000) at the end
+     of its last one, and adds a DMA `call` (0x50000000, the first packet) to the packet.
+  4. After the batches, when the app's +0x730 is set and its +0x20 virtual (on +8) answers non-zero, it uploads the
+     texture at the app's +0x30's +0x70 as context 1.
+  5. A DMA `end` (0x70000000) closes the packet.
+- **Opening a state write:** each state write begins the packet with a DMA `cnt` of one quadword holding an empty
+  GIF tag (1 << 60). Its registers start 0x30 into the packet: a builder of {count, next place, start}, which the
+  game keeps on its stack (the port uses a scratch area: STANDIN).
+- **`PS2Draw_WriteFullState` 0x1c51f0** writes the default state. First the VU1 program (`PS2Draw_WriteTexState`,
+  row G7h3: program 0, how 0, the state's word). Then, for context 1 and context 2: the clamp, the alpha, the
+  z buffer (base +0xfa68, format +0xfa64, the state's +0x11) and the test.
+- **`PS2Draw_WriteStateChanges` 0x1c5368**(list, batch, word, view, &packet) writes what differs from the list's
+  current state, taking it over.
+  - **The VU1 program** (unless the batch's is 0): how 0 for a new program, 1 for the same program with a new word;
+    then how 2 when the state's +0 word still differs.
+  - **The view:** when it changed it is kept, and when it is not negative the view's rectangle (the list's +0x3024
+    + 8·view: x, y, w, h halves) becomes both scissors.
+  - **The rest, in order:** both z buffers on +0x11, both tests on +0x12 / +0x13 / +6, the first clamp (+0x14), the
+    first alpha (+0x15 with the fix +0xc), the second clamp (+0x16, kept but not written when 2), and the second
+    alpha (+0x17 with +0xd).
+- **The GS writers** each add a register value and its number, and count it:
+  - `GsPkt_SetScissor` 0x1c0340 writes SCISSOR_1 and _2 from x, w, y, h.
+  - 0x1c03b8 (not in the index) writes TEXFLUSH.
+  - `GsPkt_SetAlpha` 0x1c03e8 writes ALPHA from a table for modes 0..8 (0x2a, 0x6a, 0x89, 0x44, 0x46, 0x48, 0x81,
+    0x42, 0x49). Modes 9 and 10 use the fixed alpha (0x64 / 0x68). Past 10 nothing is written, but it still counts.
+  - `GsPkt_SetClamp` 0x1c04f8 writes 5 (clamped) for 1, else 0.
+  - `GsPkt_SetZBuf` 0x1c0560 writes the base, the format − 0x30 at bit 24, and the mask bit 32 for 1.
+  - `GsPkt_SetTest` 0x1c05d8 has both tests on. The alpha test is 2 for 1, 6 for 2, else 1; the depth test is 2 for
+    1, 3 for 0, else 1; AREF is at bit 4.
+  - Context 2 picks each register's second copy; any other context picks the first.
+- **`GsPkt_Close` 0x1c06a0** does nothing when no registers were added. Otherwise it writes the header: a DMA tag
+  over the registers, a VIF code, and a GIF tag (the count, EOP, A+D).
+  - How 0 puts the header in a `ret` packet at 0x33d6c0 that the packet calls.
+  - How 1 puts a `cnt` at the start with VIF DIRECT, and moves the packet on to the registers' end.
+  - How 2 does the same as 1 with VIF UNPACK to VU1 0x3f2.
+  - Any other how does nothing.
+- **`Game_DrawLists` 0x1c7290** runs `BxList_DrawAll` on 0x337c60 for each of the thirteen lists at 0x33d7d8.
+
+Checked in the runner (`tests/drawflush.rs`, 4000 cases). Each case builds a list with G7h1's port, then runs the
+flush, one batch's changes, the full state, a GS writer or close (on a random builder, every how), or
+`Game_DrawLists`. The VU1 program write, the upload, the sort, the lists' draw and the app's question are logging
+stand-ins. All 70 mutants were caught.

@@ -2635,12 +2635,12 @@ address,size,name,system,status
 0x1c01e8,36,cScreenOverlay::~cScreenOverlay,frontend,not started
 0x1c0210,64,cScreenOverlay::__tf,runtime,host
 0x1c0260,80,cOverlayMan::__tf,runtime,host
-0x1c0340,116,GsPkt_SetScissor,render?,not started
-0x1c03e8,84,GsPkt_SetAlpha,render?,not started
-0x1c04f8,104,GsPkt_SetClamp,render?,not started
-0x1c0560,120,GsPkt_SetZBuf,render?,not started
-0x1c05d8,200,GsPkt_SetTest,render?,not started
-0x1c06a0,516,GsPkt_Close,render?,not started
+0x1c0340,116,GsPkt_SetScissor,render?,checked
+0x1c03e8,84,GsPkt_SetAlpha,render?,checked
+0x1c04f8,104,GsPkt_SetClamp,render?,checked
+0x1c0560,120,GsPkt_SetZBuf,render?,checked
+0x1c05d8,200,GsPkt_SetTest,render?,checked
+0x1c06a0,516,GsPkt_Close,render?,checked
 0x1c08a8,68,Gfx_InstallVif1Handler,render,not started
 0x1c08f0,48,Gfx_RemoveVif1Handler,render,not started
 0x1c0920,56,Gfx_StartVif1Irq,render,not started
@@ -2683,16 +2683,16 @@ address,size,name,system,status
 0x1c4d68,384,PS2Draw_SetState,render?,checked
 0x1c4ee8,60,PS2Draw_BindTexture,render?,checked
 0x1c4f28,184,FUN_001c4f28,render?,checked
-0x1c4fe0,524,PS2Draw_FlushBuckets,render?,not started
-0x1c51f0,376,PS2Draw_WriteFullState,render?,not started
-0x1c5368,828,PS2Draw_WriteStateChanges,render?,not started
+0x1c4fe0,524,PS2Draw_FlushBuckets,render?,checked
+0x1c51f0,376,PS2Draw_WriteFullState,render?,checked
+0x1c5368,828,PS2Draw_WriteStateChanges,render?,checked
 0x1c5c88,100,PS2Draw_WriteTexState,render?,not started
 0x1c6f98,208,PS2Draw_StateEquals,render?,checked
 0x1c7068,32,FUN_001c7068,render?,checked
 0x1c7088,292,PS2Draw_PackSortKey,render?,checked
 0x1c71b0,92,tPS2DrawState::vf0_1c71b0,other,checked
 0x1c7210,64,tPS2DrawState::__tf,runtime,host
-0x1c7290,88,Game_DrawLists,game,not started
+0x1c7290,88,Game_DrawLists,game,checked
 0x1c72e8,1320,Game_DrawFrame,game,not started
 0x1c7810,220,cTerrainObjNode::Draw,world,checked
 0x1c78f0,12,cModelsObjNode::Draw,world,not started

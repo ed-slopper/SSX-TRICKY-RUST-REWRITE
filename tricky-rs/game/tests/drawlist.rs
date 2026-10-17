@@ -44,6 +44,9 @@ impl DrawListEnv for Ours {
     fn call(&mut self, _m: &mut Mem, func: u32, args: &[u32]) {
         self.0.push(Call(func, args.to_vec()));
     }
+    fn vcall(&mut self, _m: &mut Mem, func: u32, this: u32, args: &[u32]) -> u32 {
+        panic!("no virtuals: {func:#x} {this:#x} {args:?}")
+    }
 }
 
 fn state(k: u32) -> u32 {
