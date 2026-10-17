@@ -229,7 +229,7 @@ fn particle_packets_and_blend_match_the_original() {
         let before = m.r32(RENDER + 0x474);
         let func = match which {
             0 => {
-                p::set_blend(&mut m, RENDER, blend, half);
+                p::set_e_and_half(&mut m, RENDER, blend, half);
                 for (k, v) in [RENDER, blend, half].into_iter().enumerate() {
                     r.cpu.set_gpr(4 + k, v as u64);
                 }

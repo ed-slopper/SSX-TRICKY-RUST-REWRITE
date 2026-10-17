@@ -86,7 +86,7 @@ fn kind_point(m: &Mem, icon: u32, kind: u32) -> V {
 ///
 /// The colour is put at the slot's +0x88. The size (+0x70, +0x74) is 33.2, less nearer than 500 and more past
 /// 3000 (both as depth / the bound), times the scales. Past 2777.4 the alpha falls to 0 at 3700. The renderer
-/// gets +0x1a0, the depth bias (0, 2, 0.01), +0x1e8(2, 0), texture app +0x30 → +0x94, then +0x240 with the slot's
+/// gets +0x1a0, +0x1c8(0, 2, 0.01), +0x1e8(2, 0), texture app +0x30 → +0x94, then +0x240 with the slot's
 /// +0x60, +0x70, +0x78, +0x80, +0x88, and +0x1a8.
 pub fn draw(m: &mut Mem, env: &mut dyn RiderDrawEnv, icon: u32) {
     let game = m.r32(m.r32(APP) + 0x730);

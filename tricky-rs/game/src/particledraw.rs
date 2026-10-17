@@ -1,16 +1,17 @@
 //! The particle systems' draw, the EE side (board row G7e1): `ParticleSys_Draw` 0x1d8bc8, which sets the
-//! renderer's state for a system and hands it to the renderer's +0x258; and the renderer's virtuals that it uses:
-//! +0x1e0 0x1e93e8 (the blend) and the two particle packets, +0x250 0x1e2a60 (VU1 program 6) and +0x258 0x1e2e60
-//! (program 7). On the bytes at their addresses ([`Mem`]); the frame's matrices are `cull::frame_matrices`; the
+//! renderer's state for a system and hands it to the renderer's +0x258 (VU1 program 6); and the renderer's
+//! virtuals +0x1e8 0x1e93e8 (the texture state's +0xe and +4) and the two particle packets, +0x258 0x1e2a60 (VU1
+//! program 6: the particle systems' trails) and +0x260 0x1e2e60 (program 7: the snowfall's flakes, `snowfall`'s
+//! layers). (The renderer's vtable is at 0x393610.) On the bytes at their addresses ([`Mem`]); the frame's matrices are `cull::frame_matrices`; the
 //! renderer's other virtuals and the packet's submit are calls out ([`ParticleDrawEnv`]). Checked in the function
 //! runner (`tests/particledraw.rs`).
 //!
 //! **A particle system** (as drawn): +4 its texture's place in the app's table (app +0x30), +8 its kind (the blend
-//! by the table at 0x392cf8, the kind held to 0..10), +0x10 the block that goes to VU1 (9 quadwords for program
-//! 7, 20 for program 6), +0x150 / +0x160 its box (min, max).
+//! by the table at 0x392cf8, the kind held to 0..10), +0x10 the block that goes to VU1 (program 6's 20
+//! quadwords), +0x150 / +0x160 its box (min, max).
 //!
-//! **The renderer's texture state** (+0x470): +0 a word cleared with the program, +4 the blend's second half,
-//! +0xe the blend, +0x10 the VU1 program. +0x474 is set whenever the state changes.
+//! **The renderer's texture state** (+0x470): +0 a word cleared with the program, +4 a half and +0xe a
+//! byte (set by +0x1e8), +0x10 the VU1 program. +0x474 is set whenever the state changes.
 
 use crate::cull::{self, CullEnv};
 use crate::pf::Mem;
@@ -20,7 +21,8 @@ pub const APP: u32 = 0x337c58;
 /// The blend for each kind 0..10
 pub const BLENDS: u32 = 0x392cf8;
 pub const SUBMIT: u32 = 0x1e8838;
-/// 0.08, the depth bias the draw sets (+0x1c8's float)
+/// 0.08, the float the draws hand +0x1c8 (the texture state's +6 gets it × 128: 10; with +0x12 and +0x13, by
+/// their fields the GS's alpha test)
 pub const BIAS: u32 = 0x3da3_d70a;
 
 /// The calls out (with the frame's two and the submit, as `cull::CullEnv`)
@@ -44,8 +46,8 @@ fn w64(m: &mut Mem, a: u32, v: u64) {
 }
 
 /// `ParticleSys_Draw` 0x1d8bc8(ps): nothing when the renderer's box test (+0x280) answers 1 (all out); else
-/// +0x1c0(1), the depth bias +0x1c8(0, 0, 0.08), the kind's blend (+0x1e0), the system's texture (+0x1f0 with
-/// it, 0), the system drawn (+0x258 with its block), the bias back (+0x1c8(0, 2, 0.08)) and +0x1c0(0).
+/// +0x1c0(1), +0x1c8(0, 0, 0.08), the kind's blend (+0x1e0), the system's texture (+0x1f0 with
+/// it, 0), the system drawn (+0x258 with its block), +0x1c8(0, 2, 0.08) and +0x1c0(0).
 pub fn particle_sys_draw(m: &mut Mem, env: &mut dyn ParticleDrawEnv, ps: u32) {
     let r = m.r32(m.r32(APP) + 0x724);
     if vcall(m, env, r, 0x280, &[ps + 0x150, ps + 0x160]) == 1 {
@@ -65,14 +67,14 @@ pub fn particle_sys_draw(m: &mut Mem, env: &mut dyn ParticleDrawEnv, ps: u32) {
     vcall(m, env, r, 0x1c0, &[0]);
 }
 
-/// The renderer's +0x1e0, `0x1e93e8`(r, blend, half): when either differs from the texture state's (+0xe, the
+/// The renderer's +0x1e8, `0x1e93e8`(r, byte, half): when either differs from the texture state's (+0xe, the
 /// half at +4), both set and the state marked changed (+0x474)
-pub fn set_blend(m: &mut Mem, r: u32, blend: u32, half: u32) {
+pub fn set_e_and_half(m: &mut Mem, r: u32, byte: u32, half: u32) {
     let ts = m.r32(r + 0x470);
-    if m.r8(ts + 0xe) as u32 != blend || m.r16(ts + 4) as u32 != half {
+    if m.r8(ts + 0xe) as u32 != byte || m.r16(ts + 4) as u32 != half {
         m.w16(ts + 4, half as u16);
         m.w32(r + 0x474, 1);
-        m.w8(ts + 0xe, blend as u8);
+        m.w8(ts + 0xe, byte as u8);
     }
 }
 
@@ -81,11 +83,13 @@ pub fn set_blend(m: &mut Mem, r: u32, blend: u32, half: u32) {
 const PROG6: (u8, u32, u32, u32) = (6, 0x17, 0xd829, 0x13);
 const PROG7: (u8, u32, u32, u32) = (7, 0xc, 0xd813, 8);
 
-/// The renderer's +0x250 0x1e2a60(r, block): the block drawn by VU1 program 6 ([`particle_packet`])
+/// The renderer's +0x258 0x1e2a60(r, block): the block drawn by VU1 program 6 ([`particle_packet`]): the particle
+/// systems' (`ParticleSys_Draw`, the ground spray)
 pub fn draw_program6(m: &mut Mem, env: &mut dyn ParticleDrawEnv, r: u32, block: u32) {
     particle_packet(m, env, r, block, PROG6);
 }
-/// The renderer's +0x258 0x1e2e60(r, block): the block drawn by VU1 program 7 ([`particle_packet`])
+/// The renderer's +0x260 0x1e2e60(r, block): the block drawn by VU1 program 7 ([`particle_packet`]): the
+/// snowfall's layers (0x1c9310)
 pub fn draw_program7(m: &mut Mem, env: &mut dyn ParticleDrawEnv, r: u32, block: u32) {
     particle_packet(m, env, r, block, PROG7);
 }

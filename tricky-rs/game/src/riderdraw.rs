@@ -156,7 +156,7 @@ pub fn pick_lod(m: &mut Mem, env: &mut dyn RiderDrawEnv, br: u32) {
 /// - Nothing more when the box test (the centre ± 70, or ± 100 when +0x418 ≥ 0; z −50 .. +150) says it is out.
 /// - The LOD, the bones copied, the outfit-6 flag (+0x2b8), the lights (+0xb8 at the place with −35.02 after),
 ///   and the skin: once with blend 3, or, when the rider is fading (+0x448 below 0.95), twice: blend 1 then 3
-///   with the depth bias. +0xb8 again with 0.
+///   with +0x1c8(1, 0, 0.08). +0xb8 again with 0.
 /// - Once a frame (+4), the shadow: made about the mid-point of bones 15 and 18 with up (0, 0, −1), under the
 ///   renderer's state for it, and cast on the rider (`RiderSkin_SetBoardMatrix` with colours (1, k, k, k) and
 ///   (1, 0.3, 0.3, 0.3), k = 0.3 − 0.3 × h / −5, h the rider's height +0x1bc held to −5..0 when +0x424 is 2).

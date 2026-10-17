@@ -1,8 +1,9 @@
 //! The particle draw run whole in the function runner (board rows G7e2, G7e3; TRICKY_ELF, skipped without it), as
 //! the oracle for the VU1 particle programs' ports. All of it runs as original code:
 //! - the renderer's camera: the frame's matrices (0x1e85b0) and its projection (vf20);
-//! - each particle system drawn: program 7 by `ParticleSys_Draw` (its +0x258), program 6 by the renderer's +0x250
-//!   called directly, both through `PS2Render_Submit` into a draw list;
+//! - each block drawn as the game draws it: program 6 by `ParticleSys_Draw` (the renderer's +0x258, as the game's
+//!   vtable at 0x393610 has it), program 7 by its packet (+0x260, the snowfall's) called directly, both through
+//!   `PS2Render_Submit` into a draw list;
 //! - the flush (`PS2Draw_FlushBuckets`, with `PS2Draw_WriteTexState`, which uploads the program and the frame's
 //!   words for it).
 //!
@@ -75,7 +76,7 @@ struct Camera {
     far: f32,
 }
 
-/// A particle system's block for program 7 (9 quadwords) or 6 (20: the same nine, then random words), around
+/// A block for program 7 (a snowfall layer's: 9 quadwords) or, through [`block6`], program 6 (a particle system's), around
 /// `centre`
 fn block(g: &mut Rng, prog6: bool, centre: [f32; 3]) -> Vec<u32> {
     if prog6 {
@@ -209,8 +210,8 @@ fn draw(seed: u64, n: usize, prog6: bool, cam: &Camera) -> Option<Vu1> {
     for off in [0x1c0u32, 0x1c8, 0x1e0, 0x1e8, 0x1f0, 0x1f8, 0x200, 0x280, 0x60, 0x58] {
         w32(&mut r, RVT + off + 4, vaddr(off));
     }
-    w32(&mut r, RVT + 0x250 + 4, 0x1e2a60);
-    w32(&mut r, RVT + 0x258 + 4, 0x1e2e60);
+    w32(&mut r, RVT + 0x258 + 4, 0x1e2a60);
+    w32(&mut r, RVT + 0x260 + 4, 0x1e2e60);
     w32(&mut r, R + 0x470, TS);
     w32(&mut r, R + 0x480, D);
     w32(&mut r, R + 0x680, PKT);
@@ -264,12 +265,12 @@ fn draw(seed: u64, n: usize, prog6: bool, cam: &Camera) -> Option<Vu1> {
         w32(&mut r, ps + 4, g.below(4));
         w32(&mut r, ps + 8, g.below(11));
         if prog6 {
-            r.cpu.set_gpr(4, R as u64);
-            r.cpu.set_gpr(5, (ps + 0x10) as u64);
-            r.call(0x1e2a60).expect("the program 6 packet");
-        } else {
             r.cpu.set_gpr(4, ps as u64);
             r.call(0x1d8bc8).expect("ParticleSys_Draw");
+        } else {
+            r.cpu.set_gpr(4, R as u64);
+            r.cpu.set_gpr(5, (ps + 0x10) as u64);
+            r.call(0x1e2e60).expect("the program 7 packet");
         }
     }
     w32(&mut r, SLOT, OUT);

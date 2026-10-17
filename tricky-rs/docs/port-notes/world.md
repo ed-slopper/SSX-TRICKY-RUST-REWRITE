@@ -1569,14 +1569,16 @@ not strictly equivalent).
 
 ## The particle systems' draw, EE side (G7e1, `particledraw.rs`)
 
-`ParticleSys_Draw` 0x1d8bc8 and the renderer's virtuals it uses: +0x1e0 0x1e93e8 (the blend) and the two particle
-packets, +0x250 0x1e2a60 (VU1 program 6) and +0x258 0x1e2e60 (program 7).
+`ParticleSys_Draw` 0x1d8bc8 and three of the renderer's virtuals: +0x1e8 0x1e93e8 and the two particle packets,
++0x258 0x1e2a60 (VU1 program 6, which `ParticleSys_Draw` and the ground spray call) and +0x260 0x1e2e60 (program
+7, which the snowfall's layers call). (Correction, 2026-10-17: the renderer's vtable is at 0x393610, not
+0x393618. This note first had each of these one slot off.)
 
 - **The draw** returns at once when the renderer's box test (+0x280, on the system's box at +0x150 / +0x160)
   answers 1. Otherwise it brackets the system's draw (+0x258 with its block at +0x10) with +0x1c0(1) / (0) and
-  the depth bias +0x1c8(0, 0, 0.08) / (0, 2, 0.08). Between them come the blend for the kind (+8, held to 0..10,
+  +0x1c8(0, 0, 0.08) / (0, 2, 0.08). Between them come the blend for the kind (+8, held to 0..10,
   looked up in the table at 0x392cf8) and the texture from the app's table (+0x30) at +4.
-- **The blend** (+0x1e0) sets the texture state's blend byte (+0xe) and its half at +4, and marks the state
+- **+0x1e8** sets the texture state's byte at +0xe and its half at +4, and marks the state
   changed (+0x474) only when either differs. The half is compared at full width, so a word above 0xffff always
   counts as a change.
 - **The two packets** differ only in the program, the block's size (9 quadwords for 7, 20 for 6) and so the tag's
@@ -1588,7 +1590,8 @@ packets, +0x250 0x1e2a60 (VU1 program 6) and +0x258 0x1e2e60 (program 7).
   - The frame's matrices are made in between (`cull::frame_matrices`, the same code inlined), when +0x17d0 is
     clear. The game reads +0x17d0 before it writes the packet. The port does too, and `frame_matrices` then reads
     it again, which only matters if the packet overlaps the renderer.
-- **The +0x1e0 call** in the draw passes only the blend. The second word is whatever +0x1c8 left in a2, so the
+- **The +0x1e0 call** (the blend: the texture state's +0x15 and +0x17) passes one word. Any second word is
+  whatever +0x1c8 left in a2, so the
   port logs one word there (as `drawmodel` does).
 
 Checked in the runner (`tests/particledraw.rs`) with 5000 draws (every kind from −2 to 12 and beyond, both box
@@ -1599,8 +1602,10 @@ equivalent: one reads +0x17d0 as 0 (`frame_matrices` checks it itself), and one 
 
 ## The VU1 particle program 7 (G7e2, `particlevu.rs`)
 
-The program loaded by chain 0x31c790 (89 instructions, called at 0 by the program-7 packet). It scatters a
-system's particles at random in a box and sends each one as a two-vertex sprite.
+The program loaded by chain 0x31c790 (89 instructions, called at 0 by the program-7 packet, the renderer's
++0x260). It scatters points at random in a box and sends each one as a two-vertex sprite. Its caller is the
+snowfall's layer draw (0x1c9310), so these are snowflakes. (Correction, 2026-10-17: first written as the
+particle systems' program; those use program 6.)
 
 - **What it reads.** The frame's words at VU1 0..6 (from `PS2Draw_WriteTexState`'s particle words): the clip
   matrix, the screen's scale and offset, and the sprites' x/y scale (the projection's two scales). The system's
@@ -1641,9 +1646,11 @@ equivalent or masked:
 ## The VU1 particle program 6 (G7e3, `particlevu.rs`)
 
 The program loaded by chain 0x31c260 (152 instructions, called at 0 by the program-6 packet, the renderer's
-+0x250 0x1e2a60). The only code that reads the renderer's +0x250 is `Font_DrawStringA` 0x19d0c0. It passes the
-font as the block, and the string and floats that +0x250 ignores; this looks like a leftover of another
-renderer's text draw. No particle code reaches +0x250 directly.
++0x258 0x1e2a60). +0x258 is called by `ParticleSys_Draw` and `Fx_SurfaceSpray_Draw`, so program 6 draws the
+particle systems and the ground spray. Program 7 (+0x260) is the snowfall's (0x1c9310).
+(Correction, 2026-10-17: this note first said +0x250, and that its one caller, `Font_DrawStringA`, handed the
+font as the block. That came from reading the renderer's vtable at 0x393618; it is at 0x393610. +0x250 is
+0x1de0e0, the real text draw.)
 
 The program draws trails of sprites. `run6`'s doc has the block's layout; in short:
 - Each trail starts on a line (a corner, two edges by R, and a step per trail), bends by a random point of a box,
@@ -1766,7 +1773,7 @@ streaks, effects, marker, icon) are calls out here; each is checked on its own (
   45.18 gives 1, else 2 (the second slot 1), each capped at the rider's LODs − 2.
 - **The body**: the bones are copied; the renderer's +0x2b8 gets whether the outfit is the 6th (only when the
   part has an outfit); then the lights, and +0xb8 at the place with −35.02. The skin is drawn once with blend
-  3, or twice when the rider is fading (+0x448 below 0.95): blend 1, then 3 with the depth bias. Then +0xb8 at
+  3, or twice when the rider is fading (+0x448 below 0.95): blend 1, then 3 with +0x1c8(1, 0, 0.08). Then +0xb8 at
   the place with 0.
 - **The shadow**, once a frame (+4), is made about the mid-point of bones 15 and 18, with up (0, 0, −1), the
   light's way at +0x1a0, the bones and the board's points. It is made under the renderer's state for it
@@ -1788,7 +1795,7 @@ One more, the 26.02 threshold's `<` as `≤`, needs a depth of exactly 26.02 (a 
 
 `Streak_Draw` 0x1f08d0(streak, points) draws the hand or board streak as two strips through the renderer's
 +0x220.
-- **Texture**: the app's +0x30 → +0x74, or −1 when the app has none. **State**: the depth bias, +0x1c0(1),
+- **Texture**: the app's +0x30 → +0x74, or −1 when the app has none. **State**: +0x1c8(0, 0, 0.08), +0x1c0(1),
   blend 3, +0x1e8(2, 0), put back after.
 - **Each strip** starts at the two points it is handed (the rider's draw's: the hands' or the board's). Then
   each live entry, newest first, wrapping in a ring of 7. Strip one uses an entry's +0 / +0x10, strip two its
@@ -1814,7 +1821,7 @@ eight corners facing the camera.
   zero terms included (they can change the sign of a zero).
 - **The corners**: each of the four points (+0..+0x30), less then plus the first axis, plus the second, is
   written into the marker's own vertices (+0xe0, +0x110, … every 0x30). The renderer's +0x220 gets the eight.
-- **State**: texture app +0x30 → +0x84, the depth bias, blend 3, put back after.
+- **State**: texture app +0x30 → +0x84, +0x1c8(0, 0, 0.08), blend 3, put back after.
 
 Checked in the runner (`tests/marker.rs`): 5000 cases with the marker behind, between and past the far
 depth, some lanes ±0. 13 of 15 mutants were caught. The two left are boundary-equivalent: depth 0 and depth
@@ -1839,7 +1846,7 @@ depth, some lanes ±0. 13 of 15 mutants were caught. The two left are boundary-e
 - **Settling** sits at the kind's point with both scales 1 + 0.3408 × settle, the alpha moved toward 0.7778.
 - **Then**: the colour goes to +0x88. The size (+0x70 / +0x74) is 33.2 between 500 and 3000; nearer than 500
   it is 33.2 × z / 500, and past 3000 it is 33.2 × z / 3000. That is times the two scales. Past 2777.4 the
-  alpha fades out linearly, reaching 0 at 3700. The renderer gets +0x1a0, the depth bias (0, 2, 0.01),
+  alpha fades out linearly, reaching 0 at 3700. The renderer gets +0x1a0, +0x1c8(0, 2, 0.01),
   +0x1e8(2, 0), texture app +0x30 → +0x94, the sprite (+0x240 with the slot's +0x60, +0x70, +0x78, +0x80,
   +0x88), and +0x1a8.
 

@@ -1,6 +1,8 @@
 //! The VU1 particle programs (board rows G7e2, G7e3): what the particle packets (`particledraw`) call. Program 7
-//! (chain 0x31c790, 89 instructions) scatters a system's particles at random in a box and sends each as a sprite.
-//! Program 6 (chain 0x31c260, 152 instructions) draws trails of sprites, each bending and fading. Ported on
+//! (chain 0x31c790, 89 instructions, the renderer's +0x260) scatters the snowfall's flakes (`snowfall`'s layers)
+//! at random in a box and sends each as a sprite.
+//! Program 6 (chain 0x31c260, 152 instructions, +0x258) draws the particle systems' trails of sprites, each
+//! bending and fading (`ParticleSys_Draw`, the ground spray). Ported on
 //! [`Vu`] in the programs' order (each pair's two halves reading the registers as they were before the pair; a
 //! flag read seeing the flags of the op four pairs back). Checked call by call against the game's programs in
 //! the runner (`tests/vu1particle.rs`).
