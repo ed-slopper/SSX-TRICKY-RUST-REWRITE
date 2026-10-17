@@ -4417,28 +4417,28 @@ address,size,name,system,status
 0x2438c0,416,Huff_Encode,camera?,checked
 0x243a60,296,Compress_Block,camera?,checked
 0x243b88,236,FE_FormatRaceTime,frontend,ported
-0x243c78,368,FlakeSpinnerLoad_Init,frontend?,not started
-0x243de8,184,cFlakeSpinnerLoad::~cFlakeSpinnerLoad,game,not started
-0x243ea0,92,cFlakeSpinnerLoad::vf1_243ea0,game,not started
-0x243f00,912,cFlakeSpinnerLoad::vf2_243f00,game,not started
-0x244290,160,LoadScreen_LoadPics,other,not started
-0x244330,124,AsyncLoad_CloseArchive,race?,not started
-0x2443b0,220,cFlakeSpinnerLoad::vf4_2443b0,game,not started
-0x244490,48,cFlakeSpinnerLoad::vf3_244490,game,not started
-0x2444c0,124,cFlakeSpinnerLoad::vf5_2444c0,game,not started
-0x244540,612,LoadScreen_DrawProgressFlakes,game?,not started
-0x2447a8,588,LoadScreen_DrawTipBox,game?,not started
-0x2449f8,296,LoadScreen_DrawTicker,game?,not started
-0x244b20,964,cFlakeSpinnerLoad::vf6_244b20,game,not started
-0x244ee8,220,FUN_00244ee8,game?,not started
-0x244fc8,1488,LoadScreen_DrawBars,game?,not started
-0x245598,36,FE_GetSelectedCourse,frontend,not started
-0x2455c0,164,cFirstLoad::cFirstLoad,game,not started
-0x245668,20,cFirstLoad::~cFirstLoad,game,not started
-0x245680,52,cFirstLoad::StartAssetLoad,game,not started
-0x2456b8,168,cFirstLoad::PollAssetLoad,game,not started
-0x245760,212,cFirstLoad::DrawBackground,game,not started
-0x245838,8,cFirstLoad::DrawOverlay,frontend,not started
+0x243c78,368,FlakeSpinnerLoad_Init,frontend?,checked
+0x243de8,184,cFlakeSpinnerLoad::~cFlakeSpinnerLoad,game,checked
+0x243ea0,92,cFlakeSpinnerLoad::vf1_243ea0,game,checked
+0x243f00,912,cFlakeSpinnerLoad::vf2_243f00,game,checked
+0x244290,160,LoadScreen_LoadPics,other,checked
+0x244330,124,AsyncLoad_CloseArchive,race?,checked
+0x2443b0,220,cFlakeSpinnerLoad::vf4_2443b0,game,checked
+0x244490,48,cFlakeSpinnerLoad::vf3_244490,game,checked
+0x2444c0,124,cFlakeSpinnerLoad::vf5_2444c0,game,checked
+0x244540,612,LoadScreen_DrawProgressFlakes,game?,checked
+0x2447a8,588,LoadScreen_DrawTipBox,game?,checked
+0x2449f8,296,LoadScreen_DrawTicker,game?,checked
+0x244b20,964,cFlakeSpinnerLoad::vf6_244b20,game,checked
+0x244ee8,220,FUN_00244ee8,game?,checked
+0x244fc8,1488,LoadScreen_DrawBars,game?,checked
+0x245598,36,FE_GetSelectedCourse,frontend,checked
+0x2455c0,164,cFirstLoad::cFirstLoad,game,checked
+0x245668,20,cFirstLoad::~cFirstLoad,game,checked
+0x245680,52,cFirstLoad::StartAssetLoad,game,checked
+0x2456b8,168,cFirstLoad::PollAssetLoad,game,checked
+0x245760,212,cFirstLoad::DrawBackground,game,checked
+0x245838,8,cFirstLoad::DrawOverlay,frontend,checked
 0x245840,280,c1PTrackLoad::c1PTrackLoad,game,ported
 0x245958,88,c1PTrackLoad::~c1PTrackLoad,game,not started
 0x2459b0,148,LoadScreen_GetModePicName,game?,not started

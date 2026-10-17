@@ -1362,3 +1362,59 @@ starts.
 51 of 53 mutants were caught:
 - the second start word read from the first is equivalent (both are −1);
 - the second profile's "behind" test at a difference of exactly 0 is a boundary the cases rarely reach.
+
+## The loading screens (G9w, `loadscreen`)
+
+Every loading screen (gApp+0x734) is built on `cFlakeSpinnerLoad`: the bars at the top and bottom, the ticker,
+the snowflakes counting the load, the tip boxes with pictures, a fade.
+
+- **`FlakeSpinnerLoad_Init` 0x243c78** sets up the screen:
+  - its table, and the two fonts with room for 16 glyphs each (+0xc menu, +0x48 title);
+  - the HUD's shape −1 and its sprite record (+0xb8);
+  - the pictures' archive (+0xd4), with the pictures not yet asked for (+0x160 = 1 "all in");
+  - the bars' animation (+0x178) and the app's +0x728 (+4, the sprite set);
+  - the fade at 1, not fading in, with both fade colours red; the time 0.
+
+  Two of the sprite record's words (+0xc8, +0xd0) are written twice, the second time with the sprite's real
+  values.
+- **The load steps** (vf2 0x243f00, the step at +0xb4) wait for each file, one call at a time:
+  - 0: the HUD's textures; their "map4" shape goes to the renderer's 0x150;
+  - 1 and 2: the title and menu fonts, both scaled 1.25 by 1;
+  - then the screen's own +0x50;
+  - 3: the pictures in the list (+0x170 / +0x174, 0x34 bytes each: loaded, the file name, the 4-letter shape name
+    at +0x29, the shape at +0x30), one file at a time. A packed one is unpacked into the 0x11800-byte buffer first.
+    When none are left, the buffer is freed;
+  - 4: done when the screen's own +0x58 says so.
+- **`LoadScreen_LoadPics` 0x244290** opens the archive and keeps the list, and takes the buffer when there are
+  pictures. **`AsyncLoad_CloseArchive` 0x244330** cancels a picture still being read, frees the buffer and closes
+  the archive.
+- **vf4 0x2443b0** starts the bars' animation: three bars at 100, 250 and 400. **vf3** starts fading in and says
+  whether the fade is at 1. **vf5** steps the time by a 60th and the fade by a 30th up while fading in (else a 60th
+  down), clamped to 0..1.
+- **The draws:**
+  - `LoadScreen_DrawProgressFlakes`: ten flakes from x 120 (the steps, ys and scales are tables at 0x3a4c30..);
+    the first is left out when the word at 0x32ca50 is 3. The first `done` (at most 10) are gold, the rest a
+    faded white.
+  - `_DrawTipBox`: a black shadow, a white box 254 by 79 and the text right-aligned in black in the title font
+    (1.27 by 1.34, then put back), all faded by the box's alpha.
+  - `_DrawTicker`: the ticker's sheet tiled 700 wide along the bottom.
+  - The spinner (0x244ee8): 45 · cos(angle) wide at y 420.5.
+  - `_DrawBars`: a dark gold screen, then two bands at the top and two at the bottom (8 apart, the second at 0.4),
+    each a black strip with the sheets' pieces at 120 and 520 and the cap at the right, then the animation's three
+    white lines.
+  - vf6 (the frame): it sets up the renderer (the viewport from the screen's size as unsigned words, a 640 by 480
+    projection), draws the screen's own background and overlay, shows "loading" at step 4, and lays the fade over
+    everything in the fade's colour.
+- **`FE_GetSelectedCourse` 0x245598** gives the career's course, or the World Circuit's while its +0x3708 is 1.
+- **`cFirstLoad`** (the first load) has a single picture (+0x40c, shape name at 0x3a4cc8), drawn full screen.
+
+Checked in the runner (`tests/loadscreen.rs`): 300 cases of each of the 22 functions. Each case starts from the
+ELF's data and the screens' tables, with a screen made by the port's `init` or random. The renderer's virtuals and
+the screen's own are stand-ins through their tables, and so is every callee. A file's out words are written, the
+fills done for real, the draws log their floats and the colour stand-in logs its four words.
+
+66 of 72 mutants were caught. The six left are equivalent:
+- `init`'s two words that are written again later;
+- the fade's clamps at exactly 1 and 0;
+- the flake count's cap at 10 (`< 11` against `< 10`);
+- the unsigned conversion's low bit, which the PS2's truncating conversion never uses.
