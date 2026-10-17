@@ -253,3 +253,77 @@ pub fn skin_blend(m: &mut Mem, r: u32, matrices: u32, table: u32, bones: u32, n:
         i += 1;
     }
 }
+
+fn vcall(m: &mut Mem, env: &mut dyn RiderDrawEnv, r: u32, off: u32, args: &[u32]) -> u32 {
+    let vt = m.r32(r + 0x10);
+    let this = r.wrapping_add(m.r16(vt + off) as i16 as i32 as u32);
+    let f = m.r32(vt + off + 4);
+    env.vcall(m, f, this, args)
+}
+
+/// The renderer's +0x2f8 0x1dff88(r, slot1, _, skin, colour): the board drawn over the rider in the shadow's
+/// colour (from `RiderSkin_SetBoardMatrix`). The rider's bones are skinned (`skin::skin_parts`, its parts' table in
+/// `scratch`: STANDIN, the game's stack, 0x100 bytes), the board's model (+0x3f20) blended by the renderer's
+/// +0x310 (its LOD 0). Then each of the board's parts (0x48 each; one in slot 1 only when `slot1` is set) and
+/// each of its mesh's batches (+0x40 of them, 0x14 bytes each from the part's +0x34): both textures off
+/// (+0x1f0(−1, 0), (−1, 1)), and when the batch's flag (bit 0) is set, each of its sub-batches (+0xc; their
+/// matrix lists 8 bytes each in the part's +0x30, counted on over the part): the renderer's +0x328 with the
+/// list's blended matrices (r + 0x3f8 + the bone's 0x40), then a `cnt` of 3 (DIRECT 2: the colour as RGBAQ,
+/// ×128 as integers with Q 1) and a `call` of the sub-batch's packet, submitted (from before +0x328, follows: 1).
+pub fn board_shadow(m: &mut Mem, env: &mut dyn RiderDrawEnv, r: u32, slot1: u32, skin: u32, colour: u32, scratch: u32) {
+    use crate::ps2f::F;
+    crate::skin::skin_parts(m, skin, scratch);
+    let board = m.r32(skin + 0x3f20);
+    let word = m.r32(board + 0x50);
+    vcall(m, env, r, 0x310, &[crate::skin::SKINNED, scratch, board + 0x54, word, 0]);
+    let parts = m.r32(board) as i32;
+    let mut i = 0i32;
+    while i < parts {
+        let part = m.r32(board + 4).wrapping_add((i * 0x48) as u32);
+        let mesh = m.r32(part + 0xc);
+        i += 1;
+        if m.r8(mesh + 0x4a) as i8 == 1 && slot1 == 0 {
+            continue;
+        }
+        let mut done = 0u32;
+        let mut batch = m.r32(part + 0x34);
+        let mut j = 0i32;
+        while j < m.r16(m.r32(part + 0xc) + 0x40) as i16 as i32 {
+            vcall(m, env, r, 0x1f0, &[u32::MAX, 0]);
+            vcall(m, env, r, 0x1f0, &[u32::MAX, 1]);
+            if m.r32(batch) & 1 != 0 {
+                let mut k = 0i32;
+                while k < m.r32(batch + 0xc) as i32 {
+                    let e = m.r32(part + 0x30).wrapping_add(done.wrapping_add(k as u32) << 3);
+                    let (count, list) = (m.r32(e), m.r32(e + 4));
+                    let mut t = 0i32;
+                    while t < count as i32 {
+                        let idx = m.r32(list + 4 * t as u32);
+                        let bone = m.r32(m.r32(part + 0x2c).wrapping_add(idx.wrapping_mul(12)) + 8);
+                        let at = m.r32(r + 0x3f8).wrapping_add(bone << 6);
+                        m.w32(scratch + 0x80 + 4 * t as u32, at);
+                        t += 1;
+                    }
+                    let start = m.r32(r + 0x680);
+                    vcall(m, env, r, 0x328, &[count, scratch + 0x80]);
+                    let c = |m: &Mem, k: u32| int(rf(m, colour + 4 * k) * F(128.0));
+                    let rgbaq = (1f32.to_bits() as u64) << 32 | c(m, 1) | c(m, 3) << 16 | c(m, 2) << 8 | c(m, 0) << 24;
+                    let p = m.r32(r + 0x680);
+                    let call = m.r32(m.r32(m.r32(batch + 0x10).wrapping_add((k as u32) << 3))) as u64;
+                    let fields = [0x1000_0003u64, 0, 0, 0x5000_0002u64 << 32, 0x1000_0000u64 << 32 | 0x8001, 0xe, rgbaq, 1, call << 32 | 0x5000_0000, 0];
+                    for (n, v) in fields.into_iter().enumerate() {
+                        w64(m, p + 8 * n as u32, v);
+                    }
+                    m.w32(r + 0x680, p + 0x60);
+                    env.call(m, SUBMIT, &[r, start, p + 0x50, 1]);
+                    k += 1;
+                }
+                done = done.wrapping_add(m.r32(batch + 0xc));
+            } else {
+                done = done.wrapping_add(m.r32(batch + 0xc));
+            }
+            batch += 0x14;
+            j += 1;
+        }
+    }
+}

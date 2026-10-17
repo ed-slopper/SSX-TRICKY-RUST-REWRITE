@@ -1957,3 +1957,20 @@ Checked in the runner (`tests/renderdraw.rs`): 6000 cases on screen, off each si
 
 Checked in the runner (`tests/renderdraw.rs`): 4000 cases (7015 bones blended, weights round and random, the
 counts 0..12 and −1). All 15 mutants were caught.
+
+## The board in the shadow's colour (G7l, `renderdraw::board_shadow`)
+
++0x2f8 0x1dff88(r, slot1, _, skin, colour), from `RiderSkin_SetBoardMatrix`, draws the board over the rider in
+the shadow's colour.
+- **First** it skins the rider's bones exactly as `RiderSkin_SkinMatrices` does (now shared as
+  `skin::skin_parts`). Then it blends the board's model (+0x3f20) through +0x310 at LOD 0.
+- **The parts.** Each board part (0x48 bytes) is drawn; a part in slot 1 only when `slot1` is set
+  (`SetBoardMatrix` passes whether its two colours have the same y).
+- **The batches.** Each of a part's mesh's batches (+0x40, 0x14 bytes each from +0x34) first turns both textures
+  off. If its flag bit is set, then for each of its sub-batches:
+  - the renderer's +0x328 gets the list of its blended matrices (r + 0x3f8 + the bone × 0x40);
+  - a `cnt` of 3 is submitted (DIRECT 2: the colour as RGBAQ, Q 1) with a `call` of the sub-batch's own packet.
+  - The sub-batches' 8-byte matrix lists (in the part's +0x30) are counted on over the whole part, whether a
+    batch is drawn or not.
+
+Checked in the runner (`tests/renderdraw.rs`): 1500 cases, 2124 sub-batches drawn. All 17 mutants were caught.

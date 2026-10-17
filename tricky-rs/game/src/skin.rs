@@ -65,6 +65,20 @@ fn vcall(m: &mut Mem, env: &mut dyn ParticleDrawEnv, r: u32, off: u32, args: &[u
 /// renderer's +0x310 (0x341fc0, the table, the LOD's data, its word, 0) and +0x2e0 (the model + 0x5900 × lod,
 /// +0x3d80).
 pub fn skin_matrices(m: &mut Mem, env: &mut dyn ParticleDrawEnv, skin: u32, lod: u32, scratch: u32) {
+    skin_parts(m, skin, scratch);
+    let r = renderer(m);
+    let at = m.r32(skin + 0x3f18).wrapping_add(lod.wrapping_mul(0x5900));
+    let word = m.r32(at + 0x50);
+    vcall(m, env, r, 0x310, &[SKINNED, scratch, at + 0x54, word, 0]);
+    let at = m.r32(skin + 0x3f18).wrapping_add(lod.wrapping_mul(0x5900));
+    let bones = m.r32(skin + 0x3d80);
+    vcall(m, env, r, 0x2e0, &[at, bones]);
+}
+
+/// The skinning both `SkinMatrices` and the renderer's +0x2f8 begin with: the parts' table (32 words) cleared,
+/// then each part's bones times their bind matrices into 0x341fc0, the table getting each part's first bone at
+/// its mesh's slot
+pub fn skin_parts(m: &mut Mem, skin: u32, scratch: u32) {
     for k in 0..0x20 {
         m.w32(scratch + 4 * k, 0);
     }
@@ -87,13 +101,6 @@ pub fn skin_matrices(m: &mut Mem, env: &mut dyn ParticleDrawEnv, skin: u32, lod:
         base = base.wrapping_add(m.r16(m.r32(part + 0xc) + 0x42) as i16 as i32 as u32);
         i += 1;
     }
-    let r = renderer(m);
-    let at = m.r32(skin + 0x3f18).wrapping_add(lod.wrapping_mul(0x5900));
-    let word = m.r32(at + 0x50);
-    vcall(m, env, r, 0x310, &[SKINNED, scratch, at + 0x54, word, 0]);
-    let at = m.r32(skin + 0x3f18).wrapping_add(lod.wrapping_mul(0x5900));
-    let bones = m.r32(skin + 0x3d80);
-    vcall(m, env, r, 0x2e0, &[at, bones]);
 }
 
 /// `RiderSkin_SetBoardMatrix` 0x207f18(skin, board, a, b): nothing unless the board is drawn (+0x3f20). The
