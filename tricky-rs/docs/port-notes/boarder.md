@@ -1524,3 +1524,16 @@ with pose objects of two parts. 40 of 44 mutants were caught. The other 4 are eq
 its first child when it has one), all four lanes times the rider's scale (rider+0x464's +0x60) with one VU0 `vmulx`.
 It writes `out` as one quadword. Checked in the runner on 20,000 random controllers and clip files; 5 of 5 mutants
 were caught.
+
+## `AnimIds_Init` rewrites the clip table's lookup modes (found 2026-10-16, row G5c4)
+
+`AnimIds_Init` 0x15aec0, which the first `AnimCtl_Construct` runs, is about 10,000 instructions, mostly stores of
+constants. Running it in the runner and comparing memory shows what it writes:
+- word 1 (the lookup mode `AnimClip_ResolveAnmIndex` reads) of all 767 rows of the clip table 0x325fa8. In the exe
+  every row's is 4; after the init most are 0, some 2;
+- globals at 0x3bf994..0x3bf9d4, 0x3bfa78, 0x3bfd80..0x3c07bc, 0x3c0a80..0x3c0b8c, 0x3c23a0..0x3c2408,
+  0x3c2454..0x3c2bdc, 0x3c2ea4.., 0x3c2ef8.. and 0x3cbcc8..0x3cbf94.
+
+The table's other words (category, update mode, end action, layer, blend-in, end fade) are as the exe has them, so
+the notes that read them from the exe hold. The ports read the table from memory, so they follow whatever the init
+left.
