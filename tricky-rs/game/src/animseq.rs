@@ -69,6 +69,15 @@ pub fn div(a: F, b: F) -> F {
     }
     F(r) * F(1.0)
 }
+/// `sqrt.s` as the EE does it: of the absolute value, toward zero
+pub fn sqrt(a: F) -> F {
+    let q = (a.ee().abs() as f64).sqrt();
+    let mut r = q as f32;
+    if r as f64 > q {
+        r = f32::from_bits(r.to_bits() - 1);
+    }
+    F(r) * F(1.0)
+}
 /// `cvt.s.w`
 fn fl(v: i32) -> F {
     F(v as f32)

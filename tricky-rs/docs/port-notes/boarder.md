@@ -236,7 +236,7 @@ effect chain above, are not ported (rows G18, G19).
   dead zone); `cComputer::GetControls` 0x1384b8 is the AI's.
 - Clip end actions (`AnimCtl_HandleClipEnd` 0x15f5b8, the 4th int of the clip descriptor): 0 stop, 1 back to the
   base clip 0x1ff, 2 play 0x223, 3 play 0x202, 4 chain 0x226–0x22d → 0x22e–0x235 (`AnimCtl_EndActionChain`),
-  5 play 0x2df, 6 play 0x2de, 7 back to 0x202 on the ground (motion 2) else 0x1ff.
+  5 play 0x2df, 6 play 0x2de, 7 back to 0x202 on the alpine board (board class rider+0x420 = 2; G5a2 read it) else 0x1ff.
 - Pad rumble (`cPlayer::vf7`/`vf11` → `Rumble_Update` 0x150d18, `Rumble_Impact` 0x150a80): an impact of
   −dot(velocity, normal)·1.389 (clamped 0..2) above 0.3 buzzes the small motor for 0.02–0.1 s and sets the big
   motor's strength, which decays ×0.98333 − 0.025 per tick; nothing during replays.
@@ -1333,7 +1333,7 @@ the sounds and the motion-driven update modes. The pose blend and clip data are 
     nothing.
   - Every action but 0 removes the sequence from layer 0 (+0x28), whatever layer it is on.
   - The actions: 0 stop; 1 back to the base 0x1ff, after clearing the rider's six words +0x1fc..+0x210; 2 play
-    0x223; 3 play 0x202; 4 chain; 5 play 0x2df; 6 play 0x2de; 7 0x202 in ground motion (rider+0x420 = 2), else
+    0x223; 3 play 0x202; 4 chain; 5 play 0x2df; 6 play 0x2de; 7 0x202 on the alpine board (board class rider+0x420 = 2), else
     0x1ff.
   - Each clip played this way uses frame 0 and marker 5 (0).
   - Stop (0x161640) takes the sequence off its own layer and answers none.
@@ -1356,3 +1356,46 @@ Checked in the runner on 40,000 random controllers, about 1,700 calls for each o
 layers of sequences with real clip ids (picked by the table's end action and update mode, often the layer's current
 clip), their trees and headers, the rider's words and the key table, with the game's own clip table. The sequences'
 functions ran as the original; the calls out were logged. 48 of 50 mutants were caught. The other 2 are equivalent: stop's answer when the clips differ (it is only reached with the sequence's own clip), and the chain's "any other clip" (every clip whose end action is the chain is in its table).
+
+## The motion-driven update modes (row G5b; `game/src/animmode.rs`, checked: `tests/animmode.rs`)
+
+Clips whose update mode (the clip table's +8) is 4..11 aren't advanced by time. Instead the mode sets the
+sequence's sources, their weights (+0x54..) and their times (+0x48..) from the rider. Each picks its clips from an
+exe table by board class (rider+0x420). Riding switch (+0x1b4) mirrors the inputs of modes 4, 9 and 10.
+- **8, board class frame (table 0x379180):** the class's clip alone at rider+0x1f0 of its length.
+- **9, direction (0x379190, 5 words a class):**
+  - The direction (+0x27c, +0x280) becomes an angle. The atan2 is written inline around `Math_Atan`: ±π/2 on the y
+    axis, ±π added on the left.
+  - Each quarter turn blends two of words 0..3. The first's weight is |angle − the quarter's start| × 2/π (0x3f22f983),
+    the second's 1 minus that.
+  - Both play at the stick's length (clamped 0..1) of their clip.
+  - With no direction, word 4 plays alone at frame 0.
+- **5, crouch (0x3791d0):** the standing clip advances by time with weight 1 − crouch. The crouched clip follows at
+  the same phase with weight crouch.
+- **4, brake (0x3791e8, 10 words a class):**
+  - With neither the brake (+0x1fc) nor +0x268, words 4 and 5 are blended by the crouch, held and advanced by time.
+    On class 2 this happens only at a crouch of exactly 0 or 1.
+  - With no brake, words 1 / 3 (+0x268 above 0) or 0 / 2 are blended by the crouch. Class 2 uses words 1, 9, 3 (or
+    0, 8, 2) over two halves of the crouch. Both play at |+0x268| of their length.
+  - Braking: word 1 or 0 (by +0x268's sign) with weight 1 − |brake| at |+0x268|, then word 6 or 7 (by the brake's
+    sign) with weight |brake| at |brake|.
+- **11, gate lean:** source 0 at the start gate's lean (+0x238) of its length.
+- **6, crouch frame:** source 0 at 1 − crouch of its length.
+- **10, wind-up (0x379260, 0xc8 a class):**
+  - The spin and flip wind-ups (+0x220, +0x22c) become an angle in eighth turns (4/π, 0x3fa2f983) over the row
+    (+0x1dc) of the clip table.
+  - The two clips are weighted by the crouch. The row's word 0 plays as a third source at frame 0 with weight
+    1 − crouch.
+  - With no wind-up: word 0 at frame 0, and word 5 at the crouch of its length.
+- **7, crouch-steer (0x3794b8, 0x78 a class):** two clips weighted 1 − crouch and crouch.
+  - With no steer (+0x214), or row 1 or 2: words 0x50 / 0x64, held and advanced by time.
+  - Otherwise 0 / 0x14 steering right or 0x28 / 0x3c steering left, at |steer| of their length.
+- **The EE's rounding:** the runner rounds `sqrt.s` like division, toward zero. `Math_Atan` divides and takes a
+  square root, so the port uses `math::atan_with` with `animseq::div` / `animseq::sqrt`. With the plain `math::atan`,
+  a quarter of the angles differ in the last bit. The ports checked with all-nearest rules keep `math::atan`.
+
+Checked in the runner on 60,000 random riders and sequences, about 7,500 calls for each of 8 modes. The inputs were
+often exactly 0, ½ or 1. 34 of 42 mutants were caught. Four of the others are equivalent: the both-zero and y-axis
+tests inside the angle (zero input is handled before), the length clamp at exactly 1, and the brake's sign in the
+braking branch. The last four are the wind-up sectors' boundaries, where the angle would have to equal ±π/4 or ±3π/4
+bit for bit.

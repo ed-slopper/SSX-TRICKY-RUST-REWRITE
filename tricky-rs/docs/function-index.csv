@@ -1225,14 +1225,14 @@ address,size,name,system,status
 0x160008,80,AnimCtl_TestClipBit,animation,checked
 0x160058,120,AnimCtl_SaveSnapshot,save,checked
 0x1600d0,112,AnimCtl_LoadSnapshot,animation,checked
-0x160140,140,AnimMode_BoardClassFrame,animation,not started
-0x1601d0,976,AnimMode_DirectionBlend,animation,not started
-0x1605a0,224,AnimMode_CrouchBlend,animation,not started
-0x160680,1136,AnimMode_BrakeBlend,animation,not started
-0x160af0,48,AnimMode_GateLeanFrame,animation,not started
-0x160b20,1524,AnimMode_WindUpBlend,animation,not started
-0x161118,484,AnimMode_CrouchSteerBlend,animation,not started
-0x161300,60,AnimMode_CrouchFrame,animation,not started
+0x160140,140,AnimMode_BoardClassFrame,animation,checked
+0x1601d0,976,AnimMode_DirectionBlend,animation,checked
+0x1605a0,224,AnimMode_CrouchBlend,animation,checked
+0x160680,1136,AnimMode_BrakeBlend,animation,checked
+0x160af0,48,AnimMode_GateLeanFrame,animation,checked
+0x160b20,1524,AnimMode_WindUpBlend,animation,checked
+0x161118,484,AnimMode_CrouchSteerBlend,animation,checked
+0x161300,60,AnimMode_CrouchFrame,animation,checked
 0x161340,8,AnimMode_Advance,animation,checked
 0x161348,8,AnimMode_Advance1,animation,checked
 0x161350,8,AnimMode_Advance2,animation,checked

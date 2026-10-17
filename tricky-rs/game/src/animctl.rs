@@ -320,7 +320,7 @@ fn end_action(m: &mut Mem, env: &mut dyn SeqEnv, ctl: u32, s: u32, action: u32, 
             seq::list_remove(m, env, l0, s);
             play_clip(m, env, ctl, 0x2de, 0, 5)
         }
-        // `AnimCtl_EndActionToRide` 0x1615e8: 0x202 in ground motion (rider+0x420 2), else 0x1ff
+        // `AnimCtl_EndActionToRide` 0x1615e8: 0x202 on the alpine board (board class rider+0x420 2), else 0x1ff
         _ => {
             seq::list_remove(m, env, l0, s);
             let next = if m.r32(m.r32(ctl + 0x24) + 0x420) == 2 { 0x202 } else { 0x1ff };

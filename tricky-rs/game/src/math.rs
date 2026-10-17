@@ -85,17 +85,23 @@ pub fn asin(x: f32) -> f32 {
 
 /// `Math_Atan` 0x2510f8
 pub fn atan(x: f32) -> f32 {
+    atan_with(x, |a, b| a / b, |a: f32| a.abs().sqrt())
+}
+
+/// `Math_Atan` with its divisions and square roots made by `div` and `sqrt` (the EE's round toward zero, see
+/// `animseq::div` / `animseq::sqrt`)
+pub fn atan_with(x: f32, div: impl Fn(f32, f32) -> f32, sqrt: impl Fn(f32) -> f32) -> f32 {
     if x < -1.0 {
-        let t = 1.0 / (x * x + 1.0);
-        return t.abs().sqrt() * (asin_poly(t) + 1.0) + -HALF_PI;
+        let t = div(1.0, x * x + 1.0);
+        return sqrt(t) * (asin_poly(t) + 1.0) + -HALF_PI;
     }
     let x2 = x * x;
     if 1.0 < x {
-        let t = 1.0 / (x2 + 1.0);
-        return HALF_PI - t.sqrt() * (asin_poly(t) + 1.0);
+        let t = div(1.0, x2 + 1.0);
+        return HALF_PI - sqrt(t) * (asin_poly(t) + 1.0);
     }
-    let t = x2 / (x2 + 1.0);
-    let v = t.sqrt() * (asin_poly(t) + 1.0);
+    let t = div(x2, x2 + 1.0);
+    let v = sqrt(t) * (asin_poly(t) + 1.0);
     if x < 0.0 {
         -v
     } else {
