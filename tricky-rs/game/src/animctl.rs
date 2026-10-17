@@ -189,7 +189,7 @@ pub fn begin_clip(m: &mut Mem, env: &mut dyn SeqEnv, ctl: u32, s: u32, l: u32, c
         5 => (m.r16(hdr(m) + 0xa) as u32).wrapping_sub(1),
         _ => 0,
     };
-    let start = F(base.wrapping_add(frame) as i32 as f32);
+    let start = seq::cvt_s_w(base.wrapping_add(frame) as i32);
     m.w32(s + 0x48, if start.ee() < 0.0 { 0 } else { start.0.to_bits() });
     m.w32(s + 0x10, m.r32(ctl + 0x18));
     match m.r32(r + 8) {
@@ -452,7 +452,7 @@ pub fn clip_duration(m: &Mem, ctl: u32, k: u32) -> F {
         0 => F(0.0),
         s => {
             let len = m.r16(m.r32(m.r32(s + 0x78) + 8) + 0xa) as i32;
-            seq::div(F(len as f32), rf(m, s + 0x10) * F(30.0))
+            seq::div(seq::cvt_s_w(len), rf(m, s + 0x10) * F(30.0))
         }
     }
 }
@@ -463,7 +463,7 @@ pub fn at_end(m: &Mem, ctl: u32, k: u32) -> bool {
         0 => false,
         s => {
             let last = m.r16(m.r32(m.r32(s + 0x78) + 8) + 0xa) as i32 - 1;
-            F(last as f32).ee() <= rf(m, s + 0x48).ee()
+            seq::cvt_s_w(last).ee() <= rf(m, s + 0x48).ee()
         }
     }
 }
@@ -479,4 +479,19 @@ pub fn test_flag(m: &Mem, ctl: u32, flag: u32, k: u32) -> bool {
 pub fn test_bit(m: &Mem, ctl: u32, flag: u32, k: u32) -> bool {
     let s = current(m, ctl, k);
     (m.r8(s + 0x75) as u32 >> (flag.wrapping_sub(1) & 31)) & 1 != 0
+}
+
+/// `AnimCtl_GetClipDisplacement` 0x15fa40(out, layer): the layer's clip's root offset (`AnimData_GetRootOffset` on
+/// its file and clip, [`crate::animcurve::root_offset`]) times the rider's scale (rider+0x464's +0x60), all four
+/// lanes on VU0 (`vmulx`), into `out`
+pub fn clip_displacement(m: &mut Mem, env: &mut dyn SeqEnv, out: u32, ctl: u32, k: u32) -> u32 {
+    let c = clip(m, ctl, k);
+    let (e, sub) = clip_entry(m, env, ctl, c);
+    let off = crate::animcurve::root_offset_values(m, e, sub);
+    let scale = rf(m, m.r32(m.r32(ctl + 0x24) + 0x464) + 0x60);
+    for i in 0..4 {
+        let v = off[i as usize] * scale;
+        m.w32(out + 4 * i, v.0.to_bits());
+    }
+    out
 }
