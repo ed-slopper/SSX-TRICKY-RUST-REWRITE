@@ -9,6 +9,7 @@ use std::rc::Rc;
 use r5900::Runner;
 use tricky_game::pf::Mem;
 use tricky_game::renderdraw as rd;
+use tricky_game::ps2f::F;
 use tricky_game::riderdraw::RiderDrawEnv;
 
 struct Rng(u64);
@@ -664,4 +665,116 @@ fn skinned_draw_matches_the_original() {
     }
     println!("{base} submits, {layers} matrix lists, {paired} with paired layers");
     assert!(base > 3000 && layers > 3000 && paired > 300);
+}
+
+#[test]
+fn text_matches_the_original() {
+    let Some(mut r) = Runner::from_env() else { return };
+    r.allow(0x1de0e0);
+    const FONT: u32 = ARENA + 0x3000;
+    const GLYPHS: u32 = ARENA + 0x3100;
+    const STRING: u32 = ARENA + 0x3400;
+    const COLOUR: u32 = ARENA + 0x3040;
+    // the glyph lookup: character k's glyph at GLYPHS + 12 k, none for characters 7 and above 40
+    let find = |c: u32| if c == 7 || c > 40 { 0 } else { GLYPHS + 12 * c };
+    let log: Rc<RefCell<Vec<Call>>> = Rc::default();
+    {
+        let l = log.clone();
+        r.stub(rd::FIND_GLYPH, move |c, _| {
+            let ch = c.gpr(5) as u32;
+            l.borrow_mut().push(Call(rd::FIND_GLYPH, vec![c.gpr(4) as u32, ch]));
+            c.set_gpr(2, find(ch) as u64);
+        });
+    }
+    for func in [rd::MATRIX_UPDATE, rd::SUBMIT] {
+        let l = log.clone();
+        r.stub(func, move |c, mem| {
+            let w: Vec<u32> = (4..12).map(|k| c.gpr(k) as u32).collect();
+            l.borrow_mut().push(Call(func, logged(func, &w, &mut |a| mem.read_u32(a))));
+        });
+    }
+    struct TextEnv<'a>(&'a mut Vec<Call>, &'a dyn Fn(u32) -> u32);
+    impl RiderDrawEnv for TextEnv<'_> {
+        fn call(&mut self, m: &mut Mem, func: u32, args: &[u32]) -> u32 {
+            if func == rd::FIND_GLYPH {
+                self.0.push(Call(func, args.to_vec()));
+                return (self.1)(args[1]);
+            }
+            let mut w = args.to_vec();
+            w.resize(8, 0);
+            self.0.push(Call(func, logged(func, &w, &mut |a| m.r32(a))));
+            0
+        }
+        fn vcall(&mut self, _m: &mut Mem, func: u32, _this: u32, _args: &[u32]) -> u32 {
+            panic!("no virtual expected: {func:#x}");
+        }
+    }
+    let mut g = Rng(0x5791_5000_0000_0001);
+    let mut glyphs = 0usize;
+    for case in 0..3000u32 {
+        let mut m = Mem { regions: vec![(ARENA, vec![0; SIZE as usize])] };
+        for k in 0..SIZE / 4 {
+            m.w32(ARENA + 4 * k, g.next());
+        }
+        m.w32(R + 0x470, TS);
+        m.w32(R + 0x680, PKT + 0x10 * g.below(16));
+        let idx = g.below(3);
+        m.w32(R + 0xe4, idx);
+        m.w32(R + 0x14 + 0x34 * idx, g.below(2));
+        for k in 0..16u32 {
+            let v = if k % 5 == 0 { g.f(0.5, 2.0) } else if k >= 12 { g.f(-50.0, 50.0) } else { g.f(-0.3, 0.3) };
+            wf(&mut m, R + 0x1770 + 4 * k, v);
+        }
+        for (off, lo, hi) in [(0x1730u32, 0.5f32, 2.0f32), (0x1744, 0.5, 2.0), (0x1758, -100.0, 100.0), (0x1760, 1700.0, 2300.0), (0x1764, 1700.0, 2300.0), (0x1768, 0.0, 1.0e6)] {
+            wf(&mut m, R + off, g.f(lo, hi));
+        }
+        for k in 0..41u32 {
+            let gl = GLYPHS + 12 * k;
+            m.w16(gl + 4, g.below(256) as u16);
+            m.w16(gl + 6, g.below(256) as u16);
+            m.w8(gl + 2, g.below(32) as u8);
+            m.w8(gl + 3, g.below(32) as u8);
+            m.w8(gl + 8, g.next() as u8);
+            m.w8(gl + 9, g.next() as u8);
+            m.w8(gl + 0xa, g.next() as u8);
+        }
+        let len = [0u32, 1, 3, 10, 30][g.below(5) as usize];
+        for k in 0..len {
+            m.w16(STRING + 2 * k, 1 + g.below(45) as u16);
+        }
+        m.w16(STRING + 2 * len, 0);
+        for k in 0..4 {
+            wf(&mut m, COLOUR + 4 * k, [g.f(0.0, 1.0), 1.0, 0.5][g.below(3) as usize]);
+        }
+        let su = [g.f(0.002, 0.01), -g.f(0.002, 0.01)][g.below(2) as usize];
+        let fs: Vec<f32> = vec![g.f(-300.0, 300.0), g.f(-200.0, 200.0), g.f(0.5, 2.0), g.f(0.5, 2.0), su, g.f(0.002, 0.01), g.f(0.0, 500.0)];
+        for (at, b) in &m.regions {
+            r.mem.write(*at, b).unwrap();
+        }
+        log.borrow_mut().clear();
+        let mut calls = Vec::new();
+        let t = rd::Text { font: FONT, string: STRING, colour: COLOUR, x: F(fs[0]), y: F(fs[1]), sx: F(fs[2]), sy: F(fs[3]), su: F(fs[4]), sv: F(fs[5]), z: F(fs[6]) };
+        rd::text(&mut m, &mut TextEnv(&mut calls, &find), R, &t);
+        for (k, v) in [R, FONT, STRING, COLOUR].into_iter().enumerate() {
+            r.cpu.set_gpr(4 + k, v as u64);
+        }
+        for (k, v) in fs.iter().enumerate() {
+            r.cpu.set_f(12 + k, *v);
+        }
+        r.call(0x1de0e0).unwrap_or_else(|e| panic!("case {case}: {e}"));
+        let theirs = log.borrow().clone();
+        assert_eq!(theirs, calls, "case {case}: the calls");
+        for (at, b) in &m.regions {
+            let mut th = vec![0u8; b.len()];
+            r.mem.read(*at, &mut th).unwrap();
+            if &th != b {
+                let i = th.iter().zip(b).position(|(x, y)| x != y).unwrap() & !3;
+                let w = |v: &[u8]| u32::from_le_bytes(v[i..i + 4].try_into().unwrap());
+                panic!("case {case}: memory at {:#x}: theirs {:#x} ours {:#x}", at + i as u32, w(&th), w(b));
+            }
+        }
+        glyphs += theirs.iter().filter(|c| c.0 == rd::FIND_GLYPH).count();
+    }
+    println!("{glyphs} glyphs looked up");
+    assert!(glyphs > 20_000);
 }

@@ -2001,3 +2001,24 @@ Checked in the runner (`tests/renderdraw.rs`): 1500 cases, 2124 sub-batches draw
 
 Checked in the runner (`tests/renderdraw.rs`): 3000 cases (6582 submits, 9831 matrix lists, 1658 draws with
 paired layers). All 25 mutants were caught.
+
+## The renderer's text draw (G7l, `renderdraw::text`)
+
++0x250 0x1de0e0(r, font, string, colour; x, y, sx, sy, su, sv, z) is the text draw `Font_DrawStringA` uses: a
+string of sprites after a 0x50-byte header.
+- **Glyphs.** Each 16-bit character's glyph comes from `Font_FindGlyph` 0x19cc10; a missing one is skipped.
+  A glyph is 12 bytes: +4 / +6 its texture place, +2 / +3 its size, +8 its advance, +9 / +0xa its offset
+  (signed). The pen moves on by the advance × sx.
+- **Two modes**, by the view record's first word:
+  - **Screen:** the corners are the pen plus the offset × the scale, then plus the size. They go through the
+    projection's scales and offsets (+0x1730 / +0x1744, +0x1760 / +0x1764), with z = +0x1758 × z + +0x1768.
+  - **World:** the glyph's centre goes through the screen matrix (+0x1770) and over w, like the sprite draw.
+    The corners are the centre ∓ the half size × the projection's scales / w, with z × w.
+- **The header:** a `cnt` of 2 a glyph + 4, a DIRECT of them all, and a REGLIST of PRIM 0x56 and the colour,
+  then the glyphs' REGLIST tag (NLOOP the glyphs, EOP; ST, XYZ2, ST, XYZ2).
+  - The colour is R, G, B (the floats at +4, +8, +0xc) × 242.25, while A (the first) is × 128, with Q 1. The
+    sprite draws use 128 for all four.
+
+Checked in the runner (`tests/renderdraw.rs`): 3000 strings of 0..30 characters, some with no glyph, in both
+modes (26,968 glyphs). 19 of 20 mutants were caught. The one left re-associates the x corner, which the
+truncation to whole units hides.

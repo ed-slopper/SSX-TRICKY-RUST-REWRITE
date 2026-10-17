@@ -503,3 +503,114 @@ pub fn skinned_draw(m: &mut Mem, env: &mut dyn RiderDrawEnv, r: u32, lod: u32, s
         }
     }
 }
+
+pub const FIND_GLYPH: u32 = 0x19cc10;
+
+/// What a text draw takes: the font, the string (16-bit characters to a 0), the colour, the pen's place, the
+/// glyphs' scale, the texture coordinates' scale and the depth
+pub struct Text {
+    pub font: u32,
+    pub string: u32,
+    pub colour: u32,
+    pub x: crate::ps2f::F,
+    pub y: crate::ps2f::F,
+    pub sx: crate::ps2f::F,
+    pub sy: crate::ps2f::F,
+    pub su: crate::ps2f::F,
+    pub sv: crate::ps2f::F,
+    pub z: crate::ps2f::F,
+}
+
+/// The renderer's +0x250 0x1de0e0(r, font, string, colour; x, y, sx, sy, su, sv, z: f12..f18): a string of
+/// sprites. Each character's glyph (`Font_FindGlyph` 0x19cc10; none skips it; 12 bytes: +4 / +6 its texture
+/// place, +2 / +3 its size, +8 its advance, +9 / +0xa its offset, signed) is a sprite of two corners after the
+/// header (0x50 bytes on), the pen moving on by the advance × sx.
+/// - **On the screen** (the view record's +0 set): the corners the pen plus the offset (× the scale), then the
+///   size, through the projection's scales and offsets (+0x1730 / +0x1744, +0x1760 / +0x1764); z +0x1758 × z +
+///   +0x1768 for both.
+/// - **In the world**: the glyph's centre (half its size on) through the screen matrix (+0x1770) and over w as
+///   the sprite draw does, the corners less and plus the half size × the projection's scales over w, z × w.
+///
+/// Then the header: a `cnt` (2 a glyph + 4 quadwords), DIRECT of all, a REGLIST tag with PRIM 0x56 and the
+/// colour (R, G, B the floats at +4, +8, +0xc × 242.25, A the first × 128, Q 1), and the glyphs' REGLIST tag
+/// (NLOOP the glyphs, EOP; ST, XYZ2, ST, XYZ2); submitted. The fields are or-ed from sign-extended words.
+pub fn text(m: &mut Mem, env: &mut dyn RiderDrawEnv, r: u32, t: &Text) {
+    use crate::ps2f::F;
+    let fl = |v: i32| crate::animseq::cvt_s_w(v);
+    env.call(m, MATRIX_UPDATE, &[r]);
+    let start = m.r32(r + 0x680);
+    let mut p = start + 0x50;
+    let mut glyphs = 0u32;
+    let mut pen = t.x;
+    let screen = m.r32(r.wrapping_add(m.r32(r + 0xe4).wrapping_mul(0x34)) + 0x14) != 0;
+    let mut s = t.string;
+    let zz = rf(m, r + 0x1758) * t.z + rf(m, r + 0x1768);
+    let one = F(1.0);
+    while m.r16(s) != 0 {
+        let c = m.r16(s) as u32;
+        let g = env.call(m, FIND_GLYPH, &[t.font, c]);
+        s += 2;
+        if g == 0 {
+            continue;
+        }
+        glyphs += 1;
+        let (gu, gv) = (m.r16(g + 4) as i32, m.r16(g + 6) as i32);
+        let (gw, gh) = (m.r8(g + 2) as i32, m.r8(g + 3) as i32);
+        let (adv, ox, oy) = (m.r8(g + 8) as i8 as i32, m.r8(g + 9) as i8 as i32, m.r8(g + 0xa) as i8 as i32);
+        let (u0, v0) = (fl(gu) * t.su, fl(gv) * t.sv);
+        let (u1, v1) = (fl(gu + gw) * t.su, fl(gv + gh) * t.sv);
+        let st0 = sx(u0.0.to_bits()) | (v0.0.to_bits() as u64) << 32;
+        let st1 = sx(u1.0.to_bits()) | (v1.0.to_bits() as u64) << 32;
+        let (xyz0, xyz1);
+        if screen {
+            let (k0, k1) = (rf(m, r + 0x1730), rf(m, r + 0x1744));
+            let x0 = (pen + fl(ox) * t.sx) * k0 + rf(m, r + 0x1760);
+            let y0 = (t.y + fl(oy) * t.sy) * k1 + rf(m, r + 0x1764);
+            let x1 = x0 + fl(gw) * t.sx * k0;
+            let y1 = y0 + fl(gh) * t.sy * k1;
+            let zw = int(zz) << 32;
+            xyz0 = int(x0) | int(y0) << 16 | zw;
+            xyz1 = int(x1) | int(y1) << 16 | zw;
+        } else {
+            let half = F(0.5);
+            let hw = fl(gw) * t.sx * half;
+            let hh = fl(gh) * t.sy * half;
+            let cx = (pen + fl(ox) * t.sx) + hw;
+            let cy = (t.y + fl(oy) * t.sy) + hh;
+            let rows = [0, 1, 2, 3].map(|i| [0, 1, 2, 3].map(|j| rf(m, r + 0x1770 + 0x10 * i + 4 * j)));
+            let q = [cx, cy, t.z, one];
+            let w = [0, 1, 2, 3].map(|c| ((rows[0][c] * q[0] + rows[1][c] * q[1]) + rows[2][c] * q[2]) + rows[3][c] * q[3]);
+            let inv = crate::animseq::div(one, w[3]);
+            let a = [w[0] * inv, w[1] * inv, w[2], inv];
+            let h = [rf(m, r + 0x1730) * hw * inv, rf(m, r + 0x1744) * hh * inv, F(0.0), F(0.0)];
+            let lo = [0, 1, 2, 3].map(|k| a[k] - h[k]);
+            let hi = [0, 1, 2, 3].map(|k| a[k] + h[k]);
+            xyz0 = int(lo[0]) | int(lo[1]) << 16 | int(lo[2] * lo[3]) << 32;
+            xyz1 = int(hi[0]) | int(hi[1]) << 16 | int(hi[2] * hi[3]) << 32;
+        }
+        for (k, v) in [st0, xyz0, st1, xyz1].into_iter().enumerate() {
+            w64(m, p + 8 * k as u32, v);
+        }
+        p += 0x20;
+        pen = pen + fl(adv) * t.sx;
+    }
+    let c = |k: u32, s: f32| int(rf(m, t.colour + 4 * k) * F(s));
+    let rgbaq = c(1, 242.25) | (1f32.to_bits() as u64) << 32 | c(3, 242.25) << 16 | c(2, 242.25) << 8 | c(0, 128.0) << 24;
+    let header = [
+        0x1000_0000u64 | (glyphs * 2 + 4) as u64,
+        0,
+        0,
+        ((glyphs * 2 + 3) as u64 | 0x5000_0000) << 32,
+        0x2400_0000u64 << 32 | 1,
+        0x10,
+        0x56,
+        rgbaq,
+        (glyphs | 0x8000) as u64 | 0x8800u64 << 47,
+        0x5252,
+    ];
+    for (k, v) in header.into_iter().enumerate() {
+        w64(m, start + 8 * k as u32, v);
+    }
+    m.w32(r + 0x680, p + 0x10);
+    env.call(m, SUBMIT, &[r, start, p, 0]);
+}
