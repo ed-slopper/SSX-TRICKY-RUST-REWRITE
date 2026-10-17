@@ -82,8 +82,7 @@ state machine and the renderer are ours. Nothing has been checked against the or
 | G7a | Terrain patches: the game's tessellation and LOD, subtractive lightmaps | unowned | G7 | | [repo] README "What the viewer taught us" |
 | G7b | Objects: per-instance lights (ambient + 3 directional, 128 = 1.0), materials, the PS2 blend modes for transparent materials | unowned | G7 | | [repo] "exact PS2 blending modes" not done |
 | G7d | (umbrella: G7d1, G7d2) Lights and halos, glows, lens flares | unowned | G7 | | [repo] "lights/halos" not done; split 2026-10-16 |
-| G7d1 | The lights: `cLightMan` 0x1ce0f0 (constructor, destructor, its small virtuals), `Lights_Build` 0x1ce140, `Lights_Clear` 0x1ce278, `Mat4_RotateBy` 0x1ce310, `Lights_InsertStrongest` 0x25a028 and the world's light gathering that calls it (0x25ab2c, 0x25af08) | ed-slopper/puffin | G7 | | Split of G7d |
-| G7d2 | Lens flares and glows: `cLensFXObjNode` 0x1cbbc8 (constructor, destructor, `Draw` 0x1cbe20 with its two draw parts 0x1cc190 and 0x1cd040) and `LensFX_AddFlare` 0x1cc088 | any | G7 | | Split of G7d |
+| G7d2 | Lens flares and glows: `cLensFXObjNode` 0x1cbbc8 (constructor, destructor, `Draw` 0x1cbe20 with its two draw parts 0x1cc190 and 0x1cd040) `LensFX_AddFlare` 0x1cc088 and the world's `LensFX_Draw` 0x2006e8 that adds the flares | ed-slopper/puffin | G7 | | Split of G7d |
 | G7e | Particles as the VU1 microcode draws them (0x31c288), spark and dust sprites | unowned | G7 | | [repo] "Unresolved: spark and dust sprite rendering"; `particles.rs` has the emitters |
 | G7g | Rider shading and shadows, board reflections (env materials) | unowned | G7, E4 | | [est] |
 | G9 | Front end: title, main menu, mode select, rider / outfit / board select, options, records, trick book screens, unlock screens, music player, loading screens (`gApp+0x734`) | unowned | E1, E5 | | [repo] `ui.rs` is ours. Split (2026-10-16): G9b the shared machinery, G9c–G9t the screens (logic ported and checked in the runner, widgets as calls out), G9u the app's menus on them |
@@ -156,6 +155,7 @@ matches the original.
 
 | ID | Task | Section | Who | Date | Commit |
 |---|---|---|---|---|---|
+| G7d1 | The lights: `tricky_game::lights` (`World_GetLightsAt` with its local-light pass and the three strongest kept by `Lights_InsertStrongest`, `World_GetCellAt`, `Lights_Build`, `Lights_Clear`, `Mat4_RotateBy`, `cLightMan`), checked in the runner on 40,000 random grids, lights and quads (tests/lights.rs); 35 of 42 mutants caught, 5 equivalent, 2 exact boundaries | P2 | ed-slopper/puffin | 2026-10-16 | 9151848 |
 | G7c | Sky, fog, distance culling and the `.ltg` grid use: all its parts done (G7c1 snow, G7c2 fog, G7c3 sky, G7c4 culling and the grid lookup) | P2 | ed-slopper/puffin | 2026-10-16 | 215cc8d |
 | G7c4 | Distance culling and the grid: `tricky_game::cull` (`cPS2GraphicsMan::CullBox` with its frame matrices and the VU0 micro program 0x320 run in the runner's new micro mode from the game's own upload), `bxlist::cull_to_count` (`BxList_CullToCount`, uncalled) and `tricky_game::worldgrid` (`WorldGrid_CellAtPos` on every course's grid), checked in the runner (tests/cull.rs, tests/bxlist.rs, tests/ltg.rs); the other grid walks are G7c1/G7c2/E7a, the terrain and objects G7a/G7b | P2 | ed-slopper/puffin | 2026-10-16 | 215cc8d |
 | G7c3 | The sky: `tricky_game::sky` (`Sky_InitLayers` / `_FreeLayer(s)` / `_GetLayer` / `_GetModelByIndex` / `_Get/SetLayerCount` / `_Delete` and the static set-up, `Course_LoadSkies` / `Course_LoadSky` / `Course_RemapSkyTextures`, `cSkyBoxObjNode` constructor / destructor / draw and its light constants), checked in the runner on 16,000 random sky sets (tests/sky.rs); 37 of 38 mutants caught, one equivalent | P2 | ed-slopper/puffin | 2026-10-16 | 6f27b9d |
@@ -1206,3 +1206,4 @@ matches the original.
 - 2026-10-16 ed-slopper/puffin: G7c2 done; claim G7c3.
 - 2026-10-16 ed-slopper/puffin: G7c3 done 6f27b9d (the sky vs the original); G7c4 claimed.
 - 2026-10-16 ed-slopper/puffin: G7c4 done 215cc8d (CullBox with the runner's VU0 micro mode, BxList_CullToCount, WorldGrid_CellAtPos); G7c closed; G7d split into G7d1 (lights, claimed) and G7d2 (lens flares).
+- 2026-10-16 ed-slopper/puffin: G7d1 done 9151848 (the lights vs the original); G7d2 claimed.
