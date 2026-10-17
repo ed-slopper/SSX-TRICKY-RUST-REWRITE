@@ -83,9 +83,8 @@ state machine and the renderer are ours. Nothing has been checked against the or
 | G7b | Objects: per-instance lights (ambient + 3 directional, 128 = 1.0), materials, the PS2 blend modes for transparent materials | unowned | G7 | | [repo] "exact PS2 blending modes" not done |
 | G7d | (umbrella: G7d1, G7d2) Lights and halos, glows, lens flares | unowned | G7 | | [repo] "lights/halos" not done; split 2026-10-16 |
 | G7d2 | (umbrella: G7d2a, G7d2b, G7d2c, G7d2d) Lens flares and glows: `cLensFXObjNode` 0x1cbbc8 and its parts | unowned | G7 | | Split of G7d; split again 2026-10-16 |
-| G7d2b | The sun's flare 0x1cd040 (visibility +0x270, projection +0x278, the screen box, the 37-point outline by `Math_Atan` / `Math_SinCos` and the table at 0x391cf8) | ed-slopper/puffin | G7d2a | | Split of G7d2 |
-| G7d2c | The flares' part 0x1cc190 (3756 bytes, called from `Draw` after the sun's) | any | G7d2a | | Split of G7d2 |
-| G7d2d | The renderer's lens FX callback 0x1cdc78 (912 bytes, not in the index) and 0x1ce058, which draw what G7d2b/c made | any | G7d2b, G7d2c | | Split of G7d2 |
+| G7d2d | The renderer's lens FX callback 0x1cdc78 (912 bytes, not in the index) with the colour scale's setter / getter 0x1cdfc0 / 0x1ce000 and the vector copies 0x1ce058..0x1ce0ec; it asks the node's own virtuals (+0x50..+0x80, the PS2 node's, G7d2e) to draw | ed-slopper/puffin | G7d2b, G7d2c | | Split of G7d2 |
+| G7d2e | The PS2 lens FX node that draws: `LensFX_Create` 0x1ea408, `cPS2LensFXObjNode` 0x1ea4d0 (constructor, destructor, vtable 0x393ea8) and its virtuals 0x1ea520 (vf9, 1136 bytes), 0x1ea990, 0x1eaa40, 0x1eaa68, 0x1eab88, 0x1eab90 (1300), 0x1eb0a8 (1236): the visibility answers and the GS packets | any | G7d2d | | Split of G7d2 |
 | G7e | Particles as the VU1 microcode draws them (0x31c288), spark and dust sprites | unowned | G7 | | [repo] "Unresolved: spark and dust sprite rendering"; `particles.rs` has the emitters |
 | G7g | Rider shading and shadows, board reflections (env materials) | unowned | G7, E4 | | [est] |
 | G9 | Front end: title, main menu, mode select, rider / outfit / board select, options, records, trick book screens, unlock screens, music player, loading screens (`gApp+0x734`) | unowned | E1, E5 | | [repo] `ui.rs` is ours. Split (2026-10-16): G9b the shared machinery, G9c–G9t the screens (logic ported and checked in the runner, widgets as calls out), G9u the app's menus on them |
@@ -158,6 +157,8 @@ matches the original.
 
 | ID | Task | Section | Who | Date | Commit |
 |---|---|---|---|---|---|
+| G7d2c | The flares: `lensfx::flares_part` (0x1cc190: each kept flare's projection, boxes, depth toward the camera, the kind's size and reach, two glows, the turned streak, the normalised colour and its fade), checked in the runner with `Math_Sin` / `Math_Cos` / `Vec3_Dot` / `Vec3_Div` as the original (tests/lensfx.rs); 27 of 29 mutants caught | P2 | ed-slopper/puffin | 2026-10-16 | 24584e7 |
+| G7d2b | The sun's flare: `lensfx::sun_part` (0x1cd040: the sun placed by its angles and distance, hidden or projected, its sprite and glow boxes, colours, and the 37-ray outline to the screen's edges with the corners put in by `Math_Atan`), checked in the runner with `Math_SinCos` / `Math_Atan` running as the original (tests/lensfx.rs); 25 of 31 mutants caught, 3 equivalent, 3 exact boundaries | P2 | ed-slopper/puffin | 2026-10-16 | 24584e7 |
 | G7d2a | The lens flares' node: `tricky_game::lensfx` (`cLensFXObjNode` constructor / destructor / `Draw` with its per-half and per-view blocks, `LensFX_AddFlare`, the world's `LensFX_Draw`; the two drawing parts called out for G7d2b/c), checked in the runner on 20,000 random nodes and worlds (tests/lensfx.rs); 25 of 27 mutants caught; `lights.rs` now compares the EE's values | P2 | ed-slopper/puffin | 2026-10-16 | c3ef877 |
 | G7d1 | The lights: `tricky_game::lights` (`World_GetLightsAt` with its local-light pass and the three strongest kept by `Lights_InsertStrongest`, `World_GetCellAt`, `Lights_Build`, `Lights_Clear`, `Mat4_RotateBy`, `cLightMan`), checked in the runner on 40,000 random grids, lights and quads (tests/lights.rs); 35 of 42 mutants caught, 5 equivalent, 2 exact boundaries | P2 | ed-slopper/puffin | 2026-10-16 | 9151848 |
 | G7c | Sky, fog, distance culling and the `.ltg` grid use: all its parts done (G7c1 snow, G7c2 fog, G7c3 sky, G7c4 culling and the grid lookup) | P2 | ed-slopper/puffin | 2026-10-16 | 215cc8d |
@@ -1213,3 +1214,4 @@ matches the original.
 - 2026-10-16 ed-slopper/puffin: G7d1 done 9151848 (the lights vs the original); G7d2 claimed.
 - 2026-10-16 ed-slopper/puffin: G7d2 split into G7d2a (the node, AddFlare, LensFX_Draw; claimed), G7d2b (the sun), G7d2c (the flares), G7d2d (the draw callback).
 - 2026-10-16 ed-slopper/puffin: G7d2a done c3ef877 (the lens FX node vs the original); G7d2b claimed.
+- 2026-10-16 ed-slopper/puffin: G7d2b and G7d2c done 24584e7 (the sun's flare and the flares vs the original); G7d2d claimed; G7d2e added (the PS2 node's drawing virtuals).
