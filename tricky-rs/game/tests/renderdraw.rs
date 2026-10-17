@@ -113,3 +113,102 @@ fn strips_match_the_original() {
     }
     println!("{chunks} chunks");
 }
+
+fn wf(m: &mut Mem, at: u32, v: f32) {
+    m.w32(at, v.to_bits());
+}
+impl Rng {
+    fn f(&mut self, lo: f32, hi: f32) -> f32 {
+        lo + (hi - lo) * (self.next() >> 8) as f32 / (1u32 << 24) as f32
+    }
+}
+
+#[test]
+fn sprite_matches_the_original() {
+    let Some(mut r) = Runner::from_env() else { return };
+    r.allow(0x1dd5c8);
+    let log: Rc<RefCell<Vec<Call>>> = Rc::default();
+    for func in [rd::MATRIX_UPDATE, rd::SUBMIT] {
+        let l = log.clone();
+        r.stub(func, move |c, mem| {
+            let w: Vec<u32> = (4..12).map(|k| c.gpr(k) as u32).collect();
+            l.borrow_mut().push(Call(func, logged(func, &w, &mut |a| mem.read_u32(a))));
+        });
+    }
+    const PLACE: u32 = ARENA + 0x3000;
+    const SIZE2: u32 = ARENA + 0x3010;
+    const ST0: u32 = ARENA + 0x3020;
+    const ST1: u32 = ARENA + 0x3030;
+    const COLOUR: u32 = ARENA + 0x3040;
+    let mut g = Rng(0x5791_1000_0000_0001);
+    let mut drawn = 0usize;
+    for case in 0..6000u32 {
+        let mut m = Mem { regions: vec![(ARENA, vec![0; SIZE as usize])] };
+        for k in 0..SIZE / 4 {
+            m.w32(ARENA + 4 * k, g.next());
+        }
+        m.w32(R + 0x470, TS);
+        m.w32(R + 0x680, PKT + 0x10 * g.below(16));
+        // the screen matrix: a perspective onto a 640 × 448 screen about 2048 (the offset in the depth's row, so that
+        // it survives the divide), w the depth
+        for i in 0..4u32 {
+            for j in 0..4u32 {
+                let v = match (i, j) {
+                    (0, 0) => g.f(200.0, 400.0),
+                    (1, 1) => -g.f(200.0, 300.0),
+                    (2, 2) => g.f(-500.0, 500.0),
+                    (2, 3) => 1.0,
+                    (2, 0) | (2, 1) => g.f(1800.0, 2300.0),
+                    (3, 2) => g.f(0.0, 1.6e7),
+                    _ => if g.below(3) == 0 { g.f(-0.2, 0.2) } else { 0.0 },
+                };
+                wf(&mut m, R + 0x1770 + 0x10 * i + 4 * j, v);
+            }
+        }
+        wf(&mut m, R + 0x1730, g.f(200.0, 400.0));
+        wf(&mut m, R + 0x1744, g.f(200.0, 300.0));
+        for (k, v) in [1728.0f32, 1824.0, 1.6e7, 9.0e6, 2368.0, 2272.0, 0.0, 4.0e6].into_iter().enumerate() {
+            wf(&mut m, R + 0x17b0 + 4 * k as u32, v);
+        }
+        // the place: on screen, off each side, behind the camera (w below 0), near and far
+        let spread = [50.0f32, 400.0, 3000.0][g.below(3) as usize];
+        for k in 0..2 {
+            wf(&mut m, PLACE + 4 * k, g.f(-spread, spread));
+        }
+        wf(&mut m, PLACE + 8, [g.f(-5.0, 300.0), -10.0, g.f(-200.0, -0.5), 1.0, 50.0, g.f(0.5, 5.0)][g.below(6) as usize]);
+        wf(&mut m, PLACE + 0xc, 1.0);
+        wf(&mut m, SIZE2, [g.f(0.0, 5.0), g.f(0.0, 100.0)][g.below(2) as usize]);
+        wf(&mut m, SIZE2 + 4, [g.f(0.0, 5.0), g.f(0.0, 100.0)][g.below(2) as usize]);
+        for k in 0..2 {
+            wf(&mut m, ST0 + 4 * k, [g.f(0.0, 1.0), -0.5, 1.0][g.below(3) as usize]);
+            wf(&mut m, ST1 + 4 * k, [g.f(0.0, 1.0), -0.5, 1.0][g.below(3) as usize]);
+        }
+        for k in 0..4 {
+            wf(&mut m, COLOUR + 4 * k, [g.f(0.0, 2.0), 0.0, 1.0, -0.5][g.below(4) as usize]);
+        }
+        for (at, b) in &m.regions {
+            r.mem.write(*at, b).unwrap();
+        }
+        log.borrow_mut().clear();
+        let mut ours = Ours(Vec::new());
+        rd::sprite(&mut m, &mut ours, R, PLACE, SIZE2, ST0, ST1, COLOUR);
+        for (k, v) in [R, PLACE, SIZE2, ST0, ST1, COLOUR].into_iter().enumerate() {
+            r.cpu.set_gpr(4 + k, v as u64);
+        }
+        r.call(0x1dd5c8).unwrap_or_else(|e| panic!("case {case}: {e}"));
+        let theirs = log.borrow().clone();
+        assert_eq!(theirs, ours.0, "case {case}: the calls");
+        for (at, b) in &m.regions {
+            let mut th = vec![0u8; b.len()];
+            r.mem.read(*at, &mut th).unwrap();
+            if &th != b {
+                let i = th.iter().zip(b).position(|(x, y)| x != y).unwrap() & !3;
+                let w = |v: &[u8]| u32::from_le_bytes(v[i..i + 4].try_into().unwrap());
+                panic!("case {case}: memory at {:#x}: theirs {:#x} ours {:#x}", at + i as u32, w(&th), w(b));
+            }
+        }
+        drawn += theirs.iter().any(|c| c.0 == rd::SUBMIT) as usize;
+    }
+    println!("{drawn} drawn");
+    assert!(drawn > 500 && drawn < 5900);
+}

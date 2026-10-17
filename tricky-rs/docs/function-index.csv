@@ -3016,7 +3016,7 @@ address,size,name,system,status
 0x1dce08,1608,cPS2GraphicsMan::vf21_1dce08,render,not started
 0x1dd450,156,cPS2GraphicsMan::vf35_1dd450,render,not started
 0x1dd4f0,216,cPS2GraphicsMan::vf15_1dd4f0,render,not started
-0x1dd5c8,1072,cPS2GraphicsMan::vf71_1dd5c8,render,not started
+0x1dd5c8,1072,cPS2GraphicsMan::vf71_1dd5c8,render,checked
 0x1dd9f8,1764,cPS2GraphicsMan::vf72_1dd9f8,render,not started
 0x1de0e0,1764,cPS2GraphicsMan::vf73_1de0e0,render,not started
 0x1de7c8,704,cPS2GraphicsMan::vf67_1de7c8,render,checked

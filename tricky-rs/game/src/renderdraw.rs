@@ -91,3 +91,94 @@ pub fn strips(m: &mut Mem, env: &mut dyn RiderDrawEnv, r: u32, n: u32, vertices:
     env.call(m, SUBMIT, &[r, start, p, 0]);
     clear_program(m, r);
 }
+
+fn rf(m: &Mem, a: u32) -> crate::ps2f::F {
+    crate::ps2f::F(f32::from_bits(m.r32(a)))
+}
+/// A word as the EE holds it after `lw` or `mfc1`: sign-extended to 64 bits
+fn sx(v: u32) -> u64 {
+    v as i32 as i64 as u64
+}
+/// `cvt.w.s` then `mfc1`: the integer, sign-extended
+fn int(x: crate::ps2f::F) -> u64 {
+    sx(crate::sndlib::cvt_w(x.0) as u32)
+}
+
+/// The outcode of a corner against the screen's box (+0x17b0.. +0x17c8): x below the left 2, beyond the right 1,
+/// y 8 / 4; with w below 0 all of those flipped (^ 0x2f) and z not tested, else z beyond the near 0x20, before
+/// the far 0x10
+fn outcode(m: &Mem, r: u32, c: [crate::ps2f::F; 4]) -> u32 {
+    let mut o = 0;
+    if c[0] < rf(m, r + 0x17b0) {
+        o = 2;
+    }
+    if rf(m, r + 0x17c0) < c[0] {
+        o |= 1;
+    }
+    if c[1] < rf(m, r + 0x17b4) {
+        o |= 8;
+    }
+    if rf(m, r + 0x17c4) < c[1] {
+        o |= 4;
+    }
+    if c[3] < crate::ps2f::F(0.0) {
+        return o ^ 0x2f;
+    }
+    if rf(m, r + 0x17b8) < c[2] {
+        o |= 0x20;
+    }
+    if c[2] < rf(m, r + 0x17c8) {
+        o |= 0x10;
+    }
+    o
+}
+
+/// The renderer's +0x240 0x1dd5c8(r, place, size, st0, st1, colour): one sprite. The matrices are made; the place
+/// goes through the screen matrix (+0x1770) and over w (x, y; z kept, w 1 / w), the half size by the projection's
+/// scales (+0x1730, +0x1744) over w. The two corners (less and plus the half size) are outcoded (`outcode`), and
+/// nothing is drawn when they share a side. Else a `cnt` of 5 at the packet place: DIRECT 4 of a
+/// REGLIST tag (NLOOP 1, EOP; PRIM, ST, RGBAQ, XYZ2, ST, XYZ2) with the primitive 0x56, the first ST, the colour
+/// (×128 as integers: R the second float, G the third, B the fourth, A the first; Q 1), the first corner (x, y,
+/// z × w as integers), the second ST and corner; submitted (start, start + 0x60, 0). The fields are or-ed from
+/// sign-extended words, as the EE has them, so a negative one fills the bits above it.
+pub fn sprite(m: &mut Mem, env: &mut dyn RiderDrawEnv, r: u32, place: u32, size: u32, st0: u32, st1: u32, colour: u32) {
+    use crate::ps2f::F;
+    env.call(m, MATRIX_UPDATE, &[r]);
+    let rows = [0, 1, 2, 3].map(|i| [0, 1, 2, 3].map(|j| rf(m, r + 0x1770 + 0x10 * i + 4 * j)));
+    let pl = [0, 1, 2, 3].map(|j| rf(m, place + 4 * j));
+    let p = [0, 1, 2, 3].map(|c| ((rows[0][c] * pl[0] + rows[1][c] * pl[1]) + rows[2][c] * pl[2]) + rows[3][c] * pl[3]);
+    let inv = crate::animseq::div(F(1.0), p[3]);
+    let hx = rf(m, r + 0x1730) * rf(m, size) * inv;
+    let hy = rf(m, r + 0x1744) * rf(m, size + 4) * inv;
+    let a = [p[0] * inv, p[1] * inv, p[2], inv];
+    let h = [hx, hy, F(0.0), F(0.0)];
+    let lo = [0, 1, 2, 3].map(|k| a[k] - h[k]);
+    let hi = [0, 1, 2, 3].map(|k| a[k] + h[k]);
+    if outcode(m, r, lo) & outcode(m, r, hi) != 0 {
+        return;
+    }
+    let t = m.r32(r + 0x680);
+    let st = |m: &Mem, at: u32| sx(m.r32(at)) | (m.r32(at + 4) as u64) << 32;
+    let c = |k: u32| int(rf(m, colour + 4 * k) * F(128.0));
+    let rgbaq = (1f32.to_bits() as u64) << 32 | c(1) | c(3) << 16 | c(2) << 8 | c(0) << 24;
+    let xyz = |q: [F; 4]| int(q[0]) | int(q[1]) << 16 | int(q[2] * q[3]) << 32;
+    let fields = [
+        0x1000_0005u64,
+        0,
+        0,
+        0x5000_0004u64 << 32,
+        0x6400_0000u64 << 32 | 0x8001,
+        0x52_5120,
+        0x56,
+        st(m, st0),
+        rgbaq,
+        xyz(lo),
+        st(m, st1),
+        xyz(hi),
+    ];
+    for (k, v) in fields.into_iter().enumerate() {
+        w64(m, t + 8 * k as u32, v);
+    }
+    m.w32(r + 0x680, t + 0x70);
+    env.call(m, SUBMIT, &[r, t, t + 0x60, 0]);
+}

@@ -1917,3 +1917,27 @@ The submit's stand-in logs the texture state as it is then, so the reset at the 
 byte. 14 of 17 mutants were caught. The three left are equivalent:
 - the chunk bounds (< 74 / < 72) as one less: exactly 73 or 71 give the same count either way;
 - the end's reset without its word-0 check: word 0 was just cleared.
+
+## The renderer's sprite draw (G7l, `renderdraw::sprite`)
+
++0x240 0x1dd5c8(r, place, size, st0, st1, colour) draws one sprite: the speed dust and the attitude icon.
+- **Placing.** The matrices are made. The place goes through the screen matrix (+0x1770): x and y are divided
+  by w, z is kept, and w becomes 1/w. The half size is the projection's scales (+0x1730, +0x1744) × the size /
+  w.
+- **Culling.** Both corners are outcoded against the screen's box (+0x17b0 left, +0x17b4 top, +0x17b8 far,
+  +0x17c0 right, +0x17c4 bottom, +0x17c8 near). A corner with w below 0 has its code flipped (^ 0x2f), which
+  always sets the far bit, so a sprite behind the camera is always culled. The sprite is skipped when the two
+  codes share a bit.
+- **The packet**: a `cnt` of 5, DIRECT 4, then a REGLIST tag (PRIM 0x56, ST, RGBAQ, XYZ2, ST, XYZ2).
+  - The colour is ×128 as integers, laid out R, G, B, A from the floats at +4, +8, +0xc, +0, with Q 1.0.
+  - Each corner is (x, y, z × w) as integers.
+  - The 64-bit fields are or-ed from sign-extended words, as the EE has them after `lw` / `mfc1`. So a negative
+    coordinate, or an ST word with its sign set, fills the bits above it.
+
+Checked in the runner (`tests/renderdraw.rs`): 6000 cases on screen, off each side, behind, near and far
+(715 drawn). 14 of 21 mutants were caught. The seven left:
+- `<` as `≤` at the screen's edges and at w = 0 (boundaries);
+- the right edge's bit as the bottom's (the corners are ordered, so the same sprites share a bit);
+- the w flip with 0x3f (behind is culled either way);
+- the far bit as the near's (both corners have the same z);
+- the y half size re-associated (lost in the truncation to whole units).
