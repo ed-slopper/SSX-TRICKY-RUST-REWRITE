@@ -4482,33 +4482,33 @@ address,size,name,system,status
 0x24c278,88,c2PFELoad::vf5_24c278,frontend,checked
 0x24c2d0,340,c2PFELoad::DrawBackground,frontend,checked
 0x24c428,800,c2PFELoad::DrawOverlay,frontend,checked
-0x24c748,300,cFELoadFromQuit::cFELoadFromQuit,frontend,ported
-0x24c878,100,cFELoadFromQuit::~cFELoadFromQuit,frontend,not started
-0x24c8e0,72,cFELoadFromQuit::vf9_24c8e0,frontend,not started
-0x24c928,2112,cFELoadFromQuit::vf10_24c928,frontend,not started
-0x24d168,52,cFELoadFromQuit::vf4_24d168,frontend,not started
-0x24d1a0,496,LoadScreen_SetupTips,race?,not started
-0x24d390,88,cFELoadFromQuit::vf5_24d390,frontend,not started
-0x24d3e8,228,cFELoadFromQuit::vf7_24d3e8,frontend,not started
-0x24d4d0,804,cFELoadFromQuit::vf8_24d4d0,frontend,not started
-0x24d7f8,280,cTrickTutorialLoad::cTrickTutorialLoad,game,ported
-0x24d910,88,cTrickTutorialLoad::~cTrickTutorialLoad,game,not started
-0x24d968,72,cTrickTutorialLoad::StartAssetLoad,game,not started
-0x24d9b0,2112,cTrickTutorialLoad::PollAssetLoad,game,not started
-0x24e1f0,52,cTrickTutorialLoad::vf4_24e1f0,game,not started
-0x24e228,60,TrickTutorialLoad_SetTitle,game?,not started
-0x24e268,88,cTrickTutorialLoad::vf5_24e268,game,not started
-0x24e2c0,228,cTrickTutorialLoad::DrawBackground,game,not started
-0x24e3a8,1652,cTrickTutorialLoad::DrawOverlay,frontend,not started
-0x24ea20,280,cRiderRankingLoad::cRiderRankingLoad,game,not started
-0x24eb38,88,cRiderRankingLoad::~cRiderRankingLoad,game,not started
-0x24eb90,276,cRiderRankingLoad::StartAssetLoad,game,not started
-0x24eca8,2112,cRiderRankingLoad::PollAssetLoad,game,not started
-0x24f4e8,52,cRiderRankingLoad::vf4_24f4e8,game,not started
-0x24f520,920,FE_FillCareerSummary,frontend,not started
-0x24f8c0,88,cRiderRankingLoad::vf5_24f8c0,game,not started
-0x24f918,300,cRiderRankingLoad::DrawBackground,game,not started
-0x24fa48,1292,cRiderRankingLoad::DrawOverlay,frontend,not started
+0x24c748,300,cFELoadFromQuit::cFELoadFromQuit,frontend,checked
+0x24c878,100,cFELoadFromQuit::~cFELoadFromQuit,frontend,checked
+0x24c8e0,72,cFELoadFromQuit::vf9_24c8e0,frontend,checked
+0x24c928,2112,cFELoadFromQuit::vf10_24c928,frontend,checked
+0x24d168,52,cFELoadFromQuit::vf4_24d168,frontend,checked
+0x24d1a0,496,LoadScreen_SetupTips,frontend,checked
+0x24d390,88,cFELoadFromQuit::vf5_24d390,frontend,checked
+0x24d3e8,228,cFELoadFromQuit::vf7_24d3e8,frontend,checked
+0x24d4d0,804,cFELoadFromQuit::vf8_24d4d0,frontend,checked
+0x24d7f8,280,cTrickTutorialLoad::cTrickTutorialLoad,frontend,checked
+0x24d910,88,cTrickTutorialLoad::~cTrickTutorialLoad,frontend,checked
+0x24d968,72,cTrickTutorialLoad::StartAssetLoad,frontend,checked
+0x24d9b0,2112,cTrickTutorialLoad::PollAssetLoad,frontend,checked
+0x24e1f0,52,cTrickTutorialLoad::vf4_24e1f0,frontend,checked
+0x24e228,60,TrickTutorialLoad_SetTitle,frontend,checked
+0x24e268,88,cTrickTutorialLoad::vf5_24e268,frontend,checked
+0x24e2c0,228,cTrickTutorialLoad::DrawBackground,frontend,checked
+0x24e3a8,1652,cTrickTutorialLoad::DrawOverlay,frontend,checked
+0x24ea20,280,cRiderRankingLoad::cRiderRankingLoad,frontend,checked
+0x24eb38,88,cRiderRankingLoad::~cRiderRankingLoad,frontend,checked
+0x24eb90,276,cRiderRankingLoad::StartAssetLoad,frontend,checked
+0x24eca8,2112,cRiderRankingLoad::PollAssetLoad,frontend,checked
+0x24f4e8,52,cRiderRankingLoad::vf4_24f4e8,frontend,checked
+0x24f520,920,FE_FillCareerSummary,frontend,checked
+0x24f8c0,88,cRiderRankingLoad::vf5_24f8c0,frontend,checked
+0x24f918,300,cRiderRankingLoad::DrawBackground,frontend,checked
+0x24fa48,1292,cRiderRankingLoad::DrawOverlay,frontend,checked
 0x250018,80,cRiderRankingLoad::__tf,runtime,host
 0x250068,80,cTrickTutorialLoad::__tf,runtime,host
 0x2500b8,80,cFELoadFromQuit::__tf,runtime,host

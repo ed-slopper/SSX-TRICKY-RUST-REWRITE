@@ -2058,3 +2058,506 @@ const TRACK2_TABLE: [Store; 197] = [
     K(0x0ce8, 0x41300000), K(0x0cb4, 0x3f188000), K(0x0cc0, 0x3f228000), K(0x0cb0, 0x41300000),
     K(0x0cd0, 0x3f188000), K(0x0cdc, 0x3f228000), K(0x0cd4, 0x3f788000), K(0x0ccc, 0x41300000),
 ];
+
+// --- G9w5: the load from quit, the trick tutorial's load and the rider ranking's ---
+
+pub const QUIT_VTABLE: u32 = 0x3a50f8;
+pub const TUTORIAL_VTABLE: u32 = 0x3a5098;
+pub const RANKING_VTABLE: u32 = 0x3a5038;
+pub const RAND: u32 = 0x23d4a8;
+pub const LEVEL_STRING_ID: u32 = 0x164730;
+/// The career's unlocks (12 bytes each: +4 the kind, +8 an index; the count before them) and the profiles' items
+/// (0xf0 per profile, 0x14 each: +0 a name, +8 a kind)
+pub const UNLOCKS_COUNT: u32 = 0x3353f8;
+pub const UNLOCKS: u32 = 0x335400;
+pub const PROFILE_ITEMS: u32 = 0x332148;
+/// Four colour records the loading screens' static start fills
+pub const STATIC_COLOURS: u32 = 0x3d2c88;
+pub const SET_VEC4: u32 = 0x14f5f0;
+pub use crate::resultpages::{SET_RECT, TB_APPEND, TB_DELETE, TB_DRAW, TB_INIT, TB_RESET, TB_SET_FONT, TB_SET_SCALE, TB_WRAP};
+
+/// `cFELoadFromQuit::cFELoadFromQuit` 0x24c748(this, from_menu): the animation at +0x40c, a text box at +0x6dc, the
+/// records at +0x1b50, the flag kept (+0x1e64), the tips set up
+pub fn quit_new(m: &mut Mem, env: &mut dyn TextBoxEnv, this: u32, from_menu: u32) -> u32 {
+    init(m, env, this);
+    m.w32(this, QUIT_VTABLE);
+    call(m, env, ANIM_INIT, &[this + 0x40c]);
+    call(m, env, TB_INIT, &[this + 0x6dc]);
+    for i in 0..28 {
+        let r = this + 0x1b50 + 0x1c * i;
+        m.w32(r, 0xffff_ffff);
+        wf(m, r + 4, ONE);
+        wf(m, r + 8, ONE);
+        m.w32(r + 0xc, 0);
+        m.w32(r + 0x10, 0);
+        wf(m, r + 0x14, ONE);
+        wf(m, r + 0x18, ONE);
+    }
+    put4(m, this + 0x94, [ONE, ZERO, ZERO, ZERO]);
+    put4(m, this + 0xa4, [ONE, ZERO, ZERO, ZERO]);
+    m.w32(this + 0x1e64, from_menu);
+    for i in (0..28).rev() {
+        m.w32(this + 0x1b50 + 0x1c * i, 0xffff_ffff);
+    }
+    setup_tips(m, env, this);
+    this
+}
+
+/// `cFELoadFromQuit::~cFELoadFromQuit` 0x24c878(this, flags): its text box deleted too
+pub fn quit_delete(m: &mut Mem, env: &mut dyn TextBoxEnv, this: u32, flags: u32) {
+    m.w32(this, QUIT_VTABLE);
+    call(m, env, BANK_UNLOAD, &[m.r32(SPEECH)]);
+    call(m, env, TB_DELETE, &[this + 0x6dc, 2]);
+    call(m, env, ANIM_DELETE, &[this + 0x40c, 2]);
+    delete(m, env, this, flags);
+}
+
+/// vf9 0x24c8e0(this): the sound bank, the sprite set and its icons, not yet in (+0x1e60)
+pub fn quit_start(m: &mut Mem, env: &mut dyn TextBoxEnv, this: u32) {
+    call(m, env, BANK_LOAD, &[m.r32(SPEECH)]);
+    call(m, env, SPRITES_INIT, &[m.r32(this + 4)]);
+    call(m, env, LOAD_ICONS, &[m.r32(this + 4), 0x2cc, 1]);
+    m.w32(this + 0x1e60, 0);
+}
+
+/// vf10 0x24c928(this): [`poll_sprites`] with the records at +0x1b50
+pub fn quit_poll(m: &mut Mem, env: &mut dyn TextBoxEnv, this: u32) -> u32 {
+    poll_sprites(m, env, this, 0x1b50)
+}
+
+/// vf4 0x24d168 (the front end loads')
+pub fn quit_vf4(m: &mut Mem, env: &mut dyn TextBoxEnv, this: u32, scratch: u32) {
+    fe1_vf4(m, env, this, scratch);
+}
+
+fn rand_tip(m: &mut Mem, env: &mut dyn TextBoxEnv, this: u32) -> u32 {
+    let t = call(m, env, RAND, &[]) % 19;
+    m.w32(this + 0x1b4c, t);
+    t
+}
+
+/// `LoadScreen_SetupTips` 0x24d1a0(this): the heading 0xe30; a tip (+0x1b4c) of the 19 at random, never 17: when
+/// the screen comes from the menu (+0x1e64), or the player's level string is not 31 or 32, any; else one of 3, 4,
+/// 6 and 15. Then the animation's bars: the heading's and the tip's title (0xcff + 2·tip) and text (0xd00 + 2·tip)
+pub fn setup_tips(m: &mut Mem, env: &mut dyn TextBoxEnv, this: u32) {
+    copy_loc(m, env, this + 0x6a0, 0xe30);
+    if m.r32(this + 0x1e64) != 0 {
+        while rand_tip(m, env, this) == 17 {}
+    } else {
+        let id = call(m, env, PLAYER_ID, &[CAREER, 0]);
+        let lv = call(m, env, LEVEL_STRING_ID, &[CAREER, id]);
+        if lv.wrapping_sub(0x1f) < 2 {
+            loop {
+                let t = rand_tip(m, env, this);
+                if t.wrapping_sub(3) < 2 || t == 6 || t == 15 {
+                    break;
+                }
+            }
+        } else {
+            while rand_tip(m, env, this) == 17 {}
+        }
+    }
+    let anim = this + 0x40c;
+    let n = call(m, env, WSTR_COUNT, &[this + 0x6a0]);
+    call(m, env, ANIM_ADD_BAR, &[anim, 1, 1, 2, 0, 0, n]);
+    for (line, base) in [(2u32, 0xcffu32), (3, 0xd00)] {
+        let tip = m.r32(this + 0x1b4c);
+        let s = loc(m, env, (tip << 1).wrapping_add(base));
+        let n = call(m, env, WSTR_COUNT, &[s]);
+        call(m, env, ANIM_ADD_BAR, &[anim, line, line, 1, 0, 0, n]);
+    }
+}
+
+/// vf5 0x24d390 (the front end loads')
+pub fn quit_vf5(m: &mut Mem, env: &mut dyn TextBoxEnv, this: u32) {
+    fe1_vf5(m, env, this);
+}
+
+/// vf7 0x24d3e8(this): once the sprites are in, the bars, the ticker, the course's sprite (+0x1d10), the flakes
+pub fn quit_draw_background(m: &mut Mem, env: &mut dyn TextBoxEnv, this: u32, scratch: u32) {
+    if m.r32(this + 0x1e60) == 0 {
+        return;
+    }
+    let recs = this + 0x1b50;
+    draw_bars(m, env, this, recs, scratch);
+    draw_ticker(m, env, recs, scratch);
+    rcall(m, env, 0x1d0, &[7], &[]);
+    put4(m, scratch, [ONE; 4]);
+    call(m, env, SET_COLOUR, &[DRAW_COLOUR, scratch]);
+    let s = k(0x3f93_3333);
+    fcall(m, env, SPRITE_RECT, &[this + 0x1d10, 0x40], &[F(28.0), k(0x436b_0000), s, s]);
+    let n = m.r32(m.r32(APP) + 8);
+    draw_flakes(m, env, recs, n as i32);
+}
+
+/// vf8 0x24d4d0(this): two text styles (the title font; the menu font, its +4 set unless the animation's +0xc is
+/// 1); at step 4 the heading shadowed in gold, the tip's title in black right of the heading (or ending at 620 if
+/// it fits), its text in the screen's text box (205, 280 wide, 320 high, at 1.07)
+pub fn quit_draw_overlay(m: &mut Mem, env: &mut dyn TextBoxEnv, this: u32, scratch: u32) {
+    let (title, menu) = (this + 0x48, this + 0xc);
+    let (a, b, col) = (scratch, scratch + 0x10, scratch + 0x20);
+    rcall(m, env, 0x1d0, &[0xc], &[]);
+    call(m, env, TS_INIT, &[a]);
+    call(m, env, TS_CONSTRUCT, &[b]);
+    call(m, env, TS_SET_FONT, &[a, title]);
+    m.w32(a + 4, 1);
+    call(m, env, TS_SET_FONT, &[b, menu]);
+    if m.r32(this + 0x418) != 1 {
+        m.w32(b + 4, 1);
+    }
+    if m.r32(this + 0xb4) == 4 {
+        put4(m, col, [ONE, k(0x3f73_f7cf), k(0x3f3a_9fbe), k(0x3dd9_1687)]);
+        call(m, env, SET_COLOUR, &[DRAW_COLOUR, col]);
+        let s12 = k(0x3f99_999a);
+        fcall(m, env, PRINTF_SHADOWED_A, &[title, this + 0x6a0], &[s12, F(30.0), F(27.0)]);
+        let half = F(320.0);
+        let tip = m.r32(this + 0x1b4c);
+        let s = loc(m, env, (tip << 1).wrapping_add(0xcff));
+        let w = fcall(m, env, MEASURE_WIDE, &[menu, s, 0], &[s12]);
+        let room = F(620.0) - crate::animseq::cvt_s_w(w as i32);
+        let x = if room < half { room } else { half };
+        put4(m, col, [ONE, ZERO, ZERO, ZERO]);
+        call(m, env, SET_COLOUR, &[DRAW_COLOUR, col]);
+        let tip = m.r32(this + 0x1b4c);
+        let s = loc(m, env, (tip << 1).wrapping_add(0xcff));
+        fcall(m, env, DRAW_STRING, &[menu, s], &[x, k(0x42fe_0000), s12]);
+        let tb = this + 0x6dc;
+        call(m, env, TB_SET_FONT, &[tb, menu]);
+        call(m, env, TB_RESET, &[tb]);
+        put4(m, col, [ONE, ZERO, ZERO, ZERO]);
+        for i in 0..4 {
+            m.w32(tb + 0x3c + 4 * i, m.r32(col + 4 * i));
+        }
+        m.w32(tb + 0x6c, 0);
+        let s107 = k(0x3f88_f5c3);
+        fcall(m, env, TB_SET_SCALE, &[tb], &[s107, s107]);
+        fcall(m, env, SET_RECT, &[tb], &[half, k(0x434d_0000), k(0x438c_0000), half]);
+        let tip = m.r32(this + 0x1b4c);
+        let s = loc(m, env, (tip << 1).wrapping_add(0xd00));
+        call(m, env, TB_APPEND, &[tb, s]);
+        call(m, env, TB_WRAP, &[tb, 0]);
+        m.w32(tb + 0x6c, 0);
+        put4(m, col, [ONE, ZERO, ZERO, ZERO]);
+        call(m, env, SET_COLOUR, &[DRAW_COLOUR, col]);
+        call(m, env, TB_DRAW, &[tb, 0xffff_ffff, 0]);
+    }
+    call(m, env, TS_DESTRUCT_THUNK, &[b, 2]);
+    call(m, env, TS_DESTRUCT, &[a, 2]);
+}
+
+/// `cTrickTutorialLoad::cTrickTutorialLoad` 0x24d7f8(this): the animation at +0x40c, the records at +0x6dc, the
+/// title set
+pub fn tutorial_new(m: &mut Mem, env: &mut dyn TextBoxEnv, this: u32) -> u32 {
+    screen_new(m, env, this, TUTORIAL_VTABLE, 0x40c, 0x6dc);
+    tutorial_set_title(m, env, this);
+    this
+}
+
+/// `cTrickTutorialLoad::~cTrickTutorialLoad` 0x24d910(this, flags)
+pub fn tutorial_delete(m: &mut Mem, env: &mut dyn TextBoxEnv, this: u32, flags: u32) {
+    screen_delete(m, env, this, flags, TUTORIAL_VTABLE, 0x40c);
+}
+
+/// `cTrickTutorialLoad::StartAssetLoad` 0x24d968(this): the sound bank, the sprite set and its icons, not yet in
+/// (+0x9ec)
+pub fn tutorial_start(m: &mut Mem, env: &mut dyn TextBoxEnv, this: u32) {
+    call(m, env, BANK_LOAD, &[m.r32(SPEECH)]);
+    call(m, env, SPRITES_INIT, &[m.r32(this + 4)]);
+    call(m, env, LOAD_ICONS, &[m.r32(this + 4), 0x2cc, 1]);
+    m.w32(this + 0x9ec, 0);
+}
+
+/// `cTrickTutorialLoad::PollAssetLoad` 0x24d9b0(this): [`poll_sprites`] with the records at +0x6dc
+pub fn tutorial_poll(m: &mut Mem, env: &mut dyn TextBoxEnv, this: u32) -> u32 {
+    poll_sprites(m, env, this, 0x6dc)
+}
+
+/// vf4 0x24e1f0 (the track loads')
+pub fn tutorial_vf4(m: &mut Mem, env: &mut dyn TextBoxEnv, this: u32, scratch: u32) {
+    track1_vf4(m, env, this, scratch);
+}
+
+/// `TrickTutorialLoad_SetTitle` 0x24e228(this): the heading 0xe80
+pub fn tutorial_set_title(m: &mut Mem, env: &mut dyn TextBoxEnv, this: u32) {
+    copy_loc(m, env, this + 0x6a0, 0xe80);
+}
+
+/// vf5 0x24e268(this): the base's tick, the animation, the loading loop stopped (1) once the app's +8 reaches 8
+pub fn tutorial_vf5(m: &mut Mem, env: &mut dyn TextBoxEnv, this: u32) {
+    tick(m, env, this);
+    call(m, env, ANIM_UPDATE, &[this + 0x40c]);
+    if (m.r32(m.r32(APP) + 8) as i32) >= 8 {
+        call(m, env, LOOP_STOP, &[m.r32(SPEECH), 1]);
+    }
+}
+
+/// `cTrickTutorialLoad::DrawBackground` 0x24e2c0(this): once the sprites are in, the bars, the ticker, the pad
+/// (+0x90c) in white at the centre by 1.1, the flakes
+pub fn tutorial_draw_background(m: &mut Mem, env: &mut dyn TextBoxEnv, this: u32, scratch: u32) {
+    if m.r32(this + 0x9ec) == 0 {
+        return;
+    }
+    let recs = this + 0x6dc;
+    draw_bars(m, env, this, recs, scratch);
+    draw_ticker(m, env, recs, scratch);
+    rcall(m, env, 0x1d0, &[7], &[]);
+    put4(m, scratch, [ONE; 4]);
+    call(m, env, SET_COLOUR, &[DRAW_COLOUR, scratch]);
+    let s = k(0x3f8c_cccd);
+    fcall(m, env, SPRITE_RECT, &[this + 0x90c, 0x60], &[F(320.0), F(240.0), s, s]);
+    let n = m.r32(m.r32(APP) + 8);
+    draw_flakes(m, env, recs, n as i32);
+}
+
+/// `cTrickTutorialLoad::DrawOverlay` 0x24e3a8(this): on texture 12, once the sprites are in: the heading centred
+/// in gold (shadowed, 1.4), then in black the pad's labels for the career's controller (+0x168c: 0 the labels
+/// 0xc7c..0xc80 and 0xc82, else 0xc84..0xc89, 0xc81 and 0xc83), the two pads (+0x928, +0x944) and their captions
+pub fn tutorial_draw_overlay(m: &mut Mem, env: &mut dyn TextBoxEnv, this: u32, scratch: u32) {
+    rcall(m, env, 0x1d0, &[0xc], &[]);
+    if m.r32(this + 0x9ec) == 0 {
+        return;
+    }
+    let menu = this + 0xc;
+    put4(m, scratch, [ONE, k(0x3f73_f7cf), k(0x3f3a_9fbe), k(0x3dd9_1687)]);
+    call(m, env, SET_COLOUR, &[DRAW_COLOUR, scratch]);
+    let cx = F(320.0);
+    fcall(m, env, SHADOWED_CENTRED, &[this + 0x48, this + 0x6a0], &[k(0x3fb3_3333), cx, F(25.0)]);
+    put4(m, scratch, [ONE, ZERO, ZERO, ZERO]);
+    call(m, env, SET_COLOUR, &[DRAW_COLOUR, scratch]);
+    let pad = m.r32(CAREER + 0x168c);
+    let s = loc(m, env, if pad == 0 { 0xd28 } else { 0xd29 });
+    fcall(m, env, DRAW_CENTRED, &[menu, s], &[cx, k(0x43bb_0000), ONE]);
+    let (lx, lx2, small) = (F(160.0), F(130.0), k(0x3f59_999a));
+    let right = |m: &mut Mem, env: &mut dyn TextBoxEnv, id: u32, x: F, y: u32, sc: F| {
+        let s = loc(m, env, id);
+        fcall(m, env, DRAW_RIGHT, &[menu, s], &[x, k(y), sc]);
+    };
+    let text = |m: &mut Mem, env: &mut dyn TextBoxEnv, id: u32, x: F, y: u32, sc: F| {
+        let s = loc(m, env, id);
+        fcall(m, env, DRAW_STRING, &[menu, s], &[x, k(y), sc]);
+    };
+    if m.r32(CAREER + 0x168c) == 0 {
+        right(m, env, 0xc7c, lx, 0x4319_0000, ONE);
+        right(m, env, 0xc7d, lx, 0x4327_0000, ONE);
+        right(m, env, 0xc7e, lx, 0x4348_0000, ONE);
+        right(m, env, 0xc7f, lx, 0x4356_0000, ONE);
+        right(m, env, 0xc80, lx2, 0x4375_0000, small);
+        right(m, env, 0xc82, lx2, 0x4393_8000, ONE);
+        text(m, env, 0xde2, F(470.0), 0x431f_0000, ONE);
+    } else {
+        right(m, env, 0xc84, lx, 0x4319_0000, ONE);
+        right(m, env, 0xc85, lx, 0x4327_0000, ONE);
+        right(m, env, 0xc86, lx, 0x4348_0000, ONE);
+        right(m, env, 0xc87, lx, 0x4356_0000, ONE);
+        right(m, env, 0xc88, lx2, 0x4375_0000, small);
+        right(m, env, 0xc81, lx2, 0x4381_8000, small);
+        right(m, env, 0xc89, lx2, 0x4393_8000, ONE);
+        right(m, env, 0xc83, lx2, 0x439a_8000, ONE);
+        text(m, env, 0xc8e, F(470.0), 0x431f_0000, ONE);
+    }
+    let ps = k(0x3f38_51ec);
+    fcall(m, env, SPRITE_RECT, &[this + 0x928, 0], &[F(140.0), F(240.0), ps, ps]);
+    fcall(m, env, SPRITE_RECT, &[this + 0x944, 0], &[F(140.0), F(290.0), ps, ps]);
+    text(m, env, 0xc8d, F(190.0), 0x42fa_0000, ONE);
+    text(m, env, 0xc8d, F(360.0), 0x42fa_0000, ONE);
+    right(m, env, 0xc8b, F(310.0), 0x43a0_0000, ONE);
+    text(m, env, 0xc8c, F(330.0), 0x43a0_0000, ONE);
+    text(m, env, 0xc90, F(470.0), 0x4364_0000, ONE);
+    text(m, env, 0xc91, F(470.0), 0x437d_0000, small);
+    text(m, env, 0xc8a, F(470.0), 0x4391_0000, ONE);
+}
+
+/// `cRiderRankingLoad::cRiderRankingLoad` 0x24ea20(this): the animation at +0x40c, the records at +0xa60, the
+/// career's summary
+pub fn ranking_new(m: &mut Mem, env: &mut dyn TextBoxEnv, this: u32) -> u32 {
+    screen_new(m, env, this, RANKING_VTABLE, 0x40c, 0xa60);
+    fill_career_summary(m, env, this);
+    this
+}
+
+/// `cRiderRankingLoad::~cRiderRankingLoad` 0x24eb38(this, flags)
+pub fn ranking_delete(m: &mut Mem, env: &mut dyn TextBoxEnv, this: u32, flags: u32) {
+    screen_delete(m, env, this, flags, RANKING_VTABLE, 0x40c);
+}
+
+/// `cRiderRankingLoad::StartAssetLoad` 0x24eb90(this): the sound bank, the sprite set and its icons, not yet in
+/// (+0xd70); one picture (+0xd74): the player's rider ("ldr1"); its load started
+pub fn ranking_start(m: &mut Mem, env: &mut dyn TextBoxEnv, this: u32) {
+    let e = this + 0xd74;
+    call(m, env, BANK_LOAD, &[m.r32(SPEECH)]);
+    call(m, env, SPRITES_INIT, &[m.r32(this + 4)]);
+    call(m, env, LOAD_ICONS, &[m.r32(this + 4), 0x2cc, 1]);
+    m.w32(this + 0xd70, 0);
+    m.w32(e, 0);
+    m.w8(e + 4, 0);
+    m.w8(e + 0x29, 0);
+    m.w32(e + 0x30, 0xffff_ffff);
+    let id = call(m, env, PLAYER_ID, &[CAREER, 0]);
+    let p = call(m, env, PLAYER_PROFILE, &[CAREER, id]);
+    rider_pic_name(m, env, p, e + 4);
+    put_shape_name(m, e, SHAPE_R1);
+    load_pics(m, env, this, e, 1);
+}
+
+/// `cRiderRankingLoad::PollAssetLoad` 0x24eca8(this): [`poll_sprites`] with the records at +0xa60
+pub fn ranking_poll(m: &mut Mem, env: &mut dyn TextBoxEnv, this: u32) -> u32 {
+    poll_sprites(m, env, this, 0xa60)
+}
+
+/// vf4 0x24f4e8 (the front end loads')
+pub fn ranking_vf4(m: &mut Mem, env: &mut dyn TextBoxEnv, this: u32, scratch: u32) {
+    fe1_vf4(m, env, this, scratch);
+}
+
+/// `FE_FillCareerSummary` 0x24f520(this): the ranking's lines: 0xd2a, 0xd2b, 0xd2c, the player's level, 0xd2d, the
+/// next unlock's item (the first unlock of kind 4: its index into the profile's items, 0 without one) and its kind's
+/// line (0x81, 0xb9, 0x79 for kinds 0 to 2); then the animation's bars
+pub fn fill_career_summary(m: &mut Mem, env: &mut dyn TextBoxEnv, this: u32) {
+    let id = call(m, env, PLAYER_ID, &[CAREER, 0]);
+    let profile = call(m, env, PLAYER_PROFILE, &[CAREER, id]);
+    let mut item = 0u32;
+    let n = m.r32(UNLOCKS_COUNT) as i32;
+    let mut i = 0;
+    while i < n {
+        let e = UNLOCKS + 0xc * i as u32;
+        if m.r32(e + 4) == 4 {
+            item = m.r32(e + 8);
+            break;
+        }
+        i += 1;
+    }
+    copy_loc(m, env, this + 0x6a0, 0xd2a);
+    copy_loc(m, env, this + 0x6c8, 0xd2b);
+    copy_loc(m, env, this + 0x8bc, 0xd2c);
+    let id = call(m, env, PLAYER_ID, &[CAREER, 0]);
+    let lv = call(m, env, LEVEL_NAME, &[CAREER, id]);
+    call(m, env, WSTR_COPY, &[this + 0x902, lv]);
+    copy_loc(m, env, this + 0x948, 0xd2d);
+    let it = profile.wrapping_mul(0xf0).wrapping_add(item.wrapping_mul(0x14)).wrapping_add(PROFILE_ITEMS);
+    call(m, env, WSTR_SET_ASCII, &[this + 0x98e, m.r32(it)]);
+    copy_loc(m, env, this + 0x9d4, 0xd2e);
+    match m.r32(it + 8) {
+        0 => copy_loc(m, env, this + 0xa1a, 0x81),
+        1 => copy_loc(m, env, this + 0xa1a, 0xb9),
+        2 => copy_loc(m, env, this + 0xa1a, 0x79),
+        _ => {}
+    }
+    let anim = this + 0x40c;
+    for (line, at, k2, extra) in [(1u32, 0x6a0u32, 2u32, 0u32), (2, 0x6c8, 1, 0), (3, 0x902, 2, 4), (4, 0x98e, 2, 4), (5, 0xa1a, 2, 4)] {
+        let n = call(m, env, WSTR_COUNT, &[this + at]);
+        call(m, env, ANIM_ADD_BAR, &[anim, line, line, k2, 0, 0, n.wrapping_add(extra)]);
+    }
+}
+
+/// vf5 0x24f8c0(this): the base's tick, the animation, the loading loop stopped (0) when the app's +8 is 9
+pub fn ranking_vf5(m: &mut Mem, env: &mut dyn TextBoxEnv, this: u32) {
+    tick(m, env, this);
+    call(m, env, ANIM_UPDATE, &[this + 0x40c]);
+    if m.r32(m.r32(APP) + 8) == 9 {
+        call(m, env, LOOP_STOP, &[m.r32(SPEECH), 0]);
+    }
+}
+
+/// `cRiderRankingLoad::DrawBackground` 0x24f918(this): once the sprites are in, the bars, the ticker, the badge
+/// (the first record) in white by 0.9, the rider's picture in a tip box (23, 150) once it is in, the flakes
+pub fn ranking_draw_background(m: &mut Mem, env: &mut dyn TextBoxEnv, this: u32, scratch: u32) {
+    if m.r32(this + 0xd70) == 0 {
+        return;
+    }
+    let recs = this + 0xa60;
+    draw_bars(m, env, this, recs, scratch);
+    draw_ticker(m, env, recs, scratch);
+    rcall(m, env, 0x1d0, &[8], &[]);
+    put4(m, scratch, [ONE; 4]);
+    call(m, env, SET_COLOUR, &[DRAW_COLOUR, scratch]);
+    let s = k(0x3f66_6666);
+    fcall(m, env, SPRITE_RECT, &[recs, 0], &[F(10.0), ZERO, s, s]);
+    if m.r32(this + 0xd74) == 1 {
+        draw_tip_box(m, env, this, m.r32(this + 0xd74 + 0x30), 0, 7, F(23.0), k(0x4316_0000), ONE, scratch);
+    }
+    let n = m.r32(m.r32(APP) + 8);
+    draw_flakes(m, env, recs, n as i32);
+}
+
+/// `cRiderRankingLoad::DrawOverlay` 0x24fa48(this): two text styles in the menu font; at step 4 on texture 10 the
+/// headings 0xe73 and 0xe74 in gold, the ranking's heading typed in at 320, its text in a text box (on the stack,
+/// typed in by the animation's line 2), and three labels right-aligned at 380 in black with their values typed in
+/// at 410 in white (rows at 290, 323, 356)
+pub fn ranking_draw_overlay(m: &mut Mem, env: &mut dyn TextBoxEnv, this: u32, scratch: u32) {
+    let menu = this + 0xc;
+    let (a, b, col, tb) = (scratch, scratch + 0x10, scratch + 0x20, scratch + 0x30);
+    let anim = this + 0x40c;
+    call(m, env, TS_INIT, &[a]);
+    call(m, env, TS_CONSTRUCT, &[b]);
+    call(m, env, TS_SET_FONT, &[a, menu]);
+    m.w32(a + 4, 1);
+    call(m, env, TS_SET_FONT, &[b, menu]);
+    m.w32(b + 4, 1);
+    if m.r32(this + 0xb4) == 4 {
+        rcall(m, env, 0x1d0, &[0xa], &[]);
+        put4(m, col, [ONE, k(0x3f73_f7cf), k(0x3f3a_9fbe), k(0x3dd9_1687)]);
+        call(m, env, SET_COLOUR, &[DRAW_COLOUR, col]);
+        let s11 = k(0x3f8c_cccd);
+        let s = loc(m, env, 0xe73);
+        fcall(m, env, PRINTF_SHADOWED_A, &[this + 0x48, s], &[s11, F(15.0), F(25.0)]);
+        let s = loc(m, env, 0xe74);
+        fcall(m, env, PRINTF_SHADOWED_A, &[this + 0x48, s], &[s11, F(46.0), F(54.0)]);
+        put4(m, col, [ONE, ZERO, ZERO, ZERO]);
+        call(m, env, SET_COLOUR, &[DRAW_COLOUR, col]);
+        let s12 = k(0x3f99_999a);
+        let cx = F(320.0);
+        let n = call(m, env, ANIM_VALUE, &[anim, 1]);
+        fcall(m, env, DRAW_ALIGNED, &[a, 0, this + 0x6a0, n, 0, 1], &[s12, cx, k(0x42dc_0000)]);
+        call(m, env, TB_INIT, &[tb]);
+        call(m, env, TB_SET_FONT, &[tb, menu]);
+        call(m, env, TB_RESET, &[tb]);
+        put4(m, col, [ONE, ZERO, ZERO, ZERO]);
+        for i in 0..4 {
+            m.w32(tb + 0x3c + 4 * i, m.r32(col + 4 * i));
+        }
+        m.w32(tb + 0x6c, 0);
+        m.w32(tb + 0x24, 0);
+        m.w32(tb + 0x20, 0);
+        let s106 = k(0x3f87_ae14);
+        fcall(m, env, TB_SET_SCALE, &[tb], &[s106, s106]);
+        fcall(m, env, SET_RECT, &[tb], &[cx, k(0x4318_0000), k(0x4387_0000), F(120.0)]);
+        call(m, env, TB_APPEND, &[tb, this + 0x6c8]);
+        call(m, env, TB_WRAP, &[tb, 0]);
+        m.w32(tb + 0x6c, 0);
+        let n = call(m, env, ANIM_VALUE, &[anim, 2]);
+        call(m, env, TB_DRAW, &[tb, n, 0]);
+        let (lx, vx) = (F(380.0), k(0x43cd_0000));
+        for (label, value, line, y) in [(0x8bcu32, 0x902u32, 3u32, 0x4391_0000u32), (0x948, 0x98e, 4, 0x43a1_8000), (0x9d4, 0xa1a, 5, 0x43b2_0000)] {
+            put4(m, col, [ONE, ZERO, ZERO, ZERO]);
+            call(m, env, SET_COLOUR, &[DRAW_COLOUR, col]);
+            fcall(m, env, DRAW_RIGHT, &[menu, this + label], &[lx, k(y), s12]);
+            put4(m, col, [ONE; 4]);
+            call(m, env, SET_COLOUR, &[DRAW_COLOUR, col]);
+            let n = call(m, env, ANIM_VALUE, &[anim, line]);
+            fcall(m, env, DRAW_ALIGNED, &[a, 0, this + value, n, 1, 1], &[s12, vx, k(y)]);
+        }
+        call(m, env, TB_DELETE, &[tb, 2]);
+    }
+    call(m, env, TS_DESTRUCT_THUNK, &[b, 2]);
+    call(m, env, TS_DESTRUCT, &[a, 2]);
+}
+
+/// 0x24ff58 (the loading screens' static start): four colour records at 0x3d2c88 (white-gold, gold, red-gold, and a
+/// sprite record: unset, white, full size)
+pub fn static_init(m: &mut Mem) {
+    let c = STATIC_COLOURS;
+    let one = ONE.0.to_bits();
+    for (o, v) in [
+        (0x28u32, 0x3b03_126fu32), (0, one), (8, 0), (0x48, one), (0x20, one), (0x24, 0x3d9b_3d08), (0x10, one),
+        (0x14, 0x3ef2_fec5), (0x18, 0), (4, 0x3f76_e979), (0x30, 0xffff_ffff), (0x34, one), (0x38, one), (0x3c, 0),
+        (0x40, 0), (0x44, one),
+    ] {
+        m.w32(c + o, v);
+    }
+}
+
+/// 0x250000(it, v): 0x14f5f0 on `it` with the four floats at `v` (`v` passed on too)
+pub fn set_vec4(m: &mut Mem, env: &mut dyn TextBoxEnv, it: u32, v: u32) {
+    let f = [rf(m, v), rf(m, v + 4), rf(m, v + 8), rf(m, v + 0xc)];
+    fcall(m, env, SET_VEC4, &[it, v], &f);
+}

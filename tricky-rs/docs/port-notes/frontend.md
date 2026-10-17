@@ -1519,3 +1519,36 @@ the bar's `this` adjustment, which is 0 in the table.
 The runner test now has 19,500 cases over 65 functions. 45 of 46 mutants were caught. The one left gives the
 one-player destructor the two-player table; the base's destructor overwrites that word straight after, so the
 mutant is equivalent.
+
+### The load from quit, the trick tutorial's load and the rider ranking's (G9w5)
+
+- **`cFELoadFromQuit`** (table 0x3a50f8) is the loading screen shown when quitting a race back to the menus. Its
+  constructor takes a flag (kept at +0x1e64: the screen comes from the menu) and also builds a text box at +0x6dc.
+  - **`LoadScreen_SetupTips` 0x24d1a0** picks one of 19 tips (+0x1b4c) at random, never tip 17. When the flag is
+    clear and the player's level string id is 31 or 32, the pick is redrawn until it is one of tips 3, 4, 6 and 15.
+    The tip's title and text are the labels 0xcff + 2·tip and 0xd00 + 2·tip, and the heading and both of them get
+    one animation bar each.
+  - Its overlay draws the tip's title in black at x = min(620 − its width, 320), then the text wrapped in the text
+    box (320, 205, 280 by 320, at 1.07). The menu style's "typed in" flag is set only when the animation's +0xc
+    is not 1.
+- **`cTrickTutorialLoad`** (0x3a5098) has no pictures. Its overlay draws the pad's labels in one of two layouts
+  picked by the career's controller setting (+0x168c), the two pad sprites (+0x928, +0x944) and their captions.
+  Its loop is played and stopped with 1, as on the track loads.
+- **`cRiderRankingLoad`** (0x3a5038) loads the player's rider ("ldr1"), shown in a tip box at (23, 150).
+  - **`FE_FillCareerSummary` 0x24f520** walks the career's unlock list (0x3353f8 the count, 12-byte entries from
+    0x335400) for the first entry of kind 4. That entry's index picks the item among the player's profile's items
+    (0x332148, 0xf0 per profile, 0x14 each), giving the item's name and, by its kind (0..2), the line 0x81, 0xb9 or
+    0x79. Without such an entry it takes item 0.
+  - Its overlay builds a text box on its stack (sp+0x30, frame 0x15a0) and deletes it after drawing. The vf5 stops
+    the loop only when the app's +8 is exactly 9 (the other screens stop it from 8 on).
+- **The three polls** are the shared sprite poll, at the records +0x1b50, +0x6dc and +0xa60.
+- Two small functions after them that the index doesn't list are ported too:
+  - 0x24ff58 fills four static colour records at 0x3d2c88;
+  - 0x250000 passes a vector's four floats to 0x14f5f0, with the vector's pointer left in a1.
+
+The same runner test, now 28,200 cases over 94 functions. The text boxes' stand-ins log the box's first 0x70 bytes
+when it is scaled and when it is drawn, so the colour copied into it and the fields cleared by hand are checked
+for the box on the stack too.
+All 55 mutants are caught. Five first survived and showed gaps in the test, now closed: the text styles' +4 is
+logged when they are destroyed, the text box's init stand-in fills the box and its wrap sets +0x6c, and the
+static records start non-zero.

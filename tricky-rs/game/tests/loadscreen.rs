@@ -45,6 +45,8 @@ const SPEECH_AT: (u32, u32) = (0x343000, 0x100);
 /// The two-player summary's labels' ids, and the front end's widgets' tables
 const LABELS: (u32, u32) = (0x3463f0, 0x20);
 const WIDGETS: (u32, u32) = (0x3b5a00, 0x1800);
+/// the loading screens' static colour records
+const STATICS: (u32, u32) = (0x3d2c80, 0x80);
 /// The progress bar's virtual at its table's 0x13c
 const BAR_SIZE: u32 = 0x2ad828;
 const ARENA: u32 = 0x0100_0000;
@@ -180,6 +182,14 @@ fn arity(func: u32) -> (usize, usize) {
         ls::MEASURE_WIDE => (3, 1),
         ls::FIND_RIDER | ls::FORMAT_RACE_TIME => (2, 0),
         ls::SHADOWED_CENTRED => (2, 3),
+        ls::RAND => (0, 0),
+        ls::LEVEL_STRING_ID => (2, 0),
+        ls::TB_INIT | ls::TB_RESET => (1, 0),
+        ls::TB_SET_FONT | ls::TB_APPEND | ls::TB_WRAP | ls::TB_DELETE => (2, 0),
+        ls::TB_SET_SCALE => (1, 2),
+        ls::SET_RECT => (1, 4),
+        ls::TB_DRAW => (3, 0),
+        ls::SET_VEC4 => (2, 4),
         _ => panic!("no arity for {func:#x}"),
     }
 }
@@ -214,6 +224,14 @@ fn standin(io: &mut dyn Io, func: u32, w: &[u32], f: &[u32], ans: &Answers) -> (
             log.extend((0..4).map(|k| io.r32(w[c] + 4 * k)));
         }
     }
+    // the text box (on the stack too) as it stands when it is scaled and drawn
+    if matches!(func, ls::TB_SET_SCALE | ls::TB_DRAW) {
+        log.extend((0..0x1c).map(|k| token(io.r32(w[0] + 4 * k))));
+    }
+    // a text style's +4 (set by hand) as it is destroyed
+    if matches!(func, ls::TS_DESTRUCT_THUNK | ls::TS_DESTRUCT) {
+        log.push(io.r32(w[0] + 4));
+    }
     if func == ls::DRAW_ALIGNED || func == ls::DRAW_CURSOR {
         // (the text style's +4, set by hand)
         log.push(io.r32(w[0] + 4));
@@ -238,6 +256,23 @@ fn standin(io: &mut dyn Io, func: u32, w: &[u32], f: &[u32], ans: &Answers) -> (
         ls::BANK_POLL | ls::SPRITES_POLL => [0u32, 1, 1, 7][(r % 4) as usize],
         ls::PLAYER_PROFILE => r % 12,
         ls::FIND_RIDER => r % 6,
+        // a text box made with words of the seed's, its +0x6c set by the wrap: the fields cleared by hand show
+        ls::TB_INIT => {
+            if stack(w[0]) || mapped(w[0], 0x70) {
+                for k in 0..0x1c {
+                    io.w32(w[0] + 4 * k, r.rotate_left(k));
+                }
+            }
+            0
+        }
+        ls::TB_WRAP => {
+            if stack(w[0]) || mapped(w[0] + 0x6c, 4) {
+                io.w32(w[0] + 0x6c, r | 1);
+            }
+            0
+        }
+        // (the levels 31 and 32 the most: they narrow the tips)
+        ls::LEVEL_STRING_ID => [31u32, 32, 31, 32, r % 40][(r % 5) as usize],
         ls::ATTRIBUTES => {
             // four attributes of four words (the bars read +4, +8, +0xc)
             if stack(w[2]) || mapped(w[2], 0x40) {
@@ -300,6 +335,9 @@ fn loading_screens_match_the_original() {
         0x247a60, 0x247b78, 0x247bd0, 0x247d58, 0x2485f8, 0x248a60, 0x248a98, 0x248ad0, 0x248b18, 0x249250, 0x2493e0,
         0x249758, 0x249870, 0x2498c8, 0x249900, 0x249948, 0x24a188, 0x24a930, 0x24a988, 0x24aa70, 0x24b028, 0x24b140,
         0x24b198, 0x24b320, 0x24bb60, 0x24bb98, 0x24bbd0, 0x24c278, 0x24c2d0, 0x24c428,
+        0x24c748, 0x24c878, 0x24c8e0, 0x24c928, 0x24d168, 0x24d1a0, 0x24d390, 0x24d3e8, 0x24d4d0, 0x24d7f8, 0x24d910,
+        0x24d968, 0x24d9b0, 0x24e1f0, 0x24e228, 0x24e268, 0x24e2c0, 0x24e3a8, 0x24ea20, 0x24eb38, 0x24eb90, 0x24eca8,
+        0x24f4e8, 0x24f520, 0x24f8c0, 0x24f918, 0x24fa48, 0x24ff58, 0x250000,
     ];
     for f in funcs.into_iter().chain([0x250e98]) {
         r.allow(f);
@@ -318,6 +356,8 @@ fn loading_screens_match_the_original() {
         ls::TS_SET_FONT, ls::TS_DESTRUCT_THUNK, ls::TS_DESTRUCT, ls::DRAW_ALIGNED, ls::DRAW_CURSOR, ls::SET_COPY_RECT,
         ls::ATTRIBUTES, ls::WIDGET_COLOUR, ls::WIDGET_POS, ls::WIDGET_VALUE, ls::BAR_DRAW, ls::BAR_DELETE, ls::GRADIENT_RECT,
         ls::DRAW_STRING, ls::DRAW_CENTRED, ls::MEASURE_WIDE, BAR_SIZE, ls::FIND_RIDER, ls::FORMAT_RACE_TIME, ls::SHADOWED_CENTRED,
+        ls::RAND, ls::LEVEL_STRING_ID, ls::TB_INIT, ls::TB_RESET, ls::TB_SET_FONT, ls::TB_APPEND, ls::TB_WRAP, ls::TB_DELETE,
+        ls::TB_SET_SCALE, ls::SET_RECT, ls::TB_DRAW, ls::SET_VEC4,
     ];
     stubs.extend(ROFFS.map(rv));
     stubs.extend(SOFFS.map(sv));
@@ -355,6 +395,7 @@ fn loading_screens_match_the_original() {
                 (SPEECH_AT.0, vec![0; SPEECH_AT.1 as usize]),
                 (LABELS.0, vec![0; LABELS.1 as usize]),
                 (WIDGETS.0, widgets.clone()),
+                (STATICS.0, vec![0x5a; STATICS.1 as usize]),
                 (ARENA, vec![0; SIZE as usize]),
                 (HEAP.0, vec![0; HEAP.1 as usize]),
                 (SCRATCH, vec![0; 0x800]),
@@ -428,6 +469,30 @@ fn loading_screens_match_the_original() {
         for at in (ls::CAREER + 0x3294..ls::CAREER + 0x3294 + 6 * 0xbc).step_by(4) {
             let (v, w) = (g.next(), g.f(0.0, 500.0).to_bits());
             m.w32(at, g.pick(&[v, w]));
+        }
+        // the load from quit (from the menu, its tip, the menu style's flag), the tutorial's and the ranking's
+        // flags, the ranking's picture, the career's controller, its unlocks and the profiles' items' kinds
+        let any = g.next();
+        let from_menu = g.pick(&[0u32, 1, any]);
+        m.w32(THIS + 0x1e64, from_menu);
+        m.w32(THIS + 0x1e60, g.below(2));
+        m.w32(THIS + 0x1b4c, g.below(19));
+        let any = g.next();
+        m.w32(THIS + 0x418, g.pick(&[1u32, 0, any]));
+        m.w32(THIS + 0x9ec, g.below(2));
+        m.w32(THIS + 0xd70, g.below(2));
+        m.w32(THIS + 0xd74, g.pick(&[0u32, 1, 1, 2]));
+        let any = g.next();
+        m.w32(ls::CAREER + 0x168c, g.pick(&[0u32, 1, any]));
+        let nu = g.pick(&[0u32, 1, 3, 8]);
+        m.w32(ls::UNLOCKS_COUNT, nu);
+        for i in 0..8 {
+            let e = ls::UNLOCKS + 0xc * i;
+            m.w32(e + 4, g.pick(&[4u32, 0, 1, 3, 5]));
+            m.w32(e + 8, g.below(12));
+        }
+        for i in 0..12 * 12 {
+            m.w32(ls::PROFILE_ITEMS + 0x14 * i + 8, g.below(4));
         }
         // the two-player load's pictures and its ids' table
         for i in 0..2 {
@@ -666,6 +731,104 @@ fn loading_screens_match_the_original() {
                 ls::fe2_draw_overlay(&mut m, e, THIS, SCRATCH);
                 none
             }
+            0x24c748 => ls::quit_new(&mut m, e, THIS, from_menu),
+            0x24c878 => {
+                ls::quit_delete(&mut m, e, THIS, flags);
+                none
+            }
+            0x24c8e0 => {
+                ls::quit_start(&mut m, e, THIS);
+                none
+            }
+            0x24c928 => ls::quit_poll(&mut m, e, THIS),
+            0x24d168 => {
+                ls::quit_vf4(&mut m, e, THIS, SCRATCH);
+                none
+            }
+            0x24d1a0 => {
+                ls::setup_tips(&mut m, e, THIS);
+                none
+            }
+            0x24d390 => {
+                ls::quit_vf5(&mut m, e, THIS);
+                none
+            }
+            0x24d3e8 => {
+                ls::quit_draw_background(&mut m, e, THIS, SCRATCH);
+                none
+            }
+            0x24d4d0 => {
+                ls::quit_draw_overlay(&mut m, e, THIS, SCRATCH);
+                none
+            }
+            0x24d7f8 => ls::tutorial_new(&mut m, e, THIS),
+            0x24d910 => {
+                ls::tutorial_delete(&mut m, e, THIS, flags);
+                none
+            }
+            0x24d968 => {
+                ls::tutorial_start(&mut m, e, THIS);
+                none
+            }
+            0x24d9b0 => ls::tutorial_poll(&mut m, e, THIS),
+            0x24e1f0 => {
+                ls::tutorial_vf4(&mut m, e, THIS, SCRATCH);
+                none
+            }
+            0x24e228 => {
+                ls::tutorial_set_title(&mut m, e, THIS);
+                none
+            }
+            0x24e268 => {
+                ls::tutorial_vf5(&mut m, e, THIS);
+                none
+            }
+            0x24e2c0 => {
+                ls::tutorial_draw_background(&mut m, e, THIS, SCRATCH);
+                none
+            }
+            0x24e3a8 => {
+                ls::tutorial_draw_overlay(&mut m, e, THIS, SCRATCH);
+                none
+            }
+            0x24ea20 => ls::ranking_new(&mut m, e, THIS),
+            0x24eb38 => {
+                ls::ranking_delete(&mut m, e, THIS, flags);
+                none
+            }
+            0x24eb90 => {
+                ls::ranking_start(&mut m, e, THIS);
+                none
+            }
+            0x24eca8 => ls::ranking_poll(&mut m, e, THIS),
+            0x24f4e8 => {
+                ls::ranking_vf4(&mut m, e, THIS, SCRATCH);
+                none
+            }
+            0x24f520 => {
+                ls::fill_career_summary(&mut m, e, THIS);
+                none
+            }
+            0x24f8c0 => {
+                ls::ranking_vf5(&mut m, e, THIS);
+                none
+            }
+            0x24f918 => {
+                ls::ranking_draw_background(&mut m, e, THIS, SCRATCH);
+                none
+            }
+            0x24fa48 => {
+                ls::ranking_draw_overlay(&mut m, e, THIS, SCRATCH);
+                none
+            }
+            0x24ff58 => {
+                ls::static_init(&mut m);
+                none
+            }
+            0x250000 => {
+                ls::set_vec4(&mut m, e, THIS, THIS + 0x100);
+                none
+            }
             _ => unreachable!(),
         };
         if func == 0x243f00 && (step as usize) < 5 {
@@ -686,7 +849,9 @@ fn loading_screens_match_the_original() {
             0x244540 => vec![THIS, SHEETS, done],
             0x2447a8 => vec![THIS, 0, SHEETS, text, tex],
             0x2449f8 | 0x244fc8 => vec![THIS, SHEETS],
-            0x245958 | 0x247b78 | 0x249870 | 0x24b140 => vec![THIS, flags],
+            0x245958 | 0x247b78 | 0x249870 | 0x24b140 | 0x24c878 | 0x24d910 | 0x24eb38 => vec![THIS, flags],
+            0x24c748 => vec![THIS, from_menu],
+            0x250000 => vec![THIS, THIS + 0x100],
             0x2459b0 | 0x245a48 | 0x245b68 => vec![pick, SCRATCH],
             _ => vec![THIS],
         };
