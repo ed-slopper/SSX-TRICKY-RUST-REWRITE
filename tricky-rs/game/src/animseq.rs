@@ -57,7 +57,7 @@ fn wf(m: &mut Mem, a: u32, v: F) {
     m.w32(a, v.0.to_bits());
 }
 /// `div.s` as the EE does it: toward zero (the largest float for a zero divisor, as [`F`])
-fn div(a: F, b: F) -> F {
+pub fn div(a: F, b: F) -> F {
     let (x, y) = (a.ee(), b.ee());
     if y == 0.0 {
         return a / b;

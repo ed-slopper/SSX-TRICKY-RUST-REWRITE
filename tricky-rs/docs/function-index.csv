@@ -1197,32 +1197,32 @@ address,size,name,system,status
 0x15ad68,64,cReplayRecordHeader::__tf,runtime,host
 0x15ada8,280,AnimClip_ResolveAnmIndex,animation,ported
 0x15aec0,16040,AnimIds_Init,animation,not started
-0x15ed68,200,AnimCtl_Construct,animation,not started
-0x15ee30,140,AnimCtl_Reset,animation,ported
-0x15eec0,56,AnimCtl_GetClipType,animation,ported
-0x15eef8,80,AnimCtl_TurnAllLayers,animation,ported
-0x15ef48,80,AnimCtl_SetAllLayersStance,animation,ported
-0x15ef98,136,AnimCtl_StopClipsInCategory,animation,not started
-0x15f020,48,AnimCtl_ClearClips,animation,not started
-0x15f050,12,AnimCtl_BlendOutAll,animation,ported
-0x15f060,672,AnimCtl_BeginClip,animation,not started
-0x15f300,144,AnimCtl_FireClipSounds,audio,not started
-0x15f390,176,AnimCtl_UpdateLayers,animation,not started
-0x15f440,372,AnimCtl_UpdateClip,animation,not started
-0x15f5b8,328,AnimCtl_HandleClipEnd,animation,not started
-0x15f700,200,AnimCtl_FlushEndedClips,animation,not started
+0x15ed68,200,AnimCtl_Construct,animation,checked
+0x15ee30,140,AnimCtl_Reset,animation,checked
+0x15eec0,56,AnimCtl_GetClipType,animation,checked
+0x15eef8,80,AnimCtl_TurnAllLayers,animation,checked
+0x15ef48,80,AnimCtl_SetAllLayersStance,animation,checked
+0x15ef98,136,AnimCtl_StopClipsInCategory,animation,checked
+0x15f020,48,AnimCtl_ClearClips,animation,checked
+0x15f050,12,AnimCtl_BlendOutAll,animation,checked
+0x15f060,672,AnimCtl_BeginClip,animation,checked
+0x15f300,144,AnimCtl_FireClipSounds,audio,checked
+0x15f390,176,AnimCtl_UpdateLayers,animation,checked
+0x15f440,372,AnimCtl_UpdateClip,animation,checked
+0x15f5b8,328,AnimCtl_HandleClipEnd,animation,checked
+0x15f700,200,AnimCtl_FlushEndedClips,animation,checked
 0x15f7c8,632,AnimCtl_BlendPose,animation,ported
 0x15fa40,196,AnimCtl_GetClipDisplacement,animation,ported
-0x15fb08,172,AnimCtl_FindFirstMarkerFrame,animation,ported
-0x15fbb8,320,RaceScene_SetClipMarker,animation?,not started
-0x15fcf8,216,AnimCtl_PlayClip,animation,ported
-0x15fdd0,16,AnimCtl_GetClip,animation,ported
-0x15fde0,144,AnimCtl_GetMarkerPhase,animation,ported
-0x15fe70,84,AnimCtl_GetLayerPhase,animation,ported
-0x15fec8,116,AnimCtl_GetClipDuration,animation,not started
-0x15ff40,116,AnimCtl_IsClipAtEnd,animation,ported
-0x15ffb8,80,AnimCtl_TestClipFlag,animation,ported
-0x160008,80,AnimCtl_TestClipBit,animation,not started
+0x15fb08,172,AnimCtl_FindFirstMarkerFrame,animation,checked
+0x15fbb8,320,RaceScene_SetClipMarker,animation?,checked
+0x15fcf8,216,AnimCtl_PlayClip,animation,checked
+0x15fdd0,16,AnimCtl_GetClip,animation,checked
+0x15fde0,144,AnimCtl_GetMarkerPhase,animation,checked
+0x15fe70,84,AnimCtl_GetLayerPhase,animation,checked
+0x15fec8,116,AnimCtl_GetClipDuration,animation,checked
+0x15ff40,116,AnimCtl_IsClipAtEnd,animation,checked
+0x15ffb8,80,AnimCtl_TestClipFlag,animation,checked
+0x160008,80,AnimCtl_TestClipBit,animation,checked
 0x160058,120,AnimCtl_SaveSnapshot,save,checked
 0x1600d0,112,AnimCtl_LoadSnapshot,animation,checked
 0x160140,140,AnimMode_BoardClassFrame,animation,not started
@@ -1233,18 +1233,18 @@ address,size,name,system,status
 0x160b20,1524,AnimMode_WindUpBlend,animation,not started
 0x161118,484,AnimMode_CrouchSteerBlend,animation,not started
 0x161300,60,AnimMode_CrouchFrame,animation,not started
-0x161340,8,AnimMode_Advance,animation,not started
-0x161348,8,AnimMode_Advance1,animation,not started
-0x161350,8,AnimMode_Advance2,animation,not started
-0x161358,8,AnimMode_Advance3,animation,not started
-0x161360,60,AnimCtl_EndActionPlay202,animation,not started
-0x1613a0,96,AnimCtl_EndActionToBase,animation,not started
-0x161400,296,AnimCtl_EndActionChain,animation,not started
-0x161528,60,AnimCtl_EndActionPlay223,animation,not started
-0x161568,60,AnimCtl_EndActionPlay2DF,animation,not started
-0x1615a8,60,AnimCtl_EndActionPlay2DE,animation,not started
-0x1615e8,84,AnimCtl_EndActionToRide,animation,not started
-0x161640,92,AnimCtl_EndActionStop,animation,not started
+0x161340,8,AnimMode_Advance,animation,checked
+0x161348,8,AnimMode_Advance1,animation,checked
+0x161350,8,AnimMode_Advance2,animation,checked
+0x161358,8,AnimMode_Advance3,animation,checked
+0x161360,60,AnimCtl_EndActionPlay202,animation,checked
+0x1613a0,96,AnimCtl_EndActionToBase,animation,checked
+0x161400,296,AnimCtl_EndActionChain,animation,checked
+0x161528,60,AnimCtl_EndActionPlay223,animation,checked
+0x161568,60,AnimCtl_EndActionPlay2DF,animation,checked
+0x1615a8,60,AnimCtl_EndActionPlay2DE,animation,checked
+0x1615e8,84,AnimCtl_EndActionToRide,animation,checked
+0x161640,92,AnimCtl_EndActionStop,animation,checked
 0x1616a0,124,StaticInit_AnimCtl,other,not started
 0x161730,48,Career_Construct,race?,ported
 0x161760,64,Career_Destruct,race?,not started

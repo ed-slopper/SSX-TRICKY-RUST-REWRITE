@@ -1282,3 +1282,77 @@ sequences' fields (often whole or half frames, and weights that land exactly on 
 and the key table. That is about 1,400 calls for each of 28 functions. Delete, the tree maker and the pool's alloc
 were logged. 39 of 42 mutants were caught. The other 3 are equivalent: two memsets that later writes cover, and the
 backward stop frame stored over an equal time.
+
+## The animation controller (row G5a2; `game/src/animctl.rs`, checked: `tests/animctl.rs`)
+
+The rider's controller (rider+0x46c0) starts clips on its three layers, advances them each tick and ends them. It
+works on the sequences and layers of G5a1. Its calls out are the pose blend (`AnimCtl_BlendPose` 0x15f7c8), the
+clip data (`AnimClip_ResolveAnmIndex`, `AnimData_GetClipId` / `_GetMarkerFrame` / `_SetMarker` / `_GetMarkerPhase`),
+the sounds and the motion-driven update modes. The pose blend and clip data are G5c; the modes are G5b.
+- **The fields:**
+  - +8..+0x10: each layer's current clip (0x300 none);
+  - +0x14 the stance;
+  - +0x18 the speed new clips take (reset to 1);
+  - +0x1c (reset to −1), which new clips copy to their +0x18;
+  - +0x20 the facing new clips take;
+  - +0x24 the rider;
+  - the layers from +0x28, 0x70 apart.
+
+  The constructor makes each layer's two ends skeleton sequences and empties the list. The first controller made
+  also runs `AnimIds_Init` (the flag at 0x32b38c).
+- **The clip table** 0x325fa8 has 0x2ff rows; the word after it is the flag, and the career block starts two words
+  later. Each row is 7 words: category, lookup mode, update mode, end action, layer, blend-in frames, end fade
+  frames. In the exe, the blend-ins are 0 or 7, the end fades 0 or 10, and the layers 0..2.
+- **Playing a clip (`AnimCtl_PlayClip` 0x15fcf8; clip, frame, marker):** a new sequence is begun on the clip's layer
+  (`AnimCtl_BeginClip` 0x15f060), and the answer becomes that layer's current clip. The audio system (0x343050) is
+  told the layer's clip type (0x235778).
+- **`AnimCtl_BeginClip`:**
+  - With no animation for this rider (0x585), the sequence is deleted and the answer is none.
+  - Otherwise the sequence becomes current, gets the clip, +0x28 = 1, and source 0 = the animation (one source). It
+    takes the controller's stance, facing and +0x1c.
+  - The start frame is `frame` plus: marker 1..4 of the first list for `marker` 1..4 (0 if that marker is unused),
+    the last frame for `marker` 6, otherwise 0. It is never below 0. The speed is the controller's.
+  - The update mode then sets a stop frame: mode 1 stops at marker 2, mode 2 at the last frame; mode 3 holds.
+  - The weight is 1, and the end's fade comes from the table.
+  - With no blend-in, the layer and layer 1 are emptied (`AnimCtl_ClearClips`). With a blend-in, when it is layer 1
+    or the layer has sequences, those lose "current" and fade out over the blend-in, and the new one fades in from
+    weight 0.
+  - The sequence is then put on the layer.
+- **Each tick (`AnimCtl_UpdateLayers` 0x15f390; dt):** every sequence of the three layers, newest first, is updated
+  (`AnimCtl_UpdateClip` 0x15f440):
+  - its update mode moves it: 0..3 is the plain advance (`AnimMode_Advance..3` jump to it); 4..11 are the
+    rider-driven modes; past 11 nothing;
+  - the first list's markers crossed this tick play their sounds (the header's +0x1c + 2k, 0x235780);
+  - the weight is updated (vtable slot 3).
+
+  Then the pose is blended.
+- **Ends (`AnimCtl_FlushEndedClips` 0x15f700):** the ended sequences of all layers are listed first, then each
+  is handled (`AnimCtl_HandleClipEnd` 0x15f5b8).
+  - A sequence that isn't current is just taken off its clip's layer.
+  - A current one runs its clip's end action, and the answer becomes the layer's current clip. Actions past 7 do
+    nothing.
+  - Every action but 0 removes the sequence from layer 0 (+0x28), whatever layer it is on.
+  - The actions: 0 stop; 1 back to the base 0x1ff, after clearing the rider's six words +0x1fc..+0x210; 2 play
+    0x223; 3 play 0x202; 4 chain; 5 play 0x2df; 6 play 0x2de; 7 0x202 in ground motion (rider+0x420 = 2), else
+    0x1ff.
+  - Each clip played this way uses frame 0 and marker 5 (0).
+  - Stop (0x161640) takes the sequence off its own layer and answers none.
+  - The chain (0x161400, table 0x379620): 0x226..0x22d go to 0x22e..0x235; 0x270 → 0x235, 0x271 → 0x234,
+    0x272 → 0x22f, 0x273 → 0x22e, 0x274 → 0x235, 0x275 → 0x234, 0x276 and 0x277 → 0x22f. Any other clip id
+    answers itself.
+- **The queries:**
+  - the layer's clip; its type (the category, 8 with none);
+  - the current clip's phase (1 when not playing); its duration (length / (speed × 30), 0 when not playing); whether
+    it is at its end;
+  - marker n − 1's phase;
+  - the clip's first marker of 0..3 that has a frame (−1 if none);
+  - `TestClipFlag` / `TestClipBit` (+0x74 / +0x75 bit flag − 1). These read the current clip's sequence without
+    checking that one exists.
+- **The rest:** `RaceScene_SetClipMarker` 0x15fbb8 sets the clip's first marker that has a frame. A frame of −1
+  then clears all four. `StopClipsInCategory` clears the stop frame of a category's sequences (any category for
+  0x1c). `BlendOutAll` fades layer 1's sequences over 10 frames. Turn and stance apply to all three layers.
+
+Checked in the runner on 40,000 random controllers, about 1,700 calls for each of 23 functions. The data was three
+layers of sequences with real clip ids (picked by the table's end action and update mode, often the layer's current
+clip), their trees and headers, the rider's words and the key table, with the game's own clip table. The sequences'
+functions ran as the original; the calls out were logged. 48 of 50 mutants were caught. The other 2 are equivalent: stop's answer when the clips differ (it is only reached with the sequence's own clip), and the chain's "any other clip" (every clip whose end action is the chain is in its table).
