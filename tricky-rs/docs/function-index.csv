@@ -1784,7 +1784,7 @@ address,size,name,system,status
 0x1819d8,8,cVideoLoadModule::vf1_1819d8,video,not started
 0x1819e0,20,cVideoLoadModule::~cVideoLoadModule,video,not started
 0x1819f8,80,cVideoLoadModule::__tf,runtime,host
-0x181a48,16,Color_SetRGBV,debugmenu?,not started
+0x181a48,16,Color_SetRGBV,debugmenu,checked
 0x181a68,80,cReplayEndRaceHandler::__tf,runtime,host
 0x181ad0,80,cSelectLessonHandler::__tf,runtime,host
 0x181b28,64,cAIStateHandler::__tf,runtime,host
@@ -2012,56 +2012,56 @@ address,size,name,system,status
 0x18c0a8,108,cRGBMenuItem::HandleInput,debugmenu,checked
 0x18c118,172,cErrorMenu::cErrorMenu,debugmenu,checked
 0x18c1c8,188,cErrorMenu::cErrorMenu,debugmenu,checked
-0x18c288,140,DebugMenu_BeginDraw,debugmenu?,not started
-0x18c318,104,DebugMenu_EndDraw,debugmenu?,not started
-0x18c380,932,DebugMenu_DrawBox,debugmenu?,not started
-0x18c728,680,DebugMenu_DrawUpArrow,debugmenu?,not started
-0x18c9d0,680,DebugMenu_DrawDownArrow,debugmenu?,not started
-0x18cc78,576,MenuItem_MeasureLabel,debugmenu?,not started
-0x18ceb8,524,DebugMenu_DrawItemBox,debugmenu?,not started
-0x18d0c8,436,MenuItem_DrawLabel,debugmenu?,not started
-0x18d280,224,cStringMenuItem::Measure,debugmenu,not started
-0x18d360,832,cStringMenuItem::Draw,debugmenu,not started
-0x18d6a0,568,cColorMenuItem::Measure,debugmenu,not started
-0x18d8d8,1032,cColorMenuItem::Draw,debugmenu,not started
-0x18dce0,116,cRGBTitleMenuItem::Measure,debugmenu,not started
-0x18dd58,244,cRGBTitleMenuItem::Draw,debugmenu,not started
-0x18df38,40,Draw_RectI,render,not started
-0x18df60,16,Vec4_SetFromVec3,debugmenu?,ported
+0x18c288,140,DebugMenu_BeginDraw,debugmenu,checked
+0x18c318,104,DebugMenu_EndDraw,debugmenu,checked
+0x18c380,932,DebugMenu_DrawBox,debugmenu,checked
+0x18c728,680,DebugMenu_DrawUpArrow,debugmenu,checked
+0x18c9d0,680,DebugMenu_DrawDownArrow,debugmenu,checked
+0x18cc78,576,MenuItem_MeasureLabel,debugmenu,checked
+0x18ceb8,524,DebugMenu_DrawItemBox,debugmenu,checked
+0x18d0c8,436,MenuItem_DrawLabel,debugmenu,checked
+0x18d280,224,cStringMenuItem::Measure,debugmenu,checked
+0x18d360,832,cStringMenuItem::Draw,debugmenu,checked
+0x18d6a0,568,cColorMenuItem::Measure,debugmenu,checked
+0x18d8d8,1032,cColorMenuItem::Draw,debugmenu,checked
+0x18dce0,116,cRGBTitleMenuItem::Measure,debugmenu,checked
+0x18dd58,244,cRGBTitleMenuItem::Draw,debugmenu,checked
+0x18df38,40,Draw_RectI,debugmenu,checked
+0x18df60,16,Vec4_SetFromVec3,debugmenu,checked
 0x18df80,80,cErrorMenu::__tf,runtime,host
-0x18dfd0,88,cErrorMenu::~cErrorMenu,debugmenu?,not started
+0x18dfd0,88,cErrorMenu::~cErrorMenu,debugmenu,checked
 0x18e030,80,cRGBMenuItem::__tf,runtime,host
-0x18e080,100,cRGBMenuItem::~cRGBMenuItem,debugmenu,not started
+0x18e080,100,cRGBMenuItem::~cRGBMenuItem,debugmenu,checked
 0x18e0f0,80,cRGBTitleMenuItem::__tf,runtime,host
-0x18e140,8,cRGBTitleMenuItem::~cRGBTitleMenuItem,debugmenu,not started
+0x18e140,8,cRGBTitleMenuItem::~cRGBTitleMenuItem,debugmenu,checked
 0x18e148,80,cExpandMenuItem::__tf,runtime,host
-0x18e198,64,cExpandMenuItem::~cExpandMenuItem,debugmenu,not started
+0x18e198,64,cExpandMenuItem::~cExpandMenuItem,debugmenu,checked
 0x18e1d8,80,cExpandMenuItemMenu::__tf,runtime,host
-0x18e228,8,cExpandMenuItemMenu::~cExpandMenuItemMenu,debugmenu?,not started
+0x18e228,8,cExpandMenuItemMenu::~cExpandMenuItemMenu,debugmenu,checked
 0x18e230,80,cColorMenuItem::__tf,runtime,host
-0x18e280,8,cColorMenuItem::~cColorMenuItem,debugmenu,not started
+0x18e280,8,cColorMenuItem::~cColorMenuItem,debugmenu,checked
 0x18e288,80,cStringMenuItem::__tf,runtime,host
-0x18e2d8,8,cStringMenuItem::~cStringMenuItem,debugmenu,not started
+0x18e2d8,8,cStringMenuItem::~cStringMenuItem,debugmenu,checked
 0x18e310,80,cAngleMenuItem::__tf,runtime,host
-0x18e360,8,cAngleMenuItem::~cAngleMenuItem,debugmenu,not started
+0x18e360,8,cAngleMenuItem::~cAngleMenuItem,debugmenu,checked
 0x18e398,80,cFloatMenuItem::__tf,runtime,host
-0x18e3e8,8,cFloatMenuItem::~cFloatMenuItem,debugmenu,not started
+0x18e3e8,8,cFloatMenuItem::~cFloatMenuItem,debugmenu,checked
 0x18e400,80,cIntMenuItem::__tf,runtime,host
-0x18e450,8,cIntMenuItem::~cIntMenuItem,debugmenu,not started
+0x18e450,8,cIntMenuItem::~cIntMenuItem,debugmenu,checked
 0x18e458,80,cSpaceMenuItem::__tf,runtime,host
-0x18e4a8,8,cSpaceMenuItem::~cSpaceMenuItem,debugmenu,not started
+0x18e4a8,8,cSpaceMenuItem::~cSpaceMenuItem,debugmenu,checked
 0x18e4c0,80,cNullMenuItem::__tf,runtime,host
-0x18e510,8,cNullMenuItem::~cNullMenuItem,debugmenu,not started
+0x18e510,8,cNullMenuItem::~cNullMenuItem,debugmenu,checked
 0x18e528,80,cCommandMenuItem::__tf,runtime,host
-0x18e578,8,cCommandMenuItem::~cCommandMenuItem,debugmenu,not started
+0x18e578,8,cCommandMenuItem::~cCommandMenuItem,debugmenu,checked
 0x18e588,80,cPopMenuItem::__tf,runtime,host
-0x18e5d8,8,cPopMenuItem::~cPopMenuItem,debugmenu,not started
+0x18e5d8,8,cPopMenuItem::~cPopMenuItem,debugmenu,checked
 0x18e5e8,80,cSubMenuItem::__tf,runtime,host
-0x18e638,8,cSubMenuItem::~cSubMenuItem,debugmenu,not started
+0x18e638,8,cSubMenuItem::~cSubMenuItem,debugmenu,checked
 0x18e660,80,cEnumMenuItem::__tf,runtime,host
-0x18e6b0,8,cEnumMenuItem::~cEnumMenuItem,debugmenu,not started
+0x18e6b0,8,cEnumMenuItem::~cEnumMenuItem,debugmenu,checked
 0x18e6c8,80,cBoolMenuItem::__tf,runtime,host
-0x18e718,8,cBoolMenuItem::~cBoolMenuItem,debugmenu,not started
+0x18e718,8,cBoolMenuItem::~cBoolMenuItem,debugmenu,checked
 0x18e748,64,cMenu::__tf,runtime,host
 0x18e798,64,cMenuItem::__tf,runtime,host
 0x18e850,404,ReplayMgr_Init,game?,checked

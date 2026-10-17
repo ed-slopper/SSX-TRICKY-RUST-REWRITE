@@ -1692,3 +1692,46 @@ reads them. 72 of 77 mutants are caught. The other 5 are equivalent:
 - the float's faster rate from exactly 1 (the same product);
 - one extra step of the string's insert shift (overwritten straight after);
 - the expand item's header added at 0 instead of the end of an empty menu (twice).
+
+## The debug menu's drawing (G9a4c, `game/src/dmdraw.rs`)
+
+- **The frame:** `DebugMenu_BeginDraw` keeps the renderer's texture in the menu's +0 (its first word, otherwise
+  unused) and sets texture 12 and the blend (2, 2; 0.08). `EndDraw` puts both back (1, 2; 0.08).
+- **`DebugMenu_DrawBox`** fills the box in its colour at alpha 0.8 (texture 11, untextured, mode 3).
+  - It then draws the top and left edges 1.4 times lighter (clamped to 0..1) and the bottom and right edges 0.7
+    times as dark, each half a pixel in.
+  - The arrows are a box in the picked colour with a chevron drawn twice, at 4 and 3..5 pixels in.
+- **`MenuItem_MeasureLabel`**(out, item, title, label, value) adds up the font's widths (the font is the manager's
+  +0x38).
+  - With all three given: the label's width, plus twice the wider of the title and the value, plus 40.
+  - Otherwise: the given widths, plus 20 when the title has something beside it (or, without a title, when both
+    a label and a value are given).
+  - The result is at least 200, then + 20 wide, and the font's height + 4 high.
+- **`DrawItemBox` / `DrawLabel`** draw the title 10 in from the left, the label centred and the value 10 in from the
+  right, all one pixel down. The colours (three floats each, filled by the start code 0x18de60) are:
+  - disabled (flag 8): box 0x3cde68, text 0x3cde38;
+  - picked: box 0x3cde78, text 0x3cde48;
+  - the others: box 0x3cde88, text 0x3cde58.
+- **The string item's draw** underlines the cursor when picked. To get the line's ends it measures the string cut
+  at the cursor, then cut after the cursor's character, writing a 0 into the buffer and putting the byte back each
+  time. The wider of the first width + 2 and the second gives the right end.
+- **The colour item's draw** shows the channel's name, its value · 255.99 as "%d" and a gradient bar 182 by 11,
+  with a marker over it at the value.
+  - The bar runs from the colour with the channel at 0 to the colour with it at 1. Its two four-float colours start
+    with 1, written separately from the three channels.
+  - Its value's text goes into the stack slot that had just held the box colour, so the test's format stand-in,
+    which writes nothing, leaves those bytes for the measure to read. The port lays out its scratch at the game's
+    frame offsets, so it reads the same bytes.
+- **The RGB title** measures at least 27 high and 53 wider, and draws a 23 by 23 swatch of its colour 33 in from the
+  right.
+- **The start code 0x18de60** builds the debug menu's global manager (0x337e08) and fills the six colours; 0x18de50
+  destroys the manager at exit.
+- **The kinds' destructors** are the item's, tail-called. The error, RGB and expand items first destroy what they
+  hold, passing flags 2 (no free).
+- **Unlisted functions:** `Color_SetRGBV`'s twin 0x18df70, eighteen setters of one word (+0x10, +0x14, +0x1c)
+  or two floats, an enum's list setter 0x18e650, and five accessors (an item's or a menu's font, +4, the depth).
+
+The runner test (tests/dmdraw.rs) has 19,500 cases over the 65 functions. The font's stand-ins log the string
+they are given, up to its end, and the gradient's stand-in logs its four colours. 68 of 71 mutants are caught;
+the 3 left are equivalent: the two "at least" floors at their own value, and the expand item's menu destroyed with
+flags 0 instead of 2 (neither frees).
