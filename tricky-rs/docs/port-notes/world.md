@@ -1441,3 +1441,64 @@ What the harness had to learn:
 
 Stand-ins: the allocator and fill, the texture upload, the renderer's texture and blend virtuals, and the screen
 size.
+
+## The 4-step patch program on VU1 (row G7a4b; `game/src/vu.rs`, `game/src/patchvu.rs`, checked: `tests/vu1patch.rs`)
+
+The VU1 program that the Bezier lists' kind 3 (4 steps on every edge) draws with is the chain at 0x30f960, 743
+instructions. `patchvu::run4` is its port, on `vu::Vu`, a VU1 with the VU's rounding.
+
+**What it is given** (data memory in quadwords):
+- 0..5: the matrix set (the camera's matrix to the clip frame, then the screen's scale and offset);
+- 6: the vertex colour;
+- 7..10: four GIF tags;
+- 11..44: the Bezier tables (it reads the 1/3-step weights at 25..28 and the 4 × 4 grid at 29..44);
+- TOP..TOP+20: the patch: its lightmap rectangle, its four corners' texture coordinates, its 16 coefficients.
+
+**What it does:**
+- **Evaluate (0x168).**
+  - The edges' texture coordinates (0x518): each corner pair interpolated at t = 0, 1/3, 2/3, 1.
+  - The grid (0x628): for each row's s weights, the 16 coefficients collapse to four vectors. Each of the row's
+    four points is their sum under the t weights, giving the points (177..), their texture coordinates (245..),
+    and the grid's (u, v) offset by the lightmap rectangle (93..).
+- **Draw the textured strips (0x868).** Two passes of 4 × 2 quads, rows 0..2 then 2..3. Each vertex is put
+  through the matrix, divided by w, scaled and offset to the screen with `ftoi4`, and its ST is the texture
+  coordinate times Q. The first two vertices of a strip carry the GS's no-draw bit.
+- **Clip.** Each triangle is clip-tested (`vclipw`, the last three tests).
+  - A triangle with any test set is not drawn in the strip: its newest vertex gets the no-draw bit.
+  - Unless a point is past the far plane, or all three are outside one plane, the triangle is clipped
+    Sutherland–Hodgman style: the near plane, then x ≥ −w, x ≤ w, y ≤ w, y ≥ −w, between two buffers (314, 341).
+  - Each cut point is the earlier point ∓ the edge times f_earlier / f_edge.
+  - What is left is divided, put on the screen and sent as its own packet from 724 or 752 (alternating, as 313
+    says).
+- **The lightmap pass (0x328).** The strips are sent again under the second context's tags, with each vertex's ST
+  rewritten as its lightmap coordinate times Q (0xd68). For a clipped patch (0x410) the strips are rebuilt from the
+  lightmap coordinates instead, clipper and all.
+- **A view's pass (0x80, 0xe0).** The 16 points go through the view's matrix (at TOP) into 93.., and the lightmap
+  pass then draws with those as the texture coordinates: a projected texture.
+
+**Entries.** 0 and 0x28 are the patch unclipped and clipped; 0x80 and 0xe0 the view's pass unclipped and clipped
+(the program words `StaticInit_Render` gives kind 3 at the clip kind + 1 / + 2). 0x50 and 0x68 (evaluate and
+textured strips only) are not reached by any list kind's table word; they are ported but not checked.
+
+**What the port had to keep, for the registers to come out the same:**
+- every `bal`'s link in vi15;
+- `fcand` / `fcor` answers in vi1;
+- the pair after the E bit, which still runs: it is the next entry's first lower op (a link, `xtop`, or the `isw`
+  of vi15);
+- branch delay slots that hold the next flag check. The clip handler's checks chain, so one more check is made
+  after the one that ends it. The clipper's "both out" branch still makes the w lanes and the "either out" test,
+  and its "both in" branch the "earlier out" test.
+
+The program is software-pipelined: each `div` is used 7 pairs later and each FMAC result 4 pairs later. The runner's
+results-at-once model therefore gives the hardware's answers here, and the port does its arithmetic in the same
+order.
+
+Checked in the runner (`tests/vu1patch.rs`). Six cameras: far above a patch, close over it, inside the course
+looking along it, half of them with two views. Six runs of 48 of gari's patches under each. All 864 calls of the
+4-step program (216 at each of the four entries) match: data memory, registers, and every GS quadword (102,951),
+including the 57 that clipped a triangle.
+
+The cases later grew to nine cameras (one inside a patch looking along it, two with far planes near the patches):
+1224 calls, 146,456 quadwords, 77 clipped. 51 of 54 mutants were caught. The three left are equivalent:
+- two lanes of the t = 0 weight, which is (0, 0, 0, 1) in y and z;
+- entry 0x80's closing `xtop`, after its own `xtop` has already set vi1.

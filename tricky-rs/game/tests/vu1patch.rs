@@ -1,20 +1,27 @@
-//! The patch draw run whole in the function runner (board row G7a4a; TRICKY_ELF and TRICKY_DISC for gari's `.pbd`,
-//! skipped without them), as the oracle for the VU1 patch programs' ports. All of it runs as original code:
+//! The patch draw run whole in the function runner (board rows G7a4a and G7a4b..; TRICKY_ELF and TRICKY_DISC for
+//! gari's `.pbd`, skipped without them), as the oracle for the VU1 patch programs' ports. All of it runs as original
+//! code:
 //! - the Bezier manager made by its constructor, with the tables;
 //! - some of gari's patches queued (vf16) at each tessellation and mixed, clipped or not;
 //! - the queue drawn (vf15) through `PS2Render_Submit` into a draw list, under a camera made by the frame's
-//!   matrices (0x1e85b0) and looking at the patches;
+//!   matrices (0x1e85b0) and the renderer's projection (vf20);
 //! - the flush (`PS2Draw_FlushBuckets`, with `PS2Draw_WriteTexState`).
 //!
 //! The DMA chain the flush builds is then walked into `r5900::vu1::Vu1`, which runs the game's patch programs and
 //! logs what they send to the GS. The renderer's texture and blend virtuals, the allocator, the fill, the texture
-//! upload and the frame's view planes are stand-ins.
+//! upload and the screen's size are stand-ins. Several cameras (far above a patch, close over it, inside the
+//! course) so that triangles cross the frustum and the programs' clipper runs.
+//!
+//! `patch_programs_match_the_game` then checks `tricky_game::patchvu` against every call of a ported program: from
+//! the registers and data memory it was called with, the same data memory, registers and GS packets after.
 
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use r5900::vu1::Vu1;
+use r5900::vu1::{Run, Vu1};
 use r5900::Runner;
+use tricky_game::patchvu;
+use tricky_game::vu::Vu;
 
 const ARENA: u32 = 0x0100_0000;
 const SIZE: u32 = 0x0010_0000;
@@ -44,11 +51,7 @@ fn gari_patches() -> Option<Vec<Vec<u8>>> {
     let mut files = tricky_data::big::Files::new(d);
     files.mount("data/models/gari.big").map_err(|e| eprintln!("gari.big: {e:?}")).ok()?;
     let pbd = files.load("|data/models/gari.pbd").map_err(|e| eprintln!("gari.pbd: {e:?}")).ok().flatten()?;
-    let parsed = tricky_data::pbd::Pbd::parse(&pbd);
-    if parsed.is_none() {
-        eprintln!("gari.pbd didn't parse");
-    }
-    Some(parsed?.patches)
+    Some(tricky_data::pbd::Pbd::parse(&pbd)?.patches)
 }
 
 fn w32(r: &mut Runner, at: u32, v: u32) {
@@ -58,12 +61,27 @@ fn wf(r: &mut Runner, at: u32, v: f32) {
     r.mem.write_u32(at, v.to_bits());
 }
 
-#[test]
-fn the_patch_draw_runs_on_vu1() {
-    let Some(mut r) = Runner::from_env() else { return };
-    let Some(patches) = gari_patches() else { return };
+/// A camera: its place relative to the first patch's box centre (x, y, height) and whether it looks down
+/// (else along +y)
+struct Camera {
+    at: [f32; 3],
+    down: bool,
+    /// Views (vf17) added, so that the view passes run
+    views: bool,
+    /// The far plane
+    far: f32,
+}
+
+/// One whole draw: `n` patches from `first`, the steps by `k % 4` (4, 6, 8, mixed), clipped by `k / 4 % 2`; the
+/// VU1 that ran the chain (its calls recorded)
+fn draw(patches: &[Vec<u8>], first: usize, n: usize, cam: &Camera) -> Option<Vu1> {
+    let mut r = Runner::from_env()?;
     r.mem.write(ARENA, &vec![0u8; SIZE as usize]).unwrap();
-    for f in [0x1d9be0u32, 0x1d9c88, 0x1db150, 0x1d9d20, 0x1db1e8, 0x1db530, 0x1d9d50, 0x1d9f58, 0x1e8838, 0x1e88c8, 0x1c4d68, 0x1c4d30, 0x1c4f28, 0x1c4340, 0x1c4468, 0x1c6f98, 0x1c7068, 0x1c7088, 0x1c4fe0, 0x1c4220, 0x1c51f0, 0x1c5368, 0x1c42a0, 0x1c5c88, 0x1ea068, 0x1c0340, 0x1c03e8, 0x1c04f8, 0x1c0560, 0x1c05d8, 0x1c06a0, 0x1e85b0, 0x2cfc00] {
+    for f in [0x1d9be0u32, 0x1d9c88, 0x1db150, 0x1d9d20, 0x1db1e8, 0x1db530, 0x1d9d50, 0x1d9f58, 0x1e8838, 0x1e88c8, 0x1c4d68, 0x1c4d30, 0x1c4f28, 0x1c4340, 0x1c4468, 0x1c6f98, 0x1c7068, 0x1c7088, 0x1c4fe0, 0x1c4220, 0x1c51f0, 0x1c5368, 0x1c42a0, 0x1c5c88, 0x1ea068, 0x1c0340, 0x1c03e8, 0x1c04f8, 0x1c0560, 0x1c05d8, 0x1c06a0, 0x1e85b0, 0x2cfc00, 0x1c4650, 0x1c4c38, 0x1da5c8] {
+        r.allow(f);
+    }
+    // the projection's calls: vf20, Math_SinCos, tanf and its parts
+    for f in [0x1dc3e0u32, 0x250c10, 0x2f2880, 0x2f3108, 0x2f3e38] {
         r.allow(f);
     }
     let heap = Rc::new(RefCell::new(HEAP));
@@ -82,16 +100,17 @@ fn the_patch_draw_runs_on_vu1() {
         }
     });
     r.stub(0x1c3818, |_, _| {});
-    r.allow(0x1c4650);
-    r.allow(0x1c4c38);
     for off in [0x1c8u32, 0x1f0, 0x1f8, 0x200] {
         r.stub(vaddr(off), |_, _| {});
+    }
+    for (off, v) in [(0x60u32, 640u64), (0x58, 448)] {
+        r.stub(vaddr(off), move |c, _| c.set_gpr(2, v));
     }
     // the app and the renderer: its vtable (the Bezier manager's getter real), texture state, draw list, packets
     w32(&mut r, 0x337c58, APP);
     w32(&mut r, APP + 0x724, R);
     w32(&mut r, R + 0x10, RVT);
-    for off in [0x1c8u32, 0x1f0, 0x1f8, 0x200] {
+    for off in [0x1c8u32, 0x1f0, 0x1f8, 0x200, 0x60, 0x58] {
         w32(&mut r, RVT + off + 4, vaddr(off));
     }
     w32(&mut r, RVT + 0x24, 0x1ea068);
@@ -105,13 +124,37 @@ fn the_patch_draw_runs_on_vu1() {
     w32(&mut r, D + 0xc, BATCHES);
     w32(&mut r, D + 0xfa64, 0x32);
     w32(&mut r, D + 0xfa68, 0x8c);
-    // the Bezier manager: constructed (its records, defaults, tables), the views off
+    // the lists' VU1 program tables, then the Bezier manager: constructed (its records, defaults, tables)
+    r.call(0x1db640).expect("StaticInit_Render");
     r.cpu.set_gpr(4, BZ as u64);
     r.call(0x1d9be0).expect("the Bezier manager's constructor");
-    w32(&mut r, BZ + 0x20, 0);
-    // gari's first patches, queued at 4, 6, 8 steps and mixed
-    let n = patches.len().min(24);
-    for (k, p) in patches.iter().take(n).enumerate() {
+    w32(&mut r, BZ + 0x20, cam.views as u32);
+    if cam.views {
+        // two views: a quad, the box test's matrix, the matrix the view pass puts the points through (a scaled,
+        // turned one), a texture word, a float; the box test (the renderer's +0x288) keeping every view
+        r.stub(vaddr(0x288), |c, _| c.set_gpr(2, 0));
+        w32(&mut r, RVT + 0x288 + 4, vaddr(0x288));
+        let view = ARENA + 0x3c00;
+        for (k, (scale, turn)) in [(0.001f32, 0.0f32), (0.0007, 0.6)].into_iter().enumerate() {
+            let (c, s) = (turn.cos(), turn.sin());
+            let m = [[scale * c, scale * s, 0.0, 0.0], [-scale * s, scale * c, 0.0, 0.0], [0.0, 0.0, scale, 0.0], [0.5, 0.5, 0.0, 1.0]];
+            for k in 0..16 {
+                wf(&mut r, view + 0x10 + 4 * k, if k % 5 == 0 { 1.0 } else { 0.0 });
+            }
+            for (i, row) in m.iter().enumerate() {
+                for (j, x) in row.iter().enumerate() {
+                    wf(&mut r, view + 0x50 + 16 * i as u32 + 4 * j as u32, *x);
+                }
+            }
+            for (i, v) in [BZ, view, view + 0x10, view + 0x50, 7 + k as u32].into_iter().enumerate() {
+                r.cpu.set_gpr(4 + i, v as u64);
+            }
+            r.cpu.set_f(12, 0.5);
+            r.call(0x1d9eb8).expect("a view");
+        }
+    }
+    // the patches, queued at 4, 6, 8 steps and mixed
+    for (k, p) in patches.iter().skip(first).take(n).enumerate() {
         let at = PATCHES + 0x1c0 * k as u32;
         r.mem.write(at, p).unwrap();
         let steps: [u8; 4] = match k % 4 {
@@ -128,36 +171,32 @@ fn the_patch_draw_runs_on_vu1() {
         }
         r.call(0x1d9d50).expect("the queue");
     }
-    // a camera over the first patch's box, looking down
-    let b: Vec<f32> = (0..6).map(|k| f32::from_bits(u32::from_le_bytes(patches[0][0x150 + 4 * k..0x154 + 4 * k].try_into().unwrap()))).collect();
-    let centre = [(b[0] + b[3]) / 2.0, (b[1] + b[4]) / 2.0, (b[2] + b[5]) / 2.0];
+    // the camera (row vectors, translation last), the frame's other matrices plain
+    let b: Vec<f32> = (0..6).map(|k| f32::from_bits(u32::from_le_bytes(patches[first][0x150 + 4 * k..0x154 + 4 * k].try_into().unwrap()))).collect();
+    let c = [(b[0] + b[3]) / 2.0 + cam.at[0], (b[1] + b[4]) / 2.0 + cam.at[1], (b[2] + b[5]) / 2.0 + cam.at[2]];
     for base in [0x1730u32, 0x4d0, 0x570, 0x5b0] {
         for k in 0..16 {
             wf(&mut r, R + base + 4 * k, if k % 5 == 0 { 1.0 } else { 0.0 });
         }
     }
-    // the view (row vectors, translation last): 2000 above the patch, looking down (view z = −world z)
-    let view = [[1.0, 0.0, 0.0, 0.0], [0.0, -1.0, 0.0, 0.0], [0.0, 0.0, -1.0, 0.0], [-centre[0], centre[1], centre[2] + 2000.0, 1.0]];
+    let view = if cam.down {
+        // view z = −world z
+        [[1.0, 0.0, 0.0, 0.0], [0.0, -1.0, 0.0, 0.0], [0.0, 0.0, -1.0, 0.0], [-c[0], c[1], c[2], 1.0]]
+    } else {
+        // view z = world y, view y = −world z
+        [[1.0, 0.0, 0.0, 0.0], [0.0, 0.0, 1.0, 0.0], [0.0, -1.0, 0.0, 0.0], [-c[0], c[2], -c[1], 1.0]]
+    };
     for (i, row) in view.iter().enumerate() {
         for (j, v) in row.iter().enumerate() {
             wf(&mut r, CAM + 16 * i as u32 + 4 * j as u32, *v);
         }
     }
     w32(&mut r, R + 0x17d0, 0);
-    // the projection: the renderer's vf20 (field of view, near, far), on a 640 × 448 screen (its +0x60, +0x58)
-    r.allow(0x1dc3e0);
-    r.allow(0x2f3e38);
-    r.allow(0x2f3108);
-    r.allow(0x2f2880);
-    r.allow(0x250c10);
-    for (off, v) in [(0x60u32, 640u64), (0x58, 448)] {
-        w32(&mut r, RVT + off + 4, vaddr(off));
-        r.stub(vaddr(off), move |c, _| c.set_gpr(2, v));
-    }
+    // the projection: the renderer's vf20 (field of view, near, far), on a 640 × 448 screen
     r.cpu.set_gpr(4, R as u64);
     r.cpu.set_f(12, 1.0);
     r.cpu.set_f(13, 10.0);
-    r.cpu.set_f(14, 100000.0);
+    r.cpu.set_f(14, cam.far);
     r.call(0x1dc3e0).expect("the projection");
     // (its x and y scales come out 0 with these arguments: a perspective of 1, 1 put in their place, keeping its
     // depth terms and the screen's scale and offset at +0x550 / +0x560)
@@ -165,13 +204,7 @@ fn the_patch_draw_runs_on_vu1() {
         wf(&mut r, R + base, 1.0);
         wf(&mut r, R + base + 0x14, 1.0);
     }
-    if std::env::var("DUMP").is_ok() {
-        for at in (0x550u32..0x5f0).step_by(16) {
-            let f: Vec<String> = (0..4).map(|k| format!("{:12.4}", f32::from_bits(r.mem.read_u32(R + at + 4 * k)))).collect();
-            println!("R+{at:#x} {}", f.join(" "));
-        }
-    }
-    // the queue drawn into the draw list, then the list flushed into one DMA chain
+    // the queue drawn into the draw list, then the list flushed into one DMA chain, then that on VU1
     r.cpu.set_gpr(4, BZ as u64);
     r.cpu.set_gpr(5, R as u64);
     r.call(0x1d9f58).expect("the queue drawn");
@@ -179,61 +212,115 @@ fn the_patch_draw_runs_on_vu1() {
     r.cpu.set_gpr(4, D as u64);
     r.cpu.set_gpr(5, SLOT as u64);
     r.call(0x1c4fe0).expect("the flush");
-    let end = r.mem.read_u32(SLOT);
-    println!("the chain: {:#x} bytes from {OUT:#x}; {} batches", end - OUT, r.mem.read_u32(D + 8));
-    if std::env::var("DUMP").is_ok() {
-        let set = r.mem.read_u32(D + 0xfa5c);
-        println!("matrix set {set}");
-        for row in 0..24u32 {
-            let b = D + 0x20 + 0x180 * set.min(8) + 16 * row;
-            let f: Vec<String> = (0..4).map(|k| format!("{:10.4}", f32::from_bits(r.mem.read_u32(b + 4 * k)))).collect();
-            println!("  +{:#05x} {}", 16 * row, f.join(" "));
-        }
-        let (mut at, mut stack) = (OUT, Vec::new());
-        for _ in 0..60 {
-            let w: Vec<u32> = (0..4).map(|k| r.mem.read_u32(at + 4 * k)).collect();
-            let (qwc, id, addr) = (w[0] & 0xffff, (w[0] >> 28) & 7, w[1]);
-            println!("{at:#x}: id {id} qwc {qwc:#x} addr {addr:#x} vif {:08x} {:08x}", w[2], w[3]);
-            let data = if matches!(id, 0 | 3 | 4) { addr } else { at + 16 };
-            for q in 0..qwc.min(6) {
-                let d: Vec<String> = (0..4).map(|k| format!("{:08x}", r.mem.read_u32(data + 16 * q + 4 * k))).collect();
-                println!("      {}", d.join(" "));
-            }
-            at = match id {
-                1 => at + 16 + 16 * qwc,
-                2 => addr,
-                3 | 4 => at + 16,
-                5 => {
-                    stack.push(at + 16 + 16 * qwc);
-                    addr
-                }
-                6 => match stack.pop() {
-                    Some(a) => a,
-                    None => break,
-                },
-                _ => break,
-            };
-        }
+    let mut v = Vu1 { record: true, trace: std::env::var("TRACE").is_ok(), ..Vu1::default() };
+    v.run_chain(&mut r.mem, OUT).expect("the chain on VU1");
+    Some(v)
+}
+
+fn cameras() -> Vec<Camera> {
+    let mut c = Vec::new();
+    for (k, z) in [2000.0, 300.0, 40.0].into_iter().enumerate() {
+        c.push(Camera { at: [0.0, 0.0, z], down: true, views: k % 2 == 1, far: 100000.0 });
     }
-    let mut v = Vu1::default();
-    let tags = v.run_chain(&mut r.mem, OUT).expect("the chain on VU1");
-    println!("{tags} tags, {} program calls, {} kicks, {} GS quadwords", v.calls.len(), v.kicks.len(), v.gs.len());
-    if std::env::var("DUMP").is_ok() {
-        for &(at, from) in v.kicks.iter().take(3) {
-            let to = v.kicks.iter().find(|k| k.1 > from).map_or(v.gs.len(), |k| k.1);
-            println!("kick at {at:#x}: {} quadwords", to - from);
-            for q in &v.gs[from..(from + 12).min(to)] {
-                println!("   {:08x} {:08x} {:08x} {:08x}", q[0], q[1], q[2], q[3]);
-            }
-        }
+    for (k, (x, y, z)) in [(0.0, -600.0, 80.0), (200.0, -200.0, 20.0), (-150.0, 100.0, 60.0)].into_iter().enumerate() {
+        c.push(Camera { at: [x, y, z], down: false, views: k % 2 == 0, far: 100000.0 });
     }
+    // inside a patch looking along it (its near plane through the patches), and two near far planes
+    c.push(Camera { at: [0.0, 0.0, 10.0], down: false, views: false, far: 100000.0 });
+    c.push(Camera { at: [0.0, 0.0, 2000.0], down: true, views: true, far: 2050.0 });
+    c.push(Camera { at: [0.0, -300.0, 60.0], down: false, views: false, far: 600.0 });
+    c
+}
+
+#[test]
+fn the_patch_draw_runs_on_vu1() {
+    let Some(patches) = gari_patches() else { return };
+    let Some(v) = draw(&patches, 0, 24, &cameras()[0]) else { return };
+    println!("{} program calls, {} kicks, {} GS quadwords", v.calls.len(), v.kicks.len(), v.gs.len());
     // one program call per patch; every kick a PACKED tag of ST, RGBAQ, XYZF2 vertices; real screen places
-    assert_eq!(v.calls.len(), n);
-    assert!(v.kicks.len() >= n);
+    assert_eq!(v.calls.len(), 24);
+    assert!(v.kicks.len() >= 24);
     for &(_, from) in &v.kicks {
         let tag = v.gs[from];
         assert_eq!((tag[1] >> 26 & 3, tag[2]), (0, 0x412), "a kick's tag {tag:x?}");
     }
     let xs: Vec<u32> = v.kicks.iter().map(|&(_, from)| v.gs[from + 3][0]).collect();
     assert!(xs.iter().any(|&x| x != xs[0]), "the vertices spread over the screen");
+}
+
+/// The micro memory a chain loads, to its last instruction (a longer program's tail may follow it in the VU)
+fn program(chain: u32) -> Option<Vec<u8>> {
+    let mut r = Runner::from_env()?;
+    let mut v = Vu1::default();
+    v.run_chain(&mut r.mem, chain).ok()?;
+    let end = v.micro.chunks(8).rposition(|p| p.iter().any(|b| *b != 0))? + 1;
+    v.micro.truncate(8 * end);
+    Some(v.micro)
+}
+
+/// A recorded call against the port: the same data memory, registers and GS packets
+fn check(run: &Run, gs: &[[u32; 4]], port: fn(&mut Vu, u32), what: &str) -> usize {
+    let mut p = Vu::new();
+    p.vf = run.regs_in.vf;
+    p.vi = run.regs_in.vi;
+    p.acc = run.regs_in.acc;
+    p.q = run.regs_in.q;
+    p.clip = run.regs_in.clip;
+    p.top = run.top;
+    for (k, q) in p.mem.iter_mut().enumerate() {
+        *q = [0, 1, 2, 3].map(|j| u32::from_le_bytes(run.data_in[16 * k + 4 * j..16 * k + 4 * j + 4].try_into().unwrap()));
+    }
+    port(&mut p, run.start);
+    let theirs = &gs[run.gs_from..run.gs_to];
+    if let Some(i) = theirs.iter().zip(&p.gs).position(|(a, b)| a != b) {
+        panic!("{what} from {:#x}: GS quadword {i}: theirs {:x?} ours {:x?}", run.start, theirs[i], p.gs[i]);
+    }
+    assert_eq!(theirs.len(), p.gs.len(), "{what} from {:#x}: GS quadwords", run.start);
+    for k in 0..0x400 {
+        let t = [0, 1, 2, 3].map(|j| u32::from_le_bytes(run.data_out[16 * k + 4 * j..16 * k + 4 * j + 4].try_into().unwrap()));
+        assert_eq!(t, p.mem[k], "{what} from {:#x}: data memory at quadword {k}", run.start);
+    }
+    for k in 0..32 {
+        assert_eq!(run.regs_out.vf[k].map(f32::to_bits), p.vf[k].map(f32::to_bits), "{what} from {:#x}: vf{k}", run.start);
+    }
+    assert_eq!(run.regs_out.vi, p.vi, "{what} from {:#x}: vi (clip flags theirs {:#x} ours {:#x}, in {:#x})", run.start, run.regs_out.clip, p.clip, run.regs_in.clip);
+    assert_eq!(run.regs_out.acc.map(f32::to_bits), p.acc.map(f32::to_bits), "{what} from {:#x}: ACC", run.start);
+    assert_eq!(run.regs_out.q.to_bits(), p.q.to_bits(), "{what} from {:#x}: Q", run.start);
+    assert_eq!(run.regs_out.clip, p.clip, "{what} from {:#x}: the clip flags", run.start);
+    theirs.len()
+}
+
+#[test]
+fn patch_programs_match_the_game() {
+    let Some(patches) = gari_patches() else { return };
+    let Some(p4) = program(0x30f960) else { return };
+    let (mut calls, mut quadwords, mut clipped) = (0usize, 0usize, 0usize);
+    let mut starts = std::collections::BTreeMap::new();
+    for cam in cameras() {
+        for first in (0..patches.len().saturating_sub(48)).step_by(97).take(6) {
+            let Some(v) = draw(&patches, first, 48, &cam) else { return };
+            if std::env::var("TRACE").is_ok() {
+                let run = v.runs.iter().find(|r| r.micro[..p4.len()] == p4[..]).unwrap();
+                let mut last = None;
+                for (pc, vi) in &v.traced[run.traced_from..run.traced_to] {
+                    if last != Some(vi[1]) {
+                        println!("{pc:#06x} vi1 = {}", vi[1]);
+                        last = Some(vi[1]);
+                    }
+                }
+                return;
+            }
+            for run in v.runs.iter().filter(|r| r.micro[..p4.len()] == p4[..]) {
+                quadwords += check(run, &v.gs, patchvu::run4, "the 4-step program");
+                *starts.entry(run.start).or_insert(0usize) += 1;
+                calls += 1;
+                clipped += (run.regs_out.vi[14] != run.regs_in.vi[14]) as usize;
+            }
+        }
+    }
+    println!("{calls} calls of the 4-step program, {quadwords} GS quadwords, {clipped} with a triangle clipped; by entry {starts:x?}");
+    assert!(calls > 100 && clipped > 10);
+    for start in [0, 0x28, 0x80, 0xe0] {
+        assert!(starts.get(&start).copied().unwrap_or(0) > 10, "the entry at {start:#x} ran");
+    }
 }

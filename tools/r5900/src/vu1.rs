@@ -41,6 +41,33 @@ pub struct Vu1 {
     pub kicks: Vec<(u32, usize)>,
     /// Each `MSCAL` / `MSCALF` / `MSCNT`'s start (in bytes) and TOP when it ran
     pub calls: Vec<(u32, u32)>,
+    /// With `record` set: each program call's state before and after (for checking a port of the programs)
+    pub record: bool,
+    pub runs: Vec<Run>,
+    /// With `trace` set: each pair run (its place) and the integer registers after it, for finding where a port
+    /// and the program part
+    pub trace: bool,
+    pub traced: Vec<(u32, [u16; 16])>,
+}
+
+/// One program call as `record` keeps it: VU1's registers, data memory, TOP and ITOP on the way in; the registers
+/// and data memory on the way out; what it sent to the GS (`gs` from `gs_from`)
+#[derive(Clone)]
+pub struct Run {
+    pub start: u32,
+    pub top: u32,
+    pub itop: u32,
+    pub regs_in: Cpu,
+    pub data_in: Vec<u8>,
+    pub regs_out: Cpu,
+    pub data_out: Vec<u8>,
+    pub gs_from: usize,
+    pub gs_to: usize,
+    /// The micro memory it ran (which program)
+    pub micro: Vec<u8>,
+    /// Its pairs in `traced` (with `trace` set)
+    pub traced_from: usize,
+    pub traced_to: usize,
 }
 
 impl Default for Vu1 {
@@ -66,6 +93,10 @@ impl Default for Vu1 {
             gs: Vec::new(),
             kicks: Vec::new(),
             calls: Vec::new(),
+            record: false,
+            runs: Vec::new(),
+            trace: false,
+            traced: Vec::new(),
         }
     }
 }
@@ -194,7 +225,13 @@ impl Vu1 {
                     }
                     self.dbf = !self.dbf;
                     self.calls.push((start, self.top));
+                    let before = self.record.then(|| (self.regs.clone(), self.data.clone(), self.gs.len()));
+                    let traced_from = self.traced.len();
                     self.exec(start)?;
+                    if let Some((regs_in, data_in, gs_from)) = before {
+                        let (regs_out, data_out, gs_to) = (self.regs.clone(), self.data.clone(), self.gs.len());
+                        self.runs.push(Run { start, top: self.top, itop: self.itop, regs_in, data_in, regs_out, data_out, gs_from, gs_to, micro: self.micro.clone(), traced_from, traced_to: self.traced.len() });
+                    }
                 }
                 0x20 => {
                     let (d, j) = take(i, 1).ok_or("STMASK past the data")?;
@@ -355,6 +392,9 @@ impl Vu1 {
                 if let Some(t) = self.lower(&before, lo, pc).map_err(err)? {
                     branch = Some(t);
                 }
+            }
+            if self.trace {
+                self.traced.push((pc, self.regs.vi));
             }
             if ending {
                 self.tpc = next & 0x3ff8;

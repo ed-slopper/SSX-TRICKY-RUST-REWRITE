@@ -180,3 +180,5 @@ pub mod drawmodel;
 pub mod terraindraw;
 pub mod bezier;
 pub mod drawlist;
+pub mod vu;
+pub mod patchvu;
