@@ -27,6 +27,7 @@ pub mod knockables;
 pub mod courses;
 pub mod debris;
 pub mod debugmenu;
+pub mod dmitems;
 pub mod finish;
 pub mod fxrand;
 pub mod gate;

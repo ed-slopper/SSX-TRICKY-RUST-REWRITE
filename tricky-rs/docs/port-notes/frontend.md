@@ -1641,3 +1641,54 @@ and menus. 60 of 64 mutants are caught. The other 4 are equivalent: the hidden i
 pulling the first shown back when it equals the selection; one extra step of `AddItem`'s shift (overwritten
 straight after); and mode 4's select test on the key instead of the stored word (they differ only when the key
 became 8).
+
+## The debug menu's item kinds (G9a4b, `game/src/dmitems.rs`)
+
+Every kind keeps the `cMenuItem` base and adds fields from +0x10. Labels go through `MenuItem_MeasureLabel` and
+`MenuItem_DrawLabel` (G9a4c) as a title with a value beside it, or as a lone label. A menu's +0x18 virtual runs
+a command (item, argument) and its +0x20 hears that an item's value changed.
+- **bool** (table 0x389e00): +0x10 the title, +0x14 / +0x18 the words for true and false, +0x1c the bool.
+  - Select flips it; with both words, left (0x4b00) and right (0x4d00) flip it too.
+  - Its measure is the wider of the title beside each word.
+- **enum** (0x389dc0): +0x14 the count, +0x18 the list (8 bytes each: name, value), +0x1c the value.
+  - Select runs the menu's command (argument 0). Left and right step round the list; a value not in the list
+    goes to the first or the last entry. The steps are a signed `div`, which traps on an empty list.
+  - It also checks up and down, but the base turns those keys into answers first, so they never get there.
+  - 0x189d38 (not indexed) sets the list and counts it to the first entry without a name.
+- **sub-menu**, **pop**, **command**, **null**, **space**:
+  - select pushes the item's menu (+0x14), or pops;
+  - a command runs the menu's command with its argument (+0x18), showing a value (+0x14) when it has one;
+  - the null and space items can't be picked; the space measures as its height only.
+- **int** (0x389c40), **float** (0x389c00), **angle** (0x389bc0): held left or right (the pad's buttons 8 and 4)
+  step the value inside its range, faster the longer they are held. The menu is told, and a second value
+  (+0x2c / +0x30) is kept equal.
+  - The int steps by 1 + held² / 288 · 0.1, taking the whole part and keeping the fraction (+0x28) for later.
+  - The float moves by the range · 0.00005, times (held² · 50 / 60 · 50 / 60 / 200) once that reaches 1. The
+    angle is the same code, drawn in degrees (· 57.2958). The float is drawn as value · scale (+0x20) + offset
+    (+0x24).
+  - Both formats get their float through 0x2f7aa8, which makes it a double for the variable arguments.
+- **string** (0x389b80) is a name editor (+0x14 the buffer, +0x18 its size, +0x1c the cursor).
+  - Left and right move the cursor; right past the end appends '0' while there is room.
+  - 'a' inserts '0' at the cursor and 'A' deletes there.
+  - 'c' and select step the character up and down through the name characters (letters, digits, '_'), round the
+    signed byte.
+- **colour** (0x389b40) edits one channel (+0x14) of a float colour (+0x10). Held left or right moves it by
+  0.0004 · max(1, held² / 288), inside 0..1.
+- **expand** (0x389ab0) holds a whole menu at +0x14 (its own table 0x389b00, its owner at +0x12c), with a header
+  item (+0x10) first.
+  - Its key handler passes the key to the inner menu's picked item. Moving past the inner menu's ends puts the
+    selection back and answers down or up to the outer menu.
+  - When the item is picked in the outer menu, it measures and draws all its inner items, the others 20 in from
+    the header; otherwise just the header. Its draw moves the given box's y down past each item it draws.
+  - The inner menu's command and change go to the owner's +0x40 / +0x48, which pass them on to the outer menu.
+- **RGB** (0x389a20) is an expand item over three colour items (red, green, blue) under a title with a swatch
+  (`cRGBTitleMenuItem`, 0x389a70). After each key it copies the colour to a kept one (+0x5ac).
+- **The error menu** (0x3899e0) is a menu of a message (a null item), a gap (a space of 10, or 30 with a message)
+  and a pop item.
+
+The runner test (tests/dmitems.rs) has 23,700 cases over the 75 functions, with each kind's fields set up as it
+reads them. 72 of 77 mutants are caught. The other 5 are equivalent:
+- the enum's up and down checks (unreachable);
+- the float's faster rate from exactly 1 (the same product);
+- one extra step of the string's insert shift (overwritten straight after);
+- the expand item's header added at 0 instead of the end of an empty menu (twice).

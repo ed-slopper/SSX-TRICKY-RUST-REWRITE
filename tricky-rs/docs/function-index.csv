@@ -1941,77 +1941,77 @@ address,size,name,system,status
 0x1897b0,60,cMenuManager::Draw,debugmenu,checked
 0x1897f0,164,cMenuManager::Push,debugmenu,checked
 0x189898,172,cMenuManager::Pop,debugmenu,checked
-0x189948,116,cBoolMenuItem::cBoolMenuItem,debugmenu,not started
-0x1899c0,204,cBoolMenuItem::HandleInput,debugmenu,not started
-0x189a90,260,cBoolMenuItem::Measure,debugmenu,not started
-0x189b98,160,cBoolMenuItem::Draw,debugmenu,not started
-0x189c38,68,cEnumMenuItem::cEnumMenuItem,debugmenu,not started
-0x189c80,64,cEnumMenuItem::cEnumMenuItem,debugmenu,not started
-0x189cc0,116,cEnumMenuItem::cEnumMenuItem,debugmenu,not started
-0x189d78,648,cEnumMenuItem::HandleInput,debugmenu,not started
-0x18a000,280,cEnumMenuItem::Measure,debugmenu,not started
-0x18a118,180,cEnumMenuItem::Draw,debugmenu,not started
-0x18a1d0,88,cSubMenuItem::cSubMenuItem,debugmenu,not started
-0x18a228,112,cSubMenuItem::HandleInput,debugmenu,not started
-0x18a298,52,cSubMenuItem::Measure,debugmenu,not started
-0x18a2d0,76,cSubMenuItem::Draw,debugmenu,not started
-0x18a320,72,cPopMenuItem::cPopMenuItem,debugmenu,not started
-0x18a368,108,cPopMenuItem::HandleInput,debugmenu,not started
-0x18a3d8,52,cPopMenuItem::Measure,debugmenu,not started
-0x18a410,76,cPopMenuItem::Draw,debugmenu,not started
-0x18a460,56,cCommandMenuItem::cCommandMenuItem,debugmenu,not started
-0x18a498,68,cCommandMenuItem::cCommandMenuItem,debugmenu,not started
-0x18a4e0,88,cCommandMenuItem::cCommandMenuItem,debugmenu,not started
-0x18a548,132,cCommandMenuItem::HandleInput,debugmenu,not started
-0x18a5d0,84,cCommandMenuItem::Measure,debugmenu,not started
-0x18a628,140,cCommandMenuItem::Draw,debugmenu,not started
-0x18a6b8,72,cNullMenuItem::cNullMenuItem,debugmenu,not started
-0x18a700,8,cNullMenuItem::IsSelectable,debugmenu,not started
-0x18a708,52,cNullMenuItem::Measure,debugmenu,not started
-0x18a740,76,cNullMenuItem::Draw,debugmenu,not started
-0x18a790,72,cSpaceMenuItem::cSpaceMenuItem,debugmenu,not started
-0x18a7d8,8,cSpaceMenuItem::IsSelectable,debugmenu,not started
-0x18a7e0,52,cSpaceMenuItem::Measure,debugmenu,not started
-0x18a818,8,cSpaceMenuItem::Draw,debugmenu,not started
-0x18a820,84,cIntMenuItem::cIntMenuItem,debugmenu,not started
-0x18a878,132,cIntMenuItem::cIntMenuItem,debugmenu,not started
-0x18a900,64,IntMenuItem_SetRange,debugmenu?,not started
-0x18a940,364,cIntMenuItem::HandleInput,debugmenu,not started
-0x18aab0,56,cIntMenuItem::Measure,debugmenu,not started
-0x18aae8,124,cIntMenuItem::Draw,debugmenu,not started
-0x18ab68,144,cFloatMenuItem::cFloatMenuItem,debugmenu,not started
-0x18abf8,432,cFloatMenuItem::HandleInput,debugmenu,not started
-0x18ada8,56,cFloatMenuItem::Measure,debugmenu,not started
-0x18ade0,160,cFloatMenuItem::Draw,debugmenu,not started
-0x18ae80,144,cAngleMenuItem::cAngleMenuItem,debugmenu,not started
-0x18af10,432,cAngleMenuItem::HandleInput,debugmenu,not started
-0x18b0c0,56,cAngleMenuItem::Measure,debugmenu,not started
-0x18b0f8,160,cAngleMenuItem::Draw,debugmenu,not started
-0x18b198,52,cStringMenuItem::cStringMenuItem,debugmenu,not started
-0x18b1d0,108,cStringMenuItem::cStringMenuItem,debugmenu,not started
-0x18b240,20,StringMenuItem_Set,debugmenu?,not started
-0x18b258,1028,cStringMenuItem::HandleInput,debugmenu,not started
-0x18b660,88,cColorMenuItem::cColorMenuItem,debugmenu,not started
-0x18b6b8,340,cColorMenuItem::HandleInput,debugmenu,not started
-0x18b810,44,cExpandMenuItemMenu::vf2_18b810,debugmenu?,not started
-0x18b840,44,cExpandMenuItemMenu::vf3_18b840,debugmenu?,not started
-0x18b870,136,cExpandMenuItem::cExpandMenuItem,debugmenu,not started
-0x18b8f8,164,cExpandMenuItem::cExpandMenuItem,debugmenu,not started
-0x18b9a0,8,ExpandMenuItem_AddItem,debugmenu?,not started
-0x18b9f8,108,ExpandMenuItem_ReplaceItem,debugmenu?,not started
-0x18ba68,236,cExpandMenuItem::HandleInput,debugmenu,not started
-0x18bb58,44,cExpandMenuItem::vf7_18bb58,debugmenu,not started
-0x18bb88,44,cExpandMenuItem::vf8_18bb88,debugmenu,not started
-0x18bbb8,444,cExpandMenuItem::Measure,debugmenu,not started
-0x18bd78,312,cExpandMenuItem::Draw,debugmenu,not started
-0x18beb0,120,cExpandMenuItem::vf5_18beb0,debugmenu,not started
-0x18bf28,40,cExpandMenuItem::vf6_18bf28,debugmenu,not started
-0x18bf50,88,cRGBTitleMenuItem::cRGBTitleMenuItem,debugmenu,not started
-0x18bfa8,8,cRGBTitleMenuItem::IsSelectable,debugmenu,not started
-0x18bfb0,248,cRGBMenuItem::cRGBMenuItem,debugmenu,not started
-0x18c0a8,108,cRGBMenuItem::HandleInput,debugmenu,not started
-0x18c118,172,cErrorMenu::cErrorMenu,debugmenu?,not started
-0x18c1c8,188,cErrorMenu::cErrorMenu,debugmenu?,not started
+0x189948,116,cBoolMenuItem::cBoolMenuItem,debugmenu,checked
+0x1899c0,204,cBoolMenuItem::HandleInput,debugmenu,checked
+0x189a90,260,cBoolMenuItem::Measure,debugmenu,checked
+0x189b98,160,cBoolMenuItem::Draw,debugmenu,checked
+0x189c38,68,cEnumMenuItem::cEnumMenuItem,debugmenu,checked
+0x189c80,64,cEnumMenuItem::cEnumMenuItem,debugmenu,checked
+0x189cc0,116,cEnumMenuItem::cEnumMenuItem,debugmenu,checked
+0x189d78,648,cEnumMenuItem::HandleInput,debugmenu,checked
+0x18a000,280,cEnumMenuItem::Measure,debugmenu,checked
+0x18a118,180,cEnumMenuItem::Draw,debugmenu,checked
+0x18a1d0,88,cSubMenuItem::cSubMenuItem,debugmenu,checked
+0x18a228,112,cSubMenuItem::HandleInput,debugmenu,checked
+0x18a298,52,cSubMenuItem::Measure,debugmenu,checked
+0x18a2d0,76,cSubMenuItem::Draw,debugmenu,checked
+0x18a320,72,cPopMenuItem::cPopMenuItem,debugmenu,checked
+0x18a368,108,cPopMenuItem::HandleInput,debugmenu,checked
+0x18a3d8,52,cPopMenuItem::Measure,debugmenu,checked
+0x18a410,76,cPopMenuItem::Draw,debugmenu,checked
+0x18a460,56,cCommandMenuItem::cCommandMenuItem,debugmenu,checked
+0x18a498,68,cCommandMenuItem::cCommandMenuItem,debugmenu,checked
+0x18a4e0,88,cCommandMenuItem::cCommandMenuItem,debugmenu,checked
+0x18a548,132,cCommandMenuItem::HandleInput,debugmenu,checked
+0x18a5d0,84,cCommandMenuItem::Measure,debugmenu,checked
+0x18a628,140,cCommandMenuItem::Draw,debugmenu,checked
+0x18a6b8,72,cNullMenuItem::cNullMenuItem,debugmenu,checked
+0x18a700,8,cNullMenuItem::IsSelectable,debugmenu,checked
+0x18a708,52,cNullMenuItem::Measure,debugmenu,checked
+0x18a740,76,cNullMenuItem::Draw,debugmenu,checked
+0x18a790,72,cSpaceMenuItem::cSpaceMenuItem,debugmenu,checked
+0x18a7d8,8,cSpaceMenuItem::IsSelectable,debugmenu,checked
+0x18a7e0,52,cSpaceMenuItem::Measure,debugmenu,checked
+0x18a818,8,cSpaceMenuItem::Draw,debugmenu,checked
+0x18a820,84,cIntMenuItem::cIntMenuItem,debugmenu,checked
+0x18a878,132,cIntMenuItem::cIntMenuItem,debugmenu,checked
+0x18a900,64,IntMenuItem_SetRange,debugmenu,checked
+0x18a940,364,cIntMenuItem::HandleInput,debugmenu,checked
+0x18aab0,56,cIntMenuItem::Measure,debugmenu,checked
+0x18aae8,124,cIntMenuItem::Draw,debugmenu,checked
+0x18ab68,144,cFloatMenuItem::cFloatMenuItem,debugmenu,checked
+0x18abf8,432,cFloatMenuItem::HandleInput,debugmenu,checked
+0x18ada8,56,cFloatMenuItem::Measure,debugmenu,checked
+0x18ade0,160,cFloatMenuItem::Draw,debugmenu,checked
+0x18ae80,144,cAngleMenuItem::cAngleMenuItem,debugmenu,checked
+0x18af10,432,cAngleMenuItem::HandleInput,debugmenu,checked
+0x18b0c0,56,cAngleMenuItem::Measure,debugmenu,checked
+0x18b0f8,160,cAngleMenuItem::Draw,debugmenu,checked
+0x18b198,52,cStringMenuItem::cStringMenuItem,debugmenu,checked
+0x18b1d0,108,cStringMenuItem::cStringMenuItem,debugmenu,checked
+0x18b240,20,StringMenuItem_Set,debugmenu,checked
+0x18b258,1028,cStringMenuItem::HandleInput,debugmenu,checked
+0x18b660,88,cColorMenuItem::cColorMenuItem,debugmenu,checked
+0x18b6b8,340,cColorMenuItem::HandleInput,debugmenu,checked
+0x18b810,44,cExpandMenuItemMenu::vf2_18b810,debugmenu,checked
+0x18b840,44,cExpandMenuItemMenu::vf3_18b840,debugmenu,checked
+0x18b870,136,cExpandMenuItem::cExpandMenuItem,debugmenu,checked
+0x18b8f8,164,cExpandMenuItem::cExpandMenuItem,debugmenu,checked
+0x18b9a0,8,ExpandMenuItem_AddItem,debugmenu,checked
+0x18b9f8,108,ExpandMenuItem_ReplaceItem,debugmenu,checked
+0x18ba68,236,cExpandMenuItem::HandleInput,debugmenu,checked
+0x18bb58,44,cExpandMenuItem::vf7_18bb58,debugmenu,checked
+0x18bb88,44,cExpandMenuItem::vf8_18bb88,debugmenu,checked
+0x18bbb8,444,cExpandMenuItem::Measure,debugmenu,checked
+0x18bd78,312,cExpandMenuItem::Draw,debugmenu,checked
+0x18beb0,120,cExpandMenuItem::vf5_18beb0,debugmenu,checked
+0x18bf28,40,cExpandMenuItem::vf6_18bf28,debugmenu,checked
+0x18bf50,88,cRGBTitleMenuItem::cRGBTitleMenuItem,debugmenu,checked
+0x18bfa8,8,cRGBTitleMenuItem::IsSelectable,debugmenu,checked
+0x18bfb0,248,cRGBMenuItem::cRGBMenuItem,debugmenu,checked
+0x18c0a8,108,cRGBMenuItem::HandleInput,debugmenu,checked
+0x18c118,172,cErrorMenu::cErrorMenu,debugmenu,checked
+0x18c1c8,188,cErrorMenu::cErrorMenu,debugmenu,checked
 0x18c288,140,DebugMenu_BeginDraw,debugmenu?,not started
 0x18c318,104,DebugMenu_EndDraw,debugmenu?,not started
 0x18c380,932,DebugMenu_DrawBox,debugmenu?,not started
