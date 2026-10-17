@@ -3229,7 +3229,7 @@ address,size,name,system,status
 0x1f05a0,476,cReplayOverlay::~cReplayOverlay,frontend,checked
 0x1f0780,84,cReplayOverlay::__tf,runtime,host
 0x1f0808,80,cReplayControlOverlay::__tf,runtime,host
-0x1f08d0,1412,Streak_Draw,frontend?,not started
+0x1f08d0,1412,Streak_Draw,frontend?,checked
 0x1f0e58,8,ScreenAnimTrack_Construct,frontend?,checked
 0x1f0e60,28,ScreenAnimTrack_Delete,frontend?,not started
 0x1f0e80,200,ScreenAnim_Step,frontend?,checked

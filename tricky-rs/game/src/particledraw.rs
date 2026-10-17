@@ -34,7 +34,7 @@ fn vfn(m: &Mem, r: u32, off: u32) -> (u32, u32) {
     let vt = m.r32(r + 0x10);
     (r.wrapping_add(m.r16(vt + off) as i16 as i32 as u32), m.r32(vt + off + 4))
 }
-fn vcall(m: &mut Mem, env: &mut dyn ParticleDrawEnv, r: u32, off: u32, args: &[u32]) -> u32 {
+pub(crate) fn vcall(m: &mut Mem, env: &mut dyn ParticleDrawEnv, r: u32, off: u32, args: &[u32]) -> u32 {
     let (this, f) = vfn(m, r, off);
     env.vcall(m, f, this, args)
 }

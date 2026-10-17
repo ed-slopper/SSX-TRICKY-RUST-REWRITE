@@ -1783,3 +1783,21 @@ Checked in the runner (`tests/riderdraw.rs`): 6000 draws and 4000 helper cases. 
   as a huge number; Rust's compare would not, so the test leaves them out.
 
 One more, the 26.02 threshold's `<` as `≤`, needs a depth of exactly 26.02 (a boundary).
+
+## The rider's streaks (G7g5, `streak.rs`)
+
+`Streak_Draw` 0x1f08d0(streak, points) draws the hand or board streak as two strips through the renderer's
++0x220.
+- **Texture**: the app's +0x30 → +0x74, or −1 when the app has none. **State**: the depth bias, +0x1c0(1),
+  blend 3, +0x1e8(2, 0), put back after.
+- **Each strip** starts at the two points it is handed (the rider's draw's: the hands' or the board's). Then
+  each live entry, newest first, wrapping in a ring of 7. Strip one uses an entry's +0 / +0x10, strip two its
+  +0x20 / +0x30.
+- **The inner edge**'s alpha comes from the fade at 0x33f398 (0.65 × 0.7^k, then 0), starting 7 − the live count
+  in. So a full streak starts at 0.65 and a short one starts fainter. The outer edge keeps the colour's own
+  alpha. Colours are ×128 as integers.
+- The vertices' first 16 bytes (u, v) are never written: the streak is drawn untextured in effect, whatever
+  the stack held.
+
+Checked in the runner (`tests/streak.rs`): 5000 cases of 0..7 live entries anywhere in the ring, the app with
+a texture or not; 90,036 vertices. All 15 mutants were caught.
