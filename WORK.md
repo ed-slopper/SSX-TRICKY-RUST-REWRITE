@@ -81,8 +81,7 @@ state machine and the renderer are ours. Nothing has been checked against the or
 | G7 | Rendering, as the PS2 renderer does it. Split before claiming: | unowned | E3a, E3b | | [repo] |
 | G21 | **The rider stutters back and forth the whole run** (play test by bredclan, 2026-10-17, tricky-rs.2026-10-17.exe from 3580b5f). To find: whether it is the port (our stand-ins between the exact pieces: the rider's step, its control state, the app's camera or its frame timing fighting the game's fixed tick) or something the decompiling will fix once the boarder state machine (G1) runs whole. First step: log the rider's place and heading each tick in a run (`TRICKY_SIM`) and see which one goes back and forth, and on which frames | any | | | Play test 2026-10-17 |
 | G7r | (umbrella: G7r1..G7r4) The rider's skin as the game keeps it: the memory banks, the shape lists the outfits load into, the skin parts and their LODs, the rider skin, and the limbs' IK | ed-slopper/puffin | G7 | | Split of G7 |
-| G7r3 | The rider skin: `RiderSkin_Init` / `_Delete` / `_Reset` / `_ClearParts` / `_Bind` / `_AllocLods` / `_SkinMatricesFE` / `_Scale` / `_Resolve*` / `_SetRootMatrix`, `FUN_00207e50`, the `Boarder_*` glue 0x2083e8..0x2083fc | ed-slopper/puffin | G7r2 | | Split of G7r |
-| G7r4 | The limbs' IK: `Skel_GetBoneWorldPos` 0x2059f8, `Boarder_PoseBonesFromAngles` 0x205a78, `Boarder_SolveLimbIk` 0x205e98, `Boarder_GetBoneWorldPos` 0x208398 | any | G7r3 | | Split of G7r |
+| G7r4 | The limbs' IK: `Skel_GetBoneWorldPos` 0x2059f8, `Boarder_PoseBonesFromAngles` 0x205a78, `Boarder_SolveLimbIk` 0x205e98, `Boarder_GetBoneWorldPos` 0x208398 | ed-slopper/puffin | G7r3 | | Split of G7r |
 | G9 | Front end: title, main menu, mode select, rider / outfit / board select, options, records, trick book screens, unlock screens, music player, loading screens (`gApp+0x734`) | unowned | E1, E5 | | [repo] `ui.rs` is ours. Split (2026-10-16): G9b the shared machinery, G9c–G9t the screens (logic ported and checked in the runner, widgets as calls out), G9u the app's menus on them |
 | G9b | (umbrella: G9b1, G9b2) The front end's shared machinery: `cFE3D` (the manager, its per-frame update and the screen it runs), the `cFE3DState` base (the phases, `TransitionIn` / `Out`, `Finish` and `CreateNextState`, `UpdateTransition`, `Activate`, `LayoutWidgets`), the widgets they drive and the 3D transition record (`FE3DTransition_*`, notes in frontend.md) | any | G9 | | Split of G9 |
 | G9b2 | (umbrella: G9b2a, G9b2b, G9b2c, G9b2d, G9b2e) The rest of G9b: `cFE3D` (the manager: its per-frame update, the screen stack 0x275b10 / 0x275c10 / 0x2ac030, the players and their pad queries 0x26ce08..0x26cef8), the widgets the screens build (the constructor 0x2b1138 and its virtuals, the list 0x2ac018 / 0x2ac048, the place 0x2acb20, the screen helpers 0x274108, 0x2763f0, 0x2719c0, 0x2718f0, 0x271848, 0x2742e8) and the 3D transition record (`FE3DTransition_*`) | any | G9b1 | | Split from G9b; split (2026-10-16) |
@@ -153,6 +152,7 @@ matches the original.
 
 | ID | Task | Section | Who | Date | Commit |
 |---|---|---|---|---|---|
+| G7r3 | riderskin.rs: the rider skin (bind with the inverse bind pose, the front end's skinning, the LOD draw, the rest); runner-checked, 50/51 mutants | P2 | ed-slopper/puffin | 2026-10-17 | 830b123 |
 | G7r2 | skinpart.rs: SkinPart_* and SkinLod_*; runner-checked, 52/53 mutants (1 equivalent) | P2 | ed-slopper/puffin | 2026-10-17 | 800860a |
 | G7r1 | bdrload.rs: the skin banks, the outfit shape lists, SkinTexList_Find, BdrLoad_BindTextures; runner-checked, 43/43 mutants | P2 | ed-slopper/puffin | 2026-10-17 | 24891da |
 | G7q | (umbrella) the texture manager: G7q1..G7q4 | P2 | ed-slopper/puffin | 2026-10-17 | G7q1..G7q4 |
@@ -1314,3 +1314,4 @@ matches the original.
 - 2026-10-17 ed-slopper/puffin: split G7r (the rider skin) from G7 into G7r1..G7r4; claim G7r and G7r1.
 - 2026-10-17 ed-slopper/puffin: G7r1 done (24891da): the rider skin's banks and outfit shape lists. Claim G7r2.
 - 2026-10-17 ed-slopper/puffin: G7r2 done (800860a): the rider skin's parts and LODs. Claim G7r3.
+- 2026-10-17 ed-slopper/puffin: G7r3 done (830b123): the rider skin. Claim G7r4 (the limbs' IK), the last of G7r.
