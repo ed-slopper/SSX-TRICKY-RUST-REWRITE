@@ -1144,25 +1144,25 @@ address,size,name,system,status
 0x1587e8,44,AnimData_GetMarkerFrame,animation,checked
 0x158818,80,AnimData_SetMarker,animation,checked
 0x158868,160,SkelAnim_Create,other,ported
-0x158908,168,AnimFileList_Load,animation,not started
-0x1589b8,120,AnimFileList_Load2,animation,not started
-0x158a30,192,AnimFile_PollLoad,animation,not started
+0x158908,168,AnimFileList_Load,animation,checked
+0x1589b8,120,AnimFileList_Load2,animation,checked
+0x158a30,192,AnimFile_PollLoad,animation,checked
 0x158af0,28,AnimFile_Reset,animation,checked
-0x158b10,248,AnimFile_IndexClipNames,animation,not started
-0x158c10,40,AnimFile_Bind,animation,ported
+0x158b10,248,AnimFile_IndexClipNames,animation,checked
+0x158c10,40,AnimFile_Bind,animation,checked
 0x158c38,144,AnimData_Construct,animation,checked
 0x158cc8,76,AnimData_Clear,animation,checked
 0x158d18,76,AnimData_Init,animation,checked
 0x158d68,88,AnimData_GetClipId,animation,checked
 0x158dc0,224,SkelAnim_CreateTree,other,ported
-0x158ea0,284,AnimData_OpenBig,animation,not started
-0x158fc0,176,AnimData_PollLoad,animation,not started
+0x158ea0,284,AnimData_OpenBig,animation,checked
+0x158fc0,176,AnimData_PollLoad,animation,checked
 0x159070,208,AnimData_Reset,animation,checked
-0x159140,12,FUN_00159140,files?,not started
-0x159150,1500,AnimData_LoadClipTable,animation,not started
+0x159140,12,FUN_00159140,files?,checked
+0x159150,1500,AnimData_LoadClipTable,animation,checked
 0x159730,8,thunk_FUN_00159150,runtime,host
-0x159738,152,AnimData_LoadFileList,animation,not started
-0x1597d0,76,AnimData_IndexAllClips,animation,not started
+0x159738,152,AnimData_LoadFileList,animation,checked
+0x1597d0,76,AnimData_IndexAllClips,animation,checked
 0x159820,92,StaticInit_AnimNameHashes,frontend?,checked
 0x159880,104,SkelAnim_Init,other,not started
 0x1598e8,36,SkelAnim_SetSkeleton,other,not started

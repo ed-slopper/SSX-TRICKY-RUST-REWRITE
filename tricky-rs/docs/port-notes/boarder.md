@@ -1537,3 +1537,39 @@ constants. Running it in the runner and comparing memory shows what it writes:
 The table's other words (category, update mode, end action, layer, blend-in, end fade) are as the exe has them, so
 the notes that read them from the exe hold. The ports read the table from memory, so they follow whatever the init
 left.
+
+## The animation bank's loads (row G5c2; `game/src/animload.rs`, checked: `tests/animload.rs`)
+
+- **The files:** the bank's 0x1be `.afl` files are named at 0x3258b0. They are cmanim, bxanim, exanim, franim,
+  feanim, ed2anim, lu2anim, kr2anim, mr2anim, ps2anim, br2anim, jp2anim, the scenes' files, and the uber files at
+  0x19a.. (ex), 0x1a6.. (bx) and 0x1b2.. (fr).
+- **Loading one** (`AnimData_LoadFileList` 0x159738):
+  - Loaded now (`AnimFileList_Load`): `|data/char/<name>.afl` is opened, a block of its size is taken from the bank's
+    memory, the file is read into it and bound.
+  - Otherwise, unless already asked for or loaded, it is asked of the BIG file `data/char/anm.big` through the
+    object's virtual at +0x80 and marked as asked (+0x18 + 4i).
+  - `AnimData_PollLoad` takes in the requests that are ready. When all are in, it resets the BIG file and indexes
+    every clip.
+- **Binding** (`AnimFile_Bind`): the file record gets the image (+4), its clip headers (image + 0xc), and its curve
+  offsets and data (image + its +4 and +8). The image's +2 is the clip count.
+- **Indexing** (`AnimFile_IndexClipNames`): each clip's name hash (header +0) is looked up among the clip names'
+  hashes; at the first match, the key table gets (the file, the clip). The clip number is also written into the
+  caller's key.
+- **`AnimData_OpenBig` 0x158ea0(mode, now, list, n):**
+  - A mode already open does nothing. Otherwise the bank is reset and the mode noted.
+  - Loading later, the BIG file is opened and loads are marked as waiting.
+  - Mode 0 loads feanim; modes 1 and 2 the clip table (`AnimData_LoadClipTable`). Then the list's n files.
+  - Loading now, every clip is indexed.
+- **`AnimData_LoadClipTable` 0x159150:**
+  - First the shared files, in this order: cmanim, kr2anim, ed2anim, lu2anim, mr2anim, ps2anim, br2anim, jp2anim,
+    bxanim, exanim, franim.
+  - Then each human rider of the career's race roster (+0x27dc; player byte +0x69 not negative) gets its
+    character's (+0x3c) uber file for its board class (+0x48). A character and class that an earlier human already
+    had is skipped.
+  - The characters' order within a class's files: Eddie, Elise, Mac, JP, Zoe, Moby, Luther, Kaori, Psymon, Seeiah,
+    Brodi, Marisol (character ids 0, 7, 3, 6, 5, 4, 2, 1, 8, 9, 10, 11).
+
+Checked in the runner on 8,000 random banks, about 800 calls for each of 10 functions. The data was files loaded,
+asked for or neither; random name hashes; rosters of humans and computers with repeats; and a BIG file with a fake
+vtable. The file and BIG reads were stand-ins writing generated `.afl` images; `sprintf` was a one-`%s` stand-in.
+27 of 29 mutants were caught. The other 2 are equivalent: a load "now" falling through to the async path (the file is loaded by then, so that path returns at once), and indexing after an async open (the reset leaves nothing loaded to index).
