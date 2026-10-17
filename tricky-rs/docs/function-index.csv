@@ -2501,8 +2501,8 @@ address,size,name,system,status
 0x1b16f0,952,Results_BuildStatsPage,race?,checked
 0x1b1aa8,256,Results_BuildLessonPage,race?,checked
 0x1b1ba8,324,Results_SetMedalVerdict,race?,checked
-0x1b2158,720,Results_DrawBestTrick,hud?,not started
-0x1b2428,3732,Results_DrawVersusPage,ai?,not started
+0x1b2158,720,Results_DrawBestTrick,hud?,checked
+0x1b2428,3732,Results_DrawVersusPage,ai?,checked
 0x1b32c0,1580,Results_UpdateSaveBeforeExit,save,ported
 0x1b38f0,272,cViewHiScoresOverlay::cViewHiScoresOverlay,frontend,ported
 0x1b3a00,1068,cViewHiScoresOverlay::Reset,frontend,not started

@@ -816,3 +816,319 @@ pub fn lesson_page(m: &mut Mem, env: &mut dyn TextBoxEnv, this: u32) {
     let c = m.r32(page + 0x34);
     m.w32(page + 0x34, c.wrapping_add(1));
 }
+
+/// The text drawer's colour (four floats; its first scaled by the HUD's fade after each colour is set)
+pub const DRAW_COLOUR: u32 = 0x337fe8;
+/// The score deltas' blink: a count of frames, back to 0 past 30
+pub const BLINK: u32 = 0x338214;
+/// Two words the time challenge's differences start from
+pub const DIFF_START: u32 = 0x38e448;
+pub const TB_INIT: u32 = 0x1957b0;
+pub const TB_SET_FONT: u32 = 0x196028;
+pub const TB_RESET: u32 = 0x195ee8;
+pub const TB_SET_SCALE: u32 = 0x1961f0;
+pub const TB_SET_ASCII: u32 = 0x196128;
+pub const TB_APPEND: u32 = 0x196088;
+pub const TB_WRAP: u32 = 0x196218;
+pub const TB_DRAW: u32 = 0x1957d8;
+pub const TB_DELETE: u32 = 0x14f390;
+pub const SET_RECT: u32 = 0x196070;
+pub const SET_COLOUR: u32 = 0x14eee8;
+pub const MEASURE_WIDE: u32 = 0x19dc78;
+pub const PRINTF_SHADOWED: u32 = 0x19d3f0;
+pub const PRINTF_SHADOWED_A: u32 = 0x19d568;
+pub const HISCORES_TEXT: u32 = 0x1ab1a0;
+pub const MC_DRAW: u32 = 0x1cf628;
+pub const SCORE_DELTA: u32 = 0x1a91c8;
+pub const FORMAT_TIME_SIGNED: u32 = 0x1a6c90;
+pub const WSTR_FORMAT: u32 = 0x17ce38;
+
+/// The results' gold: (1, 0.953, 0.729, 0.106)
+const GOLD: [u32; 4] = [0x3f80_0000, 0x3f73_f7cf, 0x3f3a_9fbe, 0x3dd9_1687];
+
+fn hud_sprites(m: &Mem, this: u32) -> u32 {
+    m.r32(m.r32(this + 4) + 0x42c)
+}
+fn fcall(m: &mut Mem, env: &mut dyn TextBoxEnv, func: u32, args: &[u32], f: &[F]) -> u32 {
+    env.call(m, func, args, f)
+}
+/// The drawer's colour from four words at `at`, then its first scaled by the HUD's fade (+0x70)
+fn colour(m: &mut Mem, env: &mut dyn TextBoxEnv, this: u32, at: u32) {
+    call(m, env, SET_COLOUR, &[DRAW_COLOUR, at]);
+    let h = hud_sprites(m, this);
+    let v = rf(m, DRAW_COLOUR) * rf(m, h + 0x70);
+    wf(m, DRAW_COLOUR, v);
+}
+fn put4(m: &mut Mem, at: u32, v: [u32; 4]) {
+    for (i, w) in v.into_iter().enumerate() {
+        m.w32(at + 4 * i as u32, w);
+    }
+}
+fn race_name(r: u32) -> u32 {
+    r.wrapping_mul(0x84).wrapping_add(RACE) + 8
+}
+
+/// `Results_DrawBestTrick` 0x1b2158(this, who, align; x, y, w, h): a text box (in `scratch`, the game's 0x1470
+/// bytes of stack) in the HUD's small font at 0.83 (0.747 in the app's mode 2 with the page's +0x48), the heading
+/// 0x1f9 in gold (shadowed, at 0.66) above the player's trick line (`who`+8) wrapped in the box (x, y + the font's
+/// height · 0.66 + 6, w, h). The heading's x: `align` 0 at x, 2 right-aligned to x + w (its measured width taken
+/// off; the box's alignment words +0x20 / +0x24 set to 0 and 1), 1 where the caller's registers left it
+/// (`kept`: the game's f21 and f23, unset on that path), 25 to the left with the medal flag and one rider.
+pub fn draw_best_trick(m: &mut Mem, env: &mut dyn TextBoxEnv, this: u32, who: u32, align: u32, x: F, y: F, w: F, h: F, kept: (F, F), scratch: u32) {
+    let tb = scratch;
+    call(m, env, TB_INIT, &[tb]);
+    let s = loc(m, env, 0x1f9);
+    let hs = hud_sprites(m, this);
+    call(m, env, TB_SET_FONT, &[tb, m.r32(hs + 4)]);
+    call(m, env, TB_RESET, &[tb]);
+    let big = k(0x3f54_7ae1);
+    fcall(m, env, TB_SET_SCALE, &[tb], &[big, big]);
+    if m.r32(m.r32(APP) + 0x58) == 2 && m.r32(m.r32(this) + 0x48) != 0 {
+        let v = k(0x3f3f_3b64);
+        fcall(m, env, TB_SET_SCALE, &[tb], &[v, v]);
+    }
+    let small = k(0x3f28_f5c3);
+    let (head_x, box_x) = match align {
+        0 => {
+            m.w32(tb + 0x20, 0);
+            m.w32(tb + 0x24, 0);
+            (x, x)
+        }
+        1 => kept,
+        _ => {
+            let hs = hud_sprites(m, this);
+            let wd = fcall(m, env, MEASURE_WIDE, &[m.r32(hs + 8), s, 0], &[small]);
+            m.w32(tb + 0x24, 1);
+            m.w32(tb + 0x20, 0);
+            ((x + w) - cvt_s_w(wd as i32), x)
+        }
+    };
+    let hs = hud_sprites(m, this);
+    let fh = cvt_s_w(m.r32(m.r32(hs + 8) + 0xc) as i32) * small;
+    put4(m, tb + 0x1470, GOLD);
+    call(m, env, SET_COLOUR, &[DRAW_COLOUR, tb + 0x1470]);
+    let top = (y + fh) + F(6.0);
+    let hs = hud_sprites(m, this);
+    let v = rf(m, DRAW_COLOUR) * rf(m, hs + 0x70);
+    wf(m, DRAW_COLOUR, v);
+    if m.r32(this + 0xc8) != 0 && m.r32(RACE) == 1 {
+        fcall(m, env, PRINTF_SHADOWED_A, &[m.r32(hs + 8), s], &[small, head_x - F(25.0), y]);
+    } else {
+        let hs = hud_sprites(m, this);
+        fcall(m, env, PRINTF_SHADOWED_A, &[m.r32(hs + 8), s], &[small, head_x, y]);
+    }
+    fcall(m, env, SET_RECT, &[tb], &[box_x, top, w, h]);
+    call(m, env, TB_SET_ASCII, &[tb, who + 8]);
+    call(m, env, TB_WRAP, &[tb, 0]);
+    call(m, env, TB_DRAW, &[tb, 0xffff_ffff, 0]);
+    call(m, env, TB_DELETE, &[tb, 2]);
+}
+
+/// `Results_DrawVersusPage` 0x1b2428(this): nothing while the HUD's +0x328 is set; the memory card's overlay while
+/// the HUD's +0x430 is 2. Else the high scores' text of the page, then in gold (the colours on the stack, in
+/// `scratch`: 0x15c0 bytes, and the best tricks' frames past them):
+/// - with the medal flag, the players' names and best tricks (one rider: at 226 and the trick at 191; two: at 78
+///   and 363, the tricks at 108 right-aligned and 303);
+/// - in mode 1 the names again (192; or 70 and 330);
+/// - in modes 4 and 2 with two profiles the heading 0xe5c and each player's line 0xdde above the columns; the
+///   blink counted on (back to 0 past 30); for each row of the page the score deltas of a rider who is no
+///   player's (the block's +0xd4 / +0xdc, and +0xd8 / +0xe0 with two profiles; the blink / 2.5) then white, a
+///   player's row gold;
+/// - in mode 7 the time challenge: the headings 0xe5d, 0xeae, 0xe61, 0xe9b, then for each profile its rider's
+///   name, character, time and that time's difference from the career's +0x2b08 (magenta when ahead, yellow
+///   else), rows 25 apart from 200; and a box saying who won (0xc76 when the first is behind, or with two
+///   profiles the second; else 0xc77);
+/// - with the overlay's message (+0x20) a box with it, lower with the verdict or the medal flag shown.
+pub fn draw_versus_page(m: &mut Mem, env: &mut dyn TextBoxEnv, this: u32, scratch: u32) {
+    let sp = scratch;
+    let hud = m.r32(this + 4);
+    if m.r32(m.r32(hud + 0x42c) + 0x328) != 0 {
+        return;
+    }
+    if m.r32(hud + 0x430) == 2 {
+        call(m, env, MC_DRAW, &[hud]);
+        return;
+    }
+    call(m, env, HISCORES_TEXT, &[m.r32(this)]);
+    put4(m, sp, GOLD);
+    colour(m, env, this, sp);
+    let gold_small = k(0x3f33_3333);
+    if m.r32(this + 0xc8) != 0 {
+        if m.r32(CAREER + 0x27dc) == 1 {
+            let r = call(m, env, FIND_RIDER, &[CAREER, 0]);
+            let hs = hud_sprites(m, this);
+            fcall(m, env, PRINTF_SHADOWED, &[m.r32(hs + 8), race_name(r)], &[gold_small, F(226.0), F(122.0)]);
+            draw_best_trick(m, env, this, WHO, 0, F(191.0), k(0x4392_8000), F(322.0), F(90.0), (F(0.0), F(0.0)), sp + 0x15c0);
+        } else {
+            let two = k(0x3f23_d70a);
+            let hs = hud_sprites(m, this);
+            let r = call(m, env, FIND_RIDER, &[CAREER, 0]);
+            fcall(m, env, PRINTF_SHADOWED, &[m.r32(hs + 8), race_name(r)], &[two, F(78.0), F(122.0)]);
+            let r = call(m, env, FIND_RIDER, &[CAREER, 1]);
+            let hs = hud_sprites(m, this);
+            fcall(m, env, PRINTF_SHADOWED, &[m.r32(hs + 8), race_name(r)], &[two, k(0x43b5_8000), F(122.0)]);
+            draw_best_trick(m, env, this, WHO, 2, F(108.0), k(0x4388_8000), F(165.0), F(90.0), (F(0.0), F(0.0)), sp + 0x15c0);
+            draw_best_trick(m, env, this, WHO + 0x78, 0, k(0x4397_8000), k(0x4388_8000), F(165.0), F(90.0), (F(0.0), F(0.0)), sp + 0x15c0);
+        }
+    }
+    let mode = m.r32(CAREER + 0x2afc);
+    if mode == 1 {
+        put4(m, sp, GOLD);
+        colour(m, env, this, sp);
+        let hs = hud_sprites(m, this);
+        if m.r32(RACE) == mode {
+            let r = call(m, env, FIND_RIDER, &[CAREER, 0]);
+            fcall(m, env, PRINTF_SHADOWED, &[m.r32(hs + 8), race_name(r)], &[gold_small, F(192.0), F(122.0)]);
+        } else {
+            let r = call(m, env, FIND_RIDER, &[CAREER, 0]);
+            fcall(m, env, PRINTF_SHADOWED, &[m.r32(hs + 8), race_name(r)], &[gold_small, F(70.0), F(122.0)]);
+            let hs = hud_sprites(m, this);
+            let r = call(m, env, FIND_RIDER, &[CAREER, 1]);
+            fcall(m, env, PRINTF_SHADOWED, &[m.r32(hs + 8), race_name(r)], &[gold_small, F(330.0), F(122.0)]);
+        }
+    }
+    let mode = m.r32(CAREER + 0x2afc);
+    if mode == 4 || mode == 2 {
+        put4(m, sp, GOLD);
+        colour(m, env, this, sp);
+        if call(m, env, COUNT_PROFILES, &[CAREER]) == 2 {
+            let hs = hud_sprites(m, this);
+            let hx = rf(m, COL_RIGHT + 8) + F(35.0);
+            let hy = rf(m, COL_X) - F(45.0);
+            let s = loc(m, env, 0xe5c);
+            fcall(m, env, PRINTF_SHADOWED_A, &[m.r32(hs + 8), s], &[k(0x3f26_6666), hx, hy]);
+            for (p, col) in [(0u32, 8u32), (1, 0xc)] {
+                let fmt = loc(m, env, 0xdde);
+                let r = call(m, env, FIND_RIDER, &[CAREER, p]);
+                call(m, env, WSTR_FORMAT, &[sp + 0x10, fmt, race_name(r)]);
+                let hs = hud_sprites(m, this);
+                let y = rf(m, COL_X) - F(23.0);
+                fcall(m, env, PRINTF_SHADOWED_A, &[m.r32(hs + 4), sp + 0x10], &[k(0x3f19_999a), rf(m, COL_RIGHT + col), y]);
+            }
+        }
+        let t = rf(m, BLINK) + F(1.0);
+        wf(m, BLINK, t);
+        if F(30.0) < t {
+            m.w32(BLINK, 0);
+        }
+        let phase = div(rf(m, BLINK), F(2.5));
+        let mut row = 0u32;
+        while (row as i32) < m.r32(m.r32(this) + 4) as i32 {
+            let r = m.r32(ORDER + 4 * row);
+            if m.r8(r.wrapping_mul(0x84).wrapping_add(RACE) + 0x69) as i8 == -1 {
+                let blk = r.wrapping_mul(0xbc).wrapping_add(ORDER);
+                let y = rf(m, COL_X + 4 * row) + F(3.0);
+                let hs = hud_sprites(m, this);
+                let (a, b) = (cvt_s_w(m.r32(blk + 0xd4) as i32), cvt_s_w(m.r32(blk + 0xdc) as i32));
+                fcall(m, env, SCORE_DELTA, &[hs], &[rf(m, COL_RIGHT + 8), y, a, b, phase]);
+                if call(m, env, COUNT_PROFILES, &[CAREER]) == 2 {
+                    let y = rf(m, COL_X + 4 * row) + F(3.0);
+                    let hs = hud_sprites(m, this);
+                    let (a, b) = (cvt_s_w(m.r32(blk + 0xd8) as i32), cvt_s_w(m.r32(blk + 0xe0) as i32));
+                    fcall(m, env, SCORE_DELTA, &[hs], &[rf(m, COL_RIGHT + 0xc), y, a, b, phase]);
+                }
+                put4(m, sp, [0x3f80_0000; 4]);
+            } else {
+                put4(m, sp, GOLD);
+            }
+            colour(m, env, this, sp);
+            row += 1;
+        }
+    }
+    let mode = m.r32(CAREER + 0x2afc);
+    if mode == 7 {
+        put4(m, sp, GOLD);
+        colour(m, env, this, sp);
+        let big = k(0x3f42_8f5c);
+        for (id, x) in [(0xe5du32, 40.0f32), (0xeae, 200.0), (0xe61, 320.0), (0xe9b, 430.0)] {
+            let hs = hud_sprites(m, this);
+            let s = loc(m, env, id);
+            fcall(m, env, PRINTF_SHADOWED_A, &[m.r32(hs + 8), s], &[big, F(x), F(175.0)]);
+        }
+        m.w32(sp, m.r32(DIFF_START));
+        m.w32(sp + 4, m.r32(DIFF_START + 4));
+        let row_scale = k(0x3f6b_851f);
+        let mut c = 0u32;
+        while (c as i32) < call(m, env, COUNT_PROFILES, &[CAREER]) as i32 {
+            put4(m, sp + 0x10, [0x3f80_0000; 4]);
+            call(m, env, SET_COLOUR, &[DRAW_COLOUR, sp + 0x10]);
+            let fc = cvt_s_w(c as i32);
+            let y = fc * F(25.0) + F(200.0);
+            let r = m.r32(ORDER + 4 * c);
+            let hs = hud_sprites(m, this);
+            let v = rf(m, DRAW_COLOUR) * rf(m, hs + 0x70);
+            wf(m, DRAW_COLOUR, v);
+            fcall(m, env, PRINTF_SHADOWED, &[m.r32(hs + 4), race_name(r)], &[row_scale, F(40.0), y]);
+            let ch = m.r32(r.wrapping_mul(0x84).wrapping_add(RACE) + 0x3c).wrapping_mul(0x38).wrapping_add(CHARACTERS);
+            let hs = hud_sprites(m, this);
+            fcall(m, env, PRINTF_SHADOWED, &[m.r32(hs + 4), m.r32(ch + 4)], &[row_scale, F(200.0), y]);
+            let t = m.r32((r << 2).wrapping_add(TIMES));
+            call(m, env, FORMAT_TIME_SIGNED, &[t, sp + 0x30]);
+            let hs = hud_sprites(m, this);
+            fcall(m, env, PRINTF_SHADOWED_A, &[m.r32(hs + 4), sp + 0x30], &[row_scale, F(320.0), y]);
+            let d = t.wrapping_sub(m.r32(CAREER + 0x2b08));
+            m.w32(sp + 4 * c, d);
+            if (d as i32) < 0 {
+                put4(m, sp + 0x10, [0x3f80_0000, 0, 0x3f80_0000, 0]);
+            } else {
+                put4(m, sp + 0x10, [0x3f80_0000, 0x3f80_0000, 0, 0]);
+            }
+            call(m, env, SET_COLOUR, &[DRAW_COLOUR, sp + 0x10]);
+            let hs = hud_sprites(m, this);
+            let v = rf(m, DRAW_COLOUR) * rf(m, hs + 0x70);
+            wf(m, DRAW_COLOUR, v);
+            call(m, env, FORMAT_TIME_SIGNED, &[m.r32(sp + 4 * c), sp + 0x10]);
+            c += 1;
+            let hs = hud_sprites(m, this);
+            fcall(m, env, PRINTF_SHADOWED_A, &[m.r32(hs + 4), sp + 0x10], &[row_scale, F(430.0), fc * F(25.0) + F(200.0)]);
+        }
+        let tb = sp + 0x60;
+        call(m, env, TB_INIT, &[tb]);
+        let hs = hud_sprites(m, this);
+        call(m, env, TB_SET_FONT, &[tb, m.r32(hs + 4)]);
+        call(m, env, TB_RESET, &[tb]);
+        let s8 = k(0x3f4c_cccd);
+        fcall(m, env, TB_SET_SCALE, &[tb], &[s8, s8]);
+        put4(m, sp + 0x10, GOLD);
+        for i in 0..4 {
+            m.w32(tb + 0x3c + 4 * i, m.r32(sp + 0x10 + 4 * i));
+        }
+        let hs = hud_sprites(m, this);
+        m.w32(tb + 0x38, m.r32(hs + 0x70));
+        fcall(m, env, SET_RECT, &[tb], &[F(115.0), F(300.0), F(340.0), F(60.0)]);
+        let id = if (m.r32(sp) as i32) < 0 {
+            0xc76
+        } else if call(m, env, COUNT_PROFILES, &[CAREER]) == 2 {
+            if (m.r32(sp + 4) as i32) >= 0 { 0xc77 } else { 0xc76 }
+        } else {
+            0xc77
+        };
+        let s = loc(m, env, id);
+        call(m, env, TB_APPEND, &[tb, s]);
+        call(m, env, TB_WRAP, &[tb, 0]);
+        call(m, env, TB_DRAW, &[tb, 0xffff_ffff, 0]);
+        call(m, env, TB_DELETE, &[tb, 2]);
+    }
+    if m.r16(this + 0x20) == 0 {
+        return;
+    }
+    let tb = sp;
+    call(m, env, TB_INIT, &[tb]);
+    let hs = hud_sprites(m, this);
+    call(m, env, TB_SET_FONT, &[tb, m.r32(hs + 4)]);
+    call(m, env, TB_RESET, &[tb]);
+    put4(m, sp + 0x1470, GOLD);
+    for i in 0..4 {
+        m.w32(tb + 0x3c + 4 * i, m.r32(sp + 0x1470 + 4 * i));
+    }
+    let hs = hud_sprites(m, this);
+    m.w32(tb + 0x38, m.r32(hs + 0x70));
+    let s8 = k(0x3f4c_cccd);
+    fcall(m, env, TB_SET_SCALE, &[tb], &[s8, s8]);
+    let y = if m.r32(this + 0xc4) != 0 || m.r32(this + 0xc8) != 0 { k(0x43bb_8000) } else { F(360.0) };
+    fcall(m, env, SET_RECT, &[tb], &[F(70.0), y, F(340.0), F(60.0)]);
+    call(m, env, TB_APPEND, &[tb, this + 0x20]);
+    call(m, env, TB_WRAP, &[tb, 0]);
+    call(m, env, TB_DRAW, &[tb, 0xffff_ffff, 0]);
+    call(m, env, TB_DELETE, &[tb, 2]);
+}

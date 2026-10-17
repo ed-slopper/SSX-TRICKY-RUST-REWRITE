@@ -54,6 +54,8 @@ const RECT: u32 = ARENA + 0x980;
 const APPOBJ: u32 = ARENA + 0xa00;
 /// A players' record for the stats rows: +0 the player, +4 the row
 const WHO: u32 = ARENA + 0xb00;
+/// The HUD's fonts (+0xc their height)
+const FONT: u32 = ARENA + 0xd00;
 /// The port's scratch: inside the runner's stack's range, so both log as the token
 const SCRATCH: u32 = 0x01f8_0000;
 const STACK_TOKEN: u32 = 0x5c5c_5c5c;
@@ -65,15 +67,22 @@ struct Call(u32, Vec<u32>);
 
 trait Io {
     fn w8(&mut self, a: u32, v: u8);
+    fn r32(&mut self, a: u32) -> u32;
 }
 impl Io for Mem {
     fn w8(&mut self, a: u32, v: u8) {
         Mem::w8(self, a, v)
     }
+    fn r32(&mut self, a: u32) -> u32 {
+        Mem::r32(self, a)
+    }
 }
 impl Io for r5900::Mem {
     fn w8(&mut self, a: u32, v: u8) {
         self.write_u8(a, v)
+    }
+    fn r32(&mut self, a: u32) -> u32 {
+        self.read_u32(a)
     }
 }
 fn mapped(a: u32, n: u32) -> bool {
@@ -95,8 +104,21 @@ impl Answers {
     }
 }
 
-/// How many of a callee's arguments are logged, and its answer
-fn standin(io: &mut dyn Io, func: u32, w: &[u32], ans: &Answers) -> (u32, Call) {
+/// How many float arguments a draw takes (f12 on)
+fn floats(func: u32) -> usize {
+    match func {
+        rp::TB_SET_SCALE => 2,
+        rp::MEASURE_WIDE => 1,
+        rp::PRINTF_SHADOWED | rp::PRINTF_SHADOWED_A => 3,
+        rp::SET_RECT => 4,
+        rp::SCORE_DELTA => 5,
+        _ => 0,
+    }
+}
+
+/// How many of a callee's arguments are logged (and what they point at: a colour's four words, a text box's
+/// alignment and colour words), and its answer
+fn standin(io: &mut dyn Io, func: u32, w: &[u32], f: &[u32], ans: &Answers) -> (u32, Call) {
     let n = match func {
         rp::LOC | rp::WSTR_COPY | rp::WSTR_SET_ASCII | rp::GET_RECT | rp::PLAYER_ID | rp::ATTR_POINTS | rp::FIND_RIDER | rp::TRICK_NAME | rp::CIRCUIT_MEDAL => 2,
         rp::SPRINTF => 4,
@@ -108,9 +130,20 @@ fn standin(io: &mut dyn Io, func: u32, w: &[u32], ans: &Answers) -> (u32, Call) 
             _ => 5,
         },
         rp::SPEECH_CLEAR => 2,
+        rp::TB_SET_FONT | rp::TB_SET_ASCII | rp::TB_APPEND | rp::TB_WRAP | rp::TB_DELETE | rp::FORMAT_TIME_SIGNED => 2,
+        rp::SET_COLOUR => 2,
+        rp::MEASURE_WIDE | rp::WSTR_FORMAT | rp::TB_DRAW => 3,
+        rp::PRINTF_SHADOWED | rp::PRINTF_SHADOWED_A => 2,
         _ => 1,
     };
-    let log: Vec<u32> = w[..n].iter().map(|&a| token(a)).collect();
+    let mut log: Vec<u32> = w[..n].iter().map(|&a| token(a)).collect();
+    log.extend(&f[..floats(func)]);
+    if func == rp::SET_COLOUR {
+        log.extend((0..4).map(|k| io.r32(w[1] + 4 * k)));
+    }
+    if func == rp::TB_DRAW {
+        log.extend([0x20, 0x24, 0x38, 0x3c, 0x40, 0x44, 0x48].map(|o| io.r32(w[0] + o)));
+    }
     let r = ans.next();
     let answer = match func {
         rp::LOC => STRINGS + 4 * (w[1] & 0xffff),
@@ -131,6 +164,7 @@ fn standin(io: &mut dyn Io, func: u32, w: &[u32], ans: &Answers) -> (u32, Call) 
         rp::COUNT_PROFILES => r % 3,
         rp::FIND_RIDER => r % 6,
         rp::CIRCUIT_MEDAL => r % 4,
+        rp::MEASURE_WIDE => r % 300,
         rp::GOT_RACE_FINAL | rp::GOT_SHOWOFF_FINAL => r % 2,
         _ => 0,
     };
@@ -142,10 +176,12 @@ struct Env<'a> {
     ans: &'a Answers,
 }
 impl TextBoxEnv for Env<'_> {
-    fn call(&mut self, m: &mut Mem, func: u32, args: &[u32], _: &[F]) -> u32 {
+    fn call(&mut self, m: &mut Mem, func: u32, args: &[u32], fargs: &[F]) -> u32 {
         let mut w = args.to_vec();
         w.resize(8, 0);
-        let (a, c) = standin(m, func, &w, self.ans);
+        let mut f: Vec<u32> = fargs.iter().map(|x| x.0.to_bits()).collect();
+        f.resize(8, 0);
+        let (a, c) = standin(m, func, &w, &f, self.ans);
         self.log.push(c);
         a
     }
@@ -161,7 +197,7 @@ fn result_pages_match_the_original() {
     let funcs = [
         0x1bf918u32, 0x1bf980, 0x1bf9d8, 0x1bfa08, 0x1bfa30, 0x1bfa50, 0x1bfa70, 0x1bfa90, 0x1bfab0, 0x1bfac8, 0x1bfae0,
         0x1bfaf8, 0x1bfb10, 0x1bfb20, 0x1aae10, 0x1aae88, 0x1af720, 0x1af940, 0x1af950, 0x1b1ba8, 0x1b0188, 0x1b07f8,
-        0x1b0998, 0x1b1278, 0x1b0bb8, 0x1b16f0, 0x1b1aa8,
+        0x1b0998, 0x1b1278, 0x1b0bb8, 0x1b16f0, 0x1b1aa8, 0x1b2158, 0x1b2428,
     ];
     for f in funcs {
         r.allow(f);
@@ -175,7 +211,10 @@ fn result_pages_match_the_original() {
         rp::LOC, rp::MEMSET, rp::WSTR_COPY, rp::WSTR_SET_ASCII, rp::WSTR_FORMAT_ASCII, rp::GET_RECT, rp::BACKDROP_RESET,
         rp::GOT_RACE_FINAL, rp::GOT_SHOWOFF_FINAL, rp::EVENT_MODE, rp::PLAYER_ID, rp::ATTR_POINTS, rp::MEDAL_RANK,
         rp::CLAMP_RANK, rp::FORMAT_TIME, rp::SPEECH_END, rp::SPEECH_CLEAR, rp::COUNT_PROFILES, rp::FIND_RIDER, rp::SPRINTF,
-        rp::TRICK_NAME, rp::CIRCUIT_MEDAL,
+        rp::TRICK_NAME, rp::CIRCUIT_MEDAL, rp::TB_INIT, rp::TB_SET_FONT, rp::TB_RESET, rp::TB_SET_SCALE, rp::TB_SET_ASCII,
+        rp::TB_APPEND, rp::TB_WRAP, rp::TB_DRAW, rp::TB_DELETE, rp::SET_RECT, rp::SET_COLOUR, rp::MEASURE_WIDE,
+        rp::PRINTF_SHADOWED, rp::PRINTF_SHADOWED_A, rp::HISCORES_TEXT, rp::MC_DRAW, rp::SCORE_DELTA, rp::FORMAT_TIME_SIGNED,
+        rp::WSTR_FORMAT,
     ];
     let log: Rc<RefCell<Vec<Call>>> = Rc::default();
     let ans = Rc::new(Answers { seed: Cell::new(0), n: Cell::new(0) });
@@ -188,7 +227,8 @@ fn result_pages_match_the_original() {
                 let d = c.gpr(6);
                 w = vec![w[0], w[1], d as u32, (d >> 32) as u32, w[3], 0, 0, 0];
             }
-            let (v, call) = standin(mem, func, &w, &a);
+            let f: Vec<u32> = (12..20).map(|k| c.f(k).to_bits()).collect();
+            let (v, call) = standin(mem, func, &w, &f, &a);
             l.borrow_mut().push(call);
             c.set_gpr(2, v as i32 as i64 as u64);
         });
@@ -202,12 +242,12 @@ fn result_pages_match_the_original() {
     let speech = read(&mut r, SPEECH_AT);
     let rodata = read(&mut r, RODATA);
     let mut g = Rng(0x5ce1_5000_0000_0001);
-    let (mut rows, mut verdicts) = (0usize, 0usize);
+    let (mut rows, mut verdicts, mut deltas, mut challenges) = (0usize, 0usize, 0usize, 0usize);
     let per = 300u32;
     for case in 0..funcs.len() as u32 * per {
         let func = funcs[(case % funcs.len() as u32) as usize];
         let mut m = Mem {
-            regions: vec![(DATA.0, data.clone()), (SPEECH_AT.0, speech.clone()), (RODATA.0, rodata.clone()), (ARENA, vec![0; SIZE as usize]), (SCRATCH, vec![0; 0x100])],
+            regions: vec![(DATA.0, data.clone()), (SPEECH_AT.0, speech.clone()), (RODATA.0, rodata.clone()), (ARENA, vec![0; SIZE as usize]), (SCRATCH, vec![0; 0x3000])],
         };
         for k in 0..SIZE / 4 {
             m.w32(ARENA + 4 * k, g.next());
@@ -219,18 +259,42 @@ fn result_pages_match_the_original() {
         m.w32(PAGE0 + 4, BASE);
         // (the pages' builder empties the menu first; the career page called alone finds a few items)
         m.w32(PAGE + 0x34, g.below(3));
-        // (the stats page clears as many rows' riders as the page's +4, left by the page before: 16 at most)
-        m.w32(PAGE + 4, g.below(17));
+        // (the page's +4: its rows, left by the page before; six at most, as the versus page reads the order by it)
+        m.w32(PAGE + 4, g.below(7));
         m.w32(BASE + 0xc, g.below(300));
         m.w32(HUD + 0x42c, SPRITES);
         // the app (its string table) and the speech, set at run time
         m.w32(rp::APP, APPOBJ);
+        m.w32(APPOBJ + 0x58, g.pick(&[2u32, 0]));
+        // the draws: the HUD's sprites (+4, +8 fonts, +0x70 the fade, +0x328 hidden), its overlay state, the flags
+        m.w32(SPRITES + 4, FONT);
+        m.w32(SPRITES + 8, FONT + 0x40);
+        m.w32(FONT + 0xc, g.below(40));
+        m.w32(FONT + 0x4c, g.below(40));
+        wf(&mut m, SPRITES + 0x70, g.f(0.0, 1.0));
+        m.w32(SPRITES + 0x328, g.pick(&[0u32, 0, 0, 1]));
+        m.w32(HUD + 0x430, g.pick(&[0u32, 0, 0, 2]));
+        m.w32(THIS + 0xc8, g.below(2));
+        m.w32(THIS + 0xc4, g.below(2));
+        let msg = g.next();
+        // (a message's first half word: some with only the high byte set)
+        m.w32(THIS + 0x20, g.pick(&[0u32, msg, 0x100]));
+        // (29: the count reaches 30 exactly)
+        let b = g.f(0.0, 35.0);
+        wf(&mut m, rp::BLINK, g.pick(&[b, 29.0]));
+        let drawn = g.f(0.0, 1.0);
+        wf(&mut m, rp::DRAW_COLOUR, drawn);
         m.w32(rp::SPEECH, g.next());
         // (and past 2^24, where whole numbers round: sums in another order come out differently)
         let x = { let v = g.f(-50.0, 400.0); let w = g.f(2e7, 2e8); g.pick(&[v, w]) };
         wf(&mut m, RECT + 8, x);
         // the career and the race
-        let mode = g.pick(&[1u32, 2, 3, 4, 4, 5, 6, 7, 8, 9, 0, 10]);
+        let mode = if func == 0x1b2428 {
+            // (the versus page draws in modes 1, 2, 4 and 7)
+            g.pick(&[1u32, 2, 4, 7, 7, 3])
+        } else {
+            g.pick(&[1u32, 2, 3, 4, 4, 5, 6, 7, 8, 9, 0, 10])
+        };
         m.w32(rp::CAREER + 0x2afc, mode);
         // (six riders at most: the order's six words run into the times)
         let n = { let v = g.below(7); g.pick(&[v, 6, 4]) };
@@ -246,6 +310,10 @@ fn result_pages_match_the_original() {
             m.w32(rp::ORDER + 4 * i, g.below(6));
             m.w32(rp::TIMES + 4 * i, g.next());
         }
+        let any = g.next();
+        // (or a rider's own time: a difference of 0)
+        let own = m.r32(rp::TIMES + 4 * g.below(6));
+        m.w32(rp::CAREER + 0x2b08, g.pick(&[0u32, any, own, own]));
         m.w32(rp::CAREER + 0x3264, g.below(6));
         // the race riders' stats blocks (their +4: the career's +0x3294, 0xbc each) and the speed's unit
         for i in 0..6 {
@@ -268,6 +336,9 @@ fn result_pages_match_the_original() {
         m.w32(WHO, g.below(4));
         m.w32(WHO + 4, g.below(7));
         let scol = g.below(6);
+        let align = g.below(3);
+        let (bx, by, bw, bh) = (g.f(0.0, 500.0), g.f(0.0, 400.0), g.f(10.0, 300.0), g.f(10.0, 100.0));
+        let kept = (g.f(-100.0, 600.0), g.f(-100.0, 600.0));
         // (the event's +0x320 is the career's mode itself, +0x2afc)
         m.w32(rp::CAREER + 0x27dc + 0x31c, g.next());
         m.w32(THIS + 0x1c, g.pick(&[0u32, 1, 2, 3]));
@@ -382,8 +453,20 @@ fn result_pages_match_the_original() {
                 rp::lesson_page(&mut m, &mut env, THIS);
                 none
             }
+            0x1b2158 => {
+                rp::draw_best_trick(&mut m, &mut env, THIS, WHO, align, F(bx), F(by), F(bw), F(bh), (F(kept.0), F(kept.1)), SCRATCH);
+                none
+            }
+            0x1b2428 => {
+                rp::draw_versus_page(&mut m, &mut env, THIS, SCRATCH);
+                none
+            }
             _ => unreachable!(),
         };
+        if func == 0x1b2428 {
+            deltas += env.log.iter().filter(|c| c.0 == rp::SCORE_DELTA).count();
+            challenges += env.log.iter().filter(|c| c.0 == rp::FORMAT_TIME_SIGNED).count();
+        }
         if matches!(func, 0x1af720 | 0x1af950 | 0x1b0188) {
             rows += env.log.iter().filter(|c| c.0 == rp::FORMAT_TIME).count();
             verdicts += env.log.iter().filter(|c| c.0 == rp::MEDAL_RANK).count();
@@ -396,6 +479,8 @@ fn result_pages_match_the_original() {
             0x1aae10 | 0x1aae88 => [PAGE, 0, 0, 0, 0],
             0x1af720 | 0x1af950 | 0x1b1ba8 | 0x1b0188 | 0x1b07f8 | 0x1b0bb8 | 0x1b16f0 | 0x1b1aa8 => [THIS, 0, 0, 0, 0],
             0x1b0998 => [THIS, WHO, 0, 0, 0],
+            0x1b2158 => [THIS, WHO, align, 0, 0],
+            0x1b2428 => [THIS, 0, 0, 0, 0],
             0x1b1278 => [THIS, WHO, scol, 0, 0],
             0x1af940 => [0; 5],
             _ => [PAGE, row, col, a3, t0],
@@ -406,9 +491,18 @@ fn result_pages_match_the_original() {
         if func == 0x1aae10 {
             r.cpu.set_f(12, fx);
             r.cpu.set_f(13, fw);
+        } else if func == 0x1b2158 {
+            for (k, v) in [bx, by, bw, bh].into_iter().enumerate() {
+                r.cpu.set_f(12 + k, v);
+            }
+            // (what the caller leaves in f21 and f23: the heading's and the box's x on alignment 1)
+            r.cpu.set_f(21, kept.0);
+            r.cpu.set_f(23, kept.1);
         } else {
             r.cpu.set_f(12, fv);
         }
+        // (the stack cleared, as the port's scratch starts: alignment 1 leaves the box's alignment words unset)
+        r.mem.write(0x01ff_0000 - 0x4000, &[0u8; 0x4000]).unwrap();
         r.call(func).unwrap_or_else(|e| panic!("case {case} {func:#x}: {e}"));
         if ours != none {
             assert_eq!(r.cpu.gpr(2) as u32, ours, "case {case} {func:#x}: the answer");
@@ -428,6 +522,6 @@ fn result_pages_match_the_original() {
             }
         }
     }
-    println!("{rows} finishers' rows, {verdicts} verdicts");
-    assert!(rows > 1000 && verdicts > 100);
+    println!("{rows} finishers' rows, {verdicts} verdicts, {deltas} score deltas, {challenges} time challenge times");
+    assert!(rows > 1000 && verdicts > 100 && deltas > 50 && challenges > 50);
 }

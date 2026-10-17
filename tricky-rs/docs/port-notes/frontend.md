@@ -1321,3 +1321,44 @@ overlay's tie count.
 
 45 of 47 mutants were caught. The two left are equivalent: the best score starting at 0 instead of -1 lists the same
 players while the tie count starts at 0 (as `BuildPages` leaves it), and adding 0 times a place to a place.
+
+### The results' draws (G9v4)
+
+- **`Results_DrawBestTrick` 0x1b2158**(this, who, align; x, y, w, h) draws a player's best trick in a text box built
+  on its stack: the HUD's small font at 0.83 (0.747 in the app's mode 2 when the page's +0x48 is set), the heading
+  0x1f9 in gold, shadowed at 0.66, and the trick line (`who` + 8, the lines the medal page fills) wrapped in the box
+  from y + the font's height · 0.66 + 6. The heading's x depends on the alignment:
+  - 0: at x;
+  - 2: right-aligned to x + w by its measured width, with the box's alignment words set to (0, 1);
+  - 1: whatever the caller left in f21 and f23. That path never sets them (a game bug), but its only caller, the
+    versus page, passes 0 or 2. The port takes the two as `kept`.
+
+  With the medal flag and one rider, the heading moves 25 to the left.
+- **`Results_DrawVersusPage` 0x1b2428:**
+  - It draws nothing while the HUD's +0x328 is set, and the memory card overlay while the HUD's +0x430 is 2.
+    Otherwise it draws the high scores' text, then in gold (each colour set with the HUD's fade, +0x70, on its
+    first component).
+  - With the medal flag: the players' names and best tricks (one rider: the name at 226 and the trick at 191; two:
+    names at 78 and 363, tricks right-aligned at 108 and at 303).
+  - In mode 1: the names again.
+  - In modes 4 and 2: with two profiles, the heading 0xe5c and each player's line (0xdde, a "%s" format) above the
+    columns. It counts a blink at 0x338214 on by 1 a frame (back to 0 past 30). Each row of a rider who isn't a
+    player draws that rider's score deltas (`HUD_DrawScoreDelta`, from the block's +0xd4 / +0xdc, plus +0xd8 /
+    +0xe0 with two profiles, with blink / 2.5) and turns the colour white; a player's row turns it gold.
+  - In mode 7, the time challenge: four headings, then for each profile its rider's name, character, time and that
+    time's difference from the career's +0x2b08 (magenta when ahead, yellow else), rows 25 apart from 200. A box
+    says who won: 0xc76 when the first is behind, or with two profiles when the second is; else 0xc77. The two
+    differences start from two words at 0x38e448, both −1.
+  - With the overlay's message (+0x20, a half word tested), a box with it, 15 lower when the verdict or the medal
+    flag is shown.
+
+  Each text box's colour and alpha are copied into it by hand (+0x3c..+0x48 and +0x38).
+
+Checked in the same runner test, now 8700 cases over the 29 functions. The text boxes' and the font's functions are
+stand-ins that log their float arguments; the colour stand-in logs the four words it is given, and the box's draw
+logs the box's alignment and colour words. The runner's stack is cleared before each case, as the port's scratch
+starts.
+
+51 of 53 mutants were caught:
+- the second start word read from the first is equivalent (both are −1);
+- the second profile's "behind" test at a difference of exactly 0 is a boundary the cases rarely reach.
