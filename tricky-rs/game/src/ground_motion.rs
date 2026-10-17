@@ -19,6 +19,10 @@
 //!   10), `Boarder_Wipeout` 0x11d830, `Score_Crash` 0x156de0, `Boarder_AddMeter` 0x11b018, rail capture (G1b, not ported yet)
 //!   and `Boarder_InstanceCollisions` 0x125088. The test records each call, with its arguments, in the order they
 //!   are made.
+//!
+//! The yaw and the tilt take `math::asin`, not `math::asin_ee`: `tests/ground_motion.rs` runs the original with every
+//! float rule nearest (as this port's floats are) and feeds it arguments beyond 0.7071, where the EE's chopped square
+//! root no longer matches (tried 2026-10-17).
 
 use crate::ground::{forward_drag, ground_thrust, side_friction, spring_force, DragState, FrictionState, ThrustState};
 use crate::math;

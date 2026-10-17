@@ -8,6 +8,11 @@
 //! turned (its side), rider+0x180 the y axis (its forward) and rider+0x1a0 the z axis (**the board's up**, proven
 //! here; `jump::JumpState::up` and `ground_motion::Rider::board_up` are this vector). rider+0x1b0 is the board's
 //! heading, the angle of the forward vector in the x-y plane, from `Math_Atan` 0x2510f8.
+//!
+//! `placed_attitude`, `rotate_vec_to_vec` and `slerp` take `math::asin`, not `math::asin_ee`: `tests/placement.rs`,
+//! `tests/orient.rs` and `tests/spin_enter.rs` run the original with every float rule nearest (as this port's floats
+//! are) and feed it arguments beyond 0.7071, where the EE's chopped square root no longer matches (tried
+//! 2026-10-17).
 
 use crate::math;
 

@@ -4,6 +4,10 @@
 //! game's order. `tests/spin.rs` checks it bit for bit against the original in the function runner.
 //!
 //! Field names are the spin object's (`st`, the handler's `this`) and the rider's (`rider` = st+0x70) offsets.
+//!
+//! `turn_of` and `landing_align` take `math::asin`, not `math::asin_ee`: `tests/spin_enter.rs` runs the original with
+//! every float rule nearest (as this port's floats are) and feeds it arguments beyond 0.7071, where the EE's chopped
+//! square root no longer matches (tried 2026-10-17).
 
 use crate::jump::pad_dir;
 use crate::math::sin_cos;

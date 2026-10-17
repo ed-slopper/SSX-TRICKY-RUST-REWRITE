@@ -1,6 +1,10 @@
 //! The landing check exactly as the original computes it (`Landing_CheckAngles` 0x12ba78, board row E8a1): in cm
 //! and the game's z up, with the vector unit's order and the game's own arcsine and arctangent (`crate::math`),
 //! checked bit for bit against the original in the function runner (`tests/landing.rs`).
+//!
+//! The pitch takes `math::asin`, not `math::asin_ee`: `tests/landing.rs` runs the original with every float rule
+//! nearest (as this port's floats are) and feeds it arguments beyond 0.7071, where the EE's chopped square root no
+//! longer matches (tried 2026-10-17).
 
 use crate::math;
 

@@ -5,6 +5,10 @@
 //! The emitter table is 40 records of 0x50 bytes (20 words) a manager points at with its first word. Word 0 is the
 //! state (0 free, 1 playing), +4 / +8 / +0x3c the key `Matches` compares, +0x30 the voice handle (-1 none), +0x34 a
 //! "still wanted" flag `UpdateAll` clears every pass, +0x38 which voice engine the handle is in, +0x40 -1 once stopped.
+//!
+//! The cone's angles take `math::asin`, not `math::asin_ee`: `tests/worldemitter.rs` runs the original with every
+//! float rule nearest (as this port's floats are) and feeds it arguments beyond 0.7071, where the EE's chopped square
+//! root no longer matches (tried 2026-10-17).
 
 /// Words in an emitter record and the number of records.
 pub const WORDS: usize = 20;

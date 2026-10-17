@@ -8,6 +8,10 @@
 //! the board and the wall ray (`World_RayCast`, row E7), `Boarder_ProbeGround` (which needs the world), the landing
 //! check and choice (`Landing_CheckAngles`, `Landing_ChooseState`: ported in `crate::landing`, their effects are the
 //! environment's), scoring, the wipe-out, clips, sounds and the rider's virtuals.
+//!
+//! `wall_bump` takes `math::asin` like the port's other callers (their tests run the original with every float rule
+//! nearest, where `math::asin_ee`'s chopped square root no longer matches). Here it makes no difference: an argument
+//! beyond 0.7071 (`tests/air_motion.rs` feeds some) gives an angle over the 0x3dd67750 limit, held to it either way.
 
 use crate::ground_motion::CrashRecord;
 use crate::orient::{quat_multiply, turn_axis, update_orientation, Orient};

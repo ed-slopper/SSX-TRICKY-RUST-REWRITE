@@ -2,6 +2,10 @@
 //! `WipeoutMotion_Enter` 0x10c198, `WipeoutMotion_Update` 0x10c2f0 (the tumble and the slides), `WipeoutMotion_Exit`
 //! 0x10d680, `Wipeout_StartGetUp` 0x10f178, `Wipeout_PlayImpactClip` 0x10f9a0 and `GetUpMotion_Update` 0x1102c8. In
 //! the PS2's floats, in the game's order of operations; checked in the function runner (`tests/wipeout_motion.rs`).
+//!
+//! The lie-flat turn takes `math::asin`, not `math::asin_ee`: `tests/ragdoll.rs` runs the original with every float
+//! rule nearest (as this port's floats are) and feeds it arguments beyond 0.7071, where the EE's chopped square root
+//! no longer matches (tried 2026-10-17).
 
 use crate::math::asin;
 use crate::orient::{rotate_vec_to_vec, slerp};
