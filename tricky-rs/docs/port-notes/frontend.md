@@ -1735,3 +1735,44 @@ The runner test (tests/dmdraw.rs) has 19,500 cases over the 65 functions. The fo
 they are given, up to its end, and the gradient's stand-in logs its four colours. 68 of 71 mutants are caught;
 the 3 left are equivalent: the two "at least" floors at their own value, and the expand item's menu destroyed with
 flags 0 instead of 2 (neither frees).
+
+## The debug menus (G9a4d, `game/src/dmmenus.rs`)
+
+The developer menu's pages are built from the item kinds (G9a4b). Each item's +0 is used as its id (the pages'
+handlers switch on it), and each page keeps the values its items edit from +0x118.
+- **`cDebugMenu`** (table 0x389070) holds, in order:
+  - a title;
+  - the version line, formatted into 0x337de8 at start;
+  - a gap and a back (pop) item;
+  - three commands: 2 (only when the race has +0x40, and not in the career's mode 6), 1, and 0;
+  - sub items for the render, game and sound pages, which it holds at +0x3d8, +0x218 and +0x1968.
+
+  Its command handler (vf2) does: 0 saves the career (+0x3704 1, `0x161a98`, +0x3260 2, the race's +0x54 1,
+  `0x161840`); 1 quits the race (0x180a10); 2 closes the menu (the global manager inactive) and shows the race's
+  overlay 9. Entering it resumes and pauses the sound.
+  Leaving it as the last menu, while the race isn't ending (+0x54), calls `Debug_Printf2` (empty in this build:
+  it only stores its arguments) and stops the sound. Either way it shows overlay 9 when the race's +0x40 object
+  has a +0x4c.
+- **`cRenderOptionsMenu`** (0x389130): the bezier page and the resolutions behind sub items, the frame-rate bool
+  (the race's +0x74), the split-screen bool (only with two players; the race's +0x29c, then its mode set again),
+  the gamma float (0.5..2, the renderer's +0x67c, set through the app's brightness) and the filter enum (the
+  renderer's +0x130's word, set through its +0x120).
+- **`cResolutionMenu`** (0x389170) makes 128 command items. It shows one per renderer mode (the renderer's +0x50
+  the count, +0x48 a mode's name), with the mode as the item's id. Entering it picks the item of the current mode
+  (+0x40); choosing sets the mode (+0x28), the race's mode and the input again.
+- **`cBezierOptionsMenu`** (0x3891b0): three bools and two floats (1000..3000, 5000..15000), read from and set on the
+  renderer's +0x20 object's virtuals (+0x60/+0x48, +0x68/+0x50, +0x70/+0x58, +0x30/+0x20, +0x38/+0x28).
+- **`cGameOptionsMenu`** (0x3890f0): a bool (0x17f078 on the race, set to the race's +0x48), a riders int (1..the
+  race's riders) and a restart command. The restart resets every rider (0x11da40), then calls the race's +0xa0
+  virtual (its table at +8) with the count − 1.
+- **`cSoundVolumeMenu`** (0x3890b0): seven volume ints (0..11), three enums and the song enum.
+  - The song enum's list (+0x144) is built from the songs that are on.
+  - The volumes are read from the sound system as ints of its floats (channels 0, 1, 4, 2).
+  - A changed volume is set as int / 11 (clamped to 0..1); the preset sets the system's and reads the volumes back;
+    the song picks and starts the music.
+- **The destructors** take the items and pages apart, last first. The resolution page's 128 commands go through
+  their tables' destructors (+8, flags 0).
+- **0x188310** fills four static colour records at 0x3cdde8, as the loading screens' 0x24ff58 does at 0x3d2c88.
+
+The runner test (tests/dmmenus.rs) has 8,400 cases over the 28 functions, with the whole debug menu's code
+(G9a4a..c) real on both sides. 70 of 71 mutants are caught; the one left gives the riders int a minimum of 0, which its range sets to 1 straight after.

@@ -29,6 +29,7 @@ pub mod debris;
 pub mod debugmenu;
 pub mod dmdraw;
 pub mod dmitems;
+pub mod dmmenus;
 pub mod finish;
 pub mod fxrand;
 pub mod gate;

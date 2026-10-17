@@ -1870,38 +1870,38 @@ address,size,name,system,status
 0x186aa8,8,cVideoModule::vf3_186aa8,video,not started
 0x186ab0,80,cVideoModule::__tf,runtime,host
 0x186b28,64,cGameModule::__tf,runtime,host
-0x186bb0,328,cResolutionMenu::cResolutionMenu,debugmenu,not started
-0x186cf8,212,cResolutionMenu::vf5_186cf8,debugmenu,not started
-0x186dd0,92,cResolutionMenu::vf2_186dd0,debugmenu,not started
-0x186e30,624,cRenderOptionsMenu::cRenderOptionsMenu,debugmenu,not started
-0x1870a0,204,cRenderOptionsMenu::vf3_1870a0,debugmenu,not started
-0x187170,760,cBezierOptionsMenu::cBezierOptionsMenu,debugmenu,not started
-0x187468,360,cBezierOptionsMenu::vf3_187468,debugmenu,not started
-0x1875d0,380,cGameOptionsMenu::cGameOptionsMenu,debugmenu,not started
-0x187750,216,cGameOptionsMenu::vf2_187750,debugmenu,not started
-0x187828,40,cGameOptionsMenu::vf3_187828,debugmenu,not started
-0x187850,636,cDebugMenu::cDebugMenu,debugmenu,not started
-0x187ad0,8,cDebugMenu::InstallStub,debugmenu,not started
-0x187ad8,248,cDebugMenu::vf2_187ad8,debugmenu,not started
-0x187bd0,80,cDebugMenu::vf5_187bd0,debugmenu,not started
-0x187c20,148,cDebugMenu::vf6_187c20,debugmenu,not started
-0x187cb8,672,cSoundVolumeMenu::cSoundVolumeMenu,debugmenu,not started
-0x187f58,260,SoundMenu_BuildMusicList,audio,ported
-0x188060,28,cSoundVolumeMenu::vf1_188060,debugmenu,not started
-0x188080,656,cSoundVolumeMenu::vf3_188080,debugmenu,not started
+0x186bb0,328,cResolutionMenu::cResolutionMenu,debugmenu,checked
+0x186cf8,212,cResolutionMenu::vf5_186cf8,debugmenu,checked
+0x186dd0,92,cResolutionMenu::vf2_186dd0,debugmenu,checked
+0x186e30,624,cRenderOptionsMenu::cRenderOptionsMenu,debugmenu,checked
+0x1870a0,204,cRenderOptionsMenu::vf3_1870a0,debugmenu,checked
+0x187170,760,cBezierOptionsMenu::cBezierOptionsMenu,debugmenu,checked
+0x187468,360,cBezierOptionsMenu::vf3_187468,debugmenu,checked
+0x1875d0,380,cGameOptionsMenu::cGameOptionsMenu,debugmenu,checked
+0x187750,216,cGameOptionsMenu::vf2_187750,debugmenu,checked
+0x187828,40,cGameOptionsMenu::vf3_187828,debugmenu,checked
+0x187850,636,cDebugMenu::cDebugMenu,debugmenu,checked
+0x187ad0,8,cDebugMenu::InstallStub,debugmenu,checked
+0x187ad8,248,cDebugMenu::vf2_187ad8,debugmenu,checked
+0x187bd0,80,cDebugMenu::vf5_187bd0,debugmenu,checked
+0x187c20,148,cDebugMenu::vf6_187c20,debugmenu,checked
+0x187cb8,672,cSoundVolumeMenu::cSoundVolumeMenu,debugmenu,checked
+0x187f58,260,SoundMenu_BuildMusicList,debugmenu,checked
+0x188060,28,cSoundVolumeMenu::vf1_188060,debugmenu,checked
+0x188080,656,cSoundVolumeMenu::vf3_188080,debugmenu,checked
 0x1883c0,80,cDebugMenu::__tf,runtime,host
-0x188410,208,cDebugMenu::~cDebugMenu,debugmenu,not started
+0x188410,208,cDebugMenu::~cDebugMenu,debugmenu,checked
 0x1884e0,80,cSoundVolumeMenu::__tf,runtime,host
-0x188530,184,cSoundVolumeMenu::~cSoundVolumeMenu,debugmenu,not started
+0x188530,184,cSoundVolumeMenu::~cSoundVolumeMenu,debugmenu,checked
 0x1885e8,80,cGameOptionsMenu::__tf,runtime,host
-0x188638,112,cGameOptionsMenu::~cGameOptionsMenu,debugmenu,not started
+0x188638,112,cGameOptionsMenu::~cGameOptionsMenu,debugmenu,checked
 0x1886a8,80,cRenderOptionsMenu::__tf,runtime,host
-0x1886f8,172,cRenderOptionsMenu::~cRenderOptionsMenu,debugmenu,not started
+0x1886f8,172,cRenderOptionsMenu::~cRenderOptionsMenu,debugmenu,checked
 0x1887a8,80,cResolutionMenu::__tf,runtime,host
-0x1887f8,188,cResolutionMenu::~cResolutionMenu,debugmenu,not started
+0x1887f8,188,cResolutionMenu::~cResolutionMenu,debugmenu,checked
 0x1888b8,80,cBezierOptionsMenu::__tf,runtime,host
-0x188908,136,cBezierOptionsMenu::~cBezierOptionsMenu,debugmenu,not started
-0x188990,40,Debug_Printf2,audio?,ported
+0x188908,136,cBezierOptionsMenu::~cBezierOptionsMenu,debugmenu,checked
+0x188990,40,Debug_Printf2,debugmenu,checked
 0x1889b8,32,cMenuItem::cMenuItem,debugmenu,checked
 0x1889d8,36,cMenuItem::~cMenuItem,debugmenu,checked
 0x188a00,124,cMenuItem::HandleInput,debugmenu,checked
