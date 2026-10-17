@@ -80,8 +80,6 @@ state machine and the renderer are ours. Nothing has been checked against the or
 | G5d | The app's rider animation on G5a..c, replacing its own choice of clip (README: "Which clip plays when is my state logic") | any | G5a, G5b, G5c, G1 | | Split of G5 (needs a play test); the clip plays come from the boarder states (`ControlEnv::play_clip` and the like), which the app runs only once G1 puts the game's state machine in it |
 | G7 | Rendering, as the PS2 renderer does it. Split before claiming: | unowned | E3a, E3b | | [repo] |
 | G21 | **The rider stutters back and forth the whole run** (play test by bredclan, 2026-10-17, tricky-rs.2026-10-17.exe from 3580b5f). To find: whether it is the port (our stand-ins between the exact pieces: the rider's step, its control state, the app's camera or its frame timing fighting the game's fixed tick) or something the decompiling will fix once the boarder state machine (G1) runs whole. First step: log the rider's place and heading each tick in a run (`TRICKY_SIM`) and see which one goes back and forth, and on which frames | any | | | Play test 2026-10-17 |
-| G7q | (umbrella: G7q1..G7q4) The texture manager (`TexMan_*` 0x1c0cd8..0x1c4088, the renderer's +0x47c): its records, VRAM and CLUT slots, uploads and LODs | ed-slopper/puffin | G7 | | Split of G7 |
-| G7q3 | `TexMan_UploadTextures` 0x1c1f50 (5112 bytes: the frame's uploads) | ed-slopper/puffin | G7q2 | | Split of G7q |
 | G9 | Front end: title, main menu, mode select, rider / outfit / board select, options, records, trick book screens, unlock screens, music player, loading screens (`gApp+0x734`) | unowned | E1, E5 | | [repo] `ui.rs` is ours. Split (2026-10-16): G9b the shared machinery, G9c–G9t the screens (logic ported and checked in the runner, widgets as calls out), G9u the app's menus on them |
 | G9b | (umbrella: G9b1, G9b2) The front end's shared machinery: `cFE3D` (the manager, its per-frame update and the screen it runs), the `cFE3DState` base (the phases, `TransitionIn` / `Out`, `Finish` and `CreateNextState`, `UpdateTransition`, `Activate`, `LayoutWidgets`), the widgets they drive and the 3D transition record (`FE3DTransition_*`, notes in frontend.md) | any | G9 | | Split of G9 |
 | G9b2 | (umbrella: G9b2a, G9b2b, G9b2c, G9b2d, G9b2e) The rest of G9b: `cFE3D` (the manager: its per-frame update, the screen stack 0x275b10 / 0x275c10 / 0x2ac030, the players and their pad queries 0x26ce08..0x26cef8), the widgets the screens build (the constructor 0x2b1138 and its virtuals, the list 0x2ac018 / 0x2ac048, the place 0x2acb20, the screen helpers 0x274108, 0x2763f0, 0x2719c0, 0x2718f0, 0x271848, 0x2742e8) and the 3D transition record (`FE3DTransition_*`) | any | G9b1 | | Split from G9b; split (2026-10-16) |
@@ -152,6 +150,8 @@ matches the original.
 
 | ID | Task | Section | Who | Date | Commit |
 |---|---|---|---|---|---|
+| G7q | (umbrella) the texture manager: G7q1..G7q4 | P2 | ed-slopper/puffin | 2026-10-17 | G7q1..G7q4 |
+| G7q3 | texman.rs: TexMan_UploadTextures (buckets, the high8 area, the budget, the VRAM layout, the uploads); runner-checked, 56/57 mutants | P2 | ed-slopper/puffin | 2026-10-17 | 8dad1bd |
 | G7q4 | texman.rs: UpdateLod, InitLoadNodes, FreeAll, the VRAM and CLUT slot finders, the bind, UploadTexture and its packets; runner-checked, 64/66 mutants (2 equivalent) | P2 | ed-slopper/puffin | 2026-10-17 | eb1c7f1 |
 | G7q2 | texman.rs: the draw-into and fill packets, TexMan_UploadPixels; runner-checked, 29/30 mutants (1 equivalent) | P2 | ed-slopper/puffin | 2026-10-17 | c3dc5da |
 | G7q1 | texman.rs: TexMan_Init, CalcLodParams, the tear-down, RegisterTexture, LockTexture; runner-checked, 52/53 mutants | P2 | ed-slopper/puffin | 2026-10-17 | b05e272 |
@@ -1305,3 +1305,4 @@ matches the original.
 - 2026-10-17 ed-slopper/puffin: G7q1 done (b05e272): texman.rs, the texture manager's set-up and records (names wrld / plr pick the detail level; 8-bit palettes stored in the GS's block order). Claim G7q2.
 - 2026-10-17 ed-slopper/puffin: G7q2 done (c3dc5da): the texture manager's pixel uploads. Claim G7q4 (G7q3 next after it).
 - 2026-10-17 ed-slopper/puffin: G7q4 done (eb1c7f1): the texture manager's slots, binds and uploads (8-bit textures go up as 32-bit at half size). Claim G7q3, the last of G7q.
+- 2026-10-17 ed-slopper/puffin: G7q3 done (8dad1bd) and the G7q umbrella with it: the texture manager is ported whole (texman.rs, 32 functions, 4 runner tests). The level upload's 'Buckets' and the high8 area (8-bit textures in the top bytes of 32-bit VRAM, PSMT8H) explained in world.md.
