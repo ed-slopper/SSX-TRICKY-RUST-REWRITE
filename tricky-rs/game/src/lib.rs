@@ -179,3 +179,4 @@ pub mod objdraw;
 pub mod drawmodel;
 pub mod terraindraw;
 pub mod bezier;
+pub mod drawlist;

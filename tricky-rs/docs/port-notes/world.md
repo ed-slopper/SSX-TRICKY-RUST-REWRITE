@@ -1276,3 +1276,52 @@ allocator answering 0 or a place. 26 of 29 mutants were caught. The three left a
 - t²·t as t·t²;
 - the two multiplies regrouped: by 2⁻⁷ it is exact while normal, and both sides flush to 0 otherwise;
 - the +0x530 clear, overwritten before it is read.
+
+## The renderer's draw lists (row G7h1; `game/src/drawlist.rs`, checked: `tests/drawlist.rs`)
+
+`PS2Render_Submit` 0x1e8838 doesn't send a packet. It puts the packet in the draw list at the renderer's +0x480,
+under the state it is drawn with, and the flush (row G7h2) writes the lists out later in sort order.
+
+- **The pending state:**
+  - When the renderer's +0x474 is set, `PS2Draw_SetState` 0x1c4d68 takes the texture state (+0x470) into the
+    list's current state, and +0x474 is cleared.
+  - When +0x478 is set, `PS2Draw_SetTexturePage` 0x1c4d30 takes the state's +8 and +0xa (as signed halves), and
+    +0x478 is cleared.
+  - `PS2Render_FlushState` 0x1e88c8 does only these two.
+- **`SetState`** compares field by field, in this order: +0xe, +4, +0xf, +0x10, +0, +0x11, +0x12, +0x13, +6, +0x15,
+  +0x14, +0xc, +0x17, +0x16, +0xd. It takes each field that differs, and on any difference clears the list's "batch
+  found" (+0xfa54).
+  - **`SetTexturePage`** takes both words when either differs, and clears "page found" (+0xfa4c).
+  - **`PS2Draw_BindTexture` 0x1c4ee8** is the two together.
+- **The add, 0x1c4f28**(list, start, end, follows):
+  - When no page is found, it finds or makes one (0x1c4340). The hash is the page's first word (negative taken as
+    0) mod 512 into the heads at +0x3224, and a page matches on both words (0x1c7068). A new page goes to the head
+    of its chain with no batches.
+  - When no batch is found, `PS2Draw_FindOrAddBatch` 0x1c4468 walks the page's batches. It takes one with the same
+    words +0x1c / +0x20 (the list's +0xfa5c / +0xfa60), not following another, and with a state that is
+    `PS2Draw_StateEquals` 0x1c6f98: everything but the texture page.
+  - Otherwise it makes a batch at the head of the page's list. The state and the list's +0xfa40 are copied in, but
+    +0x18 gets its old word back. The batch also gets the two words, the page, and no packets.
+  - A new batch that follows (with a batch before it) is hung off the one before (+0x34 = 1, +0x38 = it).
+    Otherwise it gets its key from `PS2Draw_PackSortKey` 0x1c7088 and goes into the sort list: the batch at
+    +0x3a28 + 4n, and (n << 16 | the key's low half) at +0x7a28 + 4n.
+  - Its first packet's start is kept at +0x2c. Every later packet is chained on with a DMA `next` tag (0x20000000,
+    start; 0, 0) written at the end of the previous one, and the end is kept at +0x30.
+- **The key** is (0x13 − the layer +0xf) << 27, the blend's order << 17, the VU1 program's rank << 14, the page's
+  first word << 5, and the batch's +0x1c. Negative words count as 0.
+  - The blend's order is 0x3ff for kind 0, 0x3fe for kind 1, the texture +4 for kind 2, and 0 otherwise.
+  - The program's rank by +0x10 is 0, 7, 5, 4, 6, 3, 1, 1, 2, 2, 1 for programs 0..10, and 0 past them.
+  - Only the low half reaches the first sort.
+- **`PS2Draw_SortBuckets` 0x1c42a0** sorts the keys with the library sort 0x2cfc00 (count, keys, room at
+  +0xba28). It then rewrites each one as its batch's index << 16 | the high half of the batch's key, and sorts
+  again: a two-pass sort on the 32-bit key.
+- **The rest:**
+  - `PS2Draw_ClearBuckets` 0x1c4270 empties the 512 heads.
+  - `PS2DrawState_Init` 0x1c4220 and the constructor 0x1c71b0 set a default state: layer 3, +0x12 1, +0x13 2,
+    +6 12, the rest 0. The constructor also sets the texture page to −1, −1.
+  - 0x1c4638 sets +0xfa64 and +0xfa68.
+
+Checked in the runner (`tests/drawlist.rs`, 1500 cases): each case is 40 random steps on one list, with the memory
+compared after every step. The states are a few, some alike but for one field. The texture pages include negative
+and ≥ 512 words, and the renderer's pending flags are random. 69 of 70 mutants were caught. The one left is
+equivalent: copying the state with or without +0xfa40, since +0x18 gets its old word back straight after.

@@ -2671,26 +2671,26 @@ address,size,name,system,status
 0x1c4088,208,Gfx_InitStatePools,render,not started
 0x1c4158,72,FUN_001c4158,render?,not started
 0x1c41a0,128,Gfx_InitStatePool,render,not started
-0x1c4220,80,PS2DrawState_Init,render?,not started
-0x1c4270,44,PS2Draw_ClearBuckets,render?,not started
-0x1c42a0,156,PS2Draw_SortBuckets,render?,not started
-0x1c4340,292,FUN_001c4340,render?,not started
-0x1c4468,464,PS2Draw_FindOrAddBatch,render?,not started
-0x1c4638,20,FUN_001c4638,render?,not started
+0x1c4220,80,PS2DrawState_Init,render?,checked
+0x1c4270,44,PS2Draw_ClearBuckets,render?,checked
+0x1c42a0,156,PS2Draw_SortBuckets,render?,checked
+0x1c4340,292,FUN_001c4340,render?,checked
+0x1c4468,464,PS2Draw_FindOrAddBatch,render?,checked
+0x1c4638,20,FUN_001c4638,render?,checked
 0x1c4650,1508,PS2Draw_SelectMatrixSet,render?,ported
 0x1c4c38,244,PS2Draw_SelectViewport,render?,ported
-0x1c4d30,52,PS2Draw_SetTexturePage,render?,not started
-0x1c4d68,384,PS2Draw_SetState,render?,not started
-0x1c4ee8,60,PS2Draw_BindTexture,render?,not started
-0x1c4f28,184,FUN_001c4f28,render?,not started
+0x1c4d30,52,PS2Draw_SetTexturePage,render?,checked
+0x1c4d68,384,PS2Draw_SetState,render?,checked
+0x1c4ee8,60,PS2Draw_BindTexture,render?,checked
+0x1c4f28,184,FUN_001c4f28,render?,checked
 0x1c4fe0,524,PS2Draw_FlushBuckets,render?,not started
 0x1c51f0,376,PS2Draw_WriteFullState,render?,not started
 0x1c5368,828,PS2Draw_WriteStateChanges,render?,not started
 0x1c5c88,100,PS2Draw_WriteTexState,render?,not started
-0x1c6f98,208,PS2Draw_StateEquals,render?,not started
-0x1c7068,32,FUN_001c7068,render?,not started
-0x1c7088,292,PS2Draw_PackSortKey,render?,not started
-0x1c71b0,92,tPS2DrawState::vf0_1c71b0,other,not started
+0x1c6f98,208,PS2Draw_StateEquals,render?,checked
+0x1c7068,32,FUN_001c7068,render?,checked
+0x1c7088,292,PS2Draw_PackSortKey,render?,checked
+0x1c71b0,92,tPS2DrawState::vf0_1c71b0,other,checked
 0x1c7210,64,tPS2DrawState::__tf,runtime,host
 0x1c7290,88,Game_DrawLists,game,not started
 0x1c72e8,1320,Game_DrawFrame,game,not started
@@ -3099,8 +3099,8 @@ address,size,name,system,status
 0x1e81f8,20,FUN_001e81f8,render?,not started
 0x1e8210,924,cPS2GraphicsMan::vf77_1e8210,render,not started
 0x1e85b0,648,PS2Render_UpdateModelMatrices,render?,ported
-0x1e8838,140,PS2Render_Submit,render?,ported
-0x1e88c8,96,PS2Render_FlushState,render?,not started
+0x1e8838,140,PS2Render_Submit,render?,checked
+0x1e88c8,96,PS2Render_FlushState,render?,checked
 0x1e8928,48,cPS2GraphicsMan::vf36_1e8928,render,not started
 0x1e8958,24,cPS2GraphicsMan::vf24_1e8958,render,not started
 0x1e8970,76,cPS2GraphicsMan::vf23_1e8970,render,not started
