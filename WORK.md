@@ -80,7 +80,6 @@ state machine and the renderer are ours. Nothing has been checked against the or
 | G5d | The app's rider animation on G5a..c, replacing its own choice of clip (README: "Which clip plays when is my state logic") | any | G5a, G5b, G5c, G1 | | Split of G5 (needs a play test); the clip plays come from the boarder states (`ControlEnv::play_clip` and the like), which the app runs only once G1 puts the game's state machine in it |
 | G7 | Rendering, as the PS2 renderer does it. Split before claiming: | unowned | E3a, E3b | | [repo] |
 | G7e | (umbrella: G7e1, G7e2, G7e3, G7e4) Particles as the VU1 microcode draws them (0x31c288), spark and dust sprites | unowned | G7 | | [repo] "Unresolved: spark and dust sprite rendering"; `particles.rs` has the emitters |
-| G7e3 | The VU1 particle program 6 (chain 0x31c260, 152 instructions), drawn by vf74 (find its callers first: none read slot +0x250 directly) | ed-slopper/puffin | G7e1, G7i | | Split of G7e |
 | G7e4 | The spray, speed dust and spark sprites' draws: `Fx_Spray_DrawParticles` 0x12d890, `Fx_SpeedDust_Draw` 0x12fb40, `Fx_SurfaceSpray_Draw`, `Sprite_DrawRotatedQuad` / `_DrawRotatedTexQuad` 0x19b8c8 / 0x19bb48 | any | G7e1 | | Split of G7e |
 | G7g | Rider shading and shadows, board reflections (env materials) | unowned | G7, E4 | | [est] |
 | G9 | Front end: title, main menu, mode select, rider / outfit / board select, options, records, trick book screens, unlock screens, music player, loading screens (`gApp+0x734`) | unowned | E1, E5 | | [repo] `ui.rs` is ours. Split (2026-10-16): G9b the shared machinery, G9c–G9t the screens (logic ported and checked in the runner, widgets as calls out), G9u the app's menus on them |
@@ -153,6 +152,7 @@ matches the original.
 
 | ID | Task | Section | Who | Date | Commit |
 |---|---|---|---|---|---|
+| G7e3 | VU1 particle program 6 (chain 0x31c260: trails) in particlevu.rs, all 960 calls match in the runner; runner VU1 has the MAC flags (4 pairs late), fmand/fmeq/fmor, I loaded after the upper op | P2 | ed-slopper/puffin | 2026-10-17 | f73d222 |
 | G7e2 | VU1 particle program 7 (chain 0x31c790) in particlevu.rs, all 960 calls match the game in the runner (tests/vu1particle.rs); runner VU1 has the random unit | P2 | ed-slopper/puffin | 2026-10-17 | 723bb58 |
 | G7e1 | ParticleSys_Draw, the blend (+0x1e0) and the program 6/7 packets (+0x250/+0x258) in particledraw.rs; runner-checked, 28/30 mutants (2 equivalent) | P2 | ed-slopper/puffin | 2026-10-17 | 6c8b344 |
 | G7a | Terrain patches: all its parts done (G7a1 the terrain's draw and each edge's LOD, G7a2 the visible TGroups, G7a3 the Bezier manager's queue, draw and tables, G7a4 the VU1 patch programs: tessellation, the textured and subtractive lightmap passes, the view passes, the clipper) | P2 | ed-slopper/puffin | 2026-10-17 | 35e202c |
@@ -1261,3 +1261,4 @@ matches the original.
 - 2026-10-17 ed-slopper/puffin: G7e split into G7e1 (the particles' draw on the EE; claimed), G7e2 / G7e3 (VU1 particle programs 7 and 6), G7e4 (the spray, dust and spark sprites).
 - 2026-10-17 ed-slopper/puffin: G7e1 done (6c8b344): `particledraw.rs`, ParticleSys_Draw and the renderer's blend and program 6/7 packets, checked in the runner. G7e2 claimed.
 - 2026-10-17 ed-slopper/puffin: G7e2 done (723bb58): program 7 in `particlevu.rs`; the runner's VU1 has `rinit` / `rnext` / `rget` / `rxor` (PCSX2's step). Found: from the second particle on, the x and y random lanes are equal (the loop steps x from y's R).
+- 2026-10-17 ed-slopper/puffin: G7e3 done (f73d222): program 6 (trails of bending, fading sprites). Its flag reads need the FMAC latency (the runner now models MAC flags four pairs late), and its I bits showed the runner loaded I one op too early (fixed). The only +0x250 caller is Font_DrawStringA (a leftover: the font as the block).
