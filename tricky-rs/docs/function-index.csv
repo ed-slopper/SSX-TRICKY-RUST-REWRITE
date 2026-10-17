@@ -2722,22 +2722,22 @@ address,size,name,system,status
 0x1c9a18,124,StaticInit_SnowFallMan,render?,checked
 0x1c9a98,80,cSnowFallMan::__tf,runtime,host
 0x1c9ae8,8,cSnowFallMan::~cSnowFallMan,render,not started
-0x1c9b20,60,cFogObjMan::cFogObjMan,frontend?,not started
-0x1c9b60,68,cFogObjMan::~cFogObjMan,world?,not started
-0x1c9ba8,296,FogObjMan_Build,world?,not started
-0x1c9cd0,128,FogObjMan_DeleteAll,world?,not started
-0x1c9d50,8,cFogObjMan::vf1_1c9d50,world?,not started
-0x1c9d58,1388,cFogObjMan::vf2_1c9d58,world?,not started
-0x1ca2c8,20,cFogVolume::cFogVolume,render,not started
-0x1ca2e0,36,cFogVolume::~cFogVolume,render,not started
-0x1ca308,8,cFogVolume::vf1_1ca308,render,not started
-0x1ca310,8,cFogVolume::vf2_1ca310,render,not started
-0x1ca318,8,cFogVolume::vf3_1ca318,render,not started
-0x1ca320,56,cPS2FogVolume::cPS2FogVolume,render,not started
-0x1ca358,80,cPS2FogVolume::~cPS2FogVolume,render,not started
-0x1ca3a8,492,cPS2FogVolume::vf1_1ca3a8,render,not started
-0x1ca598,8,cPS2FogVolume::vf2_1ca598,render,not started
-0x1ca5a0,1928,cPS2FogVolume::vf3_1ca5a0,render,not started
+0x1c9b20,60,cFogObjMan::cFogObjMan,frontend?,checked
+0x1c9b60,68,cFogObjMan::~cFogObjMan,world?,checked
+0x1c9ba8,296,FogObjMan_Build,world?,checked
+0x1c9cd0,128,FogObjMan_DeleteAll,world?,checked
+0x1c9d50,8,cFogObjMan::vf1_1c9d50,world?,checked
+0x1c9d58,1388,cFogObjMan::vf2_1c9d58,world?,checked
+0x1ca2c8,20,cFogVolume::cFogVolume,render,checked
+0x1ca2e0,36,cFogVolume::~cFogVolume,render,checked
+0x1ca308,8,cFogVolume::vf1_1ca308,render,checked
+0x1ca310,8,cFogVolume::vf2_1ca310,render,checked
+0x1ca318,8,cFogVolume::vf3_1ca318,render,checked
+0x1ca320,56,cPS2FogVolume::cPS2FogVolume,render,checked
+0x1ca358,80,cPS2FogVolume::~cPS2FogVolume,render,checked
+0x1ca3a8,492,cPS2FogVolume::vf1_1ca3a8,render,checked
+0x1ca598,8,cPS2FogVolume::vf2_1ca598,render,checked
+0x1ca5a0,1928,cPS2FogVolume::vf3_1ca5a0,render,checked
 0x1cad68,80,cPS2FogVolume::__tf,runtime,host
 0x1cadb8,80,cFogObjMan::__tf,runtime,host
 0x1cae08,64,cFogVolume::__tf,runtime,host
@@ -4551,7 +4551,7 @@ address,size,name,system,status
 0x2522a0,20,cCourseResolve_Common::Reset,race,not started
 0x2522b8,40,cCourseResolve_Common::vf3_2522b8,race,not started
 0x2522e0,52,Course_LookupInstanceById,race,not started
-0x252318,52,Course_LookupParticleById,race,not started
+0x252318,52,Course_LookupParticleById,race,checked
 0x252350,184,cCourseResolve_Common::Resolve,race,not started
 0x252408,100,cCourseResolve_Common::ResolveDataOnly,race,not started
 0x252470,724,cCourseResolve_Common::ResolveTGroupHeader,race,ported

@@ -731,3 +731,49 @@ Checked in the runner on 6,000 random managers, games, cameras and weather, abou
 The renderer was a fake vtable whose box test answered inside, outside or partly. 32 of 36 mutants were caught. The
 others: (x − 1) + 1 is exact for the factors, the parity's remainder −1 gives 1 either way, and two distance
 boundaries (exactly 7 sizes, or exactly 6).
+
+## Fog (row G7c2; `game/src/fog.rs`, checked: `tests/fog.rs`)
+
+- **The fog object manager** (`cFogObjMan`: vtable 0x3916f0, up to 64 volume objects from +0x10):
+  - `FogObjMan_Build` makes a `cPS2FogVolume` (0x1c bytes from the allocator, named "FogVolume" and filled with
+    0xdeadc0de) for each of the world's fog definitions (the world's +4's +0x30 of them; `0x252318` reads the list
+    at +0x70). It notes the object on the definition (+0x14) and builds it from the definition (slot +0x10).
+  - `DeleteAll` deletes each object (slot +8, flags 3).
+- **Building a volume** (vf1 0x1ca3a8):
+  - The point count is the definition's first group's count, once for each of its groups. The game reads the same
+    group every time.
+  - One block holds 0x34 bytes a point ("FogVolData", 0xdeadc0ed): the points (w 1), their screen positions,
+    colours (128 and three channels × 128) and sizes.
+- **The manager's draw (vf2):**
+  - It sets the renderer up: +0x1a0; +0x1d0 4; +0x1f0 (gApp+0x30's +0x88, 0); +0x1f8 (1, 0); +0x1f0 (−1, 1); +0x1e0 3;
+    +0x1c0 1; +0x1c8 (0, 2, 0).
+  - The camera is the camera matrix's last row negated and run through the matrix again (+0xf8).
+  - It walks the world's cells (the list at 0x3464c4) up to 0xa2 or the first empty one. For each fog slot
+    (the world's +0x48) the cell's mask (+0x36) has, the cell's slot records (+0x38, 0x4c bytes) give placed
+    volumes (a matrix, the definition at +0x40, the box at +0x44 / +0x50).
+  - When the cell's other mask (+0x32) asks, each volume is tested against the view; outside skips it. Within
+    20000.09 of the camera it is drawn (slot +0x20) with that answer and an alpha: 1 within 12500.37, then fading to
+    0. Then +0x1a8.
+  - Without a test, the answer passed is the last one made: a stack word in the game (STANDIN: the caller's `last`).
+- **The volume's draw (vf3 0x1ca5a0):**
+  - The volume's position goes through the renderer's +0x5b0 rows, with w scaled by +0x630's w, clamped to 0..x
+    (`vmaxx` / `vminix`) and made an integer (`vftoi0`, `vmtir`). The low 16 bits go to the renderer's +0x1e8 (2, v).
+  - Each point goes through the volume's matrix and the renderer's +0x1770 rows to its screen position. The points
+    are sorted by screen w with the C library's `qsort` (`data::disc::qsort`, Bentley–McIlroy; the comparison
+    answers `a < b`, 1 or 0).
+  - Each point deeper than 500 is projected (x and y over w, w its reciprocal) into a sprite of its size × the
+    renderer's scale (+0x1730, +0x1744).
+  - With clipping, a sprite whose two corners share an outcode bit is dropped. The bits are x 2 / 1, y 8 / 4, z
+    0x20 / 0x10 against +0x17b0..+0x17c8; with w below 0 the code is flipped.
+  - Its colour is copied, and its alpha × the draw's alpha fades by the square of (depth − 500) / 2101.95 until
+    2601.95.
+  - The sprites go into one GIF packet at the renderer's +0x680: a tag, the register settings, then ST, RGBAQ, XYZ2,
+    ST, XYZ2 a sprite, with integer fields OR-ed from sign-extended values as the game does. The packet is sent with
+    0x1e8838.
+- **The runner and the disassembler** now know `vmaxbc`, `vminibc`, `vftoi0/4/12/15` and `vmtir`.
+
+Checked in the runner on 12,000 random worlds, about 1,000 calls for each of 12 functions. Volume objects were built
+from random definitions; renderers had random matrices, a clip box about a sprite's size, and a fake vtable; the
+world had holes in its cell list. About 700 packets were built. 33 of 40 mutants were caught. The other 7 are
+equivalent (the w < 0 outcode, since a sprite's w is 1/depth; the delete's flags 3 or 1) or boundaries (depth
+exactly 500 or 2601.95, z on the clip plane, distance exactly 12500.37 or 20000.09).

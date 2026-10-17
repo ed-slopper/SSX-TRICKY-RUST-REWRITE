@@ -441,6 +441,22 @@ fn vf_to_quad(v: [f32; 4]) -> [u8; 16] {
 }
 
 /// Write the fields of `vf[reg]` selected by `dest` (bit 3 = x … bit 0 = w); VF0 is read-only.
+/// The VU's ordering of floats: as sign-and-magnitude integers (−0 below +0)
+fn vu_key(x: f32) -> i64 {
+    let b = x.to_bits();
+    if b & 0x8000_0000 != 0 {
+        -((b & 0x7fff_ffff) as i64) - 1
+    } else {
+        b as i64
+    }
+}
+fn vu_max(a: f32, b: f32) -> f32 {
+    if vu_key(a) >= vu_key(b) { a } else { b }
+}
+fn vu_min(a: f32, b: f32) -> f32 {
+    if vu_key(a) <= vu_key(b) { a } else { b }
+}
+
 fn set_vf(c: &mut crate::Cpu, reg: usize, dest: u32, v: [f32; 4]) {
     if reg == 0 {
         return;
@@ -491,6 +507,8 @@ fn cop2(r: &mut Runner, pc: u32, w: u32, rs: usize, rt: usize, rd: usize, sa: u3
             40 => lanes(&|i| pf::add(s[i], t[i])),                                      // vadd
             42 => lanes(&|i| pf::mul(s[i], t[i])),                                      // vmul
             44 => lanes(&|i| pf::sub(s[i], t[i])),                                      // vsub
+            16..=19 => lanes(&|i| vu_max(s[i], bc)),                                    // vmaxbc
+            20..=23 => lanes(&|i| vu_min(s[i], bc)),                                    // vminibc
             // vopmsub: fd = ACC − (fs.y·ft.z, fs.z·ft.x, fs.x·ft.y) (with vopmula, the cross product)
             46 => {
                 let p = [pf::mul(s[1], t[2]), pf::mul(s[2], t[0]), pf::mul(s[0], t[1])];
@@ -527,6 +545,21 @@ fn cop2(r: &mut Runner, pc: u32, w: u32, rs: usize, rt: usize, rd: usize, sa: u3
             None
         }
         59 => None, // vwaitq: the result is already there
+        // vftoi0 / vftoi4 / vftoi12 / vftoi15 ft, fs: each lane to an integer (×1, 16, 4096, 32768), toward zero,
+        // saturating; the integer's bits kept in the lane
+        20..=23 => {
+            let scale = [1.0f64, 16.0, 4096.0, 32768.0][(fun & 3) as usize];
+            let v = lanes(&|i| f32::from_bits(((s[i] as f64) * scale).clamp(i32::MIN as f64, i32::MAX as f64) as i32 as u32));
+            set_vf(c, ft, dest, v);
+            None
+        }
+        // vmtir it, fs.fsf: the lane's low 16 bits to the integer register (it is ft's field)
+        60 => {
+            if ft != 0 {
+                c.vi[ft] = s[fsf].to_bits() as u16;
+            }
+            None
+        }
         x => return unimpl(format!("vu0 macro special2 {x}")),
     };
     if let Some(v) = to_acc {
@@ -708,6 +741,28 @@ mod tests {
         assert_eq!(c.vf[5], [0.25, 0.5, 0.75, 1.0], "vmulq by vdiv's Q = 1/4");
         assert_eq!(c.vf[6], [15.0, 20.0, 25.0, 30.0]);
         assert_eq!(c.q, 0.5, "vrsqrt: 1 / sqrt(4)");
+    }
+
+    #[test]
+    fn vu0_max_min_ftoi_mtir() {
+        // the fog value's sequence (cPS2FogVolume vf3 0x1ca63c..): vmaxx.w, vminix.w, vftoi0, vmtir vi1, vf.w
+        let rn = run(
+            &[
+                vu(1, 0, 3, 3, 16),                  // vmaxx.w vf3 = max(vf3.w, vf0.x)
+                vu(1, 5, 3, 3, 20),                  // vminix.w vf3 = min(vf3.w, vf5.x)
+                vu(15, 4, 1, 5 << 0, 0x3c) | (5 << 6), // vftoi0 vf4, vf1
+                vu(3, 1, 3, 15, 0x3c) | (15 << 6),   // vmtir vi1, vf3.w
+            ],
+            |rn| {
+                rn.cpu.vf[1] = [2.75, -2.75, 1.0e12, -0.5];
+                rn.cpu.vf[3] = [0.0, 0.0, 0.0, 300.5];
+                rn.cpu.vf[5] = [200.0, 0.0, 0.0, 0.0];
+            },
+        );
+        let c = &rn.cpu;
+        assert_eq!(c.vf[3][3], 200.0, "clamped into 0..vf5.x");
+        assert_eq!(c.vf[4].map(|x| x.to_bits() as i32), [2, -2, i32::MAX, 0], "toward zero, saturating");
+        assert_eq!(c.vi[1], 200f32.to_bits() as u16, "vmtir takes the lane's low 16 bits");
     }
 
     #[test]

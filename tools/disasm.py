@@ -50,6 +50,8 @@ for i in range(0,n,4):
                 if m is None and fn<4: m="vadd"+bc
                 if m is None and 8<=fn<12: m="vmadd"+bc
                 if m is None and 24<=fn<28: m="vmul"+bc
+                if m is None and 16<=fn<20: m="vmax"+bc
+                if m is None and 20<=fn<24: m="vmini"+bc
                 if m:
                     tail="" if fn==28 else ", vf%d"%ft
                     print("%08x: %-8s vf%d, vf%d%s"%(a+i,m+"."+dest,fd,fs,tail)); continue
@@ -66,6 +68,8 @@ for i in range(0,n,4):
                 if k in (56,58): print("%08x: %-8s Q, vf%d.%s, vf%d.%s"%(a+i,{56:"vdiv",58:"vrsqrt"}[k],fs,fsf,ft,ftf)); continue
                 if k==57: print("%08x: %-8s Q, vf%d.%s"%(a+i,"vsqrt",ft,ftf)); continue
                 if k==59: print("%08x: vwaitq"%(a+i)); continue
+                if 20<=k<24: print("%08x: %-8s vf%d, vf%d"%(a+i,"vftoi%d.%s"%([0,4,12,15][k-20],dest),ft,fs)); continue
+                if k==60: print("%08x: %-8s vi%d, vf%d.%s"%(a+i,"vmtir",ft,fs,fsf)); continue
     if names:
         print("%08x: %-8s $%s, $%s, $%s"%(a+i,names,R[rdd],R[rs],R[rt])); continue
     if op==0x1c and fn in (0x10,0x12) and rs==0 and rt==0:

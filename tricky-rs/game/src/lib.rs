@@ -45,6 +45,7 @@ pub mod animpose;
 pub mod animseq;
 pub mod snowfall;
 pub mod fe_character;
+pub mod fog;
 pub mod fe_title;
 pub mod fe_numplayers;
 pub mod fe_modeselect;
