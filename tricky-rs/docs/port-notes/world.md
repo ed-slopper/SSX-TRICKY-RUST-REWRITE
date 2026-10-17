@@ -2168,3 +2168,78 @@ or a corner each, sometimes shared), rectangles of no width or height and off th
 rectangles with 0 and 1 in them.
 22 of 23 mutants were caught. The one left gives the filled rectangle the straight layout of (0, 0, 1, 1),
 which is the same thing as 0 to 1.
+
+## The text box (G7n, `textbox`)
+
+The front end, the HUD and the trick book draw their paragraphs through one text box (`TextBox_*`
+0x1957b0..0x1965b4). It holds wide text, cuts it into lines that fit its width, and draws them aligned.
+
+**Its layout** (0x1470 bytes):
+- +0 the font (its +0xc is the glyphs' height, an integer); +4, +8 the place; +0xc, +0x10 the size.
+- +0x14 the line height; +0x18 the scale; +0x1c the first line drawn.
+- +0x20 centred and +0x24 right-aligned; +0x28 the indent of every line but the first.
+- +0x2c, +0x30 the first line's place from the last draw, as integers; +0x34 a shift on x; +0x38 the alpha's scale.
+- +0x3c the colour, +0x4c the highlight's, +0x5c the shadow's; +0x6c the shadow on or off.
+- +0x70 the lines (128 pointers into +0x270); +0x270 the text cut into lines; +0xa70 the text itself;
+  +0x1270 the lines' widths (128 integers).
+
+**Setting it up.**
+- `Reset` 0x195ee8 (and `Init`, which only resets) leaves the font alone. It sets no text, no lines,
+  left-aligned at (0, 0) in 100 × 100, line height 9, scale 1, white, the shadow (1, 0, 0, 0) and on.
+- `SetFont` sets the line height to the font's height + 3 and cuts the text again.
+- `SetScale` 0x1961f0(scale, k) sets the scale and the line height to (the font's height + 3) × k.
+- `AppendText` adds a wide string after the text, joined by the break string at 0x337e58 unless the text
+  already ends in `\`. It goes back to the first line and cuts again.
+- `TextWidget_SetAscii` makes a narrow string wide in a buffer from the heap 0x38aaf0. The buffer is twice the
+  length and filled with 0xdeadc0ed, so the wide copy's 0 runs two bytes past it, as the game does. It appends
+  the copy and frees the buffer.
+- `Color_Set4` 0x196070 writes four floats to +4..+0x10 of what it is given.
+
+**Cutting the lines** (`WrapLines` 0x196218(again)). The text is copied to +0x270 and walked from each space,
+`\` or end to the next. At each one, the line so far is measured (`Font_MeasureWide` at the scale, plus the
+indent after the first line) against the box's width as an integer:
+- **Too wide** (or a `\`): if the last place cut at is a space (and this is not a `\`), the line ends at that
+  space and is measured again, and the next line starts after it. With `again` set, the walk goes back to the
+  next line's start. At the text's end the rest is also a line of its own. Otherwise the line ends here.
+- **It fits:** a space becomes the last place cut at; the end ends the line.
+
+A line's end is written as a 0, and there are at most 128 lines. `LineCount`, `GetMaxLineWidth` and
+`GetHeight` read the result. The height is the line height × (lines − 1) as an integer, plus the font's height
+× the scale.
+
+**Drawing.**
+- `Draw` 0x1957d8(count, cursor) draws from the first line down, a line height apart, at most `count`
+  characters in all (−1 for all).
+  - Each line's x is the box's, plus half the spare width when centred, all of it when right-aligned, or the
+    indent after the first line.
+  - The colour goes into the font drawer 0x337fe8, whose first float is then × the alpha scale.
+  - A text style is built on the stack: `TextStyle_Construct` with `cursor`, else `TextStyle_Init`. The line
+    goes to `Font_DrawWithCursor` or `Font_DrawAligned` (style, 0, the line, its characters, the shadow, 1;
+    the scale, x, y), and the style is destroyed (2).
+  - Empty lines are skipped, and the first line's place is kept.
+- The highlighted draw 0x195a48 lays the lines out the same way and draws them with `Font_DrawStringA`, with
+  no limit and no alpha scale. With the shadow on, each line is drawn first in the shadow's colour, 2 right
+  and down. A line that starts with `~` is drawn without the `~` in the highlight colour, which is first set
+  to (1, 0, 0, 1).
+- `DrawCentered` moves the text down to the box's middle when it is shorter than the box, and (left-aligned
+  only) right to its middle when narrower. `DrawVCentered` does the same down and shifts x by +0x34. Both put
+  the place back after.
+
+What the draws build on the game's stack (the 0x10-byte text style) the port builds in a caller's scratch area
+(STANDIN).
+
+Checked in the runner (`tests/textbox.rs`). There are 3000 scripts (16,045 steps) of resets, text set wide, narrow
+and appended, the box's fields changed between steps, then the draws and the queries. The texts have words,
+runs of spaces, `\` breaks, words longer than the box, `~` lines, and many short lines past the 128. The string
+and measuring stand-ins do their work on both sides.
+
+61 of 70 mutants were caught. Eight of those left change nothing that can be seen:
+- `AppendText`'s own clearing of the first line, which `WrapLines` does again;
+- a measure of the line start just set to the same place;
+- `<` as `<=` in the widest line and the centring (equal values give the same);
+- the widest line compared unsigned (no width is negative);
+- the centring's halves grouped (halving is exact);
+- `count` −1's running total, which nothing reads;
+- `DrawVCentered`'s shift with no lines, which no draw sees.
+
+The ninth is the 128-line limit at the text's end after a space break, which needs exactly 127 lines then.

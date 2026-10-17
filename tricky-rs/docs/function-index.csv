@@ -2233,23 +2233,23 @@ address,size,name,system,status
 0x1956c8,40,Replay_ClearPins,frontend?,checked
 0x1956f0,28,FUN_001956f0,frontend?,checked
 0x195710,28,FUN_00195710,frontend?,checked
-0x1957b0,40,TextBox_Init,render,not started
-0x1957d8,620,TextBox_Draw,render,not started
-0x195a48,572,FUN_00195a48,hud?,not started
-0x195c88,340,TextBox_DrawCentered,render,not started
-0x195de0,260,TextBox_DrawVCentered,render,not started
-0x195ee8,264,TextBox_Reset,render,not started
-0x195ff0,52,TextBox_ClearText,render,not started
-0x196028,68,TextBox_SetFont,render,not started
-0x196070,20,Color_Set4,frontend?,not started
-0x196088,160,TextBox_AppendText,render,not started
-0x196128,188,TextWidget_SetAscii,render,not started
-0x1961e8,8,TextBox_SetLineHeight,render,not started
-0x1961f0,40,TextBox_SetScale,render,not started
-0x196218,644,TextBox_WrapLines,render,not started
-0x1964a0,56,TextBox_LineCount,render,not started
-0x1964d8,88,TextBox_GetMaxLineWidth,render,not started
-0x196530,132,TextBox_GetHeight,render,not started
+0x1957b0,40,TextBox_Init,render,checked
+0x1957d8,620,TextBox_Draw,render,checked
+0x195a48,572,FUN_00195a48,hud?,checked
+0x195c88,340,TextBox_DrawCentered,render,checked
+0x195de0,260,TextBox_DrawVCentered,render,checked
+0x195ee8,264,TextBox_Reset,render,checked
+0x195ff0,52,TextBox_ClearText,render,checked
+0x196028,68,TextBox_SetFont,render,checked
+0x196070,20,Color_Set4,frontend?,checked
+0x196088,160,TextBox_AppendText,render,checked
+0x196128,188,TextWidget_SetAscii,render,checked
+0x1961e8,8,TextBox_SetLineHeight,render,checked
+0x1961f0,40,TextBox_SetScale,render,checked
+0x196218,644,TextBox_WrapLines,render,checked
+0x1964a0,56,TextBox_LineCount,render,checked
+0x1964d8,88,TextBox_GetMaxLineWidth,render,checked
+0x196530,132,TextBox_GetHeight,render,checked
 0x196700,20,cAIPath::vf2_196700,ai,not started
 0x196718,64,cAIPath::vf3_196718,ai,not started
 0x196758,252,ResetState_GetRespawnPos,boarder,ported
