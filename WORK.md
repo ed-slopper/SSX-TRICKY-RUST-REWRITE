@@ -81,8 +81,7 @@ state machine and the renderer are ours. Nothing has been checked against the or
 | G7 | Rendering, as the PS2 renderer does it. Split before claiming: | unowned | E3a, E3b | | [repo] |
 | G21 | **The rider stutters back and forth the whole run** (play test by bredclan, 2026-10-17, tricky-rs.2026-10-17.exe from 3580b5f). To find: whether it is the port (our stand-ins between the exact pieces: the rider's step, its control state, the app's camera or its frame timing fighting the game's fixed tick) or something the decompiling will fix once the boarder state machine (G1) runs whole. First step: log the rider's place and heading each tick in a run (`TRICKY_SIM`) and see which one goes back and forth, and on which frames | any | | | Play test 2026-10-17 |
 | G7q | (umbrella: G7q1..G7q4) The texture manager (`TexMan_*` 0x1c0cd8..0x1c4088, the renderer's +0x47c): its records, VRAM and CLUT slots, uploads and LODs | ed-slopper/puffin | G7 | | Split of G7 |
-| G7q1 | The texture manager's set-up and records: `TexMan_Init` 0x1c0cd8, `TexMan_CalcLodParams` 0x1c0da8, `FUN_001c0e78` (its tear-down), `TexMan_RegisterTexture` 0x1c0ef8, `TexMan_LockTexture` 0x1c17c0 | ed-slopper/puffin | G7q | | Split of G7q |
-| G7q2 | The texture manager's pixel uploads: `FUN_001c1ab8`, `FUN_001c1bd0`, `TexMan_UploadPixels` 0x1c1d58 | any | G7q1 | | Split of G7q |
+| G7q2 | The texture manager's pixel uploads: `FUN_001c1ab8`, `FUN_001c1bd0`, `TexMan_UploadPixels` 0x1c1d58 | ed-slopper/puffin | G7q1 | | Split of G7q |
 | G7q3 | `TexMan_UploadTextures` 0x1c1f50 (5112 bytes: the frame's uploads) | any | G7q2 | | Split of G7q |
 | G7q4 | The rest of the texture manager: `TexMan_UpdateLod` 0x1c3348, `TexMan_InitLoadNodes`, `TexMan_FreeAll`, `TexMan_FindVramSlot`, `TexMan_FindClutSlot`, `FUN_001c3818`, `TexMan_UploadTexture` 0x1c3ba8, `FUN_001c3d88`, `FUN_001c3f68` | any | G7q1 | | Split of G7q |
 | G9 | Front end: title, main menu, mode select, rider / outfit / board select, options, records, trick book screens, unlock screens, music player, loading screens (`gApp+0x734`) | unowned | E1, E5 | | [repo] `ui.rs` is ours. Split (2026-10-16): G9b the shared machinery, G9c–G9t the screens (logic ported and checked in the runner, widgets as calls out), G9u the app's menus on them |
@@ -155,6 +154,7 @@ matches the original.
 
 | ID | Task | Section | Who | Date | Commit |
 |---|---|---|---|---|---|
+| G7q1 | texman.rs: TexMan_Init, CalcLodParams, the tear-down, RegisterTexture, LockTexture; runner-checked, 52/53 mutants | P2 | ed-slopper/puffin | 2026-10-17 | b05e272 |
 | G7p | quad2d.rs: Draw_Line, the two-colour line, the rectangle outline and the triangle; runner-checked, 16/16 mutants | P2 | ed-slopper/puffin | 2026-10-17 | 3700f00 |
 | G7o | fontdraw.rs: the font's draws and set-up (Font_*, TextStyle_*, the aligned and cursor draws) and the wide strings WStr_*; runner-checked, 58/59 mutants (1 equivalent) | P2 | ed-slopper/puffin | 2026-10-17 | 246eeaf |
 | G7n | textbox.rs: the text box TextBox_* 0x1957b0..0x1965b4 and Color_Set4; runner-checked (3000 scripts), 61/70 mutants (8 equivalent, 1 boundary) | P2 | ed-slopper/puffin | 2026-10-17 | d17c668 |
@@ -1302,3 +1302,4 @@ matches the original.
 - 2026-10-17 ed-slopper/puffin: split G7p from G7 (the 2D line draws 0x19c1e8..0x19c774) and claim it.
 - 2026-10-17 ed-slopper/puffin: G7p done (3700f00): the 2D line draws in quad2d.rs. G7m..G7p together are the game's 2D and text drawing (quads, lines, the font, the text box).
 - 2026-10-17 ed-slopper/puffin: split G7q (the texture manager) from G7 into G7q1..G7q4; claim G7q and G7q1.
+- 2026-10-17 ed-slopper/puffin: G7q1 done (b05e272): texman.rs, the texture manager's set-up and records (names wrld / plr pick the detail level; 8-bit palettes stored in the GS's block order). Claim G7q2.
