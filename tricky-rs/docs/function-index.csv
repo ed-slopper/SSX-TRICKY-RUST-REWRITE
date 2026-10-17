@@ -2686,7 +2686,7 @@ address,size,name,system,status
 0x1c4fe0,524,PS2Draw_FlushBuckets,render?,checked
 0x1c51f0,376,PS2Draw_WriteFullState,render?,checked
 0x1c5368,828,PS2Draw_WriteStateChanges,render?,checked
-0x1c5c88,100,PS2Draw_WriteTexState,render?,not started
+0x1c5c88,4872,PS2Draw_WriteTexState,render?,checked
 0x1c6f98,208,PS2Draw_StateEquals,render?,checked
 0x1c7068,32,FUN_001c7068,render?,checked
 0x1c7088,292,PS2Draw_PackSortKey,render?,checked

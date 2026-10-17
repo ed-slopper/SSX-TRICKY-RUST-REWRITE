@@ -20,6 +20,7 @@
 //! +0x38 the one that follows it, +0x3c the next of its page.
 
 use crate::pf::Mem;
+use crate::ps2f::F;
 
 /// The library sort 0x2cfc00(count, keys, room): the keys sorted by their low halves
 pub const SORT: u32 = 0x2cfc00;
@@ -679,5 +680,268 @@ pub fn game_draw_lists(m: &mut Mem, env: &mut dyn DrawListEnv) {
     for k in 0..13 {
         let l = m.r32(0x33d7d8 + 4 * k);
         env.call(m, DRAW_ALL, &[0x337c60, l]);
+    }
+}
+
+// ---- The VU1 program upload (row G7h3) ----
+
+/// The VU1 chains `write_tex_state` calls, by program (0 and 10 none; 8 and 9 share one)
+pub const CHAINS: [u32; 11] = [0, 0x312af0, 0x3110f0, 0x30f960, 0x314620, 0x319e30, 0x31c260, 0x31c790, 0x318080, 0x318080, 0];
+
+/// A DMA `call` of `to` (and an empty second half)
+fn dma_call(m: &mut Mem, at: u32, to: u32) {
+    sd(m, at, ((to as u64) << 32) | 0x5000_0000);
+}
+
+/// The current matrix set's twelve doublewords (+0x80..+0xdf) at `to`
+fn matrix_words(m: &mut Mem, set: u32, to: u32) {
+    for k in 0..12 {
+        let lo = m.r32(set + 0x80 + 8 * k);
+        let hi = m.r32(set + 0x84 + 8 * k);
+        sd(m, to + 8 * k, ((hi as u64) << 32) | lo as u64);
+    }
+}
+
+/// A GIF tag of one A+D register's place in the VU1 program's buffers
+const GIF_A: u64 = (0x302e_4000 << 32) | 0x8000;
+const GIF_B: u64 = (0x312e_4000 << 32) | 0x8000;
+const GIF_C: u64 = (0x302e_c000 << 32) | 0x8000;
+const GIF_D: u64 = (0x312e_c000 << 32) | 0x8000;
+const GIF_E: u64 = (0x300e_c000 << 32) | 0x8000;
+
+/// A patch program's (1..4) or the program 5's matrices alone (how 1): a `cnt` of 7 with them
+fn matrices_only(m: &mut Mem, set: u32, pkt: u32) {
+    let p = m.r32(pkt);
+    sd(m, p, 0x1000_0007);
+    sd(m, p + 0x18, 0xd80c << 47);
+    sd(m, p + 8, 0);
+    sd(m, p + 0x10, 0);
+    m.w32(pkt, p + 0x80);
+    matrix_words(m, set, p + 0x20);
+}
+
+/// The four quadwords at the set's +0x120, the two at +0x160 and +0x170 with their z ÷ 16, and (+0xe0, +0xf4, 0,
+/// 0): what the programs 6 and 7 take besides
+fn particle_words(m: &mut Mem, set: u32, pkt: u32) {
+    let (f3, f2) = (m.r32(set + 0xe0), m.r32(set + 0xf4));
+    let put = |m: &mut Mem, q: [u32; 4]| {
+        let p = m.r32(pkt);
+        sd(m, p, ((q[1] as u64) << 32) | q[0] as u64);
+        m.w32(pkt, p + 0x10);
+        sd(m, p + 8, ((q[3] as u64) << 32) | q[2] as u64);
+    };
+    for k in 0..4 {
+        let q = [0, 1, 2, 3].map(|j| m.r32(set + 0x120 + 0x10 * k + 4 * j));
+        put(m, q);
+    }
+    for at in [0x160, 0x170] {
+        let mut q = [0, 1, 2, 3].map(|j| m.r32(set + at + 4 * j));
+        q[2] = (F(f32::from_bits(q[2])) * F(0.0625)).0.to_bits();
+        put(m, q);
+    }
+    put(m, [f3, f2, 0, 0]);
+}
+
+/// The program 8's matrix (the set's +0..+0x3f) transposed where it is, its first three rows then sent, and a
+/// `call` of `word` when there is one
+fn transposed_rows(m: &mut Mem, set: u32, word: u32, pkt: u32) {
+    let rows: Vec<[u32; 4]> = (0..4).map(|r| [0, 1, 2, 3].map(|j| m.r32(set + 0x10 * r + 4 * j))).collect();
+    for r in 0..4u32 {
+        for j in 0..4u32 {
+            m.w32(set + 0x10 * r + 4 * j, rows[j as usize][r as usize]);
+        }
+    }
+    let q = m.r32(pkt);
+    m.w32(pkt, q + 0x30);
+    for k in 0..12 {
+        let w = m.r32(set + 4 * k);
+        m.w32(q + 4 * k, w);
+    }
+    if word != 0 {
+        m.w32(pkt, q + 0x40);
+        dma_call(m, q + 0x30, word);
+        sd(m, q + 0x38, 0);
+    }
+}
+
+/// A `call` of `word` alone when there is one
+fn call_word(m: &mut Mem, word: u32, pkt: u32) {
+    if word != 0 {
+        let p = m.r32(pkt);
+        dma_call(m, p, word);
+        sd(m, p + 8, 0);
+        m.w32(pkt, p + 0x10);
+    }
+}
+
+/// `PS2Draw_WriteTexState` 0x1c5c88(d, program, how, word, &packet): the VU1 program's packet. The current matrix
+/// set is the list's +0x20 + 0x180 · +0xfa5c.
+/// - **Patches (1..4)**, how 0: a `call` of the program's chain, a `cnt` of 12 with the set's matrices and the
+///   four GIF tags the program draws with, then a `ref` of the Bezier manager's table for it (4 steps +0x534, 6
+///   +0x538, 8 +0x53c, mixed +0x540). How 1: the matrices alone. Else nothing.
+/// - **5**, how 0: its chain and a `cnt` of 7 with the matrices and two unpacks; how 1 the matrices alone.
+/// - **6, 7** (the particles): the chain (how 0) or none (how 1), then a `cnt` of 8 with the matrices'
+///   neighbours (see `particle_words`).
+/// - **8**: how 0 its chain, the matrices and three unpacks; how 1 the matrices and one; either way then the set's
+///   matrix transposed in place and three rows, and a `call` of the word. How 2 the word's `call` alone.
+/// - **9**: how 0 its chain and two unpacks, and the word's `call`; how 1 and 2 the word's `call` alone.
+pub fn write_tex_state(m: &mut Mem, env: &mut dyn DrawListEnv, d: u32, prog: u32, how: u32, word: u32, pkt: u32) {
+    let set = d.wrapping_add(m.r32(d + 0xfa5c).wrapping_mul(0x180)).wrapping_add(0x20);
+    if prog >= 11 {
+        return;
+    }
+    let how = how as i32;
+    match prog {
+        1..=4 => {
+            if how == 1 {
+                return matrices_only(m, set, pkt);
+            }
+            if how != 0 {
+                return;
+            }
+            let (x, table, qwc): (u64, u32, u32) = match prog {
+                1 => (0xd8ba, 0x53c, 0x52),
+                2 => (0xd882, 0x538, 0x36),
+                3 => (0xd85a, 0x534, 0x22),
+                _ => (0xd882, 0x540, 0x36),
+            };
+            let p = m.r32(pkt);
+            dma_call(m, p, CHAINS[prog as usize]);
+            let v = p + 8;
+            sd(m, v + 8, 0x1000_000c);
+            sd(m, v + 0x20, x << 47);
+            sd(m, v, 0);
+            sd(m, v + 0x10, 0);
+            sd(m, v + 0x18, 0);
+            m.w32(v + 0x88, 0x80);
+            m.w32(v + 0x8c, 0x80);
+            matrix_words(m, set, v + 0x28);
+            m.w32(v + 0x90, 0x80);
+            for (at, w) in [(0xc8, GIF_D), (0x98, GIF_A), (0xa8, GIF_B), (0xb8, GIF_C), (0xd0, 0x412), (0xa0, 0x412), (0xb0, 0x412), (0xc0, 0x412)] {
+                sd(m, v + at, w);
+            }
+            m.w32(pkt, v + 0xd8);
+            m.w32(v + 0x94, 0x80);
+            // the Bezier manager (the renderer's +0x20)
+            let r = m.r32(m.r32(APP) + 0x724);
+            let vt = m.r32(r + 0x10);
+            let this = r.wrapping_add(m.r16(vt + 0x20) as i16 as i32 as u32);
+            let f = m.r32(vt + 0x24);
+            let bz = env.vcall(m, f, this, &[]);
+            let t = m.r32(bz + table);
+            let q = m.r32(pkt);
+            sd(m, q, ((t as u64) << 32) | (0x3000_0000 | qwc) as u64);
+            sd(m, q + 8, 0);
+            m.w32(pkt, q + 0x10);
+        }
+        5 => {
+            if how == 1 {
+                return matrices_only(m, set, pkt);
+            }
+            if how != 0 {
+                return;
+            }
+            let p = m.r32(pkt);
+            dma_call(m, p, CHAINS[5]);
+            let v = p + 8;
+            sd(m, v + 8, 0x1000_0007);
+            sd(m, v + 0x20, 0xd80c << 47);
+            sd(m, v, 0);
+            sd(m, v + 0x10, 0);
+            sd(m, v + 0x18, 0);
+            matrix_words(m, set, v + 0x28);
+            sd(m, v + 0x88, 0x1000_0004);
+            sd(m, v + 0x90, 0);
+            sd(m, v + 0x98, 0);
+            m.w32(pkt, v + 0xd8);
+            for (at, w) in [(0xa0, 0x6c01_03c8u64 << 32), (0xc0, 0x6c01_03e4 << 32), (0xc8, GIF_C), (0xd0, 0x412), (0xa8, GIF_C), (0xb0, 0x412), (0xb8, 0)] {
+                sd(m, v + at, w);
+            }
+        }
+        6 | 7 => {
+            match how {
+                0 => {
+                    let p = m.r32(pkt);
+                    dma_call(m, p, CHAINS[prog as usize]);
+                    let v = p + 8;
+                    sd(m, v + 8, 0x1000_0008);
+                    sd(m, v + 0x20, 0xd80e << 47);
+                    m.w32(pkt, v + 0x28);
+                    sd(m, v, 0);
+                    sd(m, v + 0x10, 0);
+                    sd(m, v + 0x18, 0);
+                }
+                1 => {
+                    let p = m.r32(pkt);
+                    sd(m, p, 0x1000_0008);
+                    sd(m, p + 0x18, 0xd80e << 47);
+                    m.w32(pkt, p + 0x20);
+                    sd(m, p + 8, 0);
+                    sd(m, p + 0x10, 0);
+                }
+                _ => return,
+            }
+            particle_words(m, set, pkt);
+        }
+        8 => {
+            match how {
+                0 => {
+                    let p = m.r32(pkt);
+                    dma_call(m, p, CHAINS[8]);
+                    let v = p + 8;
+                    sd(m, v + 0x20, 0xd80c << 47);
+                    sd(m, v + 8, 0x1000_0007);
+                    sd(m, v, 0);
+                    sd(m, v + 0x10, 0);
+                    sd(m, v + 0x18, 0);
+                    matrix_words(m, set, v + 0x28);
+                    for (at, w) in [(0x88, 0x1000_0004u64), (0x90, 0), (0x98, 0), (0xa0, 0x6c01_03c8 << 32), (0xc0, 0x6c01_03e4 << 32), (0xc8, GIF_E), (0xd8, 0x1000_0005), (0xf0, 0x6c04_0392 << 32), (0xf8, GIF_B), (0x100, 0x412)] {
+                        sd(m, v + at, w);
+                    }
+                    m.w32(pkt, v + 0x108);
+                    for (at, w) in [(0xa8, GIF_E), (0xb0, 0x412), (0xb8, 0), (0xd0, 0x412), (0xe0, 0), (0xe8, 0)] {
+                        sd(m, v + at, w);
+                    }
+                }
+                1 => {
+                    let p = m.r32(pkt);
+                    sd(m, p, 0x1000_0007);
+                    let v = p + 8;
+                    sd(m, v + 0x10, 0xd80c << 47);
+                    sd(m, v, 0);
+                    sd(m, v + 8, 0);
+                    matrix_words(m, set, v + 0x18);
+                    for (at, w) in [(0x78, 0x1000_0005u64), (0x90, 0x6c04_0392 << 32), (0x80, 0), (0x88, 0), (0x98, GIF_B), (0xa0, 0x412)] {
+                        sd(m, v + at, w);
+                    }
+                    m.w32(pkt, v + 0xa8);
+                }
+                2 => return call_word(m, word, pkt),
+                _ => return,
+            }
+            transposed_rows(m, set, word, pkt);
+        }
+        9 => match how {
+            0 => {
+                let p = m.r32(pkt);
+                dma_call(m, p, CHAINS[9]);
+                let v = p + 8;
+                for (at, w) in [(8, 0x1000_0004u64), (0x20, 0x6c01_03c8 << 32), (0x40, 0x6c01_03e4 << 32), (0x48, GIF_E), (0x50, 0x412)] {
+                    sd(m, v + at, w);
+                }
+                m.w32(pkt, v + 0x58);
+                for (at, w) in [(0, 0u64), (0x10, 0), (0x18, 0), (0x28, GIF_E), (0x30, 0x412), (0x38, 0)] {
+                    sd(m, v + at, w);
+                }
+                if word != 0 {
+                    m.w32(pkt, v + 0x68);
+                    dma_call(m, v + 0x58, word);
+                    sd(m, v + 0x60, 0);
+                }
+            }
+            1 | 2 => call_word(m, word, pkt),
+            _ => {}
+        },
+        _ => {}
     }
 }

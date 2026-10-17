@@ -1376,3 +1376,41 @@ Checked in the runner (`tests/drawflush.rs`, 4000 cases). Each case builds a lis
 flush, one batch's changes, the full state, a GS writer or close (on a random builder, every how), or
 `Game_DrawLists`. The VU1 program write, the upload, the sort, the lists' draw and the app's question are logging
 stand-ins. All 70 mutants were caught.
+
+## The VU1 program upload (row G7h3; `drawlist::write_tex_state`, checked: `tests/texstate.rs`)
+
+**`PS2Draw_WriteTexState` 0x1c5c88**(list, program, how, word, &packet) writes the packet that sets up a batch's
+VU1 program. The index's 100 bytes are wrong: the function runs 4872 bytes, to 0x1c6f94, as a switch over 11
+programs (0x390aa0).
+- **Inputs:** the matrix set it uses is the list's +0x20 + 0x180 · +0xfa5c. `how` is 0 for a new program, 1 for a
+  new word, and 2 for a new state word (see `WriteStateChanges`).
+- **Patches, programs 1..4** (8, 6, 4 steps and mixed, as the Bezier lists' kinds 1, 2, 3, 4):
+  - How 0 builds, in order:
+    - a DMA `call` of the program's chain (0x312af0, 0x3110f0, 0x30f960, 0x314620);
+    - a `cnt` of 12 holding a VIF unpack, the set's twelve doublewords (+0x80..+0xdf), four 0x80 words, and four
+      GIF tags with A+D 0x412;
+    - a DMA `ref` of the Bezier manager's table for the program, with that table's quadword count: 0x52 at +0x53c,
+      0x36 at +0x538, 0x22 at +0x534, 0x36 at +0x540. The manager comes from the renderer's +0x20.
+  - How 1 sends only a `cnt` of 7 with the matrices. Any other how sends nothing.
+- **Program 5** (chain 0x319e30):
+  - How 0: the chain, then a `cnt` of 7 with the matrices, then a `cnt` of 4 with two unpacks to VU1 0x3c8 and
+    0x3e4.
+  - How 1: the matrices alone.
+- **Programs 6 and 7** (the particles' chains 0x31c260 / 0x31c790):
+  - How 0 calls the chain first; how 1 does not.
+  - Then a `cnt` of 8 with the set's four quadwords at +0x120, the quadwords at +0x160 and +0x170 with each z ÷ 16,
+    and (+0xe0, +0xf4, 0, 0).
+- **Program 8** (chain 0x318080):
+  - How 0: the chain, the matrices, and three unpacks. How 1: the matrices and one unpack.
+  - Either way it then transposes the set's matrix (+0..+0x3f) in place with MMI pairs (`pextlw` / `pextuw`, then
+    `pcpyld` / `pcpyud`), so each call transposes it again. It sends three rows of the result, and a `call` of the
+    word when that isn't 0.
+  - How 2: the word's `call` alone.
+- **Program 9** (chain 0x318080):
+  - How 0: the chain, two unpacks, and the word's `call`.
+  - How 1 and 2: the word's `call` alone.
+- **Programs 0 and 10, and anything past them,** write nothing.
+
+Checked in the runner (`tests/texstate.rs`, 30,000 cases: any program, how and word; the matrix sets mostly real
+floats; the Bezier manager behind a logging stand-in). 54 of 55 mutants were caught. The one left is equivalent:
+the bound checked at 12 instead of 11, which only adds program 11, and the switch writes nothing for it.
