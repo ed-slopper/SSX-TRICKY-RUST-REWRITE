@@ -1595,3 +1595,49 @@ The runner test (tests/pausedraw.rs) has 12,000 cases. Its menu-list stand-in re
 logs both arrays.
 All 63 mutants are caught. Two first survived because the ELF loads the career's three words and the camera
 names as zero; the test now makes them random.
+
+## The debug menu's framework (G9a4a, `game/src/debugmenu.rs`)
+
+The leftover developer menu (`cDebugMenu`) is built on three small classes.
+- **`cMenuItem`** (table 0x389e80) is the item base: +0 the label, +4 the menu, +8 flags (1 shown, 8 not
+  selectable), +0xc the table.
+  - Its virtuals: +0x10 the key's handler, +0x18 whether it can be picked, +0x20 its size, +0x28 its draw with a
+    box, +0x30 picked, +0x38 left.
+  - The size virtual returns a 16-byte box (x, y, w, h) through a hidden first pointer, so it takes (out, this).
+  - The base's key handler turns the frame's key into the menu's answer: back 8 → 1, escape 0x1b → 2, down 0x5000
+    → 3, up 0x4800 → 4.
+  - The index has the bit-1 test as `MenuItem_IsDisabled`, but it is the "shown" bit. Two setters the index
+    doesn't list, 0x188ae8 and 0x188b20, set and clear bits 1 and 8.
+- **`cMenu`** (0x389e40) has +4 its manager, +8 the count, +0xc the item picked, +0x10 the first shown, and up to
+  64 items from +0x14.
+  - Moving the selection goes round the list with a signed `div` (it traps on an empty menu) to the next item
+    that can be picked. The old item is left and the new one picked, told how: 0 by the next key, 1 by the
+    previous, 2 set.
+  - `AddItem` keeps the selection on its item only when the menu has a manager and was not empty. `RemoveItem`
+    keeps it inside the list, and skips on when the removed item was the picked one. 0x189390, also unlisted,
+    clears the count and the selection.
+  - **vf4 0x188e88** lays the menu out and draws it:
+    - Every shown item is measured into a box on the stack; a hidden one gets height and width 0.
+    - The list is centred across 640 by its widest item. When the total height is under 421 it is also centred
+      down 480, and the first shown goes back to 0.
+    - Otherwise it starts at y = 30: the first shown is pulled back to the selection if it is past it, then
+      moved on while the items from it to the selection add up to 421 or more.
+    - From the first shown, each item that still fits above 451 is drawn (the picked one always is), at the
+      list's x, the running y and the widest item's width.
+    - The arrows show when there is more above (the first shown is not 0) or below (the loop stopped early).
+- **`cMenuManager`** holds a stack of menus (+0 the depth, +4.. the menus), the pad (+0x2c), the frame's key
+  (+0x30) and whether it is active (+0x34).
+  - `Update` reads the key from the pressed device (`Input_FindPressedDevice` on the app's +0x24). In the app's
+    mode 4, 13 and 100 become back (8) and 99 becomes select (13); otherwise 100 is select and 98 back. A top
+    menu answering 1 is popped; one answering 2 pops them all.
+  - `Push` leaves the old top menu and enters the new one; `Pop` leaves the top and enters the one under it.
+    The manager is inactive once none is left.
+  - `Draw` doesn't check the depth: with no menu it takes the depth word itself as one.
+  - 0x189590 (the destructor) and 0x1897a8 (the pad's getter) are not in the index.
+- The destructors pass the free (`Mem_Delete` 0x114f80) the flags masked to bit 1, not the flags.
+
+The runner test (tests/debugmenu.rs) has 22,000 cases over the 44 functions, with stand-in tables for the items
+and menus. 60 of 64 mutants are caught. The other 4 are equivalent: the hidden item's zero width (never read);
+pulling the first shown back when it equals the selection; one extra step of `AddItem`'s shift (overwritten
+straight after); and mode 4's select test on the key instead of the stored word (they differ only when the key
+became 8).

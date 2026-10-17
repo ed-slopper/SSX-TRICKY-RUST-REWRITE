@@ -26,6 +26,7 @@ pub mod course_ground;
 pub mod knockables;
 pub mod courses;
 pub mod debris;
+pub mod debugmenu;
 pub mod finish;
 pub mod fxrand;
 pub mod gate;

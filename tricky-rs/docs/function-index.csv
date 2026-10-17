@@ -1902,45 +1902,45 @@ address,size,name,system,status
 0x1888b8,80,cBezierOptionsMenu::__tf,runtime,host
 0x188908,136,cBezierOptionsMenu::~cBezierOptionsMenu,debugmenu,not started
 0x188990,40,Debug_Printf2,audio?,ported
-0x1889b8,32,cMenuItem::cMenuItem,debugmenu,not started
-0x1889d8,36,cMenuItem::~cMenuItem,debugmenu,not started
-0x188a00,124,cMenuItem::HandleInput,debugmenu,not started
-0x188a80,72,cMenuItem::IsSelectable,debugmenu,not started
-0x188ac8,8,cMenuItem::vf5_188ac8,debugmenu,not started
-0x188ad0,8,cMenuItem::vf6_188ad0,debugmenu,not started
-0x188ad8,12,MenuItem_IsDisabled,debugmenu?,not started
-0x188b10,12,MenuItem_HasFlag8,debugmenu?,not started
-0x188b48,32,MenuItem_GetKey,debugmenu?,not started
-0x188b68,32,MenuItem_IsPadKey,debugmenu?,not started
-0x188b88,32,MenuItem_GetButtons,debugmenu?,not started
-0x188ba8,36,cMenu::cMenu,debugmenu,not started
-0x188bd0,36,cMenu::~cMenu,debugmenu,not started
-0x188bf8,88,Menu_SkipUnselectable,debugmenu?,not started
-0x188c50,204,Menu_SelectNext,debugmenu?,not started
-0x188d20,208,Menu_SelectPrev,debugmenu?,not started
-0x188df0,132,cMenu::vf1_188df0,debugmenu,not started
-0x188e78,8,cMenu::vf2_188e78,debugmenu,not started
-0x188e80,8,cMenu::vf3_188e80,debugmenu,not started
-0x188e88,952,cMenu::vf4_188e88,debugmenu,not started
-0x189240,168,cMenu::AddItem,debugmenu,not started
-0x1892e8,168,Menu_RemoveItem,debugmenu?,not started
-0x1893a0,176,Menu_SetSelection,debugmenu?,not started
-0x189450,40,Menu_GetSelectedIndex,debugmenu?,not started
-0x189478,48,Menu_GetCurrentItem,debugmenu?,not started
-0x1894a8,108,cMenu::vf5_1894a8,debugmenu,not started
-0x189518,72,cMenu::vf6_189518,debugmenu,not started
-0x189560,44,cMenuManager::cMenuManager,debugmenu,not started
-0x1895b0,20,cMenuManager::Reset,debugmenu,not started
-0x1895c8,20,cMenuManager::IsActive,debugmenu,ported
-0x1895e0,8,cMenuManager::SetActive,debugmenu,not started
-0x1895e8,300,cMenuManager::Update,debugmenu,not started
-0x189718,8,cMenuManager::GetKey,debugmenu,not started
-0x189720,64,cMenuManager::IsPadKey,debugmenu,not started
-0x189760,60,cMenuManager::GetButtons,debugmenu,not started
-0x1897a0,8,cMenuManager::SetPad,debugmenu,not started
-0x1897b0,60,cMenuManager::Draw,debugmenu,not started
-0x1897f0,164,cMenuManager::Push,debugmenu,not started
-0x189898,172,cMenuManager::Pop,debugmenu,not started
+0x1889b8,32,cMenuItem::cMenuItem,debugmenu,checked
+0x1889d8,36,cMenuItem::~cMenuItem,debugmenu,checked
+0x188a00,124,cMenuItem::HandleInput,debugmenu,checked
+0x188a80,72,cMenuItem::IsSelectable,debugmenu,checked
+0x188ac8,8,cMenuItem::vf5_188ac8,debugmenu,checked
+0x188ad0,8,cMenuItem::vf6_188ad0,debugmenu,checked
+0x188ad8,12,MenuItem_IsDisabled,debugmenu,checked
+0x188b10,12,MenuItem_HasFlag8,debugmenu,checked
+0x188b48,32,MenuItem_GetKey,debugmenu,checked
+0x188b68,32,MenuItem_IsPadKey,debugmenu,checked
+0x188b88,32,MenuItem_GetButtons,debugmenu,checked
+0x188ba8,36,cMenu::cMenu,debugmenu,checked
+0x188bd0,36,cMenu::~cMenu,debugmenu,checked
+0x188bf8,88,Menu_SkipUnselectable,debugmenu,checked
+0x188c50,204,Menu_SelectNext,debugmenu,checked
+0x188d20,208,Menu_SelectPrev,debugmenu,checked
+0x188df0,132,cMenu::vf1_188df0,debugmenu,checked
+0x188e78,8,cMenu::vf2_188e78,debugmenu,checked
+0x188e80,8,cMenu::vf3_188e80,debugmenu,checked
+0x188e88,952,cMenu::vf4_188e88,debugmenu,checked
+0x189240,168,cMenu::AddItem,debugmenu,checked
+0x1892e8,168,Menu_RemoveItem,debugmenu,checked
+0x1893a0,176,Menu_SetSelection,debugmenu,checked
+0x189450,40,Menu_GetSelectedIndex,debugmenu,checked
+0x189478,48,Menu_GetCurrentItem,debugmenu,checked
+0x1894a8,108,cMenu::vf5_1894a8,debugmenu,checked
+0x189518,72,cMenu::vf6_189518,debugmenu,checked
+0x189560,44,cMenuManager::cMenuManager,debugmenu,checked
+0x1895b0,20,cMenuManager::Reset,debugmenu,checked
+0x1895c8,20,cMenuManager::IsActive,debugmenu,checked
+0x1895e0,8,cMenuManager::SetActive,debugmenu,checked
+0x1895e8,300,cMenuManager::Update,debugmenu,checked
+0x189718,8,cMenuManager::GetKey,debugmenu,checked
+0x189720,64,cMenuManager::IsPadKey,debugmenu,checked
+0x189760,60,cMenuManager::GetButtons,debugmenu,checked
+0x1897a0,8,cMenuManager::SetPad,debugmenu,checked
+0x1897b0,60,cMenuManager::Draw,debugmenu,checked
+0x1897f0,164,cMenuManager::Push,debugmenu,checked
+0x189898,172,cMenuManager::Pop,debugmenu,checked
 0x189948,116,cBoolMenuItem::cBoolMenuItem,debugmenu,not started
 0x1899c0,204,cBoolMenuItem::HandleInput,debugmenu,not started
 0x189a90,260,cBoolMenuItem::Measure,debugmenu,not started
