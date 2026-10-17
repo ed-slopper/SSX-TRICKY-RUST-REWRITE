@@ -2136,3 +2136,35 @@ Two more lived in the first run and showed weak test data:
   that the EE reads as 0.
 
 The test now adds a random life and writes the frame last (bar the two texture numbers those entries read).
+
+## The 2D quad helpers (G7m, `quad2d`)
+
+The HUD (`hudsprites`), the front end's fades (`fe_transition`) and the replay screens (`replayui`) draw their
+rectangles through six small helpers. The ports there call them out by address; `quad2d` is the helpers
+themselves.
+
+All six draw the same quad. The rectangle (x, y, w, h in f12..f15) becomes four vertices, (x, y), (x + w, y),
+(x, y + h), (x + w, y + h), handed to the renderer's +0x220 (4, the vertices, 0). Each vertex holds:
+- u, v and 1.0 (+0xc is left unwritten);
+- the colour: the floats at +4, +8, +0xc and +0 × 128, as integers;
+- the place (x, y, z, 1). z is the first colour's +0x10.
+
+They differ in their colours and their texture coordinates (f16..f19 when they take them):
+
+| Helper | Colours | u, v at the four corners |
+|---|---|---|
+| `Draw_FilledRect` 0x19b108 | one (a0) | 0 to 1 |
+| `FUN_0019b2a0` | a1..a3 and t0, a corner each (z from a0) | 0 to 1 |
+| `Sprite_SubmitGradientQuad` 0x19b4d8 | as `FUN_0019b2a0` | u f17 to f18, v f16 to f19 |
+| `Draw_TexturedRect` 0x19b730 | one | as the gradient quad |
+| `Sprite_SubmitQuad` 0x19bdf8 | one | a quarter turned: (f18, f16), (f18, f19), (f17, f16), (f17, f19) |
+| `Sprite_SubmitGradientQuadRotated` 0x19bf90 | turned with the texture: a2, t0, a1, a3 | as `Sprite_SubmitQuad` |
+
+Each first waits in an empty loop of four rounds; the port leaves it out, since nothing can see it. The
+vertices the game builds on its stack, the port builds in a caller's scratch area (STANDIN: 0xc0 bytes).
+
+Checked in the runner (`tests/quad2d.rs`): 1000 cases of each helper, on colours of 0, 1, ½ and between (one,
+or a corner each, sometimes shared), rectangles of no width or height and off the screen, and texture
+rectangles with 0 and 1 in them.
+22 of 23 mutants were caught. The one left gives the filled rectangle the straight layout of (0, 0, 1, 1),
+which is the same thing as 0 to 1.

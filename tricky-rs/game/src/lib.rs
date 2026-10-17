@@ -187,6 +187,7 @@ pub mod skin;
 pub mod riderdraw;
 pub mod boardfx;
 pub mod fxdraw;
+pub mod quad2d;
 pub mod streak;
 pub mod marker;
 pub mod attitude;

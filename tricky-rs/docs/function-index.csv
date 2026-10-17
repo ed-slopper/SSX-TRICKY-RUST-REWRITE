@@ -2333,14 +2333,14 @@ address,size,name,system,status
 0x19afd8,116,cAnimTexFlipNodeState::__tf,runtime,host
 0x19b050,64,cTexFlip::__tf,runtime,host
 0x19b090,64,cReplayRecordHeader::__tf,runtime,host
-0x19b108,404,Draw_FilledRect,render,ported
-0x19b2a0,564,FUN_0019b2a0,render?,not started
-0x19b4d8,596,Sprite_SubmitGradientQuad,frontend?,not started
-0x19b730,404,Draw_TexturedRect,render,ported
+0x19b108,404,Draw_FilledRect,render,checked
+0x19b2a0,564,FUN_0019b2a0,render?,checked
+0x19b4d8,596,Sprite_SubmitGradientQuad,frontend?,checked
+0x19b730,404,Draw_TexturedRect,render,checked
 0x19b8c8,640,Sprite_DrawRotatedQuad,boarder?,checked
 0x19bb48,688,Sprite_DrawRotatedTexQuad,boarder?,checked
-0x19bdf8,404,Sprite_SubmitQuad,frontend?,ported
-0x19bf90,596,Sprite_SubmitGradientQuadRotated,frontend?,not started
+0x19bdf8,404,Sprite_SubmitQuad,frontend?,checked
+0x19bf90,596,Sprite_SubmitGradientQuadRotated,frontend?,checked
 0x19c1e8,292,Draw_Line,render,ported
 0x19c310,324,FUN_0019c310,,not started
 0x19c458,456,FUN_0019c458,,not started
