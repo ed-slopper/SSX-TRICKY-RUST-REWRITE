@@ -82,8 +82,7 @@ state machine and the renderer are ours. Nothing has been checked against the or
 | G7a | Terrain patches: the game's tessellation and LOD, subtractive lightmaps | unowned | G7 | | [repo] README "What the viewer taught us" |
 | G7b | Objects: per-instance lights (ambient + 3 directional, 128 = 1.0), materials, the PS2 blend modes for transparent materials | unowned | G7 | | [repo] "exact PS2 blending modes" not done |
 | G7c | (umbrella: G7c1, G7c2, G7c3, G7c4) Sky, fog, distance culling, `.ltg` grid use | unowned | G7, E3e | | [est] Split 2026-10-16 |
-| G7c1 | The falling snow: `cSnowFallMan` 0x1c8db8..0x1c9ae8 (the constructor, `SnowFall_InitLayers` / `_SetDensity` / `_SetScale` / `_SetRange` / `_SnapOrigin`, its per-frame virtuals and the layer helpers 0x1c9310 / 0x1c9388), the draw calls out | any | G7 | ed-slopper/puffin | Split of G7c |
-| G7c2 | Fog: `cFogObjMan` 0x1c9b20..0x1ca2c0 (`FogObjMan_Build` / `_DeleteAll`, its virtuals) and `cFogVolume` / `cPS2FogVolume` 0x1ca2c8..0x1cad68 | any | G7 | | Split of G7c |
+| G7c2 | Fog: `cFogObjMan` 0x1c9b20..0x1ca2c0 (`FogObjMan_Build` / `_DeleteAll`, its virtuals) and `cFogVolume` / `cPS2FogVolume` 0x1ca2c8..0x1cad68 | any | ed-slopper/puffin | | Split of G7c |
 | G7c3 | The sky: `Sky_*` 0x1859c0..0x186078 (layers, `Course_RemapSkyTextures`) and `cSkyBoxObjNode` 0x1c7900..0x1c7d00 | any | G7 | | Split of G7c |
 | G7c4 | Distance culling and the `.ltg` grid: `cPS2GraphicsMan::CullBox` 0x1e1b10, `BxList_CullToCount` 0x17db00 and the world's use of the light grid | any | G7, E3e | | Split of G7c |
 | G7d | Lights and halos, glows, lens flares | unowned | G7 | | [repo] "lights/halos" not done |
@@ -159,6 +158,7 @@ matches the original.
 
 | ID | Task | Section | Who | Date | Commit |
 |---|---|---|---|---|---|
+| G7c1 | The falling snow: `tricky_game::snowfall` (`cSnowFallMan`'s constructor, `SnowFall_InitLayers` / `_SetDensity` / `_SetScale` / `_SetRange` / `_SnapOrigin`, the step and the draw with its culling walk, `StaticInit_SnowFallMan`), checked in the runner on 6,000 random managers (tests/snowfall.rs); `fxrand::snow_layers` corrected to eight layers | P2 | ed-slopper/puffin | 2026-10-16 | 7b1cbcb |
 | G5c | The clip data (umbrella: G5c1, G5c2, G5c3, G5c4): all its parts done | P2 | ed-slopper/puffin | 2026-10-16 | 39b8176 |
 | G5c4 | `AnimIds_Init` 0x15aec0 as `tricky_game::animids::init`: its fixed image (the clip table's 767 lookup modes, 1,411 index-table words, 16 half stores), checked byte for byte against the original over random memory (tests/animids.rs) | P2 | ed-slopper/puffin | 2026-10-16 | 39b8176 |
 | G5c2 | The animation bank's loads: `tricky_game::animload` (`AnimData_OpenBig` / `_LoadClipTable` with the shared and uber files by roster / `_LoadFileList` / `_PollLoad` / `_IndexAllClips`, `AnimFileList_Load` / `_Load2`, `AnimFile_PollLoad` / `_Bind` / `_IndexClipNames`; file and BIG reads called out), checked in the runner on 8,000 random banks (tests/animload.rs) | P2 | ed-slopper/puffin | 2026-10-16 | d557385 |
@@ -1200,3 +1200,4 @@ matches the original.
 - 2026-10-16 ed-slopper/puffin: claim G5c4.
 - 2026-10-16 ed-slopper/puffin: G5c4 done; G5c done (all its parts).
 - 2026-10-16 ed-slopper/puffin: split G7c into G7c1..G7c4; claim G7c1.
+- 2026-10-16 ed-slopper/puffin: G7c1 done; claim G7c2.
