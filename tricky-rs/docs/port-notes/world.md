@@ -1170,3 +1170,41 @@ which matters only at a whole number.
 Checked in the runner (`tests/terraindraw.rs`), on their own and inside the terrain's draw, which now runs them as
 the game does. 16 of 17 mutants were caught; the one left is equivalent (a square's low corner at exactly 0).
 
+
+## The Bezier manager's queue (row G7a3a; `game/src/bezier.rs`, checked: `tests/bezier.rs`)
+
+- **`cPS2BezierMan`** (vtable 0x392fd8; `cBezierMan`'s is 0x3930d8) is the renderer's object at +0x484, which the
+  renderer's +0x20 (0x1ea068) hands out. Its constructor 0x1d9be0 sets the vtable, spins an empty 8-turn loop, and
+  runs vf1. The destructor 0x1d9c40 sets the vtable, runs vf2, then `cBezierMan`'s (0x1db908): that vtable, and
+  the delete 0x114f80 (this, 1) when flag 1 is set.
+- **vf1 0x1d9c88** stores +0x24 0, +0x20 1, +0x28 8.0, the near and far LOD distances +0x10 3000 and +0x14 15000,
+  +0x18 1 and +0x1c 1. Then `RendPatch_Alloc` 0x1db150, +0x530 (the tables) 0, and a tail call to
+  `Render_BuildBezierTables` 0x1db1e8 (row G7a3c).
+  - `RendPatch_Alloc` asks the allocator 0x2ccf70 for 0xc000 bytes under the name at 0x392fb8. When it gets them it
+    fills them with 0xdeadc0ed (0x2cc808). It keeps the pointer at +0x544 either way, then calls its own +0x78
+    (begin) through the vtable.
+- **vf2 0x1d9cf8** frees the records (0x1db1c8, when the pointer isn't 0; the pointer is left) and the tables
+  (0x1db4f8: freed when not 0, then 0). Both go through `Mem_Free` 0x14a040.
+- **Accessors 0x1db840..0x1db894:** set and get +0x18, +0x1c, +0x20 (+0x24 only set), the two distances as floats,
+  and words +0x534..+0x540 (get only).
+- **Begin, vf14 0x1d9d20 (+0x78):** zeroes the view count +0x2c, the record count +0x548, and four lists, each a
+  count and a head: +0x54c/+0x550, +0x554/+0x558, +0x55c/+0x560, +0x564/+0x568.
+- **The queue, vf16 0x1d9d50 (+0x88)**(patch, steps, shorts, clip) takes the next 0x18-byte record and counts it.
+  - The record gets +4 3 when clipped (else 0), +0x10 the patch, and +8..+0xb the four step bytes.
+  - +0xc gets the first short's low half. +0xe gets the low half of the word at shorts+4, or −1 when that word is
+    negative or switch +0x1c is off. The sign is read before +0xc is written.
+  - When all four steps are equal it links the record at the head of the list for 4 (kind 0), 6 (1) or 8 (2). Any
+    other equal value links it nowhere; the record is still counted. Mixed steps go to list +0x564 (kind 3).
+  - Linking stores the old head at +0x14 and the kind at +0, bumps the list's count, and makes the record the head.
+- **The views, vf17 0x1d9eb8**(quad, a, b, word, f) fill view n = +0x2c, at this + 0xa0·n:
+  - +0x30 the quad, +0x40 the matrix a, +0x80 the matrix b, all copied with lq/sq so both sides round down to 16;
+  - +0xc4 the word, +0xc0 the float. Then the count goes up.
+- **The renderer's +0x2c0 0x1e9068** calls the manager's +0x78 with the manager as its second word too. **Its
+  +0x2d0 0x1e9008** passes the patch, steps, shorts and clip through to the manager's +0x88. The terrain's draw
+  reaches the queue that way.
+
+Checked in the runner (`tests/bezier.rs`, 40,000 cases), with the game's vtable or a stand-in, and the real begin
+and queue or logging stand-ins. 46 of 49 mutants were caught. The three left are equivalent:
+- the alloc and the +0x530 clear swapped;
+- the destructor's first vtable store, overwritten before it is read;
+- begin's this when the slot is the real one, whose adjust is 0.

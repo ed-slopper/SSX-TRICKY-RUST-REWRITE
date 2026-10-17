@@ -2973,34 +2973,34 @@ address,size,name,system,status
 0x1d9a68,124,StaticInit_ParticleMan,render?,not started
 0x1d9ae8,80,cParticleMan::__tf,runtime,host
 0x1d9b38,44,FUN_001d9b38,render?,not started
-0x1d9be0,96,cPS2BezierMan::cPS2BezierMan,render,not started
-0x1d9c40,68,cPS2BezierMan::~cPS2BezierMan,render,not started
-0x1d9c88,108,cPS2BezierMan::vf1_1d9c88,render,not started
-0x1d9cf8,40,cPS2BezierMan::vf2_1d9cf8,render,not started
-0x1d9d20,44,cPS2BezierMan::vf14_1d9d20,render,not started
-0x1d9d50,360,cPS2BezierMan::vf16_1d9d50,render,not started
-0x1d9eb8,156,cPS2BezierMan::vf17_1d9eb8,render,not started
+0x1d9be0,96,cPS2BezierMan::cPS2BezierMan,render,checked
+0x1d9c40,68,cPS2BezierMan::~cPS2BezierMan,render,checked
+0x1d9c88,108,cPS2BezierMan::vf1_1d9c88,render,checked
+0x1d9cf8,40,cPS2BezierMan::vf2_1d9cf8,render,checked
+0x1d9d20,44,cPS2BezierMan::vf14_1d9d20,render,checked
+0x1d9d50,360,cPS2BezierMan::vf16_1d9d50,render,checked
+0x1d9eb8,156,cPS2BezierMan::vf17_1d9eb8,render,checked
 0x1d9f58,1644,cPS2BezierMan::vf15_1d9f58,render,not started
 0x1da5c8,2948,FUN_001da5c8,render?,not started
-0x1db150,116,RendPatch_Alloc,render?,not started
-0x1db1c8,28,FUN_001db1c8,render?,not started
+0x1db150,116,RendPatch_Alloc,render?,checked
+0x1db1c8,28,FUN_001db1c8,render?,checked
 0x1db1e8,780,Render_BuildBezierTables,render,not started
-0x1db4f8,56,FUN_001db4f8,render?,not started
+0x1db4f8,56,FUN_001db4f8,render?,checked
 0x1db530,268,Render_FillBezierWeights,render,not started
 0x1db640,508,StaticInit_Render,render?,not started
-0x1db840,8,cPS2BezierMan::vf13_1db840,render,not started
-0x1db848,8,cPS2BezierMan::vf12_1db848,render,not started
-0x1db850,8,cPS2BezierMan::vf11_1db850,render,not started
-0x1db858,8,cPS2BezierMan::vf10_1db858,render,not started
-0x1db860,8,cPS2BezierMan::vf9_1db860,render,not started
-0x1db868,8,cPS2BezierMan::vf8_1db868,render,not started
-0x1db870,8,cPS2BezierMan::vf7_1db870,render,not started
-0x1db878,8,cPS2BezierMan::vf6_1db878,render,not started
-0x1db880,8,cPS2BezierMan::vf5_1db880,render,not started
-0x1db888,8,cPS2BezierMan::vf4_1db888,render,not started
-0x1db890,8,cPS2BezierMan::vf3_1db890,render,not started
+0x1db840,8,cPS2BezierMan::vf13_1db840,render,checked
+0x1db848,8,cPS2BezierMan::vf12_1db848,render,checked
+0x1db850,8,cPS2BezierMan::vf11_1db850,render,checked
+0x1db858,8,cPS2BezierMan::vf10_1db858,render,checked
+0x1db860,8,cPS2BezierMan::vf9_1db860,render,checked
+0x1db868,8,cPS2BezierMan::vf8_1db868,render,checked
+0x1db870,8,cPS2BezierMan::vf7_1db870,render,checked
+0x1db878,8,cPS2BezierMan::vf6_1db878,render,checked
+0x1db880,8,cPS2BezierMan::vf5_1db880,render,checked
+0x1db888,8,cPS2BezierMan::vf4_1db888,render,checked
+0x1db890,8,cPS2BezierMan::vf3_1db890,render,checked
 0x1db8b8,80,cPS2BezierMan::__tf,runtime,host
-0x1db908,36,cBezierMan::~cBezierMan,render?,not started
+0x1db908,36,cBezierMan::~cBezierMan,render?,checked
 0x1db930,64,cBezierMan::__tf,runtime,host
 0x1db9f0,100,PS2LightMan_Create,render?,not started
 0x1dba58,84,PS2GraphicsMan_Create,render?,not started
@@ -3117,9 +3117,9 @@ address,size,name,system,status
 0x1e8e20,128,cPS2GraphicsMan::vf12_1e8e20,render,not started
 0x1e8ea0,8,Gfx_FlipDisplay,render,not started
 0x1e8fd8,44,cPS2GraphicsMan::vf90_1e8fd8,render,not started
-0x1e9008,44,cPS2GraphicsMan::vf89_1e9008,render,not started
+0x1e9008,44,cPS2GraphicsMan::vf89_1e9008,render,checked
 0x1e9038,48,cPS2GraphicsMan::vf88_1e9038,render,not started
-0x1e9068,44,cPS2GraphicsMan::vf87_1e9068,render,not started
+0x1e9068,44,cPS2GraphicsMan::vf87_1e9068,render,checked
 0x1e9098,80,cPS2GraphicsMan::vf66_1e9098,render,not started
 0x1e90e8,28,cPS2GraphicsMan::vf14_1e90e8,render,not started
 0x1e9108,28,cPS2GraphicsMan::vf13_1e9108,render,not started
@@ -3152,7 +3152,7 @@ address,size,name,system,status
 0x1ea008,12,cPS2GraphicsMan::vf64_1ea008,render,not started
 0x1ea018,8,cPS2GraphicsMan::vf37_1ea018,render,not started
 0x1ea020,72,cPS2GraphicsMan::vf19_1ea020,render,not started
-0x1ea068,8,cPS2GraphicsMan::vf3_1ea068,render,not started
+0x1ea068,8,cPS2GraphicsMan::vf3_1ea068,render,checked
 0x1ea070,80,cPS2GraphicsMan::__tf,runtime,host
 0x1ea0c0,108,cPS2GraphicsMan::cPS2GraphicsMan,render,not started
 0x1ea130,8,cPS2GraphicsMan::~cPS2GraphicsMan,render,not started
