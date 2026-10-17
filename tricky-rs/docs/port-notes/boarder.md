@@ -1233,3 +1233,52 @@ helpers. Most end alike: off the course (+0x290 = 0) or with bit 0, +0x304 = !bi
   `Boarder_LaunchFromGate` (8 → 9), `Boarder_AddSpeedSample` (+0xdc += speed · 0.036, +0xe0 += 1).
 - Checked in the runner: 40,000 dispatches over every state (the update called with its object), 60,000 event bits,
   40,000 rumbles and helpers: fields and every call compared.
+
+## The animation sequences and layers (row G5a1; `game/src/animseq.rs`, checked: `tests/animseq.rs`)
+
+The controller's three layers are lists of sequences. A sequence is one clip being played. The code works through
+pointers and virtual calls, so the port keeps the bytes at their addresses and runs its own functions for the
+vtables' entries.
+- **The list (`ClipList_*` 0x203ae0..0x203cd8):** the list object holds both end nodes, itself and itself + 0x38.
+  Nodes link through +0x2c and +0x30. A new node goes in right after the list, so a walk by +0x30 meets the newest
+  first. Remove calls the node's slot 1 (delete); "RemoveAndDestroy" 0x203b00 calls slot 2, which for a boarder
+  sequence is its reset. DestroyAll deletes each node (reading the next one first), then empties the list.
+- **The vtables:** pairs of (this-adjustment short, function). `cSkelSequence` 0x39e470 has delete (nothing), reset
+  0x203cf8 and the weight update 0x203a40. `cBoarderSequence` 0x379020 has delete 0x159ff8 (reset, then
+  `operator delete` 0x114f80), reset 0x159ee8 and update 0x15a3a8, then save and load.
+- **The weight:** each tick it moves by its rate. At 1 or more it stays at 1 and the rate stops. At 0 or less it
+  stays at 0, the rate stops and the sequence has ended (+0x24). The boarder sequence first takes the end's fade
+  rate (+0x70) once source 0's whole frame reaches the fade frame (+0x6c).
+- **The fades:**
+  - `SetBlendOut` 0x159d88 (frames; below 0 means what is left of source 0, at least 1) gives the rate
+    −|speed| × 30 / (60 × frames). A sequence that isn't held also gets a stop frame: 0 when playing backwards, the
+    last frame otherwise.
+  - `SetBlendIn` 0x159e38 gives (1 − weight) × |speed| × 30 / (60 × frames).
+  - `SetEndBlendOut` 0x15a330 puts the fade at length − (frames + 1). 0 frames means never: 0x0fffffff, rate −1.
+- **A source (`SetSource` 0x159bb8; slot, clip):**
+  - The key comes from the key table 0x3bc530 (a word per clip id). When that word is the none key (0x39e468), the
+    table's first word that isn't none is used instead.
+  - Only a new key changes anything: the old tree is destroyed (`SkelAnim_DestroyTree` 0x159a80, children first),
+    a new one is made from the bank 0x3211a8 (`SkelAnim_Create` 0x158dc0), and the stop frame is cleared.
+  - A tree's header (its +8) holds the child count (+9), the length (+0xa) and two lists of four marker frames
+    (+0xc, +0x14).
+- **The advance (0x15a030; dt):**
+  - A held sequence at its end goes back to frame 0.
+  - Otherwise each source's time moves by dt × speed × 30 / 60, and the marker bits are rebuilt (see the rail
+    capture notes for +0x74..+0x77).
+  - The time stops at the stop frame and at the clip's ends. When it was already at the end, a sequence that isn't
+    held has ended.
+- **`GetPhase` 0x159e80:** time / (length − 1) (1 for a one-frame clip), measured from the end when playing
+  backwards.
+- **The layer helpers** fade out, turn the facing, set the stance, find a clip (the newest) and clear "current".
+- **`BdrSeq_Create` 0x15a700:** 0x90 bytes from the node pool 0x345e48 (named "BdrSeq"), zeroed. Then the
+  constructor sets the skeleton sequence's vtable and reset, its own vtable, no trees and no keys, and calls the
+  reset.
+- **The EE's division rounds toward zero** (the runner's rule), where `ps2f::F` rounds to nearest. The port divides
+  with its own chopped `div`. The last bit of the fade rates depends on it.
+
+Checked in the runner on 40,000 random worlds: three layers with sequences linked on them and some loose, the
+sequences' fields (often whole or half frames, and weights that land exactly on 1 and 0), their trees and headers,
+and the key table. That is about 1,400 calls for each of 28 functions. Delete, the tree maker and the pool's alloc
+were logged. 39 of 42 mutants were caught. The other 3 are equivalent: two memsets that later writes cover, and the
+backward stop frame stored over an equal time.

@@ -1167,26 +1167,26 @@ address,size,name,system,status
 0x159880,104,SkelAnim_Init,other,not started
 0x1598e8,36,SkelAnim_SetSkeleton,other,not started
 0x159910,364,FUN_00159910,animation?,not started
-0x159a80,132,SkelAnim_DestroyTree,boarder?,ported
-0x159b08,72,cBoarderSequence::cBoarderSequence,boarder,not started
-0x159b50,88,FUN_00159b50,render?,not started
-0x159bb8,460,AnimClip_SetSource,animation,not started
-0x159d88,172,AnimClip_SetBlendOut,animation,not started
-0x159e38,72,AnimClip_SetBlendIn,animation,not started
-0x159e80,100,AnimClip_GetPhase,animation,not started
-0x159ee8,272,cBoarderSequence::vf1_159ee8,boarder,not started
-0x159ff8,56,cBoarderSequence::~cBoarderSequence,boarder,not started
-0x15a030,764,AnimClip_Advance,animation,ported
-0x15a330,116,AnimClip_SetEndBlendOut,animation,not started
-0x15a3a8,48,cBoarderSequence::vf2_15a3a8,boarder,not started
+0x159a80,132,SkelAnim_DestroyTree,boarder?,checked
+0x159b08,72,cBoarderSequence::cBoarderSequence,boarder,checked
+0x159b50,88,FUN_00159b50,render?,checked
+0x159bb8,460,AnimClip_SetSource,animation,checked
+0x159d88,172,AnimClip_SetBlendOut,animation,checked
+0x159e38,72,AnimClip_SetBlendIn,animation,checked
+0x159e80,100,AnimClip_GetPhase,animation,checked
+0x159ee8,272,cBoarderSequence::vf1_159ee8,boarder,checked
+0x159ff8,56,cBoarderSequence::~cBoarderSequence,boarder,checked
+0x15a030,764,AnimClip_Advance,animation,checked
+0x15a330,116,AnimClip_SetEndBlendOut,animation,checked
+0x15a3a8,48,cBoarderSequence::vf2_15a3a8,boarder,checked
 0x15a3d8,212,cBoarderSequence::SaveSnapshot,save,checked
 0x15a4b0,332,cBoarderSequence::vf4_15a4b0,boarder,checked
-0x15a600,84,AnimLayer_BlendOutAll,animation,not started
-0x15a658,52,AnimLayer_Turn,animation,not started
-0x15a690,52,AnimLayer_SetStance,animation,not started
-0x15a6c8,56,AnimLayer_FindClip,animation,not started
-0x15a700,96,BdrSeq_Create,render?,ported
-0x15a760,52,AnimLayer_ClearCurrentFlags,animation,not started
+0x15a600,84,AnimLayer_BlendOutAll,animation,checked
+0x15a658,52,AnimLayer_Turn,animation,checked
+0x15a690,52,AnimLayer_SetStance,animation,checked
+0x15a6c8,56,AnimLayer_FindClip,animation,checked
+0x15a700,96,BdrSeq_Create,render?,checked
+0x15a760,52,AnimLayer_ClearCurrentFlags,animation,checked
 0x15a798,128,AnimLayer_SaveSnapshot,save,checked
 0x15a818,168,AnimLayer_LoadSnapshot,animation,checked
 0x15a8c0,192,AnimData_Destruct,animation,not started
@@ -3350,17 +3350,17 @@ address,size,name,system,status
 0x202990,68,PoseBlend_Finish,animation?,not started
 0x2029d8,292,PoseBlend_EvalCurves,animation?,not started
 0x202b00,3904,FUN_00202b00,animation?,not started
-0x203a40,92,cSkelSequence::vf2_203a40,render,not started
+0x203a40,92,cSkelSequence::vf2_203a40,render,checked
 0x203aa0,40,cSkelSequence::SaveSnapshot,save,checked
 0x203ac8,20,cSkelSequence::vf4_203ac8,render,checked
-0x203ae0,28,ClipList_Insert,animation?,not started
-0x203b00,72,ClipList_RemoveAndDestroy,other,not started
-0x203b48,24,ClipList_Init,other,not started
-0x203b98,60,ClipList_Count,world?,ported
-0x203bd8,72,ClipList_Remove,boarder?,not started
-0x203c20,108,ClipList_DestroyAll,boarder?,ported
-0x203cf8,64,cSkelSequence::vf1_203cf8,render,not started
-0x203d38,8,cSkelSequence::vf0_203d38,render,not started
+0x203ae0,28,ClipList_Insert,animation?,checked
+0x203b00,72,ClipList_RemoveAndDestroy,other,checked
+0x203b48,24,ClipList_Init,other,checked
+0x203b98,60,ClipList_Count,world?,checked
+0x203bd8,72,ClipList_Remove,boarder?,checked
+0x203c20,108,ClipList_DestroyAll,boarder?,checked
+0x203cf8,64,cSkelSequence::vf1_203cf8,render,checked
+0x203d38,8,cSkelSequence::vf0_203d38,render,checked
 0x203d40,52,FUN_00203d40,render?,not started
 0x203d78,80,cSkelSequence::__tf,runtime,host
 0x203df8,80,cSkelSequenceState::__tf,runtime,host
