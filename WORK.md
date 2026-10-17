@@ -81,9 +81,9 @@ state machine and the renderer are ours. Nothing has been checked against the or
 | G7 | Rendering, as the PS2 renderer does it. Split before claiming: | unowned | E3a, E3b | | [repo] |
 | G7a | Terrain patches: the game's tessellation and LOD, subtractive lightmaps | unowned | G7 | | [repo] README "What the viewer taught us" |
 | G7b | Objects: per-instance lights (ambient + 3 directional, 128 = 1.0), materials, the PS2 blend modes for transparent materials | unowned | G7 | | [repo] "exact PS2 blending modes" not done |
-| G7c | (umbrella: G7c1, G7c2, G7c3, G7c4) Sky, fog, distance culling, `.ltg` grid use | unowned | G7, E3e | | [est] Split 2026-10-16 |
-| G7c4 | Distance culling and the `.ltg` grid: `cPS2GraphicsMan::CullBox` 0x1e1b10, `BxList_CullToCount` 0x17db00 and the world's use of the light grid | ed-slopper/puffin | G7, E3e | | Split of G7c |
-| G7d | Lights and halos, glows, lens flares | unowned | G7 | | [repo] "lights/halos" not done |
+| G7d | (umbrella: G7d1, G7d2) Lights and halos, glows, lens flares | unowned | G7 | | [repo] "lights/halos" not done; split 2026-10-16 |
+| G7d1 | The lights: `cLightMan` 0x1ce0f0 (constructor, destructor, its small virtuals), `Lights_Build` 0x1ce140, `Lights_Clear` 0x1ce278, `Mat4_RotateBy` 0x1ce310, `Lights_InsertStrongest` 0x25a028 and the world's light gathering that calls it (0x25ab2c, 0x25af08) | ed-slopper/puffin | G7 | | Split of G7d |
+| G7d2 | Lens flares and glows: `cLensFXObjNode` 0x1cbbc8 (constructor, destructor, `Draw` 0x1cbe20 with its two draw parts 0x1cc190 and 0x1cd040) and `LensFX_AddFlare` 0x1cc088 | any | G7 | | Split of G7d |
 | G7e | Particles as the VU1 microcode draws them (0x31c288), spark and dust sprites | unowned | G7 | | [repo] "Unresolved: spark and dust sprite rendering"; `particles.rs` has the emitters |
 | G7g | Rider shading and shadows, board reflections (env materials) | unowned | G7, E4 | | [est] |
 | G9 | Front end: title, main menu, mode select, rider / outfit / board select, options, records, trick book screens, unlock screens, music player, loading screens (`gApp+0x734`) | unowned | E1, E5 | | [repo] `ui.rs` is ours. Split (2026-10-16): G9b the shared machinery, G9c–G9t the screens (logic ported and checked in the runner, widgets as calls out), G9u the app's menus on them |
@@ -156,6 +156,8 @@ matches the original.
 
 | ID | Task | Section | Who | Date | Commit |
 |---|---|---|---|---|---|
+| G7c | Sky, fog, distance culling and the `.ltg` grid use: all its parts done (G7c1 snow, G7c2 fog, G7c3 sky, G7c4 culling and the grid lookup) | P2 | ed-slopper/puffin | 2026-10-16 | 215cc8d |
+| G7c4 | Distance culling and the grid: `tricky_game::cull` (`cPS2GraphicsMan::CullBox` with its frame matrices and the VU0 micro program 0x320 run in the runner's new micro mode from the game's own upload), `bxlist::cull_to_count` (`BxList_CullToCount`, uncalled) and `tricky_game::worldgrid` (`WorldGrid_CellAtPos` on every course's grid), checked in the runner (tests/cull.rs, tests/bxlist.rs, tests/ltg.rs); the other grid walks are G7c1/G7c2/E7a, the terrain and objects G7a/G7b | P2 | ed-slopper/puffin | 2026-10-16 | 215cc8d |
 | G7c3 | The sky: `tricky_game::sky` (`Sky_InitLayers` / `_FreeLayer(s)` / `_GetLayer` / `_GetModelByIndex` / `_Get/SetLayerCount` / `_Delete` and the static set-up, `Course_LoadSkies` / `Course_LoadSky` / `Course_RemapSkyTextures`, `cSkyBoxObjNode` constructor / destructor / draw and its light constants), checked in the runner on 16,000 random sky sets (tests/sky.rs); 37 of 38 mutants caught, one equivalent | P2 | ed-slopper/puffin | 2026-10-16 | 6f27b9d |
 | G7c2 | Fog: `tricky_game::fog` (`cFogObjMan` constructor / destructor / `FogObjMan_Build` / `_DeleteAll` / the draw walking the world's cells; `cFogVolume` / `cPS2FogVolume` constructor, destructor, build and the draw's depth-sorted sprites and GS packet), checked in the runner on 12,000 random worlds (tests/fog.rs); the runner gained `vmaxbc` / `vminibc` / `vftoi` / `vmtir` | P2 | ed-slopper/puffin | 2026-10-16 | b1a2740 |
 | G7c1 | The falling snow: `tricky_game::snowfall` (`cSnowFallMan`'s constructor, `SnowFall_InitLayers` / `_SetDensity` / `_SetScale` / `_SetRange` / `_SnapOrigin`, the step and the draw with its culling walk, `StaticInit_SnowFallMan`), checked in the runner on 6,000 random managers (tests/snowfall.rs); `fxrand::snow_layers` corrected to eight layers | P2 | ed-slopper/puffin | 2026-10-16 | 7b1cbcb |
@@ -1203,3 +1205,4 @@ matches the original.
 - 2026-10-16 ed-slopper/puffin: G7c1 done; claim G7c2.
 - 2026-10-16 ed-slopper/puffin: G7c2 done; claim G7c3.
 - 2026-10-16 ed-slopper/puffin: G7c3 done 6f27b9d (the sky vs the original); G7c4 claimed.
+- 2026-10-16 ed-slopper/puffin: G7c4 done 215cc8d (CullBox with the runner's VU0 micro mode, BxList_CullToCount, WorldGrid_CellAtPos); G7c closed; G7d split into G7d1 (lights, claimed) and G7d2 (lens flares).
