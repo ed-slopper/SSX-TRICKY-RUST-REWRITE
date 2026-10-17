@@ -495,12 +495,12 @@ address,size,name,system,status
 0x12e0e8,584,Fx_SpawnLandingPuffs,boarder,not started
 0x12e330,948,Fx_Spray_SpawnParticle,boarder,ported
 0x12e6e8,560,Fx_BrakeSpray_Update,boarder,ported
-0x12e918,752,Fx_Spray_Draw,boarder,not started
+0x12e918,752,Fx_Spray_Draw,boarder,checked
 0x12ec08,108,Fx_BoardPuff_Init,boarder,not started
 0x12ec78,28,Fx_BoardPuff_Destruct,boarder,not started
 0x12ec98,12,Fx_BoardPuff_Reset,boarder,not started
 0x12eca8,1228,Fx_BoardPuff_Update,boarder,ported
-0x12f178,676,Fx_BoardPuff_Draw,boarder,not started
+0x12f178,676,Fx_BoardPuff_Draw,boarder,checked
 0x12f420,108,Fx_SpeedDust_Init,boarder,not started
 0x12f490,28,Fx_SpeedDust_Destruct,boarder,not started
 0x12f4b0,12,Fx_SpeedDust_Reset,boarder,not started
@@ -511,7 +511,7 @@ address,size,name,system,status
 0x12fef0,1976,Fx_BoardTrail_Update,boarder,ported
 0x1306b0,684,Fx_BoardTrail_SetPoint,boarder,ported
 0x130960,568,Fx_BoardTrail_Push,boarder,ported
-0x130b98,1396,Fx_BoardTrail_Draw,boarder,not started
+0x130b98,1396,Fx_BoardTrail_Draw,boarder,checked
 0x131110,80,Fx_SurfaceSpray_Init,boarder,not started
 0x131160,76,Fx_SurfaceSpray_Reset,boarder,not started
 0x1311b0,4440,Fx_SurfaceSpray,boarder,ported
@@ -530,7 +530,7 @@ address,size,name,system,status
 0x1343d0,1120,AttitudeIcon_Update,boarder?,not started
 0x134830,2192,AttitudeIcon_Draw,boarder?,checked
 0x1350c0,176,Boarder_UpdateEffects,boarder,ported
-0x135170,140,BoarderRender_DrawEffects,boarder?,not started
+0x135170,140,BoarderRender_DrawEffects,boarder?,checked
 0x135200,84,BoarderRender_ResetEffects,boarder?,not started
 0x135258,12,BoarderRender_EmitBrakeSpray,world?,ported
 0x135268,12,BoarderRender_SpawnLandingPuffs,boarder?,not started

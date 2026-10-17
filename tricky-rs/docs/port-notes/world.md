@@ -2022,3 +2022,57 @@ string of sprites after a 0x50-byte header.
 Checked in the runner (`tests/renderdraw.rs`): 3000 strings of 0..30 characters, some with no glyph, in both
 modes (26,968 glyphs). 19 of 20 mutants were caught. The one left re-associates the x corner, which the
 truncation to whole units hides.
+
+## The rider's effect draws (G7e5, `boardfx`)
+
+`BoarderRender_DrawEffects` 0x135170(fx) draws one rider's effects in this order:
+1. The board's puffs (+0).
+2. Its trail (+0x1c20).
+3. The ground spray (+0x4b60).
+4. The brake spray (+0x99b0).
+5. The speed dust (+0xb600).
+6. The board's track (+0x8020), unless the race has two or more players and its mode's +0x88 is 3 or more.
+
+The port covers the three of these draws not ported elsewhere. All three start the same way: the test
++0x1c8(0, 0, 0.08), +0x1c0(1), blend 5 and +0x1e8(2, 0). They undo it at the end: +0x1c8(0, 2, 0.08), +0x1c0(0),
++0x1e8(0, 0) and blend 3.
+
+- **The puffs** (`Fx_BoardPuff_Draw` 0x12f178) are a ring of 64 records of 0x70 bytes from +0x10. +0x1c10 is
+  how many there are and +0x1c14 the oldest. A puff past its life (+0x5c below its age +0) is skipped. Each
+  other puff is a sprite (the renderer's +0x240):
+  - Its texture is 0x18 + its +0x40 in the app's table.
+  - Its size grows as +0x64 × age / life, but is never below +0x60.
+  - Its alpha (written to +0x48) rises as +0x44 × age / +0x58 while the puff is younger than +0x58, then falls
+    as +0x44 × (life − age) / (life − +0x58).
+  - It is placed at +0x20 + +0x30 × half the size (`Vec4_Scale`).
+  - The count is read again after each drawn puff.
+- **The brake spray's sprites** (`Fx_Spray_Draw` 0x12e918). The ribbons come first (`Fx_Spray_DrawParticles`
+  0x12d890 on +0x970, a call out here). Then each entry of the pool (30 of 0x50 bytes; +0x960 how many, +0x964
+  the oldest) is a sprite. Its texture is 0x18 + its +0x44. Its age t (+0x40) sets the rest:
+  - For t below 0.2, the alpha (written to +0x20) is t × +0x48 / 0.2 and the size t × 120 / 0.2.
+  - Otherwise the size is 120 + (t − 0.2) × 130 / 1.8 and the alpha k (0.4 k + 0.6) × +0x48, with k = (2 − t)
+    × 0.5555556.
+  - It is placed at +0 + +0x10 × 0.9 × the size.
+- **The trail** (`Fx_BoardTrail_Draw` 0x130b98) draws nothing when it has no points (+0x50). Otherwise it uses
+  texture 3 and sets +0x1f8(0, 0) before the shared state. Its points are a ring of 75 entries of 0xa0 bytes
+  from +0x60 (+0x54 the oldest). Each entry holds four places (+0..+0x3f), a colour (+0x84..+0x8c × 128), an
+  alpha (+0x80 × (0.9 − +0x94) / 0.9 × 128), a u (+0x90) and a break flag (+0x9c). All are integers in the
+  vertices.
+  - **The cap** is a strip of four pairs. Each pair runs from the board's point (+0x20; u the newest's u + 1,
+    v 0.5, alpha 0) to one of the newest entry's four places (its u; v 0.98 − 0.32 k).
+  - **The ribbon** is three bands, one between each two neighbouring places. Each band gets two vertices from
+    every entry but the last. An entry's break draws what has been gathered (if 3 or more) and starts again,
+    and so does the band's end. Each band starts from none.
+  - The game waits in a short empty loop (0x95 rounds) between the cap and the ribbon. The port leaves it out:
+    it does nothing that can be seen.
+
+What the game builds on its stack (a sprite's place and size, the trail's 0x1da0 bytes of vertices) the port
+builds in a caller's scratch area (STANDIN: the same bytes).
+
+Checked in the runner (`tests/boardfx.rs`): 2000 cases of the effect list, both ways through the track's test.
+3000 cases of each draw, with ages at and about their turning points (0, the fade, the life, 0.2, 2) and
+trails of 0, 1, 2, 3, 75 and random lengths with breaks.
+76 of 81 mutants were caught. The five left: the least size's `<` as `<=` (equal sizes give the same
+answer); not reading the puff count again (nothing in a draw changes it); two changes to the trail's alpha (its
+grouping, and 0.9 an ulp off), which the cast to a whole number after × 128 hides; and the break's "3 or more" as
+"4 or more" (the count is always even).
