@@ -49,10 +49,11 @@ pub fn step_factors(f: &mut [u32; 9], steps: u32) {
 /// drawn in the order 4, 6, 7, 5; `SnowFall_InitLayers`).
 pub type SnowLayer = [u32; 4];
 
-/// `SnowFall_InitLayers` 0x1c8ec8: seven layers, each four draws. The rest of a layer is fixed by the manager's
+/// `SnowFall_InitLayers` 0x1c8ec8: eight layers (+0x10, 0x90 each, up to the origin at +0x490), each four draws
+/// (32 in all, counted in the runner; an earlier reading said seven). The rest of a layer is fixed by the manager's
 /// constants (`cSnowFallMan` 0x1c8db8: +0x4b0 = 0.1875, +0x4b4 = 0.5, +0x4b8 = 350.0, +0x4bc = 2.0, +0x4c0 = 3.0).
-pub fn snow_layers(rand_fx: &mut dyn FnMut() -> u32) -> [SnowLayer; 7] {
-    let mut out = [[0u32; 4]; 7];
+pub fn snow_layers(rand_fx: &mut dyn FnMut() -> u32) -> [SnowLayer; 8] {
+    let mut out = [[0u32; 4]; 8];
     for l in out.iter_mut() {
         // drawn into words 4, 6, 7, 5 in that order
         let w4 = one_plus_unit(rand_fx());
@@ -81,7 +82,7 @@ pub fn lesson_path_var(rand_fx: u32) -> u32 {
 pub struct GameSnow {
     /// `cGame+0x74`: snow falls in this run.
     pub on: bool,
-    pub layers: [SnowLayer; 7],
+    pub layers: [SnowLayer; 8],
     /// `cGame+0x78`, given to `SnowFall_SetDensity`: 0.05 + 0.15 u.
     pub density: f32,
     /// `FUN_001c91c0`'s two arguments (`+0x4bc`, `+0x4c0` of the snow manager): 5 + u and 7 − u.
@@ -90,7 +91,7 @@ pub struct GameSnow {
 
 /// The snow's draws in `cGame::Init`: one draw for whether it snows (only when the game mode is neither 2 nor 4,
 /// the race has at most one rider and fewer than three entries: `unit < chance`, `chance` = the course record's
-/// float at +0x54), then the 28 layer draws of the `cSnowFallMan` constructor, then the density, then the two
+/// float at +0x54), then the 32 layer draws of the `cSnowFallMan` constructor, then the density, then the two
 /// fall values. `mode` is `DAT_0032de8c`.
 pub fn game_init_snow(
     rand_fx: &mut dyn FnMut() -> u32,
@@ -253,6 +254,7 @@ mod tests {
         // layer 0 drew 1, 2, 3, 4 into words 4, 6, 7, 5
         assert_eq!(l[0], [one_plus_unit(1), one_plus_unit(4), one_plus_unit(2), one_plus_unit(3)]);
         assert_eq!(l[6][0], one_plus_unit(25));
+        assert_eq!(l[7][0], one_plus_unit(29));
     }
 
     #[test]
@@ -277,7 +279,7 @@ mod tests {
         };
         let g = game_init_snow(&mut r, 0, 1, 1, 1.0);
         assert!(g.on); // every unit is below 1.0
-        assert_eq!(count, 1 + 28 + 3);
+        assert_eq!(count, 1 + 32 + 3);
         assert!((0.05..0.2).contains(&g.density));
         assert!((5.0..6.0).contains(&g.fall.0) && (6.0..=7.0).contains(&g.fall.1));
         // no chance draw in a race of three or in mode 4
@@ -288,7 +290,7 @@ mod tests {
         };
         let g = game_init_snow(&mut r2, 4, 1, 1, 1.0);
         assert!(!g.on);
-        assert_eq!(n, 28 + 3);
+        assert_eq!(n, 32 + 3);
     }
 
     #[test]

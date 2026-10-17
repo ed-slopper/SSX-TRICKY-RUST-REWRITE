@@ -630,7 +630,7 @@ velocity, +0x424 motion, +0x428 state, +0x2e4 impact counter; recordings kept on
       order, once per emission step. So the spray, trail and splash randomness is a third generator, seeded from `Rand_Fx`.
     - `cGame::Init`'s snow: after `ParticleMan_Init`, when the game mode is neither 2 nor 4, the race has at most one rider
       (`+0x7c`) and fewer than three entries (`+0x88`) one draw decides `snow = u < course record +0x54`; then
-      `SnowFall_InitLayers` 0x1c8ec8 (in the `cSnowFallMan` constructor) makes 7 layers x 4 draws (words 4, 6, 7, 5 of the
+      `SnowFall_InitLayers` 0x1c8ec8 (in the `cSnowFallMan` constructor) makes 8 layers x 4 draws (32; counted in the runner in G7c1, an earlier reading said 7) (words 4, 6, 7, 5 of the
       0x90-byte layer record, each in [1, 2)); then density `0.05 + 0.15 u` (`+0x78`, `SnowFall_SetDensity`); then two draws
       for `FUN_001c91c0`: `5 + u` and `7 - u'` (`+0x4bc`, `+0x4c0`, which set each layer's words 1 and 2).
     - `Crowd_LoadTexturesRandomize` 0x1458e0 (right after, from `cGame::Init`): for every instance whose model flags have
@@ -698,3 +698,36 @@ velocity, +0x424 motion, +0x428 state, +0x2e4 impact counter; recordings kept on
 - `Sky_Delete` 0x186078: destroys the 10 layers last to first (each layer's destructor), then frees the set when
   bit 0 of the flags is set.
 
+## The falling snow (row G7c1; `game/src/snowfall.rs`, checked: `tests/snowfall.rs`)
+
+`cSnowFallMan` 0x1c8db8 has eight layers of flakes, 0x90 bytes each from +0x10. The grid's origin is at +0x490.
+- **Its fields:** +0x4a0 the fall velocity (a frame's step is 1/60 of it), +0x4b0 the alpha, +0x4b4 the density,
+  +0x4b8 the cell size, and +0x4bc / +0x4c0 the fall range.
+- **The constructor:** origin (0, 0, 0, 1), velocity (0, 0, −300, 0), alpha 0.1875, density 0.5, size 350, range
+  2..3. Then `SnowFall_InitLayers`.
+- **A layer:**
+  - its flake count: density × size³ / 10⁶, with the EE's division, truncated;
+  - 2a − b and b − a from the range;
+  - four `Rand_Fx` factors in [1, 2), drawn into +0x10, +0x18, +0x1c, +0x14 in that order;
+  - the cell's axes (size on each), its colour (128, 128, 128, alpha × 128), a zero row and (1, 1, 0, 0).
+- **The setters:** density (all counts), scale (the axes, then the origin snapped), range, velocity and alpha.
+  Snapping takes the origin's whole multiples of twice the size away (each axis, truncated).
+- **The per-frame step (vf1):** the origin moves by 1/60 of the velocity and is snapped.
+- **The draw (vf2):** only while it snows (the game's +0x74).
+  - The density follows the camera's weather (+0xa4's +0x18) when it changes.
+  - The camera's cell is its offset from the origin over the size, rounded half up.
+  - The renderer is set up (+0x1c0 1; +0x1c8 (0, 0, 0.08); +0x1e0 5; +0x1f0 (gApp+0x30's +0x4c, 0)), the walk runs
+    from that cell's centre, and the renderer is put back.
+- **The walk (0x1c9388), four levels deep:**
+  - Each level has eight octants at half the extent (child bits: −x, −y, −z).
+  - Each octant is tested against the view (the renderer's +0x280 on its box) unless its parent was wholly inside.
+    1 = outside skips it; 0 = inside stops further tests below it.
+  - **At the bottom** is one cell. Its layer is chosen by the cell's parity (x 0x240, y 0x120, z 0x90 bytes apart).
+    It is drawn (+0x260) when the camera is within 7 sizes (the distance includes the w lanes, on VU0), and the
+    alpha fades over the last size.
+- **`StaticInit_SnowFallMan`** writes three colour rows at 0x3d0da0..0x3d0dc8.
+
+Checked in the runner on 6,000 random managers, games, cameras and weather, about 430 calls for each of 14 kinds.
+The renderer was a fake vtable whose box test answered inside, outside or partly. 32 of 36 mutants were caught. The
+others: (x − 1) + 1 is exact for the factors, the parity's remainder −1 gives 1 either way, and two distance
+boundaries (exactly 7 sizes, or exactly 6).

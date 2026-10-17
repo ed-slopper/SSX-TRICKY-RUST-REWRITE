@@ -43,6 +43,7 @@ pub mod animload;
 pub mod animmode;
 pub mod animpose;
 pub mod animseq;
+pub mod snowfall;
 pub mod fe_character;
 pub mod fe_title;
 pub mod fe_numplayers;

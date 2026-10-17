@@ -2709,17 +2709,17 @@ address,size,name,system,status
 0x1c8c38,52,BoarderShadow_Init,boarder?,not started
 0x1c8c70,92,BoarderShadow_AllocTexture,boarder?,not started
 0x1c8cd0,124,StaticInit_TerrainObjNode,other,not started
-0x1c8db8,268,cSnowFallMan::cSnowFallMan,render,ported
-0x1c8ec8,512,SnowFall_InitLayers,world?,ported
-0x1c90d0,96,SnowFall_SetDensity,other,ported
-0x1c9130,140,SnowFall_SetScale,render?,not started
-0x1c91c0,72,SnowFall_SetRange,game?,not started
-0x1c9218,160,SnowFall_SnapOrigin,render?,not started
-0x1c92b8,88,cSnowFallMan::vf1_1c92b8,render,not started
-0x1c9310,116,FUN_001c9310,render?,not started
-0x1c9388,952,FUN_001c9388,render?,not started
-0x1c9740,724,cSnowFallMan::vf2_1c9740,render,not started
-0x1c9a18,124,StaticInit_SnowFallMan,render?,not started
+0x1c8db8,268,cSnowFallMan::cSnowFallMan,render,checked
+0x1c8ec8,512,SnowFall_InitLayers,world?,checked
+0x1c90d0,96,SnowFall_SetDensity,other,checked
+0x1c9130,140,SnowFall_SetScale,render?,checked
+0x1c91c0,72,SnowFall_SetRange,game?,checked
+0x1c9218,160,SnowFall_SnapOrigin,render?,checked
+0x1c92b8,88,cSnowFallMan::vf1_1c92b8,render,checked
+0x1c9310,116,FUN_001c9310,render?,checked
+0x1c9388,952,FUN_001c9388,render?,checked
+0x1c9740,724,cSnowFallMan::vf2_1c9740,render,checked
+0x1c9a18,124,StaticInit_SnowFallMan,render?,checked
 0x1c9a98,80,cSnowFallMan::__tf,runtime,host
 0x1c9ae8,8,cSnowFallMan::~cSnowFallMan,render,not started
 0x1c9b20,60,cFogObjMan::cFogObjMan,frontend?,not started
