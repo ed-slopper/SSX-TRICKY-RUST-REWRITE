@@ -77,8 +77,7 @@ state machine and the renderer are ours. Nothing has been checked against the or
 | G1a5b3b2 | (umbrella: G1a5b3b2a, G1a5b3b2b) The rest of G1a5b3b: the wind-ups through `boarder::prewind_update` (the game's per-tick crouch and wind-up), late tricks (`jump::spin_start_from_stick`, the port's `air_mode2` / `bank_late` replaced), the AI's reads of the port's spin axes (`race.rs`) moved to the spin object, the button map from the rider's own BTNMAP and trick slots | any | G1a5b3b1 | | Split from G1a5b3b (needs a play test) |
 | G1a5b3b2b | The rest of G1a5b3b2: the wind-ups through `boarder::prewind_update` (the crouch state 0xe on its pad word, the game's per-tick crouch and wind-up, the release to state 10) and the button map from the rider's own BTNMAP and trick slots | any | G1a5b3b1 | | Split from G1a5b3b2 (needs a play test); looked at 2026-10-16: the port's prewind already uses `PrewindState_SetWindTarget`'s target and rate (`set_wind_target`, the stat18 factor) and the release's snapping; the now/rate/target triples are 12-byte objects (constructed by 0x122f10 at rider+0x1e0..+0x274) whose per-tick step is still to find (not a plain store; look for the class's method among the motions' and `cBoarder::vf7`'s callees) |
 | G5 | (umbrella: G5a, G5b, G5c, G5d) Animation: the game's own animation state machine and blending for all 248 `bxanim` clips (plus cmanim, ps2anim, ubers), clip markers, replacing our choice of clip | unowned | F1, E4 | | [repo] README: "Which clip plays when is my state logic". Split 2026-10-16 |
-| G5a | (umbrella: G5a1, G5a2) The rider's animation controller (rider+0x46c0): `AnimCtl_*`, `AnimClip_*`, `AnimLayer_*` on the clip table's records | any | G5 | | Split of G5; split 2026-10-16 |
-| G5b | The motion blends `AnimMode_*` 0x160140..0x161358 (board class, direction, crouch, brake, gate lean, wind-up, crouch-steer): the frames each motion state feeds the controller | any | G5a | | Split of G5 |
+| G5b | The motion blends `AnimMode_*` 0x160140..0x161358 (board class, direction, crouch, brake, gate lean, wind-up, crouch-steer): the frames each motion state feeds the controller | any | ed-slopper/puffin | | Split of G5 |
 | G5c | The clip data: `AnimData_*` / `AnimFile_*` / `AnimFileList_*` 0x1586c0..0x15ac48 (the clip table, markers, root offsets, the BIG and file list loads) and `AnimCurve_*` / `AnimCtl_BlendPose` (the pose from the curves) | any | G5 | | Split of G5 |
 | G5d | The app's rider animation on G5a..c, replacing its own choice of clip (README: "Which clip plays when is my state logic") | any | G5a, G5b, G5c | | Split of G5 (needs a play test) |
 | G7 | Rendering, as the PS2 renderer does it. Split before claiming: | unowned | E3a, E3b | | [repo] |
@@ -158,6 +157,7 @@ matches the original.
 
 | ID | Task | Section | Who | Date | Commit |
 |---|---|---|---|---|---|
+| G5a | The rider's animation controller (umbrella: G5a1, G5a2): all its parts done | P2 | ed-slopper/puffin | 2026-10-16 | d30610b |
 | G5a2 | The rider's animation controller: `tricky_game::animctl` (`AnimCtl_Construct` / `_Reset` / `_BeginClip` / `_PlayClip` / `_UpdateLayers` / `_UpdateClip` / `_HandleClipEnd` / `_FlushEndedClips`, the eight end actions, the queries, `RaceScene_SetClipMarker`) on G5a1, checked in the runner on 40,000 random controllers with the game's clip table (tests/animctl.rs) | P2 | ed-slopper/puffin | 2026-10-16 | 462c377 |
 | G5a1 | The animation sequences and layers: `tricky_game::animseq` (`ClipList_*`, `cSkelSequence` reset / weight, `cBoarderSequence` create / construct / reset / delete / weight, `AnimClip_SetSource` / `_SetBlendOut` / `_SetBlendIn` / `_GetPhase` / `_Advance` / `_SetEndBlendOut`, `SkelAnim_DestroyTree`, `AnimLayer_*`) on the game's bytes, checked in the runner on 40,000 random worlds (tests/animseq.rs) | P2 | ed-slopper/puffin | 2026-10-16 | 10aea98 |
 | G3 | Rider attributes and progression (umbrella: G3a, G3b, G3c, G3d; the career's points, levels, unlocks and board / outfit words were E12b's): all its parts done | P2 | ed-slopper/puffin | 2026-10-16 | ba3d112 |
@@ -1177,3 +1177,4 @@ matches the original.
 - 2026-10-16 ed-slopper/puffin: G5a1 done.
 - 2026-10-16 ed-slopper/puffin: claim G5a2.
 - 2026-10-16 ed-slopper/puffin: G5a2 done.
+- 2026-10-16 ed-slopper/puffin: G5a done (all its parts); claim G5b.
