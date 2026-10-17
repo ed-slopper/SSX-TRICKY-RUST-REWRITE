@@ -551,7 +551,7 @@ address,size,name,system,status
 0x1370d8,44,Vec4_ScaleCopy15,other,not started
 0x137108,56,Vec3_Div,camera?,ported
 0x137140,48,Vec3_Dot,camera?,ported
-0x1371e0,280,FUN_001371e0,ai?,checked
+0x1371e0,280,AIComputer_DirNoseComponent,ai,checked
 0x1372f8,720,AIComputer_SteerTowards,ai,ported
 0x1375c8,656,AIComputer_RideLine,ai,ported
 0x137858,444,AIComputer_RideToJump,ai,ported
@@ -791,7 +791,7 @@ address,size,name,system,status
 0x145808,124,cCrackedNode::ApplyImpact,world,ported
 0x145888,84,cCrackedNode::SaveSnapshot,save,checked
 0x1458e0,520,Crowd_LoadTexturesRandomize,world,ported
-0x145ae8,60,FUN_00145ae8,world?,not started
+0x145ae8,60,Crowd_ClearTextures,world,not started
 0x145b28,128,cCrowdBoxNode::cCrowdBoxNode,world,ported
 0x145ba8,88,cCrowdBoxNode::cCrowdBoxNode,world,checked
 0x145c00,136,cCrowdBoxNode::Init,world,ported
@@ -829,10 +829,10 @@ address,size,name,system,status
 0x148188,64,cParticleNode::OnMessage,world,ported
 0x1481c8,8,cParticleNode::Draw,world,not started
 0x1481d0,72,cParticleNode::SaveSnapshot,save,checked
-0x148218,168,FUN_00148218,frontend?,not started
+0x148218,168,cCameraNode::cCameraNode,camera,not started
 0x1482c0,144,CamAnimFrame_Create,frontend?,not started
 0x148350,292,CamAnim_SetShot,frontend?,not started
-0x148478,76,cCollideEmitterNode::vf12_148478,world,not started
+0x148478,76,cCameraNode::~cCameraNode,camera,not started
 0x148560,284,cCollideEmitterNode::cCollideEmitterNode,world,not started
 0x148680,196,cCollideEmitterNode::cCollideEmitterNode,world,checked
 0x148748,328,CollideEmitterNode_CreateParticles,world?,ported
@@ -858,7 +858,7 @@ address,size,name,system,status
 0x149270,84,cMovieNode::__tf,runtime,host
 0x1492c8,92,cCollideEmitterNode::__tf,runtime,host
 0x1493e8,92,cCameraNode::__tf,runtime,host
-0x149448,84,FUN_00149448,world?,not started
+0x149448,84,CameraNodeState_Destruct,camera,not started
 0x1494a0,84,cParticleNode::__tf,runtime,host
 0x1494f8,84,cEmitterNode::__tf,runtime,host
 0x149550,92,cTrickTriggerNode::__tf,runtime,host
@@ -934,7 +934,7 @@ address,size,name,system,status
 0x14bbe8,428,cLessonMan::vf2_14bbe8,tutorial,not started
 0x14bd98,764,LessonOverlay_DrawButtons,frontend,not started
 0x14c098,528,LessonOverlay_DrawPage,frontend,not started
-0x14c2a8,12,FUN_0014c2a8,scoring?,ported
+0x14c2a8,12,Lesson_SetTrickSeen,scoring?,ported
 0x14c2c0,8,FUN_0014c2c0,frontend?,not started
 0x14c2c8,8,FUN_0014c2c8,frontend?,not started
 0x14c2d0,3176,LessonOverlay_DrawTrickBookPage,frontend,not started
@@ -1092,7 +1092,7 @@ address,size,name,system,status
 0x155410,48,Score_GetMultiplier,scoring,checked
 0x155440,128,Score_CalcPoints,scoring,checked
 0x1554c0,116,Score_CalcBasePoints,scoring,checked
-0x155538,80,FUN_00155538,scoring?,checked
+0x155538,80,Score_FindTrickMessage,scoring,checked
 0x155588,1172,Score_GetGradeForPoints,scoring,checked
 0x155a20,136,Score_Reset,scoring,checked
 0x155aa8,104,Score_BankPoints,scoring,checked
@@ -1249,7 +1249,7 @@ address,size,name,system,status
 0x161730,48,Career_Construct,race?,ported
 0x161760,64,Career_Destruct,race?,not started
 0x1617a0,148,Career_InitNewGame,race?,ported
-0x161838,16,FUN_00161838,race?,ported
+0x161838,16,Career_ResetCircuitHeat,race?,ported
 0x161840,96,Career_ClearAllPlayerFlags,race?,ported
 0x1618a0,28,Career_IsCircuitFinalEvent,race?,ported
 0x1618c0,28,Career_GotRaceFinalUnlock,race?,ported
@@ -1646,7 +1646,7 @@ address,size,name,system,status
 0x17b748,256,App_LoadFonts,game,not started
 0x17b848,92,Course_OpenBig,race,not started
 0x17b8a8,144,App_CreateEffectsLoader,game,not started
-0x17b938,56,FUN_0017b938,frontend?,not started
+0x17b938,56,App_FreeEffectsLoader,game,not started
 0x17b970,12,Render_GetBrightness,render,not started
 0x17b980,204,Render_SetBrightness,render,ported
 0x17ba50,392,cApplication::vf1_17ba50,game,not started
@@ -1659,12 +1659,12 @@ address,size,name,system,status
 0x17c150,128,Loc_LoadForRegion,game?,ported
 0x17c1d0,8,FUN_0017c1d0,game?,not started
 0x17c2e0,8,Course_CloseBig,race,not started
-0x17c360,28,FUN_0017c360,,not started
-0x17c380,28,FUN_0017c380,game?,not started
-0x17c3a8,28,FUN_0017c3a8,audio?,not started
+0x17c360,28,App_GetCourseId,game,not started
+0x17c380,28,App_FindCourseById,game,not started
+0x17c3a8,28,App_GetCourseInfo,game,not started
 0x17c3c8,80,cApplication::__tf,runtime,host
 0x17c418,76,cApplication::~cApplication,game,not started
-0x17c468,28,FUN_0017c468,game?,not started
+0x17c468,28,EffectsLoader_Delete,game?,not started
 0x17c488,36,cAppMan::~cAppMan,game,not started
 0x17c4b0,64,cAppMan::__tf,runtime,host
 0x17c530,64,cAppMan::cAppMan,game,not started
@@ -1857,7 +1857,7 @@ address,size,name,system,status
 0x186368,20,CourseTable_GetEntry,race,not started
 0x186380,112,CourseTable_FindByName,race,not started
 0x1863f8,72,CourseTable_FindById,race,not started
-0x186440,32,FUN_00186440,game?,not started
+0x186440,32,CourseTable_GetId,race,not started
 0x1864a0,84,cVideoModule::cVideoModule,video,not started
 0x1864f8,96,cVideoModule::~cVideoModule,video,not started
 0x186558,40,cVideoModule::vf1_186558,video,not started
@@ -1908,9 +1908,9 @@ address,size,name,system,status
 0x188ad0,8,cMenuItem::vf6_188ad0,debugmenu,not started
 0x188ad8,12,MenuItem_IsDisabled,debugmenu?,not started
 0x188b10,12,MenuItem_HasFlag8,debugmenu?,not started
-0x188b48,32,FUN_00188b48,debugmenu?,not started
-0x188b68,32,FUN_00188b68,debugmenu?,not started
-0x188b88,32,FUN_00188b88,debugmenu?,not started
+0x188b48,32,MenuItem_GetKey,debugmenu?,not started
+0x188b68,32,MenuItem_IsPadKey,debugmenu?,not started
+0x188b88,32,MenuItem_GetButtons,debugmenu?,not started
 0x188ba8,36,cMenu::cMenu,debugmenu,not started
 0x188bd0,36,cMenu::~cMenu,debugmenu,not started
 0x188bf8,88,Menu_SkipUnselectable,debugmenu?,not started
@@ -1932,8 +1932,8 @@ address,size,name,system,status
 0x1895c8,20,cMenuManager::IsActive,debugmenu,ported
 0x1895e0,8,cMenuManager::SetActive,debugmenu,not started
 0x1895e8,300,cMenuManager::Update,debugmenu,not started
-0x189718,8,FUN_00189718,debugmenu?,not started
-0x189720,64,FUN_00189720,debugmenu?,not started
+0x189718,8,cMenuManager::GetKey,debugmenu,not started
+0x189720,64,cMenuManager::IsPadKey,debugmenu,not started
 0x189760,60,cMenuManager::GetButtons,debugmenu,not started
 0x1897a0,8,cMenuManager::SetPad,debugmenu,not started
 0x1897b0,60,cMenuManager::Draw,debugmenu,not started
@@ -1944,7 +1944,7 @@ address,size,name,system,status
 0x189a90,260,cBoolMenuItem::Measure,debugmenu,not started
 0x189b98,160,cBoolMenuItem::Draw,debugmenu,not started
 0x189c38,68,cEnumMenuItem::cEnumMenuItem,debugmenu,not started
-0x189c80,64,FUN_00189c80,debugmenu?,not started
+0x189c80,64,cEnumMenuItem::cEnumMenuItem,debugmenu,not started
 0x189cc0,116,cEnumMenuItem::cEnumMenuItem,debugmenu,not started
 0x189d78,648,cEnumMenuItem::HandleInput,debugmenu,not started
 0x18a000,280,cEnumMenuItem::Measure,debugmenu,not started
@@ -1957,7 +1957,7 @@ address,size,name,system,status
 0x18a368,108,cPopMenuItem::HandleInput,debugmenu,not started
 0x18a3d8,52,cPopMenuItem::Measure,debugmenu,not started
 0x18a410,76,cPopMenuItem::Draw,debugmenu,not started
-0x18a460,56,FUN_0018a460,debugmenu?,not started
+0x18a460,56,cCommandMenuItem::cCommandMenuItem,debugmenu,not started
 0x18a498,68,cCommandMenuItem::cCommandMenuItem,debugmenu,not started
 0x18a4e0,88,cCommandMenuItem::cCommandMenuItem,debugmenu,not started
 0x18a548,132,cCommandMenuItem::HandleInput,debugmenu,not started
@@ -1996,7 +1996,7 @@ address,size,name,system,status
 0x18b870,136,cExpandMenuItem::cExpandMenuItem,debugmenu,not started
 0x18b8f8,164,cExpandMenuItem::cExpandMenuItem,debugmenu,not started
 0x18b9a0,8,ExpandMenuItem_AddItem,debugmenu?,not started
-0x18b9f8,108,FUN_0018b9f8,debugmenu?,not started
+0x18b9f8,108,ExpandMenuItem_ReplaceItem,debugmenu?,not started
 0x18ba68,236,cExpandMenuItem::HandleInput,debugmenu,not started
 0x18bb58,44,cExpandMenuItem::vf7_18bb58,debugmenu,not started
 0x18bb88,44,cExpandMenuItem::vf8_18bb88,debugmenu,not started
@@ -2025,7 +2025,7 @@ address,size,name,system,status
 0x18dce0,116,cRGBTitleMenuItem::Measure,debugmenu,not started
 0x18dd58,244,cRGBTitleMenuItem::Draw,debugmenu,not started
 0x18df38,40,Draw_RectI,render,not started
-0x18df60,16,FUN_0018df60,debugmenu?,ported
+0x18df60,16,Vec4_SetFromVec3,debugmenu?,ported
 0x18df80,80,cErrorMenu::__tf,runtime,host
 0x18dfd0,88,cErrorMenu::~cErrorMenu,debugmenu?,not started
 0x18e030,80,cRGBMenuItem::__tf,runtime,host
@@ -2135,7 +2135,7 @@ address,size,name,system,status
 0x1928f0,164,Replay_RecordInput,boarder?,checked
 0x192998,164,Replay_ReadInput,boarder?,checked
 0x192a40,224,ReplayInput_Load,world?,checked
-0x192b20,24,FUN_00192b20,game?,checked
+0x192b20,24,ReplayKeyframe_Construct,game?,checked
 0x192b38,112,Replay_AllocStream,game?,checked
 0x192ba8,68,Replay_FreeStream,render?,checked
 0x192bf0,12,Replay_RewindRead,ai?,checked
@@ -2950,7 +2950,7 @@ address,size,name,system,status
 0x1d5a08,36,Rand_VuNext,world?,ported
 0x1d5a30,304,ParticleSys_StepEmitter,world?,ported
 0x1d5b60,10532,FUN_001d5b60,world?,not started
-0x1d8488,8,FUN_001d8488,ai?,ported
+0x1d8488,8,ParticleNode_InitMem,ai?,ported
 0x1d8490,1592,ParticleSys_Create,world?,ported
 0x1d8ac8,52,ParticleNode_SetLifetime,world?,ported
 0x1d8b00,28,ParticleNode_FreeMem,world?,not started
@@ -3059,7 +3059,7 @@ address,size,name,system,status
 0x1e1e68,92,cPS2GraphicsMan::vf81_1e1e68,render,not started
 0x1e1ec8,96,FUN_001e1ec8,render?,not started
 0x1e1f28,68,FUN_001e1f28,render?,not started
-0x1e1f70,2516,cPS2GraphicsMan::DrawModel,render,not started
+0x1e1f70,2516,cPS2GraphicsMan::DrawModel,render,ported
 0x1e2948,280,cPS2GraphicsMan::vf85_1e2948,render,not started
 0x1e2a60,1024,cPS2GraphicsMan::vf74_1e2a60,render,not started
 0x1e2e60,1024,cPS2GraphicsMan::vf75_1e2e60,render,not started
@@ -3271,7 +3271,7 @@ address,size,name,system,status
 0x1fabc8,1504,cSplinePathNode::Draw,world,not started
 0x1fb1a8,132,cSplinePathNode::SaveSnapshot,save,checked
 0x1fb368,92,cSplinePathNode::__tf,runtime,host
-0x1fb3c8,28,FUN_001fb3c8,game?,not started
+0x1fb3c8,28,SplinePathNode_FreeMem,game?,not started
 0x1fb468,116,cSplinePathNodeState::__tf,runtime,host
 0x1fb4e0,288,FUN_001fb4e0,,not started
 0x1fb600,140,FUN_001fb600,render?,not started
@@ -3678,14 +3678,14 @@ address,size,name,system,status
 0x21ddc0,552,FUN_0021ddc0,audio?,not started
 0x21dfe8,604,FUN_0021dfe8,audio?,not started
 0x21e248,592,FUN_0021e248,audio?,not started
-0x21e498,40,FUN_0021e498,audio?,not started
+0x21e498,40,Audio_ScheduleWorldTriggersOn,audio,not started
 0x21e4f0,44,Audio_ResumeAfterSpeech,audio,not started
 0x21e528,108,Audio_CheerForRider,audio,ported
 0x21e688,8,FUN_0021e688,frontend?,ported
 0x21e690,28,FUN_0021e690,frontend?,not started
 0x21e6c0,28,cBXAudio::vf3_21e6c0,audio,ported
 0x21e6e8,80,cBXAudio::__tf,runtime,host
-0x21e738,80,FUN_0021e738,game?,not started
+0x21e738,80,SnowProgram_Destruct,game?,not started
 0x21e788,88,FUN_0021e788,render?,not started
 0x21e7e0,60,FUN_0021e7e0,audio?,not started
 0x21e8a0,56,cController::cController,audio?,not started
@@ -4012,7 +4012,7 @@ address,size,name,system,status
 0x22e360,36,WorldTriggerMgr_Reset,audio?,not started
 0x22e388,100,FUN_0022e388,audio?,not started
 0x22e3f0,12,FUN_0022e3f0,audio?,not started
-0x22e400,32,FUN_0022e400,race?,ported
+0x22e400,32,WorldTriggerMgr_SetActive,race?,ported
 0x22e420,124,StaticInit_WorldTriggerMgr,other,not started
 0x22e4e0,108,Speech_PostFEEvent,frontend?,checked
 0x22e550,88,Speech_GetFEModeMask,frontend?,checked
@@ -4332,7 +4332,7 @@ address,size,name,system,status
 0x23e9b0,104,cPS2MemCard::vf8_23e9b0,save,not started
 0x23ea18,96,MemCard_GetSlotError,save,not started
 0x23ea78,32,cPS2MemCard::vf60_23ea78,save,not started
-0x23ea98,40,FUN_0023ea98,save?,not started
+0x23ea98,40,MemCard_ClearCurrentSlotStatus,save,not started
 0x23eac0,88,MemCard_ResetState,save,not started
 0x23eb18,16,MemCard_ClearName,save,not started
 0x23eb28,32,cPS2MemCard::vf40_23eb28,save,not started
@@ -4349,7 +4349,7 @@ address,size,name,system,status
 0x23edb0,24,cPS2MemCard::vf55_23edb0,save,not started
 0x23edc8,3752,cPS2MemCard::vf2_23edc8,save,not started
 0x23fb60,344,cPS2MemCard::vf13_23fb60,save,not started
-0x23fcb8,236,FUN_0023fcb8,save?,not started
+0x23fcb8,236,MemCard_CheckRoomForFiles,save,not started
 0x23fda8,140,cPS2MemCard::vf11_23fda8,save,not started
 0x23fe38,12,MemCard_IsErrorCode,save,not started
 0x23fe48,92,cPS2MemCard::vf59_23fe48,save,not started
@@ -4382,7 +4382,7 @@ address,size,name,system,status
 0x2401c8,20,Rand_LoadSnapshot,ai?,checked
 0x2401e0,220,Rand_Next,world?,checked
 0x2402c0,172,Rand_Seed,world?,checked
-0x2403a8,204,Dma_SendGif,render?,not started
+0x2403a8,204,Dma_SendGif,render?,ported
 0x2408c8,204,Dma_SendGifChain,render?,not started
 0x240a98,480,CourseDma_PatchContext,race,not started
 0x240c78,516,FUN_00240c78,race?,not started
@@ -4590,7 +4590,7 @@ address,size,name,system,status
 0x254af0,44,Course_GetMaterial,race,ported
 0x254b20,44,Course_GetSplineSegment,race,ported
 0x254b50,40,Course_GetSpline,race,ported
-0x254b78,44,FUN_00254b78,race?,not started
+0x254b78,44,Course_GetCamera,camera,not started
 0x254ba8,12,Course_GetHashTables,race,not started
 0x254bb8,56,Course_LightHashCount,race,not started
 0x254bf0,56,Course_LightHashTable,race,not started
@@ -5364,13 +5364,13 @@ address,size,name,system,status
 0x291688,60,cFEStateMCOverlay::vf48_291688,save,not started
 0x2916c8,232,cFEStateMCOverlay::vf49_2916c8,save,not started
 0x2917b0,1528,cFEStateMCOverlay::vf54_2917b0,save,not started
-0x291da8,88,FUN_00291da8,save?,not started
+0x291da8,88,FEMemCard_ShowLocDialog,save,not started
 0x291e00,1460,FEMemCard_ShowDialog,save,not started
-0x2923b8,108,FUN_002923b8,save?,not started
+0x2923b8,108,FEMemCard_HideDialog,save,not started
 0x292428,164,FEMemCard_ShowMessageWidgets,save,not started
 0x2924d0,356,FEMemCard_EnableButtons,save,not started
-0x292638,368,FUN_00292638,save?,not started
-0x2927a8,48,FUN_002927a8,save?,not started
+0x292638,368,FEMemCard_ShowPrompt,save,not started
+0x2927a8,48,FEMemCard_HidePrompt,save,not started
 0x2927d8,56,FEMemCard_ShowLocMessage,save,not started
 0x292810,176,FEMemCard_ShowMessage,save,not started
 0x2928c0,88,FEMemCard_HideMessage,save,not started
@@ -5381,7 +5381,7 @@ address,size,name,system,status
 0x292d40,60,cFEStateMCOverlay::vf55_292d40,save,not started
 0x292d80,236,FEMemCard_ShowEmptySlots,save,not started
 0x292e70,564,FEMemCard_LayoutMessage,save,not started
-0x2930a8,112,FUN_002930a8,save?,not started
+0x2930a8,112,FEMemCard_HideInfoGroups,save,not started
 0x293120,72,FUN_00293120,frontend?,not started
 0x293210,8,cFEStateMCOverlay::vf23_293210,save,not started
 0x293218,8,cFEStateMCOverlay::vf26_293218,save,not started
@@ -6146,8 +6146,8 @@ address,size,name,system,status
 0x2c3730,3396,Huff_Decode,lib-compress?,ported
 0x2c4478,96,Fmt_WriteDigits,lib-text?,not started
 0x2c44d8,44,Fmt_WriteAbsDigits,lib-text?,not started
-0x2c4508,216,FUN_002c4508,lib-text?,not started
-0x2c45e0,772,FUN_002c45e0,lib-text?,not started
+0x2c4508,216,Fmt_WriteFixed,lib-text?,not started
+0x2c45e0,772,Fmt_WriteNumber,lib-text?,not started
 0x2c48e8,716,WStr_VFormat,lib-text?,ported
 0x2c4e90,68,WStr_Sprintf,lib-text?,not started
 0x2c50b0,172,Loc_MapId,lib-text?,ported
@@ -7268,7 +7268,7 @@ address,size,name,system,status
 0x306810,16,iSignalSema,kernel?,host
 0x306820,16,WaitSema,kernel?,host
 0x306830,16,PollSema,kernel?,host
-0x306a60,16,FlushCache,kernel?,host
+0x306a60,16,FlushCache,kernel?,ported
 0x306a90,16,iFlushCache,kernel?,host
 0x306ab0,16,sceSifStopDma,kernel?,host
 0x306b20,16,GsPutIMR,kernel?,host

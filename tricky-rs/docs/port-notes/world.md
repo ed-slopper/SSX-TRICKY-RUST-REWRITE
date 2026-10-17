@@ -1075,3 +1075,11 @@ Checked in the runner on 12,000 random worlds, instances, models with bone table
 an animated object, with the light gathering running as the original. 7,000 model draws were compared, and 26 of 27
 mutants caught. The one left is equivalent: x × 2z against z × 2x, both exact.
 
+
+## Names from F1c batch 17 (proven)
+
+- `Crowd_ClearTextures` 0x145ae8 (on course unload): clears `DAT_0031d370` and the 16 crowd texture ids at 0x31d4b8
+  (0x48 apart).
+- `ParticleNode_InitMem` 0x1d8488 (the identity constructor that pairs with `ParticleNode_FreeMem`),
+  `SplinePathNode_FreeMem` 0x1fb3c8.
+- Not settled: the empty 0x259028, 0x2520a0; draws 0x1ab028, 0x244ee8, 0x249250.

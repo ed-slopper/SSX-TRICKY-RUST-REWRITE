@@ -638,3 +638,8 @@ the start / select legend.
   mutants tried.
 - **With this, every G12 split is done:** the instant replay from its byte streams to its last overlay is ported and
   checked.
+
+## Names from F1c batch 17 (proven)
+
+- `ReplayKeyframe_Construct` 0x192b20: zeroes 16 bytes; `ReplayMgr_Init` runs it over the 16 records of 0x24 at
+  +0x3e68. Not settled: the empty keyframe hooks 0x193058 / 0x193060.

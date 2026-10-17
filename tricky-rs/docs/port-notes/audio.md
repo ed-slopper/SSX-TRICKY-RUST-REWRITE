@@ -667,3 +667,13 @@ the entry and the box fills in the newest one before 0x222358 plays it.
 - The host now runs this function. The only STANDIN left is `SND_PlayBankSound`, which keeps each sound for the
   app (its record byte as the volume) instead of playing it. The sound library and the bank monitor's own
   functions are G10.
+
+## Names from F1c batch 17 (proven)
+
+- `WorldTriggerMgr_SetActive` 0x22e400 (was `FUN_0022e400` in `game/src/prerace.rs`): manager 0x34370c +0x443c =
+  on; called with (1, 1) it schedules the switch instead.
+- `Audio_ScheduleWorldTriggersOn` 0x21e498 (from `cPreRaceHandler` Enter / Update): `SndSys_ScheduleEvent` in 0xfa
+  with callback 0x21e4c0 (not a function in Ghidra), which calls `WorldTriggerMgr_SetActive`(mgr, 1, 0).
+  Settles 0x21e498 from the batch 14 list.
+- `SnowProgram_Destruct` 0x21e738: frees the program pointer of a 0x50-byte snow program record (the arrays at
+  cBXAudio +0x745c, +0x777c, +0x7a9c).

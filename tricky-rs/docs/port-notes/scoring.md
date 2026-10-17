@@ -167,3 +167,12 @@ Part of the port notes (index: [README.md](README.md)); units and wording as des
   caught (the survivor, kind 12 keeping a slot found for 7 / 8, cannot happen).
 - The app's `Rider::show` pushes every message and announcement into the entries, which `gamehud` copies to the
   rider's +0x597c for the HUD. The announcer side (speech) is not wired yet.
+
+## Names from F1c batch 17 (proven)
+
+- `Score_FindTrickMessage` 0x155538 (was `FUN_00155538` above and in `game/src/grade.rs`): the first of the
+  score's 12 entries at +0x15c (0x14 apart) of kind 8 or 7.
+- `Lesson_SetTrickSeen` 0x14c2a8 (was `FUN_0014c2a8` in `game/src/career.rs`): lesson (gApp+0x730 → +0x34)
+  +0x64 = 1; `Score_TrickBookCheck` calls it when the book's trick is landed.
+- `Career_ResetCircuitHeat` 0x161838: career+0x3220 (the circuit setup at +0x320c, its +0x14) = 0.
+- Not settled: `Score_LandTrick` 0x155cc8 (empty in retail, see above).

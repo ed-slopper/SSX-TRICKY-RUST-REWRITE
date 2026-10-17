@@ -1166,3 +1166,20 @@ decompiled bodies match the live functions token for token. The copies sit at 0x
 | `ListFE3D<Op>Op_Apply` (Format and Update 1..5) | `cListFE3D<Op>Op::vf1` | calls the child's matching virtual (`cList::vf1` 0x2ac220 runs it on each node until one returns non-zero) |
 
 The batch 13 "no xrefs" list's 0x2761c0, 0x28e9c8, 0x29e088 and 0x2aafc8 are the four `FE3DWGroup_FreeChildren`.
+
+## Names from F1c batch 17 (proven)
+
+- Menus: `MenuItem_GetKey` 0x188b48, `MenuItem_IsPadKey` 0x188b68, `MenuItem_GetButtons` 0x188b88 (item+4 its menu,
+  +4 its manager); `cMenuManager::GetKey` 0x189718 (+0x30), `cMenuManager::IsPadKey` 0x189720 (the pad device's
+  +0x2c == key); `cEnumMenuItem::cEnumMenuItem` 0x189c80 (the second constructor), `cCommandMenuItem::cCommandMenuItem`
+  0x18a460; `ExpandMenuItem_ReplaceItem` 0x18b9f8 (no callers: takes the current item +0x10 out of the menu +0x14,
+  sets the new one, adds it).
+- Memory card screen: `FEMemCard_ShowLocDialog` 0x291da8 (the localised-string form of `FEMemCard_ShowDialog`),
+  `FEMemCard_HideDialog` 0x2923b8 (+0x2c78), `FEMemCard_ShowPrompt` 0x292638 (+0x2c80, text 0xdeb or 0x15e, placed
+  under the message +0x2c7c), `FEMemCard_HidePrompt` 0x2927a8, `FEMemCard_HideInfoGroups` 0x2930a8 (groups 0x15, 0x16).
+- Text formatting (the wide-char printf): `Fmt_WriteNumber` 0x2c45e0 (one number conversion: digits by
+  `Fmt_WriteDigits` / `Fmt_WriteAbsDigits` / `Fmt_WriteFixed`, then zero padding, sign, `0` / `0x` prefix, padding
+  left or right; called from 0x2c4d1c, inside code Ghidra has no function for), `Fmt_WriteFixed` 0x2c4508 (the
+  fixed-point digits with the `.`).
+- `Vec4_SetFromVec3` 0x18df60: `Vec4_Set`(dst, v.x, v.y, v.z, w from f12).
+- Not settled: 0x2c5558 (no callers), 0x26ac30, 0x260fa0.

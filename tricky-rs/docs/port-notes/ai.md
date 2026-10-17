@@ -357,3 +357,9 @@ Part of the port notes (index: [README.md](README.md)); units and wording as des
   (`rider/ground_tick.rs`) left it off: a body already past the frame's thin plate was pushed out through the far face,
   the next tick back again, the normal flipping each tick and the counter filling in five ticks. With
   `front_only` set, TRICKY_SIM=600 elysium: 6 falls (was 20), the 11 courses 2 stuck / 50 falls (was 2 / 54).
+
+## Names from F1c batch 17 (proven)
+
+- `AIComputer_DirNoseComponent` 0x1371e0 (was `FUN_001371e0` in `game/src/aipad.rs`): the target direction
+  (rider+0x57e0) less its part along the frame's +0x4aa0 axis, normalised, dotted with the nose (+0x4ab0), times the
+  skill (+0x86c) / 7.8941293; the computer's air-trick input bits 22..23 come from it.

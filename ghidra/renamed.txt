@@ -663,3 +663,8 @@
 22a0c8 FUN_0022a0c8 SndHandle_IsDone
 228bb0 FUN_00228bb0 SpeechSys_SetSlotHold
 234058 FUN_00234058 Speech_OnTimeUp
+1371e0 FUN_001371e0 AIComputer_DirNoseComponent
+14c2a8 FUN_0014c2a8 Lesson_SetTrickSeen
+155538 FUN_00155538 Score_FindTrickMessage
+22e400 FUN_0022e400 WorldTriggerMgr_SetActive
+148478 cCollideEmitterNode::vf12 cCameraNode::~cCameraNode

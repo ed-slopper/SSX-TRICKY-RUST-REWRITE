@@ -188,3 +188,17 @@ case-insensitive walk of a kind's list) stays for the app's intro until it moves
   trees and scope lists, and names with right and wrong hashes, one with high bytes. Every lookup's result was
   compared. The game's own `strcmp` runs too; the runner learnt its `PSUBW` / `PSUBB` / `PNOR` / `PAND` for it.
   The tests caught the 8 mutants tried.
+
+## Names from F1c batch 17 (proven)
+
+- `cCameraNode::cCameraNode` 0x148218 (from `TriggerOp_SpawnCameraNode`): `cCamAnimFrame` at +0x1c (vtable at
+  +0xa8), `cBxTypeObjNode` at +0xac (type 1000), vtable 0x36c6b0 at +0xb4, +0xc4 = `Course_GetCamera`(course,
+  record +0x18), then `CamAnim_SetShot`(this, record + 8).
+- The vtable 0x36c6b0 (entries of 8 bytes, delta 0xff54 = −0xac): `__tf` 0x1493e8, `~cCameraNode` 0x148478 (was
+  listed wrongly as `cCollideEmitterNode::vf12`), then 0x1484c8 and 0x1493c0, which Ghidra has no function at
+  (gap: make them functions and name them).
+- `CameraNodeState_Destruct` 0x149448: destroys the state's `cCamAnimFrame` (+0x1c); deletes it if flag & 1.
+- `Course_GetCamera` 0x254b78: the `.pbd` hash table's camera list (+0x78) by index; `ResolveHashTable` resolves the
+  camera list with it.
+- Ghidra: the HTTP rename cannot set a namespace, so 0x148218 / 0x148478 and the class methods of this batch carry
+  the plain method name in Ghidra; running `ApplySsxSymbols.java` on `ghidra/symbols.txt` moves them into their class.

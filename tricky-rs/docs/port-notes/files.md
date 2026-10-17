@@ -417,3 +417,13 @@ Checked in the runner on 3,000 random shapes of the converted types and others, 
 (two by the data crate's unit tests of the chunk walk). The survivor turns 0x62's mode 5 into 3, which the block
 decoder treats alike.
 
+
+## Names from F1c batch 17 (proven)
+
+- `MemCard_ClearCurrentSlotStatus` 0x23ea98: clears +0x174 / +0x178 of the current slot (+0x10, 0x14 apart).
+- `MemCard_CheckRoomForFiles` 0x23fcb8: free space (vf 0x8c) and each file's size (vf 0x9c); a file not yet on the
+  card gets +0x1a4 + i·0x70 = 1 if it does not fit, else its size comes off the free space.
+- `App_GetCourseId` 0x17c360, `App_FindCourseById` 0x17c380, `App_GetCourseInfo` 0x17c3a8: wrappers (no callers)
+  on the course table at gApp+100; `CourseTable_GetId` 0x186440: record i's +0x80 id (i capped at 13).
+- `App_FreeEffectsLoader` 0x17b938 (gApp+0x30, made by `App_CreateEffectsLoader`), `EffectsLoader_Delete` 0x17c468.
+- Not settled: 0x23ed48 (sets a +0x19c flag), 0x240c78 (patches a `CourseDma` chain).

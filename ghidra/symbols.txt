@@ -154,6 +154,7 @@ L 40b078 cCollideEmitterNode typeinfo
 L 36c650 cCollideEmitterNode vtable
 F 1493e8 cCameraNode __tf
 L 40b0a8 cCameraNode typeinfo
+L 36c6b0 cCameraNode vtable
 F 1494a0 cParticleNode __tf
 L 40b188 cParticleNode typeinfo
 L 36c718 cParticleNode vtable
@@ -4560,7 +4561,7 @@ F 199200 cAnimObjectNode Kill
 F 19a390 cAnimComboNode Kill
 F 180d08 cGame vf4
 F 1811a0 cGame vf6
-F 148478 cCollideEmitterNode vf12
+F 148478 cCameraNode ~cCameraNode
 F 19a8f0 cAnimTexFlipNode vf28
 G 102e00 StaticInit_SpinControl
 G 105b10 StaticInit_PrewindControl
@@ -7175,3 +7176,41 @@ G 2ab610 ListFE3DOffsetOp_Apply4
 G 2ab698 ListFE3DUpdateOp_Apply5
 G 2ab718 ListFE3DRenderTextOp_Apply4
 G 2ab798 ListFE3DRenderOp_Apply4
+G 1371e0 AIComputer_DirNoseComponent
+G 145ae8 Crowd_ClearTextures
+G 14c2a8 Lesson_SetTrickSeen
+G 155538 Score_FindTrickMessage
+G 161838 Career_ResetCircuitHeat
+G 17b938 App_FreeEffectsLoader
+G 17c468 EffectsLoader_Delete
+G 17c360 App_GetCourseId
+G 17c380 App_FindCourseById
+G 17c3a8 App_GetCourseInfo
+G 186440 CourseTable_GetId
+G 192b20 ReplayKeyframe_Construct
+G 188b48 MenuItem_GetKey
+G 188b68 MenuItem_IsPadKey
+G 188b88 MenuItem_GetButtons
+G 18b9f8 ExpandMenuItem_ReplaceItem
+G 18df60 Vec4_SetFromVec3
+G 1d8488 ParticleNode_InitMem
+G 1fb3c8 SplinePathNode_FreeMem
+G 21e738 SnowProgram_Destruct
+G 22e400 WorldTriggerMgr_SetActive
+G 21e498 Audio_ScheduleWorldTriggersOn
+G 23ea98 MemCard_ClearCurrentSlotStatus
+G 23fcb8 MemCard_CheckRoomForFiles
+G 254b78 Course_GetCamera
+G 149448 CameraNodeState_Destruct
+G 291da8 FEMemCard_ShowLocDialog
+G 2923b8 FEMemCard_HideDialog
+G 292638 FEMemCard_ShowPrompt
+G 2927a8 FEMemCard_HidePrompt
+G 2930a8 FEMemCard_HideInfoGroups
+G 2c45e0 Fmt_WriteNumber
+G 2c4508 Fmt_WriteFixed
+F 148218 cCameraNode cCameraNode
+F 189718 cMenuManager GetKey
+F 189720 cMenuManager IsPadKey
+F 189c80 cEnumMenuItem cEnumMenuItem
+F 18a460 cCommandMenuItem cCommandMenuItem
