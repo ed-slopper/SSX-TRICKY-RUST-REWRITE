@@ -3337,7 +3337,7 @@ address,size,name,system,status
 0x201c20,272,AsyncBdrLoad_FreeSlot,common?,not started
 0x201d30,308,AsyncBdrLoad_IsSlotReady,other,not started
 0x201e68,912,AsyncBdrLoad_Request,boarder?,not started
-0x2021f8,432,BdrLoad_BindTextures,boarder?,not started
+0x2021f8,432,BdrLoad_BindTextures,boarder?,checked
 0x2023a8,124,StaticInit_AsyncBdrLoad,other,not started
 0x202428,80,cAsyncBdrLoad::__tf,runtime,host
 0x202478,36,cBdrLoad::~cBdrLoad,game,not started
@@ -3365,22 +3365,22 @@ address,size,name,system,status
 0x203d78,80,cSkelSequence::__tf,runtime,host
 0x203df8,80,cSkelSequenceState::__tf,runtime,host
 0x203e48,64,cReplayRecordHeader::__tf,runtime,host
-0x203e88,12,SkinBank_Init,render?,not started
-0x203e98,112,MdfMemBank_Init,render?,not started
-0x203f08,88,SkinBank_Delete,render?,not started
-0x203f60,60,SkinBank_Alloc,render?,not started
-0x203fa0,48,MemBank_AlignSize,render?,not started
-0x203fd0,40,BdrLoad_ConstructShapeList,render?,not started
-0x203ff8,76,BdrLoad_DestructShapeList,render?,not started
-0x204048,28,BdrLoad_ClearShapeList,render?,not started
-0x204068,568,BdrLoad_LoadOutfitParts,render?,not started
-0x2042a0,72,BdrLoad_RegisterShapeFile,boarder?,not started
-0x2042e8,196,BdrLoad_RegisterShapes,boarder?,not started
-0x2043b0,72,BdrLoad_RebindShapeFile,boarder?,not started
-0x2043f8,196,BdrLoad_RebindShapes,boarder?,not started
-0x2044c0,200,BdrLoad_FindPartName,render?,not started
-0x204588,16,BdrLoad_GetShapeSlot,boarder?,not started
-0x204598,160,SkinTexList_Find,render?,not started
+0x203e88,12,SkinBank_Init,render?,checked
+0x203e98,112,MdfMemBank_Init,render?,checked
+0x203f08,88,SkinBank_Delete,render?,checked
+0x203f60,60,SkinBank_Alloc,render?,checked
+0x203fa0,48,MemBank_AlignSize,render?,checked
+0x203fd0,40,BdrLoad_ConstructShapeList,render?,checked
+0x203ff8,76,BdrLoad_DestructShapeList,render?,checked
+0x204048,28,BdrLoad_ClearShapeList,render?,checked
+0x204068,568,BdrLoad_LoadOutfitParts,render?,checked
+0x2042a0,72,BdrLoad_RegisterShapeFile,boarder?,checked
+0x2042e8,196,BdrLoad_RegisterShapes,boarder?,checked
+0x2043b0,72,BdrLoad_RebindShapeFile,boarder?,checked
+0x2043f8,196,BdrLoad_RebindShapes,boarder?,checked
+0x2044c0,200,BdrLoad_FindPartName,render?,checked
+0x204588,16,BdrLoad_GetShapeSlot,boarder?,checked
+0x204598,160,SkinTexList_Find,render?,checked
 0x2049b0,460,FUN_002049b0,,not started
 0x204f28,240,FUN_00204f28,,not started
 0x205018,76,SkinPart_Delete,game?,not started

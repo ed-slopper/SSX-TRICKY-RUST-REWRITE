@@ -2467,3 +2467,36 @@ total: hundreds of thousands of rounds of step 5, the same on both sides.
 
 56 of 57 mutants were caught. The one left reads the last group's texture count instead of its slot count when
 deciding whether it is a lone slot; a group of one slot nearly always has one texture.
+
+## The rider skin: banks and shape lists (G7r1, `bdrload`)
+
+The rider's skin keeps its pieces in banks and names its textures through a shape list per outfit.
+
+- **A bank** (`MdfMemBank_Init` 0x203e98) takes its size + 0x80 bytes (named `MdfMemBank`, filled with
+  0xdeadc0ed) and aligns its free place up to 128 bytes (`MemBank_AlignSize`), counting the skipped bytes as
+  taken. `SkinBank_Alloc` hands out the free place and moves it on by the size rounded down to 128, plus 128.
+  A negative size rounds toward zero first, so sizes are always 1 to 128 bytes generous.
+- **A shape list** holds up to 60 four-character names (5 bytes each, from +4) and each name's texture (+0x130,
+  −1 for none). Clearing it sets the count to 0 and the textures to −1.
+  - `BdrLoad_FindPartName` returns a name's place, adding it at the end if new, or −1 for an empty name.
+  - `SkinTexList_Find` returns a name's texture, or −1.
+  - `BdrLoad_LoadOutfitParts` names the five parts (`head`, `helm`, `boot`, `suit`, `bord`) and gives each a
+    texture to draw into, through the renderer's +0x158: 128 × 128, the suit 256 × 256, named `plr`, with a
+    64 KB `dummy` buffer that is freed after.
+  - `BdrLoad_RegisterShapes` makes a texture (+0x150) of each name's shape found in a loaded file
+    (`Shape_FindByName`). `BdrLoad_RebindShapes` hands a found shape to the name's existing texture (+0x160).
+    The `…ShapeFile` forms load the file first (`File_Load`) and free it after.
+- **`BdrLoad_BindTextures`** 0x2021f8 binds rider n's record (0x50 bytes from +0x14):
+  - its three texture ids go through the loader's texture manager +8 (the third through +0xc when there is
+    one), using the manager's +0x68;
+  - its five more go through +0x10;
+  - with the rider's skin wanting it, the skin is reset (flag bit 8; `Boarder_ResetSkin` with bit 13 off) or its
+    parts cleared (bit 9);
+  - then the skin is built (`BdrLoad_BuildSkin` 0x201138, a call out here).
+
+Checked in the runner (`tests/bdrload.rs`): 1200 cases of each of the 17 functions. They cover banks at
+addresses near the top of memory, sizes of −129, −256 and every rounding, lists of 0 to 12 names (repeats,
+empty names, textures of 0 and −1), files whose shapes are found or not, buffers that are not had, and records
+with ids below 0 and each flag. The `strncmp`, copy and fill stand-ins do their work. All 43 mutants were caught.
+Four of them needed the data widened first: a size of −129, a bank at 0xffffff00, a failed buffer, and a texture
+of 0.
