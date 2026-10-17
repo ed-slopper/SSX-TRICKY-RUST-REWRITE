@@ -80,8 +80,7 @@ state machine and the renderer are ours. Nothing has been checked against the or
 | G5d | The app's rider animation on G5a..c, replacing its own choice of clip (README: "Which clip plays when is my state logic") | any | G5a, G5b, G5c, G1 | | Split of G5 (needs a play test); the clip plays come from the boarder states (`ControlEnv::play_clip` and the like), which the app runs only once G1 puts the game's state machine in it |
 | G7 | Rendering, as the PS2 renderer does it. Split before claiming: | unowned | E3a, E3b | | [repo] |
 | G7a | (umbrella: G7a1, G7a2, G7a3) Terrain patches: the game's tessellation and LOD, subtractive lightmaps | unowned | G7 | | [repo] README "What the viewer taught us"; split 2026-10-17 |
-| G7a1 | The terrain's draw: `cTerrainObjNode::Draw` 0x1c7810 (the draw distance) and `Patch_DrawVisibleCells` 0x2008f8 (each visible patch's box test, its four edges' LOD from the camera's distance to its corners, the renderer's patch draw +0x2d0) | ed-slopper/puffin | G7 | | Split of G7a |
-| G7a2 | The cells around the camera: `World_VisitCellsNear` 0x260278 and `World_CullVisibility` 0x260458 | any | G7a1 | | Split of G7a |
+| G7a2 | The cells around the camera: `World_VisitCellsNear` 0x260278 and `World_CullVisibility` 0x260458 | ed-slopper/puffin | G7a1 | | Split of G7a |
 | G7a3 | The renderer's patch draw (+0x2d0) and the Bezier manager: `Render_BuildBezierTables` 0x1db1e8, `Render_FillBezierWeights` 0x1db530, `cPS2BezierMan`, the tessellation by LOD (0x1da5c8 and the renderer's patch virtuals), the lightmaps | any | G7a1 | | Split of G7a |
 | G7e | Particles as the VU1 microcode draws them (0x31c288), spark and dust sprites | unowned | G7 | | [repo] "Unresolved: spark and dust sprite rendering"; `particles.rs` has the emitters |
 | G7g | Rider shading and shadows, board reflections (env materials) | unowned | G7, E4 | | [est] |
@@ -155,6 +154,7 @@ matches the original.
 
 | ID | Task | Section | Who | Date | Commit |
 |---|---|---|---|---|---|
+| G7a1 | The terrain's draw: `tricky_game::terraindraw` (`cTerrainObjNode::Draw`: the draw distance, the cell visits; `Patch_DrawVisibleCells`: the LOD line from the Bezier manager, the camera in its frame, the patches by cell with show-off and box tests, each edge's LOD from its corners' distances as 4, 6 or 8 steps, the renderer's patch draw), checked in the runner on 20,000 random worlds (tests/terraindraw.rs); 19 of 23 mutants caught, the rest equivalent or ulp boundaries | P2 | ed-slopper/puffin | 2026-10-16 | 9f705b4 |
 | G7b | Objects: all its parts done (G7b1 the objects' draws with their own lights, G7b2 the renderer's model draw with materials and blends) | P2 | ed-slopper/puffin | 2026-10-16 | 287df93 |
 | G7b2 | The renderer's model draw: `tricky_game::drawmodel` (`cPS2GraphicsMan::DrawModel`: the frame's matrices shared with `CullBox`, the texture cache, the scaled matrix or per-bone matrices with bind-pose bones built, each batch's texture and blend (fogged by the clip matrix, the second blend, none), the UV scroll and the DMA packet with the matrix and light block for VU1 and a call of the batch's packet), checked in the runner on 20,000 cases (tests/drawmodel.rs); 23 of 26 mutants caught, 3 equivalent | P2 | ed-slopper/puffin | 2026-10-16 | 287df93 |
 | G7b1 | The objects' draws: `tricky_game::objdraw` (`Instance_DrawVisibleCells` by cell with the box tests and show-off counts, `Instance_Draw`, `cRollerNode::Draw`, `cMeshAnimNode::Draw` with its quaternion bones, `cAnimObjectNode` vf28 with its animated and bind-pose bones; each lit by its own block or the lights where it is), checked in the runner on 12,000 random worlds with the light gathering as the original (tests/objdraw.rs); 26 of 27 mutants caught, one equivalent | P2 | ed-slopper/puffin | 2026-10-16 | e262217 |
@@ -1225,3 +1225,4 @@ matches the original.
 - 2026-10-16 ed-slopper/puffin: G7b1 done e262217 (the objects' draws vs the original); G7b2 claimed.
 - 2026-10-16 ed-slopper/puffin: G7b2 done 287df93 (DrawModel vs the original); G7b closed.
 - 2026-10-17 ed-slopper/puffin: G7a split into G7a1 (the terrain's draw and patch walk; claimed), G7a2 (the cells near), G7a3 (the patch draw and Bezier manager).
+- 2026-10-17 ed-slopper/puffin: G7a1 done 9f705b4 (the terrain's draw vs the original); G7a2 claimed.
