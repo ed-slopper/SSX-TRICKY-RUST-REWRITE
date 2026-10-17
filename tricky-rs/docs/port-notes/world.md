@@ -1208,3 +1208,43 @@ and queue or logging stand-ins. 46 of 49 mutants were caught. The three left are
 - the alloc and the +0x530 clear swapped;
 - the destructor's first vtable store, overwritten before it is read;
 - begin's this when the slot is the real one, whose adjust is 0.
+
+## The Bezier queue drawn (row G7a3b; `bezier::draw`, `bezier::draw_views`, checked: `tests/bezierdraw.rs`)
+
+- **vf15 0x1d9f58**(this, renderer) lays the four lists out at +0x56c as four entries of four words: the count, the
+  head, a program kind (3, 2, 1 and 4: the texture state's byte at +0x10) and a program table (0x3d0f58, 0x3d0f40,
+  0x3d0f28, 0x3d0f10). Then it runs:
+  1. the frame's matrices (0x1e85b0);
+  2. the views' draw when +0x20 is set;
+  3. the renderer's +0x1c8 (1, 0, 0.08), +0x200 (1, 1), +0x1f8 (0, 0) and +0x1f8 (2, 1);
+  4. each non-empty list in turn, then the close below.
+- **Each list:** when the texture state's byte isn't the list's kind, or its word is set, the byte takes the kind,
+  the word goes to 0 and the renderer's +0x474 to 1. Then each record in turn:
+  - Its two textures (+0xc and +0xe) are bound through the renderer's +0x1f0 (texture, slot 0 or 1) when they
+    differ from the last ones bound. The last ones start at 0xffff and are kept as halves, but each new one is read
+    as signed, so a texture of 0x8000 or more is bound every time.
+  - Its packet is written at the renderer's +0x680, which then moves on. A uniform patch's packet is 0x90 bytes; a
+    mixed one's is 0xa0 and has its four steps as words at +0x20.
+  - The packet holds the patch's address, then a word built from the patch's first three floats ×128 made whole (x,
+    y, z): x << 4, (x + z − 1) << 14 | 0xa, y << 24, (y + z − 1) << 34.
+  - The program is the list's table word at the record's clip kind + 1, or'd with 0x14000000.
+  - It is sent with 0x1e8838 (renderer, packet, packet + 0x80 or + 0x90, 0).
+- **The close:** +0x1f0 (−1, 0), +0x1f0 (−1, 1), +0x1c8 (0, 2, 0.08), +0x1f8 (0, 1). The texture state's program is
+  cleared (word 0, +0x474 1, byte 0) when either the byte or the word is set.
+- **The views' draw 0x1da5c8**(this, renderer) does nothing when there are no views. Otherwise it runs +0x1f8 (0, 0),
+  +0x1f8 (2, 1) and the frame's matrices, then goes through the same lists with textures tracked on their own.
+  - Each patch's box (+0x150 and +0x15c, each with w 1) is box-tested with the renderer's +0x288 against each view's
+    first matrix (+0x40 of the view). Views that don't answer 1 (outside) are kept. The game builds the box on its
+    stack; the port uses a scratch area (STANDIN).
+  - A patch seen by no view is left in its list.
+  - A patch seen by some view is drawn once as vf15 would, between +0x200 (1, 1) and +0x200 (2, 1). Then each seeing
+    view gets a pass: the view's second matrix (+0x80, eight doublewords) and the program at the clip kind + 2, or'd
+    with 0x15000000. The view's texture (+0xc4) is bound in slot 1 when it changed, compared as a full word.
+  - Finally the patch is taken out of its list: the entry's count goes down, and the head, or the last kept record's
+    +0x14, skips it.
+  - It ends with the same close.
+
+Checked in the runner (`tests/bezierdraw.rs`, 20,000 cases). The random lists are linked over shared patches, and
+up to eight views each have a texture. The box test answers by a hash of what it is given. A submit also logs the
+texture state, since the close would hide it otherwise. 60 of 61 mutants were caught; the last one pointed at a
+redundant `break` on the loop's final pass, which is now gone.

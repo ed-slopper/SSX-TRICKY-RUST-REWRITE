@@ -2980,8 +2980,8 @@ address,size,name,system,status
 0x1d9d20,44,cPS2BezierMan::vf14_1d9d20,render,checked
 0x1d9d50,360,cPS2BezierMan::vf16_1d9d50,render,checked
 0x1d9eb8,156,cPS2BezierMan::vf17_1d9eb8,render,checked
-0x1d9f58,1644,cPS2BezierMan::vf15_1d9f58,render,not started
-0x1da5c8,2948,FUN_001da5c8,render?,not started
+0x1d9f58,1644,cPS2BezierMan::vf15_1d9f58,render,checked
+0x1da5c8,2948,FUN_001da5c8,render?,checked
 0x1db150,116,RendPatch_Alloc,render?,checked
 0x1db1c8,28,FUN_001db1c8,render?,checked
 0x1db1e8,780,Render_BuildBezierTables,render,not started

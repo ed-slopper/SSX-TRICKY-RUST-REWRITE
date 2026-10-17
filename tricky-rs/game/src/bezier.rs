@@ -223,3 +223,316 @@ pub fn renderer_patch_draw(m: &mut Mem, env: &mut dyn BezierEnv, r: u32, patch: 
     let bz = m.r32(r + 0x484);
     own(m, env, bz, 0x88, &[patch, steps, shorts, clip]);
 }
+
+// ---- The queue drawn (row G7a3b) ----
+
+/// The renderer's per-frame matrices (0x1e85b0) and a packet sent (0x1e8838)
+pub const MATRICES: u32 = 0x1e85b0;
+pub const SUBMIT: u32 = 0x1e8838;
+/// The four lists' VU1 programs: a word for each clip kind (+4 + 1), for the patch and (+4 + 2) its view's pass
+pub const PROGRAMS: [u32; 4] = [0x3d0f58, 0x3d0f40, 0x3d0f28, 0x3d0f10];
+/// 0.08, the renderer's +0x1c8's float on the way in and out
+const BLEND: u32 = 0x3da3_d70a;
+
+/// The renderer's virtual at `off` (its vtable at +0x10) with these words
+fn rv(m: &mut Mem, env: &mut dyn BezierEnv, r: u32, off: u32, args: &[u32]) -> u32 {
+    let (t, f) = vfn(m, r, 0x10, off);
+    env.vcall(m, f, t, args)
+}
+
+fn sd(m: &mut Mem, at: u32, v: u64) {
+    m.w32(at, v as u32);
+    m.w32(at + 4, (v >> 32) as u32);
+}
+
+/// The texture state's program check (the renderer's +0x470): when its byte +0x10 isn't `kind` or its word is set,
+/// the byte becomes `kind`, the word 0 and the renderer's +0x474 1
+fn use_program(m: &mut Mem, r: u32, kind: u32) {
+    let ts = m.r32(r + 0x470);
+    if m.r8(ts + 0x10) as u32 != kind || m.r32(ts) != 0 {
+        m.w8(ts + 0x10, kind as u8);
+        m.w32(ts, 0);
+        m.w32(r + 0x474, 1);
+    }
+}
+
+/// The patch's two textures (+0xc, +0xe) bound when they differ from the last ones (the renderer's +0x1f0 with
+/// the slot): a stored short read back as a half, the next compared as signed, so a half of 0x8000 up is always
+/// bound again
+fn bind_textures(m: &mut Mem, env: &mut dyn BezierEnv, r: u32, rec: u32, last: &mut [u32; 2]) {
+    for (k, at) in [0xcu32, 0xe].into_iter().enumerate() {
+        let t = m.r16(rec + at) as i16 as i32 as u32;
+        if t != last[k] {
+            rv(m, env, r, 0x1f0, &[t, k as u32]);
+            last[k] = m.r16(rec + at) as u32;
+        }
+    }
+}
+
+/// The patch's corner (its floats ×128, made whole) as the GIF's register word: x << 4, (x + z − 1) << 14 | 0xa,
+/// y << 24, (y + z − 1) << 34
+fn corner_word(m: &Mem, patch: u32) -> u64 {
+    let c = |k: u32| crate::sndlib::cvt_w((F(f32::from_bits(m.r32(patch + 4 * k))) * F(128.0)).0) as i64;
+    let (x, y, z) = (c(0), c(1), c(2));
+    let sx = |v: i64| v as i32 as i64;
+    let a = sx(x + z);
+    let b = sx(y + z);
+    let hi = (sx(b - 1) as u64) << 34;
+    ((x as u64) << 4) | hi | ((sx(a - 1) as u64) << 14) | 0xa | ((y as u64) << 24)
+}
+
+/// The program word for a record in a list: `PROGRAMS[list]`'s table at the record's clip kind + `plus`
+fn program(m: &Mem, entry: u32, rec: u32, plus: u32) -> u32 {
+    let table = m.r32(entry + 0xc);
+    m.r32(table.wrapping_add(m.r32(rec + 4).wrapping_add(plus).wrapping_mul(4)))
+}
+
+/// A uniform patch's packet at the renderer's +0x680 (0x90 bytes, then sent with its end at +0x80)
+fn uniform_packet(m: &mut Mem, r: u32, entry: u32, rec: u32) -> u32 {
+    let p = m.r32(r + 0x680);
+    let patch = m.r32(rec + 0x10);
+    sd(m, p + 0x18, 0xd82b << 47);
+    sd(m, p, 0x1000_0001);
+    sd(m, p + 8, 0);
+    sd(m, p + 0x10, 0);
+    sd(m, p + 0x30, 0x1000_0004);
+    sd(m, p + 0x40, 0x8000 << 45);
+    sd(m, p + 0x48, 0x5000_0002 << 32);
+    sd(m, p + 0x20, ((patch as u64) << 32) | 0x3000_0015);
+    sd(m, p + 0x50, 0x1000_0000_0000_8001);
+    sd(m, p + 0x58, 0xe);
+    sd(m, p + 0x28, 0);
+    sd(m, p + 0x38, 0);
+    let w = corner_word(m, patch);
+    let prog = program(m, entry, rec, 1);
+    sd(m, p + 0x78, ((prog | 0x1400_0000) as u64) << 32);
+    m.w32(r + 0x680, p.wrapping_add(0x90));
+    sd(m, p + 0x60, w);
+    sd(m, p + 0x68, 9);
+    sd(m, p + 0x70, 0);
+    p
+}
+
+/// A mixed patch's packet (0xa0 bytes: its four steps as words first, then sent with its end at +0x90)
+fn mixed_packet(m: &mut Mem, r: u32, entry: u32, rec: u32) -> u32 {
+    let p = m.r32(r + 0x680);
+    let patch = m.r32(rec + 0x10);
+    sd(m, p, 0x1000_0002);
+    m.w32(r + 0x680, p.wrapping_add(0x20));
+    sd(m, p + 0x18, 0xd82d << 47);
+    sd(m, p + 8, 0);
+    sd(m, p + 0x10, 0);
+    for k in 0..4 {
+        let s = m.r8(rec + 8 + k) as u32;
+        m.w32(p + 0x20 + 4 * k, s);
+    }
+    sd(m, p + 0x40, 0x1000_0004);
+    sd(m, p + 0x50, 0x8000 << 45);
+    sd(m, p + 0x58, 0x5000_0002 << 32);
+    sd(m, p + 0x30, ((patch as u64) << 32) | 0x3000_0015);
+    sd(m, p + 0x60, 0x1000_0000_0000_8001);
+    sd(m, p + 0x68, 0xe);
+    sd(m, p + 0x38, 0);
+    sd(m, p + 0x48, 0);
+    let w = corner_word(m, patch);
+    sd(m, p + 0x80, 0);
+    let prog = program(m, entry, rec, 1);
+    sd(m, p + 0x70, w);
+    sd(m, p + 0x88, ((prog | 0x1400_0000) as u64) << 32);
+    sd(m, p + 0x78, 9);
+    m.w32(r + 0x680, p.wrapping_add(0xa0));
+    p
+}
+
+/// A view's matrix b (+0x80..+0xc0 of the view) as eight doublewords at `to`
+fn view_matrix(m: &mut Mem, view: u32, to: u32) {
+    for j in 0..8 {
+        let lo = m.r32(view + 0x80 + 8 * j);
+        let hi = m.r32(view + 0x84 + 8 * j);
+        sd(m, to + 8 * j, ((hi as u64) << 32) | lo as u64);
+    }
+}
+
+/// A uniform patch's pass for a view (0xb0 bytes: the view's matrix b, then the program at the clip kind + 2; sent
+/// with its end at +0xa0)
+fn view_packet(m: &mut Mem, r: u32, entry: u32, rec: u32, this: u32, v: u32) -> u32 {
+    let p = m.r32(r + 0x680);
+    let view = this.wrapping_add(v.wrapping_mul(0xa0));
+    sd(m, p, 0x1000_0009);
+    sd(m, p + 8, 0);
+    sd(m, p + 0x10, 0);
+    sd(m, p + 0x18, 0xd809 << 47);
+    let prog = program(m, entry, rec, 2);
+    view_matrix(m, view, p + 0x20);
+    m.w32(r + 0x680, p.wrapping_add(0xb0));
+    sd(m, p + 0x60, 0x8000 << 45);
+    sd(m, p + 0x68, 0x5000_0002 << 32);
+    sd(m, p + 0x70, 0x1000_0000_0000_8001);
+    sd(m, p + 0x78, 0xe);
+    sd(m, p + 0x80, 5);
+    sd(m, p + 0x88, 9);
+    sd(m, p + 0x90, ((prog | 0x1500_0000) as u64) << 32);
+    sd(m, p + 0x98, 0);
+    p
+}
+
+/// A mixed patch's pass for a view (0xc0 bytes: its steps, the view's matrix b, the program; end at +0xb0)
+fn view_packet_mixed(m: &mut Mem, r: u32, entry: u32, rec: u32, this: u32, v: u32) -> u32 {
+    let p = m.r32(r + 0x680);
+    let view = this.wrapping_add(v.wrapping_mul(0xa0));
+    sd(m, p + 0x18, 0xd80b << 47);
+    sd(m, p, 0x1000_000a);
+    sd(m, p + 8, 0);
+    sd(m, p + 0x10, 0);
+    m.w32(r + 0x680, p.wrapping_add(0x20));
+    for k in 0..4 {
+        let s = m.r8(rec + 8 + k) as u32;
+        m.w32(p + 0x20 + 4 * k, s);
+    }
+    view_matrix(m, view, p + 0x30);
+    sd(m, p + 0x78, 0x5000_0002 << 32);
+    sd(m, p + 0x70, 0x8000 << 45);
+    sd(m, p + 0x80, 0x1000_0000_0000_8001);
+    sd(m, p + 0x88, 0xe);
+    let prog = program(m, entry, rec, 2);
+    sd(m, p + 0x90, 5);
+    sd(m, p + 0x98, 9);
+    sd(m, p + 0xa8, 0x8000 << 45);
+    m.w32(r + 0x680, p.wrapping_add(0xc0));
+    sd(m, p + 0xa0, ((prog | 0x1500_0000) as u64) << 32);
+    p
+}
+
+/// vf15 0x1d9f58(this, renderer): the four lists drawn (the views' first, 0x1da5c8, when +0x20 is set)
+///
+/// The lists are laid out at +0x56c as four of count, head, program kind (3, 2, 1, 4) and program table; after
+/// the frame's matrices, each patch of the uniform three and then the mixed one is bound and sent.
+pub fn draw(m: &mut Mem, env: &mut dyn BezierEnv, this: u32, r: u32, scratch: u32) {
+    let list = |m: &Mem, k: u32| (m.r32(this + [0x54c, 0x554, 0x55c, 0x564][k as usize]), m.r32(this + [0x550, 0x558, 0x560, 0x568][k as usize]));
+    m.w32(this + 0x574, 3);
+    let l = [0, 1, 2, 3].map(|k| list(m, k));
+    for (k, (count, head)) in l.into_iter().enumerate() {
+        let e = this + 0x56c + 0x10 * k as u32;
+        m.w32(e + 4, head);
+        m.w32(e, count);
+        if k > 0 {
+            m.w32(e + 8, [3, 2, 1, 4][k]);
+        }
+        m.w32(e + 0xc, PROGRAMS[k]);
+    }
+    env.call(m, MATRICES, &[r]);
+    if m.r32(this + 0x20) != 0 {
+        draw_views(m, env, this, r, scratch);
+    }
+    rv(m, env, r, 0x1c8, &[1, 0, BLEND]);
+    let mut last = [0xffff; 2];
+    rv(m, env, r, 0x200, &[1, 1]);
+    rv(m, env, r, 0x1f8, &[0, 0]);
+    rv(m, env, r, 0x1f8, &[2, 1]);
+    for k in 0..4u32 {
+        let e = this + 0x56c + 0x10 * k;
+        if m.r32(e) == 0 {
+            continue;
+        }
+        let kind = m.r32(e + 8);
+        use_program(m, r, kind);
+        let mut rec = m.r32(e + 4);
+        while rec != 0 {
+            bind_textures(m, env, r, rec, &mut last);
+            let p = if k < 3 { uniform_packet(m, r, e, rec) } else { mixed_packet(m, r, e, rec) };
+            let end = if k < 3 { 0x80 } else { 0x90 };
+            env.call(m, SUBMIT, &[r, p, p.wrapping_add(end), 0]);
+            rec = m.r32(rec + 0x14);
+        }
+    }
+    finish(m, env, r);
+}
+
+/// The draws' close: no textures (the renderer's +0x1f0 with −1 in both slots), +0x1c8 (0, 2, 0.08), +0x1f8
+/// (0, 1), and the texture state's program cleared
+fn finish(m: &mut Mem, env: &mut dyn BezierEnv, r: u32) {
+    rv(m, env, r, 0x1f0, &[u32::MAX, 0]);
+    rv(m, env, r, 0x1f0, &[u32::MAX, 1]);
+    rv(m, env, r, 0x1c8, &[0, 2, BLEND]);
+    rv(m, env, r, 0x1f8, &[0, 1]);
+    let ts = m.r32(r + 0x470);
+    if m.r8(ts + 0x10) != 0 || m.r32(ts) != 0 {
+        m.w32(ts, 0);
+        m.w32(r + 0x474, 1);
+        m.w8(ts + 0x10, 0);
+    }
+}
+
+/// 0x1da5c8(this, renderer): the patches seen from the views (a reflection's or a mirror's), drawn once for the
+/// main camera and then once for each view whose box test (the renderer's +0x288 on the patch's box, +0x150 and
+/// +0x15c with w 1, in the view's first matrix) doesn't answer 1 (outside); a patch drawn so is taken out of its
+/// list. The box is built in `scratch` (the game builds it on its stack: STANDIN).
+pub fn draw_views(m: &mut Mem, env: &mut dyn BezierEnv, this: u32, r: u32, scratch: u32) {
+    if m.r32(this + 0x2c) == 0 {
+        return;
+    }
+    let mut last = [0xffff; 2];
+    rv(m, env, r, 0x1f8, &[0, 0]);
+    rv(m, env, r, 0x1f8, &[2, 1]);
+    env.call(m, MATRICES, &[r]);
+    for k in 0..4u32 {
+        let e = this + 0x56c + 0x10 * k;
+        if m.r32(e) == 0 {
+            continue;
+        }
+        let kind = m.r32(e + 8);
+        use_program(m, r, kind);
+        let mut prev = 0u32;
+        let mut rec = m.r32(e + 4);
+        while rec != 0 {
+            let mut seen = [0u32; 8];
+            let mut n = 0usize;
+            let mut v = 0u32;
+            while (v as i32) < m.r32(this + 0x2c) as i32 {
+                let patch = m.r32(rec + 0x10);
+                for (at, from) in [(scratch, 0x150u32), (scratch + 0x10, 0x15c)] {
+                    for j in 0..3 {
+                        let w = m.r32(patch.wrapping_add(from + 4 * j));
+                        m.w32(at + 4 * j, w);
+                    }
+                    m.w32(at + 0xc, 1f32.to_bits());
+                }
+                let mat = this.wrapping_add(v.wrapping_mul(0xa0)).wrapping_add(0x40);
+                if rv(m, env, r, 0x288, &[scratch, scratch + 0x10, mat]) != 1 {
+                    seen[n] = v;
+                    n += 1;
+                }
+                v += 1;
+            }
+            if n == 0 {
+                prev = rec;
+                rec = m.r32(rec + 0x14);
+                continue;
+            }
+            bind_textures(m, env, r, rec, &mut last);
+            let p = if k < 3 { uniform_packet(m, r, e, rec) } else { mixed_packet(m, r, e, rec) };
+            rv(m, env, r, 0x200, &[1, 1]);
+            env.call(m, SUBMIT, &[r, p, p.wrapping_add(if k < 3 { 0x80 } else { 0x90 }), 0]);
+            rv(m, env, r, 0x200, &[2, 1]);
+            for &view in &seen[..n] {
+                let p = if k < 3 { view_packet(m, r, e, rec, this, view) } else { view_packet_mixed(m, r, e, rec, this, view) };
+                let tex = m.r32(this.wrapping_add(view.wrapping_mul(0xa0)) + 0xc4);
+                if tex != last[1] {
+                    rv(m, env, r, 0x1f0, &[tex, 1]);
+                    last[1] = m.r16(this.wrapping_add(view.wrapping_mul(0xa0)) + 0xc4) as u32;
+                }
+                env.call(m, SUBMIT, &[r, p, p.wrapping_add(if k < 3 { 0xa0 } else { 0xb0 }), 1]);
+            }
+            let c = m.r32(e);
+            m.w32(e, c.wrapping_sub(1));
+            let next = m.r32(rec + 0x14);
+            if rec == m.r32(e + 4) {
+                m.w32(e + 4, next);
+            } else {
+                m.w32(prev + 0x14, next);
+            }
+            rec = m.r32(rec + 0x14);
+        }
+    }
+    finish(m, env, r);
+}
