@@ -376,3 +376,22 @@ count 0x3353f8, the riders out 0x335664 + 0x10 · character). The heats' rider s
   course lookups for courses 0..15 and three values past them.
 
 - `StaticInit_RaceScene` 0x169dc0 (row E1b2q): nine scene constants written at 0x3cbff8..0x3cc020 (1.0, 0.9646, 0.0 and 0.0188, 0.949, 0.0012 as floats; nothing reads them by name), `FUN_00168360` (the scene table a, `fxrand::scene_table_a`), and `FUN_00169640` on the race scene object at 0x32edc0: its first word is 0x10 and its word 0x10f is 0 (`FUN_00169688`). That object is what `Update`, `RaceScene_Prepare` and `RaceScene_Play` run on; their rows own it.
+
+## The player's attribute getters (board row G3d; checked: `tests/career_attrs.rs`)
+
+- `Career_GetPlayerAttributes` 0x164638(p, out) and `_For` 0x1646b0(p, board, out) call `Career_GetAttributes`
+  0x165468 on player p's slot. The bonus bytes are the board's entry in the board table 0x332148: 0xf0 bytes a
+  rider, 0x14 a board, the four bonus bytes at +0x10, in the order of `trickdata::BOARDS`. The rider is the
+  profile's word 0. The board is its word 4 for the first, the argument for the second.
+- `Career_GetAttributes` takes a slot, not a player. The levels come from that slot's record (+0x18). The base and
+  the cap (+0x38d0, +0x3890, 0x10 a slot) come from the slot found again for the slot's own player. Usually that is
+  the same slot. It differs when the player isn't in any slot: `Career_FindPlayerSlot` gives -1, and slot -1's byte
+  names another player. It also differs when the same player is in an earlier slot. `Career::attributes` now takes
+  the slot.
+- `Career_FindPlayerSlot` 0x166550 compares the whole 64-bit register with each slot's sign-extended byte. A caller
+  with junk above the byte would find nothing; the game's callers all pass clean values.
+- `Career_GetPlayerStats` 0x163fe8(p) gives the record's address (the slot's +0x18). `Career_GetPlayerLevelName`
+  0x164808(p) looks up `Career_GetPlayerLevelStringId` through the localiser (gApp+0x50, 0x2c5160).
+- A rider or board past the table gives zero bonuses in the port (STANDIN); the game reads whatever follows the
+  table.
+- Checked in the runner on 20,000 random careers, about 5,000 calls each. 8 of 8 mutants were caught.

@@ -717,11 +717,14 @@ impl Career {
         refund
     }
 
-    /// `Career_GetAttributes` 0x165468(slot of player, board's bonus bytes): per group the base level, the level
-    /// now (the cap with the cheat), the board's bonus / 10 and the cap plus it.
-    pub fn attributes(&self, p: i8, bonus: [u8; 4], cheats: &crate::cheats::Cheats) -> Attributes {
-        let k = self.find_player_slot(p) as isize;
-        let rec = self.ri(0x30fc + 0x44 * k + 0x18).wrapping_sub(CAREER_BASE) as usize;
+    /// `Career_GetAttributes` 0x165468(slot, board's bonus bytes): per group the base level, the level now (the cap
+    /// with the cheat), the board's bonus / 10 and the cap plus it. The levels are the slot's record's (its +0x18);
+    /// the base and the cap are those of the slot found again for the slot's player (another slot when that player is
+    /// in an earlier one too, or in none).
+    pub fn attributes(&self, slot: i32, bonus: [u8; 4], cheats: &crate::cheats::Cheats) -> Attributes {
+        let s = Self::so(slot);
+        let k = self.find_player_slot(self.bytes[(0x30fc + s) as usize] as i8) as isize;
+        let rec = self.ri(0x30fc + s + 0x18).wrapping_sub(CAREER_BASE) as usize;
         let mut out = [[0u32; 4]; 4];
         for i in 0..4 {
             let cap = self.ri(0x3890 + 0x10 * k + 4 * i as isize);
@@ -732,6 +735,30 @@ impl Career {
             }
         }
         out
+    }
+
+    /// `Career_GetPlayerAttributes` 0x164638(p): [`Career::attributes`] with the bonus of the profile's board (word 4)
+    /// for its rider (word 0)
+    pub fn player_attributes(&self, p: i8, cheats: &crate::cheats::Cheats) -> Attributes {
+        self.player_attributes_for(p, self.profile_word(p, 4), cheats)
+    }
+
+    /// `Career_GetPlayerAttributesFor` 0x1646b0(p, board): [`Career::attributes`] with that board's bonus for the
+    /// profile's rider
+    pub fn player_attributes_for(&self, p: i8, board: u32, cheats: &crate::cheats::Cheats) -> Attributes {
+        self.attributes(self.find_player_slot(p), board_bonus(self.profile_word(p, 0), board), cheats)
+    }
+
+    /// `Career_GetPlayerStats` 0x163fe8(p): the address of player `p`'s record (the slot's +0x18)
+    pub fn player_record(&self, p: i8) -> u32 {
+        let k = Self::so(self.find_player_slot(p));
+        self.ri(0x3114 + k)
+    }
+
+    /// `Career_GetPlayerLevelName` 0x164808(p): the localiser's (gApp+0x50, `Loc_GetString` 0x2c5160) string for
+    /// [`Career::player_level_string`]
+    pub fn player_level_name<T>(&self, p: i8, loc: &mut dyn FnMut(u32) -> T) -> T {
+        loc(self.player_level_string(p))
     }
 
     /// `Career_GetPlayerLevel` 0x164840: the level (0..9) from the record's +4 + +8 (points earned)
@@ -1510,6 +1537,12 @@ impl StaticTables {
         let i = 7 * character + outfit;
         self.outfits[i / 7][i % 7][word]
     }
+}
+
+/// A board's bonus bytes from the board table (0x332148: 0xf0 a rider, 0x14 a board, the four bytes at +0x10; as
+/// `trickdata::BOARDS`). STANDIN: a rider or board past the table gives zeros, where the game reads what follows it.
+pub fn board_bonus(rider: u32, board: u32) -> [u8; 4] {
+    crate::trickdata::BOARDS.get(rider as usize).and_then(|r| r.get(board as usize)).map_or([0; 4], |b| b.bonus)
 }
 
 /// `Career_GetStatusName` 0x1634c0: the string id (`Loc_GetString` on gApp+0x50) of status 0..9, else none

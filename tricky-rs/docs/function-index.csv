@@ -1268,7 +1268,7 @@ address,size,name,system,status
 0x163980,292,Career_PrepareRace,race?,ported
 0x163ab0,96,Career_FinishRace,race?,checked
 0x163b10,36,Career_IsCharacterUnlocked,frontend?,ported
-0x163b38,124,Career_GetModeFlag,frontend?,not started
+0x163b38,124,Career_GetModeFlag,frontend?,checked
 0x163bb8,264,Career_IsCourseUnlocked,frontend?,ported
 0x163d30,100,Career_IsUnlockBitSet,frontend?,ported
 0x163d98,100,Career_IsUnlocked,frontend?,ported
@@ -1279,7 +1279,7 @@ address,size,name,system,status
 0x163f18,56,Career_GetPlayerTrickBook,frontend?,ported
 0x163f50,52,Career_GetPlayerFlags,race?,ported
 0x163f88,96,Career_CountPlayerFlags,race?,ported
-0x163fe8,52,Career_GetPlayerStats,race?,not started
+0x163fe8,52,Career_GetPlayerStats,race?,checked
 0x164020,64,TrickBook_IsPageComplete,scoring,not started
 0x164060,68,TrickBook_CountCompletePages,scoring,ported
 0x1640a8,92,TrickBook_CountToTier,scoring,ported
@@ -1294,10 +1294,10 @@ address,size,name,system,status
 0x164368,48,Career_GetAttributePoints,race?,ported
 0x164398,332,Career_SpendAttributePoint,race?,ported
 0x1644e8,328,Career_RefundAttributePoint,race?,ported
-0x164638,120,Career_GetPlayerAttributes,race?,not started
-0x1646b0,128,Career_GetPlayerAttributesFor,race?,not started
+0x164638,120,Career_GetPlayerAttributes,race?,checked
+0x1646b0,128,Career_GetPlayerAttributesFor,race?,checked
 0x164730,212,Career_GetPlayerLevelStringId,race?,ported
-0x164808,56,Career_GetPlayerLevelName,race?,not started
+0x164808,56,Career_GetPlayerLevelName,race?,checked
 0x164840,212,Career_GetPlayerLevel,race?,ported
 0x164918,52,Career_GetPlayerName,frontend?,ported
 0x164950,20,Career_SetPlayerRiderSlot,frontend?,ported
@@ -1332,7 +1332,7 @@ address,size,name,system,status
 0x165cf0,1888,Career_BuildRaceRiders,race?,ported
 0x166450,92,Career_ResetRiders,race?,ported
 0x1664b0,56,Career_InitRiderList,race?,ported
-0x1664e8,100,Career_GetPlayerLastRider,race?,not started
+0x1664e8,100,Career_GetPlayerLastRider,race?,checked
 0x166550,48,Career_FindPlayerSlot,race?,ported
 0x166580,20,Career_GetPlayerId,race?,ported
 0x166598,100,Career_FindRiderOfPlayer,race?,ported

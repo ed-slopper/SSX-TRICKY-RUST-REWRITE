@@ -274,7 +274,7 @@ fn career_ops_are_the_original() {
                 let entry = 0x332148 + 4 * (rider as u32 * 60 + board as u32 * 5);
                 call(&mut r, 0x165468, &[c as u64, (c + 0x30fc + 0x44 * slot) as u64, entry as u64, out as u64]);
                 let theirs: Vec<u32> = (0..16).map(|k| r.mem.read_u32(out + 4 * k)).collect();
-                let a = ours.attributes(p as i8, BOARDS[rider][board].bonus, &cheats);
+                let a = ours.attributes(slot as i32, BOARDS[rider][board].bonus, &cheats);
                 assert_eq!(theirs, a.iter().flatten().copied().collect::<Vec<_>>(), "{}", what("attributes"));
             }
             24 => {
