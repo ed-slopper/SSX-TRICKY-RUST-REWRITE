@@ -98,7 +98,7 @@ impl Answers {
 /// How many of a callee's arguments are logged, and its answer
 fn standin(io: &mut dyn Io, func: u32, w: &[u32], ans: &Answers) -> (u32, Call) {
     let n = match func {
-        rp::LOC | rp::WSTR_COPY | rp::WSTR_SET_ASCII | rp::GET_RECT | rp::PLAYER_ID | rp::ATTR_POINTS | rp::FIND_RIDER => 2,
+        rp::LOC | rp::WSTR_COPY | rp::WSTR_SET_ASCII | rp::GET_RECT | rp::PLAYER_ID | rp::ATTR_POINTS | rp::FIND_RIDER | rp::TRICK_NAME | rp::CIRCUIT_MEDAL => 2,
         rp::SPRINTF => 4,
         rp::FORMAT_TIME => 2,
         rp::MEMSET | rp::MEDAL_RANK | rp::SPEECH_END => 3,
@@ -130,6 +130,7 @@ fn standin(io: &mut dyn Io, func: u32, w: &[u32], ans: &Answers) -> (u32, Call) 
         rp::CLAMP_RANK => r % 4,
         rp::COUNT_PROFILES => r % 3,
         rp::FIND_RIDER => r % 6,
+        rp::CIRCUIT_MEDAL => r % 4,
         rp::GOT_RACE_FINAL | rp::GOT_SHOWOFF_FINAL => r % 2,
         _ => 0,
     };
@@ -160,7 +161,7 @@ fn result_pages_match_the_original() {
     let funcs = [
         0x1bf918u32, 0x1bf980, 0x1bf9d8, 0x1bfa08, 0x1bfa30, 0x1bfa50, 0x1bfa70, 0x1bfa90, 0x1bfab0, 0x1bfac8, 0x1bfae0,
         0x1bfaf8, 0x1bfb10, 0x1bfb20, 0x1aae10, 0x1aae88, 0x1af720, 0x1af940, 0x1af950, 0x1b1ba8, 0x1b0188, 0x1b07f8,
-        0x1b0998, 0x1b1278,
+        0x1b0998, 0x1b1278, 0x1b0bb8, 0x1b16f0, 0x1b1aa8,
     ];
     for f in funcs {
         r.allow(f);
@@ -174,6 +175,7 @@ fn result_pages_match_the_original() {
         rp::LOC, rp::MEMSET, rp::WSTR_COPY, rp::WSTR_SET_ASCII, rp::WSTR_FORMAT_ASCII, rp::GET_RECT, rp::BACKDROP_RESET,
         rp::GOT_RACE_FINAL, rp::GOT_SHOWOFF_FINAL, rp::EVENT_MODE, rp::PLAYER_ID, rp::ATTR_POINTS, rp::MEDAL_RANK,
         rp::CLAMP_RANK, rp::FORMAT_TIME, rp::SPEECH_END, rp::SPEECH_CLEAR, rp::COUNT_PROFILES, rp::FIND_RIDER, rp::SPRINTF,
+        rp::TRICK_NAME, rp::CIRCUIT_MEDAL,
     ];
     let log: Rc<RefCell<Vec<Call>>> = Rc::default();
     let ans = Rc::new(Answers { seed: Cell::new(0), n: Cell::new(0) });
@@ -217,6 +219,8 @@ fn result_pages_match_the_original() {
         m.w32(PAGE0 + 4, BASE);
         // (the pages' builder empties the menu first; the career page called alone finds a few items)
         m.w32(PAGE + 0x34, g.below(3));
+        // (the stats page clears as many rows' riders as the page's +4, left by the page before: 16 at most)
+        m.w32(PAGE + 4, g.below(17));
         m.w32(BASE + 0xc, g.below(300));
         m.w32(HUD + 0x42c, SPRITES);
         // the app (its string table) and the speech, set at run time
@@ -226,7 +230,7 @@ fn result_pages_match_the_original() {
         let x = { let v = g.f(-50.0, 400.0); let w = g.f(2e7, 2e8); g.pick(&[v, w]) };
         wf(&mut m, RECT + 8, x);
         // the career and the race
-        let mode = g.pick(&[4u32, 4, 2, 9, 7, 8, 0, 10]);
+        let mode = g.pick(&[1u32, 2, 3, 4, 4, 5, 6, 7, 8, 9, 0, 10]);
         m.w32(rp::CAREER + 0x2afc, mode);
         // (six riders at most: the order's six words run into the times)
         let n = { let v = g.below(7); g.pick(&[v, 6, 4]) };
@@ -256,6 +260,9 @@ fn result_pages_match_the_original() {
                 wf(&mut m, blk + o, g.f(0.0, 500.0));
             }
             wf(&mut m, blk + 0x6c, g.f(0.5, 100.0));
+            // (scores small and sometimes equal: the medal page lists the best's ties)
+            let sc = g.below(5000);
+            m.w32(blk + 0x7c, g.pick(&[0u32, 100, 500, sc]));
         }
         m.w32(rp::CAREER + 0x1680, g.below(2));
         m.w32(WHO, g.below(4));
@@ -264,6 +271,7 @@ fn result_pages_match_the_original() {
         // (the event's +0x320 is the career's mode itself, +0x2afc)
         m.w32(rp::CAREER + 0x27dc + 0x31c, g.next());
         m.w32(THIS + 0x1c, g.pick(&[0u32, 1, 2, 3]));
+        m.w32(THIS + 0xe8, 0);
         // what the ELF leaves 0 and the game fills at run time: the lines and the words before them, the titles, the
         // rows' ids, the columns' places and alignments
         for at in (rp::LINES - 8..rp::CELLS).step_by(4) {
@@ -362,6 +370,18 @@ fn result_pages_match_the_original() {
             }
             0x1b0998 => rp::rider_stats_rows(&mut m, &mut env, THIS, WHO),
             0x1b1278 => rp::add_rider_stats(&mut m, &mut env, THIS, WHO, scol, SCRATCH),
+            0x1b0bb8 => {
+                rp::medal_page(&mut m, &mut env, THIS);
+                none
+            }
+            0x1b16f0 => {
+                rp::stats_page(&mut m, &mut env, THIS, SCRATCH);
+                none
+            }
+            0x1b1aa8 => {
+                rp::lesson_page(&mut m, &mut env, THIS);
+                none
+            }
             _ => unreachable!(),
         };
         if matches!(func, 0x1af720 | 0x1af950 | 0x1b0188) {
@@ -374,7 +394,7 @@ fn result_pages_match_the_original() {
             0x1bfb10 | 0x1bfb20 => [PAGE, a3, 0, 0, 0],
             0x1bfab0 | 0x1bfac8 | 0x1bfae0 | 0x1bfaf8 => [PAGE, row, a3, 0, 0],
             0x1aae10 | 0x1aae88 => [PAGE, 0, 0, 0, 0],
-            0x1af720 | 0x1af950 | 0x1b1ba8 | 0x1b0188 | 0x1b07f8 => [THIS, 0, 0, 0, 0],
+            0x1af720 | 0x1af950 | 0x1b1ba8 | 0x1b0188 | 0x1b07f8 | 0x1b0bb8 | 0x1b16f0 | 0x1b1aa8 => [THIS, 0, 0, 0, 0],
             0x1b0998 => [THIS, WHO, 0, 0, 0],
             0x1b1278 => [THIS, WHO, scol, 0, 0],
             0x1af940 => [0; 5],

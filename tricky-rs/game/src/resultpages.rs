@@ -75,6 +75,8 @@ pub const SPRINTF: u32 = 0x2fca28;
 /// The speed's units: miles and kilometres an hour
 pub const UNIT_MPH: u32 = 0x38e438;
 pub const UNIT_KMH: u32 = 0x38e440;
+pub const TRICK_NAME: u32 = 0x1551c0;
+pub const CIRCUIT_MEDAL: u32 = 0x16baa8;
 
 fn call(m: &mut Mem, env: &mut dyn TextBoxEnv, func: u32, args: &[u32]) -> u32 {
     env.call(m, func, args, &[])
@@ -226,8 +228,11 @@ pub fn build_pages(m: &mut Mem, env: &mut dyn TextBoxEnv, this: u32, scratch: u3
         m.w32(ROW_IDS + 4 * k, 0xffff_ffff);
     }
     match m.r32(CAREER + 0x2afc) {
+        1 => stats_page(m, env, this, scratch),
         2 | 9 => standings_page(m, env, this, scratch),
+        3 | 5 => medal_page(m, env, this),
         4 => career_page(m, env, this, scratch),
+        6 => lesson_page(m, env, this),
         7 => time_challenge_page(m, env, this),
         _ => {}
     }
@@ -598,4 +603,216 @@ pub fn add_rider_stats(m: &mut Mem, env: &mut dyn TextBoxEnv, this: u32, who: u3
     let t = m.r32((ch << 2).wrapping_add(CAREER) + 0x327c);
     call(m, env, FORMAT_TIME, &[t, cell(row, col.wrapping_add(9))]);
     col.wrapping_add(10)
+}
+
+/// The two players' stats records the medal and stats pages fill (0x78 apart: +0 the player, +4 the row; the lines
+/// the pages clear follow each)
+pub const WHO: u32 = 0x3382d0;
+
+/// Columns' places from `COL_RIGHT`'s first on, each the given step past the one before
+fn space_columns(m: &mut Mem, steps: &[F]) {
+    let mut v = rf(m, COL_RIGHT);
+    for (i, &s) in steps.iter().enumerate() {
+        v = v + s;
+        wf(m, COL_RIGHT + 4 * (i as u32 + 1), v);
+    }
+}
+
+/// `Results_BuildMedalPage` 0x1b0bb8(this): the overlay's box (363 by 320), the medal flag, the rows' riders −1.
+/// The menu: with the show-off's final unlock "continue" (0x18d), "retry", "save"; else in the event's state 3
+/// "continue" (0xdb5), 0x191, "retry", "save", 0x18e; else "continue" (0x18d) when the player has points to spend,
+/// or 0xdb5 and 0x191, then "retry", "save". Each player's trick line formatted (`Score_FormatTrickName` into the
+/// lines), the page's number 3 · players, the title 0xe56. With one player the medal's rank from the circuit (and the
+/// verdict when the state is 5), laid out at 140 with the first column at 191; with more, the best score's players
+/// listed in the overlay's +0xd0 (+0xe8 how many; none when all tie) and their rows' ids cleared, the first column at
+/// 20. Then the stats rows of the first player (and the second, with two profiles) and the columns spaced.
+pub fn medal_page(m: &mut Mem, env: &mut dyn TextBoxEnv, this: u32) {
+    let ev = CAREER + 0x27dc;
+    let page = m.r32(this);
+    wf(m, this + 0x14, k(0x43b5_8000));
+    m.w32(page + 0x44, 0);
+    wf(m, this + 0x18, k(0x43a0_0000));
+    let showoff = m.r32(this + 0xc);
+    m.w32(this + 0xc8, 1);
+    for k in (0..16).rev() {
+        m.w32(ROW_RIDERS + 4 * k, 0xffff_ffff);
+    }
+    for k in (0..8).rev() {
+        m.w32(ROW_IDS + 4 * k, 0xffff_ffff);
+    }
+    let items: &[(u32, u32)] = if showoff != 0 {
+        &[(0, 0x18d), (1, 0x190), (4, 0x193)]
+    } else if m.r32(ev + 0x320) == 3 {
+        &[(0, 0xdb5), (2, 0x191), (1, 0x190), (4, 0x193), (3, 0x18e)]
+    } else if has_points(m, env) as i32 > 0 {
+        &[(0, 0x18d), (1, 0x190), (4, 0x193)]
+    } else {
+        &[(0, 0xdb5), (2, 0x191), (1, 0x190), (4, 0x193)]
+    };
+    for &(kind, id) in items {
+        let s = loc(m, env, id);
+        add_item(m, this, kind, s);
+    }
+    let mut i = 0u32;
+    while (i as i32) < m.r32(ev) as i32 {
+        let rider = call(m, env, FIND_RIDER, &[CAREER, i]);
+        let idx = m.r32(rider.wrapping_mul(0x84).wrapping_add(ev + 4));
+        let blk = idx.wrapping_mul(0xbc).wrapping_add(CAREER) + 0x3308;
+        call(m, env, TRICK_NAME, &[i.wrapping_mul(0x78).wrapping_add(LINES), blk]);
+        i += 1;
+    }
+    let n = m.r32(ev);
+    let page = m.r32(this);
+    m.w32(page + 8, n.wrapping_mul(3));
+    let t = loc(m, env, 0xe56);
+    set_title(m, env, t);
+    if m.r32(ev) == 1 {
+        let rank = call(m, env, CIRCUIT_MEDAL, &[m.r32(ORDER + 0xac), m.r32(ev + 0x31c)]);
+        m.w32(this + 0x1c, rank);
+        if m.r32(ev + 0x320) == 5 {
+            medal_verdict(m, env, this);
+        }
+        set_row_layout(m, m.r32(this), F(140.0), F(3.0));
+        wf(m, COL_RIGHT, F(191.0));
+    } else {
+        let mut best = -1i32;
+        set_row_layout(m, m.r32(this), F(140.0), F(3.0));
+        wf(m, COL_RIGHT, F(20.0));
+        let mut i = 0u32;
+        while (i as i32) < m.r32(ev) as i32 {
+            let rider = call(m, env, FIND_RIDER, &[CAREER, i]);
+            let idx = m.r32(rider.wrapping_mul(0x84).wrapping_add(ev + 4));
+            let blk = idx.wrapping_mul(0xbc).wrapping_add(CAREER) + 0x3294;
+            let score = m.r32(blk + 0x7c) as i32;
+            if best < score {
+                m.w32(this + 0xd0, i);
+                m.w32(this + 0xe8, 1);
+                best = m.r32(blk + 0x7c) as i32;
+            } else if score == best {
+                let n = m.r32(this + 0xe8);
+                m.w32((n << 2).wrapping_add(this) + 0xd0, i);
+                let n = m.r32(this + 0xe8);
+                m.w32(this + 0xe8, n.wrapping_add(1));
+            }
+            i += 1;
+        }
+        let n = m.r32(this + 0xe8);
+        if n == m.r32(ev) {
+            m.w32(this + 0xe8, 0);
+        } else if n as i32 > 0 {
+            let mut i = 0u32;
+            while (i as i32) < n as i32 {
+                match m.r32(this + 0xd0 + 4 * i) {
+                    0 => m.w32(ROW_IDS + 4, 0),
+                    1 => m.w32(ROW_IDS + 0x10, 0),
+                    _ => {}
+                }
+                i += 1;
+            }
+        }
+    }
+    m.w32(WHO + 0x7c, 3);
+    m.w32(ROW_RIDERS, 0);
+    m.w32(WHO + 4, 0);
+    let v = rider_stats_rows(m, env, this, WHO);
+    let page = m.r32(this);
+    m.w32(page + 4, v);
+    if call(m, env, COUNT_PROFILES, &[CAREER]) == 2 {
+        rider_stats_rows(m, env, this, WHO + 0x78);
+    }
+    let one = m.r32(ev) == 1;
+    let (a, b, c) = if one { (F(160.0), F(90.0), F(32.0)) } else { (F(140.0), F(113.0), F(32.0)) };
+    m.w32(COL_ALIGN + 0x14, 2);
+    m.w32(COL_ALIGN, 0);
+    space_columns(m, &[a, b, c, a, b, c]);
+    m.w32(COL_ALIGN + 4, 2);
+    m.w32(COL_ALIGN + 8, 2);
+    m.w32(COL_ALIGN + 0xc, 0);
+    m.w32(COL_ALIGN + 0x10, 2);
+}
+
+/// `Results_BuildStatsPage` 0x1b16f0(this): laid out from the sprite's x + 79 (rows 3 apart), the page's riders'
+/// rows −1, the menu 0xdb6, 0x191, "retry", 0x18e, the title 0xe46; with one rider the first column at 192 and the
+/// number 2, else 70 and 5; each player's stats from column 1 (the second's with more than one rider) and the
+/// columns spaced (160, 90, 40 for one; 151, 80, 30 for more)
+pub fn stats_page(m: &mut Mem, env: &mut dyn TextBoxEnv, this: u32, scratch: u32) {
+    let hud = m.r32(this + 4);
+    let page = m.r32(this);
+    let sprites = m.r32(m.r32(hud + 0x42c));
+    m.w32(page + 0x44, 0);
+    let r = call(m, env, GET_RECT, &[sprites, 0x37]);
+    let x = (((rf(m, r + 8) + F(10.0)) + F(7.0)) + F(23.0)) + F(39.0);
+    set_row_layout(m, m.r32(this), x, F(3.0));
+    let page = m.r32(this);
+    let n = m.r32(page + 4) as i32;
+    let mut i = 0;
+    while i < n {
+        m.w32(ROW_RIDERS + 4 * i as u32, 0xffff_ffff);
+        i += 1;
+    }
+    for k in (0..8).rev() {
+        m.w32(ROW_IDS + 4 * k, 0xffff_ffff);
+    }
+    for (kind, id) in [(0u32, 0xdb6u32), (2, 0x191), (1, 0x190), (3, 0x18e)] {
+        let s = loc(m, env, id);
+        add_item(m, this, kind, s);
+    }
+    let t = loc(m, env, 0xe46);
+    set_title(m, env, t);
+    let page = m.r32(this);
+    if m.r32(RACE) == 1 {
+        wf(m, COL_RIGHT, F(192.0));
+        m.w32(page + 8, 2);
+    } else {
+        wf(m, COL_RIGHT, F(70.0));
+        m.w32(page + 8, 5);
+    }
+    m.w32(WHO + 4, 0);
+    m.w32(WHO + 0x7c, 3);
+    if m.r32(RACE) == 1 {
+        let v = add_rider_stats(m, env, this, WHO, 1, scratch);
+        let page = m.r32(this);
+        m.w32(page + 4, v);
+        space_columns(m, &[F(160.0), F(90.0), F(40.0), F(160.0), F(90.0)]);
+    } else {
+        let v = add_rider_stats(m, env, this, WHO, 1, scratch);
+        let page = m.r32(this);
+        m.w32(page + 4, v);
+        add_rider_stats(m, env, this, WHO + 0x78, 1, scratch);
+        space_columns(m, &[F(151.0), F(80.0), F(30.0), F(151.0), F(80.0)]);
+    }
+    m.w32(COL_ALIGN + 0x10, 2);
+    m.w32(COL_ALIGN, 0);
+    m.w32(COL_ALIGN + 8, 1);
+    m.w32(COL_ALIGN + 4, 2);
+    m.w32(COL_ALIGN + 0xc, 0);
+}
+
+/// `Results_BuildLessonPage` 0x1b1aa8(this): laid out at 142 (rows 3 apart), the first two columns at 131 and 400,
+/// the title 0xe47, the number 1, the menu 0x191 (written as the first item in place) and 0x18e
+pub fn lesson_page(m: &mut Mem, env: &mut dyn TextBoxEnv, this: u32) {
+    let page = m.r32(this);
+    m.w32(page + 0x44, 0);
+    set_row_layout(m, page, F(142.0), F(3.0));
+    wf(m, COL_RIGHT, F(131.0));
+    wf(m, COL_RIGHT + 4, F(400.0));
+    let t = loc(m, env, 0xe47);
+    set_title(m, env, t);
+    let page = m.r32(this);
+    m.w32(page + 8, 1);
+    m.w32(page + 0x34, 0);
+    m.w32(page + 4, 0);
+    let s = loc(m, env, 0x191);
+    let page = m.r32(this);
+    let n = m.r32(page + 0x34).wrapping_add(1);
+    m.w32(page + 0xc, 2);
+    m.w32(page + 0x34, n);
+    m.w32(page + 0x10, s);
+    let s = loc(m, env, 0x18e);
+    let page = m.r32(this);
+    let e = (n << 3).wrapping_add(page) + 0xc;
+    m.w32(e, 3);
+    m.w32(e + 4, s);
+    let c = m.r32(page + 0x34);
+    m.w32(page + 0x34, c.wrapping_add(1));
 }

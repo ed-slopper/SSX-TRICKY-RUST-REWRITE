@@ -1287,3 +1287,37 @@ that fixed, G9v1's mode test is caught too (54 of 55).
 
 44 of 45 mutants were caught. The one left changes the miles factor by a bit, which the truncation to a whole speed
 does not show.
+
+### The medal, stats and lesson pages (G9v3)
+
+- **`Results_BuildMedalPage` 0x1b0bb8** (modes 3 and 5):
+  - sets the overlay's box (363 by 320), the medal flag and the rows' ids to −1;
+  - picks the menu: with the show-off's final unlock, continue, retry and save; else in the event's state 3,
+    0xdb5, 0x191, retry, save and 0x18e; else continue when the player has points to spend, or 0xdb5 and 0x191,
+    then retry and save;
+  - writes each player's trick line (`Score_FormatTrickName` into the four 0x78-byte lines; the block here is the
+    stats block's +0x74, at the career's +0x3308);
+  - sets the page's number to 3 · players and the title to 0xe56.
+
+  With one player it takes the medal from the circuit (`Circuit_GetMedal` on the order's +0xac and the event's
+  +0x31c), shows the verdict in state 5, and lays out at 140 with the first column at 191. With more it collects the
+  players with the best score (the block's +0x7c) into the overlay's +0xd0 (+0xe8 says how many; none when every
+  player ties) and clears their rows' ids (+4 for player 0, +0x10 for player 1), with the first column at 20.
+  Finally it fills the first player's stats rows (and the second's with two profiles) into the players' records
+  at 0x3382d0 (the second at +0x78, row 3) and spaces the columns.
+- **`Results_BuildStatsPage` 0x1b16f0** (mode 1) is laid out from x + 79 with rows 3 apart:
+  - it marks as many rows' riders −1 as the page's +4 says (left over from the page before) and sets the menu and
+    the title 0xe46;
+  - with one rider the first column is at 192 (number 2), else at 70 (number 5);
+  - it adds each player's stats from column 1 (the second player's only with more than one rider) and spaces the
+    columns: 160, 90, 40 for one; 151, 80, 30 for more.
+- **`Results_BuildLessonPage` 0x1b1aa8** (mode 6) is laid out at 142, with the first columns at 131 and 400, the
+  title 0xe47 and the number 1. Its first menu item is written in place (+0xc) after the count is set to 0; the
+  second is added as usual.
+
+Checked in the same runner test, now 8100 cases over the 27 functions, with every career mode from 0 to 10 through
+`BuildPages`. Two words the pages leave alone had to be kept realistic: the page's +4 (at most 16 rows) and the
+overlay's tie count.
+
+45 of 47 mutants were caught. The two left are equivalent: the best score starting at 0 instead of -1 lists the same
+players while the tie count starts at 0 (as `BuildPages` leaves it), and adding 0 times a place to a place.
