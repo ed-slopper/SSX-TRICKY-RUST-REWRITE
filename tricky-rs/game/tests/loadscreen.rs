@@ -40,15 +40,19 @@ impl Rng {
 
 const DATA: (u32, u32) = (0x328000, 0x18000);
 const RODATA: (u32, u32) = (0x3a4b00, 0xa00);
+/// The speech's pointer (the sound banks are on it)
+const SPEECH_AT: (u32, u32) = (0x343000, 0x100);
 const ARENA: u32 = 0x0100_0000;
-const SIZE: u32 = 0x2000;
+const SIZE: u32 = 0x5000;
 const THIS: u32 = ARENA;
-const RENDER: u32 = ARENA + 0x800;
-const RVT: u32 = ARENA + 0x900;
-const SVT: u32 = ARENA + 0xb00;
-const APPOBJ: u32 = ARENA + 0xc00;
-const PICS: u32 = ARENA + 0xd00;
-const SHEETS: u32 = ARENA + 0x1000;
+const RENDER: u32 = ARENA + 0x1800;
+const RVT: u32 = ARENA + 0x1900;
+const SVT: u32 = ARENA + 0x1b00;
+const APPOBJ: u32 = ARENA + 0x1c00;
+const PICS: u32 = ARENA + 0x1d00;
+const SHEETS: u32 = ARENA + 0x2000;
+/// The sprite set (the screen's +4: its +0x15e8.. sheets)
+const SET: u32 = ARENA + 0x3000;
 /// The packed pictures' buffer
 const HEAP: (u32, u32) = (0x0110_0000, 0x12000);
 const SCRATCH: u32 = 0x01f8_0000;
@@ -97,7 +101,7 @@ impl Io for r5900::Mem {
     }
 }
 fn mapped(a: u32, n: u32) -> bool {
-    [DATA, RODATA, (ARENA, SIZE), HEAP].iter().any(|&(at, s)| a >= at && a as u64 + n as u64 <= (at + s) as u64)
+    [DATA, RODATA, SPEECH_AT, (ARENA, SIZE), HEAP].iter().any(|&(at, s)| a >= at && a as u64 + n as u64 <= (at + s) as u64)
 }
 fn stack(a: u32) -> bool {
     (0x01f0_0000..0x01ff_0000).contains(&a)
@@ -152,6 +156,14 @@ fn arity(func: u32) -> (usize, usize) {
         ls::SPRITE_ANCHORED => (2, 4),
         ls::SET_FADE => (1, 1),
         ls::LOC => (2, 0),
+        ls::SPRINTF | ls::LOAD_ICONS | ls::WSTR_FORMAT | ls::WSTR_FORMAT_ASCII | ls::EVENT_MEDAL => (3, 0),
+        ls::BANK_LOAD | ls::BANK_POLL | ls::BANK_UNLOAD | ls::SPRITES_INIT | ls::SPRITES_POLL | ls::WSTR_COUNT => (1, 0),
+        ls::COMPLETE_PAGES | ls::TS_INIT | ls::TS_CONSTRUCT => (1, 0),
+        ls::LOOP_PLAY | ls::LOOP_STOP | ls::WSTR_COPY | ls::WSTR_SET_ASCII | ls::PLAYER_ID | ls::PLAYER_PROFILE => (2, 0),
+        ls::LEVEL_NAME | ls::TRICK_BOOK | ls::COURSE_NAME | ls::COURSE_DIFFICULTY | ls::COURSE_LOCATION => (2, 0),
+        ls::COURSE_DROP | ls::COURSE_LENGTH | ls::MAP_X | ls::MAP_Y | ls::ANIM_VALUE | ls::TS_SET_FONT => (2, 0),
+        ls::TS_DESTRUCT_THUNK | ls::TS_DESTRUCT => (2, 0),
+        ls::DRAW_ALIGNED | ls::DRAW_CURSOR => (6, 3),
         _ => panic!("no arity for {func:#x}"),
     }
 }
@@ -165,6 +177,17 @@ fn standin(io: &mut dyn Io, func: u32, w: &[u32], f: &[u32], ans: &Answers) -> (
     }
     if func == rv(0x68) {
         log.extend((0..3).map(|k| io.r32(w[1] + 4 * k)));
+    }
+    // the draws: the drawer's colour as it stands when they draw
+    if matches!(
+        func,
+        ls::SPRITE_RECT | ls::FILLED_RECT | ls::SPRITE_TILED | ls::SPRITE_ANCHORED | ls::DRAW_RIGHT | ls::PRINTF_SHADOWED_A | ls::DRAW_ALIGNED | ls::DRAW_CURSOR
+    ) {
+        log.extend((0..4).map(|k| io.r32(ls::DRAW_COLOUR + 4 * k)));
+    }
+    if func == ls::DRAW_ALIGNED || func == ls::DRAW_CURSOR {
+        // (the text style's +4, set by hand)
+        log.push(io.r32(w[0] + 4));
     }
     let r = ans.next();
     let answer = match func {
@@ -183,6 +206,12 @@ fn standin(io: &mut dyn Io, func: u32, w: &[u32], f: &[u32], ans: &Answers) -> (
             0
         }
         ls::UNPACKED_SIZE => r % 2,
+        ls::BANK_POLL | ls::SPRITES_POLL => [0u32, 1, 1, 7][(r % 4) as usize],
+        ls::PLAYER_PROFILE => r % 12,
+        // (six pages in the book; 7 too, past it)
+        ls::COMPLETE_PAGES => r % 8,
+        ls::EVENT_MEDAL => r % 4,
+        ls::MAP_X | ls::MAP_Y => ((r % 1000) as f32 / 1000.0).to_bits(),
         ls::EA_ALLOC => if r % 4 == 0 { 0 } else { HEAP.0 },
         ls::MEMSET => {
             if mapped(w[0], w[2]) {
@@ -227,6 +256,8 @@ fn loading_screens_match_the_original() {
     let funcs = [
         0x243c78u32, 0x243de8, 0x243ea0, 0x243f00, 0x244290, 0x244330, 0x2443b0, 0x244490, 0x2444c0, 0x244540, 0x2447a8,
         0x2449f8, 0x244b20, 0x244ee8, 0x244fc8, 0x245598, 0x2455c0, 0x245668, 0x245680, 0x2456b8, 0x245760, 0x245838,
+        0x245840, 0x245958,
+        0x2459b0, 0x245a48, 0x245b68, 0x245cb8, 0x245ec0, 0x246700, 0x246f18, 0x246f50, 0x246f88, 0x246fe0, 0x2473d8,
     ];
     for f in funcs.into_iter().chain([0x250e98]) {
         r.allow(f);
@@ -237,7 +268,12 @@ fn loading_screens_match_the_original() {
         ls::ANIM_EVAL, ls::LOAD_MODULE_DELETE, ls::FILE_LOAD, ls::FILE_IS_DONE, ls::FILE_FINISH, ls::FILE_CANCEL,
         ls::SHAPE_FIND, ls::SHAPE_ENTRY, ls::UNPACKED_SIZE, ls::DECODE, ls::EA_FREE, ls::EA_ALLOC, ls::MEMSET,
         ls::MEM_FREE, ls::SET_COLOUR, ls::SPRITE_RECT, ls::FILLED_RECT, ls::DRAW_RIGHT, ls::PRINTF_SHADOWED_A,
-        ls::SPRITE_TILED, ls::SPRITE_ANCHORED, ls::SET_FADE, ls::LOC,
+        ls::SPRITE_TILED, ls::SPRITE_ANCHORED, ls::SET_FADE, ls::LOC, ls::SPRINTF, ls::BANK_LOAD, ls::BANK_POLL, ls::LOOP_PLAY,
+        ls::LOOP_STOP, ls::BANK_UNLOAD, ls::SPRITES_INIT, ls::LOAD_ICONS, ls::SPRITES_POLL, ls::WSTR_COPY, ls::WSTR_COUNT,
+        ls::WSTR_SET_ASCII, ls::WSTR_FORMAT, ls::WSTR_FORMAT_ASCII, ls::PLAYER_ID, ls::PLAYER_PROFILE, ls::LEVEL_NAME,
+        ls::TRICK_BOOK, ls::COMPLETE_PAGES, ls::EVENT_MEDAL, ls::COURSE_NAME, ls::COURSE_DIFFICULTY, ls::COURSE_LOCATION,
+        ls::COURSE_DROP, ls::COURSE_LENGTH, ls::MAP_X, ls::MAP_Y, ls::ANIM_VALUE, ls::TS_INIT, ls::TS_CONSTRUCT,
+        ls::TS_SET_FONT, ls::TS_DESTRUCT_THUNK, ls::TS_DESTRUCT, ls::DRAW_ALIGNED, ls::DRAW_CURSOR,
     ];
     stubs.extend(ROFFS.map(rv));
     stubs.extend(SOFFS.map(sv));
@@ -263,7 +299,7 @@ fn loading_screens_match_the_original() {
     let data = read(&mut r, DATA);
     let rodata = read(&mut r, RODATA);
     let mut g = Rng(0x5ce1_6000_0000_0001);
-    let (mut steps, mut pics, mut fades) = ([0usize; 5], 0usize, 0usize);
+    let (mut steps, mut pics, mut fades, mut filled) = ([0usize; 5], 0usize, 0usize, 0usize);
     let per = 300u32;
     for case in 0..funcs.len() as u32 * per {
         let func = funcs[(case % funcs.len() as u32) as usize];
@@ -271,6 +307,7 @@ fn loading_screens_match_the_original() {
             regions: vec![
                 (DATA.0, data.clone()),
                 (RODATA.0, rodata.clone()),
+                (SPEECH_AT.0, vec![0; SPEECH_AT.1 as usize]),
                 (ARENA, vec![0; SIZE as usize]),
                 (HEAP.0, vec![0; HEAP.1 as usize]),
                 (SCRATCH, vec![0; 0x200]),
@@ -329,6 +366,20 @@ fn loading_screens_match_the_original() {
         let pic = g.below(50);
         m.w32(THIS + 0x40c, g.pick(&[0xffff_ffffu32, pic]));
         wf(&mut m, ls::DRAW_COLOUR, g.f(0.0, 1.0));
+        // the one-player track load: its sprite set, the map's size, the sprites' flag, the summary's step, modes
+        m.w32(THIS + 4, SET);
+        m.w32(ls::SPEECH, g.next());
+        wf(&mut m, THIS + 0xb34, g.f(1.0, 300.0));
+        wf(&mut m, THIS + 0xb38, g.f(1.0, 300.0));
+        m.w32(THIS + 0xe24, g.below(2));
+        m.w32(THIS + 0x40c, g.below(11));
+        for i in 0..3 {
+            m.w32(THIS + 0xe28 + 0x34 * i, g.pick(&[0u32, 1, 1, 2]));
+        }
+        for o in [0x2afc, 0x3818] {
+            m.w32(ls::CAREER + o, g.below(11));
+        }
+        m.w32(APPOBJ + 8, g.below(12));
         let done = g.pick(&[0u32, 3, 9, 10, 11, 20]);
         let any = g.next();
         let (text, tex) = (g.pick(&[0u32, any]), g.below(20));
@@ -336,6 +387,7 @@ fn loading_screens_match_the_original() {
         let (fx, fa) = (g.f(0.0, 640.0), g.f(0.0, 1.0));
         let fy = { let a = g.f(0.0, 480.0); let b = g.f(2e7, 2e8); g.pick(&[a, a, b]) };
         let flags = g.below(4);
+        let pick = g.below(14);
         for (at, b) in &m.regions {
             r.mem.write(*at, b).unwrap();
         }
@@ -413,11 +465,57 @@ fn loading_screens_match_the_original() {
                 none
             }
             0x245838 => none,
+            0x245840 => ls::track1_new(&mut m, e, THIS),
+            0x245958 => {
+                ls::track1_delete(&mut m, e, THIS, flags);
+                none
+            }
+            0x2459b0 => {
+                ls::mode_pic_name(&mut m, e, pick, SCRATCH);
+                none
+            }
+            0x245a48 => {
+                ls::track_pic_name(&mut m, e, pick, SCRATCH);
+                none
+            }
+            0x245b68 => {
+                ls::rider_pic_name(&mut m, e, pick, SCRATCH);
+                none
+            }
+            0x245cb8 => {
+                ls::track1_start(&mut m, e, THIS);
+                none
+            }
+            0x245ec0 => ls::track1_poll(&mut m, e, THIS),
+            0x246700 => {
+                ls::fill_event_summary(&mut m, e, THIS);
+                none
+            }
+            0x246f18 => {
+                ls::track1_vf4(&mut m, e, THIS, SCRATCH);
+                none
+            }
+            0x246f50 => ls::track1_vf3(&mut m, e, THIS, SCRATCH),
+            0x246f88 => {
+                ls::track1_vf5(&mut m, e, THIS);
+                none
+            }
+            0x246fe0 => {
+                ls::track1_draw_background(&mut m, e, THIS, SCRATCH);
+                none
+            }
+            0x2473d8 => {
+                ls::track1_draw_overlay(&mut m, e, THIS, SCRATCH);
+                none
+            }
             _ => unreachable!(),
         };
         if func == 0x243f00 && (step as usize) < 5 {
             steps[step as usize] += 1;
             pics += env.log.iter().filter(|c| c.0 == rv(0x150)).count();
+        }
+        if func == 0x245ec0 && ours == 1 {
+            filled += 1;
         }
         if func == 0x244b20 {
             fades += env.log.iter().filter(|c| c.0 == ls::FILLED_RECT).count();
@@ -430,6 +528,8 @@ fn loading_screens_match_the_original() {
             0x244540 => vec![THIS, SHEETS, done],
             0x2447a8 => vec![THIS, 0, SHEETS, text, tex],
             0x2449f8 | 0x244fc8 => vec![THIS, SHEETS],
+            0x245958 => vec![THIS, flags],
+            0x2459b0 | 0x245a48 | 0x245b68 => vec![pick, SCRATCH],
             _ => vec![THIS],
         };
         for (k, v) in regs.into_iter().enumerate() {
@@ -456,6 +556,6 @@ fn loading_screens_match_the_original() {
             }
         }
     }
-    println!("{steps:?} poll steps, {pics} shapes added, {fades} draws' rects");
-    assert!(steps.iter().all(|&s| s > 30) && pics > 50 && fades > 50);
+    println!("{steps:?} poll steps, {pics} shapes added, {fades} draws' rects, {filled} sprite tables filled");
+    assert!(steps.iter().all(|&s| s > 30) && pics > 30 && fades > 50 && filled > 50);
 }

@@ -4439,19 +4439,19 @@ address,size,name,system,status
 0x2456b8,168,cFirstLoad::PollAssetLoad,game,checked
 0x245760,212,cFirstLoad::DrawBackground,game,checked
 0x245838,8,cFirstLoad::DrawOverlay,frontend,checked
-0x245840,280,c1PTrackLoad::c1PTrackLoad,game,ported
-0x245958,88,c1PTrackLoad::~c1PTrackLoad,game,not started
-0x2459b0,148,LoadScreen_GetModePicName,game?,not started
-0x245a48,288,LoadScreen_GetTrackPicName,game?,not started
-0x245b68,336,LoadScreen_GetRiderPicName,game?,not started
-0x245cb8,520,c1PTrackLoad::StartAssetLoad,game,not started
-0x245ec0,2112,c1PTrackLoad::PollAssetLoad,game,not started
-0x246700,2072,FE_FillEventSummary,frontend,not started
-0x246f18,52,c1PTrackLoad::vf4_246f18,game,not started
-0x246f50,56,c1PTrackLoad::vf3_246f50,game,not started
-0x246f88,88,c1PTrackLoad::vf5_246f88,game,not started
-0x246fe0,1016,c1PTrackLoad::DrawBackground,game,not started
-0x2473d8,1668,c1PTrackLoad::DrawOverlay,frontend,not started
+0x245840,280,c1PTrackLoad::c1PTrackLoad,game,checked
+0x245958,88,c1PTrackLoad::~c1PTrackLoad,game,checked
+0x2459b0,148,LoadScreen_GetModePicName,game?,checked
+0x245a48,288,LoadScreen_GetTrackPicName,game?,checked
+0x245b68,336,LoadScreen_GetRiderPicName,game?,checked
+0x245cb8,520,c1PTrackLoad::StartAssetLoad,game,checked
+0x245ec0,2112,c1PTrackLoad::PollAssetLoad,game,checked
+0x246700,2072,FE_FillEventSummary,frontend,checked
+0x246f18,52,c1PTrackLoad::vf4_246f18,game,checked
+0x246f50,56,c1PTrackLoad::vf3_246f50,game,checked
+0x246f88,88,c1PTrackLoad::vf5_246f88,game,checked
+0x246fe0,1016,c1PTrackLoad::DrawBackground,game,checked
+0x2473d8,1668,c1PTrackLoad::DrawOverlay,frontend,checked
 0x247a60,280,c2PTrackLoad::c2PTrackLoad,race,ported
 0x247b78,88,c2PTrackLoad::~c2PTrackLoad,race,not started
 0x247bd0,388,c2PTrackLoad::StartAssetLoad,race,not started

@@ -1418,3 +1418,44 @@ fills done for real, the draws log their floats and the colour stand-in logs its
 - the fade's clamps at exactly 1 and 0;
 - the flake count's cap at 10 (`< 11` against `< 10`);
 - the unsigned conversion's low bit, which the PS2's truncating conversion never uses.
+
+### The one-player track load (G9w2)
+
+- **`c1PTrackLoad`** (table 0x3a5278) adds to the base:
+  - an animation at +0x40c, which types the summary in line by line;
+  - 28 sprite records at +0xb14, which the poll fills;
+  - the event's summary as wide strings 0x3c apart from +0x6a0;
+  - three pictures at +0xe28: the event mode's, the course's and the player's rider's. Each file name is made by
+    `LoadScreen_Get{Mode,Track,Rider}PicName` ("ldmode…%s", "ldtrack…%s", "ldrider…%s" with ".ssh"), and the shape
+    names are "ldmo", "ldtr", "ldri". Some indexes give no file: mode 6, and courses 9 and 10.
+- **The poll** (0x245ec0) waits for the sound bank and the sprite set, then fills the 28 records with 197 stores:
+  sheets, places, sizes and the texture's corners, the sheet words taken from the set's +0x15e8 / +0x15ec /
+  +0x15f0, and the loaded flag at records + 0x310. The front end's loads, the load from quit, the trick tutorial's
+  and the rider ranking's polls are the same code with the records at another place, so the port shares it
+  (`poll_sprites`, `base` per screen).
+- **`FE_FillEventSummary` 0x246700** writes the lines:
+  - the mode's heading and line (two switches on the career's mode; nothing at all for modes 8 and 9);
+  - the course's name, eight labels, and the course's difficulty, location, drop and length;
+  - the player's character and level;
+  - the trick book: "%d" of the next page, or 0xc9e once all 6 are done;
+  - the medal line for the event.
+
+  Then it adds the animation's bars, each as long as its text.
+- **vf3..vf5:** the loading loop is played with the bars and stopped once the app's +8 reaches 8; the archive is
+  closed if the fade isn't in.
+- **`DrawBackground` 0x246fe0:**
+  - the bars, the ticker, and each picture that is in drawn in a tip box (the mode's with its line, the course's,
+    the rider's; faded by the animation);
+  - the map (record +0xb30, 1.8 wide, 80 / its height high), with the course's marker placed by
+    `Course_GetMapMarkerX` / `Y` (not for course 7);
+  - the mode's badge in modes 4 and 5, then the flakes.
+- **`DrawOverlay` 0x2473d8** uses two text styles on the stack (title and menu fonts):
+  - the headings (0xe73 / 0xe74 in modes 4 and 5), or else the mode's heading typed in at 1.2;
+  - the course's name in pink;
+  - the labels right-aligned at 460, and their values typed in at 475 with the cursor on the animation's current
+    line.
+
+The same runner test, now 10,500 cases over the 35 functions. Its draw stand-ins also log the drawer's colour
+(0x337fe8) as it stands when they draw. Without that, a wrong colour that a later draw overwrote went unseen. 58 of
+59 mutants were caught; the one left is the constructor's second pass setting the records' first words to −1,
+which the first pass already did.

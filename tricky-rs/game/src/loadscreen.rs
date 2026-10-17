@@ -667,3 +667,515 @@ pub fn first_draw_background(m: &mut Mem, env: &mut dyn TextBoxEnv, this: u32, s
     fcall(m, env, FILLED_RECT, &[DRAW_COLOUR], &[ZERO, ZERO, F(640.0), F(480.0)]);
     rcall(m, env, 0x1f8, &[0, 0], &[]);
 }
+
+// --- G9w2: the one-player track load, and the sprite records every screen's poll fills ---
+
+pub const TRACK1_VTABLE: u32 = 0x3a5278;
+pub const SPEECH: u32 = 0x343050;
+pub const RACE: u32 = 0x32db6c;
+pub const CHARACTERS: u32 = 0x331ea8;
+/// "ldmo", "ldtr", "ldri" (with their 0): the pictures' shape names
+pub const SHAPE_MODE: u32 = 0x3a4f10;
+pub const SHAPE_TRACK: u32 = 0x3a4f18;
+pub const SHAPE_RIDER: u32 = 0x3a4f20;
+/// ".ssh", and "%d"
+pub const SSH: u32 = 0x3a4ce0;
+pub const FMT_D: u32 = 0x3a4b30;
+pub const SPRINTF: u32 = 0x2fca28;
+pub const BANK_LOAD: u32 = 0x214878;
+pub const BANK_POLL: u32 = 0x2148c8;
+pub const LOOP_PLAY: u32 = 0x214910;
+pub const LOOP_STOP: u32 = 0x214d10;
+pub const BANK_UNLOAD: u32 = 0x214d78;
+pub const SPRITES_INIT: u32 = 0x1f7f28;
+pub const LOAD_ICONS: u32 = 0x1f9a80;
+pub const SPRITES_POLL: u32 = 0x1f9d28;
+pub const WSTR_COPY: u32 = 0x17cc80;
+pub const WSTR_COUNT: u32 = 0x17cc48;
+pub const WSTR_SET_ASCII: u32 = 0x17ccb8;
+pub const WSTR_FORMAT: u32 = 0x17ce38;
+pub const WSTR_FORMAT_ASCII: u32 = 0x17ce70;
+pub const PLAYER_ID: u32 = 0x166580;
+pub const PLAYER_PROFILE: u32 = 0x164330;
+pub const LEVEL_NAME: u32 = 0x164808;
+pub const TRICK_BOOK: u32 = 0x163f18;
+pub const COMPLETE_PAGES: u32 = 0x164060;
+pub const EVENT_MEDAL: u32 = 0x163e28;
+pub const COURSE_NAME: u32 = 0x16b650;
+pub const COURSE_DIFFICULTY: u32 = 0x16b330;
+pub const COURSE_LOCATION: u32 = 0x16b3f8;
+pub const COURSE_DROP: u32 = 0x16b4c0;
+pub const COURSE_LENGTH: u32 = 0x16b588;
+pub const MAP_X: u32 = 0x16b6d8;
+pub const MAP_Y: u32 = 0x16b7b0;
+pub const ANIM_VALUE: u32 = 0x1f1448;
+pub const TS_INIT: u32 = 0x19dec0;
+pub const TS_CONSTRUCT: u32 = 0x19e388;
+pub const TS_SET_FONT: u32 = 0x19e380;
+pub const TS_DESTRUCT_THUNK: u32 = 0x19e3b0;
+pub const TS_DESTRUCT: u32 = 0x19ded0;
+pub const DRAW_ALIGNED: u32 = 0x19df90;
+pub const DRAW_CURSOR: u32 = 0x19e460;
+
+/// One of the poll's stores: (offset from the records, a float's bits / the sheet's word at / a whole number)
+#[derive(Clone, Copy)]
+enum Store {
+    K(u32, u32),
+    Sheet(u32, u32),
+    Int(u32, u32),
+}
+use Store::{Int, K, Sheet};
+
+/// The stores, in the game's order (the records' +0x310 is the loaded flag)
+const SPRITE_TABLE: [Store; 197] = [
+    Sheet(0x0000, 0x15e8), Sheet(0x001c, 0x15e8), Sheet(0x0038, 0x15e8), Int(0x0310, 1), K(0x0018, 0x3ee30000),
+    K(0x0004, 0x43320000), K(0x0008, 0x42e40000), K(0x0028, 0x3f418000), K(0x002c, 0x3e850000),
+    K(0x0030, 0x3f608000), K(0x0020, 0x431f0000), K(0x0024, 0x427c0000), K(0x0044, 0x3cb00000),
+    K(0x0050, 0x3e0e0000), K(0x0048, 0x3f5c8000), K(0x004c, 0x3f7c8000), Sheet(0x0054, 0x15e8),
+    K(0x0060, 0x3f158000), K(0x0068, 0x3e810000), K(0x0058, 0x42820000), K(0x0014, 0x3f318000),
+    K(0x003c, 0x42040000), K(0x0040, 0x41f80000), K(0x000c, 0x3b000000), K(0x0010, 0x3b000000),
+    K(0x0034, 0x3f7f8000), K(0x006c, 0x3f7f8000), K(0x0064, 0x3b000000), K(0x005c, 0x42d60000),
+    Sheet(0x0070, 0x15e8), Sheet(0x008c, 0x15e8), Sheet(0x00a8, 0x15ec), Sheet(0x00c4, 0x15ec),
+    K(0x0088, 0x3f2d8000), K(0x0080, 0x3ef50000), K(0x0084, 0x3f0c8000), K(0x0074, 0x41980000),
+    K(0x0078, 0x41a00000), K(0x00a4, 0x3f318000), K(0x009c, 0x3e9b0000), K(0x00a0, 0x3ec70000),
+    K(0x0090, 0x41b80000), K(0x00c0, 0x3f3b8000), K(0x00b8, 0x3cd00000), K(0x00bc, 0x3e320000),
+    K(0x00b0, 0x41d80000), K(0x00d0, 0x3f1e8000), K(0x00d4, 0x3e620000), K(0x00d8, 0x3ead0000),
+    K(0x00c8, 0x41f80000), K(0x007c, 0x3f1a8000), K(0x0098, 0x3f198000), K(0x0094, 0x41c80000),
+    K(0x00b4, 0x3f218000), K(0x00ac, 0x421c0000), K(0x00cc, 0x41e00000), K(0x00dc, 0x3f398000),
+    Sheet(0x00e0, 0x15ec), Sheet(0x00fc, 0x15ec), Sheet(0x0118, 0x15ec), Sheet(0x0134, 0x15ec),
+    K(0x00ec, 0x3f218000), K(0x00f8, 0x3f3c8000), K(0x00f0, 0x3ec50000), K(0x00f4, 0x3f0a8000),
+    K(0x00e4, 0x42240000), K(0x00e8, 0x41e00000), K(0x0114, 0x3f3a8000), K(0x010c, 0x3f1a8000),
+    K(0x0104, 0x41c80000), K(0x0124, 0x3f198000), K(0x0130, 0x3f458000), K(0x011c, 0x42040000),
+    K(0x0120, 0x42340000), K(0x0140, 0x3f408000), K(0x014c, 0x3f668000), K(0x0144, 0x3d380000),
+    K(0x0148, 0x3e120000), K(0x0138, 0x41d00000), Sheet(0x0150, 0x15ec), K(0x015c, 0x3f428000),
+    K(0x0110, 0x3f458000), K(0x012c, 0x3f718000), K(0x013c, 0x421c0000), K(0x0108, 0x3f228000),
+    K(0x0100, 0x42300000), K(0x0128, 0x3f518000), K(0x0168, 0x3f718000), Sheet(0x016c, 0x15ec),
+    Sheet(0x0188, 0x15ec), Sheet(0x01a4, 0x15ec), K(0x0160, 0x3e5a0000), K(0x0164, 0x3eb90000),
+    K(0x0154, 0x421c0000), K(0x0178, 0x3f438000), K(0x0184, 0x3f748000), K(0x017c, 0x3ed50000),
+    K(0x0180, 0x3f118000), K(0x0170, 0x42200000), K(0x0174, 0x42480000), K(0x0194, 0x3f4b8000),
+    K(0x01a0, 0x3f7b8000), K(0x018c, 0x423c0000), K(0x0190, 0x42440000), K(0x01b0, 0x3f4d8000),
+    K(0x01b8, 0x3f728000), K(0x01a8, 0x42080000), Sheet(0x01c0, 0x15ec), K(0x01cc, 0x3c200000),
+    K(0x01d8, 0x3f1b8000), K(0x01d0, 0x3bc00000), K(0x01b4, 0x3f518000), K(0x01ac, 0x42300000),
+    K(0x0158, 0x42400000), K(0x0198, 0x3f188000), K(0x019c, 0x3f468000), K(0x01bc, 0x3f788000),
+    K(0x01d4, 0x3f804000), Sheet(0x01dc, 0x15e8), Sheet(0x01f8, 0x15e8), Sheet(0x0214, 0x15e8),
+    K(0x01c8, 0x431a0000), Sheet(0x0230, 0x15f0), K(0x0234, 0x43800000), K(0x01c4, 0x43800000),
+    K(0x0240, 0x3b000000), K(0x01e8, 0x3f188000), K(0x01f4, 0x3f228000), K(0x01ec, 0x3f6f8000),
+    K(0x01f0, 0x3f778000), K(0x01e0, 0x41100000), K(0x01e4, 0x41300000), K(0x0204, 0x3f188000),
+    K(0x0210, 0x3f228000), K(0x0208, 0x3f788000), K(0x020c, 0x3f788000), K(0x01fc, 0x3f800000),
+    K(0x0200, 0x41300000), K(0x0220, 0x3f188000), K(0x022c, 0x3f228000), K(0x0224, 0x3f798000),
+    K(0x0228, 0x3f7f8000), K(0x0218, 0x40e00000), K(0x021c, 0x41300000), K(0x023c, 0x3b000000),
+    K(0x0248, 0x3f398000), K(0x0244, 0x3f7f8000), K(0x0238, 0x433a0000), Sheet(0x024c, 0x15e8),
+    Sheet(0x0268, 0x15e8), Sheet(0x0284, 0x15e8), Sheet(0x02a0, 0x15e8), K(0x0258, 0x3f088000),
+    K(0x0264, 0x3f378000), K(0x025c, 0x3f138000), K(0x0260, 0x3f388000), K(0x0274, 0x3f0e8000),
+    K(0x0280, 0x3f338000), K(0x0278, 0x3f398000), K(0x027c, 0x3f688000), K(0x026c, 0x42400000),
+    K(0x0270, 0x42180000), K(0x0294, 0x3f618000), K(0x02ac, 0x3ee50000), K(0x02b8, 0x3f098000),
+    K(0x02b0, 0x3f468000), K(0x02b4, 0x3f5d8000), K(0x02a8, 0x41c00000), K(0x0250, 0x42180000),
+    K(0x0254, 0x42400000), K(0x0290, 0x3ee50000), K(0x029c, 0x3f098000), K(0x0298, 0x3f788000),
+    K(0x0288, 0x41c00000), K(0x028c, 0x41c00000), K(0x02a4, 0x41c00000), Sheet(0x02bc, 0x15e8),
+    K(0x02fc, 0x41300000), Sheet(0x02d8, 0x15e8), K(0x02cc, 0x3f778000), K(0x02d0, 0x3f6f8000),
+    K(0x02c0, 0x41100000), K(0x02ec, 0x3f788000), K(0x02dc, 0x3f800000), Sheet(0x02f4, 0x15e8),
+    K(0x0300, 0x3f188000), K(0x030c, 0x3f228000), K(0x0304, 0x3f7f8000), K(0x0308, 0x3f798000),
+    K(0x02f8, 0x40e00000), K(0x02c8, 0x3f188000), K(0x02d4, 0x3f228000), K(0x02c4, 0x41300000),
+    K(0x02e4, 0x3f188000), K(0x02f0, 0x3f228000), K(0x02e8, 0x3f788000), K(0x02e0, 0x41300000),
+];
+
+/// The poll most screens share (`c1PTrackLoad::PollAssetLoad` 0x245ec0 and five more, the records at another
+/// place in each): 0 until the sound bank and the sprite set are in; then the sprite records (0x1c bytes each from
+/// `base`: a sheet, a place, a size, the texture's corners) filled from the table the game builds them by, the
+/// sheet words from the set's +0x15e8 / +0x15ec / +0x15f0, and the loaded flag (`base` + 0x310); 1
+pub fn poll_sprites(m: &mut Mem, env: &mut dyn TextBoxEnv, this: u32, base: u32) -> u32 {
+    if call(m, env, BANK_POLL, &[m.r32(SPEECH)]) == 0 {
+        return 0;
+    }
+    if call(m, env, SPRITES_POLL, &[m.r32(this + 4)]) == 0 {
+        return 0;
+    }
+    let set = m.r32(this + 4);
+    for s in SPRITE_TABLE {
+        match s {
+            K(o, v) | Int(o, v) => m.w32(this + base + o, v),
+            Sheet(o, w) => m.w32(this + base + o, m.r32(set + w)),
+        }
+    }
+    1
+}
+
+/// `c1PTrackLoad::c1PTrackLoad` 0x245840(this): the base's, its table, the bars' animation (+0x40c), 28 sprite
+/// records (+0xb14) unset and full size, the fade's colours red, the event's summary filled; `this`
+pub fn track1_new(m: &mut Mem, env: &mut dyn TextBoxEnv, this: u32) -> u32 {
+    init(m, env, this);
+    m.w32(this, TRACK1_VTABLE);
+    call(m, env, ANIM_INIT, &[this + 0x40c]);
+    for i in 0..28 {
+        let r = this + 0xb14 + 0x1c * i;
+        m.w32(r, 0xffff_ffff);
+        wf(m, r + 4, ONE);
+        wf(m, r + 8, ONE);
+        m.w32(r + 0xc, 0);
+        m.w32(r + 0x10, 0);
+        wf(m, r + 0x14, ONE);
+        wf(m, r + 0x18, ONE);
+    }
+    put4(m, this + 0x94, [ONE, ZERO, ZERO, ZERO]);
+    put4(m, this + 0xa4, [ONE, ZERO, ZERO, ZERO]);
+    for i in (0..28).rev() {
+        m.w32(this + 0xb14 + 0x1c * i, 0xffff_ffff);
+    }
+    fill_event_summary(m, env, this);
+    this
+}
+
+/// `c1PTrackLoad::~c1PTrackLoad` 0x245958(this, flags): the sound bank unloaded, the animation deleted, then the
+/// base's
+pub fn track1_delete(m: &mut Mem, env: &mut dyn TextBoxEnv, this: u32, flags: u32) {
+    m.w32(this, TRACK1_VTABLE);
+    call(m, env, BANK_UNLOAD, &[m.r32(SPEECH)]);
+    call(m, env, ANIM_DELETE, &[this + 0x40c, 2]);
+    delete(m, env, this, flags);
+}
+
+/// `LoadScreen_GetModePicName` 0x2459b0(mode, out): "ldmode…%s" with ".ssh" for modes 1 to 5 and 7 (free ride,
+/// race, show-off, race, show-off, time challenge); nothing for the rest
+pub fn mode_pic_name(m: &mut Mem, env: &mut dyn TextBoxEnv, mode: u32, out: u32) {
+    let fmt = match mode {
+        1 => 0x3a4d08,
+        2 | 4 => 0x3a4cd0,
+        3 | 5 => 0x3a4ce8,
+        7 => 0x3a4cf8,
+        _ => return,
+    };
+    call(m, env, SPRINTF, &[out, fmt, SSH]);
+}
+
+/// `LoadScreen_GetTrackPicName` 0x245a48(course, out): "ldtrack<name>%s" for courses 0 to 8 and 11
+pub fn track_pic_name(m: &mut Mem, env: &mut dyn TextBoxEnv, course: u32, out: u32) {
+    const T: [u32; 12] = [0x3a4d40, 0x3a4d50, 0x3a4d60, 0x3a4d70, 0x3a4d80, 0x3a4d90, 0x3a4da0, 0x3a4db0, 0x3a4dc0, 0, 0, 0x3a4dd0];
+    if course >= 12 || T[course as usize] == 0 {
+        return;
+    }
+    call(m, env, SPRINTF, &[out, T[course as usize], SSH]);
+}
+
+/// `LoadScreen_GetRiderPicName` 0x245b68(character, out): "ldrider<name>%s" for the twelve characters
+pub fn rider_pic_name(m: &mut Mem, env: &mut dyn TextBoxEnv, ch: u32, out: u32) {
+    if ch >= 12 {
+        return;
+    }
+    call(m, env, SPRINTF, &[out, 0x3a4e10 + 0x10 * ch, SSH]);
+}
+
+/// The career's event mode: its +0x2afc, or the World Circuit's +0x3818 while its +0x3708 is 1
+fn event_mode(m: &Mem) -> u32 {
+    if m.r32(CAREER + 0x3708) == 1 { m.r32(CAREER + 0x3818) } else { m.r32(CAREER + 0x2afc) }
+}
+
+/// A shape's 4-letter name and its 0 at a picture's +0x29
+fn put_shape_name(m: &mut Mem, e: u32, name: u32) {
+    for k in 0..5 {
+        let b = m.r8(name + k);
+        m.w8(e + 0x29 + k, b);
+    }
+}
+
+/// `c1PTrackLoad::StartAssetLoad` 0x245cb8(this): the sound bank, the sprite set and its icons (0x2cc) asked for,
+/// not yet in; three pictures (+0xe28): the event mode's, the course's and the player's rider's, each with its
+/// shape's name; then their load started
+pub fn track1_start(m: &mut Mem, env: &mut dyn TextBoxEnv, this: u32) {
+    let list = this + 0xe28;
+    call(m, env, BANK_LOAD, &[m.r32(SPEECH)]);
+    call(m, env, SPRITES_INIT, &[m.r32(this + 4)]);
+    call(m, env, LOAD_ICONS, &[m.r32(this + 4), 0x2cc, 1]);
+    m.w32(this + 0xe24, 0);
+    for i in 0..3u32 {
+        let e = list + 0x34 * i;
+        m.w32(e, 0);
+        m.w8(e + 4, 0);
+        m.w8(e + 0x29, 0);
+        m.w32(e + 0x30, 0xffff_ffff);
+        match i {
+            0 => {
+                let mode = event_mode(m);
+                mode_pic_name(m, env, mode, e + 4);
+                put_shape_name(m, e, SHAPE_MODE);
+            }
+            1 => {
+                let c = selected_course(m);
+                track_pic_name(m, env, c, e + 4);
+                put_shape_name(m, e, SHAPE_TRACK);
+            }
+            _ => {
+                let id = call(m, env, PLAYER_ID, &[CAREER, 0]);
+                let p = call(m, env, PLAYER_PROFILE, &[CAREER, id]);
+                rider_pic_name(m, env, p, e + 4);
+                put_shape_name(m, e, SHAPE_RIDER);
+            }
+        }
+    }
+    load_pics(m, env, this, list, 3);
+}
+
+/// `c1PTrackLoad::PollAssetLoad` 0x245ec0(this): [`poll_sprites`] with the records at +0xb14
+pub fn track1_poll(m: &mut Mem, env: &mut dyn TextBoxEnv, this: u32) -> u32 {
+    poll_sprites(m, env, this, 0xb14)
+}
+
+fn loc(m: &mut Mem, env: &mut dyn TextBoxEnv, id: u32) -> u32 {
+    let t = m.r32(m.r32(APP) + 0x50);
+    call(m, env, LOC, &[t, id])
+}
+fn copy_loc(m: &mut Mem, env: &mut dyn TextBoxEnv, to: u32, id: u32) {
+    let s = loc(m, env, id);
+    call(m, env, WSTR_COPY, &[to, s]);
+}
+
+/// `FE_FillEventSummary` 0x246700(this): the event's lines (wide strings at +0x6a0.. 0x3c apart) for the screen:
+/// the mode's heading (+0x6a0: 0xe2b free ride and lesson, 0xe71 race, show-off and time challenge, 0xe2f
+/// otherwise; nothing at all for modes 8 and 9), the mode's line (+0x6dc), the course's name, the labels
+/// 0x11d..0x124 and 0x11c, the course's difficulty, location, drop and length, the player's character and level,
+/// the trick book's pages ("%d" of the next, or 0xc9e when all 6 are done), the event's medal line; then the bars'
+/// animation's lines, each as long as its text
+pub fn fill_event_summary(m: &mut Mem, env: &mut dyn TextBoxEnv, this: u32) {
+    let mode = event_mode(m);
+    let heading = match mode {
+        1 | 6 => 0xe2b,
+        2 | 3 | 7 => 0xe71,
+        8 | 9 => return,
+        _ => 0xe2f,
+    };
+    copy_loc(m, env, this + 0x6a0, heading);
+    let line = match mode {
+        2 | 4 => 0xe2c,
+        3 | 5 => 0xe2d,
+        6 => 0xe2e,
+        7 => 0xe72,
+        _ => 0xe2a,
+    };
+    copy_loc(m, env, this + 0x6dc, line);
+    let t = m.r32(m.r32(APP) + 0x50);
+    let c = selected_course(m);
+    let id = call(m, env, COURSE_NAME, &[CAREER, c]);
+    let s = call(m, env, LOC, &[t, id]);
+    call(m, env, WSTR_COPY, &[this + 0x718, s]);
+    let pid = call(m, env, PLAYER_ID, &[CAREER, 0]);
+    let profile = call(m, env, PLAYER_PROFILE, &[CAREER, pid]);
+    for (o, id) in [(0x754u32, 0x11du32), (0x790, 0x11f), (0x7cc, 0x124), (0x808, 0x11e), (0x844, 0x121), (0x880, 0x120), (0x8bc, 0x123), (0x8f8, 0x11c)] {
+        copy_loc(m, env, this + o, id);
+    }
+    for (o, f) in [(0x934u32, COURSE_DIFFICULTY), (0x970, COURSE_LOCATION), (0x9ac, COURSE_DROP), (0x9e8, COURSE_LENGTH)] {
+        let c = selected_course(m);
+        let s = call(m, env, f, &[CAREER, c]);
+        call(m, env, WSTR_COPY, &[this + o, s]);
+    }
+    let name = m.r32(profile.wrapping_mul(0x38).wrapping_add(CHARACTERS) + 4);
+    call(m, env, WSTR_SET_ASCII, &[this + 0xa24, name]);
+    let pid = call(m, env, PLAYER_ID, &[CAREER, 0]);
+    let lv = call(m, env, LEVEL_NAME, &[CAREER, pid]);
+    call(m, env, WSTR_COPY, &[this + 0xa60, lv]);
+    let pid = call(m, env, PLAYER_ID, &[CAREER, 0]);
+    let book = call(m, env, TRICK_BOOK, &[CAREER, pid]);
+    let pages = call(m, env, COMPLETE_PAGES, &[book]);
+    if pages == 6 {
+        let f = loc(m, env, 0xc9e);
+        call(m, env, WSTR_FORMAT, &[this + 0xa9c, f, pages]);
+    } else {
+        call(m, env, WSTR_FORMAT_ASCII, &[this + 0xa9c, FMT_D, pages.wrapping_add(1)]);
+    }
+    let c = selected_course(m);
+    let medal = call(m, env, EVENT_MEDAL, &[CAREER, mode, c]);
+    let id = match medal {
+        0 => 0x12f,
+        1 => 0x135,
+        2 => 0x12c,
+        _ => 0x132,
+    };
+    copy_loc(m, env, this + 0xad8, id);
+    let anim = this + 0x40c;
+    let count = |m: &mut Mem, env: &mut dyn TextBoxEnv, at: u32| call(m, env, WSTR_COUNT, &[at]);
+    let bar = |m: &mut Mem, env: &mut dyn TextBoxEnv, a: [u32; 6]| {
+        call(m, env, ANIM_ADD_BAR, &[anim, a[0], a[1], a[2], a[3], a[4], a[5]]);
+    };
+    let n = count(m, env, this + 0x6a0);
+    bar(m, env, [1, 1, 2, 0, 0, n]);
+    bar(m, env, [2, 1, 0x46, 3, 0, 1000]);
+    bar(m, env, [0x13, 1, 1, 0, 0, 0x82]);
+    bar(m, env, [4, 1, 0x46, 3, 0, 1000]);
+    let n = count(m, env, this + 0xad8);
+    bar(m, env, [0x11, 1, 2, 0, 0, n.wrapping_add(0x3c)]);
+    let n = count(m, env, this + 0x718);
+    bar(m, env, [5, 2, 2, 0, 0, n]);
+    bar(m, env, [6, 2, 0x3c, 3, 0, 1000]);
+    bar(m, env, [7, 3, 0x32, 2, 0x190, 1000]);
+    bar(m, env, [8, 3, 0x46, 3, 0, 1000]);
+    for (o, line, row) in [(0x934u32, 9u32, 3u32), (0x970, 0xa, 4), (0x9ac, 0xb, 5), (0x9e8, 0xc, 6)] {
+        let n = count(m, env, this + o);
+        bar(m, env, [line, row, 2, 0, 0, n.wrapping_add(0x14)]);
+    }
+    bar(m, env, [0xd, 7, 0x32, 3, 0, 1000]);
+    for (o, line, row) in [(0xa24u32, 0xeu32, 7u32), (0xa60, 0xf, 8), (0xa9c, 0x10, 9)] {
+        let n = count(m, env, this + o);
+        bar(m, env, [line, row, 2, 0, 0, n.wrapping_add(0x14)]);
+    }
+}
+
+/// vf4 0x246f18(this): the loading loop played, then the bars started
+pub fn track1_vf4(m: &mut Mem, env: &mut dyn TextBoxEnv, this: u32, scratch: u32) {
+    call(m, env, LOOP_PLAY, &[m.r32(SPEECH), 1]);
+    start_bars(m, env, this, scratch);
+}
+
+/// vf3 0x246f50(this): 1 once the fade is in; else the pictures' archive closed, 0
+pub fn track1_vf3(m: &mut Mem, env: &mut dyn TextBoxEnv, this: u32, scratch: u32) -> u32 {
+    if fade_in(m, this) != 0 {
+        return 1;
+    }
+    close_archive(m, env, this, scratch);
+    0
+}
+
+/// vf5 0x246f88(this): the base's tick, the summary's animation, and the loading loop stopped once the app's +8
+/// reaches 8
+pub fn track1_vf5(m: &mut Mem, env: &mut dyn TextBoxEnv, this: u32) {
+    tick(m, env, this);
+    call(m, env, ANIM_UPDATE, &[this + 0x40c]);
+    if (m.r32(m.r32(APP) + 8) as i32) >= 8 {
+        call(m, env, LOOP_STOP, &[m.r32(SPEECH), 1]);
+    }
+}
+
+fn anim_value(m: &mut Mem, env: &mut dyn TextBoxEnv, anim: u32, line: u32) -> F {
+    F(f32::from_bits(call(m, env, ANIM_EVAL, &[anim, line])))
+}
+
+/// `c1PTrackLoad::DrawBackground` 0x246fe0(this): once the sprites are in, the bars and the ticker; each picture that
+/// is in in a tip box (the mode's with the mode's line at y 100, the course's at 199, the rider's at 300, faded by
+/// the animation's lines 4, 8 and 13); the map (sprite +0xb30, 1.8 wide, 80 / its height high) and the course's
+/// marker on it (sprite +0xb4c) unless the course is 7; the mode's badge (sprite +0xb14) in modes 4 and 5; the
+/// flakes
+pub fn track1_draw_background(m: &mut Mem, env: &mut dyn TextBoxEnv, this: u32, scratch: u32) {
+    let mode = event_mode(m);
+    let hscale = crate::animseq::div(F(80.0), rf(m, this + 0xb38));
+    if m.r32(this + 0xe24) == 0 {
+        return;
+    }
+    let recs = this + 0xb14;
+    let badge = mode.wrapping_sub(4) < 2;
+    draw_bars(m, env, this, recs, scratch);
+    draw_ticker(m, env, recs, scratch);
+    let anim = this + 0x40c;
+    for i in 0..3u32 {
+        let e = this + 0xe28 + 0x34 * i;
+        if m.r32(e) != 1 {
+            continue;
+        }
+        let (line, y, text) = match i {
+            0 => (4, F(100.0), this + 0x6dc),
+            1 => (8, k(0x4347_0000), 0),
+            _ => (0xd, F(300.0), 0),
+        };
+        let a = anim_value(m, env, anim, line);
+        draw_tip_box(m, env, this, m.r32(e + 0x30), text, 7, F(23.0), y, a, scratch);
+    }
+    rcall(m, env, 0x1d0, &[8], &[]);
+    let wide = k(0x3fe6_6666);
+    let x = F(320.0);
+    let grey = k(0x3ee6_6666);
+    wf(m, DRAW_COLOUR, ONE);
+    wf(m, DRAW_COLOUR + 0xc, grey);
+    wf(m, DRAW_COLOUR + 4, grey);
+    wf(m, DRAW_COLOUR + 8, grey);
+    let a = anim_value(m, env, anim, 6);
+    let v = rf(m, DRAW_COLOUR) * a;
+    wf(m, DRAW_COLOUR, v);
+    fcall(m, env, SPRITE_RECT, &[this + 0xb30, 0], &[x, ZERO, wide, hscale]);
+    rcall(m, env, 0x1d0, &[9], &[]);
+    let mw = rf(m, this + 0xb34) * wide;
+    let mh = rf(m, this + 0xb38) * hscale;
+    put4(m, scratch, [ONE; 4]);
+    call(m, env, SET_COLOUR, &[DRAW_COLOUR, scratch]);
+    let s = anim_value(m, env, anim, 7);
+    if selected_course(m) != 7 {
+        let c = selected_course(m);
+        let mx = F(f32::from_bits(call(m, env, MAP_X, &[CAREER, c])));
+        let px = mw * mx + x;
+        let c = selected_course(m);
+        let my = F(f32::from_bits(call(m, env, MAP_Y, &[CAREER, c])));
+        fcall(m, env, SPRITE_RECT, &[this + 0xb4c, 0x60], &[px, mh * my + ZERO, s, s]);
+    }
+    rcall(m, env, 0x1d0, &[8], &[]);
+    put4(m, scratch, [ONE; 4]);
+    call(m, env, SET_COLOUR, &[DRAW_COLOUR, scratch]);
+    let a = anim_value(m, env, anim, 2);
+    let v = rf(m, DRAW_COLOUR) * a;
+    wf(m, DRAW_COLOUR, v);
+    if badge {
+        let b = k(0x3f66_6666);
+        fcall(m, env, SPRITE_RECT, &[recs, 0], &[F(10.0), ZERO, b, b]);
+    }
+    let n = m.r32(m.r32(APP) + 8);
+    draw_flakes(m, env, recs, n as i32);
+}
+
+/// `c1PTrackLoad::DrawOverlay` 0x2473d8(this): on texture 10, two text styles (the title and menu fonts, +4 set):
+/// in modes 4 and 5 the headings 0xe73 and 0xe74 in gold, else the mode's heading typed in (the animation's line
+/// 1) at 1.2; the course's name typed in (line 5) in pink; the labels right-aligned in black (from y 186, 26 apart;
+/// and the medal's in modes 4 and 5) and their values typed in with the cursor on the animation's current line
+pub fn track1_draw_overlay(m: &mut Mem, env: &mut dyn TextBoxEnv, this: u32, scratch: u32) {
+    let mode = event_mode(m);
+    let badge = mode.wrapping_sub(4) < 2;
+    let (title, menu) = (this + 0x48, this + 0xc);
+    let (a, b) = (scratch, scratch + 0x10);
+    let col = scratch + 0x20;
+    rcall(m, env, 0x1d0, &[0xa], &[]);
+    call(m, env, TS_INIT, &[a]);
+    call(m, env, TS_CONSTRUCT, &[b]);
+    call(m, env, TS_SET_FONT, &[a, title]);
+    m.w32(a + 4, 1);
+    call(m, env, TS_SET_FONT, &[b, menu]);
+    m.w32(b + 4, 1);
+    let anim = this + 0x40c;
+    let gold = [k(0x3f80_0000), k(0x3f73_f7cf), k(0x3f3a_9fbe), k(0x3dd9_1687)];
+    if badge {
+        put4(m, col, gold);
+        call(m, env, SET_COLOUR, &[DRAW_COLOUR, col]);
+        let big = k(0x3f8c_cccd);
+        let s = loc(m, env, 0xe73);
+        fcall(m, env, PRINTF_SHADOWED_A, &[title, s], &[big, F(15.0), F(25.0)]);
+        let s = loc(m, env, 0xe74);
+        fcall(m, env, PRINTF_SHADOWED_A, &[title, s], &[big, F(46.0), F(54.0)]);
+    } else {
+        put4(m, col, gold);
+        call(m, env, SET_COLOUR, &[DRAW_COLOUR, col]);
+        let n = call(m, env, ANIM_VALUE, &[anim, 1]);
+        fcall(m, env, DRAW_ALIGNED, &[a, 0, this + 0x6a0, n, 0, 1], &[k(0x3f99_999a), F(30.0), F(30.0)]);
+    }
+    put4(m, col, [ONE, k(0x3f09_78d5), k(0x3f45_e354), k(0x3f53_b646)]);
+    call(m, env, SET_COLOUR, &[DRAW_COLOUR, col]);
+    let n = call(m, env, ANIM_VALUE, &[anim, 5]);
+    fcall(m, env, DRAW_ALIGNED, &[a, 0, this + 0x718, n, 0, 1], &[k(0x3f4c_cccd), k(0x43c5_8000), F(30.0)]);
+    wf(m, DRAW_COLOUR, ONE);
+    wf(m, DRAW_COLOUR + 0xc, ZERO);
+    wf(m, DRAW_COLOUR + 4, ZERO);
+    wf(m, DRAW_COLOUR + 8, ZERO);
+    let (lx, sc) = (F(460.0), k(0x3f94_7ae1));
+    let ys = [k(0x433a_0000), k(0x4354_0000), k(0x436e_0000), k(0x4384_0000), k(0x4397_8000), k(0x43a4_8000), k(0x43b1_8000)];
+    for (i, o) in [0x754u32, 0x790, 0x7cc, 0x808, 0x844, 0x880, 0x8bc].into_iter().enumerate() {
+        fcall(m, env, DRAW_RIGHT, &[menu, this + o], &[lx, ys[i], sc]);
+    }
+    let vx = k(0x43ed_8000);
+    let step = m.r32(anim);
+    if badge {
+        let y = k(0x4303_0000);
+        fcall(m, env, DRAW_RIGHT, &[menu, this + 0x8f8], &[lx, y, sc]);
+        let n = call(m, env, ANIM_VALUE, &[anim, 0x11]);
+        let step = m.r32(anim);
+        fcall(m, env, DRAW_CURSOR, &[b, 0, this + 0xad8, n, 0, (step == 1) as u32], &[sc, vx, y]);
+    }
+    let _ = step;
+    for (i, (line, o, at)) in [(9u32, 0x934u32, 3u32), (0xa, 0x970, 4), (0xb, 0x9ac, 5), (0xc, 0x9e8, 6), (0xe, 0xa24, 7), (0xf, 0xa60, 8), (0x10, 0xa9c, 9)].into_iter().enumerate() {
+        let n = call(m, env, ANIM_VALUE, &[anim, line]);
+        let step = m.r32(anim);
+        fcall(m, env, DRAW_CURSOR, &[b, 0, this + o, n, 0, (step == at) as u32], &[sc, vx, ys[i]]);
+    }
+    call(m, env, TS_DESTRUCT_THUNK, &[b, 2]);
+    call(m, env, TS_DESTRUCT, &[a, 2]);
+}
