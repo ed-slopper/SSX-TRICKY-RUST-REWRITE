@@ -1552,3 +1552,46 @@ for the box on the stack too.
 All 55 mutants are caught. Five first survived and showed gaps in the test, now closed: the text styles' +4 is
 logged when they are destroyed, the text box's init stand-in fills the box and its wrap sets +0x6c, and the
 static records start non-zero.
+
+## Pause menu draws and constructor (G9a3, `game/src/pausedraw.rs`)
+
+- **`cPauseMenuOverlay::cPauseMenuOverlay` 0x1ab9f8(this, whole)** is built over the backdrop overlay it draws
+  on (+0x42c).
+  - When `whole` is set, it is the most-derived object: the backdrop is the overlay's own at +0x820, and it is
+    built first.
+  - Otherwise the compiler's constructor for a virtual base runs. It copies the backdrop's table (0x98 bytes from
+    0x38f0c8) onto its own stack, moves the copy's six `this` adjustments (+8, +0x18, +0x68, +0x70, +0x78, +0x80)
+    by where the backdrop really sits, and points the backdrop's +0x28 at the stack copy. The pointer is left
+    dangling once the constructor returns. The port makes the copy in its scratch, and the test checks the copy's
+    bytes against the game's stack.
+  - Then: the second table (0x38f160), the trick info at +0x7f8, the three camera names (labels 0x1d8, 0x1da,
+    0x1d9 into 0x338230), the pages cleared (0x3a8 bytes from +0x438) and built, +0x7e8 −1, +0x7f8 the app's +0x60,
+    and three of the career's words (+0x3704, +0x3708, +0x370c) cleared. The main page's builder 0x1ac678 is G9a1's
+    (`pausemenu`), called by address here.
+- **`PauseMenu_DrawMainPage` 0x1ac7e0** draws the main page's list (`Overlay_DrawMenuList`, centred on y; its ninth and tenth
+  arguments go on the stack: the pulse, and the items' enabled words, all 1) and the heading box.
+  - With the trick book shown (+0x7f0) the list moves to y = the page's edge + 95, with no pointer sprite (0x74
+    → −1) and no pulse.
+  - It then draws the rider's name, the page ("%d" 0xe64: the next page, at most 6) and the trick's number
+    (0xea7). The trick's name is smaller from 50 characters on.
+  - The trick's info (`cTrickInfo` vf2 / `cGameTrickInfo` vf5) is drawn at (320, 303), with arrows when there are
+    tricks before or after on the page, and 0xc93 once the trick is done.
+- **`PauseMenu_DrawMusicList` 0x1ad198** draws nothing despite its name: it builds the options page's items.
+  - The items are brightness (kind 8, top 50) and camera (9, top 3), the view for one player (0xb) and for two
+    (0xc), the song (0xd, top: the songs enabled) and five volumes (0xe, 0x10, 0x13, 0xf, 0x15, top 50).
+  - It also measures the four view names and every enabled song, then throws the widths away.
+  - Finally it copies the page's 16 bytes of colour (0x38e380).
+- **`PauseMenu_DrawOptionsPage` 0x1ad628** lays the rows out centred on 240, the menu font's height · 0.8 + 6
+  apart, starting from `240 − height · count · 0.5`. In each row:
+  - the label and ":" are right-aligned at 264 and 270, gold when picked;
+  - the value is drawn at 305: the camera's name (kind 9), the song (0xd), or the view's name by its value (kinds
+    0xb, 0xc: 0 → 0x14a, 1 → 0x14d, 2 → 0x14c, 3 → 0x14e, else 0x14d);
+  - a slider (+0x10 clear) is the bar sprite 0x56 with 0x57 tiled over it by value / top (`div.s`);
+  - the picked row's arrows sit at 282 and past the value's width.
+
+  Every colour is scaled by the backdrop's alpha (+0x70) except the slider's white.
+
+The runner test (tests/pausedraw.rs) has 12,000 cases. Its menu-list stand-in reads the two stack arguments and
+logs both arrays.
+All 63 mutants are caught. Two first survived because the ELF loads the career's three words and the camera
+names as zero; the test now makes them random.

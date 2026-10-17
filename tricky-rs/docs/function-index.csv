@@ -2464,7 +2464,7 @@ address,size,name,system,status
 0x1ab028,284,FUN_001ab028,game?,not started
 0x1ab148,88,cResultsOverlay::Update,frontend,ported
 0x1ab1a0,2132,cViewHiScoresOverlay::DrawText,frontend,not started
-0x1ab9f8,516,cPauseMenuOverlay::cPauseMenuOverlay,frontend,ported
+0x1ab9f8,516,cPauseMenuOverlay::cPauseMenuOverlay,frontend,checked
 0x1abc00,620,cCountdownOverlay::vf34_1abc00,frontend,not started
 0x1abe70,528,cCountdownOverlay::vf31_1abe70,frontend,not started
 0x1ac080,176,cCountdownOverlay::vf32_1ac080,frontend,not started
@@ -2472,10 +2472,10 @@ address,size,name,system,status
 0x1ac410,368,PauseMenu_Resume,frontend?,ported
 0x1ac580,248,PauseMenu_PopLevel,frontend?,ported
 0x1ac678,356,PauseMenu_BuildMainPage,frontend?,ported
-0x1ac7e0,1568,PauseMenu_DrawMainPage,frontend?,not started
+0x1ac7e0,1568,PauseMenu_DrawMainPage,frontend,checked
 0x1ace00,920,PauseMenu_UpdateMainPage,frontend?,ported
-0x1ad198,1164,PauseMenu_DrawMusicList,frontend?,not started
-0x1ad628,1788,PauseMenu_DrawOptionsPage,hud?,not started
+0x1ad198,1164,PauseMenu_DrawMusicList,frontend,checked
+0x1ad628,1788,PauseMenu_DrawOptionsPage,frontend,checked
 0x1add28,1572,PauseMenu_UpdateOptionsPage,audio?,ported
 0x1ae350,100,cCountdownOverlay::Reset,frontend,not started
 0x1ae3b8,248,cCountdownOverlay::Update,frontend,not started
