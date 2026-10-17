@@ -90,8 +90,15 @@ pub fn frame_matrices<E: CullEnv + ?Sized>(m: &mut Mem, env: &mut E, r: u32) {
 /// OR-ed and AND-ed.
 pub fn cull_box(m: &mut Mem, env: &mut dyn CullEnv, r: u32, min: u32, max: u32) -> u32 {
     frame_matrices(m, env, r);
+    box_test(m, r + 0x5b0, min, max)
+}
+
+/// The box test itself (VU0 micro program 0x320, which sets its own ones): the box's eight corners through the
+/// matrix at `matrix`; 1 when every corner is beyond the same side, 0 when none is beyond any, else 2. `CullBox`
+/// runs it on the renderer's clip matrix; the renderer's +0x288 on a matrix it is handed.
+pub fn box_test(m: &Mem, matrix: u32, min: u32, max: u32) -> u32 {
     let (lo, hi) = (rq(m, min), rq(m, max));
-    let clip_rows = rows(m, r + 0x5b0);
+    let clip_rows = rows(m, matrix);
     let (mut any, mut all) = (0u32, 63u32);
     for k in 0..8 {
         let pick = |i: usize| if k >> (2 - i) & 1 != 0 { hi[i] } else { lo[i] };

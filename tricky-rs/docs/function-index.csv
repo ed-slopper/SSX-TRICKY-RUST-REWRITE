@@ -3012,7 +3012,7 @@ address,size,name,system,status
 0x1dc328,136,cPS2GraphicsMan::vf4_1dc328,render,not started
 0x1dc3b0,48,cPS2GraphicsMan::vf25_1dc3b0,render,not started
 0x1dc3e0,2092,cPS2GraphicsMan::vf20_1dc3e0,render,not started
-0x1dcc10,504,cPS2GraphicsMan::vf22_1dcc10,render,not started
+0x1dcc10,504,cPS2GraphicsMan::vf22_1dcc10,render,checked
 0x1dce08,1608,cPS2GraphicsMan::vf21_1dce08,render,not started
 0x1dd450,156,cPS2GraphicsMan::vf35_1dd450,render,not started
 0x1dd4f0,216,cPS2GraphicsMan::vf15_1dd4f0,render,not started
@@ -3047,15 +3047,15 @@ address,size,name,system,status
 0x1e1188,68,cPS2GraphicsMan::vf42_1e1188,render,not started
 0x1e11d0,388,cPS2GraphicsMan::vf43_1e11d0,render,not started
 0x1e1358,348,cPS2GraphicsMan::vf44_1e1358,render,not started
-0x1e14b8,88,cPS2GraphicsMan::vf46_1e14b8,render,not started
-0x1e1510,308,cPS2GraphicsMan::vf47_1e1510,render,not started
-0x1e1648,28,cPS2GraphicsMan::vf45_1e1648,render,not started
-0x1e1668,136,cPS2GraphicsMan::vf48_1e1668,render,not started
+0x1e14b8,88,cPS2GraphicsMan::vf46_1e14b8,render,checked
+0x1e1510,308,cPS2GraphicsMan::vf47_1e1510,render,checked
+0x1e1648,28,cPS2GraphicsMan::vf45_1e1648,render,checked
+0x1e1668,136,cPS2GraphicsMan::vf48_1e1668,render,checked
 0x1e16f0,28,cPS2GraphicsMan::vf49_1e16f0,render,not started
 0x1e1710,28,cPS2GraphicsMan::vf50_1e1710,render,not started
 0x1e1730,988,cPS2GraphicsMan::vf78_1e1730,render,not started
 0x1e1b10,768,cPS2GraphicsMan::CullBox,render,checked
-0x1e1e10,88,cPS2GraphicsMan::vf80_1e1e10,render,not started
+0x1e1e10,88,cPS2GraphicsMan::vf80_1e1e10,render,checked
 0x1e1e68,92,cPS2GraphicsMan::vf81_1e1e68,render,not started
 0x1e1ec8,96,FUN_001e1ec8,render?,not started
 0x1e1f28,68,FUN_001e1f28,render?,not started
@@ -3102,7 +3102,7 @@ address,size,name,system,status
 0x1e8838,140,PS2Render_Submit,render?,checked
 0x1e88c8,96,PS2Render_FlushState,render?,checked
 0x1e8928,48,cPS2GraphicsMan::vf36_1e8928,render,not started
-0x1e8958,24,cPS2GraphicsMan::vf24_1e8958,render,not started
+0x1e8958,24,cPS2GraphicsMan::vf24_1e8958,render,checked
 0x1e8970,76,cPS2GraphicsMan::vf23_1e8970,render,not started
 0x1e89c0,600,cPS2GraphicsMan::vf18_1e89c0,render,not started
 0x1e8c18,192,cPS2GraphicsMan::vf17_1e8c18,render,not started
@@ -3116,37 +3116,37 @@ address,size,name,system,status
 0x1e8dd0,80,cPS2GridMesh::__tf,runtime,host
 0x1e8e20,128,cPS2GraphicsMan::vf12_1e8e20,render,not started
 0x1e8ea0,8,Gfx_FlipDisplay,render,not started
-0x1e8fd8,44,cPS2GraphicsMan::vf90_1e8fd8,render,not started
+0x1e8fd8,44,cPS2GraphicsMan::vf90_1e8fd8,render,checked
 0x1e9008,44,cPS2GraphicsMan::vf89_1e9008,render,checked
 0x1e9038,48,cPS2GraphicsMan::vf88_1e9038,render,not started
 0x1e9068,44,cPS2GraphicsMan::vf87_1e9068,render,checked
-0x1e9098,80,cPS2GraphicsMan::vf66_1e9098,render,not started
+0x1e9098,80,cPS2GraphicsMan::vf66_1e9098,render,checked
 0x1e90e8,28,cPS2GraphicsMan::vf14_1e90e8,render,not started
 0x1e9108,28,cPS2GraphicsMan::vf13_1e9108,render,not started
 0x1e9128,116,FUN_001e9128,render?,not started
-0x1e91e8,52,cPS2GraphicsMan::vf63_1e91e8,render,not started
-0x1e9338,60,cPS2GraphicsMan::vf62_1e9338,render,not started
-0x1e9378,60,cPS2GraphicsMan::SetTexture,render,not started
+0x1e91e8,52,cPS2GraphicsMan::vf63_1e91e8,render,checked
+0x1e9338,60,cPS2GraphicsMan::vf62_1e9338,render,checked
+0x1e9378,60,cPS2GraphicsMan::SetTexture,render,checked
 0x1e93e8,48,cPS2GraphicsMan::vf60_1e93e8,render,checked
-0x1e9418,48,cPS2GraphicsMan::vf59_1e9418,render,not started
-0x1e9448,12,cPS2GraphicsMan::vf58_1e9448,render,not started
-0x1e9458,32,cPS2GraphicsMan::vf57_1e9458,render,not started
-0x1e9478,112,cPS2GraphicsMan::SetAlphaBlend,render,not started
-0x1e94e8,32,cPS2GraphicsMan::vf55_1e94e8,render,not started
+0x1e9418,48,cPS2GraphicsMan::vf59_1e9418,render,checked
+0x1e9448,12,cPS2GraphicsMan::vf58_1e9448,render,checked
+0x1e9458,32,cPS2GraphicsMan::vf57_1e9458,render,checked
+0x1e9478,112,cPS2GraphicsMan::SetAlphaBlend,render,checked
+0x1e94e8,32,cPS2GraphicsMan::vf55_1e94e8,render,checked
 0x1e9508,288,cPS2GraphicsMan::vf54_1e9508,render,not started
 0x1e9628,72,cPS2GraphicsMan::vf53_1e9628,render,not started
-0x1e9670,40,cPS2GraphicsMan::vf52_1e9670,render,not started
-0x1e9698,112,cPS2GraphicsMan::vf51_1e9698,render,not started
+0x1e9670,40,cPS2GraphicsMan::vf52_1e9670,render,checked
+0x1e9698,112,cPS2GraphicsMan::vf51_1e9698,render,checked
 0x1e9708,376,cPS2GraphicsMan::vf34_1e9708,render,not started
 0x1e9880,52,cPS2GraphicsMan::vf33_1e9880,render,not started
 0x1e98b8,52,cPS2GraphicsMan::vf32_1e98b8,render,not started
 0x1e98f0,124,cPS2GraphicsMan::vf31_1e98f0,render,not started
-0x1e9970,8,cPS2GraphicsMan::vf30_1e9970,render,not started
+0x1e9970,8,cPS2GraphicsMan::vf30_1e9970,render,checked
 0x1e9978,44,cPS2GraphicsMan::vf29_1e9978,render,not started
 0x1e99a8,1244,cPS2GraphicsMan::vf28_1e99a8,render,not started
 0x1e9e88,32,cPS2GraphicsMan::vf27_1e9e88,render,not started
 0x1e9ea8,68,cPS2GraphicsMan::vf26_1e9ea8,render,not started
-0x1e9ef0,8,cPS2GraphicsMan::vf86_1e9ef0,render,not started
+0x1e9ef0,8,cPS2GraphicsMan::vf86_1e9ef0,render,checked
 0x1e9ff0,8,cPS2GraphicsMan::vf96_1e9ff0,render,not started
 0x1e9ff8,12,cPS2GraphicsMan::vf65_1e9ff8,render,not started
 0x1ea008,12,cPS2GraphicsMan::vf64_1ea008,render,not started

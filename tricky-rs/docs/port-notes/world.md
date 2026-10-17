@@ -1853,3 +1853,44 @@ depth, some lanes ±0. 13 of 15 mutants were caught. The two left are boundary-e
 Checked in the runner (`tests/attitude.rs`): 8000 cases covering every mode, the depth bounds exactly, and both
 slots. 26 of 31 mutants were caught. The five left are boundary-equivalent: the fade at 0.1, the squash at 1/3,
 `s × 0 + 0.2`, and depths 500 and 2777.4, where both sides of each bound give the same value.
+
+## The renderer's state virtuals (G7k, `renderstate.rs`)
+
+The small `cPS2GraphicsMan` virtuals that the draws call. The vtable is at 0x393610 (installed by 0x1ea0c0);
+slot +off's function is the word at +off + 4 there.
+- **+0xb8 0x1dcc10(r, place, k)** sets the depth offset: the rider's draw passes −35.02, then 0. It makes the
+  matrices, then moves the place k along the camera's forward. Both places go through the clip matrix. When
+  both depths are within −1..1 the offset is +0x5f8 × their difference, else 0. On a change it is kept in the
+  view record (+0x20), and the screen's z offsets become it + 32767 (+0x608 and +0x568); with a 24-bit buffer
+  (+0x6a4 = 0x31) the base is 8388479.5. The frame's matrices are then made again (+0x17d0).
+- **+0xc8** answers the view record's field of view (+0x30); **+0xf8** answers the camera (+0x3f4).
+- **+0x170 / +0x178 / +0x188** call into the texture manager (+0x47c): `TexMan_LockTexture`, then 0x1c1ab8
+  (draw into a texture) and 0x1c1bd0 (clear one), each packet submitted. **+0x180** builds the packet that puts
+  the screen back (FRAME_1, SCISSOR_1, XYOFFSET_1).
+- **+0x1a0 / +0x1a8** push and pop the 0x1c-byte texture state (+0x470, the depth at +0x46c).
+  - **A quirk:** the push copies the state into the next place but puts that place's last word (+0x18) back as
+    it was. So the pushed state's +0x18 is whatever the place last held, not the copy.
+- **+0x1c0..+0x200** set the texture state's bytes, each marking it changed only on a change:
+  - +0x1c0 sets +0x11.
+  - +0x1c8 sets +0x12, +0x13 and +6 = trunc(f × 128). By their fields that is the GS's alpha test; the draws'
+    0.08 becomes 10.
+  - +0x1d0 / +0x1d8 set and get +0xf.
+  - +0x1e0 sets the blend bytes +0x15 and +0x17 to one value.
+  - +0x1f0 sets a texture (+8 or +0xa), marking +0x478.
+  - +0x1f8 sets +0x14 or +0x16.
+  - +0x200 picks a blend preset by mode −1..5: (+0x15, +0x17) = (3, 1), (0, 3), (3, 6), (3, 7), (3, 1), (3, 9),
+    (3, 10).
+- **+0x218** copies the light block's two matrices to +0x17f0. **+0x288** runs the box test (`CullBox`'s VU0
+  program 0x320, which makes its own ones) on a matrix it is handed, sharing `cull::box_test`.
+- **+0x2b8** stores +0x1d90 (the rider's outfit-6 flag). **+0x2d8** forwards to the Bezier manager's (+0x484)
+  own +0x90.
+
+Checked in the runner (`tests/renderstate.rs`): 12,600 cases, 600 per function. The texture state was already
+as asked or not, and the depths fell inside, at and beyond ±1. 43 of 47 mutants were caught. The four left:
+- the scissor's bottom without sign extension (shifted out by << 48);
+- the push copying six words (its quirk puts the seventh back);
+- the box test with min and max swapped (the same eight corners);
+- −1 < z as −1 ≤ z (a boundary).
+
+The test sets each argument sign-extended to its 64-bit register, as the EE holds a 32-bit value: `SetTexture`'s
+`lh` compares all 64 bits.
