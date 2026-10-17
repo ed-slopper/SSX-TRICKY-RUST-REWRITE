@@ -539,10 +539,10 @@ address,size,name,system,status
 0x1356f8,1984,cBoarderRender::vf7_1356f8,boarder,not started
 0x135eb8,652,BoarderRender_UpdateLighting,world?,ported
 0x136148,548,BoarderRender_RecordStreaks,render?,not started
-0x136370,348,BoarderRender_PickLod,render?,not started
-0x1364d0,1908,BoarderRender_Draw,render?,not started
-0x136c48,492,BoarderRender_GetHandStreakPoints,render?,not started
-0x136e38,52,BoarderRender_CopyBoarderMatrix,render?,not started
+0x136370,348,BoarderRender_PickLod,render?,checked
+0x1364d0,1908,BoarderRender_Draw,render?,checked
+0x136c48,492,BoarderRender_GetHandStreakPoints,render?,checked
+0x136e38,52,BoarderRender_CopyBoarderMatrix,render?,checked
 0x136e70,32,Boarder_EmitBrakeSpray,boarder,ported
 0x136e90,12,Boarder_SpawnLandingPuffs,boarder,ported
 0x136ea0,64,BoarderRender_Reset,boarder?,not started

@@ -1747,3 +1747,39 @@ drawn or not, a and b with the same y or not, and skin parts copying from either
 a quarter, a half turn and random. `Math_SinCos` has to be the EE-rule port (`animcurve::sin_cos`, its square
 root toward zero); the host-rule `math::sin_cos` is an ulp off. All 27 mutants were caught; one only once the
 scratch started with old words.
+
+## The rider's draw (G7g4, `riderdraw.rs`)
+
+`BoarderRender_Draw` 0x1364d0(br) with its own pieces: `_PickLod` 0x136370, `_GetHandStreakPoints` 0x136c48,
+`_CopyBoarderMatrix` 0x136e38 and `Career_IsPlayerOutfit6` 0x167038. Its other callees (skin, shadow, lights,
+streaks, effects, marker, icon) are calls out here; each is checked on its own (G7g1..3, G7d, G7g5, G7e5).
+- **Skipped** when the rider isn't drawn (+0x46b0), the game's mode is 6, or the rider is fully faded
+  (+0x448 = 0).
+- **Streaks.** The hand streaks are drawn when two or more are live. Their points come from the arms: bone 8
+  moved 15.0157 on from bone 7 (a length over all four lanes, by `vrsqrt`), with bone 6; and 12 from 11, with
+  10. The board's streaks are drawn when two or more are live and the part's +0x78 is 0; their points are the
+  rider's +0x5760 rows. The effects follow.
+- **The marker** is drawn in a race of two or more players with a kind of 2 or more, when +0x41c is 1 and the
+  camera isn't on this rider. **The icon** is drawn unless +0x41c is 1.
+- **The box test** uses the centre (+0x4ad0) ± 70 in x and y (± 100 when +0x418 ≥ 0), with z from −50 to +150.
+- **The LOD**: the rider's place through the view, its depth × tan(fov) × 0.05. Below 26.02 gives 0, below
+  45.18 gives 1, else 2 (the second slot 1), each capped at the rider's LODs − 2.
+- **The body**: the bones are copied; the renderer's +0x2b8 gets whether the outfit is the 6th (only when the
+  part has an outfit); then the lights, and +0xb8 at the place with −35.02. The skin is drawn once with blend
+  3, or twice when the rider is fading (+0x448 below 0.95): blend 1, then 3 with the depth bias. Then +0xb8 at
+  the place with 0.
+- **The shadow**, once a frame (+4), is made about the mid-point of bones 15 and 18, with up (0, 0, −1), the
+  light's way at +0x1a0, the bones and the board's points. It is made under the renderer's state for it
+  (+0x1d8 saved, +0x1d0, +0x1c8, +0x1c0, blend 0, the shadow's texture to +0x178 and +0x188).
+  - It is then cast onto the rider by `RiderSkin_SetBoardMatrix`, whose "board" is the shadow (its +0x110,
+    +0x150, +0x160). The colours are (1, k, k, k) and (1, 0.3, 0.3, 0.3), with k = 0.3 − 0.3 × h / −5. h is
+    the rider's +0x1bc held to −5..0 when +0x424 is 2, else 0.
+  - Every draw ends with the shadow's draw and blend 3.
+
+Checked in the runner (`tests/riderdraw.rs`): 6000 draws and 4000 helper cases. The draws had 3690 skin draws,
+1120 shadows made and 118 markers, and every LOD came up. 46 of 49 mutants were caught. The three left:
+- `+ (−50)` as `− 50`, and the halves summed (both the same in IEEE);
+- `!(0 ≤ h)` as `h < 0`. These differ only for a NaN height. The EE's FPU has no NaN, so it treats those bits
+  as a huge number; Rust's compare would not, so the test leaves them out.
+
+One more, the 26.02 threshold's `<` as `≤`, needs a depth of exactly 26.02 (a boundary).
