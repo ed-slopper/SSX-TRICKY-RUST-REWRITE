@@ -44,7 +44,7 @@ const APPOBJ: u32 = ARENA + 0x1c00;
 const TEXTABLE: u32 = ARENA + 0x1d00;
 const COLOUR: u32 = ARENA + 0x1e00;
 const SCRATCH: u32 = 0x0180_0000;
-const SLOTS: [u32; 10] = [0x1c0, 0x1c8, 0x1e0, 0x1e8, 0x1f0, 0x1f8, 0x220, 0x240, 0x258, 0x280];
+const SLOTS: [u32; 11] = [0x1c0, 0x1c8, 0x1e0, 0x1e8, 0x1f0, 0x1f8, 0x220, 0x238, 0x240, 0x258, 0x280];
 fn vaddr(off: u32) -> u32 {
     0x01ff_0000 + off
 }
@@ -58,7 +58,7 @@ fn logged(off: u32, w: &[u32], f12: u32, rd: &mut dyn FnMut(u32) -> u32) -> Vec<
     match off {
         0x1c8 => out.extend([w[1], w[2], f12]),
         0x1c0 | 0x1e0 | 0x258 => out.push(w[1]),
-        0x220 => {
+        0x220 | 0x238 => {
             out.extend([w[1], w[3]]);
             for k in 0..w[1].min(64) {
                 for j in (0..0x30).step_by(4) {
@@ -236,6 +236,46 @@ fn quads_match_the_original() {
             3 => q::textured_rect(m, e, a0, fx, fy, fw, fh, ft, SCRATCH),
             4 => q::submit_quad(m, e, a0, fx, fy, fw, fh, ft, SCRATCH),
             _ => q::gradient_quad_turned(m, e, a0, corner, fx, fy, fw, fh, ft, SCRATCH),
+        }, func, &regs, &fregs);
+    }
+    assert!(seen.iter().all(|&n| n == 1000));
+}
+
+#[test]
+fn lines_match_the_original() {
+    let log: Rc<RefCell<Vec<Call>>> = Rc::default();
+    let Some(mut r) = runner(&log) else { return };
+    for f in [0x19c1e8u32, 0x19c310, 0x19c458, 0x19c620] {
+        r.allow(f);
+    }
+    let mut g = Rng(0x9ad2_1000_0000_0001);
+    let mut seen = [0usize; 4];
+    for case in 0..4000u32 {
+        let mut m = fresh(&mut g, 0xf0);
+        let cols: [u32; 3] = [0, 1, 2].map(|k| COLOUR + 0x20 * k);
+        for &c in &cols {
+            for k in 0..4 {
+                let v = g.f(0.0, 2.0);
+                wf(&mut m, c + 4 * k, g.pick(&[0.0, 1.0, 0.5, v, v]));
+            }
+            wf(&mut m, c + 0x10, g.f(-1.0, 1.0));
+        }
+        let p: [f32; 6] = [0, 1, 2, 3, 4, 5].map(|_| { let v = g.f(-100.0, 700.0); g.pick(&[0.0f32, v, v]) });
+        let fp = p.map(F);
+        let which = (case % 4) as usize;
+        seen[which] += 1;
+        let fregs: Vec<(usize, f32)> = (0..6).map(|k| (12 + k, p[k])).collect();
+        let (func, regs) = match which {
+            0 => (0x19c1e8u32, vec![(4usize, cols[0] as u64)]),
+            1 => (0x19c310, vec![(4, cols[0] as u64), (5, cols[1] as u64), (6, cols[2] as u64)]),
+            2 => (0x19c458, vec![(4, cols[0] as u64)]),
+            _ => (0x19c620, vec![(4, cols[0] as u64)]),
+        };
+        run(&mut r, &log, &mut m, case, &mut |m, e| match which {
+            0 => q::line(m, e, cols[0], fp[0], fp[1], fp[2], fp[3], SCRATCH),
+            1 => q::gradient_line(m, e, cols[0], cols[1], cols[2], fp[0], fp[1], fp[2], fp[3], SCRATCH),
+            2 => q::rect_outline(m, e, cols[0], fp[0], fp[1], fp[2], fp[3], SCRATCH),
+            _ => q::triangle(m, e, cols[0], [(fp[0], fp[1]), (fp[2], fp[3]), (fp[4], fp[5])], SCRATCH),
         }, func, &regs, &fregs);
     }
     assert!(seen.iter().all(|&n| n == 1000));

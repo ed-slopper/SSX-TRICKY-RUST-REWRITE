@@ -2341,10 +2341,10 @@ address,size,name,system,status
 0x19bb48,688,Sprite_DrawRotatedTexQuad,boarder?,checked
 0x19bdf8,404,Sprite_SubmitQuad,frontend?,checked
 0x19bf90,596,Sprite_SubmitGradientQuadRotated,frontend?,checked
-0x19c1e8,292,Draw_Line,render,ported
-0x19c310,324,FUN_0019c310,,not started
-0x19c458,456,FUN_0019c458,,not started
-0x19c620,344,FUN_0019c620,,not started
+0x19c1e8,292,Draw_Line,render,checked
+0x19c310,324,FUN_0019c310,,checked
+0x19c458,456,FUN_0019c458,,checked
+0x19c620,344,FUN_0019c620,,checked
 0x19c788,48,Font_Init,hud,checked
 0x19c7b8,80,Font_Construct,hud,checked
 0x19c808,76,Font_Delete,hud,checked

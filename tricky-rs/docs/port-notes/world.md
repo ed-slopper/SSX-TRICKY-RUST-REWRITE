@@ -2305,3 +2305,19 @@ is the 0 either way. Three were caught only after the test grew:
 - shadowed stand-ins that leave the drawer in their own colour, with every draw logging the alpha it draws
   with. Without them, half of the alpha from before the first draw looks the same as half of the alpha after
   it.
+
+## The 2D line draws (G7p, `quad2d`)
+
+The quads (G7m) have four line-type neighbours. They build their vertices the same way: u, v, 1.0; the colour
+× 128 as integers in the order +4, +8, +0xc, +0; the place with z from the first colour's +0x10 and w 1. Like
+the quads, each first waits in an empty loop.
+
+| Draw | Vertices | To |
+|---|---|---|
+| `Draw_Line` 0x19c1e8 (colour; x0, y0, x1, y1) | the two ends, u, v (0, 0) and (1, 1) | +0x238 (lines), 2 |
+| `FUN_0019c310` (zsrc, c0, c1; the ends) | as `Draw_Line`, a colour each end | +0x238, 2 |
+| `FUN_0019c458` (colour; x, y, w, h) | the rectangle's outline: (x, y), (x + w, y), (x + w, y + h), (x, y + h), (x, y), u, v round 0..1 | +0x238, 5 |
+| `FUN_0019c620` (colour; three corners in f12..f17) | a triangle, u, v (0, 0), (1, 0), (1, 1) | +0x220 (a strip), 3 |
+
+Checked in the runner (`tests/quad2d.rs`): 1000 cases of each, with ends at 0 and random places.
+All 16 mutants were caught.
