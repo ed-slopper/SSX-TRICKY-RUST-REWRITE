@@ -147,17 +147,17 @@ pub fn mat4_rotate_by(m: &mut Mem, a: u32, b: u32) {
 fn insert(m: &mut Mem, st: &mut [F; 3], colours: u32, dirs: u32, dir: [F; 4], colour: [u32; 4]) {
     let c = |k: usize| F(f32::from_bits(colour[k]));
     let s = F(((c(1) + c(2)) + c(3)).0.abs());
-    if !(st[0].0 < s.0) {
+    if !(st[0].ee() < s.ee()) {
         return;
     }
     let mut slot = 0u32;
-    if st[1].0 < s.0 {
+    if st[1].ee() < s.ee() {
         st[0] = st[1];
         copy16(m, colours, colours + 0x10);
         let d = rq(m, dirs + 0x10);
         wq(m, dirs, d);
         slot = 1;
-        if st[2].0 < s.0 {
+        if st[2].ee() < s.ee() {
             st[1] = st[2];
             copy16(m, colours + 0x10, colours + 0x20);
             let d = rq(m, dirs + 0x20);
@@ -209,7 +209,7 @@ fn vu_dot(a: [F; 4], b: [F; 4]) -> F {
 
 /// The falloff with distance d: 1 below 100, else 100 / d, 10⁴ / d² or 10⁶ / d³ for kinds 1, 2, 3 (others 1)
 fn falloff(kind: u32, d: F) -> F {
-    let near = d.0 < 100.0;
+    let near = d.ee() < 100.0;
     match kind {
         1 if !near => div(F(100.0), d),
         2 if !near => div(F(10000.0), d * d),
@@ -229,7 +229,7 @@ fn spot_power(base: F, e: i32) -> F {
         b = div(F(1.0), b);
         e = e.wrapping_neg();
     }
-    if b.0 == 0.0 {
+    if b.ee() == 0.0 {
         return F(0.0);
     }
     let mut r = F(1.0);
@@ -299,7 +299,7 @@ pub fn get_lights_at(m: &mut Mem, world: u32, pos: u32, ambient: u32, colours: u
     let dir_of = |m: &Mem, l: u32| [rf(m, l + 0x1c), rf(m, l + 0x20), rf(m, l + 0x24), F(0.0)];
     let cone = |m: &Mem, l: u32, to: [F; 4]| {
         let c = -vu_dot(to, dir_of(m, l));
-        (rf(m, l + 0x4c).0 < c.0).then_some(c)
+        (rf(m, l + 0x4c).ee() < c.ee()).then_some(c)
     };
     // the local lights
     let mut sum = [one, zero, zero, zero];
@@ -333,7 +333,7 @@ pub fn get_lights_at(m: &mut Mem, world: u32, pos: u32, ambient: u32, colours: u
     if found {
         for j in 1..4 {
             let v = sum[j] + one;
-            sum[j] = if v.0 < 0.0 { zero } else if 1.0 < v.0 { one } else { v };
+            sum[j] = if v.ee() < 0.0 { zero } else if 1.0 < v.ee() { one } else { v };
         }
     }
     let dim = |m: &Mem, l: u32, q: [F; 4]| {

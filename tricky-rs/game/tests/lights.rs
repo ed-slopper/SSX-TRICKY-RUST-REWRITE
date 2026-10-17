@@ -195,10 +195,20 @@ fn lights_match_the_original() {
                 for k in 0..3 {
                     wf(&mut m, IN + 4 * k, s[k as usize]);
                 }
+                // (now and then raw words, Inf and NaN patterns among them: the EE has neither, it compares them
+                // as large numbers)
+                if g.below(6) == 0 {
+                    for k in 0..3 {
+                        m.w32(IN + 4 * k, [0x7f80_0000u32, 0x7fc0_1234, 0xff80_0000, g.next()][g.below(4) as usize]);
+                    }
+                }
                 for k in 0..0x80 / 4 {
                     wf(&mut m, IN + 0x10 + 4 * k, g.f(-1.0, 1.0));
                 }
                 let c = IN + 0xa0 + odd(&mut g);
+                if g.below(6) == 0 {
+                    m.w32(c + 4 * (1 + g.below(3)), [0x7f80_0000u32, 0x7fc0_1234, 0xff80_0000][g.below(3) as usize]);
+                }
                 if g.below(4) == 0 {
                     // a sum exactly one of the strengths
                     let t = s[g.below(3) as usize];

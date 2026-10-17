@@ -894,4 +894,41 @@ lights of every kind, flag, falloff and power; points off 16-byte alignment, who
 the falloff boundary at 100, the clamp at exactly 1, the clamp without local lights (never used), a 0 base in the
 power (it differs only for −0), and the ambient's × 1. Two are exact boundaries the random data does not reach: the
 INode division's rounding, and a cone exactly at its cosine.
+(G7d2a fixed `lights.rs` to compare the EE's values (`F::ee`, where Inf and NaN patterns are large numbers), as the
+FPU does, instead of IEEE floats.)
+
+## The lens flares' node (row G7d2a; `game/src/lensfx.rs`, checked: `tests/lensfx.rs`)
+
+- **`cLensFXObjNode`** (0x2fdc bytes, vtable 0x391bd8): +0xc the frame's half, flipped as view 0 is drawn; +0x10 the
+  half last finished; +0x14 the view; +0x20 the views of each half.
+  - +0x30 + 0xc0 × half + 0x60 × view is a view's block: the renderer's +0xc0 quad (a struct return: the quad
+    comes back through a0, `this` in a1), +0xf8's camera matrix copied, and +0xd0's three values (it writes them
+    through three pointers).
+  - +0x1b0 + 8 × half + 4 × view counts the flares. Their entries are at +0x1c0 + 0x1040 × half + 0x820 × view +
+    0xd0 × k (+0 1, +0xc8 the depth, +0xcc the light).
+  - +0x2fc0 is the flare texture (gApp+0x30's +0x70), +0x2fd8 a colour scale (1).
+  - The constructor sets both halves to −1, registers the renderer callback 0x1cdc78 with the node (+0x318), and
+    the destructor removes it (+0x318 with 0, 0). Its empty nested loops (constructing trivial members) change
+    nothing.
+- **`Draw` 0x1cbe20** works in this order:
+  1. the view's block (each address taken before its call) and the half's view count (game+0x298);
+  2. the flare count cleared;
+  3. the sun's colours: its +0x3c, +0x40, +0x44, +0x24 and +0x10, each × +0x2fd8, to +0x2fc4..+0x2fd4;
+  4. the renderer's +0x190 and +0x198 on the texture, to +0x18 and +0x1c;
+  5. `LensFX_Draw`, the sun's part (0x1cd040, G7d2b), the flares' part (0x1cc190, G7d2c);
+  6. after the half's last view, +0x10 is set to that half.
+  - A half of −1 (as made) is only safe on view 0, which flips it to 0, and the game always draws view 0 first.
+    On another view the block would land on the node's own first words.
+- **`LensFX_Draw` 0x2006e8**(world, node): it walks the live cells in order and stops at the first empty one (the
+  cells after a hole are never reached). It visits each slot the cell's mask names, and in it each light with a
+  flare flag (+4 & 0x70) that the renderer's +0x270 does not hide (non-zero hides it). The light's depth is the
+  third lane of its position through +0xf8's rows. When that depth is below the sun's +0x5c, the light goes to
+  `LensFX_AddFlare`.
+- **`LensFX_AddFlare` 0x1cc088**(node, light, depth): the view takes up to ten flares. When it is full, a nearer one
+  replaces the farthest (the last of the deepest). With none deeper than 0 that index is −1, so a negative depth is
+  written just before the first entry.
+
+Checked in the runner on 20,000 random nodes (halves −1, 0 and 1; nodes off 16-byte alignment; full views; random
+words as depths) and worlds (cells with holes). 25 of 27 mutants were caught. Of the two left, one is equivalent
+(the position's w, always 1, in the depth) and one is a boundary (a depth exactly at the sun's limit).
 

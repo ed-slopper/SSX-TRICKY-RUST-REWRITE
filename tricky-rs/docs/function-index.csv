@@ -2765,10 +2765,10 @@ address,size,name,system,status
 0x1cbaa0,84,cAnimFrame::__tf,runtime,host
 0x1cbb38,80,cAnimFrameState::__tf,runtime,host
 0x1cbb88,64,cReplayRecordHeader::__tf,runtime,host
-0x1cbbc8,496,cLensFXObjNode::cLensFXObjNode,world,not started
-0x1cbdb8,104,cLensFXObjNode::~cLensFXObjNode,world,not started
-0x1cbe20,616,cLensFXObjNode::Draw,world,not started
-0x1cc088,264,LensFX_AddFlare,world?,not started
+0x1cbbc8,496,cLensFXObjNode::cLensFXObjNode,world,checked
+0x1cbdb8,104,cLensFXObjNode::~cLensFXObjNode,world,checked
+0x1cbe20,616,cLensFXObjNode::Draw,world,checked
+0x1cc088,264,LensFX_AddFlare,world?,checked
 0x1cc190,3756,FUN_001cc190,camera?,not started
 0x1cd040,3128,FUN_001cd040,boarder?,not started
 0x1ce008,80,cLensFXObjNode::__tf,runtime,host
@@ -3319,7 +3319,7 @@ address,size,name,system,status
 0x200300,80,cVideoStreamMan::__tf,runtime,host
 0x200390,748,Instance_DrawVisibleCells,world,not started
 0x200680,100,Instance_Draw,world,not started
-0x2006e8,524,LensFX_Draw,world?,not started
+0x2006e8,524,LensFX_Draw,world?,checked
 0x2008f8,1820,Patch_DrawVisibleCells,world?,not started
 0x201018,124,StaticInit_Instance,other,not started
 0x201098,44,FUN_00201098,,not started
