@@ -1,7 +1,7 @@
 //! The lens flares' node (board row G7d2a): `cLensFXObjNode` 0x1cbbc8..0x1cc088, `LensFX_AddFlare` 0x1cc088 and
 //! the world's `LensFX_Draw` 0x2006e8 that offers it the course's flaring lights. On the bytes at their addresses
-//! ([`Mem`]); the base object, the renderer's virtuals and the node's two drawing parts (the sun's 0x1cd040, row
-//! G7d2b, and the flares' 0x1cc190, G7d2c) are calls out ([`LensEnv`]). Checked in the function runner
+//! ([`Mem`]); the base object and the renderer's virtuals are calls out ([`LensEnv`]). The sun's part (0x1cd040, row
+//! G7d2b) is [`sun_part`], the flares' (0x1cc190, G7d2c) [`flares_part`]. Checked in the function runner
 //! (`tests/lensfx.rs`).
 //!
 //! **The node** (0x2fdc bytes): +0xc the frame's half (0 / 1, flipped on view 0), +0x10 the half ready to draw,
@@ -11,6 +11,8 @@
 //! 0x1040 half + 0x820 view + 0xd0 k (+0 1, +0xc8 the depth, +0xcc the light); +0x2240.. the sun's (G7d2b);
 //! +0x2fc4.. the sun's colours × +0x2fd8.
 
+use crate::animcurve::sin_cos;
+use crate::animseq::{cvt_s_w, div, sqrt};
 use crate::pf::Mem;
 use crate::ps2f::F;
 
@@ -21,8 +23,6 @@ pub const WORLD: u32 = 0x346488;
 pub const CALLBACK: u32 = 0x1cdc78;
 pub const BASE_CONSTRUCT: u32 = 0x17cf50;
 pub const BASE_DESTRUCT: u32 = 0x17cfe0;
-pub const SUN_PART: u32 = 0x1cd040;
-pub const FLARES_PART: u32 = 0x1cc190;
 
 /// The calls out
 pub trait LensEnv {
@@ -36,6 +36,8 @@ pub trait LensEnv {
     fn view_values(&mut self, m: &mut Mem, func: u32, this: u32) -> [u32; 3];
     /// The renderer's +0x270 on a point (a quad): not 0 when it is not to be flared
     fn hidden(&mut self, m: &mut Mem, func: u32, this: u32, p: [u32; 4]) -> u32;
+    /// The renderer's +0x278: a point (a quad) projected to the screen (a quad, through a pointer)
+    fn project(&mut self, m: &mut Mem, func: u32, this: u32, p: [u32; 4]) -> [u32; 4];
 }
 
 fn rf(m: &Mem, a: u32) -> F {
@@ -222,11 +224,417 @@ pub fn draw(m: &mut Mem, env: &mut dyn LensEnv, this: u32) {
     let a = env.vcall(m, f, t, &[tex]);
     m.w32(this + 0x1c, a);
     lens_draw(m, env, WORLD, this);
-    env.call(m, SUN_PART, &[this]);
-    env.call(m, FLARES_PART, &[this]);
+    sun_part(m, env, this);
+    // (STANDIN: the two size registers as `Draw`'s caller leaves them, taken as 0; they matter only for a flare of
+    // another kind first)
+    flares_part(m, env, this, [F(0.0); 2]);
     let half = m.r32(this + 0xc);
     let views = m.r32((this + 0x20).wrapping_add(half.wrapping_mul(4)));
     if m.r32(this + 0x14) == views.wrapping_sub(1) {
         m.w32(this + 0x10, half);
+    }
+}
+
+/// The sun's angles from the screen: 37 (angle, length) pairs at 0x391cf8 (the word before them, 0x391cf4, is read
+/// for a corner put first)
+pub const SUN_RAYS: u32 = 0x391cf8;
+
+fn rq(m: &Mem, a: u32) -> [F; 4] {
+    let a = a & !15;
+    [0, 1, 2, 3].map(|k| rf(m, a + 4 * k))
+}
+fn bits(q: [F; 4]) -> [u32; 4] {
+    q.map(|x| x.0.to_bits())
+}
+fn int(v: F) -> u32 {
+    v.ee() as i32 as u32
+}
+/// The matrix's rows (each word as `lwc1` reads it) times a vector: ((v.x m[i][0] + v.y m[i][1]) + v.z m[i][2]) +
+/// v.w m[i][3]
+fn rows_times(m: &Mem, at: u32, v: [F; 4]) -> [F; 4] {
+    let e = |i: u32, j: u32| rf(m, at + 0x10 * i + 4 * j);
+    [0, 1, 2, 3].map(|i| ((v[0] * e(i, 0) + v[1] * e(i, 1)) + v[2] * e(i, 2)) + v[3] * e(i, 3))
+}
+/// The same for (1, z, z, z), its x folded away: ((m[i][0] + m[i][1] z) + m[i][2] z) + m[i][3] z
+fn rows_times_x(m: &Mem, at: u32, z: F) -> [F; 4] {
+    let e = |i: u32, j: u32| rf(m, at + 0x10 * i + 4 * j);
+    [0, 1, 2, 3].map(|i| ((e(i, 0) + e(i, 1) * z) + e(i, 2) * z) + e(i, 3) * z)
+}
+
+/// The sun's flare, 0x1cd040(node): its block (+0x2240 + 0x6c0 half + 0x360 view) for the renderer's callback.
+///
+/// With the course's sun off (its +0): none (block +0 is 0). Otherwise the sun is placed from its two angles (+0x28,
+/// +0x2c, in degrees: (cos a cos b, sin a cos b, sin b)) at its distance from the camera's origin in its frame. The
+/// distance is +0x30, or the view's +0x88 − 1 when that is nearer, its size (+0x14) shrunk in proportion. Hidden
+/// (+0x270): none. Otherwise its block holds:
+/// - +0x10 the projected point (+0x278); +0x24.. the sprite box from it (16 × 16, 8 back) and +0x34.. that box
+///   clamped to the view (+0x30.. of the view's block); +0x20 its depth.
+/// - +0x48.. the glow's box from the projections of the sun moved by its size right (the camera's x row) and down:
+///   twice the distance across, half back. +0x58.. halves of the texture's answers.
+/// - the colours: +0x84, +0x6c.., +0x7c.. the sun's +0xc, +0x18.., +4.. over 255; +0x68 and +0x78 1.
+/// - +0x88 a count and +0x8c.. the outline: rays from the sun in the table's 37 directions, the screen's four
+///   corners put in among them by angle (`Math_Atan`), each to the screen's edge (in −1..1). Each gives a point,
+///   its length (+0x1f4..) and a fade, 1 − (its length² ÷ 3, at most 1) (+0x1f8..). The first point is repeated at
+///   the end.
+pub fn sun_part(m: &mut Mem, env: &mut dyn LensEnv, node: u32) {
+    let (one, zero) = (F(1.0), F(0.0));
+    let half = m.r32(node + 0xc);
+    let view = m.r32(node + 0x14);
+    let sun = m.r32(game(m) + 0x2c);
+    let s = node.wrapping_add(half.wrapping_mul(0x6c0)).wrapping_add(0x2240).wrapping_add(view.wrapping_mul(0x360));
+    if m.r32(sun) == 0 {
+        m.w32(s, 0);
+        return;
+    }
+    let block = |m: &Mem| {
+        node.wrapping_add(m.r32(node + 0x14).wrapping_mul(0x60)).wrapping_add(m.r32(node + 0xc).wrapping_mul(0xc0))
+    };
+    let b = node.wrapping_add(view.wrapping_mul(0x60)).wrapping_add(half.wrapping_mul(0xc0));
+    let lim = rf(m, sun + 0x30);
+    let near = rf(m, b + 0x88);
+    let (dist, size) = if near.ee() < lim.ee() {
+        let d = near - one;
+        (d, rf(m, sun + 0x14) * div(d, lim))
+    } else {
+        (lim, rf(m, sun + 0x14))
+    };
+    let r = renderer(m);
+    let deg = F(f32::from_bits(0x3c8e_fa35));
+    let (sa, ca) = sin_cos(rf(m, sun + 0x28) * deg);
+    let (sb, cb) = sin_cos(rf(m, sun + 0x2c) * deg);
+    let b = block(m);
+    let cam = rq(m, b + 0x70).map(|x| x * F(-1.0));
+    let o = rows_times(m, b + 0x40, cam);
+    let dir = [ca * cb, sa * cb, sb, one];
+    let base = [o[0], o[1], o[2], zero];
+    let mut p = [0, 1, 2, 3].map(|k| dir[k] * dist + base[k]);
+    p[3] = one;
+    let (t, f) = vfn(m, r, 0x270);
+    if env.hidden(m, f, t, bits(p)) != 0 {
+        m.w32(s, 0);
+        return;
+    }
+    m.w32(s, 1);
+    let (t, f) = vfn(m, r, 0x278);
+    let pr = env.project(m, f, t, bits(p));
+    for k in 0..4 {
+        m.w32(((s + 0x10) & !15) + 4 * k, pr[k as usize]);
+    }
+    m.w32(s + 0x30, 0x10);
+    let fx = rf(m, s + 0x10) - F(8.0);
+    let fy = rf(m, s + 0x14) - F(8.0);
+    m.w32(s + 0x2c, 0x10);
+    m.w32(s + 0x24, int(fx));
+    m.w32(s + 0x28, int(fy));
+    for k in 0..4 {
+        let w = m.r32(s + 0x24 + 4 * k);
+        m.w32(s + 0x34 + 4 * k, w);
+    }
+    for (at, side) in [(0x34u32, 0x38u32), (0x38, 0x3c)] {
+        let b = block(m);
+        let v = m.r32(s + at) as i32;
+        let hi = (m.r32(b + 0x30).wrapping_add(m.r32(b + side)) as i32).wrapping_sub(0x10);
+        m.w32(s + at, if v < 0 { 0 } else { v.min(hi) } as u32);
+    }
+    let depth = m.r32(s + 0x18);
+    m.w32(s + 0x20, depth);
+    let b = block(m);
+    let right = rows_times_x(m, b + 0x40, zero).map(|x| x * size);
+    let down = rows_times(m, b + 0x40, [zero, F(-1.0), zero, zero]).map(|x| x * size);
+    let mut right = [0, 1, 2, 3].map(|k| right[k] + p[k]);
+    let mut down = [0, 1, 2, 3].map(|k| down[k] + p[k]);
+    right[3] = one;
+    down[3] = one;
+    let (t, f) = vfn(m, r, 0x278);
+    let pr_r = env.project(m, f, t, bits(right)).map(|w| F(f32::from_bits(w)));
+    let pr_d = env.project(m, f, t, bits(down)).map(|w| F(f32::from_bits(w)));
+    let (sx, sy) = (rf(m, s + 0x10), rf(m, s + 0x14));
+    let (dx, dy) = (pr_r[0] - sx, pr_d[1] - sy);
+    m.w32(s + 0x68, one.0.to_bits());
+    m.w32(s + 0x78, one.0.to_bits());
+    let (ix, iy) = (int(dx + dx), int(dy + dy));
+    m.w32(s + 0x50, ix);
+    m.w32(s + 0x54, iy);
+    let hx = cvt_s_w(ix as i32) * F(0.5);
+    let hy = cvt_s_w(iy as i32) * F(0.5);
+    m.w32(s + 0x48, int(sx - hx));
+    m.w32(s + 0x4c, int(sy - hy));
+    let half_of = |m: &Mem, at: u32, k: F| int(cvt_s_w(m.r32(at) as i32) * k);
+    let v = half_of(m, node + 0x18, F(0.5));
+    m.w32(s + 0x58, v);
+    let v = half_of(m, node + 0x1c, zero);
+    m.w32(s + 0x5c, v);
+    let v = half_of(m, node + 0x18, F(0.5));
+    m.w32(s + 0x60, v);
+    let v = half_of(m, node + 0x1c, F(0.5));
+    m.w32(s + 0x64, v);
+    let k255 = F(255.0);
+    let c = |m: &Mem, o: u32| div(cvt_s_w(m.r32(sun + o) as i32), k255);
+    for (o, at) in [(0xc, 0x84), (0x18, 0x6c), (0x1c, 0x70), (0x20, 0x74), (4, 0x7c), (8, 0x80)] {
+        let v = c(m, o);
+        m.w32(s + at, v.0.to_bits());
+    }
+    let b = block(m);
+    let x0 = cvt_s_w(m.r32(b + 0x30) as i32);
+    let y0 = cvt_s_w(m.r32(b + 0x34) as i32);
+    let w = cvt_s_w(m.r32(b + 0x38) as i32);
+    let h = cvt_s_w(m.r32(b + 0x3c) as i32);
+    let (ex0, ey0) = (sx - x0, sy - y0);
+    let nx = div(ex0 + ex0, w) - one;
+    let ny = div(ey0 + ey0, h) - one;
+    // the corners' angles from the sun
+    let pi = F(f32::from_bits(0x4049_0fdb));
+    let atan = |x: F| F(crate::math::atan_with(x.0, |a, b| div(F(a), F(b)).0, |a| sqrt(F(a)).0));
+    let mut corner = [zero; 4];
+    for (k, (cx, cy)) in [(1.0f32, 1.0f32), (-1.0, 1.0), (-1.0, -1.0), (1.0, -1.0)].into_iter().enumerate() {
+        let ddx = F(cx) - nx;
+        let ddy = F(cy) - ny;
+        let mut a = if 0.0 < ddx.ee() {
+            atan(div(ddy, ddx))
+        } else if ddx.ee() < 0.0 {
+            atan(div(ddy, ddx)) + pi
+        } else if 0.0 < ddy.ee() {
+            F(f32::from_bits(0x3fc9_0fdb))
+        } else {
+            F(f32::from_bits(0xbfc9_0fdb))
+        };
+        if a.ee() < 0.0 {
+            a = a + F(f32::from_bits(0x40c9_0fdb));
+        }
+        corner[k] = a;
+    }
+    // the rays to the screen's edge
+    let (mut ci, mut cnt, mut step, mut e) = (0usize, 0u32, 0i32, 0i32);
+    while step < 0x25 {
+        let at = SUN_RAYS.wrapping_add((8 * e) as u32);
+        let (ang, len) = if ci < 4 && corner[ci].ee() < rf(m, at).ee() {
+            let v = (corner[ci], rf(m, at.wrapping_sub(4)));
+            ci += 1;
+            e -= 1;
+            step -= 1;
+            v
+        } else {
+            (rf(m, at), rf(m, at + 4))
+        };
+        let (sn, cs) = sin_cos(ang);
+        let to_edge = |d: F, from: F| {
+            if 0.0 < d.ee() {
+                div(one - from, d)
+            } else if d.ee() < 0.0 {
+                div(F(-1.0) - from, d)
+            } else {
+                F(10.0)
+            }
+        };
+        let tx = to_edge(cs, nx);
+        let ty = to_edge(sn, ny);
+        let (ex, ey) = if tx.ee() < ty.ee() {
+            (if 0.0 < cs.ee() { one } else { F(-1.0) }, ny + tx * sn)
+        } else {
+            (nx + ty * cs, if 0.0 < sn.ee() { one } else { F(-1.0) })
+        };
+        let px = x0 + ((ex + one) * F(0.5)) * (w - one);
+        let py = y0 + ((ey + one) * F(0.5)) * (h - one);
+        let (qx, qy) = (ex - nx, ey - ny);
+        let mut d2 = qx * qx + qy * qy;
+        let pt = s + 0x8c + 8 * cnt;
+        m.w32(pt, px.0.to_bits());
+        m.w32(pt + 4, py.0.to_bits());
+        let three = F(3.0);
+        if three.ee() < d2.ee() {
+            d2 = three;
+        }
+        let fade = div(three - d2, three);
+        m.w32(s + 0x1f4 + 8 * cnt, len.0.to_bits());
+        m.w32(s + 0x1f8 + 8 * cnt, fade.0.to_bits());
+        cnt += 1;
+        step += 1;
+        e += 1;
+    }
+    for k in 0..2 {
+        let v = m.r32(s + 0x8c + 4 * k);
+        m.w32(s + 0x8c + 8 * cnt + 4 * k, v);
+    }
+    let (l0, f0) = (m.r32(s + 0x1f4), m.r32(s + 0x1f8));
+    m.w32(s + 0x1f4 + 8 * cnt, l0);
+    m.w32(s + 0x88, cnt + 1);
+    m.w32(s + 0x1f8 + 8 * cnt, f0);
+}
+
+fn add4(a: [F; 4], b: [F; 4]) -> [F; 4] {
+    [0, 1, 2, 3].map(|k| a[k] + b[k])
+}
+fn sub4(a: [F; 4], b: [F; 4]) -> [F; 4] {
+    [0, 1, 2, 3].map(|k| a[k] - b[k])
+}
+fn scale4(a: [F; 4], s: F) -> [F; 4] {
+    a.map(|x| x * s)
+}
+fn words(q: [u32; 4]) -> [F; 4] {
+    q.map(|w| F(f32::from_bits(w)))
+}
+
+/// The flares' part, 0x1cc190(node, sizes): for each flare the view keeps (its entry, +0x1c0 + 0x1040 half +
+/// 0x820 view + 0xd0 k), what the renderer's callback draws:
+/// - +0x10 the light's projected position (+0x278); +0x24.. its 16 × 8 sprite box (8 and 4 back), +0x34.. that box
+///   clamped to the view; +0x20 the depth of the point moved toward the camera by the kind's reach.
+/// - the kind (flags & 0x70: 0x10, 0x20, 0x40) gives a size and a reach (100.74 and 300, 200.08 and 500, 500 and
+///   800). Any other kind keeps the last one's (`sizes`, the two registers as the caller left them, then as the
+///   last flare set them).
+/// - +0x58.. a glow box, twice the projection of the size along the camera's x (and −y) axes; +0x78.. a second one,
+///   the size scaled by the sun's +0x34 plus 1.0095 × ((√2 − the flare's distance from the screen's middle) ×
+///   0.7071)⁴; +0x68.., +0x88.. halves of the texture's answers.
+/// - +0x98..+0xb4 a streak's four corners: turned by −(the flare's screen x × π/2) (`Math_Cos`, `Math_Sin`), sized
+///   by the sun's +0x38 plus 1.2523 × that fourth power; +0xb8.. texture halves.
+/// - +0x4c.. its colour (+0x10.. × +8) normalised (`Vec3_Dot`, `Vec3_Div`; left as it is at length 0); +0x48 1, or
+///   past half the sun's limit (+0x5c) fading to 0 at the limit.
+pub fn flares_part(m: &mut Mem, env: &mut dyn LensEnv, node: u32, sizes: [F; 2]) {
+    let (one, zero, halfk) = (F(1.0), F(0.0), F(0.5));
+    let r = renderer(m);
+    let n = {
+        let at = node.wrapping_add(m.r32(node + 0x14).wrapping_mul(4)).wrapping_add(m.r32(node + 0xc).wrapping_mul(8));
+        m.r32(at.wrapping_add(0x1b0)) as i32
+    };
+    let sun = m.r32(game(m) + 0x2c);
+    let (mut size, mut reach) = (sizes[0], sizes[1]);
+    let mut k = 0i32;
+    while k < n {
+        let half = m.r32(node + 0xc);
+        let view = m.r32(node + 0x14);
+        let e = node
+            .wrapping_add(half.wrapping_mul(0x1040))
+            .wrapping_add(0x1c0)
+            .wrapping_add(view.wrapping_mul(0x820))
+            .wrapping_add((k as u32).wrapping_mul(0xd0));
+        let light = m.r32(e + 0xcc);
+        let p = [rf(m, light + 0x28), rf(m, light + 0x2c), rf(m, light + 0x30), one];
+        let (t, f) = vfn(m, r, 0x278);
+        let q = env.project(m, f, t, bits(p));
+        for j in 0..4 {
+            m.w32(((e + 0x10) & !15) + 4 * j, q[j as usize]);
+        }
+        m.w32(e + 0x30, 8);
+        let fx = rf(m, e + 0x10) - F(8.0);
+        let fy = rf(m, e + 0x14) - F(4.0);
+        m.w32(e + 0x2c, 0x10);
+        m.w32(e + 0x24, int(fx));
+        m.w32(e + 0x28, int(fy));
+        for j in 0..4 {
+            let w = m.r32(e + 0x24 + 4 * j);
+            m.w32(e + 0x34 + 4 * j, w);
+        }
+        for (at, side, less) in [(0x34u32, 0x38u32, 0x10i32), (0x38, 0x3c, 8)] {
+            let b = node.wrapping_add(m.r32(node + 0x14).wrapping_mul(0x60)).wrapping_add(m.r32(node + 0xc).wrapping_mul(0xc0));
+            let v = m.r32(e + at) as i32;
+            let hi = (m.r32(b + 0x30).wrapping_add(m.r32(b + side)) as i32).wrapping_sub(less);
+            m.w32(e + at, if v < 0 { 0 } else { v.min(hi) } as u32);
+        }
+        match m.r32(light + 4) & 0x70 {
+            0x10 => (size, reach) = (F(f32::from_bits(0x42c9_7ab1)), F(300.0)),
+            0x20 => (size, reach) = (F(f32::from_bits(0x4348_1413)), F(500.0)),
+            0x40 => (size, reach) = (F(500.0), F(800.0)),
+            _ => {}
+        }
+        let b = node.wrapping_add(m.r32(node + 0x14).wrapping_mul(0x60)).wrapping_add(m.r32(node + 0xc).wrapping_mul(0xc0));
+        let mat = b + 0x40;
+        let fwd = [rf(m, b + 0x48) * reach, rf(m, b + 0x58) * reach, rf(m, b + 0x68) * reach, zero];
+        let (t, f) = vfn(m, r, 0x278);
+        let moved = env.project(m, f, t, bits(sub4(p, fwd)));
+        m.w32(e + 0x20, moved[2]);
+        let x_axis = rows_times_x(m, mat, zero);
+        let y_axis = rows_times(m, mat, [zero, F(-1.0), zero, zero]);
+        let mut a = add4(p, scale4(x_axis, size));
+        let mut c = add4(p, scale4(y_axis, size));
+        a[3] = one;
+        c[3] = one;
+        let (t, f) = vfn(m, r, 0x278);
+        let pa = words(env.project(m, f, t, bits(a)));
+        let pc = words(env.project(m, f, t, bits(c)));
+        let (qx, qy) = (rf(m, e + 0x10), rf(m, e + 0x14));
+        let glow = |m: &mut Mem, at: u32, pa: [F; 4], pc: [F; 4]| {
+            let (ix, iy) = (int((pa[0] - qx) + (pa[0] - qx)), int((pc[1] - qy) + (pc[1] - qy)));
+            m.w32(e + at + 8, ix);
+            m.w32(e + at + 0xc, iy);
+            m.w32(e + at, int(qx - cvt_s_w(ix as i32) * halfk));
+            m.w32(e + at + 4, int(qy - cvt_s_w(iy as i32) * halfk));
+        };
+        glow(m, 0x58, pa, pc);
+        let tex = |m: &mut Mem, at: u32, ks: [F; 4]| {
+            for (j, (src, kk)) in [(0x18u32, ks[0]), (0x1c, ks[1]), (0x18, ks[2]), (0x1c, ks[3])].into_iter().enumerate() {
+                let v = int(cvt_s_w(m.r32(node + src) as i32) * kk);
+                m.w32(e + at + 4 * j as u32, v);
+            }
+        };
+        tex(m, 0x68, [zero, zero, halfk, halfk]);
+        let b = node.wrapping_add(m.r32(node + 0x14).wrapping_mul(0x60)).wrapping_add(m.r32(node + 0xc).wrapping_mul(0xc0));
+        let x0 = cvt_s_w(m.r32(b + 0x30) as i32);
+        let y0 = cvt_s_w(m.r32(b + 0x34) as i32);
+        let hh = cvt_s_w(m.r32(b + 0x3c) as i32);
+        let (dx, dy) = (qx - x0, qy - y0);
+        let ww = cvt_s_w(m.r32(b + 0x38) as i32);
+        let nx = div(dx + dx, ww) - one;
+        let ny = div(dy + dy, hh) - one;
+        let rr = sqrt(nx * nx + ny * ny);
+        let mut fall = (F(f32::from_bits(0x3fb5_0529)) - rr) * F(f32::from_bits(0x3f35_04bd));
+        fall = fall * fall;
+        fall = fall * fall;
+        let s2 = size * (rf(m, sun + 0x34) + fall * F(f32::from_bits(0x3f81_39f6)));
+        let a = add4(p, scale4(x_axis, s2));
+        let c = add4(p, scale4(y_axis, s2));
+        let mut a = a;
+        let mut c = c;
+        a[3] = one;
+        c[3] = one;
+        let (t, f) = vfn(m, r, 0x278);
+        let pa = words(env.project(m, f, t, bits(a)));
+        let pc = words(env.project(m, f, t, bits(c)));
+        glow(m, 0x78, pa, pc);
+        tex(m, 0x88, [halfk, zero, halfk, halfk]);
+        // the streak, turned with the flare's place across the screen
+        let ang = -((nx * F(f32::from_bits(0x4049_0fdb))) * halfk);
+        let (ca, sa) = (F(crate::math::cos(ang.0)), F(crate::math::sin(ang.0)));
+        let ang2 = ang + F(f32::from_bits(0x3fc9_0fdb));
+        let u = rows_times(m, mat, [ca, sa, zero, zero]);
+        let (cb, sb) = (-F(crate::math::cos(ang2.0)), -F(crate::math::sin(ang2.0)));
+        let streak = fall * F(f32::from_bits(0x3fa0_49e0));
+        let v = rows_times(m, mat, [cb, sb, zero, zero]);
+        let s3 = size * (rf(m, sun + 0x38) + streak);
+        let mut a = add4(p, scale4(u, s3));
+        let mut c = add4(p, scale4(v, s3));
+        a[3] = one;
+        c[3] = one;
+        let (t, f) = vfn(m, r, 0x278);
+        // (the projected quad as `lqc2` reads it: rounded down to 16)
+        let q4 = rq(m, e + 0x10);
+        let su = sub4(words(env.project(m, f, t, bits(a))), q4);
+        let sv = sub4(words(env.project(m, f, t, bits(c))), q4);
+        for (at, cu, cv) in [(0x98u32, -1.0f32, -1.0f32), (0xa0, 1.0, -1.0), (0xa8, 1.0, 1.0), (0xb0, -1.0, 1.0)] {
+            let t = if cu < 0.0 { sub4(q4, su) } else { add4(q4, su) };
+            let t = if cv < 0.0 { sub4(t, sv) } else { add4(t, sv) };
+            m.w32(e + at, t[0].0.to_bits());
+            m.w32(e + at + 4, t[1].0.to_bits());
+        }
+        tex(m, 0xb8, [zero, halfk, halfk, halfk]);
+        // the colour, normalised
+        let lk = rf(m, light + 8);
+        let col = [rf(m, light + 0x10) * lk, rf(m, light + 0x14) * lk, rf(m, light + 0x18) * lk];
+        let len = sqrt((col[0] * col[0] + col[1] * col[1]) + col[2] * col[2]);
+        let nc = if len.ee() == 0.0 {
+            col
+        } else {
+            let inv = div(one, len);
+            [col[0] * inv, col[1] * inv, col[2] * inv]
+        };
+        m.w32(e + 0x4c, nc[0].0.to_bits());
+        m.w32(e + 0x50, nc[1].0.to_bits());
+        m.w32(e + 0x48, one.0.to_bits());
+        m.w32(e + 0x54, nc[2].0.to_bits());
+        let depth = rf(m, e + 0xc8);
+        let lim = rf(m, sun + 0x5c) * halfk;
+        if lim.ee() < depth.ee() {
+            let v = div(lim - (depth - lim), lim);
+            m.w32(e + 0x48, v.0.to_bits());
+        }
+        k += 1;
     }
 }

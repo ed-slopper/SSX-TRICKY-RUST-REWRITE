@@ -932,3 +932,45 @@ Checked in the runner on 20,000 random nodes (halves −1, 0 and 1; nodes off 16
 words as depths) and worlds (cells with holes). 25 of 27 mutants were caught. Of the two left, one is equivalent
 (the position's w, always 1, in the depth) and one is a boundary (a depth exactly at the sun's limit).
 
+## The sun's flare and the flares (rows G7d2b, G7d2c; `lensfx::sun_part`, `lensfx::flares_part`)
+
+These are the two parts `Draw` runs after `LensFX_Draw`. They fill the blocks the renderer's callback (G7d2d) draws,
+and are checked in `tests/lensfx.rs` with `Math_SinCos`, `Math_Atan`, `Math_Sin`, `Math_Cos`, `Vec3_Dot` and
+`Vec3_Div` running as the original.
+
+- **The sun, 0x1cd040** (block +0x2240 + 0x6c0 × half + 0x360 × view): nothing (+0 = 0) when the course's sun
+  (game+0x2c) is off or the renderer's +0x270 hides it.
+  - Its direction is (cos a cos b, sin a cos b, sin b) for its angles +0x28 and +0x2c (degrees × 0.017453292).
+    It sits at its distance (+0x30) from the camera's origin in the camera's frame, or at the view's +0x88 − 1
+    when that is nearer, with its size (+0x14) shrunk by the same ratio.
+  - The block holds the projection (+0x278) and a 16 × 16 sprite box from it, clamped to the view. A glow box comes
+    from the sun moved by its size along the camera's x axis and −y axis (twice the projected distance across).
+    It also holds halves of the texture's two answers and the sun's six colour bytes over 255.
+  - The outline: the sun's position in −1..1 screen terms, the four screen corners' angles from it (`Math_Atan`; π
+    added for x < 0, ±π/2 straight up or down, 2π added below 0), and the 37 (angle, length) pairs at 0x391cf8 with
+    the corners put in by angle. A corner takes the length of the pair before it; for the first pair that is the
+    word at 0x391cf4, 0.
+  - Each ray (`Math_SinCos`) runs to the nearest screen edge (10 when parallel). Its point is in pixels, then its
+    length, then its fade, 1 − min(d², 3) ÷ 3 by the screen distance. The first point is repeated at the end;
+    +0x88 counts them.
+- **The flares, 0x1cc190**, for each kept flare entry:
+  - The light's projection; a 16 × 8 sprite box (8 and 4 back), clamped; and the depth of the light moved toward
+    the camera (the matrix's z column) by its kind's reach.
+  - The kinds (flags & 0x70): 0x10 size 100.74 and reach 300; 0x20 200.08 and 500; 0x40 500 and 800. Any other
+    value keeps the last flare's (the first takes the two registers as the caller left them: STANDIN 0 from
+    `Draw`).
+  - Two glow boxes: the size, then the size × (the sun's +0x34 + 1.0095 × ((√2 − r) × 0.7071)⁴), where r is the
+    flare's distance from the screen's middle in −1..1 terms.
+  - A streak's four corners (Q ∓ U ∓ V): U and V are the camera's axes turned by −(screen x × π/2) and that + π/2
+    (`Math_Cos`, `Math_Sin`, the second pair negated), sized by the sun's +0x38 + 1.2523 × the fourth power.
+  - The light's colour (+0x10.. × +8) normalised (left as it is at length 0). An alpha of 1 that, past half the
+    sun's limit (+0x5c), falls to 0 at the limit.
+  - The streak reads the projected quad with `lqc2`, rounded down to 16 bytes, while the boxes read its words as
+    they are (a node off a 16-byte boundary showed the difference).
+
+Checked in the runner on 20,000 cases (3,400 suns drawn, flares of every kind, sizes left in the registers, nodes off
+16-byte alignment). The sun: 25 of 31 mutants caught. The six left are three equivalent (the sun's w, set to 1 after;
+a fade capped at exactly 3) and three exact boundaries (the view's near value equal to the sun's distance, a sun
+exactly on the screen's edge, an angle exactly 0). The flares: 27 of 29 caught. The two left are a depth exactly at
+half the limit (1 either way) and a colour length of exactly 0.
+

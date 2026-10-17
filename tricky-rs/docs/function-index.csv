@@ -2769,8 +2769,8 @@ address,size,name,system,status
 0x1cbdb8,104,cLensFXObjNode::~cLensFXObjNode,world,checked
 0x1cbe20,616,cLensFXObjNode::Draw,world,checked
 0x1cc088,264,LensFX_AddFlare,world?,checked
-0x1cc190,3756,FUN_001cc190,camera?,ported
-0x1cd040,3128,FUN_001cd040,boarder?,ported
+0x1cc190,3756,FUN_001cc190,camera?,checked
+0x1cd040,3128,FUN_001cd040,boarder?,checked
 0x1ce008,80,cLensFXObjNode::__tf,runtime,host
 0x1ce058,44,FUN_001ce058,,not started
 0x1ce0f0,28,cLightMan::cLightMan,render,checked

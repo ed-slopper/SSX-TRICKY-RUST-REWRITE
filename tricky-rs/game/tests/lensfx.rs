@@ -53,7 +53,7 @@ const LIGHTS: u32 = ARENA + 0x1c00;
 const NODE0: u32 = ARENA + 0x3000;
 const NCELL: u32 = 5;
 const NLIGHT: u32 = 16;
-const SLOTS: [u32; 9] = [0xc0, 0xd0, 0xf8, 0x190, 0x198, 0x270, 0x318, 0x2a0, 0x2b0];
+const SLOTS: [u32; 9] = [0xc0, 0xd0, 0xf8, 0x190, 0x198, 0x270, 0x278, 0x318, 0x2a0];
 fn vaddr(off: u32) -> u32 {
     0x01ff_0000 + off
 }
@@ -64,6 +64,12 @@ enum Call {
     V(u32, u32, Vec<u32>),
 }
 
+/// The stand-in projection: x and y over the depth (at least 1) × 300, about the screen's middle
+fn project_answer(p: &[u32; 4]) -> [u32; 4] {
+    let f = p.map(f32::from_bits);
+    let z = f[2].abs().max(1.0);
+    [f[0] / z * 300.0 + 320.0, f[1] / z * 300.0 + 224.0, f[2], 1.0].map(f32::to_bits)
+}
 fn hidden_answer(p: &[u32; 4]) -> u32 {
     (mix(p[0] ^ p[1].rotate_left(9)) % 4 == 0) as u32
 }
@@ -96,6 +102,10 @@ impl LensEnv for Ours {
         self.0.push(Call::V(func, this, p.to_vec()));
         hidden_answer(&p)
     }
+    fn project(&mut self, _m: &mut Mem, func: u32, this: u32, p: [u32; 4]) -> [u32; 4] {
+        self.0.push(Call::V(func, this, p.to_vec()));
+        project_answer(&p)
+    }
 }
 
 fn wf(m: &mut Mem, at: u32, v: f32) {
@@ -105,11 +115,11 @@ fn wf(m: &mut Mem, at: u32, v: f32) {
 #[test]
 fn lens_fx_node_matches_the_original() {
     let Some(mut r) = Runner::from_env() else { return };
-    for a in [0x1cbbc8u32, 0x1cbdb8, 0x1cbe20, 0x1cc088, 0x2006e8, 0x25ecb8] {
+    for a in [0x1cbbc8u32, 0x1cbdb8, 0x1cbe20, 0x1cc088, 0x2006e8, 0x25ecb8, 0x1cd040, 0x250c10, 0x2510f8, 0x102f50, 0x1cc190, 0x250e98, 0x250d60, 0x137140, 0x137108] {
         r.allow(a);
     }
     let log: Rc<RefCell<Vec<Call>>> = Rc::default();
-    for (f, n) in [(lf::BASE_CONSTRUCT, 2), (lf::BASE_DESTRUCT, 2), (lf::SUN_PART, 1), (lf::FLARES_PART, 1)] {
+    for (f, n) in [(lf::BASE_CONSTRUCT, 2), (lf::BASE_DESTRUCT, 2)] {
         let l = log.clone();
         r.stub(f, move |c, _| l.borrow_mut().push(Call::C(f, (0..n).map(|k| c.gpr(4 + k) as u32).collect())));
     }
@@ -133,6 +143,14 @@ fn lens_fx_node_matches_the_original() {
                     }
                     l.borrow_mut().push(Call::V(f, this, vec![]));
                 }
+                0x278 => {
+                    let (out, this, a) = (c.gpr(4) as u32, c.gpr(5) as u32, c.gpr(6) as u32);
+                    let p = [0, 1, 2, 3].map(|k| m.read_u32(a + 4 * k));
+                    for (k, w) in project_answer(&p).into_iter().enumerate() {
+                        m.write_u32(out + 4 * k as u32, w);
+                    }
+                    l.borrow_mut().push(Call::V(f, this, p.to_vec()));
+                }
                 0x270 => {
                     let (this, a) = (c.gpr(4) as u32, c.gpr(5) as u32);
                     let p = [0, 1, 2, 3].map(|k| m.read_u32(a + 4 * k));
@@ -152,12 +170,21 @@ fn lens_fx_node_matches_the_original() {
             }
         });
     }
+    // the sun's ray table (and the word before it) as the exe has it
+    let mut rays = vec![0u8; 0x130];
+    r.mem.read(lf::SUN_RAYS - 8, &mut rays).unwrap();
     let mut g = Rng(0x1e45_0000_0000_0001);
-    let mut counts = [0usize; 5];
+    let mut counts = [0usize; 7];
+    let mut suns = 0usize;
     let (mut offered, mut replaced) = (0usize, 0usize);
     for case in 0..20_000u32 {
         let mut m = Mem {
-            regions: vec![(ARENA, vec![0; SIZE as usize]), (lf::GAPP, vec![0; 4]), (lf::WORLD, vec![0; 0x3c + 4 * 0xa2 + 4])],
+            regions: vec![
+                (ARENA, vec![0; SIZE as usize]),
+                (lf::GAPP, vec![0; 4]),
+                (lf::WORLD, vec![0; 0x3c + 4 * 0xa2 + 4]),
+                (lf::SUN_RAYS - 8, rays.clone()),
+            ],
         };
         for k in 0..SIZE / 4 {
             m.w32(ARENA + 4 * k, g.next());
@@ -175,6 +202,15 @@ fn lens_fx_node_matches_the_original() {
         m.w32(GAME + 0x290, g.below(2));
         m.w32(GAME + 0x298, 1 + g.below(2));
         wf(&mut m, SUN + 0x5c, g.f(100.0, 3000.0));
+        // the sun: on (mostly), its colours, size, angles and distance
+        m.w32(SUN, (g.below(5) != 0) as u32);
+        for o in [4u32, 8, 0xc, 0x18, 0x1c, 0x20] {
+            m.w32(SUN + o, g.below(256));
+        }
+        wf(&mut m, SUN + 0x14, g.f(10.0, 200.0));
+        wf(&mut m, SUN + 0x28, [g.f(-180.0, 180.0), 0.0, 90.0, 45.0][g.below(4) as usize]);
+        wf(&mut m, SUN + 0x2c, g.f(-10.0, 80.0));
+        wf(&mut m, SUN + 0x30, g.f(1000.0, 10000.0));
         for k in 0..16 {
             wf(&mut m, CAMMAT + 4 * k, if k % 5 == 0 { g.f(0.5, 1.5) } else if k >= 12 { g.f(-500.0, 500.0) } else { g.f(-0.5, 0.5) });
         }
@@ -184,15 +220,35 @@ fn lens_fx_node_matches_the_original() {
         let NODE = NODE0 + if g.below(6) == 0 { 4 } else { 0 };
         m.w32(NODE + 0xc, [0u32, 1, 0, 1, u32::MAX][g.below(5) as usize]);
         m.w32(NODE + 0x14, g.below(2));
-        // (half −1 reads its counts from +0x1a8)
-        for k in 0..6 {
-            m.w32(NODE + 0x1a8 + 4 * k, [0u32, 3, 9, 10, 10, 10][g.below(6) as usize]);
-        }
         for k in 0..2 * 2 * 10 {
             let e = NODE + 0x1c0 + 0xd0 * k + (k / 10) * (0x820 - 0xd0 * 10);
             wf(&mut m, e + 0xc8, [g.f(0.0, 3000.0), -g.f(0.0, 10.0), 0.0][g.below(3) as usize]);
+            m.w32(e + 0xcc, LIGHTS + 0x60 * g.below(NLIGHT));
         }
         wf(&mut m, NODE + 0x2fd8, g.f(0.0, 2.0));
+        m.w32(NODE + 0x18, g.below(512));
+        m.w32(NODE + 0x1c, g.below(512));
+        // the view blocks: the screen's box, the camera matrix (a turn about z and a position), the near value
+        for blk in 0..4u32 {
+            let b = NODE + 0x60 * blk;
+            m.w32(b + 0x30, g.below(64));
+            m.w32(b + 0x34, g.below(64));
+            m.w32(b + 0x38, 320 + g.below(321));
+            m.w32(b + 0x3c, 224 + g.below(225));
+            let a = g.f(-3.1, 3.1);
+            let (sn, cs) = (a.sin(), a.cos());
+            let rows = [[cs, -sn, 0.0, 0.0], [sn, cs, 0.0, 0.0], [0.0, 0.0, 1.0, 0.0], [g.f(-500.0, 500.0), g.f(-500.0, 500.0), g.f(-100.0, 100.0), 1.0]];
+            for (i, row) in rows.iter().enumerate() {
+                for (j, v) in row.iter().enumerate() {
+                    wf(&mut m, b + 0x40 + 0x10 * i as u32 + 4 * j as u32, *v);
+                }
+            }
+            wf(&mut m, b + 0x88, g.f(500.0, 12000.0));
+        }
+        // the flare counts (half −1 reads its counts from +0x1a8, where the last view block's +0x88 is)
+        for k in 0..6 {
+            m.w32(NODE + 0x1a8 + 4 * k, [0u32, 3, 9, 10, 10, 10][g.below(6) as usize]);
+        }
         // the world: cells with masks, slots listing lights
         m.w32(lf::WORLD, GRID);
         m.w32(GRID + 0x48, 1 + g.below(3));
@@ -219,6 +275,10 @@ fn lens_fx_node_matches_the_original() {
         for k in 0..NLIGHT {
             let at = LIGHTS + 0x60 * k;
             m.w32(at + 4, g.next() & 0x1f0);
+            wf(&mut m, at + 8, [g.f(0.0, 2.0), 0.0][(g.below(8) == 0) as usize]);
+            for j in 0..3 {
+                wf(&mut m, at + 0x10 + 4 * j, g.f(0.0, 1.0));
+            }
             for j in 0..3 {
                 wf(&mut m, at + 0x28 + 4 * j, g.f(-3000.0, 3000.0));
             }
@@ -228,7 +288,11 @@ fn lens_fx_node_matches_the_original() {
         }
         log.borrow_mut().clear();
         let mut ours = Ours(Vec::new());
-        let kind = g.below(5) as usize;
+        let kind = g.below(7) as usize;
+        // (the flares' size registers: as the STANDIN takes them for a draw, else random)
+        let sizes = if kind == 4 { [0.0f32, 0.0] } else { [g.f(10.0, 900.0), g.f(10.0, 900.0)] };
+        r.cpu.set_f(26, sizes[0]);
+        r.cpu.set_f(27, sizes[1]);
         // (the game draws view 0 first, which turns a half of −1 into 0)
         if kind == 4 && m.r32(NODE + 0xc) == u32::MAX {
             m.w32(GAME + 0x290, 0);
@@ -254,6 +318,22 @@ fn lens_fx_node_matches_the_original() {
                 lf::add_flare(&mut m, NODE, light, F(d));
                 (0x1cc088, vec![NODE, light])
             }
+            6 => {
+                if m.r32(NODE + 0xc) == u32::MAX {
+                    m.w32(NODE + 0xc, 0);
+                    r.mem.write_u32(NODE + 0xc, 0);
+                }
+                lf::flares_part(&mut m, &mut ours, NODE, [F(sizes[0]), F(sizes[1])]);
+                (0x1cc190, vec![NODE])
+            }
+            5 => {
+                if m.r32(NODE + 0xc) == u32::MAX {
+                    m.w32(NODE + 0xc, 1);
+                    r.mem.write_u32(NODE + 0xc, 1);
+                }
+                lf::sun_part(&mut m, &mut ours, NODE);
+                (0x1cd040, vec![NODE])
+            }
             3 => {
                 lf::lens_draw(&mut m, &mut ours, lf::WORLD, NODE);
                 (0x2006e8, vec![lf::WORLD, NODE])
@@ -275,6 +355,9 @@ fn lens_fx_node_matches_the_original() {
             assert_eq!(r.cpu.gpr(2) as u32, v, "case {case}: {func:#x} answer");
         }
         assert_eq!(*log.borrow(), ours.0, "case {case}: {func:#x} calls");
+        if matches!(kind, 4 | 5) && m.r32(NODE + 0x2240 + 0x6c0 * m.r32(NODE + 0xc) + 0x360 * m.r32(NODE + 0x14)) == 1 {
+            suns += 1;
+        }
         if matches!(kind, 3 | 4) {
             offered += ours.0.iter().filter(|c| matches!(c, Call::V(f, _, _) if *f == vaddr(0x270))).count();
         }
@@ -291,6 +374,6 @@ fn lens_fx_node_matches_the_original() {
             replaced += 1;
         }
     }
-    println!("{counts:?}, {offered} lights tested, {replaced} adds to a full view");
-    assert!(offered > 3000 && replaced > 300);
+    println!("{counts:?}, {offered} lights tested, {replaced} adds to a full view, {suns} suns drawn");
+    assert!(offered > 3000 && replaced > 300 && suns > 1000);
 }
