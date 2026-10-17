@@ -679,7 +679,7 @@ address,size,name,system,status
 0x13f330,280,RollerNode_HitNode,world?,not started
 0x13f448,380,Roller_OnHit,world?,ported
 0x13f5c8,1072,Roller_CheckCollision,world?,ported
-0x13f9f8,404,cRollerNode::Draw,world,not started
+0x13f9f8,404,cRollerNode::Draw,world,checked
 0x13fb90,92,cRollerNode::SaveSnapshot,save,checked
 0x13fbf0,104,cDebounceNode::cDebounceNode,world,not started
 0x13fc58,80,cDebounceNode::cDebounceNode,world,checked
@@ -809,7 +809,7 @@ address,size,name,system,status
 0x146f40,752,MeshAnimNode_Start,render,ported
 0x147230,620,cMeshAnimNode::Update,animation,ported
 0x1474a0,120,cMeshAnimNode::Kill,animation,ported
-0x147518,896,cMeshAnimNode::Draw,animation,not started
+0x147518,896,cMeshAnimNode::Draw,animation,checked
 0x147898,84,cMeshAnimNode::SaveSnapshot,save,checked
 0x1478f0,220,cTrickTriggerNode::cTrickTriggerNode,world,not started
 0x1479d0,176,cTrickTriggerNode::cTrickTriggerNode,world,checked
@@ -2301,7 +2301,7 @@ address,size,name,system,status
 0x199200,88,cAnimObjectNode::Kill,animation,checked
 0x199258,132,MeshAnim_ApplyFrames,render,ported
 0x1992e0,64,cAnimComboNode::Draw,animation,not started
-0x199320,1328,cAnimObjectNode::vf28_199320,animation,not started
+0x199320,1328,cAnimObjectNode::vf28_199320,animation,checked
 0x1998d0,36,MeshAnimNode_GetFrameMatrix,render,ported
 0x1998f8,240,cAnimObjectNode::SaveSnapshot,save,checked
 0x1999e8,736,AnimObjectNode_CreateOverlap,animation,checked
@@ -3317,8 +3317,8 @@ address,size,name,system,status
 0x200270,116,cVideoStreamMan::vf2_200270,video,not started
 0x2002e8,20,VideoStreamMan_IsFinished,frontend?,ported
 0x200300,80,cVideoStreamMan::__tf,runtime,host
-0x200390,748,Instance_DrawVisibleCells,world,ported
-0x200680,100,Instance_Draw,world,not started
+0x200390,748,Instance_DrawVisibleCells,world,checked
+0x200680,100,Instance_Draw,world,checked
 0x2006e8,524,LensFX_Draw,world?,checked
 0x2008f8,1820,Patch_DrawVisibleCells,world?,ported
 0x201018,124,StaticInit_Instance,other,not started

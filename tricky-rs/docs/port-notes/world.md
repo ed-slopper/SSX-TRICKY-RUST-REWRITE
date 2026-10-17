@@ -1034,3 +1034,44 @@ of the rest are equivalent: sign bits a shift of 32 or 48 drops, an all-ones GIF
 always on 16 bytes, a width's arithmetic shift whose top bits the next shift drops. One is unreached: the sign of a
 read-back size beyond 2³¹.
 
+## The objects' draws (row G7b1; `game/src/objdraw.rs`, checked: `tests/objdraw.rs`)
+
+- **The model draw** is the renderer's +0x2a8 (`cPS2GraphicsMan::DrawModel`, G7b2), with (model, part, matrix,
+  light block, bones, 0). The part is the model's +0xc for the course's instances, the instance's +0xf0 for animated
+  ones. A course instance keeps its own light block at +0x40 and its matrix at +0.
+- **`Instance_DrawVisibleCells` 0x200390**(world):
+  - It sets the renderer's +0x1c8 (0, 2, 0.01) and +0x1e0 (3), and clears the first words of the 128 12-byte
+    entries at 0x31d938 (from the last).
+  - It walks the live cells in order, stopping at the first empty one, and in each the slots its mask (+0x36)
+    names. A slot's instances are counted by +0x26, or +0x28 in show-off modes 3 and 5 (0x32de8c).
+  - It draws each instance with +0xe8 bits 0 and 1 both set. The box test (+0x280, outside = 1) is skipped when
+    the cell's +0x32 bit says the slot is wholly in view.
+  - Then +0x1c8 (0, 2, 0.08), and the light manager's (0x33efb8) +0x78 with 0.
+- **`Instance_Draw` 0x200680**(world, inst, matrix, lights) draws the instance's model (+0xc0, part its +0xc) when
+  +0xe8 bit 0 is set.
+- **`cRollerNode::Draw` 0x13f9f8** needs its instance shown (+0xe8 bit 2) and its box (+0x2a0, +0x2b0) not
+  outside. Its matrix is `Mat4_FromPosQuat` of `RollerNode_PlaceFromBody` (both in `roller.rs`). The lights at the
+  matrix's place are gathered (`World_GetLightsAt`), built, and turned by the matrix (`Mat4_RotateBy`), then the
+  instance goes through `Instance_Draw` with them.
+- **`cMeshAnimNode::Draw` 0x147518** needs to be on (+0x6cc). The box test is skipped once it has shown (+0x6d0,
+  then set).
+  - Each bone is a matrix from the quaternion at +0x38 + 16k (w, x, y, z) and the position at +0x3c0 + 16k.
+    The rows are (1 − 2y² − 2z², 2xy + 2wz, 2xz − 2wy), (2xy − 2wz, 1 − 2x² − 2z², 2yz + 2wx) and (2xz + 2wy,
+    2yz − 2wx, 1 − 2x² − 2y²), w 0, made from the doubled components as the game orders them.
+  - It is drawn with the world's matrix 0x346440. The light block is the instance's own when the model's +0x10
+    bit 1 is set. Otherwise it is the lights at +0x6c0's matrix's place (or the instance's), turned by the
+    instance's matrix.
+- **`cAnimObjectNode` vf28 0x199320**(node, matrix, test) tests its instance's (+0x58) box only with `test`.
+  - Its bones are the model's +8 table, 0x18 a bone: +0 the parent (−1 none), +0x10 animated, +0x14 the bind
+    pose. Each is the animation's next matrix (0x1998d0(node, the count of animated ones so far)) or the bind
+    pose, times its parent's.
+  - It is drawn between +0x1c8 (0, 2, 0.01) and (0, 2, 0.08). The light block is the instance's own when its
+    +0x30 object's +0x80 answers non-zero or the model asks; otherwise the lights at the matrix's place, turned by
+    it.
+- The game builds these matrices and blocks on its stack. The port builds them in a caller's scratch area
+  (STANDIN for the frame; the same bytes), and the test compares what the model draw is given by content.
+
+Checked in the runner on 12,000 random worlds, instances, models with bone tables, a roller, an animated mesh and
+an animated object, with the light gathering running as the original. 7,000 model draws were compared, and 26 of 27
+mutants caught. The one left is equivalent: x × 2z against z × 2x, both exact.
+
