@@ -1131,39 +1131,39 @@ address,size,name,system,status
 0x1579e0,572,Score_TrickBookCheck,scoring,ported
 0x157c18,52,TrickId_Matches,scoring?,checked
 0x157c50,92,Score_IsFocusPlayer,scoring,ported
-0x157d58,12,FUN_00157d58,frontend?,not started
-0x157d68,56,FUN_00157d68,render?,not started
-0x157da0,112,AnimMemBank_Init,animation,not started
-0x157e10,88,AnimMemBank_Destruct,animation,not started
-0x157e68,60,AnimMemBank_Alloc,animation,not started
-0x157ea8,48,AnimMemBank_AlignStart,animation,not started
+0x157d58,12,FUN_00157d58,frontend?,checked
+0x157d68,56,FUN_00157d68,render?,checked
+0x157da0,112,AnimMemBank_Init,animation,checked
+0x157e10,88,AnimMemBank_Destruct,animation,checked
+0x157e68,60,AnimMemBank_Alloc,animation,checked
+0x157ea8,48,AnimMemBank_AlignStart,animation,checked
 0x157ed8,344,AnimCurve_Eval,animation,ported
 0x158030,1676,AnimCurve_EvalPiece,animation,ported
 0x1586c0,216,AnimData_GetRootOffset,animation,not started
-0x158798,80,AnimData_GetMarkerPhase,animation,not started
-0x1587e8,44,AnimData_GetMarkerFrame,animation,not started
-0x158818,80,AnimData_SetMarker,animation,not started
+0x158798,80,AnimData_GetMarkerPhase,animation,checked
+0x1587e8,44,AnimData_GetMarkerFrame,animation,checked
+0x158818,80,AnimData_SetMarker,animation,checked
 0x158868,160,SkelAnim_Create,other,ported
 0x158908,168,AnimFileList_Load,animation,not started
 0x1589b8,120,AnimFileList_Load2,animation,not started
 0x158a30,192,AnimFile_PollLoad,animation,not started
-0x158af0,28,AnimFile_Reset,animation,not started
+0x158af0,28,AnimFile_Reset,animation,checked
 0x158b10,248,AnimFile_IndexClipNames,animation,not started
 0x158c10,40,AnimFile_Bind,animation,ported
-0x158c38,144,AnimData_Construct,animation,not started
-0x158cc8,76,AnimData_Clear,animation,not started
-0x158d18,76,AnimData_Init,animation,not started
-0x158d68,88,AnimData_GetClipId,animation,not started
+0x158c38,144,AnimData_Construct,animation,checked
+0x158cc8,76,AnimData_Clear,animation,checked
+0x158d18,76,AnimData_Init,animation,checked
+0x158d68,88,AnimData_GetClipId,animation,checked
 0x158dc0,224,SkelAnim_CreateTree,other,ported
 0x158ea0,284,AnimData_OpenBig,animation,not started
 0x158fc0,176,AnimData_PollLoad,animation,not started
-0x159070,208,AnimData_Reset,animation,not started
+0x159070,208,AnimData_Reset,animation,checked
 0x159140,12,FUN_00159140,files?,not started
 0x159150,1500,AnimData_LoadClipTable,animation,not started
 0x159730,8,thunk_FUN_00159150,runtime,host
 0x159738,152,AnimData_LoadFileList,animation,not started
 0x1597d0,76,AnimData_IndexAllClips,animation,not started
-0x159820,92,StaticInit_AnimNameHashes,frontend?,not started
+0x159820,92,StaticInit_AnimNameHashes,frontend?,checked
 0x159880,104,SkelAnim_Init,other,not started
 0x1598e8,36,SkelAnim_SetSkeleton,other,not started
 0x159910,364,FUN_00159910,animation?,not started
@@ -1189,10 +1189,10 @@ address,size,name,system,status
 0x15a760,52,AnimLayer_ClearCurrentFlags,animation,checked
 0x15a798,128,AnimLayer_SaveSnapshot,save,checked
 0x15a818,168,AnimLayer_LoadSnapshot,animation,checked
-0x15a8c0,192,AnimData_Destruct,animation,not started
+0x15a8c0,192,AnimData_Destruct,animation,checked
 0x15a980,16,StaticDtor_AnimLayer,files?,not started
 0x15abe8,92,cBoarderSequence::__tf,runtime,host
-0x15ac48,76,AnimFile_Destruct,animation,not started
+0x15ac48,76,AnimFile_Destruct,animation,checked
 0x15ad18,80,cBoarderSequenceState::__tf,runtime,host
 0x15ad68,64,cReplayRecordHeader::__tf,runtime,host
 0x15ada8,280,AnimClip_ResolveAnmIndex,animation,ported
@@ -4387,7 +4387,7 @@ address,size,name,system,status
 0x240a98,480,CourseDma_PatchContext,race,not started
 0x240c78,516,FUN_00240c78,race?,not started
 0x240e80,88,Name_ElfHash,frontend?,ported
-0x240ed8,32,Name_Hash,frontend?,not started
+0x240ed8,32,Name_Hash,frontend?,checked
 0x240ef8,3256,Huff_DecodeBlock,ai?,checked
 0x241bb8,308,Huff_CreateHeader,ai?,not started
 0x241cf0,52,Bytes_ReadBE,ai?,checked

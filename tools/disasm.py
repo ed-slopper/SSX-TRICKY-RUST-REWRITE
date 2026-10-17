@@ -32,6 +32,40 @@ for i in range(0,n,4):
         off=w&0xffff
         off=off-0x10000 if off&0x8000 else off
         print("%08x: %-8s $%s, %s($%s)"%(a+i,"lq" if op==0x1e else "sq",R[rt],hex(off) if off>=0 else "-"+hex(-off),R[rs])); continue
+    # VU0 macro mode (as tools/r5900's exec.rs runs it): lqc2/sqc2, qmfc2/cfc2/qmtc2, special1 and special2
+    if op in (0x36, 0x3e):
+        off=w&0xffff
+        off=off-0x10000 if off&0x8000 else off
+        print("%08x: %-8s vf%d, %s($%s)"%(a+i,"lqc2" if op==0x36 else "sqc2",rt,hex(off) if off>=0 else "-"+hex(-off),R[rs])); continue
+    if op==0x12:
+        if rs&16==0 and rs in (1,2,5):
+            nm={1:"qmfc2",2:"cfc2",5:"qmtc2"}[rs]
+            print("%08x: %-8s $%s, %s%d"%(a+i,nm,R[rt],"vi" if rs==2 else "vf",rdd)); continue
+        if rs&16:
+            dest=''.join(c for k,c in enumerate("xyzw") if (w>>21)&15&(8>>k))
+            ft,fs,fd,sa=rt,rdd,(w>>6)&31,(w>>6)&31
+            bc="xyzw"[fn&3]
+            if fn<60:
+                m={40:"vadd",42:"vmul",44:"vsub",46:"vopmsub",28:"vmulq"}.get(fn)
+                if m is None and fn<4: m="vadd"+bc
+                if m is None and 8<=fn<12: m="vmadd"+bc
+                if m is None and 24<=fn<28: m="vmul"+bc
+                if m:
+                    tail="" if fn==28 else ", vf%d"%ft
+                    print("%08x: %-8s vf%d, vf%d%s"%(a+i,m+"."+dest,fd,fs,tail)); continue
+            else:
+                k=(sa<<2)|(fn&3)
+                fsf="xyzw"[(w>>21)&3]; ftf="xyzw"[(w>>23)&3]
+                m={42:"vmula",46:"vopmula"}.get(k)
+                if m is None and k<4: m="vadda"+"xyzw"[k]
+                if m is None and 8<=k<12: m="vmadda"+"xyzw"[k-8]
+                if m is None and 24<=k<28: m="vmula"+"xyzw"[k-24]
+                if m:
+                    print("%08x: %-8s ACC, vf%d, vf%d"%(a+i,m+"."+dest,fs,ft)); continue
+                if k==48: print("%08x: %-8s vf%d, vf%d"%(a+i,"vmove."+dest,ft,fs)); continue
+                if k in (56,58): print("%08x: %-8s Q, vf%d.%s, vf%d.%s"%(a+i,{56:"vdiv",58:"vrsqrt"}[k],fs,fsf,ft,ftf)); continue
+                if k==57: print("%08x: %-8s Q, vf%d.%s"%(a+i,"vsqrt",ft,ftf)); continue
+                if k==59: print("%08x: vwaitq"%(a+i)); continue
     if names:
         print("%08x: %-8s $%s, $%s, $%s"%(a+i,names,R[rdd],R[rs],R[rt])); continue
     if op==0x1c and fn in (0x10,0x12) and rs==0 and rt==0:

@@ -1399,3 +1399,47 @@ often exactly 0, ½ or 1. 34 of 42 mutants were caught. Four of the others are e
 tests inside the angle (zero input is handled before), the length clamp at exactly 1, and the brake's sign in the
 braking branch. The last four are the wind-up sectors' boundaries, where the angle would have to equal ±π/4 or ±3π/4
 bit for bit.
+
+## The animation bank (row G5c1; `game/src/animdata.rs`, checked: `tests/animdata.rs`)
+
+`AnimData` at 0x3211a8 is the bank the sequences take their clips from.
+- **Its layout:**
+  - +0 a memory bank: its block, the next free byte, the bytes used, the block's size;
+  - +0x10 (4), +0x14;
+  - 0x1be words at +0x18;
+  - the BIG file object (`cAsyncBigFile`) at +0x710;
+  - 0x1be file records of 0x18 bytes from +0x724: the bank, +4, the clip headers (+8, 0x24 bytes each), +0xc, +0x10,
+    +0x14 (−1).
+- **A clip's key** (the key table 0x3bc530) is two shorts: the file and the clip in it. `AnimData_GetClipId`
+  0x158d68 just reads that word.
+- **A clip header:** +9 the child count, +0xa the length in frames, then three lists of four shorts. +0xc are the
+  markers (`AnimData_GetMarkerPhase`: marker / (length − 1), at least 1; the sequences' marker bits). +0x14 are the
+  marker frames the race scenes read (`AnimData_GetMarkerFrame`, −1 for 0xffff). +0x1c are the marker sounds
+  (`AnimCtl_FireClipSounds`).
+- **`AnimData_SetMarker` 0x158818(file, clip, k, v):** −1 clears the second list's frame k. Any other value is
+  written to the third list, the sounds, at k. That is what the game does; `RaceScene_SetClipMarker` calls it.
+- **The memory bank:**
+  - `Init` allocates size + 0x80 (`EAMem_Alloc` with the name at 0x378fa0) and fills it with 0xdeadc0ed through
+    `EAMem_Set`. That writes each byte, half and word at its alignment from the value's low bits, so the bytes run
+    ed c0 ad de.
+  - `AlignStart` puts the next free byte at the block rounded up to 128 (+0x7f, then division toward zero) and counts
+    the skipped bytes as used.
+  - `Alloc` hands out the next free byte and moves on by the size rounded toward zero to 128, plus 128.
+- **The clip names:** `StaticInit_AnimNameHashes` 0x159820 hashes the 0x584 names (pointers at 0x3242a0) into
+  0x3bdb40. `Name_Hash` 0x240e80 is a PJW-style hash: h × 16 plus each signed byte, with the top four bits folded
+  back in at bit 23 and cleared.
+- **Construct, clear, init, reset, destruct:**
+  - Construct makes the BIG file object, empties every file, hashes the names, sets +0x10 4 and +0x14 0, and clears
+    the words at +0x18.
+  - Init gives every file this bank. Clear frees the block and takes the files' bank away.
+  - Reset aligns the block again, empties the files, calls the BIG file's 0x23bea0 when its first word is set, and
+    makes every key none.
+  - Destruct destroys the files from the last, then the BIG file and the memory bank (both with flags 2); flag 1
+    also deletes the bank.
+
+Checked in the runner on 30,000 random banks, about 1,600 calls for each of 19 functions. The data was the files'
+headers in an arena, random markers (often unset), random names with high bytes, and blocks at unaligned addresses.
+27 of 27 mutants were caught.
+
+`tools/disasm.py` now decodes the VU0 macro instructions (`lqc2` / `sqc2`, `qmfc2` / `cfc2` / `qmtc2` and the vector
+operations, as `tools/r5900` runs them), which capstone shows as `.word` or Octeon branches.
