@@ -1443,3 +1443,29 @@ headers in an arena, random markers (often unset), random names with high bytes,
 
 `tools/disasm.py` now decodes the VU0 macro instructions (`lqc2` / `sqc2`, `qmfc2` / `cfc2` / `qmtc2` and the vector
 operations, as `tools/r5900` runs them), which capstone shows as `.word` or Octeon branches.
+
+## The animation curves and angle helpers (row G5c3a; `game/src/animcurve.rs`, checked: `tests/animcurve.rs`)
+
+- **A curve** (`AnimCurve_Eval` 0x157ed8, one piece `AnimCurve_EvalPiece` 0x158030):
+  - It starts with a 16-bit header: the low four bits are the kind, the rest (signed) the length in frames.
+  - Constants are 24-bit floats: three bytes as the float's top bits, with a low byte of 0x80.
+  - Kinds 0..3 are polynomials (constant, t·a + b, (t·a + b)·t + c, the cubic likewise).
+  - Kind 4 is a table of 32-bit floats, one a frame. Kinds 6 and 7 are tables of bytes or 16-bit values, scaled by
+    the second constant and offset by the first. The tables are interpolated linearly between whole frames, and the
+    next value isn't read at a whole frame.
+  - Kind 5 is a run of pieces: each covers its length − 1 frames, the frame counts on through them, and past the last
+    the value is 0. A piece's size is 5, 8, 0xb, 0xe, 4·len + 2, 0, len + 8 or 2·len + 8 bytes by kind.
+  - Any other kind is 0.
+- **`AnimData_GetRootOffset` 0x1586c0:** the clip's three root curves at frame 0, taken from its first child when
+  it has children. The first curve's index is the header's +4; the indices are looked up in the file's offset table.
+- **0x202520 (the Euler delta from a to b):** each angle difference is wrapped into a turn (rounded with + ½, toward
+  zero, and one down when that overshot). The same rotation's other triple (x + π, −b.y − a.y + π, z + π) is used
+  when its absolute angles sum to less. `Euler_Lerp` 0x202758 adds t times that delta; `Euler_LerpArray` does it in
+  place on lists of pointers.
+- **0x250c10 (the sine and cosine pair):** the sine comes from its polynomial on the quarter turn's remainder, and
+  the cosine is √(1 − sin²). The quarter swaps and negates them. The square root is the EE's, toward zero.
+
+Checked in the runner on 60,000 random curves, files, triples and angles, about 7,500 calls for each of 8 functions.
+The curves sat at unaligned addresses, and some runs had a negative count. 29 of 31 mutants were caught. The
+other two are boundaries: the two Euler sums exactly equal, and an angle of exactly 0 in the sine's quarter rounding,
+which is equivalent because ±½ both truncate to 0.

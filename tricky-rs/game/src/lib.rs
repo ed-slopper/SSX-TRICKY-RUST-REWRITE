@@ -36,6 +36,7 @@ pub mod ridercol;
 pub mod sfxcalc;
 pub mod fe3dstate;
 pub mod animctl;
+pub mod animcurve;
 pub mod animdata;
 pub mod animmode;
 pub mod animseq;

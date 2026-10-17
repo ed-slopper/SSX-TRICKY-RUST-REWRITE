@@ -14,7 +14,7 @@ address,size,name,system,status
 0x102de8,20,SpinControl_LoadSnapshot,boarder,checked
 0x102e80,208,Quat_Multiply,boarder?,ported
 0x102f50,44,Vec4_Scale,common?,ported
-0x102f80,44,Vec3_Scale,common?,ported
+0x102f80,44,Vec3_Scale,common?,checked
 0x102fb0,24,CruiseControl_Enter,boarder?,ported
 0x102fc8,1012,CruiseControl_Update,boarder?,checked
 0x1033c0,16,CruiseControl_Exit,boarder?,ported
@@ -1137,9 +1137,9 @@ address,size,name,system,status
 0x157e10,88,AnimMemBank_Destruct,animation,checked
 0x157e68,60,AnimMemBank_Alloc,animation,checked
 0x157ea8,48,AnimMemBank_AlignStart,animation,checked
-0x157ed8,344,AnimCurve_Eval,animation,ported
-0x158030,1676,AnimCurve_EvalPiece,animation,ported
-0x1586c0,216,AnimData_GetRootOffset,animation,not started
+0x157ed8,344,AnimCurve_Eval,animation,checked
+0x158030,1676,AnimCurve_EvalPiece,animation,checked
+0x1586c0,216,AnimData_GetRootOffset,animation,checked
 0x158798,80,AnimData_GetMarkerPhase,animation,checked
 0x1587e8,44,AnimData_GetMarkerFrame,animation,checked
 0x158818,80,AnimData_SetMarker,animation,checked
@@ -3342,9 +3342,9 @@ address,size,name,system,status
 0x202428,80,cAsyncBdrLoad::__tf,runtime,host
 0x202478,36,cBdrLoad::~cBdrLoad,game,not started
 0x2024a0,64,cBdrLoad::__tf,runtime,host
-0x202520,568,Euler_ShortestDelta,animation?,not started
-0x202758,148,Euler_Lerp,animation?,not started
-0x2027f0,116,Euler_LerpArray,animation?,not started
+0x202520,568,Euler_ShortestDelta,animation?,checked
+0x202758,148,Euler_Lerp,animation?,checked
+0x2027f0,116,Euler_LerpArray,animation?,checked
 0x202868,196,PoseBlend_Begin,animation?,not started
 0x202930,92,PoseBlend_Add,animation?,not started
 0x202990,68,PoseBlend_Finish,animation?,not started
