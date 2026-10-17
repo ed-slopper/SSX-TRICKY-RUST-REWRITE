@@ -1414,3 +1414,30 @@ programs (0x390aa0).
 Checked in the runner (`tests/texstate.rs`, 30,000 cases: any program, how and word; the matrix sets mostly real
 floats; the Bezier manager behind a logging stand-in). 54 of 55 mutants were caught. The one left is equivalent:
 the bound checked at 12 instead of 11, which only adds program 11, and the switch writes nothing for it.
+
+## The patch draw run whole on VU1 (row G7a4a; checked: `tests/vu1patch.rs`)
+
+The oracle for the patch programs' ports runs everything as original code in the runner:
+1. the Bezier manager's constructor, with its tables;
+2. 24 of gari's patches (from the disc) queued at 4, 6 and 8 steps and mixed, half clipped;
+3. vf15 drawing them through `PS2Render_Submit` into a draw list;
+4. `PS2Draw_FlushBuckets` writing the list out;
+5. the flush's DMA chain walked into `r5900::vu1::Vu1`.
+
+All four patch programs run, one call per patch: 108 kicks of PACKED ST / RGBAQ / XYZF2 vertices.
+
+What the harness had to learn:
+- **The VIF reads a command's data on through later DMA tags.** A patch program's UNPACK of 0x5d quadwords
+  starts in the `cnt` that `PS2Draw_WriteTexState` writes and finishes in the `ref` of the Bezier table. The `ref`
+  tag's own VIF words are not data. The runner now takes a DMA tag's upper half as VIF codes only when a code is
+  due, as the game's layout needs (PCSX2 has a comment to the same effect).
+- **A matrix set is the renderer's block from +0x490**, copied by `PS2Draw_SelectMatrixSet` 0x1c4650: +0x80
+  (from the renderer's +0x510, the camera times +0x4d0) and the screen's scale and offset (+0x550, +0x560) are
+  what the patch programs get.
+- **The renderer's vf20 0x1dc3e0** (field of view f12, near f13, far f14; the screen's width and height from its
+  +0x60 / +0x58) sets the screen terms and the depth terms of the projection at +0x4d0 / +0x570. With the
+  arguments tried its x and y scales came out 0, so the harness writes 1 there: the camera is the harness's own,
+  2000 above the first patch, looking down.
+
+Stand-ins: the allocator and fill, the texture upload, the renderer's texture and blend virtuals, and the screen
+size.

@@ -98,6 +98,7 @@ impl Vu1 {
         let mut at = tadr;
         let mut stack: Vec<u32> = Vec::new();
         let mut stream: Vec<u32> = Vec::new();
+        let mut is_tag: Vec<bool> = Vec::new();
         for n in 1..100_000 {
             let mut tag = [0u8; 16];
             mem.read(at, &mut tag).ok_or(format!("DMA tag outside memory at {at:#x}"))?;
@@ -106,6 +107,7 @@ impl Vu1 {
             let (qwc, id) = (lo & 0xffff, (lo >> 28) & 7);
             stream.push(u32::from_le_bytes(tag[8..12].try_into().unwrap()));
             stream.push(u32::from_le_bytes(tag[12..16].try_into().unwrap()));
+            is_tag.extend([true, true]);
             let data_at = match id {
                 0 | 3 | 4 => addr,
                 _ => at + 16,
@@ -113,6 +115,7 @@ impl Vu1 {
             let mut data = vec![0u8; 16 * qwc as usize];
             mem.read(data_at, &mut data).ok_or(format!("DMA data outside memory at {data_at:#x}"))?;
             stream.extend(data.chunks(4).map(|c| u32::from_le_bytes(c.try_into().unwrap())));
+            is_tag.resize(stream.len(), false);
             let after = at + 16 + 16 * qwc;
             let next = match id {
                 0 => None,
@@ -129,7 +132,7 @@ impl Vu1 {
             match next {
                 Some(t) => at = t,
                 None => {
-                    self.vif(&stream)?;
+                    self.vif_tagged(&stream, &is_tag)?;
                     return Ok(n);
                 }
             }
@@ -140,9 +143,30 @@ impl Vu1 {
     /// VIF1 codes. `MPG` fills micro memory, `UNPACK` data memory (every format, with the cycle, the mode
     /// and the mask), `DIRECT` the GS log; the calls run the program.
     pub fn vif(&mut self, w: &[u32]) -> Result<(), String> {
+        self.vif_tagged(w, &vec![false; w.len()])
+    }
+
+    /// As [`vif`](Self::vif), with the words that are DMA tags' upper halves marked: those are VIF codes when a
+    /// code is due, but a code's data skips them (an `UNPACK` going on from a `cnt` into a `ref`'s data)
+    fn vif_tagged(&mut self, all: &[u32], is_tag: &[bool]) -> Result<(), String> {
         let mut i = 0usize;
-        while i < w.len() {
-            let code = w[i];
+        // `take(i, n)`: the next n data words from i, skipping tag words; and where they end
+        let take = |i: usize, n: usize| -> Option<(Vec<u32>, usize)> {
+            let mut out = Vec::with_capacity(n);
+            let mut j = i;
+            while out.len() < n {
+                if j >= all.len() {
+                    return None;
+                }
+                if !is_tag[j] {
+                    out.push(all[j]);
+                }
+                j += 1;
+            }
+            Some((out, j))
+        };
+        while i < all.len() {
+            let code = all[i];
             i += 1;
             let (cmd, num, imm) = ((code >> 24) & 0x7f, (code >> 16) & 0xff, code & 0xffff);
             match cmd {
@@ -173,40 +197,56 @@ impl Vu1 {
                     self.exec(start)?;
                 }
                 0x20 => {
-                    self.mask = *w.get(i).ok_or("STMASK past the data")?;
-                    i += 1;
+                    let (d, j) = take(i, 1).ok_or("STMASK past the data")?;
+                    self.mask = d[0];
+                    i = j;
                 }
                 0x30 | 0x31 => {
-                    let v: [u32; 4] = w.get(i..i + 4).ok_or("STROW / STCOL past the data")?.try_into().unwrap();
+                    let (d, j) = take(i, 4).ok_or("STROW / STCOL past the data")?;
+                    let v: [u32; 4] = d.try_into().unwrap();
                     if cmd == 0x30 {
                         self.row = v;
                     } else {
                         self.col = v;
                     }
-                    i += 4;
+                    i = j;
                 }
                 0x4a => {
+                    // (the program follows the code at once: a stream puts the code where its program lands on 64
+                    // bits)
                     let n = if num == 0 { 256 } else { num as usize };
-                    i += i % 2; // the program is 64-bit aligned in the stream
-                    let code = w.get(i..i + 2 * n).ok_or("MPG past the data")?;
+                    let (code, j) = take(i, 2 * n).ok_or("MPG past the data")?;
                     for (k, x) in code.iter().enumerate() {
                         let at = (imm as usize * 8 + 4 * k) % MEM;
                         wr32(&mut self.micro, at, *x);
                     }
-                    i += 2 * n;
+                    i = j;
                 }
                 0x50 | 0x51 => {
                     let n = if imm == 0 { 0x10000 } else { imm as usize };
-                    i += (4 - i % 4) % 4; // the data is quadword aligned
-                    let d = w.get(i..i + 4 * n).ok_or("DIRECT past the data")?;
+                    let (d, j) = take(i, 4 * n).ok_or("DIRECT past the data")?;
                     self.gs.extend(d.chunks(4).map(|c| [c[0], c[1], c[2], c[3]]));
-                    i += 4 * n;
+                    i = j;
                 }
-                0x60..=0x7f => i += self.unpack(cmd, num, imm, &w[i..])?,
+                0x60..=0x7f => {
+                    let (d, j) = take(i, self.unpack_words(cmd, num)).ok_or("UNPACK past the data")?;
+                    self.unpack(cmd, num, imm, &d)?;
+                    i = j;
+                }
                 _ => return Err(format!("VIF code {code:#010x}")),
             }
         }
         Ok(())
+    }
+
+    /// The words an `UNPACK` reads: its vectors that carry data (all with CL ≥ WL; with WL > CL, CL of each WL)
+    fn unpack_words(&self, cmd: u32, num: u32) -> usize {
+        let (vn, vl) = ((cmd >> 2) & 3, cmd & 3);
+        let n = if num == 0 { 256 } else { num as usize };
+        let (cl, wl) = (self.cl.max(1) as usize, self.wl.max(1) as usize);
+        let data_vectors = if wl <= cl { n } else { (n / wl) * cl + (n % wl).min(cl) };
+        let bits = if vl == 3 { 16 } else { [32usize, 16, 8][vl as usize] * (vn as usize + 1) };
+        (bits * data_vectors).div_ceil(32)
     }
 
     /// One `UNPACK`: `num` vectors to data memory from `imm`'s address (+ TOPS with bit 15), written by the cycle
@@ -617,8 +657,8 @@ mod tests {
     #[test]
     fn mpg_unpack_formats_and_offsets() {
         let mut v = Vu1::default();
-        // an MPG first in the stream: its program follows after a word of padding, at 64 bits
-        v.vif(&[0x4a01_0003, 0, 0x1111_1111, 0x2222_2222]).unwrap();
+        // an MPG after a NOP: its program follows at once
+        v.vif(&[0, 0x4a01_0003, 0x1111_1111, 0x2222_2222]).unwrap();
         assert_eq!((rd32(&v.micro, 0x18), rd32(&v.micro, 0x1c)), (0x1111_1111, 0x2222_2222));
         // V4-8 signed and unsigned, S-8 signed
         v.vif(&[0x0100_0101, 0x6e01_0010, 0x80ff_0102, 0x6e01_4011, 0x80ff_0102, 0x6201_0012, 0x0000_0080]).unwrap();
@@ -670,6 +710,16 @@ mod tests {
         put(&mut r, d + 0x10, &[9, 10, 11, 12]);
         put(&mut r, d, &[5, 6, 7, 8]);
         assert_eq!(v.run_chain(&mut r.mem, a).unwrap(), 6);
+        // an UNPACK of two vectors begun in a cnt and finished in a ref's data: the ref tag's own VIF words (here
+        // a code that would fail) are skipped while the data runs on
+        let e = 0x4000u32;
+        put(&mut r, e, &[0x1000_0001, 0, 0, 0x6c02_0010]);
+        put(&mut r, e + 0x10, &[21, 22, 23, 24]);
+        put(&mut r, e + 0x20, &[0x3000_0001, e + 0x40, 0x7f00_0000, 0x7f00_0000]);
+        put(&mut r, e + 0x30, &[0x7000_0000, 0, 0, 0]);
+        put(&mut r, e + 0x40, &[25, 26, 27, 28]);
+        v.run_chain(&mut r.mem, e).unwrap();
+        assert_eq!((v.qw(0x10), v.qw(0x11)), ([21, 22, 23, 24], [25, 26, 27, 28]));
         assert_eq!((v.qw(0), v.qw(1), v.qw(2)), ([1, 2, 3, 4], [5, 6, 7, 8], [9, 10, 11, 12]), "cnt, ref, refs");
     }
 }
