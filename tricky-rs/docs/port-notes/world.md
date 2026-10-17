@@ -1148,3 +1148,25 @@ mutants were caught. Two of the rest are equivalent (the clamps at exactly 1 and
 boundaries: the division rounded to nearest, and the distance summed in another order, move the LOD by an ulp,
 which matters only at a whole number.
 
+## The visible list of TGroups (row G7a2; `terraindraw::visit_cells_near`, `cull_visibility`)
+
+- The world's visible list (`VisList`, world+0x3c) holds up to 0xa2 TGroup pointers with a count at +0x288. The
+  "cells" the draws walk are TGroups. `VisList_Clear` 0x25ec88 zeroes the entries from the last and the count;
+  `VisList_Add` 0x25ecc8 appends at the count with no bound. `CellList_Clear` 0x260f90 and `CellList_Add` 0x260f98
+  are those on world+0x3c. The walks stop at the first empty entry, and what lies past it is never read.
+- **`World_VisitCellsNear` 0x260278**(world, pos, r) clears the list.
+  - The camera's TGroup is (p − corner + size) ÷ size − 1 per axis, using the grid of the world at 0x346488,
+    whatever world is passed.
+  - The square of ±r around it is clamped to 0..w−1 and 0..h−1. Its TGroups are put in the list column by
+    column, using the passed world's grid and skipping empty ones.
+- **`World_CullVisibility` 0x260458**(world, cam, distance) box-tests each listed TGroup (its +0 and +0xc) and
+  first clears its slot marks (+0x36 shown, +0x32 wholly in view):
+  - wholly in view: both set to all slots;
+  - partly in view: each slot holding anything (the words +0x24 and +0x28, the half +0x2c, the word +0x48 not all
+    0) is box-tested on its own +0 and +0xc. In view sets both of its bits, partly in view only the shown one;
+  - outside, or any other answer: nothing.
+  - The camera and the distance are not used.
+
+Checked in the runner (`tests/terraindraw.rs`), on their own and inside the terrain's draw, which now runs them as
+the game does. 16 of 17 mutants were caught; the one left is equivalent (a square's low corner at exactly 0).
+

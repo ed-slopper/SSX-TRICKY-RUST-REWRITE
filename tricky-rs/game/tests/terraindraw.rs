@@ -46,7 +46,8 @@ const BZ: u32 = ARENA + 0xa00;
 const BZVT: u32 = ARENA + 0xa40;
 const CAMMAT: u32 = ARENA + 0xb00;
 const GRID: u32 = ARENA + 0xc00;
-const CELLS: u32 = ARENA + 0xd00;
+const CELLS: u32 = ARENA + 0x4000;
+const TABLE: u32 = ARENA + 0x4400;
 const RECS: u32 = ARENA + 0xe00;
 const LISTS: u32 = ARENA + 0x1300;
 const PATCHES: u32 = ARENA + 0x1500;
@@ -59,7 +60,6 @@ fn vaddr(off: u32) -> u32 {
 
 #[derive(Clone, Debug, PartialEq)]
 enum Call {
-    C(u32, Vec<u32>),
     V(u32, u32, Vec<u32>),
     Patch { this: u32, patch: u32, steps: [u8; 4], shorts: [u32; 2], clip: u32 },
 }
@@ -83,13 +83,6 @@ struct Ours {
     far: u32,
 }
 impl TerrainEnv for Ours {
-    fn call(&mut self, _m: &mut Mem, func: u32, args: &[u32], f12: u32) {
-        let mut a = args.to_vec();
-        if func == t::CULL_VISIBILITY {
-            a.push(f12);
-        }
-        self.log.push(Call::C(func, a));
-    }
     fn vcall(&mut self, _m: &mut Mem, func: u32, this: u32, args: &[u32]) -> u32 {
         self.log.push(Call::V(func, this, args.to_vec()));
         vanswer(func, self.near, self.far)
@@ -110,15 +103,11 @@ fn wf(m: &mut Mem, at: u32, v: f32) {
 #[test]
 fn terrain_draw_matches_the_original() {
     let Some(mut r) = Runner::from_env() else { return };
-    for a in [0x1c7810u32, 0x2008f8, 0x25ecb8, 0x102f50] {
+    for a in [0x1c7810u32, 0x2008f8, 0x25ecb8, 0x102f50, 0x260278, 0x260458, 0x260f90, 0x260f98, 0x25ec88, 0x25ecc8] {
         r.allow(a);
     }
     let log: Rc<RefCell<Vec<Call>>> = Rc::default();
     let dists = Rc::new(RefCell::new((0u32, 0u32)));
-    let l = log.clone();
-    r.stub(t::VISIT_CELLS_NEAR, move |c, _| l.borrow_mut().push(Call::C(t::VISIT_CELLS_NEAR, (0..3).map(|k| c.gpr(4 + k) as u32).collect())));
-    let l = log.clone();
-    r.stub(t::CULL_VISIBILITY, move |c, _| l.borrow_mut().push(Call::C(t::CULL_VISIBILITY, vec![c.gpr(4) as u32, c.gpr(5) as u32, c.f(12).to_bits()])));
     for off in RSLOTS.into_iter().map(vaddr).chain([vaddr(0x130), vaddr(0x138)]) {
         let (l, d) = (log.clone(), dists.clone());
         r.stub(off, move |c, m| {
@@ -165,6 +154,10 @@ fn terrain_draw_matches_the_original() {
         for k in 0..SIZE / 4 {
             m.w32(ARENA + 4 * k, g.next());
         }
+        // (the world's visible list as random as the game's memory, beyond what the walks reach)
+        for k in 0..(0x3c + 4 * 0xa2 + 4) / 4 {
+            m.w32(t::WORLD + 4 * k, g.next());
+        }
         m.w32(t::GAPP, APP);
         m.w32(APP + 0x724, RENDER);
         let game = if g.below(10) == 0 { 0 } else { GAME };
@@ -193,21 +186,45 @@ fn terrain_draw_matches_the_original() {
             wf(&mut m, CAMMAT + 4 * k, if k % 5 == 0 { 1.0 } else if k >= 12 { g.f(-3000.0, 3000.0) } else { g.f(-0.3, 0.3) });
         }
         m.w32(t::SHOW_MODE, [0u32, 3, 5, 1][g.below(4) as usize]);
-        // the cells: masks, the slots' wholly-inside bits, patch counts and lists
+        // the grid (3 × 3 TGroups, 1000 a side, its corner at −1500; some missing) and the visible list: TGroups
+        // with boxes, masks, the slots' wholly-inside bits, their own boxes, contents and patch lists
         m.w32(t::WORLD, GRID);
+        wf(&mut m, GRID + 4, -1500.0);
+        wf(&mut m, GRID + 8, -1300.0);
+        wf(&mut m, GRID + 0x28, 1000.0);
+        m.w32(GRID + 0x2c, 3);
+        m.w32(GRID + 0x30, 3);
+        m.w32(GRID + 0x4c, TABLE);
+        for k in 0..9 {
+            m.w32(TABLE + 4 * k, if g.below(6) == 0 { 0 } else { CELLS + 0x40 * (k % NCELL) });
+        }
         m.w32(GRID + 0x48, 1 + g.below(3));
         let ncell = g.below(NCELL + 1);
         for c in 0..0xa2 {
             let hole = ncell > 1 && c == ncell - 2 && case % 3 == 0;
-            m.w32(t::WORLD + 0x3c + 4 * c, if c < ncell && !hole { CELLS + 0x20 * c } else { 0 });
+            // (past the first empty place, whatever was there: the walks never go beyond it)
+            let v = if c < ncell && !hole { CELLS + 0x40 * c } else if c <= ncell { 0 } else { g.next() | 1 };
+            m.w32(t::WORLD + 0x3c + 4 * c, v);
         }
+        m.w32(t::WORLD + 0x3c + 0x288, g.below(4));
         for c in 0..NCELL {
-            let at = CELLS + 0x20 * c;
+            let at = CELLS + 0x40 * c;
+            for k in 0..6 {
+                wf(&mut m, at + 4 * k, g.f(-2000.0, 2000.0));
+            }
             m.w16(at + 0x36, g.below(8) as u16);
             m.w16(at + 0x32, g.below(8) as u16);
             m.w32(at + 0x38, RECS + 0x100 * c);
             for s in 0..3 {
                 let rec = RECS + 0x100 * c + 0x4c * s;
+                for k in 0..6 {
+                    wf(&mut m, rec + 4 * k, g.f(-2000.0, 2000.0));
+                }
+                let full = g.below(4) != 0;
+                m.w32(rec + 0x28, if full && g.below(2) == 0 { 1 } else { 0 });
+                m.w16(rec + 0x2c, if full && g.below(2) == 0 { 1 } else { 0 });
+                m.w32(rec + 0x48, if full && g.below(2) == 0 { 1 } else { 0 });
+                m.w16(rec + 0x26, if g.below(4) == 0 { 1 + g.below(3) as u16 } else { 0 });
                 m.w16(rec + 0x24, [0u16, 1, 2, 4, 0xffff][g.below(5) as usize]);
                 let list = LISTS + 0x10 * (3 * c + s);
                 m.w32(rec + 0x34, list);
@@ -233,13 +250,31 @@ fn terrain_draw_matches_the_original() {
         }
         log.borrow_mut().clear();
         let mut ours = Ours { log: Vec::new(), near: near.to_bits(), far: far.to_bits() };
-        let whole = g.below(2) == 0;
-        let (func, args) = if whole {
-            t::terrain_draw(&mut m, &mut ours);
-            (0x1c7810u32, vec![ARENA])
-        } else {
-            t::patch_draw_visible(&mut m, &mut ours, t::WORLD);
-            (0x2008f8, vec![t::WORLD])
+        // (the camera's place, for the visits)
+        let view = m.r32(GAME + 0x290);
+        for k in 0..2 {
+            wf(&mut m, GAME + 0xb0 + 0x80 * view + 4 * k, g.f(-2500.0, 2500.0));
+        }
+        r.mem.write(ARENA, &m.regions[0].1).unwrap();
+        let kind = g.below(4);
+        let (func, args) = match kind {
+            0 => {
+                t::terrain_draw(&mut m, &mut ours);
+                (0x1c7810u32, vec![ARENA])
+            }
+            1 => {
+                t::patch_draw_visible(&mut m, &mut ours, t::WORLD);
+                (0x2008f8, vec![t::WORLD])
+            }
+            2 => {
+                let (pos, rr) = (GAME + 0xb0, [0u32, 1, 2, 4, u32::MAX][g.below(5) as usize]);
+                t::visit_cells_near(&mut m, t::WORLD, pos, rr as i32);
+                (0x260278, vec![t::WORLD, pos, rr])
+            }
+            _ => {
+                t::cull_visibility(&mut m, &mut ours, t::WORLD, GAME + 0xb0, tricky_game::ps2f::F(1.0));
+                (0x260458, vec![t::WORLD, GAME + 0xb0])
+            }
         };
         for (i, v) in args.iter().enumerate() {
             r.cpu.set_gpr(4 + i, *v as u64);

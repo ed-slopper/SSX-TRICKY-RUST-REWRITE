@@ -1,7 +1,8 @@
 //! The terrain's draw (board row G7a1): `cTerrainObjNode::Draw` 0x1c7810 and `Patch_DrawVisibleCells` 0x2008f8,
 //! which hands each visible Bezier patch of the course to the renderer's patch draw (+0x2d0, row G7a3) with the
-//! tessellation of its four edges chosen by the camera's distance. On the bytes at their addresses ([`Mem`]); the
-//! cells' visits (G7a2) and the renderer's and the Bezier manager's virtuals are calls out ([`TerrainEnv`]). Checked
+//! tessellation of its four edges chosen by the camera's distance, and the visible list of TGroups it walks
+//! (`World_VisitCellsNear` 0x260278, `World_CullVisibility` 0x260458, row G7a2). On the bytes at their addresses
+//! ([`Mem`]); the renderer's and the Bezier manager's virtuals are calls out ([`TerrainEnv`]). Checked
 //! in the function runner (`tests/terraindraw.rs`).
 //!
 //! **A patch** (listed by the slots of the `.ltg` cells, +0x24 a count, +0x34 the list): +0x150 / +0x15c its box,
@@ -16,13 +17,9 @@ pub const WORLD: u32 = 0x346488;
 pub const SHOW_MODE: u32 = 0x32de8c;
 /// The tessellation by LOD 0..3: 4, 4, 6, 8
 pub const LOD_STEPS: u32 = 0x39afb8;
-pub const VISIT_CELLS_NEAR: u32 = 0x260278;
-pub const CULL_VISIBILITY: u32 = 0x260458;
 
 /// The calls out
 pub trait TerrainEnv {
-    /// A function with these words (and f12 as bits)
-    fn call(&mut self, m: &mut Mem, func: u32, args: &[u32], f12: u32);
     /// A virtual (the renderer's, the Bezier manager's) with these words; its answer (a float's bits for the
     /// manager's two distances)
     fn vcall(&mut self, m: &mut Mem, func: u32, this: u32, args: &[u32]) -> u32;
@@ -58,9 +55,121 @@ pub fn terrain_draw(m: &mut Mem, env: &mut dyn TerrainEnv) {
         dist = if (m.r32(game.wrapping_add(0x298)) as i32) < 2 { rf(m, course.wrapping_add(0x60)) } else { rf(m, course.wrapping_add(0x64)) };
     }
     let n = ((dist - F(1.0)).ee() as i32).wrapping_div(10000).wrapping_add(1);
-    env.call(m, VISIT_CELLS_NEAR, &[WORLD, cam, n as u32], 0);
-    env.call(m, CULL_VISIBILITY, &[WORLD, cam], dist.0.to_bits());
+    visit_cells_near(m, WORLD, cam, n);
+    cull_visibility(m, env, WORLD, cam, dist);
     patch_draw_visible(m, env, WORLD);
+}
+
+/// `VisList_Clear` 0x25ec88(list): the 0xa2 entries cleared (from the last), none counted (+0x288)
+pub fn vis_clear(m: &mut Mem, list: u32) {
+    for k in (0..0xa2u32).rev() {
+        m.w32(list + 4 * k, 0);
+    }
+    m.w32(list + 0x288, 0);
+}
+
+/// `VisList_Add` 0x25ecc8(list, tgroup): put at the count (no bound), counted
+pub fn vis_add(m: &mut Mem, list: u32, tg: u32) {
+    let n = m.r32(list + 0x288);
+    m.w32(list.wrapping_add(n.wrapping_mul(4)), tg);
+    m.w32(list + 0x288, n.wrapping_add(1));
+}
+
+/// `World_VisitCellsNear` 0x260278(world, pos, r): the world's visible list cleared (`CellList_Clear` 0x260f90),
+/// then the TGroups in the square of r about the one under `pos` (the grid at 0x346488's: (p − corner + size) ÷
+/// size − 1), clamped to the grid, put in it column by column (`CellList_Add` 0x260f98; the world's own grid read
+/// for each)
+pub fn visit_cells_near(m: &mut Mem, world: u32, pos: u32, r: i32) {
+    vis_clear(m, world + 0x3c);
+    let g = m.r32(WORLD);
+    let size = rf(m, g + 0x28);
+    let cx = crate::animseq::div((rf(m, pos) - rf(m, g + 4)) + size, size).ee() as i32 - 1;
+    let cy = crate::animseq::div((rf(m, pos + 4) - rf(m, g + 8)) + size, size).ee() as i32 - 1;
+    let (hx, lx, hy, ly) = (cx.wrapping_add(r), cx.wrapping_sub(r), cy.wrapping_add(r), cy.wrapping_sub(r));
+    let lx = lx.min(i32::MAX);
+    let x0 = if lx > -1 { lx } else { 0 };
+    let ly = ly.min(i32::MAX);
+    let y0 = if ly > -1 { ly } else { 0 };
+    let w = m.r32(g + 0x2c) as i32;
+    let h = m.r32(g + 0x30) as i32;
+    let x1 = if 0 < hx { hx } else { 0 };
+    let x1 = if w.wrapping_sub(1) < x1 { w.wrapping_sub(1) } else { x1 };
+    let y1 = if 0 < hy { hy } else { 0 };
+    let y1 = if h.wrapping_sub(1) < y1 { h.wrapping_sub(1) } else { y1 };
+    let mut x = x0;
+    while x <= x1 {
+        let mut y = y0;
+        while y <= y1 {
+            let gw = m.r32(world);
+            let tw = m.r32(gw + 0x2c) as i32;
+            let tx = if x < 0 { 0 } else { x.min(tw.wrapping_sub(1)) };
+            let th = m.r32(gw + 0x30) as i32;
+            let ty = if y < 0 { 0 } else { y.min(th.wrapping_sub(1)) };
+            let at = m.r32(gw + 0x4c).wrapping_add((ty.wrapping_mul(m.r32(gw + 0x2c) as i32).wrapping_add(tx) as u32).wrapping_mul(4));
+            let tg = m.r32(at);
+            if tg != 0 {
+                vis_add(m, world + 0x3c, tg);
+            }
+            y += 1;
+        }
+        x += 1;
+    }
+}
+
+/// `World_CullVisibility` 0x260458(world, cam, distance): each TGroup of the visible list (to the first empty
+/// place) tested by its box (+0, +0xc; the renderer's +0x280): its slots' marks (+0x36 shown, +0x32 wholly in
+/// view) cleared; wholly in view all set; partly, each slot that holds anything (+0x24, +0x28, +0x2c, +0x48)
+/// tested by its own box: in view both bits, partly only the shown one. (The camera and distance are not used.)
+pub fn cull_visibility(m: &mut Mem, env: &mut dyn TerrainEnv, world: u32, _cam: u32, _dist: F) {
+    let r = renderer(m);
+    let mut c = 0u32;
+    while (c as i32) < 0xa2 {
+        let tg = m.r32(world + 0x3c + 4 * c);
+        c += 1;
+        if tg == 0 {
+            break;
+        }
+        let (t, f) = vfn(m, r, 0x10, 0x280);
+        let (lo, hi) = (corner(m, tg), corner(m, tg + 0xc));
+        let v = env.cull(m, f, t, lo, hi);
+        m.w16(tg + 0x36, 0);
+        m.w16(tg + 0x32, 0);
+        match v {
+            0 => {
+                m.w16(tg + 0x32, 0xffff);
+                m.w16(tg + 0x36, 0xffff);
+            }
+            2 => {
+                let mut k = 0u32;
+                while (k as i32) < m.r32(m.r32(WORLD) + 0x48) as i32 {
+                    let rec = m.r32(tg + 0x38).wrapping_add(0x4c * k);
+                    let kk = k;
+                    k += 1;
+                    let empty = m.r32(rec + 0x24) == 0 && m.r32(rec + 0x28) == 0 && m.r16(rec + 0x2c) == 0 && m.r32(rec + 0x48) == 0;
+                    if empty {
+                        continue;
+                    }
+                    let (t, f) = vfn(m, r, 0x10, 0x280);
+                    let (lo, hi) = (corner(m, rec), corner(m, rec + 0xc));
+                    let bit = 1u16 << (kk & 31);
+                    match env.cull(m, f, t, lo, hi) {
+                        0 => {
+                            let a = m.r16(tg + 0x36) | bit;
+                            let b = m.r16(tg + 0x32) | bit;
+                            m.w16(tg + 0x36, a);
+                            m.w16(tg + 0x32, b);
+                        }
+                        2 => {
+                            let a = m.r16(tg + 0x36) | bit;
+                            m.w16(tg + 0x36, a);
+                        }
+                        _ => {}
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
 }
 
 /// `Patch_DrawVisibleCells` 0x2008f8(world).

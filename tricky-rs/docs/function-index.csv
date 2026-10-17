@@ -4677,9 +4677,9 @@ address,size,name,system,status
 0x25ebe0,80,cWorldLine::__tf,runtime,host
 0x25ec30,44,Vec4_ScaleCopy11,world?,not started
 0x25ec60,40,VisList_Construct,world?,not started
-0x25ec88,44,VisList_Clear,world?,not started
+0x25ec88,44,VisList_Clear,world?,checked
 0x25ecb8,16,VisList_Get,world?,not started
-0x25ecc8,28,VisList_Add,other,not started
+0x25ecc8,28,VisList_Add,other,checked
 0x25ece8,136,cCourseResolve::cCourseResolve,race,not started
 0x25ed70,128,World_Destruct,world,not started
 0x25edf0,1704,Course_LoadRenderData,race,ported
@@ -4690,8 +4690,8 @@ address,size,name,system,status
 0x25feb8,20,Course_GetEffectHeader,race,ported
 0x25fed0,400,World_CellActivate_RunPersistant,world,ported
 0x260108,368,World_CellDeactivate,world,ported
-0x260278,480,World_VisitCellsNear,world,not started
-0x260458,668,World_CullVisibility,world,not started
+0x260278,480,World_VisitCellsNear,world,checked
+0x260458,668,World_CullVisibility,world,checked
 0x2606f8,412,Course_RemapTextures,race,ported
 0x260898,264,Course_RemapLightmapTextures,race,ported
 0x2609b0,28,RailNode_GetSpline,boarder,not started
@@ -4703,8 +4703,8 @@ address,size,name,system,status
 0x260d08,204,World_GetCellAt,world,checked
 0x260dd8,144,World_FindScript,world,ported
 0x260e68,44,Course_GetScriptEntry,race,ported
-0x260f90,8,CellList_Clear,world?,not started
-0x260f98,8,CellList_Add,world?,not started
+0x260f90,8,CellList_Clear,world?,checked
+0x260f98,8,CellList_Add,world?,checked
 0x260fa0,28,FUN_00260fa0,world?,not started
 0x260fc0,28,CellList_Destruct,world?,not started
 0x260fe0,80,cCourseResolve::__tf,runtime,host
