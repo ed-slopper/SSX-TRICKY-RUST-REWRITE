@@ -78,9 +78,16 @@ pub fn sqrt(a: F) -> F {
     }
     F(r) * F(1.0)
 }
-/// `cvt.s.w`
+/// `cvt.s.w` as the EE does it: toward zero (exact below 2^24)
+pub fn cvt_s_w(v: i32) -> F {
+    let mut f = v as f32;
+    if (f as f64).abs() > (v as f64).abs() {
+        f = f32::from_bits(f.to_bits() - 1);
+    }
+    F(f)
+}
 fn fl(v: i32) -> F {
-    F(v as f32)
+    cvt_s_w(v)
 }
 /// `cvt.w.s`: toward zero, saturating
 fn int(v: F) -> i32 {

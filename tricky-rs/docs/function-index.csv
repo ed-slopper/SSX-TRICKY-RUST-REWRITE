@@ -1166,7 +1166,7 @@ address,size,name,system,status
 0x159820,92,StaticInit_AnimNameHashes,frontend?,checked
 0x159880,104,SkelAnim_Init,other,not started
 0x1598e8,36,SkelAnim_SetSkeleton,other,not started
-0x159910,364,FUN_00159910,animation?,not started
+0x159910,364,FUN_00159910,animation?,checked
 0x159a80,132,SkelAnim_DestroyTree,boarder?,checked
 0x159b08,72,cBoarderSequence::cBoarderSequence,boarder,checked
 0x159b50,88,FUN_00159b50,render?,checked
@@ -1211,8 +1211,8 @@ address,size,name,system,status
 0x15f440,372,AnimCtl_UpdateClip,animation,checked
 0x15f5b8,328,AnimCtl_HandleClipEnd,animation,checked
 0x15f700,200,AnimCtl_FlushEndedClips,animation,checked
-0x15f7c8,632,AnimCtl_BlendPose,animation,ported
-0x15fa40,196,AnimCtl_GetClipDisplacement,animation,ported
+0x15f7c8,632,AnimCtl_BlendPose,animation,checked
+0x15fa40,196,AnimCtl_GetClipDisplacement,animation,checked
 0x15fb08,172,AnimCtl_FindFirstMarkerFrame,animation,checked
 0x15fbb8,320,RaceScene_SetClipMarker,animation?,checked
 0x15fcf8,216,AnimCtl_PlayClip,animation,checked
@@ -3345,11 +3345,11 @@ address,size,name,system,status
 0x202520,568,Euler_ShortestDelta,animation?,checked
 0x202758,148,Euler_Lerp,animation?,checked
 0x2027f0,116,Euler_LerpArray,animation?,checked
-0x202868,196,PoseBlend_Begin,animation?,not started
-0x202930,92,PoseBlend_Add,animation?,not started
-0x202990,68,PoseBlend_Finish,animation?,not started
-0x2029d8,292,PoseBlend_EvalCurves,animation?,not started
-0x202b00,3904,FUN_00202b00,animation?,not started
+0x202868,196,PoseBlend_Begin,animation?,checked
+0x202930,92,PoseBlend_Add,animation?,checked
+0x202990,68,PoseBlend_Finish,animation?,checked
+0x2029d8,292,PoseBlend_EvalCurves,animation?,checked
+0x202b00,3904,FUN_00202b00,animation?,checked
 0x203a40,92,cSkelSequence::vf2_203a40,render,checked
 0x203aa0,40,cSkelSequence::SaveSnapshot,save,checked
 0x203ac8,20,cSkelSequence::vf4_203ac8,render,checked

@@ -1469,3 +1469,58 @@ Checked in the runner on 60,000 random curves, files, triples and angles, about 
 The curves sat at unaligned addresses, and some runs had a negative count. 29 of 31 mutants were caught. The
 other two are boundaries: the two Euler sums exactly equal, and an angle of exactly 0 in the sine's quarter rounding,
 which is equivalent because ±½ both truncate to 0.
+
+## The pose blend (row G5c3b; `game/src/animpose.rs`, checked: `tests/animpose.rs`)
+
+- **`AnimCtl_BlendPose` 0x15f7c8** (the end of every `AnimCtl_UpdateLayers`):
+  - It lists the controller's sequences with weight above 0, newest first, layer by layer.
+  - Each of the rider's pose objects (rider+0x7bc of them, 0x394 bytes from +0x7c0) is begun.
+  - The object gets every listed source with weight whose tree's children are of the object's part (the child's
+    header's +8, a signed byte, equal to +0x384). Each comes with the sequence's stance (+0x64), bone mask (+0x18),
+    the source's frame, the source's weight × the sequence's, and the sequence's facing (+0x14).
+  - Then the object is finished.
+- **A pose object:**
+  - +0 the rotations (Euler) and +0x108 the translations, 22 bones at most; +0x210 the channel values when there is
+    no skeleton;
+  - +0x28c the sources (`PoseBlend_Add` takes ten at most);
+  - +0x380 the translation scale, +0x388 the skeleton (0x54 bytes a bone), +0x38c the bone count, +0x390 the mask's
+    first bit.
+
+  `PoseBlend_Begin` sets the bind pose, or 0 for every channel.
+- **Binding (0x159910):** a tree that still holds its clip's channel offsets and data (+0x2a4 and +0x2a8 both set)
+  notes each bone's first channel and points each channel at its curve. Without a skeleton that is one channel a
+  bone; with one, three for translation curves (bone flag 1) and three for rotation curves (flag 2). Then it forgets
+  the offsets.
+- **Without a skeleton (`PoseBlend_EvalCurves`):** each channel adds the source's weight × its curve.
+- **With one (`FUN_00202b00`):**
+  - It sets six static guards and clears both passes' weights.
+  - **Pass 0** takes the sources with a bone mask, **pass 1** the rest. A bone is used when its bit
+    (bone + +0x390) is in the mask and pass 0 hasn't already weighted it fully.
+  - **The translation** comes from the curves (× the scale) or the bind pose (flag 4). With a stance, the mirror
+    bone's (+0x16) is used.
+    - The root's (parent −1) is turned by the facing about z. The rotation is built from the angle's sine and cosine
+      (0x250c10), multiplied on VU0 with the matrix at 0x346440, and its top 3 × 3 is applied to the vector.
+    - With a stance, the translation is then scaled by the mirror scale (+0x48).
+  - **The rotation** comes from the curves or the bind pose (flag 8). The root's z gets the facing. With a stance it
+    becomes the mirror offset (+0x30) + rotation × scale (+0x3c).
+  - **Mixing within a pass:** the first source sets the bone and its weight. Each later one adds its weight. The
+    translations become new × w / total + old × old weight / total, and the rotations are queued for one
+    `Euler_LerpArray` after the source's bones.
+  - **The final mix:** at pass-0 weight 1, pass 0's values; at 0, pass 1's; otherwise the translations are mixed by
+    that weight, and the rotation starts from pass 1's and moves towards pass 0's by it.
+  - The scratch arrays live at 0x3d2170..0x3d2958.
+- **The EE's conversions:** `cvt.s.w` rounds toward zero in the runner too. A huge angle saturates `cvt.w.s` to
+  0x7fffffff, which converts back to 2147483520 there, not 2147483648. The ports now use `animseq::cvt_s_w`.
+
+Checked in the runner on 12,000 random worlds, about 1,700 calls for each of 7 functions. The worlds had skeletons
+with every flag combination, mirrors and parents; up to ten sources with masks, stances and weights often 0, ½ or 1;
+trees bound or still to bind; curves of every kind; and, for the whole blend, a controller with sequences and a rider
+with pose objects of two parts. 40 of 44 mutants were caught. The other 4 are equivalent: the root turn's x-axis term
+(the axis is fixed at (0, 0, 1)), two weight tests (weights are never negative), and the empty lerp call.
+
+## The clip displacement (row G5c3c; `animctl::clip_displacement`, checked: `tests/animdisp.rs`)
+
+`AnimCtl_GetClipDisplacement` 0x15fa40(out, layer): the layer's clip's root offset (`AnimData_GetRootOffset`, on
+its first child when it has one), all four lanes times the rider's scale (rider+0x464's +0x60) with one VU0 `vmulx`.
+It writes `out` as one quadword. Checked in the runner on 20,000 random controllers and clip files; 5 of 5 mutants
+were caught.

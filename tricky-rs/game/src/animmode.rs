@@ -35,7 +35,7 @@ fn abs(v: F) -> F {
 /// Source i's last frame (its clip header's length − 1)
 fn last(m: &Mem, s: u32, i: u32) -> F {
     let t = m.r32(s + 0x78 + 4 * i);
-    F((m.r16(m.r32(t + 8) + 0xa) as i32 - 1) as f32)
+    crate::animseq::cvt_s_w(m.r16(m.r32(t + 8) + 0xa) as i32 - 1)
 }
 fn rider(m: &Mem, ctl: u32) -> u32 {
     m.r32(ctl + 0x24)

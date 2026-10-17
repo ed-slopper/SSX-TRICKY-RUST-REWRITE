@@ -39,6 +39,7 @@ pub mod animctl;
 pub mod animcurve;
 pub mod animdata;
 pub mod animmode;
+pub mod animpose;
 pub mod animseq;
 pub mod fe_character;
 pub mod fe_title;

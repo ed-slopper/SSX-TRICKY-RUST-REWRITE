@@ -16,7 +16,7 @@
 //!
 //! Any other kind is 0.
 
-use crate::animseq::sqrt;
+use crate::animseq::{cvt_s_w, sqrt};
 use crate::pf::Mem;
 use crate::ps2f::F;
 
@@ -61,7 +61,7 @@ pub fn eval_piece(m: &Mem, piece: u32, t: F) -> F {
         4 => {
             let i = int(t);
             let at = p.wrapping_add((i as u32).wrapping_mul(4));
-            let frac = t - F(i as f32);
+            let frac = t - cvt_s_w(i);
             let v0 = f32le(m, at);
             if frac.ee() == 0.0 {
                 v0
@@ -73,7 +73,7 @@ pub fn eval_piece(m: &Mem, piece: u32, t: F) -> F {
             let i = int(t);
             let first = f24(m, p);
             let second = f24(m, p + 3);
-            let frac = t - F(i as f32);
+            let frac = t - cvt_s_w(i);
             let q = |j: u32| {
                 if k == 6 {
                     m.r8(p.wrapping_add(6).wrapping_add(i as u32).wrapping_add(j)) as i32
@@ -81,11 +81,11 @@ pub fn eval_piece(m: &Mem, piece: u32, t: F) -> F {
                     u16le(m, p.wrapping_add(6).wrapping_add((i as u32).wrapping_mul(2)).wrapping_add(2 * j)) as i32
                 }
             };
-            let q0 = F(q(0) as f32);
+            let q0 = cvt_s_w(q(0));
             if frac.ee() == 0.0 {
                 return q0 * second + first;
             }
-            (q0 + frac * (F(q(1) as f32) - q0)) * second + first
+            (q0 + frac * (cvt_s_w(q(1)) - q0)) * second + first
         }
         _ => F(0.0),
     }
@@ -119,11 +119,11 @@ pub fn eval_data(m: &Mem, data: u32, t: F) -> F {
     while i < count {
         let ph = u16le(m, p);
         let len = (ph as u16 as i16 as i32) >> 4;
-        if t.ee() <= F((len - 1) as f32).ee() {
+        if t.ee() <= cvt_s_w(len - 1).ee() {
             return eval_piece(m, p, t);
         }
         p = p.wrapping_add(piece_size(ph & 0xf, len) as u32);
-        t = t - F((len - 1) as f32);
+        t = t - cvt_s_w(len - 1);
         i = (i + 1) as i8 as i32;
     }
     F(0.0)
@@ -138,23 +138,31 @@ pub fn eval(m: &Mem, curve: u32, t: F) -> F {
 /// root curves at frame 0 (the header's +4 the first curve's index in the file's offsets at +0xc; the offsets from
 /// the file's data at +0x10), w 0
 pub fn root_offset(m: &mut Mem, file: u32, clip: u32, out: u32) {
+    let v = root_offset_values(m, file, clip);
+    for k in 0..4 {
+        wf(m, out + 4 * k, v[k as usize]);
+    }
+}
+
+/// [`root_offset`]'s four values
+pub fn root_offset_values(m: &Mem, file: u32, clip: u32) -> [F; 4] {
     let mut h = m.r32(file + 8).wrapping_add(clip.wrapping_mul(0x24));
     if m.r8(h + 9) != 0 {
         h += 0x24;
     }
     let offs = m.r32(file + 0xc).wrapping_add(m.r32(h + 4).wrapping_mul(4));
+    let mut v = [F(0.0); 4];
     for k in 0..3 {
         let data = m.r32(file + 0x10).wrapping_add(m.r32(offs + 4 * k));
-        let v = eval_data(m, data, F(0.0));
-        wf(m, out + 4 * k, v);
+        v[k as usize] = eval_data(m, data, F(0.0));
     }
-    m.w32(out + 0xc, 0);
+    v
 }
 
 /// v − 2π·round(v / 2π), the rounding as the game does it (+ ½, toward zero, one down when that overshot)
 fn wrap(v: F) -> F {
     let k = v * F(f32::from_bits(0x3e22_f983)) + F(0.5);
-    let mut n = F(int(k) as f32);
+    let mut n = cvt_s_w(int(k));
     if k.ee() < n.ee() {
         n = n - F(1.0);
     }
@@ -224,7 +232,7 @@ pub fn euler_lerp_array(m: &mut Mem, as_: u32, bs: u32, ts: u32, n: i32) {
 pub fn sin_cos(x: F) -> (F, F) {
     let q = if x.ee() < 0.0 { x * F(f32::from_bits(0x3f22_f983)) - F(0.5) } else { x * F(f32::from_bits(0x3f22_f983)) + F(0.5) };
     let n = int(q);
-    let r = x - F(n as f32) * F(f32::from_bits(0x3fc9_0fdb));
+    let r = x - cvt_s_w(n) * F(f32::from_bits(0x3fc9_0fdb));
     let r2 = r * r;
     let c = |b: u32| F(f32::from_bits(b));
     let p = (((r2 * c(0x3638_ef1d) + c(0xb950_0d01)) * r2 + c(0x3c08_8889)) * r2 + c(0xbe2a_aaab)) * r2 + F(1.0);

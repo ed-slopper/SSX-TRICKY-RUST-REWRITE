@@ -133,7 +133,7 @@ pub fn marker_phase(m: &Mem, f: u32, c: u32, k: u32) -> F {
         last = 1;
     }
     let mk = m.r16(h.wrapping_add(k.wrapping_mul(2)) + 0xc) as i32;
-    div(F(mk as f32), F(last as f32))
+    div(crate::animseq::cvt_s_w(mk), crate::animseq::cvt_s_w(last))
 }
 
 /// `AnimData_GetMarkerFrame` 0x1587e8(file, clip, k): the second list's frame k, −1 when unset
