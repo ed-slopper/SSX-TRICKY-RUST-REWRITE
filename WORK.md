@@ -81,8 +81,7 @@ state machine and the renderer are ours. Nothing has been checked against the or
 | G7 | Rendering, as the PS2 renderer does it. Split before claiming: | unowned | E3a, E3b | | [repo] |
 | G7a | (umbrella: G7a1, G7a2, G7a3, G7a4) Terrain patches: the game's tessellation and LOD, subtractive lightmaps | unowned | G7 | | [repo] README "What the viewer taught us"; split 2026-10-17 |
 | G7a4 | (umbrella: G7a4a, G7a4b, G7a4c, G7a4d, G7a4e) The patch micro programs on VU1: what the patch and view packets run (`MSCAL` at the VU1 places `StaticInit_Render` writes: 0xa, 0, 0x10, 0xd, 5, 0x1c / 0x30), the tessellation by the Bezier tables (`bezier::build_tables`) and the views' pass; first find where the programs are uploaded from | unowned | G7a3 | | Split of G7a 2026-10-17: G7a1..3 ported the EE side; needs G7h3, G7i |
-| G7a4b | The 4-step patch program (chain 0x30f960, 743 instructions) ported 1:1 and checked against `Vu1` on G7a4a's packets || ed-slopper/puffin | G7a4a | | Split of G7a4 |
-| G7a4c | The 6-step patch program (chain 0x3110f0, 821 instructions) | any | G7a4b | | Split of G7a4 |
+| G7a4c | The 6-step patch program (chain 0x3110f0, 821 instructions) || ed-slopper/puffin | G7a4b | | Split of G7a4 |
 | G7a4d | The 8-step patch program (chain 0x312af0, 860 instructions) | any | G7a4b | | Split of G7a4 |
 | G7a4e | The mixed patch program (chain 0x314620, 1853 instructions) | any | G7a4b | | Split of G7a4 |
 | G7e | Particles as the VU1 microcode draws them (0x31c288), spark and dust sprites | unowned | G7 | | [repo] "Unresolved: spark and dust sprite rendering"; `particles.rs` has the emitters |
@@ -157,6 +156,7 @@ matches the original.
 
 | ID | Task | Section | Who | Date | Commit |
 |---|---|---|---|---|---|
+| G7a4b | The 4-step patch VU1 program (chain 0x30f960): `tricky_game::patchvu::run4` on `vu::Vu` (a VU1 with the VU's rounding): the patch evaluated (edges, the 4 x 4 grid), the textured strips with the clip test and the Sutherland-Hodgman clipper, the lightmap pass, the view pass; checked call by call against the game's program in the runner's VU1 (tests/vu1patch.rs: 1224 calls under nine cameras, data memory, registers and 146,456 GS quadwords the same); 51 of 54 mutants caught, the rest equivalent | P2 | ed-slopper/puffin | 2026-10-17 | 9b210a2 |
 | G7a4a | The patch draw run whole in the runner (tests/vu1patch.rs): the Bezier manager, the queue and draw, PS2Render_Submit, the flush and WriteTexState as original code on 24 of gari's patches under a set-up camera; the DMA chain walked into r5900::vu1::Vu1 runs all four patch programs (108 kicks of ST / RGBAQ / XYZF2 vertices); the runner's VIF now runs a command's data on past later DMA tags' VIF words (unit-tested, 4 of 4 mutants caught) | P2 | ed-slopper/puffin | 2026-10-17 | 8daf959 |
 | G7i | VU1 in the function runner: `r5900::vu1::Vu1` (a DMA source chain walked into VIF1; NOP, STCYCL, OFFSET, BASE, ITOP, STMOD, the FLUSHes, MSCAL / MSCALF / MSCNT with TOP's double buffer, STMASK, STROW, STCOL, MPG, DIRECT, UNPACK in every format with the cycle, mode and mask; VU1 micro programs with their memory, Q, the clip flags, branches, XITOP / XTOP and XGKICK to a logged GS packet), the rest of the VU upper ops, documented in docs/checking.md; the game's eight VU1 chains load (tests/vu1_chains.rs); 36 of 36 mutants caught by the unit tests | P2 | ed-slopper/puffin | 2026-10-17 | c86abc6 |
 | G7h | The renderer's draw lists: all its parts done (G7h1 the state, pages, batches and sort; G7h2 the flush and GS register writers; G7h3 the VU1 program upload) | P2 | ed-slopper/puffin | 2026-10-17 | 8a89cc8 |
@@ -1250,3 +1250,4 @@ matches the original.
 - 2026-10-17 ed-slopper/puffin: G7h3 done 8a89cc8 (the VU1 program upload vs the original); G7h closed; G7i claimed.
 - 2026-10-17 ed-slopper/puffin: G7i done c86abc6 (VU1 and VIF1 in the runner); G7a4 split into G7a4a (the whole patch draw run in the runner; claimed) and G7a4b..e (the four programs).
 - 2026-10-17 ed-slopper/puffin: G7a4a done 8daf959 (the patch draw run whole on VU1 in the runner); G7a4b claimed.
+- 2026-10-17 ed-slopper/puffin: G7a4b done 9b210a2 (the 4-step patch program vs the game's, call by call); G7a4c claimed.
