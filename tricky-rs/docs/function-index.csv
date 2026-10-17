@@ -2458,8 +2458,8 @@ address,size,name,system,status
 0x1aa630,1492,Overlay_DrawMenuList,frontend,checked
 0x1aac08,168,Dialog_PollButtons,frontend?,ported
 0x1aacb0,352,ResultsOverlay_Init,frontend,not started
-0x1aae10,116,Results_SetRowLayout,frontend?,not started
-0x1aae88,56,Results_ClearText,frontend?,not started
+0x1aae10,116,Results_SetRowLayout,frontend?,checked
+0x1aae88,56,Results_ClearText,frontend?,checked
 0x1aaec0,360,Overlay_DrawCourseTitle,frontend,not started
 0x1ab028,284,FUN_001ab028,game?,not started
 0x1ab148,88,cResultsOverlay::Update,frontend,ported
@@ -2490,8 +2490,8 @@ address,size,name,system,status
 0x1aed50,1484,cPopFinishOverlay::DrawText,frontend,not started
 0x1af320,336,cBlackFadeOverlay::Draw,frontend,not started
 0x1af470,684,OverlayMan_CreateOverlays,frontend,ported
-0x1af720,544,Results_BuildPages,frontend?,not started
-0x1af950,2100,Results_BuildCareerPage,race?,not started
+0x1af720,544,Results_BuildPages,frontend?,checked
+0x1af950,2100,Results_BuildCareerPage,race?,checked
 0x1b0188,1644,Results_BuildStandingsPage,race?,not started
 0x1b07f8,412,Results_BuildTimeChallengePage,frontend?,not started
 0x1b0998,544,Results_BuildRiderStatsRows,ai?,not started
@@ -2499,7 +2499,7 @@ address,size,name,system,status
 0x1b1278,1144,Results_AddRiderStats,race?,not started
 0x1b16f0,952,Results_BuildStatsPage,race?,not started
 0x1b1aa8,256,Results_BuildLessonPage,race?,not started
-0x1b1ba8,324,Results_SetMedalVerdict,race?,not started
+0x1b1ba8,324,Results_SetMedalVerdict,race?,checked
 0x1b2158,720,Results_DrawBestTrick,hud?,not started
 0x1b2428,3732,Results_DrawVersusPage,ai?,not started
 0x1b32c0,1580,Results_UpdateSaveBeforeExit,save,ported
@@ -2600,14 +2600,14 @@ address,size,name,system,status
 0x1bf500,84,cViewHiScoresOverlay::__tf,runtime,host
 0x1bf580,820,cViewHiScoresOverlay::vf19_1bf580,frontend,not started
 0x1bf8b8,92,cRaceResultsOverlay::__tf,runtime,host
-0x1bf918,100,Results_SetCellFloat,frontend?,not started
-0x1bfa08,40,Results_SetCellInt,frontend?,not started
-0x1bfa30,32,Results_SetCellText,race?,not started
-0x1bfa50,32,Results_SetCellAscii,race?,not started
-0x1bfab0,24,Results_SetRowName,race?,not started
-0x1bfac8,24,Results_SetRowNameAscii,race?,not started
-0x1bfb10,12,Results_SetTitle,race?,not started
-0x1bfb20,12,Results_SetTitleAscii,race?,not started
+0x1bf918,100,Results_SetCellFloat,frontend?,checked
+0x1bfa08,40,Results_SetCellInt,frontend?,checked
+0x1bfa30,32,Results_SetCellText,race?,checked
+0x1bfa50,32,Results_SetCellAscii,race?,checked
+0x1bfab0,24,Results_SetRowName,race?,checked
+0x1bfac8,24,Results_SetRowNameAscii,race?,checked
+0x1bfb10,12,Results_SetTitle,race?,checked
+0x1bfb20,12,Results_SetTitleAscii,race?,checked
 0x1bfc70,256,cResultsOverlay::vf0_1bfc70,frontend,not started
 0x1bfd70,84,cResultsOverlay::__tf,runtime,host
 0x1bfdc8,32,cSelectNextEventOverlay::vf2_1bfdc8,frontend,not started

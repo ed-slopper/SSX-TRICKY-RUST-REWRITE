@@ -1183,3 +1183,65 @@ The batch 13 "no xrefs" list's 0x2761c0, 0x28e9c8, 0x29e088 and 0x2aafc8 are the
   fixed-point digits with the `.`).
 - `Vec4_SetFromVec3` 0x18df60: `Vec4_Set`(dst, v.x, v.y, v.z, w from f12).
 - Not settled: 0x2c5558 (no callers), 0x26ac30, 0x260fa0.
+
+## The results screens' pages (G9v, `resultpages`)
+
+After a race, `cResultsOverlay` shows pages built into one table in the game's data.
+
+- **The table:**
+  - 0x3385c0 holds 8 rows of 16 cells, each a 0x80-byte wide string (a cell is at `row << 11 | col << 7`);
+  - the rows' names are at 0x33c5c0 (8 of 0x80 bytes) and the title at 0x33c9c0;
+  - the columns' places are 17 floats at 0x338550, with more places from 0x338598 and their alignments at
+    0x3384d0.
+- **The setters** (`Results_SetCell*`, `_SetRowName*`, `_SetTitle*`, 0x1bf918..0x1bfb2c) each copy, set from
+  narrow, or format ("%d", "%d%s", "%f", "%f%s") into one place. The float ones pass the value as a double made by
+  the compiler's `__extendsfdf2`. Two pairs of them only return a cell's or a row name's place. All of them ignore
+  their first argument (the page).
+- **`Results_SetRowLayout` 0x1aae10**(page; x, w) keeps x as the left edge. The first column is at
+  x + 0.85·width + 12, and each later one 0.85·width + w further on; the width is the page's +0 → +4 → +0xc, a
+  whole number. **`Results_ClearText` 0x1aae88** clears the names and the cells.
+- **`Results_BuildPages` 0x1af720**:
+  - resets the backdrop and clears the table, the overlay's verdict line and four 0x6e-byte lines (each with the
+    word before it);
+  - empties the menu and records whether the final unlock was had (the race's in career mode 4, else the
+    show-off's);
+  - sets the medal rank to 3 and the rows' riders to −1;
+  - builds the page for the career's mode: 1 the stats, 2 and 9 the standings, 3 and 5 the medals, 4 the career, 6
+    the lesson, 7 the time challenge, 8 none;
+  - keeps the menu's count and queues the race's end lines (`Speech_QueueRaceEndLines`).
+
+  0x1af940 is a separate small function that clears the speech's event.
+- **The menu** is up to five items at the page's +0xc, each a kind and a string, with the count at +0x34. The count
+  is read again after each item is stored, so a sixth item would overwrite the count itself. The pages never add
+  more than five.
+- **`Results_BuildCareerPage` 0x1af950:**
+  - the layout comes from the HUD's sprite 0x37 (its x + 79, rows 18 apart), plus five fixed columns and four
+    alignments;
+  - it sets the rows' names, the page's numbers and the title of the event's mode;
+  - in mode 2 the menu is continue, the points entry (only when there are none to spend), retry, quit and save
+    (again only when none), and the verdict is shown with the first columns 37 apart;
+  - in the other modes the verdict line says "advance" when no player finished in the first half of the race,
+    else the mode's line, and the menu is the continue entry plus four more. The check uses the career's +0x3264,
+    which is the finishing order's first word (0x32e5f4);
+  - then each finisher's row: the place ("%d" with st, nd, rd, th), the name (the character's for a rider who
+    isn't a player, the rider's own for a player), a fixed narrow string, and the time. With the verdict shown, a
+    player's row also sets the rank (`Circuit_ClampMedalRank`) and makes the verdict.
+- **`Results_SetMedalVerdict` 0x1b1ba8** picks the verdict line from the career's rank for the event (0x163e28):
+  - 3 gives 0x249;
+  - below the medal's rank gives 0x248;
+  - otherwise rank 0 gives 0x247, and anything else 0x246.
+
+Checked in the runner (`tests/resultpages.rs`): 300 cases of each of the row's 20 functions. Each case starts from
+the ELF's own data at 0x328000..0x340000, with these made random:
+- the career's mode and its event;
+- the race's riders (players or not), the finishing order (six at most: its six words run into the times) and the
+  times;
+- the run-time globals (the lines, the modes' titles);
+- the sprite's x, up to past 2^24 so the sums' order matters.
+
+Every callee is a stand-in on both sides, answering from the case's seed. A format's buffer on the game's stack
+and the port's scratch log as one token.
+
+53 of 55 mutants were caught:
+- starting the "advance" loop at 0 instead of 1 is equivalent, since its first check reads the same word;
+- the career-mode test (4 against 3) can only be told apart once the medal page (mode 3) is ported (G9v3).
