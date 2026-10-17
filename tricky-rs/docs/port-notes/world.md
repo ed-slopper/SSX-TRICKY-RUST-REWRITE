@@ -1974,3 +1974,30 @@ the shadow's colour.
     batch is drawn or not.
 
 Checked in the runner (`tests/renderdraw.rs`): 1500 cases, 2124 sub-batches drawn. All 17 mutants were caught.
+
+## The rider's skinned draw and its reflections (G7l, `renderdraw::skinned_draw`)
+
++0x2e0 0x1df478(r, lod), from `RiderSkin_SkinMatrices`, draws the rider's skinned model. The board's reflection
+(the "env materials" of row G7g) lives here.
+- **Set-up.** The renderer's +0x330 gets the first part's +0x38; the matrices are made.
+- **Each part's batches** (0x14 bytes each), in turn:
+  - The batch's texture (+4) becomes texture 0.
+  - **Texture 1 is the environment map.** Normally it is r + 0x644, or r + 0x648 when the batch's +8 is
+    negative. The texture state's +0xd gets |+8|'s low byte, with blend mode 5 and +0x1f8(1, 1). For the 6th
+    outfit (+0x1d90, set by the rider's draw) it is the app's texture +0x30 → +0x90 instead, with +0x1f8(0, 1),
+    mode 4 and +0xd = 0x21.
+  - Then +0x1c8(1, 2, 0.08), and +0x1e8 1 for flag 0x8000, else 0.
+- **Flag 1: the base pass.** Each sub-batch's matrix list goes to +0x328, then a `call` of its packet. All of them
+  are submitted together. (The part's 8-byte matrix lists are counted on over all its batches.)
+- **Flag 0x100: the layer pass**, from the part's material (+0: its layer weights at +0x210, its pairing flag
+  at +0x288). Each sub-batch's matrices go first.
+  - **Unpaired:** a `call` of the first layer record's packet, a `call` of one quadword with MSCAL 0x4b0 for
+    each further record, and a `cnt` of 1 with MSCAL.
+  - **Paired:** the records go in pairs; an odd count's last is paired with itself. Each pair gets two `call`s
+    and a row of (the first weight, the part's +0x38 × 2560). Then, for each further layer of the mesh (+0x48)
+    whose weight is above 0.01, the pair's packets that far on (+4 + layer × +8) with that weight. A `cnt` of 1
+    with FLUSH and MSCAL ends it.
+  - All submitted.
+
+Checked in the runner (`tests/renderdraw.rs`): 3000 cases (6582 submits, 9831 matrix lists, 1658 draws with
+paired layers). All 25 mutants were caught.

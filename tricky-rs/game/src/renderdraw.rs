@@ -6,7 +6,7 @@
 //! the colour as four integers, +0x20 the place.
 
 use crate::pf::Mem;
-use crate::riderdraw::RiderDrawEnv;
+use crate::riderdraw::{RiderDrawEnv, APP};
 
 pub const MATRIX_UPDATE: u32 = 0x1e85b0;
 pub const SUBMIT: u32 = 0x1e8838;
@@ -324,6 +324,182 @@ pub fn board_shadow(m: &mut Mem, env: &mut dyn RiderDrawEnv, r: u32, slot1: u32,
             }
             batch += 0x14;
             j += 1;
+        }
+    }
+}
+
+/// The packet place's next doublewords written (the place left after them)
+fn put(m: &mut Mem, r: u32, words: &[u64]) -> u32 {
+    let p = m.r32(r + 0x680);
+    for (k, v) in words.iter().enumerate() {
+        w64(m, p + 8 * k as u32, *v);
+    }
+    m.w32(r + 0x680, p + 8 * words.len() as u32);
+    p + 8 * words.len() as u32
+}
+
+/// A sub-batch's matrix list (8 bytes in the part's +0x30: a count and the list) handed to the renderer's +0x328
+/// as the blended matrices (r + 0x3f8 + the bone's 0x40), in `scratch` (STANDIN: the game's stack)
+fn matrices(m: &mut Mem, env: &mut dyn RiderDrawEnv, r: u32, part: u32, at: u32, scratch: u32) {
+    let e = m.r32(part + 0x30).wrapping_add(at << 3);
+    let (count, list) = (m.r32(e), m.r32(e + 4));
+    let mut t = 0i32;
+    while t < count as i32 {
+        let idx = m.r32(list + 4 * t as u32);
+        let bone = m.r32(m.r32(part + 0x2c).wrapping_add(idx.wrapping_mul(12)) + 8);
+        let w = m.r32(r + 0x3f8).wrapping_add(bone << 6);
+        m.w32(scratch + 4 * t as u32, w);
+        t += 1;
+    }
+    vcall(m, env, r, 0x328, &[count, scratch]);
+}
+
+/// The DMA `call` of the packet whose address is the first word at `at`, with `qwc` quadwords
+fn call_of(m: &Mem, at: u32, qwc: u64) -> u64 {
+    (m.r32(at) as u64) << 32 | 0x5000_0000 | qwc
+}
+
+/// The renderer's +0x2e0 0x1df478(r, lod): the rider's skinned model drawn (from `RiderSkin_SkinMatrices`). The
+/// renderer's +0x330 with the first part's +0x38, the matrices made; then each part (0x48 bytes) and each of its
+/// mesh's batches (+0x40, 0x14 bytes each from the part's +0x34):
+/// - the batch's texture (+4) as the first (+0x1f0); the environment map as the second: without the outfit flag
+///   (+0x1d90), +0x644 or (the batch's +8 below 0) +0x648, the texture state's +0xd the +8's magnitude's low
+///   byte, blend mode 5 (+0x200), +0x1f8(1, 1); with it, the app's texture +0x30 → +0x90, +0x1f8(0, 1), mode 4,
+///   +0xd = 0x21; the test +0x1c8(1, 2, 0.08); +0x1e8(1 or, without the flag 0x8000, 0, 0);
+/// - flag 1, the base pass: each sub-batch (+0xc; the part's matrix lists counted on over its batches) its
+///   matrices to +0x328 and a `call` of its packet (the batch's +0x10 list), all submitted;
+/// - flag 0x100, the layer pass (the part's material +0, its layer weights at +0x210): each sub-batch's matrices,
+///   then either (the material's +0x288 is 0) a `call` of its packet and, for each further layer record (12
+///   bytes), a `call` of 1 with MSCAL 0x4b0, ended by a `cnt` of 1 with MSCAL; or the layer records in pairs (an
+///   odd count's last paired with itself): each pair's two `call`s with a row of the first weight and the part's
+///   +0x38 × 2560, then for each further layer of the mesh (+0x48) whose weight is above 0.01 the pair's packets
+///   that far on (+4 + the layer × +8) with that weight, ended by a `cnt` of 1 with FLUSH and MSCAL; all
+///   submitted.
+pub fn skinned_draw(m: &mut Mem, env: &mut dyn RiderDrawEnv, r: u32, lod: u32, scratch: u32) {
+    use crate::ps2f::F;
+    let mscal = (0x4b0u64 >> 3) | 0x1400_0000;
+    let parts = m.r32(lod) as i32;
+    let first = m.r32(m.r32(lod + 4) + 0x38);
+    vcall(m, env, r, 0x330, &[first]);
+    env.call(m, MATRIX_UPDATE, &[r]);
+    let mut i = 0i32;
+    while i < parts {
+        let part = m.r32(lod + 4).wrapping_add((i * 0x48) as u32);
+        i += 1;
+        let height = rf(m, part + 0x38) * F(2560.0);
+        if m.r16(m.r32(part + 0xc) + 0x40) as i16 <= 0 {
+            continue;
+        }
+        let mut done = 0u32;
+        let mut batch = m.r32(part + 0x34);
+        let mut j = 0i32;
+        loop {
+            let tex = m.r32(batch + 4);
+            vcall(m, env, r, 0x1f0, &[tex, 0]);
+            let envmap;
+            if m.r32(r + 0x1d90) == 0 {
+                let word = m.r32(batch + 8) as i32;
+                let v = word.wrapping_abs() as u32 & 0xff;
+                let ts = m.r32(r + 0x470);
+                if m.r8(ts + 0xd) as u32 != v {
+                    m.w8(ts + 0xd, v as u8);
+                    m.w32(r + 0x474, 1);
+                }
+                envmap = if (m.r32(batch + 8) as i32) < 0 { m.r32(r + 0x648) } else { m.r32(r + 0x644) };
+                vcall(m, env, r, 0x200, &[5, 1]);
+                vcall(m, env, r, 0x1f8, &[1, 1]);
+            } else {
+                envmap = m.r32(m.r32(m.r32(APP) + 0x30) + 0x90);
+                vcall(m, env, r, 0x1f8, &[0, 1]);
+                vcall(m, env, r, 0x200, &[4, 1]);
+                let ts = m.r32(r + 0x470);
+                if m.r8(ts + 0xd) != 0x21 {
+                    m.w8(ts + 0xd, 0x21);
+                    m.w32(r + 0x474, 1);
+                }
+            }
+            vcall(m, env, r, 0x1f0, &[envmap, 1]);
+            vcall(m, env, r, 0x1c8, &[1, 2, 0x3da3_d70a]);
+            let flag = if m.r32(batch) & 0x8000 != 0 { 1 } else { 0 };
+            vcall(m, env, r, 0x1e8, &[flag, 0]);
+            if m.r32(batch) & 1 != 0 {
+                let start = m.r32(r + 0x680);
+                let mut end = start;
+                let mut k = 0i32;
+                while k < m.r32(batch + 0xc) as i32 {
+                    matrices(m, env, r, part, done.wrapping_add(k as u32), scratch);
+                    let c = call_of(m, m.r32(m.r32(batch + 0x10).wrapping_add((k as u32) << 3)), 0);
+                    end = put(m, r, &[c, 0]);
+                    k += 1;
+                }
+                m.w32(r + 0x680, end + 0x10);
+                env.call(m, SUBMIT, &[r, start, end, 0]);
+            }
+            if m.r32(batch) & 0x100 != 0 {
+                let weights = m.r32(part) + 0x210;
+                let start = m.r32(r + 0x680);
+                let mut k = 0i32;
+                while k < m.r32(batch + 0xc) as i32 {
+                    matrices(m, env, r, part, done.wrapping_add(k as u32), scratch);
+                    let entry = m.r32(batch + 0x10).wrapping_add((k as u32) << 3);
+                    if m.r32(m.r32(part) + 0x288) == 0 {
+                        let c = call_of(m, m.r32(entry), 0);
+                        put(m, r, &[c, 0]);
+                        let mut t = 1u32;
+                        while (t as i32) < m.r32(m.r32(batch + 0x10).wrapping_add((k as u32) << 3) + 4) as i32 {
+                            let rec = m.r32(m.r32(batch + 0x10).wrapping_add((k as u32) << 3)).wrapping_add(12 * t);
+                            let c = call_of(m, rec, 1);
+                            put(m, r, &[c, 0, 0, mscal << 32]);
+                            t += 1;
+                        }
+                        put(m, r, &[0x1000_0001, 0, 0, mscal << 32]);
+                    } else {
+                        let n = m.r32(entry + 4) as i32;
+                        let pairs = if n & 1 != 0 { n + 1 } else { n };
+                        let even = n & 1 == 0;
+                        let mut t = 0i32;
+                        while t < pairs {
+                            let base = m.r32(m.r32(batch + 0x10).wrapping_add((k as u32) << 3));
+                            let l0 = base.wrapping_add((t as u32).wrapping_mul(12));
+                            let (a0, a8) = (m.r32(l0 + 4), m.r32(l0 + 8));
+                            let w0 = rf(m, weights);
+                            let c0 = call_of(m, l0, 0);
+                            let row = (height.0.to_bits() as u64) << 32 | w0.0.to_bits() as u64;
+                            put(m, r, &[c0, 0, (a0 as u64) << 32 | 0x5000_0001, 0, 0x6401_03ffu64 << 32, row]);
+                            let second = if !even && t == pairs - 2 { t } else { t + 1 };
+                            let base = m.r32(m.r32(batch + 0x10).wrapping_add((k as u32) << 3));
+                            let l1 = base.wrapping_add((second as u32).wrapping_mul(12));
+                            let (b0, b8) = (m.r32(l1 + 4), m.r32(l1 + 8));
+                            let c1 = call_of(m, l1, 0);
+                            put(m, r, &[c1, 0, (b0 as u64) << 32 | 0x5000_0000, 0, 0x1000_0001, 0, 0, 0]);
+                            let mut layer = 1u32;
+                            while (layer as i32) < m.r16(m.r32(part + 0xc) + 0x48) as i16 as i32 {
+                                let w = rf(m, weights + 4 * layer);
+                                if F(f32::from_bits(0x3c23_d70a)) < w {
+                                    let p0 = a0.wrapping_add(layer.wrapping_mul(a8));
+                                    let p1 = b0.wrapping_add(layer.wrapping_mul(b8));
+                                    let row = (height.0.to_bits() as u64) << 32 | w.0.to_bits() as u64;
+                                    put(m, r, &[(p0 as u64) << 32 | 0x5000_0001, 0, 0x6401_03ffu64 << 32, row]);
+                                    put(m, r, &[(p1 as u64) << 32 | 0x5000_0000, 0, 0x1000_0001, 0, 0, 0]);
+                                }
+                                layer += 1;
+                            }
+                            put(m, r, &[0x1000_0001, 0, mscal, mscal | 0x8800u64 << 45]);
+                            t += 2;
+                        }
+                    }
+                    k += 1;
+                }
+                let end = m.r32(r + 0x680);
+                m.w32(r + 0x680, end + 0x10);
+                env.call(m, SUBMIT, &[r, start, end, 0]);
+            }
+            done = done.wrapping_add(m.r32(batch + 0xc));
+            batch += 0x14;
+            j += 1;
+            if !(j < m.r16(m.r32(part + 0xc) + 0x40) as i16 as i32) {
+                break;
+            }
         }
     }
 }

@@ -3029,7 +3029,7 @@ address,size,name,system,status
 0x1dee80,672,cPS2GraphicsMan::vf99_1dee80,render,not started
 0x1df120,436,cPS2GraphicsMan::vf101_1df120,render,not started
 0x1df2d8,416,cPS2GraphicsMan::vf100_1df2d8,render,not started
-0x1df478,2480,cPS2GraphicsMan::vf91_1df478,render,not started
+0x1df478,2480,cPS2GraphicsMan::vf91_1df478,render,checked
 0x1dfe30,344,cPS2GraphicsMan::vf93_1dfe30,render,checked
 0x1dff88,1328,cPS2GraphicsMan::vf94_1dff88,render,checked
 0x1e04b8,280,Render_FormatVramStats,render,not started

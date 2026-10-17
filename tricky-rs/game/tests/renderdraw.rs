@@ -477,3 +477,191 @@ fn board_shadow_matches_the_original() {
     println!("{subs} sub-batches drawn");
     assert!(subs > 1000);
 }
+
+/// What the skinned draw's virtuals are logged with (+0x330 its float, +0x1c8 its float, +0x328 its matrix list,
+/// which also moves the packet place on, as the real one appends)
+fn slog(off: u32, w: &[u32], f12: u32, read: &mut dyn FnMut(u32) -> u32, write: &mut dyn FnMut(u32, u32)) -> Vec<u32> {
+    let mut v = vec![w[0]];
+    match off {
+        0x330 => v.push(f12),
+        0x1c8 => v.extend([w[1], w[2], f12]),
+        0x328 => {
+            v.push(w[1]);
+            v.extend((0..w[1].min(8)).map(|k| read(w[2] + 4 * k)));
+            let p = read(R + 0x680);
+            write(R + 0x680, p + 0x20);
+        }
+        _ => v.extend([w[1], w[2]]),
+    }
+    v
+}
+
+struct SkinEnv<'a>(&'a mut Vec<Call>);
+impl RiderDrawEnv for SkinEnv<'_> {
+    fn call(&mut self, m: &mut Mem, func: u32, args: &[u32]) -> u32 {
+        let mut w = args.to_vec();
+        w.resize(8, 0);
+        self.0.push(Call(func, logged(func, &w, &mut |a| m.r32(a))));
+        0
+    }
+    fn vcall(&mut self, m: &mut Mem, func: u32, this: u32, args: &[u32]) -> u32 {
+        let off = func - 0x01ff_0000;
+        let f12 = match off {
+            0x330 => args[0],
+            0x1c8 => args[2],
+            _ => 0,
+        };
+        let mut w = vec![this];
+        w.extend(args);
+        w.resize(8, 0);
+        let m2 = RefCell::new(m);
+        let v = slog(off, &w, f12, &mut |a| m2.borrow().r32(a), &mut |a, x| m2.borrow_mut().w32(a, x));
+        self.0.push(Call(func, v));
+        0
+    }
+}
+
+#[test]
+fn skinned_draw_matches_the_original() {
+    let Some(mut r) = Runner::from_env() else { return };
+    r.allow(0x1df478);
+    const RVT: u32 = ARENA + 0x2800;
+    const APPOBJ: u32 = ARENA + 0x2c00;
+    const APPTEX: u32 = ARENA + 0x2d00;
+    const LOD: u32 = ARENA + 0x5000;
+    const PARTS: u32 = ARENA + 0x5100;
+    const MESHES: u32 = ARENA + 0x5400;
+    const MATERIALS: u32 = ARENA + 0x5600;
+    const BATCHES: u32 = ARENA + 0x6000;
+    const SUBS: u32 = ARENA + 0x6400;
+    const LISTS: u32 = ARENA + 0x6800;
+    const DESCS: u32 = ARENA + 0x6a00;
+    const RECS: u32 = ARENA + 0x6c00;
+    const ENTRIES: u32 = ARENA + 0x7400;
+    const SCRATCH: u32 = 0x0180_0000;
+    const SLOTS: [u32; 7] = [0x330, 0x1f0, 0x200, 0x1f8, 0x1c8, 0x1e8, 0x328];
+    let log: Rc<RefCell<Vec<Call>>> = Rc::default();
+    for off in SLOTS {
+        let l = log.clone();
+        r.stub(0x01ff_0000 + off, move |c, mem| {
+            let w: Vec<u32> = (4..12).map(|k| c.gpr(k) as u32).collect();
+            let f12 = c.fpr[12];
+            let m2 = RefCell::new(mem);
+            let v = slog(off, &w, f12, &mut |a| m2.borrow_mut().read_u32(a), &mut |a, x| m2.borrow_mut().write_u32(a, x));
+            l.borrow_mut().push(Call(0x01ff_0000 + off, v));
+        });
+    }
+    for func in [rd::MATRIX_UPDATE, rd::SUBMIT] {
+        let l = log.clone();
+        r.stub(func, move |c, mem| {
+            let w: Vec<u32> = (4..12).map(|k| c.gpr(k) as u32).collect();
+            l.borrow_mut().push(Call(func, logged(func, &w, &mut |a| mem.read_u32(a))));
+        });
+    }
+    let mut g = Rng(0x5791_4000_0000_0001);
+    let (mut base, mut layers, mut paired) = (0usize, 0usize, 0usize);
+    for case in 0..3000u32 {
+        let mut m = Mem { regions: vec![(ARENA, vec![0; SIZE as usize]), (tricky_game::riderdraw::APP, vec![0; 4]), (SCRATCH, vec![0; 0x40])] };
+        for k in 0..SIZE / 4 {
+            m.w32(ARENA + 4 * k, g.next());
+        }
+        m.w32(R + 0x10, RVT);
+        for off in SLOTS {
+            m.w16(RVT + off, [0u16, 0x10][g.below(2) as usize]);
+            m.w32(RVT + off + 4, 0x01ff_0000 + off);
+        }
+        m.w32(tricky_game::riderdraw::APP, APPOBJ);
+        m.w32(APPOBJ + 0x30, APPTEX);
+        m.w32(R + 0x470, TS);
+        m.w32(R + 0x474, 0);
+        m.w8(TS + 0xd, [0u8, 3, 0x21][g.below(3) as usize]);
+        m.w32(R + 0x680, PKT + 0x10 * g.below(16));
+        m.w32(R + 0x3f8, ARENA + 0xf000);
+        m.w32(R + 0x1d90, (g.below(3) == 0) as u32);
+        // the LOD: 0..3 parts, each a mesh of 0..3 batches and 0..4 layers, a material (its weights, its paired flag)
+        m.w32(LOD, g.below(4));
+        m.w32(LOD + 4, PARTS);
+        for p in 0..3u32 {
+            let part = PARTS + 0x48 * p;
+            let mesh = MESHES + 0x50 * p;
+            let mat = MATERIALS + 0x300 * p;
+            m.w32(part, mat);
+            m.w32(part + 0xc, mesh);
+            m.w32(part + 0x2c, DESCS);
+            m.w32(part + 0x30, SUBS + 0x100 * p);
+            m.w32(part + 0x34, BATCHES + 0x100 * p);
+            wf(&mut m, part + 0x38, g.f(0.0, 2.0));
+            m.w16(mesh + 0x40, g.below(4) as u16);
+            m.w16(mesh + 0x48, g.below(5) as u16);
+            m.w32(mat + 0x288, g.below(2));
+            for l in 0..5 {
+                wf(&mut m, mat + 0x210 + 4 * l, [0.0f32, 0.005, 0.01, 0.5, 1.0][g.below(5) as usize]);
+            }
+            for b in 0..3u32 {
+                let batch = BATCHES + 0x100 * p + 0x14 * b;
+                m.w32(batch, [0u32, 1, 0x100, 0x101, 0x8001, 0x8100][g.below(6) as usize]);
+                m.w32(batch + 4, g.next());
+                m.w32(batch + 8, [5u32, 0xffff_fffb, 0, 0x8000_0000, 0x1ff][g.below(5) as usize]);
+                m.w32(batch + 0xc, g.below(4));
+                m.w32(batch + 0x10, ENTRIES + 0x40 * (3 * p + b));
+            }
+            for s in 0..12u32 {
+                let at = SUBS + 0x100 * p + 8 * s;
+                m.w32(at, g.below(5));
+                m.w32(at + 4, LISTS + 0x20 * (s % 8));
+            }
+        }
+        for k in 0..64 {
+            m.w32(LISTS + 4 * k, g.below(8));
+        }
+        for k in 0..8 {
+            m.w32(DESCS + 12 * k + 8, g.below(16));
+        }
+        // each sub-batch: its layer records (0..5 of 12 bytes: the packet's address word, a place, a stride)
+        for e in 0..9 * 8u32 {
+            let at = ENTRIES + 8 * e;
+            m.w32(at, RECS + 0x40 * (e % 24));
+            m.w32(at + 4, g.below(6));
+        }
+        for k in 0..24 * 5u32 {
+            let rec = RECS + 12 * k;
+            m.w32(rec, ARENA + 0x7c00 + 0x10 * (k % 32));
+            m.w32(rec + 4, g.next() & 0x00ff_fff0);
+            m.w32(rec + 8, 0x10 * g.below(8));
+        }
+        for (at, b) in &m.regions {
+            if *at != SCRATCH {
+                r.mem.write(*at, b).unwrap();
+            }
+        }
+        log.borrow_mut().clear();
+        let mut calls = Vec::new();
+        rd::skinned_draw(&mut m, &mut SkinEnv(&mut calls), R, LOD, SCRATCH);
+        r.cpu.set_gpr(4, R as u64);
+        r.cpu.set_gpr(5, LOD as u64);
+        r.call(0x1df478).unwrap_or_else(|e| panic!("case {case}: {e}"));
+        let theirs = log.borrow().clone();
+        if theirs != calls {
+            let i = theirs.iter().zip(&calls).position(|(x, y)| x != y).unwrap_or(theirs.len().min(calls.len()));
+            panic!("case {case}: call {i} of {}/{}: theirs {:x?} ours {:x?}", theirs.len(), calls.len(), theirs.get(i), calls.get(i));
+        }
+        for (at, b) in &m.regions {
+            if *at == SCRATCH {
+                continue;
+            }
+            let mut th = vec![0u8; b.len()];
+            r.mem.read(*at, &mut th).unwrap();
+            if &th != b {
+                let i = th.iter().zip(b).position(|(x, y)| x != y).unwrap() & !3;
+                let w = |v: &[u8]| u32::from_le_bytes(v[i..i + 4].try_into().unwrap());
+                panic!("case {case}: memory at {:#x}: theirs {:#x} ours {:#x}", at + i as u32, w(&th), w(b));
+            }
+        }
+        let submits = theirs.iter().filter(|c| c.0 == rd::SUBMIT).count();
+        base += submits;
+        layers += theirs.iter().filter(|c| c.0 == 0x01ff_0000 + 0x328).count();
+        paired += (submits > 0 && (0..3u32).any(|p| m.r32(MATERIALS + 0x300 * p + 0x288) != 0)) as usize;
+    }
+    println!("{base} submits, {layers} matrix lists, {paired} with paired layers");
+    assert!(base > 3000 && layers > 3000 && paired > 300);
+}
