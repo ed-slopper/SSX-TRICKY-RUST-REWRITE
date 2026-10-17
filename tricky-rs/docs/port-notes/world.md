@@ -2243,3 +2243,65 @@ and measuring stand-ins do their work on both sides.
 - `DrawVCentered`'s shift with no lines, which no draw sees.
 
 The ninth is the 128-line limit at the text's end after a space break, which needs exactly 127 lines then.
+
+## The font's draws and set-up, and the wide strings (G7o, `fontdraw`)
+
+This is the rest of the font: what the text box and the screens call to put a string down. Drawing the glyphs
+themselves (`Font_DrawStringA` / `_Raw` and the shadowed draws), measuring them and formatting stay calls out.
+
+- **The wide strings** (`WStr_*` 0x17cc48..0x17ce30) are 16-bit strings ending in 0.
+  - The copies stop at the 0 and write one.
+  - Narrow to wide sign-extends each byte: 0x80..0xff become 0xff80..0xffff. Wide to narrow keeps the low byte.
+  - The `N` forms stop after n characters (none for n ≤ 0). That includes the unnamed narrow-to-wide copy at
+    0x17cd70.
+  - `WStr_Append` returns the end it copied to, not the string.
+- **A text style** (`TextStyle_*`) is two words: the font, and +4, whether a typed character makes a sound.
+  `Init` and `Construct` clear +4, and the destructor deletes it only with flag 1.
+- **A font's set-up.**
+  - `Font_Init` / `_Construct` set the file (+0, `Construct` parses it, `Font_ParseSfn`(f, file, 0)), no texture
+    (+8), the scales 1 (+0x18, +0x1c), +0x20 and +0x24 0, and +0x38 −1.
+  - `Font_Free` frees the texture if there is one and clears +4 and +8; `Font_Delete` frees, then deletes with
+    flag 1.
+- **The glyph's width and advance** (0x19d9e0 / 0x19da08) are the glyph's signed +8 (0 for none). They are
+  found by the character's low byte and low 16 bits.
+- **The centred and right-aligned draws** (0x19d210..0x19d3ec) take the string's measured width off x: half of
+  it (read from the measure's record at +8) or all of it. The narrow forms make the string wide first.
+- **The formatted draws** (`Font_DrawfRaw` / `_DrawfWide`) spill their variable arguments (a2..t3, as
+  doublewords) after a buffer on the stack. They format into the buffer (`vsprintf` 0x301ca0 / its wide form
+  0x2c48e8) and draw it, with the floats turned from (scale, x, y) to (x, y, scale).
+- **`Font_DrawAligned`** 0x19df90(style, align, string, count, shadow; scale, x, y).
+  - Left (0) and centred (1) draw with `Font_DrawStringA`, or the shadowed draw / the shadowed centred one.
+    So **centred without a shadow draws left-aligned.** Right (2) uses `Font_DrawRightAligned` or the
+    shadowed right draw. Any other alignment draws nothing.
+  - With a count, the first `count` characters are drawn as a copy. Then the next character goes after their
+    measured width, at half the drawer's alpha. If the copy ends in a space, it moves 6 × the scale further.
+    The alpha is put back after.
+  - The space check reads the copy at count − 1 even when the count is past the string. It then looks past
+    the copy's end, at whatever the stack holds there. The port reads its scratch there, so the test clears
+    the runner's stack before each call to make the two the same.
+- **`Font_DrawWithCursor`** 0x19e460(…, cursor) draws the whole string with the count −1, left-aligned whatever
+  the alignment. Otherwise it draws aligned, then the cursor:
+  - the blink: 0x338000 counts down; below 0 it goes back to 70 and the cursor-on flag 0x337ffc flips;
+  - the typed part's narrow copy, measured with `Font_MeasureAscii`, plus 6 × the scale after a space while
+    the line goes on;
+  - no texture (the renderer's +0x1f0(−1, 0));
+  - with the cursor on and wanted, a filled rectangle in the drawer's colour (`Draw_FilledRect`), 3 past the
+    typed part, 10 wide and the font's height × the scale high;
+  - the typed character's sound (0x214dd0 with 0x343050's word) while the line goes on and the style sounds.
+  0x19e3b8 (not in the index) is its narrow form.
+
+What the game builds on its stack (the strings' copies, the measure's record, the formats' buffers and
+arguments) the port builds in a caller's scratch area (STANDIN).
+
+Checked in the runner (`tests/fontdraw.rs`): 600 cases of each of the 28 functions. The strings have spaces,
+the sign bit and none at all; the counts are −1, 0, 1, 3, the length and past it; the three alignments and a fourth
+that draws nothing, the shadow and the cursor on and off, the blink at 0, 1 and 30, styles that sound or not, fonts with and
+without a texture. That gave 240 cursors drawn, 211 sounds and 326 blinks.
+
+58 of 59 mutants were caught. The one left takes the next character at a count equal to the length, where it
+is the 0 either way. Three were caught only after the test grew:
+- a count of −2 (only −1 means all);
+- character 1 in the strings (a count stopping above 1);
+- shadowed stand-ins that leave the drawer in their own colour, with every draw logging the alpha it draws
+  with. Without them, half of the alpha from before the first draw looks the same as half of the alpha after
+  it.

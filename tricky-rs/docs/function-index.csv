@@ -1676,13 +1676,13 @@ address,size,name,system,status
 0x17c9d8,360,FUN_0017c9d8,render?,not started
 0x17cb40,92,FUN_0017cb40,render?,not started
 0x17cbc8,64,cAppMan::__tf,runtime,host
-0x17cc48,52,WStr_Count,race?,not started
-0x17cc80,52,WStr_Copy,common?,ported
-0x17ccb8,60,WStr_SetAscii,race?,ported
-0x17ccf8,56,WStr_ToAscii,other,ported
-0x17cd30,60,WStr_CopyN,frontend?,not started
-0x17cdb8,68,WStr_ToAsciiN,hud?,not started
-0x17ce00,52,WStr_Append,frontend?,not started
+0x17cc48,52,WStr_Count,race?,checked
+0x17cc80,52,WStr_Copy,common?,checked
+0x17ccb8,60,WStr_SetAscii,race?,checked
+0x17ccf8,56,WStr_ToAscii,other,checked
+0x17cd30,60,WStr_CopyN,frontend?,checked
+0x17cdb8,68,WStr_ToAsciiN,hud?,checked
+0x17ce00,52,WStr_Append,frontend?,checked
 0x17ce38,52,WStr_Format,frontend?,ported
 0x17ce70,168,WStr_FormatAscii,frontend?,ported
 0x17cf50,68,cBxObjNode::cBxObjNode,world,checked
@@ -2345,40 +2345,40 @@ address,size,name,system,status
 0x19c310,324,FUN_0019c310,,not started
 0x19c458,456,FUN_0019c458,,not started
 0x19c620,344,FUN_0019c620,,not started
-0x19c788,48,Font_Init,hud,not started
-0x19c7b8,80,Font_Construct,hud,not started
-0x19c808,76,Font_Delete,hud,not started
+0x19c788,48,Font_Init,hud,checked
+0x19c7b8,80,Font_Construct,hud,checked
+0x19c808,76,Font_Delete,hud,checked
 0x19c858,116,Font_ParseSfn,hud,ported
-0x19c8d0,60,Font_Free,hud,not started
+0x19c8d0,60,Font_Free,hud,checked
 0x19c910,764,Font_ParseGlyphs,hud,checked
 0x19cc10,148,Font_FindGlyph,hud,checked
 0x19cca8,712,Font_BuildTexture,hud,ported
 0x19cf70,332,Font_DrawStringRaw,hud,ported
 0x19d0c0,332,Font_DrawStringA,hud,ported
-0x19d210,100,Font_DrawCenteredAscii,hud,not started
-0x19d278,144,Font_DrawCentered,hud,not started
-0x19d308,100,Font_DrawRightAscii,hud,not started
-0x19d370,124,Font_DrawRightAligned,hud,not started
+0x19d210,100,Font_DrawCenteredAscii,hud,checked
+0x19d278,144,Font_DrawCentered,hud,checked
+0x19d308,100,Font_DrawRightAscii,hud,checked
+0x19d370,124,Font_DrawRightAligned,hud,checked
 0x19d3f0,376,Font_PrintfShadowed,hud,checked
 0x19d568,376,Font_PrintfShadowedA,hud,checked
 0x19d6e0,140,Font_PrintfShadowedCentered,hud,checked
 0x19d770,140,Font_PrintShadowedCentered,hud,checked
 0x19d800,100,Font_PrintAsciiShadowedRight,hud,checked
 0x19d868,120,Font_PrintShadowedRight,hud,checked
-0x19d8e0,128,Font_DrawfRaw,hud,not started
-0x19d960,128,Font_DrawfWide,hud,not started
-0x19d9e0,40,Font_GetGlyphWidth,hud,not started
-0x19da08,40,Font_GlyphAdvance,hud,not started
+0x19d8e0,128,Font_DrawfRaw,hud,checked
+0x19d960,128,Font_DrawfWide,hud,checked
+0x19d9e0,40,Font_GetGlyphWidth,hud,checked
+0x19da08,40,Font_GlyphAdvance,hud,checked
 0x19da30,584,Font_MeasureAscii,hud,checked
 0x19dc78,584,Font_MeasureWide,hud,checked
-0x19dec0,12,TextStyle_Init,render,not started
-0x19ded0,28,TextStyle_Destruct,render,not started
-0x19def0,156,Font_DrawAlignedAscii,hud,not started
-0x19df90,1008,Font_DrawAligned,hud,not started
-0x19e380,8,TextStyle_SetFont,render,not started
-0x19e388,40,TextStyle_Construct,render,not started
+0x19dec0,12,TextStyle_Init,render,checked
+0x19ded0,28,TextStyle_Destruct,render,checked
+0x19def0,156,Font_DrawAlignedAscii,hud,checked
+0x19df90,1008,Font_DrawAligned,hud,checked
+0x19e380,8,TextStyle_SetFont,render,checked
+0x19e388,40,TextStyle_Construct,render,checked
 0x19e3b0,8,thunk_FUN_0019ded0,runtime,host
-0x19e460,572,Font_DrawWithCursor,hud,not started
+0x19e460,572,Font_DrawWithCursor,hud,checked
 0x19e6a0,124,StaticInit_Font,other,not started
 0x19e7a0,160,Score_GetRankForPoints,scoring,ported
 0x19e840,68,Score_GetRankColour,scoring,ported
