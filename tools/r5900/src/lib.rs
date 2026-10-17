@@ -15,6 +15,7 @@
 mod exec;
 pub mod md5;
 pub mod ps2float;
+pub mod vu1;
 
 use std::collections::{HashMap, HashSet};
 use std::fmt;
@@ -169,6 +170,8 @@ pub struct Cpu {
     pub vi: [u16; 16],
     pub acc: [f32; 4],
     pub q: f32,
+    /// VU micro mode's I register (an upper word's I bit loads it from the lower word)
+    pub i: f32,
     /// VU0's clip flags (four tests of six bits, the latest lowest) and CMSAR0 (`vcallmsr`'s start, in 8 bytes)
     pub clip: u32,
     pub cmsar0: u16,
@@ -179,7 +182,7 @@ impl Cpu {
     fn new() -> Cpu {
         let mut vf = [[0.0; 4]; 32];
         vf[0] = [0.0, 0.0, 0.0, 1.0];
-        Cpu { gpr: [0; 32], hi: 0, lo: 0, fpr: [0; 32], fcc: false, vf, vi: [0; 16], acc: [0.0; 4], q: 0.0, clip: 0, cmsar0: 0, pc: 0 }
+        Cpu { gpr: [0; 32], hi: 0, lo: 0, fpr: [0; 32], fcc: false, vf, vi: [0; 16], acc: [0.0; 4], q: 0.0, i: 0.0, clip: 0, cmsar0: 0, pc: 0 }
     }
 
     pub fn gpr(&self, r: usize) -> u64 {

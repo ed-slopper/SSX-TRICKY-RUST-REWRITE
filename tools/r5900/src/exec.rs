@@ -457,7 +457,7 @@ fn vu_min(a: f32, b: f32) -> f32 {
     if vu_key(a) <= vu_key(b) { a } else { b }
 }
 
-fn set_vf(c: &mut crate::Cpu, reg: usize, dest: u32, v: [f32; 4]) {
+pub(crate) fn set_vf(c: &mut crate::Cpu, reg: usize, dest: u32, v: [f32; 4]) {
     if reg == 0 {
         return;
     }
@@ -517,7 +517,7 @@ fn cop2(r: &mut Runner, pc: u32, w: u32, rs: usize, rt: usize, rd: usize, _sa: u
 
 /// A VU upper op (macro mode's special1 / special2; micro mode's upper word has the same fields): dest bits
 /// 24..21 (x..w), ft 20..16, fs 15..11, fd 10..6, broadcast in the low two bits
-fn vu_upper(c: &mut crate::Cpu, w: u32) -> Result<(), String> {
+pub(crate) fn vu_upper(c: &mut crate::Cpu, w: u32) -> Result<(), String> {
     let (rt, rd, sa, fun) = (((w >> 16) & 31) as usize, ((w >> 11) & 31) as usize, (w >> 6) & 31, w & 63);
     let dest = (w >> 21) & 15;
     let (ft, fs, fd) = (rt, rd, sa as usize);
@@ -527,7 +527,24 @@ fn vu_upper(c: &mut crate::Cpu, w: u32) -> Result<(), String> {
     if fun < 60 {
         let v = match fun {
             0..=3 => lanes(&|i| pf::add(s[i], bc)),                                     // vaddbc
+            4..=7 => lanes(&|i| pf::sub(s[i], bc)),                                     // vsubbc
             8..=11 => lanes(&|i| pf::add(c.acc[i], pf::mul(s[i], bc))),                 // vmaddbc
+            12..=15 => lanes(&|i| pf::sub(c.acc[i], pf::mul(s[i], bc))),                // vmsubbc
+            29 => lanes(&|i| vu_max(s[i], c.i)),                                        // vmaxi
+            30 => lanes(&|i| pf::mul(s[i], c.i)),                                       // vmuli
+            31 => lanes(&|i| vu_min(s[i], c.i)),                                        // vminii
+            32 => lanes(&|i| pf::add(s[i], c.q)),                                       // vaddq
+            33 => lanes(&|i| pf::add(c.acc[i], pf::mul(s[i], c.q))),                    // vmaddq
+            34 => lanes(&|i| pf::add(s[i], c.i)),                                       // vaddi
+            35 => lanes(&|i| pf::add(c.acc[i], pf::mul(s[i], c.i))),                    // vmaddi
+            36 => lanes(&|i| pf::sub(s[i], c.q)),                                       // vsubq
+            37 => lanes(&|i| pf::sub(c.acc[i], pf::mul(s[i], c.q))),                    // vmsubq
+            38 => lanes(&|i| pf::sub(s[i], c.i)),                                       // vsubi
+            39 => lanes(&|i| pf::sub(c.acc[i], pf::mul(s[i], c.i))),                    // vmsubi
+            41 => lanes(&|i| pf::add(c.acc[i], pf::mul(s[i], t[i]))),                   // vmadd
+            43 => lanes(&|i| vu_max(s[i], t[i])),                                       // vmax
+            45 => lanes(&|i| pf::sub(c.acc[i], pf::mul(s[i], t[i]))),                   // vmsub
+            47 => lanes(&|i| vu_min(s[i], t[i])),                                       // vmini
             24..=27 => lanes(&|i| pf::mul(s[i], bc)),                                   // vmulbc
             28 => lanes(&|i| pf::mul(s[i], c.q)),                                       // vmulq
             40 => lanes(&|i| pf::add(s[i], t[i])),                                      // vadd
@@ -550,7 +567,46 @@ fn vu_upper(c: &mut crate::Cpu, w: u32) -> Result<(), String> {
     let acc = c.acc;
     let to_acc = match (sa << 2) | (fun & 3) {
         0..=3 => Some(lanes(&|i| pf::add(s[i], bc))),                   // vaddabc
+        4..=7 => Some(lanes(&|i| pf::sub(s[i], bc))),                   // vsubabc
         8..=11 => Some(lanes(&|i| pf::add(acc[i], pf::mul(s[i], bc)))), // vmaddabc
+        12..=15 => Some(lanes(&|i| pf::sub(acc[i], pf::mul(s[i], bc)))), // vmsubabc
+        28 => Some(lanes(&|i| pf::mul(s[i], c.q))),                     // vmulaq
+        30 => Some(lanes(&|i| pf::mul(s[i], c.i))),                     // vmulai
+        32 => Some(lanes(&|i| pf::add(s[i], c.q))),                     // vaddaq
+        33 => Some(lanes(&|i| pf::add(acc[i], pf::mul(s[i], c.q)))),    // vmaddaq
+        34 => Some(lanes(&|i| pf::add(s[i], c.i))),                     // vaddai
+        35 => Some(lanes(&|i| pf::add(acc[i], pf::mul(s[i], c.i)))),    // vmaddai
+        36 => Some(lanes(&|i| pf::sub(s[i], c.q))),                     // vsubaq
+        37 => Some(lanes(&|i| pf::sub(acc[i], pf::mul(s[i], c.q)))),    // vmsubaq
+        38 => Some(lanes(&|i| pf::sub(s[i], c.i))),                     // vsubai
+        39 => Some(lanes(&|i| pf::sub(acc[i], pf::mul(s[i], c.i)))),    // vmsubai
+        40 => Some(lanes(&|i| pf::add(s[i], t[i]))),                    // vadda
+        41 => Some(lanes(&|i| pf::add(acc[i], pf::mul(s[i], t[i])))),   // vmadda
+        44 => Some(lanes(&|i| pf::sub(s[i], t[i]))),                    // vsuba
+        45 => Some(lanes(&|i| pf::sub(acc[i], pf::mul(s[i], t[i])))),   // vmsuba
+        // vitof0 / 4 / 12 / 15 ft, fs: each lane's integer bits to a float (÷ 1, 16, 4096, 32768)
+        16..=19 => {
+            let scale = [1.0f32, 16.0, 4096.0, 32768.0][(fun & 3) as usize];
+            let v = lanes(&|i| pf::from_int(s[i].to_bits() as i32) / scale);
+            set_vf(c, ft, dest, v);
+            None
+        }
+        // vabs ft, fs
+        29 => {
+            set_vf(c, ft, dest, lanes(&|i| f32::from_bits(s[i].to_bits() & 0x7fff_ffff)));
+            None
+        }
+        // vmr32 ft, fs: the lanes rotated (y, z, w, x)
+        49 => {
+            set_vf(c, ft, dest, [s[1], s[2], s[3], s[0]]);
+            None
+        }
+        // vmfir ft, is: the integer register sign-extended into each lane (is is fs's field)
+        61 => {
+            let v = f32::from_bits(c.vi[fs & 15] as i16 as i32 as u32);
+            set_vf(c, ft, dest, [v; 4]);
+            None
+        }
         24..=27 => Some(lanes(&|i| pf::mul(s[i], bc))),                 // vmulabc
         42 => Some(lanes(&|i| pf::mul(s[i], t[i]))),                    // vmula
         46 => Some([pf::mul(s[1], t[2]), pf::mul(s[2], t[0]), pf::mul(s[0], t[1]), acc[3]]), // vopmula
