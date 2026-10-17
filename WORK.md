@@ -81,8 +81,7 @@ state machine and the renderer are ours. Nothing has been checked against the or
 | G7 | Rendering, as the PS2 renderer does it. Split before claiming: | unowned | E3a, E3b | | [repo] |
 | G21 | **The rider stutters back and forth the whole run** (play test by bredclan, 2026-10-17, tricky-rs.2026-10-17.exe from 3580b5f). To find: whether it is the port (our stand-ins between the exact pieces: the rider's step, its control state, the app's camera or its frame timing fighting the game's fixed tick) or something the decompiling will fix once the boarder state machine (G1) runs whole. First step: log the rider's place and heading each tick in a run (`TRICKY_SIM`) and see which one goes back and forth, and on which frames | any | | | Play test 2026-10-17 |
 | G9w | (umbrella: G9w1..G9w5) The loading screens (gApp+0x734) as `tricky_game::loadscreen` and the screens' modules: the base `cFlakeSpinnerLoad`, the first load, the one- and two-player track loads, the front end's loads, the load from quit, the trick tutorial's and the rider ranking's, 0x243c78..0x250018 | ed-slopper/puffin | G9 | | Split of G9 |
-| G9w1 | The base `cFlakeSpinnerLoad` (`FlakeSpinnerLoad_Init`, its destructor and vf1..vf6, `LoadScreen_LoadPics`, `AsyncLoad_CloseArchive`, `_DrawProgressFlakes`, `_DrawTipBox`, `_DrawTicker`, the spinner 0x244ee8, `_DrawBars`), `FE_GetSelectedCourse` and `cFirstLoad` 0x2455c0..0x245838 | ed-slopper/puffin | G9w | | Split of G9w |
-| G9w2 | `c1PTrackLoad` 0x245840..0x2473d8: the destructor, the pictures' names (`LoadScreen_GetModePicName` / `_GetTrackPicName` / `_GetRiderPicName`), `StartAssetLoad`, `PollAssetLoad`, `FE_FillEventSummary`, vf3..vf5, `DrawBackground`, `DrawOverlay` | any | G9w1 | | Split of G9w |
+| G9w2 | `c1PTrackLoad` 0x245840..0x2473d8: the destructor, the pictures' names (`LoadScreen_GetModePicName` / `_GetTrackPicName` / `_GetRiderPicName`), `StartAssetLoad`, `PollAssetLoad`, `FE_FillEventSummary`, vf3..vf5, `DrawBackground`, `DrawOverlay` | ed-slopper/puffin | G9w1 | | Split of G9w |
 | G9w3 | `c2PTrackLoad` 0x247a60..0x2493e0 (with `LoadScreen_FillEventText` and 0x249250) | any | G9w1 | | Split of G9w |
 | G9w4 | The front end's loads `c1PFELoad` and `c2PFELoad` 0x249758..0x24c428 (with `FE_FillRaceSummary1P` / `2P`) | any | G9w1 | | Split of G9w |
 | G9w5 | `cFELoadFromQuit` (with `LoadScreen_SetupTips`), `cTrickTutorialLoad` (C11d's) and `cRiderRankingLoad` (with `FE_FillCareerSummary`) 0x24c748..0x24fa48 | any | G9w1 | | Split of G9w |
@@ -156,6 +155,7 @@ matches the original.
 
 | ID | Task | Section | Who | Date | Commit |
 |---|---|---|---|---|---|
+| G9w1 | The loading screens' base `cFlakeSpinnerLoad` (init, destructor, the load steps, the pictures, the bars, flakes, tip box, ticker, spinner, frame), `FE_GetSelectedCourse` and `cFirstLoad` as `tricky_game::loadscreen`, checked in the runner on 6600 cases (tests/loadscreen.rs), 66 of 72 mutants caught (6 equivalent) | P2 | ed-slopper/puffin | 2026-10-17 | ed3798a |
 | G9v | The results screens' pages whole: `tricky_game::resultpages` (G9v1..G9v4, 29 functions) | P2 | ed-slopper/puffin | 2026-10-17 | 9ce649d |
 | G9v4 | `Results_DrawBestTrick` and `Results_DrawVersusPage` in `tricky_game::resultpages`, checked in the runner (tests/resultpages.rs, 8700 cases over the 29 functions), 51 of 53 mutants caught | P2 | ed-slopper/puffin | 2026-10-17 | 9ce649d |
 | G9v3 | The medal, stats and lesson pages in `tricky_game::resultpages` (every career mode through `Results_BuildPages`), checked in the runner (tests/resultpages.rs, 8100 cases), 45 of 47 mutants caught | P2 | ed-slopper/puffin | 2026-10-17 | 98c6693 |
@@ -1333,3 +1333,4 @@ matches the original.
 - 2026-10-17 ed-slopper/puffin: G9v2 done (d744909): the standings, time challenge and players' stats pages. Claim G9v3.
 - 2026-10-17 ed-slopper/puffin: G9v3 done (98c6693): the medal, stats and lesson pages; C11d's lesson page is in it. Claim G9v4.
 - 2026-10-17 ed-slopper/puffin: G9v4 done (9ce649d) and the G9v umbrella with it: the results screens are ported whole (resultpages.rs, 29 functions, one runner test, 8700 cases). Next: the loading screens (G9w).
+- 2026-10-17 ed-slopper/puffin: G9w1 done (ed3798a): the loading screens' base and the first load (loadscreen.rs, 22 functions). Claim G9w2.
