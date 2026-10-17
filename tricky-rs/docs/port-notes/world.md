@@ -1819,3 +1819,30 @@ eight corners facing the camera.
 Checked in the runner (`tests/marker.rs`): 5000 cases with the marker behind, between and past the far
 depth, some lanes ±0. 13 of 15 mutants were caught. The two left are boundary-equivalent: depth 0 and depth
 31128.5 give the same size by either branch.
+
+## The attitude icon (G7g5, `attitude.rs`)
+
+`AttitudeIcon_Draw` 0x134830(icon) draws the icon over the camera's rider.
+- **The slot.** The icon has two slots of 0x80 bytes. Slot 1 is used when the camera's rider (+0x460) is not
+  the career player's rider (`Career_FindRiderOfPlayer`).
+- **When it draws.** The slot must be shown (+0x98) and either moving (+0xac) or fixed (+0xbc). Its place
+  (+0x60) must be before the camera and nearer than 3700.08.
+- **Moving.** The fade t (+0xb0) rises as t / 0.1 to 0.1, then falls from 1 over the next 0.9. The place is the
+  point +0x50 along the icon's four points (0..3, linear between each pair).
+  - Fixed as well: the place is pulled from the kind's point (+0xc0: 1 the second, 2 the fourth, else the first)
+    toward that point by the fade. Both scales are 1 + 0.3 × fade, and the colour's first lane (the alpha)
+    moves toward 0.7778 by the fade.
+  - Otherwise the alpha is 0.7778 × fade.
+- **Squashing** (+0xa0) sits at the kind's point. The two scales run through three linear pieces over +0xa4:
+  (0.2, 0.3) → (0.2, 1.40) → (1.60, 0.43) → (1.0, 1.0). The pieces meet exactly at 1/3 and 2/3. The settle
+  (+0xb8) is cleared.
+- **Settling** sits at the kind's point with both scales 1 + 0.3408 × settle, the alpha moved toward 0.7778.
+- **Then**: the colour goes to +0x88. The size (+0x70 / +0x74) is 33.2 between 500 and 3000; nearer than 500
+  it is 33.2 × z / 500, and past 3000 it is 33.2 × z / 3000. That is times the two scales. Past 2777.4 the
+  alpha fades out linearly, reaching 0 at 3700. The renderer gets +0x1a0, the depth bias (0, 2, 0.01),
+  +0x1e8(2, 0), texture app +0x30 → +0x94, the sprite (+0x240 with the slot's +0x60, +0x70, +0x78, +0x80,
+  +0x88), and +0x1a8.
+
+Checked in the runner (`tests/attitude.rs`): 8000 cases covering every mode, the depth bounds exactly, and both
+slots. 26 of 31 mutants were caught. The five left are boundary-equivalent: the fade at 0.1, the squash at 1/3,
+`s × 0 + 0.2`, and depths 500 and 2777.4, where both sides of each bound give the same value.

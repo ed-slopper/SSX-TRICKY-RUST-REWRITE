@@ -187,5 +187,6 @@ pub mod skin;
 pub mod riderdraw;
 pub mod streak;
 pub mod marker;
+pub mod attitude;
 pub mod particledraw;
 pub mod particlevu;
