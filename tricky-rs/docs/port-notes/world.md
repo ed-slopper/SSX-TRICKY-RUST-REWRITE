@@ -2565,3 +2565,42 @@ some parts scaled, banks and the bind matrix full of random values, and bound on
 mutants were caught. The one left drops the inverse offset's w × 0 term, which only matters when the rest of
 the sum is exactly −0. Eight were caught only after the test filled the banks and the bind matrix with random
 values. With zeros there, the inverse pose's results come out the same whatever the code does.
+
+## The rider's bones and the limbs' IK (G7r4, `limbik`)
+
+- **`Skel_GetBoneWorldPos`** 0x2059f8(out, part, i, matrices) puts point i of the part (16 bytes: x, y, z and
+  its bone) through its bone's matrix. **`Boarder_GetBoneWorldPos`** 0x208398 does the same for the skin's part
+  of a kind.
+- **`Boarder_PoseBonesFromAngles`** 0x205a78(part, matrix, left, right) poses the skeleton:
+  - bone 0 is the matrix times its own rotation (its three angles; its offset 0x108 past them);
+  - bones 1 to 12 are their parents' matrices times their own;
+  - then the legs: bones 16, 17, 18 are solved toward `left` and 13, 14, 15 toward `right`.
+  `Boarder_BuildBoneMatrices` 0x2083f8 runs it on the skin's kind-0 part.
+- **`Boarder_SolveLimbIk`** 0x205e98(part, upper, middle, end, target, matrices) bends a two-bone limb to reach
+  a point.
+  1. The upper bone is its parent's matrix times its own rotation (offset from its record's +0x18). The
+     direction to the target is normalised the vector unit's way (the four lanes squared and summed, `vsqrt`,
+     1 / it).
+  2. With k1 and k2 the middle and end bones' lengths (their offsets' x) over the distance, the limb can bend
+     when k1 + k2 > 1. Then h = √(2(k1² + k2²) − (k1² − k2²)² − 1) / 2 (0 if what's under the root is
+     negative), and the knee angle is asin(h / k1) + asin(h / k2), each clamped to ±0.99999. The knee is never
+     straighter than 0.2.
+  3. The bent limb's end is found, and the upper bone is turned onto the target. The turn is about the
+     normalised cross product of the target's direction and the end's (`vopmula` / `vopmsub`), by asin of that
+     cross product's length (at most 0.99999). It is built as an axis-angle matrix with the game's own order of
+     products, and skipped when the length is 0.001 or less.
+  4. The middle bone is the upper's matrix times a turn of −the knee angle about z. The end bone's place is the
+     middle's matrix times its offset.
+- **`Math_Asin`'s square root is the FPU's `sqrt.s`**, which the EE rounds toward zero. The port's existing
+  `math::asin` rounds to nearest, so the IK uses a new `math::asin_ee` with the EE's rounding. That is the one-bit
+  difference the first run of the test found.
+
+Checked in the runner (`tests/limbik.rs`): 2000 cases of each of the five functions, on 19-bone skeletons with
+random angles, offsets and lengths, a random root, and targets near and far (5721 knees bent, 279 near
+straight).
+39 of 44 mutants were caught. The five left are boundaries that cannot change the result:
+- `<=` vs `<` at k1 + k2 = 1 and at a zero root, where the angle comes out 0 either way;
+- the lower clamp, which a positive h / k never reaches;
+- `<` vs `<=` at the 0.2 floor;
+- the 0.99999 cap on the turn, which a cross product of two unit vectors exceeds only when they are within
+  0.00001 of perpendicular.

@@ -3390,9 +3390,9 @@ address,size,name,system,status
 0x2055c0,176,SkinPart_ResolveTextureNames,render?,checked
 0x205670,300,SkinPart_ResolveMaterials,render?,checked
 0x2057a0,600,SkinPart_SetChildMatrices,boarder?,checked
-0x2059f8,124,Skel_GetBoneWorldPos,boarder?,not started
-0x205a78,1056,Boarder_PoseBonesFromAngles,boarder,not started
-0x205e98,2428,Boarder_SolveLimbIk,boarder,not started
+0x2059f8,124,Skel_GetBoneWorldPos,boarder?,checked
+0x205a78,1056,Boarder_PoseBonesFromAngles,boarder,checked
+0x205e98,2428,Boarder_SolveLimbIk,boarder,checked
 0x206818,648,SkinPart_CopyBoneMatrices,other,checked
 0x206ac0,160,SkinLod_AddPart,render?,checked
 0x206b60,40,SkinLod_MaterialEquals,render?,checked
@@ -3415,10 +3415,10 @@ address,size,name,system,status
 0x208220,152,RiderSkin_Scale,render?,checked
 0x2082b8,112,RiderSkin_ResolveTextureNames,render?,checked
 0x208328,112,RiderSkin_ResolveMaterials,render?,checked
-0x208398,60,Boarder_GetBoneWorldPos,boarder,not started
+0x208398,60,Boarder_GetBoneWorldPos,boarder,checked
 0x2083d8,16,RiderSkin_SetRootMatrix,boarder?,checked
 0x2083e8,16,Boarder_SetSkinChildMatrices,boarder,checked
-0x2083f8,8,Boarder_BuildBoneMatrices,boarder,not started
+0x2083f8,8,Boarder_BuildBoneMatrices,boarder,checked
 0x208400,100,RiderSkin_CopyBoneMatrices,boarder?,checked
 0x208468,32,MpfFile_Open,boarder?,ported
 0x208488,184,MpfFile_AddPart,render?,ported

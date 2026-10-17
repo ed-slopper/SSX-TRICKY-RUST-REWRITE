@@ -83,6 +83,22 @@ pub fn asin(x: f32) -> f32 {
     HALF_PI - t.abs().sqrt() * (asin_poly(t) + 1.0)
 }
 
+/// `Math_Asin` 0x250fd0 as the EE makes it: its `sqrt.s` toward zero (`animseq::sqrt`), every step a float op
+pub fn asin_ee(x: crate::ps2f::F) -> crate::ps2f::F {
+    use crate::ps2f::F;
+    let poly = |t: F| t * (F(A1) + t * (F(A2) + t * (F(A3) + t * F(A4))));
+    if x < F(-0.707_106_77) {
+        let t = F(1.0) - x * x;
+        return crate::animseq::sqrt(t) * (poly(t) + F(1.0)) + F(-HALF_PI);
+    }
+    let x2 = x * x;
+    if !(F(0.707_106_77) < x) {
+        return poly(x2) * x + x;
+    }
+    let t = F(1.0) - x2;
+    F(HALF_PI) - crate::animseq::sqrt(t) * (poly(t) + F(1.0))
+}
+
 /// `Math_Atan` 0x2510f8
 pub fn atan(x: f32) -> f32 {
     atan_with(x, |a, b| a / b, |a: f32| a.abs().sqrt())
