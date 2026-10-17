@@ -83,8 +83,7 @@ state machine and the renderer are ours. Nothing has been checked against the or
 | G7b | Objects: per-instance lights (ambient + 3 directional, 128 = 1.0), materials, the PS2 blend modes for transparent materials | unowned | G7 | | [repo] "exact PS2 blending modes" not done |
 | G7d | (umbrella: G7d1, G7d2) Lights and halos, glows, lens flares | unowned | G7 | | [repo] "lights/halos" not done; split 2026-10-16 |
 | G7d2 | (umbrella: G7d2a, G7d2b, G7d2c, G7d2d) Lens flares and glows: `cLensFXObjNode` 0x1cbbc8 and its parts | unowned | G7 | | Split of G7d; split again 2026-10-16 |
-| G7d2a | The lens FX node: `cLensFXObjNode` constructor / destructor (the renderer callback registered at +0x318), `Draw` 0x1cbe20 (the per-frame and per-view blocks: the renderer's view quad, camera matrix and +0xd0 values, the sun's colours, the two textures' answers), `LensFX_AddFlare` 0x1cc088 (ten flares a view, the dimmest replaced) and the world's `LensFX_Draw` 0x2006e8 | ed-slopper/puffin | G7 | | Split of G7d2 |
-| G7d2b | The sun's flare 0x1cd040 (visibility +0x270, projection +0x278, the screen box, the 37-point outline by `Math_Atan` / `Math_SinCos` and the table at 0x391cf8) | any | G7d2a | | Split of G7d2 |
+| G7d2b | The sun's flare 0x1cd040 (visibility +0x270, projection +0x278, the screen box, the 37-point outline by `Math_Atan` / `Math_SinCos` and the table at 0x391cf8) | ed-slopper/puffin | G7d2a | | Split of G7d2 |
 | G7d2c | The flares' part 0x1cc190 (3756 bytes, called from `Draw` after the sun's) | any | G7d2a | | Split of G7d2 |
 | G7d2d | The renderer's lens FX callback 0x1cdc78 (912 bytes, not in the index) and 0x1ce058, which draw what G7d2b/c made | any | G7d2b, G7d2c | | Split of G7d2 |
 | G7e | Particles as the VU1 microcode draws them (0x31c288), spark and dust sprites | unowned | G7 | | [repo] "Unresolved: spark and dust sprite rendering"; `particles.rs` has the emitters |
@@ -159,6 +158,7 @@ matches the original.
 
 | ID | Task | Section | Who | Date | Commit |
 |---|---|---|---|---|---|
+| G7d2a | The lens flares' node: `tricky_game::lensfx` (`cLensFXObjNode` constructor / destructor / `Draw` with its per-half and per-view blocks, `LensFX_AddFlare`, the world's `LensFX_Draw`; the two drawing parts called out for G7d2b/c), checked in the runner on 20,000 random nodes and worlds (tests/lensfx.rs); 25 of 27 mutants caught; `lights.rs` now compares the EE's values | P2 | ed-slopper/puffin | 2026-10-16 | c3ef877 |
 | G7d1 | The lights: `tricky_game::lights` (`World_GetLightsAt` with its local-light pass and the three strongest kept by `Lights_InsertStrongest`, `World_GetCellAt`, `Lights_Build`, `Lights_Clear`, `Mat4_RotateBy`, `cLightMan`), checked in the runner on 40,000 random grids, lights and quads (tests/lights.rs); 35 of 42 mutants caught, 5 equivalent, 2 exact boundaries | P2 | ed-slopper/puffin | 2026-10-16 | 9151848 |
 | G7c | Sky, fog, distance culling and the `.ltg` grid use: all its parts done (G7c1 snow, G7c2 fog, G7c3 sky, G7c4 culling and the grid lookup) | P2 | ed-slopper/puffin | 2026-10-16 | 215cc8d |
 | G7c4 | Distance culling and the grid: `tricky_game::cull` (`cPS2GraphicsMan::CullBox` with its frame matrices and the VU0 micro program 0x320 run in the runner's new micro mode from the game's own upload), `bxlist::cull_to_count` (`BxList_CullToCount`, uncalled) and `tricky_game::worldgrid` (`WorldGrid_CellAtPos` on every course's grid), checked in the runner (tests/cull.rs, tests/bxlist.rs, tests/ltg.rs); the other grid walks are G7c1/G7c2/E7a, the terrain and objects G7a/G7b | P2 | ed-slopper/puffin | 2026-10-16 | 215cc8d |
@@ -1212,3 +1212,4 @@ matches the original.
 - 2026-10-16 ed-slopper/puffin: G7c4 done 215cc8d (CullBox with the runner's VU0 micro mode, BxList_CullToCount, WorldGrid_CellAtPos); G7c closed; G7d split into G7d1 (lights, claimed) and G7d2 (lens flares).
 - 2026-10-16 ed-slopper/puffin: G7d1 done 9151848 (the lights vs the original); G7d2 claimed.
 - 2026-10-16 ed-slopper/puffin: G7d2 split into G7d2a (the node, AddFlare, LensFX_Draw; claimed), G7d2b (the sun), G7d2c (the flares), G7d2d (the draw callback).
+- 2026-10-16 ed-slopper/puffin: G7d2a done c3ef877 (the lens FX node vs the original); G7d2b claimed.
