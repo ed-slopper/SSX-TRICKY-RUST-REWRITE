@@ -1527,3 +1527,42 @@ of each, all four reachable entries:
 - 8 steps: 644,191 quadwords, 42 clipped.
 
 All 22 mutants of the parts that differ by N were caught.
+
+## The mixed patch program (row G7a4e; `patchvu::run_mixed`)
+
+The Bezier lists' kind 4, patches whose edges have different steps, draw with the chain at 0x314620 (1853
+instructions).
+
+**Its layout:**
+- TOP+0 holds the four edges' steps (4, 6 or 8; the edges at s = 0, s = 1, t = 0, t = 1), and the patch follows at
+  TOP+1.
+- **The inside** is a 6 × 6 grid at 1/7 .. 6/7, from the Bezier tables' "inside of 8" part. It is evaluated and drawn
+  with the 6-step program's code, which the mixed chain carries unchanged: its edges, grid, strip pass (one packet
+  of five strips, 60 vertices), handlers, lightmap rewrite, view transform and six-plane clipper, with the patch one
+  quadword on and its own return places (687, 733).
+- **Each edge's points** are evaluated at that edge's own steps (0xa28), with the weights picked as 11 for 8 steps,
+  19 for 6, else 25.
+  - s = 0 uses the coefficient rows c3, c7, c11, c15. s = 1 uses each row of four summed; its loop runs on into
+    edge 0's loop (0xd30 branches to 0xca0), which is the same code.
+  - t = 0 uses c12..c15. t = 1 is the whole polynomial, summed at t = 1.
+  - The points go to 213, 221, 229 and 237 (8 apart); their texture coordinates 68 on; their lightmap coordinates
+    to 129, 137, 145 and 153, from the lightmap rectangle turned to (w, h, x, y).
+- **The zipper (0x2728)** joins each edge to the inner grid's border row (rows 0 and 5, columns 0 and 5) into the
+  second packet, whose NLOOP is 24 + the steps' sum.
+  - The longer row is A: the edge when it has 6 or more steps. A and B alternate for B's count, then A's two left
+    over.
+  - Each new triangle is clip-tested. One that crosses the frustum goes to one of four handlers (for a new A, a new
+    B, and the two left over). Each keeps vi9, vi10, vi12 and vi15 in vf19, builds the triangle from the rows two
+    and three back, and runs the shared clipper.
+- **The lightmap pass** rewrites the edges' ST from the lightmap coordinates in the zipper's vertex order (0x1a48,
+  0x1d00). When B has four, the last vertex's Q is the w loaded into vf8: the slot the program loaded there.
+- **The clipped pass** zips again from the lightmap coordinates.
+- **The view pass** (0x80, 0x180) puts the 36 inner points and each edge's points through the view's matrix
+  (TOP+1).
+
+Checked against the game's program (`tests/vu1patch.rs`, the nine cameras), with the mixed patches' steps cycling
+through nine combinations so that every edge is drawn at 4, 6 and 8 and both zipper directions run. All 1224
+calls match the game at the four reachable entries (0, 0x28, 0x80, 0x180): 629,303 GS quadwords, 93 calls sending
+a clipped polygon. 42 of 43 mutants were caught. The one left changes the inner grid's second handler's return
+place: it lives only in vi14, which the edges' code overwrites before the program ends in every case run (masked,
+not strictly equivalent).

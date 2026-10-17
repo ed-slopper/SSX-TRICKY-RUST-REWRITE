@@ -161,7 +161,8 @@ fn draw(patches: &[Vec<u8>], first: usize, n: usize, cam: &Camera) -> Option<Vu1
             0 => [4; 4],
             1 => [6; 4],
             2 => [8; 4],
-            _ => [4, 6, 8, 6],
+            // the mixed ones: every edge at 4, 6 and 8 over the cases
+            _ => [[4, 6, 8, 6], [8, 4, 6, 4], [6, 8, 4, 8], [4, 4, 8, 8], [8, 8, 6, 4], [6, 6, 6, 4], [4, 8, 4, 8], [8, 6, 4, 6], [6, 4, 8, 4]][(first + k / 4) % 9],
         };
         r.mem.write(STEPS, &steps).unwrap();
         w32(&mut r, SHORTS, 0);
@@ -293,13 +294,13 @@ fn check(run: &Run, gs: &[[u32; 4]], port: fn(&mut Vu, u32), what: &str) -> usiz
 #[test]
 fn patch_programs_match_the_game() {
     let Some(patches) = gari_patches() else { return };
-    let ports: [(u32, fn(&mut Vu, u32), &str); 3] = [(0x30f960, patchvu::run4, "the 4-step program"), (0x3110f0, patchvu::run6, "the 6-step program"), (0x312af0, patchvu::run8, "the 8-step program")];
+    let ports: [(u32, fn(&mut Vu, u32), &str); 4] = [(0x30f960, patchvu::run4, "the 4-step program"), (0x3110f0, patchvu::run6, "the 6-step program"), (0x312af0, patchvu::run8, "the 8-step program"), (0x314620, patchvu::run_mixed, "the mixed program")];
     let mut programs = Vec::new();
     for (chain, port, what) in ports {
         let Some(image) = program(chain) else { return };
         programs.push((image, port, what));
     }
-    let mut stats: Vec<(usize, usize, usize, std::collections::BTreeMap<u32, usize>)> = vec![Default::default(); 3];
+    let mut stats: Vec<(usize, usize, usize, std::collections::BTreeMap<u32, usize>)> = vec![Default::default(); 4];
     for cam in cameras() {
         for first in (0..patches.len().saturating_sub(48)).step_by(97).take(6) {
             let Some(v) = draw(&patches, first, 48, &cam) else { return };
@@ -309,7 +310,8 @@ fn patch_programs_match_the_game() {
                         let st = &mut stats[k];
                         st.1 += check(run, &v.gs, *port, what);
                         st.0 += 1;
-                        st.2 += (run.regs_out.vi[14] != run.regs_in.vi[14]) as usize;
+                        // the calls that sent a clipped polygon (a packet from 724 or 752)
+                        st.2 += v.kicks.iter().any(|&(at, from)| (at == 724 || at == 752) && from >= run.gs_from && from < run.gs_to) as usize;
                         *st.3.entry(run.start).or_insert(0) += 1;
                     }
                 }
@@ -319,7 +321,8 @@ fn patch_programs_match_the_game() {
     for (k, (calls, quadwords, clipped, starts)) in stats.iter().enumerate() {
         println!("{}: {calls} calls, {quadwords} GS quadwords, {clipped} with a triangle clipped; by entry {starts:x?}", programs[k].2);
         assert!(*calls > 100 && *clipped > 10, "{}", programs[k].2);
-        for start in [0, 0x28, 0x80, 0xe0] {
+        let entries: &[u32] = if k == 3 { &[0, 0x28, 0x80, 0x180] } else { &[0, 0x28, 0x80, 0xe0] };
+        for &start in entries {
             assert!(starts.get(&start).copied().unwrap_or(0) > 10, "{}: the entry at {start:#x} ran", programs[k].2);
         }
     }
