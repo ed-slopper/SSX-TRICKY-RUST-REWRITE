@@ -17,6 +17,10 @@ use crate::fe3dstate::{vcall, FeEnv, GAPP};
 use crate::fe_venuesel::LOC_STRING;
 use crate::fe_wentry::{button_layout, SET_WORLD_POS};
 use crate::fe_wtext::{set_scale, set_string_id, set_wide_text};
+use crate::fe_misc::{ICON_ENTRY_VTABLE, ICON_TEXT_VTABLE};
+use crate::fe_widgets::{
+    icon_init, text_entry_init, vcall_class, widget_init, BUFFERED_TEXT_VTABLE, ENTRY_VTABLE, ICON_VTABLE,
+};
 use crate::pf::Mem;
 use crate::ps2f::F;
 
@@ -929,4 +933,343 @@ pub fn on_state(m: &mut Mem, e: &mut dyn FeEnv, o: u32, a: u32, buf: u32) {
         }
         _ => {}
     }
+}
+
+// ---- the overlay's widgets (row G9y4b)
+
+/// The builder's calls out: the dialog thing's set-up (0x273f18, f12) and its frames (0x3ae51c), the world group
+/// (0x2720f8), the menu's constructor (0x26d3b8), the heap (0x2ccf70), the single-line text's constructor
+/// (0x2b1138), the text box's (0x2b0b90) and its string (0x2b0fb8), a group's widget added (0x2762e0), the thing's
+/// constructor (0x267f58) and its float (0x2686c0, f12), a widget added to the state (0x2763f0), the widget placed
+/// (0x2acb20), the screen's layout (0x2742e8), the manager's start of a quiet run (0x1ceee0), the slot number's format
+/// (0x2fca28)
+pub const CREATE_DIALOG: u32 = 0x273f18;
+pub const DIALOG_FRAMES: u32 = 0x3ae51c;
+pub const WORLD_GROUP: u32 = 0x2720f8;
+pub const MENU_CTOR: u32 = 0x26d3b8;
+pub const ALLOC: u32 = 0x2ccf70;
+pub const TEXT_CTOR: u32 = 0x2b1138;
+pub const TEXT_BOX: u32 = 0x2b0b90;
+pub const SET_STRING: u32 = 0x2b0fb8;
+pub const GROUP_ADD: u32 = 0x2762e0;
+pub const THING_CTOR: u32 = 0x267f58;
+pub const THING_FLOAT: u32 = 0x2686c0;
+pub const STATE_ADD: u32 = 0x2763f0;
+pub const PLACE: u32 = 0x2acb20;
+pub const SCREEN_LAYOUT: u32 = 0x2742e8;
+pub const MGR_QUIET: u32 = 0x1ceee0;
+pub const FORMAT: u32 = 0x2fca28;
+/// The builder's strings: the slot list's line (0x3b1160), the slot number's format (0x3b10d0), the short text the
+/// message groups start with (0x3b1178, 3 bytes), the buttons' (0x3b11b0, 0x3b11b8), the message's (0x3b11c0)
+pub const LINE_TEXT: u32 = 0x3b1160;
+pub const SLOT_FORMAT: u32 = 0x3b10d0;
+pub const SHORT_TEXT: u32 = 0x3b1178;
+pub const BUTTON1_TEXT: u32 = 0x3b11b0;
+pub const BUTTON2_TEXT: u32 = 0x3b11b8;
+pub const MESSAGE_TEXT: u32 = 0x3b11c0;
+
+/// (1, 0.953, 0.729, 0.106)
+const HIGHLIGHT: [u32; 4] = [ONE, 0x3f73_f7cf, 0x3f3a_9fbe, 0x3dd9_1687];
+/// (0.7, 0.953, 0.729, 0.106)
+const HIGHLIGHT_DIM: [u32; 4] = [0x3f33_3333, 0x3f73_f7cf, 0x3f3a_9fbe, 0x3dd9_1687];
+
+fn putw(m: &mut Mem, at: u32, v: [u32; 4]) {
+    for (k, x) in v.iter().enumerate() {
+        m.w32(at + 4 * k as u32, *x);
+    }
+}
+
+fn fb(v: f32) -> u32 {
+    v.to_bits()
+}
+
+/// An allocation (with its alignment), filled with 0xdeadc0de when it came back
+fn alloc(m: &mut Mem, e: &mut dyn FeEnv, tag: u32, size: u32, align: u32) -> u32 {
+    let at = e.call(m, ALLOC, &[tag, size, align]);
+    if at != 0 {
+        e.call(m, FILL, &[at, 0xdead_c0de, size]);
+    }
+    at
+}
+
+/// The widget's own virtual at `off` handed the vector `v` (written at `at`)
+fn vcall_v(m: &mut Mem, e: &mut dyn FeEnv, w: u32, off: u32, v: [u32; 4], at: u32) {
+    putw(m, at, v);
+    vcall(m, e, w, off, &[at]);
+}
+
+/// A buffered single-line text (0x330 bytes) made for the state: the text's constructor (`font`), its +0x130 half
+/// cleared and the buffered text's table
+fn buffered_text(m: &mut Mem, e: &mut dyn FeEnv, state: u32, font: u32) -> u32 {
+    let t = alloc(m, e, 0x3b1140, 0x330, 0x10);
+    e.call(m, TEXT_CTOR, &[t, state, 0, font]);
+    m.w16(t.wrapping_add(0x130), 0);
+    m.w32(t.wrapping_add(0xc), BUFFERED_TEXT_VTABLE);
+    t
+}
+
+/// The entry's child at `at` (+0x110 or +0x114) replaced: the old one destroyed (its +8 with 3)
+fn set_child(m: &mut Mem, e: &mut dyn FeEnv, w: u32, at: u32, c: u32) {
+    let old = m.r32(w + at);
+    if old != 0 {
+        vcall(m, e, old, 8, &[3]);
+    }
+    m.w32(w + at, c);
+}
+
+fn menu_font(m: &Mem) -> u32 {
+    m.r32(m.r32(GAPP) + 0x60)
+}
+
+/// A text box (0x15a0 bytes) made for the state with the menu font, in `parent`
+fn text_box(m: &mut Mem, e: &mut dyn FeEnv, state: u32, parent: u32) -> u32 {
+    let t = alloc(m, e, 0x3b1180, 0x15a0, 0x10);
+    let font = menu_font(m);
+    e.call(m, TEXT_BOX, &[t, state, parent, font])
+}
+
+/// The widget moved to `at` (x, y, z) through its +0x70: the difference from its position, w 1
+fn move_to(m: &mut Mem, e: &mut dyn FeEnv, w: u32, at: [F; 3], buf: u32) {
+    let p = q(m, w + 0x80);
+    let d = [at[0] - p[0], at[1] - p[1], at[2] - p[2]];
+    putw(m, buf, [d[0].0.to_bits(), d[1].0.to_bits(), d[2].0.to_bits(), ONE]);
+    vcall(m, e, w, 0x70, &[buf]);
+}
+
+/// One of the dialog's two buttons (0x150 bytes, the icon text entry, in the dialog): its icon (15 × 15) and text
+/// (`text`), sized 18 × 15, placed at `x` and the dialog's y + 225 - 60, its id, +0x70 1, white
+fn dialog_button(m: &mut Mem, e: &mut dyn FeEnv, state: u32, x: f32, dy: F, text: u32, id: u32, buf: u32) {
+    let b = alloc(m, e, 0x3b11a0, 0x150, 0x10);
+    let d = m.r32(state - 0x42c + 0x2c78);
+    let font = menu_font(m);
+    text_entry_init(m, e, b, state, d);
+    m.w32(b + 0xc, ICON_ENTRY_VTABLE);
+    let i = alloc(m, e, 0x3b1100, 0x120, 0);
+    icon_init(m, e, i, state, d);
+    putw(m, buf + 0x90, [fb(10.0), fb(10.0), 0, 0]);
+    vcall_class(m, e, ICON_VTABLE, i, 0x138, &[buf + 0x90]);
+    set_child(m, e, b, 0x110, i);
+    m.w32(b + 0xc, ICON_TEXT_VTABLE);
+    let t = alloc(m, e, 0x3b1110, 0x130, 0);
+    let t = e.call(m, TEXT_CTOR, &[t, state, d, font]);
+    set_child(m, e, b, 0x114, t);
+    let icon = m.r32(b + 0x110);
+    vcall_v(m, e, icon, 0x138, [fb(15.0), fb(15.0), 0, 0], buf + 0xa0);
+    vcall_v(m, e, b, 0x138, [fb(18.0), fb(15.0), 0, 0], buf + 0xa0);
+    let y = dy + F(225.0) - F(60.0);
+    putw(m, buf + 0x40, [fb(x), y.0.to_bits(), 0, ONE]);
+    e.call(m, PLACE, &[b, buf + 0x40]);
+    let label = m.r32(b + 0x114);
+    vcall(m, e, label, 0x158, &[text]);
+    m.w32(b, id);
+    m.w32(b + 0x70, 1);
+    vcall_v(m, e, b, 0x50, [ONE; 4], buf + 0x40);
+    let d = m.r32(state - 0x42c + 0x2c78);
+    e.call(m, GROUP_ADD, &[d, b]);
+}
+
+/// The overlay's builder 0x28f3e0(o; `buf` 0xd0 bytes, laid out as the game's frame): its widgets made:
+/// - the dialog thing (0x273f18, over the frames at 0x3ae51c, 450) and the world group titled for the operation
+///   (0xdd5 for a two-slot card, else 0xdd7 for the career, 0xdd6 for the options; buttons 0x1f40), its accept
+///   button (0x800) hidden unless two-slot; the state's buttons cleared;
+/// - the slot list (a menu of 0x190 bytes; id 0, +0x158 the screen's +0x3c): one highlighted line (0x3b1160, ids
+///   from 1) for each of the card's slots (+0x1d8), the box 640 wide, at (0, 140), aligned 4, laid out, shown;
+/// - the info list (id 0xb): an entry for each of the four slots (one for the options) with the slot's number
+///   (0x3b10d0) and its line (id 0xc + k), the box 640 wide, at (185, 190), aligned 6, laid out, hidden;
+/// - the message group (0x15; the short text, the alternate font) and the detail box (0x16);
+/// - the dialog (a thing of 0x170, +0x2c78, raised 6, hidden, its float 225) with its text (0x10, at y 50, 640 × 50)
+///   and two buttons (0x13 at x 270, 0x14 at 370);
+/// - the message (0x11, +0x2c7c: at (20, 255) for a two-slot card, else (20, 280), 600 × 50) and the prompt (0x12,
+///   +0x2c80: at (0, 325), 640 × 50), hidden, in the root group;
+/// - then the screen laid out, the manager started unless quiet, +0x494 cleared, the root and title groups put at
+///   the origin, the bottom group at 480 less its height; each one's +0x20 cleared. Answers the bottom group
+pub fn build(m: &mut Mem, e: &mut dyn FeEnv, o: u32, buf: u32) -> u32 {
+    let st = o + 0x42c;
+    let frames = m.r32(DIALOG_FRAMES);
+    e.call(m, CREATE_DIALOG, &[st, frames, fb(450.0)]);
+    if m.r32(o + 8) == 1 {
+        e.call(m, WORLD_GROUP, &[st, 0xdd5, 0x1f40]);
+    } else {
+        let id = if m.r32(o) == 0 { 0xdd7 } else { 0xdd6 };
+        e.call(m, WORLD_GROUP, &[st, id, 0x1f40]);
+        let b = e.call(m, STATE_BUTTON, &[st, 0x800]);
+        vcall(m, e, b, 0x28, &[0]);
+    }
+    e.call(m, STATE_BUTTONS, &[st, 0]);
+
+    // the slot list
+    let l = alloc(m, e, 0x3b1130, 0x190, 0x10);
+    let list = e.call(m, MENU_CTOR, &[l, st, 0, 1, 2, 0]);
+    let root = m.r32(st + 0x38);
+    let at = m.r32(o + 0x3c);
+    m.w32(list, 0);
+    m.w32(list + 0x158, at);
+    e.call(m, GROUP_ADD, &[root, list]);
+    let mut n = 0;
+    let mut id = 1;
+    loop {
+        let card = m.r32(o + 0x224);
+        let count = vcall0(m, e, card, 0x1d8, &[]);
+        if n >= count as i32 {
+            break;
+        }
+        let t = buffered_text(m, e, st, menu_font(m));
+        n += 1;
+        vcall_class(m, e, BUFFERED_TEXT_VTABLE, t, 0x158, &[LINE_TEXT]);
+        m.w32(t, id);
+        id += 1;
+        vcall_v(m, e, t, 0x108, HIGHLIGHT, buf + 0x40);
+        vcall_v(m, e, t, 0x120, HIGHLIGHT_DIM, buf + 0x40);
+        vcall(m, e, list, 0x148, &[t]);
+    }
+    m.w32(list + 0x160, 0);
+    putw(m, list + 0x170, [fb(640.0), 0, 0, 0]);
+    putw(m, buf + 0x40, [0, fb(140.0), 0, ONE]);
+    e.call(m, PLACE, &[list, buf + 0x40]);
+    m.w32(list + 0x154, 4);
+    vcall(m, e, list, 0x140, &[]);
+    m.w32(list + 0x70, 1);
+    vcall(m, e, list, 0x28, &[1]);
+
+    // the info list
+    let l = alloc(m, e, 0x3b1130, 0x190, 0x10);
+    let at = m.r32(o + 0x3c);
+    let info = e.call(m, MENU_CTOR, &[l, st, 0, 1, at, 0]);
+    let at = m.r32(o + 0x3c);
+    let root = m.r32(st + 0x38);
+    m.w32(info + 0x158, at);
+    m.w32(info, 0xb);
+    e.call(m, GROUP_ADD, &[root, info]);
+    let mut k = 0u32;
+    loop {
+        let w = alloc(m, e, 0x3b1168, 0x150, 0x10);
+        widget_init(m, e, w, st, 0);
+        m.w32(w + 0xc, ENTRY_VTABLE);
+        for (off, v) in [(0x110u32, 0u32), (0x114, 0), (0x118, fb(15.0)), (0x11c, 4), (0x130, 6)] {
+            m.w32(w + off, v);
+        }
+        putw(m, w + 0x120, [fb(30.0), 0, 0, 0]);
+        putw(m, w + 0x140, [0, 0, 0, ONE]);
+        let t = buffered_text(m, e, st, menu_font(m));
+        e.call(m, FORMAT, &[buf, SLOT_FORMAT, k + 1]);
+        vcall(m, e, t, 0x158, &[buf]);
+        vcall_v(m, e, t, 0x108, HIGHLIGHT, buf + 0x40);
+        set_child(m, e, w, 0x110, t);
+        let t = buffered_text(m, e, st, menu_font(m));
+        vcall_class(m, e, BUFFERED_TEXT_VTABLE, t, 0x158, &[LINE_TEXT]);
+        m.w32(t, k + 0xc);
+        vcall_v(m, e, t, 0x108, HIGHLIGHT, buf + 0x40);
+        set_child(m, e, w, 0x114, t);
+        vcall(m, e, info, 0x148, &[w]);
+        if m.r32(o) != 0 || k + 1 >= 4 {
+            break;
+        }
+        k += 1;
+    }
+    m.w32(info + 0x160, 0);
+    putw(m, info + 0x170, [fb(640.0), 0, 0, 0]);
+    putw(m, buf + 0x40, [fb(185.0), fb(190.0), 0, ONE]);
+    e.call(m, PLACE, &[info, buf + 0x40]);
+    m.w32(info + 0x154, 6);
+    vcall(m, e, info, 0x140, &[]);
+    m.w32(info + 0x70, 1);
+    vcall(m, e, info, 0x28, &[0]);
+
+    // the message group and the detail box
+    let font = m.r32(m.r32(GAPP) + 0x5c);
+    let t = buffered_text(m, e, st, font);
+    let short = |m: &mut Mem| {
+        m.w16(buf, m.r16(SHORT_TEXT));
+        m.w8(buf + 2, m.r8(SHORT_TEXT + 2));
+    };
+    short(m);
+    vcall(m, e, t, 0x158, &[buf]);
+    m.w32(t, 0x15);
+    let root = m.r32(st + 0x38);
+    e.call(m, GROUP_ADD, &[root, t]);
+    let tb = text_box(m, e, st, 0);
+    short(m);
+    e.call(m, SET_STRING, &[tb, buf]);
+    m.w32(tb, 0x16);
+    let root = m.r32(st + 0x38);
+    e.call(m, GROUP_ADD, &[root, tb]);
+
+    // the dialog
+    let d = alloc(m, e, 0x3b1190, 0x170, 0x10);
+    let d = e.call(m, THING_CTOR, &[d, st, 0]);
+    m.w32(o + 0x2c78, d);
+    e.call(m, STATE_ADD, &[st, d]);
+    let parent = m.r32(o + 0x2c78);
+    let t = text_box(m, e, st, parent);
+    m.w32(t + 0x70, 1);
+    m.w32(t, 0x10);
+    move_to(m, e, t, [F(0.0), F(50.0), F(0.0)], buf + 0x50);
+    vcall_v(m, e, t, 0x138, [fb(640.0), fb(50.0), 0, 0], buf + 0x40);
+    e.call(m, SET_STRING, &[t, SHORT_TEXT]);
+    let d = m.r32(o + 0x2c78);
+    e.call(m, GROUP_ADD, &[d, t]);
+    let d = m.r32(o + 0x2c78);
+    m.w32(d + 0x70, 6);
+    vcall(m, e, d, 0x28, &[0]);
+    let d = m.r32(o + 0x2c78);
+    e.call(m, THING_FLOAT, &[d, fb(225.0)]);
+    let d = m.r32(o + 0x2c78);
+    let dy = rf(m, d + 0x84);
+    dialog_button(m, e, st, 270.0, dy, BUTTON1_TEXT, 0x13, buf);
+    dialog_button(m, e, st, 370.0, dy, BUTTON2_TEXT, 0x14, buf);
+
+    // the message and the prompt
+    let t = text_box(m, e, st, 0);
+    m.w32(o + 0x2c7c, t);
+    e.call(m, SET_STRING, &[t, MESSAGE_TEXT]);
+    let t = m.r32(o + 0x2c7c);
+    m.w32(t, 0x11);
+    vcall(m, e, t, 0x28, &[0]);
+    let t = m.r32(o + 0x2c7c);
+    let y = if m.r32(o + 8) != 0 { 255.0 } else { 280.0 };
+    m.w32(t + 0x70, 1);
+    move_to(m, e, t, [F(20.0), F(y), F(0.0)], buf + 0x50);
+    let t = m.r32(o + 0x2c7c);
+    vcall_v(m, e, t, 0x138, [fb(600.0), fb(50.0), 0, 0], buf + 0x40);
+    let root = m.r32(st + 0x38);
+    let t = m.r32(o + 0x2c7c);
+    e.call(m, GROUP_ADD, &[root, t]);
+    let p = text_box(m, e, st, 0);
+    m.w32(o + 0x2c80, p);
+    m.w32(p, 0x12);
+    vcall(m, e, p, 0x28, &[0]);
+    let p = m.r32(o + 0x2c80);
+    m.w32(p + 0x70, 1);
+    move_to(m, e, p, [F(0.0), F(325.0), F(0.0)], buf + 0x50);
+    let p = m.r32(o + 0x2c80);
+    vcall_v(m, e, p, 0x138, [fb(640.0), fb(50.0), 0, 0], buf + 0x40);
+    let root = m.r32(st + 0x38);
+    let p = m.r32(o + 0x2c80);
+    e.call(m, GROUP_ADD, &[root, p]);
+
+    // the screen laid out and its groups put in place
+    e.call(m, SCREEN_LAYOUT, &[st]);
+    if m.r32(o + 4) != 1 {
+        e.call(m, MGR_QUIET, &[o]);
+    }
+    let root = m.r32(st + 0x38);
+    m.w32(o + 0x494, 0);
+    putw(m, buf + 0x40, [0, 0, 0, ONE]);
+    e.call(m, PLACE, &[root, buf + 0x40]);
+    let root = m.r32(st + 0x38);
+    let title = m.r32(st + 0x40);
+    m.w32(root + 0x20, 0);
+    putw(m, buf + 0x40, [0, 0, 0, ONE]);
+    e.call(m, PLACE, &[title, buf + 0x40]);
+    let bottom = m.r32(st + 0x44);
+    let title = m.r32(st + 0x40);
+    m.w32(title + 0x20, 0);
+    vcall(m, e, bottom, 0x128, &[buf + 0x40, buf + 0x50]);
+    let h = rf(m, buf + 0x54) - rf(m, buf + 0x44);
+    let bottom = m.r32(st + 0x44);
+    putw(m, buf + 0x60, [0, (F(480.0) - h).0.to_bits(), 0, ONE]);
+    e.call(m, PLACE, &[bottom, buf + 0x60]);
+    let bottom = m.r32(st + 0x44);
+    m.w32(bottom + 0x20, 0);
+    bottom
 }

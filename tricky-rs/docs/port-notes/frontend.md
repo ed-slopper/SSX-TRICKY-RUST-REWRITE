@@ -2300,3 +2300,34 @@ zero lanes.
 Of the 68 mutants, 64 are caught. The four survivors drop a destructor's own table store (the text icon's, text
 entry's, icon text's and icon entry's). Each is a dead store: the next destructor in the chain writes its own
 table before anything reads it.
+
+## G9y4b: the memory card overlay's builder (`fe_mcard::build`, `tests/fe_mcard_build.rs`)
+
+The builder 0x28f3e0 is not in the function index. It sits between the overlay's destructor and vf2, and makes the
+overlay's widgets once:
+
+- **Opening.** The dialog thing and the world group, titled 0xdd5 for a two-slot card, else 0xdd7 for the career
+  or 0xdd6 for the options. The accept button is hidden unless two-slot.
+- **The slot list.** One highlighted line for each slot the card reports. The card is asked again on every round.
+- **The info list.** Four entries for the career, one for the options. Each holds the slot's number (formatted
+  into the frame) and a line, the line's id 0xc + k.
+- **The message group and the detail box.** Both start with the same 3-byte text.
+- **The dialog** (+0x2c78), with its text and two buttons. Each button is an icon text entry with an icon 15 × 15
+  and a label, at x 270 / 370 and the dialog's y + 165.
+- **The message (+0x2c7c) and the prompt (+0x2c80).** Each is moved to its place through its +0x70 by the
+  difference from its position (the VU0's subtract, w 1).
+- **Closing.** The screen is laid out and the manager started unless quiet. The root and title groups go to the
+  origin, and the bottom group to 480 less its height. Each one's +0x20 is cleared. The builder answers the bottom
+  group.
+
+The inline entry constructors are the widget's followed by the entry's words, so the port writes the widget's
+(`fe_widgets`) and then the words the game leaves. The port keeps the builder's buffers at the stack frame's own
+offsets: the strings the game builds on the stack are read by value, so the words around them must match too.
+
+The test runs 1,500 cases with random flags, slot counts and positions. The widget classes' virtuals are read from
+the game's tables and stubbed.
+
+Of the 55 mutants, 52 are caught. The three survivors are equivalent:
+- the short text's third byte, which is 0 in the game's data;
+- the icon entry's table store, which the icon text's overwrites before anything reads it;
+- the old-child destroy, never reached as the entries' children were just cleared.
