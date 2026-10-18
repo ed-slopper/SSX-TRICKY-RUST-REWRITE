@@ -5637,7 +5637,7 @@ address,size,name,system,status
 0x2ac3b0,120,FE3DThing_StartTween,frontend?,checked
 0x2ac428,76,cFE3DThing::vf6_2ac428,frontend,checked
 0x2ac478,52,cFE3DThing::vf7_2ac478,frontend,checked
-0x2ac4b0,36,FE3D_GetSpriteRect,frontend?,not started
+0x2ac4b0,36,FE3D_GetSpriteRect,frontend?,checked
 0x2ac580,76,cFE3DGroup::vf7_2ac580,frontend,checked
 0x2ac5d0,76,cFE3DGroup::vf6_2ac5d0,frontend,checked
 0x2ac620,116,cFE3DGroup::vf13_2ac620,frontend,checked
@@ -5717,42 +5717,42 @@ address,size,name,system,status
 0x2adf30,24,FE3DWidget_SlideInDir4,frontend?,checked
 0x2adf88,64,FUN_002adf88,frontend?,not started
 0x2adfc8,208,cFE3DTiledIcon::vf11_2adfc8,frontend,not started
-0x2ae098,408,FE3DButton_Layout,frontend?,not started
+0x2ae098,408,FE3DButton_Layout,frontend?,checked
 0x2ae230,400,FUN_002ae230,frontend?,ported
 0x2ae3c0,928,FE3DProgressBar_UpdateFill,frontend?,ported
 0x2ae760,140,FE3DProgressBar_StepUp,frontend?,not started
 0x2ae7f0,140,FE3DProgressBar_StepDown,frontend?,not started
 0x2ae880,1700,cFE3DProgressBar::vf11_2ae880,frontend,not started
 0x2aef28,396,cFE3DProgressBar::vf28_2aef28,frontend,not started
-0x2af0b8,136,cFE3DWEntry::vf9_2af0b8,frontend,not started
-0x2af140,136,cFE3DWEntry::vf32_2af140,frontend,not started
-0x2af1c8,136,cFE3DWEntry::vf33_2af1c8,frontend,not started
-0x2af250,136,cFE3DWEntry::vf34_2af250,frontend,not started
-0x2af2d8,136,cFE3DWEntry::vf35_2af2d8,frontend,not started
-0x2af360,104,cFE3DWEntry::vf4_2af360,frontend,not started
-0x2af3c8,108,cFE3DWEntry::vf29_2af3c8,frontend,not started
-0x2af438,104,cFE3DWEntry::vf3_2af438,frontend,not started
-0x2af4a0,108,cFE3DWEntry::vf31_2af4a0,frontend,not started
-0x2af510,60,cFE3DWEntry::vf28_2af510,frontend,not started
-0x2af550,108,cFE3DWEntry::vf1_2af550,frontend,not started
-0x2af5c0,768,cFE3DWEntry::vf36_2af5c0,frontend,not started
-0x2af8c0,620,cFE3DWEntry::vf37_2af8c0,frontend,not started
-0x2afb30,788,cFE3DWEntry::vf39_2afb30,frontend,not started
-0x2afe48,128,cFE3DWEntry::vf13_2afe48,frontend,not started
-0x2afec8,200,cFE3DWEntry::vf11_2afec8,frontend,not started
+0x2af0b8,136,cFE3DWEntry::vf9_2af0b8,frontend,checked
+0x2af140,136,cFE3DWEntry::vf32_2af140,frontend,checked
+0x2af1c8,136,cFE3DWEntry::vf33_2af1c8,frontend,checked
+0x2af250,136,cFE3DWEntry::vf34_2af250,frontend,checked
+0x2af2d8,136,cFE3DWEntry::vf35_2af2d8,frontend,checked
+0x2af360,104,cFE3DWEntry::vf4_2af360,frontend,checked
+0x2af3c8,108,cFE3DWEntry::vf29_2af3c8,frontend,checked
+0x2af438,104,cFE3DWEntry::vf3_2af438,frontend,checked
+0x2af4a0,108,cFE3DWEntry::vf31_2af4a0,frontend,checked
+0x2af510,60,cFE3DWEntry::vf28_2af510,frontend,checked
+0x2af550,108,cFE3DWEntry::vf1_2af550,frontend,checked
+0x2af5c0,768,cFE3DWEntry::vf36_2af5c0,frontend,checked
+0x2af8c0,620,cFE3DWEntry::vf37_2af8c0,frontend,checked
+0x2afb30,788,cFE3DWEntry::vf39_2afb30,frontend,checked
+0x2afe48,128,cFE3DWEntry::vf13_2afe48,frontend,checked
+0x2afec8,200,cFE3DWEntry::vf11_2afec8,frontend,checked
 0x2aff90,64,FUN_002aff90,frontend?,not started
-0x2affd0,48,FE3DList_GetSelectedIndex,frontend?,not started
-0x2b0000,288,cFE3DWListBox::vf28_2b0000,frontend,not started
-0x2b0120,48,cFE3DWListBox::vf1_2b0120,frontend,not started
-0x2b0150,168,cFE3DWListBox::vf11_2b0150,frontend,not started
-0x2b01f8,52,cFE3DWListBox::vf37_2b01f8,frontend,not started
-0x2b0230,480,cFE3DWNameEntry::cFE3DWNameEntry,frontend,not started
-0x2b0410,24,NameEntry_GetChar,frontend?,ported
-0x2b0428,60,NameEntry_SetChar,frontend?,ported
-0x2b0468,120,cFE3DWNameEntry::vf37_2b0468,frontend,not started
-0x2b04e0,68,cFE3DWNameEntry::vf1_2b04e0,frontend,not started
-0x2b0528,808,cFE3DWNameEntry::vf11_2b0528,frontend,not started
-0x2b0850,832,cFE3DWNameEntry::vf28_2b0850,frontend,not started
+0x2affd0,48,FE3DList_GetSelectedIndex,frontend?,checked
+0x2b0000,288,cFE3DWListBox::vf28_2b0000,frontend,checked
+0x2b0120,48,cFE3DWListBox::vf1_2b0120,frontend,checked
+0x2b0150,168,cFE3DWListBox::vf11_2b0150,frontend,checked
+0x2b01f8,52,cFE3DWListBox::vf37_2b01f8,frontend,checked
+0x2b0230,480,cFE3DWNameEntry::cFE3DWNameEntry,frontend,checked
+0x2b0410,24,NameEntry_GetChar,frontend?,checked
+0x2b0428,60,NameEntry_SetChar,frontend?,checked
+0x2b0468,120,cFE3DWNameEntry::vf37_2b0468,frontend,checked
+0x2b04e0,68,cFE3DWNameEntry::vf1_2b04e0,frontend,checked
+0x2b0528,808,cFE3DWNameEntry::vf11_2b0528,frontend,checked
+0x2b0850,832,cFE3DWNameEntry::vf28_2b0850,frontend,checked
 0x2b0b90,584,FE3DTextBox_Init,frontend?,checked
 0x2b0dd8,160,cFE3DWText::vf11_2b0dd8,frontend,checked
 0x2b0e78,40,cFE3DWText::vf12_2b0e78,frontend,checked
@@ -5796,20 +5796,20 @@ address,size,name,system,status
 0x2b26c8,12,cFE3DScrollingText::vf37_2b26c8,frontend,checked
 0x2b2750,20,cFE3DScrollingText::~cFE3DScrollingText,frontend,checked
 0x2b2920,80,cFE3DScrollingText::__tf,runtime,host
-0x2b2990,8,cFE3DWNameEntry::vf26_2b2990,frontend,not started
-0x2b2998,108,cFE3DWNameEntry::vf12_2b2998,frontend,not started
-0x2b2a30,68,cFE3DWNameEntry::~cFE3DWNameEntry,frontend,not started
+0x2b2990,8,cFE3DWNameEntry::vf26_2b2990,frontend,checked
+0x2b2998,108,cFE3DWNameEntry::vf12_2b2998,frontend,checked
+0x2b2a30,68,cFE3DWNameEntry::~cFE3DWNameEntry,frontend,checked
 0x2b2c58,80,cFE3DWNameEntry::__tf,runtime,host
-0x2b2cb0,80,cFE3DWListBox::~cFE3DWListBox,frontend,not started
-0x2b2d00,448,cFE3DWListBox::cFE3DWListBox,frontend,not started
+0x2b2cb0,80,cFE3DWListBox::~cFE3DWListBox,frontend,checked
+0x2b2d00,448,cFE3DWListBox::cFE3DWListBox,frontend,checked
 0x2b2ec0,444,FUN_002b2ec0,frontend?,not started
 0x2b3080,80,cFE3DWListBox::__tf,runtime,host
-0x2b30d0,8,cFE3DWEntry::vf22_2b30d0,frontend,not started
-0x2b30d8,128,cFE3DWEntry::vf12_2b30d8,frontend,not started
+0x2b30d0,8,cFE3DWEntry::vf22_2b30d0,frontend,checked
+0x2b30d8,128,cFE3DWEntry::vf12_2b30d8,frontend,checked
 0x2b32a8,80,FUN_002b32a8,frontend?,not started
 0x2b3300,80,FUN_002b3300,frontend?,not started
-0x2b3358,68,cFE3DWEntry::~cFE3DWEntry,frontend,not started
-0x2b35d0,436,cFE3DWEntry::cFE3DWEntry,frontend,not started
+0x2b3358,68,cFE3DWEntry::~cFE3DWEntry,frontend,checked
+0x2b35d0,436,cFE3DWEntry::cFE3DWEntry,frontend,checked
 0x2b3788,80,cFE3DWEntry::__tf,runtime,host
 0x2b37d8,8,cFE3DProgressBar::vf23_2b37d8,frontend,not started
 0x2b37e0,8,cFE3DProgressBar::vf39_2b37e0,frontend,not started

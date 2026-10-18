@@ -1930,3 +1930,53 @@ with the hide or mark character or not. The scrolling text's slots, ids, roll, s
 - the split's check for an empty string, which falls through to the same -1;
 - a fade of exactly 1 clamped to 1;
 - the scrolling text destructor's table, which the widget's destructor overwrites at once.
+
+## G9x3a: the entries, list box, name entry and button (`game/src/fe_wentry.rs`)
+
+- **The entry (`cFE3DWEntry`)** is a widget that holds two children, +0x110 and an optional +0x114 (an icon and
+  its label, or a label and its value).
+  - Most of its virtuals do their own part and then call the same virtual on each child: the colours (vf9, vf32..35),
+    the active and shown words (vf3, vf4), the chosen and enabled flags (vf29, vf31), the move (vf13), the text draw
+    (vf11) and the update (vf12). Input goes to the second child only (vf28).
+  - Each child sits in a box: +0x120 for the first and +0x140 for the second (0 means the child's own size). The
+    alignment is +0x11c for the first and +0x130 for the second: bit 1 keeps x where it is, bit 0 puts the child
+    at the box's right edge, and neither centres it; bits 2 and 3 do the same for y. The gap after the first box is
+    +0x118.
+  - The layout (vf39) formats and sizes the first child and moves it into its box at the entry's position. The
+    second child's box starts after the first box (or after the first child's width, by the alignment) and the gap.
+  - The size (vf37) and the bounds (vf36) follow the same rules. The bounds start from the position and the first
+    box, widen to the first child's bounds, then push the high corner out to the second box and widen to the second
+    child's.
+- **`FE3DButton_Layout`** sets up an entry as a button. The icon gets the sprite's size (at most 17 each way) and
+  white; the label gets its text, scale 0.7, no border, and colour (1, 0, 0, 0). Both boxes are (0, the icon's
+  height); the icon goes to the left and the label is centred, with a gap of 4. Then the entry is laid out.
+- **`FE3D_GetSpriteRect`** is the sprite set's rectangle (`0x1f9e50` on gApp+0x728); the widget it is given is not
+  used.
+- **The list box (`cFE3DWListBox`)** shows one widget of its list (+0x114) at a time (+0x110).
+  - Left and right move to the node before or after, wrapping to the list's last or first at the end. The old
+    widget is told it is left (+0xf0 with 0) and the new one that it is chosen (+0xf0 with 1); then the owner is
+    told (+0xc0).
+  - The draw moves the shown widget to the list box's position and gives it the list box's colour before its text.
+- **The name entry (`cFE3DWNameEntry`)** is the on-screen keyboard: 42 characters (the table at 0x3b7f58) in rows of
+  +0x114, each cell 0x348464 by 0x348468 at the scale +0x118.
+  - The chosen character is drawn in the chosen colour (with the cursor widget, +0x11c, put over it), the others in
+    the enabled colour.
+  - 'e' is the end key: string 0x112, printed at the scale times 0x34846c. 'd' is the delete key, sprite 0x3b.
+  - Input is only taken from the front end's player (the input's +0x40 must equal the front end's +5 less one).
+    Left and right wrap within the row. Up from the top row goes to the same column of the last row, or to the last
+    character; down from the last row goes to the top. Accept and back tell the owner (+0xd8, +0xb0).
+  - Each key plays its sound (+0x120 move, +0x121 accept, +0x122 back) on the front end's sound player.
+  - `NameEntry_SetChar` picks the last of the 42 that matches.
+
+The test has 58,500 cases (39 functions, 1,500 each). The children's bounds and sizes are written by their
+stand-ins. The 42 characters (with 'e', 'd' and spaces among them), the cell sizes, the end key's scale, the rows'
+length (1 to 42) and the front end's player are random.
+
+The name entry calls its owner without checking for none; the button needs both children.
+
+101 of 106 mutants are caught. The other five are equivalent:
+- raising the first child's size to a box of 0 writes the same 0;
+- `(mode >> 2) & 2` tests the same bit as `(mode >> 3) & 1`;
+- the right move's `max(0)` can't bite: the index there is never negative;
+- `r < last` against `r <= last` in the up move gives the same character;
+- the down move's rows check against 1 instead of 2 lands on the same index.
