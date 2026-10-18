@@ -153,7 +153,7 @@ matches the original.
 
 | ID | Task | Section | Who | Date | Commit |
 |---|---|---|---|---|---|
-| G9y3 | The front end's sound object (cFE3DSound and its base, 111 functions) | P2 | ed-slopper/puffin | 2026-10-17 | 285c314 |
+| G9y3 | The front end's sound object (cFE3DSound and its base, 111 functions) | P2 | ed-slopper/puffin | 2026-10-17 | df9fad0 |
 | G9y2 | the group operations copies checked in the runner (67 functions, 20,100 cases) | P2 | ed-slopper/puffin | 2026-10-17 | 3d9db11 |
 | G9y1 | the menu checked in the runner (73,500 cases; 124/124 mutants) | P2 | ed-slopper/puffin | 2026-10-17 | cbd5f94 |
 | G9x | G9x1..G9x4 done: the widget classes, 208 functions checked | P2 | ed-slopper/puffin | 2026-10-17 | 2e5ba0f |
@@ -1386,4 +1386,4 @@ matches the original.
 - 2026-10-17 ed-slopper/puffin: G9x4 done (2e5ba0f: the bars and pictures, 41 functions checked); G9x done; added G9y (the rest of the front end's code, G9y1..G9y6) and claimed G9y1 (the menu).
 - 2026-10-17 ed-slopper/puffin: G9y1 done (cbd5f94: the menu, 49 functions checked); claimed G9y2 (the group operations' copies).
 - 2026-10-17 ed-slopper/puffin: G9y2 done (the 67 copies checked against G9x1's port); claimed G9y3 (the sound object).
-- 2026-10-17 ed-slopper/puffin: G9y3 done (285c314: the sound object, 111 functions, 55/56 mutants, the survivor equivalent); G9y4 claimed (the memory card overlay).
+- 2026-10-17 ed-slopper/puffin: G9y3 done (df9fad0: the sound object, 111 functions, 55/56 mutants, the survivor equivalent); G9y4 claimed (the memory card overlay).
