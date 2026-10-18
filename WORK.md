@@ -84,8 +84,7 @@ state machine and the renderer are ours. Nothing has been checked against the or
 | G9y8 | (umbrella: G9y8a..G9y8g) The front end's nine big screen builders in 0x26c000..0x2aab58, marked `ported` in the index but only called by the screens' ports: ported and checked in the runner | any | G9y | | Split of G9y 2026-10-17 |
 | G9y8c | `FE_BuildRiderShortBioScreen` 0x285230 (26 KB) | any | G9y8 | | Split of G9y 2026-10-17 |
 | G9y8e | `FE_BuildSoundOptions` 0x29fb70 (15 KB) | any | G9y8 | | Split of G9y 2026-10-17 |
-| G9y8f | `FE_BuildControllerConfig` 0x2a36e8 (7.4 KB) | ed-slopper/puffin | G9y8 | | Split of G9y 2026-10-17 |
-| G9y8g | `FE_BuildOptionsScreen` 0x2a53d0 (11 KB) | any | G9y8 | | Split of G9y 2026-10-17 |
+| G9y8g | `FE_BuildOptionsScreen` 0x2a53d0 (11 KB) | ed-slopper/puffin | G9y8 | | Split of G9y 2026-10-17 |
 | G9 | Front end: title, main menu, mode select, rider / outfit / board select, options, records, trick book screens, unlock screens, music player, loading screens (`gApp+0x734`) | unowned | E1, E5 | | [repo] `ui.rs` is ours. Split (2026-10-16): G9b the shared machinery, G9c–G9t the screens (logic ported and checked in the runner, widgets as calls out), G9u the app's menus on them |
 | G9b | (umbrella: G9b1, G9b2) The front end's shared machinery: `cFE3D` (the manager, its per-frame update and the screen it runs), the `cFE3DState` base (the phases, `TransitionIn` / `Out`, `Finish` and `CreateNextState`, `UpdateTransition`, `Activate`, `LayoutWidgets`), the widgets they drive and the 3D transition record (`FE3DTransition_*`, notes in frontend.md) | any | G9 | | Split of G9 |
 | G9b2 | (umbrella: G9b2a, G9b2b, G9b2c, G9b2d, G9b2e) The rest of G9b: `cFE3D` (the manager: its per-frame update, the screen stack 0x275b10 / 0x275c10 / 0x2ac030, the players and their pad queries 0x26ce08..0x26cef8), the widgets the screens build (the constructor 0x2b1138 and its virtuals, the list 0x2ac018 / 0x2ac048, the place 0x2acb20, the screen helpers 0x274108, 0x2763f0, 0x2719c0, 0x2718f0, 0x271848, 0x2742e8) and the 3D transition record (`FE3DTransition_*`) | any | G9b1 | | Split from G9b; split (2026-10-16) |
@@ -155,6 +154,7 @@ matches the original.
 
 | ID | Task | Section | Who | Date | Commit |
 |---|---|---|---|---|---|
+| G9y8f | The controller page (0x2a36e8; 36/36 mutants) | P2 | ed-slopper/puffin | 2026-10-17 | 1e81c40 |
 | G9y8d | The DVD screen's character list and jukebox (0x296870, 0x297178; 44/45 mutants) | P2 | ed-slopper/puffin | 2026-10-17 | ddabb86 |
 | G9y8b | The rider bio panel (0x27f600; 18/18 mutants) | P2 | ed-slopper/puffin | 2026-10-17 | 8de6699 |
 | G9y8a | The rider profile's frame and records panel (0x27e918, 0x282d30; 55/56 mutants) | P2 | ed-slopper/puffin | 2026-10-17 | 7d296cf |
@@ -1405,3 +1405,4 @@ matches the original.
 - 2026-10-17 ed-slopper/puffin: G9y8a done (the rider profile's frame and records); G9y8b claimed (the bio panel).
 - 2026-10-17 ed-slopper/puffin: G9y8b done (the rider bio panel); G9y8d claimed (the DVD screen's lists).
 - 2026-10-17 ed-slopper/puffin: G9y8d done (the DVD lists); G9y8f claimed (the controller page).
+- 2026-10-17 ed-slopper/puffin: G9y8f done (the controller page); G9y8g claimed (0x2a53d0, which is the display page's builder).
