@@ -396,3 +396,60 @@ pub fn build_records(m: &mut Mem, e: &mut dyn FeEnv, s: u32, buf: u32) {
     e.call(m, GROUP_ADD, &[grp, ml]);
     m.w32(s + 0x504, ml);
 }
+
+// ---- the bio panel (0x27f600)
+
+/// Each bio line's first string (by the rider's bio line, 15 strings apart; none past 11)
+const BIO_BASES: [u32; 12] = [0xbac, 0xbbb, 0xbca, 0xbd9, 0xbe8, 0xbf7, 0xc06, 0xc15, 0xc24, 0xc33, 0xc42, 0xc51];
+
+/// `FE_BuildRiderBioScreen` 0x27f600(s; `buf` 0x10 bytes): the bio panel in the group at +0x4f0 for the screen's
+/// rider (+0x2e): a list (0x190 bytes, the menu's constructor with (1, 2, 0)) of 15 rows, each a text entry (0x150
+/// bytes) holding a heading (0x24a + row) and the rider's line (the bio line's first string + row), both red at 0.8;
+/// the list at (350, 111) with a gap of 4, added to the group, the group shown
+pub fn build_bio(m: &mut Mem, e: &mut dyn FeEnv, s: u32, buf: u32) {
+    let rider = m.r8(s + 0x2e) as i8 as i32 as u32;
+    let grp = m.r32(s + 0x4f0);
+    let rec = e.call(m, RIDER_RECORD, &[CAREER, rider]);
+    let first = m.r8(rec) as i8 as i32 as u32;
+    let l = e.call(m, ALLOC, &[0x3af868, 0x190, 0]);
+    if l != 0 {
+        e.call(m, FILL, &[l, 0xdead_c0de, 0x190]);
+    }
+    let list = e.call(m, MENU_CTOR, &[l, s, grp, 1, 2, 0]);
+    let k = e.call(m, RIDER_BIO_LINE, &[CAREER, first]);
+    let base = if k < 12 { BIO_BASES[k as usize] } else { 0 };
+    let red = [ONE, 0, 0, 0];
+    for j in 0..15u32 {
+        let font = menu_font(m);
+        let w = text_entry(m, e, s, 0x3af878, grp, font);
+        let font = menu_font(m);
+        let t2 = text(m, e, s, 0x3af890, grp, font);
+        let t1 = m.r32(w + 0x110);
+        vcall(m, e, t1, 0x150, &[0x24a + j]);
+        vcall(m, e, t2, 0x150, &[base.wrapping_add(j)]);
+        m.w32(w + 0x11c, 5);
+        let old = m.r32(w + 0x114);
+        if old != 0 {
+            vcall(m, e, old, 8, &[3]);
+        }
+        m.w32(w + 0x130, 6);
+        m.w32(w + 0x114, t2);
+        put(m, buf, red);
+        vcall(m, e, w, 0x50, &[buf]);
+        put(m, buf, red);
+        vcall(m, e, t2, 0x50, &[buf]);
+        let t1 = m.r32(w + 0x110);
+        m.w32(t2 + 0x118, 0x3f4c_cccd);
+        m.w32(t1 + 0x114, 0);
+        m.w32(t2 + 0x114, 0);
+        m.w32(t1 + 0x118, 0x3f4c_cccd);
+        vcall(m, e, list, 0x148, &[w]);
+    }
+    m.w32(list + 0x150, 1);
+    put(m, buf, [fb(350.0), fb(111.0), 0, ONE]);
+    e.call(m, WIDGET_PLACE, &[list, buf]);
+    m.w32(list + 0x154, 2);
+    m.w32(list + 0x15c, fb(4.0));
+    e.call(m, GROUP_ADD, &[grp, list]);
+    vcall(m, e, grp, 0x20, &[1]);
+}

@@ -1,5 +1,5 @@
-//! `tricky_game::fe_riderbuild` (board row G9y8a) against the original in the function runner (TRICKY_ELF; skipped
-//! without it): the rider profile's frame (0x27e918) and records panel (0x282d30). Every case builds a random screen
+//! `tricky_game::fe_riderbuild` (board rows G9y8a, G9y8b) against the original in the function runner (TRICKY_ELF; skipped
+//! without it): the rider profile's frame (0x27e918), records panel (0x282d30) and bio panel (0x27f600). Every case builds a random screen
 //! (its rider byte, group, buffers) and app in the arena and random career counts; one builder then runs on both
 //! sides. Every callee is a stand-in on both sides answering from the case's seed: the heap (handed out in order),
 //! the constructors (which give their object a table of stand-ins and answer it), the career's rider record, bio
@@ -13,7 +13,7 @@ use std::rc::Rc;
 use r5900::Runner;
 use tricky_game::fe3dstate::{FeEnv, ALLOC, FILL, GAPP, WIDGET_PLACE};
 use tricky_game::fe_riderbuild as rb;
-use tricky_game::fe_widgets::{ICON_VTABLE, LIST_INIT, UPDATE_COLOR};
+use tricky_game::fe_widgets::{ICON_VTABLE, LIST_INIT, TEXT_ENTRY_VTABLE, UPDATE_COLOR};
 use tricky_game::fe_world::{MENU_LIST_VTABLE, SCALED_ICON_VTABLE};
 use tricky_game::pf::Mem;
 
@@ -41,7 +41,7 @@ impl Rng {
 const DATA: (u32, u32) = (0x337c00, 0x400);
 const CAREER: (u32, u32) = (0x32b000, 0x2000);
 /// the game's words the builders read: the records' events and dash, the icon classes' and menu list's tables
-const GAME: [(u32, u32); 3] = [(0x3af800, 0x200), (0x3b6e00, 0x600), (0x3b7f00, 0x300)];
+const GAME: [(u32, u32); 4] = [(0x3af800, 0x200), (0x3b6e00, 0x600), (0x3b7f00, 0x300), (0x3ae600, 0x400)];
 const ARENA: u32 = 0x0100_0000;
 const SIZE: u32 = 0x1000;
 const S: u32 = ARENA;
@@ -56,7 +56,7 @@ const STACK_TOKEN: u32 = 0x5c5c_5c5c;
 fn slot(off: u32) -> u32 {
     0x0181_0000 + off
 }
-const SLOTS: [u32; 12] = [8, 0x28, 0x50, 0x100, 0x108, 0x110, 0x118, 0x138, 0x140, 0x148, 0x150, 0x158];
+const SLOTS: [u32; 13] = [8, 0x20, 0x28, 0x50, 0x100, 0x108, 0x110, 0x118, 0x138, 0x140, 0x148, 0x150, 0x158];
 
 #[derive(Clone, Debug, PartialEq)]
 struct Call(u32, Vec<u32>);
@@ -181,7 +181,7 @@ impl FeEnv for Env<'_> {
     }
 }
 
-const FUNCS: [u32; 2] = [0x27e918, 0x282d30];
+const FUNCS: [u32; 3] = [0x27e918, 0x282d30, 0x27f600];
 
 #[test]
 fn rider_profile_builders_match_the_original() {
@@ -212,6 +212,7 @@ fn rider_profile_builders_match_the_original() {
         (SCALED_ICON_VTABLE, 0x50),
         (MENU_LIST_VTABLE, 0xf8),
         (MENU_LIST_VTABLE, 0x148),
+        (TEXT_ENTRY_VTABLE, 0x50),
     ] {
         let f = word(vt + off + 4);
         if !ans.vfs.borrow().contains(&f) {
@@ -268,6 +269,7 @@ fn rider_profile_builders_match_the_original() {
         m.w32(GAPP, APPOBJ);
         m.w8(S + 0x2e, g.pick(&[0u8, 3, 0x7f, 0x80, 0xff]));
         m.w32(S + 0x4f8, GRP);
+        m.w32(S + 0x4f0, GRP);
         m.w32(GRP + 0xc, VT);
         for off in SLOTS {
             m.w16(VT + off, g.pick(&[0u16, 4]));
@@ -290,6 +292,7 @@ fn rider_profile_builders_match_the_original() {
         let ours = match func {
             0x27e918 => rb::build_profile_frame(mm, e, S, SCRATCH),
             0x282d30 => { rb::build_records(mm, e, S, SCRATCH); none }
+            0x27f600 => { rb::build_bio(mm, e, S, SCRATCH); none }
             _ => unreachable!(),
         };
         ans.n.set(0);

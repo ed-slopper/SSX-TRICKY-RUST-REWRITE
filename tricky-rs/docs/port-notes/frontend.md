@@ -2437,3 +2437,13 @@ The test runs 1,200 cases (600 each). The constructors give their objects a tabl
 
 Of the 56 mutants, 55 are caught. The survivor is equivalent: it replaces a second child that is always none
 there.
+
+## G9y8b: the rider bio panel (`fe_riderbuild::build_bio`)
+
+`FE_BuildRiderBioScreen` 0x27f600 fills the bio panel (the group at +0x4f0) with a list of 15 rows. Each row is a
+text entry holding a heading (string 0x24a + row) and the rider's line. The line's string is the first string of
+the rider's bio line (0xbac, 15 apart for bio lines 0..11; 0 past them) plus the row. Both texts are red at 0.8. The
+list goes at (350, 111) with a gap of 4 and is added to the group, then the group is shown.
+
+The test (with G9y8a's, `tests/fe_riderbuild.rs`) runs 600 cases of it. The text entry's own colour call goes
+through the game's table, which the test reads and stubs. All 18 mutants are caught.
