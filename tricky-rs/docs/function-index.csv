@@ -4906,7 +4906,10 @@ address,size,name,system,status
 0x269508,80,cListFE3DRenderOp::__tf,runtime,host
 0x269558,8,cListFE3DRenderOp::~cListFE3DRenderOp,frontend?,checked
 0x269560,36,cListOperator::~cListOperator,frontend?,checked
+0x26957c,8,FUN_0026957c,frontend?,checked
 0x269588,64,cListOperator::__tf,runtime,host
+0x2695c8,64,FUN_002695c8,frontend?,checked
+0x269608,24,FUN_00269608,frontend?,checked
 0x269620,232,cListFE3DGetExtentOp::vf1_269620,frontend?,checked
 0x269708,80,cListFE3DGetExtentOp::__tf,runtime,host
 0x269758,64,cListFE3DOnInputOp::vf1_269758,frontend?,checked
@@ -4921,18 +4924,19 @@ address,size,name,system,status
 0x269998,80,cListFE3DSkipActivityOp::__tf,runtime,host
 0x2699e8,52,cListFE3DOffsetOp::vf1_2699e8,frontend?,checked
 0x269a20,80,cListFE3DOffsetOp::__tf,runtime,host
-0x269a70,92,FE3DGeometry_BindInstance,frontend?,not started
-0x269ad0,56,FE3DGeometry_GetPos,frontend?,not started
-0x269b08,224,cFE3DGeometry::vf10_269b08,frontend,not started
+0x269a70,92,FE3DGeometry_BindInstance,frontend?,checked
+0x269ad0,56,FE3DGeometry_GetPos,frontend?,checked
+0x269b08,224,cFE3DGeometry::vf10_269b08,frontend,checked
 0x269be8,64,FUN_00269be8,frontend?,checked
-0x269c28,68,cFE3DMovieGeometry::~cFE3DMovieGeometry,frontend,not started
+0x269c28,68,cFE3DMovieGeometry::~cFE3DMovieGeometry,frontend,checked
 0x269c70,84,FEWorld_OpenCourseVideo,frontend?,checked
 0x269cc8,72,FE3DMovie_Stop,frontend?,checked
-0x269d10,396,cFE3DMovieGeometry::vf10_269d10,frontend,not started
-0x269ed0,20,cFE3DAnim::vf12_269ed0,frontend,not started
-0x269ee8,1160,cFE3DAnimRotate::vf10_269ee8,frontend,not started
-0x26a370,192,cFE3DAnimRotate::vf12_26a370,frontend,not started
-0x26a430,132,cFE3DAnimTranslate::vf10_26a430,frontend,not started
+0x269d10,396,cFE3DMovieGeometry::vf10_269d10,frontend,checked
+0x269ea0,48,FUN_00269ea0,frontend?,checked
+0x269ed0,20,cFE3DAnim::vf12_269ed0,frontend,checked
+0x269ee8,1160,cFE3DAnimRotate::vf10_269ee8,frontend,checked
+0x26a370,192,cFE3DAnimRotate::vf12_26a370,frontend,checked
+0x26a430,132,cFE3DAnimTranslate::vf10_26a430,frontend,checked
 0x26a4b8,276,cFE3DCamera::cFE3DCamera,camera,not started
 0x26a5d0,132,FE3DCamera_DrawWorld,camera,not started
 0x26a658,1288,cFE3DCamera::vf10_26a658,camera,not started

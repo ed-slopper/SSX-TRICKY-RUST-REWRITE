@@ -2,8 +2,9 @@
 //! voice-line and world helpers (0x261b38..0x263270): they go through the front end's sound player (`cFE3D` +0xa4,
 //! its table at +0), its world (+0x80, found by name hash), its riders (+0x20, twelve) and its course films (+0xfc,
 //! ten). Then the characters (`cFE3DCharacter`: the rider model, its loads, its poses and lights) and the dialog box
-//! (`cFE3DDialog`) with the group's own virtuals. Every call out goes through [`FeEnv`]. Checked in the function
-//! runner (`tests/fe_scene.rs`, `tests/fe_scene_char.rs`, `tests/fe_scene_dialog.rs`).
+//! (`cFE3DDialog`) with the group's own virtuals, then the geometry, its films and the animations. Every call out
+//! goes through [`FeEnv`]. Checked in the function runner (`tests/fe_scene.rs`, `tests/fe_scene_char.rs`,
+//! `tests/fe_scene_dialog.rs`, `tests/fe_scene_anim.rs`).
 
 use crate::fe3dstate::{vcall, FeEnv, GAPP};
 use crate::pf::Mem;
@@ -1226,4 +1227,207 @@ pub fn group_extent(m: &mut Mem, e: &mut dyn FeEnv, g: u32, min: u32, max: u32, 
     }
     e.call(m, LIST_APPLY, &[g + 0x110, buf]);
     e.call(m, EXTENT_OP_DTOR, &[buf, 2]);
+}
+
+// ---- the geometry, its films and the animations (0x26957c..0x26a4b8)
+
+/// The geometry's calls out: the world's instance by name hash (0x2550c8 on the world at 0x346488), a matrix made
+/// (0x1ce278), an instance drawn (0x200680), the geometry's destructor (0x26cc40), a film's texture (0x2001c8),
+/// the draw's lighting set up (0x1ce140)
+pub const FIND_INSTANCE: u32 = 0x2550c8;
+pub const WORLD: u32 = 0x346488;
+pub const MATRIX_MAKE: u32 = 0x1ce278;
+pub const DRAW_INSTANCE: u32 = 0x200680;
+pub const GEOMETRY_DTOR: u32 = 0x26cc40;
+pub const VIDEO_TEXTURE: u32 = 0x2001c8;
+pub const LIGHTING_SETUP: u32 = 0x1ce140;
+/// The film geometry's table
+pub const MOVIE_GEOMETRY_VTABLE: u32 = 0x3abae0;
+
+/// 0x26957c: nothing
+pub fn nothing() {}
+
+/// 0x269608(out; x, y, z, w): `out` set (the copy of `Vec4_Set`)
+pub fn vec4_set(m: &mut Mem, out: u32, v: [u32; 4]) {
+    m.w32(out + 0xc, v[3]);
+    m.w32(out, v[0]);
+    m.w32(out + 4, v[1]);
+    m.w32(out + 8, v[2]);
+}
+
+/// `FE3DGeometry_BindInstance` 0x269a70(g, name): the world's instance of that name (+0xa0); when there is one,
+/// its flags (+0xe8) lose bit 1 and gain bit 2
+pub fn bind_instance(m: &mut Mem, e: &mut dyn FeEnv, g: u32, name: u32) {
+    let h = e.call(m, NAME_HASH, &[name]);
+    let inst = e.call(m, FIND_INSTANCE, &[WORLD, h]);
+    m.w32(g + 0xa0, inst);
+    if inst != 0 {
+        let f = m.r32(inst + 0xe8);
+        m.w32(inst + 0xe8, (f & 0xffff_fffd) | 4);
+    }
+}
+
+/// `FE3DGeometry_GetPos` 0x269ad0(g, out): the instance's position (+0x30) with w 1, when there is an instance
+pub fn geometry_pos(m: &mut Mem, g: u32, out: u32) {
+    let inst = m.r32(g + 0xa0);
+    if inst == 0 {
+        return;
+    }
+    m.w32(out, m.r32(inst + 0x30));
+    m.w32(out + 4, m.r32(inst + 0x34));
+    m.w32(out + 0xc, ONE);
+    m.w32(out + 8, m.r32(inst + 0x38));
+}
+
+/// `cFE3DGeometry` vf10 0x269b08(g, -; `buf` 0xc0 bytes): when it has an instance and is shown, the instance drawn
+/// (a matrix made, then the instance's own copied beside it) at the renderer's state raised by its +0x70
+pub fn geometry_render(m: &mut Mem, e: &mut dyn FeEnv, g: u32, buf: u32) {
+    if m.r32(g + 0xa0) == 0 || m.r32(g + 0x14) == 0 {
+        return;
+    }
+    let st = render_state(m, e);
+    let lift = m.r32(g + 0x70);
+    set_render_state(m, e, st.wrapping_add(lift));
+    e.call(m, MATRIX_MAKE, &[buf]);
+    let inst = m.r32(g + 0xa0);
+    for k in 0..16u32 {
+        let v = m.r32(inst + 4 * k);
+        m.w32(buf + 0x80 + 4 * k, v);
+    }
+    e.call(m, DRAW_INSTANCE, &[WORLD, inst, buf + 0x80, buf]);
+    set_render_state(m, e, st);
+}
+
+/// `cFE3DMovieGeometry::~cFE3DMovieGeometry` 0x269c28(g, flags): its table put back, its film stopped, then the
+/// geometry's destructor
+pub fn movie_geometry_dtor(m: &mut Mem, e: &mut dyn FeEnv, g: u32, flags: u32) {
+    m.w32(g + 0xc, MOVIE_GEOMETRY_VTABLE);
+    movie_stop(m, e, g);
+    e.call(m, GEOMETRY_DTOR, &[g, flags]);
+}
+
+/// `cFE3DMovieGeometry` vf10 0x269d10(g, a; `buf` 0xc0 bytes): when it has an instance and is shown, at the state
+/// raised by its +0x70: with a film playing (+0xb0), the film's texture drawn on the instance (the renderer's +0x1e0
+/// with 3, the lighting (1, 0.5, 0.5, 0.5) / (0, 0, 0, 1) / 0 set up, then its +0x2a8 with the instance's +0xc0, the
+/// texture, the instance and the lighting); without, the plain geometry's draw
+pub fn movie_geometry_render(m: &mut Mem, e: &mut dyn FeEnv, g: u32, a: u32, buf: u32) {
+    if m.r32(g + 0xa0) == 0 || m.r32(g + 0x14) == 0 {
+        return;
+    }
+    let st = render_state(m, e);
+    let lift = m.r32(g + 0x70);
+    set_render_state(m, e, st.wrapping_add(lift));
+    let h = m.r32(g + 0xb0);
+    if (h as i32) >= 0 {
+        let player = m.r32(fe(m) + 0x124);
+        let tex = e.call(m, VIDEO_TEXTURE, &[player, h]);
+        let r = renderer(m);
+        vcall_at(m, e, r, 0x10, 0x1e0, &[3]);
+        let half = HALF.0.to_bits();
+        put(m, buf + 0x80, [ONE, half, half, half]);
+        put(m, buf + 0x90, [0, 0, 0, ONE]);
+        put(m, buf + 0xa0, [0, 0, 0, 0]);
+        let (c, p, z) = (buf + 0x80, buf + 0x90, buf + 0xa0);
+        e.call(m, LIGHTING_SETUP, &[buf, c, p, z, p, z, p, z]);
+        let inst = m.r32(g + 0xa0);
+        let model = m.r32(inst + 0xc0);
+        let r = renderer(m);
+        vcall_at(m, e, r, 0x10, 0x2a8, &[model, tex, inst, buf, 0, 0]);
+    } else {
+        let _ = a;
+        geometry_render(m, e, g, buf);
+    }
+    set_render_state(m, e, st);
+}
+
+/// 0x269ea0(a): the animation's rate (+0xa8) one over its seconds (+0xa4) at 60 a second, squared as the game has it
+/// (1 / (s · 60 · 60))
+pub fn anim_set_rate(m: &mut Mem, a: u32) {
+    let s = fl(m, a + 0xa4) * F(60.0) * F(60.0);
+    m.w32(a + 0xa8, (F(1.0) / s).0.to_bits());
+}
+
+/// `cFE3DAnim` vf12 0x269ed0(a): the time (+0xa0) moved on by the rate (+0xa8)
+pub fn anim_step(m: &mut Mem, a: u32) {
+    let t = fl(m, a + 0xa0) + fl(m, a + 0xa8);
+    m.w32(a + 0xa0, t.0.to_bits());
+}
+
+fn rows(m: &Mem, at: u32) -> [[F; 4]; 4] {
+    [0u32, 1, 2, 3].map(|r| [0u32, 1, 2, 3].map(|k| fl(m, at + 0x10 * r + 4 * k)))
+}
+
+/// Four rows times a row vector on VU0 (vmulax / vmadday / vmaddaz / vmaddw): the sum of rows[k] x v[k]
+fn mat_vec(rows: &[[F; 4]; 4], v: [F; 4]) -> [F; 4] {
+    [0, 1, 2, 3].map(|i| ((rows[0][i] * v[0] + rows[1][i] * v[1]) + rows[2][i] * v[2]) + rows[3][i] * v[3])
+}
+
+/// The rotation by `angle` about the unit axis `a` (x, y or z), as the game builds it from the sine and cosine:
+/// rows (t·x·x + c, t·y·x − s·z, t·z·x + s·y), (t·x·y + s·z, t·y·y + c, t·z·y − s·x), (t·x·z − s·y, t·y·z + s·x,
+/// t·z·z + c) with t = 1 − c, and (0, 0, 0, 1)
+fn axis_rotation(angle: F, a: [F; 3]) -> [[F; 4]; 4] {
+    let (s, c) = crate::math::sin_cos(angle.0);
+    let (s, c) = (F(s), F(c));
+    let [ax, ay, az] = a;
+    let t = F(1.0) - c;
+    let (tz, tx, ty) = (t * az, t * ax, t * ay);
+    let (sz, sx, sy) = (s * az, s * ax, s * ay);
+    let z0 = (tz * ax) + sy;
+    let y0 = (ty * ax) - sz;
+    let z1 = (tz * ay) - sx;
+    let z2 = (tz * az) + c;
+    let x0 = (tx * ax) + c;
+    let x1 = (tx * ay) + sz;
+    let x2 = (tx * az) - sy;
+    let y1 = (ty * ay) + c;
+    let y2 = (ty * az) + sx;
+    let o = F(0.0);
+    [[x0, y0, z0, o], [x1, y1, z1, o], [x2, y2, z2, o], [o, o, o, F(1.0)]]
+}
+
+/// `cFE3DAnimRotate` vf10 0x269ee8(a, mat): unless it drives another thing (+0xac), `mat` turned by the angles at
+/// +0xb0, +0xb4 and +0xb8 about x, y and z in that order (each rotation times the matrix on VU0)
+pub fn anim_rotate_apply(m: &mut Mem, a: u32, mat: u32) {
+    if m.r32(a + 0xac) != 0 {
+        return;
+    }
+    let mut cur = rows(m, mat);
+    let one = F(1.0);
+    let o = F(0.0);
+    for (k, axis) in [[one, o, o], [o, one, o], [o, o, one]].iter().enumerate() {
+        let r = axis_rotation(fl(m, a + 0xb0 + 4 * k as u32), *axis);
+        cur = r.map(|row| mat_vec(&cur, row));
+    }
+    for (r, row) in cur.iter().enumerate() {
+        for (k, v) in row.iter().enumerate() {
+            m.w32(mat + 0x10 * r as u32 + 4 * k as u32, v.0.to_bits());
+        }
+    }
+}
+
+/// `cFE3DAnimRotate` vf12 0x26a370(a): the time stepped, then the angles from +0xb0 toward +0xbc by the time
+/// (start + (end − start) · t) put on the driven thing's +0x90 (+0xac) or its own
+pub fn anim_rotate_update(m: &mut Mem, a: u32) {
+    anim_step(m, a);
+    let t = fl(m, a + 0xa0);
+    let v = [0u32, 4, 8].map(|k| (fl(m, a + 0xbc + k) - fl(m, a + 0xb0 + k)) * t + fl(m, a + 0xb0 + k));
+    let target = m.r32(a + 0xac);
+    let at = if target != 0 { target + 0x90 } else { a + 0x90 };
+    for (k, x) in v.iter().enumerate() {
+        m.w32(at + 4 * k as u32, x.0.to_bits());
+    }
+}
+
+/// `cFE3DAnimTranslate` vf10 0x26a430(a, mat): unless it drives another thing, `mat`'s last row moved through the
+/// matrix by the offset at +0xb0 (the matrix times the offset on VU0)
+pub fn anim_translate_apply(m: &mut Mem, a: u32, mat: u32) {
+    if m.r32(a + 0xac) != 0 {
+        return;
+    }
+    let cur = rows(m, mat);
+    let v = [0u32, 4, 8, 0xc].map(|k| fl(m, a + 0xb0 + k));
+    let r = mat_vec(&cur, v);
+    for (k, x) in r.iter().enumerate() {
+        m.w32(mat + 0x30 + 4 * k as u32, x.0.to_bits());
+    }
 }

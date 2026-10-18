@@ -2635,3 +2635,26 @@ All 52 mutants are caught.
 
 The test runs 400 cases of each of the 26 functions. The group's free of its children (a checked copy) runs for real.
 All 48 mutants are caught.
+
+## G9z4: the geometry, its films and the animations (`game/src/fe_scene.rs`, `tests/fe_scene_anim.rs`)
+
+- **Geometry.** `FE3DGeometry_BindInstance` finds the world's instance by name hash (0x2550c8 on the world at
+  0x346488) and sets bit 2 of its flags (+0xe8), clearing bit 1. `_GetPos` reads the instance's position with w 1.
+- **Draws.** The geometry's draw (vf10) makes a matrix (0x1ce278) and draws the instance with its own matrix copied
+  beside it (0x200680), at the render state raised by its +0x70. The film geometry's draw does the same unless a
+  film is playing. With a film, it draws the film's texture on the instance through the renderer's +0x2a8, after
+  its +0x1e0 with 3 and a lighting set-up (0x1ce140) of (1, 0.5, 0.5, 0.5), (0, 0, 0, 1) and 0. Its destructor
+  stops the film.
+- **Animations.**
+  - The rate (0x269ea0) is 1 / (seconds x 60 x 60), multiplied in that order. The step (`cFE3DAnim` vf12) adds the
+    rate to the time.
+  - `cFE3DAnimRotate`'s apply (vf10) turns the matrix about x, y and z by its three angles in turn. Each rotation
+    is built from `Math_SinCos` as the game builds it inline (axis-angle, t = 1 - cos), then multiplied in on VU0.
+  - Its update (vf12) moves the angles from start to end by the time, onto the driven thing's +0x90 or its own.
+  - `cFE3DAnimTranslate`'s apply moves the matrix's last row through the matrix by its offset.
+  - Neither apply does anything when it drives another thing (+0xac).
+- **Copies.** 0x2695c8 is a copy of 0x267f18's pool-or-heap free. 0x269608 is a copy of `Vec4_Set`. These two,
+  an empty function (0x26957c) and the rate were missing from the index.
+
+The test runs 600 cases of each of the 15 functions with the game's `Math_SinCos` for real. All 37 mutants are
+caught.
