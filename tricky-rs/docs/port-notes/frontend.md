@@ -2658,3 +2658,35 @@ All 48 mutants are caught.
 
 The test runs 600 cases of each of the 15 functions with the game's `Math_SinCos` for real. All 37 mutants are
 caught.
+
+## G9z5: the front end's cameras (`game/src/fe_scene.rs`, `tests/fe_scene_cam.rs`)
+
+- **`cFE3DCamera`.** The constructor is the thing's set-up plus a field of view of pi/4 and planes 20 and 20000.
+  - Its view (vf10) starts from the identity at 0x346440 with y and z swapped. It turns that about x by +0x90 less
+    pi/2, then about z by +0x98, then about y by +0x94. Each turn is the inline axis-angle rotation (as in G9z4)
+    multiplied in on VU0. The last row is the matrix times the position (+0x80).
+  - It then sets the renderer's projection (+0xa8) and view (+0xf0).
+  - `FE3DCamera_DrawWorld` draws the world's cells out to (far - 1) / 10000 + 1, then the world with the far plane.
+- **`cFE3DCameraScripted`.**
+  - Its set-up (0x26ab60) makes a camera-animation frame (0xc8 bytes from the pool at 0x345e48) with
+    (0, -1, 30, 0) and the parameter table 0x3aa918, on shot 0x9a.
+  - `_SetShot` remakes the frame from the shot's row (0x347208, 0x14 bytes a row) unless the shot is unchanged.
+  - Its view takes the frame's angles in degrees and its position. The field of view is 2 atan(8.997951 / lens)
+    when the lens is positive. The translation is the position through `Vec4_Scale` by -1, with w 1, and the camera
+    keeps the angles, the field of view and the negated position.
+- **`cFE3DCameraCombined`.** It holds a scripted camera at +0xc0. Its vf10, vf12 and vf28 pass through to it.
+- **Shots.**
+  - `FE3DCamera_PanToRider`: the rider after the kept one (+0x184, mod 12) gets shot 0xf + k. Any other rider gets
+    0x1b (rider 0) or 0x27 - k.
+  - The screens' shots: CharSelect 0x27 + k (mode 8), RiderShot 0x33 + k (mode 9), CharModify 0x3f + k (mode 0xa).
+  - The custom board and body shots: 0x4b / 0x57 and 0x63 / 0x6f plus the kept rider, by a flag.
+  - All of them go through the jump tables at 0x3ab2b0..0x3ab430, which run in order.
+- **`FE3DCamera_SetMode`.** It works the game's nested switches through: on the mode; then, for modes 2 and 6, on
+  the front end's screen kind (`cFE3D` +0xf0); and, in mode 6, on whether the app's +0x58 is 4. Mode 2 can keep a
+  different mode (5, 4 or 3) from the one asked for. Only mode 1 answers whether it moved from a mode.
+
+The test runs 500 cases of each of the 20 functions. `Math_SinCos`, `Math_Atan` and `Vec4_Scale` run for real. A
+view matrix on the stack is logged by value, all 16 words.
+
+Of the 50 mutants, 49 are caught. The survivor is data-equivalent: the shots' byte read unsigned, and all 16 rows'
+bytes are 0 in the game's data.

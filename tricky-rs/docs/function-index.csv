@@ -4937,26 +4937,26 @@ address,size,name,system,status
 0x269ee8,1160,cFE3DAnimRotate::vf10_269ee8,frontend,checked
 0x26a370,192,cFE3DAnimRotate::vf12_26a370,frontend,checked
 0x26a430,132,cFE3DAnimTranslate::vf10_26a430,frontend,checked
-0x26a4b8,276,cFE3DCamera::cFE3DCamera,camera,not started
-0x26a5d0,132,FE3DCamera_DrawWorld,camera,not started
-0x26a658,1288,cFE3DCamera::vf10_26a658,camera,not started
-0x26ab60,204,FE3DCameraScripted_Init,camera,not started
-0x26ac30,28,FUN_0026ac30,camera?,not started
-0x26ac50,72,cFE3DCameraScripted::vf1_26ac50,camera,not started
-0x26ac98,1556,cFE3DCameraScripted::vf10_26ac98,camera,not started
-0x26b2b0,64,cFE3DCameraScripted::vf12_26b2b0,camera,not started
-0x26b2f0,264,FE3DCameraScripted_SetShot,camera,not started
-0x26b3f8,88,cFE3DCameraCombined::cFE3DCameraCombined,camera,not started
-0x26b450,44,cFE3DCameraCombined::vf12_26b450,camera,not started
-0x26b480,56,cFE3DCameraCombined::vf10_26b480,camera,not started
-0x26b4b8,44,cFE3DCameraCombined::vf28_26b4b8,camera,not started
-0x26b4e8,632,FE3DCamera_PanToRider,camera,ported
-0x26b760,328,CharSelect_PlayCameraShot,camera,ported
-0x26b8a8,328,FECharSel_PlayRiderShot,frontend?,ported
-0x26b9f0,328,CharModify_PlayCameraShot,camera,ported
-0x26bb38,384,CustomBoard_PlayCameraShot,camera,ported
-0x26bcb8,384,CustomBody_PlayCameraShot,camera,ported
-0x26be38,600,FE3DCamera_SetMode,camera,ported
+0x26a4b8,276,cFE3DCamera::cFE3DCamera,camera,checked
+0x26a5d0,132,FE3DCamera_DrawWorld,camera,checked
+0x26a658,1288,cFE3DCamera::vf10_26a658,camera,checked
+0x26ab60,204,FE3DCameraScripted_Init,camera,checked
+0x26ac30,28,FUN_0026ac30,camera?,checked
+0x26ac50,72,cFE3DCameraScripted::vf1_26ac50,camera,checked
+0x26ac98,1556,cFE3DCameraScripted::vf10_26ac98,camera,checked
+0x26b2b0,64,cFE3DCameraScripted::vf12_26b2b0,camera,checked
+0x26b2f0,264,FE3DCameraScripted_SetShot,camera,checked
+0x26b3f8,88,cFE3DCameraCombined::cFE3DCameraCombined,camera,checked
+0x26b450,44,cFE3DCameraCombined::vf12_26b450,camera,checked
+0x26b480,56,cFE3DCameraCombined::vf10_26b480,camera,checked
+0x26b4b8,44,cFE3DCameraCombined::vf28_26b4b8,camera,checked
+0x26b4e8,632,FE3DCamera_PanToRider,camera,checked
+0x26b760,328,CharSelect_PlayCameraShot,camera,checked
+0x26b8a8,328,FECharSel_PlayRiderShot,frontend?,checked
+0x26b9f0,328,CharModify_PlayCameraShot,camera,checked
+0x26bb38,384,CustomBoard_PlayCameraShot,camera,checked
+0x26bcb8,384,CustomBody_PlayCameraShot,camera,checked
+0x26be38,600,FE3DCamera_SetMode,camera,checked
 0x26c090,280,FE3DCamera_PanToVenue,camera,checked
 0x26c1a8,280,FE3DCamera_PlayVenueShot,camera,checked
 0x26c2c0,172,VenueSel_PlayCurrentShot,frontend?,checked

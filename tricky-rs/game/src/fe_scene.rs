@@ -2,9 +2,9 @@
 //! voice-line and world helpers (0x261b38..0x263270): they go through the front end's sound player (`cFE3D` +0xa4,
 //! its table at +0), its world (+0x80, found by name hash), its riders (+0x20, twelve) and its course films (+0xfc,
 //! ten). Then the characters (`cFE3DCharacter`: the rider model, its loads, its poses and lights) and the dialog box
-//! (`cFE3DDialog`) with the group's own virtuals, then the geometry, its films and the animations. Every call out
-//! goes through [`FeEnv`]. Checked in the function runner (`tests/fe_scene.rs`, `tests/fe_scene_char.rs`,
-//! `tests/fe_scene_dialog.rs`, `tests/fe_scene_anim.rs`).
+//! (`cFE3DDialog`) with the group's own virtuals, then the geometry, its films and the animations, and the cameras.
+//! Every call out goes through [`FeEnv`]. Checked in the function runner (`tests/fe_scene.rs`, `tests/fe_scene_char.rs`,
+//! `tests/fe_scene_dialog.rs`, `tests/fe_scene_anim.rs`, `tests/fe_scene_cam.rs`).
 
 use crate::fe3dstate::{vcall, FeEnv, GAPP};
 use crate::pf::Mem;
@@ -1430,4 +1430,360 @@ pub fn anim_translate_apply(m: &mut Mem, a: u32, mat: u32) {
     for (k, x) in r.iter().enumerate() {
         m.w32(mat + 0x30 + 4 * k as u32, x.0.to_bits());
     }
+}
+
+// ---- the cameras (0x26a4b8..0x26c08c)
+
+/// The cameras' calls out: a shot played (`FE3DCamera_PlayShot` 0x26c370, ported in `fe_misc`), the world drawn
+/// (0x260278 then 0x260458 on the world at 0x346488), a pool's allocation (0x23d3b0 on the pool at 0x345e48), a
+/// camera animation's frame made (`CamAnimFrame_Create` 0x1482c0) and its shot set (`CamAnim_SetShot` 0x148350), a
+/// vector scaled (0x102f50) and the arctangent (0x2510f8)
+pub const PLAY_SHOT: u32 = 0x26c370;
+pub const WORLD_DRAW_BEGIN: u32 = 0x260278;
+pub const WORLD_DRAW: u32 = 0x260458;
+pub const POOL_ALLOC: u32 = 0x23d3b0;
+pub const CAM_FRAME_CREATE: u32 = 0x1482c0;
+pub const CAM_SET_SHOT: u32 = 0x148350;
+pub const VEC_SCALE: u32 = 0x102f50;
+pub const ATAN: u32 = 0x2510f8;
+/// The cameras' tables, the camera animation's name and its parameters' table, the shots (0x14 bytes each), the
+/// identity the camera's view starts from
+pub const CAMERA_VTABLE: u32 = 0x3ab738;
+pub const SCRIPTED_VTABLE: u32 = 0x3ab648;
+pub const COMBINED_VTABLE: u32 = 0x3ab558;
+pub const CAM_ANIM_NAME: u32 = 0x3aa938;
+pub const CAM_ANIM_PARAMS: u32 = 0x3aa918;
+pub const SHOTS: u32 = 0x347208;
+pub const IDENTITY: u32 = 0x346440;
+
+/// `cFE3DCamera`'s constructor 0x26a4b8(c): the thing's set-up, its table, the field of view (pi/4, +0xa0) and the
+/// near and far planes (20, 20000)
+pub fn camera_ctor(m: &mut Mem, c: u32) -> u32 {
+    thing_init(m, c);
+    m.w32(c + 0xc, CAMERA_VTABLE);
+    m.w32(c + 0xa0, 0x3f49_0fdb);
+    m.w32(c + 0xa4, F(20.0).0.to_bits());
+    m.w32(c + 0xa8, F(20000.0).0.to_bits());
+    c
+}
+
+/// `FE3DCamera_DrawWorld` 0x26a5d0(c, pos): the world drawn from `pos` out to the far plane (+0xa8): its cells up to
+/// (far - 1) / 10000 + 1 (chopped) away first, then the draw itself with the far plane
+pub fn camera_draw_world(m: &mut Mem, e: &mut dyn FeEnv, c: u32, pos: u32) {
+    let far = fl(m, c + 0xa8);
+    let n = ((far - F(1.0)).ee() as i32) / 10000 + 1;
+    e.call(m, WORLD_DRAW_BEGIN, &[WORLD, pos, n as u32]);
+    let far = fl(m, c + 0xa8);
+    e.call(m, WORLD_DRAW, &[WORLD, pos, far.0.to_bits()]);
+}
+
+/// A camera animation's frame (0xc8 bytes from the pool, filled) made with 3 and the parameters at `buf`
+fn cam_frame(m: &mut Mem, e: &mut dyn FeEnv, buf: u32) -> u32 {
+    let a = e.call(m, POOL_ALLOC, &[POOL, 0xc8, 0x4000_0000, CAM_ANIM_NAME, 0, 0]);
+    if a != 0 {
+        e.call(m, FILL, &[a, 0xdead_c0de, 0xc8]);
+    }
+    e.call(m, CAM_FRAME_CREATE, &[a, 3, buf])
+}
+
+/// The camera animation's frame (+0xb0), when there is one, destroyed (its +8 with 3, its table at +0xb4 for the
+/// part at +0xac)
+fn drop_frame(m: &mut Mem, e: &mut dyn FeEnv, c: u32) {
+    let f = m.r32(c + 0xb0);
+    if f != 0 {
+        let vt = m.r32(f + 0xb4);
+        let o = f + 0xac;
+        let adj = m.r16(vt.wrapping_add(8)) as i16 as u32;
+        let func = m.r32(vt.wrapping_add(0xc));
+        e.call(m, func, &[o.wrapping_add(adj), 3]);
+    }
+}
+
+/// `FE3DCameraScripted_Init` 0x26ab60(c; `buf` 0x20 bytes): a camera, then the scripted camera's: shot 0x9a (+0xb4),
+/// +0xb8 0, its table, and its animation's frame made from (0, -1, 30, 0) and the parameters' table (0x3aa918)
+pub fn scripted_init(m: &mut Mem, e: &mut dyn FeEnv, c: u32, buf: u32) -> u32 {
+    camera_ctor(m, c);
+    m.w32(c + 0xb4, 0x9a);
+    m.w32(c + 0xb0, 0);
+    m.w32(c + 0xb8, 0);
+    m.w32(c + 0xc, SCRIPTED_VTABLE);
+    put(m, buf, [0, F(-1.0).0.to_bits(), F(30.0).0.to_bits(), 0]);
+    m.w32(buf + 0x10, CAM_ANIM_PARAMS);
+    let f = cam_frame(m, e, buf);
+    m.w32(c + 0xb0, f);
+    c
+}
+
+/// 0x26ac30(c): the frame's +0x10 times 100
+pub fn scripted_scale_frame(m: &mut Mem, c: u32) {
+    let f = m.r32(c + 0xb0);
+    let v = fl(m, f + 0x10) * F(100.0);
+    m.w32(f + 0x10, v.0.to_bits());
+}
+
+/// `cFE3DCameraScripted` vf1 0x26ac50(c): its frame destroyed and cleared
+pub fn scripted_free(m: &mut Mem, e: &mut dyn FeEnv, c: u32) {
+    if m.r32(c + 0xb0) != 0 {
+        drop_frame(m, e, c);
+        m.w32(c + 0xb0, 0);
+    }
+}
+
+/// `cFE3DCameraScripted` vf12 0x26b2b0(c): its own +0x48, then +0xb8 the frame's +0x18
+pub fn scripted_update(m: &mut Mem, e: &mut dyn FeEnv, c: u32) {
+    vcall(m, e, c, 0x48, &[]);
+    let f = m.r32(c + 0xb0);
+    m.w32(c + 0xb8, m.r32(f + 0x18));
+}
+
+
+/// `FE3DCameraScripted_SetShot` 0x26b2f0(c, k; `buf` 0x20 bytes): unless the shot (+0xb4) is already `k`, the frame
+/// remade from the shot's row (0x347208 + 0x14 k: its floats at +4, +8 and +0xc, its byte at +0x10 and its first
+/// word) and given that shot
+pub fn scripted_set_shot(m: &mut Mem, e: &mut dyn FeEnv, c: u32, k: u32, buf: u32) {
+    let row = SHOTS.wrapping_add(k.wrapping_mul(0x14));
+    m.w32(buf + 0xc, m.r8(row + 0x10) as i8 as i32 as u32);
+    m.w32(buf + 0x10, m.r32(row));
+    m.w32(buf + 8, m.r32(row + 0xc));
+    if m.r32(c + 0xb4) == k {
+        return;
+    }
+    m.w32(buf, m.r32(row + 4));
+    m.w32(buf + 4, m.r32(row + 8));
+    drop_frame(m, e, c);
+    let f = cam_frame(m, e, buf);
+    m.w32(c + 0xb0, f);
+    e.call(m, CAM_SET_SHOT, &[f, buf]);
+    m.w32(c + 0xb4, k);
+}
+
+/// `cFE3DCameraCombined`'s constructor 0x26b3f8(c; `buf` 0x20 bytes): a camera with its table and a scripted camera
+/// inside it (+0xc0, also +0xb0), no mode (+0x180) and no rider or flag (the bytes +0x184, +0x185)
+pub fn combined_ctor(m: &mut Mem, e: &mut dyn FeEnv, c: u32, buf: u32) -> u32 {
+    camera_ctor(m, c);
+    m.w32(c + 0xc, COMBINED_VTABLE);
+    scripted_init(m, e, c + 0xc0, buf);
+    m.w32(c + 0xb0, c + 0xc0);
+    m.w32(c + 0x180, 0);
+    m.w8(c + 0x184, 0);
+    m.w8(c + 0x185, 0);
+    c
+}
+
+/// `cFE3DCameraCombined` vf12 0x26b450 and vf28 0x26b4b8(c): the inner camera's +0x68 or +0xe8 (handed itself)
+pub fn combined_inner(m: &mut Mem, e: &mut dyn FeEnv, c: u32, off: u32) {
+    let s = m.r32(c + 0xb0);
+    vcall(m, e, s, off, &[s]);
+}
+
+/// `cFE3DCameraCombined` vf10 0x26b480(c, a): when shown, the inner camera's +0x58 (handed `a`)
+pub fn combined_render(m: &mut Mem, e: &mut dyn FeEnv, c: u32, a: u32) {
+    if m.r32(c + 0x14) != 0 {
+        let s = m.r32(c + 0xb0);
+        vcall(m, e, s, 0x58, &[a]);
+    }
+}
+
+/// The camera's shot played (0x26c370)
+fn shot(m: &mut Mem, e: &mut dyn FeEnv, c: u32, k: u32) {
+    e.call(m, PLAY_SHOT, &[c, k]);
+}
+
+/// `FE3DCamera_PanToRider` 0x26b4e8(c, k): the rider after the last (+0x184, mod 12) plays shot 0xf + k, any other
+/// 0x1b for rider 0 and 0x27 - k for the rest (riders 0..11); the rider kept, mode 7
+pub fn pan_to_rider(m: &mut Mem, e: &mut dyn FeEnv, c: u32, k: u32) {
+    let k = k as u8 as i8 as i32;
+    let next = (m.r8(c + 0x184) as i8 as i32 + 1) % 12;
+    if (k as u32) < 12 {
+        if k == next {
+            shot(m, e, c, 0xf + k as u32);
+        } else {
+            shot(m, e, c, if k == 0 { 0x1b } else { 0x27 - k as u32 });
+        }
+    }
+    m.w8(c + 0x184, k as u8);
+    m.w32(c + 0x180, 7);
+}
+
+/// The screens' rider shots: `CharSelect_PlayCameraShot` 0x26b760 (0x27 + k, mode 8), `FECharSel_PlayRiderShot`
+/// 0x26b8a8 (0x33 + k, mode 9), `CharModify_PlayCameraShot` 0x26b9f0 (0x3f + k, mode 0xa): for riders 0..11 the shot,
+/// then the rider kept and the mode set
+pub fn rider_shot(m: &mut Mem, e: &mut dyn FeEnv, c: u32, k: u32, base: u32, mode: u32) {
+    let k = k as u8 as i8 as i32;
+    if (k as u32) < 12 {
+        shot(m, e, c, base + k as u32);
+    }
+    m.w8(c + 0x184, k as u8);
+    m.w32(c + 0x180, mode);
+}
+
+/// `CustomBoard_PlayCameraShot` 0x26bb38 (0x4b or, with `alt`, 0x57) and `CustomBody_PlayCameraShot` 0x26bcb8 (0x63
+/// or 0x6f)(c, alt): the kept rider's (+0x184, 0..11) shot
+pub fn custom_shot(m: &mut Mem, e: &mut dyn FeEnv, c: u32, alt: u32, base: u32, alt_base: u32) {
+    let k = m.r8(c + 0x184) as i8 as i32;
+    if (k as u32) < 12 {
+        let b = if alt != 0 { alt_base } else { base };
+        shot(m, e, c, b + k as u32);
+    }
+}
+
+/// `FE3DCamera_SetMode` 0x26be38(c, mode) -> whether it moved from a mode (1 only): unless already in `mode` (+0x180):
+/// - 1: shot 0; 2: shot 1 from mode 1, else by the front end's screen kind (`cFE3D` +0xf0: 0 shot 3 and mode 5, 1, 3
+///   and 4 shot 4 and mode 4, 2 shot 2 and mode 3); 3: shot 5; 4: shot 6; 5: shot 7 from mode 3, shot 8 from mode 4;
+/// - 6: by the screen kind (0 shot 0xd, 1, 3, 4 shot 0xe, 2 shot 0xc; 0xa, 0xb, 9 instead unless the app's +0x58 is
+///   4); 11: shot 0x7b and the flag (+0x185) cleared;
+/// - then the mode (or the one the screen kind chose) kept
+pub fn set_mode(m: &mut Mem, e: &mut dyn FeEnv, c: u32, mode: u32) -> u32 {
+    let cur = m.r32(c + 0x180);
+    if cur == mode {
+        return 0;
+    }
+    let f = fe(m);
+    let mut keep = mode;
+    let mut moved = 0;
+    let app58 = |m: &Mem| m.r32(m.r32(GAPP) + 0x58) == 4;
+    match mode.wrapping_sub(1) {
+        0 => {
+            moved = (cur != 0) as u32;
+            shot(m, e, c, 0);
+        }
+        1 => {
+            if cur == 1 {
+                shot(m, e, c, 1);
+            } else {
+                match m.r32(f + 0xf0) {
+                    0 => {
+                        shot(m, e, c, 3);
+                        keep = 5;
+                    }
+                    1 | 3 | 4 => {
+                        shot(m, e, c, 4);
+                        keep = 4;
+                    }
+                    2 => {
+                        shot(m, e, c, 2);
+                        keep = 3;
+                    }
+                    _ => {}
+                }
+            }
+        }
+        2 => shot(m, e, c, 5),
+        3 => shot(m, e, c, 6),
+        4 => {
+            if cur == 3 {
+                shot(m, e, c, 7);
+            } else if cur == 4 {
+                shot(m, e, c, 8);
+            } else {
+                m.w32(c + 0x180, keep);
+                return moved;
+            }
+        }
+        5 => match m.r32(f + 0xf0) {
+            0 => {
+                let k = if app58(m) { 0xd } else { 0xa };
+                shot(m, e, c, k);
+            }
+            1 | 3 | 4 => {
+                let k = if app58(m) { 0xe } else { 0xb };
+                shot(m, e, c, k);
+            }
+            2 => {
+                let k = if app58(m) { 0xc } else { 9 };
+                shot(m, e, c, k);
+            }
+            _ => {}
+        },
+        10 => {
+            shot(m, e, c, 0x7b);
+            m.w8(c + 0x185, 0);
+        }
+        _ => {}
+    }
+    m.w32(c + 0x180, keep);
+    moved
+}
+
+/// The view both cameras build: the identity (0x346440) with y and z swapped, turned about x by `angles[0]` - pi/2,
+/// about z by `angles[2]` and about y by `angles[1]` (each rotation times the matrix on VU0), its last row the
+/// matrix times `t`
+fn view_matrix(m: &Mem, angles: [F; 3], t: [F; 4]) -> [[F; 4]; 4] {
+    let mut cur = rows(m, IDENTITY);
+    cur[1][1] = F(0.0);
+    cur[1][2] = F(1.0);
+    cur[2][1] = F(1.0);
+    cur[2][2] = F(0.0);
+    let (one, o) = (F(1.0), F(0.0));
+    let half_pi = F(f32::from_bits(0x3fc9_0fdb));
+    for (angle, axis) in [(angles[0] - half_pi, [one, o, o]), (angles[2], [o, o, one]), (angles[1], [o, one, o])] {
+        let r = axis_rotation(angle, axis);
+        cur = r.map(|row| mat_vec(&cur, row));
+    }
+    cur[3] = mat_vec(&cur, t);
+    cur
+}
+
+/// The renderer's projection (+0xa8: field of view, near, far) and view (+0xf0: the matrix on `buf`) set
+fn set_view(m: &mut Mem, e: &mut dyn FeEnv, c: u32, fov: F, view: &[[F; 4]; 4], buf: u32) {
+    let (near, far) = (m.r32(c + 0xa4), m.r32(c + 0xa8));
+    let r = renderer(m);
+    vcall_at(m, e, r, 0x10, 0xa8, &[fov.0.to_bits(), near, far]);
+    for (i, row) in view.iter().enumerate() {
+        for (k, v) in row.iter().enumerate() {
+            m.w32(buf + 0x10 * i as u32 + 4 * k as u32, v.0.to_bits());
+        }
+    }
+    let r = renderer(m);
+    vcall_at(m, e, r, 0x10, 0xf0, &[buf]);
+}
+
+/// `cFE3DCamera` vf10 0x26a658(c; `buf` 0x40 bytes): when shown, the view from its angles (+0x90..+0x98) and
+/// position (+0x80), its projection, and the world drawn from there
+pub fn camera_render(m: &mut Mem, e: &mut dyn FeEnv, c: u32, buf: u32) {
+    if m.r32(c + 0x14) == 0 {
+        return;
+    }
+    let angles = [0u32, 4, 8].map(|k| fl(m, c + 0x90 + k));
+    let t = [0u32, 4, 8, 0xc].map(|k| fl(m, c + 0x80 + k));
+    let view = view_matrix(m, angles, t);
+    let fov = fl(m, c + 0xa0);
+    set_view(m, e, c, fov, &view, buf);
+    camera_draw_world(m, e, c, c + 0x80);
+}
+
+/// `cFE3DCameraScripted` vf10 0x26ac98(c; `buf` 0x50 bytes): when shown, from its frame's shot: the angles in
+/// degrees (+0x74..+0x7c) and position (+0x68, w 1); the field of view 2 atan(8.997951 / lens) for a positive lens
+/// (+0x94), else pi/4; the view from the angles and the position negated (`Vec4_Scale` by -1, w 1), kept as the
+/// camera's (+0x90.., +0xa0, +0x80); its projection, and the world drawn from the position
+pub fn scripted_render(m: &mut Mem, e: &mut dyn FeEnv, c: u32, buf: u32) {
+    if m.r32(c + 0x14) == 0 {
+        return;
+    }
+    let f = m.r32(c + 0xb0) + 0x1c;
+    let deg = F(f32::from_bits(0x3c8e_fa35));
+    let angles = [0u32, 4, 8].map(|k| fl(m, f + 0x58 + k) * deg);
+    let pos = [fl(m, f + 0x4c), fl(m, f + 0x50), fl(m, f + 0x54), F(1.0)];
+    let mut t = pos.map(|v| v * F(-1.0));
+    t[3] = F(1.0);
+    let lens = fl(m, f + 0x78);
+    let fov = if 0.0 < lens.ee() {
+        let a = F(crate::math::atan((F(f32::from_bits(0x410f_f79b)) / lens).0));
+        a + a
+    } else {
+        F(f32::from_bits(0x3f49_0fdb))
+    };
+    let view = view_matrix(m, angles, t);
+    for (k, v) in angles.iter().enumerate() {
+        m.w32(c + 0x90 + 4 * k as u32, v.0.to_bits());
+    }
+    m.w32(c + 0xa0, fov.0.to_bits());
+    for (k, v) in t.iter().enumerate() {
+        m.w32(c + 0x80 + 4 * k as u32, v.0.to_bits());
+    }
+    set_view(m, e, c, fov, &view, buf);
+    for (k, v) in pos.iter().enumerate() {
+        m.w32(buf + 0x40 + 4 * k as u32, v.0.to_bits());
+    }
+    camera_draw_world(m, e, c, buf + 0x40);
 }
