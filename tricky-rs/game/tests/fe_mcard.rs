@@ -237,15 +237,15 @@ impl FeEnv for Env<'_> {
     }
 }
 
-const FUNCS: [u32; 37] = [
+const FUNCS: [u32; 38] = [
     0x28f260, 0x28f380, 0x290de0, 0x290fd0, 0x291178, 0x291198, 0x291240, 0x2912e8, 0x291450, 0x291470, 0x291498,
     0x2914a0, 0x2914a8, 0x2914d0, 0x291648, 0x291688, 0x2916c8, 0x2917b0, 0x291da8, 0x291e00, 0x2923b8, 0x292428,
     0x2924d0, 0x292638, 0x2927a8, 0x2927d8, 0x292810, 0x2928c0, 0x292918, 0x292940, 0x292968, 0x292c70, 0x292d40,
-    0x292d80, 0x292e70, 0x2930a8, 0x293210,
+    0x292d80, 0x292e70, 0x2930a8, 0x293210, 0x293218,
 ];
 /// the widgets' code they call, run as the original: the wrapped text's setters and scale, the button layout and
 /// the sprite rectangle, the placing
-const ALSO: [u32; 9] = [0x2b0f18, 0x2b0f68, 0x2b1008, 0x2b1070, 0x2b4cc0, 0x2ae098, 0x2ac4b0, 0x2addb0, 0x293218];
+const ALSO: [u32; 8] = [0x2b0f18, 0x2b0f68, 0x2b1008, 0x2b1070, 0x2b4cc0, 0x2ae098, 0x2ac4b0, 0x2addb0];
 
 #[test]
 fn memory_card_overlay_matches_the_original() {
@@ -435,7 +435,7 @@ fn memory_card_overlay_matches_the_original() {
             0x2912e8 => mc::finish(mm, e, O),
             0x291470 => mc::vf3(mm, e, O),
             0x291498 => mc::zero(),
-            0x2914a0 | 0x293210 => { mc::nothing(); none }
+            0x2914a0 | 0x293210 | 0x293218 => { mc::nothing(); none }
             0x2914a8 => mc::vf5(mm, e, O),
             0x2914d0 => { mc::slot_line(mm, e, O, a1 & 3, s); none }
             0x291648 => { mc::step(mm, e, O, true); none }

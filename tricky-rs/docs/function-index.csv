@@ -4960,7 +4960,7 @@ address,size,name,system,status
 0x26cc40,20,cFE3DGeometry::~cFE3DGeometry,frontend,checked
 0x26cd48,80,cFE3DGeometry::__tf,runtime,host
 0x26cd98,44,Vec4_ScaleCopy13,frontend?,checked
-0x26cdc8,32,CheatCode_Matches,input,ported
+0x26cdc8,32,CheatCode_Matches,input,checked
 0x26cde8,16,FEInput_IsEnter,frontend?,checked
 0x26cdf8,16,FEInput_IsEscape,frontend?,checked
 0x26ce08,40,FEKey_IsAccept,frontend?,checked
@@ -4973,9 +4973,9 @@ address,size,name,system,status
 0x26cea8,16,FEInput_IsRight,frontend?,checked
 0x26cef8,44,FEPlayer_IsPadConnected,frontend?,checked
 0x26cf28,56,FUN_0026cf28,frontend?,checked
-0x26cf60,608,cCheatCodes::Update,input,ported
+0x26cf60,608,cCheatCodes::Update,input,checked
 0x26d1c0,8,FE_SetRumbleEnabled,frontend,checked
-0x26d1c8,136,FE_RumblePad,frontend,ported
+0x26d1c8,136,FE_RumblePad,frontend,checked
 0x26d3b8,668,cFE3DMenu::cFE3DMenu,frontend,checked
 0x26d658,8,cFE3DMenu::vf40_26d658,frontend,checked
 0x26d660,612,cFE3DMenu::vf39_26d660,frontend,checked
@@ -5393,7 +5393,7 @@ address,size,name,system,status
 0x2930a8,112,FEMemCard_HideInfoGroups,save,checked
 0x293120,72,FUN_00293120,frontend?,checked
 0x293210,8,cFEStateMCOverlay::vf23_293210,save,checked
-0x293218,8,cFEStateMCOverlay::vf26_293218,save,ported
+0x293218,8,cFEStateMCOverlay::vf26_293218,save,checked
 0x293230,92,cFEStateMCOverlay::__tf,runtime,host
 0x293290,8,cFE3DIconText::vf22_293290,frontend,checked
 0x293298,8,cFE3DIconText::vf41_293298,frontend,checked
