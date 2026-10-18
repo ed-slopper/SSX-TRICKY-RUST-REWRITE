@@ -2572,3 +2572,41 @@ Of the 52 mutants, 48 are caught. The four survivors are equivalent:
 - Player 1 for 0x262ad0's selection: both choices were just reset to 4.
 - The course test without its `andi`: the course is a sign-extended byte, so "below 10" is the same test.
 - The music byte read unsigned: the game's ten music bytes are all positive.
+
+## G9z2: the front end's characters and their lighting (`game/src/fe_scene.rs`, `tests/fe_scene_char.rs`)
+
+These are `cFE3DCharacter`, the riders standing in the front end's 3D scene, and its scene base. The draw (vf10)
+is G9z2b.
+
+- **Set-up.** `FE3DCharacter_Init` (c, rider) does the thing's set-up, then:
+  - the character's table, poses 3 (shown +0xa0, wanted +0xa1), +0xa4 1, the rider (+0xb0), and no load in flight
+    (+0xb4 and +0xb8 -1);
+  - a rider model (0x5b00 bytes, its parts set with 1) and a rider record (0x84 bytes);
+  - the model's textures requested through the loader with a request on the stack (0, then table 0x39e280);
+  - lit fully but not selected.
+  The destructor destroys the model (its table at +0) and frees the record.
+- **Rider info.** `FE3DCharacter_FillRiderInfo` fills the record:
+  - +0x44 from the board table at 0x332148 (0x14 bytes a board, 0xf0 a rider);
+  - five parts from the career (0x16b1d0 / 220 / 1f8 / 270 / 248);
+  - the rider row's words at 0x331ea8 (0x38 bytes a rider).
+  `_LoadRiderAsync` then starts the load on the front end's loader (`cFE3D` +0x18) with the load options' first
+  word.
+- **Update (vf12).**
+  - An outfit or board change (+0x15c, +0x160) releases a load in flight. With no load, it reloads instead, with
+    bits 10 and 11 of the options set from the two changes.
+  - A load that is done is finished and released.
+  - When the model has its rider, a finished pose 1 goes to 2. A new wanted pose plays its clip: 0 0x2f9; 1 by the
+    screen's mode (0x2fa..0x2fd); 2 0x2fe. Then the animation runs at speed 1 and steps.
+  - The lights are worked out.
+- **Lighting.** `FE3DCharacter_UpdateLighting` moves the light (+0x150) by 1/15 toward 1 when selected or toward 0
+  when not, clamped to 0..1.
+  - When the light moves, the light block (+0xc0) is filled. `_FillLightsA` (unselected) is used at 0 and
+    `_FillLightsB` (selected) at 1. In between, `FE3DLighting_Lerp` mixes the two, from sets built on the stack.
+  - Each of the three lights then gets a direction (+0x120 + 0x10 k) from its two angles in degrees:
+    (cos a cos b, sin b, sin a cos b), normalised on VU0 with w 0.
+
+The test runs 500 cases of each of the 17 functions. They run for real on both sides with the game's
+`Math_Sin` / `Math_Cos`. The loader's options write a word, and a request on the stack is logged by value. Only the
+destructor sees a character without its model or record. 0x2661f0 (the pose stopped) was missing from the index.
+
+All 52 mutants are caught.

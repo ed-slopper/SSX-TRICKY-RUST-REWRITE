@@ -4820,26 +4820,27 @@ address,size,name,system,status
 0x265c68,8,cFE3D::vf3_265c68,frontend,checked
 0x265ca0,176,cFE3D::cFE3D,frontend,not started
 0x265d50,80,cFE3D::__tf,runtime,host
-0x265da0,28,FUN_00265da0,frontend?,not started
-0x265dc0,20,cFE3DScene::~cFE3DScene,frontend,not started
+0x265da0,28,FUN_00265da0,frontend?,checked
+0x265dc0,20,cFE3DScene::~cFE3DScene,frontend,checked
 0x265dd8,80,cFE3DScene::__tf,runtime,host
 0x265e50,64,cGameModule::__tf,runtime,host
-0x265ed8,568,FE3DCharacter_Init,frontend?,not started
-0x266110,124,cFE3DCharacter::~cFE3DCharacter,frontend,not started
-0x266190,84,FE3DRider_SaveSelection,save,ported
-0x2661e8,8,FUN_002661e8,frontend?,ported
-0x266208,276,FE3DCharacter_FillRiderInfo,race?,not started
-0x266320,112,FE3DCharacter_LoadRiderAsync,other,not started
-0x266390,84,FE3DCharacter_FreeRider,boarder?,not started
-0x2663e8,12,FUN_002663e8,frontend?,not started
+0x265ed8,568,FE3DCharacter_Init,frontend?,checked
+0x266110,124,cFE3DCharacter::~cFE3DCharacter,frontend,checked
+0x266190,84,FE3DRider_SaveSelection,save,checked
+0x2661e8,8,FUN_002661e8,frontend?,checked
+0x2661f0,24,FUN_002661f0,frontend?,checked
+0x266208,276,FE3DCharacter_FillRiderInfo,race?,checked
+0x266320,112,FE3DCharacter_LoadRiderAsync,other,checked
+0x266390,84,FE3DCharacter_FreeRider,boarder?,checked
+0x2663e8,12,FUN_002663e8,frontend?,checked
 0x2663f8,2556,cFE3DCharacter::vf10_2663f8,frontend,not started
-0x266df8,680,cFE3DCharacter::vf12_266df8,frontend,not started
-0x2670a0,64,FE3DCharacter_LoadRider,game?,not started
+0x266df8,680,cFE3DCharacter::vf12_266df8,frontend,checked
+0x2670a0,64,FE3DCharacter_LoadRider,game?,checked
 0x2670e0,8,FE3DCharacter_SetSelected,frontend?,checked
-0x2670e8,784,FE3DCharacter_UpdateLighting,frontend?,not started
-0x2673f8,272,FE3DCharacter_FillLightsA,frontend?,not started
-0x267508,360,FE3DCharacter_FillLightsB,frontend?,not started
-0x267670,488,FE3DLighting_Lerp,frontend?,not started
+0x2670e8,784,FE3DCharacter_UpdateLighting,frontend?,checked
+0x2673f8,272,FE3DCharacter_FillLightsA,frontend?,checked
+0x267508,360,FE3DCharacter_FillLightsB,frontend?,checked
+0x267670,488,FE3DLighting_Lerp,frontend?,checked
 0x267858,180,FE3DCharSel_IsOutfitBlocked,frontend?,checked
 0x267910,140,FE3DCharSel_IsOutfitTakenBy,frontend?,checked
 0x2679a0,376,FE3DCharSel_PickFreeOutfit,frontend?,checked

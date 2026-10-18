@@ -1,10 +1,12 @@
 //! The front end's 3D scene code below 0x26c000 (board rows G9z1..) on the game's bytes. First the screens' audio,
 //! voice-line and world helpers (0x261b38..0x263270): they go through the front end's sound player (`cFE3D` +0xa4,
 //! its table at +0), its world (+0x80, found by name hash), its riders (+0x20, twelve) and its course films (+0xfc,
-//! ten). Every call out goes through [`FeEnv`]. Checked in the function runner (`tests/fe_scene.rs`).
+//! ten). Then the characters (`cFE3DCharacter`: the rider model, its loads, its poses and lights). Every call out
+//! goes through [`FeEnv`]. Checked in the function runner (`tests/fe_scene.rs`, `tests/fe_scene_char.rs`).
 
 use crate::fe3dstate::{vcall, FeEnv, GAPP};
 use crate::pf::Mem;
+use crate::ps2f::F;
 
 /// The calls out: a world script run by name (0x13bad8), a name's hash (0x240ed8), the world's thing by hash
 /// (0x26fe50), the camera's mode (0x26be38), the career's medal (0x163e28), a film opened (0x1fff30) and released
@@ -401,4 +403,460 @@ pub fn show_course_video(m: &mut Mem, e: &mut dyn FeEnv, course: u32, open: u32)
     }
     let music = m.r8(VENUE_MUSIC.wrapping_add(c)) as i8 as i32 as u32;
     snd(m, e, 0x28, &[music]);
+}
+
+// ---- the characters and their lighting (0x265da0..0x267670)
+
+/// The characters' calls out: an object freed (0x114f80), the scene's base destructor (0x2ace78), the thing's
+/// (0x2acd10), the allocation and its fill (0x2ccf70, 0x2cc808), the rider model's constructor (0x116828), its
+/// parts set (0x116a88), its rider set (0x116a68) and freed (0x116a18), the loader's request made (0x2010c8) and
+/// run (0x202478), a load's options (0x201ad8 / 0x201a38), started (0x201e68), done (0x201d30), finished (0x2021f8)
+/// and released (0x201c20), the career's choices kept (0x164e78 the outfit, 0x164df8 the board) and the rider's
+/// parts (0x16b1d0, 0x16b220, 0x16b1f8, 0x16b270, 0x16b248), the model's animation: playing (0x15ff40), played
+/// (0x15fcf8), its speed (0x15f390), stepped (0x15f700), stopped (0x15ee30), the screen's mode (0x265758)
+pub const FREE: u32 = 0x114f80;
+pub const SCENE_BASE_DTOR: u32 = 0x2ace78;
+pub const THING_DTOR: u32 = 0x2acd10;
+pub const ALLOC: u32 = 0x2ccf70;
+pub const FILL: u32 = 0x2cc808;
+pub const MODEL_CTOR: u32 = 0x116828;
+pub const MODEL_SET_PARTS: u32 = 0x116a88;
+pub const MODEL_SET_RIDER: u32 = 0x116a68;
+pub const MODEL_FREE_RIDER: u32 = 0x116a18;
+pub const LOAD_REQUEST: u32 = 0x2010c8;
+pub const LOAD_RUN: u32 = 0x202478;
+pub const LOAD_OPTIONS: u32 = 0x201ad8;
+pub const LOAD_OPTIONS_ASYNC: u32 = 0x201a38;
+pub const LOAD_START: u32 = 0x201e68;
+pub const LOAD_DONE: u32 = 0x201d30;
+pub const LOAD_FINISH: u32 = 0x2021f8;
+pub const LOAD_RELEASE: u32 = 0x201c20;
+pub const KEEP_OUTFIT: u32 = 0x164e78;
+pub const KEEP_BOARD: u32 = 0x164df8;
+pub const RIDER_PARTS: [u32; 5] = [0x16b1d0, 0x16b220, 0x16b1f8, 0x16b270, 0x16b248];
+pub const ANIM_PLAYING: u32 = 0x15ff40;
+pub const ANIM_PLAY: u32 = 0x15fcf8;
+pub const ANIM_SPEED: u32 = 0x15f390;
+pub const ANIM_STEP: u32 = 0x15f700;
+pub const ANIM_STOP: u32 = 0x15ee30;
+pub const SCREEN_MODE: u32 = 0x265758;
+/// The scene's and the character's tables, the request's own (handed to the loader), the riders' boards (0x14 a
+/// board, 0xf0 a rider) and the riders (0x38 each)
+pub const SCENE_VTABLE: u32 = 0x3a9100;
+pub const CHARACTER_VTABLE: u32 = 0x3a99f8;
+pub const REQUEST_VTABLE: u32 = 0x39e280;
+pub const RIDER_BOARDS: u32 = 0x332148;
+pub const RIDERS: u32 = 0x331ea8;
+const THING_VTABLE: u32 = 0x3b5a00;
+
+fn fl(m: &Mem, at: u32) -> F {
+    F(f32::from_bits(m.r32(at)))
+}
+
+/// 0x265da0(o, flags): `o` freed when bit 0 is set
+pub fn scene_delete(m: &mut Mem, e: &mut dyn FeEnv, o: u32, flags: u32) {
+    if flags & 1 != 0 {
+        e.call(m, FREE, &[o]);
+    }
+}
+
+/// `cFE3DScene::~cFE3DScene` 0x265dc0(o, flags): its table at +0x20 put back, then the base's destructor
+pub fn scene_dtor(m: &mut Mem, e: &mut dyn FeEnv, o: u32, flags: u32) {
+    m.w32(o + 0x20, SCENE_VTABLE);
+    e.call(m, SCENE_BASE_DTOR, &[o, flags]);
+}
+
+/// The thing's part of the character's set-up (as `cFE3DThing`'s): the links, flags and vectors
+fn thing_init(m: &mut Mem, o: u32) {
+    m.w32(o, u32::MAX);
+    m.w32(o + 4, o);
+    m.w32(o + 8, o);
+    m.w32(o + 0xc, THING_VTABLE);
+    m.w32(o + 0x10, 0);
+    m.w32(o + 0x14, 1);
+    for at in (0x18..0x28).step_by(4) {
+        m.w32(o + at, 0);
+    }
+    m.w32(o + 0x28, 1);
+    for at in [0x2cu32, 0x30] {
+        m.w32(o + at, 0);
+    }
+    for at in (0x40..0x60).step_by(4) {
+        m.w32(o + at, 0);
+    }
+    for at in (0x60..0x70).step_by(4) {
+        m.w32(o + at, ONE);
+    }
+    for at in [0x70u32, 0x74, 0x80, 0x84, 0x88] {
+        m.w32(o + at, 0);
+    }
+    m.w32(o + 0x8c, ONE);
+    for at in [0x90u32, 0x94, 0x98] {
+        m.w32(o + at, 0);
+    }
+}
+
+fn alloc(m: &mut Mem, e: &mut dyn FeEnv, name: u32, size: u32) -> u32 {
+    let a = e.call(m, ALLOC, &[name, size, 0]);
+    if a != 0 {
+        e.call(m, FILL, &[a, 0xdead_c0de, size]);
+    }
+    a
+}
+
+/// The loader's request for the model's textures (`buf`: 0 and the request's table) made and run with 2
+fn load_model(m: &mut Mem, e: &mut dyn FeEnv, c: u32, buf: u32) {
+    m.w32(buf, 0);
+    m.w32(buf + 4, REQUEST_VTABLE);
+    let model = m.r32(c + 0xac);
+    e.call(m, LOAD_REQUEST, &[buf, model, 0]);
+    e.call(m, LOAD_RUN, &[buf, 2]);
+}
+
+/// `FE3DCharacter_Init` 0x265ed8(c, rider; `buf` 0xd0 bytes): the thing's set-up, then the character's: its table,
+/// the shown and wanted poses (+0xa0, +0xa1) 3, +0xa4 1, the rider (+0xb0), no load (+0xb4, +0xb8 -1), no
+/// changes (+0x15c, +0x160); the rider model (0x5b00 bytes, its parts set with 1; +0xac) and its rider record
+/// (0x84 bytes; +0xa8); the model's textures loaded; not selected, lit fully (+0x150 1) and the lights worked out
+/// ([`update_lighting`])
+pub fn character_init(m: &mut Mem, e: &mut dyn FeEnv, c: u32, rider: u32, buf: u32) -> u32 {
+    thing_init(m, c);
+    m.w32(c + 0xc, CHARACTER_VTABLE);
+    m.w8(c + 0xa1, 3);
+    m.w32(c + 0xa4, 1);
+    m.w32(c + 0xb0, rider);
+    m.w32(c + 0xb8, u32::MAX);
+    m.w8(c + 0xa0, 3);
+    m.w32(c + 0xb4, u32::MAX);
+    m.w32(c + 0x15c, 0);
+    m.w32(c + 0x160, 0);
+    let a = alloc(m, e, 0x3a99d8, 0x5b00);
+    let model = e.call(m, MODEL_CTOR, &[a]);
+    m.w32(c + 0xac, model);
+    e.call(m, MODEL_SET_PARTS, &[model, 1]);
+    let info = alloc(m, e, 0x3a99e8, 0x84);
+    m.w32(c + 0xa8, info);
+    m.w32(buf, 0);
+    m.w32(buf + 4, REQUEST_VTABLE);
+    let model = m.r32(c + 0xac);
+    e.call(m, LOAD_REQUEST, &[buf, model, 0]);
+    m.w32(c + 0x154, 0);
+    m.w32(c + 0x150, ONE);
+    update_lighting(m, c, buf + 0x10);
+    e.call(m, LOAD_RUN, &[buf, 2]);
+    c
+}
+
+/// `cFE3DCharacter::~cFE3DCharacter` 0x266110(c, flags): its table put back, the model destroyed (its +8 with 3,
+/// its table at +0) and the rider record freed, then the thing's destructor
+pub fn character_dtor(m: &mut Mem, e: &mut dyn FeEnv, c: u32, flags: u32) {
+    m.w32(c + 0xc, CHARACTER_VTABLE);
+    let model = m.r32(c + 0xac);
+    if model != 0 {
+        vcall_at(m, e, model, 0, 8, &[3]);
+        m.w32(c + 0xac, 0);
+    }
+    let info = m.r32(c + 0xa8);
+    if info != 0 {
+        e.call(m, FREE, &[info]);
+        m.w32(c + 0xa8, 0);
+    }
+    e.call(m, THING_DTOR, &[c, flags]);
+}
+
+/// `FE3DRider_SaveSelection` 0x266190(c, player): the character's outfit (the byte at +0x158) and board (+0x159)
+/// kept in the career for the player
+pub fn save_selection(m: &mut Mem, e: &mut dyn FeEnv, c: u32, player: u32) {
+    let outfit = m.r8(c + 0x158) as i8 as i32 as u32;
+    e.call(m, KEEP_OUTFIT, &[CAREER, player, outfit]);
+    let board = m.r8(c + 0x159) as i8 as i32 as u32;
+    e.call(m, KEEP_BOARD, &[CAREER, player, board]);
+}
+
+/// 0x2661e8(c, pose): the wanted pose (+0xa1)
+pub fn set_pose(m: &mut Mem, c: u32, pose: u32) {
+    m.w8(c + 0xa1, pose as u8);
+}
+
+/// 0x2661f0(c): the wanted pose 3 and the model's animation stopped
+pub fn stop_pose(m: &mut Mem, e: &mut dyn FeEnv, c: u32) {
+    let model = m.r32(c + 0xac);
+    m.w8(c + 0xa1, 3);
+    e.call(m, ANIM_STOP, &[model + 0x46c0]);
+}
+
+/// `FE3DCharacter_FillRiderInfo` 0x266208(c): the rider record (+0xa8) filled for the rider (+0xb0) in its outfit
+/// (+0x158) and board (+0x159): +0x40 0, +0x44 the board's word (0x332148), the five parts from the career (+0x48,
+/// +0x50, +0x4c, +0x58, +0x54), and from the rider's row (0x331ea8) its first word (+0x38, +0x3c), +0x24 (+0x60)
+/// and the byte +0x34 (+0x64)
+pub fn fill_rider_info(m: &mut Mem, e: &mut dyn FeEnv, c: u32) {
+    let outfit = m.r8(c + 0x158) as i8 as i32 as u32;
+    let rider = m.r32(c + 0xb0);
+    let info = m.r32(c + 0xa8);
+    m.w32(info + 0x40, 0);
+    let at = RIDER_BOARDS.wrapping_add(outfit.wrapping_mul(0x14)).wrapping_add(rider.wrapping_mul(0xf0));
+    let v = m.r32(at.wrapping_add(8));
+    m.w32(info + 0x44, v);
+    let board = |m: &Mem| m.r8(c + 0x159) as i8 as i32 as u32;
+    let part = |m: &mut Mem, e: &mut dyn FeEnv, f: u32, arg: u32, at: u32| {
+        let rider = m.r32(c + 0xb0);
+        let v = e.call(m, f, &[CAREER, rider, arg]);
+        let info = m.r32(c + 0xa8);
+        m.w32(info + at, v);
+    };
+    let o = m.r8(c + 0x158) as i8 as i32 as u32;
+    part(m, e, RIDER_PARTS[0], o, 0x48);
+    part(m, e, RIDER_PARTS[1], 0, 0x50);
+    let b = board(m);
+    part(m, e, RIDER_PARTS[2], b, 0x4c);
+    part(m, e, RIDER_PARTS[3], 0, 0x58);
+    part(m, e, RIDER_PARTS[4], 0, 0x54);
+    let rider = m.r32(c + 0xb0);
+    let info = m.r32(c + 0xa8);
+    let row = RIDERS.wrapping_add(rider.wrapping_mul(0x38));
+    m.w32(info + 0x38, m.r32(row));
+    m.w32(info + 0x60, m.r32(row.wrapping_add(0x24)));
+    m.w32(info + 0x3c, m.r32(row));
+    m.w8(info + 0x64, m.r8(row.wrapping_add(0x34)));
+}
+
+/// `FE3DCharacter_LoadRiderAsync` 0x266320(c; `buf` 0x10 bytes): the rider record filled, the model given the
+/// rider, and its load started on the front end's loader (`cFE3D` +0x18) with the load options' first word; the
+/// shown pose 3, no changes
+pub fn load_rider_async(m: &mut Mem, e: &mut dyn FeEnv, c: u32, buf: u32) {
+    fill_rider_info(m, e, c);
+    e.call(m, LOAD_OPTIONS_ASYNC, &[buf]);
+    let (model, rider, info) = (m.r32(c + 0xac), m.r32(c + 0xb0), m.r32(c + 0xa8));
+    e.call(m, MODEL_SET_RIDER, &[model, rider, info]);
+    let loader = m.r32(fe(m) + 0x18);
+    let model = m.r32(c + 0xac);
+    let opts = m.r32(buf);
+    let h = e.call(m, LOAD_START, &[loader, model, 1, opts]);
+    m.w32(c + 0xb4, h);
+    m.w8(c + 0xa0, 3);
+    m.w32(c + 0x15c, 0);
+    m.w32(c + 0x160, 0);
+}
+
+/// `FE3DCharacter_FreeRider` 0x266390(c): the model's rider freed (with 1) and the load, when there is one,
+/// released
+pub fn free_rider(m: &mut Mem, e: &mut dyn FeEnv, c: u32) {
+    let model = m.r32(c + 0xac);
+    e.call(m, MODEL_FREE_RIDER, &[model, 1]);
+    let h = m.r32(c + 0xb4);
+    if (h as i32) >= 0 {
+        let loader = m.r32(fe(m) + 0x18);
+        e.call(m, LOAD_RELEASE, &[loader, h]);
+        m.w32(c + 0xb4, u32::MAX);
+    }
+}
+
+/// 0x2663e8(c): the model's +0x46b0 (whether it has its rider)
+pub fn has_model(m: &Mem, c: u32) -> u32 {
+    m.r32(m.r32(c + 0xac).wrapping_add(0x46b0))
+}
+
+/// `cFE3DCharacter` vf12 0x266df8(c; `buf` 0xc0 bytes), the update:
+/// - an outfit or board change (+0x15c, +0x160): a load in flight is released; otherwise the rider is reloaded with
+///   the load options' bits 10 and 11 set from the two changes, and the changes cleared;
+/// - a load in flight that is done is finished and released;
+/// - when the model has its rider: a pose that finished playing (pose 1) goes to 2; a new wanted pose (+0xa1) is
+///   played (0: 0x2f9; 1: by the screen's mode 0 0x2fa, 1 0x2fb, 2 0x2fc, else 0x2fd; 2: 0x2fe; others none) and
+///   becomes the shown one (+0xa0); the animation at speed 1 and stepped;
+/// - the lights worked out
+pub fn character_update(m: &mut Mem, e: &mut dyn FeEnv, c: u32, buf: u32) {
+    if m.r32(c + 0x160) != 0 || m.r32(c + 0x15c) != 0 {
+        let h = m.r32(c + 0xb4);
+        if (h as i32) >= 0 {
+            let loader = m.r32(fe(m) + 0x18);
+            e.call(m, LOAD_RELEASE, &[loader, h]);
+            m.w32(c + 0xb4, u32::MAX);
+        } else {
+            e.call(m, LOAD_OPTIONS, &[buf]);
+            let mut v = m.r32(buf);
+            v = (v & !0x400) | ((m.r32(c + 0x15c) & 1) << 10);
+            v = (v & !0x800) | ((m.r32(c + 0x160) & 1) << 11);
+            m.w32(buf, v);
+            fill_rider_info(m, e, c);
+            let (model, rider, info) = (m.r32(c + 0xac), m.r32(c + 0xb0), m.r32(c + 0xa8));
+            e.call(m, MODEL_SET_RIDER, &[model, rider, info]);
+            let loader = m.r32(fe(m) + 0x18);
+            let model = m.r32(c + 0xac);
+            let opts = m.r32(buf);
+            let h = e.call(m, LOAD_START, &[loader, model, 1, opts]);
+            m.w32(c + 0xb4, h);
+            m.w32(c + 0x15c, 0);
+            m.w32(c + 0x160, 0);
+        }
+    }
+    let h = m.r32(c + 0xb4);
+    if (h as i32) >= 0 {
+        let loader = m.r32(fe(m) + 0x18);
+        if e.call(m, LOAD_DONE, &[loader, h]) != 0 {
+            let h = m.r32(c + 0xb4);
+            e.call(m, LOAD_FINISH, &[loader, h]);
+            let h = m.r32(c + 0xb4);
+            e.call(m, LOAD_RELEASE, &[loader, h]);
+            m.w32(c + 0xb4, u32::MAX);
+        }
+    }
+    let model = m.r32(c + 0xac);
+    if m.r32(model + 0x46b0) != 0 {
+        let anim = model + 0x46c0;
+        if e.call(m, ANIM_PLAYING, &[anim, 0]) != 0 && m.r8(c + 0xa0) as i8 == 1 {
+            m.w8(c + 0xa1, 2);
+        }
+        let want = m.r8(c + 0xa1) as i8;
+        if want != m.r8(c + 0xa0) as i8 {
+            let clip = match want {
+                0 => Some(0x2f9),
+                1 => {
+                    let f = fe(m);
+                    Some(match e.call(m, SCREEN_MODE, &[f]) {
+                        0 => 0x2fa,
+                        1 => 0x2fb,
+                        2 => 0x2fc,
+                        _ => 0x2fd,
+                    })
+                }
+                2 => Some(0x2fe),
+                _ => None,
+            };
+            if let Some(clip) = clip {
+                let model = m.r32(c + 0xac);
+                e.call(m, ANIM_PLAY, &[model + 0x46c0, clip, 0, 5]);
+            }
+            m.w8(c + 0xa0, m.r8(c + 0xa1));
+        }
+        let model = m.r32(c + 0xac);
+        e.call(m, ANIM_SPEED, &[model + 0x46c0, ONE]);
+        let model = m.r32(c + 0xac);
+        e.call(m, ANIM_STEP, &[model + 0x46c0]);
+    }
+    update_lighting(m, c, buf);
+}
+
+/// `FE3DCharacter_LoadRider` 0x2670a0(c; `buf` 0x10 bytes): the model's textures loaded
+pub fn load_rider(m: &mut Mem, e: &mut dyn FeEnv, c: u32, buf: u32) {
+    load_model(m, e, c, buf);
+}
+
+/// The lights: (1, 0.25, 0.25, 0.25) ambient, two lights of 1.25 at 60° and 120° (and 0), none third
+const LIGHTS_A: ([u32; 4], [[u32; 4]; 3], [u32; 3], [u32; 3]) = (
+    [ONE, 0x3e80_0000, 0x3e80_0000, 0x3e80_0000],
+    [[0, 0x3fa0_0000, 0x3fa0_0000, 0x3fa0_0000], [0, 0x3fa0_0000, 0x3fa0_0000, 0x3fa0_0000], [0; 4]],
+    [0x4270_0000, 0x42f0_0000, 0],
+    [0, 0, 0],
+);
+/// (1, 0.1, 0.1, 0.1) ambient, lights of 10 at (75°, 58°), (2.1, 1.9, 1.7) at (345°, 20°), (1, 1, 2) at (285°, -20°)
+const LIGHTS_B: ([u32; 4], [[u32; 4]; 3], [u32; 3], [u32; 3]) = (
+    [ONE, 0x3dcc_cccd, 0x3dcc_cccd, 0x3dcc_cccd],
+    [[0, 0x4120_0000, 0x4120_0000, 0x4120_0000], [0, 0x4006_6666, 0x3ff3_3333, 0x3fd9_999a], [0, ONE, ONE, 0x4000_0000]],
+    [0x4296_0000, 0x43ac_8000, 0x438e_8000],
+    [0x4268_0000, 0x41a0_0000, 0xc1a0_0000],
+);
+
+fn fill_lights(m: &mut Mem, l: u32, s: &([u32; 4], [[u32; 4]; 3], [u32; 3], [u32; 3])) {
+    for k in 0..4u32 {
+        m.w32(l + 4 * k, s.0[k as usize]);
+    }
+    for i in 0..3u32 {
+        for k in 0..4u32 {
+            m.w32(l + 0x28 + 0x10 * i + 4 * k, s.1[i as usize][k as usize]);
+        }
+        m.w32(l + 0x10 + 4 * i, s.2[i as usize]);
+        m.w32(l + 0x1c + 4 * i, s.3[i as usize]);
+    }
+}
+
+/// `FE3DCharacter_FillLightsA` 0x2673f8(c, l): the unselected lights ([`LIGHTS_A`]) into `l` (the ambient, then
+/// each light's colour at +0x28 + 0x10 k and angles at +0x10 + 4 k and +0x1c + 4 k)
+pub fn fill_lights_a(m: &mut Mem, l: u32) {
+    fill_lights(m, l, &LIGHTS_A);
+}
+
+/// `FE3DCharacter_FillLightsB` 0x267508(c, l): the selected lights ([`LIGHTS_B`])
+pub fn fill_lights_b(m: &mut Mem, l: u32) {
+    fill_lights(m, l, &LIGHTS_B);
+}
+
+/// `FE3DLighting_Lerp` 0x267670(c, out, a, b; t): `out` = `a` · t + `b` · (1 − t) over the ambient, the angles and
+/// the colours
+pub fn lighting_lerp(m: &mut Mem, out: u32, a: u32, b: u32, t: u32) {
+    let t = F(f32::from_bits(t));
+    let u = F(1.0) - t;
+    let mix = |m: &mut Mem, at: u32| {
+        let v = fl(m, a + at) * t + fl(m, b + at) * u;
+        m.w32(out + at, v.0.to_bits());
+    };
+    for at in [0u32, 4, 8, 0xc] {
+        mix(m, at);
+    }
+    for k in 0..3u32 {
+        for at in [0x10 + 4 * k, 0x1c + 4 * k, 0x28 + 0x10 * k, 0x2c + 0x10 * k, 0x30 + 0x10 * k, 0x34 + 0x10 * k] {
+            mix(m, at);
+        }
+    }
+}
+
+/// v / |v| on VU0 (the sum of four squares, `vrsqrt`, `vmulq`); 1/√0 is the largest float
+fn vu_unit(v: [f32; 4]) -> [f32; 4] {
+    let m = [v[0] * v[0], v[1] * v[1], v[2] * v[2], v[3] * v[3]];
+    let s = ((m[0] + m[1]) + 1.0 * m[2]) + 1.0 * m[3];
+    let q = if s == 0.0 { f32::MAX } else { 1.0 / s.sqrt() };
+    v.map(|x| x * q)
+}
+
+/// `FE3DCharacter_UpdateLighting` 0x2670e8(c; `buf` 0xc0 bytes for the two sets mixed): the light (+0x150) moved a fifteenth toward 1 when selected (+0x154)
+/// or toward 0 when not, kept in 0..1; when it moved, the lights (+0xc0) are the unselected ones at 0, the selected
+/// ones at 1 or the mix between, and each light's direction (+0x120 + 0x10 k) is worked out from its angles in
+/// degrees (a at +0xd0 + 4 k, b at +0xdc + 4 k): (cos a cos b, sin b, sin a cos b), made unit length with w 0
+pub fn update_lighting(m: &mut Mem, c: u32, buf: u32) {
+    let step = F(f32::from_bits(0x3d88_8889));
+    let t = fl(m, c + 0x150);
+    let moved = if m.r32(c + 0x154) != 0 {
+        if t.ee() < 1.0 {
+            let v = t + step;
+            let v = if v.ee() < 0.0 { F(0.0) } else if 1.0 < v.ee() { F(1.0) } else { v };
+            m.w32(c + 0x150, v.0.to_bits());
+            true
+        } else {
+            false
+        }
+    } else if 0.0 < t.ee() {
+        let v = t - step;
+        let v = if v.ee() < 0.0 { F(0.0) } else if 1.0 < v.ee() { F(1.0) } else { v };
+        m.w32(c + 0x150, v.0.to_bits());
+        true
+    } else {
+        false
+    };
+    if !moved {
+        return;
+    }
+    let t = fl(m, c + 0x150);
+    let l = c + 0xc0;
+    if t.ee() == 0.0 {
+        fill_lights_a(m, l);
+    } else if t.ee() == 1.0 {
+        fill_lights_b(m, l);
+    } else {
+        let (sel, unsel) = (buf, buf + 0x60);
+        fill_lights_b(m, sel);
+        fill_lights_a(m, unsel);
+        lighting_lerp(m, l, sel, unsel, t.0.to_bits());
+    }
+    let deg = F(f32::from_bits(0x3c8e_fa35));
+    for k in 0..3u32 {
+        let a = (fl(m, c + 0xd0 + 4 * k) * deg).0;
+        let b = (fl(m, c + 0xdc + 4 * k) * deg).0;
+        let x = (F(crate::math::cos(a)) * F(crate::math::cos(b))).0;
+        let y = crate::math::sin(b);
+        let z = (F(crate::math::sin(a)) * F(crate::math::cos(b))).0;
+        let d = vu_unit([x, y, z, 0.0]);
+        let at = c + 0x120 + 0x10 * k;
+        for (i, v) in d.iter().enumerate() {
+            m.w32(at + 4 * i as u32, v.to_bits());
+        }
+        m.w32(at + 0xc, 0);
+    }
 }
