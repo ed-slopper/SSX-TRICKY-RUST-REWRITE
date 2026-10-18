@@ -1005,3 +1005,64 @@ event overlays' `Reset`s 0x1bb678 and 0x1bc6a8, the help's empty 0x1bd308 and th
   (0x3ce788, the static 0x338220 + 131).
 
 The runner test (tests/nextevent.rs) has 176,000 cases over the 44 functions: the overlay's flags, slots, lists, points, timer, dialog answers and pad buttons, the venue lists and modes, and the font's height (odd too) are random. The progress bar's 0x1b0 bytes are logged at each of its calls, and the text boxes' words as they draw and go. 170 of 174 mutants are caught. The four left are equivalent: the single answer's pick between first and second when only one is set; the notice's width plus a zero; the unsigned length's halving keeping its low bit (the same float); and the event menu's measure at its scale +0x470, which it has just set to 1.
+
+## The race overlays' constructors, destructors and small virtuals (G8n6, `game/src/overlaybase.rs`)
+
+The overlays use GCC 2 virtual bases in two families:
+
+| | the backdrop | the class's own table |
+|---|---|---|
+| the results family | at the overlay's +0 | (none) |
+| the memory card family | at +0x42c | at +0x428 |
+
+The backdrop's +0x28 is the table that the overlay's class sees it through.
+
+When the overlay is part of a whole object (a constructor's `whole` 0, a destructor's flags 0), the class's
+table is copied to the frame (0x98 bytes). Its `this` shifts (half words at the class's offsets) are moved by
+`this` − (the backdrop − its offset), and the backdrop's +0x28 then points at the copy. A destructor with flags
+sets the table and leaves it; flag 2 destroys the backdrop and flag 1 frees the object (0x114f80).
+
+- **The results family's destructors** (the index's vf0s: unlocked, race help, next race, high-score record, high
+  scores; and `cResultsOverlay`'s own) do the class's stage (its copy at the frame's +0xa0) and then the results
+  overlay's (its copy at the frame). The classes' tables, backdrop offsets and shifts are:
+  - unlocked: 0x38f328 at 0x268;
+  - race help: 0x38f3c0 at 0x54;
+  - next race: 0x38f458 at 0x258;
+  - high-score record: 0x38f4f0 at 0x118;
+  - high scores: 0x38f588 at 0x54;
+  - the results overlay: 0x38f880 at 0x54, with shifts 8, 0x70 and 0x78.
+- **The constructors** (`NextRaceOverlay_Init` 0x1b3f50, the unlocked overlay's 0x1b58c0, the race help's 0x1bd190)
+  run `ResultsOverlay_Init` and then the class's stage. The index marks all three "ported", but none was.
+  - The next race's sets three standings titles (0xe4b, 0xe4c, 0xe4a), clears the targets, and empties their
+    texts.
+  - The unlocked overlay's loads the unlocks' ten single and ten plural formats and the kinds' sprites
+    (0x58, 0x59, −1, 0x5a, 0x5b, 0x5c, 0x5d, −1, 0x5f, 0x5e).
+- **The card family's destructors** (next event, venue, points, pause menu) set their own table at +0x428 and
+  their backdrop's, with a copy at +0xa0 when there are no flags. The pause menu also destroys its member at +0x7f8
+  (0x155058). Then comes the card UI's own stage: its table 0x38f9b0, its backdrop's 0x38f918 with one shift at
+  0x438, and its base destructor (0x1ce580). `cSaveOverlay`'s destructor 0x1bfe00 is that stage alone.
+- **The card family's constructors** set up the backdrop (their own when whole), call `SaveOverlay_Init`, then set
+  their tables and clear one field (+0x464, +0x55c, +0x440).
+- **`cViewHiScoresOverlay` vf19 0x1bf580** destroys the race results overlay, an object of two parts: `this`+0 is
+  the results part and +4 the card part.
+  - **With no flags:** the high scores' table (shifts 8, 0x20, 0x68..0x88; its backdrop at 0x10c) is copied to the
+    frame's +0xa0. The card part's own table (0x1c8 bytes, shifts 8 and 0x20..0x38, at 0x454) goes to its +0x140.
+  - **Flag 2:** sets the results part's table back (its copy at the frame). The card UI's copy then overwrites
+    the same frame before the base destructor and the backdrop's destructor run.
+- **The backdrop's destructor** 0x1bff78 (the index's "ported" again wrong) sets its table, destroys its
+  animation (+0x94), and then runs the screen overlay's 0x1c01e8, which sets its table and frees on flag 1.
+- **The small overlays'** (the lesson controller's and the lesson's on backdrops; the black fade's, async load's,
+  pop finish's and countdown's on screen overlays) destructors set their tables and run the base's. Their
+  constructors, which the index doesn't list, run the base's init and set their tables.
+- **The rest are one-liners:**
+  - answers of 0, 1 or `this`, and empty virtuals;
+  - the career saved to the card (directly, or through the card part at +4);
+  - the async load's `Reset` (+0x2c);
+  - setters of +0x55c, +0x434 and the pad state (0x3381e0);
+  - the new buttons (+0x10 and not +0xc, its +0x2c cleared);
+  - whether a card save runs, and whether a dialog is up;
+  - the screen overlay's flag tests and copies (+0xc, +0x10, +0x14, +0x24);
+  - its virtual +0x78 when shown;
+  - `Draw_SolidRect`: untextured, then the colour, then the rectangle.
+
+The runner test (tests/overlaybase.rs) has 45,000 cases over the 75 functions, with the results overlay's init and the backdrop's and screen overlay's destructors real on both sides. The tables copied to the frame are compared byte for byte (6,855 of them). 62 of 64 mutants are caught. The two left drop stores that are overwritten before anything reads them: the card destructor's first +0x428, and the race results' shifts that the card UI's copy overwrites.

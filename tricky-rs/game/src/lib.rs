@@ -118,6 +118,7 @@ pub mod hudsprites;
 pub mod hudtext;
 pub mod hudstate;
 pub mod menudraw;
+pub mod overlaybase;
 pub mod overlays;
 pub mod placing;
 pub mod replayui;

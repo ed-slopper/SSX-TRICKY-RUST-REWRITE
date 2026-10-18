@@ -2508,7 +2508,7 @@ address,size,name,system,status
 0x1b3a00,1068,cViewHiScoresOverlay::Reset,frontend,checked
 0x1b3e30,152,cViewHiScoresOverlay::Draw,frontend,checked
 0x1b3ec8,136,cViewHiScoresOverlay::Update,frontend,checked
-0x1b3f50,460,NextRaceOverlay_Init,frontend,ported
+0x1b3f50,460,NextRaceOverlay_Init,frontend,checked
 0x1b4120,284,cNextRaceOverlay::Reset,frontend,checked
 0x1b4250,620,Results_BuildStandingsHeader,frontend?,checked
 0x1b44c0,972,Results_BuildHiScorePage,frontend?,checked
@@ -2516,7 +2516,7 @@ address,size,name,system,status
 0x1b4950,1092,cNextRaceOverlay::Draw,frontend,checked
 0x1b4d98,2780,cNextRaceOverlay::DrawText,frontend,checked
 0x1b5878,68,cNextRaceOverlay::Update,frontend,checked
-0x1b58c0,820,cUnlockedOverlay::cUnlockedOverlay,frontend,ported
+0x1b58c0,820,cUnlockedOverlay::cUnlockedOverlay,frontend,checked
 0x1b5bf8,768,Results_AddAwardLine,race?,checked
 0x1b5ef8,1376,cUnlockedOverlay::Reset,frontend,checked
 0x1b65f0,1228,cUnlockedOverlay::DrawText,frontend,checked
@@ -2529,7 +2529,7 @@ address,size,name,system,status
 0x1b8548,24,cLessonOverlay::Draw,frontend,not started
 0x1b8560,8,cLessonControllerOverlay::Draw,frontend,not started
 0x1b8568,240,SaveOverlay_Init,save,ported
-0x1b8658,192,Draw_SolidRect,render,not started
+0x1b8658,192,Draw_SolidRect,render,checked
 0x1b8718,1180,cSelectNextEventOverlay::vf17_1b8718,frontend,checked
 0x1b8bb8,336,cSelectNextEventOverlay::vf26_1b8bb8,frontend,checked
 0x1b8d08,2084,cSelectNextEventOverlay::vf16_1b8d08,frontend,checked
@@ -2553,53 +2553,53 @@ address,size,name,system,status
 0x1bc8a0,1156,NextEventOverlay_SaveBeforeExitB,save,ported
 0x1bcd28,1120,NextEventOverlay_DrawEvent,frontend,checked
 0x1bd188,8,cSelectNextEventOverlay::vf3_1bd188,frontend,checked
-0x1bd190,288,cHelpRaceOverlay::cHelpRaceOverlay,frontend,ported
+0x1bd190,288,cHelpRaceOverlay::cHelpRaceOverlay,frontend,checked
 0x1bd2b0,84,cHelpRaceOverlay::Reset,frontend,checked
 0x1bd310,68,cHelpRaceOverlay::Update,frontend,checked
 0x1bd358,92,cHelpRaceOverlay::Draw,frontend,checked
 0x1bd3b8,1248,cHelpRaceOverlay::DrawText,frontend,checked
 0x1bd898,384,StaticInit_HelpRaceOverlay,frontend,checked
-0x1bda40,464,cSelectNextEventOverlay::~cSelectNextEventOverlay,frontend,not started
-0x1bdc10,288,cSelectNextEventOverlay::cSelectNextEventOverlay,frontend,not started
+0x1bda40,464,cSelectNextEventOverlay::~cSelectNextEventOverlay,frontend,checked
+0x1bdc10,288,cSelectNextEventOverlay::cSelectNextEventOverlay,frontend,checked
 0x1bdd30,84,cSelectNextEventOverlay::__tf,runtime,host
-0x1bdd98,464,cSelectNextVenueOverlay::~cSelectNextVenueOverlay,frontend,not started
-0x1bdf68,288,cSelectNextVenueOverlay::cSelectNextVenueOverlay,frontend,not started
+0x1bdd98,464,cSelectNextVenueOverlay::~cSelectNextVenueOverlay,frontend,checked
+0x1bdf68,288,cSelectNextVenueOverlay::cSelectNextVenueOverlay,frontend,checked
 0x1be088,84,cSelectNextVenueOverlay::__tf,runtime,host
-0x1be0e8,476,cPointDistributionOverlay::~cPointDistributionOverlay,frontend,not started
-0x1be2c8,300,cPointDistributionOverlay::cPointDistributionOverlay,frontend,not started
+0x1be0e8,476,cPointDistributionOverlay::~cPointDistributionOverlay,frontend,checked
+0x1be2c8,300,cPointDistributionOverlay::cPointDistributionOverlay,frontend,checked
 0x1be3f8,84,cPointDistributionOverlay::__tf,runtime,host
-0x1be450,20,cLessonControllerOverlay::~cLessonControllerOverlay,frontend,not started
+0x1be450,20,cLessonControllerOverlay::~cLessonControllerOverlay,frontend,checked
 0x1be4a0,80,cLessonControllerOverlay::__tf,runtime,host
-0x1be4f0,20,cLessonOverlay::~cLessonOverlay,frontend,not started
+0x1be4f0,20,cLessonOverlay::~cLessonOverlay,frontend,checked
 0x1be540,80,cLessonOverlay::__tf,runtime,host
-0x1be590,20,cBlackFadeOverlay::~cBlackFadeOverlay,frontend,not started
+0x1be590,20,cBlackFadeOverlay::~cBlackFadeOverlay,frontend,checked
 0x1be5e0,80,cBlackFadeOverlay::__tf,runtime,host
-0x1be630,8,cPopAsyncLoadOverlay::Reset,frontend,not started
-0x1be638,20,cPopAsyncLoadOverlay::~cPopAsyncLoadOverlay,frontend,not started
+0x1be630,8,cPopAsyncLoadOverlay::Reset,frontend,checked
+0x1be638,20,cPopAsyncLoadOverlay::~cPopAsyncLoadOverlay,frontend,checked
 0x1be688,80,cPopAsyncLoadOverlay::__tf,runtime,host
-0x1be6d8,8,cPopFinishOverlay::vf17_1be6d8,frontend,not started
-0x1be6e0,8,cPopFinishOverlay::vf4_1be6e0,frontend,not started
-0x1be6e8,20,cPopFinishOverlay::~cPopFinishOverlay,frontend,not started
+0x1be6d8,8,cPopFinishOverlay::vf17_1be6d8,frontend,checked
+0x1be6e0,8,cPopFinishOverlay::vf4_1be6e0,frontend,checked
+0x1be6e8,20,cPopFinishOverlay::~cPopFinishOverlay,frontend,checked
 0x1be738,80,cPopFinishOverlay::__tf,runtime,host
-0x1be788,20,cCountdownOverlay::~cCountdownOverlay,frontend,not started
+0x1be788,20,cCountdownOverlay::~cCountdownOverlay,frontend,checked
 0x1be7d8,80,cCountdownOverlay::__tf,runtime,host
-0x1be828,8,cPauseMenuOverlay::vf6_1be828,frontend,not started
-0x1be830,8,cPauseMenuOverlay::vf5_1be830,frontend,not started
-0x1be838,8,cPauseMenuOverlay::vf4_1be838,frontend,not started
-0x1be840,8,cPauseMenuOverlay::vf3_1be840,frontend,not started
-0x1be858,516,cPauseMenuOverlay::~cPauseMenuOverlay,frontend,not started
+0x1be828,8,cPauseMenuOverlay::vf6_1be828,frontend,checked
+0x1be830,8,cPauseMenuOverlay::vf5_1be830,frontend,checked
+0x1be838,8,cPauseMenuOverlay::vf4_1be838,frontend,checked
+0x1be840,8,cPauseMenuOverlay::vf3_1be840,frontend,checked
+0x1be858,516,cPauseMenuOverlay::~cPauseMenuOverlay,frontend,checked
 0x1bea60,84,cPauseMenuOverlay::__tf,runtime,host
-0x1beab8,448,cUnlockedOverlay::vf0_1beab8,frontend,not started
+0x1beab8,448,cUnlockedOverlay::vf0_1beab8,frontend,checked
 0x1bec78,84,cUnlockedOverlay::__tf,runtime,host
-0x1becd8,460,cHelpRaceOverlay::vf0_1becd8,frontend,not started
+0x1becd8,460,cHelpRaceOverlay::vf0_1becd8,frontend,checked
 0x1beea8,84,cHelpRaceOverlay::__tf,runtime,host
-0x1bef08,460,cNextRaceOverlay::vf0_1bef08,frontend,not started
+0x1bef08,460,cNextRaceOverlay::vf0_1bef08,frontend,checked
 0x1bf0d8,84,cNextRaceOverlay::__tf,runtime,host
-0x1bf130,448,cHiScoreRecordOverlay::vf0_1bf130,frontend,not started
+0x1bf130,448,cHiScoreRecordOverlay::vf0_1bf130,frontend,checked
 0x1bf2f0,84,cHiScoreRecordOverlay::__tf,runtime,host
-0x1bf348,436,cViewHiScoresOverlay::vf0_1bf348,frontend,not started
+0x1bf348,436,cViewHiScoresOverlay::vf0_1bf348,frontend,checked
 0x1bf500,84,cViewHiScoresOverlay::__tf,runtime,host
-0x1bf580,820,cViewHiScoresOverlay::vf19_1bf580,frontend,not started
+0x1bf580,820,cViewHiScoresOverlay::vf19_1bf580,frontend,checked
 0x1bf8b8,92,cRaceResultsOverlay::__tf,runtime,host
 0x1bf918,100,Results_SetCellFloat,frontend?,checked
 0x1bf980,88,Results_SetCellFloatPlain,frontend?,checked
@@ -2615,33 +2615,33 @@ address,size,name,system,status
 0x1bfaf8,24,Results_GetRowNameB,frontend?,checked
 0x1bfb10,12,Results_SetTitle,race?,checked
 0x1bfb20,12,Results_SetTitleAscii,race?,checked
-0x1bfc70,256,cResultsOverlay::vf0_1bfc70,frontend,not started
+0x1bfc70,256,cResultsOverlay::vf0_1bfc70,frontend,checked
 0x1bfd70,84,cResultsOverlay::__tf,runtime,host
-0x1bfdc8,32,cSelectNextEventOverlay::vf2_1bfdc8,frontend,not started
-0x1bfe00,264,cSaveOverlay::~cSaveOverlay,save,not started
+0x1bfdc8,32,cSelectNextEventOverlay::vf2_1bfdc8,frontend,checked
+0x1bfe00,264,cSaveOverlay::~cSaveOverlay,save,checked
 0x1bff08,92,cSaveOverlay::__tf,runtime,host
-0x1bff78,76,cBackdropOverlay::~cBackdropOverlay,frontend,ported
+0x1bff78,76,cBackdropOverlay::~cBackdropOverlay,frontend,checked
 0x1bffc8,80,cBackdropOverlay::__tf,runtime,host
 0x1c0020,28,HUD_GetSpriteRect,hud,checked
-0x1c0040,8,cScreenOverlay::vf17_1c0040,frontend,not started
-0x1c0048,8,cScreenOverlay::vf16_1c0048,frontend,not started
-0x1c0050,8,cScreenOverlay::Reset,frontend,not started
-0x1c0058,8,cScreenOverlay::DrawText,frontend,not started
-0x1c0060,8,cScreenOverlay::Draw,frontend,not started
+0x1c0040,8,cScreenOverlay::vf17_1c0040,frontend,checked
+0x1c0048,8,cScreenOverlay::vf16_1c0048,frontend,checked
+0x1c0050,8,cScreenOverlay::Reset,frontend,checked
+0x1c0058,8,cScreenOverlay::DrawText,frontend,checked
+0x1c0060,8,cScreenOverlay::Draw,frontend,checked
 0x1c0068,108,HUD_DrawSprite,hud,checked
-0x1c0148,56,FUN_001c0148,,not started
-0x1c0180,12,cScreenOverlay::vf11_1c0180,frontend,not started
-0x1c0190,12,cScreenOverlay::vf10_1c0190,frontend,not started
-0x1c01a0,8,cScreenOverlay::vf9_1c01a0,frontend,not started
-0x1c01a8,8,cScreenOverlay::vf8_1c01a8,frontend,not started
-0x1c01b0,8,cScreenOverlay::vf7_1c01b0,frontend,not started
-0x1c01b8,8,cScreenOverlay::vf6_1c01b8,frontend,not started
-0x1c01c0,8,cScreenOverlay::vf5_1c01c0,frontend,not started
-0x1c01c8,8,cScreenOverlay::vf4_1c01c8,frontend,not started
-0x1c01d0,8,cScreenOverlay::vf3_1c01d0,frontend,not started
-0x1c01d8,8,cScreenOverlay::vf2_1c01d8,frontend,not started
-0x1c01e0,8,cScreenOverlay::vf1_1c01e0,frontend,not started
-0x1c01e8,36,cScreenOverlay::~cScreenOverlay,frontend,not started
+0x1c0148,56,FUN_001c0148,,checked
+0x1c0180,12,cScreenOverlay::vf11_1c0180,frontend,checked
+0x1c0190,12,cScreenOverlay::vf10_1c0190,frontend,checked
+0x1c01a0,8,cScreenOverlay::vf9_1c01a0,frontend,checked
+0x1c01a8,8,cScreenOverlay::vf8_1c01a8,frontend,checked
+0x1c01b0,8,cScreenOverlay::vf7_1c01b0,frontend,checked
+0x1c01b8,8,cScreenOverlay::vf6_1c01b8,frontend,checked
+0x1c01c0,8,cScreenOverlay::vf5_1c01c0,frontend,checked
+0x1c01c8,8,cScreenOverlay::vf4_1c01c8,frontend,checked
+0x1c01d0,8,cScreenOverlay::vf3_1c01d0,frontend,checked
+0x1c01d8,8,cScreenOverlay::vf2_1c01d8,frontend,checked
+0x1c01e0,8,cScreenOverlay::vf1_1c01e0,frontend,checked
+0x1c01e8,36,cScreenOverlay::~cScreenOverlay,frontend,checked
 0x1c0210,64,cScreenOverlay::__tf,runtime,host
 0x1c0260,80,cOverlayMan::__tf,runtime,host
 0x1c0340,116,GsPkt_SetScissor,render?,checked
