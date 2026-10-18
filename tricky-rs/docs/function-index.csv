@@ -5753,16 +5753,16 @@ address,size,name,system,status
 0x2b04e0,68,cFE3DWNameEntry::vf1_2b04e0,frontend,not started
 0x2b0528,808,cFE3DWNameEntry::vf11_2b0528,frontend,not started
 0x2b0850,832,cFE3DWNameEntry::vf28_2b0850,frontend,not started
-0x2b0b90,584,FE3DTextBox_Init,frontend?,ported
-0x2b0dd8,160,cFE3DWText::vf11_2b0dd8,frontend,not started
-0x2b0e78,40,cFE3DWText::vf12_2b0e78,frontend,not started
-0x2b0ea0,116,cFE3DWText::vf37_2b0ea0,frontend,not started
-0x2b0f18,80,FE3DText_SetWideText,frontend?,ported
-0x2b0f68,76,FE3DText_SetStringId,frontend?,ported
-0x2b0fb8,76,FE3DText_SetText,frontend?,ported
-0x2b1008,100,FE3DText_SetupTextBox,frontend?,not started
-0x2b1070,84,FE3DText_LoadStringId,frontend?,not started
-0x2b10c8,112,FE3DText_Layout,frontend?,not started
+0x2b0b90,584,FE3DTextBox_Init,frontend?,checked
+0x2b0dd8,160,cFE3DWText::vf11_2b0dd8,frontend,checked
+0x2b0e78,40,cFE3DWText::vf12_2b0e78,frontend,checked
+0x2b0ea0,116,cFE3DWText::vf37_2b0ea0,frontend,checked
+0x2b0f18,80,FE3DText_SetWideText,frontend?,checked
+0x2b0f68,76,FE3DText_SetStringId,frontend?,checked
+0x2b0fb8,76,FE3DText_SetText,frontend?,checked
+0x2b1008,100,FE3DText_SetupTextBox,frontend?,checked
+0x2b1070,84,FE3DText_LoadStringId,frontend?,checked
+0x2b10c8,112,FE3DText_Layout,frontend?,checked
 0x2b1138,496,cFE3DWSingleLineText::cFE3DWSingleLineText,frontend,checked
 0x2b1328,20,cFE3DWSingleLineText::~cFE3DWSingleLineText,frontend,checked
 0x2b1340,68,cFE3DWSingleLineText::vf39_2b1340,frontend,checked
@@ -5772,29 +5772,29 @@ address,size,name,system,status
 0x2b15d0,24,cFE3DWSingleLineText::vf40_2b15d0,frontend,checked
 0x2b15e8,76,cFE3DWSingleLineText::vf41_2b15e8,frontend,checked
 0x2b1638,20,cFE3DWSingleLineText::vf42_2b1638,frontend,checked
-0x2b1650,60,cFE3DWBufferedSingleLineText::vf40_2b1650,frontend,not started
-0x2b1690,12,cFE3DWBufferedSingleLineText::vf41_2b1690,frontend,not started
-0x2b16a0,60,cFE3DWBufferedSingleLineText::vf42_2b16a0,frontend,not started
-0x2b1758,20,cFE3DWColouredText::~cFE3DWColouredText,frontend,not started
-0x2b1770,644,cFE3DWColouredText::vf11_2b1770,frontend,not started
-0x2b19f8,8,cFE3DWColouredText::vf12_2b19f8,frontend,not started
-0x2b1a00,104,cFE3DWColouredText::vf37_2b1a00,frontend,not started
-0x2b1a68,184,FUN_002b1a68,frontend?,not started
-0x2b1b20,576,cFE3DScrollingText::cFE3DScrollingText,frontend,not started
-0x2b1d60,64,cFE3DScrollingText::vf39_2b1d60,frontend,not started
-0x2b1da0,68,FE3DScrollingText_AddLine,frontend?,not started
-0x2b1de8,108,FE3DScrollingText_ShiftUp,frontend?,not started
-0x2b1e58,72,FE3DScrollingText_ShiftDown,frontend?,not started
-0x2b1ea0,68,FE3DScrollingText_CountLines,frontend?,not started
-0x2b1ee8,188,FE3DScrollingText_Advance,frontend?,not started
-0x2b1fa8,68,FE3DScrollingText_ClearLines,frontend?,not started
-0x2b1ff0,84,FE3DScrollingText_SetSpeed,frontend?,not started
-0x2b2048,56,cFE3DScrollingText::vf38_2b2048,frontend,not started
-0x2b2080,928,cFE3DScrollingText::vf11_2b2080,frontend,not started
-0x2b2420,236,cFE3DScrollingText::vf12_2b2420,frontend,not started
-0x2b2510,176,cFE3DScrollingText::vf28_2b2510,frontend,not started
-0x2b26c8,12,cFE3DScrollingText::vf37_2b26c8,frontend,not started
-0x2b2750,20,cFE3DScrollingText::~cFE3DScrollingText,frontend,not started
+0x2b1650,60,cFE3DWBufferedSingleLineText::vf40_2b1650,frontend,checked
+0x2b1690,12,cFE3DWBufferedSingleLineText::vf41_2b1690,frontend,checked
+0x2b16a0,60,cFE3DWBufferedSingleLineText::vf42_2b16a0,frontend,checked
+0x2b1758,20,cFE3DWColouredText::~cFE3DWColouredText,frontend,checked
+0x2b1770,644,cFE3DWColouredText::vf11_2b1770,frontend,checked
+0x2b19f8,8,cFE3DWColouredText::vf12_2b19f8,frontend,checked
+0x2b1a00,104,cFE3DWColouredText::vf37_2b1a00,frontend,checked
+0x2b1a68,184,FUN_002b1a68,frontend?,checked
+0x2b1b20,576,cFE3DScrollingText::cFE3DScrollingText,frontend,checked
+0x2b1d60,64,cFE3DScrollingText::vf39_2b1d60,frontend,checked
+0x2b1da0,68,FE3DScrollingText_AddLine,frontend?,checked
+0x2b1de8,108,FE3DScrollingText_ShiftUp,frontend?,checked
+0x2b1e58,72,FE3DScrollingText_ShiftDown,frontend?,checked
+0x2b1ea0,68,FE3DScrollingText_CountLines,frontend?,checked
+0x2b1ee8,188,FE3DScrollingText_Advance,frontend?,checked
+0x2b1fa8,68,FE3DScrollingText_ClearLines,frontend?,checked
+0x2b1ff0,84,FE3DScrollingText_SetSpeed,frontend?,checked
+0x2b2048,56,cFE3DScrollingText::vf38_2b2048,frontend,checked
+0x2b2080,928,cFE3DScrollingText::vf11_2b2080,frontend,checked
+0x2b2420,236,cFE3DScrollingText::vf12_2b2420,frontend,checked
+0x2b2510,176,cFE3DScrollingText::vf28_2b2510,frontend,checked
+0x2b26c8,12,cFE3DScrollingText::vf37_2b26c8,frontend,checked
+0x2b2750,20,cFE3DScrollingText::~cFE3DScrollingText,frontend,checked
 0x2b2920,80,cFE3DScrollingText::__tf,runtime,host
 0x2b2990,8,cFE3DWNameEntry::vf26_2b2990,frontend,not started
 0x2b2998,108,cFE3DWNameEntry::vf12_2b2998,frontend,not started
@@ -5828,26 +5828,26 @@ address,size,name,system,status
 0x2b4408,20,cFE3DIcon::~cFE3DIcon,frontend,not started
 0x2b4620,436,cFE3DIcon::cFE3DIcon,frontend,not started
 0x2b47d8,80,cFE3DIcon::__tf,runtime,host
-0x2b4828,8,cFE3DWColouredText::vf25_2b4828,frontend,not started
-0x2b4830,40,cFE3DWColouredText::vf39_2b4830,frontend,not started
-0x2b4858,76,FUN_002b4858,frontend?,not started
-0x2b48b0,64,cFE3DWColouredText::cFE3DWColouredText,frontend,not started
+0x2b4828,8,cFE3DWColouredText::vf25_2b4828,frontend,checked
+0x2b4830,40,cFE3DWColouredText::vf39_2b4830,frontend,checked
+0x2b4858,76,FUN_002b4858,frontend?,checked
+0x2b48b0,64,cFE3DWColouredText::cFE3DWColouredText,frontend,checked
 0x2b48f0,80,cFE3DWColouredText::__tf,runtime,host
-0x2b4940,8,cFE3DWBufferedSingleLineText::vf44_2b4940,frontend,not started
-0x2b4948,20,cFE3DWBufferedSingleLineText::~cFE3DWBufferedSingleLineText,frontend,not started
-0x2b4998,64,cFE3DWBufferedSingleLineText::cFE3DWBufferedSingleLineText,frontend,not started
+0x2b4940,8,cFE3DWBufferedSingleLineText::vf44_2b4940,frontend,checked
+0x2b4948,20,cFE3DWBufferedSingleLineText::~cFE3DWBufferedSingleLineText,frontend,checked
+0x2b4998,64,cFE3DWBufferedSingleLineText::cFE3DWBufferedSingleLineText,frontend,checked
 0x2b49d8,80,cFE3DWBufferedSingleLineText::__tf,runtime,host
 0x2b4a28,8,cFE3DWSingleLineText::vf43_2b4a28,frontend,checked
 0x2b4ab0,436,FUN_002b4ab0,frontend?,not started
 0x2b4c68,80,cFE3DWSingleLineText::__tf,runtime,host
-0x2b4cb8,8,cFE3DWText::vf24_2b4cb8,frontend,not started
-0x2b4cc0,8,FE3DText_SetScale,frontend?,not started
-0x2b4cc8,12,FE3DText_ApplyScale,frontend?,ported
-0x2b4ce8,76,cFE3DWText::vf13_2b4ce8,frontend,not started
-0x2b4d38,84,cFE3DWText::vf38_2b4d38,frontend,not started
-0x2b4d90,76,cFE3DWText::vf39_2b4d90,frontend,not started
-0x2b4df0,108,cFE3DWText::vf9_2b4df0,frontend,not started
-0x2b4ed0,76,cFE3DWText::~cFE3DWText,frontend,not started
+0x2b4cb8,8,cFE3DWText::vf24_2b4cb8,frontend,checked
+0x2b4cc0,8,FE3DText_SetScale,frontend?,checked
+0x2b4cc8,12,FE3DText_ApplyScale,frontend?,checked
+0x2b4ce8,76,cFE3DWText::vf13_2b4ce8,frontend,checked
+0x2b4d38,84,cFE3DWText::vf38_2b4d38,frontend,checked
+0x2b4d90,76,cFE3DWText::vf39_2b4d90,frontend,checked
+0x2b4df0,108,cFE3DWText::vf9_2b4df0,frontend,checked
+0x2b4ed0,76,cFE3DWText::~cFE3DWText,frontend,checked
 0x2b50e0,80,cFE3DWText::__tf,runtime,host
 0x2b51d8,1164,cFE3DWList::vf44_2b51d8,frontend,not started
 0x2b5668,748,FE3DMenu_Scroll,frontend?,not started

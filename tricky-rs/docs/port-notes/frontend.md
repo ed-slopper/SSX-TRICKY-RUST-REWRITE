@@ -1865,3 +1865,68 @@ being copied. The group's table is logged as its children are deleted.
 - the stores of 0 to the w of the offset's vector (on the stack, and never read);
 - the store of 0 to the w of the thing's vf13 vector (the same);
 - the thing destructor's table, which the node's destructor overwrites at once.
+
+## G9x2: the text widgets (`game/src/fe_wtext.rs`)
+
+The front end's text widgets other than the plain single-line text (G9b2c's `fe_widget`), 0x2b0b90..0x2b4f18.
+
+- **The wrapped text (`cFE3DWText`)** keeps a text box at +0x12c.
+  - Its font is at +0x110. +0x11c is the wrap mode it passes to the box. +0x120 says whether the text came from a
+    string id, and +0x124 holds that id (or -1).
+  - `FE3DTextBox_Init` builds the widget, sets the font, the table and the box, and then sizes itself to (640, 50)
+    through its own vf38.
+  - Setting a text clears the box first:
+    - `SetWideText`: the box's font and rectangle, then the wide text added;
+    - `SetStringId`: the same with the id's string, and the id kept;
+    - `SetText`: the narrow text added (`0x196128`).
+  - The box's rectangle always comes from the widget's position (+0x80) and size (+0x100).
+  - vf13 moves the position by a vector's x, y and z; vf38 takes a new size and rewraps; vf39 rewraps.
+  - vf9 sets the colour (+0x60) and copies it to the box's (+0x168).
+  - vf37 answers the box's widest line and its height. `SetScale` sets the box's line height. `ApplyScale` sets the
+    box's scale, with the box's +0x14 as the second value.
+- **The buffered text (`cFE3DWBufferedSingleLineText`)** copies the string into its own buffer at +0x130 (wide or
+  narrow) and points the single-line text at it. Setting an id empties the buffer first.
+- **The two-coloured text (`cFE3DWColouredText`)** draws its string's first word in a second colour (+0x130,
+  set by 0x2b4858).
+  - The split (+0x140, found by 0x2b1a68 after each layout) is the index of the first space, or -1.
+  - When the split is past the start, the draw copies the first word into a stack buffer (with a limit, then ends
+    it) and draws it in the second colour. It moves x on by the word's width and goes back to the widget's colour
+    (+0x60). It then draws the rest after the space.
+  - With no split, the second colour is set and the whole string is drawn in it. A string that starts with a space
+    (a split of 0) is drawn from its second character, also in the second colour.
+  - Its size is the single-line text's, less the narrow width of the string at 0x3b67d0 when split.
+- **The scrolling text (`cFE3DScrollingText`)**, the credits' roll, keeps up to 30 line ids at +0x110 (-1 for
+  none). The other fields are listed in the module's header.
+  - A line's height is the font's height times the scale, plus the gap. vf39 and vf38 fit as many lines as the
+    height allows, truncated.
+  - Each update moves the roll by the speed (+ when rolling up, − when rolling down). Once it passes a whole line
+    height, the slots are shifted (up or down), the roll is brought back by a line, and `Advance` runs.
+    - `Advance`: while there is room and the next id is within the first and last ids, that id is added and the
+      next id moves on (+1 rolling up, −1 rolling down). When no lines are left, the next id goes back to the
+      first id (the last id when rolling down) and the slots are cleared.
+    - `AddLine` scans from the last slot forward, past the end of the slots, until it finds an empty one, and only
+      stops early when the index turns negative. After a shift up the last slot is always empty, so the scan stops
+      at once.
+  - Pad up and down change the speed by 0.1 (`SetSpeed` keeps it between 0.1 and 0.35 of the font's height). Up
+    speeds a roll up and slows a roll down; down does the opposite.
+  - The draw takes each slot's string by id:
+    - a string starting with the character at 0x337e50 is skipped (but still takes its line);
+    - one starting with the character at 0x337e48 is drawn without that character in the chosen colour (+0xac)
+      with border flag +0x1b8;
+    - the others are drawn in the enabled colour (+0xbc) with flag +0x1b4.
+  - The colour's first word is replaced by the line's fade: the first line fades by the roll over a line height,
+    the last by the roll over the font's height. The fade is clamped to 0..1 and flipped when rolling down.
+  - Lines are always drawn wide, aligned against the size by the font's width (2 centred, 1 to the right).
+
+Two of the coloured text's unnamed helpers (`FUN_002b1a68`, the split, and `FUN_002b4858`, the second colour) are
+ported here, not in G9x4.
+
+The test has 72,000 cases (48 functions, 1,500 each). The copies with a limit fill their buffer in the test, so
+where the end of the first word goes is seen. The strings are random wide strings of letters and spaces, starting
+with the hide or mark character or not. The scrolling text's slots, ids, roll, speed and alignment are random too.
+
+91 of 95 mutants are caught. The other four are equivalent:
+- `SetStringId`'s store of the id, which `LoadStringId` has just made;
+- the split's check for an empty string, which falls through to the same -1;
+- a fade of exactly 1 clamped to 1;
+- the scrolling text destructor's table, which the widget's destructor overwrites at once.

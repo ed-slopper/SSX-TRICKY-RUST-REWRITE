@@ -60,6 +60,7 @@ pub mod fe_characcept;
 pub mod fe_hintbook;
 pub mod fe_video;
 pub mod fe_wgroup;
+pub mod fe_wtext;
 pub mod fe_widgets;
 pub mod fe_widget;
 pub mod fe_manager;
