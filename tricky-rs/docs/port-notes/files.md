@@ -458,3 +458,52 @@ decoder treats alike.
   Rust code was not changed.
 - Not settled: 0x2c8068 (a file open through `FileSys_RunWithHeap` 0x2c7f60; `speechload.rs` and `crowdbox.rs` call
   it), 0x2cc2c0 (from `FileSys_InitWithBuffer`: a poll task 0x2cc680 and the mode at 0x3bba60).
+
+## Names from F1c batch 21 (proven)
+
+Sony SDK libraries linked into the game, named after the SDK functions they match. Each was matched by the
+RPC command number it sends (or the hardware register it touches) and by its callers in the game.
+
+- **SIF and file I/O (libkernel / sifrpc / fileio):** `sceSifInitCmd` 0x3089b8, `sceSifExitCmd` 0x308c38,
+  `SifCmd_IntrHandler` 0x308eb0, `sceSifInitRpc` 0x309088 (boot.rs `SDK_INIT`), `sceSifExitRpc` 0x309228 (called by
+  `sceSifRebootIop`), the RPC packet helpers `SifRpc_GetPacket` 0x309318 / `GetFPacket` 0x309348 / `OnEnd` 0x309388
+  (packet ids 0x80000009..0x8000000c) / `OnRData` 0x309440 / `FindServer` 0x3095f8 / `OnBind` 0x309648.
+  File server (bind 0x80000001, buffer 0x40a640): `sceFsInit` 0x30a588, `sceFsReset` 0x30a7b8, and by RPC number
+  `sceLseek` 4, `sceRead` 2, `sceIoctl` 5, `sceIoctl2` 0x1a, `sceMkdir` 7, `sceFormat` 0xe, `sceAddDrv` 0xf,
+  `sceDclose` 10, `sceDread` 0xb, `sceGetstat` 0xc, `sceChstat` 0xd, `sceRename` 0x11, `sceSync` 0x13, `sceMount`
+  0x14, `sceLseek64` 0x16, `sceDevctl` 0x17, `sceSymlink` 0x18, `sceReadlink` 0x19. `Fio_PathCmd` 0x30b888 sends
+  a path with the command in a1; one-line wrappers pass `sceRemove` 6, `sceRmdir` 8, `sceDelDrv` 0x10, `sceChdir`
+  0x12, `sceUmount` 0x15; `sceDopen` 0x30bfd0 passes 9 and turns the reply into an fd. The fd table and lock:
+  `Fio_InitFdSema`, `Fio_AllocFd`, `Fio_GetFd`, `Fio_InitSema`, `Fio_Lock`, `Fio_Unlock` (0x309fe8..0x30a578).
+- **Module loader (loadfile, server 0x40aac0):** `SifLoad_Init` 0x30d7b8 (binds, RPC 0xff), `SifLoad_ModuleCmd`
+  0x30dbc8 (`sceSifLoadModule` and 0x30de10 call it), `SifLoad_ModuleBufferCmd` 0x30d980 (RPC 6, under
+  `sceSifLoadModuleBuffer` 0x30db88 and `sceSifLoadStartModuleBuffer` 0x30dba8), `SifLoad_ElfCmd` 0x30de30 (under
+  `sceSifLoadElf` 0x30df38, a3 = 1), `sceSifLoadIopHeap` 0x30d6c8 (IOP heap server 0x40a6c0, RPC 3).
+- **CD (libcdvd):** `sceCdInitEeCB` 0x2e8538 (creates the callback thread `Cd_CallbackThread` 0x2e8478; CdFs_Mount
+  calls it with priority 0xb, stack 0x34a5c0, 0x800), `Cd_CallbackHandler` 0x2e83d8, `Cd_InitSemas` 0x2e86b0,
+  `Cd_Exit` 0x2e8748 (from `sceCdInit` mode exit: kills the thread, removes SIF handler 0x80000012), `Cd_Delay`
+  0x2e8318 / `Cd_AlarmWakeup` 0x2e82f0 (alarm + semaphore sleep, used by `sceCdSync`/`sceCdSyncS`),
+  `Cd_CheckNCmd` 0x2e8d00 (N-command server 0x80000595) and `Cd_CheckSCmd` 0x2e9018 (S-command server 0x80000593),
+  `sceCdMmode` 0x2e9660 (S-cmd 0x22; boot.rs `CD_MODE`), `sceCdGetToc` 0x2e9908 (N-cmd 4, 0x810-byte buffer),
+  `sceCdStop` 0x2e9b98 (N-cmd 7, async with the callback).
+- **Pad (libpad, server 0x403c40):** `Pad_SendActData` 0x2e6f48 (DMAs the actuator block, from
+  `scePadSetActDirect`), `Pad_SendInit` 0x2e71b8 (cmd 0x10, from `scePadInit`), `scePadEnd` 0x2e7258 (0xf),
+  `Pad_GetDmaStr` 0x2e7578 (returns the newer of the two DMA frames; used by every pad reader),
+  `scePadSetVrefParam` 0x2e8080 (0xb), `scePadGetPortMax` 0x2e8150 (0xc), `scePadGetSlotMax` 0x2e81b8 (0xd),
+  `scePadGetModVersion` 0x2e8220 (0x12, from `scePadInit`).
+- **Memory card (libmc, from batch 18's list):** `sceMcFormat` 0x2f20b8 (0x10), `sceMcDelete` 0x2f2180 (0xf),
+  `sceMcFlush` 0x2f22a8 (0xa), `sceMcSetFileInfo` 0x2f2360 (0xe), `sceMcRename` 0x2f2538 (0xe with flag 0x10, cmd
+  word 0x13), `sceMcUnformat` 0x2f26a0 (0x11), `sceMcGetEntSpace` 0x2f2768 (0x12).
+- **MPEG (libmpeg, used by the movie player vf1 0x2ba560):** `sceMpegInit` 0x2e9e70 (resets the IPU DMA
+  channels), `sceMpegCreate` 0x2e9f10, `sceMpegDelete` 0x2ea150 (returns 1), `sceMpegGetPicture` 0x2ea190,
+  `sceMpegGetPictureRAW8` 0x2ea1d8, `sceMpegGetPictureRAW8xy` 0x2ea220, `sceMpegAddCallback` 0x2ea370.
+- **VU and VIF0 debug (libdev):** `sceDevVu0Reset/Pause/Continue/Exec/GetTpc` 0x2e62c8..0x2e6460,
+  `sceDevVu1Reset/Pause/Continue/Exec/GetTpc/GetCnd/PutCnd` 0x2e6778..0x2e6ad0, `sceDevVif0Reset/Pause/Continue/
+  GetCnd` 0x2e6c18..0x2e6d68, plus `DevVu0_IsBusy` 0x2e62b0, `DevVu_AnyBusy` 0x2e66c0, `DevVu0_GetState`,
+  `DevVu1_GetState`, `DevVif0_GetState`, `DevVu0_SaveIntRegs` 0x2e6470, `DevVu0_SaveFloatRegs` 0x2e6550,
+  `DevVu_PutQword` 0x2e66f0 / `DevVu_GetQword` 0x2e6730 (VU1 registers through VU0 memory 0x400+). Reset and pause
+  set the FBRST bits (VU0 reset 2, break 1; VU1 0x200 / 0x100); only the resets are called by the game (0x1dbad8).
+
+Unclear (batch 21): 0x2f1368 (libmc cmd 0x15), 0x2e8288 (libpad cmd 0x14), 0x2e8e70 (CD N-cmd 0xe, result
+compared with 6 in CdFs_Mount, maybe the drive status), 0x2e87c8 / 0x2e8838 (power-off callback set / call),
+0x30d8b8, 0x30d948, 0x30e470 (from `_InitSys`), 0x307830..0x308c38 (deci2 / SIO debug console and printf helpers).
