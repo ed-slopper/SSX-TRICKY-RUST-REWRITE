@@ -83,9 +83,8 @@ state machine and the renderer are ours. Nothing has been checked against the or
 | G9y | (umbrella: G9y1..G9y8) The rest of the front end's own code in 0x26c000..0x2aab58 (~370 functions not yet checked; the screen builders marked `ported` are G9b's): the menu, the copies of the widget group's operations, the sound widgets, the memory card overlay, the world group, and the rest, checked in the runner | any | G9x | | Added 2026-10-17 by ed-slopper/puffin |
 | G9y8 | (umbrella: G9y8a..G9y8g) The front end's nine big screen builders in 0x26c000..0x2aab58, marked `ported` in the index but only called by the screens' ports: ported and checked in the runner | any | G9y | | Split of G9y 2026-10-17 |
 | G9y8c | `FE_BuildRiderShortBioScreen` 0x285230 (26 KB) | any | G9y8 | | Split of G9y 2026-10-17 |
-| G9y8d | The DVD screen's lists: `FE_BuildDvdCharacterList` 0x296870 (2 KB), `FE_BuildDvdJukebox` 0x297178 (3.6 KB) | ed-slopper/puffin | G9y8 | | Split of G9y 2026-10-17 |
 | G9y8e | `FE_BuildSoundOptions` 0x29fb70 (15 KB) | any | G9y8 | | Split of G9y 2026-10-17 |
-| G9y8f | `FE_BuildControllerConfig` 0x2a36e8 (7.4 KB) | any | G9y8 | | Split of G9y 2026-10-17 |
+| G9y8f | `FE_BuildControllerConfig` 0x2a36e8 (7.4 KB) | ed-slopper/puffin | G9y8 | | Split of G9y 2026-10-17 |
 | G9y8g | `FE_BuildOptionsScreen` 0x2a53d0 (11 KB) | any | G9y8 | | Split of G9y 2026-10-17 |
 | G9 | Front end: title, main menu, mode select, rider / outfit / board select, options, records, trick book screens, unlock screens, music player, loading screens (`gApp+0x734`) | unowned | E1, E5 | | [repo] `ui.rs` is ours. Split (2026-10-16): G9b the shared machinery, G9c–G9t the screens (logic ported and checked in the runner, widgets as calls out), G9u the app's menus on them |
 | G9b | (umbrella: G9b1, G9b2) The front end's shared machinery: `cFE3D` (the manager, its per-frame update and the screen it runs), the `cFE3DState` base (the phases, `TransitionIn` / `Out`, `Finish` and `CreateNextState`, `UpdateTransition`, `Activate`, `LayoutWidgets`), the widgets they drive and the 3D transition record (`FE3DTransition_*`, notes in frontend.md) | any | G9 | | Split of G9 |
@@ -156,6 +155,7 @@ matches the original.
 
 | ID | Task | Section | Who | Date | Commit |
 |---|---|---|---|---|---|
+| G9y8d | The DVD screen's character list and jukebox (0x296870, 0x297178; 44/45 mutants) | P2 | ed-slopper/puffin | 2026-10-17 | ddabb86 |
 | G9y8b | The rider bio panel (0x27f600; 18/18 mutants) | P2 | ed-slopper/puffin | 2026-10-17 | 8de6699 |
 | G9y8a | The rider profile's frame and records panel (0x27e918, 0x282d30; 55/56 mutants) | P2 | ed-slopper/puffin | 2026-10-17 | 7d296cf |
 | G9y7 | The front end's small ported-but-unchecked functions (42: 3 marked from E10a, 1 in G9y4's test, 38 ported in 3 batches) | P2 | ed-slopper/puffin | 2026-10-17 | ded121d |
@@ -1404,3 +1404,4 @@ matches the original.
 - 2026-10-17 ed-slopper/puffin: G9y7 done (ded121d: the 42 small front end functions); G9y8 added for the nine big screen builders (G9y8a..g), G9y8a claimed (the rider profile's frame and records).
 - 2026-10-17 ed-slopper/puffin: G9y8a done (the rider profile's frame and records); G9y8b claimed (the bio panel).
 - 2026-10-17 ed-slopper/puffin: G9y8b done (the rider bio panel); G9y8d claimed (the DVD screen's lists).
+- 2026-10-17 ed-slopper/puffin: G9y8d done (the DVD lists); G9y8f claimed (the controller page).
