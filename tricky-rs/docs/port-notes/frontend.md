@@ -2366,3 +2366,31 @@ destructor run as the original. Sprite heights and the help bar's height share a
 
 Of the 50 mutants, 47 are caught. The three survivors are equivalent: two read the venue byte unsigned (any byte
 at or past 0x80 is out of range either way), and one drops the `- 0` from the help bar's height.
+
+### Batch 2: the options screen's small functions (`tests/fe_opts.rs`)
+
+- **The pages' reads and writes** (`FE3DOptions_ReadPage1..3` / `WritePage1..3`). Each is a fixed list of (item,
+  page word, kind): a choice keeps the chosen node's index and is put back through the value widget's +0x160; a bar
+  keeps the widget's +0x160 and is put back through the bar's value set.
+- **The applies.** `SoundOptions_Apply` maps the first choice's id 8..11 to the sound mode, then hands the second
+  choice's index, the five bars and the last choice (on for 0x12) to the sound player, keeping them in the career's
+  settings. `GameOptions_Apply` sets four flags from the chosen ids (5, 5, 7, 7). `OptionsState_Refresh` runs the
+  three pages' refreshes.
+- **The change handlers.** Sound: the mode, the second choice (with a refresh) or the last choice, each followed by
+  a sound cue (0x10, 0x11, 0x17). Game: the rumble on the pad that changed it (the node's +0xf0), or one of the two
+  arrows. Display: the career's display words, and for the screen mode the renderer's mode, then its size from its
+  width and height as unsigned floats. 0x2a9c50 does nothing.
+- **The arrows' line chooser (0x2a9350).** It picks the third or fourth item by the item's id (0/2, 1/3; 4..7 by the
+  list's chosen id). Any other id makes the game read the value widget of no item, the word at 0x114. The test
+  keeps ids in range.
+- **`FE3DOptions_SetHelpText`.** 0xdce for the end marker, else the open page's string table by the item's id, or
+  the controller page's own string.
+- **`ControllerConfig_Layout`.** Each of the three groups' widgets is laid out, placed by its entry, and moved back by
+  its width / half width and up by its height / half height, by the entry's flags.
+- **Builders.** The credits page's scrolling text, the title's two arrows and the three-line single-text page.
+
+The test runs 15,200 cases (19 functions, 800 each). The controller tables' flags are randomised in the test's
+copy, as the game's own entries don't use every mix.
+
+Of the 68 mutants, 67 are caught. The survivor is equivalent under the chop rule: it drops the sticky bit from the
+unsigned conversion.
