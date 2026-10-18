@@ -80,6 +80,7 @@ pub mod fe_riderbuild;
 pub mod fe_scene;
 pub mod app;
 pub mod game_main;
+pub mod start_screen;
 pub mod fe_riderprofile;
 pub mod fe_sound;
 pub mod fe_optbuild;

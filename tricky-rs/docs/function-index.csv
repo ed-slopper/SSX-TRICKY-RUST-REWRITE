@@ -1815,10 +1815,10 @@ address,size,name,system,status
 0x182c10,80,cPS2ExecutionMan::__tf,runtime,host
 0x182c60,36,cExecutionMan::~cExecutionMan,render?,not started
 0x182c88,64,cExecutionMan::__tf,runtime,host
-0x182d08,208,cStartScreen::vf1_182d08,game,not started
-0x182dd8,248,cStartScreen::vf4_182dd8,game,not started
-0x182ed0,776,cStartScreen::vf2_182ed0,game,not started
-0x1831d8,720,cStartScreen::vf6_1831d8,game,not started
+0x182d08,208,cStartScreen::vf1_182d08,game,checked
+0x182dd8,248,cStartScreen::vf4_182dd8,game,checked
+0x182ed0,776,cStartScreen::vf2_182ed0,game,checked
+0x1831d8,720,cStartScreen::vf6_1831d8,game,checked
 0x1834a8,144,Input_GetAnyNewButtons,input,ported
 0x183538,296,MemCardMsg_DrawBox,save,not started
 0x183660,292,Overlay_DrawDontRemoveCard,frontend,not started
@@ -1826,19 +1826,27 @@ address,size,name,system,status
 0x183ae8,308,MemCardMsg_DrawButtonPrompt,save,not started
 0x183c20,1672,MemCardMsg_Draw,save,not started
 0x1842a8,112,Loc_GetUnquotedString,game?,checked
-0x184318,136,StartScreenSingle_Create,frontend?,not started
-0x1843a0,8,FUN_001843a0,game?,not started
-0x1843f8,8,cStartScreen::vf3_1843f8,game,not started
+0x184318,136,StartScreenSingle_Create,frontend?,checked
+0x1843a0,8,FUN_001843a0,game?,checked
+0x1843a8,56,FUN_001843a8,frontend?,checked
+0x1843e0,24,FUN_001843e0,frontend?,checked
+0x1843f8,8,cStartScreen::vf3_1843f8,game,checked
 0x184400,80,cStartScreen::__tf,runtime,host
-0x184450,76,cStartScreen::~cStartScreen,game,not started
+0x184450,76,cStartScreen::~cStartScreen,game,checked
+0x1844a0,36,FUN_001844a0,frontend?,checked
 0x1844c8,64,cGameModule::__tf,runtime,host
-0x1845a0,60,cStartScreenSingle::vf4_1845a0,game,not started
+0x184508,32,FUN_00184508,frontend?,checked
+0x184528,16,FUN_00184528,frontend?,checked
+0x184538,64,FUN_00184538,frontend?,checked
+0x184578,8,FUN_00184578,frontend?,checked
+0x184580,28,FUN_00184580,frontend?,checked
+0x1845a0,60,cStartScreenSingle::vf4_1845a0,game,checked
 0x1845e0,968,cStartScreenSingle::vf5_1845e0,game,not started
 0x1850e8,88,StartScreenSingle_SetState,game?,not started
-0x185410,32,cStartScreenSingle::vf6_185410,game,not started
+0x185410,32,cStartScreenSingle::vf6_185410,game,checked
 0x185430,1164,cStartScreenSingle::vf7_185430,game,not started
 0x185968,80,cStartScreenSingle::__tf,runtime,host
-0x1859b8,8,cStartScreenSingle::~cStartScreenSingle,game,not started
+0x1859b8,8,cStartScreenSingle::~cStartScreenSingle,game,checked
 0x1859c0,104,Sky_InitLayers,render?,checked
 0x185a28,80,Sky_FreeLayers,render?,checked
 0x185a78,156,Sky_FreeLayer,render?,checked

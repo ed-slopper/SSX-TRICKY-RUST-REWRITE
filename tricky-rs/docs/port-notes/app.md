@@ -99,3 +99,33 @@ as junk, so a missing clear shows.
 
 Of the 51 mutants, 50 are caught. The survivor is equivalent: the front end's test of the career's bits without
 bit 5, which has already been handled just above.
+
+## E1f1: the start screen's module (`game/src/start_screen.rs`, `tests/start_screen.rs`)
+
+The start screen is the module the application opens first. `cStartScreenSingle` is the one-player screen built on
+`cStartScreen`.
+
+- **Making it.** `StartScreenSingle_Create` (0x184318) makes it: 0x3cc8 bytes, then its font at +8 and its text box
+  at +0x48. It keeps going even when the allocation fails.
+- **Start.** vf4 (0x182dd8) makes the memory card object (+4) and sets the renderer white with alpha 0. It clears
+  the counters, makes the start module (0x410 bytes) and switches the app to it.
+  - The single screen's vf4 also clears its state, its wait and the card's answers.
+- **Enter.** vf1 loads the font (sized 1.8 by 1.4) and picks sprite set 0x2c9. It starts the blink at 1/60 with a
+  step of 1.
+- **Leave.** vf2 does nothing until +0x44 is set. It then draws one last black frame on a 640 by 480 screen and
+  waits for it. Then it frees the card and switches the app. It starts the career unless the card has already
+  loaded one (+0x3cb0), and releases the font.
+- **Draw.** vf6 sets up the same screen. It draws a white rectangle and sprite 0x28 of the sets over the whole
+  screen, then the screen's own +0x40 while it runs.
+  - The single screen's vf6 is this draw, answering 0.
+- **Small functions.**
+  - 0x1843a8 resets the record at 0x3cdd28 (-1, 1, 1, 0, 0, 1, 1).
+  - 0x1843e0 draws a sprite with its size scaled by the set's +4 and +8.
+  - 0x184528 and 0x184580 set a colour (0x184580 is a copy of `Color_SetRGB`).
+  - 0x1844a0 is a copy of the module's destructor; 0x184538 is a copy of the pool-or-heap free.
+  - Eight of these small functions were missing from the index.
+
+The test runs 400 cases of each of the 19 functions. The module's destructor and `Color_SetRGB` run for real.
+
+Of the 46 mutants, 45 are caught. The survivor is equivalent: the sticky bit in the unsigned conversion, which
+never changes a chopped `cvt.s.w` (as in E1d).
