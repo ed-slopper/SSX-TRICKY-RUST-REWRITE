@@ -890,3 +890,245 @@ pub fn static_init(m: &mut Mem) {
         m.w32(a, v);
     }
 }
+
+/// E1f3's calls out: the text box's rectangle (0x196070), text (0x196088), line height (0x1961e8), layout
+/// (0x1964a0), clear (0x195ff0) and draw (0x1957d8); the font's text width (0x19dc78) and print (0x19d0c0); a sprite
+/// drawn at a place (0x14eed0)
+pub const TB_RECT: u32 = 0x196070;
+pub const TB_TEXT: u32 = 0x196088;
+pub const TB_LINE: u32 = 0x1961e8;
+pub const TB_LAYOUT: u32 = 0x1964a0;
+pub const TB_CLEAR: u32 = 0x195ff0;
+pub const TB_DRAW: u32 = 0x1957d8;
+pub const TEXT_WIDTH: u32 = 0x19dc78;
+pub const FONT_PRINT: u32 = 0x19d0c0;
+pub const SPRITE_AT: u32 = 0x14eed0;
+
+/// The text box (+0x48) placed at (112, `top`), 416 wide and four of the font's lines (+0x14, chopped) high
+fn box_rect(m: &mut Mem, e: &mut dyn FeEnv, s: u32, top: u32) {
+    let t = s + 0x48;
+    let h = int_float(m.r32(s + 0x14)) * F(4.0);
+    e.call(m, TB_RECT, &[t, 0x42e0_0000, top, 0x43d0_0000, h.0.to_bits()]);
+}
+
+/// The text box's line height: its +0x14 and 4
+fn box_line(m: &mut Mem, e: &mut dyn FeEnv, t: u32) {
+    let l = F(f32::from_bits(m.r32(t + 0x14))) + F(4.0);
+    e.call(m, TB_LINE, &[t, l.0.to_bits()]);
+}
+
+/// `MemCardMsg_DrawBox` 0x183538(s, text, kind, wait; `buf` 0xc bytes): the text box at (112, 96) with the text,
+/// centred and laid out, texture mode 3, the font white, drawn; then the buttons (`MemCardMsg_Draw`) when `kind` has
+/// any
+pub fn draw_box(m: &mut Mem, e: &mut dyn FeEnv, s: u32, text: u32, kind: u32, wait: u32, buf: u32) {
+    let t = s + 0x48;
+    box_rect(m, e, s, 0x42c0_0000);
+    e.call(m, TB_TEXT, &[t, text]);
+    box_line(m, e, t);
+    m.w32(t + 0x24, 0);
+    m.w32(t + 0x20, 1);
+    e.call(m, TB_LAYOUT, &[t]);
+    rend(m, e, 0x1e0, &[3]);
+    for k in [2u32, 0, 1] {
+        m.w32(buf + 4 * k, ONE);
+    }
+    e.call(m, gm::FONT_COLOUR, &[gm::FONT_STATE, buf]);
+    e.call(m, TB_DRAW, &[t, u32::MAX, 0]);
+    if kind != 0 {
+        draw_buttons(m, e, s, kind, wait, buf);
+    }
+}
+
+/// `Overlay_DrawDontRemoveCard` 0x183660(s): the text box at (112, 230.4) cleared, string 0x15e in it, centred,
+/// texture mode 3, its colour (+0x3c) the blink (+0x3ca8) then three ones, drawn
+pub fn draw_dont_remove_card(m: &mut Mem, e: &mut dyn FeEnv, s: u32) {
+    let t = s + 0x48;
+    box_rect(m, e, s, 0x4366_6666);
+    e.call(m, TB_CLEAR, &[t]);
+    let x = loc(m, e, 0x15e);
+    e.call(m, TB_TEXT, &[t, x]);
+    box_line(m, e, t);
+    m.w32(t + 0x20, 1);
+    m.w32(t + 0x24, 0);
+    rend(m, e, 0x1e0, &[3]);
+    let blink = m.r32(s + 0x3ca8);
+    for (k, v) in [blink, ONE, ONE, ONE].into_iter().enumerate() {
+        m.w32(t + 0x3c + 4 * k as u32, v);
+    }
+    e.call(m, TB_DRAW, &[t, u32::MAX, 0]);
+}
+
+/// The width of string `id` in the font (+8) at scale 1, chopped to a float
+fn width_of(m: &mut Mem, e: &mut dyn FeEnv, s: u32, id: u32) -> F {
+    let x = loc(m, e, id);
+    int_float(e.call(m, TEXT_WIDTH, &[s + 8, x, 0, ONE]))
+}
+
+/// `MemCardMsg_DrawOptions` 0x183788(s, groups, flags) -> the width of the row of buttons: the strings' widths (in
+/// three groups: 0x155 or 0xc9a; 0x1ba; 0x154, 0xc9b or 0x162; with two, the second chosen from flags 4, 0x10 and
+/// 8; with one, the first of flags 2, 1, 8, 0x10 and 4, else 0x162), 35 a button and 25 between
+pub fn draw_options(m: &mut Mem, e: &mut dyn FeEnv, s: u32, n: u32, flags: u32) -> F {
+    let first = if flags & 1 != 0 { 0x155 } else { 0xc9a };
+    let mut w = F(0.0);
+    match n {
+        3 => {
+            w = width_of(m, e, s, first);
+            w = w + width_of(m, e, s, 0x1ba);
+            let id = if flags & 0x10 != 0 {
+                0x154
+            } else if flags & 8 != 0 {
+                0xc9b
+            } else {
+                0x162
+            };
+            w = w + width_of(m, e, s, id);
+        }
+        2 => {
+            w = width_of(m, e, s, first);
+            let id = if flags & 4 != 0 {
+                0x1ba
+            } else if flags & 0x10 != 0 {
+                0x154
+            } else if flags & 8 != 0 {
+                0xc9b
+            } else {
+                0x162
+            };
+            w = w + width_of(m, e, s, id);
+        }
+        1 => {
+            let id = if flags & 2 != 0 {
+                Some(0xc9a)
+            } else if flags & 1 != 0 {
+                Some(0x155)
+            } else if flags & 8 != 0 {
+                Some(0xc9b)
+            } else if flags & 0x10 != 0 {
+                Some(0x154)
+            } else if flags & 4 != 0 {
+                Some(0x1ba)
+            } else {
+                None
+            };
+            w = match id {
+                Some(id) => width_of(m, e, s, id),
+                None => width_of(m, e, s, 0x162) + w,
+            };
+        }
+        _ => {}
+    }
+    let buttons = int_float(n) * F(35.0);
+    let gaps = int_float(n.wrapping_sub(1)) * F(25.0);
+    w + buttons + gaps
+}
+
+/// The button's sprite (0x51 for 1 and 2, 0x50 for 4, 8 and 0x10, 0x4f for 0x20, 0x52 for 0x40); any other
+/// leaves the caller's a3
+fn button_sprite(button: u32, a3: u32) -> u32 {
+    match button {
+        1 | 2 => 0x51,
+        4 | 8 | 0x10 => 0x50,
+        0x20 => 0x4f,
+        0x40 => 0x52,
+        _ => a3,
+    }
+}
+
+/// `MemCardMsg_DrawButtonPrompt` 0x183ae8(s, button, text, `a3`; x, y; `buf` 0xc bytes) -> the prompt's width:
+/// the button's sprite at (x, y) sized 1, the font white, the text at (x + 35, y), its width + 60. `a3` is the
+/// sprite for a button the game has none for (whatever the caller left there)
+pub fn button_prompt(m: &mut Mem, e: &mut dyn FeEnv, s: u32, button: u32, text: u32, a3: u32, x: F, y: F, buf: u32) -> F {
+    let sprite = button_sprite(button, a3);
+    let ss = sprites(m);
+    let sp = e.call(m, SPRITE_SET_RECT, &[ss, sprite]);
+    e.call(m, SPRITE_AT, &[sp, 0, x.0.to_bits(), y.0.to_bits(), ONE, ONE]);
+    for k in 0..3u32 {
+        m.w32(buf + 4 * k, ONE);
+    }
+    e.call(m, gm::FONT_COLOUR, &[gm::FONT_STATE, buf]);
+    let tx = x + F(35.0);
+    e.call(m, FONT_PRINT, &[s + 8, text, tx.0.to_bits(), y.0.to_bits(), ONE]);
+    let w = e.call(m, TEXT_WIDTH, &[s + 8, text, 0, ONE]);
+    int_float(w) + F(60.0)
+}
+
+/// `MemCardMsg_Draw` 0x183c20(s, flags, wait; `buf` 0xc bytes): the buttons the flags ask for in up to three groups
+/// (1 / 2 the first, 4 / 0x20 the second, 8 / 0x10 / 0x40 the third). With `wait` they go in a row centred on 320
+/// (each one's x moved on by the widths so far, added again each time, as the game does), else down a column at
+/// x 160 (30 apart), from y 340. With one group, its buttons all at (x, 340); flag 1 draws its button and then goes
+/// on to the others
+pub fn draw_buttons(m: &mut Mem, e: &mut dyn FeEnv, s: u32, flags: u32, wait: u32, buf: u32) {
+    let mut n = (flags & 3 != 0) as u32;
+    if flags & 0x58 != 0 {
+        n += 1;
+    }
+    if flags & 0x24 != 0 {
+        n += 1;
+    }
+    let mut y = F(340.0);
+    let mut sum = F(0.0);
+    let mut x = if wait != 0 { F(320.0) - draw_options(m, e, s, n, flags) * F(0.5) } else { F(160.0) };
+    let prompt = |m: &mut Mem, e: &mut dyn FeEnv, button: u32, id: u32, x: F, y: F| {
+        let text = loc(m, e, id);
+        button_prompt(m, e, s, button, text, 0, x, y, buf)
+    };
+    let mut step = |w: F, x: &mut F, y: &mut F| {
+        sum = sum + w;
+        if wait != 0 {
+            *x = *x + sum;
+        } else {
+            *y = *y + F(30.0);
+        }
+    };
+    let last = |flags: u32| -> (u32, u32) {
+        if flags & 0x10 != 0 {
+            (0x10, 0x154)
+        } else if flags & 8 != 0 {
+            (8, 0xc9b)
+        } else {
+            (0x40, 0x162)
+        }
+    };
+    match n {
+        3 => {
+            let w = if flags & 1 != 0 { prompt(m, e, 1, 0x155, x, y) } else { prompt(m, e, 2, 0xc9a, x, y) };
+            step(w, &mut x, &mut y);
+            let b = if flags & 4 != 0 { 4 } else { 0x20 };
+            let w = prompt(m, e, b, 0x1ba, x, y);
+            step(w, &mut x, &mut y);
+            let (b, id) = last(flags);
+            prompt(m, e, b, id, x, y);
+        }
+        2 => {
+            let id = if flags & 1 != 0 { 0x155 } else { 0xc9a };
+            let w = prompt(m, e, 1, id, x, y);
+            step(w, &mut x, &mut y);
+            let (b, id) = if flags & 4 != 0 {
+                (4, 0x1ba)
+            } else if flags & 0x20 != 0 {
+                (0x20, 0x1ba)
+            } else {
+                last(flags)
+            };
+            prompt(m, e, b, id, x, y);
+        }
+        1 => {
+            if flags & 1 != 0 {
+                prompt(m, e, 1, 0x155, x, y);
+            }
+            let (b, id) = if flags & 2 != 0 {
+                (2, 0xc9a)
+            } else if flags & 8 != 0 {
+                (8, 0xc9b)
+            } else if flags & 0x10 != 0 {
+                (0x10, 0x154)
+            } else if flags & 4 != 0 {
+                (4, 0x1ba)
+            } else {
+                (0x40, 0x162)
+            };
+            prompt(m, e, b, id, x, y);
+        }
+        _ => {}
+    }
+}

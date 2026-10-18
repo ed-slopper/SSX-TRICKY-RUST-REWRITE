@@ -167,3 +167,30 @@ All 83 mutants are caught. Six were first missed by gaps in the test; the cases 
 - a career block that starts as random words;
 - four files on the card;
 - counts other than 1 and 2.
+
+## E1f3: the memory card messages (same file, `tests/start_screen_msg.rs`)
+
+- **`MemCardMsg_DrawBox`** (0x183538) draws a message box.
+  - It places the screen's text box at (112, 96), 416 wide and four font lines high. The line height is a word
+    turned into a float by the chopping `cvt.s.w`.
+  - It sets the text, centres it, lays it out, and draws it white.
+  - Then it draws the buttons when the message has any.
+- **`Overlay_DrawDontRemoveCard`** draws string 0x15e at (112, 230.4) in the colour of the blink.
+- **`MemCardMsg_Draw`** (0x183c20) draws up to three groups of buttons:
+  - the groups: 1 or 2; 4 or 0x20; 8, 0x10 or 0x40;
+  - each button is a sprite with its string beside it;
+  - while waiting, the buttons go in a row centred on 320, measured first by `_DrawOptions`; otherwise down a
+    column at x 160, 30 apart from y 340.
+- **The game's row.** In the three-group row, each step moves x on by the running total of the widths so far. So
+  the first button's width counts twice. The port does the same.
+- **One group.** With flag 1, its button is drawn, and then the other flags are still checked.
+- **`_DrawButtonPrompt`** picks the button's sprite: 0x51, 0x50, 0x4f or 0x52. For a button without one it uses
+  whatever the caller left in a3; the game's own callers never pass such a button.
+
+The test runs 4,000 cases of each of the 5 functions. They run for real together; the strings, widths, sprites and
+the text box are stand-ins.
+
+Of the 44 mutants, 43 are caught. The survivor is equivalent: in the two-group row, button 2 instead of 1 for the
+first group. Both use sprite 0x51.
+
+`cStartScreenSingle` vf7 still calls the box through the call seam (`DRAW_BOX`), as it was checked in E1f2.
