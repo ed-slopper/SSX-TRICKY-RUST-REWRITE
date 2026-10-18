@@ -641,3 +641,43 @@ The runner test (tests/raceoverlays.rs) has 18,000 cases over the 12 functions. 
 results overlay's table copy is checked against the game's stack. 57 of 60 mutants are caught. The 3 left are
 equivalent: the last button's returned x (unused), "GO"'s fade at exactly a half (both 1), and the async load's
 last colour word (already 1).
+
+## The pop finish overlay and the black fade (G8n2, `game/src/raceoverlays.rs`)
+
+- **`cPopFinishOverlay`** keeps a record per player, 0x3c bytes each from +0x2c. Its fields: +0 shown, +4 the frames
+  to wait, +8 waiting, +0xc the free ride's flag, +0x10 the medal sprite (−1 for none), +0x14 the place's
+  character, +0x16 a wide-string score, +0x38 the alpha.
+  - `Reset`(player) starts that player's wait at 8 frames, with alpha 0. A negative player means the first.
+  - Its vf16 stops the sound system's channel 0.
+- **`Update`** counts each waiting player's wait down unless the overlay is hidden. When it reaches 0 it fills the
+  record by the career's mode, through a jump table at 0x38e3e0:
+  - **the race (modes 2, 4):** shown in mode 2, or in mode 4 when 0x1635b0 says 2. The medal comes from the
+    rider's place (`0x16bb58`; 1 → sprite 0x28, 0 → 0x29, 2 → 0x27). The place's character is '1' + the place. The
+    score is the rider's (0x11f2a0, formatted by 0x1a6ba0).
+  - **the time trial (3, 5):** only once the rider has finished (+0x418). Its time is "%s" of the rider's +0x5910.
+    In a single race (the event table's count under 2) it gets a medal by the time (0x16baa8 against the course),
+    shown only when there is one ('2', '1', '3' for 1, 0, 2).
+  - **the free ride (7):** nothing shown; its flag set for the text.
+  - **the show-off (9):** the score.
+- **`Draw`** does nothing while the overlay is hidden or the pause menu's backdrop is up (+0xc). Otherwise, once the
+  viewed player's wait is over, it raises that player's alpha by 0.05 (up to 1). When the record is shown, it draws
+  the medal sprite at 72, 211 on the small screen (the display mode word 0x32ca50 is 3) or 217, at 1.3.
+- **`DrawText`**, in the event's mode 7 with the free ride's flag:
+  - 0xe43, then the time (0x11ea28, kept per player at 0x3ce368), drawn right-aligned at 305.
+  - Its difference from the event's target (+0x32c), green with a "+" format (0x38e400) when over, red when under.
+  - It calls the career's best time 0x163468 for the course but doesn't use the answer.
+
+  Otherwise:
+  - an unshown record gets 0xe43, or 0xe5b when the rider hasn't finished;
+  - a medal gets the line "%c%s %s" (0x38e408) of the place's character, its word (0xe44 '1', 0xe54 '2', 0xe58 '3',
+    else 0xe45) and 0xe4f, at 2.0 (1.76 in the career's +0x16c0 mode 3);
+  - then the score's text, if any.
+
+  Each colour is scaled by the player's alpha.
+- **`cBlackFadeOverlay::Draw`** acts while the viewed rider fades (+0x44c above 0) and the race's +0x40 lets it (with
+  its +0x20 between 1 and 9 it asks 0x193ce0). It fills the screen with the fade as the drawer's first word,
+  untextured in mode 3, with the renderer's +0x1c0 switched off around it.
+
+The test now has 28,500 cases over the 18 functions. A variadic format's stand-in logs the arguments its format
+takes (three for the medal line). 53 of 54 mutants are caught. The one left takes a player of 0 as "not
+positive", which maps it to 0 all the same.

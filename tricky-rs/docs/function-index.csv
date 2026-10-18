@@ -2483,12 +2483,12 @@ address,size,name,system,status
 0x1ae650,16,cPopAsyncLoadOverlay::Update,frontend,checked
 0x1ae660,320,cPopAsyncLoadOverlay::Draw,frontend,checked
 0x1ae7a0,8,cPopAsyncLoadOverlay::DrawText,frontend,checked
-0x1ae7a8,56,cPopFinishOverlay::Reset,frontend,not started
-0x1ae7e0,16,cPopFinishOverlay::vf16_1ae7e0,frontend,not started
-0x1ae7f0,916,cPopFinishOverlay::Update,frontend,not started
-0x1aeb88,452,cPopFinishOverlay::Draw,frontend,not started
-0x1aed50,1484,cPopFinishOverlay::DrawText,frontend,not started
-0x1af320,336,cBlackFadeOverlay::Draw,frontend,not started
+0x1ae7a8,56,cPopFinishOverlay::Reset,frontend,checked
+0x1ae7e0,16,cPopFinishOverlay::vf16_1ae7e0,frontend,checked
+0x1ae7f0,916,cPopFinishOverlay::Update,frontend,checked
+0x1aeb88,452,cPopFinishOverlay::Draw,frontend,checked
+0x1aed50,1484,cPopFinishOverlay::DrawText,frontend,checked
+0x1af320,336,cBlackFadeOverlay::Draw,frontend,checked
 0x1af470,684,OverlayMan_CreateOverlays,frontend,ported
 0x1af720,544,Results_BuildPages,frontend?,checked
 0x1af940,16,Results_ClearSpeechEvent,frontend?,checked

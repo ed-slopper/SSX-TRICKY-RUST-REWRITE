@@ -38,6 +38,11 @@ impl Rng {
 }
 
 const DATA: (u32, u32) = (0x328000, 0x18000);
+const TIMES: (u32, u32) = (0x3ce300, 0x100);
+const SYS_AT: (u32, u32) = (0x343000, 0x100);
+const RIDERS: (u32, u32) = (0x0110_0000, 0xc000);
+const RIDER0: u32 = 0x0110_0000;
+const RIDER1: u32 = 0x0110_6000;
 const TABLES: (u32, u32) = (0x38f800, 0x200);
 const ARENA: u32 = 0x0100_0000;
 const SIZE: u32 = 0x3000;
@@ -50,12 +55,14 @@ const RACE1C: u32 = ARENA + 0x1900;
 const RENDER: u32 = ARENA + 0x1a00;
 const RVT: u32 = ARENA + 0x1b00;
 const RECT: u32 = ARENA + 0x1e00;
+const PAUSE: u32 = ARENA + 0x2000;
+const O40: u32 = ARENA + 0x2c00;
 const SCRATCH: u32 = 0x01f8_0000;
 const STACK_TOKEN: u32 = 0x5c5c_5c5c;
 fn rv(off: u32) -> u32 {
     0x01ff_0000 + off
 }
-const ROFFS: [u32; 5] = [0x1d0, 0x1d8, 0x1e0, 0x1f0, 0x1f8];
+const ROFFS: [u32; 7] = [0x1c0, 0x1c8, 0x1d0, 0x1d8, 0x1e0, 0x1f0, 0x1f8];
 
 #[derive(Clone, Debug, PartialEq)]
 struct Call(u32, Vec<u32>);
@@ -102,6 +109,7 @@ impl Answers {
 fn arity(func: u32) -> (usize, usize) {
     match func {
         f if f == rv(0x1d8) => (1, 0),
+        f if f == rv(0x1c8) => (3, 1),
         f if f == rv(0x1f0) || f == rv(0x1f8) => (3, 0),
         f if f & 0xffff_0000 == 0x01ff_0000 => (2, 0),
         ro::LOC | ro::SET_COLOUR | ro::GET_RECT | ro::COURSE_NAME => (2, 0),
@@ -114,12 +122,19 @@ fn arity(func: u32) -> (usize, usize) {
         ro::BACKDROP_INIT | ro::OVERLAY_HIDDEN | ro::RACE_PLAYERS => (1, 0),
         ro::COUNT_DIGITS => (3, 4),
         ro::SIN => (0, 1),
+        ro::OVERLAY_GET | ro::RIDER_SCORE | ro::RIDER_TIME | ro::PLACE_MEDAL | ro::CAREER_STATE => (1, 0),
+        ro::SND_STOP_ONE | ro::FORMAT_TIME | ro::FORMAT_SCORE | ro::TIME_MEDAL | ro::FADE_SHOWS => (2, 0),
+        ro::PRINT_SHADOWED_RIGHT => (2, 3),
+        ro::WSTR_FORMAT => (5, 0),
+        ro::CAREER_BEST => (3, 0),
         _ => panic!("no arity for {func:#x}"),
     }
 }
 
 fn standin(io: &mut dyn Io, func: u32, w: &[u32], f: &[u32], ans: &Answers) -> (u32, Call) {
     let (ni, nf) = arity(func);
+    // (the format's arguments as many as its format takes: the medal line's three, the others' one)
+    let ni = if func == ro::WSTR_FORMAT && w[1] != ro::FMT_MEDAL { 3 } else { ni };
     let mut log: Vec<u32> = w[..ni].iter().map(|&a| token(a)).collect();
     log.extend(&f[..nf]);
     if func == ro::SET_COLOUR {
@@ -128,6 +143,7 @@ fn standin(io: &mut dyn Io, func: u32, w: &[u32], f: &[u32], ans: &Answers) -> (
     if matches!(
         func,
         ro::FILLED_RECT | ro::PRINTF_SHADOWED_A | ro::PRINT_SHADOWED_CENTRED | ro::DRAW_SPRITE | ro::BACKDROP_FRAME | ro::COUNT_DIGITS
+            | ro::PRINT_SHADOWED_RIGHT
     ) {
         log.extend((0..4).map(|k| io.r32(ro::DRAW_COLOUR + 4 * k)));
     }
@@ -137,6 +153,11 @@ fn standin(io: &mut dyn Io, func: u32, w: &[u32], f: &[u32], ans: &Answers) -> (
         ro::GET_RECT => RECT,
         ro::OVERLAY_HIDDEN => [0u32, 0, 1, r][(r % 4) as usize],
         ro::RACE_PLAYERS => [1u32, 2, 1, 3][(r % 4) as usize],
+        ro::OVERLAY_GET => PAUSE,
+        ro::TIME_MEDAL | ro::PLACE_MEDAL => r % 5,
+        ro::CAREER_STATE => [2u32, 1][(r % 2) as usize],
+        ro::FADE_SHOWS => r % 2,
+        ro::RIDER_TIME => [r % 20000, 1000, 5000][(r >> 9) as usize % 3],
         ro::MEMSET => {
             for k in 0..w[2] / 4 {
                 io.w32(w[0] + 4 * k, (w[1] & 0xff) * 0x0101_0101);
@@ -169,8 +190,9 @@ fn wf(m: &mut Mem, at: u32, v: f32) {
     m.w32(at, v.to_bits());
 }
 
-const FUNCS: [u32; 12] = [
+const FUNCS: [u32; 19] = [
     0x1aa268, 0x1aacb0, 0x1aae10, 0x1aae88, 0x1aaec0, 0x1ab028, 0x1ae350, 0x1ae3b8, 0x1ae4b0, 0x1ae650, 0x1ae660, 0x1ae7a0,
+    0x1ae7a8, 0x1ae7e0, 0x1ae7f0, 0x1aeb88, 0x1aed50, 0x1af320, 0x1ae7f0,
 ];
 
 #[test]
@@ -182,7 +204,9 @@ fn race_overlays_match_the_original() {
     let mut stubs = vec![
         ro::LOC, ro::SET_COLOUR, ro::MEMSET, ro::FILLED_RECT, ro::MEASURE_WIDE, ro::PRINTF_SHADOWED_A,
         ro::PRINT_SHADOWED_CENTRED, ro::DRAW_SPRITE, ro::BACKDROP_FRAME, ro::BACKDROP_INIT, ro::GET_RECT, ro::COURSE_NAME,
-        ro::OVERLAY_HIDDEN, ro::OVERLAY_HIDE, ro::RACE_PLAYERS, ro::COUNT_DIGITS, ro::SIN,
+        ro::OVERLAY_HIDDEN, ro::OVERLAY_HIDE, ro::RACE_PLAYERS, ro::COUNT_DIGITS, ro::SIN, ro::OVERLAY_GET, ro::SND_STOP_ONE,
+        ro::PRINT_SHADOWED_RIGHT, ro::WSTR_FORMAT, ro::FORMAT_TIME, ro::FORMAT_SCORE, ro::RIDER_SCORE, ro::RIDER_TIME,
+        ro::CAREER_BEST, ro::TIME_MEDAL, ro::PLACE_MEDAL, ro::CAREER_STATE, ro::FADE_SHOWS,
     ];
     stubs.extend(ROFFS.map(rv));
     let log: Rc<RefCell<Vec<Call>>> = Rc::default();
@@ -215,6 +239,9 @@ fn race_overlays_match_the_original() {
             regions: vec![
                 (DATA.0, data.clone()),
                 (TABLES.0, tables.clone()),
+                (TIMES.0, vec![0; TIMES.1 as usize]),
+                (SYS_AT.0, vec![0x77; SYS_AT.1 as usize]),
+                (RIDERS.0, vec![0; RIDERS.1 as usize]),
                 (ARENA, vec![0; SIZE as usize]),
                 (SCRATCH, vec![0; 0x800]),
             ],
@@ -262,8 +289,44 @@ fn race_overlays_match_the_original() {
         for k in 0..4 {
             wf(&mut m, ro::DRAW_COLOUR + 4 * k, g.f(0.0, 1.0));
         }
+        // the pop finish's two records, the viewed player, the riders (place, finished, fade, time), the race's
+        // +0x40, the pause overlay's backdrop, the event's table and the finishing times
+        for i in 0..2 {
+            let p = THIS + 0x2c + 0x3c * i;
+            m.w32(p, g.below(2));
+            m.w32(p + 4, g.pick(&[1u32, 1, 2, 0, 5]));
+            m.w32(p + 8, g.pick(&[0u32, 1, 1]));
+            m.w32(p + 0xc, g.below(2));
+            m.w32(p + 0x10, g.pick(&[0xffff_ffffu32, 0x28, 0x27]));
+            m.w8(p + 0x14, g.pick(&[0u8, b'1', b'2', b'3', b'x']));
+            m.w16(p + 0x16, g.pick(&[0u16, 0x41]));
+            let a = g.f(0.0, 1.0);
+            wf(&mut m, p + 0x38, g.pick(&[0.0f32, a, 0.98, 1.0]));
+        }
+        m.w32(RACE + 0x290, g.below(2));
+        m.w32(RACE + 0xa4, RIDER0);
+        m.w32(RACE + 0xa4 + 0x80, RIDER1);
+        for rd in [RIDER0, RIDER1] {
+            m.w32(rd + 0x110, g.below(4));
+            m.w32(rd + 0x418, g.pick(&[0u32, 1, 3, 0xffff_ffff]));
+            let f = g.f(0.0, 1.0);
+            wf(&mut m, rd + 0x44c, g.pick(&[0.0f32, f, 1.0]));
+            let any = g.next();
+            m.w32(rd + 0x5910, any);
+        }
+        m.w32(RACE + 0x40, g.pick(&[0u32, O40, O40]));
+        m.w32(O40 + 0x20, g.pick(&[0u32, 1, 9, 10, 20]));
+        m.w32(PAUSE + 0x42c, PAUSE + 0x100);
+        m.w32(PAUSE + 0x100 + 0xc, g.pick(&[0u32, 0, 1]));
+        m.w32(ro::RACE_TABLE, g.pick(&[1u32, 2]));
+        m.w32(ro::RACE_TABLE + 0x320, g.pick(&[7u32, 7, 1]));
+        m.w32(ro::RACE_TABLE + 0x32c, g.pick(&[3000u32, 1000]));
+        m.w32(ro::CAREER + 0x16c0, g.pick(&[3u32, 1]));
+        m.w32(ro::DISPLAY_MODE, g.pick(&[3u32, 0]));
+        m.w32(ro::CAREER + 0x2afc, g.pick(&[2u32, 3, 4, 5, 6, 7, 8, 9, 3, 1]));
         let any = g.next();
         let whole = g.pick(&[0u32, 1, any]);
+        let player = g.pick(&[0u32, 1, 0xffff_ffff, 0x8000_0000]);
         let (f1, f2) = (g.f(0.0, 480.0), g.f(-5.0, 30.0));
         for (at, b) in &m.regions {
             r.mem.write(*at, b).unwrap();
@@ -288,6 +351,12 @@ fn race_overlays_match_the_original() {
             0x1ae650 => { ro::pop_async_update(mm, THIS); none }
             0x1ae660 => { ro::pop_async_draw(mm, e, THIS); none }
             0x1ae7a0 => { ro::pop_async_draw_text(); none }
+            0x1ae7a8 => { ro::pop_finish_reset(mm, THIS, player); none }
+            0x1ae7e0 => { ro::pop_finish_vf16(mm, e); none }
+            0x1ae7f0 => { ro::pop_finish_update(mm, e, THIS); none }
+            0x1aeb88 => { ro::pop_finish_draw(mm, e, THIS, SCRATCH); none }
+            0x1aed50 => { ro::pop_finish_draw_text(mm, e, THIS, SCRATCH); none }
+            0x1af320 => { ro::black_fade_draw(mm, e, THIS); none }
             _ => unreachable!(),
         };
         buttons += env.log.iter().filter(|c| c.0 == ro::DRAW_SPRITE).count();
@@ -297,6 +366,7 @@ fn race_overlays_match_the_original() {
         log.borrow_mut().clear();
         let regs: Vec<u32> = match func {
             0x1aacb0 => vec![THIS, whole],
+            0x1ae7a8 => vec![THIS, player],
             _ => vec![THIS],
         };
         for (k, v) in regs.into_iter().enumerate() {
