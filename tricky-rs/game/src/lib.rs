@@ -80,6 +80,7 @@ pub mod fe_riderbuild;
 pub mod fe_riderprofile;
 pub mod fe_sound;
 pub mod fe_options;
+pub mod fe_dvdbuild;
 pub mod fe_dvdcontent;
 pub mod fe_transition;
 pub mod fe_helpers;

@@ -5415,8 +5415,8 @@ address,size,name,system,status
 0x293ba0,128,cFE3DStateTitle::LayoutWidgets,frontend,checked
 0x293c20,496,cFE3DStateDVDContent::CreateNextState,frontend,checked
 0x293e10,10848,cFE3DStateDVDContent::vf11_293e10,frontend,checked
-0x296870,2192,FE_BuildDvdCharacterList,frontend,ported
-0x297178,3624,FE_BuildDvdJukebox,frontend,ported
+0x296870,2192,FE_BuildDvdCharacterList,frontend,checked
+0x297178,3624,FE_BuildDvdJukebox,frontend,checked
 0x297fa0,968,FE_BuildDvdCharacterMenu,frontend,checked
 0x298368,856,FE_BuildDvdDemoMenu,frontend,checked
 0x2986c0,2988,cFE3DStateDVDContent::Update,frontend,checked

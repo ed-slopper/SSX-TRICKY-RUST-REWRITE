@@ -2447,3 +2447,22 @@ list goes at (350, 111) with a gap of 4 and is added to the group, then the grou
 
 The test (with G9y8a's, `tests/fe_riderbuild.rs`) runs 600 cases of it. The text entry's own colour call goes
 through the game's table, which the test reads and stubs. All 18 mutants are caught.
+
+## G9y8d: the DVD screen's lists (`game/src/fe_dvdbuild.rs`, `tests/fe_dvdbuild.rs`)
+
+- **`FE_BuildDvdCharacterList` 0x296870(s, item).** It builds a character's credits.
+  - **The list.** The list at +0x6c is made the first time (later it is emptied through its +0x10). The title (+0x64)
+    is given the character's title.
+  - **The lines.** Each string of the character's range (from a table of 12; none for items 1, 6 and past 11)
+    becomes either a heading or a line. A heading starts with the marker at 0x337e48: a buffered text in the second
+    font, white, 0.6. A line is red, 0.7. Each goes 20 or 25 (a heading) or 15 or 20 (a line) below the one before,
+    depending on what that was, and is moved there through its +0x70.
+  - **The rest.** A marker icon carries the item. The list goes at -640, and each of its widgets slides in from 640.
+- **`FE_BuildDvdJukebox` 0x297178.** A menu (+0x70) holds two lists of the 21 songs: the first 11 slide in from 640,
+  the rest from -640. Two now-playing entries (+0xa0, +0xa4) go at (250, 115) and (250, 145).
+
+The test runs 1,600 cases (800 each). Stand-in strings sometimes start with the heading marker, and the list's walk
+stops after a few widgets. Some layouts take only the object.
+
+Of the 45 mutants, 44 are caught. The survivor is equivalent: it swaps two colour buffers that hold the same
+colour.
