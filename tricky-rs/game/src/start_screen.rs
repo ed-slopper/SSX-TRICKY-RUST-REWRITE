@@ -867,27 +867,33 @@ pub fn single_message(m: &mut Mem, e: &mut dyn FeEnv, s: u32, buf: u32) {
 /// 0x1858c0, a static initialiser: three colours at 0x3cdd48 (1, 0.9645, 0), 0x3cdd58 (1, 0.4746, 0) and 0x3cdd68
 /// (1, 0.0758, 0.002), and a record at 0x3cdd78 (-1, 1, 1, 0, 0, 1, 1)
 pub fn static_init(m: &mut Mem) {
+    colours_init(m, 0x3cdd48);
+}
+
+/// The static initialisers' work (0x1858c0 at 0x3cdd48, 0x186a00 at 0x3cdd98): three colours from `base` 0x10
+/// apart and a record after them, in the game's order of stores
+pub fn colours_init(m: &mut Mem, base: u32) {
     let words: [(u32, u32); 17] = [
-        (0x3cdd70, 0x3b03_126f),
-        (0x3cdd48, ONE),
-        (0x3cdd50, 0),
-        (0x3cdd90, ONE),
-        (0x3cdd68, ONE),
-        (0x3cdd6c, 0x3d9b_3d08),
-        (0x3cdd58, ONE),
-        (0x3cdd5c, 0x3ef2_fec5),
-        (0x3cdd60, 0),
-        (0x3cdd4c, 0x3f76_e979),
-        (0x3cdd78, u32::MAX),
-        (0x3cdd7c, ONE),
-        (0x3cdd80, ONE),
-        (0x3cdd84, 0),
-        (0x3cdd88, 0),
-        (0x3cdd8c, ONE),
-        (0x3cdd90, ONE),
+        (0x28, 0x3b03_126f),
+        (0, ONE),
+        (8, 0),
+        (0x48, ONE),
+        (0x20, ONE),
+        (0x24, 0x3d9b_3d08),
+        (0x10, ONE),
+        (0x14, 0x3ef2_fec5),
+        (0x18, 0),
+        (4, 0x3f76_e979),
+        (0x30, u32::MAX),
+        (0x34, ONE),
+        (0x38, ONE),
+        (0x3c, 0),
+        (0x40, 0),
+        (0x44, ONE),
+        (0x48, ONE),
     ];
     for (a, v) in words {
-        m.w32(a, v);
+        m.w32(base + a, v);
     }
 }
 

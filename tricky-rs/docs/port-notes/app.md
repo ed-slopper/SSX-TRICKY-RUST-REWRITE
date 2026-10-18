@@ -194,3 +194,45 @@ Of the 44 mutants, 43 are caught. The survivor is equivalent: in the two-group r
 first group. Both use sprite 0x51.
 
 `cStartScreenSingle` vf7 still calls the box through the call seam (`DRAW_BOX`), as it was checked in E1f2.
+
+## E1g: the boot films and the execution manager (`game/src/boot.rs`, `tests/boot.rs`)
+
+- **`cVideoModule`** plays one boot film.
+  - Its constructor copies the film's name to +0xc and keeps the word after it at +0x10c.
+  - Its enter makes the video player (+8), and its start hands the player the name.
+  - Its frame ticks the sound (0.02 s) and runs the player until it has finished. Then, once (+0x110), it makes the
+    next module. The choice is by the career's flags, the same tests as `cApplication` vf3's: the front end, or one of
+    the six results modules.
+  - Its draw runs the player's +0x20 between the renderer's checks.
+- **`cVideoLoadModule`'s** virtuals do nothing, or answer 1.
+- **The static initialiser** 0x186a00 is 0x1858c0's again, 0x50 bytes on. Both now go through one function,
+  `start_screen::colours_init`.
+- **`cPS2ExecutionMan`** runs the game's frame timing.
+  - vf1 makes the frame semaphore (+0xc) and the vsync semaphore (+0x4024, counting to 0x400). It starts the vsync
+    thread (+0x4020): 0x1825e8, on the 0x4000-byte stack inside the manager, one priority above the main thread's.
+    Then it adds a handler for interrupt 3.
+  - That handler (0x1825d0) signals the vsync semaphore. The thread waits on it and runs `App_VSyncTick`, forever.
+  - vf3 waits for a frame and then drains the semaphore; vf4 signals it while something waits (+0x10).
+  - vf2 undoes vf1.
+- **The stack canary.** `Stack_FillCanary` keeps the stack's top, bottom and end, and the stack pointer's page. It
+  fills from the bottom to the top, and from the end to 1 KiB under the stack pointer, with 0xdeafc0ed.
+  `Mem_PrintStackUsage` counts how much of each is still the canary and prints it.
+- **`Iop_RebootAndLoadModules`** runs the boot's steps in order:
+  - it reboots and syncs the IOP, retrying until each takes;
+  - it loads the six IOP modules, each retried until it loads;
+  - it seeds the effects' generator from the clock and prints the date (BCD);
+  - it lays out the main heap: 2 KiB past the 64-byte line after a probing 1 KiB `malloc`, up to the heap's end. The
+    heap is filled with 0xdeafc0de (one letter off the canary) and the canary is laid.
+  - `PS2ExecutionMan_Create` calls it, then makes the 0x4030-byte manager.
+- **Calls out.** Everything that talks to the kernel, the SDK or the IOP stays a call out.
+
+The test runs 1,200 cases of each of the 28 functions.
+- **The vsync thread.** It never returns. The test stops it at its fifth wait: the stand-in points the return
+  address at the runner's sentinel, and the port's side unwinds.
+- **Stand-ins that write.** The thread's status, the clock and `memset` write their buffers. `malloc` answers near a
+  small heap whose end the stand-in picks.
+- **Index.** 0x1825d0, 0x1825e8 and 0x186a00 were missing from it.
+
+Of the 66 mutants, 65 are caught. The survivor is equivalent: the PS2 manager's destructor stores its table just
+before the base destructor overwrites it. Three were first missed and are now covered: the results path for two
+players, and a canary run that reaches the stack's bottom (twice).
