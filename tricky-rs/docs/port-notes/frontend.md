@@ -1993,7 +1993,7 @@ of four ways, set by +0x190:
 - **3, in a frame:** a frame widget (+0x194) is moved over the chosen item (0x2b5958). The frame's offset is the
   item's position less the frame's, less half the difference of their sizes.
 - **4, a window:** +0x1a0 items are shown, from +0x198 to +0x19c.
-  - Scrolling moves both ends on together: forward when stepping on without wrap, or back with it (+0x13c). The
+  - Scrolling moves both ends on together: forward when stepping on with the pad's way as it is, or back with it reversed (+0x13c). The
     end that comes into view is aligned (0x26df58 for the last, 0x26dd60 for the first), and every item is moved
     back by the frame's offset (an offset operation over the list).
   - The layout sets the window's count: all the items when unset, or when it is more than there are. It turns the
@@ -2005,7 +2005,7 @@ of four ways, set by +0x190:
 
 Other things to know:
 - `cFE3DWList` vf44 makes the two arrows: icons allocated (0x120 bytes, filled with 0xdeadc0de), owned by the list's
-  owner, 10 by 10, slid in from anchors 3 and 4. It also sets mode 2, no wrap and a gap of 15.
+  owner, 10 by 10, slid in from anchors 3 and 4. It also sets mode 2, the pad's way not reversed and a gap of 15.
 - The render (vf10) runs only while +0x14 is *clear*. For modes other than 1, 2 and 4, render and render text put
   the renderer's state back and raise it again (render) or run the menu's vf11 (render text). Their arrows and frame
   are drawn only while the list is chosen (+0xa0).
@@ -2062,3 +2062,47 @@ to mean "none". The stack and the port's scratch are filled alike (0xa5), so a w
 87 of 89 mutants are caught. The other two are equivalent:
 - the tiled icon's destructor's table, which the icon's overwrites at once;
 - the tiled constructor's size through the tiled table instead of the icon's (both have 0x2ad828 at +0x138).
+
+## G9y1: the menu (`game/src/fe_menu.rs`)
+
+`cFE3DMenu` is the widget that holds a list of items (+0x118) the pad moves between. G9x3b's list builds on it.
+Its fields are listed in the module's header.
+- **Choosing.** An item can be chosen while shown (+0x14) and enabled (+0xa4 clear).
+  - `FE3DMenu_NextSelectable` / `PrevSelectable` walk the items (+8 / +4). At the list's end they go round to its
+    first / last when the menu wraps (+0x158); otherwise they answer the item they started from. With wrap and no
+    item that can be chosen, the game's search never ends.
+  - The steps (vf41 / vf42, the other way with +0x13c) play the no-move sound when the choice stays (+0x110).
+    Otherwise they play the move sound (+0x111), tell the old item it is left and the owner (+0xb8: old, new), and
+    restart the arrow on that side. Then they update the arrows and tell the new item it is chosen.
+- **The pad (vf28).** It takes a pressed input only while the menu is enabled. While active, the owner's update
+  must also leave it in state 2. The chosen item gets the input first.
+  - Then the way along the menu: left/up step back (+0x158), right/down step on (+0x150).
+  - Accept plays its sound by whether the item can be chosen, and tells the owner (+0xd8) when it can.
+  - Back plays its sound when the owner allows it (+0x1c), and tells the owner (+0xb0).
+  - The keys 0x63 and 0x61 play their sounds and tell the owner (+0xc8 / +0xd0) when the item is enabled. They
+    answer 0, not 1.
+- **Layout (vf39).** The choice is kept when it can still be chosen, else the first that can is taken.
+  - With items that lay themselves out (+0x180), each item is formatted and the arrows are updated.
+  - Otherwise the box (+0x170) becomes the largest item (when +0x160), or the items are formatted. Then the items
+    are laid along the menu from its position by `cListFE3DWMenuFormatOp`. Each shown item is placed at the running
+    position in its box by the alignment (+0x154), and the position moves on by the box (or the item's size) and
+    the gap.
+- **Arrows (`FE3DMenu_UpdateArrows`).** Each arrow is hidden when the choice can't go its way (without wrap), and
+  put 5 beside the chosen item's bounds, centred on it across. For a menu running down, both go before it, side
+  by side. +0x144 leaves them where they are, but only for a menu running across.
+- **Aligning (`FE3DMenu_AlignItem` and 0x26df58).** These put an item before / after another along the menu: by
+  the box when set (half the size difference) or by the other's size, plus the gap. Across, it is centred on the
+  other by the box when set.
+- **The list operations' destructors** (`cListOperator::~cListOperator` 0x269560 and the eleven that jump to it):
+  the base table, freed on flag 1. The menu calls them directly.
+- **Other operations:**
+  - `cListFE3DGetExtentOp` widens two corners by each shown item's bounds;
+  - `cListFE3DFindHashNameOp` answers the item whose +0x74 matches;
+  - `cListFE3DSetActiveDefaultStartDataOp` calls the item's +0x30.
+
+The test has 73,500 cases (49 functions, 1,500 each). The items are linked both ways and one of them can always be
+chosen. A list's end is found where the nodes leave the items, or now and then at random. The sizes and bounds are
+written by the items' stand-ins; the size call's buffer is not logged, as only the callee writes it. Sounds past
+0x7f, sizes below 1 and a gap of 0 are in the mix.
+
+All 124 mutants are caught.

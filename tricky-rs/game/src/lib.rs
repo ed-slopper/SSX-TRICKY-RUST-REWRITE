@@ -67,6 +67,7 @@ pub mod fe_wtext;
 pub mod fe_widgets;
 pub mod fe_widget;
 pub mod fe_manager;
+pub mod fe_menu;
 pub mod fe_flow;
 pub mod fe_custombody;
 pub mod fe_charmodify;

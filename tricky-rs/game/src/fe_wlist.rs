@@ -4,7 +4,7 @@
 //! functions of the row that call each other, and the widget's own (`fe_wgroup`, `fe_widgets`), are called directly.
 //! Checked in the function runner (`tests/fe_wlist.rs`).
 //!
-//! The menu: its items in a list at +0x118, +0x13c whether it wraps, +0x140 the chosen item, +0x148 / +0x14c the two
+//! The menu: its items in a list at +0x118, +0x13c the pad's way reversed, +0x140 the chosen item, +0x148 / +0x14c the two
 //! arrows, +0x150 the way it runs (0 across, else down), +0x154 the alignment in the box (bit 0 to the right / bottom
 //! edge, bit 1 as it is, else centred; bits 2 and 3 for y), +0x15c the gap, +0x170 / +0x174 the box, +0x190 the mode
 //! (1 plain, 2 one item at a time, 3 in a frame, 4 a window of items), +0x194 the frame, +0x198 / +0x19c the first
@@ -129,7 +129,7 @@ pub fn frame_offset(m: &mut Mem, e: &mut dyn FeEnv, out: u32, l: u32, buf: u32) 
     out
 }
 
-/// `cFE3DWList` vf44 0x2b51d8 (its arrows made; `buf` 0x40 bytes): one item at a time, no wrap, a gap of 15; two
+/// `cFE3DWList` vf44 0x2b51d8 (its arrows made; `buf` 0x40 bytes): one item at a time, the pad's way not reversed, a gap of 15; two
 /// icons (0x120 bytes each, filled with 0xdeadc0de) owned by the list's owner with the list as their parent, each 10
 /// by 10, slid in from anchors 3 and 4, shown raised (+0x70 1), kept at +0x148 and +0x14c; +0x154 0
 pub fn make_arrows(m: &mut Mem, e: &mut dyn FeEnv, l: u32, buf: u32) {
@@ -161,7 +161,7 @@ pub fn make_arrows(m: &mut Mem, e: &mut dyn FeEnv, l: u32, buf: u32) {
 
 /// `FE3DMenu_Scroll` 0x2b5668(l, old, item, dir; `buf` 0x40 bytes), by the mode: 2 the item moved into the box at
 /// the list's position; 3 the frame centred on the chosen item; 4 the window moved on one way or the other (down
-/// when rolling forward without wrap or back with it), its ends aligned and the items moved back by the frame's
+/// when stepping on with the pad's way as it is, or back with it reversed), its ends aligned and the items moved back by the frame's
 /// offset; then the arrows' update (for every mode but the others)
 pub fn scroll(m: &mut Mem, e: &mut dyn FeEnv, l: u32, item: u32, dir: u32, buf: u32) {
     match m.r32(l + 0x190) {
@@ -213,8 +213,8 @@ pub fn scroll(m: &mut Mem, e: &mut dyn FeEnv, l: u32, item: u32, dir: u32, buf: 
             vcall(m, e, frame, 0x70, &[buf]);
         }
         4 => {
-            let wraps = m.r32(l + 0x13c) != 0;
-            let forward = (dir == 1 && !wraps) || (dir == u32::MAX && wraps);
+            let reversed = m.r32(l + 0x13c) != 0;
+            let forward = (dir == 1 && !reversed) || (dir == u32::MAX && reversed);
             let (first, last);
             if forward {
                 first = e.call(m, MENU_NEXT, &[l, m.r32(l + 0x198)]);

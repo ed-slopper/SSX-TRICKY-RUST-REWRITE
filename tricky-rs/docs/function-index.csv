@@ -4873,25 +4873,25 @@ address,size,name,system,status
 0x269270,116,cFE3DWGroup::vf13_269270,frontend,not started
 0x2692e8,80,cFE3DWGroup::~cFE3DWGroup,frontend,not started
 0x269338,80,cFE3DWGroup::__tf,runtime,host
-0x269388,8,cListFE3DGetExtentOp::~cListFE3DGetExtentOp,frontend?,not started
-0x269390,8,cListFE3DOnInputOp::~cListFE3DOnInputOp,frontend?,not started
-0x269398,8,cListFE3DFormatOp::~cListFE3DFormatOp,frontend?,not started
-0x2693a0,8,cListFE3DUpdateActivityOp::~cListFE3DUpdateActivityOp,frontend?,not started
-0x2693a8,8,cListFE3DResetActivityOp::~cListFE3DResetActivityOp,frontend?,not started
-0x2693b0,8,cListFE3DSkipActivityOp::~cListFE3DSkipActivityOp,frontend?,not started
-0x2693b8,8,cListFE3DOffsetOp::~cListFE3DOffsetOp,frontend?,not started
+0x269388,8,cListFE3DGetExtentOp::~cListFE3DGetExtentOp,frontend?,checked
+0x269390,8,cListFE3DOnInputOp::~cListFE3DOnInputOp,frontend?,checked
+0x269398,8,cListFE3DFormatOp::~cListFE3DFormatOp,frontend?,checked
+0x2693a0,8,cListFE3DUpdateActivityOp::~cListFE3DUpdateActivityOp,frontend?,checked
+0x2693a8,8,cListFE3DResetActivityOp::~cListFE3DResetActivityOp,frontend?,checked
+0x2693b0,8,cListFE3DSkipActivityOp::~cListFE3DSkipActivityOp,frontend?,checked
+0x2693b8,8,cListFE3DOffsetOp::~cListFE3DOffsetOp,frontend?,checked
 0x2693c0,44,cListFE3DUpdateOp::vf1_2693c0,frontend?,not started
 0x2693f0,80,cListFE3DUpdateOp::__tf,runtime,host
-0x269440,8,cListFE3DUpdateOp::~cListFE3DUpdateOp,frontend?,ported
+0x269440,8,cListFE3DUpdateOp::~cListFE3DUpdateOp,frontend?,checked
 0x269448,44,cListFE3DRenderTextOp::vf1_269448,frontend?,not started
 0x269478,80,cListFE3DRenderTextOp::__tf,runtime,host
-0x2694c8,8,cListFE3DRenderTextOp::~cListFE3DRenderTextOp,frontend?,not started
+0x2694c8,8,cListFE3DRenderTextOp::~cListFE3DRenderTextOp,frontend?,checked
 0x2694d0,52,cListFE3DRenderOp::vf1_2694d0,frontend?,not started
 0x269508,80,cListFE3DRenderOp::__tf,runtime,host
-0x269558,8,cListFE3DRenderOp::~cListFE3DRenderOp,frontend?,not started
-0x269560,36,cListOperator::~cListOperator,frontend?,not started
+0x269558,8,cListFE3DRenderOp::~cListFE3DRenderOp,frontend?,checked
+0x269560,36,cListOperator::~cListOperator,frontend?,checked
 0x269588,64,cListOperator::__tf,runtime,host
-0x269620,232,cListFE3DGetExtentOp::vf1_269620,frontend?,not started
+0x269620,232,cListFE3DGetExtentOp::vf1_269620,frontend?,checked
 0x269708,80,cListFE3DGetExtentOp::__tf,runtime,host
 0x269758,64,cListFE3DOnInputOp::vf1_269758,frontend?,not started
 0x269798,80,cListFE3DOnInputOp::__tf,runtime,host
@@ -4974,46 +4974,46 @@ address,size,name,system,status
 0x26cef8,44,FEPlayer_IsPadConnected,frontend?,checked
 0x26cf28,56,FUN_0026cf28,frontend?,checked
 0x26cf60,608,cCheatCodes::Update,input,ported
-0x26d1c0,8,FE_SetRumbleEnabled,frontend,not started
+0x26d1c0,8,FE_SetRumbleEnabled,frontend,checked
 0x26d1c8,136,FE_RumblePad,frontend,ported
-0x26d3b8,668,cFE3DMenu::cFE3DMenu,frontend,ported
-0x26d658,8,cFE3DMenu::vf40_26d658,frontend,not started
-0x26d660,612,cFE3DMenu::vf39_26d660,frontend,not started
-0x26d8c8,1172,FE3DMenu_UpdateArrows,frontend?,ported
-0x26dd60,500,FE3DMenu_AlignItem,frontend?,not started
-0x26df58,500,FUN_0026df58,frontend?,not started
-0x26e150,996,cFE3DMenu::vf28_26e150,frontend,not started
-0x26e538,140,FE3DMenu_NextSelectable,frontend?,not started
-0x26e5c8,140,FE3DMenu_PrevSelectable,frontend?,not started
-0x26e658,352,cFE3DMenu::vf41_26e658,frontend,not started
-0x26e7b8,352,cFE3DMenu::vf42_26e7b8,frontend,not started
-0x26e918,140,cFE3DMenu::vf5_26e918,frontend,not started
-0x26e9a8,76,cFE3DMenu::vf7_26e9a8,frontend,not started
-0x26e9f8,156,cFE3DMenu::vf1_26e9f8,frontend,not started
-0x26ea98,256,cFE3DMenu::vf11_26ea98,frontend,not started
-0x26eb98,164,cFE3DMenu::vf12_26eb98,frontend,not started
-0x26ec40,920,cFE3DMenu::vf36_26ec40,frontend,not started
-0x26efd8,540,cFE3DMenu::vf37_26efd8,frontend,not started
-0x26f2a0,464,cListFE3DWMenuFormatOp::vf1_26f2a0,frontend?,not started
+0x26d3b8,668,cFE3DMenu::cFE3DMenu,frontend,checked
+0x26d658,8,cFE3DMenu::vf40_26d658,frontend,checked
+0x26d660,612,cFE3DMenu::vf39_26d660,frontend,checked
+0x26d8c8,1172,FE3DMenu_UpdateArrows,frontend?,checked
+0x26dd60,500,FE3DMenu_AlignItem,frontend?,checked
+0x26df58,500,FUN_0026df58,frontend?,checked
+0x26e150,996,cFE3DMenu::vf28_26e150,frontend,checked
+0x26e538,140,FE3DMenu_NextSelectable,frontend?,checked
+0x26e5c8,140,FE3DMenu_PrevSelectable,frontend?,checked
+0x26e658,352,cFE3DMenu::vf41_26e658,frontend,checked
+0x26e7b8,352,cFE3DMenu::vf42_26e7b8,frontend,checked
+0x26e918,140,cFE3DMenu::vf5_26e918,frontend,checked
+0x26e9a8,76,cFE3DMenu::vf7_26e9a8,frontend,checked
+0x26e9f8,156,cFE3DMenu::vf1_26e9f8,frontend,checked
+0x26ea98,256,cFE3DMenu::vf11_26ea98,frontend,checked
+0x26eb98,164,cFE3DMenu::vf12_26eb98,frontend,checked
+0x26ec40,920,cFE3DMenu::vf36_26ec40,frontend,checked
+0x26efd8,540,cFE3DMenu::vf37_26efd8,frontend,checked
+0x26f2a0,464,cListFE3DWMenuFormatOp::vf1_26f2a0,frontend?,checked
 0x26f470,80,cListFE3DWMenuFormatOp::__tf,runtime,host
-0x26f4c0,8,cListFE3DWMenuFormatOp::~cListFE3DWMenuFormatOp,frontend?,not started
-0x26f4c8,8,cFE3DMenu::vf18_26f4c8,frontend,not started
-0x26f4d0,240,cFE3DMenu::vf29_26f4d0,frontend,not started
-0x26f5c0,180,cFE3DMenu::vf13_26f5c0,frontend,not started
-0x26f688,12,FUN_0026f688,frontend?,not started
-0x26f698,44,FUN_0026f698,frontend?,not started
-0x26f7c0,108,FUN_0026f7c0,frontend?,not started
-0x26f830,116,FUN_0026f830,frontend?,not started
-0x26f8d8,128,cFE3DMenu::vf43_26f8d8,frontend,not started
-0x26f970,28,FUN_0026f970,frontend?,not started
-0x26f990,28,FUN_0026f990,save?,not started
-0x26f9d0,80,cFE3DMenu::~cFE3DMenu,frontend,not started
+0x26f4c0,8,cListFE3DWMenuFormatOp::~cListFE3DWMenuFormatOp,frontend?,checked
+0x26f4c8,8,cFE3DMenu::vf18_26f4c8,frontend,checked
+0x26f4d0,240,cFE3DMenu::vf29_26f4d0,frontend,checked
+0x26f5c0,180,cFE3DMenu::vf13_26f5c0,frontend,checked
+0x26f688,12,FUN_0026f688,frontend?,checked
+0x26f698,44,FUN_0026f698,frontend?,checked
+0x26f7c0,108,FUN_0026f7c0,frontend?,checked
+0x26f830,116,FUN_0026f830,frontend?,checked
+0x26f8d8,128,cFE3DMenu::vf43_26f8d8,frontend,checked
+0x26f970,28,FUN_0026f970,frontend?,checked
+0x26f990,28,FUN_0026f990,save?,checked
+0x26f9d0,80,cFE3DMenu::~cFE3DMenu,frontend,checked
 0x26fa20,80,cFE3DMenu::__tf,runtime,host
-0x26fa70,44,ListFE3DFormatOp_Apply1,frontend?,not started
+0x26fa70,44,ListFE3DFormatOp_Apply1,frontend?,checked
 0x26faa0,80,cListFE3DFormatOp::__tf,runtime,host
-0x26faf8,44,cListFE3DSetActiveDefaultStartDataOp::vf1_26faf8,frontend?,not started
+0x26faf8,44,cListFE3DSetActiveDefaultStartDataOp::vf1_26faf8,frontend?,checked
 0x26fb28,80,cListFE3DSetActiveDefaultStartDataOp::__tf,runtime,host
-0x26fb78,8,cListFE3DSetActiveDefaultStartDataOp::~cListFE3DSetActiveDefaultStartDataOp,frontend?,not started
+0x26fb78,8,cListFE3DSetActiveDefaultStartDataOp::~cListFE3DSetActiveDefaultStartDataOp,frontend?,checked
 0x26fbb0,80,cListFE3DResetActivityOp::__tf,runtime,host
 0x26fc40,80,cListFE3DUpdateOp::__tf,runtime,host
 0x26fcc8,80,cListFE3DRenderTextOp::__tf,runtime,host
@@ -5028,9 +5028,9 @@ address,size,name,system,status
 0x270038,80,cListFE3DUpdateOp::__tf,runtime,host
 0x2700c0,80,cListFE3DRenderTextOp::__tf,runtime,host
 0x270150,80,cListFE3DRenderOp::__tf,runtime,host
-0x2701a8,24,cListFE3DFindHashNameOp::vf1_2701a8,frontend?,not started
+0x2701a8,24,cListFE3DFindHashNameOp::vf1_2701a8,frontend?,checked
 0x2701c0,80,cListFE3DFindHashNameOp::__tf,runtime,host
-0x270210,8,cListFE3DFindHashNameOp::~cListFE3DFindHashNameOp,frontend?,not started
+0x270210,8,cListFE3DFindHashNameOp::~cListFE3DFindHashNameOp,frontend?,checked
 0x270218,28,FUN_00270218,frontend?,not started
 0x270260,64,cListOperator::__tf,runtime,host
 0x2702e0,68,cFE3DSound::cFE3DSound,frontend,not started
