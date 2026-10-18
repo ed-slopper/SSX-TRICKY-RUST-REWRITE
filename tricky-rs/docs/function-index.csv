@@ -4880,30 +4880,30 @@ address,size,name,system,status
 0x2693a8,8,cListFE3DResetActivityOp::~cListFE3DResetActivityOp,frontend?,checked
 0x2693b0,8,cListFE3DSkipActivityOp::~cListFE3DSkipActivityOp,frontend?,checked
 0x2693b8,8,cListFE3DOffsetOp::~cListFE3DOffsetOp,frontend?,checked
-0x2693c0,44,cListFE3DUpdateOp::vf1_2693c0,frontend?,not started
+0x2693c0,44,cListFE3DUpdateOp::vf1_2693c0,frontend?,checked
 0x2693f0,80,cListFE3DUpdateOp::__tf,runtime,host
 0x269440,8,cListFE3DUpdateOp::~cListFE3DUpdateOp,frontend?,checked
-0x269448,44,cListFE3DRenderTextOp::vf1_269448,frontend?,not started
+0x269448,44,cListFE3DRenderTextOp::vf1_269448,frontend?,checked
 0x269478,80,cListFE3DRenderTextOp::__tf,runtime,host
 0x2694c8,8,cListFE3DRenderTextOp::~cListFE3DRenderTextOp,frontend?,checked
-0x2694d0,52,cListFE3DRenderOp::vf1_2694d0,frontend?,not started
+0x2694d0,52,cListFE3DRenderOp::vf1_2694d0,frontend?,checked
 0x269508,80,cListFE3DRenderOp::__tf,runtime,host
 0x269558,8,cListFE3DRenderOp::~cListFE3DRenderOp,frontend?,checked
 0x269560,36,cListOperator::~cListOperator,frontend?,checked
 0x269588,64,cListOperator::__tf,runtime,host
 0x269620,232,cListFE3DGetExtentOp::vf1_269620,frontend?,checked
 0x269708,80,cListFE3DGetExtentOp::__tf,runtime,host
-0x269758,64,cListFE3DOnInputOp::vf1_269758,frontend?,not started
+0x269758,64,cListFE3DOnInputOp::vf1_269758,frontend?,checked
 0x269798,80,cListFE3DOnInputOp::__tf,runtime,host
-0x2697e8,44,cListFE3DFormatOp::vf1_2697e8,frontend?,not started
+0x2697e8,44,cListFE3DFormatOp::vf1_2697e8,frontend?,checked
 0x269818,80,cListFE3DFormatOp::__tf,runtime,host
-0x269868,44,cListFE3DUpdateActivityOp::vf1_269868,frontend?,not started
+0x269868,44,cListFE3DUpdateActivityOp::vf1_269868,frontend?,checked
 0x269898,80,cListFE3DUpdateActivityOp::__tf,runtime,host
-0x2698e8,44,cListFE3DResetActivityOp::vf1_2698e8,frontend?,not started
+0x2698e8,44,cListFE3DResetActivityOp::vf1_2698e8,frontend?,checked
 0x269918,80,cListFE3DResetActivityOp::__tf,runtime,host
-0x269968,44,cListFE3DSkipActivityOp::vf1_269968,frontend?,not started
+0x269968,44,cListFE3DSkipActivityOp::vf1_269968,frontend?,checked
 0x269998,80,cListFE3DSkipActivityOp::__tf,runtime,host
-0x2699e8,52,cListFE3DOffsetOp::vf1_2699e8,frontend?,not started
+0x2699e8,52,cListFE3DOffsetOp::vf1_2699e8,frontend?,checked
 0x269a20,80,cListFE3DOffsetOp::__tf,runtime,host
 0x269a70,92,FE3DGeometry_BindInstance,frontend?,not started
 0x269ad0,56,FE3DGeometry_GetPos,frontend?,not started
@@ -5024,7 +5024,7 @@ address,size,name,system,status
 0x26feb8,136,FUN_0026feb8,frontend?,ported
 0x26ff40,68,FE3DTextList_RenderAll,frontend?,ported
 0x26ff88,68,FE3D_UpdateAll,frontend?,ported
-0x270008,44,ListFE3DUpdateOp_Apply1,frontend?,not started
+0x270008,44,ListFE3DUpdateOp_Apply1,frontend?,checked
 0x270038,80,cListFE3DUpdateOp::__tf,runtime,host
 0x2700c0,80,cListFE3DRenderTextOp::__tf,runtime,host
 0x270150,80,cListFE3DRenderOp::__tf,runtime,host
@@ -5194,16 +5194,16 @@ address,size,name,system,status
 0x275db8,8,cFE3DWTextEntry::vf41_275db8,frontend,not started
 0x275dc0,8,cFE3DWTextEntry::vf40_275dc0,frontend,not started
 0x275dc8,20,cFE3DWTextEntry::~cFE3DWTextEntry,frontend,not started
-0x275e38,76,FE3DWGroup_UpdateActivity1,frontend?,not started
-0x275e88,76,FE3DWGroup_ResetActivity1,frontend?,not started
-0x275ed8,76,FE3DWGroup_SkipActivity1,frontend?,not started
-0x275f28,96,FE3DWGroup_OnInput1,frontend?,not started
-0x275f88,96,FE3DWGroup_Update1,frontend?,not started
-0x275fe8,196,FE3DWGroup_RenderText1,frontend?,not started
-0x2760b0,212,FE3DWGroup_Render1,frontend?,not started
-0x276188,56,FE3DWGroup_Format1,frontend?,not started
-0x2761c0,44,FE3DWGroup_FreeChildren1,world?,not started
-0x276268,116,FE3DWGroup_Offset1,frontend?,not started
+0x275e38,76,FE3DWGroup_UpdateActivity1,frontend?,checked
+0x275e88,76,FE3DWGroup_ResetActivity1,frontend?,checked
+0x275ed8,76,FE3DWGroup_SkipActivity1,frontend?,checked
+0x275f28,96,FE3DWGroup_OnInput1,frontend?,checked
+0x275f88,96,FE3DWGroup_Update1,frontend?,checked
+0x275fe8,196,FE3DWGroup_RenderText1,frontend?,checked
+0x2760b0,212,FE3DWGroup_Render1,frontend?,checked
+0x276188,56,FE3DWGroup_Format1,frontend?,checked
+0x2761c0,44,FE3DWGroup_FreeChildren1,world?,checked
+0x276268,116,FE3DWGroup_Offset1,frontend?,checked
 0x2762e0,8,FE3DGroup_Add,frontend?,ported
 0x276338,80,cFE3DWGroup::__tf,runtime,host
 0x2763a0,8,cFE3DState::vf25_2763a0,frontend,not started
@@ -5219,23 +5219,23 @@ address,size,name,system,status
 0x2764a8,12,cFE3DState::vf6_2764a8,frontend,checked
 0x2764e0,80,cFE3DState::__tf,runtime,host
 0x2766b8,80,cListFE3DGetExtentOp::__tf,runtime,host
-0x276708,64,ListFE3DOnInputOp_Apply1,frontend?,not started
+0x276708,64,ListFE3DOnInputOp_Apply1,frontend?,checked
 0x276748,80,cListFE3DOnInputOp::__tf,runtime,host
-0x276798,44,ListFE3DFormatOp_Apply2,frontend?,not started
+0x276798,44,ListFE3DFormatOp_Apply2,frontend?,checked
 0x2767c8,80,cListFE3DFormatOp::__tf,runtime,host
-0x276818,44,ListFE3DUpdateActivityOp_Apply1,frontend?,not started
+0x276818,44,ListFE3DUpdateActivityOp_Apply1,frontend?,checked
 0x276848,80,cListFE3DUpdateActivityOp::__tf,runtime,host
-0x276898,44,ListFE3DResetActivityOp_Apply1,frontend?,not started
+0x276898,44,ListFE3DResetActivityOp_Apply1,frontend?,checked
 0x2768c8,80,cListFE3DResetActivityOp::__tf,runtime,host
-0x276918,44,ListFE3DSkipActivityOp_Apply1,frontend?,not started
+0x276918,44,ListFE3DSkipActivityOp_Apply1,frontend?,checked
 0x276948,80,cListFE3DSkipActivityOp::__tf,runtime,host
-0x276998,52,ListFE3DOffsetOp_Apply1,frontend?,not started
+0x276998,52,ListFE3DOffsetOp_Apply1,frontend?,checked
 0x2769d0,80,cListFE3DOffsetOp::__tf,runtime,host
-0x276a20,44,ListFE3DUpdateOp_Apply2,frontend?,not started
+0x276a20,44,ListFE3DUpdateOp_Apply2,frontend?,checked
 0x276a50,80,cListFE3DUpdateOp::__tf,runtime,host
-0x276aa0,44,ListFE3DRenderTextOp_Apply1,frontend?,not started
+0x276aa0,44,ListFE3DRenderTextOp_Apply1,frontend?,checked
 0x276ad0,80,cListFE3DRenderTextOp::__tf,runtime,host
-0x276b20,52,ListFE3DRenderOp_Apply1,frontend?,not started
+0x276b20,52,ListFE3DRenderOp_Apply1,frontend?,checked
 0x276b58,80,cListFE3DRenderOp::__tf,runtime,host
 0x276ba8,64,cListOperator::__tf,runtime,host
 0x276be8,132,cFE3DStateCharacterSelect::cFE3DStateCharacterSelect,frontend,checked
@@ -5324,35 +5324,35 @@ address,size,name,system,status
 0x28e5c8,20,cFE3DStateCharacterSelect::~cFE3DStateCharacterSelect,frontend,not started
 0x28e5e0,8,cFE3DStateCharacterSelect::vf13_28e5e0,frontend,not started
 0x28e5e8,80,cFE3DStateCharacterSelect::__tf,runtime,host
-0x28e640,76,FE3DWGroup_UpdateActivity2,frontend?,not started
-0x28e690,76,FE3DWGroup_ResetActivity2,frontend?,not started
-0x28e6e0,76,FE3DWGroup_SkipActivity2,frontend?,not started
-0x28e730,96,FE3DWGroup_OnInput2,frontend?,not started
-0x28e790,96,FE3DWGroup_Update2,frontend?,not started
-0x28e7f0,196,FE3DWGroup_RenderText2,frontend?,not started
-0x28e8b8,212,FE3DWGroup_Render2,frontend?,not started
-0x28e990,56,FE3DWGroup_Format2,frontend?,not started
-0x28e9c8,44,FE3DWGroup_FreeChildren2,world?,not started
-0x28ea70,116,FE3DWGroup_Offset2,frontend?,not started
+0x28e640,76,FE3DWGroup_UpdateActivity2,frontend?,checked
+0x28e690,76,FE3DWGroup_ResetActivity2,frontend?,checked
+0x28e6e0,76,FE3DWGroup_SkipActivity2,frontend?,checked
+0x28e730,96,FE3DWGroup_OnInput2,frontend?,checked
+0x28e790,96,FE3DWGroup_Update2,frontend?,checked
+0x28e7f0,196,FE3DWGroup_RenderText2,frontend?,checked
+0x28e8b8,212,FE3DWGroup_Render2,frontend?,checked
+0x28e990,56,FE3DWGroup_Format2,frontend?,checked
+0x28e9c8,44,FE3DWGroup_FreeChildren2,world?,checked
+0x28ea70,116,FE3DWGroup_Offset2,frontend?,checked
 0x28eb40,80,cFE3DWGroup::__tf,runtime,host
 0x28ed30,80,cListFE3DGetExtentOp::__tf,runtime,host
-0x28ed80,64,ListFE3DOnInputOp_Apply2,frontend?,not started
+0x28ed80,64,ListFE3DOnInputOp_Apply2,frontend?,checked
 0x28edc0,80,cListFE3DOnInputOp::__tf,runtime,host
-0x28ee10,44,ListFE3DFormatOp_Apply3,frontend?,not started
+0x28ee10,44,ListFE3DFormatOp_Apply3,frontend?,checked
 0x28ee40,80,cListFE3DFormatOp::__tf,runtime,host
-0x28ee90,44,ListFE3DUpdateActivityOp_Apply2,frontend?,not started
+0x28ee90,44,ListFE3DUpdateActivityOp_Apply2,frontend?,checked
 0x28eec0,80,cListFE3DUpdateActivityOp::__tf,runtime,host
-0x28ef10,44,ListFE3DResetActivityOp_Apply2,frontend?,not started
+0x28ef10,44,ListFE3DResetActivityOp_Apply2,frontend?,checked
 0x28ef40,80,cListFE3DResetActivityOp::__tf,runtime,host
-0x28ef90,44,ListFE3DSkipActivityOp_Apply2,frontend?,not started
+0x28ef90,44,ListFE3DSkipActivityOp_Apply2,frontend?,checked
 0x28efc0,80,cListFE3DSkipActivityOp::__tf,runtime,host
-0x28f010,52,ListFE3DOffsetOp_Apply2,frontend?,not started
+0x28f010,52,ListFE3DOffsetOp_Apply2,frontend?,checked
 0x28f048,80,cListFE3DOffsetOp::__tf,runtime,host
-0x28f098,44,ListFE3DUpdateOp_Apply3,frontend?,not started
+0x28f098,44,ListFE3DUpdateOp_Apply3,frontend?,checked
 0x28f0c8,80,cListFE3DUpdateOp::__tf,runtime,host
-0x28f118,44,ListFE3DRenderTextOp_Apply2,frontend?,not started
+0x28f118,44,ListFE3DRenderTextOp_Apply2,frontend?,checked
 0x28f148,80,cListFE3DRenderTextOp::__tf,runtime,host
-0x28f198,52,ListFE3DRenderOp_Apply2,frontend?,not started
+0x28f198,52,ListFE3DRenderOp_Apply2,frontend?,checked
 0x28f1d0,80,cListFE3DRenderOp::__tf,runtime,host
 0x28f220,64,cListOperator::__tf,runtime,host
 0x28f260,284,cFEStateMCOverlay::cFEStateMCOverlay,save,ported
@@ -5500,35 +5500,35 @@ address,size,name,system,status
 0x29dc88,20,cFE3DStateTitle::~cFE3DStateTitle,frontend,not started
 0x29dca0,8,cFE3DStateTitle::vf13_29dca0,frontend,not started
 0x29dca8,80,cFE3DStateTitle::__tf,runtime,host
-0x29dd00,76,FE3DWGroup_UpdateActivity3,frontend?,not started
-0x29dd50,76,FE3DWGroup_ResetActivity3,frontend?,not started
-0x29dda0,76,FE3DWGroup_SkipActivity3,frontend?,not started
-0x29ddf0,96,FE3DWGroup_OnInput3,frontend?,not started
-0x29de50,96,FE3DWGroup_Update3,frontend?,not started
-0x29deb0,196,FE3DWGroup_RenderText3,frontend?,not started
-0x29df78,212,FE3DWGroup_Render3,frontend?,not started
-0x29e050,56,FE3DWGroup_Format3,frontend?,not started
-0x29e088,44,FE3DWGroup_FreeChildren3,world?,not started
-0x29e130,116,FE3DWGroup_Offset3,frontend?,not started
+0x29dd00,76,FE3DWGroup_UpdateActivity3,frontend?,checked
+0x29dd50,76,FE3DWGroup_ResetActivity3,frontend?,checked
+0x29dda0,76,FE3DWGroup_SkipActivity3,frontend?,checked
+0x29ddf0,96,FE3DWGroup_OnInput3,frontend?,checked
+0x29de50,96,FE3DWGroup_Update3,frontend?,checked
+0x29deb0,196,FE3DWGroup_RenderText3,frontend?,checked
+0x29df78,212,FE3DWGroup_Render3,frontend?,checked
+0x29e050,56,FE3DWGroup_Format3,frontend?,checked
+0x29e088,44,FE3DWGroup_FreeChildren3,world?,checked
+0x29e130,116,FE3DWGroup_Offset3,frontend?,checked
 0x29e200,80,cFE3DWGroup::__tf,runtime,host
 0x29e3f0,80,cListFE3DGetExtentOp::__tf,runtime,host
-0x29e440,64,ListFE3DOnInputOp_Apply3,frontend?,not started
+0x29e440,64,ListFE3DOnInputOp_Apply3,frontend?,checked
 0x29e480,80,cListFE3DOnInputOp::__tf,runtime,host
-0x29e4d0,44,ListFE3DFormatOp_Apply4,frontend?,not started
+0x29e4d0,44,ListFE3DFormatOp_Apply4,frontend?,checked
 0x29e500,80,cListFE3DFormatOp::__tf,runtime,host
-0x29e550,44,ListFE3DUpdateActivityOp_Apply3,frontend?,not started
+0x29e550,44,ListFE3DUpdateActivityOp_Apply3,frontend?,checked
 0x29e580,80,cListFE3DUpdateActivityOp::__tf,runtime,host
-0x29e5d0,44,ListFE3DResetActivityOp_Apply3,frontend?,not started
+0x29e5d0,44,ListFE3DResetActivityOp_Apply3,frontend?,checked
 0x29e600,80,cListFE3DResetActivityOp::__tf,runtime,host
-0x29e650,44,ListFE3DSkipActivityOp_Apply3,frontend?,not started
+0x29e650,44,ListFE3DSkipActivityOp_Apply3,frontend?,checked
 0x29e680,80,cListFE3DSkipActivityOp::__tf,runtime,host
-0x29e6d0,52,ListFE3DOffsetOp_Apply3,frontend?,not started
+0x29e6d0,52,ListFE3DOffsetOp_Apply3,frontend?,checked
 0x29e708,80,cListFE3DOffsetOp::__tf,runtime,host
-0x29e758,44,ListFE3DUpdateOp_Apply4,frontend?,not started
+0x29e758,44,ListFE3DUpdateOp_Apply4,frontend?,checked
 0x29e788,80,cListFE3DUpdateOp::__tf,runtime,host
-0x29e7d8,44,ListFE3DRenderTextOp_Apply3,frontend?,not started
+0x29e7d8,44,ListFE3DRenderTextOp_Apply3,frontend?,checked
 0x29e808,80,cListFE3DRenderTextOp::__tf,runtime,host
-0x29e858,52,ListFE3DRenderOp_Apply3,frontend?,not started
+0x29e858,52,ListFE3DRenderOp_Apply3,frontend?,checked
 0x29e890,80,cListFE3DRenderOp::__tf,runtime,host
 0x29e8e0,64,cListOperator::__tf,runtime,host
 0x29e920,104,cFE3DStateOptions::cFE3DStateOptions,frontend,checked

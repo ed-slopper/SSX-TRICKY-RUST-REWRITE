@@ -167,11 +167,95 @@ const FUNCS: [u32; 61] = [
     0x2acf60, 0x2addb0, 0x2ade40, 0x2adf18, 0x2adf30, 0x2b3950,
 ];
 
+/// The copies of the operations above elsewhere in the game (the same bytes but for their branches, in other
+/// translation units): (the copy, the function it copies)
+const COPIES: [(u32, u32); 67] = [
+    (0x2693c0, 0x2ab698),
+    (0x269448, 0x2ab718),
+    (0x2694d0, 0x2ab798),
+    (0x269758, 0x2ab380),
+    (0x2697e8, 0x2ab410),
+    (0x269868, 0x2ab490),
+    (0x2698e8, 0x2ab510),
+    (0x269968, 0x2ab590),
+    (0x2699e8, 0x2ab610),
+    (0x270008, 0x2ab698),
+    (0x275e38, 0x2aac40),
+    (0x275e88, 0x2aac90),
+    (0x275ed8, 0x2aace0),
+    (0x275f28, 0x2aad30),
+    (0x275f88, 0x2aad90),
+    (0x275fe8, 0x2aadf0),
+    (0x2760b0, 0x2aaeb8),
+    (0x276188, 0x2aaf90),
+    (0x2761c0, 0x2aafc8),
+    (0x276268, 0x2ab070),
+    (0x276708, 0x2ab380),
+    (0x276798, 0x2ab410),
+    (0x276818, 0x2ab490),
+    (0x276898, 0x2ab510),
+    (0x276918, 0x2ab590),
+    (0x276998, 0x2ab610),
+    (0x276a20, 0x2ab698),
+    (0x276aa0, 0x2ab718),
+    (0x276b20, 0x2ab798),
+    (0x28e640, 0x2aac40),
+    (0x28e690, 0x2aac90),
+    (0x28e6e0, 0x2aace0),
+    (0x28e730, 0x2aad30),
+    (0x28e790, 0x2aad90),
+    (0x28e7f0, 0x2aadf0),
+    (0x28e8b8, 0x2aaeb8),
+    (0x28e990, 0x2aaf90),
+    (0x28e9c8, 0x2aafc8),
+    (0x28ea70, 0x2ab070),
+    (0x28ed80, 0x2ab380),
+    (0x28ee10, 0x2ab410),
+    (0x28ee90, 0x2ab490),
+    (0x28ef10, 0x2ab510),
+    (0x28ef90, 0x2ab590),
+    (0x28f010, 0x2ab610),
+    (0x28f098, 0x2ab698),
+    (0x28f118, 0x2ab718),
+    (0x28f198, 0x2ab798),
+    (0x29dd00, 0x2aac40),
+    (0x29dd50, 0x2aac90),
+    (0x29dda0, 0x2aace0),
+    (0x29ddf0, 0x2aad30),
+    (0x29de50, 0x2aad90),
+    (0x29deb0, 0x2aadf0),
+    (0x29df78, 0x2aaeb8),
+    (0x29e050, 0x2aaf90),
+    (0x29e088, 0x2aafc8),
+    (0x29e130, 0x2ab070),
+    (0x29e440, 0x2ab380),
+    (0x29e4d0, 0x2ab410),
+    (0x29e550, 0x2ab490),
+    (0x29e5d0, 0x2ab510),
+    (0x29e650, 0x2ab590),
+    (0x29e6d0, 0x2ab610),
+    (0x29e758, 0x2ab698),
+    (0x29e7d8, 0x2ab718),
+    (0x29e858, 0x2ab798),
+];
+
 #[test]
 fn widget_bases_match_the_original() {
+    let pairs: Vec<(u32, u32)> = FUNCS.iter().map(|&f| (f, f)).collect();
+    run(&pairs, 800);
+}
+
+/// (board row G9y2) each copy run in the runner against the port of the function it copies
+#[test]
+fn copies_match_the_original() {
+    run(&COPIES, 300);
+}
+
+/// Every case runs `pairs[k].0` in the runner against the port of `pairs[k].1`
+fn run(pairs: &[(u32, u32)], per: u32) {
     let Some(mut r) = Runner::from_env() else { return };
-    for f in FUNCS {
-        r.allow(f);
+    for f in FUNCS.iter().chain(pairs.iter().map(|p| &p.0)) {
+        r.allow(*f);
     }
     let mut stubs = vec![
         wg::LIST_DELETE_ALL, wg::LIST_INIT, wg::NODE_UNLINK, wg::WIDGET_UPDATE_ACTIVITY, wg::WIDGET_RESET_ACTIVITY,
@@ -206,9 +290,8 @@ fn widget_bases_match_the_original() {
     let ident = read(&mut r, IDENT);
     let mut g = Rng(0x9e1a_0000_0000_0001);
     let mut walked = 0usize;
-    let per = 800u32;
-    for case in 0..FUNCS.len() as u32 * per {
-        let func = FUNCS[(case % FUNCS.len() as u32) as usize];
+    for case in 0..pairs.len() as u32 * per {
+        let (addr, func) = pairs[(case % pairs.len() as u32) as usize];
         let mut m = Mem { regions: vec![(DATA.0, data.clone()), (IDENT.0, ident.clone()), (ARENA, vec![0; SIZE as usize]), (SCRATCH, vec![0; 0x800])] };
         for k in 0..SIZE / 4 {
             m.w32(ARENA + 4 * k, g.next());
@@ -338,7 +421,7 @@ fn widget_bases_match_the_original() {
         }
         r.cpu.set_f(12, x);
         r.cpu.set_f(13, y);
-        r.call(func).unwrap_or_else(|e| panic!("case {case} {func:#x}: {e}"));
+        r.call(addr).unwrap_or_else(|e| panic!("case {case} {addr:#x} ({func:#x}): {e}"));
         if ours != none {
             assert_eq!(r.cpu.gpr(2) as u32, ours, "case {case} {func:#x}: the answer");
         }

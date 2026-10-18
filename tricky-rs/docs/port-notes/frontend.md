@@ -2106,3 +2106,13 @@ written by the items' stand-ins; the size call's buffer is not logged, as only t
 0x7f, sizes below 1 and a gap of 0 are in the mix.
 
 All 124 mutants are caught.
+
+## G9y2: the copies of the widget group's operations (`tests/fe_wgroup.rs`)
+
+The group operations (`FE3DWGroup_*`) and the list operations' applies (`ListFE3D*Op_Apply*`) are compiled into
+several translation units. There are 67 copies in all: three of each group operation and up to five of each apply.
+Each copy has the same bytes as the G9x1 function it copies (`*4` / `Apply4`), but for its branch targets (compared
+with the branches taken relative to each function's start). G9x1's test now also runs every copy in the runner
+against the port of the function it copies. That is 20,100 cases (300 a copy), with some 10,000 nodes given an
+operation. The port is G9x1's, and its mutants were caught there, so the copies are not mutated again. One copy,
+`ListFE3DFormatOp_Apply1` 0x26fa70, is checked in G9y1 as the menu's format apply.
