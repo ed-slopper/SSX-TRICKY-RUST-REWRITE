@@ -2394,3 +2394,22 @@ copy, as the game's own entries don't use every mix.
 
 Of the 68 mutants, 67 are caught. The survivor is equivalent under the chop rule: it drops the sticky bit from the
 unsigned conversion.
+
+### Batch 3: the rider bio's texts and the DVD screen's menus (`tests/fe_bio.rs`)
+
+- **`FE3D_BuildRiderBioTextA` / `B`.** A scrolling text in the bio's group shows the line range for the screen's
+  rider. The career's bio line for the rider's record picks the range: text A reads its table at 0x3af9c8, text B
+  has its own (none past 11). The text is sized 350 × 260 at (205, 120), then laid out and added, and the group is
+  shown.
+- **`FE_BuildDvdCharacterMenu` / `FE_BuildDvdDemoMenu`.** A menu list of the screen's lines: the twelve character
+  ids in order that have a string, or the two demo lines. Each line is red with a grey outline and slides in from
+  740. The menu goes at (-640, 132 / 200), is kept at +0x68 / +0x74 and added.
+
+The test runs 4,000 cases (4 functions, 1,000 each). The menu list's own virtuals are read from the game's table
+and stubbed; the list-add stand-in logs the list's +0x190.
+
+Of the 40 mutants, 38 are caught. The two survivors are equivalent on the game's own data: the two text scales
+(0x3481c8, 0x3481cc) hold the same value, and the twelfth character id has no string.
+
+G9y7 is done: every small function in 0x26c000..0x2aab58 is now checked. The nine big screen builders that the
+index also marked `ported` (only named as calls) are G9y8.

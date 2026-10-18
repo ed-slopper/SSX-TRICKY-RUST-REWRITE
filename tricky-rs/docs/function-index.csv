@@ -5275,8 +5275,8 @@ address,size,name,system,status
 0x27e918,3304,FE_BuildRiderProfileScreen,frontend,ported
 0x27f600,14128,FE_BuildRiderBioScreen,frontend,ported
 0x282d30,8000,FE_BuildRiderRecordsScreen,frontend,ported
-0x284c70,752,FE3D_BuildRiderBioTextA,frontend?,ported
-0x284f60,720,FE3D_BuildRiderBioTextB,frontend?,ported
+0x284c70,752,FE3D_BuildRiderBioTextA,frontend?,checked
+0x284f60,720,FE3D_BuildRiderBioTextB,frontend?,checked
 0x285230,26424,FE_BuildRiderShortBioScreen,frontend,ported
 0x28b968,1124,cFE3DStateRiderProfile::vf11_28b968,frontend,checked
 0x28bdd0,76,cFE3DStateRiderProfile::Update,frontend,checked
@@ -5417,8 +5417,8 @@ address,size,name,system,status
 0x293e10,10848,cFE3DStateDVDContent::vf11_293e10,frontend,checked
 0x296870,2192,FE_BuildDvdCharacterList,frontend,ported
 0x297178,3624,FE_BuildDvdJukebox,frontend,ported
-0x297fa0,968,FE_BuildDvdCharacterMenu,frontend,ported
-0x298368,856,FE_BuildDvdDemoMenu,frontend,ported
+0x297fa0,968,FE_BuildDvdCharacterMenu,frontend,checked
+0x298368,856,FE_BuildDvdDemoMenu,frontend,checked
 0x2986c0,2988,cFE3DStateDVDContent::Update,frontend,checked
 0x299270,128,cFE3DStateDVDContent::Activate,frontend,checked
 0x2992f0,68,cFE3DStateDVDContent::Deactivate,frontend,checked

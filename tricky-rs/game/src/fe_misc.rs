@@ -1122,3 +1122,194 @@ pub fn build_single_text(m: &mut Mem, e: &mut dyn FeEnv, s: u32, buf: u32) -> u3
     }
     vcall(m, e, page, 0x140, &[])
 }
+
+// ---- the rider bio's two texts (row G9y7)
+
+/// The career's rider record (0x164318: the career, the rider) and its bio line (0x164330: the career, the
+/// record's first byte); the texts' allocation name; the first text's line ranges (12 of start, end)
+pub const RIDER_RECORD: u32 = 0x164318;
+pub const RIDER_BIO_LINE: u32 = 0x164330;
+pub const BIO_TEXT_NAME: u32 = 0x3af9b8;
+pub const BIO_LINES_A: u32 = 0x3af9c8;
+/// The second text's line ranges, by the bio line
+const BIO_LINES_B: [(u32, u32); 12] = [
+    (0x259, 0x267),
+    (0x268, 0x27e),
+    (0x27f, 0x291),
+    (0x292, 0x2a8),
+    (0x2a9, 0x2bc),
+    (0x2bd, 0x2d4),
+    (0x2d5, 0x2e9),
+    (0x2ea, 0x2ff),
+    (0x300, 0x313),
+    (0x314, 0x322),
+    (0x323, 0x33c),
+    (0x33d, 0x350),
+];
+
+/// `FE3D_BuildRiderBioTextA` 0x284c70 / `B` 0x284f60(s; `buf` 0x10 bytes): a scrolling text (0x1c0 bytes, the menu
+/// font) in the bio's group (+0x500 / +0x4f4) showing the lines for the screen's rider (+0x2e, signed): the career's
+/// bio line for the rider's record picks the range (A: from the table at 0x3af9c8; B: its own, none past 11); its
+/// first line one on, +0x190 0; sized 350 × 260, at (205, 120), white with a red second colour and outline; +0x1b8
+/// 1, +0x18c 0.8, +0x1ac 8, +0x1b4 0; laid out, added to the group, the group shown (+0x20 with 1)
+pub fn rider_bio_text(m: &mut Mem, e: &mut dyn FeEnv, s: u32, second: bool, buf: u32) {
+    let rider = m.r8(s + 0x2e) as i8 as i32 as u32;
+    let group = m.r32(s + if second { 0x4f4 } else { 0x500 });
+    let rec = e.call(m, RIDER_RECORD, &[CAREER, rider]);
+    let first = m.r8(rec) as i8 as i32 as u32;
+    let t = e.call(m, ALLOC, &[BIO_TEXT_NAME, 0x1c0, 0]);
+    if t != 0 {
+        e.call(m, FILL, &[t, 0xdead_c0de, 0x1c0]);
+    }
+    let font = m.r32(m.r32(GAPP) + 0x60);
+    let t = e.call(m, SCROLL_TEXT_CTOR, &[t, s, group, font]);
+    let k = e.call(m, RIDER_BIO_LINE, &[CAREER, first]);
+    let (start, end) = if second {
+        if k < 12 { BIO_LINES_B[k as usize] } else { (0, 0) }
+    } else {
+        let at = BIO_LINES_A + 8 * k;
+        (m.r32(at), m.r32(at + 4))
+    };
+    m.w32(t + 0x198, start.wrapping_add(1));
+    m.w32(t + 0x19c, end);
+    m.w32(t + 0x190, 0);
+    let put = |m: &mut Mem, v: [u32; 4]| {
+        for (k, x) in v.into_iter().enumerate() {
+            m.w32(buf + 4 * k as u32, x);
+        }
+    };
+    put(m, [350.0f32.to_bits(), 260.0f32.to_bits(), 0, ONE]);
+    vcall(m, e, t, 0x138, &[buf]);
+    put(m, [205.0f32.to_bits(), 120.0f32.to_bits(), 0, ONE]);
+    e.call(m, crate::fe3dstate::WIDGET_PLACE, &[t, buf]);
+    put(m, [ONE; 4]);
+    vcall(m, e, t, 0x108, &[buf]);
+    put(m, [ONE, 0, 0, 0]);
+    vcall(m, e, t, 0x110, &[buf]);
+    put(m, [ONE, 0, 0, 0]);
+    vcall(m, e, t, 0x50, &[buf]);
+    m.w32(t + 0x1b8, 1);
+    m.w32(t + 0x18c, 0x3f4c_cccd);
+    m.w32(t + 0x1ac, 8.0f32.to_bits());
+    m.w32(t + 0x1b4, 0);
+    vcall(m, e, t, 0x140, &[]);
+    group_add(m, e, group, t);
+    vcall(m, e, group, 0x20, &[1]);
+}
+
+// ---- the DVD screen's two menus (row G9y7)
+
+/// The menus' allocation names and tables: the menu (0x3b2908), the character menu's texts (0x3b2448) and order
+/// (12 ids at 0x3b2918, their strings at 0x348098, 0 for none), the demo menu's texts (0x3b2950) and strings (two at
+/// 0x3b2948); the menus' gap (0x348030) and the texts' scales (0x3481c8, 0x3481cc); a widget's colour run (0x2ac3b0)
+pub const DVD_MENU_NAME: u32 = 0x3b2908;
+pub const DVD_CHAR_TEXT_NAME: u32 = 0x3b2448;
+pub const DVD_CHAR_ORDER: u32 = 0x3b2918;
+pub const DVD_CHAR_STRINGS: u32 = 0x348098;
+pub const DVD_DEMO_TEXT_NAME: u32 = 0x3b2950;
+pub const DVD_DEMO_STRINGS: u32 = 0x3b2948;
+pub const DVD_MENU_GAP: u32 = 0x348030;
+pub const COLOUR_RUN: u32 = 0x2ac3b0;
+
+/// The menu (a list of 0x1b0 bytes made for the screen: the menu's constructor with (0, 0, 0, 1), the list's table,
+/// +0x190 2, the gap (+0x15c), +0x194..+0x1a0 cleared)
+fn dvd_menu(m: &mut Mem, e: &mut dyn FeEnv, s: u32) -> u32 {
+    let l = e.call(m, ALLOC, &[DVD_MENU_NAME, 0x1b0, 0]);
+    if l != 0 {
+        e.call(m, FILL, &[l, 0xdead_c0de, 0x1b0]);
+    }
+    e.call(m, crate::fe_world::MENU_CTOR, &[l, s, 0, 0, 0, 1]);
+    m.w32(l + 0x190, 2);
+    m.w32(l + 0xc, crate::fe_world::MENU_LIST_VTABLE);
+    let gap = m.r32(DVD_MENU_GAP);
+    m.w32(l + 0x15c, gap);
+    for at in [0x194u32, 0x198, 0x19c, 0x1a0] {
+        m.w32(l + at, 0);
+    }
+    l
+}
+
+/// One of the menu's lines: a single-line text (0x130 bytes, the menu font) with its id and string (through its own
+/// +0x150 or +0x158), +0x114 0 and its scale; red, red, grey and grey (+0x108, +0x110, +0x120, +0x118), slid in from
+/// 740 (track 2, 30 frames), hidden (+0x20 with 0), enabled (+0x100 with 1), added to the menu
+fn dvd_line(m: &mut Mem, e: &mut dyn FeEnv, s: u32, l: u32, name: u32, id: u32, string: (u32, u32), scale: u32, buf: u32) {
+    let t = e.call(m, ALLOC, &[name, 0x130, 0]);
+    if t != 0 {
+        e.call(m, FILL, &[t, 0xdead_c0de, 0x130]);
+    }
+    let font = m.r32(m.r32(GAPP) + 0x60);
+    let t = e.call(m, TEXT_CTOR, &[t, s, l, font]);
+    m.w32(t, id);
+    vcall(m, e, t, string.0, &[string.1]);
+    m.w32(t + 0x114, 0);
+    let sc = m.r32(scale);
+    m.w32(t + 0x118, sc);
+    vcall(m, e, t, 0x108, &[buf]);
+    vcall(m, e, t, 0x110, &[buf + 0x10]);
+    vcall(m, e, t, 0x120, &[buf + 0x20]);
+    vcall(m, e, t, 0x118, &[buf + 0x30]);
+    for (k, v) in [740.0f32.to_bits(), 0, 0, 0].into_iter().enumerate() {
+        m.w32(buf + 0x50 + 4 * k as u32, v);
+    }
+    e.call(m, COLOUR_RUN, &[t, 2, buf + 0x50, 0x1e, 0]);
+    vcall(m, e, t, 0x20, &[0]);
+    vcall(m, e, t, 0x100, &[1]);
+    vcall(m, e, l, 0x148, &[t]);
+}
+
+/// The menu finished: +0x190 1, +0x154 2, +0x150 1, +0x70 2, +0x13c 0, placed at (-640, `y`), +0x114 and +0x115 -1,
+/// laid out, kept at `at` of the screen and added to it
+fn dvd_menu_done(m: &mut Mem, e: &mut dyn FeEnv, s: u32, l: u32, y: f32, at: u32, buf: u32) -> u32 {
+    m.w32(l + 0x190, 1);
+    m.w32(l + 0x154, 2);
+    m.w32(l + 0x150, 1);
+    m.w32(l + 0x70, 2);
+    m.w32(l + 0x13c, 0);
+    for (k, v) in [(-640.0f32).to_bits(), y.to_bits(), 0, ONE].into_iter().enumerate() {
+        m.w32(buf + 0x50 + 4 * k as u32, v);
+    }
+    e.call(m, crate::fe3dstate::WIDGET_PLACE, &[l, buf + 0x50]);
+    m.w8(l + 0x115, 0xff);
+    m.w8(l + 0x114, 0xff);
+    vcall(m, e, l, 0x140, &[]);
+    m.w32(s + at, l);
+    e.call(m, STATE_ADD, &[s, l])
+}
+
+/// The lines' colours: red (twice) and grey (twice), at `buf`..`buf + 0x40`
+fn dvd_colours(m: &mut Mem, buf: u32) {
+    let half = 0x3f00_0000;
+    for (k, v) in [[ONE, 0, 0, 0], [ONE, 0, 0, 0], [ONE, half, half, half], [ONE, half, half, half]].iter().enumerate() {
+        for (i, x) in v.iter().enumerate() {
+            m.w32(buf + 0x10 * k as u32 + 4 * i as u32, *x);
+        }
+    }
+}
+
+/// `FE_BuildDvdCharacterMenu` 0x297fa0(s; `buf` 0x60 bytes): the character menu (+0x68): a line for each of the 12
+/// ids in order (0x3b2918) that has a string (0x348098), its string through +0x158, at y 132
+pub fn dvd_character_menu(m: &mut Mem, e: &mut dyn FeEnv, s: u32, buf: u32) -> u32 {
+    dvd_colours(m, buf);
+    let l = dvd_menu(m, e, s);
+    for k in 0..12 {
+        let id = m.r32(DVD_CHAR_ORDER + 4 * k);
+        let string = m.r32(DVD_CHAR_STRINGS + 4 * id);
+        if string == 0 {
+            continue;
+        }
+        dvd_line(m, e, s, l, DVD_CHAR_TEXT_NAME, id, (0x158, string), 0x3481c8, buf);
+    }
+    dvd_menu_done(m, e, s, l, 132.0, 0x68, buf)
+}
+
+/// `FE_BuildDvdDemoMenu` 0x298368(s; `buf` 0x60 bytes): the demo menu (+0x74): its two lines (ids 0, 1; strings at
+/// 0x3b2948 through +0x150), at y 200
+pub fn dvd_demo_menu(m: &mut Mem, e: &mut dyn FeEnv, s: u32, buf: u32) -> u32 {
+    dvd_colours(m, buf);
+    let l = dvd_menu(m, e, s);
+    for k in 0..2 {
+        let string = m.r32(DVD_DEMO_STRINGS + 4 * k);
+        dvd_line(m, e, s, l, DVD_DEMO_TEXT_NAME, k, (0x150, string), 0x3481cc, buf);
+    }
+    dvd_menu_done(m, e, s, l, 200.0, 0x74, buf)
+}
