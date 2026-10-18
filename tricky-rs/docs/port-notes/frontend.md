@@ -2262,3 +2262,41 @@ Of the 55 mutants, 50 are caught. The five survivors are equivalent:
 - `y - 0` against `y`, which is the same here (twice);
 - a size call through the class's table against the object's, when the object was just given that class's table
   (twice).
+
+## G9y6: the rest of the front end's own code (`game/src/fe_misc.rs`, `tests/fe_misc.rs`)
+
+The small functions left in 0x26c000..0x2aab58:
+
+- **Destructors.**
+  - The cameras' (combined, scripted, plain) and the animations' and geometry's: each sets its table, runs what its
+    class adds (the node's vf1, the scripted camera's own part 0x26ac50), then goes on to its base, down to the
+    thing's destructor (0x2acd10).
+  - The fourteen states' destructors: each sets its table and goes on to the state's (0x2717a0).
+  - The text icon's, text entry's, icon text's and icon entry's: each sets its table and goes on to the entry's.
+- **Answers.** The twelve screen numbers the states' vf13 answer, nine virtuals that do nothing, one that answers 0
+  and twelve that answer 1.
+- **Helpers.**
+  - `FE3DCamera_PlayShot`, and the scripted camera's vf28 (+0xb8).
+  - `Vec4_ScaleCopy13`: a quadword scaled, read and written at the quadwords the pointers fall in.
+  - The pad's enter / escape tests.
+  - A free on flag 1 (0x270218).
+  - `FE_CreateDialog`: a thing of 0x170 bytes, its float set, run in on track 1, raised and added to the state.
+  - The count of the item table's groups present in the state's list (0x2754d8).
+  - The title group's text and pieces resized (0x275760).
+  - A two-list destructor (0x2759f0).
+  - A child placed (0x28e020).
+  - The overlay's state update (0x293120).
+  - The player count's vf26.
+- **The options pages' refreshes.**
+  - Sound: two choices, five volume bars and an inverted choice from the sound player.
+  - Game: four choices from the career's settings.
+  - Display: five choices, one inverted and one less 2, and the brightness bar.
+
+The test runs 60,000 cases (75 functions, 800 each). The thing's destructor 0x2acd10 is a stand-in on both sides,
+as `fe_wentry`'s entry destructor already calls it, so the cameras' ports call it too. Only the group count is
+given finds that answer none, as the other callers don't look. The vector scale is handed unaligned pointers and
+zero lanes.
+
+Of the 68 mutants, 64 are caught. The four survivors drop a destructor's own table store (the text icon's, text
+entry's, icon text's and icon entry's). Each is a dead store: the next destructor in the chain writes its own
+table before anything reads it.

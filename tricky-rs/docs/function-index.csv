@@ -4940,29 +4940,29 @@ address,size,name,system,status
 0x26c090,280,FE3DCamera_PanToVenue,camera,ported
 0x26c1a8,280,FE3DCamera_PlayVenueShot,camera,ported
 0x26c2c0,172,VenueSel_PlayCurrentShot,frontend?,ported
-0x26c370,16,FE3DCamera_PlayShot,camera,not started
+0x26c370,16,FE3DCamera_PlayShot,camera,checked
 0x26c430,8,FUN_0026c430,frontend?,ported
-0x26c450,80,cFE3DCameraCombined::~cFE3DCameraCombined,camera,not started
+0x26c450,80,cFE3DCameraCombined::~cFE3DCameraCombined,camera,checked
 0x26c4a0,80,cFE3DCameraCombined::__tf,runtime,host
-0x26c4f0,8,cFE3DCameraScripted::vf28_26c4f0,camera,not started
-0x26c500,68,cFE3DCameraScripted::~cFE3DCameraScripted,camera,not started
+0x26c4f0,8,cFE3DCameraScripted::vf28_26c4f0,camera,checked
+0x26c500,68,cFE3DCameraScripted::~cFE3DCameraScripted,camera,checked
 0x26c548,80,cFE3DCameraScripted::__tf,runtime,host
-0x26c598,8,cFE3DCamera::vf28_26c598,camera,not started
-0x26c5d0,68,cFE3DCamera::~cFE3DCamera,camera,not started
+0x26c598,8,cFE3DCamera::vf28_26c598,camera,checked
+0x26c5d0,68,cFE3DCamera::~cFE3DCamera,camera,checked
 0x26c618,80,cFE3DCamera::__tf,runtime,host
-0x26c680,20,cFE3DAnimTranslate::~cFE3DAnimTranslate,frontend,not started
+0x26c680,20,cFE3DAnimTranslate::~cFE3DAnimTranslate,frontend,checked
 0x26c790,80,cFE3DAnimTranslate::__tf,runtime,host
-0x26c820,20,cFE3DAnimRotate::~cFE3DAnimRotate,frontend,not started
+0x26c820,20,cFE3DAnimRotate::~cFE3DAnimRotate,frontend,checked
 0x26c930,80,cFE3DAnimRotate::__tf,runtime,host
-0x26c9a0,20,cFE3DAnim::~cFE3DAnim,frontend,not started
+0x26c9a0,20,cFE3DAnim::~cFE3DAnim,frontend,checked
 0x26cab0,80,cFE3DAnim::__tf,runtime,host
 0x26cbf0,80,cFE3DMovieGeometry::__tf,runtime,host
-0x26cc40,20,cFE3DGeometry::~cFE3DGeometry,frontend,not started
+0x26cc40,20,cFE3DGeometry::~cFE3DGeometry,frontend,checked
 0x26cd48,80,cFE3DGeometry::__tf,runtime,host
-0x26cd98,44,Vec4_ScaleCopy13,frontend?,not started
+0x26cd98,44,Vec4_ScaleCopy13,frontend?,checked
 0x26cdc8,32,CheatCode_Matches,input,ported
-0x26cde8,16,FEInput_IsEnter,frontend?,ported
-0x26cdf8,16,FEInput_IsEscape,frontend?,ported
+0x26cde8,16,FEInput_IsEnter,frontend?,checked
+0x26cdf8,16,FEInput_IsEscape,frontend?,checked
 0x26ce08,40,FEKey_IsAccept,frontend?,checked
 0x26ce30,40,FEKey_IsBack,frontend?,checked
 0x26ce58,16,FUN_0026ce58,frontend?,checked
@@ -5031,7 +5031,7 @@ address,size,name,system,status
 0x2701a8,24,cListFE3DFindHashNameOp::vf1_2701a8,frontend?,checked
 0x2701c0,80,cListFE3DFindHashNameOp::__tf,runtime,host
 0x270210,8,cListFE3DFindHashNameOp::~cListFE3DFindHashNameOp,frontend?,checked
-0x270218,28,FUN_00270218,frontend?,ported
+0x270218,28,FUN_00270218,frontend?,checked
 0x270260,64,cListOperator::__tf,runtime,host
 0x2702e0,68,cFE3DSound::cFE3DSound,frontend,checked
 0x270328,76,cFE3DSound::~cFE3DSound,frontend,checked
@@ -5155,7 +5155,7 @@ address,size,name,system,status
 0x2718f0,204,FE3DButtonBar_SetVisible,frontend?,checked
 0x2719c0,1844,FE3D_BuildButtonBar,frontend?,checked
 0x2720f8,7708,FE3D_BuildWorldGroup,frontend?,checked
-0x273f18,232,FE_CreateDialog,frontend,not started
+0x273f18,232,FE_CreateDialog,frontend,checked
 0x274000,264,FE_CreateList,frontend,checked
 0x274108,256,FE_CreateList2,frontend,checked
 0x274208,112,FE3D_BuildDialogScreen,frontend?,ported
@@ -5172,28 +5172,28 @@ address,size,name,system,status
 0x274f18,556,cFE3DState::LayoutWidgets,frontend,checked
 0x275148,800,cFE3DState::Update,frontend,checked
 0x275468,108,FEList_SetFocused,frontend?,ported
-0x2754d8,268,FUN_002754d8,frontend?,not started
+0x2754d8,268,FUN_002754d8,frontend?,checked
 0x2755e8,372,FUN_002755e8,frontend?,ported
-0x275760,296,FUN_00275760,frontend?,not started
+0x275760,296,FUN_00275760,frontend?,checked
 0x275888,56,cFE3DState::vf21_275888,frontend,checked
 0x2758c0,220,cFE3DState::vf22_2758c0,frontend,checked
 0x2759a0,40,cFE3DState::vf26_2759a0,frontend,checked
 0x2759c8,36,FE_GetSpriteRect,frontend,ported
-0x2759f0,124,FUN_002759f0,frontend?,not started
+0x2759f0,124,FUN_002759f0,frontend?,checked
 0x275a70,80,FUN_00275a70,frontend?,checked
 0x275ac8,72,FUN_00275ac8,frontend?,checked
 0x275b10,124,FE_PushState,frontend,checked
 0x275b90,124,FE_PopState,frontend,checked
 0x275c10,76,FE_FinishState,frontend,checked
 0x275c60,40,FEStateStack_Clear,frontend?,checked
-0x275d30,8,cFE3DTextIcon::vf22_275d30,frontend,not started
-0x275d38,8,cFE3DTextIcon::vf42_275d38,frontend,not started
-0x275d40,8,cFE3DTextIcon::vf40_275d40,frontend,not started
-0x275d48,8,cFE3DTextIcon::vf19_275d48,frontend,not started
-0x275d50,20,cFE3DTextIcon::~cFE3DTextIcon,frontend,not started
-0x275db8,8,cFE3DWTextEntry::vf41_275db8,frontend,not started
-0x275dc0,8,cFE3DWTextEntry::vf40_275dc0,frontend,not started
-0x275dc8,20,cFE3DWTextEntry::~cFE3DWTextEntry,frontend,not started
+0x275d30,8,cFE3DTextIcon::vf22_275d30,frontend,checked
+0x275d38,8,cFE3DTextIcon::vf42_275d38,frontend,checked
+0x275d40,8,cFE3DTextIcon::vf40_275d40,frontend,checked
+0x275d48,8,cFE3DTextIcon::vf19_275d48,frontend,checked
+0x275d50,20,cFE3DTextIcon::~cFE3DTextIcon,frontend,checked
+0x275db8,8,cFE3DWTextEntry::vf41_275db8,frontend,checked
+0x275dc0,8,cFE3DWTextEntry::vf40_275dc0,frontend,checked
+0x275dc8,20,cFE3DWTextEntry::~cFE3DWTextEntry,frontend,checked
 0x275e38,76,FE3DWGroup_UpdateActivity1,frontend?,checked
 0x275e88,76,FE3DWGroup_ResetActivity1,frontend?,checked
 0x275ed8,76,FE3DWGroup_SkipActivity1,frontend?,checked
@@ -5206,16 +5206,16 @@ address,size,name,system,status
 0x276268,116,FE3DWGroup_Offset1,frontend?,checked
 0x2762e0,8,FE3DGroup_Add,frontend?,ported
 0x276338,80,cFE3DWGroup::__tf,runtime,host
-0x2763a0,8,cFE3DState::vf25_2763a0,frontend,not started
-0x2763a8,8,cFE3DState::vf24_2763a8,frontend,not started
-0x2763b0,8,cFE3DState::vf23_2763b0,frontend,not started
+0x2763a0,8,cFE3DState::vf25_2763a0,frontend,checked
+0x2763a8,8,cFE3DState::vf24_2763a8,frontend,checked
+0x2763b0,8,cFE3DState::vf23_2763b0,frontend,checked
 0x2763f0,8,FE3D_AddToWorldList,frontend?,checked
-0x276418,8,cFE3DState::vf20_276418,frontend,not started
-0x276420,8,cFE3DState::vf19_276420,frontend,not started
-0x276428,8,cFE3DState::vf18_276428,frontend,not started
-0x276430,8,cFE3DState::vf13_276430,frontend,not started
-0x276460,8,cFE3DState::vf11_276460,frontend,not started
-0x2764a0,8,cFE3DState::CreateNextState,frontend,not started
+0x276418,8,cFE3DState::vf20_276418,frontend,checked
+0x276420,8,cFE3DState::vf19_276420,frontend,checked
+0x276428,8,cFE3DState::vf18_276428,frontend,checked
+0x276430,8,cFE3DState::vf13_276430,frontend,checked
+0x276460,8,cFE3DState::vf11_276460,frontend,checked
+0x2764a0,8,cFE3DState::CreateNextState,frontend,checked
 0x2764a8,12,cFE3DState::vf6_2764a8,frontend,checked
 0x2764e0,80,cFE3DState::__tf,runtime,host
 0x2766b8,80,cListFE3DGetExtentOp::__tf,runtime,host
@@ -5302,27 +5302,27 @@ address,size,name,system,status
 0x28dd50,164,cFE3DStateCustomBody::vf22_28dd50,frontend,checked
 0x28ddf8,152,cFE3DStateCustomBody::vf26_28ddf8,frontend,checked
 0x28de90,196,FECustomBody_UpdateDesc,frontend?,checked
-0x28e020,8,FUN_0028e020,frontend?,not started
+0x28e020,8,FUN_0028e020,frontend?,checked
 0x28e040,80,cFE3DTextIcon::__tf,runtime,host
-0x28e108,20,cFE3DStateCustomBody::~cFE3DStateCustomBody,frontend,not started
+0x28e108,20,cFE3DStateCustomBody::~cFE3DStateCustomBody,frontend,checked
 0x28e158,80,cFE3DStateCustomBody::__tf,runtime,host
-0x28e1a8,20,cFE3DStateCustomBoard::~cFE3DStateCustomBoard,frontend,not started
+0x28e1a8,20,cFE3DStateCustomBoard::~cFE3DStateCustomBoard,frontend,checked
 0x28e1c0,80,cFE3DStateCustomBoard::__tf,runtime,host
-0x28e210,20,cFE3DStateHintBook::~cFE3DStateHintBook,frontend,not started
+0x28e210,20,cFE3DStateHintBook::~cFE3DStateHintBook,frontend,checked
 0x28e260,80,cFE3DStateHintBook::__tf,runtime,host
-0x28e2b0,20,cFE3DStateRiderProfile::~cFE3DStateRiderProfile,frontend,not started
+0x28e2b0,20,cFE3DStateRiderProfile::~cFE3DStateRiderProfile,frontend,checked
 0x28e308,80,cFE3DStateRiderProfile::__tf,runtime,host
 0x28e360,76,cFE3DStateTrickBook::~cFE3DStateTrickBook,frontend,checked
-0x28e420,8,cFE3DStateTrickBook::vf13_28e420,frontend,not started
+0x28e420,8,cFE3DStateTrickBook::vf13_28e420,frontend,checked
 0x28e428,80,cFE3DStateTrickBook::__tf,runtime,host
-0x28e478,20,cFE3DStateCharacterAccept::~cFE3DStateCharacterAccept,frontend,not started
-0x28e4c8,8,cFE3DStateCharacterAccept::vf13_28e4c8,frontend,not started
+0x28e478,20,cFE3DStateCharacterAccept::~cFE3DStateCharacterAccept,frontend,checked
+0x28e4c8,8,cFE3DStateCharacterAccept::vf13_28e4c8,frontend,checked
 0x28e4d0,80,cFE3DStateCharacterAccept::__tf,runtime,host
-0x28e520,20,cFE3DStateCharacterModify::~cFE3DStateCharacterModify,frontend,not started
-0x28e570,8,cFE3DStateCharacterModify::vf13_28e570,frontend,not started
+0x28e520,20,cFE3DStateCharacterModify::~cFE3DStateCharacterModify,frontend,checked
+0x28e570,8,cFE3DStateCharacterModify::vf13_28e570,frontend,checked
 0x28e578,80,cFE3DStateCharacterModify::__tf,runtime,host
-0x28e5c8,20,cFE3DStateCharacterSelect::~cFE3DStateCharacterSelect,frontend,not started
-0x28e5e0,8,cFE3DStateCharacterSelect::vf13_28e5e0,frontend,not started
+0x28e5c8,20,cFE3DStateCharacterSelect::~cFE3DStateCharacterSelect,frontend,checked
+0x28e5e0,8,cFE3DStateCharacterSelect::vf13_28e5e0,frontend,checked
 0x28e5e8,80,cFE3DStateCharacterSelect::__tf,runtime,host
 0x28e640,76,FE3DWGroup_UpdateActivity2,frontend?,checked
 0x28e690,76,FE3DWGroup_ResetActivity2,frontend?,checked
@@ -5391,18 +5391,18 @@ address,size,name,system,status
 0x292d80,236,FEMemCard_ShowEmptySlots,save,checked
 0x292e70,564,FEMemCard_LayoutMessage,save,checked
 0x2930a8,112,FEMemCard_HideInfoGroups,save,checked
-0x293120,72,FUN_00293120,frontend?,not started
+0x293120,72,FUN_00293120,frontend?,checked
 0x293210,8,cFEStateMCOverlay::vf23_293210,save,checked
 0x293218,8,cFEStateMCOverlay::vf26_293218,save,ported
 0x293230,92,cFEStateMCOverlay::__tf,runtime,host
-0x293290,8,cFE3DIconText::vf22_293290,frontend,not started
-0x293298,8,cFE3DIconText::vf41_293298,frontend,not started
-0x2932a0,8,cFE3DIconText::vf19_2932a0,frontend,not started
-0x2932a8,20,cFE3DIconText::~cFE3DIconText,frontend,not started
+0x293290,8,cFE3DIconText::vf22_293290,frontend,checked
+0x293298,8,cFE3DIconText::vf41_293298,frontend,checked
+0x2932a0,8,cFE3DIconText::vf19_2932a0,frontend,checked
+0x2932a8,20,cFE3DIconText::~cFE3DIconText,frontend,checked
 0x2932c0,80,cFE3DIconText::__tf,runtime,host
-0x293310,8,cFE3DIconEntry::vf40_293310,frontend,not started
-0x293318,8,cFE3DIconEntry::vf19_293318,frontend,not started
-0x293320,20,cFE3DIconEntry::~cFE3DIconEntry,frontend,not started
+0x293310,8,cFE3DIconEntry::vf40_293310,frontend,checked
+0x293318,8,cFE3DIconEntry::vf19_293318,frontend,checked
+0x293320,20,cFE3DIconEntry::~cFE3DIconEntry,frontend,checked
 0x293338,80,cFE3DIconEntry::__tf,runtime,host
 0x293390,60,cFE3DStateTitle::cFE3DStateTitle,frontend,checked
 0x2933d0,340,cFE3DStateTitle::CreateNextState,frontend,checked
@@ -5429,8 +5429,8 @@ address,size,name,system,status
 0x299700,1808,cFE3DStateDVDContent::vf22_299700,frontend,checked
 0x299e10,480,cFE3DStateDVDContent::vf26_299e10,frontend,checked
 0x299ff0,600,cFE3DStateDVDContent::vf21_299ff0,frontend,checked
-0x29a248,8,cFE3DStateDVDContent::vf25_29a248,frontend,not started
-0x29a250,8,cFE3DStateDVDContent::vf24_29a250,frontend,not started
+0x29a248,8,cFE3DStateDVDContent::vf25_29a248,frontend,checked
+0x29a250,8,cFE3DStateDVDContent::vf24_29a250,frontend,checked
 0x29a258,216,cFE3DStateModeSelect::CreateNextState,frontend,checked
 0x29a330,432,cFE3DStateModeSelect::vf11_29a330,frontend,checked
 0x29a4e0,288,cFE3DStateModeSelect::Activate,frontend,checked
@@ -5446,7 +5446,7 @@ address,size,name,system,status
 0x29ac50,88,cFE3DStateNumPlayers::vf19_29ac50,frontend,checked
 0x29ac68,20,cFE3DStateNumPlayers::vf20_29ac68,frontend,checked
 0x29ac80,128,cFE3DStateNumPlayers::vf22_29ac80,frontend,checked
-0x29ad00,40,cFE3DStateNumPlayers::vf26_29ad00,frontend,not started
+0x29ad00,40,cFE3DStateNumPlayers::vf26_29ad00,frontend,checked
 0x29ad28,28,FE3DNumPlayers_SetPromptText,frontend?,checked
 0x29ad48,216,cFE3DStateEventSel::CreateNextState,frontend,checked
 0x29b000,708,cFE3DStateEventSel::vf11_29b000,frontend,checked
@@ -5476,29 +5476,29 @@ address,size,name,system,status
 0x29d2d0,280,cFE3DStateUserName::Activate,frontend,checked
 0x29d3e8,220,cFE3DStateUserName::vf21_29d3e8,frontend,checked
 0x29d4c8,444,cFE3DStateUserName::vf26_29d4c8,frontend,checked
-0x29d7b0,20,cFE3DStateUserName::~cFE3DStateUserName,frontend,not started
-0x29d810,8,cFE3DStateUserName::vf13_29d810,frontend,not started
+0x29d7b0,20,cFE3DStateUserName::~cFE3DStateUserName,frontend,checked
+0x29d810,8,cFE3DStateUserName::vf13_29d810,frontend,checked
 0x29d818,80,cFE3DStateUserName::__tf,runtime,host
-0x29d868,20,cFE3DStateVenueSel::~cFE3DStateVenueSel,frontend,not started
-0x29d8b8,8,cFE3DStateVenueSel::vf13_29d8b8,frontend,not started
+0x29d868,20,cFE3DStateVenueSel::~cFE3DStateVenueSel,frontend,checked
+0x29d8b8,8,cFE3DStateVenueSel::vf13_29d8b8,frontend,checked
 0x29d8c0,80,cFE3DStateVenueSel::__tf,runtime,host
-0x29d910,20,cFE3DStateDifficultSel::~cFE3DStateDifficultSel,frontend,not started
-0x29d960,8,cFE3DStateDifficultSel::vf13_29d960,frontend,not started
+0x29d910,20,cFE3DStateDifficultSel::~cFE3DStateDifficultSel,frontend,checked
+0x29d960,8,cFE3DStateDifficultSel::vf13_29d960,frontend,checked
 0x29d968,80,cFE3DStateDifficultSel::__tf,runtime,host
-0x29d9b8,20,cFE3DStateEventSel::~cFE3DStateEventSel,frontend,not started
-0x29da08,8,cFE3DStateEventSel::vf13_29da08,frontend,not started
+0x29d9b8,20,cFE3DStateEventSel::~cFE3DStateEventSel,frontend,checked
+0x29da08,8,cFE3DStateEventSel::vf13_29da08,frontend,checked
 0x29da10,80,cFE3DStateEventSel::__tf,runtime,host
-0x29da60,20,cFE3DStateNumPlayers::~cFE3DStateNumPlayers,frontend,not started
-0x29dab0,8,cFE3DStateNumPlayers::vf13_29dab0,frontend,not started
+0x29da60,20,cFE3DStateNumPlayers::~cFE3DStateNumPlayers,frontend,checked
+0x29dab0,8,cFE3DStateNumPlayers::vf13_29dab0,frontend,checked
 0x29dab8,80,cFE3DStateNumPlayers::__tf,runtime,host
-0x29db08,20,cFE3DStateModeSelect::~cFE3DStateModeSelect,frontend,not started
-0x29db58,8,cFE3DStateModeSelect::vf13_29db58,frontend,not started
+0x29db08,20,cFE3DStateModeSelect::~cFE3DStateModeSelect,frontend,checked
+0x29db58,8,cFE3DStateModeSelect::vf13_29db58,frontend,checked
 0x29db60,80,cFE3DStateModeSelect::__tf,runtime,host
 0x29dbb0,20,cFE3DStateDVDContent::~cFE3DStateDVDContent,frontend,checked
 0x29dc30,8,cFE3DStateDVDContent::vf13_29dc30,frontend,checked
 0x29dc38,80,cFE3DStateDVDContent::__tf,runtime,host
-0x29dc88,20,cFE3DStateTitle::~cFE3DStateTitle,frontend,not started
-0x29dca0,8,cFE3DStateTitle::vf13_29dca0,frontend,not started
+0x29dc88,20,cFE3DStateTitle::~cFE3DStateTitle,frontend,checked
+0x29dca0,8,cFE3DStateTitle::vf13_29dca0,frontend,checked
 0x29dca8,80,cFE3DStateTitle::__tf,runtime,host
 0x29dd00,76,FE3DWGroup_UpdateActivity3,frontend?,checked
 0x29dd50,76,FE3DWGroup_ResetActivity3,frontend?,checked
@@ -5538,11 +5538,11 @@ address,size,name,system,status
 0x29ec70,220,FE3DOptions_WritePage2,frontend?,ported
 0x29ed50,224,FE3DOptions_ReadPage3,frontend?,ported
 0x29ee30,284,FE3DOptions_WritePage3,frontend?,ported
-0x29ef50,548,SoundOptions_Refresh,audio,not started
+0x29ef50,548,SoundOptions_Refresh,audio,checked
 0x29f178,692,SoundOptions_Apply,audio,ported
-0x29f430,216,GameOptions_Refresh,game?,not started
+0x29f430,216,GameOptions_Refresh,game?,checked
 0x29f508,232,GameOptions_Apply,game?,ported
-0x29f5f0,304,DisplayOptions_Refresh,frontend?,not started
+0x29f5f0,304,DisplayOptions_Refresh,frontend?,checked
 0x29f720,1056,FEOptions_ApplyDisplay,frontend?,checked
 0x29fb40,48,OptionsState_Refresh,frontend?,ported
 0x29fb70,15224,FE_BuildSoundOptions,frontend,ported

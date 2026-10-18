@@ -69,6 +69,7 @@ pub mod fe_world;
 pub mod fe_widget;
 pub mod fe_manager;
 pub mod fe_mcard;
+pub mod fe_misc;
 pub mod fe_menu;
 pub mod fe_flow;
 pub mod fe_custombody;
