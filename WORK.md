@@ -82,8 +82,7 @@ state machine and the renderer are ours. Nothing has been checked against the or
 | G21 | **The rider stutters back and forth the whole run** (play test by bredclan, 2026-10-17, tricky-rs.2026-10-17.exe from 3580b5f). To find: whether it is the port (our stand-ins between the exact pieces: the rider's step, its control state, the app's camera or its frame timing fighting the game's fixed tick) or something the decompiling will fix once the boarder state machine (G1) runs whole. First step: log the rider's place and heading each tick in a run (`TRICKY_SIM`) and see which one goes back and forth, and on which frames | any | | | Play test 2026-10-17 |
 | G9z | (umbrella: G9z1..G9z5) The front end's 3D scene code below 0x26c000 (0x261b38..0x26bfff, ~140 functions, most marked `ported` in the index but only called by the screens' ports): ported and checked in the runner. `cFE3D`'s constructors, destructor, vf1 and vf4 stay with G9b2d2 | any | G9y | | Added 2026-10-17 by ed-slopper/puffin |
 | G9z2b | The front end character's draw `cFE3DCharacter` vf10 0x2663f8 (2.5 KB: the model's matrices on VU0, its lights and the renderer's calls) | any | G9z2 | | Split of G9z2 2026-10-17 |
-| G9z3 | The front end's things, dialog and group copies 0x267f08..0x2692e8 (`cFE3DThing`'s constructor, 0x268308..0x268808, `cFE3DDialog` vf10..vf16 and destructor, `cFE3DWGroup`'s virtuals and destructor) | ed-slopper/puffin | G9z | | Split of G9z 2026-10-17 |
-| G9z4 | The front end's geometry, films and animations 0x269a70..0x26a430 (`FE3DGeometry_*`, `cFE3DGeometry` vf10, `cFE3DMovieGeometry`, `cFE3DAnim` / `AnimRotate` / `AnimTranslate`) | any | G9z | | Split of G9z 2026-10-17 |
+| G9z4 | The front end's geometry, films and animations 0x269a70..0x26a430 (`FE3DGeometry_*`, `cFE3DGeometry` vf10, `cFE3DMovieGeometry`, `cFE3DAnim` / `AnimRotate` / `AnimTranslate`) | ed-slopper/puffin | G9z | | Split of G9z 2026-10-17 |
 | G9z5 | The front end's cameras 0x26a4b8..0x26bfff (`cFE3DCamera`, `FE3DCamera_DrawWorld`, `cFE3DCameraScripted`, `cFE3DCameraCombined`, `FE3DCamera_PanToRider`, the screens' camera shots, `FE3DCamera_SetMode`) | any | G9z | | Split of G9z 2026-10-17 |
 | G9 | Front end: title, main menu, mode select, rider / outfit / board select, options, records, trick book screens, unlock screens, music player, loading screens (`gApp+0x734`) | unowned | E1, E5 | | [repo] `ui.rs` is ours. Split (2026-10-16): G9b the shared machinery, G9c–G9t the screens (logic ported and checked in the runner, widgets as calls out), G9u the app's menus on them |
 | G9b | (umbrella: G9b1, G9b2) The front end's shared machinery: `cFE3D` (the manager, its per-frame update and the screen it runs), the `cFE3DState` base (the phases, `TransitionIn` / `Out`, `Finish` and `CreateNextState`, `UpdateTransition`, `Activate`, `LayoutWidgets`), the widgets they drive and the 3D transition record (`FE3DTransition_*`, notes in frontend.md) | any | G9 | | Split of G9 |
@@ -154,6 +153,7 @@ matches the original.
 
 | ID | Task | Section | Who | Date | Commit |
 |---|---|---|---|---|---|
+| G9z3 | The dialog box, the group's own virtuals and two memory helpers (26 functions and 10 group copies; 48/48 mutants) | P2 | ed-slopper/puffin | 2026-10-17 | f90bb51 |
 | G9z2 | The front end's characters and their lighting (17 functions; 52/52 mutants) | P2 | ed-slopper/puffin | 2026-10-17 | ca02d13 |
 | G9z1 | The screens' audio, voice-line and world helpers (65 functions in 0x261b38..0x263270 and 4 more; 48/52 mutants, the rest equivalent) | P2 | ed-slopper/puffin | 2026-10-17 | bdefe89 |
 | G9y | The rest of the front end's own code in 0x26c000..0x2aab58 (G9y1..G9y8; every function there checked) | P2 | ed-slopper/puffin | 2026-10-17 | c86186b |
@@ -1418,3 +1418,4 @@ matches the original.
 - 2026-10-17 ed-slopper/puffin: G9y8c done (c86186b: the rider short bio, 34/34); G9y8 and G9y closed (every function in 0x26c000..0x2aab58 checked); G9z added for the 3D scene code below it (G9z1..G9z5), G9z1 claimed.
 - 2026-10-17 ed-slopper/puffin: G9z1 done (bdefe89: the screens' audio, voice-line and world helpers, 69 functions, 48/52); G9z2 claimed, its draw split off as G9z2b.
 - 2026-10-17 ed-slopper/puffin: G9z2 done (ca02d13: the characters and their lighting, 52/52); G9z3 claimed (things, dialog, group copies).
+- 2026-10-17 ed-slopper/puffin: G9z3 done (f90bb51: the dialog box and the group's own virtuals, 48/48); G9z4 claimed (geometry, films, animations).
