@@ -404,3 +404,235 @@ pub fn display_refresh(m: &mut Mem, e: &mut dyn FeEnv, page: u32) {
     let v = F(f32::from_bits(e.call(m, BRIGHTNESS, &[app])));
     widget_set_value(m, e, w, v);
 }
+
+// ---- the small helpers ported for row G9y7
+
+/// The calls out: the scripted camera's part 0x26ac30, the list's add (0x2ac140), the render operations'
+/// destructors (0x269558, 0x2694c8, 0x269440), the state's vf12 (0x2717e8), the sprite set's rectangle (0x1f9e50),
+/// the world group (0x2720f8), the two menu lists (0x274000, 0x274108), the state's buttons (0x2718f0), the dialog
+/// thing (0x273f18)
+pub const SCRIPTED_PART_26AC30: u32 = 0x26ac30;
+pub const LIST_ADD: u32 = 0x2ac140;
+pub const RENDER_OP_DTOR: u32 = 0x269558;
+pub const TEXT_OP_DTOR: u32 = 0x2694c8;
+pub const UPDATE_OP_DTOR: u32 = 0x269440;
+pub const STATE_VF12: u32 = 0x2717e8;
+pub const SPRITE_SET_RECT: u32 = 0x1f9e50;
+pub const WORLD_GROUP: u32 = 0x2720f8;
+pub const CREATE_LIST: u32 = 0x274000;
+pub const CREATE_LIST2: u32 = 0x274108;
+pub const STATE_BUTTONS: u32 = 0x2718f0;
+pub const CREATE_DIALOG: u32 = 0x273f18;
+/// The tables: the state's and its world's (and the world's allocation name), the render, text and update
+/// operations', and the render's matrix
+pub const STATE_VTABLE: u32 = 0x3aea90;
+pub const STATE_WORLD_VTABLE: u32 = 0x3b58d0;
+pub const STATE_WORLD_NAME: u32 = 0x3ae548;
+pub const RENDER_OP_VTABLE: u32 = 0x3aa010;
+pub const TEXT_OP_VTABLE: u32 = 0x3a9ff8;
+pub const UPDATE_OP_VTABLE: u32 = 0x3a9fe0;
+pub const RENDER_MATRIX: u32 = 0x346440;
+
+fn lt(a: F, b: F) -> bool {
+    a.ee() < b.ee()
+}
+
+/// A venue's shot from a table of ten (none for the others, which only keep the venue)
+fn venue_shot(m: &mut Mem, e: &mut dyn FeEnv, c: u32, k: u32, shots: [u32; 10]) -> u32 {
+    let k = k as u8 as i8 as i32 as u32;
+    let r = if k < 10 { camera_play_shot(m, e, c, shots[k as usize]) } else { 0 };
+    m.w8(c + 0x185, k as u8);
+    r
+}
+
+/// `FE3DCamera_PanToVenue` 0x26c090(c, k): the pan to venue `k` (a signed byte; 0x86, then 0x8f down to 0x87), the
+/// venue kept (+0x185)
+pub fn pan_to_venue(m: &mut Mem, e: &mut dyn FeEnv, c: u32, k: u32) -> u32 {
+    venue_shot(m, e, c, k, [0x86, 0x8f, 0x8e, 0x8d, 0x8c, 0x8b, 0x8a, 0x89, 0x88, 0x87])
+}
+
+/// `FE3DCamera_PlayVenueShot` 0x26c1a8(c, k): venue `k`'s shot (0x7c + k), the venue kept (+0x185)
+pub fn play_venue_shot(m: &mut Mem, e: &mut dyn FeEnv, c: u32, k: u32) -> u32 {
+    venue_shot(m, e, c, k, [0x7c, 0x7d, 0x7e, 0x7f, 0x80, 0x81, 0x82, 0x83, 0x84, 0x85])
+}
+
+/// `VenueSel_PlayCurrentShot` 0x26c2c0(c): the kept venue's (+0x185, signed) own shot (0x90 + k); 0x3b0000 left in
+/// the answer for any other
+pub fn play_current_shot(m: &mut Mem, e: &mut dyn FeEnv, c: u32) -> u32 {
+    let k = m.r8(c + 0x185) as i8 as i32 as u32;
+    if k < 10 { camera_play_shot(m, e, c, 0x90 + k) } else { 0x3b_0000 }
+}
+
+/// 0x26c430(c, a): the scripted camera's part (+0xc0) handed on to 0x26ac30
+pub fn camera_part_26c430(m: &mut Mem, e: &mut dyn FeEnv, c: u32, a: u32) -> u32 {
+    e.call(m, SCRIPTED_PART_26AC30, &[c + 0xc0, a])
+}
+
+/// A list operation (at `op`) handed to the world's +0x10 (its table at +0x20), then destroyed (2)
+fn world_apply(m: &mut Mem, e: &mut dyn FeEnv, w: u32, op: u32, dtor: u32) {
+    let vt = m.r32(w + 0x20);
+    let adj = m.r16(vt.wrapping_add(0x10)) as i16 as u32;
+    let f = m.r32(vt.wrapping_add(0x14));
+    e.call(m, f, &[w.wrapping_add(adj), op]);
+    e.call(m, dtor, &[op, 2]);
+}
+
+/// 0x26feb8(w; `buf` 0x48 bytes): the world rendered: the render's matrix (0x346440, 0x40 bytes) copied, a render
+/// operation pointing at the copy handed to the world, then destroyed, and the copy's free on flag (2: kept)
+pub fn render_all(m: &mut Mem, e: &mut dyn FeEnv, w: u32, buf: u32) {
+    for k in 0..16 {
+        let v = m.r32(RENDER_MATRIX + 4 * k);
+        m.w32(buf + 4 * k, v);
+    }
+    m.w32(buf + 0x40, RENDER_OP_VTABLE);
+    m.w32(buf + 0x44, buf);
+    world_apply(m, e, w, buf + 0x40, RENDER_OP_DTOR);
+    free_on_flag(m, e, buf, 2);
+}
+
+/// `FE3DTextList_RenderAll` 0x26ff40(w; `buf` 4 bytes): a text render operation handed to the world, then destroyed
+pub fn text_render_all(m: &mut Mem, e: &mut dyn FeEnv, w: u32, buf: u32) {
+    m.w32(buf, TEXT_OP_VTABLE);
+    world_apply(m, e, w, buf, TEXT_OP_DTOR);
+}
+
+/// `FE3D_UpdateAll` 0x26ff88(w; `buf` 4 bytes): an update operation handed to the world, then destroyed
+pub fn update_all(m: &mut Mem, e: &mut dyn FeEnv, w: u32, buf: u32) {
+    m.w32(buf, UPDATE_OP_VTABLE);
+    world_apply(m, e, w, buf, UPDATE_OP_DTOR);
+}
+
+/// `cFE3DState::cFE3DState` 0x2715c8(s): its links (+0 -1, +4 and +8 itself), its words (+0x10 2, +0x18..+0x20
+/// and +0x28 1, the rest cleared, +0x2c and +0x2e bytes), its table; its world (+0x34: a thing of 0xd0 bytes with
+/// the world's table and its list at +0xa0) added to the front end's list (+0x80); +0x2d -1
+pub fn state_ctor(m: &mut Mem, e: &mut dyn FeEnv, s: u32) -> u32 {
+    m.w32(s, u32::MAX);
+    m.w32(s + 4, s);
+    m.w32(s + 8, s);
+    for (at, v) in [(0x14u32, 0u32), (0x18, 1), (0x1c, 1), (0x20, 1), (0x24, 0), (0x28, 1)] {
+        m.w32(s + at, v);
+    }
+    m.w8(s + 0x2c, 0);
+    m.w8(s + 0x2e, 0);
+    for at in [0x30u32, 0x34, 0x38, 0x3c, 0x40, 0x44, 0x48, 0x50] {
+        m.w32(s + at, 0);
+    }
+    m.w32(s + 0xc, STATE_VTABLE);
+    m.w32(s + 0x10, 2);
+    let w = e.call(m, ALLOC, &[STATE_WORLD_NAME, 0xd0, 0]);
+    if w != 0 {
+        e.call(m, FILL, &[w, 0xdead_c0de, 0xd0]);
+    }
+    // the thing: its links, flags and vectors (as `fe_widgets::widget_init` begins), then the world's table
+    m.w32(w, u32::MAX);
+    m.w32(w.wrapping_add(4), w);
+    m.w32(w.wrapping_add(8), w);
+    m.w32(w.wrapping_add(0x10), 0);
+    m.w32(w.wrapping_add(0x14), 1);
+    for at in [0x18u32, 0x1c, 0x20, 0x24, 0x2c, 0x30] {
+        m.w32(w.wrapping_add(at), 0);
+    }
+    m.w32(w.wrapping_add(0x28), 1);
+    for k in 0..8 {
+        m.w32(w.wrapping_add(0x40 + 4 * k), 0);
+    }
+    for k in 0..4 {
+        m.w32(w.wrapping_add(0x60 + 4 * k), ONE);
+    }
+    m.w32(w.wrapping_add(0x70), 0);
+    m.w32(w.wrapping_add(0x74), 0);
+    for (k, v) in [0, 0, 0, ONE].into_iter().enumerate() {
+        m.w32(w.wrapping_add(0x80 + 4 * k as u32), v);
+    }
+    for k in 0..3 {
+        m.w32(w.wrapping_add(0x90 + 4 * k), 0);
+    }
+    m.w32(w.wrapping_add(0xc), STATE_WORLD_VTABLE);
+    e.call(m, crate::fe_widgets::LIST_INIT, &[w.wrapping_add(0xa0)]);
+    m.w32(s + 0x34, w);
+    let fe = m.r32(m.r32(GAPP) + 0x734);
+    e.call(m, LIST_ADD, &[fe + 0x80, w]);
+    m.w8(s + 0x2d, 0xff);
+    s
+}
+
+/// `cFE3DState::~cFE3DState` 0x2717a0(s, flags): its table, its vf12 (0x2717e8), then the node's destructor
+pub fn state_base_dtor(m: &mut Mem, e: &mut dyn FeEnv, s: u32, flags: u32) {
+    m.w32(s + 0xc, STATE_VTABLE);
+    e.call(m, STATE_VF12, &[s]);
+    crate::fe_wgroup::node_dtor(m, e, s, flags);
+}
+
+/// `FE_GetSpriteRect` 0x2759c8(s, k): sprite `k`'s rectangle in the app's sprite set (+0x728)
+pub fn sprite_rect(m: &mut Mem, e: &mut dyn FeEnv, k: u32) -> u32 {
+    let set = m.r32(m.r32(GAPP) + 0x728);
+    e.call(m, SPRITE_SET_RECT, &[set, k])
+}
+
+/// `FE3DGroup_Add` 0x2762e0(g, w): the widget added to the group's list (+0x110)
+pub fn group_add(m: &mut Mem, e: &mut dyn FeEnv, g: u32, w: u32) -> u32 {
+    e.call(m, LIST_ADD, &[g + 0x110, w])
+}
+
+/// `FE3D_BuildDialogScreen` 0x274208 / `FE3D_BuildDialogScreen2` 0x274278(s, title, buttons; f12): the world group
+/// (title, buttons), the dialog thing (30 frames, f12), the menu list (0x274000 / 0x274108, in the root group +0x38)
+/// added to the root group, then the state's buttons
+pub fn dialog_screen(m: &mut Mem, e: &mut dyn FeEnv, s: u32, title: u32, buttons: u32, f12: F, second: bool) -> u32 {
+    e.call(m, WORLD_GROUP, &[s, title, buttons]);
+    e.call(m, CREATE_DIALOG, &[s, 0x1e, f12.0.to_bits()]);
+    let root = m.r32(s + 0x38);
+    e.call(m, if second { CREATE_LIST2 } else { CREATE_LIST }, &[s, root]);
+    let (root, list) = (m.r32(s + 0x38), m.r32(s + 0x3c));
+    group_add(m, e, root, list);
+    e.call(m, STATE_BUTTONS, &[s, buttons])
+}
+
+/// `FEList_SetFocused` 0x275468(s, w): the focused widget (+0x30) told it is left (+0xf0 with 0), the new one kept
+/// and told (+0xf0 with 1)
+pub fn set_focused(m: &mut Mem, e: &mut dyn FeEnv, s: u32, w: u32) {
+    let old = m.r32(s + 0x30);
+    if old != 0 {
+        vcall(m, e, old, 0xf0, &[0]);
+    }
+    m.w32(s + 0x30, w);
+    if w != 0 {
+        vcall(m, e, w, 0xf0, &[1]);
+    }
+}
+
+/// 0x2755e8(s; f12 the height; `buf` 0x30 bytes): the help bar (+0x44): its fourth widget measured (unused); the
+/// space left (the height less sprite 5's, less 0) when more than 0: its first two widgets sized 320 by it, scaled
+/// (+0x124) by it over sprite 15's height, +0x120 1 (the first also measured, unused)
+pub fn help_bar_layout(m: &mut Mem, e: &mut dyn FeEnv, s: u32, h: F, buf: u32) {
+    let zero = F(0.0);
+    let bar = m.r32(s + 0x44);
+    let w = e.call(m, NTH, &[bar + 0x110, 3]);
+    vcall(m, e, w, 0x130, &[buf]);
+    let r5 = sprite_rect(m, e, 5);
+    let h5 = rf(m, r5.wrapping_add(8));
+    let r15 = sprite_rect(m, e, 0xf);
+    let d = (h - h5) - zero;
+    if !lt(zero, d) {
+        return;
+    }
+    let h15 = rf(m, r15.wrapping_add(8));
+    let scale = d / h15;
+    let size = |m: &mut Mem| {
+        for (k, v) in [320.0f32.to_bits(), d.0.to_bits(), 0, 0].into_iter().enumerate() {
+            m.w32(buf + 0x20 + 4 * k as u32, v);
+        }
+    };
+    let bar = m.r32(s + 0x44);
+    let w = e.call(m, NTH, &[bar + 0x110, 0]);
+    vcall(m, e, w, 0x130, &[buf + 0x10]);
+    size(m);
+    vcall(m, e, w, 0x138, &[buf + 0x20]);
+    wf(m, w + 0x124, scale);
+    m.w32(w + 0x120, ONE);
+    let bar = m.r32(s + 0x44);
+    let w = e.call(m, NTH, &[bar + 0x110, 1]);
+    size(m);
+    vcall(m, e, w, 0x138, &[buf + 0x20]);
+    wf(m, w + 0x124, scale);
+    m.w32(w + 0x120, ONE);
+}

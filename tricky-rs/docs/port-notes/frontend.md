@@ -2331,3 +2331,38 @@ Of the 55 mutants, 52 are caught. The three survivors are equivalent:
 - the short text's third byte, which is 0 in the game's data;
 - the icon entry's table store, which the icon text's overwrites before anything reads it;
 - the old-child destroy, never reached as the entries' children were just cleared.
+
+## G9y7: the front end's small ported-but-unchecked functions
+
+The index had 42 small functions in 0x26c000..0x2aab58 marked `ported`. Most were only named as calls in other
+rows' ports. Three of them (the button cheats' `CheatCode_Matches`, `cCheatCodes::Update` and `FE_RumblePad`) were
+already run by E10a's test and are now marked. The overlay's empty vf26 joined G9y4's test. The rest are ported in
+`fe_misc.rs`, in batches.
+
+### Batch 1 (`tests/fe_small.rs`)
+
+- **The venue cameras.** `FE3DCamera_PanToVenue` and `FE3DCamera_PlayVenueShot` play a shot from a table of ten
+  for a signed venue byte and keep the venue at +0x185, which they also store for venues out of range.
+  `VenueSel_PlayCurrentShot` plays the kept venue's shot (0x90 + k). Out of range, it leaves 0x3b0000 in its
+  answer, from an address loaded in a delay slot.
+- **0x26c430** hands the scripted camera's part on to 0x26ac30.
+- **The world's passes.** The render, text and update passes (0x26feb8, `FE3DTextList_RenderAll`,
+  `FE3D_UpdateAll`) each put a list operation on the stack and hand it to the world's +0x10. The render pass's
+  operation points at a stack copy of the render's matrix 0x346440.
+- **The state.** `cFE3DState::cFE3DState` sets the state's words and makes its world: a thing of 0xd0 bytes with
+  its own table and list, added to the front end's list. The destructor sets the table, runs vf12, then the node's
+  destructor.
+- **Small calls.** `FE_GetSpriteRect` asks the app's sprite set. `FE3DGroup_Add` adds to the group's list.
+- **The two dialog screens.** World group, dialog thing (30 frames), menu list into the root group, then the
+  state's buttons.
+- **`FEList_SetFocused`** tells the old widget it is left (+0xf0 0) and the new one it is focused (+0xf0 1).
+- **The help bar's layout (0x2755e8).** It measures the bar's fourth widget without using the size. If the height
+  left over sprite 5's is more than 0, its first two widgets are sized 320 by it and scaled by it over sprite 15's
+  height.
+
+The test runs 15,000 cases (15 functions, 1,000 each). The camera's shot, the free on flag and the node's
+destructor run as the original. Sprite heights and the help bar's height share a few values, so the help bar's
+"more than 0" is tested at equality.
+
+Of the 50 mutants, 47 are caught. The three survivors are equivalent: two read the venue byte unsigned (any byte
+at or past 0x80 is out of range either way), and one drops the `- 0` from the help bar's height.
