@@ -100,7 +100,7 @@ pub fn character_list(m: &mut Mem, e: &mut dyn FeEnv, s: u32, item: u32, buf: u3
     put(m, pos, [fb(90.0), fb(130.0), 0, 0]);
     // the line before: -1 none, 1 a heading, 0 a line
     let mut before: i32 = -1;
-    let mut scale = F(0.0);
+    let mut scale: F;
     let add_y = |m: &mut Mem, dy: f32| {
         let y = rf(m, pos + 4) + F(dy);
         m.w32(pos + 4, y.0.to_bits());

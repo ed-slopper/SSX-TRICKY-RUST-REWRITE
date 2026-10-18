@@ -2466,3 +2466,18 @@ stops after a few widgets. Some layouts take only the object.
 
 Of the 45 mutants, 44 are caught. The survivor is equivalent: it swaps two colour buffers that hold the same
 colour.
+
+## G9y8f: the controller page (`game/src/fe_optbuild.rs`, `tests/fe_optbuild.rs`)
+
+`FE_BuildControllerConfig` 0x2a36e8 builds the options screen's controller page.
+
+- **Once** (the flag at 0x348460 is game data): the pad pictures' x is set, centring sprite 0x3d at 0.8 across
+  640.
+- **Pictures.** Three pad pictures, sized by their sprites at 0.8, go in the group at +0x90.
+- **Label groups** (+0xc0..+0xc8). Each label comes from the same layouts that `ControllerConfig_Layout` uses. The
+  third group is shown, then the pages are laid out.
+- **Entries.** The page (+0x8c) gets four entries, each with a sub-menu as its second child, and an end entry (the
+  id 0xabcd1234). The first two sub-menus get the choices 4 and 5, the next two get 6 and 7.
+
+The test runs 800 cases with the once flag either way. The group's own +0x28 and the text entry's colours go
+through the game's tables, which the test reads and stubs. All 36 mutants are caught.
