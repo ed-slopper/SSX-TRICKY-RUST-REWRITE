@@ -81,8 +81,7 @@ state machine and the renderer are ours. Nothing has been checked against the or
 | G7 | Rendering, as the PS2 renderer does it. Split before claiming: | unowned | E3a, E3b | | [repo] |
 | G21 | **The rider stutters back and forth the whole run** (play test by bredclan, 2026-10-17, tricky-rs.2026-10-17.exe from 3580b5f). To find: whether it is the port (our stand-ins between the exact pieces: the rider's step, its control state, the app's camera or its frame timing fighting the game's fixed tick) or something the decompiling will fix once the boarder state machine (G1) runs whole. First step: log the rider's place and heading each tick in a run (`TRICKY_SIM`) and see which one goes back and forth, and on which frames | any | | | Play test 2026-10-17 |
 | G9y | (umbrella: G9y1..G9y6) The rest of the front end's own code in 0x26c000..0x2aab58 (~370 functions not yet checked; the screen builders marked `ported` are G9b's): the menu, the copies of the widget group's operations, the sound widgets, the memory card overlay, the world group, and the rest, checked in the runner | any | G9x | | Added 2026-10-17 by ed-slopper/puffin |
-| G9y3 | The sound widgets: `cFE3DSound`, `cFE3DSoundBase` (~110 small functions), checked in the runner || ed-slopper/puffin | G9y | | Split of G9y |
-| G9y4 | The memory card overlay: `cFEStateMCOverlay`'s virtuals, `FEMemCard_*` (show dialog, prompt, slot list, buttons, message), checked in the runner | any | G9y | | Split of G9y |
+| G9y4 | The memory card overlay: `cFEStateMCOverlay`'s virtuals, `FEMemCard_*` (show dialog, prompt, slot list, buttons, message), checked in the runner | ed-slopper/puffin | G9y | | Split of G9y |
 | G9y5 | The world group: `FE3D_BuildWorldGroup` 0x2720f8 (7.7 KB), `FE_CreateList`, `FE3DWorld_FindByHash`, checked in the runner | any | G9y | | Split of G9y |
 | G9y6 | The rest of 0x26c000..0x2aab58: the cameras' and animations' small virtuals (`cFE3DCamera*`, `cFE3DAnim*`), the options' small functions (`FE3DOptions`, `SoundOptions`, `DisplayOptions`, `GameOptions`, `ControllerConfig`), `cFE3DState`'s, the text and icon helpers, the unnamed `FUN_*`, checked in the runner | any | G9y | | Split of G9y |
 | G9 | Front end: title, main menu, mode select, rider / outfit / board select, options, records, trick book screens, unlock screens, music player, loading screens (`gApp+0x734`) | unowned | E1, E5 | | [repo] `ui.rs` is ours. Split (2026-10-16): G9b the shared machinery, G9c–G9t the screens (logic ported and checked in the runner, widgets as calls out), G9u the app's menus on them |
@@ -154,6 +153,7 @@ matches the original.
 
 | ID | Task | Section | Who | Date | Commit |
 |---|---|---|---|---|---|
+| G9y3 | The front end's sound object (cFE3DSound and its base, 111 functions) | P2 | ed-slopper/puffin | 2026-10-17 | 285c314 |
 | G9y2 | the group operations copies checked in the runner (67 functions, 20,100 cases) | P2 | ed-slopper/puffin | 2026-10-17 | 3d9db11 |
 | G9y1 | the menu checked in the runner (73,500 cases; 124/124 mutants) | P2 | ed-slopper/puffin | 2026-10-17 | cbd5f94 |
 | G9x | G9x1..G9x4 done: the widget classes, 208 functions checked | P2 | ed-slopper/puffin | 2026-10-17 | 2e5ba0f |
@@ -1386,3 +1386,4 @@ matches the original.
 - 2026-10-17 ed-slopper/puffin: G9x4 done (2e5ba0f: the bars and pictures, 41 functions checked); G9x done; added G9y (the rest of the front end's code, G9y1..G9y6) and claimed G9y1 (the menu).
 - 2026-10-17 ed-slopper/puffin: G9y1 done (cbd5f94: the menu, 49 functions checked); claimed G9y2 (the group operations' copies).
 - 2026-10-17 ed-slopper/puffin: G9y2 done (the 67 copies checked against G9x1's port); claimed G9y3 (the sound object).
+- 2026-10-17 ed-slopper/puffin: G9y3 done (285c314: the sound object, 111 functions, 55/56 mutants, the survivor equivalent); G9y4 claimed (the memory card overlay).
