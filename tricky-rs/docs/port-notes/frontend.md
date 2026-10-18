@@ -2116,3 +2116,22 @@ with the branches taken relative to each function's start). G9x1's test now also
 against the port of the function it copies. That is 20,100 cases (300 a copy), with some 10,000 nodes given an
 operation. The port is G9x1's, and its mutants were caught there, so the copies are not mutated again. One copy,
 `ListFE3DFormatOp_Apply1` 0x26fa70, is checked in G9y1 as the menu's format apply.
+
+## Names from F1c batch 18 (proven)
+
+- The card overlays' calls on the card system (+0x224): `MCOverlay_BeginLoad` 0x1ce6b8 (`BeginLoadSlot`, +0x28 =
+  the bytes), `MCOverlay_LoadMore` 0x1d1fd0 (`LoadMore`, +0x28 += n), `MCOverlay_EndLoad` 0x1ce700;
+  `MCOverlay_BeginSave` 0x1d1e30 (`BeginSaveSlot`, 0x33efbc = 1, +0x24 = the bytes), `MCOverlay_SaveMore` 0x1d1f18
+  (`SaveMore`, +0x24 += n; the replay save's chunks), `MCOverlay_EndSave` 0x1ce880; `MCOverlay_ResetCard` 0x1d1e88
+  (vf11, which syncs and resets the card state). Not settled: 0x1d1dd8 (calls the empty vf30), 0x1d1f60 (vf36, +0x44
+  = 1, then state 0x14), 0x1d2010 (vf26, +0x40 = 1, then state 0x22), 0x1ce730 (vf15, card +0x24 = size; overlay
+  +0x30).
+- The app's VSync mode (app+4, state +0xc: 1 start, 2 run, 3 stop, 0 none). `cPS2ExecutionMan` vf1 starts a thread
+  (entry 0x1825e8, not a function in Ghidra) and a VBlank-start handler (intc 3, 0x182170); the thread calls
+  `App_VSyncTick` 0x17c9d8: input devices read for each elapsed tick, the mode run by its state, then the
+  execution manager's vf at +0x2c. `App_RunVSyncModeTicks` 0x17cb40 (the mode's +0x34 once per recorded input tick,
+  then +0x3c), `App_StartVSyncMode` 0x17c998 (+0x2c, state 2), `App_StopVSyncMode` 0x17c908 (state 3, waits on the
+  manager's +0x24 until the tick clears it, deletes the mode). Inferred, not proven: the VSync mode is a loading
+  screen.
+- `TextBox_Destruct` 0x14f390 (results, lessons, `cStartScreen` +0x48), `SpriteSet_SetShape` 0x1f9ee8 (the 0x1c-byte
+  rect `SpriteSet_GetRect` reads), `LessonOverlay_DrawPage2` / `3` 0x14c2c0 / 0x14c2c8 (empty in retail).

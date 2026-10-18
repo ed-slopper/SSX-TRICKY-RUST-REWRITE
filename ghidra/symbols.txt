@@ -2086,20 +2086,20 @@ F 23ff18 cPS2MemCard vf18
 F 23ff38 cPS2MemCard vf19
 F 23ff08 cPS2MemCard vf20
 F 23ffa0 cPS2MemCard vf21
-F 23e038 cPS2MemCard vf22
-F 23e090 cPS2MemCard vf23
+F 23e038 cPS2MemCard BeginLoadSlot
+F 23e090 cPS2MemCard LoadMore
 F 23e0a8 cPS2MemCard vf24
-F 23e0c8 cPS2MemCard vf25
+F 23e0c8 cPS2MemCard EndLoad
 F 23e0b8 cPS2MemCard vf26
 F 23de48 cPS2MemCard vf27
 F 23de98 cPS2MemCard vf28
-F 23dea8 cPS2MemCard vf29
+F 23dea8 cPS2MemCard BeginSave
 F 23dea0 cPS2MemCard vf30
-F 23df20 cPS2MemCard vf31
+F 23df20 cPS2MemCard BeginSaveSlot
 F 23fea8 cPS2MemCard vf32
-F 23df80 cPS2MemCard vf33
+F 23df80 cPS2MemCard SaveMore
 F 23df98 cPS2MemCard vf34
-F 23dfb8 cPS2MemCard vf35
+F 23dfb8 cPS2MemCard EndSave
 F 23dfa8 cPS2MemCard vf36
 F 23ed08 cPS2MemCard vf37
 F 23ed10 cPS2MemCard vf38
@@ -7214,3 +7214,45 @@ F 189718 cMenuManager GetKey
 F 189720 cMenuManager IsPadKey
 F 189c80 cEnumMenuItem cEnumMenuItem
 F 18a460 cCommandMenuItem cCommandMenuItem
+G 14f6c8 ContactPool_Destruct
+G 14f720 ContactPool_Alloc
+G 14f8c8 ContactIndex_Destruct
+G 14f920 ContactIndex_Pop
+G 14fa00 ContactMgr_Destruct
+G 157d58 AnimData_InitBlock
+G 157d68 AnimData_FreeBlock
+G 159b50 BoarderSequence_Clear
+G 17a1a8 Parse_IsSectionEnd
+G 17c908 App_StopVSyncMode
+G 17c998 App_StartVSyncMode
+G 17c9d8 App_VSyncTick
+G 17cb40 App_RunVSyncModeTicks
+G 194870 ReplaySave_End
+G 1948c0 ReplaySave_Abort
+G 14c2c0 LessonOverlay_DrawPage2
+G 14c2c8 LessonOverlay_DrawPage3
+G 14f390 TextBox_Destruct
+G 1f9ee8 SpriteSet_SetShape
+G 21ef58 CrowdBox_Destruct
+G 1ce6b8 MCOverlay_BeginLoad
+G 1d1fd0 MCOverlay_LoadMore
+G 1ce700 MCOverlay_EndLoad
+G 1d1e30 MCOverlay_BeginSave
+G 1d1f18 MCOverlay_SaveMore
+G 1ce880 MCOverlay_EndSave
+G 1d1e88 MCOverlay_ResetCard
+G 23dfc0 MemCard_BeginLoad
+G 23ecf0 MemCard_GetSlotFileName
+G 2f1428 sceMcOpen
+G 2f1560 sceMcMkdir
+G 2f1598 sceMcClose
+G 2f1650 sceMcSeek
+G 2f17b8 sceMcRead
+G 2f18d8 sceMcWrite
+G 2f1ac8 sceMcSync
+G 2f1c00 sceMcGetInfo
+G 2f1f68 sceMcChdir
+G 2f12b0 sceMcChangeThreadPriority
+G 2f1a80 Mc_Delay
+G 2f1a58 Mc_AlarmWakeup
+G 2f1ee0 Mc_ChdirDone

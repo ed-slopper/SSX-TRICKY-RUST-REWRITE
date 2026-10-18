@@ -1584,3 +1584,12 @@ the numbers it stores:
 These are the clip-to-animation tables `AnimClip_ResolveAnmIndex` reads, often as triples (one animation per board
 class). The runner check fills the whole ranges, gaps included, at random, runs both, and compares every byte; 4 of
 4 mutants were caught. `AnimCtl_Construct`'s port still calls the init out (`IDS_INIT`).
+
+## Names from F1c batch 18 (proven)
+
+- `AnimData_InitBlock` 0x157d58 / `AnimData_FreeBlock` 0x157d68: the anim data's first word (0x3211a8 +0) zeroed,
+  and freed and zeroed (`AnimData_Construct`, `AnimData_Clear`).
+- `BoarderSequence_Clear` 0x159b50 (from the `cBoarderSequence` constructor): +0x78 zeroed, +0x84 set to 0xff
+  (12 bytes each), then its vtable slot at +0x14.
+- `Parse_IsSectionEnd` 0x17a1a8 (was `FUN_0017a1a8` in `game/src/input.rs`): out of text, or "};" (its line
+  skipped).

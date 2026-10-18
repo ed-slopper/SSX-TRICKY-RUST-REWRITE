@@ -643,3 +643,8 @@ the start / select legend.
 
 - `ReplayKeyframe_Construct` 0x192b20: zeroes 16 bytes; `ReplayMgr_Init` runs it over the 16 records of 0x24 at
   +0x3e68. Not settled: the empty keyframe hooks 0x193058 / 0x193060.
+
+## Names from F1c batch 18 (proven)
+
+- `ReplaySave_End` 0x194870 (vf6) and `ReplaySave_Abort` 0x1948c0 (vf5): the same code, freeing the chunk (+0x40a8)
+  and scratch (+0x40b0). Not settled: the array destructors 0x1956f0 / 0x195710 in `ReplayMgr_Free`.

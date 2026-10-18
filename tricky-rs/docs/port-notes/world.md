@@ -2686,3 +2686,10 @@ sides. The calls, the answers and the memory matched on the first run.
 walk it without end (22 GB). The test's walks and call logs are now bounded, so such a mutant fails at once. The
 pool's index of a pair below the pool (a signed shift) needed its own cases. The one left masks the pair's place
 with 0xfff instead of 0x1fff, which cannot matter while the pool has 0x100 pairs.
+
+## Names from F1c batch 18 (proven)
+
+- The broadphase's helpers (see "The race's broadphase"): `ContactPool_Alloc` 0x14f720, `ContactPool_Destruct`
+  0x14f6c8, `ContactIndex_Pop` 0x14f920, `ContactIndex_Destruct` 0x14f8c8, `ContactMgr_Destruct` 0x14fa00.
+- `CrowdBox_Destruct` 0x21ef58: `Crowd_StopCheer`, `CrowdBox_StopAll`, delete on flag 1 (400-byte records,
+  `CrowdSys_Free`).

@@ -427,3 +427,21 @@ decoder treats alike.
   on the course table at gApp+100; `CourseTable_GetId` 0x186440: record i's +0x80 id (i capped at 13).
 - `App_FreeEffectsLoader` 0x17b938 (gApp+0x30, made by `App_CreateEffectsLoader`), `EffectsLoader_Delete` 0x17c468.
 - Not settled: 0x23ed48 (sets a +0x19c flag), 0x240c78 (patches a `CourseDma` chain).
+
+## Names from F1c batch 18 (proven)
+
+- Sony's `libmc` (all RPC calls to the card server 0x405580, command kept in 0x35d3a0, semaphore 0x35d3a4):
+  `sceMcGetInfo` 0x2f1c00 (1), `sceMcOpen` 0x2f1428 (2), `sceMcClose` 0x2f1598 (3), `sceMcSeek` 0x2f1650 (4),
+  `sceMcRead` 0x2f17b8 (5), `sceMcWrite` 0x2f18d8 (6), `sceMcMkdir` 0x2f1560 (`sceMcOpen` with mode 0x40, then
+  command 0xb), `sceMcChdir` 0x2f1f68 (0xc; its end callback `Mc_ChdirDone` 0x2f1ee0 copies the current dir out),
+  `sceMcChangeThreadPriority` 0x2f12b0 (0x14), `sceMcSync` 0x2f1ac8 (mode 0 waits, polling every 0x3c ticks with
+  `Mc_Delay` 0x2f1a80 = `SetAlarm` + `SleepThread`, woken by `Mc_AlarmWakeup` 0x2f1a58). Not settled: 0x2f1368
+  (command 0x15, waits for its result), 0x2f1280 (hands out the RPC buffers). The read and info callbacks 0x2f1728 /
+  0x2f1ba8 are not functions in Ghidra.
+- `MemCard_Process`'s steps use them: 0x16 / 0x25 open to write (mode 0x203), 0x17 write, 0x18 / 0x1e close,
+  0x1c open to read (mode 1), 0x1d read, 0x24 mkdir.
+- `cPS2MemCard` virtuals: `BeginSave` 0x23dea8 (vf29: dir name into +0xb1, "%s/%s" path into +0xf1, buffer +0x2c,
+  size +0x20, step 0x15), `BeginSaveSlot` 0x23df20 (vf31: the same with the slot's file name), `SaveMore` 0x23df80
+  (vf33: buffer, size, step 0x17), `EndSave` 0x23dfb8 (vf35: step 0x18, the close); `BeginLoadSlot` 0x23e038 (vf22,
+  through `MemCard_BeginLoad` 0x23dfc0: step 0x1b), `LoadMore` 0x23e090 (vf23: step 0x1d), `EndLoad` 0x23e0c8
+  (vf25: step 0x1e). `MemCard_GetSlotFileName` 0x23ecf0: the slot's name (+0x1a8 + slot·0x70).

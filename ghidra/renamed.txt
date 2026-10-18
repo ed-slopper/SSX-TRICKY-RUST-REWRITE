@@ -668,3 +668,6 @@
 155538 FUN_00155538 Score_FindTrickMessage
 22e400 FUN_0022e400 WorldTriggerMgr_SetActive
 148478 cCollideEmitterNode::vf12 cCameraNode::~cCameraNode
+17a1a8 FUN_0017a1a8 Parse_IsSectionEnd
+194870 FUN_00194870 ReplaySave_End
+1948c0 FUN_001948c0 ReplaySave_Abort
