@@ -2229,3 +2229,36 @@ Of the 95 mutants, 92 are caught. Three survive:
 - the slot list's guard on a second button that is never null once the card has two slots' buttons;
 - the slot list's buffer moved within the stack, which the test can't see, as stack addresses are compared as one
   token.
+
+## G9y5: the world group (`game/src/fe_world.rs`, `tests/fe_world.rs`)
+
+`FE3D_BuildWorldGroup` 0x2720f8 builds the two groups every screen keeps in its world. The screen's own widgets
+come later.
+
+- **The top group (+0x40).** It holds the screen's title, a white single-line text in the menu font at (20, 20).
+  The title is measured, and two end pieces (sprites 0x21 and 0x20, grey) are put 27 below the text's top; the second
+  sits at the text's width + 20. Then come the frame across the top (scaled sprites 0xd and 0xe, each half the
+  screen wide and sprite 13 high) and the band under it (sprites 5 and 6), white.
+- **The bottom group (+0x44).** It has its own frame pieces (scaled 0xb and 0xc, as tall as sprites 13 and 9 together,
+  and 7 and 8), grey. The help bar's buttons are added when the screen asks for them (0x2719c0, kept at +0x48).
+  Last comes the scrolling text (+0x4c): a text box in the highlight colour at (20, 37), sized 480 × 40, its string
+  set, scaled 0.8 and given the font's height.
+- **Both groups** are raised (+0x70 6) and added to the world. Sprite 5's rectangle is asked for twice; the second
+  answer is not used.
+- **The widgets are made in place.** The builder inlines the thing, widget, group and icon constructors
+  ([`crate::fe_widgets`]). A scaled icon is an icon given the table 0x3b6e40 and +0x120 / +0x124 1.0. Every size call
+  goes through the class's table, not the object's.
+- **`FE_CreateList` 0x274000** makes the screen's menu list (0x1b0 bytes, the menu's constructor, then the list's
+  table 0x3b7fe0 and its +0x168), at (320, 63).
+- **`FE3DWorld_FindByHash` 0x26fe50** hands a find operation (its table and the hash, on the stack) to the world's
+  +0x10, then destroys it.
+
+The test runs 4,500 cases (3 functions, 1,500 each). The allocator stand-in hands out a heap in order; the text
+constructors give their object a table of stand-ins; the icon classes' own virtuals are read from the game's tables
+and stubbed. The font's height runs past 2^24 (cvt chops, `cvt=c`).
+
+Of the 55 mutants, 50 are caught. The five survivors are equivalent:
+- the fill guarded on a null allocation, which crashes either way;
+- `y - 0` against `y`, which is the same here (twice);
+- a size call through the class's table against the object's, when the object was just given that class's table
+  (twice).

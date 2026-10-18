@@ -65,6 +65,7 @@ pub mod fe_wgroup;
 pub mod fe_wlist;
 pub mod fe_wtext;
 pub mod fe_widgets;
+pub mod fe_world;
 pub mod fe_widget;
 pub mod fe_manager;
 pub mod fe_mcard;

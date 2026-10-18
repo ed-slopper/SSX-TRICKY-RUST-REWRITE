@@ -5019,7 +5019,7 @@ address,size,name,system,status
 0x26fcc8,80,cListFE3DRenderTextOp::__tf,runtime,host
 0x26fd48,64,cListOperator::__tf,runtime,host
 0x26fe00,80,cListFE3DOffsetOp::__tf,runtime,host
-0x26fe50,92,FE3DWorld_FindByHash,frontend?,not started
+0x26fe50,92,FE3DWorld_FindByHash,frontend?,checked
 0x26feb0,8,thunk_FUN_002ac178,runtime,host
 0x26feb8,136,FUN_0026feb8,frontend?,ported
 0x26ff40,68,FE3DTextList_RenderAll,frontend?,ported
@@ -5154,9 +5154,9 @@ address,size,name,system,status
 0x271888,52,FE3DState_AddPlayer,frontend?,checked
 0x2718f0,204,FE3DButtonBar_SetVisible,frontend?,checked
 0x2719c0,1844,FE3D_BuildButtonBar,frontend?,checked
-0x2720f8,7708,FE3D_BuildWorldGroup,frontend?,not started
+0x2720f8,7708,FE3D_BuildWorldGroup,frontend?,checked
 0x273f18,232,FE_CreateDialog,frontend,not started
-0x274000,264,FE_CreateList,frontend,not started
+0x274000,264,FE_CreateList,frontend,checked
 0x274108,256,FE_CreateList2,frontend,checked
 0x274208,112,FE3D_BuildDialogScreen,frontend?,ported
 0x274278,112,FE3D_BuildDialogScreen2,frontend?,ported
