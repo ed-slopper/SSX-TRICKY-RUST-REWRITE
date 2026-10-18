@@ -13,6 +13,7 @@ use std::rc::Rc;
 use r5900::Runner;
 use tricky_game::pf::Mem;
 use tricky_game::ps2f::F;
+use tricky_game::pausedraw as pd;
 use tricky_game::raceoverlays as ro;
 use tricky_game::textbox::TextBoxEnv;
 
@@ -57,6 +58,8 @@ const RVT: u32 = ARENA + 0x1b00;
 const RECT: u32 = ARENA + 0x1e00;
 const PAUSE: u32 = ARENA + 0x2000;
 const O40: u32 = ARENA + 0x2c00;
+const BEST: u32 = ARENA + 0x2800;
+const LOW: (u32, u32) = (0, 0x200);
 const SCRATCH: u32 = 0x01f8_0000;
 const STACK_TOKEN: u32 = 0x5c5c_5c5c;
 fn rv(off: u32) -> u32 {
@@ -127,6 +130,11 @@ fn arity(func: u32) -> (usize, usize) {
         ro::PRINT_SHADOWED_RIGHT => (2, 3),
         ro::WSTR_FORMAT => (5, 0),
         ro::CAREER_BEST => (3, 0),
+        ro::SET_CELL_INT | ro::SET_CELL_ASCII => (4, 0),
+        ro::SET_ROW_NAME | ro::HUD_SHOW | pd::WSTR_FORMAT => (3, 0),
+        ro::BACKDROP_RESET | ro::RESULTS_UPDATE | ro::SELECT_SOUND => (1, 0),
+        ro::NEW_BUTTONS => (2, 0),
+        ro::DRAW_MENU_LIST => (10, 3),
         _ => panic!("no arity for {func:#x}"),
     }
 }
@@ -143,9 +151,15 @@ fn standin(io: &mut dyn Io, func: u32, w: &[u32], f: &[u32], ans: &Answers) -> (
     if matches!(
         func,
         ro::FILLED_RECT | ro::PRINTF_SHADOWED_A | ro::PRINT_SHADOWED_CENTRED | ro::DRAW_SPRITE | ro::BACKDROP_FRAME | ro::COUNT_DIGITS
-            | ro::PRINT_SHADOWED_RIGHT
+            | ro::PRINT_SHADOWED_RIGHT | ro::DRAW_MENU_LIST
     ) {
         log.extend((0..4).map(|k| io.r32(ro::DRAW_COLOUR + 4 * k)));
+    }
+    // the menu list's labels and "on" words (the count of them)
+    if func == ro::DRAW_MENU_LIST {
+        let n = w[4].min(16);
+        log.extend((0..n).map(|k| io.r32(w[3] + 4 * k)));
+        log.extend((0..n).map(|k| io.r32(w[9] + 4 * k)));
     }
     let r = ans.next();
     let answer = match func {
@@ -157,6 +171,8 @@ fn standin(io: &mut dyn Io, func: u32, w: &[u32], f: &[u32], ans: &Answers) -> (
         ro::TIME_MEDAL | ro::PLACE_MEDAL => r % 5,
         ro::CAREER_STATE => [2u32, 1][(r % 2) as usize],
         ro::FADE_SHOWS => r % 2,
+        ro::CAREER_BEST => BEST,
+        ro::NEW_BUTTONS => [0u32, 0x20, r, r | 0x20, r & !0x20][(r % 5) as usize],
         ro::RIDER_TIME => [r % 20000, 1000, 5000][(r >> 9) as usize % 3],
         ro::MEMSET => {
             for k in 0..w[2] / 4 {
@@ -176,7 +192,7 @@ struct Env<'a> {
 impl TextBoxEnv for Env<'_> {
     fn call(&mut self, m: &mut Mem, func: u32, args: &[u32], fargs: &[F]) -> u32 {
         let mut w = args.to_vec();
-        w.resize(8, 0);
+        w.resize(10, 0);
         let mut f: Vec<u32> = fargs.iter().map(|x| x.0.to_bits()).collect();
         f.resize(8, 0);
         let (a, c) = standin(m, func, &w, &f, self.ans);
@@ -190,8 +206,8 @@ fn wf(m: &mut Mem, at: u32, v: f32) {
     m.w32(at, v.to_bits());
 }
 
-const FUNCS: [u32; 19] = [
-    0x1aa268, 0x1aacb0, 0x1aae10, 0x1aae88, 0x1aaec0, 0x1ab028, 0x1ae350, 0x1ae3b8, 0x1ae4b0, 0x1ae650, 0x1ae660, 0x1ae7a0,
+const FUNCS: [u32; 24] = [
+    0x1ab1a0, 0x1ab1a0, 0x1b3a00, 0x1b3e30, 0x1b3ec8, 0x1aa268, 0x1aacb0, 0x1aae10, 0x1aae88, 0x1aaec0, 0x1ab028, 0x1ae350, 0x1ae3b8, 0x1ae4b0, 0x1ae650, 0x1ae660, 0x1ae7a0,
     0x1ae7a8, 0x1ae7e0, 0x1ae7f0, 0x1aeb88, 0x1aed50, 0x1af320, 0x1ae7f0,
 ];
 
@@ -206,7 +222,9 @@ fn race_overlays_match_the_original() {
         ro::PRINT_SHADOWED_CENTRED, ro::DRAW_SPRITE, ro::BACKDROP_FRAME, ro::BACKDROP_INIT, ro::GET_RECT, ro::COURSE_NAME,
         ro::OVERLAY_HIDDEN, ro::OVERLAY_HIDE, ro::RACE_PLAYERS, ro::COUNT_DIGITS, ro::SIN, ro::OVERLAY_GET, ro::SND_STOP_ONE,
         ro::PRINT_SHADOWED_RIGHT, ro::WSTR_FORMAT, ro::FORMAT_TIME, ro::FORMAT_SCORE, ro::RIDER_SCORE, ro::RIDER_TIME,
-        ro::CAREER_BEST, ro::TIME_MEDAL, ro::PLACE_MEDAL, ro::CAREER_STATE, ro::FADE_SHOWS,
+        ro::CAREER_BEST, ro::TIME_MEDAL, ro::PLACE_MEDAL, ro::CAREER_STATE, ro::FADE_SHOWS, ro::SET_CELL_INT,
+        ro::SET_CELL_ASCII, ro::SET_ROW_NAME, ro::HUD_SHOW, pd::WSTR_FORMAT, ro::BACKDROP_RESET, ro::RESULTS_UPDATE,
+        ro::SELECT_SOUND, ro::NEW_BUTTONS, ro::DRAW_MENU_LIST,
     ];
     stubs.extend(ROFFS.map(rv));
     let log: Rc<RefCell<Vec<Call>>> = Rc::default();
@@ -214,7 +232,11 @@ fn race_overlays_match_the_original() {
     for func in stubs {
         let (l, a) = (log.clone(), ans.clone());
         r.stub(func, move |c, mem| {
-            let w: Vec<u32> = (4..12).map(|k| c.gpr(k) as u32).collect();
+            let mut w: Vec<u32> = (4..12).map(|k| c.gpr(k) as u32).collect();
+            // (the menu list's ninth and tenth arguments, on the stack)
+            let sp = c.gpr(29) as u32;
+            w.push(mem.read_u32(sp));
+            w.push(mem.read_u32(sp + 8));
             let f: Vec<u32> = (12..20).map(|k| c.f(k).to_bits()).collect();
             let (v, call) = standin(mem, func, &w, &f, &a);
             l.borrow_mut().push(call);
@@ -229,9 +251,11 @@ fn race_overlays_match_the_original() {
         b
     };
     let data = read(&mut r, DATA);
+    let low = read(&mut r, LOW);
     let tables = read(&mut r, TABLES);
     let mut g = Rng(0x8a7e_0000_0000_0001);
     let (mut buttons, mut gos, mut digits) = (0usize, 0usize, 0usize);
+    let (mut cells, mut scores, mut lists, mut prints) = (0usize, 0usize, 0usize, 0usize);
     let per = 1500u32;
     for case in 0..FUNCS.len() as u32 * per {
         let func = FUNCS[(case % FUNCS.len() as u32) as usize];
@@ -244,6 +268,7 @@ fn race_overlays_match_the_original() {
                 (RIDERS.0, vec![0; RIDERS.1 as usize]),
                 (ARENA, vec![0; SIZE as usize]),
                 (SCRATCH, vec![0; 0x800]),
+                (LOW.0, low.clone()),
             ],
         };
         for k in 0..SIZE / 4 {
@@ -324,6 +349,64 @@ fn race_overlays_match_the_original() {
         m.w32(ro::CAREER + 0x16c0, g.pick(&[3u32, 1]));
         m.w32(ro::DISPLAY_MODE, g.pick(&[3u32, 0]));
         m.w32(ro::CAREER + 0x2afc, g.pick(&[2u32, 3, 4, 5, 6, 7, 8, 9, 3, 1]));
+        // the results table: its counts, flags and menu (+4 rows, +8 columns, +0x10 the labels, +0x34 their count,
+        // +0x38 the pick, +0x44..+0x50 flags), its alignments, x, highlights, rows; the best times' table (an entry
+        // 0x14 bytes: its rider +0xc, its score +0x10; +0x64 the count, +0x6c scores or times), the career's event
+        // count, the app's mode, the race's +0x38, low memory (the high scores' table read from 0 in other modes)
+        if matches!(func, 0x1ab1a0 | 0x1b3a00 | 0x1b3e30 | 0x1b3ec8) {
+            m.w32(THIS + 4, g.pick(&[0u32, 1, 3, 5, 10, 16, 0xffff_ffff]));
+            m.w32(THIS + 8, g.pick(&[0u32, 1, 2, 3, 4, 5, 0xffff_ffff]));
+            for i in 0..8 {
+                let any = g.next();
+                m.w32(THIS + 0x10 + 8 * i, any);
+            }
+            m.w32(THIS + 0x34, g.pick(&[0u32, 0, 1, 3, 8, 0xffff_ffff]));
+            m.w32(THIS + 0x38, g.below(4));
+            for o in [0x44u32, 0x48, 0x4c, 0x50] {
+                let any = g.next();
+                m.w32(THIS + o, g.pick(&[0u32, 1, any]));
+            }
+            for i in 0..8 {
+                m.w32(ro::TABLE_ALIGN + 4 * i, g.below(3));
+            }
+            for i in 0..16 {
+                m.w32(ro::ROW_MARK + 4 * i, g.pick(&[0xffff_ffffu32, 0xffff_ffff, 0, 1, 2, 3, 0xffff_fffe]));
+            }
+            for i in 0..8 {
+                m.w32(ro::COL_MARK + 4 * i, g.pick(&[0xffff_ffffu32, 0xffff_ffff, 0, 1, 2, 3, 0xffff_fffe]));
+            }
+            for i in 0..9 {
+                wf(&mut m, ro::TABLE_X + 4 * i, g.f(0.0, 640.0));
+            }
+            for i in 0..17 {
+                wf(&mut m, ro::TITLE_ROWS + 4 * i, g.f(0.0, 480.0));
+            }
+            wf(&mut m, ro::TITLE_X, g.f(0.0, 300.0));
+            wf(&mut m, BACKDROP + 0x2c, g.f(0.0, 480.0));
+            for k in 0..0x80 {
+                let any = g.next();
+                m.w32(BEST + 4 * k, any);
+            }
+            for e in 0..20 {
+                m.w32(BEST + 0x14 * e + 0xc, g.below(16));
+            }
+            m.w32(BEST + 0x64, g.pick(&[0u32, 1, 5, 10, 20, 0xffff_ffff]));
+            let any = g.next();
+            m.w32(BEST + 0x6c, g.pick(&[0u32, any]));
+            // (the event's mode +0x320 is the career's +0x2afc)
+            m.w32(ro::CAREER + 0x2afc, g.pick(&[1u32, 1, 0, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]));
+            for i in 0..2 {
+                let any = g.next();
+                m.w32(ro::RESULT_WORDS + 4 * i, any);
+            }
+            m.w32(ro::CAREER + 0x27dc, g.pick(&[2u32, 1]));
+            m.w32(APPOBJ + 0x58, g.pick(&[2u32, 1]));
+            m.w32(RACE + 0x38, O40 + 0x100);
+            for k in 0..LOW.1 / 4 {
+                m.w32(4 * k, g.below(4));
+            }
+            m.w32(0x64, g.pick(&[0u32, 1, 3]));
+        }
         let any = g.next();
         let whole = g.pick(&[0u32, 1, any]);
         let player = g.pick(&[0u32, 1, 0xffff_ffff, 0x8000_0000]);
@@ -340,6 +423,10 @@ fn race_overlays_match_the_original() {
         let mm = &mut m;
         let ours = match func {
             0x1aa268 => { ro::dialog_draw(mm, e, THIS); none }
+            0x1ab1a0 => { ro::draw_table(mm, e, THIS, SCRATCH); none }
+            0x1b3a00 => { ro::hiscores_reset(mm, e, THIS); none }
+            0x1b3e30 => { ro::hiscores_draw(mm, e, THIS, SCRATCH); none }
+            0x1b3ec8 => { ro::hiscores_update(mm, e, THIS); none }
             0x1aacb0 => ro::results_init(mm, e, THIS, whole, SCRATCH),
             0x1aae10 => { ro::title_rows(mm, THIS, F(f1), F(f2)); none }
             0x1aae88 => { ro::clear_buffers(mm, e); none }
@@ -362,6 +449,10 @@ fn race_overlays_match_the_original() {
         buttons += env.log.iter().filter(|c| c.0 == ro::DRAW_SPRITE).count();
         gos += env.log.iter().filter(|c| c.0 == ro::PRINT_SHADOWED_CENTRED).count();
         digits += env.log.iter().filter(|c| c.0 == ro::COUNT_DIGITS).count();
+        cells += env.log.iter().filter(|c| c.0 == ro::SET_CELL_ASCII).count();
+        scores += env.log.iter().filter(|c| c.0 == ro::FORMAT_SCORE && func == 0x1b3a00).count();
+        lists += env.log.iter().filter(|c| c.0 == ro::DRAW_MENU_LIST && c.1[4] > 1).count();
+        prints += env.log.iter().filter(|c| c.0 == ro::PRINTF_SHADOWED_A && func == 0x1ab1a0).count();
         ans.n.set(0);
         log.borrow_mut().clear();
         let regs: Vec<u32> = match func {
@@ -404,6 +495,7 @@ fn race_overlays_match_the_original() {
             }
         }
     }
-    println!("{buttons} buttons, {gos} GOs, {digits} counts drawn");
+    println!("{buttons} buttons, {gos} GOs, {digits} counts drawn; {cells} cells, {scores} scores, {lists} lists, {prints} table prints");
     assert!(buttons > 1000 && gos > 200 && digits > 200);
+    assert!(cells > 1000 && scores > 200 && lists > 200 && prints > 5000);
 }

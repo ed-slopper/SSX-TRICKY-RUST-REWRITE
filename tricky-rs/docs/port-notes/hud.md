@@ -681,3 +681,48 @@ last colour word (already 1).
 The test now has 28,500 cases over the 18 functions. A variadic format's stand-in logs the arguments its format
 takes (three for the medal line). 53 of 54 mutants are caught. The one left takes a player of 0 as "not
 positive", which maps it to 0 all the same.
+
+## The results table and the high scores overlay (G8n3, part 1, `game/src/raceoverlays.rs`)
+
+- **The results table** lives in fixed buffers that every results overlay shares:
+  - the title (wide, 0x33c9c0);
+  - the column heads (0x33c5c0, 0x80 bytes each);
+  - the cells (0x3385c0: column c's at 0x800 c, row r's 0x80 r further on);
+  - eight alignments (0x3384d0: 0 left, 1 centred, 2 right);
+  - the columns' x (0x338598, column c spanning x[c]..x[c+1]);
+  - eight column highlights (0x3384f0) and sixteen row highlights (0x338510), −1 for none.
+
+  The event's mode word +0x320 (`0x32db6c` + 0x320) is the same word as the career's +0x2afc.
+- **`cViewHiScoresOverlay::DrawText` 0x1ab1a0** draws the table for every results overlay, not only the high scores
+  (the index's name):
+  - **The title:** on texture 7, white by the backdrop's alpha, 30 below the frame's top. In a two-player table
+    (+0x48) it is at 0.8, and at 76 rather than 116 in the app's mode 2.
+  - **The heads:** in gold at 0.7, 8 above the titles' x (0x3385bc). The third head in a long table (+0x50) is at
+    0.6 and 2 lower. A head is right-aligned for alignment 2, and so is the first column's with +0x4c; centred for 1;
+    at the column's x for 0. Any other alignment keeps the last x: at the first column that is the caller's `$f21`,
+    a STANDIN 0.
+  - **The cells:** at 0.85 (0.8 in the career's mode 1 with a two-race event), placed by the column's alignment
+    (others at x). Each is coloured by the larger of its row's and column's highlights: 0 gold, 1 yellow (its alpha
+    and blue set straight, not through `Color_Set`), 2 white, others left as they are. Highlight 2 also sets a flag
+    that only picks between three identical prints.
+  - **The menu:** the overlay's own (+0x34 items from +0x10, 8 bytes apart, +0x38 picked), at 600, 40 above the
+    frame's middle.
+- **`Reset` 0x1b3a00:**
+  - resets the backdrop and clears the buffers;
+  - lays the rows out from the frame's top + 79 (3 apart);
+  - sets the columns' x to 131, 214, 342, 415, 505, with the fourth right-aligned;
+  - clears the highlights;
+  - unless in mode 7, names the heads 0xe5f, 0xe5d, 0x1cd and 0xe61. The fourth is renamed straight after anyway,
+    0xe61 for scores or else 0xe5e.
+
+  It then reads the course's best table (`0x163468`): scores in modes 3 and 5, times in 2, 4 and 9. The title is
+  formatted from the word at 0x3384c4 or 0x3384c0 with the count (+0x64). Each entry (0x14 bytes) fills a row: its
+  rank, its name, the rider's name (from the characters' table), and the score formatted (`0x1a6ba0`) or the time as
+  a number. In the other modes there is no table and the game reads one from address 0. The port does the same.
+- **`Draw` 0x1b3e30:** the course's title (460 high) and the help line 0x1d7 at 600, 430.
+- **`Update` 0x1b3ec8:** the results' update. The select button (0x20) plays the select sound, hides overlay item 11
+  and shows item 1.
+
+The test now has 36,000 cases. The table's layout, highlights, counts (up to 20 rows), flags and best table are all
+random, and low memory is mapped for the null table. 66 of 68 mutants are caught. The two left remove one of the
+column highlights' two clears, which are each enough alone.
