@@ -4737,65 +4737,67 @@ address,size,name,system,status
 0x261a10,56,cWorldSphTree::vf2_261a10,world,ported
 0x261a48,96,cWorldSphTree::vf10_261a48,world,not started
 0x261aa8,80,cWorldSphTree::__tf,runtime,host
-0x261b38,864,FE3DCharSel_SetSelected,frontend?,ported
-0x261e98,72,VenueSel_ClearVenue,frontend?,not started
-0x261ee0,64,FE3DCharSel_SayIndexedLine,frontend?,ported
-0x261f20,60,FE3DCharModify_SayLine1E,frontend?,ported
-0x261f60,60,FE3DCharModify_SayLine1F,frontend?,ported
-0x261fa0,60,FE3DCharModify_SayLine20,frontend?,ported
-0x261fe0,60,FE3DCharModify_SayLine22,frontend?,ported
-0x262020,60,FE3DCharModify_SayLine23,frontend?,ported
-0x262060,60,FE3DEventSel_SayLine08,frontend?,ported
-0x2620a0,60,FE3DEventSel_SayLine09,frontend?,ported
-0x2620e0,60,FE3DEventSel_SayLine0A,frontend?,ported
-0x262120,60,FE3DEventSel_SayLine0B,frontend?,ported
-0x262160,60,FE3DEventSel_SayLine0C,frontend?,ported
-0x2621a0,132,FE3DCharSel_StartAudio,audio,ported
-0x262228,56,FE3DCharAccept_StartAudio,audio,ported
-0x262260,100,FE3DCharModify_StartAudio,audio,ported
-0x2622c8,56,FE3DCustomBoard_StartAudio,audio,ported
-0x262300,56,FE3DCustomBody_StartAudio,audio,ported
-0x262338,76,FE3DDifficultSel_StartAudio,audio,ported
-0x262388,76,FE3DEventSel_StartAudio,audio,ported
-0x2623d8,24,FE3DModeSelect_SetCamera,camera,ported
-0x262438,60,FE3DTitle_SetCameraAndMusic,camera,ported
-0x2624b8,76,FE3DVenueSel_StartAudio,audio,ported
-0x262508,60,FE3DDVDContent_StartAudio,audio,ported
-0x262548,60,FE3DDVDContent_SayLine3E,frontend?,ported
-0x262588,60,FE3DDVDContent_SayLine41,frontend?,ported
-0x2625c8,60,FE3DDVDContent_SayLine42,frontend?,ported
-0x262608,100,FE3DOptions_StartAudio,audio,ported
-0x262670,60,FE3DSound_SayLine27,audio,ported
-0x2626b0,60,FE3DSound_SayLine29,audio,ported
-0x2626f0,60,FE3DSound_SayLine25,audio,ported
-0x262730,60,FE3DSound_SayLine2A,audio,not started
-0x262770,60,FE3DSound_StopLine,audio,ported
-0x2627b0,60,FE3DSound_SayLine26,audio,ported
-0x2627f0,80,FE3DModeSelect_SayLine06,frontend?,ported
-0x262840,80,FE3DModeSelect_SayLine04,frontend?,ported
-0x262890,80,FE3DModeSelect_SayLine05,frontend?,ported
-0x2628e0,60,FE3DNumPlayers_SayLine0E,frontend?,ported
-0x262920,60,FE3DNumPlayers_SayLine0F,frontend?,ported
-0x262960,260,FEWorld_SetOpenPanel,frontend?,not started
-0x262a68,100,FEWorld_OnTitleOpen,frontend?,ported
-0x262ad0,164,FUN_00262ad0,frontend?,ported
-0x262b78,88,FUN_00262b78,frontend?,ported
-0x262bd0,80,FUN_00262bd0,frontend?,ported
-0x262c20,60,FUN_00262c20,frontend?,ported
-0x262c60,60,FUN_00262c60,frontend?,ported
-0x262ca0,56,FUN_00262ca0,frontend?,not started
-0x262cd8,112,FEWorld_OnTitleStop,frontend?,ported
-0x262d48,56,FE3DSound_ResumeMenuMusic,audio,not started
-0x262d80,452,FEVenueSel_ShowMedals,frontend?,ported
-0x262f48,56,FE3DSound_SetMusicEvent3,audio,not started
-0x262f80,60,FE3DSound_SayLine01,audio,not started
-0x262fc0,60,FE3DSound_SayLine02,audio,not started
-0x263000,332,FEWorld_ShowCourseVideo,frontend?,ported
-0x263150,96,VenueSel_SetVenue,frontend?,ported
-0x2631b0,60,FE3DDifficultSel_SayLine2C,frontend?,ported
-0x2631f0,60,FE3DDifficultSel_SayLine2D,frontend?,ported
-0x263230,60,FE3DDifficultSel_SayLine2E,frontend?,ported
-0x263270,12,FUN_00263270,frontend?,ported
+0x261b38,864,FE3DCharSel_SetSelected,frontend?,checked
+0x261e98,72,VenueSel_ClearVenue,frontend?,checked
+0x261ee0,64,FE3DCharSel_SayIndexedLine,frontend?,checked
+0x261f20,60,FE3DCharModify_SayLine1E,frontend?,checked
+0x261f60,60,FE3DCharModify_SayLine1F,frontend?,checked
+0x261fa0,60,FE3DCharModify_SayLine20,frontend?,checked
+0x261fe0,60,FE3DCharModify_SayLine22,frontend?,checked
+0x262020,60,FE3DCharModify_SayLine23,frontend?,checked
+0x262060,60,FE3DEventSel_SayLine08,frontend?,checked
+0x2620a0,60,FE3DEventSel_SayLine09,frontend?,checked
+0x2620e0,60,FE3DEventSel_SayLine0A,frontend?,checked
+0x262120,60,FE3DEventSel_SayLine0B,frontend?,checked
+0x262160,60,FE3DEventSel_SayLine0C,frontend?,checked
+0x2621a0,132,FE3DCharSel_StartAudio,audio,checked
+0x262228,56,FE3DCharAccept_StartAudio,audio,checked
+0x262260,100,FE3DCharModify_StartAudio,audio,checked
+0x2622c8,56,FE3DCustomBoard_StartAudio,audio,checked
+0x262300,56,FE3DCustomBody_StartAudio,audio,checked
+0x262338,76,FE3DDifficultSel_StartAudio,audio,checked
+0x262388,76,FE3DEventSel_StartAudio,audio,checked
+0x2623d8,24,FE3DModeSelect_SetCamera,camera,checked
+0x2623f0,72,FUN_002623f0,frontend?,checked
+0x262438,60,FE3DTitle_SetCameraAndMusic,camera,checked
+0x262478,64,FUN_00262478,frontend?,checked
+0x2624b8,76,FE3DVenueSel_StartAudio,audio,checked
+0x262508,60,FE3DDVDContent_StartAudio,audio,checked
+0x262548,60,FE3DDVDContent_SayLine3E,frontend?,checked
+0x262588,60,FE3DDVDContent_SayLine41,frontend?,checked
+0x2625c8,60,FE3DDVDContent_SayLine42,frontend?,checked
+0x262608,100,FE3DOptions_StartAudio,audio,checked
+0x262670,60,FE3DSound_SayLine27,audio,checked
+0x2626b0,60,FE3DSound_SayLine29,audio,checked
+0x2626f0,60,FE3DSound_SayLine25,audio,checked
+0x262730,60,FE3DSound_SayLine2A,audio,checked
+0x262770,60,FE3DSound_StopLine,audio,checked
+0x2627b0,60,FE3DSound_SayLine26,audio,checked
+0x2627f0,80,FE3DModeSelect_SayLine06,frontend?,checked
+0x262840,80,FE3DModeSelect_SayLine04,frontend?,checked
+0x262890,80,FE3DModeSelect_SayLine05,frontend?,checked
+0x2628e0,60,FE3DNumPlayers_SayLine0E,frontend?,checked
+0x262920,60,FE3DNumPlayers_SayLine0F,frontend?,checked
+0x262960,260,FEWorld_SetOpenPanel,frontend?,checked
+0x262a68,100,FEWorld_OnTitleOpen,frontend?,checked
+0x262ad0,164,FUN_00262ad0,frontend?,checked
+0x262b78,88,FUN_00262b78,frontend?,checked
+0x262bd0,80,FUN_00262bd0,frontend?,checked
+0x262c20,60,FUN_00262c20,frontend?,checked
+0x262c60,60,FUN_00262c60,frontend?,checked
+0x262ca0,56,FUN_00262ca0,frontend?,checked
+0x262cd8,112,FEWorld_OnTitleStop,frontend?,checked
+0x262d48,56,FE3DSound_ResumeMenuMusic,audio,checked
+0x262d80,452,FEVenueSel_ShowMedals,frontend?,checked
+0x262f48,56,FE3DSound_SetMusicEvent3,audio,checked
+0x262f80,60,FE3DSound_SayLine01,audio,checked
+0x262fc0,60,FE3DSound_SayLine02,audio,checked
+0x263000,332,FEWorld_ShowCourseVideo,frontend?,checked
+0x263150,96,VenueSel_SetVenue,frontend?,checked
+0x2631b0,60,FE3DDifficultSel_SayLine2C,frontend?,checked
+0x2631f0,60,FE3DDifficultSel_SayLine2D,frontend?,checked
+0x263230,60,FE3DDifficultSel_SayLine2E,frontend?,checked
+0x263270,12,FUN_00263270,frontend?,checked
 0x263280,332,cFE3D::cFE3D,frontend,not started
 0x2633d0,672,cFE3D::~cFE3D,frontend,not started
 0x263670,224,FE3D_SetNumPlayers,frontend?,checked
@@ -4833,7 +4835,7 @@ address,size,name,system,status
 0x2663f8,2556,cFE3DCharacter::vf10_2663f8,frontend,not started
 0x266df8,680,cFE3DCharacter::vf12_266df8,frontend,not started
 0x2670a0,64,FE3DCharacter_LoadRider,game?,not started
-0x2670e0,8,FE3DCharacter_SetSelected,frontend?,not started
+0x2670e0,8,FE3DCharacter_SetSelected,frontend?,checked
 0x2670e8,784,FE3DCharacter_UpdateLighting,frontend?,not started
 0x2673f8,272,FE3DCharacter_FillLightsA,frontend?,not started
 0x267508,360,FE3DCharacter_FillLightsB,frontend?,not started
@@ -4908,10 +4910,10 @@ address,size,name,system,status
 0x269a70,92,FE3DGeometry_BindInstance,frontend?,not started
 0x269ad0,56,FE3DGeometry_GetPos,frontend?,not started
 0x269b08,224,cFE3DGeometry::vf10_269b08,frontend,not started
-0x269be8,64,FUN_00269be8,frontend?,ported
+0x269be8,64,FUN_00269be8,frontend?,checked
 0x269c28,68,cFE3DMovieGeometry::~cFE3DMovieGeometry,frontend,not started
-0x269c70,84,FEWorld_OpenCourseVideo,frontend?,not started
-0x269cc8,72,FE3DMovie_Stop,frontend?,not started
+0x269c70,84,FEWorld_OpenCourseVideo,frontend?,checked
+0x269cc8,72,FE3DMovie_Stop,frontend?,checked
 0x269d10,396,cFE3DMovieGeometry::vf10_269d10,frontend,not started
 0x269ed0,20,cFE3DAnim::vf12_269ed0,frontend,not started
 0x269ee8,1160,cFE3DAnimRotate::vf10_269ee8,frontend,not started

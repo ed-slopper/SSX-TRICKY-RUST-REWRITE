@@ -2541,3 +2541,34 @@ and sometimes all-zero favourite counts. Two quirks in the test:
 - The short bio's group is its own object, apart from the records' group.
 
 All 34 mutants are caught.
+
+## G9z1: the screens' audio, voice-line and world helpers (`game/src/fe_scene.rs`, `tests/fe_scene.rs`)
+
+There are 65 small functions in 0x261b38..0x263270 (two of them, 0x2623f0 and 0x262478, were missing from the
+index), plus four from further up that they call. Most work through the front end's sound player: `cFE3D` +0xa4,
+with its table at +0, not +0xc.
+
+- **Voice lines.** 28 functions only play a voice line through the player's +0x10; line -1 stops it.
+  `FE3DCharSel_SayIndexedLine` plays its byte argument through +0x18.
+- **One sound call.** Eight functions only make a single sound-player call. The screens' `StartAudio` functions
+  play a line, then one or two calls, or end on the music's third event (0x262f48).
+- **The world's panels.** `FEWorld_SetOpenPanel` runs the open panel's closing script (panels 0..2), then the new
+  panel's opening script, then sets the byte. The mode select's three lines open panels 0, 1 and 2.
+- **The character select.** `FE3DCharSel_SetSelected` (f, player, -, sel) hides the twelve riders and shows `sel`
+  and its two neighbours on each side, mod 12. It fades the player's old picture out and the new one in, clears
+  every rider's selection and marker, then marks the chosen rider. The pictures are world things found by name hash
+  and driven through 0x269be8: the thing's instance's controller +0xc0, with its table at +8. 0x262ad0 resets both
+  players' choices to 4 and selects rider 4 for player 0.
+- **Venues.** `VenueSel_SetVenue` / `_ClearVenue` run a venue's opening or closing script (8 bytes a venue at
+  0x347180). `FEVenueSel_ShowMedals` sets each venue's medal mark from the career's medal, but only in mode 2 and
+  when shown: gold 2, silver 1 and bronze 0 on parameter 2, and parameter 4 for visible. `FEWorld_ShowCourseVideo`
+  stops and hides the ten course films, then opens and shows the course's film (128 by 128) and sets its music.
+
+The test runs 200 cases of each. The functions that call each other run for real on both sides. The world's finds
+answer none or one of four things, each with or without its instance and controller.
+
+Of the 52 mutants, 48 are caught. The four survivors are equivalent:
+
+- Player 1 for 0x262ad0's selection: both choices were just reset to 4.
+- The course test without its `andi`: the course is a sign-extended byte, so "below 10" is the same test.
+- The music byte read unsigned: the game's ten music bytes are all positive.
