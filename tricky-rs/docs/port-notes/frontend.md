@@ -1820,3 +1820,48 @@ fields, so they are really `cPauseMenuOverlay`'s.
 The test now has 27,000 cases. The pages and their member pointers are random (none, plain, or virtual through a
 table at +0x7c0, with random shifts). 47 of 48 mutants are caught. The one left saves the career before setting
 +0x3260 to 2; that order can't be seen while the save's own code is a stand-in.
+
+## G9x1: the widget bases and their lists (`game/src/fe_wgroup.rs`)
+
+The code that every front end widget builds on, 0x2aab58..0x2adf48 and 0x2b3950.
+
+- **Operations over the children.** A widget group (`FE3DWGroup_*`) keeps its children in a list at +0x110; the
+  plain group (`cFE3DGroup`) keeps them at +0xa0. To do something to every child, the group builds an operation on
+  the stack: its table at +0, one argument at +4, or a vector at +0x10. It walks the list with it (`cList` vf1
+  0x2ac220: each node's +0x18 with the operation, stopping at the first that answers non-zero), then destroys it
+  (the operation's destructor with 2). Each operation's apply (`ListFE3D*Op_Apply`) calls one virtual of the
+  child: on input +0xe8 (the answer is the child when it took the input, else 0), format +0x140, update activity
+  +0x48, reset +0x40, skip +0x38, offset +0x70 (with the vector), update +0x68, render text +0x60, render +0x58
+  (with the matrix).
+- **The group's own steps.** Most do the children's step, then the widget's own: the activity update
+  (`0x2ad380`), the reset (`0x2ad2c0`), the skip (the thing's vf6), and so on. Update, render and render text do
+  nothing while the widget is hidden (+0x10 for update, +0x14 for the others).
+  - Render and render text raise the renderer's state by the widget's +0x70 around the children (the renderer's
+    +0x1d8 read, +0x1d0 set) and put it back after.
+  - The plain group's render copies the identity matrix (0x346440, 0x40 bytes) to the stack, multiplies it by the
+    matrix it is given (0x2abc18), renders the children with it, and destroys it (0x270218 with 2).
+- **Offsets.** The children are moved first; then the widget's own position (+0x80) gets the vector's x, y and z
+  (its w is set to 0 and not added).
+- **The thing.** `cFE3DThing` vf6 (when active and not looping, the tween's frame goes to its end, +0x24 from
+  +0x28), vf7 (running, frame 0), vf12 (its +0x48), vf13 (the position moved by a vector), vf9 (the colour, +0x60,
+  from a vector), the one-word setters (+0x10, +0x14) and the virtuals that answer 0 or 1 or do nothing.
+- **Destructors.** Each sets its own table and then calls its base's. The plain group deletes its children
+  (0x2ac178), destroys its list (`cList::~cList`: its table at +0x20, its two nodes, freed on flag 1), then the
+  thing's and the node's (the node unlinks itself, 0x2abf38, and is freed on flag 1).
+- **The plain group's constructor** writes the thing's words: the links, the flags, white, the position (0, 0, 0,
+  1), the size 0. Then it sets up its list (0x2abfb0) and its table.
+- **Placing and sliding in.** `FE3DWidget_Place` shows the widget (+0xf8 with 1), puts it at (x, y) (+0x138), sets
+  its anchor (+0x110) and clears sliding (+0x114). `FE3DWidget_SlideIn` places it, sets its colour to 0x3d36f0
+  (+0x50), and runs a colour tween (track 5) from 0x3d3700 to 0x3d36f0 over the frames given. Then it hides the
+  widget (+0x20 with 0). The two `SlideInDir` forms slide in at anchors 3 and 4 over 15 frames from (18, 18).
+  `FE3DWidget_SetValue` stores a float at +0x160.
+
+The test has 48,800 cases (61 functions, 800 each). The list's walk and the row's own helpers run for real. The
+lists are chains of up to five nodes in the arena, so some 15,000 nodes are given an operation. The identity matrix
+is in memory the game clears at start-up, so the test fills it with random words; that way all 16 words are seen
+being copied. The group's table is logged as its children are deleted.
+
+60 of 63 mutants are caught. The other three are equivalent:
+- the stores of 0 to the w of the offset's vector (on the stack, and never read);
+- the store of 0 to the w of the thing's vf13 vector (the same);
+- the thing destructor's table, which the node's destructor overwrites at once.
