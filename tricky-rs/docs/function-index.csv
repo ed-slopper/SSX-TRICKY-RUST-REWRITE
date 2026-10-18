@@ -5033,119 +5033,119 @@ address,size,name,system,status
 0x270210,8,cListFE3DFindHashNameOp::~cListFE3DFindHashNameOp,frontend?,checked
 0x270218,28,FUN_00270218,frontend?,ported
 0x270260,64,cListOperator::__tf,runtime,host
-0x2702e0,68,cFE3DSound::cFE3DSound,frontend,not started
-0x270328,76,cFE3DSound::~cFE3DSound,frontend,not started
-0x270378,88,cFE3DSound::vf1_270378,frontend,not started
-0x2703d0,68,cFE3DSound::vf2_2703d0,frontend,not started
-0x2704c8,40,cFE3DSound::vf3_2704c8,frontend,not started
-0x2704f0,68,cFE3DSound::vf4_2704f0,frontend,not started
-0x2705d0,56,cFE3DSound::vf5_2705d0,frontend,not started
-0x2705e0,12,cFE3DSound::vf6_2705e0,frontend,not started
-0x2705f0,12,cFE3DSound::vf7_2705f0,frontend,not started
-0x270600,20,cFE3DSound::vf8_270600,frontend,not started
-0x270610,48,cFE3DSound::vf9_270610,frontend,not started
-0x270770,16,cFE3DSound::vf10_270770,frontend,not started
-0x270780,12,cFE3DSound::vf11_270780,frontend,not started
-0x270790,80,cFE3DSound::vf12_270790,frontend,not started
-0x2707e0,136,cFE3DSound::vf13_2707e0,frontend,not started
-0x270860,88,cFE3DSound::vf14_270860,frontend,not started
-0x2708b8,128,cFE3DSound::vf15_2708b8,frontend,not started
-0x270938,12,cFE3DSound::vf16_270938,frontend,not started
-0x270948,12,cFE3DSound::vf17_270948,frontend,not started
-0x270958,44,cFE3DSound::vf18_270958,frontend,not started
-0x270988,12,cFE3DSound::vf19_270988,frontend,not started
-0x270998,12,cFE3DSound::vf20_270998,frontend,not started
-0x2709a8,12,cFE3DSound::vf21_2709a8,frontend,not started
-0x2709b8,44,cFE3DSound::vf22_2709b8,frontend,not started
-0x2709e8,12,cFE3DSound::vf23_2709e8,frontend,not started
-0x2709f8,68,cFE3DSound::vf24_2709f8,frontend,not started
-0x270a40,12,cFE3DSound::vf25_270a40,frontend,not started
-0x270a50,12,cFE3DSound::vf26_270a50,frontend,not started
-0x270a60,12,cFE3DSound::vf27_270a60,frontend,not started
-0x270a70,60,cFE3DSound::vf28_270a70,frontend,not started
-0x270ab0,20,cFE3DSound::vf29_270ab0,frontend,not started
-0x270ac0,36,cFE3DSound::vf30_270ac0,frontend,not started
-0x270ae8,12,cFE3DSound::vf31_270ae8,frontend,not started
-0x270af8,12,cFE3DSound::vf32_270af8,frontend,not started
-0x270b08,20,cFE3DSound::vf33_270b08,frontend,not started
-0x270b18,204,cFE3DSound::vf34_270b18,frontend,not started
-0x270be8,12,cFE3DSound::vf35_270be8,frontend,not started
-0x270bf8,36,cFE3DSound::vf36_270bf8,frontend,not started
-0x270c20,16,cFE3DSound::vf37_270c20,frontend,not started
-0x270c30,892,cFE3DSound::vf38_270c30,frontend,not started
-0x270fb0,16,cFE3DSound::vf39_270fb0,frontend,not started
-0x270fc0,12,cFE3DSound::vf40_270fc0,frontend,not started
-0x270fd0,36,cFE3DSound::vf41_270fd0,frontend,not started
-0x270ff8,16,cFE3DSound::vf42_270ff8,frontend,not started
-0x271008,36,cFE3DSound::vf43_271008,frontend,not started
-0x271030,16,cFE3DSound::vf44_271030,frontend,not started
-0x271040,36,cFE3DSound::vf45_271040,frontend,not started
-0x271068,16,cFE3DSound::vf46_271068,frontend,not started
-0x271078,16,cFE3DSound::vf47_271078,frontend,not started
-0x271088,12,cFE3DSound::vf48_271088,frontend,not started
-0x271098,36,cFE3DSound::vf49_271098,frontend,not started
-0x2710c0,16,cFE3DSound::vf50_2710c0,frontend,not started
-0x2710d0,36,cFE3DSound::vf51_2710d0,frontend,not started
-0x2710f8,16,cFE3DSound::vf52_2710f8,frontend,not started
-0x271108,36,cFE3DSound::vf53_271108,frontend,not started
-0x271130,12,cFE3DSound::vf54_271130,frontend,not started
+0x2702e0,68,cFE3DSound::cFE3DSound,frontend,checked
+0x270328,76,cFE3DSound::~cFE3DSound,frontend,checked
+0x270378,88,cFE3DSound::vf1_270378,frontend,checked
+0x2703d0,68,cFE3DSound::vf2_2703d0,frontend,checked
+0x2704c8,40,cFE3DSound::vf3_2704c8,frontend,checked
+0x2704f0,68,cFE3DSound::vf4_2704f0,frontend,checked
+0x2705d0,56,cFE3DSound::vf5_2705d0,frontend,checked
+0x2705e0,12,cFE3DSound::vf6_2705e0,frontend,checked
+0x2705f0,12,cFE3DSound::vf7_2705f0,frontend,checked
+0x270600,20,cFE3DSound::vf8_270600,frontend,checked
+0x270610,48,cFE3DSound::vf9_270610,frontend,checked
+0x270770,16,cFE3DSound::vf10_270770,frontend,checked
+0x270780,12,cFE3DSound::vf11_270780,frontend,checked
+0x270790,80,cFE3DSound::vf12_270790,frontend,checked
+0x2707e0,136,cFE3DSound::vf13_2707e0,frontend,checked
+0x270860,88,cFE3DSound::vf14_270860,frontend,checked
+0x2708b8,128,cFE3DSound::vf15_2708b8,frontend,checked
+0x270938,12,cFE3DSound::vf16_270938,frontend,checked
+0x270948,12,cFE3DSound::vf17_270948,frontend,checked
+0x270958,44,cFE3DSound::vf18_270958,frontend,checked
+0x270988,12,cFE3DSound::vf19_270988,frontend,checked
+0x270998,12,cFE3DSound::vf20_270998,frontend,checked
+0x2709a8,12,cFE3DSound::vf21_2709a8,frontend,checked
+0x2709b8,44,cFE3DSound::vf22_2709b8,frontend,checked
+0x2709e8,12,cFE3DSound::vf23_2709e8,frontend,checked
+0x2709f8,68,cFE3DSound::vf24_2709f8,frontend,checked
+0x270a40,12,cFE3DSound::vf25_270a40,frontend,checked
+0x270a50,12,cFE3DSound::vf26_270a50,frontend,checked
+0x270a60,12,cFE3DSound::vf27_270a60,frontend,checked
+0x270a70,60,cFE3DSound::vf28_270a70,frontend,checked
+0x270ab0,20,cFE3DSound::vf29_270ab0,frontend,checked
+0x270ac0,36,cFE3DSound::vf30_270ac0,frontend,checked
+0x270ae8,12,cFE3DSound::vf31_270ae8,frontend,checked
+0x270af8,12,cFE3DSound::vf32_270af8,frontend,checked
+0x270b08,20,cFE3DSound::vf33_270b08,frontend,checked
+0x270b18,204,cFE3DSound::vf34_270b18,frontend,checked
+0x270be8,12,cFE3DSound::vf35_270be8,frontend,checked
+0x270bf8,36,cFE3DSound::vf36_270bf8,frontend,checked
+0x270c20,16,cFE3DSound::vf37_270c20,frontend,checked
+0x270c30,892,cFE3DSound::vf38_270c30,frontend,checked
+0x270fb0,16,cFE3DSound::vf39_270fb0,frontend,checked
+0x270fc0,12,cFE3DSound::vf40_270fc0,frontend,checked
+0x270fd0,36,cFE3DSound::vf41_270fd0,frontend,checked
+0x270ff8,16,cFE3DSound::vf42_270ff8,frontend,checked
+0x271008,36,cFE3DSound::vf43_271008,frontend,checked
+0x271030,16,cFE3DSound::vf44_271030,frontend,checked
+0x271040,36,cFE3DSound::vf45_271040,frontend,checked
+0x271068,16,cFE3DSound::vf46_271068,frontend,checked
+0x271078,16,cFE3DSound::vf47_271078,frontend,checked
+0x271088,12,cFE3DSound::vf48_271088,frontend,checked
+0x271098,36,cFE3DSound::vf49_271098,frontend,checked
+0x2710c0,16,cFE3DSound::vf50_2710c0,frontend,checked
+0x2710d0,36,cFE3DSound::vf51_2710d0,frontend,checked
+0x2710f8,16,cFE3DSound::vf52_2710f8,frontend,checked
+0x271108,36,cFE3DSound::vf53_271108,frontend,checked
+0x271130,12,cFE3DSound::vf54_271130,frontend,checked
 0x2711e8,80,cFE3DSound::__tf,runtime,host
-0x271238,36,cFE3DSoundBase::~cFE3DSoundBase,frontend,not started
+0x271238,36,cFE3DSoundBase::~cFE3DSoundBase,frontend,checked
 0x271260,64,cFE3DSoundBase::__tf,runtime,host
-0x2712e0,8,cFE3DSoundBase::vf54_2712e0,frontend,not started
-0x2712e8,8,cFE3DSoundBase::vf53_2712e8,frontend,not started
-0x2712f0,8,cFE3DSoundBase::vf52_2712f0,frontend,not started
-0x2712f8,12,cFE3DSoundBase::vf51_2712f8,frontend,not started
-0x271308,8,cFE3DSoundBase::vf50_271308,frontend,not started
-0x271310,12,cFE3DSoundBase::vf49_271310,frontend,not started
-0x271320,8,cFE3DSoundBase::vf48_271320,frontend,not started
-0x271328,12,cFE3DSoundBase::vf47_271328,frontend,not started
-0x271338,8,cFE3DSoundBase::vf46_271338,frontend,not started
-0x271340,12,cFE3DSoundBase::vf45_271340,frontend,not started
-0x271350,8,cFE3DSoundBase::vf44_271350,frontend,not started
-0x271358,12,cFE3DSoundBase::vf43_271358,frontend,not started
-0x271368,8,cFE3DSoundBase::vf42_271368,frontend,not started
-0x271370,12,cFE3DSoundBase::vf41_271370,frontend,not started
-0x271380,8,cFE3DSoundBase::vf40_271380,frontend,not started
-0x271388,8,cFE3DSoundBase::vf39_271388,frontend,not started
-0x271390,8,cFE3DSoundBase::vf38_271390,frontend,not started
-0x271398,8,cFE3DSoundBase::vf37_271398,frontend,not started
-0x2713a0,8,cFE3DSoundBase::vf36_2713a0,frontend,not started
-0x2713a8,8,cFE3DSoundBase::vf35_2713a8,frontend,not started
-0x2713b0,8,cFE3DSoundBase::vf34_2713b0,frontend,not started
-0x2713b8,8,cFE3DSoundBase::vf33_2713b8,frontend,not started
-0x2713c0,8,cFE3DSoundBase::vf32_2713c0,frontend,not started
-0x2713c8,8,cFE3DSoundBase::vf31_2713c8,frontend,not started
-0x2713d0,8,cFE3DSoundBase::vf30_2713d0,frontend,not started
-0x2713d8,8,cFE3DSoundBase::vf29_2713d8,frontend,not started
-0x2713e0,8,cFE3DSoundBase::vf28_2713e0,frontend,not started
-0x2713e8,8,cFE3DSoundBase::vf27_2713e8,frontend,not started
-0x2713f0,8,cFE3DSoundBase::vf26_2713f0,frontend,not started
-0x2713f8,8,cFE3DSoundBase::vf25_2713f8,frontend,not started
-0x271400,8,cFE3DSoundBase::vf24_271400,frontend,not started
-0x271408,8,cFE3DSoundBase::vf23_271408,frontend,not started
-0x271410,8,cFE3DSoundBase::vf22_271410,frontend,not started
-0x271418,8,cFE3DSoundBase::vf21_271418,frontend,not started
-0x271420,8,cFE3DSoundBase::vf20_271420,frontend,not started
-0x271428,8,cFE3DSoundBase::vf19_271428,frontend,not started
-0x271430,8,cFE3DSoundBase::vf18_271430,frontend,not started
-0x271438,8,cFE3DSoundBase::vf17_271438,frontend,not started
-0x271440,8,cFE3DSoundBase::vf16_271440,frontend,not started
-0x271448,8,cFE3DSoundBase::vf15_271448,frontend,not started
-0x271450,8,cFE3DSoundBase::vf14_271450,frontend,not started
-0x271458,8,cFE3DSoundBase::vf13_271458,frontend,not started
-0x271460,8,cFE3DSoundBase::vf12_271460,frontend,not started
-0x271468,8,cFE3DSoundBase::vf11_271468,frontend,not started
-0x271470,8,cFE3DSoundBase::vf10_271470,frontend,not started
-0x271478,8,cFE3DSoundBase::vf9_271478,frontend,not started
-0x271480,8,cFE3DSoundBase::vf8_271480,frontend,not started
-0x271488,8,cFE3DSoundBase::vf7_271488,frontend,not started
-0x271490,8,cFE3DSoundBase::vf6_271490,frontend,not started
-0x271498,8,cFE3DSoundBase::vf5_271498,frontend,not started
-0x2714a0,8,cFE3DSoundBase::vf4_2714a0,frontend,not started
-0x2714a8,8,cFE3DSoundBase::vf3_2714a8,frontend,not started
-0x2714b0,8,cFE3DSoundBase::vf2_2714b0,frontend,not started
-0x2714b8,8,cFE3DSoundBase::vf1_2714b8,frontend,not started
+0x2712e0,8,cFE3DSoundBase::vf54_2712e0,frontend,checked
+0x2712e8,8,cFE3DSoundBase::vf53_2712e8,frontend,checked
+0x2712f0,8,cFE3DSoundBase::vf52_2712f0,frontend,checked
+0x2712f8,12,cFE3DSoundBase::vf51_2712f8,frontend,checked
+0x271308,8,cFE3DSoundBase::vf50_271308,frontend,checked
+0x271310,12,cFE3DSoundBase::vf49_271310,frontend,checked
+0x271320,8,cFE3DSoundBase::vf48_271320,frontend,checked
+0x271328,12,cFE3DSoundBase::vf47_271328,frontend,checked
+0x271338,8,cFE3DSoundBase::vf46_271338,frontend,checked
+0x271340,12,cFE3DSoundBase::vf45_271340,frontend,checked
+0x271350,8,cFE3DSoundBase::vf44_271350,frontend,checked
+0x271358,12,cFE3DSoundBase::vf43_271358,frontend,checked
+0x271368,8,cFE3DSoundBase::vf42_271368,frontend,checked
+0x271370,12,cFE3DSoundBase::vf41_271370,frontend,checked
+0x271380,8,cFE3DSoundBase::vf40_271380,frontend,checked
+0x271388,8,cFE3DSoundBase::vf39_271388,frontend,checked
+0x271390,8,cFE3DSoundBase::vf38_271390,frontend,checked
+0x271398,8,cFE3DSoundBase::vf37_271398,frontend,checked
+0x2713a0,8,cFE3DSoundBase::vf36_2713a0,frontend,checked
+0x2713a8,8,cFE3DSoundBase::vf35_2713a8,frontend,checked
+0x2713b0,8,cFE3DSoundBase::vf34_2713b0,frontend,checked
+0x2713b8,8,cFE3DSoundBase::vf33_2713b8,frontend,checked
+0x2713c0,8,cFE3DSoundBase::vf32_2713c0,frontend,checked
+0x2713c8,8,cFE3DSoundBase::vf31_2713c8,frontend,checked
+0x2713d0,8,cFE3DSoundBase::vf30_2713d0,frontend,checked
+0x2713d8,8,cFE3DSoundBase::vf29_2713d8,frontend,checked
+0x2713e0,8,cFE3DSoundBase::vf28_2713e0,frontend,checked
+0x2713e8,8,cFE3DSoundBase::vf27_2713e8,frontend,checked
+0x2713f0,8,cFE3DSoundBase::vf26_2713f0,frontend,checked
+0x2713f8,8,cFE3DSoundBase::vf25_2713f8,frontend,checked
+0x271400,8,cFE3DSoundBase::vf24_271400,frontend,checked
+0x271408,8,cFE3DSoundBase::vf23_271408,frontend,checked
+0x271410,8,cFE3DSoundBase::vf22_271410,frontend,checked
+0x271418,8,cFE3DSoundBase::vf21_271418,frontend,checked
+0x271420,8,cFE3DSoundBase::vf20_271420,frontend,checked
+0x271428,8,cFE3DSoundBase::vf19_271428,frontend,checked
+0x271430,8,cFE3DSoundBase::vf18_271430,frontend,checked
+0x271438,8,cFE3DSoundBase::vf17_271438,frontend,checked
+0x271440,8,cFE3DSoundBase::vf16_271440,frontend,checked
+0x271448,8,cFE3DSoundBase::vf15_271448,frontend,checked
+0x271450,8,cFE3DSoundBase::vf14_271450,frontend,checked
+0x271458,8,cFE3DSoundBase::vf13_271458,frontend,checked
+0x271460,8,cFE3DSoundBase::vf12_271460,frontend,checked
+0x271468,8,cFE3DSoundBase::vf11_271468,frontend,checked
+0x271470,8,cFE3DSoundBase::vf10_271470,frontend,checked
+0x271478,8,cFE3DSoundBase::vf9_271478,frontend,checked
+0x271480,8,cFE3DSoundBase::vf8_271480,frontend,checked
+0x271488,8,cFE3DSoundBase::vf7_271488,frontend,checked
+0x271490,8,cFE3DSoundBase::vf6_271490,frontend,checked
+0x271498,8,cFE3DSoundBase::vf5_271498,frontend,checked
+0x2714a0,8,cFE3DSoundBase::vf4_2714a0,frontend,checked
+0x2714a8,8,cFE3DSoundBase::vf3_2714a8,frontend,checked
+0x2714b0,8,cFE3DSoundBase::vf2_2714b0,frontend,checked
+0x2714b8,8,cFE3DSoundBase::vf1_2714b8,frontend,checked
 0x2715c8,468,FE3D_CreateStateGroup,frontend?,ported
 0x2717a0,68,cFE3DState::~cFE3DState,frontend,ported
 0x2717e8,92,cFE3DState::vf12_2717e8,frontend,checked

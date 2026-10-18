@@ -2135,3 +2135,42 @@ operation. The port is G9x1's, and its mutants were caught there, so the copies 
   screen.
 - `TextBox_Destruct` 0x14f390 (results, lessons, `cStartScreen` +0x48), `SpriteSet_SetShape` 0x1f9ee8 (the 0x1c-byte
   rect `SpriteSet_GetRect` reads), `LessonOverlay_DrawPage2` / `3` 0x14c2c0 / 0x14c2c8 (empty in retail).
+
+## G9y3: the front end's sound object (`game/src/fe_sound.rs`, `tests/fe_sound.rs`)
+
+`cFE3DSound` is the front end's handle on the game's sound system (its object at 0x343050). Its base,
+`cFE3DSoundBase`, has 54 virtuals that do nothing or answer 0, 0.0 or 1.
+
+- **Construction and destruction.** The constructor sets the table, keeps its id at +4 and opens the sound system
+  for it. The destructor sets its own table again, closes the sound system, then runs the base's destructor (the
+  base table, freed on flag 1).
+- **Handing on.** Most virtuals (24 of them) only hand their registers on to one of the sound system's functions,
+  with the sound system in place of themselves. Three of them call rather than jump, which comes to the same.
+- **Front end events (vf2, vf4).** The event is a signed byte; past 11 nothing plays. Each event has a sound id in
+  one of two tables (the second has none for events 9 and 10). The id is played through the object's own +0x10.
+- **Music (vf9).** By `k + 1` (nothing past 25), one of seven music calls is made with `k`, or 0x2129f8 is made
+  with a track (-1 or 0..4).
+- **Music switches (vf12..vf15, vf24).** These call their own +0x10 with -1, then start or stop the music by
+  whether they are switched on.
+- **Settings (vf34).** When the career holds sound settings (+0x169c of its block at +8), the sound system is told
+  the bank (+0x1668), the five volumes (channels 0..2, the master volume, channels 3 and 4) and the mode (+0x166c).
+  Then the sound system is updated.
+- **Volumes.** Five virtual pairs get and set the volume of channels 0..4. vf37, vf39 and vf47 read words of the
+  sound system.
+- **Reloading (vf38).** When the sound system answers 1 for the bank, the five volumes are kept and the sound is
+  stopped. Then each of these steps follows a frame after the last:
+  1. the sound system is closed;
+  2. the load is waited for;
+  3. the bank is loaded;
+  4. the volumes are set back;
+  5. the object's id is opened again;
+  6. the sound is updated.
+
+  Then it is reloaded. A frame here is the front end's own wait: its widgets are updated, the renderer is asked
+  until it answers, then the front end's +0x38 is called.
+
+The test runs 66,600 cases (111 functions, 600 each). The k picks cover every one of vf9's indices. The object's
+table is logged as the sound system is closed.
+
+Of the 56 mutants, 55 are caught. The survivor reads the event as an unsigned byte rather than a signed one. That
+gives the same result: both forms are past 11 for any byte with its top bit set.
