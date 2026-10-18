@@ -677,3 +677,31 @@ the entry and the box fills in the newest one before 0x222358 plays it.
   Settles 0x21e498 from the batch 14 list.
 - `SnowProgram_Destruct` 0x21e738: frees the program pointer of a 0x50-byte snow program record (the arrays at
   cBXAudio +0x745c, +0x777c, +0x7a9c).
+
+## Names from F1c batch 19 (proven)
+
+- Crowd sets: `CrowdSoundList_Destruct` 0x21ece0 (`PtrArray_FreeAll`, delete on flag 1), `CrowdSoundSet_Destruct`
+  0x221538 (its three lists at +0, +0x18, +0x30: trick, fall, anticipate); `~cCrowdSys` runs it over the three sets
+  at +0x3730.
+- The speech library (`game/src/speechlib.rs`, `speechplay.rs`, `speechsys.rs`; the Rust function in brackets):
+  - tables: `SpeechLib_InitBankTable` 0x2bb060 (from Init) and `SpeechLib_ClearBankTable` 0x2bb078 (from Shutdown),
+    the same body [`clear_bank_table`]; `SpeechLib_BankHasSound` 0x2bb270; `SpeechLib_FindEventInBank` 0x2bb610;
+    `SpeechLib_GetEventBankWord` / `Kind` / `Size` 0x2bb700 / 0x2bb750 / 0x2bb7d0; `SpeechLib_FindBankKey`
+    0x2bcfd8; `SpeechLib_LookupHeaderBanks` 0x2bc850.
+  - a bank's history ring and bitmap: `SpeechBank_PushRecent` 0x2bb2d8, `SpeechBank_FindRecent` 0x2bb370,
+    `SpeechBank_StirBitmap` 0x2bb430, `SpeechBank_ClearRowBit` 0x2bc938, `SpeechBank_TestEntryBit` 0x2bc9d8,
+    `SpeechBank_RowAllowed` 0x2bca80, `SpeechBank_GetKinds` 0x2bc738 (bytes +8, +9).
+  - voices: `SpeechLib_ResetVoices` 0x2bb810, `SpeechLib_GroupLimitsOk` 0x2bba50, `SpeechLib_StartVoice0`
+    0x2bc700 (0x2bc5e0 for group 0), `SpeechVoice_ClearFlags` 0x2bdad0 (+0x60, +0x61).
+  - checks: `SpeechLib_MasksAgree` 0x2bc7a0, `SpeechLib_MaskMatch` 0x2be650, `SpeechLib_ModeOk` 0x2bcf90,
+    `SpeechLib_IdCountOk` 0x2bcf48 and `SpeechLib_ClearIdCounts` 0x2badc0 (the eight (id, count) pairs at 0x3494b0),
+    `SpeechLib_RunCheckCallback` 0x2bc490 (0x348dec), `SpeechLib_Percent` 0x2bccd0 (of 0x3494f4),
+    `SpeechLib_Weight` 0x2bcdb0 (0x348930).
+  - the pending (id, value) at 0x348dc0: `SpeechLib_SetPending` 0x2bc750, `_GetPending` 0x2bc768, `_ClearPending`
+    0x2bc788.
+  - `SpeechIdList_Clear` 0x2bbd68, `SpeechIdList_Contains` 0x2bbd78 ({count, halfwords}); `SpeechRow_Clear` 0x2bea20;
+    `SpeechLib_SetClockBase` 0x2be208 (0x349518, from Init); `SpeechLib_CalcBufferBytes` 0x2bae08 (from
+    `Speech_InitLibrary`); `SpeechLib_Fatal` 0x2bebe8 (0x3495d3 = 'B', `exit(0)`).
+- Not settled: 0x2bad70 (`REGISTER` in `speechload.rs`: 0x2bac78 for a slot below 8), 0x2baeb8 / 0x2baed0 (each
+  clears three words, at 0x348df8 and 0x348de0; `speechlib.rs` calls 0x2baed0 "stop every voice", which its body
+  does not show), 0x2bb090 (`v << 2`).

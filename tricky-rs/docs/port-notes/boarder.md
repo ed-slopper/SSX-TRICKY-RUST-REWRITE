@@ -1593,3 +1593,8 @@ class). The runner check fills the whole ranges, gaps included, at random, runs 
   (12 bytes each), then its vtable slot at +0x14.
 - `Parse_IsSectionEnd` 0x17a1a8 (was `FUN_0017a1a8` in `game/src/input.rs`): out of text, or "};" (its line
   skipped).
+
+## Names from F1c batch 19 (proven)
+
+- `RiderSkin_DrawLod` 0x207e50 (was `FUN_00207e50` in `game/src/riderskin.rs`, `draw_lod`): LOD n's parts with a
+  mesh (+0x48) handed to the renderer's +0x2e8 call (the part, its entry + 0x210).

@@ -1066,3 +1066,8 @@ sets the table and leaves it; flag 2 destroys the backdrop and flag 1 frees the 
   - `Draw_SolidRect`: untextured, then the colour, then the rectangle.
 
 The runner test (tests/overlaybase.rs) has 45,000 cases over the 75 functions, with the results overlay's init and the backdrop's and screen overlay's destructors real on both sides. The tables copied to the frame are compared byte for byte (6,855 of them). 62 of 64 mutants are caught. The two left drop stores that are overwritten before anything reads them: the card destructor's first +0x428, and the race results' shifts that the card UI's copy overwrites.
+
+## Names from F1c batch 19 (proven)
+
+- `Draw_GradientRect` 0x19b2a0 (was `FUN_0019b2a0` in `game/src/quad2d.rs`): a rectangle with a colour at each
+  corner, z from the first word's +0x10, u and v 0..1.

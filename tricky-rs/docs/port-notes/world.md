@@ -2693,3 +2693,37 @@ with 0xfff instead of 0x1fff, which cannot matter while the pool has 0x100 pairs
   0x14f6c8, `ContactIndex_Pop` 0x14f920, `ContactIndex_Destruct` 0x14f8c8, `ContactMgr_Destruct` 0x14fa00.
 - `CrowdBox_Destruct` 0x21ef58: `Crowd_StopCheer`, `CrowdBox_StopAll`, delete on flag 1 (400-byte records,
   `CrowdSys_Free`).
+
+## Names from F1c batch 19 (proven)
+
+Most of these were ported and checked under their addresses already; the names follow what the code and the
+ported functions do.
+
+- Texture manager (`game/src/texman.rs`): `TexMan_Shutdown` 0x1c0e78 (`shut_down`), `TexMan_BuildDrawIntoPacket`
+  0x1c1ab8 (FRAME / SCISSOR / XYOFFSET to draw into texture n), `TexMan_BuildFillPacket` 0x1c1bd0 (a sprite filling
+  texture n in a colour), `TexMan_BindTexture` 0x1c3818, `TexMan_BuildVramPacket` 0x1c3d88, `TexMan_BuildClutPacket`
+  0x1c3f68.
+- Draw lists (`game/src/drawlist.rs`): `PS2Draw_AddPacket` 0x1c4f28, `PS2Draw_FindOrAddPage` 0x1c4340,
+  `PS2DrawPage_Matches` 0x1c7068, `PS2Draw_SetZBuffer` 0x1c4638 (+0xfa64 / +0xfa68, the z buffer words the flush
+  writes; from `Gfx_SetDisplayMode`), `PS2Draw_FreeTables` 0x1c4158 (frees the page and batch tables, +4 and +0xc;
+  from `cPS2GraphicsMan::vf2`).
+- `SnowFall_DrawLayerAt` 0x1c9310, `SnowFall_DrawOctant` 0x1c9388 (`game/src/snowfall.rs`).
+- Bezier patches (`game/src/bezier.rs`): `BezierMan_DrawViews` 0x1da5c8, `BezierMan_FreePatches` 0x1db1c8 (+0x544),
+  `BezierMan_FreeTables` 0x1db4f8 (+0x530).
+- Renderer maths: `PS2Render_ClipTransform` 0x1e1f28 (a point through the clip matrix rows +0x5b0..+0x5e0),
+  `PS2Render_ProjectToScreen` 0x1e1ec8 (the same, divided by w, then × +0x5f0 + +0x600; from `cPS2GraphicsMan::vf78`),
+  `PS2Render_CalcFog` 0x1e9128 (no callers: after `PS2Render_UpdateModelMatrices`, the point's clip w × +0x630's w,
+  clamped to 0..+0x630's x, made whole: the fog value the model draws compute inline).
+- The render thread's frame states (+0x6d8; the buffers' states at +0x6dc, the current one +0x690):
+  `Gfx_RenderThread` sends a ready buffer (1), then the end packet (3), and flips at 5.
+  - `Gfx_Vif1DmaHandler` 0x1e4028 (the DMAC channel 1 handler `AddDmacHandler` installs) calls `Gfx_OnVif1DmaDone`
+    0x1e4060: 1 → 2 (signals +0x700), 3 → 4.
+  - `Gfx_OnVblankStart` 0x1e3fe0 (from `Gfx_VblankStartHandler`): counts vblanks (+0x6f4); at 4 with +0x6f0 of them,
+    → 5 and signals +0x700.
+  - `Gfx_BeginBuffer` 0x1e40a0 (`cPS2GraphicsMan::vf13`): the current buffer free (0) → 1; 1 when it was 0 or 1.
+  - `Gfx_FlushIfIdle` 0x1e40f0 (`cPS2GraphicsMan::vf14`): when the state is 0, `PS2Render_FlushMeshCache`(1); returns
+    whether it was.
+- `Vec4_ScaleCopy19` 0x1d9b38 (one more copy of the scale).
+- Not settled: 0x1d9700 (the particle manager's draw of one 0xf0 record), 0x1e0680 (a jump table by display mode,
+  < 0x3b), 0x1e81f8 ({word, 0, 0}), 0x1e4288, 0x1e4e20 / 0x1e4eb8, 0x1fb600..0x1fbbb0 (byte reorders by the tables at
+  0x340f10 / 0x341190, likely texture swizzles), 0x203d40, 0x21e788.

@@ -671,3 +671,11 @@
 17a1a8 FUN_0017a1a8 Parse_IsSectionEnd
 194870 FUN_00194870 ReplaySave_End
 1948c0 FUN_001948c0 ReplaySave_Abort
+19b2a0 FUN_0019b2a0 Draw_GradientRect
+1c0e78 FUN_001c0e78 TexMan_Shutdown
+1c1ab8 FUN_001c1ab8 TexMan_BuildDrawIntoPacket
+1c1bd0 FUN_001c1bd0 TexMan_BuildFillPacket
+1c3818 FUN_001c3818 TexMan_BindTexture
+1c3d88 FUN_001c3d88 TexMan_BuildVramPacket
+1c3f68 FUN_001c3f68 TexMan_BuildClutPacket
+207e50 FUN_00207e50 RiderSkin_DrawLod
