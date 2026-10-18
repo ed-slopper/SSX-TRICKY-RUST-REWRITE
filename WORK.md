@@ -82,9 +82,8 @@ state machine and the renderer are ours. Nothing has been checked against the or
 | G21 | **The rider stutters back and forth the whole run** (play test by bredclan, 2026-10-17, tricky-rs.2026-10-17.exe from 3580b5f). To find: whether it is the port (our stand-ins between the exact pieces: the rider's step, its control state, the app's camera or its frame timing fighting the game's fixed tick) or something the decompiling will fix once the boarder state machine (G1) runs whole. First step: log the rider's place and heading each tick in a run (`TRICKY_SIM`) and see which one goes back and forth, and on which frames | any | | | Play test 2026-10-17 |
 | G9y | (umbrella: G9y1..G9y8) The rest of the front end's own code in 0x26c000..0x2aab58 (~370 functions not yet checked; the screen builders marked `ported` are G9b's): the menu, the copies of the widget group's operations, the sound widgets, the memory card overlay, the world group, and the rest, checked in the runner | any | G9x | | Added 2026-10-17 by ed-slopper/puffin |
 | G9y8 | (umbrella: G9y8a..G9y8g) The front end's nine big screen builders in 0x26c000..0x2aab58, marked `ported` in the index but only called by the screens' ports: ported and checked in the runner | any | G9y | | Split of G9y 2026-10-17 |
-| G9y8b | `FE_BuildRiderBioScreen` 0x27f600 (14 KB) | ed-slopper/puffin | G9y8 | | Split of G9y 2026-10-17 |
 | G9y8c | `FE_BuildRiderShortBioScreen` 0x285230 (26 KB) | any | G9y8 | | Split of G9y 2026-10-17 |
-| G9y8d | The DVD screen's lists: `FE_BuildDvdCharacterList` 0x296870 (2 KB), `FE_BuildDvdJukebox` 0x297178 (3.6 KB) | any | G9y8 | | Split of G9y 2026-10-17 |
+| G9y8d | The DVD screen's lists: `FE_BuildDvdCharacterList` 0x296870 (2 KB), `FE_BuildDvdJukebox` 0x297178 (3.6 KB) | ed-slopper/puffin | G9y8 | | Split of G9y 2026-10-17 |
 | G9y8e | `FE_BuildSoundOptions` 0x29fb70 (15 KB) | any | G9y8 | | Split of G9y 2026-10-17 |
 | G9y8f | `FE_BuildControllerConfig` 0x2a36e8 (7.4 KB) | any | G9y8 | | Split of G9y 2026-10-17 |
 | G9y8g | `FE_BuildOptionsScreen` 0x2a53d0 (11 KB) | any | G9y8 | | Split of G9y 2026-10-17 |
@@ -157,6 +156,7 @@ matches the original.
 
 | ID | Task | Section | Who | Date | Commit |
 |---|---|---|---|---|---|
+| G9y8b | The rider bio panel (0x27f600; 18/18 mutants) | P2 | ed-slopper/puffin | 2026-10-17 | 8de6699 |
 | G9y8a | The rider profile's frame and records panel (0x27e918, 0x282d30; 55/56 mutants) | P2 | ed-slopper/puffin | 2026-10-17 | 7d296cf |
 | G9y7 | The front end's small ported-but-unchecked functions (42: 3 marked from E10a, 1 in G9y4's test, 38 ported in 3 batches) | P2 | ed-slopper/puffin | 2026-10-17 | ded121d |
 | G9y4b | The memory card overlay's builder 0x28f3e0 (52/55 mutants, the rest equivalent) | P2 | ed-slopper/puffin | 2026-10-17 | 800248b |
@@ -1403,3 +1403,4 @@ matches the original.
 - 2026-10-17 ed-slopper/puffin: G9y4b done (800248b: the overlay's builder, 52/55 mutants, the rest equivalent); G9y7 added and claimed (the 42 small ported-but-unchecked front end functions).
 - 2026-10-17 ed-slopper/puffin: G9y7 done (ded121d: the 42 small front end functions); G9y8 added for the nine big screen builders (G9y8a..g), G9y8a claimed (the rider profile's frame and records).
 - 2026-10-17 ed-slopper/puffin: G9y8a done (the rider profile's frame and records); G9y8b claimed (the bio panel).
+- 2026-10-17 ed-slopper/puffin: G9y8b done (the rider bio panel); G9y8d claimed (the DVD screen's lists).
