@@ -5272,9 +5272,9 @@ address,size,name,system,status
 0x27e3c0,524,cFE3DStateTrickBook::vf26_27e3c0,frontend,checked
 0x27e5d0,552,cFE3DStateTrickBook::vf22_27e5d0,frontend,checked
 0x27e7f8,288,cFE3DStateTrickBook::vf24_27e7f8,frontend,checked
-0x27e918,3304,FE_BuildRiderProfileScreen,frontend,ported
+0x27e918,3304,FE_BuildRiderProfileScreen,frontend,checked
 0x27f600,14128,FE_BuildRiderBioScreen,frontend,ported
-0x282d30,8000,FE_BuildRiderRecordsScreen,frontend,ported
+0x282d30,8000,FE_BuildRiderRecordsScreen,frontend,checked
 0x284c70,752,FE3D_BuildRiderBioTextA,frontend?,checked
 0x284f60,720,FE3D_BuildRiderBioTextB,frontend?,checked
 0x285230,26424,FE_BuildRiderShortBioScreen,frontend,ported

@@ -2413,3 +2413,27 @@ Of the 40 mutants, 38 are caught. The two survivors are equivalent on the game's
 
 G9y7 is done: every small function in 0x26c000..0x2aab58 is now checked. The nine big screen builders that the
 index also marked `ported` (only named as calls) are G9y8.
+
+## G9y8a: the rider profile's frame and records panel (`game/src/fe_riderbuild.rs`, `tests/fe_riderbuild.rs`)
+
+- **`FE_BuildRiderProfileScreen` 0x27e918.** It builds the profile's frame, five icons added to the state:
+  - the pale backdrop, 460 × 480 at x 180;
+  - the picture (+0x4ec, sprite 0x7c);
+  - the side bar, a scaled sprite 0x28 as wide as the sprite and scaled to 480 high;
+  - two red bands at y 0 and 422.
+- **`FE_BuildRiderRecordsScreen` 0x282d30.** It fills the records panel (the group at +0x4f8) for the screen's
+  rider.
+  - **Rows.** Each of the 10 events (0x3af8d0) gets a row in the left list: the event's name, and a text icon with
+    either its record value (events 6 and 7, the icon hidden) or its medal and count. The other events also get a
+    row in the right list with the second medal and count. A count of none shows the dash. The left counts are
+    written as numbers into the screen's +0x58 buffers; the right ones go through the format into +0x364.
+  - **Headings and rank list.** Six column headings follow. Then the rank list (+0x504): ten lines in the second
+    font, with its marker (+0x508).
+- **Made in place.** The entries are text entries (`fe_widgets::text_entry_init`) and text icons (a text entry with
+  the text icon's table and an icon as its second child). A replaced child is destroyed through its +8 with 3.
+
+The test runs 1,200 cases (600 each). The constructors give their objects a table of stand-ins and a random
++0xa8 (a value or none). Medals answer 0..3 and -1, and counts may be none or negative.
+
+Of the 56 mutants, 55 are caught. The survivor is equivalent: it replaces a second child that is always none
+there.
