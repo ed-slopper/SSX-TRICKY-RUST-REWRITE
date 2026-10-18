@@ -169,7 +169,17 @@ const FUNCS: [u32; 61] = [
 
 /// The copies of the operations above elsewhere in the game (the same bytes but for their branches, in other
 /// translation units): (the copy, the function it copies)
-const COPIES: [(u32, u32); 67] = [
+const COPIES: [(u32, u32); 77] = [
+    (0x268e40, 0x2aac40),
+    (0x268e90, 0x2aac90),
+    (0x268ee0, 0x2aace0),
+    (0x268f30, 0x2aad30),
+    (0x268f90, 0x2aad90),
+    (0x268ff0, 0x2aadf0),
+    (0x2690b8, 0x2aaeb8),
+    (0x269190, 0x2aaf90),
+    (0x2691c8, 0x2aafc8),
+    (0x269270, 0x2ab070),
     (0x2693c0, 0x2ab698),
     (0x269448, 0x2ab718),
     (0x2694d0, 0x2ab798),

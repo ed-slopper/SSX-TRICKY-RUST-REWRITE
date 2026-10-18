@@ -2610,3 +2610,28 @@ The test runs 500 cases of each of the 17 functions. They run for real on both s
 destructor sees a character without its model or record. 0x2661f0 (the pose stopped) was missing from the index.
 
 All 52 mutants are caught.
+
+## G9z3: the dialog box, the group's own virtuals and two memory helpers (`game/src/fe_scene.rs`, `tests/fe_scene_dialog.rs`)
+
+- **The constructor.** 0x267f58, which the index names `cFE3DThing::cFE3DThing`, is `cFE3DDialog`'s constructor.
+  The dialog starts as a group. It then gets its own table and five sprite slots (+0x140..+0x150, none) and is
+  sized 100 by 30 through its class. Its colours are (0.88, 0.1, 0.1, 0.1) and its bottom corners are sprites 0x11
+  and 0x12. Its edge (+0x154) is that sprite's height; the corners' colour (+0x158) is white.
+- **The frame (0x268308).** It is drawn in two passes:
+  - In the dialog's colour: the body sprite over its box, less the edge (minus a sixth of it) at a top or a bottom
+    that has corners. Then, unless the edge is 0, the edges' middles, inset 0.36 of the half width.
+  - In the corners' colour, one render state up: the corners, half the box wide and the edge high, with anchors 0,
+    8, 0xc and 4.
+  An edge of 0 returns before the render state is put back, as in the game.
+- **Layouts.** 0x2686c0 is the boxed layout: four corners, centred down the screen. 0x268808 is the bar layout:
+  bottom corners only, at the top.
+- **Virtuals.** The render and text render (vf10, vf11) raise the render state by its +0x70 around the children's
+  operations. The update (vf12) runs the children, then its own +0x48 when active. Twelve small accessors (0x268ce0,
+  0x268d00..0x268db0) and the scene's colour set-up (0x268c38) were missing from the index.
+- **The group.** Ten of `cFE3DWGroup`'s virtuals here are byte-for-byte copies of `FE3DWGroup_*4` (all but the
+  branch targets). They join `tests/fe_wgroup.rs`'s copies. Its extent (vf36: 9999 / -9999, then the extent
+  operation), its vf21 (1) and its destructor are ported.
+- **Memory.** 0x267f18 frees to the pool at 0x345e48 when the block lies inside it, and to the heap otherwise.
+
+The test runs 400 cases of each of the 26 functions. The group's free of its children (a checked copy) runs for real.
+All 48 mutants are caught.

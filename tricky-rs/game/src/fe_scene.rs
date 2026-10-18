@@ -1,8 +1,9 @@
 //! The front end's 3D scene code below 0x26c000 (board rows G9z1..) on the game's bytes. First the screens' audio,
 //! voice-line and world helpers (0x261b38..0x263270): they go through the front end's sound player (`cFE3D` +0xa4,
 //! its table at +0), its world (+0x80, found by name hash), its riders (+0x20, twelve) and its course films (+0xfc,
-//! ten). Then the characters (`cFE3DCharacter`: the rider model, its loads, its poses and lights). Every call out
-//! goes through [`FeEnv`]. Checked in the function runner (`tests/fe_scene.rs`, `tests/fe_scene_char.rs`).
+//! ten). Then the characters (`cFE3DCharacter`: the rider model, its loads, its poses and lights) and the dialog box
+//! (`cFE3DDialog`) with the group's own virtuals. Every call out goes through [`FeEnv`]. Checked in the function
+//! runner (`tests/fe_scene.rs`, `tests/fe_scene_char.rs`, `tests/fe_scene_dialog.rs`).
 
 use crate::fe3dstate::{vcall, FeEnv, GAPP};
 use crate::pf::Mem;
@@ -859,4 +860,370 @@ pub fn update_lighting(m: &mut Mem, c: u32, buf: u32) {
         }
         m.w32(at + 0xc, 0);
     }
+}
+
+// ---- the dialog box, the group's own virtuals and two memory helpers (0x267f08..0x2692e8)
+
+/// The dialog's calls out: the sprite by index (0x2ac4b0), a sprite drawn (0x1fc178: the sprite, its anchor, then
+/// x, y, w, h), the font's colour (0x14eee8 on the font state at 0x337fe8), a vector set (0x14f5f0, four floats),
+/// a list's operation applied (0x2ac220) and the operations' destructors (the extent's 0x269388, the update's
+/// 0x269440, the text render's 0x2694c8, the render's 0x269558), the list's emptying (0x2ac178) and destructor
+/// (0x2ace78), the thing's unlink (0x2acf28), the widget's destructor (0x2adaa8), a pool's free (0x23d420) and the
+/// heap's (0x2ccfc0)
+pub const SPRITE_RECT: u32 = 0x2ac4b0;
+pub const SPRITE_DRAW: u32 = 0x1fc178;
+pub const FONT_SET_COLOUR: u32 = 0x14eee8;
+pub const FONT_STATE: u32 = 0x337fe8;
+pub const VEC4_SET: u32 = 0x14f5f0;
+pub const LIST_APPLY: u32 = 0x2ac220;
+pub const EXTENT_OP_DTOR: u32 = 0x269388;
+pub const UPDATE_OP_DTOR: u32 = 0x269440;
+pub const RENDER_TEXT_OP_DTOR: u32 = 0x2694c8;
+pub const RENDER_OP_DTOR: u32 = 0x269558;
+pub const LIST_DELETE_ALL: u32 = 0x2ac178;
+pub const LIST_DTOR: u32 = 0x2ace78;
+pub const THING_UNLINK: u32 = 0x2acf28;
+pub const WIDGET_DTOR: u32 = 0x2adaa8;
+pub const POOL_FREE: u32 = 0x23d420;
+pub const HEAP_FREE: u32 = 0x2ccfc0;
+/// The operations' tables, the dialog's and the group's tables, the pool (its base and size)
+pub const EXTENT_OP: u32 = 0x3aa660;
+pub const UPDATE_OP: u32 = 0x3a9fe0;
+pub const RENDER_TEXT_OP: u32 = 0x3a9ff8;
+pub const RENDER_OP: u32 = 0x3aa010;
+pub const DIALOG_VTABLE: u32 = 0x3a9d50;
+pub const GROUP_VTABLE: u32 = 0x3a9e98;
+pub const POOL: u32 = 0x345e48;
+/// (0.88, 0.1, 0.1, 0.1): the dialog's colour
+const DIALOG_COLOUR: [u32; 4] = [0x3f61_47ae, 0x3dcc_cccd, 0x3dcc_cccd, 0x3dcc_cccd];
+const HALF: F = F(0.5);
+
+fn put(m: &mut Mem, at: u32, v: [u32; 4]) {
+    for (k, x) in v.iter().enumerate() {
+        m.w32(at + 4 * k as u32, *x);
+    }
+}
+
+/// The renderer (the app's +0x724, its table at +0x10)
+fn renderer(m: &Mem) -> u32 {
+    m.r32(m.r32(GAPP).wrapping_add(0x724))
+}
+
+fn render_state(m: &mut Mem, e: &mut dyn FeEnv) -> u32 {
+    let r = renderer(m);
+    vcall_at(m, e, r, 0x10, 0x1d8, &[])
+}
+
+fn set_render_state(m: &mut Mem, e: &mut dyn FeEnv, v: u32) {
+    let r = renderer(m);
+    vcall_at(m, e, r, 0x10, 0x1d0, &[v]);
+}
+
+/// 0x267f08(p): 0x108 bytes of `p` zeroed (the fill)
+pub fn zero_108(m: &mut Mem, e: &mut dyn FeEnv, p: u32) {
+    e.call(m, FILL, &[p, 0, 0x108]);
+}
+
+/// 0x267f18(p): `p` freed to the pool at 0x345e48 when it lies inside it (past its base, within its size), else to
+/// the heap
+pub fn free_block(m: &mut Mem, e: &mut dyn FeEnv, p: u32) {
+    let d = p.wrapping_sub(m.r32(POOL)) as i32;
+    let inside = d > 0 && d < m.r32(POOL + 4) as i32;
+    if inside {
+        e.call(m, POOL_FREE, &[POOL, p]);
+    } else {
+        e.call(m, HEAP_FREE, &[p]);
+    }
+}
+
+/// `cFE3DDialog`'s constructor 0x267f58(d, owner, parent; `buf` 0x10 bytes) (the index's `cFE3DThing::cFE3DThing`):
+/// a group, then the dialog's table, its five sprites (+0x140..+0x150) none, sized 100 x 30 by its class, its four
+/// colours (0.88, 0.1, 0.1, 0.1), the sides 0x11 and 0x12 (+0x150, +0x14c), the edge (+0x154) the side sprite's
+/// height, white for the corners (+0x158) and its own colour (+0x60)
+pub fn dialog_ctor(m: &mut Mem, e: &mut dyn FeEnv, d: u32, owner: u32, parent: u32, buf: u32) -> u32 {
+    crate::fe_widgets::group_init(m, e, d, owner, parent);
+    m.w32(d + 0xc, DIALOG_VTABLE);
+    for k in 0..5u32 {
+        m.w32(d + 0x150 - 4 * k, u32::MAX);
+    }
+    put(m, buf, [F(100.0).0.to_bits(), F(30.0).0.to_bits(), 0, 0]);
+    crate::fe_widgets::vcall_class(m, e, DIALOG_VTABLE, d, 0x138, &[buf]);
+    for at in [0xacu32, 0xbc, 0xcc, 0xdc] {
+        put(m, d + at, DIALOG_COLOUR);
+    }
+    m.w32(d + 0x150, 0x11);
+    m.w32(d + 0x14c, 0x12);
+    let r = e.call(m, SPRITE_RECT, &[d, 0x11]);
+    m.w32(d + 0x154, m.r32(r.wrapping_add(8)));
+    put(m, d + 0x158, [ONE; 4]);
+    put(m, d + 0x60, DIALOG_COLOUR);
+    d
+}
+
+/// Whether the dialog has its top corners (+0x144, +0x148; 0x268db0) or its bottom ones (+0x150, +0x14c; 0x268d90)
+pub fn dialog_has_top(m: &Mem, d: u32) -> bool {
+    (m.r32(d + 0x144) as i32) >= 0 && (m.r32(d + 0x148) as i32) >= 0
+}
+
+pub fn dialog_has_bottom(m: &Mem, d: u32) -> bool {
+    (m.r32(d + 0x150) as i32) >= 0 && (m.r32(d + 0x14c) as i32) >= 0
+}
+
+fn draw(m: &mut Mem, e: &mut dyn FeEnv, d: u32, k: u32, anchor: u32, r: [F; 4]) {
+    let spr = e.call(m, SPRITE_RECT, &[d, k]);
+    let [x, y, w, h] = r.map(|v| v.0.to_bits());
+    e.call(m, SPRITE_DRAW, &[spr, anchor, x, y, w, h]);
+}
+
+/// 0x268308(d): the dialog's frame drawn in the font's colour (its own, +0x60): the body (sprite +0x140) over its
+/// box (+0x80, +0x84; +0x100 x +0x104) less the edge (+0x154, less a sixth of it) at a top and a bottom with
+/// corners; unless the edge is 0, the edges' middles (0.36 of the half width in from the sides) above and below;
+/// then in the corners' colour (+0x158) the corners (half wide, the edge high) with their anchors (0, 8, 0xc, 4).
+/// The renderer's state is raised by one between the two passes and put back after (not when the edge is 0).
+pub fn dialog_draw_frame(m: &mut Mem, e: &mut dyn FeEnv, d: u32) {
+    let st = render_state(m, e);
+    e.call(m, FONT_SET_COLOUR, &[FONT_STATE, d + 0x60]);
+    let w = fl(m, d + 0x100);
+    let edge = fl(m, d + 0x154);
+    let half_w = w * HALF;
+    let half_e = edge * HALF;
+    let sixth = edge * F(f32::from_bits(0x3e2a_ab8a));
+    let inset = half_w * F(f32::from_bits(0x3eb8_00a8));
+    let x = fl(m, d + 0x80);
+    let mut y = fl(m, d + 0x84);
+    let mut h = fl(m, d + 0x104);
+    if dialog_has_top(m, d) {
+        let cut = edge - sixth;
+        h = h - cut;
+        y = y + cut;
+    }
+    if dialog_has_bottom(m, d) {
+        let cut = edge - sixth;
+        h = h - cut;
+    }
+    let body = m.r32(d + 0x140);
+    draw(m, e, d, body, 0, [x, y, w, h]);
+    let edge = fl(m, d + 0x154);
+    if edge.ee() == 0.0 {
+        return;
+    }
+    let y = (fl(m, d + 0x84) + edge) - half_e;
+    let x = fl(m, d + 0x80) + inset;
+    let w = fl(m, d + 0x100) - (inset + inset);
+    let h = half_e - sixth;
+    if dialog_has_top(m, d) {
+        let body = m.r32(d + 0x140);
+        draw(m, e, d, body, 0, [x, y, w, h]);
+    }
+    if dialog_has_bottom(m, d) {
+        let y = ((fl(m, d + 0x84) + fl(m, d + 0x104)) - fl(m, d + 0x154)) + sixth;
+        let body = m.r32(d + 0x140);
+        draw(m, e, d, body, 0, [x, y, w, h]);
+    }
+    set_render_state(m, e, st.wrapping_add(1));
+    e.call(m, FONT_SET_COLOUR, &[FONT_STATE, d + 0x158]);
+    let w = fl(m, d + 0x100) * HALF;
+    let h = fl(m, d + 0x154);
+    if dialog_has_top(m, d) {
+        let k = m.r32(d + 0x144);
+        draw(m, e, d, k, 0, [fl(m, d + 0x80), fl(m, d + 0x84), w, h]);
+        let k = m.r32(d + 0x148);
+        draw(m, e, d, k, 8, [fl(m, d + 0x80) + fl(m, d + 0x100), fl(m, d + 0x84), w, h]);
+    }
+    if dialog_has_bottom(m, d) {
+        let k = m.r32(d + 0x14c);
+        let (x, y) = (fl(m, d + 0x80) + fl(m, d + 0x100), fl(m, d + 0x84) + fl(m, d + 0x104));
+        draw(m, e, d, k, 0xc, [x, y, w, h]);
+        let k = m.r32(d + 0x150);
+        let (x, y) = (fl(m, d + 0x80), fl(m, d + 0x84) + fl(m, d + 0x104));
+        draw(m, e, d, k, 4, [x, y, w, h]);
+    }
+    set_render_state(m, e, st);
+}
+
+/// The dialog's look shared by its two layouts: its colour through its +0x50, white corners, sized 640 x `height`
+fn dialog_look(m: &mut Mem, e: &mut dyn FeEnv, d: u32, height: F, buf: u32) {
+    put(m, buf, DIALOG_COLOUR);
+    vcall(m, e, d, 0x50, &[buf]);
+    put(m, d + 0x158, [ONE; 4]);
+    put(m, buf, [F(640.0).0.to_bits(), height.0.to_bits(), 0, 0]);
+    vcall(m, e, d, 0x138, &[buf]);
+}
+
+/// 0x2686c0(d; height; `buf`): the dialog with all four corners (0x17, 0x18, 0x16, 0x15), centred down the screen
+/// (y = (480 - height) / 2), its edge the bottom-left corner's height
+pub fn dialog_layout_boxed(m: &mut Mem, e: &mut dyn FeEnv, d: u32, height: u32, buf: u32) {
+    let height = F(f32::from_bits(height));
+    m.w32(d + 0x144, 0x17);
+    m.w32(d + 0x148, 0x18);
+    m.w32(d + 0x150, 0x15);
+    m.w32(d + 0x14c, 0x16);
+    dialog_look(m, e, d, height, buf);
+    let y = (F(480.0) - height) * HALF;
+    put(m, buf, [0, y.0.to_bits(), 0, ONE]);
+    e.call(m, crate::fe3dstate::WIDGET_PLACE, &[d, buf]);
+    let k = m.r32(d + 0x150);
+    let r = e.call(m, SPRITE_RECT, &[d, k]);
+    m.w32(d + 0x154, m.r32(r.wrapping_add(8)));
+}
+
+/// 0x268808(d; height; `buf`): the dialog as a bar at the top: no top corners, the bottom ones 0x11 and 0x12, its
+/// edge that sprite's height (set before and after), at (0, 0)
+pub fn dialog_layout_bar(m: &mut Mem, e: &mut dyn FeEnv, d: u32, height: u32, buf: u32) {
+    let height = F(f32::from_bits(height));
+    m.w32(d + 0x148, u32::MAX);
+    m.w32(d + 0x150, 0x11);
+    m.w32(d + 0x14c, 0x12);
+    m.w32(d + 0x144, u32::MAX);
+    let r = e.call(m, SPRITE_RECT, &[d, 0x11]);
+    m.w32(d + 0x154, m.r32(r.wrapping_add(8)));
+    dialog_look(m, e, d, height, buf);
+    put(m, buf, [0, 0, 0, ONE]);
+    e.call(m, crate::fe3dstate::WIDGET_PLACE, &[d, buf]);
+    let r = e.call(m, SPRITE_RECT, &[d, 0x11]);
+    m.w32(d + 0x154, m.r32(r.wrapping_add(8)));
+}
+
+/// `cFE3DDialog` vf10 0x268940(d, matrix; `buf`): when shown (+0x14), the children drawn with the matrix at the
+/// renderer's state raised by one and then by the dialog's +0x70; the state put back
+pub fn dialog_render(m: &mut Mem, e: &mut dyn FeEnv, d: u32, matrix: u32, buf: u32) {
+    if m.r32(d + 0x14) == 0 {
+        return;
+    }
+    let st = render_state(m, e);
+    set_render_state(m, e, st.wrapping_add(1));
+    if m.r32(d + 0x14) != 0 {
+        let s = render_state(m, e);
+        let lift = m.r32(d + 0x70);
+        set_render_state(m, e, s.wrapping_add(lift));
+        m.w32(buf + 4, matrix);
+        m.w32(buf, RENDER_OP);
+        e.call(m, LIST_APPLY, &[d + 0x110, buf]);
+        set_render_state(m, e, s);
+        e.call(m, RENDER_OP_DTOR, &[buf, 2]);
+    }
+    set_render_state(m, e, st);
+}
+
+/// `cFE3DDialog` vf11 0x268a80(d; `buf`): when shown, the frame drawn at the state raised by the dialog's +0x70,
+/// then (still shown) the children's texts at the state raised by one more and the +0x70; the state put back
+pub fn dialog_render_text(m: &mut Mem, e: &mut dyn FeEnv, d: u32, buf: u32) {
+    if m.r32(d + 0x14) == 0 {
+        return;
+    }
+    let st = render_state(m, e);
+    let lift = m.r32(d + 0x70);
+    set_render_state(m, e, st.wrapping_add(lift));
+    dialog_draw_frame(m, e, d);
+    set_render_state(m, e, st.wrapping_add(1));
+    if m.r32(d + 0x14) != 0 {
+        let s = render_state(m, e);
+        let lift = m.r32(d + 0x70);
+        set_render_state(m, e, s.wrapping_add(lift));
+        m.w32(buf, RENDER_TEXT_OP);
+        e.call(m, LIST_APPLY, &[d + 0x110, buf]);
+        set_render_state(m, e, s);
+        e.call(m, RENDER_TEXT_OP_DTOR, &[buf, 2]);
+    }
+    set_render_state(m, e, st);
+}
+
+/// `cFE3DDialog` vf12 0x268bd0(d; `buf`): the children updated, then when active (+0x10) its own +0x48
+pub fn dialog_update(m: &mut Mem, e: &mut dyn FeEnv, d: u32, buf: u32) {
+    m.w32(buf, UPDATE_OP);
+    e.call(m, LIST_APPLY, &[d + 0x110, buf]);
+    if m.r32(d + 0x10) != 0 {
+        vcall(m, e, d, 0x48, &[]);
+    }
+    e.call(m, UPDATE_OP_DTOR, &[buf, 2]);
+}
+
+/// The scene's colours set up once (0x268c38): (1, 0.076, 0.002) at 0x3d2eb8, (1, 0.965, 0) at 0x3d2e98, (1, 0.474,
+/// 0) at 0x3d2ea8, and at 0x3d2ec8 -1 then (1, 1, 0, 0, 1, 1)
+pub fn scene_colours_init(m: &mut Mem) {
+    for (at, v) in [
+        (0x3d2eb8u32, [ONE, 0x3d9b_3d08, 0x3b03_126f]),
+        (0x3d2e98, [ONE, 0x3f76_e979, 0]),
+        (0x3d2ea8, [ONE, 0x3ef2_fec5, 0]),
+    ] {
+        for (k, x) in v.iter().enumerate() {
+            m.w32(at + 4 * k as u32, *x);
+        }
+    }
+    m.w32(0x3d2ec8, u32::MAX);
+    for (k, x) in [ONE, ONE, 0, 0, ONE, ONE].iter().enumerate() {
+        m.w32(0x3d2ecc + 4 * k as u32, *x);
+    }
+}
+
+/// 0x268ce0(out, v): `out` set from the four floats at `v`
+pub fn vec4_set_from(m: &mut Mem, e: &mut dyn FeEnv, out: u32, v: u32) {
+    let f = [0u32, 4, 8, 0xc].map(|k| m.r32(v + k));
+    e.call(m, VEC4_SET, &[out, f[0], f[1], f[2], f[3]]);
+}
+
+/// The dialog's small accessors: the edge (0x268d00 set, 0x268d08 get), the corners' colour (0x268d10 set,
+/// 0x268d38 got into `out`), a sprite by slot (0x268d60 set, 0x268d70 get; the body is slot 0, 0x268d80 / 0x268d88)
+pub fn dialog_set_edge(m: &mut Mem, d: u32, v: u32) {
+    m.w32(d + 0x154, v);
+}
+
+pub fn dialog_edge(m: &Mem, d: u32) -> u32 {
+    m.r32(d + 0x154)
+}
+
+pub fn dialog_set_corner_colour(m: &mut Mem, d: u32, v: u32) {
+    for k in 0..4u32 {
+        let x = m.r32(v + 4 * k);
+        m.w32(d + 0x158 + 4 * k, x);
+    }
+}
+
+pub fn dialog_corner_colour(m: &mut Mem, out: u32, d: u32) -> u32 {
+    for k in 0..4u32 {
+        let x = m.r32(d + 0x158 + 4 * k);
+        m.w32(out + 4 * k, x);
+    }
+    out
+}
+
+pub fn dialog_set_sprite(m: &mut Mem, d: u32, k: u32, v: u32) {
+    m.w32(d.wrapping_add(k.wrapping_mul(4)).wrapping_add(0x140), v);
+}
+
+pub fn dialog_sprite(m: &Mem, d: u32, k: u32) -> u32 {
+    m.r32(d.wrapping_add(k.wrapping_mul(4)).wrapping_add(0x140))
+}
+
+/// `cFE3DDialog::~cFE3DDialog` 0x268dd0(d, flags): its table put back, then the group's destructor
+pub fn dialog_dtor(m: &mut Mem, e: &mut dyn FeEnv, d: u32, flags: u32) {
+    m.w32(d + 0xc, DIALOG_VTABLE);
+    group_dtor(m, e, d, flags);
+}
+
+/// `cFE3DWGroup::~cFE3DWGroup` 0x2692e8(g, flags): its table put back, the children freed (0x2691c8: the list
+/// emptied, then itself unlinked), the list destroyed with 2, then the widget's destructor
+pub fn group_dtor(m: &mut Mem, e: &mut dyn FeEnv, g: u32, flags: u32) {
+    m.w32(g + 0xc, GROUP_VTABLE);
+    e.call(m, LIST_DELETE_ALL, &[g + 0x110]);
+    e.call(m, THING_UNLINK, &[g]);
+    e.call(m, LIST_DTOR, &[g + 0x110, 2]);
+    e.call(m, WIDGET_DTOR, &[g, flags]);
+}
+
+/// `cFE3DWGroup` vf36 0x2691f8(g, min, max; `buf` 0x10 bytes): the extent of the children: `min` from 9999 and
+/// `max` from -9999 on x, y and z, the extent operation applied
+pub fn group_extent(m: &mut Mem, e: &mut dyn FeEnv, g: u32, min: u32, max: u32, buf: u32) {
+    let big = F(9999.0).0.to_bits();
+    for k in [0u32, 8, 4] {
+        m.w32(min + k, big);
+    }
+    for k in [0u32, 8, 4] {
+        m.w32(max + k, (-F(9999.0)).0.to_bits());
+    }
+    for (k, v) in [EXTENT_OP, min, max].iter().enumerate() {
+        m.w32(buf + 4 * k as u32, *v);
+    }
+    e.call(m, LIST_APPLY, &[g + 0x110, buf]);
+    e.call(m, EXTENT_OP_DTOR, &[buf, 2]);
 }

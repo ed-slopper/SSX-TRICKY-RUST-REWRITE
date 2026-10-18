@@ -4851,30 +4851,43 @@ address,size,name,system,status
 0x267cc0,200,FE3DCharSel_IsOutfitAvailable,frontend?,checked
 0x267e50,80,cFE3DCharacter::__tf,runtime,host
 0x267ec8,64,cBdrLoad::__tf,runtime,host
-0x267f08,12,FUN_00267f08,frontend?,not started
-0x267f58,944,cFE3DThing::cFE3DThing,frontend,ported
-0x268308,948,FUN_00268308,frontend?,not started
-0x2686c0,324,FUN_002686c0,frontend?,not started
-0x268808,312,FUN_00268808,frontend?,not started
-0x268940,316,cFE3DDialog::vf10_268940,frontend,not started
-0x268a80,336,cFE3DDialog::vf11_268a80,frontend,not started
-0x268bd0,100,cFE3DDialog::vf12_268bd0,frontend,not started
-0x268cf8,8,cFE3DDialog::vf16_268cf8,frontend,not started
-0x268dd0,20,cFE3DDialog::~cFE3DDialog,frontend,not started
+0x267f08,12,FUN_00267f08,frontend?,checked
+0x267f18,64,FUN_00267f18,frontend?,checked
+0x267f58,944,cFE3DThing::cFE3DThing,frontend,checked
+0x268308,948,FUN_00268308,frontend?,checked
+0x2686c0,324,FUN_002686c0,frontend?,checked
+0x268808,312,FUN_00268808,frontend?,checked
+0x268940,316,cFE3DDialog::vf10_268940,frontend,checked
+0x268a80,336,cFE3DDialog::vf11_268a80,frontend,checked
+0x268bd0,100,cFE3DDialog::vf12_268bd0,frontend,checked
+0x268c38,168,FUN_00268c38,frontend?,checked
+0x268ce0,24,FUN_00268ce0,frontend?,checked
+0x268cf8,8,cFE3DDialog::vf16_268cf8,frontend,checked
+0x268d00,8,FUN_00268d00,frontend?,checked
+0x268d08,8,FUN_00268d08,frontend?,checked
+0x268d10,40,FUN_00268d10,frontend?,checked
+0x268d38,40,FUN_00268d38,frontend?,checked
+0x268d60,16,FUN_00268d60,frontend?,checked
+0x268d70,16,FUN_00268d70,frontend?,checked
+0x268d80,8,FUN_00268d80,frontend?,checked
+0x268d88,8,FUN_00268d88,frontend?,checked
+0x268d90,32,FUN_00268d90,frontend?,checked
+0x268db0,32,FUN_00268db0,frontend?,checked
+0x268dd0,20,cFE3DDialog::~cFE3DDialog,frontend,checked
 0x268de8,80,cFE3DDialog::__tf,runtime,host
-0x268e38,8,cFE3DWGroup::vf21_268e38,frontend,not started
-0x268e40,76,cFE3DWGroup::vf8_268e40,frontend,not started
-0x268e90,76,cFE3DWGroup::vf7_268e90,frontend,not started
-0x268ee0,76,cFE3DWGroup::vf6_268ee0,frontend,not started
-0x268f30,96,cFE3DWGroup::vf28_268f30,frontend,not started
-0x268f90,96,cFE3DWGroup::vf12_268f90,frontend,not started
-0x268ff0,196,cFE3DWGroup::vf11_268ff0,frontend,not started
-0x2690b8,212,cFE3DWGroup::vf10_2690b8,frontend,not started
-0x269190,56,cFE3DWGroup::vf39_269190,frontend,not started
-0x2691c8,44,cFE3DWGroup::vf1_2691c8,frontend,not started
-0x2691f8,116,cFE3DWGroup::vf36_2691f8,frontend,not started
-0x269270,116,cFE3DWGroup::vf13_269270,frontend,not started
-0x2692e8,80,cFE3DWGroup::~cFE3DWGroup,frontend,not started
+0x268e38,8,cFE3DWGroup::vf21_268e38,frontend,checked
+0x268e40,76,cFE3DWGroup::vf8_268e40,frontend,checked
+0x268e90,76,cFE3DWGroup::vf7_268e90,frontend,checked
+0x268ee0,76,cFE3DWGroup::vf6_268ee0,frontend,checked
+0x268f30,96,cFE3DWGroup::vf28_268f30,frontend,checked
+0x268f90,96,cFE3DWGroup::vf12_268f90,frontend,checked
+0x268ff0,196,cFE3DWGroup::vf11_268ff0,frontend,checked
+0x2690b8,212,cFE3DWGroup::vf10_2690b8,frontend,checked
+0x269190,56,cFE3DWGroup::vf39_269190,frontend,checked
+0x2691c8,44,cFE3DWGroup::vf1_2691c8,frontend,checked
+0x2691f8,116,cFE3DWGroup::vf36_2691f8,frontend,checked
+0x269270,116,cFE3DWGroup::vf13_269270,frontend,checked
+0x2692e8,80,cFE3DWGroup::~cFE3DWGroup,frontend,checked
 0x269338,80,cFE3DWGroup::__tf,runtime,host
 0x269388,8,cListFE3DGetExtentOp::~cListFE3DGetExtentOp,frontend?,checked
 0x269390,8,cListFE3DOnInputOp::~cListFE3DOnInputOp,frontend?,checked
