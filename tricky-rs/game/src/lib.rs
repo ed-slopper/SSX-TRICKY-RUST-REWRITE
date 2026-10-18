@@ -80,6 +80,7 @@ pub mod sndqueue;
 pub mod sndlib;
 pub mod speechlib;
 pub mod mcoverlay;
+pub mod nextevent;
 pub mod speechload;
 pub mod chantload;
 pub mod pausedraw;

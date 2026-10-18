@@ -879,3 +879,129 @@ The test now has 72,000 cases. The unlock lists, counts, the grid (row 0 and eac
 move ends), the cursor, the name and the new records are random. The stand-ins log the text style's +4, an ASCII
 string's first characters, a stacked text's first word and the text box's +0x20 / +0x24 / +0x6c.
 195 of 197 mutants are caught. The two left are equivalent: a slot of 0 maps to 0 under either test, and the row count +4 is compared signed or unsigned but is never negative.
+
+## The next event overlays: the card screens, points, venue and event choices, race help (G8n5, `game/src/nextevent.rs`)
+
+`cSelectNextEventOverlay`'s base is the memory card UI (`cMCOverlayManager`), so the index's names for its slots
+("DrawText", "Reset", vf16, vf17, vf23, vf26) are the card UI's screens. The overlay `o` has:
+- +0x10 / +0x18 / +0x1c: the options' flags;
+- +0x38: the slot picked;
+- +0x48: the progress;
+- +0x4c: the message's alpha;
+- +0x54: the state;
+- +0x168 / +0x174 + 0x58 i: a slot's two flags;
+- +0x218 / +0x21c: the entries and the pick;
+- +0x224: the card system;
+- +0x428: its second table;
+- +0x42c: its backdrop;
+- +0x434: its title's id.
+
+The functions the index doesn't list are the points overlay's `Reset` 0x1ba208 and vf16 0x1ba2f0, the venue and
+event overlays' `Reset`s 0x1bb678 and 0x1bc6a8, the help's empty 0x1bd308 and the three small functions
+0x1bda18..0x1bda38.
+
+**A widths' clamp is shared by the screens.** Under 200 becomes 200; over 384 becomes 320; over 512 becomes 384.
+
+### The card screens
+- **vf17 0x1b8718, the progress:**
+  - the frame (item 0xe, 290 high);
+  - a box (texture 15) across 104..516, its rect 0x2a's height · 0.8 tall, centred on 240;
+  - 14 divider lines, 27.47 apart from 131.47;
+  - the progress (+0x48, when above 0) as a purple bar, step · 14 · the share long, plus a step;
+  - the frame (texture 18);
+  - line 0x1c3 (with +0xd8) in a box clamped to its width + 10, at 144;
+  - the overlay's own virtual +0xd8.
+- **vf26 0x1b8bb8, the card system's message:** 0x15e when its +0x1a0 says so, else 0xdeb. It goes in a box at
+  128, 312 (384 × 96) with the alpha +0x4c.
+- **vf16 0x1b8d08, the card screen:**
+  - the frame (item 5, 420 high) and the title box;
+  - four colours: white, a dim white, yellow, and the pick's purple. Their alphas are 0.4 out of state 7.
+  - the card system's name (+0x1e0 with +0x21c) centred at 86.4, and its description (+0x1b0) in a box under it;
+  - the list (+0x1d0 the count, +0x70 an entry), numbered at 204.8 and named at 236.8, 36 apart from 168. Only
+    the first entry shows while the overlay's word 0 is 1. The pick, when named, sits on a purple bar; its
+    colour is set to yellow and straight back to white.
+  - the three options 0x1bb, 0x154, 0x157 at 448, dim unless +0x10 / +0x1c / +0x18, with the pad sprites 0x74,
+    0x73, 0x72 at 420;
+  - out of state 7, the screen shaded.
+- **"DrawText" 0x1b9530(this, text, first, second, swapped), a question:**
+  - the frame (item 0x10, 300 high);
+  - the text in a box across the screen at 204 (its line height + 4), centred;
+  - the answers with their pad sprites on 295: both side by side (placed from 640 · 0.13 and · 0.27), or the one
+    alone centred. Its measure of the text and the clamp's compares are unused.
+- **"Reset" 0x1b9968(this, text), a notice:** the text in a box clamped to its width + 10, one line high. Its y is
+  240 − half the height, cut to a whole number.
+- **vf23 0x1b9b80, the slots screen:**
+  - the title at 38.4, 19.2;
+  - each slot (`MCSlot_GetLabel`) at 96, 26.4 apart, white when usable (both its flags), else dim;
+  - the pick on a purple bar;
+  - 0x155 (dim unless the pick is usable) and 0x154 with their sprites.
+- **The small virtuals:** vf47..vf53 play the move sound unless at the end, then call the base's next/previous; or
+  they play the select or back sound.
+
+### The point distribution overlay
+- **`Reset`:**
+  - the attributes' names 0x25, 0x27, 0x28, 0x29 into 0x33d6b0;
+  - the player's points kept (+0x438, +0x43c);
+  - no card operation, no exit timer, no pending video;
+  - the career's +4 cleared (in a delay slot, so in every mode);
+  - in the career's +0x370c mode 1, the speech for the level.
+- **`AttribPointsOverlay_StartExitTimer` 0x1ba300:** when the exit waits (0x32ea9c is 1), sets the timer to 5
+  seconds. It returns the timer's flag.
+- **`Update` 0x1ba330:**
+  - **A card save:** runs to its end; a good result saves and, unless the exit waits, leaves.
+  - **The exit timer:** counts down 1/60 a frame while no dialog is up, and leaves at 0.
+  - **A dialog's answer:** 3 (no) leaves unless the exit waits. 1 (yes) to the save question starts the save. 0 and
+    2 return.
+  - **The buttons:** up/down pick the attribute (wrapping 0..3); left/right refund or spend a point, with the tick
+    or error sound. Select with no points left asks to save (0x1c1).
+  - **Leaving:** hides item 15. In mode 1 it ends the race, with the video "%s" of the player's rider pending,
+    +0x3260 set to 0x30, and the race's +0x54 and the career's +4 set; otherwise it shows item 17.
+- **`Draw` 0x1ba788:**
+  - **First:** the dialog, or the card save's draw.
+  - **The level screen** (with the exit timer): 0xd25 / 0xd26, the level's name (+1) and the next level's in gold,
+    and 0x175.
+  - **The points screen:** a `cFE3DProgressBar` built on the stack exactly as the game inlines it: the thing's and
+    the widget's words, the colour update, the bar's, its rectangle virtual (+0x138) and colours.
+    - The points left, out of the points at open (+0x438 · 6 wide), at 335, 244. The first time the screen opens
+      it notes the points (0x338228, 0x3ce370).
+    - Four attribute rows, 19 apart from 270. The picked row is gold with arrows. Each has its name, its bar (its
+      maximum · 5 wide, the base + the bonus out of the maximum) at 200, and "%d/%d".
+    - The rider's name; 0xe50; help 0xc78 in a box.
+    - **With no points:** the help line 0x113.
+    - **Otherwise:** 0xc79 in a second box. Its alignment words are written into the first box, and its load of
+      0x197 is unused.
+    - Last, the bar's destructor.
+- **vf3:** `Career_SaveToCard`.
+
+### The venue and event choices
+- **The venue `Reset`:** the venues of the career's +0x3818 mode:
+  - mode 1: the race courses;
+  - modes 2, 4, 7: the second list;
+  - others: the third. Mode 3 also adds course 6, at the third list's count.
+
+  It then sets each venue's sprite (0x45 + the venue, for venues under 12), its text's buffer (0x3ce378, 0x50
+  apart) and its unlocked flag; the menu's top and left (320 less half the longest name, from the courses' records
+  at 0x332f28); the second-to-last item empty and the last 0x18f.
+- **`NextEventOverlay_DrawVenue` 0x1bbf20:**
+  - the head (0xe4e, its text by the mode through the format 0x38e5f0 of 0xe76, the mode's word, 0xe77);
+  - the venues' menu, and the pick's sprite when unlocked;
+  - the help line 0x1d7, right-aligned;
+  - in modes 4 and 5, the medals (0x135, 0x12f, 0x12c, 0x132), dim when locked.
+- **The event `Reset`:**
+  - the five items 0x19b, 0x1c9, 0xc7a, 0x1c8, 0x18f, the third off in modes 4 and 5;
+  - the pick: 2 in mode 7, 1 in modes 3 and 5;
+  - the menu centred;
+  - no pending video, the career's +4 cleared.
+- **`DrawEvent` 0x1bcd28:** the head (0xe49), the help line when +0x464 is set, and the five items' menu.
+
+### The race help
+- **`Reset`, `Update` and `Draw`:** as the other results overlays.
+- **`DrawText` 0x1bd3b8:**
+  - the heading 0xebd in gold;
+  - five lines with bullet squares (at 115 in the app's modes 2 and 3, else 160);
+  - help 0x155;
+  - pad sprites 0x71 and 0x75 after the third and fifth lines.
+- **`StaticInit_HelpRaceOverlay` 0x1bd898:** fills its static vectors and colours, and sets the name grid's x
+  (0x3ce788, the static 0x338220 + 131).
+
+The runner test (tests/nextevent.rs) has 176,000 cases over the 44 functions: the overlay's flags, slots, lists, points, timer, dialog answers and pad buttons, the venue lists and modes, and the font's height (odd too) are random. The progress bar's 0x1b0 bytes are logged at each of its calls, and the text boxes' words as they draw and go. 170 of 174 mutants are caught. The four left are equivalent: the single answer's pick between first and second when only one is set; the notice's width plus a zero; the unsigned length's halving keeping its low bit (the same float); and the event menu's measure at its scale +0x470, which it has just set to 1.

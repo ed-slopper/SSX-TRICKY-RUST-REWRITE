@@ -2530,35 +2530,35 @@ address,size,name,system,status
 0x1b8560,8,cLessonControllerOverlay::Draw,frontend,not started
 0x1b8568,240,SaveOverlay_Init,save,ported
 0x1b8658,192,Draw_SolidRect,render,not started
-0x1b8718,1180,cSelectNextEventOverlay::vf17_1b8718,frontend,not started
-0x1b8bb8,336,cSelectNextEventOverlay::vf26_1b8bb8,frontend,not started
-0x1b8d08,2084,cSelectNextEventOverlay::vf16_1b8d08,frontend,not started
-0x1b9530,1080,cSelectNextEventOverlay::DrawText,frontend,not started
-0x1b9968,536,cSelectNextEventOverlay::Reset,frontend,not started
-0x1b9b80,1388,cSelectNextEventOverlay::vf23_1b9b80,frontend,not started
-0x1ba0f0,68,cSelectNextEventOverlay::vf47_1ba0f0,frontend,not started
-0x1ba138,56,cSelectNextEventOverlay::vf48_1ba138,frontend,not started
-0x1ba170,8,cSelectNextEventOverlay::vf49_1ba170,frontend,not started
-0x1ba178,68,cSelectNextEventOverlay::vf50_1ba178,frontend,not started
-0x1ba1c0,56,cSelectNextEventOverlay::vf51_1ba1c0,frontend,not started
-0x1ba1f8,8,cSelectNextEventOverlay::vf52_1ba1f8,frontend,not started
-0x1ba200,8,cSelectNextEventOverlay::vf53_1ba200,frontend,not started
-0x1ba300,44,AttribPointsOverlay_StartExitTimer,frontend,not started
-0x1ba330,1108,AttribPointsOverlay_Update,frontend,not started
-0x1ba788,3816,AttribPointsOverlay_Draw,frontend,not started
-0x1bb670,8,cPointDistributionOverlay::vf3_1bb670,frontend,not started
+0x1b8718,1180,cSelectNextEventOverlay::vf17_1b8718,frontend,checked
+0x1b8bb8,336,cSelectNextEventOverlay::vf26_1b8bb8,frontend,checked
+0x1b8d08,2084,cSelectNextEventOverlay::vf16_1b8d08,frontend,checked
+0x1b9530,1080,cSelectNextEventOverlay::DrawText,frontend,checked
+0x1b9968,536,cSelectNextEventOverlay::Reset,frontend,checked
+0x1b9b80,1388,cSelectNextEventOverlay::vf23_1b9b80,frontend,checked
+0x1ba0f0,68,cSelectNextEventOverlay::vf47_1ba0f0,frontend,checked
+0x1ba138,56,cSelectNextEventOverlay::vf48_1ba138,frontend,checked
+0x1ba170,8,cSelectNextEventOverlay::vf49_1ba170,frontend,checked
+0x1ba178,68,cSelectNextEventOverlay::vf50_1ba178,frontend,checked
+0x1ba1c0,56,cSelectNextEventOverlay::vf51_1ba1c0,frontend,checked
+0x1ba1f8,8,cSelectNextEventOverlay::vf52_1ba1f8,frontend,checked
+0x1ba200,8,cSelectNextEventOverlay::vf53_1ba200,frontend,checked
+0x1ba300,44,AttribPointsOverlay_StartExitTimer,frontend,checked
+0x1ba330,1108,AttribPointsOverlay_Update,frontend,checked
+0x1ba788,3816,AttribPointsOverlay_Draw,frontend,checked
+0x1bb670,8,cPointDistributionOverlay::vf3_1bb670,frontend,checked
 0x1bbb30,1004,NextEventOverlay_SaveBeforeExitA,save,ported
-0x1bbf20,1916,NextEventOverlay_DrawVenue,frontend,not started
-0x1bc6a0,8,cSelectNextVenueOverlay::vf3_1bc6a0,frontend,not started
+0x1bbf20,1916,NextEventOverlay_DrawVenue,frontend,checked
+0x1bc6a0,8,cSelectNextVenueOverlay::vf3_1bc6a0,frontend,checked
 0x1bc8a0,1156,NextEventOverlay_SaveBeforeExitB,save,ported
-0x1bcd28,1120,NextEventOverlay_DrawEvent,frontend,not started
-0x1bd188,8,cSelectNextEventOverlay::vf3_1bd188,frontend,not started
+0x1bcd28,1120,NextEventOverlay_DrawEvent,frontend,checked
+0x1bd188,8,cSelectNextEventOverlay::vf3_1bd188,frontend,checked
 0x1bd190,288,cHelpRaceOverlay::cHelpRaceOverlay,frontend,ported
-0x1bd2b0,84,cHelpRaceOverlay::Reset,frontend,not started
-0x1bd310,68,cHelpRaceOverlay::Update,frontend,not started
-0x1bd358,92,cHelpRaceOverlay::Draw,frontend,not started
-0x1bd3b8,1248,cHelpRaceOverlay::DrawText,frontend,not started
-0x1bd898,384,StaticInit_HelpRaceOverlay,frontend,not started
+0x1bd2b0,84,cHelpRaceOverlay::Reset,frontend,checked
+0x1bd310,68,cHelpRaceOverlay::Update,frontend,checked
+0x1bd358,92,cHelpRaceOverlay::Draw,frontend,checked
+0x1bd3b8,1248,cHelpRaceOverlay::DrawText,frontend,checked
+0x1bd898,384,StaticInit_HelpRaceOverlay,frontend,checked
 0x1bda40,464,cSelectNextEventOverlay::~cSelectNextEventOverlay,frontend,not started
 0x1bdc10,288,cSelectNextEventOverlay::cSelectNextEventOverlay,frontend,not started
 0x1bdd30,84,cSelectNextEventOverlay::__tf,runtime,host
