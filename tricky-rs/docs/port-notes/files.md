@@ -507,3 +507,60 @@ RPC command number it sends (or the hardware register it touches) and by its cal
 Unclear (batch 21): 0x2f1368 (libmc cmd 0x15), 0x2e8288 (libpad cmd 0x14), 0x2e8e70 (CD N-cmd 0xe, result
 compared with 6 in CdFs_Mount, maybe the drive status), 0x2e87c8 / 0x2e8838 (power-off callback set / call),
 0x30d8b8, 0x30d948, 0x30e470 (from `_InitSys`), 0x307830..0x308c38 (deci2 / SIO debug console and printf helpers).
+
+## Names from F1c batch 22 (proven)
+
+EA's system library (memory, debug output, threads, timer) and the file library, read from the code.
+
+- **Memory (EAMem):** `EAMem_Zero` 0x2cc938 (`EAMem_Set` to 0), `EAMem_HeapHeaderSize` 0x2cd990 (heap table
+  0x34eff8[flags & 0xf] +0x30), `EAMem_BlockHeaderSize` 0x2cc9a0 (that plus the name's length + 1 when the heap keeps
+  names, flag 0x100), `EAMem_GetName` 0x2cd9b8, `EAMem_AllocAligned` 0x2ccf50 (passes all of `EAMem_AllocEx`'s
+  arguments: name, size, alignment, alignment offset, flags), `EAMem_Alloc0` 0x2ccf98 (as `EAMem_Alloc` but passes 0
+  in the sixth argument, which `EAMem_AllocEx` never reads), `EAMem_Resize` 0x2cda18 (resizes a block in place, -1 =
+  as large as the free space after it allows; `BankSlot_Load` shrinks banks with it), `EAMem_ClearHeapTable`
+  0x2cd250, `EAMem_InitDefaultHeapMax` 0x2cd890 (`EAMem_InitDefaultHeap(0x6000000)`, no callers).
+  Heap checks under `EAMem_ValidateHeap` (block magics 'FB' 0x4246 used, 'SB' 0x4253 heap sentinel, error code in
+  gp-0x7f44): `EAMem_IsBlockHeader` 0x2cdc60, `EAMem_CheckNeighbours` 0x2cdcc8, `EAMem_CheckBackLinks` 0x2cddc0,
+  `EAMem_CheckInHeap` 0x2cde70, `Mem_IsReadable` 0x2ce2c0 (stub: pointer != 0).
+- **Debug output:** 8 outputs at 0x350700 (12 bytes: name, handler, enabled bit) and 64 categories at 0x34f2f8
+  (8 bytes: name, enabled bit, group bit). `Debug_Message` 0x2ce5e8 (category, format, ...: if the category is on,
+  vsprintf and call every enabled output; `Debug_Fatal` sends to category 2), `Debug_InitChannels` 0x2ce4c0
+  (outputs 4..7 and categories 16..63 cleared, category 2 and output 2 on), `DebugOut_SetEnabled` 0x2ce6e0 / `Raw`
+  0x2ce3c0, `DebugOut_IsEnabled`, `DebugOut_SetHandler`, `DebugOut_Call`, `DebugCat_SetEnabled` 0x2ce800 / `Raw`
+  0x2ce3f0 (category 0 = all, 1 = the group), `DebugCat_IsEnabled`, `DebugCat_SetName`.
+- **Threads and timer:** `Sys_InitPollTasks` 0x2cebb8 (clears the 16-entry table at 0x403a00), `Thread_Exit`
+  0x2cf358 (hands its own stack to the poll task `Thread_FreeExitedStack` 0x2cee88, then ExitDeleteThread),
+  `Thread_WakeSleepers` 0x2cf068 (timer callback added by `Thread_SleepTicks`: wakes the 256 sleep slots at
+  0x34f5f8 whose tick has come, removes itself when none are left), `Timer_AddCallback` 0x2cf598 /
+  `Timer_RemoveCallback` 0x2cf608 (8 slots at 0x350688, run by `Timer_IrqHandler`, which also counts the tick in
+  gp-0x7e60), `Fpu_SaveRegs` 0x2cf7e0 / `Fpu_RestoreRegs` 0x2cf8e8 (the handler saves the 32 FPU registers around
+  them).
+- **Async file loads:** callbacks of `AsyncFile_Load`/`LoadInto`/`StartRead`: `AsyncFile_OnOpened` 0x2c5a98,
+  `AsyncFile_OnSized` 0x2c59c0 (allocates through the hook gp-0x7f98), `AsyncFile_OnChunkThenClose` 0x2c58d0 and
+  `AsyncFile_OnChunk` 0x2c5b98 (0x8000-byte reads; the first closes the file at the end), `AsyncFile_OnClosed` 0x2c5898.
+- **Streams:** `Strm_ClassifyPackets` 0x2c6668, `Strm_OnDataRead` 0x2c6928, `Strm_SetPriorities` 0x2c7220
+  (+0x38 normal, +0x3c urgent read priority), `Strm_SetLowWater` 0x2c7270 (+0x40), `Strm_SetUrgent` 0x2c72e0
+  (+0x44; raises the read's priority with `FileSys_SetPriority`), `Strm_GetFillBytes` 0x2c7cf0 (+0x48;
+  `Strm_ConsumeBytes` turns urgent when it falls under the low-water mark).
+- **Sync file calls:** `File_GetSize0` 0x2c7f18, `File_LoadAlloc0` 0x2c8068, `File_LoadInto0` 0x2c8348,
+  `File_OpenBig0` 0x2c86b8: the same as `File_GetSize`, `File_LoadAlloc`, `File_LoadInto`, `File_OpenBig` but they
+  store 0 instead of 1 in word +0xc of the argument block, which neither the callbacks nor `FileSys_RunWithHeap`
+  read. Note: `speechload.rs` calls 0x2c8068 `OPEN_BIG` and `crowdbox.rs` `OPEN_FILE`; its callback is
+  `File_LoadAllocCb` 0x2c7f60 (load the whole file into new memory). `File_PeekUnpackedSize` 0x2c88d8 (reads the
+  first 0x80 bytes, returns `Compress_UnpackedSize`; 0x2c8910 is the same without the read check,
+  `File_PeekUnpackedSizeUnchecked`), `File_LoadUnpackInto` 0x2c8a90 (reads, unpacks if packed, copies at most n
+  bytes, then flushes the caches; `File_LoadUnpackInto2` 0x2c8bc8 is a jump to it, called by the lesson handlers'
+  Enter), `File_WriteSync` 0x2c8e28 (`File_ReadChunked` with `FileSys_QueueWrite`, as `File_ReadSync` passes
+  `FileSys_QueueRead`).
+- **Disc and queue:** `CdFs_CdCallback` 0x2c9498 (given to `sceCdCallback`), `CdFs_StartRead` 0x2c9e20 (from
+  `FileSys_DevRead`: splits a read into whole and part sectors), `CdFs_RecoverRead` 0x2c9710 (re-inits the drive,
+  rereads sector 0x10, then the pending read) and `CdFs_PollRecover` 0x2c9930, `FileSys_SetPriority` 0x2ca460
+  (op +0x10, re-sorts the queue), `FileSys_GetOpState` 0x2ca3b0 (+0xc), `FileSys_GetOpContext` 0x2ca3e0 (+0x14),
+  `FileSys_OnBigOpened` 0x2cadc0 / `FileSys_OnBigClosed` 0x2cafa8 (callbacks of the BIG mount and unmount),
+  `FileSys_SetHeap` 0x2cb1f0, `FileSys_ParsePath` 0x2cb830 (splits `device|path`), `HostFs_Init` 0x2cc2c0
+  (adds `HostFs_ServiceRead` as a poll task). `disc.rs` says 1000 files is "0x2cc2c0's default"; 0x2cc2c0 has no
+  such number (left for the owner of disc.rs).
+
+Unclear (batch 22): 0x2cf2f8 (ReferThreadStatus, result unused), 0x2c7098 (stream call from the movie player),
+0x2c73a0 / 0x2c7de8 (request word +4), 0x2c7d20, 0x2c84a0, 0x2c8ef8 / 0x2c9070 (sync ops through the stub 0x2cebb0,
+which always returns 0), 0x2cac38 (queues op type 7), 0x2cb9c8 (empty), thunks 0x2cc328 / 0x2cc348.

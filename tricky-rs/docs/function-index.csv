@@ -6211,11 +6211,11 @@ address,size,name,system,status
 0x2c5760,68,AsyncFile_FindSlot,lib-file?,host
 0x2c57a8,96,AsyncFile_FreeSlot,lib-file?,host
 0x2c5808,144,AsyncFile_Complete,lib-file?,host
-0x2c5898,52,FUN_002c5898,lib-file?,host
-0x2c58d0,236,FUN_002c58d0,lib-file?,host
-0x2c59c0,212,FUN_002c59c0,lib-file?,host
-0x2c5a98,256,FUN_002c5a98,lib-file?,host
-0x2c5b98,196,FUN_002c5b98,lib-file?,host
+0x2c5898,52,AsyncFile_OnClosed,lib-file?,host
+0x2c58d0,236,AsyncFile_OnChunkThenClose,lib-file?,host
+0x2c59c0,212,AsyncFile_OnSized,lib-file?,host
+0x2c5a98,256,AsyncFile_OnOpened,lib-file?,host
+0x2c5b98,196,AsyncFile_OnChunk,lib-file?,host
 0x2c5c60,208,AsyncFile_Init,lib-file?,ported
 0x2c5d30,240,AsyncFile_CancelAll,lib-file?,host
 0x2c5e20,172,AsyncFile_Load,lib-file?,ported
@@ -6233,19 +6233,19 @@ address,size,name,system,status
 0x2c6558,72,Strm_LookupRequest,lib-file?,host
 0x2c65a0,112,Strm_UnlinkRequest,lib-file?,host
 0x2c6610,84,Strm_MatchChunkType,lib-file?,host
-0x2c6668,548,FUN_002c6668,lib-file?,host
+0x2c6668,548,Strm_ClassifyPackets,lib-file?,host
 0x2c6890,60,Strm_OnReadDone,lib-file?,host
 0x2c68d0,84,Strm_OpenAfterClose,lib-file?,host
-0x2c6928,252,FUN_002c6928,lib-file?,host
+0x2c6928,252,Strm_OnDataRead,lib-file?,host
 0x2c6a28,348,Strm_KickNextRequest,lib-file?,host
 0x2c6b88,704,Strm_ScanPackets,lib-file?,host
 0x2c6e48,40,Strm_CalcMemSize,lib-file?,host
 0x2c6e70,548,Strm_Create,lib-file?,host
 0x2c7098,220,FUN_002c7098,lib-file?,host
 0x2c7178,168,VideoStream_Close,lib-file?,host
-0x2c7220,76,FUN_002c7220,lib-file?,host
-0x2c7270,108,FUN_002c7270,lib-file?,host
-0x2c72e0,96,FUN_002c72e0,lib-file?,host
+0x2c7220,76,Strm_SetPriorities,lib-file?,host
+0x2c7270,108,Strm_SetLowWater,lib-file?,host
+0x2c72e0,96,Strm_SetUrgent,lib-file?,host
 0x2c7340,96,Strm_GetChunk,lib-file?,host
 0x2c73a0,48,FUN_002c73a0,lib-file?,host
 0x2c73d0,248,VideoStream_QueueFile,lib-file?,host
@@ -6258,41 +6258,41 @@ address,size,name,system,status
 0x2c7c40,48,Strm_GetState,lib-file?,host
 0x2c7c70,72,Strm_IsFinished,lib-file?,host
 0x2c7cb8,56,Strm_GetBufferSize,lib-file?,host
-0x2c7cf0,48,FUN_002c7cf0,lib-file?,host
+0x2c7cf0,48,Strm_GetFillBytes,lib-file?,host
 0x2c7d20,196,FUN_002c7d20,lib-file?,host
 0x2c7de8,76,FUN_002c7de8,lib-file?,host
 0x2c7e38,32,FileSys_Exists,lib-file?,ported
 0x2c7e58,108,File_GetSizeCb,files,not started
 0x2c7ec8,76,File_GetSize,files,ported
-0x2c7f18,72,FUN_002c7f18,lib-file?,host
+0x2c7f18,72,File_GetSize0,files,not started
 0x2c7f60,180,File_LoadAllocCb,files,not started
 0x2c8018,80,File_LoadAlloc,files,ported
-0x2c8068,76,FUN_002c8068,lib-file?,ported
+0x2c8068,76,File_LoadAlloc0,files,ported
 0x2c80b8,192,File_LoadAllocSizeCb,files,not started
 0x2c8178,112,File_LoadAllocSize,files,not started
 0x2c81e8,108,File_ReadWhole,files,not started
 0x2c8258,152,File_LoadIntoCb,files,not started
 0x2c82f0,84,File_LoadInto,files,ported
-0x2c8348,80,FUN_002c8348,lib-file?,host
+0x2c8348,80,File_LoadInto0,files,not started
 0x2c8398,148,File_LoadManyCb,files,not started
 0x2c8430,108,File_LoadMany,files,not started
 0x2c84a0,104,FUN_002c84a0,lib-file?,host
 0x2c8508,352,File_OpenBigCb,files,not started
 0x2c8668,80,File_OpenBig,files,not started
-0x2c86b8,76,FUN_002c86b8,lib-file?,host
+0x2c86b8,76,File_OpenBig0,files,not started
 0x2c8708,220,Host_WriteFile,lib-file?,host
 0x2c87e8,240,Host_WriteFileChecked,lib-file?,host
-0x2c88d8,56,FUN_002c88d8,lib-file?,host
-0x2c8910,40,FUN_002c8910,lib-file?,host
+0x2c88d8,56,File_PeekUnpackedSize,files,not started
+0x2c8910,40,File_PeekUnpackedSizeUnchecked,files,not started
 0x2c8938,308,File_LoadAndUnpack,files,ported
 0x2c8a70,28,File_Load,files,ported
-0x2c8a90,312,FUN_002c8a90,lib-file?,host
-0x2c8bc8,28,FUN_002c8bc8,lib-file?,host
+0x2c8a90,312,File_LoadUnpackInto,files,not started
+0x2c8bc8,28,File_LoadUnpackInto2,files,not started
 0x2c8be8,264,File_ReadChunkCb,files,not started
 0x2c8cf0,164,File_ReadChunked,files,not started
 0x2c8d98,112,File_OpenSync,files,not started
 0x2c8e08,32,File_ReadSync,files,not started
-0x2c8e28,32,FUN_002c8e28,lib-file?,host
+0x2c8e28,32,File_WriteSync,files,not started
 0x2c8e48,84,File_CloseSync,files,not started
 0x2c8ea0,84,File_SizeSync,files,not started
 0x2c8ef8,84,FUN_002c8ef8,lib-file?,host
@@ -6305,24 +6305,24 @@ address,size,name,system,status
 0x2c9200,536,CdFs_ScanDir,lib-file?,ported
 0x2c9420,32,CdFs_CompareEntryName,lib-file?,ported
 0x2c9440,28,CdFs_CompareName,lib-file?,ported
-0x2c9498,40,FUN_002c9498,lib-file?,host
+0x2c9498,40,CdFs_CdCallback,lib-file?,host
 0x2c94c0,192,CdStream_IssueRead,lib-file?,host
 0x2c9580,396,CdStream_Thread,lib-file?,host
-0x2c9710,540,FUN_002c9710,lib-file?,host
-0x2c9930,60,FUN_002c9930,lib-file?,host
+0x2c9710,540,CdFs_RecoverRead,lib-file?,host
+0x2c9930,60,CdFs_PollRecover,lib-file?,host
 0x2c9970,848,CdFs_Mount,lib-file?,ported
 0x2c9cc0,352,CdFs_FindFile,lib-file?,ported
-0x2c9e20,656,FUN_002c9e20,lib-file?,host
+0x2c9e20,656,CdFs_StartRead,lib-file?,host
 0x2ca0b0,108,CdFs_GetFileInfo,lib-file?,host
 0x2ca120,80,CdFs_FindEntry,lib-file?,host
 0x2ca170,148,FileSys_Init,lib-file?,ported
 0x2ca208,276,FileSys_InitWithBuffer,lib-file?,host
 0x2ca320,72,FileSys_CalcMemSize,lib-file?,host
 0x2ca368,72,FileSys_GetStatus,lib-file?,host
-0x2ca3b0,44,FUN_002ca3b0,lib-file?,host
-0x2ca3e0,44,FUN_002ca3e0,lib-file?,host
+0x2ca3b0,44,FileSys_GetOpState,lib-file?,host
+0x2ca3e0,44,FileSys_GetOpContext,lib-file?,host
 0x2ca410,80,FileSys_SetCallback,lib-file?,host
-0x2ca460,348,FUN_002ca460,lib-file?,host
+0x2ca460,348,FileSys_SetPriority,lib-file?,host
 0x2ca5c0,100,FileSys_CancelOp,lib-file?,host
 0x2ca628,204,FileSys_WaitOp,lib-file?,host
 0x2ca6f8,252,FileSys_GetResult,lib-file?,host
@@ -6334,17 +6334,17 @@ address,size,name,system,status
 0x2caba0,152,FileSys_GetFileSize,lib-file?,host
 0x2cac38,108,FUN_002cac38,lib-file?,host
 0x2caca8,280,FileSys_OnBigHeaderRead,lib-file?,ported
-0x2cadc0,172,FUN_002cadc0,lib-file?,host
+0x2cadc0,172,FileSys_OnBigOpened,lib-file?,host
 0x2cae70,308,FileSys_QueueMountBig,lib-file?,host
-0x2cafa8,44,FUN_002cafa8,lib-file?,host
+0x2cafa8,44,FileSys_OnBigClosed,lib-file?,host
 0x2cafd8,436,FileSys_QueueUnmountBig,lib-file?,host
 0x2cb190,96,FileSys_RunWithHeap,lib-file?,host
-0x2cb1f0,36,FUN_002cb1f0,lib-file?,host
+0x2cb1f0,36,FileSys_SetHeap,lib-file?,host
 0x2cb218,228,FileSys_SetRootPath,lib-file?,ported
 0x2cb300,36,FileSys_GetRootPath,lib-file?,host
 0x2cb328,1112,FileSys_RunQueue,lib-file?,ported
 0x2cb780,164,FileSys_CompleteCurrent,lib-file?,host
-0x2cb830,408,FUN_002cb830,lib-file?,host
+0x2cb830,408,FileSys_ParsePath,lib-file?,host
 0x2cb9c8,8,FUN_002cb9c8,lib-file?,host
 0x2cb9d0,328,FileSys_AllocOp,lib-file?,host
 0x2cbb18,80,FileSys_FreeOp,lib-file?,host
@@ -6361,7 +6361,7 @@ address,size,name,system,status
 0x2cc120,144,BIG_GetFileDataList,lib-big?,not started
 0x2cc1b0,184,BIG_GetFileCount,lib-big?,ported
 0x2cc268,84,BIG_GetFileName,lib-big?,not started
-0x2cc2c0,100,FUN_002cc2c0,lib-file?,ported
+0x2cc2c0,100,HostFs_Init,lib-file?,ported
 0x2cc328,28,FUN_002cc328,lib-file?,host
 0x2cc348,28,FUN_002cc348,lib-file?,host
 0x2cc368,336,FileSys_MakeDevicePath,lib-file?,host
@@ -6372,50 +6372,50 @@ address,size,name,system,status
 0x2cc730,108,HostFs_Write,lib-file?,host
 0x2cc7a0,100,FileSys_DevGetSize,lib-file?,host
 0x2cc808,300,EAMem_Set,lib-eamem?,ported
-0x2cc938,32,FUN_002cc938,lib-eamem?,host
+0x2cc938,32,EAMem_Zero,lib-eamem?,host
 0x2cc958,40,Compress_Alloc,lib-eamem?,ported
 0x2cc980,28,Compress_Free,lib-eamem?,host
-0x2cc9a0,96,FUN_002cc9a0,lib-eamem?,host
+0x2cc9a0,96,EAMem_BlockHeaderSize,lib-eamem?,host
 0x2cca00,1344,EAMem_AllocEx,lib-eamem?,host
-0x2ccf50,28,FUN_002ccf50,lib-eamem?,host
+0x2ccf50,28,EAMem_AllocAligned,lib-eamem?,host
 0x2ccf70,40,EAMem_Alloc,lib-eamem?,ported
-0x2ccf98,40,FUN_002ccf98,lib-eamem?,host
+0x2ccf98,40,EAMem_Alloc0,lib-eamem?,host
 0x2ccfc0,420,EAMem_Free,lib-eamem?,ported
 0x2cd168,232,EAMem_InitBlock,lib-eamem?,host
-0x2cd250,40,FUN_002cd250,lib-eamem?,host
+0x2cd250,40,EAMem_ClearHeapTable,lib-eamem?,host
 0x2cd278,644,EAMem_InitHeap,lib-eamem?,host
 0x2cd500,112,EAMem_DestroyHeap,lib-eamem?,host
 0x2cd570,104,EAMem_FreeAll,lib-eamem?,host
 0x2cd798,136,EAMem_InitMainHeap,lib-eamem?,ported
 0x2cd820,108,EAMem_InitDefaultHeap,lib-eamem?,host
-0x2cd890,28,FUN_002cd890,lib-eamem?,host
+0x2cd890,28,EAMem_InitDefaultHeapMax,lib-eamem?,host
 0x2cd8b0,224,EAMem_DestroyAll,lib-eamem?,host
-0x2cd990,32,FUN_002cd990,lib-eamem?,host
+0x2cd990,32,EAMem_HeapHeaderSize,lib-eamem?,host
 0x2cd9b0,8,EAMem_GetSize,lib-eamem?,host
-0x2cd9b8,84,FUN_002cd9b8,lib-eamem?,host
-0x2cda18,576,FUN_002cda18,lib-eamem?,host
-0x2cdc60,104,FUN_002cdc60,lib-eamem?,host
-0x2cdcc8,244,FUN_002cdcc8,lib-eamem?,host
-0x2cddc0,176,FUN_002cddc0,lib-eamem?,host
-0x2cde70,152,FUN_002cde70,lib-eamem?,host
+0x2cd9b8,84,EAMem_GetName,lib-eamem?,host
+0x2cda18,576,EAMem_Resize,lib-eamem?,host
+0x2cdc60,104,EAMem_IsBlockHeader,lib-eamem?,host
+0x2cdcc8,244,EAMem_CheckNeighbours,lib-eamem?,host
+0x2cddc0,176,EAMem_CheckBackLinks,lib-eamem?,host
+0x2cde70,152,EAMem_CheckInHeap,lib-eamem?,host
 0x2cdf08,204,EAMem_ValidateHeap,lib-eamem?,host
 0x2cdfd8,116,EAMem_ValidateAll,lib-eamem?,ported
 0x2ce04c,200,Crc_Compute16,lib-eamem?,ported
 0x2ce114,272,EAMem_Copy,lib-eamem?,ported
 0x2ce228,112,Mem_Move,lib-eamem?,ported
-0x2ce2c0,8,FUN_002ce2c0,lib-eamem?,host
+0x2ce2c0,8,Mem_IsReadable,lib-eamem?,host
 0x2ce2c8,220,Debug_Fatal,lib-eamem?,host
-0x2ce3c0,48,FUN_002ce3c0,lib-eamem?,host
-0x2ce3f0,208,FUN_002ce3f0,lib-eamem?,host
-0x2ce4c0,272,FUN_002ce4c0,lib-eamem?,host
-0x2ce5e8,248,FUN_002ce5e8,lib-eamem?,host
-0x2ce6e0,104,FUN_002ce6e0,lib-eamem?,host
-0x2ce748,76,FUN_002ce748,lib-eamem?,host
-0x2ce798,104,FUN_002ce798,lib-eamem?,host
-0x2ce800,72,FUN_002ce800,lib-eamem?,host
-0x2ce848,72,FUN_002ce848,lib-eamem?,host
-0x2ce890,80,FUN_002ce890,lib-eamem?,host
-0x2ce8e0,112,FUN_002ce8e0,lib-eamem?,host
+0x2ce3c0,48,DebugOut_SetEnabledRaw,lib-eamem?,host
+0x2ce3f0,208,DebugCat_SetEnabledRaw,lib-eamem?,host
+0x2ce4c0,272,Debug_InitChannels,lib-eamem?,host
+0x2ce5e8,248,Debug_Message,lib-eamem?,host
+0x2ce6e0,104,DebugOut_SetEnabled,lib-eamem?,host
+0x2ce748,76,DebugOut_IsEnabled,lib-eamem?,host
+0x2ce798,104,DebugOut_SetHandler,lib-eamem?,host
+0x2ce800,72,DebugCat_SetEnabled,lib-eamem?,host
+0x2ce848,72,DebugCat_IsEnabled,lib-eamem?,host
+0x2ce890,80,DebugCat_SetName,lib-eamem?,host
+0x2ce8e0,112,DebugOut_Call,lib-eamem?,host
 0x2ce950,92,Sys_RunExitHandlers,lib-eamem?,host
 0x2ce9b0,32,Sys_Abort,lib-eamem?,host
 0x2ce9d0,120,Sys_AddExitHandler,lib-eamem?,host
@@ -6424,16 +6424,16 @@ address,size,name,system,status
 0x2ceb00,96,Mutex_Lock,lib-eamem?,host
 0x2ceb60,80,Mutex_Unlock,lib-eamem?,host
 0x2cebb0,8,FileSys_QueueUnsupported,lib-eamem?,host
-0x2cebb8,48,FUN_002cebb8,lib-eamem?,host
+0x2cebb8,48,Sys_InitPollTasks,lib-eamem?,host
 0x2cebe8,176,Sys_AddPollTask,lib-eamem?,host
 0x2cec98,100,Sys_RemovePollTask,lib-eamem?,host
 0x2ced00,284,Sys_RunPollTasks,lib-eamem?,ported
 0x2cee20,96,Sys_PollFor,lib-eamem?,host
-0x2cee88,52,FUN_002cee88,lib-eamem?,host
+0x2cee88,52,Thread_FreeExitedStack,lib-eamem?,host
 0x2ceec0,56,Sys_InitMainThread,lib-eamem?,ported
 0x2cef30,216,Thread_Create,lib-eamem?,host
 0x2cf008,92,Thread_Kill,lib-eamem?,host
-0x2cf068,140,FUN_002cf068,lib-eamem?,host
+0x2cf068,140,Thread_WakeSleepers,lib-eamem?,host
 0x2cf0f8,172,Thread_SleepTicks,lib-eamem?,host
 0x2cf1a8,88,Thread_SleepMs,lib-eamem?,host
 0x2cf200,80,Thread_IsCurrent,lib-eamem?,host
@@ -6441,7 +6441,7 @@ address,size,name,system,status
 0x2cf2a0,88,Thread_SetPriority,lib-eamem?,host
 0x2cf2f8,32,FUN_002cf2f8,lib-eamem?,host
 0x2cf318,60,Thread_Join,lib-eamem?,host
-0x2cf358,104,FUN_002cf358,lib-eamem?,host
+0x2cf358,104,Thread_Exit,lib-eamem?,host
 0x2cf3c0,40,Sema_Create,lib-eamem?,host
 0x2cf3e8,28,Sema_Delete,lib-eamem?,host
 0x2cf408,28,Sema_Signal,lib-eamem?,host
@@ -6451,12 +6451,12 @@ address,size,name,system,status
 0x2cf4b0,28,RecMutex_Destroy,lib-eamem?,host
 0x2cf4d0,128,RecMutex_Lock,lib-eamem?,host
 0x2cf550,68,RecMutex_Unlock,lib-eamem?,host
-0x2cf598,108,FUN_002cf598,lib-eamem?,host
-0x2cf608,60,FUN_002cf608,lib-eamem?,host
+0x2cf598,108,Timer_AddCallback,lib-eamem?,host
+0x2cf608,60,Timer_RemoveCallback,lib-eamem?,host
 0x2cf648,332,Timer_Init,lib-eamem?,ported
 0x2cf798,68,Timer_Shutdown,lib-eamem?,host
-0x2cf7e0,264,FUN_002cf7e0,lib-eamem?,host
-0x2cf8e8,264,FUN_002cf8e8,lib-snd?,not started
+0x2cf7e0,264,Fpu_SaveRegs,save,not started
+0x2cf8e8,264,Fpu_RestoreRegs,lib-snd?,not started
 0x2cf9f0,204,Timer_IrqHandler,lib-snd?,not started
 0x2cfac0,12,Timer_GetTicks,lib-snd?,not started
 0x2cfad0,48,Timer_Delta,lib-snd?,not started
