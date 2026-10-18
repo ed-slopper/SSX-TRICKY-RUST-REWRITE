@@ -2465,10 +2465,10 @@ address,size,name,system,status
 0x1ab148,88,cResultsOverlay::Update,frontend,ported
 0x1ab1a0,2132,cViewHiScoresOverlay::DrawText,frontend,not started
 0x1ab9f8,516,cPauseMenuOverlay::cPauseMenuOverlay,frontend,checked
-0x1abc00,620,cCountdownOverlay::vf34_1abc00,frontend,not started
-0x1abe70,528,cCountdownOverlay::vf31_1abe70,frontend,not started
-0x1ac080,176,cCountdownOverlay::vf32_1ac080,frontend,not started
-0x1ac130,732,cCountdownOverlay::vf33_1ac130,frontend,not started
+0x1abc00,620,cCountdownOverlay::vf34_1abc00,frontend,checked
+0x1abe70,528,cCountdownOverlay::vf31_1abe70,frontend,checked
+0x1ac080,176,cCountdownOverlay::vf32_1ac080,frontend,checked
+0x1ac130,732,cCountdownOverlay::vf33_1ac130,frontend,checked
 0x1ac410,368,PauseMenu_Resume,frontend?,ported
 0x1ac580,248,PauseMenu_PopLevel,frontend?,ported
 0x1ac678,356,PauseMenu_BuildMainPage,frontend?,ported

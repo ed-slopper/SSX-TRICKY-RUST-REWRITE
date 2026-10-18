@@ -1776,3 +1776,47 @@ handlers switch on it), and each page keeps the values its items edit from +0x11
 
 The runner test (tests/dmmenus.rs) has 8,400 cases over the 28 functions, with the whole debug menu's code
 (G9a4a..c) real on both sides. 70 of 71 mutants are caught; the one left gives the riders int a minimum of 0, which its range sets to 1 straight after.
+
+## The pause overlay's own virtuals (G9a5, `game/src/pausedraw.rs`)
+
+The index named these four `cCountdownOverlay::vf31..34`. They sit in the pause overlay's table and act on its
+fields, so they are really `cPauseMenuOverlay`'s.
+
+- **Its pages** are kept as up to two pointers at +0x7e0, with the page shown at +0x7e8.
+  - Each page has three of GCC 2's member-function pointers: +0x110 the update, +0x118 the draw, +0x120 the text.
+  - Each pointer is a `this` shift (+0), an index (+2) and then a word. The index is 0 for none. Above 0 it is a
+    virtual: the word's low half is the table's offset from `this`, the entry is at index · 8 − 8, and the entry
+    holds its own shift and the function. Below 0, the word is the function.
+- **vf34 0x1abc00 (open):**
+  - resets the backdrop and resumes the pause (0x1ad8a8 with 0);
+  - starts the frame's three animations (0.88, then two slides);
+  - sets the trick book's page from the career's first trick not done (`0x1a9f30`; when there is none, or it is 30
+    or more, page 5's first);
+  - reads the options page's values by item kind: the brightness · 50; the race's two modes (kinds 9 and 10); the
+    two players' cameras (the camera index − 0xb); the song (the music's +0x36e8); the five volumes · 50 (channels 0,
+    1, 4, 2 and 3 for kinds 0xe, 0xf, 0x13, 0x10 and 0x15). The other kinds get 0;
+  - clears the card operation (+0x430) and the trick book's flag (+0x7f0), and sets +0x7ec.
+- **vf31 0x1abe70 (draw):**
+  - with a dialog up (the backdrop's +0x328), draws only the dialog and returns;
+  - while a card operation is saving (+0x430 is 2), draws nothing;
+  - otherwise sizes the backdrop's frame (item 0xe) by the page's items: the menu font's height · 0.92 + 4 each,
+    from 100 (95 on the main page), and 120 more with the trick book;
+  - on texture 16, calls the page's draw (+0x118);
+  - once the frame is fully open (+0x34 equals +0x2c), draws the help line 0x1d7 at 600, (h + 480) / 2 − 40.
+- **vf32 0x1ac080 (text):** does nothing while a dialog is up. Otherwise it draws the card operation while one
+  saves (+0x430 is 2), or else calls the page's text (+0x120).
+- **vf33 0x1ac130 (update):** updates the backdrop first.
+  - **A card operation:** runs until it is done; a good result saves the career (+0x3704 1, `0x161a98`, +0x3260
+    2, `0x161840`). Then it is destroyed and +0x430 cleared.
+  - **A dialog's answer:**
+    - 3, while not in the save question, does nothing;
+    - 2 (no) clears +0x430;
+    - 1 (yes) to the save question starts the save (+0x434 0x1c4, the operation begun at the career's +0x27d4,
+      saving with 1).
+    - Otherwise the race is left. With +0x7ec the career is saved. Without it, the four players' flags are
+      cleared, and then the lesson ends (in a lesson) or the race quits. The page is popped.
+  - **No dialog:** the page's update (+0x110) runs.
+
+The test now has 27,000 cases. The pages and their member pointers are random (none, plain, or virtual through a
+table at +0x7c0, with random shifts). 47 of 48 mutants are caught. The one left saves the career before setting
++0x3260 to 2; that order can't be seen while the save's own code is a stand-in.

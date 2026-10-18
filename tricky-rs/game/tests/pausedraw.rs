@@ -54,6 +54,12 @@ const RVT: u32 = ARENA + 0x1800;
 const RECT: u32 = ARENA + 0x1900;
 const RIDER: u32 = ARENA + 0x1a00;
 const SYS: u32 = ARENA + 0x2400;
+const PAGES: u32 = ARENA + 0x5000;
+const PMF_VT: u32 = ARENA + 0x5600;
+/// the pages' member functions' stand-ins
+fn mf(n: u32) -> u32 {
+    0x0183_0000 + n
+}
 const SCRATCH: u32 = 0x01f8_0000;
 const STACK_TOKEN: u32 = 0x5c5c_5c5c;
 /// The renderer's virtuals' stand-ins
@@ -130,6 +136,14 @@ fn arity(func: u32) -> (usize, usize) {
         pd::TRICK_INFO_SET => (4, 0),
         pd::TRICK_INFO_DRAW => (2, 2),
         pd::SPRITE_TILED => (2, 6),
+        f if f & 0xffff_0000 == 0x0183_0000 => (1, 0),
+        pd::BACKDROP_RESET | pd::BACKDROP_UPDATE | pd::POP_LEVEL | pd::FIRST_UNDONE | pd::GET_BRIGHT => (1, 0),
+        pd::RACE_MODE_A | pd::RACE_MODE_B | pd::GET_CAMERA | pd::CAM_GET | pd::DIALOG_DRAW | pd::MC_UPDATE => (1, 0),
+        pd::MC_IS_DONE | pd::MC_RESULT | pd::MC_DESTROY | pd::MC_CREATE | pd::MC_RESTART => (1, 0),
+        pd::CAREER_SAVE_A | pd::CAREER_SAVE_B | pd::LESSON_END | pd::QUIT_RACE => (1, 0),
+        pd::START_FRAME_ANIM | pd::START_CHILD_SLIDE | pd::START_EDGE_SLIDE | pd::BACKDROP_FRAME => (2, 1),
+        pd::PAUSE_RESUME | pd::GET_VOL | pd::DIALOG_POLL | pd::MC_DRAW | pd::MC_BEGIN | pd::MC_START_SAVE => (2, 0),
+        pd::PLAYER_ID | pd::CLEAR_FLAGS => (2, 0),
         _ => panic!("no arity for {func:#x}"),
     }
 }
@@ -144,7 +158,7 @@ fn standin(io: &mut dyn Io, func: u32, w: &[u32], f: &[u32], ans: &Answers) -> (
     // the draws: the drawer's colour as it stands when they draw
     if matches!(
         func,
-        pd::DRAW_MENU_LIST | pd::LABEL_BOX | pd::DRAW_SPRITE | pd::PRINTF_SHADOWED | pd::PRINTF_SHADOWED_CENTRED
+        pd::DRAW_MENU_LIST | pd::LABEL_BOX | pd::DRAW_SPRITE | pd::BACKDROP_FRAME | pd::PRINTF_SHADOWED | pd::PRINTF_SHADOWED_CENTRED
             | pd::PRINT_SHADOWED_CENTRED | pd::PRINTF_SHADOWED_A | pd::PRINT_SHADOWED_RIGHT
             | pd::PRINT_ASCII_SHADOWED_RIGHT | pd::SPRITE_TILED | pd::TRICK_INFO_DRAW
     ) {
@@ -169,6 +183,10 @@ fn standin(io: &mut dyn Io, func: u32, w: &[u32], f: &[u32], ans: &Answers) -> (
         pd::MEASURE_WIDE | pd::MEASURE_ASCII => r % 300,
         // (no songs, or −1, sometimes)
         pd::MUSIC_COUNT => [0u32, 0xffff_ffff, 1, 2, 5][(r % 5) as usize],
+        pd::FIRST_UNDONE => [0xffff_ffffu32, 5, 29, 30, 40][(r % 5) as usize],
+        pd::GET_VOL | pd::GET_BRIGHT => ((r % 23) as f32 / 20.0).to_bits(),
+        pd::DIALOG_POLL => [0u32, 1, 2, 3, 1, 3][(r % 6) as usize],
+        pd::MC_IS_DONE | pd::MC_RESULT => r % 2,
         pd::MEMSET => {
             if mapped(w[0], w[2]) {
                 for k in 0..w[2] / 4 {
@@ -206,7 +224,7 @@ fn wf(m: &mut Mem, at: u32, v: f32) {
 #[test]
 fn pause_menu_draws_match_the_original() {
     let Some(mut r) = Runner::from_env() else { return };
-    let funcs = [0x1ab9f8u32, 0x1ac7e0, 0x1ad198, 0x1ad628];
+    let funcs = [0x1ab9f8u32, 0x1ac7e0, 0x1ad198, 0x1ad628, 0x1abc00, 0x1abe70, 0x1ac080, 0x1ac130, 0x1ac130];
     for f in funcs {
         r.allow(f);
     }
@@ -217,8 +235,14 @@ fn pause_menu_draws_match_the_original() {
         pd::TRICK_BOOK, pd::COMPLETE_PAGES, pd::PLAYER_PROFILE, pd::PAGE_FIRST, pd::TRICK_DONE, pd::FIND_RIDER,
         pd::TRICK_GET_INFO, pd::FORMAT_TRICK_NAME, pd::TRICK_INFO_SET, pd::TRICK_INFO_DRAW, pd::TRICK_INFO_NEW,
         pd::GET_RECT, pd::SPRITE_TILED, pd::MUSIC_COUNT, pd::MUSIC_SELECT, pd::MUSIC_NEXT, pd::BACKDROP_INIT,
-        pd::SAVE_INIT, pd::BUILD_MAIN_PAGE,
+        pd::SAVE_INIT, pd::BUILD_MAIN_PAGE, pd::BACKDROP_RESET, pd::START_FRAME_ANIM, pd::START_CHILD_SLIDE,
+        pd::START_EDGE_SLIDE, pd::BACKDROP_UPDATE, pd::BACKDROP_FRAME, pd::PAUSE_RESUME, pd::POP_LEVEL, pd::FIRST_UNDONE,
+        pd::GET_VOL, pd::GET_BRIGHT, pd::RACE_MODE_A, pd::RACE_MODE_B, pd::GET_CAMERA, pd::CAM_GET, pd::DIALOG_DRAW,
+        pd::DIALOG_POLL, pd::MC_DRAW, pd::MC_UPDATE, pd::MC_IS_DONE, pd::MC_RESULT, pd::MC_DESTROY, pd::MC_CREATE,
+        pd::MC_BEGIN, pd::MC_START_SAVE, pd::MC_RESTART, pd::PLAYER_ID, pd::CLEAR_FLAGS, pd::CAREER_SAVE_A,
+        pd::CAREER_SAVE_B, pd::LESSON_END, pd::QUIT_RACE,
     ];
+    stubs.extend((0..8).map(|n| mf(4 * n)));
     stubs.extend(ROFFS.map(rv));
     let log: Rc<RefCell<Vec<Call>>> = Rc::default();
     let ans = Rc::new(Answers { seed: Cell::new(0), n: Cell::new(0) });
@@ -307,6 +331,38 @@ fn pause_menu_draws_match_the_original() {
         }
         m.w32(THIS + 0x7f0, g.below(2));
         m.w32(THIS + 0x7f4, g.below(30));
+        // the pages (two, each with its three member-function pointers: none, a function, or a virtual through
+        // the table at +0x7c0), the page shown, the card operation, the dialog, the race's lesson
+        m.w32(THIS + 0x7c0, PMF_VT);
+        for n in 0..8 {
+            m.w32(PMF_VT + 8 * n, g.pick(&[0u32, 4]));
+            m.w32(PMF_VT + 8 * n + 4, mf(4 * n));
+        }
+        for pg in 0..2 {
+            let page = PAGES + 0x200 * pg;
+            m.w32(THIS + 0x7e0 + 4 * pg, page);
+            for o in [0x110u32, 0x118, 0x120] {
+                let idx = g.pick(&[0u16, 0xffff, 1, 3]);
+                m.w16(page + o, g.pick(&[0u16, 4]));
+                m.w16(page + o + 2, idx);
+                if idx == 0xffff {
+                    m.w32(page + o + 4, mf(4 * g.below(8)));
+                } else {
+                    m.w16(page + o + 4, 0x7c0);
+                }
+            }
+            m.w32(page + 0x18, g.pick(&[1u32, 4, 7]));
+        }
+        m.w32(THIS + 0x7e8, g.below(2));
+        m.w32(THIS + 0x430, g.pick(&[0u32, 1, 2]));
+        m.w32(THIS + 0x7ec, g.below(2));
+        let any = g.next();
+        m.w32(HUD + 0x328, g.pick(&[0u32, any]));
+        if g.below(2) == 0 {
+            m.w32(HUD + 0x34, m.r32(HUD + 0x2c));
+        }
+        let any = g.next();
+        m.w32(RACE + 0x34, g.pick(&[0u32, any]));
         for k in 0..4 {
             wf(&mut m, pd::DRAW_COLOUR + 4 * k, g.f(0.0, 1.0));
         }
@@ -333,6 +389,22 @@ fn pause_menu_draws_match_the_original() {
             }
             0x1ad628 => {
                 pd::draw_options_page(&mut m, e, THIS, SCRATCH);
+                none
+            }
+            0x1abc00 => {
+                pd::open(&mut m, e, THIS);
+                none
+            }
+            0x1abe70 => {
+                pd::draw(&mut m, e, THIS, SCRATCH);
+                none
+            }
+            0x1ac080 => {
+                pd::draw_text(&mut m, e, THIS);
+                none
+            }
+            0x1ac130 => {
+                pd::update(&mut m, e, THIS);
                 none
             }
             _ => unreachable!(),

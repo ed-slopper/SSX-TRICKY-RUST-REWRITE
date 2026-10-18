@@ -1,4 +1,5 @@
-//! The pause menu's draws and its constructor (board row G9a3): `cPauseMenuOverlay`'s constructor, the main page's
+//! The pause menu's draws, its constructor and its own virtuals (board rows G9a3, G9a5): `cPauseMenuOverlay`'s
+//! constructor and virtuals, the main page's
 //! draw, the options page's items and its draw. On the game's bytes ([`Mem`]); every callee (the fonts, the HUD's
 //! sprites and boxes, the menu list, the trick book, the music system, the renderer's virtuals) is a
 //! [`TextBoxEnv`] call by address. Checked in the function runner (`tests/pausedraw.rs`). The page stack and the
@@ -422,4 +423,243 @@ pub fn draw_options_page(m: &mut Mem, env: &mut dyn TextBoxEnv, this: u32, scrat
             break;
         }
     }
+}
+
+// --- G9a5: the pause overlay's own virtuals (the index has them as `cCountdownOverlay`'s) ---
+
+pub const BACKDROP_RESET: u32 = 0x1aa628;
+pub const START_FRAME_ANIM: u32 = 0x1a89b0;
+pub const START_CHILD_SLIDE: u32 = 0x1a8ad8;
+pub const START_EDGE_SLIDE: u32 = 0x1a8b70;
+pub const BACKDROP_UPDATE: u32 = 0x1a8bd8;
+pub const BACKDROP_FRAME: u32 = 0x1a9bb8;
+pub const PAUSE_RESUME: u32 = 0x1ac410;
+pub const POP_LEVEL: u32 = 0x1ac580;
+pub const FIRST_UNDONE: u32 = 0x1641f8;
+pub const GET_VOL: u32 = 0x211f20;
+pub const GET_BRIGHT: u32 = 0x17b970;
+pub const RACE_MODE_A: u32 = 0x17f158;
+pub const RACE_MODE_B: u32 = 0x17f190;
+pub const GET_CAMERA: u32 = 0x181470;
+pub const CAM_GET: u32 = 0x173e08;
+pub const DIALOG_DRAW: u32 = 0x1aa268;
+pub const DIALOG_POLL: u32 = 0x1aac08;
+pub const MC_DRAW: u32 = 0x1cf628;
+pub const MC_UPDATE: u32 = 0x1ceee0;
+pub const MC_IS_DONE: u32 = 0x1d21a0;
+pub const MC_RESULT: u32 = 0x1d21c0;
+pub const MC_DESTROY: u32 = 0x1ceeb0;
+pub const MC_CREATE: u32 = 0x1cee68;
+pub const MC_BEGIN: u32 = 0x1ce8b0;
+pub const MC_START_SAVE: u32 = 0x1ce778;
+pub const MC_RESTART: u32 = 0x1d2140;
+pub const PLAYER_ID: u32 = 0x166580;
+pub const CLEAR_FLAGS: u32 = 0x165400;
+pub const CAREER_SAVE_A: u32 = 0x161a98;
+pub const CAREER_SAVE_B: u32 = 0x161840;
+pub const LESSON_END: u32 = 0x14b638;
+pub const QUIT_RACE: u32 = 0x180a10;
+
+/// A page's member-function pointer at `pmf` called on the overlay (GCC 2's layout: +0 the `this` shift, +2 the
+/// index (0 none; above 0 a virtual: its table at `this` + the half word at +4, the entry index · 8 − 8 with its own
+/// shift in its low half word and the function in its high word), +4 the function itself when the index is below 0)
+fn member_call(m: &mut Mem, env: &mut dyn TextBoxEnv, this: u32, pmf: u32) {
+    let idx = m.r16(pmf + 2) as i16;
+    if idx == 0 {
+        return;
+    }
+    let delta = m.r16(pmf) as i16 as u32;
+    let (func, me) = if idx > 0 {
+        let vt = m.r32(this.wrapping_add(m.r16(pmf + 4) as i16 as u32));
+        let e = vt.wrapping_add(((idx as i32 as u32) << 3).wrapping_sub(8));
+        let shift = m.r16(e) as i16 as u32;
+        (m.r32(e + 4), this.wrapping_add(shift.wrapping_add(delta)))
+    } else {
+        (m.r32(pmf + 4), this.wrapping_add(delta))
+    };
+    env.call(m, func, &[me], &[]);
+}
+fn page_of(m: &Mem, this: u32) -> u32 {
+    m.r32(this + 0x7e0 + (m.r32(this + 0x7e8) << 2))
+}
+
+/// `cPauseMenuOverlay` vf34 0x1abc00(this): opened: the backdrop reset, the pages back to the main one, the frame's
+/// animations started; the trick book's page from the first trick not done (else page 5's first), and the options
+/// page's values read: the brightness · 50, the race's two modes, the two players' cameras, the song, the five
+/// volumes · 50 (kinds 8..21; the others 0); no card operation, no trick book shown
+pub fn open(m: &mut Mem, env: &mut dyn TextBoxEnv, this: u32) {
+    let z = F(0.0);
+    call(m, env, BACKDROP_RESET, &[m.r32(this + 0x42c)]);
+    call(m, env, PAUSE_RESUME, &[this, 0]);
+    fcall(m, env, START_FRAME_ANIM, &[m.r32(this + 0x42c), 0x40], &[z]);
+    fcall(m, env, START_FRAME_ANIM, &[m.r32(this + 0x42c), 2], &[k(0x3f61_47ae)]);
+    fcall(m, env, START_CHILD_SLIDE, &[m.r32(this + 0x42c), 2], &[z]);
+    fcall(m, env, START_EDGE_SLIDE, &[m.r32(this + 0x42c), 2], &[z]);
+    m.w32(this + 0x7ec, 1);
+    let player = m.r32(m.r32(m.r32(m.r32(APP) + 0x730) + 0x38) + 0xc);
+    let book = call(m, env, TRICK_BOOK, &[CAREER, player]);
+    let t = call(m, env, FIRST_UNDONE, &[book]);
+    m.w32(this + 0x7f4, t);
+    if t == 0xffff_ffff || (t as i32) >= 0x1e {
+        let f = call(m, env, PAGE_FIRST, &[5]);
+        m.w32(this + 0x7f4, f);
+    }
+    let page = this + 0x570;
+    let mut i = 0i32;
+    while i < m.r32(page + 0x18) as i32 {
+        let e = page + 0x1c + 0x18 * i as u32;
+        let vol = |m: &mut Mem, env: &mut dyn TextBoxEnv, ch: u32| {
+            let v = call(m, env, GET_VOL, &[m.r32(MUSIC), ch]);
+            crate::sndlib::cvt_w((F(f32::from_bits(v)) * F(50.0)).0) as u32
+        };
+        let v = match m.r32(e) {
+            8 => {
+                let b = call(m, env, GET_BRIGHT, &[m.r32(APP)]);
+                crate::sndlib::cvt_w((F(f32::from_bits(b)) * F(50.0)).0) as u32
+            }
+            9 => call(m, env, RACE_MODE_A, &[m.r32(m.r32(APP) + 0x730)]),
+            0xa => call(m, env, RACE_MODE_B, &[m.r32(m.r32(APP) + 0x730)]),
+            0xb | 0xc => {
+                let c = call(m, env, GET_CAMERA, &[m.r32(e) - 0xb]);
+                call(m, env, CAM_GET, &[c])
+            }
+            0xd => m.r32(m.r32(MUSIC) + 0x36e8),
+            0xe => vol(m, env, 0),
+            0xf => vol(m, env, 1),
+            0x10 => vol(m, env, 2),
+            0x13 => vol(m, env, 4),
+            0x15 => vol(m, env, 3),
+            _ => 0,
+        };
+        m.w32(e + 8, v);
+        i += 1;
+    }
+    m.w32(this + 0x430, 0);
+    m.w32(this + 0x7f0, 0);
+}
+
+/// `cPauseMenuOverlay` vf31 0x1abe70(this): the dialog when one is up; else (no card operation) the backdrop's frame
+/// as high as the page's items need (the menu font's height · 0.92 + 4 each, from 100 (95 on the main page), 120
+/// more with the trick book), on texture 16 the page's draw (its member function +0x118), and the help line 0x1d7
+/// (once the frame is open)
+pub fn draw(m: &mut Mem, env: &mut dyn TextBoxEnv, this: u32, scratch: u32) {
+    let idx = m.r32(this + 0x7e8);
+    let hud = m.r32(this + 0x42c);
+    let page = page_of(m, this);
+    if m.r32(hud + 0x328) != 0 {
+        call(m, env, DIALOG_DRAW, &[hud]);
+        return;
+    }
+    if m.r32(this + 0x430) == 2 {
+        return;
+    }
+    let top = if idx == 0 { F(95.0) } else { F(100.0) };
+    let font = m.r32(hud + 4);
+    let rows = cvt_s_w(m.r32(page + 0x18) as i32);
+    let each = cvt_s_w(m.r32(font + 0xc) as i32) * k(0x3f6b_851f) + F(4.0);
+    let mut h = rows * each + top;
+    if m.r32(this + 0x7f0) != 0 {
+        h = h + F(120.0);
+    }
+    fcall(m, env, BACKDROP_FRAME, &[hud, 0xe], &[h]);
+    rcall(m, env, 0x1d0, &[0x10]);
+    member_call(m, env, this, page + 0x118);
+    let y = (h + F(480.0)) * F(0.5) - F(40.0);
+    let s = loc(m, env, 0x1d7);
+    let (labels, on) = (scratch + 0x10, scratch + 0x14);
+    m.w32(labels, s);
+    let hud = m.r32(this + 0x42c);
+    m.w32(on, 1);
+    if rf(m, hud + 0x34).ee() == rf(m, hud + 0x2c).ee() {
+        fcall(m, env, DRAW_MENU_LIST, &[hud, 3, 0, labels, 1, 0xffff_ffff, 0x73, 1, 0, on], &[F(600.0), y, k(0x3f3a_e148)]);
+    }
+}
+
+/// `cPauseMenuOverlay` vf32 0x1ac080(this): unless a dialog is up: the card operation's draw while one runs, else
+/// the page's text (its member function +0x120)
+pub fn draw_text(m: &mut Mem, env: &mut dyn TextBoxEnv, this: u32) {
+    if m.r32(m.r32(this + 0x42c) + 0x328) != 0 {
+        return;
+    }
+    if m.r32(this + 0x430) == 2 {
+        call(m, env, MC_DRAW, &[this, this]);
+        return;
+    }
+    let page = page_of(m, this);
+    member_call(m, env, this, page + 0x120);
+}
+
+fn save_career(m: &mut Mem, env: &mut dyn TextBoxEnv) {
+    m.w32(CAREER + 0x3704, 1);
+    call(m, env, CAREER_SAVE_A, &[CAREER]);
+    call(m, env, CAREER_SAVE_B, &[CAREER]);
+    m.w32(CAREER + 0x3260, 2);
+    let r = m.r32(m.r32(APP) + 0x730);
+    m.w32(r + 0x54, 1);
+}
+fn clear_players(m: &mut Mem, env: &mut dyn TextBoxEnv) {
+    for p in 0..4 {
+        let id = call(m, env, PLAYER_ID, &[CAREER, p]);
+        call(m, env, CLEAR_FLAGS, &[CAREER, id]);
+    }
+}
+
+/// `cPauseMenuOverlay` vf33 0x1ac130(this): the backdrop's update; a card operation run to its end (a good result
+/// saves the career); a dialog's answer: no (2) closes it, yes (1) to the save question starts the save (+0x434 0x1c4,
+/// the operation 0x27d4), else the race is left (the career saved when +0x7ec, else the players' flags cleared and
+/// the lesson ended or the race quit) and the page popped; no dialog: the page's update (+0x110)
+pub fn update(m: &mut Mem, env: &mut dyn TextBoxEnv, this: u32) {
+    call(m, env, BACKDROP_UPDATE, &[m.r32(this + 0x42c)]);
+    if m.r32(this + 0x430) == 2 {
+        call(m, env, MC_UPDATE, &[this]);
+        if call(m, env, MC_IS_DONE, &[this]) == 0 {
+            return;
+        }
+        if call(m, env, MC_RESULT, &[this]) != 0 {
+            save_career(m, env);
+        }
+        m.w32(this + 0x430, 0);
+        call(m, env, MC_DESTROY, &[this]);
+        return;
+    }
+    let hud = m.r32(this + 0x42c);
+    if m.r32(hud + 0x328) == 0 {
+        let page = page_of(m, this);
+        member_call(m, env, this, page + 0x110);
+        return;
+    }
+    let r = call(m, env, DIALOG_POLL, &[hud, 0xffff_ffff]);
+    if r == 0 {
+        return;
+    }
+    if r == 3 && m.r32(this + 0x430) != 1 {
+        return;
+    }
+    if r == 2 {
+        m.w32(this + 0x430, 0);
+        return;
+    }
+    if r == 1 && m.r32(this + 0x430) == 1 {
+        m.w32(this + 0x430, 2);
+        clear_players(m, env);
+        m.w32(this + 0x434, 0x1c4);
+        call(m, env, MC_CREATE, &[this]);
+        call(m, env, MC_BEGIN, &[this, 0x27d4]);
+        call(m, env, MC_START_SAVE, &[this, 1]);
+        call(m, env, MC_RESTART, &[this]);
+        return;
+    }
+    if m.r32(this + 0x7ec) != 0 {
+        save_career(m, env);
+    } else {
+        clear_players(m, env);
+        let r = m.r32(m.r32(APP) + 0x730);
+        let lesson = m.r32(r + 0x34);
+        if lesson != 0 {
+            call(m, env, LESSON_END, &[lesson]);
+        } else {
+            call(m, env, QUIT_RACE, &[r]);
+        }
+    }
+    call(m, env, POP_LEVEL, &[this]);
 }
