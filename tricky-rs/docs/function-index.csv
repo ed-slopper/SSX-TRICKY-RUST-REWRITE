@@ -1745,9 +1745,9 @@ address,size,name,system,status
 0x17dff0,80,cBxTypeObjNodeState::__tf,runtime,host
 0x17e040,116,cBxSortObjNodeState::__tf,runtime,host
 0x17e0b8,64,cReplayRecordHeader::__tf,runtime,host
-0x17e0f8,76,cGame::cGame,game,not started
+0x17e0f8,76,cGame::cGame,game,checked
 0x17e148,2988,cGame::Init,game,ported
-0x17ecf8,896,cGame::vf0_17ecf8,game,not started
+0x17ecf8,896,cGame::vf0_17ecf8,game,checked
 0x17f078,124,cGame::IsPaused,game,ported
 0x17f0f8,96,Game_IsMenuOrOverlayActive,frontend,ported
 0x17f158,12,Game_GetHudOption,game,checked
@@ -1765,17 +1765,18 @@ address,size,name,system,status
 0x180848,456,Game_MoveLeaderToSlot0,game,ported
 0x180a10,324,Game_RestartRace,game,ported
 0x180b58,276,Game_ResetCameras,camera,ported
-0x180c70,152,cGame::Restart,game,not started
-0x180d08,228,cGame::vf4_180d08,game,not started
-0x180e00,928,Game_UpdateOrShowResults,game,not started
-0x1811a0,716,cGame::vf6_1811a0,game,not started
+0x180c70,152,cGame::Restart,game,checked
+0x180d08,228,cGame::vf4_180d08,game,checked
+0x180df0,16,FUN_00180df0,frontend?,checked
+0x180e00,928,Game_UpdateOrShowResults,game,checked
+0x1811a0,716,cGame::vf6_1811a0,game,checked
 0x181470,52,Game_GetCamera,camera,checked
 0x1814a8,20,Race_GetRider,race,ported
-0x1814c0,220,Game_UpdateObjectLists,game,not started
-0x1815a0,148,Game_CanPause,game,not started
-0x181638,572,cGame::Update,game,not started
+0x1814c0,220,Game_UpdateObjectLists,game,checked
+0x1815a0,148,Game_CanPause,game,checked
+0x181638,572,cGame::Update,game,checked
 0x181878,68,Game_UpdateCamerasStep,camera,checked
-0x1818c0,72,FUN_001818c0,,not started
+0x1818c0,72,FUN_001818c0,,checked
 0x1819b0,8,cVideoLoadModule::vf6_1819b0,video,not started
 0x1819b8,8,cVideoLoadModule::vf5_1819b8,video,not started
 0x1819c0,8,cVideoLoadModule::vf4_1819c0,video,not started
@@ -1793,14 +1794,14 @@ address,size,name,system,status
 0x181de8,92,cGame::__tf,runtime,host
 0x181e48,36,cLoadModule::~cLoadModule,game?,ported
 0x181e70,64,cLoadModule::__tf,runtime,host
-0x181eb0,36,cGameModule::~cGameModule,game,not started
+0x181eb0,36,cGameModule::~cGameModule,game,checked
 0x181ed8,64,cGameModule::__tf,runtime,host
 0x181ff0,80,cGameState::__tf,runtime,host
 0x182040,28,Color_SetRGB,game?,ported
-0x182060,8,cLoadModule::vf4_182060,game?,not started
-0x182068,8,cGameModule::vf4_182068,game,not started
+0x182060,8,cLoadModule::vf4_182060,game?,checked
+0x182068,8,cGameModule::vf4_182068,game,checked
 0x182070,64,cReplayRecordHeader::__tf,runtime,host
-0x1820b0,188,Game_Main,game,not started
+0x1820b0,188,Game_Main,game,checked
 0x182170,680,FUN_00182170,,not started
 0x182418,20,cPS2ExecutionMan::~cPS2ExecutionMan,render,not started
 0x182430,324,cPS2ExecutionMan::vf1_182430,render,not started
