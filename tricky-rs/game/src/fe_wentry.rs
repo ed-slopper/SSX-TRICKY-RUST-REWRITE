@@ -71,12 +71,22 @@ fn fl(v: u32) -> F {
     F(f)
 }
 
+/// `c.olt` / `c.ole` / `c.eq` with 0 as the EE does them: no NaN (an exponent of all ones is a huge value),
+/// denormals as 0
+fn lt(a: F, b: F) -> bool {
+    a.ee() < b.ee()
+}
+
+fn zero(a: F) -> bool {
+    a.ee() == 0.0
+}
+
 fn min(a: F, b: F) -> F {
-    if b < a { b } else { a }
+    if lt(b, a) { b } else { a }
 }
 
 fn max(a: F, b: F) -> F {
-    if a < b { b } else { a }
+    if lt(a, b) { b } else { a }
 }
 
 fn rcall(m: &mut Mem, e: &mut dyn FeEnv, off: u32, args: &[u32]) -> u32 {
@@ -204,14 +214,14 @@ pub fn entry_bounds(m: &mut Mem, e: &mut dyn FeEnv, w: u32, lo: u32, hi: u32, bu
         return;
     }
     let bx = rf(m, w + 0x140);
-    if bx != F(0.0) {
+    if !zero(bx) {
         let hi0 = rf(m, hi);
-        let base = if rf(m, w + 0x120) == F(0.0) { hi0 } else { rf(m, w + 0x80) + rf(m, w + 0x120) };
+        let base = if zero(rf(m, w + 0x120)) { hi0 } else { rf(m, w + 0x80) + rf(m, w + 0x120) };
         let x = bx + base + rf(m, w + 0x118);
         wf(m, hi, max(hi0, x));
     }
     let by = rf(m, w + 0x144);
-    if by != F(0.0) {
+    if !zero(by) {
         let y = rf(m, w + 0x84) + by;
         let v = max(rf(m, hi + 4), y);
         wf(m, hi + 4, v);
@@ -223,7 +233,7 @@ pub fn entry_bounds(m: &mut Mem, e: &mut dyn FeEnv, w: u32, lo: u32, hi: u32, bu
 /// One axis of a child's size in its box: the box when set, else by the alignment bits (`edge` the child's size,
 /// `right` 0, else half)
 fn fit(m: &Mem, boxv: F, mode: u32, edge_bit: u32, mask: u32, size: F) -> Option<F> {
-    if boxv != F(0.0) {
+    if !zero(boxv) {
         Some(boxv)
     } else if (mode >> edge_bit) & 1 != 0 {
         Some(size)
@@ -245,11 +255,11 @@ pub fn entry_size(m: &mut Mem, e: &mut dyn FeEnv, w: u32, out: u32, buf: u32) {
     let a = m.r32(w + 0x110);
     vcall(m, e, a, 0x130, &[buf]);
     let bx = rf(m, w + 0x120);
-    if rf(m, buf) < bx {
+    if lt(rf(m, buf), bx) {
         wf(m, buf, bx);
     }
     let by = rf(m, w + 0x124);
-    if rf(m, buf + 4) < by {
+    if lt(rf(m, buf + 4), by) {
         wf(m, buf + 4, by);
     }
     let mode = m.r32(w + 0x11c);
@@ -324,7 +334,7 @@ pub fn entry_layout(m: &mut Mem, e: &mut dyn FeEnv, w: u32, buf: u32) {
     vcall(m, e, b, 0x140, &[]);
     let bx = rf(m, w + 0x120);
     let mut x = pos[0];
-    if bx != F(0.0) {
+    if !zero(bx) {
         x = x + bx;
     } else if (mode >> 1) & 1 != 0 {
         x = x + size_a[0];
@@ -410,10 +420,10 @@ pub fn button_layout(m: &mut Mem, e: &mut dyn FeEnv, w: u32, at: u32, text: u32,
     let r = sprite_rect(m, e, at);
     let mut y = rf(m, r.wrapping_add(8));
     let top = F(17.0);
-    if top < x {
+    if lt(top, x) {
         x = top;
     }
-    if top < y {
+    if lt(top, y) {
         y = top;
     }
     widget_place(m, e, icon, at, x, y, buf + 0x20);

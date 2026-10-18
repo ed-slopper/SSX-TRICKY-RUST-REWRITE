@@ -2022,3 +2022,6 @@ and the chosen item without checking for none, as does the scroll that calls it,
 
 All 97 mutants are caught. To catch them, the menu's own steps and layout sometimes choose another item in their
 stand-ins, and the boxes are sometimes a denormal (0 to the EE).
+
+**Follow-up (G9x2, G9x3a):** the text widgets' and the entries' float comparisons now go through `ee()` too, as
+the menu list's do (G9x3b): the EE has no NaN and takes denormals as 0. Both tests pass unchanged.

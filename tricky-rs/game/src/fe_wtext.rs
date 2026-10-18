@@ -85,6 +85,16 @@ fn int(v: F) -> u32 {
     v.ee() as i32 as u32
 }
 
+/// `c.olt` / `c.ole` / `c.eq` with 0 as the EE does them: no NaN (an exponent of all ones is a huge value),
+/// denormals as 0
+fn lt(a: F, b: F) -> bool {
+    a.ee() < b.ee()
+}
+
+fn le(a: F, b: F) -> bool {
+    a.ee() <= b.ee()
+}
+
 fn abs(v: F) -> F {
     F(f32::from_bits(v.0.to_bits() & 0x7fff_ffff))
 }
@@ -563,9 +573,9 @@ pub fn set_speed(m: &mut Mem, t: u32, v: F) {
     let font = m.r32(t + 0x188);
     let top = fl(m.r32(font.wrapping_add(0xc))) * F(f32::from_bits(0x3eb3_3333));
     let low = F(f32::from_bits(0x3dcc_cccd));
-    let v = if v < low {
+    let v = if lt(v, low) {
         low
-    } else if top < v {
+    } else if lt(top, v) {
         top
     } else {
         v
@@ -609,9 +619,9 @@ pub fn scroll_draw(m: &mut Mem, e: &mut dyn FeEnv, t: u32, buf: u32) {
                 } else if i + 1 == m.r32(t + 0x1b0) {
                     alpha = abs(rf(m, t + 0x1a4)) / fl(m.r32(font.wrapping_add(0xc)));
                 }
-                if alpha < F(0.0) {
+                if lt(alpha, F(0.0)) {
                     alpha = F(0.0);
-                } else if F(1.0) <= alpha {
+                } else if le(F(1.0), alpha) {
                     alpha = F(1.0);
                 }
                 if m.r32(t + 0x1a0) == 1 {
@@ -665,14 +675,14 @@ pub fn scroll_update(m: &mut Mem, e: &mut dyn FeEnv, t: u32) {
         };
         wf(m, t + 0x1a4, off);
         let h = line_height(m, t);
-        if h < abs(rf(m, t + 0x1a4)) {
+        if lt(h, abs(rf(m, t + 0x1a4))) {
             if dir == 0 {
                 shift_up(m, t);
             } else {
                 shift_down(m, t);
             }
             let off = rf(m, t + 0x1a4);
-            let off = if F(0.0) < off { off - h } else { off + h };
+            let off = if lt(F(0.0), off) { off - h } else { off + h };
             wf(m, t + 0x1a4, off);
             advance(m, t);
         }
