@@ -601,3 +601,43 @@ AI notes' "+0x38 the preference" is the other class, `cAIPath`.
 (+0x418: the race time in hundredths at the line, −1 until then) and whether it is human (+0x41c). The places the HUD
 shows are therefore the game's own, ordered by the same progress and updated every sixth tick.
 
+
+## The race's other overlays, part one (G8n1, `game/src/raceoverlays.rs`)
+
+- **`Dialog_Draw` 0x1aa268** draws the dialog box. `Dialog_Set` (G9a1's callee) left its fields: two lines (+0x328,
+  +0x32c), three button words (A +0x330, C +0x334, B +0x338), the box's size (+0x33c, +0x340) and the buttons'
+  indent (+0x344).
+  - It sets untextured mode 3 and keeps the texture to put back at the end.
+  - It draws the backdrop's frame (layer 17, 165 high, on texture 18), then switches to texture 19.
+  - In white: up to two lines, each centred in the box, from 20 down and 30 apart.
+  - The buttons in a row from the indent: A (pad sprite 0x74), B (0x72), C (0x73). Each word sits 23 past its
+    sprite and 2 down; the next button starts 40 past the word.
+- **`ResultsOverlay_Init` 0x1aacb0**(this, whole) makes the results overlay's backdrop and gives it the results'
+  view of the backdrop's table (0x38f880).
+  - With `whole`, the backdrop is its own at +0x54.
+  - Without it, it uses the same stack copy of the table as the pause menu's constructor (G9a3), with three `this`
+    adjustments moved (+8, +0x70, +0x78).
+  - It then sets three words (0xe1e, 0xe1f, 0xe1e at 0x3384c0) and clears +0x3c..+0x50.
+- **Results helpers the index doesn't list:**
+  - 0x1aae10(this; x, gap) lays out the results' 17 title rows at 0x338550. The first is at x + the menu font's
+    height · 0.85 + 12, each later one that height + `gap` below; x is kept at 0x3385bc.
+  - 0x1aae88 clears the results' two buffers (0x400 bytes at 0x33c5c0, 0x4000 at 0x3385c0).
+- **`Overlay_DrawCourseTitle` 0x1aaec0**(this; height) draws the backdrop's frame (layer 5), then the course's name
+  (`Course_GetName` 0x16b650 on the career's course) in a pale blue scaled by the backdrop's alpha. It sits at x =
+  116, 7 below the frame's top (the frame's top plus sprite 0x37's +8).
+- **0x1ab028** (unnamed) draws a 3-wide white divider. In the career's mode 3 it is 260 high at 286.5; otherwise 214
+  high at 316.5.
+- **The countdown overlay:**
+  - `Reset` sets 90 frames of "GO" and the count from the race's clock (its +0x14 in 60ths): +0x30 is 1 − the
+    whole seconds, +0x34 the fraction left.
+  - `Update`, unless the overlay is hidden, keeps that up while the race counts down (its +0x1c 3). After that it
+    fades "GO" over its 90 frames, then hides overlay item 4.
+  - `Draw`, unless hidden or in a two-player race, draws on texture 19 either "GO" (0xeaf: growing 3.5 · t,
+    rising, full for its first half then fading) or the count's digits (0x1a82e8).
+- **The async load's overlay:** `Update` counts its frames. `Draw` puts 0x175 right-aligned at 600 on 440. It also
+  takes a sine of its frames (· π / 120) that nothing uses (an alpha pulse compiled out); `DrawText` is empty.
+
+The runner test (tests/raceoverlays.rs) has 18,000 cases over the 12 functions. As with the pause menu, the
+results overlay's table copy is checked against the game's stack. 57 of 60 mutants are caught. The 3 left are
+equivalent: the last button's returned x (unused), "GO"'s fade at exactly a half (both 1), and the async load's
+last colour word (already 1).

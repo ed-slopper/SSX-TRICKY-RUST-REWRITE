@@ -98,6 +98,7 @@ pub mod ragdoll;
 pub mod prerace;
 pub mod props;
 pub mod race;
+pub mod raceoverlays;
 pub mod rand;
 pub mod ground;
 pub mod ground_motion;
