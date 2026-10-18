@@ -726,3 +726,61 @@ positive", which maps it to 0 all the same.
 The test now has 36,000 cases. The table's layout, highlights, counts (up to 20 rows), flags and best table are all
 random, and low memory is mapped for the null table. 66 of 68 mutants are caught. The two left remove one of the
 column highlights' two clears, which are each enough alone.
+
+## The next race overlay and the results' builders (G8n3, part 2, `game/src/raceoverlays.rs`)
+
+The event's course +0x31c (`0x32db6c` + 0x31c) is the same word as the career's +0x2af8, as its mode +0x320 is the
+career's +0x2afc.
+
+- **`cNextRaceOverlay::Reset` 0x1b4120:**
+  - resets the backdrop and clears the buffers;
+  - sets no menu (+0x34, +0x38, +0xc), help 0x18d (+0x10), no highlights, no targets (+0x1d8);
+  - builds the page by the career's mode: 2, 4 and 9 the standings, 3 and 5 the hi-score page, 7 the time
+    challenge's;
+  - calls the speech's next race (`0x231ff8`, with the word at 0x343050).
+- **Its vf16 0x1b4240** (not in the index) stops the sound system's channel 0.
+- **`Results_BuildStandingsHeader` 0x1b4250:**
+  - **One player:** rows from 137, 23 apart, and two columns (131, 259, 434).
+  - **Otherwise:** rows from 142, 29 apart, and three columns (116, 244, 419, 594).
+  - It clears the note (+0x54).
+  - **The title and help:** 0x207 and 0x1c5 in event modes 2 and 9. Otherwise, by the career's state (`0x1635b0`),
+    the title word at 0x338290 and the help id at 0x390838.
+  - **The rows:** each rider whose player byte (+0x69 of its 0x84-byte record) is −1 gets a row with its name. The
+    row count is the riders less the players.
+- **`Results_BuildHiScorePage` 0x1b44c0:**
+  - one column (131..410) and no rows;
+  - the note 0xe3f with the course's best score;
+  - the targets shown at 50 (+0x1dc, +0x1d8).
+  - **Title and help:** in event mode 3, 0xe67 with help 0x1c6 in a one-rider event, else help 0x1c7 with the targets
+    hidden at 148. In the other modes, 0xe6e and 0x1d4.
+  - **The three targets** (+0x118, +0x158, +0x198) are formatted by 0x185. On course 6 of mode 3 they are the
+    numbers 800000, 500000 and 250000, printed through "%d" (0x38e200). Otherwise they are the course's three
+    strings (courses 0..5, 8, 11). Any other course leaves the frame's three words as they are.
+- **`Results_BuildTimeChallengeHeader` 0x1b4890:** the course's best of kind 2, giving its score (+0x1e0), its name
+  (+0x208) and its rider's name (+0x230); the title 0xe96 and help 0xc75.
+- **`Draw` 0x1b4950:** sets the backdrop's +0x50 to 0.8 for the duration and puts it back after.
+  - **The course's title:** 410 high in mode 7, else 460.
+  - **In modes 3 and 5:** the targets' three medals, sprite 0x2e at +0x1dc: at 150 in gold, 215 pale and 280 yellow.
+  - **In modes 2 and 4:** each computer rider's row gets its attitude to the first player (`0x1a8fa0`, at the second
+    column, 3 lower), and to the second player with two. The second call's a1 is left at the 1 of the rider lookup,
+    not the attitude byte.
+  - **When the targets show:** the three target sprites (0x390848) at 426, from 189 and 40 apart.
+- **`DrawText` 0x1b4d98:**
+  - **In event mode 7, the time challenge's head:**
+    - the players' names and riders at 117 and 330, in white with the alpha in place of the first component;
+    - the headings 0xea2..0xea4 in gold;
+    - the best's score, name and rider.
+  - **Modes 4 and 5** mark the table two-player (+0x48).
+  - **In modes 2 and 4, the standings' heads:** 0xe60 and 0xe5c, and the players' riders through 0xeb7.
+  - **Then, in every mode:**
+    - the table;
+    - the note (not in mode 7);
+    - the help (+0x114) in a text box at 346 in modes 3 and 5, 320 in mode 7, else 352. Its colour is gold, with the
+      alpha written straight into the box;
+    - in modes 3 and 5, the targets' labels 0x204..0x206;
+    - the targets, when shown.
+- **`Update` 0x1b5878:** the results' update; the menu is shown once the race's +0x1c object's +0x4f8 is clear.
+
+The test now has 49,500 cases. The riders' records, attitudes, courses, the targets' flags and the standings'
+titles are random, and the sprites' stand-in logs the backdrop's +0x50. 119 of 120 mutants are caught. The one left
+reads the hi-score page's course through the career's +0x2af8, the same word.

@@ -825,3 +825,416 @@ pub fn hiscores_update(m: &mut Mem, env: &mut dyn TextBoxEnv, this: u32) {
     let r = race(m);
     call(m, env, HUD_SHOW, &[m.r32(r + 0x38), 1, 0xffff_ffff]);
 }
+
+// --- G8n3b: the next race overlay and the results' builders ---
+
+/// The standings' titles (a word per career state) and help lines (0x390838), the hi-score page's three sprites
+/// (0x390848), its targets' format (0x38e200) and each course's three target strings
+pub const STANDINGS_TITLES: u32 = 0x338290;
+pub const STANDINGS_HELP: u32 = 0x390838;
+pub const TARGET_SPRITES: u32 = 0x390848;
+pub const FMT_TARGET: u32 = 0x38e200;
+pub const PROFILE_PLAYERS: u32 = 0x164288;
+pub const PLAYER_ID: u32 = 0x166580;
+pub const FIND_RIDER: u32 = 0x166598;
+pub const PLAYER_NAME: u32 = 0x164918;
+pub const PLAYER_PROFILE: u32 = 0x164330;
+pub const PRINTF_SHADOWED: u32 = 0x19d3f0;
+pub const ATTITUDE_LABEL: u32 = 0x1a8fa0;
+pub const SPEECH_NEXT_RACE: u32 = 0x231ff8;
+pub const WSTR_SET_ASCII: u32 = 0x17ccb8;
+pub const SPRINTF: u32 = 0x2fca28;
+pub const TB_INIT: u32 = 0x1957b0;
+pub const TB_SET_FONT: u32 = 0x196028;
+pub const TB_RESET: u32 = 0x195ee8;
+pub const TB_SET_SCALE: u32 = 0x1961f0;
+pub const TB_SET_RECT: u32 = 0x196070;
+pub const TB_APPEND: u32 = 0x196088;
+pub const TB_WRAP: u32 = 0x196218;
+pub const TB_DRAW: u32 = 0x1957d8;
+pub const TB_DELETE: u32 = 0x14f390;
+
+/// `cNextRaceOverlay::Reset` 0x1b4120(this): the backdrop reset, the buffers cleared, no menu (+0x34, +0x38, +0xc),
+/// the help 0x18d (+0x10), no highlights, no targets (+0x1d8); the page built by the career's mode (2, 4, 9 the
+/// standings, 3, 5 the hi-score page, 7 the time challenge's); then the speech's next race (0x343050's word)
+pub fn next_race_reset(m: &mut Mem, env: &mut dyn TextBoxEnv, this: u32, scratch: u32) {
+    call(m, env, BACKDROP_RESET, &[m.r32(this)]);
+    clear_buffers(m, env);
+    m.w32(this + 0x38, 0);
+    m.w32(this + 0x34, 0);
+    let s = loc(m, env, 0x18d);
+    m.w32(this + 0x10, s);
+    m.w32(this + 0xc, 0);
+    for i in (0..16).rev() {
+        m.w32(ROW_MARK + 4 * i, 0xffff_ffff);
+    }
+    for i in (0..8).rev() {
+        m.w32(COL_MARK + 4 * i, 0xffff_ffff);
+    }
+    m.w32(this + 0x1d8, 0);
+    match m.r32(CAREER + 0x2afc) {
+        2 | 4 | 9 => build_standings(m, env, this),
+        3 | 5 => build_hiscore_page(m, env, this, scratch),
+        7 => build_time_challenge(m, env, this),
+        _ => {}
+    }
+    call(m, env, SPEECH_NEXT_RACE, &[m.r32(MUSIC)]);
+}
+
+/// The next race overlay's vf16 0x1b4240: the sound system's channel 0 stopped
+pub fn next_race_vf16(m: &mut Mem, env: &mut dyn TextBoxEnv) {
+    call(m, env, SND_STOP_ONE, &[m.r32(MUSIC), 0]);
+}
+
+/// `Results_BuildStandingsHeader` 0x1b4250(this): the rows laid out (one player: 137, 23 apart; two columns at 131,
+/// 259, 434; else 142, 29 apart; three at 116, 244, 419, 594), no note (+0x54), the title and help (the race's
+/// 0x207 / 0x1c5 in event modes 2 and 9, else by the career's state), a row for each computer rider (its name; the
+/// rows the riders less the players)
+pub fn build_standings(m: &mut Mem, env: &mut dyn TextBoxEnv, this: u32) {
+    if call(m, env, PROFILE_PLAYERS, &[CAREER]) == 1 {
+        title_rows(m, this, F(137.0), F(23.0));
+        wf(m, TABLE_X, F(131.0));
+        m.w32(TABLE_ALIGN, 0);
+        wf(m, TABLE_X + 8, F(434.0));
+        wf(m, TABLE_X + 4, F(259.0));
+        m.w32(TABLE_ALIGN + 4, 0);
+        m.w32(this + 8, 2);
+    } else {
+        title_rows(m, this, F(142.0), F(29.0));
+        wf(m, TABLE_X, F(116.0));
+        m.w32(TABLE_ALIGN, 0);
+        wf(m, TABLE_X + 0xc, F(594.0));
+        wf(m, TABLE_X + 4, F(244.0));
+        wf(m, TABLE_X + 8, F(419.0));
+        m.w32(TABLE_ALIGN + 8, 0);
+        m.w32(this + 8, 3);
+        m.w32(TABLE_ALIGN + 4, 0);
+    }
+    m.w16(this + 0x54, 0);
+    let mode = m.r32(RACE_TABLE + 0x320);
+    let help = if mode == 2 || mode == 9 {
+        let s = loc(m, env, 0x207);
+        call(m, env, SET_TITLE, &[this, s]);
+        0x1c5
+    } else {
+        let st = call(m, env, CAREER_STATE, &[CAREER]);
+        let t = m.r32(STANDINGS_TITLES + (st << 2));
+        call(m, env, SET_TITLE, &[this, t]);
+        m.r32(STANDINGS_HELP.wrapping_add(st << 2))
+    };
+    let s = loc(m, env, help);
+    m.w32(this + 0x114, s);
+    let players = call(m, env, PROFILE_PLAYERS, &[CAREER]);
+    m.w32(this + 4, m.r32(RACE_TABLE).wrapping_sub(players));
+    let mut row = 0u32;
+    let mut i = 0u32;
+    while (i as i32) < m.r32(RACE_TABLE) as i32 {
+        let e = RACE_TABLE + 8 + 0x84 * i;
+        let who = m.r8(RACE_TABLE + 0x69 + 0x84 * i) as i8 as i32 as u32;
+        if who == 0xffff_ffff {
+            call(m, env, SET_CELL_ASCII, &[this, 0, row, e]);
+            m.w32(ROW_MARK + 4 * row, who);
+            row += 1;
+        }
+        i += 1;
+    }
+}
+
+/// Each course's three target strings (the hi-score page's; the courses not listed leave the frame's words)
+fn course_targets(course: u32) -> Option<[u32; 3]> {
+    Some(match course {
+        0 => [0x38e4c0, 0x38e4c8, 0x38e4d0],
+        1 => [0x38e4d8, 0x38e4e0, 0x38e4e8],
+        2 | 3 => [0x38e4f0, 0x38e4f8, 0x38e500],
+        4 => [0x38e508, 0x38e510, 0x38e518],
+        5 => [0x38e510, 0x38e530, 0x38e500],
+        8 => [0x38e520, 0x38e4f0, 0x38e528],
+        11 => [0x38e538, 0x38e540, 0x38e4f8],
+        _ => return None,
+    })
+}
+
+/// `Results_BuildHiScorePage` 0x1b44c0(this): one column (131..410) and no rows; the note 0xe3f with the course's
+/// best score (+0x54); the targets shown (+0x1d8, at 50 (+0x1dc)); in event mode 3 the title 0xe67 and help 0x1c6
+/// in a one-rider event, else 0x1c7 with the targets hidden at 148; in the others 0xe6e and 0x1d4. Then the three
+/// targets (+0x118, +0x158, +0x198) by 0x185: on course 6 of mode 3 the numbers 800000, 500000, 250000, else the
+/// course's strings
+pub fn build_hiscore_page(m: &mut Mem, env: &mut dyn TextBoxEnv, this: u32, scratch: u32) {
+    wf(m, TABLE_X, F(131.0));
+    m.w32(this + 8, 1);
+    m.w32(this + 4, 0);
+    wf(m, TABLE_X + 4, F(410.0));
+    let best = call(m, env, CAREER_BEST, &[CAREER, 1, m.r32(RACE_TABLE + 0x31c)]);
+    let s = loc(m, env, 0xe3f);
+    call(m, env, crate::pausedraw::WSTR_FORMAT, &[this + 0x54, s, m.r32(best + 0x10)]);
+    wf(m, this + 0x1dc, F(50.0));
+    m.w32(this + 0x1d8, 1);
+    if m.r32(RACE_TABLE + 0x320) == 3 {
+        let s = loc(m, env, 0xe67);
+        call(m, env, SET_TITLE, &[this, s]);
+        if m.r32(CAREER + 0x27dc) == 1 {
+            let s = loc(m, env, 0x1c6);
+            m.w32(this + 0x114, s);
+        } else {
+            let s = loc(m, env, 0x1c7);
+            m.w32(this + 0x114, s);
+            wf(m, this + 0x1dc, F(148.0));
+            m.w32(this + 0x1d8, 0);
+        }
+    } else {
+        let s = loc(m, env, 0xe6e);
+        call(m, env, SET_TITLE, &[this, s]);
+        let s = loc(m, env, 0x1d4);
+        m.w32(this + 0x114, s);
+    }
+    let course = m.r32(RACE_TABLE + 0x31c);
+    let fmt = loc(m, env, 0x185);
+    if m.r32(RACE_TABLE + 0x320) == 3 && m.r32(RACE_TABLE + 0x31c) == 6 {
+        let buf = scratch + 0x10;
+        for (i, n) in [800_000u32, 500_000, 250_000].into_iter().enumerate() {
+            call(m, env, SPRINTF, &[buf, FMT_TARGET, n]);
+            call(m, env, crate::pausedraw::WSTR_FORMAT, &[this + 0x118 + 0x40 * i as u32, fmt, buf]);
+        }
+        return;
+    }
+    if let Some(t) = course_targets(course) {
+        for (i, s) in t.into_iter().enumerate() {
+            m.w32(scratch + 4 * i as u32, s);
+        }
+    }
+    for i in 0..3 {
+        let s = m.r32(scratch + 4 * i);
+        call(m, env, crate::pausedraw::WSTR_FORMAT, &[this + 0x118 + 0x40 * i, fmt, s]);
+    }
+}
+
+/// `Results_BuildTimeChallengeHeader` 0x1b4890(this): the course's best (kind 2): its score (+0x1e0), name (+0x208)
+/// and rider's name (+0x230); the title 0xe96 and help 0xc75
+pub fn build_time_challenge(m: &mut Mem, env: &mut dyn TextBoxEnv, this: u32) {
+    let best = call(m, env, CAREER_BEST, &[CAREER, 2, m.r32(CAREER + 0x2af8)]);
+    call(m, env, FORMAT_SCORE, &[m.r32(best + 0x10), this + 0x1e0]);
+    call(m, env, WSTR_SET_ASCII, &[this + 0x208, best]);
+    let name = m.r32(m.r32(best + 0xc).wrapping_mul(0x38).wrapping_add(CHARACTERS) + 4);
+    call(m, env, WSTR_SET_ASCII, &[this + 0x230, name]);
+    let s = loc(m, env, 0xe96);
+    call(m, env, SET_TITLE, &[this, s]);
+    let s = loc(m, env, 0xc75);
+    m.w32(this + 0x114, s);
+}
+
+/// The two players' riders' attitude labels on a standings row (the second only with two players)
+fn attitude_labels(m: &mut Mem, env: &mut dyn TextBoxEnv, this: u32, base: u32, y: F) {
+    let r = call(m, env, FIND_RIDER, &[CAREER, 0]);
+    let a = m.r8(RACE_TABLE.wrapping_add(base).wrapping_add(r << 2) + 0x24) as i8 as i32;
+    let r = call(m, env, FIND_RIDER, &[CAREER, 0]);
+    let b = m.r8(RACE_TABLE.wrapping_add(base).wrapping_add(r << 2) + 0x26) as u32;
+    fcall(m, env, ATTITUDE_LABEL, &[m.r32(this), b], &[rf(m, TABLE_X + 4), y + F(3.0), cvt_s_w(a), cvt_s_w(b as i32)]);
+    if call(m, env, PROFILE_PLAYERS, &[CAREER]) != 2 {
+        return;
+    }
+    let r = call(m, env, FIND_RIDER, &[CAREER, 1]);
+    let a = m.r8(RACE_TABLE.wrapping_add(base).wrapping_add(r << 2) + 0x24) as i8 as i32;
+    let r = call(m, env, FIND_RIDER, &[CAREER, 1]);
+    let b = m.r8(RACE_TABLE.wrapping_add(base).wrapping_add(r << 2) + 0x26) as u32;
+    // (its a1 is left at the 1 the rider's lookup took)
+    fcall(m, env, ATTITUDE_LABEL, &[m.r32(this), 1], &[rf(m, TABLE_X + 8), y + F(3.0), cvt_s_w(a), cvt_s_w(b as i32)]);
+}
+
+/// `cNextRaceOverlay::Draw` 0x1b4950(this): with the backdrop's +0x50 at 0.8 meanwhile: the course's title (410
+/// high in mode 7, else 460) and in modes 3 and 5 the targets' three medals (sprite 0x2e at +0x1dc: 150 gold, 215
+/// pale, 280 yellow); in modes 2 and 4 each computer rider's row its attitudes to the players; the three target
+/// sprites (0x390848) at 426 from 189, 40 apart, when the targets show
+pub fn next_race_draw(m: &mut Mem, env: &mut dyn TextBoxEnv, this: u32, scratch: u32) {
+    let kept = rf(m, m.r32(this) + 0x50);
+    wf(m, m.r32(this) + 0x50, k(0x3f4c_cccd));
+    let mode = m.r32(CAREER + 0x2afc);
+    if mode == 5 || mode == 3 {
+        draw_course_title(m, env, this, F(460.0), scratch);
+        let two = F(2.0);
+        for (c, y) in [
+            (gold(), F(150.0)),
+            ([ONE, ONE, k(0x3ef1_26e9), k(0x3d1f_be77)], F(215.0)),
+            ([ONE, ONE, F(0.0), F(0.0)], F(280.0)),
+        ] {
+            faded(m, env, c, m.r32(this) + 0x70, scratch);
+            fcall(m, env, DRAW_SPRITE, &[m.r32(this), 0x2e, 0], &[rf(m, this + 0x1dc), y, two, two]);
+        }
+    } else if mode == 7 {
+        draw_course_title(m, env, this, F(410.0), scratch);
+    } else {
+        draw_course_title(m, env, this, F(460.0), scratch);
+    }
+    if mode == 4 || mode == 2 {
+        let mut row = 0u32;
+        let mut i = 0u32;
+        while (i as i32) < m.r32(RACE_TABLE) as i32 {
+            let base = 0x84 * i;
+            if m.r8(RACE_TABLE + base + 0x69) as i8 == -1 {
+                let y = rf(m, TITLE_ROWS + 4 * row);
+                attitude_labels(m, env, this, base, y);
+                row += 1;
+            }
+            i += 1;
+        }
+    }
+    if m.r32(this + 0x1d8) != 0 {
+        faded(m, env, [ONE; 4], m.r32(this) + 0x70, scratch);
+        let mut y = F(189.0);
+        let s = k(0x3f19_999a);
+        for i in 0..3 {
+            let sprite = m.r32(TARGET_SPRITES + 4 * i);
+            fcall(m, env, DRAW_SPRITE, &[m.r32(this), sprite, 0], &[F(426.0), y, s, s]);
+            y = y + F(40.0);
+        }
+    }
+    wf(m, m.r32(this) + 0x50, kept);
+}
+
+/// A colour set with the backdrop's alpha in place of its first (not times it)
+fn with_alpha(m: &mut Mem, env: &mut dyn TextBoxEnv, c: [F; 4], this: u32, scratch: u32) {
+    put4(m, scratch, c);
+    call(m, env, SET_COLOUR, &[DRAW_COLOUR, scratch]);
+    let a = rf(m, m.r32(this) + 0x70);
+    wf(m, DRAW_COLOUR, a);
+}
+
+/// A player's line of the standings' head: 0xeb7 with the player's rider's name, at `x`, 23 above the first row
+fn standings_name(m: &mut Mem, env: &mut dyn TextBoxEnv, this: u32, player: u32, buf: u32, x: F) {
+    let s = loc(m, env, 0xeb7);
+    let r = call(m, env, FIND_RIDER, &[CAREER, player]);
+    let e = RACE_TABLE.wrapping_add(r.wrapping_mul(0x84)) + 8;
+    call(m, env, crate::pausedraw::WSTR_FORMAT, &[buf, s, e]);
+    let y = rf(m, TITLE_ROWS) - F(23.0);
+    fcall(m, env, PRINTF_SHADOWED_A, &[m.r32(m.r32(this) + 8), buf], &[k(0x3ef0_a3d7), x, y]);
+}
+
+/// `cNextRaceOverlay::DrawText` 0x1b4d98(this): in event mode 7 the time challenge's head (the players' names and
+/// riders at 117 / 330, the headings 0xea2..0xea4 and the best's score, name and rider); modes 4 and 5 mark the
+/// table two-player (+0x48); in modes 2 and 4 the standings' heads (0xe60, 0xe5c and the players' riders); the
+/// table; the note (+0x54, not in mode 7); the help (+0x114) in a box (346 in modes 3 / 5, 320 in 7, else 352);
+/// in modes 3 and 5 the targets' labels 0x204..0x206; the targets (+0x118..) when shown
+pub fn next_race_draw_text(m: &mut Mem, env: &mut dyn TextBoxEnv, this: u32, scratch: u32) {
+    let r = call(m, env, GET_RECT, &[m.r32(m.r32(this)), 0x37]);
+    let top = (F(480.0) - rf(m, m.r32(this) + 0x2c)) * F(0.5) + rf(m, r + 8);
+    let mode = m.r32(RACE_TABLE + 0x320);
+    let b = |m: &Mem| m.r32(this);
+    if mode == 7 {
+        with_alpha(m, env, [ONE; 4], this, scratch);
+        let (y0, y1) = (top + F(90.0), top + F(120.0));
+        let (s8, s85) = (k(0x3f4c_cccd), k(0x3f59_999a));
+        let p = call(m, env, PLAYER_ID, &[CAREER, 0]);
+        let name = call(m, env, PLAYER_NAME, &[CAREER, p]);
+        fcall(m, env, PRINTF_SHADOWED, &[m.r32(b(m) + 8), name], &[s8, F(117.0), y0]);
+        let p = call(m, env, PLAYER_ID, &[CAREER, 0]);
+        let c = call(m, env, PLAYER_PROFILE, &[CAREER, p]);
+        let rider = m.r32(c.wrapping_mul(0x38).wrapping_add(CHARACTERS) + 4);
+        fcall(m, env, PRINTF_SHADOWED, &[m.r32(b(m) + 8), rider], &[s85, F(117.0), y1]);
+        if call(m, env, PROFILE_PLAYERS, &[CAREER]) == 2 {
+            let p = call(m, env, PLAYER_ID, &[CAREER, 1]);
+            let name = call(m, env, PLAYER_NAME, &[CAREER, p]);
+            fcall(m, env, PRINTF_SHADOWED, &[m.r32(b(m) + 8), name], &[s8, F(330.0), y0]);
+            let p = call(m, env, PLAYER_ID, &[CAREER, 1]);
+            let c = call(m, env, PLAYER_PROFILE, &[CAREER, p]);
+            let rider = m.r32(c.wrapping_mul(0x38).wrapping_add(CHARACTERS) + 4);
+            fcall(m, env, PRINTF_SHADOWED, &[m.r32(b(m) + 8), rider], &[s85, F(330.0), y1]);
+        }
+        with_alpha(m, env, gold(), this, scratch);
+        let y = top + F(170.0);
+        let s75 = k(0x3f40_0000);
+        let x = if m.r32(m.r32(APP) + 0x58) == 2 { F(47.0) } else { F(117.0) };
+        let s = loc(m, env, 0xea2);
+        fcall(m, env, PRINTF_SHADOWED_A, &[m.r32(b(m) + 8), s], &[s75, x, y]);
+        let s = loc(m, env, 0xea3);
+        fcall(m, env, PRINTF_SHADOWED_A, &[m.r32(b(m) + 8), s], &[s75, F(345.0), y]);
+        let s = loc(m, env, 0xea4);
+        fcall(m, env, PRINTF_SHADOWED_A, &[m.r32(b(m) + 8), s], &[s75, F(480.0), y]);
+        with_alpha(m, env, [ONE; 4], this, scratch);
+        let y = top + F(200.0);
+        let s92 = k(0x3f6b_851f);
+        for (o, x) in [(0x1e0u32, F(117.0)), (0x208, F(345.0)), (0x230, F(480.0))] {
+            fcall(m, env, PRINTF_SHADOWED_A, &[m.r32(b(m) + 4), this + o], &[s92, x, y]);
+        }
+    }
+    if mode.wrapping_sub(4) < 2 {
+        m.w32(this + 0x48, 1);
+    }
+    if mode == 4 || mode == 2 {
+        faded(m, env, gold(), b(m) + 0x70, scratch);
+        let y = rf(m, TITLE_ROWS) - F(48.0);
+        let s76 = k(0x3f42_8f5c);
+        let s = loc(m, env, 0xe60);
+        fcall(m, env, PRINTF_SHADOWED_A, &[m.r32(b(m) + 8), s], &[s76, rf(m, TABLE_X), y]);
+        if call(m, env, PROFILE_PLAYERS, &[CAREER]) == 1 {
+            let s = loc(m, env, 0xe5c);
+            let y = rf(m, TITLE_ROWS) - F(48.0);
+            fcall(m, env, PRINTF_SHADOWED_A, &[m.r32(b(m) + 8), s], &[s76, rf(m, TABLE_X + 4), y]);
+            let x = rf(m, TABLE_X + 4);
+            standings_name(m, env, this, 0, scratch + 0x10, x);
+        } else {
+            let x = rf(m, TABLE_X + 4) + F(65.0);
+            let y = rf(m, TITLE_ROWS) - F(48.0);
+            let s = loc(m, env, 0xe5c);
+            fcall(m, env, PRINTF_SHADOWED_A, &[m.r32(b(m) + 8), s], &[s76, x, y]);
+            let x = rf(m, TABLE_X + 4);
+            standings_name(m, env, this, 0, scratch, x);
+            let x = rf(m, TABLE_X + 8);
+            standings_name(m, env, this, 1, scratch, x);
+        }
+    }
+    draw_table(m, env, this, scratch + 0x1600);
+    if m.r16(this + 0x54) != 0 && mode != 7 {
+        faded(m, env, gold(), b(m) + 0x70, scratch);
+        fcall(m, env, PRINTF_SHADOWED_A, &[m.r32(b(m) + 8), this + 0x54], &[k(0x3f33_3333), F(116.0), F(118.0)]);
+    }
+    let tb = scratch + 0x30;
+    call(m, env, TB_INIT, &[tb]);
+    call(m, env, TB_SET_FONT, &[tb, m.r32(b(m) + 4)]);
+    call(m, env, TB_RESET, &[tb]);
+    let s88 = k(0x3f61_47ae);
+    fcall(m, env, TB_SET_SCALE, &[tb], &[s88, s88]);
+    // the box's colour: gold, its first the backdrop's alpha (set on the frame and copied, not through the drawer)
+    put4(m, scratch, gold());
+    for i in 0..4 {
+        m.w32(tb + 0x3c + 4 * i, m.r32(scratch + 4 * i));
+    }
+    m.w32(tb + 0x38, m.r32(b(m) + 0x70));
+    let y = match mode {
+        5 | 3 => F(346.0),
+        7 => F(320.0),
+        _ => F(352.0),
+    };
+    fcall(m, env, TB_SET_RECT, &[tb], &[F(116.0), y, F(380.0), F(100.0)]);
+    call(m, env, TB_APPEND, &[tb, m.r32(this + 0x114)]);
+    call(m, env, TB_WRAP, &[tb, 0]);
+    call(m, env, TB_DRAW, &[tb, 0xffff_ffff, 0]);
+    if mode == 5 || mode == 3 {
+        let a = loc(m, env, 0x204);
+        let bb = loc(m, env, 0x205);
+        let c = loc(m, env, 0x206);
+        faded(m, env, [ONE; 4], b(m) + 0x70, scratch);
+        let x = rf(m, this + 0x1dc) + F(60.0);
+        let s = if m.r32(m.r32(APP) + 0x58) == 2 { k(0x3f53_f7cf) } else { k(0x3f6b_851f) };
+        for (t, y) in [(a, F(170.0)), (bb, F(235.0)), (c, F(300.0))] {
+            fcall(m, env, PRINTF_SHADOWED_A, &[m.r32(b(m) + 4), t], &[s, x, y]);
+        }
+    }
+    if m.r32(this + 0x1d8) != 0 {
+        faded(m, env, [ONE; 4], b(m) + 0x70, scratch);
+        let mut y = F(194.0);
+        for i in 0..3 {
+            fcall(m, env, PRINTF_SHADOWED_A, &[m.r32(b(m) + 4), this + 0x118 + (i << 6)], &[k(0x3f6b_851f), F(486.0), y]);
+            y = y + F(40.0);
+        }
+    }
+    call(m, env, TB_DELETE, &[tb, 2]);
+}
+
+/// `cNextRaceOverlay::Update` 0x1b5878(this): the results' update; the menu shown (+0x34 1) once the race's +0x1c
+/// object's +0x4f8 is clear
+pub fn next_race_update(m: &mut Mem, env: &mut dyn TextBoxEnv, this: u32) {
+    call(m, env, RESULTS_UPDATE, &[this]);
+    let r = race(m);
+    if m.r32(m.r32(r + 0x1c) + 0x4f8) == 0 {
+        m.w32(this + 0x34, 1);
+    }
+}

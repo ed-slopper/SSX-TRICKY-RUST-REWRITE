@@ -2463,7 +2463,7 @@ address,size,name,system,status
 0x1aaec0,360,Overlay_DrawCourseTitle,frontend,checked
 0x1ab028,284,FUN_001ab028,frontend,checked
 0x1ab148,88,cResultsOverlay::Update,frontend,ported
-0x1ab1a0,2132,cViewHiScoresOverlay::DrawText,hud,checked
+0x1ab1a0,2132,cViewHiScoresOverlay::DrawText,frontend,checked
 0x1ab9f8,516,cPauseMenuOverlay::cPauseMenuOverlay,frontend,checked
 0x1abc00,620,cCountdownOverlay::vf34_1abc00,frontend,checked
 0x1abe70,528,cCountdownOverlay::vf31_1abe70,frontend,checked
@@ -2509,13 +2509,13 @@ address,size,name,system,status
 0x1b3e30,152,cViewHiScoresOverlay::Draw,frontend,checked
 0x1b3ec8,136,cViewHiScoresOverlay::Update,frontend,checked
 0x1b3f50,460,NextRaceOverlay_Init,frontend,ported
-0x1b4120,284,cNextRaceOverlay::Reset,frontend,not started
-0x1b4250,620,Results_BuildStandingsHeader,frontend?,not started
-0x1b44c0,972,Results_BuildHiScorePage,frontend?,not started
-0x1b4890,188,Results_BuildTimeChallengeHeader,frontend?,not started
-0x1b4950,1092,cNextRaceOverlay::Draw,frontend,not started
-0x1b4d98,2780,cNextRaceOverlay::DrawText,frontend,not started
-0x1b5878,68,cNextRaceOverlay::Update,frontend,not started
+0x1b4120,284,cNextRaceOverlay::Reset,frontend,checked
+0x1b4250,620,Results_BuildStandingsHeader,frontend?,checked
+0x1b44c0,972,Results_BuildHiScorePage,frontend?,checked
+0x1b4890,188,Results_BuildTimeChallengeHeader,frontend?,checked
+0x1b4950,1092,cNextRaceOverlay::Draw,frontend,checked
+0x1b4d98,2780,cNextRaceOverlay::DrawText,frontend,checked
+0x1b5878,68,cNextRaceOverlay::Update,frontend,checked
 0x1b58c0,820,cUnlockedOverlay::cUnlockedOverlay,frontend,ported
 0x1b5bf8,768,Results_AddAwardLine,race?,not started
 0x1b5ef8,1376,cUnlockedOverlay::Reset,frontend,ported
