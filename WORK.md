@@ -82,8 +82,7 @@ state machine and the renderer are ours. Nothing has been checked against the or
 | G21 | **The rider stutters back and forth the whole run** (play test by bredclan, 2026-10-17, tricky-rs.2026-10-17.exe from 3580b5f). To find: whether it is the port (our stand-ins between the exact pieces: the rider's step, its control state, the app's camera or its frame timing fighting the game's fixed tick) or something the decompiling will fix once the boarder state machine (G1) runs whole. First step: log the rider's place and heading each tick in a run (`TRICKY_SIM`) and see which one goes back and forth, and on which frames | any | | | Play test 2026-10-17 |
 | G9y | (umbrella: G9y1..G9y8) The rest of the front end's own code in 0x26c000..0x2aab58 (~370 functions not yet checked; the screen builders marked `ported` are G9b's): the menu, the copies of the widget group's operations, the sound widgets, the memory card overlay, the world group, and the rest, checked in the runner | any | G9x | | Added 2026-10-17 by ed-slopper/puffin |
 | G9y8 | (umbrella: G9y8a..G9y8g) The front end's nine big screen builders in 0x26c000..0x2aab58, marked `ported` in the index but only called by the screens' ports: ported and checked in the runner | any | G9y | | Split of G9y 2026-10-17 |
-| G9y8c | `FE_BuildRiderShortBioScreen` 0x285230 (26 KB) | any | G9y8 | | Split of G9y 2026-10-17 |
-| G9y8e | `FE_BuildSoundOptions` 0x29fb70 (15 KB) | ed-slopper/puffin | G9y8 | | Split of G9y 2026-10-17 |
+| G9y8c | `FE_BuildRiderShortBioScreen` 0x285230 (26 KB) | ed-slopper/puffin | G9y8 | | Split of G9y 2026-10-17 |
 | G9 | Front end: title, main menu, mode select, rider / outfit / board select, options, records, trick book screens, unlock screens, music player, loading screens (`gApp+0x734`) | unowned | E1, E5 | | [repo] `ui.rs` is ours. Split (2026-10-16): G9b the shared machinery, G9c–G9t the screens (logic ported and checked in the runner, widgets as calls out), G9u the app's menus on them |
 | G9b | (umbrella: G9b1, G9b2) The front end's shared machinery: `cFE3D` (the manager, its per-frame update and the screen it runs), the `cFE3DState` base (the phases, `TransitionIn` / `Out`, `Finish` and `CreateNextState`, `UpdateTransition`, `Activate`, `LayoutWidgets`), the widgets they drive and the 3D transition record (`FE3DTransition_*`, notes in frontend.md) | any | G9 | | Split of G9 |
 | G9b2 | (umbrella: G9b2a, G9b2b, G9b2c, G9b2d, G9b2e) The rest of G9b: `cFE3D` (the manager: its per-frame update, the screen stack 0x275b10 / 0x275c10 / 0x2ac030, the players and their pad queries 0x26ce08..0x26cef8), the widgets the screens build (the constructor 0x2b1138 and its virtuals, the list 0x2ac018 / 0x2ac048, the place 0x2acb20, the screen helpers 0x274108, 0x2763f0, 0x2719c0, 0x2718f0, 0x271848, 0x2742e8) and the 3D transition record (`FE3DTransition_*`) | any | G9b1 | | Split from G9b; split (2026-10-16) |
@@ -153,6 +152,7 @@ matches the original.
 
 | ID | Task | Section | Who | Date | Commit |
 |---|---|---|---|---|---|
+| G9y8e | The sound page (0x29fb70; 28/29 mutants) | P2 | ed-slopper/puffin | 2026-10-17 | 7b513eb |
 | G9y8g | The display page (0x2a53d0; 29/29 mutants) | P2 | ed-slopper/puffin | 2026-10-17 | 0cc5d15 |
 | G9y8f | The controller page (0x2a36e8; 36/36 mutants) | P2 | ed-slopper/puffin | 2026-10-17 | 1e81c40 |
 | G9y8d | The DVD screen's character list and jukebox (0x296870, 0x297178; 44/45 mutants) | P2 | ed-slopper/puffin | 2026-10-17 | ddabb86 |
@@ -1407,3 +1407,4 @@ matches the original.
 - 2026-10-17 ed-slopper/puffin: G9y8d done (the DVD lists); G9y8f claimed (the controller page).
 - 2026-10-17 ed-slopper/puffin: G9y8f done (the controller page); G9y8g claimed (0x2a53d0, which is the display page's builder).
 - 2026-10-17 ed-slopper/puffin: G9y8g done (0cc5d15: the display page, 29/29); G9y8e claimed (the sound page).
+- 2026-10-17 ed-slopper/puffin: G9y8e done (7b513eb: the sound page, 28/29); G9y8c claimed (the rider short bio).
