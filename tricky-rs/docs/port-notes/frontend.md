@@ -1980,3 +1980,45 @@ The name entry calls its owner without checking for none; the button needs both 
 - the right move's `max(0)` can't bite: the index there is never negative;
 - `r < last` against `r <= last` in the up move gives the same character;
 - the down move's rows check against 1 instead of 2 lands on the same index.
+
+## G9x3b: the menu list (`game/src/fe_wlist.rs`)
+
+`cFE3DWList` is a menu (`cFE3DMenu`, whose own code is G9b's and is a stand-in here) that shows its items in one
+of four ways, set by +0x190:
+- **1, plain:** everything is left to the menu.
+- **2, one item at a time:** the chosen item sits in the box (+0x170, +0x174) at the list's position, aligned by
+  +0x154. Bit 0 puts it at the right or bottom edge, bit 1 keeps it where it is, and neither centres it. Bits 2 and
+  3 do the same for y. A list running across (+0x150 0) always centres x; one running down (+0x150 1) always
+  centres y.
+- **3, in a frame:** a frame widget (+0x194) is moved over the chosen item (0x2b5958). The frame's offset is the
+  item's position less the frame's, less half the difference of their sizes.
+- **4, a window:** +0x1a0 items are shown, from +0x198 to +0x19c.
+  - Scrolling moves both ends on together: forward when stepping on without wrap, or back with it (+0x13c). The
+    end that comes into view is aligned (0x26df58 for the last, 0x26dd60 for the first), and every item is moved
+    back by the frame's offset (an offset operation over the list).
+  - The layout sets the window's count: all the items when unset, or when it is more than there are. It turns the
+    list so the first item sits in the middle (half the window from the back moved to the front), takes the first
+    and last shown, lets the menu lay out, then turns the list back.
+  - The size adds up the shown items along the list, each with the box's size that way when set, plus the gap
+    (+0x15c), with the gap taken off the end; across, it takes the box or the largest item. Hidden items (+0x14
+    clear) don't count.
+
+Other things to know:
+- `cFE3DWList` vf44 makes the two arrows: icons allocated (0x120 bytes, filled with 0xdeadc0de), owned by the list's
+  owner, 10 by 10, slid in from anchors 3 and 4. It also sets mode 2, no wrap and a gap of 15.
+- The render (vf10) runs only while +0x14 is *clear*. For modes other than 1, 2 and 4, render and render text put
+  the renderer's state back and raise it again (render) or run the menu's vf11 (render text). Their arrows and frame
+  are drawn only while the list is chosen (+0xa0).
+- vf43 chooses the k-th item: the old one is told it is left, and the new one chosen while the list is. Then it
+  scrolls: from the first item in mode 2; in the others (but 1), only when the choice changed.
+- `StaticInit_FE3DWList` writes three colours and a block of words at 0x3d3760..0x3d37ac.
+- The PS2's FPU has no NaN: a word with an exponent of all ones compares as a huge number. The list's comparisons
+  go through `ee()` so that random words in the test compare as the game's do.
+
+The test has 47,500 cases (19 functions, 2,500 each). The menu's code, the list helpers and the heap are stand-ins.
+The list's walk, the placing and sliding in and the vector scale run for real. The icon's own virtuals, reached
+through its real table, are stubbed by the addresses read from the game's data. The frame's offset reads the frame
+and the chosen item without checking for none, as does the scroll that calls it, so those cases always have both.
+
+All 97 mutants are caught. To catch them, the menu's own steps and layout sometimes choose another item in their
+stand-ins, and the boxes are sometimes a denormal (0 to the EE).
