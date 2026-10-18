@@ -5277,7 +5277,7 @@ address,size,name,system,status
 0x282d30,8000,FE_BuildRiderRecordsScreen,frontend,checked
 0x284c70,752,FE3D_BuildRiderBioTextA,frontend?,checked
 0x284f60,720,FE3D_BuildRiderBioTextB,frontend?,checked
-0x285230,26424,FE_BuildRiderShortBioScreen,frontend,ported
+0x285230,26424,FE_BuildRiderShortBioScreen,frontend,checked
 0x28b968,1124,cFE3DStateRiderProfile::vf11_28b968,frontend,checked
 0x28bdd0,76,cFE3DStateRiderProfile::Update,frontend,checked
 0x28be20,232,cFE3DStateRiderProfile::CreateNextState,frontend,checked

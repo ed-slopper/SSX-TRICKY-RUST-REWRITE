@@ -2517,3 +2517,27 @@ page.
 The test runs 800 cases. The stand-in tables' +0xc0 answers 0 or 1 and takes only the object (the game leaves the
 loop counter in a1). Of the 29 mutants, 28 are caught. The survivor is equivalent: it moves the first bar's size
 vector to where the other bars put theirs, on the stack, where nothing reads it afterwards.
+
+## G9y8c: the rider short bio (`game/src/fe_riderbuild.rs`, `tests/fe_riderbuild.rs`)
+
+`FE_BuildRiderShortBioScreen` 0x285230 builds the rider profile's short bio panel in the group at +0x4fc.
+
+- **Bests.** It first copies the rider's bests: 0x9c bytes at +0x160 of the career's rider record (records are
+  0x1c4 apart). The bests are pairs of (best, venue).
+- **Rows.** A list gets 13 rows:
+  - Ten rows show counts, written with "%d" through `WStr_FormatAscii` 0x17ce70.
+  - Three show times, written in hundredths through `HUD_FormatTime` 0x1a6ba0 (the float times 100, chopped).
+  - Each row's value goes in its own 0x28-byte wide string at 0x3d3098. The best's venue name comes from the venue
+    table at 0x332f28 (0x1c bytes apart, the name at +4).
+  - A count of 0 or less, or a time of 0 or less, shows "-" and "---" instead.
+- **Favourite venue.** The last row is the favourite venue: the first venue with the most of the 13 counts at +0x38
+  (compared unsigned), shown with "%s (%d)". When every count is 0 it shows "---".
+- **Layout.** The list goes at (390, 135) with a gap of 3. Two headings follow, and the group is shown.
+
+The test (with G9y8a's) runs 600 cases. Each case gives every rider bests either side of 0, venues among the 13,
+and sometimes all-zero favourite counts. Two quirks in the test:
+
+- The records panel's sprintf leaves a stray fourth word, so only the favourite's format logs its fourth argument.
+- The short bio's group is its own object, apart from the records' group.
+
+All 34 mutants are caught.

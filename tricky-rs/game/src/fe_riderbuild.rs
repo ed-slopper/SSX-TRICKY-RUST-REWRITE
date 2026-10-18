@@ -453,3 +453,181 @@ pub fn build_bio(m: &mut Mem, e: &mut dyn FeEnv, s: u32, buf: u32) {
     e.call(m, GROUP_ADD, &[grp, list]);
     vcall(m, e, grp, 0x20, &[1]);
 }
+
+// ---- the short bio panel (0x285230)
+
+/// The short bio's calls out: a number formatted into a wide string (0x17ce70: the string, the format, the number)
+pub const WSTR_FORMAT: u32 = 0x17ce70;
+/// The short bio's wide strings (0x28 bytes each, one a row), the favourite venue's, the venues (0x1c bytes apart,
+/// their names at +4), the dash for a row's value, the number's and the favourite's formats
+pub const BIO_VALUES: u32 = 0x3d3098;
+pub const BIO_FAVOURITE: u32 = 0x3d33b8;
+pub const VENUES: u32 = 0x332f28;
+pub const VALUE_DASH: u32 = 0x3afa98;
+pub const FAVOURITE_FORMAT: u32 = 0x3afab8;
+/// The short bio's rows: (the label, the best's word in the rider's bests, a time rather than a count). The bests are
+/// pairs (the best, its venue); a count of none or less, or a time of 0 or less, shows the dashes.
+const SHORT_BIO_ROWS: [(u32, u32, bool); 13] = [
+    (0xc60, 0x00, false),
+    (0xc61, 0x08, false),
+    (0xc62, 0x10, false),
+    (0xc68, 0x6c, false),
+    (0xc69, 0x74, false),
+    (0xc6a, 0x7c, false),
+    (0xc6b, 0x84, false),
+    (0xc6c, 0x8c, false),
+    (0xdb2, 0x94, false),
+    (0xc63, 0x18, false),
+    (0xc64, 0x20, true),
+    (0xc65, 0x28, true),
+    (0xc66, 0x30, true),
+];
+
+fn venue_name(m: &Mem, v: u32) -> u32 {
+    m.r32(VENUES.wrapping_add(v.wrapping_mul(0x1c)) + 4)
+}
+
+/// `FE_BuildRiderShortBioScreen` 0x285230(s; `buf` 0x20 bytes): the short bio panel in the group at +0x4fc for the
+/// screen's rider (+0x2e). The rider's bests (0x9c bytes at +0x160 of the career's rider, 0x1c4 apart) are copied
+/// first. A list (0x190 bytes) gets a row for each of [`SHORT_BIO_ROWS`]: a text entry with the label and, as its
+/// second child, a text entry (x 80) with the best (its own wide string: the count, the time through 0x1a6ba0 in
+/// hundredths, or a dash) and, as its second child, the best's venue (or the dashes). The last row is the favourite
+/// venue: the first venue with the most of the 13 counts at +0x38, with the count, or the dashes when all are 0.
+/// The list goes at (390, 135) with a gap of 3, then two
+/// headings (0xc6d at (375, 110), 0xc6e at (500, 110)), and the group is shown.
+pub fn build_short_bio(m: &mut Mem, e: &mut dyn FeEnv, s: u32, buf: u32) {
+    let rider = m.r8(s + 0x2e) as i8 as i32 as u32;
+    let rec = e.call(m, RIDER_RECORD, &[CAREER, rider]);
+    let slot = m.r8(rec) as i8 as i32 as u32;
+    let grp = m.r32(s + 0x4fc);
+    let k = e.call(m, RIDER_BIO_LINE, &[CAREER, slot]);
+    let from = CAREER.wrapping_add(k.wrapping_mul(0x1c4)) + 0x160;
+    let mut bests = [0u32; 39];
+    for (i, w) in bests.iter_mut().enumerate() {
+        *w = m.r32(from.wrapping_add(4 * i as u32));
+    }
+    let best = |off: u32| bests[off as usize / 4];
+    let l = e.call(m, ALLOC, &[0x3afa60, 0x190, 0]);
+    if l != 0 {
+        e.call(m, FILL, &[l, 0xdead_c0de, 0x190]);
+    }
+    let list = e.call(m, MENU_CTOR, &[l, s, grp, 1, 2, 0]);
+    let black = [ONE, 0, 0, 0];
+    let mut row = 0u32;
+    for &(label, off, time) in SHORT_BIO_ROWS.iter() {
+        let font = menu_font(m);
+        let w = text_entry(m, e, s, 0x3af918, list, font);
+        let font = menu_font(m);
+        let v = text_entry(m, e, s, 0x3afa78, w, font);
+        let font = menu_font(m);
+        let venue = text(m, e, s, 0x3afa88, v, font);
+        m.w32(w + 0x11c, 5);
+        set_child(m, e, w, 0x114, v);
+        m.w32(w + 0x130, 6);
+        m.w32(w + 0x118, fb(15.0));
+        m.w32(v + 0x130, 6);
+        m.w32(v + 0x11c, 6);
+        put(m, v + 0x120, [fb(80.0), 0, 0, 0]);
+        set_child(m, e, v, 0x114, venue);
+        for x in [w, v, venue] {
+            put(m, buf, black);
+            vcall(m, e, x, 0x50, &[buf]);
+        }
+        let t = m.r32(w + 0x110);
+        vcall(m, e, t, 0x150, &[label]);
+        let at = BIO_VALUES + 0x28 * row;
+        let shown = if time {
+            let f = F(f32::from_bits(best(off)));
+            if f.ee() <= 0.0 {
+                None
+            } else {
+                let n = (f * F(100.0)).ee() as i32 as u32;
+                e.call(m, WRITE_NUMBER, &[n, at]);
+                Some(())
+            }
+        } else if (best(off) as i32) <= 0 {
+            None
+        } else {
+            e.call(m, WSTR_FORMAT, &[at, COUNT_FORMAT, best(off)]);
+            Some(())
+        };
+        match shown {
+            None => {
+                e.call(m, WSTR_COPY, &[at, VALUE_DASH]);
+                vcall(m, e, venue, 0x158, &[DASH]);
+            }
+            Some(()) => {
+                let name = venue_name(m, best(off + 4));
+                vcall(m, e, venue, 0x158, &[name]);
+            }
+        }
+        let t = m.r32(v + 0x110);
+        vcall(m, e, t, 0x148, &[at]);
+        row += 1;
+        let (t1, t2) = (m.r32(w + 0x110), m.r32(v + 0x110));
+        for x in [t1, t2, venue] {
+            m.w32(x + 0x118, 0x3f4c_cccd);
+            m.w32(x + 0x114, 0);
+        }
+        vcall(m, e, list, 0x148, &[w]);
+    }
+    // the favourite venue
+    let font = menu_font(m);
+    let w = text_entry(m, e, s, 0x3af918, list, font);
+    let font = menu_font(m);
+    let fav = text(m, e, s, 0x3afaa0, w, font);
+    m.w32(w + 0x11c, 5);
+    let old = m.r32(w + 0x114);
+    if old != 0 {
+        vcall(m, e, old, 8, &[3]);
+    }
+    m.w32(w + 0x118, fb(15.0));
+    m.w32(w + 0x130, 6);
+    m.w32(w + 0x114, fav);
+    let t = m.r32(w + 0x110);
+    vcall(m, e, t, 0x150, &[0xc67]);
+    let t = m.r32(w + 0x110);
+    m.w32(t + 0x114, 0);
+    put(m, buf, black);
+    vcall(m, e, w, 0x50, &[buf]);
+    let t = m.r32(w + 0x110);
+    m.w32(t + 0x118, 0x3f4c_cccd);
+    m.w32(fav + 0x114, 0);
+    put(m, buf, black);
+    vcall(m, e, fav, 0x50, &[buf]);
+    m.w32(fav + 0x118, 0x3f4c_cccd);
+    let (mut most, mut at) = (0u32, 13u32);
+    for i in 0..13u32 {
+        let n = best(0x38 + 4 * i);
+        if most < n {
+            most = n;
+            at = i;
+        }
+    }
+    if at != 13 {
+        let name = venue_name(m, at);
+        e.call(m, FORMAT, &[BIO_FAVOURITE, FAVOURITE_FORMAT, name, most]);
+        vcall(m, e, fav, 0x158, &[BIO_FAVOURITE]);
+    } else {
+        vcall(m, e, fav, 0x158, &[DASH]);
+    }
+    vcall(m, e, list, 0x148, &[w]);
+    m.w32(list + 0x150, 1);
+    place(m, e, list, fb(390.0), fb(135.0), buf);
+    m.w32(list + 0x154, 2);
+    m.w32(list + 0x15c, fb(3.0));
+    e.call(m, GROUP_ADD, &[grp, list]);
+    // the headings
+    for (sid, x) in [(0xc6du32, 375.0f32), (0xc6e, 500.0)] {
+        let font = menu_font(m);
+        let t = text(m, e, s, 0x3af978, grp, font);
+        vcall(m, e, t, 0x150, &[sid]);
+        put(m, buf + 0x10, [ONE, 0, 0, 0]);
+        vcall(m, e, t, 0x50, &[buf + 0x10]);
+        m.w32(t + 0x114, 0);
+        place(m, e, t, fb(x), fb(110.0), buf + 0x10);
+        m.w32(t + 0x118, 0x3f4c_cccd);
+        e.call(m, GROUP_ADD, &[grp, t]);
+    }
+    vcall(m, e, grp, 0x20, &[1]);
+}

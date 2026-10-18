@@ -1,5 +1,6 @@
-//! `tricky_game::fe_riderbuild` (board rows G9y8a, G9y8b) against the original in the function runner (TRICKY_ELF; skipped
-//! without it): the rider profile's frame (0x27e918), records panel (0x282d30) and bio panel (0x27f600). Every case builds a random screen
+//! `tricky_game::fe_riderbuild` (board rows G9y8a, G9y8b, G9y8c) against the original in the function runner (TRICKY_ELF;
+//! skipped without it): the rider profile's frame (0x27e918), records panel (0x282d30), bio panel (0x27f600) and short
+//! bio (0x285230). Every case builds a random screen
 //! (its rider byte, group, buffers) and app in the arena and random career counts; one builder then runs on both
 //! sides. Every callee is a stand-in on both sides answering from the case's seed: the heap (handed out in order),
 //! the constructors (which give their object a table of stand-ins and answer it), the career's rider record, bio
@@ -41,7 +42,10 @@ impl Rng {
 const DATA: (u32, u32) = (0x337c00, 0x400);
 const CAREER: (u32, u32) = (0x32b000, 0x2000);
 /// the game's words the builders read: the records' events and dash, the icon classes' and menu list's tables
-const GAME: [(u32, u32); 4] = [(0x3af800, 0x200), (0x3b6e00, 0x600), (0x3b7f00, 0x300), (0x3ae600, 0x400)];
+const GAME: [(u32, u32); 5] =
+    [(0x3af800, 0x300), (0x3b6e00, 0x600), (0x3b7f00, 0x300), (0x3ae600, 0x400), (0x332f00, 0x200)];
+/// the short bio's wide strings
+const STRINGS: (u32, u32) = (0x3d3000, 0x400);
 const ARENA: u32 = 0x0100_0000;
 const SIZE: u32 = 0x1000;
 const S: u32 = ARENA;
@@ -106,7 +110,8 @@ fn arity(f: u32, ans: &Answers) -> (usize, usize) {
     match f {
         rb::MENU_CTOR => (6, 0),
         rb::TEXT_CTOR => (4, 0),
-        ALLOC | FILL | rb::RECORD_VALUE | rb::MEDAL | rb::FORMAT => (3, 0),
+        rb::FORMAT => (4, 0),
+        ALLOC | FILL | rb::RECORD_VALUE | rb::MEDAL | rb::WSTR_FORMAT => (3, 0),
         rb::PLACE_CHILD => (2, 2),
         rb::RIDER_RECORD | rb::RIDER_BIO_LINE | rb::EVENT_NAME | rb::WSTR_COPY | rb::WRITE_NUMBER | rb::GROUP_ADD
         | rb::STATE_ADD | rb::SPRITE_RECT | WIDGET_PLACE => (2, 0),
@@ -118,7 +123,11 @@ fn arity(f: u32, ans: &Answers) -> (usize, usize) {
 }
 
 fn standin(io: &mut dyn Io, f: u32, w: &[u32], fl: &[u32], ans: &Answers) -> (u32, Call) {
-    let (ni, nf) = arity(f, ans);
+    let (mut ni, nf) = arity(f, ans);
+    // (the format's fourth argument only where the format takes one: the records' leave a stray word there)
+    if f == rb::FORMAT && w[1] != rb::FAVOURITE_FORMAT {
+        ni = 3;
+    }
     let mut log: Vec<u32> = w[..ni].iter().map(|&a| token(a)).collect();
     log.extend(&fl[..nf]);
     // (a vector on the stack by value)
@@ -128,7 +137,7 @@ fn standin(io: &mut dyn Io, f: u32, w: &[u32], fl: &[u32], ans: &Answers) -> (u3
     let r = ans.next();
     let mut g = Rng(r as u64 | 1);
     // (the copies and formats write a few words at their target)
-    if f == rb::WSTR_COPY || f == rb::FORMAT {
+    if f == rb::WSTR_COPY || f == rb::FORMAT || f == rb::WSTR_FORMAT {
         for k in 0..2 {
             io.w32(w[0] + 4 * k, g.next() & 0x00ff_00ff);
         }
@@ -181,7 +190,7 @@ impl FeEnv for Env<'_> {
     }
 }
 
-const FUNCS: [u32; 3] = [0x27e918, 0x282d30, 0x27f600];
+const FUNCS: [u32; 4] = [0x27e918, 0x282d30, 0x27f600, 0x285230];
 
 #[test]
 fn rider_profile_builders_match_the_original() {
@@ -222,7 +231,7 @@ fn rider_profile_builders_match_the_original() {
     let mut stubs = vec![
         ALLOC, FILL, rb::MENU_CTOR, rb::TEXT_CTOR, rb::RIDER_RECORD, rb::RIDER_BIO_LINE, rb::EVENT_NAME,
         rb::RECORD_VALUE, rb::MEDAL, rb::PLACE_CHILD, rb::WSTR_COPY, rb::WRITE_NUMBER, rb::FORMAT, rb::GROUP_ADD,
-        rb::STATE_ADD, rb::SPRITE_RECT, WIDGET_PLACE, UPDATE_COLOR, LIST_INIT,
+        rb::STATE_ADD, rb::SPRITE_RECT, WIDGET_PLACE, UPDATE_COLOR, LIST_INIT, rb::WSTR_FORMAT,
     ];
     stubs.extend(ans.vfs.borrow().iter().copied());
     stubs.extend(SLOTS.map(slot));
@@ -248,7 +257,7 @@ fn rider_profile_builders_match_the_original() {
         for b in career.iter_mut() {
             *b = g.next() as u8;
         }
-        let mut regions = vec![(DATA.0, data.clone()), (CAREER.0, career)];
+        let mut regions = vec![(DATA.0, data.clone()), (CAREER.0, career), (STRINGS.0, vec![0; STRINGS.1 as usize])];
         regions.extend(game.iter().cloned());
         regions.extend([
             (ARENA, vec![0; SIZE as usize]),
@@ -266,10 +275,30 @@ fn rider_profile_builders_match_the_original() {
         for k in 0..0x200 {
             m.w32(rb::COUNTS_LEFT + 4 * k, g.pick(&[0u32, 3, 12, 0xffff_ffff]));
         }
+        // (the riders' bests: counts and times either side of 0, their venues among the 13, the favourite's counts
+        // sometimes all 0)
+        for k in 0..12u32 {
+            let b = rb::CAREER + 0x1c4 * k + 0x160;
+            for off in [0u32, 8, 0x10, 0x18, 0x6c, 0x74, 0x7c, 0x84, 0x8c, 0x94] {
+                m.w32(b + off, g.pick(&[0u32, 1, 7, 1234, 0xffff_fffe, 0x8000_0000]));
+                m.w32(b + off + 4, g.below(13));
+            }
+            for off in [0x20u32, 0x28, 0x30] {
+                m.w32(b + off, g.pick(&[-1.0f32, 0.0, 0.004, 12.34, 75.5, 1.0e6]).to_bits());
+                m.w32(b + off + 4, g.below(13));
+            }
+            let none = g.below(4) == 0;
+            for i in 0..13 {
+                m.w32(b + 0x38 + 4 * i, if none { 0 } else { g.pick(&[0u32, 1, 5, 9, 0x8000_0001]) });
+            }
+        }
         m.w32(GAPP, APPOBJ);
         m.w8(S + 0x2e, g.pick(&[0u8, 3, 0x7f, 0x80, 0xff]));
         m.w32(S + 0x4f8, GRP);
         m.w32(S + 0x4f0, GRP);
+        // (the short bio's group its own)
+        m.w32(S + 0x4fc, GRP + 0x80);
+        m.w32(GRP + 0x80 + 0xc, VT);
         m.w32(GRP + 0xc, VT);
         for off in SLOTS {
             m.w16(VT + off, g.pick(&[0u16, 4]));
@@ -293,6 +322,7 @@ fn rider_profile_builders_match_the_original() {
             0x27e918 => rb::build_profile_frame(mm, e, S, SCRATCH),
             0x282d30 => { rb::build_records(mm, e, S, SCRATCH); none }
             0x27f600 => { rb::build_bio(mm, e, S, SCRATCH); none }
+            0x285230 => { rb::build_short_bio(mm, e, S, SCRATCH); none }
             _ => unreachable!(),
         };
         ans.n.set(0);
