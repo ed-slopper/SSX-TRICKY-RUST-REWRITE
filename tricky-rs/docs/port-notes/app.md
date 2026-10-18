@@ -236,3 +236,41 @@ The test runs 1,200 cases of each of the 28 functions.
 Of the 66 mutants, 65 are caught. The survivor is equivalent: the PS2 manager's destructor stores its table just
 before the base destructor overwrites it. Three were first missed and are now covered: the results path for two
 players, and a canary run that reaches the stack's bottom (twice).
+
+## E1h: `cGame::Init` (`game/src/game_main.rs`, `tests/game_init.rs`)
+
+`cGame::Init` (0x17e148) sets the race up.
+- **Progress.** The app keeps the game at +0x730 and counts its progress at +8, from 0 to 10. The load screen reads
+  that count.
+- **Before the objects.** It resets the world and sets each pad's vibration from the career's settings (+0x1678,
+  +0x167c). It seeds the game's generator from the career's +0x2b04, then sets up the pool, the world's lists and
+  the lesson.
+- **The objects,** in the game's order:
+  - the replay node (+0x14) and the race (+0x1c): the race gets its own table and eleven part tables, and three
+    lists;
+  - a node (+0x18), then the riders (+0x40; none in mode 6): they are given the career's list and how many of its
+    entries are in use;
+  - the world (+0x24), the tricks (+0x30) and the course (+0x10, found by number in the course table);
+  - the courses (+0x28): this course's record (+0x2c, the index kept from 0 to 12) gives the fog colour (/255, at
+    +0x5c);
+  - the HUD's fades, the overlays, the snow, the speech, the lesson helper (mode 6), three more objects, the
+    controllers, the shadows and the race menu (+0x2a0).
+- **The attract flag** (+0x74) is set when an effects random draw falls under the course's chance (+0x54). It is
+  only drawn outside modes 2 and 4, with fewer than two players and fewer than three AI.
+- **The snow's rate** is 0.05 plus 0.15 of a draw, kept at +0x78. Its drift is a draw plus 5, and 7 less a draw.
+- **The end.** The two fonts are sized (1.3 by 1.4, 1.4 by 1.8), and the second is the pause menu's. Then the
+  course's archive and world are opened, the music is picked by the course's name upper-cased, the HUD option and
+  viewport mode are set again, the brightness likewise, the archives closed, and the game restarted.
+
+The test runs 3,000 cases.
+- **Run for real:** the checked course table look-ups, the archive's open and close, the effects loader and the
+  restart.
+- **Stand-ins that act:** the fill stand-in really fills; the node constructor leaves the race its player and AI
+  counts; the courses' constructor fills its records; `strcpy` copies a short string.
+- **The race's table** is the game's (0x364738); its two virtuals are stood in for.
+- **The progress count** at app+8 is logged with every call, so each step shows.
+
+Of the 51 mutants, 50 are caught. The survivor is the fill skipped when an allocation fails. The test's allocator
+never fails: a failed one would write the tables at address 0 on both sides. Two gaps were first missed: the
+progress steps, and the pads' settings (any nonzero is on). A third, the attract draw landing exactly on the chance,
+is now covered by draws of exactly 0, 0.25 and 0.5.

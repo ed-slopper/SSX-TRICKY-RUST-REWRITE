@@ -1746,7 +1746,7 @@ address,size,name,system,status
 0x17e040,116,cBxSortObjNodeState::__tf,runtime,host
 0x17e0b8,64,cReplayRecordHeader::__tf,runtime,host
 0x17e0f8,76,cGame::cGame,game,checked
-0x17e148,2988,cGame::Init,game,ported
+0x17e148,2988,cGame::Init,game,checked
 0x17ecf8,896,cGame::vf0_17ecf8,game,checked
 0x17f078,124,cGame::IsPaused,game,ported
 0x17f0f8,96,Game_IsMenuOrOverlayActive,frontend,ported
