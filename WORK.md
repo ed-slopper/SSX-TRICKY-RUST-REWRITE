@@ -34,8 +34,10 @@ state machine and the renderer are ours. Nothing has been checked against the or
 | ID | Task | Area | Needs | Who | Notes |
 |---|---|---|---|---|---|
 | E1 | Start-up and main loop: `entry` 0x100008, the `gApp` (0x337C58) init, `cGame::Init` 0x17E148, `cGame::Update` 0x181638, game modes and the front end ↔ race switch, pause (`cGame::IsPaused` 0x17F078) | unowned | F1 | | [est] Our Bevy app loop is the stand-in |
-| E1e | `cApplication` and its loop on the game's bytes: vf1, vf2, vf3, its destructor, `cAppMan`, `App_Run`, `App_MainLoop`, the vsync mode (`App_StartVSyncMode` / `_StopVSyncMode` / `_VSyncTick` / `_RunVSyncModeTicks`), `cPS2Device` vf6 / vf7, checked in the runner | ed-slopper/puffin | E1 | | Split of E1 2026-10-17 |
-| E1f | The start screen on the game's bytes: `cStartScreen` / `cStartScreenSingle` (vf1..vf7, `StartScreenSingle_Create` / `_SetState`) and the memory card messages (`MemCardMsg_DrawBox` / `_DrawOptions` / `_DrawButtonPrompt` / `_Draw`, `Overlay_DrawDontRemoveCard`), checked in the runner | any | E1 | | Split of E1 2026-10-17 |
+| E1f | The start screen on the game's bytes: `cStartScreen` / `cStartScreenSingle` (vf1..vf7, `StartScreenSingle_Create` / `_SetState`) and the memory card messages (`MemCardMsg_DrawBox` / `_DrawOptions` / `_DrawButtonPrompt` / `_Draw`, `Overlay_DrawDontRemoveCard`), checked in the runner | any | E1 | | Split of E1 2026-10-17; split into E1f1, E1f2, E1f3 |
+| E1f1 | The start screen's module on the game's bytes: `cStartScreen` vf1 (enter), vf2 (leave), vf3, vf4 (start), vf6 (draw) and its destructor, `StartScreenSingle_Create`, `cStartScreenSingle` vf4 / vf6 / destructor, and the small functions beside them (0x1843a0..0x184580), checked in the runner | ed-slopper/puffin | E1 | | Split of E1f |
+| E1f2 | The single start screen's state machine on the game's bytes: `cStartScreenSingle` vf5 0x1845e0 (the frame: the blink, the card's answers, 28 states), `StartScreenSingle_SetState` 0x1850e8 and vf7 0x185430 (the draw), checked in the runner | any | E1f1 | | Split of E1f |
+| E1f3 | The memory card messages on the game's bytes: `MemCardMsg_DrawBox` / `_DrawOptions` / `_DrawButtonPrompt` / `_Draw`, `Overlay_DrawDontRemoveCard`, `Input_GetAnyNewButtons` checked, in the runner | any | E1f1 | | Split of E1f |
 | E1g | The boot films' module and the execution manager on the game's bytes: `cVideoModule`, `cVideoLoadModule`, `cPS2ExecutionMan` vf1..vf4, `Stack_FillCanary`, `Mem_PrintStackUsage`, `Iop_RebootAndLoadModules`, `PS2ExecutionMan_Create` (platform glue: what talks to the IOP stays a call out), checked in the runner | any | E1 | | Split of E1 2026-10-17 |
 | E1a | Fixed 60 Hz tick with per-boarder time scale (`dt = timescale/60`, boarder+0x12c) driving every system, frame-rate independent of the window | any | | | [repo] `port-notes/README.md` (units); check what `SmoothDt` in `main.rs` does today Split: E1a1, E1a2 |
 | E1a2 | The rest of E1a: world animations, props, particles, spray, camera on the same tick; draw between ticks (interpolate, ours: tag STANDIN) | any | E1a1 | | Split of E1a |
@@ -152,6 +154,7 @@ matches the original.
 
 | ID | Task | Section | Who | Date | Commit |
 |---|---|---|---|---|---|
+| E1e | The application start, shutdown, vsync mode and main loop: game/src/app.rs, tests/app_loop.rs; 50 of 51 mutants caught, the survivor equivalent | P2 | ed-slopper/puffin | 2026-10-17 | ee10911 |
 | E1d | The game object's frame (16 functions; 49/50 mutants, the survivor equivalent) | P2 | ed-slopper/puffin | 2026-10-17 | 20452fc |
 | E1c | The course table and the app's small helpers (27 functions; 41/43 mutants, the rest equivalent) | P2 | ed-slopper/puffin | 2026-10-17 | dc7811c |
 | G9z | The front end's 3D scene code below 0x26c000 (G9z1..G9z5, G9z2b; every function there checked but cFE3D's set-up and tear-down, G9b2d2) | P2 | ed-slopper/puffin | 2026-10-17 | dc475ef |
@@ -1429,3 +1432,4 @@ matches the original.
 - 2026-10-17 ed-slopper/puffin: G9z2b done (dc475ef: the character's draw, 30/30); G9z closed (the front end's 3D scene code all checked but G9b2d2's). E1 split into E1c..E1g for the application and game code the index still has unchecked; E1c claimed (the course table and app helpers).
 - 2026-10-17 ed-slopper/puffin: E1c done (dc7811c: the course table and the app's helpers, 41/43); E1d claimed (cGame's frame).
 - 2026-10-18 ed-slopper/puffin: E1d done (20452fc: cGame's frame, 49/50); E1e claimed (cApplication and its loop).
+- 2026-10-18 ed-slopper/puffin: E1e closed (ee10911); E1f split into E1f1..E1f3, E1f1 claimed
