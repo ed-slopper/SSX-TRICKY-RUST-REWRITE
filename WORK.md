@@ -81,8 +81,7 @@ state machine and the renderer are ours. Nothing has been checked against the or
 | G7 | Rendering, as the PS2 renderer does it. Split before claiming: | unowned | E3a, E3b | | [repo] |
 | G21 | **The rider stutters back and forth the whole run** (play test by bredclan, 2026-10-17, tricky-rs.2026-10-17.exe from 3580b5f). To find: whether it is the port (our stand-ins between the exact pieces: the rider's step, its control state, the app's camera or its frame timing fighting the game's fixed tick) or something the decompiling will fix once the boarder state machine (G1) runs whole. First step: log the rider's place and heading each tick in a run (`TRICKY_SIM`) and see which one goes back and forth, and on which frames | any | | | Play test 2026-10-17 |
 | G9y | (umbrella: G9y1..G9y6) The rest of the front end's own code in 0x26c000..0x2aab58 (~370 functions not yet checked; the screen builders marked `ported` are G9b's): the menu, the copies of the widget group's operations, the sound widgets, the memory card overlay, the world group, and the rest, checked in the runner | any | G9x | | Added 2026-10-17 by ed-slopper/puffin |
-| G9y1 | The menu: `cFE3DMenu` (constructor, layout, arrows `FE3DMenu_UpdateArrows`, `FE3DMenu_NextSelectable` / `PrevSelectable`, `FE3DMenu_AlignItem`, input, bounds, size, render, update, move, destructor), `cListFE3DWMenuFormatOp`, the list operations' destructors (`cListOperator::~cListOperator` 0x269560 and the ones that jump to it), `cListFE3DGetExtentOp` / `FindHashNameOp` / `SetActiveDefaultStartDataOp`, `FE_SetRumbleEnabled`, checked in the runner | ed-slopper/puffin | G9y | | Split of G9y |
-| G9y2 | The copies of the widget group's operations (`FE3DWGroup_*1..3`, `ListFE3D*Op_Apply1..3` and the like: 68 functions byte-identical but for their branches to G9x1's `*4` / `Apply4`, mapped in G9y2's test): G9x1's test run at each copy's address | any | G9y | | Split of G9y |
+| G9y2 | The copies of the widget group's operations (`FE3DWGroup_*1..3`, `ListFE3D*Op_Apply1..3` and the like: 68 functions byte-identical but for their branches to G9x1's `*4` / `Apply4`, mapped in G9y2's test): G9x1's test run at each copy's address || ed-slopper/puffin | G9y | | Split of G9y |
 | G9y3 | The sound widgets: `cFE3DSound`, `cFE3DSoundBase` (~110 small functions), checked in the runner | any | G9y | | Split of G9y |
 | G9y4 | The memory card overlay: `cFEStateMCOverlay`'s virtuals, `FEMemCard_*` (show dialog, prompt, slot list, buttons, message), checked in the runner | any | G9y | | Split of G9y |
 | G9y5 | The world group: `FE3D_BuildWorldGroup` 0x2720f8 (7.7 KB), `FE_CreateList`, `FE3DWorld_FindByHash`, checked in the runner | any | G9y | | Split of G9y |
@@ -156,6 +155,7 @@ matches the original.
 
 | ID | Task | Section | Who | Date | Commit |
 |---|---|---|---|---|---|
+| G9y1 | the menu checked in the runner (73,500 cases; 124/124 mutants) | P2 | ed-slopper/puffin | 2026-10-17 | cbd5f94 |
 | G9x | G9x1..G9x4 done: the widget classes, 208 functions checked | P2 | ed-slopper/puffin | 2026-10-17 | 2e5ba0f |
 | G9x3 | G9x3a and G9x3b done | P2 | ed-slopper/puffin | 2026-10-17 | 5d0e165 |
 | G9x4 | the bars and pictures checked in the runner (61,500 cases; 87/89 mutants, 2 equivalent) | P2 | ed-slopper/puffin | 2026-10-17 | 2e5ba0f |
@@ -1384,3 +1384,4 @@ matches the original.
 - 2026-10-17 ed-slopper/puffin: G9x3a done (2166460: entries, list box, name entry, button; 39 functions checked); claimed G9x3b (the menu list).
 - 2026-10-17 ed-slopper/puffin: G9x3b done (the menu list, 19 functions checked); claimed G9x4 (the bars and pictures).
 - 2026-10-17 ed-slopper/puffin: G9x4 done (2e5ba0f: the bars and pictures, 41 functions checked); G9x done; added G9y (the rest of the front end's code, G9y1..G9y6) and claimed G9y1 (the menu).
+- 2026-10-17 ed-slopper/puffin: G9y1 done (cbd5f94: the menu, 49 functions checked); claimed G9y2 (the group operations' copies).
