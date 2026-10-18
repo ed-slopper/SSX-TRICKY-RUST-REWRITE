@@ -1645,31 +1645,31 @@ address,size,name,system,status
 0x17b668,68,cPS2Device::vf6_17b668,render,not started
 0x17b6b0,68,cPS2Device::vf7_17b6b0,render,not started
 0x17b6f8,80,cPS2Device::__tf,runtime,host
-0x17b748,256,App_LoadFonts,game,not started
-0x17b848,92,Course_OpenBig,race,not started
-0x17b8a8,144,App_CreateEffectsLoader,game,not started
-0x17b938,56,App_FreeEffectsLoader,game,not started
+0x17b748,256,App_LoadFonts,game,checked
+0x17b848,92,Course_OpenBig,race,checked
+0x17b8a8,144,App_CreateEffectsLoader,game,checked
+0x17b938,56,App_FreeEffectsLoader,game,checked
 0x17b970,12,Render_GetBrightness,render,ported
 0x17b980,204,Render_SetBrightness,render,ported
 0x17ba50,392,cApplication::vf1_17ba50,game,not started
 0x17bbd8,532,cApplication::vf3_17bbd8,game,not started
-0x17bdf0,8,FUN_0017bdf0,game?,not started
+0x17bdf0,8,FUN_0017bdf0,game?,checked
 0x17bdf8,332,App_OpenBigFiles,files,ported
 0x17bf48,352,cApplication::vf2_17bf48,game,not started
-0x17c0a8,108,Loc_Load,game?,not started
-0x17c118,56,Loc_Unload,game?,not started
+0x17c0a8,108,Loc_Load,game?,checked
+0x17c118,56,Loc_Unload,game?,checked
 0x17c150,128,Loc_LoadForRegion,game?,ported
-0x17c1d0,8,FUN_0017c1d0,game?,not started
-0x17c2e0,8,Course_CloseBig,race,not started
-0x17c360,28,App_GetCourseId,game,not started
-0x17c380,28,App_FindCourseById,game,not started
-0x17c3a8,28,App_GetCourseInfo,game,not started
+0x17c1d0,8,FUN_0017c1d0,game?,checked
+0x17c2e0,8,Course_CloseBig,race,checked
+0x17c360,28,App_GetCourseId,game,checked
+0x17c380,28,App_FindCourseById,game,checked
+0x17c3a8,28,App_GetCourseInfo,game,checked
 0x17c3c8,80,cApplication::__tf,runtime,host
 0x17c418,76,cApplication::~cApplication,game,not started
-0x17c468,28,EffectsLoader_Delete,game?,not started
+0x17c468,28,EffectsLoader_Delete,game?,checked
 0x17c488,36,cAppMan::~cAppMan,game,not started
 0x17c4b0,64,cAppMan::__tf,runtime,host
-0x17c530,64,cAppMan::cAppMan,game,not started
+0x17c530,64,cAppMan::cAppMan,game,checked
 0x17c570,328,App_Run,game,not started
 0x17c6b8,44,App_SetMode,game,ported
 0x17c6e8,536,App_MainLoop,game,not started
@@ -1824,7 +1824,7 @@ address,size,name,system,status
 0x183788,864,MemCardMsg_DrawOptions,save,not started
 0x183ae8,308,MemCardMsg_DrawButtonPrompt,save,not started
 0x183c20,1672,MemCardMsg_Draw,save,not started
-0x1842a8,112,Loc_GetUnquotedString,game?,not started
+0x1842a8,112,Loc_GetUnquotedString,game?,checked
 0x184318,136,StartScreenSingle_Create,frontend?,not started
 0x1843a0,8,FUN_001843a0,game?,not started
 0x1843f8,8,cStartScreen::vf3_1843f8,game,not started
@@ -1850,16 +1850,18 @@ address,size,name,system,status
 0x185dd0,428,Course_RemapSkyTextures,race,checked
 0x186078,160,Sky_Delete,game?,checked
 0x186118,80,cCourseResolve::__tf,runtime,host
-0x186168,8,cCourseResolve::~cCourseResolve,race,not started
-0x1861f0,40,FUN_001861f0,frontend?,not started
-0x186218,76,CourseTable_Delete,race,not started
-0x186268,224,Course_OpenModelsBig,race,ported
-0x186348,8,CourseTable_Destruct,race,not started
-0x186350,20,Course_GetInfo,race,ported
-0x186368,20,CourseTable_GetEntry,race,not started
-0x186380,112,CourseTable_FindByName,race,not started
-0x1863f8,72,CourseTable_FindById,race,not started
-0x186440,32,CourseTable_GetId,race,not started
+0x186168,8,cCourseResolve::~cCourseResolve,race,checked
+0x186170,64,FUN_00186170,frontend?,checked
+0x1861b0,64,FUN_001861b0,frontend?,checked
+0x1861f0,40,FUN_001861f0,frontend?,checked
+0x186218,76,CourseTable_Delete,race,checked
+0x186268,224,Course_OpenModelsBig,race,checked
+0x186348,8,CourseTable_Destruct,race,checked
+0x186350,20,Course_GetInfo,race,checked
+0x186368,20,CourseTable_GetEntry,race,checked
+0x186380,112,CourseTable_FindByName,race,checked
+0x1863f8,72,CourseTable_FindById,race,checked
+0x186440,32,CourseTable_GetId,race,checked
 0x1864a0,84,cVideoModule::cVideoModule,video,not started
 0x1864f8,96,cVideoModule::~cVideoModule,video,not started
 0x186558,40,cVideoModule::vf1_186558,video,not started
