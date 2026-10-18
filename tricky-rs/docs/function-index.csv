@@ -5355,44 +5355,44 @@ address,size,name,system,status
 0x28f198,52,ListFE3DRenderOp_Apply2,frontend?,checked
 0x28f1d0,80,cListFE3DRenderOp::__tf,runtime,host
 0x28f220,64,cListOperator::__tf,runtime,host
-0x28f260,284,cFEStateMCOverlay::cFEStateMCOverlay,save,ported
-0x28f380,92,cFEStateMCOverlay::~cFEStateMCOverlay,save,not started
-0x290de0,484,cFEStateMCOverlay::vf2_290de0,save,not started
-0x290fd0,8,cFEStateMCOverlay::Draw,save,not started
-0x291178,28,cFEStateMCOverlay::vf7_291178,save,not started
-0x291198,168,cFEStateMCOverlay::vf8_291198,save,not started
-0x291240,168,cFEStateMCOverlay::vf9_291240,save,not started
-0x2912e8,356,cFEStateMCOverlay::vf10_2912e8,save,not started
-0x291450,28,cFEStateMCOverlay::vf11_291450,save,not started
-0x291470,36,cFEStateMCOverlay::vf3_291470,save,not started
-0x291498,8,cFEStateMCOverlay::vf4_291498,save,not started
-0x2914a0,8,cFEStateMCOverlay::vf6_2914a0,save,not started
-0x2914a8,36,cFEStateMCOverlay::vf5_2914a8,save,not started
-0x2914d0,376,cFEStateMCOverlay::vf44_2914d0,save,not started
-0x291648,60,cFEStateMCOverlay::vf47_291648,save,not started
-0x291688,60,cFEStateMCOverlay::vf48_291688,save,not started
-0x2916c8,232,cFEStateMCOverlay::vf49_2916c8,save,not started
-0x2917b0,1528,cFEStateMCOverlay::vf54_2917b0,save,not started
-0x291da8,88,FEMemCard_ShowLocDialog,save,not started
-0x291e00,1460,FEMemCard_ShowDialog,save,not started
-0x2923b8,108,FEMemCard_HideDialog,save,not started
-0x292428,164,FEMemCard_ShowMessageWidgets,save,not started
-0x2924d0,356,FEMemCard_EnableButtons,save,not started
-0x292638,368,FEMemCard_ShowPrompt,save,not started
-0x2927a8,48,FEMemCard_HidePrompt,save,not started
-0x2927d8,56,FEMemCard_ShowLocMessage,save,not started
-0x292810,176,FEMemCard_ShowMessage,save,not started
-0x2928c0,88,FEMemCard_HideMessage,save,not started
-0x292918,40,cFEStateMCOverlay::vf50_292918,save,not started
-0x292940,40,cFEStateMCOverlay::vf51_292940,save,not started
-0x292968,772,FEMemCard_FillSlotList,save,not started
-0x292c70,168,cFEStateMCOverlay::vf1_292c70,save,not started
-0x292d40,60,cFEStateMCOverlay::vf55_292d40,save,not started
-0x292d80,236,FEMemCard_ShowEmptySlots,save,not started
-0x292e70,564,FEMemCard_LayoutMessage,save,not started
-0x2930a8,112,FEMemCard_HideInfoGroups,save,not started
+0x28f260,284,cFEStateMCOverlay::cFEStateMCOverlay,save,checked
+0x28f380,92,cFEStateMCOverlay::~cFEStateMCOverlay,save,checked
+0x290de0,484,cFEStateMCOverlay::vf2_290de0,save,checked
+0x290fd0,8,cFEStateMCOverlay::Draw,save,checked
+0x291178,28,cFEStateMCOverlay::vf7_291178,save,checked
+0x291198,168,cFEStateMCOverlay::vf8_291198,save,checked
+0x291240,168,cFEStateMCOverlay::vf9_291240,save,checked
+0x2912e8,356,cFEStateMCOverlay::vf10_2912e8,save,checked
+0x291450,28,cFEStateMCOverlay::vf11_291450,save,checked
+0x291470,36,cFEStateMCOverlay::vf3_291470,save,checked
+0x291498,8,cFEStateMCOverlay::vf4_291498,save,checked
+0x2914a0,8,cFEStateMCOverlay::vf6_2914a0,save,checked
+0x2914a8,36,cFEStateMCOverlay::vf5_2914a8,save,checked
+0x2914d0,376,cFEStateMCOverlay::vf44_2914d0,save,checked
+0x291648,60,cFEStateMCOverlay::vf47_291648,save,checked
+0x291688,60,cFEStateMCOverlay::vf48_291688,save,checked
+0x2916c8,232,cFEStateMCOverlay::vf49_2916c8,save,checked
+0x2917b0,1528,cFEStateMCOverlay::vf54_2917b0,save,checked
+0x291da8,88,FEMemCard_ShowLocDialog,save,checked
+0x291e00,1460,FEMemCard_ShowDialog,save,checked
+0x2923b8,108,FEMemCard_HideDialog,save,checked
+0x292428,164,FEMemCard_ShowMessageWidgets,save,checked
+0x2924d0,356,FEMemCard_EnableButtons,save,checked
+0x292638,368,FEMemCard_ShowPrompt,save,checked
+0x2927a8,48,FEMemCard_HidePrompt,save,checked
+0x2927d8,56,FEMemCard_ShowLocMessage,save,checked
+0x292810,176,FEMemCard_ShowMessage,save,checked
+0x2928c0,88,FEMemCard_HideMessage,save,checked
+0x292918,40,cFEStateMCOverlay::vf50_292918,save,checked
+0x292940,40,cFEStateMCOverlay::vf51_292940,save,checked
+0x292968,772,FEMemCard_FillSlotList,save,checked
+0x292c70,168,cFEStateMCOverlay::vf1_292c70,save,checked
+0x292d40,60,cFEStateMCOverlay::vf55_292d40,save,checked
+0x292d80,236,FEMemCard_ShowEmptySlots,save,checked
+0x292e70,564,FEMemCard_LayoutMessage,save,checked
+0x2930a8,112,FEMemCard_HideInfoGroups,save,checked
 0x293120,72,FUN_00293120,frontend?,not started
-0x293210,8,cFEStateMCOverlay::vf23_293210,save,not started
+0x293210,8,cFEStateMCOverlay::vf23_293210,save,checked
 0x293218,8,cFEStateMCOverlay::vf26_293218,save,not started
 0x293230,92,cFEStateMCOverlay::__tf,runtime,host
 0x293290,8,cFE3DIconText::vf22_293290,frontend,not started

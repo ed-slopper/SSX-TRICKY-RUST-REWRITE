@@ -2174,3 +2174,58 @@ table is logged as the sound system is closed.
 
 Of the 56 mutants, 55 are caught. The survivor reads the event as an unsigned byte rather than a signed one. That
 gives the same result: both forms are past 11 for any byte with its top bit set.
+
+## G9y4: the memory card overlay (`game/src/fe_mcard.rs`, `tests/fe_mcard.rs`)
+
+`cFEStateMCOverlay` is the front end state shown over a screen while the memory card manager (the save code's
+`cMCOverlayManager`, which the overlay is built on) saves or loads the career or the options. The `FEMemCard_*`
+functions are its dialog, message, prompt and slot list.
+
+- **Construction.** The manager is made and the front end state at +0x42c set up. Its flags (+0x480..+0x49c) and
+  the dialog and message are cleared and both tables set, then the manager is started.
+  - A save of the options first sets up their buffer (0x27d4 bytes, +0x490 0x1c4).
+  - A load sets up the career's 0x80000 bytes (+0x490 0x176) or the options' (+0x490 0x177).
+- **The pad (vf2).** While not quiet, a few of the manager's states take their own keys first: the key 0x63 in 7, 23
+  and 28, enter in 9, and back / accept in 10 (neither with escape / enter). Otherwise accept, back, up and down give
+  the manager's bits. Either pad counts.
+- **The steps.**
+  - vf8 begins: the career reads from the last loaded block, which is the career's +0x36fc (0x920 bytes); the options
+    read into their cleared buffer.
+  - vf9 reads more (at most 0x4000 at a time). First the block's header is summed (0x2ce04c) against the word it
+    carries at +0x334, which is cleared first.
+  - vf10 finishes:
+    - the career block's bytes summed as signed bytes from 0xdeadbeef must match the word after its length, then the
+      player is kept and the career loaded;
+    - the options' sum must match, then they are copied into the career's settings, the sound mode set and the options
+      saved.
+- **The slots.** The slot line (vf44) is enabled when its 0x58-byte record has a save (+0x174 and +0x168). The slot
+  list's buttons (`FEMemCard_FillSlotList`) follow what the card says: ready, empty (the empty-slot name 0x15f, by a
+  compare of the wide strings), unusable (+0x1c8) or corrupt (0x148).
+- **The dialog.** The text is set and centred, then the two buttons are hidden. Each bit of the buttons word then lays
+  out button 1 or 2 with its sprite and string. Two shown buttons are placed side by side under the dialog (x 320 less
+  the first's width less 50, and 370); one is centred. The state's buttons are disabled while a dialog is up.
+- **The message and prompt.** The message is centred and given the menu font's height plus 4 as its line height. The
+  prompt (0x15e when the card is in, else 0xdeb) goes 5 below it. The layout of the message (0x292e70) puts the card's
+  text for the chosen slot at the root group's y + 60 and its detail under it.
+- **The manager's state (vf54).** When quiet, only state 1 (the front end state's +0x28 and +0x40) and states 1..3's
+  message are shown. Otherwise the dialog, message and prompt are hidden first, and each of the 34 states puts its
+  own words up. State 1 also keeps the loaded career's player, or puts back the options' brightness (clamped to
+  0..2) and music.
+- **Two findings while testing.** The buttons' enable (0x2924d0) hands on 1 or 0, not the value it was given, and
+  reads the two-slot flag after the first button. The front end state's +0x28 and +0x40 take only the state (what
+  the other registers hold then is left by earlier calls).
+
+The test runs 55,500 cases (37 functions, 1,500 each). The overlay, the front end state, the card (its table of
+stand-ins) and eight widgets are random. The buttons' labels and icons are objects of their own, as laying out a
+button writes its icon's sprite and clears its label's +0x114. The slot records run over the card's word (slot 2's
++0x174 is +0x224), so the card is written after them.
+
+The runner converts ints to floats toward zero here (`cvt=c`), as the port's line height does; font heights past
+2^24 are in the mix. The colour stand-in scribbles over the vector it is given, so a vector handed on again must be
+written again.
+
+Of the 95 mutants, 92 are caught. Three survive:
+- clamping the read at `>= 0x4000` rather than `> 0x4000`, which is equivalent;
+- the slot list's guard on a second button that is never null once the card has two slots' buttons;
+- the slot list's buffer moved within the stack, which the test can't see, as stack addresses are compared as one
+  token.
