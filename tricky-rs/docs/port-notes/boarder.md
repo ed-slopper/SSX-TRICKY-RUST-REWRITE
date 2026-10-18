@@ -1598,3 +1598,8 @@ class). The runner check fills the whole ranges, gaps included, at random, runs 
 
 - `RiderSkin_DrawLod` 0x207e50 (was `FUN_00207e50` in `game/src/riderskin.rs`, `draw_lod`): LOD n's parts with a
   mesh (+0x48) handed to the renderer's +0x2e8 call (the part, its entry + 0x210).
+
+## Names from F1c batch 20 (proven)
+
+- `SkelAnim_BindCurves` 0x159910 and `PoseBlend_BlendSkeleton` 0x202b00 (was `FUN_00202b00` in
+  `game/src/animpose.rs`), checked in the function runner.

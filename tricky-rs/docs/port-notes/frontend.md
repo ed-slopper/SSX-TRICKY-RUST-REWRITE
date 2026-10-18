@@ -2711,3 +2711,48 @@ model has its rider.
 The test (with G9z2's) runs 500 draw cases. Matrices on the stack are logged by value (16 words), vectors 4 words.
 The lights handed to the lighting set-up are logged by value too: otherwise clearing and restoring the ambient
 would leave nothing to see. All 30 mutants are caught.
+
+## Names from F1c batch 20 (proven)
+
+Functions already ported under a bare address in `game/src/fe_*.rs`, named from the code and the Rust port. Several
+were not functions in Ghidra and were made with `create_function` first: 0x262478, 0x2661f0, 0x267f18,
+0x268ce0..0x268db0, 0x269608, 0x269ea0.
+
+- Sound and characters: `FE3DSound_StopTitleSayLine0D` 0x2623f0, `FE3DSound_SayLine00` 0x262478 (the say-line
+  table in `fe_scene.rs`: the front end's +0xa4, its +0x14 with 0), `FE3DPlayer_ClearPick` 0x265bb8 (+0x44 = -1),
+  `FE3DCharacter_HasRider` 0x2663e8 (model +0x46b0), `FE3DCharacter_StopPose` 0x2661f0 (+0xa1 = 3,
+  `AnimCtl_Reset` on the model's +0x46c0).
+- Memory: `FE3D_ZeroBlock108` 0x267f08 (0x108 bytes), `FE3D_FreeBlock` 0x267f18 (`MemPool_Free` when inside the
+  pool at 0x345e48, else `EAMem_Free`); `Mem_DeleteIfFlag1`..`4` 0x265bc8, 0x265da0, 0x270218, 0x184508 (the
+  destructor tail of empty classes: `Mem_Delete` on bit 0; 0x270218 is the list operator's in `fe_wgroup.rs`).
+- The dialog box (`cFE3DDialog`): `FE3DDialog_DrawFrame` 0x268308, `_SetupCentred` 0x2686c0 (four corners, y =
+  (480 - height) / 2), `_SetupTopBar` 0x268808 (bottom corners 0x11, 0x12 at (0, 0)); accessors `SetEdge` /
+  `GetEdge` 0x268d00 / 0x268d08 (+0x154), `SetCornerColor` / `GetCornerColor` 0x268d10 / 0x268d38 (+0x158, 16
+  bytes), `SetSprite` / `GetSprite` 0x268d60 / 0x268d70 (+0x140 + 4k), `SetBodySprite` / `GetBodySprite`
+  0x268d80 / 0x268d88 (+0x140), `HasBottomCorners` 0x268d90 (+0x150 and +0x14c both ≥ 0), `HasTopCorners`
+  0x268db0 (+0x144 and +0x148). `Vec4_SetFromArray` 0x268ce0, `Vec4_SetCopy1` 0x269608.
+- `FE3DAnim_SetRate` 0x269ea0: +0xa8 = 1 / (+0xa4 · 60 · 60).
+- Menus: `FE3DMenu_AlignItemAfter` 0x26df58 (`FE3DMenu_AlignItem` 0x26dd60's twin), `FE3DMenu_RenderArrowsText`
+  0x26f7c0 (+0x60 while chosen), `FE3DMenu_RenderArrows` 0x26f830 (+0x58), `FE3DMenu_GetItem` 0x26f970 and
+  `FE3DMenu_FindItem` 0x26f990 (`FE3DGroup_GetChild` / `FindById` on +0x118). `FEWorld_Render` 0x26feb8.
+- Screens and the stack: `FE3DState_LayoutAndSlideIn` 0x2742e8, `FE3DState_CountHelpButtons` 0x2754d8 (the 17
+  (id, group) items at 0x347f20 in the list +0x48's +0x118, a group counted once), `FE3DState_LayoutHelpBar`
+  0x2755e8, `FE3DState_SetTitle` 0x275760, `FE3DStack_Destruct` 0x2759f0 (the two lists at 0 and +0x24),
+  `FE3DStack_LayoutAll` 0x275a70 (each screen's vtable +0x8c, `cFE3DState::LayoutWidgets`),
+  `FE3DStack_UpdateTopAndFlush` 0x275ac8 (the top's +0x94, `cFE3DState::Update`, then the finished list deleted).
+  `FEMemCard_ActivateState` 0x293120 (`cFE3DState::Activate` on +0x42c, then its +0x4c).
+- DVD content: `FEDVDContent_SetCaptionId` 0x2994c8, `_SetCaptionText` 0x2995a8, `_ShowCaptions` 0x299688.
+- Options: `FE3DOptions_BuildTitleArrows` 0x2a8520, `GameOptions_OnLineChosen` 0x2a9350, `GameOptions_OnChange`
+  0x2a9848, `OptionsPage3_OnChange` 0x2a9c50 (empty).
+- Widgets: `FE3DVideo_SetStartWord` 0x2aba70 (+0x158), `FE3DGroup_GetFirstWidget` 0x2ac698 (`List_First` on
+  +0xa0), `FE3DThing_SetVec90` / `SetVec90Xyz` 0x2aca88 / 0x2acaa8, `FE3DWidget_SetWorldPosXyzw` 0x2acb70,
+  `_SetColorRgba` 0x2acc40 (its +0x54), `_SetSizeXyzw` 0x2ad7e8 (its +0x13c), `_PostEvent` 0x2ada58 (the record
+  at 0x347e10 through its +0xec), `FE3DWidget_PlaceChild` 0x28e020 (`FE3DWidget_Place` on +0x114),
+  `FE3DWidget_SlideInDir3Flag` 0x2adf88, `FE3DButton_LayoutReversed` 0x2ae230, `FE3DListBox_AddWidget` 0x2aff90,
+  `FE3DColouredText_FindSplit` 0x2b1a68, `FE3DColouredText_SetColour2` 0x2b4858, `FE3DEntry_SetFirstChild` /
+  `SetSecondChild` 0x2b3300 / 0x2b32a8 (+0x110 / +0x114), `FE3DWidget_SetWidth` / `SetHeight` 0x2b3860 /
+  0x2b3820, `FE3DWList_GetFrameOffset` 0x2b5958, `Vec4_ScaleCopy20` 0x2adcb8. The bare constructors
+  `cFE3DWListBox::cFE3DWListBox` 0x2b2ec0 and `cFE3DWSingleLineText::cFE3DWSingleLineText` 0x2b4ab0 have no
+  callers (unused out-of-line copies).
+- Not settled: the music cues 0x262ad0, 0x262b78, 0x262bd0, 0x262c20, 0x262c60, 0x262ca0; 0x263270 (a player's
+  byte +1 = 4); 0x265758; 0x26c430 (`j 0x26ac30` with this + 0xc0; 0x26ac30 not settled).

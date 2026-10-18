@@ -705,3 +705,40 @@ the entry and the box fills in the newest one before 0x222358 plays it.
 - Not settled: 0x2bad70 (`REGISTER` in `speechload.rs`: 0x2bac78 for a slot below 8), 0x2baeb8 / 0x2baed0 (each
   clears three words, at 0x348df8 and 0x348de0; `speechlib.rs` calls 0x2baed0 "stop every voice", which its body
   does not show), 0x2bb090 (`v << 2`).
+
+## Names from F1c batch 20 (proven)
+
+Functions already ported under a bare address, named from the code and the Rust port.
+
+- Pathfinder (`game/src/pf.rs`, checked in the function runner): the driver's callbacks handed over by `PathX_Init`
+  0x223648: `Path_OnDriverUpdate` 0x2c0488, `Path_OnDriverBeat` 0x2c0898, `Path_OnDriverStop` 0x2bedb8. The walk:
+  `Path_FindTrack` 0x2bedf0, `Path_ApplyTrackVolumes` 0x2bef08, `Path_GetSegmentOffset` 0x2befd8,
+  `Path_TakeBranch` 0x2bf038, `Path_WalkToAudioNode` 0x2bf108, `Path_RouteValue` 0x2bf290, `Path_GetEventCell`
+  0x2bf320, `Path_GetEventTarget` 0x2bf490, `Path_NextSegment` 0x2bf508, `Path_ReleaseWaiting` 0x2bfa78,
+  `Path_AdvanceTrack` 0x2bfbb8, `Path_StartSegment` 0x2bfe28, `Path_SyncToLead` 0x2c00d0. The calls in:
+  `PathX_GetTrackBytes` 0x2c1018, `PathX_SetLookahead` 0x2c1068, `PathX_SetTrackLatency` 0x2c1130,
+  `PathX_GetTrackSlot` 0x2c1168, `PathX_GetPlaying` 0x2c1190, `PathX_SetVariable` 0x2c1288, `PathX_ClearEvents`
+  0x2c1380, `PathX_GetQueuedEvents` 0x2c1430, `PathX_GetCurrentEvent` 0x2c1500, `PathX_PostEvent` 0x2c15c8,
+  `PathX_JumpToNode` 0x2c1890, `PathX_SetPitch` 0x2c1b98. `PathDriver_GetTrackBytes` 0x2231a8: for n > 0,
+  `SndStream_CalcMemSize` + 0x20000, else 0.
+- Music: `Song_GetPlayingNode` 0x224768 (the first word `PathX_GetPlaying` answers), `Song_IsBankReady` 0x2249c0
+  (1 unless +0xfc is clear and the bank (+0xa3c table, 0x60 each) is loading with its handle's state, 0x2d14d0,
+  not 1), `MusicSys_CheckSongBank` 0x2259d0 (the bank not loaded: +0xfc cleared, the system's +0x24, and with its low
+  two bits clear `MusicSys_LoadSongBank`).
+- Sound events: `SndEvent_Tick` 0x21ea48 (in use: the countdown down 10, under 5 the callback, direct or by vtable
+  index; a nonzero answer clears the event), `SndEvent_SetTimes` 0x222ab8 (+4 and +8 the same value; from
+  `SndEvent_Set` and `SndEvent_Clear`). `BankInstance_SetHandle` 0x20aba8 (+0xc the handle, +0x10 the program; from
+  `SndSys_PlayPending`). `SndQueue_StartLastVoice` 0x2212a0 (from `WorldEmitter_Update`: `CrowdBox_StartSound` on the
+  last queued entry, the handle `<< 8 |` the entry, the count down one; -1 without a table at +0x372c).
+- Speech: `SpeechSys_DrainCutsceneRing` 0x230ff8 (from `CamScript_Update`), `Speech_TriggerIndexedLine` 0x2314e0
+  (0x4008010 with the word at 0x3a2750 + 4i and the mode mask). From `cBoarder::vf10` 0x11a348:
+  `Speech_OnPlaceChange` 0x233ba0 (event bit 0xc: roll 6, the listener, more than one rider, 0x1002049 with 0/1/2 by
+  the career's +0xa4 / +0x124), `Speech_OnEventBit13Or14` 0x234558 (roll 0xe, 0x1002051 with 2 for bit 0x14, else
+  1), `Speech_OnEventBit15` 0x234610 (roll 0xf, 0x1002053), `Speech_OnEventBit16` 0x233740 (roll 0x12, the listener,
+  0x1002056), and the event's sound `Audio_SetEventBitSound` 0x21c0a0. The bits' meaning is not known, so the names
+  say the bit.
+- Not settled: 0x233e10 (roll 9, 0x1002046 with 1; its one caller 0x219258 has no callers and fires it when a
+  value at +0x18 → +0x1c passes 0.875; `speech.rs` calls it `on_boost_full`, unproven), 0x2129f8 and 0x212e98 (long
+  music switches, from `cFE3DSound` vf9 0x270610 and `PauseMenu_UpdateOptionsPage`), 0x223a90 (0x2d2d50 on a slot
+  unless its byte +0xe is set; from `Path_OnDriverUpdate`), 0x2d14d0 (the sound library's bank-handle state, prefix
+  unknown).

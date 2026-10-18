@@ -274,3 +274,15 @@ Of the 51 mutants, 50 are caught. The survivor is the fill skipped when an alloc
 never fails: a failed one would write the tables at address 0 on both sides. Two gaps were first missed: the
 progress steps, and the pads' settings (any nonzero is on). A third, the attract draw landing exactly on the chance,
 is now covered by draws of exactly 0, 0.25 and 0.5.
+
+## Names from F1c batch 20 (proven)
+
+- The vsync thread (settles the batch 18 gap 0x1825e8): `App_OnVSync` 0x1825d0 (the interrupt handler:
+  `iSignalSema` on gApp+0x28's +0x4024), `App_VSyncThread` 0x1825e8 (`WaitSema` on the same, then `App_VSyncTick`,
+  forever). Both made with `create_function`.
+- `cGame::vf2` 0x180df0 (the vtable 0x386980 slot at +0x1c; `game_main.rs` calls it the leave): +0xc = 0, return 1.
+- `SpriteSet_DrawScaled` 0x1843e0 (`Sprite_DrawAnchored` with w, h scaled by the set's +4 and +8),
+  `Color_SetRGBFromVec` 0x184528, `Color_SetRGBCopy1` 0x184580 (a copy of `Color_SetRGB`). `TextBox_DrawLines`
+  0x195a48.
+- Not settled: 0x1843a8 (resets the record at 0x3cdd28), 0x184578 (empty), 0x1858c0 / 0x186a00 (static
+  initialisers), 0x11f488, 0x257dc0.

@@ -2727,3 +2727,8 @@ ported functions do.
 - Not settled: 0x1d9700 (the particle manager's draw of one 0xf0 record), 0x1e0680 (a jump table by display mode,
   < 0x3b), 0x1e81f8 ({word, 0, 0}), 0x1e4288, 0x1e4e20 / 0x1e4eb8, 0x1fb600..0x1fbbb0 (byte reorders by the tables at
   0x340f10 / 0x341190, likely texture swizzles), 0x203d40, 0x21e788.
+
+## Names from F1c batch 20 (proven)
+
+- Lens flares (`game/src/lensfx.rs`): `LensFX_PrepareFlares` 0x1cc190 (row G7d2c's flares part),
+  `LensFX_PrepareSun` 0x1cd040 (G7d2b's sun part).

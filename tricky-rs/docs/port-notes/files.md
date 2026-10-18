@@ -445,3 +445,16 @@ decoder treats alike.
   (vf33: buffer, size, step 0x17), `EndSave` 0x23dfb8 (vf35: step 0x18, the close); `BeginLoadSlot` 0x23e038 (vf22,
   through `MemCard_BeginLoad` 0x23dfc0: step 0x1b), `LoadMore` 0x23e090 (vf23: step 0x1d), `EndLoad` 0x23e0c8
   (vf25: step 0x1e). `MemCard_GetSlotFileName` 0x23ecf0: the slot's name (+0x1a8 + slot·0x70).
+
+## Names from F1c batch 20 (proven)
+
+- `BIG_FindEntry` 0x2cc0d8 (`BIG_Lookup` with the table at 0x3bb960; the entry's address or 0),
+  `BIG_GetFileCount` 0x2cc1b0 (`BIG_Identify` 1: the big-endian count after the magic), `Shape_Find` 0x2c25f0
+  (a thunk to `Shape_FindByName`).
+- Pad library: `scePadGetButtonMask` 0x2e7e08 (the four mask bytes +0x79..+0x7c when the pad's +0x72 is 1),
+  `scePadSetButtonInfo` 0x2e7ec0 (RPC command 10; on 1 `scePadSetReqState` 2), `scePadInfoPressMode` 0x2e7f70 (the
+  mask is 0x3ffff), `scePadEnterPressMode` 0x2e7fd0 (`scePadSetButtonInfo` 0xfff). `game/src/inputring.rs` calls
+  these two `enter_press_mode` and `press_mode_next`; by the SDK they are the press-mode query and its entry. The
+  Rust code was not changed.
+- Not settled: 0x2c8068 (a file open through `FileSys_RunWithHeap` 0x2c7f60; `speechload.rs` and `crowdbox.rs` call
+  it), 0x2cc2c0 (from `FileSys_InitWithBuffer`: a poll task 0x2cc680 and the mode at 0x3bba60).
