@@ -129,3 +129,41 @@ The test runs 400 cases of each of the 19 functions. The module's destructor and
 
 Of the 46 mutants, 45 are caught. The survivor is equivalent: the sticky bit in the unsigned conversion, which
 never changes a chopped `cvt.s.w` (as in E1d).
+
+## E1f2: the single start screen's state machine (same file, `tests/start_screen_state.rs`)
+
+The single start screen checks the memory card for a saved career before the front end opens. Its state at +0x3cc4
+(28 states) drives that check through the card object's virtuals.
+
+- **`StartScreenSingle_SetState`** (0x1850e8) keeps the state and does its entry work:
+  - the timer at +0x14b8 (75, 120 or 180 frames) or the wait at +0x14c4 (15 or 120);
+  - the card's questions in state 2: is a card there, is it formatted wrong, is there a save, is it damaged;
+  - the save's file name in states 3 and 9: the game code and a tag, put together with `sprintf`;
+  - reading the block into +0x14d0 in state 5.
+  It calls itself for the state it picks.
+- **The frame** (vf5, 0x1845e0):
+  - It moves the blink between 0.2 and 1, turning it back past either end. Nothing more runs once +0x44 is set.
+  - It updates the card, counts the timers down and reads the new buttons.
+  - Outside the states that wait on the card, a changed card makes it pick a state again (the same questions as
+    state 2, mapped a little differently).
+  - Then the state's own step: the button answers (0x880 back, 0x120 yes), the card's file count and room, and so on.
+  - In state 6 a block whose CRC matches the one kept at +0x3c9c is copied into the career. Then the audio is set up
+    again when the system changed, and the brightness is set from the block (+0.5, kept from 0 to 2).
+  - The index gives this function as 968 bytes; it is 0xb08.
+- **The message** (vf7, 0x185430) resets the text box and draws the state's message in the card's box. The message
+  is one or two localised strings, some with the size or count put in.
+- **`Input_GetAnyNewButtons`** (0x1834a8) is ported here on the game's bytes: the buttons that are down now and were
+  not before, on any device.
+- **0x1858c0** is a static initialiser: three colours and a record. It was missing from the index.
+
+The test runs 3,000 cases of each of the 5 functions. `SetState` and `Loc_GetUnquotedString` run for real. The
+stand-ins that fill a buffer write four words into it. `sprintf`'s stand-in also logs where the name's parts lie,
+so a moved buffer shows.
+
+All 83 mutants are caught. Six were first missed by gaps in the test; the cases now cover them:
+- the buffer offsets;
+- a blink landing exactly on its limit;
+- a sound answer of 2;
+- a career block that starts as random words;
+- four files on the card;
+- counts other than 1 and 2.

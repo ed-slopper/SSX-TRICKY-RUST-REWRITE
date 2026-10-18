@@ -1819,7 +1819,7 @@ address,size,name,system,status
 0x182dd8,248,cStartScreen::vf4_182dd8,game,checked
 0x182ed0,776,cStartScreen::vf2_182ed0,game,checked
 0x1831d8,720,cStartScreen::vf6_1831d8,game,checked
-0x1834a8,144,Input_GetAnyNewButtons,input,ported
+0x1834a8,144,Input_GetAnyNewButtons,input,checked
 0x183538,296,MemCardMsg_DrawBox,save,not started
 0x183660,292,Overlay_DrawDontRemoveCard,frontend,not started
 0x183788,864,MemCardMsg_DrawOptions,save,not started
@@ -1841,10 +1841,11 @@ address,size,name,system,status
 0x184578,8,FUN_00184578,frontend?,checked
 0x184580,28,FUN_00184580,frontend?,checked
 0x1845a0,60,cStartScreenSingle::vf4_1845a0,game,checked
-0x1845e0,968,cStartScreenSingle::vf5_1845e0,game,not started
-0x1850e8,88,StartScreenSingle_SetState,game?,not started
+0x1845e0,968,cStartScreenSingle::vf5_1845e0,game,checked
+0x1850e8,88,StartScreenSingle_SetState,game?,checked
 0x185410,32,cStartScreenSingle::vf6_185410,game,checked
-0x185430,1164,cStartScreenSingle::vf7_185430,game,not started
+0x185430,1164,cStartScreenSingle::vf7_185430,game,checked
+0x1858c0,168,FUN_001858c0,frontend?,checked
 0x185968,80,cStartScreenSingle::__tf,runtime,host
 0x1859b8,8,cStartScreenSingle::~cStartScreenSingle,game,checked
 0x1859c0,104,Sky_InitLayers,render?,checked
