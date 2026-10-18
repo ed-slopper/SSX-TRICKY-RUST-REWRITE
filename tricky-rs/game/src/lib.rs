@@ -59,6 +59,7 @@ pub mod fe_difficultsel;
 pub mod fe_characcept;
 pub mod fe_hintbook;
 pub mod fe_video;
+pub mod fe_wbar;
 pub mod fe_wentry;
 pub mod fe_wgroup;
 pub mod fe_wlist;

@@ -2025,3 +2025,40 @@ stand-ins, and the boxes are sometimes a denormal (0 to the EE).
 
 **Follow-up (G9x2, G9x3a):** the text widgets' and the entries' float comparisons now go through `ee()` too, as
 the menu list's do (G9x3b): the EE has no NaN and takes denormals as 0. Both tests pass unchanged.
+
+## G9x4: the bars and pictures (`game/src/fe_wbar.rs`)
+
+- **The progress bar (`cFE3DProgressBar`)** holds a value (+0x160) between a bottom (+0x154) and a top (+0x150). The
+  value may also be held between a lowest (+0x15c) and a highest (+0x158) setting, where -9999 means none.
+  - `StepUp` / `StepDown` move the value by +0x164 and hold it to the limit, or else to the top or bottom. They
+    update the arrows and answer the value in f0.
+  - The pad steps the value up the way the bar fills (+0x168: 0 right, 1 left, 2 up, 3 down) and down the other
+    way. Each step restarts the arrow on that side and tells the owner (+0xc0). Accept answers on its own.
+  - `UpdateFill` shows each arrow (+0x188 towards the bottom, +0x18c towards the top) unless the value has reached
+    its end. It puts the arrow 5 beyond that end of the bar, centred across.
+  - The draw tiles the background (+0x16c), flipped for a bar that fills left or up. It puts the end sprite
+    (+0x170, none below 0) at the far end, 6 wide. One state higher, it draws the cap up to the highest setting in
+    the cap colour (+0x140). Two states higher, it draws the fill, shaded from the low colour (+0x110) to the colour
+    at the value: the high colour +0x120 scaled by the value, the alpha kept. For a way of filling outside 0..3 the
+    draw stops after raising the renderer's state, and leaves it raised.
+- **The icons.** The icon (`cFE3DIcon`) draws its sprite (+0x110, flip +0x114) at its position and size in its
+  colour. The tiled icon (`cFE3DTiledIcon`) tiles it by +0x120 and +0x124. Its constructor sizes it to 10 by 10
+  through the icon's +0x138, which it inherits.
+- **The second button layout (0x2ae230).** The help buttons' one. It differs from `FE3DButton_Layout`: the children
+  are the other way round (icon +0x114, label +0x110), there is no first gap, and the boxes are one higher than the
+  icon.
+- **Small ones:**
+  - the video and options states' destructors and virtuals, `FE3DState_SetName` (+0x54), `FE3D_AddWidget`, a group's
+    first widget;
+  - setters that pass their floats through the stack (+0x90, the world position, the colour, the size with one side
+    kept);
+  - two operation applies (skip, move);
+  - the vector scale 0x2adcb8, the slide-in from anchor 3 that then sets +0x114 16;
+  - the list box's add, and constructors that build only the widget (list box, single-line text, icon, bar).
+
+The test has 61,500 cases (41 functions, 1,500 each). Values are sometimes below the -9999 mark, so that it is seen
+to mean "none". The stack and the port's scratch are filled alike (0xa5), so a word left unwritten is seen.
+
+87 of 89 mutants are caught. The other two are equivalent:
+- the tiled icon's destructor's table, which the icon's overwrites at once;
+- the tiled constructor's size through the tiled table instead of the icon's (both have 0x2ad828 at +0x138).
