@@ -81,8 +81,9 @@ state machine and the renderer are ours. Nothing has been checked against the or
 | G7 | Rendering, as the PS2 renderer does it. Split before claiming: | unowned | E3a, E3b | | [repo] |
 | G21 | **The rider stutters back and forth the whole run** (play test by bredclan, 2026-10-17, tricky-rs.2026-10-17.exe from 3580b5f). To find: whether it is the port (our stand-ins between the exact pieces: the rider's step, its control state, the app's camera or its frame timing fighting the game's fixed tick) or something the decompiling will fix once the boarder state machine (G1) runs whole. First step: log the rider's place and heading each tick in a run (`TRICKY_SIM`) and see which one goes back and forth, and on which frames | any | | | Play test 2026-10-17 |
 | G9x | (umbrella: G9x1..G9x4) The front end's widget classes' own code, 0x2aab58..0x2b68e0 (~200 functions, ~43 KB; the builders that write widgets in place are G9b2c's): the bases, the texts, the lists and entries, the bars and icons, checked in the runner | any | G9b2c | | Added 2026-10-17 by ed-slopper/puffin |
-| G9x2 | The text widgets: `cFE3DWText`, `cFE3DWSingleLineText`, `cFE3DWBufferedSingleLineText`, `cFE3DWColouredText`, `FE3DText_*`, `FE3DTextBox_*`, `cFE3DScrollingText` / `FE3DScrollingText_*`, checked in the runner || ed-slopper/puffin | G9x | | Split of G9x |
-| G9x3 | The lists and entries: `cFE3DWList`, `cFE3DWEntry`, `cFE3DWListBox`, `cFE3DWNameEntry` / `NameEntry_*`, `FE3DMenu_*`, `FE3DButton_*`, `FE3DList_*`, checked in the runner | any | G9x | | Split of G9x |
+| G9x3 | (umbrella: G9x3a, G9x3b) The lists and entries: `cFE3DWList`, `cFE3DWEntry`, `cFE3DWListBox`, `cFE3DWNameEntry` / `NameEntry_*`, `FE3DMenu_*`, `FE3DButton_*`, `FE3DList_*`, checked in the runner | any | G9x | | Split of G9x |
+| G9x3a | The entries, list box, name entry and button: `cFE3DWEntry`, `cFE3DWListBox`, `FE3DList_GetSelectedIndex`, `cFE3DWNameEntry` / `NameEntry_*`, `FE3DButton_Layout`, `FE3D_GetSpriteRect`, checked in the runner | ed-slopper/puffin | G9x3 | | Split of G9x3 |
+| G9x3b | The menu list: `cFE3DWList`'s virtuals and `StaticInit_FE3DWList`, `FE3DMenu_Scroll`, `FUN_002b5958`, checked in the runner | any | G9x3 | | Split of G9x3 |
 | G9x4 | The bars and pictures: `cFE3DProgressBar` / `FE3DProgressBar_*`, `cFE3DIcon`, `cFE3DTiledIcon`, `cFE3DStateVideo`'s small virtuals, the range's unnamed `FUN_*`, checked in the runner | any | G9x | | Split of G9x |
 | G9 | Front end: title, main menu, mode select, rider / outfit / board select, options, records, trick book screens, unlock screens, music player, loading screens (`gApp+0x734`) | unowned | E1, E5 | | [repo] `ui.rs` is ours. Split (2026-10-16): G9b the shared machinery, G9c–G9t the screens (logic ported and checked in the runner, widgets as calls out), G9u the app's menus on them |
 | G9b | (umbrella: G9b1, G9b2) The front end's shared machinery: `cFE3D` (the manager, its per-frame update and the screen it runs), the `cFE3DState` base (the phases, `TransitionIn` / `Out`, `Finish` and `CreateNextState`, `UpdateTransition`, `Activate`, `LayoutWidgets`), the widgets they drive and the 3D transition record (`FE3DTransition_*`, notes in frontend.md) | any | G9 | | Split of G9 |
@@ -153,6 +154,7 @@ matches the original.
 
 | ID | Task | Section | Who | Date | Commit |
 |---|---|---|---|---|---|
+| G9x2 | the text widgets checked in the runner (72,000 cases; 91/95 mutants, 4 equivalent; with FUN_002b1a68 and FUN_002b4858) | P2 | ed-slopper/puffin | 2026-10-17 | 842414d |
 | G9x1 | the widget bases and their lists checked in the runner (48,800 cases; 60/63 mutants, 3 equivalent) | P2 | ed-slopper/puffin | 2026-10-17 | a1f2e47 |
 | G8n | (umbrella: G8n1..G8n6) The race's other overlays, 0x1aa268..0x1c01e8, all checked in the runner | P2 | ed-slopper/puffin | 2026-10-17 | b6c4465 |
 | G8n6 | The race overlays' constructors, destructors and small virtuals in `tricky_game::overlaybase` (with the inits the index marked ported and the functions it misses), checked in the runner (tests/overlaybase.rs, 45,000 cases; 62/64 mutants) | P2 | ed-slopper/puffin | 2026-10-17 | b6c4465 |
@@ -1371,3 +1373,4 @@ matches the original.
 - 2026-10-17 ed-slopper/puffin: G8n6 done b6c4465 (overlay constructors, destructors, small virtuals; 62/64 mutants); G8n umbrella closed
 - 2026-10-17 ed-slopper/puffin: added G9x (the front end's widget classes, 0x2aab58..0x2b68e0) split G9x1..G9x4; claimed G9x1
 - 2026-10-17 ed-slopper/puffin: G9x1 done (a1f2e47: the widget bases and lists, 61 functions checked); claimed G9x2 (the text widgets).
+- 2026-10-17 ed-slopper/puffin: G9x2 done (842414d: the text widgets, 48 functions checked); split G9x3 into G9x3a (entries, list box, name entry, button) and G9x3b (the menu list); claimed G9x3a.
