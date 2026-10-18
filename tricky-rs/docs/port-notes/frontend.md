@@ -2497,3 +2497,23 @@ The board called 0x2a53d0 `FE_BuildOptionsScreen`, but it builds the options scr
   brightness (0x17b970) through 0x2b3950.
 
 The test now answers the kind checks with 0 or 1, so both sides of the check run. All 29 mutants are caught.
+
+## G9y8e: the sound page (`game/src/fe_optbuild.rs`, `tests/fe_optbuild.rs`)
+
+`FE_BuildSoundOptions` 0x29fb70 builds the options screen's sound page (+0x80). It is laid out like the display
+page.
+
+- **Entries.** There are eight entries (ids 0..7). The first two and the last get a sub-menu; the middle five get a
+  progress bar sized 100 by 30. Then comes the end entry.
+- **Kind check.** It is the display page's check, with one addition: a choice list (the +0x90 side) also gets
+  +0x154 2.
+- **Choices.** Entry 0 gets four choices (ids 8..11), entry 1 six (12..17) and entry 7 two (18, 19). Each sub-menu
+  gets +0x154 2 once, before its choices.
+- **Bars.** Each bar that is a slider is set to 1 by 1/11 (0x3dba2e8c), shown from 0, made visible and sized 150 by
+  15.
+- **The end.** The page is refreshed from the sound player (`SoundOptions_Refresh` 0x29ef50, called out with the
+  screen) and laid out.
+
+The test runs 800 cases. The stand-in tables' +0xc0 answers 0 or 1 and takes only the object (the game leaves the
+loop counter in a1). Of the 29 mutants, 28 are caught. The survivor is equivalent: it moves the first bar's size
+vector to where the other bars put theirs, on the stack, where nothing reads it afterwards.

@@ -1,5 +1,5 @@
 //! The options screen's big builders (board rows G9y8e..g) on the game's bytes: `FE_BuildControllerConfig` (the
-//! controller page), then the sound page and the screen itself. The widgets are made in place as the game inlines
+//! controller page), the sound page and the display page. The widgets are made in place as the game inlines
 //! them ([`crate::fe_widgets`]); every other call goes out through [`FeEnv`]. Checked in the function runner
 //! (`tests/fe_optbuild.rs`).
 
@@ -223,8 +223,9 @@ const DISPLAY_CHOICES: [(u32, u32, u32); 9] =
 pub const DISPLAY_NAMES: u32 = 0x3b40e0;
 
 /// A choice widget's kind set-up: a slider (its +0xc0 answers) is given +0x174 0x1a, +0x16c 0x19 and white at
-/// +0x130, +0x110 and +0x120; otherwise, when its +0x90 answers, its bytes +0x112, +0x114 and +0x115 are -1
-fn choice_kind(m: &mut Mem, e: &mut dyn FeEnv, w: u32, slider: u32) {
+/// +0x130, +0x110 and +0x120; otherwise, when its +0x90 answers, its bytes +0x112, +0x114 and +0x115 are -1 (and, on
+/// the sound page, `pick`, its +0x154 2)
+fn choice_kind(m: &mut Mem, e: &mut dyn FeEnv, w: u32, slider: u32, pick: bool) {
     if slider != 0 {
         m.w32(w + 0x174, 0x1a);
         m.w32(w + 0x16c, 0x19);
@@ -232,6 +233,9 @@ fn choice_kind(m: &mut Mem, e: &mut dyn FeEnv, w: u32, slider: u32) {
             put(m, w + at, [ONE; 4]);
         }
     } else if vcall(m, e, w, 0x90, &[]) != 0 {
+        if pick {
+            m.w32(w + 0x154, 2);
+        }
         for at in [0x112u32, 0x114, 0x115] {
             m.w8(w + at, 0xff);
         }
@@ -272,7 +276,7 @@ pub fn display_page(m: &mut Mem, e: &mut dyn FeEnv, s: u32, buf: u32) {
             m.w32(l + at, 0);
         }
         let slider = vcall_class(m, e, MENU_LIST_VTABLE, l, 0xc0, &[]);
-        choice_kind(m, e, l, slider);
+        choice_kind(m, e, l, slider, false);
         display_entry_done(m, e, w, l, id, sid, page, buf);
     }
     // the brightness bar
@@ -282,7 +286,7 @@ pub fn display_page(m: &mut Mem, e: &mut dyn FeEnv, s: u32, buf: u32) {
     put(m, buf + 0x20, [fb(100.0), fb(30.0), 0, 0]);
     vcall_class(m, e, crate::fe_widgets::PROGRESS_VTABLE, b, 0x138, &[buf + 0x20]);
     let slider = vcall(m, e, b, 0xc0, &[]);
-    choice_kind(m, e, b, slider);
+    choice_kind(m, e, b, slider, false);
     display_entry_done(m, e, w, b, 5, 0x80, page, buf);
     // the end
     let w = page_entry(m, e, s, 0x3b4070, page);
@@ -333,5 +337,103 @@ pub fn display_page(m: &mut Mem, e: &mut dyn FeEnv, s: u32, buf: u32) {
     let app = m.r32(GAPP);
     let v = e.call(m, BRIGHTNESS, &[app]);
     e.call(m, BAR_VALUE, &[bar, v]);
+    vcall(m, e, page, 0x140, &[]);
+}
+
+// ---- the sound page (0x29fb70)
+
+/// The sound page's refresh from the sound player (0x29ef50, [`crate::fe_misc::sound_refresh`]), called out
+pub const SOUND_REFRESH: u32 = 0x29ef50;
+/// The sound page's entries in order: (the entry's child's name, its string, a bar rather than a sub-menu)
+const SOUND_ENTRIES: [(u32, u32, bool); 8] = [
+    (0x3b3fe8, 0xe2, false),
+    (0x3b3ff8, 0xd9, false),
+    (0x3b4008, 0xc8, true),
+    (0x3b4018, 0xca, true),
+    (0x3b4028, 0x82, true),
+    (0x3b4040, 0xcf, true),
+    (0x3b4050, 0xdf, true),
+    (0x3b4060, 0x7b, false),
+];
+/// The sub-menus' choices: (the entry, its (id, string)s)
+const SOUND_CHOICES: [(u32, &[(u32, u32)]); 3] = [
+    (0, &[(8, 0xce), (9, 0xe4), (10, 0xe5), (11, 0xb8)]),
+    (1, &[(12, 0xe6), (13, 0xd4), (14, 0xd1), (15, 0xe0), (16, 0xd0), (17, 0xd3)]),
+    (7, &[(18, 0xd7), (19, 0xd5)]),
+];
+
+/// `FE_BuildSoundOptions` 0x29fb70(s; `buf` 0x30 bytes): the sound page (+0x80) given eight entries (ids 0..7; the
+/// strings in [`SOUND_ENTRIES`]), the first two and the last with a sub-menu (0x1b0 bytes), the rest with a progress
+/// bar (0x190 bytes, 100 × 30), each child's kind set up (a choice list also given +0x154 2); an end entry (0xdcd, the
+/// id 0xabcd1234); the sub-menus' choices (each given +0x154 2 first); the five bars, when they are sliders, set to 1
+/// by 1/11 (0x3dba2e8c), shown at 0, made visible and sized 150 × 15; the page refreshed from the sound player and
+/// laid out
+pub fn sound_page(m: &mut Mem, e: &mut dyn FeEnv, s: u32, buf: u32) {
+    let page = m.r32(s + 0x80);
+    for (id, &(name, sid, bar)) in SOUND_ENTRIES.iter().enumerate() {
+        let id = id as u32;
+        let w = page_entry(m, e, s, 0x3b3fd8, page);
+        let c = if bar {
+            let b = alloc(m, e, name, 0x190);
+            crate::fe_widgets::progress_init(m, e, b, s, page);
+            // (the first bar's size is put 0x10 further up the buffer)
+            let at = if id == 2 { buf + 0x20 } else { buf + 0x10 };
+            put(m, at, [fb(100.0), fb(30.0), 0, 0]);
+            vcall_class(m, e, crate::fe_widgets::PROGRESS_VTABLE, b, 0x138, &[at]);
+            let slider = vcall(m, e, b, 0xc0, &[]);
+            choice_kind(m, e, b, slider, true);
+            b
+        } else {
+            let l = alloc(m, e, name, 0x1b0);
+            e.call(m, MENU_CTOR, &[l, s, page, 0, 0, 1]);
+            m.w32(l + 0x190, 2);
+            m.w32(l + 0x194, 0);
+            m.w32(l + 0xc, MENU_LIST_VTABLE);
+            for at in [0x198u32, 0x19c, 0x1a0] {
+                m.w32(l + at, 0);
+            }
+            let slider = vcall_class(m, e, MENU_LIST_VTABLE, l, 0xc0, &[]);
+            choice_kind(m, e, l, slider, true);
+            l
+        };
+        display_entry_done(m, e, w, c, id, sid, page, buf);
+    }
+    // the end
+    let w = page_entry(m, e, s, 0x3b4070, page);
+    let t = m.r32(w + 0x110);
+    vcall(m, e, t, 0x150, &[0xdcd]);
+    entry_colours(m, e, w, buf);
+    m.w32(w + 0x11c, 5);
+    m.w32(w, 0xabcd_1234);
+    vcall(m, e, page, 0x148, &[w]);
+    // the choices
+    let list = page + 0x118;
+    for (k, choices) in SOUND_CHOICES {
+        let item = e.call(m, FIND, &[list, k]);
+        let sub = m.r32(item + 0x114);
+        m.w32(sub + 0x154, 2);
+        for &(id, sid) in choices {
+            let t = alloc(m, e, 0x3b4080, 0x130);
+            let font = menu_font(m);
+            let t = e.call(m, TEXT_CTOR, &[t, s, sub, font]);
+            m.w32(t, id);
+            vcall(m, e, t, 0x150, &[sid]);
+            vcall(m, e, sub, 0x148, &[t]);
+        }
+    }
+    // the bars
+    for k in 2..7u32 {
+        let item = e.call(m, FIND, &[list, k]);
+        let bar = m.r32(item + 0x114);
+        if vcall(m, e, bar, 0xc0, &[]) != 0 {
+            m.w32(bar + 0x150, ONE);
+            m.w32(bar + 0x164, 0x3dba_2e8c);
+            vcall(m, e, bar, 0xf8, &[0]);
+            vcall(m, e, bar, 0x28, &[1]);
+            put(m, buf, [fb(150.0), fb(15.0), 0, 0]);
+            vcall(m, e, bar, 0x138, &[buf]);
+        }
+    }
+    e.call(m, SOUND_REFRESH, &[s]);
     vcall(m, e, page, 0x140, &[]);
 }

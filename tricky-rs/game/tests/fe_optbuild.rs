@@ -57,7 +57,7 @@ const STACK_TOKEN: u32 = 0x5c5c_5c5c;
 fn slot(off: u32) -> u32 {
     0x0181_0000 + off
 }
-const SLOTS: [u32; 11] = [8, 0x28, 0x50, 0x108, 0x110, 0x138, 0x140, 0x148, 0x150, 0x158, 0xf8];
+const SLOTS: [u32; 12] = [8, 0x28, 0x50, 0x108, 0x110, 0x138, 0x140, 0x148, 0x150, 0x158, 0xf8, 0xc0];
 
 #[derive(Clone, Debug, PartialEq)]
 struct Call(u32, Vec<u32>);
@@ -113,7 +113,7 @@ fn arity(f: u32, ans: &Answers) -> (usize, usize) {
         ob::SPRITE_RECT | ob::GROUP_ADD | ob::FIND | WIDGET_PLACE => (2, 0),
         ob::BAR_VALUE => (1, 1),
         f if ans.lone.borrow().contains(&f) => (1, 0),
-        f if f == slot(0x140) => (1, 0),
+        f if f == slot(0x140) || f == slot(0xc0) => (1, 0),
         f if f & 0xffff_0000 == 0x0181_0000 => (2, 0),
         f if ans.vfs.borrow().contains(&f) => (2, 0),
         _ => (1, 0),
@@ -147,7 +147,7 @@ fn standin(io: &mut dyn Io, f: u32, w: &[u32], fl: &[u32], ans: &Answers) -> (u3
         ob::SPRITE_RECT => RECTS + 0x10 * (r % 4),
         ob::FIND => obj(r % 4),
         // (the kind checks either way)
-        f if ans.lone.borrow().contains(&f) => r % 2,
+        f if ans.lone.borrow().contains(&f) || f == slot(0xc0) => r % 2,
         _ => r,
     };
     (answer, Call(f, log))
@@ -171,7 +171,7 @@ impl FeEnv for Env<'_> {
     }
 }
 
-const FUNCS: [u32; 2] = [0x2a36e8, 0x2a53d0];
+const FUNCS: [u32; 3] = [0x2a36e8, 0x2a53d0, 0x29fb70];
 
 #[test]
 fn options_builders_match_the_original() {
@@ -215,7 +215,7 @@ fn options_builders_match_the_original() {
     }
     let mut stubs = vec![
         ALLOC, FILL, ob::MENU_CTOR, ob::TEXT_CTOR, ob::SPRITE_RECT, ob::GROUP_ADD, ob::FIND, ob::PAGES_LAYOUT,
-        WIDGET_PLACE, UPDATE_COLOR, LIST_INIT, ob::BRIGHTNESS, ob::BAR_VALUE,
+        WIDGET_PLACE, UPDATE_COLOR, LIST_INIT, ob::BRIGHTNESS, ob::BAR_VALUE, ob::SOUND_REFRESH,
     ];
     stubs.extend(ans.lone.borrow().iter().copied());
     stubs.extend(ans.vfs.borrow().iter().copied());
@@ -284,6 +284,7 @@ fn options_builders_match_the_original() {
         match func {
             0x2a36e8 => ob::controller_config(mm, e, S, SCRATCH),
             0x2a53d0 => ob::display_page(mm, e, S, SCRATCH),
+            0x29fb70 => ob::sound_page(mm, e, S, SCRATCH),
             _ => unreachable!(),
         }
         ans.n.set(0);
