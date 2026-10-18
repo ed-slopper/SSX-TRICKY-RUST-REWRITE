@@ -5547,7 +5547,7 @@ address,size,name,system,status
 0x29fb40,48,OptionsState_Refresh,frontend?,checked
 0x29fb70,15224,FE_BuildSoundOptions,frontend,ported
 0x2a36e8,7400,FE_BuildControllerConfig,frontend,checked
-0x2a53d0,11268,FE_BuildOptionsScreen,frontend,ported
+0x2a53d0,11268,FE_BuildOptionsScreen,frontend,checked
 0x2a7fd8,932,FE3D_BuildSingleText,frontend?,checked
 0x2a8380,412,FE_BuildCredits,frontend,checked
 0x2a8520,1296,FUN_002a8520,frontend?,checked

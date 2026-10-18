@@ -2481,3 +2481,19 @@ colour.
 
 The test runs 800 cases with the once flag either way. The group's own +0x28 and the text entry's colours go
 through the game's tables, which the test reads and stubs. All 36 mutants are caught.
+
+## G9y8g: the display page (`game/src/fe_optbuild.rs`, `tests/fe_optbuild.rs`)
+
+The board called 0x2a53d0 `FE_BuildOptionsScreen`, but it builds the options screen's display page (+0x98).
+
+- **Entries.** Five entries (ids 0..4) each get a sub-menu as their second child. A sixth (id 5) gets a progress bar
+  sized 100 by 30. Then comes the end entry.
+- **Kind check.** Each child's kind is checked. A slider (its +0xc0 answers) gets +0x174 0x1a, +0x16c 0x19 and white
+  at three colours. Otherwise, when its +0x90 answers, its bytes +0x112, +0x114 and +0x115 are set to -1.
+- **Choices.** Nine choices (ids 7..15) go to the first four sub-menus; each time a choice is added, its sub-menu's
+  +0x154 is set to 2. The fifth sub-menu gets five names (ids 0x10..0x14), set through +0x158 from a table at 0x3b40e0, 8 bytes
+  apart.
+- **Layout and the bar.** The sub-menus are laid out. The bar is shown from 0, sized 15 high, and set to the display
+  brightness (0x17b970) through 0x2b3950.
+
+The test now answers the kind checks with 0 or 1, so both sides of the check run. All 29 mutants are caught.

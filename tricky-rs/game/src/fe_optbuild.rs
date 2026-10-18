@@ -210,3 +210,128 @@ pub fn controller_config(m: &mut Mem, e: &mut dyn FeEnv, s: u32, buf: u32) {
     }
     vcall(m, e, page, 0x140, &[]);
 }
+
+// ---- the display page (0x2a53d0)
+
+/// The display brightness (0x17b970: the app; f0) and a bar's value set (0x2b3950, f12)
+pub const BRIGHTNESS: u32 = 0x17b970;
+pub const BAR_VALUE: u32 = 0x2b3950;
+/// The display page's choice strings by item: (item, id, string)
+const DISPLAY_CHOICES: [(u32, u32, u32); 9] =
+    [(0, 7, 0xbc), (0, 8, 0xcd), (1, 9, 0xd5), (1, 10, 0xde0), (1, 11, 0xde1), (3, 14, 0xd2), (3, 15, 0x78), (2, 12, 0xd7), (2, 13, 0xd5)];
+/// The fifth item's choices' strings (five, 8 bytes apart), set through +0x158
+pub const DISPLAY_NAMES: u32 = 0x3b40e0;
+
+/// A choice widget's kind set-up: a slider (its +0xc0 answers) is given +0x174 0x1a, +0x16c 0x19 and white at
+/// +0x130, +0x110 and +0x120; otherwise, when its +0x90 answers, its bytes +0x112, +0x114 and +0x115 are -1
+fn choice_kind(m: &mut Mem, e: &mut dyn FeEnv, w: u32, slider: u32) {
+    if slider != 0 {
+        m.w32(w + 0x174, 0x1a);
+        m.w32(w + 0x16c, 0x19);
+        for at in [0x130u32, 0x110, 0x120] {
+            put(m, w + at, [ONE; 4]);
+        }
+    } else if vcall(m, e, w, 0x90, &[]) != 0 {
+        for at in [0x112u32, 0x114, 0x115] {
+            m.w8(w + at, 0xff);
+        }
+    }
+}
+
+/// The entry finished: +0x11c 5, its colours, its text's string, its id, its second child `c` (with the same id)
+fn display_entry_done(m: &mut Mem, e: &mut dyn FeEnv, w: u32, c: u32, id: u32, sid: u32, page: u32, buf: u32) {
+    m.w32(w + 0x11c, 5);
+    entry_colours(m, e, w, buf);
+    let t = m.r32(w + 0x110);
+    vcall(m, e, t, 0x150, &[sid]);
+    m.w32(w, id);
+    let old = m.r32(w + 0x114);
+    if old != 0 {
+        vcall(m, e, old, 8, &[3]);
+    }
+    m.w32(c, id);
+    m.w32(w + 0x114, c);
+    vcall(m, e, page, 0x148, &[w]);
+}
+
+/// The display page's builder 0x2a53d0(s; `buf` 0x30 bytes): the page (+0x98) given five entries (ids 0..4; strings
+/// 0xe3, 0xed, 0x7c, 0xdc, 0xc9), each with a sub-menu (0x1b0 bytes; its kind set up) as its second child; a sixth
+/// (id 5, 0x80) with a progress bar (0x190 bytes, 100 × 30); an end entry (0xdcd, the id 0xabcd1234); the sub-menus'
+/// choices (+0x154 2) and the fifth's five names; each sub-menu laid out; the bar shown from 0 by 0.02 at the display
+/// brightness; the page laid out
+pub fn display_page(m: &mut Mem, e: &mut dyn FeEnv, s: u32, buf: u32) {
+    let page = m.r32(s + 0x98);
+    for (id, sid) in [(0u32, 0xe3u32), (1, 0xed), (2, 0x7c), (3, 0xdc), (4, 0xc9)] {
+        let w = page_entry(m, e, s, 0x3b3fd8, page);
+        let l = alloc(m, e, 0x3b40c0, 0x1b0);
+        e.call(m, MENU_CTOR, &[l, s, page, 0, 0, 1]);
+        m.w32(l + 0x190, 2);
+        m.w32(l + 0x194, 0);
+        m.w32(l + 0xc, MENU_LIST_VTABLE);
+        for at in [0x198u32, 0x19c, 0x1a0] {
+            m.w32(l + at, 0);
+        }
+        let slider = vcall_class(m, e, MENU_LIST_VTABLE, l, 0xc0, &[]);
+        choice_kind(m, e, l, slider);
+        display_entry_done(m, e, w, l, id, sid, page, buf);
+    }
+    // the brightness bar
+    let w = page_entry(m, e, s, 0x3b3fd8, page);
+    let b = alloc(m, e, 0x3b40c8, 0x190);
+    crate::fe_widgets::progress_init(m, e, b, s, page);
+    put(m, buf + 0x20, [fb(100.0), fb(30.0), 0, 0]);
+    vcall_class(m, e, crate::fe_widgets::PROGRESS_VTABLE, b, 0x138, &[buf + 0x20]);
+    let slider = vcall(m, e, b, 0xc0, &[]);
+    choice_kind(m, e, b, slider);
+    display_entry_done(m, e, w, b, 5, 0x80, page, buf);
+    // the end
+    let w = page_entry(m, e, s, 0x3b4070, page);
+    let t = m.r32(w + 0x110);
+    vcall(m, e, t, 0x150, &[0xdcd]);
+    entry_colours(m, e, w, buf);
+    m.w32(w + 0x11c, 5);
+    m.w32(w, 0xabcd_1234);
+    vcall(m, e, page, 0x148, &[w]);
+    // the choices
+    let list = page + 0x118;
+    for (k, id, sid) in DISPLAY_CHOICES {
+        let item = e.call(m, FIND, &[list, k]);
+        let sub = m.r32(item + 0x114);
+        m.w32(sub + 0x154, 2);
+        let t = alloc(m, e, 0x3b40d0, 0x130);
+        let font = menu_font(m);
+        let t = e.call(m, TEXT_CTOR, &[t, s, sub, font]);
+        m.w32(t, id);
+        vcall(m, e, t, 0x150, &[sid]);
+        vcall(m, e, sub, 0x148, &[t]);
+    }
+    let item = e.call(m, FIND, &[list, 4]);
+    let sub = m.r32(item + 0x114);
+    m.w32(sub + 0x154, 2);
+    for i in 0..5u32 {
+        let t = alloc(m, e, 0x3b4080, 0x130);
+        let font = menu_font(m);
+        let t = e.call(m, TEXT_CTOR, &[t, s, sub, font]);
+        m.w32(t, 0x10 + i);
+        vcall(m, e, t, 0x158, &[DISPLAY_NAMES + 8 * i]);
+        vcall(m, e, sub, 0x148, &[t]);
+    }
+    for k in 0..5u32 {
+        let item = e.call(m, FIND, &[list, k]);
+        let sub = m.r32(item + 0x114);
+        vcall(m, e, sub, 0x140, &[]);
+    }
+    let item = e.call(m, FIND, &[list, 5]);
+    let bar = m.r32(item + 0x114);
+    vcall(m, e, bar, 0xf8, &[0]);
+    let x = m.r32(bar + 0x100);
+    put(m, buf, [x, fb(15.0), 0, 0]);
+    vcall(m, e, bar, 0x138, &[buf]);
+    m.w32(bar + 0x150, ONE);
+    m.w32(bar + 0x164, 0x3ca3_d70a);
+    m.w32(bar + 0x154, 0);
+    let app = m.r32(GAPP);
+    let v = e.call(m, BRIGHTNESS, &[app]);
+    e.call(m, BAR_VALUE, &[bar, v]);
+    vcall(m, e, page, 0x140, &[]);
+}

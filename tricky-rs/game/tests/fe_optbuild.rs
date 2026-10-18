@@ -12,7 +12,8 @@ use std::rc::Rc;
 use r5900::Runner;
 use tricky_game::fe3dstate::{FeEnv, ALLOC, FILL, GAPP, WIDGET_PLACE};
 use tricky_game::fe_optbuild as ob;
-use tricky_game::fe_widgets::{GROUP_VTABLE, ICON_VTABLE, LIST_INIT, TEXT_ENTRY_VTABLE, UPDATE_COLOR};
+use tricky_game::fe_widgets::{GROUP_VTABLE, ICON_VTABLE, LIST_INIT, PROGRESS_VTABLE, TEXT_ENTRY_VTABLE, UPDATE_COLOR};
+use tricky_game::fe_world::MENU_LIST_VTABLE;
 use tricky_game::pf::Mem;
 
 struct Rng(u64);
@@ -39,7 +40,7 @@ impl Rng {
 const DATA: (u32, u32) = (0x337c00, 0x400);
 /// the game's words the builders read and keep: the controller page's tables and once flag, its pictures' x; the
 /// widget classes' tables
-const GAME: [(u32, u32); 5] = [(0x348200, 0x300), (0x3d3500, 0x100), (0x3a9e00, 0x200), (0x3ae600, 0x400), (0x3b6e00, 0x600)];
+const GAME: [(u32, u32); 6] = [(0x348200, 0x300), (0x3d3500, 0x100), (0x3a9e00, 0x200), (0x3ae600, 0x400), (0x3b6c00, 0x800), (0x3b7f00, 0x200)];
 const ARENA: u32 = 0x0100_0000;
 const SIZE: u32 = 0x1000;
 const S: u32 = ARENA;
@@ -56,7 +57,7 @@ const STACK_TOKEN: u32 = 0x5c5c_5c5c;
 fn slot(off: u32) -> u32 {
     0x0181_0000 + off
 }
-const SLOTS: [u32; 8] = [8, 0x28, 0x50, 0x108, 0x110, 0x140, 0x148, 0x150];
+const SLOTS: [u32; 11] = [8, 0x28, 0x50, 0x108, 0x110, 0x138, 0x140, 0x148, 0x150, 0x158, 0xf8];
 
 #[derive(Clone, Debug, PartialEq)]
 struct Call(u32, Vec<u32>);
@@ -94,6 +95,8 @@ struct Answers {
     heap: Cell<u32>,
     /// the widget classes' virtuals called through the game's tables (one argument each)
     vfs: RefCell<Vec<u32>>,
+    /// the virtuals that take only the object (the kind checks)
+    lone: RefCell<Vec<u32>>,
 }
 impl Answers {
     fn next(&self) -> u32 {
@@ -108,6 +111,8 @@ fn arity(f: u32, ans: &Answers) -> (usize, usize) {
         ob::TEXT_CTOR => (4, 0),
         ALLOC | FILL => (3, 0),
         ob::SPRITE_RECT | ob::GROUP_ADD | ob::FIND | WIDGET_PLACE => (2, 0),
+        ob::BAR_VALUE => (1, 1),
+        f if ans.lone.borrow().contains(&f) => (1, 0),
         f if f == slot(0x140) => (1, 0),
         f if f & 0xffff_0000 == 0x0181_0000 => (2, 0),
         f if ans.vfs.borrow().contains(&f) => (2, 0),
@@ -141,6 +146,8 @@ fn standin(io: &mut dyn Io, f: u32, w: &[u32], fl: &[u32], ans: &Answers) -> (u3
         }
         ob::SPRITE_RECT => RECTS + 0x10 * (r % 4),
         ob::FIND => obj(r % 4),
+        // (the kind checks either way)
+        f if ans.lone.borrow().contains(&f) => r % 2,
         _ => r,
     };
     (answer, Call(f, log))
@@ -164,7 +171,7 @@ impl FeEnv for Env<'_> {
     }
 }
 
-const FUNCS: [u32; 1] = [0x2a36e8];
+const FUNCS: [u32; 2] = [0x2a36e8, 0x2a53d0];
 
 #[test]
 fn options_builders_match_the_original() {
@@ -174,7 +181,7 @@ fn options_builders_match_the_original() {
         r.allow(f);
     }
     let log: Rc<RefCell<Vec<Call>>> = Rc::default();
-    let ans = Rc::new(Answers { seed: Cell::new(0), n: Cell::new(0), heap: Cell::new(HEAP.0), vfs: RefCell::default() });
+    let ans = Rc::new(Answers { seed: Cell::new(0), n: Cell::new(0), heap: Cell::new(HEAP.0), vfs: RefCell::default(), lone: RefCell::default() });
     let game: Vec<(u32, Vec<u8>)> = GAME
         .iter()
         .map(|&(at, n)| {
@@ -193,16 +200,24 @@ fn options_builders_match_the_original() {
         (TEXT_ENTRY_VTABLE, 0x110),
         (TEXT_ENTRY_VTABLE, 0x108),
         (TEXT_ENTRY_VTABLE, 0x50),
+        (PROGRESS_VTABLE, 0x138),
     ] {
         let f = word(vt + off + 4);
         if !ans.vfs.borrow().contains(&f) {
             ans.vfs.borrow_mut().push(f);
         }
     }
+    for (vt, off) in [(MENU_LIST_VTABLE, 0xc0u32), (MENU_LIST_VTABLE, 0x90), (PROGRESS_VTABLE, 0xc0), (PROGRESS_VTABLE, 0x90)] {
+        let f = word(vt + off + 4);
+        if !ans.lone.borrow().contains(&f) {
+            ans.lone.borrow_mut().push(f);
+        }
+    }
     let mut stubs = vec![
         ALLOC, FILL, ob::MENU_CTOR, ob::TEXT_CTOR, ob::SPRITE_RECT, ob::GROUP_ADD, ob::FIND, ob::PAGES_LAYOUT,
-        WIDGET_PLACE, UPDATE_COLOR, LIST_INIT,
+        WIDGET_PLACE, UPDATE_COLOR, LIST_INIT, ob::BRIGHTNESS, ob::BAR_VALUE,
     ];
+    stubs.extend(ans.lone.borrow().iter().copied());
     stubs.extend(ans.vfs.borrow().iter().copied());
     stubs.extend(SLOTS.map(slot));
     for f in stubs {
@@ -244,8 +259,9 @@ fn options_builders_match_the_original() {
             m.w16(VT + off, g.pick(&[0u16, 4]));
             m.w32(VT + off + 4, slot(off));
         }
-        // the screen: its group (+0x90), page (+0x8c), the third label group; the finds' items and sub-menus
-        for (at, k) in [(0x90u32, 4u32), (0x8c, 5), (0xc8, 6)] {
+        // the screen: its group (+0x90), its pages (+0x8c, +0x98, +0x80), the third label group; the finds' items and
+        // sub-menus
+        for (at, k) in [(0x90u32, 4u32), (0x8c, 5), (0xc8, 6), (0x98, 3), (0x80, 2)] {
             m.w32(S + at, obj(k));
         }
         for k in 0..8 {
@@ -267,6 +283,7 @@ fn options_builders_match_the_original() {
         let mm = &mut m;
         match func {
             0x2a36e8 => ob::controller_config(mm, e, S, SCRATCH),
+            0x2a53d0 => ob::display_page(mm, e, S, SCRATCH),
             _ => unreachable!(),
         }
         ans.n.set(0);
