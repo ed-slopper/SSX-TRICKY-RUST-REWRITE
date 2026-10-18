@@ -34,7 +34,6 @@ state machine and the renderer are ours. Nothing has been checked against the or
 | ID | Task | Area | Needs | Who | Notes |
 |---|---|---|---|---|---|
 | E1 | Start-up and main loop: `entry` 0x100008, the `gApp` (0x337C58) init, `cGame::Init` 0x17E148, `cGame::Update` 0x181638, game modes and the front end ↔ race switch, pause (`cGame::IsPaused` 0x17F078) | unowned | F1 | | [est] Our Bevy app loop is the stand-in |
-| E1h | `cGame::Init` 0x17e148 on the game's bytes (the race set up: the objects in the game's order, the course, fog, snow, fonts, the attract flag), checked in the runner with the checked course table, archive, effects loader and restart run for real | ed-slopper/puffin | E1d | | Split of E1 2026-10-18 |
 | E1i | The rest of E1's ported-but-unchecked functions on the game's bytes, checked in the runner: `cPS2Device` vf1..vf5, vf9, vf10, `Render_Get/SetBrightness`, 0x182170, `App_OpenBigFiles`, `Loc_LoadForRegion`, `App_SetMode`, `cLoadModule::~cLoadModule`, the game's helpers 0x17f078..0x181d60 (`IsPaused`, `Game_IsMenuOrOverlayActive`, `SetHudOption`, `SetViewportMode`, `IsLeadOrFocusRider`, `LayoutViewports`, `GetLeadingPlayer`, `MoveLeaderToSlot0`, `RestartRace`, `ResetCameras`, `RestoreViews`, `UseSingleView`) and `entry` 0x100008 | any | E1h | | Split of E1 2026-10-18 |
 | E1a | Fixed 60 Hz tick with per-boarder time scale (`dt = timescale/60`, boarder+0x12c) driving every system, frame-rate independent of the window | any | | | [repo] `port-notes/README.md` (units); check what `SmoothDt` in `main.rs` does today Split: E1a1, E1a2 |
 | E1a2 | The rest of E1a: world animations, props, particles, spray, camera on the same tick; draw between ticks (interpolate, ours: tag STANDIN) | any | E1a1 | | Split of E1a |
@@ -151,6 +150,7 @@ matches the original.
 
 | ID | Task | Section | Who | Date | Commit |
 |---|---|---|---|---|---|
+| E1h | cGame::Init on the game's bytes: game/src/game_main.rs game_init, tests/game_init.rs; 50 of 51 mutants (the survivor an allocation failure the test cannot make) | P2 | ed-slopper/puffin | 2026-10-17 | 3ce56d2 |
 | E1g | The boot films and the execution manager: game/src/boot.rs, tests/boot.rs (28 functions); 65 of 66 mutants, the survivor equivalent | P2 | ed-slopper/puffin | 2026-10-17 | 2abebb7 |
 | E1f | The start screen and the memory card messages: E1f1 (9244372), E1f2 (a5e0d3a), E1f3 (5e8cf06) | P2 | ed-slopper/puffin | 2026-10-17 | 5e8cf06 |
 | E1f3 | The memory card messages: DrawBox, DrawOptions, DrawButtonPrompt, Draw, DrawDontRemoveCard (tests/start_screen_msg.rs); 43 of 44 mutants, the survivor equivalent | P2 | ed-slopper/puffin | 2026-10-17 | 5e8cf06 |
@@ -1439,3 +1439,4 @@ matches the original.
 - 2026-10-18 ed-slopper/puffin: E1f2 done (a5e0d3a: the single start screen, 83/83); E1f3 claimed (the memory card messages).
 - 2026-10-18 ed-slopper/puffin: E1f3 done (5e8cf06: the memory card messages, 43/44); E1f closed; E1g claimed (the boot films and the execution manager).
 - 2026-10-18 ed-slopper/puffin: E1g done (2abebb7: the boot films and the execution manager, 65/66); E1h added and claimed (cGame::Init), E1i added (the rest of E1 unchecked).
+- 2026-10-18 ed-slopper/puffin: E1h done (3ce56d2: cGame::Init, 50/51). Paused at the user's request; E1i (drafted in the scratchpad, not in the crate) is still open.
