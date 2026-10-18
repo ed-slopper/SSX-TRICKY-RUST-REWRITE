@@ -4833,7 +4833,7 @@ address,size,name,system,status
 0x266320,112,FE3DCharacter_LoadRiderAsync,other,checked
 0x266390,84,FE3DCharacter_FreeRider,boarder?,checked
 0x2663e8,12,FUN_002663e8,frontend?,checked
-0x2663f8,2556,cFE3DCharacter::vf10_2663f8,frontend,not started
+0x2663f8,2556,cFE3DCharacter::vf10_2663f8,frontend,checked
 0x266df8,680,cFE3DCharacter::vf12_266df8,frontend,checked
 0x2670a0,64,FE3DCharacter_LoadRider,game?,checked
 0x2670e0,8,FE3DCharacter_SetSelected,frontend?,checked

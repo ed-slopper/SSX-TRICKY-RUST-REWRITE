@@ -2690,3 +2690,24 @@ view matrix on the stack is logged by value, all 16 words.
 
 Of the 50 mutants, 49 are caught. The survivor is data-equivalent: the shots' byte read unsigned, and all 16 rows'
 bytes are 0 in the game's data.
+
+## G9z2b: the front end character's draw (`game/src/fe_scene.rs`, `tests/fe_scene_char.rs`)
+
+`cFE3DCharacter` vf10 0x2663f8 (c, mat) draws the character. It runs only when the character is shown and its
+model has its rider.
+
+- **Placement.** The model is placed by `mat`. When its turn (+0xb8) is set, the matrix is first turned about z by
+  turn x -pi/6 - pi/2 and put at the front end's +0x60.
+- **Shadow.** Unless +0xa4, the shadow's matrix is raised 1000 and turned a quarter turn about y, then about x, and
+  the shadow's part (+0x7c0 + 0x394 x its index) is cleared. The shadow's matrix is then set and the shadow made.
+- **Culling.** The renderer's box test (+0x280) gets a box of 70 either side across and from -50 to 150 up, about
+  the placed position. A 1 culls the draw.
+- **Lights.** The three lights' directions go through the transpose of the renderer's view (+0xf8). The game
+  transposes with the MMI `PEXTLW` / `PEXTUW` / `PCPYLD` / `PCPYUD`, which the disassembler shows as words.
+- **Passes.** The model is drawn twice: first with the ambient's first lane cleared, then with it restored. The
+  render states, fog (0.08) and texture modes are set around the passes as the game does. Board 6 has the
+  renderer's +0x2b8 on.
+
+The test (with G9z2's) runs 500 draw cases. Matrices on the stack are logged by value (16 words), vectors 4 words.
+The lights handed to the lighting set-up are logged by value too: otherwise clearing and restoring the ambient
+would leave nothing to see. All 30 mutants are caught.

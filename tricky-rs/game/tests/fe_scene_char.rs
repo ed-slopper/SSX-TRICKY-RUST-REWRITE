@@ -1,5 +1,5 @@
-//! `tricky_game::fe_scene`'s characters (board row G9z2) against the original in the function runner (TRICKY_ELF;
-//! skipped without it): `cFE3DCharacter`'s set-up, update, loads, poses and lights. Every case builds a random
+//! `tricky_game::fe_scene`'s characters (board rows G9z2, G9z2b) against the original in the function runner (TRICKY_ELF;
+//! skipped without it): `cFE3DCharacter`'s set-up, update, draw, loads, poses and lights. Every case builds a random
 //! character (its rider, outfit and board, poses, load, changes, light and angles), rider model and front end in the
 //! arena; one function then runs on both sides. The character's own functions and the game's sine and cosine run for
 //! real on both sides; every other callee is a stand-in answering from the case's seed: the heap (handed out in
@@ -47,9 +47,12 @@ const VT: u32 = ARENA + 0x1800;
 const C: u32 = ARENA + 0x2000;
 const INFO: u32 = ARENA + 0x2400;
 const LIGHTS: u32 = ARENA + 0x2800;
+const R: u32 = ARENA + 0x2c00;
+const VIEW: u32 = ARENA + 0x2d00;
 const MODEL: (u32, u32) = (0x0120_0000, 0x4800);
 const HEAP: (u32, u32) = (0x0110_0000, 0x10000);
 const SCRATCH: u32 = 0x01f8_0000;
+const SCRATCH_SIZE: u32 = 0x200;
 const STACK_TOKEN: u32 = 0x5c5c_5c5c;
 fn slot(off: u32) -> u32 {
     0x0181_0000 + off
@@ -81,7 +84,7 @@ impl Io for r5900::Mem {
     }
 }
 fn stack(a: u32) -> bool {
-    (0x01fe_c000..0x01ff_0000).contains(&a) || (SCRATCH..SCRATCH + 0x100).contains(&a)
+    (0x01fe_c000..0x01ff_0000).contains(&a) || (SCRATCH..SCRATCH + SCRATCH_SIZE).contains(&a)
 }
 fn token(a: u32) -> u32 {
     if (0x01f0_0000..0x01ff_0000).contains(&a) { STACK_TOKEN } else { a }
@@ -95,6 +98,12 @@ fn arity(f: u32) -> (usize, usize) {
         sc::SCENE_BASE_DTOR | sc::THING_DTOR | sc::MODEL_SET_PARTS | sc::MODEL_FREE_RIDER | sc::LOAD_RUN
         | sc::LOAD_DONE | sc::LOAD_FINISH | sc::LOAD_RELEASE | sc::ANIM_PLAYING => (2, 0),
         sc::ANIM_SPEED => (1, 1),
+        sc::LIGHTING_SETUP => (8, 0),
+        f if f == slot(0x1c8) => (3, 1),
+        f if f == slot(0x280) => (3, 0),
+        f if f == slot(0xf8) || f == slot(0x1a8) => (1, 0),
+        sc::MODEL_SET_MATRIX | sc::MODEL_SET_SHADOW_MATRIX | sc::MODEL_DRAW => (2, 0),
+        f if [0x2b8u32, 0x1a0, 0x1c0, 0x218, 0x1e0].iter().any(|&o| slot(o) == f) => (2, 0),
         f if f == slot(8) => (2, 0),
         _ => (1, 0),
     }
@@ -116,9 +125,23 @@ fn standin(io: &mut dyn Io, f: u32, w: &[u32], fl: &[u32], ans: &Answers) -> (u3
     let (ni, nf) = arity(f);
     let mut log: Vec<u32> = w[..ni].iter().map(|&a| token(a)).collect();
     log.extend(&fl[..nf]);
-    // (a request or options on the stack by value)
-    if stack(w[0]) {
-        log.extend((0..2).map(|k| token(io.r32(w[0] + 4 * k))));
+    // (a request or options on the stack by value; for the draw, the matrices and vectors it hands on)
+    if f == sc::LOAD_REQUEST || f == sc::LOAD_RUN || f == sc::LOAD_OPTIONS || f == sc::LOAD_OPTIONS_ASYNC {
+        if stack(w[0]) {
+            log.extend((0..2).map(|k| token(io.r32(w[0] + 4 * k))));
+        }
+    } else {
+        let matrix = f == sc::MODEL_SET_MATRIX || f == sc::MODEL_SET_SHADOW_MATRIX || f == slot(0x218);
+        let words = if matrix { 16 } else { 4 };
+        for &a in w[..ni].iter() {
+            if stack(a) {
+                log.extend((0..words).map(|k| token(io.r32(a + 4 * k))));
+            }
+        }
+        // (the lights the set-up is handed, by value: the draw clears its ambient's first lane for one pass)
+        if f == sc::LIGHTING_SETUP {
+            log.extend((0..4).map(|k| io.r32(w[1] + 4 * k)));
+        }
     }
     let r = ans.next();
     let mut g = Rng(r as u64 | 1);
@@ -135,6 +158,8 @@ fn standin(io: &mut dyn Io, f: u32, w: &[u32], fl: &[u32], ans: &Answers) -> (u3
         sc::MODEL_CTOR => MODEL.0,
         sc::LOAD_DONE | sc::ANIM_PLAYING => r % 2,
         sc::SCREEN_MODE => g.pick(&[0u32, 1, 2, 3]),
+        f if f == slot(0x280) => g.pick(&[0u32, 1, 1, 2]),
+        f if f == slot(0xf8) => VIEW,
         sc::LOAD_START => g.pick(&[0u32, 4, 0xffff_ffff]),
         _ => r,
     };
@@ -159,7 +184,8 @@ impl FeEnv for Env<'_> {
     }
 }
 
-const FUNCS: [u32; 17] = [
+const FUNCS: [u32; 18] = [
+    0x2663f8,
     0x265da0, 0x265dc0, 0x265ed8, 0x266110, 0x266190, 0x2661e8, 0x2661f0, 0x266208, 0x266320, 0x266390, 0x2663e8,
     0x266df8, 0x2670a0, 0x2670e8, 0x2673f8, 0x267508, 0x267670,
 ];
@@ -183,6 +209,7 @@ fn ours(m: &mut Mem, e: &mut dyn FeEnv, f: u32, a: [u32; 4], f12: u32) -> Option
         0x2670a0 => sc::load_rider(m, e, a[0], buf),
         0x2670e8 => sc::update_lighting(m, a[0], buf),
         0x2673f8 => sc::fill_lights_a(m, a[1]),
+        0x2663f8 => sc::character_draw(m, e, a[0], a[1], buf),
         0x267508 => sc::fill_lights_b(m, a[1]),
         0x267670 => sc::lighting_lerp(m, a[1], a[2], a[3], f12),
         _ => unreachable!("{f:#x}"),
@@ -199,6 +226,9 @@ fn characters_match_the_original() {
     }
     r.allow(SIN);
     r.allow(COS);
+    // (the draw's turns: `Math_SinCos`, and the shadow part's clear 0x267f08)
+    r.allow(0x250c10);
+    r.allow(0x267f08);
     let log: Rc<RefCell<Vec<Call>>> = Rc::default();
     let ans = Rc::new(Answers { seed: Cell::new(0), n: Cell::new(0), heap: Cell::new(HEAP.0) });
     let game: Vec<(u32, Vec<u8>)> = GAME
@@ -214,8 +244,10 @@ fn characters_match_the_original() {
         sc::MODEL_SET_RIDER, sc::MODEL_FREE_RIDER, sc::LOAD_REQUEST, sc::LOAD_RUN, sc::LOAD_OPTIONS,
         sc::LOAD_OPTIONS_ASYNC, sc::LOAD_START, sc::LOAD_DONE, sc::LOAD_FINISH, sc::LOAD_RELEASE, sc::KEEP_OUTFIT,
         sc::KEEP_BOARD, sc::ANIM_PLAYING, sc::ANIM_PLAY, sc::ANIM_SPEED, sc::ANIM_STEP, sc::ANIM_STOP, sc::SCREEN_MODE,
-        slot(8),
+        slot(8), sc::LIGHTING_SETUP, sc::MODEL_SET_MATRIX, sc::MODEL_SET_SHADOW_MATRIX, sc::MODEL_MAKE_SHADOW,
+        sc::MODEL_DRAW, sc::MATRIX_MAKE,
     ];
+    stubs.extend([0x280u32, 0x2b8, 0x1a0, 0x1c8, 0x1c0, 0xf8, 0x218, 0x1e0, 0x1a8].map(slot));
     stubs.extend(sc::RIDER_PARTS);
     for f in stubs {
         let (l, a) = (log.clone(), ans.clone());
@@ -241,7 +273,7 @@ fn characters_match_the_original() {
             (ARENA, vec![0; SIZE as usize]),
             (MODEL.0, vec![0; MODEL.1 as usize]),
             (HEAP.0, vec![0; HEAP.1 as usize]),
-            (SCRATCH, vec![0; 0x100]),
+            (SCRATCH, vec![0; SCRATCH_SIZE as usize]),
         ]);
         let mut m = Mem { regions };
         for k in 0..SIZE / 4 {
@@ -252,8 +284,25 @@ fn characters_match_the_original() {
         }
         m.w32(GAPP, APPOBJ);
         m.w32(APPOBJ + 0x734, FE);
-        m.w16(VT + 8, g.pick(&[0u16, 4]));
-        m.w32(VT + 0xc, slot(8));
+        for off in [8u32, 0x280, 0x2b8, 0x1a0, 0x1c8, 0x1c0, 0xf8, 0x218, 0x1e0, 0x1a8] {
+            m.w16(VT + off, g.pick(&[0u16, 4]));
+            m.w32(VT + off + 4, slot(off));
+        }
+        // (the renderer, its view, the front end's position; the draw's turn, shadow flag and shown flag)
+        m.w32(APPOBJ + 0x724, R);
+        m.w32(R + 0x10, VT);
+        for k in 0..16 {
+            m.w32(VIEW + 4 * k, g.f(-2.0, 2.0).to_bits());
+        }
+        for k in 0..4 {
+            m.w32(FE + 0x60 + 4 * k, g.f(-300.0, 300.0).to_bits());
+        }
+        m.w32(C + 0xb8, g.pick(&[0xffff_ffffu32, 0, 1, 5, 11]));
+        m.w32(C + 0xa4, g.below(2));
+        m.w32(C + 0x14, g.pick(&[0u32, 1, 1]));
+        for k in 0..12 {
+            m.w32(C + 0x120 + 4 * k, g.f(-1.0, 1.0).to_bits());
+        }
         // (the character: its model or none, its record, rider, outfit and board, poses, load, changes, light)
         // (only the destructor sees a character without its model or record)
         let dtor = func == 0x266110;
@@ -277,6 +326,7 @@ fn characters_match_the_original() {
         }
         m.w32(MODEL.0, VT);
         m.w32(MODEL.0 + 0x46b0, g.below(2));
+        m.w32(MODEL.0 + 0x44dc, g.below(4));
         for k in 0..0x60u32 {
             m.w32(LIGHTS + 4 * k, g.f(-10.0, 400.0).to_bits());
         }
@@ -285,7 +335,7 @@ fn characters_match_the_original() {
         }
         r.mem.write(0x01ff_0000 - 0x4000, &[0u8; 0x4000]).unwrap();
         let a = [C, g.pick(&[0u32, 1, 2, 3, 12]), LIGHTS + 0x60, LIGHTS + 0xc0];
-        let a = if func == 0x2673f8 || func == 0x267508 || func == 0x267670 { [C, LIGHTS, a[2], a[3]] } else { a };
+        let a = if func == 0x2673f8 || func == 0x267508 || func == 0x267670 || func == 0x2663f8 { [C, LIGHTS, a[2], a[3]] } else { a };
         let any = g.f(0.0, 1.0);
         let f12 = g.pick(&[0.0f32, 1.0, 0.25, 0.7, any]).to_bits();
         ans.seed.set(((g.next() as u64) << 32) | g.next() as u64);

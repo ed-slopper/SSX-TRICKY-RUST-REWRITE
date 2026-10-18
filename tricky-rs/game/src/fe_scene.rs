@@ -1787,3 +1787,127 @@ pub fn scripted_render(m: &mut Mem, e: &mut dyn FeEnv, c: u32, buf: u32) {
     }
     camera_draw_world(m, e, c, buf + 0x40);
 }
+
+// ---- the character's draw (0x2663f8)
+
+/// The character draw's calls out: the model's matrices set (0x2083e8 its placement, 0x2083d8 its shadow's), its
+/// shadow made (0x208400) and the model drawn (0x208010), all on the model's +0x79c
+pub const MODEL_SET_MATRIX: u32 = 0x2083e8;
+pub const MODEL_SET_SHADOW_MATRIX: u32 = 0x2083d8;
+pub const MODEL_MAKE_SHADOW: u32 = 0x208400;
+pub const MODEL_DRAW: u32 = 0x208010;
+
+fn put_rows(m: &mut Mem, at: u32, r: &[[F; 4]; 4]) {
+    for (i, row) in r.iter().enumerate() {
+        for (k, v) in row.iter().enumerate() {
+            m.w32(at + 0x10 * i as u32 + 4 * k as u32, v.0.to_bits());
+        }
+    }
+}
+
+fn rend(m: &mut Mem, e: &mut dyn FeEnv, off: u32, args: &[u32]) -> u32 {
+    let r = renderer(m);
+    vcall_at(m, e, r, 0x10, off, args)
+}
+
+/// The two lighting passes' set-up: the lights (+0xc0) with the view's directions (`dirs`) set up into `out`
+fn character_lights(m: &mut Mem, e: &mut dyn FeEnv, c: u32, dirs: u32, out: u32) {
+    e.call(m, LIGHTING_SETUP, &[out, c + 0xc0, dirs, c + 0xe8, dirs + 0x10, c + 0xf8, dirs + 0x20, c + 0x108]);
+    rend(m, e, 0x218, &[out]);
+}
+
+/// `cFE3DCharacter` vf10 0x2663f8(c, mat; `buf` 0x1c0 bytes), the draw: when shown and the model has its rider:
+/// - the model placed by `mat`, turned first (when its turn, +0xb8, is set) about z by -pi turn / 6 - pi/2 and put at
+///   the front end's +0x60;
+/// - its shadow's matrix (unless +0xa4: raised 1000 and turned a quarter about y and about x, the shadow's part
+///   cleared) set and the shadow made;
+/// - unless the renderer culls the box (70 either side across, from -50 to 150 up, about the model) : the lights'
+///   directions through the transposed view (the renderer's +0xf8), then the model drawn twice: unlit ambient (its
+///   lights' ambient red cleared) at one state and lit at another, the second pass with its fog (0.08), and
+///   for board 6 the renderer's +0x2b8 on around it
+pub fn character_draw(m: &mut Mem, e: &mut dyn FeEnv, c: u32, mat: u32, buf: u32) {
+    if m.r32(c + 0x14) == 0 || has_model(m, c) == 0 {
+        return;
+    }
+    let f = fe(m);
+    let mut cur = rows(m, mat);
+    let turn = m.r32(c + 0xb8) as i32;
+    if turn >= 0 {
+        let a = F(turn as f32) * F(f32::from_bits(0xbe2a_aaab)) * F(f32::from_bits(0x4049_0fdb))
+            - F(f32::from_bits(0x3fc9_0fdb));
+        let r = axis_rotation(a, [F(0.0), F(0.0), F(1.0)]);
+        cur = r.map(|row| mat_vec(&cur, row));
+        let t = [0u32, 4, 8, 0xc].map(|k| fl(m, f + 0x60 + k));
+        cur[3] = mat_vec(&cur, t);
+    }
+    let placed = buf;
+    put_rows(m, placed, &cur);
+    let model = m.r32(c + 0xac);
+    e.call(m, MODEL_SET_MATRIX, &[model + 0x79c, placed]);
+    let mut shadow = rows(m, placed);
+    if m.r32(c + 0xa4) == 0 {
+        shadow[3] = mat_vec(&shadow, [F(0.0), F(1000.0), F(0.0), F(1.0)]);
+        let q = F(f32::from_bits(0x3fc9_0fdb));
+        for axis in [[F(0.0), F(1.0), F(0.0)], [F(1.0), F(0.0), F(0.0)]] {
+            let r = axis_rotation(q, axis);
+            shadow = r.map(|row| mat_vec(&shadow, row));
+        }
+        let model = m.r32(c + 0xac);
+        let part = model.wrapping_add(m.r32(model + 0x44dc).wrapping_mul(0x394)).wrapping_add(0x7c0);
+        zero_108(m, e, part);
+    }
+    let sh = buf + 0x40;
+    put_rows(m, sh, &shadow);
+    let model = m.r32(c + 0xac);
+    e.call(m, MODEL_SET_SHADOW_MATRIX, &[model + 0x79c, sh]);
+    let model = m.r32(c + 0xac);
+    e.call(m, MODEL_MAKE_SHADOW, &[model + 0x79c]);
+    let at = [0u32, 4, 8].map(|k| fl(m, placed + 0x30 + k));
+    let (lo, hi) = (buf + 0x80, buf + 0x90);
+    let (w70, w50, w150) = (F(70.0), F(-50.0), F(150.0));
+    put(m, lo, [(at[0] - w70).0.to_bits(), (at[1] - w70).0.to_bits(), (at[2] + w50).0.to_bits(), ONE]);
+    put(m, hi, [(at[0] + w70).0.to_bits(), (at[1] + w70).0.to_bits(), (at[2] + w150).0.to_bits(), ONE]);
+    if rend(m, e, 0x280, &[lo, hi]) == 1 {
+        return;
+    }
+    if m.r8(c + 0x159) as i8 == 6 {
+        rend(m, e, 0x2b8, &[1]);
+    }
+    rend(m, e, 0x1a0, &[c + 0x108]);
+    let fog = 0x3da3_d70a;
+    rend(m, e, 0x1c8, &[1, 0, fog]);
+    rend(m, e, 0x1c0, &[0]);
+    let v = rend(m, e, 0xf8, &[]);
+    let view = rows(m, v);
+    let t: [[F; 4]; 4] = [0, 1, 2, 3].map(|i| [0, 1, 2, 3].map(|k| view[k][i]));
+    let ambient = m.r32(c + 0xc0);
+    let dirs = buf + 0xa0;
+    for k in 0..3u32 {
+        let d = [0u32, 4, 8, 0xc].map(|j| fl(m, c + 0x120 + 0x10 * k + j));
+        let r = mat_vec(&t, d);
+        for (j, x) in r.iter().enumerate() {
+            m.w32(dirs + 0x10 * k + 4 * j as u32, x.0.to_bits());
+        }
+    }
+    m.w32(c + 0xc0, 0);
+    let out = buf + 0x110;
+    character_lights(m, e, c, dirs, out);
+    rend(m, e, 0x1c0, &[0]);
+    rend(m, e, 0x1e0, &[1]);
+    let model = m.r32(c + 0xac);
+    e.call(m, MODEL_DRAW, &[model + 0x79c, 0]);
+    rend(m, e, 0x1c0, &[1]);
+    rend(m, e, 0x1e0, &[3]);
+    m.w32(c + 0xc0, ambient);
+    character_lights(m, e, c, dirs, out);
+    rend(m, e, 0x1c0, &[0]);
+    let model = m.r32(c + 0xac);
+    e.call(m, MODEL_DRAW, &[model + 0x79c, 0]);
+    rend(m, e, 0x1c0, &[1]);
+    rend(m, e, 0x1c8, &[1, 2, fog]);
+    rend(m, e, 0x1a8, &[]);
+    let id = buf + 0x180;
+    e.call(m, MATRIX_MAKE, &[id]);
+    rend(m, e, 0x218, &[id]);
+    rend(m, e, 0x2b8, &[0]);
+}
