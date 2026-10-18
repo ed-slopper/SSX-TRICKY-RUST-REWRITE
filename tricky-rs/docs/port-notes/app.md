@@ -65,3 +65,37 @@ run for real. The pause button writes a player; the race and the +0x2a0 object h
 
 Of the 50 mutants, 49 are caught. The survivor is equivalent: `(v >> 1) | (v & 1)` without the low bit converts
 to the same float, because `cvt.s.w` chops and the sticky bit never changes a chopped result.
+
+## E1e: the application's start, shutdown and main loop (`game/src/app.rs`, `tests/app_loop.rs`)
+
+- **Start.** `cApplication` vf1 (0x17ba50) makes the world, the renderer (+0x724), the fades (+0x72c) and 200
+  records at +0x728. Each record is reset to -1, 1, 1, 0, 0, 1, 1. It then loads the strings and starts the career
+  and the sound.
+- **Next module.** vf3 (0x17bbd8) picks the next module by the app's stage at +0x73c:
+  - 0: the start screen;
+  - 1: the archives opened, then the front end;
+  - 2: a film when the career's +0x3260 bit 5 asks for one (the bit is then cleared); otherwise the front end when
+    any of the other bits are set; otherwise the race set up from the career's chosen course, mode and player, and
+    the game;
+  - 3: the game.
+- **Shutdown.** vf2 (0x17bf48) and the two destructors tear the app down in the game's order.
+- **The vsync mode.** While a module is pending at +4, the vsync interrupt (`App_VSyncTick`) runs it.
+  - The interrupt moves the fraction at +0x1c on by the rate at +0x18. It steps the input through every whole frame
+    the fraction crosses, then acts on the vsync stage at +0xc:
+    - 1: enter the module, then stage 2;
+    - 2: tick;
+    - 3: ask whether it is done (stage 0), else tick.
+  - `App_StopVSyncMode` sets stage 3 and waits for the stage to change. It then destroys the pending module.
+- **Main loop.** `App_MainLoop` enters each module and stops the vsync mode, then runs frame by frame:
+  - After the display's wait, it leaves the module when the app is quitting or a pending module is ready, provided
+    the module agrees.
+  - Otherwise each pending input frame updates the module and, unless paused, draws it. At most the app's +0x14
+    frames run at a time.
+  - When the module is left, the next one comes from the app's +0x20 virtual.
+
+The test runs 400 cases of each of the 15 functions. In the test, the display's wait stands in for the vsync
+interrupt: it sometimes hands over a pending module and sometimes sets the quit flag (to 1 or 2). The heap starts
+as junk, so a missing clear shows.
+
+Of the 51 mutants, 50 are caught. The survivor is equivalent: the front end's test of the career's bits without
+bit 5, which has already been handled just above.

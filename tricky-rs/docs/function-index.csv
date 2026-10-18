@@ -1642,8 +1642,8 @@ address,size,name,system,status
 0x17b5e8,36,cPS2Device::vf5_17b5e8,render,ported
 0x17b610,44,cPS2Device::vf1_17b610,render,ported
 0x17b640,36,cPS2Device::vf2_17b640,render,ported
-0x17b668,68,cPS2Device::vf6_17b668,render,not started
-0x17b6b0,68,cPS2Device::vf7_17b6b0,render,not started
+0x17b668,68,cPS2Device::vf6_17b668,render,checked
+0x17b6b0,68,cPS2Device::vf7_17b6b0,render,checked
 0x17b6f8,80,cPS2Device::__tf,runtime,host
 0x17b748,256,App_LoadFonts,game,checked
 0x17b848,92,Course_OpenBig,race,checked
@@ -1651,11 +1651,11 @@ address,size,name,system,status
 0x17b938,56,App_FreeEffectsLoader,game,checked
 0x17b970,12,Render_GetBrightness,render,ported
 0x17b980,204,Render_SetBrightness,render,ported
-0x17ba50,392,cApplication::vf1_17ba50,game,not started
-0x17bbd8,532,cApplication::vf3_17bbd8,game,not started
+0x17ba50,392,cApplication::vf1_17ba50,game,checked
+0x17bbd8,532,cApplication::vf3_17bbd8,game,checked
 0x17bdf0,8,FUN_0017bdf0,game?,checked
 0x17bdf8,332,App_OpenBigFiles,files,ported
-0x17bf48,352,cApplication::vf2_17bf48,game,not started
+0x17bf48,352,cApplication::vf2_17bf48,game,checked
 0x17c0a8,108,Loc_Load,game?,checked
 0x17c118,56,Loc_Unload,game?,checked
 0x17c150,128,Loc_LoadForRegion,game?,ported
@@ -1665,18 +1665,18 @@ address,size,name,system,status
 0x17c380,28,App_FindCourseById,game,checked
 0x17c3a8,28,App_GetCourseInfo,game,checked
 0x17c3c8,80,cApplication::__tf,runtime,host
-0x17c418,76,cApplication::~cApplication,game,not started
+0x17c418,76,cApplication::~cApplication,game,checked
 0x17c468,28,EffectsLoader_Delete,game?,checked
-0x17c488,36,cAppMan::~cAppMan,game,not started
+0x17c488,36,cAppMan::~cAppMan,game,checked
 0x17c4b0,64,cAppMan::__tf,runtime,host
 0x17c530,64,cAppMan::cAppMan,game,checked
-0x17c570,328,App_Run,game,not started
+0x17c570,328,App_Run,game,checked
 0x17c6b8,44,App_SetMode,game,ported
-0x17c6e8,536,App_MainLoop,game,not started
-0x17c908,144,App_StopVSyncMode,game,not started
-0x17c998,64,App_StartVSyncMode,game,not started
-0x17c9d8,360,App_VSyncTick,game,not started
-0x17cb40,92,App_RunVSyncModeTicks,game,not started
+0x17c6e8,536,App_MainLoop,game,checked
+0x17c908,144,App_StopVSyncMode,game,checked
+0x17c998,64,App_StartVSyncMode,game,checked
+0x17c9d8,360,App_VSyncTick,game,checked
+0x17cb40,92,App_RunVSyncModeTicks,game,checked
 0x17cbc8,64,cAppMan::__tf,runtime,host
 0x17cc48,52,WStr_Count,race?,checked
 0x17cc80,52,WStr_Copy,common?,checked
