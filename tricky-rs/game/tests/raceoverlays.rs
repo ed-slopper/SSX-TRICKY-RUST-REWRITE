@@ -39,12 +39,12 @@ impl Rng {
 }
 
 const DATA: (u32, u32) = (0x328000, 0x18000);
-const TIMES: (u32, u32) = (0x3ce300, 0x100);
+const TIMES: (u32, u32) = (0x3ce300, 0x500);
 const SYS_AT: (u32, u32) = (0x343000, 0x100);
 const RIDERS: (u32, u32) = (0x0110_0000, 0xc000);
 const RIDER0: u32 = 0x0110_0000;
 const RIDER1: u32 = 0x0110_6000;
-const TABLES: (u32, u32) = (0x38f800, 0x200);
+const TABLES: (u32, u32) = (0x38f400, 0x600);
 const ARENA: u32 = 0x0100_0000;
 const SIZE: u32 = 0x3000;
 const THIS: u32 = ARENA;
@@ -61,6 +61,7 @@ const O40: u32 = ARENA + 0x2c00;
 const BEST: u32 = ARENA + 0x2800;
 const LOW: (u32, u32) = (0, 0x200);
 const HELPS: (u32, u32) = (0x390800, 0x100);
+const GRID_SRC: (u32, u32) = (0x38e500, 0x100);
 const SCRATCH: u32 = 0x01f8_0000;
 const STACK_TOKEN: u32 = 0x5c5c_5c5c;
 fn rv(off: u32) -> u32 {
@@ -144,6 +145,16 @@ fn arity(func: u32) -> (usize, usize) {
         ro::ATTITUDE_LABEL => (2, 4),
         ro::TB_SET_SCALE => (1, 2),
         ro::TB_SET_RECT => (1, 4),
+        ro::SET_TITLE_ASCII | ro::FIND_SLOT | ro::CAREER_BOOK | ro::ANIM_VALUE | ro::TS_SET_FONT | ro::TS_DESTRUCT => (2, 0),
+        ro::RACE_FINAL_UNLOCK | ro::SHOWOFF_FINAL_UNLOCK | ro::PAGES_COMPLETE | ro::ANIM_RESET | ro::WSTR_COUNT => (1, 0),
+        ro::SPEECH_UNLOCKS | ro::TS_INIT => (1, 0),
+        ro::ANIM_ADD_BAR => (7, 0),
+        ro::DRAW_ALIGNED => (6, 3),
+        ro::STRNCPY | ro::LIBC_MEMSET | ro::SET_PLAYER_NAME | ro::SET_ROW_NAME_ASCII => (3, 0),
+        ro::STRLEN | ro::MOVE_SOUND | ro::BACK_SOUND => (1, 0),
+        ro::STRCPY | ro::WSTR_COPY | ro::SET_PLAYER_PAD | ro::SPEECH_HISCORE => (2, 0),
+        ro::MEASURE_ASCII => (3, 1),
+        ro::DRAW_STRING_A | ro::DRAW_STRING_RAW | ro::PRINTF_SHADOWED_CENTERED => (2, 3),
         _ => panic!("no arity for {func:#x}"),
     }
 }
@@ -151,7 +162,12 @@ fn arity(func: u32) -> (usize, usize) {
 fn standin(io: &mut dyn Io, func: u32, w: &[u32], f: &[u32], ans: &Answers) -> (u32, Call) {
     let (ni, nf) = arity(func);
     // (the format's arguments as many as its format takes: the medal line's three, the others' one)
-    let ni = if func == ro::WSTR_FORMAT && w[1] != ro::FMT_MEDAL { 3 } else { ni };
+    let ni = if func == ro::WSTR_FORMAT && w[1] != ro::FMT_MEDAL && w[1] != ro::FMT_PLAYER_LINE { 3 } else { ni };
+    // (the unlocks' formats (marked 0x0aa0_xxxx) take two)
+    let ni = if func == pd::WSTR_FORMAT && w[1] >> 16 == 0x0aa0 { 4 } else { ni };
+    let ni = if func == ro::WSTR_FORMAT && w[1] == ro::FMT_PLAYER_LINE { 4 } else { ni };
+    // (the time challenge's box text 0xea0 (its stand-in's answer marked) takes none)
+    let ni = if func == pd::WSTR_FORMAT && w[1] == 0x0bb0_0ea0 { 2 } else { ni };
     let mut log: Vec<u32> = w[..ni].iter().map(|&a| token(a)).collect();
     log.extend(&f[..nf]);
     if func == ro::SET_COLOUR {
@@ -160,9 +176,25 @@ fn standin(io: &mut dyn Io, func: u32, w: &[u32], f: &[u32], ans: &Answers) -> (
     if matches!(
         func,
         ro::FILLED_RECT | ro::PRINTF_SHADOWED_A | ro::PRINT_SHADOWED_CENTRED | ro::DRAW_SPRITE | ro::BACKDROP_FRAME | ro::COUNT_DIGITS
-            | ro::PRINT_SHADOWED_RIGHT | ro::DRAW_MENU_LIST | ro::PRINTF_SHADOWED | ro::ATTITUDE_LABEL
+            | ro::PRINT_SHADOWED_RIGHT | ro::DRAW_MENU_LIST | ro::PRINTF_SHADOWED | ro::ATTITUDE_LABEL | ro::DRAW_ALIGNED
+            | ro::DRAW_STRING_A | ro::DRAW_STRING_RAW | ro::PRINTF_SHADOWED_CENTERED
     ) {
         log.extend((0..4).map(|k| io.r32(ro::DRAW_COLOUR + 4 * k)));
+    }
+    // the text style's +4 and an ASCII string's first characters as they are drawn or measured
+    if func == ro::DRAW_ALIGNED {
+        log.push(io.r32(w[0] + 4));
+    }
+    if func == ro::MEASURE_ASCII {
+        log.extend((0..3).map(|k| io.r32(w[1] + 4 * k)));
+    }
+    // a text on the stack the box takes (its first word)
+    if func == ro::TB_APPEND && stack(w[1]) {
+        log.push(io.r32(w[1]));
+    }
+    // the text box's alignment words and +0x6c as it draws
+    if func == ro::TB_DRAW {
+        log.extend([0x20u32, 0x24, 0x6c].map(|o| io.r32(w[0] + o)));
     }
     // the sprites' backdrop's scale (+0x50) as they draw
     if func == ro::DRAW_SPRITE && w[0] == BACKDROP {
@@ -193,6 +225,16 @@ fn standin(io: &mut dyn Io, func: u32, w: &[u32], f: &[u32], ans: &Answers) -> (
         ro::PLAYER_ID => r % 4,
         ro::FIND_RIDER => r % 8,
         ro::PLAYER_PROFILE => r % 16,
+        ro::FIND_SLOT => [0xffff_ffffu32, 0, 1, 2, 3, 0xffff_fffe][(r % 6) as usize],
+        ro::WSTR_COUNT => [0u32, r % 40][(r >> 7) as usize % 2],
+        ro::ANIM_VALUE => r % 50,
+        ro::LOC if w[1] == 0xea0 => 0x0bb0_0ea0,
+        ro::STRLEN => r % 11,
+        // (a text formatted on the stack: its first word the answer, for the box that takes it)
+        pd::WSTR_FORMAT if stack(w[0]) => {
+            io.w32(w[0], r);
+            r
+        }
         ro::NEW_BUTTONS => [0u32, 0x20, r, r | 0x20, r & !0x20][(r % 5) as usize],
         ro::RIDER_TIME => [r % 20000, 1000, 5000][(r >> 9) as usize % 3],
         ro::MEMSET => {
@@ -227,7 +269,9 @@ fn wf(m: &mut Mem, at: u32, v: f32) {
     m.w32(at, v.to_bits());
 }
 
-const FUNCS: [u32; 33] = [
+const FUNCS: [u32; 48] = [
+    0x1b6b90, 0x1b6d60, 0x1b7068, 0x1b7078, 0x1b73e0, 0x1b7d98, 0x1b7d98, 0x1b81b8,
+    0x1b5bf8, 0x1b5bf8, 0x1b5ef8, 0x1b6458, 0x1b6468, 0x1b65f0, 0x1b6ac0,
     0x1b4120, 0x1b4120, 0x1b4240, 0x1b4250, 0x1b44c0, 0x1b4890, 0x1b4950, 0x1b4d98, 0x1b5878, 0x1ab1a0, 0x1ab1a0, 0x1b3a00, 0x1b3e30, 0x1b3ec8, 0x1aa268, 0x1aacb0, 0x1aae10, 0x1aae88, 0x1aaec0, 0x1ab028, 0x1ae350, 0x1ae3b8, 0x1ae4b0, 0x1ae650, 0x1ae660, 0x1ae7a0,
     0x1ae7a8, 0x1ae7e0, 0x1ae7f0, 0x1aeb88, 0x1aed50, 0x1af320, 0x1ae7f0,
 ];
@@ -248,7 +292,12 @@ fn race_overlays_match_the_original() {
         ro::SELECT_SOUND, ro::NEW_BUTTONS, ro::DRAW_MENU_LIST, ro::PROFILE_PLAYERS, ro::SPEECH_NEXT_RACE, ro::TB_INIT,
         ro::TB_RESET, ro::PLAYER_ID, ro::FIND_RIDER, ro::PLAYER_NAME, ro::PLAYER_PROFILE, ro::WSTR_SET_ASCII, ro::SET_TITLE,
         ro::TB_SET_FONT, ro::TB_APPEND, ro::TB_WRAP, ro::TB_DELETE, ro::SPRINTF, ro::TB_DRAW, ro::PRINTF_SHADOWED,
-        ro::ATTITUDE_LABEL, ro::TB_SET_SCALE, ro::TB_SET_RECT,
+        ro::ATTITUDE_LABEL, ro::TB_SET_SCALE, ro::TB_SET_RECT, ro::SET_TITLE_ASCII, ro::FIND_SLOT, ro::CAREER_BOOK,
+        ro::ANIM_VALUE, ro::TS_SET_FONT, ro::TS_DESTRUCT, ro::RACE_FINAL_UNLOCK, ro::SHOWOFF_FINAL_UNLOCK, ro::PAGES_COMPLETE,
+        ro::ANIM_RESET, ro::WSTR_COUNT, ro::SPEECH_UNLOCKS, ro::TS_INIT, ro::ANIM_ADD_BAR, ro::DRAW_ALIGNED, ro::STRNCPY,
+        ro::LIBC_MEMSET, ro::SET_PLAYER_NAME, ro::SET_ROW_NAME_ASCII, ro::STRLEN, ro::MOVE_SOUND, ro::BACK_SOUND, ro::STRCPY,
+        ro::WSTR_COPY, ro::SET_PLAYER_PAD, ro::SPEECH_HISCORE, ro::MEASURE_ASCII, ro::DRAW_STRING_A, ro::DRAW_STRING_RAW,
+        ro::PRINTF_SHADOWED_CENTERED,
     ];
     stubs.extend(ROFFS.map(rv));
     let log: Rc<RefCell<Vec<Call>>> = Rc::default();
@@ -277,11 +326,13 @@ fn race_overlays_match_the_original() {
     let data = read(&mut r, DATA);
     let low = read(&mut r, LOW);
     let helps = read(&mut r, HELPS);
+    let grid_src = read(&mut r, GRID_SRC);
     let tables = read(&mut r, TABLES);
     let mut g = Rng(0x8a7e_0000_0000_0001);
     let (mut buttons, mut gos, mut digits) = (0usize, 0usize, 0usize);
     let (mut cells, mut scores, mut lists, mut prints) = (0usize, 0usize, 0usize, 0usize);
     let (mut labels, mut boxes, mut targets, mut names) = (0usize, 0usize, 0usize, 0usize);
+    let mut more = [0usize; 6];
     let per = 1500u32;
     for case in 0..FUNCS.len() as u32 * per {
         let func = FUNCS[(case % FUNCS.len() as u32) as usize];
@@ -295,6 +346,7 @@ fn race_overlays_match_the_original() {
                 (ARENA, vec![0; SIZE as usize]),
                 (SCRATCH, vec![0; 0x4000]),
                 (HELPS.0, helps.clone()),
+                (GRID_SRC.0, grid_src.clone()),
                 (LOW.0, low.clone()),
             ],
         };
@@ -380,7 +432,7 @@ fn race_overlays_match_the_original() {
         // +0x38 the pick, +0x44..+0x50 flags), its alignments, x, highlights, rows; the best times' table (an entry
         // 0x14 bytes: its rider +0xc, its score +0x10; +0x64 the count, +0x6c scores or times), the career's event
         // count, the app's mode, the race's +0x38, low memory (the high scores' table read from 0 in other modes)
-        if matches!(func, 0x1ab1a0 | 0x1b3a00 | 0x1b3e30 | 0x1b3ec8 | 0x1b4120..=0x1b5878) {
+        if matches!(func, 0x1ab1a0 | 0x1b3a00 | 0x1b3e30 | 0x1b3ec8 | 0x1b4120..=0x1b81b8) {
             m.w32(THIS + 4, g.pick(&[0u32, 1, 3, 5, 10, 16, 0xffff_ffff]));
             m.w32(THIS + 8, g.pick(&[0u32, 1, 2, 3, 4, 5, 0xffff_ffff]));
             for i in 0..8 {
@@ -447,6 +499,73 @@ fn race_overlays_match_the_original() {
             m.w32(RACE1C + 0x4f8, g.pick(&[0u32, any]));
             m.w32(ro::CAREER + 0x2afc, g.below(11));
             wf(&mut m, BACKDROP + 0x50, g.f(0.0, 2.0));
+            // the unlocked overlay's: the players' counts and values by kind (0x28 each), the rows' sprites, the
+            // kinds' sprites, the names, the final unlocks, the unlocks' formats, the race's unlock list, the
+            // backdrop's animation's row
+            for k in 0..40 {
+                m.w32(THIS + 0x54 + 4 * k, g.pick(&[0u32, 1, 1, 2, 3, 0xffff_ffff]));
+                m.w32(THIS + 0xf4 + 4 * k, g.pick(&[6u32, 7, 6, 7, 0, 3, 11, 15]));
+            }
+            m.w32(THIS + 0x1a4, g.below(8));
+            for k in 0..10 {
+                m.w32(THIS + 0x1d0 + 4 * k, g.pick(&[0xffff_ffffu32, 0, 0x30, 0x58]));
+            }
+            for k in 0..30 {
+                m.w32(THIS + 0x1f4 + 4 * k, g.pick(&[0xffff_ffffu32, 0, 0x30, 0x58]));
+            }
+            for k in 0..4 {
+                let any = g.next();
+                m.w32(THIS + 0x1b0 + 4 * k, g.pick(&[0u32, any]));
+            }
+            m.w32(THIS + 0x1a8, g.below(2));
+            m.w32(THIS + 0x1ac, g.below(2));
+            for k in 0..10 {
+                m.w32(ro::AWARD_PLURAL + 4 * k, 0x0aa0_0000 + k);
+                m.w32(ro::AWARD_SINGLE + 4 * k, 0x0aa0_0100 + k);
+            }
+            m.w32(ro::UNLOCKS, g.pick(&[0u32, 1, 3, 8, 20]));
+            for k in 0..20 {
+                m.w32(ro::UNLOCK_LIST + 0xc * k, g.below(5));
+                m.w32(ro::UNLOCK_LIST + 0xc * k + 4, g.pick(&[0u32, 1, 2, 3, 4, 5, 6, 8, 9, 9]));
+                m.w32(ro::UNLOCK_LIST + 0xc * k + 8, g.pick(&[6u32, 7, 2, 5, 13]));
+            }
+            m.w32(BACKDROP + 0x94, g.below(6));
+            // (the menu items' words before their labels, which the unlocked overlay's select tests)
+            for i in 0..5 {
+                let any = g.next();
+                m.w32(THIS + 0xc + 8 * i, g.pick(&[0u32, any]));
+            }
+            // the high-score record's: the name grid (row 0 and every row's first column set, so every move
+            // ends), its x / y, the cursor (+0x58 the row, +0x5c the column), the name (+0x60 its length, +0x64),
+            // the record index (+0x110), entering (+0x114, +0x3c), the entry's row (+0x54); the race's new
+            // records (the pad, the best table, the new entry)
+            for r in 0..3u32 {
+                for c in 0..14u32 {
+                    let v = if r == 0 || c == 0 { g.pick(&[b'A', b'B', b'd', b'e']) } else { g.pick(&[b'A', b'd', b'e', 0, 0]) };
+                    m.w8(ro::NAME_GRID + 14 * r + c, v);
+                }
+            }
+            for (a, lo, hi) in [(ro::GRID_X0, 0.0, 300.0), (ro::GRID_DX, 5.0, 30.0), (ro::GRID_DY, 5.0, 30.0), (ro::GRID_Y0, 0.0, 300.0)] {
+                wf(&mut m, a, g.f(lo, hi));
+            }
+            m.w32(THIS + 0x58, g.below(3));
+            m.w32(THIS + 0x5c, g.below(14));
+            m.w32(THIS + 0x60, g.pick(&[0u32, 3, 8, 9, 10, 0xffff_ffff]));
+            for k in 0..11 {
+                m.w8(THIS + 0x64 + k, g.pick(&[0u8, b'Q', b'R']));
+            }
+            m.w32(THIS + 0x110, g.below(3));
+            m.w32(THIS + 0x114, g.below(2));
+            m.w32(THIS + 0x3c, g.below(2));
+            wf(&mut m, THIS + 0x54, g.f(0.0, 400.0));
+            for k in 0..4 {
+                let rec = ro::NEW_RECORDS + 0x10 * k;
+                m.w32(rec, g.pick(&[0xffff_ffffu32, 0, 1]));
+                m.w32(rec + 8, BEST);
+                let other = g.next();
+                let e = BEST + 0x14 * g.below(6);
+                m.w32(rec + 0xc, g.pick(&[e, other]));
+            }
             for i in 0..4 {
                 let any = g.next();
                 m.w32(ro::STANDINGS_TITLES + 4 * i, any);
@@ -460,6 +579,7 @@ fn race_overlays_match_the_original() {
         }
         let any = g.next();
         let whole = g.pick(&[0u32, 1, any]);
+        let (kind, who) = (g.below(11), g.below(4));
         let player = g.pick(&[0u32, 1, 0xffff_ffff, 0x8000_0000]);
         let (f1, f2) = (g.f(0.0, 480.0), g.f(-5.0, 30.0));
         for (at, b) in &m.regions {
@@ -474,6 +594,19 @@ fn race_overlays_match_the_original() {
         let mm = &mut m;
         let ours = match func {
             0x1aa268 => { ro::dialog_draw(mm, e, THIS); none }
+            0x1b6b90 => ro::hiscore_record_init(mm, e, THIS, whole, SCRATCH),
+            0x1b6d60 => { ro::hiscore_record_reset(mm, e, THIS); none }
+            0x1b7068 => { ro::hiscore_record_vf16(mm, e); none }
+            0x1b7078 => { ro::hiscore_record_draw(mm, e, THIS, SCRATCH); none }
+            0x1b73e0 => { ro::hiscore_record_draw_text(mm, e, THIS, SCRATCH); none }
+            0x1b7d98 => { ro::hiscore_record_update(mm, e, THIS); none }
+            0x1b81b8 => ro::hiscore_submit_entry(mm, e, THIS),
+            0x1b5bf8 => { ro::add_award_line(mm, e, THIS, kind, who); none }
+            0x1b5ef8 => { ro::unlocked_reset(mm, e, THIS); none }
+            0x1b6458 => { ro::unlocked_vf16(mm, e); none }
+            0x1b6468 => { ro::unlocked_draw(mm, e, THIS, SCRATCH); none }
+            0x1b65f0 => { ro::unlocked_draw_text(mm, e, THIS, SCRATCH); none }
+            0x1b6ac0 => { ro::unlocked_update(mm, e, THIS); none }
             0x1b4120 => { ro::next_race_reset(mm, e, THIS, SCRATCH); none }
             0x1b4240 => { ro::next_race_vf16(mm, e); none }
             0x1b4250 => { ro::build_standings(mm, e, THIS); none }
@@ -513,14 +646,18 @@ fn race_overlays_match_the_original() {
         boxes += env.log.iter().filter(|c| c.0 == ro::TB_DRAW).count();
         targets += env.log.iter().filter(|c| c.0 == ro::SPRINTF).count();
         names += env.log.iter().filter(|c| c.0 == ro::PRINTF_SHADOWED).count();
+        for (k, f) in [ro::ANIM_ADD_BAR, pd::WSTR_FORMAT, ro::DRAW_STRING_RAW, ro::MOVE_SOUND, ro::SPEECH_HISCORE, ro::BACK_SOUND].into_iter().enumerate() {
+            more[k] += env.log.iter().filter(|c| c.0 == f).count();
+        }
         scores += env.log.iter().filter(|c| c.0 == ro::FORMAT_SCORE && func == 0x1b3a00).count();
         lists += env.log.iter().filter(|c| c.0 == ro::DRAW_MENU_LIST && c.1[4] > 1).count();
         prints += env.log.iter().filter(|c| c.0 == ro::PRINTF_SHADOWED_A && func == 0x1ab1a0).count();
         ans.n.set(0);
         log.borrow_mut().clear();
         let regs: Vec<u32> = match func {
-            0x1aacb0 => vec![THIS, whole],
+            0x1aacb0 | 0x1b6b90 => vec![THIS, whole],
             0x1ae7a8 => vec![THIS, player],
+            0x1b5bf8 => vec![THIS, kind, who],
             _ => vec![THIS],
         };
         for (k, v) in regs.into_iter().enumerate() {
@@ -535,7 +672,7 @@ fn race_overlays_match_the_original() {
         assert_eq!(*log.borrow(), env.log, "case {case} {func:#x}: the calls");
         // the results overlay's table copy on the stack (when not whole): the backdrop's +0x28 points at it on
         // both sides, and its bytes are the same
-        if func == 0x1aacb0 && whole == 0 {
+        if (func == 0x1aacb0 || func == 0x1b6b90) && whole == 0 {
             let theirs = r.mem.read_u32(BACKDROP + 0x28);
             assert!(stack(theirs), "case {case}: the table copy not on the stack ({theirs:#x})");
             assert_eq!(m.r32(BACKDROP + 0x28), SCRATCH);
@@ -563,4 +700,6 @@ fn race_overlays_match_the_original() {
     assert!(cells > 1000 && scores > 200 && lists > 200 && prints > 5000);
     println!("{labels} attitude labels, {boxes} help boxes, {targets} target numbers, {names} names");
     assert!(labels > 300 && boxes > 1000 && targets > 30 && names > 200);
+    println!("bars, formats, grid letters, moves, record speeches, deletes: {more:?}");
+    assert!(more.iter().all(|&n| n > 100));
 }

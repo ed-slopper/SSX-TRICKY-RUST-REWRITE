@@ -784,3 +784,98 @@ career's +0x2afc.
 The test now has 49,500 cases. The riders' records, attitudes, courses, the targets' flags and the standings'
 titles are random, and the sprites' stand-in logs the backdrop's +0x50. 119 of 120 mutants are caught. The one left
 reads the hi-score page's course through the career's +0x2af8, the same word.
+
+## The unlocked and high-score record overlays (G8n4, `game/src/raceoverlays.rs`)
+
+The index marks `cUnlockedOverlay::Reset` 0x1b5ef8 "ported", but nothing ported it. Each overlay also has a vf16
+(0x1b6458, 0x1b7068: stop the sound system's channel 0) and a `Draw` (0x1b6468, 0x1b7078) that the index doesn't
+list.
+
+- **The unlocked overlay's records:**
+  - +0x54: a count per player (0x28 bytes each) and kind.
+  - +0xf4: the last value for each.
+  - +0x194: the players' flags.
+  - +0x1a4: the next row.
+  - +0x1a8 / +0x1ac: the race's and the show-off's final unlocks.
+  - +0x1b0 / +0x1c0: the players' names and riders.
+  - +0x1d0: the kinds' sprites.
+  - +0x1f8: the rows' sprites (28).
+- **`Results_AddAwardLine` 0x1b5bf8(this, kind, player)** adds a row for a player's unlocks of one kind:
+  - **Two or more:** formatted by the kind's plural format (0x338240 + 4 kind) with the count.
+  - **One:** formatted by the single format (0x338268 + 4 kind), with the kind's own words:
+    - kinds 0 and 1: the course's name;
+    - kind 2: only courses 6 and 7, with sprite 0x58 or none;
+    - kind 3: the rider's name;
+    - kind 5: the player's complete trick book pages;
+    - other kinds: the player.
+  - **None:** nothing.
+  - Unless named above, the row's sprite is the kind's (+0x1d0 + 4 kind).
+- **`Reset` 0x1b5ef8:**
+  - clears the buffers and sets every highlight to 2;
+  - sets the title to 0x38e220;
+  - asks for the final unlock (`0x1618c0` in the career's mode 4, else `0x1618e0`);
+  - gathers the race's unlock list (0x3353f8: a count and entries of 0xc bytes: the player, the kind, the value)
+    per player slot (`0x166550`; a negative slot counts as 0). Kind 9 stores its value as the count; the others
+    count up.
+  - For each flagged player:
+    - the lines in the order 5, 9, 8, 4, 3, 2, 1, 0, 6;
+    - the name;
+    - with a kind 4 or 5, the rider;
+    - +4 keeps the highest row;
+    - the next player's rows start at row 7.
+  - **The rows' layout:** one column at 156..436, the first rows 13 apart (10 with two players), from the frame's
+    top + 91.
+  - **The reveal:** each row is added to the backdrop's animation (+0x94, `0x1f11c0`). Its length is the text's
+    plus 0x50, or 0 when the row is empty.
+  - Last, the speech's unlock lines.
+- **`Draw`:**
+  - the course's title (460 high);
+  - with one player, the sprite of the row the animation is revealing (+0x94 is the row + 1), or, when that row has
+    none, the last row's.
+- **`DrawText` 0x1b65f0:**
+  - each player's name line ("%s %s" 0x38e548 of 0xdf6 and the name) in gold, 148 apart, with 0xdf7 under it;
+  - the rows through `Font_DrawAligned`, by the animation's count of each row;
+  - the final unlock's note (0xc9c or 0xc9d) in a white box at 65, 330;
+  - the menu.
+- **`Update` 0x1b6ac0:**
+  - the menu shows once the race's +0x1c object's +0x4f8 is clear;
+  - button 0x800 plays the select sound and, unless the picked item's word (+0xc + 8 the pick) is set, hides
+    overlay item 13 and shows item 1.
+- **The high-score record.** The name grid at 0x3382a0 is three rows of 14 characters, where 'd' deletes, 'e' ends
+  and 0 is empty. `Init` 0x1b6b90 copies the grid in from 0x38e550 (and to its own frame, unused), with the record's
+  backdrop table 0x38f4f0 (six shifts) as the results overlay does.
+- **`Reset` 0x1b6d60:**
+  - sets the high scores' layout and clears the name (+0x64, 0xb bytes);
+  - sets entering (+0x114);
+  - sets the title by the mode: 3/5, 2/4/9, and 7 (0xea1, with the best of kind 2). Other modes read the table from
+    address 0;
+  - submits the first record.
+- **`Draw` 0x1b7078:**
+  - the cursor (sprite 0x36 frame 0x20) over the picked character: +0x58 is the row, +0x5c the column;
+  - in mode 7, a faint bar;
+  - otherwise the name's caret (sprite 0x32). The measures of the character and of the name with "." are unused.
+- **`DrawText` 0x1b73e0:**
+  - the table and the grid's characters ('e' as the word 0x112, 'd' as sprite 0x32);
+  - **In mode 7, the time challenge's box:** 0xea0 (its format takes nothing; a2 is whatever the colour copy left),
+    the labels, the best's score and the target in white, and their difference (`0x1a6c90`) in magenta.
+  - **Otherwise:** the name typed at the entry's row.
+  - **Then:** the help line (0x113, or 0x18d on the end key) and the two prompts.
+- **`Update` 0x1b7d98** reads the entering player's pad (the race's +0x38's +0xc):
+  - up/down (0x20001 / 0x40002) and left/right (0x100008 / 0x80004) move past empty cells. Up and left wrap only
+    once and then keep going down; down and right wrap by 3 and 14.
+  - select types the character, the tenth character on replacing the ninth.
+  - 'd' deletes the last character.
+  - 'e' submits the next record. When there is none, it hides overlay item 2 and shows item 13 if any unlock isn't
+    kind 7, else item 1.
+- **`HiScore_SubmitEntry` 0x1b81b8** takes the race's new records at 0x32eca0 (0x10 each: the pad, _, the best
+  table, the new entry):
+  - Past the first record, it sets the name typed as the entering player's (`0x164968`) and copies it over the last
+    record's entry.
+  - A record with a pad rebuilds the table. The new entry is highlighted (2), its row kept (+0x54), its speech run,
+    and while entering its name copied in and line 0x114 formatted. Mode 7 blanks the cells.
+  - The cursor goes to the end key.
+
+The test now has 72,000 cases. The unlock lists, counts, the grid (row 0 and each first column filled, so every
+move ends), the cursor, the name and the new records are random. The stand-ins log the text style's +4, an ASCII
+string's first characters, a stacked text's first word and the text box's +0x20 / +0x24 / +0x6c.
+195 of 197 mutants are caught. The two left are equivalent: a slot of 0 maps to 0 under either test, and the row count +4 is compared signed or unsigned but is never negative.

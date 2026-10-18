@@ -2517,15 +2517,15 @@ address,size,name,system,status
 0x1b4d98,2780,cNextRaceOverlay::DrawText,frontend,checked
 0x1b5878,68,cNextRaceOverlay::Update,frontend,checked
 0x1b58c0,820,cUnlockedOverlay::cUnlockedOverlay,frontend,ported
-0x1b5bf8,768,Results_AddAwardLine,race?,not started
-0x1b5ef8,1376,cUnlockedOverlay::Reset,frontend,ported
-0x1b65f0,1228,cUnlockedOverlay::DrawText,frontend,not started
-0x1b6ac0,204,cUnlockedOverlay::Update,frontend,not started
-0x1b6b90,460,HiScoreRecordOverlay_Init,frontend,not started
-0x1b6d60,776,cHiScoreRecordOverlay::Reset,frontend,not started
-0x1b73e0,2488,cHiScoreRecordOverlay::DrawText,frontend,not started
-0x1b7d98,1056,cHiScoreRecordOverlay::Update,frontend,not started
-0x1b81b8,912,HiScore_SubmitEntry,race?,not started
+0x1b5bf8,768,Results_AddAwardLine,race?,checked
+0x1b5ef8,1376,cUnlockedOverlay::Reset,frontend,checked
+0x1b65f0,1228,cUnlockedOverlay::DrawText,frontend,checked
+0x1b6ac0,204,cUnlockedOverlay::Update,frontend,checked
+0x1b6b90,460,HiScoreRecordOverlay_Init,frontend,checked
+0x1b6d60,776,cHiScoreRecordOverlay::Reset,frontend,checked
+0x1b73e0,2488,cHiScoreRecordOverlay::DrawText,frontend,checked
+0x1b7d98,1056,cHiScoreRecordOverlay::Update,frontend,checked
+0x1b81b8,912,HiScore_SubmitEntry,race?,checked
 0x1b8548,24,cLessonOverlay::Draw,frontend,not started
 0x1b8560,8,cLessonControllerOverlay::Draw,frontend,not started
 0x1b8568,240,SaveOverlay_Init,save,ported

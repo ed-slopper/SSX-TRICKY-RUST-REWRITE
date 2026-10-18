@@ -1238,3 +1238,832 @@ pub fn next_race_update(m: &mut Mem, env: &mut dyn TextBoxEnv, this: u32) {
         m.w32(this + 0x34, 1);
     }
 }
+
+// --- G8n4a: the unlocked overlay ---
+
+/// The unlocks' formats by kind: the plural (a count) and the single
+pub const AWARD_PLURAL: u32 = 0x338240;
+pub const AWARD_SINGLE: u32 = 0x338268;
+/// The race's unlocks: a count and the list (0xc each: the player, the kind, the value)
+pub const UNLOCKS: u32 = 0x3353f8;
+pub const UNLOCK_LIST: u32 = 0x335400;
+pub const UNLOCKED_TITLE: u32 = 0x38e220;
+pub const FMT_PLAYER_LINE: u32 = 0x38e548;
+pub const SET_TITLE_ASCII: u32 = 0x1bfb20;
+pub const FIND_SLOT: u32 = 0x166550;
+pub const RACE_FINAL_UNLOCK: u32 = 0x1618c0;
+pub const SHOWOFF_FINAL_UNLOCK: u32 = 0x1618e0;
+pub const CAREER_BOOK: u32 = 0x163f18;
+pub const PAGES_COMPLETE: u32 = 0x164060;
+pub const ANIM_RESET: u32 = 0x1f1258;
+pub const ANIM_ADD_BAR: u32 = 0x1f11c0;
+pub const ANIM_VALUE: u32 = 0x1f1448;
+pub const WSTR_COUNT: u32 = 0x17cc48;
+pub const SPEECH_UNLOCKS: u32 = 0x232330;
+pub const TS_INIT: u32 = 0x19dec0;
+pub const TS_SET_FONT: u32 = 0x19e380;
+pub const TS_DESTRUCT: u32 = 0x19ded0;
+pub const DRAW_ALIGNED: u32 = 0x19df90;
+
+/// `Results_AddAwardLine` 0x1b5bf8(this, kind, player): the player's unlocks of a kind as the table's next row (+0x1a4)
+/// with its sprite (+0x1f8 by row): a count of 2 or more by the plural format; one by the single, with the kind's
+/// own words (0, 1 a course's name; 2 the course 6 or 7 only, sprite 0x58 or none; 3 a rider; 5 the player's
+/// complete trick book pages); none, nothing. The sprites are the kind's (+0x1d0)
+pub fn add_award_line(m: &mut Mem, env: &mut dyn TextBoxEnv, this: u32, kind: u32, player: u32) {
+    let rec = player.wrapping_mul(0x28);
+    let at = this + 0x54 + (kind << 2) + rec;
+    let n = m.r32(at);
+    let cell = |m: &Mem| TABLE_CELLS + (m.r32(this + 0x1a4) << 7);
+    let wf_ = crate::pausedraw::WSTR_FORMAT;
+    let mark = if (n as i32) >= 2 {
+        call(m, env, wf_, &[cell(m), m.r32(AWARD_PLURAL + (kind << 2)), n, player]);
+        m.r32(this + (kind << 2) + 0x1d0)
+    } else if (n as i32) <= 0 {
+        return;
+    } else if kind == 3 {
+        let c = m.r32(this + rec + 0xc + 0xf4);
+        let name = m.r32(c.wrapping_mul(0x38).wrapping_add(CHARACTERS) + 4);
+        call(m, env, wf_, &[cell(m), m.r32(AWARD_SINGLE + 0xc), m.r32(at), name]);
+        m.r32(this + 0x1dc)
+    } else if kind == 2 {
+        let course = m.r32(this + rec + 8 + 0xf4);
+        if course != 6 && course != 7 {
+            return;
+        }
+        let c = cell(m);
+        let t = m.r32(m.r32(APP) + 0x50);
+        let id = call(m, env, COURSE_NAME, &[CAREER, course]);
+        let s = call(m, env, LOC, &[t, id]);
+        call(m, env, wf_, &[c, m.r32(AWARD_SINGLE + 8), m.r32(at), s]);
+        if course == 6 { 0x58 } else { 0xffff_ffff }
+    } else if kind < 2 {
+        let c = cell(m);
+        let t = m.r32(m.r32(APP) + 0x50);
+        let id = call(m, env, COURSE_NAME, &[CAREER, m.r32(this + (kind << 2) + rec + 0xf4)]);
+        let s = call(m, env, LOC, &[t, id]);
+        call(m, env, wf_, &[c, m.r32(AWARD_SINGLE + (kind << 2)), m.r32(at), s]);
+        m.r32(this + (kind << 2) + 0x1d0)
+    } else if kind == 5 {
+        let p = call(m, env, PLAYER_ID, &[CAREER, player]);
+        let book = call(m, env, CAREER_BOOK, &[CAREER, p]);
+        let pages = call(m, env, PAGES_COMPLETE, &[book]);
+        call(m, env, wf_, &[cell(m), m.r32(AWARD_SINGLE + 0x14), m.r32(this + 0x54 + rec + 0x14), pages]);
+        m.r32(this + 0x1e4)
+    } else {
+        call(m, env, wf_, &[cell(m), m.r32(AWARD_SINGLE + (kind << 2)), n, player]);
+        m.r32(this + (kind << 2) + 0x1d0)
+    };
+    let row = m.r32(this + 0x1a4);
+    m.w32(this + (row << 2) + 0x1f8, mark);
+    m.w32(this + 0x1a4, row.wrapping_add(1));
+}
+
+/// `cUnlockedOverlay::Reset` 0x1b5ef8(this): the buffers cleared, no menu, help 0x18d, every highlight 2 (white),
+/// the title 0x38e220; the final unlock (the race's in the career's mode 4 (+0x1a8), else the show-off's (+0x1ac));
+/// the players' unlocks gathered from the race's list (the count per kind, the bonus kind 9 as its value; the
+/// last value; the player flagged); each flagged player's lines (kinds 5, 9, 8, 4, 3, 2, 1, 0, 6), name and, with
+/// a kind 4 or 5, rider; the rows laid out (one column at 156..436, the first rows 13 apart, 10 with two players)
+/// and each revealed in turn by the backdrop's animation (+0x94); the speech's unlock lines
+pub fn unlocked_reset(m: &mut Mem, env: &mut dyn TextBoxEnv, this: u32) {
+    let (names, riders, flags) = (this + 0x1b0, this + 0x1c0, this + 0x194);
+    let (counts, values) = (this + 0x54, this + 0xf4);
+    clear_buffers(m, env);
+    m.w32(this + 0x38, 0);
+    m.w32(this + 0x34, 0);
+    let s = loc(m, env, 0x18d);
+    m.w32(this + 0x10, s);
+    m.w32(this + 0xc, 0);
+    for i in (0..16).rev() {
+        m.w32(ROW_MARK + 4 * i, 2);
+    }
+    for i in (0..8).rev() {
+        m.w32(COL_MARK + 4 * i, 2);
+    }
+    call(m, env, SET_TITLE_ASCII, &[this, UNLOCKED_TITLE]);
+    m.w32(this + 0x1a8, 0);
+    m.w32(this + 0x1ac, 0);
+    if m.r32(CAREER + 0x2afc) == 4 {
+        let v = call(m, env, RACE_FINAL_UNLOCK, &[CAREER]);
+        m.w32(this + 0x1a8, v);
+    } else {
+        let v = call(m, env, SHOWOFF_FINAL_UNLOCK, &[CAREER]);
+        m.w32(this + 0x1ac, v);
+    }
+    let n = m.r32(UNLOCKS);
+    for p in 0..4 {
+        m.w32(names + 4 * p, 0);
+        m.w32(riders + 4 * p, 0);
+        m.w32(flags + 4 * p, 0);
+        for j in 0..10 {
+            m.w32(counts + 0x28 * p + 4 * j, 0);
+            m.w32(values + 0x28 * p + 4 * j, 0);
+        }
+    }
+    for i in (0..28).rev() {
+        m.w32(this + 0x1f8 + 4 * i, 0xffff_ffff);
+    }
+    if (n as i32) > 0 {
+        let mut e = UNLOCK_LIST;
+        let mut left = n;
+        loop {
+            let slot = call(m, env, FIND_SLOT, &[CAREER, m.r32(e)]);
+            let p = if (slot as i32) > -1 { slot } else { 0 };
+            let kind = m.r32(e + 4);
+            let rec = p.wrapping_mul(0x28);
+            if kind == 9 {
+                m.w32(counts.wrapping_add(rec) + 0x24, m.r32(e + 8));
+            } else {
+                let at = counts.wrapping_add((kind << 2).wrapping_add(rec));
+                m.w32(at, m.r32(at).wrapping_add(1));
+            }
+            let kind = m.r32(e + 4);
+            m.w32(flags.wrapping_add(p << 2), 1);
+            m.w32(values.wrapping_add((kind << 2).wrapping_add(rec)), m.r32(e + 8));
+            e += 0xc;
+            left = left.wrapping_sub(1);
+            if left == 0 {
+                break;
+            }
+        }
+    }
+    m.w32(this + 4, 0);
+    m.w32(this + 8, 1);
+    m.w32(this + 0x1a4, 0);
+    for p in 0..4u32 {
+        if m.r32(flags + 4 * p) == 0 {
+            continue;
+        }
+        for kind in [5u32, 9, 8, 4, 3, 2, 1, 0, 6] {
+            add_award_line(m, env, this, kind, p);
+        }
+        let id = call(m, env, PLAYER_ID, &[CAREER, p]);
+        let name = call(m, env, PLAYER_NAME, &[CAREER, id]);
+        m.w32(names + 4 * p, name);
+        let rec = this + 0x28 * p;
+        if (m.r32(rec + 0x68) as i32) > 0 || (m.r32(rec + 0x64) as i32) > 0 {
+            let id = call(m, env, PLAYER_ID, &[CAREER, p]);
+            let c = call(m, env, PLAYER_PROFILE, &[CAREER, id]);
+            m.w32(riders + 4 * p, m.r32(c.wrapping_mul(0x38).wrapping_add(CHARACTERS) + 4));
+        }
+        let row = m.r32(this + 0x1a4);
+        if (m.r32(this + 4) as i32) < row as i32 {
+            m.w32(this + 4, row);
+        }
+        m.w32(this + 0x1a4, 7);
+    }
+    wf(m, TABLE_X, F(156.0));
+    let r = call(m, env, GET_RECT, &[m.r32(m.r32(this)), 0x37]);
+    let top = rf(m, r + 8) + F(10.0);
+    let gap = if call(m, env, PROFILE_PLAYERS, &[CAREER]) == 2 { F(10.0) } else { F(13.0) };
+    title_rows(m, this, top + F(7.0) + F(23.0) + F(51.0), gap);
+    let x = rf(m, TABLE_X) + F(280.0);
+    m.w32(TABLE_ALIGN, 0);
+    wf(m, TABLE_X + 4, x);
+    call(m, env, ANIM_RESET, &[m.r32(this) + 0x94]);
+    if (m.r32(this + 4) as i32) > 0 {
+        let mut i = 1u32;
+        loop {
+            let cell = TABLE_CELLS + (i << 7) - 0x80;
+            let pad = if call(m, env, WSTR_COUNT, &[cell]) == 0 { 0 } else { 0x50 };
+            let anim = m.r32(this) + 0x94;
+            let len = call(m, env, WSTR_COUNT, &[cell]);
+            call(m, env, ANIM_ADD_BAR, &[anim, i, i, 1, 0, 0, len.wrapping_add(pad)]);
+            i += 1;
+            if (m.r32(this + 4) as i32) < i as i32 {
+                break;
+            }
+        }
+    }
+    call(m, env, SPEECH_UNLOCKS, &[m.r32(MUSIC)]);
+}
+
+/// The unlocked overlay's vf16 0x1b6458: the sound system's channel 0 stopped
+pub fn unlocked_vf16(m: &mut Mem, env: &mut dyn TextBoxEnv) {
+    call(m, env, SND_STOP_ONE, &[m.r32(MUSIC), 0]);
+}
+
+/// The unlocked row's sprite (white, at 44, 160) when it has one
+fn row_sprite(m: &mut Mem, env: &mut dyn TextBoxEnv, this: u32, at: u32, scratch: u32) -> bool {
+    if (m.r32(at) as i32) <= 0 {
+        return false;
+    }
+    put4(m, scratch, [ONE; 4]);
+    call(m, env, SET_COLOUR, &[DRAW_COLOUR, scratch]);
+    fcall(m, env, DRAW_SPRITE, &[m.r32(this), m.r32(at), 0], &[F(44.0), F(160.0), ONE, ONE]);
+    true
+}
+
+/// The unlocked overlay's `Draw` 0x1b6468(this): the course's title (460 high); with one player the sprite of the
+/// row the animation is revealing (+0x94 the row + 1), or, when that has none, the last row's
+pub fn unlocked_draw(m: &mut Mem, env: &mut dyn TextBoxEnv, this: u32, scratch: u32) {
+    draw_course_title(m, env, this, F(460.0), scratch);
+    if call(m, env, PROFILE_PLAYERS, &[CAREER]) == 2 {
+        return;
+    }
+    let mut none = true;
+    let mut i = 0u32;
+    while (i as i32) < m.r32(this + 4) as i32 {
+        if m.r32(m.r32(this) + 0x94) == i + 1 && row_sprite(m, env, this, this + 0x1f8 + 4 * i, scratch) {
+            none = false;
+        }
+        i += 1;
+    }
+    if m.r32(m.r32(this) + 0x94) == 0 || !none {
+        return;
+    }
+    row_sprite(m, env, this, (this + 0x1f8).wrapping_add(i.wrapping_sub(1) << 2), scratch);
+}
+
+/// `cUnlockedOverlay::DrawText` 0x1b65f0(this): in gold each player's name line ("%s %s" of 0xdf6 and the name,
+/// 0.656) and 0xdf7 28 under it, 148 apart; the rows (0.85, by the backdrop's animation's count of each row);
+/// the final unlock's note (0xc9c the race's, else 0xc9d the show-off's) in a white box at 65, 330; the menu
+pub fn unlocked_draw_text(m: &mut Mem, env: &mut dyn TextBoxEnv, this: u32, scratch: u32) {
+    let r = call(m, env, GET_RECT, &[m.r32(m.r32(this)), 0x37]);
+    let mut y = rf(m, r + 8) + F(10.0) + F(7.0) + F(23.0) + F(5.0);
+    let (st, buf, line) = (scratch + 0x10, scratch + 0x20, scratch + 0x40);
+    faded(m, env, gold(), m.r32(this) + 0x70, st);
+    for i in 0..4 {
+        let name = m.r32(this + 0x1b0 + 4 * i);
+        if name == 0 {
+            continue;
+        }
+        let y2 = y + F(28.0);
+        call(m, env, WSTR_SET_ASCII, &[buf, name]);
+        let s = loc(m, env, 0xdf6);
+        call(m, env, WSTR_FORMAT, &[line, FMT_PLAYER_LINE, s, buf]);
+        fcall(m, env, PRINTF_SHADOWED_A, &[m.r32(m.r32(this) + 8), line], &[k(0x3f27_ef9e), F(116.0), y]);
+        y = y + F(148.0);
+        let s = loc(m, env, 0xdf7);
+        fcall(m, env, PRINTF_SHADOWED_A, &[m.r32(m.r32(this) + 8), s], &[k(0x3f4c_cccd), F(116.0), y2]);
+    }
+    call(m, env, TS_INIT, &[st]);
+    call(m, env, TS_SET_FONT, &[st, m.r32(m.r32(this) + 4)]);
+    m.w32(st + 4, 1);
+    put4(m, buf, [ONE; 4]);
+    call(m, env, SET_COLOUR, &[DRAW_COLOUR, buf]);
+    let mut i = 0u32;
+    while (i as i32) < m.r32(this + 4) as i32 {
+        let cell = TABLE_CELLS + (i << 7);
+        let n = call(m, env, ANIM_VALUE, &[m.r32(this) + 0x94, i + 1]);
+        let y = rf(m, TITLE_ROWS + 4 * i);
+        fcall(m, env, DRAW_ALIGNED, &[st, 0, cell, n, 1, 1], &[k(0x3f59_999a), rf(m, TABLE_X), y]);
+        i += 1;
+    }
+    if m.r32(this + 0x1a8) != 0 || m.r32(this + 0x1ac) != 0 {
+        let tb = scratch + 0x1d0;
+        call(m, env, TB_INIT, &[tb]);
+        call(m, env, TB_SET_FONT, &[tb, m.r32(m.r32(this) + 4)]);
+        call(m, env, TB_RESET, &[tb]);
+        put4(m, buf, [ONE; 4]);
+        for i in 0..4 {
+            m.w32(tb + 0x3c + 4 * i, m.r32(buf + 4 * i));
+        }
+        let s85 = k(0x3f59_999a);
+        fcall(m, env, TB_SET_SCALE, &[tb], &[s85, s85]);
+        fcall(m, env, TB_SET_RECT, &[tb], &[F(65.0), F(330.0), F(450.0), F(100.0)]);
+        let id = if m.r32(this + 0x1a8) != 0 { 0xc9c } else { 0xc9d };
+        let s = loc(m, env, id);
+        call(m, env, TB_APPEND, &[tb, s]);
+        call(m, env, TB_DRAW, &[tb, 0xffff_ffff, 0]);
+        call(m, env, TB_DELETE, &[tb, 2]);
+    }
+    let n = m.r32(this + 0x34) as i32;
+    if n > 0 {
+        let (labels, on) = (buf, scratch + 0x50);
+        for i in 0..n as u32 {
+            m.w32(labels + 4 * i, m.r32(this + 0x10 + 8 * i));
+            m.w32(on + 4 * i, 1);
+        }
+        let b0 = m.r32(this);
+        let y = (rf(m, b0 + 0x2c) + F(480.0)) * F(0.5) - F(40.0);
+        let (cnt, sel) = (m.r32(this + 0x34), m.r32(this + 0x38));
+        fcall(m, env, DRAW_MENU_LIST, &[b0, 3, 0, labels, cnt, sel, 0x74, 1, 1, on], &[F(600.0), y, k(0x3f3a_e148)]);
+    }
+    call(m, env, TS_DESTRUCT, &[st, 2]);
+}
+
+/// `cUnlockedOverlay::Update` 0x1b6ac0(this): the results' update; the menu shown once the race's +0x1c object's
+/// +0x4f8 is clear; the button 0x800 plays the select sound and, unless the picked item's word (+0xc + 8 the pick)
+/// is set, hides overlay item 13 and shows item 1
+pub fn unlocked_update(m: &mut Mem, env: &mut dyn TextBoxEnv, this: u32) {
+    call(m, env, RESULTS_UPDATE, &[this]);
+    let r = race(m);
+    if m.r32(m.r32(r + 0x1c) + 0x4f8) == 0 {
+        m.w32(this + 0x34, 1);
+    }
+    let b = call(m, env, NEW_BUTTONS, &[m.r32(this), 0xffff_ffff]);
+    if b == 0 || b & 0x800 == 0 {
+        return;
+    }
+    call(m, env, SELECT_SOUND, &[m.r32(this)]);
+    if m.r32(this.wrapping_add(m.r32(this + 0x38) << 3) + 0xc) != 0 {
+        return;
+    }
+    let r = race(m);
+    call(m, env, OVERLAY_HIDE, &[m.r32(r + 0x38), 0xd, 0xffff_ffff]);
+    let r = race(m);
+    call(m, env, HUD_SHOW, &[m.r32(r + 0x38), 1, 0xffff_ffff]);
+}
+
+// --- G8n4b: the high-score record overlay ---
+
+/// The name entry's grid: three rows of 14 characters ('d' delete, 'e' end, 0 none), copied from 0x38e550; its
+/// x (the first column, the step) and y (the first row, the step)
+pub const NAME_GRID: u32 = 0x3382a0;
+pub const NAME_GRID_SRC: u32 = 0x38e550;
+pub const GRID_X0: u32 = 0x3ce788;
+pub const GRID_DX: u32 = 0x338218;
+pub const GRID_DY: u32 = 0x33821c;
+pub const GRID_Y0: u32 = 0x338224;
+/// The high-score record's backdrop table and the race's new records (0x10 each: the player's pad or −1, _, the
+/// best table, the new entry)
+pub const RECORD_BACKDROP_VTABLE: u32 = 0x38f4f0;
+pub const NEW_RECORDS: u32 = 0x32eca0;
+pub const EMPTY: u32 = 0x38e220;
+pub const STRNCPY: u32 = 0x2fd630;
+pub const STRLEN: u32 = 0x2fd260;
+pub const STRCPY: u32 = 0x2fd14c;
+pub const LIBC_MEMSET: u32 = 0x2fb468;
+pub const MEASURE_ASCII: u32 = 0x19da30;
+pub const DRAW_STRING_A: u32 = 0x19d0c0;
+pub const DRAW_STRING_RAW: u32 = 0x19cf70;
+pub const PRINTF_SHADOWED_CENTERED: u32 = 0x19d6e0;
+pub const WSTR_COPY: u32 = 0x17cc80;
+pub const MOVE_SOUND: u32 = 0x1a8648;
+pub const BACK_SOUND: u32 = 0x1a8658;
+pub const SET_PLAYER_NAME: u32 = 0x164968;
+pub const SET_PLAYER_PAD: u32 = 0x1a7878;
+pub const SPEECH_HISCORE: u32 = 0x232240;
+pub const SET_ROW_NAME_ASCII: u32 = 0x1bfac8;
+
+/// `HiScoreRecordOverlay_Init` 0x1b6b90(this, whole): as the results overlay's (its own backdrop at +0x118 when
+/// `whole`), with the record's backdrop table (copied to the frame, its six shifts moved by the overlay's place,
+/// when not); the name grid cleared and copied in (0x2a bytes; the game also copies the grid to its frame unused);
+/// +0x44 set
+pub fn hiscore_record_init(m: &mut Mem, env: &mut dyn TextBoxEnv, this: u32, whole: u32, scratch: u32) -> u32 {
+    if whole != 0 {
+        m.w32(this, this + 0x118);
+        call(m, env, BACKDROP_INIT, &[this + 0x118]);
+    }
+    results_init(m, env, this, 0, scratch + 0x200);
+    let b = m.r32(this);
+    m.w32(b + 0x28, RECORD_BACKDROP_VTABLE);
+    if whole == 0 {
+        for i in 0..0x98 / 4 {
+            m.w32(scratch + 4 * i, m.r32(RECORD_BACKDROP_VTABLE + 4 * i));
+        }
+        let d = this.wrapping_sub(b.wrapping_sub(0x118));
+        for o in [8u32, 0x68, 0x70, 0x78, 0x80, 0x88] {
+            let h = (m.r16(RECORD_BACKDROP_VTABLE + o) as u32).wrapping_add(d);
+            m.w16(scratch + o, h as u16);
+        }
+        m.w32(b + 0x28, scratch);
+    }
+    for i in 0..0x2b {
+        m.w8(scratch + 0xa0 + i, m.r8(NAME_GRID_SRC + i));
+    }
+    call(m, env, MEMSET, &[NAME_GRID, 0, 0x2a]);
+    call(m, env, STRNCPY, &[NAME_GRID, NAME_GRID_SRC, 0x2a]);
+    m.w32(this + 0x44, 1);
+    this
+}
+
+/// `cHiScoreRecordOverlay::Reset` 0x1b6d60(this): the backdrop reset, the buffers cleared, the high scores' table
+/// layout (rows from the frame's top + 79, columns at 131, 214, 342, 415, 505, the score right-aligned; no
+/// highlights; the name +0x64 cleared (0xb bytes); the entering flag +0x114 set); the title by the mode (the
+/// scores' 0x3384c4 in 3 and 5, the times' 0x3384c0 in 2, 4 and 9, 0xea1 in 7 with the best kind 2; others no
+/// table, read from address 0); the rows the table's count; the heads (not in mode 7); then the first record
+/// submitted (+0x110 0)
+pub fn hiscore_record_reset(m: &mut Mem, env: &mut dyn TextBoxEnv, this: u32) {
+    call(m, env, BACKDROP_RESET, &[m.r32(this)]);
+    clear_buffers(m, env);
+    let r = call(m, env, GET_RECT, &[m.r32(m.r32(this)), 0x37]);
+    let x = rf(m, r + 8) + F(10.0) + F(7.0) + F(23.0) + F(39.0);
+    title_rows(m, this, x, F(3.0));
+    m.w32(TABLE_ALIGN + 0xc, 2);
+    for (i, v) in [131.0f32, 214.0, 342.0, 415.0, 505.0].into_iter().enumerate() {
+        wf(m, TABLE_X + 4 * i as u32, F(v));
+    }
+    m.w32(TABLE_ALIGN, 0);
+    m.w32(this + 8, 4);
+    m.w32(this + 0x114, 1);
+    m.w32(TABLE_ALIGN + 4, 0);
+    m.w32(TABLE_ALIGN + 8, 0);
+    m.w32(this + 0x38, 0);
+    m.w32(this + 0x34, 0);
+    for i in (0..16).rev() {
+        m.w32(ROW_MARK + 4 * i, 0xffff_ffff);
+    }
+    for i in (0..8).rev() {
+        m.w32(COL_MARK + 4 * i, 0xffff_ffff);
+    }
+    call(m, env, MEMSET, &[this + 0x64, 0, 0xb]);
+    let course = m.r32(CAREER + 0x2af8);
+    let best = match m.r32(CAREER + 0x2afc) {
+        3 | 5 => {
+            let best = call(m, env, CAREER_BEST, &[CAREER, 1, course]);
+            call(m, env, crate::pausedraw::WSTR_FORMAT, &[TABLE_TITLE, m.r32(RESULT_WORDS + 4), m.r32(best + 0x64)]);
+            best
+        }
+        2 | 4 | 9 => {
+            let best = call(m, env, CAREER_BEST, &[CAREER, 0, course]);
+            call(m, env, crate::pausedraw::WSTR_FORMAT, &[TABLE_TITLE, m.r32(RESULT_WORDS), m.r32(best + 0x64)]);
+            best
+        }
+        7 => {
+            let best = call(m, env, CAREER_BEST, &[CAREER, 2, course]);
+            let s = loc(m, env, 0xea1);
+            call(m, env, WSTR_COPY, &[TABLE_TITLE, s]);
+            best
+        }
+        // (no table: the game reads it from address 0)
+        _ => 0,
+    };
+    m.w32(this + 4, m.r32(best + 0x64));
+    if m.r32(CAREER + 0x2afc) != 7 {
+        for (c, id) in [0xe5fu32, 0xe5d, 0x1cd, 0xe5e].into_iter().enumerate() {
+            let s = loc(m, env, id);
+            call(m, env, SET_ROW_NAME, &[this, c as u32, s]);
+        }
+    }
+    m.w32(this + 0x110, 0);
+    hiscore_submit_entry(m, env, this);
+}
+
+/// The high-score record's vf16 0x1b7068: the sound system's channel 0 stopped
+pub fn hiscore_record_vf16(m: &mut Mem, env: &mut dyn TextBoxEnv) {
+    call(m, env, SND_STOP_ONE, &[m.r32(MUSIC), 0]);
+}
+
+/// The high-score record's `Draw` 0x1b7078(this): the course's title (410 high in mode 7, else 460); the
+/// renderer's +0x1e0 (3) and texture 7; the grid's cursor (sprite 0x36 frame 0x20, white at 0.5 of the alpha while
+/// entering (+0x3c), else 0.2) at the picked character (+0x58 the row, +0x5c the column; its measure unused); in
+/// mode 7 a faint bar (213, 287, 200 × 25), else the name's caret (sprite 0x32 at the second column − 15, the
+/// entry's row + 2; its measure of the name and "." unused)
+pub fn hiscore_record_draw(m: &mut Mem, env: &mut dyn TextBoxEnv, this: u32, scratch: u32) {
+    let mode = m.r32(CAREER + 0x2afc);
+    let h = if mode == 7 { F(410.0) } else { F(460.0) };
+    draw_course_title(m, env, this, h, scratch + 0x40);
+    rcall(m, env, 0x1e0, &[3]);
+    rcall(m, env, 0x1d0, &[7]);
+    let (row, col) = (m.r32(this + 0x58), m.r32(this + 0x5c));
+    let ch = m.r8(NAME_GRID.wrapping_add(col).wrapping_add(row.wrapping_mul(0xe)));
+    m.w8(scratch + 1, 0);
+    m.w8(scratch, ch);
+    fcall(m, env, MEASURE_ASCII, &[m.r32(m.r32(this) + 4), scratch, 0], &[ONE]);
+    let col_ = scratch + 0x10;
+    put4(m, col_, [ONE; 4]);
+    call(m, env, SET_COLOUR, &[DRAW_COLOUR, col_]);
+    let f = if m.r32(this + 0x3c) != 0 { F(0.5) } else { k(0x3e4c_cccd) };
+    let a = rf(m, m.r32(this) + 0x70) * f;
+    wf(m, DRAW_COLOUR, rf(m, DRAW_COLOUR) * a);
+    let y = cvt_s_w(m.r32(this + 0x58) as i32) * rf(m, GRID_DY);
+    let yy = rf(m, GRID_Y0) + y;
+    let x = cvt_s_w(m.r32(this + 0x5c) as i32) * rf(m, GRID_DX);
+    let xx = rf(m, GRID_X0) + ONE + x;
+    fcall(m, env, DRAW_SPRITE, &[m.r32(this), 0x36, 0x20], &[xx, yy - ONE, k(0x3f8f_5c29), k(0x3f8c_cccd)]);
+    if mode == 7 {
+        rcall(m, env, 0x1f0, &[0xffff_ffff, 0]);
+        put4(m, col_, [ONE; 4]);
+        call(m, env, SET_COLOUR, &[DRAW_COLOUR, col_]);
+        wf(m, DRAW_COLOUR, rf(m, DRAW_COLOUR) * k(0x3e99_999a));
+        fcall(m, env, FILLED_RECT, &[DRAW_COLOUR], &[F(213.0), k(0x438f_8000), F(200.0), F(25.0)]);
+        return;
+    }
+    let name = this + 0x64;
+    let len = call(m, env, STRLEN, &[name]);
+    let end = name.wrapping_add(len);
+    m.w8(end, b'.');
+    m.w8(len.wrapping_add(name) + 1, 0);
+    fcall(m, env, MEASURE_ASCII, &[m.r32(m.r32(this) + 4), name, 0], &[k(0x3f59_999a)]);
+    m.w8(end, 0);
+    put4(m, col_, [ONE, ONE, ONE, F(0.0)]);
+    call(m, env, SET_COLOUR, &[DRAW_COLOUR, col_]);
+    let a = if m.r32(this + 0x3c) != 0 {
+        rf(m, m.r32(this) + 0x70)
+    } else {
+        rf(m, m.r32(this) + 0x70) * k(0x3ecc_cccd)
+    };
+    wf(m, DRAW_COLOUR, rf(m, DRAW_COLOUR) * a);
+    let x = rf(m, TABLE_X + 4) - F(15.0);
+    fcall(m, env, DRAW_SPRITE, &[m.r32(this), 0x32, 0], &[x, rf(m, this + 0x54) + F(2.0), k(0x3f99_999a), k(0x3f99_999a)]);
+}
+
+/// `cHiScoreRecordOverlay::DrawText` 0x1b73e0(this): the table; the grid's characters (white by the alpha;
+/// 'e' the word 0x112 centred small, 'd' the delete sprite 0x32, others centred), a row at a time until a 0;
+/// in mode 7 the time challenge's box (0xea0 in gold at 132, 135), its three labels (0xe9e, 0xe9d, 0xe9f)
+/// right-aligned at 300, the best's score and the event's target in white and their difference in magenta at
+/// 400, 0xe21 centred, and the name typed (when any) in gold; otherwise the name typed at the entry's row; the
+/// help (0x113, or 0x18d on the end key) once the race's +0x1c's +0x4f8 is clear; the two prompts 0xe20 / 0xe21
+/// (not in mode 7)
+pub fn hiscore_record_draw_text(m: &mut Mem, env: &mut dyn TextBoxEnv, this: u32, scratch: u32) {
+    let mode = m.r32(CAREER + 0x2afc);
+    draw_table(m, env, this, scratch + 0x1800);
+    let ch = scratch + 0x10;
+    let col = scratch + 0x20;
+    call(m, env, LIBC_MEMSET, &[ch, 0, 2]);
+    put4(m, col, [ONE; 4]);
+    call(m, env, SET_COLOUR, &[DRAW_COLOUR, col]);
+    wf(m, DRAW_COLOUR, rf(m, DRAW_COLOUR) * rf(m, m.r32(this) + 0x70));
+    let mut y = rf(m, GRID_Y0);
+    let small = k(0x3f0c_cccd);
+    for row in 0..3u32 {
+        let mut x = rf(m, GRID_X0);
+        for c in 0..14u32 {
+            let v = m.r8(NAME_GRID + row * 0xe + c);
+            m.w8(ch, v);
+            if v == 0 {
+                break;
+            }
+            match v {
+                b'e' => {
+                    let s = loc(m, env, 0x112);
+                    let w = fcall(m, env, MEASURE_WIDE, &[m.r32(m.r32(this) + 4), s, 0], &[small]);
+                    let yy = y + F(4.0);
+                    let xx = x - cvt_s_w(w as i32) * F(0.5);
+                    let s = loc(m, env, 0x112);
+                    fcall(m, env, DRAW_STRING_A, &[m.r32(m.r32(this) + 4), s], &[xx, yy, small]);
+                }
+                b'd' => {
+                    let s = k(0x3f9d_70a4);
+                    fcall(m, env, DRAW_SPRITE, &[m.r32(this), 0x32, 1], &[x - F(5.0), y + F(3.0), s, s]);
+                }
+                _ => {
+                    let w = fcall(m, env, MEASURE_ASCII, &[m.r32(m.r32(this) + 4), ch, 0], &[ONE]);
+                    let xx = x - cvt_s_w(w as i32) * F(0.5);
+                    fcall(m, env, DRAW_STRING_RAW, &[m.r32(m.r32(this) + 4), ch], &[xx, y, ONE]);
+                }
+            }
+            x = x + rf(m, GRID_DX);
+        }
+        y = y + rf(m, GRID_DY);
+    }
+    if mode == 7 {
+        let best = call(m, env, CAREER_BEST, &[CAREER, 2, m.r32(RACE_TABLE + 0x31c)]);
+        let tb = scratch + 0x30;
+        call(m, env, TB_INIT, &[tb]);
+        call(m, env, TB_SET_FONT, &[tb, m.r32(m.r32(this) + 8)]);
+        call(m, env, TB_RESET, &[tb]);
+        put4(m, col, gold());
+        for i in 0..4 {
+            m.w32(tb + 0x3c + 4 * i, m.r32(col + 4 * i));
+        }
+        m.w32(tb + 0x6c, 1);
+        m.w32(tb + 0x20, 0);
+        m.w32(tb + 0x24, 0);
+        m.w32(tb + 0x20, 1);
+        m.w32(tb + 0x38, m.r32(m.r32(this) + 0x70));
+        let s7 = k(0x3f33_3333);
+        fcall(m, env, TB_SET_SCALE, &[tb], &[s7, s7]);
+        fcall(m, env, TB_SET_RECT, &[tb], &[F(132.0), F(135.0), F(370.0), F(100.0)]);
+        let s = loc(m, env, 0xea0);
+        let text = scratch + 0x14a0;
+        call(m, env, crate::pausedraw::WSTR_FORMAT, &[text, s]);
+        call(m, env, TB_APPEND, &[tb, text]);
+        call(m, env, TB_WRAP, &[tb, 0]);
+        call(m, env, TB_DRAW, &[tb, 0xffff_ffff, 0]);
+        let s65 = k(0x3f26_6666);
+        with_alpha(m, env, [ONE, ONE, k(0x3ef1_26e9), k(0x3d1f_be77)], this, col);
+        for (id, y) in [(0xe9eu32, F(190.0)), (0xe9d, F(210.0)), (0xe9f, F(230.0))] {
+            let s = loc(m, env, id);
+            fcall(m, env, PRINT_SHADOWED_RIGHT, &[m.r32(m.r32(this) + 8), s], &[s65, F(300.0), y]);
+        }
+        with_alpha(m, env, [ONE; 4], this, col);
+        let s9 = k(0x3f66_6666);
+        let (a, b2, c) = (scratch + 0x16a0, scratch + 0x16d0, scratch + 0x1700);
+        call(m, env, FORMAT_SCORE, &[m.r32(best + 0x10), a]);
+        fcall(m, env, PRINT_SHADOWED_RIGHT, &[m.r32(m.r32(this) + 4), a], &[s9, F(400.0), F(190.0)]);
+        call(m, env, FORMAT_SCORE, &[m.r32(RACE_TABLE + 0x32c), b2]);
+        fcall(m, env, PRINT_SHADOWED_RIGHT, &[m.r32(m.r32(this) + 4), b2], &[s9, F(400.0), F(210.0)]);
+        call(m, env, FORMAT_TIME, &[m.r32(best + 0x10).wrapping_sub(m.r32(RACE_TABLE + 0x32c)), c]);
+        with_alpha(m, env, [ONE, F(0.0), ONE, F(0.0)], this, col);
+        fcall(m, env, PRINT_SHADOWED_RIGHT, &[m.r32(m.r32(this) + 4), c], &[s9, F(400.0), F(230.0)]);
+        with_alpha(m, env, gold(), this, col);
+        let s = loc(m, env, 0xe21);
+        fcall(m, env, PRINT_SHADOWED_CENTRED, &[m.r32(m.r32(this) + 8), s], &[s7, F(320.0), F(260.0)]);
+        if m.r8(this + 0x64) != 0 {
+            rcall(m, env, 0x1d0, &[0x13]);
+            faded(m, env, gold(), m.r32(this) + 0x70, col);
+            fcall(m, env, PRINTF_SHADOWED_CENTERED, &[m.r32(m.r32(this) + 4), this + 0x64], &[ONE, F(320.0), F(290.0)]);
+        }
+        call(m, env, TB_DELETE, &[tb, 2]);
+    } else if m.r8(this + 0x64) != 0 {
+        faded(m, env, gold(), m.r32(this) + 0x70, col);
+        fcall(m, env, PRINTF_SHADOWED, &[m.r32(m.r32(this) + 4), this + 0x64], &[k(0x3f59_999a), rf(m, TABLE_X + 4), rf(m, this + 0x54)]);
+    }
+    let r = race(m);
+    if m.r32(m.r32(r + 0x1c) + 0x4f8) == 0 {
+        faded(m, env, [ONE; 4], m.r32(this) + 0x70, col);
+        let (label, on) = (scratch + 0x1730, scratch + 0x1734);
+        let s = loc(m, env, 0x113);
+        m.w32(label, s);
+        if m.r32(this + 0x58) == 2 && m.r32(this + 0x5c) == 0xd {
+            let s = loc(m, env, 0x18d);
+            m.w32(label, s);
+        }
+        let s73 = k(0x3f3a_e148);
+        m.w32(on, 1);
+        fcall(m, env, MEASURE_WIDE, &[m.r32(m.r32(this) + 4), m.r32(label), 0], &[s73]);
+        let y = if mode == 7 { k(0x43ca_8000) } else { F(430.0) };
+        fcall(m, env, DRAW_MENU_LIST, &[m.r32(this), 3, 0, label, 1, 0xffff_ffff, 0x74, 1, 0, on], &[F(600.0), y, s73]);
+    }
+    faded(m, env, gold(), m.r32(this) + 0x70, col);
+    if mode == 7 {
+        return;
+    }
+    let s7 = k(0x3f33_3333);
+    let s = loc(m, env, 0xe20);
+    fcall(m, env, PRINT_SHADOWED_CENTRED, &[m.r32(m.r32(this) + 8), s], &[s7, F(320.0), F(256.0)]);
+    let s = loc(m, env, 0xe21);
+    fcall(m, env, PRINT_SHADOWED_CENTRED, &[m.r32(m.r32(this) + 8), s], &[s7, F(320.0), F(280.0)]);
+}
+
+fn grid_at(m: &Mem, row: u32, col: u32) -> i8 {
+    m.r8(NAME_GRID.wrapping_add(col).wrapping_add(row.wrapping_mul(0xe))) as i8
+}
+
+/// `cHiScoreRecordOverlay::Update` 0x1b7d98(this): the results' update; the entering player's pad's new buttons:
+/// up / down (0x20001, 0x40002) move the row (up wrapping 0 to 2, down by 3) and left / right (0x100008, 0x80004)
+/// the column (left wrapping 0 to 13, right by 14), past empty cells (up and left on without wrapping), each with
+/// the move sound; select (0x800) takes the picked character with the select sound: 'd' deletes the last
+/// (the back sound; no longer entering), 'e' ends (entering; the next record submitted, or when there is none
+/// overlay item 2 hidden and item 13 shown if any unlock isn't kind 7, else 1); any other is typed (a fresh name
+/// when entering), the tenth on replacing the ninth
+pub fn hiscore_record_update(m: &mut Mem, env: &mut dyn TextBoxEnv, this: u32) {
+    call(m, env, RESULTS_UPDATE, &[this]);
+    let r = race(m);
+    let pad = m.r32(m.r32(r + 0x38) + 0xc);
+    let b = call(m, env, NEW_BUTTONS, &[m.r32(this), pad]);
+    if b == 0 {
+        return;
+    }
+    if b & 0x20001 != 0 {
+        call(m, env, MOVE_SOUND, &[m.r32(this)]);
+        let v = m.r32(this + 0x58).wrapping_sub(1);
+        m.w32(this + 0x58, if (v as i32) < 0 { 2 } else { v });
+        while grid_at(m, m.r32(this + 0x58), m.r32(this + 0x5c)) == 0 {
+            let v = m.r32(this + 0x58).wrapping_sub(1);
+            m.w32(this + 0x58, v);
+        }
+    }
+    if b & 0x40002 != 0 {
+        call(m, env, MOVE_SOUND, &[m.r32(this)]);
+        loop {
+            let v = (m.r32(this + 0x58) as i32).wrapping_add(1).wrapping_rem(3) as u32;
+            m.w32(this + 0x58, v);
+            if grid_at(m, v, m.r32(this + 0x5c)) != 0 {
+                break;
+            }
+        }
+    }
+    if b & 0x100008 != 0 {
+        call(m, env, MOVE_SOUND, &[m.r32(this)]);
+        let v = m.r32(this + 0x5c).wrapping_sub(1);
+        m.w32(this + 0x5c, if (v as i32) < 0 { 0xd } else { v });
+        while grid_at(m, m.r32(this + 0x58), m.r32(this + 0x5c)) == 0 {
+            let v = m.r32(this + 0x5c).wrapping_sub(1);
+            m.w32(this + 0x5c, v);
+        }
+    }
+    if b & 0x80004 != 0 {
+        call(m, env, MOVE_SOUND, &[m.r32(this)]);
+        loop {
+            let v = (m.r32(this + 0x5c) as i32).wrapping_add(1).wrapping_rem(0xe) as u32;
+            m.w32(this + 0x5c, v);
+            if grid_at(m, m.r32(this + 0x58), v) != 0 {
+                break;
+            }
+        }
+    }
+    if b & 0x800 == 0 {
+        return;
+    }
+    let c = grid_at(m, m.r32(this + 0x58), m.r32(this + 0x5c));
+    call(m, env, SELECT_SOUND, &[m.r32(this)]);
+    if c == b'd' as i8 {
+        call(m, env, BACK_SOUND, &[m.r32(this)]);
+        if m.r32(this + 0x114) != 0 {
+            m.w32(this + 0x114, 0);
+        }
+        let n = m.r32(this + 0x60);
+        if (n as i32) > 0 {
+            let n = n - 1;
+            m.w32(this + 0x60, n);
+            m.w8(this.wrapping_add(n) + 0x64, 0);
+        }
+        return;
+    }
+    if c == b'e' as i8 {
+        m.w32(this + 0x114, 1);
+        if hiscore_submit_entry(m, env, this) != 0 {
+            return;
+        }
+        let n = m.r32(UNLOCKS);
+        let mut others = 0u32;
+        if (n as i32) > 0 {
+            let mut e = UNLOCK_LIST + 4;
+            let mut left = n;
+            loop {
+                if m.r32(e) != 7 {
+                    others += 1;
+                }
+                e += 0xc;
+                left = left.wrapping_sub(1);
+                if left == 0 {
+                    break;
+                }
+            }
+        }
+        let r = race(m);
+        call(m, env, OVERLAY_HIDE, &[m.r32(r + 0x38), 2, 0xffff_ffff]);
+        let item = if others != 0 { 0xd } else { 1 };
+        let r = race(m);
+        call(m, env, HUD_SHOW, &[m.r32(r + 0x38), item, 0xffff_ffff]);
+        return;
+    }
+    let name = this + 0x64;
+    if m.r32(this + 0x114) != 0 {
+        m.w32(this + 0x114, 0);
+        call(m, env, MEMSET, &[name, 0, 0xb]);
+        m.w32(this + 0x60, 0);
+    }
+    let n = m.r32(this + 0x60);
+    if (n as i32) < 9 {
+        m.w8(name.wrapping_add(n), c as u8);
+        m.w32(this + 0x60, m.r32(this + 0x60).wrapping_add(1));
+    } else {
+        m.w8(n.wrapping_add(name).wrapping_sub(1), c as u8);
+    }
+}
+
+/// `HiScore_SubmitEntry` 0x1b81b8(this) -> whether there was a record: the race's new record at +0x110 (0x10 each
+/// from 0x32eca0); past the first, the name typed is set as the entering player's (0x164968) and copied over the
+/// last record's entry. A record with a player (+0 not negative) gets the table rebuilt: the cells cleared, the
+/// overlay given the player's pad, a row for each of the best table's entries (its rank; the new one highlighted
+/// (2) with the entry's row kept (+0x54), its speech, and while entering the name copied in and the line 0x114;
+/// others named), the rider, the score or the time, blanked in mode 7; the fourth head; the cursor on the end key
+/// (row 2, column 13), the name's length, the next record
+pub fn hiscore_submit_entry(m: &mut Mem, env: &mut dyn TextBoxEnv, this: u32) -> u32 {
+    let n = m.r32(this + 0x110);
+    let rec = NEW_RECORDS.wrapping_add(n << 4);
+    let table = m.r32(rec + 8);
+    let name = this + 0x64;
+    if (n as i32) > 0 {
+        let r = race(m);
+        let pad = m.r32(m.r32(r + 0x38) + 0xc);
+        let s = call(m, env, SET_PLAYER_NAME, &[CAREER, pad, name]);
+        call(m, env, STRCPY, &[name, s]);
+        let last = m.r32(NEW_RECORDS.wrapping_add(m.r32(this + 0x110) << 4).wrapping_sub(4));
+        call(m, env, STRCPY, &[last, s]);
+    }
+    let mode = m.r32(CAREER + 0x2afc);
+    if (m.r32(rec) as i32) < 0 {
+        return 0;
+    }
+    call(m, env, MEMSET, &[TABLE_CELLS, 0, 0x4000]);
+    let r = race(m);
+    call(m, env, SET_PLAYER_PAD, &[m.r32(r + 0x38), m.r32(rec)]);
+    let mut i = 0u32;
+    while (i as i32) < m.r32(m.r32(rec + 8) + 0x64) as i32 {
+        let e = table.wrapping_add(i.wrapping_mul(0x14));
+        call(m, env, SET_CELL_INT, &[this, 0, i, i + 1]);
+        if e == m.r32(rec + 0xc) {
+            m.w32(ROW_MARK + 4 * i, 2);
+            wf(m, this + 0x54, rf(m, TITLE_ROWS + 4 * i));
+            call(m, env, SPEECH_HISCORE, &[m.r32(MUSIC), i]);
+            if m.r32(this + 0x114) != 0 {
+                call(m, env, STRCPY, &[name, e]);
+                let s = loc(m, env, 0x114);
+                call(m, env, crate::pausedraw::WSTR_FORMAT, &[this + 0x70, s, name]);
+            }
+        } else {
+            m.w32(ROW_MARK + 4 * i, 0xffff_ffff);
+            call(m, env, SET_CELL_ASCII, &[this, 1, i, e]);
+        }
+        let rider = m.r32(m.r32(e + 0xc).wrapping_mul(0x38).wrapping_add(CHARACTERS) + 4);
+        call(m, env, SET_CELL_ASCII, &[this, 2, i, rider]);
+        if m.r32(m.r32(rec + 8) + 0x6c) != 0 {
+            call(m, env, FORMAT_SCORE, &[m.r32(e + 0x10), TABLE_CELLS + 0x1800 + (i << 7)]);
+        } else {
+            call(m, env, SET_CELL_INT, &[this, 3, i, m.r32(e + 0x10)]);
+        }
+        if mode == 7 {
+            for c in 0..4 {
+                call(m, env, SET_CELL_ASCII, &[this, c, i, EMPTY]);
+            }
+        }
+        i += 1;
+    }
+    let id = if m.r32(m.r32(rec + 8) + 0x6c) != 0 { 0xe61 } else { 0xe5e };
+    let s = loc(m, env, id);
+    call(m, env, SET_ROW_NAME, &[this, 3, s]);
+    if mode == 7 {
+        call(m, env, SET_ROW_NAME_ASCII, &[this, 3, EMPTY]);
+    }
+    m.w32(this + 0x58, 2);
+    m.w32(this + 0x5c, 0xd);
+    let len = call(m, env, STRLEN, &[name]);
+    m.w32(this + 0x60, len);
+    m.w32(this + 0x110, m.r32(this + 0x110).wrapping_add(1));
+    1
+}
