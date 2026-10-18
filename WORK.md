@@ -34,8 +34,7 @@ state machine and the renderer are ours. Nothing has been checked against the or
 | ID | Task | Area | Needs | Who | Notes |
 |---|---|---|---|---|---|
 | E1 | Start-up and main loop: `entry` 0x100008, the `gApp` (0x337C58) init, `cGame::Init` 0x17E148, `cGame::Update` 0x181638, game modes and the front end ↔ race switch, pause (`cGame::IsPaused` 0x17F078) | unowned | F1 | | [est] Our Bevy app loop is the stand-in |
-| E1c | The course table and the app's small helpers on the game's bytes: `CourseTable_*` (0x186218..0x186440), `App_GetCourseId` / `_FindCourseById` / `_GetCourseInfo`, `Course_OpenBig` / `_CloseBig`, `Loc_Load` / `_Unload` / `Loc_GetUnquotedString`, `App_LoadFonts`, the effects loader (`App_CreateEffectsLoader` / `_FreeEffectsLoader`, `EffectsLoader_Delete`), checked in the runner | ed-slopper/puffin | E1 | | Split of E1 2026-10-17 by ed-slopper/puffin |
-| E1d | `cGame`'s frame on the game's bytes: `cGame::cGame`, vf0, `Restart`, vf4, vf6, `Update` 0x181638, `Game_UpdateOrShowResults`, `Game_UpdateObjectLists`, `Game_CanPause`, 0x1818c0, `Game_Main`, 0x182170 and the modules' small virtuals, checked in the runner | any | E1 | | Split of E1 2026-10-17 |
+| E1d | `cGame`'s frame on the game's bytes: `cGame::cGame`, vf0, `Restart`, vf4, vf6, `Update` 0x181638, `Game_UpdateOrShowResults`, `Game_UpdateObjectLists`, `Game_CanPause`, 0x1818c0, `Game_Main`, 0x182170 and the modules' small virtuals, checked in the runner | ed-slopper/puffin | E1 | | Split of E1 2026-10-17 |
 | E1e | `cApplication` and its loop on the game's bytes: vf1, vf2, vf3, its destructor, `cAppMan`, `App_Run`, `App_MainLoop`, the vsync mode (`App_StartVSyncMode` / `_StopVSyncMode` / `_VSyncTick` / `_RunVSyncModeTicks`), `cPS2Device` vf6 / vf7, checked in the runner | any | E1 | | Split of E1 2026-10-17 |
 | E1f | The start screen on the game's bytes: `cStartScreen` / `cStartScreenSingle` (vf1..vf7, `StartScreenSingle_Create` / `_SetState`) and the memory card messages (`MemCardMsg_DrawBox` / `_DrawOptions` / `_DrawButtonPrompt` / `_Draw`, `Overlay_DrawDontRemoveCard`), checked in the runner | any | E1 | | Split of E1 2026-10-17 |
 | E1g | The boot films' module and the execution manager on the game's bytes: `cVideoModule`, `cVideoLoadModule`, `cPS2ExecutionMan` vf1..vf4, `Stack_FillCanary`, `Mem_PrintStackUsage`, `Iop_RebootAndLoadModules`, `PS2ExecutionMan_Create` (platform glue: what talks to the IOP stays a call out), checked in the runner | any | E1 | | Split of E1 2026-10-17 |
@@ -154,6 +153,7 @@ matches the original.
 
 | ID | Task | Section | Who | Date | Commit |
 |---|---|---|---|---|---|
+| E1c | The course table and the app's small helpers (27 functions; 41/43 mutants, the rest equivalent) | P2 | ed-slopper/puffin | 2026-10-17 | dc7811c |
 | G9z | The front end's 3D scene code below 0x26c000 (G9z1..G9z5, G9z2b; every function there checked but cFE3D's set-up and tear-down, G9b2d2) | P2 | ed-slopper/puffin | 2026-10-17 | dc475ef |
 | G9z2b | The front end character's draw (0x2663f8; 30/30 mutants) | P2 | ed-slopper/puffin | 2026-10-17 | dc475ef |
 | G9z5 | The front end's cameras (20 functions; 49/50 mutants, the survivor data-equivalent) | P2 | ed-slopper/puffin | 2026-10-17 | e98c38c |
@@ -1427,3 +1427,4 @@ matches the original.
 - 2026-10-17 ed-slopper/puffin: G9z4 done (8f97546: geometry, films and animations, 37/37); G9z5 claimed (the cameras).
 - 2026-10-17 ed-slopper/puffin: G9z5 done (e98c38c: the front end's cameras, 49/50); G9z2b claimed (the character's draw).
 - 2026-10-17 ed-slopper/puffin: G9z2b done (dc475ef: the character's draw, 30/30); G9z closed (the front end's 3D scene code all checked but G9b2d2's). E1 split into E1c..E1g for the application and game code the index still has unchecked; E1c claimed (the course table and app helpers).
+- 2026-10-17 ed-slopper/puffin: E1c done (dc7811c: the course table and the app's helpers, 41/43); E1d claimed (cGame's frame).
