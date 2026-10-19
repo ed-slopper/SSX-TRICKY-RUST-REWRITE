@@ -670,3 +670,10 @@ with four (the render setup 0x1dbad8 and 0x182430 pass the handler's argument), 
 - `Vec4_ScaleCopy21`..`31` (0x1780b8, 0x197d70, 0x1cae48, 0x1ce058, 0x1d8dc0, 0x1ea358, 0x201098, 0x208628,
   0x238a80, 0x23b588, 0x2b6a70) and `Mat4_TransformVec4Copy1` 0x2085e8: more out-of-line copies of the VU0
   scale (44 bytes) and `Mat4_TransformVec4` 0x178078 (64 bytes), no references.
+
+## Names from F1c batch 29 (proven)
+
+- `sceDmaPutEnv` 0x2e5950 (env): libdma's environment set: checks the fields (−1..−4 when out of range), then
+  D_CTRL (bits from tables 0x35ade8 / 0x35adf8 / 0x35ae08, the release cycle), D_PCR, D_SQWC, D_RBOR,
+  D_RBSR, and keeps a copy at 0x35ae18. `sceDmaReset` 0x2e5860 calls it on a zeroed 0x14-byte env.
+- `Dma_Bzero` 0x2e5800 (p, n): n bytes zeroed (libdma's own; Sony's name unknown).

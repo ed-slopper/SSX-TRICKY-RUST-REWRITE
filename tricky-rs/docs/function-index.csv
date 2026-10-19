@@ -2248,8 +2248,8 @@ address,size,name,system,status
 0x1956b0,12,ReplayStatus_Clear,frontend?,checked
 0x1956c0,8,thunk_FUN_00193a78,runtime,checked
 0x1956c8,40,Replay_ClearPins,frontend?,checked
-0x1956f0,28,FUN_001956f0,frontend?,checked
-0x195710,28,FUN_00195710,frontend?,checked
+0x1956f0,28,Mem_DeleteIfFlag5,frontend?,checked
+0x195710,28,Mem_DeleteIfFlag6,frontend?,checked
 0x1957b0,40,TextBox_Init,render,checked
 0x1957d8,620,TextBox_Draw,render,checked
 0x195a48,572,TextBox_DrawLines,render,checked
@@ -3491,7 +3491,7 @@ address,size,name,system,status
 0x20a6e0,128,BankManager_IsSlotLoaded,audio?,not started
 0x20a7b8,80,cBankManager::__tf,runtime,host
 0x20a888,56,BankInstance_Init,audio?,not started
-0x20a8c0,28,FUN_0020a8c0,audio?,not started
+0x20a8c0,28,Mem_DeleteIfFlag7,audio?,not started
 0x20a8e0,248,SndVoice_IsDone,audio?,ported
 0x20a9d8,72,BankInstance_Reset,audio?,not started
 0x20aa20,88,BankInstance_IsFree,audio?,not started
@@ -3788,7 +3788,7 @@ address,size,name,system,status
 0x222888,124,StaticInit_MidiSys,audio?,not started
 0x222908,80,cMidiSys::__tf,runtime,host
 0x222998,20,SndEvent_Init,audio?,checked
-0x2229b0,28,FUN_002229b0,audio?,checked
+0x2229b0,28,Mem_DeleteIfFlag8,audio?,checked
 0x2229d0,168,SndEvent_Set,audio?,checked
 0x222a78,16,SndEvent_IsFree,audio?,checked
 0x222a88,44,SndEvent_Clear,audio?,checked
@@ -4730,7 +4730,7 @@ address,size,name,system,status
 0x260e68,44,Course_GetScriptEntry,race,ported
 0x260f90,8,CellList_Clear,world?,checked
 0x260f98,8,CellList_Add,world?,checked
-0x260fa0,28,FUN_00260fa0,world?,not started
+0x260fa0,28,Mem_DeleteIfFlag9,world?,not started
 0x260fc0,28,CellList_Destruct,world?,not started
 0x260fe0,80,cCourseResolve::__tf,runtime,host
 0x261060,64,SphereTreeBufCache::__tf,runtime,host
@@ -6713,14 +6713,14 @@ address,size,name,system,status
 0x2e0630,12,FUN_002e0630,lib-snd?,not started
 0x2e0640,488,SoftVoice_Start,lib-snd?,not started
 0x2e0828,128,FUN_002e0828,lib-snd?,not started
-0x2e08a8,52,FUN_002e08a8,lib-snd?,not started
+0x2e08a8,52,SoftVoice_StopAndNotify,lib-snd?,not started
 0x2e08e0,160,SoftVoice_Stop,lib-snd?,not started
 0x2e0980,104,SoftVoice_SetVolume,lib-snd?,not started
 0x2e09e8,552,SoftMix_Mix,lib-snd?,not started
-0x2e0c10,48,FUN_002e0c10,lib-snd?,not started
-0x2e0c40,76,FUN_002e0c40,lib-snd?,not started
-0x2e0c90,864,FUN_002e0c90,lib-snd?,not started
-0x2e0ff0,12,FUN_002e0ff0,lib-snd?,not started
+0x2e0c10,48,SoftReverb_Clear,lib-snd?,not started
+0x2e0c40,76,SoftReverb_AddInput,lib-snd?,not started
+0x2e0c90,864,SoftReverb_Process,lib-snd?,not started
+0x2e0ff0,12,SoftReverb_SetPaused,lib-snd?,not started
 0x2e1000,48,SoftVoice_SetFxSend,lib-snd?,not started
 0x2e1030,68,SoftVoice_GetPosition,lib-snd?,not started
 0x2e1078,184,SoftVoice_SetPitch,lib-snd?,not started
@@ -6782,26 +6782,26 @@ address,size,name,system,status
 0x2e46e8,912,SndFx_Resample_Pull,lib-snd?,not started
 0x2e4a78,128,SndFx_Resample_Init,lib-snd?,not started
 0x2e4bd8,44,SndMath_ISqrt,lib-snd?,not started
-0x2e4c08,152,FUN_002e4c08,sdk?,host
-0x2e4ca0,540,FUN_002e4ca0,sdk?,host
-0x2e4ec0,84,FUN_002e4ec0,sdk?,host
-0x2e4f18,124,FUN_002e4f18,sdk?,host
-0x2e4f98,636,FUN_002e4f98,sdk?,host
-0x2e5218,56,FUN_002e5218,sdk?,host
-0x2e5250,124,FUN_002e5250,sdk?,host
+0x2e4c08,152,SndMath_MsToPrimeSamples,sdk?,host
+0x2e4ca0,540,SoftReverb_Setup,sdk?,host
+0x2e4ec0,84,SoftReverb_FreeBuffers,sdk?,host
+0x2e4f18,124,SndMix_AddSat32,sdk?,host
+0x2e4f98,636,SoftReverb_RunDelay,sdk?,host
+0x2e5218,56,SndVoice_GetHead,sdk?,host
+0x2e5250,124,SndVoice_GetChannelIndex,sdk?,host
 0x2e52d0,8,FUN_002e52d0,sdk?,host
 0x2e52d8,8,FUN_002e52d8,sdk?,host
 0x2e52e0,8,FUN_002e52e0,sdk?,host
-0x2e52e8,424,FUN_002e52e8,sdk?,host
+0x2e52e8,424,SoftVoice_StartChannels,sdk?,host
 0x2e5490,152,FUN_002e5490,sdk?,host
-0x2e5528,136,FUN_002e5528,sdk?,host
+0x2e5528,136,Snd_ReadBEInt,sdk?,host
 0x2e55b0,160,sceDevVif1Reset,sdk?,host
 0x2e56e0,272,sceGsResetGraph,sdk?,host
 0x2e57f0,12,sceGsGetGParam,sdk?,host
-0x2e5800,52,FUN_002e5800,sdk?,host
+0x2e5800,52,Dma_Bzero,sdk?,host
 0x2e5838,40,sceDmaGetChan,sdk?,ported
 0x2e5860,220,sceDmaReset,sdk?,host
-0x2e5950,472,FUN_002e5950,sdk?,host
+0x2e5950,472,sceDmaPutEnv,sdk?,host
 0x2e5b88,216,sceDmaSend,sdk?,host
 0x2e5c60,228,sceDmaSendN,sdk?,host
 0x2e5d48,228,sceDmaSendI,sdk?,host

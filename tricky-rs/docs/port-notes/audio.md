@@ -921,3 +921,49 @@ Read in Ghidra (`SLUS_203.26`) and checked against the ported Rust code where th
 - `SndEvent_ClearStreamPrebuffer` 0x22a2d0 (event, record): `SndStream_SetPrebufferMs`(record+0x1c, 0), returns 1.
   It is the callback word of the 8-byte record at 0x3a0420 (0, −1, 0x22a2d0) that `speechsys.rs` passes to the
   scheduler, so a delayed speech stream starts when its delay runs out.
+
+## Names from F1c batch 29 (proven)
+
+EA's sound library, from the batch 25 unclear list and the `sdk?` rows at 0x2e4c08..0x2e5528 (EA's code, not
+Sony's):
+
+- The software reverb (the effect-bus flag 0x10; "reverb" is our word for it, inferred from what it does:
+  delay lines with feedback, damping and left/right gains):
+  - `SoftReverb_Setup` 0x2e4ca0 (rate, preset): frees the old lines, then for each of 3 stages the preset's
+    tap count (byte +4 + stage) and per tap (4 bytes from +8): pan as (b3·128/127, 128 − that) scaled by
+    (preset byte 7 + 100) / 350, feedback ±(b2·128/127), and a delay of `SndMath_MsToPrimeSamples`(rate,
+    big-endian 16-bit ms at the tap) samples, each line `SndMem_Alloc`ed and zeroed; ends in `SoftReverb_Clear`.
+    Called from 0x2dd278 with preset 0x351208 (param 1) or 0x358b80, which then installs `SoftReverb_Process`,
+    `SoftReverb_Clear` and `SoftReverb_AddInput` at 0x358cd0 / 0x358cc8 / 0x358ccc (all three cleared to 0
+    when it is turned off).
+  - `SndMath_MsToPrimeSamples` 0x2e4c08 (rate, ms): rate·ms/1000, at least 3, raised to the next prime (trial
+    division up to `SndMath_ISqrt` + 1).
+  - `SoftReverb_FreeBuffers` 0x2e4ec0: `SndMem_Free` of each of the 11 line buffers (0x35aba4, stride 0x24).
+  - `SoftReverb_RunDelay` 0x2e4f98 (line, n, in, out): one delay line over n samples, 4 at a time after the odd
+    ones: out = (in>>7)·g5 + delayed, written back = (out>>7)·g4 + in, then a one-pole damping
+    (state = g8·(w>>7) + (state>>7)·g7) on the written sample.
+  - `SoftReverb_Process` 0x2e0c90 (n): unless paused (0x358cd4), counts the idle ticks (0x35a6c0) and below
+    2000 runs every line through the three input/output buffers (0x358ec0, 0x3596c0, 0x359ec0), wrapping
+    at each line's length.
+  - `SoftReverb_Clear` 0x2e0c10: idle count 2000 and the 0x800-byte input buffer 0x358ec0 zeroed.
+  - `SoftReverb_AddInput` 0x2e0c40 (voice, …, channel): when the voice has samples (+8), the add hook
+    (0x358e84, set by 0x2e0610 to 0x2e4af8) mixes them into the input buffer at the channel; idle count 0.
+  - `SoftReverb_SetPaused` 0x2e0ff0: the 0x358cd4 word (from `SND_StopDriver` and 0x2db738).
+- `SndMix_AddSat32` 0x2e4f18 (bytes, src, dst): dst += src with 32-bit saturating adds (`paddsw`), 64 bytes a
+  loop (from `SoftReverb_Process`).
+- `Snd_ReadBEInt` 0x2e5528 (bytes, n): an n-byte big-endian integer, sign-extended for n = 1, 2, 3.
+- Voice groups (0x88-byte records at 0x3511f8; soft voices are numbered after the hardware ones, the counts at
+  0x350fe3 / 0x350fe4): `SndVoice_GetHead` 0x2e5218 (the record's +0x28, or itself when −1) and
+  `SndVoice_GetChannelIndex` 0x2e5250 (its place 1..5 in the head's list at +6; 0 when none);
+  `SoftVoice_StartChannels` 0x2e52e8 (from `SndStreamVoice_Play`: for a voice with flag 4 and not 8 at +0x24,
+  `SoftVoice_Start` on each of its +0x23 channels, then pitch, pan, effect send, 0x2dcc88 / 0x2dcd40,
+  low-pass, 0x2dced0, and 0x2e0828 on each channel).
+- `SoftVoice_StopAndNotify` 0x2e08a8: `SoftVoice_Stop` and the done hook 0x358cc0 (from `SoftMix_Mix`).
+- `Mem_DeleteIfFlag5`..`9` (0x1956f0, 0x195710, 0x20a8c0, 0x2229b0, 0x260fa0): the same body as
+  `Mem_DeleteIfFlag1` (`Mem_Delete` when bit 0 of the second argument), at the end of `ReplayMgr_Free` (two),
+  `~cBankMonitor`, `~cMonitor` and `Course_FreeCollision`.
+
+Still unclear: 0x2e5490 (the index in 0x358c38 of the entry whose voice validates to the argument), 0x2e00e0
+(+8 = 1.5 · (+0xc · +4) / 32768), 0x2e0828, 0x2e0610, the three return-0 stubs 0x2e52d0 / 0x2e52d8 / 0x2e52e0
+(from `SndStreamVoice_CalcMemSize`, `_Create`, `_Destroy`), 0x2dd278 (flags 0x20 / 0x40 paths), and the
+earlier batch 25 list.
