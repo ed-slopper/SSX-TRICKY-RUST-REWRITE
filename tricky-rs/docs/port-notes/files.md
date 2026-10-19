@@ -656,3 +656,17 @@ of each pair is called with three arguments (`Timer_Init`, `Gfx_InstallVif1Handl
 with four (the render setup 0x1dbad8 and 0x182430 pass the handler's argument), so they are `AddIntcHandler` /
 `AddIntcHandler2` and `AddDmacHandler` / `AddDmacHandler2` (Sony's names; Ghidra already has the `…2` labels there).
 `game/src/boot.rs` `ADD_INTC` is 0x3064d0, `AddIntcHandler2`. Also `entry` 0x100008.
+
+## Names from F1c batch 28 (proven)
+
+- `App_VSyncIntcHandler` 0x182170 (cause, arg): calls `arg`, then `SYNC`, `EI`, returns 1; `boot.rs` adds it with
+  `AddIntcHandler2`(3, 0x182170, 0, `App_OnVSync` 0x1825d0). Settles the batch 18 gap at 0x182170.
+- `TrickDef_Unload` 0x1545b8: clears the loaded flag 0x31e08c that `TrickDef_Load` 0x154580 sets (called from the
+  game's teardown).
+- `Score_GetTrickName` 0x157978: score + 0x250, the text `Score_AnnounceTrick` formats the trick's name into
+  (`lesson.rs` `trick_text_nonempty`, `LessonOverlay_DrawTipPage`).
+- `Rand_Init` 0x2401a0: copies the 0x18-byte default state at 0x3a4a00 into a random generator (the size
+  `Rand_SaveSnapshot` writes); from `StaticInit_MemCard`.
+- `Vec4_ScaleCopy21`..`31` (0x1780b8, 0x197d70, 0x1cae48, 0x1ce058, 0x1d8dc0, 0x1ea358, 0x201098, 0x208628,
+  0x238a80, 0x23b588, 0x2b6a70) and `Mat4_TransformVec4Copy1` 0x2085e8: more out-of-line copies of the VU0
+  scale (44 bytes) and `Mat4_TransformVec4` 0x178078 (64 bytes), no references.

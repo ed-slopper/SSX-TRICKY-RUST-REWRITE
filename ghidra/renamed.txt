@@ -721,3 +721,7 @@
 191278 FUN_00191278 Replay_SetMode11From10
 1951d0 FUN_001951d0 ReplayCamTrack_CanInsert
 1955e0 FUN_001955e0 ReplayPlaylist_SetCurrent
+19c310 FUN_0019c310 Draw_GradientLine
+19c458 FUN_0019c458 Draw_RectOutline
+19c620 FUN_0019c620 Draw_Triangle
+157978 FUN_00157978 Score_GetTrickName

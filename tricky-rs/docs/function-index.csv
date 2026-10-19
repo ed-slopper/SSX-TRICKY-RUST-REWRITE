@@ -1073,7 +1073,7 @@ address,size,name,system,status
 0x1544a8,20,Snapshot_ReadHeader,ai?,checked
 0x154548,44,Vec4_ScaleCopy17,other,not started
 0x154580,56,TrickDef_Load,other,ported
-0x1545b8,12,FUN_001545b8,,ported
+0x1545b8,12,TrickDef_Unload,other,ported
 0x154638,36,Trick_GetInfo,frontend?,ported
 0x154688,64,cTrickInfo::vf2_154688,tutorial,ported
 0x1546c8,1104,TrickInfo_BuildText,game?,not started
@@ -1127,7 +1127,7 @@ address,size,name,system,status
 0x157308,40,Score_ClearTrickEntries,scoring,checked
 0x157330,352,Scoring_PushMessage,scoring?,checked
 0x157490,1252,Score_BuildTrickId,scoring,checked
-0x157978,8,FUN_00157978,,ported
+0x157978,8,Score_GetTrickName,scoring,ported
 0x157980,40,Score_SaveSnapshot,save,checked
 0x1579a8,56,Score_LoadSnapshot,scoring,checked
 0x1579e0,572,Score_TrickBookCheck,scoring,ported
@@ -1553,7 +1553,7 @@ address,size,name,system,status
 0x177f58,80,CamPath::__tf,runtime,host
 0x178038,64,cOfflineObject::__tf,runtime,host
 0x178078,64,Mat4_TransformVec4,other,ported
-0x1780b8,44,FUN_001780b8,,not started
+0x1780b8,44,Vec4_ScaleCopy21,other,not started
 0x1781c0,124,cCamControl::cCamControl,boarder,ported
 0x178240,100,cCamControl::~cCamControl,boarder,not started
 0x1782a8,40,Game_RegisterCamera,camera,checked
@@ -1802,7 +1802,7 @@ address,size,name,system,status
 0x182068,8,cGameModule::vf4_182068,game,checked
 0x182070,64,cReplayRecordHeader::__tf,runtime,host
 0x1820b0,188,Game_Main,game,checked
-0x182170,680,FUN_00182170,,ported
+0x182170,680,App_VSyncIntcHandler,game,ported
 0x182418,20,cPS2ExecutionMan::~cPS2ExecutionMan,render,checked
 0x182430,324,cPS2ExecutionMan::vf1_182430,render,checked
 0x182578,88,cPS2ExecutionMan::vf2_182578,render,checked
@@ -2292,7 +2292,7 @@ address,size,name,system,status
 0x197ce0,8,cPath::vf3_197ce0,ai,not started
 0x197ce8,8,cPath::vf2_197ce8,ai,not started
 0x197d30,64,cPath::__tf,runtime,host
-0x197d70,44,FUN_00197d70,,not started
+0x197d70,44,Vec4_ScaleCopy22,other,not started
 0x197da0,236,AIP_LoadPathsFromFile,files,ported
 0x197e90,96,AIPath_Free,ai,not started
 0x197ef0,8,AIPathSet_GetMainPath,ai,ported
@@ -2359,9 +2359,9 @@ address,size,name,system,status
 0x19bdf8,404,Sprite_SubmitQuad,frontend?,checked
 0x19bf90,596,Sprite_SubmitGradientQuadRotated,frontend?,checked
 0x19c1e8,292,Draw_Line,render,checked
-0x19c310,324,FUN_0019c310,,checked
-0x19c458,456,FUN_0019c458,,checked
-0x19c620,344,FUN_0019c620,,checked
+0x19c310,324,Draw_GradientLine,render,checked
+0x19c458,456,Draw_RectOutline,render,checked
+0x19c620,344,Draw_Triangle,render,checked
 0x19c788,48,Font_Init,hud,checked
 0x19c7b8,80,Font_Construct,hud,checked
 0x19c808,76,Font_Delete,hud,checked
@@ -2765,7 +2765,7 @@ address,size,name,system,status
 0x1cad68,80,cPS2FogVolume::__tf,runtime,ported
 0x1cadb8,80,cFogObjMan::__tf,runtime,host
 0x1cae08,64,cFogVolume::__tf,runtime,host
-0x1cae48,44,FUN_001cae48,,not started
+0x1cae48,44,Vec4_ScaleCopy23,other,not started
 0x1caef8,212,EffectsLoader_LoadTextures,frontend?,ported
 0x1cb078,92,AnimFrame_Init,animation,not started
 0x1cb0d8,116,AnimFrame_SetKey,animation,ported
@@ -2796,7 +2796,7 @@ address,size,name,system,status
 0x1cc190,3756,LensFX_PrepareFlares,camera?,checked
 0x1cd040,3128,LensFX_PrepareSun,boarder?,checked
 0x1ce008,80,cLensFXObjNode::__tf,runtime,host
-0x1ce058,44,FUN_001ce058,,checked
+0x1ce058,44,Vec4_ScaleCopy24,other,checked
 0x1ce0f0,28,cLightMan::cLightMan,render,checked
 0x1ce110,44,cLightMan::~cLightMan,render,checked
 0x1ce140,308,Lights_Build,render,checked
@@ -2945,8 +2945,8 @@ address,size,name,system,status
 0x1d4258,148,MockupEditor_Delete,game?,not started
 0x1d42f0,72,MockupEditor_Reset,game?,not started
 0x1d4338,216,MockupEditor_Draw,frontend?,not started
-0x1d4410,296,FUN_001d4410,,not started
-0x1d4538,296,FUN_001d4538,,not started
+0x1d4410,296,MockupEditor_AddSprite,other,not started
+0x1d4538,296,MockupEditor_AddLocText,other,not started
 0x1d4660,304,MockupEditor_AddItem,other,not started
 0x1d4790,44,MockupEditor_NextItem,game?,not started
 0x1d47c0,44,MockupEditor_PrevItem,game?,not started
@@ -2982,7 +2982,7 @@ address,size,name,system,status
 0x1d8bc8,384,ParticleSys_Draw,world?,checked
 0x1d8d48,56,ParticleNode_SaveState,save,checked
 0x1d8d80,64,ParticleSys_ReadReplay,ai?,checked
-0x1d8dc0,44,FUN_001d8dc0,,not started
+0x1d8dc0,44,Vec4_ScaleCopy25,other,not started
 0x1d8e30,288,ParticleMan_Init,frontend?,ported
 0x1d8f50,132,cParticleMan::~cParticleMan,render,not started
 0x1d8fd8,64,PoolList_Pop,world?,not started
@@ -3206,7 +3206,7 @@ address,size,name,system,status
 0x1ea308,8,cGraphicsMan::vf14_1ea308,render,not started
 0x1ea310,8,cGraphicsMan::vf13_1ea310,render,not started
 0x1ea318,64,cGraphicsMan::__tf,runtime,host
-0x1ea358,44,FUN_001ea358,,not started
+0x1ea358,44,Vec4_ScaleCopy26,other,not started
 0x1ea408,200,LensFX_Create,frontend?,checked
 0x1ea4d0,52,cPS2LensFXObjNode::cPS2LensFXObjNode,world,checked
 0x1ea508,20,cPS2LensFXObjNode::~cPS2LensFXObjNode,world,checked
@@ -3313,8 +3313,8 @@ address,size,name,system,status
 0x1ff000,684,VideoStream_Draw,debugmenu?,checked
 0x1ff2b0,532,FE3DTransition_StartIn,race?,checked
 0x1ff4c8,200,FE3DTransition_StartOut,race?,checked
-0x1ff590,120,FUN_001ff590,,checked
-0x1ff608,64,FUN_001ff608,,checked
+0x1ff590,120,FE3DTransition_ApplySavedValues,save,checked
+0x1ff608,64,FE3DTransition_ApplyCurrentValues,other,checked
 0x1ff648,80,FE3DTransition_Start,frontend?,checked
 0x1ff6a0,36,FE3DTransition_StopFade,race?,checked
 0x1ff6f0,300,VideoStream_Init,audio?,not started
@@ -3346,13 +3346,13 @@ address,size,name,system,status
 0x2006e8,524,LensFX_Draw,world?,checked
 0x2008f8,1820,Patch_DrawVisibleCells,world?,checked
 0x201018,124,StaticInit_Instance,other,not started
-0x201098,44,FUN_00201098,,not started
+0x201098,44,Vec4_ScaleCopy27,other,not started
 0x2010c8,80,BdrLoad_LoadRider,render?,ported
 0x201118,32,BdrLoad_AddPart,render?,not started
 0x201138,1616,BdrLoad_BuildSkin,boarder?,ported
 0x201788,8,FUN_00201788,frontend?,not started
 0x201790,676,BdrLoad_RequestRider,boarder?,ported
-0x201a38,32,FUN_00201a38,,ported
+0x201a38,32,BdrLoad_FERequest,other,ported
 0x201a98,32,BdrLoad_DefaultRequest,other,not started
 0x201ad8,52,FUN_00201ad8,frontend?,ported
 0x201b50,60,AsyncBdrLoad_Init,frontend?,ported
@@ -3447,8 +3447,8 @@ address,size,name,system,status
 0x208468,32,MpfFile_Open,boarder?,ported
 0x208488,184,MpfFile_AddPart,render?,ported
 0x208540,164,StaticInit_BdrLoad,other,not started
-0x2085e8,64,FUN_002085e8,,not started
-0x208628,44,FUN_00208628,,not started
+0x2085e8,64,Mat4_TransformVec4Copy1,other,not started
+0x208628,44,Vec4_ScaleCopy28,other,not started
 0x2086d8,628,AsyncSys_PopQueue,audio?,not started
 0x208950,424,AsyncSys_Init,audio?,not started
 0x208af8,124,cAsyncSys::~cAsyncSys,files,not started
@@ -3990,7 +3990,7 @@ address,size,name,system,status
 0x22a228,40,StreamSys_SetVolume,audio?,not started
 0x22a278,60,StreamSys_GetSlotHandle,audio?,ported
 0x22a2b8,20,StreamSys_GetStream,audio?,not started
-0x22a2d0,36,FUN_0022a2d0,,not started
+0x22a2d0,36,SndEvent_ClearStreamPrebuffer,other,not started
 0x22a2f8,80,cStreamSys::__tf,runtime,host
 0x22a470,84,AudioTGroups_Init,audio,not started
 0x22a4c8,76,AudioTGroups_Delete,audio,not started
@@ -4104,12 +4104,12 @@ address,size,name,system,status
 0x22f9e0,76,SpeechEvt_Post3006034,other,checked
 0x22fa30,96,SpeechEvt_Post3006036,world?,checked
 0x22fa90,76,SpeechEvt_Post3006038,other,checked
-0x22fae0,84,FUN_0022fae0,,checked
-0x22fb38,88,FUN_0022fb38,,checked
-0x22fb90,88,FUN_0022fb90,,checked
-0x22fbe8,100,FUN_0022fbe8,,checked
-0x22fc50,84,FUN_0022fc50,,checked
-0x22fca8,88,FUN_0022fca8,,checked
+0x22fae0,84,SpeechEvt_Post8000,other,checked
+0x22fb38,88,SpeechEvt_Post8001,other,checked
+0x22fb90,88,SpeechEvt_Post8002,other,checked
+0x22fbe8,100,SpeechEvt_Post8003,other,checked
+0x22fc50,84,SpeechEvt_Post8004,other,checked
+0x22fca8,88,SpeechEvt_Post8005,other,checked
 0x22fd00,72,SpeechEvt_Post500a000,audio?,checked
 0x22fd48,96,SpeechEvt_Post4008000,other,checked
 0x22fda8,92,SpeechEvt_Post4008002,race?,checked
@@ -4223,7 +4223,7 @@ address,size,name,system,status
 0x237d50,2284,Collide_SphereTriangleTwoSided,world?,ported
 0x238640,408,Collide_BoarderBox,world?,ported
 0x238980,256,FUN_00238980,,not started
-0x238a80,44,FUN_00238a80,,not started
+0x238a80,44,Vec4_ScaleCopy29,other,not started
 0x238af0,736,SphereTreeCache_Init,render?,not started
 0x238dd0,384,SphereTreeBufCache_FreeAll,render?,not started
 0x238f50,568,SphereTreeCache_Get,render?,ported
@@ -4260,7 +4260,7 @@ address,size,name,system,status
 0x23b4c8,84,SphereTree::__tf,runtime,host
 0x23b520,36,SphereTreeBufCache::~SphereTreeBufCache,render?,not started
 0x23b548,64,SphereTreeBufCache::__tf,runtime,host
-0x23b588,44,FUN_0023b588,,not started
+0x23b588,44,Vec4_ScaleCopy30,other,not started
 0x23b6b0,56,Tri_ContainsPointVu0,world?,ported
 0x23b6e8,964,Collide_SphereBox,world?,ported
 0x23bb70,40,BigArchive_Init,frontend?,ported
@@ -4402,7 +4402,7 @@ address,size,name,system,status
 0x2400a8,80,cPS2MemCard::__tf,runtime,host
 0x2400f8,36,cMemCard::~cMemCard,save,not started
 0x240120,64,cMemCard::__tf,runtime,host
-0x2401a0,16,FUN_002401a0,,not started
+0x2401a0,16,Rand_Init,other,not started
 0x2401b0,20,Rand_SaveSnapshot,save,checked
 0x2401c8,20,Rand_LoadSnapshot,ai?,checked
 0x2401e0,220,Rand_Next,world?,checked
@@ -5720,9 +5720,9 @@ address,size,name,system,status
 0x2acfe0,64,cListNode::__tf,runtime,host
 0x2ad048,64,cListOperator::__tf,runtime,host
 0x2ad0f8,80,cListFE3DResetActivityOp::__tf,runtime,host
-0x2ad148,44,FUN_002ad148,,checked
+0x2ad148,44,ListFE3DSkipActivityOp_Apply5,other,checked
 0x2ad178,80,cListFE3DSkipActivityOp::__tf,runtime,host
-0x2ad1c8,52,FUN_002ad1c8,,checked
+0x2ad1c8,52,ListFE3DOffsetOp_Apply5,other,checked
 0x2ad200,80,cListFE3DOffsetOp::__tf,runtime,host
 0x2ad250,108,cFE3DWidget::vf5_2ad250,frontend,checked
 0x2ad2c0,188,cFE3DWidget::vf7_2ad2c0,frontend,checked
@@ -5905,10 +5905,10 @@ address,size,name,system,status
 0x2b6838,68,cFE3DWList::~cFE3DWList,frontend,checked
 0x2b68e0,72,cFE3DWList::cFE3DWList,frontend,checked
 0x2b6928,80,cFE3DWList::__tf,runtime,host
-0x2b6978,52,FUN_002b6978,,not started
+0x2b6978,52,ListFE3DOffsetOp_Apply6,other,not started
 0x2b69b0,80,cListFE3DOffsetOp::__tf,runtime,host
 0x2b6a30,64,cListOperator::__tf,runtime,host
-0x2b6a70,44,FUN_002b6a70,,not started
+0x2b6a70,44,Vec4_ScaleCopy31,other,not started
 0x2b6ae0,144,CCommDriver::vf4_2b6ae0,comm,host
 0x2b6b70,236,CCommDriver::vf6_2b6b70,comm,host
 0x2b6c60,48,CCommDriver::vf3_2b6c60,comm,host

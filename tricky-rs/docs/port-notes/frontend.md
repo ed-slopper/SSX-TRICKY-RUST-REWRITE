@@ -2764,3 +2764,29 @@ The results table helpers of `game/src/resultpages.rs`, made functions in Ghidra
 `Results_GetCellB` 0x1bfa90 (0x3385c0 + row·0x800 + col·0x80, the same code), `Results_GetRowName` 0x1bfae0 and
 `Results_GetRowNameB` 0x1bfaf8 (0x33c5c0 + row·0x80), `Results_ClearSpeechEvent` 0x1af940 (`SpeechSys_ClearEvent`,
 in the page table at 0x38f874). None has a direct caller.
+
+## Names from F1c batch 28 (proven)
+
+Functions the index had with no system at all, read in Ghidra:
+
+- `Draw_GradientLine` 0x19c310, `Draw_RectOutline` 0x19c458, `Draw_Triangle` 0x19c620: the 2D line with a colour
+  per end, the rectangle's four edges and the filled triangle (`quad2d.rs`, checked), beside `Draw_Line` 0x19c1e8.
+- `FE3DTransition_ApplySavedValues` 0x1ff590 / `_ApplyCurrentValues` 0x1ff608: while a blend's values are held
+  (+0x64), the renderer's vf +0x128 given the saved values (+0x1c, the second word 0 and the third 1.0) or the
+  current ones (+0x30) (`fe_transition.rs` `hand_saved` / `hand_current`).
+- `ListFE3DSkipActivityOp_Apply5` 0x2ad148 (the child's +0x38, 0) and `ListFE3DOffsetOp_Apply5` 0x2ad1c8 /
+  `_Apply6` 0x2b6978 (the child's +0x70 with the op's vector +0x10, 0): byte-for-byte the bodies of
+  `cListFE3DSkipActivityOp::vf1` 0x269968 and `cListFE3DOffsetOp::vf1` 0x2699e8, with no references (more unused
+  copies, as in batch 16; `fe_wbar.rs` `op_skip` / `op_move`).
+- `MockupEditor_AddLocText` 0x1d4538 and `MockupEditor_AddSprite` 0x1d4410: `MockupEditor_AddItem` 0x1d4660's
+  siblings. The item's kind (+0x14 of the 0xd4-byte record) is 1 with a string id (+0x3c, drawn through
+  `Loc_GetString`), 2 with ASCII text (+0x40, `MockupEditor_AddItem`) and 3 with a sprite (+0xc4, drawn with
+  `Sprite_DrawRectScaled`), as `MockupEditor_DrawItemInfo` 0x1d3c00 reads them; both called from
+  `MockupEditor_DrawItems`.
+- `BdrLoad_FERequest` 0x201a38: a rider load request with byte 0 = 1 and the bits 0x1f00 set, 0x2000 cleared
+  (`BdrLoad_DefaultRequest` 0x201a98 is the same with byte 0 = 0xf); its one caller is
+  `FE3DCharacter_LoadRiderAsync`. The name is from that caller (inferred: what byte 0 selects).
+
+Left unnamed (no references, meaning open): 0x1818c0 (renderer vf +0x108 and the font word 0x337ff8 = 0.002),
+0x1c0148 (`cScreenOverlay`: when shown, its +0x28 table's +0x78; in no vtable), 0x19aa18, 0x238980, 0x201c10 (+8,
++0xc, +0x10 set from three arguments), 0x256100 (empty), 0x1fb4e0 / 0x2049b0 / 0x204f28.

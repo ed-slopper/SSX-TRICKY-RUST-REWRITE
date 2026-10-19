@@ -912,3 +912,12 @@ Read in Ghidra (`SLUS_203.26`) and checked against the ported Rust code where th
 - Not settled: 0x215f18 (no callers: kind 0 id 0x32 at a rider, volume curve 3 of the length of the two objects'
   +0x150 sum, then `SndSys_QueueSounds`, like `Sfx_OnWallHit`), 0x219258 (pointer-to-member at 0x39eb5c),
   0x2215a8.
+
+## Names from F1c batch 28 (proven)
+
+- `SpeechEvt_Post8000` 0x22fae0 .. `SpeechEvt_Post8005` 0x22fca8: each zeroes a 0x50-byte event, sets the id
+  0x8000..0x8005 and its argument words (one for 0x8000, two for the others) and calls `SpeechLib_PostEvent`,
+  like the named `SpeechEvt_Post*` beside them. None has a caller.
+- `SndEvent_ClearStreamPrebuffer` 0x22a2d0 (event, record): `SndStream_SetPrebufferMs`(record+0x1c, 0), returns 1.
+  It is the callback word of the 8-byte record at 0x3a0420 (0, −1, 0x22a2d0) that `speechsys.rs` passes to the
+  scheduler, so a delayed speech stream starts when its delay runs out.
