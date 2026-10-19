@@ -286,3 +286,35 @@ is now covered by draws of exactly 0, 0.25 and 0.5.
   0x195a48.
 - Not settled: 0x1843a8 (resets the record at 0x3cdd28), 0x184578 (empty), 0x1858c0 / 0x186a00 (static
   initialisers), 0x11f488, 0x257dc0.
+
+## E1i: the game's and the app's small helpers (`game/src/game_helpers.rs`, `tests/game_helpers.rs`)
+
+- **Pause tests.** `cGame::IsPaused` is true for any of: the game's own flag (+0x48), the pause menu, the lesson
+  (when there are riders) or the speech. `Game_IsMenuOrOverlayActive` is the same without the lesson.
+- **Setters.** `Game_SetHudOption`, `Game_SetViewportMode` and `Render_SetBrightness` keep their value in the career
+  (+0x16b0, +0x1688, +0x16b4) and set the settings-changed flag (+0x3258) only when it changes.
+  - The viewport mode also sets +0x29c to the other mode and lays the views out.
+  - The brightness reads the display's colour, sets the renderer's +0x67c to the value + 0.5 (kept from 0 to 2,
+    as in E1f2's state 6), and sets the colour again. It compares as floats, so -0 and +0 are the same.
+- **The race restart and the camera reset** share a start: the race's restart call, each camera reset, the camera
+  script stopped and reset, the riders restarted. They also share an end: the replay, the speech, the sound and the
+  pads' latch.
+  - The restart calls the race's +0x80; in mode 7 it takes the career's course record (+0x2b08 its +0x10).
+  - The camera reset calls the lesson helper and the race's +0x88.
+- **Views.** `Game_RestoreViews` sets as many views as cameras; `Game_UseSingleView` sets one. Both lay the views
+  out.
+- **The app.**
+  - `App_SetMode` keeps the module pending and enters it.
+  - `Loc_LoadForRegion` makes the strings' buffer and loads region 0's or region 1's strings file.
+  - `App_OpenBigFiles` opens the seven archives (three only when their file is there) with the quiet flag at
+    0x3bb978 cleared. It then fills the course table and writes the build string.
+- **0x182170** is the interrupt wrapper. It keeps every float register over the handler's call and ends with `ei`,
+  which the runner does not run, so it is ported but not checked.
+- **`cPS2Device`** (the pads, on structs in `controls.rs`) stays with the input rows.
+
+The test runs 1,000 cases of each of the 15 functions. `Loc_Load` and the course table's fill run for real. The
+course table's `sprintf` is logged with three arguments and the build string's with four. The archive stand-in logs
+the quiet flag.
+
+Of the 52 mutants, 51 are caught. The survivor is equivalent: the brightness compared as plain floats, where -0 and
++0 are equal too. Two were first missed: the speech test's answer of 2, and the quiet flag.
