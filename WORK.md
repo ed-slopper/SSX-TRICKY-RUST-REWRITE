@@ -34,7 +34,6 @@ state machine and the renderer are ours. Nothing has been checked against the or
 | ID | Task | Area | Needs | Who | Notes |
 |---|---|---|---|---|---|
 | E1 | Start-up and main loop: `entry` 0x100008, the `gApp` (0x337C58) init, `cGame::Init` 0x17E148, `cGame::Update` 0x181638, game modes and the front end ↔ race switch, pause (`cGame::IsPaused` 0x17F078) | unowned | F1 | | [est] Our Bevy app loop is the stand-in |
-| E1i | The rest of E1's small helpers on the game's bytes, checked in the runner: `cGame::IsPaused`, `Game_IsMenuOrOverlayActive`, `Game_SetHudOption`, `Game_SetViewportMode`, `Render_Get/SetBrightness`, `Game_RestartRace`, `Game_ResetCameras`, `Game_RestoreViews`, `Game_UseSingleView`, `Race_GetRider`, `cLoadModule::~cLoadModule`, `App_SetMode`, `Loc_LoadForRegion`, `App_OpenBigFiles`; the interrupt wrapper 0x182170 ported but not checkable (it ends with `ei`, which the runner lacks). `cPS2Device` (the pad, on structs in `controls.rs`) stays with the input rows; `entry` with the runtime | ed-slopper/puffin | E1h | | Split of E1 2026-10-18; narrowed 2026-10-19 |
 | E1a | Fixed 60 Hz tick with per-boarder time scale (`dt = timescale/60`, boarder+0x12c) driving every system, frame-rate independent of the window | any | | | [repo] `port-notes/README.md` (units); check what `SmoothDt` in `main.rs` does today Split: E1a1, E1a2 |
 | E1a2 | The rest of E1a: world animations, props, particles, spray, camera on the same tick; draw between ticks (interpolate, ours: tag STANDIN) | any | E1a1 | | Split of E1a |
 | E1b | Random numbers: the game's `rand` and seeding, used by AI tricks, grabs, announcer, so runs can match the original | unowned | F1 | | [est] Split: E1b1, E1b2 |
@@ -150,6 +149,7 @@ matches the original.
 
 | ID | Task | Section | Who | Date | Commit |
 |---|---|---|---|---|---|
+| E1i | The game's and the app's small helpers: game/src/game_helpers.rs, tests/game_helpers.rs (15 functions checked; 0x182170 ported, not checkable); 51 of 52 mutants, the survivor equivalent | P2 | ed-slopper/puffin | 2026-10-17 | 1511230 |
 | E1h | cGame::Init on the game's bytes: game/src/game_main.rs game_init, tests/game_init.rs; 50 of 51 mutants (the survivor an allocation failure the test cannot make) | P2 | ed-slopper/puffin | 2026-10-17 | 3ce56d2 |
 | E1g | The boot films and the execution manager: game/src/boot.rs, tests/boot.rs (28 functions); 65 of 66 mutants, the survivor equivalent | P2 | ed-slopper/puffin | 2026-10-17 | 2abebb7 |
 | E1f | The start screen and the memory card messages: E1f1 (9244372), E1f2 (a5e0d3a), E1f3 (5e8cf06) | P2 | ed-slopper/puffin | 2026-10-17 | 5e8cf06 |
@@ -1441,3 +1441,4 @@ matches the original.
 - 2026-10-18 ed-slopper/puffin: E1g done (2abebb7: the boot films and the execution manager, 65/66); E1h added and claimed (cGame::Init), E1i added (the rest of E1 unchecked).
 - 2026-10-18 ed-slopper/puffin: E1h done (3ce56d2: cGame::Init, 50/51). Paused at the user's request; E1i (drafted in the scratchpad, not in the crate) is still open.
 - 2026-10-19 ed-slopper/puffin: E1i narrowed (the pad left to the input rows) and claimed.
+- 2026-10-19 ed-slopper/puffin: E1i done (1511230: the small helpers, 51/52). Paused after one task, as asked.
