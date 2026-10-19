@@ -648,3 +648,14 @@ the start / select legend.
 
 - `ReplaySave_End` 0x194870 (vf6) and `ReplaySave_Abort` 0x1948c0 (vf5): the same code, freeing the chunk (+0x40a8)
   and scratch (+0x40b0). Not settled: the array destructors 0x1956f0 / 0x195710 in `ReplayMgr_Free`.
+
+## Names from F1c batch 26 (proven)
+
+Named in Ghidra after the ported Rust and these notes, each read there: `ReplayCam_CanInsertCut` 0x190c88
+(`ReplayCamTrack_CanInsert` on the rider's track), `ReplayCamTrack_CanInsert` 0x1951d0 (cuts on at 0x32ca4c and count
+< 0x80), `Replay_SetMode11From10` 0x191278, `ReplayPlaylist_SetCurrent` 0x1955e0 (+4), `ReplayControl_Slide`
+0x1ec728, `ReplayControl_ShowMessage` 0x1eded0 (+0x480 message, +0x47c = 60, +0x478 = 1.0), `ReplayControl_DrawStrip`
+0x1edef0, `ReplayControl_DrawTimeline` 0x1ed490, `ReplayControl_DrawKey` 0x1eee00 (the three from the panel's Draw
+at 0x1ece08..0x1ece20). The snapshot loads `cComputer::LoadSnapshot` 0x13a4b8 and `cPlayer::LoadSnapshot` 0x153450
+(made functions in Ghidra) are the vtable slots after `SaveSnapshot` (0x36aa0c, 0x36f264): `Boarder_LoadSnapshot`,
+then `Replay_Read` of 0x40 / 0xc bytes at +0x860.

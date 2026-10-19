@@ -3533,11 +3533,11 @@ address,size,name,system,status
 0x20c680,712,SndSys_EchoCallback,other,checked
 0x20c948,1124,SndSys_PlayPending,audio?,checked
 0x20cdb0,124,StaticInit_SndSys,audio?,not started
-0x20ce30,672,FUN_0020ce30,audio?,not started
-0x20d0d0,520,cBankSys::vf12_20d0d0,audio?,not started
-0x20d2d8,504,FUN_0020d2d8,audio?,not started
-0x20d4d0,480,FUN_0020d4d0,audio?,not started
-0x20d6b0,440,FUN_0020d6b0,audio?,not started
+0x20ce30,672,SndSys_PlaySoundVolume,audio,not started
+0x20d0d0,520,cBankSys::PlaySound,audio,not started
+0x20d2d8,504,SndSys_PushEntryKindId,audio?,not started
+0x20d4d0,480,SndSys_PushEntryKind,audio?,not started
+0x20d6b0,440,SndSys_PushEntryCopy1,audio?,not started
 0x20d898,80,cBankSys::__tf,runtime,host
 0x20d928,200,Sfx_EvalCurve,audio?,ported
 0x20d9f0,96,Audio_MusicStateToMode,audio,ported
@@ -6069,14 +6069,14 @@ address,size,name,system,status
 0x2bbcf8,108,SpeechLib_PostEventArgs,lib-snd?,ported
 0x2bbd68,12,SpeechIdList_Clear,lib-snd?,ported
 0x2bbd78,88,SpeechIdList_Contains,lib-snd?,ported
-0x2bbdd0,632,find_victim,lib-snd?,ported
-0x2bc048,292,pick_voice,lib-snd?,ported
+0x2bbdd0,632,SpeechLib_FindVictimVoice,lib-snd?,ported
+0x2bc048,292,SpeechLib_PickVoice,lib-snd?,ported
 0x2bc200,288,SpeechLib_FreeVoice,lib-snd?,ported
-0x2bc320,364,claim_voice,lib-snd?,ported
+0x2bc320,364,SpeechLib_ClaimVoice,lib-snd?,ported
 0x2bc490,44,SpeechLib_RunCheckCallback,lib-snd?,ported
-0x2bc4c0,132,run_group,lib-snd?,ported
+0x2bc4c0,132,SpeechLib_RunGroup,lib-snd?,ported
 0x2bc548,140,SpeechLib_Service,lib-snd?,ported
-0x2bc5e0,288,start_voice,lib-snd?,ported
+0x2bc5e0,288,SpeechLib_StartVoice,lib-snd?,ported
 0x2bc700,28,SpeechLib_StartVoice0,lib-snd?,ported
 0x2bc738,20,SpeechBank_GetKinds,lib-snd?,ported
 0x2bc750,20,SpeechLib_SetPending,lib-snd?,ported
@@ -6088,36 +6088,36 @@ address,size,name,system,status
 0x2bc9a0,56,SpeechLib_TestBit,lib-snd?,ported
 0x2bc9d8,164,SpeechBank_TestEntryBit,lib-snd?,ported
 0x2bca80,176,SpeechBank_RowAllowed,lib-snd?,ported
-0x2bcb30,412,collect_rows,lib-snd?,ported
+0x2bcb30,412,SpeechLib_CollectRows,lib-snd?,ported
 0x2bccd0,52,SpeechLib_Percent,lib-snd?,ported
-0x2bcd08,168,weight_sum,lib-snd?,ported
+0x2bcd08,168,SpeechLib_WeightSum,lib-snd?,ported
 0x2bcdb0,40,SpeechLib_Weight,lib-snd?,ported
-0x2bcdd8,364,order_rows,lib-snd?,ported
+0x2bcdd8,364,SpeechLib_OrderRows,lib-snd?,ported
 0x2bcf48,68,SpeechLib_IdCountOk,lib-snd?,ported
 0x2bcf90,72,SpeechLib_ModeOk,lib-snd?,ported
 0x2bcfd8,160,SpeechLib_FindBankKey,lib-snd?,ported
-0x2bd078,284,build_event,lib-snd?,ported
+0x2bd078,284,SpeechLib_BuildEvent,lib-snd?,ported
 0x2bd198,128,SpeechLib_Shuffle,lib-snd?,ported
-0x2bd218,208,shuffle_rows,lib-snd?,ported
-0x2bd2e8,132,next_combo,lib-snd?,ported
-0x2bd370,184,find_combo,lib-snd?,ported
-0x2bd430,628,select_row,lib-snd?,ported
-0x2bd6a8,236,select_rows,lib-snd?,ported
-0x2bd798,396,fire_params,lib-snd?,ported
-0x2bd928,420,play_rows,lib-snd?,ported
+0x2bd218,208,SpeechLib_ShuffleRows,lib-snd?,ported
+0x2bd2e8,132,SpeechLib_NextCombo,lib-snd?,ported
+0x2bd370,184,SpeechLib_FindCombo,lib-snd?,ported
+0x2bd430,628,SpeechLib_SelectRow,lib-snd?,ported
+0x2bd6a8,236,SpeechLib_SelectRows,lib-snd?,ported
+0x2bd798,396,SpeechLib_FireParams,lib-snd?,ported
+0x2bd928,420,SpeechLib_PlayRows,lib-snd?,ported
 0x2bdad0,12,SpeechVoice_ClearFlags,lib-snd?,ported
 0x2bdae0,132,SpeechLib_ClearQueue,lib-snd?,ported
 0x2bdb68,264,SpeechLib_QueueEvent,lib-snd?,ported
 0x2bdc70,36,SpeechLib_HasQueued,lib-snd?,ported
-0x2bdc98,340,queue_run,lib-snd?,ported
-0x2bddf0,80,param_test,lib-snd?,ported
-0x2bde40,764,start_rec,lib-snd?,ported
-0x2be140,196,start_entry,lib-snd?,ported
+0x2bdc98,340,SpeechLib_RunQueue,lib-snd?,ported
+0x2bddf0,80,SpeechLib_ParamTest,lib-snd?,ported
+0x2bde40,764,SpeechLib_StartEvent,lib-snd?,ported
+0x2be140,196,SpeechLib_StartVoiceEvent,lib-snd?,ported
 0x2be208,12,SpeechLib_SetClockBase,lib-snd?,ported
-0x2be218,152,has_value,lib-snd?,ported
-0x2be2b0,92,get_record,lib-snd?,ported
-0x2be310,344,record_callback,lib-snd?,ported
-0x2be468,484,param_masks,lib-snd?,ported
+0x2be218,152,SpeechLib_HasValue,lib-snd?,ported
+0x2be2b0,92,SpeechLib_GetRecord,lib-snd?,ported
+0x2be310,344,SpeechLib_RecordCallback,lib-snd?,ported
+0x2be468,484,SpeechLib_ParamMasks,lib-snd?,ported
 0x2be650,40,SpeechLib_MaskMatch,lib-snd?,ported
 0x2be678,236,SpeechLib_Rand,lib-snd?,ported
 0x2be768,108,SpeechLib_SeedRand,lib-snd?,ported
@@ -6126,7 +6126,7 @@ address,size,name,system,status
 0x2be8c8,64,SpeechLib_InitHistory,lib-snd?,ported
 0x2be908,280,SpeechLib_PickVariant,lib-snd?,ported
 0x2bea20,40,SpeechRow_Clear,lib-snd?,ported
-0x2bea48,360,row_info,lib-snd?,ported
+0x2bea48,360,SpeechLib_GetRowInfo,lib-snd?,ported
 0x2bebb0,52,SpeechLib_GetTime,lib-snd?,ported
 0x2bebe8,128,SpeechLib_Fatal,lib-snd?,checked
 0x2bec68,56,FUN_002bec68,audio?,checked

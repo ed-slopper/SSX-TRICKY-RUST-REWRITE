@@ -2756,3 +2756,11 @@ were not functions in Ghidra and were made with `create_function` first: 0x26247
   callers (unused out-of-line copies).
 - Not settled: the music cues 0x262ad0, 0x262b78, 0x262bd0, 0x262c20, 0x262c60, 0x262ca0; 0x263270 (a player's
   byte +1 = 4); 0x265758; 0x26c430 (`j 0x26ac30` with this + 0xc0; 0x26ac30 not settled).
+
+## Names from F1c batch 26 (proven)
+
+The results table helpers of `game/src/resultpages.rs`, made functions in Ghidra and named: `Results_SetCellFloatPlain`
+0x1bf980 ("%f" at 0x38e210), `Results_SetCellIntSuffix` 0x1bf9d8 ("%d%s" at 0x38e208), `Results_GetCell` 0x1bfa70 and
+`Results_GetCellB` 0x1bfa90 (0x3385c0 + row·0x800 + col·0x80, the same code), `Results_GetRowName` 0x1bfae0 and
+`Results_GetRowNameB` 0x1bfaf8 (0x33c5c0 + row·0x80), `Results_ClearSpeechEvent` 0x1af940 (`SpeechSys_ClearEvent`,
+in the page table at 0x38f874). None has a direct caller.

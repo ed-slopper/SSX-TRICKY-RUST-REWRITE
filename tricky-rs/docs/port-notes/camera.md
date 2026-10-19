@@ -202,3 +202,8 @@ case-insensitive walk of a kind's list) stays for the app's intro until it moves
   camera list with it.
 - Ghidra: the HTTP rename cannot set a namespace, so 0x148218 / 0x148478 and the class methods of this batch carry
   the plain method name in Ghidra; running `ApplySsxSymbols.java` on `ghidra/symbols.txt` moves them into their class.
+
+## Names from F1c batch 26 (proven)
+
+`Camera_FocusFromMainPath` 0x1739f0 (Rust `camera_ctl::focus_from_main_path`): +0x42c..+0x434 from the main AI path's
++0xc..+0x14 (`AIPathSet_GetMainPath` 0x337fb8). No callers in Ghidra.

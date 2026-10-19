@@ -2766,3 +2766,10 @@ Renderer and film player:
   the five buffers.
 
 Still unclear: 0x1e4288 (from `Gfx_FlipDisplay` and the render thread), 0x2ea158 (libmpeg, takes the bitstream).
+
+## Names from F1c batch 26 (proven)
+
+- `ContactPool_Free` 0x14f740 (made a function in Ghidra; `Contact_FreePair` 0x14fd80 tail-jumps to it with
+  bp + 0x10): the pair back on the pool's free list (+0xc, link +0x18), count +4 down by one.
+- `ContactIndex_Push` 0x14f940: the inverse of `ContactIndex_Pop` 0x14f920 (`--count`, then the word stored), from
+  `Contact_RemoveAllForNode`.

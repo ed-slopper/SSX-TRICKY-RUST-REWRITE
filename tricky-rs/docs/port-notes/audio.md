@@ -844,3 +844,32 @@ bank sound), 0x2d6910, 0x2d6a18 (voice +0x2b), 0x2dfda0 (from `SndMidi_NoteOff`)
 three decoders installed by 0x2e1530 / 0x2e1578 / 0x2e15c0 (0x2e1600..0x2e2848, 0x2e28c8, 0x2e2c50..0x2e3620), the
 VU0 audio codec 0x2d6ad0..0x2da8d8 (0x2d6ad0 installs its three callbacks at 0x353d40), 0x2daee8, 0x2db3b8,
 0x2db738.
+
+## Names from F1c batch 26 (proven)
+
+Read in Ghidra (`SLUS_203.26`) and checked against the ported Rust code where there is some.
+
+- **Speech library voice and row logic** (`game/src/speechplay.rs`, which named them only by address and Rust
+  function): `SpeechLib_FindVictimVoice` 0x2bbdd0, `SpeechLib_PickVoice` 0x2bc048, `SpeechLib_ClaimVoice` 0x2bc320,
+  `SpeechLib_RunGroup` 0x2bc4c0 (no callers), `SpeechLib_StartVoice` 0x2bc5e0 (from `SpeechLib_Service` and
+  `SpeechLib_StartVoice0`), `SpeechLib_CollectRows` 0x2bcb30, `SpeechLib_WeightSum` 0x2bcd08, `SpeechLib_OrderRows`
+  0x2bcdd8, `SpeechLib_BuildEvent` 0x2bd078, `SpeechLib_ShuffleRows` 0x2bd218, `SpeechLib_NextCombo` 0x2bd2e8,
+  `SpeechLib_FindCombo` 0x2bd370, `SpeechLib_SelectRow` 0x2bd430, `SpeechLib_SelectRows` 0x2bd6a8,
+  `SpeechLib_FireParams` 0x2bd798 (callback 0x348de8), `SpeechLib_PlayRows` 0x2bd928 (callback 0x348de0),
+  `SpeechLib_RunQueue` 0x2bdc98, `SpeechLib_ParamTest` 0x2bddf0, `SpeechLib_StartEvent` 0x2bde40,
+  `SpeechLib_StartVoiceEvent` 0x2be140 (callback 0x348df0), `SpeechLib_HasValue` 0x2be218, `SpeechLib_GetRecord`
+  0x2be2b0, `SpeechLib_RecordCallback` 0x2be310, `SpeechLib_ParamMasks` 0x2be468, `SpeechLib_GetRowInfo` 0x2bea48.
+  Each one's callees, callers and globals match its doc comment in `speechplay.rs`.
+- **The audio system's pending-sound queue** (`game/src/sndqueue.rs`):
+  - `SndSys_PushEntry` 0x2210e8: `++count` and the entry's defaults (Rust `queue_push`), from `WorldEmitter_Update`.
+  - Four out-of-line copies with no callers and no vtable word: `SndSys_PushEntryCopy1` 0x20d6b0 (the same code as
+    0x2210e8), `SndSys_PushEntryKind` 0x20d4d0 (and kind +0xa40 = arg), `SndSys_PushEntryKindId` 0x20d2d8 (kind and
+    id +0xa44), `SndSys_PlaySoundVolume` 0x20ce30 (kind, id, volume clamped 0..127 into the record and kept in +0x3c,
+    then `SndSys_PlayPending`).
+  - `cBankSys::PlaySound` 0x20d0d0 (was vf12; slot +0x6c of the vtable 0x39e878, also slot 12 of cController's):
+    an entry with kind and id, then `SndSys_PlayPending`. `cBXAudio::PlayFESound` 0x20eaf0 overrides the same slot.
+  - `SndSys_EchoCallback` 0x20c680 (made a function in Ghidra): the delay echo's scheduler callback (event words
+    0x39e874 / 0x39ecf4), Rust `sndplay::echo`.
+- **Music:** `Song_SetSoundDelay` 0x224a50 (the song's +0x11c/+0x120/+0x124 into words 1, 2, 0 of the entry's
+  +0x74 row); `Music_AirLoopEvent` 0x225850 (the air-loop event's callback, word at 0x3a009c; calls the system's
+  virtual +0x74). This settles 0x225850 from the batch 14 unclear list.

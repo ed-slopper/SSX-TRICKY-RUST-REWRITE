@@ -2005,7 +2005,7 @@ F 20a658 cBankManager vf10
 F 20a688 cBankManager vf11
 F 20bc60 cBankMonitor ~cBankMonitor
 F 20c610 cBankSys ~cBankSys
-F 20d0d0 cBankSys vf12
+F 20d0d0 cBankSys PlaySound
 F 20ddb0 cBXAudio ~cBXAudio
 F 212280 cBXAudio vf1
 F 21bc60 cBXAudio vf2
@@ -7843,3 +7843,57 @@ G 229658 Stream_ClearPrebuffer
 G 2296b0 Stream_ClearRequestPrebuffer
 G 22a1e0 StreamSys_ClearRequestPrebuffer
 G 223a90 PathX_SetTrackPrebuffer
+G 2bbdd0 SpeechLib_FindVictimVoice
+G 2bc048 SpeechLib_PickVoice
+G 2bc320 SpeechLib_ClaimVoice
+G 2bc4c0 SpeechLib_RunGroup
+G 2bc5e0 SpeechLib_StartVoice
+G 2bcb30 SpeechLib_CollectRows
+G 2bcd08 SpeechLib_WeightSum
+G 2bcdd8 SpeechLib_OrderRows
+G 2bd078 SpeechLib_BuildEvent
+G 2bd218 SpeechLib_ShuffleRows
+G 2bd2e8 SpeechLib_NextCombo
+G 2bd370 SpeechLib_FindCombo
+G 2bd430 SpeechLib_SelectRow
+G 2bd6a8 SpeechLib_SelectRows
+G 2bd798 SpeechLib_FireParams
+G 2bd928 SpeechLib_PlayRows
+G 2bdc98 SpeechLib_RunQueue
+G 2bddf0 SpeechLib_ParamTest
+G 2bde40 SpeechLib_StartEvent
+G 2be140 SpeechLib_StartVoiceEvent
+G 2be218 SpeechLib_HasValue
+G 2be2b0 SpeechLib_GetRecord
+G 2be310 SpeechLib_RecordCallback
+G 2be468 SpeechLib_ParamMasks
+G 2bea48 SpeechLib_GetRowInfo
+G 2210e8 SndSys_PushEntry
+G 20d6b0 SndSys_PushEntryCopy1
+G 20d4d0 SndSys_PushEntryKind
+G 20d2d8 SndSys_PushEntryKindId
+G 20ce30 SndSys_PlaySoundVolume
+G 20c680 SndSys_EchoCallback
+G 224a50 Song_SetSoundDelay
+G 225850 Music_AirLoopEvent
+G 1739f0 Camera_FocusFromMainPath
+G 190c88 ReplayCam_CanInsertCut
+G 191278 Replay_SetMode11From10
+G 1951d0 ReplayCamTrack_CanInsert
+G 1955e0 ReplayPlaylist_SetCurrent
+G 1ec728 ReplayControl_Slide
+G 1ed490 ReplayControl_DrawTimeline
+G 1eded0 ReplayControl_ShowMessage
+G 1edef0 ReplayControl_DrawStrip
+G 1eee00 ReplayControl_DrawKey
+G 1af940 Results_ClearSpeechEvent
+G 1bf980 Results_SetCellFloatPlain
+G 1bf9d8 Results_SetCellIntSuffix
+G 1bfa70 Results_GetCell
+G 1bfa90 Results_GetCellB
+G 1bfae0 Results_GetRowName
+G 1bfaf8 Results_GetRowNameB
+G 14f740 ContactPool_Free
+G 14f940 ContactIndex_Push
+F 13a4b8 cComputer LoadSnapshot
+F 153450 cPlayer LoadSnapshot
