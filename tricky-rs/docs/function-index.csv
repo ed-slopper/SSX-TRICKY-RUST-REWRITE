@@ -3565,7 +3565,7 @@ address,size,name,system,status
 0x20fb68,244,Audio_IsNearerPlayer2,audio,ported
 0x20fc60,124,Audio_GetRiderListener,audio,ported
 0x20fce0,868,Sfx_StartAirLoop,audio?,not started
-0x210048,1656,FUN_00210048,audio?,not started
+0x210048,1656,Sfx_StartGlideLoop,audio?,not started
 0x2106c0,884,Sfx_StartCarveLoop,audio?,not started
 0x210a38,148,Audio_InitRiderSounds,audio,not started
 0x210ad0,128,Sfx_StartRiderLoops,audio?,not started
@@ -3621,7 +3621,7 @@ address,size,name,system,status
 0x215458,48,Audio_PlayPauseSound,audio,ported
 0x215488,88,Audio_StopAll,audio,ported
 0x2154e0,372,SndSys_IsQueued,audio?,ported
-0x215658,828,FUN_00215658,audio?,not started
+0x215658,828,SndSys_UpdateQueuedSounds,audio,not started
 0x215998,652,SndSys_QueueSounds,audio,ported
 0x215c28,752,Audio_StopQueuedSounds,audio,not started
 0x215f18,984,FUN_00215f18,audio?,not started
@@ -3631,7 +3631,7 @@ address,size,name,system,status
 0x216930,48,Audio_PlayCountdownBeep,audio,ported
 0x216960,748,Sfx_OnRiderCollision,audio?,ported
 0x216c50,260,Sfx_InstanceCollision,audio?,ported
-0x216d58,1952,FUN_00216d58,audio?,not started
+0x216d58,1952,Sfx_PlayTakeoff,audio?,not started
 0x2174f8,2132,Sfx_OnAirEnter,audio?,ported
 0x217d50,1172,Sfx_UpdateAir,audio?,ported
 0x2181e8,300,Sfx_OnWipeout,audio?,ported
@@ -3665,9 +3665,10 @@ address,size,name,system,status
 0x21a788,60,Sfx_GetSnowInput4,audio?,ported
 0x21a7c8,1736,Sfx_LoadBoardConfig,audio?,ported
 0x21ae90,1448,Sfx_RunSnowProgram,audio?,ported
-0x21b440,196,FUN_0021b440,audio?,not started
-0x21b628,236,FUN_0021b628,audio?,not started
-0x21b718,272,FUN_0021b718,audio?,not started
+0x21b440,196,Sfx_UpdateAirLoop,audio?,not started
+0x21b508,288,Sfx_UpdateGlideLoop,audio?,not started
+0x21b628,236,Sfx_UpdateAiGlideLoop,audio?,not started
+0x21b718,272,Sfx_UpdateCarveLoop,audio?,not started
 0x21b828,1076,Audio_BigAirMusicDuck,audio,ported
 0x21bc60,8,cBXAudio::vf2_21bc60,audio,not started
 0x21bca8,88,Audio_SetVolumePreset,audio,ported
@@ -3696,12 +3697,12 @@ address,size,name,system,status
 0x21d0c0,1284,Audio_LoadAmbientBanks,audio,not started
 0x21d5c8,72,Audio_StopEventSound,audio,ported
 0x21d610,112,Audio_SetMusicState,audio,not started
-0x21d680,812,FUN_0021d680,audio?,not started
-0x21d9b0,812,FUN_0021d9b0,audio?,not started
+0x21d680,812,Sfx_PlayClipBoardSound51,audio,not started
+0x21d9b0,812,Sfx_PlayClipBoardSound50,audio,not started
 0x21dce0,224,Sfx_OnMeterFilled,audio?,ported
-0x21ddc0,552,FUN_0021ddc0,audio?,not started
-0x21dfe8,604,FUN_0021dfe8,audio?,not started
-0x21e248,592,FUN_0021e248,audio?,not started
+0x21ddc0,552,Music_PlayMeterCue1,audio,not started
+0x21dfe8,604,Music_PlayMeterCue2,audio,not started
+0x21e248,592,Music_RestartMeterCue,audio,not started
 0x21e498,40,Audio_ScheduleWorldTriggersOn,audio,not started
 0x21e4f0,44,Audio_ResumeAfterSpeech,audio,ported
 0x21e528,108,Audio_CheerForRider,audio,ported
@@ -3711,7 +3712,7 @@ address,size,name,system,status
 0x21e6e8,80,cBXAudio::__tf,runtime,host
 0x21e738,80,SnowProgram_Destruct,game?,not started
 0x21e788,88,FUN_0021e788,render?,not started
-0x21e7e0,60,FUN_0021e7e0,audio?,not started
+0x21e7e0,60,BankInstance_SetPitchBend,audio?,not started
 0x21e8a0,56,cController::cController,audio?,not started
 0x21e8d8,20,cController::~cController,audio?,not started
 0x21e8f0,220,BankInstance_Update,audio?,not started
@@ -3783,7 +3784,7 @@ address,size,name,system,status
 0x222100,92,cMidiSys::~cMidiSys,audio?,not started
 0x222160,500,MidiSys_PushEvent,audio?,ported
 0x222358,1084,MidiSys_PlayPending,audio?,ported
-0x222798,240,FUN_00222798,audio?,not started
+0x222798,240,MidiSys_PlayEventCallback,audio?,not started
 0x222888,124,StaticInit_MidiSys,audio?,not started
 0x222908,80,cMidiSys::__tf,runtime,host
 0x222998,20,SndEvent_Init,audio?,checked
@@ -3902,8 +3903,8 @@ address,size,name,system,status
 0x226cc0,280,cSndPlayOpts::~cSndPlayOpts,audio?,not started
 0x226dd8,80,SndSys_SetPendingVolume,audio?,ported
 0x226e58,44,FUN_00226e58,audio?,not started
-0x227350,440,FUN_00227350,audio?,not started
-0x227508,428,FUN_00227508,audio?,not started
+0x227350,440,SndSys_PushEntryCopy2,audio?,not started
+0x227508,428,SndSys_ResetEntry,audio?,not started
 0x227708,24,SndPlayOpts_InitCurrent,audio?,not started
 0x2278d0,80,cSndPlayOpts::__tf,runtime,host
 0x227960,100,cSoundSys::cSoundSys,audio,not started
@@ -3931,7 +3932,7 @@ address,size,name,system,status
 0x228998,100,SpeechSys_UpdateAll,frontend?,checked
 0x228a00,188,SpeechSys_AddBank,audio?,checked
 0x228ac0,40,Speech_LoadEventsForSlot,audio?,checked
-0x228ae8,156,FUN_00228ae8,audio?,not started
+0x228ae8,156,SpeechSys_PlayEventAnySlot,audio?,not started
 0x228b88,48,FUN_00228b88,audio?,not started
 0x228bb0,48,SpeechSys_SetSlotHold,audio?,ported
 0x228bd8,168,SpeechSys_Trigger,audio?,ported
@@ -6583,7 +6584,7 @@ address,size,name,system,status
 0x2d68a8,100,SND_GetPanLevels,audio,not started
 0x2d6910,24,FUN_002d6910,lib-snd?,not started
 0x2d6928,236,Snd_Rand,lib-snd?,not started
-0x2d6a18,180,FUN_002d6a18,lib-snd?,not started
+0x2d6a18,180,SndHandle_SetPitchBend,lib-snd?,not started
 0x2d6ad0,52,FUN_002d6ad0,lib-snd?,not started
 0x2d6b08,128,Dma_ToScratchpad,lib-snd?,not started
 0x2d6b88,128,Dma_FromScratchpad,lib-snd?,not started
@@ -7281,10 +7282,10 @@ address,size,name,system,status
 0x3063e0,16,SetGsCrt,kernel?,host
 0x306400,16,_Exit,kernel?,host
 0x3064c0,16,AddIntcHandler,kernel?,host
-0x3064d0,16,AddIntcHandler,kernel?,ported
+0x3064d0,16,AddIntcHandler2,kernel?,ported
 0x3064e0,16,RemoveIntcHandler,kernel?,ported
 0x3064f0,16,AddDmacHandler,kernel?,host
-0x306500,16,AddDmacHandler,kernel?,host
+0x306500,16,AddDmacHandler2,kernel?,host
 0x306510,16,RemoveDmacHandler,kernel?,host
 0x306520,16,_EnableIntc,kernel?,host
 0x306530,16,_DisableIntc,kernel?,host

@@ -644,3 +644,15 @@ The debug link to the host PC (`CCommDriver` and its Deci2 driver, 0x2b6ae0..0x2
 - `Cstring_InitInt` 0x2b81c0 (`sprintf "%d"`, then `Cstring_AssignAscii`), `Cstring_ToInt` 0x2b93b0 (`atoi` of an
   8-bit copy), `Cstring_ToFloat` 0x2b9400 (`atof`, to float), `Cstring_GetBinarySize` 0x2b9598 (the length word at the
   head of the buffer, 0 without one; `Cstring_GetBinary` copies that many bytes after it).
+
+## Names from F1c batch 27 (proven)
+
+The kernel's system call stubs (`li v1, n; syscall; jr ra`) that Ghidra's Emotion Engine extension names, put in
+`ghidra/symbols.txt` after checking each number: 0x3063e0 `SetGsCrt` (2) .. 0x306c10 `Deci2Call` (0x7c), 52 stubs,
+plus `RFU091` 0x307480 (0x5b) and the two copies of `RFU116_SetSyscall` (0x74) at 0x307428 and 0x30e460. Interrupt
+context versions use the negative number (`iSignalSema` −0x43, `isceSifSetDma` −0x77, ...). `SetAlarm` 0x306560
+uses 0xfc. Two numbers have two stubs each: 0x10 at 0x3064c0 / 0x3064d0 and 0x12 at 0x3064f0 / 0x306500; the first
+of each pair is called with three arguments (`Timer_Init`, `Gfx_InstallVif1Handler`, `sceSifInitCmd`), the second
+with four (the render setup 0x1dbad8 and 0x182430 pass the handler's argument), so they are `AddIntcHandler` /
+`AddIntcHandler2` and `AddDmacHandler` / `AddDmacHandler2` (Sony's names; Ghidra already has the `…2` labels there).
+`game/src/boot.rs` `ADD_INTC` is 0x3064d0, `AddIntcHandler2`. Also `entry` 0x100008.

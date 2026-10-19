@@ -873,3 +873,42 @@ Read in Ghidra (`SLUS_203.26`) and checked against the ported Rust code where th
 - **Music:** `Song_SetSoundDelay` 0x224a50 (the song's +0x11c/+0x120/+0x124 into words 1, 2, 0 of the entry's
   +0x74 row); `Music_AirLoopEvent` 0x225850 (the air-loop event's callback, word at 0x3a009c; calls the system's
   virtual +0x74). This settles 0x225850 from the batch 14 unclear list.
+
+## Names from F1c batch 27 (proven)
+
+- **The rider's loop sounds.** Each start function queues a loop at the rider (+0x140) with an update callback in
+  the entry's +0x44 (a pointer-to-member word pair `0xffff0000, fn`; the same pairs sit at 0x39eb38..0x39eb58):
+  - `Sfx_StartGlideLoop` 0x210048 (from `Sfx_StartRiderLoops` and its own update): the human's rider (+0x41c = 1)
+    gets zboard program surface·8 + 4 with `Sfx_UpdateGlideLoop` 0x21b508 (made a function in Ghidra) and pending
+    volume 40; an AI rider program surface·8 + 6 with `Sfx_UpdateAiGlideLoop` 0x21b628 and 50.
+  - The updates, per tick: `Sfx_UpdateAirLoop` 0x21b440 (curves 5 and 6 of `Sfx_ImpactSpeed` while +0x424 = 2),
+    `Sfx_UpdateGlideLoop` (GLIDE programs at cBXAudio +0x745c), `Sfx_UpdateAiGlideLoop` (AIGLIDE, +0x777c, only
+    while +0x424 is 2 or 3), `Sfx_UpdateCarveLoop` 0x21b718 (CARVE, +0x7a9c; restarts `Sfx_StartCarveLoop` when
+    the surface changes). The program's volume goes to the instance's +0x64 (divided by `Boarder_TickSfxFadeIn`,
+    0 while +0x5ae4), its bend to `BankInstance_SetPitchBend` 0x21e7e0.
+  - `BankInstance_SetPitchBend` 0x21e7e0: `SndHandle_SetPitchBend` 0x2d6a18 under `SND_Lock` (each voice of the
+    handle: byte +0x2b = bend, then `SNDVoice_CalcPitchMult` and `SndVoice_UpdatePitch`; also from
+    `SndMidi_OnPitchBend`). This settles 0x21e7e0 and 0x2d6a18 of the earlier unclear lists; 0x2215a8 (the same body
+    on an object not proven to be a bank instance, no callers) stays open.
+- `SndSys_UpdateQueuedSounds` 0x215658 (from `Audio_InGameUpdate`): each record of the ring `SndSys_QueueSounds`
+  fills (+0x6e24 size, +0x6e28 words, +0x6e2c head, +0x6e30 tail; four words: owner, handle, end tick, flag) is
+  taken off; one whose handle is 0 or still known to `BankMonitor_Find` goes back while its end tick is after the
+  system's +0x80, else, with the flag set, its sound is stopped (`SndSys_StopBankSound`).
+- `Sfx_PlayTakeoff` 0x216d58 (no callers): the human's rider's takeoff sound (program surface·8 + 2, volume
+  impact·127/1000 kept within 64..127), the same as the end of `Sfx_OnAirEnter`.
+- `Sfx_PlayClipBoardSound50` 0x21d9b0 / `Sfx_PlayClipBoardSound51` 0x21d680 (from `Sfx_PlayClipSound` for clip
+  events 0xd0 / 0xd1): the human's rider only, kind 1, id 0x50 / 0x51, volume 127.
+- The cues of `Music_UpdateMeterCues`, kind 5 on slot 6: `Music_PlayMeterCue1` 0x21ddc0 (id 1; handle kept at
+  +0x7458; when the watched rider's +0x24 drops below 2.7), `Music_PlayMeterCue2` 0x21dfe8 (stops +0x7458, then id 2;
+  when +0x24 reaches 0), `Music_RestartMeterCue` 0x21e248 (stops +0x7458 and plays kind 5 without setting an id, so
+  the entry keeps the id word it had; when +0x58a8 went past the stored count).
+- Queue entry copies: `SndSys_PushEntryCopy2` 0x227350 (the same code as `SndSys_PushEntry`), `SndSys_ResetEntry`
+  0x227508 (the same without `++count`: the current entry back to its defaults). No callers.
+- `MidiSys_PlayEventCallback` 0x222798 (word at 0x39fd84, before the cMidiSys vtable): a scheduled event (+0x18
+  slot, +0x1c kind, +0x20 id, +0x24 volume) pushed with `MidiSys_PushEvent` and played; returns 1. The MIDI twin of
+  `SndSys_EchoCallback`.
+- `SpeechSys_PlayEventAnySlot` 0x228ae8 (from 0x227b24, not a function in Ghidra): `Speech_PlayEvent` on slot 0,
+  then slot 1 (+0x3718); when the slot that played is +0x3724 the callback +0x3720 gets the result.
+- Not settled: 0x215f18 (no callers: kind 0 id 0x32 at a rider, volume curve 3 of the length of the two objects'
+  +0x150 sum, then `SndSys_QueueSounds`, like `Sfx_OnWallHit`), 0x219258 (pointer-to-member at 0x39eb5c),
+  0x2215a8.
