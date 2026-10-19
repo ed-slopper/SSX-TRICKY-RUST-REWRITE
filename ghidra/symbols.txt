@@ -7692,3 +7692,39 @@ G 2eabf0 Mpeg_PrintError
 F 2f8d98 type_info OperatorEq
 F 2f93b8 type_info OperatorNe
 F 2f9438 type_info Before
+G 2b70c0 CommStack_Resize
+G 2b7118 CommStack_Pop
+G 2b7128 CommStack_Delete
+G 2b7178 CommStack_Clear
+G 2b79a0 CommStack_ResizeCopy1
+G 2b7530 CommPacket_SetHeader
+G 2b7550 Deci2Comm_ReceiveRecord
+G 2b7570 Deci2Comm_PumpReceive
+G 2b7700 Deci2Comm_HasPacket
+G 2b7848 Deci2Comm_PollTask
+G 2b81c0 Cstring_InitInt
+G 2b93b0 Cstring_ToInt
+G 2b9400 Cstring_ToFloat
+G 2b9598 Cstring_GetBinarySize
+G 1e09e0 Gfx_SetDitherMatrix
+G 1e4e20 Gfx_LoadImageToFrame
+G 1e4eb8 Gfx_LoadImage
+G 1e50d8 PS2Render_ClipLine
+G 1e7298 PS2GridMesh_SplitBatches
+G 1e74e8 PS2GridMesh_BuildPacket
+G 1e81f8 StripPacket_Init
+G 1e7e08 StripPacket_Begin
+G 1e7fc0 StripPacket_AddVertex
+G 1e80a0 StripPacket_Destroy
+G 2ba290 VideoPlayer_DrawFrame
+G 2ba408 VideoPlayer_OnMpegNoData
+G 2ba438 VideoPlayer_FeedMpeg
+G 2ba998 VideoPlayer_Close
+G 209aa0 AsyncSys_PopNext
+G 20abb8 BankInstance_SetStream
+G 20abf8 BankInstance_SetHandleCopy1
+G 20ac50 BankInstance_SetPan
+G 229348 Stream_SetPan
+G 2d2eb8 SndStream_SetPan
+G 2266a8 SpuAlloc_PopRecord
+F 2b6fd0 CCommDriver CCommDriver

@@ -3060,7 +3060,7 @@ address,size,name,system,status
 0x1e05d0,140,Render_CalcTexVramSize,render,not started
 0x1e0680,48,FUN_001e0680,render?,not started
 0x1e06e0,764,Gfx_SetDisplayMode,render,not started
-0x1e09e0,984,FUN_001e09e0,render?,not started
+0x1e09e0,984,Gfx_SetDitherMatrix,render,not started
 0x1e0db8,256,Render_SetColorScale,render,ported
 0x1e0eb8,252,Gfx_GetBrightness,render,ported
 0x1e0fb8,116,Render_SetFade,render,ported
@@ -3098,9 +3098,9 @@ address,size,name,system,status
 0x1e4120,28,Gfx_RenderThreadEntry,render,not started
 0x1e4140,324,Gfx_RenderThread,render,not started
 0x1e4288,2964,FUN_001e4288,render?,not started
-0x1e4e20,148,FUN_001e4e20,render?,not started
-0x1e4eb8,536,FUN_001e4eb8,render?,not started
-0x1e50d8,5120,FUN_001e50d8,render?,not started
+0x1e4e20,148,Gfx_LoadImageToFrame,render,not started
+0x1e4eb8,536,Gfx_LoadImage,render,not started
+0x1e50d8,5120,PS2Render_ClipLine,render?,not started
 0x1e64d8,404,PS2GridMesh_Init,render?,not started
 0x1e6670,36,cGridMesh::~cGridMesh,render?,not started
 0x1e6698,80,cPS2GridMesh::~cPS2GridMesh,render,not started
@@ -3110,17 +3110,17 @@ address,size,name,system,status
 0x1e6ad8,800,cPS2GridMesh::vf5_1e6ad8,render,not started
 0x1e6df8,48,cPS2GridMesh::vf6_1e6df8,render,not started
 0x1e6e28,1132,cPS2GridMesh::vf7_1e6e28,render,not started
-0x1e7298,592,FUN_001e7298,render?,not started
-0x1e74e8,1480,FUN_001e74e8,render?,not started
+0x1e7298,592,PS2GridMesh_SplitBatches,render?,not started
+0x1e74e8,1480,PS2GridMesh_BuildPacket,render?,not started
 0x1e7ab0,12,cPS2GraphicsMan::vf98_1e7ab0,render,not started
 0x1e7ac0,564,cPS2GraphicsMan::vf97_1e7ac0,render,checked
 0x1e7cf8,64,GridMesh_PackUV,render?,not started
 0x1e7d38,100,GridMesh_PackNormal,render?,not started
 0x1e7da0,100,Vec3_PackShort,render?,not started
-0x1e7e08,436,FUN_001e7e08,render?,not started
-0x1e7fc0,220,FUN_001e7fc0,render?,not started
-0x1e80a0,340,FUN_001e80a0,render?,not started
-0x1e81f8,20,FUN_001e81f8,render?,not started
+0x1e7e08,436,StripPacket_Begin,render?,not started
+0x1e7fc0,220,StripPacket_AddVertex,render?,not started
+0x1e80a0,340,StripPacket_Destroy,render?,not started
+0x1e81f8,20,StripPacket_Init,render?,not started
 0x1e8210,924,cPS2GraphicsMan::vf77_1e8210,render,not started
 0x1e85b0,648,PS2Render_UpdateModelMatrices,render?,ported
 0x1e8838,140,PS2Render_Submit,render?,checked
@@ -3459,7 +3459,7 @@ address,size,name,system,status
 0x209088,896,AsyncSys_CancelBank,audio?,ported
 0x209408,1676,AsyncSys_Update,audio?,not started
 0x209a98,8,FUN_00209a98,frontend?,not started
-0x209aa0,8,FUN_00209aa0,audio?,not started
+0x209aa0,8,AsyncSys_PopNext,audio?,not started
 0x209af0,80,cAsyncSys::__tf,runtime,host
 0x209b40,88,FUN_00209b40,audio?,ported
 0x209c18,48,BankSlot_Init,audio?,not started
@@ -3499,10 +3499,10 @@ address,size,name,system,status
 0x20ab28,28,BankInstance_DistanceVolume,audio?,not started
 0x20ab48,92,SndVoice_DopplerPitch,audio?,ported
 0x20aba8,12,BankInstance_SetHandle,audio?,ported
-0x20abb8,64,FUN_0020abb8,audio?,not started
-0x20abf8,12,FUN_0020abf8,audio?,not started
+0x20abb8,64,BankInstance_SetStream,audio?,not started
+0x20abf8,12,BankInstance_SetHandleCopy1,audio?,not started
 0x20ac08,72,BankInstance_ComputeDistance,audio?,not started
-0x20ac50,232,FUN_0020ac50,audio?,not started
+0x20ac50,232,BankInstance_SetPan,audio?,not started
 0x20ad38,236,BankInstance_SetPitch,audio?,ported
 0x20ae28,656,SndVoice_SetVolume,audio?,ported
 0x20b0b8,156,SndVoice_Stop,audio?,not started
@@ -3895,7 +3895,7 @@ address,size,name,system,status
 0x226520,296,cPS2SoundManager::vf4_226520,audio,not started
 0x226650,36,cPS2SoundManager::vf5_226650,audio,not started
 0x226678,48,cPS2SoundManager::vf6_226678,audio,not started
-0x2266a8,60,FUN_002266a8,audio?,not started
+0x2266a8,60,SpuAlloc_PopRecord,audio?,not started
 0x226738,80,cPS2SoundManager::__tf,runtime,host
 0x226788,64,cSoundManager::__tf,runtime,host
 0x226848,1144,cSndPlayOpts::cSndPlayOpts,audio?,not started
@@ -3944,7 +3944,7 @@ address,size,name,system,status
 0x228fb0,668,Stream_Init,audio?,not started
 0x229268,128,Stream_Delete,render?,ported
 0x2292e8,96,Stream_Open,audio?,not started
-0x229348,76,FUN_00229348,audio?,not started
+0x229348,76,Stream_SetPan,audio?,not started
 0x229398,8,Stream_SetVolume,audio?,ported
 0x2293a0,60,Stream_SetPitch,audio?,not started
 0x2293e0,176,Stream_UpdateVolume,audio?,not started
@@ -5921,29 +5921,29 @@ address,size,name,system,status
 0x2b6eb8,8,CCommDriver::vf8_2b6eb8,comm,host
 0x2b6ec0,8,CCommDriver::vf1_2b6ec0,comm,host
 0x2b6ec8,264,CCommDriver::~CCommDriver,comm,host
-0x2b6fd0,176,FUN_002b6fd0,comm?,host
+0x2b6fd0,176,CCommDriver::CCommDriver,comm,host
 0x2b7080,64,CCommDriver::__tf,runtime,host
-0x2b70c0,88,FUN_002b70c0,comm?,host
-0x2b7118,12,FUN_002b7118,comm?,host
-0x2b7128,76,FUN_002b7128,comm?,host
-0x2b7178,8,FUN_002b7178,comm?,host
+0x2b70c0,88,CommStack_Resize,comm?,host
+0x2b7118,12,CommStack_Pop,comm?,host
+0x2b7128,76,CommStack_Delete,comm?,host
+0x2b7178,8,CommStack_Clear,comm?,host
 0x2b7180,80,Comm_Crc16,comm?,host
 0x2b71d0,188,CDeci2CopydataCommDriver::vf1_2b71d0,comm,host
 0x2b7290,256,CDeci2CopydataCommDriver::vf2_2b7290,comm,host
 0x2b7390,248,CDeci2CopydataCommDriver::vf5_2b7390,comm,host
 0x2b7488,160,CDeci2CopydataCommDriver::vf6_2b7488,comm,host
 0x2b7528,8,CDeci2CopydataCommDriver::vf7_2b7528,comm,host
-0x2b7530,28,FUN_002b7530,comm?,host
-0x2b7550,32,FUN_002b7550,comm?,host
-0x2b7570,32,FUN_002b7570,comm?,host
+0x2b7530,28,CommPacket_SetHeader,comm?,host
+0x2b7550,32,Deci2Comm_ReceiveRecord,comm?,host
+0x2b7570,32,Deci2Comm_PumpReceive,comm?,host
 0x2b7590,364,Deci2Comm_Handler,comm?,host
-0x2b7700,20,FUN_002b7700,comm?,host
+0x2b7700,20,Deci2Comm_HasPacket,comm?,host
 0x2b7718,300,Net_ReceivePacket,comm,host
-0x2b7848,32,FUN_002b7848,comm?,host
+0x2b7848,32,Deci2Comm_PollTask,comm?,host
 0x2b7868,8,CDeci2CopydataCommDriver::vf8_2b7868,comm,host
 0x2b7870,20,CDeci2CopydataCommDriver::~CDeci2CopydataCommDriver,comm,host
 0x2b7950,80,CDeci2CopydataCommDriver::__tf,runtime,host
-0x2b79a0,88,FUN_002b79a0,comm?,host
+0x2b79a0,88,CommStack_ResizeCopy1,comm?,host
 0x2b7b18,84,FUN_002b7b18,comm?,host
 0x2b7b78,104,FUN_002b7b78,comm?,host
 0x2b7c08,28,FUN_002b7c08,comm?,host
@@ -5957,7 +5957,7 @@ address,size,name,system,status
 0x2b8020,120,Cstring_InitCopy,comm?,host
 0x2b8098,164,Cstring_InitAsciiN,comm?,host
 0x2b8140,128,Cstring_InitWideN,comm?,host
-0x2b81c0,80,FUN_002b81c0,comm?,host
+0x2b81c0,80,Cstring_InitInt,comm?,host
 0x2b8210,76,Cstring_Destroy,comm?,host
 0x2b8260,68,Cstring_AssignChar,comm?,host
 0x2b82a8,164,Cstring_AssignAscii,comm?,host
@@ -5994,11 +5994,11 @@ address,size,name,system,status
 0x2b90e0,200,Cstring_TrimRight,comm?,host
 0x2b91a8,176,Cstring_Prepend,comm?,host
 0x2b9258,344,Cstring_ReplaceAll,comm?,host
-0x2b93b0,76,FUN_002b93b0,comm?,host
-0x2b9400,84,FUN_002b9400,comm?,host
+0x2b93b0,76,Cstring_ToInt,comm?,host
+0x2b9400,84,Cstring_ToFloat,comm?,host
 0x2b9458,200,Cstring_Format,render?,not started
 0x2b9520,116,Cstring_GetBinary,comm?,host
-0x2b9598,56,FUN_002b9598,comm?,host
+0x2b9598,56,Cstring_GetBinarySize,comm?,host
 0x2b95d0,184,Cstring_SetBinary,render?,not started
 0x2b9688,112,Cstring_SerializedSize,comm?,host
 0x2b96f8,116,Cstring_PackedSize,comm?,host
@@ -6019,11 +6019,12 @@ address,size,name,system,status
 0x2ba098,248,PS2VideoPlayer_Init,other,not started
 0x2ba190,176,cPS2VideoPlayer::~cPS2VideoPlayer,render,not started
 0x2ba240,80,VideoStream_FlushFrames,render?,not started
-0x2ba290,372,FUN_002ba290,render?,not started
-0x2ba438,296,FUN_002ba438,render?,not started
+0x2ba290,372,VideoPlayer_DrawFrame,render?,not started
+0x2ba408,44,VideoPlayer_OnMpegNoData,render?,not started
+0x2ba438,296,VideoPlayer_FeedMpeg,render?,not started
 0x2ba560,684,cPS2VideoPlayer::vf1_2ba560,render,not started
 0x2ba810,392,cPS2VideoPlayer::vf3_2ba810,render,not started
-0x2ba998,92,FUN_002ba998,render?,not started
+0x2ba998,92,VideoPlayer_Close,render?,not started
 0x2ba9f8,248,cPS2VideoPlayer::vf2_2ba9f8,render,not started
 0x2baaf8,8,cPS2VideoPlayer::vf4_2baaf8,render,not started
 0x2bab00,8,cPS2VideoPlayer::vf5_2bab00,render,not started
@@ -6526,7 +6527,7 @@ address,size,name,system,status
 0x2d2dd8,56,FUN_002d2dd8,lib-snd?,not started
 0x2d2e10,64,SndStream_SetVolume,lib-snd?,ported
 0x2d2e50,104,SndStream_FadeVolume,lib-snd?,ported
-0x2d2eb8,84,FUN_002d2eb8,lib-snd?,not started
+0x2d2eb8,84,SndStream_SetPan,lib-snd?,not started
 0x2d2f10,64,SndStream_SetPitch,lib-snd?,ported
 0x2d2f50,60,FUN_002d2f50,lib-snd?,not started
 0x2d2f90,180,FUN_002d2f90,lib-snd?,not started

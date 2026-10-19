@@ -2732,3 +2732,37 @@ ported functions do.
 
 - Lens flares (`game/src/lensfx.rs`): `LensFX_PrepareFlares` 0x1cc190 (row G7d2c's flares part),
   `LensFX_PrepareSun` 0x1cd040 (G7d2b's sun part).
+
+## Names from F1c batch 24 (proven)
+
+Renderer and film player:
+
+- `Gfx_SetDitherMatrix` 0x1e09e0: packs 16 entries (3 bits each, every 4 bits) into the 64-bit word at +0x660,
+  the layout of the GS `DIMX` register. The graphics manager's vf1 passes the table at 0x3931d8:
+  0,4,1,5 / 6,2,7,3 / 1,5,0,4 / 7,3,6,2, that is −4..3 in 3-bit two's complement.
+- `Gfx_LoadImage` 0x1e4eb8: waits for the GIF DMA channel, then builds on the scratchpad one
+  BITBLTBUF/TRXPOS/TRXREG/TRXDIR + IMAGE chain per piece (bytes a pixel from the format: 32-bit 4, 24-bit 3, 16-bit
+  2, 8-bit 1, 4-bit ½; at most 0x7fff0 bytes a piece) and sends it with `Dma_SendGifChain`.
+  `Gfx_LoadImageToFrame` 0x1e4e20: `FlushCache(0)`, then `Gfx_LoadImage` into the frame buffer (base +0x6d0, width
+  +0x698, format +0x6a0); returns 1.
+- `PS2Render_ClipLine` 0x1e50d8: clips the segment between two projected vertices to the bounds at +0x17b0..+0x17cc
+  by their outcodes (0x20 near, 0x10 far, 8/4 top/bottom, 2/1 left/right), interpolating ST and colour too; returns 0
+  when the segment is outside.
+- The strip packet the graphics manager's vf70 builds (vf70 projects each point, takes outcodes, clips with
+  `PS2Render_ClipLine`): `StripPacket_Init` 0x1e81f8 (+0 the packet cursor, +4/+8 = 0), `StripPacket_Begin` 0x1e7e08
+  (closes the open strip with its GIF tag, opens a new one, writes the first vertex), `StripPacket_AddVertex`
+  0x1e7fc0 (RGBAQ, ST × Q, XYZ2; count +0xc), `StripPacket_Destroy` 0x1e80a0 (closes the packet, `PS2Render_Submit`,
+  `Mem_Delete` when bit 0 of the flag is set).
+- `PS2GridMesh_SplitBatches` 0x1e7298: splits the grid's rows into VIF batches below 0xde qwords and returns the
+  size. `PS2GridMesh_BuildPacket` 0x1e74e8: writes the batches' VIF packet template; `PS2GridMesh_Init` builds two
+  (double buffer).
+- `VideoPlayer_DrawFrame` 0x2ba290: converts the decoded picture 16 lines at a time from 32-bit to 24-bit, centred,
+  and loads each band with `Gfx_LoadImageToFrame`, running the poll tasks between; from `cPS2VideoPlayer` vf3.
+- `VideoPlayer_OnMpegNoData` 0x2ba408 (was not a function; created): the callback vf1 registers with
+  `sceMpegAddCallback(…, 1 = no data, …)`; it calls `VideoPlayer_FeedMpeg` 0x2ba438, which copies the next stream
+  packet into the bitstream buffer (+0xbc), pads it to 16 bytes and hands it to 0x2ea158; at the stream's end it
+  hands 16 bytes of MPEG sequence end codes (00 00 01 b7). Returns 1.
+- `VideoPlayer_Close` 0x2ba998: closes the sound stream (+0xb0) and the video stream (+0x38), `sceMpegDelete`, frees
+  the five buffers.
+
+Still unclear: 0x1e4288 (from `Gfx_FlipDisplay` and the render thread), 0x2ea158 (libmpeg, takes the bitstream).

@@ -3649,6 +3649,7 @@ address,system,how
 0x2b9e08,comm,graph
 0x2ba240,render,neighbour
 0x2ba290,render,graph
+0x2ba408,render,neighbour
 0x2ba438,render,neighbour
 0x2ba998,render,neighbour
 0x2bac78,audio,loose

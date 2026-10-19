@@ -622,3 +622,25 @@ the libraries' own (static ones included).
   0x35ee70 then jumps to 0x307f08); 0x306ca0 (no callers, waits on the vsync-start bit of I_STAT); 0x307438
   (syscall 0x5a) and its caller 0x307490 (from `_InitSys`, reads T3_MODE); the other libmpeg internals
   (0x2ea158, 0x2ea2a8, 0x2ea2c8, 0x2ea308, 0x2ea3e8, 0x2ea6f8..0x2f0e90).
+
+## Names from F1c batch 24 (proven)
+
+The debug link to the host PC (`CCommDriver` and its Deci2 driver, 0x2b6ae0..0x2b7e78) and the `Cstring` helpers:
+
+- `CCommDriver::CCommDriver` 0x2b6fd0: stores `CCommDriver::vtable` at +0x1c8, clears the counters and builds two
+  arrays of ten `Cstring`s (+0x38 and +0x100). No callers (an out-of-line copy).
+- `CommStack_Resize` 0x2b70c0 (`realloc` the data to n words; +0 count, +4 data, +8 the last word),
+  `CommStack_Pop` 0x2b7118 (resize to n−1), `CommStack_Clear` 0x2b7178 (resize to 0), `CommStack_Delete` 0x2b7128
+  (clear, then `Mem_Delete` when bit 0 of the flag is set; from `~CCommDriver`). `CommStack_ResizeCopy1` 0x2b79a0 is
+  the same code as `CommStack_Resize`, with no callers. The Deci2 driver's vf6 pushes a 0 on both stacks, runs
+  `Deci2Comm_PumpReceive` until the top word is set, then pops both.
+- `CommPacket_SetHeader` 0x2b7530: fills a 12-byte header (+0 short, +4 short, +6 byte, +7 byte, +8 word, +2 = 0);
+  from the Deci2 driver's vf2 and vf5 (its sends).
+- `Deci2Comm_HasPacket` 0x2b7700: the received byte count 0x3d37d4 > 0. `Deci2Comm_PollTask` 0x2b7848: the same as a
+  bool; the driver's vf1 (`sceDeci2Open(0xe001, …, Deci2Comm_Handler)`) adds it with `Sys_AddPollTask`.
+- `Deci2Comm_ReceiveRecord` 0x2b7550: `Net_ReceivePacket(buf, 0x4d8)`, from `CommDriver_RecvPacket`.
+  `Deci2Comm_PumpReceive` 0x2b7570: `Net_ReceivePacket` into a 0x2800-byte stack buffer (the packet is handled
+  through the driver's virtuals inside `Net_ReceivePacket`).
+- `Cstring_InitInt` 0x2b81c0 (`sprintf "%d"`, then `Cstring_AssignAscii`), `Cstring_ToInt` 0x2b93b0 (`atoi` of an
+  8-bit copy), `Cstring_ToFloat` 0x2b9400 (`atof`, to float), `Cstring_GetBinarySize` 0x2b9598 (the length word at the
+  head of the buffer, 0 without one; `Cstring_GetBinary` copies that many bytes after it).

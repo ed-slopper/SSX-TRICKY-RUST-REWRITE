@@ -742,3 +742,21 @@ Functions already ported under a bare address, named from the code and the Rust 
   music switches, from `cFE3DSound` vf9 0x270610 and `PauseMenu_UpdateOptionsPage`), 0x223a90 (0x2d2d50 on a slot
   unless its byte +0xe is set; from `Path_OnDriverUpdate`), 0x2d14d0 (the sound library's bank-handle state, prefix
   unknown).
+
+## Names from F1c batch 24 (proven)
+
+- `AsyncSys_PopNext` 0x209aa0: `AsyncSys_PopQueue(sys, 0)`; the flag, when set, empties all four queues as well.
+- `BankInstance_SetStream` 0x20abb8 (+0xc the stream, +0x10 its name, +0x50; from the bank manager's vf14),
+  `BankInstance_SetHandleCopy1` 0x20abf8 (the same code as `BankInstance_SetHandle`; from `MidiSys_PlayPending`).
+- `BankInstance_SetPan` 0x20ac50: only when the pan moved by 0x200 or more (+0xac the last); by kind +0: 1 sound
+  (`SndHandle_SetPan`), 2 MIDI (`SndMidi_SetPan`), 3 stream (`Stream_SetPan`). From `BankInstance_UpdatePositional`.
+- `Stream_SetPan` 0x229348 (`SND_Lock`, `SndStream_SetPan` on +4), `SndStream_SetPan` 0x2d2eb8 (stores the two
+  values at +0xfc/+0xfe and calls `SndHandle_SetPan` on its handle; −8 without a stream).
+- `SpuAlloc_PopRecord` 0x2266a8: takes a record (0x18 bytes from +0xc) off the sound manager's free list (+0x310,
+  link +0x14); 0 when empty. From `cPS2SoundManager` vf3, the sound-memory allocator.
+
+Still unclear: 0x20a268 (bank manager vf11's record setup), 0x21e7e0 / 0x2215a8 (`SND_Lock` around 0x2d6a18, which
+sets each voice's byte +0x2b and recalculates its pitch), 0x229658 / 0x2296b0 / 0x22a1e0 (0x2d2d50 sets a stream
+request's +0x28), 0x228b88 / 0x228c80 (speech slot +0x348; four triggers with 0x343708 set), 0x2168f8, 0x222ae0,
+0x223128, 0x2248f8, 0x226e58, 0x2c2040; the front end's music cues 0x262ad0..0x262ca0 are calls to `cFE3DSound`
+vf12..vf15 and vf20, whose meaning is still open.
