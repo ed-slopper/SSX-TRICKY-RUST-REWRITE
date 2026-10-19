@@ -564,3 +564,61 @@ EA's system library (memory, debug output, threads, timer) and the file library,
 Unclear (batch 22): 0x2cf2f8 (ReferThreadStatus, result unused), 0x2c7098 (stream call from the movie player),
 0x2c73a0 / 0x2c7de8 (request word +4), 0x2c7d20, 0x2c84a0, 0x2c8ef8 / 0x2c9070 (sync ops through the stub 0x2cebb0,
 which always returns 0), 0x2cac38 (queues op type 7), 0x2cb9c8 (empty), thunks 0x2cc328 / 0x2cc348.
+
+## Names from F1c batch 23 (proven)
+
+Host code linked into the exe: gcc 2.95's C++ runtime (libgcc2 `L_eh`, `frame.c`, `exception.cc`,
+`tinfo.cc`/`tinfo2.cc`, `fp-bit.c`), newlib and Sony's libkernel, plus a few libmpeg helpers. Each was read in
+Ghidra and matched to the library's code by its structure, its callers and the fields it touches; the names are
+the libraries' own (static ones included).
+
+- **Exception throwing (libgcc2):** `old_find_exception_handler` 0x2f4998 (3-word {start, end, handler} table
+  ending in -1), `find_exception_handler` 0x2f4a70 (4-word entries, match function per entry),
+  `get_reg_addr` 0x2f4bb8 (follows saved-in-register state 2, offset state 1 from the CFA, else `abort`),
+  `copy_reg` 0x2f4c40, `next_stack_level` 0x2f4cc0 (calls `__frame_state_for`), `__unwinding_cleanup`
+  0x2f4d50 (empty), `throw_helper` 0x2f4d58 (called by `__throw` / `__rethrow`).
+- **`exception.cc`:** `terminate` 0x2f67b0 (calls the handler at 0x35d3ac, initially `__default_terminate`),
+  `__default_unexpected` 0x2f67c8 (the initial value of 0x35d9a4; calls `terminate`), `set_terminate` 0x2f67d8
+  and `set_unexpected` 0x2f67e8 (swap 0x35d3ac / 0x35d9a4), `unexpected` 0x2f67f8, `__cp_exception_info` 0x2f6810
+  (&info->value, +8), `__cp_eh_info` 0x2f6838, `__start_cp_handler` 0x2f6858 (caught +0x14 = 1, handlers +0x20
+  += 1), `__eh_alloc` 0x2f6890 (malloc, `terminate` on failure), `__eh_free` 0x2f68b8, `__cplus_type_matcher`
+  0x2f68d8 (language 4 = C++), `__cp_push_exception` 0x2f6948 (0x30-byte cp_eh_info: value +8 and +0x28, type
+  +0xc, cleanup +0x10, next +0x18), `__cp_pop_exception` 0x2f69d8, `__uncatch_exception` 0x2f6aa0,
+  `__check_eh_spec` 0x2f6ad0 (throws `bad_exception` when the spec allows it).
+- **`frame.c` (DWARF2 unwind tables):** `fde_merge` 0x2f7b80, `end_fde_sort` 0x2f7c80 (aborts on count
+  mismatch; heapsort inlined), `count_fdes` 0x2f7ee8, `add_fdes` 0x2f7f30, `frame_init` 0x2f7fb8, `find_fde`
+  0x2f80f8 (object list at 0x406bd0), `extract_cie_info` 0x2f81e0 (augmentation "" / "eh" / 'z'),
+  `execute_cfa_insn` 0x2f82e8, `__frame_state_for` 0x2f87c8, `fde_split` 0x2f89a0.
+- **RTTI (`tinfo.cc` / `tinfo2.cc`):** `type_info::OperatorEq` 0x2f8d98 (`operator==`: same object or `strcmp`
+  of the names), `type_info::OperatorNe` 0x2f93b8 (`operator!=`), `type_info::Before` 0x2f9438 (`before`:
+  `strcmp` < 0), `__throw_type_match_rtti_2` 0x2f9460, `__is_pointer` 0x2f9928, `__dynamic_cast` 0x2f9a40,
+  `__tfv` 0x2f9af0 (type info of `void`: name "v", `__builtin_type_info` vtable). The three operators carry
+  CamelCase method names because the name check takes no `operator` names.
+- **fp-bit (float):** `_fpadd_parts_f` 0x2f70a8 (float copy of `_fpadd_parts`, called by `__addsf3` /
+  `__subsf3`; `_f` added by us to tell it from the double one at 0x2f5c88), `__mulsf3` 0x2f73a0 (between
+  `__subsf3` and `__divsf3`; no callers).
+- **newlib:** `std` 0x2fa4f0 (FILE setup with `__sread`/`__swrite`/`__sseek`/`__sclose`, from `__sinit`),
+  `__sfmoreglue` 0x2fa548 (n × 0x58-byte FILEs), `__sfp` 0x2fa5b8, `__sprint_vfi` 0x2fea28 / `__sbprintf_vfi`
+  0x2fea70 (`vfiprintf.c`'s copies of `__sprint` / `__sbprintf`, which are at 0x2ff770 / 0x2ff7b8; `_vfi`
+  added by us), `quorem` 0x301ec0 (dtoa's Bigint quotient, called by `_dtoa_r`).
+- **Sony libkernel:** `_SyncDCache` 0x306f88 (D-cache `DXWBIN` loop over a range) under `SyncDCache` 0x307030
+  (DIntr/EIntr around it, start and end masked to 64 bytes; called by libpad), `_InvalidDCache` 0x3070c8
+  (`DXIN`) under `InvalidDCache` 0x307170, `iWakeupThread` 0x307718 (wakes another thread with
+  `_iWakeupThread`; the current thread is queued instead), `iRotateThreadReadyQueue` 0x3077b0 (queued, priority
+  < 128), `TopThread` 0x307568 (the thread draining that queue: op 0 `WakeupThread`, 1
+  `RotateThreadReadyQueue`, 2 `SuspendThread`), `InitThread` 0x307640 (from `_InitSys`: makes the semaphore and
+  that thread, priority 1). `InitThread` / `TopThread` are ps2sdk's names for the same code (Sony's own
+  unknown; ps2sdk has `topThread`, made `TopThread` for the name check).
+- **libmpeg helpers:** `Mpeg_RunCallback` 0x2ea398 (calls the callback stored for a type at mp+0x40, +0xc +8k),
+  `MpegWork_Init` / `_Mark` / `_Release` / `_Alloc` 0x2ea4b8 / 0x2ea4d0 / 0x2ea4e0 / 0x2ea4f0 (the work area
+  bump allocator; `_Alloc` aligns and fails with "work area size is too small"), `Mpeg_GetPictureCommon`
+  0x2ea570 (shared body of the three `sceMpegGetPicture*`), `Mpeg_StopDma` 0x2eab28 (stops the IPU_FROM, IPU_TO
+  and SPR_TO DMA channels), `Mpeg_PrintError` 0x2eabf0 ("[MPEG ERROR]%s\n", from `Mpeg_Error`).
+- Made into functions in Ghidra this batch: 0x2f67d8, 0x2f67e8, 0x2f6810 (were tails of the noreturn
+  functions before them). They were added by hand to `function-index.csv` and `function-systems.csv` as
+  `runtime`.
+- **Unclear (batch 23):** the libkernel newlib stubs 0x306df8, 0x306f38, 0x306f60 (each sets errno 5 and
+  returns -1; which newlib call each one is cannot be told apart); 0x306c50 (from `sceSifSyncIop`, clears
+  0x35ee70 then jumps to 0x307f08); 0x306ca0 (no callers, waits on the vsync-start bit of I_STAT); 0x307438
+  (syscall 0x5a) and its caller 0x307490 (from `_InitSys`, reads T3_MODE); the other libmpeg internals
+  (0x2ea158, 0x2ea2a8, 0x2ea2c8, 0x2ea308, 0x2ea3e8, 0x2ea6f8..0x2f0e90).

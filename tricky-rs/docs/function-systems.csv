@@ -4667,7 +4667,10 @@ address,system,how
 0x2f6758,runtime,lib
 0x2f67b0,runtime,lib
 0x2f67c8,runtime,lib
+0x2f67d8,runtime,lib
+0x2f67e8,runtime,lib
 0x2f67f8,runtime,lib
+0x2f6810,runtime,lib
 0x2f6838,runtime,lib
 0x2f6858,runtime,lib
 0x2f6890,runtime,lib
