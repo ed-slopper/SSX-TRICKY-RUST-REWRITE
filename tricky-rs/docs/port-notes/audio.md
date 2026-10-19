@@ -760,3 +760,87 @@ sets each voice's byte +0x2b and recalculates its pitch), 0x229658 / 0x2296b0 / 
 request's +0x28), 0x228b88 / 0x228c80 (speech slot +0x348; four triggers with 0x343708 set), 0x2168f8, 0x222ae0,
 0x223128, 0x2248f8, 0x226e58, 0x2c2040; the front end's music cues 0x262ad0..0x262ca0 are calls to `cFE3DSound`
 vf12..vf15 and vf20, whose meaning is still open.
+
+## Names from F1c batch 25 (proven)
+
+EA's sound library (the `SNDAUTHOR Dave Mercier` one, 0x2cf000..0x2e5000), named from its code and callers.
+
+- Setup: `SND_GetConfig` 0x2cfeb0 (the first call fills the defaults with `SND_SetDefaultConfig`; then copies the
+  0x108-byte config at 0x350fb8 out), `SND_SetConfig` 0x2d0080 (copies it back in). `SND_Init` calls both.
+  `SND_BuildPanTable` 0x2d6618 (from `SND_Init`: the pan table at 0x351398, rows of 6 levels by speaker mode
+  0x350ff3, through `Snd_PanCurve` 0x2d65f0 = 2x − x²/127), `SND_GetPanLevels` 0x2d68a8 (the row for pan >> 8, each
+  level × 0x102). `SND_SetMasterVolume` 0x2d2f90 (0x351191, 0x7f at init; recalculates every playing voice).
+- Ticks: `SND_Tick` 0x2d0698 (the default tick at 0x3511a0: counter 0x35119c + 1, then the `SND_AddTickCallback`
+  list), `SND_RunTicks` 0x2d05a0 (from `SND_MixThread`: runs the tick until the counter catches up with
+  calls × 100 / rate). `SND_StartStreamPoll` 0x2d0548 adds `SND_StreamPollTask` 0x2d0520 (`SND_RunStreamTasks`)
+  as a poll task once.
+- Memory: `SndMem_Alloc` 0x2d0b98 (16-byte aligned, from the heap at 0x351210), `SndMem_ClampSize` 0x2d0ac0.
+  Sound RAM: `SpuMem_Alloc` 0x2de640 / `SpuMem_Free` 0x2de848 (kind 0x100 goes to `sceSifAllocIopHeap` /
+  `sceSifFreeIopHeap`; otherwise 64-byte blocks in a sorted table at 0x353c80), `SpuMem_GetLargestFree` 0x2de998
+  (returns the size, writes the address), `SpuMem_ClampRange` 0x2de5c8 (to 0x353c7a..0x353c7c). Thunks:
+  `SND_SetSpuRange` 0x2d0a80 (`SpuMem_SetRange`), `SND_GetLargestSpuFree` 0x2d0aa0.
+- Transfers to the IOP: `SndXfer_Queue` 0x2de108 (a 28-entry queue at 0x353328, 16 bytes each, with a priority byte
+  +0xe; kind 0x100 is sent at once with `sceSifSetDma`), `SndXfer_Upload` 0x2de258 (in 0x1000-byte pieces),
+  `SndXfer_Kick` 0x2de088, `SndXfer_StartNext` 0x2ddeb8 (highest priority, then lowest id: `sceSifSetDma` and
+  `sceSifSendCmd`), `SndXfer_IsDone` 0x2de368, `SndXfer_OnDone` 0x2de3b8; `SND_OnIopReply` 0x2db690 (the IOP's reply:
+  kind 2 = a transfer done, kind 0 = an RPC answer, signals the semaphore). Thunks `SND_Upload` 0x2dddc8,
+  `SND_IsUploadDone` 0x2ddde8.
+- Banks (slots of 0x10 at 0x3511fc): `SndBank_Register` 0x2d0f98 (from `BankSlot_Load`, `PathX_LoadBank`,
+  `AsyncSys_Update`: uploads the bank's sample data, flag +0xc while loading), `SndBank_Unregister` 0x2d1200 (−1 =
+  all; stops its voices first), `SndBank_Check` 0x2d13d8 (−8 bad slot, −18 still loading),
+  `SndBank_GetResidentSize` 0x2d1428 (header +8), `SndBank_Relocate` 0x2d1448 (copies that part elsewhere and
+  points the slot at it), `SndBank_IsPlaying` 0x2d14d0 (1 while a voice of the bank, voice +0x12, is alive).
+  `musicsong.rs` calls 0x2d14d0 `SND_HANDLE_STATE`; the value it reads is this one (Rust left unchanged).
+- Streams: `SndStream_Create` 0x2d24e0 (behind `SndStream_Open`; slots at 0x350768), `SndStream_CalcSize` 0x2d2a88
+  (n × 0x2c + 0x124 + the voice's size), `SndStream_UpdateAll` 0x2d2270, `SndStream_ParseChunk` 0x2d20c8 (EA's
+  chunks: `SCHl` → `SndStream_OnHeaderChunk` 0x2d1b70, `SCCl` → `SndStream_OnCountChunk` 0x2d1e30, `SCDl` →
+  `SndStream_OnDataChunk` 0x2d1e88, `SCEl` → `SndStream_OnEndChunk` 0x2d2090), `SndStream_StartVoice` 0x2d17b0,
+  `SndStream_RemoveQueued` 0x2d1960, `SndStream_ConsumeBytes` 0x2d1ab8, `SndFormat_BytesPerSecond` 0x2d1840 (rate
+  × channels × bytes per sample × 256: 0x92 for codec 5 = PS2 ADPCM's 16 bytes per 28 samples, 0x200 for 8 = PCM16,
+  0x88 for 10, 0x33 for 4), `SndStream_QueueHandle` 0x2d2db0 (`SndStream_Queue` mode 2: an existing request),
+  `SndStream_SetLowWater` 0x2d2f50.
+  - The prebuffer: `SndStream_Queue`'s second argument goes to the request's +0x28; `SndStream_IsPrebuffering`
+    0x2d2178 holds the request while its buffered time (bytes × 1000 / rate) is under that many ms, then clears
+    it. `SndStream_SetPrebufferMs` 0x2d2d50 sets it. Its callers, unclear in batch 24: `Stream_ClearPrebuffer`
+    0x229658 (0 on the current request), `Stream_ClearRequestPrebuffer` 0x2296b0, `StreamSys_ClearRequestPrebuffer`
+    0x22a1e0 (from `Sfx_PlayClipSound`), `PathX_SetTrackPrebuffer` 0x223a90 (its a1, unless the track's byte +0x16
+    is set; `pf.rs` calls it with 0).
+  - The stream's voice (table 0x358c38): `SndStreamVoice_CalcBaseSize` 0x2df238 (n × 0x20 + 0x7c),
+    `_CalcMemSize` 0x2df248, `_Create` 0x2df278, `_Play` 0x2df3b0, `_AddBlock` 0x2df6f8, `_GetFreeBlocks` 0x2df840,
+    `_GetQueuedBytes` 0x2df878, `_Stop` 0x2df8c8, `_Destroy` 0x2df978.
+- MIDI: `SndMidi_RunEvents` 0x2d3f00 (from `SndMidi_Tick`; by status byte: 0x80 `SndMidi_NoteOff` 0x2d3b90, 0x90
+  `SndMidi_NoteOn` 0x2d39c8, 0xb0 `SndMidi_OnController` 0x2d3c30, 0xc0 the program byte, 0xe0
+  `SndMidi_OnPitchBend` 0x2d3e18, meta 0x2f end of track: `SndMidi_Stop` once `SndMidi_VoicesDone` 0x2d3938).
+- Voices (0x88 each at 0x3511f8; each channel's work is done by the software mixer below):
+  `SndVoice_StopChannels` 0x2dc340, `SndVoice_UpdatePitch` 0x2dc4e8, `SndVoice_UpdateVolume` 0x2dc8e8,
+  `SndVoice_UpdatePan` 0x2dd560 (from `SndHandle_SetPan`), `SndVoice_UpdateFxSend` 0x2dc6f0,
+  `SndVoice_CalcFxSend` 0x2dfef0 (+0x5c × +0x5d × the bus level at 0x351204/0x351205/0x351206 >> 14 into +0x5e/+0x5f),
+  `SndHandle_SetFxSend` 0x2dfcf0, `SndVoice_SetLowpassHz` 0x2dcdf0 (Hz / (rate / 2)), `SndVoice_GetPosition`
+  0x2dde08, `SndVoice_AddFx` 0x2deb38 / `SndVoice_RemoveFx` 0x2debf8 and their `SndHandle_` loops 0x2d3718 /
+  0x2d3780. `SndPlayParams_SetDefaults` 0x2dfe78 (volume 0x7f, pan 0x40, +0x10 = 8), `Snd_RandRange` 0x2dff90
+  (random ±x, x clamped to 0..0x10000).
+- Software mixer (channels of 100 bytes at 0x358e80): `SoftMix_Init` 0x2e0348 (from `SND_LoadIopDriver`),
+  `SoftMix_Shutdown` 0x2e0538 (from `SND_StopDriver`), `SoftMix_Mix` 0x2e09e8 (from `SND_MixThread`),
+  `SoftVoice_Start` 0x2e0640 (picks the decoder by codec), `_Stop` 0x2e08e0, `_SetVolume` 0x2e0980, `_SetFxSend`
+  0x2e1000, `_GetPosition` 0x2e1030, `_SetPitch` 0x2e1078 (adds a resampler, id 0xa0), `_SetLowpass` 0x2e12a0 (adds
+  a one-pole filter, id 0x28, while the value is under 1.0), `_AddFx` 0x2e1360, `_RemoveFx` 0x2e13f8 (by id).
+  `SndMix_ClampToPcm16` 0x2e3b2c (>> 7, clamped). Effects are pulled through `SndFxChain_*`: `SndFx_PcmOut_Init` /
+  `_Pull` 0x2e3a48 / 0x2e39d0 (`Snd_FloatToPcm16`), `SndFx_Lowpass_Init` / `_Pull` / `_SetCoef` 0x2e3cc0 / 0x2e3c00
+  / 0x2e3c90, `SndFx_Fir_Init` / `_Pull` / `_Process` / `_Design` 0x2e3e08 / 0x2e4280 / 0x2e3ce8 / 0x2e3fe0 (9 taps,
+  symmetric; cut-off 2f / rate, at most 0.8; `_DesignUnity` 0x2e4238 gain 1.0, `_DesignGain` 0x2e4260),
+  `SndFx_Resample_Init` / `_Pull` / `_Interp` / `_SetStep` 0x2e4a78 / 0x2e46e8 / 0x2e45a0 / 0x2e46c8 (16.16 steps).
+  Maths: `SndMath_Sin` 0x2e3e40 / `SndMath_Cos` 0x2e3f10 (Taylor series, angle wrapped at 2π), `SndMath_ISqrt`
+  0x2e4bd8. `SndBits_Write` 0x2d6c08 (the writer beside `SndBits_Read`).
+
+Still unclear: 0x2bb090 (x << 2), 0x2cfe90 (`printf` of a1, no callers), 0x2d0e98 (runs the callbacks at 0x3511d4
+for each of a record's pending items), 0x2d1570, 0x2d1680 / 0x2dd990 (bank layer fix-ups), 0x2d1a80, 0x2d2dd8
+(`SndStream_Create` with a1..a5 moved and 1), 0x2d3358 (largest time left of a handle's voices), 0x2d3548 /
+0x2d35f8 / 0x2dd188 / 0x2dd0d0 / 0x2dd278 / 0x2dd388 / 0x2dd3f0 (effect-bus setup, flags 0x10/0x20/0x40),
+0x2d4ab0 / 0x2d4ae8 (voice picking), 0x2d4f58 / 0x2dacb0 (a voice's end), 0x2d59d8 / 0x2d5e18 / 0x2d60b0 (playing a
+bank sound), 0x2d6910, 0x2d6a18 (voice +0x2b), 0x2dfda0 (from `SndMidi_NoteOff`), 0x2dd9c8, 0x2dcc88 / 0x2dcd40 /
+0x2dced0 / 0x2e1138 / 0x2e11e8 / 0x2e4300 / 0x2e4480 / 0x2e4500 (two more per-channel effects), 0x2def00, 0x2df1d8,
+0x2df8c0 (returns −15), 0x2df9b8 / 0x2dfc08, 0x2dffe8, 0x2e00e0, 0x2e0100, 0x2e0610, 0x2e0630, 0x2e0828, 0x2e08a8,
+0x2e0c10 / 0x2e0c40 / 0x2e0c90 / 0x2e0ff0 (an effect with a 2000-tick timeout), 0x2e1130 and 0x2dc338 (empty), the
+three decoders installed by 0x2e1530 / 0x2e1578 / 0x2e15c0 (0x2e1600..0x2e2848, 0x2e28c8, 0x2e2c50..0x2e3620), the
+VU0 audio codec 0x2d6ad0..0x2da8d8 (0x2d6ad0 installs its three callbacks at 0x353d40), 0x2daee8, 0x2db3b8,
+0x2db738.

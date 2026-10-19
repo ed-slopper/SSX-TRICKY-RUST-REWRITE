@@ -716,3 +716,4 @@
 233740 FUN_00233740 Speech_OnEventBit16
 21c0a0 FUN_0021c0a0 Audio_SetEventBitSound
 202b00 FUN_00202b00 PoseBlend_BlendSkeleton
+223a90 FUN_00223a90 PathX_SetTrackPrebuffer

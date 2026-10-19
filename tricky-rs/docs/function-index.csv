@@ -3817,7 +3817,7 @@ address,size,name,system,status
 0x223710,112,PathX_StopDriver,audio?,ported
 0x223780,464,StreamSlot_GetPosition,audio?,ported
 0x223950,320,StreamSlot_Play,audio?,ported
-0x223a90,48,FUN_00223a90,audio?,ported
+0x223a90,48,PathX_SetTrackPrebuffer,audio?,ported
 0x223ac0,172,StreamSlot_Fade,audio?,ported
 0x223b70,8,StreamSlot_SetVolume,audio?,ported
 0x223b78,196,StreamSlot_SetPitch,audio?,ported
@@ -3955,9 +3955,9 @@ address,size,name,system,status
 0x2295c0,52,Stream_HasReached,audio?,ported
 0x2295f8,44,Stream_IsQueued,audio?,not started
 0x229628,44,Stream_IsPlaying,audio?,ported
-0x229658,40,FUN_00229658,audio?,not started
+0x229658,40,Stream_ClearPrebuffer,audio?,not started
 0x229680,44,Stream_GetHandle,audio?,not started
-0x2296b0,12,FUN_002296b0,audio?,not started
+0x2296b0,12,Stream_ClearRequestPrebuffer,audio?,not started
 0x2296c0,80,Stream_GetPlayTime,audio?,ported
 0x229710,48,Stream_Resume,audio?,not started
 0x229740,48,Stream_Pause,audio?,not started
@@ -3985,7 +3985,7 @@ address,size,name,system,status
 0x22a0c8,88,SndHandle_IsDone,audio?,ported
 0x22a120,84,SndHandle_IsPlaying,audio?,not started
 0x22a178,60,StreamSys_IsSlotPlaying,audio?,checked
-0x22a1e0,40,FUN_0022a1e0,audio?,not started
+0x22a1e0,40,StreamSys_ClearRequestPrebuffer,audio?,not started
 0x22a228,40,StreamSys_SetVolume,audio?,not started
 0x22a278,60,StreamSys_GetSlotHandle,audio?,ported
 0x22a2b8,20,StreamSys_GetStream,audio?,not started
@@ -6468,69 +6468,69 @@ address,size,name,system,status
 0x2cfc00,396,Sort_Radix16,lib-snd?,ported
 0x2cfd90,252,Sort_ShellPairs,lib-snd?,ported
 0x2cfe90,28,FUN_002cfe90,lib-snd?,not started
-0x2cfeb0,460,FUN_002cfeb0,lib-snd?,not started
-0x2d0080,476,FUN_002d0080,lib-snd?,not started
+0x2cfeb0,460,SND_GetConfig,audio,not started
+0x2d0080,476,SND_SetConfig,audio,not started
 0x2d0260,464,SND_Init,audio,not started
 0x2d0430,224,SND_Shutdown,audio,not started
-0x2d0520,32,FUN_002d0520,lib-snd?,not started
-0x2d0548,88,FUN_002d0548,lib-snd?,not started
-0x2d05a0,248,FUN_002d05a0,lib-snd?,not started
-0x2d0698,624,FUN_002d0698,lib-snd?,not started
+0x2d0520,32,SND_StreamPollTask,audio,not started
+0x2d0548,88,SND_StartStreamPoll,audio,not started
+0x2d05a0,248,SND_RunTicks,audio,not started
+0x2d0698,624,SND_Tick,audio,not started
 0x2d0908,48,SND_Lock,audio,ported
 0x2d0938,48,SND_Unlock,audio,ported
 0x2d0968,56,SND_AddTickCallback,audio,not started
 0x2d09a0,220,SND_RemoveTickCallback,audio,not started
-0x2d0a80,28,FUN_002d0a80,lib-snd?,not started
-0x2d0aa0,28,FUN_002d0aa0,lib-snd?,not started
-0x2d0ac0,48,FUN_002d0ac0,lib-snd?,not started
+0x2d0a80,28,SND_SetSpuRange,audio,not started
+0x2d0aa0,28,SND_GetLargestSpuFree,audio,not started
+0x2d0ac0,48,SndMem_ClampSize,lib-snd?,not started
 0x2d0af0,112,SndMem_Init,lib-snd?,not started
 0x2d0b60,52,SndMem_UsedPercent,lib-snd?,not started
-0x2d0b98,568,FUN_002d0b98,lib-snd?,not started
+0x2d0b98,568,SndMem_Alloc,lib-snd?,not started
 0x2d0dd0,200,SndMem_Free,lib-snd?,not started
 0x2d0e98,252,FUN_002d0e98,lib-snd?,not started
-0x2d0f98,616,FUN_002d0f98,lib-snd?,not started
-0x2d1200,472,FUN_002d1200,lib-snd?,not started
-0x2d13d8,80,FUN_002d13d8,lib-snd?,not started
-0x2d1428,28,FUN_002d1428,lib-snd?,not started
-0x2d1448,136,FUN_002d1448,lib-snd?,not started
-0x2d14d0,160,FUN_002d14d0,lib-snd?,ported
+0x2d0f98,616,SndBank_Register,lib-snd?,not started
+0x2d1200,472,SndBank_Unregister,lib-snd?,not started
+0x2d13d8,80,SndBank_Check,lib-snd?,not started
+0x2d1428,28,SndBank_GetResidentSize,lib-snd?,not started
+0x2d1448,136,SndBank_Relocate,lib-snd?,not started
+0x2d14d0,160,SndBank_IsPlaying,lib-snd?,ported
 0x2d1570,268,FUN_002d1570,lib-snd?,not started
 0x2d1680,152,FUN_002d1680,lib-snd?,not started
 0x2d1718,152,SND_PlayBankSound,audio,ported
-0x2d17b0,140,FUN_002d17b0,lib-snd?,not started
-0x2d1840,136,FUN_002d1840,lib-snd?,not started
+0x2d17b0,140,SndStream_StartVoice,lib-snd?,not started
+0x2d1840,136,SndFormat_BytesPerSecond,lib-snd?,not started
 0x2d18c8,92,SndStream_CloseAll,lib-snd?,not started
 0x2d1928,56,SndStream_Get,lib-snd?,not started
-0x2d1960,288,FUN_002d1960,lib-snd?,not started
+0x2d1960,288,SndStream_RemoveQueued,lib-snd?,not started
 0x2d1a80,56,FUN_002d1a80,lib-snd?,not started
-0x2d1ab8,184,FUN_002d1ab8,lib-snd?,not started
-0x2d1b70,700,FUN_002d1b70,lib-snd?,not started
-0x2d1e30,88,FUN_002d1e30,lib-snd?,not started
-0x2d1e88,520,FUN_002d1e88,lib-snd?,not started
-0x2d2090,52,FUN_002d2090,lib-snd?,not started
-0x2d20c8,176,FUN_002d20c8,lib-snd?,not started
-0x2d2178,248,FUN_002d2178,lib-snd?,not started
-0x2d2270,564,FUN_002d2270,lib-snd?,not started
+0x2d1ab8,184,SndStream_ConsumeBytes,lib-snd?,not started
+0x2d1b70,700,SndStream_OnHeaderChunk,lib-snd?,not started
+0x2d1e30,88,SndStream_OnCountChunk,lib-snd?,not started
+0x2d1e88,520,SndStream_OnDataChunk,lib-snd?,not started
+0x2d2090,52,SndStream_OnEndChunk,lib-snd?,not started
+0x2d20c8,176,SndStream_ParseChunk,lib-snd?,not started
+0x2d2178,248,SndStream_IsPrebuffering,lib-snd?,not started
+0x2d2270,564,SndStream_UpdateAll,lib-snd?,not started
 0x2d24a8,56,SndStream_CountOpen,lib-snd?,not started
-0x2d24e0,584,FUN_002d24e0,lib-snd?,not started
+0x2d24e0,584,SndStream_Create,lib-snd?,not started
 0x2d2728,348,SndStream_Queue,lib-snd?,not started
 0x2d2888,32,SndStream_Open,lib-snd?,not started
 0x2d28a8,160,SndStream_Close,lib-snd?,not started
 0x2d2948,28,SndStream_QueueFile,lib-snd?,not started
 0x2d2968,284,SndStream_Stop,lib-snd?,not started
-0x2d2a88,52,FUN_002d2a88,lib-snd?,not started
+0x2d2a88,52,SndStream_CalcSize,lib-snd?,not started
 0x2d2ac0,68,SndStream_CalcMemSize,lib-snd?,not started
 0x2d2b08,264,SndStream_GetStatus,lib-snd?,ported
 0x2d2c10,320,SndHandle_GetState,lib-snd?,ported
-0x2d2d50,96,FUN_002d2d50,lib-snd?,not started
-0x2d2db0,36,FUN_002d2db0,lib-snd?,not started
+0x2d2d50,96,SndStream_SetPrebufferMs,lib-snd?,not started
+0x2d2db0,36,SndStream_QueueHandle,lib-snd?,not started
 0x2d2dd8,56,FUN_002d2dd8,lib-snd?,not started
 0x2d2e10,64,SndStream_SetVolume,lib-snd?,ported
 0x2d2e50,104,SndStream_FadeVolume,lib-snd?,ported
 0x2d2eb8,84,SndStream_SetPan,lib-snd?,not started
 0x2d2f10,64,SndStream_SetPitch,lib-snd?,ported
-0x2d2f50,60,FUN_002d2f50,lib-snd?,not started
-0x2d2f90,180,FUN_002d2f90,lib-snd?,not started
+0x2d2f50,60,SndStream_SetLowWater,lib-snd?,not started
+0x2d2f90,180,SND_SetMasterVolume,audio,not started
 0x2d3048,188,SndHandle_Fade,lib-snd?,not started
 0x2d3108,172,SndHandle_SetVolume,lib-snd?,ported
 0x2d31b8,164,SndHandle_SetPitch,lib-snd?,not started
@@ -6541,16 +6541,16 @@ address,size,name,system,status
 0x2d3480,196,SndHandle_SetPan,lib-snd?,not started
 0x2d3548,176,FUN_002d3548,lib-snd?,not started
 0x2d35f8,288,FUN_002d35f8,lib-snd?,not started
-0x2d3718,96,FUN_002d3718,lib-snd?,not started
-0x2d3780,96,FUN_002d3780,lib-snd?,not started
+0x2d3718,96,SndHandle_AddFx,lib-snd?,not started
+0x2d3780,96,SndHandle_RemoveFx,lib-snd?,not started
 0x2d37e8,76,SndMidi_Validate,lib-snd?,not started
 0x2d3838,252,SndMidi_UpdateFade,lib-snd?,not started
-0x2d3938,140,FUN_002d3938,lib-snd?,not started
-0x2d39c8,452,FUN_002d39c8,lib-snd?,not started
-0x2d3b90,160,FUN_002d3b90,lib-snd?,not started
-0x2d3c30,488,FUN_002d3c30,lib-snd?,not started
-0x2d3e18,228,FUN_002d3e18,lib-snd?,not started
-0x2d3f00,520,FUN_002d3f00,lib-snd?,not started
+0x2d3938,140,SndMidi_VoicesDone,lib-snd?,not started
+0x2d39c8,452,SndMidi_NoteOn,lib-snd?,not started
+0x2d3b90,160,SndMidi_NoteOff,lib-snd?,not started
+0x2d3c30,488,SndMidi_OnController,lib-snd?,not started
+0x2d3e18,228,SndMidi_OnPitchBend,lib-snd?,not started
+0x2d3f00,520,SndMidi_RunEvents,lib-snd?,not started
 0x2d4108,288,SndMidi_Tick,lib-snd?,not started
 0x2d4228,160,SndMidi_Init,lib-snd?,not started
 0x2d42c8,64,SndMidi_Shutdown,lib-snd?,not started
@@ -6578,16 +6578,16 @@ address,size,name,system,status
 0x2d59d8,1084,FUN_002d59d8,lib-snd?,not started
 0x2d5e18,664,FUN_002d5e18,lib-snd?,not started
 0x2d60b0,1340,FUN_002d60b0,lib-snd?,not started
-0x2d65f0,36,FUN_002d65f0,lib-snd?,not started
-0x2d6618,652,FUN_002d6618,lib-snd?,not started
-0x2d68a8,100,FUN_002d68a8,lib-snd?,not started
+0x2d65f0,36,Snd_PanCurve,lib-snd?,not started
+0x2d6618,652,SND_BuildPanTable,audio,not started
+0x2d68a8,100,SND_GetPanLevels,audio,not started
 0x2d6910,24,FUN_002d6910,lib-snd?,not started
 0x2d6928,236,Snd_Rand,lib-snd?,not started
 0x2d6a18,180,FUN_002d6a18,lib-snd?,not started
 0x2d6ad0,52,FUN_002d6ad0,lib-snd?,not started
 0x2d6b08,128,Dma_ToScratchpad,lib-snd?,not started
 0x2d6b88,128,Dma_FromScratchpad,lib-snd?,not started
-0x2d6c08,180,FUN_002d6c08,lib-snd?,not started
+0x2d6c08,180,SndBits_Write,lib-snd?,not started
 0x2d6cc0,1240,FUN_002d6cc0,lib-snd?,not started
 0x2d7198,436,FUN_002d7198,lib-snd?,not started
 0x2d7350,892,FUN_002d7350,lib-snd?,not started
@@ -6627,20 +6627,20 @@ address,size,name,system,status
 0x2dad58,400,SND_SetDefaultConfig,audio,not started
 0x2daee8,1228,FUN_002daee8,lib-snd?,not started
 0x2db3b8,724,FUN_002db3b8,lib-snd?,not started
-0x2db690,96,FUN_002db690,lib-snd?,not started
+0x2db690,96,SND_OnIopReply,audio,not started
 0x2db6f0,68,Str_Cat,lib-snd?,not started
 0x2db738,896,FUN_002db738,lib-snd?,not started
 0x2dbab8,344,SND_MixThread,audio,not started
 0x2dbc10,1500,SND_LoadIopDriver,audio,not started
 0x2dc1f0,324,SND_StopDriver,audio,not started
 0x2dc338,8,FUN_002dc338,lib-snd?,not started
-0x2dc340,420,FUN_002dc340,lib-snd?,not started
-0x2dc4e8,520,FUN_002dc4e8,lib-snd?,not started
-0x2dc6f0,500,FUN_002dc6f0,lib-snd?,not started
-0x2dc8e8,928,FUN_002dc8e8,lib-snd?,not started
+0x2dc340,420,SndVoice_StopChannels,lib-snd?,not started
+0x2dc4e8,520,SndVoice_UpdatePitch,lib-snd?,not started
+0x2dc6f0,500,SndVoice_UpdateFxSend,lib-snd?,not started
+0x2dc8e8,928,SndVoice_UpdateVolume,lib-snd?,not started
 0x2dcc88,180,FUN_002dcc88,lib-snd?,not started
 0x2dcd40,176,FUN_002dcd40,lib-snd?,not started
-0x2dcdf0,224,FUN_002dcdf0,lib-snd?,not started
+0x2dcdf0,224,SndVoice_SetLowpassHz,lib-snd?,not started
 0x2dced0,176,FUN_002dced0,lib-snd?,not started
 0x2dcf80,88,SND_InitLockSema,audio,not started
 0x2dcfd8,40,SND_DeleteLockSema,audio,not started
@@ -6652,28 +6652,28 @@ address,size,name,system,status
 0x2dd388,100,FUN_002dd388,lib-snd?,not started
 0x2dd3f0,24,FUN_002dd3f0,lib-snd?,not started
 0x2dd408,344,FUN_002dd408,lib-snd?,not started
-0x2dd560,1068,FUN_002dd560,lib-snd?,not started
+0x2dd560,1068,SndVoice_UpdatePan,lib-snd?,not started
 0x2dd990,56,FUN_002dd990,lib-snd?,not started
 0x2dd9c8,1024,FUN_002dd9c8,lib-snd?,not started
-0x2dddc8,28,FUN_002dddc8,lib-snd?,not started
-0x2ddde8,28,FUN_002ddde8,lib-snd?,not started
-0x2dde08,172,FUN_002dde08,lib-snd?,not started
-0x2ddeb8,464,FUN_002ddeb8,lib-snd?,not started
-0x2de088,124,FUN_002de088,lib-snd?,not started
-0x2de108,336,FUN_002de108,lib-snd?,not started
-0x2de258,268,FUN_002de258,lib-snd?,not started
-0x2de368,80,FUN_002de368,lib-snd?,not started
-0x2de3b8,96,FUN_002de3b8,lib-snd?,not started
+0x2dddc8,28,SND_Upload,audio,not started
+0x2ddde8,28,SND_IsUploadDone,audio,not started
+0x2dde08,172,SndVoice_GetPosition,lib-snd?,not started
+0x2ddeb8,464,SndXfer_StartNext,lib-snd?,not started
+0x2de088,124,SndXfer_Kick,lib-snd?,not started
+0x2de108,336,SndXfer_Queue,lib-snd?,not started
+0x2de258,268,SndXfer_Upload,lib-snd?,not started
+0x2de368,80,SndXfer_IsDone,lib-snd?,not started
+0x2de3b8,96,SndXfer_OnDone,lib-snd?,not started
 0x2de418,140,Sif_SendDma,lib-snd?,not started
 0x2de4c8,128,SndDma_ToScratchpad,lib-snd?,not started
 0x2de548,128,SndDma_FromScratchpad,lib-snd?,not started
-0x2de5c8,120,FUN_002de5c8,lib-snd?,not started
-0x2de640,516,FUN_002de640,lib-snd?,not started
-0x2de848,212,FUN_002de848,lib-snd?,not started
+0x2de5c8,120,SpuMem_ClampRange,lib-snd?,not started
+0x2de640,516,SpuMem_Alloc,lib-snd?,not started
+0x2de848,212,SpuMem_Free,lib-snd?,not started
 0x2de920,120,SpuMem_SetRange,lib-snd?,not started
-0x2de998,416,FUN_002de998,lib-snd?,not started
-0x2deb38,192,FUN_002deb38,lib-snd?,not started
-0x2debf8,180,FUN_002debf8,lib-snd?,not started
+0x2de998,416,SpuMem_GetLargestFree,lib-snd?,not started
+0x2deb38,192,SndVoice_AddFx,lib-snd?,not started
+0x2debf8,180,SndVoice_RemoveFx,lib-snd?,not started
 0x2decac,272,Snd_MemCopy,lib-snd?,not started
 0x2dedc0,40,SND_AddStreamTask,audio,not started
 0x2dede8,156,SND_RemoveStreamTask,audio,not started
@@ -6684,51 +6684,51 @@ address,size,name,system,status
 0x2df158,64,SndBank_FindFreeSlot,lib-snd?,not started
 0x2df198,60,SndBank_GetSound,audio,not started
 0x2df1d8,96,FUN_002df1d8,lib-snd?,not started
-0x2df238,12,FUN_002df238,lib-snd?,not started
-0x2df248,44,FUN_002df248,lib-snd?,not started
-0x2df278,312,FUN_002df278,lib-snd?,not started
-0x2df3b0,836,FUN_002df3b0,lib-snd?,not started
-0x2df6f8,324,FUN_002df6f8,lib-snd?,not started
-0x2df840,56,FUN_002df840,lib-snd?,not started
-0x2df878,36,FUN_002df878,lib-snd?,not started
+0x2df238,12,SndStreamVoice_CalcBaseSize,lib-snd?,not started
+0x2df248,44,SndStreamVoice_CalcMemSize,lib-snd?,not started
+0x2df278,312,SndStreamVoice_Create,lib-snd?,not started
+0x2df3b0,836,SndStreamVoice_Play,lib-snd?,not started
+0x2df6f8,324,SndStreamVoice_AddBlock,lib-snd?,not started
+0x2df840,56,SndStreamVoice_GetFreeBlocks,lib-snd?,not started
+0x2df878,36,SndStreamVoice_GetQueuedBytes,lib-snd?,not started
 0x2df8c0,8,FUN_002df8c0,lib-snd?,not started
-0x2df8c8,172,FUN_002df8c8,lib-snd?,not started
-0x2df978,60,FUN_002df978,lib-snd?,not started
+0x2df8c8,172,SndStreamVoice_Stop,lib-snd?,not started
+0x2df978,60,SndStreamVoice_Destroy,lib-snd?,not started
 0x2df9b8,588,FUN_002df9b8,lib-snd?,not started
 0x2dfc08,100,FUN_002dfc08,lib-snd?,not started
 0x2dfc70,124,SndStream_FindRequest,lib-snd?,not started
-0x2dfcf0,172,FUN_002dfcf0,lib-snd?,not started
+0x2dfcf0,172,SndHandle_SetFxSend,lib-snd?,not started
 0x2dfda0,216,FUN_002dfda0,lib-snd?,not started
-0x2dfe78,120,FUN_002dfe78,lib-snd?,not started
-0x2dfef0,156,FUN_002dfef0,lib-snd?,not started
-0x2dff90,88,FUN_002dff90,lib-snd?,not started
+0x2dfe78,120,SndPlayParams_SetDefaults,lib-snd?,not started
+0x2dfef0,156,SndVoice_CalcFxSend,lib-snd?,not started
+0x2dff90,88,Snd_RandRange,lib-snd?,not started
 0x2dffe8,240,FUN_002dffe8,lib-snd?,not started
 0x2e00d8,8,FUN_002e00d8,lib-snd?,not started
 0x2e00e0,32,FUN_002e00e0,lib-snd?,not started
 0x2e0100,584,FUN_002e0100,lib-snd?,not started
-0x2e0348,496,FUN_002e0348,lib-snd?,not started
-0x2e0538,212,FUN_002e0538,lib-snd?,not started
+0x2e0348,496,SoftMix_Init,lib-snd?,not started
+0x2e0538,212,SoftMix_Shutdown,lib-snd?,not started
 0x2e0610,32,FUN_002e0610,lib-snd?,not started
 0x2e0630,12,FUN_002e0630,lib-snd?,not started
-0x2e0640,488,FUN_002e0640,lib-snd?,not started
+0x2e0640,488,SoftVoice_Start,lib-snd?,not started
 0x2e0828,128,FUN_002e0828,lib-snd?,not started
 0x2e08a8,52,FUN_002e08a8,lib-snd?,not started
-0x2e08e0,160,FUN_002e08e0,lib-snd?,not started
-0x2e0980,104,FUN_002e0980,lib-snd?,not started
-0x2e09e8,552,FUN_002e09e8,lib-snd?,not started
+0x2e08e0,160,SoftVoice_Stop,lib-snd?,not started
+0x2e0980,104,SoftVoice_SetVolume,lib-snd?,not started
+0x2e09e8,552,SoftMix_Mix,lib-snd?,not started
 0x2e0c10,48,FUN_002e0c10,lib-snd?,not started
 0x2e0c40,76,FUN_002e0c40,lib-snd?,not started
 0x2e0c90,864,FUN_002e0c90,lib-snd?,not started
 0x2e0ff0,12,FUN_002e0ff0,lib-snd?,not started
-0x2e1000,48,FUN_002e1000,lib-snd?,not started
-0x2e1030,68,FUN_002e1030,lib-snd?,not started
-0x2e1078,184,FUN_002e1078,lib-snd?,not started
+0x2e1000,48,SoftVoice_SetFxSend,lib-snd?,not started
+0x2e1030,68,SoftVoice_GetPosition,lib-snd?,not started
+0x2e1078,184,SoftVoice_SetPitch,lib-snd?,not started
 0x2e1130,8,FUN_002e1130,lib-snd?,not started
 0x2e1138,176,FUN_002e1138,lib-snd?,not started
 0x2e11e8,184,FUN_002e11e8,lib-snd?,not started
-0x2e12a0,188,FUN_002e12a0,lib-snd?,not started
-0x2e1360,148,FUN_002e1360,lib-snd?,not started
-0x2e13f8,132,FUN_002e13f8,lib-snd?,not started
+0x2e12a0,188,SoftVoice_SetLowpass,lib-snd?,not started
+0x2e1360,148,SoftVoice_AddFx,lib-snd?,not started
+0x2e13f8,132,SoftVoice_RemoveFx,lib-snd?,not started
 0x2e1480,92,SndFxChain_Insert,lib-snd?,not started
 0x2e14e0,76,SndFxChain_Remove,lib-snd?,not started
 0x2e1530,72,FUN_002e1530,lib-snd?,not started
@@ -6758,29 +6758,29 @@ address,size,name,system,status
 0x2e3070,376,FUN_002e3070,lib-snd?,not started
 0x2e31e8,1080,FUN_002e31e8,lib-snd?,not started
 0x2e3620,940,FUN_002e3620,lib-snd?,not started
-0x2e39d0,116,FUN_002e39d0,lib-snd?,not started
-0x2e3a48,20,FUN_002e3a48,lib-snd?,not started
+0x2e39d0,116,SndFx_PcmOut_Pull,lib-snd?,not started
+0x2e3a48,20,SndFx_PcmOut_Init,lib-snd?,not started
 0x2e3a5c,208,Snd_FloatToPcm16,lib-snd?,not started
-0x2e3b2c,132,FUN_002e3b2c,lib-snd?,not started
-0x2e3c00,144,FUN_002e3c00,lib-snd?,not started
-0x2e3c90,44,FUN_002e3c90,lib-snd?,not started
-0x2e3cc0,36,FUN_002e3cc0,lib-snd?,not started
-0x2e3ce8,288,FUN_002e3ce8,lib-snd?,not started
-0x2e3e08,52,FUN_002e3e08,lib-snd?,not started
-0x2e3e40,208,FUN_002e3e40,lib-snd?,not started
-0x2e3f10,208,FUN_002e3f10,lib-snd?,not started
-0x2e3fe0,600,FUN_002e3fe0,lib-snd?,not started
-0x2e4238,40,FUN_002e4238,lib-snd?,not started
-0x2e4260,28,FUN_002e4260,lib-snd?,not started
-0x2e4280,128,FUN_002e4280,lib-snd?,not started
+0x2e3b2c,132,SndMix_ClampToPcm16,lib-snd?,not started
+0x2e3c00,144,SndFx_Lowpass_Pull,lib-snd?,not started
+0x2e3c90,44,SndFx_Lowpass_SetCoef,lib-snd?,not started
+0x2e3cc0,36,SndFx_Lowpass_Init,lib-snd?,not started
+0x2e3ce8,288,SndFx_Fir_Process,lib-snd?,not started
+0x2e3e08,52,SndFx_Fir_Init,lib-snd?,not started
+0x2e3e40,208,SndMath_Sin,lib-snd?,not started
+0x2e3f10,208,SndMath_Cos,lib-snd?,not started
+0x2e3fe0,600,SndFx_Fir_Design,lib-snd?,not started
+0x2e4238,40,SndFx_Fir_DesignUnity,lib-snd?,not started
+0x2e4260,28,SndFx_Fir_DesignGain,lib-snd?,not started
+0x2e4280,128,SndFx_Fir_Pull,lib-snd?,not started
 0x2e4300,384,FUN_002e4300,lib-snd?,not started
 0x2e4480,124,FUN_002e4480,lib-snd?,not started
 0x2e4500,16,FUN_002e4500,lib-snd?,not started
-0x2e45a0,296,FUN_002e45a0,lib-snd?,not started
-0x2e46c8,32,FUN_002e46c8,lib-snd?,not started
-0x2e46e8,912,FUN_002e46e8,lib-snd?,not started
-0x2e4a78,128,FUN_002e4a78,lib-snd?,not started
-0x2e4bd8,44,FUN_002e4bd8,lib-snd?,not started
+0x2e45a0,296,SndFx_Resample_Interp,lib-snd?,not started
+0x2e46c8,32,SndFx_Resample_SetStep,lib-snd?,not started
+0x2e46e8,912,SndFx_Resample_Pull,lib-snd?,not started
+0x2e4a78,128,SndFx_Resample_Init,lib-snd?,not started
+0x2e4bd8,44,SndMath_ISqrt,lib-snd?,not started
 0x2e4c08,152,FUN_002e4c08,sdk?,host
 0x2e4ca0,540,FUN_002e4ca0,sdk?,host
 0x2e4ec0,84,FUN_002e4ec0,sdk?,host
