@@ -2790,3 +2790,40 @@ Functions the index had with no system at all, read in Ghidra:
 Left unnamed (no references, meaning open): 0x1818c0 (renderer vf +0x108 and the font word 0x337ff8 = 0.002),
 0x1c0148 (`cScreenOverlay`: when shown, its +0x28 table's +0x78; in no vtable), 0x19aa18, 0x238980, 0x201c10 (+8,
 +0xc, +0x10 set from three arguments), 0x256100 (empty), 0x1fb4e0 / 0x2049b0 / 0x204f28.
+
+## G9b2d2a: the front end manager's set-up and tear-down (`fe_manager.rs`, `tests/fe_manager_setup.rs`)
+
+- **The constructors.** `cFE3D::cFE3D` 0x263280(fe, from_game) and 0x265ca0(fe) share a base:
+  - the table and +0x70 3, +0x71 -1;
+  - the players' picks (+0x7c..+0x7f) cleared;
+  - the drawn list (+0x80, its table at +0xa0) and the stack's two lists (+0xa8, +0xcc).
+- **The full constructor** also clears its words, sets the game type 2 and clears the app's step. It clears the
+  career's +0x3710 and, coming from the game, sets its +0x3260 to 1. It then sets up the lesson and sets the players
+  from the career's two-player test.
+- **The destructor** tears down in the game's order:
+  - the lights and the fades;
+  - the twelve models (unloaded, then destroyed through the table at their +0xc);
+  - the stack, the drawn list and the course;
+  - the objects at +0x18, +0x10, +0x14, the players, the 3D scene (+0xa4) and the video manager (+0x124), each
+    through its own table place (+4, +0x10, +0, +8). The scenes and the 3D scene are closed first, without a null
+    check, as in the game;
+  - the effects loader, the fonts, the renderer's +0x148, the lesson, the world lists, the pool, the app's front end
+    (+0x734), then the three lists' own destructors and the module's.
+- **vf4, the start.**
+  - It sets the renderer's +0x120 from the career's +0x1684 and puts the viewport over the whole display.
+  - It loads the twelve models. Each is waited on frame by frame (its +0x68 each frame) until it says loaded, then
+    finished.
+  - It closes and destroys the scene at +0xc and sets both players' +0x4c to 10.
+  - On a career's first start (+0x3260 1) it makes the two boot films as video screens: the logo's (its next screen
+    the menus' first, the word at 0x3471fc) and the intro's (its next the logo). It pushes the intro and sets +0x3260
+    to 2. Otherwise it pushes the first screen.
+- **Leftover registers.** The renderer's +0x140 call, and the first model's loaded test, carry whatever a1 held. The
+  test does not log them.
+
+The test runs 2,000 cases of each of the 4 functions. The player count, the effects loader's free and delete and the
+module's destructor run for real. Each place an object keeps a table (+0, +4, +8, +0xc, +0x10) has its own table with
+its own adjust, so a wrong place shows. The boot films' table is the game's (0x3b5010), with its +0x60 stood in for.
+
+Of the 48 mutants, 46 are caught. The two survivors are equivalent: the player count's narrowing to a byte, which
+`set_players` does again, and the sticky bit of the unsigned conversion. Two were first missed while every place
+shared one table.

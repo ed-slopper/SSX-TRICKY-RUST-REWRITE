@@ -1,7 +1,7 @@
 //! The front end's manager (board row G9b2d1) on the game's bytes: `cFE3D`'s per-frame update (vf5) and draw (vf6),
 //! its player count and its small helpers, every call out through [`FeEnv`]; checked in the function runner
-//! (`tests/fe_manager.rs`). Its set-up and tear-down (the constructors, the destructor, vf1, vf4) are object glue
-//! left to the app (row G9b2d2).
+//! (`tests/fe_manager.rs`). Its constructors, destructor and vf4 (row G9b2d2a) are here too, checked in
+//! `tests/fe_manager_setup.rs`; vf1, the 19 objects' set-up, is row G9b2d2b.
 //!
 //! The manager (gApp+0x734): +4 the players (a signed byte), +5 a byte, +6 the state (0 the menus, 1 leaving for the
 //! game, 2 left), +8 a word, +0x60 a vector, +0x74 / +0x78 the two players, +0x7c the players' picks (two bytes
@@ -17,6 +17,7 @@ use crate::fe_riderprofile::{SET_FILM, VIDEO_VTABLE};
 use crate::fe_title::BASE_CTOR;
 use crate::fe_trickbook::CLEAR_SLOT;
 use crate::pf::Mem;
+use crate::ps2f::F;
 
 /// The calls: the transition's update (0x1fece8) and the fade's draw (0x1ff000) on gApp+0x72c; a player's cheats
 /// (0x26cf60); the drawn list's update (0x26ff88) and draws (0x26feb8, 0x26ff40); the sound bank's update (0x17d950
@@ -478,4 +479,264 @@ pub fn free_if(m: &mut Mem, e: &mut dyn FeEnv, obj: u32, flags: u32) {
     if flags & 1 != 0 {
         e.call(m, FREE, &[obj]);
     }
+}
+
+/// The set-up and tear-down's calls (board row G9b2d2a): a drawn list's constructor (0x2abfb0), the lesson's set up
+/// (0x158d18 on 0x3211a8 with 0x7d3e8) and the career's two-player test (0x164288); the manager's lights' destructor
+/// (0x261e98 on +0x70), the fades' reset (0x1ff6a0 on gApp+0x72c), a model's unload (0x2abf38), the stack's clear
+/// (0x275c60), the drawn list's clear (0x26feb0), the course's unload (0x25f498 on 0x346488, 1), a player's
+/// destructor (0x265bc8), the fonts' release (0x19c8d0), the lesson's stop (0x159070) and reset (0x158cc8), the world
+/// lists' clear (0x17d440 on 0x337c60), the pool's (0x23d368 on 0x345e48), the stack's, the drawn list's and the
+/// lights' own destructors (0x2759f0, 0x265dc0, 0x265da0); a model's load (0x266320), loaded test (0x2663e8) and
+/// finish (0x2661e8), the frame wait (0x2ced00); a video screen's film (0x2abb58) and its first screen (0x2aba70)
+pub mod setup {
+    pub const VTABLE: u32 = 0x3a90c0;
+    pub const LIST_VTABLE: u32 = 0x3a9100;
+    pub const LIST_CTOR: u32 = 0x2abfb0;
+    pub const LESSON_INIT: u32 = 0x158d18;
+    pub const LESSON: u32 = 0x3211a8;
+    pub const LESSON_FUNC: u32 = 0x7d3e8;
+    pub const TWO_PLAYERS: u32 = 0x164288;
+    pub const LIGHTS_DTOR: u32 = 0x261e98;
+    pub const FADES_RESET: u32 = 0x1ff6a0;
+    pub const MODEL_UNLOAD: u32 = 0x2abf38;
+    pub const STACK_CLEAR: u32 = 0x275c60;
+    pub const DRAWN_CLEAR: u32 = 0x26feb0;
+    pub const COURSE_UNLOAD: u32 = 0x25f498;
+    pub const PLAYER_DTOR: u32 = 0x265bc8;
+    pub const FONT_RELEASE: u32 = 0x19c8d0;
+    pub const LESSON_STOP: u32 = 0x159070;
+    pub const LESSON_RESET: u32 = 0x158cc8;
+    pub const LISTS_CLEAR: u32 = 0x17d440;
+    pub const POOL_CLEAR: u32 = 0x23d368;
+    pub const STACK_DTOR: u32 = 0x2759f0;
+    pub const DRAWN_DTOR: u32 = 0x265dc0;
+    pub const LIGHTS_DTOR2: u32 = 0x265da0;
+    pub const MODEL_LOAD: u32 = 0x266320;
+    pub const MODEL_LOADED: u32 = 0x2663e8;
+    pub const MODEL_FINISH: u32 = 0x2661e8;
+    pub const FRAME_WAIT: u32 = 0x2ced00;
+    pub const FIRST_SCREEN: u32 = 0x2aba70;
+    pub const FILM_NAME: u32 = 0x3a8d38;
+    /// The boot films: the logo's and the intro's
+    pub const FILMS: [u32; 2] = [0x3a8d48, 0x3a8d60];
+    /// The first screen the menus push when there is no film (the word at 0x3471fc)
+    pub const FIRST: u32 = 0x3471fc;
+}
+
+/// The part both constructors share: the table, +0x70 3 and +0x71 -1, the picks (+0x7c..+0x7f) cleared, the drawn
+/// list (+0x80, its table at +0xa0) and the stack's two lists (+0xa8, +0xcc) made
+fn fe_base(m: &mut Mem, e: &mut dyn FeEnv, fe: u32) {
+    m.w32(fe, setup::VTABLE);
+    m.w8(fe + 0x70, 3);
+    m.w8(fe + 0x71, 0xff);
+    for k in 0..4 {
+        m.w8(fe + 0x7c + k, 0);
+    }
+    e.call(m, setup::LIST_CTOR, &[fe + 0x80]);
+    m.w32(fe + 0x80 + 0x20, setup::LIST_VTABLE);
+    e.call(m, setup::LIST_CTOR, &[fe + 0xa8]);
+    e.call(m, setup::LIST_CTOR, &[fe + 0xcc]);
+}
+
+/// `cFE3D::cFE3D` 0x263280(fe, from_game) -> fe: the base; +5, +6 and +0xc..+0x18, +0x50, +0xa4 cleared, the game
+/// type 2 (+0xf0), the idle frames and the film cleared; the app's step cleared, the career's +0x3710 cleared and,
+/// coming from the game, its +0x3260 1; the lesson set up, +8 cleared, the players by the career's two-player test
+pub fn fe_ctor(m: &mut Mem, e: &mut dyn FeEnv, fe: u32, from_game: u32) -> u32 {
+    m.w32(fe, setup::VTABLE);
+    m.w8(fe + 0x70, 3);
+    m.w8(fe + 0x71, 0xff);
+    m.w8(fe + 5, 0);
+    m.w8(fe + 6, 0);
+    for at in [0xcu32, 0x10, 0x14, 0x18, 0x50] {
+        m.w32(fe + at, 0);
+    }
+    for k in 0..4 {
+        m.w8(fe + 0x7c + k, 0);
+    }
+    e.call(m, setup::LIST_CTOR, &[fe + 0x80]);
+    m.w32(fe + 0xa4, 0);
+    m.w32(fe + 0x80 + 0x20, setup::LIST_VTABLE);
+    e.call(m, setup::LIST_CTOR, &[fe + 0xa8]);
+    e.call(m, setup::LIST_CTOR, &[fe + 0xcc]);
+    m.w32(fe + 0xf0, 2);
+    m.w32(fe + 0xf4, 0);
+    let app = m.r32(GAPP);
+    m.w32(app + 8, 0);
+    m.w32(fe + 0xf8, 0);
+    m.w32(CAREER + 0x3710, 0);
+    if from_game != 0 {
+        m.w32(CAREER + 0x3260, 1);
+    }
+    e.call(m, setup::LESSON_INIT, &[setup::LESSON, setup::LESSON_FUNC]);
+    m.w32(fe + 8, 0);
+    let n = e.call(m, setup::TWO_PLAYERS, &[CAREER]);
+    m.w8(fe + 4, n as u8);
+    set_players(m, e, fe, n as u8 as i8 as i32 as u32);
+    fe
+}
+
+/// `cFE3D::cFE3D` 0x265ca0(fe) -> fe: the base only
+pub fn fe_ctor_base(m: &mut Mem, e: &mut dyn FeEnv, fe: u32) -> u32 {
+    fe_base(m, e, fe);
+    fe
+}
+
+/// An object destroyed through its table at `vt_at` (+8 with 3), when there is one
+fn destroy_at(m: &mut Mem, e: &mut dyn FeEnv, o: u32, vt_at: u32) {
+    if o != 0 {
+        vcall_at(m, e, o, vt_at, 8, &[3]);
+    }
+}
+
+/// `cFE3D::~cFE3D` 0x2633d0(fe, flags): its table; the lights, the fades reset, the twelve models (+0x20..)
+/// unloaded and destroyed, the stack and drawn list cleared, the course unloaded; +0x18 destroyed and cleared; the
+/// two scenes (+0x10, +0x14) closed (+0x18) and destroyed; both players; the 3D scene (+0xa4) closed (+0x120) and
+/// destroyed; the video manager (+0x124); the effects loader freed, the fonts released, the renderer's +0x148, the
+/// lesson stopped and reset, the world lists and the pool cleared, the app's front end (+0x734) cleared; the stack,
+/// the drawn list and the lights destroyed (with 2), then the module's destructor
+pub fn fe_dtor(m: &mut Mem, e: &mut dyn FeEnv, fe: u32, flags: u32) {
+    m.w32(fe, setup::VTABLE);
+    e.call(m, setup::LIGHTS_DTOR, &[fe + 0x70]);
+    let fades = m.r32(m.r32(GAPP) + 0x72c);
+    e.call(m, setup::FADES_RESET, &[fades]);
+    for k in 0..12u32 {
+        let at = fe + 0x20 + 4 * k;
+        let o = m.r32(at);
+        e.call(m, setup::MODEL_UNLOAD, &[o]);
+        let o = m.r32(at);
+        destroy_at(m, e, o, 0xc);
+    }
+    e.call(m, setup::STACK_CLEAR, &[fe + 0xa8]);
+    e.call(m, setup::DRAWN_CLEAR, &[fe + 0x80]);
+    e.call(m, setup::COURSE_UNLOAD, &[COURSE, 1]);
+    let o = m.r32(fe + 0x18);
+    destroy_at(m, e, o, 4);
+    m.w32(fe + 0x18, 0);
+    for at in [0x10u32, 0x14] {
+        let o = m.r32(fe + at);
+        vcall_at(m, e, o, 0x10, 0x18, &[]);
+        let o = m.r32(fe + at);
+        destroy_at(m, e, o, 0x10);
+    }
+    for at in [0x74u32, 0x78] {
+        let p = m.r32(fe + at);
+        if p != 0 {
+            e.call(m, setup::PLAYER_DTOR, &[p, 3]);
+        }
+    }
+    let sc = m.r32(fe + 0xa4);
+    vcall_at(m, e, sc, 0, 0x120, &[]);
+    let sc = m.r32(fe + 0xa4);
+    destroy_at(m, e, sc, 0);
+    let vm = m.r32(fe + 0x124);
+    destroy_at(m, e, vm, 8);
+    let app = m.r32(GAPP);
+    crate::app::free_effects_loader(m, e, app);
+    for at in [0x5cu32, 0x60] {
+        let f = m.r32(m.r32(GAPP) + at);
+        e.call(m, setup::FONT_RELEASE, &[f]);
+    }
+    renderer_call(m, e, 0x148, &[]);
+    e.call(m, setup::LESSON_STOP, &[setup::LESSON]);
+    e.call(m, setup::LESSON_RESET, &[setup::LESSON]);
+    e.call(m, setup::LISTS_CLEAR, &[SOUND_BANK]);
+    e.call(m, setup::POOL_CLEAR, &[0x345e48]);
+    let app = m.r32(GAPP);
+    m.w32(app + 0x734, 0);
+    e.call(m, setup::STACK_DTOR, &[fe + 0xa8, 2]);
+    e.call(m, setup::DRAWN_DTOR, &[fe + 0x80, 2]);
+    e.call(m, setup::LIGHTS_DTOR2, &[fe + 0x70, 2]);
+    crate::game_main::module_dtor(m, e, fe, flags);
+}
+
+/// `cvt.s.w`: toward zero
+fn int_float(v: u32) -> F {
+    let v = v as i32;
+    let mut f = v as f32;
+    if (f as f64).abs() > (v as f64).abs() {
+        f = f32::from_bits(f.to_bits() - 1);
+    }
+    F(f)
+}
+
+/// An unsigned word as a float (`cvt.s.w` of half with the low bit kept, doubled, past 2^31)
+fn unsigned_float(v: u32) -> F {
+    if (v as i32) >= 0 {
+        int_float(v)
+    } else {
+        let h = int_float((v >> 1) | (v & 1));
+        h + h
+    }
+}
+
+/// `cFE3D` vf4 0x2637a0(fe), the start: the renderer's +0x120 with the career's +0x1684, the viewport over the
+/// whole display, its +0x140; the twelve models (+0x20..) loaded, waited on frame by frame (each frame their +0x68)
+/// and finished; the scene at +0xc closed (+0x18), destroyed and cleared; both players' +0x4c 10. After a career's
+/// first start (+0x3260 1) the two boot films (0x160 bytes each, video screens) made, the intro's first screen the
+/// logo's, the logo pushed and +0x3260 2; otherwise the first screen (0x3471fc) pushed. +8 1
+pub fn fe_start(m: &mut Mem, e: &mut dyn FeEnv, fe: u32) {
+    let v = m.r32(CAREER + 0x1684);
+    renderer_call(m, e, 0x120, &[v]);
+    let w = unsigned_float(renderer_call(m, e, 0x58, &[]));
+    let h = unsigned_float(renderer_call(m, e, 0x60, &[]));
+    renderer_call(m, e, 0x98, &[0, 0, w.0.to_bits(), h.0.to_bits()]);
+    renderer_call(m, e, 0x140, &[]);
+    for k in 0..12u32 {
+        let at = fe + 0x20 + 4 * k;
+        let o = m.r32(at);
+        e.call(m, setup::MODEL_LOAD, &[o]);
+        loop {
+            let o = m.r32(at);
+            // (the first test's a1 is whatever was left there; the rest 0)
+            if e.call(m, setup::MODEL_LOADED, &[o]) != 0 {
+                break;
+            }
+            e.call(m, setup::FRAME_WAIT, &[0]);
+            let o = m.r32(at);
+            vcall_at(m, e, o, 0xc, 0x68, &[]);
+        }
+        let o = m.r32(at);
+        e.call(m, setup::MODEL_FINISH, &[o, 0]);
+    }
+    let sc = m.r32(fe + 0xc);
+    vcall_at(m, e, sc, 0x10, 0x18, &[]);
+    let sc = m.r32(fe + 0xc);
+    destroy_at(m, e, sc, 0x10);
+    m.w32(fe + 0xc, 0);
+    for k in 0..2u32 {
+        let p = m.r32(fe + 0x74 + 4 * k);
+        m.w32(p + 0x4c, 10);
+    }
+    let first = m.r32(setup::FIRST);
+    if m.r32(CAREER + 0x3260) == 1 {
+        let film = |m: &mut Mem, e: &mut dyn FeEnv, name: u32| {
+            let v = alloc(m, e, setup::FILM_NAME, 0x160, 0x10);
+            e.call(m, BASE_CTOR, &[v]);
+            m.w32(v + 0x154, 0);
+            m.w32(v + 0x158, 1);
+            m.w32(v + 0xc, VIDEO_VTABLE);
+            m.w32(v + 0x15c, 0);
+            e.call(m, SET_FILM, &[v, name]);
+            v
+        };
+        let logo = film(m, e, setup::FILMS[0]);
+        let first = m.r32(setup::FIRST);
+        m.w32(logo + 0x15c, first);
+        vcall_at(m, e, logo, 0xc, 0x60, &[]);
+        let intro = film(m, e, setup::FILMS[1]);
+        m.w32(fe + 0xf8, intro);
+        let v = m.r32(fe + 0xf8);
+        e.call(m, setup::FIRST_SCREEN, &[v, 0]);
+        let v = m.r32(fe + 0xf8);
+        m.w32(v + 0x15c, logo);
+        let v = m.r32(fe + 0xf8);
+        vcall_at(m, e, v, 0xc, 0x60, &[]);
+        let v = m.r32(fe + 0xf8);
+        e.call(m, STACK_PUSH, &[fe + 0xa8, v]);
+        m.w32(CAREER + 0x3260, 2);
+    } else {
+        e.call(m, STACK_PUSH, &[fe + 0xa8, first]);
+    }
+    m.w32(fe + 8, 1);
 }

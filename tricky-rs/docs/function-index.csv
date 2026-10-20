@@ -4814,11 +4814,11 @@ address,size,name,system,status
 0x2631f0,60,FE3DDifficultSel_SayLine2D,frontend?,checked
 0x263230,60,FE3DDifficultSel_SayLine2E,frontend?,checked
 0x263270,12,FUN_00263270,frontend?,checked
-0x263280,332,cFE3D::cFE3D,frontend,ported
-0x2633d0,672,cFE3D::~cFE3D,frontend,not started
+0x263280,332,cFE3D::cFE3D,frontend,checked
+0x2633d0,672,cFE3D::~cFE3D,frontend,checked
 0x263670,224,FE3D_SetNumPlayers,frontend?,checked
 0x263750,76,cFE3D::vf2_263750,frontend,checked
-0x2637a0,908,cFE3D::vf4_2637a0,frontend,not started
+0x2637a0,908,cFE3D::vf4_2637a0,frontend,checked
 0x263b30,5288,cFE3D::vf1_263b30,frontend,not started
 0x264fd8,960,cFE3D::vf6_264fd8,frontend,checked
 0x265398,956,cFE3D::vf5_265398,frontend,checked
@@ -4834,7 +4834,7 @@ address,size,name,system,status
 0x265bc8,28,Mem_DeleteIfFlag1,frontend?,checked
 0x265c28,36,FE3D_IsMultiplayer,frontend?,checked
 0x265c68,8,cFE3D::vf3_265c68,frontend,checked
-0x265ca0,176,cFE3D::cFE3D,frontend,ported
+0x265ca0,176,cFE3D::cFE3D,frontend,checked
 0x265d50,80,cFE3D::__tf,runtime,host
 0x265da0,28,Mem_DeleteIfFlag2,frontend?,checked
 0x265dc0,20,cFE3DScene::~cFE3DScene,frontend,checked
