@@ -84,7 +84,6 @@ state machine and the renderer are ours. Nothing has been checked against the or
 | G9b | (umbrella: G9b1, G9b2) The front end's shared machinery: `cFE3D` (the manager, its per-frame update and the screen it runs), the `cFE3DState` base (the phases, `TransitionIn` / `Out`, `Finish` and `CreateNextState`, `UpdateTransition`, `Activate`, `LayoutWidgets`), the widgets they drive and the 3D transition record (`FE3DTransition_*`, notes in frontend.md) | any | G9 | | Split of G9 |
 | G9b2 | (umbrella: G9b2a, G9b2b, G9b2c, G9b2d, G9b2e) The rest of G9b: `cFE3D` (the manager: its per-frame update, the screen stack 0x275b10 / 0x275c10 / 0x2ac030, the players and their pad queries 0x26ce08..0x26cef8), the widgets the screens build (the constructor 0x2b1138 and its virtuals, the list 0x2ac018 / 0x2ac048, the place 0x2acb20, the screen helpers 0x274108, 0x2763f0, 0x2719c0, 0x2718f0, 0x271848, 0x2742e8) and the 3D transition record (`FE3DTransition_*`) | any | G9b1 | | Split from G9b; split (2026-10-16) |
 | G9b2d | (umbrella: G9b2d1, G9b2d2) The front end's manager `cFE3D` (the constructors 0x263280 / 0x265ca0, the destructor, vf1 0x263b30, vf2, vf3, vf4, vf5, vf6) on the game's bytes | any | G9b2a | | Split of G9b2; split (2026-10-16) |
-| G9b2d2a | The front end manager's constructors 0x263280 / 0x265ca0, destructor 0x2633d0 and vf4 0x2637a0 (the riders loaded, the boot films, the first screen pushed) on the game's bytes, checked in the runner | ed-slopper/puffin | G9b2d1 | | Split of G9b2d2 |
 | G9b2d2b | The front end manager's vf1 0x263b30 (19 objects made, fonts, models and sounds loaded) on the game's bytes, checked in the runner | any | G9b2d2a | | Split of G9b2d2 |
 | G9b2d2 | The front end manager's set-up and tear-down: the constructors 0x263280 / 0x265ca0, the destructor 0x2633d0, vf1 0x263b30 (19 objects made, fonts, models and sounds loaded) and vf4 0x2637a0 (the riders loaded, the boot films, the first screen pushed). Object glue (allocation, asset loading and virtual calls), so like G4k it belongs with the app (G9u) | any | G9b2d1 | | Split of G9b2d; unblocked 2026-10-19 (E1 checks object glue on the bytes), split into G9b2d2a, G9b2d2b |
 | G9u | (umbrella: G9u1, G9u2, G9u3) The app's menus (`src/ui.rs`, ours) on the ported screens: the screen flow and choices as the game's, drawn with the app's widgets until the game's widget drawing is ported | any | G9b–G9t | | Split of G9; split (2026-10-16) |
@@ -151,6 +150,7 @@ matches the original.
 
 | ID | Task | Section | Who | Date | Commit |
 |---|---|---|---|---|---|
+| G9b2d2a | The front end manager's constructors, destructor and vf4 on the game's bytes (fe_manager.rs, tests/fe_manager_setup.rs); 46 of 48 mutants, the survivors equivalent | P2 | ed-slopper/puffin | 2026-10-17 | 76baf6b |
 | E1i | The game's and the app's small helpers: game/src/game_helpers.rs, tests/game_helpers.rs (15 functions checked; 0x182170 ported, not checkable); 51 of 52 mutants, the survivor equivalent | P2 | ed-slopper/puffin | 2026-10-17 | 1511230 |
 | E1h | cGame::Init on the game's bytes: game/src/game_main.rs game_init, tests/game_init.rs; 50 of 51 mutants (the survivor an allocation failure the test cannot make) | P2 | ed-slopper/puffin | 2026-10-17 | 3ce56d2 |
 | E1g | The boot films and the execution manager: game/src/boot.rs, tests/boot.rs (28 functions); 65 of 66 mutants, the survivor equivalent | P2 | ed-slopper/puffin | 2026-10-17 | 2abebb7 |
@@ -1445,3 +1445,4 @@ matches the original.
 - 2026-10-19 ed-slopper/puffin: E1i narrowed (the pad left to the input rows) and claimed.
 - 2026-10-19 ed-slopper/puffin: E1i done (1511230: the small helpers, 51/52). Paused after one task, as asked.
 - 2026-10-19 ed-slopper/puffin: G9b2d2 unblocked and split (G9b2d2a, G9b2d2b); G9b2d2a claimed.
+- 2026-10-19 ed-slopper/puffin: G9b2d2a done (76baf6b: cFE3D's set-up and tear-down, 46/48); G9b2d2b (vf1) open. Paused after one task, as asked.
