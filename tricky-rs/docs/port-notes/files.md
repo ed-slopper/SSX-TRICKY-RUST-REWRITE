@@ -733,3 +733,12 @@ slots 0xc0 / 0xc4 else 0x78 / 0x7c; +8 == 0 → 0xb0 / 0xb4 else 0x88 / 0x8c), t
 0x306f38 / 0x306f60 (errno 5, −1, no callers; probably open/unlink/link-style stubs, not provable), libmpeg
 0x2ea820..0x2f0e90.
 
+## Names from F1c batch 32 (proven)
+
+- A DECI2 host link object with no callers and no vtable found (dead code; names partly inferred):
+  `Deci2Host_Destroy` 0x2b7b18 (deleting destructor: `~CDeci2CopydataCommDriver` on +8), `Deci2Host_Open` 0x2b7b78
+  (+0x2c / +0x34 / +0x3c = self, +0x28 / +0x30 / +0x38 = the callbacks 0x2b7be0 / 0x2b7be8 / 0x2b7bf0, then the
+  driver's vf1 0x2b71d0: `sceDeci2Open` protocol 0xe001 and `Sys_AddPollTask` 0x2b7848; +0x1e8 = 1, returns 1),
+  `Deci2Host_Wait` 0x2b7c08 (driver vf6 0x2b7488 sends, then pumps `Deci2Comm_PumpReceive` until the reply flag,
+  returns the result).
+- Still open: libmpeg 0x2ea820..0x2f0e90 (SDK internals).

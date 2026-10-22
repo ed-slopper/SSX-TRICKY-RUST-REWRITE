@@ -2725,8 +2725,8 @@ ported functions do.
     whether it was.
 - `Vec4_ScaleCopy19` 0x1d9b38 (one more copy of the scale).
 - Not settled: 0x1d9700 (the particle manager's draw of one 0xf0 record), 0x1e0680 (a jump table by display mode,
-  < 0x3b), 0x1e81f8 ({word, 0, 0}), 0x1e4288, 0x1e4e20 / 0x1e4eb8, 0x1fb600..0x1fbbb0 (byte reorders by the tables at
-  0x340f10 / 0x341190, likely texture swizzles), 0x203d40, 0x21e788.
+  < 0x3b), 0x1e81f8 ({word, 0, 0}), 0x1e4288, 0x1e4e20 / 0x1e4eb8, 0x1fb600..0x1fbbb0 (named in batch 32: the texture
+  swizzles), 0x203d40, 0x21e788.
 
 ## Names from F1c batch 20 (proven)
 
@@ -2773,3 +2773,11 @@ Still unclear: 0x1e4288 (from `Gfx_FlipDisplay` and the render thread), 0x2ea158
   bp + 0x10): the pair back on the pool's free list (+0xc, link +0x18), count +4 down by one.
 - `ContactIndex_Push` 0x14f940: the inverse of `ContactIndex_Pop` 0x14f920 (`--count`, then the word stored), from
   `Contact_RemoveAllForNode`.
+
+## Names from F1c batch 32 (proven)
+
+- Texture swizzles (GS memory order, done on the EE): `Tex_Swizzle4` 0x1fbbb0 (no callers; the 4-bit twin of
+  `Tex_Swizzle` 0x1fbe98: power-of-two sizes up to 1024 else −1, 128 × 128 pages, rows of width / 2 bytes, through
+  two 8 KB stack buffers) → `Tex_SwizzlePage4` 0x1fb690 → `Tex_SwizzleBlock4` 0x1fb4e0 (nibble reorder by the
+  table 0x340b10). `Tex_Swizzle` → `Tex_SwizzlePage8` 0x1fb920 (128 × 64 page, block tables 0x341290 / 0x341210)
+  → `Tex_SwizzleBlock8` 0x1fb600 (byte reorder of a 256-byte block by the table 0x340f10).

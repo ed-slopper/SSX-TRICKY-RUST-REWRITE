@@ -325,3 +325,16 @@ Of the 52 mutants, 51 are caught. The survivor is equivalent: the brightness com
   (from `Gfx_StartVif1Irq` 0x1c0920; `Gfx_Vif1Interrupt` 0x1c0c70 counts +0xc and writes VIF1_FBRST = 8 when
   VIF1_STAT & 0x400). `Gfx_UpdateVif1Irq` 0x1c09c8: empty, called each frame by `cPS2GraphicsMan` vf15 0x1dd4f0
   (at 0x1dd5a4) with 0x33d7b0.
+
+## Names from F1c batch 32 (proven)
+
+Empty functions, named by where they are called (the verbs are inferred):
+- `App_PreInit` 0x17bdf0: the first call of `cApplication` vf1 0x17ba50.
+- `Loc_OnRegionLoaded` 0x17c1d0: the last call of `Loc_LoadForRegion`, given the app's strings (+0x50).
+- `StartScreen_OnClose` 0x1843a0: in `cStartScreen` vf2 0x182ed0, after `Career_DefaultPlayerName`.
+
+Also: `AnimData_LoadFileList4` 0x159140 = `AnimData_LoadFileList(this, 4, arg)`, called by `AnimData_OpenBig` when
+its mode is 0.
+
+Left open: the MockupEditor's empty item callbacks 0x1d41c8 (button 0x40 on the current item, args +0x109c,
++0x10a0, item), 0x1d4d08 (button 0x10, every item), 0x1d41d0 / 0x1d4d78 (button 0x20, every item).

@@ -1071,3 +1071,10 @@ The runner test (tests/overlaybase.rs) has 45,000 cases over the 75 functions, w
 
 - `Draw_GradientRect` 0x19b2a0 (was `FUN_0019b2a0` in `game/src/quad2d.rs`): a rectangle with a colour at each
   corner, z from the first word's +0x10, u and v 0..1.
+
+## Names from F1c batch 32 (proven)
+
+- `SpriteSet_InitFrontEndRects` 0x1f1580 (11964 bytes): the front end's twin of `SpriteSet_InitHudGameRects`,
+  the 7-word records {texture, w, h, v0, u0, u1, v1} of the sprite set (gApp +0x728) written from immediates
+  (record 3 at +0x5c = {−1, 24.0, 29.0, ...}). Called by `cFE3D` vf1 0x263b30 (at 0x263eac) and the start screen's
+  vf1 0x182d08 (at 0x182d80).

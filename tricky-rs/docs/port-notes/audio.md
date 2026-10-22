@@ -1033,5 +1033,34 @@ earlier batch 25 list.
   `Dts_EncodeFrame` (buffers, flags, scratch): odd flags → −3; tables 0x351f00 / 0x352300 / 0x352900 by that
   0xe0 / 0x160 / 0x1e0 size (copied to the scratchpad with `Dma_ToScratchpad` when work +0xa3c is set); on a flag
   change writes a new header; per channel 0x2d7350 then 0x2d76d0 (config +0 == 1) or 0x2d7f38; finally 0x2d7af0
-  or 0x2d8828. The stages 0x2d7350..0x2d8828 and the helpers 0x2d9510..0x2da7e0 are not named yet.
+  or 0x2d8828. The stages and helpers are named in batch 32.
 
+## Names from F1c batch 32 (proven)
+
+- The DTS encoder's stages (`Dts_EncodeFrame` 0x2d9220, batch 31). Per channel:
+  - `Dts_AnalyzeChannel` 0x2d7350: the channel's samples to floats (`Dts_Pcm16ToFloat` 0x2d9570: pextlh / psraw /
+    vitof0) or copied in (`Dts_CopyBlocks` 0x2d9510, lqc2 / sqc2, 128 bytes a step), windowed by the frame size
+    (config +4 0xe0 / 0x160 / 0x1e0 → `Dts_Window224` 0x2d95f0 / `Dts_Window352` 0x2d96d0 / `Dts_Window480`
+    0x2d97e0, VU0 multiply-accumulate with the coefficient table at work +0xa24), then a chain of nine VU0 stages
+    0x2d9930, 0x2d9a00, 0x2d9a90, 0x2d9bf0, 0x2d9cc0, 0x2d9d80, 0x2d9e90, 0x2d9fb0, 0x2da0d0 and 0x2da2d0, which
+    writes the output with the table at work +0xa38. Those ten are left unnamed: butterflies of a filterbank, but
+    which stage is which is not proven.
+  - `Dts_QuantizeChannelQuad` 0x2d76d0 (config +0 == 1) / `Dts_QuantizeChannel51` 0x2d7f38 (else): 24 subbands,
+    peaks from `Dts_FindPeaks` 0x2da510 (absolute max with pmaxw, 24 outputs); scale index = 7 bits from peak ×
+    weight (config +0xc + 4i) through the scale table 0x351b60 (1, 1, 2, 2, 2, 2, 3, 3, 3, 4, 4, 5, 6, 7, 7, 8,
+    10, 11, 12, 14, 16, 18, 20, 23, ...) and the small-value table 0x353138. Quad: subbands 0..13 at 10 bits
+    (`Dts_Quantize10Bit` 0x2da694, halves masked 0x3ff), 14..23 at 8 bits (`Dts_Quantize8Bit` 0x2da710, ppacb);
+    the 5.1 version also uses `Dts_Quantize5Bit` 0x2da770 (bytes masked 0x1f).
+  - Then for the frame: `Dts_PackScalesQuad` 0x2d7af0 / `Dts_PackScales51` 0x2d8828 pack the 24 7-bit scale
+    indices of each channel (+4..+0x1b) into the frame as byte-swapped 16-bit words; the 5.1 one also runs
+    `Dts_EncodeLfe` 0x2d7198 on the sixth buffer (param +0x14) and packs the LFE scale and 8 samples at frame
+    +0x112.
+  - `Dts_EncodeLfe` 0x2d7198: `Dts_DecimateLfe` 0x2da7e0 (three IIR stages, 13 coefficients at 0x353100, state at
+    config +0x6c, one output per 64 inputs, 8 outputs), peak → scale index by the same table, samples × (1 / scale)
+    × 28.571428 to bytes.
+  - Inferred from the DTS format, not from the code: channel arrangement 8 = L, R, SL, SR ("Quad"), 9 = C, L, R,
+    SL, SR (+ LFE, "51").
+- `RingQueue_Destroy` 0x209b40: frees the ring's data (+4) and the ring itself when flag & 1. The ring {capacity
+  +0, data +4, write +8, read +0xc} as `AsyncSys_PopQueue` reads it; used for `cAsyncSys`'s four queues (+0x9f0 /
+  +0xa00 / +0xa10 / +0xa20) in `~cAsyncSys` and `~cBXAudio`, and by `Speech_FreeNarration` (+0x7dbc) and
+  `Speech_FreeCharScriptSamples` (+0x7dd4).

@@ -2789,7 +2789,7 @@ Functions the index had with no system at all, read in Ghidra:
 
 Left unnamed (no references, meaning open): 0x1818c0 (renderer vf +0x108 and the font word 0x337ff8 = 0.002),
 0x1c0148 (`cScreenOverlay`: when shown, its +0x28 table's +0x78; in no vtable), 0x19aa18, 0x238980, 0x201c10 (+8,
-+0xc, +0x10 set from three arguments), 0x256100 (empty), 0x1fb4e0 / 0x2049b0 / 0x204f28.
++0xc, +0x10 set from three arguments), 0x256100 (empty), 0x2049b0 / 0x204f28 (0x1fb4e0 is `Tex_SwizzleBlock4`, batch 32).
 
 ## G9b2d2a: the front end manager's set-up and tear-down (`fe_manager.rs`, `tests/fe_manager_setup.rs`)
 
