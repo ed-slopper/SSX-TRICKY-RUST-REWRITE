@@ -677,3 +677,39 @@ with four (the render setup 0x1dbad8 and 0x182430 pass the handler's argument), 
   D_CTRL (bits from tables 0x35ade8 / 0x35adf8 / 0x35ae08, the release cycle), D_PCR, D_SQWC, D_RBOR,
   D_RBSR, and keeps a copy at 0x35ae18. `sceDmaReset` 0x2e5860 calls it on a zeroed 0x14-byte env.
 - `Dma_Bzero` 0x2e5800 (p, n): n bytes zeroed (libdma's own; Sony's name unknown).
+
+## Names from F1c batch 30 (proven)
+
+- `CourseTable_Construct` 0x1861f0: calls `CourseTable_Destruct` 0x186348 (*p = 0) and returns this; caller
+  `App_LoadFonts` 0x17b748.
+- `AsyncBdrLoad_SetMode` 0x201788 (p, v): *p = v. The front end's `cFE3D` vf1 0x263b30 sets it to 1 at 0x263fd0 on
+  its new loader (`AsyncBdrLoad_Init` 0x201b50 clears it); what 1 means is inferred.
+- `BdrLoad_FEBoardRequest` 0x201ad8: byte 0 = 1, request word = (w & 0xffffe6ff) | 0x2600: bits 9 (board .mpf),
+  10 (board .ssh) and 13 set, 8, 11, 12 (body/head .mpf, suit/boot, head/helmet .ssh) cleared, as the bits of
+  `BdrLoad_RequestRider` 0x201790. Caller `cFE3D` vf12 0x266df8 at 0x266e4c (fe_scene.rs LOAD_OPTIONS).
+- `AsyncBdrLoad_SetManagers` 0x201c10 (p, a, b, c), no callers: +8, +0xc, +0x10 = a, b, c, the managers
+  `AsyncBdrLoad_FreeSlot` 0x201c20 frees through (rider meshes, board mesh, textures; vtable slot 0x5c).
+- Sony's IOP side (host): `sceSifGetSreg` 0x308970 (0x407a80[i]); `SifRpc_AllocPacket` 0x309250 (DIntr, first free
+  of the rpc's 0x40-byte packets, +0x10 = (i << 16) | 5, request id counter skipping 0) / `SifRpc_FreePacket`
+  0x3092f8; `Fio_Intr` 0x30a140 (the fileio RPC receive handler `sceFsInit` registers: copies the tail bytes of a
+  read, dread, getstat and the ≤ 0x400-byte replies of commands 0x17 / 0x19 / 0x1a, then `iSignalSema`);
+  `Fio_VersionMismatch` 0x30a728 (from `sceOpen`: the IOP's version at 0x40a668 against "2240" and "....");
+  `SifLoad_GetIopVal` 0x30df80 / `SifLoad_SetIopVal` 0x30e070 (loadfile RPC 3 / 2, byte / half / word).
+- The Deci2 TTY (strings "TTY: ..." 0x3bb208..0x3bb260, protocol 0x210): `sceTtyInit` 0x307f08
+  (`sceDeci2Open(0x210, 0x407550, sceTtyHandler)`), `sceTtyHandler` 0x307b50, `sceTtyWrite` 0x307ce8 (from
+  `write`; \n → \r\n, ≤ 0x100 bytes), `sceTtyRead` 0x307e38 (from `read`; up to \n or \r), the ring at 0x407440
+  {size, count, read, write, data} (`TtyRing_Init` 0x307aa8, `_Push` 0x307ad0, `_Pop` 0x307b10), `Tty_Reset`
+  0x306c50 (from `sceSifSyncIop`), `Intc_WaitVblankStart` 0x306ca0 (no callers; waits INTC_STAT bit 2).
+- Kernel printf: `Sio_PutcRaw` 0x307fc8 (waits SIO_ISR & 0x8000, writes TXFIFO), `Sio_Putc` 0x3080b0 (\n → \r\n,
+  the default putc hook at 0x35f620), `Kprintf_Vformat` 0x3082e0 (fmt, va, through the hook), `Kprintf_Printf`
+  0x3088a8, `Kprintf_PutcBuffered` 0x308000 (line buffer 0x407800, flushed at \n or 126 chars; `scePrintf`
+  0x3088e0 swaps it in), `Kprintf_PrintDouble` 0x308178 ("0.%d" and "e+%d" / "e%d"), `Kprintf_DoubleToInt`
+  0x3080e8 (rounded, 0 if tiny, 9999 if too big).
+- A second libgcc copy after the SDK: `__divdi3_2` 0x30e4d8 (signed 64-bit divide, negates at entry; used by the
+  kernel printf), `__moddi3` 0x30edb0, `__umoddi3` 0x30f418 (callers `_strtol_r`, `_strtoul_r`, `_vfprintf_r`,
+  `_vfiprintf_r`, `Kprintf_Vformat`). Lead: `__divdi3` 0x2f54e8 has no sign handling at its entry, so it may be
+  `__udivdi3` (not renamed).
+
+Still unclear: 0x1cf648 / 0x1cf698 (no callers; dispatch through the memory card overlay's +0x428 vtable), the
+errno stubs 0x306df8 / 0x306f38 / 0x306f60 (errno 5, −1), 0x307438 / 0x307490, libmpeg 0x2ea820..0x2f0e90, and the
+lib-snd runs 0x2d6cc0..0x2da7e0 and 0x2e1760..0x2e3620.

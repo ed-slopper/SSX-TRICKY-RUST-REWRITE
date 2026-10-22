@@ -207,3 +207,10 @@ case-insensitive walk of a kind's list) stays for the app's intro until it moves
 
 `Camera_FocusFromMainPath` 0x1739f0 (Rust `camera_ctl::focus_from_main_path`): +0x42c..+0x434 from the main AI path's
 +0xc..+0x14 (`AIPathSet_GetMainPath` 0x337fb8). No callers in Ghidra.
+
+## Names from F1c batch 30 (proven)
+
+- `CamCamera_Update` 0x16ddd0 (no callers in Ghidra): calls `CamView_Update` 0x1703b8 on the camera's view (+4,
+  what `CamCamera_GetView` 0x16dda8 returns), then jumps to `CamLens_Update` 0x1730d8 on the view's lens (+4 +0x120,
+  `CamCamera_GetLens` 0x16ddb8). Both are empty (`jr ra`) in this build; the verb is inferred from their place.
+  0x1730d8 was not a function in Ghidra (8 bytes after `CamLens_SetHeight` 0x1730c0); made one.

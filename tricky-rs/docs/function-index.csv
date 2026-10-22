@@ -118,7 +118,7 @@ address,size,name,system,status
 0x10dad8,460,Ragdoll_InitFromBoarder,wipeout,ported
 0x10dca8,1252,Ragdoll_Step,wipeout,ported
 0x10e190,2616,Ragdoll_Contacts,wipeout,ported
-0x10ebc8,8,FUN_0010ebc8,wipeout?,not started
+0x10ebc8,8,Ragdoll_OnContact,wipeout,not started
 0x10ebd0,408,Ragdoll_HitNode,wipeout,not started
 0x10ed68,1040,Ragdoll_HitRoller,wipeout,ported
 0x10f178,2088,Wipeout_StartGetUp,wipeout,ported
@@ -232,7 +232,7 @@ address,size,name,system,status
 0x1164c0,20,cAIWorld::SaveSnapshot,save,checked
 0x1164d8,236,cAIWorld::vf8_1164d8,ai,checked
 0x1165c8,124,StaticInit_AIWorld,ai?,not started
-0x116648,8,thunk_FUN_00115dc0,runtime,host
+0x116648,8,thunk_FUN_00115dc0,runtime,ported
 0x116650,20,cAIWorld::~cAIWorld,ai,not started
 0x1166a0,80,cAIWorld::__tf,runtime,host
 0x1166f0,184,Boarder_GatherWorldEmitters,boarder,ported
@@ -1442,7 +1442,7 @@ address,size,name,system,status
 0x16dd68,60,CamCamera::CamCamera,camera,ported
 0x16dda8,16,CamCamera::GetView,camera,checked
 0x16ddb8,20,CamCamera::GetLens,camera,checked
-0x16ddd0,56,FUN_0016ddd0,camera?,not started
+0x16ddd0,56,CamCamera_Update,camera,not started
 0x16de00,124,StaticInit_CamCamera,camera,not started
 0x16de80,80,CamCamera::__tf,runtime,host
 0x16ded0,8,CamCamera::~CamCamera,camera,ported
@@ -1471,7 +1471,7 @@ address,size,name,system,status
 0x16fb08,856,Camera_CollidePush,camera,ported
 0x16fe60,1340,Camera_CollideWorld,camera,ported
 0x1703a0,20,CamView_SetTarget,other,checked
-0x1703b8,8,FUN_001703b8,camera?,not started
+0x1703b8,8,CamView_Update,camera?,not started
 0x1703c0,124,StaticInit_Camera,camera,not started
 0x170440,44,Vec4_Scale,camera?,ported
 0x170470,60,CamPath::CamPath,camera?,ported
@@ -1498,6 +1498,7 @@ address,size,name,system,status
 0x172268,64,cOfflineObject::__tf,runtime,host
 0x1722e8,3540,CamCamera_EvalLookAt,camera,ported
 0x1730c0,24,CamLens_SetHeight,camera?,checked
+0x1730d8,8,CamLens_Update,other,not started
 0x1730e0,124,StaticInit_CamCamera2,camera,not started
 0x1731f8,116,Camera_ResetRiderTrack,camera,checked
 0x173270,1456,Camera_TrackRider,camera,ported
@@ -1865,7 +1866,7 @@ address,size,name,system,status
 0x186168,8,cCourseResolve::~cCourseResolve,race,checked
 0x186170,64,FUN_00186170,race?,checked
 0x1861b0,64,FUN_001861b0,race?,checked
-0x1861f0,40,FUN_001861f0,frontend?,checked
+0x1861f0,40,CourseTable_Construct,race,checked
 0x186218,76,CourseTable_Delete,race,checked
 0x186268,224,Course_OpenModelsBig,race,checked
 0x186348,8,CourseTable_Destruct,race,checked
@@ -2669,8 +2670,8 @@ address,size,name,system,status
 0x1c08f0,48,Gfx_RemoveVif1Handler,render,not started
 0x1c0920,56,Gfx_StartVif1Irq,render,not started
 0x1c0958,52,Gfx_StopVif1Irq,render,not started
-0x1c0990,52,FUN_001c0990,render?,not started
-0x1c09c8,8,FUN_001c09c8,render?,not started
+0x1c0990,52,Gfx_ResetVif1IrqCounts,render,not started
+0x1c09c8,8,Gfx_UpdateVif1Irq,render,not started
 0x1c09d0,396,Gfx_SaveFpRegs,save,not started
 0x1c0b60,268,Gfx_RestoreFpRegs,render,not started
 0x1c0c70,100,Gfx_Vif1Interrupt,render,not started
@@ -3350,14 +3351,14 @@ address,size,name,system,status
 0x2010c8,80,BdrLoad_LoadRider,render?,ported
 0x201118,32,BdrLoad_AddPart,render?,not started
 0x201138,1616,BdrLoad_BuildSkin,boarder?,ported
-0x201788,8,FUN_00201788,frontend?,not started
+0x201788,8,AsyncBdrLoad_SetMode,frontend?,not started
 0x201790,676,BdrLoad_RequestRider,boarder?,ported
 0x201a38,32,BdrLoad_FERequest,other,ported
 0x201a98,32,BdrLoad_DefaultRequest,other,not started
-0x201ad8,52,FUN_00201ad8,frontend?,ported
+0x201ad8,52,BdrLoad_FEBoardRequest,frontend?,ported
 0x201b50,60,AsyncBdrLoad_Init,frontend?,ported
 0x201b90,128,cAsyncBdrLoad::~cAsyncBdrLoad,files,not started
-0x201c10,16,FUN_00201c10,,not started
+0x201c10,16,AsyncBdrLoad_SetManagers,other,not started
 0x201c20,272,AsyncBdrLoad_FreeSlot,common?,ported
 0x201d30,308,AsyncBdrLoad_IsSlotReady,other,ported
 0x201e68,912,AsyncBdrLoad_Request,boarder?,ported
@@ -3458,7 +3459,7 @@ address,size,name,system,status
 0x208ed8,432,AsyncSys_QueueLoad,audio?,not started
 0x209088,896,AsyncSys_CancelBank,audio?,ported
 0x209408,1676,AsyncSys_Update,audio?,not started
-0x209a98,8,FUN_00209a98,frontend?,not started
+0x209a98,8,AsyncSys_CancelAll,frontend?,not started
 0x209aa0,8,AsyncSys_PopNext,audio?,not started
 0x209af0,80,cAsyncSys::__tf,runtime,host
 0x209b40,88,FUN_00209b40,audio?,ported
@@ -3575,7 +3576,7 @@ address,size,name,system,status
 0x2116d8,648,Audio_RaceInit,audio,ported
 0x211960,440,Audio_ShutdownRace,audio,ported
 0x211b18,60,Audio_FreeCourseAudio,audio,ported
-0x211b58,596,Audio_StopRaceAudio,audio,not started
+0x211b58,596,Audio_StopRaceAudio,audio,ported
 0x211db0,184,SndMgr_SetVolume,frontend?,ported
 0x211f20,20,SndMgr_GetVolume,frontend?,ported
 0x211f38,20,SndMgr_GetSlot,audio?,ported
@@ -3585,7 +3586,7 @@ address,size,name,system,status
 0x211fb8,92,Audio_FadeMusicTo,audio,not started
 0x212018,504,Audio_UpdateMusicFade,audio,not started
 0x212210,92,Audio_SetSpeechLevel,audio,ported
-0x212270,16,FUN_00212270,save?,ported
+0x212270,16,Audio_SetMusicFx,audio,ported
 0x212280,68,cBXAudio::vf1_212280,audio,not started
 0x212300,68,Audio_PlayFESound32Gated,audio,ported
 0x212348,48,Audio_PlayFESound30,audio,ported
@@ -3706,8 +3707,8 @@ address,size,name,system,status
 0x21e498,40,Audio_ScheduleWorldTriggersOn,audio,not started
 0x21e4f0,44,Audio_ResumeAfterSpeech,audio,ported
 0x21e528,108,Audio_CheerForRider,audio,ported
-0x21e688,8,FUN_0021e688,frontend?,ported
-0x21e690,28,FUN_0021e690,frontend?,not started
+0x21e688,8,Audio_GetMusicFx,audio,ported
+0x21e690,28,Audio_GetMusicFxThunk,audio,not started
 0x21e6c0,28,cBXAudio::vf3_21e6c0,audio,ported
 0x21e6e8,80,cBXAudio::__tf,runtime,host
 0x21e738,80,SnowProgram_Destruct,game?,not started
@@ -4270,7 +4271,7 @@ address,size,name,system,status
 0x23bcc0,80,BigArchive_Close,frontend?,ported
 0x23bd10,128,cAsyncBigFile::cAsyncBigFile,files,ported
 0x23bd90,148,cAsyncBigFile::~cAsyncBigFile,files,ported
-0x23be28,20,BigFile_ClearTable,files,not started
+0x23be28,20,BigFile_ClearTable,files,ported
 0x23be90,8,cAsyncBigFile::vf1_23be90,files,not started
 0x23be98,8,cAsyncBigFile::vf3_23be98,files,ported
 0x23bea0,8,cAsyncBigFile::vf2_23bea0,files,ported
@@ -5056,7 +5057,7 @@ address,size,name,system,status
 0x26fd48,64,cListOperator::__tf,runtime,host
 0x26fe00,80,cListFE3DOffsetOp::__tf,runtime,host
 0x26fe50,92,FE3DWorld_FindByHash,frontend?,checked
-0x26feb0,8,thunk_FUN_002ac178,runtime,host
+0x26feb0,8,thunk_FUN_002ac178,runtime,ported
 0x26feb8,136,FEWorld_Render,frontend?,checked
 0x26ff40,68,FE3DTextList_RenderAll,frontend?,checked
 0x26ff88,68,FE3D_UpdateAll,frontend?,checked
@@ -6034,9 +6035,9 @@ address,size,name,system,status
 0x2bab80,64,cVideoPlayer::__tf,runtime,host
 0x2bac00,64,StaticInit_VideoPlayer,other,not started
 0x2bac40,56,StaticDtor_VideoPlayer,other,not started
-0x2bac78,244,FUN_002bac78,audio?,not started
-0x2bad70,48,FUN_002bad70,audio?,ported
-0x2bada0,28,FUN_002bada0,audio?,not started
+0x2bac78,244,SpeechLib_AddEventBank,audio?,not started
+0x2bad70,48,SpeechLib_RegisterEventBank,audio?,ported
+0x2bada0,28,SpeechLib_RegisterEventBank0,audio?,not started
 0x2badc0,72,SpeechLib_ClearIdCounts,audio?,ported
 0x2bae08,124,SpeechLib_CalcBufferBytes,audio?,checked
 0x2baeb8,24,FUN_002baeb8,audio?,ported
@@ -6130,7 +6131,7 @@ address,size,name,system,status
 0x2bea48,360,SpeechLib_GetRowInfo,lib-snd?,ported
 0x2bebb0,52,SpeechLib_GetTime,lib-snd?,ported
 0x2bebe8,128,SpeechLib_Fatal,lib-snd?,checked
-0x2bec68,56,FUN_002bec68,audio?,checked
+0x2bec68,56,SpeechLib_Printf,audio?,checked
 0x2beca0,180,Path_Init,audio?,checked
 0x2bed58,92,PathX_SelectSong,audio?,checked
 0x2bedb8,52,Path_OnDriverStop,audio?,checked
@@ -7331,8 +7332,8 @@ address,size,name,system,status
 0x306be0,16,sceSifSetReg,kernel?,host
 0x306bf0,16,sceSifGetReg,kernel?,host
 0x306c10,16,Deci2Call,kernel?,host
-0x306c50,12,FUN_00306c50,kernel?,host
-0x306ca0,96,FUN_00306ca0,kernel?,host
+0x306c50,12,Tty_Reset,kernel?,host
+0x306ca0,96,Intc_WaitVblankStart,kernel?,host
 0x306d00,124,write,kernel?,host
 0x306d80,116,read,kernel?,host
 0x306df8,40,FUN_00306df8,kernel?,host
@@ -7375,22 +7376,22 @@ address,size,name,system,status
 0x307a30,36,sceDeci2ExLock,sdk?,host
 0x307a58,36,sceDeci2ExUnLock,sdk?,host
 0x307a80,36,kputs,sdk?,host
-0x307aa8,36,FUN_00307aa8,sdk?,host
-0x307ad0,60,FUN_00307ad0,sdk?,host
-0x307b10,60,FUN_00307b10,sdk?,host
-0x307b50,400,FUN_00307b50,sdk?,host
-0x307ce8,336,FUN_00307ce8,sdk?,host
-0x307e38,208,FUN_00307e38,sdk?,host
-0x307f08,188,FUN_00307f08,sdk?,host
-0x307fc8,56,FUN_00307fc8,sdk?,host
-0x308000,176,FUN_00308000,sdk?,host
-0x3080b0,52,FUN_003080b0,sdk?,host
-0x3080e8,144,FUN_003080e8,sdk?,host
-0x308178,352,FUN_00308178,sdk?,host
-0x3082e0,1476,FUN_003082e0,sdk?,host
-0x3088a8,56,FUN_003088a8,sdk?,host
+0x307aa8,36,TtyRing_Init,sdk?,host
+0x307ad0,60,TtyRing_Push,sdk?,host
+0x307b10,60,TtyRing_Pop,sdk?,host
+0x307b50,400,sceTtyHandler,sdk?,host
+0x307ce8,336,sceTtyWrite,sdk?,host
+0x307e38,208,sceTtyRead,sdk?,host
+0x307f08,188,sceTtyInit,sdk?,host
+0x307fc8,56,Sio_PutcRaw,sdk?,host
+0x308000,176,Kprintf_PutcBuffered,sdk?,host
+0x3080b0,52,Sio_Putc,sdk?,host
+0x3080e8,144,Kprintf_DoubleToInt,sdk?,host
+0x308178,352,Kprintf_PrintDouble,sdk?,host
+0x3082e0,1476,Kprintf_Vformat,sdk?,host
+0x3088a8,56,Kprintf_Printf,sdk?,host
 0x3088e0,96,scePrintf,sdk?,host
-0x308970,24,FUN_00308970,sdk?,host
+0x308970,24,sceSifGetSreg,sdk?,host
 0x3089b8,640,sceSifInitCmd,sdk?,host
 0x308c38,52,sceSifExitCmd,sdk?,host
 0x308c70,24,sceSifSetCmdBuffer,sdk?,host
@@ -7403,8 +7404,8 @@ address,size,name,system,status
 0x308fd8,172,DCache_WritebackInvalidate,sdk?,host
 0x309088,412,sceSifInitRpc,sdk?,ported
 0x309228,36,sceSifExitRpc,sdk?,host
-0x309250,168,FUN_00309250,sdk?,host
-0x3092f8,28,FUN_003092f8,sdk?,host
+0x309250,168,SifRpc_AllocPacket,sdk?,host
+0x3092f8,28,SifRpc_FreePacket,sdk?,host
 0x309318,48,SifRpc_GetPacket,sdk?,host
 0x309348,64,SifRpc_GetFPacket,sdk?,host
 0x309388,180,SifRpc_OnEnd,sdk?,host
@@ -7424,12 +7425,12 @@ address,size,name,system,status
 0x309fe8,92,Fio_InitFdSema,sdk?,host
 0x30a048,136,Fio_AllocFd,sdk?,host
 0x30a0d0,108,Fio_GetFd,sdk?,host
-0x30a140,948,FUN_0030a140,sdk?,host
+0x30a140,948,Fio_Intr,sdk?,host
 0x30a4f8,76,Fio_InitSema,sdk?,host
 0x30a548,44,Fio_Lock,sdk?,host
 0x30a578,12,Fio_Unlock,sdk?,host
 0x30a588,416,sceFsInit,sdk?,host
-0x30a728,140,FUN_0030a728,sdk?,host
+0x30a728,140,Fio_VersionMismatch,sdk?,host
 0x30a7b8,52,sceFsReset,sdk?,ported
 0x30a7f0,644,sceOpen,sdk?,host
 0x30aa78,380,sceClose,sdk?,host
@@ -7474,8 +7475,8 @@ address,size,name,system,status
 0x30de10,28,FUN_0030de10,sdk?,host
 0x30de30,260,SifLoad_ElfCmd,sdk?,host
 0x30df38,28,sceSifLoadElf,sdk?,host
-0x30df80,236,FUN_0030df80,sdk?,host
-0x30e070,220,FUN_0030e070,sdk?,host
+0x30df80,236,SifLoad_GetIopVal,sdk?,host
+0x30e070,220,SifLoad_SetIopVal,sdk?,host
 0x30e150,304,sceSifResetIop,sdk?,host
 0x30e280,40,sceSifIsAliveIop,sdk?,host
 0x30e2a8,72,sceSifSyncIop,sdk?,ported
@@ -7485,9 +7486,9 @@ address,size,name,system,status
 0x30e460,16,RFU116_SetSyscall,sdk?,host
 0x30e470,64,FUN_0030e470,sdk?,host
 0x30e4b0,36,_InitSys,sdk?,host
-0x30e4d8,1772,FUN_0030e4d8,sdk?,host
+0x30e4d8,1772,__divdi3_2,runtime,host
 0x30ebc8,92,__fixdfdi,runtime,host
 0x30ec28,236,__fixunsdfdi,runtime,host
 0x30ed18,152,__floatdidf,runtime,host
-0x30edb0,1628,FUN_0030edb0,sdk?,host
-0x30f418,1332,FUN_0030f418,sdk?,host
+0x30edb0,1628,__moddi3,runtime,host
+0x30f418,1332,__umoddi3,runtime,host

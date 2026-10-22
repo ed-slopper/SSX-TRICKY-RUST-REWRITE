@@ -318,3 +318,10 @@ the quiet flag.
 
 Of the 52 mutants, 51 are caught. The survivor is equivalent: the brightness compared as plain floats, where -0 and
 +0 are equal too. Two were first missed: the speech test's answer of 2, and the quiet flag.
+
+## Names from F1c batch 30 (proven)
+
+- `Gfx_ResetVif1IrqCounts` 0x1c0990: zeroes the three pairs +0xc / +0x10 of the VIF1 interrupt record 0x33d7b0
+  (from `Gfx_StartVif1Irq` 0x1c0920; `Gfx_Vif1Interrupt` 0x1c0c70 counts +0xc and writes VIF1_FBRST = 8 when
+  VIF1_STAT & 0x400). `Gfx_UpdateVif1Irq` 0x1c09c8: empty, called each frame by `cPS2GraphicsMan` vf15 0x1dd4f0
+  (at 0x1dd5a4) with 0x33d7b0.

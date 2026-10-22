@@ -263,3 +263,8 @@ Part of the port notes (index: [README.md](README.md)); units and wording as des
 - Our riders' shoves go through `hit::shove` (`props::shove_push`; STANDIN frame: heading, right, world up, the
   position; shove heading 0 right, π left). Still STANDIN: the collision body (our riders have no game skeleton in
   the game crate, so one sphere), the pair records (not kept), the hop.
+
+## Names from F1c batch 30 (proven)
+
+- `Ragdoll_OnContact` 0x10ebc8: empty. `Ragdoll_Contacts` calls it at 0x10eb4c for each contact with the ragdoll
+  and the contact's other object (its +0x60 − 0x82c; 0 when none or the ragdoll itself).

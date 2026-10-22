@@ -967,3 +967,20 @@ Still unclear: 0x2e5490 (the index in 0x358c38 of the entry whose voice validate
 (+8 = 1.5 · (+0xc · +4) / 32768), 0x2e0828, 0x2e0610, the three return-0 stubs 0x2e52d0 / 0x2e52d8 / 0x2e52e0
 (from `SndStreamVoice_CalcMemSize`, `_Create`, `_Destroy`), 0x2dd278 (flags 0x20 / 0x40 paths), and the
 earlier batch 25 list.
+
+## Names from F1c batch 30 (proven)
+
+- `Audio_SetMusicFx` 0x212270 / `Audio_GetMusicFx` 0x21e688: set / get the audio word +0x3844. Set by
+  `Profile_ApplyAudioSettings` 0x161a98 and the sound options screen (`cFE3DSound` vf34 0x270b18, after the five
+  volumes and the speech level; vf54 0x271130); read by `Sfx_SpinTrickStart` 0x218b78 (the spin sound 0x77 in
+  slot 4 plays only when it is set), `Profile_SyncAudioSettings`, `cFE3DSound` vf53 and `Audio_TrickyTrigger`
+  0x21c610. What the flag means is inferred (musichost.rs: "music on"; career.rs: "the output mode").
+  `Audio_GetMusicFxThunk` 0x21e690: a wrapper with no callers.
+- `SpeechLib_AddEventBank` 0x2bac78 (bank): a bank with the halfword 0x803 header; reads its kinds
+  (`SpeechBank_GetKinds`), refuses (0) if one of the 8 slots {bank, word} at 0x348e08 has the same kinds (+9, +8),
+  else stores it in the first free one and returns 1. `SpeechLib_RegisterEventBank` 0x2bad70 (bank, i): calls it
+  only when i < 8 (speechload.rs REGISTER; caller `Speech_LoadEvents` 0x227d70). `SpeechLib_RegisterEventBank0`
+  0x2bada0: (bank, 0), no callers.
+- `SpeechLib_Printf` 0x2bec68: an empty variadic (stores its arguments and returns), no callers.
+- `AsyncSys_CancelAll` 0x209a98 (sys): `AsyncSys_PopQueue(sys, 1)`, the flag that empties all four queues.
+  Callers: `AsyncSys_Shutdown`, `Audio_Shutdown`, `Audio_ShutdownRace`, `Audio_StopMusicAndSpeech`.
