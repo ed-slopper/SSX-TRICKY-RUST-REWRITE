@@ -6586,18 +6586,20 @@ address,size,name,system,status
 0x2d6910,24,FUN_002d6910,lib-snd?,not started
 0x2d6928,236,Snd_Rand,lib-snd?,not started
 0x2d6a18,180,SndHandle_SetPitchBend,lib-snd?,not started
-0x2d6ad0,52,FUN_002d6ad0,lib-snd?,not started
+0x2d6ad0,52,Dts_InstallEncoder,lib-snd?,not started
 0x2d6b08,128,Dma_ToScratchpad,lib-snd?,not started
 0x2d6b88,128,Dma_FromScratchpad,lib-snd?,not started
 0x2d6c08,180,SndBits_Write,lib-snd?,not started
-0x2d6cc0,1240,FUN_002d6cc0,lib-snd?,not started
+0x2d6cc0,1240,Dts_WriteFrameHeader,lib-snd?,not started
 0x2d7198,436,FUN_002d7198,lib-snd?,not started
 0x2d7350,892,FUN_002d7350,lib-snd?,not started
 0x2d76d0,1056,FUN_002d76d0,lib-snd?,not started
 0x2d7af0,1096,FUN_002d7af0,lib-snd?,not started
 0x2d7f38,2288,FUN_002d7f38,lib-snd?,not started
 0x2d8828,1468,FUN_002d8828,lib-snd?,not started
-0x2d9220,752,FUN_002d9220,lib-snd?,not started
+0x2d8de8,140,Dts_GetWorkSize,other,not started
+0x2d8e78,932,Dts_Init,other,not started
+0x2d9220,752,Dts_EncodeFrame,lib-snd?,not started
 0x2d9510,92,FUN_002d9510,lib-snd?,not started
 0x2d9570,124,FUN_002d9570,lib-snd?,not started
 0x2d95f0,216,FUN_002d95f0,lib-snd?,not started
@@ -6696,8 +6698,8 @@ address,size,name,system,status
 0x2df8c0,8,FUN_002df8c0,lib-snd?,not started
 0x2df8c8,172,SndStreamVoice_Stop,lib-snd?,not started
 0x2df978,60,SndStreamVoice_Destroy,lib-snd?,not started
-0x2df9b8,588,FUN_002df9b8,lib-snd?,not started
-0x2dfc08,100,FUN_002dfc08,lib-snd?,not started
+0x2df9b8,588,SndStreamVoice_GetBuffer,lib-snd?,not started
+0x2dfc08,100,SndStreamVoice_Consume,lib-snd?,not started
 0x2dfc70,124,SndStream_FindRequest,lib-snd?,not started
 0x2dfcf0,172,SndHandle_SetFxSend,lib-snd?,not started
 0x2dfda0,216,FUN_002dfda0,lib-snd?,not started
@@ -6733,33 +6735,42 @@ address,size,name,system,status
 0x2e13f8,132,SoftVoice_RemoveFx,lib-snd?,not started
 0x2e1480,92,SndFxChain_Insert,lib-snd?,not started
 0x2e14e0,76,SndFxChain_Remove,lib-snd?,not started
-0x2e1530,72,FUN_002e1530,lib-snd?,not started
-0x2e1578,72,FUN_002e1578,lib-snd?,not started
-0x2e15c0,52,FUN_002e15c0,lib-snd?,not started
-0x2e1600,348,FUN_002e1600,lib-snd?,not started
-0x2e1760,108,FUN_002e1760,lib-snd?,not started
-0x2e17d0,408,FUN_002e17d0,lib-snd?,not started
-0x2e1968,120,FUN_002e1968,lib-snd?,not started
-0x2e19e8,196,FUN_002e19e8,lib-snd?,not started
-0x2e1af0,184,FUN_002e1af0,lib-snd?,not started
-0x2e1be8,288,FUN_002e1be8,lib-snd?,not started
-0x2e1d08,116,FUN_002e1d08,lib-snd?,not started
-0x2e1d80,544,FUN_002e1d80,lib-snd?,not started
-0x2e1ff0,652,FUN_002e1ff0,lib-snd?,not started
-0x2e2280,560,FUN_002e2280,lib-snd?,not started
-0x2e2510,684,FUN_002e2510,lib-snd?,not started
-0x2e27c0,132,FUN_002e27c0,lib-snd?,not started
-0x2e2848,124,FUN_002e2848,lib-snd?,not started
-0x2e28c8,720,FUN_002e28c8,lib-snd?,not started
+0x2e1530,72,SoftMix_RegisterPcm16,lib-snd?,not started
+0x2e1578,72,SoftMix_RegisterXa,lib-snd?,not started
+0x2e15c0,52,SoftMix_RegisterMicroTalk,lib-snd?,not started
+0x2e15f8,8,SndMt_GetPosOneShot,other,not started
+0x2e1600,348,SndMt_PullOneShot,lib-snd?,not started
+0x2e1760,108,SndMt_InitOneShot,lib-snd?,not started
+0x2e17d0,408,SndMt_PullStream,lib-snd?,not started
+0x2e1968,120,SndMt_InitStream,lib-snd?,not started
+0x2e19e0,8,SndPcm_GetPosOneShot,other,not started
+0x2e19e8,196,SndPcm_PullOneShot,lib-snd?,not started
+0x2e1ab0,56,SndPcm_InitOneShot,other,not started
+0x2e1ae8,8,SndPcm_GetPosLoop,other,not started
+0x2e1af0,184,SndPcm_PullLoop,lib-snd?,not started
+0x2e1ba8,64,SndPcm_InitLoop,other,not started
+0x2e1be8,288,SndPcm_PullStream,lib-snd?,not started
+0x2e1d08,116,SndPcm_InitStream,lib-snd?,not started
+0x2e1d80,544,SndXa_PullOneShot,lib-snd?,not started
+0x2e1fa0,8,SndXa_GetPosOneShot,other,not started
+0x2e1fa8,72,SndXa_InitOneShot,other,not started
+0x2e1ff0,652,SndXa_DecodeToLoopEnd,lib-snd?,not started
+0x2e2280,560,SndXa_PullLoop,lib-snd?,not started
+0x2e24b0,8,SndXa_GetPosLoop,other,not started
+0x2e24b8,88,SndXa_InitLoop,other,not started
+0x2e2510,684,SndXa_PullStream,lib-snd?,not started
+0x2e27c0,132,SndXa_InitStream,lib-snd?,not started
+0x2e2848,124,SndXa_TakeBuffered,lib-snd?,not started
+0x2e28c8,720,SndXa_DecodeFrames,lib-snd?,not started
 0x2e2b98,104,SndBits_Read,lib-snd?,not started
 0x2e2c00,80,SndBits_Skip,lib-snd?,not started
-0x2e2c50,580,FUN_002e2c50,lib-snd?,not started
-0x2e2e98,120,FUN_002e2e98,lib-snd?,not started
-0x2e2f10,252,FUN_002e2f10,lib-snd?,not started
-0x2e3010,96,FUN_002e3010,lib-snd?,not started
-0x2e3070,376,FUN_002e3070,lib-snd?,not started
-0x2e31e8,1080,FUN_002e31e8,lib-snd?,not started
-0x2e3620,940,FUN_002e3620,lib-snd?,not started
+0x2e2c50,580,SndMt_ReadExcitation,lib-snd?,not started
+0x2e2e98,120,SndMt_InterpolateOdd,lib-snd?,not started
+0x2e2f10,252,SndMt_RcToLpc,lib-snd?,not started
+0x2e3010,96,SndMt_SynthSubframe,lib-snd?,not started
+0x2e3070,376,SndMt_ParseHeader,lib-snd?,not started
+0x2e31e8,1080,SndMt_DecodeFrame,lib-snd?,not started
+0x2e3620,940,SndMt_LpcSynth,lib-snd?,not started
 0x2e39d0,116,SndFx_PcmOut_Pull,lib-snd?,not started
 0x2e3a48,20,SndFx_PcmOut_Init,lib-snd?,not started
 0x2e3a5c,208,Snd_FloatToPcm16,lib-snd?,not started
@@ -7038,7 +7049,7 @@ address,size,name,system,status
 0x2f5450,48,exit,libc?,ported
 0x2f5480,96,__muldi3,runtime,host
 0x2f54e0,8,cPadDevice::vf8_2f54e0,input,not started
-0x2f54e8,1484,__divdi3,runtime,host
+0x2f54e8,1484,__udivdi3,runtime,host
 0x2f5ab8,300,__pack_d,runtime,host
 0x2f5be8,152,__unpack_d,runtime,host
 0x2f5c88,576,_fpadd_parts,libc?,host
@@ -7359,9 +7370,9 @@ address,size,name,system,status
 0x3073e8,32,iEnableDmac,kernel?,host
 0x307408,32,iDisableDmac,kernel?,host
 0x307428,16,RFU116_SetSyscall,kernel?,host
-0x307438,16,FUN_00307438,kernel?,host
+0x307438,16,Kernel_Copy,kernel?,host
 0x307480,16,RFU091,kernel?,host
-0x307490,212,FUN_00307490,kernel?,host
+0x307490,212,Kernel_ApplyPatch,kernel?,host
 0x307568,216,TopThread,kernel?,host
 0x307640,212,InitThread,kernel?,host
 0x307718,148,iWakeupThread,kernel?,host
@@ -7486,7 +7497,7 @@ address,size,name,system,status
 0x30e460,16,RFU116_SetSyscall,sdk?,host
 0x30e470,64,FUN_0030e470,sdk?,host
 0x30e4b0,36,_InitSys,sdk?,host
-0x30e4d8,1772,__divdi3_2,runtime,host
+0x30e4d8,1772,__divdi3,runtime,host
 0x30ebc8,92,__fixdfdi,runtime,host
 0x30ec28,236,__fixunsdfdi,runtime,host
 0x30ed18,152,__floatdidf,runtime,host

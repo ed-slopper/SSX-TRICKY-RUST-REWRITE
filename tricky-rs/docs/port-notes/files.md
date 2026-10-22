@@ -705,11 +705,31 @@ with four (the render setup 0x1dbad8 and 0x182430 pass the handler's argument), 
   0x3088a8, `Kprintf_PutcBuffered` 0x308000 (line buffer 0x407800, flushed at \n or 126 chars; `scePrintf`
   0x3088e0 swaps it in), `Kprintf_PrintDouble` 0x308178 ("0.%d" and "e+%d" / "e%d"), `Kprintf_DoubleToInt`
   0x3080e8 (rounded, 0 if tiny, 9999 if too big).
-- A second libgcc copy after the SDK: `__divdi3_2` 0x30e4d8 (signed 64-bit divide, negates at entry; used by the
-  kernel printf), `__moddi3` 0x30edb0, `__umoddi3` 0x30f418 (callers `_strtol_r`, `_strtoul_r`, `_vfprintf_r`,
-  `_vfiprintf_r`, `Kprintf_Vformat`). Lead: `__divdi3` 0x2f54e8 has no sign handling at its entry, so it may be
-  `__udivdi3` (not renamed).
+- libgcc's 64-bit division: `__divdi3` 0x30e4d8 (signed, negates at entry; used by the kernel printf; was named
+  `__divdi3_2` here, corrected in batch 31), `__moddi3` 0x30edb0, `__umoddi3` 0x30f418 (callers `_strtol_r`,
+  `_strtoul_r`, `_vfprintf_r`, `_vfiprintf_r`, `Kprintf_Vformat`). The old `__divdi3` 0x2f54e8 is `__udivdi3`
+  (renamed in batch 31).
 
 Still unclear: 0x1cf648 / 0x1cf698 (no callers; dispatch through the memory card overlay's +0x428 vtable), the
 errno stubs 0x306df8 / 0x306f38 / 0x306f60 (errno 5, −1), 0x307438 / 0x307490, libmpeg 0x2ea820..0x2f0e90, and the
 lib-snd runs 0x2d6cc0..0x2da7e0 and 0x2e1760..0x2e3620.
+
+## Names from F1c batch 31 (proven)
+
+- libgcc fix (both in `ghidra/renamed.txt`): 0x2f54e8 `__divdi3` → `__udivdi3` (no sign handling at all: an
+  unsigned 64-bit quotient; callers `Kprintf_Vformat`, `SndVoice_UpdatePitch`, `_malloc_trim_r`, `_strtol_r`,
+  `_strtoul_r`, `_vfprintf_r`, `_vfiprintf_r`), and 0x30e4d8 `__divdi3_2` → `__divdi3` (bgez a0 / negate at
+  entry). One libgcc, not two copies: `__udivdi3` 0x2f54e8, `__divdi3` 0x30e4d8, `__moddi3` 0x30edb0, `__umoddi3`
+  0x30f418.
+- `Kernel_Copy` 0x307438: the kernel syscall 0x5a (Sony's `kCopy`; the name check takes no lower-case-first
+  CamelCase, so it is `Kernel_Copy` here). `Kernel_ApplyPatch` 0x307490 (from `_InitSys` 0x30e4b0): when
+  RCNT3_MODE & 0x100 is clear, copies 0x740 bytes from 0x35ee78 to 0x80076000 and 0x20 bytes from 0x35f5b8 to
+  0x82000 with `Kernel_Copy`, around `RFU116_SetSyscall` and `FlushCache(0)` / `(2)`, then sets syscalls 2..7 again
+  from the table at 0x35f5e8 (RFU091 lookup + `RFU116_SetSyscall`). That this is the old-kernel patch is
+  inferred.
+
+Still unclear: 0x1cf648 / 0x1cf698 (no callers; through the memory card overlay's +0x428 vtable: +0x44 < 1 →
+slots 0xc0 / 0xc4 else 0x78 / 0x7c; +8 == 0 → 0xb0 / 0xb4 else 0x88 / 0x8c), the newlib errno stubs 0x306df8 /
+0x306f38 / 0x306f60 (errno 5, −1, no callers; probably open/unlink/link-style stubs, not provable), libmpeg
+0x2ea820..0x2f0e90.
+

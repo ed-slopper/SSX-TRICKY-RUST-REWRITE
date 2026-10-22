@@ -725,3 +725,5 @@
 19c458 FUN_0019c458 Draw_RectOutline
 19c620 FUN_0019c620 Draw_Triangle
 157978 FUN_00157978 Score_GetTrickName
+2f54e8 __divdi3 __udivdi3
+30e4d8 __divdi3_2 __divdi3

@@ -984,3 +984,54 @@ earlier batch 25 list.
 - `SpeechLib_Printf` 0x2bec68: an empty variadic (stores its arguments and returns), no callers.
 - `AsyncSys_CancelAll` 0x209a98 (sys): `AsyncSys_PopQueue(sys, 1)`, the flag that empties all four queues.
   Callers: `AsyncSys_Shutdown`, `Audio_Shutdown`, `Audio_ShutdownRace`, `Audio_StopMusicAndSpeech`.
+
+## Names from F1c batch 31 (proven)
+
+- Stream voices: `SndStreamVoice_GetBuffer` 0x2df9b8 (voice, channel, &addr, &flag): the stream record
+  0x358c38[voice]; per channel a ring of buffers (+8 read index, +0x14 counts, +0x20 ring size, +0x24 master
+  index); calls the record's +0x34 callback when a buffer is used up; returns the size or −1.
+  `SndStreamVoice_Consume` 0x2dfc08 (voice, channel, n): for the master channel (+0x22) takes n from +0x2c and calls
+  the +0x38 callback (voice, n, +0x3c).
+- Soft-mixer decoders. `SoftVoice_Start` 0x2e0640 picks an init function from the table 0x358cd8[codec base +
+  variant] and a state size from 0x358d44[...]. Codec base: 7 / 8 → 3, 9 → 0 (+0x14 flag 0: no copy), 10 → 6,
+  4 → 9, 0xe → 12, 0xf → 15, 0x10 → 18, 0x40 → 21, else 0. Variant: one-shot 0, loop 1 (when the loop argument
+  > 0), stream 2 (data from the stream voice). An init sets state +4 to the pull function and the args block's
+  [8] to the position getter (kept at voice +0x48). Registered by `SoftMix_Init`:
+  - PCM16, codecs 7 / 8 (`SoftMix_RegisterPcm16` 0x2e1530, states 0x20 / 0x24 / 0x28): `SndPcm_InitOneShot`
+    0x2e1ab0, `SndPcm_PullOneShot` 0x2e19e8 (copies up to the length +0x18, pads with zeros, −1 when done),
+    `SndPcm_GetPosOneShot` 0x2e19e0 (+0x14), `SndPcm_InitLoop` 0x2e1ba8, `SndPcm_PullLoop` 0x2e1af0 (from the end
+    +0x1c back to the loop start +0x18), `SndPcm_GetPosLoop` 0x2e1ae8, `SndPcm_InitStream` 0x2e1d08,
+    `SndPcm_PullStream` 0x2e1be8 (through `SndStreamVoice_GetBuffer` / `_Consume`).
+  - XA ADPCM, codec 10 (`SoftMix_RegisterXa` 0x2e1578, states 0x6c / 0xb4 / 0x74). Proven by the coefficient
+    table 0x35a700 = (0, 0), (240, 0), (460, −208), (392, −220) and frames of 1 header byte (coefficient index in
+    the high nibble, shift = low nibble + 8) and 14 bytes = 28 samples, MMI `phmadh`, clamped to ±32767:
+    `SndXa_DecodeFrames` 0x2e28c8. `SndXa_InitOneShot` 0x2e1fa8, `SndXa_PullOneShot` 0x2e1d80,
+    `SndXa_GetPosOneShot` 0x2e1fa0 (+0x28), `SndXa_InitLoop` 0x2e24b8, `SndXa_PullLoop` 0x2e2280,
+    `SndXa_DecodeToLoopEnd` 0x2e1ff0 (whole frames up to the loop end +0x30, then back to the loop start +0x2c;
+    the samples left over are kept at +0x44), `SndXa_GetPosLoop` 0x2e24b0, `SndXa_InitStream` 0x2e27c0,
+    `SndXa_PullStream` 0x2e2510, `SndXa_TakeBuffered` 0x2e2848 (copies min(n, kept) kept samples out, moves the
+    rest down).
+  - MicroTalk, codec 4 (`SoftMix_RegisterMicroTalk` 0x2e15c0, states 0xd6c / 0xd78; one-shot and stream only).
+    `SndMt_ParseHeader` 0x2e3070 reads bits 1, 4 (0x20 − x), 4 (gain (x + 1) · 8.0) and 6 (64 gains, geometric
+    with ratio 1.04 + 0.001 · x), clears the 12-entry arrays and the 324-float buffer. That this is EA's
+    MicroTalk (UTK) is a lead from the known format; the constants are proven. `SndMt_DecodeFrame` 0x2e31e8,
+    `SndMt_ReadExcitation` 0x2e2c50 (108 samples, Huffman tables 0x35a838 / 0x35aa38, or ± fixed / zero runs),
+    `SndMt_InterpolateOdd` 0x2e2e98 (odd samples from 6 taps 0.59738594 / −0.11459156 / 0.01803268),
+    `SndMt_RcToLpc` 0x2e2f10 (12 reflection coefficients → predictor), `SndMt_SynthSubframe` 0x2e3010 (RcToLpc,
+    then 0x2e3620), `SndMt_LpcSynth` 0x2e3620 (synthesis: inferred from its arguments), `SndMt_InitOneShot`
+    0x2e1760, `SndMt_PullOneShot` 0x2e1600, `SndMt_GetPosOneShot` 0x2e15f8 (+0xd68), `SndMt_InitStream` 0x2e1968,
+    `SndMt_PullStream` 0x2e17d0.
+- DTS output (sound mode 3). `Dts_InstallEncoder` 0x2d6ad0, called by `cPS2SoundManager` vf1 0x226168 only for
+  mode 3 (which then sets manager +8 = 2): 0x353d40 = `Dts_GetWorkSize` 0x2d8de8, 0x353d44 = `Dts_Init` 0x2d8e78
+  (both called by `SND_LoadIopDriver` at 0x2dbcac / 0x2dbd58 with a0 = 1 or 2 by config byte +0x3b == 5, a1 =
+  config byte +0x3e) and 0x353d48 = `Dts_EncodeFrame` 0x2d9220 (called by `SND_MixThread` at 0x2dbb70 between
+  `Vu0_SaveRegs` / `Vu0_RestoreRegs` when byte 0x350ff5 & 2 is set). Proven DTS by `Dts_WriteFrameHeader`
+  0x2d6cc0: it writes with `SndBits_Write` the IEC 61937 preamble 0xF8724E1F, 0x000B3EE8 (data type 11 = DTS type
+  I, burst length) and the DTS sync word 0x7FFE8001, then frame-header fields; the 6-bit channel arrangement is 8
+  when config byte +0 == 1, else 9. `Dts_GetWorkSize` (a0 1 → ×2, 2 → ×4, else −1; a1 < 0x22 → 0xe0, < 0x43 →
+  0x160, < 0x65 → 0x1e0, else −2) returns two sizes ((4·n + 0x3c)·k + 0xa8 and 4·(2n + 0x200) + 0xc00).
+  `Dts_EncodeFrame` (buffers, flags, scratch): odd flags → −3; tables 0x351f00 / 0x352300 / 0x352900 by that
+  0xe0 / 0x160 / 0x1e0 size (copied to the scratchpad with `Dma_ToScratchpad` when work +0xa3c is set); on a flag
+  change writes a new header; per channel 0x2d7350 then 0x2d76d0 (config +0 == 1) or 0x2d7f38; finally 0x2d7af0
+  or 0x2d8828. The stages 0x2d7350..0x2d8828 and the helpers 0x2d9510..0x2da7e0 are not named yet.
+
