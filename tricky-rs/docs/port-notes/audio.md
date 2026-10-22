@@ -738,8 +738,7 @@ Functions already ported under a bare address, named from the code and the Rust 
   0x1002056), and the event's sound `Audio_SetEventBitSound` 0x21c0a0. The bits' meaning is not known, so the names
   say the bit.
 - Not settled: 0x233e10 (roll 9, 0x1002046 with 1; its one caller 0x219258 has no callers and fires it when a
-  value at +0x18 → +0x1c passes 0.875; `speech.rs` calls it `on_boost_full`, unproven), 0x2129f8 and 0x212e98 (long
-  music switches, from `cFE3DSound` vf9 0x270610 and `PauseMenu_UpdateOptionsPage`), 0x223a90 (0x2d2d50 on a slot
+  value at +0x18 → +0x1c passes 0.875; `speech.rs` calls it `on_boost_full`, unproven), 0x223a90 (0x2d2d50 on a slot
   unless its byte +0xe is set; from `Path_OnDriverUpdate`), 0x2d14d0 (the sound library's bank-handle state, prefix
   unknown).
 
@@ -1064,3 +1063,12 @@ earlier batch 25 list.
   +0, data +4, write +8, read +0xc} as `AsyncSys_PopQueue` reads it; used for `cAsyncSys`'s four queues (+0x9f0 /
   +0xa00 / +0xa10 / +0xa20) in `~cAsyncSys` and `~cBXAudio`, and by `Speech_FreeNarration` (+0x7dbc) and
   `Speech_FreeCharScriptSamples` (+0x7dd4).
+
+## Names from F1c batch 33 (proven)
+
+- `Audio_PlayFEVolumeTest` 0x2129f8: called by `cFE3DSound` vf9 0x270610 with −1, 0, 2, 3, 4 or 1. 2 and 3 play
+  sound 0x40 of bank 0 on `SndMgr_GetSlot(slot)`; 4, 0 and −1 go to `Audio_PlayFESound11`; 1 plays nothing.
+- `Audio_PlayPauseVolumeTest` 0x212e98: called by `PauseMenu_UpdateOptionsPage` with 0..4 when a slider's value
+  (×50) changes; 1..4 play sound 0x70 on `Audio_GetVolumeSlot(n)` (audio+0x3848+0xc·n), 0 and −1 have no slot.
+- Inferred: "volume test" (the sample played when a volume slider moves) is read from where they are called (the
+  options pages); the sounds' contents were not listened to.

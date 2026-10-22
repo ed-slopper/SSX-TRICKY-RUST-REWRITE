@@ -741,4 +741,43 @@ slots 0xc0 / 0xc4 else 0x78 / 0x7c; +8 == 0 → 0xb0 / 0xb4 else 0x88 / 0x8c), t
   driver's vf1 0x2b71d0: `sceDeci2Open` protocol 0xe001 and `Sys_AddPollTask` 0x2b7848; +0x1e8 = 1, returns 1),
   `Deci2Host_Wait` 0x2b7c08 (driver vf6 0x2b7488 sends, then pumps `Deci2Comm_PumpReceive` until the reply flag,
   returns the result).
-- Still open: libmpeg 0x2ea820..0x2f0e90 (SDK internals).
+- Still open: libmpeg 0x2ea820..0x2f0e90 (SDK internals); batch 33 named part of it, below.
+
+## Names from F1c batch 33 (proven)
+
+libmpeg, Sony's MPEG-2 decoder on the IPU, as the movie player (vf1 0x2ba560, `VideoPlayer_FeedMpeg` 0x2ba438)
+drives it. Field names follow the MPEG-2 standard (ISO 13818-2), matched by bit widths and start codes; Sony's own
+error strings call the parts `_sequenceScalableExtension` and so on.
+
+- **Feed and reset:** `Mpeg_FeedData` 0x2ea158 (buffer → 0x35c910, size rounded up to 16 → 0x35ca40, then
+  `Mpeg_StartIpuToDma` 0x2eac88: chain tags at 0x404d40 (uncached 0x20404d40), at most 0xfff40 bytes each, tag id 3
+  (ref) or 0 (refe) for the last; IPU_TO TADR = 0x404d40, QWC 0, CHCR 0x105). `Mpeg_Reset` 0x2ea2c8 (from
+  `sceMpegCreate`: sys+0/+4/+8 = 0, mp+8 = 0, sys[0x20] = −1, sys[0x2b] = 0, `Mpeg_StopDma`, picture counter
+  0x35ca44 = 0, `Mpeg_SetMpeg1Mode` 0x2eaa40 (0x35d1f0 = 0, `Ipu_SetMp1` 0x2ed398: IPU_CTRL bit 23)).
+  `Mpeg_ClearRefBuffers` 0x2ea308 (+0x28 = 0 on the six image buffers 0x35c940..0x35c95c), `Mpeg_InitWorkBuffers`
+  0x2eaad8 (work 0x35c900 split at +0, +0x1800, +0x1b00, +0x3300), `Mpeg_IsEnd` 0x2ea2a8 (sys+0, set at sequence
+  end; read by the movie's vf3 0x2ba810), `Mpeg_SetPictureSize` 0x2ead60 (w, h and both >> 4).
+- **Callbacks:** `Mpeg_RunNodataCallback` 0x2ea3e8 (`Mpeg_RunCallback` type 1, run by every IPU wait every 5000
+  spins). `sceMpegCreate` stores the default StopDMA at sys+0x1c (type 2) `Mpeg_DefaultStopDmaCb` 0x2eb610 and
+  RestartDMA at sys+0x24 (type 3) `Mpeg_DefaultRestartDmaCb` 0x2eb620 (both created; they jump to 0x2f0b88 /
+  0x2f0c70 with sys+0x4c). `Mpeg_NextPicture` runs type 5 (time stamp) with pts / dts −1.
+- **IPU bit reader:** `Ipu_GetBits` 0x2eeb80 (FDEC 0x40000000 | n, returns the top n bits), `Ipu_ShowBits` 0x2ee930,
+  `Ipu_SkipBits` 0x2eea68, `Ipu_WaitCmdResult` 0x2ee6c8, `Ipu_DecodeVlc` 0x2ee778 (VDEC 0x30000000 | table << 26;
+  reads IPU_TOP and IPU_BP).
+- **Headers:** `Mpeg_NextStartCode` 0x2eece8 (byte-align, skip to 0x000001), `Mpeg_NextPicture` 0x2eedc0 (0x1b3
+  sequence header → 0x2ead80, 0x1b8 → `Mpeg_ParseGopHeader` 0x2ef3b0, 0x100 → `Mpeg_ParsePictureHeader` 0x2eeee8 and
+  returns picture_coding_type, 0x1b7 sequence end → 0), `Mpeg_ParseExtensions` 0x2eefb8 (0x1b5: 4-bit id into the
+  table 0x35d280 of 11; 0x1b2 user data skipped), `Mpeg_SkipExtraInfo` 0x2ef298, `Mpeg_ParseSliceHeader` 0x2eed50,
+  `Mpeg_CalcPictureNumber` 0x2ef2d0 (running number from temporal_reference, 0x400 wrap). Extensions by id:
+  1 `Mpeg_ParseSequenceExt` 0x2eb3c8 (MPEG-2 mode, `Ipu_SetMp1(0)`; profile/level 0x48 or 0x58 and chroma 4:2:0
+  only), 2 `Mpeg_ParseSeqDisplayExt` 0x2eb530, 3 `Mpeg_ParseQuantMatrixExt` 0x2ef498 (created; intra / non-intra
+  matrices via IPU SETIQ 0x50000000 / 0x58000000, chroma matrices are an error), 4 `Mpeg_ParseCopyrightExt`
+  0x2ef638, 5 `Mpeg_SeqScalableExtUnsupported` 0x2eb5d0, 7 `Mpeg_ParsePictureDisplayExt` 0x2ef548, 8
+  `Mpeg_ParsePictureCodingExt` 0x2ef068 (f_codes; intra_dc_precision, q_scale_type, intra_vlc_format,
+  alternate_scan into IPU_CTRL bits 16-17, 22, 21, 20; picture_structure → 0x35caec), 9
+  `Mpeg_PicSpatialScalableExtUnsupported` 0x2eb5f0, 10 `Mpeg_PicTemporalScalableExtUnsupported` 0x2eb600, 0 and 6
+  `Mpeg_UnknownExt` 0x2eb5e0 (the last four created; each only `Mpeg_Error`s its string).
+- **Decode:** `Mpeg_DecodePicture` 0x2ea820 (no callers found; frame pictures (structure 3) →
+  `Mpeg_DecodeFramePicture` 0x2ea6f8, fields → `Mpeg_DecodeFieldPicture` 0x2ea860).
+- Still open in libmpeg: 0x2ea9d0, 0x2eaa50 (picks the output buffers by picture_structure), the sequence header
+  0x2ead80, 0x2eb220..0x2ec438, 0x2ed3c0..0x2ee4b0 (macroblock decode), 0x2ef6e8..0x2f0e90 (output / CSC / DMA).
