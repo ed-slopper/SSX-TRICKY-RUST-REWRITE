@@ -583,3 +583,180 @@ fn planted_bugs_are_caught() {
         assert!(caught >= 20, "a one-bit error in {name} was caught in only {caught} of 400 ticks");
     }
 }
+
+mod recording;
+use recording::{f32_at, load, u32_le, vec4};
+
+/// The rider as `GroundMotion_Update` reads it, from a recorded rider block (0x600 bytes from the rider), its stats
+/// block, the ground motion object (its phase +8) and the animation's block at rider+0x46c0 (the clip +8).
+fn rider_of(a: &[u8], st: &[u8], motion: &[u8], anim: &[u8]) -> Rider {
+    Rider {
+        p: probe::Rider {
+            pos: vec4(a, 0x140),
+            fwd: vec4(a, 0x180),
+            normal: vec4(a, 0x2a0),
+            ground: vec4(a, 0x2d0),
+            plane_fwd: vec4(a, 0x320),
+            side: vec4(a, 0x330),
+            fall: vec4(a, 0x2b0),
+            x244: f32_at(a, 0x244),
+            stat60: f32_at(st, 0x60),
+            height: f32_at(a, 0x1bc),
+            surface: u32_le(a, 0x290),
+            surface_ticks: u32_le(a, 0x29c),
+            kind: u32_le(a, 0x2e0),
+        },
+        vel: vec4(a, 0x150),
+        up: vec4(a, 0x2c0),
+        board_up: vec4(a, 0x1a0),
+        quat: vec4(a, 0x170),
+        board_side: vec4(a, 0x190),
+        timescale: f32_at(a, 0x12c),
+        boost_level: f32_at(a, 0x130),
+        speed_timer: f32_at(a, 0x134),
+        drag: f32_at(a, 0x160),
+        yaw: f32_at(a, 0x1b0),
+        course_yaw: f32_at(a, 0x370),
+        switch: u32_le(a, 0x1b4),
+        bob: f32_at(a, 0x1c0),
+        wobble: f32_at(a, 0x1cc),
+        lean: f32_at(a, 0x1d8),
+        brake: f32_at(a, 0x1fc),
+        crouch: f32_at(a, 0x208),
+        steer: f32_at(a, 0x214),
+        d1: f32_at(a, 0x294),
+        d2: f32_at(a, 0x298),
+        class: u32_le(a, 0x420),
+        state: u32_le(a, 0x428),
+        mask: u32_le(a, 0x494),
+        stats: Stats { speed: st[0x0e] as f32, edging: st[0x11] as f32, grip: st[0x13] as f32, cubic: st[0x19] as f32, stance: u32_le(st, 0x40) },
+        skating: u32_le(anim, 8) == 0x221,
+        phase: f32_at(motion, 8),
+    }
+}
+
+/// The ground tick over a recorded race (board row F4b3b). For every pair of samples one tick apart in which a rider
+/// is on the snow (motion +0x424 = 2) at both: `GroundMotion_Update` 0x10a0d8 on the rider as recorded at the first,
+/// against the second, field by field. Run three ways: our `ground_motion::update`, and the game's own code in the
+/// function runner (the world of `ground_motion_is_the_originals`) under IEEE adds and under PCSX2's COP1 adder (F4g).
+///
+/// The world's ray cast under `Boarder_ProbeGround` is answered with what the probe left in the second sample (ground
+/// point +0x2d0, normal +0x2a0, surface +0x290, kind +0x2e0; no hit when the kind is 3), so the course is not needed.
+/// `cBoarder::vf7` 0x117198 shapes the inputs (brake, crouch, steer, the probe's side offset) and the spring band
+/// before the motion, so those are taken from the second sample. After the motion the tick still turns the rider's up
+/// (+0x2c0, not compared), caps the speed (the velocity is not compared at the cap or over it), pushes riders apart
+/// (`Boarder_RiderCollisions` 0x123fc8) and may change the control state.
+/// Not in the recording, so not given: the walls (`Boarder_WallCollide` 0x126250 answers no wall) and the instances
+/// (`Boarder_InstanceCollisions` 0x125088 does nothing). The ground motion object is the state manager
+/// *(rider+0x5ae0) + 0x4b0, rider − 0x400 for most riders (window `-400:10`; the test checks its +0xc is the rider),
+/// the clip window `46c0:10`. Needs TRICKY_RECORDING and TRICKY_STATS (lines `rider stats-address hex`).
+#[test]
+fn ground_ticks_against_the_running_game() {
+    let (Ok(paths), Ok(stats)) = (std::env::var("TRICKY_RECORDING"), std::env::var("TRICKY_STATS")) else { return };
+    let stats: Vec<Vec<u8>> = std::fs::read_to_string(&stats).unwrap().lines()
+        .map(|l| { let h = l.split_whitespace().nth(2).unwrap(); (0..h.len()).step_by(2).map(|i| u8::from_str_radix(&h[i..i + 2], 16).unwrap()).collect() })
+        .collect();
+    let path = paths.split(';').next().unwrap();
+    let (n, ticks) = load(path);
+    let (Some(km), Some(ka)) = (ticks[0].extra.iter().position(|(o, _)| *o == -0x400), ticks[0].extra.iter().position(|(o, _)| *o == 0x46c0)) else {
+        eprintln!("{path}: no -400 and 46c0 windows: skipping");
+        return;
+    };
+    let head = std::fs::read_to_string(path).unwrap().lines().next().unwrap().to_string();
+    let addr: Vec<u32> = head.split_whitespace().skip(3).take(n).map(|h| u32::from_str_radix(h, 16).unwrap()).collect();
+    let mut runners = Vec::new();
+    for rules in ["add=n,mul=n,div=n,cvt=n", "add=n,fadd=g1,mul=n,div=n,cvt=n"] {
+        let Some(mut w) = world() else { return };
+        w.r.float_rules = Rules::parse(rules).unwrap();
+        runners.push((rules, w));
+    }
+    let names = [
+        "pos", "vel", "fwd", "board_up", "normal", "fall", "up", "ground", "plane_fwd", "side", "quat", "board_side", "drag", "height", "bob", "wobble",
+        "lean", "phase", "yaw", "surface", "surface_ticks", "kind", "state", "mask",
+    ];
+    // per field: the field's bits (vectors as four words)
+    let fields = |r: &Rider| -> Vec<Vec<u32>> {
+        let b = bits(r);
+        (0..names.len()).map(|f| if f < 12 { b[4 * f..4 * f + 4].to_vec() } else { vec![b[48 + f - 12]] }).collect()
+    };
+    // the fields the motion writes (+0x2c0, the rider's up, it only reads: something after it in the tick turns it)
+    let written: Vec<usize> = (0..names.len()).filter(|&f| names[f] != "up").collect();
+    let one_step = |a: &[u8], b: &[u8]| {
+        let (p, q, v) = (vec4(a, 0x140), vec4(b, 0x140), vec4(a, 0x150));
+        let d = ((q[0] - p[0]).powi(2) + (q[1] - p[1]).powi(2) + (q[2] - p[2]).powi(2)).sqrt();
+        let e = (v[0] * v[0] + v[1] * v[1] + v[2] * v[2]).sqrt() * f32_at(a, 0x12c) / 60.0;
+        e > 1.0 && d > 0.7 * e && d < 1.4 * e
+    };
+    let mut count = vec![vec![0usize; names.len()]; 1 + runners.len()];
+    let (mut skew, mut capped) = (0, 0);
+    let mut whole = vec![0usize; 1 + runners.len()];
+    let (mut pairs, mut other) = (0, 0);
+    for w in ticks.windows(2) {
+        if w[1].tick != w[0].tick + 1 {
+            continue;
+        }
+        for i in 0..n {
+            let (a, b) = (&w[0].riders[i], &w[1].riders[i]);
+            if u32_le(a, 0x424) != 2 || u32_le(b, 0x424) != 2 {
+                continue;
+            }
+            let (ma, mb) = (&w[0].extra[km].1[i], &w[1].extra[km].1[i]);
+            let (na, nb) = (&w[0].extra[ka].1[i], &w[1].extra[ka].1[i]);
+            if u32_le(ma, 0xc) != addr[i] {
+                other += 1;
+                continue;
+            }
+            if !one_step(a, b) {
+                skew += 1;
+                continue;
+            }
+            pairs += 1;
+            let st = &stats[i];
+            let mut rider = rider_of(a, st, ma, na);
+            // what `cBoarder::vf7` 0x117198 moves before the motion, so the motion read it as the second sample holds
+            // it: the input records (value +0, rate +4, target +8; each value moved toward its target by rate / 60:
+            // brake +0x1fc, crouch +0x208, steer +0x214, the probe's side offset +0x244) and the spring band +0x294,
+            // +0x298
+            let after = rider_of(b, st, mb, nb);
+            (rider.brake, rider.crouch, rider.steer, rider.p.x244, rider.d1, rider.d2) = (after.brake, after.crouch, after.steer, after.p.x244, after.d1, after.d2);
+            let want = fields(&rider_of(b, st, mb, nb));
+            let kind = u32_le(b, 0x2e0);
+            let hit = (kind != 3).then(|| Hit { kind, point: vec4(b, 0x2d0), normal: vec4(b, 0x2a0), surface: u32_le(b, 0x290) });
+            let mut got = Vec::new();
+            let mut mine = rider;
+            update(&mut mine, &SURFACE_TABLE, &mut E { log: Vec::new(), hit, wall: false, meter: 0.0 });
+            got.push(fields(&mine));
+            for (_, g) in runners.iter_mut() {
+                *g.hit.borrow_mut() = hit;
+                g.wall.set(false);
+                g.put(&rider);
+                g.r.cpu.set_gpr(4, g.motion as u64);
+                g.r.call(0x10a0d8).unwrap_or_else(|e| panic!("tick {} rider {i}: {e:?}", w[0].tick));
+                got.push(fields(&g.get(&rider)));
+            }
+            // the speed limit after the motion (`cBoarder::vf7` 0x117198: 2788.8394 cm/s, higher while boosting, coming
+            // down 3.472222 a tick) scales the velocity down to it: not compared where the game's speed is at the lowest
+            // limit or over (2788 to leave room for the scaling's rounding)
+            let v = vec4(b, 0x150);
+            let free = (v[0] * v[0] + v[1] * v[1] + v[2] * v[2]).sqrt() < 2788.0;
+            capped += !free as usize;
+            for (k, g) in got.iter().enumerate() {
+                let mut all = true;
+                for &f in &written {
+                    let ok = g[f] == want[f];
+                    if names[f] == "vel" && !free {
+                        continue;
+                    }
+                    count[k][f] += ok as usize;
+                    all &= ok;
+                }
+                whole[k] += all as usize;
+            }
+        }
+    }
+    eprintln!("{path}: ground ticks (motion 2 at both samples): {pairs} compared ({capped} over the speed limit: velocity not compared); left out {other} whose motion object's +0xc is not the rider, {skew} not one update apart");
+    for (k, way) in ["ours (ground_motion::update)".to_string()].into_iter().chain(runners.iter().map(|(r, _)| format!("the game's in the runner, {r}"))).enumerate() {
+        let line: Vec<String> = written.iter().map(|&f| format!("{} {}", names[f], count[k][f])).collect();
+        eprintln!("  {way}: every field {}; {}", whole[k], line.join(", "));
+    }
+}

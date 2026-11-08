@@ -467,6 +467,47 @@ Found (rec8: a 110 s race by hand, 6,585 samples):
 Still to do: the pad and the animation's answers (the rows that port them, G5, would have to be recorded or
 replayed too); the ground tick (F4b3b) and the take-off tick (F4b3c).
 
+## F4b3b: the ground tick from a recorded race (2026-11-08)
+
+`tests/ground_motion.rs` `ground_ticks_against_the_running_game` replays `GroundMotion_Update` 0x10a0d8 over a race:
+every pair of samples one tick apart where a rider is on the snow (motion +0x424 = 2) at both. It runs our
+`ground_motion::update` and the game's own code in the function runner (the world of `ground_motion_is_the_originals`,
+under IEEE adds and under `fadd=g1`) on the first sample and compares with the second, field by field. The course is
+not loaded: the world's ray cast under `Boarder_ProbeGround` is answered with what the probe left in the second sample
+(ground point +0x2d0, normal +0x2a0, surface +0x290, kind +0x2e0). Recording: `pine.py record 100 rec10.txt 0x600
+-400:10 46c0:10 5ae0:4` (the ground motion object and the clip), with `TRICKY_STATS`. The recording reader moved to
+`tests/recording/mod.rs`, shared with `tests/replay.rs`.
+
+Proven (read from the code):
+- The ground motion object is the state manager *(rider+0x5ae0) + 0x4b0 (its +0xc the rider, +8 the phase): rider −
+  0x400 for five riders, rider − 0x3d0 for the one whose manager is rider − 0x880 (left out, as in F4b3a).
+- `cBoarder::vf7` 0x117198 moves the input records before the motion (from 0x117244 on: value +0, rate +4, target +8;
+  the value steps toward the target by rate · 0.016666668): brake +0x1fc, crouch +0x208, steer +0x214 and on to
+  +0x244, the probe's side offset. It also writes the spring band +0x294 / +0x298 (0x11787c, 0x1178cc), the speed
+  timer +0x134 and the body height +0x308. So the motion reads those as the second sample holds them; the test takes
+  brake, crouch, steer, +0x244 and the band from there.
+
+Found (rec10: 100 s raced by hand, 5,991 samples, 6 riders):
+- 19,606 ground pairs. Left out: 3,744 of the sixth rider and 2,612 not one update apart (the position moved by 0 or 2
+  ticks' worth, as in F4b3a). 13,250 compared.
+- Ours and the game's code under IEEE adds give the same count on every field; neither gets a whole tick (the board's
+  turn, `Boarder_RotateAboutAxis`, is off on almost every tick: quaternion 157 of 13,250).
+- The game's code under `fadd=g1`: every written field bit for bit on 12,122 of 13,250 ticks (91.5%); position 12,727,
+  velocity 6,857 of 7,357 (below the speed limit), quaternion 12,642, yaw 12,651, drag 12,904, height 12,635, bob
+  12,806, phase 12,708, lean 13,227, normal, ground, surface and kind 13,250. So, as for the air (F4b3a), the running
+  game's ground tick is its own code with PCSX2's COP1 adder.
+- Not compared: the rider's up (+0x2c0), which the motion only reads and something later in the tick turns, and the
+  velocity where the speed is 2,788 cm/s or more: after the motion `cBoarder::vf7` scales it to the speed limit
+  (2,788.8394 cm/s; it comes down 3.472222 a tick after a boost; seen in the samples: the speed drops by 3.4725 a
+  tick).
+- Inferred, not checked: most of the 1,128 left are the parts of the tick after the motion or outside it: riders
+  near each other pushed apart (`Boarder_RiderCollisions` 0x123fc8; seen: two riders 100 cm apart whose velocities
+  are 7 cm/s off), walls and instances (answered as none), and control-state changes (59 ticks where only the state
+  differs).
+
+Still to do (row F4b3e): the rest of the tick after the motion (the up's turn, the speed limit, the rider collisions)
+ported and replayed, the walls and instances recorded, the sixth rider (its windows sit 0x30 further on).
+
 ## How a row gets to `checked`
 
 1. Port the function (address in its doc comment, AGENTS.md §13).
