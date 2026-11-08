@@ -779,5 +779,82 @@ error strings call the parts `_sequenceScalableExtension` and so on.
   `Mpeg_UnknownExt` 0x2eb5e0 (the last four created; each only `Mpeg_Error`s its string).
 - **Decode:** `Mpeg_DecodePicture` 0x2ea820 (no callers found; frame pictures (structure 3) →
   `Mpeg_DecodeFramePicture` 0x2ea6f8, fields → `Mpeg_DecodeFieldPicture` 0x2ea860).
-- Still open in libmpeg: 0x2ea9d0, 0x2eaa50 (picks the output buffers by picture_structure), the sequence header
-  0x2ead80, 0x2eb220..0x2ec438, 0x2ed3c0..0x2ee4b0 (macroblock decode), 0x2ef6e8..0x2f0e90 (output / CSC / DMA).
+- Still open in libmpeg after batch 33: named in batch 34, below.
+
+## Names from F1c batch 34 (proven)
+
+The rest of libmpeg. Behaviour is read from the code; the split into functions follows the MPEG-2 reference
+decoder's shape (`motion_vectors`, `decode_motion_vector`, `Dual_Prime_Arithmetic`, `form_predictions`), matched
+by what each does, not by any name in the binary. Globals: 0x35caec picture_structure (1 top, 2 bottom, 3 frame),
+0x35cabc picture_coding_type (1 I, 2 P, 3 B), 0x35ca68 / 0x35ca6c width / height in macroblocks, 0x35ca48 the
+"error, resync at the next slice" flag, 0x35d1b8 which of the two macroblock work slots (0x140 bytes each, from
+0x35cf38) is in use, 0x35ca5c "waiting for the second field".
+
+- **Sequence and buffers:** `Mpeg_ParseSequenceHeader` 0x2ead80 (from `Mpeg_NextPicture` on 0x1b3: 12-bit width /
+  height → 0x35ca60 / 0x35ca64 ("vertical size > 2800" if over 0xaf0), aspect 0x35ca70, frame rate 0x35ca74, bit
+  rate 0x35ca78, vbv 0x35ca7c, constrained 0x35ca80; the two load_*_quantiser_matrix bits: 1 = IPU SETIQ reads the
+  matrix from the stream, 0 = `Ipu_LoadQuantMatrixDma` 0x2eb308 sends the default from 0x35c9c0 / 0x35ca00 (4 qw on
+  IPU_TO, then SETIQ 0x50000000 / 0x58000000); then `Mpeg_ParseExtensions`; MPEG-1 forces frame / progressive; on a
+  size change frees and reallocates three 0x1800-per-macroblock buffers at sys+0xfc/+0x100/+0x104 and
+  `Mpeg_SetImageBuffers` 0x2eb220 points the nine image descriptors 0x35cb90..0x35ced0 at them (uncached; the
+  bottom-field ones at +0x180 per 512 pixels), each sized by `Mpeg_SetPictureSize`).
+  `Mpeg_SetupPictureBuffers` 0x2ef880 (I/P pictures swap the forward / backward references 0x35c940..0x35c95c, B
+  pictures decode into 0x35c948 / 0x35c954 / 0x35c960; the current targets go to 0x35cb84 (frame) / 0x35cb88 (top) /
+  0x35cb8c (bottom); copies the picture's type, structure, time stamps into the target descriptor +0x18..+0x60;
+  returns whether the references it needs are decoded (+0x28 == 1)).
+- **Picture decode:** `Mpeg_DecodePictureData` 0x2ef6e8 ("odd number of field pictures", "unknown picture
+  sutructure"; on success marks the target +0x28 = 1) → `Mpeg_DecodeSlices` 0x2ed860 (resets the work slot,
+  repeats `Mpeg_DecodeSlice` while it returns 1 (error, resync) or 3 (slice ended); "= Skip to the next picture ="
+  on 1 / 2) → `Mpeg_DecodeSlice` 0x2edab0 (returns 0 picture done, 1 error, 2 fatal, 3 next slice; "Too many
+  macroblocks in picture"), `Mpeg_StartSlice` 0x2ed988 (slice_start_code 0x101..0x1af, else "slice_start_code(0x%08x)
+  out of range"; first macroblock address from slice_vertical_position, quantiser, `Mpeg_GetMbAddrInc`; clears the
+  eight PMVs; on error prints "_sliceA0(): error happens", so Sony's own name is probably `_sliceA0`, inferred),
+  `Mpeg_GetMbAddrInc` 0x2ed750 (VLC table 0; 0x22 stuffing (and the MPEG-1 11-bit 0xf), 0x23 escape +33; anything
+  else invalid: "Invalid macroblock_address_increment code").
+- **Macroblock:** `Mpeg_DecodeMacroblock` 0x2edd80 (picture_coding_type into IPU_CTRL bits 24-26; macroblock_type by
+  VLC table 1 ("Invalid macroblock_type code: 0"); frame/field_motion_type, dct_type, quantiser_scale_code 0x35cb80;
+  forward / backward vectors (MPEG-1 → `Mpeg_MotionVector` with full_pel 0x35cac4 / 0x35cacc and f 0x35cac8 /
+  0x35cad0; MPEG-2 → `Mpeg_MotionVectors` with f_codes 0x35cad8..0x35cae4); concealment marker bit; coded or intra
+  starts IPU BDEC 0x20000000 (intra << 27, DCR 0x35cb7c << 26, dct_type << 25, qsc << 16) into the slot's buffer by
+  IPU_FROM 0x30 qw; resets PMVs on intra without concealment and in P pictures without forward motion).
+  `Mpeg_SkippedMacroblock` 0x2edcb0 ("skiped macroblock in I picure is not allowed"; P zeroes the PMVs).
+  `Mpeg_MotionVectors` 0x2ee330 (one vector with optional field select, or two field vectors),
+  `Mpeg_MotionVector` 0x2ee4b0 (motion_code by VLC table 2, residual `Ipu_GetBits(r_size)`, optional dmvector for
+  dual prime), `Mpeg_DecodeMotionVector` 0x2ee2a8 (adds and wraps into ±16 << r_size, halves / doubles for field
+  vectors), `Mpeg_GetDmVector` 0x2ed5a8 (VLC table 3), `Mpeg_CalcDualPrime` 0x2ed5c8 (the derived vectors for frame
+  and field pictures, 0x35caf0 top_field_first).
+- **Motion compensation and reconstruction:** `Mpeg_StartMotionComp` 0x2eb630 (non-intra: "Invalid modion type --
+  ignored(%d)" outside 1..3, `Mpeg_FormPredictions`, then a SPR_TO DMA chain (tag ids 3 / 0, 0x30 qw luma and 0x30
+  chroma per block) pulls the reference blocks into scratchpad; sets the slot's destination address in the target
+  picture, macroblock size 0x180 bytes), `Mpeg_FormPredictions` 0x2eb968 (forward (mb_type & 8) and backward (& 4) by
+  motion_type, frame or field, dual prime; "(a)/(b)/(c) invalid motion_type(%d)-0/1/2"), `Mpeg_QueuePrediction`
+  0x2ec018 (one block: whole-pel position split into macroblock and offset, luma 16 and chroma 8 rows, the row split
+  where a block crosses a macroblock, and the half-pel averaging routines from the tables 0x35d208 (luma) / 0x35d228
+  (chroma) indexed by average << 2 | half-x << 1 | half-y), `Mpeg_ReconMacroblock` 0x2ec438 (runs the queued
+  routines, then adds the IDCT result as halfwords, clamps 0..255 with MMI `pminh` / `pmaxh` (0x2ed380) and packs
+  `ppacb` into the picture, 0x18 × 32 bytes; "intra && skip MB" if both flags are set), `Mpeg_WaitBdec` 0x2ed3c0
+  (waits for IPU_FROM to drain, pumping the no-data callback; records IPU_TOP / bits left 0x35d1d8 / 0x35d1dc; on
+  IPU_CTRL bit 14 "Error code detected(BDEC)", resets the IPU and stops IPU_FROM, returns false).
+- **Output:** `Mpeg_OutputPicture` 0x2ef7c8 (after the first picture outputs the previous reference, or the B
+  picture itself), `Mpeg_FlushLastPicture` 0x2ea9d0 / `Mpeg_OutputLastRef` 0x2eaa50 (at sequence end in field mode,
+  outputs the last reference; "the second field is missing"), `Mpeg_OutputFrame` 0x2f00c0 / `Mpeg_OutputFieldPair`
+  0x2f01d8 (`Mpeg_GetPictureInfo` 0x2eff28 for pts (interpolated from sys+0x78/+0x80/+0x88 when the stream has none),
+  dts and a flags word (descriptor +0x2c type << 0, +0x30 structure << 3, +0x40 << 5, +0x3c top_field_first << 6,
+  +0x38 << 7, +0x34 << 8) into sys+0x10/+0x18/+0x20; copies the display extension fields to sys+0xb4..+0xd0; `Mpeg_CheckOutputSize` 0x2efc60
+  ("Too small buffer size for %dx%d picture\n"); sys+0xb0 picks the copy: 0 `Mpeg_CopyRawPicture` 0x2efd00 (the decoded
+  YCbCr macroblocks as they are, through scratchpad by SPR_TO / SPR_FROM; that this is the RAW8 path is inferred), else `Mpeg_CscPicture` 0x2f0860 (IPU colour conversion to RGB32)).
+  `Mpeg_CscPicture` feeds the picture to IPU_TO (in 0xffff-qw pieces by `Mpeg_IpuToDmaHandler` 0x2f0788, created,
+  DMAC channel 4) and runs CSC 0x70000000: `Ipu_Csc` 0x2f0398 for up to 0x3ff macroblocks, `Ipu_CscLarge` 0x2f05c8
+  for more (0x3ff at a time, `Ipu_CscDmaHandler` 0x2f0480, created, DMAC channel 3; "CSC handler error\n").
+- **IPU DMA (Sony's libipu, names inferred from its documented API, the bodies match it):** `sceIpuStopDMA` 0x2f0b88
+  (was a function in Ghidra but not in the index; stops IPU_TO, saves its MADR / TADR / QWC / CHCR, waits for the
+  IPU output FIFO (IPU_CTRL bits 4-7) to empty, stops IPU_FROM, saves MADR / QWC / CHCR, IPU_BP and IPU_CTRL: the `sceIpuDmaEnv` layout),
+  `sceIpuRestartDMA` 0x2f0c70 (puts them back, backing IPU_TO up by the input FIFO's unread quadwords from the saved IPU_BP, and re-issues
+  the bit pointer as IPU command 0), `sceIpuSync`
+  0x2f0dc0 (mode 0 waits while IPU_CTRL busy, 1 returns busy), `sceIpuInit` 0x2f0e90 (from `sceMpegInit`: reset,
+  intra matrix 0x35d320 (4 qw) and non-intra matrix (the 0x35d360 quadword four times) by SETIQ, VQ CLUT 0x35d370 by SETVQ 0x60000000, SETTH
+  0x90000000, reset). The CHCR writes with the DMAC suspended (D_ENABLEW bit 16): `Ipu_SetFromChcr` 0x2f0ab8,
+  `Ipu_SetToChcr` 0x2f0b20, `Ipu_SetToChcr2` 0x2f0e28 (a second copy, in `sceIpuInit`'s file). The default
+  StopDMA / RestartDMA callbacks of batch 33 jump to the first two.
+- Inferred only: the names; that `Mpeg_DecodePicture` 0x2ea820 is the body of `sceMpegGetPicture` (no caller
+  found). libmpeg has no unnamed functions left.

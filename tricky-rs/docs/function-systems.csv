@@ -4537,6 +4537,12 @@ address,system,how
 0x2eb308,sdk,lib
 0x2eb3c8,sdk,lib
 0x2eb530,sdk,lib
+0x2eb5d0,sdk,lib
+0x2eb5e0,sdk,lib
+0x2eb5f0,sdk,lib
+0x2eb600,sdk,lib
+0x2eb610,sdk,lib
+0x2eb620,sdk,lib
 0x2eb630,sdk,lib
 0x2eb968,sdk,lib
 0x2ec018,sdk,lib
@@ -4570,6 +4576,7 @@ address,system,how
 0x2ef298,sdk,lib
 0x2ef2d0,sdk,lib
 0x2ef3b0,sdk,lib
+0x2ef498,sdk,lib
 0x2ef548,sdk,lib
 0x2ef638,sdk,lib
 0x2ef6e8,sdk,lib
@@ -4581,10 +4588,13 @@ address,system,how
 0x2f00c0,sdk,lib
 0x2f01d8,sdk,lib
 0x2f0398,sdk,lib
+0x2f0480,sdk,lib
 0x2f05c8,sdk,lib
+0x2f0788,sdk,lib
 0x2f0860,sdk,lib
 0x2f0ab8,sdk,lib
 0x2f0b20,sdk,lib
+0x2f0b88,sdk,lib
 0x2f0c70,sdk,lib
 0x2f0dc0,sdk,lib
 0x2f0e28,sdk,lib
