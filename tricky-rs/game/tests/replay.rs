@@ -7,12 +7,14 @@
 //! velocity: a rider in the air gets exactly that (nothing else moves it in the air unless it hits something).
 
 use tricky_game::air::{integrate_rk4, predict_at_takeoff, Predict, RayHit};
+use tricky_game::orient::{update_orientation, Orient};
+use tricky_game::spin::{spin_update, Anim, SpinObj, SpinRider};
 
 struct Tick {
     tick: u32,
     riders: Vec<Vec<u8>>,
     /// the windows `pine.py record ... <off>:<len>` adds (header `extra <off> <len>`): (offset, per rider)
-    extra: Vec<(usize, Vec<Vec<u8>>)>,
+    extra: Vec<(i64, Vec<Vec<u8>>)>,
 }
 
 fn f32_at(b: &[u8], off: usize) -> f32 {
@@ -32,7 +34,8 @@ fn load(path: &str) -> (usize, Vec<Tick>) {
     let (n, size) = (at - 3, usize::from_str_radix(head[at + 1], 16).unwrap());
     // the pad's block follows the riders when the recorder found it, then the extra windows, rider by rider
     let pad = head.iter().position(|w| *w == "pad").is_some_and(|k| head[k + 1] != "0") as usize;
-    let windows: Vec<usize> = head.iter().enumerate().filter(|(_, w)| **w == "extra").map(|(k, _)| usize::from_str_radix(head[k + 1], 16).unwrap()).collect();
+    // (an offset may be negative: `-170` is the spin object, before the rider)
+    let windows: Vec<i64> = head.iter().enumerate().filter(|(_, w)| **w == "extra").map(|(k, _)| i64::from_str_radix(head[k + 1], 16).unwrap()).collect();
     let hex = |h: &str| (0..h.len()).step_by(2).map(|i| u8::from_str_radix(&h[i..i + 2], 16).unwrap()).collect::<Vec<u8>>();
     let ticks = lines
         .map(|l| {
@@ -419,4 +422,218 @@ fn pcsx2_add(a: f32, b: f32) -> f32 {
     let guard = 2f64.powi(e - 24); // one bit below its last mantissa bit
     let cut = (small as f64 / guard).trunc() * guard;
     (big as f64 + cut) as f32 // exact in f64, rounded once to nearest
+}
+
+fn u32_le(b: &[u8], off: usize) -> u32 {
+    u32::from_le_bytes(b[off..off + 4].try_into().unwrap())
+}
+
+/// The spin object (`SpinState_Update`'s `this`: the state manager *(rider+0x5ae0) + 0x740, which is rider − 0x170,
+/// recorded as the window `-170:74`) as `spin::SpinObj`.
+fn spin_obj(st: &[u8]) -> SpinObj {
+    SpinObj {
+        mode: u32_le(st, 8),
+        phase: f32_at(st, 0xc),
+        owed: f32_at(st, 0x10),
+        spin_hi: f32_at(st, 0x14),
+        spin_lo: f32_at(st, 0x18),
+        spin_floor: f32_at(st, 0x1c),
+        flip_hi: f32_at(st, 0x20),
+        flip_lo: f32_at(st, 0x24),
+        flip_floor: f32_at(st, 0x28),
+        w_spin: f32_at(st, 0x2c),
+        w_flip: f32_at(st, 0x30),
+        align: f32_at(st, 0x34),
+        align_axis: [f32_at(st, 0x40), f32_at(st, 0x44), f32_at(st, 0x48)],
+        align_w: f32_at(st, 0x4c),
+        emax_spin: f32_at(st, 0x50),
+        emax_flip: f32_at(st, 0x54),
+        x58: u32_le(st, 0x58),
+        x5c: u32_le(st, 0x5c),
+        x60: u32_le(st, 0x60),
+        x64: u32_le(st, 0x64),
+    }
+}
+
+/// The air's spin state over a recorded race (board row F4b3a). For every pair of samples one tick apart in which a
+/// rider is in the air (motion 1) and in control state 0x10 (spin) at both: `SpinState_Update` 0x100908 on the spin
+/// object and the rider as recorded at the first, against the second. Run three ways: our `spin::spin_update` (then
+/// `orient::update_orientation` when it asks for `Boarder_UpdateOrientation` 0x129008), and the game's own code in the
+/// function runner under IEEE adds and under PCSX2's COP1 adder (F4g).
+///
+/// Not in the recording, so 0 for all three: the pad word (built on the stack by the rider's virtual 9 in `cBoarder::vf7`
+/// 0x117198 and handed to `Boarder_UpdateControl` 0x11c9a0, never stored) and the animation's answers (clip, type,
+/// phase, trick clips). So only what does not read them is compared: the turn toward the landing slope (the quaternion
+/// +0x170, the axes +0x180..+0x1a0 and the angle left st+0x34) and the spin and flip angles (+0x1d0, +0x1d4); the
+/// rates are compared only in mode 2 at the end, where the stick is not read for them.
+///
+/// The recorder's sample can fall between two frames or inside one, between the rider's motion (`Boarder_UpdateMotion`
+/// 0x11c770, whose `AirPredict_Tick` 0x123ec8 moves the time to touch down) and its control (0x11c9a0): the time to
+/// touch down the control read is then the first sample's (+0x57b8) rather than the second's. Both are tried, the
+/// second's first. Pairs that hold no update of the rider or two (the position or the angles moved by 0 or 2 ticks'
+/// worth) are left out. Needs TRICKY_STATS (the tricks stat, stats+0x1a) and a recording with the windows `57b0:64`
+/// and `-170:74` (the spin object: the state manager *(rider+0x5ae0) + 0x740).
+#[test]
+fn spin_ticks_against_the_running_game() {
+    let (Ok(paths), Ok(stats)) = (std::env::var("TRICKY_RECORDING"), std::env::var("TRICKY_STATS")) else { return };
+    let stats: Vec<Vec<u8>> = std::fs::read_to_string(&stats).unwrap().lines()
+        .map(|l| { let h = l.split_whitespace().nth(2).unwrap(); (0..h.len()).step_by(2).map(|i| u8::from_str_radix(&h[i..i + 2], 16).unwrap()).collect() })
+        .collect();
+    let path = paths.split(';').next().unwrap();
+    let (n, ticks) = load(path);
+    let (Some(kp), Some(ks)) = (ticks[0].extra.iter().position(|(o, _)| *o == 0x57b0), ticks[0].extra.iter().position(|(o, _)| *o == -0x170)) else {
+        eprintln!("{path}: no 57b0 and -170 windows: skipping");
+        return;
+    };
+    // the rider addresses (header `race X riders a b c ...`): the window is the spin object only where its +0x70 is the
+    // rider (the state manager sits 0x8b0 before most riders, but 0x880 before one)
+    let head = std::fs::read_to_string(path).unwrap().lines().next().unwrap().to_string();
+    let addr: Vec<u32> = head.split_whitespace().skip(3).take(n).map(|h| u32::from_str_radix(h, 16).unwrap()).collect();
+    let mut runners: Vec<(&str, r5900::Runner, [u32; 3])> = Vec::new();
+    for rules in ["add=n,mul=n,div=n,cvt=n", "add=n,fadd=g1,mul=n,div=n,cvt=n"] {
+        let Some(mut r) = r5900::Runner::from_env() else { break };
+        r.float_rules = r5900::ps2float::Rules::parse(rules).unwrap();
+        for f in [0x250c10, 0x102e80, 0x102f80, 0x102f50, 0x129008, 0x2510f8] {
+            r.allow(f); // Math_SinCos, Quat_Multiply, Vec3_Scale, Vec4_Scale, Boarder_UpdateOrientation, Math_Atan
+        }
+        for f in [0x155e00, 0x155e68, 0x102800, 0x127918, 0x15fcf8, 0x15eef8, 0x11db00, 0x127d08, 0x118f10] {
+            r.stub(f, |_, _| {});
+        }
+        for f in [0x1272e8, 0x102158, 0x15fdd0, 0x15eec0] {
+            r.stub(f, |c, _| c.set_gpr(2, 0));
+        }
+        r.stub(0x15fe70, |c, _| c.set_f(0, 0.0));
+        let at = [r.mem.alloc(0x6400) + 0x200, r.mem.alloc(0x100), r.mem.alloc(4)];
+        runners.push((rules, r, at));
+    }
+    let one_step = |a: &[u8], b: &[u8]| {
+        let (p, q, v) = (vec4(a, 0x140), vec4(b, 0x140), vec4(a, 0x150));
+        let d = ((q[0] - p[0]).powi(2) + (q[1] - p[1]).powi(2) + (q[2] - p[2]).powi(2)).sqrt();
+        let e = (v[0] * v[0] + v[1] * v[1] + v[2] * v[2]).sqrt() * f32_at(a, 0x12c) / 60.0;
+        let dt = f32_at(a, 0x12c) / 60.0;
+        let turned = [(0x1d0, 0x2c), (0x1d4, 0x30)].iter().all(|&(o, w)| {
+            let step = f32_at(&a[0x600..], w) * dt;
+            step.abs() < 1e-4 || ((f32_at(b, o) - f32_at(a, o)) / step - 1.0).abs() < 0.5
+        });
+        e > 1.0 && d > 0.7 * e && d < 1.4 * e && turned
+    };
+    // what is compared, as bits: quaternion, axes, spin, flip, angle left, and (mode 2) rates, bands, largest errors
+    let names = ["quaternion", "axes", "spin", "flip", "angle left", "rates (mode 2)", "bands (mode 2)", "largest errors (mode 2)"];
+    let pick = |st: &SpinObj, r: &[u8]| -> Vec<Vec<u32>> {
+        let b = |v: &[f32]| v.iter().map(|x| x.to_bits()).collect::<Vec<u32>>();
+        vec![b(&vec4(r, 0x170)), b(&[vec4(r, 0x180), vec4(r, 0x190), vec4(r, 0x1a0)].concat()), b(&[f32_at(r, 0x1d0)]), b(&[f32_at(r, 0x1d4)]), b(&[st.align]),
+            b(&[st.w_spin, st.w_flip]), b(&[st.spin_hi, st.spin_lo, st.spin_floor, st.flip_hi, st.flip_lo, st.flip_floor]), b(&[st.emax_spin, st.emax_flip])]
+    };
+    // per way: per field [ticks, bit for bit], and the ticks that took the first sample's time to touch down
+    let mut count = vec![vec![[0usize; 2]; names.len()]; 1 + runners.len()];
+    let mut first_land = vec![0usize; 1 + runners.len()];
+    let (mut other, mut skew) = (0, 0);
+    for w in ticks.windows(2) {
+        if w[1].tick != w[0].tick + 1 {
+            continue;
+        }
+        for i in 0..n {
+            let (a, b) = (&w[0].riders[i], &w[1].riders[i]);
+            let (pa, pb) = (&w[0].extra[kp].1[i], &w[1].extra[kp].1[i]);
+            let (sa, sb) = (&w[0].extra[ks].1[i], &w[1].extra[ks].1[i]);
+            if u32_le(a, 0x428) != 0x10 || u32_le(b, 0x428) != 0x10 || u32_le(a, 0x424) != 1 || u32_le(b, 0x424) != 1 {
+                continue;
+            }
+            if u32_le(sa, 0x70) != addr[i] {
+                other += 1;
+                continue;
+            }
+            let ab: Vec<u8> = [&a[..], &sa[..]].concat();
+            if !one_step(&ab, b) {
+                skew += 1;
+                continue;
+            }
+            let stat = &stats[i];
+            let mode = u32_le(sa, 8);
+            let want = pick(&spin_obj(sb), b);
+            // one way's fields for a time to touch down
+            let ours = |land: f32| {
+                let mut st = spin_obj(sa);
+                let mut r = SpinRider {
+                    timescale: f32_at(a, 0x12c),
+                    land,
+                    quat: vec4(a, 0x170),
+                    spin: f32_at(a, 0x1d0),
+                    flip: f32_at(a, 0x1d4),
+                    tricks: stat[0x1a],
+                    stat10: stat[0x10],
+                    mirror: u32_le(stat, 0x40),
+                    switch: u32_le(a, 0x1b4),
+                    wind_spin: f32_at(a, 0x274),
+                    wind_flip: f32_at(a, 0x278),
+                    x1f0: f32_at(a, 0x1f0),
+                    x1f4: f32_at(a, 0x1f4),
+                    x1f8: f32_at(a, 0x1f8),
+                    class: u32_le(a, 0x420),
+                    hp_face: vec4(pb, 0x20),
+                    hp_axis: vec4(pb, 0x30),
+                    vel: vec4(a, 0x150),
+                    pos: vec4(a, 0x140),
+                    x5800: f32_at(pb, 0x50),
+                    ..Default::default()
+                };
+                let calls = spin_update(0, &mut st, &mut r, &Anim::default());
+                let mut o = Orient { q: r.quat, fwd: vec4(a, 0x180), side: vec4(a, 0x190), up: vec4(a, 0x1a0), ..Default::default() };
+                if calls.contains(&tricky_game::spin::SpinCall::Orientation) {
+                    update_orientation(&mut o);
+                }
+                let mut out = a.clone();
+                for (k, v) in [o.q, o.fwd, o.side, o.up].iter().enumerate() {
+                    for (j, x) in v.iter().enumerate() {
+                        out[0x170 + 0x10 * k + 4 * j..][..4].copy_from_slice(&x.to_le_bytes());
+                    }
+                }
+                out[0x1d0..0x1d4].copy_from_slice(&r.spin.to_le_bytes());
+                out[0x1d4..0x1d8].copy_from_slice(&r.flip.to_le_bytes());
+                pick(&st, &out)
+            };
+            let mut ways: Vec<Box<dyn FnMut(f32) -> Vec<Vec<u32>> + '_>> = vec![Box::new(ours)];
+            for (_, g, [rd, stats_at, pad]) in runners.iter_mut() {
+                let (rd, stats_at, pad) = (*rd, *stats_at, *pad);
+                ways.push(Box::new(move |land: f32| {
+                    g.mem.write(rd, a).unwrap();
+                    g.mem.write(rd + 0x57b0, pb).unwrap();
+                    g.mem.write_f32(rd + 0x57b8, land);
+                    g.mem.write(rd - 0x170, sa).unwrap();
+                    g.mem.write_u32(rd - 0x170 + 0x70, rd);
+                    g.mem.write(stats_at, stat).unwrap();
+                    g.mem.write_u32(rd + 0x464, stats_at);
+                    g.mem.write_u32(pad, 0);
+                    g.cpu.set_gpr(4, (rd - 0x170) as u64);
+                    g.cpu.set_gpr(5, pad as u64);
+                    g.call(0x100908).unwrap_or_else(|e| panic!("tick {} rider {i}: {e:?}", w[0].tick));
+                    let (mut gs, mut gr) = (vec![0u8; 0x74], vec![0u8; 0x600]);
+                    g.mem.read(rd - 0x170, &mut gs).unwrap();
+                    g.mem.read(rd, &mut gr).unwrap();
+                    pick(&spin_obj(&gs), &gr)
+                }));
+            }
+            for (k, way) in ways.iter_mut().enumerate() {
+                let mut got = way(f32_at(pb, 8));
+                if got[..5] != want[..5] {
+                    let other = way(f32_at(pa, 8));
+                    if other[..5] == want[..5] {
+                        got = other;
+                        first_land[k] += 1;
+                    }
+                }
+                for (f, c) in count[k].iter_mut().enumerate() {
+                    if f < 5 || mode == 2 {
+                        c[0] += 1;
+                        c[1] += (got[f] == want[f]) as usize;
+                    }
+                }
+            }
+        }
+    }
+    eprintln!("{path}: spin ticks (state 0x10 in the air; left out: {other} whose window is not the spin object, {skew} not one update apart):");
+    for (k, way) in ["ours (spin::spin_update)".to_string()].into_iter().chain(runners.iter().map(|(r, _, _)| format!("the game's in the runner, {r}"))).enumerate() {
+        let line: Vec<String> = names.iter().zip(&count[k]).map(|(n, c)| format!("{n} {} of {}", c[1], c[0])).collect();
+        eprintln!("  {way}: {} (the first sample's time to touch down on {})", line.join(", "), first_land[k]);
+    }
 }

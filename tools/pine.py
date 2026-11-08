@@ -18,7 +18,8 @@ PINE reads and writes memory and saves and loads states; it has no breakpoints o
                                                         not change while reading (F4b; keep it on your PC);
                                                         each <off>:<len> (hex) adds that window of every rider
                                                         after the pad, read in one message with the rider
-                                                        (57b0:64 = the flight prediction, F4h2)
+                                                        (57b0:64 = the flight prediction, F4h2; an offset
+                                                        may be negative: -170:74 = the spin object, F4b3a)
     python tools/pine.py counters [<start> <end>]       find tick counters and clocks: words in .data/.bss
                                                         (default 0x31D300-0x40C174) that climb about 60 a
                                                         second, or floats that climb about 1 a second

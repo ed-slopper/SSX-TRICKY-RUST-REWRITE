@@ -428,6 +428,45 @@ jumps. `flight_predictions_against_the_running_game` in `tricky-rs/game/tests/re
   the velocity changed sideways after the prediction, or the flight reads something of the rider that ours does
   not (row F4h3).
 
+## F4b3a: the air's spin state from a recorded race (2026-11-08)
+
+`tests/replay.rs` `spin_ticks_against_the_running_game` replays `SpinState_Update` 0x100908 over a race: every pair of
+samples one tick apart where a rider is in the air (motion +0x424 = 1) and in control state 0x10 (+0x428) at both.
+It runs our `spin::spin_update` and the game's own code in the function runner (IEEE adds, then PCSX2's COP1 adder
+`fadd=g1`) on the first sample, and compares with the second. Recording: `pine.py record 110 rec8.txt 0x600 57b0:64
+-170:74` (the `-170` window is the spin object), with the stats blocks saved after it (`TRICKY_STATS`).
+
+Proven (read from the code):
+- The spin object is the state manager *(rider+0x5ae0) + 0x740, and its +0x70 is the rider. The manager is rider −
+  0x8b0 for five of the six riders and rider − 0x880 for the sixth, so `-170` is the spin object for the five only;
+  the test checks +0x70 and leaves the sixth out.
+- `cBoarder::vf7` 0x117198 runs the motion first (`Boarder_UpdateMotion` 0x11c770 at 0x117960; in the air it is
+  `AirMotion_Update`, whose `AirPredict_Tick` 0x123ec8 moves the time to touch down +0x57b8) and then the control
+  (`Boarder_UpdateControl` 0x11c9a0 at 0x117b78). So the spin state reads this tick's time to touch down.
+- The pad word the control gets is built on the stack (virtual 9 of the rider, at 0x117b6c, into sp+0x30) and never
+  stored, so it cannot be recorded. The animation's answers (clip, type, phase, trick clips) are not recorded either.
+  Both are 0 in the test: only the fields that do not read them are compared (the turn toward the landing slope, the
+  spin and flip angles; the rates, bands and largest errors only in mode 2).
+
+Found (rec8: a 110 s race by hand, 6,585 samples):
+- 7,566 pairs in state 0x10. Left out: 1,259 of the sixth rider, 1,183 not one update apart (the position or the
+  angles moved by 0 or 2 ticks' worth: the recorder reads the race's tick counter, which does not move at the same
+  moment as the riders). 5,124 compared.
+- Ours and the game's code under IEEE adds give the same counts on every field: quaternion 1,591, axes 1,431, spin
+  4,508, flip 4,358, angle left 4,201 of 5,124; rates 1,442, bands 1,550, largest errors 1,444 of 1,551 (mode 2).
+- The game's code under `fadd=g1`: quaternion 5,077, axes 5,075, spin 5,046, flip 5,122, angle left 5,078 of 5,124;
+  rates 1,549, bands 1,550, largest errors 1,551 of 1,551. So the running game's `SpinState_Update` is its own code
+  with PCSX2's COP1 adder (F4g), and our port matches that code under IEEE. The gap between ours and the game is the
+  adder alone: the port's floats follow the runner's default rules (F4c decides them).
+- 28 of the `g1` matches needed the first sample's time to touch down instead of the second's. Inferred: there the
+  samples fell inside a frame, between the rider's motion and its control, so the control's input was already in
+  the first sample.
+- Inferred, not checked: most of the 78 spin misses are mode 2 ticks where the spin moves while its rate is 0 (the
+  half-pipe clips 0x23c / 0x23d add their phase × π; the phase is the animation's answer, recorded as 0).
+
+Still to do: the pad and the animation's answers (the rows that port them, G5, would have to be recorded or
+replayed too); the ground tick (F4b3b) and the take-off tick (F4b3c).
+
 ## How a row gets to `checked`
 
 1. Port the function (address in its doc comment, AGENTS.md §13).
