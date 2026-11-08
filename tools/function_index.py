@@ -9,7 +9,7 @@ only: nothing of the game's code goes in it.
     python tools/function_index.py names                   check ghidra/symbols.txt against AGENTS.md §14
 
 Names: the Ghidra name, replaced by any name our notes and code give the address (`Name` 0xaddr).
-System: from the name; for unnamed functions, the system of the named functions on both sides when they
+System: from the address inside the linked libraries (LIB_BANDS), else from the name (SYSTEMS); for unnamed functions, the system of the named functions on both sides when they
 agree, marked with a trailing '?'. Status: 'host' for the libraries Rust and Bevy stand in for (HOST), 'ported' when the address or the name is written in tricky-rs/src or tricky-rs/game/src (lines tagged STANDIN do not
 count), 'checked'
 is set by hand (or by the comparison harness, row F4) and is kept, otherwise 'not started'.
@@ -18,6 +18,8 @@ import csv
 import re
 import sys
 from pathlib import Path
+
+from function_systems import LIB_BANDS  # the linked libraries' address bands (row F1b)
 
 ROOT = Path(__file__).resolve().parent.parent
 INDEX = ROOT / "tricky-rs" / "docs" / "function-index.csv"
@@ -33,7 +35,7 @@ NOTES = [ROOT / "tricky-rs" / "docs", ROOT / "notes"]
 # First match wins. Matched against the whole name (class::method or Free_Function).
 SYSTEMS = [
     (r"^(thunk|__|_GLOBAL_|entry$)|::__tf$|::__(dt|vt)", "runtime"),
-    (r"MemCard|^cMC|MCOverlay|^Profile_|Save", "save"),
+    (r"MemCard|^cMC|MCOverlay|^Profile_|^c?Save", "save"),
     (r"^cPad|^Pad_|^Input_|Cheat", "input"),
     (r"Camera|^cBxCam|^Cam_|\bcml", "camera"),
     (r"^(cMenu|cMenuManager|cDebugMenu|c\w*MenuItem|cGameOptionsMenu|cRenderOptionsMenu|cResolutionMenu|cBezierOptionsMenu|cSoundVolumeMenu)\b", "debugmenu"),
@@ -58,6 +60,54 @@ SYSTEMS = [
     (r"^(cPath|cEventPath)\b", "ai"),
     (r"^(cBankManager)\b", "audio"),
     (r"^(CDeci2|C8bit)", "comm"),
+    # Row F1e: the prefixes of the functions F1c named, which matched none of the rules above.
+    (r"^c?Replay", "replay"),
+    # the replays' Huffman codec at 0x240ef8-0x243c00 (port-notes/files.md, row G12b)
+    (r"^(Huff|Compress|Decompress|Delta|Bytes)_", "replay"),
+    (r"^SnowFall\w*_", "render"),
+    (r"^cExecutionMan::", "game"),
+    (r"^(cController)(_|::)", "audio"),
+    (r"^(BigArchive|AsyncFile)(_|::)", "files"),
+    (r"^(Ascii|Sjis)_", "save"),
+    (r"^(TrickId|TrickDef)_", "scoring"),
+    (r"^(PostAI|PreAI|Computer)_", "ai"),
+    (r"^(OfflineObject|GameModule)_", "game"),
+    (r"^(VideoModule|Movie)_", "video"),
+    (r"^(TerrainObjNode|UVScroll)_", "world"),
+    (r"^(Model|MaskedList)_|^tPS2", "render"),
+    (r"^(Body)_", "world"),
+    (r"^(BlockMan|Object)_", "common"),
+    (r"^(Item|ListOp)_", "frontend"),
+    (r"^Crt_", "sdk"),  # Sony's crt0 start-up at 0x1000a8: Rust and Bevy host it
+    (r"^WStr_", "common"),  # the game's own wide-string helpers at 0x17cc48; EA's (lib-text) are a library band
+    (r"^(VideoStream|VideoStreamMan|VideoPlayer)(_|::)", "video"),
+    (r"^c?(Cam[A-Z]\w*|Cml\w*|Highlight)(_|::)", "camera"),
+    (r"^(Speech\w*|Sfx|Stream|StreamSys|StreamSlot|c?Bank[A-Z]\w*|Song\w*|Snd(Sys|Event|Voice|Handle|Mgr|Queue|PlayOpts)"
+     r"|cSndPlayOpts|PathX|PathDriver|IniReader|c?MidiSys|cMusicSys|Jukebox|SpuAlloc|AsyncSys|WorldTriggerMgr"
+     r"|c?Monitor|cCrowdSys|cSpeechSys|cStreamSys)(_|::)", "audio"),
+    (r"^(Career|Results|RaceScene|RaceMenu|RaceHud|HighScore|HiScore|Rivals)(_|::)", "race"),
+    (r"^(c?Lesson\w*|TrickTutorialLoad)(_|::)", "tutorial"),
+    (r"^(MockupEditor\w*|MockupItem|LoadScreen|Loc|GameOptions|EffectsLoader|cLoadModule|StartScreen\w*|ScreenAnim"
+     r"|SnowProgram|AsyncLoad|FlakeSpinnerLoad|cOfflineObject|Iop|Stack|TrickInfo)(_|::)", "game"),
+    (r"^(FE\w*|c?ListFE3D\w*|cListOperator|Backdrop|PauseMenu|VenueSel|NameEntry|Dialog|ScreenAnimTrack|DisplayOptions"
+     r"|OptionsState|OptionsPage3|ControllerConfig|CustomBoard|Streak|Trick)(_|::)", "frontend"),
+    (r"^(Sprite|HUDItem|Hud|RiderProfile)(_|::)", "hud"),
+    (r"^(MCSlot)(_|::)", "save"),
+    (r"^(PadCfg|PadDevice|InputRecorder)(_|::)", "input"),
+    (r"^(Menu|MenuItem|DebugMenu|ExpandMenuItem|IntMenuItem|StringMenuItem|c\w*Menu)(_|::)", "debugmenu"),
+    (r"^(Cstring|Comm\w*|Deci2\w*)(_|::)", "comm"),
+    (r"^(PS2[A-Z]\w*|RiderSkin|Skin[A-Z]\w*|GsPkt|StripPacket|BoarderRender|BoarderShadow|Sky|c?BezierMan|c?GridMesh"
+     r"|SphereTreeCache|SphereTreeBufCache|OwnedBuf|MdfMemBank|MemBank|RendPatch|Dma|Rle|SkelSeq|BdrSeq|BoarderSequence"
+     r"|MpfFile|LensFX|Particle[A-Z]\w*|Parse|Patch)(_|::)", "render"),
+    (r"^(PoseBlend|SkelAnim|ClipList|cCamAnimFrame)(_|::)", "animation"),
+    (r"^(cPreAI|cPostAI|cComputer|SplineModelNode|SplinePathNode|SplineModel)(_|::)", "ai"),
+    (r"^(BdrLoad|AsyncBdrLoad|\w+Control|\w+Motion|Pickup|PlayerMarker|cPlayer|AttitudeIcon|Rumble|Vibration|Ride|Skel"
+     r"|EaseRecord|Spline)(_|::)", "boarder"),
+    (r"^(SphTree|SphereTree|bxSphereTree|BxList|RollerNode|Roller|Fence\w*|Collide\w*|CollCache|CacheBuffer"
+     r"|Broadphase\w*|Contact\w*|UVScrollNode|VisList|WorldGrid|CellList|c?FogObjMan|PoolList|Snapshot|WorldInstance"
+     r"|WorldNode|ScriptNode|TriggerOp|MovieNode|BxObjNode|Obj|Tri|cBxCache|PatchCache|Controller)(_|::)", "world"),
+    (r"^(Vec3|Vec4|Quat|Mat4|Euler|Math|Rand|Mem|MemPool|Pool|PtrArray|RingQueue|List|cList|ListNode|Color|Name|Float"
+     r"|Vu0|Debug)(_|::)", "common"),
 ]
 SYS_RES = [(re.compile(p), s) for p, s in SYSTEMS]
 
@@ -68,9 +118,16 @@ WORD = re.compile(r"[A-Za-z_][A-Za-z0-9_]*(?:::[A-Za-z_][A-Za-z0-9_]*)*")
 NAMED = re.compile(r"`?([A-Za-z_][A-Za-z0-9_:]*[A-Za-z0-9_])`?\s*\(?0x([0-9a-fA-F]{5,6})\b")
 
 
+STATIC = re.compile(r"^Static(Init|Dtor)_(.+)$")
+
+
 def system_of(name):
     if not name or name.startswith("FUN_"):
         return ""
+    # a static constructor or destructor belongs to the module it sets up: StaticInit_Cml -> Cml_
+    m = STATIC.match(name)
+    if m:
+        return system_of(m.group(2).rstrip("0123456789") + "_")
     for rx, sysname in SYS_RES:
         if rx.search(name):
             return sysname
@@ -134,7 +191,7 @@ def guessed_systems():
     if not GUESSES.exists():
         return {}
     with open(GUESSES, newline="", encoding="utf-8") as f:
-        return {int(r["address"], 16): r["system"] for r in csv.DictReader(f)}
+        return {int(r["address"], 16): (r["system"], r["how"]) for r in csv.DictReader(f)}
 
 
 def symbol_names():
@@ -179,8 +236,15 @@ def refresh(rows):
     for r in rows:
         a = int(r["address"], 16)
         r["system"] = system_of(r["name"])
-        if r["system"] in ("", "other") and a in guessed:
-            r["system"] = guessed[a] + "?"
+        guess, how = guessed.get(a, ("", ""))
+        band = next((b for lo, hi, b in LIB_BANDS if lo <= a < hi), None)
+        # the library bands are proven by address (tools/function_systems.py LIB_BANDS): they win over a
+        # name's prefix (SND_, File_, Pad_ there are EA's or Sony's), except gcc's runtime names
+        if band and r["system"] != "runtime":
+            r["system"] = band
+        elif r["system"] in ("", "other") and guess:
+            # address ranges our notes prove need no '?' either; the rest is a guess
+            r["system"] = guess + ("" if how == "range" else "?")
         # the source may write cClass::Method as cClass_Method, or still use a name since renamed
         spellings = {r["name"], *old_names.get(a, ())}
         named_in_src = any(LOOKS_NAMED.search(n) and (n in in_src or n.replace("::", "_") in in_src)

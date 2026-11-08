@@ -9,7 +9,7 @@ names only, nothing of the game's code.
 | `address` | Start address in `SLUS_203.26` |
 | `size` | Bytes, as Ghidra 12.1.4 sees the function |
 | `name` | Our name: Ghidra's, replaced for `FUN_…` by the name in `ghidra/symbols.txt`, else the name our notes or code give that address (`` `Name` 0xaddr ``) |
-| `system` | From the name when it has one. Otherwise a guess, marked `?`, from [`function-systems.csv`](function-systems.csv) (call graph, shared globals, neighbours, address ranges the notes prove; see `tools/function_systems.py`), or from the named functions on both sides. Empty = not known yet |
+| `system` | From the address inside the linked libraries (`LIB_BANDS`, below; gcc's `runtime` names excepted), else from the name's prefix (`SYSTEMS` in `tools/function_index.py`; `StaticInit_X` / `StaticDtor_X` go with `X_`). Otherwise a guess, marked `?`, from [`function-systems.csv`](function-systems.csv) (call graph, shared globals, neighbours, address ranges the notes prove; see `tools/function_systems.py`), or from the named functions on both sides. Empty = not known yet |
 | `status` | `not started`, `host` (a library Rust and Bevy stand in for, or the dev-kit link: not ported, see below), `ported` (the address or the name is written in `tricky-rs/src`, outside lines tagged `STANDIN`), or `checked` (matches the original on the comparison harness, row F4; set by hand until F4 exists) |
 
 Regenerate after porting something:
@@ -106,3 +106,18 @@ Guesses are guesses. In a spot check of 14 (2026-10-10, before the address range
 right; the two wrong ones were a `Score_*` function placed in boarder (its caller) and a libc function placed in
 frontend. Both kinds are fixed now, but a small helper called mostly from one system still lands in that system
 even when it belongs to another. Fix one by naming the function (`ghidra/symbols.txt`).
+
+Since row F1e (2026-11-08) every function is named and its system comes from the name, so the guesses only fill
+a system when a prefix has no rule. Prefixes that spread over several guessed systems were given one owner:
+`Career_`, `Results_`, `Rivals_`, `RaceScene_` → race (career standings and results are race outcomes; the front end
+only shows them); `Replay*`, `ReplayPin_` and the replays' own Huffman codec at 0x240ef8–0x243c00 (`Huff_`,
+`Compress_`, `Decompress_`, `Delta_`, `Bytes_`) → `replay`, a system of its own (it was split over camera and ai);
+the game's math, lists, memory pools and wide-string helpers (`Vec3_`, `Vec4_`, `Quat_`, `Mat4_`, `Rand_`, `List_`,
+`Mem_`, `WStr_` at 0x17cc48, ...) → common; `Cstring_` → comm (only the dev-kit link uses it, port-notes/files.md).
+Moving the library bands ahead of the names put 36 functions from `not started` into `host`: EA's whole-file loads
+`File_*` 0x2c7e58–0x2c8ea0 (were `files`, inside lib-file), `Pad_*` and `DevVu0_*` (Sony's pad and VU0 libraries,
+inside sdk), `Fpu_SaveRegs` 0x2cf7e0 (lib-eamem), `cPadDevice::vf8` 0x2f54e0 (a vtable slot that is gcc's
+terminate thunk, inside libc), `Cstring_Format` / `Cstring_SetBinary` (comm) and `Crt_Exit` 0x1000a8 (Sony's
+crt0, sdk). The rule for `save` matched `Save` anywhere in a name, so 104 functions sat in save, most of them `SaveSnapshot` (the replay snapshot of
+every boarder control, world node and timer); it now matches only a name that starts with `Save` or
+`cSave`, and they go with their own prefix. One name keeps `other`: `Misc_EmptyStubA` 0x256100, an empty function with no caller.
