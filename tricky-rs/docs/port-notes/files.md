@@ -858,3 +858,22 @@ by what each does, not by any name in the binary. Globals: 0x35caec picture_stru
   StopDMA / RestartDMA callbacks of batch 33 jump to the first two.
 - Inferred only: the names; that `Mpeg_DecodePicture` 0x2ea820 is the body of `sceMpegGetPicture` (no caller
   found). libmpeg has no unnamed functions left.
+
+## Names from F1c batch 35 (proven unless marked)
+
+- Streams: `Strm_SetPlaylistEntry` 0x2c7098 (entry n, 1-based up to header +0x1c, of the 12-byte table +0x18 gets
+  (a3, a4, a5) while +0x34 is 0; a5 ≤ +0x24 or −1 / −2; "playlist" inferred), `Strm_GetWord4` 0x2c73a0,
+  `Strm_FindBufferedRequest` 0x2c7d20 (walks the request list under the mutex with `RingBuf_InRange`),
+  `Strm_GetRequestWord4` 0x2c7de8 (`Strm_LookupRequest` +4).
+- `File_BatchLoad` 0x2c84a0 (n names → `File_LoadManyCb` under heap 0x3bb930), `FileSys_SyncOp0` 0x2c8ef8 /
+  `SyncOp2` 0x2c9070 (queue, wait, result), `FileSys_QueueOp7` 0x2cac38 (op type 7, +0x10 / +0x14 = a1 / a2),
+  `FileSys_NoOpHook` 0x2cb9c8, `FileSys_SetRootThunk` / `GetRootThunk` 0x2cc328 / 0x2cc348, `WStr_FormatThunk`
+  0x2c5558, `EAMem_ReferThread` 0x2cf2f8.
+- SDK: `Pad_RpcCmd14` 0x2e8288 (libpad RPC 0x403c40, command 0x14), `Cd_SetPowerOffCallback` 0x2e87c8 (stores the
+  callback / argument at 0x404004 / 0x404008, answers the old one; this has `sceCdPOffCallback`'s signature, while
+  the function now named `sceCdPOffCallback` 0x2e8878 is what it calls first, unsettled), `Cd_RunPowerOffCallback`
+  0x2e8838, `Cd_NcmdRpc0E` 0x2e8e70 (N-command RPC 0xe, from `sceCdRead` / `sceCdStop`), `Mc_GetRpcBuffers` 0x2f1280,
+  `Mc_RpcCmd15` 0x2f1368, `Thread_PostSelfEvent` 0x307830, `SifLoad_CheckVersion` 0x30d8b8 / `ResetVersion`
+  0x30d948, `sceSifLoadStartModule` 0x30de10 (`SifLoad_ModuleCmd` with the result pointer a3 passed on, unlike
+  `sceSifLoadModule`), `InitSys_ClearSyscalls` 0x30e470 (syscalls 0x80..0xff set to 0), `Libc_EioStubA..C`
+  0x306df8 / 0x306f38 / 0x306f60 (errno 5, −1; A sits between `read` and `close`).

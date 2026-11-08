@@ -2827,3 +2827,32 @@ its own adjust, so a wrong place shows. The boot films' table is the game's (0x3
 Of the 48 mutants, 46 are caught. The two survivors are equivalent: the player count's narrowing to a byte, which
 `set_players` does again, and the sticky bit of the unsigned conversion. Two were first missed while every place
 shared one table.
+
+## Names from F1c batch 35 (proven unless marked)
+
+- Card overlays and the card's virtuals (`cPS2MemCard` vtable 0x3a4598): vf15 0x23dd88 sets card +0x24, vf24 /
+  vf34 test state +4 == 0x35 / 0x34, vf26 sets +0x40 = 1, vf30 is empty, vf36 sets +0x44 = 1.
+  `MCOverlay_SetSaveBytes` 0x1ce730 (vf15 with a1, overlay +0x30 = a1), `MCOverlay_OpenSave` 0x1d1dd8 (0x33efbc = 1,
+  the empty vf30, +0x24 = a3; like `MCOverlay_BeginSave`), `MCOverlay_CancelSave` 0x1d1f60 (0x33efbc = 0, vf36,
+  then the owner's state 0x14 and its slot +0x38), `MCOverlay_CancelLoad` 0x1d2010 (vf26, state 0x22, slot +0x60).
+  "Cancel" is inferred from vf26 / vf36 following `EndLoad` / `EndSave` in the table. `MCOverlay_DispatchByCount`
+  0x1cf648 (owner table at +0x428: slot +0xc0 when +0x44 < 1, else +0x78) and `MCOverlay_DispatchByMode` 0x1cf698
+  (+0xb0 when +8 is 0, the load, else +0x88); both have no callers.
+- Front end cues on the sound object (gApp+0x734 → +0xa4, `cFE3DSound`): `FECue_ModeSelect` 0x262ad0 (vf20 of
+  ModeSelect, NumPlayers, EventSel: `FE3DPlayer_SetMode4` 0x263270 (byte +1 = 4) on world +0x7c and +0x7e,
+  `FE3DCharSel_SetSelected(0, 1, 4)`, camera mode 6, sound vf14(1)); `FECue_CharModify` 0x262b78 (CharacterModify
+  vf20: camera mode 0xb, vf15(1)); `FECue_ModeSelectBack` 0x262bd0 (ModeSelect vf18: vf12(0),
+  `FEWorld_SetOpenPanel(3)`); `FECue_CharSelectBack` 0x262c20 (CharacterSelect vf18: vf13(0));
+  `FECue_EventSelBack` 0x262c60 (EventSel / VenueSel vf18: vf14(0)); `FECue_UnusedSoundVf20` 0x262ca0 (vf20, no
+  callers). "Back" is inferred.
+- `FE3DCharacter_NextAltIndex` 0x265758 (from `cFE3DCharacter` vf12): answers 0x347200 + 0x3471f8·2 and toggles
+  0x347200. `FE3DCharacter_SetFlagA1` 0x2661e8 (+0xa1). `FE3DNode_RefreshModel` 0x269be8: +0xa0 → +0xe4 object's
+  virtual at its table (+8) +0xc0 (name inferred). `FE3DState_ScaleCamTime` 0x26c430 (`j` with this + 0xc0) →
+  `FE3DCameraScripted_Scale100` 0x26ac30 (+0xb0 → +0x10 ×= 100). `FEEvent_IsType61` / `IsType63` 0x26ce58 /
+  0x26ce68 (*p == 0x61 / 99). `FE3D_SetPadDeviceWord8` 0x26cf28 (`Input_GetDevice(gApp+0x24, +0x40)` +8 = a1).
+  `FE3DThing_SetVec170` 0x26f688 / `SetVec170Xy` 0x26f698 (x, y, 0, 0; no callers).
+- `MenuOverlay_DrawDivider` 0x1ab028: a 3-wide filled rect at (287, 155, 260 high) when 0x32de8c is 3, else
+  (317, 120, 214 high). `Hud_DrawPulsingIcon` 0x244ee8 (width 45·cos a1, at x − 30 − w/2, y 420.5, sprite
+  a2+0xb8; no callers). `RaceHud_DrawGradientBox` 0x249250 (from a `DrawOverlay`, `Draw_GradientRect`).
+- Copies made functions: `FE3D_FreeBlockCopy1..4` 0x184538 / 0x186170 / 0x1861b0 / 0x2695c8 (of `FE3D_FreeBlock`
+  0x267f18), `GameModule_DtorCopy1` 0x1844a0, `StartScreen_EmptyHook` 0x184578, `ListOp_EmptyHook` 0x26957c.

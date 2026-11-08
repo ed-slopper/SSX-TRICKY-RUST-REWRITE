@@ -1154,3 +1154,51 @@ ones at 0x3511f8; the IOP shared block is 0x353314.
 - Inferred only: the names; "distortion" for effect 0x78 (from the clip-and-gain maths); that the five add-only
   passes plus four multiply passes form a fast transform for the analysis filterbank; which IOP block chunk is
   which beyond the addresses recorded. lib-snd has no unnamed functions left (0x2bb090, x << 2, is ported).
+
+## Names from F1c batch 35 (proven unless marked)
+
+- `BankSlot_Configure` 0x20a268: `cBankManager` vf11 0x20a688 calls it on the record mgr+0xa3c + n·0x60: the
+  global object *0x342c44's virtual +0x38, then +4 = a1, +0 = (a2 == 0), strcpy(+0x20, a3).
+- `Sfx_PlayRiderBump` 0x215f18 (no callers, no data reference): when a rider is within 40 ahead and not queued,
+  the volume is curve 3 (`Sfx_EvalCurve`) of |a1+0x150 + a2+0x150|, sound 0x32 is queued on `SndMgr_GetSlot(4)` at
+  rider+0x140, then `SndSys_QueueSounds`. Built like `Sfx_OnWallHit` 0x2162f0. Name inferred.
+- `Sfx_InstanceControllerVf26` 0x2168f8 (no callers): calls the controller node at a1+0xe4 through vtable +0xd8
+  (`cControllerNode` slot vf26).
+- `Sfx_MeterFullEvent` 0x219258: the pointer-to-member at 0x39eb5c. `Sfx_OnMeterAdd` 0x2191c0 schedules it for
+  3000 ms (`SndSys_ScheduleEvent`); `Sfx_UpdateBoost`, `Sfx_OnBoost` and `Audio_CancelRaceEvents` cancel it. It
+  calls `Speech_OnMeterFull` 0x233e10 when audio+0x6e3c is 0 and the rider's meter (+0x1c) is over 0.875.
+- `Speech_OnMeterFull` 0x233e10: rider+0x418 < 0, `Speech_RollChance(9)`, 0x32de8c != 6 and no replay →
+  `SpeechEvt_Post1002046` with 1 (our `speech.rs` calls it on_boost_full).
+- `Audio_SetHandlePitchBend` 0x2215a8 (no callers): `SndHandle_SetPitchBend(obj+4, a1)` between `SND_Lock` /
+  `SND_Unlock`; the same body as `BankInstance_SetPitchBend` 0x21e7e0. Its class is not proven.
+- `Monitor_TickCallback` 0x222ae0: the SND tick callback that `cMonitor`'s constructor 0x222b10 adds and its
+  destructor 0x222ba0 removes; calls the global monitor 0x343128's virtual +0x28 (vf4 0x222c30).
+- `PathX_PollTask` 0x223128: `Sys_AddPollTask(0x223128, 5, 100)` in `PathX_Init`; calls the hook at 0x34313c
+  (`PathX_Init`'s a0) when set. `PathX_StopDriver` calls it too.
+- `SndSys_SetEntryCallback` 0x226e58: stores the 8-byte pointer-to-member a1 at entry +0x44 + [+0x20]·8.
+- `SpeechSys_SetFollowStream` 0x228b88: speech slot (audio+0x3718)[n] +0x348 = a2, the stream the slot follows
+  (from `Audio_FreeRaceStream` and `Audio_LoadFEConfig` with 0).
+- `SpeechSys_FlushTriggers` 0x228c80 (no callers): `SpeechSys_ClearEvent` without its `SpeechSys_StopStream`:
+  0x343708 = 1, `SpeechSys_Trigger` four times, then cleared. While 0x343708 is set, 0x227b00 answers −1 instead
+  of `SpeechSys_PlayEventAnySlot`.
+- `WorldInstance_GetSoundKeys` 0x22baf8: instance+0xf4 → +4 is a count and records of type 0..3 (7, 12, 12 and 6
+  words); each record's word +1 goes into one of up to four outs. `WorldInstance_HasHitOnlyKey` 0x22e1b8 (from
+  `Sfx_PlayInstanceHit` 0x22d508): one of the four keys is a hit-only key. `WorldEmitter_IsHitOnlyKey` 0x22e240:
+  key 0x1c, 0x10 or 0x39; `WorldEmitter_Update` plays such an emitter only after `WorldEmitter_WasPlayed` (our
+  `worldemitter.rs:288` calls it has_queued).
+- `SoundId_IsAmbient` 0x22e388: ids 0x4f..0x60, 0x67..0x93, 0x9f..0xb2, 0xb7..0xb9, or `SoundId_IsAmbientExtra`
+  0x22e3f0 (id 0x66). They are the ids `SoundId_ToBankProgram` puts in bank 6 program 0.
+- `Speech_GetPlaceMask` 0x233ab0 (from `Speech_OnPlaceChange`, jump table 0x3a2e30 on mode a2 < 6, p = a1 + 1):
+  mode 0 → 1 (p 6 → 0x101) | 0x400000; 1 → 2 (p 1 → 0x22) | 0x400000; 2 → 0x400004; 3 → 8; 4 → 0x2000; 5 → 0x4010
+  (p 1 → 0x4090); else 0.
+- `Song_DurationThunk` 0x2248f8 (`jal Song_GetLengthMs`, no callers); `Song_ClearBreak` 0x225948 (music+0x36f0 →
+  +0xfc = 0, from `Music_CancelBreak`).
+- `SpeechLib_ClearSpareHooks` 0x2baeb8 (clears 0x348df8/0x348dfc/0x348e00, read nowhere else);
+  `SpeechLib_ClearCallbacks` 0x2baed0 clears the three speech callbacks 0x348de0 (row playing), 0x348de4 (param
+  question), 0x348de8 (param values), from `SpeechLib_Init` / `Shutdown`.
+- `Shape_PaletteFormatIndex` 0x2c2040 (from `VideoStream_AllocShape`): 0xf / 0x10 → 0x20, 0x12 / 0x18 → 0,
+  0x20 → 0x21, else 0; the sibling of `Shape_PixelFormatIndex` 0x2c26d8.
+- Stream voices: `SndStreamVoice_NoExtraMem` 0x2e52d0, `NoCreateHook` 0x2e52d8, `NoDestroyHook` 0x2e52e0 answer 0
+  (from `CalcMemSize` / `Create` / `Destroy`). `SndVoice_FindStreamSlot` 0x2e5490: the index in the stream voice
+  table 0x358c38 (count byte 0x350ff2) whose `SndVoice_Validate` matches a0, else −1 (from the MT, PCM and XA
+  `InitStream`s).

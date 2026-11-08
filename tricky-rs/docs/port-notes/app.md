@@ -338,3 +338,26 @@ its mode is 0.
 
 Left open: the MockupEditor's empty item callbacks 0x1d41c8 (button 0x40 on the current item, args +0x109c,
 +0x10a0, item), 0x1d4d08 (button 0x10, every item), 0x1d41d0 / 0x1d4d78 (button 0x20, every item).
+
+## Names from F1c batch 35 (proven unless marked)
+
+- `Boarder_State4PastHalf` 0x11f488 (from `cBxCamera` vf1): 1 when +0x1ec ≥ 1, or +0x1e8 is 4 and anim layer 0's
+  phase (+0x46c0) is ≥ 0.5.
+- `Draw_ResetZ` 0x1818c0 (renderer +0x108 slot, 0x337ff8 = 0.002; name inferred), `Model_IsBoxCulled` 0x19aa18
+  (renderer +0x280 slot on the min / max at +0x58 → +0xcc..+0xe0, answers != 1), `Item_NotifyIfEnabled` 0x1c0148,
+  `MaskedList_Draw` 0x238980 (renderer +0x268 slot on +0x20, then each 0x20-byte item whose bit in +0x24 is set).
+- `ParticleSys_CalcBounds` 0x1d5b60 (from `ParticleSys_Create`: min / max over the emitter's corners),
+  `ParticleMan_DrawSlot` 0x1d9700 (`cParticleMan` vf2; slot stride 0xf0).
+- `Gfx_DispatchDisplayMode` 0x1e0680 (jump table 0x393370, 59 cases, from `Gfx_SetDisplayMode`),
+  `Gfx_ProgramDisplay` 0x1e4288 (from `Gfx_FlipDisplay` / `Gfx_RenderThread`: waits on VIF1 / GIF / GS, writes
+  PMODE, SMODE2, DISPFB1, DISPLAY1, BGCOLOR and the GIF packet at 0x3d1070).
+- `MeshChunk_ScalePositions` 0x2049b0 / `Model_ScalePositions` 0x204f28 (positions ×= a float when flag 0x100),
+  `CourseDma_RebuildChain` 0x240c78 (from `CourseDma_ResolveMeshContext`: copies a DMA chain, cnt tags copied, ref
+  tags matching a1 / a2 / a3 turned into nops or spliced, ends at the end tag), `SkelSeq_DtorMember34` 0x203d40,
+  `OwnedBuf_Delete1` / `2` 0x21e788 / 0x235e70 (free +4, delete on flag 1), `MemCard_FlagSlot` 0x23ed48 (slot
+  record ·0x70 +0x19c = 1, from `cPS2MemCard` vf2).
+- `Game_InitVenueTable` 0x257dc0 (from the game's Init 0x17e5c0: 13 records of 0x94 bytes of defaults, then
+  per-record values; "venue" inferred), `Game_EmptyHook` 0x259028 (`cGame` vf0), `Misc_EmptyStubA` 0x256100,
+  `CacheBuffer_EvictThunk` 0x2520a0, `Replay_NoOpHook` 0x18ebc8, `Replay_KeyframeHookA` / `B` 0x193058 / 0x193060
+  (empty), `MockupItem_StubA` / `B` 0x1d41c8 / 0x1d41d0 (empty) and `MockupEditor_ForEachA` / `B` 0x1d4d08 /
+  0x1d4d78 (each item, stride 0xd4).
