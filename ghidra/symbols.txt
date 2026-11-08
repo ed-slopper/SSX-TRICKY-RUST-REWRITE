@@ -5374,7 +5374,7 @@ G 2e9188 sceCdInit
 G 2e9468 sceCdDiskReady
 G 2e9728 sceCdRead
 G 2e9d78 sceCdReadClock
-G 2e8878 sceCdPOffCallback
+G 2e8878 Cd_InitPowerOff
 G 2e7078 scePadInit
 G 2e72d8 scePadPortOpen
 G 2f10c8 sceMcInit
@@ -8332,7 +8332,7 @@ G 2e52d8 SndStreamVoice_NoCreateHook
 G 2e52e0 SndStreamVoice_NoDestroyHook
 G 2e5490 SndVoice_FindStreamSlot
 G 2e8288 Pad_RpcCmd14
-G 2e87c8 Cd_SetPowerOffCallback
+G 2e87c8 sceCdPOffCallback
 G 2e8838 Cd_RunPowerOffCallback
 G 2e8e70 Cd_NcmdRpc0E
 G 2f1280 Mc_GetRpcBuffers
@@ -8397,3 +8397,4 @@ G 2695c8 FE3D_FreeBlockCopy4
 G 1844a0 GameModule_DtorCopy1
 G 184578 StartScreen_EmptyHook
 G 26957c ListOp_EmptyHook
+G 2bb090 SpeechLib_BankTableBytes

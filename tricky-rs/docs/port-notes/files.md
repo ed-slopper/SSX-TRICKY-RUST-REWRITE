@@ -869,11 +869,20 @@ by what each does, not by any name in the binary. Globals: 0x35caec picture_stru
   `SyncOp2` 0x2c9070 (queue, wait, result), `FileSys_QueueOp7` 0x2cac38 (op type 7, +0x10 / +0x14 = a1 / a2),
   `FileSys_NoOpHook` 0x2cb9c8, `FileSys_SetRootThunk` / `GetRootThunk` 0x2cc328 / 0x2cc348, `WStr_FormatThunk`
   0x2c5558, `EAMem_ReferThread` 0x2cf2f8.
-- SDK: `Pad_RpcCmd14` 0x2e8288 (libpad RPC 0x403c40, command 0x14), `Cd_SetPowerOffCallback` 0x2e87c8 (stores the
-  callback / argument at 0x404004 / 0x404008, answers the old one; this has `sceCdPOffCallback`'s signature, while
-  the function now named `sceCdPOffCallback` 0x2e8878 is what it calls first, unsettled), `Cd_RunPowerOffCallback`
+- SDK: `Pad_RpcCmd14` 0x2e8288 (libpad RPC 0x403c40, command 0x14), `sceCdPOffCallback` 0x2e87c8 (stores the
+  callback / argument at 0x404004 / 0x404008 between `DIntr` / `EIntr`, answers the old one: Sony's
+  `sceCdPOffCallback(func, addr)`; named `Cd_SetPowerOffCallback` in batch 35, renamed after), `Cd_RunPowerOffCallback`
   0x2e8838, `Cd_NcmdRpc0E` 0x2e8e70 (N-command RPC 0xe, from `sceCdRead` / `sceCdStop`), `Mc_GetRpcBuffers` 0x2f1280,
   `Mc_RpcCmd15` 0x2f1368, `Thread_PostSelfEvent` 0x307830, `SifLoad_CheckVersion` 0x30d8b8 / `ResetVersion`
   0x30d948, `sceSifLoadStartModule` 0x30de10 (`SifLoad_ModuleCmd` with the result pointer a3 passed on, unlike
   `sceSifLoadModule`), `InitSys_ClearSyscalls` 0x30e470 (syscalls 0x80..0xff set to 0), `Libc_EioStubA..C`
   0x306df8 / 0x306f38 / 0x306f60 (errno 5, −1; A sits between `read` and `close`).
+
+## Names from F1c batch 36 (proven unless marked)
+
+- `Cd_InitPowerOff` 0x2e8878 (was `sceCdPOffCallback`; from `sceCdInit` and from `sceCdPOffCallback` 0x2e87c8 while
+  0x35aebc < 0): `sceSifInitRpc`, 0x35aea4 = 1, SIF command handler 0x80000012 = `Cd_RunPowerOffCallback` 0x2e8838,
+  then binds RPC 0x80000596 (client 0x404078; up to 18 tries, 0x35aebc = 0 once bound) and calls its function 1
+  with 0xb at 0x4040a0; answers 1 on success. 0x35aea4 is 1 while it runs, which keeps the handler from calling the
+  callback. The two names were swapped: 0x2e87c8 has the SDK function's signature and behaviour (both in
+  `ghidra/renamed.txt`).

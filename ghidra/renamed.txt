@@ -727,3 +727,5 @@
 157978 FUN_00157978 Score_GetTrickName
 2f54e8 __divdi3 __udivdi3
 30e4d8 __divdi3_2 __divdi3
+2e8878 sceCdPOffCallback Cd_InitPowerOff
+2e87c8 Cd_SetPowerOffCallback sceCdPOffCallback

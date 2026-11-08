@@ -1202,3 +1202,8 @@ ones at 0x3511f8; the IOP shared block is 0x353314.
   (from `CalcMemSize` / `Create` / `Destroy`). `SndVoice_FindStreamSlot` 0x2e5490: the index in the stream voice
   table 0x358c38 (count byte 0x350ff2) whose `SndVoice_Validate` matches a0, else −1 (from the MT, PCM and XA
   `InitStream`s).
+
+## Names from F1c batch 36 (proven)
+
+- `SpeechLib_BankTableBytes` 0x2bb090: `v << 2`. `SpeechSys` init (0x228898) calls it with 300 for the size of
+  the table it allocates and hands to `SpeechLib_SetBankTable` 0x2bb098 with the same 300.
