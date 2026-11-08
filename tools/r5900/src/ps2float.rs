@@ -10,8 +10,16 @@
 //! - `EeAdder` (add and subtract only): the adder as the manual describes it: the smaller operand's mantissa is
 //!   shifted right to line the exponents up and the bits shifted out are dropped (there is no guard bit), then the
 //!   sum is normalised and cut toward zero.
+//! - `Guard` (add and subtract only): PCSX2's COP1 adder as normal play shows it (F4h2, F4g): the smaller operand
+//!   is cut toward zero to one bit below the larger's last mantissa bit (one guard bit, no sticky bit), then the
+//!   sum is rounded to nearest, ties to even.
 //!
-//! [`Rules::default`] is the best match to the game in PCSX2 so far (`tricky-rs/docs/checking.md`, F4f, F4g).
+//! The COP1 (FPU) `add.s`/`sub.s` have their own rule, `fadd`, apart from VU0's adds (`add`): in PCSX2 they differ.
+//! `add=` sets both; `fadd=` after it sets the FPU's alone.
+//!
+//! [`Rules::default`] is the best match to the game in PCSX2 so far (`tricky-rs/docs/checking.md`, F4f, F4g, F4h2),
+//! except `fadd`: PCSX2's COP1 adds are `fadd=g1`, but the default stays nearest, the rule our ports are checked
+//! by, until board row F4c decides (with `fadd=g1` 38 of the game crate's runner tests part by an ulp).
 //! `TRICKY_FLOAT_RULES=add=ee,mul=chop` style strings parse with [`Rules::parse`].
 //!
 //! Exact results are formed in f64 and then cut to f32: products and quotients of two floats, and sums of
@@ -27,11 +35,16 @@ pub enum Round {
     Chop,
     /// Add and subtract only.
     EeAdder,
+    /// Add and subtract only.
+    Guard,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Rules {
+    /// VU0's adds and subtracts (and their multiply-adds' sums).
     pub add: Round,
+    /// COP1's `add.s` and `sub.s`.
+    pub fadd: Round,
     pub mul: Round,
     pub div: Round,
     pub cvt: Round,
@@ -39,9 +52,9 @@ pub struct Rules {
 
 impl Rules {
     /// Everything toward zero, as the manual describes the hardware.
-    pub const MANUAL: Rules = Rules { add: Round::Chop, mul: Round::Chop, div: Round::Chop, cvt: Round::Chop };
+    pub const MANUAL: Rules = Rules { add: Round::Chop, fadd: Round::Chop, mul: Round::Chop, div: Round::Chop, cvt: Round::Chop };
 
-    /// `add=ee,mul=chop,div=nearest,cvt=chop`; parts left out keep the default.
+    /// `add=ee,fadd=g1,mul=chop,div=nearest,cvt=chop`; parts left out keep the default; `add=` sets `fadd` too.
     pub fn parse(s: &str) -> Result<Rules, String> {
         let mut r = Rules::default();
         for part in s.split(',').map(str::trim).filter(|p| !p.is_empty()) {
@@ -49,15 +62,17 @@ impl Rules {
             let v = match v {
                 "n" | "nearest" => Round::Nearest,
                 "c" | "chop" => Round::Chop,
-                "ee" if k == "add" => Round::EeAdder,
-                _ => return Err(format!("{part}: rule is nearest, chop or (add only) ee")),
+                "ee" if k.ends_with("add") => Round::EeAdder,
+                "g1" | "guard" if k.ends_with("add") => Round::Guard,
+                _ => return Err(format!("{part}: rule is nearest, chop or (add and fadd only) ee or g1")),
             };
             match k {
-                "add" => r.add = v,
+                "add" => (r.add, r.fadd) = (v, v),
+                "fadd" => r.fadd = v,
                 "mul" => r.mul = v,
                 "div" => r.div = v,
                 "cvt" => r.cvt = v,
-                _ => return Err(format!("{part}: op is add, mul, div or cvt")),
+                _ => return Err(format!("{part}: op is add, fadd, mul, div or cvt")),
             }
         }
         Ok(r)
@@ -65,9 +80,9 @@ impl Rules {
 }
 
 impl Default for Rules {
-    /// The best match to the game in PCSX2 so far.
+    /// The best match to the game in PCSX2 so far, but for `fadd` (nearest until F4c; PCSX2 is `Guard`).
     fn default() -> Rules {
-        Rules { add: Round::Nearest, mul: Round::Nearest, div: Round::Chop, cvt: Round::Chop }
+        Rules { add: Round::Nearest, fadd: Round::Nearest, mul: Round::Nearest, div: Round::Chop, cvt: Round::Chop }
     }
 }
 
@@ -153,10 +168,38 @@ fn add_ee(a: f32, b: f32) -> f32 {
     f32::from_bits((sa << 31) | ((e as u32) << 23) | (m as u32 & 0x7f_ffff))
 }
 
+/// One guard bit, then to nearest (`Round::Guard`).
+fn add_guard(a: f32, b: f32) -> f32 {
+    let (big, small) = if b.abs() > a.abs() { (b, a) } else { (a, b) };
+    if small == 0.0 {
+        return round(big as f64, Round::Nearest);
+    }
+    let e = ((big.to_bits() >> 23) & 0xff) as i32 - 127;
+    let guard = 2f64.powi(e - 24); // one bit below the larger operand's last mantissa bit
+    let cut = (small as f64 / guard).trunc() * guard;
+    round(big as f64 + cut, Round::Nearest) // exact in f64, rounded once
+}
+
+/// COP1's `add.s` (`Rules::fadd`).
+pub fn fadd(a: f32, b: f32) -> f32 {
+    add_by(a, b, rules().fadd)
+}
+
+/// COP1's `sub.s`.
+pub fn fsub(a: f32, b: f32) -> f32 {
+    fadd(a, -b)
+}
+
+/// VU0's add (`Rules::add`).
 pub fn add(a: f32, b: f32) -> f32 {
+    add_by(a, b, rules().add)
+}
+
+fn add_by(a: f32, b: f32, how: Round) -> f32 {
     let (a, b) = (load(a), load(b));
-    match rules().add {
+    match how {
         Round::EeAdder => add_ee(a, b),
+        Round::Guard => add_guard(a, b),
         how => round(a as f64 + b as f64, how),
     }
 }
@@ -221,6 +264,16 @@ mod tests {
         set_rules(Rules::parse("add=ee").unwrap());
         assert_eq!(add(add(1.0, 2f32.powi(-24)), 2f32.powi(-24)), 1.0);
         assert_eq!(add(1.5, -0.25), 1.25);
+        // one guard bit, then nearest: of 1 + (2^-24 + 2^-30) the guard keeps 2^-24, a tie, which goes to even (1),
+        // where IEEE sees past the half and gives 1 + 2^-23
+        set_rules(Rules::parse("add=g1").unwrap());
+        let x = 2f32.powi(-24) + 2f32.powi(-30);
+        assert_eq!(add(1.0, x), 1.0);
+        assert_eq!(1.0f32 + x, 1.0 + 2f32.powi(-23));
+        assert_eq!(add(1.0, 2f32.powi(-23) + 2f32.powi(-24)), 1.0 + 2f32.powi(-22)); // 1.5 ulp: a tie, to even
+        let r = Rules::parse("add=n,fadd=g1").unwrap();
+        assert_eq!((r.add, r.fadd), (Round::Nearest, Round::Guard));
+        assert_eq!(Rules::parse("add=c").unwrap().fadd, Round::Chop);
         set_rules(Rules::default());
         assert!(Rules::parse("mul=ee").is_err());
     }

@@ -389,8 +389,8 @@ fn cop1(r: &mut Runner, _pc: u32, w: u32, rs: usize, rt: usize, rd: usize, fd: u
         16 => {
             let (a, b) = (c.f(fs), c.f(ft));
             let v = match fun {
-                0 => pf::add(a, b),
-                1 => pf::sub(a, b),
+                0 => pf::fadd(a, b),
+                1 => pf::fsub(a, b),
                 2 => pf::mul(a, b),
                 3 => pf::div(a, b),
                 4 => pf::sqrt(b), // sqrt.s fd, ft

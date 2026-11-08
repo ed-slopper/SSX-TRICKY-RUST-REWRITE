@@ -176,6 +176,32 @@ fn air_steps_tell_the_float_rules_apart() {
             }
         }
         eprintln!("{path}: under {rules} the runner gives the game's air step on {runner} of {ours}");
+        // `AirPredict_Tick` 0x123ec8 (three COP1 `add.s`/`sub.s`) on the prediction record (rider+0x57b0, F4h2)
+        let Some(k) = ticks[0].extra.iter().position(|(off, _)| *off == 0x57b0) else { continue };
+        let rec = r.mem.alloc(0x60);
+        let (mut steps, mut same) = (0, 0);
+        for w in ticks.windows(2) {
+            if w[1].tick != w[0].tick + 1 {
+                continue;
+            }
+            for (pa, pb) in w[0].extra[k].1.iter().zip(&w[1].extra[k].1) {
+                let x4c = |p: &[u8]| f32_at(p, 0x4c);
+                if x4c(pb) == 0.0 || x4c(pa) == 0.0 && pb[8..0x4c] != pa[8..0x4c] || f32_at(pa, 0x44) == 0.0 && f32_at(pa, 0x48) == 0.0 {
+                    continue; // not a tick in the air (or a fresh prediction, or nothing to count down)
+                }
+                r.mem.write(rec, pa).unwrap();
+                r.cpu.set_gpr(4, rec as u64);
+                r.call(0x123ec8).unwrap();
+                let got: Vec<u32> = [0x4c, 8, 0x50].iter().map(|o| r.mem.read_u32(rec + o)).collect();
+                let want: Vec<u32> = [0x4c, 8, 0x50].iter().map(|o| f32_at(pb, *o).to_bits()).collect();
+                // one tick apart only (the recorder sometimes falls a frame behind: those are left out)
+                if ((x4c(pb) - x4c(pa)) * 60.0 - 1.0).abs() < 0.01 {
+                    steps += 1;
+                    same += (got == want) as usize;
+                }
+            }
+        }
+        eprintln!("{path}: under {rules} the runner gives the game's AirPredict_Tick on {same} of {steps} single ticks");
     }
 }
 
@@ -312,7 +338,7 @@ fn flight_predictions_against_the_running_game() {
                     }
                     // a landing: from the rider at the end of the tick, our flight; the ray answers with the game's
                     // landing on the first of our segments that passes within 0.05 cm of its point
-                    let (mut best, mut hit_seg, mut seg) = (f32::MAX, None, 0);
+                    let (mut best, mut hit_seg, mut seg, mut nearest) = (f32::MAX, None, 0, (f32::MAX, 0.0f32));
                     let mut ray = |a: [f32; 4], b: [f32; 4]| {
                         seg += 1;
                         let d = [b[0] - a[0], b[1] - a[1], b[2] - a[2]];
@@ -321,6 +347,9 @@ fn flight_predictions_against_the_running_game() {
                         let h = (q[0] * d[0] + q[1] * d[1] + q[2] * d[2]) / dd;
                         let off = [q[0] - h * d[0], q[1] - h * d[1], q[2] - h * d[2]];
                         let dist = (off[0] * off[0] + off[1] * off[1] + off[2] * off[2]).sqrt();
+                        if hit_seg.is_none() && dist < nearest.0 {
+                            nearest = (dist, h);
+                        }
                         if hit_seg.is_none() && (0.0..=1.0).contains(&h) && dist < 0.05 {
                             best = dist;
                             hit_seg = Some(seg);
@@ -344,7 +373,8 @@ fn flight_predictions_against_the_running_game() {
                         worst_v = worst_v.max((0..3).map(|q| (p.vel[q] - gv[q]).abs()).fold(0.0, f32::max));
                     } else {
                         off_seg += 1;
-                        eprintln!("  {ctx}: the game's landing {gpoint:?} at {} s is on none of our segments", f32_at(pb, 0x44));
+                        eprintln!("  {ctx}: the game's landing {gpoint:?} at {} s is on none of our segments \
+                            (nearest {} cm off, at {} along)", f32_at(pb, 0x44), nearest.0, nearest.1);
                     }
                 } else if x4c(pb) != 0.0 && x4c(pa).to_bits() != x4c(pb).to_bits() {
                     // a tick in the air: `AirPredict_Tick`

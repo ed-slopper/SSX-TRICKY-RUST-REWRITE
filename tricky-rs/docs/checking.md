@@ -290,6 +290,35 @@ is what normal play shows.
 The game's `$gp` at the breakpoint was 0x3C38F0, the value the runner works out from the entry code, and the code
 in memory was byte-identical to `SLUS_203.26`.
 
+**F4g, 2026-11-08 (irregulur/lynx): PCSX2's COP1 adder, from the per-tick replays.** F4h2 read the rule off
+`AirPredict_Tick` 0x123ec8 (three COP1 `add.s`/`sub.s`, `checking.md` F4h2). It is now a runner rule:
+`ps2float::Round::Guard` (`g1`). The smaller operand is cut toward zero to one bit below the larger's last
+mantissa bit (one guard bit, no sticky bit), then the sum is rounded to nearest, ties to even. COP1's add and
+subtract now have their own setting, `fadd`, apart from VU0's `add`. `add=` sets both and `fadd=` after it sets
+the FPU's alone (`TRICKY_FLOAT_RULES=add=n,fadd=g1,mul=n,div=n,cvt=n`). `air_steps_tell_the_float_rules_apart`
+in `tricky-rs/game/tests/replay.rs` now also runs the game's `AirPredict_Tick` in the runner on every recorded
+air tick of the prediction record (rider+0x57b0). Recordings: the attract demo (rec 5) and a Single Event raced
+by hand (rec 6, 90 s, 6 riders):
+
+| Rules (mul, div, cvt nearest) | Air step (VU0, `Air_IntegrateRK4`) | `AirPredict_Tick` (COP1), single ticks |
+|---|---|---|
+| add=n (IEEE) | 1,940 / 1,940; 5,800 / 5,800 | 1,560 / 2,036; 4,207 / 5,877 |
+| **add=n, fadd=g1** | **1,940 / 1,940; 5,800 / 5,800** | **2,036 / 2,036; 5,877 / 5,877** |
+| add=n, fadd=ee (no guard bit, chop) | all | 1,730; 4,512 |
+| add=n, fadd=c (chop) | all | 1,684; 5,443 |
+| add=g1 (VU0 too) | 117; 357 | all |
+
+So in normal play PCSX2's COP1 `add.s`/`sub.s` are `g1` and VU0's adds are nearest: the two units differ.
+That answers the question F4f/F4g left open. `g1` also gives the two values at 0x109d6c that no IEEE rule
+gave (`Boarder_ForwardDrag`'s cub term, stat bytes 76 and 81, with nearest multiplies). It was not yet run
+on the 159 saved `Boarder_ForwardDrag`/`Boarder_SideFriction` captures, which stay on ed-slopper's PC
+(`tools/r5900/tests/captured.rs`, `TRICKY_CAPTURES`, `TRICKY_FLOAT_RULES=add=n,fadd=g1`): row F4g2.
+
+The runner's default stays `fadd=n`, the rule every `checked` row was checked by. With `fadd=g1` as the
+default, 38 of the game crate's 622 runner tests part from our IEEE ports (mostly draw code: animation
+curves, Bézier tables, fonts, quads, lights, fog, the limb IK). Whether the port follows PCSX2's adder
+(and the console's, still unknown) is F4c, a decision for the humans.
+
 ## F4d: our functions against the original (done 2026-10-10)
 
 `tricky-rs/game/src/ground.rs` holds `forward_drag` (`Boarder_ForwardDrag` 0x109cb8) and `side_friction`
@@ -392,6 +421,12 @@ jumps. `flight_predictions_against_the_running_game` in `tricky-rs/game/tests/re
     the port stays IEEE until F4c decides.
 - Takeoffs (`takeoffs_against_the_running_game`, stats from the same demo): 13 jumps, left-overs as before
   (0.7–133 cm/s). The steep-lip branch is still in no recording.
+- A Single Event raced by hand (90 s, F4g's recording): 54 predictions (+3 half-made); 8 of 8 no-landing records
+  bit for bit, all from the rider at the end of the tick. 46 with a landing all have the time to the top bit for
+  bit; on 42 the game's landing is on our flight (0.0029 cm, 1.1e-6 s). On 4 (ticks 2462, 3027 and 4296 of rider 4,
+  tick 3318 of rider 0) it is 30–157 cm off every segment: the same vertical but another sideways path. Either
+  the velocity changed sideways after the prediction, or the flight reads something of the rider that ours does
+  not (row F4h3).
 
 ## How a row gets to `checked`
 
