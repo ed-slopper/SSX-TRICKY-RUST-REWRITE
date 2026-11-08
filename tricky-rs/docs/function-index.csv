@@ -3230,10 +3230,8 @@ address,size,name,system,status
 0x1ed490,2616,ReplayControl_DrawTimeline,replay,checked
 0x1eded0,28,ReplayControl_ShowMessage,replay,checked
 0x1edef0,1904,ReplayControl_DrawStrip,replay,checked
-0x1ee660,136,Gfx_BeginScreenSpace,render,ported
 0x1ee660,136,Gfx_BeginScreenSpace,render,checked
-0x1ee6e8,52,Gfx_EndScreenSpace,render,ported
-0x1ee6e8,56,Gfx_EndScreenSpace,render,checked
+0x1ee6e8,52,Gfx_EndScreenSpace,render,checked
 0x1ee720,1760,HUD_DrawStartSelectPrompt,hud,checked
 0x1eee00,2060,ReplayControl_DrawKey,replay,checked
 0x1ef610,320,ReplayOverlay_Init,frontend,checked

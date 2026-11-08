@@ -291,7 +291,18 @@ def build(export_csv):
 def status():
     with open(INDEX, newline="", encoding="utf-8") as f:
         rows = list(csv.DictReader(f))
-    write(refresh(rows))
+    # one row per address: a copy with the same size is merged ('checked' kept), a copy with another size is an error
+    by_addr = {}
+    for r in rows:
+        k = int(r["address"], 16)
+        if k not in by_addr:
+            by_addr[k] = r
+        elif by_addr[k]["size"] != r["size"]:
+            sys.exit(f"{INDEX.relative_to(ROOT)}: {r['address']} twice, sizes {by_addr[k]['size']} and {r['size']}: "
+                     "keep the row with Ghidra's size")
+        elif r["status"] == "checked":
+            by_addr[k]["status"] = "checked"
+    write(refresh(list(by_addr.values())))
 
 
 # AGENTS.md §14, as patterns. A part is a capitalised word: Boarder, GroundMotion, SND, AIP.
