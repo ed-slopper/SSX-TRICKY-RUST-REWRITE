@@ -1072,3 +1072,85 @@ earlier batch 25 list.
   (×50) changes; 1..4 play sound 0x70 on `Audio_GetVolumeSlot(n)` (audio+0x3848+0xc·n), 0 and −1 have no slot.
 - Inferred: "volume test" (the sample played when a volume slider moves) is read from where they are called (the
   options pages); the sounds' contents were not listened to.
+
+## Names from F1c batch 34 (proven)
+
+The rest of EA's sound library (batch 25's "Still unclear" list), read in Ghidra. Voice records are the 0x88-byte
+ones at 0x3511f8; the IOP shared block is 0x353314.
+
+- **Bank sounds:** `SndPT_NextTag` 0x2dffe8 (EA's PT tag stream: skips 0xfc padding, 0xff ends, 0xfd / 0xfe are
+  markers, else tag, size (0xff → 4-byte big-endian size), and the value when size < 5; also used by
+  `SND_ParsePTLayer`). `SndSound_ParseHeader` 0x2d60b0 (from `SndBank_GetSoundInfo` and `SndStream_OnHeaderChunk`:
+  defaults rate 0x5622 = 22050, 1 channel, codec 5; tags 0x84 rate, 0x82 channels, 0xa0 codec, 0x85 / 0x88 / 0x89 /
+  0x94 / 0x95 / 0xa2 / 0xa3 sample offsets, 0x98..0x9b / 0xa4 / 0xa5 copied blobs, 0x14 up to four sub-records,
+  0xa1 flags, 0x8c → play params +8; per-channel pan from 0x351214). `SndBank_GetSoundInfo` 0x2d1570 (parses one
+  sound into the caller's three structs and frees the blobs again; −8 bad bank or sound).
+  `SndBank_FixLayerAddrs` 0x2d1680 (from `SndBank_Register`: each layer whose flags match gets
+  `SndLayer_SetSampleAddr` 0x2dd990 (its sample address = upload base + its offset from the first layer's) and
+  `SndLayer_RunCallbacks` 0x2d0e98 (each of the layer's +0x17 pending items is passed, with a mode 0 / 1, to every
+  callback in the list 0x3511d4, count 0x351196, set up by `SND_Init` and `SndStream_OnHeaderChunk`)).
+- **Playing:** `SND_PlayBankSound` → `SndSound_PlayLayers` 0x2d5e18 (every layer whose key and velocity ranges hold
+  the note gets `SndVoice_PlayLayer`; if none lives, stops them all; if more than one, they share a new group id at
+  voice +0x2a and the last one gets +0x26 = 1) → `SndVoice_PlayLayer` 0x2d59d8 (for each speaker mask from
+  `SndSpeaker_NextMask` 0x2def00 (the masks at 0x350ff8, count 0x350ff7, that match the layer's mask & 0x71c /
+  & 0xe0): `SndVoice_Alloc`, then fills the voice: pan by `Snd_MidiPanToPan` 0x2d6910 (128 shorts at 0x351998),
+  pitch in cents with random spread, volume ×param / 0x7f, envelope (+0x68 table, +0x3c slope), random picks,
+  `SNDVoice_CalcPitchMult`, `SndVoice_CalcFxSend`, `SndVoice_CalcVolume`, and `SndVoice_Start`; on failure releases
+  the channels and tries the next mask; −9 when no mask is left).
+  `SndVoice_Alloc` 0x2d4ae8 (n channels in voices [lo, hi): first free ones (+0x65 == 0) by oldest +0x2c, then
+  steals by lowest priority +0x4c (< 0x65), oldest first; `SndVoice_IsPicked` 0x2d4ab0 keeps a voice from being
+  picked twice (list 0x351278); sorts the picks, stops what they played, links the extra channels to the first
+  (+0x28 = first, the first's +4.. = the list), handle = counter 0x351270 (+0x100 per call) | first).
+  `SndVoice_Start` 0x2dd9c8 (software voices (+0x24 & 4): `SoftVoice_Start` per channel, then pitch, pan, fx send,
+  `SndVoice_SetFxA`, `SndVoice_SetDistortion`, `SndVoice_SetLowpassHz`, `SndVoice_SetFirHz`, `SoftVoice_SetPlaying`;
+  flag 8 and flag 0x100 voices are hardware SPU voices: writes the start address with a sequence count
+  (0x353c98 += 0x800000) into the IOP block). `SndVoice_HighestChannel` 0x2df1d8 (index of the largest channel
+  number of a voice).
+- **Ending:** `SndVoice_Release` 0x2d4f58 (clears +0x65 / +0x2a / +0x26 and stamps +0x2c; for a grouped voice, frees
+  the group when it is the second of a pair or marks the leader +0x65 = 2), `SoftVoice_OnEnd` 0x2dacb0 (a software
+  channel's end: `SndVoice_Release(channel + the two hardware voice counts)`), `SndVoice_ReapFinished` 0x2db3b8 (from
+  `SND_MixThread`: hardware voices whose IOP slot reports done and which are older than 5 ticks are released),
+  `SndHandle_Release` 0x2dfda0 (from `SndMidi_NoteOff`: each voice with envelope release stage +0x4f < 0 stops, else
+  jumps to that stage), `SndHandle_GetTimeLeft` 0x2d3358 (largest time left of a handle's voices, from length −
+  position, rate, pitch and +0x66; −7 none; `PathX_GetPositionMs`), `SndStreamVoice_StopUnsupported` 0x2df8c0
+  (returns −15).
+- **Effect buses (16 bytes each at 0x351200):** `SND_SetFxBus` 0x2d3548 (type, level, the two parameters; type 0
+  forces level 0; then `SndFxBus_Configure` and `SND_ApplyFxBusLevels`), `SND_ApplyFxBusLevels` 0x2d35f8 (flags 0x10 /
+  0x20 / 0x40 set the bus level bytes +5 / +6 / +4, `SndIop_SetFxLevel` 0x2dd3f0 (IOP block +0xb), and every voice's
+  fx send), `SndFxBus_Configure` 0x2dd388 (keeps the flags at 0x353c8c and installs `SndFxBus_Apply` as the
+  driver-start hook 0x353c84), `SndFxBus_Apply` 0x2dd278 (0x40 → `SndSpu_SetReverbMode` 0x2dd188 (EA's reverb ids 0,
+  5, 10, 20, 30, 40, 50, 120, 110, 100 → SPU2 modes 0..9; work area end = (0x200000 − size from 0x358b98) >> 6 →
+  0x353c7e; mode and the two depths into the IOP block +8..+10), 0x20 → `SndFxBus_SendConfig` 0x2dd0d0 (copies the
+  bus's parameter block, or the default 0x358b80, into the shared block 0x353cdc with a change counter), 0x10 → the
+  software reverb (`SoftReverb_Setup` and its three hooks, or `SoftReverb_FreeBuffers`)).
+- **Software mixer:** `SoftVoice_Mix` 0x2e0100 (pulls up to 32 samples through the channel's effect chain, ramps
+  each speaker level from +0x14.. to +0x2c.., mixes with the mixer hook 0x358e84, and feeds the reverb input),
+  `SoftVoice_CalcGain` 0x2e00e0 (+8 = (+0xc × +4) >> 15 + >> 16), `SoftVoice_SetPlaying` 0x2e0828 (levels jump to
+  their targets, state 2), `SoftMix_SetDefaultMixer` 0x2e0610 (hook 0x2e4af8, 0x358cc4 = 0x400),
+  `SoftMix_SetResampleQuality` 0x2e0630 (0x358cc6; `SoftVoice_SetPitch` uses the better resampler above 0x18),
+  `SoftMix_ShutdownStub` 0x2e00d8 and `SND_NoOpHook` 0x2dc338 (empty).
+- **Per-channel effects:** `SndVoice_SetDistortion` 0x2dcd40 → `SoftVoice_SetDistortion` 0x2e1138 (adds effect id
+  0x78: `SndFx_Distort_Init` 0x2e4500, `SndFx_Distort_Pull` 0x2e4300 (clips each sample to [lo, hi] then × gain >> 7),
+  `SndFx_Distort_SetLevel` 0x2e4480 (l = x × 32000 >> 15; lo = l − 0x8000, hi = 0x7fff − l, gain = 0x3fde00 / hi);
+  level ≤ 0 removes it). `SndVoice_SetFirHz` 0x2dced0 → `SoftVoice_SetFirHz` 0x2e11e8 (adds the 9-tap FIR, id 0x50,
+  `SndFx_Fir_DesignUnity` at the mixer rate). `SndVoice_SetFxA` 0x2dcc88 → `SoftVoice_SetFxA` 0x2e1130 (empty in this
+  build). All three act on software voices only (+0x24 & 4).
+- **Config and driver:** `SND_ApplyConfig` 0x2daee8 (`SND_SetConfig`'s body: rates rounded to 24000 / 36000 /
+  48000, speaker mode and voice counts clamped to the limits 0x350fbc..0x350fc0; before the driver runs it stores
+  the config and the voice total 0x351198, after it only the live fields, and re-pans voices when the speaker
+  mode changed), `SndIop_BuildSharedBlock` 0x2db738 (from `SND_LoadIopDriver`: lays out the uncached block at
+  0x20355f80 (0x2c00 bytes) as tagged chunks 3, 2 (software reverb), 1 (mix buffers), 4, 5 (when 0x350ff5 & 2),
+  6, 7, and records their addresses: 0x353314, 0x353318, 0x35331c, 0x353cdc, 0x353cd0, 0x353c9c..).
+- **Misc:** `Snd_Printf` 0x2cfe90 (`printf(a1)`, no callers), `SndStream_ReleasePacketCb` 0x2d1a80 (installed by
+  `SndStream_Create`: `Strm_ReleasePacket` on the stream's packet), `SndStream_OpenEx` 0x2d2dd8 (`SndStream_Create`
+  with a0 moved to the sixth argument and mode 1; `SndStream_Open` passes 0, 0; used by the movie player vf1
+  0x2ba560), `SndPan_ApplyQuadrantSigns` 0x2dd408 (from `SndVoice_UpdatePan`: flips the signs of the two levels by
+  the quadrant of the position), `Vu0_RestoreFlags` 0x2da8d8 (from `Vu0_RestoreRegs`: rebuilds the saved VU0 status
+  flags by a `vmul` of chosen ±1 / 0 / ±1e30 vectors).
+- **DTS filterbank:** `Dts_AnalyzeChannel` runs ten passes between scratchpad buffers +0x600 / +0x800:
+  `Dts_FbPass1`..`Dts_FbPass5` 0x2d9930 / 0x2d9a00 / 0x2d9a90 / 0x2d9bf0 / 0x2d9cc0 (VU0 add / subtract only),
+  `Dts_FbTwiddle1`..`Dts_FbTwiddle4` 0x2d9d80 / 0x2d9e90 / 0x2d9fb0 / 0x2da0d0 (add / subtract and multiplies by the
+  tables at work +0xa28..+0xa34) and `Dts_FbOutput` 0x2da2d0 (table +0xa38, writes 0x40 values to the output).
+- Inferred only: the names; "distortion" for effect 0x78 (from the clip-and-gain maths); that the five add-only
+  passes plus four multiply passes form a fast transform for the analysis filterbank; which IOP block chunk is
+  which beyond the addresses recorded. lib-snd has no unnamed functions left (0x2bb090, x << 2, is ported).
