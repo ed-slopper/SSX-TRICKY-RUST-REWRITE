@@ -335,7 +335,7 @@ riders each):
 - Takeoff, the jump impulse, the flight prediction (RK4 with sub-steps, $a3 ≠ 0) and the jump's steep-lip
   branch are row F4h2.
 
-## F4h2: takeoffs from a recorded race (2026-10-10, part done)
+## F4h2: takeoffs and the flight prediction from a recorded race (2026-10-10, 2026-11-08)
 
 A third recording (`pine.py record 40`, 2,334 ticks, six riders, with jumps), and each rider's stat block saved
 over PINE in the same race (TRICKY_STATS: `rider stats-address hex` lines).
@@ -353,6 +353,45 @@ over PINE in the same race (TRICKY_STATS: `rider stats-address hex` lines).
   far the crouch unwound (rider+0x1c8 − rider+0x208) within the tick.
 - Bit for bit needs the state inside the tick (crouch, the ground forces before the impulse): replaying the whole
   tick, row F4b3. The flight prediction (RK4 with sub-steps) and the steep-lip branch are still to do.
+
+**F4h2, 2026-11-08 (irregulur/lynx): the flight prediction.** Recorded with
+`pine.py record 60 <file> 0x600 57b0:64`, which now also reads the prediction record (rider+0x57b0, 0x54 bytes:
++8 time left, +0x10 point, +0x20 velocity, +0x30 normal, +0x40 surface word, +0x44 landing time, +0x48 time to the
+top, +0x4c time since take-off, +0x50 time to the top left) in the same PINE message as the rider. (The first try
+read the windows after all six riders: 6 of 41 predictions then sat one tick ahead of their rider. Reading each
+rider's block and windows in one message fixed that.) The race was the attract demo, run twice: same ticks, same
+jumps. `flight_predictions_against_the_running_game` in `tricky-rs/game/tests/replay.rs`, on the second recording:
+
+- 35 take-off predictions (a record whose +0x4c is 0 and which changed this tick), plus 2 read while the game was
+  still inside `AirPredict_AtTakeoff` 0x123b10 (+8 counting up, +0x44 still 0; skipped).
+- **No landing (7):** the record then holds the prediction's own position, velocity and normal, so it can be
+  made again from them: `air::predict_at_takeoff` gives all 0x4c bytes bit for bit on 7 of 7. Those inputs are
+  the rider's at the end of the tick on 6; on one (tick 19500, rider 0, state 3 → 0xd) the rider's velocity
+  was about halved after the prediction, later in the same tick (inferred: a hit or the 0xd placing).
+- **A landing (28):** made from the rider at the end of the tick (+0x140, +0x150, +0x2a0). The time to the top
+  is bit for bit on 27. Without the course here, the test's ray answers with the game's own landing (point,
+  normal, word) on the first of our segments that passes within 0.05 cm of the game's point. That happens on
+  the same 27, at most 0.0084 cm off, which shows our flight's steps are the game's. The landing time is then
+  within 5.8e-6 s and the velocity within 0.011 cm/s; both use our ray's fraction, not the game's.
+- The other one (tick 21105, rider 4, state 0xa → 0x10): the game's time to the top is 0, so its velocity was
+  not rising when it predicted. The rider ends the tick rising at 345.8 cm/s, and 21104 shows a 576 cm/s jump
+  impulse. Inferred: this time the impulse came after the air motion's enter, within the tick. Settling it needs
+  the in-tick state (F4b3).
+- **`AirPredict_Tick` 0x123ec8**, each tick in the air: `Predict::tick` in IEEE f32 gives the record bit for
+  bit on 1,604 of 2,239 ticks. With **PCSX2's FPU adder** as these ticks show it, it gives 2,101, and 131
+  more are two ticks apart (the recorder fell a frame behind). The rule: the smaller operand is cut toward
+  zero to one bit below the larger's last mantissa bit, then the sum is rounded to nearest, ties to even
+  (`pcsx2_add` in the test). Its three operations are plain COP1 `add.s` and `sub.s`.
+  - On the first recording, of the operations where the rules differ: IEEE nearest fits 38 of 448 adds and
+    471 of 604 subtracts; toward zero fits 396 and 193; the EE adder (no guard bit) 396 and 314; one guard bit
+    with nearest fits **434 of 448** and **604 of 604** (the 14 adds are the two-tick gaps).
+  - It also gives F4g's `add.s` at 0x109d6c (0x3f99610a for stat byte 76, 0x3f98a67c for 81) with
+    nearest multiplies, where IEEE gives 1 ulp less.
+  - The air step (`Air_IntegrateRK4`, VU0 macro code) stays IEEE-nearest: 1,940 of 1,940 in the runner on this
+    recording. So in normal play PCSX2's COP1 add/sub differs from its vector unit. This is the lead for F4g;
+    the port stays IEEE until F4c decides.
+- Takeoffs (`takeoffs_against_the_running_game`, stats from the same demo): 13 jumps, left-overs as before
+  (0.7–133 cm/s). The steep-lip branch is still in no recording.
 
 ## How a row gets to `checked`
 

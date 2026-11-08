@@ -12,10 +12,13 @@ PINE reads and writes memory and saves and loads states; it has no breakpoints o
     python tools/pine.py watch <addr> <bytes> <seconds> <out.txt>
                                                         poll a block, write every distinct copy with a timestamp
     python tools/pine.py riders                          the race object and its riders (addresses, place, speed)
-    python tools/pine.py record <seconds> <out.txt> [<bytes>]
+    python tools/pine.py record <seconds> <out.txt> [<bytes>] [<off>:<len> ...]
                                                         each tick: the race tick and every rider's first
                                                         <bytes> (default 0x600), kept only when the tick did
-                                                        not change while reading (F4b; keep it on your PC)
+                                                        not change while reading (F4b; keep it on your PC);
+                                                        each <off>:<len> (hex) adds that window of every rider
+                                                        after the pad, read in one message with the rider
+                                                        (57b0:64 = the flight prediction, F4h2)
     python tools/pine.py counters [<start> <end>]       find tick counters and clocks: words in .data/.bss
                                                         (default 0x31D300-0x40C174) that climb about 60 a
                                                         second, or floats that climb about 1 a second
@@ -103,6 +106,22 @@ class Pine:
             a += 8 * n
         skip = addr % 8
         return out[skip:skip + length]
+
+    def read_blocks(self, ranges):
+        """Several (addr, length) blocks in as few messages as possible (one, when they fit), so they are read
+        as close together in time as the emulator allows."""
+        cmds, cuts = [], []
+        for addr, length in ranges:
+            a = addr - addr % 8
+            n = (addr + length - a + 7) // 8
+            cmds += [(READ64, struct.pack("<I", a + 8 * k)) for k in range(n)]
+            cuts.append((8 * n, addr % 8, length))
+        out = b"".join(self.batch(cmds[i:i + BATCH]) for i in range(0, len(cmds), BATCH))
+        blocks, at = [], 0
+        for size, skip, length in cuts:
+            blocks.append(out[at + skip:at + skip + length])
+            at += size
+        return blocks
 
     def save_state(self, slot):
         self.call(SAVE_STATE, struct.pack("<B", slot))
@@ -221,23 +240,28 @@ def main(argv):
             ts, = struct.unpack("<f", p.read_block(r + RIDER_TIMESCALE, 4))
             speed = sum(v * v for v in vel) ** 0.5
             print(f"  rider {r:#x}  place {p.read32(r + RIDER_PLACE)}  {speed:7.1f} cm/s  timescale {ts:.4f}")
-    elif cmd == ["record"] and len(argv) in (3, 4):
+    elif cmd == ["record"] and len(argv) >= 3:
         seconds, out = float(argv[1]), argv[2]
-        size = int(argv[3], 0) if len(argv) == 4 else 0x600
+        size = int(argv[3], 0) if len(argv) >= 4 else 0x600
+        extra = [tuple(int(x, 16) for x in w.split(":")) for w in argv[4:]]
         race, riders = find_race(p)
         if race is None:
             sys.exit("no race found (is a race running?)")
         pad = find_pad(p)
         kept, last, t0 = 0, None, time.time()
         with open(out, "w", encoding="ascii") as f:
-            f.write(f"race {race:x} riders {' '.join(f'{r:x}' for r in riders)} bytes {size:x} pad {pad or 0:x}\n")
+            f.write(f"race {race:x} riders {' '.join(f'{r:x}' for r in riders)} bytes {size:x} pad {pad or 0:x}"
+                    + "".join(f" extra {o:x} {n:x}" for o, n in extra) + "\n")
             while time.time() - t0 < seconds:
                 tick = p.read32(race + RACE_TICK)
                 if tick == last:
                     continue
-                blocks = [p.read_block(r, size) for r in riders]
+                # each rider's windows right after its block, so they come from the same frame as near as can be
+                both = [p.read_blocks([(r, size)] + [(r + o, n) for o, n in extra]) for r in riders]
+                blocks = [b[0] for b in both]
                 if pad:
                     blocks.append(p.read_block(pad, PAD_BYTES))
+                blocks += [b[1 + k] for k in range(len(extra)) for b in both]
                 if p.read32(race + RACE_TICK) != tick:
                     continue  # the game moved on while we read: drop the sample
                 f.write(f"tick {tick} " + " ".join(b.hex() for b in blocks) + "\n")
