@@ -23,6 +23,7 @@ use tricky_game::air::{predict_at_takeoff, Predict, RayHit};
 use tricky_game::jump::{jump_impulse, JumpState};
 use tricky_game::orient::{take_off, TakeOffEnv, TakeOffRider};
 use tricky_game::probe::{self, Hit};
+use tricky_game::rider::ground_tick::{lean_targets, lean_up};
 use tricky_game::surface::SURFACE_TABLE;
 
 type V4 = [f32; 4];
@@ -646,13 +647,16 @@ fn rider_of(a: &[u8], st: &[u8], motion: &[u8], anim: &[u8]) -> Rider {
 /// The world's ray cast under `Boarder_ProbeGround` is answered with what the probe left in the second sample (ground
 /// point +0x2d0, normal +0x2a0, surface +0x290, kind +0x2e0; no hit when the kind is 3), so the course is not needed.
 /// `cBoarder::vf7` 0x117198 shapes the inputs (brake, crouch, steer, the probe's side offset) and the spring band
-/// before the motion, so those are taken from the second sample. After the motion the tick still turns the rider's up
-/// (+0x2c0, not compared), caps the speed (`speed_limit_of`, `speed_limit`: applied to each way), pushes riders apart
-/// (`Boarder_RiderCollisions` 0x123fc8) and may change the control state.
+/// before the motion, so those are taken from the second sample. After the motion the tick caps the speed
+/// (`speed_limit_of`, `speed_limit`: applied to each way), pushes riders apart (`Boarder_RiderCollisions` 0x123fc8, not
+/// replayed), may change the control state, and at its end `Boarder_UpdateLeanTargets` 0x129500 turns the rider's up
+/// +0x2c0 toward the normal and aims the lean record (+0x24c): run each way too (ours `lean_up`, `lean_targets`), and
+/// both compared (board row F4b3e). Samples read inside a tick are left out (`late`).
 /// Not in the recording, so not given: the walls (`Boarder_WallCollide` 0x126250 answers no wall) and the instances
 /// (`Boarder_InstanceCollisions` 0x125088 does nothing). The ground motion object is the state manager
 /// *(rider+0x5ae0) + 0x4b0, rider − 0x400 for most riders (window `-400:10`; the test checks its +0xc is the rider),
-/// the clip window `46c0:10`. Needs TRICKY_RECORDING and TRICKY_STATS (lines `rider stats-address hex`).
+/// rider − 0x3d0 for the one whose manager is at rider − 0x880 (window `-3d0:10`, when recorded), the clip window
+/// `46c0:10`. Needs TRICKY_RECORDING and TRICKY_STATS (lines `rider stats-address hex`).
 #[test]
 fn ground_ticks_against_the_running_game() {
     let (Ok(paths), Ok(stats)) = (std::env::var("TRICKY_RECORDING"), std::env::var("TRICKY_STATS")) else { return };
@@ -665,6 +669,8 @@ fn ground_ticks_against_the_running_game() {
         eprintln!("{path}: no -400 and 46c0 windows: skipping");
         return;
     };
+    // the rider whose state manager is at rider − 0x880: its ground motion object is 0x30 further on (window `-3d0:10`)
+    let km6 = ticks[0].extra.iter().position(|(o, _)| *o == -0x3d0);
     let head = std::fs::read_to_string(path).unwrap().lines().next().unwrap().to_string();
     let addr: Vec<u32> = head.split_whitespace().skip(3).take(n).map(|h| u32::from_str_radix(h, 16).unwrap()).collect();
     let mut runners = Vec::new();
@@ -675,15 +681,15 @@ fn ground_ticks_against_the_running_game() {
     }
     let names = [
         "pos", "vel", "fwd", "board_up", "normal", "fall", "up", "ground", "plane_fwd", "side", "quat", "board_side", "drag", "height", "bob", "wobble",
-        "lean", "phase", "yaw", "surface", "surface_ticks", "kind", "state", "mask",
+        "lean", "phase", "yaw", "surface", "surface_ticks", "kind", "state", "mask", "lean_target",
     ];
     // per field: the field's bits (vectors as four words)
-    let fields = |r: &Rider| -> Vec<Vec<u32>> {
+    // (the last, the lean record's target +0x24c, is not the motion's: `Boarder_UpdateLeanTargets` sets it)
+    let fields = |r: &Rider, target: f32| -> Vec<Vec<u32>> {
         let b = bits(r);
-        (0..names.len()).map(|f| if f < 12 { b[4 * f..4 * f + 4].to_vec() } else { vec![b[48 + f - 12]] }).collect()
+        (0..names.len() - 1).map(|f| if f < 12 { b[4 * f..4 * f + 4].to_vec() } else { vec![b[48 + f - 12]] }).chain([vec![target.to_bits()]]).collect()
     };
-    // the fields the motion writes (+0x2c0, the rider's up, it only reads: something after it in the tick turns it)
-    let written: Vec<usize> = (0..names.len()).filter(|&f| names[f] != "up").collect();
+    let written: Vec<usize> = (0..names.len()).collect();
     let one_step = |a: &[u8], b: &[u8]| {
         let (p, q, v) = (vec4(a, 0x140), vec4(b, 0x140), vec4(a, 0x150));
         let d = ((q[0] - p[0]).powi(2) + (q[1] - p[1]).powi(2) + (q[2] - p[2]).powi(2)).sqrt();
@@ -694,7 +700,12 @@ fn ground_ticks_against_the_running_game() {
     let (mut skew, mut capped) = (0, 0);
     let mut whole = vec![0usize; 1 + runners.len()];
     let (mut pairs, mut other) = (0, 0);
-    for w in ticks.windows(2) {
+    // A sample read while the game was inside the rider's tick, after the motion and before `Boarder_UpdateLeanTargets`
+    // at its end: the rider's up +0x2c0 is still the last tick's (inferred from the samples: PINE reads while the EE
+    // runs; the up only stands still once it equals the normal)
+    let late = |p: &[u8], x: &[u8]| vec4(x, 0x2c0) == vec4(p, 0x2c0) && vec4(x, 0x2c0) != vec4(x, 0x2a0);
+    let mut torn = 0;
+    for (wi, w) in ticks.windows(2).enumerate() {
         if w[1].tick != w[0].tick + 1 {
             continue;
         }
@@ -703,7 +714,11 @@ fn ground_ticks_against_the_running_game() {
             if u32_le(a, 0x424) != 2 || u32_le(b, 0x424) != 2 {
                 continue;
             }
-            let (ma, mb) = (&w[0].extra[km].1[i], &w[1].extra[km].1[i]);
+            let k = match km6 {
+                Some(k6) if u32_le(&w[0].extra[km].1[i], 0xc) != addr[i] => k6,
+                _ => km,
+            };
+            let (ma, mb) = (&w[0].extra[k].1[i], &w[1].extra[k].1[i]);
             let (na, nb) = (&w[0].extra[ka].1[i], &w[1].extra[ka].1[i]);
             if u32_le(ma, 0xc) != addr[i] {
                 other += 1;
@@ -711,6 +726,11 @@ fn ground_ticks_against_the_running_game() {
             }
             if !one_step(a, b) {
                 skew += 1;
+                continue;
+            }
+            let before = (wi > 0 && ticks[wi - 1].tick + 1 == w[0].tick).then(|| &ticks[wi - 1].riders[i]);
+            if late(a, b) || before.is_some_and(|p| late(p, a)) {
+                torn += 1;
                 continue;
             }
             pairs += 1;
@@ -722,14 +742,17 @@ fn ground_ticks_against_the_running_game() {
             // +0x298
             let after = rider_of(b, st, mb, nb);
             (rider.brake, rider.crouch, rider.steer, rider.p.x244, rider.d1, rider.d2) = (after.brake, after.crouch, after.steer, after.p.x244, after.d1, after.d2);
-            let want = fields(&rider_of(b, st, mb, nb));
+            let want = fields(&rider_of(b, st, mb, nb), f32_at(b, 0x24c));
             let kind = u32_le(b, 0x2e0);
             let hit = (kind != 3).then(|| Hit { kind, point: vec4(b, 0x2d0), normal: vec4(b, 0x2a0), surface: u32_le(b, 0x290) });
             let mut got = Vec::new();
             let mut mine = rider;
             update(&mut mine, &SURFACE_TABLE, &mut E { log: Vec::new(), hit, wall: false, meter: 0.0 });
             mine.vel = speed_limit(mine.vel, speed_limit_of(a, b, |x, y| x - y));
-            got.push(fields(&mine));
+            // the end of the tick: `Boarder_UpdateLeanTargets` 0x129500 turns the up toward the normal and aims the lean
+            mine.up = lean_up(mine.up, mine.p.normal);
+            let (_, target) = lean_targets(2, mine.steer, mine.vel);
+            got.push(fields(&mine, target));
             for (_, g) in runners.iter_mut() {
                 *g.hit.borrow_mut() = hit;
                 g.wall.set(false);
@@ -739,7 +762,13 @@ fn ground_ticks_against_the_running_game() {
                 let mut r = g.get(&rider);
                 // (the runner's float rules are still set from its call)
                 r.vel = speed_limit(r.vel, speed_limit_of(a, b, r5900::ps2float::fsub));
-                got.push(fields(&r));
+                wv(&mut g.r.mem, g.rd + 0x150, r.vel);
+                g.r.mem.write_u32(g.rd + 0x424, 2);
+                g.r.cpu.set_gpr(4, g.rd as u64);
+                g.r.call(0x129500).unwrap_or_else(|e| panic!("tick {} rider {i}: {e:?}", w[0].tick));
+                r.up = rv(&mut g.r.mem, g.rd + 0x2c0);
+                let target = g.r.mem.read_f32(g.rd + 0x24c);
+                got.push(fields(&r, target));
             }
             // how many met the speed limit (`speed_limit_of`, applied above to each way's velocity)
             let v = vec4(b, 0x150);
@@ -755,7 +784,7 @@ fn ground_ticks_against_the_running_game() {
             }
         }
     }
-    eprintln!("{path}: ground ticks (motion 2 at both samples): {pairs} compared ({capped} at the speed limit); left out {other} whose motion object's +0xc is not the rider, {skew} not one update apart");
+    eprintln!("{path}: ground ticks (motion 2 at both samples): {pairs} compared ({capped} at the speed limit); left out {other} whose motion object's +0xc is not the rider, {skew} not one update apart, {torn} read inside a tick (it or the sample before)");
     for (k, way) in ["ours (ground_motion::update)".to_string()].into_iter().chain(runners.iter().map(|(r, _)| format!("the game's in the runner, {r}"))).enumerate() {
         let line: Vec<String> = written.iter().map(|&f| format!("{} {}", names[f], count[k][f])).collect();
         eprintln!("  {way}: every field {}; {}", whole[k], line.join(", "));
@@ -892,6 +921,7 @@ fn takeoff_ticks_against_the_running_game() {
         eprintln!("{path}: no -400, 46c0 and 57b0 windows: skipping");
         return;
     };
+    let km6 = win(-0x3d0);
     let head = std::fs::read_to_string(path).unwrap().lines().next().unwrap().to_string();
     let addr: Vec<u32> = head.split_whitespace().skip(3).take(n).map(|h| u32::from_str_radix(h, 16).unwrap()).collect();
     let mut runners = Vec::new();
@@ -940,7 +970,11 @@ fn takeoff_ticks_against_the_running_game() {
             if u32_le(a, 0x424) != 2 || u32_le(b, 0x424) != 1 {
                 continue;
             }
-            let (ma, mb) = (&w[0].extra[km].1[i], &w[1].extra[km].1[i]);
+            let k = match km6 {
+                Some(k6) if u32_le(&w[0].extra[km].1[i], 0xc) != addr[i] => k6,
+                _ => km,
+            };
+            let (ma, mb) = (&w[0].extra[k].1[i], &w[1].extra[k].1[i]);
             let (na, nb) = (&w[0].extra[ka].1[i], &w[1].extra[ka].1[i]);
             let (pa, pb) = (&w[0].extra[kp].1[i], &w[1].extra[kp].1[i]);
             if u32_le(ma, 0xc) != addr[i] {

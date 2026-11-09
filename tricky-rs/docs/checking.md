@@ -557,6 +557,36 @@ Found (rec11):
 Still to do: rows F4b3e (after the motion: collisions, the rider's up) and F4b3f (the jump control ported, the
 take-offs by rider bumps and the same-tick spin update replayed).
 
+## F4b3e: the end of the rider's tick from a recorded race (2026-11-08)
+
+`tests/ground_motion.rs` `ground_ticks_against_the_running_game` now runs the rest of `cBoarder::vf7` 0x117198 that
+needs no other rider: the speed limit (F4b3c) and `Boarder_UpdateLeanTargets` 0x129500 at the end of the tick (ours
+`ground_tick::lean_up` and `lean_targets`; the runner calls the game's), and compares the rider's up +0x2c0 and the lean
+record's target +0x24c too. New recording `rec12.txt` (150 s, raced by hand in the pack: `pine.py record 150 rec12.txt
+0x600 57b0:64 -400:10 -3d0:10 -170:74 -140:74 46c0:10 5ae0:4`, and `rec12.stats`): the `-3d0` window is the sixth
+rider's ground motion object (its manager is at rider − 0x880), so every rider is now compared; `-140:74` is its spin
+object, for F4b3d.
+
+Found:
+- Samples read inside a tick (inferred): PINE reads while the EE runs, so a sample can hold a rider after its motion
+  but before `Boarder_UpdateLeanTargets`: its up is still the last tick's while the rest has moved. 344 of the first
+  831 up/target misses in rec10 were such samples, and the next pair then starts from the stale up. The test leaves
+  out a pair when either sample's up equals the one before it while differing from the normal (`late`): 1,069 pairs
+  in rec10, 1,146 in rec11, 2,463 in rec12.
+- Under `fadd=g1`, whole ground ticks (every field, up and lean target included): rec10 11,482 of 12,181 (94.3%,
+  was 91.5%), rec11 19,550 of 20,130 (97.1%, was 94.3%), rec12 33,152 of 34,538 (96.0%). rec12 per field: position
+  33,775, velocity 34,067, quaternion 33,910, up 34,291, lean target 34,456, state 34,353. Take-offs (F4b3c) on rec12
+  with the sixth rider: 96 of 116 whole.
+- Ours equals the game's code under IEEE on every field except the up on 3 ticks of rec12 (34,288 against 34,291; the
+  vector unit's `vrsqrt` against our `unit`, not looked into).
+- Position misses on rec12 (763): 656 with another rider within 3 m (440 within 1.5 m, median 0.9 cm off): rider
+  collisions (`Boarder_RiderCollisions` 0x123fc8), not replayed; 107 with no rider within 3 m (median 0.16 cm, up to
+  33 cm): walls and instances, answered as none.
+- 186 up misses in rec10 remain where both samples look complete; there the game's up moved about 1.5 times our
+  step (unexplained).
+
+Still to do: row F4b3g.
+
 ## How a row gets to `checked`
 
 1. Port the function (address in its doc comment, AGENTS.md §13).
