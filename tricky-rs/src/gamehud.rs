@@ -461,8 +461,8 @@ fn build(elf: &[u8], rects: &[(u32, [f32; 7])], title: &[u8], menu: &[u8]) -> Me
     for (id, r) in rects {
         let at = SET + 8 + 28 * id;
         m.w32(at, r[0] as u32);
-        for k in 1..7 {
-            m.w32(at + 4 * k as u32, r[k].to_bits());
+        for (k, v) in r.iter().enumerate().take(7).skip(1) {
+            m.w32(at + 4 * k as u32, v.to_bits());
         }
     }
     // the fonts as `cGame::Init` 0x17e148 loads them (`Font_ParseSfn` 0x19c858: no added advance or origin, the

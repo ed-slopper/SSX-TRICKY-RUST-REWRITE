@@ -1116,7 +1116,6 @@ fn spawn_terrain(
 #[derive(Component, Clone, Copy)]
 struct TrickOnly;
 /// Show-off ramps (trick-only patches) appear, and are solid, only in show-off events.
-
 fn trick_only_ramps(game: Res<ui::Game>, mut world: ResMut<World>, mut rails: ResMut<RailsRes>, mut props: ResMut<Props>, mut q: Query<&mut Visibility, With<TrickOnly>>, mut last: Local<Option<(ui::Event, usize)>>) {
     let on = game.event == ui::Event::ShowOff;
     if world.0.showoff != on { world.0.showoff = on; }
