@@ -1,5 +1,5 @@
 //! The boarder's control states' updates exactly as the original runs them (board row G1f): cruising (with the look
-//! back), changing to fakie, bumps, hard and normal landings, natural air, sitting at the start and getting up. Each
+//! back), changing to fakie, bumps, the jump, hard and normal landings, natural air, sitting at the start and getting up. Each
 //! reads the pad word the way `cPlayer::GetControls` packs it and calls the boarder's helpers (already ported and
 //! checked: steer, crouch, brake, boost, lean, reset) through [`ControlEnv`]. Checked bit for bit in the function
 //! runner (`tests/control.rs`).
@@ -96,6 +96,10 @@ pub trait ControlEnv {
     fn update_lean_anim(&mut self, r: &mut Rider, a: f32, b: f32);
     fn rotate_about_axis(&mut self, r: &mut Rider, angle: f32);
     fn request_reset(&mut self, r: &mut Rider);
+    /// `Jump_ApplyImpulse` 0x1284e0(rider, the smallest jump in cm/s: `jump::jump_impulse`) and
+    /// `Takeoff_SetSpinRates` 0x126e30 (`jump::takeoff_spin_rates`, then state 0x10)
+    fn jump_impulse(&mut self, r: &mut Rider, min: f32);
+    fn takeoff_spin_rates(&mut self, r: &mut Rider);
     /// `Boarder_PlayCelebrate` 0x128150, `Boarder_PlayDisappointed` 0x127e80, `Boarder_PlayWindUpMasked` 0x127d08,
     /// `Boarder_PlayTakeoffClip` 0x127298, `Ride_AITauntCheck` 0x103660, `CruiseControl_RandomFlourish` 0x103b88
     fn play_celebrate(&mut self, r: &mut Rider);
@@ -263,6 +267,21 @@ pub fn change_fakie(env: &mut dyn ControlEnv, pad: u32, r: &mut Rider) {
     after_clip(env, pad, r, clip);
     env.set_steer_target(r, stick(pad, 0x15));
     env.set_crouch_target(r, stick(pad, 0xf));
+    reset_check(env, pad, r);
+}
+
+/// `JumpControl_Update` 0x1046b0: once the crouch (+0x208) is let go the rider jumps (`Jump_ApplyImpulse` with the
+/// smallest jump 630.8786 cm/s), takes to the air (motion 1) and gets its spin rates (`Takeoff_SetSpinRates`, which
+/// enters the spin state 0x10); still crouched, the steer target is 0. Then the reset check, on the rider as the
+/// calls left it.
+pub fn jump(env: &mut dyn ControlEnv, pad: u32, r: &mut Rider) {
+    if r.crouch == 0.0 {
+        env.jump_impulse(r, f32::from_bits(0x441d_b83b));
+        env.set_motion(r, 1);
+        env.takeoff_spin_rates(r);
+    } else {
+        env.set_steer_target(r, 0.0);
+    }
     reset_check(env, pad, r);
 }
 

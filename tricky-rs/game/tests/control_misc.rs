@@ -98,6 +98,8 @@ impl ControlEnv for World {
     fn request_reset(&mut self, _r: &mut Rider) {
         self.log.push(Ev::Reset(0x42caebe0));
     }
+    fn jump_impulse(&mut self, _: &mut Rider, _: f32) {}
+    fn takeoff_spin_rates(&mut self, _: &mut Rider) {}
     fn play_celebrate(&mut self, _: &mut Rider) {}
     fn play_disappointed(&mut self, _: &mut Rider) {}
     fn play_wind_up(&mut self, _: &mut Rider) {}

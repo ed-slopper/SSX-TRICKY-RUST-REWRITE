@@ -1,7 +1,7 @@
 //! The control states' updates (board row G1f) against the game in the function runner (TRICKY_ELF; skipped
 //! without it): `CruiseControl_Update` (and `_LookBack`), `ChangeFakieControl_Update`, `BumpControl_Update`,
 //! `LandHardControl_Update`, `LandNormalControl_Update`, `NaturalAirControl_Update`, `SitAndWaitControl_Update`,
-//! `GetupFromSitControl_Update` on random riders and pads, the boarder's helpers and the animation scripted the same
+//! `GetupFromSitControl_Update`, `JumpControl_Update` on random riders and pads, the boarder's helpers and the animation scripted the same
 //! on both sides: every field of the rider and the state object, and every call with its arguments, compared.
 
 use std::cell::RefCell;
@@ -47,6 +47,8 @@ enum Ev {
     Lean(u32, u32),
     Rotate(u32),
     Reset(u32),
+    Jump(u32),
+    SpinRates,
     Celebrate,
     Disappointed,
     WindUp,
@@ -117,6 +119,12 @@ impl ControlEnv for World {
     }
     fn request_reset(&mut self, _r: &mut Rider) {
         self.log.push(Ev::Reset(0x42caebe0));
+    }
+    fn jump_impulse(&mut self, _r: &mut Rider, min: f32) {
+        self.log.push(Ev::Jump(min.to_bits()));
+    }
+    fn takeoff_spin_rates(&mut self, _r: &mut Rider) {
+        self.log.push(Ev::SpinRates);
     }
     fn play_celebrate(&mut self, _r: &mut Rider) {
         self.log.push(Ev::Celebrate);
@@ -335,6 +343,14 @@ fn control_updates_are_the_original() {
     s!(0x127918, |c, _m, x| x.log.push(Ev::Lean(c.f(12).to_bits(), c.f(13).to_bits())));
     s!(0x128e90, |c, _m, x| x.log.push(Ev::Rotate(c.f(12).to_bits())));
     s!(0x118f10, |c, _m, x| x.log.push(Ev::Reset(c.f(12).to_bits())));
+    s!(0x1284e0, |c, _m, x| {
+        assert_eq!(c.gpr(4) as u32, rider);
+        x.log.push(Ev::Jump(c.f(12).to_bits()))
+    });
+    s!(0x126e30, |c, _m, x| {
+        assert_eq!(c.gpr(4) as u32, rider);
+        x.log.push(Ev::SpinRates)
+    });
     s!(0x128150, |_c, _m, x| x.log.push(Ev::Celebrate));
     s!(0x127e80, |_c, _m, x| x.log.push(Ev::Disappointed));
     s!(0x127d08, |_c, _m, x| x.log.push(Ev::WindUp));
@@ -363,7 +379,7 @@ fn control_updates_are_the_original() {
     let obj = r.mem.alloc(0x40);
     let pad_at = r.mem.alloc(16);
     let mut g = Rng(0xc0_47_801_0000_0001);
-    let mut seen = [0u32; 9];
+    let mut seen = [0u32; 10];
     let mut reached = std::collections::BTreeMap::new();
     for case in 0..80_000 {
         let mut rd = random_rider(&mut g);
@@ -397,7 +413,7 @@ fn control_updates_are_the_original() {
             r.mem.write_u32(obj + 4 * k, 0);
         }
         r.mem.write_f32(obj + 8, f8);
-        let op = g.below(9) as usize;
+        let op = g.below(10) as usize;
         seen[op] += 1;
         let mut out_obj: Vec<u32> = vec![];
         let mut ours_obj: Vec<u32> = vec![];
@@ -470,6 +486,14 @@ fn control_updates_are_the_original() {
                 r.call(0x105c60).unwrap();
                 control::getup_from_sit(&mut ours, &mut rd);
             }
+            9 => {
+                // cJumpControl: word 0 the rider
+                r.mem.write_u32(obj, rider);
+                r.cpu.set_gpr(4, obj as u64);
+                r.cpu.set_gpr(5, pad_at as u64);
+                r.call(0x1046b0).unwrap();
+                control::jump(&mut ours, pad, &mut rd);
+            }
             _ => {
                 let look = g.pick(&[0.0, 0.99, 1.0, 2.0]);
                 r.mem.write_f32(obj + 8, look);
@@ -491,6 +515,8 @@ fn control_updates_are_the_original() {
                 Ev::Cam(..) => format!("{op} cam"),
                 Ev::State(st) => format!("{op} state {st:#x}"),
                 Ev::Reset(_) => format!("{op} reset"),
+                Ev::Jump(_) => format!("{op} jump"),
+                Ev::Steer(_) if op == 9 => format!("{op} steer"),
                 _ => continue,
             };
             *reached.entry(key).or_insert(0u32) += 1;
@@ -507,7 +533,7 @@ fn control_updates_are_the_original() {
     }
     eprintln!("ops {seen:?}
 {reached:?}");
-    for k in ["0 play 0x221", "0 stop", "8 play 0x210", "8 play 0x20f", "0 play 0x210", "2 rotate", "5 takeoff", "5 state 0x10", "6 cam", "7 play 0x221", "7 state 0x3", "0 state 0x6", "0 state 0xe", "1 state 0x5", "3 state 0x5", "4 state 0xe", "5 reset"] {
+    for k in ["0 play 0x221", "0 stop", "8 play 0x210", "8 play 0x20f", "0 play 0x210", "2 rotate", "5 takeoff", "5 state 0x10", "6 cam", "7 play 0x221", "7 state 0x3", "0 state 0x6", "0 state 0xe", "1 state 0x5", "3 state 0x5", "4 state 0xe", "5 reset", "9 jump", "9 steer", "9 reset"] {
         assert!(reached.contains_key(k), "never reached: {k}");
     }
 }

@@ -161,7 +161,14 @@ Proven (run in the function runner, 30,000 / 30,000 / 20,000 random cases bit fo
   front of the rider's, then `Boarder_UpdateOrientation`.
 - `Boarder_TakeOff` 0x128470: `Boarder_SetMotion`(1); then the state (rider+0x428) is read. If it is not 0xa
   (`cJumpControl`): rider+0x1c8 := rider+0x208, `Jump_ApplyImpulse`(min 0), `Boarder_SetState`(0xd). If it is 0xa:
-  `Jump_ApplyImpulse`(min 0), tail call `Takeoff_SetSpinRates`.
+  `Jump_ApplyImpulse`(min 0), tail call `Takeoff_SetSpinRates`. That sets state 0x10 (`Boarder_SetState` →
+  `Boarder_EnterControlState` 0x11c8e8 → `SpinControl_Enter` 0x100598) inside the motion, so the control that runs
+  next in `cBoarder::vf7` on the same tick is already `SpinState_Update` 0x100908 (proven, row F4b3f; its landing
+  alignment turns the board on the take-off tick).
+- `JumpControl_Update` 0x1046b0 (`control::jump`, F4b3f): rider+0x208 == 0 → `Jump_ApplyImpulse`(630.8786),
+  `Boarder_SetMotion`(1), `Takeoff_SetSpinRates` (state 0x10 entered inside the control: the spin update starts
+  next tick); else `Boarder_SetSteerTarget`(0). Then the reset check (pad bit 0, or rider+0x290 != 0 →
+  rider+0x304 = !(pad bit 0), `Boarder_RequestReset`(101.46).
 - The crash virtual of `GroundMotion_Update` (vtable+0x64 of cBoarder's vtable 0x367640, this-delta 0) is
   `cBoarder::EmitBrakeSpray` 0x11a798 (slot 11): `Boarder_EmitBrakeSpray` 0x136e70 → `BoarderRender_EmitBrakeSpray`
   0x135258 → `Fx_BrakeSpray_Emit` 0x12e008. It makes spray from the position, velocity and normal and changes

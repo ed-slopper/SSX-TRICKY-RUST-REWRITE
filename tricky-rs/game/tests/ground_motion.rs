@@ -30,7 +30,9 @@ use tricky_game::rider::ground_tick::{lean_targets, lean_up};
 use tricky_game::surface::SURFACE_TABLE;
 use tricky_game::animctl;
 use tricky_game::control::{self, Bump, ControlEnv, LandNormal};
-use tricky_game::orient::Orient;
+use tricky_game::orient::{update_orientation, Orient};
+use tricky_game::spin::{spin_enter, spin_update, AlignRider, Anim, SpinCall, SpinEnterRider, SpinObj, SpinRider};
+use tricky_game::jump::{takeoff_spin_rates, TakeoffState};
 
 type V4 = [f32; 4];
 
@@ -752,6 +754,12 @@ impl ControlEnv for CtlEnv {
         r.board = self.o.fwd;
     }
     fn request_reset(&mut self, _: &mut control::Rider) {}
+    fn jump_impulse(&mut self, _: &mut control::Rider, _: f32) {
+        unreachable!("the jump control is replayed by the take-off test")
+    }
+    fn takeoff_spin_rates(&mut self, _: &mut control::Rider) {
+        unreachable!("the jump control is replayed by the take-off test")
+    }
     fn play_celebrate(&mut self, _: &mut control::Rider) {}
     fn play_disappointed(&mut self, _: &mut control::Rider) {}
     fn play_wind_up(&mut self, _: &mut control::Rider) {}
@@ -1421,6 +1429,139 @@ impl TakeOffEnv for OurTakeOff<'_> {
     }
 }
 
+/// `JumpControl_Update` (`control::jump`) on the ground replay's rider: its calls are [`OurTakeOff`]'s, the rider's
+/// crouch (+0x208) and surface its own; the steer target and the reset check only counted (not compared here).
+struct OurJump<'a, 'b> {
+    t: TakeOffRider,
+    env: &'a mut OurTakeOff<'b>,
+    steer: usize,
+}
+impl ControlEnv for OurJump<'_, '_> {
+    fn jump_impulse(&mut self, _: &mut control::Rider, min: f32) {
+        self.env.jump_impulse(&mut self.t, min);
+    }
+    fn set_motion(&mut self, _: &mut control::Rider, m: u32) {
+        self.env.set_motion(&mut self.t, m);
+    }
+    fn takeoff_spin_rates(&mut self, _: &mut control::Rider) {
+        self.env.takeoff_spin_rates(&mut self.t);
+    }
+    fn set_steer_target(&mut self, _: &mut control::Rider, _: f32) {
+        self.steer += 1;
+    }
+    fn request_reset(&mut self, _: &mut control::Rider) {}
+    fn clip(&mut self, _: u32) -> i32 { unreachable!() }
+    fn clip_type(&mut self, _: u32) -> i32 { unreachable!() }
+    fn clip_at_end(&mut self, _: u32) -> bool { unreachable!() }
+    fn layer_phase(&mut self, _: u32) -> f32 { unreachable!() }
+    fn play_clip(&mut self, _: &mut control::Rider, _: i32) { unreachable!() }
+    fn set_state(&mut self, _: &mut control::Rider, _: u32) { unreachable!() }
+    fn set_crouch_target(&mut self, _: &mut control::Rider, _: f32) { unreachable!() }
+    fn set_brake_crouch_input(&mut self, _: &mut control::Rider, _: f32, _: f32) { unreachable!() }
+    fn set_brake_target(&mut self, _: &mut control::Rider, _: f32) { unreachable!() }
+    fn update_boost(&mut self, _: &mut control::Rider, _: u32, _: u32) { unreachable!() }
+    fn update_lean_anim(&mut self, _: &mut control::Rider, _: f32, _: f32) { unreachable!() }
+    fn rotate_about_axis(&mut self, _: &mut control::Rider, _: f32) { unreachable!() }
+    fn play_celebrate(&mut self, _: &mut control::Rider) { unreachable!() }
+    fn play_disappointed(&mut self, _: &mut control::Rider) { unreachable!() }
+    fn play_wind_up(&mut self, _: &mut control::Rider) { unreachable!() }
+    fn play_takeoff(&mut self, _: &mut control::Rider) { unreachable!() }
+    fn ai_taunt_check(&mut self, _: &mut control::Rider) { unreachable!() }
+    fn random_flourish(&mut self, _: &mut control::Rider) { unreachable!() }
+    fn stop(&mut self, _: &mut control::Rider) { unreachable!() }
+    fn race_riders(&mut self) -> i32 { unreachable!() }
+    fn race_state(&mut self) -> i32 { unreachable!() }
+    fn cam_start(&mut self, _: i32, _: &str) { unreachable!() }
+    fn run_control(&mut self, _: &mut control::Rider, _: u32) { unreachable!() }
+}
+
+/// The spin state a take-off from the jump control enters, from the recorded tick: `Takeoff_SetSpinRates` 0x126e30's
+/// rates into the object (+0x2c, +0x30; +0x58 0), what `SpinControl_Enter` 0x100598 reads of the rider, and the clip
+/// type it asks (0xb, mode 0, when the end sample's object is in mode 0). The prediction `Boarder_SetMotion` made this
+/// tick is the end sample's (`pb`): the landing slope and its kind (+0x57e0, +0x57f0), the time to touch down (+0x57b8).
+struct SpinIn {
+    rates: (f32, f32),
+    enter: SpinEnterRider,
+    clip_type: u32,
+    slope_kind: u32,
+    slope: V4,
+    class: u32,
+    rider: SpinRider,
+}
+
+fn spin_in(a: &[u8], st: &[u8], na: &[u8], pb: &[u8], mode_after: Option<u32>, x208: f32) -> SpinIn {
+    // STANDIN: Takeoff_Setup 0x12bee0 (called first) is not replayed; the rates from the sample before the tick
+    let t = takeoff_spin_rates(&TakeoffState {
+        clip: u32_le(na, 8) as i32 as i64,
+        x208,
+        tricks_stat: st[0x1a],
+        wind_spin: f32_at(a, 0x220),
+        wind_flip: f32_at(a, 0x22c),
+        class: u32_le(a, 0x420),
+        fakie: u32_le(a, 0x1b4) != 0,
+    });
+    SpinIn {
+        rates: (t.spin, t.flip),
+        enter: SpinEnterRider {
+            x138: f32_at(a, 0x138),
+            switch: u32_le(a, 0x1b4),
+            stance: u32_le(st, 0x40),
+            kind: u32_le(a, 0x1dc),
+            up_z: 0.0,
+            wind_spin: f32_at(a, 0x274),
+            wind_flip: f32_at(a, 0x278),
+            x218: 0.0,
+            x21c: 0.0,
+            x268: [0.0; 3],
+        },
+        clip_type: if mode_after == Some(0) { 0xb } else { 0 },
+        slope_kind: u32_le(pb, 0x40),
+        slope: vec4(pb, 0x30),
+        class: u32_le(a, 0x420),
+        rider: SpinRider {
+            timescale: f32_at(a, 0x12c),
+            land: f32_at(pb, 8),
+            spin: f32_at(a, 0x1d0),
+            flip: f32_at(a, 0x1d4),
+            tricks: st[0x1a],
+            stat10: st[0x10],
+            mirror: u32_le(st, 0x40),
+            switch: u32_le(a, 0x1b4),
+            wind_spin: f32_at(a, 0x274),
+            wind_flip: f32_at(a, 0x278),
+            x1f0: f32_at(a, 0x1f0),
+            x1f4: f32_at(a, 0x1f4),
+            x1f8: f32_at(a, 0x1f8),
+            class: u32_le(a, 0x420),
+            hp_face: vec4(pb, 0x20),
+            hp_axis: vec4(pb, 0x30),
+            x5800: f32_at(pb, 0x50),
+            ..Default::default()
+        },
+    }
+}
+
+/// Ours: `SpinControl_Enter` (`spin::spin_enter`) as `Takeoff_SetSpinRates` enters state 0x10, then the control's
+/// update this tick, `SpinState_Update` (`spin::spin_update`, pad 0, the animation's answers 0), on the rider as the
+/// take-off left it; its attitude (`Boarder_UpdateOrientation`) when the update turned it.
+fn spin_on_takeoff_tick(r: &mut Rider, s: &SpinIn) {
+    let mut st = SpinObj { w_spin: s.rates.0, w_flip: s.rates.1, ..Default::default() };
+    let mut e = s.enter;
+    e.up_z = r.board_up[2];
+    let al = AlignRider { slope_kind: s.slope_kind, slope: s.slope, fwd: r.p.fwd, quat: r.quat, class: s.class };
+    spin_enter(&mut st, &mut e, &al, s.clip_type);
+    let mut sr = SpinRider { quat: r.quat, vel: r.vel, pos: r.p.pos, ..s.rider };
+    sr.wind_spin = e.wind_spin;
+    sr.wind_flip = e.wind_flip;
+    let calls = spin_update(0, &mut st, &mut sr, &Anim::default());
+    if calls.contains(&SpinCall::Orientation) {
+        let mut o = Orient { q: sr.quat, fwd: r.p.fwd, side: r.board_side, up: r.board_up, yaw: r.yaw };
+        update_orientation(&mut o);
+        (r.quat, r.p.fwd, r.board_side, r.board_up, r.yaw) = (o.q, o.fwd, o.side, o.up, o.yaw);
+    }
+    r.p.pos = sr.pos;
+}
+
 /// The speed limit as `cBoarder::vf7` 0x117198 sets it after the motion when the rider is not in the air
 /// (0x1179a4..0x117a84): the target is 3347.2222 cm/s while the speed timer +0x134 runs, else while boosting (+0x130
 /// > 0) by the meter +0x1c (over 0.6659923 3347.2222, over 0.33362994 3072.1418, over 0 2932.43), else 2788.8394;
@@ -1513,6 +1654,8 @@ fn takeoff_ticks_against_the_running_game() {
         return;
     };
     let km6 = win(-0x3d0);
+    let ks = win(-0x170);
+    let clip_type = Rc::new(Cell::new(0u32));
     let head = std::fs::read_to_string(path).unwrap().lines().next().unwrap().to_string();
     let addr: Vec<u32> = head.split_whitespace().skip(3).take(n).map(|h| u32::from_str_radix(h, 16).unwrap()).collect();
     let mut runners = Vec::new();
@@ -1538,6 +1681,19 @@ fn takeoff_ticks_against_the_running_game() {
         }
         let ctl = w.r.mem.alloc(0x10);
         w.r.mem.write_u32(ctl, w.rd);
+        // the spin state's enter and first update (F4b3f): `SpinControl_CalcLandingAlign` and its maths run, the
+        // clip type is the test's, the update's other calls answer 0
+        for f in [0x11db00, 0x2508b8, 0x102e80, 0x10c120, 0x250fd0, 0x250d60, 0x250c10, 0x102f80, 0x102f50, 0x2510f8, 0x129008] {
+            w.r.allow(f);
+        }
+        for f in [0x155e00, 0x155e68, 0x102800, 0x127918, 0x15fcf8, 0x15eef8, 0x127d08] {
+            w.r.stub(f, |_, _| {});
+        }
+        for f in [0x1272e8, 0x102158] {
+            w.r.stub(f, |c, _| c.set_gpr(2, 0));
+        }
+        let ct = clip_type.clone();
+        w.r.stub(0x15eec0, move |c, _| c.set_gpr(2, ct.get() as u64));
         runners.push((rules, w, off, ctl));
     }
     let one_step = |a: &[u8], b: &[u8]| {
@@ -1604,17 +1760,25 @@ fn takeoff_ticks_against_the_running_game() {
             update(&mut mine, &SURFACE_TABLE, &mut e);
             let up_by_motion = e.log.contains(&Ev::TakeOff);
             let mut t = TakeOffRider { state: mine.state, crouch: crouch0, x208: mine.crouch };
+            // the spin state entered by a take-off from the jump control, and (motion take-offs) its update in the
+            // control this tick (F4b3f)
+            let spun = up_by_motion && rider.state == 0xa && std::env::var("TRICKY_NOSPIN").is_err();
+            let sin = spin_in(a, st, na, pb, ks.map(|k| u32_le(&w[1].extra[k].1[i], 8)), mine.crouch);
             let mut env = OurTakeOff { r: &mut mine, motion: 2, jump_stat: st[0x17], off: Off::default(), steep: false };
             if up_by_motion {
                 take_off(&mut t, &mut env);
             } else if jumps {
                 env.r.vel = speed_limit(env.r.vel, speed_limit_of(a, b, |x, y| x - y));
-                env.jump_impulse(&mut t, f32::from_bits(0x441db83b));
-                env.set_motion(&mut t, 1);
-                env.takeoff_spin_rates(&mut t);
+                let mut cr = control::Rider { crouch: env.r.crouch, surface: env.r.p.surface, ..Default::default() };
+                let mut j = OurJump { t, env: &mut env, steer: 0 };
+                control::jump(&mut j, 0, &mut cr);
+                assert_eq!(j.steer, 0, "the jump control fires only with the crouch let go");
             }
             let ours_off = env.off;
             let lip = env.steep;
+            if spun {
+                spin_on_takeoff_tick(&mut mine, &sin);
+            }
             steep += lip as usize;
             let mut got = vec![(mine, ours_off)];
 
@@ -1634,6 +1798,29 @@ fn takeoff_ticks_against_the_running_game() {
                 if g.log.borrow().contains(&Ev::TakeOff) {
                     g.r.cpu.set_gpr(4, g.rd as u64);
                     g.r.call(0x128470).unwrap_or_else(|e| panic!("tick {} rider {i}: {e:?}", w[0].tick));
+                    if spun {
+                        let (m, rd) = (&mut g.r.mem, g.rd);
+                        let so = g.handler + 0x740;
+                        for k in 0..0x70 / 4 {
+                            m.write_u32(so + 4 * k, 0);
+                        }
+                        m.write_u32(so + 0x70, rd);
+                        m.write_f32(so + 0x2c, sin.rates.0);
+                        m.write_f32(so + 0x30, sin.rates.1);
+                        m.write(rd + 0x57b0, pb).unwrap();
+                        m.write(g.stats, st).unwrap();
+                        for o in [0x12c, 0x138, 0x1d0, 0x1d4, 0x1f0, 0x1f4, 0x1f8, 0x274, 0x278, 0x420] {
+                            m.write_u32(rd + o, u32_le(a, o as usize));
+                        }
+                        clip_type.set(sin.clip_type);
+                        g.r.cpu.set_gpr(4, so as u64);
+                        g.r.call(0x100598).unwrap_or_else(|e| panic!("tick {} rider {i}: enter {e:?}", w[0].tick));
+                        let pad = *ctl + 8;
+                        g.r.mem.write_u32(pad, 0);
+                        g.r.cpu.set_gpr(4, so as u64);
+                        g.r.cpu.set_gpr(5, pad as u64);
+                        g.r.call(0x100908).unwrap_or_else(|e| panic!("tick {} rider {i}: spin {e:?}", w[0].tick));
+                    }
                 } else if jumps {
                     // (the runner's float rules are still set from its call)
                     let v = speed_limit(rv(&mut g.r.mem, g.rd + 0x150), speed_limit_of(a, b, r5900::ps2float::fsub));
@@ -1721,6 +1908,9 @@ fn takeoff_ticks_against_the_running_game() {
                     eprintln!("  tick {} rider {i}: {} state {:x}, nearest rider {near:.0} cm, steep {lip}, pushed {was_pushed}: {bad:?} pos off {:?} vel off {:?} (kind {:x} surface {:x})", w[1].tick,
                         if up_by_motion { "motion" } else if jumps { "jump control" } else { "neither" }, rider.state,
                         d(r.p.pos, vec4(b, 0x140)), d(r.vel, vec4(b, 0x150)), u32_le(b, 0x2e0), u32_le(b, 0x290));
+                    if std::env::var("TRICKY_DBG").as_deref() == Ok("2") {
+                        eprintln!("    fwd {:?} want {:?} (before {:?})\n    up {:?} want {:?} (before {:?})\n    yaw {} want {} (before {}) crouch {} {} -> {} steer {} {} spin {:?}", r.p.fwd, vec4(b, 0x180), vec4(a, 0x180), r.board_up, vec4(b, 0x1a0), vec4(a, 0x1a0), r.yaw, f32_at(b, 0x1b0), f32_at(a, 0x1b0), f32_at(a, 0x1c8), f32_at(a, 0x208), f32_at(b, 0x208), f32_at(a, 0x214), f32_at(b, 0x214), (0..8).map(|k| f32_at(b, 0x5d0 + 4 * k)).collect::<Vec<_>>());
+                    }
                 }
             }
         }

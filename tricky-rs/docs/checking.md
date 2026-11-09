@@ -788,6 +788,31 @@ game's landing point lies on the flight from what `Boarder_SetMotion` saw (`pred
 What is left: the walls and objects inside the ground motion in these tests (a recording of what the world answers,
 or the course); the riders around a take-off replayed rather than taken from the second sample (row F4h5).
 
+## F4b3f: the jump control and the spin state on the take-off tick (2026-11-09)
+
+`JumpControl_Update` 0x1046b0 is ported (`control::jump`, read from its disassembly): with rider+0x208 (the
+crouch) at 0 it calls `Jump_ApplyImpulse` 0x1284e0 with 630.8786 (0x441db83b), `Boarder_SetMotion`(1) and
+`Takeoff_SetSpinRates` 0x126e30; else `Boarder_SetSteerTarget`(0); then the reset check (pad bit 0 or rider+0x290
+set). `tests/control.rs` runs it against the game's on every case (`9 jump`, `9 steer`, `9 reset`), and the take-off
+test now takes off by it through `ControlEnv` (two new calls: `jump_impulse`, `takeoff_spin_rates`).
+
+The orientation-only take-offs of F4h4 are motion take-offs from the jump state (0xa). Proven:
+`Boarder_TakeOff` 0x128470 in state 0xa calls `Takeoff_SetSpinRates`, which sets state 0x10 through
+`Boarder_SetState` 0x11f608, whose `Boarder_EnterControlState` 0x11c8e8 runs `SpinControl_Enter` 0x100598; this
+happens inside the motion, so the control that follows in `cBoarder::vf7` the same tick is already
+`SpinState_Update` 0x100908, whose landing alignment turns the board (about 0.005 rad). A jump-control take-off
+enters the spin state inside the control, so its first update is next tick. The test now runs, for motion
+take-offs from state 0xa, `spin::spin_enter` and `spin::spin_update` (pad 0) on ours, and the game's 0x100598 and
+0x100908 in the runner (`spin_on_takeoff_tick`; the clip type from rider−0x170's mode when recorded).
+
+- **rec16:** whole take-off ticks under `fadd=g1` **227 of 235** (221 before); all 6 orientation-only ticks fixed.
+- **rec15:** 108 of 110 (104). **rec11:** 56 of 62 (54; no −0x170 window, no bodies).
+- Ours still equals the runner under IEEE on every field.
+- **Left:** rec15 9803 r5 (motion take-off from 0xa): forward 1e-4 off in ours and in the runner, so an input
+  of `SpinState_Update` the recording lacks (inferred: the rider's fields past +0x700, such as +0x46d4, +0x46e0,
+  +0x4ab0, which the test leaves 0; `Takeoff_Setup` 0x12bee0 writes +0x46e0 for kinds 3 and 4 and is not
+  replayed, STANDIN in `spin_in`). The rest are F4h5's (walls, objects, riders around) and rec11's missing windows.
+
 ## How a row gets to `checked`
 
 1. Port the function (address in its doc comment, AGENTS.md §13).
