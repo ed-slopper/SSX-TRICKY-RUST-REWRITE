@@ -19,6 +19,9 @@ use std::rc::Rc;
 use r5900::ps2float::Rules;
 use r5900::Runner;
 use tricky_game::ground_motion::{update, CrashRecord, Env, Rider, Stats, WALL_MASK};
+use tricky_game::air::{predict_at_takeoff, Predict, RayHit};
+use tricky_game::jump::{jump_impulse, JumpState};
+use tricky_game::orient::{take_off, TakeOffEnv, TakeOffRider};
 use tricky_game::probe::{self, Hit};
 use tricky_game::surface::SURFACE_TABLE;
 
@@ -644,7 +647,7 @@ fn rider_of(a: &[u8], st: &[u8], motion: &[u8], anim: &[u8]) -> Rider {
 /// point +0x2d0, normal +0x2a0, surface +0x290, kind +0x2e0; no hit when the kind is 3), so the course is not needed.
 /// `cBoarder::vf7` 0x117198 shapes the inputs (brake, crouch, steer, the probe's side offset) and the spring band
 /// before the motion, so those are taken from the second sample. After the motion the tick still turns the rider's up
-/// (+0x2c0, not compared), caps the speed (the velocity is not compared at the cap or over it), pushes riders apart
+/// (+0x2c0, not compared), caps the speed (`speed_limit_of`, `speed_limit`: applied to each way), pushes riders apart
 /// (`Boarder_RiderCollisions` 0x123fc8) and may change the control state.
 /// Not in the recording, so not given: the walls (`Boarder_WallCollide` 0x126250 answers no wall) and the instances
 /// (`Boarder_InstanceCollisions` 0x125088 does nothing). The ground motion object is the state manager
@@ -725,6 +728,7 @@ fn ground_ticks_against_the_running_game() {
             let mut got = Vec::new();
             let mut mine = rider;
             update(&mut mine, &SURFACE_TABLE, &mut E { log: Vec::new(), hit, wall: false, meter: 0.0 });
+            mine.vel = speed_limit(mine.vel, speed_limit_of(a, b, |x, y| x - y));
             got.push(fields(&mine));
             for (_, g) in runners.iter_mut() {
                 *g.hit.borrow_mut() = hit;
@@ -732,21 +736,18 @@ fn ground_ticks_against_the_running_game() {
                 g.put(&rider);
                 g.r.cpu.set_gpr(4, g.motion as u64);
                 g.r.call(0x10a0d8).unwrap_or_else(|e| panic!("tick {} rider {i}: {e:?}", w[0].tick));
-                got.push(fields(&g.get(&rider)));
+                let mut r = g.get(&rider);
+                // (the runner's float rules are still set from its call)
+                r.vel = speed_limit(r.vel, speed_limit_of(a, b, r5900::ps2float::fsub));
+                got.push(fields(&r));
             }
-            // the speed limit after the motion (`cBoarder::vf7` 0x117198: 2788.8394 cm/s, higher while boosting, coming
-            // down 3.472222 a tick) scales the velocity down to it: not compared where the game's speed is at the lowest
-            // limit or over (2788 to leave room for the scaling's rounding)
+            // how many met the speed limit (`speed_limit_of`, applied above to each way's velocity)
             let v = vec4(b, 0x150);
-            let free = (v[0] * v[0] + v[1] * v[1] + v[2] * v[2]).sqrt() < 2788.0;
-            capped += !free as usize;
+            capped += ((v[0] * v[0] + v[1] * v[1] + v[2] * v[2]).sqrt() >= f32_at(b, 0x1c4) - 0.01) as usize;
             for (k, g) in got.iter().enumerate() {
                 let mut all = true;
                 for &f in &written {
                     let ok = g[f] == want[f];
-                    if names[f] == "vel" && !free {
-                        continue;
-                    }
                     count[k][f] += ok as usize;
                     all &= ok;
                 }
@@ -754,9 +755,312 @@ fn ground_ticks_against_the_running_game() {
             }
         }
     }
-    eprintln!("{path}: ground ticks (motion 2 at both samples): {pairs} compared ({capped} over the speed limit: velocity not compared); left out {other} whose motion object's +0xc is not the rider, {skew} not one update apart");
+    eprintln!("{path}: ground ticks (motion 2 at both samples): {pairs} compared ({capped} at the speed limit); left out {other} whose motion object's +0xc is not the rider, {skew} not one update apart");
     for (k, way) in ["ours (ground_motion::update)".to_string()].into_iter().chain(runners.iter().map(|(r, _)| format!("the game's in the runner, {r}"))).enumerate() {
         let line: Vec<String> = written.iter().map(|&f| format!("{} {}", names[f], count[k][f])).collect();
         eprintln!("  {way}: every field {}; {}", whole[k], line.join(", "));
+    }
+}
+
+/// What the take-off's callees saw: `Boarder_SetMotion` 0x11f610 (the motion, and the rider's position, velocity and
+/// normal at that call, which `AirMotion_Enter` 0x108310 hands to `AirPredict_AtTakeoff`), `Takeoff_SetSpinRates`
+/// 0x126e30 and `Boarder_SetState` 0x11f608.
+#[derive(Clone, Debug, Default, PartialEq)]
+struct Off {
+    motion: Vec<(u32, [V4; 3])>,
+    spin_rates: u32,
+    state: Vec<u32>,
+}
+
+/// Our take-off's callees on our rider (`orient::take_off`): the jump is `jump::jump_impulse`.
+struct OurTakeOff<'a> {
+    r: &'a mut Rider,
+    motion: u32,
+    jump_stat: u8,
+    off: Off,
+}
+impl TakeOffEnv for OurTakeOff<'_> {
+    fn set_motion(&mut self, _: &mut TakeOffRider, motion: u32) {
+        self.motion = motion;
+        self.off.motion.push((motion, [self.r.p.pos, self.r.vel, self.r.p.normal]));
+    }
+    fn jump_impulse(&mut self, t: &mut TakeOffRider, min: f32) {
+        let s = JumpState {
+            crouch: t.crouch,
+            x208: t.x208,
+            vel: self.r.vel,
+            jump_stat: self.jump_stat,
+            motion: self.motion,
+            up: self.r.board_up,
+            normal: self.r.p.normal,
+            forward: self.r.p.plane_fwd,
+        };
+        self.r.vel = jump_impulse(min, &s).0;
+    }
+    fn takeoff_spin_rates(&mut self, _: &mut TakeOffRider) {
+        self.off.spin_rates += 1;
+    }
+    fn set_state(&mut self, _: &mut TakeOffRider, state: u32) {
+        self.off.state.push(state);
+    }
+}
+
+/// The speed limit as `cBoarder::vf7` 0x117198 sets it after the motion when the rider is not in the air
+/// (0x1179a4..0x117a84): the target is 3347.2222 cm/s while the speed timer +0x134 runs, else while boosting (+0x130
+/// > 0) by the meter +0x1c (over 0.6659923 3347.2222, over 0.33362994 3072.1418, over 0 2932.43), else 2788.8394;
+/// the limit +0x1c4 is the larger of that and the last tick's less 3.472222 (COP1 `sub.s`: `sub`). `a` is the rider
+/// at the start of the tick, `b` after the shaping (the timer is moved before the motion).
+fn speed_limit_of(a: &[u8], b: &[u8], sub: fn(f32, f32) -> f32) -> f32 {
+    let target = if f32_at(b, 0x134) > 0.0 {
+        f32::from_bits(0x4551338e)
+    } else if f32_at(a, 0x130) > 0.0 {
+        let m = f32_at(a, 0x1c);
+        match () {
+            _ if f32::from_bits(0x3f2a7e78) < m => f32::from_bits(0x4551338e),
+            _ if f32::from_bits(0x3eaad18b) < m => f32::from_bits(0x45400245),
+            _ if 0.0 < m => f32::from_bits(0x453746e1),
+            _ => f32::from_bits(0x452e4d6e),
+        }
+    } else {
+        f32::from_bits(0x452e4d6e)
+    };
+    let decayed = sub(f32_at(a, 0x1c4), f32::from_bits(0x405e38e3));
+    if target < decayed { decayed } else { target }
+}
+
+/// Over the limit the velocity is scaled down to it (0x117968..0x117ab0: the length on VU0, `div.s`, `vmulx`).
+fn speed_limit(vel: V4, limit: f32) -> V4 {
+    use r5900::ps2float as pf;
+    let sq = vel.map(|x| pf::mul(x, x));
+    let speed = pf::sqrt(pf::add(pf::add(pf::add(sq[0], sq[1]), pf::mul(1.0, sq[2])), pf::mul(1.0, sq[3])));
+    if limit < speed {
+        let k = pf::div(limit, speed);
+        vel.map(|x| pf::mul(x, k))
+    } else {
+        vel
+    }
+}
+
+/// The game's prediction from (pos, vel, normal) with the game's landing (record +0x10 point, +0x30 normal, +0x40
+/// word) on the first of our segments within 0.05 cm of its point, as `flight_predictions_against_the_running_game`
+/// in `tests/replay.rs` answers it (no landing: every ray misses).
+fn predict_like(pos: V4, vel: V4, normal: V4, rec: &[u8]) -> Predict {
+    let (gpoint, gnormal, gword) = (vec4(rec, 0x10), vec4(rec, 0x30), u32_le(rec, 0x40));
+    let mut found = false;
+    let mut ray = |a: V4, b: V4| {
+        if gword == 0xffff_ffff || found {
+            return (-1.0, RayHit::default());
+        }
+        let d = [b[0] - a[0], b[1] - a[1], b[2] - a[2]];
+        let q = [gpoint[0] - a[0], gpoint[1] - a[1], gpoint[2] - a[2]];
+        let h = (q[0] * d[0] + q[1] * d[1] + q[2] * d[2]) / (d[0] * d[0] + d[1] * d[1] + d[2] * d[2]);
+        let off = [q[0] - h * d[0], q[1] - h * d[1], q[2] - h * d[2]];
+        if (0.0..=1.0).contains(&h) && (off[0] * off[0] + off[1] * off[1] + off[2] * off[2]).sqrt() < 0.05 {
+            found = true;
+            (h, RayHit { point: gpoint, normal: gnormal, word: gword })
+        } else {
+            (-1.0, RayHit::default())
+        }
+    };
+    predict_at_takeoff(pos, vel, normal, &mut ray)
+}
+
+/// The take-off tick over a recorded race (board row F4b3c): every pair of samples one tick apart in which a rider
+/// goes from the snow to the air (motion +0x424 2 → 1). The tick runs the ground motion as in
+/// `ground_ticks_against_the_running_game` (same inputs, same answered ray cast), and then one of two ways up:
+/// - the motion leaves the snow itself (`GroundMotion_Update` ends with `Boarder_TakeOff` 0x128470: air motion,
+///   then the jump with no smallest jump, then state 0xd, or from the jump control the spin rates);
+/// - the jump control (`JumpControl_Update` 0x1046b0, state 0xa) once the crouch +0x208 is unwound to 0, after
+///   the motion and the speed limit: `Jump_ApplyImpulse` 0x1284e0 with 630.8786 cm/s at least, then the air
+///   motion and the spin rates.
+/// Run three ways: ours (`ground_motion::update`, `orient::take_off`, `jump::jump_impulse`; the jump control is not
+/// ported, so for it the test makes the same calls), and the game's code in the function runner under IEEE adds and
+/// under `fadd=g1`. Compared with the second sample: position and velocity, the ground motion's other fields, the
+/// calls, and the flight prediction (rider+0x57b0, made inside `Boarder_SetMotion`): its inputs where it found no
+/// landing (it keeps them), the time to the top (+0x48) from the inputs each way saw.
+/// Needs TRICKY_RECORDING (windows `-400:10 46c0:10 57b0:64`) and TRICKY_STATS.
+#[test]
+fn takeoff_ticks_against_the_running_game() {
+    let (Ok(paths), Ok(stats)) = (std::env::var("TRICKY_RECORDING"), std::env::var("TRICKY_STATS")) else { return };
+    let stats: Vec<Vec<u8>> = std::fs::read_to_string(&stats).unwrap().lines()
+        .map(|l| { let h = l.split_whitespace().nth(2).unwrap(); (0..h.len()).step_by(2).map(|i| u8::from_str_radix(&h[i..i + 2], 16).unwrap()).collect() })
+        .collect();
+    let path = paths.split(';').next().unwrap();
+    let (n, ticks) = load(path);
+    let win = |o: i64| ticks[0].extra.iter().position(|(x, _)| *x == o);
+    let (Some(km), Some(ka), Some(kp)) = (win(-0x400), win(0x46c0), win(0x57b0)) else {
+        eprintln!("{path}: no -400, 46c0 and 57b0 windows: skipping");
+        return;
+    };
+    let head = std::fs::read_to_string(path).unwrap().lines().next().unwrap().to_string();
+    let addr: Vec<u32> = head.split_whitespace().skip(3).take(n).map(|h| u32::from_str_radix(h, 16).unwrap()).collect();
+    let mut runners = Vec::new();
+    for rules in ["add=n,mul=n,div=n,cvt=n", "add=n,fadd=g1,mul=n,div=n,cvt=n"] {
+        let Some(mut w) = world() else { return };
+        w.r.float_rules = Rules::parse(rules).unwrap();
+        let off = Rc::new(RefCell::new(Off::default()));
+        let (o, rd) = (off.clone(), w.rd);
+        w.r.stub(0x11f610, move |cpu, mem| {
+            let m = cpu.gpr(5) as u32;
+            o.borrow_mut().motion.push((m, [rv(mem, rd + 0x140), rv(mem, rd + 0x150), rv(mem, rd + 0x2a0)]));
+            mem.write_u32(rd + 0x424, m);
+        });
+        let o = off.clone();
+        w.r.stub(0x126e30, move |_, _| o.borrow_mut().spin_rates += 1);
+        let o = off.clone();
+        w.r.stub(0x11f608, move |cpu, _| o.borrow_mut().state.push(cpu.gpr(5) as u32));
+        w.r.stub(0x156618, |c, _| c.set_f(0, 0.0)); // Score_StartTrickChain
+        w.r.stub(0x126948, |_, _| {}); // Boarder_SetSteerTarget (the jump control while still crouched)
+        w.r.stub(0x118f10, |_, _| {}); // Boarder_RequestReset
+        for f in [0x1284e0, 0x250d60] {
+            w.r.allow(f); // Jump_ApplyImpulse, Math_Sin
+        }
+        let ctl = w.r.mem.alloc(0x10);
+        w.r.mem.write_u32(ctl, w.rd);
+        runners.push((rules, w, off, ctl));
+    }
+    let one_step = |a: &[u8], b: &[u8]| {
+        let (p, q, v) = (vec4(a, 0x140), vec4(b, 0x140), vec4(a, 0x150));
+        let d = ((q[0] - p[0]).powi(2) + (q[1] - p[1]).powi(2) + (q[2] - p[2]).powi(2)).sqrt();
+        let e = (v[0] * v[0] + v[1] * v[1] + v[2] * v[2]).sqrt() * f32_at(a, 0x12c) / 60.0;
+        e > 1.0 && d > 0.7 * e && d < 1.4 * e
+    };
+    let names = ["pos", "vel", "fwd", "board_up", "plane_fwd", "side", "quat", "drag", "height", "bob", "lean", "yaw", "the way up", "prediction inputs", "time to the top"];
+    let ways = 1 + runners.len();
+    let mut count = vec![vec![0usize; names.len()]; ways];
+    let mut of = vec![0usize; names.len()];
+    let mut whole = vec![0usize; ways];
+    let (mut pairs, mut other, mut skew, mut by_motion, mut by_jump, mut neither, mut no_pred, mut torn) = (0, 0, 0, 0, 0, 0, 0, 0);
+    for w in ticks.windows(2) {
+        if w[1].tick != w[0].tick + 1 {
+            continue;
+        }
+        for i in 0..n {
+            let (a, b) = (&w[0].riders[i], &w[1].riders[i]);
+            if u32_le(a, 0x424) != 2 || u32_le(b, 0x424) != 1 {
+                continue;
+            }
+            let (ma, mb) = (&w[0].extra[km].1[i], &w[1].extra[km].1[i]);
+            let (na, nb) = (&w[0].extra[ka].1[i], &w[1].extra[ka].1[i]);
+            let (pa, pb) = (&w[0].extra[kp].1[i], &w[1].extra[kp].1[i]);
+            if u32_le(ma, 0xc) != addr[i] {
+                other += 1;
+                continue;
+            }
+            if !one_step(a, b) {
+                skew += 1;
+                continue;
+            }
+            pairs += 1;
+            let st = &stats[i];
+            let mut rider = rider_of(a, st, ma, na);
+            let after = rider_of(b, st, mb, nb);
+            (rider.brake, rider.crouch, rider.steer, rider.p.x244, rider.d1, rider.d2) = (after.brake, after.crouch, after.steer, after.p.x244, after.d1, after.d2);
+            let kind = u32_le(b, 0x2e0);
+            let hit = (kind != 3).then(|| Hit { kind, point: vec4(b, 0x2d0), normal: vec4(b, 0x2a0), surface: u32_le(b, 0x290) });
+            let crouch0 = f32_at(a, 0x1c8);
+            // the jump control fires on this tick: state 0xa and the crouch unwound to 0 before the motion
+            let jumps = rider.state == 0xa && rider.crouch == 0.0;
+
+            // ours
+            let mut mine = rider;
+            let mut e = E { log: Vec::new(), hit, wall: false, meter: 0.0 };
+            update(&mut mine, &SURFACE_TABLE, &mut e);
+            let up_by_motion = e.log.contains(&Ev::TakeOff);
+            let mut t = TakeOffRider { state: mine.state, crouch: crouch0, x208: mine.crouch };
+            let mut env = OurTakeOff { r: &mut mine, motion: 2, jump_stat: st[0x17], off: Off::default() };
+            if up_by_motion {
+                take_off(&mut t, &mut env);
+            } else if jumps {
+                env.r.vel = speed_limit(env.r.vel, speed_limit_of(a, b, |x, y| x - y));
+                env.jump_impulse(&mut t, f32::from_bits(0x441db83b));
+                env.set_motion(&mut t, 1);
+                env.takeoff_spin_rates(&mut t);
+            }
+            let ours_off = env.off;
+            let mut got = vec![(mine, ours_off)];
+
+            // the game's code
+            for (_, g, off, ctl) in runners.iter_mut() {
+                *g.hit.borrow_mut() = hit;
+                g.wall.set(false);
+                g.log.borrow_mut().clear();
+                *off.borrow_mut() = Off::default();
+                g.put(&rider);
+                g.r.mem.write_u32(g.rd + 0x424, 2);
+                g.r.mem.write_f32(g.rd + 0x1c8, crouch0);
+                g.r.mem.write_u32(g.rd + 0x1dc, u32_le(a, 0x1dc));
+                g.r.mem.write_u8(g.stats + 0x17, st[0x17]);
+                g.r.cpu.set_gpr(4, g.motion as u64);
+                g.r.call(0x10a0d8).unwrap_or_else(|e| panic!("tick {} rider {i}: {e:?}", w[0].tick));
+                if g.log.borrow().contains(&Ev::TakeOff) {
+                    g.r.cpu.set_gpr(4, g.rd as u64);
+                    g.r.call(0x128470).unwrap_or_else(|e| panic!("tick {} rider {i}: {e:?}", w[0].tick));
+                } else if jumps {
+                    // (the runner's float rules are still set from its call)
+                    let v = speed_limit(rv(&mut g.r.mem, g.rd + 0x150), speed_limit_of(a, b, r5900::ps2float::fsub));
+                    wv(&mut g.r.mem, g.rd + 0x150, v);
+                    let pad = *ctl + 8;
+                    g.r.mem.write_u32(pad, 0);
+                    g.r.cpu.set_gpr(4, *ctl as u64);
+                    g.r.cpu.set_gpr(5, pad as u64);
+                    g.r.call(0x1046b0).unwrap_or_else(|e| panic!("tick {} rider {i}: {e:?}", w[0].tick));
+                }
+                let r = g.get(&rider);
+                got.push((r, off.borrow().clone()));
+            }
+            if up_by_motion {
+                by_motion += 1;
+            } else if jumps {
+                by_jump += 1;
+            } else {
+                neither += 1;
+            }
+
+            // the prediction made this tick
+            // (a record read while the game was inside the prediction, as in F4h2: `AirPredict_Reset` 0x123ab8 done,
+            // velocity 0, or a landing with no landing time yet)
+            let changed = f32_at(pb, 0x4c) == 0.0 && pb[8..0x54] != pa[8..0x54];
+            let inside = vec4(pb, 0x20) == [0.0; 4] || (u32_le(pb, 0x40) != 0xffff_ffff && f32_at(pb, 0x44) == 0.0);
+            let made = changed && !inside;
+            no_pred += !changed as usize;
+            torn += (changed && inside) as usize;
+            let want = [vec4(b, 0x140), vec4(b, 0x150), vec4(b, 0x180), vec4(b, 0x1a0), vec4(b, 0x320), vec4(b, 0x330), vec4(b, 0x170)].map(b4);
+            let want_f = [0x160, 0x1bc, 0x1c0, 0x1d8, 0x1b0].map(|o| f32_at(b, o).to_bits());
+            for (k, (r, off)) in got.iter().enumerate() {
+                let mut ok = [r.p.pos, r.vel, r.p.fwd, r.board_up, r.p.plane_fwd, r.p.side, r.quat].map(b4).iter().zip(&want).map(|(x, y)| x == y).collect::<Vec<_>>();
+                ok.extend([r.drag, r.p.height, r.bob, r.lean, r.yaw].iter().zip(&want_f).map(|(x, y)| x.to_bits() == *y));
+                ok.push(off.motion.len() == 1 && off.motion[0].0 == 1);
+                let mut used = vec![true; names.len()];
+                used[13] = false;
+                used[14] = false;
+                if made && off.motion.len() == 1 {
+                    let [p, v, nn] = off.motion[0].1;
+                    let no_landing = u32_le(pb, 0x40) == 0xffff_ffff;
+                    used[13] = no_landing;
+                    ok.push(no_landing && [p, v, nn].map(b4) == [vec4(pb, 0x10), vec4(pb, 0x20), vec4(pb, 0x30)].map(b4));
+                    used[14] = true;
+                    ok.push(predict_like(p, v, nn, pb).t_top.to_bits() == u32_le(pb, 0x48));
+                } else {
+                    ok.extend([false, false]);
+                }
+                let mut all = true;
+                for f in 0..names.len() {
+                    if used[f] {
+                        count[k][f] += ok[f] as usize;
+                        if k == 0 {
+                            of[f] += 1;
+                        }
+                        all &= ok[f];
+                    }
+                }
+                whole[k] += all as usize;
+            }
+        }
+    }
+    eprintln!("{path}: take-off ticks (motion 2 → 1): {pairs} compared ({by_motion} left the snow in the motion, {by_jump} by the jump control, {neither} neither; {no_pred} with no new prediction read, {torn} read while it was being made); left out {other} whose motion object's +0xc is not the rider, {skew} not one update apart");
+    for (k, way) in ["ours".to_string()].into_iter().chain(runners.iter().map(|(r, ..)| format!("the game's in the runner, {r}"))).enumerate() {
+        let line: Vec<String> = (0..names.len()).map(|f| format!("{} {} of {}", names[f], count[k][f], of[f])).collect();
+        eprintln!("  {way}: all {}; {}", whole[k], line.join(", "));
     }
 }

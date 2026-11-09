@@ -496,10 +496,10 @@ Found (rec10: 100 s raced by hand, 5,991 samples, 6 riders):
   velocity 6,857 of 7,357 (below the speed limit), quaternion 12,642, yaw 12,651, drag 12,904, height 12,635, bob
   12,806, phase 12,708, lean 13,227, normal, ground, surface and kind 13,250. So, as for the air (F4b3a), the running
   game's ground tick is its own code with PCSX2's COP1 adder.
-- Not compared: the rider's up (+0x2c0), which the motion only reads and something later in the tick turns, and the
-  velocity where the speed is 2,788 cm/s or more: after the motion `cBoarder::vf7` scales it to the speed limit
-  (2,788.8394 cm/s; it comes down 3.472222 a tick after a boost; seen in the samples: the speed drops by 3.4725 a
-  tick).
+- Not compared: the rider's up (+0x2c0), which the motion only reads and something later in the tick turns. The
+  velocity was first left out where the speed was 2,788 cm/s or more (after the motion `cBoarder::vf7` scales it to
+  the speed limit); since F4b3c the test applies the limit as the game does, and the velocity is compared everywhere:
+  rec10 under `fadd=g1` velocity 12,498 of 13,250, whole ticks 12,103; rec11 whole ticks 20,061 of 21,276 (94.3%).
 - Inferred, not checked: most of the 1,128 left are the parts of the tick after the motion or outside it: riders
   near each other pushed apart (`Boarder_RiderCollisions` 0x123fc8; seen: two riders 100 cm apart whose velocities
   are 7 cm/s off), walls and instances (answered as none), and control-state changes (59 ticks where only the state
@@ -507,6 +507,55 @@ Found (rec10: 100 s raced by hand, 5,991 samples, 6 riders):
 
 Still to do (row F4b3e): the rest of the tick after the motion (the up's turn, the speed limit, the rider collisions)
 ported and replayed, the walls and instances recorded, the sixth rider (its windows sit 0x30 further on).
+
+## F4b3c: the take-off tick from a recorded race (2026-11-08)
+
+`tests/ground_motion.rs` `takeoff_ticks_against_the_running_game`: every pair of samples one tick apart in which a
+rider goes from the snow to the air (motion +0x424 2 → 1). The ground motion runs as in F4b3b (same inputs from the
+second sample, same answered ray cast), then the way up, three ways: ours (`ground_motion::update`, `orient::take_off`,
+`jump::jump_impulse`; the jump control is not ported, so the test makes its calls), and the game's code in the runner
+(`Boarder_TakeOff` 0x128470 or `JumpControl_Update` 0x1046b0 run whole, with `Jump_ApplyImpulse` 0x1284e0) under IEEE
+adds and under `fadd=g1`. `Boarder_SetMotion` 0x11f610 is recorded with the rider's position, velocity and normal at
+the call: that is what `AirMotion_Enter` 0x108310 hands `AirPredict_AtTakeoff`. Recording: `pine.py record 100
+rec11.txt 0x600 57b0:64 -400:10 -170:74 46c0:10 5ae0:4` and `rec11.stats` (100 s raced by hand, 5,888 samples).
+
+Proven (read from the code):
+- `Boarder_UpdateMotion` 0x11c770 runs only the current motion, so on the take-off tick the air motion does not run:
+  the second sample holds the ground motion's step plus the jump.
+- Two ways up. (1) `GroundMotion_Update` ends with `Boarder_TakeOff` (0x10ab78, then straight to its epilogue):
+  `Boarder_SetMotion`(1) first, so the prediction sees the velocity before the jump; then out of the jump control
+  rider+0x1c8 = +0x208, `Jump_ApplyImpulse`(0) (no strength left: the velocity only changes off a steep lip) and state
+  0xd; in the jump control (0xa) `Jump_ApplyImpulse`(0) with the crouch it has, then `Takeoff_SetSpinRates` 0x126e30.
+  (2) `JumpControl_Update` (state 0xa, from `Boarder_UpdateControl` after the motion) once the crouch +0x208 is 0:
+  `Jump_ApplyImpulse` with 630.8786 cm/s (0x441db83b) at least, then `Boarder_SetMotion`(1), so this prediction sees
+  the velocity after the jump, then `Takeoff_SetSpinRates`.
+- The speed limit (`cBoarder::vf7` 0x1179a4..0x117ab0) is applied after the motion only when the motion is not the
+  air (0x11799c), so it applies before the jump control's jump but not after a take-off in the motion. Target 3347.2222
+  cm/s while the speed timer +0x134 runs; else while boosting (+0x130 > 0) by the meter +0x1c: over 0.6659923 3347.2222,
+  over 0.33362994 3072.1418, over 0 2932.43; else 2788.8394. The limit +0x1c4 is the larger of the target and last
+  tick's limit less 3.472222 (a COP1 `sub.s`), and over it the velocity is scaled by limit / speed. (The sample after
+  a take-off holds 3347.2222 at +0x1c4: something on the way up sets it, so the test works the limit out from the
+  first sample.) Now applied in F4b3b's test too, so the velocity is compared on every ground tick.
+
+Found (rec11):
+- 99 take-offs: 31 of the rider whose motion object is elsewhere (left out, as in F4b3b), 6 not one update apart; 62
+  compared: 43 left the snow in the motion, 17 by the jump control, 2 neither (rider bumps: another rider 165 and 206 cm
+  away; `Boarder_RiderHit` 0x124920 jumps and sets the air motion itself).
+- Ours equals the game's code under IEEE on every field, as before; the take-off itself (calls, the jump) matches,
+  but the ground step before it is off as in F4b3b (quaternion 2 of 62).
+- Under `fadd=g1`: the whole tick bit for bit on 54 of 62; position 57, velocity 57, quaternion 55, the way up (one
+  `Boarder_SetMotion`(1)) 60. The prediction's inputs, where it found no landing and so keeps them: 11 of 12 equal the
+  rider at the `Boarder_SetMotion` call; the time to the top (+0x48) from those inputs 54 of 54 (all three ways).
+- 7 prediction records were read while the game was making them (6 with `AirPredict_Reset` 0x123ab8 done, velocity
+  0, and the state still 3 rather than 0xd: the PINE read landed between `Boarder_SetMotion` and `Boarder_SetState`);
+  left out of the prediction counts.
+- Inferred, not checked: of the 8 off, 2 are the rider bumps, 3 riders near another (69 and 114 cm: pushed apart after
+  the motion), 2 take-offs in the motion from the jump control state whose orientation alone is off (the spin state
+  0x10 set by `Takeoff_SetSpinRates` may already run its update this tick), and 1 velocity 56–87 cm/s off with no
+  rider near (a wall or instance, answered as none).
+
+Still to do: rows F4b3e (after the motion: collisions, the rider's up) and F4b3f (the jump control ported, the
+take-offs by rider bumps and the same-tick spin update replayed).
 
 ## How a row gets to `checked`
 
