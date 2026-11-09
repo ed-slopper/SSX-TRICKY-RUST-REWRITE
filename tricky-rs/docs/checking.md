@@ -755,6 +755,39 @@ Found:
 What is left: the rider collisions after the motion in the take-off test, and the prediction made before a push
 (row F4h4); the orientation and the jump control (F4b3f); the float rule (F4c).
 
+## F4h4: the frame's rider collisions around the take-off (2026-11-09)
+
+`takeoff_ticks_against_the_running_game` (`tests/ground_motion.rs`) now replays the frame's
+`Boarder_RiderCollisions` 0x123fc8 around the rider that takes off (`FrameRun`, when the bodies are recorded): the
+riders that tick before it in the frame (slot 5 down to 0, as F4b3g) push and hit it before its motion, so its
+motion starts from there; after its take-off (motion 1, as `Boarder_SetMotion` left it) it and the riders after it
+collide. The other riders are taken as `ground_ticks_against_the_running_game` takes those it does not replay (the
+second sample's velocity and motion, air bodies moved by their step). The prediction check now also asks whether the
+game's landing point lies on the flight from what `Boarder_SetMotion` saw (`predict_like`).
+
+- **rec16 (Snow Dream):** whole take-off ticks under `fadd=g1` **221 of 235** (210 before); 13 pushed, 11 of them
+  whole. The prediction from the take-off's own inputs: no-landing inputs 34 of 38, time to the top 235 of 235, the
+  game's landing on the flight 194 of 197. So the 10 landings and 3 no-landing records of F4h3 that the flight test
+  (made from the end of the tick) could not place are the pushes: from the inputs the motion saw they are the game's,
+  except tick 7807 rider 2 (three times, after save states) below. Tick 6765 rider 0 of the flight test is no
+  take-off: it is in the wipe-out motion (5, state 0x13) all along, its prediction re-made there; not looked at.
+- **rec15:** 104 of 110 (102 before); 2 pushed, both whole; landing on the flight 91 of 91. rec11 has no bodies
+  (54 of 62 as before).
+- **Left on rec16** (10 different ticks, 14 with repeats):
+  - 4 with only the orientation off (10397 r2, 10458 r1, 10578 r3, 7897 r5 ×3): take-offs in the motion from the
+    jump state, F4b3f.
+  - 5 with the ground step's velocity off by 0.002–1.2 cm/s before the take-off (the no-landing inputs show it):
+    11535 r2, 6167 r1, 6335 r4 (pushed too), 7807 r2 ×3 in the bump state (2), 12509 r1 in 3 (rec15: 10316 r4,
+    state 2). Proven: `GroundMotion_Update` calls `Boarder_WallCollide` 0x126250 and `Boarder_InstanceCollisions`
+    0x125088, which this test answers with no wall and no object (not in the recording). Inferred: walls or
+    objects; 11535 r2 has nobody within 2,359 cm and the ground test misses it the two ticks before too (3 → 2 at
+    11533 with nobody near: a bump not from a rider), 7807 r2 likewise at 7803.
+  - 7325 r4 (jump control, pushed by rider 1, 168 cm): ends 2 cm and 10 cm/s off. Rider 1 ticks after it and is
+    taken from the second sample, after the hit; the ground test misses rider 1 at that tick too.
+
+What is left: the walls and objects inside the ground motion in these tests (a recording of what the world answers,
+or the course); the riders around a take-off replayed rather than taken from the second sample (row F4h5).
+
 ## How a row gets to `checked`
 
 1. Port the function (address in its doc comment, AGENTS.md §13).
