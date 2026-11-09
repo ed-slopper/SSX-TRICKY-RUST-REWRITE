@@ -118,9 +118,9 @@ impl Vu1 {
     }
     fn set_qw(&mut self, qa: u32, dest: u32, v: [u32; 4]) {
         let at = (qa as usize * 16) % MEM;
-        for k in 0..4 {
+        for (k, w) in v.into_iter().enumerate() {
             if dest & (8 >> k) != 0 {
-                wr32(&mut self.data, at + 4 * k, v[k]);
+                wr32(&mut self.data, at + 4 * k, w);
             }
         }
     }
@@ -620,6 +620,46 @@ impl Vu1 {
     }
 }
 
+/// The MAC flags an upper op sets, from its result (in the lanes of its dest; the others' flags clear), when it
+/// sets them: not the max / mini, ftoi / itof, abs, clip and nop ops. As PCSX2: zero for ±0, sign for the sign
+/// bit, underflow and zero for a denormal, overflow for exponent 255.
+fn mac_flags(hi: u32, c: &Cpu) -> Option<u32> {
+    let op = hi & 0x3f;
+    let dest = (hi >> 21) & 15;
+    let v = if op < 0x3c {
+        if matches!(op, 0x10..=0x17 | 0x1d | 0x1f | 0x2b | 0x2f | 0x30..=0x3b) {
+            return None;
+        }
+        match ((hi >> 6) & 31) as usize {
+            0 => return Some(0x1_0000),
+            fd => c.vf[fd],
+        }
+    } else {
+        let sop = ((hi >> 6) & 0x1f) << 2 | (hi & 3);
+        if matches!(sop, 0x10..=0x17 | 0x1d | 0x1f | 0x2f) {
+            return None;
+        }
+        c.acc
+    };
+    let mut f = 0;
+    for (i, x) in v.iter().enumerate() {
+        if dest & (8 >> i) == 0 {
+            continue;
+        }
+        let (sh, b) = (3 - i, x.to_bits());
+        if b >> 31 != 0 {
+            f |= 0x10 << sh;
+        }
+        match (b & 0x7fff_ffff, b >> 23 & 0xff) {
+            (0, _) => f |= 1 << sh,
+            (_, 0) => f |= 0x101 << sh,
+            (_, 255) => f |= 0x1000 << sh,
+            _ => {}
+        }
+    }
+    Some(f)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -865,44 +905,4 @@ mod tests {
         assert_eq!((v.qw(0x10), v.qw(0x11)), ([21, 22, 23, 24], [25, 26, 27, 28]));
         assert_eq!((v.qw(0), v.qw(1), v.qw(2)), ([1, 2, 3, 4], [5, 6, 7, 8], [9, 10, 11, 12]), "cnt, ref, refs");
     }
-}
-
-/// The MAC flags an upper op sets, from its result (in the lanes of its dest; the others' flags clear), when it
-/// sets them: not the max / mini, ftoi / itof, abs, clip and nop ops. As PCSX2: zero for ±0, sign for the sign
-/// bit, underflow and zero for a denormal, overflow for exponent 255.
-fn mac_flags(hi: u32, c: &Cpu) -> Option<u32> {
-    let op = hi & 0x3f;
-    let dest = (hi >> 21) & 15;
-    let v = if op < 0x3c {
-        if matches!(op, 0x10..=0x17 | 0x1d | 0x1f | 0x2b | 0x2f | 0x30..=0x3b) {
-            return None;
-        }
-        match ((hi >> 6) & 31) as usize {
-            0 => return Some(0x1_0000),
-            fd => c.vf[fd],
-        }
-    } else {
-        let sop = ((hi >> 6) & 0x1f) << 2 | (hi & 3);
-        if matches!(sop, 0x10..=0x17 | 0x1d | 0x1f | 0x2f) {
-            return None;
-        }
-        c.acc
-    };
-    let mut f = 0;
-    for (i, x) in v.iter().enumerate() {
-        if dest & (8 >> i) == 0 {
-            continue;
-        }
-        let (sh, b) = (3 - i, x.to_bits());
-        if b >> 31 != 0 {
-            f |= 0x10 << sh;
-        }
-        match (b & 0x7fff_ffff, b >> 23 & 0xff) {
-            (0, _) => f |= 1 << sh,
-            (_, 0) => f |= 0x101 << sh,
-            (_, 255) => f |= 0x1000 << sh,
-            _ => {}
-        }
-    }
-    Some(f)
 }

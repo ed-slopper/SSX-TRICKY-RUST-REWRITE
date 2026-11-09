@@ -159,8 +159,8 @@ fn step(r: &mut Runner, pc: u32) -> Result<Next, Error> {
                 27 => {
                     // divu
                     let (n, d) = (a as u32, b as u32);
-                    if d != 0 {
-                        c.lo = (c.lo >> 64) << 64 | sext32(n / d) as u128;
+                    if let Some(q) = n.checked_div(d) {
+                        c.lo = (c.lo >> 64) << 64 | sext32(q) as u128;
                         c.hi = (c.hi >> 64) << 64 | sext32(n % d) as u128;
                     }
                     return Ok(Next::Seq);
@@ -647,11 +647,11 @@ pub(crate) fn vu_upper(c: &mut crate::Cpu, w: u32) -> Result<(), String> {
         31 => {
             let lim = t[3].abs();
             let mut f = 0;
-            for k in 0..3 {
-                if s[k] > lim {
+            for (k, &x) in s.iter().enumerate().take(3) {
+                if x > lim {
                     f |= 1 << (2 * k);
                 }
-                if s[k] < -lim {
+                if x < -lim {
                     f |= 2 << (2 * k);
                 }
             }
@@ -762,6 +762,105 @@ fn vu0_lower(s: &crate::Cpu, c: &mut crate::Cpu, w: u32, pc: u32) -> Result<Opti
         _ => return Err(format!("lower op {op:#x}")),
     }
     Ok(None)
+}
+
+/// The MMI instructions implemented so far: the pipeline-1 multiply and divide (`mult1`, `multu1`, `div1`,
+/// `divu1`, `madd1`, `maddu1`) and their HI1/LO1 moves (HI1 and LO1 are the upper 64 bits of HI and LO); the
+/// lanes' add and subtract (`paddw`, `psubw`, `paddb`, `psubb`) and the 128-bit logic (`pand`, `pxor`, `por`,
+/// `pnor`, as libc's `strcmp` uses them); `pextlw`, `pextuw`, `pcpyld`, `pcpyud`.
+fn mmi(r: &mut Runner, pc: u32, w: u32, rs: usize, rt: usize, rd: usize, fun: u32) -> Result<Next, Error> {
+    let c = &mut r.cpu;
+    let (a, b) = (c.gpr(rs), c.gpr(rt));
+    let set_hi1 = |c: &mut crate::Cpu, v: u64| c.hi = (c.hi & u64::MAX as u128) | ((v as u128) << 64);
+    let set_lo1 = |c: &mut crate::Cpu, v: u64| c.lo = (c.lo & u64::MAX as u128) | ((v as u128) << 64);
+    match fun {
+        0x00 | 0x01 => {
+            // madd / maddu: {HI, LO} (32 bits each) += rs * rt; LO, HI sign-extended, and rd = LO
+            let acc = ((c.hi as u64 as u32 as u64) << 32 | c.lo as u64 as u32 as u64) as i64;
+            let p = if fun == 0 { (a as u32 as i32 as i64).wrapping_mul(b as u32 as i32 as i64) } else { ((a as u32 as u64) * (b as u32 as u64)) as i64 };
+            let t = acc.wrapping_add(p) as u64;
+            let keep = |x: u128| (x >> 64) << 64;
+            c.lo = keep(c.lo) | sext32(t as u32) as u128;
+            c.hi = keep(c.hi) | sext32((t >> 32) as u32) as u128;
+            c.set_gpr(rd, sext32(t as u32));
+        }
+        0x20 | 0x21 => {
+            // madd1 / maddu1: as madd / maddu on HI1, LO1
+            let acc = (((c.hi >> 64) as u64 as u32 as u64) << 32 | (c.lo >> 64) as u64 as u32 as u64) as i64;
+            let p = if fun == 0x20 { (a as u32 as i32 as i64).wrapping_mul(b as u32 as i32 as i64) } else { ((a as u32 as u64) * (b as u32 as u64)) as i64 };
+            let t = acc.wrapping_add(p) as u64;
+            set_lo1(c, sext32(t as u32));
+            set_hi1(c, sext32((t >> 32) as u32));
+            c.set_gpr(rd, sext32(t as u32));
+        }
+        0x10 => c.set_gpr(rd, (c.hi >> 64) as u64), // mfhi1
+        0x11 => set_hi1(c, a),                       // mthi1
+        0x12 => c.set_gpr(rd, (c.lo >> 64) as u64), // mflo1
+        0x13 => set_lo1(c, a),                       // mtlo1
+        0x18 | 0x19 => {
+            // mult1 / multu1: as mult / multu into LO1, HI1 (and rd)
+            let p = if fun == 0x18 { (a as u32 as i32 as i64).wrapping_mul(b as u32 as i32 as i64) as u64 } else { (a as u32 as u64) * (b as u32 as u64) };
+            set_lo1(c, sext32(p as u32));
+            set_hi1(c, sext32((p >> 32) as u32));
+            c.set_gpr(rd, sext32(p as u32));
+        }
+        0x1a => {
+            let (n, d) = (a as u32 as i32, b as u32 as i32);
+            if d != 0 {
+                set_lo1(c, sext32(n.wrapping_div(d) as u32));
+                set_hi1(c, sext32(n.wrapping_rem(d) as u32));
+            }
+        }
+        0x1b => {
+            let (n, d) = (a as u32, b as u32);
+            if let Some(q) = n.checked_div(d) {
+                set_lo1(c, sext32(q));
+                set_hi1(c, sext32(n % d));
+            }
+        }
+        // the 128-bit lane arithmetic and logic: paddw / psubw / paddb / psubb (MMI0), pand / pxor (MMI2),
+        // por / pnor (MMI3)
+        0x08 | 0x09 | 0x29 if matches!((fun, (w >> 6) & 0x1f), (0x08, 0x00 | 0x01 | 0x08 | 0x09) | (0x09, 0x12 | 0x13) | (0x29, 0x12 | 0x13)) => {
+            let (s, t) = (r.cpu.gpr[rs], r.cpu.gpr[rt]);
+            let lanes = |bits: u32, f: &dyn Fn(u128, u128) -> u128| -> u128 {
+                let mask = (1u128 << bits) - 1;
+                (0..128 / bits).fold(0u128, |acc, i| acc | (f((s >> (bits * i)) & mask, (t >> (bits * i)) & mask) & mask) << (bits * i))
+            };
+            let v = match (fun, (w >> 6) & 0x1f) {
+                (0x08, 0x00) => lanes(32, &|x, y| x.wrapping_add(y)),
+                (0x08, 0x01) => lanes(32, &|x, y| x.wrapping_sub(y)),
+                (0x08, 0x08) => lanes(8, &|x, y| x.wrapping_add(y)),
+                (0x08, 0x09) => lanes(8, &|x, y| x.wrapping_sub(y)),
+                (0x09, 0x12) => s & t,
+                (0x09, 0x13) => s ^ t,
+                (0x29, 0x12) => s | t,
+                _ => !(s | t),
+            };
+            if rd != 0 {
+                r.cpu.gpr[rd] = v;
+            }
+        }
+        // the 128-bit shuffles (MMI0 / MMI1 / MMI2 / MMI3 groups, the operation in the sa field)
+        0x08 | 0x28 | 0x09 | 0x29 if matches!((fun, (w >> 6) & 0x1f), (0x08 | 0x28, 0x12) | (0x09 | 0x29, 0x0e)) => {
+            let (s, t) = (r.cpu.gpr[rs], r.cpu.gpr[rt]);
+            let word = |v: u128, i: u32| (v >> (32 * i)) as u32 as u128;
+            let v = match fun {
+                // pextlw: rt0, rs0, rt1, rs1
+                0x08 => word(t, 0) | word(s, 0) << 32 | word(t, 1) << 64 | word(s, 1) << 96,
+                // pextuw: rt2, rs2, rt3, rs3
+                0x28 => word(t, 2) | word(s, 2) << 32 | word(t, 3) << 64 | word(s, 3) << 96,
+                // pcpyld: low = rt low, high = rs low
+                0x09 => (t as u64 as u128) | (s as u64 as u128) << 64,
+                // pcpyud: low = rs high, high = rt high
+                _ => (s >> 64) | (t >> 64) << 64,
+            };
+            if rd != 0 {
+                r.cpu.gpr[rd] = v;
+            }
+        }
+        _ => return Err(Error::Unimplemented { pc, word: w, what: format!("MMI {fun:#x}") }),
+    }
+    Ok(Next::Seq)
 }
 
 #[cfg(test)]
@@ -942,7 +1041,7 @@ mod tests {
             &[
                 vu(1, 0, 3, 3, 16),                  // vmaxx.w vf3 = max(vf3.w, vf0.x)
                 vu(1, 5, 3, 3, 20),                  // vminix.w vf3 = min(vf3.w, vf5.x)
-                vu(15, 4, 1, 5 << 0, 0x3c) | (5 << 6), // vftoi0 vf4, vf1
+                vu(15, 4, 1, 5, 0x3c) | (5 << 6),      // vftoi0 vf4, vf1
                 vu(3, 1, 3, 15, 0x3c) | (15 << 6),   // vmtir vi1, vf3.w
             ],
             |rn| {
@@ -1203,103 +1302,4 @@ mod tests {
         assert_eq!(rn.cpu.gpr(7), 32042, "madd1 on LO1 kept through mult");
         assert_eq!(rn.cpu.gpr(8), 32042);
     }
-}
-
-/// The MMI instructions implemented so far: the pipeline-1 multiply and divide (`mult1`, `multu1`, `div1`,
-/// `divu1`, `madd1`, `maddu1`) and their HI1/LO1 moves (HI1 and LO1 are the upper 64 bits of HI and LO); the
-/// lanes' add and subtract (`paddw`, `psubw`, `paddb`, `psubb`) and the 128-bit logic (`pand`, `pxor`, `por`,
-/// `pnor`, as libc's `strcmp` uses them); `pextlw`, `pextuw`, `pcpyld`, `pcpyud`.
-fn mmi(r: &mut Runner, pc: u32, w: u32, rs: usize, rt: usize, rd: usize, fun: u32) -> Result<Next, Error> {
-    let c = &mut r.cpu;
-    let (a, b) = (c.gpr(rs), c.gpr(rt));
-    let set_hi1 = |c: &mut crate::Cpu, v: u64| c.hi = (c.hi & u64::MAX as u128) | ((v as u128) << 64);
-    let set_lo1 = |c: &mut crate::Cpu, v: u64| c.lo = (c.lo & u64::MAX as u128) | ((v as u128) << 64);
-    match fun {
-        0x00 | 0x01 => {
-            // madd / maddu: {HI, LO} (32 bits each) += rs * rt; LO, HI sign-extended, and rd = LO
-            let acc = ((c.hi as u64 as u32 as u64) << 32 | c.lo as u64 as u32 as u64) as i64;
-            let p = if fun == 0 { (a as u32 as i32 as i64).wrapping_mul(b as u32 as i32 as i64) } else { ((a as u32 as u64) * (b as u32 as u64)) as i64 };
-            let t = acc.wrapping_add(p) as u64;
-            let keep = |x: u128| (x >> 64) << 64;
-            c.lo = keep(c.lo) | sext32(t as u32) as u128;
-            c.hi = keep(c.hi) | sext32((t >> 32) as u32) as u128;
-            c.set_gpr(rd, sext32(t as u32));
-        }
-        0x20 | 0x21 => {
-            // madd1 / maddu1: as madd / maddu on HI1, LO1
-            let acc = (((c.hi >> 64) as u64 as u32 as u64) << 32 | (c.lo >> 64) as u64 as u32 as u64) as i64;
-            let p = if fun == 0x20 { (a as u32 as i32 as i64).wrapping_mul(b as u32 as i32 as i64) } else { ((a as u32 as u64) * (b as u32 as u64)) as i64 };
-            let t = acc.wrapping_add(p) as u64;
-            set_lo1(c, sext32(t as u32));
-            set_hi1(c, sext32((t >> 32) as u32));
-            c.set_gpr(rd, sext32(t as u32));
-        }
-        0x10 => c.set_gpr(rd, (c.hi >> 64) as u64), // mfhi1
-        0x11 => set_hi1(c, a),                       // mthi1
-        0x12 => c.set_gpr(rd, (c.lo >> 64) as u64), // mflo1
-        0x13 => set_lo1(c, a),                       // mtlo1
-        0x18 | 0x19 => {
-            // mult1 / multu1: as mult / multu into LO1, HI1 (and rd)
-            let p = if fun == 0x18 { (a as u32 as i32 as i64).wrapping_mul(b as u32 as i32 as i64) as u64 } else { (a as u32 as u64) * (b as u32 as u64) };
-            set_lo1(c, sext32(p as u32));
-            set_hi1(c, sext32((p >> 32) as u32));
-            c.set_gpr(rd, sext32(p as u32));
-        }
-        0x1a => {
-            let (n, d) = (a as u32 as i32, b as u32 as i32);
-            if d != 0 {
-                set_lo1(c, sext32(n.wrapping_div(d) as u32));
-                set_hi1(c, sext32(n.wrapping_rem(d) as u32));
-            }
-        }
-        0x1b => {
-            let (n, d) = (a as u32, b as u32);
-            if d != 0 {
-                set_lo1(c, sext32(n / d));
-                set_hi1(c, sext32(n % d));
-            }
-        }
-        // the 128-bit lane arithmetic and logic: paddw / psubw / paddb / psubb (MMI0), pand / pxor (MMI2),
-        // por / pnor (MMI3)
-        0x08 | 0x09 | 0x29 if matches!((fun, (w >> 6) & 0x1f), (0x08, 0x00 | 0x01 | 0x08 | 0x09) | (0x09, 0x12 | 0x13) | (0x29, 0x12 | 0x13)) => {
-            let (s, t) = (r.cpu.gpr[rs], r.cpu.gpr[rt]);
-            let lanes = |bits: u32, f: &dyn Fn(u128, u128) -> u128| -> u128 {
-                let mask = (1u128 << bits) - 1;
-                (0..128 / bits).fold(0u128, |acc, i| acc | (f((s >> (bits * i)) & mask, (t >> (bits * i)) & mask) & mask) << (bits * i))
-            };
-            let v = match (fun, (w >> 6) & 0x1f) {
-                (0x08, 0x00) => lanes(32, &|x, y| x.wrapping_add(y)),
-                (0x08, 0x01) => lanes(32, &|x, y| x.wrapping_sub(y)),
-                (0x08, 0x08) => lanes(8, &|x, y| x.wrapping_add(y)),
-                (0x08, 0x09) => lanes(8, &|x, y| x.wrapping_sub(y)),
-                (0x09, 0x12) => s & t,
-                (0x09, 0x13) => s ^ t,
-                (0x29, 0x12) => s | t,
-                _ => !(s | t),
-            };
-            if rd != 0 {
-                r.cpu.gpr[rd] = v;
-            }
-        }
-        // the 128-bit shuffles (MMI0 / MMI1 / MMI2 / MMI3 groups, the operation in the sa field)
-        0x08 | 0x28 | 0x09 | 0x29 if matches!((fun, (w >> 6) & 0x1f), (0x08 | 0x28, 0x12) | (0x09 | 0x29, 0x0e)) => {
-            let (s, t) = (r.cpu.gpr[rs], r.cpu.gpr[rt]);
-            let word = |v: u128, i: u32| (v >> (32 * i)) as u32 as u128;
-            let v = match fun {
-                // pextlw: rt0, rs0, rt1, rs1
-                0x08 => word(t, 0) | word(s, 0) << 32 | word(t, 1) << 64 | word(s, 1) << 96,
-                // pextuw: rt2, rs2, rt3, rs3
-                0x28 => word(t, 2) | word(s, 2) << 32 | word(t, 3) << 64 | word(s, 3) << 96,
-                // pcpyld: low = rt low, high = rs low
-                0x09 => (t as u64 as u128) | (s as u64 as u128) << 64,
-                // pcpyud: low = rs high, high = rt high
-                _ => (s >> 64) | (t >> 64) << 64,
-            };
-            if rd != 0 {
-                r.cpu.gpr[rd] = v;
-            }
-        }
-        _ => return Err(Error::Unimplemented { pc, word: w, what: format!("MMI {fun:#x}") }),
-    }
-    Ok(Next::Seq)
 }
