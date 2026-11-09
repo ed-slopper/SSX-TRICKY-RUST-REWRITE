@@ -178,6 +178,12 @@ and 4 s, whole `Air_IntegrateRK4` flights without substeps, 10 tries or a bracke
 against the world (`cWorldLine`(0, …, 0)); the first hit: velocity and time interpolated to its fraction, its point,
 normal and word, the top's time kept at +0x50. None: the rider's own position, velocity and normal, word −1.
 
+Which velocity it sees (row F4h3, proven from the code and against recordings): `Boarder_TakeOff` 0x128470 (a take-off
+in the ground motion) calls `Boarder_SetMotion`(1), whose `AirMotion_Enter` 0x108310 predicts, before
+`Jump_ApplyImpulse`(0): out of the jump state (0xa) with the crouch it has, else after +0x1c8 = +0x208 (no strength,
+so only a steep lip changes the velocity, halving it and more). `JumpControl_Update` 0x1046b0 jumps first and predicts
+after. Riders pushed apart later in the tick (`Boarder_RiderCollisions`) move the rider after the prediction too.
+
 `AirMotion_Update` 0x108378 (`air_motion::update`, the calls other rows' work through `AirEnv`):
 - the flight step (dt = +0x12c / 60, no substeps), `AirPredict_Tick`, the surface from the prediction's (+0x57f0;
   a new one: ticks 0x80000001);

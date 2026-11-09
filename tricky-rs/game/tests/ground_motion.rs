@@ -1330,6 +1330,8 @@ struct OurTakeOff<'a> {
     motion: u32,
     jump_stat: u8,
     off: Off,
+    /// the jump went off a steep lip
+    steep: bool,
 }
 impl TakeOffEnv for OurTakeOff<'_> {
     fn set_motion(&mut self, _: &mut TakeOffRider, motion: u32) {
@@ -1347,7 +1349,9 @@ impl TakeOffEnv for OurTakeOff<'_> {
             normal: self.r.p.normal,
             forward: self.r.p.plane_fwd,
         };
-        self.r.vel = jump_impulse(min, &s).0;
+        let (v, steep) = jump_impulse(min, &s);
+        self.r.vel = v;
+        self.steep |= steep;
     }
     fn takeoff_spin_rates(&mut self, _: &mut TakeOffRider) {
         self.off.spin_rates += 1;
@@ -1483,6 +1487,7 @@ fn takeoff_ticks_against_the_running_game() {
     let mut count = vec![vec![0usize; names.len()]; ways];
     let mut of = vec![0usize; names.len()];
     let mut whole = vec![0usize; ways];
+    let (mut steep, mut steep_whole) = (0, vec![0usize; ways]);
     let (mut pairs, mut other, mut skew, mut by_motion, mut by_jump, mut neither, mut no_pred, mut torn) = (0, 0, 0, 0, 0, 0, 0, 0);
     for w in ticks.windows(2) {
         if w[1].tick != w[0].tick + 1 {
@@ -1525,7 +1530,7 @@ fn takeoff_ticks_against_the_running_game() {
             update(&mut mine, &SURFACE_TABLE, &mut e);
             let up_by_motion = e.log.contains(&Ev::TakeOff);
             let mut t = TakeOffRider { state: mine.state, crouch: crouch0, x208: mine.crouch };
-            let mut env = OurTakeOff { r: &mut mine, motion: 2, jump_stat: st[0x17], off: Off::default() };
+            let mut env = OurTakeOff { r: &mut mine, motion: 2, jump_stat: st[0x17], off: Off::default(), steep: false };
             if up_by_motion {
                 take_off(&mut t, &mut env);
             } else if jumps {
@@ -1535,6 +1540,8 @@ fn takeoff_ticks_against_the_running_game() {
                 env.takeoff_spin_rates(&mut t);
             }
             let ours_off = env.off;
+            let lip = env.steep;
+            steep += lip as usize;
             let mut got = vec![(mine, ours_off)];
 
             // the game's code
@@ -1612,9 +1619,20 @@ fn takeoff_ticks_against_the_running_game() {
                     }
                 }
                 whole[k] += all as usize;
+                steep_whole[k] += (all && lip) as usize;
+                if !all && k == 2 && std::env::var("TRICKY_DBG").is_ok() {
+                    let near = (0..n).filter(|&j| j != i).map(|j| {
+                        let (p, q) = (vec4(b, 0x140), vec4(&w[1].riders[j], 0x140));
+                        ((p[0] - q[0]).powi(2) + (p[1] - q[1]).powi(2) + (p[2] - q[2]).powi(2)).sqrt()
+                    }).fold(f32::MAX, f32::min);
+                    let bad: Vec<&str> = (0..names.len()).filter(|&f| used[f] && !ok[f]).map(|f| names[f]).collect();
+                    eprintln!("  tick {} rider {i}: {} state {:x}, nearest rider {near:.0} cm, steep {lip}: {bad:?}", w[1].tick,
+                        if up_by_motion { "motion" } else if jumps { "jump control" } else { "neither" }, rider.state);
+                }
             }
         }
     }
+    eprintln!("{path}: {steep} take-offs off a steep lip (`Jump_ApplyImpulse`'s second branch), whole for ours, the runner's: {steep_whole:?}");
     eprintln!("{path}: take-off ticks (motion 2 → 1): {pairs} compared ({by_motion} left the snow in the motion, {by_jump} by the jump control, {neither} neither; {no_pred} with no new prediction read, {torn} read while it was being made); left out {other} whose motion object's +0xc is not the rider, {skew} not one update apart");
     for (k, way) in ["ours".to_string()].into_iter().chain(runners.iter().map(|(r, ..)| format!("the game's in the runner, {r}"))).enumerate() {
         let line: Vec<String> = (0..names.len()).map(|f| format!("{} {} of {}", names[f], count[k][f], of[f])).collect();

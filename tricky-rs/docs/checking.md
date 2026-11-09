@@ -712,6 +712,49 @@ What is left:
 - Cruise (3) and prewind (0xe) need the pad word: 48 ticks 3 → 0xe, 6 ticks 3 → 4, 2 ticks 3 → 2, 48 ticks 0xe → 0xa
   (the release) miss the state (row F4b3k). No fakie cruise (5) in rec15.
 
+## F4h3: the take-off's jump and the flight prediction it sees (2026-11-09)
+
+`flight_predictions_against_the_running_game` (`tests/replay.rs`) and `takeoff_ticks_against_the_running_game`
+(`tests/ground_motion.rs`), on the old recordings and rec16 (240 s of Snow Dream raced by hand with save states, so
+ticks repeat; `pine.py record 240 rec16.txt 0x700 57b0:64 -400:10 -3d0:10 -170:74 46c0:10 5ae0:4 5900:4` and
+F4b3i's control windows, plus `rec16.stats`).
+
+Proven (code): `Boarder_TakeOff` 0x128470 calls `Boarder_SetMotion`(1) (the prediction, from `AirMotion_Enter`) and
+only then `Jump_ApplyImpulse` 0x1284e0 with 0: out of the jump state (0xa) with the crouch it has, else after setting
++0x1c8 to +0x208, so the jump has no strength and only a steep lip changes the velocity (v′ = ((1−b)v + b|v|L)/2).
+`JumpControl_Update` 0x1046b0 jumps before it predicts.
+
+Found:
+- **Tick 19500, rider 0 (rec5; F4h2's "halved after"):** a take-off off a steep lip (normal z 0.469, state 3 → 0xd).
+  The prediction holds the velocity before the jump; the game's `Jump_ApplyImpulse` in the runner on it gives the
+  rider's velocity at the end of the tick bit for bit under PCSX2's adder (`fadd=g1`), 1 ulp off in x and z under
+  IEEE (ours too: the float rule, F4c).
+- **Tick 21105, rider 4 (rec5) and rec6's 4 landings 30–157 cm off our flight (ticks 2462, 3027, 4296 of rider 4,
+  3318 of rider 0):** take-offs in the motion, predicted before the jump (21105, 3027, 3318, 4296 out of the jump
+  state with strength; 2462 off a steep lip out of prewind, 0xe). The velocity before the jump, found from the one
+  after it (`unjump`: Newton's steps, then the f32 values within 6 ulps that the game's jump in the runner under
+  `fadd=g1` turns into the rider's end velocity bit for bit; found on every one), gives the time to the top bit for
+  bit and the game's landing on our flight on all 5 (rec5 with rec4's stat blocks: the attract demo has the same
+  riders).
+- **The steep-lip branch in recordings:** rec5 tick 19500, rec6 tick 2462, rec15 one take-off (the whole tick bit for
+  bit in the runner under `fadd=g1`), rec16 tick 11278 (rider 5, pushed by rider 0 146 cm away in the same tick).
+- **rec16 predictions:** 267 (+7 read half-made). 38 with no landing, all 38 bit for bit from their own inputs, 35
+  of them the rider's at the end of the tick. 229 with a landing: the time to the top bit for bit on 229 (6 from the
+  velocity before the tick's jump), the game's landing on our flight on 219. The other 10 (5 take-offs met again
+  after save states) and the 3 no-landing records whose inputs are not the rider's all have another rider 99–172 cm
+  away: pushed apart after the prediction (inferred; the runner's own `AirPredict_AtTakeoff` from the end of the tick
+  misses by the same cm). `AirPredict_Tick` 21,089 of 21,089 with PCSX2's adder (rec15 11,546 of 11,546): with
+  samples at a frame's end the two-tick gaps are gone.
+- **Whole take-off ticks** (`takeoff_ticks_against_the_running_game`, rec16): 235 (125 in the motion, 108 by the
+  jump control, 2 by rider hits); under `fadd=g1` the runner has all fields on 210 (rec15: 102 of 110), ours (IEEE)
+  on 1, as before. Of the 25 off (with repeats): 17 have another rider within 180 cm (pushes and hits after the
+  motion, not replayed here), 6 (4 different) take off in the motion from the jump state with only the orientation off (F4b3f's
+  same-tick spin update), 2 have the ground step off with no rider near (ticks 11535 rider 2, 12509 rider 1).
+  `TRICKY_DBG=1` lists them.
+
+What is left: the rider collisions after the motion in the take-off test, and the prediction made before a push
+(row F4h4); the orientation and the jump control (F4b3f); the float rule (F4c).
+
 ## How a row gets to `checked`
 
 1. Port the function (address in its doc comment, AGENTS.md §13).

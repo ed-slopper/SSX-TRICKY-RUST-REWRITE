@@ -7,6 +7,7 @@
 //! velocity: a rider in the air gets exactly that (nothing else moves it in the air unless it hits something).
 
 use tricky_game::air::{integrate_rk4, predict_at_takeoff, Predict, RayHit};
+use tricky_game::jump::{jump_impulse, JumpState};
 use tricky_game::orient::{update_orientation, Orient};
 use tricky_game::spin::{spin_update, Anim, SpinObj, SpinRider};
 
@@ -241,6 +242,13 @@ fn takeoffs_against_the_running_game() {
 /// top (+0x48) is bit for bit and the landing on our flight shows the steps are the game's. The landing time and
 /// velocity use our ray's fraction, so they are only near. Then every tick in the air: +0x4c, +8 and +0x50 from
 /// the tick before, in IEEE f32 (the port) and with PCSX2's adder (`pcsx2_add`). Findings: `checking.md`, F4h2.
+///
+/// A take-off in the motion (`Boarder_TakeOff` 0x128470) predicts before `Jump_ApplyImpulse` 0x1284e0 (row F4h3): its
+/// record's velocity is the one before the jump. With no landing the jump is run on it (ours, and the game's in the
+/// runner under IEEE and PCSX2's adder) against the rider's velocity at the end of the tick. With a landing whose
+/// time to the top or landing misses from the end of the tick, the velocity before the jump is found (`unjump`, with
+/// the game's jump under PCSX2's adder) and the flight made again from it. The jump's strength needs the stat blocks
+/// (TRICKY_STATS) out of the jump state (0xa).
 #[test]
 fn flight_predictions_against_the_running_game() {
     let Ok(paths) = std::env::var("TRICKY_RECORDING") else { return };
@@ -254,6 +262,15 @@ fn flight_predictions_against_the_running_game() {
         let (mut no_hit, mut no_hit_exact, mut no_hit_rider) = (0, 0, 0);
         let (mut worst_line, mut worst_t, mut worst_v) = (0f32, 0f32, 0f32);
         let (mut steps, mut steps_exact, mut steps_guard, mut steps_two) = (0, 0, 0, 0);
+        let (mut before_jump, mut steep_after, mut steep_exact) = (0, 0, 0);
+        // the game's `Jump_ApplyImpulse` in the function runner, IEEE adds and PCSX2's adder
+        let mut predictors: Vec<Option<Predictor>> = ["add=n,mul=n,div=n,cvt=n", "add=n,fadd=g1,mul=n,div=n,cvt=n"].into_iter().map(Predictor::new).collect();
+        let mut jumper: Option<Vec<(&str, Jumper)>> = ["add=n,mul=n,div=n,cvt=n", "add=n,fadd=g1,mul=n,div=n,cvt=n"]
+            .into_iter().map(|rules| Jumper::new(rules).map(|j| (rules, j))).collect();
+        // the stat blocks (TRICKY_STATS: `rider stats-address hex` lines), for the jump's strength
+        let stats: Vec<Vec<u8>> = std::env::var("TRICKY_STATS").ok().and_then(|f| std::fs::read_to_string(f).ok()).map(|t| t.lines()
+            .map(|l| { let h = l.split_whitespace().nth(2).unwrap(); (0..h.len()).step_by(2).map(|i| u8::from_str_radix(&h[i..i + 2], 16).unwrap()).collect() })
+            .collect()).unwrap_or_default();
         let u32_at = |b: &[u8], o: usize| u32::from_le_bytes(b[o..o + 4].try_into().unwrap());
         for w in ticks.windows(2) {
             if w[1].tick != w[0].tick + 1 {
@@ -296,33 +313,50 @@ fn flight_predictions_against_the_running_game() {
                         if (gpoint, vec4(pb, 0x20), gnormal) == (pos, vel, normal) {
                             no_hit_rider += 1;
                         } else {
-                            eprintln!("  {ctx}: no landing, made from velocity {:?}, the rider ends the tick with {vel:?}", vec4(pb, 0x20));
+                            // made before a jump the tick did afterwards: `Boarder_TakeOff` 0x128470 predicts first,
+                            // then `Jump_ApplyImpulse` 0x1284e0
+                            let state = u32_at(&w[0].riders[i], 0x428);
+                            let js = jump_state(rb, stats.get(i).map(|s| s[0x17]), state, vec4(pb, 0x20));
+                            let after = js.map(|js| jump_impulse(0.0, &js));
+                            if let Some((v, true)) = after {
+                                steep_after += 1;
+                                let game = jumper.as_mut().map(|j| j.iter_mut().map(|(_, r)| game_jump(r, rb, stats.get(i), vec4(pb, 0x20), state).map(f32::to_bits) == vel.map(f32::to_bits)).collect::<Vec<_>>());
+                                steep_exact += (v.map(f32::to_bits) == vel.map(f32::to_bits)) as usize;
+                                eprintln!("  {ctx}: no landing, made before a steep-lip jump: ours after it {v:?}, the game's {vel:?} \
+                                    (the runner's IEEE, fadd=g1 equal: {game:?}; normal z {}, forward z {})", gnormal[2], vec4(rb, 0x320)[2]);
+                            } else {
+                                eprintln!("  {ctx}: no landing, made from velocity {:?}, the rider ends the tick with {vel:?} \
+                                    (the jump after it: {after:?})", vec4(pb, 0x20));
+                            }
                         }
                         continue;
                     }
                     // a landing: from the rider at the end of the tick, our flight; the ray answers with the game's
                     // landing on the first of our segments that passes within 0.05 cm of its point
-                    let (mut best, mut hit_seg, mut seg, mut nearest) = (f32::MAX, None, 0, (f32::MAX, 0.0f32));
-                    let mut ray = |a: [f32; 4], b: [f32; 4]| {
-                        seg += 1;
-                        let d = [b[0] - a[0], b[1] - a[1], b[2] - a[2]];
-                        let q = [gpoint[0] - a[0], gpoint[1] - a[1], gpoint[2] - a[2]];
-                        let dd = d[0] * d[0] + d[1] * d[1] + d[2] * d[2];
-                        let h = (q[0] * d[0] + q[1] * d[1] + q[2] * d[2]) / dd;
-                        let off = [q[0] - h * d[0], q[1] - h * d[1], q[2] - h * d[2]];
-                        let dist = (off[0] * off[0] + off[1] * off[1] + off[2] * off[2]).sqrt();
-                        if hit_seg.is_none() && dist < nearest.0 {
-                            nearest = (dist, h);
+                    let (mut p, mut hit_seg, mut best, mut nearest) = fly(pos, vel, normal, gpoint, gnormal, gword);
+                    if p.t_top.to_bits() != f32_at(pb, 0x48).to_bits() || hit_seg.is_none() {
+                        // made before a jump the tick did afterwards (`Boarder_TakeOff` 0x128470 predicts first, then
+                        // `Jump_ApplyImpulse` 0x1284e0): the velocity before that jump, found from the one after it
+                        let state = u32_at(&w[0].riders[i], 0x428);
+                        let js = jump_state(rb, stats.get(i).map(|s| s[0x17]), state, vel);
+                        if let Some(js) = js {
+                            // the velocity before, found with the game's jump under PCSX2's adder (else ours)
+                            let (before, exact) = match jumper.as_mut() {
+                                Some(j) => unjump(&js, &mut |v| game_jump(&mut j[1].1, rb, stats.get(i), v, state)),
+                                None => unjump(&js, &mut |v| jump_impulse(0.0, &JumpState { vel: v, ..js }).0),
+                            };
+                            let q = fly(pos, before, normal, gpoint, gnormal, gword);
+                            eprintln!("  {ctx}: from the velocity before the tick's jump {before:?} ({} found exactly; \
+                                state {state:x}, steep lip {}): time to the top {}, landing {}", if exact { "" } else { "not" },
+                                jump_impulse(0.0, &JumpState { vel: before, ..js }).1,
+                                q.0.t_top.to_bits() == f32_at(pb, 0x48).to_bits(),
+                                if q.1.is_some() { "on our flight".to_string() } else { format!("{} cm off", q.3.0) });
+                            if q.0.t_top.to_bits() == f32_at(pb, 0x48).to_bits() && q.1.is_some() {
+                                before_jump += 1;
+                                (p, hit_seg, best, nearest) = q;
+                            }
                         }
-                        if hit_seg.is_none() && (0.0..=1.0).contains(&h) && dist < 0.05 {
-                            best = dist;
-                            hit_seg = Some(seg);
-                            (h, RayHit { point: gpoint, normal: gnormal, word: gword })
-                        } else {
-                            (-1.0, RayHit::default())
-                        }
-                    };
-                    let p = predict_at_takeoff(pos, vel, normal, &mut ray);
+                    }
                     tops += 1;
                     if p.t_top.to_bits() == f32_at(pb, 0x48).to_bits() {
                         top += 1;
@@ -337,8 +371,9 @@ fn flight_predictions_against_the_running_game() {
                         worst_v = worst_v.max((0..3).map(|q| (p.vel[q] - gv[q]).abs()).fold(0.0, f32::max));
                     } else {
                         off_seg += 1;
+                        let game: Vec<(f32, bool, f32)> = predictors.iter_mut().flatten().map(|q| q.fly(pos, vel, normal, gpoint, gnormal, gword)).collect();
                         eprintln!("  {ctx}: the game's landing {gpoint:?} at {} s is on none of our segments \
-                            (nearest {} cm off, at {} along)", f32_at(pb, 0x44), nearest.0, nearest.1);
+                            (nearest {} cm off, at {} along); the runner's (IEEE, fadd=g1): {game:?}", f32_at(pb, 0x44), nearest.0, nearest.1);
                     }
                 } else if x4c(pb) != 0.0 && x4c(pa).to_bits() != x4c(pb).to_bits() {
                     // a tick in the air: `AirPredict_Tick`
@@ -367,8 +402,222 @@ fn flight_predictions_against_the_running_game() {
             {tops} found a landing: from the rider at the end of the tick, time to the top bit for bit on {top}, the \
             game's landing on our flight on {on_seg} (at most {worst_line:.4} cm off the segment; landing time within \
             {worst_t:e} s, velocity within {worst_v:e} cm/s), on none of our segments on {off_seg}. AirPredict_Tick bit for bit on {steps_exact} of {steps} ticks in IEEE f32, \
-            on {steps_guard} with PCSX2's adder (+{steps_two} two ticks apart)");
+            on {steps_guard} with PCSX2's adder (+{steps_two} two ticks apart). Made before a steep-lip jump with no landing: \
+            {steep_after}, ours after the jump the game's on {steep_exact}; landings from the velocity before the tick's jump: {before_jump}");
     }
+}
+
+/// What `Jump_ApplyImpulse` 0x1284e0 read on a take-off tick, from the rider at the end of the tick with the velocity
+/// `vel` it had before the jump: out of the jump state (0xa) `Boarder_TakeOff` 0x128470 first sets the crouch +0x1c8
+/// to +0x208 (no strength: only a steep lip changes the velocity). `None` when the jump has strength and the stat
+/// block is not there.
+fn jump_state(rb: &[u8], jump_stat: Option<u8>, state: u32, vel: [f32; 4]) -> Option<JumpState> {
+    let x208 = f32_at(rb, 0x208);
+    let crouch = if state == 0xa { f32_at(rb, 0x1c8) } else { x208 };
+    if crouch > x208 && jump_stat.is_none() {
+        return None;
+    }
+    Some(JumpState {
+        crouch,
+        x208,
+        vel,
+        jump_stat: jump_stat.unwrap_or(0),
+        motion: u32_le(rb, 0x424),
+        up: vec4(rb, 0x1a0),
+        normal: vec4(rb, 0x2a0),
+        forward: vec4(rb, 0x320),
+    })
+}
+
+/// The velocity before `jump_impulse(0, js)` that gives `js.vel` after it: Newton's steps in f64 on our jump, then
+/// the f32 values a few ulps around for one that `exact` (a jump: ours, or the game's in the runner) gives it bit for
+/// bit (true when found).
+fn unjump(js: &JumpState, exact: &mut dyn FnMut([f32; 4]) -> [f32; 4]) -> ([f32; 4], bool) {
+    let after = js.vel;
+    let jump = |v: [f64; 3]| -> [f64; 3] {
+        let (o, _) = jump_impulse(0.0, &JumpState { vel: [v[0] as f32, v[1] as f32, v[2] as f32, 0.0], ..*js });
+        [o[0] as f64, o[1] as f64, o[2] as f64]
+    };
+    let mut v = [after[0] as f64, after[1] as f64, after[2] as f64];
+    for _ in 0..40 {
+        let f = jump(v);
+        let r = [f[0] - after[0] as f64, f[1] - after[1] as f64, f[2] - after[2] as f64];
+        let mut m = [[0f64; 3]; 3];
+        for c in 0..3 {
+            let mut u = v;
+            u[c] += 1.0;
+            let g = jump(u);
+            for k in 0..3 {
+                m[k][c] = g[k] - f[k];
+            }
+        }
+        let det = |m: [[f64; 3]; 3]| {
+            m[0][0] * (m[1][1] * m[2][2] - m[1][2] * m[2][1]) - m[0][1] * (m[1][0] * m[2][2] - m[1][2] * m[2][0])
+                + m[0][2] * (m[1][0] * m[2][1] - m[1][1] * m[2][0])
+        };
+        let d = det(m);
+        for c in 0..3 {
+            let mut mc = m;
+            for k in 0..3 {
+                mc[k][c] = r[k];
+            }
+            v[c] -= det(mc) / d;
+        }
+    }
+    let near = [v[0] as f32, v[1] as f32, v[2] as f32, 0.0];
+    let step = |x: f32, k: i32| f32::from_bits((x.to_bits() as i32 + if x < 0.0 { -k } else { k }) as u32);
+    for dx in -6..=6 {
+        for dy in -6..=6 {
+            for dz in -6..=6 {
+                let c = [step(near[0], dx), step(near[1], dy), step(near[2], dz), 0.0];
+                if exact(c).map(f32::to_bits) == after.map(f32::to_bits) {
+                    return (c, true);
+                }
+            }
+        }
+    }
+    (near, false)
+}
+
+/// Our flight from `pos`, `vel`, `normal` with the ray answering the game's landing (point, normal, word) on the first
+/// of our segments passing within 0.05 cm of its point: the prediction, that segment, its distance, and the nearest
+/// any segment came (distance, fraction along).
+fn fly(pos: [f32; 4], vel: [f32; 4], normal: [f32; 4], gpoint: [f32; 4], gnormal: [f32; 4], gword: u32) -> (Predict, Option<usize>, f32, (f32, f32)) {
+    let (mut best, mut hit_seg, mut seg, mut nearest) = (f32::MAX, None, 0, (f32::MAX, 0.0f32));
+    let mut ray = |a: [f32; 4], b: [f32; 4]| {
+        seg += 1;
+        let d = [b[0] - a[0], b[1] - a[1], b[2] - a[2]];
+        let q = [gpoint[0] - a[0], gpoint[1] - a[1], gpoint[2] - a[2]];
+        let dd = d[0] * d[0] + d[1] * d[1] + d[2] * d[2];
+        let h = (q[0] * d[0] + q[1] * d[1] + q[2] * d[2]) / dd;
+        let off = [q[0] - h * d[0], q[1] - h * d[1], q[2] - h * d[2]];
+        let dist = (off[0] * off[0] + off[1] * off[1] + off[2] * off[2]).sqrt();
+        if hit_seg.is_none() && dist < nearest.0 {
+            nearest = (dist, h);
+        }
+        if hit_seg.is_none() && (0.0..=1.0).contains(&h) && dist < 0.05 {
+            best = dist;
+            hit_seg = Some(seg);
+            (h, RayHit { point: gpoint, normal: gnormal, word: gword })
+        } else {
+            (-1.0, RayHit::default())
+        }
+    };
+    let p = predict_at_takeoff(pos, vel, normal, &mut ray);
+    (p, hit_seg, best, nearest)
+}
+
+/// `AirPredict_AtTakeoff` 0x123b10 in the function runner (`AirPredict_Reset` 0x123ab8 and `Air_IntegrateRK4`
+/// 0x12b340 run as the original), the world ray answered as in `fly`: whether the game's landing is on its flight,
+/// and the nearest any segment came.
+struct Predictor {
+    r: r5900::Runner,
+    rd: u32,
+    oracle: std::rc::Rc<std::cell::RefCell<([f32; 4], [f32; 4], u32, Option<[f32; 4]>, bool, f32)>>,
+}
+
+impl Predictor {
+    fn new(rules: &str) -> Option<Predictor> {
+        let mut r = r5900::Runner::from_env()?;
+        r.float_rules = r5900::ps2float::Rules::parse(rules).unwrap();
+        r.allow(0x123ab8);
+        r.allow(0x12b340);
+        // (landing point, normal, word, the segment's start, hit yet, nearest)
+        let oracle: std::rc::Rc<std::cell::RefCell<([f32; 4], [f32; 4], u32, Option<[f32; 4]>, bool, f32)>> = Default::default();
+        let (o1, o2) = (oracle.clone(), oracle.clone());
+        let get4 = |m: &mut r5900::Mem, at: u32| -> [f32; 4] { std::array::from_fn(|k| m.read_f32(at + 4 * k as u32)) };
+        // the `cWorldLine` constructor: the segment's two ends
+        r.stub(0x25d7f0, move |c, m| {
+            let (a, b) = (get4(m, c.gpr(5) as u32), get4(m, c.gpr(6) as u32));
+            let mut o = o1.borrow_mut();
+            o.3 = Some(a);
+            let g = o.0;
+            let d = [b[0] - a[0], b[1] - a[1], b[2] - a[2]];
+            let q = [g[0] - a[0], g[1] - a[1], g[2] - a[2]];
+            let h = (q[0] * d[0] + q[1] * d[1] + q[2] * d[2]) / (d[0] * d[0] + d[1] * d[1] + d[2] * d[2]);
+            let off = [q[0] - h * d[0], q[1] - h * d[1], q[2] - h * d[2]];
+            let dist = (off[0] * off[0] + off[1] * off[1] + off[2] * off[2]).sqrt();
+            if !o.4 && dist < o.5 {
+                o.5 = dist;
+            }
+            // the fraction kept in the start's w for the ray (a hit only within 0.05 cm, the first time)
+            o.3 = if !o.4 && (0.0..=1.0).contains(&h) && dist < 0.05 { o.4 = true; Some([h, 0.0, 0.0, 0.0]) } else { None };
+        });
+        r.stub(0x25aff8, move |c, m| {
+            let o = o2.borrow();
+            let out = c.gpr(6) as u32;
+            match o.3 {
+                Some(h) => {
+                    for k in 0..4 {
+                        m.write_f32(out + 0x10 + 4 * k, o.0[k as usize]);
+                        m.write_f32(out + 0x20 + 4 * k, o.1[k as usize]);
+                    }
+                    m.write_u32(out + 0x34, o.2);
+                    c.set_f(0, h[0]);
+                }
+                None => c.set_f(0, -1.0),
+            }
+        });
+        let rd = r.mem.alloc(0x6000);
+        r.mem.write_u32(rd + 0x57b0 + 0x60, rd);
+        Some(Predictor { r, rd, oracle })
+    }
+
+    /// (time to the top, landing on the flight, nearest)
+    fn fly(&mut self, pos: [f32; 4], vel: [f32; 4], normal: [f32; 4], gpoint: [f32; 4], gnormal: [f32; 4], gword: u32) -> (f32, bool, f32) {
+        *self.oracle.borrow_mut() = (gpoint, gnormal, gword, None, false, f32::MAX);
+        for (o, v) in [(0x140, pos), (0x150, vel), (0x2a0, normal)] {
+            for (k, x) in v.iter().enumerate() {
+                self.r.mem.write_f32(self.rd + o + 4 * k as u32, *x);
+            }
+        }
+        self.r.cpu.set_gpr(4, (self.rd + 0x57b0) as u64);
+        self.r.call(0x123b10).unwrap();
+        let o = self.oracle.borrow();
+        (self.r.mem.read_f32(self.rd + 0x57b0 + 0x48), o.4, o.5)
+    }
+}
+
+/// The function runner set up for `Jump_ApplyImpulse` 0x1284e0 (scoring and the meter stubbed).
+struct Jumper {
+    r: r5900::Runner,
+    rd: u32,
+    st: u32,
+}
+
+impl Jumper {
+    fn new(rules: &str) -> Option<Jumper> {
+        let mut r = r5900::Runner::from_env()?;
+        r.float_rules = r5900::ps2float::Rules::parse(rules).unwrap();
+        for f in [0x250e98, 0x250d60, 0x102f50] {
+            r.allow(f); // Math_Cos, Math_Sin, Vec4_Scale
+        }
+        r.stub(0x156618, |c, _| c.set_f(0, 0.0));
+        r.stub(0x11b018, |_, _| {});
+        let rd = r.mem.alloc(0x6000);
+        let st = r.mem.alloc(0x100);
+        Some(Jumper { r, rd, st })
+    }
+}
+
+/// The game's jump on the rider at the end of the tick `rb` with the velocity `vel` (as `jump_state`).
+fn game_jump(j: &mut Jumper, rb: &[u8], stat: Option<&Vec<u8>>, vel: [f32; 4], state: u32) -> [f32; 4] {
+    j.r.mem.write(j.rd, rb).unwrap();
+    if let Some(s) = stat {
+        j.r.mem.write(j.st, s).unwrap();
+    }
+    j.r.mem.write_u32(j.rd + 0x464, j.st);
+    if state != 0xa {
+        j.r.mem.write_f32(j.rd + 0x1c8, f32_at(rb, 0x208));
+    }
+    for (c, x) in vel.iter().enumerate() {
+        j.r.mem.write_f32(j.rd + 0x150 + 4 * c as u32, *x);
+    }
+    j.r.cpu.set_f(12, 0.0);
+    j.r.cpu.set_gpr(4, j.rd as u64);
+    j.r.cpu.set_gpr(5, j.rd as u64);
+    j.r.call(0x1284e0).unwrap();
+    std::array::from_fn(|c| j.r.mem.read_f32(j.rd + 0x150 + 4 * c as u32))
 }
 
 /// `add.s` as PCSX2 runs it in normal play, read off the recorded `AirPredict_Tick` 0x123ec8 (row F4h2; F4g): the
