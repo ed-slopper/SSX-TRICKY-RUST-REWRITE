@@ -28,6 +28,9 @@ use tricky_game::orient::{take_off, TakeOffEnv, TakeOffRider};
 use tricky_game::probe::{self, Hit};
 use tricky_game::rider::ground_tick::{lean_targets, lean_up};
 use tricky_game::surface::SURFACE_TABLE;
+use tricky_game::animctl;
+use tricky_game::control::{self, Bump, ControlEnv, LandNormal};
+use tricky_game::orient::Orient;
 
 type V4 = [f32; 4];
 
@@ -74,6 +77,8 @@ enum Ev {
     Meter(u32),
     Rail,
     Instances,
+    /// a boarder helper the control calls (its address)
+    Call(u32),
 }
 
 fn b4(v: V4) -> [u32; 4] {
@@ -141,6 +146,11 @@ struct W {
     hit: Rc<RefCell<Option<Hit>>>,
     wall: Rc<Cell<bool>>,
     meter: Rc<Cell<f32>>,
+    /// the boarder handler (rider+0x5ae0: word 0 the rider, its control states' objects from +0x610), the pad word
+    /// `Boarder_UpdateControl` reads, and two animation sequences with their clip trees and headers (`Ctl`)
+    handler: u32,
+    pad: u32,
+    seqs: [(u32, u32, u32); 2],
 }
 
 fn world() -> Option<W> {
@@ -179,7 +189,7 @@ fn world() -> Option<W> {
     r.mem.write_u32(vtable + 0x64, 0x11a798);
     // what vf11 reaches: the object at rider+0x5ae0 (its word 0 is the rider, +0x3e0 the render object whose +0x99b0
     // is the brake spray's state)
-    let handler = r.mem.alloc(0x400);
+    let handler = r.mem.alloc(0x900);
     let render = r.mem.alloc(0x9a00);
     r.mem.write_u32(rd + 0x5ae0, handler);
     r.mem.write_u32(handler, rd);
@@ -251,7 +261,23 @@ fn world() -> Option<W> {
             cpu.set_f(0, 0.4);
         }
     });
-    Some(W { r, rd, stats, motion, log, hit, wall, meter })
+    // the control after the motion (F4b3i): `Boarder_UpdateControl` 0x11c9a0 and the updates replayed (bump 0x1041b0,
+    // fakie change 0x104030, hard landing 0x104800, normal landing 0x104e68), the animation queries they make
+    // (`AnimCtl_GetClipType` 0x15eec0, `AnimCtl_GetLayerPhase` 0x15fe70, `AnimLayer_FindClip` 0x15a6c8,
+    // `AnimClip_GetPhase` 0x159e80) on the layer `Ctl::put` lays out; what they ask of the boarder is logged
+    for a in [0x11c9a0, 0x1041b0, 0x104030, 0x104800, 0x104e68, 0x15eec0, 0x15fe70, 0x15a6c8, 0x159e80] {
+        r.allow(a);
+    }
+    for a in [0x126948, 0x126c00, 0x126b38, 0x126c78, 0x127918, 0x15fcf8, 0x118f10] {
+        let l = log.clone();
+        r.stub(a, move |_, _| l.borrow_mut().push(Ev::Call(a)));
+    }
+    let pad = r.mem.alloc(16);
+    let mut seqs = [(0, 0, 0); 2];
+    for s in &mut seqs {
+        *s = (r.mem.alloc(0x80), r.mem.alloc(0x10), r.mem.alloc(0x10));
+    }
+    Some(W { r, rd, stats, motion, log, hit, wall, meter, handler, pad, seqs })
 }
 
 impl W {
@@ -314,6 +340,37 @@ impl W {
     }
 
     /// The rider as the original left it (what it never writes is taken from `like`).
+    /// `Boarder_UpdateControl` 0x11c9a0 in the runner on the rider `get` left (its velocity `p.vel`): the animation
+    /// controller laid out at +0x46c0, the handler's control objects copied (the game rider's address, `addr`, made
+    /// the runner's), the pad word; then the velocity, board and the state `Boarder_SetState` was asked for
+    fn control(&mut self, p: &mut Rider, c: &Ctl, addr: u32) {
+        let (rd, h) = (self.rd, self.handler);
+        let m = &mut self.r.mem;
+        wv(m, rd + 0x150, p.vel);
+        m.write_u32(rd + 0x418, c.controller as u32);
+        for (a, v) in lay(c, rd + 0x46c0, self.seqs[0]) {
+            m.write_u32(a, v);
+        }
+        for o in (0..c.handler.len()).step_by(4) {
+            let v = u32_le(&c.handler, o);
+            m.write_u32(h + 0x600 + o as u32, if v == addr { rd } else { v });
+        }
+        m.write_u32(self.pad, c.pad);
+        self.log.borrow_mut().clear();
+        self.r.cpu.set_gpr(4, h as u64);
+        self.r.cpu.set_gpr(5, self.pad as u64);
+        self.r.call(0x11c9a0).unwrap_or_else(|e| panic!("Boarder_UpdateControl: {e:?}"));
+        let m = &mut self.r.mem;
+        (p.vel, p.quat, p.p.fwd, p.board_side, p.board_up, p.yaw) = (rv(m, rd + 0x150), rv(m, rd + 0x170), rv(m, rd + 0x180), rv(m, rd + 0x190), rv(m, rd + 0x1a0), m.read_f32(rd + 0x1b0));
+        for e in self.log.borrow().iter() {
+            if let Ev::State(s) = e {
+                if *s != p.state {
+                    p.state = *s;
+                }
+            }
+        }
+    }
+
     fn get(&mut self, like: &Rider) -> Rider {
         let (m, rd) = (&mut self.r.mem, self.rd);
         let mut r = *like;
@@ -596,6 +653,156 @@ use recording::{f32_at, load, u32_le, vec4};
 
 /// The rider as `GroundMotion_Update` reads it, from a recorded rider block (0x600 bytes from the rider), its stats
 /// block, the ground motion object (its phase +8) and the animation's block at rider+0x46c0 (the clip +8).
+/// What `Boarder_UpdateControl` 0x11c9a0 reads of a rider (F4b3i): layer 0's and 1's clips (+0x46c0 +8, +0xc) and, of
+/// layer 0's sequences (windows `4718>0`, `4718>30>0`, their lengths `4718>78>8>a`, `4718>30>78>8>a`), the first
+/// playing layer 0's clip (what `AnimLayer_FindClip` finds; none: the phase is 1); the handler's control objects
+/// (window `5ae0>600`, +0x600..+0x830), the pad word and the controller (+0x418)
+#[derive(Clone)]
+struct Ctl {
+    clips: [u32; 2],
+    seq: Option<(Vec<u8>, u16)>,
+    handler: Vec<u8>,
+    pad: u32,
+    controller: i32,
+}
+
+/// The controls replayed: bump (2), change fakie (4), fakie cruise (5, not on its turn clip 0x202, which plays clips
+/// and flips the stance), hard landing (0xb), normal landing (0xc)
+const CONTROLS: [u32; 5] = [2, 4, 5, 0xb, 0xc];
+
+/// (the animation read from sample `t`, the handler from `th`)
+fn ctl_of(t: &recording::Tick, th: &recording::Tick, i: usize, ka: usize, addr: u32, pad: u32) -> Option<Ctl> {
+    let w = |name: &str| t.chased.iter().find(|(s, _)| s == name).map(|(_, v)| &v[i]);
+    let h = th.chased.iter().find(|(s, _)| s == "5ae0>600").map(|(_, v)| &v[i])?;
+    let (s1, s2, l1, l2) = (w("4718>0")?, w("4718>30>0")?, w("4718>78>8>a")?, w("4718>30>78>8>a")?);
+    let c = &t.extra[ka].1[i];
+    let clips = [u32_le(c, 8), u32_le(c, 0xc)];
+    // the list ends at the layer's sentinel, rider + 0x4720
+    let seq = if u32_le(s1, 0x40) == clips[0] {
+        Some((s1.clone(), u16::from_le_bytes([l1[0], l1[1]])))
+    } else if u32_le(s1, 0x30) != addr + 0x4720 && u32_le(s2, 0x40) == clips[0] {
+        Some((s2.clone(), u16::from_le_bytes([l2[0], l2[1]])))
+    } else {
+        None
+    };
+    Some(Ctl { clips, seq, handler: h.clone(), pad, controller: u32_le(&t.riders[i], 0x418) as i32 })
+}
+
+/// The animation controller (at `ctl`) laid out for `animctl`'s queries: the three layers' clips (layer 2's none) and
+/// lists (+0x28 + 0x70·k: head +0x30, sentinel +0x38), layer 0's holding the sequence (at `seq`: +0x30 next, +0x78
+/// the tree, whose +8 is the header, whose u16 +0xa is the length) when there is one; as word writes, in order
+fn lay(c: &Ctl, ctl: u32, seq: (u32, u32, u32)) -> Vec<(u32, u32)> {
+    let mut w = vec![(ctl + 8, c.clips[0]), (ctl + 0xc, c.clips[1]), (ctl + 0x10, animctl::NONE)];
+    for k in 0..3 {
+        let l = ctl + 0x28 + 0x70 * k;
+        w.push((l + 0x30, l + 0x38));
+    }
+    if let Some((bytes, len)) = &c.seq {
+        w.extend((0..0x80).step_by(4).map(|o| (seq.0 + o as u32, u32_le(bytes, o))));
+        let l = ctl + 0x28;
+        w.extend([(l + 0x30, seq.0), (seq.0 + 0x30, l + 0x38), (seq.0 + 0x78, seq.1), (seq.1 + 8, seq.2), (seq.2 + 8, (*len as u32) << 16)]);
+    }
+    w
+}
+
+/// Our side of the control: `control::update_control` on an animation controller in a `pf::Mem` (the clip table
+/// copied from the ELF), the board turned by `orient::rotate_about_axis` about its up (+0x1a0, as
+/// `BumpControl_Update` passes it); the state set is kept (as `Boarder_SetState` 0x11f608: only a different one)
+struct CtlEnv {
+    m: tricky_game::pf::Mem,
+    o: Orient,
+    pad: u32,
+    bump: Bump,
+    land: LandNormal,
+    state: Option<u32>,
+}
+
+const CTL: u32 = 0x0200_0000;
+
+impl ControlEnv for CtlEnv {
+    fn clip(&mut self, layer: u32) -> i32 {
+        animctl::clip(&self.m, CTL, layer) as i32
+    }
+    fn clip_type(&mut self, layer: u32) -> i32 {
+        animctl::clip_type(&self.m, CTL, layer) as i32
+    }
+    fn clip_at_end(&mut self, layer: u32) -> bool {
+        animctl::at_end(&self.m, CTL, layer)
+    }
+    fn layer_phase(&mut self, layer: u32) -> f32 {
+        animctl::layer_phase(&self.m, CTL, layer).0
+    }
+    fn play_clip(&mut self, _: &mut control::Rider, _: i32) {}
+    fn set_state(&mut self, r: &mut control::Rider, s: u32) {
+        if s != r.control {
+            r.control = s;
+            self.state = Some(s);
+        }
+    }
+    fn set_motion(&mut self, _: &mut control::Rider, _: u32) {}
+    fn set_steer_target(&mut self, _: &mut control::Rider, _: f32) {}
+    fn set_crouch_target(&mut self, _: &mut control::Rider, _: f32) {}
+    fn set_brake_crouch_input(&mut self, _: &mut control::Rider, _: f32, _: f32) {}
+    fn set_brake_target(&mut self, _: &mut control::Rider, _: f32) {}
+    fn update_boost(&mut self, _: &mut control::Rider, _: u32, _: u32) {}
+    fn update_lean_anim(&mut self, _: &mut control::Rider, _: f32, _: f32) {}
+    fn rotate_about_axis(&mut self, r: &mut control::Rider, angle: f32) {
+        let axis = self.o.up;
+        tricky_game::orient::rotate_about_axis(&mut self.o, angle, axis);
+        r.board = self.o.fwd;
+    }
+    fn request_reset(&mut self, _: &mut control::Rider) {}
+    fn play_celebrate(&mut self, _: &mut control::Rider) {}
+    fn play_disappointed(&mut self, _: &mut control::Rider) {}
+    fn play_wind_up(&mut self, _: &mut control::Rider) {}
+    fn play_takeoff(&mut self, _: &mut control::Rider) {}
+    fn ai_taunt_check(&mut self, _: &mut control::Rider) {}
+    fn random_flourish(&mut self, _: &mut control::Rider) {}
+    fn stop(&mut self, _: &mut control::Rider) {}
+    fn race_riders(&mut self) -> i32 {
+        6
+    }
+    fn race_state(&mut self) -> i32 {
+        3
+    }
+    fn cam_start(&mut self, _: i32, _: &str) {}
+    fn run_control(&mut self, r: &mut control::Rider, c: u32) {
+        let pad = self.pad;
+        match c {
+            2 => {
+                let mut b = self.bump;
+                b.update(self, pad, r);
+                self.bump = b;
+            }
+            4 => control::change_fakie(self, pad, r),
+            0xb => control::land_hard(self, pad, r),
+            0xc => {
+                let mut l = self.land;
+                l.update(self, pad, r);
+                self.land = l;
+            }
+            _ => panic!("control {c:x} not replayed"),
+        }
+    }
+}
+
+/// `Boarder_UpdateControl` ours on the rider after its motion: the velocity, board, state it leaves
+fn control_ours(p: &mut Rider, c: &Ctl, table: &[u8]) {
+    let mut m = tricky_game::pf::Mem { regions: vec![(animctl::CLIP_TABLE, table.to_vec()), (CTL, vec![0; 0x300])] };
+    for (a, v) in lay(c, CTL, (CTL + 0x200, CTL + 0x280, CTL + 0x290)) {
+        m.w32(a, v);
+    }
+    let o = Orient { q: p.quat, fwd: p.p.fwd, side: p.board_side, up: p.board_up, yaw: p.yaw };
+    let (bump, land) = (Bump { turn: f32_at(&c.handler, 0x18), done: f32_at(&c.handler, 0x1c) }, LandNormal { crouch: f32_at(&c.handler, 0xf8) });
+    let mut env = CtlEnv { m, o, pad: c.pad, bump, land, state: None };
+    let mut r = control::Rider { vel: p.vel, board: p.p.fwd, brake: p.brake, crouch: p.crouch, steer: p.steer, surface: p.p.surface, controller: c.controller, stance: p.switch, control: p.state, ..Default::default() };
+    control::update_control(&mut env, c.pad, &mut r);
+    (p.vel, p.quat, p.p.fwd, p.board_side, p.board_up, p.yaw) = (r.vel, env.o.q, env.o.fwd, env.o.side, env.o.up, env.o.yaw);
+    if let Some(s) = env.state {
+        p.state = s;
+    }
+}
+
 fn rider_of(a: &[u8], st: &[u8], motion: &[u8], anim: &[u8]) -> Rider {
     Rider {
         p: probe::Rider {
@@ -844,7 +1051,22 @@ fn ground_ticks_against_the_running_game() {
         rider: Rider,
         want: Vec<Vec<u32>>,
         hit: Option<Hit>,
+        ctl: Option<Ctl>,
     }
+    // the clip table the control's `AnimCtl_GetClipType` reads (ELF data)
+    let table: Vec<u8> = (0..0x300 * 0x1c).step_by(4).flat_map(|o| runners[0].1.r.mem.read_u32(animctl::CLIP_TABLE + o).to_le_bytes()).collect();
+    let anim_b = std::env::var("TRICKY_ANIM_B").is_ok();
+    // the clips are taken from the second sample (TRICKY_CLIP_A: the first), the sequences from the first
+    // (TRICKY_ANIM_B: the second): what matches best (rec15: the fakie change's clip 0x200 already 0x1ff, the bump's
+    // phase the first sample's). Inferred: the animation moves on before the rider's tick, and the sequence windows,
+    // read in later PINE batches than the rider's, are read after it
+    let clip_b = std::env::var("TRICKY_CLIP_A").is_err();
+    // controls replayed by state, and those left out (fakie cruise on its turn clip; no windows)
+    let mut ctl_count = std::collections::BTreeMap::<u32, usize>::new();
+    let (mut ctl_turn, mut ctl_none, mut ctl_right) = (0, 0, 0);
+    let mut ctl_same = vec![0usize; runners.len()];
+    // and of those, the quaternion equal to the game's: ours, the runner's
+    let (mut ctl_ours_game, mut ctl_runner_game) = (vec![0usize; runners.len()], vec![0usize; runners.len()]);
     for (wi, w) in ticks.windows(2).enumerate() {
         if w[1].tick != w[0].tick + 1 {
             continue;
@@ -899,7 +1121,33 @@ fn ground_ticks_against_the_running_game() {
             // how many met the speed limit (`speed_limit_of`, applied below to each way's velocity)
             let v = vec4(b, 0x150);
             capped += ((v[0] * v[0] + v[1] * v[1] + v[2] * v[2]).sqrt() >= f32_at(b, 0x1c4) - 0.01) as usize;
-            prep[i] = Some(Prep { rider, want, hit });
+            // the control (F4b3i) on the states replayed. STANDIN: the pad word is the computer's (cComputer::GetControls
+            // 0x1384b8 into the stack of `cBoarder::vf7`, not recordable): only the brake bit (4), set when the rider
+            // ends the tick prewinding (0xe), as the landings and the bump pick 0xe on it
+            let ctl = if CONTROLS.contains(&rider.state) && std::env::var("TRICKY_NOCTL").is_err() {
+                let pad = if u32_le(b, 0x428) == 0xe { 4 } else { 0 };
+                match ctl_of(if anim_b { &w[1] } else { &w[0] }, &w[0], i, ka, addr[i], pad) {
+                    Some(c) if rider.state == 5 && c.clips[0] == 0x202 => {
+                        ctl_turn += 1;
+                        None
+                    }
+                    Some(mut c) => {
+                        if clip_b {
+                            let x = &w[1].extra[ka].1[i];
+                            c.clips = [u32_le(x, 8), u32_le(x, 0xc)];
+                        }
+                        *ctl_count.entry(rider.state).or_default() += 1;
+                        Some(c)
+                    }
+                    None => {
+                        ctl_none += 1;
+                        None
+                    }
+                }
+            } else {
+                None
+            };
+            prep[i] = Some(Prep { rider, want, hit, ctl });
         }
         if prep.iter().all(Option::is_none) {
             continue;
@@ -928,6 +1176,9 @@ fn ground_ticks_against_the_running_game() {
                         let mut mine = rider;
                         update(&mut mine, &SURFACE_TABLE, &mut E { log: Vec::new(), hit: p.hit, wall: false, meter: 0.0 });
                         mine.vel = speed_limit(mine.vel, speed_limit_of(a, b, |x, y| x - y));
+                        if let Some(c) = &p.ctl {
+                            control_ours(&mut mine, c, &table);
+                        }
                         mine
                     } else {
                         let g = &mut runners[k - 1].1;
@@ -939,6 +1190,20 @@ fn ground_ticks_against_the_running_game() {
                         let mut r = g.get(&rider);
                         // (the runner's float rules are still set from its call)
                         r.vel = speed_limit(r.vel, speed_limit_of(a, b, r5900::ps2float::fsub));
+                        if let Some(c) = &p.ctl {
+                            // ours from the same rider, against the game's under each way's rules
+                            let mut mine = r;
+                            control_ours(&mut mine, c, &table);
+                            g.control(&mut r, c, addr[me]);
+                            ctl_same[k - 1] += (bits(&mine) == bits(&r)) as usize;
+                            ctl_ours_game[k - 1] += (fields(&mine, 0.0)[10] == p.want[10]) as usize;
+                            ctl_runner_game[k - 1] += (fields(&r, 0.0)[10] == p.want[10]) as usize;
+                            if bits(&mine) != bits(&r) && std::env::var("TRICKY_DBG3").is_ok() {
+                                let (x, y) = (bits(&mine), bits(&r));
+                                let d: Vec<usize> = (0..x.len()).filter(|&j| x[j] != y[j]).collect();
+                                eprintln!("DBG3 way {k} state {:x} clip {:x} words {d:?} ulps {:?}", p.rider.state, c.clips[0], d.iter().map(|&j| x[j] as i64 - y[j] as i64).collect::<Vec<_>>());
+                            }
+                        }
                         r
                     };
                     riders[me].pos = r.p.pos;
@@ -1014,7 +1279,13 @@ fn ground_ticks_against_the_running_game() {
                     all &= ok;
                 }
                 whole[k] += all as usize;
+                ctl_right += (k == runners.len() && all && p.ctl.is_some()) as usize;
                 pushed_whole[k] += (all && was_pushed) as usize;
+                if k == runners.len() && !all && std::env::var("TRICKY_DBG2").is_ok() {
+                    let bad: Vec<&str> = written.iter().filter(|&&f| g[f] != p.want[f]).map(|&f| names[f]).collect();
+                    let a = &w[0].riders[i];
+                    eprintln!("DBG2 tick {} rider {i}: state {:x}->{:x} ours {:x} clip {:x}->{:x} bad {bad:?}", w[1].tick, u32_le(a, 0x428), u32_le(b, 0x428), g[22][0], u32_le(&w[0].extra[ka].1[i], 8), u32_le(&w[1].extra[ka].1[i], 8));
+                }
                 if k == runners.len() && was_pushed {
                     let hit = (0..n).any(|j| u32_le(b, 0x48 + 0x20 * j) == w[1].tick);
                     pushed_pos[hit as usize][(g[0] == p.want[0]) as usize] += 1;
@@ -1028,6 +1299,7 @@ fn ground_ticks_against_the_running_game() {
         }
     }
     eprintln!("{path}: ground ticks (motion 2 at both samples): {pairs} compared ({capped} at the speed limit); left out {other} whose motion object's +0xc is not the rider, {skew} not one update apart, {torn} read inside a tick (it or the sample before)");
+    eprintln!("  controls replayed by state: {ctl_count:x?}, every field right under fadd=g1: {ctl_right}; ours from the runner's rider the same as the runner's (per runner way): {ctl_same:?}, quaternion the game's: ours {ctl_ours_game:?}, the runner's {ctl_runner_game:?}; left out: {ctl_turn} fakie cruise on its turn clip, {ctl_none} without the windows");
     if kc.is_some() {
         eprintln!("  frames left out because a sample was read before every rider had ticked: {mid}");
     }

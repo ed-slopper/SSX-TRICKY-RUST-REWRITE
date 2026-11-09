@@ -19,7 +19,9 @@ PINE reads and writes memory and saves and loads states; it has no breakpoints o
                                                         each <off>:<len> (hex) adds that window of every rider
                                                         after the pad, read in one message with the rider
                                                         (57b0:64 = the flight prediction, F4h2; an offset
-                                                        may be negative: -170:74 = the spin object, F4b3a)
+                                                        may be negative: -170:74 = the spin object, F4b3a;
+                                                        `>` follows a pointer: 5ae0>610:10 = the handler's
+                                                        bump control, F4b3i)
     python tools/pine.py counters [<start> <end>]       find tick counters and clocks: words in .data/.bss
                                                         (default 0x31D300-0x40C174) that climb about 60 a
                                                         second, or floats that climb about 1 a second
@@ -245,7 +247,9 @@ def main(argv):
     elif cmd == ["record"] and len(argv) >= 3:
         seconds, out = float(argv[1]), argv[2]
         size = int(argv[3], 0) if len(argv) >= 4 else 0x600
-        extra = [tuple(int(x, 16) for x in w.split(":")) for w in argv[4:]]
+        # a window's offset may follow pointers: `5ae0>600:230` reads the word at rider+0x5ae0 and then 0x230 bytes
+        # at that word + 0x600 (each `>k` steps through one more pointer)
+        extra = [(o, [int(x, 16) for x in o.split(">")], int(n, 16)) for o, n in (w.split(":") for w in argv[4:])]
         race, riders = find_race(p)
         if race is None:
             sys.exit("no race found (is a race running?)")
@@ -253,7 +257,7 @@ def main(argv):
         kept, last, t0, counts = 0, None, time.time(), None
         with open(out, "w", encoding="ascii") as f:
             f.write(f"race {race:x} riders {' '.join(f'{r:x}' for r in riders)} bytes {size:x} pad {pad or 0:x}"
-                    + "".join(f" extra {o:x} {n:x}" for o, n in extra) + "\n")
+                    + "".join(f" extra {o} {n:x}" for o, _, n in extra) + "\n")
             while time.time() - t0 < seconds:
                 tick = p.read32(race + RACE_TICK)
                 if tick == last:
@@ -269,12 +273,29 @@ def main(argv):
                         break
                 # every rider's block and windows (and the pad) in one batch between two reads of the race tick, so
                 # they come from the same frame as near as the emulator allows (PINE reads while the EE runs)
-                ranges = [(race + RACE_TICK, 4)] + [(r, size) for r in riders] + [(r + o, n) for o, n in extra for r in riders]
-                got = p.read_blocks(ranges + ([(pad, PAD_BYTES)] if pad else []) + [(race + RACE_TICK, 4)])
-                if struct.unpack("<I", got[0])[0] != tick or struct.unpack("<I", got[-1])[0] != tick:
-                    continue  # the game moved on while we read: drop the sample
+                # (a window through pointers: its pointers read in the same batch, its bytes in one more each
+                # level, all before the race tick is read again)
+                at = [(r + c[0]) & 0xFFFFFFFF for _, c, _ in extra for r in riders]
+                deep = [len(c) - 1 for _, c, _ in extra for r in riders]
+                plain = [(a, n) if d == 0 else (a, 4) for a, d, n in zip(at, deep, [n for _, _, n in extra for r in riders])]
+                ranges = [(race + RACE_TICK, 4)] + [(r, size) for r in riders] + plain
+                got = p.read_blocks(ranges + ([(pad, PAD_BYTES)] if pad else []))
                 k = len(riders)
-                blocks = got[1:1 + k] + ([got[-2]] if pad else []) + got[1 + k:1 + k + k * len(extra)]
+                wins = got[1 + k:1 + k + len(plain)]
+                steps = [c[1:] for _, c, _ in extra for r in riders]
+                lens = [n for _, _, n in extra for r in riders]
+                level = 0
+                while any(level < len(s) for s in steps):
+                    todo = [i for i, s in enumerate(steps) if level < len(s)]
+                    for i in todo:
+                        at[i] = (struct.unpack("<I", wins[i])[0] + steps[i][level]) & 0x1FFFFFF  # (a stray pointer stays in RAM)
+                    more = p.read_blocks([(at[i], lens[i] if level == len(steps[i]) - 1 else 4) for i in todo])
+                    for i, b in zip(todo, more):
+                        wins[i] = b
+                    level += 1
+                if struct.unpack("<I", got[0])[0] != tick or p.read32(race + RACE_TICK) != tick:
+                    continue  # the game moved on while we read: drop the sample
+                blocks = got[1:1 + k] + ([got[-1]] if pad else []) + wins
                 f.write(f"tick {tick} " + " ".join(b.hex() for b in blocks) + "\n")
                 last, kept = tick, kept + 1
                 counts = p.read_blocks([(r + RIDER_TICKS, 4) for r in riders])

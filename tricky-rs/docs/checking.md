@@ -667,6 +667,51 @@ What is left (row F4b3j, `TRICKY_DBG=1` lists them):
   position right: the hit's arithmetic is ours under IEEE, not the game's under PCSX2's adder.
 - the 53 pushed ticks with no hit whose position is still off (as F4b3g).
 
+## F4b3i: the control after the motion (2026-11-09)
+
+`ground_ticks_against_the_running_game` now runs `Boarder_UpdateControl` 0x11c9a0 after a ground rider's motion and
+speed limit, before its collisions, on the states it replays: bump (2), change fakie (4), fakie cruise (5, not on
+its turn clip 0x202), hard landing (0xb) and normal landing (0xc). Ours is `control::update_control` on an animation
+controller laid out in a `pf::Mem` (`animctl`'s queries, the clip table copied from the ELF) with the board turned by
+`orient::rotate_about_axis`; the runner's is the original with its bump, fakie change and landing updates and the
+animation queries (`AnimCtl_GetClipType` 0x15eec0, `AnimCtl_GetLayerPhase` 0x15fe70, `AnimLayer_FindClip` 0x15a6c8,
+`AnimClip_GetPhase` 0x159e80) on the same layout; the state `Boarder_SetState` 0x11f608 is asked for becomes the
+rider's.
+
+Recording: `tools/pine.py record` takes windows through pointers (`<off>><off>...:<len>`, read in later batches):
+rec15 adds `5ae0>600:230` (the handler's control objects: bump +0x610, its turn +8 and the turn so far +0xc; normal
+landing +0x6f0, its crouch +8), `4718>0:80` and `4718>30>0:80` (layer 0's first two sequences) and their lengths
+`4718>78>8>a:2`, `4718>30>78>8>a:2`.
+
+Proven (code):
+- `cBoarder::vf7` calls the controller's virtual (+0x54: `cComputer::GetControls` 0x1384b8, `cPlayer::GetControls`
+  0x151250) for a pad word on its stack, then `Boarder_UpdateControl(handler, &pad)`, after the motion and the
+  speed limit and before `Score_Tick`, `Boarder_RiderCollisions`, `Boarder_UpdateLeanTargets`.
+- `BumpControl_Update` turns about the board's up (+0x1a0, `a1` at 0x1042dc) by the turn so far less turn × phase.
+- `AnimClip_GetPhase` = t (+0x48) / (length − 1) (1 when 0), (length − 1 − t) / (length − 1) when the speed +0x10 is
+  below 0; `AnimLayer_FindClip` walks the layer's list (+0x30, next +0x30, sentinel +0x38) for +0x40 = the clip.
+
+Inferred: the clips are best taken from the second sample and the sequences from the first (rec15: every field
+37,252 against 37,234 with both from the first, 37,086 with both from the second): a fakie change's clip is already
+0x1ff when its update runs, and the bump's phase is the first sample's. The animation seems to move on before the
+rider's tick, and the sequence windows (later PINE batches) to be read after it. `TRICKY_CLIP_A`, `TRICKY_ANIM_B`
+switch them. STANDIN in the test: the computer's pad word is on the stack and not recorded; it is 0 with the brake
+bit (4) when the rider ends the tick prewinding (0xe).
+
+rec15 (150 s, 8,991 ticks; `TRICKY_NOCTL=1` turns the control off, its numbers in brackets) under `fadd=g1`: 37,501
+ground ticks, every field 37,252 (36,954); quaternion 37,461 (37,241); state 37,388 (37,293). Controls replayed:
+bump 402, change fakie 251, hard landing 102, normal landing 320; 1,030 of the 1,075 have every field right, the 45
+others miss the position (walls, instances), not the control. Ours and the runner ask for the same states (37,388
+both). Ours run on the runner's rider gives the runner's result in 1,000 of 1,075 (IEEE) and 699 (`fadd=g1`); its
+quaternion is the game's in 876, the runner's in 1,058 under `fadd=g1`. rec14 (no control windows) is unchanged.
+
+What is left:
+- Bump turns: in 182 bump ticks ours turns 1 ulp off the game's, which the runner (`div=n`) has right: `animseq::div`
+  rounds `AnimClip_GetPhase`'s `div.s` toward zero, the game here to nearest (row F4b3l). Ours rotates under IEEE,
+  the game under PCSX2's adder (as the motion, F4g).
+- Cruise (3) and prewind (0xe) need the pad word: 48 ticks 3 → 0xe, 6 ticks 3 → 4, 2 ticks 3 → 2, 48 ticks 0xe → 0xa
+  (the release) miss the state (row F4b3k). No fakie cruise (5) in rec15.
+
 ## How a row gets to `checked`
 
 1. Port the function (address in its doc comment, AGENTS.md §13).
