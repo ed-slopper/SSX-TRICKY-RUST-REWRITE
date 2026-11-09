@@ -169,6 +169,10 @@ Proven (run in the function runner, 30,000 / 30,000 / 20,000 random cases bit fo
   `Boarder_SetMotion`(1), `Takeoff_SetSpinRates` (state 0x10 entered inside the control: the spin update starts
   next tick); else `Boarder_SetSteerTarget`(0). Then the reset check (pad bit 0, or rider+0x290 != 0 →
   rider+0x304 = !(pad bit 0), `Boarder_RequestReset`(101.46).
+- The time scale (+0x12c) is moved only by `Boarder_SetTimeScaleRateLimited` 0x11cff0, from the controller virtual
+  (`cComputer::GetControls` 0x1384b8, `cPlayer::GetControls` 0x151250 → `Boarder_UpdateSlopeTimeScale` 0x153130),
+  which `cBoarder::vf7` calls between the motion and the control: the motion steps with last tick's time scale, the
+  control (the spin update's dt) with this tick's (proven, row F4b3m).
 - The crash virtual of `GroundMotion_Update` (vtable+0x64 of cBoarder's vtable 0x367640, this-delta 0) is
   `cBoarder::EmitBrakeSpray` 0x11a798 (slot 11): `Boarder_EmitBrakeSpray` 0x136e70 → `BoarderRender_EmitBrakeSpray`
   0x135258 → `Fx_BrakeSpray_Emit` 0x12e008. It makes spray from the position, velocity and normal and changes

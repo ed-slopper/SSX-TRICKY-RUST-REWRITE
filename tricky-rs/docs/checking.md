@@ -813,6 +813,27 @@ take-offs from state 0xa, `spin::spin_enter` and `spin::spin_update` (pad 0) on 
   +0x4ab0, which the test leaves 0; `Takeoff_Setup` 0x12bee0 writes +0x46e0 for kinds 3 and 4 and is not
   replayed, STANDIN in `spin_in`). The rest are F4h5's (walls, objects, riders around) and rec11's missing windows.
 
+## F4b3m: the time scale the control reads (2026-11-09)
+
+The last take-off of F4b3f (rec15 tick 9803 rider 5, a motion take-off from the jump state) turned 1e-4 rad too
+little toward the landing slope, in ours and in the runner. Its time scale (+0x12c) went from 0.9449985 in the
+first sample to 0.95344484 in the second, and the turn of `SpinState_Update` 0x100908 is `align · dt / land` with
+dt = time scale / 60, so it was 0.9% short.
+
+Proven: the only per-tick writer of +0x12c is `Boarder_SetTimeScaleRateLimited` 0x11cff0 (at most 0.008446341 a
+tick toward its target; the other store is the reset `cBoarder::vf8` 0x116ab8, 1.0). Its callers are
+`cComputer::GetControls` 0x1384b8 and `Boarder_UpdateSlopeTimeScale` 0x153130 (from `cPlayer::GetControls`
+0x151250), the controller virtual that `cBoarder::vf7` 0x117198 calls after the motion and before
+`Boarder_UpdateControl` 0x11c9a0. So the motion reads the old time scale and the control the new one: the second
+sample's.
+
+- `takeoff_ticks_against_the_running_game` (`spin_in`) and `spin_ticks_against_the_running_game` now give the
+  spin update the second sample's time scale (ours, and the runner's rider +0x12c).
+- Take-off ticks whole under `fadd=g1`: rec15 **109 of 110** (108), rec16 227 of 235, rec11 56 of 62 (unchanged; the
+  rest are F4h5's and rec11's missing windows). Ours still equals the runner under IEEE.
+- Spin ticks (rec8) under `fadd=g1`: quaternion 5,090 (5,077), axes 5,088 (5,075), spin 5,059 (5,046), angle left
+  5,091 (5,078) of 5,124. Under IEEE ours and the runner agree (quaternion 1,592, spin 4,518, angle left 4,211).
+
 ## How a row gets to `checked`
 
 1. Port the function (address in its doc comment, AGENTS.md §13).

@@ -1489,7 +1489,7 @@ struct SpinIn {
     rider: SpinRider,
 }
 
-fn spin_in(a: &[u8], st: &[u8], na: &[u8], pb: &[u8], mode_after: Option<u32>, x208: f32) -> SpinIn {
+fn spin_in(a: &[u8], b: &[u8], st: &[u8], na: &[u8], pb: &[u8], mode_after: Option<u32>, x208: f32) -> SpinIn {
     // STANDIN: Takeoff_Setup 0x12bee0 (called first) is not replayed; the rates from the sample before the tick
     let t = takeoff_spin_rates(&TakeoffState {
         clip: u32_le(na, 8) as i32 as i64,
@@ -1519,7 +1519,9 @@ fn spin_in(a: &[u8], st: &[u8], na: &[u8], pb: &[u8], mode_after: Option<u32>, x
         slope: vec4(pb, 0x30),
         class: u32_le(a, 0x420),
         rider: SpinRider {
-            timescale: f32_at(a, 0x12c),
+            // the controller virtual (`GetControls` 0x151250 / 0x1384b8) moves the time scale between the motion and
+            // the control (`Boarder_SetTimeScaleRateLimited` 0x11cff0): the control sees the second sample's (F4b3m)
+            timescale: f32_at(b, 0x12c),
             land: f32_at(pb, 8),
             spin: f32_at(a, 0x1d0),
             flip: f32_at(a, 0x1d4),
@@ -1544,7 +1546,7 @@ fn spin_in(a: &[u8], st: &[u8], na: &[u8], pb: &[u8], mode_after: Option<u32>, x
 /// Ours: `SpinControl_Enter` (`spin::spin_enter`) as `Takeoff_SetSpinRates` enters state 0x10, then the control's
 /// update this tick, `SpinState_Update` (`spin::spin_update`, pad 0, the animation's answers 0), on the rider as the
 /// take-off left it; its attitude (`Boarder_UpdateOrientation`) when the update turned it.
-fn spin_on_takeoff_tick(r: &mut Rider, s: &SpinIn) {
+fn spin_on_takeoff_tick(r: &mut Rider, s: &SpinIn) -> SpinObj {
     let mut st = SpinObj { w_spin: s.rates.0, w_flip: s.rates.1, ..Default::default() };
     let mut e = s.enter;
     e.up_z = r.board_up[2];
@@ -1560,6 +1562,7 @@ fn spin_on_takeoff_tick(r: &mut Rider, s: &SpinIn) {
         (r.quat, r.p.fwd, r.board_side, r.board_up, r.yaw) = (o.q, o.fwd, o.side, o.up, o.yaw);
     }
     r.p.pos = sr.pos;
+    st
 }
 
 /// The speed limit as `cBoarder::vf7` 0x117198 sets it after the motion when the rider is not in the air
@@ -1763,7 +1766,7 @@ fn takeoff_ticks_against_the_running_game() {
             // the spin state entered by a take-off from the jump control, and (motion take-offs) its update in the
             // control this tick (F4b3f)
             let spun = up_by_motion && rider.state == 0xa && std::env::var("TRICKY_NOSPIN").is_err();
-            let sin = spin_in(a, st, na, pb, ks.map(|k| u32_le(&w[1].extra[k].1[i], 8)), mine.crouch);
+            let sin = spin_in(a, b, st, na, pb, ks.map(|k| u32_le(&w[1].extra[k].1[i], 8)), mine.crouch);
             let mut env = OurTakeOff { r: &mut mine, motion: 2, jump_stat: st[0x17], off: Off::default(), steep: false };
             if up_by_motion {
                 take_off(&mut t, &mut env);
@@ -1776,9 +1779,7 @@ fn takeoff_ticks_against_the_running_game() {
             }
             let ours_off = env.off;
             let lip = env.steep;
-            if spun {
-                spin_on_takeoff_tick(&mut mine, &sin);
-            }
+            let our_spin = spun.then(|| spin_on_takeoff_tick(&mut mine, &sin));
             steep += lip as usize;
             let mut got = vec![(mine, ours_off)];
 
@@ -1809,9 +1810,10 @@ fn takeoff_ticks_against_the_running_game() {
                         m.write_f32(so + 0x30, sin.rates.1);
                         m.write(rd + 0x57b0, pb).unwrap();
                         m.write(g.stats, st).unwrap();
-                        for o in [0x12c, 0x138, 0x1d0, 0x1d4, 0x1f0, 0x1f4, 0x1f8, 0x274, 0x278, 0x420] {
+                        for o in [0x138, 0x1d0, 0x1d4, 0x1f0, 0x1f4, 0x1f8, 0x274, 0x278, 0x420] {
                             m.write_u32(rd + o, u32_le(a, o as usize));
                         }
+                        m.write_f32(rd + 0x12c, sin.rider.timescale);
                         clip_type.set(sin.clip_type);
                         g.r.cpu.set_gpr(4, so as u64);
                         g.r.call(0x100598).unwrap_or_else(|e| panic!("tick {} rider {i}: enter {e:?}", w[0].tick));
@@ -1910,6 +1912,13 @@ fn takeoff_ticks_against_the_running_game() {
                         d(r.p.pos, vec4(b, 0x140)), d(r.vel, vec4(b, 0x150)), u32_le(b, 0x2e0), u32_le(b, 0x290));
                     if std::env::var("TRICKY_DBG").as_deref() == Ok("2") {
                         eprintln!("    fwd {:?} want {:?} (before {:?})\n    up {:?} want {:?} (before {:?})\n    yaw {} want {} (before {}) crouch {} {} -> {} steer {} {} spin {:?}", r.p.fwd, vec4(b, 0x180), vec4(a, 0x180), r.board_up, vec4(b, 0x1a0), vec4(a, 0x1a0), r.yaw, f32_at(b, 0x1b0), f32_at(a, 0x1b0), f32_at(a, 0x1c8), f32_at(a, 0x208), f32_at(b, 0x208), f32_at(a, 0x214), f32_at(b, 0x214), (0..8).map(|k| f32_at(b, 0x5d0 + 4 * k)).collect::<Vec<_>>());
+                        if let Some(o) = our_spin {
+                            let z = vec![0u8; 0x74];
+                            let g = ks.map_or(&z, |k| &w[1].extra[k].1[i]);
+                            eprintln!("    spin ours mode {} rates {} {} align {} axis {:?} | game mode {} rates {} {} align {} axis {:?}\n    land {} timescale {} slope kind {} slope {:?} class {} clip type {:x}",
+                                o.mode, o.w_spin, o.w_flip, o.align, o.align_axis, u32_le(g, 8), f32_at(g, 0x2c), f32_at(g, 0x30), f32_at(g, 0x34), vec4(g, 0x40),
+                                sin.rider.land, sin.rider.timescale, sin.slope_kind, sin.slope, sin.class, sin.clip_type);
+                        }
                     }
                 }
             }

@@ -677,7 +677,9 @@ fn spin_obj(st: &[u8]) -> SpinObj {
 /// The recorder's sample can fall between two frames or inside one, between the rider's motion (`Boarder_UpdateMotion`
 /// 0x11c770, whose `AirPredict_Tick` 0x123ec8 moves the time to touch down) and its control (0x11c9a0): the time to
 /// touch down the control read is then the first sample's (+0x57b8) rather than the second's. Both are tried, the
-/// second's first. Pairs that hold no update of the rider or two (the position or the angles moved by 0 or 2 ticks'
+/// second's first. The time scale (+0x12c) is always the second sample's: the controller virtual (`GetControls`
+/// 0x151250 / 0x1384b8) moves it by `Boarder_SetTimeScaleRateLimited` 0x11cff0 between the motion and the control
+/// (F4b3m). Pairs that hold no update of the rider or two (the position or the angles moved by 0 or 2 ticks'
 /// worth) are left out. Needs TRICKY_STATS (the tricks stat, stats+0x1a) and a recording with the windows `57b0:64`
 /// and `-170:74` (the spin object: the state manager *(rider+0x5ae0) + 0x740).
 #[test]
@@ -759,10 +761,10 @@ fn spin_ticks_against_the_running_game() {
             let mode = u32_le(sa, 8);
             let want = pick(&spin_obj(sb), b);
             // one way's fields for a time to touch down
-            let ours = |land: f32| {
+            let ours = |land: f32, ts: f32| {
                 let mut st = spin_obj(sa);
                 let mut r = SpinRider {
-                    timescale: f32_at(a, 0x12c),
+                    timescale: ts,
                     land,
                     quat: vec4(a, 0x170),
                     spin: f32_at(a, 0x1d0),
@@ -799,11 +801,12 @@ fn spin_ticks_against_the_running_game() {
                 out[0x1d4..0x1d8].copy_from_slice(&r.flip.to_le_bytes());
                 pick(&st, &out)
             };
-            let mut ways: Vec<Box<dyn FnMut(f32) -> Vec<Vec<u32>> + '_>> = vec![Box::new(ours)];
+            let mut ways: Vec<Box<dyn FnMut(f32, f32) -> Vec<Vec<u32>> + '_>> = vec![Box::new(ours)];
             for (_, g, [rd, stats_at, pad]) in runners.iter_mut() {
                 let (rd, stats_at, pad) = (*rd, *stats_at, *pad);
-                ways.push(Box::new(move |land: f32| {
+                ways.push(Box::new(move |land: f32, ts: f32| {
                     g.mem.write(rd, a).unwrap();
+                    g.mem.write_f32(rd + 0x12c, ts);
                     g.mem.write(rd + 0x57b0, pb).unwrap();
                     g.mem.write_f32(rd + 0x57b8, land);
                     g.mem.write(rd - 0x170, sa).unwrap();
@@ -821,9 +824,9 @@ fn spin_ticks_against_the_running_game() {
                 }));
             }
             for (k, way) in ways.iter_mut().enumerate() {
-                let mut got = way(f32_at(pb, 8));
+                let mut got = way(f32_at(pb, 8), f32_at(b, 0x12c));
                 if got[..5] != want[..5] {
-                    let other = way(f32_at(pa, 8));
+                    let other = way(f32_at(pa, 8), f32_at(b, 0x12c));
                     if other[..5] == want[..5] {
                         got = other;
                         first_land[k] += 1;
