@@ -137,6 +137,7 @@ class Pine:
 STATS_TABLE, STATS_STRIDE = 0x32DB70, 0x84
 RACE_TICK, RACE_COUNT, RACE_RIDERS = 0x18, 0x88, 0xC4
 RIDER_POS, RIDER_VEL, RIDER_TIMESCALE, RIDER_PLACE, RIDER_STATS = 0x140, 0x150, 0x12C, 0x110, 0x464
+RIDER_TICKS = 0x5900  # rider+0x5820 (score) +0xe0: the speed-sample count, +1.0 a tick
 # The pad: Sony's pad library writes each controller's data into a double buffer (two records 0x80 apart):
 # status, mode (0x73 analog, 0x79 pressure), buttons (2 bytes, active low), right x, right y, left x, left y,
 # then 12 pressures (right left up down triangle circle cross square L1 R1 L2 R2). Found at 0x845940 / 0x8459C0.
@@ -249,7 +250,7 @@ def main(argv):
         if race is None:
             sys.exit("no race found (is a race running?)")
         pad = find_pad(p)
-        kept, last, t0 = 0, None, time.time()
+        kept, last, t0, counts = 0, None, time.time(), None
         with open(out, "w", encoding="ascii") as f:
             f.write(f"race {race:x} riders {' '.join(f'{r:x}' for r in riders)} bytes {size:x} pad {pad or 0:x}"
                     + "".join(f" extra {o:x} {n:x}" for o, n in extra) + "\n")
@@ -257,16 +258,26 @@ def main(argv):
                 tick = p.read32(race + RACE_TICK)
                 if tick == last:
                     continue
-                # each rider's windows right after its block, so they come from the same frame as near as can be
-                both = [p.read_blocks([(r, size)] + [(r + o, n) for o, n in extra]) for r in riders]
-                blocks = [b[0] for b in both]
-                if pad:
-                    blocks.append(p.read_block(pad, PAD_BYTES))
-                blocks += [b[1 + k] for k in range(len(extra)) for b in both]
-                if p.read32(race + RACE_TICK) != tick:
+                # The race tick moves at the start of the frame, before the riders tick (slot 5 first, slot 0 last:
+                # cBoarderHandler objects in list 8, then cPostAI in list 11 moves their bodies). Wait until every
+                # rider has ticked (its speed-sample count +0x5900, a float that `Boarder_AddSpeedSample` 0x155dc8
+                # adds 1 to each tick, has moved), at most 30 ms, so the sample is of the frame's end.
+                until = time.time() + 0.03
+                while counts is not None and time.time() < until:
+                    now = p.read_blocks([(r + RIDER_TICKS, 4) for r in riders])
+                    if all(a != b for a, b in zip(now, counts)):
+                        break
+                # every rider's block and windows (and the pad) in one batch between two reads of the race tick, so
+                # they come from the same frame as near as the emulator allows (PINE reads while the EE runs)
+                ranges = [(race + RACE_TICK, 4)] + [(r, size) for r in riders] + [(r + o, n) for o, n in extra for r in riders]
+                got = p.read_blocks(ranges + ([(pad, PAD_BYTES)] if pad else []) + [(race + RACE_TICK, 4)])
+                if struct.unpack("<I", got[0])[0] != tick or struct.unpack("<I", got[-1])[0] != tick:
                     continue  # the game moved on while we read: drop the sample
+                k = len(riders)
+                blocks = got[1:1 + k] + ([got[-2]] if pad else []) + got[1 + k:1 + k + k * len(extra)]
                 f.write(f"tick {tick} " + " ".join(b.hex() for b in blocks) + "\n")
                 last, kept = tick, kept + 1
+                counts = p.read_blocks([(r + RIDER_TICKS, 4) for r in riders])
         print(f"{kept} ticks of {len(riders)} riders in {seconds:g} s to {out}")
     elif cmd == ["counters"]:
         start, end = (int(argv[1], 16), int(argv[2], 16)) if len(argv) == 3 else (0x31D300, 0x40C174)

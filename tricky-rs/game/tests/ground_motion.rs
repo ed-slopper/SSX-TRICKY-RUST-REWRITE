@@ -20,6 +20,7 @@ use r5900::ps2float::Rules;
 use r5900::Runner;
 use tricky_game::ground_motion::{update, CrashRecord, Env, Rider, Stats, WALL_MASK};
 use tricky_game::air::{predict_at_takeoff, Predict, RayHit};
+use tricky_game::collbody::{overlap, CollBody};
 use tricky_game::jump::{jump_impulse, JumpState};
 use tricky_game::orient::{take_off, TakeOffEnv, TakeOffRider};
 use tricky_game::probe::{self, Hit};
@@ -639,6 +640,65 @@ fn rider_of(a: &[u8], st: &[u8], motion: &[u8], anim: &[u8]) -> Rider {
     }
 }
 
+/// A rider's collision body as recorded (rider+0x470: +0x10 the bounding centre, +0x20 its radius, +0x24, +0x28 the
+/// sphere count, +0x30 the spheres, 0x20 each).
+fn body_of(r: &[u8]) -> CollBody {
+    let mut b = CollBody::new();
+    b.center = vec4(r, 0x480);
+    b.radius = f32_at(r, 0x490);
+    b.x24 = u32_le(r, 0x494) as i32;
+    b.count = (u32_le(r, 0x498) as i32).clamp(0, 18);
+    for k in 0..18 {
+        b.spheres[k] = (vec4(r, 0x4a0 + 0x20 * k), f32_at(r, 0x4b0 + 0x20 * k));
+    }
+    b
+}
+
+/// The pushes `Boarder_RiderCollisions` 0x123fc8 gives in one frame, from the bodies as the first sample holds them
+/// (set by `Boarder_UpdateBroadphase` 0x126748 after every rider's tick; the ground motion does not move a body, the
+/// air motion does, by its step: taken as the rider's move between the samples). The riders tick in `order`; each
+/// tests every other rider (all of them stand in for its neighbour list +0x700, in slot order), pushes the pair
+/// apart by 0.55 of the overlap each and moves both bodies (`Boarder_Translate` 0x1267a0). For each rider: the
+/// moves it got before its own tick (its motion starts from them) and from its own tick on, in order. Finished
+/// riders (`Boarder_IsFinishedAndStopped`) are not looked at: none in these recordings stop before the end.
+fn frame_pushes(a: &[Vec<u8>], b: &[Vec<u8>], order: &[usize]) -> Vec<(Vec<V4>, Vec<V4>)> {
+    let n = a.len();
+    let mut body: Vec<CollBody> = a.iter().map(|r| body_of(r)).collect();
+    let mut out = vec![(Vec::new(), Vec::new()); n];
+    let mut ticked = vec![false; n];
+    for &me in order {
+        if u32_le(&a[me], 0x424) == 1 && u32_le(&b[me], 0x424) == 1 {
+            let (p, q) = (vec4(&a[me], 0x140), vec4(&b[me], 0x140));
+            body[me].translate([q[0] - p[0], q[1] - p[1], q[2] - p[2], q[3] - p[3]]);
+        }
+        ticked[me] = true;
+        for o in 0..n {
+            if o == me {
+                continue;
+            }
+            let Some((v, _)) = overlap(&body[me], &body[o]) else { continue };
+            let v = [v[0] * 0.55, v[1] * 0.55, v[2] * 0.55, v[3] * 0.55];
+            let neg = [v[0] * -1.0, v[1] * -1.0, v[2] * -1.0, v[3] * -1.0];
+            body[me].translate(neg);
+            body[o].translate(v);
+            out[me].1.push(neg);
+            if ticked[o] { out[o].1.push(v) } else { out[o].0.push(v) }
+        }
+    }
+    out
+}
+
+fn w0_len(ticks: &[recording::Tick]) -> usize {
+    ticks.first().map_or(0, |t| t.riders[0].len())
+}
+
+fn add_all(mut p: V4, vs: &[V4]) -> V4 {
+    for v in vs {
+        p = [p[0] + v[0], p[1] + v[1], p[2] + v[2], p[3] + v[3]];
+    }
+    p
+}
+
 /// The ground tick over a recorded race (board row F4b3b). For every pair of samples one tick apart in which a rider
 /// is on the snow (motion +0x424 = 2) at both: `GroundMotion_Update` 0x10a0d8 on the rider as recorded at the first,
 /// against the second, field by field. Run three ways: our `ground_motion::update`, and the game's own code in the
@@ -651,7 +711,9 @@ fn rider_of(a: &[u8], st: &[u8], motion: &[u8], anim: &[u8]) -> Rider {
 /// (`speed_limit_of`, `speed_limit`: applied to each way), pushes riders apart (`Boarder_RiderCollisions` 0x123fc8, not
 /// replayed), may change the control state, and at its end `Boarder_UpdateLeanTargets` 0x129500 turns the rider's up
 /// +0x2c0 toward the normal and aims the lean record (+0x24c): run each way too (ours `lean_up`, `lean_targets`), and
-/// both compared (board row F4b3e). Samples read inside a tick are left out (`late`).
+/// both compared (board row F4b3e). Samples read inside a tick are left out (`late`). With the bodies recorded
+/// (window 0x700), the frame's pushes apart are replayed (`frame_pushes`, board row F4b3g); with the riders' tick
+/// counts (window `5900:4`), frames not sampled at a frame's end are left out.
 /// Not in the recording, so not given: the walls (`Boarder_WallCollide` 0x126250 answers no wall) and the instances
 /// (`Boarder_InstanceCollisions` 0x125088 does nothing). The ground motion object is the state manager
 /// *(rider+0x5ae0) + 0x4b0, rider − 0x400 for most riders (window `-400:10`; the test checks its +0xc is the rider),
@@ -705,10 +767,32 @@ fn ground_ticks_against_the_running_game() {
     // runs; the up only stands still once it equals the normal)
     let late = |p: &[u8], x: &[u8]| vec4(x, 0x2c0) == vec4(p, 0x2c0) && vec4(x, 0x2c0) != vec4(x, 0x2a0);
     let mut torn = 0;
+    let kc = ticks[0].extra.iter().position(|(o, _)| *o == 0x5900);
+    let mut mid = 0;
+    // the riders' bodies are in the recording when its window reaches +0x6e0: then each frame's pushes are replayed
+    // (`frame_pushes`), the riders ticking in `order`: their `cBoarderHandler` objects sit in object list 8 (updated
+    // by `Game_UpdateObjectLists` 0x1814c0 through `BxList_UpdateAll` 0x17d950) from slot 5 down to slot 0, as read
+    // over PINE; TRICKY_ORDER (slots, comma separated) overrides it, TRICKY_NOPUSH turns the pushes off
+    let pushes = w0_len(&ticks) >= 0x6e0 && std::env::var("TRICKY_NOPUSH").is_err();
+    let order: Vec<usize> = std::env::var("TRICKY_ORDER").map(|o| o.split(',').map(|x| x.parse().unwrap()).collect()).unwrap_or((0..n).rev().collect());
+    let (mut pushed, mut pushed_whole) = (0, vec![0usize; 1 + runners.len()]);
+    // pushed ticks by whether the rider was also hit (`Boarder_RiderHit`, not replayed: its bump record +0x40 + 0x20·j
+    // +8 holds the second sample's tick): [hit][position right]
+    let mut pushed_pos = [[0usize; 2]; 2];
     for (wi, w) in ticks.windows(2).enumerate() {
         if w[1].tick != w[0].tick + 1 {
             continue;
         }
+        // with the riders' tick counts recorded (window `5900:4`), a frame whose samples are not both of a frame's
+        // end (every rider ticked once between them, all at the same count) is left out
+        if let Some(kc) = kc {
+            let c = |t: &recording::Tick, r: usize| f32_at(&t.extra[kc].1[r], 0);
+            if (0..n).any(|r| c(&w[1], r) != c(&w[0], r) + 1.0 || c(&w[0], r) - w[0].tick as f32 != c(&w[0], 0) - w[0].tick as f32) {
+                mid += 1;
+                continue;
+            }
+        }
+        let push = if pushes { frame_pushes(&w[0].riders, &w[1].riders, &order) } else { vec![(Vec::new(), Vec::new()); n] };
         for i in 0..n {
             let (a, b) = (&w[0].riders[i], &w[1].riders[i]);
             if u32_le(a, 0x424) != 2 || u32_le(b, 0x424) != 2 {
@@ -736,6 +820,10 @@ fn ground_ticks_against_the_running_game() {
             pairs += 1;
             let st = &stats[i];
             let mut rider = rider_of(a, st, ma, na);
+            let (pre, post) = &push[i];
+            rider.p.pos = add_all(rider.p.pos, pre);
+            let was_pushed = !pre.is_empty() || !post.is_empty();
+            pushed += was_pushed as usize;
             // what `cBoarder::vf7` 0x117198 moves before the motion, so the motion read it as the second sample holds
             // it: the input records (value +0, rate +4, target +8; each value moved toward its target by rate / 60:
             // brake +0x1fc, crouch +0x208, steer +0x214, the probe's side offset +0x244) and the spring band +0x294,
@@ -749,6 +837,7 @@ fn ground_ticks_against_the_running_game() {
             let mut mine = rider;
             update(&mut mine, &SURFACE_TABLE, &mut E { log: Vec::new(), hit, wall: false, meter: 0.0 });
             mine.vel = speed_limit(mine.vel, speed_limit_of(a, b, |x, y| x - y));
+            mine.p.pos = add_all(mine.p.pos, post);
             // the end of the tick: `Boarder_UpdateLeanTargets` 0x129500 turns the up toward the normal and aims the lean
             mine.up = lean_up(mine.up, mine.p.normal);
             let (_, target) = lean_targets(2, mine.steer, mine.vel);
@@ -762,6 +851,7 @@ fn ground_ticks_against_the_running_game() {
                 let mut r = g.get(&rider);
                 // (the runner's float rules are still set from its call)
                 r.vel = speed_limit(r.vel, speed_limit_of(a, b, r5900::ps2float::fsub));
+                r.p.pos = add_all(r.p.pos, post);
                 wv(&mut g.r.mem, g.rd + 0x150, r.vel);
                 g.r.mem.write_u32(g.rd + 0x424, 2);
                 g.r.cpu.set_gpr(4, g.rd as u64);
@@ -781,10 +871,22 @@ fn ground_ticks_against_the_running_game() {
                     all &= ok;
                 }
                 whole[k] += all as usize;
+                pushed_whole[k] += (all && was_pushed) as usize;
+                if k == 2 && was_pushed {
+                    let hit = (0..n).any(|j| u32_le(b, 0x40 + 0x20 * j + 8) == w[1].tick);
+                    pushed_pos[hit as usize][(g[0] == want[0]) as usize] += 1;
+                }
             }
         }
     }
     eprintln!("{path}: ground ticks (motion 2 at both samples): {pairs} compared ({capped} at the speed limit); left out {other} whose motion object's +0xc is not the rider, {skew} not one update apart, {torn} read inside a tick (it or the sample before)");
+    if kc.is_some() {
+        eprintln!("  frames left out because a sample was read before every rider had ticked: {mid}");
+    }
+    if pushes {
+        eprintln!("  pushed apart by another rider in the frame (order {order:?}): {pushed}; every field right: {pushed_whole:?}");
+        eprintln!("  of those, under fadd=g1: not hit {} (position right {}), hit too {} (position right {})", pushed_pos[0][0] + pushed_pos[0][1], pushed_pos[0][1], pushed_pos[1][0] + pushed_pos[1][1], pushed_pos[1][1]);
+    }
     for (k, way) in ["ours (ground_motion::update)".to_string()].into_iter().chain(runners.iter().map(|(r, _)| format!("the game's in the runner, {r}"))).enumerate() {
         let line: Vec<String> = written.iter().map(|&f| format!("{} {}", names[f], count[k][f])).collect();
         eprintln!("  {way}: every field {}; {}", whole[k], line.join(", "));

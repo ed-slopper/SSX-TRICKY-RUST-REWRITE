@@ -587,6 +587,50 @@ Found:
 
 Still to do: row F4b3g.
 
+## F4b3g: riders pushed apart, from a recorded race (2026-11-08)
+
+`tests/ground_motion.rs` `ground_ticks_against_the_running_game` now replays, every frame, the pushes of
+`Boarder_RiderCollisions` 0x123fc8 (`frame_pushes`) when the recording holds the riders' collision bodies (window
+`0x700`, the body at +0x470..+0x6e0).
+
+Proven (code and PINE):
+- `cBoarder::vf7` 0x117198 calls `Boarder_RiderCollisions` at 0x117cd4, after the motion, the speed limit, the
+  control and the score, and only while the race's state (race +0x1c) is 3 or more and not 5.
+- `Boarder_Translate` 0x1267a0 moves only the body, its bounds +0x6e0/+0x6f0 and the broadphase box; the driver
+  moves the positions itself (0x1240fc, 0x124150, 0x12416c). The ground motion moves no body.
+- The bodies are rebuilt from the bones once a frame, by `cPostAI::vf1` 0x114730 (`Boarder_UpdateBroadphase`
+  0x126748 for each rider in slot order), which sits in object list 11. `Game_UpdateObjectLists` 0x1814c0 runs the lists in
+  the order of the table at 0x337c70: 0, 1, 2, 3, 5, 6, 7, 8, 4, 10, 11. The riders' `cBoarderHandler` objects
+  (vtable 0x36a9c0, `cPlayer` 0x36f218 for the one the pad drives) are list 8. Walking that list (`BxList_First`
+  0x17d860, header list·0x34 + *(0x337c60+4)) gives slot 5 first, slot 0 last. So the collisions of frame F use
+  the bodies of frame F−1's end, moved by the pushes of riders that ticked earlier in F.
+- Each rider's speed-sample count, rider+0x5900 (score +0xe0, a float that `Boarder_AddSpeedSample` 0x155dc8 adds
+  1 to every tick), tells whether the rider has ticked yet this frame.
+
+The recordings were the problem. Up to rec13, `pine.py record` read the six riders in six PINE messages right
+after the race tick moved. PINE reads while the EE runs, and the race tick moves at the start of the frame, so
+most samples held riders from both sides of their tick, with bodies from mixed moments. A 4 s check had 61 of 241
+samples at a frame's end. On rec13 (old reader, 150 s) the pushes went wrong: 7 of 232 pushed ticks right. The pushes
+themselves were confirmed there: where two riders were pushed, their position misses are exact opposites. `record`
+now waits until every rider's +0x5900 has moved (at most 30 ms), then reads every block and window in one batch
+between two reads of the race tick. 235 of 235 samples were then at a frame's end. With the window `5900:4`, the
+test also leaves out frames whose samples are not both at a frame's end (none in rec14).
+
+rec14 (150 s, raced by hand in the pack: `pine.py record 150 rec14.txt 0x700 57b0:64 -400:10 -3d0:10 46c0:10
+5ae0:4 5900:4`, and `rec14.stats`): 37,852 ground ticks compared, 3 left out as not one update apart, 11 as read
+inside a tick (rec13: 2,584 and 1,509). Under `fadd=g1`:
+- every field 37,135 (98.1%; 37,019 without the pushes); position 37,703 (37,497 without); the up 37,852 of
+  37,852. The 186 ups "1.5 steps on" of rec10 were samples read mid-frame.
+- 343 ticks with a push: 205 without a hit, position right on 152; 138 where the pair was also hit
+  (`Boarder_RiderHit` 0x124920, every third tick per pair, not replayed): velocity wrong on all 138.
+- Overlapping pairs against the game's bump records: of all frames where two bodies at the frame's start overlap
+  and the pair may be hit again, the game hit them on all but 3.
+- Misses with no push: 235 the control state only, about 200 the board's orientation only (fwd, quaternion, yaw):
+  the control after the motion (`Boarder_UpdateControl` 0x11c9a0) is not replayed on the snow; 18 positions
+  (walls and instances).
+
+Still to do: rows F4b3h and F4b3i.
+
 ## How a row gets to `checked`
 
 1. Port the function (address in its doc comment, AGENTS.md §13).
