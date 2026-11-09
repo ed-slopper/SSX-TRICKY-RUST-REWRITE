@@ -53,8 +53,10 @@ pub trait ColEnv {
     fn translate(&mut self, r: usize, v: V4);
     /// `Boarder_GetSpeedStat` (FUN_0011d7b0)
     fn speed_stat(&mut self, r: usize) -> f32;
-    /// `Boarder_RiderHit`(speed, hit rider `to`, from rider `from`, the record `rec_owner`'s record of `rec_of`, dir)
-    fn rider_hit(&mut self, speed: f32, to: usize, from: usize, rec_owner: usize, rec_of: usize, dir: V4) -> bool;
+    /// `Boarder_RiderHit`(speed, hit rider `to`, from rider `from`, the record `rec_owner`'s record of `rec_of`, dir);
+    /// `vel` is the hit rider's velocity +0x150, which the hit changes (the next pair's closing speeds read it)
+    #[allow(clippy::too_many_arguments)]
+    fn rider_hit(&mut self, speed: f32, to: usize, from: usize, rec_owner: usize, rec_of: usize, dir: V4, vel: &mut V4) -> bool;
     /// `Boarder_ScoreKnockdown` 0x11e9a0, `Boarder_ScoreCrash` 0x11e988
     fn score_knockdown(&mut self, r: usize);
     fn score_crash(&mut self, r: usize);
@@ -108,8 +110,8 @@ pub fn rider_collisions(me: usize, list: &[usize], riders: &mut [ColRider], tick
         }
         let n = normalize(v);
         let (to_o, to_me) = pair_speeds(n, riders[me].vel, riders[o].vel, sm, so);
-        let hit1 = env.rider_hit(to_o, me, o, me, o, n);
-        let hit2 = env.rider_hit(to_me, o, me, o, me, n);
+        let hit1 = env.rider_hit(to_o, me, o, me, o, n, &mut riders[me].vel);
+        let hit2 = env.rider_hit(to_me, o, me, o, me, n, &mut riders[o].vel);
         if hit2 {
             if !hit1 {
                 riders[me].rec[o].hits = riders[me].rec[o].hits.wrapping_add(1);
@@ -143,7 +145,7 @@ pub fn rider_collisions(me: usize, list: &[usize], riders: &mut [ColRider], tick
         let s = |r: &ColRider, stat: f32| ShoveRider { pos: r.pos, vel: r.vel, fwd: r.fwd, side: r.side, up: r.up, at: r.at, heading: r.heading, speed_stat: stat, stability: r.stability };
         let (sm, so) = (env.speed_stat(me), env.speed_stat(i));
         let Some((speed, n)) = shove(&s(&riders[me], sm), &s(&riders[i], so), practice) else { continue };
-        if env.rider_hit(speed, i, me, i, me, n) {
+        if env.rider_hit(speed, i, me, i, me, n, &mut riders[i].vel) {
             env.score_knockdown(me);
             env.score_crash(i);
         }

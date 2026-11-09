@@ -78,7 +78,7 @@ impl ColEnv for Env<'_> {
     fn speed_stat(&mut self, r: usize) -> f32 {
         self.0.stat[r]
     }
-    fn rider_hit(&mut self, speed: f32, to: usize, from: usize, owner: usize, of: usize, dir: [f32; 4]) -> bool {
+    fn rider_hit(&mut self, speed: f32, to: usize, from: usize, owner: usize, of: usize, dir: [f32; 4], _vel: &mut [f32; 4]) -> bool {
         let h = self.0.hits.pop_front().unwrap();
         self.0.log.push(format!("hit {:08x} {to} {from} rec {owner}/{of} {:?} -> {h}", speed.to_bits(), bits(dir)));
         h

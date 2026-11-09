@@ -21,6 +21,8 @@ use r5900::Runner;
 use tricky_game::ground_motion::{update, CrashRecord, Env, Rider, Stats, WALL_MASK};
 use tricky_game::air::{predict_at_takeoff, Predict, RayHit};
 use tricky_game::collbody::{overlap, CollBody};
+use tricky_game::hit::{rider_hit, HitRider};
+use tricky_game::ridercol::{rider_collisions, ColEnv, ColRec, ColRider};
 use tricky_game::jump::{jump_impulse, JumpState};
 use tricky_game::orient::{take_off, TakeOffEnv, TakeOffRider};
 use tricky_game::probe::{self, Hit};
@@ -654,49 +656,102 @@ fn body_of(r: &[u8]) -> CollBody {
     b
 }
 
-/// The pushes `Boarder_RiderCollisions` 0x123fc8 gives in one frame, from the bodies as the first sample holds them
-/// (set by `Boarder_UpdateBroadphase` 0x126748 after every rider's tick; the ground motion does not move a body, the
-/// air motion does, by its step: taken as the rider's move between the samples). The riders tick in `order`; each
-/// tests every other rider (all of them stand in for its neighbour list +0x700, in slot order), pushes the pair
-/// apart by 0.55 of the overlap each and moves both bodies (`Boarder_Translate` 0x1267a0). For each rider: the
-/// moves it got before its own tick (its motion starts from them) and from its own tick on, in order. Finished
-/// riders (`Boarder_IsFinishedAndStopped`) are not looked at: none in these recordings stop before the end.
-fn frame_pushes(a: &[Vec<u8>], b: &[Vec<u8>], order: &[usize]) -> Vec<(Vec<V4>, Vec<V4>)> {
-    let n = a.len();
-    let mut body: Vec<CollBody> = a.iter().map(|r| body_of(r)).collect();
-    let mut out = vec![(Vec::new(), Vec::new()); n];
-    let mut ticked = vec![false; n];
-    for &me in order {
-        if u32_le(&a[me], 0x424) == 1 && u32_le(&b[me], 0x424) == 1 {
-            let (p, q) = (vec4(&a[me], 0x140), vec4(&b[me], 0x140));
-            body[me].translate([q[0] - p[0], q[1] - p[1], q[2] - p[2], q[3] - p[3]]);
-        }
-        ticked[me] = true;
-        for o in 0..n {
-            if o == me {
-                continue;
-            }
-            let Some((v, _)) = overlap(&body[me], &body[o]) else { continue };
-            let v = [v[0] * 0.55, v[1] * 0.55, v[2] * 0.55, v[3] * 0.55];
-            let neg = [v[0] * -1.0, v[1] * -1.0, v[2] * -1.0, v[3] * -1.0];
-            body[me].translate(neg);
-            body[o].translate(v);
-            out[me].1.push(neg);
-            if ticked[o] { out[o].1.push(v) } else { out[o].0.push(v) }
+/// What `Boarder_RiderCollisions` 0x123fc8 (`ridercol::rider_collisions`, checked in `tests/ridercol.rs`) asks while
+/// one frame is replayed (board rows F4b3g, F4b3h). The bodies start as the first sample holds them (set by
+/// `Boarder_UpdateBroadphase` 0x126748 after every rider's tick; the ground motion does not move a body, the air
+/// motion does, by its step: taken as the rider's move between the samples) and are moved by the pushes
+/// (`Boarder_Translate` 0x1267a0). The hits are `hit::rider_hit` on the hit rider as it is at that moment (`hit`:
+/// after its tick when it has ticked, else as the first sample holds it), with the pair's record from the second
+/// sample (+0x40 + 0x20·j: [0] the distance, [1] the bearing; read only for a hop or a wipe-out, which leave the
+/// ground). Finished riders (`Boarder_IsFinishedAndStopped`) are not looked at: none in these recordings stop
+/// before the end; nor the shoves (the layer-1 clip type is not in the recording: `clip_type1` answers 0).
+struct Frame {
+    body: Vec<CollBody>,
+    hit: Vec<HitRider>,
+    rec: Vec<Vec<[f32; 2]>>,
+    /// `Boarder_GetSpeedStat` 0x11d7b0 of each rider at that moment
+    stat: Vec<f32>,
+    /// per rider: pushes and hits it got this frame
+    pushes: Vec<usize>,
+    hits: Vec<usize>,
+}
+
+impl Frame {
+    fn new(a: &[Vec<u8>], b: &[Vec<u8>], stats: &[Vec<u8>]) -> Frame {
+        let n = a.len();
+        Frame {
+            body: a.iter().map(|r| body_of(r)).collect(),
+            hit: a.iter().map(|r| hit_rider(r)).collect(),
+            rec: b.iter().map(|r| (0..n).map(|j| [f32_at(r, 0x40 + 0x20 * j), f32_at(r, 0x44 + 0x20 * j)]).collect()).collect(),
+            stat: (0..n).map(|i| speed_stat(&stats[i], f32_at(&a[i], 0x130))).collect(),
+            pushes: vec![0; n],
+            hits: vec![0; n],
         }
     }
-    out
+}
+
+impl ColEnv for Frame {
+    fn overlap(&mut self, a: usize, b: usize) -> Option<V4> {
+        overlap(&self.body[a], &self.body[b]).map(|(v, _)| v)
+    }
+    fn finished_stopped(&mut self, _: usize) -> bool {
+        false
+    }
+    fn translate(&mut self, r: usize, v: V4) {
+        self.body[r].translate(v);
+        self.pushes[r] += 1;
+    }
+    fn speed_stat(&mut self, r: usize) -> f32 {
+        self.stat[r]
+    }
+    fn rider_hit(&mut self, speed: f32, to: usize, _: usize, owner: usize, of: usize, dir: V4, vel: &mut V4) -> bool {
+        let mut h = self.hit[to];
+        h.vel = *vel;
+        let knocked = rider_hit(speed, dir, self.rec[owner][of], false, false, &mut h, &mut Vec::new());
+        *vel = h.vel;
+        self.hit[to] = h;
+        self.hits[to] += 1;
+        knocked
+    }
+    fn score_knockdown(&mut self, _: usize) {}
+    fn score_crash(&mut self, _: usize) {}
+    fn crash_meter(&mut self, _: usize) {}
+    fn rand_game(&mut self) {}
+    fn collision_sound(&mut self, _: usize, _: usize) {}
+    fn clip_type1(&mut self, _: usize) -> u32 {
+        0
+    }
+    fn clip_flag(&mut self, _: usize, _: u32) -> bool {
+        false
+    }
+}
+
+/// What `Boarder_RiderHit` reads of a recorded rider.
+fn hit_rider(r: &[u8]) -> HitRider {
+    HitRider { heading: f32_at(r, 0x1b0), pos: vec4(r, 0x140), vel: vec4(r, 0x150), normal: vec4(r, 0x2a0), motion: u32_le(r, 0x424), crouch: f32_at(r, 0x1c8) }
+}
+
+/// `Boarder_GetSpeedStat` 0x11d7b0: stats+0x1e × (stats+0x12 × 2.145779 × 0.003921569 + 0.79599), then × (1 + the
+/// boost level +0x130 × 7.999995).
+fn speed_stat(st: &[u8], boost: f32) -> f32 {
+    let m = st[0x1e] as f32 * (st[0x12] as f32 * 2.145_779 * 0.003_921_569 + 0.795_99);
+    boost * 7.999_995 * m + m
+}
+
+/// The driver's view of a recorded rider: position, velocity, motion and its records of the others (+0x40 + 0x20·j:
+/// +8 the last bump's tick, +0xc the last shove's, +0x1a the hits).
+fn col_rider(r: &[u8], n: usize) -> ColRider {
+    ColRider {
+        pos: vec4(r, 0x140),
+        vel: vec4(r, 0x150),
+        motion: u32_le(r, 0x424),
+        rec: (0..n).map(|j| ColRec { bump: u32_le(r, 0x48 + 0x20 * j) as i32, shove: u32_le(r, 0x4c + 0x20 * j) as i32, hits: u16::from_le_bytes([r[0x5a + 0x20 * j], r[0x5b + 0x20 * j]]) }).collect(),
+        ..Default::default()
+    }
 }
 
 fn w0_len(ticks: &[recording::Tick]) -> usize {
     ticks.first().map_or(0, |t| t.riders[0].len())
-}
-
-fn add_all(mut p: V4, vs: &[V4]) -> V4 {
-    for v in vs {
-        p = [p[0] + v[0], p[1] + v[1], p[2] + v[2], p[3] + v[3]];
-    }
-    p
 }
 
 /// The ground tick over a recorded race (board row F4b3b). For every pair of samples one tick apart in which a rider
@@ -708,12 +763,14 @@ fn add_all(mut p: V4, vs: &[V4]) -> V4 {
 /// point +0x2d0, normal +0x2a0, surface +0x290, kind +0x2e0; no hit when the kind is 3), so the course is not needed.
 /// `cBoarder::vf7` 0x117198 shapes the inputs (brake, crouch, steer, the probe's side offset) and the spring band
 /// before the motion, so those are taken from the second sample. After the motion the tick caps the speed
-/// (`speed_limit_of`, `speed_limit`: applied to each way), pushes riders apart (`Boarder_RiderCollisions` 0x123fc8, not
-/// replayed), may change the control state, and at its end `Boarder_UpdateLeanTargets` 0x129500 turns the rider's up
+/// (`speed_limit_of`, `speed_limit`: applied to each way), may change the control state, pushes riders apart and hits
+/// them (`Boarder_RiderCollisions` 0x123fc8), and at its end `Boarder_UpdateLeanTargets` 0x129500 turns the rider's up
 /// +0x2c0 toward the normal and aims the lean record (+0x24c): run each way too (ours `lean_up`, `lean_targets`), and
 /// both compared (board row F4b3e). Samples read inside a tick are left out (`late`). With the bodies recorded
-/// (window 0x700), the frame's pushes apart are replayed (`frame_pushes`, board row F4b3g); with the riders' tick
-/// counts (window `5900:4`), frames not sampled at a frame's end are left out.
+/// (window 0x700), the whole frame is replayed each way: the riders in tick order, each one's motion from where the
+/// earlier riders' pushes and hits left it, its collisions with `ridercol::rider_collisions` and `hit::rider_hit`
+/// (`Frame`; board rows F4b3g, F4b3h); with the riders' tick counts (window `5900:4`), frames not sampled at a frame's
+/// end are left out. TRICKY_DBG lists the bump records and the hit ticks' velocities the replay misses.
 /// Not in the recording, so not given: the walls (`Boarder_WallCollide` 0x126250 answers no wall) and the instances
 /// (`Boarder_InstanceCollisions` 0x125088 does nothing). The ground motion object is the state manager
 /// *(rider+0x5ae0) + 0x4b0, rider − 0x400 for most riders (window `-400:10`; the test checks its +0xc is the rider),
@@ -775,10 +832,19 @@ fn ground_ticks_against_the_running_game() {
     // over PINE; TRICKY_ORDER (slots, comma separated) overrides it, TRICKY_NOPUSH turns the pushes off
     let pushes = w0_len(&ticks) >= 0x6e0 && std::env::var("TRICKY_NOPUSH").is_err();
     let order: Vec<usize> = std::env::var("TRICKY_ORDER").map(|o| o.split(',').map(|x| x.parse().unwrap()).collect()).unwrap_or((0..n).rev().collect());
-    let (mut pushed, mut pushed_whole) = (0, vec![0usize; 1 + runners.len()]);
-    // pushed ticks by whether the rider was also hit (`Boarder_RiderHit`, not replayed: its bump record +0x40 + 0x20·j
-    // +8 holds the second sample's tick): [hit][position right]
+    let mut pushed = 0;
+    let mut pushed_whole = vec![0usize; 1 + runners.len()];
+    // pushed ticks under fadd=g1 by whether the rider was also hit (the game's bump record +0x40 + 0x20·j +8 holds
+    // the second sample's tick): [hit][position right], and of the hit ones how many have the velocity right
     let mut pushed_pos = [[0usize; 2]; 2];
+    let mut hit_vel = 0;
+    // the replayed frame's bumps against the game's records (pairs whose record either side changed this frame)
+    let (mut bumps, mut bumps_right) = (0, 0);
+    struct Prep {
+        rider: Rider,
+        want: Vec<Vec<u32>>,
+        hit: Option<Hit>,
+    }
     for (wi, w) in ticks.windows(2).enumerate() {
         if w[1].tick != w[0].tick + 1 {
             continue;
@@ -792,7 +858,8 @@ fn ground_ticks_against_the_running_game() {
                 continue;
             }
         }
-        let push = if pushes { frame_pushes(&w[0].riders, &w[1].riders, &order) } else { vec![(Vec::new(), Vec::new()); n] };
+        // the riders whose ground tick is replayed, and what each needs
+        let mut prep: Vec<Option<Prep>> = (0..n).map(|_| None).collect();
         for i in 0..n {
             let (a, b) = (&w[0].riders[i], &w[1].riders[i]);
             if u32_le(a, 0x424) != 2 || u32_le(b, 0x424) != 2 {
@@ -820,61 +887,142 @@ fn ground_ticks_against_the_running_game() {
             pairs += 1;
             let st = &stats[i];
             let mut rider = rider_of(a, st, ma, na);
-            let (pre, post) = &push[i];
-            rider.p.pos = add_all(rider.p.pos, pre);
-            let was_pushed = !pre.is_empty() || !post.is_empty();
-            pushed += was_pushed as usize;
             // what `cBoarder::vf7` 0x117198 moves before the motion, so the motion read it as the second sample holds
             // it: the input records (value +0, rate +4, target +8; each value moved toward its target by rate / 60:
             // brake +0x1fc, crouch +0x208, steer +0x214, the probe's side offset +0x244) and the spring band +0x294,
             // +0x298
             let after = rider_of(b, st, mb, nb);
             (rider.brake, rider.crouch, rider.steer, rider.p.x244, rider.d1, rider.d2) = (after.brake, after.crouch, after.steer, after.p.x244, after.d1, after.d2);
-            let want = fields(&rider_of(b, st, mb, nb), f32_at(b, 0x24c));
+            let want = fields(&after, f32_at(b, 0x24c));
             let kind = u32_le(b, 0x2e0);
             let hit = (kind != 3).then(|| Hit { kind, point: vec4(b, 0x2d0), normal: vec4(b, 0x2a0), surface: u32_le(b, 0x290) });
-            let mut got = Vec::new();
-            let mut mine = rider;
-            update(&mut mine, &SURFACE_TABLE, &mut E { log: Vec::new(), hit, wall: false, meter: 0.0 });
-            mine.vel = speed_limit(mine.vel, speed_limit_of(a, b, |x, y| x - y));
-            mine.p.pos = add_all(mine.p.pos, post);
-            // the end of the tick: `Boarder_UpdateLeanTargets` 0x129500 turns the up toward the normal and aims the lean
-            mine.up = lean_up(mine.up, mine.p.normal);
-            let (_, target) = lean_targets(2, mine.steer, mine.vel);
-            got.push(fields(&mine, target));
-            for (_, g) in runners.iter_mut() {
-                *g.hit.borrow_mut() = hit;
-                g.wall.set(false);
-                g.put(&rider);
-                g.r.cpu.set_gpr(4, g.motion as u64);
-                g.r.call(0x10a0d8).unwrap_or_else(|e| panic!("tick {} rider {i}: {e:?}", w[0].tick));
-                let mut r = g.get(&rider);
-                // (the runner's float rules are still set from its call)
-                r.vel = speed_limit(r.vel, speed_limit_of(a, b, r5900::ps2float::fsub));
-                r.p.pos = add_all(r.p.pos, post);
-                wv(&mut g.r.mem, g.rd + 0x150, r.vel);
-                g.r.mem.write_u32(g.rd + 0x424, 2);
-                g.r.cpu.set_gpr(4, g.rd as u64);
-                g.r.call(0x129500).unwrap_or_else(|e| panic!("tick {} rider {i}: {e:?}", w[0].tick));
-                r.up = rv(&mut g.r.mem, g.rd + 0x2c0);
-                let target = g.r.mem.read_f32(g.rd + 0x24c);
-                got.push(fields(&r, target));
-            }
-            // how many met the speed limit (`speed_limit_of`, applied above to each way's velocity)
+            // how many met the speed limit (`speed_limit_of`, applied below to each way's velocity)
             let v = vec4(b, 0x150);
             capped += ((v[0] * v[0] + v[1] * v[1] + v[2] * v[2]).sqrt() >= f32_at(b, 0x1c4) - 0.01) as usize;
-            for (k, g) in got.iter().enumerate() {
+            prep[i] = Some(Prep { rider, want, hit });
+        }
+        if prep.iter().all(Option::is_none) {
+            continue;
+        }
+        // The frame replayed each way: the riders tick in `order`; a replayed rider's motion starts from where the
+        // pushes and hits of the riders that ticked before it left it (+0x140, +0x150), then the speed limit, then
+        // its collisions (`Boarder_RiderCollisions` 0x123fc8 at 0x117cd4, while the race's state is 3 or more and not
+        // 5: always so in these recordings), then `Boarder_UpdateLeanTargets` 0x129500 (0x117ce4) on the velocity as
+        // it is then; the riders that tick after it may still push and hit it. The others' ticks are taken from the
+        // second sample (velocity, motion; an air rider's body moved by its step).
+        let tick = w[1].tick as i32;
+        let mut got: Vec<Vec<Vec<Vec<u32>>>> = vec![Vec::new(); n];
+        let mut frame_pushes = vec![0usize; n];
+        let mut frame_hits = vec![0usize; n];
+        for k in 0..1 + runners.len() {
+            let mut f = Frame::new(&w[0].riders, &w[1].riders, &stats);
+            let mut riders: Vec<ColRider> = w[0].riders.iter().map(|r| col_rider(r, n)).collect();
+            let mut done: Vec<Option<(Rider, f32)>> = vec![None; n];
+            for &me in &order {
+                let (a, b) = (&w[0].riders[me], &w[1].riders[me]);
+                if let Some(p) = &prep[me] {
+                    let mut rider = p.rider;
+                    rider.p.pos = riders[me].pos;
+                    rider.vel = riders[me].vel;
+                    let r = if k == 0 {
+                        let mut mine = rider;
+                        update(&mut mine, &SURFACE_TABLE, &mut E { log: Vec::new(), hit: p.hit, wall: false, meter: 0.0 });
+                        mine.vel = speed_limit(mine.vel, speed_limit_of(a, b, |x, y| x - y));
+                        mine
+                    } else {
+                        let g = &mut runners[k - 1].1;
+                        *g.hit.borrow_mut() = p.hit;
+                        g.wall.set(false);
+                        g.put(&rider);
+                        g.r.cpu.set_gpr(4, g.motion as u64);
+                        g.r.call(0x10a0d8).unwrap_or_else(|e| panic!("tick {} rider {me}: {e:?}", w[0].tick));
+                        let mut r = g.get(&rider);
+                        // (the runner's float rules are still set from its call)
+                        r.vel = speed_limit(r.vel, speed_limit_of(a, b, r5900::ps2float::fsub));
+                        r
+                    };
+                    riders[me].pos = r.p.pos;
+                    riders[me].vel = r.vel;
+                    riders[me].motion = 2;
+                    f.hit[me] = HitRider { heading: r.yaw, pos: r.p.pos, vel: r.vel, normal: r.p.normal, motion: 2, crouch: f32_at(b, 0x1c8) };
+                    done[me] = Some((r, 0.0));
+                } else {
+                    if u32_le(a, 0x424) == 1 && u32_le(b, 0x424) == 1 {
+                        let (p, q) = (vec4(a, 0x140), vec4(b, 0x140));
+                        f.body[me].translate([q[0] - p[0], q[1] - p[1], q[2] - p[2], q[3] - p[3]]);
+                    }
+                    riders[me].vel = vec4(b, 0x150);
+                    riders[me].motion = u32_le(b, 0x424);
+                    f.hit[me] = hit_rider(b);
+                }
+                f.stat[me] = speed_stat(&stats[me], f32_at(b, 0x130));
+                if pushes {
+                    let list: Vec<usize> = (0..n).filter(|&o| o != me).collect();
+                    rider_collisions(me, &list, &mut riders, tick, false, &mut f);
+                }
+                // the end of the tick: `Boarder_UpdateLeanTargets` turns the up toward the normal and aims the lean
+                if let Some((r, target)) = &mut done[me] {
+                    r.vel = riders[me].vel;
+                    if k == 0 {
+                        r.up = lean_up(r.up, r.p.normal);
+                        *target = lean_targets(2, r.steer, r.vel).1;
+                    } else {
+                        let g = &mut runners[k - 1].1;
+                        wv(&mut g.r.mem, g.rd + 0x150, r.vel);
+                        g.r.mem.write_u32(g.rd + 0x424, 2);
+                        g.r.cpu.set_gpr(4, g.rd as u64);
+                        g.r.call(0x129500).unwrap_or_else(|e| panic!("tick {} rider {me}: {e:?}", w[0].tick));
+                        r.up = rv(&mut g.r.mem, g.rd + 0x2c0);
+                        *target = g.r.mem.read_f32(g.rd + 0x24c);
+                    }
+                }
+            }
+            for i in 0..n {
+                if let Some((mut r, target)) = done[i] {
+                    r.vel = riders[i].vel;
+                    r.p.pos = riders[i].pos;
+                    got[i].push(fields(&r, target));
+                }
+            }
+            if k == runners.len() {
+                frame_pushes = f.pushes.clone();
+                frame_hits = f.hits.clone();
+                for i in 0..n {
+                    for j in (0..n).filter(|&j| j != i) {
+                        let (was, game) = (u32_le(&w[0].riders[i], 0x48 + 0x20 * j) as i32, u32_le(&w[1].riders[i], 0x48 + 0x20 * j) as i32);
+                        if riders[i].rec[j].bump != was || game != was {
+                            bumps += 1;
+                            bumps_right += (riders[i].rec[j].bump == game) as usize;
+                            if riders[i].rec[j].bump != game && std::env::var("TRICKY_DBG").is_ok() {
+                                eprintln!("DBG bump tick {tick} {i}->{j}: was {was} game {game} ours {} motions {} {} -> {} {}", riders[i].rec[j].bump, u32_le(&w[0].riders[i], 0x424), u32_le(&w[0].riders[j], 0x424), u32_le(&w[1].riders[i], 0x424), u32_le(&w[1].riders[j], 0x424));
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        for i in 0..n {
+            let Some(p) = &prep[i] else { continue };
+            let b = &w[1].riders[i];
+            let was_pushed = frame_pushes[i] > 0;
+            pushed += was_pushed as usize;
+            for (k, g) in got[i].iter().enumerate() {
                 let mut all = true;
                 for &f in &written {
-                    let ok = g[f] == want[f];
+                    let ok = g[f] == p.want[f];
                     count[k][f] += ok as usize;
                     all &= ok;
                 }
                 whole[k] += all as usize;
                 pushed_whole[k] += (all && was_pushed) as usize;
-                if k == 2 && was_pushed {
-                    let hit = (0..n).any(|j| u32_le(b, 0x40 + 0x20 * j + 8) == w[1].tick);
-                    pushed_pos[hit as usize][(g[0] == want[0]) as usize] += 1;
+                if k == runners.len() && was_pushed {
+                    let hit = (0..n).any(|j| u32_le(b, 0x48 + 0x20 * j) == w[1].tick);
+                    pushed_pos[hit as usize][(g[0] == p.want[0]) as usize] += 1;
+                    hit_vel += (hit && g[1] == p.want[1]) as usize;
+                    if hit && g[1] != p.want[1] && std::env::var("TRICKY_DBG").is_ok() {
+                        let ulps: Vec<i64> = (0..3).map(|c| g[1][c] as i32 as i64 - p.want[1][c] as i32 as i64).collect();
+                        eprintln!("DBG hitvel tick {} rider {i}: ulps {ulps:?} pos ok {} pushes {} hits(ours) {:?}", w[1].tick, g[0] == p.want[0], frame_pushes[i], frame_hits[i]);
+                    }
                 }
             }
         }
@@ -885,7 +1033,8 @@ fn ground_ticks_against_the_running_game() {
     }
     if pushes {
         eprintln!("  pushed apart by another rider in the frame (order {order:?}): {pushed}; every field right: {pushed_whole:?}");
-        eprintln!("  of those, under fadd=g1: not hit {} (position right {}), hit too {} (position right {})", pushed_pos[0][0] + pushed_pos[0][1], pushed_pos[0][1], pushed_pos[1][0] + pushed_pos[1][1], pushed_pos[1][1]);
+        eprintln!("  of those, under fadd=g1: not hit {} (position right {}), hit too {} (position right {}, velocity right {hit_vel})", pushed_pos[0][0] + pushed_pos[0][1], pushed_pos[0][1], pushed_pos[1][0] + pushed_pos[1][1], pushed_pos[1][1]);
+        eprintln!("  bump records (+0x40 + 0x20·j +8) changed this frame by the game or the replay: {bumps}, the replay's equal to the game's: {bumps_right}");
     }
     for (k, way) in ["ours (ground_motion::update)".to_string()].into_iter().chain(runners.iter().map(|(r, _)| format!("the game's in the runner, {r}"))).enumerate() {
         let line: Vec<String> = written.iter().map(|&f| format!("{} {}", names[f], count[k][f])).collect();

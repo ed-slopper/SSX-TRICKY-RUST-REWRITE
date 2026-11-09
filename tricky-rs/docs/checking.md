@@ -631,6 +631,42 @@ inside a tick (rec13: 2,584 and 1,509). Under `fadd=g1`:
 
 Still to do: rows F4b3h and F4b3i.
 
+## F4b3h: the frame's riders replayed together, with their hits (2026-11-09)
+
+`tests/ground_motion.rs` `ground_ticks_against_the_running_game` now replays each recorded frame whole, each way
+(ours, the runner under IEEE, the runner under `fadd=g1`): the riders in tick order (slot 5 to 0); a ground rider's
+motion starts from where the pushes and hits of the riders that ticked before it left it, then the speed limit, then
+its collisions through the port's driver (`ridercol::rider_collisions`, `Frame` as its env) with the hits as
+`hit::rider_hit`, then `Boarder_UpdateLeanTargets` on the velocity as it is then. Riders whose tick is not replayed
+(air, rail, wiped out) take their velocity and motion from the second sample at their turn.
+
+Proven (code):
+- `cBoarder::vf7` 0x117198 calls `Boarder_RiderCollisions` at 0x117cd4, `Rivals_UpdateGrudgeTimeout` at 0x117cdc,
+  then `Boarder_UpdateLeanTargets` at 0x117ce4: the lean target is aimed with the velocity after the rider's own
+  hits, before the hits of the riders that tick after it.
+- `Boarder_GetSpeedStat` 0x11d7b0 = stats+0x1e × (stats+0x12 × 2.145779 × 0.003921569 + 0.79599), × (1 + +0x130 ×
+  7.999995).
+- `Boarder_RiderHit` changes the hit rider's +0x150, which the driver reads again for the next pair's closing
+  speeds: `ColEnv::rider_hit` now hands the driver's velocity to the env (`ridercol.rs`).
+
+Inferred: the pair records' distance and bearing (+0x40, +0x44; `Race_UpdatePairDistances` 0x115a80 from the cAI
+update 0x113820) are taken from the second sample; they are read only by a hop or a wipe-out, which leave the ground.
+
+rec14 under `fadd=g1` (F4b3g's numbers in brackets): every field 37,207 (37,135) of 37,852; position 37,750
+(37,703); velocity 37,809 (37,702). Pushed ticks 343, every field right 193 (121): 205 not hit, position right 152
+(152); 138 hit, position right 107 (60), velocity right 111 (0). Bump records (+0x48 + 0x20·j) that the game or the
+replay changed: 268 records, 238 equal. Under IEEE every field stays at 18 (the adds are PCSX2's, F4g).
+
+What is left (row F4b3j, `TRICKY_DBG=1` lists them):
+- 15 pairs whose bump the replay and the game disagree on (5 the game's only, 10 the replay's only): 9 with an air
+  rider (its body moved by the step between the samples, not by `AirMotion_Update`), 2 with a wiped-out rider (its
+  body not moved at all), 4 between two ground riders (ticks 1257, 1843, 4354, 4400). The neighbour list +0x700 that
+  picks the pairs, and its order, is not recorded (the window ends at +0x700); every other rider stands in for it.
+- 27 hit ticks with the velocity off: 22 by far, all but tick 8005 with the position off too (the push vector, so
+  the bodies); 5 by 3 to 40,000 ulps (tick 4352 rider 3, 4386 riders 1 and 4, 6925, 7996), the last two with the
+  position right: the hit's arithmetic is ours under IEEE, not the game's under PCSX2's adder.
+- the 53 pushed ticks with no hit whose position is still off (as F4b3g).
+
 ## How a row gets to `checked`
 
 1. Port the function (address in its doc comment, AGENTS.md §13).
