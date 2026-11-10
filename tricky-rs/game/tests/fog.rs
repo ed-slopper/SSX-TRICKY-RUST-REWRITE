@@ -142,8 +142,6 @@ fn build_obj(m: &mut Mem, at: u32, d: u32, heap: &mut Ours) {
 #[test]
 fn fog_matches_the_original() {
     let Some(mut r) = Runner::from_env() else { return };
-    // the divide unit rounds to nearest in the game (checking.md F4b3l)
-    r.float_rules = r5900::ps2float::Rules::parse("div=n").unwrap();
     for a in [
         0x252318u32, 0x25ecb8, 0x1ca2c8, 0x1ca2e0, 0x1ca320, 0x1ca358, 0x1ca3a8, 0x1ca5a0, 0x1c9b20, 0x1c9b60, 0x1c9ba8,
         0x1c9cd0, 0x1c9d58, 0x102f50, 0x2cc808, 0x2fb5c8, 0x1cad28,

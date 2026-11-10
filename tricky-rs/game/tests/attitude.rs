@@ -92,8 +92,6 @@ fn wf(m: &mut Mem, at: u32, v: f32) {
 #[test]
 fn attitude_icon_draw_matches_the_original() {
     let Some(mut r) = Runner::from_env() else { return };
-    // the divide unit rounds to nearest in the game (checking.md F4b3l)
-    r.float_rules = r5900::ps2float::Rules::parse("div=n").unwrap();
     for f in [0x134830u32, 0x102f50] {
         r.allow(f);
     }

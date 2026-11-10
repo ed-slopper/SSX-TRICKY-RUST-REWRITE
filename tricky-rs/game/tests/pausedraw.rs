@@ -224,8 +224,6 @@ fn wf(m: &mut Mem, at: u32, v: f32) {
 #[test]
 fn pause_menu_draws_match_the_original() {
     let Some(mut r) = Runner::from_env() else { return };
-    // the divide unit rounds to nearest in the game (checking.md F4b3l)
-    r.float_rules = r5900::ps2float::Rules::parse("div=n").unwrap();
     let funcs = [0x1ab9f8u32, 0x1ac7e0, 0x1ad198, 0x1ad628, 0x1abc00, 0x1abe70, 0x1ac080, 0x1ac130, 0x1ac130];
     for f in funcs {
         r.allow(f);

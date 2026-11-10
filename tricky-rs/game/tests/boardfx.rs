@@ -98,8 +98,6 @@ fn wf(m: &mut Mem, at: u32, v: f32) {
 
 fn runner() -> Option<(Runner, Rc<RefCell<Vec<Call>>>)> {
     let mut r = Runner::from_env()?;
-    // the divide unit rounds to nearest in the game (checking.md F4b3l)
-    r.float_rules = r5900::ps2float::Rules::parse("div=n").unwrap();
     r.allow(bf::VEC4_SCALE);
     let log: Rc<RefCell<Vec<Call>>> = Rc::default();
     for off in SLOTS {

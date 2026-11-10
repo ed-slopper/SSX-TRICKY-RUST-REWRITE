@@ -2593,7 +2593,7 @@ values. With zeros there, the inverse pose's results come out the same whatever 
      middle's matrix times its offset.
 - **`Math_Asin`'s square root is the FPU's `sqrt.s`**, which the runner rounded toward zero (its old default). The
   port's `math::asin` rounds to nearest, so the IK uses `math::asin_ee` with `animseq::sqrt`. Since F4b3l both round
-  to nearest (`checking.md` F4b3l) and the IK test runs with `div=n`.
+  to nearest (`checking.md` F4b3l), the runner's default since F4b3n.
 
 Checked in the runner (`tests/limbik.rs`): 2000 cases of each of the five functions, on 19-bone skeletons with
 random angles, offsets and lengths, a random root, and targets near and far (5721 knees bent, 279 near

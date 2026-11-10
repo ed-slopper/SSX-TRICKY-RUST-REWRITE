@@ -102,8 +102,6 @@ fn wf(m: &mut Mem, at: u32, v: f32) {
 #[test]
 fn the_snowfall_matches_the_original() {
     let Some(mut r) = Runner::from_env() else { return };
-    // the divide unit rounds to nearest in the game (checking.md F4b3l)
-    r.float_rules = r5900::ps2float::Rules::parse("div=n").unwrap();
     for f in [
         0x1c8db8u32, 0x1c8ec8, 0x1c90c8, 0x1c90d0, 0x1c9130, 0x1c91c0, 0x1c9208, 0x1c9218, 0x1c92b8, 0x1c9310, 0x1c9388,
         0x1c9740, 0x1c9a18, 0x102f50,

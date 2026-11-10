@@ -201,8 +201,6 @@ const FUNCS: [u32; 79] = [
 #[test]
 fn debug_menu_items_match_the_original() {
     let Some(mut r) = Runner::from_env() else { return };
-    // the divide unit rounds to nearest in the game (checking.md F4b3l)
-    r.float_rules = r5900::ps2float::Rules::parse("div=n").unwrap();
     for f in FUNCS {
         r.allow(f);
     }

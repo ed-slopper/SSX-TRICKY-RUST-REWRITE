@@ -155,8 +155,6 @@ impl RiderDrawEnv for Ours {
 
 fn runner(log: &Rc<RefCell<Vec<Call>>>, ans: &Rc<Cell<Answers>>) -> Option<Runner> {
     let mut r = Runner::from_env()?;
-    // the divide unit rounds to nearest in the game (checking.md F4b3l)
-    r.float_rules = r5900::ps2float::Rules::parse("div=n").unwrap();
     for f in [0x1364d0u32, 0x136370, 0x136c48, 0x136e38, 0x167038, 0x250c10, 0x102f50] {
         r.allow(f);
     }

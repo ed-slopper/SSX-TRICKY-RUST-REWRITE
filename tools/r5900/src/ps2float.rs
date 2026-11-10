@@ -17,8 +17,8 @@
 //! The COP1 (FPU) `add.s`/`sub.s` have their own rule, `fadd`, apart from VU0's adds (`add`): in PCSX2 they differ.
 //! `add=` sets both; `fadd=` after it sets the FPU's alone.
 //!
-//! [`Rules::default`] is the best match to the game in PCSX2 so far (`tricky-rs/docs/checking.md`, F4f, F4g, F4h2),
-//! except `fadd`: PCSX2's COP1 adds are `fadd=g1`, but the default stays nearest, the rule our ports are checked
+//! [`Rules::default`] is the best match to the game in PCSX2 so far (`tricky-rs/docs/checking.md`, F4f, F4g, F4h2,
+//! F4b3l, F4b3n: COP1 `div.s`/`sqrt.s` and VU0's `vdiv`/`vsqrt`/`vrsqrt` round to nearest), except `fadd`: PCSX2's COP1 adds are `fadd=g1`, but the default stays nearest, the rule our ports are checked
 //! by, until board row F4c decides (with `fadd=g1` 38 of the game crate's runner tests part by an ulp).
 //! `TRICKY_FLOAT_RULES=add=ee,mul=chop` style strings parse with [`Rules::parse`].
 //!
@@ -80,9 +80,11 @@ impl Rules {
 }
 
 impl Default for Rules {
-    /// The best match to the game in PCSX2 so far, but for `fadd` (nearest until F4c; PCSX2 is `Guard`).
+    /// The best match to the game in PCSX2 so far, but for `fadd` (nearest until F4c; PCSX2 is `Guard`). The
+    /// divide and square root round to nearest: the game's `div.s` in rec15 (F4b3l), `vdiv`, `vsqrt` and `vrsqrt`
+    /// in rec17's ground motion (F4b3n), against the manual's toward zero.
     fn default() -> Rules {
-        Rules { add: Round::Nearest, fadd: Round::Nearest, mul: Round::Nearest, div: Round::Chop, cvt: Round::Chop }
+        Rules { add: Round::Nearest, fadd: Round::Nearest, mul: Round::Nearest, div: Round::Nearest, cvt: Round::Chop }
     }
 }
 
@@ -247,10 +249,15 @@ mod tests {
     use super::*;
 
     #[test]
-    fn divide_rounds_toward_zero() {
-        // 1/3 is 0x3EAAAAAB to nearest, 0x3EAAAAAA toward zero
+    fn divide_rounds_to_nearest_or_by_the_manual() {
+        // 1/3 is 0x3EAAAAAB to nearest (the default, as the game in PCSX2), 0x3EAAAAAA toward zero (the manual)
+        set_rules(Rules::default());
+        assert_eq!(div(1.0, 3.0).to_bits(), 0x3EAA_AAAB);
+        assert_eq!(div(-1.0, 3.0).to_bits(), 0xBEAA_AAAB);
+        set_rules(Rules::MANUAL);
         assert_eq!(div(1.0, 3.0).to_bits(), 0x3EAA_AAAA);
         assert_eq!(div(-1.0, 3.0).to_bits(), 0xBEAA_AAAA);
+        set_rules(Rules::default());
     }
 
     #[test]

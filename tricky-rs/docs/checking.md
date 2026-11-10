@@ -892,6 +892,25 @@ What is left (row F4b3o, `TRICKY_DBG=1` lists them):
   with the position right (9055, 9808, 9987, 19130, 848, 1439, 2326).
 - `FrameRun` (the take-off test) still walks every other rider, not the list.
 
+## F4b3n: the runner divides to nearest by default (2026-11-09)
+
+The runner's default rules (`tools/r5900/src/ps2float.rs`, `Rules::default`) now have `div=nearest`, which covers
+COP1's `div.s` and `sqrt.s` and VU0's and VU1's `vdiv`, `vsqrt` and `vrsqrt` (`exec.rs`, `vu1.rs`: all go through
+`ps2float::div` and `ps2float::sqrt`). `Rules::MANUAL` stays all toward zero. The 36 `div=n` lines F4b3l added to
+29 runner tests are gone; `vu.rs`'s doc says its `div` rounds to nearest (it is `animseq::div`, since F4b3l).
+
+Proven (recording): rec17's ground ticks (`ground_ticks_against_the_running_game`, the runner's `fadd=g1` way),
+every field right of 71,775 with the divide to nearest 71,209; with VU0's `vdiv` toward zero 30,661, `vsqrt`
+toward zero 15,670, `vrsqrt` toward zero 24,917, all three 4,553; with every divide and root toward zero (`div=c`)
+442. So VU0's macro-mode divide and both roots round to nearest, like COP1's `div.s` (F4b3l). (Measured with a
+throw-away switch in `exec.rs`, not committed.)
+
+Inferred: VU1's `div`/`sqrt`/`rsqrt` round as VU0's (the same unit design; no recording reaches VU1's results), and
+COP1's `sqrt.s` as its `div.s` (F4b3l).
+
+All 625 tests of the game crate pass with the binary (`TRICKY_ELF`), 96 test files of which run the runner under the
+default rules; `tools/r5900`'s own tests pass (its divide test now checks both rules).
+
 ## How a row gets to `checked`
 
 1. Port the function (address in its doc comment, AGENTS.md §13).

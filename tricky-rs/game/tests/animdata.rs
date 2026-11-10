@@ -63,8 +63,6 @@ impl SeqEnv for Ours {
 #[test]
 fn the_bank_matches_the_original() {
     let Some(mut r) = Runner::from_env() else { return };
-    // the divide unit rounds to nearest in the game (checking.md F4b3l)
-    r.float_rules = r5900::ps2float::Rules::parse("div=n").unwrap();
     for f in [
         0x157d58u32, 0x157d68, 0x157da0, 0x157e10, 0x157e68, 0x157ea8, 0x158af0, 0x15ac48, 0x158798, 0x1587e8, 0x158818,
         0x158d68, 0x240e80, 0x240ed8, 0x159820, 0x158c38, 0x158cc8, 0x158d18, 0x159070, 0x15a8c0, 0x2cc808,

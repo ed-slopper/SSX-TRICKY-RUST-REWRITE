@@ -206,8 +206,6 @@ fn banks(g: &mut Rng, m: &mut Mem) {
 #[test]
 fn skin_parts_match_the_original() {
     let Some(mut r) = Runner::from_env() else { return };
-    // the divide unit rounds to nearest in the game (checking.md F4b3l)
-    r.float_rules = r5900::ps2float::Rules::parse("div=n").unwrap();
     let funcs = [
         0x205018u32, 0x205068, 0x205080, 0x2054c8, 0x2054f0, 0x2055c0, 0x205670, 0x2057a0, 0x206ac0, 0x206b60, 0x206b88, 0x206c10,
         0x206d68, 0x206e30, 0x206ea0, 0x206f10,

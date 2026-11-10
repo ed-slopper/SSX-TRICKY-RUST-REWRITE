@@ -172,8 +172,6 @@ fn block6(g: &mut Rng, centre: [f32; 3]) -> Vec<u32> {
 /// One whole draw of `n` systems (program 6 when `prog6`); the VU1 that ran the chain (its calls recorded)
 fn draw(seed: u64, n: usize, prog6: bool, cam: &Camera) -> Option<Vu1> {
     let mut r = Runner::from_env()?;
-    // the divide unit rounds to nearest in the game (checking.md F4b3l)
-    r.float_rules = r5900::ps2float::Rules::parse("div=n").unwrap();
     let mut g = Rng(seed);
     r.mem.write(ARENA, &vec![0u8; SIZE as usize]).unwrap();
     for f in [0x1d8bc8u32, 0x1e2e60, 0x1e2a60, 0x1e8838, 0x1e88c8, 0x1c4d68, 0x1c4d30, 0x1c4f28, 0x1c4340, 0x1c4468, 0x1c6f98, 0x1c7068, 0x1c7088, 0x1c4fe0, 0x1c4220, 0x1c51f0, 0x1c5368, 0x1c42a0, 0x1c5c88, 0x1c0340, 0x1c03e8, 0x1c04f8, 0x1c0560, 0x1c05d8, 0x1c06a0, 0x1e85b0, 0x2cfc00, 0x1c4650, 0x1c4c38] {
@@ -311,8 +309,6 @@ fn the_particle_draw_runs_on_vu1() {
 /// The micro memory a chain loads, to its last instruction (a longer program's tail may follow it in the VU)
 fn program(chain: u32) -> Option<Vec<u8>> {
     let mut r = Runner::from_env()?;
-    // the divide unit rounds to nearest in the game (checking.md F4b3l)
-    r.float_rules = r5900::ps2float::Rules::parse("div=n").unwrap();
     let mut v = Vu1::default();
     v.run_chain(&mut r.mem, chain).ok()?;
     let end = v.micro.chunks(8).rposition(|p| p.iter().any(|b| *b != 0))? + 1;

@@ -1,6 +1,6 @@
 //! VU1 as the game's patch programs use it (rows G7a4b..e): its float and integer registers, its data memory, and
 //! the vector operations with the VU's rounding (each multiply and add rounded as the EE rounds, the largest float
-//! for an overflow, denormals as zero; `div` toward zero; `ftoi` toward zero, saturating). What a program sends to
+//! for an overflow, denormals as zero; `div` to nearest, as the game's VU0 `vdiv` in PCSX2, F4b3n; `ftoi` toward zero, saturating). What a program sends to
 //! the GS (`xgkick`) goes to [`Vu::gs`]. The programs' ports (`patchvu`) are written on these, in the order each
 //! program does its arithmetic, so their results are the same to the bit; they are checked against the game's
 //! programs run in the function runner's VU1.
