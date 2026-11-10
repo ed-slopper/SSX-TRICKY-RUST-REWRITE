@@ -1062,6 +1062,56 @@ panicked in `Twins::of` and `body_of` (from F4h5a/F4h5e); their frames get an em
 Left: the take-off test's `FrameRun` still takes a second rider that takes off in the same frame from its second
 sample (`Other` is ground ticks only).
 
+## F4b3o: rec17's bump pairs: the pair list is the last frame's, bodies pushed while stale (2026-11-10)
+
+Six rec17 bump pairs the replay and the game disagreed on (F4b3j). Two causes, both proven:
+
+**The pair list walked is the one made at the end of the frame before.** `Boarder_UpdateBroadphase` 0x126748 poses
+the body (`CollBody_UpdateFromBones`), fits its box (`CollBody_GetSphereBounds`, rider+0x6e0) and moves it in the
+broadphase (`Broadphase_MoveBox` 0x14fe68 → `Broadphase_MoveBoxOnAxis` 0x14ffc8 per axis →
+`Broadphase_ToggleOverlap` 0x150248), which links or frees a pair node (rider+0x700) at once when the boxes start or
+stop overlapping on all three axes. It runs from `cPostAI::vf1` 0x114730 at the frame's end (also
+`Replay_RefreshRiders` 0x1147f8, `Boarder_PlaceAt` 0x11cae8), and from `Boarder_Translate` 0x1267a0 on every push.
+So a frame's `Boarder_RiderCollisions` 0x123fc8 walks the list as the first sample (end of the frame before) holds
+it, plus what that frame's own pushes change. The test took the second sample's list; now the first
+(TRICKY_LIST=b: the old way). rec17 1871 0–3: no pair at 1871, the pair at 1870 with the bodies 2.25 cm into each
+other: now bumped. Not replayed: list changes from the frame's own pushes (rare: a push moves the box a few cm).
+
+**Stale bodies are not always byte for byte the last sample's.** A body read before `cPostAI::vf1` re-posed it
+(F4h5a) has still been moved by the frame's pushes (`Boarder_Translate` moves the body with the rider): rec17 11131
+r2 is the previous body shifted by (−0.10, 0.73, 0.09) cm, every sphere alike, while the rider moved 42 cm. And
+PINE's read can lag over two samples (rec17 11816 r4 byte for byte, 11817 r4 and r5 one tick behind). The test's
+classifier (`Twins::of`, tests/ground_motion.rs) now also calls a moved rider's body stale when its offset from the
+position (body centre +0x480 − +0x140) is more than 2·e+2 cm from the last fresh sample's offset while the offset of
+the body carried by the step is within e < 3 cm of it (steps over 2 cm only). The guess is the save state's other
+pass (F4h5e), else the next sample's body when that one is stale too, else the mean of the offsets of the fresh
+samples either side placed at the rider's position (STANDIN, as before; TRICKY_LAG=off: byte rule only). Stale
+samples: rec17 2,480 → 2,590, rec16 2,135, rec14 2,228 → 2,421.
+
+| `fadd=g1` | bumps right | ground ticks, every field | pushed ticks, every field |
+|---|---|---|---|
+| rec14 | 242 of 248 (=) | 37,218 (=) | 200 of 346 (341) |
+| rec15 | 126 → 130 of 134 | 37,296 → 37,295 | 215 of 249 (243) |
+| rec16 | 380 → 386 of 390 | 51,674 → 51,686 | 425 → 437 of 571 (562) |
+| rec17 | 454 → 464 of 466 | 71,219 → 71,224 | 803 → 806 of 879 (871) |
+
+rec17 pairs: 11132 1–2, 11006 1–4 and 2204 2–4 (bodies pushed while stale), 11818 1–4 (r4 lagging two samples), 1871
+0–3 (list) now bump as the game does; 10937 1–2 does not. rec15 loses 10327 r2 and 13589 r3, r5: the guessed bodies
+of 10326 r4 and 13588 r3/r5 overlap by 0.03 cm and 1 cm where the game's did not (a guess is not the body), and gains
+13698 r3, r5. Take-off test unchanged (rec11 56/62, rec15 109/110, rec16 228/235, rec17 319/327 whole).
+
+Left:
+- rec17 10937 1–2: both riders wiped out (motion 5); at sample 10936 they are 0.11 cm apart, the game bumps them in
+  10937. The wipe-out motion runs the world collisions (`Boarder_InstanceCollisions` 0x125088, `Boarder_WallCollide`
+  0x126250, each moves the body through `Boarder_Translate`), answered "nothing" in the test (inferred: the walls
+  moved them those 0.11 cm; needs the walls, as F4h5c) (row F4b3p).
+- Hit velocities (`DBG hitvel`, rec17 46 of 358 hit ticks): the pairs fixed above now hit but with a guessed body,
+  so their size is off (row F4h5d). Six are 1 to 4 ulps off with the position right (9990 r1, 11002 r4, 11126 r2,
+  2329, 2332, 2335 r1): `Boarder_RiderCollisions` takes the closing speed from VU0 dot products
+  (`vmul`/`vadday`/`vmaddaz`/`vmaddw`, x+y then +z then +w), subtracts and adds the stats with COP1 `sub.s`/`add.s`
+  (`fadd=g1`) and divides with `div.s`; `hit::pair_speeds` does it in IEEE. Run that part (or `Boarder_RiderHit`
+  0x124920 with its speed) under the runner's rules (row F4b3q).
+
 ## How a row gets to `checked`
 
 1. Port the function (address in its doc comment, AGENTS.md §13).

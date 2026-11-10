@@ -888,7 +888,7 @@ fn body_of(r: &[u8]) -> CollBody {
 #[derive(Clone)]
 struct Frame {
     body: Vec<CollBody>,
-    /// per rider: its body was read stale and placed by [`unstale`]
+    /// per rider: its body was read stale and placed by its guess ([`Twins`])
     stale: Vec<bool>,
     hit: Vec<HitRider>,
     rec: Vec<Vec<[f32; 2]>>,
@@ -899,64 +899,131 @@ struct Frame {
     hits: Vec<usize>,
 }
 
-/// A body read before `cPostAI::vf1` 0x114730 re-posed it (board row F4h5a): its bytes (rider+0x480..0x700) the
-/// previous sample's while the rider moved. `cPostAI::vf1` poses riders 0 to 5 in turn after all have ticked (5 to 0),
-/// so a PINE read that lands inside it finds the last ones still on the previous tick's pose: rec15 1,106 of 53,922
-/// samples, rec16 2,019 of 85,632, rec17 2,489 of 107,760, most of them riders 5 and 4. The body is placed where
-/// the mean of the previous and next samples' sphere offsets from the rider puts it (median 0.19 cm off on fresh
-/// ground samples of rec17, against 1.2 cm for the previous body moved by the step).
-/// When the recording holds the same tick again with a fresh body (a save state loaded: the game replays the same
-/// ticks bit for bit, rec16), that body is taken instead ([`Twins`], F4h5e).
+/// The bodies read before `cPostAI::vf1` 0x114730 re-posed them, and a guess at each (board rows F4h5a, F4b3o).
+/// `cPostAI::vf1` poses riders 0 to 5 in turn after all have ticked (5 to 0), so a PINE read that lands inside it finds
+/// the last ones still on the previous tick's pose, moved only by the pushes of their own frame (`Boarder_Translate`
+/// 0x1267a0): its centre's offset from the rider (rider+0x480 − +0x140) is then the last fresh sample's less the step.
+/// Such a sample is stale when its body is the previous sample's byte for byte while the rider moved (F4h5a), or when
+/// its offset is within 3 cm of the last fresh offset less the step and more than twice that plus 2 cm from the last
+/// fresh offset itself, the step being over 2 cm (F4b3o: rec17 11131 r2, pushed in its frame; 11817 r4 and r5, two
+/// stale samples in a row). TRICKY_LAG=off: the byte for byte ones only.
+///
+/// The guess, in order: the same tick recorded fresh on another pass of a save state (the game replays the same ticks
+/// bit for bit, rec16; F4h5e); the next sample's body when it is stale too (it is this tick's pose, moved by the next
+/// frame's pushes); else each sphere at the rider's position plus the mean of its offsets in the last fresh sample and
+/// the next one (median 0.19 cm off on fresh ground samples of rec17, against 1.2 cm for the previous body moved by
+/// the step), or the one of them there is. TRICKY_TWINS=off: no other pass.
 // STANDIN: a guess at the body PINE missed, for the body `Boarder_UpdateBroadphase` 0x126748 posed from the bones
-fn unstale(body: &mut CollBody, p: &[u8], a: &[u8], b: &[u8], twin: Option<&Vec<u8>>) -> bool {
-    if a.len() < 0x700 || p.len() < 0x700 || b.len() < 0x700 || a[0x480..0x700] != p[0x480..0x700] || a[0x140..0x14c] == p[0x140..0x14c] || b[0x480..0x700] == a[0x480..0x700] {
-        return false;
-    }
-    if let Some(t) = twin {
-        *body = body_of(t);
-        return true;
-    }
-    let (pp, pa, pb) = (vec4(p, 0x140), vec4(a, 0x140), vec4(b, 0x140));
-    let mid = |cp: V4, cb: V4| -> V4 { [((cp[0] - pp[0]) + (cb[0] - pb[0])) / 2.0 + pa[0], ((cp[1] - pp[1]) + (cb[1] - pb[1])) / 2.0 + pa[1], ((cp[2] - pp[2]) + (cb[2] - pb[2])) / 2.0 + pa[2], cp[3]] };
-    let next = body_of(b);
-    body.center = mid(body.center, next.center);
-    for k in 0..18 {
-        body.spheres[k].0 = mid(body.spheres[k].0, next.spheres[k].0);
-    }
-    true
+#[derive(Default)]
+struct Twins {
+    /// the stale samples' guesses by (tick, rider, +0x140..+0x160 and +0x480..+0x490 bytes)
+    guess: std::collections::HashMap<(u32, usize, Vec<u8>), CollBody>,
 }
 
-/// The fresh rider samples of a recording by (tick, rider, the rider's +0x140..+0x160 bytes): a sample whose body
-/// differs from its predecessor's (one tick before) or that has none. Save states make a recording run through the
-/// same ticks again, and the game replays them bit for bit (rec16: the two passes' samples are equal byte for byte
-/// where both are fresh), so a stale body (`unstale`) can be read off the other pass. TRICKY_TWINS=off: none.
-#[derive(Default)]
-struct Twins(std::collections::HashMap<(u32, usize, Vec<u8>), Vec<u8>>);
+fn stale_key(tick: u32, i: usize, r: &[u8]) -> (u32, usize, Vec<u8>) {
+    (tick, i, [&r[0x140..0x160], &r[0x480..0x490]].concat())
+}
 
 impl Twins {
     fn of(ticks: &[recording::Tick]) -> Twins {
-        let mut m = std::collections::HashMap::new();
-        if std::env::var("TRICKY_TWINS").is_ok_and(|v| v == "off") {
-            return Twins(m);
-        }
-        for (k, t) in ticks.iter().enumerate() {
-            for (i, r) in t.riders.iter().enumerate() {
-                let fresh = r.len() >= 0x700 && k > 0 && ticks[k - 1].tick + 1 == t.tick && ticks[k - 1].riders[i][0x480..0x700] != r[0x480..0x700];
-                if fresh {
-                    m.entry((t.tick, i, r[0x140..0x160].to_vec())).or_insert_with(|| r.clone());
+        use std::collections::HashMap;
+        let lag = !std::env::var("TRICKY_LAG").is_ok_and(|v| v == "off");
+        let n = ticks.first().map_or(0, |t| t.riders.len());
+        let near = |k: usize| k > 0 && ticks[k - 1].tick + 1 == ticks[k].tick;
+        let sub3 = |x: V4, y: V4| [x[0] - y[0], x[1] - y[1], x[2] - y[2]];
+        let len = |x: [f32; 3]| (x[0] * x[0] + x[1] * x[1] + x[2] * x[2]).sqrt();
+        // per sample and rider: stale, and the last fresh sample before it in an unbroken run
+        let mut stale = vec![vec![false; n]; ticks.len()];
+        let mut fresh_before = vec![vec![None; n]; ticks.len()];
+        for i in 0..n {
+            let mut last: Option<usize> = None;
+            for k in 0..ticks.len() {
+                let r = &ticks[k].riders[i];
+                if r.len() < 0x700 || !near(k) {
+                    last = (r.len() >= 0x700).then_some(k);
+                    continue;
+                }
+                fresh_before[k][i] = last;
+                let p = &ticks[k - 1].riders[i];
+                let moved = r[0x140..0x14c] != p[0x140..0x14c];
+                let off = sub3(vec4(r, 0x480), vec4(r, 0x140));
+                let step = sub3(vec4(r, 0x140), vec4(p, 0x140));
+                let lagging = lag && last.is_some_and(|l| {
+                    let lr = &ticks[l].riders[i];
+                    let of = sub3(vec4(lr, 0x480), vec4(lr, 0x140));
+                    let ef = len(sub3([off[0], off[1], off[2], 0.0], [of[0], of[1], of[2], 0.0]));
+                    let es = len([off[0] + step[0] - of[0], off[1] + step[1] - of[1], off[2] + step[2] - of[2]]);
+                    len(step) > 2.0 && es < 3.0 && ef > 2.0 * es + 2.0
+                });
+                stale[k][i] = moved && (r[0x480..0x700] == p[0x480..0x700] || lagging);
+                if !stale[k][i] {
+                    last = Some(k);
                 }
             }
         }
-        Twins(m)
+        // the fresh samples by (tick, rider, the rider's +0x140..+0x160 bytes)
+        let mut twin = HashMap::new();
+        if !std::env::var("TRICKY_TWINS").is_ok_and(|v| v == "off") {
+            for (k, t) in ticks.iter().enumerate() {
+                for (i, r) in t.riders.iter().enumerate() {
+                    if r.len() >= 0x700 && near(k) && ticks[k - 1].riders[i][0x480..0x700] != r[0x480..0x700] && !stale[k][i] {
+                        twin.entry((t.tick, i, r[0x140..0x160].to_vec())).or_insert_with(|| r.clone());
+                    }
+                }
+            }
+        }
+        let mut guess = HashMap::new();
+        for (k, t) in ticks.iter().enumerate() {
+            for i in 0..n {
+                if !stale[k][i] {
+                    continue;
+                }
+                let a = &t.riders[i];
+                let next = (k + 1 < ticks.len() && near(k + 1)).then_some(k + 1);
+                let body = if let Some(tw) = twin.get(&(t.tick, i, a[0x140..0x160].to_vec())) {
+                    body_of(tw)
+                } else if let Some(m) = next.filter(|&m| stale[m][i]) {
+                    body_of(&ticks[m].riders[i])
+                } else {
+                    let from: Vec<&Vec<u8>> = [fresh_before[k][i], next].into_iter().flatten().map(|m| &ticks[m].riders[i]).collect();
+                    if from.is_empty() {
+                        continue;
+                    }
+                    let pa = vec4(a, 0x140);
+                    let place = |o: usize| -> V4 {
+                        let mut v = [0.0f32, 0.0, 0.0, f32_at(a, o + 0xc)];
+                        for r in &from {
+                            let (c, q) = (vec4(r, o), vec4(r, 0x140));
+                            for x in 0..3 {
+                                v[x] += c[x] - q[x];
+                            }
+                        }
+                        for x in 0..3 {
+                            v[x] = v[x] / from.len() as f32 + pa[x];
+                        }
+                        v
+                    };
+                    let mut b = body_of(a);
+                    b.center = place(0x480);
+                    for s in 0..18 {
+                        b.spheres[s].0 = place(0x4a0 + 0x20 * s);
+                    }
+                    b
+                };
+                guess.entry(stale_key(t.tick, i, a)).or_insert(body);
+            }
+        }
+        Twins { guess }
     }
 
-    fn get(&self, tick: u32, i: usize, r: &[u8]) -> Option<&Vec<u8>> {
-        self.0.get(&(tick, i, r.get(0x140..0x160)?.to_vec()))
+    /// the guess at `r`'s body when it was read stale
+    fn guess(&self, tick: u32, i: usize, r: &[u8]) -> Option<&CollBody> {
+        (r.len() >= 0x700).then(|| self.guess.get(&stale_key(tick, i, r))).flatten()
     }
 }
 
 impl Frame {
-    /// `p`: the sample before `a`, when there is one (for [`unstale`]; TRICKY_STALE=keep leaves the bodies as read);
+    /// `p`: the sample before `a`, when there is one (for the stale bodies, [`Twins`]; TRICKY_STALE=keep leaves the bodies as read);
     /// `tick`: `a`'s tick
     fn new(p: Option<&[Vec<u8>]>, a: &[Vec<u8>], b: &[Vec<u8>], stats: &[Vec<u8>], twins: &Twins, tick: u32) -> Frame {
         let n = a.len();
@@ -966,8 +1033,9 @@ impl Frame {
             body: (0..n)
                 .map(|i| {
                     let mut body = body_of(&a[i]);
-                    if let Some(p) = p.filter(|_| !keep) {
-                        stale[i] = unstale(&mut body, &p[i], &a[i], &b[i], twins.get(tick, i, &a[i]));
+                    if let Some(g) = twins.guess(tick, i, &a[i]).filter(|_| p.is_some() && !keep) {
+                        body = g.clone();
+                        stale[i] = true;
                     }
                     body
                 })
@@ -1592,10 +1660,11 @@ fn ground_ticks_against_the_running_game() {
                 }
                 f.stat[me] = speed_stat(&stats[me], f32_at(b, 0x130));
                 if pushes {
-                    // the pair list as recorded (`L700`), from the frame's end or (TRICKY_LIST=a) its start; else
-                    // every other rider in slot order
+                    // the pair list as recorded (`L700`), from the frame's start (`Boarder_UpdateBroadphase` 0x126748
+                    // in the last frame's `cPostAI::vf1`) or (TRICKY_LIST=b) its end; else every other rider in slot
+                    // order
                     let how = std::env::var("TRICKY_LIST").unwrap_or_default();
-                    let list = pair_list(&w[(how != "a") as usize], &addrs, me)
+                    let list = pair_list(&w[(how == "b") as usize], &addrs, me)
                         .filter(|_| how != "none")
                         .unwrap_or_else(|| (0..n).filter(|&o| o != me).collect());
                     rider_collisions(me, &list, &mut riders, tick, false, &mut f);
@@ -1706,7 +1775,7 @@ fn ground_ticks_against_the_running_game() {
         eprintln!("  of those, under fadd=g1: not hit {} (position right {}), hit too {} (position right {}, velocity right {hit_vel})", pushed_pos[0][0] + pushed_pos[0][1], pushed_pos[0][1], pushed_pos[1][0] + pushed_pos[1][1], pushed_pos[1][1]);
         eprintln!("  bump records (+0x40 + 0x20·j +8) changed this frame by the game or the replay: {bumps}, the replay's equal to the game's: {bumps_right}");
         eprintln!("  the wipe-out motion's flight predictions (motion 5 at both samples, window 57b0): {}, right from the end of the tick {}, from it less the pushes and hits after the motion {}", wiped[0], wiped[1], wiped[2]);
-        eprintln!("  bodies read before `cPostAI::vf1` re-posed them, placed by `unstale` (TRICKY_STALE=keep: as read): {stale_bodies}");
+        eprintln!("  bodies read before `cPostAI::vf1` re-posed them, placed by a guess (TRICKY_STALE=keep: as read): {stale_bodies}");
         eprintln!("  riders leaving the snow in a replayed frame, their take-off replayed for their pushes and hits (TRICKY_NOLIFT: as recorded): {lifted}");
     }
     for (k, way) in ["ours (ground_motion::update)".to_string()].into_iter().chain(runners.iter().map(|(r, _)| format!("the game's in the runner, {r}"))).enumerate() {
@@ -2086,7 +2155,7 @@ fn takeoff_ticks_against_the_running_game() {
             // the riders that tick before it in the frame push and hit it before its motion (F4h4), each way with
             // the riders around it replayed its own way (F4h5a)
             let others: Vec<Option<Other>> = (0..n).map(|o| (o != i && replay_others).then(|| other_of(&w[0], &w[1], o, &stats[o], addr[o], wins)).flatten()).collect();
-            let lists: Vec<Vec<usize>> = (0..n).map(|o| pair_list(&w[1], &addrs, o).unwrap_or_else(|| (0..n).filter(|&x| x != o).collect())).collect();
+            let lists: Vec<Vec<usize>> = (0..n).map(|o| pair_list(&w[(std::env::var("TRICKY_LIST").as_deref() == Ok("b")) as usize], &addrs, o).unwrap_or_else(|| (0..n).filter(|&x| x != o).collect())).collect();
             let (w0r, w1r, tick) = (&w[0].riders, &w[1].riders, w[1].tick as i32);
             let mut runs: Vec<Option<FrameRun>> = vec![None; ways];
             let mut starts = vec![(rider.p.pos, rider.vel); ways];
