@@ -1035,6 +1035,33 @@ rec15, rec17 unchanged. `hit::rider_hit` unchanged (no port was wrong).
 Left (gap): the ground test does not replay a rider that leaves the snow in the frame (rec16 7325 r4), so its hit on
 rider 1 uses the end-of-tick velocity (after its jump and its own hit): rider 1's velocity there is off (row F4h5g).
 
+## F4h5g: the riders that leave the snow in the frame replayed by the ground test (2026-11-10)
+
+The ground test took a rider that leaves the snow in the frame (motion 2 → 1) from the second sample, so the pushes
+and hits it gives the riders that tick after it used its end-of-tick velocity, which already holds its own hit:
+rec16 7325, rider 4 jumps (`JumpControl_Update` 0x1046b0) and hits rider 1, whose velocity came out off
+(`DBG hitvel tick 7325 rider 1`). Now such a rider (own motion object, one step between the samples) is replayed
+each way as the take-off test runs it (`Lift` in tests/ground_motion.rs): `GroundMotion_Update` 0x10a0d8, then
+`Boarder_TakeOff` 0x128470 when the motion took off, or the speed limit and the jump control when it fires; its
+velocity, position and motion 1 then go into its collisions. The runner gets `lift_world` (`Boarder_SetMotion`
+0x11f610 sets +0x424; `Takeoff_SetSpinRates` 0x126e30, `Score_StartTrickChain` 0x156618 stubbed; `Jump_ApplyImpulse`
+0x1284e0 runs). Not run: the spin state's first update after a take-off from the jump state (F4b3f), which turns only
+the orientation. TRICKY_NOLIFT=1 turns it off.
+
+| `fadd=g1` | pushed ticks, every field (before → after) | hit ticks, velocity right | ground ticks, every field | lifted |
+|---|---|---|---|---|
+| rec14 | 199 → 200 of 341 | | 37,217 → 37,218 | 137 |
+| rec15 | 214 → 215 of 243 | 90 → 91 of 106 | 37,295 → 37,296 | 107 |
+| rec16 | 419 → 425 of 562 | 188 → 194 of 252 | 51,668 → 51,674 | 221 |
+| rec17 | 799 → 803 of 871 | 307 → 311 of 350 | 71,215 → 71,219 | 314 |
+
+Bump records unchanged (rec15 126/134, rec16 380/390, rec17 454/466). The take-off test is not changed (rec11 56/62,
+rec15 109/110, rec16 228/235, rec17 319/327 whole). Also fixed: recordings without the bodies (window 0x600, rec11)
+panicked in `Twins::of` and `body_of` (from F4h5a/F4h5e); their frames get an empty body.
+
+Left: the take-off test's `FrameRun` still takes a second rider that takes off in the same frame from its second
+sample (`Other` is ground ticks only).
+
 ## How a row gets to `checked`
 
 1. Port the function (address in its doc comment, AGENTS.md §13).

@@ -861,6 +861,10 @@ fn rider_of(a: &[u8], st: &[u8], motion: &[u8], anim: &[u8]) -> Rider {
 /// sphere count, +0x30 the spheres, 0x20 each).
 fn body_of(r: &[u8]) -> CollBody {
     let mut b = CollBody::new();
+    // (recordings without the bodies, window under 0x700: an empty body; their frames are not replayed)
+    if r.len() < 0x700 {
+        return b;
+    }
     b.center = vec4(r, 0x480);
     b.radius = f32_at(r, 0x490);
     b.x24 = u32_le(r, 0x494) as i32;
@@ -937,8 +941,8 @@ impl Twins {
         }
         for (k, t) in ticks.iter().enumerate() {
             for (i, r) in t.riders.iter().enumerate() {
-                let fresh = k > 0 && ticks[k - 1].tick + 1 == t.tick && ticks[k - 1].riders[i][0x480..0x700] != r[0x480..0x700];
-                if r.len() >= 0x700 && fresh {
+                let fresh = r.len() >= 0x700 && k > 0 && ticks[k - 1].tick + 1 == t.tick && ticks[k - 1].riders[i][0x480..0x700] != r[0x480..0x700];
+                if fresh {
                     m.entry((t.tick, i, r[0x140..0x160].to_vec())).or_insert_with(|| r.clone());
                 }
             }
@@ -1151,6 +1155,91 @@ fn tick_runner(g: &mut W, x: &Other, pos: V4, vel: V4, a: &[u8], b: &[u8], addr:
     r
 }
 
+/// A rider that leaves the snow in the frame (motion 2 → 1), replayed by the ground test so the pushes and hits it
+/// gives the riders that tick after it use the velocity it has then (board row F4h5g): its ground tick as
+/// `takeoff_ticks_against_the_running_game` runs it, from the first sample with the second's inputs.
+#[derive(Clone, Copy)]
+struct Lift {
+    rider: Rider,
+    hit: Option<Hit>,
+    /// +0x1c8 at the first sample (the crouch the jump measures)
+    crouch0: f32,
+    /// stats+0x17
+    jump_stat: u8,
+    /// +0x1dc at the first sample
+    x1dc: u32,
+}
+
+impl Lift {
+    /// The jump control fires on this tick: state 0xa and the crouch unwound to 0 before the motion.
+    fn jumps(&self) -> bool {
+        self.rider.state == 0xa && self.rider.crouch == 0.0
+    }
+
+    /// Ours: `ground_motion::update`; on a take-off in it `Boarder_TakeOff` 0x128470 (`orient::take_off`), else
+    /// when the jump control fires the speed limit and `JumpControl_Update` 0x1046b0 (`control::jump`). The spin
+    /// state's first update after a take-off from the jump state (F4b3f) turns only the orientation: not run.
+    fn ours(&self, pos: V4, vel: V4, a: &[u8], b: &[u8]) -> Rider {
+        let mut mine = self.rider;
+        (mine.p.pos, mine.vel) = (pos, vel);
+        let mut e = E { log: Vec::new(), hit: self.hit, wall: false, meter: 0.0 };
+        update(&mut mine, &SURFACE_TABLE, &mut e);
+        let mut t = TakeOffRider { state: mine.state, crouch: self.crouch0, x208: mine.crouch };
+        let mut env = OurTakeOff { r: &mut mine, motion: 2, jump_stat: self.jump_stat, off: Off::default(), steep: false };
+        if e.log.contains(&Ev::TakeOff) {
+            take_off(&mut t, &mut env);
+        } else if self.jumps() {
+            env.r.vel = speed_limit(env.r.vel, speed_limit_of(a, b, |x, y| x - y));
+            let mut cr = control::Rider { crouch: env.r.crouch, surface: env.r.p.surface, ..Default::default() };
+            control::jump(&mut OurJump { t, env: &mut env, steer: 0 }, 0, &mut cr);
+        }
+        mine
+    }
+
+    /// The game's in the runner: `GroundMotion_Update` 0x10a0d8, then `Boarder_TakeOff` 0x128470 or the speed limit
+    /// and `JumpControl_Update` 0x1046b0 (the runner as [`lift_world`] sets it up).
+    fn runner(&self, g: &mut W, pos: V4, vel: V4, a: &[u8], b: &[u8]) -> Rider {
+        let mut rider = self.rider;
+        (rider.p.pos, rider.vel) = (pos, vel);
+        *g.hit.borrow_mut() = self.hit;
+        g.wall.set(false);
+        g.log.borrow_mut().clear();
+        g.put(&rider);
+        g.r.mem.write_u32(g.rd + 0x424, 2);
+        g.r.mem.write_f32(g.rd + 0x1c8, self.crouch0);
+        g.r.mem.write_u32(g.rd + 0x1dc, self.x1dc);
+        g.r.mem.write_u8(g.stats + 0x17, self.jump_stat);
+        g.r.cpu.set_gpr(4, g.motion as u64);
+        g.r.call(0x10a0d8).unwrap_or_else(|e| panic!("a take-off's ground tick: {e:?}"));
+        if g.log.borrow().contains(&Ev::TakeOff) {
+            g.r.cpu.set_gpr(4, g.rd as u64);
+            g.r.call(0x128470).unwrap_or_else(|e| panic!("a take-off: {e:?}"));
+        } else if self.jumps() {
+            let v = speed_limit(rv(&mut g.r.mem, g.rd + 0x150), speed_limit_of(a, b, r5900::ps2float::fsub));
+            wv(&mut g.r.mem, g.rd + 0x150, v);
+            // the handler's word 0 is the rider, as the jump control's object's
+            g.r.mem.write_u32(g.pad, 0);
+            g.r.cpu.set_gpr(4, g.handler as u64);
+            g.r.cpu.set_gpr(5, g.pad as u64);
+            g.r.call(0x1046b0).unwrap_or_else(|e| panic!("the jump control: {e:?}"));
+        }
+        g.get(&rider)
+    }
+}
+
+/// What a [`Lift`] needs of the runner beyond `world`: `Boarder_SetMotion` 0x11f610 sets +0x424,
+/// `Takeoff_SetSpinRates` 0x126e30 and `Score_StartTrickChain` 0x156618 answer nothing, `Jump_ApplyImpulse`
+/// 0x1284e0, `JumpControl_Update` 0x1046b0 and `Math_Sin` 0x250d60 run.
+fn lift_world(w: &mut W) {
+    let rd = w.rd;
+    w.r.stub(0x11f610, move |cpu, mem| mem.write_u32(rd + 0x424, cpu.gpr(5) as u32));
+    w.r.stub(0x126e30, |_, _| {});
+    w.r.stub(0x156618, |c, _| c.set_f(0, 0.0));
+    for f in [0x1284e0, 0x1046b0, 0x250d60] {
+        w.r.allow(f);
+    }
+}
+
 impl FrameRun {
     #[allow(clippy::too_many_arguments)]
     fn before(wp: Option<&[Vec<u8>]>, w0: &[Vec<u8>], w1: &[Vec<u8>], stats: &[Vec<u8>], twins: &Twins, order: &[usize], tick: i32, me: usize, others: Vec<Option<Other>>, lists: Vec<Vec<usize>>, t: &mut Ticker) -> (FrameRun, V4, V4) {
@@ -1248,6 +1337,7 @@ fn ground_ticks_against_the_running_game() {
     for rules in ["add=n,mul=n,div=n,cvt=n", "add=n,fadd=g1,mul=n,div=n,cvt=n"] {
         let Some(mut w) = world() else { return };
         w.r.float_rules = Rules::parse(rules).unwrap();
+        lift_world(&mut w);
         runners.push((rules, w));
     }
     let names = [
@@ -1280,6 +1370,8 @@ fn ground_ticks_against_the_running_game() {
     let order: Vec<usize> = std::env::var("TRICKY_ORDER").map(|o| o.split(',').map(|x| x.parse().unwrap()).collect()).unwrap_or((0..n).rev().collect());
     let mut pushed = 0;
     let mut pushed_whole = vec![0usize; 1 + runners.len()];
+    let lifts = std::env::var("TRICKY_NOLIFT").is_err();
+    let mut lifted = 0;
     // pushed ticks under fadd=g1 by whether the rider was also hit (the game's bump record +0x40 + 0x20·j +8 holds
     // the second sample's tick): [hit][position right], and of the hit ones how many have the velocity right
     let mut pushed_pos = [[0usize; 2]; 2];
@@ -1329,8 +1421,27 @@ fn ground_ticks_against_the_running_game() {
         }
         // the riders whose ground tick is replayed, and what each needs
         let mut prep: Vec<Option<Prep>> = (0..n).map(|_| None).collect();
+        // the riders that leave the snow in the frame, replayed for their pushes and hits (F4h5g; TRICKY_NOLIFT: taken
+        // from the second sample), not compared (the take-off test does)
+        let mut lift: Vec<Option<Lift>> = vec![None; n];
         for i in 0..n {
             let (a, b) = (&w[0].riders[i], &w[1].riders[i]);
+            if u32_le(a, 0x424) == 2 && u32_le(b, 0x424) == 1 && lifts {
+                let k = match km6 {
+                    Some(k6) if u32_le(&w[0].extra[km].1[i], 0xc) != addr[i] => k6,
+                    _ => km,
+                };
+                let (ma, mb) = (&w[0].extra[k].1[i], &w[1].extra[k].1[i]);
+                if u32_le(ma, 0xc) == addr[i] && one_step(a, b) {
+                    let (na, nb) = (&w[0].extra[ka].1[i], &w[1].extra[ka].1[i]);
+                    let mut rider = rider_of(a, &stats[i], ma, na);
+                    let after = rider_of(b, &stats[i], mb, nb);
+                    (rider.brake, rider.crouch, rider.steer, rider.p.x244, rider.d1, rider.d2) = (after.brake, after.crouch, after.steer, after.p.x244, after.d1, after.d2);
+                    let kind = u32_le(b, 0x2e0);
+                    let hit = (kind != 3).then(|| Hit { kind, point: vec4(b, 0x2d0), normal: vec4(b, 0x2a0), surface: u32_le(b, 0x290) });
+                    lift[i] = Some(Lift { rider, hit, crouch0: f32_at(a, 0x1c8), jump_stat: stats[i][0x17], x1dc: u32_le(a, 0x1dc) });
+                }
+            }
             if u32_le(a, 0x424) != 2 || u32_le(b, 0x424) != 2 {
                 continue;
             }
@@ -1461,6 +1572,14 @@ fn ground_ticks_against_the_running_game() {
                     riders[me].motion = 2;
                     f.hit[me] = HitRider { heading: r.yaw, pos: r.p.pos, vel: r.vel, normal: r.p.normal, motion: 2, crouch: f32_at(b, 0x1c8) };
                     done[me] = Some((r, 0.0));
+                } else if let Some(l) = lift[me].filter(|_| pushes) {
+                    let (pos, vel) = (riders[me].pos, riders[me].vel);
+                    let r = if k == 0 { l.ours(pos, vel, a, b) } else { l.runner(&mut runners[k - 1].1, pos, vel, a, b) };
+                    riders[me].pos = r.p.pos;
+                    riders[me].vel = r.vel;
+                    riders[me].motion = 1;
+                    f.hit[me] = HitRider { heading: r.yaw, pos: r.p.pos, vel: r.vel, normal: r.p.normal, motion: 1, crouch: f32_at(b, 0x1c8) };
+                    lifted += (k == 0) as usize;
                 } else {
                     if u32_le(a, 0x424) == 1 && u32_le(b, 0x424) == 1 && std::env::var("TRICKY_AIRSTEP").is_ok() {
                         let (p, q) = (vec4(a, 0x140), vec4(b, 0x140));
@@ -1588,6 +1707,7 @@ fn ground_ticks_against_the_running_game() {
         eprintln!("  bump records (+0x40 + 0x20·j +8) changed this frame by the game or the replay: {bumps}, the replay's equal to the game's: {bumps_right}");
         eprintln!("  the wipe-out motion's flight predictions (motion 5 at both samples, window 57b0): {}, right from the end of the tick {}, from it less the pushes and hits after the motion {}", wiped[0], wiped[1], wiped[2]);
         eprintln!("  bodies read before `cPostAI::vf1` re-posed them, placed by `unstale` (TRICKY_STALE=keep: as read): {stale_bodies}");
+        eprintln!("  riders leaving the snow in a replayed frame, their take-off replayed for their pushes and hits (TRICKY_NOLIFT: as recorded): {lifted}");
     }
     for (k, way) in ["ours (ground_motion::update)".to_string()].into_iter().chain(runners.iter().map(|(r, _)| format!("the game's in the runner, {r}"))).enumerate() {
         let line: Vec<String> = written.iter().map(|&f| format!("{} {}", names[f], count[k][f])).collect();
