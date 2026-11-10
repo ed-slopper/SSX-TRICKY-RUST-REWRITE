@@ -21,7 +21,7 @@ use r5900::Runner;
 use tricky_game::ground_motion::{update, CrashRecord, Env, Rider, Stats, WALL_MASK};
 use tricky_game::air::{predict_at_takeoff, Predict, RayHit};
 use tricky_game::collbody::{overlap, CollBody};
-use tricky_game::hit::{rider_hit, HitRider};
+use tricky_game::hit::{rider_hit, HitCall, HitRider};
 use tricky_game::ridercol::{rider_collisions, ColEnv, ColRec, ColRider};
 use tricky_game::jump::{jump_impulse, JumpState};
 use tricky_game::orient::{take_off, TakeOffEnv, TakeOffRider};
@@ -896,6 +896,16 @@ struct Frame {
     stat: Vec<f32>,
     /// COP1's `add.s` for the way (F4b3q): IEEE, or PCSX2's adder under `fadd=g1` ([`adder`])
     add: Add,
+    /// the first sample's tick
+    tick: u32,
+    /// per rider: its state as the frame goes (the first sample's, 2 once a hit stumbles it) and whether a hit
+    /// stumbled it out of the cruise or prewind state (F4b3r: `Boarder_Stumble` 0x124dd0 → `Boarder_SetState` 2 →
+    /// `CruiseControl_Exit` 0x1033c0 / `PrewindControl_Exit` 0x1055a8 → `Boarder_UpdateBoost`(rider, 0, 0): the
+    /// boost level +0x130 is 0 from then on)
+    state: Vec<u32>,
+    stumbled: Vec<bool>,
+    /// per rider: `Boarder_GetSpeedStat` with the boost level 0
+    stat0: Vec<f32>,
     /// per rider: pushes and hits it got this frame
     pushes: Vec<usize>,
     hits: Vec<usize>,
@@ -1047,6 +1057,10 @@ impl Frame {
             rec: b.iter().map(|r| (0..n).map(|j| [f32_at(r, 0x40 + 0x20 * j), f32_at(r, 0x44 + 0x20 * j)]).collect()).collect(),
             stat: (0..n).map(|i| speed_stat(&stats[i], f32_at(&a[i], 0x130), add)).collect(),
             add,
+            tick,
+            state: a.iter().map(|r| u32_le(r, 0x428)).collect(),
+            stumbled: vec![false; n],
+            stat0: (0..n).map(|i| speed_stat(&stats[i], 0.0, add)).collect(),
             pushes: vec![0; n],
             hits: vec![0; n],
         }
@@ -1077,7 +1091,17 @@ impl ColEnv for Frame {
     fn rider_hit(&mut self, speed: f32, to: usize, _: usize, owner: usize, of: usize, dir: V4, vel: &mut V4) -> bool {
         let mut h = self.hit[to];
         h.vel = *vel;
-        let knocked = rider_hit(speed, dir, self.rec[owner][of], false, false, &mut h, &mut Vec::new());
+        let pre = h.vel;
+        let mut calls = Vec::new();
+        let knocked = rider_hit(speed, dir, self.rec[owner][of], false, false, &mut h, &mut calls);
+        if calls.iter().any(|c| matches!(c, HitCall::Stumble { .. })) && matches!(self.state[to], 3 | 0xe) && std::env::var("TRICKY_BOOST").map_or(true, |v| v != "end") {
+            self.state[to] = 2;
+            self.stumbled[to] = true;
+            self.stat[to] = self.stat0[to];
+        }
+        if std::env::var("TRICKY_DBG").is_ok_and(|v| v == "3") {
+            eprintln!("DBG3 tick {} hit to {to} owner {owner} of {of} speed {speed} dir {dir:?} pre {pre:?} post {:?} normal {:?} motion {} stats {:?}", self.tick + 1, h.vel, h.normal, h.motion, self.stat);
+        }
         *vel = h.vel;
         self.hit[to] = h;
         self.hits[to] += 1;
@@ -1106,6 +1130,28 @@ fn hit_rider(r: &[u8]) -> HitRider {
 fn speed_stat(st: &[u8], boost: f32, add: Add) -> f32 {
     let m = st[0x1e] as f32 * add(st[0x12] as f32 * 2.145_779 * 0.003_921_569, 0.795_99);
     add(boost * 7.999_995 * m, m)
+}
+
+/// The boost level (rider+0x130) a rider has when its collisions run (board row F4b3r): its second sample's, unless
+/// that is 0 while its first was boosting and it went from the cruise (3) or prewind (0xe) state to the bump state (2)
+/// in the tick: a stumble in its own collisions. (A state its control leaves zeroes the boost before the collisions.)
+/// `CruiseControl_Update` 0x102fc8 (likewise `PrewindState_Update`, `RailSlideControl_Update`) sets the level each
+/// tick through `Boarder_UpdateBoost` 0x11d038 (1.0, 0x3f19f24e or 0x3e8003b9 by the meter +0x1c, 0 when the boost
+/// button is up), before `Boarder_RiderCollisions`; a hit that stumbles the rider (state 2) then runs
+/// `CruiseControl_Exit` 0x1033c0 → `Boarder_UpdateBoost`(rider, 0, 0), which zeroes it, so the sample holds 0 but the
+/// hit was taken at the boosted speed stat. TRICKY_BOOST=end: the second sample's always, and no stumble tracking
+/// ([`Frame`]'s `stumbled`).
+/// STANDIN: the first sample's level, for the button (computer riders' pad word is not recorded, F4b3k) held as the
+/// tick before and the meter in the same band.
+fn boost_at_collisions(a: &[u8], b: &[u8]) -> f32 {
+    let (sa, sb) = (u32_le(a, 0x428), u32_le(b, 0x428));
+    let (ba, bb) = (f32_at(a, 0x130), f32_at(b, 0x130));
+    let left = matches!(sa, 3 | 0xe) && sb == 2;
+    if bb == 0.0 && ba > 0.0 && left && std::env::var("TRICKY_BOOST").map_or(true, |v| v != "end") {
+        ba
+    } else {
+        bb
+    }
 }
 
 /// A COP1 `add.s`.
@@ -1179,7 +1225,7 @@ struct Other {
 }
 
 /// What a replayed ground tick does to a rider (`Other`) starting at a position and velocity: each way's own.
-type Ticker<'a> = dyn FnMut(usize, &Other, V4, V4) -> Rider + 'a;
+type Ticker<'a> = dyn FnMut(usize, &Other, V4, V4, f32) -> Rider + 'a;
 
 /// Whether the rider moved about one tick's step between the samples (else the samples are not one update apart).
 fn one_step(a: &[u8], b: &[u8]) -> bool {
@@ -1231,11 +1277,11 @@ fn other_of(t0: &recording::Tick, t1: &recording::Tick, i: usize, st: &[u8], add
 }
 
 /// A replayed ground tick, ours: `ground_motion::update`, the speed limit, the control (as the ground test).
-fn tick_ours(x: &Other, pos: V4, vel: V4, a: &[u8], b: &[u8], table: &[u8]) -> Rider {
+fn tick_ours(x: &Other, pos: V4, vel: V4, boost: f32, a: &[u8], b: &[u8], table: &[u8]) -> Rider {
     let mut r = x.rider;
-    (r.p.pos, r.vel) = (pos, vel);
+    (r.p.pos, r.vel, r.boost_level) = (pos, vel, boost);
     update(&mut r, &SURFACE_TABLE, &mut E { log: Vec::new(), hit: x.hit, wall: false, meter: 0.0 });
-    r.vel = speed_limit(r.vel, speed_limit_of(a, b, |x, y| x - y));
+    r.vel = speed_limit(r.vel, speed_limit_at(a, b, boost, |x, y| x - y));
     if let Some(c) = &x.ctl {
         control_ours(&mut r, c, table);
     }
@@ -1244,16 +1290,16 @@ fn tick_ours(x: &Other, pos: V4, vel: V4, a: &[u8], b: &[u8], table: &[u8]) -> R
 
 /// A replayed ground tick, the game's in the runner: `GroundMotion_Update` 0x10a0d8, the speed limit under its
 /// rules, `Boarder_UpdateControl` 0x11c9a0.
-fn tick_runner(g: &mut W, x: &Other, pos: V4, vel: V4, a: &[u8], b: &[u8], addr: u32) -> Rider {
+fn tick_runner(g: &mut W, x: &Other, pos: V4, vel: V4, boost: f32, a: &[u8], b: &[u8], addr: u32) -> Rider {
     let mut rider = x.rider;
-    (rider.p.pos, rider.vel) = (pos, vel);
+    (rider.p.pos, rider.vel, rider.boost_level) = (pos, vel, boost);
     *g.hit.borrow_mut() = x.hit;
     g.wall.set(false);
     g.put(&rider);
     g.r.cpu.set_gpr(4, g.motion as u64);
     g.r.call(0x10a0d8).unwrap_or_else(|e| panic!("another rider's ground tick: {e:?}"));
     let mut r = g.get(&rider);
-    r.vel = speed_limit(r.vel, speed_limit_of(a, b, r5900::ps2float::fsub));
+    r.vel = speed_limit(r.vel, speed_limit_at(a, b, boost, r5900::ps2float::fsub));
     if let Some(c) = &x.ctl {
         g.control(&mut r, c, addr);
     }
@@ -1372,7 +1418,7 @@ impl FrameRun {
         let (f, riders) = (&mut self.f, &mut self.riders);
         let replayed = match (mine, &self.others[o]) {
             (Some((r, motion)), _) => Some((*r, motion)),
-            (None, Some(x)) => Some((t(o, x, riders[o].pos, riders[o].vel), 2)),
+            (None, Some(x)) => Some((t(o, x, riders[o].pos, riders[o].vel, if f.stumbled[o] { 0.0 } else { f32_at(a, 0x130) }), 2)),
             (None, None) => None,
         };
         if let Some((r, motion)) = replayed {
@@ -1389,7 +1435,7 @@ impl FrameRun {
             riders[o].motion = u32_le(b, 0x424);
             f.hit[o] = hit_rider(b);
         }
-        f.stat[o] = speed_stat(&stats[o], f32_at(b, 0x130), f.add);
+        f.stat[o] = if f.stumbled[o] { f.stat0[o] } else { speed_stat(&stats[o], boost_at_collisions(a, b), f.add) };
         rider_collisions(o, &self.lists[o], riders, self.tick, false, f);
     }
 }
@@ -1638,14 +1684,17 @@ fn ground_ticks_against_the_running_game() {
             let mut snap: Vec<Option<(V4, V4)>> = vec![None; n];
             for &me in &order {
                 let (a, b) = (&w[0].riders[me], &w[1].riders[me]);
+                // a rider an earlier one stumbled out of the cruise in this frame ticks with the boost off (F4b3r)
+                let boost = if f.stumbled[me] { 0.0 } else { f32_at(a, 0x130) };
                 if let Some(p) = &prep[me] {
                     let mut rider = p.rider;
                     rider.p.pos = riders[me].pos;
                     rider.vel = riders[me].vel;
+                    rider.boost_level = boost;
                     let r = if k == 0 {
                         let mut mine = rider;
                         update(&mut mine, &SURFACE_TABLE, &mut E { log: Vec::new(), hit: p.hit, wall: false, meter: 0.0 });
-                        mine.vel = speed_limit(mine.vel, speed_limit_of(a, b, |x, y| x - y));
+                        mine.vel = speed_limit(mine.vel, speed_limit_at(a, b, boost, |x, y| x - y));
                         if let Some(c) = &p.ctl {
                             control_ours(&mut mine, c, &table);
                         }
@@ -1659,7 +1708,7 @@ fn ground_ticks_against_the_running_game() {
                         g.r.call(0x10a0d8).unwrap_or_else(|e| panic!("tick {} rider {me}: {e:?}", w[0].tick));
                         let mut r = g.get(&rider);
                         // (the runner's float rules are still set from its call)
-                        r.vel = speed_limit(r.vel, speed_limit_of(a, b, r5900::ps2float::fsub));
+                        r.vel = speed_limit(r.vel, speed_limit_at(a, b, boost, r5900::ps2float::fsub));
                         if let Some(c) = &p.ctl {
                             // ours from the same rider, against the game's under each way's rules
                             let mut mine = r;
@@ -1680,6 +1729,9 @@ fn ground_ticks_against_the_running_game() {
                     riders[me].vel = r.vel;
                     riders[me].motion = 2;
                     f.hit[me] = HitRider { heading: r.yaw, pos: r.p.pos, vel: r.vel, normal: r.p.normal, motion: 2, crouch: f32_at(b, 0x1c8) };
+                    if !f.stumbled[me] {
+                        f.state[me] = r.state;
+                    }
                     done[me] = Some((r, 0.0));
                 } else if let Some(l) = lift[me].filter(|_| pushes) {
                     let (pos, vel) = (riders[me].pos, riders[me].vel);
@@ -1699,7 +1751,7 @@ fn ground_ticks_against_the_running_game() {
                     f.hit[me] = hit_rider(b);
                     snap[me] = Some((riders[me].pos, riders[me].vel));
                 }
-                f.stat[me] = speed_stat(&stats[me], f32_at(b, 0x130), f.add);
+                f.stat[me] = if f.stumbled[me] { f.stat0[me] } else { speed_stat(&stats[me], boost_at_collisions(a, b), f.add) };
                 if pushes {
                     // the pair list as recorded (`L700`), from the frame's start (`Boarder_UpdateBroadphase` 0x126748
                     // in the last frame's `cPostAI::vf1`) or (TRICKY_LIST=b) its end; else every other rider in slot
@@ -1731,6 +1783,8 @@ fn ground_ticks_against_the_running_game() {
                 if let Some((mut r, target)) = done[i] {
                     r.vel = riders[i].vel;
                     r.p.pos = riders[i].pos;
+                    // `Boarder_Stumble` 0x124dd0's `Boarder_SetState`(rider, 2) (F4b3r)
+                    r.state = f.state[i];
                     got[i].push(fields(&r, target));
                 }
             }
@@ -2018,9 +2072,15 @@ fn spin_on_takeoff_tick(r: &mut Rider, s: &SpinIn) -> SpinObj {
 /// the limit +0x1c4 is the larger of that and the last tick's less 3.472222 (COP1 `sub.s`: `sub`). `a` is the rider
 /// at the start of the tick, `b` after the shaping (the timer is moved before the motion).
 fn speed_limit_of(a: &[u8], b: &[u8], sub: fn(f32, f32) -> f32) -> f32 {
+    speed_limit_at(a, b, f32_at(a, 0x130), sub)
+}
+
+/// [`speed_limit_of`] with the boost level as the rider has it after its motion (F4b3r: 0 when a hit earlier in the
+/// frame stumbled it).
+fn speed_limit_at(a: &[u8], b: &[u8], boost: f32, sub: fn(f32, f32) -> f32) -> f32 {
     let target = if f32_at(b, 0x134) > 0.0 {
         f32::from_bits(0x4551338e)
-    } else if f32_at(a, 0x130) > 0.0 {
+    } else if boost > 0.0 {
         let m = f32_at(a, 0x1c);
         match () {
             _ if f32::from_bits(0x3f2a7e78) < m => f32::from_bits(0x4551338e),
@@ -2207,11 +2267,11 @@ fn takeoff_ticks_against_the_running_game() {
             if pushes {
                 for k in 0..ways {
                     let (run, pos, vel) = if k == 0 {
-                        FrameRun::before(wp, w0r, w1r, &stats, &twins, adder(""), &order, tick, i, others.clone(), lists.clone(), &mut |o, x, p, v| tick_ours(x, p, v, &w0r[o], &w1r[o], &table))
+                        FrameRun::before(wp, w0r, w1r, &stats, &twins, adder(""), &order, tick, i, others.clone(), lists.clone(), &mut |o, x, p, v, bo| tick_ours(x, p, v, bo, &w0r[o], &w1r[o], &table))
                     } else {
                         let add = adder(runners[k - 1].0);
                         let g = &mut runners[k - 1].1;
-                        FrameRun::before(wp, w0r, w1r, &stats, &twins, add, &order, tick, i, others.clone(), lists.clone(), &mut |o, x, p, v| tick_runner(g, x, p, v, &w0r[o], &w1r[o], addr[o]))
+                        FrameRun::before(wp, w0r, w1r, &stats, &twins, add, &order, tick, i, others.clone(), lists.clone(), &mut |o, x, p, v, bo| tick_runner(g, x, p, v, bo, &w0r[o], &w1r[o], addr[o]))
                     };
                     starts[k] = (pos, vel);
                     runs[k] = Some(run);
@@ -2308,10 +2368,10 @@ fn takeoff_ticks_against_the_running_game() {
                 if let Some(run) = runs[k].take() {
                     let m = u32_le(b, 0x424);
                     let (pos, vel, np, _) = if k == 0 {
-                        run.after(w0r, w1r, &stats, &order, r, m, &mut |o, x, p, v| tick_ours(x, p, v, &w0r[o], &w1r[o], &table))
+                        run.after(w0r, w1r, &stats, &order, r, m, &mut |o, x, p, v, bo| tick_ours(x, p, v, bo, &w0r[o], &w1r[o], &table))
                     } else {
                         let g = &mut runners[k - 1].1;
-                        run.after(w0r, w1r, &stats, &order, r, m, &mut |o, x, p, v| tick_runner(g, x, p, v, &w0r[o], &w1r[o], addr[o]))
+                        run.after(w0r, w1r, &stats, &order, r, m, &mut |o, x, p, v, bo| tick_runner(g, x, p, v, bo, &w0r[o], &w1r[o], addr[o]))
                     };
                     (r.p.pos, r.vel) = (pos, vel);
                     was_pushed |= np > 0;

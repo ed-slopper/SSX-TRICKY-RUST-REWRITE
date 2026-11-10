@@ -1144,6 +1144,41 @@ Left (row F4b3r): nine hit ticks with the position right, no stale body in the f
 to the bump state (2), so `Boarder_Stumble` 0x124dd0 ran. That is true of any hard ground hit, though, so it isn't a
 lead by itself.
 
+## F4b3r: hit at the boosted speed stat; the stumble turns the boost off (2026-11-10)
+
+All nine hit velocities F4b3q left (rec17 9055 r2, 9808 r1, 9987 r1, 19130 r2, 848 r5, 1439 r5, 2326 r1; rec16 8127
+r1, 5540 r2) had one cause: the speed stat. Every one of those riders was boosting at its first sample (+0x130
+0.250028, 0.601354 or 1.0) and has 0 at its second, and the test took the second sample's level.
+
+Proven (Ghidra): `CruiseControl_Update` 0x102fc8 (and `PrewindState_Update`, `RailSlideControl_Update`) set the
+level each tick through `Boarder_UpdateBoost` 0x11d038: 1.0, 0x3f19f24e or 0x3e8003b9 by the meter +0x1c, or 0 when
+the button is up. `Boarder_RiderCollisions` 0x123fc8 reads both riders' `Boarder_GetSpeedStat` once, before either
+hit (0x1241b0, 0x1241bc; f22 and f21). A hit over 167.31738 stumbles a rider in state 3 or 0xe (`Boarder_Stumble`
+0x124dd0 → `Boarder_SetState` 2), and leaving the cruise runs `CruiseControl_Exit` 0x1033c0 →
+`Boarder_UpdateBoost`(rider, 0, 0), which zeroes +0x130 at once (`PrewindControl_Exit` 0x1055a8 likewise). So:
+
+- the hit itself is taken at the boosted stat (the level before the stumble);
+- a rider stumbled by an earlier rider in the frame (order 5 to 0) then runs its own motion, speed limit and
+  collisions with the boost off, and is in state 2.
+
+In the test (`tests/ground_motion.rs`): `boost_at_collisions` (the first sample's level when the rider went from 3
+or 0xe to 2 with the second sample's at 0; STANDIN for the computer riders' unrecorded pad word: button held as the
+tick before), `Frame` tracks `state`/`stumbled` (set when `rider_hit` stumbles a rider in 3 or 0xe, its speed stat
+then the unboosted `stat0`), the replayed ticks (`tick_ours`, `tick_runner`, the ground loop) take boost 0 and
+`speed_limit_at` with it when stumbled, and the compared state is 2. TRICKY_BOOST=end: all of it off.
+
+| `fadd=g1` | hit ticks, velocity right | pushed ticks, every field | ground ticks, every field | state |
+|---|---|---|---|---|
+| rec14 | 114 → 115 of 141 | 201 → 213 of 346 | 37,219 → 37,231 | 37,586 → 37,602 |
+| rec15 | 91 of 108 (=) | 215 → 221 of 249 | 37,295 → 37,301 | 37,388 → 37,395 |
+| rec16 | 194 → 199 of 257 | 437 → 449 of 571 | 51,686 → 51,698 | 51,968 → 51,987 |
+| rec17 | 318 → 328 of 358 | 812 → 832 of 879 | 71,230 → 71,250 | 71,472 → 71,496 |
+
+Take-offs and bumps unchanged. Every hit tick with the position right now has the velocity right in rec15, rec16 and
+rec17. rec14 has two left (row F4b3s): 6925 r1 (state 4, hit by rider 5 in the wipe-out motion 5, state 0x13) and
+8005 r4 (a shove: +0x4c records 8005; rec14 has no clip windows, so the shove's clip type 0x15 can't be replayed).
+`DBG3` (TRICKY_DBG=3) prints every hit the replay makes.
+
 ## How a row gets to `checked`
 
 1. Port the function (address in its doc comment, AGENTS.md §13).
