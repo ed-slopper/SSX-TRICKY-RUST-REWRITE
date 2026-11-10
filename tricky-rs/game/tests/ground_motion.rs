@@ -1249,6 +1249,13 @@ fn ground_ticks_against_the_running_game() {
     let mut hit_vel = 0;
     // the replayed frame's bumps against the game's records (pairs whose record either side changed this frame)
     let (mut bumps, mut bumps_right) = (0, 0);
+    // The wipe-out motion's flight predictions (F4h5b): `Boarder_UpdateMotion` 0x11c770's motion 5 re-makes the
+    // prediction (`AirPredict_AtTakeoff` 0x123b10 at rider+0x57b0, window `57b0:64`) from the rider as
+    // `Ragdoll_Step` left it, and the rider's collisions after it (its own, 0x117cd4, and those of the riders that tick
+    // after it) still push it: [made, from the end of the tick, from the end less the pushes after its motion]. A
+    // prediction made has +0x4c 0 and +8 = +0x44 (`AirPredict_ClearLandTime` on a touch zeroes only +0x44)
+    let kp = ticks[0].extra.iter().position(|(o, _)| *o == 0x57b0);
+    let mut wiped = [0usize; 3];
     let mut stale_bodies = 0;
     struct Prep {
         rider: Rider,
@@ -1370,6 +1377,8 @@ fn ground_ticks_against_the_running_game() {
             stale_bodies += if k > 0 { 0 } else { f.stale.iter().filter(|x| **x).count() };
             let mut riders: Vec<ColRider> = w[0].riders.iter().map(|r| col_rider(r, n)).collect();
             let mut done: Vec<Option<(Rider, f32)>> = vec![None; n];
+            // where the riders not replayed were before their collisions (position, velocity)
+            let mut snap: Vec<Option<(V4, V4)>> = vec![None; n];
             for &me in &order {
                 let (a, b) = (&w[0].riders[me], &w[1].riders[me]);
                 if let Some(p) = &prep[me] {
@@ -1423,6 +1432,7 @@ fn ground_ticks_against_the_running_game() {
                     riders[me].vel = vec4(b, 0x150);
                     riders[me].motion = u32_le(b, 0x424);
                     f.hit[me] = hit_rider(b);
+                    snap[me] = Some((riders[me].pos, riders[me].vel));
                 }
                 f.stat[me] = speed_stat(&stats[me], f32_at(b, 0x130));
                 if pushes {
@@ -1456,6 +1466,29 @@ fn ground_ticks_against_the_running_game() {
                     r.vel = riders[i].vel;
                     r.p.pos = riders[i].pos;
                     got[i].push(fields(&r, target));
+                }
+            }
+            if let (0, true, Some(kp)) = (k, pushes, kp) {
+                for i in 0..n {
+                    let (a, b, ra, rb) = (&w[0].riders[i], &w[1].riders[i], &w[0].extra[kp].1[i], &w[1].extra[kp].1[i]);
+                    let Some((p0, v0)) = snap[i] else { continue };
+                    if u32_le(a, 0x424) != 5 || u32_le(b, 0x424) != 5 || f32_at(rb, 0x4c) != 0.0 || ra == rb || u32_le(rb, 8) != u32_le(rb, 0x44) {
+                        continue;
+                    }
+                    let right = |pr: &Predict| {
+                        pr.t_top.to_bits() == u32_le(rb, 0x48)
+                            && (u32_le(rb, 0x40) == 0xffff_ffff || (pr.word == u32_le(rb, 0x40) && pr.point == vec4(rb, 0x10)))
+                    };
+                    let (pos, vel, normal) = (vec4(b, 0x140), vec4(b, 0x150), vec4(b, 0x2a0));
+                    let (dp, dv) = (sub4(riders[i].pos, p0), sub4(riders[i].vel, v0));
+                    let end = right(&predict_like(pos, vel, normal, rb));
+                    let before = right(&predict_like(sub4(pos, dp), sub4(vel, dv), normal, rb));
+                    wiped[0] += 1;
+                    wiped[1] += end as usize;
+                    wiped[2] += before as usize;
+                    if std::env::var("TRICKY_DBG").is_ok() {
+                        eprintln!("DBG wiped prediction tick {tick} rider {i}: from the end {end}, less the pushes {dp:?} and hits {dv:?}: {before}");
+                    }
                 }
             }
             if k == runners.len() {
@@ -1516,6 +1549,7 @@ fn ground_ticks_against_the_running_game() {
         eprintln!("  pushed apart by another rider in the frame (order {order:?}): {pushed}; every field right: {pushed_whole:?}");
         eprintln!("  of those, under fadd=g1: not hit {} (position right {}), hit too {} (position right {}, velocity right {hit_vel})", pushed_pos[0][0] + pushed_pos[0][1], pushed_pos[0][1], pushed_pos[1][0] + pushed_pos[1][1], pushed_pos[1][1]);
         eprintln!("  bump records (+0x40 + 0x20·j +8) changed this frame by the game or the replay: {bumps}, the replay's equal to the game's: {bumps_right}");
+        eprintln!("  the wipe-out motion's flight predictions (motion 5 at both samples, window 57b0): {}, right from the end of the tick {}, from it less the pushes and hits after the motion {}", wiped[0], wiped[1], wiped[2]);
         eprintln!("  bodies read before `cPostAI::vf1` re-posed them, placed by `unstale` (TRICKY_STALE=keep: as read): {stale_bodies}");
     }
     for (k, way) in ["ours (ground_motion::update)".to_string()].into_iter().chain(runners.iter().map(|(r, _)| format!("the game's in the runner, {r}"))).enumerate() {

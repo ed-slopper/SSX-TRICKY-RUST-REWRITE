@@ -183,6 +183,10 @@ in the ground motion) calls `Boarder_SetMotion`(1), whose `AirMotion_Enter` 0x10
 `Jump_ApplyImpulse`(0): out of the jump state (0xa) with the crouch it has, else after +0x1c8 = +0x208 (no strength,
 so only a steep lip changes the velocity, halving it and more). `JumpControl_Update` 0x1046b0 jumps first and predicts
 after. Riders pushed apart later in the tick (`Boarder_RiderCollisions`) move the rider after the prediction too.
+The wipe-out motion (`Boarder_UpdateMotion` 0x11c770, motion 5) predicts again while it tumbles (`AirPredict_AtTakeoff`
+on the curled clip 0x2df, row F4h5b): from the rider as `Ragdoll_Step` placed it, which moves +0x140 but not the
+collision body, so the rider's own collisions later in its tick can still find the overlap the earlier riders'
+pushes left and push it after the prediction (rec16 6765 r0, proven against the replayed pushes).
 
 `AirMotion_Update` 0x108378 (`air_motion::update`, the calls other rows' work through `AirEnv`):
 - the flight step (dt = +0x12c / 60, no substeps), `AirPredict_Tick`, the surface from the prediction's (+0x57f0;

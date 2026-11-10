@@ -953,6 +953,40 @@ Left (gaps):
 - The recorder could re-read a rider whose body is the previous sample's, so `unstale`'s guess can go (row F4h5d,
   needs PCSX2).
 
+## F4h5b: the wipe-out motion's flight predictions; the early recorder's late windows (2026-11-10)
+
+The wipe-out motion (`Boarder_UpdateMotion` 0x11c770, motion 5, tumbling) makes the flight prediction again
+(`AirPredict_AtTakeoff` 0x123b10 on the curled clip 0x2df, else `AirPredict_Tick`) right after `Ragdoll_Step` and
+`Ragdoll_GroundProbe`; nothing after it in the motion writes the rider's position +0x140 or velocity +0x150
+(proven, decompiled). The flight test predicts from the rider at the end of the tick, so it misses when something
+later in the frame moves the rider: its own `Boarder_RiderCollisions` (0x117cd4) and those of the riders that tick
+after it.
+
+- rec16 6765 r0 (motion 5, state 0x13) was 4.26 cm off. Rider 1 (ground, ticking before it) bumped it this frame;
+  in rider 0's own call the bodies still overlap (`Ragdoll_Step` sets +0x140 but leaves the collision body where
+  `cPostAI::vf1` posed it, so the overlap between sphere 1 of rider 0 and sphere 10 of rider 1, −8.18 cm at
+  the end of 6764, is pushed apart once more), and rider 0 is moved by −0.55·v after its prediction.
+  `ground_ticks_against_the_running_game` now records, for every rider it does not replay, where it was before its
+  collisions, and for a wipe-out prediction made this tick (+0x4c 0 and +8 = +0x44; `AirPredict_ClearLandTime` on a
+  touch zeroes +0x44 only) predicts again (`predict_like`) from the end of the tick less the replayed pushes and hits
+  after its motion: rec16 5 of 5 right (3 from the end of the tick alone; 6765 needs the push of
+  (−3.45, 2.50, −0.45) cm). rec15 and rec17 have none.
+- rec4 (recorded before F4b3g, which waits for every rider's tick: no `5900` window) read a sample as soon as the
+  race tick moved, while the riders were ticking: a rider's block and its windows may then straddle the rider's
+  tick. 13 of its 16 landings off our flight were made from the **next** sample's rider (18401 r2 is the wipe-out
+  one: it recovers at 18402, motion 5 → 1, and the window holds 18402's prediction, 0.006 cm off in a float64
+  replica). The flight test tries the next sample's rider (and before its jump, `unjump`) on early recordings.
+
+| recording | flight landings off our flight before → after | wipe-out predictions right (ground test) |
+|---|---|---|
+| rec4 | 16 → 3 of 33 | – (no bodies) |
+| rec16 | 10 (6765 r0 ×2 now explained) | 5 of 5 |
+
+Left (gaps):
+- rec4 20163 r0 (next sample 0.48 cm off), 20697 r2 (state 0xa → 0x10, 23 cm from the next sample), 21542 r2 (its
+  sample repeats the one before, the recorder fell behind): early-recorder samples, not explained (row F4h5f).
+- The flight test still counts 6765 r0 as off; the ground test explains it (the flight test has no frame replay).
+
 ## How a row gets to `checked`
 
 1. Port the function (address in its doc comment, AGENTS.md §13).
