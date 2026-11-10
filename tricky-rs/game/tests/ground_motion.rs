@@ -31,6 +31,7 @@ use tricky_game::surface::SURFACE_TABLE;
 use tricky_game::animctl;
 use tricky_game::control::{self, Bump, ControlEnv, LandNormal};
 use tricky_game::orient::{update_orientation, Orient};
+use tricky_game::pose::{board_frame, PoseIn};
 use tricky_game::spin::{spin_enter, spin_update, AlignRider, Anim, SpinCall, SpinEnterRider, SpinObj, SpinRider};
 use tricky_game::jump::{takeoff_spin_rates, TakeoffState};
 
@@ -906,6 +907,10 @@ struct Frame {
     stumbled: Vec<bool>,
     /// per rider: `Boarder_GetSpeedStat` with the boost level 0
     stat0: Vec<f32>,
+    /// per rider: the type of its layer-1 clip (`AnimCtl_GetClipType`(rider+0x46c0, 1): the second sample's clip,
+    /// window `46c0`) and whether it is between the clip's flags 1 and 2 (F4b3s, the shove)
+    clip1: Vec<u32>,
+    shoving: Vec<bool>,
     /// per rider: pushes and hits it got this frame
     pushes: Vec<usize>,
     hits: Vec<usize>,
@@ -1037,8 +1042,29 @@ impl Twins {
 impl Frame {
     /// `p`: the sample before `a`, when there is one (for the stale bodies, [`Twins`]; TRICKY_STALE=keep leaves the bodies as read);
     /// `tick`: `a`'s tick
-    fn new(p: Option<&[Vec<u8>]>, a: &[Vec<u8>], b: &[Vec<u8>], stats: &[Vec<u8>], twins: &Twins, tick: u32, add: Add) -> Frame {
+    #[allow(clippy::too_many_arguments)]
+    fn new(p: Option<&[Vec<u8>]>, a: &[Vec<u8>], b: &[Vec<u8>], stats: &[Vec<u8>], twins: &Twins, tick: u32, add: Add, clips: Option<(&[Vec<u8>], &[u8])>) -> Frame {
         let n = a.len();
+        let shoves = std::env::var("TRICKY_SHOVE").map_or(true, |v| v != "off");
+        // STANDIN: the clip's flags 1 and 2 (bits of the layer-1 clip record's byte +0x74, not recorded), for the game's
+        // answer: the rider shoved someone this tick (its record of them +0x4c is the tick and its hit count +0x5a
+        // went up: `Boarder_RiderCollisions` 0x123fc8 adds one to the shover's count only)
+        let shoving = (0..n)
+            .map(|i| {
+                (0..n).any(|j| {
+                    j != i && u32_le(&b[i], 0x4c + 0x20 * j) == tick + 1 && u16::from_le_bytes([b[i][0x5a + 0x20 * j], b[i][0x5b + 0x20 * j]]) != u16::from_le_bytes([a[i][0x5a + 0x20 * j], a[i][0x5b + 0x20 * j]])
+                })
+            })
+            .collect();
+        let clip1 = (0..n)
+            .map(|i| match clips.filter(|_| shoves) {
+                Some((c, table)) => match u32_le(&c[i], 0xc) {
+                    animctl::NONE => 8,
+                    c => u32_le(table, c as usize * 0x1c),
+                },
+                None => 0,
+            })
+            .collect();
         let keep = std::env::var("TRICKY_STALE").is_ok_and(|v| v == "keep");
         let mut stale = vec![false; n];
         Frame {
@@ -1061,6 +1087,8 @@ impl Frame {
             state: a.iter().map(|r| u32_le(r, 0x428)).collect(),
             stumbled: vec![false; n],
             stat0: (0..n).map(|i| speed_stat(&stats[i], 0.0, add)).collect(),
+            clip1,
+            shoving,
             pushes: vec![0; n],
             hits: vec![0; n],
         }
@@ -1112,11 +1140,12 @@ impl ColEnv for Frame {
     fn crash_meter(&mut self, _: usize) {}
     fn rand_game(&mut self) {}
     fn collision_sound(&mut self, _: usize, _: usize) {}
-    fn clip_type1(&mut self, _: usize) -> u32 {
-        0
+    fn clip_type1(&mut self, r: usize) -> u32 {
+        self.clip1[r]
     }
-    fn clip_flag(&mut self, _: usize, _: u32) -> bool {
-        false
+    /// flag 1 (between the shove's markers) and flag 2 (past it): see `shoving`
+    fn clip_flag(&mut self, r: usize, flag: u32) -> bool {
+        flag == 1 && self.shoving[r]
     }
 }
 
@@ -1183,14 +1212,44 @@ fn pcsx2_add(a: f32, b: f32) -> f32 {
 
 /// The driver's view of a recorded rider: position, velocity, motion and its records of the others (+0x40 + 0x20·j:
 /// +8 the last bump's tick, +0xc the last shove's, +0x1a the hits).
-fn col_rider(r: &[u8], n: usize) -> ColRider {
+fn col_rider(r: &[u8], n: usize, st: &[u8]) -> ColRider {
+    let [fwd, side, up, at] = frame_of(r, st);
     ColRider {
         pos: vec4(r, 0x140),
         vel: vec4(r, 0x150),
         motion: u32_le(r, 0x424),
+        heading: f32_at(r, 0x1e0),
+        fwd,
+        side,
+        up,
+        at,
+        stability: st[0x12],
         rec: (0..n).map(|j| ColRec { bump: u32_le(r, 0x48 + 0x20 * j) as i32, shove: u32_le(r, 0x4c + 0x20 * j) as i32, hits: u16::from_le_bytes([r[0x5a + 0x20 * j], r[0x5b + 0x20 * j]]) }).collect(),
         ..Default::default()
     }
+}
+
+/// The rider's frame (+0x4aa0..+0x4ae0) as `Boarder_UpdatePose` 0x129628 built it in `cPostAI::vf1` 0x114730 after the
+/// last tick (the sample's attitude, steer, position, height and lean: [`board_frame`]); the shove measures its reach
+/// in it (F4b3s).
+// STANDIN: the pivot bone's height (rider + +0x44d8 × 0x394 + 0x8d0, not recorded) as 0: it only counts with a spin
+// or a flip (+0x1d0, +0x1d4), which riders on the snow don't have
+fn frame_of(r: &[u8], st: &[u8]) -> [V4; 4] {
+    board_frame(&PoseIn {
+        quat: vec4(r, 0x170),
+        steer: f32_at(r, 0x214),
+        motion: u32_le(r, 0x424),
+        class: u32_le(r, 0x420),
+        pos: vec4(r, 0x140),
+        up: vec4(r, 0x2c0),
+        height: f32_at(r, 0x308),
+        side: vec4(r, 0x330),
+        lean: f32_at(r, 0x244),
+        lean_scale: f32_at(st, 0x60),
+        spin: f32_at(r, 0x1d0),
+        flip: f32_at(r, 0x1d4),
+        pivot_z: 0.0,
+    })
 }
 
 /// One frame's rider collisions (`Boarder_RiderCollisions` 0x123fc8 at 0x117cd4, after the motion, the speed limit
@@ -1393,9 +1452,9 @@ fn lift_world(w: &mut W) {
 
 impl FrameRun {
     #[allow(clippy::too_many_arguments)]
-    fn before(wp: Option<&[Vec<u8>]>, w0: &[Vec<u8>], w1: &[Vec<u8>], stats: &[Vec<u8>], twins: &Twins, add: Add, order: &[usize], tick: i32, me: usize, others: Vec<Option<Other>>, lists: Vec<Vec<usize>>, t: &mut Ticker) -> (FrameRun, V4, V4) {
+    fn before(wp: Option<&[Vec<u8>]>, w0: &[Vec<u8>], w1: &[Vec<u8>], stats: &[Vec<u8>], twins: &Twins, add: Add, clips: Option<(&[Vec<u8>], &[u8])>, order: &[usize], tick: i32, me: usize, others: Vec<Option<Other>>, lists: Vec<Vec<usize>>, t: &mut Ticker) -> (FrameRun, V4, V4) {
         let n = w0.len();
-        let mut run = FrameRun { f: Frame::new(wp, w0, w1, stats, twins, tick as u32 - 1, add), riders: w0.iter().map(|x| col_rider(x, n)).collect(), others, lists, me, at: 0, tick };
+        let mut run = FrameRun { f: Frame::new(wp, w0, w1, stats, twins, tick as u32 - 1, add, clips), riders: w0.iter().enumerate().map(|(i, x)| col_rider(x, n, &stats[i])).collect(), others, lists, me, at: 0, tick };
         while order[run.at] != me {
             run.step(w0, w1, stats, order[run.at], None, t);
             run.at += 1;
@@ -1529,6 +1588,7 @@ fn ground_ticks_against_the_running_game() {
     let mut hit_vel = 0;
     // the replayed frame's bumps against the game's records (pairs whose record either side changed this frame)
     let (mut bumps, mut bumps_right) = (0, 0);
+    let (mut shoves, mut shoves_right) = (0, 0);
     // The wipe-out motion's flight predictions (F4h5b): `Boarder_UpdateMotion` 0x11c770's motion 5 re-makes the
     // prediction (`AirPredict_AtTakeoff` 0x123b10 at rider+0x57b0, window `57b0:64`) from the rider as
     // `Ragdoll_Step` left it, and the rider's collisions after it (its own, 0x117cd4, and those of the riders that tick
@@ -1672,13 +1732,27 @@ fn ground_ticks_against_the_running_game() {
         let mut frame_pushes = vec![0usize; n];
         let mut frame_hits = vec![0usize; n];
         let mut frame_stale = vec![false; n];
-        for k in 0..1 + runners.len() {
-            let mut f = Frame::new((wi > 0 && ticks[wi - 1].tick + 1 == w[0].tick).then(|| &ticks[wi - 1].riders[..]), &w[0].riders, &w[1].riders, &stats, &twins, w[0].tick, if k == 0 { adder("") } else { adder(runners[k - 1].0) });
-            stale_bodies += if k > 0 { 0 } else { f.stale.iter().filter(|x| **x).count() };
-            if k == 0 {
+        // The riders not replayed tick with the second sample's velocity, which already holds the hits they took
+        // later in the frame (F4b3s: rec14 6925, rider 5 wiped out, hitting rider 1 with them). Trial passes find
+        // those hits (`fix`, the velocity they gained from their own collisions to the frame's end) and run the
+        // frame again with them taken off, until they no longer change (at most TRICKY_PREHIT passes, 8; off: none).
+        // A rider whose hit comes and goes from pass to pass (rec16 6907, rider 5 shoved: without the shove's 444
+        // cm/s its shover's closing speed is too low to shove) keeps the second sample's velocity.
+        // STANDIN: the second sample less our hits, for the velocity the game's motion left them (not recorded)
+        let mut fix = vec![[0f32; 4]; n];
+        let mut flips = vec![false; n];
+        let trials: usize = std::env::var("TRICKY_PREHIT").map_or(8, |v| if v == "off" { 0 } else { v.parse().unwrap() });
+        let mut trial = trials > 0;
+        let mut passes = 0;
+        let mut step = 0;
+        while step < 1 + runners.len() {
+            let k = step;
+            let mut f = Frame::new((wi > 0 && ticks[wi - 1].tick + 1 == w[0].tick).then(|| &ticks[wi - 1].riders[..]), &w[0].riders, &w[1].riders, &stats, &twins, w[0].tick, if k == 0 { adder("") } else { adder(runners[k - 1].0) }, Some((&w[1].extra[ka].1[..], &table[..])));
+            stale_bodies += if k > 0 || trial { 0 } else { f.stale.iter().filter(|x| **x).count() };
+            if k == 0 && !trial {
                 frame_stale = f.stale.clone();
             }
-            let mut riders: Vec<ColRider> = w[0].riders.iter().map(|r| col_rider(r, n)).collect();
+            let mut riders: Vec<ColRider> = w[0].riders.iter().enumerate().map(|(i, r)| col_rider(r, n, &stats[i])).collect();
             let mut done: Vec<Option<(Rider, f32)>> = vec![None; n];
             // where the riders not replayed were before their collisions (position, velocity)
             let mut snap: Vec<Option<(V4, V4)>> = vec![None; n];
@@ -1740,15 +1814,15 @@ fn ground_ticks_against_the_running_game() {
                     riders[me].vel = r.vel;
                     riders[me].motion = 1;
                     f.hit[me] = HitRider { heading: r.yaw, pos: r.p.pos, vel: r.vel, normal: r.p.normal, motion: 1, crouch: f32_at(b, 0x1c8) };
-                    lifted += (k == 0) as usize;
+                    lifted += (k == 0 && !trial) as usize;
                 } else {
                     if u32_le(a, 0x424) == 1 && u32_le(b, 0x424) == 1 && std::env::var("TRICKY_AIRSTEP").is_ok() {
                         let (p, q) = (vec4(a, 0x140), vec4(b, 0x140));
                         f.body[me].translate([q[0] - p[0], q[1] - p[1], q[2] - p[2], q[3] - p[3]]);
                     }
-                    riders[me].vel = vec4(b, 0x150);
+                    riders[me].vel = sub4(vec4(b, 0x150), fix[me]);
                     riders[me].motion = u32_le(b, 0x424);
-                    f.hit[me] = hit_rider(b);
+                    f.hit[me] = HitRider { vel: riders[me].vel, ..hit_rider(b) };
                     snap[me] = Some((riders[me].pos, riders[me].vel));
                 }
                 f.stat[me] = if f.stumbled[me] { f.stat0[me] } else { speed_stat(&stats[me], boost_at_collisions(a, b), f.add) };
@@ -1779,6 +1853,26 @@ fn ground_ticks_against_the_running_game() {
                     }
                 }
             }
+            if trial {
+                let mut changed = false;
+                for i in 0..n {
+                    let Some((_, v0)) = snap[i] else { continue };
+                    let new = sub4(riders[i].vel, v0);
+                    if flips[i] || new == fix[i] {
+                        continue;
+                    }
+                    flips[i] = passes > 0 && (new == [0.0; 4]) != (fix[i] == [0.0; 4]);
+                    fix[i] = if flips[i] { [0.0; 4] } else { new };
+                    changed = true;
+                    if std::env::var("TRICKY_DBG").is_ok() {
+                        eprintln!("DBG prehit tick {tick} rider {i}: {new:?}, comes and goes {}", flips[i]);
+                    }
+                }
+                passes += 1;
+                trial = changed && passes < trials;
+                continue;
+            }
+            step += 1;
             for i in 0..n {
                 if let Some((mut r, target)) = done[i] {
                     r.vel = riders[i].vel;
@@ -1817,6 +1911,21 @@ fn ground_ticks_against_the_running_game() {
                 for i in 0..n {
                     for j in (0..n).filter(|&j| j != i) {
                         let (was, game) = (u32_le(&w[0].riders[i], 0x48 + 0x20 * j) as i32, u32_le(&w[1].riders[i], 0x48 + 0x20 * j) as i32);
+                        let (swas, sgame) = (u32_le(&w[0].riders[i], 0x4c + 0x20 * j) as i32, u32_le(&w[1].riders[i], 0x4c + 0x20 * j) as i32);
+                        if riders[i].rec[j].shove != swas || sgame != swas {
+                            shoves += 1;
+                            shoves_right += (riders[i].rec[j].shove == sgame) as usize;
+                            if riders[i].rec[j].shove != sgame && std::env::var("TRICKY_DBG").is_ok() {
+                                // the shove's reach from the first sample's frame (`frame_of`)
+                                eprintln!("DBG shove tick {tick} {i}->{j}: was {swas} game {sgame} ours {} clip types {} {}", riders[i].rec[j].shove, f.clip1[i], f.clip1[j]);
+                                let (m, o) = (col_rider(&w[0].riders[i], n, &stats[i]), col_rider(&w[0].riders[j], n, &stats[j]));
+                                let d = [o.at[0] - m.at[0], o.at[1] - m.at[1], o.at[2] - m.at[2], o.at[3] - m.at[3]];
+                                let dt = |x: V4, y: V4| x[0] * y[0] + x[1] * y[1] + x[2] * y[2] + x[3] * y[3];
+                                let h = dt(d, m.up);
+                                let lat = [d[0] - m.up[0] * h, d[1] - m.up[1] * h, d[2] - m.up[2] * h];
+                                eprintln!("    h {h} lat {} bearing {} heading {} shoving {} motions {} {} stat {} {}", (lat[0] * lat[0] + lat[1] * lat[1] + lat[2] * lat[2]).sqrt(), -(dt(d, m.fwd)).atan2(dt(d, m.side)), m.heading, f.shoving[i], m.motion, o.motion, f.stat[i], f.stat[j]);
+                            }
+                        }
                         if riders[i].rec[j].bump != was || game != was {
                             bumps += 1;
                             bumps_right += (riders[i].rec[j].bump == game) as usize;
@@ -1873,6 +1982,7 @@ fn ground_ticks_against_the_running_game() {
         eprintln!("  pushed apart by another rider in the frame (order {order:?}): {pushed}; every field right: {pushed_whole:?}");
         eprintln!("  of those, under fadd=g1: not hit {} (position right {}), hit too {} (position right {}, velocity right {hit_vel})", pushed_pos[0][0] + pushed_pos[0][1], pushed_pos[0][1], pushed_pos[1][0] + pushed_pos[1][1], pushed_pos[1][1]);
         eprintln!("  bump records (+0x40 + 0x20·j +8) changed this frame by the game or the replay: {bumps}, the replay's equal to the game's: {bumps_right}");
+        eprintln!("  shove records (+0x40 + 0x20·j +0xc) changed this frame by the game or the replay: {shoves}, the replay's equal to the game's: {shoves_right}");
         eprintln!("  the wipe-out motion's flight predictions (motion 5 at both samples, window 57b0): {}, right from the end of the tick {}, from it less the pushes and hits after the motion {}", wiped[0], wiped[1], wiped[2]);
         eprintln!("  bodies read before `cPostAI::vf1` re-posed them, placed by a guess (TRICKY_STALE=keep: as read): {stale_bodies}");
         eprintln!("  riders leaving the snow in a replayed frame, their take-off replayed for their pushes and hits (TRICKY_NOLIFT: as recorded): {lifted}");
@@ -2267,11 +2377,11 @@ fn takeoff_ticks_against_the_running_game() {
             if pushes {
                 for k in 0..ways {
                     let (run, pos, vel) = if k == 0 {
-                        FrameRun::before(wp, w0r, w1r, &stats, &twins, adder(""), &order, tick, i, others.clone(), lists.clone(), &mut |o, x, p, v, bo| tick_ours(x, p, v, bo, &w0r[o], &w1r[o], &table))
+                        FrameRun::before(wp, w0r, w1r, &stats, &twins, adder(""), Some((&w[1].extra[ka].1[..], &table[..])), &order, tick, i, others.clone(), lists.clone(), &mut |o, x, p, v, bo| tick_ours(x, p, v, bo, &w0r[o], &w1r[o], &table))
                     } else {
                         let add = adder(runners[k - 1].0);
                         let g = &mut runners[k - 1].1;
-                        FrameRun::before(wp, w0r, w1r, &stats, &twins, add, &order, tick, i, others.clone(), lists.clone(), &mut |o, x, p, v, bo| tick_runner(g, x, p, v, bo, &w0r[o], &w1r[o], addr[o]))
+                        FrameRun::before(wp, w0r, w1r, &stats, &twins, add, Some((&w[1].extra[ka].1[..], &table[..])), &order, tick, i, others.clone(), lists.clone(), &mut |o, x, p, v, bo| tick_runner(g, x, p, v, bo, &w0r[o], &w1r[o], addr[o]))
                     };
                     starts[k] = (pos, vel);
                     runs[k] = Some(run);

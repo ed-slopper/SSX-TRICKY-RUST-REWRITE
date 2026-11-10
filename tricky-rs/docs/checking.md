@@ -1179,6 +1179,55 @@ rec17. rec14 has two left (row F4b3s): 6925 r1 (state 4, hit by rider 5 in the w
 8005 r4 (a shove: +0x4c records 8005; rec14 has no clip windows, so the shove's clip type 0x15 can't be replayed).
 `DBG3` (TRICKY_DBG=3) prints every hit the replay makes.
 
+## F4b3s: the shove in the frame replay; the riders not replayed before their hits (2026-11-10)
+
+Both of rec14's hit velocities F4b3r left are right now (8005 r4 and 6925 r1).
+
+**The shove (8005 r4).** Proven (Ghidra, `Boarder_RiderCollisions` 0x123fc8, after the pairs): for every other
+rider `i` (`Race_GetRider`, not the pair list), if `i`'s record of me +0xc < tick − 3, my layer-1 clip
+(`AnimCtl_GetClipType`(rider+0x46c0, 1)) is of type 0x15, my record of `i` +0xc ≤ tick − 3, and
+`AnimCtl_TestClipFlag`(ctl, 1, 1) and not (ctl, 2, 1): `shove` (`src/hit.rs`) measures the reach in the frame at
+rider+0x4aa0 (forward, side, up, where); in reach and with a positive speed it calls `Boarder_RiderHit` on `i`, adds 1
+to my hit count of `i` (+0x1a; only the shover's) and writes the tick into both records +0xc. The clips of type 0x15
+(`CLIP_TABLE` 0x325fa8, a row's first word) are 0x205 to 0x208. rec14 does have the `46c0` window (F4b3r said it
+didn't); the layer-1 clip is its word +0xc.
+
+The test (`tests/ground_motion.rs`): `Frame` takes the layer-1 clip's type from the second sample's `46c0` window
+(`clip1`; TRICKY_SHOVE=off: none); `col_rider` builds the frame with `frame_of` (`pose::board_frame`, the
+`Boarder_UpdatePose` 0x129628 frame `cPostAI::vf1` 0x114730 leaves, from the first sample) and takes +0x1e0 and
+stats+0x12. Two stand-ins: the clip's flags 1 and 2 (bits of the clip record's +0x74, not recorded) are answered
+"between them" exactly when the game's sample shows the rider shoved this tick (its +0xc record of someone is the
+tick and its hit count of them went up), and the pivot bone's height (rider+0x44d8 × 0x394 + 0x8d0) is 0 (it only
+counts with a spin or a flip). So the test checks the reach and the speed, not when the shove starts.
+
+Shove records (+0x40 + 0x20·j +0xc) the game or the replay changed: rec14 6 of 8 right, rec16 18 of 26, rec17 6 of
+12 (none before). The misses are all the reach, read from `frame_of`: rec14 7662 r4→r3 and rec16 6065 r5→r2 (the
+shover in the air, lat 135/235 cm), rec16 13038 r5→r4 (lat 182.9 > 180), rec17 8458 r3→r0 (lat 194.9), 8462 r3→r0
+(206.5), 10076 r3→r2 (bearing −1.83 against the heading −π: 1.31 off, limit 0.96), all shoved by the game; and
+rec16 6028, 6032 r5→r0 (lat 175.9, 179.4), shoved by the replay only. Taking the frame from the sample before or
+after doesn't mend them. So the frame at rider+0x4aa0 isn't `board_frame` of the sample at the time the shove reads
+it (the skeleton or a clip may move it after `Boarder_UpdatePose`, or the pose skips a tick): row F4b3t records it.
+
+**The riders not replayed (6925 r1).** Rider 5 (wiped out, motion 5, not replayed) hits rider 1 in its own turn
+(order 5 to 0), but the test gave it the second sample's velocity, which already holds the hits it takes later in
+the frame. Now trial passes of the frame find each such rider's gain from its collisions to the frame's end and take
+it off its second-sample velocity, until the gains stop changing (TRICKY_PREHIT: at most 8 passes, off: none); a
+rider whose hit comes and goes from pass to pass keeps the second sample's velocity (rec16 6907 r5: shoved by r0
+for 444 cm/s; without it r0's closing speed is too low to shove). STANDIN for the velocity the game's motion left
+them (not recorded).
+
+| `fadd=g1` | hit ticks: position right, velocity right | pushed ticks, every field | ground ticks, every field | shove records right |
+|---|---|---|---|---|
+| rec14 | 113 → 117, 115 → 120 of 141 | 213 → 218 of 346 | 37,231 → 37,237 | 0 → 6 of 8 |
+| rec15 | 91 → 96, 91 (=) of 108 | 221 (=) of 249 | 37,301 (=) | (none) |
+| rec16 | 197 → 200, 199 → 201 of 257 | 449 → 451 of 571 | 51,698 → 51,701 | 0 → 18 of 26 |
+| rec17 | 325 → 326, 328 (=) of 358 | 832 (=) of 879 | 71,250 → 71,251 | 0 → 6 of 12 |
+
+Bumps unchanged. Hit ticks whose position is now right but not the velocity (row F4b3u): rec14 6922 r1 (111, −64,
+−10 ulps); rec15 13331, 13334, 13337, 13340, 13343 r3 (−4705 to −21131 ulps in x); rec16 6915 r0 (−1, −3, −3);
+rec17 9996 r1 (−357, −2, 28). TRICKY_DBG prints the missed shoves with their reach and each trial pass's gains
+(`DBG prehit`).
+
 ## How a row gets to `checked`
 
 1. Port the function (address in its doc comment, AGENTS.md §13).
