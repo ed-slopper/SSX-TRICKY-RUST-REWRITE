@@ -901,10 +901,16 @@ struct Frame {
 /// samples, rec16 2,019 of 85,632, rec17 2,489 of 107,760, most of them riders 5 and 4. The body is placed where
 /// the mean of the previous and next samples' sphere offsets from the rider puts it (median 0.19 cm off on fresh
 /// ground samples of rec17, against 1.2 cm for the previous body moved by the step).
+/// When the recording holds the same tick again with a fresh body (a save state loaded: the game replays the same
+/// ticks bit for bit, rec16), that body is taken instead ([`Twins`], F4h5e).
 // STANDIN: a guess at the body PINE missed, for the body `Boarder_UpdateBroadphase` 0x126748 posed from the bones
-fn unstale(body: &mut CollBody, p: &[u8], a: &[u8], b: &[u8]) -> bool {
+fn unstale(body: &mut CollBody, p: &[u8], a: &[u8], b: &[u8], twin: Option<&Vec<u8>>) -> bool {
     if a.len() < 0x700 || p.len() < 0x700 || b.len() < 0x700 || a[0x480..0x700] != p[0x480..0x700] || a[0x140..0x14c] == p[0x140..0x14c] || b[0x480..0x700] == a[0x480..0x700] {
         return false;
+    }
+    if let Some(t) = twin {
+        *body = body_of(t);
+        return true;
     }
     let (pp, pa, pb) = (vec4(p, 0x140), vec4(a, 0x140), vec4(b, 0x140));
     let mid = |cp: V4, cb: V4| -> V4 { [((cp[0] - pp[0]) + (cb[0] - pb[0])) / 2.0 + pa[0], ((cp[1] - pp[1]) + (cb[1] - pb[1])) / 2.0 + pa[1], ((cp[2] - pp[2]) + (cb[2] - pb[2])) / 2.0 + pa[2], cp[3]] };
@@ -916,9 +922,39 @@ fn unstale(body: &mut CollBody, p: &[u8], a: &[u8], b: &[u8]) -> bool {
     true
 }
 
+/// The fresh rider samples of a recording by (tick, rider, the rider's +0x140..+0x160 bytes): a sample whose body
+/// differs from its predecessor's (one tick before) or that has none. Save states make a recording run through the
+/// same ticks again, and the game replays them bit for bit (rec16: the two passes' samples are equal byte for byte
+/// where both are fresh), so a stale body (`unstale`) can be read off the other pass. TRICKY_TWINS=off: none.
+#[derive(Default)]
+struct Twins(std::collections::HashMap<(u32, usize, Vec<u8>), Vec<u8>>);
+
+impl Twins {
+    fn of(ticks: &[recording::Tick]) -> Twins {
+        let mut m = std::collections::HashMap::new();
+        if std::env::var("TRICKY_TWINS").is_ok_and(|v| v == "off") {
+            return Twins(m);
+        }
+        for (k, t) in ticks.iter().enumerate() {
+            for (i, r) in t.riders.iter().enumerate() {
+                let fresh = k > 0 && ticks[k - 1].tick + 1 == t.tick && ticks[k - 1].riders[i][0x480..0x700] != r[0x480..0x700];
+                if r.len() >= 0x700 && fresh {
+                    m.entry((t.tick, i, r[0x140..0x160].to_vec())).or_insert_with(|| r.clone());
+                }
+            }
+        }
+        Twins(m)
+    }
+
+    fn get(&self, tick: u32, i: usize, r: &[u8]) -> Option<&Vec<u8>> {
+        self.0.get(&(tick, i, r.get(0x140..0x160)?.to_vec()))
+    }
+}
+
 impl Frame {
-    /// `p`: the sample before `a`, when there is one (for [`unstale`]; TRICKY_STALE=keep leaves the bodies as read)
-    fn new(p: Option<&[Vec<u8>]>, a: &[Vec<u8>], b: &[Vec<u8>], stats: &[Vec<u8>]) -> Frame {
+    /// `p`: the sample before `a`, when there is one (for [`unstale`]; TRICKY_STALE=keep leaves the bodies as read);
+    /// `tick`: `a`'s tick
+    fn new(p: Option<&[Vec<u8>]>, a: &[Vec<u8>], b: &[Vec<u8>], stats: &[Vec<u8>], twins: &Twins, tick: u32) -> Frame {
         let n = a.len();
         let keep = std::env::var("TRICKY_STALE").is_ok_and(|v| v == "keep");
         let mut stale = vec![false; n];
@@ -927,7 +963,7 @@ impl Frame {
                 .map(|i| {
                     let mut body = body_of(&a[i]);
                     if let Some(p) = p.filter(|_| !keep) {
-                        stale[i] = unstale(&mut body, &p[i], &a[i], &b[i]);
+                        stale[i] = unstale(&mut body, &p[i], &a[i], &b[i], twins.get(tick, i, &a[i]));
                     }
                     body
                 })
@@ -1117,9 +1153,9 @@ fn tick_runner(g: &mut W, x: &Other, pos: V4, vel: V4, a: &[u8], b: &[u8], addr:
 
 impl FrameRun {
     #[allow(clippy::too_many_arguments)]
-    fn before(wp: Option<&[Vec<u8>]>, w0: &[Vec<u8>], w1: &[Vec<u8>], stats: &[Vec<u8>], order: &[usize], tick: i32, me: usize, others: Vec<Option<Other>>, lists: Vec<Vec<usize>>, t: &mut Ticker) -> (FrameRun, V4, V4) {
+    fn before(wp: Option<&[Vec<u8>]>, w0: &[Vec<u8>], w1: &[Vec<u8>], stats: &[Vec<u8>], twins: &Twins, order: &[usize], tick: i32, me: usize, others: Vec<Option<Other>>, lists: Vec<Vec<usize>>, t: &mut Ticker) -> (FrameRun, V4, V4) {
         let n = w0.len();
-        let mut run = FrameRun { f: Frame::new(wp, w0, w1, stats), riders: w0.iter().map(|x| col_rider(x, n)).collect(), others, lists, me, at: 0, tick };
+        let mut run = FrameRun { f: Frame::new(wp, w0, w1, stats, twins, tick as u32 - 1), riders: w0.iter().map(|x| col_rider(x, n)).collect(), others, lists, me, at: 0, tick };
         while order[run.at] != me {
             run.step(w0, w1, stats, order[run.at], None, t);
             run.at += 1;
@@ -1198,6 +1234,7 @@ fn ground_ticks_against_the_running_game() {
         .collect();
     let path = paths.split(';').next().unwrap();
     let (n, ticks) = load(path);
+    let twins = Twins::of(&ticks);
     let addrs = rider_addrs(path);
     let (Some(km), Some(ka)) = (ticks[0].extra.iter().position(|(o, _)| *o == -0x400), ticks[0].extra.iter().position(|(o, _)| *o == 0x46c0)) else {
         eprintln!("{path}: no -400 and 46c0 windows: skipping");
@@ -1373,7 +1410,7 @@ fn ground_ticks_against_the_running_game() {
         let mut frame_pushes = vec![0usize; n];
         let mut frame_hits = vec![0usize; n];
         for k in 0..1 + runners.len() {
-            let mut f = Frame::new((wi > 0 && ticks[wi - 1].tick + 1 == w[0].tick).then(|| &ticks[wi - 1].riders[..]), &w[0].riders, &w[1].riders, &stats);
+            let mut f = Frame::new((wi > 0 && ticks[wi - 1].tick + 1 == w[0].tick).then(|| &ticks[wi - 1].riders[..]), &w[0].riders, &w[1].riders, &stats, &twins, w[0].tick);
             stale_bodies += if k > 0 { 0 } else { f.stale.iter().filter(|x| **x).count() };
             let mut riders: Vec<ColRider> = w[0].riders.iter().map(|r| col_rider(r, n)).collect();
             let mut done: Vec<Option<(Rider, f32)>> = vec![None; n];
@@ -1827,6 +1864,7 @@ fn takeoff_ticks_against_the_running_game() {
         .collect();
     let path = paths.split(';').next().unwrap();
     let (n, ticks) = load(path);
+    let twins = Twins::of(&ticks);
     let win = |o: i64| ticks[0].extra.iter().position(|(x, _)| *x == o);
     let (Some(km), Some(ka), Some(kp)) = (win(-0x400), win(0x46c0), win(0x57b0)) else {
         eprintln!("{path}: no -400, 46c0 and 57b0 windows: skipping");
@@ -1935,10 +1973,10 @@ fn takeoff_ticks_against_the_running_game() {
             if pushes {
                 for k in 0..ways {
                     let (run, pos, vel) = if k == 0 {
-                        FrameRun::before(wp, w0r, w1r, &stats, &order, tick, i, others.clone(), lists.clone(), &mut |o, x, p, v| tick_ours(x, p, v, &w0r[o], &w1r[o], &table))
+                        FrameRun::before(wp, w0r, w1r, &stats, &twins, &order, tick, i, others.clone(), lists.clone(), &mut |o, x, p, v| tick_ours(x, p, v, &w0r[o], &w1r[o], &table))
                     } else {
                         let g = &mut runners[k - 1].1;
-                        FrameRun::before(wp, w0r, w1r, &stats, &order, tick, i, others.clone(), lists.clone(), &mut |o, x, p, v| tick_runner(g, x, p, v, &w0r[o], &w1r[o], addr[o]))
+                        FrameRun::before(wp, w0r, w1r, &stats, &twins, &order, tick, i, others.clone(), lists.clone(), &mut |o, x, p, v| tick_runner(g, x, p, v, &w0r[o], &w1r[o], addr[o]))
                     };
                     starts[k] = (pos, vel);
                     runs[k] = Some(run);

@@ -1007,6 +1007,34 @@ it is and else from the one before the tick's jump (`unjump`). Only on recording
 
 No gaps left from rec4. (rec5's flight test needs `TRICKY_STATS=rec4.stats` for 21105 r4's jump: no rec5.stats.)
 
+## F4h5e: rec16 7325 r4 was a stale body; the other pass of a save state (2026-11-10)
+
+rec16 7325 r4 (a jump-control take-off hit by rider 1 in its own collisions, motion 1 by then) ended 5 cm/s off in
+velocity and 0.06 cm in position. `Boarder_RiderHit` 0x124920 (decompiled again) and `hit::rider_hit` agree: in the
+air (+0x424 = 1, set at once by `Boarder_SetMotion` 0x11f610) the push goes along the overlap's direction as it is,
+not flattened; the prediction made before the hit lands on our flight, so the jump's velocity was right. The hit's
+direction and size come from the bodies' overlap, and rider 4's body at 7324 was stale (read before `cPostAI::vf1`
+re-posed it) on the first of rec16's two passes over these ticks: `unstale`'s mean of the neighbours put its spheres
+(0.57, 1.16, −0.79) cm off the body the second pass recorded for the same tick.
+
+Save states make a recording run through the same ticks again, and the game replays them bit for bit: of rec16's
+14,805 fresh samples recorded twice (same tick, rider and +0x140..+0x160 bytes) 14,708 have the same body (the 97
+others are read while the body was being posed). `Twins` (tests/ground_motion.rs) keeps the first fresh sample of
+each (tick, rider, position and velocity), and `unstale` takes a stale body from it before guessing: 671 of rec16's
+2,022 stale samples; none in rec15 or rec17 (one pass each). TRICKY_TWINS=off turns it off.
+
+| rec16, `fadd=g1` | before | after |
+|---|---|---|
+| take-offs whole | 227 of 235 | 228 (7325 r4) |
+| take-offs pushed in the frame, whole | 11 of 13 | 12 |
+| ground ticks, every field | 51,664 | 51,668 |
+| pushed ground ticks, every field | 415 of 562 | 419 |
+
+rec15, rec17 unchanged. `hit::rider_hit` unchanged (no port was wrong).
+
+Left (gap): the ground test does not replay a rider that leaves the snow in the frame (rec16 7325 r4), so its hit on
+rider 1 uses the end-of-tick velocity (after its jump and its own hit): rider 1's velocity there is off (row F4h5g).
+
 ## How a row gets to `checked`
 
 1. Port the function (address in its doc comment, AGENTS.md §13).
