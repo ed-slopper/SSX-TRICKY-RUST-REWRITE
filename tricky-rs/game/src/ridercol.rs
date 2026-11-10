@@ -62,6 +62,11 @@ pub trait ColEnv {
     fn score_crash(&mut self, r: usize);
     /// `Score_Crash`(rider+0x5820, 0) then `Boarder_AddMeter` of it on the rider
     fn crash_meter(&mut self, r: usize);
+    /// The pair's closing speeds ([`pair_speeds`]: the dot products on VU0, then COP1 `sub.s`, `add.s`, `div.s`,
+    /// `mul.s`); a test may answer with its own float rule for the COP1 adds, which board row F4c has yet to settle
+    fn pair_speeds(&mut self, n: V4, va: V4, vb: V4, ma: f32, mb: f32) -> (f32, f32) {
+        pair_speeds(n, va, vb, ma, mb)
+    }
     /// `Rand_Game`, the result unused
     fn rand_game(&mut self);
     /// `Sfx_OnRiderCollision`(hitter, hit) and `Speech_OnRiderCollision`(hit)
@@ -109,7 +114,7 @@ pub fn rider_collisions(me: usize, list: &[usize], riders: &mut [ColRider], tick
             so = f32::from_bits(FAR);
         }
         let n = normalize(v);
-        let (to_o, to_me) = pair_speeds(n, riders[me].vel, riders[o].vel, sm, so);
+        let (to_o, to_me) = env.pair_speeds(n, riders[me].vel, riders[o].vel, sm, so);
         let hit1 = env.rider_hit(to_o, me, o, me, o, n, &mut riders[me].vel);
         let hit2 = env.rider_hit(to_me, o, me, o, me, n, &mut riders[o].vel);
         if hit2 {

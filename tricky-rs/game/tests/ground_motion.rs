@@ -894,6 +894,8 @@ struct Frame {
     rec: Vec<Vec<[f32; 2]>>,
     /// `Boarder_GetSpeedStat` 0x11d7b0 of each rider at that moment
     stat: Vec<f32>,
+    /// COP1's `add.s` for the way (F4b3q): IEEE, or PCSX2's adder under `fadd=g1` ([`adder`])
+    add: Add,
     /// per rider: pushes and hits it got this frame
     pushes: Vec<usize>,
     hits: Vec<usize>,
@@ -1025,7 +1027,7 @@ impl Twins {
 impl Frame {
     /// `p`: the sample before `a`, when there is one (for the stale bodies, [`Twins`]; TRICKY_STALE=keep leaves the bodies as read);
     /// `tick`: `a`'s tick
-    fn new(p: Option<&[Vec<u8>]>, a: &[Vec<u8>], b: &[Vec<u8>], stats: &[Vec<u8>], twins: &Twins, tick: u32) -> Frame {
+    fn new(p: Option<&[Vec<u8>]>, a: &[Vec<u8>], b: &[Vec<u8>], stats: &[Vec<u8>], twins: &Twins, tick: u32, add: Add) -> Frame {
         let n = a.len();
         let keep = std::env::var("TRICKY_STALE").is_ok_and(|v| v == "keep");
         let mut stale = vec![false; n];
@@ -1043,7 +1045,8 @@ impl Frame {
             stale,
             hit: a.iter().map(|r| hit_rider(r)).collect(),
             rec: b.iter().map(|r| (0..n).map(|j| [f32_at(r, 0x40 + 0x20 * j), f32_at(r, 0x44 + 0x20 * j)]).collect()).collect(),
-            stat: (0..n).map(|i| speed_stat(&stats[i], f32_at(&a[i], 0x130))).collect(),
+            stat: (0..n).map(|i| speed_stat(&stats[i], f32_at(&a[i], 0x130), add)).collect(),
+            add,
             pushes: vec![0; n],
             hits: vec![0; n],
         }
@@ -1063,6 +1066,13 @@ impl ColEnv for Frame {
     }
     fn speed_stat(&mut self, r: usize) -> f32 {
         self.stat[r]
+    }
+    /// 0x124200..0x1242c4: the dots on VU0 ((x + y) + z) + w, each rounded to nearest), then `sub.s`, `add.s` (the
+    /// way's adder), `div.s` (nearest, F4b3l) and `mul.s`
+    fn pair_speeds(&mut self, n: V4, va: V4, vb: V4, ma: f32, mb: f32) -> (f32, f32) {
+        let dot = |a: V4| ((a[0] * n[0] + a[1] * n[1]) + a[2] * n[2]) + a[3] * n[3];
+        let k = (self.add)(dot(vb), -dot(va)) / (self.add)(ma, mb);
+        (mb * k, -ma * k)
     }
     fn rider_hit(&mut self, speed: f32, to: usize, _: usize, owner: usize, of: usize, dir: V4, vel: &mut V4) -> bool {
         let mut h = self.hit[to];
@@ -1093,9 +1103,36 @@ fn hit_rider(r: &[u8]) -> HitRider {
 
 /// `Boarder_GetSpeedStat` 0x11d7b0: stats+0x1e × (stats+0x12 × 2.145779 × 0.003921569 + 0.79599), then × (1 + the
 /// boost level +0x130 × 7.999995).
-fn speed_stat(st: &[u8], boost: f32) -> f32 {
-    let m = st[0x1e] as f32 * (st[0x12] as f32 * 2.145_779 * 0.003_921_569 + 0.795_99);
-    boost * 7.999_995 * m + m
+fn speed_stat(st: &[u8], boost: f32, add: Add) -> f32 {
+    let m = st[0x1e] as f32 * add(st[0x12] as f32 * 2.145_779 * 0.003_921_569, 0.795_99);
+    add(boost * 7.999_995 * m, m)
+}
+
+/// A COP1 `add.s`.
+type Add = fn(f32, f32) -> f32;
+
+/// The way's `add.s` (F4b3q): `fadd=g1` in its rules → PCSX2's adder ([`pcsx2_add`]), else IEEE; TRICKY_COLADD=n:
+/// IEEE always.
+fn adder(rules: &str) -> Add {
+    if rules.contains("fadd=g1") && std::env::var("TRICKY_COLADD").map_or(true, |v| v != "n") {
+        pcsx2_add
+    } else {
+        |a, b| a + b
+    }
+}
+
+/// `add.s` as PCSX2 runs it in normal play (`ps2float`'s `Guard`, F4h2, F4g): the smaller operand cut toward zero
+/// to one bit below the larger's last mantissa bit (one guard bit, no sticky bit), then the sum rounded to nearest,
+/// ties to even. A test model only, not the port's float rule (F4c).
+fn pcsx2_add(a: f32, b: f32) -> f32 {
+    let (big, small) = if b.abs() > a.abs() { (b, a) } else { (a, b) };
+    if small == 0.0 || big == 0.0 {
+        return a + b;
+    }
+    let e = ((big.to_bits() >> 23) & 0xff) as i32 - 127;
+    let guard = 2f64.powi(e - 24);
+    let cut = (small as f64 / guard).trunc() * guard;
+    (big as f64 + cut) as f32
 }
 
 /// The driver's view of a recorded rider: position, velocity, motion and its records of the others (+0x40 + 0x20·j:
@@ -1310,9 +1347,9 @@ fn lift_world(w: &mut W) {
 
 impl FrameRun {
     #[allow(clippy::too_many_arguments)]
-    fn before(wp: Option<&[Vec<u8>]>, w0: &[Vec<u8>], w1: &[Vec<u8>], stats: &[Vec<u8>], twins: &Twins, order: &[usize], tick: i32, me: usize, others: Vec<Option<Other>>, lists: Vec<Vec<usize>>, t: &mut Ticker) -> (FrameRun, V4, V4) {
+    fn before(wp: Option<&[Vec<u8>]>, w0: &[Vec<u8>], w1: &[Vec<u8>], stats: &[Vec<u8>], twins: &Twins, add: Add, order: &[usize], tick: i32, me: usize, others: Vec<Option<Other>>, lists: Vec<Vec<usize>>, t: &mut Ticker) -> (FrameRun, V4, V4) {
         let n = w0.len();
-        let mut run = FrameRun { f: Frame::new(wp, w0, w1, stats, twins, tick as u32 - 1), riders: w0.iter().map(|x| col_rider(x, n)).collect(), others, lists, me, at: 0, tick };
+        let mut run = FrameRun { f: Frame::new(wp, w0, w1, stats, twins, tick as u32 - 1, add), riders: w0.iter().map(|x| col_rider(x, n)).collect(), others, lists, me, at: 0, tick };
         while order[run.at] != me {
             run.step(w0, w1, stats, order[run.at], None, t);
             run.at += 1;
@@ -1352,7 +1389,7 @@ impl FrameRun {
             riders[o].motion = u32_le(b, 0x424);
             f.hit[o] = hit_rider(b);
         }
-        f.stat[o] = speed_stat(&stats[o], f32_at(b, 0x130));
+        f.stat[o] = speed_stat(&stats[o], f32_at(b, 0x130), f.add);
         rider_collisions(o, &self.lists[o], riders, self.tick, false, f);
     }
 }
@@ -1588,9 +1625,13 @@ fn ground_ticks_against_the_running_game() {
         let mut got: Vec<Vec<Vec<Vec<u32>>>> = vec![Vec::new(); n];
         let mut frame_pushes = vec![0usize; n];
         let mut frame_hits = vec![0usize; n];
+        let mut frame_stale = vec![false; n];
         for k in 0..1 + runners.len() {
-            let mut f = Frame::new((wi > 0 && ticks[wi - 1].tick + 1 == w[0].tick).then(|| &ticks[wi - 1].riders[..]), &w[0].riders, &w[1].riders, &stats, &twins, w[0].tick);
+            let mut f = Frame::new((wi > 0 && ticks[wi - 1].tick + 1 == w[0].tick).then(|| &ticks[wi - 1].riders[..]), &w[0].riders, &w[1].riders, &stats, &twins, w[0].tick, if k == 0 { adder("") } else { adder(runners[k - 1].0) });
             stale_bodies += if k > 0 { 0 } else { f.stale.iter().filter(|x| **x).count() };
+            if k == 0 {
+                frame_stale = f.stale.clone();
+            }
             let mut riders: Vec<ColRider> = w[0].riders.iter().map(|r| col_rider(r, n)).collect();
             let mut done: Vec<Option<(Rider, f32)>> = vec![None; n];
             // where the riders not replayed were before their collisions (position, velocity)
@@ -1658,7 +1699,7 @@ fn ground_ticks_against_the_running_game() {
                     f.hit[me] = hit_rider(b);
                     snap[me] = Some((riders[me].pos, riders[me].vel));
                 }
-                f.stat[me] = speed_stat(&stats[me], f32_at(b, 0x130));
+                f.stat[me] = speed_stat(&stats[me], f32_at(b, 0x130), f.add);
                 if pushes {
                     // the pair list as recorded (`L700`), from the frame's start (`Boarder_UpdateBroadphase` 0x126748
                     // in the last frame's `cPostAI::vf1`) or (TRICKY_LIST=b) its end; else every other rider in slot
@@ -1759,7 +1800,11 @@ fn ground_ticks_against_the_running_game() {
                     hit_vel += (hit && g[1] == p.want[1]) as usize;
                     if hit && g[1] != p.want[1] && std::env::var("TRICKY_DBG").is_ok() {
                         let ulps: Vec<i64> = (0..3).map(|c| g[1][c] as i32 as i64 - p.want[1][c] as i32 as i64).collect();
-                        eprintln!("DBG hitvel tick {} rider {i}: ulps {ulps:?} pos ok {} pushes {} hits(ours) {:?}", w[1].tick, g[0] == p.want[0], frame_pushes[i], frame_hits[i]);
+                        eprintln!("DBG hitvel tick {} rider {i}: ulps {ulps:?} pos ok {} pushes {} hits(ours) {:?} stale bodies {:?}", w[1].tick, g[0] == p.want[0], frame_pushes[i], frame_hits[i], (0..n).filter(|&x| frame_stale[x]).collect::<Vec<_>>());
+                        if std::env::var("TRICKY_DBG").is_ok_and(|v| v == "2") {
+                            let v = |x: &[u32]| (0..3).map(|c| f32::from_bits(x[c])).collect::<Vec<_>>();
+                            eprintln!("    ours {:?} game {:?} first {:?}", v(&g[1]), v(&p.want[1]), vec4(&w[0].riders[i], 0x150));
+                        }
                     }
                 }
             }
@@ -2162,10 +2207,11 @@ fn takeoff_ticks_against_the_running_game() {
             if pushes {
                 for k in 0..ways {
                     let (run, pos, vel) = if k == 0 {
-                        FrameRun::before(wp, w0r, w1r, &stats, &twins, &order, tick, i, others.clone(), lists.clone(), &mut |o, x, p, v| tick_ours(x, p, v, &w0r[o], &w1r[o], &table))
+                        FrameRun::before(wp, w0r, w1r, &stats, &twins, adder(""), &order, tick, i, others.clone(), lists.clone(), &mut |o, x, p, v| tick_ours(x, p, v, &w0r[o], &w1r[o], &table))
                     } else {
+                        let add = adder(runners[k - 1].0);
                         let g = &mut runners[k - 1].1;
-                        FrameRun::before(wp, w0r, w1r, &stats, &twins, &order, tick, i, others.clone(), lists.clone(), &mut |o, x, p, v| tick_runner(g, x, p, v, &w0r[o], &w1r[o], addr[o]))
+                        FrameRun::before(wp, w0r, w1r, &stats, &twins, add, &order, tick, i, others.clone(), lists.clone(), &mut |o, x, p, v| tick_runner(g, x, p, v, &w0r[o], &w1r[o], addr[o]))
                     };
                     starts[k] = (pos, vel);
                     runs[k] = Some(run);

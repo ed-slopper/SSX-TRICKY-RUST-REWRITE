@@ -1112,6 +1112,38 @@ Left:
   (`fadd=g1`) and divides with `div.s`; `hit::pair_speeds` does it in IEEE. Run that part (or `Boarder_RiderHit`
   0x124920 with its speed) under the runner's rules (row F4b3q).
 
+## F4b3q: the pair's closing speed under PCSX2's adder (2026-11-10)
+
+rec17 had six hit ticks with the position right and the velocity 1 to 4 ulps off (9990 r1, 11002 r4, 11126 r2,
+2329, 2332, 2335 r1). `Boarder_RiderCollisions` 0x123fc8 forms the closing speed at 0x124200..0x1242c4 (disassembly,
+proven): n = the push times `vrsqrt` Q of its length² (`vmul`, `vadday.x`, `vmaddaz.x`, `vmaddw.x`: ((x + y) + z) + w,
+all four lanes), the two dots the same way on VU0 (the other rider's velocity first), then COP1: `sub.s` (other −
+own), `add.s` of the two speed stats, `div.s`, and `mul.s` for each rider's share (own: other's stat × k, other:
+−own stat × k). `Boarder_GetSpeedStat` 0x11d7b0 has two `add.s` of its own (stats+0x12 term + 0.79599, boost term +
+m). `hit::pair_speeds` and the VU parts were already the game's; the COP1 adds are where PCSX2 rounds its own way
+(`fadd=g1`, F4g).
+
+The test (`tests/ground_motion.rs`) now gives each way its `add.s` (`adder`: `pcsx2_add` when the way's rules have
+`fadd=g1`, IEEE otherwise; TRICKY_COLADD=n: IEEE always) for the speed stats and the pair's closing speed, through a
+new `ColEnv::pair_speeds` (default: `hit::pair_speeds`, so the port is unchanged; its float rule waits for F4c).
+Both parts are needed: the pair's adds alone fix the six, the stats' alone none, and the pair's alone break 2145 r2.
+
+| `fadd=g1` | hit ticks, velocity right | pushed ticks, every field | ground ticks, every field |
+|---|---|---|---|
+| rec14 | 113 → 114 of 141 | 200 → 201 of 346 | 37,218 → 37,219 |
+| rec15 | 91 of 108 (=) | 215 of 249 (=) | 37,295 (=) |
+| rec16 | 194 of 257 (=) | 437 of 571 (=) | 51,686 (=) |
+| rec17 | 312 → 318 of 358 | 806 → 812 of 879 | 71,224 → 71,230 |
+
+Bumps and take-offs unchanged. `DBG hitvel` now names the frame's stale bodies, and with TRICKY_DBG=2 prints the
+velocities.
+
+Left (row F4b3r): nine hit ticks with the position right, no stale body in the frame, and the velocity far off
+(0.01 to 225 cm/s): rec17 9055 r2 (pair 2–1, rider 1 wiped out), 9808 r1 (1–3), 9987 r1 (1–3), 19130 r2 (2–1),
+848 r5 (5–4), 1439 r5 (5–1), 2326 r1 (1–3); rec16 8127 r1, 5540 r2. In every one the hit rider goes from cruise (3)
+to the bump state (2), so `Boarder_Stumble` 0x124dd0 ran. That is true of any hard ground hit, though, so it isn't a
+lead by itself.
+
 ## How a row gets to `checked`
 
 1. Port the function (address in its doc comment, AGENTS.md §13).
