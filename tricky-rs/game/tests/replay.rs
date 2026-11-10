@@ -263,7 +263,7 @@ fn flight_predictions_against_the_running_game() {
         let (mut worst_line, mut worst_t, mut worst_v) = (0f32, 0f32, 0f32);
         let (mut steps, mut steps_exact, mut steps_guard, mut steps_two) = (0, 0, 0, 0);
         let (mut before_jump, mut steep_after, mut steep_exact) = (0, 0, 0);
-        let mut next_sample = 0;
+        let mut next_sample = [0usize; 2];
         // recorded before F4b3g (no `5900:4` window): a sample was read as soon as the race tick moved, while the
         // riders were ticking, so a rider's block and its windows may straddle its tick
         let early = !ticks[0].extra.iter().any(|(off, _)| *off == 0x5900);
@@ -362,23 +362,32 @@ fn flight_predictions_against_the_running_game() {
                         }
                     }
                     // a sample of the early recorder whose window was read after the rider's next tick (it made
-                    // the prediction there): the next sample's rider
+                    // the prediction there): the next sample's rider, else (the rider's block read one air tick later
+                    // still) that rider one air step back (`unstep`); each from the velocity as it is, else from the
+                    // one before that tick's jump (as above)
                     let next = ticks.get(wi + 2).filter(|t| early && t.tick == w[1].tick + 1).map(|t| &t.riders[i]);
+                    let missed = |q: &(Predict, Option<usize>, f32, (f32, f32))| q.0.t_top.to_bits() != f32_at(pb, 0x48).to_bits() || q.1.is_none();
                     if let (Some(rc), true) = (next, p.t_top.to_bits() != f32_at(pb, 0x48).to_bits() || hit_seg.is_none()) {
-                        let mut q = fly(vec4(rc, 0x140), vec4(rc, 0x150), vec4(rc, 0x2a0), gpoint, gnormal, gword);
-                        // or made there before that tick's jump (as above)
-                        let (state, vc) = (u32_at(rb, 0x428), vec4(rc, 0x150));
-                        if let (false, Some(js)) = (q.0.t_top.to_bits() == f32_at(pb, 0x48).to_bits() && q.1.is_some(), jump_state(rc, stats.get(i).map(|s| s[0x17]), state, vc)) {
-                            let (before, _) = match jumper.as_mut() {
-                                Some(j) => unjump(&js, &mut |v| game_jump(&mut j[1].1, rc, stats.get(i), v, state)),
-                                None => unjump(&js, &mut |v| jump_impulse(0.0, &JumpState { vel: v, ..js }).0),
-                            };
-                            q = fly(vec4(rc, 0x140), before, vec4(rc, 0x2a0), gpoint, gnormal, gword);
-                        }
-                        if q.0.t_top.to_bits() == f32_at(pb, 0x48).to_bits() && q.1.is_some() {
-                            eprintln!("  {ctx}: made from the next sample's rider (motion {} → {}): the window was read after the rider's next tick", u32_at(rb, 0x424), u32_at(rc, 0x424));
-                            next_sample += 1;
-                            (p, hit_seg, best, nearest) = q;
+                        let state = u32_at(rb, 0x428);
+                        for stepped in [false, true] {
+                            if stepped && u32_at(rc, 0x424) != 1 {
+                                continue;
+                            }
+                            let (pos, vc) = if stepped { unstep(vec4(rc, 0x140), vec4(rc, 0x150), f32_at(rc, 0x12c) / 60.0) } else { (vec4(rc, 0x140), vec4(rc, 0x150)) };
+                            let mut q = fly(pos, vc, vec4(rc, 0x2a0), gpoint, gnormal, gword);
+                            if let (true, Some(js)) = (missed(&q), jump_state(rc, stats.get(i).map(|s| s[0x17]), state, vc)) {
+                                let (before, _) = match jumper.as_mut() {
+                                    Some(j) => unjump(&js, &mut |v| game_jump(&mut j[1].1, rc, stats.get(i), v, state)),
+                                    None => unjump(&js, &mut |v| jump_impulse(0.0, &JumpState { vel: v, ..js }).0),
+                                };
+                                q = fly(pos, before, vec4(rc, 0x2a0), gpoint, gnormal, gword);
+                            }
+                            if !missed(&q) {
+                                eprintln!("  {ctx}: made from the next sample's rider{} (motion {} → {}): the window was read after the rider's next tick", if stepped { " one air step back" } else { "" }, u32_at(rb, 0x424), u32_at(rc, 0x424));
+                                next_sample[stepped as usize] += 1;
+                                (p, hit_seg, best, nearest) = q;
+                                break;
+                            }
                         }
                     }
                     tops += 1;
@@ -430,8 +439,25 @@ fn flight_predictions_against_the_running_game() {
             game's landing on our flight on {on_seg} (at most {worst_line:.4} cm off the segment; landing time within \
             {worst_t:e} s, velocity within {worst_v:e} cm/s), on none of our segments on {off_seg}. AirPredict_Tick bit for bit on {steps_exact} of {steps} ticks in IEEE f32, \
             on {steps_guard} with PCSX2's adder (+{steps_two} two ticks apart). Made before a steep-lip jump with no landing: \
-            {steep_after}, ours after the jump the game's on {steep_exact}; landings from the velocity before the tick's jump: {before_jump}; from the next sample's rider (early recorder): {next_sample}");
+            {steep_after}, ours after the jump the game's on {steep_exact}; landings from the velocity before the tick's jump: {before_jump}; from the next sample's rider (early recorder): {}, one air step back from it: {}", next_sample[0], next_sample[1]);
     }
+}
+
+/// The rider one air step (`Air_IntegrateRK4` 0x12b340 over `dt`, no substeps, as `AirMotion_Update` 0x108378
+/// steps) before (pos, vel): the velocity found by iterating the step (it does not depend on the position), the
+/// position less the step's move. Not exact to the bit: good to the landing's 0.05 cm.
+fn unstep(pos: [f32; 4], vel: [f32; 4], dt: f32) -> ([f32; 4], [f32; 4]) {
+    let mut v0 = vel;
+    for _ in 0..20 {
+        let (mut p, mut v) = ([0.0; 4], v0);
+        integrate_rk4(dt, &mut p, &mut v, false);
+        for c in 0..3 {
+            v0[c] += vel[c] - v[c];
+        }
+    }
+    let (mut d, mut v) = ([0.0; 4], v0);
+    integrate_rk4(dt, &mut d, &mut v, false);
+    (std::array::from_fn(|c| if c < 3 { pos[c] - d[c] } else { pos[c] }), v0)
 }
 
 /// What `Jump_ApplyImpulse` 0x1284e0 read on a take-off tick, from the rider at the end of the tick with the velocity

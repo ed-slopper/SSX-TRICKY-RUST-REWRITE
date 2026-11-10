@@ -987,6 +987,26 @@ Left (gaps):
   sample repeats the one before, the recorder fell behind): early-recorder samples, not explained (row F4h5f).
 - The flight test still counts 6765 r0 as off; the ground test explains it (the flight test has no frame replay).
 
+## F4h5f: rec4's last three landings, one air tick further on (2026-11-10)
+
+The three rec4 landings F4h5b left off our flight (20163 r0, 20697 r2, 21542 r2) are early-recorder samples whose
+rider block was read before the take-off tick while the prediction window was read after it, and the **next**
+sample's rider block was read one air tick later still (motion 1, its window's +0x4c already 1/60 or more). Fitting
+the start of the flight to the game's landing point and velocity (float64 replica of `Air_IntegrateRK4`) put each
+start one air step before the next sample: the velocity to within the fit's 0.04 cm/s, i.e. exactly the drag and
+gravity of one step. The flight test now also tries the next sample's rider one air step back (`unstep`: the step's
+velocity found by iterating `air::integrate_rk4` over +0x12c/60 without substeps, as `AirMotion_Update` 0x108378
+steps; then the position less the step's move; not bit-exact, good to the landing's 0.05 cm), from its velocity as
+it is and else from the one before the tick's jump (`unjump`). Only on recordings without the `5900` window.
+
+| recording | landings on our flight |
+|---|---|
+| rec4 | 30 → 33 of 33 (13 from the next sample, 3 one air step back from it: 20163 r0 0.006 cm, 20697 r2 0.002 cm, 21542 r2 0.004 cm) |
+| rec5 (with rec4.stats, same attract demo riders) | 28 of 28 |
+| rec6, rec11, rec15, rec16, rec17 | unchanged |
+
+No gaps left from rec4. (rec5's flight test needs `TRICKY_STATS=rec4.stats` for 21105 r4's jump: no rec5.stats.)
+
 ## How a row gets to `checked`
 
 1. Port the function (address in its doc comment, AGENTS.md §13).
