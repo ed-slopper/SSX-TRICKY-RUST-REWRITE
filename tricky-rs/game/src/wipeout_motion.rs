@@ -155,23 +155,35 @@ fn bad(surface: u32) -> bool {
 /// (the surface's), × 0.98333; then (the caller's probe between) held to the ground by at most 8.333333 cm and the
 /// velocity into the ground taken out.
 fn slide_move(r: &mut RagRider, w: &WipeRider, env: &impl WipeEnv) {
-    let g = F(env.surface_g(r.surface));
-    let f = F(r.ground[2]) * g;
-    let a = [F(r.ground[0]) * f, F(r.ground[1]) * f, f - g, F(0.0)];
-    let dt = F(f32::from_bits(0x3c88_8889));
     let _ = w;
-    r.pos = st(add(ld(r.pos), scale(ld(r.vel), dt)));
-    r.vel = st(add(ld(r.vel), scale(a, dt)));
-    r.vel = st(scale(ld(r.vel), F(f32::from_bits(0x3f7b_bbbc))));
+    slide_step(&mut r.pos, &mut r.vel, r.ground, env.surface_g(r.surface));
+}
+
+/// `slide_move` on bare values: the position and velocity, the ground's normal and the surface's gravity `g`
+/// (the surface table's, rider+0x290's row)
+pub fn slide_step(pos: &mut V4, vel: &mut V4, ground: V4, g: f32) {
+    let g = F(g);
+    let f = F(ground[2]) * g;
+    let a = [F(ground[0]) * f, F(ground[1]) * f, f - g, F(0.0)];
+    let dt = F(f32::from_bits(0x3c88_8889));
+    *pos = st(add(ld(*pos), scale(ld(*vel), dt)));
+    *vel = st(add(ld(*vel), scale(a, dt)));
+    *vel = st(scale(ld(*vel), F(f32::from_bits(0x3f7b_bbbc))));
 }
 
 fn hold_to_ground(r: &mut RagRider, w: &WipeRider) {
-    let h = F(r.height) + F(w.x294);
+    hold_step(&mut r.pos, &mut r.vel, &mut r.height, r.ground, w.x294);
+}
+
+/// `hold_to_ground` on bare values: the position, velocity and height (+0x1bc), the ground's normal and the ride
+/// height (+0x294)
+pub fn hold_step(pos: &mut V4, vel: &mut V4, height: &mut f32, ground: V4, x294: f32) {
+    let h = F(*height) + F(x294);
     let s = if F(-8.333333) <= h { if F(8.333333) < h { F(8.333333) } else { h } } else { F(-8.333333) };
-    r.pos = st(sub(ld(r.pos), scale(ld(r.ground), s)));
-    r.height = (F(r.height) - s).0;
-    let n = ld(r.ground);
-    r.vel = st(sub(ld(r.vel), scale(n, dot(ld(r.vel), n))));
+    *pos = st(sub(ld(*pos), scale(ld(ground), s)));
+    *height = (F(*height) - s).0;
+    let n = ld(ground);
+    *vel = st(sub(ld(*vel), scale(n, dot(ld(*vel), n))));
 }
 
 impl Wipeout {

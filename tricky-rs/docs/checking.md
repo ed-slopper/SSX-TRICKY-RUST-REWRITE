@@ -1287,6 +1287,41 @@ rec14 falls to 37,234, rec16 to 51,699. Next (row F4b3w): replay the wipe-out mo
 5: `Ragdoll_Step`, the translate around it, `Ragdoll_GroundProbe`, the wall collision) in the frame and drop the
 trial passes.
 
+## F4b3w: the wiped-out riders' slides replayed in the frame (2026-11-10)
+
+Proven (`Boarder_UpdateMotion` 0x11c770 case 5, `WipeoutMotion_Update` inlined; the handler's +0x550 is the rider):
+on clips 0x2dc / 0x2dd (`AnimCtl_GetClip` of layer 0) the slide steps the rider's own +0x140 / +0x150 (the step at
+1/60 s with gravity along +0x2a0 from the surface table's row +0x290, × 0x3f7bbbbc; then held to the ground by
++0x1bc + +0x294 within ±8.333333 cm and the velocity into the ground taken out). After it `Ragdoll_GroundProbe`
+0x10fd58 and the lie-flat turn move neither (the get-up, `Wipeout_StartGetUp` 0x10f178, is not replayed); `Boarder_InstanceCollisions` and `Boarder_WallCollide`
+may. Any other clip is the tumble: the rider's velocity is the body's after `Ragdoll_Step`, which is not recorded.
+
+Now (`tests/ground_motion.rs`) a rider not replayed that is in motion 5 on the same slide clip at both samples
+slides from where the riders before it left it (ours: `wipeout_motion::slide_step`, `hold_step`, the pieces of the
+port's slide made public; the runner ways: 0x11c770 itself, the probe's hip 0, the get-up and the body's remaking
+logged), on the first sample's ground, surface and height and the second's +0x294, then the speed limit. The
+flight step, motion 4 and the slide are no longer checked against the second sample less our hits before the
+frame (that check needed the trial passes): each is taken, and a rider that ends the frame 1 cm/s or more from the
+second sample in some axis is missed, and the frame runs again (trial passes included) with it as the others
+(rec14 9 air, 2 slides; rec16 28 air, 1 motion 4; rec17 21 air, 1 motion 4, 5 slides; STANDIN as before: the rest
+of the air tick, the slide's world collisions).
+
+The slide gives the second sample's velocity on every replayed slide frame (rec14 224, rec15 153, rec16 272, rec17
+686); the position is off on 5 of rec14 and 7 of rec17, all pushes between wiped-out riders or the world (rec14
+9092-9098 riders 1, 2; 9557 rider 3, 57 cm, no push; rec17 10932-10941, F4b3p's pair).
+
+| `fadd=g1` | hit ticks, velocity right | ground ticks, every field | trial passes off: hit, every field |
+|---|---|---|---|
+| rec14 | 128 → 128 of 141 | 37,241 → 37,241 | 117 → 123, 37,234 → 37,236 |
+| rec15 | 100 → 100 of 108 | 37,309 → 37,309 | 92 → 100, 37,302 → 37,309 |
+| rec16 | 218 → 220 of 257 | 51,719 → 51,721 | 199 → 215, 51,700 → 51,716 |
+| rec17 | 335 → 335 of 358 | 71,257 → 71,257 | 328 → 335, 71,251 → 71,257 |
+
+F4b3v's last two (rec16 14535 r0, 14538 r0, hit by rider 1 sliding) are right. The trial passes stay: rec14 and
+rec16 still lose 5 each without them, every one a hit by a tumbling rider or one changing motion in the frame
+(rec14 4361, 4859, 5040, 5066, 6922; rec16 6912-6933 rider 5, 9047 rider 3, 14529 rider 1 starting its slide,
+14579 rider 4 in the get-up, motion 6). Next (row F4b3x): record the body and replay the tumble.
+
 ## How a row gets to `checked`
 
 1. Port the function (address in its doc comment, AGENTS.md §13).
