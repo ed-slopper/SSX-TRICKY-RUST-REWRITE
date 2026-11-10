@@ -1735,13 +1735,16 @@ fn ground_ticks_against_the_running_game() {
         // The riders not replayed tick with the second sample's velocity, which already holds the hits they took
         // later in the frame (F4b3s: rec14 6925, rider 5 wiped out, hitting rider 1 with them). Trial passes find
         // those hits (`fix`, the velocity they gained from their own collisions to the frame's end) and run the
-        // frame again with them taken off, until they no longer change (at most TRICKY_PREHIT passes, 8; off: none).
-        // A rider whose hit comes and goes from pass to pass (rec16 6907, rider 5 shoved: without the shove's 444
-        // cm/s its shover's closing speed is too low to shove) keeps the second sample's velocity.
+        // frame again with them taken off, until they no longer change (at most TRICKY_PREHIT passes, 64; off: none).
+        // The gain shrinks by about m_other / (m_me + m_other) a pass (0.9 against a boosting rider, rec15 13540), so
+        // every third pass jumps to the limit (Aitken's extrapolation, F4b3u). A rider whose hit comes and goes from
+        // pass to pass (rec16 6907, rider 5 shoved: without the shove's 444 cm/s its shover's closing speed is too low
+        // to shove) keeps the second sample's velocity.
         // STANDIN: the second sample less our hits, for the velocity the game's motion left them (not recorded)
         let mut fix = vec![[0f32; 4]; n];
         let mut flips = vec![false; n];
-        let trials: usize = std::env::var("TRICKY_PREHIT").map_or(8, |v| if v == "off" { 0 } else { v.parse().unwrap() });
+        let mut seq: Vec<Vec<V4>> = vec![vec![[0.0; 4]]; n];
+        let trials: usize = std::env::var("TRICKY_PREHIT").map_or(64, |v| if v == "off" { 0 } else { v.parse().unwrap() });
         let mut trial = trials > 0;
         let mut passes = 0;
         let mut step = 0;
@@ -1863,6 +1866,17 @@ fn ground_ticks_against_the_running_game() {
                     }
                     flips[i] = passes > 0 && (new == [0.0; 4]) != (fix[i] == [0.0; 4]);
                     fix[i] = if flips[i] { [0.0; 4] } else { new };
+                    seq[i].push(fix[i]);
+                    if seq[i].len() == 3 {
+                        let (f0, f1, f2) = (seq[i][0], seq[i][1], seq[i][2]);
+                        for c in 0..3 {
+                            let (d0, d1) = (f1[c] as f64 - f0[c] as f64, f2[c] as f64 - f1[c] as f64);
+                            if d1 != d0 && d1.abs() < d0.abs() {
+                                fix[i][c] = (f2[c] as f64 - d1 * d1 / (d1 - d0)) as f32;
+                            }
+                        }
+                        seq[i] = vec![fix[i]];
+                    }
                     changed = true;
                     if std::env::var("TRICKY_DBG").is_ok() {
                         eprintln!("DBG prehit tick {tick} rider {i}: {new:?}, comes and goes {}", flips[i]);

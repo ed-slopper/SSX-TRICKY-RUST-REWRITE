@@ -1228,6 +1228,35 @@ Bumps unchanged. Hit ticks whose position is now right but not the velocity (row
 rec17 9996 r1 (−357, −2, 28). TRICKY_DBG prints the missed shoves with their reach and each trial pass's gains
 (`DBG prehit`).
 
+
+## F4b3u: the riders not replayed, back to their velocity before the hits (2026-11-10)
+
+The eight hit ticks F4b3s left with the position right but not the velocity (rec14 6922 r1, rec15 13331 to 13343 r3,
+rec16 6915 r0, rec17 9996 r1) all have the same shape: the rider replayed is hit, in its own turn, by a rider not
+replayed (wiped out, motion 5, or in the air, motion 1), whose velocity is the second sample's less the hits our trial
+passes give it (F4b3s). The passes hadn't reached their limit: each pass the gain moves by the other's share of the
+pair's speed stats, m_other / (m_me + m_other) of the gap (`pair_speeds`), so 0.42 a pass in rec17 9996 and 0.9
+against a boosting rider (rec15 13540, speed stat 1528.95); 8 passes left 0.01 to 0.08 cm/s.
+
+Now (`tests/ground_motion.rs`) the passes go on to 64 (TRICKY_PREHIT) and every third one jumps to the limit
+(Aitken's extrapolation of the last three gains, per axis, only while they shrink); they stop when a pass gives the
+gain it was given.
+
+| `fadd=g1` | hit ticks: position right, velocity right | pushed ticks, every field | ground ticks, every field |
+|---|---|---|---|
+| rec14 | 117 → 124, 120 → 125 of 141 | 218 → 220 of 346 | 37,237 → 37,239 |
+| rec15 | 96 → 99, 91 → 95 of 108 | 221 → 225 of 249 | 37,301 → 37,305 |
+| rec16 | 200 → 218, 201 → 214 of 257 | 451 → 464 of 571 | 51,701 → 51,714 |
+| rec17 | 326 → 331, 328 → 331 of 358 | 832 → 834 of 879 | 71,251 → 71,253 |
+
+Bumps, shoves and states unchanged. Left (row F4b3v): 13 hit ticks with the position right and the velocity a few
+ulps off, all against a rider not replayed: 1 to 4 ulps on rec14 1309 r1, 1411 r3, 4862 r2; rec15 10331 r2, 13537 r3,
+13540 r3; rec16 6025 r2, 7803 r2, 14535 r0, 14538 r0; rec17 9996 r1, 3603 r1, 652 r2; and 22 to 24 ulps in x on rec15
+13334 r3 and rec17 658 r2 (the other in the air). The second sample less our gain can't give back the exact velocity
+the game's motion left (v + gain rounds), so this is as far as the stand-in goes: the way on is to replay those
+riders' own ticks in the frame (the wipe-out motion `Ragdoll_Step`, `AirMotion_Update` 0x108378) instead of taking
+the second sample.
+
 ## How a row gets to `checked`
 
 1. Port the function (address in its doc comment, AGENTS.md §13).
