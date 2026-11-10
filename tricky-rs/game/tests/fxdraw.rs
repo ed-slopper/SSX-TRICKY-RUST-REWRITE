@@ -120,6 +120,8 @@ impl ParticleDrawEnv for Ours {
 
 fn runner(log: &Rc<RefCell<Vec<Call>>>) -> Option<Runner> {
     let mut r = Runner::from_env()?;
+    // the divide unit rounds to nearest in the game (checking.md F4b3l)
+    r.float_rules = r5900::ps2float::Rules::parse("div=n").unwrap();
     for f in [0x132308u32, 0x12fb40, 0x12d890, 0x12d6c0, 0x19b8c8, 0x19bb48, 0x102f50, 0x250d60, 0x250e98] {
         r.allow(f);
     }

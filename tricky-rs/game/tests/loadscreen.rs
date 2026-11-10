@@ -327,6 +327,8 @@ fn wf(m: &mut Mem, at: u32, v: f32) {
 #[test]
 fn loading_screens_match_the_original() {
     let Some(mut r) = Runner::from_env() else { return };
+    // the divide unit rounds to nearest in the game (checking.md F4b3l)
+    r.float_rules = r5900::ps2float::Rules::parse("div=n").unwrap();
     let funcs = [
         0x243c78u32, 0x243de8, 0x243ea0, 0x243f00, 0x244290, 0x244330, 0x2443b0, 0x244490, 0x2444c0, 0x244540, 0x2447a8,
         0x2449f8, 0x244b20, 0x244ee8, 0x244fc8, 0x245598, 0x2455c0, 0x245668, 0x245680, 0x2456b8, 0x245760, 0x245838,

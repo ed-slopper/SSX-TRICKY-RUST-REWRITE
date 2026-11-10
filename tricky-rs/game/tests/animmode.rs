@@ -143,6 +143,8 @@ fn make_world(g: &mut Rng, m: &mut Mem, none: u32) {
 #[test]
 fn the_motion_modes_match_the_original() {
     let Some(mut r) = Runner::from_env() else { return };
+    // the divide unit rounds to nearest in the game (checking.md F4b3l)
+    r.float_rules = r5900::ps2float::Rules::parse("div=n").unwrap();
     for f in [
         0x203a40u32, 0x203cf8, 0x203d38, 0x159a80, 0x159bb8, 0x159e80, 0x159ee8, 0x15a030, 0x2510f8, 0x160140, 0x1601d0,
         0x1605a0, 0x160680, 0x160af0, 0x160b20, 0x161118, 0x161300,

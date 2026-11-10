@@ -56,27 +56,16 @@ fn rf(m: &Mem, a: u32) -> F {
 fn wf(m: &mut Mem, a: u32, v: F) {
     m.w32(a, v.0.to_bits());
 }
-/// `div.s` as the EE does it: toward zero (the largest float for a zero divisor, as [`F`])
+/// `div.s` as the game does it in normal play: to nearest (the largest float for a zero divisor, as [`F`]).
+/// Proven from the running game (`checking.md` F4b3l): `AnimClip_GetPhase` 0x159e80's `div.s` in 182 bump ticks
+/// of rec15, and the air step's divides (F4g, 341 of 341); toward zero, as the EE manual says, misses both.
 pub fn div(a: F, b: F) -> F {
-    let (x, y) = (a.ee(), b.ee());
-    if y == 0.0 {
-        return a / b;
-    }
-    let q = x as f64 / y as f64;
-    let mut r = q as f32;
-    if (r as f64).abs() > q.abs() {
-        r = f32::from_bits(r.to_bits() - 1);
-    }
-    F(r) * F(1.0)
+    a / b
 }
-/// `sqrt.s` as the EE does it: of the absolute value, toward zero
+/// `sqrt.s` as the game does it: of the absolute value, to nearest, as [`div`] (the same divide unit; the runner's
+/// `div` rule covers both). Inferred: no recording yet tells a `sqrt.s` apart (`checking.md` F4b3l).
 pub fn sqrt(a: F) -> F {
-    let q = (a.ee().abs() as f64).sqrt();
-    let mut r = q as f32;
-    if r as f64 > q {
-        r = f32::from_bits(r.to_bits() - 1);
-    }
-    F(r) * F(1.0)
+    F((a.ee().abs() as f64).sqrt() as f32) * F(1.0)
 }
 /// `cvt.s.w` as the EE does it: toward zero (exact below 2^24)
 pub fn cvt_s_w(v: i32) -> F {

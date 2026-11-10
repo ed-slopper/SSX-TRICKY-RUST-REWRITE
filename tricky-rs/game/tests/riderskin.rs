@@ -214,6 +214,8 @@ fn part_data(g: &mut Rng, m: &mut Mem, hdr: u32, data: u32, kind: u8, kinds: u32
 #[test]
 fn rider_skin_matches_the_original() {
     let Some(mut r) = Runner::from_env() else { return };
+    // the divide unit rounds to nearest in the game (checking.md F4b3l)
+    r.float_rules = r5900::ps2float::Rules::parse("div=n").unwrap();
     let funcs = [0x206f80u32, 0x207040, 0x2070a8, 0x2070e8, 0x207198, 0x207b58, 0x207e50, 0x208010, 0x208220, 0x2082b8, 0x208328, 0x2083d8, 0x2083e8];
     for f in funcs.into_iter().chain([0x203e88, 0x203f08, 0x203f60, 0x203fa0, 0x205068, 0x2057a0, 0x206e30, 0x2054f0, 0x206ea0, 0x2055c0, 0x206f10, 0x205670, 0x2044c0, 0x204598, 0x250c10, 0x102f50, 0x178078]) {
         r.allow(f);

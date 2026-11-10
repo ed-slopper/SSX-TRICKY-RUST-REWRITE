@@ -48,6 +48,8 @@ fn wf(m: &mut Mem, at: u32, v: f32) {
 #[test]
 fn limb_ik_matches_the_original() {
     let Some(mut r) = Runner::from_env() else { return };
+    // the divide unit rounds to nearest in the game (checking.md F4b3l)
+    r.float_rules = r5900::ps2float::Rules::parse("div=n").unwrap();
     let funcs = [0x2059f8u32, 0x205a78, 0x205e98, 0x208398, 0x2083f8];
     for f in funcs.into_iter().chain([0x250c10, 0x250fd0]) {
         r.allow(f);

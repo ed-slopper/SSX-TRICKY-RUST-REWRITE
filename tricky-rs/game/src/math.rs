@@ -83,7 +83,7 @@ pub fn asin(x: f32) -> f32 {
     HALF_PI - t.abs().sqrt() * (asin_poly(t) + 1.0)
 }
 
-/// `Math_Asin` 0x250fd0 as the EE makes it: its `sqrt.s` toward zero (`animseq::sqrt`), every step a float op
+/// `Math_Asin` 0x250fd0 as the EE makes it: its `sqrt.s` as `animseq::sqrt` (to nearest since F4b3l), every step a float op
 pub fn asin_ee(x: crate::ps2f::F) -> crate::ps2f::F {
     use crate::ps2f::F;
     let poly = |t: F| t * (F(A1) + t * (F(A2) + t * (F(A3) + t * F(A4))));
@@ -104,8 +104,8 @@ pub fn atan(x: f32) -> f32 {
     atan_with(x, |a, b| a / b, |a: f32| a.abs().sqrt())
 }
 
-/// `Math_Atan` with its divisions and square roots made by `div` and `sqrt` (the EE's round toward zero, see
-/// `animseq::div` / `animseq::sqrt`)
+/// `Math_Atan` with its divisions and square roots made by `div` and `sqrt` (the game's, see
+/// `animseq::div` / `animseq::sqrt`: to nearest since F4b3l)
 pub fn atan_with(x: f32, div: impl Fn(f32, f32) -> f32, sqrt: impl Fn(f32) -> f32) -> f32 {
     if x < -1.0 {
         let t = div(1.0, x * x + 1.0);

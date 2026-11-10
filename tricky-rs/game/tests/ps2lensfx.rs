@@ -98,6 +98,8 @@ fn wf(m: &mut Mem, at: u32, v: f32) {
 #[test]
 fn ps2_lens_fx_matches_the_original() {
     let Some(mut r) = Runner::from_env() else { return };
+    // the divide unit rounds to nearest in the game (checking.md F4b3l)
+    r.float_rules = r5900::ps2float::Rules::parse("div=n").unwrap();
     for a in [0x1ea408u32, 0x1ea4d0, 0x1ea508, 0x1ea520, 0x1ea990, 0x1eaa40, 0x1eaa68, 0x1eab88, 0x1eab90, 0x1eb0a8, 0x2f79a8, 0x2f7018] {
         r.allow(a);
     }

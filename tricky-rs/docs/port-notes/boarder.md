@@ -1285,8 +1285,8 @@ vtables' entries.
 - **`BdrSeq_Create` 0x15a700:** 0x90 bytes from the node pool 0x345e48 (named "BdrSeq"), zeroed. Then the
   constructor sets the skeleton sequence's vtable and reset, its own vtable, no trees and no keys, and calls the
   reset.
-- **The EE's division rounds toward zero** (the runner's rule), where `ps2f::F` rounds to nearest. The port divides
-  with its own chopped `div`. The last bit of the fade rates depends on it.
+- **The game's division rounds to nearest** (F4b3l; this said toward zero, the runner's old default, until then). The
+  port divides with `animseq::div`, which is `ps2f::F`'s divide. The last bit of the fade rates depends on it.
 
 Checked in the runner on 40,000 random worlds: three layers with sequences linked on them and some loose, the
 sequences' fields (often whole or half frames, and weights that land exactly on 1 and 0), their trees and headers,
@@ -1401,7 +1401,7 @@ exe table by board class (rider+0x420). Riding switch (+0x1b4) mirrors the input
 - **7, crouch-steer (0x3794b8, 0x78 a class):** two clips weighted 1 − crouch and crouch.
   - With no steer (+0x214), or row 1 or 2: words 0x50 / 0x64, held and advanced by time.
   - Otherwise 0 / 0x14 steering right or 0x28 / 0x3c steering left, at |steer| of their length.
-- **The EE's rounding:** the runner rounds `sqrt.s` like division, toward zero. `Math_Atan` divides and takes a
+- **The EE's rounding:** the runner rounds `sqrt.s` like division, to nearest since F4b3l (toward zero before). `Math_Atan` divides and takes a
   square root, so the port uses `math::atan_with` with `animseq::div` / `animseq::sqrt`. With the plain `math::atan`,
   a quarter of the angles differ in the last bit. The ports checked with all-nearest rules keep `math::atan`.
 
@@ -1474,7 +1474,7 @@ operations, as `tools/r5900` runs them), which capstone shows as `.word` or Octe
   when its absolute angles sum to less. `Euler_Lerp` 0x202758 adds t times that delta; `Euler_LerpArray` does it in
   place on lists of pointers.
 - **0x250c10 (the sine and cosine pair):** the sine comes from its polynomial on the quarter turn's remainder, and
-  the cosine is √(1 − sin²). The quarter swaps and negates them. The square root is the EE's, toward zero.
+  the cosine is √(1 − sin²). The quarter swaps and negates them. The square root is the EE's (`animseq::sqrt`, to nearest since F4b3l).
 
 Checked in the runner on 60,000 random curves, files, triples and angles, about 7,500 calls for each of 8 functions.
 The curves sat at unaligned addresses, and some runs had a negative count. 29 of 31 mutants were caught. The

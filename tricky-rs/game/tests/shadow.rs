@@ -67,6 +67,8 @@ impl ParticleDrawEnv for Ours {
 #[test]
 fn shadow_set_up_and_draw_match_the_original() {
     let Some(mut r) = Runner::from_env() else { return };
+    // the divide unit rounds to nearest in the game (checking.md F4b3l)
+    r.float_rules = r5900::ps2float::Rules::parse("div=n").unwrap();
     for f in [0x1c8c38u32, 0x1c8c70, 0x1c8bc8] {
         r.allow(f);
     }
@@ -162,6 +164,8 @@ impl Rng {
 #[test]
 fn shadow_update_matches_the_original() {
     let Some(mut r) = Runner::from_env() else { return };
+    // the divide unit rounds to nearest in the game (checking.md F4b3l)
+    r.float_rules = r5900::ps2float::Rules::parse("div=n").unwrap();
     for f in [0x1c7e90u32, 0x137108, 0x137140] {
         r.allow(f);
     }

@@ -184,6 +184,8 @@ fn make_pose(g: &mut Rng, m: &mut Mem, w: &World, at: u32, skel: bool) {
 #[test]
 fn the_pose_blend_matches_the_original() {
     let Some(mut r) = Runner::from_env() else { return };
+    // the divide unit rounds to nearest in the game (checking.md F4b3l)
+    r.float_rules = r5900::ps2float::Rules::parse("div=n").unwrap();
     for f in [
         0x157ed8u32, 0x158030, 0x202520, 0x102f80, 0x202758, 0x2027f0, 0x250c10, 0x202868, 0x202930, 0x202990, 0x2029d8,
         0x159910, 0x202b00, 0x15f7c8,

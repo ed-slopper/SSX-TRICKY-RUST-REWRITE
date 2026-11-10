@@ -93,6 +93,8 @@ fn wf(m: &mut Mem, at: u32, v: f32) {
 #[test]
 fn marker_draw_matches_the_original() {
     let Some(mut r) = Runner::from_env() else { return };
+    // the divide unit rounds to nearest in the game (checking.md F4b3l)
+    r.float_rules = r5900::ps2float::Rules::parse("div=n").unwrap();
     r.allow(0x133c20);
     let log: Rc<RefCell<Vec<Call>>> = Rc::default();
     for off in SLOTS {

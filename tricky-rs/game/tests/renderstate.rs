@@ -101,6 +101,8 @@ fn wf(m: &mut Mem, at: u32, v: f32) {
 #[test]
 fn renderer_state_virtuals_match_the_original() {
     let Some(mut r) = Runner::from_env() else { return };
+    // the divide unit rounds to nearest in the game (checking.md F4b3l)
+    r.float_rules = r5900::ps2float::Rules::parse("div=n").unwrap();
     r.load_vu0_chain(0x31cac0).unwrap();
     for f in [0x1dcc10u32, 0x1e8958, 0x1e9970, 0x1e1648, 0x1e14b8, 0x1e1510, 0x1e1668, 0x1e9698, 0x1e9670, 0x1e94e8, 0x1e9478, 0x1e9458, 0x1e9448, 0x1e9418, 0x1e9378, 0x1e9338, 0x1e91e8, 0x1e9098, 0x1e1e10, 0x1e9ef0, 0x1e8fd8] {
         r.allow(f);

@@ -66,6 +66,8 @@ impl RiderDrawEnv for Ours {
 #[test]
 fn strips_match_the_original() {
     let Some(mut r) = Runner::from_env() else { return };
+    // the divide unit rounds to nearest in the game (checking.md F4b3l)
+    r.float_rules = r5900::ps2float::Rules::parse("div=n").unwrap();
     r.allow(0x1de7c8);
     let log: Rc<RefCell<Vec<Call>>> = Rc::default();
     for func in [rd::MATRIX_UPDATE, rd::SUBMIT] {
@@ -127,6 +129,8 @@ impl Rng {
 #[test]
 fn sprite_matches_the_original() {
     let Some(mut r) = Runner::from_env() else { return };
+    // the divide unit rounds to nearest in the game (checking.md F4b3l)
+    r.float_rules = r5900::ps2float::Rules::parse("div=n").unwrap();
     r.allow(0x1dd5c8);
     let log: Rc<RefCell<Vec<Call>>> = Rc::default();
     for func in [rd::MATRIX_UPDATE, rd::SUBMIT] {
@@ -217,6 +221,8 @@ fn sprite_matches_the_original() {
 #[test]
 fn program9_data_and_skin_blend_match_the_original() {
     let Some(mut r) = Runner::from_env() else { return };
+    // the divide unit rounds to nearest in the game (checking.md F4b3l)
+    r.float_rules = r5900::ps2float::Rules::parse("div=n").unwrap();
     r.allow(0x1dfe30);
     r.allow(0x1e7ac0);
     const MATS: u32 = ARENA + 0x8000;
@@ -333,6 +339,8 @@ impl RiderDrawEnv for BoardEnv<'_> {
 #[test]
 fn board_shadow_matches_the_original() {
     let Some(mut r) = Runner::from_env() else { return };
+    // the divide unit rounds to nearest in the game (checking.md F4b3l)
+    r.float_rules = r5900::ps2float::Rules::parse("div=n").unwrap();
     r.allow(0x1dff88);
     // `memset` (ported; its MMI fill is not in the runner): the bytes set
     r.stub(0x2fb468, |c, mem| {
@@ -525,6 +533,8 @@ impl RiderDrawEnv for SkinEnv<'_> {
 #[test]
 fn skinned_draw_matches_the_original() {
     let Some(mut r) = Runner::from_env() else { return };
+    // the divide unit rounds to nearest in the game (checking.md F4b3l)
+    r.float_rules = r5900::ps2float::Rules::parse("div=n").unwrap();
     r.allow(0x1df478);
     const RVT: u32 = ARENA + 0x2800;
     const APPOBJ: u32 = ARENA + 0x2c00;
@@ -670,6 +680,8 @@ fn skinned_draw_matches_the_original() {
 #[test]
 fn text_matches_the_original() {
     let Some(mut r) = Runner::from_env() else { return };
+    // the divide unit rounds to nearest in the game (checking.md F4b3l)
+    r.float_rules = r5900::ps2float::Rules::parse("div=n").unwrap();
     r.allow(0x1de0e0);
     const FONT: u32 = ARENA + 0x3000;
     const GLYPHS: u32 = ARENA + 0x3100;

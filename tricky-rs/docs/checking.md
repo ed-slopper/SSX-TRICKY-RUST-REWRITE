@@ -707,7 +707,7 @@ quaternion is the game's in 876, the runner's in 1,058 under `fadd=g1`. rec14 (n
 
 What is left:
 - Bump turns: in 182 bump ticks ours turns 1 ulp off the game's, which the runner (`div=n`) has right: `animseq::div`
-  rounds `AnimClip_GetPhase`'s `div.s` toward zero, the game here to nearest (row F4b3l). Ours rotates under IEEE,
+  rounded `AnimClip_GetPhase`'s `div.s` toward zero, the game here to nearest (fixed in F4b3l). Ours rotates under IEEE,
   the game under PCSX2's adder (as the motion, F4g).
 - Cruise (3) and prewind (0xe) need the pad word: 48 ticks 3 → 0xe, 6 ticks 3 → 4, 2 ticks 3 → 2, 48 ticks 0xe → 0xa
   (the release) miss the state (row F4b3k). No fakie cruise (5) in rec15.
@@ -833,6 +833,28 @@ sample's.
   rest are F4h5's and rec11's missing windows). Ours still equals the runner under IEEE.
 - Spin ticks (rec8) under `fadd=g1`: quaternion 5,090 (5,077), axes 5,088 (5,075), spin 5,059 (5,046), angle left
   5,091 (5,078) of 5,124. Under IEEE ours and the runner agree (quaternion 1,592, spin 4,518, angle left 4,211).
+
+## F4b3l: the game's divide rounds to nearest (2026-11-09)
+
+The EE manual says `div.s` rounds toward zero, and so did `animseq::div` (and `animseq::sqrt`) and the runner's
+default rule. The running game does not:
+- **Proven, rec15:** `AnimClip_GetPhase` 0x159e80 divides the sequence's time by the clip's length (`div.s`). In the
+  182 bump ticks where that quotient is not exact, the bump control's turn (`BumpControl_Update` 0x1041b0, F4b3i)
+  is the game's only with the divide to nearest: ours (toward zero) was 1 ulp off, the runner with `div=n` right.
+- **Proven, F4g:** the air step's divides, 341 of 341 to nearest, 252 toward zero.
+- **Inferred:** `sqrt.s` rounds as the divide (same unit; the runner's `div` rule has always covered both, and
+  PCSX2 has one rounding setting for the two). No recording tells a square root apart yet.
+
+So `animseq::div` is now `ps2f::F`'s divide (to nearest, the EE's clamps) and `animseq::sqrt` rounds to nearest.
+Every port that uses them (the animation sequences, controller, data, modes, pose, curves; fog, lights, snowfall,
+the lens effects, the shadow, the skin, the limb IK, the draws) now divides as the game does. Their 29 runner tests
+ran the game's code under the runner's default `div=chop`; each now sets `div=n` (one line after its
+`Runner::from_env()`), and all pass (before the change all passed under chop; with it and without `div=n` the 29
+failed). The runner's default stays `div=chop` for the other tests (row F4b3n).
+
+rec15 ground ticks: the controls run by ours on the runner's rider now give the runner's IEEE result in 1,075 of
+1,075 (was 1,000); the quaternion is the game's in 877 under `fadd=g1` (876 before; the runner's 1,058: the rest is
+PCSX2's adder, which ours doesn't use, F4c). Take-offs (rec16, rec15) and spin ticks (rec8) are unchanged.
 
 ## How a row gets to `checked`
 

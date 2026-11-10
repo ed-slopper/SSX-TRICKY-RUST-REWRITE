@@ -112,6 +112,8 @@ fn matrix(g: &mut Rng, m: &mut Mem, at: u32) {
 #[test]
 fn skinning_matches_the_original() {
     let Some(mut r) = Runner::from_env() else { return };
+    // the divide unit rounds to nearest in the game (checking.md F4b3l)
+    r.float_rules = r5900::ps2float::Rules::parse("div=n").unwrap();
     for f in [0x207c30u32, 0x207f18, 0x208400, 0x206818, 0x250c10] {
         r.allow(f);
     }

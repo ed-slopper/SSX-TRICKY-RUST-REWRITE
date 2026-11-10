@@ -41,7 +41,7 @@ fn rider(m: &Mem, ctl: u32) -> u32 {
     m.r32(ctl + 0x24)
 }
 
-/// `Math_Atan` 0x2510f8 with the EE's division and square root (toward zero)
+/// `Math_Atan` 0x2510f8 with the game's division and square root (`animseq::div` / `animseq::sqrt`, to nearest: F4b3l)
 fn atan(x: F) -> F {
     F(crate::math::atan_with(x.0, |a, b| div(F(a), F(b)).0, |a| sqrt(F(a)).0))
 }

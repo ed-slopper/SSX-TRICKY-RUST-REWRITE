@@ -8,7 +8,7 @@ use tricky_data::ltg::{INode, Ltg};
 
 /// The INode coordinates of (x, y) as `WorldGrid_CellAtPos` makes them: an INode's size is the TGroup size over
 /// the INodes a side, made a whole number (toward zero); then (p − the grid's corner) over that, toward zero. The EE's
-/// division and conversions (both toward zero)
+/// division (to nearest, F4b3l) and conversions (toward zero)
 pub fn inode_coords(ltg: &Ltg, x: f32, y: f32) -> (i32, i32) {
     let size = cvt_s_w(div(F(ltg.tgroup_size), cvt_s_w(ltg.inode_wide)).ee() as i32);
     let cx = div(F(x) - F(ltg.bbox.min[0]), size).ee() as i32;

@@ -840,8 +840,8 @@ their sky. 37 of 38 mutants were caught. The one left is equivalent (the count l
   game calls it. With a negative n it never ends once the list is empty.
 - **`WorldGrid_CellAtPos` 0x260b18**(&grid, p, &x, &y): with no grid, 0, and the coordinates are not written.
   Otherwise an INode's size is the TGroup size (+0x28) over the INodes a side (+0x44), made a whole number. The
-  coordinates are (p − the grid's corner (+4, +8)) over that size, toward zero (the EE's division and
-  conversions). They are written out, and the INode there is `WorldGrid_CellAt`'s (`data::ltg::Ltg::inode_at`).
+  coordinates are (p − the grid's corner (+4, +8)) over that size, toward zero (the EE's division, to nearest since
+  F4b3l, and conversions). They are written out, and the INode there is `WorldGrid_CellAt`'s (`data::ltg::Ltg::inode_at`).
   Checked on all twelve courses' grids at 4,000 points each, some exactly on INode corners.
 - The other users of the `.ltg` grid are the world's walks over its cells. The snow's and the fog's are ported
   (G7c1, G7c2) and the line queries' too (E7a). Drawing the terrain and the objects belongs to G7a and G7b.
@@ -2591,9 +2591,9 @@ values. With zeros there, the inverse pose's results come out the same whatever 
      products, and skipped when the length is 0.001 or less.
   4. The middle bone is the upper's matrix times a turn of −the knee angle about z. The end bone's place is the
      middle's matrix times its offset.
-- **`Math_Asin`'s square root is the FPU's `sqrt.s`**, which the EE rounds toward zero. The port's existing
-  `math::asin` rounds to nearest, so the IK uses a new `math::asin_ee` with the EE's rounding. That is the one-bit
-  difference the first run of the test found.
+- **`Math_Asin`'s square root is the FPU's `sqrt.s`**, which the runner rounded toward zero (its old default). The
+  port's `math::asin` rounds to nearest, so the IK uses `math::asin_ee` with `animseq::sqrt`. Since F4b3l both round
+  to nearest (`checking.md` F4b3l) and the IK test runs with `div=n`.
 
 Checked in the runner (`tests/limbik.rs`): 2000 cases of each of the five functions, on 19-bone skeletons with
 random angles, offsets and lengths, a random root, and targets near and far (5721 knees bent, 279 near
