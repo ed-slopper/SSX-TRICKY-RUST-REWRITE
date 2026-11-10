@@ -1257,6 +1257,36 @@ the game's motion left (v + gain rounds), so this is as far as the stand-in goes
 riders' own ticks in the frame (the wipe-out motion `Ragdoll_Step`, `AirMotion_Update` 0x108378) instead of taking
 the second sample.
 
+## F4b3v: the riders in the air and in motion 4 replayed in the frame (2026-11-10)
+
+Proven (`cBoarder::vf7` 0x117198, `Boarder_UpdateMotion` 0x11c770): motion 1 runs `AirMotion_Update` 0x108378,
+whose first step is `Air_IntegrateRK4` 0x12b340(rider, +0x140, +0x150, 0) with dt = +0x12c × 0.016666668; after
+the motion the speed limit (0x1179a4..0x117ab0) is skipped for motion 1 (`beq` at 0x11799c) and run for every other
+motion. Motion 4 does nothing in `Boarder_UpdateMotion` (case 4 returns).
+
+Now (`tests/ground_motion.rs`) a rider not replayed that is in motion 1 at both samples ticks with its flight step
+(ours: `air::integrate_rk4`; the runner ways: the game's 0x12b340) from where the riders before it left it, position
+and velocity (TRICKY_AIRPOS=off: the velocity only); one in motion 4 at both samples keeps its velocity, then the
+speed limit. Either is taken only when it lands within 1 cm/s of the second sample less our hits (F4b3s): the rest
+of the air tick (the down ray, a wall ray that hit: rec14 1399, 1402, 5177, 7650, 7662) is not replayed, and there
+the second sample less our hits stays (STANDIN). TRICKY_NOAIR turns both off.
+
+The flight step gives the second sample's velocity on 11,639 of 11,640 air frames of rec14 (10,736 of 10,737 rec15,
+19,671 of 19,674 rec16, 21,991 of 21,994 rec17; the misses are hit in the frame); motion 4 is right on every one.
+
+| `fadd=g1` | hit ticks: position right, velocity right | pushed ticks, every field | ground ticks, every field |
+|---|---|---|---|
+| rec14 | 124, 125 → 128 of 141 | 220 → 222 of 346 | 37,239 → 37,241 |
+| rec15 | 99, 95 → 100 of 108 | 225 → 229 of 249 | 37,305 → 37,309 |
+| rec16 | 218, 214 → 218 of 257 | 464 → 468 of 571 | 51,714 → 51,719 |
+| rec17 | 331, 331 → 335 of 358 | 834 → 838 of 879 | 71,253 → 71,257 |
+
+Bumps, shoves and states unchanged. Of F4b3u's 15 ticks 13 are right; left: rec16 14535 r0 and 14538 r0 (1 ulp),
+hit by rider 1 wiped out (motion 5). The wipe-out riders still need the trial passes (TRICKY_PREHIT): with them off,
+rec14 falls to 37,234, rec16 to 51,699. Next (row F4b3w): replay the wipe-out motion (`Boarder_UpdateMotion` case
+5: `Ragdoll_Step`, the translate around it, `Ragdoll_GroundProbe`, the wall collision) in the frame and drop the
+trial passes.
+
 ## How a row gets to `checked`
 
 1. Port the function (address in its doc comment, AGENTS.md §13).

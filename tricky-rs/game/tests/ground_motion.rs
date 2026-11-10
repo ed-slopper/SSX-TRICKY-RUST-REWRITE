@@ -1582,6 +1582,8 @@ fn ground_ticks_against_the_running_game() {
     let mut pushed_whole = vec![0usize; 1 + runners.len()];
     let lifts = std::env::var("TRICKY_NOLIFT").is_err();
     let mut lifted = 0;
+    // the riders in the air the whole frame, their flight step replayed: [frames, velocity right, position right] by way
+    let mut flights = vec![[0usize; 3]; 1 + runners.len()];
     // pushed ticks under fadd=g1 by whether the rider was also hit (the game's bump record +0x40 + 0x20·j +8 holds
     // the second sample's tick): [hit][position right], and of the hit ones how many have the velocity right
     let mut pushed_pos = [[0usize; 2]; 2];
@@ -1746,6 +1748,9 @@ fn ground_ticks_against_the_running_game() {
         let mut seq: Vec<Vec<V4>> = vec![vec![[0.0; 4]]; n];
         let trials: usize = std::env::var("TRICKY_PREHIT").map_or(64, |v| if v == "off" { 0 } else { v.parse().unwrap() });
         let mut trial = trials > 0;
+        let air = std::env::var("TRICKY_NOAIR").is_err();
+        // (TRICKY_AIRPOS=off: the flight step's position not taken; its body stays as the first sample holds it either way)
+        let air_pos = std::env::var("TRICKY_AIRPOS").map_or(true, |v| v != "off");
         let mut passes = 0;
         let mut step = 0;
         while step < 1 + runners.len() {
@@ -1759,6 +1764,7 @@ fn ground_ticks_against_the_running_game() {
             let mut done: Vec<Option<(Rider, f32)>> = vec![None; n];
             // where the riders not replayed were before their collisions (position, velocity)
             let mut snap: Vec<Option<(V4, V4)>> = vec![None; n];
+            let mut flown = vec![false; n];
             for &me in &order {
                 let (a, b) = (&w[0].riders[me], &w[1].riders[me]);
                 // a rider an earlier one stumbled out of the cruise in this frame ticks with the boost off (F4b3r)
@@ -1823,7 +1829,50 @@ fn ground_ticks_against_the_running_game() {
                         let (p, q) = (vec4(a, 0x140), vec4(b, 0x140));
                         f.body[me].translate([q[0] - p[0], q[1] - p[1], q[2] - p[2], q[3] - p[3]]);
                     }
+                    let start = (riders[me].pos, riders[me].vel);
                     riders[me].vel = sub4(vec4(b, 0x150), fix[me]);
+                    // a rider in the air the whole frame (F4b3v): its flight step, `Air_IntegrateRK4` 0x12b340 as
+                    // `AirMotion_Update` 0x108378 calls it first (dt = +0x12c / 60), from where the riders before it
+                    // left it; no speed limit in the air (`cBoarder::vf7` 0x117998). STANDIN: the rest of the air
+                    // tick (the landing and wall rays, its own wall pushes) is taken as missed (TRICKY_NOAIR: the
+                    // second sample less our hits, as for the others)
+                    if u32_le(a, 0x424) == 1 && u32_le(b, 0x424) == 1 && air {
+                        let dt = f32_at(a, 0x12c) * f32::from_bits(0x3c88_8889);
+                        let (mut pos, mut vel) = start;
+                        if k == 0 {
+                            tricky_game::air::integrate_rk4(dt, &mut pos, &mut vel, false);
+                        } else {
+                            let g = &mut runners[k - 1].1;
+                            wv(&mut g.r.mem, g.rd + 0x140, pos);
+                            wv(&mut g.r.mem, g.rd + 0x150, vel);
+                            g.r.cpu.set_gpr(4, g.rd as u64);
+                            g.r.cpu.set_gpr(5, (g.rd + 0x140) as u64);
+                            g.r.cpu.set_gpr(6, (g.rd + 0x150) as u64);
+                            g.r.cpu.set_gpr(7, 0);
+                            g.r.cpu.set_f(12, dt);
+                            g.r.call(0x12b340).unwrap_or_else(|e| panic!("tick {} rider {me}: the flight step: {e:?}", w[0].tick));
+                            (pos, vel) = (rv(&mut g.r.mem, g.rd + 0x140), rv(&mut g.r.mem, g.rd + 0x150));
+                        }
+                        // a wall ray that hit turns the velocity far from the flight step's: then the second
+                        // sample less our hits, as for the others (STANDIN: the wall ray not replayed)
+                        let d = sub4(vel, riders[me].vel);
+                        if d.iter().all(|x| x.abs() < 1.0) {
+                            riders[me].vel = vel;
+                            if air_pos {
+                                riders[me].pos = pos;
+                            }
+                            flown[me] = true;
+                        }
+                    }
+                    // motion 4 the whole frame: `Boarder_UpdateMotion` 0x11c770 does nothing for it, then the speed
+                    // limit (0x1179a4) as on the snow (F4b3v: rec14 4862, rider 3)
+                    if u32_le(a, 0x424) == 4 && u32_le(b, 0x424) == 4 && air {
+                        let vel = speed_limit(start.1, speed_limit_at(a, b, boost, if k == 0 { |x, y| x - y } else { r5900::ps2float::fsub }));
+                        if sub4(vel, riders[me].vel).iter().all(|x| x.abs() < 1.0) {
+                            riders[me].vel = vel;
+                            flown[me] = true;
+                        }
+                    }
                     riders[me].motion = u32_le(b, 0x424);
                     f.hit[me] = HitRider { vel: riders[me].vel, ..hit_rider(b) };
                     snap[me] = Some((riders[me].pos, riders[me].vel));
@@ -1919,6 +1968,17 @@ fn ground_ticks_against_the_running_game() {
                     }
                 }
             }
+            for i in (0..n).filter(|&i| flown[i]) {
+                let b = &w[1].riders[i];
+                flights[k][0] += 1;
+                flights[k][1] += (riders[i].vel == vec4(b, 0x150)) as usize;
+                flights[k][2] += (riders[i].pos == vec4(b, 0x140)) as usize;
+                if k == runners.len() && riders[i].vel != vec4(b, 0x150) && std::env::var("TRICKY_DBG").is_ok() {
+                    let (o, g) = (riders[i].vel, vec4(b, 0x150));
+                    eprintln!("DBG flight tick {tick} rider {i}: hits {} ulps {:?}", f.hits[i], (0..3).map(|c| o[c].to_bits() as i64 - g[c].to_bits() as i64).collect::<Vec<_>>());
+                    eprintln!("    a {:?} ts {} ours {o:?} game {g:?}", vec4(&w[0].riders[i], 0x150), f32_at(&w[0].riders[i], 0x12c));
+                }
+            }
             if k == runners.len() {
                 frame_pushes = f.pushes.clone();
                 frame_hits = f.hits.clone();
@@ -1999,6 +2059,7 @@ fn ground_ticks_against_the_running_game() {
         eprintln!("  shove records (+0x40 + 0x20·j +0xc) changed this frame by the game or the replay: {shoves}, the replay's equal to the game's: {shoves_right}");
         eprintln!("  the wipe-out motion's flight predictions (motion 5 at both samples, window 57b0): {}, right from the end of the tick {}, from it less the pushes and hits after the motion {}", wiped[0], wiped[1], wiped[2]);
         eprintln!("  bodies read before `cPostAI::vf1` re-posed them, placed by a guess (TRICKY_STALE=keep: as read): {stale_bodies}");
+        eprintln!("  riders in the air the whole frame, their flight step replayed (TRICKY_NOAIR: as recorded) [frames, velocity right, position right] by way: {flights:?}");
         eprintln!("  riders leaving the snow in a replayed frame, their take-off replayed for their pushes and hits (TRICKY_NOLIFT: as recorded): {lifted}");
     }
     for (k, way) in ["ours (ground_motion::update)".to_string()].into_iter().chain(runners.iter().map(|(r, _)| format!("the game's in the runner, {r}"))).enumerate() {
