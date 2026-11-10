@@ -249,7 +249,12 @@ def main(argv):
         size = int(argv[3], 0) if len(argv) >= 4 else 0x600
         # a window's offset may follow pointers: `5ae0>600:230` reads the word at rider+0x5ae0 and then 0x230 bytes
         # at that word + 0x600 (each `>k` steps through one more pointer)
-        extra = [(o, [int(x, 16) for x in o.split(">")], int(n, 16)) for o, n in (w.split(":") for w in argv[4:])]
+        # `L700:78` walks the list whose head is at rider+0x700 (`Boarder_RiderCollisions` 0x123fc8's pairs: a node
+        # has the two heads at +0, +4 and their next nodes at +8, +0xc, its side `Obj_HasId` 0x110838 = node+4 is
+        # ours): each node as its address and 0x10 bytes, as many as fit in 0x78 (zeros after the last)
+        lists = [(w, int(w[1:].split(":")[0], 16), int(w.split(":")[1], 16)) for w in argv[4:] if w.startswith("L")]
+        extra = [(o, [int(x, 16) for x in o.split(">")], int(n, 16))
+                 for o, n in (w.split(":") for w in argv[4:] if not w.startswith("L"))]
         race, riders = find_race(p)
         if race is None:
             sys.exit("no race found (is a race running?)")
@@ -257,7 +262,8 @@ def main(argv):
         kept, last, t0, counts = 0, None, time.time(), None
         with open(out, "w", encoding="ascii") as f:
             f.write(f"race {race:x} riders {' '.join(f'{r:x}' for r in riders)} bytes {size:x} pad {pad or 0:x}"
-                    + "".join(f" extra {o} {n:x}" for o, _, n in extra) + "\n")
+                    + "".join(f" extra {o} {n:x}" for o, _, n in extra)
+                    + "".join(f" extra {w.split(':')[0]} {n:x}" for w, _, n in lists) + "\n")
             while time.time() - t0 < seconds:
                 tick = p.read32(race + RACE_TICK)
                 if tick == last:
@@ -293,9 +299,24 @@ def main(argv):
                     for i, b in zip(todo, more):
                         wins[i] = b
                     level += 1
+                walked = []
+                if lists:
+                    heads = [(r + o, n) for _, o, n in lists for r in riders]
+                    cur = [struct.unpack("<I", b)[0] for b in p.read_blocks([(h, 4) for h, _ in heads])]
+                    walked = [b"" for _ in heads]
+                    for _ in range(16):
+                        todo = [i for i, c in enumerate(cur) if c and len(walked[i]) + 0x14 <= heads[i][1]]
+                        if not todo:
+                            break
+                        nodes = p.read_blocks([(cur[i] & 0x1FFFFFF, 0x10) for i in todo])
+                        for i, b in zip(todo, nodes):
+                            walked[i] += struct.pack("<I", cur[i]) + b
+                            side = struct.unpack("<I", b[4:8])[0] == heads[i][0]
+                            cur[i] = struct.unpack("<I", b[8 + 4 * side:12 + 4 * side])[0]
+                    walked = [w + bytes(n - len(w)) for w, (_, n) in zip(walked, heads)]
                 if struct.unpack("<I", got[0])[0] != tick or p.read32(race + RACE_TICK) != tick:
                     continue  # the game moved on while we read: drop the sample
-                blocks = got[1:1 + k] + ([got[-1]] if pad else []) + wins
+                blocks = got[1:1 + k] + ([got[-1]] if pad else []) + wins + walked
                 f.write(f"tick {tick} " + " ".join(b.hex() for b in blocks) + "\n")
                 last, kept = tick, kept + 1
                 counts = p.read_blocks([(r + RIDER_TICKS, 4) for r in riders])

@@ -856,6 +856,42 @@ rec15 ground ticks: the controls run by ours on the runner's rider now give the 
 1,075 (was 1,000); the quaternion is the game's in 877 under `fadd=g1` (876 before; the runner's 1,058: the rest is
 PCSX2's adder, which ours doesn't use, F4c). Take-offs (rec16, rec15) and spin ticks (rec8) are unchanged.
 
+## F4b3j: the pair list and the air riders' bodies (2026-11-09)
+
+`tools/pine.py record` can now record the neighbour list a rider's collisions walk (`L700:78`: from the list head
+rider+0x700, each node's address and its first 0x10 bytes, up to six nodes); `tests/recording/mod.rs` reads it back
+(`pair_list`, `rider_addrs`). rec17 (Elysium Alps, 300 s, 17,976 ticks) has it. `ground_ticks_against_the_running_game`
+now walks each replayed rider's pairs in that order (the second sample's list; `TRICKY_LIST=a` the first's,
+`TRICKY_LIST=none` every other rider in slot order, as before and as recordings without the list do).
+
+Proven (code):
+- `Boarder_RiderCollisions` 0x123fc8 walks the list from rider+0x700: a node's +0 and +4 are the two riders' list
+  heads, the next node is at node+8 + 4·side (side: node+4 is this rider's head, `Obj_HasId` 0x110838); the other
+  rider is the object at the other head's +0x84 (id 0x3ef) less 0x82c.
+- `AirMotion_Update` 0x108378 integrates the position (`Air_IntegrateRK4`) and never moves the body by the step: its
+  only `Boarder_Translate` is the push out of the world after its ray cast. The bodies come from the bones in
+  `Boarder_UpdateBroadphase` 0x126748, which `cPostAI::vf1` 0x114730 calls for every rider after all have ticked. The
+  test moved an air rider's body by its step between the samples (F4b3g); it now leaves it as the first sample holds it
+  (`TRICKY_AIRSTEP=1` restores the old way).
+
+rec17 under `fadd=g1` (moving the air bodies in brackets): every field 71,209 (71,144) of 71,775; pushed ticks 874
+(896), every field right 799 (768); bump records changed 472 (534), equal 450 (438). rec15: every field 37,289
+(37,252), bumps 122 of 140 (120 of 184); rec16: 51,638 (51,622), bumps 374 of 420 (354 of 452). The list's order
+barely counts: rec17 with the first sample's list 71,210, with every rider 71,203 (all with the bodies left).
+
+What is left (row F4b3o, `TRICKY_DBG=1` lists them):
+- 11 pairs of rec17 whose bump the game and the replay disagree on: ground pairs at ticks 6533 (1-4), 11132 (1-2),
+  11818 (1-4), 2204 (2-4) the game's only, 10242 (1-4), 3881 (2-5), 664 (2-3) the replay's only; 1871 (0-3) with an
+  air rider, the game's only; 10937, 11006, 13565 with a wiped-out rider (motion 5 or 6), the game's only. The recorded bodies do not explain them: at 6532 riders 1 and 4 are
+  38 cm apart and the game bumps them in the next frame; from 10241 to 10244 they overlap by 3 to 5 cm and the game
+  bumps only at 10243. The gap jumps between samples (11, 5, 38, -3, 2 cm at 6530 to 6534): the bones may not be
+  posed every frame (`Boarder_UpdatePose` runs only when +0x46b0 is set, `cPostAI::vf1`), or the sample is read
+  across a frame.
+- 40 hit ticks with the velocity off: 27 with the position off too (the push vector), 6 by 1 to 4 ulps (ticks 9990,
+  11002, 11126, 2329, 2332, 2335: the hit's arithmetic is ours under IEEE, not the game's under PCSX2's adder), 7 far
+  with the position right (9055, 9808, 9987, 19130, 848, 1439, 2326).
+- `FrameRun` (the take-off test) still walks every other rider, not the list.
+
 ## How a row gets to `checked`
 
 1. Port the function (address in its doc comment, AGENTS.md §13).

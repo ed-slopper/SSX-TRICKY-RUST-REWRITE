@@ -41,7 +41,8 @@ pub fn load(path: &str) -> (usize, Vec<Tick>) {
             let mut extra = Vec::new();
             let mut chased = Vec::new();
             for (k, spec) in windows.iter().enumerate() {
-                if spec.contains('>') {
+                // (and the walked lists, `L700`: node address + 0x10 bytes each)
+                if spec.contains('>') || spec.starts_with('L') {
                     chased.push((spec.to_string(), blocks(k)));
                 } else {
                     extra.push((i64::from_str_radix(spec, 16).unwrap(), blocks(k)));
@@ -56,4 +57,33 @@ pub fn load(path: &str) -> (usize, Vec<Tick>) {
 
 pub fn u32_le(b: &[u8], off: usize) -> u32 {
     u32::from_le_bytes(b[off..off + 4].try_into().unwrap())
+}
+
+/// The riders' addresses, from the header (`race X riders a b c ... bytes N`)
+pub fn rider_addrs(path: &str) -> Vec<u32> {
+    let text = std::fs::read_to_string(path).unwrap_or_else(|e| panic!("{path}: {e}"));
+    let head: Vec<&str> = text.lines().next().expect("header").split_whitespace().collect();
+    let at = head.iter().position(|w| *w == "bytes").unwrap();
+    head[3..at].iter().map(|h| u32::from_str_radix(h, 16).unwrap()).collect()
+}
+
+/// Rider `me`'s pair list as `Boarder_RiderCollisions` 0x123fc8 walks it (the `L700` window: each node's address and
+/// its 0x10 bytes, the two list heads at +0 and +4): the other riders in the list's order (other objects left out).
+/// None without the window.
+pub fn pair_list(t: &Tick, addrs: &[u32], me: usize) -> Option<Vec<usize>> {
+    let (_, w) = t.chased.iter().find(|(s, _)| s == "L700")?;
+    let b = &w[me];
+    let head = addrs[me] + 0x700;
+    let mut list = Vec::new();
+    for k in (0..b.len() / 0x14).map(|k| k * 0x14) {
+        if b[k..k + 4] == [0; 4] {
+            break;
+        }
+        let key = |o: usize| u32::from_le_bytes(b[k + 4 + o..k + 8 + o].try_into().unwrap());
+        let other = if key(4) == head { key(0) } else { key(4) };
+        if let Some(j) = addrs.iter().position(|&a| a + 0x700 == other) {
+            list.push(j);
+        }
+    }
+    Some(list)
 }

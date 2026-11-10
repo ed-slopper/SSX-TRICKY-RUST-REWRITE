@@ -651,7 +651,7 @@ fn planted_bugs_are_caught() {
 }
 
 mod recording;
-use recording::{f32_at, load, u32_le, vec4};
+use recording::{f32_at, load, pair_list, rider_addrs, u32_le, vec4};
 
 /// The rider as `GroundMotion_Update` reads it, from a recorded rider block (0x600 bytes from the rider), its stats
 /// block, the ground motion object (its phase +8) and the animation's block at rider+0x46c0 (the clip +8).
@@ -873,9 +873,10 @@ fn body_of(r: &[u8]) -> CollBody {
 
 /// What `Boarder_RiderCollisions` 0x123fc8 (`ridercol::rider_collisions`, checked in `tests/ridercol.rs`) asks while
 /// one frame is replayed (board rows F4b3g, F4b3h). The bodies start as the first sample holds them (set by
-/// `Boarder_UpdateBroadphase` 0x126748 after every rider's tick; the ground motion does not move a body, the air
-/// motion does, by its step: taken as the rider's move between the samples) and are moved by the pushes
-/// (`Boarder_Translate` 0x1267a0). The hits are `hit::rider_hit` on the hit rider as it is at that moment (`hit`:
+/// `Boarder_UpdateBroadphase` 0x126748 from the bones, in `cPostAI::vf1` 0x114730 after every rider's tick; neither
+/// motion moves a body by its step: `AirMotion_Update` 0x108378 calls `Boarder_Translate` only to push a rider out
+/// of the world, F4b3j; TRICKY_AIRSTEP=1 moves an air rider's body by its step as before) and are moved by the
+/// pushes (`Boarder_Translate` 0x1267a0). The hits are `hit::rider_hit` on the hit rider as it is at that moment (`hit`:
 /// after its tick when it has ticked, else as the first sample holds it), with the pair's record from the second
 /// sample (+0x40 + 0x20·j: [0] the distance, [1] the bearing; read only for a hop or a wipe-out, which leave the
 /// ground). Finished riders (`Boarder_IsFinishedAndStopped`) are not looked at: none in these recordings stop
@@ -969,7 +970,7 @@ fn col_rider(r: &[u8], n: usize) -> ColRider {
 /// One frame's rider collisions (`Boarder_RiderCollisions` 0x123fc8 at 0x117cd4, after the motion, the speed limit
 /// and the control) around one replayed rider, `me` (board row F4h4). The others are taken as
 /// `ground_ticks_against_the_running_game` takes the riders it does not replay (the second sample's velocity and
-/// motion, an air rider's body moved by its step). `before` runs the riders that tick before `me` in `order` (their
+/// motion; bodies as the first sample holds them). `before` runs the riders that tick before `me` in `order` (their
 /// pushes and hits move `me` before its motion: its start position and velocity are returned); `after` puts `me` as
 /// its motion left it and runs the rest, returning its position and velocity at the frame's end.
 #[derive(Clone)]
@@ -1011,7 +1012,7 @@ impl FrameRun {
             riders[o].motion = motion;
             f.hit[o] = HitRider { heading: r.yaw, pos: r.p.pos, vel: r.vel, normal: r.p.normal, motion, crouch: f32_at(b, 0x1c8) };
         } else {
-            if u32_le(a, 0x424) == 1 && u32_le(b, 0x424) == 1 {
+            if u32_le(a, 0x424) == 1 && u32_le(b, 0x424) == 1 && std::env::var("TRICKY_AIRSTEP").is_ok() {
                 let (p, q) = (vec4(a, 0x140), vec4(b, 0x140));
                 f.body[o].translate([q[0] - p[0], q[1] - p[1], q[2] - p[2], q[3] - p[3]]);
             }
@@ -1059,6 +1060,7 @@ fn ground_ticks_against_the_running_game() {
         .collect();
     let path = paths.split(';').next().unwrap();
     let (n, ticks) = load(path);
+    let addrs = rider_addrs(path);
     let (Some(km), Some(ka)) = (ticks[0].extra.iter().position(|(o, _)| *o == -0x400), ticks[0].extra.iter().position(|(o, _)| *o == 0x46c0)) else {
         eprintln!("{path}: no -400 and 46c0 windows: skipping");
         return;
@@ -1225,7 +1227,7 @@ fn ground_ticks_against_the_running_game() {
         // its collisions (`Boarder_RiderCollisions` 0x123fc8 at 0x117cd4, while the race's state is 3 or more and not
         // 5: always so in these recordings), then `Boarder_UpdateLeanTargets` 0x129500 (0x117ce4) on the velocity as
         // it is then; the riders that tick after it may still push and hit it. The others' ticks are taken from the
-        // second sample (velocity, motion; an air rider's body moved by its step).
+        // second sample (velocity, motion; its body stays as the first sample holds it).
         let tick = w[1].tick as i32;
         let mut got: Vec<Vec<Vec<Vec<u32>>>> = vec![Vec::new(); n];
         let mut frame_pushes = vec![0usize; n];
@@ -1280,7 +1282,7 @@ fn ground_ticks_against_the_running_game() {
                     f.hit[me] = HitRider { heading: r.yaw, pos: r.p.pos, vel: r.vel, normal: r.p.normal, motion: 2, crouch: f32_at(b, 0x1c8) };
                     done[me] = Some((r, 0.0));
                 } else {
-                    if u32_le(a, 0x424) == 1 && u32_le(b, 0x424) == 1 {
+                    if u32_le(a, 0x424) == 1 && u32_le(b, 0x424) == 1 && std::env::var("TRICKY_AIRSTEP").is_ok() {
                         let (p, q) = (vec4(a, 0x140), vec4(b, 0x140));
                         f.body[me].translate([q[0] - p[0], q[1] - p[1], q[2] - p[2], q[3] - p[3]]);
                     }
@@ -1290,7 +1292,12 @@ fn ground_ticks_against_the_running_game() {
                 }
                 f.stat[me] = speed_stat(&stats[me], f32_at(b, 0x130));
                 if pushes {
-                    let list: Vec<usize> = (0..n).filter(|&o| o != me).collect();
+                    // the pair list as recorded (`L700`), from the frame's end or (TRICKY_LIST=a) its start; else
+                    // every other rider in slot order
+                    let how = std::env::var("TRICKY_LIST").unwrap_or_default();
+                    let list = pair_list(&w[(how != "a") as usize], &addrs, me)
+                        .filter(|_| how != "none")
+                        .unwrap_or_else(|| (0..n).filter(|&o| o != me).collect());
                     rider_collisions(me, &list, &mut riders, tick, false, &mut f);
                 }
                 // the end of the tick: `Boarder_UpdateLeanTargets` turns the up toward the normal and aims the lean
