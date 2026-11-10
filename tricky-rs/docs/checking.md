@@ -911,6 +911,48 @@ COP1's `sqrt.s` as its `div.s` (F4b3l).
 All 625 tests of the game crate pass with the binary (`TRICKY_ELF`), 96 test files of which run the runner under the
 default rules; `tools/r5900`'s own tests pass (its divide test now checks both rules).
 
+## F4h5a: the riders around a take-off replayed; stale bodies in the recordings (2026-11-10)
+
+`takeoff_ticks_against_the_running_game` (`tests/ground_motion.rs`): `FrameRun` now replays the other riders of the
+frame (`other_of`: a ground rider 2 → 2 with its own motion object, one step, with its control (F4b3i) from the
+second sample's clips; ours with `tick_ours`, each runner way with `tick_runner`), where it took them from the second
+sample before; TRICKY_NOREPLAY=1 takes them from the second sample again. It walks each rider's recorded pair list
+(`recording::pair_list`, rider+0x700) as the ground test does since F4b3j, all other riders when the recording has
+no list.
+
+Proven (code): `cPostAI::vf1` 0x114730 poses riders 0 to n−1 in turn (`Boarder_UpdateAnimLayers`,
+`Boarder_UpdatePose` when +0x46b0 is set, `Boarder_UpdateBroadphase`) after `vf7` has ticked them 5 to 0.
+Proven (recordings): some samples hold a rider's body (rider+0x480..0x700) byte for byte as the previous sample
+while the rider moved: rec15 1,106 of 53,922 rider samples, rec16 2,019 of 85,632, rec17 2,489 of 107,760, most of
+them riders 5 and 4 (the last posed). In rec16, which replays ticks from save states, tick 7324 was recorded twice
+with the same positions: once with rider 4's body stale, once posed. So PINE's read sometimes lands inside
+`cPostAI::vf1`; the game collides with the posed body. `Frame::new` now places such a body (`unstale`): each sphere
+at the rider's position plus the mean of its offsets in the previous and next samples (on fresh ground samples of
+rec17 this is 0.19 cm off at the median, 1.6 cm at the 90th percentile; the previous body moved by the step 1.2 cm).
+This is a stand-in (marked STANDIN in the test); TRICKY_STALE=keep uses the bodies as read.
+
+Results under `fadd=g1` (before → after):
+
+| recording | ground: every field | bumps right | take-off ticks whole | pushed take-offs whole |
+|---|---|---|---|---|
+| rec11 | – | – | 56 → 56 of 62 (no bodies) | – |
+| rec15 | 37,289 → 37,295 of 37,501 | 122/140 → 126/134 | 109 → 109 of 110 | 2/2 |
+| rec16 | 51,638 → 51,664 of 52,261 | 374/420 → 380/390 | 226 → 227 of 235 | 11/13 |
+| rec17 | 71,209 → 71,215 of 71,775 | 450/472 → 454/466 | 317 → 319 of 327 | 12/17 |
+
+("Before" for the take-offs is TRICKY_NOREPLAY=1 TRICKY_STALE=keep. rec16's gain is 7331 r1, from the stale bodies;
+rec17's 10258 r1 and 19209 r1, from the replayed riders.) F4b3o's bump pairs 6533 1–4, 10242 1–4, 3881 2–5, 664 2–3 and 13565 were stale
+bodies.
+
+Left (gaps):
+- rec16 7325 r4 (jump-control take-off, pushed and hit by rider 1 in the same frame): position within 0.05 cm,
+  velocity 5 cm/s off: the hit's velocity on a rider that has just taken off (row F4h5e).
+- Take-off ticks whose own ground step is off, no rider near or not pushed (rec16 7807 r2, 11535 r2, 12509 r1,
+  6167 r1, 6335 r4; rec15 10316 r4; rec17 6543 r1, 8925 r0 (position 5 cm off), 9814 r1, 9997 r1, 11965 r3, 13575
+  r5, 19132 r1, 648 r3): walls and instances answered "nothing" (row F4h5c).
+- The recorder could re-read a rider whose body is the previous sample's, so `unstale`'s guess can go (row F4h5d,
+  needs PCSX2).
+
 ## How a row gets to `checked`
 
 1. Port the function (address in its doc comment, AGENTS.md §13).

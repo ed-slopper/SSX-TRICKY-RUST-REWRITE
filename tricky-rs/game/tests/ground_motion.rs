@@ -884,6 +884,8 @@ fn body_of(r: &[u8]) -> CollBody {
 #[derive(Clone)]
 struct Frame {
     body: Vec<CollBody>,
+    /// per rider: its body was read stale and placed by [`unstale`]
+    stale: Vec<bool>,
     hit: Vec<HitRider>,
     rec: Vec<Vec<[f32; 2]>>,
     /// `Boarder_GetSpeedStat` 0x11d7b0 of each rider at that moment
@@ -893,11 +895,44 @@ struct Frame {
     hits: Vec<usize>,
 }
 
+/// A body read before `cPostAI::vf1` 0x114730 re-posed it (board row F4h5a): its bytes (rider+0x480..0x700) the
+/// previous sample's while the rider moved. `cPostAI::vf1` poses riders 0 to 5 in turn after all have ticked (5 to 0),
+/// so a PINE read that lands inside it finds the last ones still on the previous tick's pose: rec15 1,106 of 53,922
+/// samples, rec16 2,019 of 85,632, rec17 2,489 of 107,760, most of them riders 5 and 4. The body is placed where
+/// the mean of the previous and next samples' sphere offsets from the rider puts it (median 0.19 cm off on fresh
+/// ground samples of rec17, against 1.2 cm for the previous body moved by the step).
+// STANDIN: a guess at the body PINE missed, for the body `Boarder_UpdateBroadphase` 0x126748 posed from the bones
+fn unstale(body: &mut CollBody, p: &[u8], a: &[u8], b: &[u8]) -> bool {
+    if a.len() < 0x700 || p.len() < 0x700 || b.len() < 0x700 || a[0x480..0x700] != p[0x480..0x700] || a[0x140..0x14c] == p[0x140..0x14c] || b[0x480..0x700] == a[0x480..0x700] {
+        return false;
+    }
+    let (pp, pa, pb) = (vec4(p, 0x140), vec4(a, 0x140), vec4(b, 0x140));
+    let mid = |cp: V4, cb: V4| -> V4 { [((cp[0] - pp[0]) + (cb[0] - pb[0])) / 2.0 + pa[0], ((cp[1] - pp[1]) + (cb[1] - pb[1])) / 2.0 + pa[1], ((cp[2] - pp[2]) + (cb[2] - pb[2])) / 2.0 + pa[2], cp[3]] };
+    let next = body_of(b);
+    body.center = mid(body.center, next.center);
+    for k in 0..18 {
+        body.spheres[k].0 = mid(body.spheres[k].0, next.spheres[k].0);
+    }
+    true
+}
+
 impl Frame {
-    fn new(a: &[Vec<u8>], b: &[Vec<u8>], stats: &[Vec<u8>]) -> Frame {
+    /// `p`: the sample before `a`, when there is one (for [`unstale`]; TRICKY_STALE=keep leaves the bodies as read)
+    fn new(p: Option<&[Vec<u8>]>, a: &[Vec<u8>], b: &[Vec<u8>], stats: &[Vec<u8>]) -> Frame {
         let n = a.len();
+        let keep = std::env::var("TRICKY_STALE").is_ok_and(|v| v == "keep");
+        let mut stale = vec![false; n];
         Frame {
-            body: a.iter().map(|r| body_of(r)).collect(),
+            body: (0..n)
+                .map(|i| {
+                    let mut body = body_of(&a[i]);
+                    if let Some(p) = p.filter(|_| !keep) {
+                        stale[i] = unstale(&mut body, &p[i], &a[i], &b[i]);
+                    }
+                    body
+                })
+                .collect(),
+            stale,
             hit: a.iter().map(|r| hit_rider(r)).collect(),
             rec: b.iter().map(|r| (0..n).map(|j| [f32_at(r, 0x40 + 0x20 * j), f32_at(r, 0x44 + 0x20 * j)]).collect()).collect(),
             stat: (0..n).map(|i| speed_stat(&stats[i], f32_at(&a[i], 0x130))).collect(),
@@ -968,45 +1003,149 @@ fn col_rider(r: &[u8], n: usize) -> ColRider {
 }
 
 /// One frame's rider collisions (`Boarder_RiderCollisions` 0x123fc8 at 0x117cd4, after the motion, the speed limit
-/// and the control) around one replayed rider, `me` (board row F4h4). The others are taken as
-/// `ground_ticks_against_the_running_game` takes the riders it does not replay (the second sample's velocity and
-/// motion; bodies as the first sample holds them). `before` runs the riders that tick before `me` in `order` (their
-/// pushes and hits move `me` before its motion: its start position and velocity are returned); `after` puts `me` as
-/// its motion left it and runs the rest, returning its position and velocity at the frame's end.
+/// and the control) around one replayed rider, `me` (board rows F4h4, F4h5a). The other riders on the snow at both
+/// samples (`others`, [`other_of`]) have their ground tick replayed at their turn by `tick` (each way its own: the
+/// motion, the speed limit and the control, from where the pushes so far left them), as
+/// `ground_ticks_against_the_running_game` replays them; the rest are taken as that test takes the riders it does not
+/// replay (the second sample's velocity and motion; bodies as the first sample holds them). Each rider walks its pair
+/// list as recorded (`L700`, the second sample's; without it every other rider). `before` runs the riders that tick
+/// before `me` in `order` (their pushes and hits move `me` before its motion: its start position and velocity are
+/// returned); `after` puts `me` as its motion left it and runs the rest, returning its position and velocity at the
+/// frame's end.
 #[derive(Clone)]
 struct FrameRun {
     f: Frame,
     riders: Vec<ColRider>,
+    others: Vec<Option<Other>>,
+    lists: Vec<Vec<usize>>,
     me: usize,
     at: usize,
     tick: i32,
 }
 
+/// A rider's ground tick replayed by [`FrameRun`]: from its first sample with the inputs the second holds (as
+/// `ground_ticks_against_the_running_game` builds it), the ground answer, and the control if its state is one the
+/// replay runs.
+#[derive(Clone)]
+struct Other {
+    rider: Rider,
+    hit: Option<Hit>,
+    ctl: Option<Ctl>,
+}
+
+/// What a replayed ground tick does to a rider (`Other`) starting at a position and velocity: each way's own.
+type Ticker<'a> = dyn FnMut(usize, &Other, V4, V4) -> Rider + 'a;
+
+/// Whether the rider moved about one tick's step between the samples (else the samples are not one update apart).
+fn one_step(a: &[u8], b: &[u8]) -> bool {
+    let (p, q, v) = (vec4(a, 0x140), vec4(b, 0x140), vec4(a, 0x150));
+    let d = ((q[0] - p[0]).powi(2) + (q[1] - p[1]).powi(2) + (q[2] - p[2]).powi(2)).sqrt();
+    let e = (v[0] * v[0] + v[1] * v[1] + v[2] * v[2]).sqrt() * f32_at(a, 0x12c) / 60.0;
+    e > 1.0 && d > 0.7 * e && d < 1.4 * e
+}
+
+/// Windows a ground tick's replay reads: the motion object (`-400`, or `-3d0` for the rider whose state manager
+/// sits 0x30 further on) and the animation controller (`46c0`).
+#[derive(Clone, Copy)]
+struct Wins {
+    km: usize,
+    km6: Option<usize>,
+    ka: usize,
+}
+
+/// Rider `i`'s ground tick between two samples, when it is on the snow at both, its motion object is its own and
+/// the samples are one update apart (F4h5a).
+fn other_of(t0: &recording::Tick, t1: &recording::Tick, i: usize, st: &[u8], addr: u32, x: Wins) -> Option<Other> {
+    let (a, b) = (&t0.riders[i], &t1.riders[i]);
+    if u32_le(a, 0x424) != 2 || u32_le(b, 0x424) != 2 || !one_step(a, b) {
+        return None;
+    }
+    let k = match x.km6 {
+        Some(k6) if u32_le(&t0.extra[x.km].1[i], 0xc) != addr => k6,
+        _ => x.km,
+    };
+    let (ma, mb) = (&t0.extra[k].1[i], &t1.extra[k].1[i]);
+    if u32_le(ma, 0xc) != addr {
+        return None;
+    }
+    let (na, nb) = (&t0.extra[x.ka].1[i], &t1.extra[x.ka].1[i]);
+    let mut rider = rider_of(a, st, ma, na);
+    let after = rider_of(b, st, mb, nb);
+    (rider.brake, rider.crouch, rider.steer, rider.p.x244, rider.d1, rider.d2) = (after.brake, after.crouch, after.steer, after.p.x244, after.d1, after.d2);
+    let kind = u32_le(b, 0x2e0);
+    let hit = (kind != 3).then(|| Hit { kind, point: vec4(b, 0x2d0), normal: vec4(b, 0x2a0), surface: u32_le(b, 0x290) });
+    // the control as the ground test runs it (clips from the second sample, sequences from the first; STANDIN: the
+    // pad word's brake bit only, from the state the tick ends in); not the fakie cruise on its turn clip
+    let ctl = CONTROLS.contains(&rider.state).then(|| ctl_of(t0, t0, i, x.ka, addr, if u32_le(b, 0x428) == 0xe { 4 } else { 0 })).flatten()
+        .filter(|c| !(rider.state == 5 && c.clips[0] == 0x202))
+        .map(|mut c| {
+            c.clips = [u32_le(nb, 8), u32_le(nb, 0xc)];
+            c
+        });
+    Some(Other { rider, hit, ctl })
+}
+
+/// A replayed ground tick, ours: `ground_motion::update`, the speed limit, the control (as the ground test).
+fn tick_ours(x: &Other, pos: V4, vel: V4, a: &[u8], b: &[u8], table: &[u8]) -> Rider {
+    let mut r = x.rider;
+    (r.p.pos, r.vel) = (pos, vel);
+    update(&mut r, &SURFACE_TABLE, &mut E { log: Vec::new(), hit: x.hit, wall: false, meter: 0.0 });
+    r.vel = speed_limit(r.vel, speed_limit_of(a, b, |x, y| x - y));
+    if let Some(c) = &x.ctl {
+        control_ours(&mut r, c, table);
+    }
+    r
+}
+
+/// A replayed ground tick, the game's in the runner: `GroundMotion_Update` 0x10a0d8, the speed limit under its
+/// rules, `Boarder_UpdateControl` 0x11c9a0.
+fn tick_runner(g: &mut W, x: &Other, pos: V4, vel: V4, a: &[u8], b: &[u8], addr: u32) -> Rider {
+    let mut rider = x.rider;
+    (rider.p.pos, rider.vel) = (pos, vel);
+    *g.hit.borrow_mut() = x.hit;
+    g.wall.set(false);
+    g.put(&rider);
+    g.r.cpu.set_gpr(4, g.motion as u64);
+    g.r.call(0x10a0d8).unwrap_or_else(|e| panic!("another rider's ground tick: {e:?}"));
+    let mut r = g.get(&rider);
+    r.vel = speed_limit(r.vel, speed_limit_of(a, b, r5900::ps2float::fsub));
+    if let Some(c) = &x.ctl {
+        g.control(&mut r, c, addr);
+    }
+    r
+}
+
 impl FrameRun {
-    fn before(w0: &[Vec<u8>], w1: &[Vec<u8>], stats: &[Vec<u8>], order: &[usize], tick: i32, me: usize) -> (FrameRun, V4, V4) {
+    #[allow(clippy::too_many_arguments)]
+    fn before(wp: Option<&[Vec<u8>]>, w0: &[Vec<u8>], w1: &[Vec<u8>], stats: &[Vec<u8>], order: &[usize], tick: i32, me: usize, others: Vec<Option<Other>>, lists: Vec<Vec<usize>>, t: &mut Ticker) -> (FrameRun, V4, V4) {
         let n = w0.len();
-        let mut run = FrameRun { f: Frame::new(w0, w1, stats), riders: w0.iter().map(|x| col_rider(x, n)).collect(), me, at: 0, tick };
+        let mut run = FrameRun { f: Frame::new(wp, w0, w1, stats), riders: w0.iter().map(|x| col_rider(x, n)).collect(), others, lists, me, at: 0, tick };
         while order[run.at] != me {
-            run.step(w0, w1, stats, order[run.at], None);
+            run.step(w0, w1, stats, order[run.at], None, t);
             run.at += 1;
         }
         let (pos, vel) = (run.riders[me].pos, run.riders[me].vel);
         (run, pos, vel)
     }
 
-    fn after(mut self, w0: &[Vec<u8>], w1: &[Vec<u8>], stats: &[Vec<u8>], order: &[usize], r: &Rider, motion: u32) -> (V4, V4, usize, usize) {
+    #[allow(clippy::too_many_arguments)]
+    fn after(mut self, w0: &[Vec<u8>], w1: &[Vec<u8>], stats: &[Vec<u8>], order: &[usize], r: &Rider, motion: u32, t: &mut Ticker) -> (V4, V4, usize, usize) {
         for k in self.at..order.len() {
             let o = order[k];
-            self.step(w0, w1, stats, o, (o == self.me).then_some((r, motion)));
+            self.step(w0, w1, stats, o, (o == self.me).then_some((r, motion)), t);
         }
         (self.riders[self.me].pos, self.riders[self.me].vel, self.f.pushes[self.me], self.f.hits[self.me])
     }
 
-    fn step(&mut self, w0: &[Vec<u8>], w1: &[Vec<u8>], stats: &[Vec<u8>], o: usize, mine: Option<(&Rider, u32)>) {
-        let n = w0.len();
+    fn step(&mut self, w0: &[Vec<u8>], w1: &[Vec<u8>], stats: &[Vec<u8>], o: usize, mine: Option<(&Rider, u32)>, t: &mut Ticker) {
         let (a, b) = (&w0[o], &w1[o]);
         let (f, riders) = (&mut self.f, &mut self.riders);
-        if let Some((r, motion)) = mine {
+        let replayed = match (mine, &self.others[o]) {
+            (Some((r, motion)), _) => Some((*r, motion)),
+            (None, Some(x)) => Some((t(o, x, riders[o].pos, riders[o].vel), 2)),
+            (None, None) => None,
+        };
+        if let Some((r, motion)) = replayed {
             riders[o].pos = r.p.pos;
             riders[o].vel = r.vel;
             riders[o].motion = motion;
@@ -1021,8 +1160,7 @@ impl FrameRun {
             f.hit[o] = hit_rider(b);
         }
         f.stat[o] = speed_stat(&stats[o], f32_at(b, 0x130));
-        let list: Vec<usize> = (0..n).filter(|&x| x != o).collect();
-        rider_collisions(o, &list, riders, self.tick, false, f);
+        rider_collisions(o, &self.lists[o], riders, self.tick, false, f);
     }
 }
 
@@ -1086,12 +1224,6 @@ fn ground_ticks_against_the_running_game() {
         (0..names.len() - 1).map(|f| if f < 12 { b[4 * f..4 * f + 4].to_vec() } else { vec![b[48 + f - 12]] }).chain([vec![target.to_bits()]]).collect()
     };
     let written: Vec<usize> = (0..names.len()).collect();
-    let one_step = |a: &[u8], b: &[u8]| {
-        let (p, q, v) = (vec4(a, 0x140), vec4(b, 0x140), vec4(a, 0x150));
-        let d = ((q[0] - p[0]).powi(2) + (q[1] - p[1]).powi(2) + (q[2] - p[2]).powi(2)).sqrt();
-        let e = (v[0] * v[0] + v[1] * v[1] + v[2] * v[2]).sqrt() * f32_at(a, 0x12c) / 60.0;
-        e > 1.0 && d > 0.7 * e && d < 1.4 * e
-    };
     let mut count = vec![vec![0usize; names.len()]; 1 + runners.len()];
     let (mut skew, mut capped) = (0, 0);
     let mut whole = vec![0usize; 1 + runners.len()];
@@ -1117,6 +1249,7 @@ fn ground_ticks_against_the_running_game() {
     let mut hit_vel = 0;
     // the replayed frame's bumps against the game's records (pairs whose record either side changed this frame)
     let (mut bumps, mut bumps_right) = (0, 0);
+    let mut stale_bodies = 0;
     struct Prep {
         rider: Rider,
         want: Vec<Vec<u32>>,
@@ -1233,7 +1366,8 @@ fn ground_ticks_against_the_running_game() {
         let mut frame_pushes = vec![0usize; n];
         let mut frame_hits = vec![0usize; n];
         for k in 0..1 + runners.len() {
-            let mut f = Frame::new(&w[0].riders, &w[1].riders, &stats);
+            let mut f = Frame::new((wi > 0 && ticks[wi - 1].tick + 1 == w[0].tick).then(|| &ticks[wi - 1].riders[..]), &w[0].riders, &w[1].riders, &stats);
+            stale_bodies += if k > 0 { 0 } else { f.stale.iter().filter(|x| **x).count() };
             let mut riders: Vec<ColRider> = w[0].riders.iter().map(|r| col_rider(r, n)).collect();
             let mut done: Vec<Option<(Rider, f32)>> = vec![None; n];
             for &me in &order {
@@ -1382,6 +1516,7 @@ fn ground_ticks_against_the_running_game() {
         eprintln!("  pushed apart by another rider in the frame (order {order:?}): {pushed}; every field right: {pushed_whole:?}");
         eprintln!("  of those, under fadd=g1: not hit {} (position right {}), hit too {} (position right {}, velocity right {hit_vel})", pushed_pos[0][0] + pushed_pos[0][1], pushed_pos[0][1], pushed_pos[1][0] + pushed_pos[1][1], pushed_pos[1][1]);
         eprintln!("  bump records (+0x40 + 0x20·j +8) changed this frame by the game or the replay: {bumps}, the replay's equal to the game's: {bumps_right}");
+        eprintln!("  bodies read before `cPostAI::vf1` re-posed them, placed by `unstale` (TRICKY_STALE=keep: as read): {stale_bodies}");
     }
     for (k, way) in ["ours (ground_motion::update)".to_string()].into_iter().chain(runners.iter().map(|(r, _)| format!("the game's in the runner, {r}"))).enumerate() {
         let line: Vec<String> = written.iter().map(|&f| format!("{} {}", names[f], count[k][f])).collect();
@@ -1706,13 +1841,13 @@ fn takeoff_ticks_against_the_running_game() {
         w.r.stub(0x15eec0, move |c, _| c.set_gpr(2, ct.get() as u64));
         runners.push((rules, w, off, ctl));
     }
-    let one_step = |a: &[u8], b: &[u8]| {
-        let (p, q, v) = (vec4(a, 0x140), vec4(b, 0x140), vec4(a, 0x150));
-        let d = ((q[0] - p[0]).powi(2) + (q[1] - p[1]).powi(2) + (q[2] - p[2]).powi(2)).sqrt();
-        let e = (v[0] * v[0] + v[1] * v[1] + v[2] * v[2]).sqrt() * f32_at(a, 0x12c) / 60.0;
-        e > 1.0 && d > 0.7 * e && d < 1.4 * e
-    };
     let names = ["pos", "vel", "fwd", "board_up", "plane_fwd", "side", "quat", "drag", "height", "bob", "lean", "yaw", "the way up", "prediction inputs", "time to the top", "landing on the flight"];
+    // the riders around the take-off on the snow have their ground tick replayed (F4h5a; TRICKY_NOREPLAY: taken from
+    // the second sample, as before), with the control's clip table (ELF data)
+    let replay_others = std::env::var("TRICKY_NOREPLAY").is_err();
+    let wins = Wins { km, km6, ka };
+    let table: Vec<u8> = (0..0x300 * 0x1c).step_by(4).flat_map(|o| runners[0].1.r.mem.read_u32(animctl::CLIP_TABLE + o).to_le_bytes()).collect();
+    let addrs = rider_addrs(path);
     let ways = 1 + runners.len();
     let mut count = vec![vec![0usize; names.len()]; ways];
     let mut of = vec![0usize; names.len()];
@@ -1723,10 +1858,11 @@ fn takeoff_ticks_against_the_running_game() {
     let order: Vec<usize> = std::env::var("TRICKY_ORDER").map(|o| o.split(',').map(|x| x.parse().unwrap()).collect()).unwrap_or((0..n).rev().collect());
     let (mut pushed, mut pushed_whole) = (0, vec![0usize; ways]);
     let (mut pairs, mut other, mut skew, mut by_motion, mut by_jump, mut neither, mut no_pred, mut torn) = (0, 0, 0, 0, 0, 0, 0, 0);
-    for w in ticks.windows(2) {
+    for (wi, w) in ticks.windows(2).enumerate() {
         if w[1].tick != w[0].tick + 1 {
             continue;
         }
+        let wp = (wi > 0 && ticks[wi - 1].tick + 1 == w[0].tick).then(|| &ticks[wi - 1].riders[..]);
         for i in 0..n {
             let (a, b) = (&w[0].riders[i], &w[1].riders[i]);
             if u32_le(a, 0x424) != 2 || u32_le(b, 0x424) != 1 {
@@ -1755,17 +1891,31 @@ fn takeoff_ticks_against_the_running_game() {
             let kind = u32_le(b, 0x2e0);
             let hit = (kind != 3).then(|| Hit { kind, point: vec4(b, 0x2d0), normal: vec4(b, 0x2a0), surface: u32_le(b, 0x290) });
             let crouch0 = f32_at(a, 0x1c8);
-            // the riders that tick before it in the frame push and hit it before its motion (F4h4)
-            let run = pushes.then(|| {
-                let (run, pos, vel) = FrameRun::before(&w[0].riders, &w[1].riders, &stats, &order, w[1].tick as i32, i);
-                (rider.p.pos, rider.vel) = (pos, vel);
-                run
-            });
+            // the riders that tick before it in the frame push and hit it before its motion (F4h4), each way with
+            // the riders around it replayed its own way (F4h5a)
+            let others: Vec<Option<Other>> = (0..n).map(|o| (o != i && replay_others).then(|| other_of(&w[0], &w[1], o, &stats[o], addr[o], wins)).flatten()).collect();
+            let lists: Vec<Vec<usize>> = (0..n).map(|o| pair_list(&w[1], &addrs, o).unwrap_or_else(|| (0..n).filter(|&x| x != o).collect())).collect();
+            let (w0r, w1r, tick) = (&w[0].riders, &w[1].riders, w[1].tick as i32);
+            let mut runs: Vec<Option<FrameRun>> = vec![None; ways];
+            let mut starts = vec![(rider.p.pos, rider.vel); ways];
+            if pushes {
+                for k in 0..ways {
+                    let (run, pos, vel) = if k == 0 {
+                        FrameRun::before(wp, w0r, w1r, &stats, &order, tick, i, others.clone(), lists.clone(), &mut |o, x, p, v| tick_ours(x, p, v, &w0r[o], &w1r[o], &table))
+                    } else {
+                        let g = &mut runners[k - 1].1;
+                        FrameRun::before(wp, w0r, w1r, &stats, &order, tick, i, others.clone(), lists.clone(), &mut |o, x, p, v| tick_runner(g, x, p, v, &w0r[o], &w1r[o], addr[o]))
+                    };
+                    starts[k] = (pos, vel);
+                    runs[k] = Some(run);
+                }
+            }
             // the jump control fires on this tick: state 0xa and the crouch unwound to 0 before the motion
             let jumps = rider.state == 0xa && rider.crouch == 0.0;
 
             // ours
             let mut mine = rider;
+            (mine.p.pos, mine.vel) = starts[0];
             let mut e = E { log: Vec::new(), hit, wall: false, meter: 0.0 };
             update(&mut mine, &SURFACE_TABLE, &mut e);
             let up_by_motion = e.log.contains(&Ev::TakeOff);
@@ -1791,11 +1941,13 @@ fn takeoff_ticks_against_the_running_game() {
             let mut got = vec![(mine, ours_off)];
 
             // the game's code
-            for (_, g, off, ctl) in runners.iter_mut() {
+            for (k, (_, g, off, ctl)) in runners.iter_mut().enumerate() {
                 *g.hit.borrow_mut() = hit;
                 g.wall.set(false);
                 g.log.borrow_mut().clear();
                 *off.borrow_mut() = Off::default();
+                let mut rider = rider;
+                (rider.p.pos, rider.vel) = starts[k + 1];
                 g.put(&rider);
                 g.r.mem.write_u32(g.rd + 0x424, 2);
                 g.r.mem.write_f32(g.rd + 0x1c8, crouch0);
@@ -1845,9 +1997,15 @@ fn takeoff_ticks_against_the_running_game() {
             }
             // the frame's rider collisions after the take-off (F4h4)
             let mut was_pushed = false;
-            if let Some(run) = &run {
-                for (r, _) in got.iter_mut() {
-                    let (pos, vel, np, _) = run.clone().after(&w[0].riders, &w[1].riders, &stats, &order, r, u32_le(b, 0x424));
+            for (k, (r, _)) in got.iter_mut().enumerate() {
+                if let Some(run) = runs[k].take() {
+                    let m = u32_le(b, 0x424);
+                    let (pos, vel, np, _) = if k == 0 {
+                        run.after(w0r, w1r, &stats, &order, r, m, &mut |o, x, p, v| tick_ours(x, p, v, &w0r[o], &w1r[o], &table))
+                    } else {
+                        let g = &mut runners[k - 1].1;
+                        run.after(w0r, w1r, &stats, &order, r, m, &mut |o, x, p, v| tick_runner(g, x, p, v, &w0r[o], &w1r[o], addr[o]))
+                    };
                     (r.p.pos, r.vel) = (pos, vel);
                     was_pushed |= np > 0;
                 }
