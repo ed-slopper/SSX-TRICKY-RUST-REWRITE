@@ -16,12 +16,13 @@ use tricky_game::ps2f::F;
 use tricky_game::snowfall::{self, SnowEnv, GAPP};
 use tricky_game::vu::Vu;
 
-// Our memory for the manager and what its draw reads (gApp's renderer, game, camera and weather).
+// Our memory for the manager and what its draw reads (gApp's renderer, game, camera and the camera's rider).
 const APP: u32 = 0x0100_0000;
 const REND: u32 = 0x0101_0000;
 const VT: u32 = 0x0102_0000;
 const GAME: u32 = 0x0103_0000;
-const WEATHER: u32 = GAME + 0x180;
+/// The camera's rider (cGame+0xa4): the draw reads its weather (+0x18)
+const RIDER: u32 = GAME + 0x180;
 const MGR: u32 = 0x0104_0000;
 const MAT: u32 = 0x0105_0000;
 const BOX: u32 = MAT + 0x40;
@@ -37,6 +38,10 @@ pub struct Snow {
     vu: Vu,
     on: bool,
     tick: f32,
+    /// cGame+0x78, the density `cGame::Init` drew
+    density: F,
+    /// the camera's rider's weather (rider+0x18, `snowfall::rider_weather`)
+    weather: F,
 }
 
 #[derive(Component)]
@@ -66,22 +71,22 @@ impl Snow {
         // STANDIN: our TRICKY_SNOW=1 forces the snow on (a race never draws it), for looking at it
         let on = g.on || std::env::var("TRICKY_SNOW").is_ok_and(|v| v == "1");
         m.w32(GAME + 0x74, on as u32);
-        m.w32(GAME + 0xa4, WEATHER);
-        // STANDIN: the camera's weather density (+0xa4's +0x18, which the draw follows) is not loaded; the game's
-        // +0x78 stands in, so the draw leaves the density as cGame::Init set it
-        wf(&mut m, WEATHER + 0x18, g.density);
+        m.w32(GAME + 0xa4, RIDER);
+        // the rider's reset (`cBoarder::vf8` 0x116ab8) starts its weather at cGame+0x78
+        wf(&mut m, RIDER + 0x18, g.density);
         let words: Vec<u32> = g.layers.iter().flat_map(|l| [l[0], l[2], l[3], l[1]]).collect();
         let mut env = Env { draws: words.into_iter(), vu: None, sprites: Vec::new() };
         snowfall::construct(&mut m, &mut env, MGR, 0);
         snowfall::set_density(&mut m, MGR, F(g.density));
         snowfall::set_range(&mut m, MGR, F(g.fall.0), F(g.fall.1));
         let mut vu = Vu::new();
-        // STANDIN: the two GIF tags program 7's chain 0x31c790 loads at 25 and 521 (not read from the disc): five
-        // PACKED registers ST, RGBAQ, XYZ2, ST, XYZ2 (the program puts NLOOP | EOP in)
+        // the two GIF tags program 7's chain 0x31c790 loads at 25 and 521 (its UNPACK V4-32s at 0x31ca88 / 0x31caa8):
+        // EOP, PRE with PRIM 0x56 (sprite, textured, blended), five PACKED registers ST, RGBAQ, XYZ2, ST, XYZ2 (the
+        // program puts NLOOP | EOP in)
         for at in [25, 521] {
-            vu.mem[at] = [0, 5 << 28, 0x52152, 0];
+            vu.mem[at] = [0x8000, 0x502b_4000, 0x52512, 0];
         }
-        Snow { m, vu, on, tick: 0.0 }
+        Snow { m, vu, on, tick: 0.0, density: F(g.density), weather: F(g.density) }
     }
 }
 
@@ -155,9 +160,12 @@ pub fn snow(time: Res<SmoothDt>, game: Res<ui::Game>, snow: Option<ResMut<Snow>>
     let (Some(mut s), Ok((camera, gt)), Ok((mut tf, mesh, mat))) = (snow, cam.single(), holder.single_mut()) else { return };
     if !*loaded {
         *loaded = true;
-        // STANDIN: the particle sheet's flake ("snfl", PARTICLE.SSH, when exported), else a soft dot, for the texture
-        // the draw sets (gApp+0x30's +0x4c)
-        let (w, h, px) = image::open(lib.dir.join("particles").join("snfl.png")).ok().map(|i| {
+        // The draw's texture is gApp+0x30's +0x4c: `EffectsLoader_LoadTextures` 0x1caef8 fills gApp+0x30 with
+        // data/textures/particle.ssh's shapes by the names at 0x33edf0, so +0x4c is the 20th, "str2".
+        // STANDIN: our tools' PNG export of that shape (chars/particles), else a soft dot, for the game's own
+        // .ssh reader
+        let name = crate::particles::TEX_NAMES[0x4c / 4];
+        let (w, h, px) = image::open(lib.dir.join("particles").join(format!("{name}.png"))).ok().map(|i| {
             let i = i.to_rgba8();
             let (w, h) = i.dimensions();
             (w, h, i.into_raw())
@@ -180,6 +188,10 @@ pub fn snow(time: Res<SmoothDt>, game: Res<ui::Game>, snow: Option<ResMut<Snow>>
         while s.tick >= 1.0 / 60.0 {
             s.tick -= 1.0 / 60.0;
             snowfall::step(&mut s.m, MGR);
+            // the camera's rider's tick (`cBoarder::vf7` 0x117198) eases its weather toward the density
+            // STANDIN: the app keeps no rider event bits (rider+0x388), so event 0xe is never on
+            s.weather = snowfall::rider_weather(s.weather, s.density, false);
+            wf(&mut s.m, RIDER + 0x18, s.weather.0);
         }
     }
     let view = camera.clip_from_view() * gt.compute_matrix().inverse();

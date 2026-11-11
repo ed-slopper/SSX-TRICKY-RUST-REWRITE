@@ -24,7 +24,7 @@ pub struct Particles { nodes: Vec<Node>,
     buckets: std::collections::HashMap<(u32, u32), Handle<Mesh>>, textures: Vec<Option<Handle<Image>>>, dot: Handle<Image>, loaded: bool }
 
 /// The particle sheet's names in the game's order (table 0x33edf0), as `chars/particles/<name>.png`.
-const TEX_NAMES: [&str; 38] = ["part", "snfl", "clod", "spry", "halo", "brk1", "brk2", "brk3", "ndl1", "ndl2", "swd1", "swd2", "swp1", "swp2", "cnf1", "cnf2",
+pub(crate) const TEX_NAMES: [&str; 38] = ["part", "snfl", "clod", "spry", "halo", "brk1", "brk2", "brk3", "ndl1", "ndl2", "swd1", "swd2", "swp1", "swp2", "cnf1", "cnf2",
     "blb1", "blb2", "str1", "str2", "str3", "nois", "strk", "tral", "ex06", "ex07", "ex08", "ex09", "lens", "blnk", "mip1", "mip1", "mip2", "beam", "fog0", "spec", "envr", "exlm"];
 
 #[derive(Component)]

@@ -279,6 +279,38 @@ pub fn walk(m: &mut Mem, env: &mut dyn SnowEnv, this: u32, at: [F; 4], ix: i32, 
     }
 }
 
+/// The snow's density each rider carries (rider+0x18), which the draw follows for the camera's rider (cGame+0xa4 +
+/// view · 0x80, the camera's rider: `camera_ctl::create_cameras`). `cBoarder::vf8` 0x116ab8 (the rider's reset) sets
+/// it to the game's density (cGame+0x78, 0x116df4); each tick `cBoarder::vf7` 0x117198 (0x117b04..0x117b5c) moves it
+/// toward that density, or toward 0 while the rider's event 0xe is on (rider+0x388 bit 0x4000), by 1/120 (0x3c088889)
+/// at most: above target + step it goes down a step, below target − step up a step, else it is the target.
+pub fn rider_weather(cur: F, density: F, event_e: bool) -> F {
+    let target = if event_e { F(0.0) } else { density };
+    let step = F(f32::from_bits(0x3c08_8889));
+    if target + step < cur {
+        cur - step
+    } else if cur < target - step {
+        cur + step
+    } else {
+        target
+    }
+}
+
+#[cfg(test)]
+mod weather_tests {
+    use super::*;
+
+    #[test]
+    fn eases_by_a_120th() {
+        let s = f32::from_bits(0x3c08_8889);
+        assert_eq!(rider_weather(F(0.2), F(0.2), false), F(0.2));
+        assert_eq!(rider_weather(F(0.2), F(0.2), true), F(0.2) - F(s));
+        assert_eq!(rider_weather(F(0.0), F(0.2), false), F(0.0) + F(s));
+        assert_eq!(rider_weather(F(0.005), F(0.0), false), F(0.0));
+        assert_eq!(rider_weather(F(0.195), F(0.2), false), F(0.2));
+    }
+}
+
 /// The manager's draw (vf2, 0x1c9740): when it snows (the game's +0x74), the density taken from the camera's weather
 /// (+0xa4's +0x18) when it changed; the camera's cell (its offset from the origin over the size, rounded half up);
 /// the renderer set up (+0x1c0 1, +0x1c8 (0, 0, 0.08), +0x1e0 5, +0x1f0 (gApp+0x30's +0x4c, 0)); the walk from that

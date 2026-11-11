@@ -747,10 +747,22 @@ velocity, +0x424 motion, +0x428 state, +0x2e4 impact counter; recordings kept on
 with that matrix as the frame's words 0..3, the screen scale and offset chosen so the ftoi4 corners can be inverted,
 and the sprite scale = the projection's x / y scale per cm. Each sprite is put back in the world through the
 inverse matrix and drawn with the depth test, alpha blended, colour /128. Stand-ins (all `STANDIN:` in snow.rs):
-- the texture: the particle sheet's `snfl` if exported, else a soft dot (the draw's is gApp+0x30's +0x4c, not traced);
-- the camera's weather density (+0xa4's +0x18) is not loaded: +0x78 stands in, so the density never changes;
-- the GIF tags at 25 and 521 are ours (five PACKED registers), not the ones chain 0x31c790 loads;
+- the texture's pixels: our PNG export of the shape (the game's own `.ssh` reader stands in);
+- the rider's event 0xe (the app keeps no event bits), so the weather never eases to 0;
 - `TRICKY_SNOW=1` forces the snow on (a race, mode 4, never draws it).
+
+**Leftovers settled (row E1b2g6, proven from the code):**
+- The texture (gApp+0x30's +0x4c): `App_CreateEffectsLoader` 0x17b8a8 makes gApp+0x30 with `EffectsLoader_LoadTextures`
+  0x1caef8, 38 shapes of `data/textures/particle.ssh` (0x391860) by the 12-byte name rows at 0x33edf0. +0x4c is row 19,
+  `str2` (not `snfl`, row 1, as guessed before).
+- The weather (+0xa4's +0x18): cGame+0xa4 + view · 0x80 is the camera's rider (`Game_CreateCameras` 0x180030), so it is
+  rider+0x18. `cBoarder::vf8` 0x116ab8 (reset) sets it to cGame+0x78 (0x116df4); `cBoarder::vf7` 0x117198 (0x117b04..
+  0x117b5c) moves it each tick toward cGame+0x78, or 0 while event 0xe (rider+0x388 bit 0x4000) is on, by at most 1/120
+  (0x3c088889): `snowfall::rider_weather`. No other float store was found up to 0x205b88 (the swc1 search stops at 500 hits).
+- Program 7's GIF tags: chain 0x31c790 (DMA ret, 0x32 qwords) is STCYCL 4/4, STMASK, STMOD, BASE 7, OFFSET 9, MPG 0x59
+  instructions at 0, then two UNPACK V4-32 of one quadword to 25 (0x31ca88) and 521 (0x31caa8): both
+  `0x8000, 0x502b4000, 0x52512, 0` (EOP, PRE, PRIM 0x56 sprite + texture + blend, NREG 5: ST, RGBAQ, XYZ2, ST, XYZ2).
+- `snow_draws`' players and entries are the app's (one player; a race's heat, else one).
 
 Checked in the runner on 6,000 random managers, games, cameras and weather, about 430 calls for each of 14 kinds.
 The renderer was a fake vtable whose box test answered inside, outside or partly. 32 of 36 mutants were caught. The

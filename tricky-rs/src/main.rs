@@ -660,11 +660,13 @@ fn setup(
 /// `Crowd_LoadTexturesRandomize` 0x1458e0 (the crowd's picks, made in `spawn_instances`), with the course record's
 /// chance (`courses::SNOW_CHANCE`). `mode` is the game mode (`DAT_0032de8c`).
 /// The result makes the snowfall (`snow::Snow`, row E1b2g5).
-/// STANDIN: the app's one player and one entry, for the AI's +0x7c and +0x88 (a race, mode 4, draws no chance anyway).
+/// The AI's +0x7c (players) and +0x88 (entries, players and computer riders) are the app's: one player, and in a race
+/// (mode 4, which draws no chance anyway) its heat of `ui::HEAT` riders, else the player alone.
 fn snow_draws(level: &Level, mode: u32) -> tricky_game::fxrand::GameSnow {
+    let entries = if mode == 4 { ui::HEAT as i32 } else { 1 };
     let course = level.dir.file_name().and_then(|f| ui::CareerRes::course(&f.to_string_lossy())).map_or(12, u64::from);
     let chance = f32::from_bits(tricky_game::courses::by_course(&tricky_game::courses::SNOW_CHANCE, course));
-    tricky_game::fxrand::game_init_snow(&mut tricky_game::rand::rand_fx, mode as i32, 1, 1, chance)
+    tricky_game::fxrand::game_init_snow(&mut tricky_game::rand::rand_fx, mode as i32, 1, entries, chance)
 }
 
 fn spawn_level(
