@@ -933,7 +933,9 @@ struct Frame {
 /// Such a sample is stale when its body is the previous sample's byte for byte while the rider moved (F4h5a), or when
 /// its offset is within 3 cm of the last fresh offset less the step and more than twice that plus 2 cm from the last
 /// fresh offset itself, the step being over 2 cm (F4b3o: rec17 11131 r2, pushed in its frame; 11817 r4 and r5, two
-/// stale samples in a row). TRICKY_LAG=off: the byte for byte ones only.
+/// stale samples in a row), or when it is the previous sample's body moved whole by its pushes ([`pushed_only`], F4b3y:
+/// pushes too big for the 3 cm, and wiped-out riders, whose offset swings). TRICKY_LAG=off: the byte for byte ones
+/// only; TRICKY_RIGID=off: not the moved whole ones.
 ///
 /// The guess, in order: the same tick recorded fresh on another pass of a save state (the game replays the same ticks
 /// bit for bit, rec16; F4h5e); the next sample's body when it is stale too (it is this tick's pose, moved by the next
@@ -947,6 +949,27 @@ struct Twins {
     guess: std::collections::HashMap<(u32, usize, Vec<u8>), CollBody>,
 }
 
+/// The body `r` is the one before it, `p`, moved whole (every sphere and the centre by one vector, within 0.05 cm)
+/// by something other than the rider's step (more than 0.5 cm from it): the last pose moved only by the pushes of
+/// its frame (`Boarder_Translate` 0x1267a0 adds one vector to each sphere), read before `cPostAI::vf1` re-posed it
+/// (F4b3y: rec14 9097 riders 1 and 2, sliding wiped out, pushed 9 cm apart). A pose made from the bones is never
+/// such a copy, except moved by the step with the rider.
+fn pushed_only(p: &[u8], r: &[u8]) -> bool {
+    let count = (u32_le(r, 0x498) as usize).min(18);
+    if count == 0 || u32_le(p, 0x498) != u32_le(r, 0x498) {
+        return false;
+    }
+    let d = |o: usize| sub4(vec4(r, o), vec4(p, o));
+    let shift = d(0x480);
+    let step = d(0x140);
+    let same = (0..count).all(|s| {
+        let x = d(0x4a0 + 0x20 * s);
+        (0..3).all(|c| (x[c] - shift[c]).abs() < 0.05)
+    });
+    let off = (0..3).map(|c| (shift[c] - step[c]) * (shift[c] - step[c])).sum::<f32>().sqrt();
+    same && off > 0.5
+}
+
 fn stale_key(tick: u32, i: usize, r: &[u8]) -> (u32, usize, Vec<u8>) {
     (tick, i, [&r[0x140..0x160], &r[0x480..0x490]].concat())
 }
@@ -955,6 +978,7 @@ impl Twins {
     fn of(ticks: &[recording::Tick]) -> Twins {
         use std::collections::HashMap;
         let lag = !std::env::var("TRICKY_LAG").is_ok_and(|v| v == "off");
+        let rigid = lag && !std::env::var("TRICKY_RIGID").is_ok_and(|v| v == "off");
         let n = ticks.first().map_or(0, |t| t.riders.len());
         let near = |k: usize| k > 0 && ticks[k - 1].tick + 1 == ticks[k].tick;
         let sub3 = |x: V4, y: V4| [x[0] - y[0], x[1] - y[1], x[2] - y[2]];
@@ -982,7 +1006,7 @@ impl Twins {
                     let es = len([off[0] + step[0] - of[0], off[1] + step[1] - of[1], off[2] + step[2] - of[2]]);
                     len(step) > 2.0 && es < 3.0 && ef > 2.0 * es + 2.0
                 });
-                stale[k][i] = moved && (r[0x480..0x700] == p[0x480..0x700] || lagging);
+                stale[k][i] = moved && (r[0x480..0x700] == p[0x480..0x700] || lagging || (rigid && pushed_only(p, r)));
                 if !stale[k][i] {
                     last = Some(k);
                 }

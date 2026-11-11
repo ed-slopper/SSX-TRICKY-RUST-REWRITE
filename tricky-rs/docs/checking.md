@@ -1322,6 +1322,39 @@ rec16 still lose 5 each without them, every one a hit by a tumbling rider or one
 (rec14 4361, 4859, 5040, 5066, 6922; rec16 6912-6933 rider 5, 9047 rider 3, 14529 rider 1 starting its slide,
 14579 rider 4 in the get-up, motion 6). Next (row F4b3x): record the body and replay the tumble.
 
+## F4b3y: bodies moved whole by their pushes, read stale (2026-11-10)
+
+Of the slide positions F4b3w left off, rec14 1168 rider 5 and 9098 riders 1 and 2 start from a body read stale: at
+rec14 1167 (rider 5) and 9097 (riders 1 and 2, sliding wiped out) every sphere and the centre are the previous
+sample's moved by one vector (within 0.05 cm), about 9 cm, while the rider moved 4-26 cm: the last pose moved only by
+the pushes of its frame (`Boarder_Translate` 0x1267a0 adds one vector to each sphere of the body), read inside
+`cPostAI::vf1` 0x114730 before it re-posed the rider (proven: the copy; inferred: when PINE read it). F4h5a / F4b3o's
+tests miss these: not byte for byte, and the pushes are over F4b3o's 3 cm (or a wiped-out rider's offset from its
+position swings too much for it). The ground test now also takes a body as stale when it is the previous sample's
+moved whole by more than 0.5 cm off the rider's step (`pushed_only` in `tests/ground_motion.rs`; TRICKY_RIGID=off:
+not) and places it by the same guess (STANDIN, as before). A pose made from the bones is never such a copy except
+moved with the rider. Bodies read stale: rec14 2,425 → 2,459, rec15 1,145 → 1,153, rec16 2,142 → 2,166, rec17
+2,596 → 2,613.
+
+| `fadd=g1` | ground ticks, every field | pushed ticks, every field | hit ticks, velocity right | bump records | take-offs whole |
+|---|---|---|---|---|---|
+| rec14 | 37,241 → 37,244 | 222 → 224 | 128 → 130 of 141 | 242 → 244 of 248 | 132 → 132 of 143 |
+| rec15 | 37,309 → 37,311 | 229 → 229 | 100 → 100 of 108 | 130 → 130 of 132 | 109 → 109 of 110 |
+| rec16 | 51,721 → 51,725 | 470 → 472 | 220 → 220 of 257 | 386 of 390 → 384 of 392 | 228 → 227 of 235 |
+| rec17 | 71,257 → 71,257 | 838 → 838 | 335 → 335 of 358 | 464 → 464 of 466 | 319 → 319 of 327 |
+
+rec14 1168 rider 5 is now right; 9098 riders 1 and 2 go from 7.6 cm off to 2.4 cm (the guess, not the body). rec16
+loses two: 7799 rider 3 and 7798 rider 4 are such bodies, and with the guess the replay bumps 3 and 4 at 7800, the
+game doesn't (the stale body, a whole step behind, happened to miss); the take-off at 7800 (rider 3) goes with it.
+Only a body read right fixes these (F4h5d).
+
+The other slide positions off are not riders: rec14 9092 and 9095 rider 1 (only rider 2 is near; the pair's
+pushes are equal and opposite, rider 2 ends right, rider 1 has 6.7 cm and 5.6 cm more, velocity right), rec17 9557
+rider 3 (57 cm, no push), rec17 10932-10941 (F4b3p's pair, under 1 cm): the slide's `Boarder_InstanceCollisions`
+0x125088 and `Boarder_WallCollide` 0x126250 (`Boarder_UpdateMotion` 0x11c770 case 5 calls both after the ground
+probe), answered "nothing" in the test (inferred: nothing else in case 5 moves +0x140 after the hold, proven from
+the decompile). Row F4b3z.
+
 ## How a row gets to `checked`
 
 1. Port the function (address in its doc comment, AGENTS.md §13).
