@@ -1370,6 +1370,43 @@ Mutations caught: the feedback tap (bit 5 for bit 4), the exponent (0x3f00_0000)
 functions marked `checked`. What this does not prove: that PCSX2's register is the hardware's (the EE manual's
 description agrees; inferred).
 
+## F4b3x: tumbling riders and riders wiped out in the frame (2026-11-11)
+
+The ground test took the riders it does not replay at the second sample's velocity less the hits our collisions
+gave them, found by trial passes (TRICKY_PREHIT, `fix`/`seq`/`flips`, a STANDIN). Two kinds of rider now get the
+velocity their own tick left them before the collisions instead:
+
+- **Tumbling** (motion 5 the whole frame, the first sample's clip not a slide 0x2dc / 0x2dd): `WipeoutMotion_Update`
+  0x10c2f0's tumble ends with `Ragdoll_Step` 0x10dca8 setting rider +0x150 to the body's velocity (motion +0x70 +0x70,
+  handler +0x5d0), and nothing after it in the tick changes the body: `Boarder_RiderHit` 0x124920 adds to rider
+  +0x150 only, `Boarder_Translate` 0x1267a0 moves the collision body, not +0x140 (proven: the code; and rec18: of 1,022
+  tumbling pairs, rider +0x150 equals the recorded body's velocity in 1,001, the other 21 all hit in the frame). The
+  test takes that velocity, and the position, from the second sample (`5ae0>4f0`, handler +0x4f0..+0x5f0, the new
+  window of `pine.py record`; STANDIN: the body's step and its course contacts answered from the recording, F4h5c).
+  rec18: 992 tumbling frames, the velocity after our collisions right in 978.
+- **Wiped out by a hit in the collisions** (motion 2 to 5, or 4 to 5): their ground tick runs before the
+  collisions, so it is replayed (`other_of`, ours and the runner) from the first sample with the second sample's
+  inputs, except what `WipeoutMotion_Enter` 0x10c198 changes: the surface is read from +0x310 (+0x290 becomes 10)
+  and the control's clips from the first sample (the clips are blended out). Motion 4 to 5: the speed limit only, as
+  motion 4. rec14 8, rec16 7, rec17 8, rec18 9 such riders (TRICKY_NOWIPE: as before).
+
+The trial passes are now off by default for a recording with the tumble window (rec18; TRICKY_PREHIT=n still runs
+them) and kept for the older ones, which cannot answer their tumbles. Every field under fadd=g1, by default (and with
+the passes off):
+
+| recording | before | now | passes off |
+|---|---|---|---|
+| rec14 | 37,244 | 37,244 | 37,241 (was 37,239) |
+| rec15 | 37,311 | 37,311 | 37,311 |
+| rec16 | 51,725 | 51,725 | 51,721 (was 51,720) |
+| rec17 | 71,257 | 71,257 | 71,257 |
+| rec18 (new) | 54,597 | 54,599 | 54,599 |
+
+Bumps unchanged (rec14 244/248, rec15 130/132, rec16 384/392, rec17 464/466, rec18 520/524); take-offs unchanged
+(rec16 227/235, rec17 319/327). What the passes still give the old recordings: tumbling riders with no recorded body
+(rec14 5066 r4, 6922 and 6925 r5; rec16 6915-6927 r5), a landing in the frame (rec16 6306 r5, motion 1 to 2) and the
+get-up (rec16 14579 r4, motion 6, `GetUpMotion_Update` 0x1102c8): row F4b3x2.
+
 ## How a row gets to `checked`
 
 1. Port the function (address in its doc comment, AGENTS.md §13).

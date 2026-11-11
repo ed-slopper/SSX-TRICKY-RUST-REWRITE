@@ -1800,7 +1800,7 @@ fn ground_ticks_against_the_running_game() {
         let mut missed = vec![false; n];
         let mut flips = vec![false; n];
         let mut seq: Vec<Vec<V4>> = vec![vec![[0.0; 4]]; n];
-        let trials: usize = std::env::var("TRICKY_PREHIT").map_or(64, |v| if v == "off" { 0 } else { v.parse().unwrap() });
+        let trials: usize = std::env::var("TRICKY_PREHIT").map_or(if kt.is_some() { 0 } else { 64 }, |v| if v == "off" { 0 } else { v.parse().unwrap() });
         let mut trial = trials > 0;
         let air = std::env::var("TRICKY_NOAIR").is_err();
         // (TRICKY_AIRPOS=off: the flight step's position not taken; its body stays as the first sample holds it either way)
@@ -1955,7 +1955,8 @@ fn ground_ticks_against_the_running_game() {
                     }
                     // motion 4 the whole frame: `Boarder_UpdateMotion` 0x11c770 does nothing for it, then the speed
                     // limit (0x1179a4) as on the snow (F4b3v: rec14 4862, rider 3)
-                    if ma == (4, 4) && air && !missed[me] {
+                    // (F4b3x: and a rider in motion 4 a hit in the collisions wipes out, rec14 4859 rider 3)
+                    if (ma == (4, 4) || (ma == (4, 5) && std::env::var("TRICKY_NOWIPE").is_err())) && air && !missed[me] {
                         riders[me].vel = speed_limit(start.1, speed_limit_at(a, b, boost, if k == 0 { |x, y| x - y } else { r5900::ps2float::fsub }));
                         flown[me] = true;
                     }
