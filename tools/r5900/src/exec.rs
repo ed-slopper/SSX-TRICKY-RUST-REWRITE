@@ -659,6 +659,31 @@ pub(crate) fn vu_upper(c: &mut crate::Cpu, w: u32) -> Result<(), String> {
             None
         }
         47 => None, // vnop
+        // vrnext.dest ft: R stepped (bit 0 the XOR of bits 4 and 22, shifted in), then copied to ft; nothing at all
+        // for vf0 (as PCSX2's `_vuRNEXT`, and VU1's `rnext` in vu1.rs)
+        64 => {
+            if ft != 0 {
+                let x = (c.r >> 4 ^ c.r >> 22) & 1;
+                c.r = (c.r << 1 ^ x) & 0x7f_ffff | 0x3f80_0000;
+                set_vf(c, ft, dest, [f32::from_bits(c.r); 4]);
+            }
+            None
+        }
+        // vrget.dest ft
+        65 => {
+            if ft != 0 {
+                set_vf(c, ft, dest, [f32::from_bits(c.r); 4]);
+            }
+            None
+        }
+        66 => {
+            c.r = s[fsf].to_bits() & 0x7f_ffff | 0x3f80_0000; // vrinit R, fs.fsf
+            None
+        }
+        67 => {
+            c.r = (c.r ^ s[fsf].to_bits()) & 0x7f_ffff | 0x3f80_0000; // vrxor R, fs.fsf
+            None
+        }
         x => return Err(format!("vu0 special2 {x}")),
     };
     if let Some(v) = to_acc {
@@ -1032,6 +1057,29 @@ mod tests {
         assert_eq!(c.vf[5], [0.25, 0.5, 0.75, 1.0], "vmulq by vdiv's Q = 1/4");
         assert_eq!(c.vf[6], [15.0, 20.0, 25.0, 30.0]);
         assert_eq!(c.q, 0.5, "vrsqrt: 1 / sqrt(4)");
+    }
+
+    #[test]
+    fn vu0_random() {
+        // `Rand_VuNext` 0x1d5a08 runs `vrinit R, vf3.x` (0x4a001c3e) then `vrnext.x vf3` (0x4b03043c)
+        let rn = run(
+            &[
+                0x4a00_0c3e,                 // vrinit R, vf1.x
+                vu(8, 2, 0, 16, 0x3c),       // vrnext.x vf2
+                vu(15, 3, 0, 16, 0x3d),      // vrget vf3
+                vu(1, 0, 1, 16, 0x3f),       // vrxor R, vf1.y
+                vu(15, 4, 0, 16, 0x3d),      // vrget vf4
+                vu(15, 0, 0, 16, 0x3c),      // vrnext vf0: nothing, R not stepped
+                vu(15, 5, 0, 16, 0x3d),      // vrget vf5
+            ],
+            |rn| rn.cpu.vf[1] = [f32::from_bits(0x1234_5678), f32::from_bits(0x0bad_cafe), 0.0, 0.0],
+        );
+        let c = &rn.cpu;
+        assert_eq!(c.vf[2][0].to_bits(), 0x3fe8_acf1, "0x3fb45678 stepped: bit 4 xor bit 22 shifted in");
+        assert_eq!(c.vf[2][1], 0.0, "vrnext.x leaves y");
+        assert_eq!(c.vf[3].map(f32::to_bits), [0x3fe8_acf1; 4]);
+        assert_eq!(c.vf[4][0].to_bits(), 0x3fc5_660f, "vrxor keeps the exponent of 1.0");
+        assert_eq!(c.vf[5][0].to_bits(), 0x3fc5_660f);
     }
 
     #[test]

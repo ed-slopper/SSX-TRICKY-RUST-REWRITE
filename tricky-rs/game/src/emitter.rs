@@ -1,8 +1,8 @@
 //! The particle emitter's setters (board row G7f6): `ParticleSys_InitEmitter` 0x1d50b0, `_SetSizeRange` 0x1d52e8,
 //! `_SetLifeRange` 0x1d5300, `_SetSpawnLine` 0x1d5380, `_SetSpawnQuad` 0x1d5418, `_ClearForce` 0x1d5548,
-//! `_SetVelocityBasis` 0x1d5790, `_SetColors` 0x1d58e0, `_SetTime` 0x1d59e0 and `_AdvanceTime` 0x1d59f0. An emitter is
-//! 0x140 bytes of words (the functions take it as a word slice); +0x3c is its time scale. `_RandomizeFactors`
-//! 0x1d5180 is `fxrand::emitter_factors`.
+//! `_SetVelocityBasis` 0x1d5790, `_SetColors` 0x1d58e0, `_SetTime` 0x1d59e0, `_AdvanceTime` 0x1d59f0 and `_StepEmitter`
+//! 0x1d5a30 (row E1b2g1). An emitter is 0x140 bytes of words (the functions take it as a word slice); +0x3c is its
+//! time scale. `_RandomizeFactors` 0x1d5180 is `fxrand::emitter_factors`.
 
 pub type V4 = [f32; 4];
 
@@ -150,4 +150,20 @@ pub fn advance_time(e: &mut [u32], dt: f32) {
     let k = f(e, 0x3c);
     let t = f(e, 0x8);
     set(e, 0x8, t + dt * k);
+}
+
+/// `ParticleSys_StepEmitter` 0x1d5a30(e, dt): [`advance_time`], then while the emitted count (+0, an integer) times
+/// the interval (+0xc) is below the time (+0x8): the time less one interval, the spawn point (+0xa0) moved by its
+/// step (+0xd0, the vector unit's `vadd`), and each random factor ([`crate::fxrand::EMITTER_FACTORS`]) stepped by
+/// `Rand_VuNext` 0x1d5a08 ([`crate::fxrand::vu_next`]). The count is not changed here, so the loop ends on the time.
+pub fn step(e: &mut [u32], dt: f32) {
+    advance_time(e, dt);
+    let owed = |e: &[u32]| cl(e[0] as i32 as f32 * f(e, 0xc)) < f(e, 0x8);
+    while owed(e) {
+        set(e, 0x8, cl(f(e, 0x8) - f(e, 0xc)));
+        setv(e, 0xa0, add(v(e, 0xa0), v(e, 0xd0)));
+        for o in crate::fxrand::EMITTER_FACTORS {
+            e[o / 4] = crate::fxrand::vu_next(e[o / 4]);
+        }
+    }
 }

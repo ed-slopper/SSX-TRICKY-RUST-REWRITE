@@ -4,8 +4,8 @@
 //! Notes: `docs/port-notes/world.md`, "Random numbers".
 //!
 //! The draw order is read from the decompiled code (proven). `vu_next` is the vector unit's R register step
-//! (`VRINIT` then `VRNEXT`) as the EE manual and PCSX2 define it; it is not checked against the original here
-//! (the function runner has no `VRNEXT`; E1b2g).
+//! (`VRINIT` then `VRNEXT`) as the EE manual and PCSX2 define it, checked against the original in the function runner
+//! (its VU0 macro `vrinit` / `vrnext` follow PCSX2's; tests/emitter.rs, row E1b2g1).
 
 /// A `Rand_Fx` word as the float `1.0 + u`, `u` in [0, 1): `((r & 0x7fffff | 0x3f800000) − 1.0) + 1.0`. Exact
 /// (the subtraction and the addition lose nothing in [1, 2)), so the bits are the word's mantissa under an

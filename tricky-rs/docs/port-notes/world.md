@@ -628,6 +628,12 @@ velocity, +0x424 motion, +0x428 state, +0x2e4 impact counter; recordings kept on
       in `Fx_SurfaceSpray`). They are then the emitter's nine separate random streams: `ParticleSys_StepEmitter` 0x1d5a30 runs
       `Rand_VuNext` 0x1d5a08 (the vector unit's R register: `VRINIT` from the word's low 23 bits, `VRNEXT`) on each, in that
       order, once per emission step. So the spray, trail and splash randomness is a third generator, seeded from `Rand_Fx`.
+      Proven (disassembly, E1b2g1): `Rand_VuNext` is `lwc1`, `qmtc2 vf3`, `vrinit R, vf3.x`, `vrnext.x vf3`, `qmfc2`,
+      `swc1`; `ParticleSys_StepEmitter(e, dt)` runs `_AdvanceTime` (+0x8 += dt·+0x3c), then while `(float)+0 (an int) ·
+      +0xc < +0x8`: +0x8 −= +0xc, +0xa0 += +0xd0 (`vadd`), the nine `Rand_VuNext`. It never changes +0, so the loop ends on
+      the time. Ported as `emitter::step`, checked in the function runner (tests/emitter.rs); the runner's `vrinit` /
+      `vrnext` / `vrget` / `vrxor` follow PCSX2's (`AdvanceLFSR`: bit 4 xor bit 22 shifted in, 23 bits under the exponent
+      of 1.0), so the check proves the game's code against PCSX2's register, not against the hardware's (inferred equal).
     - `cGame::Init`'s snow: after `ParticleMan_Init`, when the game mode is neither 2 nor 4, the race has at most one rider
       (`+0x7c`) and fewer than three entries (`+0x88`) one draw decides `snow = u < course record +0x54`; then
       `SnowFall_InitLayers` 0x1c8ec8 (in the `cSnowFallMan` constructor) makes 8 layers x 4 draws (32; counted in the runner in G7c1, an earlier reading said 7) (words 4, 6, 7, 5 of the

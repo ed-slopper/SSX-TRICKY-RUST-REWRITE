@@ -1355,6 +1355,21 @@ rider 3 (57 cm, no push), rec17 10932-10941 (F4b3p's pair, under 1 cm): the slid
 probe), answered "nothing" in the test (inferred: nothing else in case 5 moves +0x140 after the hold, proven from
 the decompile). Row F4b3z.
 
+## E1b2g1: the vector unit's random register (2026-11-10)
+
+The function runner (`tools/r5900`) ran VU0's random-register instructions only in micro mode (`rinit`, `rnext`,
+`rget`, `rxor` in `vu1.rs`). Its macro mode, which `Rand_VuNext` 0x1d5a08 uses (`vrinit R, vf3.x`, `vrnext.x vf3`),
+now has them too, as PCSX2's `_vuRINIT` / `_vuRNEXT` / `_vuRGET` / `_vuRXOR` (`AdvanceLFSR`): unit test `vu0_random`.
+
+| function | port | cases | result |
+|---|---|---|---|
+| `Rand_VuNext` 0x1d5a08 | `fxrand::vu_next` | 50,000 words (any bits, floats, [1, 2), edges) | all equal |
+| `ParticleSys_StepEmitter` 0x1d5a30 (with `_AdvanceTime` 0x1d59f0) | `emitter::step` (new) | 20,000 emitters, 0 to 4+ steps (4,513 / 3,757 / 2,929 / 1,769 / 7,032) | all 0x150 bytes equal |
+
+Mutations caught: the feedback tap (bit 5 for bit 4), the exponent (0x3f00_0000), the loop test (`<=` for `<`). Both
+functions marked `checked`. What this does not prove: that PCSX2's register is the hardware's (the EE manual's
+description agrees; inferred).
+
 ## How a row gets to `checked`
 
 1. Port the function (address in its doc comment, AGENTS.md §13).
