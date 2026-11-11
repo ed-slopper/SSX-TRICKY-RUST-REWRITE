@@ -202,6 +202,11 @@ pub const MAP_MARKERS: [[u32; 13]; 2] = [
     [0x3e800000, 0x3ec28f5c, 0x3e947ae1, 0x3ec28f5c, 0x3eae147b, 0x3ebd70a4, 0x3e947ae1, 0x3e4ccccd, 0x3ec28f5c, 0x3e947ae1, 0x3d4ccccd, 0x3e4ccccd, 0x3d4ccccd],
 ];
 
+/// Each course record's snow chance (`Game_InitVenueTable` 0x257dc0: thirteen records of 0x94 bytes, the float at
+/// +0x54, as bits; `cGame::Init` 0x17e148 takes record `clamp(course, 0, 12)`): 1.0 on Snowdream, about 0.25 on
+/// Merqury City, none elsewhere. `cGame::Init` compares a `Rand_Fx` unit with it (`fxrand::game_init_snow`).
+pub const SNOW_CHANCE: [u32; 13] = [0, 0x3f800000, 0, 0, 0x3e80067d, 0, 0, 0, 0, 0, 0, 0, 0];
+
 /// A jump-table answer for the course (the game's unsigned compare: anything but 0..11 the last)
 pub fn by_course(table: &[u32; 13], course: u64) -> u32 {
     table[if course < 12 { course as usize } else { 12 }]

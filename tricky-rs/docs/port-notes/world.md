@@ -641,6 +641,13 @@ velocity, +0x424 motion, +0x428 state, +0x2e4 impact counter; recordings kept on
       for `FUN_001c91c0`: `5 + u` and `7 - u'` (`+0x4bc`, `+0x4c0`, which set each layer's words 1 and 2).
     - `Crowd_LoadTexturesRandomize` 0x1458e0 (right after, from `cGame::Init`): for every instance whose model flags have
       bit 0 set, in instance order, one draw `& 15` per sub-item (the crowd's cells) picks one of 16 textures.
+    - In the app (row E1b2g2): `spawn_level` makes the snow's draws (`snow_draws`, `fxrand::game_init_snow`) before
+      `spawn_instances` makes the crowd's picks (`fxrand::crowd_texture_pick`, instance order), as `cGame::Init` does.
+      The chance is the course record's +0x54 from `Game_InitVenueTable` 0x257dc0 (proven: thirteen 0x94-byte records,
+      1.0 for Snowdream, 0x3e80067d ≈ 0.25 for Merqury City, 0 for the rest; `courses::SNOW_CHANCE`). STANDIN: the app
+      passes one rider and one entry for the AI's +0x7c / +0x88, and draws no snow yet (row E1b2g5). `spray.rs` and
+      `particles.rs` keep their own generators, tagged STANDIN (rows E1b2g3 and E1b2g4): their effects are not built
+      on the game's emitters yet, so the game's draws there would come in the wrong counts.
     - `ParticleGroup_UpdateTrail` 0x1d9208 (from the rider's effect, `vf7_1356f8`): per call one draw for the spawn count
       (`trunc(+0x10 + +0x14 (2u - 1) + carry +0x18)`, the fraction kept), then per new particle five draws: its life
       (`+0x1c + trunc(+0x20 (2u - 1))`), a speed (`+0x70 + +0x74 (2u - 1)`), a lateral factor (`2u - 1`, with `+0x78`,

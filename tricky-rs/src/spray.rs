@@ -25,6 +25,12 @@ pub struct Spray { flakes: Vec<Flake>, next: usize, seed: u32, owed: Vec<f32>, w
 pub struct FlakeVisual(usize);
 
 impl Spray {
+    /// STANDIN: our own LCG, for the game's draws: `Fx_SurfaceSpray` 0x1311b0 (one `Rand_Fx` unit for the count, then
+    /// `ParticleSys_RandomizeFactors` 0x1d5180's nine per new emitter, stepped by `ParticleSys_StepEmitter` 0x1d5a30 and
+    /// spent by VU1 program 6), `ParticleGroup_UpdateTrail` 0x1d9208 (one draw a call, five a particle) and the brake
+    /// and splash emitters. Those are ported (`tricky_game::surfacespray`, `brakespray`, `splash`, `boardtrail`,
+    /// `emitter`, `particlevu`) but these effects are not built on them yet (row E1b2g3), so drawing the game's
+    /// stream here would only shift it by counts the game does not make.
     fn rand(&mut self) -> f32 {
         self.seed = self.seed.wrapping_mul(1664525).wrapping_add(1013904223);
         (self.seed >> 8) as f32 / 16777216.0

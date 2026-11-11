@@ -599,11 +599,12 @@ fn setup(
     mut meshes: ResMut<Assets<Mesh>>,
     mut images: ResMut<Assets<Image>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
+    game: Res<ui::Game>,
 ) {
     let level = &level.0;
     // Game space is Z-up; rotate it into Bevy's Y-up and scale it down.
     let to_bevy = Transform { rotation: Quat::from_rotation_x(-std::f32::consts::FRAC_PI_2), scale: Vec3::splat(WORLD_SCALE), ..default() };
-    spawn_level(&mut commands, level, &mut meshes, &mut images, &mut materials);
+    spawn_level(&mut commands, level, &mut meshes, &mut images, &mut materials, ui::CareerRes::mode(game.event));
 
     // camera at the start of the first race line, looking down the course
     let (pos, dir) = level.start();
@@ -654,11 +655,24 @@ fn setup(
     ));
 }
 
+/// `cGame::Init` 0x17e148's snow draws (`fxrand::game_init_snow`): after `ParticleMan_Init` and before
+/// `Crowd_LoadTexturesRandomize` 0x1458e0 (the crowd's picks, made in `spawn_instances`), with the course record's
+/// chance (`courses::SNOW_CHANCE`). `mode` is the game mode (`DAT_0032de8c`).
+/// STANDIN: the app's one player and one entry, for the AI's +0x7c and +0x88 (a race, mode 4, draws no chance anyway);
+/// and the snowfall itself (`snowfall`, row G7c1) is not drawn yet, so the result only keeps `Rand_Fx` in step.
+fn snow_draws(level: &Level, mode: u32) -> tricky_game::fxrand::GameSnow {
+    let course = level.dir.file_name().and_then(|f| ui::CareerRes::course(&f.to_string_lossy())).map_or(12, u64::from);
+    let chance = f32::from_bits(tricky_game::courses::by_course(&tricky_game::courses::SNOW_CHANCE, course));
+    tricky_game::fxrand::game_init_snow(&mut tricky_game::rand::rand_fx, mode as i32, 1, 1, chance)
+}
+
 fn spawn_level(
     commands: &mut Commands, level: &Level,
-    meshes: &mut Assets<Mesh>, images: &mut Assets<Image>, materials: &mut Assets<StandardMaterial>,
+    meshes: &mut Assets<Mesh>, images: &mut Assets<Image>, materials: &mut Assets<StandardMaterial>, mode: u32,
 ) {
     let t = spawn_terrain(commands, level, meshes, images, materials);
+    let snow = snow_draws(level, mode);
+    println!("snow: {} (density {:.3})", if snow.on { "falls" } else { "none" }, snow.density);
     let mut wa = worldanim::WorldAnim::new(level);
     let o = spawn_instances(commands, level, meshes, images, materials, &mut wa);
     println!("draw batches: {t} terrain, {o} objects");
@@ -1041,7 +1055,7 @@ fn switch_level(
     };
     list.current = next as usize;
     for e in &old { commands.entity(e).despawn(); }
-    spawn_level(&mut commands, &loaded.level, &mut meshes, &mut images, &mut materials);
+    spawn_level(&mut commands, &loaded.level, &mut meshes, &mut images, &mut materials, ui::CareerRes::mode(game.event));
     commands.insert_resource(RiderRes(Rider::new(loaded.start + Vec3::Y * 0.5, loaded.yaw)));
     commands.insert_resource(make_opponents(loaded.start, loaded.yaw, lib.player, lib.chars.len(), 0, 0));
     commands.insert_resource(World(loaded.world));

@@ -175,7 +175,7 @@ impl WorldAnim {
         let mut kids = Vec::new();
         for (_, path, buf) in parts {
             let cell = order.iter().position(|p| *p == path).unwrap_or(0).min(15);
-            let frame = (self.next() & 15) as usize;
+            let frame = tricky_game::fxrand::crowd_texture_pick(self.next());
             kids.push((cell, meshes.add(buf.build()), self.crowd_mats.as_ref().map(|m| m[frame].clone()).unwrap_or_default()));
         }
         let mut cells = Vec::new();

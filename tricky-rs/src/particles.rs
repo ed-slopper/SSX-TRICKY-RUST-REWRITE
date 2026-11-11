@@ -57,6 +57,10 @@ pub fn setup_particles(mut commands: Commands, mut meshes: ResMut<Assets<Mesh>>,
     commands.insert_resource(Particles { dot: img, seed: 12345, ..default() });
 }
 
+/// STANDIN: a hash of the particle's index and life, for the game's randomness: each emitter's nine factors drawn
+/// from `Rand_Fx` at its creation (`ParticleSys_RandomizeFactors` 0x1d5180 from `ParticleSys_Create` 0x1d85c4),
+/// stepped once per emission step (`ParticleSys_StepEmitter` 0x1d5a30) and spent by VU1 program 6
+/// (`tricky_game::particlevu`). Row E1b2g4 puts these emitters on them.
 fn hash(mut x: u32) -> u32 { x ^= x >> 16; x = x.wrapping_mul(0x7feb_352d); x ^= x >> 15; x = x.wrapping_mul(0x846c_a68b); x ^ (x >> 16) }
 /// uniform in [-0.5, 0.5) for particle `i`, life `cycle`, channel `c`
 fn u(seed: u32, i: u32, cycle: u32, c: u32) -> f32 { (hash(seed ^ hash(i.wrapping_mul(97) ^ hash(cycle.wrapping_mul(131) ^ c))) >> 8) as f32 / 16_777_216.0 - 0.5 }
