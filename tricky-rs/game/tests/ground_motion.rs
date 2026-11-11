@@ -281,6 +281,11 @@ fn world() -> Option<W> {
     for a in [0x11c770, 0x10fd58] {
         r.allow(a);
     }
+    // the get-up (F4b3x2): `GetUpMotion_Update` 0x1102c8 and its turn toward the course (`Vec4_Set` 0x10c120,
+    // `Quat_RotateVecToVec` 0x2508b8, `Quat_Slerp` 0x250a48)
+    for a in [0x1102c8, 0x10c120, 0x2508b8, 0x250a48, 0x102e80] {
+        r.allow(a);
+    }
     for a in [0x10dad8, 0x10f178] {
         let l = log.clone();
         r.stub(a, move |_, _| l.borrow_mut().push(Ev::Call(a)));
@@ -1627,6 +1632,7 @@ fn ground_ticks_against_the_running_game() {
     let mut slides = vec![[0usize; 3]; 1 + runners.len()];
     // tumbling the whole frame (F4b3x): [frames, velocity right]
     let mut tumbles = [0usize; 2];
+    let mut getups = vec![[0usize; 3]; 1 + runners.len()];
     let kt = ticks[0].chased.iter().position(|(s, _)| s == "5ae0>4f0").filter(|_| std::env::var("TRICKY_TUMBLE").map_or(true, |v| v != "off"));
     let mut missed_all = [0usize; 3];
     // pushed ticks under fadd=g1 by whether the rider was also hit (the game's bump record +0x40 + 0x20·j +8 holds
@@ -1821,6 +1827,7 @@ fn ground_ticks_against_the_running_game() {
             let mut flown = vec![false; n];
             let mut slid = vec![false; n];
             let mut tumbled = vec![false; n];
+            let mut rose = vec![false; n];
             for &me in &order {
                 let (a, b) = (&w[0].riders[me], &w[1].riders[me]);
                 // a rider an earlier one stumbled out of the cruise in this frame ticks with the boost off (F4b3r)
@@ -1922,6 +1929,20 @@ fn ground_ticks_against_the_running_game() {
                     // first sample's (a slide clip the tumble plays this tick is for the next). STANDIN: the
                     // body's step answered from the second sample's motion state (handler +0x4f0, `5ae0>4f0`), as
                     // its contacts with the course are not replayed (F4h5c)
+                    // getting up the whole frame (F4b3x2), then the speed limit (0x1179a4: motion 6 is not 1)
+                    if ma == (6, 6) && air && !missed[me] {
+                        let kind = u32_le(b, 0x2e0);
+                        let hit = (kind != 3).then(|| Hit { kind, point: vec4(b, 0x2d0), normal: vec4(b, 0x2a0), surface: u32_le(b, 0x290) });
+                        let stat60 = f32_at(&stats[me], 0x60);
+                        let (pos, vel) = if k == 0 {
+                            get_up_ours(start.0, start.1, a, b, stat60, hit)
+                        } else {
+                            get_up_runner(&mut runners[k - 1].1, start.0, start.1, a, b, stat60, hit)
+                        };
+                        riders[me].vel = speed_limit(vel, speed_limit_at(a, b, boost, if k == 0 { |x, y| x - y } else { r5900::ps2float::fsub }));
+                        riders[me].pos = pos;
+                        rose[me] = true;
+                    }
                     if let Some(m) = kt.map(|kt| &w[1].chased[kt].1[me]).filter(|m| m.len() >= 0x100) {
                         if ma == (5, 5) && clip.0.wrapping_sub(0x2dc) >= 2 {
                             riders[me].vel = vec4(m, 0xe0);
@@ -2027,7 +2048,7 @@ fn ground_ticks_against_the_running_game() {
             }
             if k == 0 {
                 let mut again = false;
-                for i in (0..n).filter(|&i| flown[i] || slid[i]) {
+                for i in (0..n).filter(|&i| flown[i] || slid[i] || rose[i]) {
                     if sub4(riders[i].vel, vec4(&w[1].riders[i], 0x150)).iter().any(|x| x.abs() >= 1.0) {
                         missed[i] = true;
                         missed_all[match u32_le(&w[1].riders[i], 0x424) { 1 => 0, 4 => 1, _ => 2 }] += 1;
@@ -2091,6 +2112,16 @@ fn ground_ticks_against_the_running_game() {
                 if k == runners.len() && (riders[i].vel != vec4(b, 0x150) || riders[i].pos != vec4(b, 0x140)) && std::env::var("TRICKY_DBG").is_ok() {
                     let (o, g) = (riders[i].vel, vec4(b, 0x150));
                     eprintln!("DBG slide tick {tick} rider {i}: hits {} pushes {} velocity ulps {:?}, position off {:?}", f.hits[i], f.pushes[i], (0..3).map(|c| o[c].to_bits() as i64 - g[c].to_bits() as i64).collect::<Vec<_>>(), sub4(riders[i].pos, vec4(b, 0x140)));
+                }
+            }
+            for i in (0..n).filter(|&i| rose[i]) {
+                let b = &w[1].riders[i];
+                getups[k][0] += 1;
+                getups[k][1] += (riders[i].vel == vec4(b, 0x150)) as usize;
+                getups[k][2] += (riders[i].pos == vec4(b, 0x140)) as usize;
+                if k == runners.len() && riders[i].vel != vec4(b, 0x150) && std::env::var("TRICKY_DBG").is_ok() {
+                    let (o, g) = (riders[i].vel, vec4(b, 0x150));
+                    eprintln!("DBG get-up tick {tick} rider {i}: hits {} ulps {:?}, position off {:?}", f.hits[i], (0..3).map(|c| o[c].to_bits() as i64 - g[c].to_bits() as i64).collect::<Vec<_>>(), sub4(riders[i].pos, vec4(b, 0x140)));
                 }
             }
             for i in (0..n).filter(|&i| flown[i]) {
@@ -2187,6 +2218,7 @@ fn ground_ticks_against_the_running_game() {
         eprintln!("  riders in the air the whole frame, their flight step replayed (TRICKY_NOAIR: as recorded) [frames, velocity right, position right] by way: {flights:?}");
         eprintln!("  wiped-out riders tumbling the whole frame, the velocity their motion left them taken from its recorded body (5ae0>4f0; TRICKY_TUMBLE=off: as the others) [frames, velocity right]: {tumbles:?}");
         eprintln!("  wiped-out riders sliding the whole frame, their slide replayed [frames, velocity right, position right] by way: {slides:?}");
+        eprintln!("  riders getting up the whole frame, their get-up replayed [frames, velocity right, position right] by way: {getups:?}");
         eprintln!("  riders whose own motion was replayed but ended the frame 1 cm/s or more from the game's, taken as the others (in the air, motion 4, sliding): {missed_all:?}");
         eprintln!("  riders leaving the snow in a replayed frame, their take-off replayed for their pushes and hits (TRICKY_NOLIFT: as recorded): {lifted}");
         eprintln!("  riders wiped out by a hit in a replayed frame, their ground tick replayed (TRICKY_NOWIPE: as the others): {wiped_in}");
@@ -2457,6 +2489,60 @@ fn slide_runner(g: &mut W, pos: V4, vel: V4, a: &[u8], b: &[u8], clip: u32, hit:
     g.wall.set(false);
     g.r.cpu.set_gpr(4, h as u64);
     g.r.call(0x11c770).unwrap_or_else(|e| panic!("the slide: {e:?}"));
+    (rv(&mut g.r.mem, rd + 0x140), rv(&mut g.r.mem, rd + 0x150))
+}
+
+/// A rider getting up the whole frame (motion 6 at both samples, F4b3x2): `GetUpMotion_Update` 0x1102c8's step from
+/// (pos, vel): the slide on the first sample's ground (+0x2a0) and surface (+0x290), `Boarder_ProbeGround` 0x128ae8
+/// on the second sample's ground (`hit`), the hold to it with the second's ride height (+0x294). Ours:
+/// `wipeout_motion::slide_step`, `probe::probe`, `hold_step` (the order of `wipeout_motion::get_up_update`).
+fn get_up_ours(pos: V4, vel: V4, a: &[u8], b: &[u8], stat60: f32, hit: Option<Hit>) -> (V4, V4) {
+    let (mut pos, mut vel) = (pos, vel);
+    tricky_game::wipeout_motion::slide_step(&mut pos, &mut vel, vec4(a, 0x2a0), SURFACE_TABLE[u32_le(a, 0x290) as usize][0]);
+    let mut p = probe::Rider {
+        pos,
+        fwd: vec4(a, 0x180),
+        normal: vec4(a, 0x2a0),
+        ground: vec4(a, 0x2d0),
+        plane_fwd: vec4(a, 0x320),
+        side: vec4(a, 0x330),
+        fall: vec4(a, 0x2b0),
+        x244: f32_at(a, 0x244),
+        stat60,
+        height: f32_at(a, 0x1bc),
+        surface: u32_le(a, 0x290),
+        surface_ticks: u32_le(a, 0x29c),
+        kind: u32_le(a, 0x2e0),
+    };
+    probe::probe(&mut p, hit);
+    tricky_game::wipeout_motion::hold_step(&mut pos, &mut vel, &mut p.height, p.normal, f32_at(b, 0x294));
+    (pos, vel)
+}
+
+/// The runner's get-up: `Boarder_UpdateMotion` 0x11c770 on the handler, motion 6 (`GetUpMotion_Update` on handler
+/// +0x5f0, whose +0xc is the rider), the world under the probe `hit`
+fn get_up_runner(g: &mut W, pos: V4, vel: V4, a: &[u8], b: &[u8], stat60: f32, hit: Option<Hit>) -> (V4, V4) {
+    let (rd, h) = (g.rd, g.handler);
+    let m = &mut g.r.mem;
+    m.write_f32(g.stats + 0x60, stat60);
+    for o in [0x170, 0x180, 0x190, 0x1a0, 0x2a0, 0x2b0, 0x2c0, 0x2d0, 0x320, 0x330, 0x360] {
+        wv(m, rd + o, vec4(a, o as usize));
+    }
+    wv(m, rd + 0x140, pos);
+    wv(m, rd + 0x150, vel);
+    for o in [0x12c, 0x1bc, 0x244] {
+        m.write_f32(rd + o, f32_at(a, o as usize));
+    }
+    m.write_f32(rd + 0x294, f32_at(b, 0x294));
+    for o in [0x290, 0x29c, 0x2e0, 0x418] {
+        m.write_u32(rd + o, u32_le(a, o as usize));
+    }
+    m.write_u32(rd + 0x424, 6);
+    m.write_u32(h + 0x5f0 + 0xc, rd);
+    *g.hit.borrow_mut() = hit;
+    g.wall.set(false);
+    g.r.cpu.set_gpr(4, h as u64);
+    g.r.call(0x11c770).unwrap_or_else(|e| panic!("the get-up: {e:?}"));
     (rv(&mut g.r.mem, rd + 0x140), rv(&mut g.r.mem, rd + 0x150))
 }
 
