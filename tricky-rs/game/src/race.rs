@@ -62,6 +62,8 @@ pub struct AiDriver {
     pub skill: f32,
     pub finished: Option<f32>,
     pub stuck: u32,
+    /// the times it put the rider back on the line after a reset zone or a fall (a second respawn, row E7c3f)
+    pub rejoins: u32,
     clock: f32,
     /// seconds spent alongside the player, and until this rider may shove again
     pub beside: f32,
@@ -86,7 +88,7 @@ pub struct AiDriver {
     route_done: bool,
 }
 impl AiDriver {
-    pub fn new(offset: f32, skill: f32) -> Self { Self { idx: 0, last_idx: 0, stuck_for: 0.0, offset, skill, finished: None, stuck: 0, clock: 0.0, beside: 0.0, seen_respawns: 0, over: Vec::new(), slow_for: 0.0, shove_wait: 4.0, plan: (0.0, 0.0, 0, false), planned: false, jumps: 0, time_scale: 1.0, was_crouching: false, route: Vec::new(), route_course: AiCourse::default(), route_last: None, route_done: false } }
+    pub fn new(offset: f32, skill: f32) -> Self { Self { idx: 0, last_idx: 0, stuck_for: 0.0, offset, skill, finished: None, stuck: 0, rejoins: 0, clock: 0.0, beside: 0.0, seen_respawns: 0, over: Vec::new(), slow_for: 0.0, shove_wait: 4.0, plan: (0.0, 0.0, 0, false), planned: false, jumps: 0, time_scale: 1.0, was_crouching: false, route: Vec::new(), route_course: AiCourse::default(), route_last: None, route_done: false } }
     /// `Rand_Game() % 100 - 16`, an unsigned remainder (`divu`), as the original rolls it against the tricks stat (0..255)
     /// (`AIComputer_PlanJumpTrick` 0x139d58, `FUN_00138bb8` 0x138c98): the game's one stream, row E1b2a.
     fn roll(&mut self) -> i32 {
@@ -260,6 +262,7 @@ impl AiDriver {
                 self.clear_of_resets(world, line);
                 let nxt = line[(self.idx + 1).min(line.len() - 1)] - line[self.idx];
                 r.respawn_heading(line[self.idx] + Vec3::Y * 1.0, crate::jump::atan2_inline(-nxt.z, nxt.x));
+                self.rejoins += 1;
             }
             self.seen_respawns = r.respawns;
         }
@@ -845,7 +848,7 @@ pub fn self_test(world: &mut CollisionWorld, rails: &Rails, line: &[Vec3], cours
     println!("frames where the rider's own speed changed abruptly (>0.15 m/frame): {}", rider_jerk.iter().filter(|j| j.0 > 0.15).count());
     println!("wipe-outs: {crashes}, stumbles: {stumbles}, score {}, last trick \"{}\"", r.score, r.last_trick);
     println!("ground/air switches: {flips} ({:.1} per second)", flips as f32 / t.max(1.0));
-    println!("distance {:.0} m, top speed {:.0} km/h, airborne {:.0} s, on rails {:.0} s, autopilot stuck {} times, fell out of the world {} times", dist, top * 3.6, air, grind, ai.stuck + stuck, r.respawns - ai.stuck - stuck);
+    println!("distance {:.0} m, top speed {:.0} km/h, airborne {:.0} s, on rails {:.0} s, autopilot stuck {} times, fell out of the world {} times (put back on the line after {} of them)", dist, top * 3.6, air, grind, ai.stuck + stuck, r.respawns - ai.stuck - ai.rejoins - stuck, ai.rejoins);
 }
 
 #[cfg(test)]
