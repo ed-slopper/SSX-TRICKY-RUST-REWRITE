@@ -1633,6 +1633,7 @@ fn ground_ticks_against_the_running_game() {
     // tumbling the whole frame (F4b3x): [frames, velocity right]
     let mut tumbles = [0usize; 2];
     let mut getups = vec![[0usize; 3]; 1 + runners.len()];
+    let mut landings = vec![[0usize; 3]; 1 + runners.len()];
     let kt = ticks[0].chased.iter().position(|(s, _)| s == "5ae0>4f0").filter(|_| std::env::var("TRICKY_TUMBLE").map_or(true, |v| v != "off"));
     let mut missed_all = [0usize; 3];
     // pushed ticks under fadd=g1 by whether the rider was also hit (the game's bump record +0x40 + 0x20·j +8 holds
@@ -1828,6 +1829,7 @@ fn ground_ticks_against_the_running_game() {
             let mut slid = vec![false; n];
             let mut tumbled = vec![false; n];
             let mut rose = vec![false; n];
+            let mut landed = vec![false; n];
             for &me in &order {
                 let (a, b) = (&w[0].riders[me], &w[1].riders[me]);
                 // a rider an earlier one stumbled out of the cruise in this frame ticks with the boost off (F4b3r)
@@ -1943,6 +1945,17 @@ fn ground_ticks_against_the_running_game() {
                         riders[me].pos = pos;
                         rose[me] = true;
                     }
+                    // landing in the frame (F4b3x2), then the speed limit (0x1179a4: motion 2 by then). STANDIN: ours
+                    // for every way (the runner has no landing yet)
+                    if ma == (1, 2) && air && !missed[me] && std::env::var("TRICKY_NOLAND").is_err() {
+                        let board = if std::env::var("TRICKY_LANDBOARD").is_ok_and(|v| v == "a") { a } else { b };
+                        let (pos, vel) = land_ours(start.0, start.1, a, b, board, stats[me][0x16]);
+                        riders[me].vel = speed_limit(vel, speed_limit_at(a, b, boost, if k == 0 { |x, y| x - y } else { r5900::ps2float::fsub }));
+                        if air_pos {
+                            riders[me].pos = pos;
+                        }
+                        landed[me] = true;
+                    }
                     if let Some(m) = kt.map(|kt| &w[1].chased[kt].1[me]).filter(|m| m.len() >= 0x100) {
                         if ma == (5, 5) && clip.0.wrapping_sub(0x2dc) >= 2 {
                             riders[me].vel = vec4(m, 0xe0);
@@ -2048,7 +2061,7 @@ fn ground_ticks_against_the_running_game() {
             }
             if k == 0 {
                 let mut again = false;
-                for i in (0..n).filter(|&i| flown[i] || slid[i] || rose[i]) {
+                for i in (0..n).filter(|&i| flown[i] || slid[i] || rose[i] || landed[i]) {
                     if sub4(riders[i].vel, vec4(&w[1].riders[i], 0x150)).iter().any(|x| x.abs() >= 1.0) {
                         missed[i] = true;
                         missed_all[match u32_le(&w[1].riders[i], 0x424) { 1 => 0, 4 => 1, _ => 2 }] += 1;
@@ -2114,12 +2127,22 @@ fn ground_ticks_against_the_running_game() {
                     eprintln!("DBG slide tick {tick} rider {i}: hits {} pushes {} velocity ulps {:?}, position off {:?}", f.hits[i], f.pushes[i], (0..3).map(|c| o[c].to_bits() as i64 - g[c].to_bits() as i64).collect::<Vec<_>>(), sub4(riders[i].pos, vec4(b, 0x140)));
                 }
             }
+            for i in (0..n).filter(|&i| landed[i]) {
+                let b = &w[1].riders[i];
+                landings[k][0] += 1;
+                landings[k][1] += (riders[i].vel == vec4(b, 0x150)) as usize;
+                landings[k][2] += (riders[i].pos == vec4(b, 0x140)) as usize;
+                if k == 0 && riders[i].vel != vec4(b, 0x150) && std::env::var("TRICKY_DBG").is_ok() {
+                    let (o, g) = (riders[i].vel, vec4(b, 0x150));
+                    eprintln!("DBG landing tick {tick} rider {i}: hits {} ulps {:?}, position off {:?}", f.hits[i], (0..3).map(|c| o[c].to_bits() as i64 - g[c].to_bits() as i64).collect::<Vec<_>>(), sub4(riders[i].pos, vec4(b, 0x140)));
+                }
+            }
             for i in (0..n).filter(|&i| rose[i]) {
                 let b = &w[1].riders[i];
                 getups[k][0] += 1;
                 getups[k][1] += (riders[i].vel == vec4(b, 0x150)) as usize;
                 getups[k][2] += (riders[i].pos == vec4(b, 0x140)) as usize;
-                if k == runners.len() && riders[i].vel != vec4(b, 0x150) && std::env::var("TRICKY_DBG").is_ok() {
+                if k == runners.len() && (riders[i].vel != vec4(b, 0x150) || riders[i].pos != vec4(b, 0x140)) && std::env::var("TRICKY_DBG").is_ok() {
                     let (o, g) = (riders[i].vel, vec4(b, 0x150));
                     eprintln!("DBG get-up tick {tick} rider {i}: hits {} ulps {:?}, position off {:?}", f.hits[i], (0..3).map(|c| o[c].to_bits() as i64 - g[c].to_bits() as i64).collect::<Vec<_>>(), sub4(riders[i].pos, vec4(b, 0x140)));
                 }
@@ -2218,6 +2241,7 @@ fn ground_ticks_against_the_running_game() {
         eprintln!("  riders in the air the whole frame, their flight step replayed (TRICKY_NOAIR: as recorded) [frames, velocity right, position right] by way: {flights:?}");
         eprintln!("  wiped-out riders tumbling the whole frame, the velocity their motion left them taken from its recorded body (5ae0>4f0; TRICKY_TUMBLE=off: as the others) [frames, velocity right]: {tumbles:?}");
         eprintln!("  wiped-out riders sliding the whole frame, their slide replayed [frames, velocity right, position right] by way: {slides:?}");
+        eprintln!("  riders landing in the frame, their landing's velocity replayed (ours every way) [frames, velocity right, position right] by way: {landings:?}");
         eprintln!("  riders getting up the whole frame, their get-up replayed [frames, velocity right, position right] by way: {getups:?}");
         eprintln!("  riders whose own motion was replayed but ended the frame 1 cm/s or more from the game's, taken as the others (in the air, motion 4, sliding): {missed_all:?}");
         eprintln!("  riders leaving the snow in a replayed frame, their take-off replayed for their pushes and hits (TRICKY_NOLIFT: as recorded): {lifted}");
@@ -2516,6 +2540,46 @@ fn get_up_ours(pos: V4, vel: V4, a: &[u8], b: &[u8], stat60: f32, hit: Option<Hi
     };
     probe::probe(&mut p, hit);
     tricky_game::wipeout_motion::hold_step(&mut pos, &mut vel, &mut p.height, p.normal, f32_at(b, 0x294));
+    (pos, vel)
+}
+
+/// A rider landing in the frame (motion 1 at the first sample, 2 at the second, F4b3x2): `AirMotion_Update`
+/// 0x108378's flight step (`Air_IntegrateRK4` 0x12b340, dt = +0x12c / 60), then on the landing
+/// `Landing_CheckAngles` 0x12ba78 on the second sample's ground (+0x2a0) and the velocity slowed by its two angles
+/// (pitch, roll: the two clamps and factors of 0x108378). `board` (+0x180 and +0x1a0) is the sample whose board
+/// the check reads. STANDIN: the landing's down ray and probe are taken as found (the second sample is on the
+/// ground) and its clamp to the ground is not replayed (the pivot needs the body's bone, not recorded): the
+/// position is the flight step's; the clip type is taken as no grab (a grab not at its safe point crashes,
+/// motion 5, not 2).
+fn land_ours(pos: V4, vel: V4, a: &[u8], b: &[u8], board: &[u8], stability: u8) -> (V4, V4) {
+    let (mut pos, mut vel) = (pos, vel);
+    tricky_game::air::integrate_rk4(f32_at(a, 0x12c) * f32::from_bits(0x3c88_8889), &mut pos, &mut vel, false);
+    let s = tricky_game::landing::LandingState {
+        clip_type: 0,
+        clip_flag4: false,
+        surface: u32_le(b, 0x290),
+        board: vec4(board, 0x180),
+        vel,
+        up: vec4(board, 0x1a0),
+        stability,
+    };
+    if let Some(l) = tricky_game::landing::check_angles(&s, vec4(b, 0x2a0)) {
+        let (a1, a2) = (l.pitch, l.roll);
+        let k = f32::from_bits;
+        let sc = |v: V4, g: f32| [v[0] * g, v[1] * g, v[2] * g, v[3] * g];
+        let lo = k(0x3e86_0a92);
+        let x = a2.abs();
+        let g = if x < lo { lo } else if k(0x3f5f_66f3) < x { k(0x3f5f_66f3) } else { x };
+        if lo < g {
+            vel = sc(vel, g * k(0xbe7b_4efa) + k(0x3f88_395b));
+        }
+        let lo = k(0x3edf_66f3);
+        let x = a1.abs();
+        let g = if x < lo { lo } else if k(0x3fb2_b8c2) < x { k(0x3fb2_b8c2) } else { x };
+        if lo < g {
+            vel = sc(vel, g * k(0xbe85_4942) + k(0x3f8e_8a0d));
+        }
+    }
     (pos, vel)
 }
 
