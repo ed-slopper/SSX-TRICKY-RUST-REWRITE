@@ -730,6 +730,7 @@ pub fn self_test(world: &mut CollisionWorld, rails: &Rails, line: &[Vec3], cours
     let (mut stuck_for, stuck, mut last_idx) = (0.0f32, 0u32, 0usize);
     let mut grind = 0.0f32;
     let (mut crashes, mut was_down, mut stumbles, mut was_stumble) = (0u32, false, 0u32, false);
+    let mut jolts = 0u32;
     let mut last_seen = String::new();
     let mut prog = tricky_data::course::Progress::default();
     let mut tube_t = 101.0f32;
@@ -766,6 +767,7 @@ pub fn self_test(world: &mut CollisionWorld, rails: &Rails, line: &[Vec3], cours
         let best = (idx, (line[idx.min(line.len() - 1)] - r.pos).length_squared());
         let before = r.pos;
         let air_before = r.air_time;
+        let respawns_before = r.respawns;
         // where the game's reset would place the rider on its path, at the game's heading (row G20c3b5)
         let game_place = if r.grounded && r.crashed <= 0.0 && r.rail.is_none() && !ai_paths.is_empty() {
             match port.ai.as_ref() { Some(a) => crate::aiglue::reset_place(ai_paths, &a.follow), None => crate::aiglue::reset_place_near(ai_paths, r.pos) }
@@ -789,7 +791,20 @@ pub fn self_test(world: &mut CollisionWorld, rails: &Rails, line: &[Vec3], cours
         world.tick_knockables(dt);
         if let Some(tb) = tube { if tb.apply(&mut r, prog.laps, dt) { ai.reroute(); tube_t = t; println!("  t {t:.1}: up the tube, {} laps to go", prog.laps); } }
         if std::env::var("TRICKY_TUBE").is_ok() && ((t > tube_t - 2.0 && t < tube_t) || (t - tube_t < 3.0 && t >= tube_t)) && ((t * 10.0) as i32) != (((t - dt) * 10.0) as i32) { println!("    t {t:.1} pos {:.1?} vel {:.1?} grounded {} class {} down {:.1}", r.pos, r.vel, r.grounded, r.tube_class, r.crashed); }
-        if std::env::var("TRICKY_RESETS").is_ok() && (r.pos - before).length() > 3.0 { println!("put back at t {t:.1}: was at {:.1?} (line point {} at {:.1?}), air {:.1} s, {}", before, ai.idx, line[ai.idx.min(line.len() - 1)], air_before, if air_before > 8.9 { "in the air too long" } else if before.y < world.min_y - 29.0 { "below the world" } else { "reset zone or autopilot" }); }
+        // a move of more than 3 m in one step: a respawn (counted in `r.respawns`), or not (row E7c3i: the wipe-out's
+        // first `Ragdoll_Contacts` pushing a body posed upside down under the snow back out of it, alaska t 110.0; or
+        // megaplex's tube, a lap)
+        if (r.pos - before).length() > 3.0 {
+            let respawned = r.respawns != respawns_before;
+            // megaplex's tube takes the rider back up to the top for its next lap (`Tube::apply`)
+            let lap = tube_t == t;
+            if !respawned && !lap { jolts += 1; }
+            if std::env::var("TRICKY_RESETS").is_ok() {
+                let why = if respawned { if air_before > 8.9 { "in the air too long" } else if before.y < world.min_y - 29.0 { "below the world" } else { "reset zone or autopilot" } }
+                    else if lap { "no respawn: up the tube for the next lap" } else if r.wipe.is_some() { "no respawn: the wipe-out's body pushed out of the snow" } else { "no respawn" };
+                println!("put back at t {t:.1}: was at {:.1?}, now {:.1?} (line point {} at {:.1?}), air {:.1} s, {why}", before, r.pos, ai.idx, line[ai.idx.min(line.len() - 1)], air_before);
+            }
+        }
         if r.rail.is_some() { grind += dt; }
         dist += (r.pos - before).length();
         if r.grounded != was_grounded { flips += 1; was_grounded = r.grounded; }
@@ -848,7 +863,7 @@ pub fn self_test(world: &mut CollisionWorld, rails: &Rails, line: &[Vec3], cours
     println!("frames where the rider's own speed changed abruptly (>0.15 m/frame): {}", rider_jerk.iter().filter(|j| j.0 > 0.15).count());
     println!("wipe-outs: {crashes}, stumbles: {stumbles}, score {}, last trick \"{}\"", r.score, r.last_trick);
     println!("ground/air switches: {flips} ({:.1} per second)", flips as f32 / t.max(1.0));
-    println!("distance {:.0} m, top speed {:.0} km/h, airborne {:.0} s, on rails {:.0} s, autopilot stuck {} times, fell out of the world {} times (put back on the line after {} of them)", dist, top * 3.6, air, grind, ai.stuck + stuck, r.respawns - ai.stuck - ai.rejoins - stuck, ai.rejoins);
+    println!("distance {:.0} m, top speed {:.0} km/h, airborne {:.0} s, on rails {:.0} s, autopilot stuck {} times, fell out of the world {} times (put back on the line after {} of them), moved more than 3 m in a step with no respawn {} times", dist, top * 3.6, air, grind, ai.stuck + stuck, r.respawns - ai.stuck - ai.rejoins - stuck, ai.rejoins, jolts);
 }
 
 #[cfg(test)]
