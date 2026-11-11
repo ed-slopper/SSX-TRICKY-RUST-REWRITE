@@ -1407,6 +1407,45 @@ Bumps unchanged (rec14 244/248, rec15 130/132, rec16 384/392, rec17 464/466, rec
 (rec14 5066 r4, 6922 and 6925 r5; rec16 6915-6927 r5), a landing in the frame (rec16 6306 r5, motion 1 to 2) and the
 get-up (rec16 14579 r4, motion 6, `GetUpMotion_Update` 0x1102c8): row F4b3x2.
 
+## F4b3x2: the get-up and landings replayed in the frame (2026-11-11)
+
+Two more kinds of rider the ground test does not replay now get the velocity their own tick left them before the
+collisions, instead of the second sample's less the trial passes' guess:
+
+- **Getting up** (motion 6 at both samples): `Boarder_UpdateMotion` 0x11c770 case 6 runs `GetUpMotion_Update`
+  0x1102c8 on handler +0x5f0 (its +0xc is the rider). Proven from the code: the slide step of the wiped-out slide
+  (pos += vel/60; vel += (n.x·g·n.z, n.y·g·n.z, g·n.z − g)/60, g the surface table's word 0 for +0x290, n = +0x2a0
+  before the probe; vel ·= 0x3f7bbbbc), then `Boarder_ProbeGround` 0x128ae8, then the hold to the ground with the
+  probe's normal (s = clamp(+0x1bc + +0x294, ±8.333333): pos −= n·s, +0x1bc −= s, vel −= n·(vel·n)); the turn
+  toward the course (+0x360, `Quat_RotateVecToVec` 0x2508b8, `Quat_Slerp` 0x250a48 by 0x3daaaaab) touches only the
+  quaternion. Then the speed limit (0x1179a4: only motion 1 skips it). Ours: `wipeout_motion::slide_step`,
+  `probe::probe`, `hold_step` (`get_up_ours`); the runner's: 0x11c770 with motion 6 (`get_up_runner`, the probe
+  answered with the second sample's ground). Every get-up frame's velocity is right where the rider has no hit:
+  rec14 526/529, rec15 376/376, rec16 762/762, rec17 1,845/1,845, rec18 1,577/1,579, ours and the runner alike (the 5
+  off all hit in the frame: the hit's model). Positions off only by the pushes apart.
+- **Landing** (motion 1 to 2): `AirMotion_Update` 0x108378's flight step (`Air_IntegrateRK4` 0x12b340, dt = +0x12c /
+  60), `Landing_CheckAngles` 0x12ba78 on the second sample's ground (+0x2a0) with the second sample's board (+0x180,
+  +0x1a0; the first's: rec16 47 landings missed by over 1 cm/s), and the velocity slowed by its pitch and roll (the
+  two clamps and factors of 0x108378); then the speed limit (motion 2 by then). Velocity right: rec14 126/145, rec15
+  85/99, rec16 175/205, rec17 268/322, rec18 151/179; the rest are 1 or 2 ulps off (inferred: the board at the
+  check is the one after this tick's control, which the second sample's is not quite, or the check's square roots;
+  not proven). STANDIN: ours on every way (the runner has no landing yet); the down ray and probe taken as found and
+  the clamp to the ground not replayed (the pivot needs the body's bone, not recorded), so the position is the flight
+  step's (tens of cm off).
+
+Every field under fadd=g1, by default and with the passes off:
+
+| recording | before | now | passes off before | passes off now |
+|---|---|---|---|---|
+| rec14 | 37,244 | 37,244 | 37,241 | 37,241 |
+| rec15 | 37,311 | 37,311 | 37,311 | |
+| rec16 | 51,725 | 51,725 | 51,721 | 51,723 |
+| rec17 | 71,257 | 71,257 | 71,257 | |
+| rec18 | 54,599 | 54,599 | 54,599 | |
+
+The passes are still needed for the tumbling riders with no recorded body (rec14 5066 r4, 6922 and 6925 r5; rec16
+6915-6927 r5): all of the remaining difference. Dropping TRICKY_PREHIT waits for those (row F4b3x3).
+
 ## How a row gets to `checked`
 
 1. Port the function (address in its doc comment, AGENTS.md §13).
