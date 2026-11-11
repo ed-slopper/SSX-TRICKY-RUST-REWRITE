@@ -1446,6 +1446,26 @@ Every field under fadd=g1, by default and with the passes off:
 The passes are still needed for the tumbling riders with no recorded body (rec14 5066 r4, 6922 and 6925 r5; rec16
 6915-6927 r5): all of the remaining difference. Dropping TRICKY_PREHIT waits for those (row F4b3x3).
 
+## F4b3x3: the landing in the runner (2026-11-11, part done)
+
+The ground test's landings (motion 1 to 2 in the frame) now run the game's own `AirMotion_Update` 0x108378 in the
+runner ways (`land_runner` in `tests/ground_motion.rs`), with `Landing_CheckAngles` 0x12ba78 and
+`AnimCtl_TestClipFlag` 0x15ffb8 real, every other call stubbed and logged; way 0 (ours) is still `land_ours`.
+
+- Proven: the 1-2 ulps of the old landing replay are the COP1 adder: the landing's factors (roll
+  `roll*-0.24541846+1.0642503`, pitch `pitch*-0.26032454+1.113588`, 0x108fa8/0x108fb0) and `Landing_CheckAngles`'s
+  `1.5707964 - asin` and atan ±pi are `add.S`. With fadd=g1 the runner gets 203 of 205 velocities right on rec16
+  (IEEE: 173; ours: 175).
+- Proven: a grab clip (types 0xe/0xf/0x10) needs layer 0's sequence laid out (flag 4 of the clip, `AnimCtl_TestClipFlag`),
+  or `Landing_CheckAngles` returns 0 and the rider crashes; the first sample's controls (`ctl_of`) give it.
+- STANDIN (in `land_runner`): both rays answer the second sample's ground with the hit 99.9 cm along the normal
+  from the line's start, so the probe's height is about 0.1 cm and the landing is not clamped to the ground (the
+  clamp's pivot needs the body's bone, not recorded); the position is the flight step's.
+- Left: rec16 8288 rider 2 (twice, trial passes): after the flight step the velocity points away from the second
+  sample's normal, so the game's down ray must have hit other ground (not recorded); every way misses it. 4 landings
+  on rec16 hit `cWorldBoarder::cWorldBoarder` (a rider on a rail line, kind 1 hit) and are left where they started.
+  The trial passes (TRICKY_PREHIT) and the tumbling riders with no recorded body are untouched.
+
 ## How a row gets to `checked`
 
 1. Port the function (address in its doc comment, AGENTS.md §13).
