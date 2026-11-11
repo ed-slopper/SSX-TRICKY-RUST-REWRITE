@@ -740,6 +740,18 @@ velocity, +0x424 motion, +0x428 state, +0x2e4 impact counter; recordings kept on
     alpha fades over the last size.
 - **`StaticInit_SnowFallMan`** writes three colour rows at 0x3d0da0..0x3d0dc8.
 
+**In the app (row E1b2g5, `tricky-rs/src/snow.rs`).** The manager is built in a small `Mem` from `cGame::Init`'s draws
+(`fxrand::game_init_snow`: the 32 layer words replayed into the constructor, then `SetDensity` with +0x78 and
+`SetRange` with the two fall values), stepped once per 60 Hz tick and drawn each frame. The walk's box tests are
+`cull::box_test` on the app camera's clip matrix (game cm to clip). Each drawn layer runs VU1 program 7 (`particlevu::run7`)
+with that matrix as the frame's words 0..3, the screen scale and offset chosen so the ftoi4 corners can be inverted,
+and the sprite scale = the projection's x / y scale per cm. Each sprite is put back in the world through the
+inverse matrix and drawn with the depth test, alpha blended, colour /128. Stand-ins (all `STANDIN:` in snow.rs):
+- the texture: the particle sheet's `snfl` if exported, else a soft dot (the draw's is gApp+0x30's +0x4c, not traced);
+- the camera's weather density (+0xa4's +0x18) is not loaded: +0x78 stands in, so the density never changes;
+- the GIF tags at 25 and 521 are ours (five PACKED registers), not the ones chain 0x31c790 loads;
+- `TRICKY_SNOW=1` forces the snow on (a race, mode 4, never draws it).
+
 Checked in the runner on 6,000 random managers, games, cameras and weather, about 430 calls for each of 14 kinds.
 The renderer was a fake vtable whose box test answered inside, outside or partly. 32 of 36 mutants were caught. The
 others: (x − 1) + 1 is exact for the factors, the parity's remainder −1 gives 1 either way, and two distance

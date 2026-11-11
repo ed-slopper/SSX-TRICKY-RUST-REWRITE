@@ -20,6 +20,7 @@ mod spray;
 mod tracks;
 mod book;
 mod particles;
+mod snow;
 mod boardsound;
 mod gamehud;
 mod hudsprites;
@@ -439,13 +440,13 @@ fn main() {
         _ => ui::Game::default(),
     })
     .init_resource::<SmoothDt>()
-    .add_systems(Startup, (setup, ui::setup_ui, sound::setup_sound, spray::setup_spray, tracks::setup_tracks, particles::setup_particles, boardsound::setup_board_sound, editor::setup_editor, worldsound::setup_world_sound))
+    .add_systems(Startup, (setup, ui::setup_ui, sound::setup_sound, spray::setup_spray, tracks::setup_tracks, particles::setup_particles, snow::setup_snow, boardsound::setup_board_sound, editor::setup_editor, worldsound::setup_world_sound))
     .add_systems(Update, (
         smooth_dt,
         ui::menus,
         (trick_only_ramps, ride, rider_model, sync_visuals, animate_visuals, chase_camera).chain().run_if(|m: Res<Mode>| *m == Mode::Ride),
         fly_camera.run_if(|m: Res<Mode>| *m == Mode::Fly),
-        (switch_level, move_movers, (worldanim::world_anim, animate_objects).chain(), move_props, sky_follow, draw_rails, toggles, ui::records, ui::trick_book, (ui::hud, hudsprites::hud_sprites, sfnfont::sfn_text, gamehud::game_hud, sfnfont::sfn_glyphs).chain(), (sound::course_music, coursemusic::course_music, pathmusic::path_music, sound::sound).chain(), boardsound::board_sound, (particles::particles, worldsound::world_sound).chain(), spray::spray, tracks::tracks, editor::editor, screenshot),
+        (switch_level, move_movers, (worldanim::world_anim, animate_objects).chain(), move_props, sky_follow, draw_rails, toggles, ui::records, ui::trick_book, (ui::hud, hudsprites::hud_sprites, sfnfont::sfn_text, gamehud::game_hud, sfnfont::sfn_glyphs).chain(), (sound::course_music, coursemusic::course_music, pathmusic::path_music, sound::sound).chain(), boardsound::board_sound, (particles::particles, worldsound::world_sound).chain(), spray::spray, snow::snow, tracks::tracks, editor::editor, screenshot),
     ).chain());
     if let Ok(path) = std::env::var("TRICKY_SHOT") {
         app.insert_resource(Shot { path, frame: 0 });
@@ -658,8 +659,8 @@ fn setup(
 /// `cGame::Init` 0x17e148's snow draws (`fxrand::game_init_snow`): after `ParticleMan_Init` and before
 /// `Crowd_LoadTexturesRandomize` 0x1458e0 (the crowd's picks, made in `spawn_instances`), with the course record's
 /// chance (`courses::SNOW_CHANCE`). `mode` is the game mode (`DAT_0032de8c`).
-/// STANDIN: the app's one player and one entry, for the AI's +0x7c and +0x88 (a race, mode 4, draws no chance anyway);
-/// and the snowfall itself (`snowfall`, row G7c1) is not drawn yet, so the result only keeps `Rand_Fx` in step.
+/// The result makes the snowfall (`snow::Snow`, row E1b2g5).
+/// STANDIN: the app's one player and one entry, for the AI's +0x7c and +0x88 (a race, mode 4, draws no chance anyway).
 fn snow_draws(level: &Level, mode: u32) -> tricky_game::fxrand::GameSnow {
     let course = level.dir.file_name().and_then(|f| ui::CareerRes::course(&f.to_string_lossy())).map_or(12, u64::from);
     let chance = f32::from_bits(tricky_game::courses::by_course(&tricky_game::courses::SNOW_CHANCE, course));
@@ -673,6 +674,7 @@ fn spawn_level(
     let t = spawn_terrain(commands, level, meshes, images, materials);
     let snow = snow_draws(level, mode);
     println!("snow: {} (density {:.3})", if snow.on { "falls" } else { "none" }, snow.density);
+    commands.insert_resource(snow::Snow::new(&snow));
     let mut wa = worldanim::WorldAnim::new(level);
     let o = spawn_instances(commands, level, meshes, images, materials, &mut wa);
     println!("draw batches: {t} terrain, {o} objects");
