@@ -29,14 +29,15 @@ const SYS_SIZE: u32 = 0x8000;
 const TABLES: u32 = 0x010c_0000;
 const TOKEN: u32 = TABLES;
 const INF_PATH: u32 = TABLES + 0x100;
-const EVENT: u32 = TABLES + 0x200;
+/// Where [`SpeechHost::post`] writes the event
+pub const EVENT: u32 = TABLES + 0x200;
 const STREAMS: u32 = TABLES + 0x400;
 const STREAM_TABLE: u32 = TABLES + 0x600;
 const VOLUME_SLOTS: u32 = TABLES + 0x700;
 const HEAP: u32 = 0x0110_0000;
 const HEAP_SIZE: u32 = 0x0040_0000;
-const STACK_BASE: u32 = 0x01e0_0000;
-const STACK_TOP: u32 = 0x0200_0000;
+pub const STACK_BASE: u32 = 0x01e0_0000;
+pub const STACK_TOP: u32 = 0x0200_0000;
 
 /// `cBXAudio`'s vtable, its two entries the speech system calls (+0x24 `vf3`, +0x7c `vf14`), as in the executable
 const AUDIO_VTABLE: u32 = 0x39f200;
@@ -66,14 +67,29 @@ pub struct LinePlay {
     pub handle: u32,
 }
 
-/// A stream as the host keeps it (STANDIN: for the game's `cStream`)
-#[derive(Clone, Copy, Debug, Default)]
+/// A part queued on a stream: the play call's handle and its length in ms (infinite until the app knows it)
+#[derive(Clone, Copy, Debug)]
+struct Part {
+    handle: u32,
+    length_ms: f32,
+}
+
+/// A stream as the host keeps it (STANDIN: for the game's `cStream` over `SndStream`, whose requests play in the
+/// order queued: `SndStream_Queue` 0x2d2728)
+#[derive(Clone, Debug, Default)]
 struct Stream {
     open: bool,
-    playing: bool,
-    /// the line's length and how far it has played, in ms (the app's)
-    length_ms: f32,
+    /// the parts queued, the one playing first
+    parts: std::collections::VecDeque<Part>,
+    /// how far the first part has played, in ms (the app's)
     played_ms: f32,
+}
+
+impl Stream {
+    /// the first part's time left
+    fn left(&self) -> f32 {
+        self.parts.front().map_or(0.0, |p| (p.length_ms - self.played_ms).max(0.0))
+    }
 }
 
 /// What the layers call out to (see the module)
@@ -86,8 +102,32 @@ pub struct HostState {
     rng: u32,
     streams: [Stream; 8],
     plays: Vec<LinePlay>,
+    /// the streams stopped (`StreamSys_StopStream`) since the app last asked
+    stops: Vec<u32>,
     handle: u32,
+    /// The stand-ins' calls and their answers, when kept ([`SpeechHost::keep_log`]): for running the original on
+    /// the same answers (`tests/speechhost.rs`)
+    log: Option<Vec<LeafCall>>,
 }
+
+/// A call the host answered as a stand-in (see the module): the function, its arguments, its answer (a float's bits)
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct LeafCall {
+    pub target: u32,
+    pub args: Vec<u32>,
+    pub answer: u32,
+}
+
+/// The functions the host answers as stand-ins (the C library, the allocator, the ini reader, the files, the BIG
+/// walk, the stream system, `Rand_Fx` and the play call); the rest are the game's functions answered by their ports
+pub const LEAVES: [u32; 30] = [
+    ss::ALLOC, ss::FREE, ss::DELETE, ss::MEMSET, ss::SPRINTF, load::STRCMP, load::STRLEN, ss::STRCPY, load::STRNCPY,
+    PRINTF, load::INI_OPEN, load::INI_CLOSE, load::FIND_SECTION, load::SECTION_START, load::AT_END, load::READ_TOKEN,
+    load::READ_STRING, load::OPEN_BIG, ss::FILE_LOAD, ss::FILE_EXISTS, load::BIG_FIND, load::BIG_COUNT, load::BIG_LOOKUP,
+    ss::MUSIC_INIT, ss::STREAM_OPEN, ss::STREAM_STATE, ss::STREAM_PLAYING, ss::STREAM_WAIT, ss::STREAM_STOP, RAND_FX,
+];
+/// More stand-ins: the play call and the two float answers
+pub const LEAVES_MORE: [u32; 3] = [PLAY_FILE, ss::STREAM_TIME_LEFT, ss::STREAM_PLAY_TIME];
 
 fn cstr(m: &Mem, at: u32) -> Vec<u8> {
     (0..0x400).map(|k| m.r8(at + k)).take_while(|b| *b != 0).collect()
@@ -185,8 +225,22 @@ impl HostState {
         &mut self.streams[((s - STREAMS) / 0x20) as usize]
     }
 
+    fn keep(&mut self, t: u32, a: &[u32], answer: u32) {
+        if let Some(log) = &mut self.log {
+            if LEAVES.contains(&t) || LEAVES_MORE.contains(&t) {
+                log.push(LeafCall { target: t, args: a.to_vec(), answer });
+            }
+        }
+    }
+
     /// The call to the function at `t` with the arguments `a`, answered (see the module)
     pub fn dispatch(&mut self, m: &mut Mem, t: u32, a: &[u32]) -> u32 {
+        let r = self.answer(m, t, a);
+        self.keep(t, a, r);
+        r
+    }
+
+    fn answer(&mut self, m: &mut Mem, t: u32, a: &[u32]) -> u32 {
         let s32 = |k: usize| a[k] as i32;
         match t {
             // the C library and the allocator
@@ -313,16 +367,24 @@ impl HostState {
                 m.w32(STREAM_TABLE + 4 * a[1], s);
                 s
             }
-            ss::STREAM_STATE => self.stream(a[0]).playing as u32,
-            ss::STREAM_PLAYING => self.stream(a[0]).playing as u32,
+            // `Stream_GetState` 0x229870: `SndStream_GetStatus`'s count of requests queued
+            ss::STREAM_STATE => self.stream(a[0]).parts.len() as u32,
+            // `Stream_IsPlaying` 0x229628: the current request's state is 2 (the stream's first)
+            ss::STREAM_PLAYING => !self.stream(a[0]).parts.is_empty() as u32,
+            // `Stream_HasReached` 0x2295c0: the ms buffered ahead (the voice's queued bytes) reach a1; STANDIN: the
+            // whole queue's time left stands for what is buffered
             ss::STREAM_WAIT => {
-                let st = *self.stream(a[0]);
-                (st.playing && st.played_ms >= a[1] as f32) as u32
+                let st = self.stream(a[0]);
+                let ahead = st.parts.iter().map(|p| p.length_ms).sum::<f32>() - st.played_ms;
+                (!st.parts.is_empty() && ahead >= a[1] as f32) as u32
             }
             ss::STREAM_STOP => {
                 let s = m.r32(STREAM_TABLE + 4 * a[1]);
                 if s != 0 {
-                    self.stream(s).playing = false;
+                    let st = self.stream(s);
+                    st.parts.clear();
+                    st.played_ms = 0.0;
+                    self.stops.push(a[1]);
                 }
                 0
             }
@@ -333,8 +395,14 @@ impl HostState {
             PLAY_FILE => {
                 let file = String::from_utf8_lossy(&cstr(m, a[2])).into_owned();
                 let s = m.r32(STREAM_TABLE + 4 * a[1]);
-                *self.stream(s) = Stream { open: true, playing: true, length_ms: f32::INFINITY, played_ms: 0.0 };
                 self.handle += 1;
+                let handle = self.handle;
+                let st = self.stream(s);
+                st.open = true;
+                if st.parts.is_empty() {
+                    st.played_ms = 0.0;
+                }
+                st.parts.push_back(Part { handle, length_ms: f32::INFINITY });
                 self.plays.push(LinePlay { stream: a[1], file, offset: a[3], handle: self.handle });
                 self.handle
             }
@@ -450,14 +518,18 @@ impl HostState {
 
     /// The same for a call answering a float
     pub fn dispatch_f(&mut self, _: &mut Mem, t: u32, a: &[u32]) -> f32 {
-        match t {
-            ss::STREAM_TIME_LEFT => {
-                let s = *self.stream(a[0]);
-                if s.playing { (s.length_ms - s.played_ms).max(0.0) } else { 0.0 }
+        let r = match t {
+            // `Stream_GetTimeLeftMs` 0x229578: the current request's ms left (`SndHandle_GetState` [2])
+            ss::STREAM_TIME_LEFT => self.stream(a[0]).left(),
+            // `Stream_GetPlayTime` 0x2296c0: its ms played plus left, its length
+            ss::STREAM_PLAY_TIME => {
+                let s = self.stream(a[0]);
+                if s.parts.is_empty() { 0.0 } else { s.played_ms + s.left() }
             }
-            ss::STREAM_PLAY_TIME => self.stream(a[0]).played_ms,
             _ => panic!("speech host: a float call to {t:#x}"),
-        }
+        };
+        self.keep(t, a, r.to_bits());
+        r
     }
 }
 
@@ -519,9 +591,11 @@ impl SpeechHost {
             heap: HEAP,
             sp: STACK_TOP - 0x100,
             rng: 0x1357_9bdf,
-            streams: [Stream::default(); 8],
+            streams: Default::default(),
+            stops: Vec::new(),
             plays: Vec::new(),
             handle: 0,
+            log: None,
         };
         let mut h = SpeechHost { mem, st };
         let m = &mut h.mem;
@@ -561,29 +635,55 @@ impl SpeechHost {
         ss::update_all(&mut self.mem, &mut self.st, SYS_AT);
     }
 
+    /// Keep the stand-ins' calls from now on ([`LeafCall`])
+    pub fn keep_log(&mut self) {
+        self.st.log = Some(Vec::new());
+    }
+
+    /// The stand-ins' calls kept since the last call
+    pub fn take_log(&mut self) -> Vec<LeafCall> {
+        self.st.log.as_mut().map(std::mem::take).unwrap_or_default()
+    }
+
     /// The lines started since the last call
     pub fn take_plays(&mut self) -> Vec<LinePlay> {
         std::mem::take(&mut self.st.plays)
     }
 
-    /// The app knows a started line's length (ms) once it has decoded it
-    pub fn line_started(&mut self, stream: u32, length_ms: f32) {
-        self.st.streams[stream as usize].length_ms = length_ms;
+    /// The streams stopped since the last call: the app cuts what they play
+    pub fn take_stops(&mut self) -> Vec<u32> {
+        std::mem::take(&mut self.st.stops)
     }
 
-    /// `dt` seconds of the streams playing: a line that reaches its length stops
+    /// The app knows a line's length (ms, by its play's handle) once it has decoded it
+    pub fn line_started(&mut self, handle: u32, length_ms: f32) {
+        for s in &mut self.st.streams {
+            for p in s.parts.iter_mut().filter(|p| p.handle == handle) {
+                p.length_ms = length_ms;
+            }
+        }
+    }
+
+    /// `dt` seconds of the streams playing: a part that reaches its length ends and the next one goes on
     pub fn frame(&mut self, dt: f32) {
-        for s in self.st.streams.iter_mut().filter(|s| s.open && s.playing) {
+        for s in self.st.streams.iter_mut().filter(|s| s.open && !s.parts.is_empty()) {
             s.played_ms += dt * 1000.0;
-            if s.played_ms >= s.length_ms {
-                s.playing = false;
+            while let Some(p) = s.parts.front().copied() {
+                if s.played_ms < p.length_ms {
+                    break;
+                }
+                s.played_ms -= p.length_ms;
+                s.parts.pop_front();
+            }
+            if s.parts.is_empty() {
+                s.played_ms = 0.0;
             }
         }
     }
 
     /// The stream is playing a line
     pub fn is_playing(&self, stream: u32) -> bool {
-        self.st.streams[stream as usize].playing
+        !self.st.streams[stream as usize].parts.is_empty()
     }
 
     /// How many speech banks are loaded (`0x343704`)
