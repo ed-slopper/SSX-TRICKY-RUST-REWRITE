@@ -1551,5 +1551,4 @@ matches the original.
 - 2026-11-11 irregulur/lynx: split G1's dispatch into G1h (cBoarder::vf7 ported, runner-checked) and G1i (the app on it); claimed G1h.
 - 2026-11-11 irregulur/lynx: G1h done (cBoarder::vf7 0x117198 ported and checked in the runner).
 - 2026-11-11 irregulur/lynx: split E1b2g7a (the race line's progress and event bits, ported) out of E1b2g7; claimed E1b2g7a.
-
 - 2026-11-11 irregulur/lynx: E1b2g7a done.
