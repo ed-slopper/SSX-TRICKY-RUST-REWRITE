@@ -1245,6 +1245,44 @@ helpers. Most end alike: off the course (+0x290 = 0) or with bit 0, +0x304 = !bi
 - Checked in the runner: 40,000 dispatches over every state (the update called with its object), 60,000 event bits,
   40,000 rumbles and helpers: fields and every call compared.
 
+## The per-tick update (row G1h; `game/src/boarder_tick.rs`, checked: `tests/boarder_tick.rs`)
+
+`cBoarder::vf7` 0x117198 is the rider's whole tick. In order (proven, disassembly):
+
+- `Boarder_GatherWorldEmitters` 0x1166f0; if +0x46b0 (active) is 0, return there (nothing else, no render).
+- `cGame::IsPaused` 0x17f078: when paused, only `cBoarderRender::vf7` 0x1356f8 (on the handler +0x5ae0) runs.
+- Distance: +0x164 += dot4(velocity +0x150, forward +0x180) · (time scale +0x12c / 60).
+- Eleven ease records (now, rate, target; now at +0x1f0, +0x1fc, +0x208, +0x214, +0x268, +0x220, +0x22c, +0x244,
+  +0x250, +0x25c, +0x284, in that order): now moves toward target by rate · 1/60 (`0x3c888889`), stopping on it. The
+  time scale is not used. These are the records `Boarder_InitEaseRecords` 0x122f10 sets up.
+- +0x278 toward +0x280 and +0x274 toward +0x27c, step 1/12 (`0x3daaaaab`).
+- Body height +0x308 toward the surface row's +0x28 on the ground (motion 2), else toward 0, step 1.6667.
+  The surface table is game +0x24, 100 bytes a row, row = +0x290.
+- Pitch +0x168 toward the board's angle (`Math_Atan` 0x2510f8 of dot(board up +0x4a80, right +0x190) and
+  dot(board up, forward +0x180)), or 0 on the alpine board (+0x420 = 2) or in the static motion (4), step
+  `0x3d567750`.
+- +0x294, +0x298 toward the surface row's +0x1c, +0x20; +0x30c toward 1 on the ground else 0 (step `0x3ada740e`).
+- Boost timers +0x134, +0x138 count down by the tick's time, floor 0.
+- `Boarder_UpdateMotion` 0x11c770 (handler).
+- Speed = |velocity| (4 lanes). Out of the air (motion ≠ 1) the speed cap +0x1c4 applies: 2788.84 cm/s; 3347.22
+  while the boost timer +0x134 runs; with a boost level +0x130 > 0, by the meter +0x1c: above 0.666 3347.22, above
+  0.3336 3072.14, above 0 2932.43. A lower cap is reached by 3.4722 a tick, not at once. Over the cap the velocity
+  is scaled down to it. `Boarder_AddSpeedSample` 0x155dc8 (+0x5820) gets the capped speed.
+- Race-line mode (game +0x1c → +0x1c = 4): events +0x388 move to +0x384 and clear;
+  `Boarder_UpdateRaceLineProgress` 0x118298, `Boarder_UpdatePathAhead` 0x118090.
+- Weather +0x18 toward the game's density +0x78 (toward 0 while event bit 0x4000 is set), step `0x3c088889`.
+- Controls: virtual 9 (vtable +0x54, this-adjust at +0x50) fills a 16-byte word on the stack, then
+  `Boarder_UpdateControl` 0x11c9a0 (handler, word).
+- Crash normal +0x2f0 · 0.98. Impact +0x2e4 · 0.956037 and knocks +0x300 · 0.978283: above 4.492 or 12.002,
+  +0x304 = 1, `Boarder_RequestReset` 0x118f10 (height 101.46), +0x304 = 0. Also a reset when +0x148 falls
+  10,000 below `gWorld` +0xc.
+- `Score_Tick` 0x156e80 (+0x5820); `Boarder_PickIdleClip` 0x11d4e8 unless state +0x428 = 0x16;
+  `Boarder_RiderCollisions` 0x123fc8 in modes above 2 except 5; `Rivals_UpdateGrudgeTimeout` 0x11efd8;
+  `Boarder_UpdateLeanTargets` 0x129500; `cBoarderRender::vf7` 0x1356f8.
+- Checked in the runner: 60,000 ticks, every call a stub that may change some fields (the same in both), so the
+  order of reads around the calls is checked too; every field and every call with its arguments compared.
+  The app does not call it yet (row G1i).
+
 ## The animation sequences and layers (row G5a1; `game/src/animseq.rs`, checked: `tests/animseq.rs`)
 
 The controller's three layers are lists of sequences. A sequence is one clip being played. The code works through

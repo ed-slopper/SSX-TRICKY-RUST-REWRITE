@@ -9,6 +9,7 @@ pub mod aipad;
 pub mod aipath;
 pub mod boarder;
 pub mod boarder_misc;
+pub mod boarder_tick;
 pub mod boosts;
 pub mod breakables;
 pub use tricky_data::anim;
