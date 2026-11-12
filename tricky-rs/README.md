@@ -200,6 +200,10 @@ The show-off medal scores and time limits are the game's own (track table 0x332f
 this repository; it is made from your disc). With the folder missing the game is simply silent. M turns the
 music off and on, N the effects.
 
+**The announcer** (with `TRICKY_DISC`): the game's own speech system runs on the disc's voice banks, the race's
+calls (checkpoints, place changes) go through its announcer, and the lines it picks are decoded from the disc's
+speech files (MicroTalk) and played; N mutes them with the effects. `TRICKY_SPEECHLOG=1` prints each call and line.
+
 - `ride.wav`, `air.wav`, `land.wav`, `jump.wav`, `grind.wav`, `rail_on.wav` from `zboard.bnk` (the board bank:
   streams 4, 1, 2, 3, 54, 53), `boost.wav`, `crash.wav`, `glass.wav`, `menu_ok.wav`, `pickup.wav` from
   `zBxsfx.bnk` (streams 5, 8, 25, 11, 23), `crowd.wav` from `Crowd.bnk`, `tricky.wav` from `tricky.bnk`, all

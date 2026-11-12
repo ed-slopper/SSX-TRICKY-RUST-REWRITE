@@ -118,7 +118,7 @@ fn at(slot: u32, rider: u32, voice: u32) -> Trigger {
 }
 
 /// What the triggers read of a rider (`cBoarder`): its id (the object, compared with the listener; its position
-/// +0x140 for the near test and the trigger), +0x418 the controller (below 0 a player's), +0x41c (1 a local player),
+/// +0x140 for the near test and the trigger), +0x418 the finish time (below 0 still racing, `Boarder_Finish` 0x11da40; the field `controller` and the test `player` keep their first names), +0x41c (1 a local player),
 /// +0x38 its race index, +0x118 / +0x120 its rival target (on, which), +0x460 its slot, +0x50 + 0x20 · slot its
 /// attitudes to the others (bytes), +0x150.. its velocity (the third word what the air line tests), +0x57f4 its air time, +0x58a8 its tricky count; through its
 /// character entry +0x464: +0x38 the character, +100 the voice, +0x74 the level.

@@ -28,6 +28,7 @@ mod worldsound;
 mod sfnfont;
 mod coursemusic;
 mod pathmusic;
+mod racespeech;
 mod editor;
 use tricky_game::rivals;
 mod rider;
@@ -434,6 +435,7 @@ fn main() {
     .init_resource::<sfnfont::SfnFonts>()
     .init_resource::<coursemusic::CourseMusic>()
     .add_plugins(pathmusic::plugin)
+    .add_plugins(racespeech::plugin)
     .insert_resource(match std::env::var("TRICKY_SCREEN").as_deref() {
         Ok("play") => ui::Game { screen: ui::Screen::Playing, ..default() },
         Ok("free") => ui::Game { screen: ui::Screen::Playing, event: ui::Event::FreeRide, ..default() },
@@ -447,7 +449,7 @@ fn main() {
         ui::menus,
         (trick_only_ramps, ride, rider_model, sync_visuals, animate_visuals, chase_camera).chain().run_if(|m: Res<Mode>| *m == Mode::Ride),
         fly_camera.run_if(|m: Res<Mode>| *m == Mode::Fly),
-        (switch_level, move_movers, (worldanim::world_anim, animate_objects).chain(), move_props, sky_follow, draw_rails, toggles, ui::records, ui::trick_book, (ui::hud, hudsprites::hud_sprites, sfnfont::sfn_text, gamehud::game_hud, sfnfont::sfn_glyphs).chain(), (sound::course_music, coursemusic::course_music, pathmusic::path_music, sound::sound).chain(), boardsound::board_sound, (particles::particles, worldsound::world_sound).chain(), spray::spray, snow::snow, tracks::tracks, editor::editor, screenshot),
+        (switch_level, move_movers, (worldanim::world_anim, animate_objects).chain(), move_props, sky_follow, draw_rails, toggles, ui::records, ui::trick_book, (ui::hud, hudsprites::hud_sprites, sfnfont::sfn_text, gamehud::game_hud, sfnfont::sfn_glyphs).chain(), (sound::course_music, coursemusic::course_music, pathmusic::path_music, racespeech::race_speech, sound::sound).chain(), boardsound::board_sound, (particles::particles, worldsound::world_sound).chain(), spray::spray, snow::snow, tracks::tracks, editor::editor, screenshot),
     ).chain());
     if let Ok(path) = std::env::var("TRICKY_SHOT") {
         app.insert_resource(Shot { path, frame: 0 });
