@@ -1694,6 +1694,8 @@ fn ground_ticks_against_the_running_game() {
     let kp = ticks[0].extra.iter().position(|(o, _)| *o == 0x57b0);
     let mut wiped = [0usize; 3];
     let mut stale_bodies = 0;
+    // tumbling riders in a replayed frame whose body was not recorded (no `5ae0>4f0` window: rec14, rec16)
+    let mut bodiless = 0;
     struct Prep {
         rider: Rider,
         want: Vec<Vec<u32>>,
@@ -1835,33 +1837,24 @@ fn ground_ticks_against_the_running_game() {
         let mut frame_hits = vec![0usize; n];
         let mut frame_stale = vec![false; n];
         // The riders not replayed tick with the second sample's velocity, which already holds the hits they took
-        // later in the frame (F4b3s: rec14 6925, rider 5 wiped out, hitting rider 1 with them). Trial passes find
-        // those hits (`fix`, the velocity they gained from their own collisions to the frame's end) and run the
-        // frame again with them taken off, until they no longer change (at most TRICKY_PREHIT passes, 64; off: none).
-        // The gain shrinks by about m_other / (m_me + m_other) a pass (0.9 against a boosting rider, rec15 13540), so
-        // every third pass jumps to the limit (Aitken's extrapolation, F4b3u). A rider whose hit comes and goes from
-        // pass to pass (rec16 6907, rider 5 shoved: without the shove's 444 cm/s its shover's closing speed is too low
-        // to shove) keeps the second sample's velocity.
-        // STANDIN: the second sample less our hits, for the velocity the game's motion left them (not recorded)
-        let mut fix = vec![[0f32; 4]; n];
+        // later in the frame (F4b3s: rec14 6925, rider 5 wiped out, hitting rider 1 with them). Trial passes used to
+        // take our hits off it again (TRICKY_PREHIT, F4b3s..F4b3x3); since every kind of rider whose velocity they
+        // fixed is now replayed (F4b3x..F4b3x3) they are gone (F4b3x4): what is left are the tumbling riders of the
+        // recordings without their body (`5ae0>4f0`: rec14, rec16), counted below.
+        // STANDIN: the second sample's velocity, for the velocity the game's motion left them (not recorded)
         // a rider whose own motion is replayed (in the air, motion 4, sliding) but ends the frame more than 1 cm/s
         // from the second sample in some axis (a wall, a landing, a get-up: not replayed) is missed: the frame runs
         // again with it as the others
         let mut missed = vec![false; n];
-        let mut flips = vec![false; n];
-        let mut seq: Vec<Vec<V4>> = vec![vec![[0.0; 4]]; n];
-        let trials: usize = std::env::var("TRICKY_PREHIT").map_or(if kt.is_some() { 0 } else { 64 }, |v| if v == "off" { 0 } else { v.parse().unwrap() });
-        let mut trial = trials > 0;
         let air = std::env::var("TRICKY_NOAIR").is_err();
         // (TRICKY_AIRPOS=off: the flight step's position not taken; its body stays as the first sample holds it either way)
         let air_pos = std::env::var("TRICKY_AIRPOS").map_or(true, |v| v != "off");
-        let mut passes = 0;
         let mut step = 0;
         while step < 1 + runners.len() {
             let k = step;
             let mut f = Frame::new((wi > 0 && ticks[wi - 1].tick + 1 == w[0].tick).then(|| &ticks[wi - 1].riders[..]), &w[0].riders, &w[1].riders, &stats, &twins, w[0].tick, if k == 0 { adder("") } else { adder(runners[k - 1].0) }, Some((&w[1].extra[ka].1[..], &table[..])));
-            stale_bodies += if k > 0 || trial { 0 } else { f.stale.iter().filter(|x| **x).count() };
-            if k == 0 && !trial {
+            stale_bodies += if k > 0 { 0 } else { f.stale.iter().filter(|x| **x).count() };
+            if k == 0 {
                 frame_stale = f.stale.clone();
             }
             let mut riders: Vec<ColRider> = w[0].riders.iter().enumerate().map(|(i, r)| col_rider(r, n, &stats[i])).collect();
@@ -1871,6 +1864,7 @@ fn ground_ticks_against_the_running_game() {
             let mut flown = vec![false; n];
             let mut slid = vec![false; n];
             let mut tumbled = vec![false; n];
+            let mut bare = vec![false; n];
             let mut rose = vec![false; n];
             let mut landed = vec![false; n];
             for &me in &order {
@@ -1931,7 +1925,7 @@ fn ground_ticks_against_the_running_game() {
                     riders[me].vel = r.vel;
                     riders[me].motion = 2;
                     f.hit[me] = HitRider { heading: r.yaw, pos: r.p.pos, vel: r.vel, normal: r.p.normal, motion: 2, crouch: f32_at(b, 0x1c8) };
-                    wiped_in += (k == 0 && !trial) as usize;
+                    wiped_in += (k == 0) as usize;
                 } else if let Some(l) = lift[me].filter(|_| pushes) {
                     let (pos, vel) = (riders[me].pos, riders[me].vel);
                     let r = if k == 0 { l.ours(pos, vel, a, b) } else { l.runner(&mut runners[k - 1].1, pos, vel, a, b) };
@@ -1939,14 +1933,14 @@ fn ground_ticks_against_the_running_game() {
                     riders[me].vel = r.vel;
                     riders[me].motion = 1;
                     f.hit[me] = HitRider { heading: r.yaw, pos: r.p.pos, vel: r.vel, normal: r.p.normal, motion: 1, crouch: f32_at(b, 0x1c8) };
-                    lifted += (k == 0 && !trial) as usize;
+                    lifted += (k == 0) as usize;
                 } else {
                     if u32_le(a, 0x424) == 1 && u32_le(b, 0x424) == 1 && std::env::var("TRICKY_AIRSTEP").is_ok() {
                         let (p, q) = (vec4(a, 0x140), vec4(b, 0x140));
                         f.body[me].translate([q[0] - p[0], q[1] - p[1], q[2] - p[2], q[3] - p[3]]);
                     }
                     let start = (riders[me].pos, riders[me].vel);
-                    riders[me].vel = sub4(vec4(b, 0x150), fix[me]);
+                    riders[me].vel = vec4(b, 0x150);
                     // a rider in the air the whole frame (F4b3v): its flight step, `Air_IntegrateRK4` 0x12b340 as
                     // `AirMotion_Update` 0x108378 calls it first (dt = +0x12c / 60), from where the riders before it
                     // left it; no speed limit in the air (`cBoarder::vf7` 0x117998). STANDIN: the rest of the air
@@ -2009,11 +2003,13 @@ fn ground_ticks_against_the_running_game() {
                         }
                         landed[me] = true;
                     }
-                    if let Some(m) = kt.map(|kt| &w[1].chased[kt].1[me]).filter(|m| m.len() >= 0x100) {
-                        if ma == (5, 5) && clip.0.wrapping_sub(0x2dc) >= 2 {
+                    if ma == (5, 5) && clip.0.wrapping_sub(0x2dc) >= 2 {
+                        if let Some(m) = kt.map(|kt| &w[1].chased[kt].1[me]).filter(|m| m.len() >= 0x100) {
                             riders[me].vel = vec4(m, 0xe0);
                             riders[me].pos = vec4(b, 0x140);
                             tumbled[me] = true;
+                        } else {
+                            bare[me] = true;
                         }
                     }
                     if ma == (1, 1) && air && !missed[me] {
@@ -2079,39 +2075,6 @@ fn ground_ticks_against_the_running_game() {
                     }
                 }
             }
-            if trial {
-                let mut changed = false;
-                for i in 0..n {
-                    let Some((_, v0)) = snap[i] else { continue };
-                    if tumbled[i] {
-                        continue;
-                    }
-                    let new = sub4(riders[i].vel, v0);
-                    if flips[i] || new == fix[i] {
-                        continue;
-                    }
-                    flips[i] = passes > 0 && (new == [0.0; 4]) != (fix[i] == [0.0; 4]);
-                    fix[i] = if flips[i] { [0.0; 4] } else { new };
-                    seq[i].push(fix[i]);
-                    if seq[i].len() == 3 {
-                        let (f0, f1, f2) = (seq[i][0], seq[i][1], seq[i][2]);
-                        for c in 0..3 {
-                            let (d0, d1) = (f1[c] as f64 - f0[c] as f64, f2[c] as f64 - f1[c] as f64);
-                            if d1 != d0 && d1.abs() < d0.abs() {
-                                fix[i][c] = (f2[c] as f64 - d1 * d1 / (d1 - d0)) as f32;
-                            }
-                        }
-                        seq[i] = vec![fix[i]];
-                    }
-                    changed = true;
-                    if std::env::var("TRICKY_DBG").is_ok() {
-                        eprintln!("DBG prehit tick {tick} rider {i}: {new:?}, comes and goes {}", flips[i]);
-                    }
-                }
-                passes += 1;
-                trial = changed && passes < trials;
-                continue;
-            }
             if k == 0 {
                 let mut again = false;
                 for i in (0..n).filter(|&i| flown[i] || slid[i] || rose[i] || landed[i]) {
@@ -2125,9 +2088,6 @@ fn ground_ticks_against_the_running_game() {
                     }
                 }
                 if again {
-                    (fix, flips, seq) = (vec![[0f32; 4]; n], vec![false; n], vec![vec![[0.0; 4]]; n]);
-                    passes = 0;
-                    trial = trials > 0;
                     continue;
                 }
             }
@@ -2165,6 +2125,7 @@ fn ground_ticks_against_the_running_game() {
                 }
             }
             if k == 0 {
+                bodiless += bare.iter().filter(|x| **x).count();
                 for i in (0..n).filter(|&i| tumbled[i]) {
                     tumbles[0] += 1;
                     tumbles[1] += (riders[i].vel == vec4(&w[1].riders[i], 0x150)) as usize;
@@ -2292,7 +2253,7 @@ fn ground_ticks_against_the_running_game() {
         eprintln!("  the wipe-out motion's flight predictions (motion 5 at both samples, window 57b0): {}, right from the end of the tick {}, from it less the pushes and hits after the motion {}", wiped[0], wiped[1], wiped[2]);
         eprintln!("  bodies read before `cPostAI::vf1` re-posed them, placed by a guess (TRICKY_STALE=keep: as read): {stale_bodies}");
         eprintln!("  riders in the air the whole frame, their flight step replayed (TRICKY_NOAIR: as recorded) [frames, velocity right, position right] by way: {flights:?}");
-        eprintln!("  wiped-out riders tumbling the whole frame, the velocity their motion left them taken from its recorded body (5ae0>4f0; TRICKY_TUMBLE=off: as the others) [frames, velocity right]: {tumbles:?}");
+        eprintln!("  wiped-out riders tumbling the whole frame, the velocity their motion left them taken from its recorded body (5ae0>4f0; TRICKY_TUMBLE=off: as the others) [frames, velocity right]: {tumbles:?}; with no body recorded (the second sample's velocity): {bodiless}");
         eprintln!("  wiped-out riders sliding the whole frame, their slide replayed [frames, velocity right, position right] by way: {slides:?}");
         eprintln!("  riders landing in the frame, their landing's velocity replayed [frames, velocity right, position right] by way: {landings:?}");
         eprintln!("  riders getting up the whole frame, their get-up replayed [frames, velocity right, position right] by way: {getups:?}");

@@ -1494,3 +1494,26 @@ without that window (row F4b3x4).
 2. Add a runner test like the one above, or a trace check for code the runner can't reach.
 3. When it passes, set `checked` for that address in `tricky-rs/docs/function-index.csv` and commit; F4a's runner
    will later write these marks itself from the test results.
+
+## F4b3x4: the trial passes gone (2026-11-11)
+
+The ground test's trial passes (TRICKY_PREHIT, `fix`/`seq`/`flips`: the second sample's velocity less the hits our
+collisions gave, found by re-running the frame) are removed. Every kind of rider they stood in for is now replayed
+(F4b3x: tumbles with a recorded body, riders wiped out by a hit; F4b3x2: get-ups, landings; F4b3x3: the landing
+under the COP1 adder). A rider not replayed takes the second sample's velocity (STANDIN, as before).
+
+What the passes still gave, and is now lost, is only the tumbling riders of the recordings with no tumble window
+(`5ae0>4f0`): the test now counts them ("with no body recorded"). Every field under fadd=g1:
+
+| recording | with the passes | now | tumbling frames with no body |
+|---|---|---|---|
+| rec14 | 37,244 | 37,241 | 525 |
+| rec15 | 37,311 | 37,311 | 217 |
+| rec16 | 51,725 | 51,723 | 912 |
+| rec17 | 71,257 | 71,257 | 1,267 |
+| rec18 | 54,599 | 54,599 | 0 (992 with the body, 978 velocity right) |
+
+The 5 ticks lost are rec14 5066 r4, 6922/6925 r5 and rec16 6915-6927 r5 (row F4b3x3): their riders tumble into
+others, and the hit needs the tumbler's velocity, which only the body window holds. rec18 is the recording that
+checks tumbles; rec14..rec17 are kept for everything else. Re-recording them with the tumble window, and rec16 8288
+r2 (the down ray's ground) and the landing's clamp (the pivot bone), need PCSX2 (row F4b3x5).
