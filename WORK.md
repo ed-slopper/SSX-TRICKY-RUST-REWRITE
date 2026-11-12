@@ -1548,4 +1548,4 @@ matches the original.
 - 2026-11-11 irregulur/lynx: F4b3x3 done (landing ported under the COP1 adder, cWorldBoarder stubbed); new row F4b3x4.
 - 2026-11-11 irregulur/lynx: F4b3x4 done (trial passes removed, no PCSX2 needed); new row F4b3x5 (re-record, needs PCSX2).
 - 2026-11-11 irregulur/lynx: split G1's dispatch into G1h (cBoarder::vf7 ported, runner-checked) and G1i (the app on it); claimed G1h.
-2026-11-11 irregulur/lynx: G1h done
+- 2026-11-11 irregulur/lynx: G1h done (cBoarder::vf7 0x117198 ported and checked in the runner).
