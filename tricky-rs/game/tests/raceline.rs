@@ -271,3 +271,35 @@ fn app_race_lines_are_the_games() {
         println!("{c}: event bits down the main line {seen:#x}, its events' {want:#x}, all lines' {all:#x}");
     }
 }
+
+/// Row E1b2g7d2: the places the app's race gives its riders (`Race::places`: `placing::update` 0x115100 on the game's
+/// bytes) put the rider furthest down the main line first. Four riders held at four distances along it.
+#[test]
+fn app_places_follow_the_riders() {
+    use glam::Vec3;
+    use tricky_game::race::{Race, RaceState};
+    for (c, bytes) in courses() {
+        let aip = tricky_data::aip::read(&bytes).unwrap();
+        let lines = RaceLines::from_aip(&aip);
+        let main = &lines.lines[lines.main];
+        let len = main.length();
+        // the app's axes (metres) from the game's
+        let at = |f: f32| {
+            let p = main.position_at(len * f).0;
+            Vec3::new(p[0] / 100.0, p[2] / 100.0, -p[1] / 100.0)
+        };
+        let mut race = Race::new((0..8).map(|k| at(k as f32 / 8.0)).collect());
+        race.race_lines = Some(lines.clone());
+        race.mode = tricky_game::courses::Mode::Race as u32;
+        let along = [0.4f32, 0.1, 0.7, 0.25];
+        let player = tricky_game::rider::Rider::new(at(along[0]), 0.0);
+        let others: Vec<(Vec3, Vec3)> = along[1..].iter().map(|&f| (at(f), Vec3::ZERO)).collect();
+        for _ in 0..60 * 4 {
+            race.update(&player, &others, 1.0 / 60.0);
+        }
+        assert!(race.state != RaceState::Countdown, "{c}");
+        let places: Vec<i32> = race.line_riders.iter().map(|r| r.place).collect();
+        println!("{c}: places {places:?}");
+        assert_eq!(places, vec![1, 3, 0, 2], "{c}");
+    }
+}

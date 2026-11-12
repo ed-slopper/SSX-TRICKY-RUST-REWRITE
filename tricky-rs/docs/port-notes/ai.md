@@ -411,9 +411,15 @@ folder without one is a STANDIN with the first line as main). The first tick is 
   (`boarder_misc::hit_checkpoint` by the game mode, `progress::time_gap` for its split, its clock addition the
   show-off's `Race::bonus`) push their messages into the rider's score; `Game_IsLeadOrFocusRider` with no camera
   (the player's slot) lets the player's music events through (`Race::music`, sent once each by
-  `src/pathmusic.rs`). Not done: the lessons, the speech, the cheer, the event sounds and `HUD_ShowItem` 7.
-- STANDIN: the places (+0x110) the hooks read are `Race::places`, `Race_UpdatePlacingsAndRubberBand`'s key on these
-  riders every 6th tick; the HUD runs the ported function on its own memory (`src/gamehud.rs`).
+  `src/pathmusic.rs`), and every rider's event bits on and off go to the music zones (`Audio_SetEventBitSound`,
+  row E1b2g7d1, see audio.md: `Race::music` as `MusicCall::EventBit`, run by the music host with the disc). Not done:
+  the lessons, the speech and the cheer (E1b2g7d3), `HUD_ShowItem` 7 (E1b2g7d4), the queued event sound (E1b2g7d5).
+- The places (+0x110) the hooks read are `Race::places` (row E1b2g7d2): the ported
+  `Race_UpdatePlacingsAndRubberBand` 0x115100 (`placing::update`) on a copy of the game's bytes it reads, every 6th
+  tick of `Race::line_frame`, after the riders' progress. Checked: `tests/raceline.rs` `app_places_follow_the_riders`
+  (four riders held along each course's main line). STANDIN: the riders' points and knock-down counts are 0 there
+  (the show-offs and knock-down practice keep their order), and the band's tables and difficulty are 0 (its writes
+  are not read back). The HUD runs the same function on its own memory (`src/gamehud.rs`).
 - Seen in the self-test (TRICKY_SIM, Garibaldi): bit 10 can come on twice at the finish (on, off, on over three
   ticks), and with it music event 10 twice; that is the ported code's doing, not checked against the game.
 - The snowfall (`src/snow.rs`) eases the weather to 0 while the player's bit 0xe (0x4000) is on. The courses with

@@ -296,6 +296,7 @@ impl EventEnv for HostEnv<'_> {
             0x20c680 => crate::sndplay::echo(m, self, _event),
             0x2259d0 => sys::reload_bank(m, self, this, STACK_TOP - 0x40),
             0x2254f8 => sys::fade_step(m, this),
+            0x21c370 => sys::event_bit_off_timer(m, self, this, _event),
             _ => 1,
         }
     }
@@ -447,6 +448,15 @@ impl MusicHost {
     pub fn music_event(&mut self, d: &mut Driver, event: u32) {
         let (m, mut e) = self.env(d);
         sys::music_event(m, &mut e, SYS, event);
+    }
+
+    /// `Audio_SetEventBitSound` 0x21c0a0: a rider's race-line event bit (the music zones, 2..7) on or off; `listener`
+    /// the rider listened to (`Audio_GetListenerRider`: the player, `RIDER_AT`), any other an address of its own (never
+    /// read: the game compares riders by address)
+    pub fn event_bit_sound(&mut self, d: &mut Driver, listener: bool, bit: u32, on: bool) {
+        let rider = if listener { RIDER_AT } else { RIDER_AT + 0x1000 };
+        let (m, mut e) = self.env(d);
+        sys::set_event_bit_sound(m, &mut e, SYS, rider, bit, on);
     }
 
     /// `Music_ScheduleBreak` (asked: as the Tricky trigger asks it)

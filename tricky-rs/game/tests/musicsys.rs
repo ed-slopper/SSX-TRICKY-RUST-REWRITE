@@ -3,7 +3,8 @@
 //! song list), every function run on both sides with the same answers from the calls out (the scheduler, Pathfinder,
 //! the stream library, the banks), the calls logged in order (floats bit for bit) and the memory compared. The song
 //! functions (`musicsong`) run as the original underneath. With the air loop's beat (row G10b2c2c1: `cBXAudio::vf13`
-//! 0x20df08 on a random air-loop event, `Music_CancelTricky` 0x21c6c0, 0x224a50).
+//! 0x20df08 on a random air-loop event, `Music_CancelTricky` 0x21c6c0, 0x224a50). With the music zones (row E1b2g7d1:
+//! `Audio_SetEventBitSound` 0x21c0a0, `Audio_EventBitOffTimer` 0x21c370).
 
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -190,7 +191,7 @@ fn music_system_matches_the_original() {
         song::STRICMP, 0x223ca8, 0x223d60, 0x224368, 0x2243e8, 0x224420, 0x224458, 0x224470, 0x224488, 0x224490, 0x224498,
         0x2245b8, 0x224620, 0x224790, 0x2247c0, 0x2247f8, 0x224898, 0x224918, 0x224978, 0x225090, 0x225260, 0x225280,
         0x225318, 0x225448, 0x225660, 0x2256c0, 0x225768, 0x2257d8, 0x225878, 0x225948, 0x225ca8, 0x225e40, 0x224a50,
-        0x21c6c0, 0x2246a8, 0x224658, 0x21c610, 0x225c40, 0x20c948, 0x20c680,
+        0x21c6c0, 0x2246a8, 0x224658, 0x21c610, 0x225c40, 0x20c948, 0x20c680, 0x21c0a0, 0x21c348, 0x21c370,
     ] {
         r.allow(f);
     }
@@ -244,7 +245,7 @@ fn music_system_matches_the_original() {
         r.mem.write_u16(vt + 0x20, [0u16, 4][g.below(2) as usize]);
         r.mem.write_u32(song::MUSIC_SYS, SYS);
         r.mem.write_f32(song::MASTER_VOLUME, 1.0);
-        let which = g.below(36);
+        let which = g.below(38);
         // the play of the queued sound: the audio system, the echo's event, the kinds' banks, the effect rows
         // (DelayTime, DelayCount, DelayFeedback, DelayLevel), +0x7c, a sound's event
         r.mem.write_u32(sndplay::AUDIO, SYS);
@@ -297,6 +298,18 @@ fn music_system_matches_the_original() {
             r.mem.write_u32(EVT + 0x18, if g.below(2) == 0 { 0 } else { SCALE });
             r.mem.write_u32(EVT + 0x1c, g.below(4));
             r.mem.write_u32(EVT + 0x24, [0i32, 64, 127, 200, -5][g.below(5) as usize] as u32);
+        }
+        // the music zones (row E1b2g7d1): the zone playing, the zone and inner part the rider is in, the rider kept,
+        // the event's bit (the off timer's at +0x1c)
+        let bit = g.below(10);
+        let rider = [RIDER, ARENA, 0][g.below(3) as usize];
+        if which >= 36 {
+            for o in [0x6e50u32, 0x6e54, 0x6e5c, 0x6e60] {
+                r.mem.write_u32(SYS + o, g.below(4));
+            }
+            r.mem.write_u32(SYS + 0x6e58, [RIDER, ARENA, 0][g.below(3) as usize]);
+            r.mem.write_u32(EVT + 0x40, bit);
+            r.mem.write_u32(EVT + 0x1c, bit);
         }
         let x = [g.next(), g.next(), g.next()];
         let secs = [0.5f32, 1.0, 2.5, 4.0][g.below(4) as usize];
@@ -351,6 +364,8 @@ fn music_system_matches_the_original() {
             32 => (0x21c610, vec![SYS, RIDER]),
             33 => (0x20c948, vec![SYS]),
             34 => (0x20c680, vec![g.next(), EVT]),
+            36 => (0x21c0a0, vec![SYS, rider, EVT + 0x40, g.below(2)]),
+            37 => (0x21c370, vec![SYS, EVT]),
             _ => (0x224a50, vec![SONG, SYS]),
         };
         // a song for the calls that do not check it
@@ -407,6 +422,8 @@ fn music_system_matches_the_original() {
             32 => { tricky_trigger(&mut m, e, SYS, RIDER); None }
             33 => Some(sndplay::play_pending(&mut m, e, SYS)),
             34 => Some(sndplay::echo(&mut m, e, EVT)),
+            36 => { set_event_bit_sound(&mut m, e, SYS, rider, bit, args[3] != 0); None }
+            37 => Some(event_bit_off_timer(&mut m, e, SYS, EVT)),
             _ => { song_delay_to_sound(&mut m, SONG, SYS); None }
         };
         let mine = std::mem::take(&mut a.borrow_mut().log);

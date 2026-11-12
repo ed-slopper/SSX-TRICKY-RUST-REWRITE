@@ -415,15 +415,20 @@ pub fn path_music(
         let e = commands.spawn((AudioPlayer::<PfStream>(h), PlaybackSettings { mode: PlaybackMode::Once, volume: Volume::Linear(0.0), ..default() }, PfPlayer)).id();
         pm.playing = Some(e);
     }
-    // the race's music events (`Audio_MusicEvent` from the lead rider's event bits, row E1b2g7b: 10 the outro at the
-    // finish), each once
+    // the race's calls to the music system, each once: `Audio_MusicEvent` from the lead rider's event bits (row
+    // E1b2g7b: 10 the outro at the finish) and `Audio_SetEventBitSound` from every rider's (row E1b2g7d1: the music
+    // zones, the player listened to)
     if !menu {
+        use tricky_game::race::MusicCall;
         let events = &race.0.music[..];
         if events.len() < pm.music_sent { pm.music_sent = 0; }
-        for &e in &events[pm.music_sent..] {
-            match &mut pm.engine {
-                Some((h, d)) => { let mut d = d.lock().unwrap(); h.music_event(&mut d, e); }
-                None => pm.shared.events.lock().unwrap().push_back(e as u8),
+        for &c in &events[pm.music_sent..] {
+            match (&mut pm.engine, c) {
+                (Some((h, d)), MusicCall::Event(e)) => { let mut d = d.lock().unwrap(); h.music_event(&mut d, e); }
+                (Some((h, d)), MusicCall::EventBit { rider, bit, on }) => { let mut d = d.lock().unwrap(); h.event_bit_sound(&mut d, rider == 0, bit, on); }
+                (None, MusicCall::Event(e)) => pm.shared.events.lock().unwrap().push_back(e as u8),
+                // STANDIN: the walk without the disc has no music system to keep the zones in
+                (None, MusicCall::EventBit { .. }) => {}
             }
         }
         pm.music_sent = events.len();

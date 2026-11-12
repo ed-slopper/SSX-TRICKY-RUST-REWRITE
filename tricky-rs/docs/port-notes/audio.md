@@ -735,8 +735,22 @@ Functions already ported under a bare address, named from the code and the Rust 
   `Speech_OnPlaceChange` 0x233ba0 (event bit 0xc: roll 6, the listener, more than one rider, 0x1002049 with 0/1/2 by
   the career's +0xa4 / +0x124), `Speech_OnEventBit13Or14` 0x234558 (roll 0xe, 0x1002051 with 2 for bit 0x14, else
   1), `Speech_OnEventBit15` 0x234610 (roll 0xf, 0x1002053), `Speech_OnEventBit16` 0x233740 (roll 0x12, the listener,
-  0x1002056), and the event's sound `Audio_SetEventBitSound` 0x21c0a0. The bits' meaning is not known, so the names
-  say the bit.
+  0x1002056), and the event's sound `Audio_SetEventBitSound` 0x21c0a0 (the music zones, below). The bits' meaning is
+  not known, so the names say the bit.
+- The music zones (row E1b2g7d1, proven; `musicsys::set_event_bit_sound` / `event_bit_off_timer`, checked in
+  `tests/musicsys.rs` cases 36 and 37): `Audio_SetEventBitSound` 0x21c0a0 (the audio object, the rider, the event, on)
+  takes race-line event bits 2..7: 2 / 4 / 6 are zones 1 / 2 / 3, 3 / 5 / 7 an inner part of the same zone. On, from
+  the rider `Audio_GetListenerRider`(−1) gives (kept at +0x6e58 whatever the bit): a zone sets +0x6e5c to it and, with
+  none playing (+0x6e50 = 0), plays it (+0x6e50 and the air loop's phrase +0x3704 the zone, `Audio_MusicEvent` 1 / 3 /
+  5); an inner part sets +0x6e60 and, its zone playing, +0x6e54. Off, from the rider kept: if the zone is the one
+  playing (inner: +0x6e54 is it) +0x6e5c (+0x6e60) is cleared and `Audio_ScheduleEventBitOff` 0x21c348 schedules
+  `Audio_EventBitOffTimer` 0x21c370 1000 ms later (`SndSys_ScheduleEvent`, the doubleword 0x39f118, the bit as the
+  event's second word, +0x1c). The timer: a zone the rider is back in (+0x6e5c / +0x6e60 the zone again) or, for a
+  zone, an inner part marked (+0x6e54) stays; else +0x6e50, +0x3704 (and for an inner part +0x6e54) are cleared and
+  `Audio_MusicEvent` 2 / 4 / 6 sent; it answers 1 (done). So the music's events 1..6 are the zones' in and out, and an
+  inner part's end takes its zone's music out with it. Its jump tables: 0x39f0e0 (on), 0x39f100 (off), 0x39f120
+  (timer). The app's music host (`musichost::MusicHost::event_bit_sound`) runs it for the race's riders, the player
+  being the listener.
 - Not settled: 0x233e10 (roll 9, 0x1002046 with 1; its one caller 0x219258 has no callers and fires it when a
   value at +0x18 → +0x1c passes 0.875; `speech.rs` calls it `on_boost_full`, unproven), 0x223a90 (0x2d2d50 on a slot
   unless its byte +0xe is set; from `Path_OnDriverUpdate`), 0x2d14d0 (the sound library's bank-handle state, prefix

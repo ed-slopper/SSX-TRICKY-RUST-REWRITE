@@ -501,6 +501,87 @@ pub fn cancel_tricky(m: &mut Mem, e: &mut dyn SongEnv, sys: u32) {
     stop_tricky(m, e, sys);
 }
 
+/// The off timer's event (the doubleword at 0x39f118: a direct call of [`event_bit_off_timer`])
+pub const EV_EVENT_BIT_OFF: [u32; 2] = [0xffff_0000, 0x21c370];
+
+/// `Audio_SetEventBitSound` 0x21c0a0 (the system, a rider, the event's bit (its first word), on): the rider's race-line
+/// event bits 2..7, the course's music zones, for the one listened to. Bits 2 / 4 / 6 are zone 1 / 2 / 3 (+0x6e5c,
+/// the zone the rider is in), 3 / 5 / 7 the same zone's inner part (+0x6e60). On, from the rider listened to
+/// (`Audio_GetListenerRider` with −1; kept at +0x6e58 whatever the bit): a zone with none playing (+0x6e50) plays
+/// (+0x6e50 and the air loop's phrase +0x3704 the zone, `Audio_MusicEvent` 1 / 3 / 5); an inner part of the zone
+/// playing marks it (+0x6e54). Off, from the rider kept: the zone playing (or its inner part marked) is left (+0x6e5c /
+/// +0x6e60 cleared) and [`event_bit_off_timer`] scheduled a second later (`Audio_ScheduleEventBitOff` 0x21c348)
+pub fn set_event_bit_sound(m: &mut Mem, e: &mut dyn SongEnv, sys: u32, rider: u32, bit: u32, on: bool) {
+    let zone = bit.wrapping_sub(2) / 2 + 1;
+    let inner = bit & 1 != 0;
+    if !on {
+        if rider != m.r32(sys + 0x6e58) || bit.wrapping_sub(2) >= 6 {
+            return;
+        }
+        if inner {
+            if m.r32(sys + 0x6e54) != zone {
+                return;
+            }
+            m.w32(sys + 0x6e60, 0);
+        } else {
+            if m.r32(sys + 0x6e50) != zone {
+                return;
+            }
+            m.w32(sys + 0x6e5c, 0);
+        }
+        let d = EV_EVENT_BIT_OFF;
+        e.call(m, SCHEDULE, &[sys, 1000, d[0], d[1], 0, bit, 0, 0, 0]);
+        return;
+    }
+    if e.call(m, LISTENER_RIDER, &[sys, u32::MAX]) != rider {
+        return;
+    }
+    m.w32(sys + 0x6e58, rider);
+    if bit.wrapping_sub(2) >= 6 {
+        return;
+    }
+    let playing = m.r32(sys + 0x6e50);
+    if inner {
+        m.w32(sys + 0x6e60, zone);
+        if playing == zone {
+            m.w32(sys + 0x6e54, playing);
+        }
+    } else {
+        m.w32(sys + 0x6e5c, zone);
+        if playing == 0 {
+            m.w32(sys + 0x3704, zone);
+            m.w32(sys + 0x6e50, zone);
+            music_event(m, e, sys, zone * 2 - 1);
+        }
+    }
+}
+
+/// `Audio_EventBitOffTimer` 0x21c370 (the system, the scheduler's event: the bit at +0x1c): a second after a zone's
+/// bit went off, unless the rider is back in it (+0x6e5c / +0x6e60 the zone again) or, for the zone itself, in an
+/// inner part (+0x6e54), the zone stops playing (+0x6e50, +0x3704 and, for an inner part, +0x6e54 cleared;
+/// `Audio_MusicEvent` 2 / 4 / 6). Always 1 (the event done)
+pub fn event_bit_off_timer(m: &mut Mem, e: &mut dyn SongEnv, sys: u32, event: u32) -> u32 {
+    let bit = m.r32(event + 0x1c);
+    if bit.wrapping_sub(2) >= 6 {
+        return 1;
+    }
+    let zone = (bit - 2) / 2 + 1;
+    if bit & 1 != 0 {
+        if m.r32(sys + 0x6e60) == zone {
+            return 1;
+        }
+    } else if m.r32(sys + 0x6e5c) == zone || m.r32(sys + 0x6e54) != 0 {
+        return 1;
+    }
+    m.w32(sys + 0x6e50, 0);
+    m.w32(sys + 0x3704, 0);
+    if bit & 1 != 0 {
+        m.w32(sys + 0x6e54, 0);
+    }
+    music_event(m, e, sys, zone * 2);
+    1
+}
+
 /// 0x224a50 (a song, the system): the song's DelayCount, DelayFeedback and DelayTime (+0x11c, +0x120, +0x124) into
 /// words 1, 2 and 0 of the current sound's effect row (+0x74, 16 bytes a sound: the echoes `SndSys_PlayPending`
 /// schedules), in that order

@@ -8400,3 +8400,5 @@ G 1844a0 GameModule_DtorCopy1
 G 184578 StartScreen_EmptyHook
 G 26957c ListOp_EmptyHook
 G 2bb090 SpeechLib_BankTableBytes
+G 21c348 Audio_ScheduleEventBitOff
+G 21c370 Audio_EventBitOffTimer
