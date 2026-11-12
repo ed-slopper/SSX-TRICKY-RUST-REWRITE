@@ -732,8 +732,11 @@ Functions already ported under a bare address, named from the code and the Rust 
   last queued entry, the handle `<< 8 |` the entry, the count down one; -1 without a table at +0x372c).
 - Speech: `SpeechSys_DrainCutsceneRing` 0x230ff8 (from `CamScript_Update`), `Speech_TriggerIndexedLine` 0x2314e0
   (0x4008010 with the word at 0x3a2750 + 4i and the mode mask). From `cBoarder::vf10` 0x11a348:
-  `Speech_OnPlaceChange` 0x233ba0 (event bit 0xc: roll 6, the listener, more than one rider, 0x1002049 with 0/1/2 by
-  the career's +0xa4 / +0x124), `Speech_OnEventBit13Or14` 0x234558 (roll 0xe, 0x1002051 with 2 for bit 0x14, else
+  `Speech_OnPlaceChange` 0x233ba0 (event bit 0xc, (the rider, place before, place now); row E1b2g7d3, checked in
+  `tests/speech.rs` op 52: a player's rider, roll 6, not the tutorial, no replay, the race object's (gApp+0x730 →
+  +0x1c) +0x88 above 1, the listener; 0x1002049 with 1 when the game object's (gApp+0x730) +0xa4 is the rider, 2
+  when its +0x124 is, else 0, the place mask and `Speech_WipeoutChance`; inferred: +0xa4 / +0x124 are players 1 and
+  2's riders), `Speech_OnEventBit13Or14` 0x234558 (roll 0xe, 0x1002051 with 2 for bit 0x14, else
   1), `Speech_OnEventBit15` 0x234610 (roll 0xf, 0x1002053), `Speech_OnEventBit16` 0x233740 (roll 0x12, the listener,
   0x1002056), and the event's sound `Audio_SetEventBitSound` 0x21c0a0 (the music zones, below). The bits' meaning is
   not known, so the names say the bit.
@@ -1202,9 +1205,9 @@ ones at 0x3511f8; the IOP shared block is 0x353314.
   `worldemitter.rs:288` calls it has_queued).
 - `SoundId_IsAmbient` 0x22e388: ids 0x4f..0x60, 0x67..0x93, 0x9f..0xb2, 0xb7..0xb9, or `SoundId_IsAmbientExtra`
   0x22e3f0 (id 0x66). They are the ids `SoundId_ToBankProgram` puts in bank 6 program 0.
-- `Speech_GetPlaceMask` 0x233ab0 (from `Speech_OnPlaceChange`, jump table 0x3a2e30 on mode a2 < 6, p = a1 + 1):
-  mode 0 → 1 (p 6 → 0x101) | 0x400000; 1 → 2 (p 1 → 0x22) | 0x400000; 2 → 0x400004; 3 → 8; 4 → 0x2000; 5 → 0x4010
-  (p 1 → 0x4090); else 0.
+- `Speech_GetPlaceMask` 0x233ab0 (from `Speech_OnPlaceChange`, jump table 0x3a2e30 on the new place a2 < 6
+  (unsigned), p = the old place a1 + 1): new 0 → 1 (p 6 → 0x101) | 0x400000; 1 → 2 (p 1 → 0x22) | 0x400000; 2 →
+  0x400004; 3 → 8; 4 → 0x2000; 5 → 0x4010 (p 1 → 0x4090); else 0 (`speech::place_mask`, checked).
 - `Song_DurationThunk` 0x2248f8 (`jal Song_GetLengthMs`, no callers); `Song_ClearBreak` 0x225948 (music+0x36f0 →
   +0xfc = 0, from `Music_CancelBreak`).
 - `SpeechLib_ClearSpareHooks` 0x2baeb8 (clears 0x348df8/0x348dfc/0x348e00, read nowhere else);
@@ -1221,3 +1224,21 @@ ones at 0x3511f8; the IOP shared block is 0x353314.
 
 - `SpeechLib_BankTableBytes` 0x2bb090: `v << 2`. `SpeechSys` init (0x228898) calls it with 300 for the size of
   the table it allocates and hands to `SpeechLib_SetBankTable` 0x2bb098 with the same 300.
+
+## The race's placing sound and cheer (row E1b2g7d3, proven, checked in `tests/sndqueue.rs`)
+
+- `Sfx_OnPlacingChange` 0x219a48 (the audio object, the rider, the rider behind it, the rider ahead, the old place
+  (t0), the new (t1)), from `Race_UpdatePlacingsAndRubberBand` when a place changes (`sndqueue::on_placing_change`):
+  only for a local player's rider (+0x41c is 1) or the listener (`Audio_GetListenerRider` −1). Taking the lead (new
+  0) with nothing queued (`SndSys_IsQueued` 0x2154e0 with 0): a queue entry inline (as `SndSys_PushEntry`) with
+  sound 0x6d, kind 0, no volume, the slot `SndMgr_GetSlot`(4), played at once (`SndSys_PlayPending`) and its
+  follow-ups queued (`SndSys_QueueSounds` 0x215998 with 0, the play's answer, +0x80 + 200, 0). Then always
+  `Speech_OnPlacingChange` 0x2347c8: (the rider, the one behind) when new < old (signed), else (the one ahead, the
+  rider). A rider at an end passes 0 for the missing one.
+- `Audio_CheerForRider` 0x21e528 (the audio object, the rider), event bit 0x12 for the lead rider: when
+  `Audio_GetListenerRider`(the rider's +0x38) is the rider, `Audio_PlayCrowdCheer` 0x221068(`DAT_00343050`, 2, the
+  rider's +0x38, or 0 in a replay); that one plays `CrowdBox_PlayCheer` 0x2203a8 on box `who` (+0x372c + 400 · who)
+  when the crowd table is there. (`sndqueue::cheer_for_rider`.)
+- In the race (`race::Race::speech`, `race::SpeechCall`): the rider's `vf10` hooks (checkpoint, place, cheer, the
+  three local lines) and `Race::places`' placing sound are queued in order for the app; the app does not run them
+  yet (no speech system in the app: row E1b2g7d3b).

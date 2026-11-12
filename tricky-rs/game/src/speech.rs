@@ -391,11 +391,58 @@ impl Announcer {
         }
     }
 
+    /// `Speech_OnPlaceChange` 0x233ba0(rider, old, new): a player's rider, roll 6, not the tutorial, no replay, a race
+    /// of more than one rider (`race.count`, the race object's +0x88) and the listener: 0x1002049 with 1 when the
+    /// game object's +0xa4 is the rider, 2 when its +0x124 is, else 0; the place mask
+    /// ([`place_mask`]) and the rider's [`wipeout_grade`]
+    pub fn on_place_change(&self, env: &mut dyn SpeechEnv, r: &SpeechRider, race: PlaceRace, old: i32, new: i64) {
+        if self.roll_first(env, r, 6) && 1 < race.count && r.id == env.listener() {
+            let lead = if race.a4 == r.id {
+                1
+            } else if race.a124 == r.id {
+                2
+            } else {
+                0
+            };
+            env.post(Event::new(0x1002049, &[lead, place_mask(old, new), wipeout_grade(r.level)]));
+        }
+    }
+
     /// `FUN_00234610`: a local player's, roll 0xf: 0x1002053
     pub fn on_local_line2(&self, env: &mut dyn SpeechEnv, r: &SpeechRider) {
         if !env.replay_playing() && r.player() && r.kind == 1 && env.mode() != 6 && self.roll(env, 0xf) {
             env.post(Event::new(0x1002053, &[]));
         }
+    }
+}
+
+/// What `Speech_OnPlaceChange` reads: the race object's (gApp+0x730 → +0x1c) rider count (+0x88), and the two
+/// rider words it compares of the game object (gApp+0x730: +0xa4, +0x124)
+#[derive(Clone, Copy, Debug, Default)]
+pub struct PlaceRace {
+    pub count: i32,
+    pub a4: u32,
+    pub a124: u32,
+}
+
+/// `Speech_GetPlaceMask` 0x233ab0(old, new): the line's mask for the new place (0..5, else 0), `old + 1` picking
+/// the variants (first from last of six, first from second, second from first)
+pub fn place_mask(old: i32, new: i64) -> u32 {
+    let p = old.wrapping_add(1);
+    match new as u64 {
+        0 => (if p == 6 { 0x101 } else { 1 }) | 0x40_0000,
+        1 => (if p == 1 { 0x22 } else { 2 }) | 0x40_0000,
+        2 => 0x40_0004,
+        3 => 8,
+        4 => 0x2000,
+        5 => {
+            if p == 1 {
+                0x4090
+            } else {
+                0x4010
+            }
+        }
+        _ => 0,
     }
 }
 

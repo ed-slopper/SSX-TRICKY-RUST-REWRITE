@@ -1459,3 +1459,161 @@ fn world_emitter_update_matches_the_original() {
     eprintln!("update paths {seen:?}");
     assert!(seen[..7].iter().all(|n| *n > 100), "{seen:?}");
 }
+
+// ---- OnPlacingChange ----
+
+struct PlaceEnv(Rc<RefCell<Or>>);
+impl QueueEnv for PlaceEnv {
+    fn get_slot(&mut self, which: u32) -> u32 {
+        self.0.borrow_mut().take("slot", which as u64, 0) as u32
+    }
+    fn rider_listener(&mut self) -> u32 {
+        panic!("not used")
+    }
+    fn play_pending(&mut self) -> u64 {
+        self.0.borrow_mut().take("pp", 0, 0) as u64
+    }
+}
+impl PlacingChangeEnv for PlaceEnv {
+    fn listener(&mut self) -> u32 {
+        self.0.borrow_mut().take("lr", u32::MAX as u64, 0) as u32
+    }
+    fn is_queued(&mut self) -> bool {
+        self.0.borrow_mut().take("queued", 0, 0) != 0
+    }
+    fn queue_sounds(&mut self, played: u64, id: u32) {
+        self.0.borrow_mut().log.push(("qs", played, id as u64));
+    }
+    fn speech_placing(&mut self, a: u32, b: u32) {
+        self.0.borrow_mut().log.push(("sp", a as u64, b as u64));
+    }
+}
+
+#[test]
+fn on_placing_change_matches_the_original() {
+    let Some(mut r) = runner() else { return };
+    let or: Rc<RefCell<Or>> = Rc::new(RefCell::new(Or::default()));
+    let (rider, sys, l) = setup(&mut r, 0x900);
+    for (a, name) in [(0x20ed20u32, "lr"), (0x2154e0, "queued"), (0x211f38, "slot"), (0x20c948, "pp")] {
+        let o = or.clone();
+        r.stub(a, move |c, _| {
+            assert_eq!(c.gpr(4) as u32, sys);
+            let x = match name {
+                "lr" | "slot" | "queued" => c.gpr(5) as u32 as u64,
+                _ => 0,
+            };
+            let v = o.borrow_mut().take(name, x, 0);
+            c.set_gpr(2, v as u64);
+        });
+    }
+    let o = or.clone();
+    r.stub(0x215998, move |c, _| {
+        assert_eq!((c.gpr(4) as u32, c.gpr(5), c.gpr(8)), (sys, 0, 0));
+        o.borrow_mut().log.push(("qs", c.gpr(6), c.gpr(7) as u32 as u64))
+    });
+    let o = or.clone();
+    r.stub(0x2347c8, move |c, _| {
+        assert_eq!(c.gpr(4) as u32, sys);
+        o.borrow_mut().log.push(("sp", c.gpr(5) as u32 as u64, c.gpr(6) as u32 as u64))
+    });
+    let mut g = Rng(0x0dd5_eed0_1234_5678);
+    let (next, prev) = (0x0123_4560u32, 0x0765_4320u32);
+    let mut seen = [0u32; 3];
+    for case in 0..30_000 {
+        fill(&mut r, sys, &l, &mut g);
+        let w80 = r.mem.read_u32(sys + 0x80);
+        let flag = [0u32, 1, 2][(g.next() % 3) as usize];
+        r.mem.write_u32(rider + 0x41c, flag);
+        let old = (g.next() % 8) as i64 - 1;
+        let new = (g.next() % 8) as i64 - 1;
+        let new = if g.next() % 3 == 0 { 0 } else { new };
+        let vals: Vec<i64> = vec![
+            [rider as i64, 0x1234][(g.next() % 2) as usize],
+            (g.next() % 2) as i64,
+            (g.next() % 100) as i64,
+            ((g.next() as i64) << 32) | g.next() as i64,
+        ];
+        // the listener is asked only when the rider is not a local player's
+        let vals = if flag == 1 { vals[1..].to_vec() } else { vals };
+        let before = read(&mut r, &l);
+        or.borrow_mut().vals = vals.clone();
+        or.borrow_mut().log.clear();
+        for (k, v) in [sys, rider, next, prev].iter().enumerate() {
+            r.cpu.set_gpr(4 + k, *v as u64);
+        }
+        r.cpu.set_gpr(8, old as u64);
+        r.cpu.set_gpr(9, new as u64);
+        r.call(0x219a48).unwrap_or_else(|e| panic!("case {case}: {e}"));
+        let orig = std::mem::take(&mut or.borrow_mut().log);
+        let after = read(&mut r, &l);
+        let mut q = before.clone();
+        or.borrow_mut().vals = vals;
+        on_placing_change(&mut q, w80, rider, flag, next, prev, old, new, &mut PlaceEnv(or.clone()));
+        let mine = std::mem::take(&mut or.borrow_mut().log);
+        assert_eq!(orig, mine, "case {case}");
+        assert_eq!(after, q, "case {case} state");
+        seen[0] += orig.iter().any(|e| e.0 == "qs") as u32;
+        seen[1] += orig.iter().any(|e| e == &("sp", rider as u64, next as u64)) as u32;
+        seen[2] += orig.iter().any(|e| e == &("sp", prev as u64, rider as u64)) as u32;
+    }
+    assert!(seen.iter().all(|n| *n > 100), "{seen:?}");
+}
+
+// ---- CheerForRider ----
+
+struct CheerT(Rc<RefCell<Or>>);
+impl CheerEnv for CheerT {
+    fn listener_rider(&mut self, who: u32) -> u32 {
+        self.0.borrow_mut().take("lr", who as u64, 0) as u32
+    }
+    fn replay_is_playing(&mut self) -> bool {
+        self.0.borrow_mut().take("replay", 0, 0) != 0
+    }
+    fn play_crowd_cheer(&mut self, level: u32, who: u32) {
+        self.0.borrow_mut().log.push(("cheer", level as u64, who as u64));
+    }
+}
+
+#[test]
+fn cheer_for_rider_matches_the_original() {
+    let Some(mut r) = runner() else { return };
+    let or: Rc<RefCell<Or>> = Rc::new(RefCell::new(Or::default()));
+    let (rider, sys, _) = setup(&mut r, 0x900);
+    let crowd_sys = r.mem.alloc(0x40);
+    r.mem.write_u32(0x343050, crowd_sys);
+    let o = or.clone();
+    r.stub(0x20ed20, move |c, _| {
+        assert_eq!(c.gpr(4) as u32, sys);
+        let v = o.borrow_mut().take("lr", c.gpr(5) as u32 as u64, 0);
+        c.set_gpr(2, v as u64);
+    });
+    let o = or.clone();
+    r.stub(0x21bfd0, move |c, _| {
+        let v = o.borrow_mut().take("replay", 0, 0);
+        c.set_gpr(2, v as u64);
+    });
+    let o = or.clone();
+    r.stub(0x221068, move |c, _| {
+        assert_eq!(c.gpr(4) as u32, crowd_sys);
+        o.borrow_mut().log.push(("cheer", c.gpr(5), c.gpr(6) as u32 as u64))
+    });
+    let mut g = Rng(0x00c4_ee55_0000_0001);
+    let mut cheers = 0;
+    for case in 0..2_000 {
+        let player = g.next() % 3;
+        r.mem.write_u32(rider + 0x38, player);
+        let vals = vec![[rider as i64, 0x1234][(g.next() % 2) as usize], (g.next() % 2) as i64];
+        or.borrow_mut().vals = vals.clone();
+        or.borrow_mut().log.clear();
+        r.cpu.set_gpr(4, sys as u64);
+        r.cpu.set_gpr(5, rider as u64);
+        r.call(0x21e528).unwrap_or_else(|e| panic!("case {case}: {e}"));
+        let orig = std::mem::take(&mut or.borrow_mut().log);
+        or.borrow_mut().vals = vals;
+        cheer_for_rider(rider, player, &mut CheerT(or.clone()));
+        let mine = std::mem::take(&mut or.borrow_mut().log);
+        assert_eq!(orig, mine, "case {case}");
+        cheers += orig.iter().filter(|e| e.0 == "cheer").count();
+    }
+    assert!(cheers > 200);
+}

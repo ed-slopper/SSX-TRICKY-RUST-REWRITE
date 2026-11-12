@@ -390,13 +390,15 @@ pub struct Race { pub line: Vec<Vec3>,
     pub clock: f32, pub line_clock: f32, pub line_frame: i32,
     /// what the riders' event bits did this frame, and every call of the run to the music system
     pub hooks: Vec<Hook>, pub music: Vec<MusicCall>,
+    /// every call of the run to the speech and crowd sounds (the audio object's handlers), in order
+    pub speech: Vec<SpeechCall>,
     /// the game's bytes the placings run on ([`Race::places`])
     pub places_mem: crate::pf::Mem }
 impl Race {
     /// The original's countdown: GO after 2.5 s (beeps at 0.5, 1.0, 1.5 and 2.0 s).
     /// A race entered: `Rand_SeedGame` seeds the game stream (`cAI::vf14_111108` 0x1112dc; STANDIN seed, see [`crate::rand::RACE_SEED`]).
-    pub fn new(line: Vec<Vec3>) -> Self { crate::rand::seed_game(crate::rand::RACE_SEED); Self { line, ai_paths: Vec::new(), idx: 0, time: 0.0, state: RaceState::Countdown, best: None, countdown: 2.5, course: AiCourse::default(), bonus: 0.0, paths: Default::default(), tube: None, cml: None, intro: false, scene: None, stage: None, finish_area: None, post: 0, post_scripts: Vec::new(), cast: None, race_lines: None, course_no: 0, mode: crate::courses::Mode::CircuitRace as u32, line_riders: Vec::new(), clock: 0.0, line_clock: 0.0, line_frame: 0, hooks: Vec::new(), music: Vec::new(), places_mem: Default::default() } }
-    pub fn restart(&mut self) { crate::rand::seed_game(crate::rand::RACE_SEED); self.idx = 0; self.time = 0.0; self.state = RaceState::Countdown; self.countdown = 2.5; self.bonus = 0.0; self.post = 0; self.post_scripts.clear(); self.cast = None; self.line_riders.clear(); self.clock = 0.0; self.line_clock = 0.0; self.line_frame = 0; self.hooks.clear(); self.music.clear(); }
+    pub fn new(line: Vec<Vec3>) -> Self { crate::rand::seed_game(crate::rand::RACE_SEED); Self { line, ai_paths: Vec::new(), idx: 0, time: 0.0, state: RaceState::Countdown, best: None, countdown: 2.5, course: AiCourse::default(), bonus: 0.0, paths: Default::default(), tube: None, cml: None, intro: false, scene: None, stage: None, finish_area: None, post: 0, post_scripts: Vec::new(), cast: None, race_lines: None, course_no: 0, mode: crate::courses::Mode::CircuitRace as u32, line_riders: Vec::new(), clock: 0.0, line_clock: 0.0, line_frame: 0, hooks: Vec::new(), music: Vec::new(), speech: Vec::new(), places_mem: Default::default() } }
+    pub fn restart(&mut self) { crate::rand::seed_game(crate::rand::RACE_SEED); self.idx = 0; self.time = 0.0; self.state = RaceState::Countdown; self.countdown = 2.5; self.bonus = 0.0; self.post = 0; self.post_scripts.clear(); self.cast = None; self.line_riders.clear(); self.clock = 0.0; self.line_clock = 0.0; self.line_frame = 0; self.hooks.clear(); self.music.clear(); self.speech.clear(); }
     /// Metres of racing line still to go from a line point.
     pub fn remaining(&self, idx: usize) -> f32 { self.line.windows(2).skip(idx).map(|w| (w[1] - w[0]).length()).sum() }
     pub fn progress(&self) -> f32 { if self.line.len() < 2 { 0.0 } else { self.idx as f32 / (self.line.len() - 1) as f32 } }
@@ -519,6 +521,27 @@ pub enum MusicCall {
     EventBit { rider: usize, bit: u32, on: bool },
 }
 
+/// What the riders' event bits and the placings ask of the audio object (`DAT_00343050`), in the order they ask;
+/// rider `k` of [`Race::line_riders`]. The app's speech host runs them (`speech::Announcer`, `sndqueue`)
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum SpeechCall {
+    /// `Speech_OnCheckpoint` 0x233ee0
+    Checkpoint(usize),
+    /// `Speech_OnPlaceChange` 0x233ba0 (the old place, the new)
+    PlaceChange(usize, i32, i32),
+    /// `Audio_CheerForRider` 0x21e528 (`sndqueue::cheer_for_rider`)
+    Cheer(usize),
+    /// `Speech_OnEventBit13Or14` 0x234558 (the kind: 0 for bit 0x13, 1 for 0x14)
+    LocalLine(usize, u32),
+    /// `Speech_OnEventBit15` 0x234610
+    LocalLine2(usize),
+    /// `Speech_OnEventBit16` 0x233740
+    ListenerLine(usize),
+    /// `Sfx_OnPlacingChange` 0x219a48 (`sndqueue::on_placing_change`): the rider, the one behind it (`next`), the one
+    /// ahead (`prev`), none for the ends, the old place and the new
+    PlacingChange { rider: usize, next: Option<usize>, prev: Option<usize>, old: i32, new: i32 },
+}
+
 impl Race {
     /// The riders' race-line progress, each 60 Hz tick of the race (the game's state 4, after the countdown):
     /// `cBoarder::vf7` 0x117198 moves the event bits on (+0x388 to +0x384, cleared) and runs
@@ -575,7 +598,7 @@ impl Race {
     /// race's +0x18) their places (+0x110). It runs on the game's bytes ([`placing_mem`]): the race (its tick, the
     /// riders, one player, the computer riders), the mode, the course, the main line's length, and of each rider its
     /// place, finish (+0x418), human or not (+0x41c) and best (+0x378); `Boarder_GetRaceProgress` 0x1170d0 is
-    /// [`crate::progress::race_progress`]. `Sfx_OnPlacingChange` 0x219a48 does nothing (row E1b2g7d3). STANDIN: the
+    /// [`crate::progress::race_progress`]; `Sfx_OnPlacingChange` 0x219a48 goes to [`Race::speech`]. STANDIN: the
     /// riders' points (+0x5910) and knock-down counts (+0x58dc / +0x58e0) are not kept here (0), so the show-offs and
     /// knock-down practice keep the order they have; the rubber band's tables (0x365060) and difficulty are 0 and what
     /// it writes (+0x100..+0x108) is not read back
@@ -603,15 +626,19 @@ impl Race {
             m.w32(o + 0x41c, (k == 0) as u32);
             m.w32(o + 0x378, r.line.place.best.to_bits());
         }
-        struct Env<'a>(&'a [LineRider], f32, f32);
+        struct Env<'a>(&'a [LineRider], f32, f32, &'a mut Vec<SpeechCall>);
         impl placing::PlacingEnv for Env<'_> {
             fn progress(&mut self, _: &mut crate::pf::Mem, rider: u32) -> f32 {
                 let k = ((rider - PLACE_RIDERS) / PLACE_RIDER) as usize;
                 crate::progress::race_progress(&self.0[k].progress(self.1), self.2)
             }
-            fn placing_sound(&mut self, _: &mut crate::pf::Mem, _: [u32; 6]) {}
+            fn placing_sound(&mut self, _: &mut crate::pf::Mem, a: [u32; 6]) {
+                let k = |r: u32| (r != 0).then(|| ((r - PLACE_RIDERS) / PLACE_RIDER) as usize);
+                let rider = k(a[1]).unwrap_or(0);
+                self.3.push(SpeechCall::PlacingChange { rider, next: k(a[2]), prev: k(a[3]), old: a[4] as i32, new: a[5] as i32 });
+            }
         }
-        placing::update(&mut m, &mut Env(&self.line_riders, self.clock, lap_len), PLACE_RACE, PLACE_STACK);
+        placing::update(&mut m, &mut Env(&self.line_riders, self.clock, lap_len, &mut self.speech), PLACE_RACE, PLACE_STACK);
         for (k, r) in self.line_riders.iter_mut().enumerate() {
             r.place = m.r32(PLACE_RIDERS + PLACE_RIDER * k as u32 + 0x110) as i32;
         }
@@ -656,7 +683,7 @@ impl Race {
 }
 
 /// The game the riders' event bits tell, for [`Race::vf10`]: rider `k` of the race, as it stands (`line`).
-/// The lessons, speech (`Speech_OnCheckpoint`, the place and local lines, row E1b2g7d3), the cheer (E1b2g7d3), the
+/// The speech lines and the cheer go to [`Race::speech`]. The lessons, the
 /// queued event sound (E1b2g7d5) and `Boarder_Finish`'s HUD item (`HUD_ShowItem` 7, E1b2g7d4) do nothing here: the app
 /// has none of them yet.
 struct Hooks<'a> {
@@ -677,7 +704,7 @@ impl crate::control::EventEnv for Hooks<'_> {
         }
     }
     fn msg_multiplier(&mut self, r: &mut crate::control::EventRider) { self.race.hooks.push(Hook::Lap(self.k, r.mult)); }
-    fn on_checkpoint(&mut self, _: &mut crate::control::EventRider) {}
+    fn on_checkpoint(&mut self, _: &mut crate::control::EventRider) { self.race.speech.push(SpeechCall::Checkpoint(self.k)); }
     /// `Boarder_HitCheckpoint` 0x11e6f8 ([`crate::boarder_misc::hit_checkpoint`]); its race-clock addition goes to
     /// the show-off's bonus
     fn hit_checkpoint(&mut self, r: &mut crate::control::EventRider, arg: u32) {
@@ -702,7 +729,7 @@ impl crate::control::EventEnv for Hooks<'_> {
         }
         race.hooks.extend(calls.into_iter().map(|c| Hook::Checkpoint(k, c)));
     }
-    fn placing(&mut self, _: &mut crate::control::EventRider, _: i32, _: i32) {}
+    fn placing(&mut self, _: &mut crate::control::EventRider, old: i32, new: i32) { self.race.speech.push(SpeechCall::PlaceChange(self.k, old, new)); }
     /// `Game_IsLeadOrFocusRider` 0x17f1f0 with no camera: the one player's slot (0)
     fn is_lead(&mut self, slot: i32) -> bool {
         let place = self.race.line_riders.first().map_or(0, |m| m.place);
@@ -713,10 +740,10 @@ impl crate::control::EventEnv for Hooks<'_> {
         self.race.music.push(MusicCall::Event(e));
         self.race.hooks.push(Hook::Music(e));
     }
-    fn cheer(&mut self, _: &mut crate::control::EventRider) {}
-    fn local_line(&mut self, _: &mut crate::control::EventRider, _: u32) {}
-    fn local_line2(&mut self, _: &mut crate::control::EventRider) {}
-    fn listener_line(&mut self, _: &mut crate::control::EventRider) {}
+    fn cheer(&mut self, _: &mut crate::control::EventRider) { self.race.speech.push(SpeechCall::Cheer(self.k)); }
+    fn local_line(&mut self, _: &mut crate::control::EventRider, kind: u32) { self.race.speech.push(SpeechCall::LocalLine(self.k, kind)); }
+    fn local_line2(&mut self, _: &mut crate::control::EventRider) { self.race.speech.push(SpeechCall::LocalLine2(self.k)); }
+    fn listener_line(&mut self, _: &mut crate::control::EventRider) { self.race.speech.push(SpeechCall::ListenerLine(self.k)); }
     /// `Audio_SetEventBitSound` 0x21c0a0, which the app's music system runs (`crate::musichost::MusicHost::event_bit_sound`)
     fn event_sound(&mut self, _: &mut crate::control::EventRider, event: [u32; 2], on: bool) {
         self.race.music.push(MusicCall::EventBit { rider: self.k, bit: event[0], on });

@@ -3649,7 +3649,7 @@ address,size,name,system,status
 0x2192a8,1208,Sfx_UpdateBoost,audio,ported
 0x219760,120,Sfx_UpdateBoostStop,audio,ported
 0x2197d8,624,Sfx_OnBoost,audio,ported
-0x219a48,808,Sfx_OnPlacingChange,audio,ported
+0x219a48,808,Sfx_OnPlacingChange,audio,checked
 0x219d70,592,Sfx_PickupMultiplier,audio,ported
 0x219fc0,592,Sfx_PickupTime,audio,ported
 0x21a210,600,Audio_PlayScoreTick,audio,ported
@@ -3706,7 +3706,7 @@ address,size,name,system,status
 0x21e248,592,Music_RestartMeterCue,audio,not started
 0x21e498,40,Audio_ScheduleWorldTriggersOn,audio,not started
 0x21e4f0,44,Audio_ResumeAfterSpeech,audio,ported
-0x21e528,108,Audio_CheerForRider,audio,ported
+0x21e528,108,Audio_CheerForRider,audio,checked
 0x21e688,8,Audio_GetMusicFx,audio,ported
 0x21e690,28,Audio_GetMusicFxThunk,audio,not started
 0x21e6c0,28,cBXAudio::vf3_21e6c0,audio,ported
@@ -4169,9 +4169,9 @@ address,size,name,system,status
 0x233858,244,Speech_OnRiderHit,audio,checked
 0x233950,200,Speech_OnAirEnter,audio,checked
 0x233a18,148,Speech_OnRiderReset,audio,checked
-0x233ab0,56,Speech_GetPlaceMask,audio,not started
+0x233ab0,56,Speech_GetPlaceMask,audio,checked
 0x233b70,48,Speech_WipeoutChance,audio,checked
-0x233ba0,276,Speech_OnPlaceChange,audio,ported
+0x233ba0,276,Speech_OnPlaceChange,audio,checked
 0x233cb8,128,Speech_OnRiderCollision,audio,checked
 0x233d38,216,Speech_OnWipeout,audio,checked
 0x233e10,104,Speech_OnMeterFull,audio,checked

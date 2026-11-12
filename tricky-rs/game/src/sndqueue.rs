@@ -530,3 +530,54 @@ pub fn instance_collision(vel: [f32; 4], sound: Option<u32>, word_80: u32, env: 
     }
     env.queue_sounds(started, word_80.wrapping_add(0x32));
 }
+
+pub trait PlacingChangeEnv: QueueEnv {
+    /// `Audio_GetListenerRider` 0x20ed20 (the audio system, −1): the rider the sound follows.
+    fn listener(&mut self) -> u32;
+    /// `SndSys_IsQueued` 0x2154e0 (the audio system, 0).
+    fn is_queued(&mut self) -> bool;
+    /// `SndSys_QueueSounds` 0x215998 (the audio system, 0, what `play_pending` returned, `word_80 + 200`, 0).
+    fn queue_sounds(&mut self, played: u64, id: u32);
+    /// `Speech_OnPlacingChange` 0x2347c8 (the audio system, the rider who passed, the rider passed).
+    fn speech_placing(&mut self, a: u32, b: u32);
+}
+
+/// `Sfx_OnPlacingChange` 0x219a48 (the audio system, the rider, the rider behind (`next`), the rider ahead (`prev`),
+/// the old place, the new): for a local player's rider (+0x41c is 1) or the listener's, taking the lead (`new` 0)
+/// queues sound 0x6d (no volume of its own) unless one is queued, played at once with the follow-ups queued after
+/// it; then the passing line: the rider over the one now behind when it moved up, else the one ahead over it.
+pub fn on_placing_change(q: &mut Queue, word_80: u32, rider: u32, flag_41c: u32, next: u32, prev: u32, old: i64, new: i64, env: &mut dyn PlacingChangeEnv) {
+    if flag_41c != 1 && env.listener() != rider {
+        return;
+    }
+    if new == 0 && !env.is_queued() {
+        let i = queue_begin(q, 0, 0x6d, None);
+        q.a40[i] = env.get_slot(4);
+        let played = env.play_pending();
+        env.queue_sounds(played, word_80.wrapping_add(200));
+    }
+    if new < old {
+        env.speech_placing(rider, next);
+    } else {
+        env.speech_placing(prev, rider);
+    }
+}
+
+pub trait CheerEnv {
+    /// `Audio_GetListenerRider` 0x20ed20 (the audio system, the rider's player number).
+    fn listener_rider(&mut self, who: u32) -> u32;
+    /// `Replay_IsPlaying` 0x21bfd0.
+    fn replay_is_playing(&mut self) -> bool;
+    /// `Audio_PlayCrowdCheer` 0x221068 (`*0x343050`, 2, who): when the crowd (+0x372c) is there,
+    /// `CrowdBox_PlayCheer` 0x2203a8 on its box `who` (0x190 bytes each).
+    fn play_crowd_cheer(&mut self, level: u32, who: u32);
+}
+
+/// `Audio_CheerForRider` 0x21e528 (the audio system, the rider): when the rider is its player's listener, the
+/// crowd's level-2 cheer on that player's box (the first, in a replay).
+pub fn cheer_for_rider(rider: u32, player: u32, env: &mut dyn CheerEnv) {
+    if env.listener_rider(player) == rider {
+        let who = if env.replay_is_playing() { 0 } else { player };
+        env.play_crowd_cheer(2, who);
+    }
+}

@@ -368,7 +368,7 @@ fn handlers_are_the_original() {
     let w = Rc::new(RefCell::new(World::new(7)));
     setup(&mut r, &w);
     // the handlers' own callees run as the game's
-    for a in [0x235d58u32, 0x233b70, 0x234698, 0x234730, 0x234c38, 0x235090, 0x233138, 0x1635b0, 0x2309a8, 0x235ba8, 0x235530, 0x164288, 0x164318, 0x166550, 0x231548, 0x231800, 0x231af8, 0x2315e0, 0x16baa8, 0x16ba60, 0x2307f0, 0x250c10, 0x230dd0, 0x230910, 0x230880, 0x234bb8, 0x228d10] {
+    for a in [0x235d58u32, 0x233b70, 0x234698, 0x234730, 0x234c38, 0x235090, 0x233138, 0x1635b0, 0x2309a8, 0x235ba8, 0x235530, 0x164288, 0x164318, 0x166550, 0x231548, 0x231800, 0x231af8, 0x2315e0, 0x16baa8, 0x16ba60, 0x2307f0, 0x250c10, 0x230dd0, 0x230910, 0x230880, 0x234bb8, 0x228d10, 0x233ab0] {
         r.allow(a);
     }
     for &(f, _, _) in POSTS {
@@ -385,15 +385,15 @@ fn handlers_are_the_original() {
     r.mem.write_u32(ring + 4, ring_buf);
     let app = r.mem.alloc(0x800);
     r.mem.write_u32(0x337c58, app);
-    let game = r.mem.alloc(0x40);
+    let game = r.mem.alloc(0x130);
     let race_obj = r.mem.alloc(0x40);
     r.mem.write_u32(app + 0x730, game);
     r.mem.write_u32(game + 0x1c, race_obj);
     let riders: Vec<u32> = (0..2).map(|_| r.mem.alloc(0x5900)).collect();
     let entries: Vec<u32> = (0..2).map(|_| r.mem.alloc(0x80)).collect();
     let mut g = Rng(0x5bee_c400_0000_0002);
-    let mut seen = [0u32; 52];
-    let mut posted = [0u32; 52];
+    let mut seen = [0u32; 53];
+    let mut posted = [0u32; 53];
     let trick_at = r.mem.alloc(8);
     let mut ids = std::collections::BTreeSet::new();
     for case in 0..60_000 {
@@ -576,7 +576,7 @@ fn handlers_are_the_original() {
             r.mem.write_u32(0x335408 + 12 * i as u32, u.value as u32);
         }
         let mut ours = w.borrow().clone();
-        let op = g.below(52) as usize;
+        let op = g.below(53) as usize;
         seen[op] += 1;
         let (a, b) = (rs[0], rs[1]);
         let (pa, pb) = (riders[0] as u64, riders[1] as u64);
@@ -833,6 +833,20 @@ fn handlers_are_the_original() {
                 call(&mut r, 0x2310c8, &[s, pa, k as u64]);
                 ann.on_cam_intro(&mut ours, &car, &a, k);
             }
+            52 => {
+                let race = speech::PlaceRace {
+                    count: g.below(4) as i32,
+                    a4: [0, riders[0], riders[1]][g.below(3) as usize],
+                    a124: [0, riders[0], riders[1]][g.below(3) as usize],
+                };
+                r.mem.write_u32(race_obj + 0x88, race.count as u32);
+                r.mem.write_u32(game + 0xa4, race.a4);
+                r.mem.write_u32(game + 0x124, race.a124);
+                let old = g.below(8) as i32 - 1;
+                let new = [0i64, 1, 2, 3, 4, 5, 6, -1][g.below(8) as usize];
+                call(&mut r, 0x233ba0, &[s, pa, old as i64 as u64, new as u64]);
+                ann.on_place_change(&mut ours, &a, race, old, new);
+            }
             42 => {
                 let p = g.below(5) as i32 - 1;
                 let t = call(&mut r, 0x2315e0, &[s, p as i64 as u64]) as u32;
@@ -881,7 +895,7 @@ fn handlers_are_the_original() {
     for id in [0x4008002u32, 0x4008003, 0x4008004, 0x4008005, 0x4008006, 0x4008010, 0x400800f, 0x4008016, 0x100200fu32, 0x1002010, 0x100201c, 0x4008007, 0x4008009, 0x4008013, 0x400800a, 0x400800b, 0x400800c, 0x400800d, 0x3006019, 0x300601a, 0x300601b, 0x300601c] {
         assert!(ids.contains(&id), "event {id:#x} never posted");
     }
-    for op in (0..25).chain([31, 32, 33, 34, 36, 37, 38, 39, 40, 41, 43, 44, 45, 46, 47, 51]) {
+    for op in (0..25).chain([31, 32, 33, 34, 36, 37, 38, 39, 40, 41, 43, 44, 45, 46, 47, 51, 52]) {
         assert!(op == 17 || posted[op] > 0, "op {op} never posted");
     }
 }
