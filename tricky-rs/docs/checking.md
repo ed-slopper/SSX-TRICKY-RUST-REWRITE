@@ -1446,7 +1446,7 @@ Every field under fadd=g1, by default and with the passes off:
 The passes are still needed for the tumbling riders with no recorded body (rec14 5066 r4, 6922 and 6925 r5; rec16
 6915-6927 r5): all of the remaining difference. Dropping TRICKY_PREHIT waits for those (row F4b3x3).
 
-## F4b3x3: the landing in the runner (2026-11-11, part done)
+## F4b3x3: the landing in the runner (2026-11-11)
 
 The ground test's landings (motion 1 to 2 in the frame) now run the game's own `AirMotion_Update` 0x108378 in the
 runner ways (`land_runner` in `tests/ground_motion.rs`), with `Landing_CheckAngles` 0x12ba78 and
@@ -1465,6 +1465,28 @@ runner ways (`land_runner` in `tests/ground_motion.rs`), with `Landing_CheckAngl
   sample's normal, so the game's down ray must have hit other ground (not recorded); every way misses it. 4 landings
   on rec16 hit `cWorldBoarder::cWorldBoarder` (a rider on a rail line, kind 1 hit) and are left where they started.
   The trial passes (TRICKY_PREHIT) and the tumbling riders with no recorded body are untouched.
+
+Finished (1deb2e2):
+
+- Way 0 now runs our `tricky_game::air_motion::update_by` (`AirMotion_Update` 0x108378 with the two slow-downs'
+  `add.s`, 0x108fb0 and 0x109054, made by the adder given) with `landing::check_angles_by` (`Landing_CheckAngles`
+  0x12ba78) and `math::asin_by` / `math::atan_by` (`Math_Asin` 0x250fd0, `Math_Atan` 0x2510f8), all given fadd=g1.
+  Proven bit for bit in the runner under fadd=g1: `Math_Asin` and `Math_Atan` on 22,000 arguments (`tests/math.rs`;
+  9,936 of them differ from the IEEE adder's result) and `Landing_CheckAngles` (`tests/landing.rs`, run under both
+  rules). Our landing velocities now equal the g1 runner's on every recording: rec14 145/145, rec15 99/99, rec16
+  203/203, rec17 321/321, rec18 178/178 (IEEE runner: 121, 85, 173, 267, 150).
+- `cWorldBoarder::cWorldBoarder` 0x257810 (the air's wall sweep when the rider does not land: the body at rider
+  +0x470) and `cWorldBoarder::vf10` 0x257ca0 are stubbed and logged in the runner; STANDIN: the sweep's
+  `World_RayCast` answered as a miss (the world around the body is not recorded).
+- rec16 8288 rider 2 no longer lands in ours either (the flight step's velocity points away from the second
+  sample's normal, so no `Landing_ChooseState`): its velocity is off by more than 1, so it is marked missed and
+  replayed as the others, which takes rec16's landing frames from 205 to 203.
+
+Every field under fadd=g1 unchanged: rec14 37,244, rec15 37,311, rec16 51,725, rec17 71,257, rec18 54,599 (passes
+off: rec14 37,241, rec16 51,723). Not done: the tumbling riders with no recorded body (rec14 5066 r4, 6922/6925 r5;
+rec16 6915-6927 r5). `Ragdoll_Step` 0x10dca8 steps the body at handler +0x4f0..+0x5f0, and rec14 and rec16 have no
+`5ae0>4f0` window, so they cannot be replayed from what was recorded; the trial passes stay on for recordings
+without that window (row F4b3x4).
 
 ## How a row gets to `checked`
 
