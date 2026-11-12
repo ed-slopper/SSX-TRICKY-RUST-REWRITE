@@ -539,7 +539,7 @@ pub fn hud(
             HudItem::Place => {
                 if game.event == Event::Race && !opponents.0.is_empty() && race.0.state != RaceState::Countdown {
                     let place = standings(&race.0, &opponents.0, &lib, &me).iter().position(|t| t.2).unwrap_or(0);
-                    let lap = if race.0.lines.has_laps() { format!("\nlap {}/4", if race.0.prog.started { (5 - race.0.prog.laps.min(4)).min(4) } else { 1 }) } else { String::new() };
+                    let lap = if race.0.course_no == 8 { format!("\nlap {}/4", (5 - race.0.laps_left(0).min(4)).min(4)) } else { String::new() };
                     // gold in the lead (HUD_DrawPlayerText)
                     if place == 0 { tint = Color::srgb(0.953, 0.729, 0.106); }
                     format!("{}{lap}", ordinal(place))

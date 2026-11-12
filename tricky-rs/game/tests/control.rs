@@ -195,7 +195,7 @@ fn fields(r: &Rider) -> Vec<(u32, u32)> {
     ] {
         v.push((o, x.to_bits()));
     }
-    for (o, x) in [(0x290, r.surface), (0x304, r.reset_flag), (0x418, r.controller as u32), (0x420, r.class), (0x38, r.index as u32), (0x460, r.slot as u32), (0x1b4, r.stance), (0x44d8, r.trick as u32), (0x46dc, r.filter)] {
+    for (o, x) in [(0x290, r.surface), (0x304, r.reset_flag), (0x418, r.finish as u32), (0x420, r.class), (0x38, r.index as u32), (0x460, r.slot as u32), (0x1b4, r.stance), (0x44d8, r.trick as u32), (0x46dc, r.filter)] {
         v.push((o, x));
     }
     for k in 0..8u32 {
@@ -240,7 +240,7 @@ fn random_rider(g: &mut Rng) -> Rider {
         lean_target: g.pick(&z),
         surface: g.below(3),
         reset_flag: g.below(2),
-        controller: if g.below(4) == 0 { g.below(3) as i32 } else { -1 },
+        finish: if g.below(4) == 0 { g.below(3) as i32 } else { -1 },
         class: g.below(4),
         air: g.pick(&[0.0, 0.35, 0.36, 2.0]),
         index: g.below(4) as i32 - 1,

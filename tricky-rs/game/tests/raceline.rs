@@ -117,7 +117,7 @@ fn random_rider(g: &mut Rng, lines: &RaceLines) -> RaceRider {
         place: RacePlace { line, to_finish, best, cache },
         events_prev: pick(g),
         events: pick(g),
-        ai: if g.chance(3) { (g.next() % 4) as i32 } else { -1 },
+        finish: if g.chance(3) { (g.next() % 4) as i32 } else { -1 },
     }
 }
 
@@ -188,7 +188,7 @@ fn race_line_progress_is_the_originals() {
             m.write_u32(rider + 0x3c4, before.place.cache.index as u32);
             m.write_u32(rider + 0x384, before.events_prev);
             m.write_u32(rider + 0x388, before.events);
-            m.write_u32(rider + 0x418, before.ai as u32);
+            m.write_u32(rider + 0x418, before.finish as u32);
             m.write_u32(b + 0x18, frame as u32);
             log.borrow_mut().clear();
             *flips.borrow_mut() = fl.clone();
@@ -256,7 +256,7 @@ fn app_race_lines_are_the_games() {
         let main = &game.lines[game.main];
         let mut none = |_: &mut RaceRider, _: Event| {};
         let at = |d: f32| main.position_at(d).0;
-        let mut r = tricky_game::raceline::start(&game, 0, at(0.0), [0.0; 4], -1, 0, &mut none);
+        let mut r = tricky_game::raceline::start(&game, 0, at(0.0), [0.0; 4], 0, &mut none);
         let (mut seen, mut d) = (0, 0.0);
         while d < main.length() {
             r.pos = at(d);

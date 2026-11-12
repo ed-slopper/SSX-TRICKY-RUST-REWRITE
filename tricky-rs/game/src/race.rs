@@ -362,14 +362,14 @@ impl AiDriver {
     }
 }
 
-/// Timing a run from the gate to the end of the course's main race line.
+/// Timing a run from the gate to the finish on the course's race lines.
 #[derive(Clone, Copy, PartialEq)]
 pub enum RaceState { Countdown, Running, Finished }
 pub struct Race { pub line: Vec<Vec3>,
     /// the course's AI paths as the game keeps them (`aiglue::paths_of`), for the ported computer riders (row G4e3)
     pub ai_paths: Vec<crate::aipath::Path>, pub idx: usize, pub time: f32, pub state: RaceState, pub best: Option<f32>, pub countdown: f32, pub course: AiCourse,
-    /// the course's race lines, the player's progress along them, and seconds the show-off clock has gained
-    pub lines: tricky_data::course::Lines, pub prog: tricky_data::course::Progress, pub bonus: f32, pub checkpoints: u32,
+    /// seconds the show-off clock has gained (`Boarder_HitCheckpoint`'s additions to the race clock)
+    pub bonus: f32,
     /// the opponents' AI path network
     pub paths: tricky_data::course::AiPaths,
     /// Tokyo Megaplex's lap tube, if the course has one
@@ -381,19 +381,26 @@ pub struct Race { pub line: Vec<Vec3>,
     /// the finish area (scene frame 2), and the post-race scenes: 0 not yet, 1 asked for, 2 playing,
     /// 3 over (results); the scripts and who plays what
     pub finish_area: Option<(Vec3, glam::Quat)>, pub post: u8, pub post_scripts: Vec<String>, pub cast: Option<tricky_data::intro::Cast>,
-    /// the course's race lines as the game keeps them (`aiglue::race_lines_of`), its number (`courses::COURSES`), and
-    /// the player's place on them as the game's rider keeps it (row E1b2g7: rider+0x374.., the event bits +0x388)
-    pub race_lines: Option<crate::aipath::RaceLines>, pub course_no: u32, pub line_rider: Option<crate::raceline::RaceRider>,
-    pub line_clock: f32, pub line_frame: i32 }
+    /// the course's race lines as the game keeps them (`aiglue::race_lines_of`), its number (`courses::COURSES`), the
+    /// game mode (0x32de8c: `courses::Mode`, the app's event) and every rider on them as the game keeps it (row
+    /// E1b2g7: the player first, then the opponents in the order the app gives them)
+    pub race_lines: Option<crate::aipath::RaceLines>, pub course_no: u32, pub mode: u32, pub line_riders: Vec<LineRider>,
+    /// the race clock (gApp+0x730 → +0x1c → +0x14, seconds from GO; it runs on after the player's finish), the
+    /// 60 Hz remainder, the race's tick count (+0x18)
+    pub clock: f32, pub line_clock: f32, pub line_frame: i32,
+    /// what the riders' event bits did this frame, and every music event of the run (`Audio_MusicEvent`)
+    pub hooks: Vec<Hook>, pub music: Vec<u32> }
 impl Race {
     /// The original's countdown: GO after 2.5 s (beeps at 0.5, 1.0, 1.5 and 2.0 s).
     /// A race entered: `Rand_SeedGame` seeds the game stream (`cAI::vf14_111108` 0x1112dc; STANDIN seed, see [`crate::rand::RACE_SEED`]).
-    pub fn new(line: Vec<Vec3>) -> Self { crate::rand::seed_game(crate::rand::RACE_SEED); Self { line, ai_paths: Vec::new(), idx: 0, time: 0.0, state: RaceState::Countdown, best: None, countdown: 2.5, course: AiCourse::default(), lines: Default::default(), prog: Default::default(), bonus: 0.0, checkpoints: 0, paths: Default::default(), tube: None, cml: None, intro: false, scene: None, stage: None, finish_area: None, post: 0, post_scripts: Vec::new(), cast: None, race_lines: None, course_no: 0, line_rider: None, line_clock: 0.0, line_frame: 0 } }
-    pub fn restart(&mut self) { crate::rand::seed_game(crate::rand::RACE_SEED); self.idx = 0; self.time = 0.0; self.state = RaceState::Countdown; self.countdown = 2.5; self.prog = Default::default(); self.bonus = 0.0; self.checkpoints = 0; self.post = 0; self.post_scripts.clear(); self.cast = None; self.line_rider = None; self.line_clock = 0.0; self.line_frame = 0; }
+    pub fn new(line: Vec<Vec3>) -> Self { crate::rand::seed_game(crate::rand::RACE_SEED); Self { line, ai_paths: Vec::new(), idx: 0, time: 0.0, state: RaceState::Countdown, best: None, countdown: 2.5, course: AiCourse::default(), bonus: 0.0, paths: Default::default(), tube: None, cml: None, intro: false, scene: None, stage: None, finish_area: None, post: 0, post_scripts: Vec::new(), cast: None, race_lines: None, course_no: 0, mode: crate::courses::Mode::CircuitRace as u32, line_riders: Vec::new(), clock: 0.0, line_clock: 0.0, line_frame: 0, hooks: Vec::new(), music: Vec::new() } }
+    pub fn restart(&mut self) { crate::rand::seed_game(crate::rand::RACE_SEED); self.idx = 0; self.time = 0.0; self.state = RaceState::Countdown; self.countdown = 2.5; self.bonus = 0.0; self.post = 0; self.post_scripts.clear(); self.cast = None; self.line_riders.clear(); self.clock = 0.0; self.line_clock = 0.0; self.line_frame = 0; self.hooks.clear(); self.music.clear(); }
     /// Metres of racing line still to go from a line point.
     pub fn remaining(&self, idx: usize) -> f32 { self.line.windows(2).skip(idx).map(|w| (w[1] - w[0]).length()).sum() }
     pub fn progress(&self) -> f32 { if self.line.len() < 2 { 0.0 } else { self.idx as f32 / (self.line.len() - 1) as f32 } }
-    pub fn update(&mut self, r: &Rider, dt: f32) {
+    /// A frame of the race: the player `r`, the opponents' positions and velocities (`others`, metres, the app's axes)
+    pub fn update(&mut self, r: &Rider, others: &[(Vec3, Vec3)], dt: f32) {
+        self.hooks.clear();
         if self.line.len() < 4 { return; }
         match self.state {
             RaceState::Countdown => {
@@ -402,7 +409,6 @@ impl Race {
             }
             RaceState::Running => {
                 self.time += dt;
-                self.race_line_ticks(r, dt);
                 // follow our place along the line; look a little ahead only, so a shortcut that
                 // passes near a later part of the course does not count as being there
                 let mut best = (self.idx, f32::MAX);
@@ -411,74 +417,240 @@ impl Race {
                     if d < best.1 { best = (i, d); }
                 }
                 self.idx = best.0;
-                let end = *self.line.last().unwrap();
-                // the finish: the race lines' finish event when the course has one, else the line's end
-                // (or, as a fallback, the end of the racing line the riders follow)
-                let mut crossed = !self.lines.has_laps() && (self.idx + 2 >= self.line.len() || (self.progress() > 0.8 && (end - r.pos).length() < 35.0));
-                for e in self.lines.update(&mut self.prog, r.pos, r.vel) {
-                    if e.kind == tricky_data::course::EV_CHECKPOINT { self.bonus += e.value as f32; self.checkpoints += 1; }
-                    if e.kind == tricky_data::course::EV_FINISH { crossed = true; }
-                }
-                if crossed {
-                    self.state = RaceState::Finished;
-                    self.best = Some(self.best.map_or(self.time, |b| b.min(self.time)));
-                }
             }
             RaceState::Finished => {}
+        }
+        if self.state == RaceState::Countdown { return; }
+        self.clock += dt;
+        self.race_line_ticks(r, others, dt);
+        if self.state != RaceState::Running { return; }
+        // the finish: `Boarder_Finish` from the player's event bits
+        let mut crossed = self.hooks.contains(&Hook::Finish(0));
+        if self.race_lines.is_none() {
+            // STANDIN: a course without race lines (no `.aip`) finishes at the end of the racing line the riders
+            // follow; the game has no such course
+            let end = *self.line.last().unwrap();
+            crossed = self.idx + 2 >= self.line.len() || (self.progress() > 0.8 && (end - r.pos).length() < 35.0);
+            if crossed {
+                self.music.push(10);
+                self.hooks.push(Hook::Music(10));
+            }
+        }
+        if crossed {
+            self.state = RaceState::Finished;
+            self.best = Some(self.best.map_or(self.time, |b| b.min(self.time)));
         }
     }
 }
 
+/// A rider on the race lines: what `Boarder_UpdateRaceLineProgress`, `cBoarder::vf10` and the hooks it calls read
+/// and write of it.
+#[derive(Clone, Copy, Debug)]
+pub struct LineRider {
+    pub line: crate::raceline::RaceRider,
+    /// the place before and now (+0x10c / +0x110; 0 first)
+    pub place_prev: i32,
+    pub place: i32,
+    /// the checkpoints counted in a show-off (+0x20)
+    pub checkpoints: i32,
+    /// where the lap line is (+0x37c) and the race's length (+0x380, `Boarder_GetCourseLength` 0x11ea20)
+    pub lap_line: f32,
+    pub length: f32,
+}
+
+impl LineRider {
+    /// What `progress` reads of it, at the race clock `clock` (seconds): `Boarder_GetRaceTime` 0x11ea28 (the finish
+    /// time once there is one, else the clock × 100, never below 0)
+    pub fn progress(&self, clock: f32) -> crate::progress::Progress {
+        let r = &self.line;
+        let time = if r.finish < 0 { (clock * 100.0) as i32 } else { r.finish };
+        crate::progress::Progress { rank: self.place, laps: r.laps_left, along: r.place.to_finish, line: self.lap_line, finish: r.finish, time: time.max(0) }
+    }
+}
+
+/// What a rider's race-line events did (`cBoarder::vf10`'s calls the app acts on), by the rider's index in
+/// [`Race::line_riders`].
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum Hook {
+    /// `Boarder_Finish` 0x11da40: over the line (its finish time, +0x418, now set)
+    Finish(usize),
+    /// `Scoring_MsgMultiplier` 0x155ca0 on a lap line: the laps left before it (+0x114, one fewer after)
+    Lap(usize, i32),
+    /// what `Boarder_HitCheckpoint` 0x11e6f8 did
+    Checkpoint(usize, crate::boarder_misc::CheckpointCall),
+    /// `Audio_MusicEvent` for the lead or focus rider
+    Music(u32),
+}
+
 impl Race {
-    /// The player's race-line progress, each 60 Hz tick of the race (the game's state 4, after the countdown):
+    /// The riders' race-line progress, each 60 Hz tick of the race (the game's state 4, after the countdown):
     /// `cBoarder::vf7` 0x117198 moves the event bits on (+0x388 to +0x384, cleared) and runs
     /// `Boarder_UpdateRaceLineProgress` 0x118298 ([`crate::raceline::update_progress`]) with the rider's `vf10`
-    /// 0x11a348 ([`crate::control::event_bits`]); the first tick puts the rider on the line
-    /// ([`crate::raceline::start`], the race's start).
-    fn race_line_ticks(&mut self, r: &Rider, dt: f32) {
-        let Some(lines) = &self.race_lines else { return };
-        let pos = [r.pos.x * 100.0, -r.pos.z * 100.0, r.pos.y * 100.0, 1.0];
-        let vel = [r.vel.x * 100.0, -r.vel.z * 100.0, r.vel.y * 100.0, 0.0];
-        let mut vf10 = |lr: &mut crate::raceline::RaceRider, e: crate::raceline::Event| {
-            let mut er = crate::control::EventRider { prev: lr.events_prev, cur: lr.events, mult: lr.laps_left, controller: lr.ai, ..Default::default() };
-            crate::control::event_bits(&mut NoEvents, &mut er, e);
-            lr.laps_left = er.mult;
-        };
+    /// 0x11a348 ([`crate::control::event_bits`]); the first tick puts each rider on the line
+    /// ([`crate::raceline::start`] and [`Race::start_rider`], the race's start).
+    fn race_line_ticks(&mut self, r: &Rider, others: &[(Vec3, Vec3)], dt: f32) {
+        let Some(lines) = self.race_lines.take() else { return };
+        let game = |v: Vec3, w: f32| [v.x * 100.0, -v.z * 100.0, v.y * 100.0, w];
+        let at: Vec<([f32; 4], [f32; 4])> =
+            std::iter::once((r.pos, r.vel)).chain(others.iter().copied()).map(|(p, v)| (game(p, 1.0), game(v, 0.0))).collect();
         self.line_clock += dt;
         while self.line_clock >= 1.0 / 60.0 {
             self.line_clock -= 1.0 / 60.0;
-            match &mut self.line_rider {
-                None => self.line_rider = Some(crate::raceline::start(lines, self.course_no, pos, vel, -1, self.line_frame, &mut vf10)),
-                Some(lr) => {
+            for (k, &(pos, vel)) in at.iter().enumerate() {
+                if k < self.line_riders.len() {
+                    let lr = &mut self.line_riders[k].line;
                     lr.pos = pos;
                     lr.vel = vel;
                     lr.events_prev = lr.events;
                     lr.events = 0;
-                    crate::raceline::update_progress(lines, lr, self.line_frame, &mut vf10);
+                    let mut lr = *lr;
+                    crate::raceline::update_progress(&lines, &mut lr, self.line_frame, &mut |x, e| self.vf10(&lines, k, x, e));
+                    self.line_riders[k].line = lr;
+                } else {
+                    let lr = crate::raceline::start(&lines, self.course_no, pos, vel, self.line_frame, &mut |x, e| self.vf10(&lines, k, x, e));
+                    self.line_riders.push(Self::start_rider(&lines, self.course_no, lr));
                 }
             }
+            self.places(&lines);
             self.line_frame += 1;
+        }
+        self.race_lines = Some(lines);
+    }
+
+    /// The rest of the rider's reset `cBoarder::vf8` 0x116ab8 the race lines give: no place yet (+0x110 = 0,
+    /// +0x10c = −1), no checkpoints (+0x20), the lap line (+0x37c: on Tokyo Megaplex, course 8, the distance to the
+    /// finish of the first race line with a lap event (0xd, `AIPath_FindEvent`) less where that event starts; else 0)
+    /// and the race's length (+0x380: the distance to the finish after the first progress, and on Megaplex three
+    /// lengths of the main line more)
+    fn start_rider(lines: &crate::aipath::RaceLines, course: u32, line: crate::raceline::RaceRider) -> LineRider {
+        let mut lap_line = 0.0;
+        let mut length = line.place.to_finish;
+        if course == 8 {
+            if let Some((k, e)) = lines.lines.iter().enumerate().find_map(|(k, p)| p.events.iter().find(|e| e.0 == 0xd).map(|e| (k, *e))) {
+                lap_line = lines.to_finish[k] - e.2;
+            }
+            length += lines.to_finish[lines.main] * 3.0;
+        }
+        LineRider { line, place_prev: -1, place: 0, checkpoints: 0, lap_line, length }
+    }
+
+    /// STANDIN: the places (+0x110) by `Race_UpdatePlacingsAndRubberBand` 0x115100's key (every 6th tick: racing
+    /// −(race progress + place × 20), finished 0x7fffffff − the finish time; the higher first), which
+    /// `crate::placing::update` ports on the game's bytes and the app runs on the HUD's memory (`gamehud.rs`), not
+    /// on these riders
+    fn places(&mut self, lines: &crate::aipath::RaceLines) {
+        if self.line_frame % 6 != 0 || self.line_riders.len() < 2 {
+            return;
+        }
+        let lap_len = lines.to_finish[lines.main];
+        let key = |r: &LineRider| -> f64 {
+            if r.line.finish >= 0 {
+                (0x7fff_ffff - r.line.finish) as f64
+            } else {
+                -(crate::progress::race_progress(&r.progress(self.clock), lap_len) as f64 + r.place as f64 * 20.0)
+            }
+        };
+        let mut order: Vec<usize> = (0..self.line_riders.len()).collect();
+        order.sort_by(|&a, &b| key(&self.line_riders[b]).total_cmp(&key(&self.line_riders[a])));
+        for (place, k) in order.into_iter().enumerate() {
+            self.line_riders[k].place = place as i32;
+        }
+    }
+
+    /// Rider `k`'s `cBoarder::vf10` 0x11a348 ([`crate::control::event_bits`]) on the race's hooks
+    fn vf10(&mut self, lines: &crate::aipath::RaceLines, k: usize, x: &mut crate::raceline::RaceRider, e: crate::raceline::Event) {
+        let me = self.line_riders.get(k).copied();
+        let mut er = crate::control::EventRider {
+            prev: x.events_prev,
+            cur: x.events,
+            mult: x.laps_left,
+            finish: x.finish,
+            place_prev: me.map_or(-1, |m| m.place_prev),
+            place: me.map_or(0, |m| m.place),
+            slot: k as i32,
+        };
+        let mut env = Hooks { race: self, lines, k, line: *x };
+        crate::control::event_bits(&mut env, &mut er, e);
+        x.laps_left = er.mult;
+        x.finish = er.finish;
+        if let Some(m) = self.line_riders.get_mut(k) {
+            m.place_prev = er.place_prev;
         }
     }
     /// The player's race-line event bits this tick (rider+0x388), 0 outside a race
-    pub fn event_bits(&self) -> u32 { self.line_rider.map_or(0, |r| r.events) }
+    pub fn event_bits(&self) -> u32 { self.line_riders.first().map_or(0, |r| r.line.events) }
+    /// The player on the race lines, once the race has started
+    pub fn line_rider(&self) -> Option<&LineRider> { self.line_riders.first() }
+    /// Rider `k`'s distance to the finish on the race lines (+0x374, in metres), once the race has started
+    pub fn to_finish(&self, k: usize) -> Option<f32> { self.line_riders.get(k).map(|m| m.line.place.to_finish / 100.0) }
+    /// Rider `k`'s laps left (+0x114: 4 at Tokyo Megaplex's start, one fewer at each lap line; 0 on the other
+    /// courses)
+    pub fn laps_left(&self, k: usize) -> u32 {
+        match self.line_riders.get(k) {
+            Some(m) => m.line.laps_left.max(0) as u32,
+            None if self.course_no == 8 => 4,
+            None => 0,
+        }
+    }
 }
 
-/// The game the player's event bits tell, for [`Race::race_line_ticks`].
-/// STANDIN: nothing happens on them but the laps left; the finish, checkpoints, laps, places, music, speech and
-/// event sounds are still the app's own (`tricky_data::course::Lines`, row E1b2g7b)
-struct NoEvents;
-impl crate::control::EventEnv for NoEvents {
+/// The game the riders' event bits tell, for [`Race::vf10`]: rider `k` of the race, as it stands (`line`).
+/// The lessons, speech (`Speech_OnCheckpoint`, the place and local lines), the cheer, the event sounds and
+/// `Boarder_Finish`'s HUD item (`HUD_ShowItem` 7) do nothing here: the app has none of them yet.
+struct Hooks<'a> {
+    race: &'a mut Race,
+    lines: &'a crate::aipath::RaceLines,
+    k: usize,
+    line: crate::raceline::RaceRider,
+}
+impl crate::control::EventEnv for Hooks<'_> {
     fn lesson(&mut self) -> bool { false }
     fn lesson_event(&mut self, _: u32) {}
     fn lesson_end(&mut self) {}
-    fn finish(&mut self, _: &mut crate::control::EventRider) {}
-    fn msg_multiplier(&mut self, _: &mut crate::control::EventRider) {}
+    /// `Boarder_Finish` 0x11da40: the finish time (+0x418) the race clock × 100, once
+    fn finish(&mut self, r: &mut crate::control::EventRider) {
+        if r.finish < 0 {
+            r.finish = (self.race.clock * 100.0) as i32;
+            self.race.hooks.push(Hook::Finish(self.k));
+        }
+    }
+    fn msg_multiplier(&mut self, r: &mut crate::control::EventRider) { self.race.hooks.push(Hook::Lap(self.k, r.mult)); }
     fn on_checkpoint(&mut self, _: &mut crate::control::EventRider) {}
-    fn hit_checkpoint(&mut self, _: &mut crate::control::EventRider, _: u32) {}
+    /// `Boarder_HitCheckpoint` 0x11e6f8 ([`crate::boarder_misc::hit_checkpoint`]); its race-clock addition goes to
+    /// the show-off's bonus
+    fn hit_checkpoint(&mut self, r: &mut crate::control::EventRider, arg: u32) {
+        let race = &mut *self.race;
+        let k = self.k;
+        let mut count = race.line_riders.get(k).map_or(0, |m| m.checkpoints);
+        let others: Vec<i32> = race.line_riders.iter().enumerate().filter(|&(i, _)| i != k).map(|(_, m)| m.checkpoints).collect();
+        let lap_len = self.lines.to_finish[self.lines.main];
+        let mut me = race.line_riders.get(k).copied().map_or_else(Default::default, |m| m.progress(race.clock));
+        me.along = self.line.place.to_finish;
+        me.laps = self.line.laps_left;
+        me.finish = r.finish;
+        let total = race.line_riders.get(k).map_or(0.0, |m| m.length);
+        let all: Vec<crate::progress::Progress> = race.line_riders.iter().map(|m| m.progress(race.clock)).collect();
+        let mut gap = || crate::progress::time_gap(&me, &all, total, lap_len);
+        let mut calls = Vec::new();
+        if let Some(add) = crate::boarder_misc::hit_checkpoint(race.mode, 0 <= r.finish, &mut count, &others, arg as i32, &mut gap, &mut calls) {
+            race.bonus += add;
+        }
+        if let Some(m) = race.line_riders.get_mut(k) {
+            m.checkpoints = count;
+        }
+        race.hooks.extend(calls.into_iter().map(|c| Hook::Checkpoint(k, c)));
+    }
     fn placing(&mut self, _: &mut crate::control::EventRider, _: i32, _: i32) {}
-    fn is_lead(&mut self, _: i32) -> bool { false }
-    fn music_event(&mut self, _: u32) {}
+    /// `Game_IsLeadOrFocusRider` 0x17f1f0 with no camera: the one player's slot (0)
+    fn is_lead(&mut self, slot: i32) -> bool {
+        let place = self.race.line_riders.first().map_or(0, |m| m.place);
+        let c = crate::racemisc::LeadOrFocus { no_camera: true, cam_word: 0, race_count: 0, is_focus: &|_| false, race_id: &|_| -1, slots: &[(place, 0)] };
+        crate::racemisc::is_lead_or_focus_rider(&c, slot)
+    }
+    fn music_event(&mut self, e: u32) {
+        self.race.music.push(e);
+        self.race.hooks.push(Hook::Music(e));
+    }
     fn cheer(&mut self, _: &mut crate::control::EventRider) {}
     fn local_line(&mut self, _: &mut crate::control::EventRider, _: u32) {}
     fn local_line2(&mut self, _: &mut crate::control::EventRider) {}
@@ -487,7 +659,6 @@ impl crate::control::EventEnv for NoEvents {
     fn queue_event_sound(&mut self, _: u32) {}
     fn stop_event_sound(&mut self) {}
 }
-
 /// Third-person camera that trails the rider. Plain data so the self-test can measure it.
 /// One of the original's named chase cameras (COMMONOB.CML), in metres and radians.
 pub struct CamDef { pub name: &'static str, dist: f32, pitch: f32, div_down: f32, div_up: f32, lag: f32, look_up: f32, base_up: f32, pitch_off: f32, pub fov: f32, look_lag: f32, roll_div: f32, roll: bool }
@@ -646,7 +817,7 @@ impl PortAi {
 }
 
 /// Headless check: ride the course on autopilot along the race line and report what happens.
-pub fn self_test(world: &mut CollisionWorld, rails: &Rails, line: &[Vec3], course: &AiCourse, lines: &tricky_data::course::Lines, paths: &tricky_data::course::AiPaths, ai_paths: &[crate::aipath::Path], tube: Option<&crate::props::Tube>, start_yaw: f32, seconds: f32) {
+pub fn self_test(world: &mut CollisionWorld, rails: &Rails, line: &[Vec3], course: &AiCourse, race_lines: Option<&crate::aipath::RaceLines>, course_no: u32, paths: &tricky_data::course::AiPaths, ai_paths: &[crate::aipath::Path], tube: Option<&crate::props::Tube>, start_yaw: f32, seconds: f32) {
     if std::env::var("TRICKY_TRICKTEST").is_ok() {
         let Some(&start) = line.first() else { return };
         let tau = std::f32::consts::TAU;
@@ -796,7 +967,9 @@ pub fn self_test(world: &mut CollisionWorld, rails: &Rails, line: &[Vec3], cours
     let (mut crashes, mut was_down, mut stumbles, mut was_stumble) = (0u32, false, 0u32, false);
     let mut jolts = 0u32;
     let mut last_seen = String::new();
-    let mut prog = tricky_data::course::Progress::default();
+    // the race lines, the player's place on them as the game keeps it (row E1b2g7b)
+    let mut race = Race { race_lines: race_lines.cloned(), course_no, state: RaceState::Running, ..Race::new(line.to_vec()) };
+    let laps = |race: &Race| race.line_rider().map_or(0, |m| m.line.laps_left.max(0) as u32);
     let mut tube_t = 101.0f32;
     let lane: Vec<f32> = std::env::var("TRICKY_LANE").ok().map(|v| v.split(',').filter_map(|x| x.parse().ok()).collect()).unwrap_or_default();
     let mut ai = AiDriver::new(lane.first().copied().unwrap_or(0.0), lane.get(1).copied().unwrap_or(1.0));
@@ -853,7 +1026,7 @@ pub fn self_test(world: &mut CollisionWorld, rails: &Rails, line: &[Vec3], cours
         r.step(world, rails, input, dt);
         if r.apply_pads(world, dt) { ai.reroute(); }
         world.tick_knockables(dt);
-        if let Some(tb) = tube { if tb.apply(&mut r, prog.laps, dt) { ai.reroute(); tube_t = t; println!("  t {t:.1}: up the tube, {} laps to go", prog.laps); } }
+        if let Some(tb) = tube { if tb.apply(&mut r, laps(&race), dt) { ai.reroute(); tube_t = t; println!("  t {t:.1}: up the tube, {} laps to go", laps(&race)); } }
         if std::env::var("TRICKY_TUBE").is_ok() && ((t > tube_t - 2.0 && t < tube_t) || (t - tube_t < 3.0 && t >= tube_t)) && ((t * 10.0) as i32) != (((t - dt) * 10.0) as i32) { println!("    t {t:.1} pos {:.1?} vel {:.1?} grounded {} class {} down {:.1}", r.pos, r.vel, r.grounded, r.tube_class, r.crashed); }
         // a move of more than 3 m in one step: a respawn (counted in `r.respawns`), or not (row E7c3i: the wipe-out's
         // first `Ragdoll_Contacts` pushing a body posed upside down under the snow back out of it, alaska t 110.0; or
@@ -893,9 +1066,16 @@ pub fn self_test(world: &mut CollisionWorld, rails: &Rails, line: &[Vec3], cours
                 t, idx, line.len(), best.1.sqrt(), r.vel.length() * 3.6, if r.grounded { "ground" } else { "air   " }, r.pos.x, r.pos.y, r.pos.z);
             next_log += 10.0;
         }
-        for e in lines.update(&mut prog, r.pos, r.vel) {
-            println!("  t {t:.1}: course event {} (value {}) on line {}, {:.0} m to go", e.kind, e.value, prog.line, prog.dtf);
-            if e.kind == tricky_data::course::EV_FINISH && finished.is_none() { println!("  finish event at t {t:.1}"); }
+        let was = race.event_bits();
+        race.update(&r, &[], dt);
+        if let Some(m) = race.line_rider() {
+            if m.line.events & !was != 0 {
+                println!("  t {t:.1}: race-line events {:#x} on line {}, {:.0} m to go", m.line.events & !was, m.line.place.line, m.line.place.to_finish / 100.0);
+            }
+        }
+        for h in &race.hooks {
+            println!("  t {t:.1}: {h:?}");
+            if *h == Hook::Finish(0) && finished.is_none() { println!("  finish event at t {t:.1}"); }
         }
         if ai.finished.is_some() { finished = Some(t); break; }
         let _ = (&mut stuck_for, &mut last_idx);

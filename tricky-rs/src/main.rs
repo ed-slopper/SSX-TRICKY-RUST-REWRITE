@@ -47,7 +47,8 @@ use collide::CollisionWorld;
 use level::*;
 use props::{Kind, Pickup, Prop};
 use rails::{Rail, Rails};
-use rider::{heading, AiDriver, ChaseCam, Input, Race, RaceState, Rider};
+use rider::{heading, AiDriver, ChaseCam, Hook, Input, Race, RaceState, Rider};
+use tricky_game::score::ScoreCall;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
@@ -96,7 +97,7 @@ struct Props(Vec<Prop>);
 struct PropVisual(usize);
 
 /// Computer-controlled opponents.
-struct Opponent { rider: Rider, driver: AiDriver, character: usize, prog: course::Progress, /// its grudge against the player (made once the characters are known)
+struct Opponent { rider: Rider, driver: AiDriver, character: usize, /// its grudge against the player (made once the characters are known)
     grudge: Option<rivals::Grudge>, taunt_wait: f32,
     /// the ported computer rider driving it on the snow (row G4e3)
     port: rider::PortAi }
@@ -115,7 +116,6 @@ fn make_opponents(start: Vec3, yaw: f32, player_char: usize, n_chars: usize, cou
             rider: { let mut r = Rider::new(start + side * lane * 1.5 + Vec3::Y * 0.5, yaw); r.ai = true; r.slot = i as u32 + 1; r },
             driver: AiDriver::new(lane * 1.5, skill),
             character: (player_char + 1 + i * if n_chars > 6 { 2 } else { 1 }) % n_chars,
-            prog: Default::default(),
             grudge: None, taunt_wait: 1.0, port: Default::default(),
         }
     }).collect())
@@ -155,12 +155,12 @@ fn proper(name: &str) -> String { let mut c = name.chars(); c.next().map(|f| f.t
 /// Everyone in finishing order: (name, time if finished, is the player).
 fn standings(race: &Race, opponents: &[Opponent], lib: &CharLib, me: &str) -> Vec<(String, Option<f32>, bool)> {
     // the original sorts the riders still going by distance to the finish along the race lines
-    let by_lines = !race.lines.is_empty();
-    let mine = if by_lines { -race.prog.dtf } else { race.progress() };
+    let by_lines = race.to_finish(0).is_some();
+    let mine = if by_lines { -race.to_finish(0).unwrap_or(0.0) } else { race.progress() };
     let mut all: Vec<(String, Option<f32>, bool, f32)> = vec![(me.to_string(), (race.state == RaceState::Finished).then_some(race.time), true, mine)];
-    for o in opponents {
+    for (k, o) in opponents.iter().enumerate() {
         let name = lib.chars.get(o.character).map(|c| proper(&c.name)).unwrap_or_else(|| "Rider".into());
-        all.push((name, o.driver.finished, false, if by_lines { -o.prog.dtf } else { o.driver.progress(&race.line) }));
+        all.push((name, o.driver.finished, false, if by_lines { -race.to_finish(k + 1).unwrap_or(f32::MAX) } else { o.driver.progress(&race.line) }));
     }
     all.sort_by(|a, b| match (a.1, b.1) {
         (Some(x), Some(y)) => x.total_cmp(&y),
@@ -204,7 +204,7 @@ struct AnimState { cur: Option<Sample>, cycle: f32, was_on_snow: bool, land: f32
 struct BodyPart { part: usize, board: bool }
 
 /// A level and everything derived from it that the game needs.
-struct Loaded { level: Level, world: CollisionWorld, rails: Rails, line: Vec<Vec3>, start: Vec3, yaw: f32, course: rider::AiCourse, lines: course::Lines, paths: course::AiPaths, tube: Option<props::Tube>, cml: Option<std::sync::Arc<intro::Cml>>, stage: Option<(Vec3, Quat)>, finish_area: Option<(Vec3, Quat)> }
+struct Loaded { level: Level, world: CollisionWorld, rails: Rails, line: Vec<Vec3>, start: Vec3, yaw: f32, course: rider::AiCourse, paths: course::AiPaths, tube: Option<props::Tube>, cml: Option<std::sync::Arc<intro::Cml>>, stage: Option<(Vec3, Quat)>, finish_area: Option<(Vec3, Quat)> }
 
 fn open_level(dir: &Path) -> Result<Loaded, String> {
     // the level from the player's disc (TRICKY_DISC, row E3a4: the course's .pbd, .ssf, .aip and sky as the game
@@ -258,7 +258,6 @@ fn open_level(dir: &Path) -> Result<Loaded, String> {
         level.patches.len(), level.instances.len(), level.world.models.len(), rails.0.len(), world.len());
     let events: Vec<(Vec3, Vec3, i32, i32)> = level.ai_events().into_iter().map(|(a, b, t, v)| (g2b(a), g2b(b), t, v)).collect();
     let course = rider::AiCourse::build(&line, &events);
-    let lines = level.race_lines();
     let paths = level.ai_paths();
     let tube = props::Tube::find(&level);
     println!("level scripts: {} objects switched by event, {} script resets, {} spline riders, {} boost pads, {} teleports, {} pickups, {} doors, {} glass pieces",
@@ -272,7 +271,7 @@ fn open_level(dir: &Path) -> Result<Loaded, String> {
     let cml = from_disc.or_else(|| intro::Cml::load(dir)).map(std::sync::Arc::new);
     let stage = level.instances.iter().find(|i| i.instance_name.starts_with("Mdl_StageArea_Start")).map(|i| (Vec3::from(i.location), level::quat4(i.rotation)));
     let finish_area = level.instances.iter().find(|i| i.instance_name.starts_with("Mdl_StageArea_Finish")).map(|i| (Vec3::from(i.location), level::quat4(i.rotation)));
-    Ok(Loaded { level, world, rails, line, start, yaw, course, lines, paths, tube, cml, stage, finish_area })
+    Ok(Loaded { level, world, rails, line, start, yaw, course, paths, tube, cml, stage, finish_area })
 }
 /// One game tick, 1/60 s: the race clock counts 60 a second (race+0x18; row E1a1).
 const TICK: f32 = 1.0 / 60.0;
@@ -366,7 +365,7 @@ fn main() {
     if std::env::var("TRICKY_GATETEST").is_ok() {
         // line six riders up as a race does and see who gets away
         let mut field = make_opponents(loaded.start, loaded.yaw, 0, 12, 5, 0);
-        field.0.push(Opponent { rider: Rider::new(loaded.start + Vec3::Y * 0.5, loaded.yaw), driver: AiDriver::new(0.0, 0.9), character: 0, prog: Default::default(), grudge: None, taunt_wait: 1.0, port: Default::default() });
+        field.0.push(Opponent { rider: Rider::new(loaded.start + Vec3::Y * 0.5, loaded.yaw), driver: AiDriver::new(0.0, 0.9), character: 0, grudge: None, taunt_wait: 1.0, port: Default::default() });
         println!("start {:.1?} yaw {:.2} line[0] {:.1?} line[1] {:.1?}", loaded.start, loaded.yaw, loaded.line[0], loaded.line[1]);
         let from: Vec<Vec3> = field.0.iter().map(|o| o.rider.pos).collect();
         let (mut t, dt) = (0.0f32, 1.0 / 120.0);
@@ -384,7 +383,8 @@ fn main() {
         return;
     }
     if let Ok(secs) = std::env::var("TRICKY_SIM") {
-        rider::self_test(&mut loaded.world, &loaded.rails, &loaded.line, &loaded.course, &loaded.lines, &loaded.paths, &tricky_game::aiglue::paths_of(&loaded.level.ai), loaded.tube.as_ref(), loaded.yaw, secs.parse().unwrap_or(300.0));
+        let (race_lines, course_no) = race_lines_of(&loaded.level);
+        rider::self_test(&mut loaded.world, &loaded.rails, &loaded.line, &loaded.course, race_lines.as_ref(), course_no, &loaded.paths, &tricky_game::aiglue::paths_of(&loaded.level.ai), loaded.tube.as_ref(), loaded.yaw, secs.parse().unwrap_or(300.0));
         return;
     }
     // TRICKY_CAM=x,y,z,yaw,pitch flies; x,y,z,tx,ty,tz is a fixed camera while the race runs (chase_camera)
@@ -403,7 +403,7 @@ fn main() {
     dirs.sort();
     if dirs.is_empty() { dirs.push(full.clone()); }
     let current = dirs.iter().position(|d| *d == full).unwrap_or(0);
-    let Loaded { level, world, rails, line, start, yaw: start_yaw, course, lines, paths, tube, cml, stage, finish_area } = loaded;
+    let Loaded { level, world, rails, line, start, yaw: start_yaw, course, paths, tube, cml, stage, finish_area } = loaded;
     let ai_paths = tricky_game::aiglue::paths_of(&level.ai);
     let (race_lines, course_no) = race_lines_of(&level);
     // TRICKY_SPAWN=x,y,z,yaw (Bevy metres, radians): start the run there instead (for checks)
@@ -422,7 +422,7 @@ fn main() {
     .insert_resource(RiderRes(Rider::new(start + Vec3::Y * 0.5, start_yaw)))
     .insert_resource(mode)
     .insert_resource(RailsRes(rails))
-    .insert_resource(RaceRes(Race { ai_paths, course, lines, paths, tube, cml, stage, finish_area, race_lines, course_no, ..Race::new(line) }))
+    .insert_resource(RaceRes(Race { ai_paths, course, paths, tube, cml, stage, finish_area, race_lines, course_no, ..Race::new(line) }))
     .insert_resource(LevelList { dirs, current })
     .init_resource::<CamRes>()
     .init_resource::<editor::Editor>()
@@ -1073,7 +1073,7 @@ fn switch_level(
     commands.insert_resource(World(loaded.world));
     commands.insert_resource(RailsRes(loaded.rails));
     let (race_lines, course_no) = race_lines_of(&loaded.level);
-    commands.insert_resource(RaceRes(Race { ai_paths: tricky_game::aiglue::paths_of(&loaded.level.ai), race_lines, course_no, course: loaded.course, lines: loaded.lines, paths: loaded.paths, tube: loaded.tube, cml: loaded.cml, stage: loaded.stage, finish_area: loaded.finish_area, ..Race::new(loaded.line) }));
+    commands.insert_resource(RaceRes(Race { ai_paths: tricky_game::aiglue::paths_of(&loaded.level.ai), race_lines, course_no, course: loaded.course, paths: loaded.paths, tube: loaded.tube, cml: loaded.cml, stage: loaded.stage, finish_area: loaded.finish_area, ..Race::new(loaded.line) }));
     commands.insert_resource(LevelRes(loaded.level));
     let mode = cam.0.mode;
     cam.0 = ChaseCam::default();
@@ -1786,7 +1786,8 @@ fn ride(
         let repick = *skill_clock > 1.0;
         if repick { *skill_clock = 0.0; }
         let player_pos = r.pos;
-        let player_dtf = race.0.prog.dtf;
+        let dtf = |k: usize| race.0.to_finish(k).unwrap_or(f32::MAX);
+        let player_dtf = dtf(0);
         for (slot, o) in opponents.0.iter_mut().enumerate() {
             let to = player_pos - o.rider.pos;
             let dist = Vec3::new(to.x, 0.0, to.z).length() * 100.0;
@@ -1801,7 +1802,7 @@ fn ride(
             let m = m.clamp(0.70005476, 1.5022597);
             let step = 0.008446341 * 60.0 * time.dt.min(0.1);
             o.driver.time_scale += (m - o.driver.time_scale).clamp(-step, step);
-            if repick { o.driver.skill = if player_dtf < o.prog.dtf { pairs.0 } else { pairs.1 }; }
+            if repick { o.driver.skill = if player_dtf < dtf(slot + 1) { pairs.0 } else { pairs.1 }; }
         }
     } else {
         for o in opponents.0.iter_mut() { o.driver.time_scale = 1.0; }
@@ -1890,37 +1891,58 @@ fn ride(
         r.finish_after(dt);
         r.apply_pads(&world.0, dt);
         if held { r.vel = Vec3::new(0.0, r.vel.y.min(0.0), 0.0); }
-        if let Some(t) = &race.0.tube { if t.apply(r, race.0.prog.laps, dt) { if let Some(d) = auto.as_mut() { d.reroute(); } } }
+        if let Some(t) = &race.0.tube { if t.apply(r, race.0.laps_left(0), dt) { if let Some(d) = auto.as_mut() { d.reroute(); } } }
         if waiting { r.vel = Vec3::new(0.0, r.vel.y.min(0.0), 0.0); }
-        let (cp, bonus, laps) = (race.0.checkpoints, race.0.bonus, race.0.prog.laps);
-        race.0.update(r, dt);
-        // a lap line: "3 LAPS TO GO" ... "FINAL LAP" (sent while laps are left)
-        if race.0.prog.laps < laps && race.0.prog.laps > 0 {
-            r.last_trick = if race.0.prog.laps == 1 { "FINAL LAP".into() } else { format!("{} LAPS TO GO", race.0.prog.laps) };
-            r.trick_timer = 2.5;
-        }
-        if race.0.checkpoints > cp && game.event == ui::Event::Race && !opponents.0.is_empty() && !race.0.lines.is_empty() {
-            // the split (Race_SplitGapCs): time behind the leader (or ahead of 2nd when leading),
-            // the distance between you turned into time at your own average pace
-            let len = race.0.lines.lines[0].dtf;
-            let mine = len - race.0.prog.dtf;
-            let mut others: Vec<f32> = opponents.0.iter().map(|o| len - o.prog.dtf).collect();
-            others.sort_by(|a, b| b.total_cmp(a));
-            let other = others[0];
-            let rate = race.0.time / mine.max(1.0);
-            let gap = rate * (other - mine);
-            let ahead = gap <= 0.0;
-            let t = gap.abs();
-            r.last_trick = format!("CHECKPOINT  {}{}:{:05.2}", if ahead { "+" } else { "-" }, (t / 60.0) as u32, t % 60.0);
-            r.trick_timer = 5.0;
-        }
-        if race.0.checkpoints > cp && game.event == ui::Event::ShowOff && race.0.bonus > bonus {
-            // a checkpoint gives the show-off clock more time (the event's value, in seconds)
-            r.last_trick = format!("TIME BONUS  {:.0} seconds", race.0.bonus - bonus);
-            r.trick_timer = 2.5;
+        // the game mode the event bits act on (0x32de8c: `courses::Mode` for the app's event)
+        race.0.mode = match game.event {
+            ui::Event::Race => tricky_game::courses::Mode::CircuitRace,
+            ui::Event::ShowOff => tricky_game::courses::Mode::CircuitShowoff,
+            ui::Event::FreeRide => tricky_game::courses::Mode::Freeride,
+        } as u32;
+        let others: Vec<(Vec3, Vec3)> = opponents.0.iter().map(|o| (o.rider.pos, o.rider.vel)).collect();
+        race.0.update(r, &others, dt);
+        // what the riders' race-line events said into their scores (row E1b2g7b)
+        for h in race.0.hooks.clone() {
+            let (k, msg) = match h {
+                // `Scoring_MsgMultiplier` 0x155ca0 at a lap line, the laps left before it
+                Hook::Lap(k, n) => {
+                    let sc = if k == 0 { &mut r.sc } else if let Some(o) = opponents.0.get_mut(k - 1) { &mut o.rider.sc } else { continue };
+                    (k, sc.msg_multiplier(n).map(|c| (c, n)))
+                }
+                // `Scoring_MsgCheckpointTime` 0x155c60 (`Boarder_HitCheckpoint`'s score call)
+                Hook::Checkpoint(k, tricky_game::boarder_misc::CheckpointCall::Score(v, late)) => {
+                    let (life, kind, value) = tricky_game::grade::checkpoint_time_message(v, late != 0);
+                    (k, Some((ScoreCall::Message(life.to_bits(), kind, value, 0), value)))
+                }
+                _ => continue,
+            };
+            let Some((ScoreCall::Message(life, kind, value, extra), n)) = msg else { continue };
+            let sc = if k == 0 { &mut r.sc } else if let Some(o) = opponents.0.get_mut(k - 1) { &mut o.rider.sc } else { continue };
+            sc.push_message(life, kind, value, extra);
+            if k != 0 { continue; }
+            // STANDIN: our words for the messages (lap, checkpoint split, show-off time bonus), for the HUD's own
+            // drawing of kinds 0xd, 10 and 11 when the game's HUD is off
+            match kind {
+                0xd => {
+                    let left = n - 1;
+                    r.last_trick = if left == 1 { "FINAL LAP".into() } else { format!("{left} LAPS TO GO") };
+                    r.trick_timer = 2.5;
+                }
+                10 => {
+                    // the split (`Boarder_GetTimeGap`, hundredths): time behind the leader, or ahead of second
+                    let ahead = value >= 0;
+                    let t = value.unsigned_abs() as f32 / 100.0;
+                    r.last_trick = format!("CHECKPOINT  {}{}:{:05.2}", if ahead { "+" } else { "-" }, (t / 60.0) as u32, t % 60.0);
+                    r.trick_timer = 5.0;
+                }
+                _ => {
+                    r.last_trick = format!("TIME BONUS  {value} seconds");
+                    r.trick_timer = 2.5;
+                }
+            }
         }
         // places by distance to the finish (the AI's choice of path depends on it)
-        let dtfs: Vec<f32> = std::iter::once(race.0.prog.dtf).chain(opponents.0.iter().map(|o| o.prog.dtf)).collect();
+        let dtfs: Vec<f32> = (0..=opponents.0.len()).map(|k| race.0.to_finish(k).unwrap_or(f32::MAX)).collect();
         let me_idx = rivals::index(lib.chars.get(lib.player).map_or("", |c| c.name.as_str()));
         let opponents_len = opponents.0.len();
         // what the ported computer riders see of the race (row G4e3): every rider's position and velocity in the
@@ -1994,13 +2016,12 @@ fn ride(
             o.rider.finish_after(dt);
             if o.rider.apply_pads(&world.0, dt) { o.driver.reroute(); }
             if held { o.rider.vel = Vec3::new(0.0, o.rider.vel.y.min(0.0), 0.0); }
-            if let Some(t) = &race.0.tube { if t.apply(&mut o.rider, o.prog.laps, dt) { o.driver.reroute(); } }
+            if let Some(t) = &race.0.tube { if t.apply(&mut o.rider, race.0.laps_left(oi + 1), dt) { o.driver.reroute(); } }
             if waiting { o.rider.vel = Vec3::new(0.0, o.rider.vel.y.min(0.0), 0.0); }
-            else if race.0.state == RaceState::Running && o.driver.finished.is_none() {
-                // rivals cross the same finish event the player does
-                let crossed = race.0.lines.update(&mut o.prog, o.rider.pos, o.rider.vel).iter().any(|e| e.kind == course::EV_FINISH);
-                if crossed {
-                    o.driver.finished = Some(race.0.time);
+            else if race.0.state != RaceState::Countdown && o.driver.finished.is_none() {
+                // rivals cross the same finish the player does (`Boarder_Finish` from their own event bits)
+                if race.0.hooks.contains(&Hook::Finish(oi + 1)) {
+                    o.driver.finished = Some(race.0.line_riders[oi + 1].line.finish as f32 / 100.0);
                     let n = opponents_len + 1;
                     o.rider.start_finish(place < n.div_ceil(2));
                 }

@@ -26,8 +26,9 @@ pub struct RaceRider {
     /// the event bits of the last tick (+0x384) and of this one (+0x388)
     pub events_prev: u32,
     pub events: u32,
-    /// the computer rider's slot (+0x418); below 0 for a player, the only riders who change line
-    pub ai: i32,
+    /// the finish time (+0x418: −1 until the line, then the race clock × 100, `Boarder_Finish` 0x11da40); only
+    /// riders still racing change line
+    pub finish: i32,
 }
 
 /// One race-line event as `cBoarder::vf10` gets it: type (bit of rider+0x388) and value.
@@ -71,7 +72,7 @@ pub fn update_progress(lines: &RaceLines, r: &mut RaceRider, frame: i32, vf10: &
     } else {
         events(lines, line, best, best, &mut r.events, &mut list);
     }
-    if r.ai < 0 {
+    if r.finish < 0 {
         let old = r.place.line;
         if 500.0 < off && frame % 60 == 0 {
             select_race_line(lines, r, false);
@@ -184,14 +185,10 @@ pub fn nearest_lines(lines: &[Path], p: V4, n: usize) -> Vec<usize> {
 
 /// A rider put on the race line at the race's start: `cAI::vf14` 0x111108 (each rider's restart point,
 /// `Boarder_SetRestartPoint` 0x118068: the main line, +0x57a0, its projection's memory dropped, +0x3a4 = −1), then
-/// the rider's reset `cBoarder::vf8` 0x116ab8: no event bits (+0x384, +0x388), the distance to the finish the
-/// line's (+0x374), laps left (+0x114) 4 on Tokyo Megaplex (course 8, `DAT_0032de88`) else 0, and one
-/// [`update_progress`] (0x117034's call).
-///
-/// STANDIN: the best (+0x378) starts at the line's distance to the finish; neither of the two writes it (the reset's
-/// `Boarder_PlaceAt` 0x11cae8 only with its last argument set, −1), so the game's start value is the one the rider
-/// held, still to be read (row E1b2g7b).
-pub fn start(lines: &RaceLines, course: u32, pos: V4, vel: V4, ai: i32, frame: i32, vf10: &mut dyn FnMut(&mut RaceRider, Event)) -> RaceRider {
+/// the rider's reset `cBoarder::vf8` 0x116ab8: no event bits (+0x384, +0x388), not finished (+0x418 = −1), the
+/// distance to the finish and its best the line's (+0x374, and +0x378 as +0x10 + 0x368 at 0x116f80), laps left
+/// (+0x114) 4 on Tokyo Megaplex (course 8, `DAT_0032de88`) else 0, and one [`update_progress`] (0x117034's call).
+pub fn start(lines: &RaceLines, course: u32, pos: V4, vel: V4, frame: i32, vf10: &mut dyn FnMut(&mut RaceRider, Event)) -> RaceRider {
     let line = lines.main;
     let to_finish = lines.to_finish[line];
     let mut r = RaceRider {
@@ -201,7 +198,7 @@ pub fn start(lines: &RaceLines, course: u32, pos: V4, vel: V4, ai: i32, frame: i
         place: RacePlace { line, to_finish, best: to_finish, cache: Default::default() },
         events_prev: 0,
         events: 0,
-        ai,
+        finish: -1,
     };
     update_progress(lines, &mut r, frame, vf10);
     r

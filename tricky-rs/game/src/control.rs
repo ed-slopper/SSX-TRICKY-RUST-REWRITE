@@ -40,11 +40,12 @@ pub struct Rider {
     pub lean: f32,
     pub lean_rate: f32,
     pub lean_target: f32,
-    /// the surface (+0x290: 0 off the course), the reset flag (+0x304), the controller (+0x418: below 0 a player),
+    /// the surface (+0x290: 0 off the course), the reset flag (+0x304), the finish time (+0x418: −1 until
+    /// the line, then the race clock × 100, `Boarder_Finish` 0x11da40),
     /// the board class (+0x420), the air time (+0x57f4)
     pub surface: u32,
     pub reset_flag: u32,
-    pub controller: i32,
+    pub finish: i32,
     pub class: u32,
     pub air: f32,
     /// the race index (+0x38), the slot (+0x460), the heading (+0x1b0), the stance (+0x1b4)
@@ -161,7 +162,7 @@ impl Cruise {
     /// `CruiseControl_Update` 0x102fc8
     pub fn update(&mut self, env: &mut dyn ControlEnv, pad: u32, r: &mut Rider) {
         let clip = env.clip(0);
-        if 0 <= r.controller && clip != 0x221 {
+        if 0 <= r.finish && clip != 0x221 {
             env.set_state(r, 6);
             return;
         }
@@ -511,7 +512,7 @@ pub fn fakie_cruise(env: &mut dyn ControlEnv, pad: u32, r: &mut Rider) {
         r.vel = st(scale(ld(r.vel), F(f32::from_bits(0x3f7d70a4))));
     } else if clip == 0x202 {
         let mut s = stick(pad, 0x15);
-        if 0 <= r.controller {
+        if 0 <= r.finish {
             s = 1.0;
         }
         if s.abs() <= 0.5 && 0.0 <= dot(ld(r.board), ld(r.vel)).0 {
@@ -556,10 +557,10 @@ pub fn set_time_scale_rate_limited(v: f32, scale: &mut f32) {
     };
 }
 
-/// `Boarder_IsDoneFinishing` 0x11d9e0: a computer rider in control state 1, or in 6 with its finish line at phase 4
+/// `Boarder_IsDoneFinishing` 0x11d9e0: a rider over the line (+0x418, its finish time, set) in control state 1, or in 6 with its finish line at phase 4
 /// (`FinishLineControl_IsPhase4` 0x1065f0 on the board object's +0x670)
-pub fn is_done_finishing(controller: i32, control: u32, finish_phase: i32) -> bool {
-    if controller < 0 {
+pub fn is_done_finishing(finish: i32, control: u32, finish_phase: i32) -> bool {
+    if finish < 0 {
         return false;
     }
     control == 1 || (control == 6 && finish_phase == 4)
@@ -653,13 +654,13 @@ impl Rumble {
 }
 
 /// What the event bits read of the rider: +0x384 last tick's bits, +0x388 this tick's, +0x114 the multipliers to
-/// give, +0x418 the controller, +0x10c / +0x110 the place before and now, +0x460 the slot
+/// give, +0x418 the finish time (−1 until the line, `Boarder_Finish` 0x11da40), +0x10c / +0x110 the place before and now, +0x460 the slot
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct EventRider {
     pub prev: u32,
     pub cur: u32,
     pub mult: i32,
-    pub controller: i32,
+    pub finish: i32,
     pub place_prev: i32,
     pub place: i32,
     pub slot: i32,
@@ -724,7 +725,7 @@ pub fn event_bits(env: &mut dyn EventEnv, r: &mut EventRider, event: [u32; 2]) {
             env.msg_multiplier(r);
             r.mult -= 1;
         }
-        if e == 0xc && r.controller < 0 {
+        if e == 0xc && r.finish < 0 {
             env.on_checkpoint(r);
             env.hit_checkpoint(r, event[1]);
         }

@@ -291,7 +291,8 @@ pub struct PathMusic {
     shared: Arc<Shared>,
     playing: Option<Entity>,
     run: u32,
-    finished_sent: bool,
+    /// the race's music events already sent
+    music_sent: usize,
     seed: u32,
     loops: HashMap<String, Handle<AudioSource>>,
     /// the air-loop layer: (phrase, next beat index, seconds to the next beat, beats left for Tricky)
@@ -355,7 +356,7 @@ pub fn path_music(
     if want != pm.want || new_run {
         if let Some(e) = pm.playing.take() { commands.entity(e).try_despawn(); }
         pm.engine = None;
-        pm.finished_sent = false;
+        pm.music_sent = race.0.music.len();
         pm.air = None;
     }
     pm.want = want.clone();
@@ -414,13 +415,18 @@ pub fn path_music(
         let e = commands.spawn((AudioPlayer::<PfStream>(h), PlaybackSettings { mode: PlaybackMode::Once, volume: Volume::Linear(0.0), ..default() }, PfPlayer)).id();
         pm.playing = Some(e);
     }
-    // the finish: the outro
-    if st == RaceState::Finished && !pm.finished_sent && !menu {
-        pm.finished_sent = true;
-        match &mut pm.engine {
-            Some((h, d)) => { let mut d = d.lock().unwrap(); h.music_event(&mut d, 10); }
-            None => pm.shared.events.lock().unwrap().push_back(10),
+    // the race's music events (`Audio_MusicEvent` from the lead rider's event bits, row E1b2g7b: 10 the outro at the
+    // finish), each once
+    if !menu {
+        let events = &race.0.music[..];
+        if events.len() < pm.music_sent { pm.music_sent = 0; }
+        for &e in &events[pm.music_sent..] {
+            match &mut pm.engine {
+                Some((h, d)) => { let mut d = d.lock().unwrap(); h.music_event(&mut d, e); }
+                None => pm.shared.events.lock().unwrap().push_back(e as u8),
+            }
         }
+        pm.music_sent = events.len();
     }
     // the game's music system: the path variable (`Music_SetPathVar`), then the frame (the song's volume, the
     // scheduler's ticks, Pathfinder's update)

@@ -182,7 +182,7 @@ fn dispatch_and_fakie_cruise_are_the_original() {
             vel: [g.f(-2000.0, 2000.0), g.f(-2000.0, 2000.0), g.f(-300.0, 300.0), g.pick(&[0.0, 1.0])],
             board: [g.f(-1.0, 1.0), g.f(-1.0, 1.0), g.f(-0.3, 0.3), 0.0],
             control: if g.below(2) == 0 { 5 } else { g.below(0x18) },
-            controller: if g.below(4) == 0 { g.below(3) as i32 } else { -1 },
+            finish: if g.below(4) == 0 { g.below(3) as i32 } else { -1 },
             stance: g.below(2),
             x46d4: g.next(),
             facing: g.f(-4.0, 4.0),
@@ -197,7 +197,7 @@ fn dispatch_and_fakie_cruise_are_the_original() {
                 r.mem.write_f32(rider + 0x180 + 4 * k, rd.board[k as usize]);
             }
             r.mem.write_u32(rider + 0x428, rd.control);
-            r.mem.write_u32(rider + 0x418, rd.controller as u32);
+            r.mem.write_u32(rider + 0x418, rd.finish as u32);
             r.mem.write_u32(rider + 0x1b4, rd.stance);
             r.mem.write_u32(rider + 0x46d4, rd.x46d4);
             r.mem.write_f32(rider + 0x46e0, rd.facing);
@@ -368,7 +368,7 @@ fn event_bits_are_the_original() {
             prev: (g.next() & !bit) | if g.below(2) == 0 { bit } else { 0 },
             cur: (g.next() & !bit) | if g.below(2) == 0 { bit } else { 0 },
             mult: g.below(3) as i32,
-            controller: if g.below(3) == 0 { 0 } else { -1 },
+            finish: if g.below(3) == 0 { 0 } else { -1 },
             place_prev: g.below(6) as i32,
             place: g.below(6) as i32,
             slot: g.below(6) as i32,
@@ -377,7 +377,7 @@ fn event_bits_are_the_original() {
         let mut ours = EvWorld { lesson: g.below(6) == 0, lead: g.below(2) == 0, log: vec![] };
         *w.borrow_mut() = ours.clone();
         r.mem.write_u32(game + 0x34, if ours.lesson { game + 0x80 } else { 0 });
-        for (o, v) in [(0x384u32, rd.prev), (0x388, rd.cur), (0x114, rd.mult as u32), (0x418, rd.controller as u32), (0x10c, rd.place_prev as u32), (0x110, rd.place as u32), (0x460, rd.slot as u32)] {
+        for (o, v) in [(0x384u32, rd.prev), (0x388, rd.cur), (0x114, rd.mult as u32), (0x418, rd.finish as u32), (0x10c, rd.place_prev as u32), (0x110, rd.place as u32), (0x460, rd.slot as u32)] {
             r.mem.write_u32(rider + o, v);
         }
         r.mem.write_u32(ev, e);

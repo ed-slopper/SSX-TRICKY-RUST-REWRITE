@@ -572,10 +572,8 @@ pub fn game_hud(
     }
     let r = &rider.0;
     let race = &race.0;
-    // each rider's race progress as `Boarder_GetRaceProgress` gives it with no lap done: its distance to the finish
-    // (+0x374: the race line's distance less how far along it), from the app's race lines (metres back to cm; 0
-    // before the start, when the app has none)
-    let cm = |d: f32| if d.is_finite() && d < 1.0e7 { d * 100.0 } else { 0.0 };
+    // each rider's distance to the finish (+0x374) and laps left (+0x114) on the race lines as the game keeps them
+    // (`Race::line_riders`, row E1b2g7b; 0 before the start)
     // the finishing times (+0x418: the race time in hundredths at the line, −1 until then)
     let mut finish = [u32::MAX; 4];
     if race.state == tricky_game::race::RaceState::Finished {
@@ -589,11 +587,9 @@ pub fn game_hud(
     let mut progress = [0.0f32; 4];
     let mut along = [0.0f32; 4];
     let mut laps = [0i32; 4];
-    along[0] = cm(race.prog.dtf);
-    laps[0] = race.prog.laps as i32;
-    for (k, o) in opponents.0.iter().take(3).enumerate() {
-        along[k + 1] = cm(o.prog.dtf);
-        laps[k + 1] = o.prog.laps as i32;
+    for (k, m) in race.line_riders.iter().take(1 + opponents.0.len().min(3)).enumerate() {
+        along[k] = m.line.place.to_finish;
+        laps[k] = m.line.laps_left;
     }
     let riding = *mode == Mode::Ride && game.screen == ui::Screen::Playing;
     let GameHud { mem, loc, sheets, tick, mode: built, disc, quads: nq, texts: nt, .. } = &mut *hud;
@@ -652,7 +648,7 @@ pub fn game_hud(
         m.w32(e + 12, t.age.to_bits());
         m.w32(e + 16, t.extra as u32);
     }
-    // `Boarder_GetRaceProgress` (`progress::race_progress`): with laps to go (+0x114, the app's count) their laps of
+    // `Boarder_GetRaceProgress` (`progress::race_progress`): with laps to go (+0x114) their laps of
     // the main path's length on top, the lap line (+0x37c) its length less its lap event's (0xd) distance
     let main = m.r32(PATH_SET + 0x10);
     let lap_len = f32::from_bits(m.r32(main + 0x38));

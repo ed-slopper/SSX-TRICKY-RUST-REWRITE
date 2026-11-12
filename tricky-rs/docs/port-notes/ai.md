@@ -375,7 +375,7 @@ on the ten courses' own lines, 60,000 cases, TRICKY_DISC + TRICKY_ELF):
   (`AIPathSet_GetMainPath` 0x197ef0, its +0x38 × 0.5) behind. Beating the best: the line's events
   (`cEventPath::vf0` 0x1969b0, `cPath::vf0` on line+0x38 − each end) from best to now, then best = now; else the
   events at the best. Their type bits are OR'd into +0x388 (only those that start after or run past the stretch).
-- Players only (+0x418 < 0) change line: off the line by more than 500 on a tick % 60 == 0 (gApp+0x730 → +0x1c →
+- Riders still racing (+0x418 < 0: no finish time yet) change line: off the line by more than 500 on a tick % 60 == 0 (gApp+0x730 → +0x1c →
   +0x18) → `Boarder_SelectRaceLine(0)`; else within 200 of the line's end → `Boarder_SelectRaceLine(1)` (not the
   own line); else a fork marker (type 0x1f) between best and now (`cEventPath::vf1` 0x1969d8: a place below 0 is
   the line's start, or its end for the second) → `Boarder_SelectRaceLine(0)`. A new line clears +0x388 and the
@@ -392,8 +392,8 @@ on the ten courses' own lines, 60,000 cases, TRICKY_DISC + TRICKY_ELF):
 Not covered: a line with no points (the original then leaves the nearest point at whatever the stack held; the
 port gives 0).
 
-In the app (row E1b2g7; `Race::race_line_ticks` in `game/src/race.rs`, the player only, each 60 Hz tick while the
-race runs, the game's state 4): the course's lines are the `.aip`'s own (`aiglue::race_lines_of`: `level::AiFile`
+In the app (row E1b2g7; `Race::race_line_ticks` in `game/src/race.rs`, each 60 Hz tick once the race runs, the
+game's state 4): the course's lines are the `.aip`'s own (`aiglue::race_lines_of`: `level::AiFile`
 now keeps the `.aip` it came from, since its offsets lose the stored directions' lengths, up to 0.1 %; a level
 folder without one is a STANDIN with the first line as main). The first tick is the race's start
 (`raceline::start`):
@@ -403,12 +403,19 @@ folder without one is a STANDIN with the first line as main). The first tick is 
   rider's reset `cBoarder::vf8` 0x116ab8: +0x384 = +0x388 = 0, +0x374 = line+0x38, +0x37c = 0 (on course 8 the
   first path of 0x337fc4 with a lap event: path+0x38 − event start), +0x114 = 4 on course 8 (`DAT_0032de88`) else
   0, then one `Boarder_UpdateRaceLineProgress` (0x117034), then +0x380 = +0x374 (+ main line+0x38 × 3 on course 8).
-- Not known: the best (+0x378) at the start. Only `Boarder_UpdateRaceLineProgress`, `Boarder_FindNearestLine`
-  0x119d30 (a respawn) and `Boarder_PlaceAt` 0x11cae8 with its last argument set (−1, with +0x374 and +0x114 = 0)
-  write it, and vf8 calls `Boarder_PlaceAt` with 0. The port starts it at the line's distance to the finish
-  (STANDIN, row E1b2g7b: read it with PINE at a race's start).
-- The rider's vf10 is `control::event_bits` with nothing behind it but the laps left (STANDIN `NoEvents`): the
-  app's finish, checkpoints, lap messages and standings still come from `tricky_data::course::Lines` (row E1b2g7b).
+- Proven: the best (+0x378) starts at the main line's distance to the finish too: vf8 0x116f80 `swc1 f0,
+  0x368(a0)` with a0 = rider+0x10 and f0 = line+0x38 (row E1b2g7c, read from the code, no PINE needed).
+- Every rider runs it (row E1b2g7b, `Race::line_riders`: the player first, then the opponents), and its vf10 is
+  `control::event_bits` on `race::Hooks`: `Boarder_Finish` sets +0x418 (race clock × 100) and ends the run (the
+  player's) or the opponent's race; `Scoring_MsgMultiplier` and `Boarder_HitCheckpoint`
+  (`boarder_misc::hit_checkpoint` by the game mode, `progress::time_gap` for its split, its clock addition the
+  show-off's `Race::bonus`) push their messages into the rider's score; `Game_IsLeadOrFocusRider` with no camera
+  (the player's slot) lets the player's music events through (`Race::music`, sent once each by
+  `src/pathmusic.rs`). Not done: the lessons, the speech, the cheer, the event sounds and `HUD_ShowItem` 7.
+- STANDIN: the places (+0x110) the hooks read are `Race::places`, `Race_UpdatePlacingsAndRubberBand`'s key on these
+  riders every 6th tick; the HUD runs the ported function on its own memory (`src/gamehud.rs`).
+- Seen in the self-test (TRICKY_SIM, Garibaldi): bit 10 can come on twice at the finish (on, off, on over three
+  ticks), and with it music event 10 twice; that is the ported code's doing, not checked against the game.
 - The snowfall (`src/snow.rs`) eases the weather to 0 while the player's bit 0xe (0x4000) is on. The courses with
   a type 0xe event on some line: Garibaldi and Elysium (none on a main line); the main lines' events are the
   checkpoints (0xc), 0 and the forks (0x1f), plus 0x16 on Untracked (`tests/raceline.rs`
