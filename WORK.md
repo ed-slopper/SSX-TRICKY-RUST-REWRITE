@@ -156,6 +156,7 @@ matches the original.
 
 | ID | Task | Section | Who | Date | Commit |
 |---|---|---|---|---|---|
+| F4b3x4 | The ground test's trial passes (TRICKY_PREHIT) removed: every rider kind they stood in for is replayed; rec14 37,241 (was 37,244), rec16 51,723 (was 51,725), rec15/17/18 unchanged; the 5 ticks lost are tumblers with no recorded body (re-record: F4b3x5) | P0 | irregulur/lynx | 2026-11-11 | 9d6013e |
 | F4b3x2 | Riders getting up (motion 6, `GetUpMotion_Update` 0x1102c8, ours and the runner) and landing (motion 1 to 2: flight step, `Landing_CheckAngles` 0x12ba78, the two slow-downs, ours) in the frame replayed before the collisions; get-up velocities right on every frame with no hit (rec16 762/762, rec17 1,845/1,845), landings rec16 175/205 (the rest 1-2 ulps). Every field fadd=g1 unchanged (rec14 37,244, rec15 37,311, rec16 51,725, rec17 71,257, rec18 54,599); passes off rec16 51,721 → 51,723 (`checking.md` F4b3x2) | P0 | irregulur/lynx | 2026-11-11 | f9014bb |
 | F4b3x3 | The ground test's landing in the runner (`AirMotion_Update` 0x108378 real, `land_runner`) and in ours (`air_motion::update_by`, `landing::check_angles_by`, `math::asin_by`/`atan_by` given the COP1 adder fadd=g1; `Math_Asin`, `Math_Atan`, `Landing_CheckAngles` bit for bit under g1); `cWorldBoarder::cWorldBoarder` 0x257810 / vf10 0x257ca0 stubbed. Landing velocities right: rec14 145/145, rec16 203/203, rec17 321/321, rec18 178/178. Every field fadd=g1 unchanged (`checking.md` F4b3x3) | P0 | irregulur/lynx | 2026-11-11 | 1deb2e2 |
 | E1b2g2 | The game's snow draws (`fxrand::game_init_snow`, chance from `Game_InitVenueTable` 0x257dc0 as `courses::SNOW_CHANCE`) made at level load before the crowd's `Crowd_LoadTexturesRandomize` 0x1458e0 picks (`fxrand::crowd_texture_pick`), in `cGame::Init` 0x17e148's order; `spray.rs` / `particles.rs` generators tagged STANDIN with the game functions they stand for (rest split to E1b2g3, E1b2g4, E1b2g5) | P1 | irregulur/lynx | 2026-11-11 | 36fab48 |
@@ -1543,3 +1544,4 @@ matches the original.
 - 2026-11-11 irregulur/lynx: F4b3x2 done (get-up and landings replayed in the frame); new row F4b3x3.
 - 2026-11-11 irregulur/lynx: F4b3x3 part done (landing in the runner), unclaimed with notes.
 - 2026-11-11 irregulur/lynx: F4b3x3 done (landing ported under the COP1 adder, cWorldBoarder stubbed); new row F4b3x4.
+- 2026-11-11 irregulur/lynx: F4b3x4 done (trial passes removed, no PCSX2 needed); new row F4b3x5 (re-record, needs PCSX2).
