@@ -205,6 +205,13 @@ pub fn wall_bump(vel: &mut V4, orient: &mut Orient, up: V4, wall: &Ray) -> Optio
 
 /// `AirMotion_Update` 0x108378 on `r`, with the surface table `table` (`crate::surface::SURFACE_TABLE`).
 pub fn update(r: &mut AirRider, table: &[[f32; 25]; 20], env: &mut dyn AirEnv) {
+    update_by(r, table, env, |a, b| a + b);
+}
+
+/// `update` with the landing's two slow-down factors' COP1 `add.s` (0x108fb0, 0x109054) made by `fadd`:
+/// PCSX2's adder (`fadd=g1`, board row F4g) is not IEEE's (F4c). Only those: the other COP1 adds here (the pivot's
+/// `Math_SinCos`, the wall bump's `Math_Asin`) stay IEEE.
+pub fn update_by(r: &mut AirRider, table: &[[f32; 25]; 20], env: &mut dyn AirEnv, fadd: impl Fn(f32, f32) -> f32) {
     crate::air::integrate_rk4(r.timescale * k(0x3c88_8889), &mut r.pos, &mut r.vel, false);
     env.predict_tick(r);
     if r.slope_kind != -1 {
@@ -291,13 +298,13 @@ pub fn update(r: &mut AirRider, table: &[[f32; 25]; 20], env: &mut dyn AirEnv) {
             let x = a2.abs();
             let g = if x < lo { lo } else if k(0x3f5f_66f3) < x { k(0x3f5f_66f3) } else { x };
             if lo < g {
-                r.vel = scale(r.vel, g * k(0xbe7b_4efa) + k(0x3f88_395b));
+                r.vel = scale(r.vel, fadd(g * k(0xbe7b_4efa), k(0x3f88_395b)));
             }
             let lo = k(0x3edf_66f3);
             let x = a1.abs();
             let g = if x < lo { lo } else if k(0x3fb2_b8c2) < x { k(0x3fb2_b8c2) } else { x };
             if lo < g {
-                r.vel = scale(r.vel, g * k(0xbe85_4942) + k(0x3f8e_8a0d));
+                r.vel = scale(r.vel, fadd(g * k(0xbe85_4942), k(0x3f8e_8a0d)));
             }
             let before = r.tricks;
             let steep = r.normal[2] < k(0x3f33_3333);

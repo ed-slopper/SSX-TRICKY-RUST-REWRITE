@@ -89,6 +89,33 @@ fn atan_is_the_originals() {
     check("Math_Atan", 0x2510f8, math::atan, &v);
 }
 
+/// `Math_Asin` and `Math_Atan` with PCSX2's COP1 adder (`fadd=g1`, F4g) against `math::asin_by` and `math::atan_by`
+/// given it (F4b3x3)
+#[test]
+fn asin_and_atan_are_the_originals_under_the_cop1_adder() {
+    let Some(mut r) = Runner::from_env() else { return };
+    r.float_rules = Rules::parse("add=n,fadd=g1,mul=n,div=n,cvt=n").unwrap();
+    let g1 = |a, b| r5900::ps2float::add_by(a, b, r5900::ps2float::Round::Guard);
+    let mut g = Rng(0x0a51_0000_0000_0002);
+    let mut v: Vec<f32> = (0..20000).map(|_| g.f(-1.0, 1.0)).collect();
+    v.extend([-1.0, 1.0, 0.0, -0.0, 0.70710677, -0.70710677, 0.7071068, -0.7071068, 0.9999999, -0.9999999]);
+    let mut ieee_off = 0;
+    for &x in &v {
+        let (game, ours) = (one(&mut r, 0x250fd0, x), math::asin_by(x, g1));
+        assert_eq!(game.to_bits(), ours.to_bits(), "Math_Asin({x}) under fadd=g1: game {game} ours {ours}");
+        ieee_off += (math::asin(x) != ours) as u32;
+    }
+    let mut w: Vec<f32> = (0..20000).map(|_| g.f(-50.0, 50.0)).collect();
+    w.extend((0..2000).map(|_| g.f(-2.0, 2.0)));
+    w.extend([-1.0, 1.0, 0.0, -0.0, 1e6, -1e6, 1.0000001, -1.0000001]);
+    for &x in &w {
+        let (game, ours) = (one(&mut r, 0x2510f8, x), math::atan_by(x, g1, |a, b| a / b, |a: f32| a.abs().sqrt()));
+        assert_eq!(game.to_bits(), ours.to_bits(), "Math_Atan({x}) under fadd=g1: game {game} ours {ours}");
+        ieee_off += (math::atan(x) != ours) as u32;
+    }
+    assert!(ieee_off > 0, "the COP1 adder changes some results");
+}
+
 #[test]
 fn angle_diff_and_hermite_are_the_originals() {
     let Some(mut r) = runner() else { return };

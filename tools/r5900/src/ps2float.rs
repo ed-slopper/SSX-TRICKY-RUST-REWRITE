@@ -197,7 +197,9 @@ pub fn add(a: f32, b: f32) -> f32 {
     add_by(a, b, rules().add)
 }
 
-fn add_by(a: f32, b: f32, how: Round) -> f32 {
+/// An add by the rule `how`, whatever the rules set: for ports that take their adder as an argument
+/// (`tricky_game::math::asin_by`, `landing::check_angles_by`, `air_motion::update_by`) run under `fadd=g1`.
+pub fn add_by(a: f32, b: f32, how: Round) -> f32 {
     let (a, b) = (load(a), load(b));
     match how {
         Round::EeAdder => add_ee(a, b),

@@ -1,14 +1,15 @@
 //! Our landing check against the original's, bit for bit (board row E8a1): the game's own `Landing_CheckAngles`
 //! 0x12ba78 run in the function runner on the player's SLUS_203.26 (TRICKY_ELF; skipped without it), with
 //! `Vec4_Scale`, `Math_Asin` and `Math_Atan` run as the original, the clip queries answering what we pick and
-//! `Boarder_SetState` recorded, and `tricky_game::landing::check_angles` on the same rider.
+//! `Boarder_SetState` recorded, and `tricky_game::landing::check_angles` on the same rider. Run twice: every float
+//! rule nearest (`check_angles`), and with PCSX2's COP1 adder (`fadd=g1`, F4g; `check_angles_by` given it, F4b3x3).
 
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use r5900::ps2float::Rules;
+use r5900::ps2float::{add_by, Round, Rules};
 use r5900::Runner;
-use tricky_game::landing::{check_angles, LandingState};
+use tricky_game::landing::{check_angles, check_angles_by, LandingState};
 
 struct Rng(u64);
 impl Rng {
@@ -40,8 +41,17 @@ fn get(r: &mut Runner, at: u32) -> Vec<u32> {
 
 #[test]
 fn landing_check_is_the_originals() {
+    landing_check_under("add=n,mul=n,div=n,cvt=n", |s, n| check_angles(s, n));
+}
+
+#[test]
+fn landing_check_is_the_originals_under_the_cop1_adder() {
+    landing_check_under("add=n,fadd=g1,mul=n,div=n,cvt=n", |s, n| check_angles_by(s, n, |a, b| add_by(a, b, Round::Guard)));
+}
+
+fn landing_check_under(rules: &str, check_angles: impl Fn(&LandingState, [f32; 4]) -> Option<tricky_game::landing::Landing>) {
     let Some(mut r) = Runner::from_env() else { return };
-    r.float_rules = Rules::parse("add=n,mul=n,div=n,cvt=n").unwrap();
+    r.float_rules = Rules::parse(rules).unwrap();
     for f in [0x102f50, 0x250fd0, 0x2510f8] {
         r.allow(f); // Vec4_Scale, Math_Asin, Math_Atan
     }

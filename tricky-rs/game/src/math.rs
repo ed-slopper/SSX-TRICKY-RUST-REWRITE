@@ -24,8 +24,9 @@ fn cos_poly(r2: f32) -> f32 {
     (((r2 * 2.480_158_8e-5 + -0.001_388_888_9) * r2 + 0.041_666_668) * r2 + -0.5) * r2 + 1.0
 }
 
-fn asin_poly(t: f32) -> f32 {
-    t * (A1 + t * (A2 + t * (A3 + t * A4)))
+/// The arcsine polynomial, its `add.s` made by `add`
+fn asin_poly_by(t: f32, add: impl Fn(f32, f32) -> f32) -> f32 {
+    t * add(A1, t * add(A2, t * add(A3, t * A4)))
 }
 
 /// `Math_Sin` 0x250d60
@@ -71,16 +72,22 @@ pub fn sin_cos(x: f32) -> (f32, f32) {
 
 /// `Math_Asin` 0x250fd0 (an argument beyond 1 gives the square root of the absolute value, as the vector unit's does)
 pub fn asin(x: f32) -> f32 {
+    asin_by(x, |a, b| a + b)
+}
+
+/// `Math_Asin` 0x250fd0 with its COP1 `add.s`/`sub.s` made by `add` (`sub.s` as `add` of the negation): PCSX2's
+/// adder (`fadd=g1`, board row F4g) is not IEEE's; `asin` is this with IEEE adds (F4c)
+pub fn asin_by(x: f32, add: impl Fn(f32, f32) -> f32 + Copy) -> f32 {
     if x < -0.707_106_77 {
-        let t = 1.0 - x * x;
-        return t.abs().sqrt() * (asin_poly(t) + 1.0) + -HALF_PI;
+        let t = add(1.0, -(x * x));
+        return add(t.abs().sqrt() * add(asin_poly_by(t, add), 1.0), -HALF_PI);
     }
     let x2 = x * x;
     if x <= 0.707_106_77 {
-        return asin_poly(x2) * x + x;
+        return add(asin_poly_by(x2, add) * x, x);
     }
-    let t = 1.0 - x2;
-    HALF_PI - t.abs().sqrt() * (asin_poly(t) + 1.0)
+    let t = add(1.0, -x2);
+    add(HALF_PI, -(t.abs().sqrt() * add(asin_poly_by(t, add), 1.0)))
 }
 
 /// `Math_Asin` 0x250fd0 as the EE makes it: its `sqrt.s` as `animseq::sqrt` (to nearest since F4b3l), every step a float op
@@ -107,17 +114,22 @@ pub fn atan(x: f32) -> f32 {
 /// `Math_Atan` with its divisions and square roots made by `div` and `sqrt` (the game's, see
 /// `animseq::div` / `animseq::sqrt`: to nearest since F4b3l)
 pub fn atan_with(x: f32, div: impl Fn(f32, f32) -> f32, sqrt: impl Fn(f32) -> f32) -> f32 {
+    atan_by(x, |a, b| a + b, div, sqrt)
+}
+
+/// `Math_Atan` 0x2510f8 with its COP1 `add.s`/`sub.s` made by `add` too (see `asin_by`)
+pub fn atan_by(x: f32, add: impl Fn(f32, f32) -> f32 + Copy, div: impl Fn(f32, f32) -> f32, sqrt: impl Fn(f32) -> f32) -> f32 {
     if x < -1.0 {
-        let t = div(1.0, x * x + 1.0);
-        return sqrt(t) * (asin_poly(t) + 1.0) + -HALF_PI;
+        let t = div(1.0, add(x * x, 1.0));
+        return add(sqrt(t) * add(asin_poly_by(t, add), 1.0), -HALF_PI);
     }
     let x2 = x * x;
     if 1.0 < x {
-        let t = div(1.0, x2 + 1.0);
-        return HALF_PI - sqrt(t) * (asin_poly(t) + 1.0);
+        let t = div(1.0, add(x2, 1.0));
+        return add(HALF_PI, -(sqrt(t) * add(asin_poly_by(t, add), 1.0)));
     }
-    let t = div(x2, x2 + 1.0);
-    let v = sqrt(t) * (asin_poly(t) + 1.0);
+    let t = div(x2, add(x2, 1.0));
+    let v = sqrt(t) * add(asin_poly_by(t, add), 1.0);
     if x < 0.0 {
         -v
     } else {

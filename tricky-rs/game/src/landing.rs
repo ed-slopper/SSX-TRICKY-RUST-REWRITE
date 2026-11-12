@@ -68,6 +68,12 @@ pub struct Landing {
 /// anything: a grab, tweak or uber clip not yet at its safe point, or surface 0, 6 or 10. Otherwise the rider goes
 /// to state 1 (`Boarder_SetState`) and the board is laid on the surface.
 pub fn check_angles(s: &LandingState, n: V4) -> Option<Landing> {
+    check_angles_by(s, n, |a, b| a + b)
+}
+
+/// `Landing_CheckAngles` 0x12ba78 with its COP1 `add.s`/`sub.s` (its own and `Math_Asin`'s, `Math_Atan`'s) made by
+/// `add`: PCSX2's adder (`fadd=g1`, board row F4g) is not IEEE's; `check_angles` is this with IEEE adds (F4c)
+pub fn check_angles_by(s: &LandingState, n: V4, add: impl Fn(f32, f32) -> f32 + Copy) -> Option<Landing> {
     if matches!(s.clip_type, 0xe..=0x10) && !s.clip_flag4 {
         return None;
     }
@@ -80,7 +86,7 @@ pub fn check_angles(s: &LandingState, n: V4) -> Option<Landing> {
     let travel = normalize(sub(vn, scale(s.up, dot(vn, s.up))));
     let c = dot(s.board, travel);
     let c = c.clamp(-0.999_999_9, 0.999_999_9);
-    let pitch = 1.570_796_4 - math::asin(c);
+    let pitch = add(1.570_796_4, -math::asin_by(c, add));
     let y = dot(s.up, n);
     let x = dot(s.board, n);
     let a = if y == 0.0 {
@@ -90,16 +96,16 @@ pub fn check_angles(s: &LandingState, n: V4) -> Option<Landing> {
             x
         }
     } else {
-        let t = math::atan(x / y);
+        let t = math::atan_by(x / y, add, |a, b| a / b, |a: f32| a.abs().sqrt());
         if y < 0.0 {
-            if 0.0 < x { t + std::f32::consts::PI } else { t - std::f32::consts::PI }
+            if 0.0 < x { add(t, std::f32::consts::PI) } else { add(t, -std::f32::consts::PI) }
         } else {
             t
         }
     };
     let roll = -a;
     let r = if 1.570_796_4 < pitch.abs() { a } else { -a };
-    let r = r * (s.stability as f32 * -1.037_406_1 * 0.003_921_569 + 2.040_804);
+    let r = r * add(s.stability as f32 * -1.037_406_1 * 0.003_921_569, 2.040_804);
     let ok = (-2.967_825..=2.684_087_8).contains(&r);
     Some(Landing { forward, side, pitch, roll, ok })
 }
