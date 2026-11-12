@@ -207,7 +207,8 @@ fn step(r: &mut Runner, pc: u32) -> Result<Next, Error> {
         5 | 21 => branch(c.gpr(rs) != c.gpr(rt), op == 21), // bne, bnel
         6 | 22 => branch(c.gpr(rs) as i64 <= 0, op == 22),  // blez, blezl
         7 | 23 => branch(c.gpr(rs) as i64 > 0, op == 23),   // bgtz, bgtzl
-        9 => {
+        8 | 9 => {
+            // addi traps on overflow; the game's (counters) never do
             c.set_gpr(rt, sext32((c.gpr(rs) as u32).wrapping_add(sext16(imm) as u32))); // addiu
             Ok(Next::Seq)
         }
@@ -397,6 +398,20 @@ fn cop1(r: &mut Runner, _pc: u32, w: u32, rs: usize, rt: usize, rd: usize, fd: u
                 5 => a.abs(),
                 6 => a,
                 7 => -a,
+                24..=26 | 30 | 31 => {
+                    c.facc = match fun {
+                        24 => pf::fadd(a, b),                  // adda.s
+                        25 => pf::fsub(a, b),                  // suba.s
+                        26 => pf::mul(a, b),                   // mula.s
+                        30 => pf::fadd(c.facc, pf::mul(a, b)), // madda.s
+                        _ => pf::fsub(c.facc, pf::mul(a, b)),  // msuba.s
+                    };
+                    return Ok(Next::Seq);
+                }
+                28 => pf::fadd(c.facc, pf::mul(a, b)), // madd.s
+                29 => pf::fsub(c.facc, pf::mul(a, b)), // msub.s
+                40 => vu_max(a, b),                    // max.s
+                41 => vu_min(a, b),                    // min.s
                 36 => {
                     c.fpr[fd] = pf::to_int(a) as u32; // cvt.w.s
                     return Ok(Next::Seq);

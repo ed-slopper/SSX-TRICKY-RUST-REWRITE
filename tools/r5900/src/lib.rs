@@ -165,6 +165,8 @@ pub struct Cpu {
     pub fpr: [u32; 32],
     /// FPU condition flag (FCR31 C).
     pub fcc: bool,
+    /// FPU accumulator (`adda.s`, `madd.s`, `madda.s` ...)
+    pub facc: f32,
     /// VU0 float registers, [x, y, z, w]; VF0 always reads (0, 0, 0, 1).
     pub vf: [[f32; 4]; 32],
     pub vi: [u16; 16],
@@ -188,7 +190,7 @@ impl Cpu {
     fn new() -> Cpu {
         let mut vf = [[0.0; 4]; 32];
         vf[0] = [0.0, 0.0, 0.0, 1.0];
-        Cpu { gpr: [0; 32], hi: 0, lo: 0, fpr: [0; 32], fcc: false, vf, vi: [0; 16], acc: [0.0; 4], q: 0.0, i: 0.0, r: 0x3f80_0000, mac: 0, clip: 0, cmsar0: 0, pc: 0 }
+        Cpu { gpr: [0; 32], hi: 0, lo: 0, fpr: [0; 32], fcc: false, facc: 0.0, vf, vi: [0; 16], acc: [0.0; 4], q: 0.0, i: 0.0, r: 0x3f80_0000, mac: 0, clip: 0, cmsar0: 0, pc: 0 }
     }
 
     pub fn gpr(&self, r: usize) -> u64 {
