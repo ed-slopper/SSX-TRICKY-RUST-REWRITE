@@ -363,3 +363,31 @@ Part of the port notes (index: [README.md](README.md)); units and wording as des
 - `AIComputer_DirNoseComponent` 0x1371e0 (was `FUN_001371e0` in `game/src/aipad.rs`): the target direction
   (rider+0x57e0) less its part along the frame's +0x4aa0 axis, normalised, dotted with the nose (+0x4ab0), times the
   skill (+0x86c) / 7.8941293; the computer's air-trick input bits 22..23 come from it.
+
+## The rider's progress on the race line (board row E1b2g7a; `tricky_game::raceline`, checked: `tests/raceline.rs`)
+
+Proven (disassembly of 0x118298, 0x118610, 0x198110, 0x1969b0, 0x1969d8; all checked bit for bit in the runner
+on the ten courses' own lines, 60,000 cases, TRICKY_DISC + TRICKY_ELF):
+
+- `Boarder_UpdateRaceLineProgress` 0x118298 (from `cBoarder::vf7` in game mode 4): projects the rider (+0x140)
+  onto its line (+0x57a0) with `AIP_ProjectOntoPathFrom` (memory +0x3b0) → +0x374 = line+0x38 − along. With laps
+  left (+0x114 > 0) the best (+0x378) is reset to it when it is more than half the main line
+  (`AIPathSet_GetMainPath` 0x197ef0, its +0x38 × 0.5) behind. Beating the best: the line's events
+  (`cEventPath::vf0` 0x1969b0, `cPath::vf0` on line+0x38 − each end) from best to now, then best = now; else the
+  events at the best. Their type bits are OR'd into +0x388 (only those that start after or run past the stretch).
+- Players only (+0x418 < 0) change line: off the line by more than 500 on a tick % 60 == 0 (gApp+0x730 → +0x1c →
+  +0x18) → `Boarder_SelectRaceLine(0)`; else within 200 of the line's end → `Boarder_SelectRaceLine(1)` (not the
+  own line); else a fork marker (type 0x1f) between best and now (`cEventPath::vf1` 0x1969d8: a place below 0 is
+  the line's start, or its end for the second) → `Boarder_SelectRaceLine(0)`. A new line clears +0x388 and the
+  projection's memory (+0x3c4 = −1), projects again, and if nearer the finish than the best takes its events from
+  the best on the new line and sets the best.
+- Every event is passed to `cBoarder::vf10` (vtable +0x5c), then each bit of +0x384 (re-read after each call)
+  that no event of the tick carried gets a `vf10` call with {bit, 0}.
+- `Boarder_SelectRaceLine` 0x118610: P = pos + 800 × the velocity's VU unit (four lanes; 0 stays 0). Of the lines
+  `AIP_FindNearestLines` 0x198110 gives for P (3; as `AIP_SortLinesByDistance` on the race lines, without the
+  respawnable filter), the one with the least |pos − nearest point to P|² + |P − point 800 on|² (both four
+  lanes, VU order); strict, so the first on a tie, the own line kept when none is under 1e37. The own line's
+  memory is dropped when |(line+0x38 − +0x374) − along| > 1600.
+
+Not covered: a line with no points (the original then leaves the nearest point at whatever the stack held; the
+port gives 0). The app does not run it yet (row G1i).

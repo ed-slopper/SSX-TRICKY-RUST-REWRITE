@@ -119,6 +119,7 @@ pub mod ragdoll;
 pub mod prerace;
 pub mod props;
 pub mod race;
+pub mod raceline;
 pub mod raceoverlays;
 pub mod rand;
 pub mod ground;

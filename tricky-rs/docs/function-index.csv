@@ -252,8 +252,8 @@ address,size,name,system,status
 0x117ec0,424,Boarder_LoadSnapshot,boarder,checked
 0x118068,36,Boarder_SetRestartPoint,boarder,ported
 0x118090,516,Boarder_UpdatePathAhead,boarder,ported
-0x118298,888,Boarder_UpdateRaceLineProgress,boarder,ported
-0x118610,544,Boarder_SelectRaceLine,boarder,ported
+0x118298,888,Boarder_UpdateRaceLineProgress,boarder,checked
+0x118610,544,Boarder_SelectRaceLine,boarder,checked
 0x118830,980,Boarder_ChoosePathAhead,boarder,ported
 0x118c08,776,Boarder_AdvanceOnPath,boarder,ported
 0x118f10,772,Boarder_RequestReset,boarder,ported
@@ -2275,8 +2275,8 @@ address,size,name,system,status
 0x196940,80,cAIPath::__tf,runtime,host
 0x196990,8,cEventPath::vf2_196990,ai,not started
 0x196998,24,cEventPath::vf3_196998,ai,not started
-0x1969b0,36,cEventPath::vf0_1969b0,ai,not started
-0x1969d8,128,cEventPath::vf1_1969d8,ai,not started
+0x1969b0,36,cEventPath::vf0_1969b0,ai,checked
+0x1969d8,128,cEventPath::vf1_1969d8,ai,checked
 0x196ac8,80,cEventPath::__tf,runtime,host
 0x196f28,516,AIPath_Load,ai,ported
 0x197130,60,AIPath_LoadPoint,ai,not started
@@ -2296,11 +2296,11 @@ address,size,name,system,status
 0x197d70,44,Vec4_ScaleCopy22,common,not started
 0x197da0,236,AIP_LoadPathsFromFile,files,ported
 0x197e90,96,AIPath_Free,ai,not started
-0x197ef0,8,AIPathSet_GetMainPath,ai,ported
+0x197ef0,8,AIPathSet_GetMainPath,ai,checked
 0x197ef8,16,AIPathSet_GetPath,ai,not started
 0x197f08,28,AIPathSet_SortByDistance,ai,not started
 0x197f28,484,AIP_SortLinesByDistance,ai,ported
-0x198110,448,AIP_FindNearestLines,ai,not started
+0x198110,448,AIP_FindNearestLines,ai,checked
 0x1982d0,256,AIPathSet_FindRaceLineAt,ai,ported
 0x1983d0,324,AIP_LoadEventPaths,files,ported
 0x198518,364,AIP_LoadAIPaths,files,ported
