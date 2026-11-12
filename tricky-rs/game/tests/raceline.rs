@@ -242,3 +242,32 @@ fn race_line_progress_is_the_originals() {
     eprintln!("changed line / events / vf10 calls / direct: {seen:?}");
     assert!(seen[0] > 500 && seen[1] > 100 && seen[2] > 1000, "{seen:?}");
 }
+
+/// Row E1b2g7: the app's race lines (`aiglue::race_lines_of`, from the level's form of the `.aip`) are the game's
+/// (`RaceLines::from_aip`), and a rider started at the main line's start (`raceline::start`) and moved down it gets
+/// its events' bits.
+#[test]
+fn app_race_lines_are_the_games() {
+    for (c, bytes) in courses() {
+        let aip = tricky_data::aip::read(&bytes).unwrap();
+        let game = RaceLines::from_aip(&aip);
+        let app = tricky_game::aiglue::race_lines_of(&tricky_data::level::AiFile::from_aip(&aip)).expect(c);
+        assert_eq!(app, game, "{c}");
+        let main = &game.lines[game.main];
+        let mut none = |_: &mut RaceRider, _: Event| {};
+        let at = |d: f32| main.position_at(d).0;
+        let mut r = tricky_game::raceline::start(&game, 0, at(0.0), [0.0; 4], -1, 0, &mut none);
+        let (mut seen, mut d) = (0, 0.0);
+        while d < main.length() {
+            r.pos = at(d);
+            r.events_prev = r.events;
+            r.events = 0;
+            update_progress(&game, &mut r, 0, &mut none);
+            seen |= r.events;
+            d += 150.0;
+        }
+        let want = main.events.iter().fold(0u32, |m, e| m | 1 << (e.0 & 31));
+        let all = game.lines.iter().flat_map(|l| &l.events).fold(0u32, |m, e| m | 1 << (e.0 & 31));
+        println!("{c}: event bits down the main line {seen:#x}, its events' {want:#x}, all lines' {all:#x}");
+    }
+}

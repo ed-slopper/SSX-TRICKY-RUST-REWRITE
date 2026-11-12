@@ -179,7 +179,10 @@ struct SplineFile { splines: Vec<Spline> }
 pub struct RaceLine { pub path_pos: [f32; 3], pub path_points: Vec<[f32; 3]>, #[serde(default)] pub distance_to_finish: f32, #[serde(default)] pub path_events: Vec<PathEvent> }
 #[derive(Deserialize, Default)]
 #[serde(rename_all = "PascalCase")]
-pub struct AiFile { #[serde(default)] pub race_lines: Vec<RaceLine>, #[serde(default, rename = "AIPaths")] pub ai_paths: Vec<AiPath> }
+pub struct AiFile { #[serde(default)] pub race_lines: Vec<RaceLine>, #[serde(default, rename = "AIPaths")] pub ai_paths: Vec<AiPath>,
+    /// the `.aip` itself when the paths came from one (the folder form has none): its race lines as the game keeps
+    /// them (the offsets above lose the stored directions' own lengths) and its main line
+    #[serde(skip)] pub aip: Option<crate::aip::Aip> }
 #[derive(Deserialize)]
 #[serde(rename_all = "PascalCase")]
 pub struct AiPath { pub path_pos: [f32; 3], pub path_points: Vec<[f32; 3]>, #[serde(default)] pub path_events: Vec<PathEvent>, #[serde(default = "fifty", rename = "U3")] pub u3: f32, #[serde(default = "yes")] pub respawnable: bool }
@@ -195,6 +198,7 @@ impl AiFile {
         AiFile {
             race_lines: a.event_paths.iter().map(|p| RaceLine { path_pos: p.start, path_points: pts(p), distance_to_finish: p.param(0).map_or(0.0, f32::from_bits), path_events: evs(p) }).collect(),
             ai_paths: a.ai_paths.iter().map(|p| AiPath { path_pos: p.start, path_points: pts(p), path_events: evs(p), u3: p.u3() as f32, respawnable: p.respawnable() != 0 }).collect(),
+            aip: Some(a.clone()),
         }
     }
 }

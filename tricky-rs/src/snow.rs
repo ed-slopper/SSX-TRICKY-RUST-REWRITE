@@ -156,7 +156,7 @@ pub fn setup_snow(mut commands: Commands, mut meshes: ResMut<Assets<Mesh>>, mut 
 #[allow(clippy::too_many_arguments)]
 pub fn snow(time: Res<SmoothDt>, game: Res<ui::Game>, snow: Option<ResMut<Snow>>, cam: Query<(&Camera, &GlobalTransform), With<Camera3d>>,
     mut holder: Query<(&mut Transform, &Mesh3d, &MeshMaterial3d<StandardMaterial>), With<SnowMesh>>, mut meshes: ResMut<Assets<Mesh>>,
-    mut materials: ResMut<Assets<StandardMaterial>>, mut images: ResMut<Assets<Image>>, lib: Res<CharLib>, mut loaded: Local<bool>) {
+    mut materials: ResMut<Assets<StandardMaterial>>, mut images: ResMut<Assets<Image>>, lib: Res<CharLib>, race: Option<Res<crate::RaceRes>>, mut loaded: Local<bool>) {
     let (Some(mut s), Ok((camera, gt)), Ok((mut tf, mesh, mat))) = (snow, cam.single(), holder.single_mut()) else { return };
     if !*loaded {
         *loaded = true;
@@ -188,9 +188,10 @@ pub fn snow(time: Res<SmoothDt>, game: Res<ui::Game>, snow: Option<ResMut<Snow>>
         while s.tick >= 1.0 / 60.0 {
             s.tick -= 1.0 / 60.0;
             snowfall::step(&mut s.m, MGR);
-            // the camera's rider's tick (`cBoarder::vf7` 0x117198) eases its weather toward the density
-            // STANDIN: the app keeps no rider event bits (rider+0x388), so event 0xe is never on
-            s.weather = snowfall::rider_weather(s.weather, s.density, false);
+            // the camera's rider's tick (`cBoarder::vf7` 0x117198) eases its weather toward the density, toward 0
+            // while it is in a race-line event 0xe (rider+0x388 bit 14, `Race::event_bits`)
+            let e = race.as_ref().is_some_and(|r| r.0.event_bits() & 0x4000 != 0);
+            s.weather = snowfall::rider_weather(s.weather, s.density, e);
             wf(&mut s.m, RIDER + 0x18, s.weather.0);
         }
     }

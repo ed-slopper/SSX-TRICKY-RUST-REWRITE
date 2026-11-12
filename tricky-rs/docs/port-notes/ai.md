@@ -390,4 +390,26 @@ on the ten courses' own lines, 60,000 cases, TRICKY_DISC + TRICKY_ELF):
   memory is dropped when |(line+0x38 − +0x374) − along| > 1600.
 
 Not covered: a line with no points (the original then leaves the nearest point at whatever the stack held; the
-port gives 0). The app does not run it yet (row G1i).
+port gives 0).
+
+In the app (row E1b2g7; `Race::race_line_ticks` in `game/src/race.rs`, the player only, each 60 Hz tick while the
+race runs, the game's state 4): the course's lines are the `.aip`'s own (`aiglue::race_lines_of`: `level::AiFile`
+now keeps the `.aip` it came from, since its offsets lose the stored directions' lengths, up to 0.1 %; a level
+folder without one is a STANDIN with the first line as main). The first tick is the race's start
+(`raceline::start`):
+
+- Proven: `cAI::vf14` 0x111108 puts every rider on the main line (`Boarder_SetRestartPoint` 0x118068(rider, main
+  line, the rider's AI path): +0x57a0, +0x57a4, +0x3a4 = +0x3c4 = −1, +0x340/+0x344/+0x348 = 0), then calls the
+  rider's reset `cBoarder::vf8` 0x116ab8: +0x384 = +0x388 = 0, +0x374 = line+0x38, +0x37c = 0 (on course 8 the
+  first path of 0x337fc4 with a lap event: path+0x38 − event start), +0x114 = 4 on course 8 (`DAT_0032de88`) else
+  0, then one `Boarder_UpdateRaceLineProgress` (0x117034), then +0x380 = +0x374 (+ main line+0x38 × 3 on course 8).
+- Not known: the best (+0x378) at the start. Only `Boarder_UpdateRaceLineProgress`, `Boarder_FindNearestLine`
+  0x119d30 (a respawn) and `Boarder_PlaceAt` 0x11cae8 with its last argument set (−1, with +0x374 and +0x114 = 0)
+  write it, and vf8 calls `Boarder_PlaceAt` with 0. The port starts it at the line's distance to the finish
+  (STANDIN, row E1b2g7b: read it with PINE at a race's start).
+- The rider's vf10 is `control::event_bits` with nothing behind it but the laps left (STANDIN `NoEvents`): the
+  app's finish, checkpoints, lap messages and standings still come from `tricky_data::course::Lines` (row E1b2g7b).
+- The snowfall (`src/snow.rs`) eases the weather to 0 while the player's bit 0xe (0x4000) is on. The courses with
+  a type 0xe event on some line: Garibaldi and Elysium (none on a main line); the main lines' events are the
+  checkpoints (0xc), 0 and the forks (0x1f), plus 0x16 on Untracked (`tests/raceline.rs`
+  `app_race_lines_are_the_games`).

@@ -380,12 +380,16 @@ pub struct Race { pub line: Vec<Vec3>,
     pub scene: Option<tricky_data::intro::SceneState>, pub stage: Option<(Vec3, glam::Quat)>,
     /// the finish area (scene frame 2), and the post-race scenes: 0 not yet, 1 asked for, 2 playing,
     /// 3 over (results); the scripts and who plays what
-    pub finish_area: Option<(Vec3, glam::Quat)>, pub post: u8, pub post_scripts: Vec<String>, pub cast: Option<tricky_data::intro::Cast> }
+    pub finish_area: Option<(Vec3, glam::Quat)>, pub post: u8, pub post_scripts: Vec<String>, pub cast: Option<tricky_data::intro::Cast>,
+    /// the course's race lines as the game keeps them (`aiglue::race_lines_of`), its number (`courses::COURSES`), and
+    /// the player's place on them as the game's rider keeps it (row E1b2g7: rider+0x374.., the event bits +0x388)
+    pub race_lines: Option<crate::aipath::RaceLines>, pub course_no: u32, pub line_rider: Option<crate::raceline::RaceRider>,
+    pub line_clock: f32, pub line_frame: i32 }
 impl Race {
     /// The original's countdown: GO after 2.5 s (beeps at 0.5, 1.0, 1.5 and 2.0 s).
     /// A race entered: `Rand_SeedGame` seeds the game stream (`cAI::vf14_111108` 0x1112dc; STANDIN seed, see [`crate::rand::RACE_SEED`]).
-    pub fn new(line: Vec<Vec3>) -> Self { crate::rand::seed_game(crate::rand::RACE_SEED); Self { line, ai_paths: Vec::new(), idx: 0, time: 0.0, state: RaceState::Countdown, best: None, countdown: 2.5, course: AiCourse::default(), lines: Default::default(), prog: Default::default(), bonus: 0.0, checkpoints: 0, paths: Default::default(), tube: None, cml: None, intro: false, scene: None, stage: None, finish_area: None, post: 0, post_scripts: Vec::new(), cast: None } }
-    pub fn restart(&mut self) { crate::rand::seed_game(crate::rand::RACE_SEED); self.idx = 0; self.time = 0.0; self.state = RaceState::Countdown; self.countdown = 2.5; self.prog = Default::default(); self.bonus = 0.0; self.checkpoints = 0; self.post = 0; self.post_scripts.clear(); self.cast = None; }
+    pub fn new(line: Vec<Vec3>) -> Self { crate::rand::seed_game(crate::rand::RACE_SEED); Self { line, ai_paths: Vec::new(), idx: 0, time: 0.0, state: RaceState::Countdown, best: None, countdown: 2.5, course: AiCourse::default(), lines: Default::default(), prog: Default::default(), bonus: 0.0, checkpoints: 0, paths: Default::default(), tube: None, cml: None, intro: false, scene: None, stage: None, finish_area: None, post: 0, post_scripts: Vec::new(), cast: None, race_lines: None, course_no: 0, line_rider: None, line_clock: 0.0, line_frame: 0 } }
+    pub fn restart(&mut self) { crate::rand::seed_game(crate::rand::RACE_SEED); self.idx = 0; self.time = 0.0; self.state = RaceState::Countdown; self.countdown = 2.5; self.prog = Default::default(); self.bonus = 0.0; self.checkpoints = 0; self.post = 0; self.post_scripts.clear(); self.cast = None; self.line_rider = None; self.line_clock = 0.0; self.line_frame = 0; }
     /// Metres of racing line still to go from a line point.
     pub fn remaining(&self, idx: usize) -> f32 { self.line.windows(2).skip(idx).map(|w| (w[1] - w[0]).length()).sum() }
     pub fn progress(&self) -> f32 { if self.line.len() < 2 { 0.0 } else { self.idx as f32 / (self.line.len() - 1) as f32 } }
@@ -398,6 +402,7 @@ impl Race {
             }
             RaceState::Running => {
                 self.time += dt;
+                self.race_line_ticks(r, dt);
                 // follow our place along the line; look a little ahead only, so a shortcut that
                 // passes near a later part of the course does not count as being there
                 let mut best = (self.idx, f32::MAX);
@@ -422,6 +427,65 @@ impl Race {
             RaceState::Finished => {}
         }
     }
+}
+
+impl Race {
+    /// The player's race-line progress, each 60 Hz tick of the race (the game's state 4, after the countdown):
+    /// `cBoarder::vf7` 0x117198 moves the event bits on (+0x388 to +0x384, cleared) and runs
+    /// `Boarder_UpdateRaceLineProgress` 0x118298 ([`crate::raceline::update_progress`]) with the rider's `vf10`
+    /// 0x11a348 ([`crate::control::event_bits`]); the first tick puts the rider on the line
+    /// ([`crate::raceline::start`], the race's start).
+    fn race_line_ticks(&mut self, r: &Rider, dt: f32) {
+        let Some(lines) = &self.race_lines else { return };
+        let pos = [r.pos.x * 100.0, -r.pos.z * 100.0, r.pos.y * 100.0, 1.0];
+        let vel = [r.vel.x * 100.0, -r.vel.z * 100.0, r.vel.y * 100.0, 0.0];
+        let mut vf10 = |lr: &mut crate::raceline::RaceRider, e: crate::raceline::Event| {
+            let mut er = crate::control::EventRider { prev: lr.events_prev, cur: lr.events, mult: lr.laps_left, controller: lr.ai, ..Default::default() };
+            crate::control::event_bits(&mut NoEvents, &mut er, e);
+            lr.laps_left = er.mult;
+        };
+        self.line_clock += dt;
+        while self.line_clock >= 1.0 / 60.0 {
+            self.line_clock -= 1.0 / 60.0;
+            match &mut self.line_rider {
+                None => self.line_rider = Some(crate::raceline::start(lines, self.course_no, pos, vel, -1, self.line_frame, &mut vf10)),
+                Some(lr) => {
+                    lr.pos = pos;
+                    lr.vel = vel;
+                    lr.events_prev = lr.events;
+                    lr.events = 0;
+                    crate::raceline::update_progress(lines, lr, self.line_frame, &mut vf10);
+                }
+            }
+            self.line_frame += 1;
+        }
+    }
+    /// The player's race-line event bits this tick (rider+0x388), 0 outside a race
+    pub fn event_bits(&self) -> u32 { self.line_rider.map_or(0, |r| r.events) }
+}
+
+/// The game the player's event bits tell, for [`Race::race_line_ticks`].
+/// STANDIN: nothing happens on them but the laps left; the finish, checkpoints, laps, places, music, speech and
+/// event sounds are still the app's own (`tricky_data::course::Lines`, row E1b2g7b)
+struct NoEvents;
+impl crate::control::EventEnv for NoEvents {
+    fn lesson(&mut self) -> bool { false }
+    fn lesson_event(&mut self, _: u32) {}
+    fn lesson_end(&mut self) {}
+    fn finish(&mut self, _: &mut crate::control::EventRider) {}
+    fn msg_multiplier(&mut self, _: &mut crate::control::EventRider) {}
+    fn on_checkpoint(&mut self, _: &mut crate::control::EventRider) {}
+    fn hit_checkpoint(&mut self, _: &mut crate::control::EventRider, _: u32) {}
+    fn placing(&mut self, _: &mut crate::control::EventRider, _: i32, _: i32) {}
+    fn is_lead(&mut self, _: i32) -> bool { false }
+    fn music_event(&mut self, _: u32) {}
+    fn cheer(&mut self, _: &mut crate::control::EventRider) {}
+    fn local_line(&mut self, _: &mut crate::control::EventRider, _: u32) {}
+    fn local_line2(&mut self, _: &mut crate::control::EventRider) {}
+    fn listener_line(&mut self, _: &mut crate::control::EventRider) {}
+    fn event_sound(&mut self, _: &mut crate::control::EventRider, _: [u32; 2], _: bool) {}
+    fn queue_event_sound(&mut self, _: u32) {}
+    fn stop_event_sound(&mut self) {}
 }
 
 /// Third-person camera that trails the rider. Plain data so the self-test can measure it.

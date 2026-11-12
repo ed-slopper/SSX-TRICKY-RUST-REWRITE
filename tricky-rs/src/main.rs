@@ -405,6 +405,7 @@ fn main() {
     let current = dirs.iter().position(|d| *d == full).unwrap_or(0);
     let Loaded { level, world, rails, line, start, yaw: start_yaw, course, lines, paths, tube, cml, stage, finish_area } = loaded;
     let ai_paths = tricky_game::aiglue::paths_of(&level.ai);
+    let (race_lines, course_no) = race_lines_of(&level);
     // TRICKY_SPAWN=x,y,z,yaw (Bevy metres, radians): start the run there instead (for checks)
     let (start, start_yaw) = std::env::var("TRICKY_SPAWN").ok().map(|v| v.split(',').filter_map(|x| x.parse::<f32>().ok()).collect::<Vec<_>>())
         .filter(|v| v.len() == 4).map_or((start, start_yaw), |v| (Vec3::new(v[0], v[1], v[2]), v[3]));
@@ -421,7 +422,7 @@ fn main() {
     .insert_resource(RiderRes(Rider::new(start + Vec3::Y * 0.5, start_yaw)))
     .insert_resource(mode)
     .insert_resource(RailsRes(rails))
-    .insert_resource(RaceRes(Race { ai_paths, course, lines, paths, tube, cml, stage, finish_area, ..Race::new(line) }))
+    .insert_resource(RaceRes(Race { ai_paths, course, lines, paths, tube, cml, stage, finish_area, race_lines, course_no, ..Race::new(line) }))
     .insert_resource(LevelList { dirs, current })
     .init_resource::<CamRes>()
     .init_resource::<editor::Editor>()
@@ -662,6 +663,13 @@ fn setup(
 /// The result makes the snowfall (`snow::Snow`, row E1b2g5).
 /// The AI's +0x7c (players) and +0x88 (entries, players and computer riders) are the app's: one player, and in a race
 /// (mode 4, which draws no chance anyway) its heat of `ui::HEAT` riders, else the player alone.
+/// The course's race lines as the game keeps them (`aiglue::race_lines_of`) and its number (`courses::COURSES`, by
+/// the level folder; 0 when unknown), for the player's race-line progress (`Race`, row E1b2g7)
+fn race_lines_of(level: &Level) -> (Option<tricky_game::aipath::RaceLines>, u32) {
+    let course = level.dir.file_name().and_then(|f| ui::CareerRes::course(&f.to_string_lossy())).unwrap_or(0);
+    (tricky_game::aiglue::race_lines_of(&level.ai), course)
+}
+
 fn snow_draws(level: &Level, mode: u32) -> tricky_game::fxrand::GameSnow {
     let entries = if mode == 4 { ui::HEAT as i32 } else { 1 };
     let course = level.dir.file_name().and_then(|f| ui::CareerRes::course(&f.to_string_lossy())).map_or(12, u64::from);
@@ -1064,7 +1072,8 @@ fn switch_level(
     commands.insert_resource(make_opponents(loaded.start, loaded.yaw, lib.player, lib.chars.len(), 0, 0));
     commands.insert_resource(World(loaded.world));
     commands.insert_resource(RailsRes(loaded.rails));
-    commands.insert_resource(RaceRes(Race { ai_paths: tricky_game::aiglue::paths_of(&loaded.level.ai), course: loaded.course, lines: loaded.lines, paths: loaded.paths, tube: loaded.tube, cml: loaded.cml, stage: loaded.stage, finish_area: loaded.finish_area, ..Race::new(loaded.line) }));
+    let (race_lines, course_no) = race_lines_of(&loaded.level);
+    commands.insert_resource(RaceRes(Race { ai_paths: tricky_game::aiglue::paths_of(&loaded.level.ai), race_lines, course_no, course: loaded.course, lines: loaded.lines, paths: loaded.paths, tube: loaded.tube, cml: loaded.cml, stage: loaded.stage, finish_area: loaded.finish_area, ..Race::new(loaded.line) }));
     commands.insert_resource(LevelRes(loaded.level));
     let mode = cam.0.mode;
     cam.0 = ChaseCam::default();

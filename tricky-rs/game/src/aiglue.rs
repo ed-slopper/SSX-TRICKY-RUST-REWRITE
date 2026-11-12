@@ -38,19 +38,38 @@ pub fn input_of(pad: u32) -> Input {
 /// (`aip::EVENT_TYPES`). STANDIN: the directions renormalised from the folder form's offsets, for the `.aip`'s own
 /// (row G4e3 may keep the `.aip`).
 pub fn paths_of(ai: &tricky_data::level::AiFile) -> Vec<Path> {
-    ai.ai_paths
-        .iter()
-        .map(|p| Path {
-            start: p.path_pos,
-            min: [0.0; 3],
-            max: [0.0; 3],
-            points: p.path_points.iter().map(|o| { let l = (o[0] * o[0] + o[1] * o[1] + o[2] * o[2]).sqrt(); (if l == 0.0 { [0.0; 3] } else { [o[0] / l, o[1] / l, o[2] / l] }, l) }).collect(),
-            u3: p.u3 as u32,
-            respawnable: p.respawnable as u32,
-            events: p.path_events.iter().map(|e| (tricky_data::aip::EVENT_TYPES.iter().position(|t| *t == e.event_type).unwrap_or(0) as u32, e.event_value as u32, e.event_start, e.event_end)).collect(),
-        })
-        .map(|mut p| { bounds(&mut p); p })
-        .collect()
+    ai.ai_paths.iter().map(|p| path_of(p.path_pos, &p.path_points, &p.path_events, p.u3 as u32, p.respawnable as u32)).collect()
+}
+
+/// A course's race lines as the game keeps them (`aipath::RaceLines`: the lines, each one's distance to the finish,
+/// the main one): the `.aip`'s own when the level has it ([`aipath::RaceLines::from_aip`]); none when the course has
+/// no race lines. STANDIN: a level folder's (no `.aip`) from its offsets as [`paths_of`], the first line the main one.
+pub fn race_lines_of(ai: &tricky_data::level::AiFile) -> Option<aipath::RaceLines> {
+    if let Some(a) = &ai.aip {
+        return (!a.event_paths.is_empty()).then(|| aipath::RaceLines::from_aip(a));
+    }
+    if ai.race_lines.is_empty() {
+        return None;
+    }
+    Some(aipath::RaceLines {
+        lines: ai.race_lines.iter().map(|p| path_of(p.path_pos, &p.path_points, &p.path_events, 0, 0)).collect(),
+        to_finish: ai.race_lines.iter().map(|p| p.distance_to_finish).collect(),
+        main: 0,
+    })
+}
+
+fn path_of(start: [f32; 3], offsets: &[[f32; 3]], events: &[tricky_data::level::PathEvent], u3: u32, respawnable: u32) -> Path {
+    let mut p = Path {
+        start,
+        min: [0.0; 3],
+        max: [0.0; 3],
+        points: offsets.iter().map(|o| { let l = (o[0] * o[0] + o[1] * o[1] + o[2] * o[2]).sqrt(); (if l == 0.0 { [0.0; 3] } else { [o[0] / l, o[1] / l, o[2] / l] }, l) }).collect(),
+        u3,
+        respawnable,
+        events: events.iter().map(|e| (tricky_data::aip::EVENT_TYPES.iter().position(|t| *t == e.event_type).unwrap_or(0) as u32, e.event_value as u32, e.event_start, e.event_end)).collect(),
+    };
+    bounds(&mut p);
+    p
 }
 
 /// The path's box (`cPath` +0x1c, +0x28) round its points
