@@ -408,7 +408,7 @@ impl W {
         let (rd, h) = (self.rd, self.handler);
         let m = &mut self.r.mem;
         wv(m, rd + 0x150, p.vel);
-        m.write_u32(rd + 0x418, c.controller as u32);
+        m.write_u32(rd + 0x418, c.finish as u32);
         for (a, v) in lay(c, rd + 0x46c0, self.seqs[0]) {
             m.write_u32(a, v);
         }
@@ -717,14 +717,14 @@ use recording::{f32_at, load, pair_list, rider_addrs, u32_le, vec4};
 /// What `Boarder_UpdateControl` 0x11c9a0 reads of a rider (F4b3i): layer 0's and 1's clips (+0x46c0 +8, +0xc) and, of
 /// layer 0's sequences (windows `4718>0`, `4718>30>0`, their lengths `4718>78>8>a`, `4718>30>78>8>a`), the first
 /// playing layer 0's clip (what `AnimLayer_FindClip` finds; none: the phase is 1); the handler's control objects
-/// (window `5ae0>600`, +0x600..+0x830), the pad word and the controller (+0x418)
+/// (window `5ae0>600`, +0x600..+0x830), the pad word and the finish time (+0x418)
 #[derive(Clone)]
 struct Ctl {
     clips: [u32; 2],
     seq: Option<(Vec<u8>, u16)>,
     handler: Vec<u8>,
     pad: u32,
-    controller: i32,
+    finish: i32,
 }
 
 /// The controls replayed: bump (2), change fakie (4), fakie cruise (5, not on its turn clip 0x202, which plays clips
@@ -746,7 +746,7 @@ fn ctl_of(t: &recording::Tick, th: &recording::Tick, i: usize, ka: usize, addr: 
     } else {
         None
     };
-    Some(Ctl { clips, seq, handler: h.clone(), pad, controller: u32_le(&t.riders[i], 0x418) as i32 })
+    Some(Ctl { clips, seq, handler: h.clone(), pad, finish: u32_le(&t.riders[i], 0x418) as i32 })
 }
 
 /// The animation controller (at `ctl`) laid out for `animctl`'s queries: the three layers' clips (layer 2's none) and
@@ -862,7 +862,7 @@ fn control_ours(p: &mut Rider, c: &Ctl, table: &[u8]) {
     let o = Orient { q: p.quat, fwd: p.p.fwd, side: p.board_side, up: p.board_up, yaw: p.yaw };
     let (bump, land) = (Bump { turn: f32_at(&c.handler, 0x18), done: f32_at(&c.handler, 0x1c) }, LandNormal { crouch: f32_at(&c.handler, 0xf8) });
     let mut env = CtlEnv { m, o, pad: c.pad, bump, land, state: None };
-    let mut r = control::Rider { vel: p.vel, board: p.p.fwd, brake: p.brake, crouch: p.crouch, steer: p.steer, surface: p.p.surface, controller: c.controller, stance: p.switch, control: p.state, ..Default::default() };
+    let mut r = control::Rider { vel: p.vel, board: p.p.fwd, brake: p.brake, crouch: p.crouch, steer: p.steer, surface: p.p.surface, finish: c.finish, stance: p.switch, control: p.state, ..Default::default() };
     control::update_control(&mut env, c.pad, &mut r);
     (p.vel, p.quat, p.p.fwd, p.board_side, p.board_up, p.yaw) = (r.vel, env.o.q, env.o.fwd, env.o.side, env.o.up, env.o.yaw);
     if let Some(s) = env.state {
@@ -1993,7 +1993,7 @@ fn ground_ticks_against_the_running_game() {
                             // `AnimCtl_TestClipFlag`)
                             let c = ctl_of(&w[0], &w[0], me, ka, addr[me], 0).unwrap_or_else(|| {
                                 let c = &w[0].extra[ka].1[me];
-                                Ctl { clips: [u32_le(c, 8), u32_le(c, 0xc)], seq: None, handler: Vec::new(), pad: 0, controller: 0 }
+                                Ctl { clips: [u32_le(c, 8), u32_le(c, 0xc)], seq: None, handler: Vec::new(), pad: 0, finish: 0 }
                             });
                             land_runner(&mut runners[k - 1].1, start.0, start.1, a, b, board, &stats[me], &c).unwrap_or(start)
                         };
