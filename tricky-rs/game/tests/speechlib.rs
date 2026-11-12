@@ -503,3 +503,66 @@ fn free_voice_pending_shuffle() {
         assert_eq!((a, b), (w.r.mem.read_u32(w.scratch), w.r.mem.read_u32(w.scratch + 4)), "case {case}");
     }
 }
+
+/// `SpeechLib_PostEvent` 0x2bba80, `SpeechLib_AddEventBank` 0x2bac78 and `SpeechLib_RegisterEventBank` 0x2bad70
+/// (row E1b2g7d3b1): the event record is the 0x50 bytes at q6 with the id and kinds of the random event; the event
+/// banks' words small (voice groups); the busy word set now and then.
+#[test]
+fn post_and_event_banks() {
+    let Some(mut w) = world() else { return };
+    for a in [0x2bb6b0, 0x2bb650, 0x2bb700, 0x2bba50, 0x2bb8d8, 0x2bc738] {
+        w.r.allow(a);
+    }
+    let mut g = Rng(90);
+    let mut sm = SM::default();
+    let mut posted = 0;
+    for case in 0..60_000u32 {
+        let mut img = build(&mut g, &w);
+        let ev: Vec<u8> = (0..4).map(|k| img.iter().rev().find(|(a, _)| *a == w.ev).unwrap().1[k]).collect();
+        img.push((w.q6, ev));
+        let words: Vec<u8> = (0..8u32).flat_map(|_| g.below(9).to_le_bytes()).collect();
+        for k in 0..8u32 {
+            img.push((0x348e0c + 8 * k, words[4 * k as usize..4 * k as usize + 4].to_vec()));
+        }
+        img.push((0x3488fc, if g.below(8) == 0 { vec![1, 0, 0, 0] } else { vec![0; 4] }));
+        let now = if g.below(3) == 0 { w.r.mem.read_u32(0x34951c) as i32 } else { g.below(3000) as i32 };
+        let which = g.below(4);
+        let bank = w.evbanks[g.below(4) as usize];
+        if g.below(2) == 0 {
+            img.push((bank, 0x803u16.to_le_bytes().to_vec()));
+        }
+        let word = [0u64, 3, 7, 8, 9, u64::MAX][g.below(6) as usize];
+        apply(&mut w, &mut sm, &img);
+        let now = if which == 0 { sm.r32(0x34951c) as i32 } else { now };
+        *w.log.borrow_mut() = Log { now, ..Default::default() };
+        let (addr, args) = match which {
+            0 | 1 => (0x2bba80u32, vec![w.q6 as u64]),
+            2 => (0x2bac78, vec![bank as u64, word & 0xffff_ffff]),
+            _ => (0x2bad70, vec![bank as u64, word]),
+        };
+        for (k, v) in args.iter().enumerate() {
+            w.r.cpu.set_gpr(4 + k, *v);
+        }
+        w.r.call(addr).unwrap();
+        let want = w.r.cpu.gpr(2) & 0xffff_ffff;
+        let theirs = dump(&mut w);
+        let their_log = std::mem::take(&mut *w.log.borrow_mut());
+        let log = Rc::new(RefCell::new(Log { now, ..Default::default() }));
+        let mut tc = TC(log.clone());
+        let got = match which {
+            0 | 1 => post_event(&mut sm, &mut tc, w.q6),
+            2 => add_event_bank(&mut sm, bank, word as u32),
+            _ => register_event_bank(&mut sm, bank, word),
+        } as u64;
+        assert_eq!(got, want, "{addr:#x} case {case}");
+        posted += (addr == 0x2bba80 && got == 1) as u32;
+        let mine_mem = dump_sm(&w, &sm);
+        if mine_mem != theirs {
+            let at = mine_mem.iter().zip(&theirs).position(|(x, y)| x != y).unwrap();
+            panic!("{addr:#x} case {case} memory differs at +{at:#x}: port {:#x} game {:#x}", mine_mem[at], theirs[at]);
+        }
+        let mine = log.borrow();
+        assert_eq!(mine.released, their_log.released, "{addr:#x} case {case} calls");
+    }
+    assert!(posted > 500, "posted {posted}");
+}

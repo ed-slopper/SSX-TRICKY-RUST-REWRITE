@@ -49,6 +49,10 @@ pub const STREAM_OPEN: u32 = 0x229ae8;
 pub const LIB_SERVICE: u32 = 0x2bc548;
 pub const LIB_UNLOAD_BANK: u32 = 0x2bb2b0;
 pub const LIB_SHUTDOWN: u32 = 0x2bb018;
+pub const LIB_REGISTER_BANK: u32 = 0x2bb4f0;
+pub const FILE_EXISTS: u32 = 0x2c7e38;
+pub const FILE_LOAD: u32 = 0x2c8018;
+pub const STRCPY: u32 = 0x2fd14c;
 
 fn cvt(v: f32) -> i32 {
     F(v).ee() as i32
@@ -266,6 +270,88 @@ pub fn play_event(m: &mut Mem, e: &mut dyn SysEnv, b: u32, ev: u32, sp: u32) -> 
         return h;
     }
     -1
+}
+
+/// `SpeechBank_Clear` 0x227c20 (a bank): no library bank (+0 −1), no name, no block (+0x84) and not owning one (+0x88)
+pub fn bank_clear(m: &mut Mem, b: u32) -> u32 {
+    m.w32(b + 0x88, 0);
+    m.w32(b, u32::MAX);
+    m.w32(b + 0x84, 0);
+    m.w8(b + 4, 0);
+    b
+}
+
+/// `SpeechBank_Load` 0x227b38 (the bank's name, its data or 0; `sp` the frame, 0x150 bytes): with no data the file
+/// named by the format at 0x3a03b0 is loaded (`File_LoadAlloc`) when it is there (else 0) and the bank owns it
+/// (+0x88); a bank record (0x8c bytes, 0xdeadc0de) cleared, holding the data (+0x84), the library's bank
+/// (`SpeechLib_RegisterBank`, +0) and the name (+4)
+pub fn bank_load(m: &mut Mem, e: &mut dyn SysEnv, name: u32, data: u32, sp: u32) -> u32 {
+    let owns = (data == 0) as u32;
+    e.call(m, SPRINTF, &[sp, 0x3a03b0, name]);
+    let mut data = data;
+    if data == 0 {
+        if e.call(m, FILE_EXISTS, &[sp]) == 0 {
+            return 0;
+        }
+        data = e.call(m, FILE_LOAD, &[sp, 0]);
+    }
+    let p = e.call(m, ALLOC, &[0x3a03b8, 0x8c, 0]);
+    if p != 0 {
+        e.call(m, MEMSET, &[p, 0xdead_c0de, 0x8c]);
+    }
+    let b = bank_clear(m, p);
+    m.w32(b + 0x88, owns);
+    m.w32(b + 0x84, data);
+    let id = e.call(m, LIB_REGISTER_BANK, &[data]);
+    m.w32(b, id);
+    e.call(m, STRCPY, &[b + 4, name]);
+    b
+}
+
+/// `SpeechSys_LoadBank` 0x2283a8 (a slot, the bank's name, its data or 0; `sp` the frame, 0x20 bytes): `SpeechBank_Load` into
+/// the slot's next bank (+0xf0), counted (+0xec and the loaded count 0x343704) when it loaded
+pub fn load_bank(m: &mut Mem, e: &mut dyn SysEnv, b: u32, name: u32, data: u32, sp: u32) {
+    let bank = bank_load(m, e, name, data, sp.wrapping_sub(0x150));
+    let n = m.r32(b + 0xec);
+    m.w32(b.wrapping_add(n.wrapping_mul(4)).wrapping_add(0xf0), bank);
+    if bank != 0 {
+        m.w32(b + 0xec, n.wrapping_add(1));
+        let c = m.r32(BANK_COUNT).wrapping_add(1);
+        m.w32(BANK_COUNT, c);
+    }
+}
+
+/// `SpeechSys_PlayEventAnySlot` 0x228ae8 (the speech system, the event; `sp` the frame, 0x50 bytes): `Speech_PlayEvent` on the
+/// first of the two slots that plays it; when that slot is the one +0x3724 names, its handle goes to the function
+/// at +0x3720. The handle, −1 when neither plays it
+pub fn play_event_any_slot(m: &mut Mem, e: &mut dyn SysEnv, this: u32, ev: u32, sp: u32) -> i32 {
+    for i in 0..2u32 {
+        let slot = m.r32(m.r32(this + 0x3718).wrapping_add(4 * i));
+        if slot == 0 {
+            continue;
+        }
+        let h = play_event(m, e, slot, ev, sp.wrapping_sub(0x1a0));
+        if h < 0 {
+            continue;
+        }
+        if m.r32(this + 0x3724) == i {
+            let f = m.r32(this + 0x3720);
+            e.call(m, f, &[h as u32]);
+        }
+        return h;
+    }
+    -1
+}
+
+/// 0x227b00, the speech library's play callback (`Speech_InitLibrary` gives it to `SpeechLib_Init`; the event; `sp`
+/// the frame, 0x10 bytes):
+/// −1 while 0x343708 is set, else `SpeechSys_PlayEventAnySlot` on `gSpeechSys`
+pub fn lib_play_callback(m: &mut Mem, e: &mut dyn SysEnv, ev: u32, sp: u32) -> i32 {
+    if m.r32(0x343708) != 0 {
+        return -1;
+    }
+    let sys = m.r32(SYS);
+    play_event_any_slot(m, e, sys, ev, sp.wrapping_sub(0x50))
 }
 
 /// `SpeechSys_StopStream` 0x2286e8 (a slot)

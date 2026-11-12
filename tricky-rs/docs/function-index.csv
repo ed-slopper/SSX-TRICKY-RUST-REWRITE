@@ -3912,8 +3912,9 @@ address,size,name,system,status
 0x2279c8,128,cSoundSys::~cSoundSys,audio,not started
 0x227a48,44,cSoundSys::vf1_227a48,audio,not started
 0x227a80,64,cSoundSys::__tf,runtime,host
-0x227b38,228,SpeechBank_Load,audio,not started
-0x227c20,28,SpeechBank_Clear,audio,not started
+0x227b00,56,SpeechSys_LibPlayCallback,audio,checked
+0x227b38,228,SpeechBank_Load,audio,checked
+0x227c20,28,SpeechBank_Clear,audio,checked
 0x227c40,100,SpeechBank_Delete,audio,checked
 0x227ca8,16,SpeechBank_HasId,audio,checked
 0x227cb8,184,SpeechBank_Init,audio,checked
@@ -3921,7 +3922,7 @@ address,size,name,system,status
 0x228168,372,SpeechSys_FreeBanks,audio,checked
 0x2282e0,144,SpeechSys_IsIdle,audio,checked
 0x228370,56,SpeechSys_ServiceIfIdle,audio,checked
-0x2283a8,88,SpeechSys_LoadBank,audio,ported
+0x2283a8,88,SpeechSys_LoadBank,audio,checked
 0x228400,724,Speech_PlayEvent,audio,checked
 0x2286e8,20,SpeechSys_StopStream,audio,checked
 0x228700,40,SpeechSlot_IsPlaying,audio,checked
@@ -3933,7 +3934,7 @@ address,size,name,system,status
 0x228998,100,SpeechSys_UpdateAll,audio,checked
 0x228a00,188,SpeechSys_AddBank,audio,checked
 0x228ac0,40,Speech_LoadEventsForSlot,audio,checked
-0x228ae8,156,SpeechSys_PlayEventAnySlot,audio,not started
+0x228ae8,156,SpeechSys_PlayEventAnySlot,audio,checked
 0x228b88,48,SpeechSys_SetFollowStream,audio,not started
 0x228bb0,48,SpeechSys_SetSlotHold,audio,ported
 0x228bd8,168,SpeechSys_Trigger,audio,ported
@@ -6035,8 +6036,8 @@ address,size,name,system,status
 0x2bab80,64,cVideoPlayer::__tf,runtime,host
 0x2bac00,64,StaticInit_VideoPlayer,video,not started
 0x2bac40,56,StaticDtor_VideoPlayer,video,not started
-0x2bac78,244,SpeechLib_AddEventBank,audio,not started
-0x2bad70,48,SpeechLib_RegisterEventBank,audio,ported
+0x2bac78,244,SpeechLib_AddEventBank,audio,checked
+0x2bad70,48,SpeechLib_RegisterEventBank,audio,checked
 0x2bada0,28,SpeechLib_RegisterEventBank0,audio,not started
 0x2badc0,72,SpeechLib_ClearIdCounts,audio,ported
 0x2bae08,124,SpeechLib_CalcBufferBytes,audio,checked
@@ -6067,7 +6068,7 @@ address,size,name,system,status
 0x2bb810,196,SpeechLib_ResetVoices,lib-snd,ported
 0x2bb8d8,376,SpeechLib_AllocVoice,lib-snd,ported
 0x2bba50,44,SpeechLib_GroupLimitsOk,lib-snd,ported
-0x2bba80,632,SpeechLib_PostEvent,lib-snd,ported
+0x2bba80,632,SpeechLib_PostEvent,lib-snd,checked
 0x2bbcf8,108,SpeechLib_PostEventArgs,lib-snd,ported
 0x2bbd68,12,SpeechIdList_Clear,lib-snd,ported
 0x2bbd78,88,SpeechIdList_Contains,lib-snd,ported

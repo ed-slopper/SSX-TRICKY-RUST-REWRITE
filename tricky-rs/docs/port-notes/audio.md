@@ -1242,3 +1242,32 @@ ones at 0x3511f8; the IOP shared block is 0x353314.
 - In the race (`race::Race::speech`, `race::SpeechCall`): the rider's `vf10` hooks (checkpoint, place, cheer, the
   three local lines) and `Race::places`' placing sound are queued in order for the app; the app does not run them
   yet (no speech system in the app: row E1b2g7d3b).
+
+## The speech library's entry points (row E1b2g7d3b1; checked: `tests/speechlib.rs` `post_and_event_banks`, `tests/speechsys.rs` ops 23..27)
+
+Proven (read in Ghidra and the disassembly):
+
+- `SpeechLib_PostEvent` 0x2bba80 (`speechlib::post_event`; the event is 20 words: the u16 id, the bank's two kind bytes
+  at +2 / +3, then the trigger's arguments): guarded by 0x3488fc (a post while one runs answers 0 and clears the
+  guard). The entry (`SpeechLib_FindEvent`) and its bank's word (`SpeechLib_GetEventBankWord`: the voice group) must
+  exist. An entry whose +0xa bit 5 is clear is "free": its chance byte +9 (signed) must be at least a draw of
+  `SpeechLib_PickVariant(100, 0xffff)`, and the voice is asked for its size +4. A "linked" entry (bit 5 set) needs both
+  of the group's limits (0x348e68 latest, 0x348e88 kept) below 16 and asks for the size of the kept voice's sound.
+  `SpeechLib_AllocVoice(size, group, linked)`; none → a linked post releases the kept voice (`SpeechLib_FreeVoice`), 0.
+  The voice (0x60 bytes from 0x348e48 + 0x60·v): +0x64 the clock (`SpeechLib_GetTime`), +0x68 the count of posts on
+  the same clock value (0x349520, the last clock at 0x34951c), +0x6a 1 (in use), +0x6b the group, +0x6c linked,
+  +0x6e −1 (next in chain; a linked post sets the group's latest voice's +0x6e to the new one), +0x70 the entry,
+  +0x74 the twenty words. The group's latest becomes the voice; a free post also makes it the kept one and counts
+  it (0x348e48 + 4·group). Answers 1.
+- `SpeechLib_AddEventBank` 0x2bac78 (a bank, its word): only version 0x803 banks; refused when an open slot's bank
+  has the same kind bytes (+8, +9); else into the first empty of the eight slots at 0x348e08 (bank, word); 1 when
+  opened. `SpeechLib_RegisterEventBank` 0x2bad70 calls it for words below 8 (unsigned).
+- `SpeechBank_Load` 0x227b38 (name, data or 0): with no data, the file "%s" formatted by 0x3a03b0 must exist
+  (`FileSys_Exists` 0x2c7e38) and is loaded (`File_LoadAlloc` 0x2c8018); the record (0x8c bytes, filled 0xdeadc0de,
+  `SpeechBank_Clear` 0x227c20) holds +0 the library's bank (`SpeechLib_RegisterBank`), +4 the name (strcpy), +0x84
+  the data, +0x88 1 when it loaded the file itself. `SpeechSys_LoadBank` 0x2283a8 puts it in the slot's next bank
+  (+0xf0, counted at +0xec and in 0x343704) when it loaded.
+- 0x227b00 (no Ghidra function before; named `SpeechSys_LibPlayCallback`): the callback `Speech_InitLibrary` gives the
+  library: −1 while 0x343708 is set, else `SpeechSys_PlayEventAnySlot` 0x228ae8 on `gSpeechSys`, which tries
+  `Speech_PlayEvent` on slot 0 then slot 1 (+0x3718) and, when the slot that played is the one +0x3724 names, hands
+  the handle to the function at +0x3720.

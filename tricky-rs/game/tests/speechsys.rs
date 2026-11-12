@@ -28,6 +28,8 @@ const STACK_TOP: u32 = 0x01ff_0000;
 /// The fake play call and the system's own answer (vtable +0x7c, +0x24)
 const V_PLAY: u32 = 0x7f_0000;
 const V_OWN: u32 = 0x7f_0100;
+/// The function a slot's handle goes to (+0x3720)
+const V_CB: u32 = 0x7f_0200;
 
 const FLOATS: [f32; 15] = [0.0, 100.0, 299.5, 300.0, 330.0, 450.0, 499.9, 500.0, 1200.0, 30.0, 270.0, 340.0, -5.0, 29.0, 329.0];
 
@@ -88,7 +90,8 @@ const LEAVES: &[(u32, usize)] = &[
     (STREAM_WAIT, 2), (STREAM_STOP, 2), (STREAM_OPEN, 5), (LIB_SERVICE, 1), (LIB_UNLOAD_BANK, 1), (LIB_SHUTDOWN, 0),
     (0x188990, 2), (0x2bb090, 1), (0x2bb098, 2), (0x2baed0, 0), (0x2baeb8, 0), (0x2be8c8, 1), (0x2bdae0, 0),
     (0x2be208, 1), (0x2bb7a0, 0), (0x2badc0, 0), (0x2bb060, 0), (0x2bb810, 0), (0x228d10, 2), (0x22e4e0, 3),
-    (0x209b40, 2), (0x14a040, 1), (0x228e10, 2), (0x2f5450, 1), (V_PLAY, 7), (V_OWN, 1),
+    (0x209b40, 2), (0x14a040, 1), (0x228e10, 2), (0x2f5450, 1), (V_PLAY, 7), (V_OWN, 1), (V_CB, 1),
+    (FILE_EXISTS, 1), (FILE_LOAD, 2), (LIB_REGISTER_BANK, 1), (STRCPY, 2),
 ];
 
 const ARENA: u32 = 0x0100_0000;
@@ -132,7 +135,7 @@ fn speech_system_matches_the_original() {
             c.set_f(0, f32::from_bits(ans));
         });
     }
-    for f in [0x227ca8u32, 0x229f60, 0x229fc8, 0x22a008, 0x22a178, 0x227c40, 0x229d40, 0x228168, 0x2282e0, 0x228370, 0x227cb8, 0x228700, 0x22a048, 0x2bae08, 0x2baf38, 0x22e550, 0x228998] {
+    for f in [0x227ca8u32, 0x229f60, 0x229fc8, 0x22a008, 0x22a178, 0x227c40, 0x229d40, 0x228168, 0x2282e0, 0x228370, 0x227cb8, 0x228700, 0x22a048, 0x2bae08, 0x2baf38, 0x22e550, 0x228998, 0x228400, 0x227c20, 0x227b38, 0x2283a8, 0x228ae8, 0x227b00] {
         r.allow(f);
     }
     let app = ARENA + 0xf000;
@@ -191,7 +194,12 @@ fn speech_system_matches_the_original() {
         for k in 0..12u32 {
             r.mem.write_u32(0x3494f0 + 4 * k, g.next());
         }
-        let which = g.below(23);
+        r.mem.write_u32(sys + 0x3720, V_CB);
+        r.mem.write_u32(sys + 0x3724, g.below(3));
+        r.mem.write_u32(0x343708, (g.below(4) == 0) as u32);
+        let name = ARENA + 0xe100;
+        let data = if g.below(2) == 0 { 0 } else { g.next() };
+        let which = g.below(28);
         let slot = slots[g.below(2) as usize];
         let n = g.below(3);
         let x = [g.next(), g.next(), g.next(), g.next(), g.next()];
@@ -237,7 +245,12 @@ fn speech_system_matches_the_original() {
             19 => (0x228ac0, vec![sys, n & 1, x[0]]),
             20 => (0x228dd0, vec![sys, n & 1]),
             21 => (0x235710, vec![sys]),
-            _ => (0x22e5a8, vec![sys, fe]),
+            22 => (0x22e5a8, vec![sys, fe]),
+            23 => (0x227c20, vec![slot + 0x10]),
+            24 => (0x227b38, vec![name, data]),
+            25 => (0x2283a8, vec![slot, name, data]),
+            26 => (0x228ae8, vec![sys, ev]),
+            _ => (0x227b00, vec![ev]),
         };
         set(&mut r, &args);
         r.call(addr).unwrap_or_else(|e| panic!("case {case}: {addr:#x}: {e}"));
@@ -303,10 +316,18 @@ fn speech_system_matches_the_original() {
             }
             20 => Some(is_slot_playing(&mut m, e, sys, n & 1)),
             21 => Some(char_script_ready(&mut m, e, sys)),
-            _ => {
+            22 => {
                 play_fe_line(&mut m, e, sys, fe, STACK_TOP - 0x40);
                 None
             }
+            23 => Some(bank_clear(&mut m, slot + 0x10)),
+            24 => Some(bank_load(&mut m, e, name, data, STACK_TOP - 0x150)),
+            25 => {
+                load_bank(&mut m, e, slot, name, data, STACK_TOP - 0x20);
+                None
+            }
+            26 => Some(play_event_any_slot(&mut m, e, sys, ev, STACK_TOP - 0x50) as u32),
+            _ => Some(lib_play_callback(&mut m, e, ev, STACK_TOP - 0x10) as u32),
         };
         let mine = std::mem::take(&mut a.borrow_mut().log);
         assert_eq!(theirs, mine, "case {case}: {addr:#x} calls");

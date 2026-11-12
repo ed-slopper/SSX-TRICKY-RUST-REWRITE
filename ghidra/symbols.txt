@@ -3811,6 +3811,7 @@ G 21a7c8 Sfx_LoadBoardConfig
 G 220ce8 Sfx_LoadTrickConfig
 G 22dce0 Audio_LoadChantBanks
 G 227d70 Speech_LoadEvents
+G 227b00 SpeechSys_LibPlayCallback
 G 227b38 SpeechBank_Load
 G 223d60 Music_LoadPathfinder
 G 22c648 Audio_LoadWorldTriggerBanks

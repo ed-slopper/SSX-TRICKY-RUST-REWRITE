@@ -317,6 +317,121 @@ pub fn clear_event_banks(m: &mut dyn Mem) {
     }
 }
 
+/// `SpeechLib_AddEventBank` 0x2bac78 (an event bank, its word): a bank of version 0x803 opened in the first free of
+/// the eight slots, unless one open already has its kinds (+8, +9); 1 when opened.
+pub fn add_event_bank(m: &mut dyn Mem, bank: u32, word: u32) -> u32 {
+    if m.r16(bank) != 0x803 {
+        return 0;
+    }
+    let (k8, k9) = bank_kinds(m, bank);
+    for i in 0..8 {
+        let b = m.r32(EVENT_BANKS + 8 * i);
+        if b != 0 && m.r8(b + 9) as u32 == k9 && m.r8(b + 8) as u32 == k8 {
+            return 0;
+        }
+    }
+    for i in 0..8 {
+        if m.r32(EVENT_BANKS + 8 * i) == 0 {
+            m.w32(EVENT_BANKS + 8 * i, bank);
+            m.w32(EVENT_BANKS + 8 * i + 4, word);
+            return 1;
+        }
+    }
+    0
+}
+
+/// `SpeechLib_RegisterEventBank` 0x2bad70 (an event bank, its word): [`add_event_bank`] when the word is below 8
+/// (unsigned), else 0.
+pub fn register_event_bank(m: &mut dyn Mem, bank: u32, word: u64) -> u32 {
+    if word < 8 { add_event_bank(m, bank, word as u32) } else { 0 }
+}
+
+/// `SpeechLib_PostEvent` 0x2bba80 (the event: 20 words, its id the u16 at +0, its bank's kinds at +2 / +3): the
+/// event's entry and its bank's word (the voice group) found; an entry not linked (+0xa bit 5) passes its chance
+/// (+9, signed, against a variant draw below 100 with tag 0xffff) and asks a voice for its size (+4), a linked one
+/// needs the group's limits below 16 and asks for the size of the group's kept voice's sound; the voice is
+/// stamped (the clock, the count of posts on the same tick at 0x349520), takes the entry and the twenty words and
+/// becomes the group's latest (and, not linked, its first, and counts); a linked one is chained after the group's
+/// latest. With no voice a linked post releases the group's kept one. 1 when posted. Guarded by 0x3488fc (a post
+/// while one runs answers 0), cleared on the way out.
+pub fn post_event(m: &mut dyn Mem, c: &mut dyn Calls, ev: u32) -> u32 {
+    const BUSY: u32 = 0x3488fc;
+    if m.r32(BUSY) != 0 {
+        m.w32(BUSY, 0);
+        return 0;
+    }
+    m.w32(BUSY, 1);
+    let r = post_inner(m, c, ev);
+    m.w32(BUSY, 0);
+    r
+}
+
+fn post_inner(m: &mut dyn Mem, c: &mut dyn Calls, ev: u32) -> u32 {
+    let hdr = find_event(m, ev);
+    if hdr == 0 {
+        return 0;
+    }
+    let Some(group) = event_word(m, ev) else { return 0 };
+    let linked = (m.r8(hdr + 10) >> 5) as u32 & 1;
+    let gi = group.wrapping_mul(4);
+    let (mut kept, mut latest) = (u32::MAX, u32::MAX);
+    let size = if linked == 0 {
+        let chance = m.r8(hdr + 9) as i8 as i32;
+        if chance < pick_variant(m, 100, 0xffff) as i32 {
+            return 0;
+        }
+        m.r16(hdr + 4)
+    } else {
+        if !group_limits_ok(m, group as i32) {
+            return 0;
+        }
+        kept = m.r32(LIMIT_B.wrapping_add(gi));
+        latest = m.r32(LIMIT_A.wrapping_add(gi));
+        let snd = m.r32(GROUPS.wrapping_add(kept.wrapping_mul(0x60)).wrapping_add(0x70));
+        m.r16(snd.wrapping_add(4))
+    };
+    let v = alloc_voice(m, c, size as u64, group as i32 as i64 as u64, linked as i64);
+    if v < 0 {
+        if linked != 0 {
+            c.release(kept as i32);
+        }
+        return 0;
+    }
+    let now = c.now();
+    if now as u32 == m.r32(0x34951c) {
+        let n = m.r16(0x349520).wrapping_add(1);
+        m.w16(0x349520, n);
+    } else {
+        m.w16(0x349520, 0);
+    }
+    let rec = GROUPS.wrapping_add((v as u32).wrapping_mul(0x60));
+    m.w32(0x34951c, now as u32);
+    m.w32(rec + 0x70, hdr);
+    m.w8(rec + 0x6b, group as u8);
+    m.w32(rec + 0x64, now as u32);
+    m.w16(rec + 0x6e, 0xffff);
+    let n = m.r16(0x349520);
+    m.w16(rec + 0x68, n);
+    m.w16(rec + 0x6c, linked as u16);
+    if linked != 0 {
+        m.w16(GROUPS.wrapping_add(latest.wrapping_mul(0x60)).wrapping_add(0x6e), v as u16);
+    }
+    for k in 0..20 {
+        let w = m.r32(ev.wrapping_add(4 * k));
+        m.w32(rec + 0x74 + 4 * k, w);
+    }
+    if linked == 0 {
+        let n = m.r32(GROUPS.wrapping_add(gi)).wrapping_add(1);
+        m.w32(GROUPS.wrapping_add(gi), n);
+    }
+    m.w8(rec + 0x6a, 1);
+    m.w32(LIMIT_A.wrapping_add(gi), v as u32);
+    if linked == 0 {
+        m.w32(LIMIT_B.wrapping_add(gi), v as u32);
+    }
+    1
+}
+
 /// 0x2bb810: every voice free: the per-group counts 0, the limits -1, the records cleared (group byte 0xff).
 pub fn reset_voices(m: &mut dyn Mem) {
     for k in 0..8 {
