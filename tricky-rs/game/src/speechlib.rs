@@ -18,14 +18,43 @@ pub trait Mem {
     fn w8(&mut self, a: u32, v: u8);
     fn w16(&mut self, a: u32, v: u16);
     fn w32(&mut self, a: u32, v: u32);
+    /// The engine's memory itself when this is one (the speech host's, `speechhost`), for calls into the parts
+    /// that work on it
+    fn pf(&mut self) -> Option<&mut crate::pf::Mem> {
+        None
+    }
+}
+
+impl Mem for crate::pf::Mem {
+    fn r8(&self, a: u32) -> u8 {
+        crate::pf::Mem::r8(self, a)
+    }
+    fn r16(&self, a: u32) -> u16 {
+        crate::pf::Mem::r16(self, a)
+    }
+    fn r32(&self, a: u32) -> u32 {
+        crate::pf::Mem::r32(self, a)
+    }
+    fn w8(&mut self, a: u32, v: u8) {
+        crate::pf::Mem::w8(self, a, v)
+    }
+    fn w16(&mut self, a: u32, v: u16) {
+        crate::pf::Mem::w16(self, a, v)
+    }
+    fn w32(&mut self, a: u32, v: u32) {
+        crate::pf::Mem::w32(self, a, v)
+    }
+    fn pf(&mut self) -> Option<&mut crate::pf::Mem> {
+        Some(self)
+    }
 }
 
 /// What the library calls out for.
 pub trait Calls {
     /// 0x2bebb0: the clock voices are timed with.
     fn now(&mut self) -> i32;
-    /// 0x2bc200: release voice `slot`.
-    fn release(&mut self, slot: i32);
+    /// 0x2bc200: release voice `slot` (on the library's memory).
+    fn release(&mut self, m: &mut dyn Mem, slot: i32);
     /// 0x2baed0: stop every voice (`SpeechLib_Shutdown`).
     fn stop_all(&mut self);
 }
@@ -393,7 +422,7 @@ fn post_inner(m: &mut dyn Mem, c: &mut dyn Calls, ev: u32) -> u32 {
     let v = alloc_voice(m, c, size as u64, group as i32 as i64 as u64, linked as i64);
     if v < 0 {
         if linked != 0 {
-            c.release(kept as i32);
+            c.release(m, kept as i32);
         }
         return 0;
     }
@@ -479,7 +508,7 @@ pub fn alloc_voice(m: &mut dyn Mem, c: &mut dyn Calls, size: u64, group: u64, li
             || (now.wrapping_sub(m.r32(r) as i32) as u32) <= m.r16(sound.wrapping_add(2)) as u32
             || keep == i;
         if !skip {
-            c.release(i);
+            c.release(m, i);
             return i;
         }
         i += 1;

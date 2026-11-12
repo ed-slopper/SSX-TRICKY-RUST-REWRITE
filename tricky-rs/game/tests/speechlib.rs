@@ -58,7 +58,7 @@ impl Calls for TC {
     fn now(&mut self) -> i32 {
         self.0.borrow().now
     }
-    fn release(&mut self, slot: i32) {
+    fn release(&mut self, _: &mut dyn Mem, slot: i32) {
         self.0.borrow_mut().released.push(slot);
     }
     fn stop_all(&mut self) {
