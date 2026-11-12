@@ -1271,3 +1271,52 @@ Proven (read in Ghidra and the disassembly):
   library: −1 while 0x343708 is set, else `SpeechSys_PlayEventAnySlot` 0x228ae8 on `gSpeechSys`, which tries
   `Speech_PlayEvent` on slot 0 then slot 1 (+0x3718) and, when the slot that played is the one +0x3724 names, hands
   the handle to the function at +0x3720.
+
+## The speech host and the speech files' MicroTalk (row E1b2g7d3b2; checked: `tests/speechhost.rs`, `tests/sndmt.rs`)
+
+**The host** (`game/src/speechhost.rs`): checked against the original in the r5900 runner on the same memory
+(`the_host_runs_as_the_original`): 600 posts (the 72 place-change combinations, then random events of the 51 ids
+`speech.rs` posts with random arguments) each followed by `SpeechSys_UpdateAll` 0x228998; after each, the post's
+answer, every library leaf call (target, arguments, answer) and the host's memory match byte for byte; 215 lines play,
+40 of them two parts and one three. The leaves are the C library, allocation, SPEECH.INF, the files, the BIG walk and
+the stream calls; the stream ones are stand-ins in the host and replayed to the original.
+
+Proven, the stream system the stand-in models: `cBXAudio::vf14` 0x20e430 → `StreamSys_PlayFile` 0x229ed0 →
+`Stream_PlayFile` 0x229770 → `SndStream_QueueFile` 0x2d2948 → `SndStream_Queue` 0x2d2728 appends a request (0x2c
+bytes; capacity +0x15, count +0x16) so a line's parts play in turn. `Stream_GetState` 0x229870 is the request count
+(`SndStream_GetStatus` 0x2d2b08 [0]); `Stream_IsPlaying` 0x229628 is the front request's `SndHandle_GetState`
+0x2d2c10 being 2; `Stream_GetTimeLeftMs` 0x229578 its left ms, `Stream_GetPlayTime` 0x2296c0 played + left (both 0
+unless state 2); `Stream_HasReached` 0x2295c0(ms) is ms ≤ the buffered ms. STANDIN: the host keeps a queue of parts
+(handle, length from the app) instead of the IOP stream; "buffered" is the queue's total left.
+
+**MicroTalk** (`game/src/sndmt.rs`, codec 4; every speech `.dat` part is EA `SCHl` / `SCCl` / `SCDl` / `SCEl`, 36000
+Hz, the announcer's stereo, the riders' mono). Proven, and checked frame by frame against the original (all frames of
+the first channel of the announcer lines the place-change events start, the decoder's whole 0xd40-byte state after
+the header and after every frame):
+
+- `SndBits_Read` 0x2e2b98 / `SndBits_Skip` 0x2e2c00: low bits first, refilled a byte at a time below eight.
+- `SndMt_ParseHeader` 0x2e3070: one bit unused; threshold = 32 − 4 bits; gain 0 = (4 bits + 1) · 8, then 63 more
+  each × (6 bits · 0.001 + 1.04); clears the coefficients, the filter history and the 324 floats of past excitation.
+- `SndMt_DecodeFrame` 0x2e31e8: 12 coefficient indices (4 of 6 bits into the table 0x35a738, 8 of 5 bits + 16), each
+  a quarter of the step from the old; the first index below the threshold picks the Huffman excitation. Four
+  subframes of 108: lag (8 bits), pitch gain (4 bits / 15), gain (6 bits, the table), odd (1 bit), plain (1 bit);
+  `SndMt_ReadExcitation` 0x2e2c50 fills every second value (plain: 2 bits ±2 or 1 bit 0; Huffman: two models of
+  256 at 0x35a838, 29 symbols at 0x35aa38 (next model, bits, value), escapes 0/1 a unary value from 7 and a sign,
+  2/3 a run of 7 + 6 bits zeros); not plain: `SndMt_InterpolateOdd` 0x2e2e98 fills the others (taps 0x3f18ee49,
+  0xbdeaaefb, 0x3c93b945) and the gain halves; then value = pitch gain · past[216 + 108·s − lag + j] + gain ·
+  excitation. The last 324 become the past; the filter runs four times, the coefficients stepped before each
+  (`SndMt_SynthSubframe` 0x2e3010 over 12, 12, 12, then 396 samples): `SndMt_RcToLpc` 0x2e2f10, then
+  `SndMt_LpcSynth` 0x2e3620 (hand-written on the FPU's accumulator: each sample adds `lpc[k]` · the output `k + 1`
+  back, the newest term last except in each twelve's first sample).
+- `SndMt_PullStream` 0x2e17d0: a block's first byte 0 goes on from the last block (bits restart at the next byte,
+  the frame kept), else the header follows and the frame restarts. `Snd_FloatToPcm16` 0x2e3a5c clamps to
+  −32768..32767 and cuts toward zero; it always writes one group of four after the remainder loop (up to four
+  samples past the count; not ported, it writes past the output only).
+- The EE's float rules matter: a dying filter reaches denormals, which the EE flushes to zero (`ps2f::F`); IEEE
+  floats differ by an ulp after a few hundred frames.
+- STANDIN: `sndmt::decode` walks a part's chunks itself (rate, channels, codec from the PT tags as
+  `SndSound_ParseHeader` 0x2d60b0 reads them; channel offsets as `SndStream_OnDataChunk` 0x2d1e88 does) instead of
+  the IOP stream reader.
+
+The runner learnt COP1's `adda.s`, `suba.s`, `mula.s`, `madd.s`, `msub.s`, `madda.s`, `msuba.s`, `max.s`, `min.s`
+(products rounded before the add, as PCSX2) and `addi` (no overflow trap).
