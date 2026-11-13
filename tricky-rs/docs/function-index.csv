@@ -3448,46 +3448,46 @@ address,size,name,system,status
 0x208540,164,StaticInit_BdrLoad,boarder,not started
 0x2085e8,64,Mat4_TransformVec4Copy1,common,not started
 0x208628,44,Vec4_ScaleCopy28,common,not started
-0x2086d8,628,AsyncSys_PopQueue,audio,not started
-0x208950,424,AsyncSys_Init,audio,not started
-0x208af8,124,cAsyncSys::~cAsyncSys,files,not started
-0x208b78,204,AsyncSys_AllocBuffer,audio,not started
-0x208c48,104,AsyncSys_Shutdown,audio,not started
-0x208cb0,552,AsyncSys_StartNext,audio,not started
-0x208ed8,432,AsyncSys_QueueLoad,audio,not started
-0x209088,896,AsyncSys_CancelBank,audio,ported
-0x209408,1676,AsyncSys_Update,audio,not started
-0x209a98,8,AsyncSys_CancelAll,audio,not started
-0x209aa0,8,AsyncSys_PopNext,audio,not started
+0x2086d8,628,AsyncSys_PopQueue,audio,checked
+0x208950,424,AsyncSys_Init,audio,checked
+0x208af8,124,cAsyncSys::~cAsyncSys,files,checked
+0x208b78,204,AsyncSys_AllocBuffer,audio,checked
+0x208c48,104,AsyncSys_Shutdown,audio,checked
+0x208cb0,552,AsyncSys_StartNext,audio,checked
+0x208ed8,432,AsyncSys_QueueLoad,audio,checked
+0x209088,896,AsyncSys_CancelBank,audio,checked
+0x209408,1676,AsyncSys_Update,audio,checked
+0x209a98,8,AsyncSys_CancelAll,audio,checked
+0x209aa0,8,AsyncSys_PopNext,audio,checked
 0x209af0,80,cAsyncSys::__tf,runtime,host
 0x209b40,88,RingQueue_Destroy,common,ported
-0x209c18,48,BankSlot_Init,audio,not started
-0x209c48,92,BankSlot_Destroy,audio,not started
-0x209ca8,80,BankInstance_UnloadChain,audio,not started
-0x209cf8,532,BankSlot_Load,audio,not started
-0x209f10,92,BankInstance_Unload,audio,not started
-0x209f70,196,BankInstance_AllocStatic,audio,not started
-0x20a038,116,BankSlot_Free,audio,not started
-0x20a0b0,100,BankSlot_Link,audio,not started
-0x20a118,84,BankSlot_Unlink,audio,not started
-0x20a170,72,BankSlot_IsLoaded,audio,not started
-0x20a1b8,96,BankInstance_Release,audio,not started
-0x20a218,76,BankInstance_AllocDynamic,audio,not started
-0x20a268,132,BankSlot_Configure,audio,not started
-0x20a2f0,224,BankManager_Init,audio,not started
-0x20a3d0,144,cBankManager::~cBankManager,audio,not started
-0x20a460,164,BankManager_LoadIfChanged,audio,ported
-0x20a508,20,BankManager_UnloadBank,audio,not started
-0x20a520,176,BankManager_LoadBank,audio,ported
-0x20a5d0,32,BankManager_AllocStatic,audio,not started
-0x20a5f0,20,BankManager_FreeSlot,audio,not started
-0x20a608,28,BankManager_LinkSlots,audio,not started
-0x20a628,20,BankManager_UnlinkSlot,audio,not started
-0x20a640,20,cBankManager::vf9_20a640,audio,not started
-0x20a658,48,cBankManager::vf10_20a658,audio,not started
-0x20a688,40,cBankManager::vf11_20a688,audio,not started
-0x20a6b0,48,BankManager_GetHandle,audio,ported
-0x20a6e0,128,BankManager_IsSlotLoaded,audio,not started
+0x209c18,48,BankSlot_Init,audio,checked
+0x209c48,92,BankSlot_Destroy,audio,checked
+0x209ca8,80,BankInstance_UnloadChain,audio,checked
+0x209cf8,532,BankSlot_Load,audio,checked
+0x209f10,92,BankInstance_Unload,audio,checked
+0x209f70,196,BankInstance_AllocStatic,audio,checked
+0x20a038,116,BankSlot_Free,audio,checked
+0x20a0b0,100,BankSlot_Link,audio,checked
+0x20a118,84,BankSlot_Unlink,audio,checked
+0x20a170,72,BankSlot_IsLoaded,audio,checked
+0x20a1b8,96,BankInstance_Release,audio,checked
+0x20a218,76,BankInstance_AllocDynamic,audio,checked
+0x20a268,132,BankSlot_Configure,audio,checked
+0x20a2f0,224,BankManager_Init,audio,checked
+0x20a3d0,144,cBankManager::~cBankManager,audio,checked
+0x20a460,164,BankManager_LoadIfChanged,audio,checked
+0x20a508,20,BankManager_UnloadBank,audio,checked
+0x20a520,176,BankManager_LoadBank,audio,checked
+0x20a5d0,32,BankManager_AllocStatic,audio,checked
+0x20a5f0,20,BankManager_FreeSlot,audio,checked
+0x20a608,28,BankManager_LinkSlots,audio,checked
+0x20a628,20,BankManager_UnlinkSlot,audio,checked
+0x20a640,20,cBankManager::vf9_20a640,audio,checked
+0x20a658,48,cBankManager::vf10_20a658,audio,checked
+0x20a688,40,cBankManager::vf11_20a688,audio,checked
+0x20a6b0,48,BankManager_GetHandle,audio,checked
+0x20a6e0,128,BankManager_IsSlotLoaded,audio,checked
 0x20a7b8,80,cBankManager::__tf,runtime,host
 0x20a888,56,BankInstance_Init,audio,not started
 0x20a8c0,28,Mem_DeleteIfFlag7,common,not started
@@ -3511,8 +3511,8 @@ address,size,name,system,status
 0x20b948,104,SndVoice_Pause,audio,not started
 0x20b9b0,80,BankInstance_ResetPitch,audio,not started
 0x20ba00,404,BankInstance_Stop,audio,not started
-0x20bb98,196,BankMonitor_Init,audio,not started
-0x20bc60,136,cBankMonitor::~cBankMonitor,audio,not started
+0x20bb98,196,BankMonitor_Init,audio,ported
+0x20bc60,136,cBankMonitor::~cBankMonitor,audio,ported
 0x20bce8,124,BankMonitor_FindFreeInstance,audio,not started
 0x20bd68,640,BankMonitor_AddInstance,audio,ported
 0x20bfe8,88,BankMonitor_PauseAll,audio,not started
@@ -3797,7 +3797,7 @@ address,size,name,system,status
 0x222ac8,12,SndEvent_Enable,audio,checked
 0x222ad8,8,SndEvent_Disable,audio,checked
 0x222ae0,48,Monitor_TickCallback,audio,not started
-0x222b10,144,cMonitor::cMonitor,audio,not started
+0x222b10,144,cMonitor::cMonitor,audio,ported
 0x222ba0,144,cMonitor::~cMonitor,audio,not started
 0x222c30,32,cMonitor::vf4_222c30,audio,checked
 0x222c50,108,SndSys_FindFreeEvent,audio,checked
@@ -3900,7 +3900,7 @@ address,size,name,system,status
 0x2266a8,60,SpuAlloc_PopRecord,audio,not started
 0x226738,80,cPS2SoundManager::__tf,runtime,host
 0x226788,64,cSoundManager::__tf,runtime,host
-0x226848,1144,cSndPlayOpts::cSndPlayOpts,audio,not started
+0x226848,1144,cSndPlayOpts::cSndPlayOpts,audio,ported
 0x226cc0,280,cSndPlayOpts::~cSndPlayOpts,audio,not started
 0x226dd8,80,SndSys_SetPendingVolume,audio,ported
 0x226e58,44,SndSys_SetEntryCallback,audio,not started
@@ -6223,7 +6223,7 @@ address,size,name,system,status
 0x2c5c60,208,AsyncFile_Init,lib-file,ported
 0x2c5d30,240,AsyncFile_CancelAll,lib-file,host
 0x2c5e20,172,AsyncFile_Load,lib-file,ported
-0x2c5ed0,200,AsyncFile_LoadInto,lib-file,host
+0x2c5ed0,200,AsyncFile_LoadInto,lib-file,ported
 0x2c5f98,216,AsyncFile_StartRead,lib-file,host
 0x2c6070,148,AsyncFile_SetCallback,lib-file,host
 0x2c6108,88,AsyncFile_IsDone,lib-file,ported
@@ -6277,7 +6277,7 @@ address,size,name,system,status
 0x2c81e8,108,File_ReadWhole,lib-file,host
 0x2c8258,152,File_LoadIntoCb,lib-file,host
 0x2c82f0,84,File_LoadInto,lib-file,ported
-0x2c8348,80,File_LoadInto0,lib-file,host
+0x2c8348,80,File_LoadInto0,lib-file,ported
 0x2c8398,148,File_LoadManyCb,lib-file,host
 0x2c8430,108,File_LoadMany,lib-file,host
 0x2c84a0,104,File_BatchLoad,lib-file,host
@@ -6395,9 +6395,9 @@ address,size,name,system,status
 0x2cd890,28,EAMem_InitDefaultHeapMax,lib-eamem,host
 0x2cd8b0,224,EAMem_DestroyAll,lib-eamem,host
 0x2cd990,32,EAMem_HeapHeaderSize,lib-eamem,host
-0x2cd9b0,8,EAMem_GetSize,lib-eamem,host
+0x2cd9b0,8,EAMem_GetSize,lib-eamem,ported
 0x2cd9b8,84,EAMem_GetName,lib-eamem,host
-0x2cda18,576,EAMem_Resize,lib-eamem,host
+0x2cda18,576,EAMem_Resize,lib-eamem,ported
 0x2cdc60,104,EAMem_IsBlockHeader,lib-eamem,host
 0x2cdcc8,244,EAMem_CheckNeighbours,lib-eamem,host
 0x2cddc0,176,EAMem_CheckBackLinks,lib-eamem,host
@@ -6467,7 +6467,7 @@ address,size,name,system,status
 0x2cfb18,44,Timer_SetAlarm,lib-snd,not started
 0x2cfb48,48,Timer_WaitAlarm,lib-snd,not started
 0x2cfb80,44,Timer_AlarmExpired,lib-snd,not started
-0x2cfbb0,72,Timer_WaitTicks,lib-snd,not started
+0x2cfbb0,72,Timer_WaitTicks,lib-snd,ported
 0x2cfc00,396,Sort_Radix16,lib-snd,ported
 0x2cfd90,252,Sort_ShellPairs,lib-snd,ported
 0x2cfe90,28,Snd_Printf,lib-snd,not started
@@ -6491,11 +6491,11 @@ address,size,name,system,status
 0x2d0b98,568,SndMem_Alloc,lib-snd,not started
 0x2d0dd0,200,SndMem_Free,lib-snd,not started
 0x2d0e98,252,SndLayer_RunCallbacks,lib-snd,not started
-0x2d0f98,616,SndBank_Register,lib-snd,not started
-0x2d1200,472,SndBank_Unregister,lib-snd,not started
+0x2d0f98,616,SndBank_Register,lib-snd,ported
+0x2d1200,472,SndBank_Unregister,lib-snd,ported
 0x2d13d8,80,SndBank_Check,lib-snd,not started
-0x2d1428,28,SndBank_GetResidentSize,lib-snd,not started
-0x2d1448,136,SndBank_Relocate,lib-snd,not started
+0x2d1428,28,SndBank_GetResidentSize,lib-snd,ported
+0x2d1448,136,SndBank_Relocate,lib-snd,ported
 0x2d14d0,160,SndBank_IsPlaying,lib-snd,ported
 0x2d1570,268,SndBank_GetSoundInfo,lib-snd,not started
 0x2d1680,152,SndBank_FixLayerAddrs,lib-snd,not started
