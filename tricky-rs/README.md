@@ -204,6 +204,8 @@ music off and on, N the effects.
 calls (checkpoints, place changes) go through its announcer, and the lines it picks are decoded from the disc's
 speech files (MicroTalk) and played; N mutes them with the effects. `TRICKY_SPEECHLOG=1` prints each call and line.
 Taking the lead plays the game's placing sound (zbxsfx program 109, from `audio/bnk/sfx_109.wav`).
+The player's tricks (named, or "repeat" for one done again), wipe-outs and boost pressed with an empty meter go to the
+announcer too; `TRICKY_SPEECHLOG=1` prints them as `rider 0 Trick {..}`.
 
 - `ride.wav`, `air.wav`, `land.wav`, `jump.wav`, `grind.wav`, `rail_on.wav` from `zboard.bnk` (the board bank:
   streams 4, 1, 2, 3, 54, 53), `boost.wav`, `crash.wav`, `glass.wav`, `menu_ok.wav`, `pickup.wav` from

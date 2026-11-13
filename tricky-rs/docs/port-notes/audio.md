@@ -1371,3 +1371,33 @@ In the app (`src/racespeech.rs`) the stand-ins are now these ports, plus: the vi
 `RelTable_Init` fills; nothing seen changing it in a race), and the line state and handle done are the host's
 queue (a stream playing has a handle and its monitor; STANDIN). Still stand-ins: gApp+0x58 (0) and the records past
 the new-record list.
+
+## The announcer's calls from the riders (E1b2g7d3b4b, `src/racespeech.rs`, `game::rider::RiderSpeech`)
+
+The app's rider keeps what it asks of the audio object (`DAT_00343050`) in `Rider::speech`; `racespeech` takes it
+every frame (whatever happens, so it never grows) and runs it on the announcer.
+
+Proven (read from the code):
+
+- `Score_AnnounceTrick` 0x157088: for the focus player (`Score_IsFocusPlayer` 0x157c50: `Game_IsLeadOrFocusRider`
+  on the rider's +0x460 and its +0x418 below 0, not over the line) `Speech_AnnounceTrick` 0x232498(the rider at
+  +0x24c, the trick's id, `Score_CalcPoints` 0x155440 of the score) when no repeat or mode 6, else
+  `Speech_OnTrickLanded` 0x2333e0; then its message. In the app the focus test is "not a computer rider, not
+  finished" and the points are `score::calc_points(units, mult)` at that moment.
+- `Boarder_Wipeout` 0x11d830: f21 = `Score_GetMultiplier` 0x155410(rider+0x5820); the boost cut only when it is
+  above 0, the uber timer runs and not Tricky; then always `Sfx_OnWipeout` 0x2181e8(f12 that value, the rider) →
+  (`sndqueue::on_wipeout`) for the listener's rider the crowd by the value and `Speech_OnWipeout` 0x233d38.
+- `Audio_GetListenerRider` 0x20ed20(who): with no replay and who ≠ −1 the game object's rider word +0xa4 + 0x80·who;
+  else the first lead or focus rider (`Game_IsLeadOrFocusRider`; in a replay `Camera_IsFocusRider`), rider 0 if
+  none. One player: the player's rider either way.
+- `Boarder_UpdateBoost` 0x11d038(rider, held, start): held with no meter (+0x1c ≤ 0) and `start`, while the race
+  camera (game object +0x40) is absent or its state +0x20 is 0 or above 9, calls `Sfx_OnBoost` 0x2197d8; that one,
+  for a rider with +0x41c 1, cancels the events (`SndSys_CancelEvents` 0x219258ffff0000), queues sound 0x6c on slot 4
+  (volume 100, pitch fields 0x5a / 0x32), `SndSys_PlayPending`, then `Speech_OnBoost` 0x233e78.
+
+Inferred / stand-ins: `start` is taken as "pressed this tick" (the pad's bit 4 in `CruiseControl_Update`); the
+camera state test is not made; the sound 0x6c is the one `boardsound` already plays (sfx_108); the crowd's part of
+`Sfx_OnWipeout` waits for the crowd boxes (row E1b2g7d3b7). Not wired yet (the app's rider does not run the ported
+callers): `Speech_OnAirTime` 0x233448 (from `AirMotion_Update` at 0x109170), `Speech_OnAirEnter` 0x233950 (from
+`Sfx_OnAirEnter` 0x2174f8), `Speech_OnTenSecondsLeft` 0x233ff0 (from 0x1a2064), the rider hits, grudges, Tricky,
+resets, race lines and the nearby-rider lines.

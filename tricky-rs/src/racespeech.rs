@@ -13,6 +13,7 @@ use bevy::prelude::*;
 use std::collections::{HashMap, VecDeque};
 use std::sync::{Arc, Mutex};
 use tricky_game::race::SpeechCall;
+use tricky_game::rider::RiderSpeech;
 use tricky_game::speech::{Announcer, Event, PlaceRace, SpeechEnv, SpeechRider, Trigger};
 use tricky_game::sndqueue::{self, PlacingChangeEnv, Queue, QueueEnv, RingEnv, SoundRing};
 use tricky_game::speechhost::SpeechHost;
@@ -143,6 +144,30 @@ impl PlacingChangeEnv for Placing<'_, '_> {
         let r = |id: u32| if id == 0 { missing_rider() } else { speech_rider(self.race, id as usize - 1) };
         let (a, b) = (r(a), r(b));
         self.announcer.on_placing_change(&mut self.env, &a, &b);
+    }
+}
+
+/// What `Sfx_OnWipeout` 0x2181e8 reaches: the crowd and the rider's wipe-out line.
+struct Wipeout<'a, 'b> {
+    announcer: &'a Announcer,
+    env: &'a mut Env<'b>,
+    rider: &'a SpeechRider,
+}
+
+impl sndqueue::WipeoutEnv for Wipeout<'_, '_> {
+    fn replay_is_playing(&mut self) -> bool {
+        false
+    }
+    /// `Audio_GetListenerRider` 0x20ed20: the player's rider (the game object's +0xa4 for player 0; for −1 the
+    /// first lead or focus rider, the player's too with one player)
+    fn listener_rider(&mut self, _: u32) -> i64 {
+        rider_id(0) as i64
+    }
+    // STANDIN: no crowd boxes in the app yet (row E1b2g7d3b7)
+    fn crowd_off(&mut self, _: u32) {}
+    fn crowd_level(&mut self, _: u32, _: u32) {}
+    fn wipeout_voice(&mut self) {
+        self.announcer.on_wipeout(self.env, self.rider);
     }
 }
 
@@ -285,9 +310,12 @@ fn wav(s: &tricky_game::sndmt::Sound) -> Vec<u8> {
 pub fn race_speech(
     mut rs: ResMut<RaceSpeech>, sounds: Res<crate::sound::Sounds>, game: Res<ui::Game>, mode: Res<Mode>, race: Res<RaceRes>, time: Res<Time>,
     mut audio: ResMut<Assets<AudioSource>>, mut commands: Commands, sfx: Option<Res<crate::boardsound::BoardSounds>>,
-    playing: Query<Entity, With<PlacingSound>>, rider: Res<crate::RiderRes>, opponents: Res<crate::Opponents>,
+    playing: Query<Entity, With<PlacingSound>>, mut rider: ResMut<crate::RiderRes>, mut opponents: ResMut<crate::Opponents>,
     cam: Query<&GlobalTransform, With<Camera3d>>,
 ) {
+    // what the riders asked of the audio object this frame, taken whatever happens (rider `k` of the race: the player, then the others)
+    let mut asks = vec![(0, std::mem::take(&mut rider.0.speech))];
+    asks.extend(opponents.0.iter_mut().enumerate().map(|(i, o)| (i + 1, std::mem::take(&mut o.rider.speech))));
     if !rs.tried {
         rs.tried = true;
         rs.announcer = announcer();
@@ -392,6 +420,35 @@ pub fn race_speech(
         }
     }
     rs.sent = calls.len();
+    for (k, list) in asks {
+        let who = speech_rider(r, k);
+        for a in list {
+            if std::env::var("TRICKY_SPEECHLOG").is_ok() {
+                println!("speech: rider {k} {a:?}");
+            }
+            match a {
+                RiderSpeech::Trick { id, repeat, points } => {
+                    if tricky_game::score::announce_speaks_trick(repeat, r.mode) {
+                        rs.announcer.announce_trick(&mut env, &who, id, points);
+                    } else {
+                        rs.announcer.on_trick_landed(&mut env, &who);
+                    }
+                }
+                // `Sfx_OnBoost` 0x2197d8: for the player's rider (+0x41c 1) its events cancelled, sound 0x6c queued
+                // and played, then `Speech_OnBoost` 0x233e78 (STANDIN: the sound is `boardsound`'s sfx_108)
+                RiderSpeech::BoostEmpty => {
+                    if k == 0 {
+                        rs.announcer.on_boost(&mut env, &who);
+                    }
+                }
+                RiderSpeech::Wipeout(level) => {
+                    let air = sndqueue::AirRider { flag_41c: (k == 0) as u32, player: 0, air: 0.0, emitter: 0 };
+                    let mut w = Wipeout { announcer: &rs.announcer, env: &mut env, rider: &who };
+                    sndqueue::on_wipeout(level, rider_id(k) as i64, &air, &mut w);
+                }
+            }
+        }
+    }
     // `SndSys_UpdateQueuedSounds` 0x215658, from `Audio_InGameUpdate`
     let mut bank = Bank { bank: &mut rs.bank, alive: &alive, stops };
     rs.ring.update(r.line_frame, &mut bank);

@@ -723,11 +723,14 @@ impl Rider {
         match c {
             Call::Crash => {
                 // `Boarder_Wipeout` 0x11d830: with a multiplier, a running uber window and not "tricky", the meter
-                // cut to two thirds (0.66599226) and the window closed; STANDIN: no `Sfx_OnWipeout` (rows G10)
-                if 0.0 < crate::score::get_multiplier(self.sc.units) && 0.0 < self.uber_timer && !self.tricky() {
+                // cut to two thirds (0.66599226) and the window closed; then `Sfx_OnWipeout` 0x2181e8 with that
+                // multiplier (the app's announcer)
+                let level = crate::score::get_multiplier(self.sc.units);
+                if 0.0 < level && 0.0 < self.uber_timer && !self.tricky() {
                     self.boost = self.boost.min(0.665_992_26);
                     self.uber_timer = 0.0;
                 }
+                self.speech.push(super::RiderSpeech::Wipeout(level));
                 let (m, calls) = self.sc.crash(false);
                 self.show(&calls);
                 self.add_meter(m);
