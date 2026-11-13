@@ -275,3 +275,46 @@ fn call(r: &mut Runner, f: u32, args: &[u64]) -> u64 {
     r.call(f).unwrap_or_else(|e| panic!("{f:#x}: {e}"));
     r.cpu.gpr(2)
 }
+
+#[test]
+fn volume_preset_and_speech_level_are_the_original() {
+    let Some(mut r) = Runner::from_env() else { return };
+    let log: Rc<RefCell<Vec<Ev>>> = Rc::new(RefCell::new(Vec::new()));
+    let l = log.clone();
+    r.stub(0x211db0, move |c, _| l.borrow_mut().push(Ev::Vol(c.gpr(5) as u32, c.f(12).to_bits())));
+    let l = log.clone();
+    r.stub(0x212210, move |c, _| l.borrow_mut().push(Ev::Speech(c.f(12).to_bits())));
+    let l = log.clone();
+    r.stub(0x212270, move |c, _| l.borrow_mut().push(Ev::Mode(c.gpr(5) as u32)));
+    let sys = r.mem.alloc(0x3900);
+    for preset in [0u64, 1, 2, 3, 4, 5, 6, 0xffff_ffff, 0xffff_ffff_ffff_ffff] {
+        log.borrow_mut().clear();
+        r.cpu.set_gpr(4, sys as u64);
+        r.cpu.set_gpr(5, preset);
+        r.call(0x21bca8).unwrap_or_else(|e| panic!("preset {preset}: {e}"));
+        assert_eq!(r.mem.read_u32(sys + 0x3834), preset as u32);
+        let mut s = Snd { vols: [0.0; 5], speech: 0.0, mode: 0, log: Vec::new() };
+        // the original's test is unsigned and on the 64-bit register
+        if preset < 6 {
+            tricky_game::career::set_volume_preset(&mut s, preset as u32);
+        }
+        assert_eq!(*log.borrow(), s.log, "preset {preset}");
+    }
+    // the speech level on its own runner (the one above stubs it)
+    let Some(mut r) = Runner::from_env() else { return };
+    let sys = r.mem.alloc(0x3900);
+    let mut g = Rng(0x2122_1000_0000_0001);
+    for case in 0..5_000 {
+        let v = match case % 4 {
+            0 => f32::from_bits(g.next()),
+            1 => (g.next() as f32 / u32::MAX as f32) * 3.0 - 1.0,
+            2 => [0.0, -0.0, 1.0, -1.0, f32::NAN, f32::INFINITY, f32::NEG_INFINITY][(g.next() % 7) as usize],
+            _ => g.next() as f32 / u32::MAX as f32,
+        };
+        r.mem.write_u32(sys + 0x383c, 0xdead_beef);
+        r.cpu.set_gpr(4, sys as u64);
+        r.cpu.set_f(12, v);
+        r.call(0x212210).unwrap_or_else(|e| panic!("case {case}: {e}"));
+        assert_eq!(r.mem.read_u32(sys + 0x383c), tricky_game::career::speech_level(v).to_bits(), "case {case} {v}");
+    }
+}

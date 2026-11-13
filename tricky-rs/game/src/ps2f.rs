@@ -10,7 +10,7 @@ use std::ops::{Add, Div, Mul, Neg, Sub};
 pub struct F(pub f32);
 
 /// A register value as the EE reads it: exponent 0 is zero, exponent 255 the largest float.
-fn load(x: f32) -> f32 {
+pub fn load(x: f32) -> f32 {
     let b = x.to_bits();
     match (b >> 23) & 0xff {
         0 => f32::from_bits(b & 0x8000_0000),

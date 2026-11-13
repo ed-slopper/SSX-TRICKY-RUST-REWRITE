@@ -1510,3 +1510,23 @@ clears the entry's arrays (+0x3c the record's volume, +0x74 row 100, 0, 0x5a, 0x
 0x3c (root), 0x7f; half-words at 8..0x16 = 0, 0, 0x1000, 0x1000, 0x1000, 0, 0xffff, 0; bytes 5..7 untouched (0xc0,
 0xad, 0xde from the fill). `sndqueue::play_opts_header` gives the header; the app's queue starts with it. Not ported:
 the rest of the constructor (the arrays' other defaults; the app's `Queue` starts them at 0).
+
+### The speech level and the volume presets (E1b2g7d3b6)
+
+Proven (checked in `tests/career.rs` `volume_preset_and_speech_level_are_the_original`):
+
+- `Audio_SetVolumePreset` 0x21bca8 (system, preset): +0x3834 = preset; presets 0..5 (unsigned test on the
+  register, jump table 0x39f0b0) call `SndMgr_SetVolume` 0x211db0 on channels 1, 4, 2, 3, then the speech level and
+  the output mode (`FUN_00212270`); preset 0 sets the mode first (its tail call is the speech level). Values (H =
+  10/11, 0x3f68ba2f): 0: H H H H, speech H, mode 1; 1: H H 0 0, 0, 1; 2: 0 H H H, H, 1; 3: 0 H 0 0, 0, 1; 4: H 0 0
+  0, 0, 1; 5: all 0, mode 0. `career::set_volume_preset`.
+- `Audio_SetSpeechLevel` 0x212210: +0x383c clamped to 0..1 by EE float compares (a denormal is 0, exponent 255 the
+  largest of its sign), a value inside stored as it came. `career::speech_level`. Nothing else writes +0x383c.
+- `cBXAudio::cBXAudio` 0x20db18: channel 0 at H, `Audio_SetVolumePreset`(0), channels 5 and 6 at 1.0; +0x6e68 (the
+  announcer's cap) 10.
+- A new career takes the profile's levels from the sound manager (`Profile_SyncAudioSettings` 0x161928); a loaded one
+  gives them to it (`Profile_ApplyAudioSettings` 0x161a98, speech at profile +0x1664).
+
+In the app: `ui::AudioLevels` is the sound manager's levels as the constructor leaves them, handed to
+`CareerFile::open`; the announcer reads its speech level each frame and has its cap of 10. STANDIN: the volumes are
+kept as given (`SndMgr_SetVolume` not ported) and nothing plays by them yet.

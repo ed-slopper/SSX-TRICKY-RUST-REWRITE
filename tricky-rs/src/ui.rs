@@ -47,11 +47,44 @@ pub struct CareerRes(pub tricky_game::career::Career);
 fn career_path() -> std::path::PathBuf {
     std::env::current_exe().ok().and_then(|p| p.parent().map(|p| p.to_path_buf())).unwrap_or_default().join("tricky-career.sav")
 }
+/// The sound manager's levels the career's profile reads and sets (`career::AudioSettings`: `SndMgr_GetVolume` /
+/// `SndMgr_SetVolume` 0x211db0 channels 0..6, the speech level +0x383c, the output mode), as `cBXAudio::cBXAudio`
+/// 0x20db18 starts them: channel 0 at 10/11 (0x3f68ba2f), `Audio_SetVolumePreset`(0) (`career::set_volume_preset`),
+/// channels 5 and 6 at 1.
+// STANDIN: the sound manager's volumes are kept as given (what `SndMgr_SetVolume` does with them is not ported); only
+// the speech level is read (by the announcer, `src/racespeech.rs`).
+#[derive(Resource, Clone, Debug)]
+pub struct AudioLevels {
+    pub vols: [f32; 7],
+    pub speech: f32,
+    pub mode: u32,
+}
+impl Default for AudioLevels {
+    fn default() -> Self {
+        let mut a = AudioLevels { vols: [0.0; 7], speech: 0.0, mode: 0 };
+        a.vols[0] = f32::from_bits(0x3f68_ba2f);
+        tricky_game::career::set_volume_preset(&mut a, 0);
+        a.vols[5] = 1.0;
+        a.vols[6] = 1.0;
+        a
+    }
+}
+impl tricky_game::career::AudioSettings for AudioLevels {
+    fn volume(&self, ch: u32) -> f32 { self.vols.get(ch as usize).copied().unwrap_or(0.0) }
+    fn speech(&self) -> f32 { self.speech }
+    fn mode(&self) -> u32 { self.mode }
+    fn set_volume(&mut self, ch: u32, v: f32) { if let Some(x) = self.vols.get_mut(ch as usize) { *x = v; } }
+    /// `Audio_SetSpeechLevel` 0x212210
+    fn set_speech(&mut self, v: f32) { self.speech = tricky_game::career::speech_level(v); }
+    fn set_mode(&mut self, m: u32) { self.mode = m; }
+}
+
 impl CareerRes {
-    pub fn load() -> Self {
+    /// The career from the card file, or a new one; its profile's audio settings go to (or, new, come from) `levels`.
+    pub fn load(levels: &mut AudioLevels) -> Self {
         let file = std::fs::read(career_path()).ok();
         let seed = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map_or(1, |d| d.as_nanos() as u32);
-        let (mut career, _) = tricky_game::career::CareerFile::open(file.as_deref(), 0, seed, None);
+        let (mut career, _) = tricky_game::career::CareerFile::open(file.as_deref(), 0, seed, Some(levels));
         // the player slots are not in the card's part: no one in them until the menus put the player in slot 0
         for k in 0..4 { career.clear_player_slot(k); }
         Self(career)

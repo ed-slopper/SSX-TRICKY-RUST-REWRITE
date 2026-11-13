@@ -3583,7 +3583,7 @@ address,size,name,system,status
 0x211f90,36,Audio_VolumeDown,audio,ported
 0x211fb8,92,Audio_FadeMusicTo,audio,not started
 0x212018,504,Audio_UpdateMusicFade,audio,not started
-0x212210,92,Audio_SetSpeechLevel,audio,ported
+0x212210,92,Audio_SetSpeechLevel,audio,checked
 0x212270,16,Audio_SetMusicFx,audio,ported
 0x212280,68,cBXAudio::vf1_212280,audio,not started
 0x212300,68,Audio_PlayFESound32Gated,audio,ported
@@ -3670,7 +3670,7 @@ address,size,name,system,status
 0x21b718,272,Sfx_UpdateCarveLoop,audio,not started
 0x21b828,1076,Audio_BigAirMusicDuck,audio,ported
 0x21bc60,8,cBXAudio::vf2_21bc60,audio,not started
-0x21bca8,88,Audio_SetVolumePreset,audio,ported
+0x21bca8,88,Audio_SetVolumePreset,audio,checked
 0x21bfd0,60,Replay_IsPlaying,replay,ported
 0x21c010,100,Audio_GetRiderPos,audio,ported
 0x21c078,36,Audio_RiderCount,audio,ported

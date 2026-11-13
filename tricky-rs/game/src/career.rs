@@ -207,6 +207,47 @@ pub trait AudioSettings {
     fn set_mode(&mut self, m: u32);
 }
 
+/// `Audio_SetVolumePreset` 0x21bca8 (the audio system, the preset; +0x3834 keeps the preset, not modelled): presets 0..5
+/// (the jump table 0x39f0b0) set the channels 1, 4, 2, 3, then the speech level and the output mode (`FUN_00212270`);
+/// channel 0 is left. 10/11 is 0x3f68ba2f. Any other preset does nothing.
+pub fn set_volume_preset(a: &mut dyn AudioSettings, preset: u32) {
+    const H: f32 = f32::from_bits(0x3f68_ba2f);
+    // (channel 1, 4, 2, 3, speech, mode)
+    let (c1, c4, c2, c3, sp, mode) = match preset {
+        0 => (H, H, H, H, H, 1),
+        1 => (H, H, 0.0, 0.0, 0.0, 1),
+        2 => (0.0, H, H, H, H, 1),
+        3 => (0.0, H, 0.0, 0.0, 0.0, 1),
+        4 => (H, 0.0, 0.0, 0.0, 0.0, 1),
+        5 => (0.0, 0.0, 0.0, 0.0, 0.0, 0),
+        _ => return,
+    };
+    for (ch, v) in [(1, c1), (4, c4), (2, c2), (3, c3)] {
+        a.set_volume(ch, v);
+    }
+    // preset 0 sets the mode before the speech level (its tail call is `Audio_SetSpeechLevel`), the rest after
+    if preset == 0 {
+        a.set_mode(mode);
+        a.set_speech(sp);
+    } else {
+        a.set_speech(sp);
+        a.set_mode(mode);
+    }
+}
+
+/// `Audio_SetSpeechLevel` 0x212210: the speech level kept clamped to 0..1, compared as the EE reads floats (a
+/// denormal is 0, exponent 255 the largest of its sign); a value inside is stored as it came.
+pub fn speech_level(v: f32) -> f32 {
+    let c = crate::ps2f::load(v);
+    if c < 1.0 && c < 0.0 {
+        0.0
+    } else if c < 1.0 {
+        v
+    } else {
+        1.0
+    }
+}
+
 /// The career block.
 #[derive(Clone, PartialEq, Eq)]
 pub struct Career {

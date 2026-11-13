@@ -291,12 +291,10 @@ fn missing_rider() -> SpeechRider {
     SpeechRider { id: 0, controller: 0, ..Default::default() }
 }
 
-/// The speech level `Announcer::roll` reads (+0x383c, `Audio_SetSpeechLevel` 0x212210 clamps it to 0..1) and its cap
-/// (+0x6e68).
-// STANDIN: 0 and 0, for the profile's speech setting (`Profile_ApplyAudioSettings` 0x161a98) and the cap's writer
-// (not found yet); with a level under 1 the roll reads the chance table's first column either way.
+/// The announcer with its cap (+0x6e68: 10, from `cBXAudio::cBXAudio` 0x20db18); the speech level (+0x383c) is the
+/// sound manager's (`ui::AudioLevels`), set each frame.
 fn announcer() -> Announcer {
-    Announcer { level: 0.0, cap: 0, ..Default::default() }
+    Announcer { cap: 10, ..Default::default() }
 }
 
 /// What the announcer's race-line handlers ask of the game (`SpeechEnv`) for the riders of `race`.
@@ -425,8 +423,7 @@ pub fn race_speech(
     mut rs: ResMut<RaceSpeech>, sounds: Res<crate::sound::Sounds>, game: Res<ui::Game>, mode: Res<Mode>, race: Res<RaceRes>, time: Res<Time>,
     mut audio: ResMut<Assets<AudioSource>>, mut commands: Commands, sfx: Option<Res<crate::boardsound::BoardSounds>>,
     playing: Query<Entity, With<PlacingSound>>, mut rider: ResMut<crate::RiderRes>, mut opponents: ResMut<crate::Opponents>,
-    cam: Query<&GlobalTransform, With<Camera3d>>, music: Res<crate::pathmusic::PathMusic>, list: Res<crate::LevelList>,
-    level: Res<crate::LevelRes>,
+    cam: Query<&GlobalTransform, With<Camera3d>>, music: Res<crate::pathmusic::PathMusic>, (list, level, levels): (Res<crate::LevelList>, Res<crate::LevelRes>, Res<ui::AudioLevels>),
 ) {
     // what the riders asked of the audio object this frame, taken whatever happens (rider `k` of the race: the player, then the others)
     let mut asks = vec![(0, std::mem::take(&mut rider.0.speech))];
@@ -463,6 +460,8 @@ pub fn race_speech(
         }
     }
     let rs = &mut *rs;
+    // the speech level +0x383c (`Audio_SetSpeechLevel` 0x212210, from the profile)
+    rs.announcer.level = levels.speech;
     let Some(sys) = &mut rs.sys else { return };
     // `Audio_LoadInGameConfig` 0x211098's BANKS.INF half for the course (`tricky_data::audiocfg::ingame_banks`): its
     // `SWAP` list and its `BANK`; the course's key is its archive name upper-cased, as the music's

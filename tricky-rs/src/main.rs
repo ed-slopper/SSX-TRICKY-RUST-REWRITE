@@ -411,6 +411,9 @@ fn main() {
     let (start, start_yaw) = std::env::var("TRICKY_SPAWN").ok().map(|v| v.split(',').filter_map(|x| x.parse::<f32>().ok()).collect::<Vec<_>>())
         .filter(|v| v.len() == 4).map_or((start, start_yaw), |v| (Vec3::new(v[0], v[1], v[2]), v[3]));
 
+    // the sound manager's levels and the career, whose profile sets them (`Profile_ApplyAudioSettings` 0x161a98)
+    let mut levels = ui::AudioLevels::default();
+    let career = ui::CareerRes::load(&mut levels);
     let mut app = App::new();
     app.add_plugins(DefaultPlugins.set(WindowPlugin {
         primary_window: Some(Window { title: "tricky-rs".into(), resolution: (1280.0_f32, 720.0_f32).into(), ..default() }),
@@ -428,7 +431,8 @@ fn main() {
     .init_resource::<CamRes>()
     .init_resource::<editor::Editor>()
     .init_resource::<editor::Reload>()
-    .insert_resource(ui::CareerRes::load())
+    .insert_resource(career)
+    .insert_resource(levels)
     .init_resource::<book::Book>()
     .init_resource::<hudsprites::HudSprites>()
     .init_resource::<gamehud::GameHud>()
