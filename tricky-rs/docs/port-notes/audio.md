@@ -1467,3 +1467,31 @@ Proven (read from the code):
 
 Heard in a Garibaldi race: take-offs reach the speech (`AirEnter`), a 4.7 s flight played a rider's line (stream 3,
 `data\speech\char\13b2.dat`).
+
+### The event sound heard (E1b2g7d5a)
+
+Proven (live Ghidra, checked in `tests/sndqueue.rs` `ambient_banks_match_the_original`):
+
+- `Audio_FindBankName` 0x21a640: `strcmp` of the name against all 200 entries of the swap list (+0x38e0, 0x40 bytes
+  each, whatever the count +0x38dc), the first equal index, else −1.
+- `Audio_LoadAmbientBank` 0x21a548 (system, index): unless the bank's flag (+0x6ae0 + 4·index) is set, the bank
+  manager's slot 6 (system +0xa3c, 0x60 a slot, state +0x240) is emptied first when its state is 0 or 1
+  (`Audio_ClearAmbientLoaded` 0x21a468 clears all 200 flags, `BankManager_UnloadBank` 0x20a508(system, 6)), or the
+  call returns −1 while it is 2 (loading). Then state 1 returns 1 (in); state 0 sets the flag and asks
+  `BankManager_LoadBank` 0x20a520(system, 6, the list entry, 0x10), −1; anything else −1. Ported as
+  `sndqueue::AmbientBanks`.
+- The swap list is BANKS.INF's `SWAP` keys of the course's section (`tricky_data::audiocfg::ingame_banks`); every
+  course of the disc lists `Tunnel1.bnk` and `RiverSmall.bnk`. Bank slots by key: MAIN 0, BOARD 1, BANK 2, CROWD 3,
+  AUX 4, TRICKY 5, the swap bank 6, songs from 8.
+- Queue kind 2 (the event sound's kind 2, sound 9) is the course's `BANK` slot; only `megaplex1.bnk` has a sound 9.
+  Kind 6 is the swap bank in slot 6.
+- On the disc's race lines only event 0xe is placed (Garibaldi's side lines 7 and 12, Elysium's 12; the type 0x17 and
+  0x18 events are on no course), so in a race only the tunnel's sound plays.
+
+In the app (`tricky-rs/src/racespeech.rs`): the course's BANKS.INF section is read from the disc (key: the course's
+archive name upper-cased, as for the music); the event sound plays the bank's sample exported by
+`tools/bnk/levelaudio.py DATA/AUDIO/AUDIO.BIG audio/world` (`audio/world/<Bank>/<Bank>_<id>[_loop].wav`), looping
+when the program loops, at the queue record's volume byte. Stand-ins: the bank manager (a load is in at once), the
+sound driver `SND_PlayBankSound` 0x2d1718. Checked by hand with the calls forced: Tunnel1 and RiverSmall loops play at
+volume 35 and stop on `Audio_StopEventSound`; kind 2 plays at volume 0, since its record keeps the queue's header byte
+(system +8, 0x18 bytes), whose writer was not found (not in `cBXAudio::cBXAudio` 0x20db18; row E1b2g7d5b).

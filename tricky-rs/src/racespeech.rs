@@ -31,6 +31,8 @@ fn disc() -> Option<Files> {
 struct Loaded {
     host: SpeechHost,
     files: Files,
+    /// DATA/CONFIG/BANKS.INF
+    banks: Option<Vec<u8>>,
 }
 
 /// A stream's parts: the one playing (its sound and seconds left) and those queued behind it.
@@ -54,6 +56,14 @@ pub struct RaceSpeech {
     ring: SoundRing,
     /// the rider event bits' sound (+0x7420)
     event: sndqueue::EventSound,
+    /// the course's ambient banks (BANKS.INF's `SWAP` list, +0x38e0) and the one in the bank manager's slot 6
+    ambient: sndqueue::AmbientBanks,
+    slot6: Slot6,
+    /// the course the banks are for, and its `BANK` (slot 2)
+    course: Option<usize>,
+    course_bank: Vec<u8>,
+    /// the banks' samples (`audio/world/`)
+    world: std::path::PathBuf,
     /// the bank sounds playing, by handle, and the last handle given
     bank: HashMap<u32, Entity>,
     handle: u32,
@@ -88,12 +98,37 @@ impl RingEnv for Bank<'_> {
 }
 
 /// What the event sound (`sndqueue::EventSound`) asks of the audio system.
-struct EventSfx<'a> {
+struct EventSfx<'a, 'b> {
     bank: Bank<'a>,
-    handle: &'a mut u32,
+    handle: &'b mut u32,
+    ambient: &'b mut sndqueue::AmbientBanks,
+    slot6: &'b mut Slot6,
 }
 
-impl QueueEnv for EventSfx<'_> {
+/// The bank manager's slot 6, the ambient bank in it.
+// STANDIN: the bank manager (`BankManager_LoadBank` 0x20a520 / `BankManager_UnloadBank` 0x20a508): a load is in at
+// once (the bank's samples are read from `audio/world/` when played)
+#[derive(Default)]
+struct Slot6 {
+    state: i32,
+    name: Vec<u8>,
+}
+
+impl sndqueue::AmbientEnv for Slot6 {
+    fn state(&mut self) -> i32 {
+        self.state
+    }
+    fn unload(&mut self) {
+        self.state = 0;
+        self.name.clear();
+    }
+    fn load(&mut self, name: &[u8]) {
+        self.state = 1;
+        self.name = name.to_vec();
+    }
+}
+
+impl QueueEnv for EventSfx<'_, '_> {
     // STANDIN: the sound manager's slots (`SndMgr_GetSlot` 0x211f38)
     fn get_slot(&mut self, _: u32) -> u32 {
         0
@@ -101,29 +136,65 @@ impl QueueEnv for EventSfx<'_> {
     fn rider_listener(&mut self) -> u32 {
         rider_id(0)
     }
-    /// `SndSys_PlayPending` 0x20c948: the entry taken off and a handle given.
-    // STANDIN: the sound driver: kind 2's sound 9 (its bank not found yet, row E1b2g7d5a) is not heard
+    /// `SndSys_PlayPending` 0x20c948: a handle given (the entry is played and taken off by the caller, [`play_bank_sound`])
     fn play_pending(&mut self) -> u64 {
         *self.handle += 1;
-        if std::env::var("TRICKY_SPEECHLOG").is_ok() {
-            println!("speech: the event sound plays as {}", *self.handle);
-        }
         *self.handle as u64
     }
 }
 
-impl sndqueue::EventSoundEnv for EventSfx<'_> {
-    /// `Audio_FindBankName` 0x21a640 / `Audio_LoadAmbientBank` 0x21a548
-    // STANDIN: the app loads no ambient banks yet (row E1b2g7d5a), so the tunnel's and the river's sounds stay pending
+impl sndqueue::EventSoundEnv for EventSfx<'_, '_> {
+    /// `Audio_FindBankName` 0x21a640 then `Audio_LoadAmbientBank` 0x21a548
     fn load_ambient_bank(&mut self, name: &str) -> i64 {
-        if std::env::var("TRICKY_SPEECHLOG").is_ok() {
-            println!("speech: the event sound wants {name}");
+        let index = self.ambient.find(name.as_bytes());
+        // (not in the list the game would read the word before the flags; every course lists both banks)
+        if index < 0 {
+            return -1;
         }
-        0
+        self.ambient.load(index as usize, self.slot6)
     }
     fn stop_bank_sound(&mut self, h: u32) {
         self.bank.stop(h);
     }
+}
+
+/// The bank file a queue entry's kind names (`SndSys_PlayPending` 0x20c948 plays from the kind's bank): kind 2 the
+/// course's `BANK` of BANKS.INF, kind 6 the ambient bank in slot 6.
+fn kind_bank(kind: u32, course: &[u8], slot6: &Slot6) -> Option<String> {
+    let path = match kind {
+        2 => course,
+        6 if slot6.state == 1 => &slot6.name,
+        _ => return None,
+    };
+    let s = String::from_utf8_lossy(path);
+    let file = s.rsplit(['\\', '/']).next()?;
+    Some(file.trim_end_matches(".bnk").trim_end_matches(".BNK").to_string())
+}
+
+/// The queue's top entry played and taken off (`SndSys_PlayPending` 0x20c948): sound `id` of its kind's bank at the
+/// record's volume byte, looping when the bank's program loops.
+// STANDIN: the sound driver (`SND_PlayBankSound` 0x2d1718), for the bank's sample exported to `audio/world/<bank>/`
+// (tools/bnk/levelaudio.py on AUDIO.BIG), its pitch and level from bnk2wav's json beside it
+fn play_bank_sound(q: &mut Queue, bank: Option<String>, dir: &std::path::Path, vol: f32, audio: &mut Assets<AudioSource>, commands: &mut Commands) -> Option<Entity> {
+    let i = q.count.max(0) as usize;
+    q.count -= 1;
+    let (id, volume) = (q.id[i], q.record[i][0]);
+    let bank = bank?;
+    let folder = dir.join(&bank);
+    let looped = folder.join(format!("{bank}_{id}_loop.wav"));
+    let (file, mode) = if looped.is_file() { (looped, PlaybackMode::Loop) } else { (folder.join(format!("{bank}_{id}.wav")), PlaybackMode::Despawn) };
+    if std::env::var("TRICKY_SPEECHLOG").is_ok() {
+        println!("speech: the event sound plays {} at volume {volume}", file.display());
+    }
+    let bytes = std::fs::read(&file).ok()?;
+    let (mut root, mut level, mut detune) = (60.0, 127.0, 0.0);
+    if let Some(e) = std::fs::read_to_string(folder.join(format!("{bank}.json"))).ok().and_then(|t| serde_json::from_str::<serde_json::Value>(&t).ok()).and_then(|v| v.get(id.to_string()).cloned()) {
+        let g = |k: &str, d: f64| e.get(k).and_then(|x| x.as_f64()).unwrap_or(d) as f32;
+        (root, level, detune) = (g("root", 60.0), g("vol", 127.0), g("detune", 0.0));
+    }
+    let speed = 2f32.powf((detune - (root - 60.0) * 100.0) / 1200.0);
+    let settings = PlaybackSettings { mode, volume: Volume::Linear(vol * volume as f32 / 127.0 * level / 127.0), speed, ..default() };
+    Some(commands.spawn((AudioPlayer(audio.add(AudioSource { bytes: bytes.into() })), settings, PlacingSound)).id())
 }
 
 /// What `Sfx_OnPlacingChange` asks of the audio system, with the announcer's passing line behind it.
@@ -352,7 +423,8 @@ pub fn race_speech(
     mut rs: ResMut<RaceSpeech>, sounds: Res<crate::sound::Sounds>, game: Res<ui::Game>, mode: Res<Mode>, race: Res<RaceRes>, time: Res<Time>,
     mut audio: ResMut<Assets<AudioSource>>, mut commands: Commands, sfx: Option<Res<crate::boardsound::BoardSounds>>,
     playing: Query<Entity, With<PlacingSound>>, mut rider: ResMut<crate::RiderRes>, mut opponents: ResMut<crate::Opponents>,
-    cam: Query<&GlobalTransform, With<Camera3d>>, music: Res<crate::pathmusic::PathMusic>,
+    cam: Query<&GlobalTransform, With<Camera3d>>, music: Res<crate::pathmusic::PathMusic>, list: Res<crate::LevelList>,
+    level: Res<crate::LevelRes>,
 ) {
     // what the riders asked of the audio object this frame, taken whatever happens (rider `k` of the race: the player, then the others)
     let mut asks = vec![(0, std::mem::take(&mut rider.0.speech))];
@@ -369,7 +441,8 @@ pub fn race_speech(
                     let inf = files.load("data/config/speech.inf").ok().flatten()?;
                     let mut banks = disc()?;
                     let host = SpeechHost::new(&inf, Box::new(move |p: &str| banks.load(p).ok().flatten()));
-                    Some(Loaded { host, files })
+                    let banks = files.load("data/config/banks.inf").ok().flatten();
+                    Some(Loaded { host, files, banks })
                 })();
                 *s2.lock().unwrap() = Some(loaded);
             });
@@ -389,6 +462,22 @@ pub fn race_speech(
     }
     let rs = &mut *rs;
     let Some(sys) = &mut rs.sys else { return };
+    // `Audio_LoadInGameConfig` 0x211098's BANKS.INF half for the course (`tricky_data::audiocfg::ingame_banks`): its
+    // `SWAP` list and its `BANK`; the course's key is its archive name upper-cased, as the music's
+    if rs.course != Some(list.current) {
+        rs.course = Some(list.current);
+        let track = list.dirs.get(list.current).and_then(|d| d.file_name()).map(|n| n.to_string_lossy().to_string()).unwrap_or_default();
+        let key = tricky_data::aip::big_name(&track).unwrap_or("").to_ascii_uppercase();
+        let banks = sys.banks.as_deref().map(|b| tricky_data::audiocfg::ingame_banks(b, key.as_bytes())).unwrap_or_default();
+        rs.ambient = sndqueue::AmbientBanks { names: banks.swaps.into_iter().take(200).collect(), ..Default::default() };
+        rs.course_bank = banks.loads.iter().rfind(|l| l.slot == 2).map(|l| l.path.clone()).unwrap_or_default();
+        rs.slot6 = Slot6::default();
+        let given = std::path::absolute(&level.0.dir).unwrap_or(level.0.dir.clone());
+        rs.world = given.parent().and_then(|p| p.parent()).map(|p| p.join("audio").join("world")).unwrap_or_default();
+        if std::env::var("TRICKY_SPEECHLOG").is_ok() {
+            println!("speech: course {key}: {} ambient banks, bank {:?}, samples in {}", rs.ambient.names.len(), String::from_utf8_lossy(&rs.course_bank), rs.world.display());
+        }
+    }
     let calls = &race.0.speech[..];
     let racing = *mode == Mode::Ride && game.screen != ui::Screen::Menu && race.0.state != RaceState::Countdown;
     // a new run: the calls start again, the lines stop
@@ -405,6 +494,8 @@ pub fn race_speech(
         }
         rs.ring = SoundRing::default();
         rs.event = Default::default();
+        rs.slot6 = Slot6::default();
+        rs.ambient.clear_loaded();
         if !racing {
             return;
         }
@@ -464,7 +555,7 @@ pub fn race_speech(
             SpeechCall::Cheer(_) => {}
             SpeechCall::EventSound(Some(kind)) => rs.event.queue(kind),
             SpeechCall::EventSound(None) => {
-                let mut e = EventSfx { bank: Bank { bank: &mut rs.bank, alive: &alive, stops: Vec::new() }, handle: &mut rs.handle };
+                let mut e = EventSfx { bank: Bank { bank: &mut rs.bank, alive: &alive, stops: Vec::new() }, handle: &mut rs.handle, ambient: &mut rs.ambient, slot6: &mut rs.slot6 };
                 rs.event.stop(&mut e);
                 stops.append(&mut e.bank.stops);
             }
@@ -532,13 +623,16 @@ pub fn race_speech(
     rs.ring.update(r.line_frame, &mut bank);
     // `Audio_PlayEventSound` 0x21d0c0, from `Audio_InGameUpdate` at 0x20ef24
     let given = rs.handle;
-    let mut ev = EventSfx { bank, handle: &mut rs.handle };
+    let mut ev = EventSfx { bank, handle: &mut rs.handle, ambient: &mut rs.ambient, slot6: &mut rs.slot6 };
     rs.event.update(&mut rs.queue, &mut ev);
     let played = *ev.handle != given;
     let bank = ev.bank;
     if played {
-        // the entry `SndSys_PlayPending` takes off
-        rs.queue.count -= 1;
+        let i = rs.queue.count.max(0) as usize;
+        let file = kind_bank(rs.queue.kind[i], &rs.course_bank, &rs.slot6);
+        if let Some(e) = play_bank_sound(&mut rs.queue, file, &rs.world, vol, &mut audio, &mut commands) {
+            bank.bank.insert(rs.handle, e);
+        }
     }
     for e in bank.stops {
         commands.entity(e).try_despawn();
