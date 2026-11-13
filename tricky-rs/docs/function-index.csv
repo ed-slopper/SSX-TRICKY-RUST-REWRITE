@@ -3653,10 +3653,10 @@ address,size,name,system,status
 0x219d70,592,Sfx_PickupMultiplier,audio,ported
 0x219fc0,592,Sfx_PickupTime,audio,ported
 0x21a210,600,Audio_PlayScoreTick,audio,ported
-0x21a468,44,Audio_ClearAmbientLoaded,audio,not started
+0x21a468,44,Audio_ClearAmbientLoaded,audio,checked
 0x21a498,176,Audio_ListBankNames,audio,not started
-0x21a548,248,Audio_LoadAmbientBank,audio,ported
-0x21a640,100,Audio_FindBankName,audio,not started
+0x21a548,248,Audio_LoadAmbientBank,audio,checked
+0x21a640,100,Audio_FindBankName,audio,checked
 0x21a6a8,68,Sfx_ImpactSpeed,audio,ported
 0x21a6f0,32,Sfx_GetDragAmount,audio,ported
 0x21a710,48,Sfx_GetSteerAmount,audio,ported

@@ -788,3 +788,67 @@ impl EventSound {
         self.pending = 0;
     }
 }
+
+/// The audio system's ambient ("swap") banks: the names `Audio_LoadInGameConfig` 0x211098 lists from BANKS.INF's
+/// `SWAP` keys (+0x38e0, 0x40 bytes each, at most 200; their count +0x38dc) and a loaded flag for each (+0x6ae0).
+/// One of them at a time sits in the bank manager's slot 6.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct AmbientBanks {
+    pub names: Vec<Vec<u8>>,
+    pub loaded: [u32; 200],
+}
+
+impl Default for AmbientBanks {
+    fn default() -> Self {
+        AmbientBanks { names: Vec::new(), loaded: [0; 200] }
+    }
+}
+
+/// The bank manager's slot 6 (the system +0xa3c, 0x60 bytes a slot).
+pub trait AmbientEnv {
+    /// the slot's state (+0x240: 0 empty, 1 in, 2 loading)
+    fn state(&mut self) -> i32;
+    /// `BankManager_UnloadBank` 0x20a508 (the system, 6)
+    fn unload(&mut self);
+    /// `BankManager_LoadBank` 0x20a520 (the system, 6, the name, 0x10)
+    fn load(&mut self, name: &[u8]);
+}
+
+impl AmbientBanks {
+    /// `Audio_FindBankName` 0x21a640: the index of the list entry equal to `name` (`strcmp` over all 200, whatever the
+    /// count), −1 when none
+    pub fn find(&self, name: &[u8]) -> i32 {
+        (0..200).find(|&i| self.names.get(i).map_or(name.is_empty(), |n| n.as_slice() == name)).map_or(-1, |i| i as i32)
+    }
+
+    /// `Audio_ClearAmbientLoaded` 0x21a468: every flag 0
+    pub fn clear_loaded(&mut self) {
+        self.loaded = [0; 200];
+    }
+
+    /// `Audio_LoadAmbientBank` 0x21a548 (the system, the index): 1 when that bank is in. Not marked loaded: slot 6
+    /// emptied first (flags cleared, unloaded) unless it is loading (−1 then). Then slot 6 in: 1; empty: the bank
+    /// marked and its load asked for, −1; loading: −1. (An index of −1 would read +0x6adc, the word before the flags;
+    /// every course of the disc's BANKS.INF lists the event sound's banks.)
+    pub fn load(&mut self, index: usize, env: &mut dyn AmbientEnv) -> i64 {
+        if self.loaded[index] == 0 {
+            let s = env.state();
+            if (0..2).contains(&s) {
+                self.clear_loaded();
+                env.unload();
+            } else if s == 2 {
+                return -1;
+            }
+        }
+        match env.state() {
+            1 => 1,
+            0 => {
+                self.loaded[index] = 1;
+                let name = self.names.get(index).cloned().unwrap_or_default();
+                env.load(&name);
+                -1
+            }
+            _ => -1,
+        }
+    }
+}

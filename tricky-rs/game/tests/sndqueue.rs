@@ -1864,3 +1864,102 @@ fn event_sound_matches_the_original() {
         assert_eq!(after, q, "case {case} {which} state");
     }
 }
+
+// ---- the ambient banks ----
+
+struct AmbEnv {
+    log: Vec<(&'static str, Vec<u8>)>,
+    states: Vec<i32>,
+}
+impl AmbientEnv for AmbEnv {
+    fn state(&mut self) -> i32 {
+        self.log.push(("state", vec![]));
+        self.states[0]
+    }
+    fn unload(&mut self) {
+        self.log.push(("unload", vec![]));
+        self.states.remove(0);
+    }
+    fn load(&mut self, name: &[u8]) {
+        self.log.push(("load", name.to_vec()));
+    }
+}
+
+#[test]
+fn ambient_banks_match_the_original() {
+    let Some(mut r) = runner() else { return };
+    let sys = r.mem.alloc(0x7000);
+    let slots = r.mem.alloc(0x60 * 12);
+    r.allow(0x2fb468);
+    r.allow(0x21a468);
+    r.allow(0x2fd008);
+    let log: Rc<RefCell<Vec<(&'static str, Vec<u8>)>>> = Rc::new(RefCell::new(Vec::new()));
+    let states: Rc<RefCell<Vec<i32>>> = Rc::new(RefCell::new(Vec::new()));
+    let (l, st) = (log.clone(), states.clone());
+    r.stub(0x20a508, move |c, m| {
+        assert_eq!((c.gpr(4) as u32, c.gpr(5)), (sys, 6));
+        l.borrow_mut().push(("unload", vec![]));
+        st.borrow_mut().remove(0);
+        m.write_u32(slots + 0x240, st.borrow()[0] as u32);
+    });
+    let l = log.clone();
+    r.stub(0x20a520, move |c, m| {
+        assert_eq!((c.gpr(4) as u32, c.gpr(5), c.gpr(7)), (sys, 6, 0x10));
+        let a = c.gpr(6) as u32;
+        let mut buf = [0u8; 0x40];
+        m.read(a, &mut buf).unwrap();
+        let name: Vec<u8> = buf.iter().copied().take_while(|&b| b != 0).collect();
+        l.borrow_mut().push(("load", name));
+    });
+    let mut g = Rng(0x0a4b_1e47_0000_7777);
+    for case in 0..20_000 {
+        r.mem.write_u32(sys + 0xa3c, slots);
+        let mut amb = AmbientBanks::default();
+        let n = 1 + g.next() % 8;
+        for i in 0..200u32 {
+            let k = g.next() % n;
+            let name: Vec<u8> = format!("|data\\audio\\B{k}.bnk").into_bytes();
+            for (j, b) in name.iter().chain(std::iter::once(&0)).enumerate() {
+                r.mem.write_u8(sys + 0x38e0 + 0x40 * i + j as u32, *b);
+            }
+            amb.names.push(name);
+        }
+        for i in 0..200u32 {
+            let f = [0, 0, 1, g.next()][(g.next() % 4) as usize];
+            r.mem.write_u32(sys + 0x6ae0 + 4 * i, f);
+            amb.loaded[i as usize] = f;
+        }
+        let pick = |g: &mut Rng| [0, 1, 2, 3, -1][(g.next() % 5) as usize];
+        let sts = vec![pick(&mut g), pick(&mut g)];
+        r.mem.write_u32(slots + 0x240, sts[0] as u32);
+        let find = g.next() % 3 == 0;
+        let want: Vec<u8> = format!("|data\\audio\\B{}.bnk", g.next() % (n + 1)).into_bytes();
+        let index = (g.next() % 200) as usize;
+        *states.borrow_mut() = sts.clone();
+        log.borrow_mut().clear();
+        let got = if find {
+            let a = r.mem.alloc(0x40);
+            for (j, b) in want.iter().chain(std::iter::once(&0)).enumerate() {
+                r.mem.write_u8(a + j as u32, *b);
+            }
+            r.cpu.set_gpr(4, sys as u64);
+            r.cpu.set_gpr(5, a as u64);
+            r.call(0x21a640).unwrap_or_else(|e| panic!("case {case}: {e}"));
+            assert_eq!(r.cpu.gpr(2) as i32, amb.find(&want), "case {case} find");
+            continue;
+        } else {
+            r.cpu.set_gpr(4, sys as u64);
+            r.cpu.set_gpr(5, index as u64);
+            r.call(0x21a548).unwrap_or_else(|e| panic!("case {case}: {e}"));
+            r.cpu.gpr(2) as i32 as i64
+        };
+        let orig = std::mem::take(&mut *log.borrow_mut());
+        let flags: Vec<u32> = (0..200).map(|i| r.mem.read_u32(sys + 0x6ae0 + 4 * i)).collect();
+        let mut env = AmbEnv { log: Vec::new(), states: sts };
+        let mine = amb.load(index, &mut env);
+        let mine_log: Vec<_> = env.log.into_iter().filter(|(n, _)| *n != "state").collect();
+        assert_eq!(got, mine, "case {case}");
+        assert_eq!(orig, mine_log, "case {case}");
+        assert_eq!(flags, amb.loaded.to_vec(), "case {case} flags");
+    }
+}
