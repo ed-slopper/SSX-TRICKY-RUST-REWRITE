@@ -3559,7 +3559,7 @@ address,size,name,system,status
 0x20f8c0,72,Audio_CancelMusicDuck,audio,not started
 0x20f908,140,Sfx_SurfaceSoundType,audio,ported
 0x20f998,20,Audio_SetMusicMode,audio,not started
-0x20f9b0,208,Audio_FindRiderNear,audio,ported
+0x20f9b0,208,Audio_FindRiderNear,audio,checked
 0x20fa80,228,Audio_AnyRiderNearAhead,audio,ported
 0x20fb68,244,Audio_IsNearerPlayer2,audio,ported
 0x20fc60,124,Audio_GetRiderListener,audio,ported
@@ -3672,8 +3672,8 @@ address,size,name,system,status
 0x21bc60,8,cBXAudio::vf2_21bc60,audio,not started
 0x21bca8,88,Audio_SetVolumePreset,audio,ported
 0x21bfd0,60,Replay_IsPlaying,replay,ported
-0x21c010,100,Audio_GetRiderPos,audio,not started
-0x21c078,36,Audio_RiderCount,audio,not started
+0x21c010,100,Audio_GetRiderPos,audio,ported
+0x21c078,36,Audio_RiderCount,audio,ported
 0x21c0a0,680,Audio_SetEventBitSound,audio,checked
 0x21c348,40,Audio_ScheduleEventBitOff,audio,checked
 0x21c370,352,Audio_EventBitOffTimer,audio,checked
@@ -3930,18 +3930,18 @@ address,size,name,system,status
 0x2287d8,88,cSpeechSys::~cSpeechSys,audio,not started
 0x228830,168,Speech_InitLibrary,audio,checked
 0x2288d8,128,SpeechSys_FreeAll,audio,checked
-0x228958,60,SpeechSys_CanPlay,audio,ported
+0x228958,60,SpeechSys_CanPlay,audio,checked
 0x228998,100,SpeechSys_UpdateAll,audio,checked
 0x228a00,188,SpeechSys_AddBank,audio,checked
 0x228ac0,40,Speech_LoadEventsForSlot,audio,checked
 0x228ae8,156,SpeechSys_PlayEventAnySlot,audio,checked
 0x228b88,48,SpeechSys_SetFollowStream,audio,not started
-0x228bb0,48,SpeechSys_SetSlotHold,audio,ported
-0x228bd8,168,SpeechSys_Trigger,audio,ported
-0x228c80,144,SpeechSys_FlushTriggers,audio,not started
-0x228d10,188,SpeechSys_ClearEvent,audio,ported
+0x228bb0,48,SpeechSys_SetSlotHold,audio,checked
+0x228bd8,168,SpeechSys_Trigger,audio,checked
+0x228c80,144,SpeechSys_FlushTriggers,audio,checked
+0x228d10,188,SpeechSys_ClearEvent,audio,checked
 0x228dd0,60,SpeechSys_IsSlotPlaying,audio,checked
-0x228e10,40,SpeechSys_GetBankId,audio,ported
+0x228e10,40,SpeechSys_GetBankId,audio,checked
 0x228e38,124,StaticInit_SpeechSys,audio,not started
 0x228eb8,80,cSpeechSys::__tf,runtime,host
 0x228fb0,668,Stream_Init,audio,not started

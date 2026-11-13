@@ -34,6 +34,10 @@ pub const EVENT: u32 = TABLES + 0x200;
 const STREAMS: u32 = TABLES + 0x400;
 const STREAM_TABLE: u32 = TABLES + 0x600;
 const VOLUME_SLOTS: u32 = TABLES + 0x700;
+/// Where a trigger's position points: 0x10 bytes for each rider id (STANDIN: the rider's +0x140, its position;
+/// the host keeps only which rider it is)
+const POSITIONS: u32 = TABLES + 0x800;
+const MAX_RIDERS: u32 = 0x80;
 const HEAP: u32 = 0x0110_0000;
 const HEAP_SIZE: u32 = 0x0040_0000;
 pub const STACK_BASE: u32 = 0x01e0_0000;
@@ -58,20 +62,28 @@ const STRINGS: [(u32, &str); 16] = [
 /// A line the speech system started: the stream it plays on (0 the announcer's, 3 the riders'), the file
 /// (`"<bank's name>.dat"`, a path in the mounted archives) and the offset of the line in it (the library's row:
 /// its threshold plus the entry's step)
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct LinePlay {
     pub stream: u32,
     pub file: String,
     pub offset: u32,
     /// the play call's handle
     pub handle: u32,
+    /// the rider the line is said at (the trigger's position, `SpeechSys_Trigger`'s a2), none for the announcer's
+    pub at: Option<u32>,
+    /// the voice (the slot's +0x354)
+    pub voice: u32,
+    /// the gain the trigger gave (the slot's +0x368; 0 none: `cBXAudio::vf14` then takes 30.0)
+    pub gain: f32,
 }
 
-/// A part queued on a stream: the play call's handle and its length in ms (infinite until the app knows it)
+/// A part queued on a stream: the play call's handle, its length in ms (infinite until the app knows it) and its
+/// voice (what the line's bank monitor keeps at +0x80)
 #[derive(Clone, Copy, Debug)]
 struct Part {
     handle: u32,
     length_ms: f32,
+    voice: u32,
 }
 
 /// A stream as the host keeps it (STANDIN: for the game's `cStream` over `SndStream`, whose requests play in the
@@ -105,6 +117,8 @@ pub struct HostState {
     /// the streams stopped (`StreamSys_StopStream`) since the app last asked
     stops: Vec<u32>,
     handle: u32,
+    /// what a trigger's callback was handed ([`SpeechHost::trigger`])
+    handed: Vec<u32>,
     /// The stand-ins' calls and their answers, when kept ([`SpeechHost::keep_log`]): for running the original on
     /// the same answers (`tests/speechhost.rs`)
     log: Option<Vec<LeafCall>>,
@@ -388,6 +402,11 @@ impl HostState {
                 }
                 0
             }
+            // what `SpeechSys_PlayEventAnySlot` hands a trigger's callback: the line's handle, kept for the caller
+            crate::speech::BIG_SCORE_CALLBACK | crate::speech::CAM_LINE_CALLBACK => {
+                self.handed.push(a[0]);
+                0
+            }
             RAND_FX => {
                 self.rng = self.rng.wrapping_mul(1_103_515_245).wrapping_add(12345);
                 self.rng >> 1
@@ -402,8 +421,9 @@ impl HostState {
                 if st.parts.is_empty() {
                     st.played_ms = 0.0;
                 }
-                st.parts.push_back(Part { handle, length_ms: f32::INFINITY });
-                self.plays.push(LinePlay { stream: a[1], file, offset: a[3], handle: self.handle });
+                st.parts.push_back(Part { handle, length_ms: f32::INFINITY, voice: a[6] });
+                let at = (a[4] != 0).then(|| (a[4] - POSITIONS) / 0x10);
+                self.plays.push(LinePlay { stream: a[1], file, offset: a[3], handle: self.handle, at, voice: a[6], gain: f32::from_bits(a[7]) });
                 self.handle
             }
             // the library
@@ -595,6 +615,7 @@ impl SpeechHost {
             stops: Vec::new(),
             plays: Vec::new(),
             handle: 0,
+            handed: Vec::new(),
             log: None,
         };
         let mut h = SpeechHost { mem, st };
@@ -679,6 +700,49 @@ impl SpeechHost {
                 s.played_ms = 0.0;
             }
         }
+    }
+
+    /// `SpeechSys_Trigger` 0x228bd8 on the slot: the library serviced for it now, the line said at the rider's
+    /// position, with the voice and gain; what the callback was handed (the lines' handles) in order
+    pub fn trigger(&mut self, t: crate::speech::Trigger) -> Vec<u32> {
+        let at = t.at.map_or(0, |id| POSITIONS + 0x10 * id.min(MAX_RIDERS - 1));
+        ss::trigger(&mut self.mem, &mut self.st, SYS_AT, t.gain, t.slot, at, t.callback, t.voice);
+        std::mem::take(&mut self.st.handed)
+    }
+
+    /// `SpeechSys_CanPlay` 0x228958
+    pub fn can_play(&mut self, slot: u32) -> bool {
+        ss::can_play(&mut self.mem, &mut self.st, SYS_AT, slot)
+    }
+
+    /// `SpeechSys_SetSlotHold` 0x228bb0
+    pub fn slot_hold(&mut self, slot: u32, v: u32) {
+        ss::set_slot_hold(&mut self.mem, SYS_AT, slot, v);
+    }
+
+    /// `SpeechSys_ClearEvent` 0x228d10
+    pub fn clear_event(&mut self, slot: u32) {
+        ss::clear_event(&mut self.mem, &mut self.st, SYS_AT, slot);
+    }
+
+    /// The slot's line: `SpeechSys_GetBankId` 0x228e10 (its stream) → `StreamSys_GetSlotHandle` 0x22a278 (the
+    /// stream's handle) → `BankMonitor_Find`(handle, 3)'s +0x80 (the voice its play call gave). STANDIN: the host's
+    /// queue for the stream's handle and its monitor (a stream playing nothing has no handle; one playing has its
+    /// monitor), so `Some(None)` never comes
+    pub fn line_state(&self, slot: u32) -> Option<Option<i32>> {
+        let s = ss::slot_stream(&self.mem, SYS_AT, slot);
+        let stream = self.mem.r32(STREAM_TABLE + 4 * (s & 7));
+        if s >= 8 || stream == 0 {
+            return None;
+        }
+        let p = self.st.streams[((stream - STREAMS) / 0x20) as usize].parts.front()?;
+        Some(Some(p.voice as i32))
+    }
+
+    /// `SndHandle_IsDone` 0x22a0c8: the handle's sound finished (state 3) or gone. STANDIN: the host's queue (a
+    /// part no longer queued is done)
+    pub fn handle_done(&self, handle: u32) -> bool {
+        !self.st.streams.iter().any(|s| s.parts.iter().any(|p| p.handle == handle))
     }
 
     /// The stream is playing a line

@@ -468,6 +468,84 @@ pub fn is_slot_playing(m: &mut Mem, e: &mut dyn SysEnv, this: u32, slot: u32) ->
     if b == 0 { 0 } else { slot_playing(m, e, b) }
 }
 
+/// `SpeechSys_CanPlay` 0x228958 (the speech system, the slot's number): the slot exists and is idle
+/// (`SpeechSys_IsIdle`)
+pub fn can_play(m: &mut Mem, e: &mut dyn SysEnv, this: u32, slot: u32) -> bool {
+    let b = m.r32(slot.wrapping_mul(4).wrapping_add(m.r32(this + 0x3718)));
+    b != 0 && slot_idle(m, e, b)
+}
+
+/// `SpeechSys_SetSlotHold` 0x228bb0 (the speech system, the slot's number, the value): the slot's +0x34c, the start
+/// `Speech_PlayEvent` gives a line it does not schedule
+pub fn set_slot_hold(m: &mut Mem, this: u32, slot: u32, v: u32) {
+    let b = m.r32(slot.wrapping_mul(4).wrapping_add(m.r32(this + 0x3718)));
+    if b != 0 {
+        m.w32(b + 0x34c, v);
+    }
+}
+
+/// `SpeechSys_Trigger` 0x228bd8 (f12 the gain, the speech system, the slot's number, the position, the callback, the
+/// voice): with the slot there, its +0x350 the position, +0x354 the voice, +0x368 the gain when above 0; the callback
+/// (when given) at +0x3720 with the slot's number at +0x3724 (`SpeechSys_PlayEventAnySlot` hands it the handle);
+/// the library serviced for the slot (`SpeechLib_Service`); then +0x3724 −1, +0x3720 0, and the slot's gain, voice and
+/// position 0
+#[allow(clippy::too_many_arguments)]
+pub fn trigger(m: &mut Mem, e: &mut dyn SysEnv, this: u32, gain: f32, slot: u32, at: u32, cb: u32, voice: u32) {
+    let at_slot = slot.wrapping_mul(4).wrapping_add(m.r32(this + 0x3718));
+    let b = m.r32(at_slot);
+    if b == 0 {
+        return;
+    }
+    m.w32(b + 0x350, at);
+    m.w32(b + 0x354, voice);
+    if 0.0 < gain {
+        m.w32(b + 0x368, gain.to_bits());
+    }
+    let b = m.r32(at_slot);
+    m.w32(b + 0x354, voice);
+    if cb != 0 {
+        m.w32(this + 0x3720, cb);
+        m.w32(this + 0x3724, slot);
+    }
+    e.call(m, LIB_SERVICE, &[slot]);
+    m.w32(this + 0x3724, u32::MAX);
+    m.w32(this + 0x3720, 0);
+    let b = m.r32(slot.wrapping_mul(4).wrapping_add(m.r32(this + 0x3718)));
+    m.w32(b + 0x368, 0);
+    m.w32(b + 0x354, 0);
+    m.w32(b + 0x350, 0);
+}
+
+/// `SpeechSys_FlushTriggers` 0x228c80 (the speech system, the slot's number): with the slot there, four bare
+/// triggers while 0x343708 is set (the library's play callback refuses them: what is queued is let go)
+pub fn flush_triggers(m: &mut Mem, e: &mut dyn SysEnv, this: u32, slot: u32) {
+    if m.r32(slot.wrapping_mul(4).wrapping_add(m.r32(this + 0x3718))) == 0 {
+        return;
+    }
+    m.w32(0x343708, 1);
+    for _ in 0..4 {
+        trigger(m, e, this, 0.0, slot, 0, 0, 0);
+    }
+    m.w32(0x343708, 0);
+}
+
+/// `SpeechSys_ClearEvent` 0x228d10 (the speech system, the slot's number): the triggers flushed as
+/// `SpeechSys_FlushTriggers` does, then the slot's stream stopped (`SpeechSys_StopStream`)
+pub fn clear_event(m: &mut Mem, e: &mut dyn SysEnv, this: u32, slot: u32) {
+    if m.r32(slot.wrapping_mul(4).wrapping_add(m.r32(this + 0x3718))) == 0 {
+        return;
+    }
+    flush_triggers(m, e, this, slot);
+    let b = m.r32(slot.wrapping_mul(4).wrapping_add(m.r32(this + 0x3718)));
+    slot_stop(m, e, b);
+}
+
+/// `SpeechSys_GetBankId` 0x228e10 (the speech system, the slot's number): the slot's stream (its +0), −1 with no slot
+pub fn slot_stream(m: &Mem, this: u32, slot: u32) -> u32 {
+    let b = m.r32(slot.wrapping_mul(4).wrapping_add(m.r32(this + 0x3718)));
+    if b == 0 { u32::MAX } else { m.r32(b) }
+}
+
 /// `Speech_GetFEModeMask` 0x22e550: the game mode (gApp+0x58) as the front end's speech bit
 pub fn fe_mode_mask(m: &Mem) -> u32 {
     match m.r32(m.r32(GAPP) + 0x58) {

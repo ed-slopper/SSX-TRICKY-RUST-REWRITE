@@ -700,3 +700,26 @@ impl SoundRing {
         }
     }
 }
+
+/// `DAT_00343998`, the radius (m) the announcer's rider lines are heard within (`Audio_FindRiderNear`'s first argument
+/// in `speech`)
+pub const SPEECH_NEAR: f32 = 30.0;
+
+/// `Audio_FindRiderNear` 0x20f9b0 (f12 the radius in metres, the audio system, a position): the first view
+/// (`Audio_RiderCount` 0x21c078: the race's +0x298, 1 with no race; `Audio_GetRiderPos` 0x21c010: the race's
+/// +0xb0 + 0x80 × i) whose position is within the radius (×100 cm, squared) of `at`, −1 for none. `count` and `view`
+/// stand for the two calls (asked again each turn, as the original does)
+pub fn find_rider_near(radius: f32, count: &mut dyn FnMut() -> i32, view: &mut dyn FnMut(i32) -> [f32; 3], at: [f32; 3]) -> i32 {
+    let r = radius * 100.0;
+    let lim = r * r;
+    let mut i = 0;
+    while i < count() {
+        let p = view(i);
+        let (dx, dy, dz) = (p[0] - at[0], p[1] - at[1], p[2] - at[2]);
+        if dx * dx + dy * dy + dz * dz < lim {
+            return i;
+        }
+        i += 1;
+    }
+    -1
+}

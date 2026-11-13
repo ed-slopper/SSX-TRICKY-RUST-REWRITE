@@ -1338,3 +1338,36 @@ the header and after every frame):
 
 The runner learnt COP1's `adda.s`, `suba.s`, `mula.s`, `madd.s`, `msub.s`, `madda.s`, `msuba.s`, `max.s`, `min.s`
 (products rounded before the add, as PCSX2) and `addi` (no overflow trap).
+
+## The speech system's calls the announcer makes (E1b2g7d3b4a, `game/src/speechsys.rs`, `sndqueue.rs`; checked: `tests/speechsys.rs`, `tests/sndqueue.rs`)
+
+Proven (read from the code, each run against the original in the function runner):
+
+- `SpeechSys_Trigger` 0x228bd8 (f12 the gain, the system, the slot, a2 the position, a3 the callback, t0 the voice):
+  with the slot there, +0x350 the position, +0x354 the voice (written twice), +0x368 the gain only when above 0;
+  a callback goes to +0x3720 with the slot at +0x3724; `SpeechLib_Service`(slot) 0x2bc548; then +0x3724 −1,
+  +0x3720 0 and the slot's +0x368, +0x354, +0x350 cleared (the slot reread from the table). The library hands the
+  callback each line's handle from `SpeechSys_PlayEventAnySlot` (`speech::BIG_SCORE_CALLBACK`, `CAM_LINE_CALLBACK`:
+  the speech host keeps them and `SpeechHost::trigger` gives them back). `tests/speechsys.rs` logs what the
+  library would see when serviced (both slots' +0x350/+0x354/+0x368, +0x3720/+0x3724, 0x343708).
+- `SpeechSys_CanPlay` 0x228958: the slot exists and `SpeechSys_IsIdle`. `SpeechSys_SetSlotHold` 0x228bb0: the slot's
+  +0x34c. `SpeechSys_GetBankId` 0x228e10: the slot's stream (+0), −1 with no slot (our name `slot_stream`).
+- `SpeechSys_FlushTriggers` 0x228c80: four bare triggers (gain 0, nothing) with 0x343708 set, so the library's play
+  callback (0x227b00) refuses what it starts. `SpeechSys_ClearEvent` 0x228d10 is the same loop inlined, then a
+  tail call to `SpeechSys_StopStream` 0x2286e8.
+- `Audio_FindRiderNear` 0x20f9b0 (f12 metres, the audio system, a position): the limit `(r·100)²` once, then for each
+  view (`Audio_RiderCount` 0x21c078, asked each turn: the race's +0x298, 1 with no race) `Audio_GetRiderPos`
+  0x21c010 (the race's +0xb0 + 0x80·i; with no race +0x80 of the object `FE3DWorld_FindByHash` finds for `Name_Hash`(0x39f0c8)) and
+  `(dx² + dy²) + dz² < limit` (view minus position) gives its index; −1 for none. The announcer's radius
+  `DAT_00343998` is 30.0.
+- `cBXAudio::vf14` 0x20e430, the play call the speech's slots use (a1 the stream, a2 the name, a3 the line, t0 the
+  position, t1 the start, t2 the voice, f12 the gain): `StreamSys_PlayFile`, then a pending sound set up (volume
+  from the gain, 30.0 when not above 0; the voice into the pending +100 table; a position makes it 3D and
+  `Audio_IsNearerPlayer2` picks the view) and `BankMonitor_AddInstance`(handle, 0x7f, 3), which `line_state`'s
+  +0x80 reads back. Not ported: the host stands in for it (`LinePlay` now carries the rider, voice and gain).
+
+In the app (`src/racespeech.rs`) the stand-ins are now these ports, plus: the view's position is the camera's
+(STANDIN for the race's +0xb0, whose writer is not traced), the relation is `rivals::relation` (the table
+`RelTable_Init` fills; nothing seen changing it in a race), and the line state and handle done are the host's
+queue (a stream playing has a handle and its monitor; STANDIN). Still stand-ins: gApp+0x58 (0) and the records past
+the new-record list.

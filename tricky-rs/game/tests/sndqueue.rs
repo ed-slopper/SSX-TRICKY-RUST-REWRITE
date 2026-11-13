@@ -1721,3 +1721,44 @@ fn sound_ring_matches_the_original() {
     eprintln!("ring {seen:?}");
     assert!(seen.iter().all(|n| *n > 100), "{seen:?}");
 }
+
+#[test]
+fn find_rider_near_matches_the_original() {
+    let Some(mut r) = runner() else { return };
+    let views = r.mem.alloc(0x80 * 4);
+    let at = r.mem.alloc(0x10);
+    let count: Rc<RefCell<i32>> = Rc::default();
+    let c2 = count.clone();
+    r.stub(0x21c078, move |c, _| c.set_gpr(2, *c2.borrow() as i64 as u64));
+    r.stub(0x21c010, move |c, _| {
+        assert_eq!(c.gpr(4) as u32, 0x5150);
+        c.set_gpr(2, (views + 0x80 * c.gpr(5) as u32) as u64);
+    });
+    let mut g = Rng(0xf1d0_0e4e_a200_0001);
+    let mut found = [0u32; 5];
+    for case in 0..20_000 {
+        let n = (g.next() % 5) as i32;
+        *count.borrow_mut() = n;
+        let pick = |g: &mut Rng| (g.next() % 8001) as f32 - 4000.0 + (g.next() % 100) as f32 / 64.0;
+        let ps: Vec<[f32; 3]> = (0..4).map(|_| [pick(&mut g), pick(&mut g), pick(&mut g)]).collect();
+        for (i, p) in ps.iter().enumerate() {
+            for k in 0..3 {
+                r.mem.write_u32(views + 0x80 * i as u32 + 4 * k, p[k as usize].to_bits());
+            }
+        }
+        let a = [pick(&mut g), pick(&mut g), pick(&mut g)];
+        for k in 0..3 {
+            r.mem.write_u32(at + 4 * k, a[k as usize].to_bits());
+        }
+        let radius = [30.0f32, 40.0, 10.0, 25.5, 0.0, -30.0][(g.next() % 6) as usize];
+        r.cpu.set_f(12, radius);
+        r.cpu.set_gpr(4, 0x5150);
+        r.cpu.set_gpr(5, at as u64);
+        r.call(0x20f9b0).unwrap();
+        let theirs = r.cpu.gpr(2) as i32;
+        let mine = find_rider_near(radius, &mut || n, &mut |i| ps[i as usize], a);
+        assert_eq!(theirs, mine, "case {case}");
+        found[(mine + 1) as usize] += 1;
+    }
+    assert!(found.iter().all(|&k| k > 100), "{found:?}");
+}

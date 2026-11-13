@@ -75,6 +75,9 @@ impl SysEnv for Ours {
         if target == 0x22e4e0 {
             v.extend(args.iter().map(|&a| m.r32(a)));
         }
+        if target == LIB_SERVICE {
+            v.extend(SEEN.iter().map(|&a| m.r32(a)));
+        }
         self.0.borrow_mut().log.push((target, v));
         self.0.borrow_mut().answer(target)
     }
@@ -95,6 +98,9 @@ const LEAVES: &[(u32, usize)] = &[
 ];
 
 const ARENA: u32 = 0x0100_0000;
+/// What the library sees when serviced: the slots' position, voice and gain (+0x350, +0x354, +0x368), the
+/// callback and its slot (+0x3720, +0x3724) and the refusing flag
+const SEEN: [u32; 9] = [ARENA + 0x9350, ARENA + 0x9354, ARENA + 0x9368, ARENA + 0xa350, ARENA + 0xa354, ARENA + 0xa368, ARENA + 0x3720, ARENA + 0x3724, 0x343708];
 /// The regions compared (and copied for the port): the arena, the globals, the library's globals, the strings
 const REGIONS: [(u32, u32); 6] = [(0, 0x400), (ARENA, 0x1_0000), (0x343700, 0x100), (0x348dc0, 0x840), (0x3a0400, 0x80), (0x10_8000, 0x2000)];
 
@@ -129,13 +135,16 @@ fn speech_system_matches_the_original() {
                 let w: Vec<u32> = v.iter().map(|&p| mem.read_u32(p)).collect();
                 v.extend(w);
             }
+            if f == LIB_SERVICE {
+                v.extend(SEEN.iter().map(|&a| mem.read_u32(a)));
+            }
             let ans = a2.borrow_mut().answer(f);
             a2.borrow_mut().log.push((f, v));
             c.set_gpr(2, ans as i32 as i64 as u64);
             c.set_f(0, f32::from_bits(ans));
         });
     }
-    for f in [0x227ca8u32, 0x229f60, 0x229fc8, 0x22a008, 0x22a178, 0x227c40, 0x229d40, 0x228168, 0x2282e0, 0x228370, 0x227cb8, 0x228700, 0x22a048, 0x2bae08, 0x2baf38, 0x22e550, 0x228998, 0x228400, 0x227c20, 0x227b38, 0x2283a8, 0x228ae8, 0x227b00] {
+    for f in [0x227ca8u32, 0x229f60, 0x229fc8, 0x22a008, 0x22a178, 0x227c40, 0x229d40, 0x228168, 0x2282e0, 0x228370, 0x227cb8, 0x228700, 0x22a048, 0x2bae08, 0x2baf38, 0x22e550, 0x228998, 0x228400, 0x227c20, 0x227b38, 0x2283a8, 0x228ae8, 0x227b00, 0x228bd8, 0x2286e8] {
         r.allow(f);
     }
     let app = ARENA + 0xf000;
@@ -199,7 +208,9 @@ fn speech_system_matches_the_original() {
         r.mem.write_u32(0x343708, (g.below(4) == 0) as u32);
         let name = ARENA + 0xe100;
         let data = if g.below(2) == 0 { 0 } else { g.next() };
-        let which = g.below(28);
+        let which = g.below(34);
+        let gain = FLOATS[g.below(FLOATS.len() as u32) as usize];
+        let cb = [0, V_CB, 0x235530][g.below(3) as usize];
         let slot = slots[g.below(2) as usize];
         let n = g.below(3);
         let x = [g.next(), g.next(), g.next(), g.next(), g.next()];
@@ -250,9 +261,16 @@ fn speech_system_matches_the_original() {
             24 => (0x227b38, vec![name, data]),
             25 => (0x2283a8, vec![slot, name, data]),
             26 => (0x228ae8, vec![sys, ev]),
+            28 => (0x228bd8, vec![sys, n & 1, x[0], cb, x[1]]),
+            29 => (0x228958, vec![sys, n & 1]),
+            30 => (0x228bb0, vec![sys, n & 1, x[0]]),
+            31 => (0x228c80, vec![sys, n & 1]),
+            32 => (0x228d10, vec![sys, n & 1]),
+            33 => (0x228e10, vec![sys, n & 1]),
             _ => (0x227b00, vec![ev]),
         };
         set(&mut r, &args);
+        r.cpu.set_f(12, gain);
         r.call(addr).unwrap_or_else(|e| panic!("case {case}: {addr:#x}: {e}"));
         let ret = r.cpu.gpr(2) as u32;
         let ret_f = r.cpu.f(0).to_bits();
@@ -327,6 +345,24 @@ fn speech_system_matches_the_original() {
                 None
             }
             26 => Some(play_event_any_slot(&mut m, e, sys, ev, STACK_TOP - 0x50) as u32),
+            28 => {
+                trigger(&mut m, e, sys, gain, n & 1, x[0], cb, x[1]);
+                None
+            }
+            29 => Some(can_play(&mut m, e, sys, n & 1) as u32),
+            30 => {
+                set_slot_hold(&mut m, sys, n & 1, x[0]);
+                None
+            }
+            31 => {
+                flush_triggers(&mut m, e, sys, n & 1);
+                None
+            }
+            32 => {
+                clear_event(&mut m, e, sys, n & 1);
+                None
+            }
+            33 => Some(slot_stream(&m, sys, n & 1)),
             _ => Some(lib_play_callback(&mut m, e, ev, STACK_TOP - 0x10) as u32),
         };
         let mine = std::mem::take(&mut a.borrow_mut().log);

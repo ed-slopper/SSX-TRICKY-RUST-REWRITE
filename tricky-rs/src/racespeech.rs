@@ -166,6 +166,16 @@ struct Env<'a> {
     mode: u32,
     course: u32,
     clock: i32,
+    /// the riders' positions (the race's order, the game's axes in cm: the rider's +0x140)
+    pos: Vec<[f32; 3]>,
+    /// the view's position (`Audio_GetRiderPos` 0x21c010: the race's +0xb0, one view in the app)
+    // STANDIN: the camera's position, for the race's +0xb0 (what writes it is not traced)
+    view: [f32; 3],
+}
+
+/// The game's axes in cm of a position in the app's (metres, y up)
+fn game_pos(v: Vec3) -> [f32; 3] {
+    [v.x * 100.0, -v.z * 100.0, v.y * 100.0]
 }
 
 /// The rider object's id the speech system compares (the listener, the game object's rider words).
@@ -201,31 +211,39 @@ impl SpeechEnv for Env<'_> {
     fn race_rider(&mut self, i: u32) -> u32 {
         rider_id(i as usize)
     }
-    // STANDIN: the rest serve the announcer's other handlers (tricks, wipe-outs, the riders' own voices, row
-    // E1b2g7d3b4), which the race does not call yet; they answer "nothing there".
-    fn can_play(&mut self, _: u32) -> bool {
-        false
+    fn can_play(&mut self, slot: u32) -> bool {
+        self.host.can_play(slot)
     }
-    fn find_near(&mut self, _: u32) -> i32 {
-        -1
+    /// `Audio_FindRiderNear` 0x20f9b0 (`DAT_00343998` 30 m, the rider's position) over the app's one view
+    fn find_near(&mut self, rider: u32) -> i32 {
+        let Some(&at) = self.pos.get(rider.wrapping_sub(1) as usize) else { return -1 };
+        let view = self.view;
+        sndqueue::find_rider_near(sndqueue::SPEECH_NEAR, &mut || 1, &mut |_| view, at)
     }
-    fn relation(&mut self, _: u32, _: u32) -> i32 {
-        0
+    /// `RelTable_GetRelation` 0x167e00 on the table `RelTable_Init` 0x167208 fills
+    fn relation(&mut self, a: u32, b: u32) -> i32 {
+        tricky_game::rivals::relation(a as usize, b as usize) as i32
     }
-    fn line_state(&mut self, _: u32) -> Option<Option<i32>> {
-        None
+    fn line_state(&mut self, slot: u32) -> Option<Option<i32>> {
+        self.host.line_state(slot)
     }
-    fn handle_done(&mut self, _: u32) -> bool {
-        true
+    fn handle_done(&mut self, handle: u32) -> bool {
+        self.host.handle_done(handle)
     }
-    fn trigger(&mut self, _: Trigger) -> Vec<u32> {
-        Vec::new()
+    fn trigger(&mut self, t: Trigger) -> Vec<u32> {
+        self.host.trigger(t)
     }
+    fn slot_hold(&mut self, slot: u32, v: u32) {
+        self.host.slot_hold(slot, v);
+    }
+    fn clear_event(&mut self, slot: u32) {
+        self.host.clear_event(slot);
+    }
+    // STANDIN: gApp+0x58, the app's mode word (0), for the game's
     fn app_mode(&mut self) -> u32 {
         0
     }
-    fn slot_hold(&mut self, _: u32, _: u32) {}
-    fn clear_event(&mut self, _: u32) {}
+    // STANDIN: no career records past the new-record list (the pre-race selection object is not kept)
     fn record_after(&mut self, _: usize) -> i32 {
         -1
     }
@@ -267,7 +285,8 @@ fn wav(s: &tricky_game::sndmt::Sound) -> Vec<u8> {
 pub fn race_speech(
     mut rs: ResMut<RaceSpeech>, sounds: Res<crate::sound::Sounds>, game: Res<ui::Game>, mode: Res<Mode>, race: Res<RaceRes>, time: Res<Time>,
     mut audio: ResMut<Assets<AudioSource>>, mut commands: Commands, sfx: Option<Res<crate::boardsound::BoardSounds>>,
-    playing: Query<Entity, With<PlacingSound>>,
+    playing: Query<Entity, With<PlacingSound>>, rider: Res<crate::RiderRes>, opponents: Res<crate::Opponents>,
+    cam: Query<&GlobalTransform, With<Camera3d>>,
 ) {
     if !rs.tried {
         rs.tried = true;
@@ -328,7 +347,9 @@ pub fn race_speech(
     rs.bank.retain(|_, e| alive.contains(e));
     let mut stops = Vec::new();
     let vol = if sounds.effects { 1.0 } else { 0.0 };
-    let mut env = Env { host: &mut sys.host, mode: r.mode, course: r.course_no, clock: r.line_frame };
+    let pos = std::iter::once(rider.0.pos).chain(opponents.0.iter().map(|o| o.rider.pos)).map(game_pos).collect();
+    let view = cam.iter().next().map_or([0.0; 3], |t| game_pos(t.translation()));
+    let mut env = Env { host: &mut sys.host, mode: r.mode, course: r.course_no, clock: r.line_frame, pos, view };
     for &c in &calls[rs.sent..] {
         if std::env::var("TRICKY_SPEECHLOG").is_ok() {
             println!("speech: {c:?}");
