@@ -1963,3 +1963,23 @@ fn ambient_banks_match_the_original() {
         assert_eq!(flags, amb.loaded.to_vec(), "case {case} flags");
     }
 }
+
+#[test]
+fn play_opts_init_matches_the_original() {
+    let Some(mut r) = runner() else { return };
+    let a = r.mem.alloc(0x20);
+    let mut g = Rng(0x5d4a_6000_1234_9876);
+    for case in 0..2_000 {
+        let mut mine = [0u8; 24];
+        for (k, b) in mine.iter_mut().enumerate() {
+            *b = g.next() as u8;
+            r.mem.write_u8(a + k as u32, *b);
+        }
+        r.cpu.set_gpr(4, a as u64);
+        r.call(0x2d4a60).unwrap_or_else(|e| panic!("case {case}: {e}"));
+        play_opts_init(&mut mine);
+        let mut orig = [0u8; 24];
+        r.mem.read(a, &mut orig).unwrap();
+        assert_eq!(orig, mine, "case {case}");
+    }
+}

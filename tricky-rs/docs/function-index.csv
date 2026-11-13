@@ -6567,7 +6567,7 @@ address,size,name,system,status
 0x2d4888,240,SndMidi_SetVolume,lib-snd,ported
 0x2d4978,144,SndMidi_Fade,lib-snd,not started
 0x2d4a08,88,SndMidi_GetState,lib-snd,ported
-0x2d4a60,80,SndPlayOpts_Init,lib-snd,not started
+0x2d4a60,80,SndPlayOpts_Init,lib-snd,checked
 0x2d4ab0,56,SndVoice_IsPicked,lib-snd,not started
 0x2d4ae8,1136,SndVoice_Alloc,lib-snd,not started
 0x2d4f58,404,SndVoice_Release,lib-snd,not started

@@ -76,7 +76,9 @@ pub struct PlacingSound;
 pub struct SpeechPlayer;
 
 pub fn plugin(app: &mut App) {
-    app.insert_resource(RaceSpeech { queue: Queue::with_capacity(8), ..default() });
+    // the system's header as `cSndPlayOpts::cSndPlayOpts` 0x226848 sets it (`sndqueue::play_opts_header`)
+    let queue = Queue { header: sndqueue::play_opts_header(), ..Queue::with_capacity(8) };
+    app.insert_resource(RaceSpeech { queue, ..default() });
 }
 
 /// Whether bank sound `h` still plays (`BankMonitor_Find`), and its stop (`SndSys_StopBankSound`).

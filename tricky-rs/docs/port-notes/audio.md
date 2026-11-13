@@ -1493,5 +1493,20 @@ archive name upper-cased, as for the music); the event sound plays the bank's sa
 `tools/bnk/levelaudio.py DATA/AUDIO/AUDIO.BIG audio/world` (`audio/world/<Bank>/<Bank>_<id>[_loop].wav`), looping
 when the program loops, at the queue record's volume byte. Stand-ins: the bank manager (a load is in at once), the
 sound driver `SND_PlayBankSound` 0x2d1718. Checked by hand with the calls forced: Tunnel1 and RiverSmall loops play at
-volume 35 and stop on `Audio_StopEventSound`; kind 2 plays at volume 0, since its record keeps the queue's header byte
-(system +8, 0x18 bytes), whose writer was not found (not in `cBXAudio::cBXAudio` 0x20db18; row E1b2g7d5b).
+volume 35 and stop on `Audio_StopEventSound`; kind 2 at volume 127, its record's header byte (below).
+
+### The queue's header record (E1b2g7d5b)
+
+Proven: the audio system's header (+8, 0x18 bytes), copied into each pending sound by `queue_begin`, is written once,
+by `cSndPlayOpts::cSndPlayOpts` 0x226848, reached from `cBXAudio::cBXAudio` 0x20db18 through the base constructors
+(`cController::cController` 0x21e8a0 → `cCrowdSys::cCrowdSys` 0x220850 → `SpeechSys_Init` 0x228728 → `MusicSys_Init`
+0x224a98 → `StreamSys_Init` 0x229890 → `MidiSys_Init` 0x222080 → `BankSys_Init` 0x20c560 → `BankManager_Init`
+0x20a2f0 → `AsyncSys_Init` 0x208950 → `BankMonitor_Init` 0x20bb98 → `cMonitor::cMonitor` 0x222b10 →
+`cSndPlayOpts::cSndPlayOpts`). That one allocates the record stack (+0x24, 0x60 bytes = four records, filled with
+0xdeadc0ed) and the queue arrays (+0x38.. +0x7c), pushes the header (+0x20 from −1 to 0, the record at 0 = +8),
+clears the entry's arrays (+0x3c the record's volume, +0x74 row 100, 0, 0x5a, 0x32, +0x7c 1), runs
+`SndPlayOpts_InitCurrent` 0x227708 → `SndPlayOpts_Init` 0x2d4a60 on that record, copies it back to +8 and pops.
+`SndPlayOpts_Init` (checked, `play_opts_init_matches_the_original`): bytes 0..4 = 0x7f (volume), 0x40 (pan), 0x7f,
+0x3c (root), 0x7f; half-words at 8..0x16 = 0, 0, 0x1000, 0x1000, 0x1000, 0, 0xffff, 0; bytes 5..7 untouched (0xc0,
+0xad, 0xde from the fill). `sndqueue::play_opts_header` gives the header; the app's queue starts with it. Not ported:
+the rest of the constructor (the arrays' other defaults; the app's `Queue` starts them at 0).

@@ -852,3 +852,25 @@ impl AmbientBanks {
         }
     }
 }
+
+/// `SndPlayOpts_Init` 0x2d4a60: a play record's defaults (volume 0x7f, pan 0x40, 0x7f, root 0x3c, 0x7f, then the
+/// half-words 0, 0, 0x1000, 0x1000, 0x1000, 0, 0xffff, 0; bytes 5..7 left as they were). `cSndPlayOpts::cSndPlayOpts`
+/// 0x226848 (built under every audio system, from `cMonitor::cMonitor` 0x222b10) runs it on the stack's first record
+/// and copies that into the system's header (+8, 0x18 bytes), the record `queue_begin` copies into each sound.
+pub fn play_opts_init(r: &mut [u8; 24]) {
+    r[..5].copy_from_slice(&[0x7f, 0x40, 0x7f, 0x3c, 0x7f]);
+    for (k, h) in [0u16, 0, 0x1000, 0x1000, 0x1000, 0, 0xffff, 0].into_iter().enumerate() {
+        r[8 + 2 * k..10 + 2 * k].copy_from_slice(&h.to_le_bytes());
+    }
+}
+
+/// The system's header (+8) as `cSndPlayOpts::cSndPlayOpts` 0x226848 leaves it: [`play_opts_init`] on a record the
+/// allocator filled with 0xdeadc0ed (`EAMem_Set`), so bytes 5..7 are 0xc0, 0xad, 0xde.
+pub fn play_opts_header() -> [u8; 24] {
+    let mut r = [0u8; 24];
+    for (k, b) in r.iter_mut().enumerate() {
+        *b = 0xdead_c0ed_u32.to_le_bytes()[k % 4];
+    }
+    play_opts_init(&mut r);
+    r
+}
