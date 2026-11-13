@@ -114,7 +114,8 @@ fn pop(m: &mut Mem, q: u32) -> u32 {
     v
 }
 
-fn strcpy(m: &mut Mem, to: u32, from: u32) {
+/// `strcpy` 0x2fd14c
+pub fn strcpy(m: &mut Mem, to: u32, from: u32) {
     let mut k = 0;
     loop {
         let b = m.r8(from.wrapping_add(k));

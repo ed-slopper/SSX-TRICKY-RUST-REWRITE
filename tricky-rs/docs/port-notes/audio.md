@@ -1561,3 +1561,36 @@ cases, the calls out logged in order and the memory compared; five mutations cau
   vtable, now cAsyncSys's pure-virtual slot (0x2f54e0).
 
 Not yet: the app still stands in for the manager (`Slot6` in `tricky-rs/src/racespeech.rs`, row E1b2g7d5d).
+
+## The bank sounds playing and their monitor (E1b2g7d5e, `game/src/bankmon.rs`; checked: `tests/bankmon.rs`)
+
+Proven (read from the code, checked in the function runner on 60,000 random monitors with 64 random instances, 35
+functions, 0x20a888..0x20c3e8, nine hand mutations all caught):
+
+- The monitor (`cBankMonitor`, made by `BankMonitor_Init` 0x20bb98 on a `cMonitor` 0x222b10) keeps 64 instances of
+  0xb0 bytes (EA memory, named at 0x39e790, the count at −0x10) at +0x8e0. An instance: +0 the engine (0 free, 1 a
+  bank sound on EA's handles, 2 a MIDI player, 3 a stream), +4 the handle, +8 playing, +0xc / +0x10 the bank and
+  the sound (or a stream and its name), +0x54 stopping, +0x58 kept, +0x5c the last distance (−1 unknown), +0x60
+  the address of a volume scale, +0x64 the volume, +0x68 the address of its position (+0x70 a copy), +0x88 the
+  fall-off distance (0 = 30), +0x8c the cull distance (0 = none), +0x94 not positional, +0x98 freed when done,
+  +0x9c / +0xa0 a key, +0xa4 / +0xa8 / +0xac the pitch, volume and pan last sent.
+- `BankMonitor_AddInstance` 0x20bd68 takes the n-th free instance (n = a counter at +0x8d0, so nested adds take
+  different ones) for a sound just started from the monitor's queue: the volume scale, position, key, fall-off,
+  cull and flags come from the queue's top record's arrays (a flag at +0x38 copies the position into the instance,
+  16 bytes at the address rounded down to 16, as `lq` does). None free: the debug message at 0x39e7a8 and the sound
+  stopped at once.
+- `BankInstance_UpdatePositional` 0x20b700: a stream waits for its handle to play; with positions on (+0x8d8) and a
+  position, the monitor's virtual +0x4c gives the squared distance (`sqrt.s`) and the listener's pan; a sound with a
+  cull distance is stopped beyond it and started again within (`BankInstance_Start` 0x20b158, which pushes a record
+  on the queue and plays it again); Doppler (+0x8d4) is (v + 8000) / 8000 with v the distance closed per second
+  clamped to ±894.08; pitch and pan are sent only when they moved more than 0xff / 0x1ff; the volume falls as the
+  square of the distance past half a metre to none at the fall-off distance, then is scaled.
+- Stopping fades over 25 (hundredths) by `SndVoice_Stop` 0x20b0b8; `BankInstance_Stop` 0x20ba00 sets or fades to a
+  volume (−1 stops; a stream stops at once). Pause sets pitch and volume to 0 and pauses MIDI;
+  `Audio_StopAllVoices` 0x20c040 really resumes every instance (its pitch back to 0x1000) and clears the paused flag.
+- `cBankMonitor::vf6` 0x20c148 resets the instances matching a 64-bit key in a1: the halfword at +0x9e against key
+  bits 16..31, then the halfword at +0xa0 against bits 32..47 (unless bits 16..31 were −1) or the word at +0xa0
+  against bits 32..63.
+
+Not yet: the app plays bank sounds through `tricky-rs/src/racespeech.rs`'s `play_bank_sound` stand-in, not through
+these (row E1b2g7d5d, with cBankSys, row E1b2g7d5f).

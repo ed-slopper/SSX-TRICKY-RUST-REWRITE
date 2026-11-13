@@ -3489,43 +3489,43 @@ address,size,name,system,status
 0x20a6b0,48,BankManager_GetHandle,audio,checked
 0x20a6e0,128,BankManager_IsSlotLoaded,audio,checked
 0x20a7b8,80,cBankManager::__tf,runtime,host
-0x20a888,56,BankInstance_Init,audio,not started
-0x20a8c0,28,Mem_DeleteIfFlag7,common,not started
+0x20a888,56,BankInstance_Init,audio,checked
+0x20a8c0,28,Mem_DeleteIfFlag7,common,checked
 0x20a8e0,248,SndVoice_IsDone,audio,ported
-0x20a9d8,72,BankInstance_Reset,audio,not started
-0x20aa20,88,BankInstance_IsFree,audio,not started
-0x20aab8,112,SndVoice_DistanceVolume,audio,ported
-0x20ab28,28,BankInstance_DistanceVolume,audio,not started
-0x20ab48,92,SndVoice_DopplerPitch,audio,ported
-0x20aba8,12,BankInstance_SetHandle,audio,ported
-0x20abb8,64,BankInstance_SetStream,audio,not started
-0x20abf8,12,BankInstance_SetHandleCopy1,audio,not started
-0x20ac08,72,BankInstance_ComputeDistance,audio,not started
-0x20ac50,232,BankInstance_SetPan,audio,not started
-0x20ad38,236,BankInstance_SetPitch,audio,ported
+0x20a9d8,72,BankInstance_Reset,audio,checked
+0x20aa20,88,BankInstance_IsFree,audio,checked
+0x20aab8,112,SndVoice_DistanceVolume,audio,checked
+0x20ab28,28,BankInstance_DistanceVolume,audio,checked
+0x20ab48,92,SndVoice_DopplerPitch,audio,checked
+0x20aba8,12,BankInstance_SetHandle,audio,checked
+0x20abb8,64,BankInstance_SetStream,audio,checked
+0x20abf8,12,BankInstance_SetHandleCopy1,audio,checked
+0x20ac08,72,BankInstance_ComputeDistance,audio,checked
+0x20ac50,232,BankInstance_SetPan,audio,checked
+0x20ad38,236,BankInstance_SetPitch,audio,checked
 0x20ae28,656,SndVoice_SetVolume,audio,ported
-0x20b0b8,156,SndVoice_Stop,audio,not started
-0x20b158,1324,BankInstance_Start,audio,not started
-0x20b688,116,BankInstance_CullByDistance,audio,not started
-0x20b700,580,BankInstance_UpdatePositional,audio,not started
-0x20b948,104,SndVoice_Pause,audio,not started
-0x20b9b0,80,BankInstance_ResetPitch,audio,not started
-0x20ba00,404,BankInstance_Stop,audio,not started
-0x20bb98,196,BankMonitor_Init,audio,ported
-0x20bc60,136,cBankMonitor::~cBankMonitor,audio,ported
-0x20bce8,124,BankMonitor_FindFreeInstance,audio,not started
-0x20bd68,640,BankMonitor_AddInstance,audio,ported
-0x20bfe8,88,BankMonitor_PauseAll,audio,not started
-0x20c040,84,Audio_StopAllVoices,audio,not started
-0x20c098,68,SndSys_StopBankSoundSoft,audio,not started
-0x20c0e0,20,BankMonitor_ResetInstance,audio,not started
-0x20c0f8,76,cBankMonitor::vf5_20c0f8,audio,not started
-0x20c148,184,cBankMonitor::vf6_20c148,audio,not started
-0x20c200,156,BankMonitor_Find,audio,ported
-0x20c2a0,104,SndSys_StopBankSound,audio,ported
-0x20c308,120,BankInstances_CountPlaying,audio,not started
-0x20c380,104,BankInstances_CountUsed,audio,not started
-0x20c3e8,60,BankMonitor_ResetTimers,audio,ported
+0x20b0b8,156,SndVoice_Stop,audio,checked
+0x20b158,1324,BankInstance_Start,audio,checked
+0x20b688,116,BankInstance_CullByDistance,audio,checked
+0x20b700,580,BankInstance_UpdatePositional,audio,checked
+0x20b948,104,SndVoice_Pause,audio,checked
+0x20b9b0,80,BankInstance_ResetPitch,audio,checked
+0x20ba00,404,BankInstance_Stop,audio,checked
+0x20bb98,196,BankMonitor_Init,audio,checked
+0x20bc60,136,cBankMonitor::~cBankMonitor,audio,checked
+0x20bce8,124,BankMonitor_FindFreeInstance,audio,checked
+0x20bd68,640,BankMonitor_AddInstance,audio,checked
+0x20bfe8,88,BankMonitor_PauseAll,audio,checked
+0x20c040,84,Audio_StopAllVoices,audio,checked
+0x20c098,68,SndSys_StopBankSoundSoft,audio,checked
+0x20c0e0,20,BankMonitor_ResetInstance,audio,checked
+0x20c0f8,76,cBankMonitor::vf5_20c0f8,audio,checked
+0x20c148,184,cBankMonitor::vf6_20c148,audio,checked
+0x20c200,156,BankMonitor_Find,audio,checked
+0x20c2a0,104,SndSys_StopBankSound,audio,checked
+0x20c308,120,BankInstances_CountPlaying,audio,checked
+0x20c380,104,BankInstances_CountUsed,audio,checked
+0x20c3e8,60,BankMonitor_ResetTimers,audio,checked
 0x20c468,80,cBankMonitor::__tf,runtime,host
 0x20c560,172,BankSys_Init,audio,not started
 0x20c610,108,cBankSys::~cBankSys,audio,not started
@@ -3798,7 +3798,7 @@ address,size,name,system,status
 0x222ad8,8,SndEvent_Disable,audio,checked
 0x222ae0,48,Monitor_TickCallback,audio,not started
 0x222b10,144,cMonitor::cMonitor,audio,ported
-0x222ba0,144,cMonitor::~cMonitor,audio,not started
+0x222ba0,144,cMonitor::~cMonitor,audio,ported
 0x222c30,32,cMonitor::vf4_222c30,audio,checked
 0x222c50,108,SndSys_FindFreeEvent,audio,checked
 0x222cc0,212,SndSys_ScheduleEvent,audio,checked
@@ -3947,9 +3947,9 @@ address,size,name,system,status
 0x228fb0,668,Stream_Init,audio,not started
 0x229268,128,Stream_Delete,audio,ported
 0x2292e8,96,Stream_Open,audio,not started
-0x229348,76,Stream_SetPan,audio,not started
+0x229348,76,Stream_SetPan,audio,ported
 0x229398,8,Stream_SetVolume,audio,ported
-0x2293a0,60,Stream_SetPitch,audio,not started
+0x2293a0,60,Stream_SetPitch,audio,ported
 0x2293e0,176,Stream_UpdateVolume,audio,not started
 0x229490,72,Stream_GetStatus,audio,not started
 0x2294d8,88,Stream_GetPlayInfo,audio,not started
@@ -6534,14 +6534,14 @@ address,size,name,system,status
 0x2d2f10,64,SndStream_SetPitch,lib-snd,ported
 0x2d2f50,60,SndStream_SetLowWater,lib-snd,not started
 0x2d2f90,180,SND_SetMasterVolume,lib-snd,not started
-0x2d3048,188,SndHandle_Fade,lib-snd,not started
+0x2d3048,188,SndHandle_Fade,lib-snd,ported
 0x2d3108,172,SndHandle_SetVolume,lib-snd,ported
-0x2d31b8,164,SndHandle_SetPitch,lib-snd,not started
+0x2d31b8,164,SndHandle_SetPitch,lib-snd,ported
 0x2d3260,88,SndHandle_Stop,lib-snd,ported
 0x2d32b8,124,SND_StopAll,lib-snd,not started
 0x2d3338,32,SndHandle_IsDead,lib-snd,ported
 0x2d3358,292,SndHandle_GetTimeLeft,lib-snd,not started
-0x2d3480,196,SndHandle_SetPan,lib-snd,not started
+0x2d3480,196,SndHandle_SetPan,lib-snd,ported
 0x2d3548,176,SND_SetFxBus,lib-snd,not started
 0x2d35f8,288,SND_ApplyFxBusLevels,lib-snd,not started
 0x2d3718,96,SndHandle_AddFx,lib-snd,not started
@@ -6559,13 +6559,13 @@ address,size,name,system,status
 0x2d42c8,64,SndMidi_Shutdown,lib-snd,not started
 0x2d4308,92,SndMidi_StopAll,lib-snd,not started
 0x2d4368,212,SndMidi_Stop,lib-snd,ported
-0x2d4440,356,SndMidi_Play,lib-snd,not started
-0x2d45a8,184,SndMidi_SetPitch,lib-snd,not started
-0x2d4660,220,SndMidi_SetPan,lib-snd,not started
-0x2d4740,200,SndMidi_Pause,lib-snd,not started
-0x2d4808,124,SndMidi_Resume,lib-snd,not started
+0x2d4440,356,SndMidi_Play,lib-snd,ported
+0x2d45a8,184,SndMidi_SetPitch,lib-snd,ported
+0x2d4660,220,SndMidi_SetPan,lib-snd,ported
+0x2d4740,200,SndMidi_Pause,lib-snd,ported
+0x2d4808,124,SndMidi_Resume,lib-snd,ported
 0x2d4888,240,SndMidi_SetVolume,lib-snd,ported
-0x2d4978,144,SndMidi_Fade,lib-snd,not started
+0x2d4978,144,SndMidi_Fade,lib-snd,ported
 0x2d4a08,88,SndMidi_GetState,lib-snd,ported
 0x2d4a60,80,SndPlayOpts_Init,lib-snd,checked
 0x2d4ab0,56,SndVoice_IsPicked,lib-snd,not started
