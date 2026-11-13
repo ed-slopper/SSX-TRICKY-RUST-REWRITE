@@ -235,6 +235,18 @@ pub enum RiderSpeech {
     Tricky { finished: bool, ubers: i32 },
     /// `Speech_OnTenSecondsLeft` 0x233ff0 from `cHUDOverlay::Update` 0x1a1f18 (the show-off's last ten seconds)
     TenSecondsLeft,
+    /// `Speech_OnAirTime` 0x233448: an uber trick landed while Tricky (from `AirMotion_Update` at 0x109170)
+    AirTime,
+    /// `Sfx_OnAirEnter` 0x2174f8's speech: `Speech_OnAirEnter` 0x233950(rider, kind) with the flight's predicted time
+    /// `air` (+0x57f4) over 5, then `Speech_OnAirNearby` 0x235170(rider, kind); `up` the velocity's third word (cm/s)
+    AirEnter { kind: u32, air: f32, up: f32 },
+    /// `Sfx_OnRiderReset` 0x218eb0's `Speech_OnRiderReset` 0x233a18 (the rider put back on the course)
+    Reset,
+    /// shoved by another rider (`Boarder_RiderCollisions` 0x123fc8's shove, at 0x124898): `Speech_OnRiderCollision`
+    /// 0x233cb8(this rider)
+    Shoved,
+    /// `Rivals_StartGrudge` 0x11ecf8's level-2 grudge against rider `at` (race index): `Speech_OnGrudge` 0x2336b8
+    Grudge { at: u32 },
     /// `Boarder_RiderHit` 0x124920's stumble or knock-down by rider `by` (race index): `Speech_RiderHitLine`
     /// 0x234d00(the other, this rider, `which`: not a shove, `crash`: knocked down), and for a knock-down
     /// `Speech_OnRiderHit` 0x233858(this rider, the other)
@@ -520,6 +532,11 @@ impl Rider {
     }
     /// Back to the safe spot: at the game's heading where the host keeps it (row G20c3b5), else the port's yaw
     pub fn respawn_safe(&mut self) {
+        // `Boarder_RequestReset` 0x118f10 → `Sfx_OnRiderReset` 0x218eb0 (a local player's, +0x41c == 1) →
+        // `Speech_OnRiderReset` 0x233a18. STANDIN: the app's resets (all here) for the game's reset state.
+        if !self.ai && self.fin.is_none() {
+            self.speech.push(RiderSpeech::Reset);
+        }
         match self.safe_heading {
             Some(h) => self.respawn_heading(self.safe.0, h),
             None => self.respawn(self.safe),
@@ -752,9 +769,15 @@ impl Rider {
                 None => (0, self.switch as u32, (self.normal.y < 0.7) as u32),
             };
             if std::env::var("TRICKY_SCOREDBG").is_ok() { println!("    land: spin {:.3} base {:.3} flip {:.3} base {:.3} goofy {} switch {} sc.spin {} sc.flip {} x10 {} x20 {} grabs {:?}", self.spin, self.spin_base, self.flip, self.flip_base, self.data.goofy, self.switch, self.sc.spin, self.sc.flip, self.sc.x10, self.sc.x20, self.sc.grabs); }
+            let before = self.sc.x88;
             let (share, calls) = self.sc.land_trick(kind, a, b);
             self.show(&calls);
             self.add_meter(share);
+            // `AirMotion_Update` at 0x109170: an uber trick counted (+0x58a8 up) on a landing from the air, Tricky
+            // on and under six before: `Speech_OnAirTime` 0x233448
+            if rail.is_none() && before < self.sc.x88 && self.tricky() && before < 6 {
+                self.speech.push(RiderSpeech::AirTime);
+            }
             self.multiplier = 1;
         }
         self.from_rail = false;
@@ -1177,6 +1200,9 @@ impl Rider {
                 self.land_time = p.t_land;
                 (self.land_word, self.land_normal) = (p.word, p.normal);
                 self.takeoffs = self.takeoffs.wrapping_add(1);
+                // `AirMotion_Enter` 0x108310 → `Sfx_OnAirEnter` 0x2174f8 (kind: the control state +0x428 was 0xd,
+                // natural air. STANDIN: 0, the app keeps no control state)
+                self.speech.push(RiderSpeech::AirEnter { kind: 0, air: self.land_time, up: self.vel.y * 100.0 });
                 self.spin_enter_game();
             }
         }

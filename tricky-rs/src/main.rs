@@ -1712,10 +1712,14 @@ fn ride(
                 let was = o.rider.stumble > 0.0;
                 o.rider.hit_by = r.slot;
                 let down = o.rider.take_hit(push, false);
+                o.rider.speech.push(tricky_game::rider::RiderSpeech::Shoved);
                 if down { hit = true; }
                 // the rider remembers it (Rider_OnKnockedDownBy): 30 for a knockdown, 15 for a stumble
                 let now = race.0.time;
-                if let Some(g) = o.grudge.as_mut() { if down { g.hit(30.0, now); } else if !was && o.rider.stumble > 0.0 { g.hit(15.0, now); } }
+                if let Some(g) = o.grudge.as_mut() {
+                    let grudge = if down { g.hit(30.0, now) } else if !was && o.rider.stumble > 0.0 { g.hit(15.0, now) } else { false };
+                    if grudge { o.rider.speech.push(tricky_game::rider::RiderSpeech::Grudge { at: 0 }); }
+                }
             }
         }
         if hit {
@@ -2064,6 +2068,7 @@ fn ride(
                     if let (true, Some(push)) = (r.shove <= 0.0, push) {
                         r.hit_by = o.rider.slot;
                         let down = r.take_hit(push, false);
+                        r.speech.push(tricky_game::rider::RiderSpeech::Shoved);
                         if down { o.rider.add_meter(1.0); r.last_trick = "Shoved!".into(); r.trick_timer = 2.0; }
                         // getting its own back cools the grudge
                         if down || (!was && r.stumble > 0.0) { if let Some(g) = o.grudge.as_mut() { g.got_even(down); } }
@@ -2074,8 +2079,9 @@ fn ride(
                 let (od, os, pd) = (o.rider.crashed > 0.0, o.rider.stumble > 0.0, r.crashed > 0.0);
                 props::bump(r, &mut o.rider);
                 if let Some(g) = o.grudge.as_mut() {
-                    if !od && o.rider.crashed > 0.0 { g.hit(30.0, race.0.time); }
-                    else if !os && o.rider.stumble > 0.0 { g.hit(9.0, race.0.time); }
+                    let grudge = if !od && o.rider.crashed > 0.0 { g.hit(30.0, race.0.time) }
+                    else if !os && o.rider.stumble > 0.0 { g.hit(9.0, race.0.time) } else { false };
+                    if grudge { o.rider.speech.push(tricky_game::rider::RiderSpeech::Grudge { at: 0 }); }
                     if !pd && r.crashed > 0.0 && o.rider.crashed <= 0.0 { g.got_even(true); }
                 }
                 let (head, tail) = opponents.0.split_at_mut(i + 1);

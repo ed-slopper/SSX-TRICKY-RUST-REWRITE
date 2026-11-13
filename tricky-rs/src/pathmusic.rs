@@ -272,6 +272,14 @@ impl PfStream {
     }
 }
 
+impl PathMusic {
+    /// The audio system's +0x6e50: the music zone playing (`Audio_SetEventBitSound` 0x21c0a0 keeps it), 0 for none
+    /// or without the game's music system
+    pub fn zone(&self) -> u32 {
+        self.engine.as_ref().map_or(0, |e| e.0.mem.r32(tricky_game::musichost::SYS + 0x6e50))
+    }
+}
+
 pub fn plugin(app: &mut App) { app.add_audio_source::<PfStream>().init_resource::<PathMusic>(); }
 
 /// MUSIC.INF settings of a song.

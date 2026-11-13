@@ -1432,3 +1432,30 @@ the shoves in `src/main.rs` set in `Rider::hit_by` just before. The app's own wi
 stand-in for `Boarder_Wipeout` on a landing or a hit) pushes the wipe-out too. Still not called: air time, air
 enter, grudges, resets, the nearby-rider lines (`Speech_OnCrashNearby` and the rest come through
 `rider_hit_line`).
+
+### The announcer's last callers (E1b2g7d3b4d)
+
+Proven (read from the code):
+
+- `Rivals_StartGrudge` 0x11ecf8 at 0x11ee08: a level-2 grudge → `Speech_OnGrudge` 0x2336b8(the rider holding it,
+  the one it is against). `rivals::Grudge::hit` now says whether one began; `src/main.rs` pushes
+  `RiderSpeech::Grudge { at: 0 }` (the app's grudges are only against the player).
+- `Boarder_RiderCollisions` 0x123fc8's shove (at 0x124864..0x124898): `Boarder_RiderHit`, then
+  `Sfx_OnRiderCollision` 0x216960(shover, shoved) and `Speech_OnRiderCollision` 0x233cb8(shoved), whether or not the
+  hit knocked anyone down (`ridercol.rs` line 157). The app's two shoves push `RiderSpeech::Shoved` after the hit.
+- `Sfx_OnRiderReset` 0x218eb0 (only from `Boarder_RequestReset` 0x118f10 at 0x118f70, for +0x41c == 1) calls
+  `Speech_OnRiderReset` 0x233a18 first with its own a0/a1 (the audio system, the rider). The speech needs +0x6e50,
+  the music zone playing (`Audio_SetEventBitSound` 0x21c0a0): `PathMusic::zone` reads it from the game's music
+  system. STANDIN: the app's resets (`Rider::respawn_safe`) for the game's reset state.
+- `AirMotion_Enter` 0x108310 ends in `Sfx_OnAirEnter`(audio, rider, +0x428 == 0xd) (0x108330..0x108360): kind 1
+  when the control state is 0xd (`NaturalAirControl`). `Sfx_OnAirEnter` calls `Speech_OnAirEnter` 0x233950(rider,
+  kind) when +0x57f4 (the flight time `AirPredict_AtTakeoff` predicted) is over 5, then `Speech_OnAirNearby`
+  0x235170(rider, kind). The app pushes `RiderSpeech::AirEnter` where it makes that prediction; kind is a STANDIN
+  0 (the app keeps no control state).
+- `AirMotion_Update` 0x109114..0x109170: after `Score_LandTrick` and `Boarder_AddMeter`, when +0x58a8 (the uber
+  count) went up, `Boarder_StartCelebrate`(100) and, Tricky on and the count before under 6, `Speech_OnAirTime`
+  0x233448 (so the name means an uber trick landed in Tricky, not air time). The app pushes `RiderSpeech::AirTime`
+  in its landing (not a rail's).
+
+Heard in a Garibaldi race: take-offs reach the speech (`AirEnter`), a 4.7 s flight played a rider's line (stream 3,
+`data\speech\char\13b2.dat`).

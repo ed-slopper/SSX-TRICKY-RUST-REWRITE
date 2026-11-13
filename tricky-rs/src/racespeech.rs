@@ -311,7 +311,7 @@ pub fn race_speech(
     mut rs: ResMut<RaceSpeech>, sounds: Res<crate::sound::Sounds>, game: Res<ui::Game>, mode: Res<Mode>, race: Res<RaceRes>, time: Res<Time>,
     mut audio: ResMut<Assets<AudioSource>>, mut commands: Commands, sfx: Option<Res<crate::boardsound::BoardSounds>>,
     playing: Query<Entity, With<PlacingSound>>, mut rider: ResMut<crate::RiderRes>, mut opponents: ResMut<crate::Opponents>,
-    cam: Query<&GlobalTransform, With<Camera3d>>,
+    cam: Query<&GlobalTransform, With<Camera3d>>, music: Res<crate::pathmusic::PathMusic>,
 ) {
     // what the riders asked of the audio object this frame, taken whatever happens (rider `k` of the race: the player, then the others)
     let mut asks = vec![(0, std::mem::take(&mut rider.0.speech))];
@@ -371,6 +371,8 @@ pub fn race_speech(
         return;
     }
     let r = &race.0;
+    // +0x6e50, the music zone playing (the music system's, as `Speech_OnRiderReset` 0x233a18 reads it)
+    rs.announcer.resets_on = music.zone();
     let mut alive: std::collections::HashSet<Entity> = playing.iter().collect();
     rs.bank.retain(|_, e| alive.contains(e));
     let mut stops = Vec::new();
@@ -456,6 +458,17 @@ pub fn race_speech(
                     if crash {
                         rs.announcer.on_rider_hit(&mut env, &who, &other);
                     }
+                }
+                RiderSpeech::Grudge { at } => rs.announcer.on_grudge(&mut env, &who, &speech_rider(r, at as usize)),
+                RiderSpeech::Shoved => rs.announcer.on_rider_collision(&mut env, &who),
+                RiderSpeech::Reset => rs.announcer.on_rider_reset(&mut env, &who),
+                RiderSpeech::AirTime => rs.announcer.on_air_time(&mut env, &who),
+                RiderSpeech::AirEnter { kind, air, up } => {
+                    let r = SpeechRider { air, vel: [0.0, 0.0, up], ..who };
+                    if 5.0 < air {
+                        rs.announcer.on_air_enter(&mut env, &r, kind as i64);
+                    }
+                    tricky_game::speech::voices::on_air_nearby(&mut env, &r, kind as i64);
                 }
                 RiderSpeech::TenSecondsLeft => rs.announcer.on_ten_seconds_left(&mut env, &who),
                 RiderSpeech::Wipeout(level) => {

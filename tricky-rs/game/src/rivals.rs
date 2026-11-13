@@ -112,8 +112,9 @@ impl Grudge {
     }
 
     /// The player put this rider down (30), shoved it off balance (15) or bumped it off balance (9)
-    /// (`Rivals_OnKnockdown`, `Rivals_OnHit`, `Rivals_OnBump`). `now` in seconds of race.
-    pub fn hit(&mut self, amount: f32, now: f32) {
+    /// (`Rivals_OnKnockdown`, `Rivals_OnHit`, `Rivals_OnBump`). `now` in seconds of race. True when a level-2 grudge
+    /// began (`Rivals_StartGrudge` 0x11ecf8 calls `Speech_OnGrudge` 0x2336b8(this rider, the player) at 0x11ee08).
+    pub fn hit(&mut self, amount: f32, now: f32) -> bool {
         let t = tick(now);
         let mut calls = Vec::new();
         if amount >= 30.0 {
@@ -123,6 +124,7 @@ impl Grudge {
         } else {
             self.ai.on_bump(&mut self.player, t, &mut calls);
         }
+        calls.contains(&RivalCall::Grudge)
     }
 
     /// It got its own back: it put the player down (`knocked`) or shoved it off balance (the player's
