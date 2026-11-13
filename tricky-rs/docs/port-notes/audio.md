@@ -86,8 +86,16 @@ Part of the port notes (index: [README.md](README.md)); units and wording as des
 - Rider event sounds (F1c, proven unless marked): `Audio_QueueEventSound` 0x21d0b0 (audio object `*0x343050`) stores
   a kind at +0x7428 and sets +0x7420 = 1 (pending); `Audio_StopEventSound` 0x21d5c8 stops the bank sound whose handle is
   at +0x7424 (if ≥ 0) and sets it to −1. `cBoarder::vf10` 0x11a348 queues kinds 0, 1, 2 when rider+0x388 bits 14, 23,
-  24 turn on and stops on their turning off. **Inferred:** whatever reads +0x7420/+0x7428 later starts the sound and
-  keeps its handle at +0x7424 (the reader is not found yet; the bits' meaning neither).
+  24 turn on and stops on their turning off. The reader (E1b2g7d5, proven, checked in `tests/sndqueue.rs`) is
+  `Audio_PlayEventSound` 0x21d0c0 (Ghidra had it as `Audio_LoadAmbientBanks`), run by `Audio_InGameUpdate` 0x20ee90 at
+  0x20ef24: with one pending, kind 0 (and any kind over 2) loads the ambient bank `|data\audio\Tunnel1.bnk` (0x39f1c0)
+  and kind 1 `|data\audio\RiverSmall.bnk` (0x39f1d8) through `Audio_FindBankName` 0x21a640 / `Audio_LoadAmbientBank`
+  0x21a548 (not 1: nothing more, still pending) and queue sound 0 as kind 6 at volume 0x23; kind 2 queues sound 9 as
+  kind 2 with no bank load. Then the voice slot (`SndMgr_GetSlot`(4)), `SndSys_PlayPending`'s handle into +0x7424 and
+  +0x7420 = 0. The stop passes f12 = 2.0 to `SndSys_StopBankSound`. So the bits are the tunnel's, the river's and a
+  third place's sound (inferred from the bank names). In the app (`src/racespeech.rs`): `race::Hooks` sends
+  `SpeechCall::EventSound`; the ambient banks are not loaded (STANDIN, row E1b2g7d5a), kind 2 gets a handle but is not
+  heard (its bank kind not found yet). None of the three bits came on in a Garibaldi race.
 
 ## The announcer's and riders' speech triggers (board row G10c1; checked: `tests/speech.rs`)
 

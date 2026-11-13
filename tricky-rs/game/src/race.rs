@@ -543,6 +543,9 @@ pub enum SpeechCall {
     /// `Sfx_OnPlacingChange` 0x219a48 (`sndqueue::on_placing_change`): the rider, the one behind it (`next`), the one
     /// ahead (`prev`), none for the ends, the old place and the new
     PlacingChange { rider: usize, next: Option<usize>, prev: Option<usize>, old: i32, new: i32 },
+    /// `Audio_QueueEventSound` 0x21d0b0 (the kind) or, `None`, `Audio_StopEventSound` 0x21d5c8: a rider's event bit
+    /// 0xe / 0x17 / 0x18 turning on or off (`sndqueue::EventSound`)
+    EventSound(Option<u32>),
 }
 
 impl Race {
@@ -687,7 +690,7 @@ impl Race {
 
 /// The game the riders' event bits tell, for [`Race::vf10`]: rider `k` of the race, as it stands (`line`).
 /// The speech lines and the cheer go to [`Race::speech`]. The lessons, the
-/// queued event sound (E1b2g7d5) and `Boarder_Finish`'s HUD item (`HUD_ShowItem` 7, E1b2g7d4) do nothing here: the app
+/// `Boarder_Finish`'s HUD item (`HUD_ShowItem` 7, E1b2g7d4) do nothing here: the app
 /// has none of them yet.
 struct Hooks<'a> {
     race: &'a mut Race,
@@ -752,8 +755,8 @@ impl crate::control::EventEnv for Hooks<'_> {
         self.race.music.push(MusicCall::EventBit { rider: self.k, bit: event[0], on });
         self.race.hooks.push(Hook::EventBit(self.k, event[0], on));
     }
-    fn queue_event_sound(&mut self, _: u32) {}
-    fn stop_event_sound(&mut self) {}
+    fn queue_event_sound(&mut self, kind: u32) { self.race.speech.push(SpeechCall::EventSound(Some(kind))); }
+    fn stop_event_sound(&mut self) { self.race.speech.push(SpeechCall::EventSound(None)); }
 }
 /// Third-person camera that trails the rider. Plain data so the self-test can measure it.
 /// One of the original's named chase cameras (COMMONOB.CML), in metres and radians.

@@ -52,6 +52,8 @@ pub struct RaceSpeech {
     /// the audio system's pending-sound queue and its ring of queued sounds (+0x6e24)
     queue: Queue,
     ring: SoundRing,
+    /// the rider event bits' sound (+0x7420)
+    event: sndqueue::EventSound,
     /// the bank sounds playing, by handle, and the last handle given
     bank: HashMap<u32, Entity>,
     handle: u32,
@@ -82,6 +84,45 @@ impl RingEnv for Bank<'_> {
         if let Some(e) = self.bank.remove(&h) {
             self.stops.push(e);
         }
+    }
+}
+
+/// What the event sound (`sndqueue::EventSound`) asks of the audio system.
+struct EventSfx<'a> {
+    bank: Bank<'a>,
+    handle: &'a mut u32,
+}
+
+impl QueueEnv for EventSfx<'_> {
+    // STANDIN: the sound manager's slots (`SndMgr_GetSlot` 0x211f38)
+    fn get_slot(&mut self, _: u32) -> u32 {
+        0
+    }
+    fn rider_listener(&mut self) -> u32 {
+        rider_id(0)
+    }
+    /// `SndSys_PlayPending` 0x20c948: the entry taken off and a handle given.
+    // STANDIN: the sound driver: kind 2's sound 9 (its bank not found yet, row E1b2g7d5a) is not heard
+    fn play_pending(&mut self) -> u64 {
+        *self.handle += 1;
+        if std::env::var("TRICKY_SPEECHLOG").is_ok() {
+            println!("speech: the event sound plays as {}", *self.handle);
+        }
+        *self.handle as u64
+    }
+}
+
+impl sndqueue::EventSoundEnv for EventSfx<'_> {
+    /// `Audio_FindBankName` 0x21a640 / `Audio_LoadAmbientBank` 0x21a548
+    // STANDIN: the app loads no ambient banks yet (row E1b2g7d5a), so the tunnel's and the river's sounds stay pending
+    fn load_ambient_bank(&mut self, name: &str) -> i64 {
+        if std::env::var("TRICKY_SPEECHLOG").is_ok() {
+            println!("speech: the event sound wants {name}");
+        }
+        0
+    }
+    fn stop_bank_sound(&mut self, h: u32) {
+        self.bank.stop(h);
     }
 }
 
@@ -363,6 +404,7 @@ pub fn race_speech(
             commands.entity(e).try_despawn();
         }
         rs.ring = SoundRing::default();
+        rs.event = Default::default();
         if !racing {
             return;
         }
@@ -420,6 +462,12 @@ pub fn race_speech(
             }
             // the crowd's cheer needs the crowd boxes in the app (row E1b2g7d3b7)
             SpeechCall::Cheer(_) => {}
+            SpeechCall::EventSound(Some(kind)) => rs.event.queue(kind),
+            SpeechCall::EventSound(None) => {
+                let mut e = EventSfx { bank: Bank { bank: &mut rs.bank, alive: &alive, stops: Vec::new() }, handle: &mut rs.handle };
+                rs.event.stop(&mut e);
+                stops.append(&mut e.bank.stops);
+            }
         }
     }
     rs.sent = calls.len();
@@ -482,6 +530,16 @@ pub fn race_speech(
     // `SndSys_UpdateQueuedSounds` 0x215658, from `Audio_InGameUpdate`
     let mut bank = Bank { bank: &mut rs.bank, alive: &alive, stops };
     rs.ring.update(r.line_frame, &mut bank);
+    // `Audio_PlayEventSound` 0x21d0c0, from `Audio_InGameUpdate` at 0x20ef24
+    let given = rs.handle;
+    let mut ev = EventSfx { bank, handle: &mut rs.handle };
+    rs.event.update(&mut rs.queue, &mut ev);
+    let played = *ev.handle != given;
+    let bank = ev.bank;
+    if played {
+        // the entry `SndSys_PlayPending` takes off
+        rs.queue.count -= 1;
+    }
     for e in bank.stops {
         commands.entity(e).try_despawn();
     }
