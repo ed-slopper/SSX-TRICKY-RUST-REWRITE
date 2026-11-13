@@ -352,6 +352,8 @@ impl SpritesEnv for Env<'_> {
 struct StateEnv {
     units: f32,
     mult: f32,
+    /// `Speech_OnTenSecondsLeft` 0x233ff0 was called (the app's announcer runs it)
+    ten: bool,
     /// each rider's race progress (`Boarder_GetRaceProgress`): its distance to the finish (+0x374), cm
     progress: [f32; 4],
 }
@@ -364,6 +366,10 @@ impl HudEnv for StateEnv {
                 0
             }
             0x155440 => tricky_game::score::calc_points(self.units, self.mult) as u32,
+            0x233ff0 => {
+                self.ten = true;
+                0
+            }
             0x1554c0 => tricky_game::score::calc_base_points(self.units) as u32,
             0x197ef0 => m.r32(PATH_SET + 0x10),
             // `HUD_BuildSplitList` (the constructor's) on the race's path set
@@ -534,7 +540,7 @@ fn load(hud: &mut GameHud, lib: &CharLib, images: &mut Assets<Image>) -> Option<
 /// and show what it drew
 #[allow(clippy::too_many_arguments)]
 pub fn game_hud(
-    mut commands: Commands, lib: Res<CharLib>, (rider, race, opponents, list): (Res<RiderRes>, Res<crate::RaceRes>, Res<crate::Opponents>, Res<crate::LevelList>), game: Res<ui::Game>, mode: Res<Mode>, time: Res<Time>,
+    mut commands: Commands, lib: Res<CharLib>, (mut rider, race, opponents, list): (ResMut<RiderRes>, Res<crate::RaceRes>, Res<crate::Opponents>, Res<crate::LevelList>), game: Res<ui::Game>, mode: Res<Mode>, time: Res<Time>,
     fonts: Res<SfnFonts>, mut hud: ResMut<GameHud>, mut images: ResMut<Assets<Image>>, root: Query<Entity, With<ui::HudRoot>>,
     mine: Query<Entity, With<GameHudRoot>>,
     mut quads: Query<(&QuadNode, &mut Node, &mut ImageNode, &mut Visibility, &mut GlobalZIndex), Without<TextNode>>,
@@ -620,7 +626,7 @@ pub fn game_hud(
         if let Some(aip) = aip {
             build_paths(m, &aip);
         }
-        hudstate::hud_overlay_new(m, &mut StateEnv { units: 0.0, mult: 0.0, progress }, HUD);
+        hudstate::hud_overlay_new(m, &mut StateEnv { units: 0.0, mult: 0.0, ten: false, progress }, HUD);
         hudstate::set_view_layout(m, 0);
         *built = Some((game_mode, course));
     }
@@ -687,7 +693,12 @@ pub fn game_hud(
             m.w32(o + 0x41c, 0);
         }
     }
-    let mut state = StateEnv { units: r.sc.units, mult: r.sc.mult, progress };
+    // the show-off's clock (the race handler's +0x14, counting down in modes 3 and 5): the time left
+    if game.event == ui::Event::ShowOff {
+        let left = ui::showoff(&ui::track_key(&list)).1 + race.bonus - race.time;
+        m.w32(WORLD + 0x14, left.max(0.0).to_bits());
+    }
+    let mut state = StateEnv { units: r.sc.units, mult: r.sc.mult, ten: false, progress };
     *tick += time.delta_secs();
     let mut n = 0;
     while *tick >= 1.0 / 60.0 && n < 4 {
@@ -701,6 +712,10 @@ pub fn game_hud(
     }
     if *tick >= 1.0 / 60.0 {
         *tick = 0.0;
+    }
+    // `Speech_OnTenSecondsLeft` 0x233ff0 (a1 the first player still racing: the player's rider)
+    if state.ten {
+        rider.0.speech.push(tricky_game::rider::RiderSpeech::TenSecondsLeft);
     }
     let mut env = Env {
         loc: loc.as_ref(),

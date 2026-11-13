@@ -303,8 +303,9 @@ impl Announcer {
         }
     }
 
-    /// `FUN_00234058`: roll 0xd (no rider), 0x1002037
-    pub fn on_race_line(&self, env: &mut dyn SpeechEnv) {
+    /// `Speech_OnTimeUp` 0x234058 (from `cRaceHandler::Update` 0x113820 when a show-off's clock runs out with a rider
+    /// still racing): roll 0xd (no rider), 0x1002037
+    pub fn on_time_up(&self, env: &mut dyn SpeechEnv) {
         if self.roll(env, 0xd) && env.mode() != 6 && !env.replay_playing() {
             env.post(Event::new(0x1002037, &[]));
         }

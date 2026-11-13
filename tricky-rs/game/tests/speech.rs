@@ -610,7 +610,7 @@ fn handlers_are_the_original() {
             }
             6 => {
                 call(&mut r, 0x234058, &[s]);
-                ann.on_race_line(&mut ours);
+                ann.on_time_up(&mut ours);
             }
             7 => {
                 call(&mut r, 0x233cb8, &[s, pa]);

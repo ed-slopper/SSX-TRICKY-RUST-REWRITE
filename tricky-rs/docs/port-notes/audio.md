@@ -1401,3 +1401,34 @@ camera state test is not made; the sound 0x6c is the one `boardsound` already pl
 callers): `Speech_OnAirTime` 0x233448 (from `AirMotion_Update` at 0x109170), `Speech_OnAirEnter` 0x233950 (from
 `Sfx_OnAirEnter` 0x2174f8), `Speech_OnTenSecondsLeft` 0x233ff0 (from 0x1a2064), the rider hits, grudges, Tricky,
 resets, race lines and the nearby-rider lines.
+
+### More of the announcer's callers (E1b2g7d3b4c)
+
+Proven (read from the code):
+
+- `Audio_TrickyTrigger` 0x21c610(audio, rider), called by `Boarder_AddMeter` 0x11b018 when the meter fills with the
+  uber timer out (`boarder::Call::Tricky`): with the audio system's +0x3844, +0x36f0, +0x3700 set, no replay, the
+  rider's +0x418 below 0 and the rider the listener's (`Audio_GetListenerRider`(−1)): +0x6e7c the rider, +0x6e84 0x7f
+  (0x5a while +0x6e50), `Music_StartTricky`, `Speech_OnTricky` 0x2337c8 (under six ubers: +0x58a8, the score's +0x88).
+- `cHUDOverlay::Update` 0x1a1f18 at 0x1a2064: `Speech_OnTenSecondsLeft` 0x233ff0 gets a1 = the first player's rider
+  (race +0xa4 + 0x80·i) still racing; the function returns at once if that rider's +0x418 ≥ 0.
+- 0x234058 is `Speech_OnTimeUp` (was `on_race_line` in `speech.rs`, now `on_time_up`): `cRaceHandler::Update` 0x113820
+  in modes 3 / 5 counts +0x14 down by 1/60 a tick; at 0 it finishes every rider (`Boarder_Finish`) and, if one of
+  them was still racing, calls it.
+- `Boarder_RiderHit` 0x124920's knock-down (s1 the rider hit, s2 the other): `Boarder_Wipeout`(s1),
+  `Rivals_OnKnockdown`(s1, s2), `Speech_RiderHitLine` 0x234d00(s2, s1, the other's clip ≠ 0x15, 1),
+  `Speech_OnRiderHit` 0x233858(s1, s2). So `on_rider_hit`'s first rider is the one knocked down (the listener) and
+  the second the one that did it (still racing: `SpeechRider::player` is "+0x418 < 0", not "a player").
+
+In the app: the Tricky call goes through `Rider::speech` (the three audio flags taken as set; the music side stays
+`pathmusic`'s, which still starts Tricky on `Boarder_IsTricky`'s edge, not on this call); `src/gamehud.rs` writes
+the show-off's time left into the race handler's +0x14 so the ported HUD update makes the ten-second call; the
+show-off's end in `src/main.rs` posts `SpeechCall::TimeUp`. Heard: with a 25 s limit (a local test) the time-up line (`Time_Run_Out.dat`) played; the ten-second call
+was not heard here because the game's HUD (`src/gamehud.rs`) did not load on that machine (no HUD sheets). `TRICKY_EVENT=showoff` (or `freeride`) starts the app
+in that event. The rider hits: `Rider::hit` (the port of `Boarder_RiderHit`) pushes `RiderSpeech::Hit` for a
+stumble (`Speech_RiderHitLine`(other, rider, not a shove, 0); proven at 0x124d60..0x124d9c) and a knock-down (the
+same with crash 1, then `Speech_OnRiderHit`(rider, other)), with the other rider's race index that `props::bump` and
+the shoves in `src/main.rs` set in `Rider::hit_by` just before. The app's own wipe-out start (`Rider::fall`, our
+stand-in for `Boarder_Wipeout` on a landing or a hit) pushes the wipe-out too. Still not called: air time, air
+enter, grudges, resets, the nearby-rider lines (`Speech_OnCrashNearby` and the rest come through
+`rider_hit_line`).

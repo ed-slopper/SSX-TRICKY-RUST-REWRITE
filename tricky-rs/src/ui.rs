@@ -323,7 +323,7 @@ pub struct Game {
     pub menu_text_tried: bool,
 }
 impl Default for Game {
-    fn default() -> Self { Self { screen: Screen::Menu, event: Event::Race, round: 0, points: 0, levels: None, rivals: None, attitude: Default::default(), lineup: true, since: 0.0, table: Vec::new(), place: 0, master: false, cursor: 0, pause_cursor: 0, row: 0, board: std::env::var("TRICKY_BOARD").ok().and_then(|b| b.parse().ok()).unwrap_or(0), track_step: 0, flow: tricky_game::fe_flow::Flow::new(), menu_text: None, menu_text_tried: false } }
+    fn default() -> Self { Self { screen: Screen::Menu, event: match std::env::var("TRICKY_EVENT").as_deref() { Ok("showoff") => Event::ShowOff, Ok("freeride") => Event::FreeRide, _ => Event::Race }, round: 0, points: 0, levels: None, rivals: None, attitude: Default::default(), lineup: true, since: 0.0, table: Vec::new(), place: 0, master: false, cursor: 0, pause_cursor: 0, row: 0, board: std::env::var("TRICKY_BOARD").ok().and_then(|b| b.parse().ok()).unwrap_or(0), track_step: 0, flow: tricky_game::fe_flow::Flow::new(), menu_text: None, menu_text_tried: false } }
 }
 impl Game {
     pub fn opponents(&self) -> usize { if self.screen != Screen::Menu && self.event != Event::Race { 0 } else { HEAT - 1 } }

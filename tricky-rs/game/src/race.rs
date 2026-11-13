@@ -537,6 +537,9 @@ pub enum SpeechCall {
     LocalLine2(usize),
     /// `Speech_OnEventBit16` 0x233740
     ListenerLine(usize),
+    /// `Speech_OnTimeUp` 0x234058 from `cRaceHandler::Update` 0x113820: a show-off's clock ran out with a rider still
+    /// racing (+0x418 < 0)
+    TimeUp,
     /// `Sfx_OnPlacingChange` 0x219a48 (`sndqueue::on_placing_change`): the rider, the one behind it (`next`), the one
     /// ahead (`prev`), none for the ends, the old place and the new
     PlacingChange { rider: usize, next: Option<usize>, prev: Option<usize>, old: i32, new: i32 },

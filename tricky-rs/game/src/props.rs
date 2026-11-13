@@ -273,6 +273,7 @@ pub fn bump(a: &mut Rider, b: &mut Rider) {
     let (ha, hb) = crate::hit::pair_speeds([n.x, n.z, n.y, 0.0], g(a.vel), g(b.vel), ma, mb);
     let a_was = a.crashed > 0.0;
     let b_was = b.crashed > 0.0;
+    (a.hit_by, b.hit_by) = (b.slot, a.slot);
     let a_down = a.hit(ha, n, false);
     let b_down = b.hit(hb, n, false);
     match (a_down, b_down) {

@@ -230,6 +230,15 @@ pub enum RiderSpeech {
     Wipeout(f32),
     /// `Sfx_OnBoost` 0x2197d8: boost pressed with no meter
     BoostEmpty,
+    /// `Audio_TrickyTrigger` 0x21c610 from `Boarder_AddMeter` 0x11b018: over the line or not (+0x418), the ubers
+    /// done (+0x58a8, the score's +0x88)
+    Tricky { finished: bool, ubers: i32 },
+    /// `Speech_OnTenSecondsLeft` 0x233ff0 from `cHUDOverlay::Update` 0x1a1f18 (the show-off's last ten seconds)
+    TenSecondsLeft,
+    /// `Boarder_RiderHit` 0x124920's stumble or knock-down by rider `by` (race index): `Speech_RiderHitLine`
+    /// 0x234d00(the other, this rider, `which`: not a shove, `crash`: knocked down), and for a knock-down
+    /// `Speech_OnRiderHit` 0x233858(this rider, the other)
+    Hit { by: u32, which: bool, crash: bool },
 }
 
 #[derive(Clone)]
@@ -412,6 +421,8 @@ pub struct Rider {
     pub show_parts: Vec<String>,
     /// what the rider asked of the audio object (`DAT_00343050`) since the app last took it, in order
     pub speech: Vec<RiderSpeech>,
+    /// the race index ([`Rider::slot`]) of the rider whose hit [`Rider::hit`] takes next (u32::MAX: none known)
+    pub hit_by: u32,
     /// this grab started scoring (`Score_StartGrab`) and was tweaked (its rate and its name the tweak's)
     pub grab_scored: bool,
     pub grab_tw: bool,
@@ -498,7 +509,7 @@ impl Rider {
                last_trick: String::new(), trick_timer: 0.0, crashed: 0.0, hard_land: 0.0, crouch_v: 0.0, brake_v: 0.0, jump_c: 0.0, jump_delay: 0.0, height: 0.0,
                course_dir: None, course_pts: None, wipe: None, crash_at: None, gm: None, crash_spray: None, lean: [0.0; 3], up: [0.0, 0.0, 1.0, 0.0], recover: None, ai: false, down_t: 0.0, getup: -1.0, stumble: 0.0, wall_hit: None, speed_timer: 0.0, spin_timer: 0.0, spin_used: false, tube_class: u8::MAX, gate_p: 0.0, gate_hi: 0.0, gate_lo: 0.0, gate_still: 0.0, gate_target: 0.0, gate_speed: 0.0, gate_state: 8, gate_rock_dir: 0, band: (0.005, 0.0250417), spin_base: 0.0, flip_base: 0.0, late: false, cause: "", spin_ax: Axis::default(), flip_ax: Axis::default(), air_mode2: false, rail_off: 0.0, rail_time: 0.0, rail_halves: 0, boost_was: false, chain: 0,
                ubers: Vec::new(), uber: 0.0, uber_id: 0, uber_done: false, letters: 0, multiplier: 1,
-               sc: new_score(), tick_acc: 0.0, full_count: 0, rail_kind: 0, rail_lean: 0.0, rail_goal0: 0.0, rail_committed: 0.0, show_parts: Vec::new(), speech: Vec::new(), grab_scored: false, grab_tw: false, hit_wait: 0, att: None, last_hit: Default::default(), impact: 0.0, impact_n: [0.0; 4], knocks: 0.0, slot: 0, place_ray: None, hit_kind: 0, land_time: 0.0, takeoffs: 0, rail_blend: 0.0, rail_word: 0, rail_grid: false, rail_hit: [0.0; 4], spin_st: None, pad_dev: Default::default(), land_word: u32::MAX, land_normal: [0.0, 0.0, 1.0, 0.0], takeoff_wind: (0.0, 0.0) };
+               sc: new_score(), tick_acc: 0.0, full_count: 0, rail_kind: 0, rail_lean: 0.0, rail_goal0: 0.0, rail_committed: 0.0, show_parts: Vec::new(), speech: Vec::new(), hit_by: u32::MAX, grab_scored: false, grab_tw: false, hit_wait: 0, att: None, last_hit: Default::default(), impact: 0.0, impact_n: [0.0; 4], knocks: 0.0, slot: 0, place_ray: None, hit_kind: 0, land_time: 0.0, takeoffs: 0, rail_blend: 0.0, rail_word: 0, rail_grid: false, rail_hit: [0.0; 4], spin_st: None, pad_dev: Default::default(), land_word: u32::MAX, land_normal: [0.0, 0.0, 1.0, 0.0], takeoff_wind: (0.0, 0.0) };
         // the start line's `Boarder_PlaceAt` 0x11cae8 (`cBoarder::vf8` 0x116ab8: heading from the path's direction)
         r.att = Some((orient::placed_attitude(placed_heading(yaw), None), yaw));
         r
@@ -582,7 +593,11 @@ impl Rider {
     /// gain at a full meter (re)opens the twenty-second uber window.
     pub fn add_meter(&mut self, units: f32) {
         let mut f = crate::boarder::Fields { meter: self.boost, uber_timer: self.uber_timer, full_count: self.full_count, ..Default::default() };
-        crate::boarder::add_meter(units, self.stats.bytes[crate::stats::METER], &mut f);
+        let (_, calls) = crate::boarder::add_meter(units, self.stats.bytes[crate::stats::METER], &mut f);
+        // `Audio_TrickyTrigger` 0x21c610 (the rider)
+        if calls.contains(&crate::boarder::Call::Tricky) {
+            self.speech.push(RiderSpeech::Tricky { finished: self.fin.is_some(), ubers: self.sc.x88 });
+        }
         self.boost = f.meter;
         self.uber_timer = f.uber_timer;
         self.full_count = f.full_count;
@@ -675,6 +690,8 @@ impl Rider {
     /// `Boarder_Wipeout` 0x11d830 itself: down, unscored (its callers score it).
     fn fall(&mut self) {
         if self.crashed > 0.0 { return; }
+        // `Boarder_Wipeout` 0x11d830 → `Sfx_OnWipeout` 0x2181e8 with `Score_GetMultiplier` 0x155410 (the app's announcer)
+        self.speech.push(RiderSpeech::Wipeout(crate::score::get_multiplier(self.sc.units)));
         self.last_trick = "CRASH".into();
         self.trick_timer = 2.0;
         // a crash in the middle of a trick in the uber window cuts the meter to two thirds and closes it
@@ -959,11 +976,15 @@ impl Rider {
         self.vel = Vec3::new(h.vel[0], h.vel[2], h.vel[1]) / 100.0;
         for c in calls {
             match c {
-                crate::hit::HitCall::Stumble { .. } => self.stumble_by(true),
-                crate::hit::HitCall::Wipeout { dir: d, .. } => {
+                crate::hit::HitCall::Stumble { shove } => {
+                    self.stumble_by(true);
+                    if self.hit_by != u32::MAX { self.speech.push(RiderSpeech::Hit { by: self.hit_by, which: !shove, crash: false }); }
+                }
+                crate::hit::HitCall::Wipeout { dir: d, shove, .. } => {
                     let d = Vec3::new(d[0], d[2], d[1]);
                     self.crash_kind = if d.dot(Vec3::new(self.yaw.cos(), 0.0, -self.yaw.sin())) > 0.0 { 3 } else { 2 };
                     self.fall();
+                    if self.hit_by != u32::MAX { self.speech.push(RiderSpeech::Hit { by: self.hit_by, which: !shove, crash: true }); }
                 }
                 _ => {}
             }

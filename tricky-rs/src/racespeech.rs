@@ -392,6 +392,7 @@ pub fn race_speech(
             SpeechCall::LocalLine(k, kind) => rs.announcer.on_local_line(&mut env, &speech_rider(r, k), kind as i64),
             SpeechCall::LocalLine2(k) => rs.announcer.on_local_line2(&mut env, &speech_rider(r, k)),
             SpeechCall::ListenerLine(k) => rs.announcer.on_listener_line(&mut env, &speech_rider(r, k)),
+            SpeechCall::TimeUp => rs.announcer.on_time_up(&mut env),
             SpeechCall::PlacingChange { rider, next, prev, old, new } => {
                 let id = |k: Option<usize>| k.map_or(0, rider_id);
                 let mut p = Placing {
@@ -441,6 +442,22 @@ pub fn race_speech(
                         rs.announcer.on_boost(&mut env, &who);
                     }
                 }
+                // `Audio_TrickyTrigger` 0x21c610: the audio system's +0x3844, +0x36f0 and +0x3700 set (STANDIN: taken as
+                // set), no replay, the rider racing (+0x418 < 0) and the listener's; then +0x6e7c the rider, +0x6e84
+                // 0x7f (0x5a while +0x6e50), `Music_StartTricky` (the music's: `pathmusic`) and `Speech_OnTricky` 0x2337c8
+                RiderSpeech::Tricky { finished, ubers } => {
+                    if !finished && k == 0 {
+                        rs.announcer.on_tricky(&mut env, &SpeechRider { tricky: ubers, ..who });
+                    }
+                }
+                RiderSpeech::Hit { by, which, crash } => {
+                    let other = speech_rider(r, by as usize);
+                    tricky_game::speech::voices::rider_hit_line(&mut env, &other, &who, which as i64, crash as i64);
+                    if crash {
+                        rs.announcer.on_rider_hit(&mut env, &who, &other);
+                    }
+                }
+                RiderSpeech::TenSecondsLeft => rs.announcer.on_ten_seconds_left(&mut env, &who),
                 RiderSpeech::Wipeout(level) => {
                     let air = sndqueue::AirRider { flag_41c: (k == 0) as u32, player: 0, air: 0.0, emitter: 0 };
                     let mut w = Wipeout { announcer: &rs.announcer, env: &mut env, rider: &who };

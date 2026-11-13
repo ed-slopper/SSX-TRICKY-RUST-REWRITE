@@ -1710,6 +1710,7 @@ fn ride(
             if o.rider.crashed > 0.0 { continue; }
             if let Some(push) = props::shove_push(r, &o.rider) {
                 let was = o.rider.stumble > 0.0;
+                o.rider.hit_by = r.slot;
                 let down = o.rider.take_hit(push, false);
                 if down { hit = true; }
                 // the rider remembers it (Rider_OnKnockedDownBy): 30 for a knockdown, 15 for a stumble
@@ -2061,6 +2062,7 @@ fn ride(
                     let push = props::shove_push(&o.rider, r);
                     let was = r.stumble > 0.0;
                     if let (true, Some(push)) = (r.shove <= 0.0, push) {
+                        r.hit_by = o.rider.slot;
                         let down = r.take_hit(push, false);
                         if down { o.rider.add_meter(1.0); r.last_trick = "Shoved!".into(); r.trick_timer = 2.0; }
                         // getting its own back cools the grudge
@@ -2104,6 +2106,10 @@ fn ride(
     // show-off ends when its clock runs out
     if playing && game.event == ui::Event::ShowOff && race.0.state == RaceState::Running && race.0.time >= ui::showoff(&ui::track_key(&list)).1 + race.0.bonus {
         race.0.state = RaceState::Finished;
+        // `cRaceHandler::Update` 0x113820: the clock out with a rider racing → `Speech_OnTimeUp` 0x234058
+        if rider.0.fin.is_none() || opponents.0.iter().any(|o| o.driver.finished.is_none()) {
+            race.0.speech.push(tricky_game::race::SpeechCall::TimeUp);
+        }
     }
     // over the line the rider brakes to a stop and reacts; the results come once it has stood
     // there (4 s after the line, as cRaceHandler_Update waits for Boarder_IsFinishedAndStopped)
