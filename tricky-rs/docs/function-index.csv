@@ -3527,16 +3527,16 @@ address,size,name,system,status
 0x20c380,104,BankInstances_CountUsed,audio,checked
 0x20c3e8,60,BankMonitor_ResetTimers,audio,checked
 0x20c468,80,cBankMonitor::__tf,runtime,host
-0x20c560,172,BankSys_Init,audio,not started
-0x20c610,108,cBankSys::~cBankSys,audio,not started
+0x20c560,172,BankSys_Init,audio,checked
+0x20c610,108,cBankSys::~cBankSys,audio,checked
 0x20c680,712,SndSys_EchoCallback,audio,checked
 0x20c948,1124,SndSys_PlayPending,audio,checked
-0x20cdb0,124,StaticInit_SndSys,audio,not started
-0x20ce30,672,SndSys_PlaySoundVolume,audio,not started
-0x20d0d0,520,cBankSys::PlaySound,audio,not started
-0x20d2d8,504,SndSys_PushEntryKindId,audio,not started
-0x20d4d0,480,SndSys_PushEntryKind,audio,not started
-0x20d6b0,440,SndSys_PushEntryCopy1,audio,not started
+0x20cdb0,124,StaticInit_SndSys,audio,checked
+0x20ce30,672,SndSys_PlaySoundVolume,audio,checked
+0x20d0d0,520,cBankSys::PlaySound,audio,checked
+0x20d2d8,504,SndSys_PushEntryKindId,audio,checked
+0x20d4d0,480,SndSys_PushEntryKind,audio,checked
+0x20d6b0,440,SndSys_PushEntryCopy1,audio,checked
 0x20d898,80,cBankSys::__tf,runtime,host
 0x20d928,200,Sfx_EvalCurve,audio,ported
 0x20d9f0,96,Audio_MusicStateToMode,audio,ported

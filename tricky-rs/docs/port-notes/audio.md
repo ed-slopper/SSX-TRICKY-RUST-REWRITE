@@ -1594,3 +1594,19 @@ functions, 0x20a888..0x20c3e8, nine hand mutations all caught):
 
 Not yet: the app plays bank sounds through `tricky-rs/src/racespeech.rs`'s `play_bank_sound` stand-in, not through
 these (row E1b2g7d5d, with cBankSys, row E1b2g7d5f).
+
+## cBankSys: the kind and id arrays and the plays (E1b2g7d5f, `game/src/banksys.rs`; checked: `tests/banksys.rs`)
+
+Proven (checked in the function runner with the bank manager's test, eight more functions, mutations caught):
+
+- `BankSys_Init` 0x20c560 makes the bank manager (`BankManager_Init` 0x20a2f0, its arguments passed on), sets the
+  vtable 0x39e878 and `gBankSys` 0x342c48, and allocates the sound queue's kind (+0xa40) and id (+0xa44) arrays,
+  0x10 bytes (four entries) each, filled with 0xdeadc0ed. `cBankSys::~cBankSys` 0x20c610 frees them, clears
+  `gBankSys` and runs the bank manager's destructor.
+- The queue pushes (`SndSys_PushEntryCopy1` 0x20d6b0, `SndSys_PushEntryKind` 0x20d4d0, `SndSys_PushEntryKindId`
+  0x20d2d8) all make the same new entry as `sndqueue::queue_push` (header record copied, +0x3c the record's first
+  byte sign-extended, envelope 100 / 90 / 50, +0x7c 1) and set the kind and id when they take them.
+  `cBankSys::PlaySound` 0x20d0d0 is the kind-and-id push and `SndSys_PlayPending` 0x20c948;
+  `SndSys_PlaySoundVolume` 0x20ce30 also keeps the volume whole at +0x3c and clamps it to 0..127 into the record.
+- `StaticInit_SndSys` 0x20cdb0 writes the two curves `Sfx_EvalCurve` 0x20d928 reads (0x3d2988..0x3d29b0: 1.0,
+  0.9645, 0 / 1.0, 0.4746, 0 / 1.0, 0.0758, 0.002).

@@ -1,4 +1,4 @@
-//! `tricky_game::banksys` (board row E1b2g7d5c) against the original in the function runner (TRICKY_ELF; skipped
+//! `tricky_game::banksys` (rows E1b2g7d5c, E1b2g7d5f) against the original in the function runner (TRICKY_ELF; skipped
 //! without it): random loaders and bank managers (their four queues, a load busy or not, the slots' states, kinds,
 //! rings and names), every function run on both sides with the same answers from the calls out (EA's memory, the file
 //! readers, the sound library's banks, the owner's and the class's virtuals), the calls logged in order and the memory
@@ -35,6 +35,11 @@ const QDATA: u32 = ARENA + 0x2400;
 const FILE: u32 = ARENA + 0x3000;
 const HEAP: u32 = ARENA + 0x3800;
 const DATA: u32 = ARENA + 0x3c00;
+/// The sound queue's arrays and records, and the kind and id arrays (cBankSys)
+const QARR: u32 = ARENA + 0x2600;
+const QREC: u32 = ARENA + 0x2900;
+const KINDS: u32 = ARENA + 0x2a00;
+const IDS: u32 = ARENA + 0x2a40;
 /// The owner's virtuals (+0x24, +0x2c, +0x34, +0x3c) and the class's when not the bank manager's (+0x54, +0x5c, +0x64)
 const V_24: u32 = 0x7f_0000;
 const V_2C: u32 = 0x7f_0100;
@@ -55,6 +60,7 @@ const LEAVES: &[(u32, usize)] = &[
     (V_3C, 1), (V_54, 2), (V_5C, 4), (V_64, 7),
     // the pure-virtual stub in cAsyncSys's vtable, reached when its destructor finishes a load
     (0x2f54e0, 7),
+    (PLAY_PENDING, 1),
 ];
 
 /// The functions ported here, run as they are in the runner
@@ -62,7 +68,8 @@ const PORTED: &[u32] = &[
     0x208950, 0x208af8, 0x208b78, 0x208c48, 0x208cb0, 0x208ed8, 0x2086d8, 0x209aa0, 0x209a98, 0x209088, 0x209408,
     0x209c18, 0x209c48, 0x209ca8, 0x209cf8, 0x209f10, 0x209f70, 0x20a038, 0x20a0b0, 0x20a118, 0x20a170, 0x20a1b8,
     0x20a218, 0x20a268, 0x20a2f0, 0x20a3d0, 0x20a460, 0x20a508, 0x20a520, 0x20a5d0, 0x20a5f0, 0x20a608, 0x20a628,
-    0x20a640, 0x20a658, 0x20a688, 0x20a6b0, 0x20a6e0, STRCPY, STRCMP,
+    0x20a640, 0x20a658, 0x20a688, 0x20a6b0, 0x20a6e0, STRCPY, STRCMP, 0x20c560, 0x20c610, 0x20cdb0, 0x20d6b0,
+    0x20d4d0, 0x20d2d8, 0x20d0d0, 0x20ce30, 0x2fb468,
 ];
 
 struct Answers {
@@ -123,7 +130,7 @@ impl SongEnv for Ours {
     }
 }
 
-const REGIONS: [(u32, u32); 4] = [(ARENA, 0x4000), (0x342c40, 0x10), (0, 0x400), (0x39e600, 0x200)];
+const REGIONS: [(u32, u32); 5] = [(ARENA, 0x4000), (0x342c40, 0x10), (0, 0x400), (0x39e600, 0x200), (0x3d2980, 0x40)];
 
 fn snap(r: &mut Runner) -> Mem {
     let mut m = Mem::default();
@@ -174,7 +181,7 @@ fn bank_manager_matches_the_original() {
         r.allow(f);
     }
     let mut g = Rng(0x20a5_20ba_4c00_0001);
-    let mut seen = [0u32; 38];
+    let mut seen = [0u32; 46];
     for case in 0..60_000u32 {
         for k in 0..0x4000 / 4 {
             r.mem.write_u32(ARENA + 4 * k, if g.below(3) == 0 { 0 } else { g.next() });
@@ -250,14 +257,22 @@ fn bank_manager_matches_the_original() {
         r.mem.write_u8(FILE + file.len() as u32, 0);
         r.mem.write_u32(ASYNC_SYS, SYS);
         r.mem.write_u32(BANK_MANAGER, SYS);
-        let which = g.below(38);
+        let which = g.below(46);
+        // the sound queue (cBankSys's pushes)
+        r.mem.write_u32(SYS + 0x20, g.below(3));
+        r.mem.write_u32(SYS + 0x24, QREC);
+        for (k, o) in [0x38u32, 0x3c, 0x40, 0x64, 0x68, 0x6c, 0x70, 0x74, 0x78, 0x7c].iter().enumerate() {
+            r.mem.write_u32(SYS + o, QARR + 0x40 * k as u32);
+        }
+        r.mem.write_u32(SYS + 0xa40, KINDS);
+        r.mem.write_u32(SYS + 0xa44, IDS);
         // the shut-down waits while a load it can't cancel is busy (for ever, here): only when it can
-        if matches!(which, 1 | 3 | 25) && !matches!(peek(&mut r, SYS + 0xa10), Some(0..=2)) {
+        if matches!(which, 1 | 3 | 25 | 39) && !matches!(peek(&mut r, SYS + 0xa10), Some(0..=2)) {
             r.mem.write_u32(SYS + 0x8e8, 0);
         }
         // the manager's destructor clears gBankManager before freeing its slots, and a static slot with sound
         // memory frees that through the owner found by it: it reads through null, so never a kind 2 there
-        if which == 25 {
+        if which == 25 || which == 39 {
             for k in 0..4 {
                 if r.mem.read_u32(SLOTS + 0x60 * k + 8) == 2 {
                     r.mem.write_u32(SLOTS + 0x60 * k + 8, 1);
@@ -273,8 +288,13 @@ fn bank_manager_matches_the_original() {
         let spu = [0u32, 0x800, g.next()][g.below(3) as usize];
         let flags = [0u32, 0x4000_0000, 0x8000_0000, 0xc000_0010, g.next()][g.below(5) as usize];
         let args: Vec<u32> = match which {
-            0 | 24 => vec![SYS, if which == 0 { w[0] } else { g.below(5) }, w[1]],
-            1 | 25 => vec![SYS, g.below(4)],
+            0 | 24 | 38 => vec![SYS, if which == 0 { w[0] } else { g.below(5) }, w[1]],
+            1 | 25 | 39 => vec![SYS, g.below(4)],
+            40 => vec![],
+            41 => vec![SYS],
+            42 => vec![SYS, w[0]],
+            43 | 44 => vec![SYS, w[0], w[1]],
+            45 => vec![SYS, w[0], w[1], [0u32, 50, 126, 127, 128, 0x17f, u32::MAX, 0x8000_0000][g.below(8) as usize]],
             2 => vec![SYS, size, flags],
             3 | 4 | 7 | 8 | 10 => vec![SYS],
             5 => vec![SYS, k, FILE, [0u32, 1, 2, 3][g.below(4) as usize], w[0]],
@@ -301,7 +321,8 @@ fn bank_manager_matches_the_original() {
             0x208950, 0x208af8, 0x208b78, 0x208c48, 0x208cb0, 0x208ed8, 0x2086d8, 0x209aa0, 0x209a98, 0x209088, 0x209408,
             0x209c18, 0x209c48, 0x209ca8, 0x209cf8, 0x209f10, 0x209f70, 0x20a038, 0x20a0b0, 0x20a118, 0x20a170,
             0x20a1b8, 0x20a218, 0x20a268, 0x20a2f0, 0x20a3d0, 0x20a460, 0x20a508, 0x20a520, 0x20a5d0, 0x20a5f0,
-            0x20a608, 0x20a628, 0x20a640, 0x20a658, 0x20a688, 0x20a6b0, 0x20a6e0,
+            0x20a608, 0x20a628, 0x20a640, 0x20a658, 0x20a688, 0x20a6b0, 0x20a6e0, 0x20c560, 0x20c610, 0x20cdb0,
+            0x20d6b0, 0x20d4d0, 0x20d2d8, 0x20d0d0, 0x20ce30,
         ][which as usize];
         let reg = |k: usize| if k < 4 { 4 + k } else { 8 + k - 4 };
         for (k, v) in args.iter().enumerate() {
@@ -351,7 +372,15 @@ fn bank_manager_matches_the_original() {
             34 => Some(manager_alloc(&mut m, &mut e, x(0), x(1), x(2), x(3))),
             35 => { manager_configure(&mut m, &mut e, x(0), x(1), x(2), x(3), x(4)); None }
             36 => Some(manager_handle(&m, x(0), x(1))),
-            _ => Some(manager_is_ready(&mut m, &mut e, x(0), x(1)) as u32),
+            37 => Some(manager_is_ready(&mut m, &mut e, x(0), x(1)) as u32),
+            38 => Some(bank_sys_init(&mut m, &mut e, x(0), x(1), x(2))),
+            39 => { bank_sys_destroy(&mut m, &mut e, x(0), x(1)); None }
+            40 => { static_init(&mut m); None }
+            41 => { push_entry(&mut m, x(0)); None }
+            42 => { push_entry_kind(&mut m, x(0), x(1)); None }
+            43 => { push_entry_kind_id(&mut m, x(0), x(1), x(2)); None }
+            44 => { play_sound(&mut m, &mut e, x(0), x(1), x(2)); None }
+            _ => { play_sound_volume(&mut m, &mut e, x(0), x(1), x(2), x(3)); None }
         };
         let ours = std::mem::take(&mut a.borrow_mut().log);
         assert_eq!(ours, theirs, "case {case} ({which} {addr:#x}): the calls");

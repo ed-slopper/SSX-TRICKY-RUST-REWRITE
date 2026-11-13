@@ -809,3 +809,158 @@ pub fn manager_is_ready(m: &mut Mem, e: &mut dyn SongEnv, mgr: u32, n: u32) -> b
     e.call(m, SND_UNLOCK, &[]);
     r
 }
+
+// ---- cBankSys (board row E1b2g7d5f): the bank manager with the queue's kind and id arrays, and the plays ----
+
+/// `gBankSys` 0x342c48
+pub const BANK_SYS: u32 = 0x342c48;
+pub const BANKSYS_VTABLE: u32 = 0x39e878;
+/// The kind and id arrays' allocation names
+pub const NAME_KINDS: u32 = 0x39e860;
+pub const NAME_IDS: u32 = 0x39e868;
+/// `SndSys_PlayPending` 0x20c948 (ported in `sndplay::play_pending`), called out
+pub const PLAY_PENDING: u32 = 0x20c948;
+
+/// `BankSys_Init` 0x20c560 (the audio system, the slot count, the `cMonitor` argument): the bank manager made, then
+/// the queue's kind (+0xa40) and id (+0xa44) arrays, four entries each
+pub fn bank_sys_init(m: &mut Mem, e: &mut dyn SongEnv, sys: u32, count: u32, arg: u32) -> u32 {
+    manager_init(m, e, sys, count, arg);
+    m.w32(sys + 4, BANKSYS_VTABLE);
+    m.w32(BANK_SYS, sys);
+    for (name, at) in [(NAME_KINDS, 0xa40), (NAME_IDS, 0xa44)] {
+        let p = e.call(m, EAMEM_ALLOC, &[name, 0x10, 0]);
+        if p != 0 {
+            e.call(m, EAMEM_SET, &[p, 0xdead_c0ed, 0x10]);
+        }
+        m.w32(sys + at, p);
+    }
+    sys
+}
+
+/// `cBankSys::~cBankSys` 0x20c610 (the audio system, the delete flags)
+pub fn bank_sys_destroy(m: &mut Mem, e: &mut dyn SongEnv, sys: u32, flags: u32) {
+    m.w32(sys + 4, BANKSYS_VTABLE);
+    for at in [0xa40, 0xa44] {
+        let p = m.r32(sys + at);
+        if p != 0 {
+            e.call(m, MEM_FREE, &[p]);
+        }
+    }
+    m.w32(BANK_SYS, 0);
+    manager_destroy(m, e, sys, flags);
+}
+
+/// `StaticInit_SndSys` 0x20cdb0: the two curves `Sfx_EvalCurve` 0x20d928 reads (0x3d2988..0x3d29b0)
+pub fn static_init(m: &mut Mem) {
+    for (at, v) in [
+        (0x3d29b0, 0x3b03_126f),
+        (0x3d29a8, 0x3f80_0000),
+        (0x3d2988, 0x3f80_0000),
+        (0x3d29ac, 0x3d9b_3d08),
+        (0x3d2998, 0x3f80_0000),
+        (0x3d299c, 0x3ef2_fec5),
+        (0x3d29a0, 0),
+        (0x3d298c, 0x3f76_e979),
+        (0x3d2990, 0),
+    ] {
+        m.w32(at, v);
+    }
+}
+
+/// A new entry on the sound queue (the audio system's `cMonitor` part at +0x20; `sndqueue::Queue`): the header
+/// record (+8) copied in, its arrays cleared, the envelope 100 / 90 / 50 and +0x7c 1. The new count (its index)
+fn queue_push(m: &mut Mem, q: u32) -> u32 {
+    let c = m.r32(q + 0x20).wrapping_add(1);
+    m.w32(q + 0x20, c);
+    let rec = c.wrapping_mul(0x18).wrapping_add(m.r32(q + 0x24));
+    let header: Vec<u8> = (0..0x18).map(|k| m.r8(q + 8 + k)).collect();
+    for (k, b) in header.iter().enumerate() {
+        m.w8(rec.wrapping_add(k as u32), *b);
+    }
+    let at = |m: &Mem, arr: u32, size: u32| c.wrapping_mul(size).wrapping_add(m.r32(q + arr));
+    m.w32(q.wrapping_add(c.wrapping_mul(4)) + 0x28, 0);
+    let a = at(m, 0x38, 4);
+    m.w32(a, 0);
+    let b0 = m.r8(rec) as i8 as i32 as u32;
+    let a = at(m, 0x3c, 4);
+    m.w32(a, b0);
+    let a = at(m, 0x40, 4);
+    m.w32(a, 0);
+    let p = q.wrapping_add(c.wrapping_mul(8)) + 0x44;
+    for k in 0..8 {
+        m.w8(p.wrapping_add(k), 0);
+    }
+    for arr in [0x68, 0x6c] {
+        let a = at(m, arr, 4);
+        m.w32(a, 0);
+    }
+    let a74 = at(m, 0x74, 16);
+    m.w32(a74.wrapping_add(4), 0);
+    let a = at(m, 0x70, 4);
+    m.w32(a, 0);
+    m.w32(a74, 100);
+    let a = at(m, 0x64, 4);
+    m.w32(a, 0);
+    m.w32(a74.wrapping_add(8), 0x5a);
+    m.w32(a74.wrapping_add(0xc), 0x32);
+    let a = at(m, 0x78, 4);
+    m.w32(a, 0);
+    let a = at(m, 0x7c, 4);
+    m.w32(a, 1);
+    c
+}
+
+fn set_kind(m: &mut Mem, q: u32, c: u32, kind: u32) {
+    let a = c.wrapping_mul(4).wrapping_add(m.r32(q + 0xa40));
+    m.w32(a, kind);
+}
+
+fn set_id(m: &mut Mem, q: u32, c: u32, id: u32) {
+    let a = c.wrapping_mul(4).wrapping_add(m.r32(q + 0xa44));
+    m.w32(a, id);
+}
+
+/// `SndSys_PushEntryCopy1` 0x20d6b0
+pub fn push_entry(m: &mut Mem, q: u32) {
+    queue_push(m, q);
+}
+
+/// `SndSys_PushEntryKind` 0x20d4d0 (the audio system, the kind)
+pub fn push_entry_kind(m: &mut Mem, q: u32, kind: u32) {
+    let c = queue_push(m, q);
+    set_kind(m, q, c, kind);
+}
+
+/// `SndSys_PushEntryKindId` 0x20d2d8 (the audio system, the kind, the id)
+pub fn push_entry_kind_id(m: &mut Mem, q: u32, kind: u32, id: u32) {
+    let c = queue_push(m, q);
+    set_kind(m, q, c, kind);
+    set_id(m, q, c, id);
+}
+
+/// `cBankSys::PlaySound` 0x20d0d0 (the audio system, the kind, the id): pushed and played at once
+pub fn play_sound(m: &mut Mem, e: &mut dyn SongEnv, q: u32, kind: u32, id: u32) {
+    push_entry_kind_id(m, q, kind, id);
+    e.call(m, PLAY_PENDING, &[q]);
+}
+
+/// `SndSys_PlaySoundVolume` 0x20ce30 (the audio system, the kind, the id, the volume): the volume kept whole at
+/// +0x3c and clamped to 0..127 into the record's first byte, then played
+pub fn play_sound_volume(m: &mut Mem, e: &mut dyn SongEnv, q: u32, kind: u32, id: u32, volume: u32) {
+    let c = queue_push(m, q);
+    set_kind(m, q, c, kind);
+    set_id(m, q, c, id);
+    let a = c.wrapping_mul(4).wrapping_add(m.r32(q + 0x3c));
+    m.w32(a, volume);
+    let v = m.r32(a) as i32;
+    let byte = if v < 0 {
+        0
+    } else if v < 0x7f {
+        m.r8(a)
+    } else {
+        0x7f
+    };
+    let rec = c.wrapping_mul(0x18).wrapping_add(m.r32(q + 0x24));
+    m.w8(rec, byte);
+    e.call(m, PLAY_PENDING, &[q]);
+}
