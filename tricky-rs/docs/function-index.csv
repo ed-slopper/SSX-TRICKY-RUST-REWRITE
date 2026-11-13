@@ -3542,10 +3542,10 @@ address,size,name,system,status
 0x20d9f0,96,Audio_MusicStateToMode,audio,ported
 0x20da50,128,Audio_CreateSystem,audio,ported
 0x20dad0,68,Audio_DeleteSystem,audio,ported
-0x20db18,660,cBXAudio::cBXAudio,audio,not started
+0x20db18,660,cBXAudio::cBXAudio,audio,ported
 0x20ddb0,340,cBXAudio::~cBXAudio,audio,not started
 0x20df08,1316,cBXAudio::vf13_20df08,audio,checked
-0x20e430,768,cBXAudio::vf14_20e430,audio,not started
+0x20e430,768,cBXAudio::vf14_20e430,audio,ported
 0x20e730,776,cBXAudio::vf8_20e730,audio,not started
 0x20ea38,180,cBXAudio::vf15_20ea38,audio,not started
 0x20eaf0,560,cBXAudio::PlayFESound,audio,not started
@@ -3619,9 +3619,9 @@ address,size,name,system,status
 0x2153f8,92,Audio_ResumeAll,audio,ported
 0x215458,48,Audio_PlayPauseSound,audio,ported
 0x215488,88,Audio_StopAll,audio,ported
-0x2154e0,372,SndSys_IsQueued,audio,ported
-0x215658,828,SndSys_UpdateQueuedSounds,audio,not started
-0x215998,652,SndSys_QueueSounds,audio,ported
+0x2154e0,372,SndSys_IsQueued,audio,checked
+0x215658,828,SndSys_UpdateQueuedSounds,audio,checked
+0x215998,652,SndSys_QueueSounds,audio,checked
 0x215c28,752,Audio_StopQueuedSounds,audio,not started
 0x215f18,984,Sfx_PlayRiderBump,audio,not started
 0x2162f0,728,Sfx_OnWallHit,audio,ported
@@ -3720,7 +3720,7 @@ address,size,name,system,status
 0x21e9d0,116,cController::vf7_21e9d0,audio,not started
 0x21ea48,196,SndEvent_Tick,audio,checked
 0x21eb10,96,cController::vf4_21eb10,audio,checked
-0x21eb70,100,Audio_UpdateSystems,audio,not started
+0x21eb70,100,Audio_UpdateSystems,audio,ported
 0x21ec58,80,cController::__tf,runtime,host
 0x21eca8,52,CrowdSoundList_Construct,audio,ported
 0x21ece0,76,CrowdSoundList_Destruct,audio,not started
@@ -6509,14 +6509,14 @@ address,size,name,system,status
 0x2d1ab8,184,SndStream_ConsumeBytes,lib-snd,not started
 0x2d1b70,700,SndStream_OnHeaderChunk,lib-snd,not started
 0x2d1e30,88,SndStream_OnCountChunk,lib-snd,not started
-0x2d1e88,520,SndStream_OnDataChunk,lib-snd,not started
+0x2d1e88,520,SndStream_OnDataChunk,lib-snd,ported
 0x2d2090,52,SndStream_OnEndChunk,lib-snd,not started
 0x2d20c8,176,SndStream_ParseChunk,lib-snd,not started
 0x2d2178,248,SndStream_IsPrebuffering,lib-snd,not started
 0x2d2270,564,SndStream_UpdateAll,lib-snd,not started
 0x2d24a8,56,SndStream_CountOpen,lib-snd,not started
 0x2d24e0,584,SndStream_Create,lib-snd,not started
-0x2d2728,348,SndStream_Queue,lib-snd,not started
+0x2d2728,348,SndStream_Queue,lib-snd,ported
 0x2d2888,32,SndStream_Open,lib-snd,not started
 0x2d28a8,160,SndStream_Close,lib-snd,not started
 0x2d2948,28,SndStream_QueueFile,lib-snd,not started
@@ -6580,7 +6580,7 @@ address,size,name,system,status
 0x2d5960,116,SndVoice_NextGroupId,lib-snd,not started
 0x2d59d8,1084,SndVoice_PlayLayer,lib-snd,not started
 0x2d5e18,664,SndSound_PlayLayers,lib-snd,not started
-0x2d60b0,1340,SndSound_ParseHeader,lib-snd,not started
+0x2d60b0,1340,SndSound_ParseHeader,lib-snd,ported
 0x2d65f0,36,Snd_PanCurve,lib-snd,not started
 0x2d6618,652,SND_BuildPanTable,lib-snd,not started
 0x2d68a8,100,SND_GetPanLevels,lib-snd,not started
@@ -6707,7 +6707,7 @@ address,size,name,system,status
 0x2dfe78,120,SndPlayParams_SetDefaults,lib-snd,not started
 0x2dfef0,156,SndVoice_CalcFxSend,lib-snd,not started
 0x2dff90,88,Snd_RandRange,lib-snd,not started
-0x2dffe8,240,SndPT_NextTag,lib-snd,not started
+0x2dffe8,240,SndPT_NextTag,lib-snd,ported
 0x2e00d8,8,SoftMix_ShutdownStub,lib-snd,not started
 0x2e00e0,32,SoftVoice_CalcGain,lib-snd,not started
 0x2e0100,584,SoftVoice_Mix,lib-snd,not started
@@ -6742,7 +6742,7 @@ address,size,name,system,status
 0x2e15f8,8,SndMt_GetPosOneShot,lib-snd,not started
 0x2e1600,348,SndMt_PullOneShot,lib-snd,not started
 0x2e1760,108,SndMt_InitOneShot,lib-snd,not started
-0x2e17d0,408,SndMt_PullStream,lib-snd,not started
+0x2e17d0,408,SndMt_PullStream,lib-snd,ported
 0x2e1968,120,SndMt_InitStream,lib-snd,not started
 0x2e19e0,8,SndPcm_GetPosOneShot,lib-snd,not started
 0x2e19e8,196,SndPcm_PullOneShot,lib-snd,not started
@@ -6763,18 +6763,18 @@ address,size,name,system,status
 0x2e27c0,132,SndXa_InitStream,lib-snd,not started
 0x2e2848,124,SndXa_TakeBuffered,lib-snd,not started
 0x2e28c8,720,SndXa_DecodeFrames,lib-snd,not started
-0x2e2b98,104,SndBits_Read,lib-snd,not started
-0x2e2c00,80,SndBits_Skip,lib-snd,not started
-0x2e2c50,580,SndMt_ReadExcitation,lib-snd,not started
-0x2e2e98,120,SndMt_InterpolateOdd,lib-snd,not started
-0x2e2f10,252,SndMt_RcToLpc,lib-snd,not started
-0x2e3010,96,SndMt_SynthSubframe,lib-snd,not started
-0x2e3070,376,SndMt_ParseHeader,lib-snd,not started
-0x2e31e8,1080,SndMt_DecodeFrame,lib-snd,not started
-0x2e3620,940,SndMt_LpcSynth,lib-snd,not started
-0x2e39d0,116,SndFx_PcmOut_Pull,lib-snd,not started
+0x2e2b98,104,SndBits_Read,lib-snd,checked
+0x2e2c00,80,SndBits_Skip,lib-snd,checked
+0x2e2c50,580,SndMt_ReadExcitation,lib-snd,checked
+0x2e2e98,120,SndMt_InterpolateOdd,lib-snd,checked
+0x2e2f10,252,SndMt_RcToLpc,lib-snd,checked
+0x2e3010,96,SndMt_SynthSubframe,lib-snd,checked
+0x2e3070,376,SndMt_ParseHeader,lib-snd,checked
+0x2e31e8,1080,SndMt_DecodeFrame,lib-snd,checked
+0x2e3620,940,SndMt_LpcSynth,lib-snd,checked
+0x2e39d0,116,SndFx_PcmOut_Pull,lib-snd,ported
 0x2e3a48,20,SndFx_PcmOut_Init,lib-snd,not started
-0x2e3a5c,208,Snd_FloatToPcm16,lib-snd,not started
+0x2e3a5c,208,Snd_FloatToPcm16,lib-snd,ported
 0x2e3b2c,132,SndMix_ClampToPcm16,lib-snd,not started
 0x2e3c00,144,SndFx_Lowpass_Pull,lib-snd,not started
 0x2e3c90,44,SndFx_Lowpass_SetCoef,lib-snd,not started
