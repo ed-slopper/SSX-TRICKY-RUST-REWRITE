@@ -421,7 +421,7 @@ pub fn menus(keys: Res<ButtonInput<KeyCode>>, pads: Query<&Gamepad>, time: Res<T
             for (k, d) in crate::trickdata::RIDERS.iter().enumerate() { game.flow.locked_riders[k] = !master && !career.char_open(d.name); }
             // the boards by career points, the uber board also by our trick book (row C15b)
             let who = crate::trickdata::RIDERS[(game.flow.choices.rider[(game.flow.player().max(0) as usize).min(1)] as usize).min(11)].name;
-            for k in 0..12 { game.flow.locked_boards[k] = !master && !(career.board_open(k) || (k == 11 && book.complete(who))); }
+            for (k, l) in game.flow.locked_boards.iter_mut().enumerate().take(12) { *l = !master && !(career.board_open(k) || (k == 11 && book.complete(who))); }
             for c in tricky_game::courses::COURSES.iter() {
                 let open = course_dir(&list, c.number).is_some_and(|i| master || career.course_open(event, &list.dirs[i].file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_default()));
                 game.flow.locked_courses[c.number as usize] = !open;
