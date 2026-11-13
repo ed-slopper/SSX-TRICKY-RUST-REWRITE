@@ -48,14 +48,14 @@ const LEAVES: &[(u32, usize)] = &[
     (MIDI_PAN, 2), (MIDI_PAUSE, 1), (MIDI_RESUME, 1), (MIDI_VOLUME, 2), (MIDI_FADE, 3), (STREAM_PAN, 3),
     (STREAM_VOLUME, 2), (STREAM_PITCH, 2), (STREAM_STOP, 1), (VOICE_IS_DONE, 1), (VOICE_SET_VOLUME, 2),
     (MEM_DELETE, 1), (MEM_FREE, 1), (EAMEM_ALLOC, 3), (EAMEM_SET, 3), (MONITOR_CTOR, 2), (MONITOR_DTOR, 2),
-    (DEBUG_PRINTF, 1), (V_LOCATE, 2),
+    (DEBUG_PRINTF, 1), (V_LOCATE, 2), (HANDLE_PITCH_BEND, 2),
 ];
 
-const ADDR: [u32; 35] = [
+const ADDR: [u32; 36] = [
     0x20a888, 0x20a8c0, 0x20a9d8, 0x20aa20, 0x20aab8, 0x20ab28, 0x20ab48, 0x20aba8, 0x20abf8, 0x20abb8, 0x20ac08,
     0x20ac50, 0x20ad38, 0x20b0b8, 0x20b158, 0x20b688, 0x20b700, 0x20b948, 0x20b9b0, 0x20ba00, 0x20bb98, 0x20bc60,
     0x20bce8, 0x20bd68, 0x20bfe8, 0x20c040, 0x20c098, 0x20c0e0, 0x20c0f8, 0x20c148, 0x20c200, 0x20c2a0, 0x20c308,
-    0x20c380, 0x20c3e8,
+    0x20c380, 0x20c3e8, 0x21e7e0,
 ];
 
 struct Answers {
@@ -162,7 +162,7 @@ fn bank_monitor_matches_the_original() {
         r.allow(f);
     }
     let mut g = Rng(0x20b7_00ba_4c00_0001);
-    let mut seen = [0u32; 35];
+    let mut seen = [0u32; 36];
     let dists = [0.0f32, 0.3, 0.5, 1.0, 10.0, 29.9, 30.0, 100.0, 1000.0, -1.0];
     for case in 0..60_000u32 {
         for k in 0..0x4000 / 4 {
@@ -227,7 +227,7 @@ fn bank_monitor_matches_the_original() {
         let name = b"stream1";
         r.mem.write(NAME, name).unwrap();
         r.mem.write_u8(NAME + name.len() as u32, 0);
-        let which = g.below(35);
+        let which = g.below(36);
         seen[which as usize] += 1;
         let k = g.below(64);
         let s = INST + 0xb0 * k;
@@ -266,6 +266,7 @@ fn bank_monitor_matches_the_original() {
             24 | 25 | 28 | 32 | 33 | 34 => (vec![MON], vec![]),
             26 | 31 => (vec![MON, handle, kind], vec![fade]),
             27 => (vec![MON, k], vec![]),
+            35 => (vec![s, pitch], vec![]),
             29 => (vec![MON], vec![]),
             _ => (vec![MON, handle, kind], vec![]),
         };
@@ -328,7 +329,8 @@ fn bank_monitor_matches_the_original() {
             31 => { stop_bank_sound(&mut m, &mut e, x(0), x(1), x(2), y(0)); None }
             32 => Some(count_playing(&mut m, &mut e, x(0))),
             33 => Some(count_used(&mut m, &mut e, x(0))),
-            _ => { reset_distances(&mut m, x(0)); None }
+            34 => { reset_distances(&mut m, x(0)); None }
+            _ => { set_pitch_bend(&mut m, &mut e, x(0), x(1)); None }
         };
         let ours = std::mem::take(&mut a.borrow_mut().log);
         assert_eq!(ours, theirs, "case {case} ({which} {addr:#x}): the calls");

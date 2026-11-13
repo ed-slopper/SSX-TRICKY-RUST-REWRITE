@@ -892,6 +892,10 @@ pub struct LoopRider {
     /// +0x790 / +0x794: the surface sound type the loops last saw.
     pub w790: u32,
     pub w794: u32,
+    /// +0x5ae4: the sound flag (the loops silent while set).
+    pub w5ae4: u32,
+    /// +0x5af0: the loops' fade-in count (`Boarder_TickSfxFadeIn` 0x11f468 counts it down).
+    pub w5af0: i32,
 }
 
 pub trait RiderLoopEnv: QueueEnv {
@@ -987,4 +991,142 @@ pub fn init_rider_sounds(q: &mut Queue, w38a0: &mut u32, riders: &mut [LoopRider
         i += 1;
     }
     *w38a0 = 0;
+}
+
+// ---- The rider's sound loops' updates (board row E1b2g7d5h) ----
+
+/// The snow program tables (`cBXAudio` + table + surface · 0x50, one 0x50-byte record each, `Sfx_RunSnowProgram`
+/// 0x21ae90): SNOW.INF's GLIDE, AIGLIDE and CARVE programs.
+pub const GLIDE_PROGRAMS: u32 = 0x745c;
+pub const AI_GLIDE_PROGRAMS: u32 = 0x777c;
+pub const CARVE_PROGRAMS: u32 = 0x7a9c;
+
+/// A loop's bank instance as its update sees it: its address and its volume (+0x64); the rider is the instance's
+/// +0x80.
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct LoopInstance {
+    pub addr: u32,
+    pub volume: i32,
+}
+
+pub trait LoopUpdateEnv: RiderLoopEnv {
+    /// `Sfx_ImpactSpeed` 0x21a6a8 (the rider).
+    fn impact_speed(&mut self, rider: u32) -> i32;
+    /// `Sfx_EvalCurve` 0x20d928 (the curve slot, the impact speed).
+    fn eval_curve(&mut self, slot: u32, x: i32) -> i64;
+    /// `Music_CancelBreak` 0x2257d8 (the audio system, 0).
+    fn cancel_break(&mut self);
+    /// `BankInstance_Reset` 0x20a9d8 (the instance).
+    fn reset_instance(&mut self, inst: u32);
+    /// `Sfx_RunSnowProgram` 0x21ae90 (the record at the audio system + `table` + `surface` · 0x50, the rider, the
+    /// volume's and the bend's words; `sfxcalc::run_snow_program`).
+    fn run_snow_program(&mut self, table: u32, surface: u32, rider: u32, vol: &mut i32, bend: &mut i32);
+    /// `BankInstance_SetPitchBend` 0x21e7e0 (the instance, the bend; `bankmon::set_pitch_bend`).
+    fn set_pitch_bend(&mut self, inst: u32, bend: i64);
+}
+
+/// The end the updates share: silent while the rider's sound flag is set, the volume divided by the fade-in count
+/// while it counts down (`Boarder_TickSfxFadeIn` 0x11f468), then the volume stored and the bend sent.
+fn finish_loop(inst: &mut LoopInstance, r: &mut LoopRider, mut vol: i32, mut bend: i64, env: &mut dyn LoopUpdateEnv) {
+    if r.w5ae4 != 0 {
+        vol = 0;
+        bend = 0;
+    }
+    let fade = crate::control::tick_sfx_fade_in(&mut r.w5af0);
+    if fade > 0 {
+        vol = vol.wrapping_div(fade);
+    }
+    inst.volume = vol;
+    env.set_pitch_bend(inst.addr, bend);
+}
+
+/// `Sfx_UpdateAirLoop` 0x21b440 (the audio system, the instance): in the air (+0x424 = 2) the volume and bend are
+/// curves 5 and 6 of the impact speed, else silent with bend 64.
+pub fn update_air_loop(inst: &mut LoopInstance, r: &mut LoopRider, env: &mut dyn LoopUpdateEnv) {
+    let (mut vol, mut bend) = (0, 0x40);
+    if r.motion == 2 {
+        let x = env.impact_speed(r.addr);
+        vol = env.eval_curve(5, x) as i32;
+        bend = env.eval_curve(6, x);
+    }
+    finish_loop(inst, r, vol, bend, env);
+}
+
+/// `Sfx_UpdateGlideLoop` 0x21b508 (the audio system, the instance): a changed motion is remembered (+0x788) and,
+/// unless it is 1, the music's break cancelled; off motion 1, a changed surface restarts the glide loop (the
+/// instance reset), else the surface's GLIDE program gives the volume and bend.
+pub fn update_glide_loop(q: &mut Queue, inst: &mut LoopInstance, r: &mut LoopRider, env: &mut dyn LoopUpdateEnv) {
+    let motion = r.motion;
+    if motion != r.w788 {
+        r.w788 = motion;
+        if motion != 1 {
+            env.cancel_break();
+        }
+    }
+    let (mut vol, mut bend) = (0, 0x40);
+    if motion != 1 {
+        let surface = env.surface_sound_type(r.addr);
+        if surface != r.w790 {
+            r.w790 = surface;
+            env.reset_instance(inst.addr);
+            start_glide_loop(q, r, surface, env);
+        } else {
+            env.run_snow_program(GLIDE_PROGRAMS, surface, r.addr, &mut vol, &mut bend);
+        }
+    }
+    finish_loop(inst, r, vol, bend as i64, env);
+}
+
+/// `Sfx_UpdateAiGlideLoop` 0x21b628 (the audio system, the instance): the motion remembered (+0x788); on the
+/// ground or a rail (+0x424 2 or 3) a changed surface restarts the glide loop (the instance reset) and the surface's
+/// AIGLIDE program gives the volume and bend; no fade-in, no sound flag.
+pub fn update_ai_glide_loop(q: &mut Queue, inst: &mut LoopInstance, r: &mut LoopRider, env: &mut dyn LoopUpdateEnv) {
+    let motion = r.motion;
+    if motion != r.w788 {
+        r.w788 = motion;
+    }
+    let (mut vol, mut bend) = (0, 0x40);
+    if (motion as i32) < 4 && 1 < (motion as i32) {
+        let surface = env.surface_sound_type(r.addr);
+        if surface != r.w790 {
+            r.w790 = surface;
+            env.reset_instance(inst.addr);
+            let surface = env.surface_sound_type(r.addr);
+            start_glide_loop(q, r, surface, env);
+        }
+        let surface = env.surface_sound_type(r.addr);
+        env.run_snow_program(AI_GLIDE_PROGRAMS, surface, r.addr, &mut vol, &mut bend);
+    }
+    inst.volume = vol;
+    env.set_pitch_bend(inst.addr, bend as i64);
+}
+
+/// `Sfx_UpdateCarveLoop` 0x21b718 (the audio system, the instance): off motion 1, a changed surface (+0x794)
+/// restarts the carve loop (the instance reset), else the surface's CARVE program gives the volume and bend.
+pub fn update_carve_loop(q: &mut Queue, inst: &mut LoopInstance, r: &mut LoopRider, env: &mut dyn LoopUpdateEnv) {
+    let (mut vol, mut bend) = (0, 0x40);
+    if r.motion != 1 {
+        let surface = env.surface_sound_type(r.addr);
+        if surface != r.w794 {
+            r.w794 = surface;
+            env.reset_instance(inst.addr);
+            let surface = env.surface_sound_type(r.addr);
+            start_carve_loop(q, r, surface, env);
+        } else {
+            let surface = env.surface_sound_type(r.addr);
+            env.run_snow_program(CARVE_PROGRAMS, surface, r.addr, &mut vol, &mut bend);
+        }
+    }
+    finish_loop(inst, r, vol, bend as i64, env);
+}
+
+/// The update an entry's callback word (+0x44) names, run on its instance.
+pub fn update_loop(update: u32, q: &mut Queue, inst: &mut LoopInstance, r: &mut LoopRider, env: &mut dyn LoopUpdateEnv) {
+    match update {
+        AIR_LOOP_UPDATE => update_air_loop(inst, r, env),
+        GLIDE_LOOP_UPDATE => update_glide_loop(q, inst, r, env),
+        AI_GLIDE_LOOP_UPDATE => update_ai_glide_loop(q, inst, r, env),
+        CARVE_LOOP_UPDATE => update_carve_loop(q, inst, r, env),
+        _ => {}
+    }
 }

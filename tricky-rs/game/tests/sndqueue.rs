@@ -2029,6 +2029,8 @@ fn loop_rider(r: &mut Runner, a: u32) -> LoopRider {
         w78c: r.mem.read_u32(a + 0x78c),
         w790: r.mem.read_u32(a + 0x790),
         w794: r.mem.read_u32(a + 0x794),
+        w5ae4: r.mem.read_u32(a + 0x5ae4),
+        w5af0: r.mem.read_u32(a + 0x5af0) as i32,
     }
 }
 
@@ -2037,7 +2039,7 @@ fn rider_loops_match_the_original() {
     let Some(mut r) = runner() else { return };
     let or: Rc<RefCell<Or>> = Rc::new(RefCell::new(Or::default()));
     let (_, sys, l) = setup(&mut r, 0x10);
-    let riders: Vec<u32> = (0..3).map(|_| r.mem.alloc(0x800)).collect();
+    let riders: Vec<u32> = (0..3).map(|_| r.mem.alloc(0x5b00)).collect();
     for f in [0x20fce0u32, 0x210048, 0x2106c0, 0x210ad0] {
         r.allow(f);
     }
@@ -2123,4 +2125,139 @@ fn rider_loops_match_the_original() {
         assert_eq!(after_riders, mine_riders, "case {case} which {which} riders");
         assert_eq!(w38a0_after, w, "case {case} which {which} +0x38a0");
     }
+}
+
+// ---- The rider's sound loops' updates (E1b2g7d5h) ----
+
+impl LoopUpdateEnv for RiderLoopsEnv {
+    fn impact_speed(&mut self, rider: u32) -> i32 {
+        self.0.borrow_mut().take("imp", rider as u64, 0) as i32
+    }
+    fn eval_curve(&mut self, slot: u32, x: i32) -> i64 {
+        self.0.borrow_mut().take("curve", slot as u64, x as i64 as u64)
+    }
+    fn cancel_break(&mut self) {
+        self.0.borrow_mut().log.push(("cancel_break", 0, 0));
+    }
+    fn reset_instance(&mut self, inst: u32) {
+        self.0.borrow_mut().log.push(("reset", inst as u64, 0));
+    }
+    fn run_snow_program(&mut self, table: u32, surface: u32, rider: u32, vol: &mut i32, bend: &mut i32) {
+        let mut o = self.0.borrow_mut();
+        *vol = o.take("snow", table.wrapping_add(surface.wrapping_mul(0x50)) as u64, rider as u64) as i32;
+        *bend = o.vals.remove(0) as i32;
+    }
+    fn set_pitch_bend(&mut self, inst: u32, bend: i64) {
+        self.0.borrow_mut().log.push(("bend", inst as u64, bend as u64));
+    }
+}
+
+#[test]
+fn loop_updates_match_the_original() {
+    let Some(mut r) = runner() else { return };
+    let or: Rc<RefCell<Or>> = Rc::new(RefCell::new(Or::default()));
+    let (rider, sys, l) = setup(&mut r, 0x5b00);
+    let inst = r.mem.alloc(0xb0);
+    for f in [0x20fce0u32, 0x210048, 0x2106c0, 0x11f468] {
+        r.allow(f);
+    }
+    for (a, name) in [(0x211f38u32, "slot"), (0x20fc60, "rl"), (0x20f908, "surf")] {
+        let o = or.clone();
+        r.stub(a, move |c, _| {
+            assert_eq!(c.gpr(4) as u32, sys);
+            let x = match name {
+                "slot" | "surf" => c.gpr(5) as u32 as u64,
+                _ => 0,
+            };
+            let v = o.borrow_mut().take(name, x, 0);
+            c.set_gpr(2, v as u64);
+        });
+    }
+    let o = or.clone();
+    r.stub(0x226dd8, move |c, _| o.borrow_mut().log.push(("spv", c.f(12).to_bits() as u64, c.f(13).to_bits() as u64)));
+    let o = or.clone();
+    r.stub(0x20c948, move |_, _| o.borrow_mut().log.push(("pp", 0, 0)));
+    let o = or.clone();
+    r.stub(0x21a6a8, move |c, _| {
+        let v = o.borrow_mut().take("imp", c.gpr(4) as u32 as u64, 0);
+        c.set_gpr(2, v as u64);
+    });
+    let o = or.clone();
+    r.stub(0x20d928, move |c, _| {
+        let v = o.borrow_mut().take("curve", c.gpr(4) as u32 as u64, c.gpr(5));
+        c.set_gpr(2, v as u64);
+    });
+    let o = or.clone();
+    r.stub(0x2257d8, move |c, _| {
+        assert_eq!((c.gpr(4) as u32, c.gpr(5)), (sys, 0));
+        o.borrow_mut().log.push(("cancel_break", 0, 0));
+    });
+    let o = or.clone();
+    r.stub(0x20a9d8, move |c, _| o.borrow_mut().log.push(("reset", c.gpr(4) as u32 as u64, 0)));
+    let o = or.clone();
+    r.stub(0x21ae90, move |c, m| {
+        let (p, vol, bend) = (c.gpr(4) as u32, c.gpr(6) as u32, c.gpr(7) as u32);
+        assert_eq!(bend, vol | 4);
+        let mut o = o.borrow_mut();
+        let v = o.take("snow", p.wrapping_sub(sys) as u64, c.gpr(5) as u32 as u64);
+        let b = o.vals.remove(0);
+        m.write_u32(vol, v as u32);
+        m.write_u32(bend, b as u32);
+    });
+    let o = or.clone();
+    r.stub(0x21e7e0, move |c, _| o.borrow_mut().log.push(("bend", c.gpr(4) as u32 as u64, c.gpr(5))));
+    let mut g = Rng(0x21b4_4021_b508_b718);
+    let mut seen = [0u32; 4];
+    for case in 0..40_000 {
+        fill(&mut r, sys, &l, &mut g);
+        for j in 0..0x5b00 / 4 {
+            r.mem.write_u32(rider + 4 * j, g.next());
+        }
+        for j in 0..0xb0 / 4 {
+            r.mem.write_u32(inst + 4 * j, g.next());
+        }
+        r.mem.write_u32(inst + 0x80, rider);
+        let which = g.next() % 4;
+        seen[which as usize] += 1;
+        // at most one new entry: the queue's inline arrays (+0x28, +0x44) hold four
+        let motion = g.next() % 5;
+        r.mem.write_u32(rider + 0x41c, [0, 1, 1, 2][g.next() as usize % 4]);
+        r.mem.write_u32(rider + 0x424, motion);
+        r.mem.write_u32(rider + 0x788, if g.next() % 2 == 0 { motion } else { g.next() % 5 });
+        r.mem.write_u32(rider + 0x790, g.next() % 3);
+        r.mem.write_u32(rider + 0x794, g.next() % 3);
+        r.mem.write_u32(rider + 0x5ae4, if g.next() % 3 == 0 { g.next() } else { 0 });
+        r.mem.write_u32(rider + 0x5af0, [0u32, 0, 1, 2, 5, u32::MAX, 0x8000_0000, 7][g.next() as usize % 8]);
+        let big = [0i64, 5, 64, 127, 128, -1, -300, 1 << 31, -(1 << 31), 0x1_0000_0005, 0x7fff_ffff][g.next() as usize % 11];
+        let vals: Vec<i64> = (0..16)
+            .map(|k| match k {
+                0 => (g.next() % 3) as i64,
+                _ if g.next() % 4 == 0 => big,
+                _ => (g.next() % 200) as i64 - 50,
+            })
+            .collect();
+        let before = read(&mut r, &l);
+        let mut mine_r = loop_rider(&mut r, rider);
+        let mut mine_i = LoopInstance { addr: inst, volume: r.mem.read_u32(inst + 0x64) as i32 };
+        or.borrow_mut().vals = vals.clone();
+        or.borrow_mut().log.clear();
+        let f = [AIR_LOOP_UPDATE, GLIDE_LOOP_UPDATE, AI_GLIDE_LOOP_UPDATE, CARVE_LOOP_UPDATE][which as usize];
+        r.cpu.set_gpr(4, sys as u64);
+        r.cpu.set_gpr(5, inst as u64);
+        r.call(f).unwrap_or_else(|e| panic!("case {case}: {e}"));
+        let orig = std::mem::take(&mut or.borrow_mut().log);
+        let after = read(&mut r, &l);
+        let after_r = loop_rider(&mut r, rider);
+        let after_vol = r.mem.read_u32(inst + 0x64) as i32;
+        let mut q = before.clone();
+        or.borrow_mut().vals = vals;
+        let mut e = RiderLoopsEnv(or.clone(), vec![]);
+        update_loop(f, &mut q, &mut mine_i, &mut mine_r, &mut e);
+        let mine = std::mem::take(&mut or.borrow_mut().log);
+        assert_eq!(orig, mine, "case {case} which {which}");
+        assert_eq!(after, q, "case {case} which {which} state");
+        assert_eq!(after_r, mine_r, "case {case} which {which} rider");
+        assert_eq!(after_vol, mine_i.volume, "case {case} which {which} volume");
+    }
+    assert!(seen.iter().all(|&n| n > 5_000), "{seen:?}");
 }

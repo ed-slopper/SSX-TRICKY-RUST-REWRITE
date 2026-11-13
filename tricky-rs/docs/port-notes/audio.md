@@ -1632,3 +1632,30 @@ Proven (checked in the function runner, 30,000 cases, eight mutations caught):
     `Sfx_UpdateCarveLoop` 0x21b718.
 - Not in the app yet: `src/boardsound.rs` still picks the board loops itself; the update callbacks are row
   E1b2g7d5h.
+
+## The rider's sound loops' updates (E1b2g7d5h, `game/src/sndqueue.rs`; checked: `tests/sndqueue.rs`, `tests/sfxcalc.rs`, `tests/bankmon.rs`)
+
+Proven (checked in the function runner: the four updates 40,000 cases, five mutations caught; the snow program
+interpreter 60,000 random programs, three mutations caught; the pitch bend in the bank monitor's test):
+
+- Each update gets the audio system and the loop's bank instance; the rider is the instance's +0x80, the volume goes
+  to the instance's +0x64 and the bend (64 = none) to `BankInstance_SetPitchBend` 0x21e7e0 (`SND_Lock`,
+  `SndHandle_SetPitchBend` 0x2d6a18 on the instance's handle +4, `SND_Unlock`; `bankmon::set_pitch_bend`).
+- The end the air, glide and carve updates share: the rider's sound flag (+0x5ae4) set → volume and bend 0; then
+  `Boarder_TickSfxFadeIn` 0x11f468 (+0x5af0 counted down) and, while its old value is above 0, the volume divided
+  by it (integer). The AI glide has neither.
+- `Sfx_UpdateAirLoop` 0x21b440: in the air (+0x424 = 2) volume = `Sfx_EvalCurve`(5, impact) and bend =
+  `Sfx_EvalCurve`(6, impact) of `Sfx_ImpactSpeed` 0x21a6a8; otherwise 0 and 64.
+- `Sfx_UpdateGlideLoop` 0x21b508: a motion other than +0x788 is stored there and, unless it is 1, the music's
+  break is cancelled (`Music_CancelBreak` 0x2257d8 with the audio system and 0). Off motion 1: a surface sound type
+  other than +0x790 is stored there, the instance reset (`BankInstance_Reset` 0x20a9d8) and the glide loop started
+  again (`Sfx_StartGlideLoop`, a new queue entry; the old instance still gets volume 0 / bend 64 this tick);
+  the same surface runs its GLIDE program (`Sfx_RunSnowProgram` on cBXAudio +0x745c + surface·0x50).
+- `Sfx_UpdateAiGlideLoop` 0x21b628: +0x788 follows the motion (no music call); only while the motion is 2 or 3, a
+  changed surface (+0x790) resets and restarts the glide loop, and then, changed or not, the AIGLIDE program (+0x777c)
+  runs. `Sfx_SurfaceSoundType` is asked once, three times on a change (each answer used where it is asked).
+- `Sfx_UpdateCarveLoop` 0x21b718: off motion 1, a changed surface (+0x794) resets and restarts the carve loop,
+  else the CARVE program (+0x7a9c) runs (the surface asked a second time for it).
+- `Sfx_RunSnowProgram` 0x21ae90 (`sfxcalc::run_snow_program`, ported earlier, now checked): the record is
+  [0] the program, [1..0x10] the stack, [0x11] pc, [0x12] sp, [0x13] the accumulator (kept between runs).
+- Not in the app yet: `src/boardsound.rs` still runs its own loops (row E1b2g7d5i).

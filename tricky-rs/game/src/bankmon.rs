@@ -37,6 +37,8 @@ pub const HANDLE_VOLUME: u32 = 0x2d3108;
 pub const HANDLE_PITCH: u32 = 0x2d31b8;
 pub const HANDLE_STOP: u32 = 0x2d3260;
 pub const HANDLE_PAN: u32 = 0x2d3480;
+/// `SndHandle_SetPitchBend` (the handle, the bend)
+pub const HANDLE_PITCH_BEND: u32 = 0x2d6a18;
 pub const PLAY_BANK_SOUND: u32 = 0x2d1718;
 pub const MIDI_STOP: u32 = 0x2d4368;
 pub const MIDI_PLAY: u32 = 0x2d4440;
@@ -446,6 +448,13 @@ pub fn resume(m: &mut Mem, e: &mut dyn SongEnv, s: u32) {
         let h = m.r32(s + 4);
         e.call(m, MIDI_RESUME, &[h]);
     }
+}
+
+/// `BankInstance_SetPitchBend` 0x21e7e0 (the instance, the bend: 64 none): the handle's voices bent, under the
+/// sound library's lock (the rider's loops' updates, `sndqueue::update_air_loop` and the others)
+pub fn set_pitch_bend(m: &mut Mem, e: &mut dyn SongEnv, s: u32, bend: u32) {
+    let h = m.r32(s + 4);
+    locked(m, e, HANDLE_PITCH_BEND, &[h, bend]);
 }
 
 /// `BankInstance_Stop` 0x20ba00 (the instance, the volume or −1 to stop, kept, the fade time in seconds): set or

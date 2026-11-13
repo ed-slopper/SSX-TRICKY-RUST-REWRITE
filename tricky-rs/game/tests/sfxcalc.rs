@@ -282,3 +282,112 @@ fn snow_program_inputs_match_the_original() {
         }
     }
 }
+
+/// One random snow program: instructions with their operands, the stack kept within its sixteen words and never
+/// popped past its first, the odd byte with no instruction, ended by 0x7f.
+fn snow_program(g: &mut Rng) -> Vec<u8> {
+    let mut p = vec![];
+    let mut sp = 0;
+    let word = |g: &mut Rng| -> [u8; 4] {
+        let v: i32 = match g.next() % 6 {
+            0 => 0,
+            1 => -((g.next() % 300) as i32),
+            2 => g.next() as i32,
+            _ => (g.next() % 300) as i32 + 1,
+        };
+        v.to_le_bytes()
+    };
+    for _ in 0..g.next() % 24 {
+        let op = [0u8, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 13, 14, 15, 16, 17, 18, 0x13, 0x14, 0x15, 0x80, 0xff][g.next() as usize % 26];
+        match op {
+            0 => p.extend([0, (g.next() % 7) as u8]),
+            1 | 2 | 6..=9 => {
+                p.push(op);
+                p.extend(word(g));
+            }
+            12 => {
+                p.push(op);
+                p.extend(word(g));
+                p.extend(word(g));
+            }
+            13 if sp < 16 => {
+                p.push(op);
+                sp += 1;
+            }
+            14 if sp >= 1 => {
+                p.push(op);
+                sp -= 1;
+            }
+            15..=18 if sp >= 2 => {
+                p.push(op);
+                sp -= 1;
+            }
+            13..=18 => {}
+            _ => p.push(op),
+        }
+    }
+    p.push(0x7f);
+    p
+}
+
+#[test]
+fn snow_program_matches_the_original() {
+    let Some(mut r) = runner() else { return };
+    let rec = r.mem.alloc(0x50);
+    let prog = r.mem.alloc(0x200);
+    let out = r.mem.alloc(0x10);
+    let rider = r.mem.alloc(0x10);
+    let log: Rc<RefCell<(Vec<i32>, Vec<(u32, u32)>)>> = Rc::new(RefCell::new((vec![], vec![])));
+    for (k, a) in [0x21a6a8u32, 0x21a6f0, 0x21a710, 0x21a740, 0x21a788].into_iter().enumerate() {
+        let l = log.clone();
+        r.stub(a, move |c, _| {
+            let mut l = l.borrow_mut();
+            l.1.push((k as u32, c.gpr(4) as u32));
+            let v = l.0.remove(0);
+            c.set_gpr(2, v as i64 as u64);
+        });
+    }
+    let mut g = Rng(0x21ae_9000_5a0b_7f13);
+    let mut traps = 0;
+    for case in 0..60_000 {
+        let p = snow_program(&mut g);
+        r.mem.write(prog, &p).unwrap();
+        let mut w = [0i32; 0x14];
+        for (k, x) in w.iter_mut().enumerate() {
+            *x = if k == 0 { prog as i32 } else { (g.next() % 400) as i32 - 100 };
+            r.mem.write_u32(rec + 4 * k as u32, *x as u32);
+        }
+        let (mut vol, mut bend) = (g.next() as i32, g.next() as i32);
+        r.mem.write_u32(out, vol as u32);
+        r.mem.write_u32(out + 4, bend as u32);
+        let inputs: Vec<i32> = (0..24).map(|_| if g.next() % 5 == 0 { g.next() as i32 } else { (g.next() % 3000) as i32 - 500 }).collect();
+        *log.borrow_mut() = (inputs.clone(), vec![]);
+        r.cpu.set_gpr(4, rec as u64);
+        r.cpu.set_gpr(5, rider as u64);
+        r.cpu.set_gpr(6, out as u64);
+        r.cpu.set_gpr(7, (out + 4) as u64);
+        let theirs_ok = r.call(0x21ae90).is_ok();
+        let theirs_calls = std::mem::take(&mut log.borrow_mut().1);
+        let theirs: Vec<i32> = (0..0x14).map(|k| r.mem.read_u32(rec + 4 * k) as i32).collect();
+        let (tv, tb) = (r.mem.read_u32(out) as i32, r.mem.read_u32(out + 4) as i32);
+
+        *log.borrow_mut() = (inputs, vec![]);
+        let l = log.clone();
+        let ours_ok = run_snow_program(&p, &mut w, &mut |n| {
+            let mut l = l.borrow_mut();
+            l.1.push((n, rider));
+            l.0.remove(0)
+        }, &mut vol, &mut bend)
+        .is_ok();
+        let ours_calls = std::mem::take(&mut log.borrow_mut().1);
+        assert_eq!(theirs_ok, ours_ok, "case {case} trap: {p:02x?}");
+        if !ours_ok {
+            traps += 1;
+            continue;
+        }
+        assert_eq!(theirs_calls, ours_calls, "case {case} inputs: {p:02x?}");
+        assert_eq!(theirs, w.to_vec(), "case {case} words: {p:02x?}");
+        assert_eq!((tv, tb), (vol, bend), "case {case} volume, bend: {p:02x?}");
+    }
+    assert!(traps > 100 && traps < 20_000, "{traps}");
+}
