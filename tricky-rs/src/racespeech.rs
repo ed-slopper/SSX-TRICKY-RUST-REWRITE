@@ -2,7 +2,9 @@
 //! banks from the player's disc, TRICKY_DISC) runs the announcer's calls the race queues (`race::Race::speech`)
 //! through `speech::Announcer`, and the lines it starts are decoded from the disc's speech files
 //! (`tricky_game::sndmt`, MicroTalk) and played, each stream's parts one after another as the game's stream queue
-//! plays them (`SndStream_Queue` 0x2d2728).
+//! plays them (`SndStream_Queue` 0x2d2728). The placing sound (`Sfx_OnPlacingChange` 0x219a48) is played from the
+//! main bank (zbxsfx, kind 0) as `boardsound` plays it, and kept on the audio system's ring of queued sounds
+//! (`sndqueue::SoundRing`).
 
 use crate::rider::RaceState;
 use crate::{ui, Mode, RaceRes};
@@ -12,6 +14,7 @@ use std::collections::{HashMap, VecDeque};
 use std::sync::{Arc, Mutex};
 use tricky_game::race::SpeechCall;
 use tricky_game::speech::{Announcer, Event, PlaceRace, SpeechEnv, SpeechRider, Trigger};
+use tricky_game::sndqueue::{self, PlacingChangeEnv, Queue, QueueEnv, RingEnv, SoundRing};
 use tricky_game::speechhost::SpeechHost;
 
 type Files = tricky_data::big::Files;
@@ -45,13 +48,108 @@ pub struct RaceSpeech {
     /// the race's speech calls already run
     sent: usize,
     streams: HashMap<u32, Stream>,
+    /// the audio system's pending-sound queue and its ring of queued sounds (+0x6e24)
+    queue: Queue,
+    ring: SoundRing,
+    /// the bank sounds playing, by handle, and the last handle given
+    bank: HashMap<u32, Entity>,
+    handle: u32,
 }
+
+#[derive(Component)]
+pub struct PlacingSound;
 
 #[derive(Component)]
 pub struct SpeechPlayer;
 
 pub fn plugin(app: &mut App) {
-    app.init_resource::<RaceSpeech>();
+    app.insert_resource(RaceSpeech { queue: Queue::with_capacity(8), ..default() });
+}
+
+/// Whether bank sound `h` still plays (`BankMonitor_Find`), and its stop (`SndSys_StopBankSound`).
+struct Bank<'a> {
+    bank: &'a mut HashMap<u32, Entity>,
+    alive: &'a std::collections::HashSet<Entity>,
+    stops: Vec<Entity>,
+}
+
+impl RingEnv for Bank<'_> {
+    fn find(&mut self, h: u32) -> bool {
+        self.bank.get(&h).is_some_and(|e| self.alive.contains(e))
+    }
+    fn stop(&mut self, h: u32) {
+        if let Some(e) = self.bank.remove(&h) {
+            self.stops.push(e);
+        }
+    }
+}
+
+/// What `Sfx_OnPlacingChange` asks of the audio system, with the announcer's passing line behind it.
+struct Placing<'a, 'b> {
+    bank: Bank<'a>,
+    ring: &'a mut SoundRing,
+    handle: &'a mut u32,
+    /// the handle `play_pending` gave, its sound started once the queue is back
+    played: Option<u32>,
+    announcer: &'a mut Announcer,
+    env: Env<'b>,
+    race: &'a tricky_game::race::Race,
+}
+
+impl QueueEnv for Placing<'_, '_> {
+    // STANDIN: the sound manager's slots (`SndMgr_GetSlot` 0x211f38), for the volume `SndSys_PlayPending` scales by
+    fn get_slot(&mut self, _: u32) -> u32 {
+        0
+    }
+    fn rider_listener(&mut self) -> u32 {
+        rider_id(0)
+    }
+    /// `SndSys_PlayPending` 0x20c948: the queue's top sound played ([`play_top`]); its handle.
+    fn play_pending(&mut self) -> u64 {
+        *self.handle += 1;
+        self.played = Some(*self.handle);
+        *self.handle as u64
+    }
+}
+
+/// The queue's top sound played and taken off (`SndSys_PlayPending` 0x20c948): kind 0 is the main bank, zbxsfx's
+/// program played as `boardsound` plays it.
+// STANDIN: the sound driver (`SND_PlayBankSound` 0x2d1718), for the bank's exported sample (tools/bnk/bnk2wav.py)
+fn play_top(q: &mut Queue, sfx: Option<&crate::boardsound::BoardSounds>, vol: f32, commands: &mut Commands) -> Option<Entity> {
+    let i = q.count.max(0) as usize;
+    q.count -= 1;
+    let name = format!("sfx_{}", q.id[i]);
+    if std::env::var("TRICKY_SPEECHLOG").is_ok() {
+        println!("speech: the placing sound {name}");
+    }
+    let bs = sfx?;
+    let h = bs.get(&name)?;
+    let settings = PlaybackSettings { mode: PlaybackMode::Despawn, volume: Volume::Linear(vol * bs.level(&name)), speed: bs.pitch(&name, 64.0), ..default() };
+    Some(commands.spawn((AudioPlayer(h), settings, PlacingSound)).id())
+}
+
+impl PlacingChangeEnv for Placing<'_, '_> {
+    fn listener(&mut self) -> u32 {
+        rider_id(0)
+    }
+    fn is_queued(&mut self) -> bool {
+        self.ring.is_queued(0, &mut self.bank)
+    }
+    fn queue_sounds(&mut self, played: u64, id: u32) {
+        self.ring.queue_sounds(0, played as u32, id, 0, &mut self.bank);
+    }
+    /// `Speech_OnPlacingChange` 0x2347c8 on the riders (0: none)
+    fn speech_placing(&mut self, a: u32, b: u32) {
+        let r = |id: u32| if id == 0 { missing_rider() } else { speech_rider(self.race, id as usize - 1) };
+        let (a, b) = (r(a), r(b));
+        self.announcer.on_placing_change(&mut self.env, &a, &b);
+    }
+}
+
+/// A rider passed as 0 (none ahead or behind).
+// STANDIN: the original reads the null rider's words (the kernel's low memory); taken here as not racing
+fn missing_rider() -> SpeechRider {
+    SpeechRider { id: 0, controller: 0, ..Default::default() }
 }
 
 /// The speech level `Announcer::roll` reads (+0x383c, `Audio_SetSpeechLevel` 0x212210 clamps it to 0..1) and its cap
@@ -168,7 +266,8 @@ fn wav(s: &tricky_game::sndmt::Sound) -> Vec<u8> {
 #[allow(clippy::too_many_arguments)]
 pub fn race_speech(
     mut rs: ResMut<RaceSpeech>, sounds: Res<crate::sound::Sounds>, game: Res<ui::Game>, mode: Res<Mode>, race: Res<RaceRes>, time: Res<Time>,
-    mut audio: ResMut<Assets<AudioSource>>, mut commands: Commands,
+    mut audio: ResMut<Assets<AudioSource>>, mut commands: Commands, sfx: Option<Res<crate::boardsound::BoardSounds>>,
+    playing: Query<Entity, With<PlacingSound>>,
 ) {
     if !rs.tried {
         rs.tried = true;
@@ -213,6 +312,10 @@ pub fn race_speech(
             }
             s.queued.clear();
         }
+        for (_, e) in rs.bank.drain() {
+            commands.entity(e).try_despawn();
+        }
+        rs.ring = SoundRing::default();
         if !racing {
             return;
         }
@@ -221,6 +324,10 @@ pub fn race_speech(
         return;
     }
     let r = &race.0;
+    let mut alive: std::collections::HashSet<Entity> = playing.iter().collect();
+    rs.bank.retain(|_, e| alive.contains(e));
+    let mut stops = Vec::new();
+    let vol = if sounds.effects { 1.0 } else { 0.0 };
     let mut env = Env { host: &mut sys.host, mode: r.mode, course: r.course_no, clock: r.line_frame };
     for &c in &calls[rs.sent..] {
         if std::env::var("TRICKY_SPEECHLOG").is_ok() {
@@ -236,11 +343,40 @@ pub fn race_speech(
             SpeechCall::LocalLine(k, kind) => rs.announcer.on_local_line(&mut env, &speech_rider(r, k), kind as i64),
             SpeechCall::LocalLine2(k) => rs.announcer.on_local_line2(&mut env, &speech_rider(r, k)),
             SpeechCall::ListenerLine(k) => rs.announcer.on_listener_line(&mut env, &speech_rider(r, k)),
-            // the crowd's cheer and the placing sound are the sound queue's (row E1b2g7d3b5)
-            SpeechCall::Cheer(_) | SpeechCall::PlacingChange { .. } => {}
+            SpeechCall::PlacingChange { rider, next, prev, old, new } => {
+                let id = |k: Option<usize>| k.map_or(0, rider_id);
+                let mut p = Placing {
+                    bank: Bank { bank: &mut rs.bank, alive: &alive, stops: Vec::new() },
+                    ring: &mut rs.ring,
+                    handle: &mut rs.handle,
+                    played: None,
+                    announcer: &mut rs.announcer,
+                    env,
+                    race: r,
+                };
+                // STANDIN: the race clock, for the audio system's tick (+0x80)
+                sndqueue::on_placing_change(&mut rs.queue, r.line_frame as u32, rider_id(rider), (rider == 0) as u32, id(next), id(prev), old as i64, new as i64, &mut p);
+                stops.append(&mut p.bank.stops);
+                let played = p.played;
+                env = p.env;
+                if let Some(h) = played {
+                    if let Some(e) = play_top(&mut rs.queue, sfx.as_deref(), vol, &mut commands) {
+                        rs.bank.insert(h, e);
+                        alive.insert(e);
+                    }
+                }
+            }
+            // the crowd's cheer needs the crowd boxes in the app (row E1b2g7d3b7)
+            SpeechCall::Cheer(_) => {}
         }
     }
     rs.sent = calls.len();
+    // `SndSys_UpdateQueuedSounds` 0x215658, from `Audio_InGameUpdate`
+    let mut bank = Bank { bank: &mut rs.bank, alive: &alive, stops };
+    rs.ring.update(r.line_frame, &mut bank);
+    for e in bank.stops {
+        commands.entity(e).try_despawn();
+    }
     // `SpeechSys_UpdateAll` 0x228998, once a frame; its lines decoded and queued on their streams
     let dt = time.delta_secs();
     sys.host.update();
@@ -268,7 +404,6 @@ pub fn race_speech(
         rs.streams.entry(p.stream).or_default().queued.push_back((h, secs));
     }
     sys.host.frame(dt);
-    let vol = if sounds.effects { 1.0 } else { 0.0 };
     for st in rs.streams.values_mut() {
         if let Some((e, left)) = &mut st.playing {
             *left -= dt;

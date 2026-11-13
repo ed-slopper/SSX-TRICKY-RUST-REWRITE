@@ -581,3 +581,122 @@ pub fn cheer_for_rider(rider: u32, player: u32, env: &mut dyn CheerEnv) {
         env.play_crowd_cheer(2, who);
     }
 }
+
+/// What the ring of queued sounds asks of the audio system.
+pub trait RingEnv {
+    /// `BankMonitor_Find` 0x20c200 (the audio system, the handle, 1): whether the sound still plays.
+    fn find(&mut self, handle: u32) -> bool;
+    /// `SndSys_StopBankSound` 0x20c2a0 (0, the audio system, the handle, 1).
+    fn stop(&mut self, handle: u32);
+}
+
+/// The audio system's ring of queued sounds: records of four words (the owner, the sound's handle, the tick it ends
+/// at, whether to stop it then) in a ring of words (+0x6e24 its size, 0x50 from `cBXAudio::cBXAudio` 0x20db18;
+/// +0x6e28 the words, filled with 0xdeadc0ed; +0x6e2c the head, +0x6e30 the tail). One word is always left free.
+#[derive(Clone, Debug, PartialEq)]
+pub struct SoundRing {
+    pub words: Vec<u32>,
+    pub head: i32,
+    pub tail: i32,
+}
+
+impl Default for SoundRing {
+    fn default() -> Self {
+        SoundRing { words: vec![0xdead_c0ed; 0x50], head: 0, tail: 0 }
+    }
+}
+
+impl SoundRing {
+    fn size(&self) -> i32 {
+        self.words.len() as i32
+    }
+    fn used(&self) -> i32 {
+        (self.head - self.tail + self.size()) % self.size()
+    }
+    fn skip(&mut self) {
+        if self.head != self.tail {
+            self.tail += 1;
+            if self.size() <= self.tail {
+                self.tail = 0;
+            }
+        }
+    }
+    fn pop(&mut self) -> u32 {
+        if self.head == self.tail {
+            return u32::MAX;
+        }
+        let v = self.words[self.tail as usize];
+        self.skip();
+        v
+    }
+    fn push(&mut self, v: u32) {
+        if (self.head + 1) % self.size() != self.tail {
+            self.words[self.head as usize] = v;
+            self.head += 1;
+            if self.size() <= self.head {
+                self.head = 0;
+            }
+        }
+    }
+    /// The `i`th word from the tail, −1 past the head.
+    fn peek(&self, i: i32) -> u32 {
+        if self.head == self.tail || self.used() <= i {
+            return u32::MAX;
+        }
+        self.words[((self.tail + i) % self.size()) as usize]
+    }
+
+    /// `SndSys_QueueSounds` 0x215998 (the audio system, the owner, the handle, the end tick, the flag): the record
+    /// added; a full ring first drops its oldest record, stopping that sound.
+    pub fn queue_sounds(&mut self, owner: u32, handle: u32, end: u32, flag: u32, env: &mut dyn RingEnv) {
+        if (self.head + 1) % self.size() == self.tail {
+            self.skip();
+            let h = self.pop();
+            env.stop(h);
+            self.skip();
+            self.skip();
+        }
+        for v in [owner, handle, end, flag] {
+            self.push(v);
+        }
+    }
+
+    /// `SndSys_IsQueued` 0x2154e0 (the audio system, the owner): whether a record of the owner holds a sound still
+    /// playing (or a handle of 0).
+    pub fn is_queued(&self, owner: u32, env: &mut dyn RingEnv) -> bool {
+        let n = self.used();
+        let mut i = 0;
+        while i < n {
+            if self.peek(i) == owner {
+                let h = self.peek(i + 1);
+                if h == 0 || env.find(h) {
+                    return true;
+                }
+            }
+            i += 4;
+        }
+        false
+    }
+
+    /// `SndSys_UpdateQueuedSounds` 0x215658 (the audio system; `now` its tick, +0x80), from `Audio_InGameUpdate`:
+    /// each record is taken off; one whose handle is 0 or still playing goes back while the tick is before its end,
+    /// else, with its flag set, its sound is stopped.
+    pub fn update(&mut self, now: i32, env: &mut dyn RingEnv) {
+        let n = self.used() >> 2;
+        for _ in 0..n {
+            let owner = self.pop();
+            let handle = self.pop() as i32;
+            let end = self.pop() as i32;
+            let flag = self.pop();
+            if handle >= 0 && (handle == 0 || env.find(handle as u32)) {
+                if now < end {
+                    for v in [owner, handle as u32, end as u32, flag] {
+                        self.push(v);
+                    }
+                } else if flag != 0 {
+                    env.stop(handle as u32);
+                }
+            }
+        }
+    }
+}

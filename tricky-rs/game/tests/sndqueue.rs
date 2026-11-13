@@ -1617,3 +1617,107 @@ fn cheer_for_rider_matches_the_original() {
     }
     assert!(cheers > 200);
 }
+
+// ---- the ring of queued sounds ----
+
+/// Plays when the handle's hash says so, the same for both sides.
+fn plays(h: u32) -> bool {
+    h.wrapping_mul(0x9e37_79b9) >> 31 != 0
+}
+
+struct RingT(Vec<(&'static str, u32)>);
+impl RingEnv for RingT {
+    fn find(&mut self, handle: u32) -> bool {
+        self.0.push(("find", handle));
+        plays(handle)
+    }
+    fn stop(&mut self, handle: u32) {
+        self.0.push(("stop", handle));
+    }
+}
+
+fn ring_read(r: &mut Runner, sys: u32) -> SoundRing {
+    let size = r.mem.read_u32(sys + 0x6e24) as usize;
+    let at = r.mem.read_u32(sys + 0x6e28);
+    SoundRing {
+        words: (0..size).map(|i| r.mem.read_u32(at + 4 * i as u32)).collect(),
+        head: r.mem.read_u32(sys + 0x6e2c) as i32,
+        tail: r.mem.read_u32(sys + 0x6e30) as i32,
+    }
+}
+
+#[test]
+fn sound_ring_matches_the_original() {
+    let Some(mut r) = runner() else { return };
+    let log: Rc<RefCell<Vec<(&'static str, u32)>>> = Rc::default();
+    let sys = r.mem.alloc(0x6f00);
+    let words = r.mem.alloc(4 * 0x50);
+    let l = log.clone();
+    r.stub(0x20c200, move |c, _| {
+        assert_eq!((c.gpr(4) as u32, c.gpr(6)), (sys, 1));
+        let h = c.gpr(5) as u32;
+        l.borrow_mut().push(("find", h));
+        c.set_gpr(2, plays(h) as u64);
+    });
+    let l = log.clone();
+    r.stub(0x20c2a0, move |c, _| {
+        assert_eq!((c.gpr(4) as u32, c.gpr(6), c.f(12)), (sys, 1, 0.0));
+        l.borrow_mut().push(("stop", c.gpr(5) as u32));
+    });
+    let mut g = Rng(0x5eed_0f_0a11_ce55);
+    let mut seen = [0u32; 6];
+    for case in 0..30_000 {
+        let size = if g.next() % 2 == 0 { 0x50 } else { 5 + g.next() % 0x4b };
+        let pick = |g: &mut Rng| match g.next() % 6 {
+            0 => 0,
+            1 => u32::MAX,
+            2 => 1 + g.next() % 4,
+            3 => 0x100 + g.next() % 8,
+            _ => g.next(),
+        };
+        let mut ring = SoundRing { words: (0..size).map(|_| pick(&mut g)).collect(), head: (g.next() % size) as i32, tail: (g.next() % size) as i32 };
+        if g.next() % 4 == 0 {
+            ring.head = (ring.tail + size as i32 - 1) % size as i32;
+        }
+        r.mem.write_u32(sys + 0x6e24, size);
+        r.mem.write_u32(sys + 0x6e28, words);
+        for (i, w) in ring.words.iter().enumerate() {
+            r.mem.write_u32(words + 4 * i as u32, *w);
+        }
+        r.mem.write_u32(sys + 0x6e2c, ring.head as u32);
+        r.mem.write_u32(sys + 0x6e30, ring.tail as u32);
+        let now = 0x100 + (g.next() % 8) as i32;
+        r.mem.write_u32(sys + 0x80, now as u32);
+        let mut mine = RingT(Vec::new());
+        let which = case % 3;
+        let a = [pick(&mut g), pick(&mut g), pick(&mut g), pick(&mut g)];
+        let mut got = false;
+        match which {
+            0 => {
+                for (k, v) in [sys as u64, a[0] as u64, a[1] as u64, a[2] as u64, a[3] as u64].iter().enumerate() {
+                    r.cpu.set_gpr(4 + k, *v);
+                }
+                r.call(0x215998).unwrap_or_else(|e| panic!("case {case}: {e}"));
+                ring.queue_sounds(a[0], a[1], a[2], a[3], &mut mine);
+            }
+            1 => {
+                r.cpu.set_gpr(4, sys as u64);
+                r.cpu.set_gpr(5, a[0] as i32 as i64 as u64);
+                r.call(0x2154e0).unwrap_or_else(|e| panic!("case {case}: {e}"));
+                got = ring.is_queued(a[0], &mut mine);
+                assert_eq!(r.cpu.gpr(2) as u32, got as u32, "case {case} answer");
+            }
+            _ => {
+                r.cpu.set_gpr(4, sys as u64);
+                r.call(0x215658).unwrap_or_else(|e| panic!("case {case}: {e}"));
+                ring.update(now, &mut mine);
+            }
+        }
+        assert_eq!(std::mem::take(&mut *log.borrow_mut()), mine.0, "case {case} calls");
+        assert_eq!(ring_read(&mut r, sys), ring, "case {case} ring");
+        seen[which as usize * 2] += 1;
+        seen[which as usize * 2 + 1] += (got || mine.0.iter().any(|c| c.0 == "stop")) as u32;
+    }
+    eprintln!("ring {seen:?}");
+    assert!(seen.iter().all(|n| *n > 100), "{seen:?}");
+}

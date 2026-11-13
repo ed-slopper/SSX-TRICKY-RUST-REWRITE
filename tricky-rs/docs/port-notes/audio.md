@@ -1242,6 +1242,24 @@ ones at 0x3511f8; the IOP shared block is 0x353314.
 - In the race (`race::Race::speech`, `race::SpeechCall`): the rider's `vf10` hooks (checkpoint, place, cheer, the
   three local lines) and `Race::places`' placing sound are queued in order for the app; the app does not run them
   yet (no speech system in the app: row E1b2g7d3b).
+- The ring of queued sounds (row E1b2g7d3b5, proven, checked in `tests/sndqueue.rs` `sound_ring_matches_the_original`,
+  30,000 cases over the three functions; `sndqueue::SoundRing`): `cBXAudio::cBXAudio` 0x20db18 makes it 0x50 words
+  (+0x6e24), fills them with 0xdeadc0ed (+0x6e28) and sets head and tail (+0x6e2c, +0x6e30) to 0; one word is always
+  left free. `SndSys_QueueSounds` 0x215998 (the system, owner, handle, end tick, flag) pushes the four words; on a
+  full ring it first drops the oldest record: skips its owner, takes its handle and stops it
+  (`SndSys_StopBankSound` 0x20c2a0: a0 the system, a1 the handle, a2 1, f12 0.0), skips the other two. A push that
+  finds the ring full is dropped. `SndSys_IsQueued` 0x2154e0 (the system, owner) walks the records from the tail
+  (every fourth word): a record of the owner whose handle is 0 or found by `BankMonitor_Find` 0x20c200 (a2 1) answers
+  1. `SndSys_UpdateQueuedSounds` 0x215658 takes every record off (count = words used >> 2); one whose handle is
+  ≥ 0 and is 0 or found goes back on while the system's tick (+0x80) is below its end (signed), else, with its flag
+  set, its sound is stopped; the rest are dropped.
+- The same constructor sets the speech cap +0x6e68 to 10 (the cap row E1b2g7d3b6 was looking for).
+- In the app (`src/racespeech.rs`): the placing change runs through `sndqueue::on_placing_change`; the sound (kind
+  0 is the main bank, zbxsfx; 0x6d is its program 109) is played from the bank's exported sample as `boardsound`
+  plays it, kept on the ring under owner 0 with the race clock standing in for the tick, so a second lead change
+  while it plays does not start it again. The passing line goes to `Announcer::on_placing_change` (it stays quiet
+  until `SpeechSys_CanPlay` is ported, row E1b2g7d3b4). The cheer is not played: the app has no crowd boxes (row
+  E1b2g7d3b7).
 
 ## The speech library's entry points (row E1b2g7d3b1; checked: `tests/speechlib.rs` `post_and_event_banks`, `tests/speechsys.rs` ops 23..27)
 

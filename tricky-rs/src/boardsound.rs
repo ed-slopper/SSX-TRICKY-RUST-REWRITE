@@ -93,15 +93,15 @@ pub struct BoardSounds { pub on: bool, files: HashMap<String, Handle<AudioSource
 pub struct Prog(String);
 
 impl BoardSounds {
-    fn get(&self, name: &str) -> Option<Handle<AudioSource>> { self.files.get(name).cloned() }
+    pub fn get(&self, name: &str) -> Option<Handle<AudioSource>> { self.files.get(name).cloned() }
     /// the loop part of a looping sample (else the whole sample)
     fn get_loop(&self, name: &str) -> Option<Handle<AudioSource>> { self.files.get(&format!("{name}_loop")).or(self.files.get(name)).cloned() }
-    fn pitch(&self, name: &str, bend: f32) -> f32 {
+    pub fn pitch(&self, name: &str, bend: f32) -> f32 {
         let (root, range, _, detune) = self.meta.get(name).copied().unwrap_or((60.0, 0.0, 127.0, 0.0));
         let cents = detune - (root - 60.0) * 100.0 + (bend - 64.0) * range * 100.0 / 64.0;
         2f32.powf(cents / 1200.0)
     }
-    fn level(&self, name: &str) -> f32 { self.meta.get(name).map_or(1.0, |m| m.2 / 127.0) }
+    pub fn level(&self, name: &str) -> f32 { self.meta.get(name).map_or(1.0, |m| m.2 / 127.0) }
 }
 
 pub fn setup_board_sound(mut commands: Commands, level: Res<LevelRes>, mut assets: ResMut<Assets<AudioSource>>) {
