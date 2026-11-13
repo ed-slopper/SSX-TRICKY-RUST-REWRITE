@@ -1530,3 +1530,34 @@ Proven (checked in `tests/career.rs` `volume_preset_and_speech_level_are_the_ori
 In the app: `ui::AudioLevels` is the sound manager's levels as the constructor leaves them, handed to
 `CareerFile::open`; the announcer reads its speech level each frame and has its cap of 10. STANDIN: the volumes are
 kept as given (`SndMgr_SetVolume` not ported) and nothing plays by them yet.
+
+## The bank manager and its file loader (E1b2g7d5c, `game/src/banksys.rs`; checked: `tests/banksys.rs`)
+
+Proven (38 functions 0x2086d8..0x20a6e0, every one run against the original in `tests/banksys.rs`, 60,000 random
+cases, the calls out logged in order and the memory compared; five mutations caught):
+
+- **cAsyncSys** (vtable 0x39e630, the global at 0x342c40) reads bank files one at a time. Layout: +4 vtable, +0x8e4
+  the file being read (then the bank handle), +0x8e8 busy, +0x8ec the next of four name buffers (+0x8f0, 0x40 each,
+  wraps after 3), four ring queues {size, data, write, read} at +0x9f0 (slot), +0xa00 (name buffer), +0xa10 (kind),
+  +0xa20 (memory flags), all four entries long; +0xa30/+0xa34 the shared read buffer (`AsyncSys_AllocBuffer`
+  0x208b78, `MemPool_Alloc` on the pool 0x345e48). `AsyncSys_QueueLoad` 0x208ed8 queues and starts when idle;
+  `AsyncSys_StartNext` 0x208cb0 releases the slot (vtable +0x50) and reads: kind 1 into the slot's own memory
+  (vtable +0x58 with size −1) or memory the reader allocates, kinds 0 and 2 into the shared buffer.
+  `AsyncSys_Update` 0x209408 polls (`AsyncFile_IsDone` 0x2c6108: 0 busy, 1 done, else failed → pop), registers the
+  bank (`SndBank_Register` 0x2d0f98); kinds 0/2 then move it to the slot's memory: relocated when the register answers
+  7 (resident: `SndBank_GetResidentSize` / `SndBank_Relocate`), else unregistered, copied and registered again; the
+  slot is told through vtable +0x60 (slot, handle or −1, 0 loaded / 1 cancelled / 2 failed, name, data, size).
+  `AsyncSys_CancelBank` 0x209088 takes a slot's loads out of the queues (the one being read through
+  `AsyncSys_PopQueue` 0x2086d8, which cancels, tells 1 when the cancel took else 2).
+- **cBankManager** (vtable 0x39e6f8, the global at 0x342c44) is a cAsyncSys with +0xa38 the slot count and +0xa3c
+  the slots (0x60 each, the count at slots−0x10): +0 state (0 empty, 1 loaded, 2 loading), +4 bank handle, +8 kind
+  (0 dynamic memory, 1 static, 2 static with sound memory), +0xc sound-memory block, +0x10/+0x14 memory and size,
+  +0x18/+0x1c a ring of linked slots (unloaded together), +0x20 the file name. `BankManager_LoadBank` 0x20a520
+  queues unless that name is already in (`BankSlot_IsLoaded` 0x20a170 strcmp), so `Audio_LoadAmbientBank`'s
+  state 2 is "being read". The memory goes through the object at `*gBankManager`+0 (its vtable +0x20 alloc sound
+  memory, +0x28 free, +0x30 hand a block, +0x38 notify).
+- Bugs kept: the manager's destructor (0x20a3d0) clears `gBankManager` before freeing the slots, so a static slot
+  with sound memory reads its owner through null; cAsyncSys's destructor finishing a busy load calls through its own
+  vtable, now cAsyncSys's pure-virtual slot (0x2f54e0).
+
+Not yet: the app still stands in for the manager (`Slot6` in `tricky-rs/src/racespeech.rs`, row E1b2g7d5d).
