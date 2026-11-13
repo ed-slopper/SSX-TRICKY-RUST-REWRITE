@@ -729,3 +729,4 @@
 30e4d8 __divdi3_2 __divdi3
 2e8878 sceCdPOffCallback Cd_InitPowerOff
 2e87c8 Cd_SetPowerOffCallback sceCdPOffCallback
+21d0c0 Audio_LoadAmbientBanks Audio_PlayEventSound

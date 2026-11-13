@@ -3694,9 +3694,9 @@ address,size,name,system,status
 0x21cf38,104,Jukebox_Open,audio,ported
 0x21cfa0,124,Jukebox_PlayTrack,audio,ported
 0x21d078,56,Music_StopStreamAndFade,audio,ported
-0x21d0b0,16,Audio_QueueEventSound,audio,ported
-0x21d0c0,1284,Audio_LoadAmbientBanks,audio,not started
-0x21d5c8,72,Audio_StopEventSound,audio,ported
+0x21d0b0,16,Audio_QueueEventSound,audio,checked
+0x21d0c0,1284,Audio_PlayEventSound,audio,checked
+0x21d5c8,72,Audio_StopEventSound,audio,checked
 0x21d610,112,Audio_SetMusicState,audio,not started
 0x21d680,812,Sfx_PlayClipBoardSound51,audio,not started
 0x21d9b0,812,Sfx_PlayClipBoardSound50,audio,not started

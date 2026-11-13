@@ -1762,3 +1762,105 @@ fn find_rider_near_matches_the_original() {
     }
     assert!(found.iter().all(|&k| k > 100), "{found:?}");
 }
+
+// ---- the event sound ----
+
+struct EvEnv(Rc<RefCell<Or>>);
+impl QueueEnv for EvEnv {
+    fn get_slot(&mut self, which: u32) -> u32 {
+        self.0.borrow_mut().take("slot", which as u64, 0) as u32
+    }
+    fn rider_listener(&mut self) -> u32 {
+        unreachable!()
+    }
+    fn play_pending(&mut self) -> u64 {
+        self.0.borrow_mut().take("pp", 0, 0) as u64
+    }
+}
+impl EventSoundEnv for EvEnv {
+    fn load_ambient_bank(&mut self, name: &str) -> i64 {
+        let at = [0x39f1c0u64, 0x39f1d8][EVENT_BANKS.iter().position(|n| *n == name).unwrap()];
+        self.0.borrow_mut().log.push(("find", at, 0));
+        self.0.borrow_mut().take("load", at, 0)
+    }
+    fn stop_bank_sound(&mut self, handle: u32) {
+        self.0.borrow_mut().log.push(("stop", 2.0f32.to_bits() as u64, handle as u64));
+    }
+}
+
+fn read_event(r: &mut Runner, sys: u32) -> EventSound {
+    EventSound { pending: r.mem.read_u32(sys + 0x7420), handle: r.mem.read_u32(sys + 0x7424), kind: r.mem.read_u32(sys + 0x7428) }
+}
+
+#[test]
+fn event_sound_matches_the_original() {
+    let Some(mut r) = runner() else { return };
+    let or: Rc<RefCell<Or>> = Rc::new(RefCell::new(Or::default()));
+    let (_, sys, l) = setup(&mut r, 0x10);
+    let o = or.clone();
+    r.stub(0x211f38, move |c, _| {
+        let v = o.borrow_mut().take("slot", c.gpr(5) as u32 as u64, 0);
+        c.set_gpr(2, v as u64);
+    });
+    let o = or.clone();
+    r.stub(0x20c948, move |c, _| {
+        let v = o.borrow_mut().take("pp", 0, 0);
+        c.set_gpr(2, v as u64);
+    });
+    let o = or.clone();
+    r.stub(0x21a640, move |c, _| {
+        assert_eq!(c.gpr(4) as u32, sys);
+        let a = c.gpr(5) as u32;
+        o.borrow_mut().log.push(("find", a as u64, 0));
+        c.set_gpr(2, a as u64);
+    });
+    let o = or.clone();
+    r.stub(0x21a548, move |c, _| {
+        assert_eq!(c.gpr(4) as u32, sys);
+        let v = o.borrow_mut().take("load", c.gpr(5) as u32 as u64, 0);
+        c.set_gpr(2, v as u64);
+    });
+    let o = or.clone();
+    r.stub(0x20c2a0, move |c, _| {
+        assert_eq!((c.gpr(4) as u32, c.gpr(6)), (0x1234_5678, 1));
+        o.borrow_mut().log.push(("stop", c.f(12).to_bits() as u64, c.gpr(5) as u32 as u64))
+    });
+    r.mem.write_u32(0x343050, 0x1234_5678);
+    let mut g = Rng(0x0e7e_47a5_0bd5_1234);
+    for case in 0..30_000 {
+        fill(&mut r, sys, &l, &mut g);
+        let ev = EventSound {
+            pending: [0, 1, g.next()][(g.next() % 3) as usize],
+            handle: if g.next() % 2 == 0 { u32::MAX - g.next() % 3 } else { g.next() % 0x8000_0000 },
+            kind: [0, 1, 2, 3, g.next()][(g.next() % 5) as usize],
+        };
+        r.mem.write_u32(sys + 0x7420, ev.pending);
+        r.mem.write_u32(sys + 0x7424, ev.handle);
+        r.mem.write_u32(sys + 0x7428, ev.kind);
+        let which = g.next() % 3;
+        let vals = vec![[0, 1, 2][(g.next() % 3) as usize], (g.next() % 100) as i64, g.next() as i64];
+        let qkind = g.next() % 4;
+        let before = read(&mut r, &l);
+        or.borrow_mut().vals = vals.clone();
+        or.borrow_mut().log.clear();
+        r.cpu.set_gpr(4, sys as u64);
+        let (addr, mut mine_ev) = (match which { 0 => 0x21d0c0, 1 => 0x21d5c8, _ => 0x21d0b0 }, ev);
+        if which == 2 {
+            r.cpu.set_gpr(5, qkind as u64);
+        }
+        r.call(addr).unwrap_or_else(|e| panic!("case {case}: {e}"));
+        let orig = std::mem::take(&mut or.borrow_mut().log);
+        let (after, after_ev) = (read(&mut r, &l), read_event(&mut r, sys));
+        let mut q = before.clone();
+        or.borrow_mut().vals = vals;
+        match which {
+            0 => mine_ev.update(&mut q, &mut EvEnv(or.clone())),
+            1 => mine_ev.stop(&mut EvEnv(or.clone())),
+            _ => mine_ev.queue(qkind),
+        }
+        let mine = std::mem::take(&mut or.borrow_mut().log);
+        assert_eq!(orig, mine, "case {case} {which} {ev:?}");
+        assert_eq!(after_ev, mine_ev, "case {case} {which} {ev:?}");
+        assert_eq!(after, q, "case {case} {which} state");
+    }
+}

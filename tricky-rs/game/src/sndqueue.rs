@@ -723,3 +723,68 @@ pub fn find_rider_near(radius: f32, count: &mut dyn FnMut() -> i32, view: &mut d
     }
     -1
 }
+
+/// The audio system's event sound (+0x7420 pending, +0x7424 its handle, +0x7428 its kind): a loop the rider's event
+/// bits ask for (`cBoarder::vf10` 0x11a348: bits 0xe, 0x17, 0x18 → kinds 0, 1, 2).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct EventSound {
+    pub pending: u32,
+    pub handle: u32,
+    pub kind: u32,
+}
+
+impl Default for EventSound {
+    /// `cBXAudio::cBXAudio` 0x20db18: the handle −1 (0x20dbdc), none pending (0x20dc18)
+    fn default() -> Self {
+        EventSound { pending: 0, handle: u32::MAX, kind: 0 }
+    }
+}
+
+/// The banks the event sound loads: kind 0 (and any kind over 2) the tunnel's (0x39f1c0), kind 1 the river's (0x39f1d8)
+pub const EVENT_BANKS: [&str; 2] = ["|data\\audio\\Tunnel1.bnk", "|data\\audio\\RiverSmall.bnk"];
+
+pub trait EventSoundEnv: QueueEnv {
+    /// `Audio_FindBankName` 0x21a640 then `Audio_LoadAmbientBank` 0x21a548 (the audio system, the name found): 1 when
+    /// the bank is in
+    fn load_ambient_bank(&mut self, name: &str) -> i64;
+    /// `SndSys_StopBankSound` 0x20c2a0(f12 2.0, the audio object, the handle, 1)
+    fn stop_bank_sound(&mut self, handle: u32);
+}
+
+impl EventSound {
+    /// `Audio_QueueEventSound` 0x21d0b0: the kind kept, the sound pending
+    pub fn queue(&mut self, kind: u32) {
+        self.kind = kind;
+        self.pending = 1;
+    }
+
+    /// `Audio_StopEventSound` 0x21d5c8: a handle kept (not negative) is stopped; none kept after
+    pub fn stop(&mut self, env: &mut dyn EventSoundEnv) {
+        if (self.handle as i32) >= 0 {
+            env.stop_bank_sound(self.handle);
+        }
+        self.handle = u32::MAX;
+    }
+
+    /// `Audio_PlayEventSound` 0x21d0c0 (from `Audio_InGameUpdate` 0x20ee90 at 0x20ef24): a pending sound played.
+    /// Kinds 0 and 1 load their bank (nothing more when it is not in, still pending) and play its sound 0 as kind 6
+    /// at volume 0x23; kind 2 plays sound 9 as kind 2. The handle is kept and nothing is pending after.
+    pub fn update(&mut self, q: &mut Queue, env: &mut dyn EventSoundEnv) {
+        if self.pending == 0 {
+            return;
+        }
+        if self.kind == 2 {
+            queue_begin(q, 2, 9, None);
+        } else {
+            let name = EVENT_BANKS[(self.kind == 1) as usize];
+            if env.load_ambient_bank(name) != 1 {
+                return;
+            }
+            queue_begin(q, 6, 0, Some(0x23));
+        }
+        let i = q.count as usize;
+        q.a40[i] = env.get_slot(4);
+        self.handle = env.play_pending() as u32;
+        self.pending = 0;
+    }
+}

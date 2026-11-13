@@ -3815,7 +3815,7 @@ G 227b00 SpeechSys_LibPlayCallback
 G 227b38 SpeechBank_Load
 G 223d60 Music_LoadPathfinder
 G 22c648 Audio_LoadWorldTriggerBanks
-G 21d0c0 Audio_LoadAmbientBanks
+G 21d0c0 Audio_PlayEventSound
 F 16dd68 CamCamera CamCamera
 F 16dda8 CamCamera GetView
 F 16ddb8 CamCamera GetLens
