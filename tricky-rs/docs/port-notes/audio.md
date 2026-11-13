@@ -1610,3 +1610,25 @@ Proven (checked in the function runner with the bank manager's test, eight more 
   `SndSys_PlaySoundVolume` 0x20ce30 also keeps the volume whole at +0x3c and clamps it to 0..127 into the record.
 - `StaticInit_SndSys` 0x20cdb0 writes the two curves `Sfx_EvalCurve` 0x20d928 reads (0x3d2988..0x3d29b0: 1.0,
   0.9645, 0 / 1.0, 0.4746, 0 / 1.0, 0.0758, 0.002).
+
+## The rider's sound loops started (E1b2g7d5g, `game/src/sndqueue.rs`; checked: `tests/sndqueue.rs`)
+
+Proven (checked in the function runner, 30,000 cases, eight mutations caught):
+
+- `Audio_InitRiderSounds` 0x210a38 cancels the race's events (`Audio_CancelRaceEvents` 0x210b50), starts every
+  rider's loops (`Race_GetRider` 0x1814a8 on `gApp` 0x337c58 +0x730; the count +0x1c → +0x88 read again after each
+  rider) and clears the audio system's +0x38a0.
+- `Sfx_StartRiderLoops` 0x210ad0 keeps the rider's motion (+0x424) in +0x788 / +0x78c and its surface sound type
+  (`Sfx_SurfaceSoundType` 0x20f908) in +0x790 / +0x794, then starts the air, glide and carve loops.
+- Each loop is a queue entry of kind 1, volume 0, the slot (`SndMgr_GetSlot` 4), the rider's emitter (+0x140), the
+  rider as the owner (+0x64), +0x7c cleared, an update callback at +0x44 (a pointer to member: halfwords 0 and -1,
+  then the function), `SndSys_SetPendingVolume`(v, -1.0), then played:
+  - air (`Sfx_StartAirLoop` 0x20fce0): the player's rider only (+0x41c == 1), sound 0, the listener asked,
+    40.0, `Sfx_UpdateAirLoop` 0x21b440;
+  - glide (`Sfx_StartGlideLoop` 0x210048): the player's rider sound `surface*8+4`, listener, 40.0,
+    `Sfx_UpdateGlideLoop` 0x21b508; any other rider sound `surface*8+6`, no listener, 50.0,
+    `Sfx_UpdateAiGlideLoop` 0x21b628;
+  - carve (`Sfx_StartCarveLoop` 0x2106c0): the player's rider only, sound `surface*8+3`, listener, 40.0,
+    `Sfx_UpdateCarveLoop` 0x21b718.
+- Not in the app yet: `src/boardsound.rs` still picks the board loops itself; the update callbacks are row
+  E1b2g7d5h.

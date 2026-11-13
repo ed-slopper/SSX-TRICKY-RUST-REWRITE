@@ -874,3 +874,117 @@ pub fn play_opts_header() -> [u8; 24] {
     play_opts_init(&mut r);
     r
 }
+
+// ---- The rider's sound loops (board row E1b2g7d5g) ----
+
+/// The rider values the loops' starts read and write.
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct LoopRider {
+    /// The rider's address (the instance's owner, +0x64; +0x140 is the emitter).
+    pub addr: u32,
+    /// +0x41c: 1 for the player's own rider.
+    pub flag_41c: u32,
+    /// +0x424: the rider's motion (2 air, 3 a rail).
+    pub motion: u32,
+    /// +0x788 / +0x78c: the motion the loops last saw.
+    pub w788: u32,
+    pub w78c: u32,
+    /// +0x790 / +0x794: the surface sound type the loops last saw.
+    pub w790: u32,
+    pub w794: u32,
+}
+
+pub trait RiderLoopEnv: QueueEnv {
+    /// `Sfx_SurfaceSoundType` 0x20f908 (the audio system, the rider).
+    fn surface_sound_type(&mut self, rider: u32) -> u32;
+    /// `SndSys_SetPendingVolume` 0x226dd8 (the volume, -1.0, the audio system).
+    fn set_pending_volume(&mut self, a: f32, b: f32);
+}
+
+/// The update callbacks the loops' entries carry (+0x44: a pointer to member, no this-adjust, no vtable index, the
+/// function): `Sfx_UpdateAirLoop` 0x21b440, `Sfx_UpdateGlideLoop` 0x21b508, `Sfx_UpdateAiGlideLoop` 0x21b628,
+/// `Sfx_UpdateCarveLoop` 0x21b718.
+pub const AIR_LOOP_UPDATE: u32 = 0x21b440;
+pub const GLIDE_LOOP_UPDATE: u32 = 0x21b508;
+pub const AI_GLIDE_LOOP_UPDATE: u32 = 0x21b628;
+pub const CARVE_LOOP_UPDATE: u32 = 0x21b718;
+
+/// One loop's entry: kind 1, the id, volume 0, the slot, the rider's emitter and update callback, the rider as the
+/// owner, the listener when `listen`, +0x7c cleared, the volume `vol` (-1.0) and played (the starts write these in
+/// different orders; only the calls' order shows).
+fn start_loop(q: &mut Queue, r: &LoopRider, id: u32, update: u32, listen: bool, vol: f32, env: &mut dyn RiderLoopEnv) {
+    let i = queue_begin(q, 1, id, Some(0));
+    q.a40[i] = env.get_slot(4);
+    q.emitter[i] = r.addr.wrapping_add(0x140);
+    q.a44[i] = [0xffff_0000, update];
+    q.a64[i] = r.addr;
+    if listen {
+        q.a68[i] = env.rider_listener();
+    }
+    q.a7c[i] = 0;
+    env.set_pending_volume(vol, -1.0);
+    env.play_pending();
+}
+
+/// `Sfx_StartAirLoop` 0x20fce0 (the audio system, the rider): the player's rider's air loop, sound 0.
+pub fn start_air_loop(q: &mut Queue, r: &LoopRider, env: &mut dyn RiderLoopEnv) {
+    if r.flag_41c == 1 {
+        start_loop(q, r, 0, AIR_LOOP_UPDATE, true, 40.0, env);
+    }
+}
+
+/// `Sfx_StartGlideLoop` 0x210048 (the audio system, the rider, the surface sound type): the glide loop, sound
+/// `surface * 8 + 4` heard by the rider's listener for the player's rider, else `surface * 8 + 6` (the AI's, louder,
+/// no listener).
+pub fn start_glide_loop(q: &mut Queue, r: &LoopRider, surface: u32, env: &mut dyn RiderLoopEnv) {
+    if r.flag_41c == 1 {
+        start_loop(q, r, surface.wrapping_mul(8).wrapping_add(4), GLIDE_LOOP_UPDATE, true, 40.0, env);
+    } else {
+        start_loop(q, r, surface.wrapping_mul(8).wrapping_add(6), AI_GLIDE_LOOP_UPDATE, false, 50.0, env);
+    }
+}
+
+/// `Sfx_StartCarveLoop` 0x2106c0 (the audio system, the rider, the surface sound type): the player's rider's carve
+/// loop, sound `surface * 8 + 3`.
+pub fn start_carve_loop(q: &mut Queue, r: &LoopRider, surface: u32, env: &mut dyn RiderLoopEnv) {
+    if r.flag_41c == 1 {
+        start_loop(q, r, surface.wrapping_mul(8).wrapping_add(3), CARVE_LOOP_UPDATE, true, 40.0, env);
+    }
+}
+
+/// `Sfx_StartRiderLoops` 0x210ad0 (the audio system, the rider): the motion and surface remembered, the three loops
+/// started.
+pub fn start_rider_loops(q: &mut Queue, r: &mut LoopRider, env: &mut dyn RiderLoopEnv) {
+    let motion = r.motion;
+    let surface = env.surface_sound_type(r.addr);
+    r.w78c = motion;
+    r.w788 = motion;
+    r.w790 = surface;
+    r.w794 = surface;
+    start_air_loop(q, r, env);
+    start_glide_loop(q, r, surface, env);
+    start_carve_loop(q, r, surface, env);
+}
+
+pub trait InitRiderSoundsEnv: RiderLoopEnv {
+    /// `Audio_CancelRaceEvents` 0x210b50.
+    fn cancel_race_events(&mut self);
+    /// The race's rider count (`gApp` 0x337c58, +0x730 → +0x1c → +0x88), read before each rider.
+    fn rider_count(&mut self) -> i32;
+    /// `Race_GetRider` (the race, the index): the rider's address.
+    fn get_rider(&mut self, i: i32) -> u32;
+}
+
+/// `Audio_InitRiderSounds` 0x210a38 (the audio system): the race's events cancelled, every rider's loops started
+/// (`riders` found by address), then the audio system's +0x38a0 cleared.
+pub fn init_rider_sounds(q: &mut Queue, w38a0: &mut u32, riders: &mut [LoopRider], env: &mut dyn InitRiderSoundsEnv) {
+    env.cancel_race_events();
+    let mut i = 0;
+    while i < env.rider_count() {
+        let a = env.get_rider(i);
+        let r = riders.iter_mut().find(|r| r.addr == a).expect("a rider the race gives");
+        start_rider_loops(q, r, env);
+        i += 1;
+    }
+    *w38a0 = 0;
+}

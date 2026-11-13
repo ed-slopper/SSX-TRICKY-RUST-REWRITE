@@ -1983,3 +1983,144 @@ fn play_opts_init_matches_the_original() {
         assert_eq!(orig, mine, "case {case}");
     }
 }
+
+// ---- The rider's sound loops (E1b2g7d5g) ----
+
+struct RiderLoopsEnv(Rc<RefCell<Or>>, Vec<u32>);
+impl QueueEnv for RiderLoopsEnv {
+    fn get_slot(&mut self, which: u32) -> u32 {
+        self.0.borrow_mut().take("slot", which as u64, 0) as u32
+    }
+    fn rider_listener(&mut self) -> u32 {
+        self.0.borrow_mut().take("rl", 0, 0) as u32
+    }
+    fn play_pending(&mut self) -> u64 {
+        self.0.borrow_mut().log.push(("pp", 0, 0));
+        0
+    }
+}
+impl RiderLoopEnv for RiderLoopsEnv {
+    fn surface_sound_type(&mut self, rider: u32) -> u32 {
+        self.0.borrow_mut().take("surf", rider as u64, 0) as u32
+    }
+    fn set_pending_volume(&mut self, a: f32, b: f32) {
+        self.0.borrow_mut().log.push(("spv", a.to_bits() as u64, b.to_bits() as u64));
+    }
+}
+impl InitRiderSoundsEnv for RiderLoopsEnv {
+    fn cancel_race_events(&mut self) {
+        self.0.borrow_mut().log.push(("cancel", 0, 0));
+    }
+    fn rider_count(&mut self) -> i32 {
+        self.1.len() as i32
+    }
+    fn get_rider(&mut self, i: i32) -> u32 {
+        self.0.borrow_mut().log.push(("gr", i as u64, 0));
+        self.1[i as usize]
+    }
+}
+
+fn loop_rider(r: &mut Runner, a: u32) -> LoopRider {
+    LoopRider {
+        addr: a,
+        flag_41c: r.mem.read_u32(a + 0x41c),
+        motion: r.mem.read_u32(a + 0x424),
+        w788: r.mem.read_u32(a + 0x788),
+        w78c: r.mem.read_u32(a + 0x78c),
+        w790: r.mem.read_u32(a + 0x790),
+        w794: r.mem.read_u32(a + 0x794),
+    }
+}
+
+#[test]
+fn rider_loops_match_the_original() {
+    let Some(mut r) = runner() else { return };
+    let or: Rc<RefCell<Or>> = Rc::new(RefCell::new(Or::default()));
+    let (_, sys, l) = setup(&mut r, 0x10);
+    let riders: Vec<u32> = (0..3).map(|_| r.mem.alloc(0x800)).collect();
+    for f in [0x20fce0u32, 0x210048, 0x2106c0, 0x210ad0] {
+        r.allow(f);
+    }
+    let (app, race, x) = (r.mem.alloc(0x800), r.mem.alloc(0x40), r.mem.alloc(0x100));
+    r.mem.write_u32(0x337c58, app);
+    r.mem.write_u32(app + 0x730, race);
+    r.mem.write_u32(race + 0x1c, x);
+    for (a, name) in [(0x211f38u32, "slot"), (0x20fc60, "rl"), (0x20f908, "surf")] {
+        let o = or.clone();
+        r.stub(a, move |c, _| {
+            assert_eq!(c.gpr(4) as u32, sys);
+            let x = match name {
+                "slot" | "surf" => c.gpr(5) as u32 as u64,
+                _ => 0,
+            };
+            let v = o.borrow_mut().take(name, x, 0);
+            c.set_gpr(2, v as u64);
+        });
+    }
+    let o = or.clone();
+    r.stub(0x226dd8, move |c, _| o.borrow_mut().log.push(("spv", c.f(12).to_bits() as u64, c.f(13).to_bits() as u64)));
+    for (a, name) in [(0x20c948u32, "pp"), (0x210b50, "cancel")] {
+        let o = or.clone();
+        r.stub(a, move |_, _| o.borrow_mut().log.push((name, 0, 0)));
+    }
+    let o = or.clone();
+    let rs = riders.clone();
+    r.stub(0x1814a8, move |c, _| {
+        assert_eq!(c.gpr(4) as u32, race);
+        o.borrow_mut().log.push(("gr", c.gpr(5) as u32 as u64, 0));
+        c.set_gpr(2, rs[c.gpr(5) as usize] as u64);
+    });
+    let mut g = Rng(0x1357_2468_aaaa_5555);
+    for case in 0..30_000 {
+        fill(&mut r, sys, &l, &mut g);
+        let which = g.next() % 6;
+        // at most three new entries: the queue's inline arrays (+0x28, +0x44) hold four
+        let n = if which == 5 { g.next() % 4 } else { 1 };
+        r.mem.write_u32(sys + 0x20, if which >= 4 { 0 } else { g.next() % 3 });
+        let list: Vec<u32> = riders[..n as usize].to_vec();
+        r.mem.write_u32(x + 0x88, n);
+        for (k, &a) in riders.iter().enumerate() {
+            for j in 0..0x800 / 4 {
+                r.mem.write_u32(a + 4 * j, g.next());
+            }
+            let local = which < 4 && g.next() % 2 == 0 || (which == 4 || which == 5 && n == 1) && k == 0 && g.next() % 2 == 0;
+            r.mem.write_u32(a + 0x41c, if local { 1 } else { [0, 2, 0xffff_ffff][g.next() as usize % 3] });
+            r.mem.write_u32(a + 0x424, g.next() % 5);
+        }
+        let rider = riders[0];
+        let surface = g.next() % 20;
+        let w38a0 = g.next();
+        r.mem.write_u32(sys + 0x38a0, w38a0);
+        let vals: Vec<i64> = (0..16).map(|_| (g.next() % 100) as i64).collect();
+        let before = read(&mut r, &l);
+        let mut mine_riders: Vec<LoopRider> = riders.iter().map(|&a| loop_rider(&mut r, a)).collect();
+        or.borrow_mut().vals = vals.clone();
+        or.borrow_mut().log.clear();
+        r.cpu.set_gpr(4, sys as u64);
+        r.cpu.set_gpr(5, rider as u64);
+        r.cpu.set_gpr(6, surface as u64);
+        let f = [0x20fce0u32, 0x210048, 0x2106c0, 0x2106c0, 0x210ad0, 0x210a38][which as usize];
+        let f = if which == 3 { 0x210048 } else { f };
+        r.call(f).unwrap_or_else(|e| panic!("case {case}: {e}"));
+        let orig = std::mem::take(&mut or.borrow_mut().log);
+        let after = read(&mut r, &l);
+        let after_riders: Vec<LoopRider> = riders.iter().map(|&a| loop_rider(&mut r, a)).collect();
+        let w38a0_after = r.mem.read_u32(sys + 0x38a0);
+        let mut q = before.clone();
+        or.borrow_mut().vals = vals;
+        let mut e = RiderLoopsEnv(or.clone(), list);
+        let mut w = w38a0;
+        match which {
+            0 => start_air_loop(&mut q, &mine_riders[0], &mut e),
+            1 | 3 => start_glide_loop(&mut q, &mine_riders[0], surface, &mut e),
+            2 => start_carve_loop(&mut q, &mine_riders[0], surface, &mut e),
+            4 => start_rider_loops(&mut q, &mut mine_riders[0], &mut e),
+            _ => init_rider_sounds(&mut q, &mut w, &mut mine_riders, &mut e),
+        }
+        let mine = std::mem::take(&mut or.borrow_mut().log);
+        assert_eq!(orig, mine, "case {case} which {which}");
+        assert_eq!(after, q, "case {case} which {which} state");
+        assert_eq!(after_riders, mine_riders, "case {case} which {which} riders");
+        assert_eq!(w38a0_after, w, "case {case} which {which} +0x38a0");
+    }
+}

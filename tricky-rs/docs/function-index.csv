@@ -3563,11 +3563,11 @@ address,size,name,system,status
 0x20fa80,228,Audio_AnyRiderNearAhead,audio,ported
 0x20fb68,244,Audio_IsNearerPlayer2,audio,ported
 0x20fc60,124,Audio_GetRiderListener,audio,ported
-0x20fce0,868,Sfx_StartAirLoop,audio,not started
-0x210048,1656,Sfx_StartGlideLoop,audio,not started
-0x2106c0,884,Sfx_StartCarveLoop,audio,not started
-0x210a38,148,Audio_InitRiderSounds,audio,not started
-0x210ad0,128,Sfx_StartRiderLoops,audio,not started
+0x20fce0,868,Sfx_StartAirLoop,audio,checked
+0x210048,1656,Sfx_StartGlideLoop,audio,checked
+0x2106c0,884,Sfx_StartCarveLoop,audio,checked
+0x210a38,148,Audio_InitRiderSounds,audio,checked
+0x210ad0,128,Sfx_StartRiderLoops,audio,checked
 0x210b50,232,Audio_CancelRaceEvents,audio,ported
 0x210c38,1120,Sfx_LoadSurfaceConfig,audio,ported
 0x211098,1584,Audio_LoadInGameConfig,audio,ported
