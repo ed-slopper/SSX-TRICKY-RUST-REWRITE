@@ -275,6 +275,23 @@ pub fn man_init(m: &mut Mem, env: &mut dyn OverlayManEnv, man: u32) {
     env.call(m, 0x1f99f8, &[m.r32(m.r32(GAPP) + 0x728), tex, 0]);
 }
 
+/// `HUDItem_Show` 0x1a7db8 (the overlay, the player, -1 all; `HUD_ShowItem` 0x1a7848's): shown (+0x84, the
+/// overlay's reset for the player) when no player had it, or (for an overlay that hides itself, +0x94) when the
+/// player's bit was off; the bit on (+0xc), +0x18 set
+pub fn show_for_player(m: &mut Mem, env: &mut dyn OverlayManEnv, o: u32, player: i32) {
+    let bit = if player < 0 { u32::MAX } else { 1u32 << (player as u32 & 31) };
+    let own = ovcall(m, env, o, 0x94, &[]);
+    let shown = m.r32(o + 0xc);
+    let mut now = shown | bit;
+    let reset = if own == 0 { shown == 0 } else { bit & shown == 0 };
+    if reset {
+        ovcall(m, env, o, 0x84, &[player as u32]);
+        now = m.r32(o + 0xc) | bit;
+    }
+    m.w32(o + 0x18, 1);
+    m.w32(o + 0xc, now);
+}
+
 /// `Overlay_HideForPlayer` 0x1a7e70 (the player, -1 all): the player's bit off (+0xc); hidden (+0x8c) when that
 /// leaves none, or (for an overlay that hides itself, +0x94) when the bit was on; +0x18 cleared
 pub fn hide_for_player(m: &mut Mem, env: &mut dyn OverlayManEnv, o: u32, player: i32) {

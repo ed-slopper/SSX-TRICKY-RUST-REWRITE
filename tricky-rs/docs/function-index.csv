@@ -2442,7 +2442,7 @@ address,size,name,system,status
 0x1a7d18,44,OverlayMan_CallNextRaceVf8,frontend,checked
 0x1a7d48,44,OverlayMan_CallSelectNextVenueVf7,frontend,checked
 0x1a7d78,60,ScreenOverlay_Init,frontend,checked
-0x1a7db8,180,HUDItem_Show,hud,ported
+0x1a7db8,180,HUDItem_Show,hud,checked
 0x1a7e70,204,Overlay_HideForPlayer,frontend,checked
 0x1a7f40,460,Overlay_DrawItemForView,frontend,checked
 0x1a8110,460,Overlay_DrawTextForView,frontend,checked

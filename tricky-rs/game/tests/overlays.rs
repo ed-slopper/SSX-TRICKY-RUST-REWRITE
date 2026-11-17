@@ -44,7 +44,7 @@ const R_FN: u32 = 0x7e0000;
 /// The integer and float arguments each virtual takes
 fn arity(func: u32) -> (usize, usize) {
     match func {
-        f if f == OV_FN + 0xc || f == OV_FN + 0x8c => (1, 0),
+        f if f == OV_FN + 0xc || f == OV_FN + 0x84 || f == OV_FN + 0x8c => (1, 0),
         f if f == R_FN + 0x1c4 || f == R_FN + 0x1d4 || f == R_FN + 0x1e4 => (1, 0),
         f if f == R_FN + 0x1cc => (2, 1),
         f if f == R_FN + 0x9c => (0, 4),
@@ -52,7 +52,7 @@ fn arity(func: u32) -> (usize, usize) {
         _ => (0, 0),
     }
 }
-const OV_SLOTS: [u32; 17] = [0xc, 0x14, 0x1c, 0x24, 0x2c, 0x34, 0x3c, 0x44, 0x4c, 0x5c, 0x64, 0x6c, 0x74, 0x7c, 0x8c, 0x94, 0x9c];
+const OV_SLOTS: [u32; 18] = [0xc, 0x14, 0x1c, 0x24, 0x2c, 0x34, 0x3c, 0x44, 0x4c, 0x5c, 0x64, 0x6c, 0x74, 0x7c, 0x84, 0x8c, 0x94, 0x9c];
 const R_SLOTS: [u32; 12] = [0x5c, 0x64, 0x8c, 0x94, 0x9c, 0xb4, 0x10c, 0x1c4, 0x1cc, 0x1d4, 0x1dc, 0x1e4];
 
 /// The direct calls the port makes and the arguments each takes
@@ -358,6 +358,10 @@ fn overlay_manager_matches_the_original() {
     let ov0 = a.ov(0);
     check(&mut r, &a, &l, &mut g, 4_000, 0x1a7e70, "hide", move |r, g| set(r, &[ov0, g.below(5).wrapping_sub(1)]), move |m, e, a| {
         hide_for_player(m, e, ov0, a[1] as i32);
+        None
+    });
+    check(&mut r, &a, &l, &mut g, 4_000, 0x1a7db8, "show", move |r, g| set(r, &[ov0, g.below(5).wrapping_sub(1)]), move |m, e, a| {
+        show_for_player(m, e, ov0, a[1] as i32);
         None
     });
     check(&mut r, &a, &l, &mut g, 2_000, 0x1a77a8, "visible", move |r, _| set(r, &[man]), move |m, _, _| Some(any_visible(m, man) as u32));
