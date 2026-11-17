@@ -32,6 +32,18 @@ const APP: u32 = ARENA + 0x1000;
 const RACE: u32 = ARENA + 0x2000;
 const WORLD: u32 = ARENA + 0x2400;
 const MAN: u32 = ARENA + 0x2500;
+/// The pop finish overlay (item 7, the manager's +0x2c; 0xa4 bytes as `OverlayMan_Init` 0x1a6fb8 allocates it), the
+/// empty overlay in the manager's other slots (the app hosts only the pop finish there; never shown), the renderer
+/// (the game's +0x724: its vtable at +0x10, each slot's function [`REND_BASE`] + the slot), the replay save page
+/// `OverlayMan_CallReplayVf1` 0x1a7be0 answers (its overlay, +0x42c, the empty one) and the pop finish's frame
+const POP: u32 = ARENA + 0x2600;
+const EMPTY: u32 = ARENA + 0x26c0;
+const RENDERER: u32 = ARENA + 0x26f0;
+const RVT: u32 = ARENA + 0x2710;
+const SAVE_PAGE: u32 = ARENA + 0x2940;
+const POP_FRAME: u32 = ARENA + 0x2d80;
+/// The renderer's virtuals as the functions its vtable names: `REND_BASE + slot` (no function of the game is up here)
+const REND_BASE: u32 = 0xf000_0000;
 const FONT1: u32 = ARENA + 0x2f00;
 const FONT2: u32 = ARENA + 0x2f40;
 const SET: u32 = ARENA + 0x3000;
@@ -48,18 +60,22 @@ const PATH_SET: u32 = 0x337fb8;
 const EVENT_PATHS: u32 = ARENA + 0x4_0000;
 /// The game's ranges copied from the executable: the HUD's globals (bands, colour, tables), the view layouts
 /// (bss), the layouts' initialisers and the formats, the settings the constructor reads, the audio object the
-/// update's sounds are handed (the app plays none of them), the placings' rubber band tables
-const ELF_RANGES: [(u32, u32); 7] = [
+/// update's sounds are handed (the app plays none of them), the placings' rubber band tables; for the pop finish
+/// overlay its formats (to 0x38e410), the display mode (0x32ca50), its vtable and the players' finishing times
+const ELF_RANGES: [(u32, u32); 9] = [
     (0x337fe8, 0x200),
     (0x33ca40, 4 * 0x424),
-    (0x38d000, 0x1400),
-    (0x32ca10, 0x40),
+    (0x38d000, 0x1410),
+    (0x32ca10, 0x44),
+    (tricky_game::overlays::VT_POP_FINISH, 0xa0),
+    (tricky_game::raceoverlays::FINISH_TIMES, 8),
     (0x32db6c, 0x340),
     (0x343050, 4),
     (0x365060, 0x60),
 ];
 
 /// One thing the game drew
+#[derive(Clone)]
 enum Cmd {
     /// `turned`: `Sprite_SubmitQuad` 0x19bdf8, the texture a quarter turn anticlockwise (its right edge on top).
     /// The HUD never turns one (no layout entry's corner and no corner its code passes has 0x10), so it is shown as
@@ -89,6 +105,10 @@ pub struct GameHud {
     disc: String,
     quads: usize,
     texts: usize,
+    /// what the pop finish overlay drew on the last game tick (its Draw and DrawText run once a tick, as the
+    /// game's frame), and whether the player had finished (+0x418 set) the frame before
+    pop_cmds: Vec<Cmd>,
+    finished: bool,
 }
 
 fn elf_bytes(elf: &[u8], addr: u32, len: u32) -> Vec<u8> {
@@ -147,8 +167,9 @@ fn put_wide(m: &mut Mem, a: u32, s: &str) {
         m.w16(a + 2 * k as u32, c);
     }
 }
-/// The C library's integer formats the HUD uses (`%d`, `%2d`, `%02d`, `%s` taken as nothing), from its arguments
-fn format(fmt: &str, args: &[u32]) -> String {
+/// The C library's formats the HUD uses (`%d`, `%2d`, `%02d`, `%c`, `%s`: a wide string for the game's wide
+/// formatters (`wide`), else a byte string; one outside the memory taken as nothing), from its arguments
+fn format(m: &Mem, fmt: &str, args: &[u32], wide_s: bool) -> String {
     let (mut out, mut it, mut chars) = (String::new(), args.iter(), fmt.chars().peekable());
     while let Some(c) = chars.next() {
         if c != '%' {
@@ -169,6 +190,13 @@ fn format(fmt: &str, args: &[u32]) -> String {
         let zero = spec.starts_with('0');
         match kind {
             '%' => out.push('%'),
+            'c' => out.push(char::from_u32(*it.next().unwrap_or(&0) & 0xffff).unwrap_or('?')),
+            's' => {
+                let a = *it.next().unwrap_or(&0);
+                if m.regions.iter().any(|(b, v)| a >= *b && a < b + v.len() as u32) {
+                    out.push_str(&if wide_s { wide(m, a) } else { ascii(m, a) });
+                }
+            }
             'd' | 'i' | 'u' => {
                 let v = *it.next().unwrap_or(&0) as i32;
                 let n = if kind == 'u' { (v as u32).to_string() } else { v.to_string() };
@@ -199,6 +227,10 @@ struct Env<'a> {
     race_time: u32,
     finished: bool,
     progress: [f32; 4],
+}
+
+fn new_env<'a>(loc: Option<&'a tricky_data::loc::LocFile>, strings: &'a mut HashMap<u32, u32>, next_string: &'a mut u32, race_time: u32, finished: bool, progress: [f32; 4]) -> Env<'a> {
+    Env { loc, cmds: Vec::new(), layer: 0, sheet: 0, low: STACK_TOP - 0x1000, strings, next_string, race_time, finished, progress }
 }
 
 impl Env<'_> {
@@ -280,25 +312,25 @@ impl SpritesEnv for Env<'_> {
                 return (at, 0.0);
             }
             0x2fca28 => {
-                let s = format(&ascii(m, a(1)), &ints[2.min(ints.len())..]);
+                let s = format(m, &ascii(m, a(1)), &ints[2.min(ints.len())..], false);
                 put_ascii(m, a(0), &s);
             }
             // `vsprintf` / `WStr_VFormat` without the caller's variable arguments: none of the HUD's printed strings
             // holds a `%` (the two loc strings that do, 0x116 and 0xe29, are formatted by `WStr_Format` first)
             0x301ca0 => {
-                let s = format(&ascii(m, a(1)), &[]);
+                let s = format(m, &ascii(m, a(1)), &[], false);
                 put_ascii(m, a(0), &s);
             }
             0x2c48e8 => {
-                let s = format(&wide(m, a(1)), &[]);
+                let s = format(m, &wide(m, a(1)), &[], true);
                 put_wide(m, a(0), &s);
             }
             0x17ce38 => {
-                let s = format(&wide(m, a(1)), &ints[2.min(ints.len())..]);
+                let s = format(m, &wide(m, a(1)), &ints[2.min(ints.len())..], true);
                 put_wide(m, a(0), &s);
             }
             0x17ce70 => {
-                let s = format(&ascii(m, a(1)), &ints[2.min(ints.len())..]);
+                let s = format(m, &ascii(m, a(1)), &ints[2.min(ints.len())..], true);
                 put_wide(m, a(0), &s);
             }
             0x17ccf8 => {
@@ -400,6 +432,139 @@ impl HudEnv for StateEnv {
     fn draw_player(&mut self, _m: &mut Mem, _func: u32, _x: f32, _y: f32, _w: f32, _h: f32, _hud: u32, _i: u32) {}
 }
 
+/// The overlay manager's and the pop finish overlay's calls (`tricky_game::overlays`, `raceoverlays::pop_finish_*`),
+/// answered on the HUD's [`Env`]: the pop finish's virtuals (vtable 0x38ef98) to the ported functions, the renderer's
+/// to [`SpritesEnv::renderer`], the rest to the game's functions the port has or the HUD's own answers
+struct PopEnv<'e, 'a> {
+    e: &'e mut Env<'a>,
+    /// the player's race time in hundredths and its finish time (+0x418), for `Boarder_EstimateFinishTime` 0x11f2a0
+    time: i32,
+    finish: i32,
+}
+
+impl PopEnv<'_, '_> {
+    fn game(&mut self, m: &mut Mem, func: u32, args: &[u32], floats: &[f32]) -> u32 {
+        use tricky_game::raceoverlays as ro;
+        let a = |k: usize| args.get(k).copied().unwrap_or(0);
+        match func {
+            f if f >= REND_BASE => self.e.renderer(m, f - REND_BASE, args.get(1..).unwrap_or(&[]), floats),
+            // `OverlayMan_IsAnyActive`, and the replay save page `OverlayMan_CallReplayVf1` answers (its overlay
+            // never shown: the app has no replay save page)
+            ro::OVERLAY_HIDDEN => tricky_game::overlays::any_active(m, MAN) as u32,
+            ro::OVERLAY_GET => SAVE_PAGE,
+            // `Font_SetColorV` 0x14eee8 (the colour, the vector): `Vec4_Set` of the vector's four words
+            ro::SET_COLOUR => {
+                for k in 0..4 {
+                    let v = m.r32(a(1) + 4 * k);
+                    m.w32(a(0) + 4 * k, v);
+                }
+                0
+            }
+            // `Circuit_GetMedal` 0x16baa8, `Circuit_ClampMedalRank` 0x16bb58, `Career_GetEventMode` 0x1635b0 (the
+            // career's +0x2b0c, a half: the executable's, the app keeps no career there)
+            ro::TIME_MEDAL => tricky_game::courses::medal(a(0) as i32, a(1)),
+            ro::PLACE_MEDAL => tricky_game::circuit::clamp_medal_rank(a(0) as i32) as u32,
+            ro::CAREER_STATE => m.r16(a(0) + 0x2b0c) as u32,
+            // `Boarder_EstimateFinishTime` 0x11f2a0 for the player: the overlay asks only once it has finished (+0x418
+            // set), so the race's length and the rider's progress are not needed (0 here)
+            ro::RIDER_SCORE => {
+                let p = tricky_game::progress::Progress { finish: self.finish, time: self.time, ..Default::default() };
+                tricky_game::progress::estimate_finish_time(&p, 0.0, 0.0) as u32
+            }
+            // `Career_GetRecords` 0x163468 (the career, the kind, the course): the records' address (the overlay
+            // does not use it)
+            ro::CAREER_BEST => match a(1) {
+                0 => a(0).wrapping_add(a(2).wrapping_mul(0x150)).wrapping_add(0x16c4),
+                1 => a(0).wrapping_add(a(2).wrapping_mul(0x150)).wrapping_add(0x1734),
+                2 => a(0).wrapping_add(a(2).wrapping_mul(0x150)).wrapping_add(0x17a4),
+                _ => 0,
+            },
+            // `SpeechSys_ClearEvent` 0x228d10 (the pop finish's +0x8c, on hiding): the app's announcer keeps its own
+            ro::SND_STOP_ONE => 0,
+            // `HUDItem_Show` 0x1a7db8 / `Overlay_HideForPlayer` 0x1a7e70 (`HUD_ShowItem` / `HUD_HideItem`'s)
+            0x1a7db8 => {
+                tricky_game::overlays::show_for_player(m, self, a(0), a(1) as i32);
+                0
+            }
+            0x1a7e70 => {
+                tricky_game::overlays::hide_for_player(m, self, a(0), a(1) as i32);
+                0
+            }
+            _ => SpritesEnv::call(&mut *self.e, m, func, args, floats).0,
+        }
+    }
+}
+
+impl tricky_game::textbox::TextBoxEnv for PopEnv<'_, '_> {
+    fn call(&mut self, m: &mut Mem, func: u32, args: &[u32], fargs: &[tricky_game::ps2f::F]) -> u32 {
+        let floats: Vec<f32> = fargs.iter().map(|f| f.0).collect();
+        self.game(m, func, args, &floats)
+    }
+}
+
+impl tricky_game::overlays::OverlayManEnv for PopEnv<'_, '_> {
+    fn virtual_call(&mut self, m: &mut Mem, func: u32, this: u32, args: &[u32], floats: &[f32]) -> u32 {
+        use tricky_game::raceoverlays as ro;
+        let a = |k: usize| args.get(k).copied().unwrap_or(0);
+        match func {
+            0x1ae7a8 => ro::pop_finish_reset(m, this, a(0)),
+            0x1ae7e0 => ro::pop_finish_vf16(m, self),
+            0x1ae7f0 => ro::pop_finish_update(m, self, this),
+            0x1aeb88 => ro::pop_finish_draw(m, self, this, POP_FRAME),
+            0x1aed50 => ro::pop_finish_draw_text(m, self, this, POP_FRAME),
+            // `cPopFinishOverlay` vf17 0x1be6d8: it hides itself
+            0x1be6d8 => return 1,
+            _ => {
+                let mut all = vec![this];
+                all.extend_from_slice(args);
+                return self.game(m, func, &all, floats);
+            }
+        }
+        0
+    }
+    fn call(&mut self, m: &mut Mem, func: u32, args: &[u32]) -> u32 {
+        self.game(m, func, args, &[])
+    }
+    fn alloc(&mut self, _m: &mut Mem, _name: u32, _size: u32) -> u32 {
+        0
+    }
+    fn device(&mut self, _pad: u32) -> u32 {
+        0
+    }
+    fn is_player_pad(&mut self, _pad: u32) -> bool {
+        false
+    }
+    fn device_pressed(&mut self, _pad: u32) -> bool {
+        false
+    }
+}
+
+impl SpritesEnv for PopEnv<'_, '_> {
+    fn call(&mut self, m: &mut Mem, func: u32, ints: &[u32], floats: &[f32]) -> (u32, f32) {
+        (self.game(m, func, ints, floats), 0.0)
+    }
+    fn renderer(&mut self, m: &mut Mem, slot: u32, ints: &[u32], floats: &[f32]) -> u32 {
+        self.e.renderer(m, slot, ints, floats)
+    }
+}
+
+/// The pop finish overlay as `OverlayMan_Init` 0x1a6fb8 builds it for a race (a screen overlay, not active and not
+/// drawn with the HUD, its vtable), in the manager's +0x2c; the manager's other slots the empty overlay.
+/// STANDIN: the overlay's 0xa4 bytes cleared, for `EAMem_Alloc`'s fresh block
+fn build_pop(m: &mut Mem) {
+    for k in 0..0xa4 {
+        m.w8(POP + k, 0);
+    }
+    for i in 0..tricky_game::overlays::OVERLAYS {
+        m.w32(MAN + 0x10 + 4 * i, EMPTY);
+    }
+    tricky_game::overlays::screen_overlay_init(m, POP);
+    m.w32(POP + 0x14, 0);
+    m.w32(MAN + 0x2c, POP);
+    m.w32(POP + 0x10, 0);
+    m.w32(POP + 0x28, tricky_game::overlays::VT_POP_FINISH);
+}
+
 /// The race's event paths as `AIP_LoadEventPaths` 0x1983d0 / `AIPath_Load` 0x196f28 lay them out, from the course's
 /// `.aip`: the count and records (0x3c bytes: +0 the events' count, +4 the events, +8 the points' count, +0xc the
 /// start, +0x1c / +0x28 the box, +0x38 parameter 0, the distance to the finish at the start), each event 16 bytes
@@ -456,7 +621,15 @@ fn build(elf: &[u8], rects: &[(u32, [f32; 7])], title: &[u8], menu: &[u8]) -> Me
     m.w32(APP + 0x60, FONT2);
     // the HUD's sprite set (`SpriteSet_InitHudGameRects` 0x1f4440 fills it), which `ScreenOverlay_Init` hands on
     m.w32(APP + 0x728, SET);
-    m.w32(APP + 0x724, 0);
+    // the renderer, its virtuals by slot ([`PopEnv`] hands them to the drawing's); the replay save page's overlay the
+    // empty one; the pop finish overlay
+    m.w32(APP + 0x724, RENDERER);
+    m.w32(RENDERER + 0x10, RVT);
+    for k in 0..0x46 {
+        m.w32(RVT + 4 + 8 * k, REND_BASE + 4 + 8 * k);
+    }
+    m.w32(SAVE_PAGE + 0x42c, EMPTY);
+    build_pop(&mut m);
     m.w32(APP + 0x730, RACE);
     m.w32(RACE + 0x1c, WORLD);
     m.w32(RACE + 0x38, MAN);
@@ -598,7 +771,7 @@ pub fn game_hud(
         laps[k] = m.line.laps_left;
     }
     let riding = *mode == Mode::Ride && game.screen == ui::Screen::Playing;
-    let GameHud { mem, loc, sheets, tick, mode: built, disc, quads: nq, texts: nt, .. } = &mut *hud;
+    let GameHud { mem, loc, sheets, tick, mode: built, disc, quads: nq, texts: nt, pop_cmds, finished: was_finished, .. } = &mut *hud;
     let Some(m) = mem.as_mut() else { return };
     // the game mode for the app's event (its menu's "World Circuit - Race" / "- Show-off" / "Free Ride":
     // `courses::Mode` CircuitRace 4, CircuitShowoff 5, Freeride 7) and the course's number from the game's course
@@ -645,7 +818,7 @@ pub fn game_hud(
     m.w32(rd + 0x418, finish[0]);
     m.w32(rd + 0x41c, 1);
     m.w32(rd + 0x5820 + 0x88, r.letters as u32);
-    m.w32(rd + 0x5910, r.multiplier);
+    m.w32(rd + 0x5910, r.score);
     for (k, t) in r.sc.timed.iter().enumerate() {
         let e = rd + 0x597c + 20 * k as u32;
         m.w32(e, t.kind);
@@ -698,6 +871,27 @@ pub fn game_hud(
         let left = ui::showoff(&ui::track_key(&list)).1 + race.bonus - race.time;
         m.w32(WORLD + 0x14, left.max(0.0).to_bits());
     }
+    let race_time = (race.time * 100.0) as u32;
+    // `Boarder_Finish` 0x11da40: the first time the player's finish time (+0x418) is set, the pop finish overlay shown
+    // for its player (`HUD_ShowItem` 0x1a7848, item 7, the rider's +0x38) when that is a player (not below 0), the
+    // race's +0x34 is clear and it has no lesson (+0x40) or the lesson's +0x20 is 0 or above 9. A new race (no
+    // finish time again) builds the race's overlays again (`OverlayMan_Init` 0x1a6fb8's pop finish)
+    let done = finish[0] != u32::MAX;
+    if done && !*was_finished {
+        let player = m.r32(RIDERS + 0x38) as i32;
+        let lesson = m.r32(RACE + 0x40);
+        let step = if lesson == 0 { 0 } else { m.r32(lesson + 0x20) as i32 };
+        if player > -1 && m.r32(RACE + 0x34) == 0 && (lesson == 0 || step == 0 || 9 < step) {
+            let mut e = new_env(loc.as_ref(), strings, next_string, race_time, !racing, progress);
+            let mut pop = PopEnv { e: &mut e, time: race_time as i32, finish: finish[0] as i32 };
+            let man = m.r32(RACE + 0x38);
+            hudsprites::show_item(m, &mut pop, man, 7, player as u32, true);
+        }
+    }
+    if !done && *was_finished {
+        build_pop(m);
+    }
+    *was_finished = done;
     let mut state = StateEnv { units: r.sc.units, mult: r.sc.mult, ten: false, progress };
     *tick += time.delta_secs();
     let mut n = 0;
@@ -708,6 +902,15 @@ pub fn game_hud(
         m.w32(WORLD + 0x18, tick);
         tricky_game::placing::update(m, &mut state, WORLD, STACK_TOP - 0x800);
         hudstate::update(m, &mut state, HUD);
+        // the overlay manager's update (`cOverlayMan` vf1 0x1a7ad0) and drawing (vf2 0x1a78c0) on its pop finish:
+        // its Draw and DrawText once a tick, as the game's frame, what they drew kept for the frames between
+        let mut e = new_env(loc.as_ref(), strings, next_string, race_time, !racing, progress);
+        {
+            let mut pop = PopEnv { e: &mut e, time: race_time as i32, finish: finish[0] as i32 };
+            tricky_game::overlays::man_update(m, &mut pop, MAN);
+            tricky_game::overlays::man_draw(m, &mut pop, MAN);
+        }
+        *pop_cmds = e.cmds;
         n += 1;
     }
     if *tick >= 1.0 / 60.0 {
@@ -717,23 +920,15 @@ pub fn game_hud(
     if state.ten {
         rider.0.speech.push(tricky_game::rider::RiderSpeech::TenSecondsLeft);
     }
-    let mut env = Env {
-        loc: loc.as_ref(),
-        cmds: Vec::new(),
-        layer: 0,
-        sheet: 0,
-        low: STACK_TOP - 0x1000,
-        strings,
-        next_string,
-        race_time: (race.time * 100.0) as u32,
-        finished: !racing,
-        progress,
-    };
+    let mut env = new_env(loc.as_ref(), strings, next_string, race_time, !racing, progress);
     if riding {
         hudsprites::draw_player_sprites(m, &mut env, 0.0, 0.0, 640.0, HUD, 0, STACK_TOP - 0x200);
         hudtext::draw_player_text(m, &mut env, 0.0, 0.0, 640.0, 480.0, HUD, 0, STACK_TOP - 0x400);
     }
-    let cmds = std::mem::take(&mut env.cmds);
+    let mut cmds = std::mem::take(&mut env.cmds);
+    if riding {
+        cmds.extend(pop_cmds.iter().cloned());
+    }
     // TRICKY_HUDDBG: what the game drew, once a second
     if std::env::var("TRICKY_HUDDBG").is_ok() && (time.elapsed_secs() * 1.0).fract() < time.delta_secs() {
         for c in &cmds {
