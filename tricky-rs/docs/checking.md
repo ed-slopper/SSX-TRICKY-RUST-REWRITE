@@ -1609,3 +1609,17 @@ Results under `fadd=g1` (the guess or not: the same):
 
 Left: rec19 2295 r4, a take-off from the bump state (2), nearest rider 53 m, velocity exact, position 7.3 cm off
 (row F4h5i).
+
+## F4h5i: rec19 2295 r4 is a wall's second push (2026-11-17)
+
+rec19 2295 r4 (F4h5d's last take-off): a take-off from the bump state, velocity exact, position 7.29 cm off. The tick
+before, 2294, is a ground tick the ground test misses too (TRICKY_DBG2 now prints the positions and velocities of
+the ticks it misses): cruise (3) → bump (2), the velocity turned by 935 cm/s, the position 8.76 cm off. Both
+position gaps (game − ours) point the same way, to four places: (0.7631, 0.2147, 0.6096) at 2294 and (0.7631,
+0.2149, 0.6095) at 2295. Inferred: `Boarder_WallCollide` 0x126250 (`walls::wall_collide`): at 2294 the rider's body
+reached a wall, pushed out by 1.1·t along its normal, the velocity into it reflected (the bounce, the impact's
+stumble: state 2); at 2295 the body still reached it and was pushed out again along the same normal, but the rider
+was moving away (the game's velocity · n = +49 cm/s), so no bounce and the velocity untouched, and the take-off
+went on (a wall hit would have stopped it, F4h5c). The tests answer the wall with nothing (no course collision), so
+both ticks stay off. Row F4h5j: the walls in the replay tests (the course's collision from the disc; the recordings
+do not say which course).

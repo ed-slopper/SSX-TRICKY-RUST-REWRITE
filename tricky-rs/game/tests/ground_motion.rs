@@ -2239,6 +2239,8 @@ fn ground_ticks_against_the_running_game() {
                     let bad: Vec<&str> = written.iter().filter(|&&f| g[f] != p.want[f]).map(|&f| names[f]).collect();
                     let a = &w[0].riders[i];
                     eprintln!("DBG2 tick {} rider {i}: state {:x}->{:x} ours {:x} clip {:x}->{:x} bad {bad:?}", w[1].tick, u32_le(a, 0x428), u32_le(b, 0x428), g[22][0], u32_le(&w[0].extra[ka].1[i], 8), u32_le(&w[1].extra[ka].1[i], 8));
+                    let v = |x: &[u32]| (0..3).map(|c| f32::from_bits(x[c])).collect::<Vec<_>>();
+                    eprintln!("    pos ours {:?} game {:?}; vel ours {:?} game {:?}", v(&g[0]), v(&p.want[0]), v(&g[1]), v(&p.want[1]));
                 }
                 if k == runners.len() && was_pushed {
                     let hit = (0..n).any(|j| u32_le(b, 0x48 + 0x20 * j) == w[1].tick);
