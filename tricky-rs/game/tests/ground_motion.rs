@@ -2479,6 +2479,21 @@ fn speed_limit_at(a: &[u8], b: &[u8], boost: f32, sub: fn(f32, f32) -> f32) -> f
     if target < decayed { decayed } else { target }
 }
 
+/// A rider's eased input at `at` (the brake +0x1fc, the crouch +0x208, the steer +0x214) as `cBoarder::vf7` 0x117198
+/// eases it before the motion (the brake at 0x117288, the crouch at 0x1172d8, the steer at 0x11732c): toward its
+/// target (`at` + 8) by its rate (`at` + 4) / 60, the target once within that step, under `add` (PCSX2's adder,
+/// [`pcsx2_add`], gives the recorded values).
+fn eased(a: &[u8], at: usize, add: Add) -> f32 {
+    let (now, step, target) = (f32_at(a, at), f32_at(a, at + 4) * f32::from_bits(0x3c88_8889), f32_at(a, at + 8));
+    if add(target, step) < now {
+        add(now, -step)
+    } else if now < add(target, -step) {
+        add(now, step)
+    } else {
+        target
+    }
+}
+
 /// Over the limit the velocity is scaled down to it (0x117968..0x117ab0: the length on VU0, `div.s`, `vmulx`).
 fn speed_limit(vel: V4, limit: f32) -> V4 {
     use r5900::ps2float as pf;
@@ -2876,6 +2891,12 @@ fn takeoff_ticks_against_the_running_game() {
             let mut rider = rider_of(a, st, ma, na);
             let after = rider_of(b, st, mb, nb);
             (rider.brake, rider.crouch, rider.steer, rider.p.x244, rider.d1, rider.d2) = (after.brake, after.crouch, after.steer, after.p.x244, after.d1, after.d2);
+            // from the bump state (2) the take-off's `Boarder_SetState`(0xd) runs `BumpControl_Exit` 0x104388 after the
+            // motion, which zeroes the brake and the crouch (+0x1fc..+0x210): the motion's are the first sample's eased
+            // as `cBoarder::vf7` eases them (F4h5c)
+            if rider.state == 2 {
+                (rider.brake, rider.crouch) = (eased(a, 0x1fc, pcsx2_add), eased(a, 0x208, pcsx2_add));
+            }
             let kind = u32_le(b, 0x2e0);
             let hit = (kind != 3).then(|| Hit { kind, point: vec4(b, 0x2d0), normal: vec4(b, 0x2a0), surface: u32_le(b, 0x290) });
             let crouch0 = f32_at(a, 0x1c8);

@@ -1517,3 +1517,44 @@ The 5 ticks lost are rec14 5066 r4, 6922/6925 r5 and rec16 6915-6927 r5 (row F4b
 others, and the hit needs the tumbler's velocity, which only the body window holds. rec18 is the recording that
 checks tumbles; rec14..rec17 are kept for everything else. Re-recording them with the tumble window, and rec16 8288
 r2 (the down ray's ground) and the landing's clamp (the pivot bone), need PCSX2 (row F4b3x5).
+
+## F4h5c: the take-offs from the bump state ran on the eased crouch (2026-11-17)
+
+F4h4 left take-off ticks whose ground step's velocity was off by 0.002 to 1.2 cm/s with the position exact (rec16
+11535 r2, 6167 r1, 6335 r4, 7807 r2, 12509 r1; rec15 10316 r4), and blamed the walls and objects inside
+`GroundMotion_Update` 0x10a0d8 that the test answers with nothing. **Proven not the walls or objects** for these
+ticks: on a take-off in the motion `Boarder_InstanceCollisions` 0x125088 is not reached (`env.take_off` returns
+first), and `Boarder_WallCollide` 0x126250 either finds nothing, moves the position (pushed out by 1.1·t·n, the wall
+moving away) or returns a hit, and a hit stops the take-off (`!wall &&`). An exact position with a take-off leaves
+only the first.
+
+**The cause, proven:** the test gave the motion the second sample's brake, crouch and steer (+0x1fc, +0x208,
++0x214). `cBoarder::vf7` 0x117198 eases each toward its target (+8) by its rate (+4) / 60 before the motion (the
+brake at 0x117288, the crouch at 0x1172d8, the steer at 0x11732c), and the control sets the targets after it, so on a
+ground tick the second sample holds what the motion saw. On a take-off from the bump state (2), `Boarder_TakeOff`
+0x128470's `Boarder_SetState`(0xd) runs `BumpControl_Exit` 0x104388 after the motion, which zeroes +0x1fc..+0x210:
+the second sample's crouch is 0, the motion's was the first sample's eased (rec16 7807 r2: 0.2687, not 0). The test
+now eases the first sample's brake and crouch for take-offs from state 2 (`eased`; under PCSX2's adder,
+`pcsx2_add`, the eased values equal the recorded ones bit for bit, under IEEE adds 1 ulp off).
+
+Take-off ticks whole under `fadd=g1` (the ground ticks unchanged):
+
+| recording | before | now |
+|---|---|---|
+| rec11 | 56 of 62 | 56 |
+| rec12 | 99 of 116 | 101 |
+| rec13 | 119 of 142 | 119 |
+| rec14 | 132 | 137 |
+| rec15 | 109 of 110 | 110 (all) |
+| rec16 | 227 of 235 | 233 |
+| rec17 | 319 | 326 |
+| rec18 | 192 | 197 |
+
+rec16's prediction inputs 37 of 38 (34), landings on the flight 196 of 197 (193). Left on rec16: 7800 r3 (pushed,
+the jump control, F4h5's riders) and **12509 r1** (row F4h5h): a take-off in the cruise state (3) after which the
+game's board points the other way (forward, steer and yaw turned round; position and velocity now exact once the
+steer is the eased one, the second sample's is its negative): something after the motion turns the rider round.
+
+Not used: easing on every tick. On ground ticks the second sample's inputs are right more often: the early samples
+of rec11 and rec13 (read while the frame ran, F4h5f) lose 2 and 1 take-offs and the ground ticks lose 1 to 27 fields
+with the eased values everywhere.
