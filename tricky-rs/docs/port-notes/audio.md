@@ -1708,4 +1708,9 @@ In the app (`src/boardsound.rs`): each loop's voice is heard as the monitor's po
 (`BankInstance_UpdatePositional` 0x20b700 with `bankmon::doppler_pitch` and `instance_distance_volume`): culled beyond
 40 m, the volume falling off as the square to none at 40 m, the Doppler pitch on the voice's pitch. Stand-ins: the
 listener is the app's camera in the game's view axes as we read them (x right, y down, z ahead: inferred, not
-proven), the pan is off; the motion word still comes from the app's rider state (row E1b2g7d5j2).
+proven), the pan is off; the motion word still comes from the app's rider state (row E1b2g7d5j3).
+
+Since E1b2g7d5j2 every race rider's loops run (`Audio_InitRiderSounds` 0x210a38's order: the player's rider, then
+the opponents): an AI rider (+0x41c not 1) gets only the AI glide loop (sound surface·8 + 6, no listener so view
+0, fall-off and cull 50, `Sfx_UpdateAiGlideLoop`), heard from the camera at its own position. The snow programs'
+records are the audio system's (one per table and surface), so all riders' runs share them, as in the game.

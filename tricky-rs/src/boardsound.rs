@@ -80,12 +80,12 @@ fn motion(r: &Rider) -> u32 {
 /// loop's bank instance is updated by the callback its queue entry carries (`sndqueue::update_loop`), its volume
 /// (+0x64) and bend heard on the loop's sample, through the bank monitor's fall-off from the listener
 /// (`BankInstance_UpdatePositional` 0x20b700). A surface change restarts a loop with the new surface's sample.
-// STANDIN: the player's rider only; the opponents' AI glide loops are row E1b2g7d5j
 #[derive(Resource, Default)]
 pub struct RiderLoops {
     /// the audio system's queue the starts push on (`cSndPlayOpts::cSndPlayOpts` 0x226848's header)
     q: Option<Queue>,
-    rider: LoopRider,
+    /// the race's riders as `Race_GetRider` lists them: the player's first, then the opponents
+    riders: Vec<LoopRider>,
     /// the playing loops
     voices: Vec<Voice>,
     /// the snow program records' words (cBXAudio + table + surface · 0x50), kept between runs
@@ -97,6 +97,8 @@ pub struct RiderLoops {
 
 /// A playing loop: its bank instance (the address the handle) and what the monitor keeps of it.
 struct Voice {
+    /// the rider it belongs to (the instance's +0x80), an index in `riders`
+    owner: usize,
     inst: LoopInstance,
     /// the update its entry carried (+0x44)
     update: u32,
@@ -112,8 +114,8 @@ struct Voice {
     playing: bool,
 }
 
-/// The player's rider's address as the loops carry it (the instance's owner, +0x80).
-// STANDIN: a token, the app's rider has no address
+/// The riders' addresses as the loops carry them (the instance's owner, +0x80): this, then 0x10000 apart.
+// STANDIN: tokens, the app's riders have no addresses
 const RIDER: u32 = 0x0100_0000;
 
 /// What the loops' starts and updates ask of the audio system and the rider.
@@ -195,7 +197,7 @@ impl RiderLoops {
     /// `BankMonitor_AddInstance` 0x20bd68: the fall-off and cull distances from the entry, the distance known at
     /// once since the entry has a position, `d`).
     // STANDIN: the sound driver, for the bank's exported loop sample (tools/bnk/bnk2wav.py), silent until updated
-    fn take_played(&mut self, played: Vec<(u32, (f32, f32))>, d: F, bs: &BoardSounds, commands: &mut Commands) {
+    fn take_played(&mut self, played: Vec<(u32, (f32, f32))>, owner: usize, d: F, bs: &BoardSounds, commands: &mut Commands) {
         let q = self.q.as_mut().expect("the queue");
         for (h, (cull, far)) in played.into_iter().rev() {
             let i = q.count.max(0) as usize;
@@ -210,7 +212,7 @@ impl RiderLoops {
                 if std::env::var("TRICKY_BOARDLOG").is_ok() {
                     println!("board loop {name}: handle {h}, update {update:#x}");
                 }
-                self.voices.push(Voice { inst: LoopInstance { addr: h, volume: 0 }, update, name, e, bend: 0x40, far, cull, last: d, playing: true });
+                self.voices.push(Voice { owner, inst: LoopInstance { addr: h, volume: 0 }, update, name, e, bend: 0x40, far, cull, last: d, playing: true });
             }
         }
     }
@@ -221,77 +223,111 @@ impl RiderLoops {
         self.q = None;
     }
 
-    /// One frame of the loops: started for a new ride, else each updated, and their voices set. `ear` is the
-    /// listener (the camera), `dt` the monitor's step.
+    /// One frame of the loops: started for a new ride, else each updated, and their voices set. `riders` are the
+    /// race's riders, the player's first; `ear` is the listener (the camera), `dt` the monitor's step.
     #[allow(clippy::too_many_arguments)]
     fn frame(
-        &mut self, ride: Option<usize>, r: &Rider, ear: Option<&GlobalTransform>, dt: f32, bs: &BoardSounds, fx: f32, pm: &mut crate::pathmusic::PathMusic,
-        commands: &mut Commands, sinks: &mut Query<&mut AudioSink, With<RiderLoop>>,
+        &mut self, ride: Option<usize>, riders: &[&Rider], ear: Option<&GlobalTransform>, dt: f32, bs: &BoardSounds, fx: f32,
+        pm: &mut crate::pathmusic::PathMusic, commands: &mut Commands, sinks: &mut Query<&mut AudioSink, With<RiderLoop>>,
     ) {
-        if ride != self.ride {
+        // a new ride, or a field of another size (a new heat), starts them again
+        if ride != self.ride || (self.q.is_some() && riders.len() != self.riders.len()) {
             self.stop(commands);
             self.ride = ride;
         }
         if self.ride.is_none() {
             return;
         }
-        // the rider's motion; a change mutes or unmutes the loops as the motions' enter and exit routines do
-        let (old, new) = (self.rider.motion, motion(r));
-        self.rider.motion = new;
-        for muted in tricky_game::states::motion_change_sfx_mutes(old, new) {
-            tricky_game::control::set_sfx_muted(&mut self.rider.w5ae4, &mut self.rider.w5af0, muted);
-        }
-        // the rider's emitter (+0x140) where the listener hears it (`cBXAudio::ListenerLocate` 0x20e730)
-        // STANDIN: the app's camera for the race's listener matrix (race +0xc0 + 0x80 per view), in the game's
-        // view axes as we read them (x right, y down, z ahead, cm: inferred), and the pan off (career +0x1668, which
-        // the app's host could not pan by anyway)
-        let d = match ear {
-            Some(cam) => {
-                let v = cam.affine().inverse().transform_point3(r.pos) * 100.0;
-                let id = [[1.0, 0.0, 0.0, 0.0], [0.0, 1.0, 0.0, 0.0], [0.0, 0.0, 1.0, 0.0], [0.0, 0.0, 0.0, 1.0]];
-                let l = tricky_game::sfxcalc::listener_locate(Some(id), [v.x, -v.y, -v.z], false);
-                F(l.map_or(1.0, |l| l.d2)).sqrt()
-            }
-            None => F(1.0),
-        };
         let start = self.q.is_none();
         if start {
             self.q = Some(Queue { header: sndqueue::play_opts_header(), ..Queue::with_capacity(8) });
-            self.rider = LoopRider { addr: RIDER, flag_41c: 1, motion: self.rider.motion, w5ae4: self.rider.w5ae4, w5af0: self.rider.w5af0, ..Default::default() };
+            // `Audio_InitRiderSounds` 0x210a38: every rider of the race, its motion read below
+            self.riders = riders
+                .iter()
+                .enumerate()
+                .map(|(k, _)| LoopRider { addr: RIDER + 0x1_0000 * k as u32, flag_41c: (k == 0) as u32, ..Default::default() })
+                .collect();
         }
-        let q = self.q.as_mut().expect("the queue");
-        let mut env = LoopEnv {
-            bs, words: &mut self.words, inp: board_in(r), motion: self.rider.motion, surface: r.surface as u32, rail: r.rail_word,
-            handle: &mut self.handle, played: Vec::new(), pending: (0.0, 0.0), reset: Vec::new(), bends: Vec::new(), cancel_break: false,
-        };
+        // each rider's motion; a change mutes or unmutes its loops as the motions' enter and exit routines do
+        for (lr, r) in self.riders.iter_mut().zip(riders) {
+            let (old, new) = (lr.motion, motion(r));
+            lr.motion = new;
+            if !start {
+                for muted in tricky_game::states::motion_change_sfx_mutes(old, new) {
+                    tricky_game::control::set_sfx_muted(&mut lr.w5ae4, &mut lr.w5af0, muted);
+                }
+            }
+        }
+        // each rider's emitter (+0x140) where the listener hears it (`cBXAudio::ListenerLocate` 0x20e730)
+        // STANDIN: the app's camera for the race's listener matrix (race +0xc0 + 0x80 per view), in the game's
+        // view axes as we read them (x right, y down, z ahead, cm: inferred), and the pan off (career +0x1668, which
+        // the app's host could not pan by anyway); one view, so every rider's listener is it
+        let dist: Vec<F> = riders
+            .iter()
+            .map(|r| match ear {
+                Some(cam) => {
+                    let v = cam.affine().inverse().transform_point3(r.pos) * 100.0;
+                    let id = [[1.0, 0.0, 0.0, 0.0], [0.0, 1.0, 0.0, 0.0], [0.0, 0.0, 1.0, 0.0], [0.0, 0.0, 0.0, 1.0]];
+                    let l = tricky_game::sfxcalc::listener_locate(Some(id), [v.x, -v.y, -v.z], false);
+                    F(l.map_or(1.0, |l| l.d2)).sqrt()
+                }
+                None => F(1.0),
+            })
+            .collect();
+        let env_for = |r: &Rider, lr: &LoopRider| (board_in(r), lr.motion, r.surface as u32, r.rail_word);
+        let mut cancel = false;
         if start {
-            sndqueue::start_rider_loops(q, &mut self.rider, &mut env);
+            for k in 0..riders.len() {
+                let (inp, motion, surface, rail) = env_for(riders[k], &self.riders[k]);
+                let q = self.q.as_mut().expect("the queue");
+                let mut env = LoopEnv {
+                    bs, words: &mut self.words, inp, motion, surface, rail, handle: &mut self.handle, played: Vec::new(), pending: (0.0, 0.0),
+                    reset: Vec::new(), bends: Vec::new(), cancel_break: false,
+                };
+                sndqueue::start_rider_loops(q, &mut self.riders[k], &mut env);
+                let played = env.played;
+                self.take_played(played, k, dist[k], bs, commands);
+            }
         } else {
-            for v in self.voices.iter_mut() {
-                sndqueue::update_loop(v.update, q, &mut v.inst, &mut self.rider, &mut env);
+            // the monitor's instances in order, each by its own update; one an update starts is updated from the next
+            // frame (it takes the slot the reset freed)
+            let ids: Vec<u32> = self.voices.iter().map(|v| v.inst.addr).collect();
+            for h in ids {
+                let Some(k) = self.voices.iter().position(|v| v.inst.addr == h) else { continue };
+                let owner = self.voices[k].owner;
+                let (inp, motion, surface, rail) = env_for(riders[owner], &self.riders[owner]);
+                let q = self.q.as_mut().expect("the queue");
+                let mut env = LoopEnv {
+                    bs, words: &mut self.words, inp, motion, surface, rail, handle: &mut self.handle, played: Vec::new(), pending: (0.0, 0.0),
+                    reset: Vec::new(), bends: Vec::new(), cancel_break: false,
+                };
+                let v = &mut self.voices[k];
+                sndqueue::update_loop(v.update, q, &mut v.inst, &mut self.riders[owner], &mut env);
+                let LoopEnv { played, reset, bends, cancel_break, .. } = env;
+                cancel |= cancel_break;
+                for (h, bend) in bends {
+                    if let Some(v) = self.voices.iter_mut().find(|v| v.inst.addr == h) {
+                        v.bend = bend;
+                    }
+                }
+                self.voices.retain(|v| {
+                    let keep = !reset.contains(&v.inst.addr);
+                    if !keep {
+                        commands.entity(v.e).try_despawn();
+                    }
+                    keep
+                });
+                self.take_played(played, owner, dist[owner], bs, commands);
             }
         }
-        let LoopEnv { played, reset, bends, cancel_break, .. } = env;
-        for (h, bend) in bends {
-            if let Some(v) = self.voices.iter_mut().find(|v| v.inst.addr == h) {
-                v.bend = bend;
-            }
-        }
-        self.voices.retain(|v| {
-            let keep = !reset.contains(&v.inst.addr);
-            if !keep {
-                commands.entity(v.e).try_despawn();
-            }
-            keep
-        });
-        self.take_played(played, d, bs, commands);
-        if cancel_break {
+        if cancel {
             pm.cancel_break();
         }
         for v in self.voices.iter_mut() {
             // the monitor's positional update (`BankInstance_UpdatePositional` 0x20b700, positions and Doppler on):
             // culled beyond the cull distance and started again within it, the Doppler pitch of the distance
             // closed, the volume falling off to none at the fall-off distance (30 when 0)
+            let d = dist[v.owner];
             if v.cull.ee() != 0.0 {
                 v.playing = if v.playing { d.ee() <= v.cull.ee() } else { d.ee() < v.cull.ee() };
             }
@@ -313,7 +349,7 @@ impl RiderLoops {
                 sink.set_speed((bs.pitch(&v.name, v.bend as f32) * p).clamp(0.25, 4.0));
             }
             if std::env::var("TRICKY_BOARDLOG").is_ok() && v.inst.volume != 0 {
-                println!("board loop {}: volume {} heard {vol} at {} m, bend {} motion {}", v.name, v.inst.volume, d.ee(), v.bend, self.rider.motion);
+                println!("board loop {}: volume {} heard {vol} at {} m, bend {} motion {}", v.name, v.inst.volume, d.ee(), v.bend, self.riders[v.owner].motion);
             }
         }
     }
@@ -394,7 +430,7 @@ pub fn board_sound(
     time: Res<Time>, rider: Res<RiderRes>, game: Res<ui::Game>, mode: Res<Mode>, sounds: Res<crate::sound::Sounds>, bs: Res<BoardSounds>,
     list: Res<crate::LevelList>, mut rl: ResMut<RiderLoops>, mut pm: ResMut<crate::pathmusic::PathMusic>,
     mut commands: Commands, mut loops: Query<(Entity, &BoardLoop, &mut AudioSink), Without<RiderLoop>>, mut sinks: Query<&mut AudioSink, With<RiderLoop>>, mut last: Local<Last>,
-    cam: Query<&GlobalTransform, With<Camera3d>>,
+    cam: Query<&GlobalTransform, With<Camera3d>>, opponents: Res<crate::Opponents>,
 ) {
     if !bs.on { return; }
     let r: &Rider = &rider.0;
@@ -409,7 +445,8 @@ pub fn board_sound(
     };
     // the rider's loops, the game's
     let ride = (*mode == Mode::Ride && game.screen != ui::Screen::Menu).then_some(list.current);
-    rl.frame(ride, r, cam.single().ok(), dt, &bs, fx, &mut pm, &mut commands, &mut sinks);
+    let riders: Vec<&Rider> = std::iter::once(r).chain(opponents.0.iter().map(|o| &o.rider)).collect();
+    rl.frame(ride, &riders, cam.single().ok(), dt, &bs, fx, &mut pm, &mut commands, &mut sinks);
     // the game values, in cm/s
     let fwd = r.forward();
     let load = r.vel.dot(fwd).abs() * 100.0;
