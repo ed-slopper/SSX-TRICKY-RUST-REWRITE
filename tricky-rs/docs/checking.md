@@ -1623,3 +1623,30 @@ was moving away (the game's velocity · n = +49 cm/s), so no bounce and the velo
 went on (a wall hit would have stopped it, F4h5c). The tests answer the wall with nothing (no course collision), so
 both ticks stay off. Row F4h5j: the walls in the replay tests (the course's collision from the disc; the recordings
 do not say which course).
+
+## F4h5j: the course's walls in the replay tests, ours (2026-11-17)
+
+With TRICKY_DISC (the player's disc) and TRICKY_COURSE (the course's models file, `mesa` for
+`data/models/mesa.big`), the ground and take-off tests answer `Boarder_WallCollide` 0x126250 for **ours** with
+`walls::wall_collide` on the course's collision (`CourseGround`), the body the first sample holds (rider+0x470, mask
++0x494 as the motion sets it), the frame's up (+0x4ac0, `frame_of`) for `Boarder_WallImpactCheck` 0x126540, and
+`Boarder_Stumble` 0x124dd0 as `Boarder_SetState`(2) from the cruise or prewind (`ground_tick::set_state`). The game's
+way in the runner still answers no wall (row F4h5k). The course the recording was made on is not recorded yet
+(rec19: course id 0x32de88 = 3, mesablanca, read from the running game).
+
+Proven: the motion casts the body as `cPostAI::vf1` posed it at the end of the last frame (not moved by the
+motion's step): rec19 2294 r4 casts at depth 7.960 (pushed 1.1 × 7.960 = 8.756 cm, the gap was 8.755), 2295 r4 at
+6.627 (7.29, the gap 7.290), both along (0.76311, 0.21481, 0.60953). The stumble at 2294 (clip 0x248, state 3 → 2)
+is the impact check's: the frame's up · n under 363.7/833.3 (with the board's up instead, 0.698: no stumble).
+
+rec19, ours (the runner's ways unchanged):
+
+| | no walls | the course's walls | without instance 1444 |
+|---|---|---|---|
+| ground ticks, pos right | 55,997 of 56,114 | 55,993 | 56,013 |
+| take-off ticks, pos right | 215 of 216 | 215 | 216 (all) |
+
+2294 r4 and 2295 r4 come out right in ours (position and state; ours is not bit exact elsewhere: fwd, quat).
+Instance 1444 of mesa (a surface facing down, normal (−0.0016, −0.358, −0.934), 56–62 cm deep in rider 4's body at
+rec19 6721–6790) is hit by our cast and not by the game's: it has no event script, is not driven, and the show-off
+flag does not change it (row F4h5l). TRICKY_WALL_SKIP=1444 leaves it out; TRICKY_WALLDBG lists the hits.

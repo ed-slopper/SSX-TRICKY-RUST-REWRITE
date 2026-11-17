@@ -106,6 +106,94 @@ struct E {
     /// also change the state as `Boarder_SetState` 0x11f608 does (`ground_tick::set_state`: the exit and enter
     /// routines; F4h5h), not only log it
     states: bool,
+    /// the course's walls (F4h5j): `Boarder_WallCollide` 0x126250 (`walls::wall_collide`) answered from them, else
+    /// `wall`
+    walls: Option<Walls>,
+}
+
+/// The course's collision (TRICKY_DISC, TRICKY_COURSE: the course's file name, `mesa` for `data/models/mesa.big`)
+/// and the rider's body as the first sample holds it (F4h5j).
+#[derive(Clone)]
+struct Walls {
+    course: std::sync::Arc<tricky_game::course_ground::CourseGround>,
+    body: CollBody,
+    /// the frame's up (+0x4ac0, [`frame_of`]), which `Boarder_WallImpactCheck` 0x126540 measures the knock against
+    up: V4,
+}
+
+/// The course the recording was made on, from the player's disc: TRICKY_DISC (the image) and TRICKY_COURSE (its
+/// models file's name); none without them (the walls then answer nothing).
+fn course() -> Option<std::sync::Arc<tricky_game::course_ground::CourseGround>> {
+    let (disc, name) = (std::env::var("TRICKY_DISC").ok()?, std::env::var("TRICKY_COURSE").ok()?);
+    let mut files = tricky_data::big::Files::new(tricky_data::disc::Disc::open(&disc).ok()?);
+    files.mount(&format!("data/models/{name}.big")).ok()?;
+    let mut get = |ext: &str| files.load(&format!("|data/models/{name}.{ext}")).ok().flatten();
+    let (pbd, ltg, ssf) = (get("pbd")?, get("ltg")?, get("ssf")?);
+    Some(std::sync::Arc::new(tricky_game::course_ground::CourseGround::new(&pbd, &ltg, &ssf)?))
+}
+
+/// The walls for a rider whose first sample is `a` (recordings with the bodies only).
+fn walls_of(course: &Option<std::sync::Arc<tricky_game::course_ground::CourseGround>>, a: &[u8], st: &[u8]) -> Option<Walls> {
+    let course = course.clone().filter(|_| 0x700 <= a.len())?;
+    Some(Walls { course, body: body_of(a), up: frame_of(a, st)[2] })
+}
+
+/// What `Boarder_WallCollide` 0x126250 calls (`walls::WallEnv`), on the ground motion's rider. The body is the
+/// one `cPostAI::vf1` posed at the end of the last frame (the first sample's): the motion moves only the position
+/// (proven by the cast: rec19 2294 and 2295 r4, the depths the recorded pushes over 1.1).
+struct WallTest<'a> {
+    g: &'a mut Rider,
+    course: &'a tricky_game::course_ground::CourseGround,
+    body: CollBody,
+}
+impl tricky_game::walls::WallEnv for WallTest<'_> {
+    /// `World_RayCast` 0x25aff8 with `cWorldBoarder`(rider+0x470, 1), its ground normal set
+    fn cast_walls(&mut self, r: &tricky_game::walls::WallRider) -> (f32, tricky_game::walls::CastRecord) {
+        let mut q = tricky_game::worldboarder::WorldBoarder::new(&self.body, 1);
+        q.reject = Some(r.ground);
+        // TRICKY_WALL_SKIP: instances left out (comma-separated; mesa 1444: hit by ours, not by the game, row F4h5l)
+        let skip: Vec<u32> = std::env::var("TRICKY_WALL_SKIP").unwrap_or_default().split(",").filter_map(|x| x.parse().ok()).collect();
+        let (t, h) = self.course.ray_cast(&mut q, false, None, &|i| skip.contains(&i));
+        // TRICKY_WALLDBG lists the hits
+        if 0.0 < t && std::env::var("TRICKY_WALLDBG").is_ok() { eprintln!("WALLDBG t {t} at {:?} n {:?} object {:?} body centre {:?} r {}", h.map(|h| h.pos), h.map(|h| h.normal), h.and_then(|h| h.object), self.body.center, self.body.radius); }
+        (t, h.map_or(Default::default(), |h| tricky_game::walls::CastRecord { pos: h.pos, normal: h.normal, object: h.object.map_or(0, |o| o as u32 + 1) }))
+    }
+    fn query_objects(&mut self, _: &tricky_game::walls::WallRider) -> (f32, tricky_game::walls::CastRecord, tricky_game::walls::Touched) {
+        unreachable!("not called by Boarder_WallCollide")
+    }
+    /// +0x2e4 and +0x2f0, which the test does not compare
+    fn accumulate_impact(&mut self, _: &mut tricky_game::walls::WallRider, _: V4) {}
+    /// `Boarder_Translate` 0x1267a0: the body moves with the push
+    fn translate(&mut self, _: &mut tricky_game::walls::WallRider, by: V4) {
+        self.body.translate(by);
+    }
+    /// `Boarder_TurnFromWall` 0x1257a0 (`orient::turn_from_wall`)
+    fn turn_from_wall(&mut self, _: &mut tricky_game::walls::WallRider, n: V4) {
+        let g = &mut *self.g;
+        let mut o = Orient { q: g.quat, fwd: g.p.fwd, side: g.board_side, up: g.board_up, yaw: g.yaw };
+        tricky_game::orient::turn_from_wall(&mut o, n);
+        (g.quat, g.p.fwd, g.board_side, g.board_up, g.yaw) = (o.q, o.fwd, o.side, o.up, o.yaw);
+    }
+    /// not replayed (a wall wipe-out ends the ground motion's frame as a crash; none in the recordings so far)
+    fn wipeout(&mut self, _: &mut tricky_game::walls::WallRider, _: &tricky_game::walls::Contact) {}
+    fn score_crash(&mut self, _: &mut tricky_game::walls::WallRider) -> f32 {
+        0.0
+    }
+    fn add_meter(&mut self, _: &mut tricky_game::walls::WallRider, _: f32) {}
+    /// `Boarder_Stumble` 0x124dd0: from the cruise (3) or the prewind (0xe), `Boarder_SetState`(2) (its clip, speech
+    /// and the bump control's random +0x618 are not compared)
+    fn stumble(&mut self, _: &mut tricky_game::walls::WallRider, _: V4, _: u32) {
+        if matches!(self.g.state, 3 | 0xe) {
+            tricky_game::rider::ground_tick::set_state(self.g, 2);
+        }
+    }
+    fn speed_stat(&mut self, _: &tricky_game::walls::WallRider) -> f32 {
+        unreachable!("not called by Boarder_WallCollide")
+    }
+    fn knock(&mut self, _: &mut tricky_game::walls::WallRider, _: f32) {}
+    fn contact(&mut self, _: u32, _: &mut tricky_game::walls::WallRider, _: &tricky_game::walls::Contact, _: &tricky_game::walls::CastRecord) {}
+    fn sfx_object(&mut self, _: &tricky_game::walls::WallRider, _: u32) {}
+    fn sfx_wall(&mut self, _: &tricky_game::walls::WallRider) {}
 }
 impl Env for E {
     fn set_state(&mut self, r: &mut Rider, state: u32) {
@@ -116,6 +204,15 @@ impl Env for E {
     }
     fn wall_collide(&mut self, r: &mut Rider) -> bool {
         self.log.push(Ev::Wall(r.mask));
+        if let Some(w) = &self.walls {
+            let course = w.course.clone();
+            let mut body = w.body;
+            body.x24 = r.mask as i32;
+            let mut wr = tricky_game::walls::WallRider { pos: r.p.pos, vel: r.vel, ground: r.p.normal, knocks: 0.0, mode: 2, state: r.state, up: w.up };
+            let hit = tricky_game::walls::wall_collide(&mut wr, &mut WallTest { g: &mut *r, course: &course, body });
+            (r.p.pos, r.vel) = (wr.pos, wr.vel);
+            return hit;
+        }
         self.wall
     }
     fn ray_cast(&mut self, _: &mut Rider, from: V4, to: V4) -> Option<Hit> {
@@ -618,7 +715,7 @@ fn compare(w: &mut W, case: &Case, ours: &Rider) -> Result<Seen, String> {
     let their_log = w.log.borrow().clone();
 
     let mut mine = *ours;
-    let mut env = E { log: Vec::new(), hit: case.hit, wall: case.wall, meter: case.meter, states: false };
+    let mut env = E { log: Vec::new(), hit: case.hit, wall: case.wall, meter: case.meter, states: false, walls: None };
     update(&mut mine, &SURFACE_TABLE, &mut env);
 
     if their_log != env.log {
@@ -1442,7 +1539,7 @@ fn other_of(t0: &recording::Tick, t1: &recording::Tick, i: usize, st: &[u8], add
 fn tick_ours(x: &Other, pos: V4, vel: V4, boost: f32, a: &[u8], b: &[u8], table: &[u8]) -> Rider {
     let mut r = x.rider;
     (r.p.pos, r.vel, r.boost_level) = (pos, vel, boost);
-    update(&mut r, &SURFACE_TABLE, &mut E { log: Vec::new(), hit: x.hit, wall: false, meter: 0.0, states: false });
+    update(&mut r, &SURFACE_TABLE, &mut E { log: Vec::new(), hit: x.hit, wall: false, meter: 0.0, states: false, walls: None });
     r.vel = speed_limit(r.vel, speed_limit_at(a, b, boost, |x, y| x - y));
     if let Some(c) = &x.ctl {
         control_ours(&mut r, c, table);
@@ -1495,7 +1592,7 @@ impl Lift {
     fn ours(&self, pos: V4, vel: V4, a: &[u8], b: &[u8]) -> Rider {
         let mut mine = self.rider;
         (mine.p.pos, mine.vel) = (pos, vel);
-        let mut e = E { log: Vec::new(), hit: self.hit, wall: false, meter: 0.0, states: false };
+        let mut e = E { log: Vec::new(), hit: self.hit, wall: false, meter: 0.0, states: false, walls: None };
         update(&mut mine, &SURFACE_TABLE, &mut e);
         let mut t = TakeOffRider { state: mine.state, crouch: self.crouch0, x208: mine.crouch };
         let mut env = OurTakeOff { r: &mut mine, motion: 2, jump_stat: self.jump_stat, off: Off::default(), steep: false };
@@ -1623,7 +1720,8 @@ fn w0_len(ticks: &[recording::Tick]) -> usize {
 /// earlier riders' pushes and hits left it, its collisions with `ridercol::rider_collisions` and `hit::rider_hit`
 /// (`Frame`; board rows F4b3g, F4b3h); with the riders' tick counts (window `5900:4`), frames not sampled at a frame's
 /// end are left out. TRICKY_DBG lists the bump records and the hit ticks' velocities the replay misses.
-/// Not in the recording, so not given: the walls (`Boarder_WallCollide` 0x126250 answers no wall) and the instances
+/// Not in the recording, so not given: the walls (`Boarder_WallCollide` 0x126250 answers no wall; ours casts at the
+/// course with TRICKY_DISC and TRICKY_COURSE, F4h5j) and the instances
 /// (`Boarder_InstanceCollisions` 0x125088 does nothing). The ground motion object is the state manager
 /// *(rider+0x5ae0) + 0x4b0, rider − 0x400 for most riders (window `-400:10`; the test checks its +0xc is the rider),
 /// rider − 0x3d0 for the one whose manager is at rider − 0x880 (window `-3d0:10`, when recorded), the clip window
@@ -1636,6 +1734,7 @@ fn ground_ticks_against_the_running_game() {
         .collect();
     let path = paths.split(';').next().unwrap();
     let (n, ticks) = load(path);
+    let course = course();
     let twins = Twins::of_recording(path, &ticks);
     let addrs = rider_addrs(path);
     let (Some(km), Some(ka)) = (ticks[0].extra.iter().position(|(o, _)| *o == -0x400), ticks[0].extra.iter().position(|(o, _)| *o == 0x46c0)) else {
@@ -1894,7 +1993,7 @@ fn ground_ticks_against_the_running_game() {
                     rider.boost_level = boost;
                     let r = if k == 0 {
                         let mut mine = rider;
-                        update(&mut mine, &SURFACE_TABLE, &mut E { log: Vec::new(), hit: p.hit, wall: false, meter: 0.0, states: false });
+                        update(&mut mine, &SURFACE_TABLE, &mut E { log: Vec::new(), hit: p.hit, wall: false, meter: 0.0, states: false, walls: walls_of(&course, a, &stats[me]) });
                         mine.vel = speed_limit(mine.vel, speed_limit_at(a, b, boost, |x, y| x - y));
                         if let Some(c) = &p.ctl {
                             control_ours(&mut mine, c, &table);
@@ -2235,7 +2334,7 @@ fn ground_ticks_against_the_running_game() {
                 whole[k] += all as usize;
                 ctl_right += (k == runners.len() && all && p.ctl.is_some()) as usize;
                 pushed_whole[k] += (all && was_pushed) as usize;
-                if k == runners.len() && !all && std::env::var("TRICKY_DBG2").is_ok() {
+                if (k == runners.len() || k == 0 && std::env::var("TRICKY_DBG2").is_ok_and(|v| v == "ours")) && !all && std::env::var("TRICKY_DBG2").is_ok() {
                     let bad: Vec<&str> = written.iter().filter(|&&f| g[f] != p.want[f]).map(|&f| names[f]).collect();
                     let a = &w[0].riders[i];
                     eprintln!("DBG2 tick {} rider {i}: state {:x}->{:x} ours {:x} clip {:x}->{:x} bad {bad:?}", w[1].tick, u32_le(a, 0x428), u32_le(b, 0x428), g[22][0], u32_le(&w[0].extra[ka].1[i], 8), u32_le(&w[1].extra[ka].1[i], 8));
@@ -2814,6 +2913,7 @@ fn takeoff_ticks_against_the_running_game() {
     let path = paths.split(';').next().unwrap();
     let (n, ticks) = load(path);
     let twins = Twins::of_recording(path, &ticks);
+    let course = course();
     let win = |o: i64| ticks[0].extra.iter().position(|(x, _)| *x == o);
     let (Some(km), Some(ka), Some(kp)) = (win(-0x400), win(0x46c0), win(0x57b0)) else {
         eprintln!("{path}: no -400, 46c0 and 57b0 windows: skipping");
@@ -2952,7 +3052,7 @@ fn takeoff_ticks_against_the_running_game() {
             // round (F4h5h; found by a run of ours)
             let mut dry = rider;
             (dry.p.pos, dry.vel) = starts[0];
-            let mut e = E { log: Vec::new(), hit, wall: false, meter: 0.0, states: false };
+            let mut e = E { log: Vec::new(), hit, wall: false, meter: 0.0, states: false, walls: walls_of(&course, a, st) };
             update(&mut dry, &SURFACE_TABLE, &mut e);
             if e.log.contains(&Ev::State(4)) {
                 (rider.steer, rider.p.x244) = (-rider.steer, -rider.p.x244);
@@ -2961,7 +3061,7 @@ fn takeoff_ticks_against_the_running_game() {
             // ours
             let mut mine = rider;
             (mine.p.pos, mine.vel) = starts[0];
-            let mut e = E { log: Vec::new(), hit, wall: false, meter: 0.0, states: true };
+            let mut e = E { log: Vec::new(), hit, wall: false, meter: 0.0, states: true, walls: walls_of(&course, a, st) };
             update(&mut mine, &SURFACE_TABLE, &mut e);
             let up_by_motion = e.log.contains(&Ev::TakeOff);
             let mut t = TakeOffRider { state: mine.state, crouch: crouch0, x208: mine.crouch };
