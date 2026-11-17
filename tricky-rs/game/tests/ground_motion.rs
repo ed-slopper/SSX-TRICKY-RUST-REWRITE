@@ -122,14 +122,26 @@ struct Walls {
 }
 
 /// The course the recording was made on, from the player's disc: TRICKY_DISC (the image) and TRICKY_COURSE (its
-/// models file's name); none without them (the walls then answer nothing).
-fn course() -> Option<std::sync::Arc<tricky_game::course_ground::CourseGround>> {
-    let (disc, name) = (std::env::var("TRICKY_DISC").ok()?, std::env::var("TRICKY_COURSE").ok()?);
+/// models file's name) or the recording's `course N`; none without them (the walls then answer nothing).
+fn course(path: &str) -> Option<std::sync::Arc<tricky_game::course_ground::CourseGround>> {
+    let disc = std::env::var("TRICKY_DISC").ok()?;
+    let name = match std::env::var("TRICKY_COURSE") {
+        Ok(name) => name,
+        Err(_) => course_name(recording::course(path)?)?.to_string(),
+    };
     let mut files = tricky_data::big::Files::new(tricky_data::disc::Disc::open(&disc).ok()?);
     files.mount(&format!("data/models/{name}.big")).ok()?;
     let mut get = |ext: &str| files.load(&format!("|data/models/{name}.{ext}")).ok().flatten();
     let (pbd, ltg, ssf) = (get("pbd")?, get("ltg")?, get("ssf")?);
     Some(std::sync::Arc::new(tricky_game::course_ground::CourseGround::new(&pbd, &ltg, &ssf)?))
+}
+
+/// The models file of course id `id` (0x32de88; the recorder writes it in the header, `course N`). Inferred: the
+/// models files' names in the order of `Camera_GetCourseCmlName` 0x178330's courses (0 garibald, 1 snowdrea, 2
+/// elysium, 3 mesablan: mesa proven by rec19's walls, 4 merqury, 5 aloha, 6 pipedrea, 7 untracke, 8 tokyo, 10 trick,
+/// 11 alaska); 9 (pipedrea again for the cameras) left out.
+fn course_name(id: u32) -> Option<&'static str> {
+    ["gari", "snow", "elysium", "mesa", "merquer", "aloha", "pipe", "untrack", "megaple", "", "trick", "alaska"].get(id as usize).copied().filter(|n| !n.is_empty())
 }
 
 /// The walls for a rider whose first sample is `a` (recordings with the bodies only).
@@ -1734,7 +1746,7 @@ fn ground_ticks_against_the_running_game() {
         .collect();
     let path = paths.split(';').next().unwrap();
     let (n, ticks) = load(path);
-    let course = course();
+    let course = course(path);
     let twins = Twins::of_recording(path, &ticks);
     let addrs = rider_addrs(path);
     let (Some(km), Some(ka)) = (ticks[0].extra.iter().position(|(o, _)| *o == -0x400), ticks[0].extra.iter().position(|(o, _)| *o == 0x46c0)) else {
@@ -2913,7 +2925,7 @@ fn takeoff_ticks_against_the_running_game() {
     let path = paths.split(';').next().unwrap();
     let (n, ticks) = load(path);
     let twins = Twins::of_recording(path, &ticks);
-    let course = course();
+    let course = course(path);
     let win = |o: i64| ticks[0].extra.iter().position(|(x, _)| *x == o);
     let (Some(km), Some(ka), Some(kp)) = (win(-0x400), win(0x46c0), win(0x57b0)) else {
         eprintln!("{path}: no -400, 46c0 and 57b0 windows: skipping");

@@ -68,6 +68,15 @@ pub fn posed(path: &str) -> bool {
     head.split_whitespace().collect::<Vec<_>>().windows(2).any(|w| w == ["posed", "1"])
 }
 
+/// The course id the header names (`course N`, recordings since F4h5k)
+pub fn course(path: &str) -> Option<u32> {
+    use std::io::BufRead;
+    let mut head = String::new();
+    std::io::BufReader::new(std::fs::File::open(path).ok()?).read_line(&mut head).ok()?;
+    let w: Vec<&str> = head.split_whitespace().collect();
+    w.windows(2).find(|w| w[0] == "course").and_then(|w| w[1].parse().ok())
+}
+
 /// The riders' addresses, from the header (`race X riders a b c ... bytes N`)
 pub fn rider_addrs(path: &str) -> Vec<u32> {
     let text = std::fs::read_to_string(path).unwrap_or_else(|e| panic!("{path}: {e}"));

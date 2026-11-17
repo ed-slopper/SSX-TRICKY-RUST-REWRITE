@@ -142,6 +142,8 @@ class Pine:
 # +0x88 and the race tick at +0x18 (60 a second).
 STATS_TABLE, STATS_STRIDE = 0x32DB70, 0x84
 RACE_TICK, RACE_COUNT, RACE_RIDERS = 0x18, 0x88, 0xC4
+# the course id (0 garibald ... 3 mesablanca ...: `Camera_GetCourseCmlName` 0x178330's order; F4h5k)
+COURSE_ID = 0x32DE88
 RIDER_POS, RIDER_VEL, RIDER_TIMESCALE, RIDER_PLACE, RIDER_STATS = 0x140, 0x150, 0x12C, 0x110, 0x464
 RIDER_TICKS = 0x5900  # rider+0x5820 (score) +0xe0: the speed-sample count, +1.0 a tick
 # The pad: Sony's pad library writes each controller's data into a double buffer (two records 0x80 apart):
@@ -319,7 +321,8 @@ def main(argv):
             f.write(f"race {race:x} riders {' '.join(f'{r:x}' for r in riders)} bytes {size:x} pad {pad or 0:x}"
                     + "".join(f" extra {o} {n:x}" for o, _, n in extra)
                     + "".join(f" extra {w.split(':')[0]} {n:x}" for w, _, n in lists)
-                    + (" posed 1" if size >= 0x700 else "") + "\n")
+                    + (" posed 1" if size >= 0x700 else "")
+                    + f" course {p.read32(COURSE_ID)}" + "\n")
             while time.time() - t0 < seconds:
                 tick = p.read32(race + RACE_TICK)
                 if tick == last:
