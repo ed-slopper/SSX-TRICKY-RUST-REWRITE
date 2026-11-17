@@ -378,6 +378,11 @@ impl Runner {
         self.stubs.insert(addr, Box::new(stub));
     }
 
+    /// Take the stub at `addr` away (calls to it then run the original if allowed).
+    pub fn unstub(&mut self, addr: u32) {
+        self.stubs.remove(&addr);
+    }
+
     /// Let calls to `addr` run the original.
     pub fn allow(&mut self, addr: u32) {
         self.allowed.insert(addr);

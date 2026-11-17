@@ -1558,3 +1558,26 @@ steer is the eased one, the second sample's is its negative): something after th
 Not used: easing on every tick. On ground ticks the second sample's inputs are right more often: the early samples
 of rec11 and rec13 (read while the frame ran, F4h5f) lose 2 and 1 take-offs and the ground ticks lose 1 to 27 fields
 with the eased values everywhere.
+
+## F4h5h: the revert inside the motion turns the rider round (2026-11-17)
+
+rec16 12509 r1 (row F4h5h, from F4h5c): a take-off in the cruise state (3) after which the game's board pointed the
+other way. Not the take-off: `CruiseControl_Exit` 0x1033c0, `NaturalAirControl_Enter` 0x1000b8 and the air
+control's update (`NaturalAirControl_Update` 0x1000e0) turn nothing. It is the ground motion itself (proven, by
+running it): the rider was riding backward (velocity along the board below −111.1 cm/s, 0xc2de38e3, no brake, state
+3, 5 or 0xc), so the motion calls `Boarder_SetState`(4) after the lean and before the acceleration, and
+`ChangeFakieControl_Enter` 0x103eb8 toggles switch (+0x1b4), turns the board half round about its up
+(`Boarder_RotateAboutAxis`(π)), negates the steer +0x214 and +0x244. Then the take-off sets state 0xd. The test
+stubbed `Boarder_SetState`, so neither way turned.
+
+The port already did it in the game (`GroundEnv::set_state`); the test now does too:
+
+- ours: `E { states: true }` runs `ground_tick::set_state` (the same routines `GroundEnv` runs, now a free
+  function), the runner runs the game's `Boarder_SetState` 0x11f608 → 0x11c7d8 → the enter switch 0x11c8e8 with
+  `ChangeFakieControl_Enter` and `NaturalAirControl_Enter` (the exit switch 0x11c840 stubbed and logged; the
+  handler's objects +0x650 and +0x70c point at the rider). `r5900::Runner::unstub` added for this.
+- the second sample's steer and +0x244 are the negated ones, so when a dry run of our motion reverts, the test turns
+  them back before replaying.
+
+rec16 take-off ticks whole under `fadd=g1`: 233 → 234 of 235 (12509 r1 now whole). Every other count on rec10-18
+unchanged (both tests). Left: rec16 7800 r3 (pushed, the jump control; F4h5's riders).

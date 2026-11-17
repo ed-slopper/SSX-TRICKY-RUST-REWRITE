@@ -1163,47 +1163,52 @@ impl GroundEnv<'_> {
     }
 }
 
+/// `Boarder_SetState` 0x11f608 on a game-side rider through `states::set_state` (row G18a): the old control state's
+/// exit routine and the new one's enter routine (`states::run_routine`) on the game-side rider's fields (the revert,
+/// state 4, is `ChangeFakieControl_Enter`: the board turned half round about its own up, switch toggled, steer and
+/// lean negated). What the routines call (the boost, clips, the animation's layers) and the fields the game-side
+/// rider does not keep are left out (no animation controller here).
+pub fn set_state(g: &mut gm::Rider, state: u32) {
+    use crate::states::{self as st, Change};
+    let mut cur = g.state;
+    for change in st::set_state(&mut cur, state) {
+        let (addr, a1) = match change {
+            Change::Exit(f) => (f.addr, state),
+            Change::Enter(f, old) => (f.addr, old),
+            Change::ClearResetTimer => continue,
+        };
+        let mut sr = st::StateRider {
+            vel: g.vel,
+            orient: Orient { q: g.quat, fwd: g.p.fwd, side: g.board_side, up: g.board_up, yaw: g.yaw },
+            stance: g.switch,
+            x1fc: [g.brake, 0.0, 0.0, g.crouch, 0.0, 0.0],
+            steer: g.steer,
+            lean: g.p.x244,
+            class: g.class,
+            state: cur,
+            stats40: g.stats.stance,
+            ..Default::default()
+        };
+        let mut obj = st::StateObj::default();
+        st::run_routine(addr, &mut sr, &mut obj, a1);
+        g.quat = sr.orient.q;
+        g.p.fwd = sr.orient.fwd;
+        g.board_side = sr.orient.side;
+        g.board_up = sr.orient.up;
+        g.yaw = sr.orient.yaw;
+        g.switch = sr.stance;
+        g.brake = sr.x1fc[0];
+        g.crouch = sr.x1fc[3];
+        g.steer = sr.steer;
+        g.p.x244 = sr.lean;
+    }
+    g.state = cur;
+}
+
 impl gm::Env for GroundEnv<'_> {
-    /// `Boarder_SetState` 0x11f608 through `states::set_state` (row G18a): the old control state's exit routine and
-    /// the new one's enter routine (`states::run_routine`) on the game-side rider's fields (the revert, state 4, is
-    /// `ChangeFakieControl_Enter`: the board turned half round about its own up, switch toggled, steer and lean
-    /// negated). What the routines call (the boost, clips, the animation's layers) and the fields the game-side
-    /// rider does not keep are left out (no animation controller here).
+    /// `Boarder_SetState` 0x11f608 through [`set_state`] (row G18a).
     fn set_state(&mut self, g: &mut gm::Rider, state: u32) {
-        use crate::states::{self as st, Change};
-        let mut cur = g.state;
-        for change in st::set_state(&mut cur, state) {
-            let (addr, a1) = match change {
-                Change::Exit(f) => (f.addr, state),
-                Change::Enter(f, old) => (f.addr, old),
-                Change::ClearResetTimer => continue,
-            };
-            let mut sr = st::StateRider {
-                vel: g.vel,
-                orient: Orient { q: g.quat, fwd: g.p.fwd, side: g.board_side, up: g.board_up, yaw: g.yaw },
-                stance: g.switch,
-                x1fc: [g.brake, 0.0, 0.0, g.crouch, 0.0, 0.0],
-                steer: g.steer,
-                lean: g.p.x244,
-                class: g.class,
-                state: cur,
-                stats40: g.stats.stance,
-                ..Default::default()
-            };
-            let mut obj = st::StateObj::default();
-            st::run_routine(addr, &mut sr, &mut obj, a1);
-            g.quat = sr.orient.q;
-            g.p.fwd = sr.orient.fwd;
-            g.board_side = sr.orient.side;
-            g.board_up = sr.orient.up;
-            g.yaw = sr.orient.yaw;
-            g.switch = sr.stance;
-            g.brake = sr.x1fc[0];
-            g.crouch = sr.x1fc[3];
-            g.steer = sr.steer;
-            g.p.x244 = sr.lean;
-        }
-        g.state = cur;
+        set_state(g, state);
     }
 
     /// `Boarder_WallCollide` 0x126250 (`walls::wall_collide`) on the course's collision (row E7c3c), with the

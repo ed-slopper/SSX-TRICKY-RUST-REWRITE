@@ -103,10 +103,16 @@ struct E {
     hit: Option<Hit>,
     wall: bool,
     meter: f32,
+    /// also change the state as `Boarder_SetState` 0x11f608 does (`ground_tick::set_state`: the exit and enter
+    /// routines; F4h5h), not only log it
+    states: bool,
 }
 impl Env for E {
-    fn set_state(&mut self, _: &mut Rider, state: u32) {
+    fn set_state(&mut self, r: &mut Rider, state: u32) {
         self.log.push(Ev::State(state));
+        if self.states {
+            tricky_game::rider::ground_tick::set_state(r, state);
+        }
     }
     fn wall_collide(&mut self, r: &mut Rider) -> bool {
         self.log.push(Ev::Wall(r.mask));
@@ -612,7 +618,7 @@ fn compare(w: &mut W, case: &Case, ours: &Rider) -> Result<Seen, String> {
     let their_log = w.log.borrow().clone();
 
     let mut mine = *ours;
-    let mut env = E { log: Vec::new(), hit: case.hit, wall: case.wall, meter: case.meter };
+    let mut env = E { log: Vec::new(), hit: case.hit, wall: case.wall, meter: case.meter, states: false };
     update(&mut mine, &SURFACE_TABLE, &mut env);
 
     if their_log != env.log {
@@ -1426,7 +1432,7 @@ fn other_of(t0: &recording::Tick, t1: &recording::Tick, i: usize, st: &[u8], add
 fn tick_ours(x: &Other, pos: V4, vel: V4, boost: f32, a: &[u8], b: &[u8], table: &[u8]) -> Rider {
     let mut r = x.rider;
     (r.p.pos, r.vel, r.boost_level) = (pos, vel, boost);
-    update(&mut r, &SURFACE_TABLE, &mut E { log: Vec::new(), hit: x.hit, wall: false, meter: 0.0 });
+    update(&mut r, &SURFACE_TABLE, &mut E { log: Vec::new(), hit: x.hit, wall: false, meter: 0.0, states: false });
     r.vel = speed_limit(r.vel, speed_limit_at(a, b, boost, |x, y| x - y));
     if let Some(c) = &x.ctl {
         control_ours(&mut r, c, table);
@@ -1479,7 +1485,7 @@ impl Lift {
     fn ours(&self, pos: V4, vel: V4, a: &[u8], b: &[u8]) -> Rider {
         let mut mine = self.rider;
         (mine.p.pos, mine.vel) = (pos, vel);
-        let mut e = E { log: Vec::new(), hit: self.hit, wall: false, meter: 0.0 };
+        let mut e = E { log: Vec::new(), hit: self.hit, wall: false, meter: 0.0, states: false };
         update(&mut mine, &SURFACE_TABLE, &mut e);
         let mut t = TakeOffRider { state: mine.state, crouch: self.crouch0, x208: mine.crouch };
         let mut env = OurTakeOff { r: &mut mine, motion: 2, jump_stat: self.jump_stat, off: Off::default(), steep: false };
@@ -1878,7 +1884,7 @@ fn ground_ticks_against_the_running_game() {
                     rider.boost_level = boost;
                     let r = if k == 0 {
                         let mut mine = rider;
-                        update(&mut mine, &SURFACE_TABLE, &mut E { log: Vec::new(), hit: p.hit, wall: false, meter: 0.0 });
+                        update(&mut mine, &SURFACE_TABLE, &mut E { log: Vec::new(), hit: p.hit, wall: false, meter: 0.0, states: false });
                         mine.vel = speed_limit(mine.vel, speed_limit_at(a, b, boost, |x, y| x - y));
                         if let Some(c) = &p.ctl {
                             control_ours(&mut mine, c, &table);
@@ -2819,8 +2825,15 @@ fn takeoff_ticks_against_the_running_game() {
         });
         let o = off.clone();
         w.r.stub(0x126e30, move |_, _| o.borrow_mut().spin_rates += 1);
+        // `Boarder_SetState` 0x11f608 runs (F4h5h): the revert in the motion (`ChangeFakieControl_Enter` 0x103eb8 turns
+        // the board half round) and the take-off's air state (`NaturalAirControl_Enter` 0x1000b8); the exits are not
+        // run (they change only what the motion has used by then: brake, crouch, boost), each logs the state entered
+        w.r.unstub(0x11f608);
+        for f in [0x11f608, 0x11c7d8, 0x11c8e8, 0x103eb8, 0x1000b8] {
+            w.r.allow(f);
+        }
         let o = off.clone();
-        w.r.stub(0x11f608, move |cpu, _| o.borrow_mut().state.push(cpu.gpr(5) as u32));
+        w.r.stub(0x11c840, move |cpu, _| o.borrow_mut().state.push(cpu.gpr(5) as u32));
         w.r.stub(0x156618, |c, _| c.set_f(0, 0.0)); // Score_StartTrickChain
         w.r.stub(0x126948, |_, _| {}); // Boarder_SetSteerTarget (the jump control while still crouched)
         w.r.stub(0x118f10, |_, _| {}); // Boarder_RequestReset
@@ -2922,11 +2935,21 @@ fn takeoff_ticks_against_the_running_game() {
             }
             // the jump control fires on this tick: state 0xa and the crouch unwound to 0 before the motion
             let jumps = rider.state == 0xa && rider.crouch == 0.0;
+            // a revert in the motion (`Boarder_SetState`(4) while riding backward) enters `ChangeFakieControl_Enter`,
+            // which negates the steer and +0x244 the second sample holds: before it the motion had them the other way
+            // round (F4h5h; found by a run of ours)
+            let mut dry = rider;
+            (dry.p.pos, dry.vel) = starts[0];
+            let mut e = E { log: Vec::new(), hit, wall: false, meter: 0.0, states: false };
+            update(&mut dry, &SURFACE_TABLE, &mut e);
+            if e.log.contains(&Ev::State(4)) {
+                (rider.steer, rider.p.x244) = (-rider.steer, -rider.p.x244);
+            }
 
             // ours
             let mut mine = rider;
             (mine.p.pos, mine.vel) = starts[0];
-            let mut e = E { log: Vec::new(), hit, wall: false, meter: 0.0 };
+            let mut e = E { log: Vec::new(), hit, wall: false, meter: 0.0, states: true };
             update(&mut mine, &SURFACE_TABLE, &mut e);
             let up_by_motion = e.log.contains(&Ev::TakeOff);
             let mut t = TakeOffRider { state: mine.state, crouch: crouch0, x208: mine.crouch };
@@ -2959,6 +2982,10 @@ fn takeoff_ticks_against_the_running_game() {
                 let mut rider = rider;
                 (rider.p.pos, rider.vel) = starts[k + 1];
                 g.put(&rider);
+                // the control states' objects `Boarder_SetState` reaches: the change fakie's (+0x650, word 0) and the
+                // natural air's (+0x700, word 3) point at the rider
+                g.r.mem.write_u32(g.handler + 0x650, g.rd);
+                g.r.mem.write_u32(g.handler + 0x70c, g.rd);
                 g.r.mem.write_u32(g.rd + 0x424, 2);
                 g.r.mem.write_f32(g.rd + 0x1c8, crouch0);
                 g.r.mem.write_u32(g.rd + 0x1dc, u32_le(a, 0x1dc));
