@@ -303,3 +303,40 @@ fn app_places_follow_the_riders() {
         assert_eq!(places, vec![1, 3, 0, 2], "{c}");
     }
 }
+
+/// Row E1b2g7d6: in the show-offs (3, 5) the places follow the riders' points (+0x5910) and in knock-down practice
+/// (0) their knock-downs less their crashes (+0x58dc − +0x58e0), whatever their distance down the line
+/// (`Race::place_scores`).
+#[test]
+fn app_places_follow_the_scores() {
+    use glam::Vec3;
+    use tricky_game::race::{PlaceScore, Race};
+    let Some((c, bytes)) = courses().into_iter().next() else { return };
+    let aip = tricky_data::aip::read(&bytes).unwrap();
+    let lines = RaceLines::from_aip(&aip);
+    let main = &lines.lines[lines.main];
+    let len = main.length();
+    let at = |f: f32| {
+        let p = main.position_at(len * f).0;
+        Vec3::new(p[0] / 100.0, p[2] / 100.0, -p[1] / 100.0)
+    };
+    let along = [0.4f32, 0.1, 0.7, 0.25];
+    let ps = |p: u32, k: u32, c: u32| PlaceScore { points: p, knocked: k, crashes: c };
+    for (mode, scores, want) in [
+        (3u32, [ps(500, 0, 0), ps(9000, 0, 0), ps(0, 0, 0), ps(2500, 0, 0)], [2, 0, 3, 1]),
+        (5, [ps(10, 0, 0), ps(20, 0, 0), ps(40, 0, 0), ps(30, 0, 0)], [3, 2, 0, 1]),
+        (0, [ps(0, 1, 0), ps(0, 4, 4), ps(0, 0, 2), ps(0, 5, 0)], [1, 2, 3, 0]),
+    ] {
+        let mut race = Race::new((0..8).map(|k| at(k as f32 / 8.0)).collect());
+        race.race_lines = Some(lines.clone());
+        race.mode = mode;
+        race.place_scores = scores.to_vec();
+        let player = tricky_game::rider::Rider::new(at(along[0]), 0.0);
+        let others: Vec<(Vec3, Vec3)> = along[1..].iter().map(|&f| (at(f), Vec3::ZERO)).collect();
+        for _ in 0..60 * 4 {
+            race.update(&player, &others, 1.0 / 60.0);
+        }
+        let places: Vec<i32> = race.line_riders.iter().map(|r| r.place).collect();
+        assert_eq!(places, want.to_vec(), "{c} mode {mode}");
+    }
+}

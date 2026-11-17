@@ -417,9 +417,12 @@ folder without one is a STANDIN with the first line as main). The first tick is 
 - The places (+0x110) the hooks read are `Race::places` (row E1b2g7d2): the ported
   `Race_UpdatePlacingsAndRubberBand` 0x115100 (`placing::update`) on a copy of the game's bytes it reads, every 6th
   tick of `Race::line_frame`, after the riders' progress. Checked: `tests/raceline.rs` `app_places_follow_the_riders`
-  (four riders held along each course's main line). STANDIN: the riders' points and knock-down counts are 0 there
-  (the show-offs and knock-down practice keep their order), and the band's tables and difficulty are 0 (its writes
-  are not read back). The HUD runs the same function on its own memory (`src/gamehud.rs`).
+  (four riders held along each course's main line). The riders' score words are `Race::place_scores` (row
+  E1b2g7d6a), set by the app each frame from each rider's score object (rider+0x5820, `score::Score`): +0x5910 the
+  points (the score's +0xf0), +0x58dc the riders it knocked down (+0xbc), +0x58e0 its crashes of `Score_Crash`'s
+  second kind (+0xc0). Proven by the ported sort (`app_places_follow_the_scores`): the show-offs (modes 3, 5) place
+  the most points first, knock-down practice (0) the most knock-downs less crashes first, whatever the distance
+  down the line. STANDIN: the band's tables and difficulty are 0 (its writes are not read back). The HUD runs the same function on its own memory (`src/gamehud.rs`).
 - Seen in the self-test (TRICKY_SIM, Garibaldi): bit 10 can come on twice at the finish (on, off, on over three
   ticks), and with it music event 10 twice; that is the ported code's doing, not checked against the game.
 - The snowfall (`src/snow.rs`) eases the weather to 0 while the player's bit 0xe (0x4000) is on. The courses with

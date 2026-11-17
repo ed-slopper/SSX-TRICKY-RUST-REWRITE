@@ -385,6 +385,9 @@ pub struct Race { pub line: Vec<Vec3>,
     /// game mode (0x32de8c: `courses::Mode`, the app's event) and every rider on them as the game keeps it (row
     /// E1b2g7: the player first, then the opponents in the order the app gives them)
     pub race_lines: Option<crate::aipath::RaceLines>, pub course_no: u32, pub mode: u32, pub line_riders: Vec<LineRider>,
+    /// each rider's score words the placings read, set by the app every frame (rider `k` as [`Race::line_riders`]):
+    /// [`PlaceScore`]
+    pub place_scores: Vec<PlaceScore>,
     /// the race clock (gApp+0x730 → +0x1c → +0x14, seconds from GO; it runs on after the player's finish), the
     /// 60 Hz remainder, the race's tick count (+0x18)
     pub clock: f32, pub line_clock: f32, pub line_frame: i32,
@@ -397,7 +400,7 @@ pub struct Race { pub line: Vec<Vec3>,
 impl Race {
     /// The original's countdown: GO after 2.5 s (beeps at 0.5, 1.0, 1.5 and 2.0 s).
     /// A race entered: `Rand_SeedGame` seeds the game stream (`cAI::vf14_111108` 0x1112dc; STANDIN seed, see [`crate::rand::RACE_SEED`]).
-    pub fn new(line: Vec<Vec3>) -> Self { crate::rand::seed_game(crate::rand::RACE_SEED); Self { line, ai_paths: Vec::new(), idx: 0, time: 0.0, state: RaceState::Countdown, best: None, countdown: 2.5, course: AiCourse::default(), bonus: 0.0, paths: Default::default(), tube: None, cml: None, intro: false, scene: None, stage: None, finish_area: None, post: 0, post_scripts: Vec::new(), cast: None, race_lines: None, course_no: 0, mode: crate::courses::Mode::CircuitRace as u32, line_riders: Vec::new(), clock: 0.0, line_clock: 0.0, line_frame: 0, hooks: Vec::new(), music: Vec::new(), speech: Vec::new(), places_mem: Default::default() } }
+    pub fn new(line: Vec<Vec3>) -> Self { crate::rand::seed_game(crate::rand::RACE_SEED); Self { line, ai_paths: Vec::new(), idx: 0, time: 0.0, state: RaceState::Countdown, best: None, countdown: 2.5, course: AiCourse::default(), bonus: 0.0, paths: Default::default(), tube: None, cml: None, intro: false, scene: None, stage: None, finish_area: None, post: 0, post_scripts: Vec::new(), cast: None, race_lines: None, course_no: 0, mode: crate::courses::Mode::CircuitRace as u32, line_riders: Vec::new(), place_scores: Vec::new(), clock: 0.0, line_clock: 0.0, line_frame: 0, hooks: Vec::new(), music: Vec::new(), speech: Vec::new(), places_mem: Default::default() } }
     pub fn restart(&mut self) { crate::rand::seed_game(crate::rand::RACE_SEED); self.idx = 0; self.time = 0.0; self.state = RaceState::Countdown; self.countdown = 2.5; self.bonus = 0.0; self.post = 0; self.post_scripts.clear(); self.cast = None; self.line_riders.clear(); self.clock = 0.0; self.line_clock = 0.0; self.line_frame = 0; self.hooks.clear(); self.music.clear(); self.speech.clear(); }
     /// Metres of racing line still to go from a line point.
     pub fn remaining(&self, idx: usize) -> f32 { self.line.windows(2).skip(idx).map(|w| (w[1] - w[0]).length()).sum() }
@@ -548,6 +551,24 @@ pub enum SpeechCall {
     EventSound(Option<u32>),
 }
 
+/// A rider's score words `placing::update` reads, from its score object (rider+0x5820, [`crate::score::Score`]).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct PlaceScore {
+    /// +0x5910: the points (the score's +0xf0, `xf0`), the show-offs' order
+    pub points: u32,
+    /// +0x58dc: riders it knocked down (+0xbc, `xbc`)
+    pub knocked: u32,
+    /// +0x58e0: its crashes of `Score_Crash`'s second kind (+0xc0, `xc0`); knock-down practice orders by
+    /// +0x58dc − +0x58e0
+    pub crashes: u32,
+}
+
+impl PlaceScore {
+    pub fn of(s: &crate::score::Score) -> Self {
+        Self { points: s.xf0, knocked: s.xbc as u32, crashes: s.xc0 as u32 }
+    }
+}
+
 impl Race {
     /// The riders' race-line progress, each 60 Hz tick of the race (the game's state 4, after the countdown):
     /// `cBoarder::vf7` 0x117198 moves the event bits on (+0x388 to +0x384, cleared) and runs
@@ -603,10 +624,9 @@ impl Race {
     /// `Race_UpdatePlacingsAndRubberBand` 0x115100 ([`crate::placing::update`]) on the riders: every 6th tick (the
     /// race's +0x18) their places (+0x110). It runs on the game's bytes ([`placing_mem`]): the race (its tick, the
     /// riders, one player, the computer riders), the mode, the course, the main line's length, and of each rider its
-    /// place, finish (+0x418), human or not (+0x41c) and best (+0x378); `Boarder_GetRaceProgress` 0x1170d0 is
-    /// [`crate::progress::race_progress`]; `Sfx_OnPlacingChange` 0x219a48 goes to [`Race::speech`]. STANDIN: the
-    /// riders' points (+0x5910) and knock-down counts (+0x58dc / +0x58e0) are not kept here (0), so the show-offs and
-    /// knock-down practice keep the order they have; the rubber band's tables (0x365060) and difficulty are 0 and what
+    /// place, finish (+0x418), human or not (+0x41c), best (+0x378) and score words ([`Race::place_scores`]: +0x5910,
+    /// +0x58dc, +0x58e0); `Boarder_GetRaceProgress` 0x1170d0 is
+    /// [`crate::progress::race_progress`]; `Sfx_OnPlacingChange` 0x219a48 goes to [`Race::speech`]. STANDIN: the rubber band's tables (0x365060) and difficulty are 0 and what
     /// it writes (+0x100..+0x108) is not read back
     fn places(&mut self, lines: &crate::aipath::RaceLines) {
         use crate::placing;
@@ -631,6 +651,10 @@ impl Race {
             m.w32(o + 0x418, r.line.finish as u32);
             m.w32(o + 0x41c, (k == 0) as u32);
             m.w32(o + 0x378, r.line.place.best.to_bits());
+            let sc = self.place_scores.get(k).copied().unwrap_or_default();
+            m.w32(o + 0x5910, sc.points);
+            m.w32(o + 0x58dc, sc.knocked);
+            m.w32(o + 0x58e0, sc.crashes);
         }
         struct Env<'a>(&'a [LineRider], f32, f32, &'a mut Vec<SpeechCall>);
         impl placing::PlacingEnv for Env<'_> {

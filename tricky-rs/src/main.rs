@@ -1912,6 +1912,7 @@ fn ride(
             ui::Event::FreeRide => tricky_game::courses::Mode::Freeride,
         } as u32;
         let others: Vec<(Vec3, Vec3)> = opponents.0.iter().map(|o| (o.rider.pos, o.rider.vel)).collect();
+        race.0.place_scores = std::iter::once(&*r).chain(opponents.0.iter().map(|o| &o.rider)).map(|x| tricky_game::race::PlaceScore::of(&x.sc)).collect();
         race.0.update(r, &others, dt);
         // what the riders' race-line events said into their scores (row E1b2g7b)
         for h in race.0.hooks.clone() {
