@@ -33,6 +33,8 @@ struct Loaded {
     files: Files,
     /// DATA/CONFIG/BANKS.INF
     banks: Option<Vec<u8>>,
+    /// DATA/CONFIG/AUDIO.INF
+    audio: Option<Vec<u8>>,
 }
 
 /// A stream's parts: the one playing (its sound and seconds left) and those queued behind it.
@@ -423,7 +425,7 @@ pub fn race_speech(
     mut rs: ResMut<RaceSpeech>, sounds: Res<crate::sound::Sounds>, game: Res<ui::Game>, mode: Res<Mode>, race: Res<RaceRes>, time: Res<Time>,
     mut audio: ResMut<Assets<AudioSource>>, mut commands: Commands, sfx: Option<Res<crate::boardsound::BoardSounds>>,
     playing: Query<Entity, With<PlacingSound>>, mut rider: ResMut<crate::RiderRes>, mut opponents: ResMut<crate::Opponents>,
-    cam: Query<&GlobalTransform, With<Camera3d>>, music: Res<crate::pathmusic::PathMusic>, (list, level, levels): (Res<crate::LevelList>, Res<crate::LevelRes>, Res<ui::AudioLevels>),
+    cam: Query<&GlobalTransform, With<Camera3d>>, music: Res<crate::pathmusic::PathMusic>, (list, level, mut levels): (Res<crate::LevelList>, Res<crate::LevelRes>, ResMut<ui::AudioLevels>),
 ) {
     // what the riders asked of the audio object this frame, taken whatever happens (rider `k` of the race: the player, then the others)
     let mut asks = vec![(0, std::mem::take(&mut rider.0.speech))];
@@ -441,7 +443,8 @@ pub fn race_speech(
                     let mut banks = disc()?;
                     let host = SpeechHost::new(&inf, Box::new(move |p: &str| banks.load(p).ok().flatten()));
                     let banks = files.load("data/config/banks.inf").ok().flatten();
-                    Some(Loaded { host, files, banks })
+                    let audio = files.load("data/config/audio.inf").ok().flatten();
+                    Some(Loaded { host, files, banks, audio })
                 })();
                 *s2.lock().unwrap() = Some(loaded);
             });
@@ -469,6 +472,10 @@ pub fn race_speech(
         rs.course = Some(list.current);
         let track = list.dirs.get(list.current).and_then(|d| d.file_name()).map(|n| n.to_string_lossy().to_string()).unwrap_or_default();
         let key = tricky_data::aip::big_name(&track).unwrap_or("").to_ascii_uppercase();
+        // first `Audio_LoadVolumeLevels` 0x21ca20 on AUDIO.INF: the race's levels, then the course's
+        if let Some(a) = sys.audio.as_deref() {
+            levels.load_levels(&tricky_data::audiocfg::levels(a, b"IGLEVELSCALING", key.as_bytes()));
+        }
         let banks = sys.banks.as_deref().map(|b| tricky_data::audiocfg::ingame_banks(b, key.as_bytes())).unwrap_or_default();
         rs.ambient = sndqueue::AmbientBanks { names: banks.swaps.into_iter().take(200).collect(), ..Default::default() };
         rs.course_bank = banks.loads.iter().rfind(|l| l.slot == 2).map(|l| l.path.clone()).unwrap_or_default();

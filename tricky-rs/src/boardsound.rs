@@ -224,10 +224,11 @@ impl RiderLoops {
     }
 
     /// One frame of the loops: started for a new ride, else each updated, and their voices set. `riders` are the
-    /// race's riders, the player's first; `ear` is the listener (the camera), `dt` the monitor's step.
+    /// race's riders, the player's first; `ear` is the listener (the camera), `dt` the monitor's step, `scale` the
+    /// loops' slot's volume (`SndMgr_GetSlot` 0x211f38 with 4, the instances' +0x60).
     #[allow(clippy::too_many_arguments)]
     fn frame(
-        &mut self, ride: Option<usize>, riders: &[&Rider], ear: Option<&GlobalTransform>, dt: f32, bs: &BoardSounds, fx: f32,
+        &mut self, ride: Option<usize>, riders: &[&Rider], ear: Option<&GlobalTransform>, dt: f32, bs: &BoardSounds, fx: f32, scale: f32,
         pm: &mut crate::pathmusic::PathMusic, commands: &mut Commands, sinks: &mut Query<&mut AudioSink, With<RiderLoop>>,
     ) {
         // a new ride, or a field of another size (a new heat), starts them again
@@ -340,11 +341,12 @@ impl RiderLoops {
                 vol = bankmon::instance_distance_volume(v.inst.volume as u32, d, far).min(0x7f);
             }
             v.last = d;
+            // the volume scaled by the slot's float, truncated
+            let vol = tricky_game::sndlib::cvt_w((F(vol as f32) * F(scale)).ee());
             if let Ok(mut sink) = sinks.get_mut(v.e) {
                 // the volume (0..127) on the bank program's own level; the bend as the driver bends the voice
                 // (`SndHandle_SetPitchBend` 0x2d6a18 → `SNDVoice_CalcPitchMult`) on the monitor's pitch (4096 = 1)
-                // STANDIN: 0.8, for the sound manager's slot 4 volume (`SndMgr_GetSlot` 0x211f38)
-                sink.set_volume(Volume::Linear(vol as f32 / 127.0 * bs.level(&v.name) * fx * 0.8));
+                sink.set_volume(Volume::Linear(vol as f32 / 127.0 * bs.level(&v.name) * fx));
                 let p = tricky_game::sndlib::cvt_w((pitch * F(4096.0)).ee()).clamp(0, 0x3fff) as f32 / 4096.0;
                 sink.set_speed((bs.pitch(&v.name, v.bend as f32) * p).clamp(0.25, 4.0));
             }
@@ -430,7 +432,7 @@ pub fn board_sound(
     time: Res<Time>, rider: Res<RiderRes>, game: Res<ui::Game>, mode: Res<Mode>, sounds: Res<crate::sound::Sounds>, bs: Res<BoardSounds>,
     list: Res<crate::LevelList>, mut rl: ResMut<RiderLoops>, mut pm: ResMut<crate::pathmusic::PathMusic>,
     mut commands: Commands, mut loops: Query<(Entity, &BoardLoop, &mut AudioSink), Without<RiderLoop>>, mut sinks: Query<&mut AudioSink, With<RiderLoop>>, mut last: Local<Last>,
-    cam: Query<&GlobalTransform, With<Camera3d>>, opponents: Res<crate::Opponents>,
+    (cam, opponents, levels): (Query<&GlobalTransform, With<Camera3d>>, Res<crate::Opponents>, Res<ui::AudioLevels>),
 ) {
     if !bs.on { return; }
     let r: &Rider = &rider.0;
@@ -446,7 +448,7 @@ pub fn board_sound(
     // the rider's loops, the game's
     let ride = (*mode == Mode::Ride && game.screen != ui::Screen::Menu).then_some(list.current);
     let riders: Vec<&Rider> = std::iter::once(r).chain(opponents.0.iter().map(|o| &o.rider)).collect();
-    rl.frame(ride, &riders, cam.single().ok(), dt, &bs, fx, &mut pm, &mut commands, &mut sinks);
+    rl.frame(ride, &riders, cam.single().ok(), dt, &bs, fx, levels.slot(4), &mut pm, &mut commands, &mut sinks);
     // the game values, in cm/s
     let fwd = r.forward();
     let load = r.vel.dot(fwd).abs() * 100.0;

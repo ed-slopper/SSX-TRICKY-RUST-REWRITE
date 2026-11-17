@@ -3575,7 +3575,7 @@ address,size,name,system,status
 0x211960,440,Audio_ShutdownRace,audio,ported
 0x211b18,60,Audio_FreeCourseAudio,audio,ported
 0x211b58,596,Audio_StopRaceAudio,audio,ported
-0x211db0,184,SndMgr_SetVolume,audio,ported
+0x211db0,184,SndMgr_SetVolume,audio,checked
 0x211f20,20,SndMgr_GetVolume,audio,ported
 0x211f38,20,SndMgr_GetSlot,audio,ported
 0x211f50,20,Audio_GetVolumeSlot,audio,not started

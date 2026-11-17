@@ -1714,3 +1714,23 @@ Since E1b2g7d5j2 every race rider's loops run (`Audio_InitRiderSounds` 0x210a38'
 the opponents): an AI rider (+0x41c not 1) gets only the AI glide loop (sound surface·8 + 6, no listener so view
 0, fall-off and cull 50, `Sfx_UpdateAiGlideLoop`), heard from the camera at its own position. The snow programs'
 records are the audio system's (one per table and surface), so all riders' runs share them, as in the game.
+
+## The sound manager's channels (E1b2g7d5j3a, `game/src/sfxcalc.rs`, `src/ui.rs`)
+
+Proven (`SndMgr_SetVolume` 0x211db0 checked in the function runner, 30,000 cases, four mutations caught):
+
+- A channel's slot is 12 bytes at the audio system's +0x3848 + 0xc · ch: +0 the volume (`SndMgr_GetVolume` 0x211f20),
+  +4 the volume on its mix level, +8 what plays (`SndMgr_GetSlot` 0x211f38 points here; `SndSys_PlayPending` and
+  `BankInstance_UpdatePositional` multiply by it).
+- `SndMgr_SetVolume`(sys, ch, f12): the volume held to 0..1 (not below 1 → 1); a jump table (0x39ed00) for 0..6:
+  0 the master: +4 and +0 = v, and the old +8 · 127 (truncated, a signed byte) to `SND_SetMasterVolume` 0x2d2f90;
+  1 the music: · 0x343058, then 0x2256a0(sys); 2 · 0x343060 (PA speech); 3 · 0x34305c (rider speech); 4 · 0x343054
+  (effects); 5 · 0x343064 (jukebox); 6 · 0x343068 (uber); channels 7 and up keep neither +0 nor +4. Then
+  +8 = +4 · the channel's scale (+0x38a8 + 4 · ch; `cBXAudio::cBXAudio` sets the seven to 1.0).
+- The mix levels 0x343054..0x343068 are 1.0 in the executable until `Audio_LoadVolumeLevels` 0x21ca20 reads AUDIO.INF
+  (`tricky_data::audiocfg::levels`); it ends by setting channels 0..6 again to their own volumes.
+
+In the app: `ui::AudioLevels` keeps the seven slots through `sfxcalc::set_volume`; `src/racespeech.rs` reads
+AUDIO.INF from the disc (TRICKY_DISC) with BANKS.INF and applies `IGLEVELSCALING` and the course's section when a
+course starts; the board loops' volume is multiplied by slot 4's float and truncated, as the monitor scales an
+instance (+0x60). Not made: the master volume's and the music's calls (STANDIN in `src/ui.rs`).

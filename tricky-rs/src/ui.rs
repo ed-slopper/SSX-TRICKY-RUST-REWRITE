@@ -47,33 +47,58 @@ pub struct CareerRes(pub tricky_game::career::Career);
 fn career_path() -> std::path::PathBuf {
     std::env::current_exe().ok().and_then(|p| p.parent().map(|p| p.to_path_buf())).unwrap_or_default().join("tricky-career.sav")
 }
-/// The sound manager's levels the career's profile reads and sets (`career::AudioSettings`: `SndMgr_GetVolume` /
-/// `SndMgr_SetVolume` 0x211db0 channels 0..6, the speech level +0x383c, the output mode), as `cBXAudio::cBXAudio`
-/// 0x20db18 starts them: channel 0 at 10/11 (0x3f68ba2f), `Audio_SetVolumePreset`(0) (`career::set_volume_preset`),
-/// channels 5 and 6 at 1.
-// STANDIN: the sound manager's volumes are kept as given (what `SndMgr_SetVolume` does with them is not ported); only
-// the speech level is read (by the announcer, `src/racespeech.rs`).
+/// The sound manager's channels the career's profile reads and sets (`career::AudioSettings`: `SndMgr_GetVolume`
+/// 0x211f20 / `SndMgr_SetVolume` 0x211db0 channels 0..6, the speech level +0x383c, the output mode), as
+/// `cBXAudio::cBXAudio` 0x20db18 starts them: the scales (+0x38a8..) 1.0, channel 0 at 10/11 (0x3f68ba2f),
+/// `Audio_SetVolumePreset`(0) (`career::set_volume_preset`), channels 5 and 6 at 1. Each channel's slot is
+/// `sfxcalc::set_volume`'s (+0 the volume, +4 on its mix level, +8 what plays: `SndMgr_GetSlot` 0x211f38's float).
+// STANDIN: the master volume's call to the sound library (`SND_SetMasterVolume` 0x2d2f90) and the music's (0x2256a0)
+// are not made; the host's volumes stand for them
 #[derive(Resource, Clone, Debug)]
 pub struct AudioLevels {
-    pub vols: [f32; 7],
+    pub slots: [[f32; 3]; 7],
+    /// the mix levels 0x343054.. (sfx, music, rider speech, PA speech, jukebox, uber), the executable's 1.0 until
+    /// a course's AUDIO.INF is read ([`AudioLevels::load_levels`])
+    pub mix: [f32; 6],
     pub speech: f32,
     pub mode: u32,
 }
 impl Default for AudioLevels {
     fn default() -> Self {
-        let mut a = AudioLevels { vols: [0.0; 7], speech: 0.0, mode: 0 };
-        a.vols[0] = f32::from_bits(0x3f68_ba2f);
+        use tricky_game::career::AudioSettings;
+        let mut a = AudioLevels { slots: [[0.0; 3]; 7], mix: [1.0; 6], speech: 0.0, mode: 0 };
+        a.set_volume(0, f32::from_bits(0x3f68_ba2f));
         tricky_game::career::set_volume_preset(&mut a, 0);
-        a.vols[5] = 1.0;
-        a.vols[6] = 1.0;
+        a.set_volume(5, 1.0);
+        a.set_volume(6, 1.0);
         a
     }
 }
+impl AudioLevels {
+    /// `Audio_LoadVolumeLevels` 0x21ca20's end: the mix levels taken (`tricky_data::audiocfg::levels`), then every
+    /// channel set again to its own volume
+    pub fn load_levels(&mut self, l: &tricky_data::audiocfg::Levels) {
+        use tricky_game::career::AudioSettings;
+        self.mix = [l.sfx, l.music, l.char_speech, l.pa_speech, l.jukebox, l.uber];
+        for ch in 0..7 {
+            let v = self.volume(ch);
+            self.set_volume(ch, v);
+        }
+    }
+    /// `SndMgr_GetSlot` 0x211f38's float: what channel `ch` plays at
+    pub fn slot(&self, ch: usize) -> f32 { self.slots[ch][2] }
+}
 impl tricky_game::career::AudioSettings for AudioLevels {
-    fn volume(&self, ch: u32) -> f32 { self.vols.get(ch as usize).copied().unwrap_or(0.0) }
+    /// `SndMgr_GetVolume` 0x211f20
+    fn volume(&self, ch: u32) -> f32 { self.slots.get(ch as usize).map_or(0.0, |s| s[0]) }
     fn speech(&self) -> f32 { self.speech }
     fn mode(&self) -> u32 { self.mode }
-    fn set_volume(&mut self, ch: u32, v: f32) { if let Some(x) = self.vols.get_mut(ch as usize) { *x = v; } }
+    /// `SndMgr_SetVolume` 0x211db0, the channels' scales 1.0
+    fn set_volume(&mut self, ch: u32, v: f32) {
+        if let Some(s) = self.slots.get_mut(ch as usize) {
+            let _ = tricky_game::sfxcalc::set_volume(s, ch, v, self.mix, 1.0);
+        }
+    }
     /// `Audio_SetSpeechLevel` 0x212210
     fn set_speech(&mut self, v: f32) { self.speech = tricky_game::career::speech_level(v); }
     fn set_mode(&mut self, m: u32) { self.mode = m; }

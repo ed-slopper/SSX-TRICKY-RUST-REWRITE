@@ -69,6 +69,51 @@ pub fn impact_speed(normal: V4, vel: V4) -> i32 {
     if v < 0 { v.wrapping_neg() } else { v }
 }
 
+/// What `SndMgr_SetVolume` asks of others for channels 0 and 1.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum VolumeCall {
+    /// the sound library's master volume, set to the channel's old output × 127, as a signed byte
+    Master(i32),
+    /// 0x2256a0 (the audio system): the music's volume taken again
+    Music,
+}
+
+/// `SndMgr_SetVolume` 0x211db0 (the audio system, the channel, f12 the volume): the channel's slot (+0x3848 + 0xc ·
+/// ch: `slot` = +0 the volume, +4 the volume on its level, +8 what plays, which `SndMgr_GetSlot` 0x211f38 points
+/// at). The volume held to 0..1 (1 when not below 1). Channels 0..6 keep it in +0 and, scaled by their mix level
+/// (`levels`: 0x343054.. `tricky_data::audiocfg::Levels` sfx, music, char speech, PA speech, jukebox, uber), in +4:
+/// 0 the master (+4 the volume itself; the old +8 · 127 to the sound library first), 1 the music, 2 the PA speech, 3
+/// the rider speech, 4 the effects, 5 the jukebox, 6 the uber; other channels keep nothing. Then +8 = +4 · the
+/// channel's scale (+0x38a8 + 4 · ch, 1.0 from `cBXAudio::cBXAudio`).
+pub fn set_volume(slot: &mut [f32; 3], ch: u32, v: f32, levels: [f32; 6], scale: f32) -> Option<VolumeCall> {
+    let v = if v < 1.0 {
+        if v < 0.0 { 0.0 } else { v }
+    } else {
+        1.0
+    };
+    let mut call = None;
+    let level = |l: usize| v * levels[l];
+    match ch {
+        0 => {
+            slot[1] = v;
+            slot[0] = v;
+            call = Some(VolumeCall::Master(crate::sndlib::cvt_w(slot[2] * 127.0) as i8 as i32));
+        }
+        1 => {
+            slot[0] = v;
+            slot[1] = level(1);
+            call = Some(VolumeCall::Music);
+        }
+        2..=6 => {
+            slot[0] = v;
+            slot[1] = level([3, 2, 0, 4, 5][ch as usize - 2]);
+        }
+        _ => {}
+    }
+    slot[2] = slot[1] * scale;
+    call
+}
+
 /// What `cBXAudio::ListenerLocate` answers: the squared distance (metres²) and, with the pan on, the two angles
 /// (the buffer's halfwords +8 and +0xa, 0x10000 to a turn).
 #[derive(Clone, Copy, Debug, PartialEq)]

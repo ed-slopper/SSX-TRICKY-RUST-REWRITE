@@ -459,3 +459,42 @@ fn snow_program_matches_the_original() {
     }
     assert!(traps > 100 && traps < 20_000, "{traps}");
 }
+
+#[test]
+fn set_volume_matches_the_original() {
+    let Some(mut r) = runner() else { return };
+    let sys = r.mem.alloc(0x4000);
+    let log: Rc<RefCell<Vec<VolumeCall>>> = Rc::new(RefCell::new(Vec::new()));
+    let l = log.clone();
+    r.stub(0x2d2f90, move |c, _| l.borrow_mut().push(VolumeCall::Master(c.gpr(4) as i32)));
+    let l = log.clone();
+    r.stub(0x2256a0, move |c, _| {
+        assert_eq!(c.gpr(4) as u32, sys);
+        l.borrow_mut().push(VolumeCall::Music)
+    });
+    let mut g = Rng(0x0bad_cafe_1234_5678);
+    for case in 0..30_000 {
+        let ch = [0u32, 1, 2, 3, 4, 5, 6, 7, 9][(g.next() % 9) as usize];
+        let v = [g.f(-0.5, 1.5), 0.0, 1.0, -0.0, g.f(0.0, 1.0)][(g.next() % 5) as usize];
+        let levels: [f32; 6] = std::array::from_fn(|_| g.f(0.0, 2.0));
+        for (k, x) in levels.iter().enumerate() {
+            r.mem.write_f32(0x343054 + 4 * k as u32, *x);
+        }
+        let at = sys + 0x3848 + ch * 0xc;
+        let mut slot = [g.f(-1.0, 1.0), g.f(-1.0, 1.0), g.f(-3.0, 3.0)];
+        let scale = g.f(0.0, 1.5);
+        for (j, x) in slot.iter().enumerate() {
+            r.mem.write_f32(at + 4 * j as u32, *x);
+        }
+        r.mem.write_f32(sys + 0x38a8 + 4 * ch, scale);
+        log.borrow_mut().clear();
+        r.cpu.set_gpr(4, sys as u64);
+        r.cpu.set_gpr(5, ch as u64);
+        r.cpu.set_f(12, v);
+        r.call(0x211db0).unwrap_or_else(|e| panic!("case {case}: {e}"));
+        let call = set_volume(&mut slot, ch, v, levels, scale);
+        let theirs: Vec<u32> = (0..3).map(|j| r.mem.read_u32(at + 4 * j)).collect();
+        assert_eq!(theirs, slot.iter().map(|x| x.to_bits()).collect::<Vec<_>>(), "case {case}: ch {ch} v {v}");
+        assert_eq!(log.borrow().clone(), call.into_iter().collect::<Vec<_>>(), "case {case}: calls");
+    }
+}
