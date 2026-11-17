@@ -90,8 +90,8 @@ prints progress, camera smoothness and time spent on rails. It reaches the finis
 ever falling through the world (it is a poor rider and gets stuck on obstacles 0 to 14 times per track).
 `TRICKY_RAILTEST=1` with it drops a rider onto the five longest rails and reports each grind;
 `TRICKY_TRICKTEST=1` drops a rider from 22 m doing five scripted things and prints how each landing scored.
-`TRICKY_G21=1` prints, every 120 frames, how evenly the player's rider moves from frame to frame, where its last
-tick left it and as drawn (between its last two ticks, row G21); `TRICKY_SIM` also counts ticks moving back and the
+`TRICKY_G21=1` prints, every 120 frames, how evenly the player's rider and the first computer rider move from frame
+to frame, where the last tick left them and as drawn (between their last two ticks, rows G21 and G21a); `TRICKY_SIM` also counts ticks moving back and the
 heading turning back and forth (`TRICKY_JITTER=1` lists them).
 
 ## Building from source

@@ -83,11 +83,19 @@ struct RiderRes(Rider, DrawLerp);
 /// here a frame runs zero, one or two ticks, so a rider drawn where its last tick left it moves in steps while the
 /// camera's filters move every frame, and it looks to stutter back and forth. STANDIN: our frame pacing for a
 /// screen that is not the PS2's (the host's, no counterpart in the game): the model and the camera follow the
-/// place `alpha` of a tick on from the place before the last tick.
+/// place `alpha` of a tick on from the place before the last tick. Row G21a: every rider (the computer riders keep
+/// theirs in `Opponent::draw`, with the player's `alpha`), and the heading too. A move over 3 m or a turn over a
+/// radian in one tick (a reset, a scene's spot) is drawn at once.
 #[derive(Default, Clone, Copy)]
-struct DrawLerp { prev: Vec3, alpha: f32 }
+struct DrawLerp { prev: Vec3, prev_yaw: f32, alpha: f32 }
 impl DrawLerp {
     fn at(&self, pos: Vec3) -> Vec3 { if (pos - self.prev).length() > 3.0 { pos } else { self.prev.lerp(pos, self.alpha) } }
+    fn yaw(&self, yaw: f32) -> f32 {
+        let d = rider::wrap(yaw - self.prev_yaw);
+        if d.abs() > 1.0 { yaw } else { yaw - d * (1.0 - self.alpha) }
+    }
+    /// before a tick: where it leaves from
+    fn mark(&mut self, r: &Rider) { (self.prev, self.prev_yaw) = (r.pos, r.yaw); }
 }
 #[derive(Resource, Default)]
 struct CamRes(ChaseCam);
@@ -112,7 +120,9 @@ struct PropVisual(usize);
 struct Opponent { rider: Rider, driver: AiDriver, character: usize, /// its grudge against the player (made once the characters are known)
     grudge: Option<rivals::Grudge>, taunt_wait: f32,
     /// the ported computer rider driving it on the snow (row G4e3)
-    port: rider::PortAi }
+    port: rider::PortAi,
+    /// drawn between its last two ticks (row G21a)
+    draw: DrawLerp }
 #[derive(Resource, Default)]
 struct Opponents(Vec<Opponent>);
 
@@ -128,7 +138,7 @@ fn make_opponents(start: Vec3, yaw: f32, player_char: usize, n_chars: usize, cou
             rider: { let mut r = Rider::new(start + side * lane * 1.5 + Vec3::Y * 0.5, yaw); r.ai = true; r.slot = i as u32 + 1; r },
             driver: AiDriver::new(lane * 1.5, skill),
             character: (player_char + 1 + i * if n_chars > 6 { 2 } else { 1 }) % n_chars,
-            grudge: None, taunt_wait: 1.0, port: Default::default(),
+            grudge: None, taunt_wait: 1.0, port: Default::default(), draw: DrawLerp::default(),
         }
     }).collect())
 }
@@ -377,7 +387,7 @@ fn main() {
     if std::env::var("TRICKY_GATETEST").is_ok() {
         // line six riders up as a race does and see who gets away
         let mut field = make_opponents(loaded.start, loaded.yaw, 0, 12, 5, 0);
-        field.0.push(Opponent { rider: Rider::new(loaded.start + Vec3::Y * 0.5, loaded.yaw), driver: AiDriver::new(0.0, 0.9), character: 0, grudge: None, taunt_wait: 1.0, port: Default::default() });
+        field.0.push(Opponent { rider: Rider::new(loaded.start + Vec3::Y * 0.5, loaded.yaw), driver: AiDriver::new(0.0, 0.9), character: 0, grudge: None, taunt_wait: 1.0, port: Default::default(), draw: DrawLerp::default() });
         println!("start {:.1?} yaw {:.2} line[0] {:.1?} line[1] {:.1?}", loaded.start, loaded.yaw, loaded.line[0], loaded.line[1]);
         let from: Vec<Vec3> = field.0.iter().map(|o| o.rider.pos).collect();
         let (mut t, dt) = (0.0f32, 1.0 / 120.0);
@@ -1896,7 +1906,8 @@ fn ride(
     *tick_bank = (*tick_bank + time.dt.min(0.1)).min(0.1 + TICK);
     while *tick_bank >= TICK * (1.0 - 1e-3) {
         *tick_bank -= TICK;
-        lerp.prev = r.pos;
+        lerp.mark(r);
+        for o in opponents.0.iter_mut() { o.draw.mark(&o.rider); }
         let dt = TICK;
         // TRICKY_AUTOPLAY: the player's rider drives itself (for screenshots and checks)
         let input = if !waiting && std::env::var("TRICKY_AUTOPLAY").is_ok() {
@@ -2127,6 +2138,7 @@ fn ride(
         }
     }
     lerp.alpha = (*tick_bank / TICK).clamp(0.0, 1.0);
+    for o in opponents.0.iter_mut() { o.draw.alpha = lerp.alpha; }
     // across the line: the heat is over
     // show-off ends when its clock runs out
     if playing && game.event == ui::Event::ShowOff && race.0.state == RaceState::Running && race.0.time >= ui::showoff(&ui::track_key(&list)).1 + race.0.bonus {
@@ -2345,7 +2357,7 @@ fn animate_visuals(
     if game.screen == ui::Screen::Paused { return; }
     let dt = time.dt;
     for (mut vis, mut tf, children) in &mut roots {
-        let r: &Rider = match vis.who { Who::Player => &rider.0, Who::Ai(i) => match opponents.0.get(i) { Some(o) => &o.rider, None => continue } };
+        let (r, draw): (&Rider, &DrawLerp) = match vis.who { Who::Player => (&rider.0, &rider.1), Who::Ai(i) => match opponents.0.get(i) { Some(o) => (&o.rider, &o.draw), None => continue } };
         let Some(entry) = lib.chars.get(vis.character) else { continue };
         // where the body is and which way it faces
         let on_snow = r.grounded || r.air_time < 0.15 || r.rail.is_some();
@@ -2353,15 +2365,16 @@ fn animate_visuals(
         // riding switch the game swaps which way the feet point and the head still looks ahead (its
         // animation mirror flag, rider+0x46d4): the body is the board's way round, drawn mirrored below
         let mirror = r.switch && r.crashed <= 0.0;
-        let h = heading(r.yaw);
+        // where and which way it is drawn: between its last two ticks (row G21a, `DrawLerp`)
+        let (drawn, h) = (draw.at(r.pos), heading(draw.yaw(r.yaw)));
         let fwd = (h - up * h.dot(up)).normalize_or(h);
         let k = |rate: f32| 1.0 - (-rate * dt).exp();
         let want_roll = if r.grounded { -r.input.steer * 0.32 * (r.vel.length() / 12.0).min(1.0) } else { 0.0 };
         vis.roll += (want_roll - vis.roll) * k(8.0);
         // down in a wipe-out the body is the tumbling rigid body's frame
-        let base = match r.wipe.as_ref().filter(|_| r.crashed > 0.0) { Some(w) => w.q, None => Transform::from_translation(r.pos).looking_to(fwd, up).rotation * Quat::from_rotation_z(vis.roll) };
+        let base = match r.wipe.as_ref().filter(|_| r.crashed > 0.0) { Some(w) => w.q, None => Transform::from_translation(drawn).looking_to(fwd, up).rotation * Quat::from_rotation_z(vis.roll) };
         // the body is drawn rider+0x308 above the snow along the rider's up (`Boarder_UpdatePose` 0x129628, row G16)
-        tf.translation = r.pos + tricky_game::rider::ground_tick::port_dir(r.up) * (r.body_height * 0.01);
+        tf.translation = drawn + tricky_game::rider::ground_tick::port_dir(r.up) * (r.body_height * 0.01);
         vis.base = vis.base.slerp(base, k(14.0));
         // flips turn the whole body about its middle, on top of the smoothed heading
         let flip = Quat::from_rotation_x(-r.flip);
@@ -2568,29 +2581,35 @@ fn animate(set: &AnimSet, kind_set: Option<(&AnimSet, &str)>, cm: Option<&AnimSe
     Some(out)
 }
 
-fn rider_model(time: Res<SmoothDt>, rider: Res<RiderRes>, model: Option<Single<&mut Transform, (With<RiderModel>, Without<RiderVisual>)>>, mut g21: Local<(Vec3, Vec3, Vec<(f32, f32)>)>) {
-    let Some(mut model) = model else { return };
+fn rider_model(time: Res<SmoothDt>, rider: Res<RiderRes>, opponents: Res<Opponents>, model: Option<Single<&mut Transform, (With<RiderModel>, Without<RiderVisual>)>>, mut g21: Local<[(Vec3, Vec3, Vec<(f32, f32)>); 2]>) {
     let r = &rider.0;
     // TRICKY_G21: how evenly the rider moves from frame to frame, drawn where its last tick left it and as drawn
-    // (row G21): the spread of each frame's move over its frame time, as a fraction of the mean, once 120 frames
+    // (row G21): the spread of each frame's move over its frame time, as a fraction of the mean, once 120 frames;
+    // the player's and the first computer rider's (row G21a)
     if std::env::var("TRICKY_G21").is_ok() && time.dt > 0.0 {
-        let (raw, drawn) = (r.pos, rider.1.at(r.pos));
-        let (a, b) = ((raw - g21.0).length() / time.dt, (drawn - g21.1).length() / time.dt);
-        if a < 100.0 && b < 100.0 { g21.2.push((a, b)); }
-        (g21.0, g21.1) = (raw, drawn);
-        if g21.2.len() >= 120 {
-            let spread = |f: &dyn Fn(&(f32, f32)) -> f32| {
-                let m = g21.2.iter().map(f).sum::<f32>() / g21.2.len() as f32;
-                let v = g21.2.iter().map(|x| (f(x) - m).powi(2)).sum::<f32>() / g21.2.len() as f32;
-                (m, v.sqrt() / m.max(1e-3))
-            };
-            let ((m, sa), (_, sb)) = (spread(&|x| x.0), spread(&|x| x.1));
-            println!("g21: speed {m:.1} m/s, frame-to-frame spread: last tick {:.0}%, drawn {:.0}%", sa * 100.0, sb * 100.0);
-            g21.2.clear();
+        let who = [Some((r, &rider.1)), opponents.0.first().map(|o| (&o.rider, &o.draw))];
+        for (k, (g, w)) in g21.iter_mut().zip(who).enumerate() {
+            let Some((r, draw)) = w else { continue };
+            let (raw, drawn) = (r.pos, draw.at(r.pos));
+            let (a, b) = ((raw - g.0).length() / time.dt, (drawn - g.1).length() / time.dt);
+            if a < 100.0 && b < 100.0 { g.2.push((a, b)); }
+            (g.0, g.1) = (raw, drawn);
+            if g.2.len() >= 120 {
+                let spread = |f: &dyn Fn(&(f32, f32)) -> f32| {
+                    let m = g.2.iter().map(f).sum::<f32>() / g.2.len() as f32;
+                    let v = g.2.iter().map(|x| (f(x) - m).powi(2)).sum::<f32>() / g.2.len() as f32;
+                    (m, v.sqrt() / m.max(1e-3))
+                };
+                let ((m, sa), (_, sb)) = (spread(&|x| x.0), spread(&|x| x.1));
+                println!("g21 {}: speed {m:.1} m/s, frame-to-frame spread: last tick {:.0}%, drawn {:.0}%", ["player", "ai 1"][k], sa * 100.0, sb * 100.0);
+                g.2.clear();
+            }
         }
     }
+    // the placeholder rider (no characters exported); the characters are drawn by `animate_visuals`
+    let Some(mut model) = model else { return };
     let up = if r.grounded || r.air_time < 0.15 { r.normal } else { Vec3::Y };
-    let h = heading(r.yaw);
+    let h = heading(rider.1.yaw(r.yaw));
     let fwd = (h - up * h.dot(up)).normalize_or(h);
     let target = Transform::from_translation(r.pos).looking_to(fwd, up).rotation;
     model.translation = rider.1.at(r.pos) + tricky_game::rider::ground_tick::port_dir(r.up) * (r.body_height * 0.01);
