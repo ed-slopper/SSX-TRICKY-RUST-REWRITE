@@ -12,7 +12,7 @@
 use super::{ground_tick, Input, Rider, RiderSpeech};
 use crate::boarder::{self, Fields, Prewind, PrewindCall, SteerState};
 use crate::control::{self, ControlEnv};
-use crate::controls::{get_controls, ButtonMap, ControlsIn, Mapper};
+use crate::controls::{get_controls, ControlsIn, Mapper};
 use crate::finish;
 
 /// The game's 1/60 s (0x3c888889): what the records move by their rate each tick (`cBoarder::vf7`)
@@ -248,8 +248,8 @@ impl Rider {
         self.rec.steer = [r.steer, r.steer_rate, r.steer_target];
     }
 
-    /// After the snow's motion, `cBoarder::vf7`'s control part: the pad word for the state (`cPlayer::GetControls`,
-    /// button map 0, STANDIN: the rider's own map and trick slots are row G1a5b3b2b) and the state's update. A rider
+    /// After the snow's motion, `cBoarder::vf7`'s control part: the pad word for the state (`cPlayer::GetControls`
+    /// on the rider's button map, [`Rider::button_map`]) and the state's update. A rider
     /// back on the snow in another state is put in cruise (prewind with the jump button held). Returns true when the
     /// rider jumped (`JumpControl_Update`'s `Jump_ApplyImpulse`, motion 1, `Takeoff_SetSpinRates`).
     pub(super) fn ground_control(&mut self, input: &Input) -> bool {
@@ -257,7 +257,7 @@ impl Rider {
             self.set_control(if input.jump { PREWIND } else { CRUISE });
         }
         self.read_pad(input);
-        let map = ButtonMap::btnmap(0, [0; 15]);
+        let map = self.button_map();
         let mut trick = 0x1a;
         let mut slope = false;
         let mut pad = get_controls(ControlsIn { state: self.ctl, paused: false }, &mut Mapper { map: &map, pad: &self.pad_dev }, &mut trick, &mut || 0, &mut slope);

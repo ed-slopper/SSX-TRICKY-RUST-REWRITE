@@ -97,3 +97,27 @@ fn tuck_crouches_and_brake_brakes_in_cruise() {
     assert!(tuck.vel.length() > brake.vel.length());
 }
 
+
+#[test]
+fn the_button_map_binds_the_riders_trick_slots() {
+    // `Pad_SetupVibration` 0x152770: combo k (easyA L2, easyB R1, ...) to the slot of row k at the character and the
+    // board's kind
+    use tricky_game::controls::{LSHIFT, LSHIFT2, RSHIFT};
+    use tricky_game::trickdata::{BOARDS, RIDERS};
+    for (ch, d) in RIDERS.iter().enumerate() {
+        for b in &BOARDS[ch][..3] {
+            let mut r = rider();
+            r.data = d;
+            r.stats.kind = b.kind;
+            let m = r.button_map();
+            let rows = &tricky_data::trick_slots::TRICK_SLOTS[ch][b.kind as usize];
+            // the last combos bound win a shared slot, so look at the first three only where they differ
+            for (k, combo) in [(0, LSHIFT2), (1, RSHIFT), (3, LSHIFT)] {
+                let slot = rows[k][0] as usize;
+                if rows.iter().skip(k + 1).all(|r| r[0] as usize != slot) {
+                    assert_eq!(m.pressed[slot], combo, "{} kind {} row {k}", d.name, b.kind);
+                }
+            }
+        }
+    }
+}

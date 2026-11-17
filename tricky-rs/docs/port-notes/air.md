@@ -136,6 +136,11 @@ Part of the port notes (index: [README.md](README.md)); units and wording as des
   unknown name ends the list. An axis's negate is any non-zero list. The binding reads 15 grabs, 14 buttons and
   16 axes whatever the counts (a short file leaves the stack's leftovers; ours leaves 0). Checked on both disc
   files and 600 edited copies against the game's parser; bound, both equal `ButtonMap::btnmap`.
+- In the app (row G1a5b3b2b, `Rider::button_map`): the ground's states and the spin state read the rider's map:
+  the trick table at 0x333098 + 0x10 · row + 0x2d0 · character (stats+0x5c) + 0xf0 · stats+0x44 (proven,
+  `Pad_SetupVibration`); stats+0x44 is the board's kind (the board record's first word at 0x332150, 0xf0 a board,
+  Old School's 1 with its bonus bytes 10, 0, 10, 10). STANDIN: n (stats+0x6c) 0, no controller option in the app;
+  the keys J, L, U, O as L1, R1, L2, R2 and the tweak key as square.
 - The front end's keys (`PadDevice_UpdateRepeat` 0x17a958, the device's +0x2c the cheats and menus read): the
   first of the table at 0x3857c0 whose buttons are down: select Esc (0x1b), start Enter (0xd), square / triangle /
   circle / X 'a'..'d' ('A'..'D' with L1, R1, L2 or R2 held), d-pad or left stick left / right / down / up as PC scan

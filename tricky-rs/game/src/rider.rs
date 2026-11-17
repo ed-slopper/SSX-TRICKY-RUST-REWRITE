@@ -1785,7 +1785,11 @@ impl Rider {
         // square 0x80, cross 0x40; `controls::PS2_BITS`)
         let mut ps2 = 0u16;
         if input.jump { ps2 |= 0x40; }
-        if input.boost { ps2 |= 0x80; }
+        if input.boost || input.tweak { ps2 |= 0x80; }
+        // the shoulder buttons (L1 0x4, R1 0x8, L2 0x1, R2 0x2): the grab combos
+        for (bit, m) in [(1, 0x4), (2, 0x8), (4, 0x1), (8, 0x2)] {
+            if input.grab & bit != 0 { ps2 |= m; }
+        }
         // (on the snow a computer rider's wind-up stick is the d-pad's x while it crouches for a jump: map 0's
         // prewind spin; the tuck and brake keys the left stick up and down: map 0's crouch and brake, row G1i1)
         let dx = match input.wind { Some(w) if self.grounded && input.jump => w, _ => input.steer };
@@ -1797,6 +1801,16 @@ impl Rider {
         self.pad_dev.read(ps2, Some([byte(input.steer), ly, 128, 128]));
     }
 
+    /// The rider's button map as `Pad_SetupVibration` 0x152770 binds it (row G1a5b3b2b): `BTNMAP<n>.DAT` (n =
+    /// stats+0x6c; STANDIN: 0, the app has no controller option) with the 15 grab combos bound to the rider's trick
+    /// slots, column 0 of the trick table 0x333098 at the character (stats+0x5c, our `RIDERS` order) and the board's
+    /// kind (stats+0x44: the board record's first word, 0x332150, `Board::kind`)
+    pub fn button_map(&self) -> crate::controls::ButtonMap {
+        let ch = RIDERS.iter().position(|r| r.name == self.data.name).unwrap_or(0);
+        let rows = &tricky_data::trick_slots::TRICK_SLOTS[ch][(self.stats.kind as usize).min(2)];
+        crate::controls::ButtonMap::btnmap(0, std::array::from_fn(|k| rows[k][0]))
+    }
+
     /// An air tick of the spin state on the game's code (row G1a5b3b1): the pad word `cPlayer::GetControls` makes
     /// for state 0x10 ([`crate::controls::get_controls`]), then `SpinState_Update` 0x100908
     /// ([`crate::spin::spin_update`]) on the kept attitude and the spin and flip so far: the turn toward the landing,
@@ -1806,7 +1820,7 @@ impl Rider {
     fn spin_tick(&mut self, input: &Input, dt: f32) {
         let Some(mut st) = self.spin_st else { return };
         self.read_pad(input);
-        let map = crate::controls::ButtonMap::btnmap(0, [0; 15]);
+        let map = self.button_map();
         let mut trick = 0x1a;
         let mut slope = false;
         let word = crate::controls::get_controls(
