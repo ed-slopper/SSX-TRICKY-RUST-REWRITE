@@ -150,6 +150,20 @@ fn walls_of(course: &Option<std::sync::Arc<tricky_game::course_ground::CourseGro
     Some(Walls { course, body: body_of(a), up: frame_of(a, st)[2] })
 }
 
+/// `World_RayCast` 0x25aff8 with `cWorldBoarder`(rider+0x470, 1) and the ground normal set, on the course: t and the
+/// record. TRICKY_WALL_SKIP: instances left out (comma-separated; mesa 1444: hit by ours, not by the game, row
+/// F4h5l); TRICKY_WALLDBG lists the hits.
+fn wall_cast(course: &tricky_game::course_ground::CourseGround, body: &CollBody, ground: V4) -> (f32, tricky_game::walls::CastRecord) {
+    let mut q = tricky_game::worldboarder::WorldBoarder::new(body, 1);
+    q.reject = Some(ground);
+    let skip: Vec<u32> = std::env::var("TRICKY_WALL_SKIP").unwrap_or_default().split(',').filter_map(|x| x.parse().ok()).collect();
+    let (t, h) = course.ray_cast(&mut q, false, None, &|i| skip.contains(&i));
+    if 0.0 < t && std::env::var("TRICKY_WALLDBG").is_ok() {
+        eprintln!("WALLDBG t {t} at {:?} n {:?} object {:?} body centre {:?} r {}", h.map(|h| h.pos), h.map(|h| h.normal), h.and_then(|h| h.object), body.center, body.radius);
+    }
+    (t, h.map_or(Default::default(), |h| tricky_game::walls::CastRecord { pos: h.pos, normal: h.normal, object: h.object.map_or(0, |o| o as u32 + 1) }))
+}
+
 /// What `Boarder_WallCollide` 0x126250 calls (`walls::WallEnv`), on the ground motion's rider. The body is the
 /// one `cPostAI::vf1` posed at the end of the last frame (the first sample's): the motion moves only the position
 /// (proven by the cast: rec19 2294 and 2295 r4, the depths the recorded pushes over 1.1).
@@ -161,14 +175,7 @@ struct WallTest<'a> {
 impl tricky_game::walls::WallEnv for WallTest<'_> {
     /// `World_RayCast` 0x25aff8 with `cWorldBoarder`(rider+0x470, 1), its ground normal set
     fn cast_walls(&mut self, r: &tricky_game::walls::WallRider) -> (f32, tricky_game::walls::CastRecord) {
-        let mut q = tricky_game::worldboarder::WorldBoarder::new(&self.body, 1);
-        q.reject = Some(r.ground);
-        // TRICKY_WALL_SKIP: instances left out (comma-separated; mesa 1444: hit by ours, not by the game, row F4h5l)
-        let skip: Vec<u32> = std::env::var("TRICKY_WALL_SKIP").unwrap_or_default().split(",").filter_map(|x| x.parse().ok()).collect();
-        let (t, h) = self.course.ray_cast(&mut q, false, None, &|i| skip.contains(&i));
-        // TRICKY_WALLDBG lists the hits
-        if 0.0 < t && std::env::var("TRICKY_WALLDBG").is_ok() { eprintln!("WALLDBG t {t} at {:?} n {:?} object {:?} body centre {:?} r {}", h.map(|h| h.pos), h.map(|h| h.normal), h.and_then(|h| h.object), self.body.center, self.body.radius); }
-        (t, h.map_or(Default::default(), |h| tricky_game::walls::CastRecord { pos: h.pos, normal: h.normal, object: h.object.map_or(0, |o| o as u32 + 1) }))
+        wall_cast(self.course, &self.body, r.ground)
     }
     fn query_objects(&mut self, _: &tricky_game::walls::WallRider) -> (f32, tricky_game::walls::CastRecord, tricky_game::walls::Touched) {
         unreachable!("not called by Boarder_WallCollide")
@@ -273,6 +280,42 @@ struct W {
     /// along the normal from the start of the last line made (`land_runner`)
     air: u32,
     landing: Rc<Cell<bool>>,
+    /// the course `World_RayCast`'s stub answers `Boarder_WallCollide`'s cast from (F4h5k; [`W::put_walls`])
+    course: Rc<RefCell<Option<std::sync::Arc<tricky_game::course_ground::CourseGround>>>>,
+}
+
+/// `Boarder_WallCollide` 0x126250 stubbed: logged, answering `wall`.
+fn stub_wall(r: &mut Runner, log: &Rc<RefCell<Vec<Ev>>>, wall: &Rc<Cell<bool>>, rd: u32) {
+    let (l, w) = (log.clone(), wall.clone());
+    r.stub(0x126250, move |cpu, mem| {
+        l.borrow_mut().push(Ev::Wall(mem.read_u32(rd + 0x494)));
+        cpu.set_gpr(2, w.get() as u64);
+    });
+}
+
+impl W {
+    /// The course's walls for the next call (F4h5k): with `walls`, `Boarder_WallCollide` 0x126250 runs as the
+    /// original, its `World_RayCast` 0x25aff8 answered by the course's cast of the body written to rider+0x470 (the
+    /// first sample's), the frame's up at +0x4ac0; without, the stub answering `wall`.
+    fn put_walls(&mut self, walls: Option<&Walls>) {
+        let (m, rd) = (&mut self.r.mem, self.rd);
+        if let Some(w) = walls {
+            let b = &w.body;
+            wv(m, rd + 0x480, b.center);
+            m.write_f32(rd + 0x490, b.radius);
+            m.write_u32(rd + 0x494, b.x24 as u32);
+            m.write_u32(rd + 0x498, b.count as u32);
+            for (k, (c, r)) in b.spheres.iter().enumerate() {
+                wv(m, rd + 0x4a0 + 0x20 * k as u32, *c);
+                m.write_f32(rd + 0x4b0 + 0x20 * k as u32, *r);
+            }
+            wv(m, rd + 0x4ac0, w.up);
+            self.r.unstub(0x126250);
+        } else {
+            stub_wall(&mut self.r, &self.log, &self.wall, rd);
+        }
+        *self.course.borrow_mut() = walls.map(|w| w.course.clone());
+    }
 }
 
 fn world() -> Option<W> {
@@ -326,12 +369,21 @@ fn world() -> Option<W> {
     let l = log.clone();
     // Boarder_SetState 0x11f608
     r.stub(0x11f608, move |cpu, _| l.borrow_mut().push(Ev::State(cpu.gpr(5) as u32)));
-    let (l, w) = (log.clone(), wall.clone());
-    // Boarder_WallCollide 0x126250
-    r.stub(0x126250, move |cpu, mem| {
-        l.borrow_mut().push(Ev::Wall(mem.read_u32(rd + 0x494)));
-        cpu.set_gpr(2, w.get() as u64);
-    });
+    // Boarder_WallCollide 0x126250 (as the original with the course's walls, F4h5k: `W::put_walls`; its callees
+    // `Boarder_AccumulateImpact` 0x125c48,
+    // `Boarder_Translate` 0x1267a0, `CollBody_Translate` 0x236448, `Boarder_TurnFromWall` 0x1257a0,
+    // `Boarder_WallImpactCheck` 0x126540, `Boarder_Stumble` 0x124dd0; the sounds, `Rand_Game` (0) and the speech stubbed;
+    // `cWorldBoarder`'s constructor and vf10 below)
+    stub_wall(&mut r, &log, &wall, rd);
+    for a in [0x126250, 0x125c48, 0x1267a0, 0x236448, 0x1257a0, 0x126540, 0x124dd0] {
+        r.allow(a);
+    }
+    // (and `Broadphase_MoveBox` 0x14fe68, the broadphase box `Boarder_Translate` moves)
+    for a in [0x216c50, 0x2162f0, 0x235398, 0x14fe68] {
+        r.stub(a, |_, _| {});
+    }
+    r.stub(0x23d4d8, |cpu, _| cpu.set_gpr(2, 0));
+    let course = Rc::new(RefCell::new(None::<std::sync::Arc<tricky_game::course_ground::CourseGround>>));
     let l = log.clone();
     // Boarder_TakeOff 0x128470 (ported and checked in tests/orient.rs; its callees are the port's to provide)
     r.stub(0x128470, move |_, _| l.borrow_mut().push(Ev::TakeOff));
@@ -376,7 +428,28 @@ fn world() -> Option<W> {
     });
     let h = hit.clone();
     let (ld, lf) = (landing.clone(), line_from.clone());
+    let (l, c) = (log.clone(), course.clone());
     r.stub(0x25aff8, move |cpu, mem| match *h.borrow() {
+        // `Boarder_WallCollide`'s cast (the shape a `cWorldBoarder`, vtable 0x3a77d8 at +0x40): the course's, of the body at
+        // rider+0x470 with the ground normal the shape holds (+0x2e0)
+        _ if mem.read_u32(cpu.gpr(5) as u32 + 0x40) == 0x3a77d8 => {
+            l.borrow_mut().push(Ev::Wall(mem.read_u32(rd + 0x494)));
+            let course = c.borrow().clone().expect("Boarder_WallCollide ran without the course");
+            let mut b = CollBody::new();
+            b.center = rv(mem, rd + 0x480);
+            b.radius = mem.read_f32(rd + 0x490);
+            b.x24 = mem.read_u32(rd + 0x494) as i32;
+            b.count = (mem.read_u32(rd + 0x498) as i32).clamp(0, 18);
+            for k in 0..18u32 {
+                b.spheres[k as usize] = (rv(mem, rd + 0x4a0 + 0x20 * k), mem.read_f32(rd + 0x4b0 + 0x20 * k));
+            }
+            let (t, h) = wall_cast(&course, &b, rv(mem, cpu.gpr(5) as u32 + 0x2e0));
+            let out = cpu.gpr(6) as u32;
+            wv(mem, out + 0x10, h.pos);
+            wv(mem, out + 0x20, h.normal);
+            mem.write_u32(out + 0x38, h.object);
+            cpu.set_f(0, t);
+        }
         None => cpu.set_f(0, -1.0),
         Some(h) => {
             let out = cpu.gpr(6) as u32;
@@ -435,13 +508,24 @@ fn world() -> Option<W> {
     // a rider that does not land (rec16 8288 r2): the air's wall sweep, `cWorldBoarder::cWorldBoarder` 0x257810 (the
     // body at rider+0x470) and `cWorldBoarder::vf10` 0x257ca0, logged; STANDIN: the sweep's `World_RayCast` answered
     // as a miss (the hit is cleared: the world around the body is not recorded)
+    // (from `Boarder_WallCollide` 0x126250..0x126540, F4h5k: only the vtable set at +0x40, which `World_RayCast`'s
+    // stub tells the wall's cast by)
+    let in_wall = |cpu: &r5900::Cpu| (0x126250..0x126540).contains(&(cpu.gpr(31) as u32));
     let (l, h) = (log.clone(), hit.clone());
-    r.stub(0x257810, move |_, _| {
+    r.stub(0x257810, move |cpu, mem| {
+        if in_wall(cpu) {
+            mem.write_u32(cpu.gpr(4) as u32 + 0x40, 0x3a77d8);
+            return;
+        }
         l.borrow_mut().push(Ev::Call(0x257810));
         *h.borrow_mut() = None;
     });
     let l = log.clone();
-    r.stub(0x257ca0, move |_, _| l.borrow_mut().push(Ev::Call(0x257ca0)));
+    r.stub(0x257ca0, move |cpu, _| {
+        if !in_wall(cpu) {
+            l.borrow_mut().push(Ev::Call(0x257ca0));
+        }
+    });
     for (o, f) in [(0x68, 0x1010), (0x80, 0x1020), (0x98, 0x1030)] {
         r.mem.write_u16(vtable + o, 0);
         r.mem.write_u32(vtable + o + 4, f);
@@ -453,7 +537,7 @@ fn world() -> Option<W> {
     for s in &mut seqs {
         *s = (r.mem.alloc(0x80), r.mem.alloc(0x10), r.mem.alloc(0x10));
     }
-    Some(W { r, rd, stats, motion, log, hit, wall, meter, handler, pad, seqs, air, landing })
+    Some(W { r, rd, stats, motion, log, hit, wall, meter, handler, pad, seqs, air, landing, course })
 }
 
 impl W {
@@ -1567,6 +1651,7 @@ fn tick_runner(g: &mut W, x: &Other, pos: V4, vel: V4, boost: f32, a: &[u8], b: 
     *g.hit.borrow_mut() = x.hit;
     g.wall.set(false);
     g.put(&rider);
+    g.put_walls(None);
     g.r.cpu.set_gpr(4, g.motion as u64);
     g.r.call(0x10a0d8).unwrap_or_else(|e| panic!("another rider's ground tick: {e:?}"));
     let mut r = g.get(&rider);
@@ -1632,6 +1717,7 @@ impl Lift {
         g.r.mem.write_u32(g.rd + 0x1dc, self.x1dc);
         g.r.mem.write_u8(g.stats + 0x17, self.jump_stat);
         g.r.cpu.set_gpr(4, g.motion as u64);
+        g.put_walls(None);
         g.r.call(0x10a0d8).unwrap_or_else(|e| panic!("a take-off's ground tick: {e:?}"));
         if g.log.borrow().contains(&Ev::TakeOff) {
             g.r.cpu.set_gpr(4, g.rd as u64);
@@ -2016,6 +2102,7 @@ fn ground_ticks_against_the_running_game() {
                         *g.hit.borrow_mut() = p.hit;
                         g.wall.set(false);
                         g.put(&rider);
+                        g.put_walls(walls_of(&course, a, &stats[me]).as_ref());
                         g.r.cpu.set_gpr(4, g.motion as u64);
                         g.r.call(0x10a0d8).unwrap_or_else(|e| panic!("tick {} rider {me}: {e:?}", w[0].tick));
                         let mut r = g.get(&rider);
@@ -3114,6 +3201,7 @@ fn takeoff_ticks_against_the_running_game() {
                 g.r.mem.write_f32(g.rd + 0x1c8, crouch0);
                 g.r.mem.write_u32(g.rd + 0x1dc, u32_le(a, 0x1dc));
                 g.r.mem.write_u8(g.stats + 0x17, st[0x17]);
+                g.put_walls(walls_of(&course, a, st).as_ref());
                 g.r.cpu.set_gpr(4, g.motion as u64);
                 g.r.call(0x10a0d8).unwrap_or_else(|e| panic!("tick {} rider {i}: {e:?}", w[0].tick));
                 if g.log.borrow().contains(&Ev::TakeOff) {

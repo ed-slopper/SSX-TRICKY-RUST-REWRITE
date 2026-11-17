@@ -1650,3 +1650,27 @@ rec19, ours (the runner's ways unchanged):
 Instance 1444 of mesa (a surface facing down, normal (−0.0016, −0.358, −0.934), 56–62 cm deep in rider 4's body at
 rec19 6721–6790) is hit by our cast and not by the game's: it has no event script, is not driven, and the show-off
 flag does not change it (row F4h5l). TRICKY_WALL_SKIP=1444 leaves it out; TRICKY_WALLDBG lists the hits.
+
+## F4h5k: the course's walls for the game's way in the runner (2026-11-17)
+
+The recorder writes the course id (0x32de88) in the header (`course N`); the tests map it to the models file
+(inferred names, `course_name`; TRICKY_COURSE still overrides). With the course, the runner's ways run
+`Boarder_WallCollide` 0x126250 as the original (`W::put_walls`: the first sample's body written to rider+0x470,
+the frame's up to +0x4ac0): `World_RayCast` 0x25aff8's stub tells the wall's cast by the shape's vtable (0x3a77d8
+at +0x40, set by the constructor's stub when called from 0x126250..0x126540) and answers it with the course's cast
+of the body in memory and the ground normal the shape holds (+0x2e0). `Boarder_AccumulateImpact`,
+`Boarder_Translate` (+ `CollBody_Translate`), `Boarder_TurnFromWall`, `Boarder_WallImpactCheck` and
+`Boarder_Stumble` run as the original; the sounds, `Broadphase_MoveBox` 0x14fe68, `Rand_Game` (0) and
+`Speech_OnStumble` are stubbed. The other riders' replayed ticks (`tick_runner`, `Lift::runner`) still answer no wall.
+
+rec19 under `fadd=g1` (TRICKY_WALL_SKIP=1444, F4h5l):
+
+| | no walls | the course's walls |
+|---|---|---|
+| take-off ticks whole | 215 of 216 | 216 (all) |
+| ground ticks every field | 55,804 of 56,114 | 55,812 |
+| ground ticks pos right | 55,997 | 56,013 |
+
+Left at 2294 r4 (the bounce): the position exact, the velocity 1–2 ulps off in y and z, the same for ours and the
+runner (so the cast's depth or normal, `CourseGround::ray_cast`, not bit exact), and the state: the ground test's
+`Boarder_SetState` stub only logs, so the stumble's 2 stays 3 there (row F4h5m). rec18 (no course): unchanged.
