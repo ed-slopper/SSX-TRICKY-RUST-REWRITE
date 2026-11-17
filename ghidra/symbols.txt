@@ -2014,7 +2014,7 @@ F 21eb10 cController vf4
 F 2213c8 cCrowdSys vf5
 F 2214a8 cCrowdSys vf6
 F 21e9d0 cController vf7
-F 20e730 cBXAudio vf8
+F 20e730 cBXAudio ListenerLocate
 F 20eaf0 cBXAudio PlayFESound
 F 20df08 cBXAudio vf13
 F 20e430 cBXAudio vf14

@@ -732,3 +732,4 @@
 21d0c0 Audio_LoadAmbientBanks Audio_PlayEventSound
 20fce0 Sfx_StartAirLoop Sfx_StartScrapeLoop
 21b440 Sfx_UpdateAirLoop Sfx_UpdateScrapeLoop
+20e730 cBXAudio::vf8 cBXAudio::ListenerLocate

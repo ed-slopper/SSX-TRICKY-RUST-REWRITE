@@ -101,6 +101,63 @@ fn curves_are_the_executables() {
 }
 
 #[test]
+fn listener_locate_matches_the_original() {
+    let Some(mut r) = runner() else { return };
+    let (app, race, inst, pos, buf) = (r.mem.alloc(0x800), r.mem.alloc(0x400), r.mem.alloc(0x100), r.mem.alloc(0x10), r.mem.alloc(0x10));
+    r.mem.write_u32(0x337c58, app);
+    r.allow(0x2510f8);
+    let mut g = Rng(0x5eed_1234_9876_abcd);
+    for case in 0..40_000 {
+        let listener = g.next() % 2;
+        let has_race = case % 50 != 0;
+        r.mem.write_u32(app + 0x730, if has_race { race } else { 0 });
+        let mut m = [[0f32; 4]; 4];
+        for (i, row) in m.iter_mut().enumerate() {
+            for (j, v) in row.iter_mut().enumerate() {
+                *v = if i == 3 { g.f(-5000.0, 5000.0) } else { g.f(-1.0, 1.0) };
+                if case % 9 == 0 && j < 3 && i < 3 {
+                    *v = (i == j) as u32 as f32;
+                }
+                r.mem.write_f32(race + 0xc0 + listener * 0x80 + 0x10 * i as u32 + 4 * j as u32, *v);
+            }
+        }
+        let mut p = [g.f(-5000.0, 5000.0), g.f(-5000.0, 5000.0), g.f(-5000.0, 5000.0)];
+        if case % 13 == 0 {
+            // on the listener's axes: the angles' special cases
+            m[3] = [0.0, -25.0, 100.0, 1.0];
+            for k in 0..4 {
+                r.mem.write_f32(race + 0xc0 + listener * 0x80 + 0x30 + 4 * k, m[3][k as usize]);
+            }
+            let pick = |g: &mut Rng| [0.0, 300.0, -300.0][(g.next() % 3) as usize];
+            p = [pick(&mut g), pick(&mut g), pick(&mut g)];
+        }
+        for (k, v) in p.iter().enumerate() {
+            r.mem.write_f32(pos + 4 * k as u32, *v);
+        }
+        r.mem.write_u32(inst + 0x68, pos);
+        r.mem.write_u32(inst + 0x84, listener);
+        let pan_on = g.next() % 3 != 0;
+        r.mem.write_u32(0x32ca00, pan_on as u32);
+        r.mem.write_u32(buf + 8, 0xdead_beef);
+        r.cpu.set_gpr(4, 0x1000);
+        r.cpu.set_gpr(5, inst as u64);
+        r.cpu.set_gpr(6, buf as u64);
+        r.call(0x20e730).unwrap_or_else(|e| panic!("case {case}: {e}"));
+        let mine = listener_locate(has_race.then_some(m), p, pan_on);
+        let d2 = r.cpu.f(0);
+        let word = r.mem.read_u32(buf + 8);
+        match mine {
+            None => assert_eq!((d2.to_bits(), word), (1.0f32.to_bits(), 0xdead_beef), "case {case}: no race"),
+            Some(l) => {
+                assert_eq!(d2.to_bits(), l.d2.to_bits(), "case {case}: distance {d2} {}", l.d2);
+                let (a, b) = l.pan.unwrap_or((0, 0));
+                assert_eq!(word, (a as u16 as u32) | (b as u16 as u32) << 16, "case {case}: pan");
+            }
+        }
+    }
+}
+
+#[test]
 fn impact_speed_and_listener_helpers_match_the_original() {
     let Some(mut r) = runner() else { return };
     let rider = r.mem.alloc(0x500);

@@ -15,6 +15,8 @@ use bevy::audio::{PlaybackMode, Volume};
 use bevy::prelude::*;
 use std::collections::HashMap;
 use tricky_game::sfxcalc::{board_input, run_snow_program, BoardIn};
+use tricky_game::bankmon;
+use tricky_game::ps2f::F;
 use tricky_game::sndqueue::{self, LoopInstance, LoopRider, Queue, QueueEnv};
 
 /// The snow sound programs as `Sfx_LoadSurfaceConfig` compiles them (`tricky_data::snowsfx`): per mode (GLIDE,
@@ -76,21 +78,38 @@ fn motion(r: &Rider) -> u32 {
 /// The rider's sound loops as the audio system runs them (row E1b2g7d5i): `Audio_InitRiderSounds` 0x210a38 starts
 /// them when a ride starts (`sndqueue::start_rider_loops`: the scrape, glide and carve loops), and every frame each
 /// loop's bank instance is updated by the callback its queue entry carries (`sndqueue::update_loop`), its volume
-/// (+0x64) and bend heard on the loop's sample. A surface change restarts a loop with the new surface's sample.
-// STANDIN: the player's rider only; the opponents' AI glide loops need the bank monitor's distance fall-off (row
-// E1b2g7d5j)
+/// (+0x64) and bend heard on the loop's sample, through the bank monitor's fall-off from the listener
+/// (`BankInstance_UpdatePositional` 0x20b700). A surface change restarts a loop with the new surface's sample.
+// STANDIN: the player's rider only; the opponents' AI glide loops are row E1b2g7d5j
 #[derive(Resource, Default)]
 pub struct RiderLoops {
     /// the audio system's queue the starts push on (`cSndPlayOpts::cSndPlayOpts` 0x226848's header)
     q: Option<Queue>,
     rider: LoopRider,
-    /// the playing loops: the bank instance (its address the handle), its update, its sample, the voice, the bend
-    voices: Vec<(LoopInstance, u32, String, Entity, i64)>,
+    /// the playing loops
+    voices: Vec<Voice>,
     /// the snow program records' words (cBXAudio + table + surface · 0x50), kept between runs
     words: HashMap<(u32, u32), [i32; 0x14]>,
     handle: u32,
     /// the level the loops were started for; none while not riding
     ride: Option<usize>,
+}
+
+/// A playing loop: its bank instance (the address the handle) and what the monitor keeps of it.
+struct Voice {
+    inst: LoopInstance,
+    /// the update its entry carried (+0x44)
+    update: u32,
+    name: String,
+    e: Entity,
+    /// the bend last set (`BankInstance_SetPitchBend` 0x21e7e0)
+    bend: i64,
+    /// the instance's fall-off (+0x88) and cull (+0x8c) distances, metres
+    far: F,
+    cull: F,
+    /// the distance last seen (+0x5c, −1 unknown) and whether the voice plays (+8)
+    last: F,
+    playing: bool,
 }
 
 /// The player's rider's address as the loops carry it (the instance's owner, +0x80).
@@ -108,8 +127,9 @@ struct LoopEnv<'a> {
     surface: u32,
     rail: u32,
     handle: &'a mut u32,
-    /// the handles `play_pending` gave, in order
-    played: Vec<u32>,
+    /// the handles `play_pending` gave, in order, with the pending volume's two distances set before each
+    played: Vec<(u32, (f32, f32))>,
+    pending: (f32, f32),
     reset: Vec<u32>,
     bends: Vec<(u32, i64)>,
     cancel_break: bool,
@@ -127,7 +147,7 @@ impl QueueEnv for LoopEnv<'_> {
     /// `SndSys_PlayPending` 0x20c948: a handle; the queue's top entry is played once the call is back
     fn play_pending(&mut self) -> u64 {
         *self.handle += 1;
-        self.played.push(*self.handle);
+        self.played.push((*self.handle, self.pending));
         *self.handle as u64
     }
 }
@@ -137,9 +157,10 @@ impl sndqueue::RiderLoopEnv for LoopEnv<'_> {
     fn surface_sound_type(&mut self, _: u32) -> u32 {
         tricky_game::sfxcalc::surface_sound_type(self.motion, self.rail, self.surface)
     }
-    // STANDIN: the loops' fall-off distance (`SndSys_SetPendingVolume` 0x226dd8, 40.0 / 50.0); the listener is the
-    // rider itself
-    fn set_pending_volume(&mut self, _: f32, _: f32) {}
+    /// `SndSys_SetPendingVolume` 0x226dd8: kept for the entry `play_pending` plays next
+    fn set_pending_volume(&mut self, cull: f32, far: f32) {
+        self.pending = (cull, far);
+    }
 }
 
 impl sndqueue::LoopUpdateEnv for LoopEnv<'_> {
@@ -171,12 +192,16 @@ impl sndqueue::LoopUpdateEnv for LoopEnv<'_> {
 
 impl RiderLoops {
     /// The queue's entries `played` started, top first, made into looping voices (`SND_PlayBankSound` 0x2d1718,
-    /// `BankMonitor_AddInstance` 0x20bd68).
+    /// `BankMonitor_AddInstance` 0x20bd68: the fall-off and cull distances from the entry, the distance known at
+    /// once since the entry has a position, `d`).
     // STANDIN: the sound driver, for the bank's exported loop sample (tools/bnk/bnk2wav.py), silent until updated
-    fn take_played(&mut self, played: Vec<u32>, bs: &BoardSounds, commands: &mut Commands) {
+    fn take_played(&mut self, played: Vec<(u32, (f32, f32))>, d: F, bs: &BoardSounds, commands: &mut Commands) {
         let q = self.q.as_mut().expect("the queue");
-        for h in played.into_iter().rev() {
+        for (h, (cull, far)) in played.into_iter().rev() {
             let i = q.count.max(0) as usize;
+            // what `SndSys_SetPendingVolume` did to the entry before it was played
+            sndqueue::set_pending_volume(q, cull, far);
+            let (far, cull) = (F(f32::from_bits(q.a6c[i])), F(f32::from_bits(q.a70[i])));
             q.count -= 1;
             let (id, update) = (q.id[i], q.a44[i][1]);
             let name = format!("board_{id}");
@@ -185,19 +210,24 @@ impl RiderLoops {
                 if std::env::var("TRICKY_BOARDLOG").is_ok() {
                     println!("board loop {name}: handle {h}, update {update:#x}");
                 }
-                self.voices.push((LoopInstance { addr: h, volume: 0 }, update, name, e, 0x40));
+                self.voices.push(Voice { inst: LoopInstance { addr: h, volume: 0 }, update, name, e, bend: 0x40, far, cull, last: d, playing: true });
             }
         }
     }
     fn stop(&mut self, commands: &mut Commands) {
-        for (_, _, _, e, _) in self.voices.drain(..) {
-            commands.entity(e).try_despawn();
+        for v in self.voices.drain(..) {
+            commands.entity(v.e).try_despawn();
         }
         self.q = None;
     }
 
-    /// One frame of the loops: started for a new ride, else each updated, and their voices set.
-    fn frame(&mut self, ride: Option<usize>, r: &Rider, bs: &BoardSounds, fx: f32, pm: &mut crate::pathmusic::PathMusic, commands: &mut Commands, sinks: &mut Query<&mut AudioSink, With<RiderLoop>>) {
+    /// One frame of the loops: started for a new ride, else each updated, and their voices set. `ear` is the
+    /// listener (the camera), `dt` the monitor's step.
+    #[allow(clippy::too_many_arguments)]
+    fn frame(
+        &mut self, ride: Option<usize>, r: &Rider, ear: Option<&GlobalTransform>, dt: f32, bs: &BoardSounds, fx: f32, pm: &mut crate::pathmusic::PathMusic,
+        commands: &mut Commands, sinks: &mut Query<&mut AudioSink, With<RiderLoop>>,
+    ) {
         if ride != self.ride {
             self.stop(commands);
             self.ride = ride;
@@ -205,55 +235,85 @@ impl RiderLoops {
         if self.ride.is_none() {
             return;
         }
-        // the rider's motion, and its sound flag where `WipeoutMotion` mutes and unmutes it
-        // STANDIN: `Sfx_MuteRiderLoops` 0x218318 on entering a wipe-out, `Sfx_UnmuteRiderLoops` 0x218b68 after it
-        // (`Boarder_SetSfxMuted` 0x11f440), for the motion state machine the app's rider lacks
-        self.rider.motion = motion(r);
-        tricky_game::control::set_sfx_muted(&mut self.rider.w5ae4, &mut self.rider.w5af0, matches!(self.rider.motion, 5 | 6) as u32);
+        // the rider's motion; a change mutes or unmutes the loops as the motions' enter and exit routines do
+        let (old, new) = (self.rider.motion, motion(r));
+        self.rider.motion = new;
+        for muted in tricky_game::states::motion_change_sfx_mutes(old, new) {
+            tricky_game::control::set_sfx_muted(&mut self.rider.w5ae4, &mut self.rider.w5af0, muted);
+        }
+        // the rider's emitter (+0x140) where the listener hears it (`cBXAudio::ListenerLocate` 0x20e730)
+        // STANDIN: the app's camera for the race's listener matrix (race +0xc0 + 0x80 per view), in the game's
+        // view axes as we read them (x right, y down, z ahead, cm: inferred), and the pan off (career +0x1668, which
+        // the app's host could not pan by anyway)
+        let d = match ear {
+            Some(cam) => {
+                let v = cam.affine().inverse().transform_point3(r.pos) * 100.0;
+                let id = [[1.0, 0.0, 0.0, 0.0], [0.0, 1.0, 0.0, 0.0], [0.0, 0.0, 1.0, 0.0], [0.0, 0.0, 0.0, 1.0]];
+                let l = tricky_game::sfxcalc::listener_locate(Some(id), [v.x, -v.y, -v.z], false);
+                F(l.map_or(1.0, |l| l.d2)).sqrt()
+            }
+            None => F(1.0),
+        };
         let start = self.q.is_none();
         if start {
             self.q = Some(Queue { header: sndqueue::play_opts_header(), ..Queue::with_capacity(8) });
-            self.rider = LoopRider { addr: RIDER, flag_41c: 1, motion: self.rider.motion, w5ae4: self.rider.w5ae4, ..Default::default() };
+            self.rider = LoopRider { addr: RIDER, flag_41c: 1, motion: self.rider.motion, w5ae4: self.rider.w5ae4, w5af0: self.rider.w5af0, ..Default::default() };
         }
         let q = self.q.as_mut().expect("the queue");
         let mut env = LoopEnv {
             bs, words: &mut self.words, inp: board_in(r), motion: self.rider.motion, surface: r.surface as u32, rail: r.rail_word,
-            handle: &mut self.handle, played: Vec::new(), reset: Vec::new(), bends: Vec::new(), cancel_break: false,
+            handle: &mut self.handle, played: Vec::new(), pending: (0.0, 0.0), reset: Vec::new(), bends: Vec::new(), cancel_break: false,
         };
         if start {
             sndqueue::start_rider_loops(q, &mut self.rider, &mut env);
         } else {
             for v in self.voices.iter_mut() {
-                sndqueue::update_loop(v.1, q, &mut v.0, &mut self.rider, &mut env);
+                sndqueue::update_loop(v.update, q, &mut v.inst, &mut self.rider, &mut env);
             }
         }
         let LoopEnv { played, reset, bends, cancel_break, .. } = env;
         for (h, bend) in bends {
-            if let Some(v) = self.voices.iter_mut().find(|v| v.0.addr == h) {
-                v.4 = bend;
+            if let Some(v) = self.voices.iter_mut().find(|v| v.inst.addr == h) {
+                v.bend = bend;
             }
         }
         self.voices.retain(|v| {
-            let keep = !reset.contains(&v.0.addr);
+            let keep = !reset.contains(&v.inst.addr);
             if !keep {
-                commands.entity(v.3).try_despawn();
+                commands.entity(v.e).try_despawn();
             }
             keep
         });
-        self.take_played(played, bs, commands);
+        self.take_played(played, d, bs, commands);
         if cancel_break {
             pm.cancel_break();
         }
-        for (inst, _, name, e, bend) in &self.voices {
-            if let Ok(mut sink) = sinks.get_mut(*e) {
-                // the instance's volume (0..127) on the bank program's own level; the bend as the driver bends the
-                // voice (`SndHandle_SetPitchBend` 0x2d6a18 → `SNDVoice_CalcPitchMult`)
-                // STANDIN: 0.8, for the sound manager's slot 4 volume (`SndMgr_GetSlot` 0x211f38)
-                sink.set_volume(Volume::Linear(inst.volume.clamp(0, 127) as f32 / 127.0 * bs.level(name) * fx * 0.8));
-                sink.set_speed(bs.pitch(name, *bend as f32).clamp(0.25, 4.0));
+        for v in self.voices.iter_mut() {
+            // the monitor's positional update (`BankInstance_UpdatePositional` 0x20b700, positions and Doppler on):
+            // culled beyond the cull distance and started again within it, the Doppler pitch of the distance
+            // closed, the volume falling off to none at the fall-off distance (30 when 0)
+            if v.cull.ee() != 0.0 {
+                v.playing = if v.playing { d.ee() <= v.cull.ee() } else { d.ee() < v.cull.ee() };
             }
-            if std::env::var("TRICKY_BOARDLOG").is_ok() && inst.volume != 0 {
-                println!("board loop {name}: volume {} bend {bend} motion {}", inst.volume, self.rider.motion);
+            let (mut vol, mut pitch) = (0, F(1.0));
+            if v.playing {
+                if v.last.ee() != -1.0 {
+                    pitch = bankmon::doppler_pitch(v.last - d, F(dt));
+                }
+                let far = if v.far.ee() == 0.0 { F(30.0) } else { v.far };
+                vol = bankmon::instance_distance_volume(v.inst.volume as u32, d, far).min(0x7f);
+            }
+            v.last = d;
+            if let Ok(mut sink) = sinks.get_mut(v.e) {
+                // the volume (0..127) on the bank program's own level; the bend as the driver bends the voice
+                // (`SndHandle_SetPitchBend` 0x2d6a18 → `SNDVoice_CalcPitchMult`) on the monitor's pitch (4096 = 1)
+                // STANDIN: 0.8, for the sound manager's slot 4 volume (`SndMgr_GetSlot` 0x211f38)
+                sink.set_volume(Volume::Linear(vol as f32 / 127.0 * bs.level(&v.name) * fx * 0.8));
+                let p = tricky_game::sndlib::cvt_w((pitch * F(4096.0)).ee()).clamp(0, 0x3fff) as f32 / 4096.0;
+                sink.set_speed((bs.pitch(&v.name, v.bend as f32) * p).clamp(0.25, 4.0));
+            }
+            if std::env::var("TRICKY_BOARDLOG").is_ok() && v.inst.volume != 0 {
+                println!("board loop {}: volume {} heard {vol} at {} m, bend {} motion {}", v.name, v.inst.volume, d.ee(), v.bend, self.rider.motion);
             }
         }
     }
@@ -334,6 +394,7 @@ pub fn board_sound(
     time: Res<Time>, rider: Res<RiderRes>, game: Res<ui::Game>, mode: Res<Mode>, sounds: Res<crate::sound::Sounds>, bs: Res<BoardSounds>,
     list: Res<crate::LevelList>, mut rl: ResMut<RiderLoops>, mut pm: ResMut<crate::pathmusic::PathMusic>,
     mut commands: Commands, mut loops: Query<(Entity, &BoardLoop, &mut AudioSink), Without<RiderLoop>>, mut sinks: Query<&mut AudioSink, With<RiderLoop>>, mut last: Local<Last>,
+    cam: Query<&GlobalTransform, With<Camera3d>>,
 ) {
     if !bs.on { return; }
     let r: &Rider = &rider.0;
@@ -348,7 +409,7 @@ pub fn board_sound(
     };
     // the rider's loops, the game's
     let ride = (*mode == Mode::Ride && game.screen != ui::Screen::Menu).then_some(list.current);
-    rl.frame(ride, r, &bs, fx, &mut pm, &mut commands, &mut sinks);
+    rl.frame(ride, r, cam.single().ok(), dt, &bs, fx, &mut pm, &mut commands, &mut sinks);
     // the game values, in cm/s
     let fwd = r.forward();
     let load = r.vel.dot(fwd).abs() * 100.0;

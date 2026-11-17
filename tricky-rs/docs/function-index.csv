@@ -3546,7 +3546,7 @@ address,size,name,system,status
 0x20ddb0,340,cBXAudio::~cBXAudio,audio,not started
 0x20df08,1316,cBXAudio::vf13_20df08,audio,checked
 0x20e430,768,cBXAudio::vf14_20e430,audio,ported
-0x20e730,776,cBXAudio::vf8_20e730,audio,not started
+0x20e730,776,cBXAudio::ListenerLocate,audio,checked
 0x20ea38,180,cBXAudio::vf15_20ea38,audio,not started
 0x20eaf0,560,cBXAudio::PlayFESound,audio,not started
 0x20ed20,312,Audio_GetListenerRider,audio,ported
@@ -3634,7 +3634,7 @@ address,size,name,system,status
 0x2174f8,2132,Sfx_OnAirEnter,audio,ported
 0x217d50,1172,Sfx_UpdateAir,audio,ported
 0x2181e8,300,Sfx_OnWipeout,audio,ported
-0x218318,12,Sfx_MuteRiderLoops,audio,not started
+0x218318,12,Sfx_MuteRiderLoops,audio,ported
 0x218328,980,Sfx_OnWipeoutImpact,audio,ported
 0x218700,972,Sfx_PlayWipeoutSlide,audio,ported
 0x218b20,72,Sfx_StopWipeoutLoop,audio,ported
@@ -3902,7 +3902,7 @@ address,size,name,system,status
 0x226788,64,cSoundManager::__tf,runtime,host
 0x226848,1144,cSndPlayOpts::cSndPlayOpts,audio,ported
 0x226cc0,280,cSndPlayOpts::~cSndPlayOpts,audio,not started
-0x226dd8,80,SndSys_SetPendingVolume,audio,ported
+0x226dd8,80,SndSys_SetPendingVolume,audio,checked
 0x226e58,44,SndSys_SetEntryCallback,audio,not started
 0x227350,440,SndSys_PushEntryCopy2,audio,not started
 0x227508,428,SndSys_ResetEntry,audio,not started

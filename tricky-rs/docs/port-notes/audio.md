@@ -1681,3 +1681,31 @@ interpreter 60,000 random programs, three mutations caught; the pitch bend in th
   `Sfx_UnmuteRiderLoops` 0x218b68; the slot volume 0.8 for `SndMgr_GetSlot` 0x211f38; no fall-off distance
   (`SndSys_SetPendingVolume` 0x226dd8); the player's rider only (the AI glide loops wait on the bank monitor's
   distance fall-off, row E1b2g7d5j).
+
+## The rider loops heard from the listener (E1b2g7d5j1, `game/src/sfxcalc.rs`, `game/src/sndqueue.rs`, `game/src/states.rs`, `src/boardsound.rs`)
+
+Proven (read in Ghidra; the first two checked in the function runner):
+
+- `cBXAudio::ListenerLocate` 0x20e730 (cBXAudio's vtable 0x39f200 +0x4c, the bank monitor's locate; was `vf8`;
+  `sfxcalc::listener_locate`, 40,000 cases, four mutations caught): no race (gApp +0x730 = 0) → 1.0, the buffer
+  untouched. Else the instance's position (+0x68 → x y z, w 1) through the matrix at race + 0xc0 + the instance's
+  listener (+0x84) · 0x80 (vmulax / vmadday / vmaddaz / vmaddw), then x · 0.01, (y + 25) · 0.01, (z − 100) · 0.01;
+  the answer is (x² + y²) + z² (metres²). With 0x32ca00 (the career's sound mode, +0x1668: 0 mono, 1, 2, 3 from the
+  sound page's choices 8..11, `SoundOptions_Apply` 0x29f178) non-zero, the buffer's halfwords +8 = atan2(x, z) and
+  +0xa = atan2(y, √(x² + z²)) (the inline atan2 around `Math_Atan`), each × 10430.378 truncated; mono writes both
+  0. The race's view blocks: +0xb0 + 0x80·i the view's position (`Audio_GetRiderPos`), +0xc0 its matrix.
+- `SndSys_SetPendingVolume` 0x226dd8 (f12 cull, f13 far, a0 the audio system; `sndqueue::set_pending_volume`, 5,000
+  cases): the top entry's +0x70 = cull, +0x6c = far, or cull when far < 0 (−0.0 counts as not below). The loops pass
+  (40, −1) or (50, −1): fall-off and cull both 40 (50 for the AI glide).
+- The mutes on a motion change (`states::motion_change_sfx_mutes`): `Boarder_ChangeMotionState` 0x11c648 calls
+  `Boarder_ExitMotionState` with a1 still the new motion; `WipeoutMotion_Exit` 0x10d680 unmutes unless it is 6,
+  `WipeOutRecoverMotion_Exit` 0x110290 unmutes, `WipeoutMotion_Enter` 0x10c198 mutes, `GroundMotion_Enter` 0x109858
+  unmutes (`Sfx_MuteRiderLoops` 0x218318 / `Sfx_UnmuteRiderLoops` 0x218b68 are `Boarder_SetSfxMuted`(rider, 1 / 0)).
+  So the loops stay muted from the wipe-out through the recovery. Also seen: `WipeoutMotion_Enter` keeps the surface
+  (+0x290) in +0x310 and sets +0x290 = 10 (the loops' surface sound type is then 7).
+
+In the app (`src/boardsound.rs`): each loop's voice is heard as the monitor's positional update hears it
+(`BankInstance_UpdatePositional` 0x20b700 with `bankmon::doppler_pitch` and `instance_distance_volume`): culled beyond
+40 m, the volume falling off as the square to none at 40 m, the Doppler pitch on the voice's pitch. Stand-ins: the
+listener is the app's camera in the game's view axes as we read them (x right, y down, z ahead: inferred, not
+proven), the pan is off; the motion word still comes from the app's rider state (row E1b2g7d5j2).

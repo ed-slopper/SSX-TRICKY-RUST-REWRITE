@@ -108,6 +108,29 @@ pub fn set_motion(motion: &mut u32, new: u32) -> Vec<Change> {
     out
 }
 
+/// The rider's sound loops' mutes a motion change makes ([`set_motion`]'s routines, in order), each the argument of
+/// `Boarder_SetSfxMuted` 0x11f440 (`control::set_sfx_muted`): `WipeoutMotion_Exit` 0x10d680 unmutes
+/// (`Sfx_UnmuteRiderLoops` 0x218b68) unless the new motion (its a1, passed through `Boarder_ExitMotionState`) is 6,
+/// `WipeOutRecoverMotion_Exit` 0x110290 unmutes; `WipeoutMotion_Enter` 0x10c198 mutes (`Sfx_MuteRiderLoops`
+/// 0x218318), `GroundMotion_Enter` 0x109858 unmutes. The routines' other work is not here.
+pub fn motion_change_sfx_mutes(old: u32, new: u32) -> Vec<u32> {
+    let mut out = Vec::new();
+    if new == old {
+        return out;
+    }
+    match old {
+        5 if new != 6 => out.push(0),
+        6 => out.push(0),
+        _ => {}
+    }
+    match new {
+        5 => out.push(1),
+        2 => out.push(0),
+        _ => {}
+    }
+    out
+}
+
 /// `Boarder_SetState` 0x11f608: as [`set_motion`] for the control state.
 pub fn set_state(state: &mut u32, new: u32) -> Vec<Change> {
     if new == *state {

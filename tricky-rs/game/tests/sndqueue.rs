@@ -2261,3 +2261,23 @@ fn loop_updates_match_the_original() {
     }
     assert!(seen.iter().all(|&n| n > 5_000), "{seen:?}");
 }
+
+#[test]
+fn set_pending_volume_matches_the_original() {
+    let Some(mut r) = runner() else { return };
+    let mut g = Rng(0x7e57_0001_d00d_beef);
+    let (_, sys, l) = setup(&mut r, 0x10);
+    for case in 0..5_000 {
+        fill(&mut r, sys, &l, &mut g);
+        let mut q = read(&mut r, &l);
+        let cull = [40.0f32, 31.0, 50.0, 0.0][(g.next() % 4) as usize];
+        let far = [-1.0f32, 0.0, -0.0, 12.5, 80.0][(g.next() % 5) as usize];
+        r.cpu.set_f(12, cull);
+        r.cpu.set_f(13, far);
+        r.cpu.set_gpr(4, sys as u64);
+        r.call(0x226dd8).unwrap_or_else(|e| panic!("case {case}: {e}"));
+        set_pending_volume(&mut q, cull, far);
+        let theirs = read(&mut r, &l);
+        assert_eq!((theirs.a6c, theirs.a70), (q.a6c, q.a70), "case {case}");
+    }
+}

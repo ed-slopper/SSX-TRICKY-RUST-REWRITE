@@ -56,6 +56,15 @@ impl Queue {
     }
 }
 
+/// `SndSys_SetPendingVolume` 0x226dd8 (`cull`, `far`, the audio system): the top entry's cull distance (+0x70) =
+/// `cull`, its fall-off distance (+0x6c) = `far`, or `cull` when `far` is below 0 (metres; `BankMonitor_AddInstance`
+/// copies them to the instance's +0x8c and +0x88).
+pub fn set_pending_volume(q: &mut Queue, cull: f32, far: f32) {
+    let i = q.count as usize;
+    q.a70[i] = cull.to_bits();
+    q.a6c[i] = if 0.0 <= far { far } else { cull }.to_bits();
+}
+
 /// What the queue's users call out to.
 pub trait QueueEnv {
     /// `SndMgr_GetSlot` 0x211f38 (the audio system, 4).

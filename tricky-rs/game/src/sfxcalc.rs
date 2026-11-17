@@ -69,6 +69,34 @@ pub fn impact_speed(normal: V4, vel: V4) -> i32 {
     if v < 0 { v.wrapping_neg() } else { v }
 }
 
+/// What `cBXAudio::ListenerLocate` answers: the squared distance (metres²) and, with the pan on, the two angles
+/// (the buffer's halfwords +8 and +0xa, 0x10000 to a turn).
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct Located {
+    pub d2: f32,
+    pub pan: Option<(i16, i16)>,
+}
+
+/// `cBXAudio::ListenerLocate` 0x20e730 (the monitor's virtual +0x4c: the audio system, the bank instance, a
+/// buffer), as `BankInstance_UpdatePositional` asks it: the sound's position (instance +0x68 → x y z, w = 1) through
+/// the listener's matrix (the race (gApp +0x730) + 0xc0 + the instance's listener (+0x84) · 0x80; rows weighted x, y,
+/// z, w on the vector unit), moved by (0, 25, −100) and made metres (× 0.01). With the pan on (0x32ca00 set) the
+/// angle about the up axis (atan2 of x over z) and the lift (atan2 of y over the flat length), × 10430.378 and
+/// truncated, else both 0. No race: 1.0 and the buffer untouched (`None`).
+pub fn listener_locate(m: Option<[[f32; 4]; 4]>, pos: [f32; 3], pan_on: bool) -> Option<Located> {
+    let m = m?;
+    let p = [pos[0], pos[1], pos[2], 1.0];
+    let lane = |l: usize| ((m[0][l] * p[0] + m[1][l] * p[1]) + m[2][l] * p[2]) + m[3][l] * p[3];
+    let (x, y, z) = (lane(0) * 0.01, (lane(1) + 25.0) * 0.01, (lane(2) + -100.0) * 0.01);
+    let pan = pan_on.then(|| {
+        let turn = |a: f32| crate::sndlib::cvt_w(a * 10430.378) as i16;
+        let az = turn(crate::jump::atan2_inline(x, z));
+        let flat = (x * x + z * z).sqrt();
+        (az, turn(crate::jump::atan2_inline(y, flat)))
+    });
+    Some(Located { d2: (x * x + y * y) + z * z, pan })
+}
+
 /// The rider fields the snow sound programs' inputs read: the ground normal (+0x320), the velocity (+0x150), the
 /// float at +0x160 and the one at +0x214.
 #[derive(Clone, Copy, Debug)]
