@@ -1089,6 +1089,9 @@ pub fn self_test(world: &mut CollisionWorld, rails: &Rails, line: &[Vec3], cours
     let mut grind = 0.0f32;
     let (mut crashes, mut was_down, mut stumbles, mut was_stumble) = (0u32, false, 0u32, false);
     let mut jolts = 0u32;
+    // row G21: the rider going back and forth: ticks moving against the last tick's move, and the heading's turn
+    // flipping its sign tick after tick (by more than 0.5 degree each way)
+    let (mut prev_step, mut backs, mut prev_dyaw, mut prev_yaw, mut wobbles) = (Vec3::ZERO, 0u32, 0.0f32, 0.0f32, 0u32);
     let mut last_seen = String::new();
     // the race lines, the player's place on them as the game keeps it (row E1b2g7b)
     let mut race = Race { race_lines: race_lines.cloned(), course_no, state: RaceState::Running, ..Race::new(line.to_vec()) };
@@ -1165,6 +1168,20 @@ pub fn self_test(world: &mut CollisionWorld, rails: &Rails, line: &[Vec3], cours
                 println!("put back at t {t:.1}: was at {:.1?}, now {:.1?} (line point {} at {:.1?}), air {:.1} s, {why}", before, r.pos, ai.idx, line[ai.idx.min(line.len() - 1)], air_before);
             }
         }
+        let step = r.pos - before;
+        if r.grounded && r.crashed <= 0.0 && step.length() < 3.0 {
+            if step.dot(prev_step) < -1e-6 {
+                backs += 1;
+                if std::env::var("TRICKY_JITTER").is_ok() { println!("  t {t:.3}: moved back: {:.4?} after {:.4?}", step, prev_step); }
+            }
+            let dyaw = wrap(r.yaw - prev_yaw);
+            if dyaw * prev_dyaw < 0.0 && dyaw.abs() > 0.0087 && prev_dyaw.abs() > 0.0087 {
+                wobbles += 1;
+                if std::env::var("TRICKY_JITTER").is_ok() { println!("  t {t:.3}: heading turned {:.2} deg after {:.2} deg", dyaw.to_degrees(), prev_dyaw.to_degrees()); }
+            }
+            prev_dyaw = dyaw;
+        }
+        (prev_step, prev_yaw) = (step, r.yaw);
         if r.rail.is_some() { grind += dt; }
         dist += (r.pos - before).length();
         if r.grounded != was_grounded { flips += 1; was_grounded = r.grounded; }
@@ -1228,6 +1245,7 @@ pub fn self_test(world: &mut CollisionWorld, rails: &Rails, line: &[Vec3], cours
     }
     println!("frames where the camera distance jumped by more than 25 cm: {pumps}");
     println!("frames where the rider's own speed changed abruptly (>0.15 m/frame): {}", rider_jerk.iter().filter(|j| j.0 > 0.15).count());
+    println!("ticks on the snow moving back against the last tick: {backs}; heading turning back and forth (>0.5 deg each way): {wobbles}");
     println!("wipe-outs: {crashes}, stumbles: {stumbles}, score {}, last trick \"{}\"", r.score, r.last_trick);
     println!("ground/air switches: {flips} ({:.1} per second)", flips as f32 / t.max(1.0));
     println!("distance {:.0} m, top speed {:.0} km/h, airborne {:.0} s, on rails {:.0} s, autopilot stuck {} times, fell out of the world {} times (put back on the line after {} of them), moved more than 3 m in a step with no respawn {} times", dist, top * 3.6, air, grind, ai.stuck + stuck, r.respawns - ai.stuck - ai.rejoins - stuck, ai.rejoins, jolts);

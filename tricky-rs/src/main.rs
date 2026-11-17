@@ -77,7 +77,18 @@ struct Shot { path: String, frame: u32 }
 #[derive(Resource)]
 struct World(CollisionWorld);
 #[derive(Resource)]
-struct RiderRes(Rider);
+struct RiderRes(Rider, DrawLerp);
+
+/// Row G21: the rider drawn between its last two ticks. The game runs one 60 Hz tick per frame on a 60 Hz screen;
+/// here a frame runs zero, one or two ticks, so a rider drawn where its last tick left it moves in steps while the
+/// camera's filters move every frame, and it looks to stutter back and forth. STANDIN: our frame pacing for a
+/// screen that is not the PS2's (the host's, no counterpart in the game): the model and the camera follow the
+/// place `alpha` of a tick on from the place before the last tick.
+#[derive(Default, Clone, Copy)]
+struct DrawLerp { prev: Vec3, alpha: f32 }
+impl DrawLerp {
+    fn at(&self, pos: Vec3) -> Vec3 { if (pos - self.prev).length() > 3.0 { pos } else { self.prev.lerp(pos, self.alpha) } }
+}
 #[derive(Resource, Default)]
 struct CamRes(ChaseCam);
 #[derive(Resource)]
@@ -423,7 +434,7 @@ fn main() {
     .insert_resource(LevelRes(level))
     .insert_resource(Overlay { rails: false, help: true })
     .insert_resource(World(world))
-    .insert_resource(RiderRes(Rider::new(start + Vec3::Y * 0.5, start_yaw)))
+    .insert_resource(RiderRes(Rider::new(start + Vec3::Y * 0.5, start_yaw), DrawLerp::default()))
     .insert_resource(mode)
     .insert_resource(RailsRes(rails))
     .insert_resource(RaceRes(Race { ai_paths, course, paths, tube, cml, stage, finish_area, race_lines, course_no, ..Race::new(line) }))
@@ -1075,7 +1086,7 @@ fn switch_level(
     list.current = next as usize;
     for e in &old { commands.entity(e).despawn(); }
     spawn_level(&mut commands, &loaded.level, &mut meshes, &mut images, &mut materials, ui::CareerRes::mode(game.event));
-    commands.insert_resource(RiderRes(Rider::new(loaded.start + Vec3::Y * 0.5, loaded.yaw)));
+    commands.insert_resource(RiderRes(Rider::new(loaded.start + Vec3::Y * 0.5, loaded.yaw), DrawLerp::default()));
     commands.insert_resource(make_opponents(loaded.start, loaded.yaw, lib.player, lib.chars.len(), 0, 0));
     commands.insert_resource(World(loaded.world));
     commands.insert_resource(RailsRes(loaded.rails));
@@ -1643,7 +1654,7 @@ fn ride(
 ) {
     // the AI skill clock, and the frame time not yet run as ticks (row E1a1)
     let (skill_clock, tick_bank) = &mut *clocks;
-    let r = &mut rider.0;
+    let RiderRes(r, lerp) = &mut *rider;
     let key = |a: KeyCode, b: KeyCode| keys.pressed(a) || keys.pressed(b);
     let up = key(KeyCode::KeyW, KeyCode::ArrowUp);
     let down = key(KeyCode::KeyS, KeyCode::ArrowDown);
@@ -1885,6 +1896,7 @@ fn ride(
     *tick_bank = (*tick_bank + time.dt.min(0.1)).min(0.1 + TICK);
     while *tick_bank >= TICK * (1.0 - 1e-3) {
         *tick_bank -= TICK;
+        lerp.prev = r.pos;
         let dt = TICK;
         // TRICKY_AUTOPLAY: the player's rider drives itself (for screenshots and checks)
         let input = if !waiting && std::env::var("TRICKY_AUTOPLAY").is_ok() {
@@ -2114,6 +2126,7 @@ fn ride(
             props::throw_all(&mut props.0, &thrown);
         }
     }
+    lerp.alpha = (*tick_bank / TICK).clamp(0.0, 1.0);
     // across the line: the heat is over
     // show-off ends when its clock runs out
     if playing && game.event == ui::Event::ShowOff && race.0.state == RaceState::Running && race.0.time >= ui::showoff(&ui::track_key(&list)).1 + race.0.bonus {
@@ -2555,14 +2568,32 @@ fn animate(set: &AnimSet, kind_set: Option<(&AnimSet, &str)>, cm: Option<&AnimSe
     Some(out)
 }
 
-fn rider_model(time: Res<SmoothDt>, rider: Res<RiderRes>, model: Option<Single<&mut Transform, (With<RiderModel>, Without<RiderVisual>)>>) {
+fn rider_model(time: Res<SmoothDt>, rider: Res<RiderRes>, model: Option<Single<&mut Transform, (With<RiderModel>, Without<RiderVisual>)>>, mut g21: Local<(Vec3, Vec3, Vec<(f32, f32)>)>) {
     let Some(mut model) = model else { return };
     let r = &rider.0;
+    // TRICKY_G21: how evenly the rider moves from frame to frame, drawn where its last tick left it and as drawn
+    // (row G21): the spread of each frame's move over its frame time, as a fraction of the mean, once 120 frames
+    if std::env::var("TRICKY_G21").is_ok() && time.dt > 0.0 {
+        let (raw, drawn) = (r.pos, rider.1.at(r.pos));
+        let (a, b) = ((raw - g21.0).length() / time.dt, (drawn - g21.1).length() / time.dt);
+        if a < 100.0 && b < 100.0 { g21.2.push((a, b)); }
+        (g21.0, g21.1) = (raw, drawn);
+        if g21.2.len() >= 120 {
+            let spread = |f: &dyn Fn(&(f32, f32)) -> f32| {
+                let m = g21.2.iter().map(f).sum::<f32>() / g21.2.len() as f32;
+                let v = g21.2.iter().map(|x| (f(x) - m).powi(2)).sum::<f32>() / g21.2.len() as f32;
+                (m, v.sqrt() / m.max(1e-3))
+            };
+            let ((m, sa), (_, sb)) = (spread(&|x| x.0), spread(&|x| x.1));
+            println!("g21: speed {m:.1} m/s, frame-to-frame spread: last tick {:.0}%, drawn {:.0}%", sa * 100.0, sb * 100.0);
+            g21.2.clear();
+        }
+    }
     let up = if r.grounded || r.air_time < 0.15 { r.normal } else { Vec3::Y };
     let h = heading(r.yaw);
     let fwd = (h - up * h.dot(up)).normalize_or(h);
     let target = Transform::from_translation(r.pos).looking_to(fwd, up).rotation;
-    model.translation = r.pos + tricky_game::rider::ground_tick::port_dir(r.up) * (r.body_height * 0.01);
+    model.translation = rider.1.at(r.pos) + tricky_game::rider::ground_tick::port_dir(r.up) * (r.body_height * 0.01);
     model.rotation = model.rotation.slerp(target, 1.0 - (-14.0 * time.dt).exp());
 }
 
@@ -2651,6 +2682,9 @@ fn chase_camera(
     *flash = (*flash - time.dt).max(0.0);
     for mut t in label.iter_mut() { t.0 = if *flash > 0.0 { chase.0.name().to_uppercase() } else { String::new() }; }
     let (mut pos, mut look) = chase.0.update(&world.0, &rider.0, time.dt);
+    // the camera on the rider as drawn (row G21, `DrawLerp`)
+    let shift = rider.1.at(rider.0.pos) - rider.0.pos;
+    (pos, look) = (pos + shift, look + shift);
     let mut roll = chase.0.roll;
     if game.screen == ui::Screen::Menu {
         // the menu looks at the chosen rider in the gate, circling slowly
