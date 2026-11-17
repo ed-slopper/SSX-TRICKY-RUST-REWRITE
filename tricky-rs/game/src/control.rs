@@ -576,6 +576,18 @@ pub fn start_line_offset(x60: f32) -> f32 {
     (F(x60) * F(90.0) - F(90.0)).0
 }
 
+/// `Boarder_SetSfxMuted` 0x11f440 (the rider, muted): the sound flag +0x5ae4 set to `muted` when it differs, and
+/// when that clears it the loops' fade-in count +0x5af0 = 5 (the audio system's mute of the rider's loops passes 1,
+/// its unmute 0).
+pub fn set_sfx_muted(flag: &mut u32, fade: &mut i32, muted: u32) {
+    if *flag != muted {
+        *flag = muted;
+        if muted == 0 {
+            *fade = 5;
+        }
+    }
+}
+
 /// `Boarder_TickSfxFadeIn` 0x11f468: +0x5af0 counted down, its old value (0 once there)
 pub fn tick_sfx_fade_in(n: &mut i32) -> i32 {
     let v = *n;

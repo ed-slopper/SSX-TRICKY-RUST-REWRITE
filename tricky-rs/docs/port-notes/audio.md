@@ -905,7 +905,7 @@ Read in Ghidra (`SLUS_203.26`) and checked against the ported Rust code where th
   - `Sfx_StartGlideLoop` 0x210048 (from `Sfx_StartRiderLoops` and its own update): the human's rider (+0x41c = 1)
     gets zboard program surface·8 + 4 with `Sfx_UpdateGlideLoop` 0x21b508 (made a function in Ghidra) and pending
     volume 40; an AI rider program surface·8 + 6 with `Sfx_UpdateAiGlideLoop` 0x21b628 and 50.
-  - The updates, per tick: `Sfx_UpdateAirLoop` 0x21b440 (curves 5 and 6 of `Sfx_ImpactSpeed` while +0x424 = 2),
+  - The updates, per tick: `Sfx_UpdateScrapeLoop` 0x21b440 (curves 5 and 6 of `Sfx_ImpactSpeed` while +0x424 = 2),
     `Sfx_UpdateGlideLoop` (GLIDE programs at cBXAudio +0x745c), `Sfx_UpdateAiGlideLoop` (AIGLIDE, +0x777c, only
     while +0x424 is 2 or 3), `Sfx_UpdateCarveLoop` 0x21b718 (CARVE, +0x7a9c; restarts `Sfx_StartCarveLoop` when
     the surface changes). The program's volume goes to the instance's +0x64 (divided by `Boarder_TickSfxFadeIn`,
@@ -1619,12 +1619,12 @@ Proven (checked in the function runner, 30,000 cases, eight mutations caught):
   rider's loops (`Race_GetRider` 0x1814a8 on `gApp` 0x337c58 +0x730; the count +0x1c → +0x88 read again after each
   rider) and clears the audio system's +0x38a0.
 - `Sfx_StartRiderLoops` 0x210ad0 keeps the rider's motion (+0x424) in +0x788 / +0x78c and its surface sound type
-  (`Sfx_SurfaceSoundType` 0x20f908) in +0x790 / +0x794, then starts the air, glide and carve loops.
+  (`Sfx_SurfaceSoundType` 0x20f908) in +0x790 / +0x794, then starts the scrape, glide and carve loops.
 - Each loop is a queue entry of kind 1, volume 0, the slot (`SndMgr_GetSlot` 4), the rider's emitter (+0x140), the
   rider as the owner (+0x64), +0x7c cleared, an update callback at +0x44 (a pointer to member: halfwords 0 and -1,
   then the function), `SndSys_SetPendingVolume`(v, -1.0), then played:
-  - air (`Sfx_StartAirLoop` 0x20fce0): the player's rider only (+0x41c == 1), sound 0, the listener asked,
-    40.0, `Sfx_UpdateAirLoop` 0x21b440;
+  - scrape (`Sfx_StartScrapeLoop` 0x20fce0, named `Sfx_StartAirLoop` until E1b2g7d5i): the player's rider only (+0x41c == 1), sound 0, the listener asked,
+    40.0, `Sfx_UpdateScrapeLoop` 0x21b440;
   - glide (`Sfx_StartGlideLoop` 0x210048): the player's rider sound `surface*8+4`, listener, 40.0,
     `Sfx_UpdateGlideLoop` 0x21b508; any other rider sound `surface*8+6`, no listener, 50.0,
     `Sfx_UpdateAiGlideLoop` 0x21b628;
@@ -1641,10 +1641,10 @@ interpreter 60,000 random programs, three mutations caught; the pitch bend in th
 - Each update gets the audio system and the loop's bank instance; the rider is the instance's +0x80, the volume goes
   to the instance's +0x64 and the bend (64 = none) to `BankInstance_SetPitchBend` 0x21e7e0 (`SND_Lock`,
   `SndHandle_SetPitchBend` 0x2d6a18 on the instance's handle +4, `SND_Unlock`; `bankmon::set_pitch_bend`).
-- The end the air, glide and carve updates share: the rider's sound flag (+0x5ae4) set → volume and bend 0; then
+- The end the scrape, glide and carve updates share: the rider's sound flag (+0x5ae4) set → volume and bend 0; then
   `Boarder_TickSfxFadeIn` 0x11f468 (+0x5af0 counted down) and, while its old value is above 0, the volume divided
   by it (integer). The AI glide has neither.
-- `Sfx_UpdateAirLoop` 0x21b440: in the air (+0x424 = 2) volume = `Sfx_EvalCurve`(5, impact) and bend =
+- `Sfx_UpdateScrapeLoop` 0x21b440 (named `Sfx_UpdateAirLoop` until E1b2g7d5i): on the ground (+0x424 = 2; 1 is the air) volume = `Sfx_EvalCurve`(5, impact) and bend =
   `Sfx_EvalCurve`(6, impact) of `Sfx_ImpactSpeed` 0x21a6a8; otherwise 0 and 64.
 - `Sfx_UpdateGlideLoop` 0x21b508: a motion other than +0x788 is stored there and, unless it is 1, the music's
   break is cancelled (`Music_CancelBreak` 0x2257d8 with the audio system and 0). Off motion 1: a surface sound type
@@ -1658,4 +1658,26 @@ interpreter 60,000 random programs, three mutations caught; the pitch bend in th
   else the CARVE program (+0x7a9c) runs (the surface asked a second time for it).
 - `Sfx_RunSnowProgram` 0x21ae90 (`sfxcalc::run_snow_program`, ported earlier, now checked): the record is
   [0] the program, [1..0x10] the stack, [0x11] pc, [0x12] sp, [0x13] the accumulator (kept between runs).
-- Not in the app yet: `src/boardsound.rs` still runs its own loops (row E1b2g7d5i).
+- In the app since E1b2g7d5i (below).
+
+## The app's board loops on the ported loops (E1b2g7d5i, `src/boardsound.rs`)
+
+- `RiderLoops` (a resource) keeps a queue (`sndqueue::play_opts_header`), the player's `LoopRider` and the playing
+  loops. When a ride starts it calls `sndqueue::start_rider_loops` (as `Audio_InitRiderSounds` 0x210a38 does); each
+  frame after that, `sndqueue::update_loop` on every loop with the callback word its queue entry carried (+0x44).
+  The entries `SndSys_PlayPending` played become looping voices of `board_<sound>` (the bank's exported sample).
+- Volume: the instance's +0x64 (0..127) / 127 on the program's own level; bend: the driver's pitch formula
+  (`BoardSounds::pitch`, `SndHandle_SetPitchBend` 0x2d6a18 → `SNDVoice_CalcPitchMult`).
+- The curves of `Sfx_EvalCurve` 0x20d928 are the executable's table at 0x343098 (`sfxcalc::CURVES`, checked
+  against the binary by `tests/sfxcalc.rs`: slot 5 the scrape's volume, 6 its bend).
+- `Boarder_SetSfxMuted` 0x11f440 ported (`control::set_sfx_muted`: +0x5ae4 set when it differs; cleared → +0x5af0 =
+  5, the fade-in `Boarder_TickSfxFadeIn` divides by).
+- `Music_CancelBreak` 0x2257d8 goes to the race's music (`PathMusic::cancel_break`).
+- Renamed: 0x20fce0 `Sfx_StartAirLoop` → `Sfx_StartScrapeLoop`, 0x21b440 `Sfx_UpdateAirLoop` →
+  `Sfx_UpdateScrapeLoop`: the loop sounds on motion 2, the ground (1 is the air), and plays zboard sound 0, the slow
+  scrape.
+- Stand-ins left (`STANDIN:` in `src/boardsound.rs`): the motion word read from the app's rider state (no
+  `Boarder_EnterMotionState` 0x11c710); mute on wipe-out / recovery for `Sfx_MuteRiderLoops` 0x218318 /
+  `Sfx_UnmuteRiderLoops` 0x218b68; the slot volume 0.8 for `SndMgr_GetSlot` 0x211f38; no fall-off distance
+  (`SndSys_SetPendingVolume` 0x226dd8); the player's rider only (the AI glide loops wait on the bank monitor's
+  distance fall-off, row E1b2g7d5j).

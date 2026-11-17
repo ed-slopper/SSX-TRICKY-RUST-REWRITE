@@ -502,6 +502,16 @@ fn rumble_and_helpers_are_the_original() {
         let mut m = n;
         assert_eq!(r.cpu.gpr(2) as i32, control::tick_sfx_fade_in(&mut m), "case {case}: fade in");
         assert_eq!(r.mem.read_u32(blk + 0x5af0) as i32, m);
+        // Boarder_SetSfxMuted 0x11f440: the sound flag and the fade-in count
+        let (flag, fade, muted) = (g.below(3), g.below(4) as i32 - 1, g.below(3));
+        r.mem.write_u32(blk + 0x5ae4, flag);
+        r.mem.write_u32(blk + 0x5af0, fade as u32);
+        r.cpu.set_gpr(4, blk as u64);
+        r.cpu.set_gpr(5, muted as u64);
+        r.call(0x11f440).unwrap();
+        let (mut f1, mut n1) = (flag, fade);
+        control::set_sfx_muted(&mut f1, &mut n1, muted);
+        assert_eq!((r.mem.read_u32(blk + 0x5ae4), r.mem.read_u32(blk + 0x5af0) as i32), (f1, n1), "case {case}: sfx muted");
         let (ph, ticks) = (g.below(6) as i32, g.below(300) as i32);
         r.mem.write_u32(fo + 8, ph as u32);
         r.mem.write_u32(fo + 0xc, ticks as u32);

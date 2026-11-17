@@ -6531,7 +6531,7 @@ G 212960 Audio_PlayFEScreenChange
 G 212428 Audio_PlayFERiderChange
 G 20f630 Audio_PlayBigAirWind
 G 2106c0 Sfx_StartCarveLoop
-G 20fce0 Sfx_StartAirLoop
+G 20fce0 Sfx_StartScrapeLoop
 G 21fc98 CrowdBox_StartSound
 G 21a210 Audio_PlayScoreTick
 G 233ff0 Speech_OnTenSecondsLeft
@@ -7901,7 +7901,7 @@ G 14f940 ContactIndex_Push
 F 13a4b8 cComputer LoadSnapshot
 F 153450 cPlayer LoadSnapshot
 G 210048 Sfx_StartGlideLoop
-G 21b440 Sfx_UpdateAirLoop
+G 21b440 Sfx_UpdateScrapeLoop
 G 21b508 Sfx_UpdateGlideLoop
 G 21b628 Sfx_UpdateAiGlideLoop
 G 21b718 Sfx_UpdateCarveLoop

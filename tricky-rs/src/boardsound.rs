@@ -4,9 +4,10 @@
 //! from `audio/snow.inf` that turn the board's load, slip, dig and lean into volume and bend.
 //!
 //! Board program = surface group * 8 + slot: 1 landing, 2 takeoff, 3 carve loop, 4 glide loop.
-//! Program 0 is the slow scrape. The loops follow the ground every frame; changing surface
-//! restarts them with the new group's samples. When these files are there, the stand-in
-//! loops and effects in `sound.rs` stand aside.
+//! Program 0 is the slow scrape. The three loops are the game's (row E1b2g7d5i): started by
+//! `sndqueue::start_rider_loops` and run every frame by `sndqueue::update_loop`, which restart
+//! them with the new group's samples when the surface changes. When these files are there, the
+//! stand-in loops and effects in `sound.rs` stand aside.
 
 use crate::rider::Rider;
 use crate::{ui, LevelRes, Mode, RiderRes};
@@ -14,31 +15,30 @@ use bevy::audio::{PlaybackMode, Volume};
 use bevy::prelude::*;
 use std::collections::HashMap;
 use tricky_game::sfxcalc::{board_input, run_snow_program, BoardIn};
+use tricky_game::sndqueue::{self, LoopInstance, LoopRider, Queue, QueueEnv};
 
-/// The snow sound programs as `Sfx_LoadSurfaceConfig` compiles them (`tricky_data::snowsfx`): per surface section
-/// name, per sub-section (GLIDE, AIGLIDE, CARVE), the game's own bytes, run by `sfxcalc::run_snow_program`.
+/// The snow sound programs as `Sfx_LoadSurfaceConfig` compiles them (`tricky_data::snowsfx`): per mode (GLIDE,
+/// AIGLIDE, CARVE), per surface sound type (PACK .. CHUTE), the game's own bytes, run by `sfxcalc::run_snow_program`.
 #[derive(Default)]
-struct Programs(HashMap<(String, String), Vec<u8>>);
+struct Programs(Vec<Vec<Vec<u8>>>);
 
 impl Programs {
     fn parse(text: &str) -> Self {
-        use tricky_data::snowsfx::{compile_all, MODES, SURFACES};
-        let mut out = HashMap::new();
-        for (mi, progs) in compile_all(text.as_bytes()).into_iter().enumerate() {
-            for (si, p) in progs.into_iter().enumerate() {
-                out.insert((SURFACES[si].to_string(), MODES[mi].to_string()), p);
-            }
-        }
-        Self(out)
+        Self(tricky_data::snowsfx::compile_all(text.as_bytes()))
     }
-    /// Run a program as the game's interpreter does (`FUN_0021ae90` 0x21ae90): (volume, bend), both 0..127
-    /// (bend 64 = no change). A program that divides by zero stops there (the original's `break 7`) and gives nothing.
-    fn run(&self, surface: &str, part: &str, b: &BoardIn) -> Option<(f32, f32)> {
-        let prog = self.0.get(&(surface.to_string(), part.to_string()))?;
-        let mut w = [0i32; 0x14];
-        let (mut vol, mut bend) = (0i32, 64i32);
-        run_snow_program(prog, &mut w, &mut |n| board_input(n, b), &mut vol, &mut bend).ok()?;
-        Some(((vol as f32).clamp(0.0, 127.0), (bend as f32).clamp(0.0, 127.0)))
+    /// `Sfx_RunSnowProgram` 0x21ae90 on the record at cBXAudio + `table` + `surface` · 0x50 (`sndqueue::GLIDE_PROGRAMS`
+    /// and the others), its words `w` kept between runs as the record keeps them. A program that divides by zero
+    /// stops there, `vol` and `bend` as far as it got.
+    // STANDIN: the stop, for the original's `break 7` (a crash on the console)
+    fn run(&self, table: u32, surface: u32, w: &mut [i32; 0x14], b: &BoardIn, vol: &mut i32, bend: &mut i32) {
+        let mode = match table {
+            sndqueue::GLIDE_PROGRAMS => 0,
+            sndqueue::AI_GLIDE_PROGRAMS => 1,
+            _ => 2,
+        };
+        if let Some(prog) = self.0.get(mode).and_then(|m| m.get(surface as usize)) {
+            let _ = run_snow_program(prog, w, &mut |n| board_input(n, b), vol, bend);
+        }
     }
 }
 
@@ -57,20 +57,211 @@ fn board_in(r: &Rider) -> BoardIn {
     }
 }
 
-/// The surface groups (`Audio_SurfaceGroup`) and their snow.inf sections.
-fn group(surface: u8) -> (usize, &'static str) {
-    match surface {
-        0 | 3 | 4 => (1, "POWDER"),
-        2 => (2, "LOOSE"),
-        5 | 6 => (3, "ICE"),
-        13 => (4, "METAL"),
-        12 => (5, "WOOD"),
-        9..=11 => (7, "ROCK"),
-        14 => (8, "GLASS"),
-        18 | 19 => (9, "CHUTE"),
-        _ => (0, "PACK"),
+/// The rider's motion as the audio system reads it (+0x424: 1 air, 2 ground, 3 a rail, 5 wiped out, 6 recovering).
+// STANDIN: the app's rider has no motion word (`Boarder_EnterMotionState` 0x11c710); read from its own state
+fn motion(r: &Rider) -> u32 {
+    if r.crashed > 0.0 {
+        5
+    } else if r.recover.is_some() {
+        6
+    } else if r.rail.is_some() {
+        3
+    } else if r.grounded {
+        2
+    } else {
+        1
     }
 }
+
+/// The rider's sound loops as the audio system runs them (row E1b2g7d5i): `Audio_InitRiderSounds` 0x210a38 starts
+/// them when a ride starts (`sndqueue::start_rider_loops`: the scrape, glide and carve loops), and every frame each
+/// loop's bank instance is updated by the callback its queue entry carries (`sndqueue::update_loop`), its volume
+/// (+0x64) and bend heard on the loop's sample. A surface change restarts a loop with the new surface's sample.
+// STANDIN: the player's rider only; the opponents' AI glide loops need the bank monitor's distance fall-off (row
+// E1b2g7d5j)
+#[derive(Resource, Default)]
+pub struct RiderLoops {
+    /// the audio system's queue the starts push on (`cSndPlayOpts::cSndPlayOpts` 0x226848's header)
+    q: Option<Queue>,
+    rider: LoopRider,
+    /// the playing loops: the bank instance (its address the handle), its update, its sample, the voice, the bend
+    voices: Vec<(LoopInstance, u32, String, Entity, i64)>,
+    /// the snow program records' words (cBXAudio + table + surface · 0x50), kept between runs
+    words: HashMap<(u32, u32), [i32; 0x14]>,
+    handle: u32,
+    /// the level the loops were started for; none while not riding
+    ride: Option<usize>,
+}
+
+/// The player's rider's address as the loops carry it (the instance's owner, +0x80).
+// STANDIN: a token, the app's rider has no address
+const RIDER: u32 = 0x0100_0000;
+
+/// What the loops' starts and updates ask of the audio system and the rider.
+struct LoopEnv<'a> {
+    bs: &'a BoardSounds,
+    words: &'a mut HashMap<(u32, u32), [i32; 0x14]>,
+    inp: BoardIn,
+    /// the rider's motion, its surface (+0x290) and the audio system's rail word (+0x6e40, the rail's word
+    /// `Rail_TryCapture` 0x125cb8 stores)
+    motion: u32,
+    surface: u32,
+    rail: u32,
+    handle: &'a mut u32,
+    /// the handles `play_pending` gave, in order
+    played: Vec<u32>,
+    reset: Vec<u32>,
+    bends: Vec<(u32, i64)>,
+    cancel_break: bool,
+}
+
+impl QueueEnv for LoopEnv<'_> {
+    // STANDIN: the sound manager's slots (`SndMgr_GetSlot` 0x211f38), for the volume `SndSys_PlayPending` scales by
+    fn get_slot(&mut self, _: u32) -> u32 {
+        0
+    }
+    // STANDIN: the listener's rider (`Audio_GetRiderListener` 0x20fc60); the app has one listener, the player
+    fn rider_listener(&mut self) -> u32 {
+        1
+    }
+    /// `SndSys_PlayPending` 0x20c948: a handle; the queue's top entry is played once the call is back
+    fn play_pending(&mut self) -> u64 {
+        *self.handle += 1;
+        self.played.push(*self.handle);
+        *self.handle as u64
+    }
+}
+
+impl sndqueue::RiderLoopEnv for LoopEnv<'_> {
+    /// `Sfx_SurfaceSoundType` 0x20f908
+    fn surface_sound_type(&mut self, _: u32) -> u32 {
+        tricky_game::sfxcalc::surface_sound_type(self.motion, self.rail, self.surface)
+    }
+    // STANDIN: the loops' fall-off distance (`SndSys_SetPendingVolume` 0x226dd8, 40.0 / 50.0); the listener is the
+    // rider itself
+    fn set_pending_volume(&mut self, _: f32, _: f32) {}
+}
+
+impl sndqueue::LoopUpdateEnv for LoopEnv<'_> {
+    /// `Sfx_ImpactSpeed` 0x21a6a8
+    fn impact_speed(&mut self, _: u32) -> i32 {
+        board_input(0, &self.inp)
+    }
+    /// `Sfx_EvalCurve` 0x20d928 on the executable's curves
+    fn eval_curve(&mut self, slot: u32, x: i32) -> i64 {
+        tricky_game::sfxcalc::eval_slot(slot, x as i64)
+    }
+    /// `Music_CancelBreak` 0x2257d8, sent to the race's music once the update is back
+    fn cancel_break(&mut self) {
+        self.cancel_break = true;
+    }
+    /// `BankInstance_Reset` 0x20a9d8: stopped and freed once the update is back
+    fn reset_instance(&mut self, inst: u32) {
+        self.reset.push(inst);
+    }
+    fn run_snow_program(&mut self, table: u32, surface: u32, _: u32, vol: &mut i32, bend: &mut i32) {
+        let w = self.words.entry((table, surface)).or_insert([0; 0x14]);
+        self.bs.programs.run(table, surface, w, &self.inp, vol, bend);
+    }
+    /// `BankInstance_SetPitchBend` 0x21e7e0
+    fn set_pitch_bend(&mut self, inst: u32, bend: i64) {
+        self.bends.push((inst, bend));
+    }
+}
+
+impl RiderLoops {
+    /// The queue's entries `played` started, top first, made into looping voices (`SND_PlayBankSound` 0x2d1718,
+    /// `BankMonitor_AddInstance` 0x20bd68).
+    // STANDIN: the sound driver, for the bank's exported loop sample (tools/bnk/bnk2wav.py), silent until updated
+    fn take_played(&mut self, played: Vec<u32>, bs: &BoardSounds, commands: &mut Commands) {
+        let q = self.q.as_mut().expect("the queue");
+        for h in played.into_iter().rev() {
+            let i = q.count.max(0) as usize;
+            q.count -= 1;
+            let (id, update) = (q.id[i], q.a44[i][1]);
+            let name = format!("board_{id}");
+            if let Some(src) = bs.get_loop(&name) {
+                let e = commands.spawn((AudioPlayer::new(src), PlaybackSettings { mode: PlaybackMode::Loop, volume: Volume::Linear(0.0), ..default() }, RiderLoop)).id();
+                if std::env::var("TRICKY_BOARDLOG").is_ok() {
+                    println!("board loop {name}: handle {h}, update {update:#x}");
+                }
+                self.voices.push((LoopInstance { addr: h, volume: 0 }, update, name, e, 0x40));
+            }
+        }
+    }
+    fn stop(&mut self, commands: &mut Commands) {
+        for (_, _, _, e, _) in self.voices.drain(..) {
+            commands.entity(e).try_despawn();
+        }
+        self.q = None;
+    }
+
+    /// One frame of the loops: started for a new ride, else each updated, and their voices set.
+    fn frame(&mut self, ride: Option<usize>, r: &Rider, bs: &BoardSounds, fx: f32, pm: &mut crate::pathmusic::PathMusic, commands: &mut Commands, sinks: &mut Query<&mut AudioSink, With<RiderLoop>>) {
+        if ride != self.ride {
+            self.stop(commands);
+            self.ride = ride;
+        }
+        if self.ride.is_none() {
+            return;
+        }
+        // the rider's motion, and its sound flag where `WipeoutMotion` mutes and unmutes it
+        // STANDIN: `Sfx_MuteRiderLoops` 0x218318 on entering a wipe-out, `Sfx_UnmuteRiderLoops` 0x218b68 after it
+        // (`Boarder_SetSfxMuted` 0x11f440), for the motion state machine the app's rider lacks
+        self.rider.motion = motion(r);
+        tricky_game::control::set_sfx_muted(&mut self.rider.w5ae4, &mut self.rider.w5af0, matches!(self.rider.motion, 5 | 6) as u32);
+        let start = self.q.is_none();
+        if start {
+            self.q = Some(Queue { header: sndqueue::play_opts_header(), ..Queue::with_capacity(8) });
+            self.rider = LoopRider { addr: RIDER, flag_41c: 1, motion: self.rider.motion, w5ae4: self.rider.w5ae4, ..Default::default() };
+        }
+        let q = self.q.as_mut().expect("the queue");
+        let mut env = LoopEnv {
+            bs, words: &mut self.words, inp: board_in(r), motion: self.rider.motion, surface: r.surface as u32, rail: r.rail_word,
+            handle: &mut self.handle, played: Vec::new(), reset: Vec::new(), bends: Vec::new(), cancel_break: false,
+        };
+        if start {
+            sndqueue::start_rider_loops(q, &mut self.rider, &mut env);
+        } else {
+            for v in self.voices.iter_mut() {
+                sndqueue::update_loop(v.1, q, &mut v.0, &mut self.rider, &mut env);
+            }
+        }
+        let LoopEnv { played, reset, bends, cancel_break, .. } = env;
+        for (h, bend) in bends {
+            if let Some(v) = self.voices.iter_mut().find(|v| v.0.addr == h) {
+                v.4 = bend;
+            }
+        }
+        self.voices.retain(|v| {
+            let keep = !reset.contains(&v.0.addr);
+            if !keep {
+                commands.entity(v.3).try_despawn();
+            }
+            keep
+        });
+        self.take_played(played, bs, commands);
+        if cancel_break {
+            pm.cancel_break();
+        }
+        for (inst, _, name, e, bend) in &self.voices {
+            if let Ok(mut sink) = sinks.get_mut(*e) {
+                // the instance's volume (0..127) on the bank program's own level; the bend as the driver bends the
+                // voice (`SndHandle_SetPitchBend` 0x2d6a18 → `SNDVoice_CalcPitchMult`)
+                // STANDIN: 0.8, for the sound manager's slot 4 volume (`SndMgr_GetSlot` 0x211f38)
+                sink.set_volume(Volume::Linear(inst.volume.clamp(0, 127) as f32 / 127.0 * bs.level(name) * fx * 0.8));
+                sink.set_speed(bs.pitch(name, *bend as f32).clamp(0.25, 4.0));
+            }
+            if std::env::var("TRICKY_BOARDLOG").is_ok() && inst.volume != 0 {
+                println!("board loop {name}: volume {} bend {bend} motion {}", inst.volume, self.rider.motion);
+            }
+        }
+    }
+}
+
+/// A voice of the rider's loops.
+#[derive(Component)]
+pub struct RiderLoop;
 
 /// piecewise-linear curve through points, clamped at the ends
 fn curve(pts: &[(f32, f32)], x: f32) -> f32 {
@@ -80,22 +271,19 @@ fn curve(pts: &[(f32, f32)], x: f32) -> f32 {
 }
 
 #[derive(Component, Clone, Copy, PartialEq)]
-pub enum BoardLoop { Scrape, Glide, Carve, Wind, Boost }
+pub enum BoardLoop { Wind, Boost }
 
 #[derive(Resource, Default)]
 pub struct BoardSounds { pub on: bool, files: HashMap<String, Handle<AudioSource>>, programs: Programs,
     /// per program (bank tags): root note, bend range (semitones), volume, detune (cents)
     meta: HashMap<String, (f32, f32, f32, f32)> }
 
-/// The sound driver's pitch (`SNDVoice_CalcPitchMult`): cents = detune − (root − 60)·100 +
-/// (bend − 64)·range·100/64, ratio 2^(cents/1200); bend does nothing without a range.
-#[derive(Component, Clone)]
-pub struct Prog(String);
-
 impl BoardSounds {
     pub fn get(&self, name: &str) -> Option<Handle<AudioSource>> { self.files.get(name).cloned() }
     /// the loop part of a looping sample (else the whole sample)
     fn get_loop(&self, name: &str) -> Option<Handle<AudioSource>> { self.files.get(&format!("{name}_loop")).or(self.files.get(name)).cloned() }
+    /// The sound driver's pitch (`SNDVoice_CalcPitchMult`): cents = detune − (root − 60)·100 +
+    /// (bend − 64)·range·100/64, ratio 2^(cents/1200); bend does nothing without a range.
     pub fn pitch(&self, name: &str, bend: f32) -> f32 {
         let (root, range, _, detune) = self.meta.get(name).copied().unwrap_or((60.0, 0.0, 127.0, 0.0));
         let cents = detune - (root - 60.0) * 100.0 + (bend - 64.0) * range * 100.0 / 64.0;
@@ -105,6 +293,7 @@ impl BoardSounds {
 }
 
 pub fn setup_board_sound(mut commands: Commands, level: Res<LevelRes>, mut assets: ResMut<Assets<AudioSource>>) {
+    commands.insert_resource(RiderLoops::default());
     let audio_of = |p: &std::path::Path| p.parent().and_then(|p| p.parent()).map(|p| p.join("audio"));
     let given = std::path::absolute(&level.0.dir).unwrap_or(level.0.dir.clone());
     let real = std::fs::canonicalize(&level.0.dir).unwrap_or(given.clone());
@@ -131,23 +320,25 @@ pub fn setup_board_sound(mut commands: Commands, level: Res<LevelRes>, mut asset
             s.meta.insert(format!("{prefix}_{k}"), (g("root", 60.0), g("bend", 0.0), g("vol", 127.0), g("detune", 0.0)));
         }
     }
-    s.on = s.files.contains_key("board_4") && !s.programs.0.is_empty();
-    println!("board sounds: {} samples, {} snow programs{}", s.files.len(), s.programs.0.len(), if s.on { "" } else { " (not used)" });
+    s.on = s.files.contains_key("board_4") && s.programs.0.iter().any(|m| !m.is_empty());
+    println!("board sounds: {} samples, {} snow programs{}", s.files.len(), s.programs.0.iter().map(Vec::len).sum::<usize>(), if s.on { "" } else { " (not used)" });
     commands.insert_resource(s);
 }
 
 /// What changed since last frame.
 #[derive(Default)]
-pub struct Last { vel: Vec3, grounded: bool, crashed: bool, grab: u8, boosting: bool, mult: u32, speed_t: f32, spin_t: f32, respawns: u32, uber: bool, group: Option<usize> }
+pub struct Last { vel: Vec3, grounded: bool, crashed: bool, grab: u8, boosting: bool, mult: u32, speed_t: f32, spin_t: f32, respawns: u32, uber: bool }
 
 #[allow(clippy::too_many_arguments)]
 pub fn board_sound(
     time: Res<Time>, rider: Res<RiderRes>, game: Res<ui::Game>, mode: Res<Mode>, sounds: Res<crate::sound::Sounds>, bs: Res<BoardSounds>,
-    mut commands: Commands, mut loops: Query<(Entity, &BoardLoop, &mut AudioSink, Option<&Prog>)>, mut last: Local<Last>,
+    list: Res<crate::LevelList>, mut rl: ResMut<RiderLoops>, mut pm: ResMut<crate::pathmusic::PathMusic>,
+    mut commands: Commands, mut loops: Query<(Entity, &BoardLoop, &mut AudioSink), Without<RiderLoop>>, mut sinks: Query<&mut AudioSink, With<RiderLoop>>, mut last: Local<Last>,
 ) {
     if !bs.on { return; }
     let r: &Rider = &rider.0;
     let dt = time.delta_secs().max(1e-4);
+    // STANDIN: silent in the menus and while paused, for the game's pause of every voice (`Audio_PauseAll`)
     let fx = if sounds.effects && *mode == Mode::Ride && !matches!(game.screen, ui::Screen::Menu | ui::Screen::Paused) { 1.0 } else { 0.0 };
     let play = |commands: &mut Commands, name: &str, vol: f32, speed: f32| {
         if fx <= 0.0 { return; }
@@ -155,48 +346,27 @@ pub fn board_sound(
             commands.spawn((AudioPlayer::new(h), PlaybackSettings { mode: PlaybackMode::Despawn, volume: Volume::Linear(vol * bs.level(name) * 0.9), speed: speed * bs.pitch(name, 64.0), ..default() }));
         }
     };
+    // the rider's loops, the game's
+    let ride = (*mode == Mode::Ride && game.screen != ui::Screen::Menu).then_some(list.current);
+    rl.frame(ride, r, &bs, fx, &mut pm, &mut commands, &mut sinks);
     // the game values, in cm/s
     let fwd = r.forward();
     let load = r.vel.dot(fwd).abs() * 100.0;
-    let inp = board_in(r);
-    let on_ground = (r.grounded || r.rail.is_some()) && r.crashed <= 0.0;
-    // on a rail: the RAIL programs and samples (group 6)
-    let (g, sect) = if r.rail.is_some() { (6, "RAIL") } else { group(r.surface) };
-    // the loops: restarted with the new surface's samples when the surface changes
-    if last.group != Some(g) {
-        last.group = Some(g);
-        for (e, kind, _, _) in &loops { if matches!(kind, BoardLoop::Glide | BoardLoop::Carve) { commands.entity(e).despawn(); } }
-        for (kind, slot) in [(BoardLoop::Glide, 4), (BoardLoop::Carve, 3)] {
-            let name = format!("board_{}", g * 8 + slot);
-            if let Some(h) = bs.get_loop(&name) {
-                commands.spawn((AudioPlayer::new(h), PlaybackSettings { mode: PlaybackMode::Loop, volume: Volume::Linear(0.0), ..default() }, kind, Prog(name)));
-            }
-        }
-    }
-    if !loops.iter().any(|l| *l.1 == BoardLoop::Scrape) {
-        if let Some(h) = bs.get_loop("board_0") { commands.spawn((AudioPlayer::new(h), PlaybackSettings { mode: PlaybackMode::Loop, volume: Volume::Linear(0.0), ..default() }, BoardLoop::Scrape, Prog("board_0".into()))); }
-        if let Some(h) = bs.get_loop("sfx_32") { commands.spawn((AudioPlayer::new(h), PlaybackSettings { mode: PlaybackMode::Loop, volume: Volume::Linear(0.0), ..default() }, BoardLoop::Wind, Prog("sfx_32".into()))); }
-    }
-    let glide = bs.programs.run(sect, "GLIDE", &inp).unwrap_or((0.0, 64.0));
-    let carve = bs.programs.run(sect, "CARVE", &inp).unwrap_or((0.0, 64.0));
+    // the surface's sound group (`Sfx_SurfaceSoundType` 0x20f908) for the one-shots below
+    let g = tricky_game::sfxcalc::surface_sound_type(motion(r), r.rail_word, r.surface as u32);
     // big air: the wind comes up as the music ducks (Audio_BigAirMusicDuck)
+    // STANDIN: our wind loop (zbxsfx 32) and its level, for the game's big-air sound
+    if !loops.iter().any(|l| *l.1 == BoardLoop::Wind) {
+        if let Some(h) = bs.get_loop("sfx_32") { commands.spawn((AudioPlayer::new(h), PlaybackSettings { mode: PlaybackMode::Loop, volume: Volume::Linear(0.0), ..default() }, BoardLoop::Wind)); }
+    }
     let t_air = if !r.grounded && r.rail.is_none() { r.air_time } else { 0.0 };
     let duck = if t_air > 1.5 && r.crashed <= 0.0 { (1.0 - (1.0 - 16.0 / 127.0) * 0.5 * t_air).clamp(16.0 / 127.0, 1.0) } else { 1.0 };
-    let crash_fade = if r.crashed > 0.0 { 0.0 } else { 1.0 };
-    for (_, kind, mut sink, prog) in &mut loops {
-        let name = prog.map_or("", |p| p.0.as_str());
-        let (vol, b) = match kind {
-            BoardLoop::Scrape if r.grounded && r.rail.is_none() => (curve(&[(10.0, 0.0), (60.0, 127.0), (200.0, 100.0), (300.0, 0.0)], load) / 127.0, curve(&[(10.0, 0.0), (30.0, 30.0), (500.0, 80.0), (900.0, 127.0)], load)),
-            BoardLoop::Glide if on_ground => (glide.0 / 127.0, glide.1),
-            BoardLoop::Carve if on_ground => (carve.0 / 127.0, carve.1),
-            BoardLoop::Wind => (1.0 - duck, 64.0),
-            _ => (0.0, 64.0),
-        };
-        let speed = bs.pitch(name, b);
-        let want = vol * bs.level(name) * fx * crash_fade * 0.8;
-        let now = sink.volume().to_linear();
-        sink.set_volume(Volume::Linear(now + (want - now) * (1.0 - (-dt * 30.0).exp())));
-        sink.set_speed(speed.clamp(0.25, 4.0));
+    for (_, kind, mut sink) in &mut loops {
+        if *kind == BoardLoop::Wind {
+            let want = (1.0 - duck) * bs.level("sfx_32") * fx * 0.8;
+            let now = sink.volume().to_linear();
+            sink.set_volume(Volume::Linear(now + (want - now) * (1.0 - (-dt * 30.0).exp())));
+        }
     }
     // one-shots
     let landed = r.grounded && !last.grounded && r.crashed <= 0.0;
@@ -225,11 +395,11 @@ pub fn board_sound(
         if let Some(h) = bs.get(&format!("sfx_{id}")) { if fx > 0.0 { commands.spawn((AudioPlayer::new(h), PlaybackSettings { mode: PlaybackMode::Despawn, volume: Volume::Linear(0.8), ..default() }, BoardLoop::Boost)); } }
     }
     if !r.boosting && last.boosting {
-        for (e, kind, _, _) in &loops { if *kind == BoardLoop::Boost { commands.entity(e).despawn(); } }
+        for (e, kind, _) in &loops { if *kind == BoardLoop::Boost { commands.entity(e).despawn(); } }
         if r.boost <= 0.0 { play(&mut commands, "sfx_108", 0.8, 1.0); }
     }
     *last = Last { vel: r.vel, grounded: r.grounded || r.rail.is_some(), crashed: r.crashed > 0.0, grab: r.grab, boosting: r.boosting, mult: r.multiplier, speed_t: r.speed_timer, spin_t: r.spin_timer,
-        respawns: r.respawns, uber: r.uber_ready(), group: last.group };
+        respawns: r.respawns, uber: r.uber_ready() };
 }
 
 #[cfg(test)]
@@ -240,10 +410,14 @@ mod tests {
         let text = "[PACK]\n[ICE]\n    [GLIDE]\n        Load Dig\n        Map 127\n        AssignVol\n        Load 64\n        AssignBend\n[POWDER]\n    [GLIDE]\n        Load Slip\n        Bound 0, 10\n        AssignVol\n";
         let p = Programs::parse(text);
         let b = BoardIn { normal: [1.0, 0.0, 0.0, 0.0], vel: [300.0, 0.0, 0.0, 0.0], f160: -50.0, f214: 0.5 };
-        let ice = p.run("ICE", "GLIDE", &b).unwrap();
-        let pow = p.run("POWDER", "GLIDE", &b).unwrap();
-        assert_eq!(ice.1, 64.0);
-        assert!(ice.0 >= 0.0 && ice.0 <= 127.0);
-        assert!(pow.0 <= 10.0);
+        let run = |surface: u32| {
+            let (mut w, mut vol, mut bend) = ([0; 0x14], 0, 64);
+            p.run(sndqueue::GLIDE_PROGRAMS, surface, &mut w, &b, &mut vol, &mut bend);
+            (vol, bend)
+        };
+        let (ice, pow) = (run(3), run(1));
+        assert_eq!(ice.1, 64);
+        assert!((0..=127).contains(&ice.0));
+        assert!(pow.0 <= 10);
     }
 }

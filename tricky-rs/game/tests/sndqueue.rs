@@ -2113,7 +2113,7 @@ fn rider_loops_match_the_original() {
         let mut e = RiderLoopsEnv(or.clone(), list);
         let mut w = w38a0;
         match which {
-            0 => start_air_loop(&mut q, &mine_riders[0], &mut e),
+            0 => start_scrape_loop(&mut q, &mine_riders[0], &mut e),
             1 | 3 => start_glide_loop(&mut q, &mine_riders[0], surface, &mut e),
             2 => start_carve_loop(&mut q, &mine_riders[0], surface, &mut e),
             4 => start_rider_loops(&mut q, &mut mine_riders[0], &mut e),
@@ -2241,7 +2241,7 @@ fn loop_updates_match_the_original() {
         let mut mine_i = LoopInstance { addr: inst, volume: r.mem.read_u32(inst + 0x64) as i32 };
         or.borrow_mut().vals = vals.clone();
         or.borrow_mut().log.clear();
-        let f = [AIR_LOOP_UPDATE, GLIDE_LOOP_UPDATE, AI_GLIDE_LOOP_UPDATE, CARVE_LOOP_UPDATE][which as usize];
+        let f = [SCRAPE_LOOP_UPDATE, GLIDE_LOOP_UPDATE, AI_GLIDE_LOOP_UPDATE, CARVE_LOOP_UPDATE][which as usize];
         r.cpu.set_gpr(4, sys as u64);
         r.cpu.set_gpr(5, inst as u64);
         r.call(f).unwrap_or_else(|e| panic!("case {case}: {e}"));

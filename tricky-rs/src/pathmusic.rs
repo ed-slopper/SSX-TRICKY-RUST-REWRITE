@@ -278,6 +278,14 @@ impl PathMusic {
     pub fn zone(&self) -> u32 {
         self.engine.as_ref().map_or(0, |e| e.0.mem.r32(tricky_game::musichost::SYS + 0x6e50))
     }
+
+    /// `Music_CancelBreak` 0x2257d8 (the audio system, 0), as the rider's glide loop asks it off the air
+    /// (`sndqueue::update_glide_loop`); nothing without the game's music system
+    pub fn cancel_break(&mut self) {
+        if let Some((h, d)) = self.engine.as_mut() {
+            h.cancel_break(&mut d.lock().unwrap(), false);
+        }
+    }
 }
 
 pub fn plugin(app: &mut App) { app.add_audio_source::<PfStream>().init_resource::<PathMusic>(); }

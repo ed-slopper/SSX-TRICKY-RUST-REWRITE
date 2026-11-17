@@ -44,6 +44,25 @@ pub fn eval_curve(xs: [i16; 4], ys: [i16; 4], x: i64) -> i64 {
     }
 }
 
+/// The curves `Sfx_EvalCurve` reads (0x343098, 0x10 bytes a slot: four x then four y shorts), as the executable
+/// holds them: 0 and 7 impacts, 5 and 6 the scrape loop's volume and bend (`sndqueue::update_scrape_loop`).
+pub const CURVES: [([i16; 4], [i16; 4]); 8] = [
+    ([100, 300, 800, 1200], [22, 60, 100, 127]),
+    ([100, 300, 800, 2000], [11, 30, 60, 120]),
+    ([200, 400, 550, 800], [33, 70, 100, 127]),
+    ([100, 1000, 2000, 4000], [20, 70, 100, 127]),
+    ([500, 1000, 1500, 2000], [0, 10, 20, 40]),
+    ([10, 60, 200, 300], [0, 127, 100, 0]),
+    ([10, 30, 500, 900], [0, 30, 80, 127]),
+    ([100, 800, 1200, 1600], [80, 90, 105, 127]),
+];
+
+/// `Sfx_EvalCurve` 0x20d928 on the executable's curve `slot` ([`CURVES`]).
+pub fn eval_slot(slot: u32, x: i64) -> i64 {
+    let (xs, ys) = CURVES[slot as usize];
+    eval_curve(xs, ys, x)
+}
+
 /// `Sfx_ImpactSpeed`: |(int)(rider+0x320 · rider+0x150)| (the vector unit's dot, x y z), the truncation saturating.
 pub fn impact_speed(normal: V4, vel: V4) -> i32 {
     let v = dot(normal, vel) as i32;

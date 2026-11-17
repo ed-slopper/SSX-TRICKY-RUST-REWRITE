@@ -90,6 +90,17 @@ fn eval_curve_matches_the_original() {
 }
 
 #[test]
+fn curves_are_the_executables() {
+    let Some(mut r) = runner() else { return };
+    for (slot, (xs, ys)) in CURVES.iter().enumerate() {
+        let mut b = [0u8; 16];
+        r.mem.read(0x343098 + slot as u32 * 16, &mut b).expect("mapped");
+        let h = |k: usize| i16::from_le_bytes([b[2 * k], b[2 * k + 1]]);
+        assert_eq!((std::array::from_fn(h), std::array::from_fn(|k| h(k + 4))), (*xs, *ys), "slot {slot}");
+    }
+}
+
+#[test]
 fn impact_speed_and_listener_helpers_match_the_original() {
     let Some(mut r) = runner() else { return };
     let rider = r.mem.alloc(0x500);

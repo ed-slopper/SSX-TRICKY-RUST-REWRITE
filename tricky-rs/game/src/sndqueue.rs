@@ -884,7 +884,7 @@ pub struct LoopRider {
     pub addr: u32,
     /// +0x41c: 1 for the player's own rider.
     pub flag_41c: u32,
-    /// +0x424: the rider's motion (2 air, 3 a rail).
+    /// +0x424: the rider's motion (1 air, 2 ground, 3 a rail).
     pub motion: u32,
     /// +0x788 / +0x78c: the motion the loops last saw.
     pub w788: u32,
@@ -906,9 +906,9 @@ pub trait RiderLoopEnv: QueueEnv {
 }
 
 /// The update callbacks the loops' entries carry (+0x44: a pointer to member, no this-adjust, no vtable index, the
-/// function): `Sfx_UpdateAirLoop` 0x21b440, `Sfx_UpdateGlideLoop` 0x21b508, `Sfx_UpdateAiGlideLoop` 0x21b628,
+/// function): `Sfx_UpdateScrapeLoop` 0x21b440, `Sfx_UpdateGlideLoop` 0x21b508, `Sfx_UpdateAiGlideLoop` 0x21b628,
 /// `Sfx_UpdateCarveLoop` 0x21b718.
-pub const AIR_LOOP_UPDATE: u32 = 0x21b440;
+pub const SCRAPE_LOOP_UPDATE: u32 = 0x21b440;
 pub const GLIDE_LOOP_UPDATE: u32 = 0x21b508;
 pub const AI_GLIDE_LOOP_UPDATE: u32 = 0x21b628;
 pub const CARVE_LOOP_UPDATE: u32 = 0x21b718;
@@ -930,10 +930,11 @@ fn start_loop(q: &mut Queue, r: &LoopRider, id: u32, update: u32, listen: bool, 
     env.play_pending();
 }
 
-/// `Sfx_StartAirLoop` 0x20fce0 (the audio system, the rider): the player's rider's air loop, sound 0.
-pub fn start_air_loop(q: &mut Queue, r: &LoopRider, env: &mut dyn RiderLoopEnv) {
+/// `Sfx_StartScrapeLoop` 0x20fce0 (the audio system, the rider): the player's rider's scrape loop, sound 0 (zboard's slow
+/// scrape; it sounds only on the ground, see [`update_scrape_loop`]).
+pub fn start_scrape_loop(q: &mut Queue, r: &LoopRider, env: &mut dyn RiderLoopEnv) {
     if r.flag_41c == 1 {
-        start_loop(q, r, 0, AIR_LOOP_UPDATE, true, 40.0, env);
+        start_loop(q, r, 0, SCRAPE_LOOP_UPDATE, true, 40.0, env);
     }
 }
 
@@ -965,7 +966,7 @@ pub fn start_rider_loops(q: &mut Queue, r: &mut LoopRider, env: &mut dyn RiderLo
     r.w788 = motion;
     r.w790 = surface;
     r.w794 = surface;
-    start_air_loop(q, r, env);
+    start_scrape_loop(q, r, env);
     start_glide_loop(q, r, surface, env);
     start_carve_loop(q, r, surface, env);
 }
@@ -1040,9 +1041,9 @@ fn finish_loop(inst: &mut LoopInstance, r: &mut LoopRider, mut vol: i32, mut ben
     env.set_pitch_bend(inst.addr, bend);
 }
 
-/// `Sfx_UpdateAirLoop` 0x21b440 (the audio system, the instance): in the air (+0x424 = 2) the volume and bend are
+/// `Sfx_UpdateScrapeLoop` 0x21b440 (the audio system, the instance): on the ground (+0x424 = 2) the volume and bend are
 /// curves 5 and 6 of the impact speed, else silent with bend 64.
-pub fn update_air_loop(inst: &mut LoopInstance, r: &mut LoopRider, env: &mut dyn LoopUpdateEnv) {
+pub fn update_scrape_loop(inst: &mut LoopInstance, r: &mut LoopRider, env: &mut dyn LoopUpdateEnv) {
     let (mut vol, mut bend) = (0, 0x40);
     if r.motion == 2 {
         let x = env.impact_speed(r.addr);
@@ -1123,7 +1124,7 @@ pub fn update_carve_loop(q: &mut Queue, inst: &mut LoopInstance, r: &mut LoopRid
 /// The update an entry's callback word (+0x44) names, run on its instance.
 pub fn update_loop(update: u32, q: &mut Queue, inst: &mut LoopInstance, r: &mut LoopRider, env: &mut dyn LoopUpdateEnv) {
     match update {
-        AIR_LOOP_UPDATE => update_air_loop(inst, r, env),
+        SCRAPE_LOOP_UPDATE => update_scrape_loop(inst, r, env),
         GLIDE_LOOP_UPDATE => update_glide_loop(q, inst, r, env),
         AI_GLIDE_LOOP_UPDATE => update_ai_glide_loop(q, inst, r, env),
         CARVE_LOOP_UPDATE => update_carve_loop(q, inst, r, env),

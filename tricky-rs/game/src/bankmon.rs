@@ -451,7 +451,7 @@ pub fn resume(m: &mut Mem, e: &mut dyn SongEnv, s: u32) {
 }
 
 /// `BankInstance_SetPitchBend` 0x21e7e0 (the instance, the bend: 64 none): the handle's voices bent, under the
-/// sound library's lock (the rider's loops' updates, `sndqueue::update_air_loop` and the others)
+/// sound library's lock (the rider's loops' updates, `sndqueue::update_scrape_loop` and the others)
 pub fn set_pitch_bend(m: &mut Mem, e: &mut dyn SongEnv, s: u32, bend: u32) {
     let h = m.r32(s + 4);
     locked(m, e, HANDLE_PITCH_BEND, &[h, bend]);

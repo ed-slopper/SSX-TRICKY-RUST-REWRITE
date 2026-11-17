@@ -323,7 +323,7 @@ address,size,name,system,status
 0x11f3b8,60,Boarder_StartCelebrate,boarder,checked
 0x11f3f8,56,Boarder_StartDisappointed,boarder,checked
 0x11f430,16,Boarder_IsTricky,boarder,checked
-0x11f440,36,Boarder_SetSfxMuted,boarder,ported
+0x11f440,36,Boarder_SetSfxMuted,boarder,checked
 0x11f468,28,Boarder_TickSfxFadeIn,boarder,checked
 0x11f488,92,Boarder_State4PastHalf,boarder,checked
 0x11f4e8,284,StaticInit_Boarder,boarder,not started
@@ -3563,7 +3563,7 @@ address,size,name,system,status
 0x20fa80,228,Audio_AnyRiderNearAhead,audio,ported
 0x20fb68,244,Audio_IsNearerPlayer2,audio,ported
 0x20fc60,124,Audio_GetRiderListener,audio,ported
-0x20fce0,868,Sfx_StartAirLoop,audio,checked
+0x20fce0,868,Sfx_StartScrapeLoop,audio,checked
 0x210048,1656,Sfx_StartGlideLoop,audio,checked
 0x2106c0,884,Sfx_StartCarveLoop,audio,checked
 0x210a38,148,Audio_InitRiderSounds,audio,checked
@@ -3664,7 +3664,7 @@ address,size,name,system,status
 0x21a788,60,Sfx_GetSnowInput4,audio,ported
 0x21a7c8,1736,Sfx_LoadBoardConfig,audio,ported
 0x21ae90,1448,Sfx_RunSnowProgram,audio,checked
-0x21b440,196,Sfx_UpdateAirLoop,audio,checked
+0x21b440,196,Sfx_UpdateScrapeLoop,audio,checked
 0x21b508,288,Sfx_UpdateGlideLoop,audio,checked
 0x21b628,236,Sfx_UpdateAiGlideLoop,audio,checked
 0x21b718,272,Sfx_UpdateCarveLoop,audio,checked

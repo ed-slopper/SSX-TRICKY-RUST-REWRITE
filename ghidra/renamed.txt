@@ -730,3 +730,5 @@
 2e8878 sceCdPOffCallback Cd_InitPowerOff
 2e87c8 Cd_SetPowerOffCallback sceCdPOffCallback
 21d0c0 Audio_LoadAmbientBanks Audio_PlayEventSound
+20fce0 Sfx_StartAirLoop Sfx_StartScrapeLoop
+21b440 Sfx_UpdateAirLoop Sfx_UpdateScrapeLoop

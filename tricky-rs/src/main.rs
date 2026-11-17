@@ -434,6 +434,7 @@ fn main() {
     .insert_resource(career)
     .insert_resource(levels)
     .init_resource::<book::Book>()
+    .init_resource::<boardsound::RiderLoops>()
     .init_resource::<hudsprites::HudSprites>()
     .init_resource::<gamehud::GameHud>()
     .init_resource::<sfnfont::SfnFonts>()
