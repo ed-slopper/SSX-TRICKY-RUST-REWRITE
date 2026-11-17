@@ -12,6 +12,7 @@ use crate::surface::SURFACE_TABLE;
 use crate::orient::{self, Orient};
 pub mod wipeout;
 pub mod ground_tick;
+pub mod control_tick;
 pub use wipeout::{Wipe, course_points};
 
 // The numbers below are the original game's (SLUS_203.26), converted from its cm and 60 Hz ticks to metres and
@@ -501,6 +502,13 @@ pub struct Rider {
     pub takeoff_wind: (f32, f32),
     /// ticks before this rider can be hit by another again (`Boarder_RiderCollisions`: three ticks)
     pub hit_wait: u8,
+    /// the control state (rider+0x428) on the snow (row G1i1: [`control_tick`]), the cruise state's object, the
+    /// prewind state's flag (its +8), the records the states set and the boost level they left (+0x130)
+    pub ctl: u32,
+    pub cruise: crate::control::Cruise,
+    pub prewind_started: u32,
+    pub rec: control_tick::Records,
+    pub boost_lvl: f32,
 }
 
 pub fn heading(yaw: f32) -> Vec3 { Vec3::new(-yaw.sin(), 0.0, -yaw.cos()) }
@@ -521,7 +529,7 @@ impl Rider {
                last_trick: String::new(), trick_timer: 0.0, crashed: 0.0, hard_land: 0.0, crouch_v: 0.0, brake_v: 0.0, jump_c: 0.0, jump_delay: 0.0, height: 0.0,
                course_dir: None, course_pts: None, wipe: None, crash_at: None, gm: None, crash_spray: None, lean: [0.0; 3], up: [0.0, 0.0, 1.0, 0.0], recover: None, ai: false, down_t: 0.0, getup: -1.0, stumble: 0.0, wall_hit: None, speed_timer: 0.0, spin_timer: 0.0, spin_used: false, tube_class: u8::MAX, gate_p: 0.0, gate_hi: 0.0, gate_lo: 0.0, gate_still: 0.0, gate_target: 0.0, gate_speed: 0.0, gate_state: 8, gate_rock_dir: 0, band: (0.005, 0.0250417), spin_base: 0.0, flip_base: 0.0, late: false, cause: "", spin_ax: Axis::default(), flip_ax: Axis::default(), air_mode2: false, rail_off: 0.0, rail_time: 0.0, rail_halves: 0, boost_was: false, chain: 0,
                ubers: Vec::new(), uber: 0.0, uber_id: 0, uber_done: false, letters: 0, multiplier: 1,
-               sc: new_score(), tick_acc: 0.0, full_count: 0, rail_kind: 0, rail_lean: 0.0, rail_goal0: 0.0, rail_committed: 0.0, show_parts: Vec::new(), speech: Vec::new(), hit_by: u32::MAX, grab_scored: false, grab_tw: false, hit_wait: 0, att: None, last_hit: Default::default(), impact: 0.0, impact_n: [0.0; 4], knocks: 0.0, slot: 0, place_ray: None, hit_kind: 0, land_time: 0.0, takeoffs: 0, rail_blend: 0.0, rail_word: 0, rail_grid: false, rail_hit: [0.0; 4], spin_st: None, pad_dev: Default::default(), land_word: u32::MAX, land_normal: [0.0, 0.0, 1.0, 0.0], takeoff_wind: (0.0, 0.0) };
+               sc: new_score(), tick_acc: 0.0, full_count: 0, rail_kind: 0, rail_lean: 0.0, rail_goal0: 0.0, rail_committed: 0.0, show_parts: Vec::new(), speech: Vec::new(), hit_by: u32::MAX, grab_scored: false, grab_tw: false, hit_wait: 0, att: None, last_hit: Default::default(), impact: 0.0, impact_n: [0.0; 4], knocks: 0.0, slot: 0, place_ray: None, hit_kind: 0, land_time: 0.0, takeoffs: 0, rail_blend: 0.0, rail_word: 0, rail_grid: false, rail_hit: [0.0; 4], spin_st: None, pad_dev: Default::default(), land_word: u32::MAX, land_normal: [0.0, 0.0, 1.0, 0.0], takeoff_wind: (0.0, 0.0), ctl: control_tick::CRUISE, cruise: Default::default(), prewind_started: 0, rec: Default::default(), boost_lvl: 0.0 };
         // the start line's `Boarder_PlaceAt` 0x11cae8 (`cBoarder::vf8` 0x116ab8: heading from the path's direction)
         r.att = Some((orient::placed_attitude(placed_heading(yaw), None), yaw));
         r
@@ -1222,6 +1230,8 @@ impl Rider {
         self.spin_timer = (self.spin_timer - dt).max(0.0);
         if let Some((c, t)) = self.recover { self.recover = if t + dt < wipeout::clip_frames(c, self.stats.kind) / 30.0 { Some((c, t + dt)) } else { None }; }
         if self.crashed > 0.0 {
+            // (the wipe-out's control state, 0x13; its own tick is the port's, row G1i2)
+            self.ctl = 0x13;
             self.wipe_step(world, dt);
             self.input = Input::default();
             return;
@@ -1235,29 +1245,40 @@ impl Rider {
         self.boosting = false;
         self.rail_cooldown = (self.rail_cooldown - dt).max(0.0);
 
-        // ---- input shaping (cBoarder::vf7): each value moves toward its target at a limited rate
+        // ---- the records (`cBoarder::vf7` 0x117198): on the snow the game's, eased toward what its control state
+        // set last tick (row G1i1, `control_tick`); elsewhere (STANDIN, row G1i2) the port's own shaping
         let speed0 = self.vel.length();
         let sped = self.speed_timer > 0.0;
         let boosting_input = (input.boost && self.boost > 0.0) || sped;
-        // `Boarder_UpdateBoost` 0x11d038: boost held and just pressed (the pad's bit 4, inferred) with an empty meter
-        // calls `Sfx_OnBoost` 0x2197d8 (STANDIN: always, for the race camera's state 1..9 test)
-        if input.boost && !self.boost_was && self.boost <= 0.0 {
-            self.speech.push(RiderSpeech::BoostEmpty);
+        let game_ctl = self.grounded && self.rail.is_none();
+        if game_ctl {
+            self.ease_records();
+        } else {
+            // (off the snow a ground state gives way to the rail's 0xf or the natural air's 0xd; their ticks are the
+            // port's, row G1i2)
+            if matches!(self.ctl, control_tick::CRUISE | control_tick::PREWIND | control_tick::JUMP) {
+                self.ctl = if self.rail.is_some() { 0xf } else { 0xd };
+            }
+            self.boost_lvl = 0.0;
+            // `Boarder_UpdateBoost` 0x11d038: boost held and just pressed (the pad's bit 4, inferred) with an empty meter
+            // calls `Sfx_OnBoost` 0x2197d8 (STANDIN: always, for the race camera's state 1..9 test)
+            if input.boost && !self.boost_was && self.boost <= 0.0 {
+                self.speech.push(RiderSpeech::BoostEmpty);
+            }
+            let lim = if boosting_input { 1.0 } else { 0.905 };
+            let steer_target = input.steer.clamp(-lim, lim) * (speed0 / 11.35).min(1.0);
+            let err = steer_target - self.steer;
+            let rate = (7.017 * err.abs()).clamp(0.1, 8.018) * if self.surface == 3 || self.surface == 4 { 0.6 } else { 1.0 };
+            self.steer += err.clamp(-rate * dt, rate * dt);
+            let crouch_target = if input.tuck || input.jump { 1.0 } else { 0.0 };
+            let e = crouch_target - self.crouch_v;
+            let r = if self.jump_delay > 0.0 { 13.333 } else { 5.0025 * e.abs().max(0.1) };
+            self.crouch_v += e.clamp(-r * dt, r * dt);
+            let brake_target = if input.brake && self.crouch_v <= 0.0 { 1.0 } else { 0.0 };
+            let e = brake_target - self.brake_v;
+            let r = if brake_target > 0.0 { 5.035 * e.abs().max(0.1) } else { 5.035 * (1.1 - e.abs()).max(0.1) };
+            self.brake_v += e.clamp(-r * dt, r * dt);
         }
-        let lim = if boosting_input { 1.0 } else { 0.905 };
-        let steer_target = input.steer.clamp(-lim, lim) * (speed0 / 11.35).min(1.0);
-        let err = steer_target - self.steer;
-        let rate = (7.017 * err.abs()).clamp(0.1, 8.018) * if self.surface == 3 || self.surface == 4 { 0.6 } else { 1.0 };
-        self.steer += err.clamp(-rate * dt, rate * dt);
-        let crouch_target = if input.tuck || input.jump { 1.0 } else { 0.0 };
-        let e = crouch_target - self.crouch_v;
-        let r = if self.jump_delay > 0.0 { 13.333 } else { 5.0025 * e.abs().max(0.1) };
-        self.crouch_v += e.clamp(-r * dt, r * dt);
-        let brake_target = if input.brake && self.crouch_v <= 0.0 { 1.0 } else { 0.0 };
-        let e = brake_target - self.brake_v;
-        let r = if brake_target > 0.0 { 5.035 * e.abs().max(0.1) } else { 5.035 * (1.1 - e.abs()).max(0.1) };
-        self.brake_v += e.clamp(-r * dt, r * dt);
-        if input.jump && self.grounded { self.charge = self.crouch_v; }
 
         // ---- grinding a rail
         if self.rail.is_some() {
@@ -1281,12 +1302,10 @@ impl Rider {
             let band = SURF_BAND[(self.surface as usize).min(19)];
             self.band.0 += (band.0 - self.band.0).clamp(-dt, dt);
             self.band.1 += (band.1 - self.band.1).clamp(-dt, dt);
-            let lvl = if sped { 1.0 } else if boosting_input { self.boost_level() } else { 0.0 };
-            // the boost meter drains while boosting (the thrust itself is in ground_thrust)
-            if boosting_input {
-                if !self.tricky() && !sped { self.boost = (self.boost - dt / BOOST_SECONDS).max(0.0); }
-                self.boosting = true;
-            }
+            // the boost level the control state left (`Boarder_UpdateBoost`, which also drains the meter), or a
+            // speed-boost pickup's
+            let lvl = if sped { 1.0 } else { self.boost_lvl };
+            self.boosting = 0.0 < lvl;
             let left = self.ground_tick(world, dt, lvl);
             handled = true;
             p = self.pos;
@@ -1298,36 +1317,14 @@ impl Rider {
             } else {
                 let n = self.normal;
                 let f = self.forward();
-                // jump: letting go of the crouch springs off once the crouch has unwound
-                if input.jump {
-                    self.prewind(&input, dt);
-                    self.jump_delay = 0.0;
-                } else if self.charge > 0.0 && self.jump_delay <= 0.0 && self.jump_c <= 0.0 {
-                    self.jump_c = self.charge;
-                    self.jump_delay = (self.charge / 13.333).max(1e-4);
-                    self.release_windup();
-                } else if self.jump_delay > 0.0 {
-                    self.jump_delay -= dt;
-                    if self.jump_delay <= 0.0 {
-                        let c = self.jump_c;
-                        let steep = self.apply_jump(c, n, f, self.board_up(), false);
-                        self.jump_c = 0.0;
-                        self.take_off();
-                        self.begin_chain(0, steep);
-                        jumped = true;
-                    }
-                } else if self.jump_c > 0.0 {
-                    // a jump released during a moment in the air (a bump) fires on touching down
+                // the control state's update after the motion (row G1i1): the jump when the crouch has unwound
+                if self.ground_control(&input) {
                     let c = self.jump_c;
                     let steep = self.apply_jump(c, n, f, self.board_up(), false);
                     self.jump_c = 0.0;
                     self.take_off();
                     self.begin_chain(0, steep);
                     jumped = true;
-                } else {
-                    self.wind = 0.0;
-                    self.wind_flip = 0.0;
-                    self.charge = 0.0;
                 }
                 // the speed limit (vf7): up at once with a boost, back down slowly afterwards
                 // the boosting cap goes by the meter left (vf7), the speed-boost pickup by its own timer
@@ -1789,11 +1786,15 @@ impl Rider {
         let mut ps2 = 0u16;
         if input.jump { ps2 |= 0x40; }
         if input.boost { ps2 |= 0x80; }
-        if 0.5 < input.steer { ps2 |= 0x2000; }
-        if input.steer < -0.5 { ps2 |= 0x8000; }
+        // (on the snow a computer rider's wind-up stick is the d-pad's x while it crouches for a jump: map 0's
+        // prewind spin; the tuck and brake keys the left stick up and down: map 0's crouch and brake, row G1i1)
+        let dx = match input.wind { Some(w) if self.grounded && input.jump => w, _ => input.steer };
+        if 0.5 < dx { ps2 |= 0x2000; }
+        if dx < -0.5 { ps2 |= 0x8000; }
         if 0.5 < input.flip { ps2 |= 0x1000; }
         if input.flip < -0.5 { ps2 |= 0x4000; }
-        self.pad_dev.read(ps2, Some([byte(input.steer), byte(-input.flip), 128, 128]));
+        let ly = if !self.grounded { byte(-input.flip) } else if input.tuck { 0 } else if input.brake { 255 } else { 128 };
+        self.pad_dev.read(ps2, Some([byte(input.steer), ly, 128, 128]));
     }
 
     /// An air tick of the spin state on the game's code (row G1a5b3b1): the pad word `cPlayer::GetControls` makes

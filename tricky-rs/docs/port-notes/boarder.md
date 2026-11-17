@@ -1283,6 +1283,32 @@ helpers. Most end alike: off the course (+0x290 = 0) or with bit 0, +0x304 = !bi
   order of reads around the calls is checked too; every field and every call with its arguments compared.
   The app does not call it yet (row G1i).
 
+## The ground's control states in the app (row G1i1; `game/src/rider/control_tick.rs`)
+
+On the snow `Rider::step` runs the game's control states in `cBoarder::vf7`'s order: the records eased before the
+motion, the state's update after it.
+
+- **Records (proven, vf7):** brake +0x1fc, crouch +0x208, steer +0x214 and the wind-ups +0x220 (spin) and +0x22c
+  (flip), each now/rate/target, move rate · 1/60 toward the target each tick (`boarder_tick::ease`). This is the
+  per-tick step of the wind-ups row G1a5b3b2b was looking for: they are two of vf7's eleven records.
+- **States (proven, ported and checked before):** cruise 3 (`CruiseControl_Update` 0x102fc8), prewind 0xe
+  (`PrewindState_Update` 0x1050e8), jump 10 (`JumpControl_Update` 0x1046b0), each on the word
+  `cPlayer::GetControls` 0x151250 packs for it (button map 0). The jump button newly down in cruise brakes to 0,
+  then enters prewind; held, the prewind crouches and winds up from the d-pad (map 0); let go, the state is 10 with
+  the crouch let out at 13.3333 a second (+0x1c8 keeps the crouch); once the crouch is 0, `Jump_ApplyImpulse`,
+  motion 1 and `Takeoff_SetSpinRates` (state 0x10).
+- **Enters (proven, decompiled):** `CruiseControl_Enter` 0x102fb0 clears its object's +8, +0xc, +0x10 and
+  rider+0x1dc. `PrewindControl_Enter` 0x105070 sets the steer, the lean +0x268 and the brake to target 0 at rate
+  6.6666665 (`0x40d55555`), blends all clips out, plays clip 0x217 and clears its flag (+8).
+- **Boost:** `Boarder_UpdateBoost` 0x11d038 from the states (it sets the boost level +0x130 and drains the meter
+  0.00075 a tick); the motion reads the level the last tick's state left (vf7's order).
+- **Stand-ins:** the pad from the app's keys (`Rider::read_pad`: tuck and brake as the left stick up and down,
+  steer as stick and d-pad x, flip as d-pad y, a computer rider's wind-up stick as the d-pad x while it crouches);
+  no clip plays, so the states read clip 0 of type 0 (row G5d); the finish (+0x418) as not crossed; no reset
+  button (the port's own respawn off the course); a rider back on the snow in another state (landing, rail, respawn,
+  wipe-out) is put in cruise, or prewind with the jump button held, as the landing clip's end would
+  (`after_clip`); the air, rail and wipe-out ticks are still the port's own (row G1i2).
+
 ## The animation sequences and layers (row G5a1; `game/src/animseq.rs`, checked: `tests/animseq.rs`)
 
 The controller's three layers are lists of sequences. A sequence is one clip being played. The code works through

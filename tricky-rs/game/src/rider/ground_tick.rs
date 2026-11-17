@@ -787,9 +787,9 @@ impl Rider {
         g.d1 = self.band.0 * 100.0;
         g.d2 = self.band.1 * 100.0;
         g.class = st.kind as u32;
-        // STANDIN: the control state is "riding" (3), or "landing" (0xb) after a hard landing, for the game's state
-        // machine (row G1)
-        g.state = if self.hard_land > 0.0 { 0xb } else { 3 };
+        // the control state (row G1i1: cruise, prewind or jump); STANDIN: "landing" (0xb) after a hard landing, for
+        // the game's landing states (row G1i2)
+        g.state = if self.hard_land > 0.0 { 0xb } else if matches!(self.ctl, 0xe | 10) { self.ctl } else { 3 };
         g.mask = 0xffff_ffff;
         // the game's stat bytes (`crate::stats`): speed +0x0e, edging +0x11, grip +0x13 and the cubic term +0x19
         let b = |i: usize| st.bytes[i] as f32;
