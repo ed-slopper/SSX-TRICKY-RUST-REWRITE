@@ -21,7 +21,11 @@ PINE reads and writes memory and saves and loads states; it has no breakpoints o
                                                         (57b0:64 = the flight prediction, F4h2; an offset
                                                         may be negative: -170:74 = the spin object, F4b3a;
                                                         `>` follows a pointer: 5ae0>610:10 = the handler's
-                                                        bump control, F4b3i)
+                                                        bump control, F4b3i); with <bytes> >= 0x700, a
+                                                        sample whose rider body looks the last frame's is read
+                                                        again (F4h5d; header `posed 1`); the riders'
+                                                        characters go to <out>.stats; a new race with other
+                                                        characters stops it
     python tools/pine.py counters [<start> <end>]       find tick counters and clocks: words in .data/.bss
                                                         (default 0x31D300-0x40C174) that climb about 60 a
                                                         second, or floats that climb about 1 a second
@@ -173,6 +177,47 @@ def find_race(p):
     return None, []
 
 
+def stale_bodies(prev, now, fresh):
+    """The riders whose body (rider+0x480..0x700: `Boarder_UpdateBroadphase` 0x126748's, posed by `cPostAI::vf1`
+    0x114730 after every rider ticked) looks like the last frame's while the rider moved (F4h5a, F4h5d): byte for byte
+    the previous sample's; or lagging (its centre less the position is the last fresh sample's moved back by the step);
+    or the previous body moved whole by something other than the step (only the frame's pushes, F4b3y). The same tests
+    as `Twins` in `tricky-rs/game/tests/ground_motion.rs`. `prev`, `now`: the riders' blocks of the samples a tick
+    apart; `fresh`: each rider's last block not found stale (or None)."""
+    def v(b, o):
+        return struct.unpack_from("<3f", b, o)
+
+    def sub(a, b):
+        return [x - y for x, y in zip(a, b)]
+
+    def norm(a):
+        return sum(x * x for x in a) ** 0.5
+
+    bad = []
+    for i, (p, r) in enumerate(zip(prev, now)):
+        if r[0x140:0x14c] == p[0x140:0x14c]:
+            continue
+        step = sub(v(r, 0x140), v(p, 0x140))
+        if r[0x480:0x700] == p[0x480:0x700]:
+            bad.append(i)
+            continue
+        if fresh[i] is not None:
+            off = sub(v(r, 0x480), v(r, 0x140))
+            was = sub(v(fresh[i], 0x480), v(fresh[i], 0x140))
+            es = norm([o + s - w for o, s, w in zip(off, step, was)])
+            if norm(step) > 2.0 and es < 3.0 and norm(sub(off, was)) > 2.0 * es + 2.0:
+                bad.append(i)
+                continue
+        count = min(struct.unpack_from("<I", r, 0x498)[0], 18)
+        if count and r[0x498:0x49c] == p[0x498:0x49c]:
+            shift = sub(v(r, 0x480), v(p, 0x480))
+            whole = all(all(abs(x - y) < 0.05 for x, y in zip(sub(v(r, 0x4a0 + 0x20 * s), v(p, 0x4a0 + 0x20 * s)), shift))
+                        for s in range(count))
+            if whole and norm(sub(shift, step)) > 0.5:
+                bad.append(i)
+    return bad
+
+
 def find_counters(p, start=0x31D300, end=0x40C174, snaps=4, gap=0.5):
     """Words that rise steadily with time across a few snapshots: ints at ~60/s (ticks), floats at ~1/s (seconds)."""
     shots = []
@@ -259,15 +304,30 @@ def main(argv):
         if race is None:
             sys.exit("no race found (is a race running?)")
         pad = find_pad(p)
+        # the riders' characters (rider+0x464 → 0x100 bytes) beside the recording, as the tests read them
+        # (`<out>.stats` for `<out>.txt`, lines `rider stats-address hex`; TRICKY_STATS)
+        def characters():
+            return [(at, p.read_block(at, 0x100)) for at in (p.read32(r + RIDER_STATS) for r in riders)]
+        chars = characters()
+        with open(out.rsplit(".", 1)[0] + ".stats", "w", encoding="ascii") as f:
+            for r, (at, b) in zip(riders, chars):
+                f.write(f"{r:x} {at:x} {b.hex()}\n")
         kept, last, t0, counts = 0, None, time.time(), None
+        k = len(riders)
+        prev, fresh, seen, left = None, [None] * k, 0, 0
         with open(out, "w", encoding="ascii") as f:
             f.write(f"race {race:x} riders {' '.join(f'{r:x}' for r in riders)} bytes {size:x} pad {pad or 0:x}"
                     + "".join(f" extra {o} {n:x}" for o, _, n in extra)
-                    + "".join(f" extra {w.split(':')[0]} {n:x}" for w, _, n in lists) + "\n")
+                    + "".join(f" extra {w.split(':')[0]} {n:x}" for w, _, n in lists)
+                    + (" posed 1" if size >= 0x700 else "") + "\n")
             while time.time() - t0 < seconds:
                 tick = p.read32(race + RACE_TICK)
                 if tick == last:
                     continue
+                if last is not None and tick < last and characters() != chars:
+                    # (a save state loaded keeps the characters: go on)
+                    print(f"the race tick went back ({last} → {tick}) with other characters: a new race; stopped")
+                    break
                 # The race tick moves at the start of the frame, before the riders tick (slot 5 first, slot 0 last:
                 # cBoarderHandler objects in list 8, then cPostAI in list 11 moves their bodies). Wait until every
                 # rider has ticked (its speed-sample count +0x5900, a float that `Boarder_AddSpeedSample` 0x155dc8
@@ -277,50 +337,74 @@ def main(argv):
                     now = p.read_blocks([(r + RIDER_TICKS, 4) for r in riders])
                     if all(a != b for a, b in zip(now, counts)):
                         break
-                # every rider's block and windows (and the pad) in one batch between two reads of the race tick, so
-                # they come from the same frame as near as the emulator allows (PINE reads while the EE runs)
-                # (a window through pointers: its pointers read in the same batch, its bytes in one more each
-                # level, all before the race tick is read again)
-                at = [(r + c[0]) & 0xFFFFFFFF for _, c, _ in extra for r in riders]
-                deep = [len(c) - 1 for _, c, _ in extra for r in riders]
-                plain = [(a, n) if d == 0 else (a, 4) for a, d, n in zip(at, deep, [n for _, _, n in extra for r in riders])]
-                ranges = [(race + RACE_TICK, 4)] + [(r, size) for r in riders] + plain
-                got = p.read_blocks(ranges + ([(pad, PAD_BYTES)] if pad else []))
-                k = len(riders)
-                wins = got[1 + k:1 + k + len(plain)]
-                steps = [c[1:] for _, c, _ in extra for r in riders]
-                lens = [n for _, _, n in extra for r in riders]
-                level = 0
-                while any(level < len(s) for s in steps):
-                    todo = [i for i, s in enumerate(steps) if level < len(s)]
-                    for i in todo:
-                        at[i] = (struct.unpack("<I", wins[i])[0] + steps[i][level]) & 0x1FFFFFF  # (a stray pointer stays in RAM)
-                    more = p.read_blocks([(at[i], lens[i] if level == len(steps[i]) - 1 else 4) for i in todo])
-                    for i, b in zip(todo, more):
-                        wins[i] = b
-                    level += 1
-                walked = []
-                if lists:
-                    heads = [(r + o, n) for _, o, n in lists for r in riders]
-                    cur = [struct.unpack("<I", b)[0] for b in p.read_blocks([(h, 4) for h, _ in heads])]
-                    walked = [b"" for _ in heads]
-                    for _ in range(16):
-                        todo = [i for i, c in enumerate(cur) if c and len(walked[i]) + 0x14 <= heads[i][1]]
-                        if not todo:
-                            break
-                        nodes = p.read_blocks([(cur[i] & 0x1FFFFFF, 0x10) for i in todo])
-                        for i, b in zip(todo, nodes):
-                            walked[i] += struct.pack("<I", cur[i]) + b
-                            side = struct.unpack("<I", b[4:8])[0] == heads[i][0]
-                            cur[i] = struct.unpack("<I", b[8 + 4 * side:12 + 4 * side])[0]
-                    walked = [w + bytes(n - len(w)) for w, (_, n) in zip(walked, heads)]
-                if struct.unpack("<I", got[0])[0] != tick or p.read32(race + RACE_TICK) != tick:
+                def read_batch():
+                    # every rider's block and windows (and the pad) in one batch between two reads of the race tick, so
+                    # they come from the same frame as near as the emulator allows (PINE reads while the EE runs)
+                    # (a window through pointers: its pointers read in the same batch, its bytes in one more each
+                    # level, all before the race tick is read again)
+                    at = [(r + c[0]) & 0xFFFFFFFF for _, c, _ in extra for r in riders]
+                    deep = [len(c) - 1 for _, c, _ in extra for r in riders]
+                    plain = [(a, n) if d == 0 else (a, 4) for a, d, n in zip(at, deep, [n for _, _, n in extra for r in riders])]
+                    ranges = [(race + RACE_TICK, 4)] + [(r, size) for r in riders] + plain
+                    got = p.read_blocks(ranges + ([(pad, PAD_BYTES)] if pad else []))
+                    wins = got[1 + k:1 + k + len(plain)]
+                    steps = [c[1:] for _, c, _ in extra for r in riders]
+                    lens = [n for _, _, n in extra for r in riders]
+                    level = 0
+                    while any(level < len(s) for s in steps):
+                        todo = [i for i, s in enumerate(steps) if level < len(s)]
+                        for i in todo:
+                            at[i] = (struct.unpack("<I", wins[i])[0] + steps[i][level]) & 0x1FFFFFF  # (a stray pointer stays in RAM)
+                        more = p.read_blocks([(at[i], lens[i] if level == len(steps[i]) - 1 else 4) for i in todo])
+                        for i, b in zip(todo, more):
+                            wins[i] = b
+                        level += 1
+                    walked = []
+                    if lists:
+                        heads = [(r + o, n) for _, o, n in lists for r in riders]
+                        cur = [struct.unpack("<I", b)[0] for b in p.read_blocks([(h, 4) for h, _ in heads])]
+                        walked = [b"" for _ in heads]
+                        for _ in range(16):
+                            todo = [i for i, c in enumerate(cur) if c and len(walked[i]) + 0x14 <= heads[i][1]]
+                            if not todo:
+                                break
+                            nodes = p.read_blocks([(cur[i] & 0x1FFFFFF, 0x10) for i in todo])
+                            for i, b in zip(todo, nodes):
+                                walked[i] += struct.pack("<I", cur[i]) + b
+                                side = struct.unpack("<I", b[4:8])[0] == heads[i][0]
+                                cur[i] = struct.unpack("<I", b[8 + 4 * side:12 + 4 * side])[0]
+                        walked = [w + bytes(n - len(w)) for w, (_, n) in zip(walked, heads)]
+                    if struct.unpack("<I", got[0])[0] != tick or p.read32(race + RACE_TICK) != tick:
+                        return None  # the game moved on while we read
+                    return got[1:1 + k] + ([got[-1]] if pad else []) + wins + walked
+                # A body read while `cPostAI::vf1` 0x114730 poses the riders (0 to n-1, after every rider ticked) is the
+                # last frame's (F4h5a: ~2 % of rider samples, mostly riders 5 and 4): read again, while the tick holds,
+                # until no rider's body looks stale (`stale_bodies`), at most 12 ms; else keep the first read
+                blocks = read_batch()
+                if blocks is None:
                     continue  # the game moved on while we read: drop the sample
-                blocks = got[1:1 + k] + ([got[-1]] if pad else []) + wins + walked
+                if size >= 0x700 and prev is not None and prev[0] + 1 == tick:
+                    until = time.time() + 0.012
+                    bad = stale_bodies(prev[1], blocks[:k], fresh)
+                    first = len(bad)
+                    while bad and time.time() < until:
+                        again = read_batch()
+                        if again is None:
+                            break
+                        now = stale_bodies(prev[1], again[:k], fresh)
+                        if len(now) <= len(bad):
+                            blocks, bad = again, now
+                    seen += first
+                    left += len(bad)
+                    for i in range(k):
+                        if i not in bad:
+                            fresh[i] = blocks[i]
+                prev = (tick, blocks[:k])
                 f.write(f"tick {tick} " + " ".join(b.hex() for b in blocks) + "\n")
                 last, kept = tick, kept + 1
                 counts = p.read_blocks([(r + RIDER_TICKS, 4) for r in riders])
-        print(f"{kept} ticks of {len(riders)} riders in {seconds:g} s to {out}")
+        print(f"{kept} ticks of {len(riders)} riders in {seconds:g} s to {out}; bodies read stale {seen}, "
+              f"still stale after reading again {left}")
     elif cmd == ["counters"]:
         start, end = (int(argv[1], 16), int(argv[2], 16)) if len(argv) == 3 else (0x31D300, 0x40C174)
         if p.status() != "running":

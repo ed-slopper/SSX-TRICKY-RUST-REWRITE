@@ -1581,3 +1581,31 @@ The port already did it in the game (`GroundEnv::set_state`); the test now does 
 
 rec16 take-off ticks whole under `fadd=g1`: 233 → 234 of 235 (12509 r1 now whole). Every other count on rec10-18
 unchanged (both tests). Left: rec16 7800 r3 (pushed, the jump control; F4h5's riders).
+
+## F4h5d: the recorder reads stale bodies again (2026-11-17)
+
+`pine.py record` read a rider's body (rider+0x480..0x700) as the last frame's in about 2 % of rider samples (F4h5a):
+it waits until every rider has ticked (+0x5900), but `cPostAI::vf1` 0x114730 poses the bodies after that (riders 0 to
+n−1: `Boarder_UpdateAnimLayers`, `Boarder_UpdatePose` when +0x46b0 is set, `Boarder_UpdateBroadphase`, then
+rider+0x42c = +0x16c; proven, decompiled), so a read landing inside it gets riders 5 and 4 unposed. No word in the
+rider counts the poses (+0x16c is a flag word, the same in every frame; `Race_UpdateLookBack` writes only the
+cameras), so the recorder checks the bytes: `stale_bodies` (the same three tests as the ground test's `Twins`: the
+body byte for byte the previous sample's while the rider moved, lagging by the step, or the previous one moved whole
+by pushes) and, while the race tick holds, reads the whole batch again until none is stale, at most 12 ms; else it
+keeps the read with the fewest. The header says `posed 1`; for such recordings the tests skip the `Twins` guess
+(STANDIN, kept for the older recordings; TRICKY_STALE=guess uses it anyway). The recorder also writes the riders'
+characters to `<out>.stats` and stops when the tick goes back with other characters (a new race).
+
+rec19 (PCSX2 with the player's disc, 200 s of a race's scoreboard replay, the game's physics run again;
+`record 200 rec19.txt 0x700` with rec18's windows): 11,986 ticks of 12,000 kept, 563 batches read again, 4 rider
+samples of 71,898 still stale (2 % before). The 20 s test before it: 104 read again, 6 left (one frame, all six
+riders the previous sample's: no pose that frame within 12 ms).
+
+Results under `fadd=g1` (the guess or not: the same):
+
+| recording | take-off ticks whole | ground ticks every field | pushed apart, every field right |
+|---|---|---|---|
+| rec19 | 215 of 216 | 55,804 of 56,114 | 506 of 538 |
+
+Left: rec19 2295 r4, a take-off from the bump state (2), nearest rider 53 m, velocity exact, position 7.3 cm off
+(row F4h5i).

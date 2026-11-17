@@ -997,6 +997,7 @@ struct Frame {
 /// the next one (median 0.19 cm off on fresh ground samples of rec17, against 1.2 cm for the previous body moved by
 /// the step), or the one of them there is. TRICKY_TWINS=off: no other pass.
 // STANDIN: a guess at the body PINE missed, for the body `Boarder_UpdateBroadphase` 0x126748 posed from the bones
+// (only for recordings made before F4h5d: the recorder now reads such samples again, header `posed 1`)
 #[derive(Default)]
 struct Twins {
     /// the stale samples' guesses by (tick, rider, +0x140..+0x160 and +0x480..+0x490 bytes)
@@ -1029,6 +1030,15 @@ fn stale_key(tick: u32, i: usize, r: &[u8]) -> (u32, usize, Vec<u8>) {
 }
 
 impl Twins {
+    /// [`Twins::of`], or none for a recording whose recorder read stale bodies again (header `posed 1`, F4h5d: its
+    /// few left, 6 of 7,008 rider samples in a 20 s test, are kept as read). TRICKY_STALE=guess: guess anyway.
+    fn of_recording(path: &str, ticks: &[recording::Tick]) -> Twins {
+        if recording::posed(path) && !std::env::var("TRICKY_STALE").is_ok_and(|v| v == "guess") {
+            return Twins::default();
+        }
+        Twins::of(ticks)
+    }
+
     fn of(ticks: &[recording::Tick]) -> Twins {
         use std::collections::HashMap;
         let lag = !std::env::var("TRICKY_LAG").is_ok_and(|v| v == "off");
@@ -1626,7 +1636,7 @@ fn ground_ticks_against_the_running_game() {
         .collect();
     let path = paths.split(';').next().unwrap();
     let (n, ticks) = load(path);
-    let twins = Twins::of(&ticks);
+    let twins = Twins::of_recording(path, &ticks);
     let addrs = rider_addrs(path);
     let (Some(km), Some(ka)) = (ticks[0].extra.iter().position(|(o, _)| *o == -0x400), ticks[0].extra.iter().position(|(o, _)| *o == 0x46c0)) else {
         eprintln!("{path}: no -400 and 46c0 windows: skipping");
@@ -2801,7 +2811,7 @@ fn takeoff_ticks_against_the_running_game() {
         .collect();
     let path = paths.split(';').next().unwrap();
     let (n, ticks) = load(path);
-    let twins = Twins::of(&ticks);
+    let twins = Twins::of_recording(path, &ticks);
     let win = |o: i64| ticks[0].extra.iter().position(|(x, _)| *x == o);
     let (Some(km), Some(ka), Some(kp)) = (win(-0x400), win(0x46c0), win(0x57b0)) else {
         eprintln!("{path}: no -400, 46c0 and 57b0 windows: skipping");

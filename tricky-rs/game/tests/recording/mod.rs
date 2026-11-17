@@ -59,6 +59,15 @@ pub fn u32_le(b: &[u8], off: usize) -> u32 {
     u32::from_le_bytes(b[off..off + 4].try_into().unwrap())
 }
 
+/// The recorder read again every sample whose rider body looked the last frame's (`pine.py record`, header `posed 1`,
+/// F4h5d)
+pub fn posed(path: &str) -> bool {
+    use std::io::BufRead;
+    let mut head = String::new();
+    std::io::BufReader::new(std::fs::File::open(path).unwrap_or_else(|e| panic!("{path}: {e}"))).read_line(&mut head).unwrap();
+    head.split_whitespace().collect::<Vec<_>>().windows(2).any(|w| w == ["posed", "1"])
+}
+
 /// The riders' addresses, from the header (`race X riders a b c ... bytes N`)
 pub fn rider_addrs(path: &str) -> Vec<u32> {
     let text = std::fs::read_to_string(path).unwrap_or_else(|e| panic!("{path}: {e}"));
