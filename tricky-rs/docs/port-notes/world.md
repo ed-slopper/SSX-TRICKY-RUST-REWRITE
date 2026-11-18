@@ -547,6 +547,37 @@ velocity, +0x424 motion, +0x428 state, +0x2e4 impact counter; recordings kept on
   normal; random up to U4), U0 mode 0 once, 1 loop, 2 back and forth; U6 random start; U7 = 4 reversed.
   Fans, penguins, sailboats, side-to-side barriers, helicopters, the multiplier gems (which spin at 1.5× and
   are never removed: their touch script only sets the multiplier and bursts particles).
+- Proven (row F4h5l; `tricky_game::meshanim`, checked: `tests/meshanim.rs`, 205 animated parts of the 11 courses,
+  48,896 frames bit for bit in the runner): a part's frame. `AnimFrame_Clear` 0x1cb150 zeroes the channels
+  (+0x4c, 16) and the kept segments (+8, one per channel); `AnimFrame_SetKey` 0x1cb0d8(t, frame, animation) copies
+  the base pose, the position as it is and the three angles **× 0.017453292** (+0x58..+0x60), then samples at t.
+  `cAnimFrame::vf1` 0x1cb300(t): each channel of the mask (anim +0x18; its curves at +0x20 in mask order) from the
+  segment it kept if t0 ≤ t < t1, else `AnimCurve_FindSegment` (the next one, else the first with t < t1, else the
+  last), at t held to [t0, t1]: ((a·x + b)·x + c)·x + d. `cMeshAnimFrame::vf1` 0x1cb498: the frame (+0x90, rows)
+  from `Math_SinCos` of −(angle × 0.017453292) for x, y, z: (cy·cz, −cy·sz, sy), (sx·sy·cz + cx·sz,
+  cx·cz − sx·sy·sz, −sx·cy), (sx·sz − cx·sy·cz, cx·sz·sy + sx·cz, cx·cy), the position. So an angle the mask leaves
+  out is turned to radians twice (the game's bug; 0 in every animated part read so far would hide it).
+  `MeshAnim_ApplyFrames` 0x199258 samples each frame at the node's time (+0x24); `MeshAnimNode_GetFrameMatrix`
+  0x1998d0(node, n) = node +0x60 + n·0xd0 + 0x90, the n-th animated part's (`BxObjNode_FromLink` 0x17d1c8: the
+  controller − 0x30).
+- Proven (row F4h5l): the node's clock. `cAnimObjectNode::cAnimObjectNode` 0x198810(op): loop op+0xc, start
+  max(op+0x10, 0)/30, end op+0x14 (< 0: the model's +0x14)/30, re-arm op+0x20·60, time = start (op+0x24 ≠ 0:
+  `Rand_GameRange`), rate op+0x18/30 (op+0x1c ≠ 0: `Rand_GameJitter`) × 1/60, negated when op+0x28 = 4; the
+  object's flags & ~2 | 4; the frames keyed and sampled at the start. Update 0x199058 adds the rate once a frame
+  (loop 1: start + (t − end) past the end). Read over PINE on mesa (`pine.py clock`, 2041 ticks of object 1444's
+  node): PCSX2's COP1 adder (`Round::Guard`) gives its time bit for bit, IEEE adds 8 of 2041.
+- Proven (code and PINE, F4h5l; `tests/course_clock`): when a node exists. The persistent script (event 0) of an
+  object in a cell that turns on (`World_CellActivate_RunPersistant` 0x25fed0) makes it: mesa's 1444 has no
+  script of its own, its neighbour 1443's effect 149 makes 1443's node and starts effect 150 on 1444 (op 7), both
+  0x100 loop, 0..90 frames at 30 a second (`data/examples/ssf_object.rs` lists an object's scripts). The cell turning
+  off (`World_CellDeactivate` 0x260108) kills it (no event-2 script); a cell turning on again while it lives does
+  nothing (its +0x64, 0x13b7d0, answers 0). A frame runs the object lists in the order 0, 1, 2, 3, 5, 6, 7, 8, 4,
+  10, 11 (`Game_UpdateObjectLists` 0x1814c0, `gBxList_UpdateOrder` 0x337c70; lists `gBxLists` 0x337c60, a list k at
+  *(+4) + 0x34·k): the AI world (list 2) turns the cells from the riders' positions at the last frame's end, the
+  controllers (list 3) step, then the riders (list 8) move and cast. A node made in the frame waits in the pending
+  list (merged at the frame's end, `BxList_MergePending`): its time is the start for that frame, then one step a
+  frame. Over PINE: 1444's node appears on the frame after the riders' positions turned its cell on and is gone on
+  the frame after they turned it off.
 
 ## World animations (`cTexFlipNode` 0x142e90, `cUVScrollNode` 0x141ff0, `cAnimDeltaNode` 0x199d10, `cFlagNode` 0x144938)
 

@@ -1724,3 +1724,34 @@ PINE on mesa (a race ridden past the spot): 1444 has no controller at the start;
 (x ≈ 74,000) it gets one (+0xe4, +0x14 = 0x100, animated) and its flags turn 0xa001a4 (the active cell's 0x100,
 bit 2 cleared, bit 4 set), kept while the rider passes (94494, 28137, −65840), dropped near (82,000, 46,000). The
 runner and ours cast it at rest pose with 0xa000a2: the next step is its pose (the controller's time) and its flags.
+
+## F4h5l: mesa's instance 1444, a keyframed object posed where the game has it (2026-11-18)
+
+1444 is not filtered out by the game: it is **posed**. Its parts are keyframed (`cAnimObjectNode`), and while its
+node lives `World_RayCastInstance` casts them at the clip's time, not at rest (the runner and ours cast the rest
+pose until now). When the node exists and its time are the game's (proven in code, checked over PINE,
+`port-notes/world.md`): the cell turning on (`World_CellActivate_RunPersistant` 0x25fed0, from the riders' positions
+at the last frame's end) runs the persistent scripts, mesa's 1443's effect 149 starts effect 150 on 1444; the node
+waits a frame in the pending list, then steps 1/60 × rate a frame; the cell turning off kills it.
+
+- `tests/meshanim.rs`: a part's frame (`AnimFrame_SetKey` 0x1cb0d8, `cAnimFrame::vf1` 0x1cb300,
+  `cMeshAnimFrame::vf1` 0x1cb498), ours against the runner on 205 animated parts of the 11 courses: 48,896 frames
+  bit for bit.
+- `tests/keyframed_clock.rs` (`pine.py clock`, TRICKY_CLOCK): 1444's node time on mesa over 2041 ticks, from the
+  riders' positions through `course_clock::clocks`: the frames it lives right and its time bit for bit with
+  PCSX2's COP1 adder (`Round::Guard`); IEEE adds part on 8.
+- The ground, take-off and wall tests pose the live objects each frame (`Keyframed`: ours with `meshanim`, the
+  runner's with the game's frame code, `RunnerCourse::pose`); TRICKY_KEYFRAMED=rest: the rest pose, as before.
+
+rec19, nothing skipped (no TRICKY_WALL_SKIP):
+
+| | rest pose | posed |
+|---|---|---|
+| wall casts (every tick), hit / bit for bit | 123 / 56,462 | 102 / 56,462 |
+| ground ticks every field, the runner under `fadd=g1` | 55,878 | 55,898 |
+| ground ticks pos right, ours | 55,993 | 56,013 |
+| state right | 56,004 | 56,019 |
+| take-off ticks whole, the runner under `fadd=g1` | 216 of 216 | 216 of 216 |
+
+Posed, rec19 comes out as it did with 1444 left out by hand (F4h5m's table), so 1444 was the whole difference.
+TRICKY_WALL_SKIP stays as a debugging switch.
