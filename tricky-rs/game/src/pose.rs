@@ -1,7 +1,7 @@
 //! The board's frame exactly as the original builds it (board row G16): `Boarder_UpdatePose` 0x129628 up to its
-//! call of `Boarder_UpdateSkeleton` (the rest poses the skeleton: animation, row G5). The frame (rider+0x4aa0..,
-//! four rows: the board's x, y and z axes and the position it is drawn at) is what the air tick's down ray, the
-//! rail code and the drawing read. Checked bit for bit in the function runner (`tests/pose.rs`).
+//! call of `Boarder_UpdateSkeleton` (the rest poses the skeleton: animation, row G5), and after it the frame's
+//! position moved to the pivot bone ([`frame_where`], F4b3t). The frame (rider+0x4aa0.., four rows: the board's x, y
+//! and z axes and the position) is what the air tick's down ray, the rail code, the shove and the drawing read. Checked bit for bit in the function runner (`tests/pose.rs`).
 
 type V4 = [f32; 4];
 
@@ -108,6 +108,35 @@ pub fn board_frame(p: &PoseIn) -> [V4; 4] {
         f[3] = apply(f, [0.0, 0.0, -bz, 1.0]);
     }
     f
+}
+
+/// What `Boarder_UpdatePose` 0x129628 does to the frame's position (+0x4ad0) after its `Boarder_UpdateSkeleton`
+/// call, for a rider whose stats+0x78 is 0 (every rider of every recording; the other path turns the frame by
+/// +0x168 and is not ported). `pivot` is the pivot bone's position (rider + +0x44d8 × 0x394 + 0x8c8, x y z), read
+/// before the skeleton is posed, so the last frame's. Unless the layer-0 clip has the skin's children follow the
+/// frame (`skin_child`: state +0x428 = 1 and the clip not 0x1fc, or the clip 0x291 or 0x2ab, or of type 0x10), the
+/// position first moves by the frame's rows times ((pivot + up·lift) − pivot, then w + 1), where `lift` is the
+/// rider's up (+0x2c0) × +0x1c0 × stats+0x60 in motions 2 and 4 and 0 otherwise (each lane, in that order). Then
+/// always: the position is the pivot through the frame (the hips, ~67 cm above the board). The rows are left as
+/// [`board_frame`] built them. The skin calls between (`Boarder_GetBoneWorldPos` 0x208398,
+/// `Boarder_BuildBoneMatrices` 0x2083f8, `Boarder_SetSkinChildMatrices` 0x2083e8) only read the frame.
+pub fn frame_where(f: [V4; 4], pivot: [f32; 3], skin_child: bool, motion: u32, up: V4, x1c0: f32, scale: f32) -> V4 {
+    let p1 = [pivot[0], pivot[1], pivot[2], 1.0];
+    let mut f = f;
+    if !skin_child {
+        let mut b = p1;
+        if motion == 2 || motion == 4 {
+            for k in 0..4 {
+                b[k] = b[k] + (up[k] * x1c0) * scale;
+            }
+        }
+        let mut c = [0.0f32; 4];
+        for k in 0..4 {
+            c[k] = (b[k] - p1[k]) + [0.0, 0.0, 0.0, 1.0][k];
+        }
+        f[3] = apply(f, c);
+    }
+    apply(f, p1)
 }
 
 /// The body's height above the snow one tick on (rider+0x308; `cBoarder::vf7` 0x117198): toward the surface table's

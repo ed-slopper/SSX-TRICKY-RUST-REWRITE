@@ -8,7 +8,7 @@ use std::rc::Rc;
 use r5900::ps2float::Rules;
 use r5900::Runner;
 use tricky_game::orient::{update_orientation, Orient};
-use tricky_game::pose::{board_frame, PoseIn};
+use tricky_game::pose::{board_frame, frame_where, PoseIn};
 
 type V4 = [f32; 4];
 
@@ -87,7 +87,7 @@ fn board_frame_matches_the_original() {
         let p = PoseIn {
             quat: o.q,
             steer: [0.0, g.f(-1.0, 1.0), -0.0][g.next() as usize % 3],
-            motion: [2u32, 3, 1][g.next() as usize % 3],
+            motion: [2u32, 3, 1, 4][g.next() as usize % 4],
             class: g.next() % 3,
             pos: [g.f(-9000.0, 9000.0), g.f(-9000.0, 9000.0), g.f(-900.0, 900.0), [1.0, 0.0][g.next() as usize % 2]],
             up: unit(&mut g),
@@ -120,12 +120,26 @@ fn board_frame_matches_the_original() {
         m.write_u32(rider + 0x44d8, bone_ix);
         m.write_f32(rider + bone_ix * 0x394 + 0x8d0, p.pivot_z);
         m.write_u32(stats + 0x78, 0);
+        // after the skeleton: the position moved to the pivot bone (row F4b3t); the clip answers 0, so the skin's
+        // children follow the frame exactly in state 1
+        let pivot = [g.f(-60.0, 60.0), g.f(-60.0, 60.0), p.pivot_z];
+        m.write_f32(rider + bone_ix * 0x394 + 0x8c8, pivot[0]);
+        m.write_f32(rider + bone_ix * 0x394 + 0x8cc, pivot[1]);
+        let state = [1u32, 2, 0x10][g.next() as usize % 3];
+        m.write_u32(rider + 0x428, state);
+        let x1c0 = [0.0, g.f(0.0, 1.0)][g.next() as usize % 2];
+        m.write_f32(rider + 0x1c0, x1c0);
         *frame.borrow_mut() = None;
         r.cpu.set_gpr(4, rider as u64);
         r.call(0x129628).unwrap_or_else(|e| panic!("case {case}: {e}"));
         let theirs = frame.borrow().expect("the skeleton call");
         let ours: Vec<u32> = board_frame(&p).iter().flat_map(|row| row.map(f32::to_bits)).collect();
         assert_eq!(theirs.to_vec(), ours, "case {case}: {p:?}");
+        let mut f = board_frame(&p);
+        f[3] = frame_where(f, pivot, state == 1, p.motion, p.up, x1c0, p.lean_scale);
+        let theirs: Vec<u32> = (0..16).map(|i| r.mem.read_u32(rider + 0x4aa0 + 4 * i)).collect();
+        let ours: Vec<u32> = f.iter().flat_map(|row| row.map(f32::to_bits)).collect();
+        assert_eq!(theirs, ours, "case {case}: the frame at the end, {p:?} pivot {pivot:?} state {state} +0x1c0 {x1c0}");
         // the board's corners from the bone the skeleton left (row G7f3)
         let rows: [[f32; 4]; 4] = std::array::from_fn(|k| std::array::from_fn(|c| bn[4 * k + c]));
         let corners = tricky_game::pose::board_corners(rows, p.class, stance, p.lean_scale);
