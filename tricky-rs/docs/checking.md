@@ -1720,3 +1720,7 @@ Instance 1444 (F4h5l): its flags in the running game are ours (0xa000a2), its bo
 E7a6 then showed the game's box is the `.pbd`'s own (the port now reads it), and the rider at 6721 is inside it
 ((94497, 27070, −65623)): the box is not why the game misses 1444. With the file's box, rec19 without the skip
 55,878 every field (PCSX2 way), with it 55,898, as before.
+PINE on mesa (a race ridden past the spot): 1444 has no controller at the start; when the rider nears it
+(x ≈ 74,000) it gets one (+0xe4, +0x14 = 0x100, animated) and its flags turn 0xa001a4 (the active cell's 0x100,
+bit 2 cleared, bit 4 set), kept while the rider passes (94494, 28137, −65840), dropped near (82,000, 46,000). The
+runner and ours cast it at rest pose with 0xa000a2: the next step is its pose (the controller's time) and its flags.
