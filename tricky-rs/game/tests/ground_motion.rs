@@ -316,6 +316,33 @@ impl W {
         }
         *self.course.borrow_mut() = walls.map(|w| w.course.clone());
     }
+
+    /// `Boarder_SetState` 0x11f608 as the original for the next call (F4h5m): `Boarder_ExitControlState` 0x11c840 and
+    /// `Boarder_EnterControlState` 0x11c8e8 with the routines the ground motion's changes reach (the revert, state 4,
+    /// from 3, 5 or 0xc; the stumble, state 2, from 3 or 0xe: `CruiseControl_Exit` 0x1033c0, `FakieCruiseControl_Exit`
+    /// 0x104688, `LandNormalControl_Exit` 0x104e38, `PrewindControl_Exit` 0x1055a8, `ChangeFakieControl_Exit` 0x104178,
+    /// `ChangeFakieControl_Enter` 0x103eb8, `BumpControl_Enter` 0x104190), their objects pointed at the rider;
+    /// `Boarder_UpdateBoost` 0x11d038 and `AnimCtl_TurnAllLayers` 0x15eef8 logged. Without, the stub that only logs the state asked for.
+    fn real_states(&mut self, on: bool) {
+        if !on {
+            let l = self.log.clone();
+            self.r.stub(0x11f608, move |cpu, _| l.borrow_mut().push(Ev::State(cpu.gpr(5) as u32)));
+            return;
+        }
+        self.r.unstub(0x11f608);
+        for f in [0x11f608, 0x11c840, 0x11c8e8, 0x1033c0, 0x104688, 0x104e38, 0x1055a8, 0x104178, 0x103eb8, 0x104190] {
+            self.r.allow(f);
+        }
+        for f in [0x11d038, 0x15eef8] {
+            let l = self.log.clone();
+            self.r.stub(f, move |_, _| l.borrow_mut().push(Ev::Call(f)));
+        }
+        // the objects' rider words: bump +0x610 (+0x10), cruise +0x630 (+0x14), change fakie +0x650 (+0), fakie cruise
+        // +0x660 (+0), normal landing +0x6f0 (+0xc), prewind +0x710 (+0xc)
+        for o in [0x620, 0x644, 0x650, 0x660, 0x6fc, 0x71c] {
+            self.r.mem.write_u32(self.handler + o, self.rd);
+        }
+    }
 }
 
 fn world() -> Option<W> {
@@ -2059,6 +2086,8 @@ fn ground_ticks_against_the_running_game() {
         // from the second sample in some axis (a wall, a landing, a get-up: not replayed) is missed: the frame runs
         // again with it as the others
         let mut missed = vec![false; n];
+        // `Boarder_SetState` 0x11f608 in the motion as the game's, both ways (F4h5m; TRICKY_STATES=stub: only logged)
+        let states = std::env::var("TRICKY_STATES").map_or(true, |v| v != "stub");
         let air = std::env::var("TRICKY_NOAIR").is_err();
         // (TRICKY_AIRPOS=off: the flight step's position not taken; its body stays as the first sample holds it either way)
         let air_pos = std::env::var("TRICKY_AIRPOS").map_or(true, |v| v != "off");
@@ -2089,9 +2118,20 @@ fn ground_ticks_against_the_running_game() {
                     rider.p.pos = riders[me].pos;
                     rider.vel = riders[me].vel;
                     rider.boost_level = boost;
+                    // a revert in the motion (`Boarder_SetState`(4) while riding backward) enters
+                    // `ChangeFakieControl_Enter` 0x103eb8, which negates the steer and +0x244 the second sample holds:
+                    // before it the motion had them the other way round (F4h5h, as the take-off test)
+                    if states {
+                        let mut dry = rider;
+                        let mut e = E { log: Vec::new(), hit: p.hit, wall: false, meter: 0.0, states: false, walls: walls_of(&course, a, &stats[me]) };
+                        update(&mut dry, &SURFACE_TABLE, &mut e);
+                        if e.log.contains(&Ev::State(4)) {
+                            (rider.steer, rider.p.x244) = (-rider.steer, -rider.p.x244);
+                        }
+                    }
                     let r = if k == 0 {
                         let mut mine = rider;
-                        update(&mut mine, &SURFACE_TABLE, &mut E { log: Vec::new(), hit: p.hit, wall: false, meter: 0.0, states: false, walls: walls_of(&course, a, &stats[me]) });
+                        update(&mut mine, &SURFACE_TABLE, &mut E { log: Vec::new(), hit: p.hit, wall: false, meter: 0.0, states, walls: walls_of(&course, a, &stats[me]) });
                         mine.vel = speed_limit(mine.vel, speed_limit_at(a, b, boost, |x, y| x - y));
                         if let Some(c) = &p.ctl {
                             control_ours(&mut mine, c, &table);
@@ -2103,8 +2143,10 @@ fn ground_ticks_against_the_running_game() {
                         g.wall.set(false);
                         g.put(&rider);
                         g.put_walls(walls_of(&course, a, &stats[me]).as_ref());
+                        g.real_states(states);
                         g.r.cpu.set_gpr(4, g.motion as u64);
                         g.r.call(0x10a0d8).unwrap_or_else(|e| panic!("tick {} rider {me}: {e:?}", w[0].tick));
+                        g.real_states(false);
                         let mut r = g.get(&rider);
                         // (the runner's float rules are still set from its call)
                         r.vel = speed_limit(r.vel, speed_limit_at(a, b, boost, r5900::ps2float::fsub));
