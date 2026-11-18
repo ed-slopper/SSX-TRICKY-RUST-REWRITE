@@ -295,6 +295,8 @@ struct W {
     /// the course built in the runner ([`W::load_course`]): `Boarder_WallCollide`'s cast then runs as the
     /// original, `World_RayCast` 0x25aff8 and the `cWorldBoarder` 0x257810 the wall makes
     real_cast: Rc<Cell<bool>>,
+    /// `Boarder_SetState` 0x11f608 runs as the original ([`W::real_states`], or the take-off test's own set-up)
+    states_real: bool,
 }
 
 /// `Boarder_WallCollide` 0x126250 stubbed: logged, answering `wall`.
@@ -364,6 +366,7 @@ impl W {
     /// `Boarder_UpdateBoost` 0x11d038 and `AnimCtl_TurnAllLayers` 0x15eef8 logged. Without, the stub that
     /// only logs the state asked for.
     fn real_states(&mut self, on: bool) {
+        self.states_real = on;
         if !on {
             let l = self.log.clone();
             self.r.stub(0x11f608, move |cpu, _| l.borrow_mut().push(Ev::State(cpu.gpr(5) as u32)));
@@ -619,7 +622,7 @@ fn world() -> Option<W> {
     for s in &mut seqs {
         *s = (r.mem.alloc(0x80), r.mem.alloc(0x10), r.mem.alloc(0x10));
     }
-    Some(W { r, rd, stats, motion, log, hit, wall, meter, handler, pad, seqs, air, landing, course, real_cast })
+    Some(W { r, rd, stats, motion, log, hit, wall, meter, handler, pad, seqs, air, landing, course, real_cast, states_real: false })
 }
 
 impl W {
@@ -1655,6 +1658,29 @@ struct Other {
     rider: Rider,
     hit: Option<Hit>,
     ctl: Option<Ctl>,
+    /// the course's walls (F4h5m), as for the rider the test compares
+    walls: Option<Walls>,
+}
+
+/// `Boarder_SetState` 0x11f608 in the ground motion as the game's, ours and the runner's (F4h5m; TRICKY_STATES=stub:
+/// only logged).
+fn states_on() -> bool {
+    std::env::var("TRICKY_STATES").map_or(true, |v| v != "stub")
+}
+
+/// A revert in the motion (`Boarder_SetState`(4) while riding backward) enters `ChangeFakieControl_Enter` 0x103eb8,
+/// which negates the steer and +0x244 the second sample holds: before it the motion had them the other way round
+/// (F4h5h). Found by a dry run of ours.
+fn unrevert(r: &mut Rider, hit: Option<Hit>, walls: &Option<Walls>) {
+    if !states_on() {
+        return;
+    }
+    let mut dry = *r;
+    let mut e = E { log: Vec::new(), hit, wall: false, meter: 0.0, states: false, walls: walls.clone() };
+    update(&mut dry, &SURFACE_TABLE, &mut e);
+    if e.log.contains(&Ev::State(4)) {
+        (r.steer, r.p.x244) = (-r.steer, -r.p.x244);
+    }
 }
 
 /// What a replayed ground tick does to a rider (`Other`) starting at a position and velocity: each way's own.
@@ -1679,7 +1705,7 @@ struct Wins {
 
 /// Rider `i`'s ground tick between two samples, when it is on the snow at both, its motion object is its own and
 /// the samples are one update apart (F4h5a).
-fn other_of(t0: &recording::Tick, t1: &recording::Tick, i: usize, st: &[u8], addr: u32, x: Wins) -> Option<Other> {
+fn other_of(t0: &recording::Tick, t1: &recording::Tick, i: usize, st: &[u8], addr: u32, x: Wins, course: &Option<std::sync::Arc<tricky_game::course_ground::CourseGround>>) -> Option<Other> {
     let (a, b) = (&t0.riders[i], &t1.riders[i]);
     // (F4b3x) a rider wiped out by a hit in the frame's collisions ends it in motion 5: its ground tick ran first.
     // `WipeoutMotion_Enter` 0x10c198 keeps the surface at +0x310 (+0x290 becomes 10) and blends the clips out
@@ -1711,14 +1737,15 @@ fn other_of(t0: &recording::Tick, t1: &recording::Tick, i: usize, st: &[u8], add
             c.clips = [u32_le(n, 8), u32_le(n, 0xc)];
             c
         });
-    Some(Other { rider, hit, ctl })
+    Some(Other { rider, hit, ctl, walls: walls_of(course, a, st) })
 }
 
 /// A replayed ground tick, ours: `ground_motion::update`, the speed limit, the control (as the ground test).
 fn tick_ours(x: &Other, pos: V4, vel: V4, boost: f32, a: &[u8], b: &[u8], table: &[u8]) -> Rider {
     let mut r = x.rider;
     (r.p.pos, r.vel, r.boost_level) = (pos, vel, boost);
-    update(&mut r, &SURFACE_TABLE, &mut E { log: Vec::new(), hit: x.hit, wall: false, meter: 0.0, states: false, walls: None });
+    unrevert(&mut r, x.hit, &x.walls);
+    update(&mut r, &SURFACE_TABLE, &mut E { log: Vec::new(), hit: x.hit, wall: false, meter: 0.0, states: states_on(), walls: x.walls.clone() });
     r.vel = speed_limit(r.vel, speed_limit_at(a, b, boost, |x, y| x - y));
     if let Some(c) = &x.ctl {
         control_ours(&mut r, c, table);
@@ -1731,12 +1758,20 @@ fn tick_ours(x: &Other, pos: V4, vel: V4, boost: f32, a: &[u8], b: &[u8], table:
 fn tick_runner(g: &mut W, x: &Other, pos: V4, vel: V4, boost: f32, a: &[u8], b: &[u8], addr: u32) -> Rider {
     let mut rider = x.rider;
     (rider.p.pos, rider.vel, rider.boost_level) = (pos, vel, boost);
+    unrevert(&mut rider, x.hit, &x.walls);
     *g.hit.borrow_mut() = x.hit;
     g.wall.set(false);
     g.put(&rider);
-    g.put_walls(None);
+    g.put_walls(x.walls.as_ref());
+    let was = g.states_real;
+    if !was {
+        g.real_states(states_on());
+    }
     g.r.cpu.set_gpr(4, g.motion as u64);
     g.r.call(0x10a0d8).unwrap_or_else(|e| panic!("another rider's ground tick: {e:?}"));
+    if !was {
+        g.real_states(false);
+    }
     let mut r = g.get(&rider);
     r.vel = speed_limit(r.vel, speed_limit_at(a, b, boost, r5900::ps2float::fsub));
     if let Some(c) = &x.ctl {
@@ -1748,9 +1783,11 @@ fn tick_runner(g: &mut W, x: &Other, pos: V4, vel: V4, boost: f32, a: &[u8], b: 
 /// A rider that leaves the snow in the frame (motion 2 → 1), replayed by the ground test so the pushes and hits it
 /// gives the riders that tick after it use the velocity it has then (board row F4h5g): its ground tick as
 /// `takeoff_ticks_against_the_running_game` runs it, from the first sample with the second's inputs.
-#[derive(Clone, Copy)]
+#[derive(Clone)]
 struct Lift {
     rider: Rider,
+    /// the course's walls (F4h5m)
+    walls: Option<Walls>,
     hit: Option<Hit>,
     /// +0x1c8 at the first sample (the crouch the jump measures)
     crouch0: f32,
@@ -1772,7 +1809,8 @@ impl Lift {
     fn ours(&self, pos: V4, vel: V4, a: &[u8], b: &[u8]) -> Rider {
         let mut mine = self.rider;
         (mine.p.pos, mine.vel) = (pos, vel);
-        let mut e = E { log: Vec::new(), hit: self.hit, wall: false, meter: 0.0, states: false, walls: None };
+        unrevert(&mut mine, self.hit, &self.walls);
+        let mut e = E { log: Vec::new(), hit: self.hit, wall: false, meter: 0.0, states: states_on(), walls: self.walls.clone() };
         update(&mut mine, &SURFACE_TABLE, &mut e);
         let mut t = TakeOffRider { state: mine.state, crouch: self.crouch0, x208: mine.crouch };
         let mut env = OurTakeOff { r: &mut mine, motion: 2, jump_stat: self.jump_stat, off: Off::default(), steep: false };
@@ -1791,6 +1829,7 @@ impl Lift {
     fn runner(&self, g: &mut W, pos: V4, vel: V4, a: &[u8], b: &[u8]) -> Rider {
         let mut rider = self.rider;
         (rider.p.pos, rider.vel) = (pos, vel);
+        unrevert(&mut rider, self.hit, &self.walls);
         *g.hit.borrow_mut() = self.hit;
         g.wall.set(false);
         g.log.borrow_mut().clear();
@@ -1800,8 +1839,15 @@ impl Lift {
         g.r.mem.write_u32(g.rd + 0x1dc, self.x1dc);
         g.r.mem.write_u8(g.stats + 0x17, self.jump_stat);
         g.r.cpu.set_gpr(4, g.motion as u64);
-        g.put_walls(None);
+        g.put_walls(self.walls.as_ref());
+        let was = g.states_real;
+        if !was {
+            g.real_states(states_on());
+        }
         g.r.call(0x10a0d8).unwrap_or_else(|e| panic!("a take-off's ground tick: {e:?}"));
+        if !was {
+            g.real_states(false);
+        }
         if g.log.borrow().contains(&Ev::TakeOff) {
             g.r.cpu.set_gpr(4, g.rd as u64);
             g.r.call(0x128470).unwrap_or_else(|e| panic!("a take-off: {e:?}"));
@@ -2111,7 +2157,7 @@ fn ground_ticks_against_the_running_game() {
         // (F4b3x) the riders a hit in this frame's collisions wipes out (motion 2 to 5): their ground tick replayed
         // (TRICKY_NOWIPE: as the others)
         let wipe: Vec<Option<Other>> = (0..n)
-            .map(|i| (u32_le(&w[1].riders[i], 0x424) == 5 && std::env::var("TRICKY_NOWIPE").is_err()).then(|| other_of(&w[0], &w[1], i, &stats[i], addr[i], Wins { km, km6, ka })).flatten())
+            .map(|i| (u32_le(&w[1].riders[i], 0x424) == 5 && std::env::var("TRICKY_NOWIPE").is_err()).then(|| other_of(&w[0], &w[1], i, &stats[i], addr[i], Wins { km, km6, ka }, &course)).flatten())
             .collect();
         for i in 0..n {
             let (a, b) = (&w[0].riders[i], &w[1].riders[i]);
@@ -2128,7 +2174,7 @@ fn ground_ticks_against_the_running_game() {
                     (rider.brake, rider.crouch, rider.steer, rider.p.x244, rider.d1, rider.d2) = (after.brake, after.crouch, after.steer, after.p.x244, after.d1, after.d2);
                     let kind = u32_le(b, 0x2e0);
                     let hit = (kind != 3).then(|| Hit { kind, point: vec4(b, 0x2d0), normal: vec4(b, 0x2a0), surface: u32_le(b, 0x290) });
-                    lift[i] = Some(Lift { rider, hit, crouch0: f32_at(a, 0x1c8), jump_stat: stats[i][0x17], x1dc: u32_le(a, 0x1dc) });
+                    lift[i] = Some(Lift { rider, walls: walls_of(&course, a, &stats[i]), hit, crouch0: f32_at(a, 0x1c8), jump_stat: stats[i][0x17], x1dc: u32_le(a, 0x1dc) });
                 }
             }
             if u32_le(a, 0x424) != 2 || u32_le(b, 0x424) != 2 {
@@ -2220,8 +2266,7 @@ fn ground_ticks_against_the_running_game() {
         // from the second sample in some axis (a wall, a landing, a get-up: not replayed) is missed: the frame runs
         // again with it as the others
         let mut missed = vec![false; n];
-        // `Boarder_SetState` 0x11f608 in the motion as the game's, both ways (F4h5m; TRICKY_STATES=stub: only logged)
-        let states = std::env::var("TRICKY_STATES").map_or(true, |v| v != "stub");
+        let states = states_on();
         let air = std::env::var("TRICKY_NOAIR").is_err();
         // (TRICKY_AIRPOS=off: the flight step's position not taken; its body stays as the first sample holds it either way)
         let air_pos = std::env::var("TRICKY_AIRPOS").map_or(true, |v| v != "off");
@@ -2252,17 +2297,7 @@ fn ground_ticks_against_the_running_game() {
                     rider.p.pos = riders[me].pos;
                     rider.vel = riders[me].vel;
                     rider.boost_level = boost;
-                    // a revert in the motion (`Boarder_SetState`(4) while riding backward) enters
-                    // `ChangeFakieControl_Enter` 0x103eb8, which negates the steer and +0x244 the second sample holds:
-                    // before it the motion had them the other way round (F4h5h, as the take-off test)
-                    if states {
-                        let mut dry = rider;
-                        let mut e = E { log: Vec::new(), hit: p.hit, wall: false, meter: 0.0, states: false, walls: walls_of(&course, a, &stats[me]) };
-                        update(&mut dry, &SURFACE_TABLE, &mut e);
-                        if e.log.contains(&Ev::State(4)) {
-                            (rider.steer, rider.p.x244) = (-rider.steer, -rider.p.x244);
-                        }
-                    }
+                    unrevert(&mut rider, p.hit, &walls_of(&course, a, &stats[me]));
                     let r = if k == 0 {
                         let mut mine = rider;
                         update(&mut mine, &SURFACE_TABLE, &mut E { log: Vec::new(), hit: p.hit, wall: false, meter: 0.0, states, walls: walls_of(&course, a, &stats[me]) });
@@ -2316,7 +2351,7 @@ fn ground_ticks_against_the_running_game() {
                     riders[me].motion = 2;
                     f.hit[me] = HitRider { heading: r.yaw, pos: r.p.pos, vel: r.vel, normal: r.p.normal, motion: 2, crouch: f32_at(b, 0x1c8) };
                     wiped_in += (k == 0) as usize;
-                } else if let Some(l) = lift[me].filter(|_| pushes) {
+                } else if let Some(l) = lift[me].clone().filter(|_| pushes) {
                     let (pos, vel) = (riders[me].pos, riders[me].vel);
                     let r = if k == 0 { l.ours(pos, vel, a, b) } else { l.runner(&mut runners[k - 1].1, pos, vel, a, b) };
                     riders[me].pos = r.p.pos;
@@ -3220,7 +3255,7 @@ fn takeoff_ticks_against_the_running_game() {
         // `Boarder_SetState` 0x11f608 runs (F4h5h): the revert in the motion (`ChangeFakieControl_Enter` 0x103eb8 turns
         // the board half round) and the take-off's air state (`NaturalAirControl_Enter` 0x1000b8); the exits are not
         // run (they change only what the motion has used by then: brake, crouch, boost), each logs the state entered
-        w.r.unstub(0x11f608);
+        w.real_states(true);
         for f in [0x11f608, 0x11c7d8, 0x11c8e8, 0x103eb8, 0x1000b8] {
             w.r.allow(f);
         }
@@ -3307,7 +3342,7 @@ fn takeoff_ticks_against_the_running_game() {
             let crouch0 = f32_at(a, 0x1c8);
             // the riders that tick before it in the frame push and hit it before its motion (F4h4), each way with
             // the riders around it replayed its own way (F4h5a)
-            let others: Vec<Option<Other>> = (0..n).map(|o| (o != i && replay_others).then(|| other_of(&w[0], &w[1], o, &stats[o], addr[o], wins)).flatten()).collect();
+            let others: Vec<Option<Other>> = (0..n).map(|o| (o != i && replay_others).then(|| other_of(&w[0], &w[1], o, &stats[o], addr[o], wins, &course)).flatten()).collect();
             let lists: Vec<Vec<usize>> = (0..n).map(|o| pair_list(&w[(std::env::var("TRICKY_LIST").as_deref() == Ok("b")) as usize], &addrs, o).unwrap_or_else(|| (0..n).filter(|&x| x != o).collect())).collect();
             let (w0r, w1r, tick) = (&w[0].riders, &w[1].riders, w[1].tick as i32);
             let mut runs: Vec<Option<FrameRun>> = vec![None; ways];
