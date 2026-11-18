@@ -1875,3 +1875,8 @@ Found:
   runs. rec20 and rec21 have one shove each (2 records): right with the pose, both wrong without it (rec20). On
   rec21 the flags are known on 22,130 rider ticks: the game's one shove is between them, and the 31 ticks between
   them on a shove clip with no shove get none from the replay either (out of reach or inside the three ticks).
+- The old recordings have no pivot window, so their shoves keep both stand-ins (the board's position, the game's
+  answer for the flags). As a test only, TRICKY_PIVOT=mean puts rec21's mean pivot on them: shove records right
+  rec14 6 of 8 (=), rec16 18 of 26 → 18 of 22 (four the replay made are gone), rec17 6 → 10 of 12; pushes rec16
+  470 → 471 of 569. So the hips were the missing reach; the rest needs each sample's own pivot. A recording with
+  more shoves than rec20/rec21's one is row F4b3t1.
