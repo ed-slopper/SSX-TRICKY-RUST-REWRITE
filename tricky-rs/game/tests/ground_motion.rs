@@ -2486,11 +2486,11 @@ fn ground_ticks_against_the_running_game() {
                     if ma == (5, 5) && clip.0 == clip.1 && clip.0.wrapping_sub(0x2dc) < 2 && air && !missed[me] {
                         // sliding the whole frame (F4b3w), then the speed limit (0x1179a4)
                         let (pos, vel) = if k == 0 {
-                            slide_ours(start.0, start.1, a, b)
+                            slide_ours(start.0, start.1, a, b, walls_of(&course, a, &stats[me]).as_ref())
                         } else {
                             let kind = u32_le(b, 0x2e0);
                             let hit = (kind != 3).then(|| Hit { kind, point: vec4(b, 0x2d0), normal: vec4(b, 0x2a0), surface: u32_le(b, 0x290) });
-                            slide_runner(&mut runners[k - 1].1, start.0, start.1, a, b, clip.0, hit)
+                            slide_runner(&mut runners[k - 1].1, start.0, start.1, a, b, clip.0, hit, walls_of(&course, a, &stats[me]).as_ref())
                         };
                         riders[me].vel = speed_limit(vel, speed_limit_at(a, b, boost, if k == 0 { |x, y| x - y } else { r5900::ps2float::fsub }));
                         riders[me].pos = pos;
@@ -2591,6 +2591,23 @@ fn ground_ticks_against_the_running_game() {
                     let list = pair_list(&w[(how == "b") as usize], &addrs, me)
                         .filter(|_| how != "none")
                         .unwrap_or_else(|| (0..n).filter(|&o| o != me).collect());
+                    // TRICKY_DBGT=<tick>: the gap between the bodies of each pair the rider looks at (ours), as the frame
+                    // has them and as either sample has them (F4b3p)
+                    if k == 0 && std::env::var("TRICKY_DBGT").is_ok_and(|v| v.parse() == Ok(tick)) {
+                        let gap = |x: &CollBody, y: &CollBody| {
+                            let mut m = f32::MAX;
+                            for i in 0..x.count.max(0) as usize {
+                                for j in 0..y.count.max(0) as usize {
+                                    let d = sub4(y.spheres[j].0, x.spheres[i].0);
+                                    m = m.min((d[0] * d[0] + d[1] * d[1] + d[2] * d[2]).sqrt() - x.spheres[i].1 - y.spheres[j].1);
+                                }
+                            }
+                            m
+                        };
+                        for &o in &list {
+                            eprintln!("DBGT tick {tick} {me}->{o}: gap now {} stale {} {}; first sample {}, second {}", gap(&f.body[me], &f.body[o]), f.stale[me], f.stale[o], gap(&body_of(&w[0].riders[me]), &body_of(&w[0].riders[o])), gap(&body_of(&w[1].riders[me]), &body_of(&w[1].riders[o])));
+                        }
+                    }
                     rider_collisions(me, &list, &mut riders, tick, false, &mut f);
                 }
                 // the end of the tick: `Boarder_UpdateLeanTargets` turns the up toward the normal and aims the lean
@@ -3049,15 +3066,63 @@ fn speed_limit(vel: V4, limit: f32) -> V4 {
 /// ride height (+0x294, moved by `cBoarder::vf7` before the motion). Ours: `wipeout_motion::slide_step` and
 /// `hold_step`; the runner's: `Boarder_UpdateMotion` 0x11c770 on the handler, the world under the probe the second
 /// sample's ground. Its body is not recorded: the probe's hip is 0 (its answer moves neither position nor velocity).
-fn slide_ours(pos: V4, vel: V4, a: &[u8], b: &[u8]) -> (V4, V4) {
+/// With the course (F4b3p), then the slide's `Boarder_WallCollide` 0x126250 (rider+0x494 the word at 0x31d310, 0xfc3;
+/// mode 5: no impact check), the body the first sample's, the ground the probe's (the second sample's +0x2a0), as
+/// `walls::wall_collide` for ours. `Boarder_InstanceCollisions` 0x125088 before it is still answered nothing.
+fn slide_ours(pos: V4, vel: V4, a: &[u8], b: &[u8], walls: Option<&Walls>) -> (V4, V4) {
     let (mut pos, mut vel, mut h) = (pos, vel, f32_at(a, 0x1bc));
     let n = vec4(a, 0x2a0);
     tricky_game::wipeout_motion::slide_step(&mut pos, &mut vel, n, SURFACE_TABLE[u32_le(a, 0x290) as usize][0]);
     tricky_game::wipeout_motion::hold_step(&mut pos, &mut vel, &mut h, n, f32_at(b, 0x294));
+    if let Some(w) = walls {
+        let mut body = w.body;
+        body.x24 = 0xfc3;
+        let mut wr = tricky_game::walls::WallRider { pos, vel, ground: vec4(b, 0x2a0), knocks: 0.0, mode: 5, state: u32_le(a, 0x428), up: w.up };
+        tricky_game::walls::wall_collide(&mut wr, &mut SlideWalls { course: &w.course, body });
+        (pos, vel) = (wr.pos, wr.vel);
+    }
     (pos, vel)
 }
 
-fn slide_runner(g: &mut W, pos: V4, vel: V4, a: &[u8], b: &[u8], clip: u32, hit: Option<Hit>) -> (V4, V4) {
+/// What the slide's `Boarder_WallCollide` 0x126250 calls (mode 5: no turn, no impact check past the knocks).
+struct SlideWalls<'a> {
+    course: &'a tricky_game::course_ground::CourseGround,
+    body: CollBody,
+}
+impl tricky_game::walls::WallEnv for SlideWalls<'_> {
+    fn cast_walls(&mut self, r: &tricky_game::walls::WallRider) -> (f32, tricky_game::walls::CastRecord) {
+        wall_cast(self.course, &self.body, r.ground)
+    }
+    fn query_objects(&mut self, _: &tricky_game::walls::WallRider) -> (f32, tricky_game::walls::CastRecord, tricky_game::walls::Touched) {
+        unreachable!("not called by Boarder_WallCollide")
+    }
+    fn accumulate_impact(&mut self, _: &mut tricky_game::walls::WallRider, _: V4) {}
+    fn translate(&mut self, _: &mut tricky_game::walls::WallRider, by: V4) {
+        self.body.translate(by);
+    }
+    fn turn_from_wall(&mut self, _: &mut tricky_game::walls::WallRider, _: V4) {
+        unreachable!("mode 2 only")
+    }
+    fn wipeout(&mut self, _: &mut tricky_game::walls::WallRider, _: &tricky_game::walls::Contact) {
+        unreachable!("not in mode 5")
+    }
+    fn score_crash(&mut self, _: &mut tricky_game::walls::WallRider) -> f32 {
+        unreachable!("not in mode 5")
+    }
+    fn add_meter(&mut self, _: &mut tricky_game::walls::WallRider, _: f32) {}
+    fn stumble(&mut self, _: &mut tricky_game::walls::WallRider, _: V4, _: u32) {
+        unreachable!("not in mode 5")
+    }
+    fn speed_stat(&mut self, _: &tricky_game::walls::WallRider) -> f32 {
+        unreachable!("not called by Boarder_WallCollide")
+    }
+    fn knock(&mut self, _: &mut tricky_game::walls::WallRider, _: f32) {}
+    fn contact(&mut self, _: u32, _: &mut tricky_game::walls::WallRider, _: &tricky_game::walls::Contact, _: &tricky_game::walls::CastRecord) {}
+    fn sfx_object(&mut self, _: &tricky_game::walls::WallRider, _: u32) {}
+    fn sfx_wall(&mut self, _: &tricky_game::walls::WallRider) {}
+}
+
+fn slide_runner(g: &mut W, pos: V4, vel: V4, a: &[u8], b: &[u8], clip: u32, hit: Option<Hit>, walls: Option<&Walls>) -> (V4, V4) {
     let (rd, h) = (g.rd, g.handler);
     let m = &mut g.r.mem;
     for (o, v) in [(0x140, pos), (0x150, vel), (0x170, vec4(a, 0x170)), (0x180, vec4(a, 0x180)), (0x190, vec4(a, 0x190)), (0x1a0, vec4(a, 0x1a0)), (0x2a0, vec4(a, 0x2a0))] {
@@ -3077,6 +3142,7 @@ fn slide_runner(g: &mut W, pos: V4, vel: V4, a: &[u8], b: &[u8], clip: u32, hit:
     }
     *g.hit.borrow_mut() = hit;
     g.wall.set(false);
+    g.put_walls(walls);
     g.r.cpu.set_gpr(4, h as u64);
     g.r.call(0x11c770).unwrap_or_else(|e| panic!("the slide: {e:?}"));
     (rv(&mut g.r.mem, rd + 0x140), rv(&mut g.r.mem, rd + 0x150))

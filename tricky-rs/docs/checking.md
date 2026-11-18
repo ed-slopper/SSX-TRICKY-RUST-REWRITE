@@ -1755,3 +1755,40 @@ rec19, nothing skipped (no TRICKY_WALL_SKIP):
 
 Posed, rec19 comes out as it did with 1444 left out by hand (F4h5m's table), so 1444 was the whole difference.
 TRICKY_WALL_SKIP stays as a debugging switch.
+
+## F4b3p: the wipe-out slide's walls, and the courses of the old recordings (2026-11-18)
+
+The courses of the recordings made before the recorder wrote the course id (`tests/course_of.rs`: a line down each
+snow rider's ground normal on every course of the disc; the course where it finds the ground within 60 cm, all but
+2 or 3 of 183–734 samples, the next best 2): rec4 and rec17 elysium, rec11, rec14 and rec15 gari, rec16 and rec18
+snow, rec19 mesa (as its header). Run the tests with TRICKY_COURSE set so.
+
+`WipeoutMotion_Update` 0x10c2f0's slide (clips 0x2dc/0x2dd) ends with rider+0x494 = the word at 0x31d310 (0xfc3),
+`Boarder_InstanceCollisions` 0x125088, `Boarder_WallCollide` 0x126250, +0x494 = −1 (proven, decompile). The ground
+test's slide replay now runs the wall for both ways: the runner's `Boarder_WallCollide` as the original on the
+course (`put_walls` with the rider's own body; before, a slide ran whatever walls the last ground rider had left, so
+with a course rec19's slides were 143 of 270 positions right in the runner), ours `walls::wall_collide` in mode 5
+(no impact check) with the first sample's body and the probe's ground (the second sample's +0x2a0,
+`Ragdoll_GroundProbe` 0x10fd58 writes it). `Boarder_InstanceCollisions` is still answered nothing: the touch
+objects the slides meet (gari's 229, flags 0x10201022, no 0x80 bounce) only run contact scripts.
+
+| `fadd=g1`, course | slides, position right | ground ticks every field | take-offs whole |
+|---|---|---|---|
+| rec17 elysium | 678 of 685 → 680 of 686 | 71,287 → 71,306 | 326 → 327 of 327 |
+| rec14 gari | 220 of 224 (=) | 37,246 → 37,247 | 137 of 143 (=) |
+| rec15 gari | 153 of 153 (=) | 37,319 (=) | 110 of 110 (=) |
+| rec16 snow | 272 of 272 (=) | 51,746 (=) | 234 of 235 (=) |
+| rec18 snow | 618 of 620 (=) | 54,606 (=) | 197 of 198 (=) |
+| rec19 mesa | 272 of 272 | 55,898 (=) | 216 of 216 (=) |
+
+rec17 9557 rider 3 (57 cm off) and 10936 rider 2 (0.03 cm) were the slide's walls: now right. Left:
+
+- rec17 10937 riders 1–2 (the row's pair): **not** the walls nor the touch objects. Both bodies are fresh (their
+  offsets from the riders move smoothly over 10933–10938), 0.115 cm apart at the frame's start (TRICKY_DBGT=10937
+  lists each pair's gap), neither wall nor touch object answers either body in the frame, and between the frame's
+  start and `Boarder_RiderCollisions` 0x123fc8 only `Boarder_Translate` 0x1267a0 (pushes, walls, bounces, the air)
+  and `Ragdoll_Contacts` (the tumble) move a body (proven: the callers of `CollBody_Translate` 0x236448 and
+  `Boarder_UpdateBroadphase` 0x126748). Yet the game bumps them in that frame (their bodies 0.31 cm into each other
+  at its end). Row F4b3p1.
+- The slide positions off after pushes: rec17 10932, 10938, 10941 (riders 1–2, under 1 cm, equal and opposite)
+  and rec14 9092, 9095 rider 1 (6 cm), 9098 riders 1–2 (row F4b3z).
