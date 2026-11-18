@@ -477,11 +477,11 @@ impl World {
                 let r = InstanceRec::from_words(w);
                 let phys = ssf.object_physics.get(i).and_then(|&k| ssf.physics.get(k as usize)).copied().unwrap_or(tricky_data::ssf::Physics([0; 6]));
                 let model = r.model.max(0) as usize;
-                let (min, max) = object_box(r.matrix, models.get(model).map_or(&[][..], |v| &v[..]), &[]);
+                // the box (+0xcc min, +0xd8 max) as the file has it: the game never changes it (row E7a6)
                 Object {
                     rows: r.matrix,
-                    min,
-                    max,
+                    min: [r.bbox[0], r.bbox[1], r.bbox[2]],
+                    max: [r.bbox[3], r.bbox[4], r.bbox[5]],
                     model,
                     flags: crate::controllers::restore_flags(phys.flags(), 0xffff_0000),
                     surface: phys.surface(),
@@ -537,37 +537,3 @@ impl World {
     }
 }
 
-/// STANDIN: an object's box from its parts' mesh boxes through the parts' (parent first) and the object's
-/// matrices, for the game's run-time box (row E7a6); the object's position when it has no mesh.
-/// `frames`: the animated parts' frames (as [`WorldEnv::frame`]), none for the rest pose.
-pub fn object_box(rows: [V4; 4], parts: &[Part], frames: &[[V4; 4]]) -> ([f32; 3], [f32; 3]) {
-    let mut world: Vec<[V4; 4]> = Vec::with_capacity(parts.len());
-    let (mut lo, mut hi) = ([f32::MAX; 3], [f32::MIN; 3]);
-    let mut n = 0;
-    for (k, p) in parts.iter().enumerate() {
-        let own = if p.animated && !frames.is_empty() {
-            n += 1;
-            frames.get(n - 1).copied().unwrap_or(IDENTITY)
-        } else {
-            p.matrix.unwrap_or(IDENTITY)
-        };
-        let parent = usize::try_from(p.parent).ok().filter(|&i| i < k).map_or(rows, |i| world[i]);
-        let m = through(parent, own);
-        world.push(m);
-        let Some(mesh) = p.mesh else { continue };
-        let (a, b) = ([mesh.lo[0], mesh.lo[1], mesh.lo[2]], [mesh.hi[0], mesh.hi[1], mesh.hi[2]]);
-        for c in 0..8 {
-            let v = [if c & 1 == 0 { a[0] } else { b[0] }, if c & 2 == 0 { a[1] } else { b[1] }, if c & 4 == 0 { a[2] } else { b[2] }, 1.0];
-            let w = apply(m, v);
-            for i in 0..3 {
-                lo[i] = lo[i].min(w[i]);
-                hi[i] = hi[i].max(w[i]);
-            }
-        }
-    }
-    if lo[0] > hi[0] {
-        let p = [rows[3][0], rows[3][1], rows[3][2]];
-        return (p, p);
-    }
-    (lo, hi)
-}

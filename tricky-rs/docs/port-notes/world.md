@@ -277,10 +277,13 @@ Part of the port notes (index: [README.md](README.md)); units and wording as des
   vertical test lines (19 of them surface 5), elysium 36 of 162 (14 surface 10). The probe takes them as the game
   does; the vertical ground query skips them (the game's landing, `AirMotion_Update` 0x108378, takes only a surface
   the rider moves into).
-- STANDINs left: the patch cache keeps every patch it tessellates (no fixed size, no eviction: speed only); an
-  object's box (+0xcc..+0xe0) is its parts' mesh boxes through its matrices (row E7a6; not the game's: mesa's
-  instance 1444 in the running game (91130.95, 22246.13, −66346.64)..(97653.03, 34243.97, −63516.43), ours
-  (91130.875, 22160.04, −66614.91)..(97692.016, 34246.56, −63565.47), F4h5m); objects with no
+- Proven (row E7a6): an object's box (+0xcc min, +0xd8 max) is in its `.pbd` instance record (no course's is
+  zero: 0 of the 11 courses' 25,128) and the game never changes it: PINE on gari, every one of the 3393 run-time
+  boxes the file's, the 41 objects with a controller too (mesa's 1444 too: (91130.95, 22246.13, −66346.64)..
+  (97653.03, 34243.97, −63516.43) in file and game). No code writes it (no store at +0xcc..+0xe0 of an instance
+  found). The port reads it (`World::from_course`); the old estimate from the parts' mesh boxes (up to 2 m
+  bigger, `world::object_box`) is gone.
+- STANDINs left: the patch cache keeps every patch it tessellates (no fixed size, no eviction: speed only); objects with no
   controller (E7b2); keyframed objects (`cAnimObjectNode`) and switched-off, broken or open ones are left out of
   the course's casts by clearing their bit 0x20 for the cast (row E7c3b: pose them as `World_RayCastInstance`
   does); the walls are still `CollisionWorld::push_out` on the drawn mesh (row E8b wiring).
@@ -379,10 +382,10 @@ Part of the port notes (index: [README.md](README.md)); units and wording as des
   clock moves (`CollisionWorld::tick_movers`, `set_mover_time`, and once when the course is set,
   `pose_course`); `CourseGround::pose` keeps them for `WorldEnv::frame` (`MeshAnimNode_GetFrameMatrix`
   0x1998d0), sets the object's controller animated (+0x14 bit 0x100) so `World_RayCastInstance` poses the
-  parts with them, and puts its box (+0xcc) round the posed parts' mesh boxes (`world::object_box` with frames).
+  parts with them, and leaves its box (+0xcc) the file's (row E7a6: the game never moves it).
   The keyframed objects are no longer skipped, and `ground`, the landing and the walls take them from the
   course's own collision meshes, not the drawn triangles. STANDINs: the controller is only that bit (row E7b2),
-  the box is ours (row E7a6), and the clocks are the port's (`Mover`, `src/worldanim.rs`). The objects' INode
+  and the clocks are the port's (`Mover`, `src/worldanim.rs`). The objects' INode
   lists stay where the course put them (the game's do too). `tests/course_ground.rs`: 8 objects over the 11
   courses whose meshes all move with an animated part are hit at rest, the same once posed at rest, and not
   once lifted 1 km. In the sims the casts hit animated parts (kind 2) on mesablanca (object 1444, over 2,400
@@ -526,8 +529,8 @@ velocity, +0x424 motion, +0x428 state, +0x2e4 impact counter; recordings kept on
   3403 on the same tick as the game's within one.
 - Proven (live): megaplex `Pinball_FlipperL` 75: matrix as the port's, flags 0x10a110a3 (0x10a111a3 while its
   cell is active, `World_CellActivate_RunPersistant` 0x25fed0; no cast reads 0x100), mass 1e30, mode 3 (sphere
-  tree), group 2. Its box is the game's (−16774, −23326, −38619)..(−16142, −21389, −37906); the port's estimate
-  (E7a6) is up to 2 m bigger (broadphase only). Twice in 10 minutes a controller was attached for exactly 300
+  tree), group 2. Its box is the game's (−16774, −23326, −38619)..(−16142, −21389, −37906); the port's (the `.pbd`'s,
+  E7a6) is the same. Twice in 10 minutes a controller was attached for exactly 300
   ticks (flags …a3 → …a5, matrix and box unchanged: the parts are posed by the controller, `World_RayCastInstance`),
   and two riders went through its box during one. At rest, the computer riders went round its tip
   (y > −21700, the paddle's long axis is its y) 18 times in 3 laps: one touch without a wipe-out, one wipe-out.

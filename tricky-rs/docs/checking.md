@@ -1717,3 +1717,6 @@ the computer's pad word, F4b3k) and the bob (60).
 Instance 1444 (F4h5l): its flags in the running game are ours (0xa000a2), its box is not: the game's
 (91130.95, 22246.13, −66346.64)..(97653.03, 34243.97, −63516.43), ours from the parts' mesh boxes
 (91130.875, 22160.04, −66614.91)..(97692.016, 34246.56, −63565.47) (row E7a6).
+E7a6 then showed the game's box is the `.pbd`'s own (the port now reads it), and the rider at 6721 is inside it
+((94497, 27070, −65623)): the box is not why the game misses 1444. With the file's box, rec19 without the skip
+55,878 every field (PCSX2 way), with it 55,898, as before.

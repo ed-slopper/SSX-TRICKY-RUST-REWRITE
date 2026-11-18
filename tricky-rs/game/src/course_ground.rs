@@ -150,16 +150,14 @@ impl CourseGround {
     /// A keyframed object's (`cAnimObjectNode`) animated parts are at `frames` (the n-th animated part's local
     /// matrix, game units, `MeshAnimNode_GetFrameMatrix` 0x1998d0): its controller (+0xe4) animated (+0x14 bit
     /// 0x100), so `World_RayCastInstance` poses those parts with them.
-    /// STANDIN: the object's box (+0xcc) is its parts' mesh boxes in that pose, for the game's run-time box (row
-    /// E7a6); the controller is only its animated bit, for the course's controllers (row E7b2).
+    /// The object's box (+0xcc) stays the file's: the game never moves it (row E7a6, PINE on gari: every box,
+    /// the 41 objects with a controller too, as the `.pbd` has it).
+    /// STANDIN: the controller is only its animated bit, for the course's controllers (row E7b2).
     pub fn pose(&self, object: u32, frames: Vec<[V4; 4]>) {
         let o = object as usize;
         let mut world = self.world.lock().unwrap_or_else(|e| e.into_inner());
-        let Some(obj) = world.objects.get(o) else { return };
-        let (rows, model) = (obj.rows, obj.model);
-        let (min, max) = crate::world::object_box(rows, world.models.get(model).map_or(&[][..], |v| &v[..]), &frames);
-        let obj = &mut world.objects[o];
-        (obj.min, obj.max, obj.controller) = (min, max, Some(0x100));
+        let Some(obj) = world.objects.get_mut(o) else { return };
+        obj.controller = Some(0x100);
         self.poses.lock().unwrap_or_else(|e| e.into_inner()).insert(o, frames);
     }
 }

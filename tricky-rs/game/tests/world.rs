@@ -110,8 +110,8 @@ fn world_casts_match_the_original() {
         let mut controllers = vec![0u32; pbd.instances.len()];
         for i in 0..pbd.instances.len() as u32 {
             let o = inst0 + 0x100 * i;
-            // the object's box (+0xcc, +0xd8): zero in the file, filled at run time by code not yet found (row
-            // E7a3); here the object's position ± a size, the same on both sides
+            // the object's box (+0xcc, +0xd8): the file's replaced by the object's position ± a size, the same on
+            // both sides, so the casts reach more objects
             let rad = g.pick(&[200.0f32, 800.0, 3000.0]);
             for k in 0..3u32 {
                 let p = r.mem.read_f32(o + 0x30 + 4 * k);
