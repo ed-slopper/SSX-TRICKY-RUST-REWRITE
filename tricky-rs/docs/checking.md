@@ -1838,3 +1838,40 @@ Found (`fadd=g1`, before → after):
 Still to do (row F4b3d1): record a race by hand with `-140:74` (the player's spin object) and tricks off the stick, so
 the player's ticks (every field, modes 0 and 1 too) are compared; and a half-pipe race with the `46c0` and sequence
 windows for the clips 0x23c / 0x23d.
+
+## F4b3t: the shove's frame, and its clip flags recorded (2026-11-18)
+
+F4b3s found the frame the shove measures its reach in (rider+0x4aa0: forward, side, up, where) is not
+`pose::board_frame` of the sample. It isn't: `Boarder_UpdatePose` 0x129628 goes on after `Boarder_UpdateSkeleton`.
+
+Proven (Ghidra):
+- After the skeleton call only the position (+0x4ad0) changes; the rows stay as `board_frame` left them. For a rider
+  whose stats+0x78 is 0 (every rider of every recording): unless the layer-0 clip has the skin's children follow
+  the frame (state +0x428 = 1 and the clip not 0x1fc, or the clip 0x291 or 0x2ab, or of type 0x10:
+  `Boarder_SetSkinChildMatrices` 0x2083e8), the position moves by the rows times ((pivot + up·lift) − pivot, w + 1),
+  lift = +0x2c0 × +0x1c0 × stats+0x60 in motions 2 and 4 (else 0); then always the position becomes the pivot bone
+  through the frame: rows · (pivot, 1). The pivot is the bone at rider + +0x44d8 × 0x394 + 0x8c8 (x y z), read
+  before the skeleton call (the same bone whose z the spin's turn uses). `Boarder_GetBoneWorldPos` 0x208398,
+  `Boarder_BuildBoneMatrices` 0x2083f8 and `Boarder_SetSkinChildMatrices` only hand the frame on (jumps into the
+  skin code with it as an argument; inferred: they read it). Ported as `pose::frame_where`; `tests/pose.rs` runs
+  the whole function in the runner and matches it bit for bit on 40,000 cases (all four motions, states 1, 2, 0x10).
+- The shove's clip flags: `AnimCtl_TestClipFlag` 0x15ffb8 (ctl, flag, layer) = bit (flag − 1) of byte +0x74 of the
+  layer's record of its clip: `AnimLayer_FindClip` 0x15a6c8 walks the layer's list (layer 1: head rider+0x4788, next
+  +0x30, ends at rider+0x4790; +0x40 the clip id).
+
+Recorded (PCSX2 with the player's disc, the race's scoreboard replay as rec19, mesa, 200 s each):
+`pine.py record 200 rec20.txt 0x700` with rec19's windows and `-140:74 4aa0:40 8c0:20 44d8:4 46b0:10`; rec21 adds
+`4788>0:80 4788>30>0:80 4788>30>30>0:80` (the layer-1 clip records).
+
+Found:
+- `tests/frame.rs` (new): the frame from each sample against the frame the game left in it. The pivot bone index
+  is 0 on every sample. rec20: the position right on 70,104 of 71,292 with the same sample's pivot (9,127 with the
+  sample before's), rec21 70,240 of 70,818; every miss a few ulps. The rows are right on only 6,828 (both): 1 to
+  8 ulps off, the quaternion's products and sums under PCSX2's floats (F4c, as everywhere else). The pivot is the
+  hips: on the snow x −3.95 (−36.7..37.8), y −7.70 (−53.5..14.7), z 70.29 (6.2..130.8) cm in the board's frame.
+- The ground test (`tests/ground_motion.rs`): `frame_of` takes the pivot and the clip from the first sample
+  (`pose_of`, windows `8c0`, `44d8`, `46c0`; TRICKY_POSE=off: as before) and the shove's flags from the records
+  (`shoving_of`, the second sample's; TRICKY_FLAGS=a the first's: the same counts), so on rec21 neither stand-in
+  runs. rec20 and rec21 have one shove each (2 records): right with the pose, both wrong without it (rec20). On
+  rec21 the flags are known on 22,130 rider ticks: the game's one shove is between them, and the 31 ticks between
+  them on a shove clip with no shove get none from the replay either (out of reach or inside the three ticks).

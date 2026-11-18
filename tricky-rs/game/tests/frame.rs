@@ -49,6 +49,9 @@ fn board_frame_against_the_recording() {
     let mut count = [[0usize; 3]; 2];
     let (mut total, mut other) = (0, 0);
     let mut misses = Vec::new();
+    // the pivot bone by motion: per axis (sum, least, most), and the samples
+    let mut piv = [[(0.0f64, f64::MAX, f64::MIN); 3]; 6];
+    let mut piv_n = [0usize; 6];
     for (ti, t) in ticks.iter().enumerate() {
         let prev = (ti > 0 && ticks[ti - 1].tick + 1 == t.tick).then(|| &ticks[ti - 1]);
         for i in 0..n {
@@ -61,6 +64,19 @@ fn board_frame_against_the_recording() {
             let game: Vec<u32> = (0..16).map(|k| u32_le(&t.extra[kf].1[i], 4 * k)).collect();
             total += 1;
             let clip = u32_le(&t.extra[ka].1[i], 8);
+            {
+                let pb = &t.extra[kp].1[i];
+                let m = u32_le(r, 0x424) as usize;
+                if m < 6 {
+                    for c in 0..3 {
+                        let v = f32_at(pb, 8 + 4 * c) as f64;
+                        piv[m][c].0 += v;
+                        piv[m][c].1 = piv[m][c].1.min(v);
+                        piv[m][c].2 = piv[m][c].2.max(v);
+                    }
+                    piv_n[m] += 1;
+                }
+            }
             let skin_child = (u32_le(r, 0x428) == 1 && clip != 0x1fc) || clip == 0x291 || clip == 0x2ab || (clip != animctl::NONE && category(clip) == 0x10);
             for (s, src) in [Some(t), prev].into_iter().enumerate() {
                 let Some(src) = src else { continue };
@@ -84,6 +100,10 @@ fn board_frame_against_the_recording() {
     eprintln!("{path}: board frames: {total} compared ({other} left out: pivot bone not 0 or stats+0x78 set)");
     for (s, name) in ["this sample's pivot", "the sample before's pivot"].iter().enumerate() {
         eprintln!("  {name}: rows {}, where {}, whole {}", count[s][0], count[s][1], count[s][2]);
+    }
+    for (m, (p, k)) in piv.iter().zip(piv_n).enumerate().filter(|(_, (_, k))| *k > 0) {
+        let line: Vec<String> = p.iter().map(|(sum, lo, hi)| format!("{:.2} ({lo:.2}..{hi:.2})", sum / k as f64)).collect();
+        eprintln!("  the pivot bone in motion {m} ({k} samples): {}", line.join(", "));
     }
     for m in misses {
         eprintln!("  miss {m}");
