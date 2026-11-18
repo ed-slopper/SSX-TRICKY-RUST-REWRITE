@@ -235,6 +235,13 @@ Part of the port notes (index: [README.md](README.md)); units and wording as des
   data qwords 16..25 comes from the chain at 0x31d1d0): for each row i, C_k = vf(4k+1)·Bᵢ.x + … + vf(4k+4)·Bᵢ.w,
   then point (i, j) = C₀·Bⱼ.x + C₁·Bⱼ.y + C₂·Bⱼ.z + C₃·Bⱼ.w (x, y, z; w 1): the patch's polynomial at s = j/9,
   t = i/9.
+- Proven (F4h5m, PCSX2 with the player's disc): in the running game every point of the patch cache is that program
+  with each product and each sum rounded toward zero (`terrain::tessellate_by`; 8,800 of 8,800 points of 88
+  entries on mesa, read over PINE; to nearest, `terrain::tessellate`, only 418, up to 3 ulps off). The quad
+  normals the game makes from those points (VU0 macro code in 0x25c7c8) are ours to nearest (1,406 of 1,406).
+  `terrain::tessellate` (what `CourseGround` uses) still rounds to nearest: which rounding the port takes is row F4c.
+  Inferred: PCSX2's VU rounding mode (Chop/Zero by default) applies to VU0's micro mode, not to its macro
+  instructions, which F4g measured to nearest.
 - The patch test (`cWorldIntersectType` +0x48, 0x25c7c8): kind 0 queries use the 3 × 3 coarse quads (every third
   point, records at +0x1a90), others the 9 × 9 fine ones (+0x650); each 0x40 record: triangle A's normal
   unit((p11 − p10) × (p10 − p01)), B's unit((p01 − p10) × (p10 − p00)), the box (made when first needed). The
@@ -271,7 +278,9 @@ Part of the port notes (index: [README.md](README.md)); units and wording as des
   does; the vertical ground query skips them (the game's landing, `AirMotion_Update` 0x108378, takes only a surface
   the rider moves into).
 - STANDINs left: the patch cache keeps every patch it tessellates (no fixed size, no eviction: speed only); an
-  object's box (+0xcc..+0xe0) is its parts' mesh boxes through its matrices (row E7a6); objects with no
+  object's box (+0xcc..+0xe0) is its parts' mesh boxes through its matrices (row E7a6; not the game's: mesa's
+  instance 1444 in the running game (91130.95, 22246.13, −66346.64)..(97653.03, 34243.97, −63516.43), ours
+  (91130.875, 22160.04, −66614.91)..(97692.016, 34246.56, −63565.47), F4h5m); objects with no
   controller (E7b2); keyframed objects (`cAnimObjectNode`) and switched-off, broken or open ones are left out of
   the course's casts by clearing their bit 0x20 for the cast (row E7c3b: pose them as `World_RayCastInstance`
   does); the walls are still `CollisionWorld::push_out` on the drawn mesh (row E8b wiring).

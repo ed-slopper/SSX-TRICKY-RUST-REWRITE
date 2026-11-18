@@ -1674,3 +1674,46 @@ rec19 under `fadd=g1` (TRICKY_WALL_SKIP=1444, F4h5l):
 Left at 2294 r4 (the bounce): the position exact, the velocity 1–2 ulps off in y and z, the same for ours and the
 runner (so the cast's depth or normal, `CourseGround::ray_cast`, not bit exact), and the state: the ground test's
 `Boarder_SetState` stub only logs, so the stumble's 2 stays 3 there (row F4h5m). rec18 (no course): unchanged.
+
+## F4h5m: the walls' cast as the game's code, and PCSX2's patch program (2026-11-17)
+
+`Boarder_SetState` 0x11f608 was a stub in the ground test's runner, so a wall's stumble (state 2) and the motion's
+revert (4) never reached rider+0x428. The motion now runs the original's (`W::real_states`: the exit and enter
+routines the motion's changes reach, `Boarder_UpdateBoost` and `AnimCtl_TurnAllLayers` logged) and ours
+`ground_tick::set_state`; a revert's steer and +0x244 are taken the other way round before the motion (`unrevert`,
+as F4h5h). The riders replayed around the compared one (`tick_ours`/`tick_runner`, `Lift`) get the same and the
+course's walls. TRICKY_STATES=stub: as before.
+
+The walls' cast in the runner is now the game's code: `r5900::Runner::hook` (a stub that may let the original run)
+lets `World_RayCast` 0x25aff8 and `cWorldBoarder::cWorldBoarder` 0x257810 run for `Boarder_WallCollide`'s cast, on
+the course built in the runner by the game's loaders (`tests/runner_course`, taken from `tests/world.rs`), the
+objects' boxes and flags ours, the patch cache (`World_LookupCollCache` 0x25c750) laid out from our tessellation.
+`wall_casts_against_the_original`: rec19's 56,462 wall casts (every tick, riders on the snow), ours and the game's
+code, t, point, normal and object the same bit for bit (102 hit; 123 without TRICKY_WALL_SKIP=1444: the game's code
+hits instance 1444 on our data too, so F4h5l is the data, below). TRICKY_WALLCAST=ours: the old way.
+
+So the 1–2 ulps at rec19 2294 r4 were not the cast's code. They were its points: PCSX2's patch cache read over PINE
+(`tests/terrain.rs`, `the_running_games_patch_cache`, TRICKY_PATCH_CACHE: per entry the patch's address, its
+coefficients and the entry, dumped by a small PINE script; the dumps stay on the player's PC) holds the VU0 patch
+program's points with **every product and sum rounded toward zero**: 8,800 of 8,800 points (88 entries, mesa);
+to nearest (`terrain::tessellate`) 418. On a first dump (25 entries, 2,500 points): nearest products with
+toward-zero sums 2,397; to nearest 118; PCSX2's COP1 adder (`g1`) or the manual's adder (`ee`) 110–146. The quad normals the game made from them (VU0 macro code) are ours
+to nearest: 1,406 of 1,406. The PCSX2 way (`fadd=g1`) now tessellates so (`terrain::tessellate_by`); ours still to
+nearest (row F4c).
+
+rec19 (TRICKY_WALL_SKIP=1444):
+
+| ground ticks, every field | before (F4h5k) | SetState | + the game's cast, PCSX2's points |
+|---|---|---|---|
+| ours / the runner to nearest | 9 | 9 | 9 |
+| the runner under `fadd=g1` | 55,812 | 55,825 | 55,898 (pos 56,080, vel 56,073 of 56,114) |
+| state right (every way) | 55,989–56,006 | 56,019 | 56,019 |
+
+rec19 2294 r4 now right in the PCSX2 way. Take-offs unchanged (rec19 216/216, rec16 234/235, rec17 326/327). The
+SetState alone on recordings without a course: rec16 51,723 → 51,746, rec18 54,599 → 54,606, rec17 71,257 →
+71,287, rec14 37,241 → 37,246, rec15 37,311 → 37,319. Left in rec19's PCSX2 way: 216 ticks, mostly the state (92:
+the computer's pad word, F4b3k) and the bob (60).
+
+Instance 1444 (F4h5l): its flags in the running game are ours (0xa000a2), its box is not: the game's
+(91130.95, 22246.13, −66346.64)..(97653.03, 34243.97, −63516.43), ours from the parts' mesh boxes
+(91130.875, 22160.04, −66614.91)..(97692.016, 34246.56, −63565.47) (row E7a6).
