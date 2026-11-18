@@ -14,6 +14,7 @@
 //! field must be caught.
 
 use std::cell::{Cell, RefCell};
+use std::collections::HashMap;
 use std::rc::Rc;
 
 use r5900::ps2float::Rules;
@@ -297,6 +298,8 @@ struct W {
     real_cast: Rc<Cell<bool>>,
     /// `Boarder_SetState` 0x11f608 runs as the original ([`W::real_states`], or the take-off test's own set-up)
     states_real: bool,
+    /// the course built in the runner ([`W::load_course`]), for its keyframed objects' poses ([`Keyframed`])
+    rc: Option<runner_course::RunnerCourse>,
 }
 
 /// `Boarder_WallCollide` 0x126250 stubbed: logged, answering `wall`.
@@ -356,6 +359,7 @@ impl W {
             self.r.allow(a);
         }
         self.real_cast.set(true);
+        self.rc = Some(rc);
     }
 
     /// `Boarder_SetState` 0x11f608 as the original for the next call (F4h5m): `Boarder_ExitControlState` 0x11c840 and
@@ -622,7 +626,7 @@ fn world() -> Option<W> {
     for s in &mut seqs {
         *s = (r.mem.alloc(0x80), r.mem.alloc(0x10), r.mem.alloc(0x10));
     }
-    Some(W { r, rd, stats, motion, log, hit, wall, meter, handler, pad, seqs, air, landing, course, real_cast, states_real: false })
+    Some(W { r, rd, stats, motion, log, hit, wall, meter, handler, pad, seqs, air, landing, course, real_cast, states_real: false, rc: None })
 }
 
 impl W {
@@ -993,6 +997,7 @@ fn planted_bugs_are_caught() {
     }
 }
 
+mod course_clock;
 mod recording;
 mod runner_course;
 use recording::{f32_at, load, pair_list, rider_addrs, u32_le, vec4};
@@ -1926,6 +1931,92 @@ impl FrameRun {
     }
 }
 
+/// The course's keyframed objects over the recording (F4h5l, `course_clock`): on each frame the objects whose
+/// `cAnimObjectNode` the cells and scripts made and its clip's time, by our clock (IEEE) and by PCSX2's adder (the
+/// running game's, `Round::Guard`); and the parts' curves (`meshanim`). TRICKY_KEYFRAMED=rest: none posed (their rest
+/// pose, as before F4h5l); =list: the samples where the live ones change, listed.
+struct Keyframed {
+    ieee: course_clock::Clocks,
+    pcsx2: course_clock::Clocks,
+    /// each object's animated parts' curves (the model's hierarchy in order)
+    anims: HashMap<usize, Vec<tricky_data::anim::ObjAnim>>,
+    /// ours: the objects posed now and their frames' channels (`AnimFrame_SetKey`'s, then each sample's)
+    ours: RefCell<HashMap<usize, Vec<[f32; 16]>>>,
+}
+
+impl Keyframed {
+    fn of(course: &tricky_game::course_ground::CourseGround, files: &(Vec<u8>, Vec<u8>, Vec<u8>), ticks: &[recording::Tick], n: usize) -> Option<Keyframed> {
+        if std::env::var("TRICKY_KEYFRAMED").is_ok_and(|v| v == "rest") {
+            return None;
+        }
+        let pbd = tricky_data::pbd::Pbd::parse(&files.0)?;
+        let ssf = tricky_data::ssf::Ssf::parse(&files.2, pbd.instances.len() as u32).ok()?;
+        let samples: Vec<(u32, Vec<V4>)> = ticks.iter().map(|t| (t.tick, (0..n).map(|i| vec4(&t.riders[i], 0x140)).collect())).collect();
+        let (ieee, pcsx2) = course.with_world(|w| {
+            (course_clock::clocks(&pbd, &ssf, w, &samples, |a, b| a + b), course_clock::clocks(&pbd, &ssf, w, &samples, |a, b| r5900::ps2float::add_by(a, b, r5900::ps2float::Round::Guard)))
+        });
+        let mut anims = HashMap::new();
+        for o in ieee.values().chain(pcsx2.values()).flatten().map(|x| x.0) {
+            anims.entry(o).or_insert_with(|| {
+                let model = &pbd.models[pbd.instances[o][0x30] as usize];
+                model.nodes.iter().filter_map(|n| n.animation.as_ref()).map(|a| tricky_data::level::node_animation(&files.0, a).unwrap()).collect()
+            });
+        }
+        if std::env::var("TRICKY_KEYFRAMED").is_ok_and(|v| v == "list") {
+            let mut last: Vec<usize> = vec![];
+            for (k, l) in &pcsx2 {
+                let now: Vec<usize> = l.iter().map(|x| x.0).collect();
+                if now != last {
+                    eprintln!("KEYFRAMED sample {k} (tick {}): {l:?}", ticks[*k].tick);
+                    last = now;
+                }
+            }
+        }
+        Some(Keyframed { ieee, pcsx2, anims, ours: RefCell::new(HashMap::new()) })
+    }
+
+    /// Ours for the motion of the frame ending at sample `frame`: each live object's parts at its time (`CourseGround::pose`, the frames by
+    /// `meshanim::mesh_frame`), the ones gone back at rest.
+    fn pose_ours(&self, course: &tricky_game::course_ground::CourseGround, frame: usize) {
+        let live = self.ieee.get(&frame).cloned().unwrap_or_default();
+        let mut ours = self.ours.borrow_mut();
+        let gone: Vec<usize> = ours.keys().filter(|o| !live.iter().any(|x| x.0 == **o)).copied().collect();
+        for o in gone {
+            ours.remove(&o);
+            course.unpose(o as u32);
+        }
+        for (o, t) in live {
+            let anims = &self.anims[&o];
+            let ch = ours.entry(o).or_insert_with(|| {
+                anims.iter().map(|a| {
+                    let mut c = tricky_game::meshanim::key_channels(a);
+                    let _ = tricky_game::meshanim::mesh_frame(a, t, &mut c);
+                    c
+                }).collect()
+            });
+            let frames = anims.iter().zip(ch.iter_mut()).map(|(a, c)| tricky_game::meshanim::mesh_frame(a, t, c)).collect();
+            course.pose(o as u32, frames);
+        }
+    }
+
+    /// The runner's for the motion of the frame ending at sample `frame` (`RunnerCourse::pose`: the game's frame code under the runner's
+    /// rules), by PCSX2's clock under `fadd=g1`, else ours.
+    fn pose_runner(&self, w: &mut W, frame: usize) {
+        let Some(rc) = &w.rc else { return };
+        let clocks = if w.r.float_rules.fadd == r5900::ps2float::Round::Guard { &self.pcsx2 } else { &self.ieee };
+        let live = clocks.get(&frame).cloned().unwrap_or_default();
+        let posed: Vec<usize> = rc.nodes.borrow().keys().copied().collect();
+        for o in posed {
+            if !live.iter().any(|x| x.0 == o) {
+                rc.pose(&mut w.r, o, None);
+            }
+        }
+        for (o, t) in live {
+            rc.pose(&mut w.r, o, Some(t));
+        }
+    }
+}
+
 fn w0_len(ticks: &[recording::Tick]) -> usize {
     ticks.first().map_or(0, |t| t.riders[0].len())
 }
@@ -1945,11 +2036,19 @@ fn wall_casts_against_the_original() {
     let step: usize = std::env::var("TRICKY_WALL_STEP").ok().and_then(|v| v.parse().ok()).unwrap_or(10);
     let Some(mut w) = world() else { return };
     w.load_course(&files, &course);
+    let keyframed = Keyframed::of(&course, &files, &ticks, n);
     let shape = w.r.mem.alloc(0x400);
     let out = w.r.mem.alloc(0x40);
     let (mut casts, mut hits, mut same) = (0, 0, 0);
     let mut off: Vec<String> = Vec::new();
-    for t in ticks.iter().step_by(step) {
+    for (ti, t) in ticks.iter().enumerate().step_by(step) {
+        // the body at the end of this frame is cast in the next (the next sample's, when it is the next frame): the
+        // keyframed objects as they are there (F4h5l)
+        if let Some(k) = &keyframed {
+            let next = ticks.get(ti + 1).filter(|x| x.tick == t.tick + 1).map_or(usize::MAX, |_| ti + 1);
+            k.pose_ours(&course, next);
+            k.pose_runner(&mut w, next);
+        }
         for i in 0..n {
             let a = &t.riders[i];
             if a.len() < 0x700 || u32_le(a, 0x424) != 2 {
@@ -2057,6 +2156,10 @@ fn ground_ticks_against_the_running_game() {
         lift_world(&mut w);
         runners.push((rules, w));
     }
+    let keyframed = match (&course, &files) {
+        (Some(c), Some(f)) => Keyframed::of(c, f, &ticks, n),
+        _ => None,
+    };
     let names = [
         "pos", "vel", "fwd", "board_up", "normal", "fall", "up", "ground", "plane_fwd", "side", "quat", "board_side", "drag", "height", "bob", "wobble",
         "lean", "phase", "yaw", "surface", "surface_ticks", "kind", "state", "mask", "lean_target",
@@ -2139,6 +2242,13 @@ fn ground_ticks_against_the_running_game() {
     for (wi, w) in ticks.windows(2).enumerate() {
         if w[1].tick != w[0].tick + 1 {
             continue;
+        }
+        // the keyframed objects where the game had them for this frame's casts (F4h5l)
+        if let (Some(k), Some(c)) = (&keyframed, &course) {
+            k.pose_ours(c, wi + 1);
+            for (_, g) in runners.iter_mut() {
+                k.pose_runner(g, wi + 1);
+            }
         }
         // with the riders' tick counts recorded (window `5900:4`), a frame whose samples are not both of a frame's
         // end (every rider ticked once between them, all at the same count) is left out
@@ -3284,6 +3394,10 @@ fn takeoff_ticks_against_the_running_game() {
         w.r.stub(0x15eec0, move |c, _| c.set_gpr(2, ct.get() as u64));
         runners.push((rules, w, off, ctl));
     }
+    let keyframed = match (&course, &files) {
+        (Some(c), Some(f)) => Keyframed::of(c, f, &ticks, n),
+        _ => None,
+    };
     let names = ["pos", "vel", "fwd", "board_up", "plane_fwd", "side", "quat", "drag", "height", "bob", "lean", "yaw", "the way up", "prediction inputs", "time to the top", "landing on the flight"];
     // the riders around the take-off on the snow have their ground tick replayed (F4h5a; TRICKY_NOREPLAY: taken from
     // the second sample, as before), with the control's clip table (ELF data)
@@ -3304,6 +3418,13 @@ fn takeoff_ticks_against_the_running_game() {
     for (wi, w) in ticks.windows(2).enumerate() {
         if w[1].tick != w[0].tick + 1 {
             continue;
+        }
+        // the keyframed objects where the game had them for this frame's casts (F4h5l)
+        if let (Some(k), Some(c)) = (&keyframed, &course) {
+            k.pose_ours(c, wi + 1);
+            for (_, g, _, _) in runners.iter_mut() {
+                k.pose_runner(g, wi + 1);
+            }
         }
         let wp = (wi > 0 && ticks[wi - 1].tick + 1 == w[0].tick).then(|| &ticks[wi - 1].riders[..]);
         for i in 0..n {

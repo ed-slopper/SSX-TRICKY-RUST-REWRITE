@@ -26,6 +26,13 @@ PINE reads and writes memory and saves and loads states; it has no breakpoints o
                                                         again (F4h5d; header `posed 1`); the riders'
                                                         characters go to <out>.stats; a new race with other
                                                         characters stops it
+    python tools/pine.py clock <object> <seconds> <out.txt>
+                                                        each tick: the race tick, course object <object>'s
+                                                        controller (+0xe4) and flags (+0xe8), its node's rate,
+                                                        time, start and end (controller - 0x30 + 0x20, a
+                                                        cAnimObjectNode; F4h5l), every rider's position (the
+                                                        floats as their bits) and tick count (+0x5900), read at
+                                                        the frame's end as `record` does (keep it on your PC)
     python tools/pine.py counters [<start> <end>]       find tick counters and clocks: words in .data/.bss
                                                         (default 0x31D300-0x40C174) that climb about 60 a
                                                         second, or floats that climb about 1 a second
@@ -144,6 +151,8 @@ STATS_TABLE, STATS_STRIDE = 0x32DB70, 0x84
 RACE_TICK, RACE_COUNT, RACE_RIDERS = 0x18, 0x88, 0xC4
 # the course id (0 garibald ... 3 mesablanca ...: `Camera_GetCourseCmlName` 0x178330's order; F4h5k)
 COURSE_ID = 0x32DE88
+# the course object (`gWorld`)
+WORLD = 0x346488
 RIDER_POS, RIDER_VEL, RIDER_TIMESCALE, RIDER_PLACE, RIDER_STATS = 0x140, 0x150, 0x12C, 0x110, 0x464
 RIDER_TICKS = 0x5900  # rider+0x5820 (score) +0xe0: the speed-sample count, +1.0 a tick
 # The pad: Sony's pad library writes each controller's data into a double buffer (two records 0x80 apart):
@@ -408,6 +417,39 @@ def main(argv):
                 counts = p.read_blocks([(r + RIDER_TICKS, 4) for r in riders])
         print(f"{kept} ticks of {len(riders)} riders in {seconds:g} s to {out}; bodies read stale {seen}, "
               f"still stale after reading again {left}")
+    elif cmd == ["clock"] and len(argv) == 4:
+        obj, seconds, out = int(argv[1]), float(argv[2]), argv[3]
+        race, riders = find_race(p)
+        if race is None:
+            sys.exit("no race found (is a race running?)")
+        # the course object gWorld 0x346488: +4 the course header, its +0x48 the instances (0x100 bytes each)
+        inst = p.read32(p.read32(WORLD + 4) + 0x48) + 0x100 * obj
+        last, kept, counts, t0 = None, 0, None, time.time()
+        with open(out, "w", encoding="ascii") as f:
+            f.write(f"clock object {obj} at {inst:#x} riders {len(riders)} course {p.read32(COURSE_ID)}\n")
+            while time.time() - t0 < seconds:
+                tick = p.read32(race + RACE_TICK)
+                if tick == last:
+                    continue
+                # as `record`: the race tick moves at the start of the frame; wait until every rider has ticked
+                # (+0x5900 moved, at most 30 ms) so the positions are the frame's end
+                until = time.time() + 0.03
+                while counts is not None and time.time() < until:
+                    now = p.read_blocks([(r + RIDER_TICKS, 4) for r in riders])
+                    if all(a != b for a, b in zip(now, counts)):
+                        break
+                got = p.read_blocks([(inst + 0xe4, 8)] + [(r + RIDER_POS, 12) for r in riders] + [(r + RIDER_TICKS, 4) for r in riders])
+                ctrl, flags = struct.unpack("<2I", got[0])
+                node = p.read_block(ctrl - 0x30 + 0x20, 16) if ctrl else b"\0" * 16
+                counts = got[1 + len(riders):]
+                if p.read32(race + RACE_TICK) != tick:
+                    continue
+                words = " ".join(f"{w:08x}" for w in struct.unpack("<4I", node))
+                pos = " ".join(",".join(f"{w:08x}" for w in struct.unpack("<3I", b)) for b in got[1:1 + len(riders)])
+                ticks = ",".join(f"{struct.unpack('<f', c)[0]:.0f}" for c in counts)
+                f.write(f"{tick} {ctrl:08x} {flags:08x} {words} {pos} {ticks}\n")
+                last, kept = tick, kept + 1
+        print(f"{kept} ticks of object {obj} in {seconds:g} s to {out}")
     elif cmd == ["counters"]:
         start, end = (int(argv[1], 16), int(argv[2], 16)) if len(argv) == 3 else (0x31D300, 0x40C174)
         if p.status() != "running":

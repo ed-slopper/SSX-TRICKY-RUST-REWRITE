@@ -160,6 +160,16 @@ impl CourseGround {
         obj.controller = Some(0x100);
         self.poses.lock().unwrap_or_else(|e| e.into_inner()).insert(o, frames);
     }
+
+    /// The object's controller gone (killed when its cell turns off, `World_CellDeactivate` 0x260108): its parts
+    /// at their own matrices again.
+    pub fn unpose(&self, object: u32) {
+        let o = object as usize;
+        let mut world = self.world.lock().unwrap_or_else(|e| e.into_inner());
+        let Some(obj) = world.objects.get_mut(o) else { return };
+        obj.controller = None;
+        self.poses.lock().unwrap_or_else(|e| e.into_inner()).remove(&o);
+    }
 }
 
 /// The world grid `Rail_ClosestPoint` 0x259330 walks (row G20c2c1a), from the course as the game resolves it: the same

@@ -208,6 +208,13 @@ impl AnimObject {
 
     /// `cAnimObjectNode::Update` 0x199058. Returns whether the node was deleted.
     pub fn update(&mut self, env: &mut impl ObjAnimEnv) -> bool {
+        self.update_by(env, |a, b| a + b)
+    }
+
+    /// [`AnimObject::update`] with the clock's adds and subtracts made by `add` (a − b as `add`(a, −b)): PCSX2's
+    /// COP1 adder (`r5900::ps2float::Round::Guard`) gives the running game's clock bit for bit (row F4h5l: mesa's
+    /// object 1444, 2041 ticks of its time read over PINE, the wraps at the clip's end too).
+    pub fn update_by(&mut self, env: &mut impl ObjAnimEnv, add: impl Fn(f32, f32) -> f32) -> bool {
         if self.moving_box {
             env.anim(ObjAnimCall::MoveBox);
         }
@@ -219,7 +226,7 @@ impl AnimObject {
             let d = self.delay;
             if d as f32 <= 0.0 {
                 let r = self.rate;
-                let t = self.time + r;
+                let t = add(self.time, r);
                 self.time = t;
                 let mut ended = false;
                 if 0.0 <= r {
@@ -228,9 +235,9 @@ impl AnimObject {
                         match self.looping {
                             2 => {
                                 self.rate = -r;
-                                self.time = self.end - (t - self.end);
+                                self.time = add(self.end, -add(t, -self.end));
                             }
-                            1 => self.time = self.start + (t - self.end),
+                            1 => self.time = add(self.start, add(t, -self.end)),
                             _ => self.time = self.end,
                         }
                     }
@@ -239,9 +246,9 @@ impl AnimObject {
                     match self.looping {
                         2 => {
                             self.rate = -r;
-                            self.time = self.start + (self.start - t);
+                            self.time = add(self.start, add(self.start, -t));
                         }
-                        1 => self.time = self.end - (self.start - t),
+                        1 => self.time = add(self.end, -add(self.start, -t)),
                         _ => self.time = self.start,
                     }
                 }

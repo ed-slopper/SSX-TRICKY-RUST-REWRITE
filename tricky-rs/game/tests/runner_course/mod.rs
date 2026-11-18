@@ -18,6 +18,8 @@ pub const W: u32 = 0x346488;
 pub struct RunnerCourse {
     pub patch0: u32,
     pub inst0: u32,
+    /// the keyframed objects given a node ([`RunnerCourse::pose`]): the object and its node
+    pub nodes: std::cell::RefCell<HashMap<usize, u32>>,
 }
 
 /// The course object built from the files: the `.pbd` at 0x80_0000, the `.ltg` at 0x100_0000, the `.ssf` at
@@ -100,7 +102,7 @@ pub fn load(r: &mut Runner, pb: &[u8], lb: &[u8], sb: &[u8]) -> RunnerCourse {
         r.call(a).unwrap();
         r.cpu.gpr(2) as u32
     };
-    RunnerCourse { patch0: get(r, 0x2549f8, 0), inst0: get(r, 0x254a28, 0) }
+    RunnerCourse { patch0: get(r, 0x2549f8, 0), inst0: get(r, 0x254a28, 0), nodes: Default::default() }
 }
 
 impl RunnerCourse {
@@ -111,7 +113,7 @@ impl RunnerCourse {
     /// 0x2576a8), or with `chop` as PCSX2 runs it, its products and sums toward zero (`tests/terrain.rs`,
     /// `the_running_games_patch_cache`); `Tri_ContainsPointVu0` 0x23b6b0 by its port; the objects' controllers none.
     pub fn cast_as_original(&self, r: &mut Runner, patches: Vec<[V4; 16]>, chop: bool) {
-        for a in [0x25aff8, 0x25bf48, 0x25d3d8, 0x25d948, 0x25d9c8, 0x25d9e0, 0x25db18, 0x25dc40, 0x25dc48, 0x25ebd8, 0x25d7a8, 0x102f50, 0x178078, 0x25c7c8] {
+        for a in [0x17d1c8, 0x1998d0, 0x1cb0d8, 0x1cb498, 0x1cb300, 0x1cb770, 0x250c10, 0x25aff8, 0x25bf48, 0x25d3d8, 0x25d948, 0x25d9c8, 0x25d9e0, 0x25db18, 0x25dc40, 0x25dc48, 0x25ebd8, 0x25d7a8, 0x102f50, 0x178078, 0x25c7c8] {
             r.allow(a);
         }
         r.stub(0x23b6b0, |c, m| {
@@ -150,6 +152,56 @@ impl RunnerCourse {
             }
             m.write_u32(c.gpr(6) as u32, entry);
         });
+    }
+
+    /// Object `o` with a keyframed node at `t` (clip seconds; row F4h5l), as `cAnimObjectNode::cAnimObjectNode`
+    /// 0x198810 and its Update 0x199058 leave it for the casts: the object's controller (+0xe4, the node + 0x30) of
+    /// type 0x100 (+0x14, animated), the node's frames (+0x60, 0xd0 each, one per animated part of the model's
+    /// hierarchy, `inst`+0xc0 → +8) set up once by `AnimFrame_Clear` 0x1cb150 (its zeroing written here) and
+    /// `AnimFrame_SetKey` 0x1cb0d8 at `t`, then sampled at `t` by `cMeshAnimFrame::vf1` 0x1cb498 on every call (the
+    /// game's code, under the runner's float rules). `None`: the controller gone (killed), the next node a new one.
+    pub fn pose(&self, r: &mut Runner, o: usize, t: Option<f32>) {
+        let inst = self.inst0 + 0x100 * o as u32;
+        let mut nodes = self.nodes.borrow_mut();
+        let Some(t) = t else {
+            if nodes.remove(&o).is_some() {
+                r.mem.write_u32(inst + 0xe4, 0);
+            }
+            return;
+        };
+        let model = r.mem.read_u32(inst + 0xc0);
+        let (count, hier) = (r.mem.read_u32(model + 4), r.mem.read_u32(model + 8));
+        let anims: Vec<u32> = (0..count).map(|k| r.mem.read_u32(hier + 0x18 * k + 0x10)).filter(|a| *a != 0).collect();
+        let node = match nodes.get(&o) {
+            Some(n) => *n,
+            None => {
+                let node = r.mem.alloc(0x68 + 0xd0 * anims.len() as u32 + 0x10);
+                let frames = (node + 0x68 + 0xf) & !0xf;
+                r.mem.write_u32(node + 0x30 + 0x14, 0x100);
+                r.mem.write_u32(node + 0x5c, anims.len() as u32);
+                r.mem.write_u32(node + 0x60, frames);
+                for (k, a) in anims.iter().enumerate() {
+                    let f = frames + 0xd0 * k as u32;
+                    for w in (0..0xd0).step_by(4) {
+                        r.mem.write_u32(f + w, 0);
+                    }
+                    r.mem.write_u32(f + 0x8c, 0x391af8);
+                    r.cpu.set_f(12, t);
+                    r.cpu.set_gpr(4, f as u64);
+                    r.cpu.set_gpr(5, *a as u64);
+                    r.call(0x1cb0d8).unwrap();
+                }
+                nodes.insert(o, node);
+                node
+            }
+        };
+        r.mem.write_u32(inst + 0xe4, node + 0x30);
+        let frames = r.mem.read_u32(node + 0x60);
+        for k in 0..anims.len() as u32 {
+            r.cpu.set_f(12, t);
+            r.cpu.set_gpr(4, (frames + 0xd0 * k) as u64);
+            r.call(0x1cb498).unwrap();
+        }
     }
 
     /// An object's box (+0xcc, +0xd8) and flags (+0xe8).

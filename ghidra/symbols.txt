@@ -2882,6 +2882,8 @@ G 2f8dd8 __rtti_user
 D 337e08 gMenuManager
 D 346488 gWorld
 D 337c58 gApp
+D 337c60 gBxLists
+D 337c70 gBxList_UpdateOrder
 D 3352a0 gCheat_UnlockEverything
 D 3352ac gCheat_MaxAttrib
 D 33edf0 gEffectsLoader_ShapeNames
