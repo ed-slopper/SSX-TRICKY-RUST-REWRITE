@@ -464,8 +464,8 @@ Found (rec8: a 110 s race by hand, 6,585 samples):
 - Inferred, not checked: most of the 78 spin misses are mode 2 ticks where the spin moves while its rate is 0 (the
   half-pipe clips 0x23c / 0x23d add their phase × π; the phase is the animation's answer, recorded as 0).
 
-Still to do: the pad and the animation's answers (the rows that port them, G5, would have to be recorded or
-replayed too); the ground tick (F4b3b) and the take-off tick (F4b3c).
+Still to do: the pad and the animation's answers (done in F4b3d, below; the player's spin object is row F4b3d1);
+the ground tick (F4b3b) and the take-off tick (F4b3c).
 
 ## F4b3b: the ground tick from a recorded race (2026-11-08)
 
@@ -1792,3 +1792,49 @@ rec17 9557 rider 3 (57 cm off) and 10936 rider 2 (0.03 cm) were the slide's wall
   at its end). Row F4b3p1.
 - The slide positions off after pushes: rec17 10932, 10938, 10941 (riders 1–2, under 1 cm, equal and opposite)
   and rec14 9092, 9095 rider 1 (6 cm), 9098 riders 1–2 (row F4b3z).
+
+## F4b3d: the pad word and the animation's answers in the spin replay (2026-11-18)
+
+`tests/replay.rs` `spin_ticks_against_the_running_game` (F4b3a) now feeds `SpinState_Update` 0x100908 a pad word and
+the animation's clip and phase, and compares the recordings with the newer windows (rec16–rec19, `0x700` bytes a
+rider). Before, it read the spin object's rates at +0x600 of the rider block (wrong for 0x700-byte recordings), so
+those recordings compared next to nothing.
+
+Proven (read from the code):
+- The player is the rider whose stats+0x6c (its button map) is not −1; stats+0x5c is its character (the trick slots'
+  index) and stats+0x44 its board kind. Its state manager is at rider − 0x880 (the others' at − 0x8b0), so its spin
+  object is rider − 0x140, a window no recording has yet (`-140:74`): the player's spin ticks are 0 of 0 so far.
+- The player's pad word: `cPlayer::GetControls` 0x151250 on the libpad record the recorder reads (header `pad P`, 20
+  bytes: status, mode 0x79/0x73, buttons little-endian with 0 = pressed, right stick x y, left stick x y, pressures).
+  `recording::player_pad` runs our `controls::get_controls` on `PadDevice::read` with that record (and the one before),
+  through `ButtonMap::btnmap`; the random grab's slot (player+0x868) is not recorded (taken as none).
+- In mode 2 (the end of the spin) with the trick clips over, the clip not 0x225 and both rates under 0.7: the stick
+  (pad bits 20–21 spin, 22–23 flip, two-bit signed) starts the wind-up (clip 0x222, st+0x5c = 1) and, once it is on,
+  steps rider+0x274 / +0x278 toward ±1 by ((stats+0x10)·0.6545031/255 + 0.54741764)·1.3750083·dt, adding the change ×
+  2.0943952 to the spin +0x1d0 / flip +0x1d4 (the flip's stick negated, and again when st+0x60). 0 moves nothing.
+- The clip (`AnimCtl_GetClip` 0x15fdd0) and the phase (`AnimCtl_GetLayerPhase` 0x15fe70) matter in mode 2 only for the
+  half-pipe clips 0x23c / 0x23d (the spin moves by the phase's change × π).
+
+Found (`fadd=g1`, before → after):
+
+| recording | spin ticks | spin | flip | quaternion | angle left | rates, bands, largest errors (mode 2) |
+|---|---|---|---|---|---|---|
+| rec16 | 16,050 | 15,806 → 16,050 | 16,050 | 16,048 | 16,050 | 5,988 of 5,988 |
+| rec17 | 15,765 | 15,270 → 15,765 | 15,765 | 15,756 | 15,760 | 9,615 of 9,615 |
+| rec18 | 14,850 | 14,422 → 14,850 | 14,850 | 14,847 | 14,848 | 6,491 of 6,491 |
+| rec19 | 8,346 | 8,148 → 8,346 | 8,346 | 8,341 | 8,344 | 5,781 of 5,781 |
+
+- Every spin miss left was a computer in mode 2 on clip 0x222 (the wind-up) with its rate 0: its stick moving
+  +0x274. A computer's pad word is not recordable (`cComputer::GetControls` 0x1384b8 writes it on `cBoarder::vf7`'s
+  stack, F4b3k), so the test reads the stick back from the second sample (`stick_from`: the sign of +0x274's and
+  +0x278's change, or the wind-up starting) and tries it after pad 0. With it every spin and flip is right: rec16 244
+  of 305 such ticks needed it, rec17 495 of 579, rec18 428 of 497, rec19 198 of 243.
+- Ours equals the runner under IEEE adds on every field and every recording (spin rec16 13,400, rec17 13,772, rec18
+  12,248, rec19 7,547): the gap to the game is the adder alone, as in F4b3a.
+- The animation's answers changed nothing on these recordings (TRICKY_NOANIM=1 gives the same counts): none has a
+  half-pipe spin. The second sample's animation was never needed.
+- Left: 2–9 quaternions a recording (and 1–5 angles left), not looked at.
+
+Still to do (row F4b3d1): record a race by hand with `-140:74` (the player's spin object) and tricks off the stick, so
+the player's ticks (every field, modes 0 and 1 too) are compared; and a half-pipe race with the `46c0` and sequence
+windows for the clips 0x23c / 0x23d.

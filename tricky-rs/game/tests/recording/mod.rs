@@ -8,6 +8,9 @@ pub struct Tick {
     pub extra: Vec<(i64, Vec<Vec<u8>>)>,
     /// the windows through pointers (`<off>><off>...:<len>`, header `extra 5ae0>610 10`): (the offsets, per rider)
     pub chased: Vec<(String, Vec<Vec<u8>>)>,
+    /// the first controller's libpad record (header `pad P`, 20 bytes: status, mode, the buttons (0 = pressed), the
+    /// right stick x, y, the left stick x, y, the pressures), when the recorder found it
+    pub pad: Option<Vec<u8>>,
 }
 
 pub fn f32_at(b: &[u8], off: usize) -> f32 {
@@ -48,7 +51,8 @@ pub fn load(path: &str) -> (usize, Vec<Tick>) {
                     extra.push((i64::from_str_radix(spec, 16).unwrap(), blocks(k)));
                 }
             }
-            Tick { tick: w[1].parse().unwrap(), riders, extra, chased }
+            let pad = (pad == 1).then(|| hex(w[2 + n]));
+            Tick { tick: w[1].parse().unwrap(), riders, extra, chased, pad }
         })
         .collect::<Vec<_>>();
     assert!(ticks.iter().all(|t| t.riders.iter().all(|r| r.len() == size)));
@@ -104,4 +108,27 @@ pub fn pair_list(t: &Tick, addrs: &[u32], me: usize) -> Option<Vec<usize>> {
         }
     }
     Some(list)
+}
+
+/// The player's pad word for control state `state` (board row F4b3d): `cPlayer::GetControls` 0x151250
+/// (`controls::get_controls`) on the pad device (`PadDevice::read`, `cPS2Device` vf10 0x17b278) fed the recorded
+/// libpad records `prev` then `now` (buttons 0 = pressed; the sticks when the mode is analog, 0x7_), through the rider's
+/// button map (`BTNMAP<stats+0x6c>`, the grab combos on the trick slots of the character stats+0x5c and the board kind
+/// stats+0x44). None for a computer rider (stats+0x6c = −1: no button map). The trick slot the random grab keeps
+/// (player+0x868) is not recorded: taken as none (0x1a), and the easy trick it draws as 0.
+pub fn player_pad(stat: &[u8], prev: Option<&[u8]>, now: &[u8], state: u32) -> Option<u32> {
+    use tricky_game::controls::{get_controls, ButtonMap, ControlsIn, Mapper, PadDevice};
+    let n = u32_le(stat, 0x6c);
+    if n > 1 {
+        return None;
+    }
+    let slots = tricky_data::trick_slots::TRICK_SLOTS[u32_le(stat, 0x5c) as usize][(u32_le(stat, 0x44) as usize).min(2)];
+    let map = ButtonMap::btnmap(n, std::array::from_fn(|k| slots[k][0]));
+    let mut pad = PadDevice::default();
+    for r in prev.into_iter().chain([now]) {
+        let analog = (r[1] >> 4 == 7).then(|| [r[6], r[7], r[4], r[5]]);
+        pad.read(!u16::from_le_bytes([r[2], r[3]]), analog);
+    }
+    let (mut trick, mut slope) = (0x1a, false);
+    Some(get_controls(ControlsIn { state, paused: false }, &mut Mapper { map: &map, pad: &pad }, &mut trick, &mut || 0, &mut slope))
 }

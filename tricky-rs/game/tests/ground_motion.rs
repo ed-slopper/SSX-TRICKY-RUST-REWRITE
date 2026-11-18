@@ -1000,7 +1000,7 @@ fn planted_bugs_are_caught() {
 mod course_clock;
 mod recording;
 mod runner_course;
-use recording::{f32_at, load, pair_list, rider_addrs, u32_le, vec4};
+use recording::{f32_at, load, pair_list, player_pad, rider_addrs, u32_le, vec4};
 
 /// The rider as `GroundMotion_Update` reads it, from a recorded rider block (0x600 bytes from the rider), its stats
 /// block, the ground motion object (its phase +8) and the animation's block at rider+0x46c0 (the clip +8).
@@ -2235,7 +2235,7 @@ fn ground_ticks_against_the_running_game() {
     let clip_b = std::env::var("TRICKY_CLIP_A").is_err();
     // controls replayed by state, and those left out (fakie cruise on its turn clip; no windows)
     let mut ctl_count = std::collections::BTreeMap::<u32, usize>::new();
-    let (mut ctl_turn, mut ctl_none, mut ctl_right) = (0, 0, 0);
+    let (mut ctl_turn, mut ctl_none, mut ctl_right, mut player_ctl) = (0, 0, 0, 0);
     let mut ctl_same = vec![0usize; runners.len()];
     // and of those, the quaternion equal to the game's: ours, the runner's
     let (mut ctl_ours_game, mut ctl_runner_game) = (vec![0usize; runners.len()], vec![0usize; runners.len()]);
@@ -2328,7 +2328,18 @@ fn ground_ticks_against_the_running_game() {
             // 0x1384b8 into the stack of `cBoarder::vf7`, not recordable): only the brake bit (4), set when the rider
             // ends the tick prewinding (0xe), as the landings and the bump pick 0xe on it
             let ctl = if CONTROLS.contains(&rider.state) && std::env::var("TRICKY_NOCTL").is_err() {
-                let pad = if u32_le(b, 0x428) == 0xe { 4 } else { 0 };
+                // TRICKY_PAD=b: the player's from the recorded pad (F4b3d, `player_pad`: the pad read at the second
+                // sample; =a the first's). Not by default: rec16 6182 r5's bump goes to prewind (the pad's bit 4, X
+                // held) while every recorded pad of 6170..6190 has X up (rec16: 678 of the player's 1,535 prewind
+                // samples show no X; rec15 5 of 1,199)
+                let read = if !std::env::var("TRICKY_PAD").is_ok_and(|v| v == "a" || v == "b") {
+                    None
+                } else if std::env::var("TRICKY_PAD").is_ok_and(|v| v == "a") { wi.checked_sub(1).map(|k| (ticks[k].pad.as_deref(), w[0].pad.as_deref())) } else { Some((w[0].pad.as_deref(), w[1].pad.as_deref())) };
+                let mine = read.and_then(|(p, now)| player_pad(&stats[i], p, now?, rider.state));
+                if mine.is_some() {
+                    player_ctl += 1;
+                }
+                let pad = mine.unwrap_or(if u32_le(b, 0x428) == 0xe { 4 } else { 0 });
                 match ctl_of(if anim_b { &w[1] } else { &w[0] }, &w[0], i, ka, addr[i], pad) {
                     Some(c) if rider.state == 5 && c.clips[0] == 0x202 => {
                         ctl_turn += 1;
@@ -2795,7 +2806,7 @@ fn ground_ticks_against_the_running_game() {
         }
     }
     eprintln!("{path}: ground ticks (motion 2 at both samples): {pairs} compared ({capped} at the speed limit); left out {other} whose motion object's +0xc is not the rider, {skew} not one update apart, {torn} read inside a tick (it or the sample before)");
-    eprintln!("  controls replayed by state: {ctl_count:x?}, every field right under fadd=g1: {ctl_right}; ours from the runner's rider the same as the runner's (per runner way): {ctl_same:?}, quaternion the game's: ours {ctl_ours_game:?}, the runner's {ctl_runner_game:?}; left out: {ctl_turn} fakie cruise on its turn clip, {ctl_none} without the windows");
+    eprintln!("  controls replayed by state: {ctl_count:x?}, every field right under fadd=g1: {ctl_right}; ours from the runner's rider the same as the runner's (per runner way): {ctl_same:?}, quaternion the game's: ours {ctl_ours_game:?}, the runner's {ctl_runner_game:?}; left out: {ctl_turn} fakie cruise on its turn clip, {ctl_none} without the windows; the player's pad word from the recorded pad on {player_ctl} (F4b3d, TRICKY_PAD=b)");
     if kc.is_some() {
         eprintln!("  frames left out because a sample was read before every rider had ticked: {mid}");
     }
