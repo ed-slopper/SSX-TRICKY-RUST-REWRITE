@@ -582,9 +582,27 @@ fn touch_effects(instances: &[Instance], logic: &LogicFile) -> std::collections:
 /// numbered context by context through all the models, its material the model's material block's entry for the
 /// context's +4), the node's matrix (−1 none) as a position, rotation and scale, and its animation (base pose, the
 /// channel mask, each channel's cubic segments: count, offset from the channel, then a, b, c, d, start, end).
-fn model_set(pbd: &crate::pbd::Pbd, b: &[u8], map: &crate::map::Map, dir: PathBuf, meshes: &mut std::collections::HashMap<PathBuf, ObjMesh>) -> Result<ModelSet, String> {
+/// A model node's animation (`cMeshAnimFrame`'s curves) from the `.pbd` bytes `b`: the base pose, the channel mask
+/// and each animated channel's cubic segments (`ResolveAnimation` 0x254078, `ResolveChannel` 0x254120).
+pub fn node_animation(b: &[u8], a: &crate::pbd::Animation) -> Result<ObjAnim, &'static str> {
     let f = |at: usize| b.get(at..at + 4).map(|w| f32::from_le_bytes([w[0], w[1], w[2], w[3]])).ok_or("past the end of the .pbd");
     let u = |at: usize| f(at).map(f32::to_bits);
+    let h = a.head.map(f32::from_bits);
+    let mut entries = vec![];
+    for (c, _) in &a.channels {
+        let c = *c as usize;
+        let (count, first) = (u(c)? as usize, c + u(c + 4)? as usize);
+        let segs = (0..count).map(|s| {
+            let v = |j: usize| f(first + 24 * s + 4 * j);
+            Ok(crate::anim::AnimSeg { a: v(0)?, b: v(1)?, c: v(2)?, d: v(3)?, t0: v(4)?, t1: v(5)? })
+        }).collect::<Result<Vec<_>, &str>>()?;
+        entries.push(crate::anim::AnimEntry { segs });
+    }
+    Ok(ObjAnim { u1: h[0], u2: h[1], u3: h[2], u4: h[3], u5: h[4], u6: h[5], action: a.head[6], entries })
+}
+
+fn model_set(pbd: &crate::pbd::Pbd, b: &[u8], map: &crate::map::Map, dir: PathBuf, meshes: &mut std::collections::HashMap<PathBuf, ObjMesh>) -> Result<ModelSet, String> {
+    let f = |at: usize| b.get(at..at + 4).map(|w| f32::from_le_bytes([w[0], w[1], w[2], w[3]])).ok_or("past the end of the .pbd");
     let vif = pbd.header.offset(0x84) as usize;
     let mut k = 0usize;
     let mut models = vec![];
@@ -626,20 +644,7 @@ fn model_set(pbd: &crate::pbd::Pbd, b: &[u8], map: &crate::map::Map, dir: PathBu
             }
             let animation = match &n.animation {
                 None => None,
-                Some(a) => {
-                    let h = a.head.map(f32::from_bits);
-                    let mut entries = vec![];
-                    for (c, _) in &a.channels {
-                        let c = *c as usize;
-                        let (count, first) = (u(c)? as usize, c + u(c + 4)? as usize);
-                        let segs = (0..count).map(|s| {
-                            let v = |j: usize| f(first + 24 * s + 4 * j);
-                            Ok(crate::anim::AnimSeg { a: v(0)?, b: v(1)?, c: v(2)?, d: v(3)?, t0: v(4)?, t1: v(5)? })
-                        }).collect::<Result<Vec<_>, &str>>()?;
-                        entries.push(crate::anim::AnimEntry { segs });
-                    }
-                    Some(ObjAnim { u1: h[0], u2: h[1], u3: h[2], u4: h[3], u5: h[4], u6: h[5], action: a.head[6], entries })
-                }
+                Some(a) => Some(node_animation(b, a)?),
             };
             objects.push(ModelObject { parent_id: n.words[0] as i32, mesh_data, position, rotation, scale, animation });
         }

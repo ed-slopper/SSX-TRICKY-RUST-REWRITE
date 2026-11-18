@@ -130,6 +130,7 @@ pub mod jump;
 pub mod landing;
 pub mod lesson;
 pub mod math;
+pub mod meshanim;
 pub mod objanim;
 pub mod orient;
 pub mod pf;
