@@ -56,9 +56,11 @@ fn enter(r: &mut Runner, slot_pc: u32, target: u32) -> Result<u32, Error> {
         return Ok(target);
     }
     if let Some(mut stub) = r.stubs.remove(&target) {
-        stub(&mut r.cpu, &mut r.mem);
+        let answered = stub(&mut r.cpu, &mut r.mem);
         r.stubs.insert(target, stub);
-        return Ok(r.cpu.gpr(31) as u32);
+        if answered {
+            return Ok(r.cpu.gpr(31) as u32);
+        }
     }
     if r.allowed.contains(&target) {
         return Ok(target);
@@ -1264,6 +1266,20 @@ mod tests {
         rn.stub(0x0020_0000, |c, _| c.set_gpr(2, 42));
         rn.call(CODE).unwrap();
         assert_eq!(rn.cpu.gpr(9), 42);
+        // a hook answers the calls it wants (a0 = 1) and lets the original (li v0, 7 ; jr ra) run the others
+        for (k, w) in [(9 << 26) | (2 << 16) | 7, r(0, 31, 0, 0, 0, 8), NOP].iter().enumerate() {
+            rn.mem.write_u32(0x0020_0000 + 4 * k as u32, *w);
+        }
+        rn.allow(0x0020_0000);
+        rn.hook(0x0020_0000, |c, _| {
+            c.set_gpr(2, 42);
+            c.gpr(4) == 1
+        });
+        for (a0, want) in [(1, 42), (0, 7)] {
+            rn.cpu.set_gpr(4, a0);
+            rn.call(CODE).unwrap();
+            assert_eq!(rn.cpu.gpr(9), want);
+        }
     }
 
     #[test]

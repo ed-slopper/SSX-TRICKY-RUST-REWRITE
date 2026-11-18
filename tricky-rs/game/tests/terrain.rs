@@ -5,7 +5,7 @@
 //! the answer, the hit, the last-hit record and every quad record the game filled compared bit for bit. A kind-2
 //! hit's refinement (`cWorldLine` +0x50, row E7c2) runs as the game's too.
 
-use r5900::ps2float::Rules;
+use r5900::ps2float::{add_by, Round, Rules};
 use r5900::{Mem, Runner};
 use tricky_data::pbd::Pbd;
 use tricky_game::terrain::{patch_test, LastHit, PatchGrid};
@@ -276,4 +276,83 @@ fn refinement_matches_the_original() {
         }
     }
     eprintln!("{moved} refined, {kept} left");
+}
+
+/// The patch cache of the running game (F4h5m): TRICKY_PATCH_CACHE, a file of the entries the game holds (per entry:
+/// the patch's address, its 16 coefficient vectors (+0x50) and the entry's 0x1cd0 bytes), read from PCSX2 with the
+/// player's disc over PINE. Each entry's points (made by the VU0 patch program, `Vu0_RunPatchProgram` 0x2576a8)
+/// against `terrain::tessellate_by` with its products and sums toward zero (PCSX2's VU rounding; to nearest,
+/// `terrain::tessellate`, only some are), and the quad normals the game filled (VU0 macro code) against ours from
+/// those points.
+#[test]
+fn the_running_games_patch_cache() {
+    let Ok(path) = std::env::var("TRICKY_PATCH_CACHE") else { return };
+    let bytes = std::fs::read(path).unwrap();
+    let w = |b: &[u8], o: usize| u32::from_le_bytes([b[o], b[o + 1], b[o + 2], b[o + 3]]);
+    let v = |b: &[u8], o: usize| -> V4 { [0, 1, 2, 3].map(|k| f32::from_bits(w(b, o + 4 * k))) };
+    let (mut entries, mut points, mut points_right, mut normals, mut normals_right) = (0, 0, 0, 0, 0);
+    let mut worst = 0i64;
+    for e in bytes.chunks(4 + 0x100 + 0x1cd0) {
+        let coeffs: [V4; 16] = std::array::from_fn(|k| v(e, 4 + 16 * k));
+        let entry = &e[4 + 0x100..];
+        if w(entry, 0) != w(e, 0) {
+            continue; // the entry changed between the two reads
+        }
+        entries += 1;
+        let ours = tricky_game::terrain::tessellate(&coeffs);
+        let chopped = tricky_game::terrain::tessellate_by(&coeffs, chop_mul, |a, b| add_by(a, b, Round::Chop));
+        for (k, (p, q)) in ours.iter().zip(&chopped).enumerate() {
+            let g = v(entry, 0x10 + 16 * k);
+            points += 1;
+            points_right += (g.map(f32::to_bits) == p.map(f32::to_bits)) as usize;
+            for x in 0..3 {
+                worst = worst.max((g[x].to_bits() as i64 - p[x].to_bits() as i64).abs());
+            }
+            assert_eq!(g.map(f32::to_bits), q.map(f32::to_bits), "patch {:#x} point {k}: the program toward zero", w(e, 0));
+        }
+        // the quad normals the game filled (from its own points): unit((p11 − p10) × (p10 − p01)) and
+        // unit((p01 − p10) × (p10 − p00)), as `terrain::patch_test` makes them
+        let pt = |k: usize| v(entry, 0x10 + 16 * k);
+        let sub = |a: V4, b: V4| [a[0] - b[0], a[1] - b[1], a[2] - b[2], a[3] - b[3]];
+        let cross = |a: V4, b: V4| {
+            let acc = [a[1] * b[2], a[2] * b[0], a[0] * b[1]];
+            [acc[0] - b[1] * a[2], acc[1] - b[2] * a[0], acc[2] - b[0] * a[1], 0.0]
+        };
+        let unit = |v: V4| {
+            let p = [v[0] * v[0], v[1] * v[1], v[2] * v[2], v[3] * v[3]];
+            let s = ((p[0] + p[1]) + 1.0 * p[2]) + 1.0 * p[3];
+            let q = if s == 0.0 { f32::MAX } else { 1.0 / s.sqrt() };
+            v.map(|x| x * q)
+        };
+        for (base, n, step) in [(0x650usize, 9usize, 1usize), (0x1a90, 3, 3)] {
+            for i in 0..n {
+                for j in 0..n {
+                    let rec = base + 0x40 * (i * n + j);
+                    let (p00, p10, p01, p11) = (pt(i * step * 10 + j * step), pt((i * step + step) * 10 + j * step), pt(i * step * 10 + j * step + step), pt((i * step + step) * 10 + j * step + step));
+                    for (at, want) in [(rec, unit(cross(sub(p11, p10), sub(p10, p01)))), (rec + 0x10, unit(cross(sub(p01, p10), sub(p10, p00))))] {
+                        if w(entry, at) == SENTINEL {
+                            continue;
+                        }
+                        normals += 1;
+                        normals_right += (v(entry, at).map(f32::to_bits) == want.map(f32::to_bits)) as usize;
+                    }
+                }
+            }
+        }
+    }
+    eprintln!("{entries} cache entries: every point the program's toward zero; to nearest (`tessellate`) {points_right} of {points} (worst {worst} ulps); quad normals right {normals_right} of {normals}");
+    assert!(entries > 0);
+    assert_eq!(normals_right, normals);
+}
+
+
+/// A product of two floats toward zero (exact in f64, then cut).
+fn chop_mul(a: f32, b: f32) -> f32 {
+    let x = a as f64 * b as f64;
+    let f = x as f32;
+    if (f as f64).abs() > x.abs() {
+        f32::from_bits(f.to_bits() - 1)
+    } else {
+        f
+    }
 }

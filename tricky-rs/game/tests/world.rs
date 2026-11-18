@@ -5,6 +5,8 @@
 //! `tricky_game::world` (result, hit record, last-patch halves). A patch's own test (the patch cache, row E7c) is
 //! answered the same made-up way on both sides, and the order the patches are asked in is compared too.
 
+mod runner_course;
+
 use std::cell::RefCell;
 use std::rc::Rc;
 
@@ -18,7 +20,7 @@ use tricky_game::worldline::{Hit, WorldLine};
 
 type V4 = [f32; 4];
 
-const W: u32 = 0x346488;
+use runner_course::W;
 const MODE: u32 = 0x32de8c;
 
 struct Rng(u64);
@@ -99,85 +101,9 @@ fn world_casts_match_the_original() {
         r.float_rules = Rules::parse("add=n,mul=n,div=n,cvt=n").unwrap();
         let pbd = Pbd::parse(&pb).unwrap();
         let ssf = Ssf::parse(&sb, pbd.instances.len() as u32).unwrap();
-        // the course object: the .pbd resolved (row E3a)
-        r.stub(0x255310, |_, _| {});
-        r.stub(0x2f7aa8, |_, _| {});
-        for a in [
-            0x253400, 0x253540, 0x2535b0, 0x253630, 0x2537d8, 0x2539b0, 0x255c20, 0x253fb0, 0x254078, 0x254120, 0x2534c8, 0x253b60, 0x253bd0, 0x253c50, 0x253d30, 0x255cc0, 0x254160, 0x2541e8,
-            0x2542a8, 0x254318, 0x254398, 0x254600, 0x254678, 0x2546a8, 0x254e58, 0x254e98, 0x2522e0, 0x252318, 0x2549f8, 0x254a28, 0x254a50, 0x254a80, 0x254af0, 0x254b20, 0x254b50, 0x254b78,
-            0x252748, 0x2527e0, 0x252b88,
-        ] {
-            r.allow(a);
-        }
-        r.call(0x251238).unwrap(); // the identity matrices
-        for o in (0..0x40).step_by(4) {
-            r.mem.write_u32(W + o, 0);
-        }
-        // the big blocks go in the game's own heap space, below the runner's test heap
-        let pf = 0x0080_0000u32;
-        assert!(pb.len() < 0x80_0000);
-        r.mem.write(pf, &pb).unwrap();
-        let blocks = r.mem.alloc(16000);
-        let flips = r.mem.alloc(4000);
-        r.mem.write_u32(W + 4, pf);
-        r.mem.write_u32(W + 8, blocks);
-        r.mem.write_u32(W + 0xc, flips);
-        r.mem.write_u32(W + 0x10, 0x3a7d50);
-        r.cpu.set_gpr(4, W as u64);
-        r.cpu.set_gpr(5, pf as u64);
-        r.call(0x255630).unwrap();
-        // the grid (row E3e), its lists through the real lookups
-        let lf = 0x0100_0000u32;
-        assert!(lb.len() < 0x10_0000);
-        r.mem.write(lf, &lb).unwrap();
-        let hdr = r.mem.alloc(8);
-        r.mem.write(hdr, &lb[..4]).unwrap();
-        r.cpu.set_gpr(4, W as u64);
-        r.cpu.set_gpr(5, lf as u64);
-        r.cpu.set_gpr(6, hdr as u64);
-        r.call(0x252470).unwrap();
-        assert_eq!(r.cpu.gpr(2), 1, "{c}: grid");
-        if r.mem.read_u32(W) == 0 {
-            r.mem.write_u32(W, lf);
-        }
+        // the course object built by the game's loaders
+        let runner_course::RunnerCourse { patch0, inst0 } = runner_course::load(&mut r, &pb, &lb, &sb);
         let grid = r.mem.read_u32(W);
-        // the .ssf (row E3c1): objects' flags and physics, the collision tables
-        let sf = 0x0110_0000u32;
-        assert!(sb.len() < 0x10_0000);
-        r.mem.write(sf, &sb).unwrap();
-        let heap = Rc::new(std::cell::Cell::new(0x0120_0000u32));
-        r.stub(0x2cc808, |_, _| {});
-        r.stub(0x2c7e38, |c, _| c.set_gpr(2, 1));
-        r.stub(0x2c8a70, move |c, _| c.set_gpr(2, sf as u64));
-        r.stub(0x14a040, |_, _| {});
-        let hp = heap.clone();
-        r.stub(0x2ccf70, move |c, _| {
-            let at = hp.get();
-            hp.set((at + c.gpr(5) as u32 + 15) & !15);
-            c.set_gpr(2, at as u64);
-        });
-        r.stub(0x238af0, |_, _| {});
-        r.stub(0x239ba8, |_, _| {});
-        r.stub(0x23b520, |_, _| {});
-        r.allow(0x239340);
-        r.stub(0x2ce114, |c, m| {
-            let mut b = vec![0u8; c.gpr(6) as usize];
-            m.read(c.gpr(5) as u32, &mut b);
-            m.write(c.gpr(4) as u32, &b).unwrap();
-        });
-        let path = r.mem.alloc(16);
-        r.cpu.set_gpr(4, W as u64);
-        r.cpu.set_gpr(5, path as u64);
-        r.call(0x25f598).unwrap();
-        // the first patch and object, through the game's getters
-        let get = |r: &mut Runner, a: u32, i: u32| {
-            r.cpu.set_gpr(4, W as u64);
-            r.cpu.set_gpr(5, i as u64);
-            r.call(a).unwrap();
-            r.cpu.gpr(2) as u32
-        };
-        let patch0 = get(&mut r, 0x2549f8, 0);
-        let inst0 = get(&mut r, 0x254a28, 0);
         // some objects get an animated controller
         let mut g = Rng(0x30e1_d000_0000_0001 ^ c.len() as u64 * 0x1234_5678);
         let ctrls = r.mem.alloc(0x40 * pbd.instances.len() as u32 + 16);

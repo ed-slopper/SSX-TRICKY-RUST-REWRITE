@@ -210,7 +210,9 @@ impl Cpu {
     }
 }
 
-pub type Stub = Box<dyn FnMut(&mut Cpu, &mut Mem)>;
+/// A stub: it reads the arguments and sets the result, and says whether it answered the call (a hook that
+/// declines lets the original run, [`Runner::hook`]).
+pub type Stub = Box<dyn FnMut(&mut Cpu, &mut Mem) -> bool>;
 
 /// One loaded executable, ready to call functions of.
 pub struct Runner {
@@ -374,8 +376,20 @@ impl Runner {
     }
 
     /// Replace calls to `addr` with `stub`, which reads the arguments and sets the result.
-    pub fn stub(&mut self, addr: u32, stub: impl FnMut(&mut Cpu, &mut Mem) + 'static) {
-        self.stubs.insert(addr, Box::new(stub));
+    pub fn stub(&mut self, addr: u32, mut stub: impl FnMut(&mut Cpu, &mut Mem) + 'static) {
+        self.stubs.insert(
+            addr,
+            Box::new(move |c, m| {
+                stub(c, m);
+                true
+            }),
+        );
+    }
+
+    /// Like [`Runner::stub`], but `hook` may decline a call (return false): the original then runs, so it must be
+    /// allowed. For a function some of whose calls a test answers itself and the others the game's code does.
+    pub fn hook(&mut self, addr: u32, hook: impl FnMut(&mut Cpu, &mut Mem) -> bool + 'static) {
+        self.stubs.insert(addr, Box::new(hook));
     }
 
     /// Take the stub at `addr` away (calls to it then run the original if allowed).

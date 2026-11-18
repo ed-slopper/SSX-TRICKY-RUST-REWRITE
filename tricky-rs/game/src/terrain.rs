@@ -22,15 +22,23 @@ pub const BASIS: [V4; 10] = [
     [1.0, 1.0, 1.0, 1.0],
 ];
 
-/// vmula.x / vmadda.y / vmadda.z / vmadd.w: a·b.x + c·b.y + d·b.z + e·b.w, lane by lane, in that order.
-fn comb(v: [V4; 4], b: V4) -> V4 {
-    [0, 1, 2, 3].map(|i| ((v[0][i] * b[0] + v[1][i] * b[1]) + v[2][i] * b[2]) + v[3][i] * b[3])
+/// vmula.x / vmadda.y / vmadda.z / vmadd.w: a·b.x + c·b.y + d·b.z + e·b.w, lane by lane, in that order, each
+/// product by `mul` and each sum by `add`.
+fn comb(v: [V4; 4], b: V4, mul: &impl Fn(f32, f32) -> f32, add: &impl Fn(f32, f32) -> f32) -> V4 {
+    [0, 1, 2, 3].map(|i| add(add(add(mul(v[0][i], b[0]), mul(v[1][i], b[1])), mul(v[2][i], b[2])), mul(v[3][i], b[3])))
 }
 
 /// The patch program (VU0 micro address 0, `FUN_002576a8` loads the patch's 16 coefficient vectors (+0x50) into
 /// vf1..vf16): for each row i, four vectors C_k = vf(4k+1..4k+4) combined by basis i, then each point the C's
 /// combined by basis j; x, y, z written (w stays the basis' 1). Point i·10 + j.
 pub fn tessellate(c: &[V4; 16]) -> [V4; 100] {
+    tessellate_by(c, |a, b| a * b, |a, b| a + b)
+}
+
+/// [`tessellate`] with its products by `mul` and sums by `add`: in PCSX2 the patch program rounds both toward
+/// zero (proven on the running game's patch cache, `tests/terrain.rs`, F4h5m), where [`tessellate`] rounds to
+/// nearest (row F4c).
+pub fn tessellate_by(c: &[V4; 16], mul: impl Fn(f32, f32) -> f32, add: impl Fn(f32, f32) -> f32) -> [V4; 100] {
     let mut out = [[0.0f32; 4]; 100];
     for i in 0..10 {
         let b = BASIS[i];
@@ -40,10 +48,10 @@ pub fn tessellate(c: &[V4; 16]) -> [V4; 100] {
                 let v = c[4 * k + m];
                 [v[0], v[1], v[2], 0.0]
             };
-            comb([g(0), g(1), g(2), g(3)], b)
+            comb([g(0), g(1), g(2), g(3)], b, &mul, &add)
         });
         for j in 0..10 {
-            let p = comb(cols, BASIS[j]);
+            let p = comb(cols, BASIS[j], &mul, &add);
             out[i * 10 + j] = [p[0], p[1], p[2], 1.0];
         }
     }

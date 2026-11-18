@@ -124,6 +124,12 @@ struct Walls {
 /// The course the recording was made on, from the player's disc: TRICKY_DISC (the image) and TRICKY_COURSE (its
 /// models file's name) or the recording's `course N`; none without them (the walls then answer nothing).
 fn course(path: &str) -> Option<std::sync::Arc<tricky_game::course_ground::CourseGround>> {
+    let (pbd, ltg, ssf) = course_files(path)?;
+    Some(std::sync::Arc::new(tricky_game::course_ground::CourseGround::new(&pbd, &ltg, &ssf)?))
+}
+
+/// The course's `.pbd`, `.ltg` and `.ssf` from the player's disc (as [`course`]).
+fn course_files(path: &str) -> Option<(Vec<u8>, Vec<u8>, Vec<u8>)> {
     let disc = std::env::var("TRICKY_DISC").ok()?;
     let name = match std::env::var("TRICKY_COURSE") {
         Ok(name) => name,
@@ -132,8 +138,7 @@ fn course(path: &str) -> Option<std::sync::Arc<tricky_game::course_ground::Cours
     let mut files = tricky_data::big::Files::new(tricky_data::disc::Disc::open(&disc).ok()?);
     files.mount(&format!("data/models/{name}.big")).ok()?;
     let mut get = |ext: &str| files.load(&format!("|data/models/{name}.{ext}")).ok().flatten();
-    let (pbd, ltg, ssf) = (get("pbd")?, get("ltg")?, get("ssf")?);
-    Some(std::sync::Arc::new(tricky_game::course_ground::CourseGround::new(&pbd, &ltg, &ssf)?))
+    Some((get("pbd")?, get("ltg")?, get("ssf")?))
 }
 
 /// The models file of course id `id` (0x32de88; the recorder writes it in the header, `course N`). Inferred: the
@@ -156,12 +161,17 @@ fn walls_of(course: &Option<std::sync::Arc<tricky_game::course_ground::CourseGro
 fn wall_cast(course: &tricky_game::course_ground::CourseGround, body: &CollBody, ground: V4) -> (f32, tricky_game::walls::CastRecord) {
     let mut q = tricky_game::worldboarder::WorldBoarder::new(body, 1);
     q.reject = Some(ground);
-    let skip: Vec<u32> = std::env::var("TRICKY_WALL_SKIP").unwrap_or_default().split(',').filter_map(|x| x.parse().ok()).collect();
+    let skip = wall_skip();
     let (t, h) = course.ray_cast(&mut q, false, None, &|i| skip.contains(&i));
     if 0.0 < t && std::env::var("TRICKY_WALLDBG").is_ok() {
         eprintln!("WALLDBG t {t} at {:?} n {:?} object {:?} body centre {:?} r {}", h.map(|h| h.pos), h.map(|h| h.normal), h.and_then(|h| h.object), body.center, body.radius);
     }
     (t, h.map_or(Default::default(), |h| tricky_game::walls::CastRecord { pos: h.pos, normal: h.normal, object: h.object.map_or(0, |o| o as u32 + 1) }))
+}
+
+/// TRICKY_WALL_SKIP: the instances the walls leave out.
+fn wall_skip() -> Vec<u32> {
+    std::env::var("TRICKY_WALL_SKIP").unwrap_or_default().split(',').filter_map(|x| x.parse().ok()).collect()
 }
 
 /// What `Boarder_WallCollide` 0x126250 calls (`walls::WallEnv`), on the ground motion's rider. The body is the
@@ -282,6 +292,9 @@ struct W {
     landing: Rc<Cell<bool>>,
     /// the course `World_RayCast`'s stub answers `Boarder_WallCollide`'s cast from (F4h5k; [`W::put_walls`])
     course: Rc<RefCell<Option<std::sync::Arc<tricky_game::course_ground::CourseGround>>>>,
+    /// the course built in the runner ([`W::load_course`]): `Boarder_WallCollide`'s cast then runs as the
+    /// original, `World_RayCast` 0x25aff8 and the `cWorldBoarder` 0x257810 the wall makes
+    real_cast: Rc<Cell<bool>>,
 }
 
 /// `Boarder_WallCollide` 0x126250 stubbed: logged, answering `wall`.
@@ -317,12 +330,39 @@ impl W {
         *self.course.borrow_mut() = walls.map(|w| w.course.clone());
     }
 
+    /// The course built in the runner by the game's loaders (`runner_course`, F4h5m), with the objects' boxes and
+    /// flags ours has (TRICKY_WALL_SKIP's left out, as [`wall_cast`]): `Boarder_WallCollide` 0x126250's cast then
+    /// runs as the original (`World_RayCast` 0x25aff8, the `cWorldBoarder` 0x257810 and its tests), the patches'
+    /// points as `terrain::tessellate` makes them, under `fadd=g1` (the PCSX2 way) toward zero as PCSX2 does.
+    fn load_course(&mut self, files: &(Vec<u8>, Vec<u8>, Vec<u8>), course: &tricky_game::course_ground::CourseGround) {
+        let (pb, lb, sb) = files;
+        let rc = runner_course::load(&mut self.r, pb, lb, sb);
+        let pbd = tricky_data::pbd::Pbd::parse(pb).unwrap();
+        let coeffs = pbd.patches.iter().map(|r| tricky_data::pbd::PatchRec::parse(r).map_or([[0.0; 4]; 16], |p| p.coeffs)).collect();
+        // the PCSX2 way (`fadd=g1`) tessellates as PCSX2 runs the VU0 patch program, toward zero
+        let chop = self.r.float_rules.fadd == r5900::ps2float::Round::Guard;
+        rc.cast_as_original(&mut self.r, coeffs, chop);
+        let skip = wall_skip();
+        course.with_world(|w| {
+            for (i, o) in w.objects.iter().enumerate() {
+                let flags = if skip.contains(&(i as u32)) { o.flags & !0x20 } else { o.flags };
+                rc.set_object(&mut self.r.mem, i, o.min, o.max, flags);
+            }
+        });
+        // the shape's constructor and the tests the casts make of it (as tests/worldboarder.rs)
+        for a in [0x257810, 0x235fc8, 0x236830, 0x2578c0, 0x257918, 0x257978, 0x257988, 0x257a50, 0x257ba8, 0x257c50, 0x257af8, 0x236130, 0x236498, 0x236bb8, 0x237480, 0x237d50, 0x238640, 0x23b6e8] {
+            self.r.allow(a);
+        }
+        self.real_cast.set(true);
+    }
+
     /// `Boarder_SetState` 0x11f608 as the original for the next call (F4h5m): `Boarder_ExitControlState` 0x11c840 and
     /// `Boarder_EnterControlState` 0x11c8e8 with the routines the ground motion's changes reach (the revert, state 4,
     /// from 3, 5 or 0xc; the stumble, state 2, from 3 or 0xe: `CruiseControl_Exit` 0x1033c0, `FakieCruiseControl_Exit`
     /// 0x104688, `LandNormalControl_Exit` 0x104e38, `PrewindControl_Exit` 0x1055a8, `ChangeFakieControl_Exit` 0x104178,
     /// `ChangeFakieControl_Enter` 0x103eb8, `BumpControl_Enter` 0x104190), their objects pointed at the rider;
-    /// `Boarder_UpdateBoost` 0x11d038 and `AnimCtl_TurnAllLayers` 0x15eef8 logged. Without, the stub that only logs the state asked for.
+    /// `Boarder_UpdateBoost` 0x11d038 and `AnimCtl_TurnAllLayers` 0x15eef8 logged. Without, the stub that
+    /// only logs the state asked for.
     fn real_states(&mut self, on: bool) {
         if !on {
             let l = self.log.clone();
@@ -456,9 +496,17 @@ fn world() -> Option<W> {
     let h = hit.clone();
     let (ld, lf) = (landing.clone(), line_from.clone());
     let (l, c) = (log.clone(), course.clone());
-    r.stub(0x25aff8, move |cpu, mem| match *h.borrow() {
-        // `Boarder_WallCollide`'s cast (the shape a `cWorldBoarder`, vtable 0x3a77d8 at +0x40): the course's, of the body at
-        // rider+0x470 with the ground normal the shape holds (+0x2e0)
+    let real_cast = Rc::new(Cell::new(false));
+    let rc = real_cast.clone();
+    r.hook(0x25aff8, move |cpu, mem| {
+        // `Boarder_WallCollide`'s cast (the shape a `cWorldBoarder`, vtable 0x3a77d8 at +0x40): the original's on the
+        // course built in the runner (F4h5m), else ours, of the body at rider+0x470 with the ground normal the shape
+        // holds (+0x2e0)
+        if mem.read_u32(cpu.gpr(5) as u32 + 0x40) == 0x3a77d8 && rc.get() {
+            l.borrow_mut().push(Ev::Wall(mem.read_u32(rd + 0x494)));
+            return false;
+        }
+        match *h.borrow() {
         _ if mem.read_u32(cpu.gpr(5) as u32 + 0x40) == 0x3a77d8 => {
             l.borrow_mut().push(Ev::Wall(mem.read_u32(rd + 0x494)));
             let course = c.borrow().clone().expect("Boarder_WallCollide ran without the course");
@@ -487,6 +535,8 @@ fn world() -> Option<W> {
             mem.write_u32(out + 0x34, h.surface);
             cpu.set_f(0, 0.4);
         }
+        }
+        true
     });
     // the control after the motion (F4b3i): `Boarder_UpdateControl` 0x11c9a0 and the updates replayed (bump 0x1041b0,
     // fakie change 0x104030, hard landing 0x104800, normal landing 0x104e68), the animation queries they make
@@ -539,13 +589,18 @@ fn world() -> Option<W> {
     // stub tells the wall's cast by)
     let in_wall = |cpu: &r5900::Cpu| (0x126250..0x126540).contains(&(cpu.gpr(31) as u32));
     let (l, h) = (log.clone(), hit.clone());
-    r.stub(0x257810, move |cpu, mem| {
+    let rc = real_cast.clone();
+    r.hook(0x257810, move |cpu, mem| {
+        if in_wall(cpu) && rc.get() {
+            return false;
+        }
         if in_wall(cpu) {
             mem.write_u32(cpu.gpr(4) as u32 + 0x40, 0x3a77d8);
-            return;
+            return true;
         }
         l.borrow_mut().push(Ev::Call(0x257810));
         *h.borrow_mut() = None;
+        true
     });
     let l = log.clone();
     r.stub(0x257ca0, move |cpu, _| {
@@ -564,7 +619,7 @@ fn world() -> Option<W> {
     for s in &mut seqs {
         *s = (r.mem.alloc(0x80), r.mem.alloc(0x10), r.mem.alloc(0x10));
     }
-    Some(W { r, rd, stats, motion, log, hit, wall, meter, handler, pad, seqs, air, landing, course })
+    Some(W { r, rd, stats, motion, log, hit, wall, meter, handler, pad, seqs, air, landing, course, real_cast })
 }
 
 impl W {
@@ -936,6 +991,7 @@ fn planted_bugs_are_caught() {
 }
 
 mod recording;
+mod runner_course;
 use recording::{f32_at, load, pair_list, rider_addrs, u32_le, vec4};
 
 /// The rider as `GroundMotion_Update` reads it, from a recorded rider block (0x600 bytes from the rider), its stats
@@ -1828,6 +1884,79 @@ fn w0_len(ticks: &[recording::Tick]) -> usize {
     ticks.first().map_or(0, |t| t.riders[0].len())
 }
 
+/// `Boarder_WallCollide` 0x126250's cast, bit for bit (F4h5m): for the bodies a recording holds (every `TRICKY_WALL_STEP`th
+/// tick, 10 unless set; riders on the snow, motion 2), ours ([`wall_cast`]: `CourseGround::ray_cast` with
+/// `WorldBoarder`) against the original's in the runner on the course its loaders built (`runner_course`):
+/// `cWorldBoarder::cWorldBoarder` 0x257810 on the body (mask `WALL_MASK`, as the ground motion sets it) with the
+/// ground normal to reject near (+0x2d0 = 1, +0x2e0), then `World_RayCast` 0x25aff8; t, the point, the normal and the
+/// object compared. Needs TRICKY_RECORDING (with the course's id) and TRICKY_DISC.
+#[test]
+fn wall_casts_against_the_original() {
+    let Ok(paths) = std::env::var("TRICKY_RECORDING") else { return };
+    let path = paths.split(';').next().unwrap();
+    let (Some(course), Some(files)) = (course(path), course_files(path)) else { return };
+    let (n, ticks) = load(path);
+    let step: usize = std::env::var("TRICKY_WALL_STEP").ok().and_then(|v| v.parse().ok()).unwrap_or(10);
+    let Some(mut w) = world() else { return };
+    w.load_course(&files, &course);
+    let shape = w.r.mem.alloc(0x400);
+    let out = w.r.mem.alloc(0x40);
+    let (mut casts, mut hits, mut same) = (0, 0, 0);
+    let mut off: Vec<String> = Vec::new();
+    for t in ticks.iter().step_by(step) {
+        for i in 0..n {
+            let a = &t.riders[i];
+            if a.len() < 0x700 || u32_le(a, 0x424) != 2 {
+                continue;
+            }
+            let mut body = body_of(a);
+            body.x24 = tricky_game::ground_motion::WALL_MASK as i32;
+            let ground = vec4(a, 0x2a0);
+            let (t_ours, rec) = wall_cast(&course, &body, ground);
+            let (m, rd) = (&mut w.r.mem, w.rd);
+            wv(m, rd + 0x480, body.center);
+            m.write_f32(rd + 0x490, body.radius);
+            m.write_u32(rd + 0x494, body.x24 as u32);
+            m.write_u32(rd + 0x498, body.count as u32);
+            for (k, (c, r)) in body.spheres.iter().enumerate() {
+                wv(m, rd + 0x4a0 + 0x20 * k as u32, *c);
+                m.write_f32(rd + 0x4b0 + 0x20 * k as u32, *r);
+            }
+            w.r.cpu.set_gpr(4, shape as u64);
+            w.r.cpu.set_gpr(5, (rd + 0x470) as u64);
+            w.r.cpu.set_gpr(6, 1);
+            w.r.call(0x257810).unwrap();
+            w.r.mem.write_u32(shape + 0x2d0, 1);
+            wv(&mut w.r.mem, shape + 0x2e0, ground);
+            for o in (0..0x40).step_by(4) {
+                w.r.mem.write_u32(out + o, 0);
+            }
+            w.r.cpu.set_gpr(4, runner_course::W as u64);
+            w.r.cpu.set_gpr(5, shape as u64);
+            w.r.cpu.set_gpr(6, out as u64);
+            w.r.cpu.set_gpr(7, 0);
+            w.r.call(0x25aff8).unwrap_or_else(|e| panic!("tick {} rider {i}: {e:?}", t.tick));
+            let t_game = w.r.cpu.f(0);
+            casts += 1;
+            hits += (0.0 < t_ours || 0.0 < t_game) as usize;
+            let m = &mut w.r.mem;
+            let obj = m.read_u32(out + 0x38);
+            let game = (t_game.to_bits(), rv(m, out + 0x10).map(f32::to_bits), rv(m, out + 0x20).map(f32::to_bits), obj);
+            let ours = (t_ours.to_bits(), rec.pos.map(f32::to_bits), rec.normal.map(f32::to_bits), rec.object);
+            let right = if 0.0 < t_game || 0.0 < t_ours { (game.0, game.1, game.2) == (ours.0, ours.1, ours.2) && (obj == 0) == (rec.object == 0) } else { true };
+            same += right as usize;
+            if !right && off.len() < 20 {
+                off.push(format!("tick {} rider {i}: ours t {t_ours} n {:?} object {}, the game's t {t_game} n {:?} object {obj:#x}", t.tick, rec.normal, rec.object, rv(m, out + 0x20)));
+            }
+        }
+    }
+    for o in &off {
+        eprintln!("  {o}");
+    }
+    eprintln!("{path}: wall casts {casts} ({hits} hit either way), the same bit for bit {same}");
+    assert!(casts > 0);
+}
+
 /// The ground tick over a recorded race (board row F4b3b). For every pair of samples one tick apart in which a rider
 /// is on the snow (motion +0x424 = 2) at both: `GroundMotion_Update` 0x10a0d8 on the rider as recorded at the first,
 /// against the second, field by field. Run three ways: our `ground_motion::update`, and the game's own code in the
@@ -1860,6 +1989,7 @@ fn ground_ticks_against_the_running_game() {
     let path = paths.split(';').next().unwrap();
     let (n, ticks) = load(path);
     let course = course(path);
+    let files = course_files(path);
     let twins = Twins::of_recording(path, &ticks);
     let addrs = rider_addrs(path);
     let (Some(km), Some(ka)) = (ticks[0].extra.iter().position(|(o, _)| *o == -0x400), ticks[0].extra.iter().position(|(o, _)| *o == 0x46c0)) else {
@@ -1874,6 +2004,10 @@ fn ground_ticks_against_the_running_game() {
     for rules in ["add=n,mul=n,div=n,cvt=n", "add=n,fadd=g1,mul=n,div=n,cvt=n"] {
         let Some(mut w) = world() else { return };
         w.r.float_rules = Rules::parse(rules).unwrap();
+        // the walls' cast as the original's on the course built in the runner (F4h5m; TRICKY_WALLCAST=ours: ours)
+        if let (Some(f), Some(c), true) = (&files, &course, std::env::var("TRICKY_WALLCAST").map_or(true, |v| v != "ours")) {
+            w.load_course(f, c);
+        }
         lift_world(&mut w);
         runners.push((rules, w));
     }
@@ -3055,6 +3189,7 @@ fn takeoff_ticks_against_the_running_game() {
     let (n, ticks) = load(path);
     let twins = Twins::of_recording(path, &ticks);
     let course = course(path);
+    let files = course_files(path);
     let win = |o: i64| ticks[0].extra.iter().position(|(x, _)| *x == o);
     let (Some(km), Some(ka), Some(kp)) = (win(-0x400), win(0x46c0), win(0x57b0)) else {
         eprintln!("{path}: no -400, 46c0 and 57b0 windows: skipping");
@@ -3069,6 +3204,10 @@ fn takeoff_ticks_against_the_running_game() {
     for rules in ["add=n,mul=n,div=n,cvt=n", "add=n,fadd=g1,mul=n,div=n,cvt=n"] {
         let Some(mut w) = world() else { return };
         w.r.float_rules = Rules::parse(rules).unwrap();
+        // the walls' cast as the original's on the course built in the runner (F4h5m; TRICKY_WALLCAST=ours: ours)
+        if let (Some(f), Some(c), true) = (&files, &course, std::env::var("TRICKY_WALLCAST").map_or(true, |v| v != "ours")) {
+            w.load_course(f, c);
+        }
         let off = Rc::new(RefCell::new(Off::default()));
         let (o, rd) = (off.clone(), w.rd);
         w.r.stub(0x11f610, move |cpu, mem| {
