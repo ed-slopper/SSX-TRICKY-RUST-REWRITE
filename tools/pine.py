@@ -26,7 +26,8 @@ PINE reads and writes memory and saves and loads states; it has no breakpoints o
                                                         bump control, F4b3i; `hookpad`: each rider's pad
                                                         word from the hook, F4b3k; `rollers` with L700:78:
                                                         the knocked objects among each rider's pairs,
-                                                        F4b3k3); with <bytes> >= 0x700, a
+                                                        F4b3k3; `flags`: every course object's flags
+                                                        +0xe8 as they change, F4b3k4); with <bytes> >= 0x700, a
                                                         sample whose rider body looks the last frame's is read
                                                         again (F4h5d; header `posed 1`); the riders'
                                                         characters go to <out>.stats; a new race with other
@@ -374,7 +375,12 @@ def main(argv):
         # the course's instances (`Course_GetInstance` 0x254a28: *(*(0x346488 + 4) + 0x48) + 0x100 × index)
         hooked = "hookpad" in argv[4:]
         rolled = "rollers" in argv[4:]
-        wins_args = [w for w in argv[4:] if w not in ("hookpad", "rollers")]
+        # `flags` (F4b3k4): every course object's flags (+0xe8; `Course_GetInstance` 0x254a28: *(*(0x346488 + 4) +
+        # 0x48) + 0x100 × index, the count at *(0x346488 + 4) + 0xc), read after the batch while the tick holds; each
+        # line ends `F` and the objects whose flags changed since the last line kept, `index:flags` (hex, comma-
+        # separated; `-` for none; the first line all of them); header `flags <count>`
+        flagged = "flags" in argv[4:]
+        wins_args = [w for w in argv[4:] if w not in ("hookpad", "rollers", "flags")]
         lists = [(w, int(w[1:].split(":")[0], 16), int(w.split(":")[1], 16)) for w in wins_args if w.startswith("L")]
         if rolled and not any(o == 0x700 for _, o, _ in lists):
             sys.exit("rollers needs the pair list L700:78")
@@ -384,6 +390,11 @@ def main(argv):
         if race is None:
             sys.exit("no race found (is a race running?)")
         pad = find_pad(p)
+        n_inst, flag_at, last_flags = 0, [], None
+        if flagged:
+            head_at = p.read32(WORLD + 4)
+            n_inst, base = p.read32(head_at + 0xc), p.read32(head_at + 0x48)
+            flag_at = [(base + 0x100 * j + 0xe8, 4) for j in range(n_inst)]
         if hooked:
             hook(p, True)
             slots = [p.read32(r + RIDER_SLOT) for r in riders]
@@ -406,6 +417,7 @@ def main(argv):
                     + (" extra hookpad 8" if hooked else "")
                     + (f" extra rollers 0 instances {p.read32(p.read32(WORLD + 4) + 0x48):x}" if rolled else "")
                     + (" posed 1" if size >= 0x700 else "")
+                    + (f" flags {n_inst}" if flagged else "")
                     + f" course {p.read32(COURSE_ID)}" + "\n")
             while time.time() - t0 < seconds:
                 tick = p.read32(race + RACE_TICK)
@@ -486,7 +498,10 @@ def main(argv):
                     if struct.unpack("<I", got[0])[0] != tick or p.read32(race + RACE_TICK) != tick:
                         return None  # the game moved on while we read
                     hooks = [table[8 * s:8 * s + 8] for s in slots] if hooked else []
-                    return got[1:1 + k] + ([got[-1]] if pad else []) + wins + walked + hooks + rollers
+                    fl = [b"".join(p.read_blocks(flag_at))] if flagged else []
+                    if flagged and p.read32(race + RACE_TICK) != tick:
+                        return None
+                    return got[1:1 + k] + ([got[-1]] if pad else []) + wins + walked + hooks + rollers + fl
                 # A body read while `cPostAI::vf1` 0x114730 poses the riders (0 to n-1, after every rider ticked) is the
                 # last frame's (F4h5a: ~2 % of rider samples, mostly riders 5 and 4): read again, while the tick holds,
                 # until no rider's body looks stale (`stale_bodies`), at most 12 ms; else keep the first read
@@ -510,7 +525,13 @@ def main(argv):
                         if i not in bad:
                             fresh[i] = blocks[i]
                 prev = (tick, blocks[:k])
-                f.write(f"tick {tick} " + " ".join(b.hex() for b in blocks) + "\n")
+                tail = ""
+                if flagged:
+                    now = struct.unpack(f"<{n_inst}I", blocks.pop())
+                    changed = [(j, x) for j, x in enumerate(now) if last_flags is None or last_flags[j] != x]
+                    tail = " F " + (",".join(f"{j:x}:{x:x}" for j, x in changed) or "-")
+                    last_flags = now
+                f.write(f"tick {tick} " + " ".join(b.hex() for b in blocks) + tail + "\n")
                 last, kept = tick, kept + 1
                 counts = p.read_blocks([(r + RIDER_TICKS, 4) for r in riders])
         print(f"{kept} ticks of {len(riders)} riders in {seconds:g} s to {out}; bodies read stale {seen}, "

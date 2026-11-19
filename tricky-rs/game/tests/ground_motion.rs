@@ -2517,7 +2517,17 @@ fn ground_ticks_against_the_running_game() {
     let mut ctl_same = vec![0usize; runners.len()];
     // and of those, the quaternion equal to the game's: ours, the runner's
     let (mut ctl_ours_game, mut ctl_runner_game) = (vec![0usize; runners.len()], vec![0usize; runners.len()]);
+    // the course objects' flags as the game had them over the race (F4b3k4, `pine.py record ... flags`): the first
+    // sample's (TRICKY_FLAGS=b: the second's, which holds the frame's own changes); TRICKY_FLAGS=off: as loaded
+    let flag_way = std::env::var("TRICKY_FLAGS").unwrap_or_default();
     for (wi, w) in ticks.windows(2).enumerate() {
+        if let (Some(c), false) = (&course, flag_way == "off") {
+            for t in if flag_way == "b" { &w[..] } else { &w[..1] } {
+                for &(o, fl) in &t.flags {
+                    c.set_flags(o as usize, fl);
+                }
+            }
+        }
         if w[1].tick != w[0].tick + 1 {
             continue;
         }
@@ -4176,4 +4186,16 @@ fn rollers_window_parses() {
     assert_eq!(r.len(), 2);
     assert_eq!((r[1].node, r[1].instance, r[1].body[0x9c], r[1].min, r[1].max), (0x1001, 0x2100, 0x9c, [1.0, 2.0, 3.0, 0.0], [4.0, 5.0, 6.0, 0.0]));
     assert!(recording::parse_rollers(&[0]).is_empty());
+}
+
+/// `pine.py record ... flags` lines (F4b3k4): the ` F ` tail read as (index, flags), `-` as none.
+#[test]
+fn flags_tail_parses() {
+    let path = std::env::temp_dir().join(format!("tricky_flags_{}.txt", std::process::id()));
+    std::fs::write(&path, "race 1 riders 10 bytes 4 pad 0 flags 3 course 1\ntick 5 00000000 F 0:10003,2:a100a3\ntick 6 00000000 F -\n").unwrap();
+    let (n, ticks) = load(path.to_str().unwrap());
+    std::fs::remove_file(&path).ok();
+    assert_eq!(n, 1);
+    assert_eq!(ticks[0].flags, vec![(0, 0x10003), (2, 0xa100a3)]);
+    assert!(ticks[1].flags.is_empty());
 }

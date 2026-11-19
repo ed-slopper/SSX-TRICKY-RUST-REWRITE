@@ -11,6 +11,9 @@ pub struct Tick {
     /// the first controller's libpad record (header `pad P`, 20 bytes: status, mode, the buttons (0 = pressed), the
     /// right stick x, y, the left stick x, y, the pressures), when the recorder found it
     pub pad: Option<Vec<u8>>,
+    /// the course objects whose flags (+0xe8) changed since the line before, as (index, flags) (`pine.py record ...
+    /// flags`: the line's ` F ` tail; the first line holds every object's; F4b3k4)
+    pub flags: Vec<(u32, u32)>,
 }
 
 pub fn f32_at(b: &[u8], off: usize) -> f32 {
@@ -53,7 +56,17 @@ pub fn load(path: &str) -> (usize, Vec<Tick>) {
                 }
             }
             let pad = (pad == 1).then(|| hex(w[2 + n]));
-            Tick { tick: w[1].parse().unwrap(), riders, extra, chased, pad }
+            let flags = match w.iter().position(|x| *x == "F") {
+                Some(k) if w[k + 1] != "-" => w[k + 1]
+                    .split(',')
+                    .map(|e| {
+                        let (i, f) = e.split_once(':').unwrap();
+                        (u32::from_str_radix(i, 16).unwrap(), u32::from_str_radix(f, 16).unwrap())
+                    })
+                    .collect(),
+                _ => Vec::new(),
+            };
+            Tick { tick: w[1].parse().unwrap(), riders, extra, chased, pad, flags }
         })
         .collect::<Vec<_>>();
     assert!(ticks.iter().all(|t| t.riders.iter().all(|r| r.len() == size)));
