@@ -1954,3 +1954,25 @@ not along the ground's normal nor a push's line). The runner's original `Boarder
 `Ragdoll_GroundProbe` and the walls on the course) misses by the same. So (inferred) something outside the motion and
 the pushes moves rider 1 in that frame: a wall the game's body meets and the first sample's body does not, or a
 knocked roller (no static touch object near: gari's are 0x10201022, no bounce). Needs the frame's world, as F4b3k3.
+
+## F4b3k2a: the computer's pad word where its routine reads nothing (2026-11-19)
+
+`computer_pad_words_against_the_running_game` (`tests/ground_motion.rs`, TRICKY_RECORDING / TRICKY_STATS of a
+recording with `hookpad`) compares `cComputer::GetControls` 0x1384b8 (`aipad::get_controls`) with the pad word the
+hook kept, for every computer rider (stats +0x6c −1) that ticked once in the frame (+0x5900 one more) and kept its
+control state (+0x428) over the frame (rec22: 2,400 ticks of state changes left out; the 9 → 0x10 ones carry an air
+trick's word, so the state moved before the control). Only the states whose answer needs nothing unrecorded:
+
+| state | routine | rec22 ticks | equal |
+|---|---|---|---|
+| 9 | stick x full (0x1f) | 579 | 579 |
+| 0xa | `AIComputer_ControlsState10` 0x1389c0, empty | 293 | 293 |
+| 0x13 | `AIComputer_ControlsIdle` 0x138b60 (only bit 0, the stuck check) | 1,871 | 1,871 |
+| 0x14 | `AIComputer_CheckStuck` (only bit 0) | 1,606 | 1,606 |
+| 0x16 | no case: 0 | 816 | 816 |
+| 0xd | `AIComputer_ControlsTurnAround` 0x138ac0: only the stick's y (bits 8–13) under 0.5 at rider+0x57b8, else 0 | 1,712 | 1,712 |
+
+Proven by the run: rider+0x57b8 is the second sample's when the control reads it (rec22 2401 r3, 2602 r1, 10463 r0
+cross 0.5 in the frame and the word follows the second's). States 5 and 0x11 do not occur in rec22. Left (row
+F4b3k2): the routines that read the computer object (+0x86c skill, +0x868 side, the line, the rubber band: not in any
+window; `5ae0>600 230` stops at +0x830): 2, 3, 4, 8, 0xb, 0xc, 0xe, 0xf, 0x10, and 0xd's steer.

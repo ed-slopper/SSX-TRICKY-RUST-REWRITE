@@ -3973,3 +3973,93 @@ fn takeoff_ticks_against_the_running_game() {
         eprintln!("  {way}: all {}; {}", whole[k], line.join(", "));
     }
 }
+
+/// F4b3k2: `cComputer::GetControls` 0x1384b8 (`aipad::get_controls`) against the pad word the hook kept
+/// (`hook_pad`), for the control states whose routine reads nothing of the computer (5, 9, 0x11, 10 and the states
+/// the switch has no case for: 0) and the stuck check's (0x14, and 0x13 `AIComputer_ControlsIdle` 0x138b60: only bit 0
+/// may be set). The state is the first sample's +0x428 (the control runs before the
+/// motion, `cBoarder::vf7` 0x117198); a rider that did not tick once in the frame is left out (its +0x5900 count
+/// not the first's + 1), and so is one whose state changed in the frame (rec22: 9 → 0x10 with an air trick's pad
+/// word, so the state moved before the control). The player (stats +0x6c not −1) is left out. Prints, by state:
+/// ticks, pad words equal.
+#[test]
+fn computer_pad_words_against_the_running_game() {
+    use tricky_game::aipad::{get_controls, AiPadEnv};
+    struct Const;
+    impl AiPadEnv for Const {
+        fn rubber_band(&mut self) -> f32 {
+            1.0
+        }
+        fn dispatch(&mut self, _: &mut u32) {
+            unreachable!()
+        }
+        fn countdown(&mut self, _: &mut u32) {
+            unreachable!()
+        }
+        fn turn_around(&mut self, _: &mut u32) {
+            unreachable!()
+        }
+        fn ride(&mut self, _: &mut u32) {
+            unreachable!()
+        }
+        fn air(&mut self, _: &mut u32) {
+            unreachable!()
+        }
+        fn air_trick(&mut self, _: &mut u32) {
+            unreachable!()
+        }
+        fn idle(&mut self, _: &mut u32) {
+            unreachable!()
+        }
+        fn check_stuck(&mut self) -> u32 {
+            0
+        }
+        fn update_skill_scale(&mut self) {}
+    }
+    let (Ok(paths), Ok(stats)) = (std::env::var("TRICKY_RECORDING"), std::env::var("TRICKY_STATS")) else { return };
+    let stats: Vec<Vec<u8>> = std::fs::read_to_string(&stats).unwrap().lines()
+        .map(|l| { let h = l.split_whitespace().nth(2).unwrap(); (0..h.len()).step_by(2).map(|i| u8::from_str_radix(&h[i..i + 2], 16).unwrap()).collect() })
+        .collect();
+    let path = paths.split(';').next().unwrap();
+    let (n, ticks) = load(path);
+    let Some(kc) = ticks[0].extra.iter().position(|(o, _)| *o == 0x5900) else { return };
+    let ks = ticks[0].extra.iter().position(|(o, _)| *o == 0x57b0);
+    let mut by: std::collections::BTreeMap<u32, [usize; 2]> = Default::default();
+    let mut changed = 0;
+    for w in ticks.windows(2) {
+        for i in (0..n).filter(|&i| u32_le(&stats[i], 0x6c) == u32::MAX) {
+            let Some(pad) = hook_pad(&w[1], i) else { continue };
+            if f32_at(&w[1].extra[kc].1[i], 0) != f32_at(&w[0].extra[kc].1[i], 0) + 1.0 {
+                continue;
+            }
+            let state = u32_le(&w[0].riders[i], 0x428);
+            if state != u32_le(&w[1].riders[i], 0x428) {
+                changed += 1;
+                continue;
+            }
+            let e = by.entry(state).or_default();
+            e[0] += 1;
+            let slow = ks.map(|k| f32_at(&w[1].extra[k].1[i], 8));
+            let routine = matches!(state, 2 | 3 | 4 | 7 | 8 | 0xb | 0xc | 0xe | 0xf | 0x10 | 0x12);
+            let ok = match state {
+                _ if routine => false,
+                // the stuck check alone (0x14), or after the idle's clearing of the zero word (0x13, `aictl::controls_idle`)
+                0x13 | 0x14 => pad & !1 == 0,
+                // the turn-around (`aictl::controls_turn_around`): the stick's y alone, and only under 0.5 (rider+0x57b8,
+                // the second sample's: it moves before the control, rec22 2401 r3, 2602 r1, 10463 r0 cross 0.5 in the
+                // frame); its steer (`AIComputer_SteerTowards`) is not recorded
+                0xd => match slow {
+                    Some(v) if v < 0.5 => pad & !0x3f00 == 0,
+                    Some(_) => pad == 0,
+                    None => false,
+                },
+                _ => get_controls(&mut Const, state, &mut 1.0) == pad,
+            };
+            e[1] += ok as usize;
+            if !ok && !routine && std::env::var("TRICKY_DBG").is_ok() {
+                eprintln!("DBG pad tick {} rider {i} state {state:#x} -> {:#x}: pad {pad:#x} slow {slow:?} -> {:?}", w[1].tick, u32_le(&w[1].riders[i], 0x428), ks.map(|k| f32_at(&w[1].extra[k].1[i], 8)));
+            }
+        }
+    }
+    eprintln!("{path}: the computer's pad words by control state [ticks, equal (the states without a routine of their own only)], the state the same at both samples ({changed} ticks where it changed left out): {:?}", by.iter().map(|(s, v)| (format!("{s:#x}"), *v)).collect::<Vec<_>>());
+}
