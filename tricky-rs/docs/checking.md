@@ -1871,7 +1871,7 @@ Found:
   hips: on the snow x −3.95 (−36.7..37.8), y −7.70 (−53.5..14.7), z 70.29 (6.2..130.8) cm in the board's frame.
 - The ground test (`tests/ground_motion.rs`): `frame_of` takes the pivot and the clip from the first sample
   (`pose_of`, windows `8c0`, `44d8`, `46c0`; TRICKY_POSE=off: as before) and the shove's flags from the records
-  (`shoving_of`, the second sample's; TRICKY_FLAGS=a the first's: the same counts), so on rec21 neither stand-in
+  (`shoving_of`, the second sample's; TRICKY_FLAGS=a the first's: the same counts; the first's since F4b3t1), so on rec21 neither stand-in
   runs. rec20 and rec21 have one shove each (2 records): right with the pose, both wrong without it (rec20). On
   rec21 the flags are known on 22,130 rider ticks: the game's one shove is between them, and the 31 ticks between
   them on a shove clip with no shove get none from the replay either (out of reach or inside the three ticks).
@@ -2031,6 +2031,21 @@ All four belong to gaps already on the board. None is the objects' flags (F4b3k4
   one `PrewindControl_Enter` 0x105070 plays when that happens, so the clip the control read in the frame isn't in
   either sample. The test takes the second sample's clip (`TRICKY_CLIP_A`) and keeps 4. Not fixable from these
   windows: it would need the layer-0 clip read in the middle of the frame.
+
+## F4b3t1: the shoves of a whole Snow race (2026-11-19)
+
+rec23 and rec24 (Snow, the demo race, recorded with the F4b3t windows) have 58 shove records (+0x40 + 0x20·j
++0xc) that the game changes, against one shove in rec20 and in rec21. Read from the second sample (as before),
+the layer-1 clip's flags make the replay shove three times when the game doesn't: 521 r3↔r4, 9946 r4↔r5 (the game
+shoves at 9947, a tick later) and 10740 r4↔r5. That is 74 records changed, 58 right. Read from the first sample,
+all 58 are right and none extra, on rec23 and rec24 alike. rec21 (2 of 2) and rec22 (6 of 6) are the same either
+way. So `shoving_of` now takes the first sample's flags (TRICKY_FLAGS=b: the second's).
+
+Inferred: the layer-1 record's flag byte (+0x74) the shove tests is moved by the animation later in the frame
+than the rider's collisions. (The layer-0 clip id, F4b3i, is best from the second sample.)
+
+rec24 under `fadd=g1`: every field 139,445 → 139,451, pos 140,214 → 140,220, state 140,237 → 140,240 of 140,300.
+rec23: every field 142,140 → 142,145. rec21 and rec22 are unchanged.
 
 ## F4b3z: rec14 9092 rider 1, what the miss is not (2026-11-19, notes)
 

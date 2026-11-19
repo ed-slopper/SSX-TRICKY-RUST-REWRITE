@@ -1892,10 +1892,12 @@ struct Pose {
 /// Whether rider `i`'s layer-1 clip is between its flags 1 and 2 (`AnimCtl_TestClipFlag` 0x15ffb8: the byte +0x74,
 /// bits 0 and 1, of the clip's record in the layer's list, `AnimLayer_FindClip` 0x15a6c8: rider+0x4788 the first,
 /// +0x30 the next, +0x40 the clip id), from the windows `4788>0`, `4788>30>0`, `4788>30>30>0` and the layer-1 clip
-/// (`46c0` +0xc) of the pair's sample TRICKY_FLAGS (a: the first, else the second). None without them, or when the
+/// (`46c0` +0xc) of the pair's first sample (TRICKY_FLAGS=b: the second; F4b3t1: rec23 and rec24, Snow, 58 of 58 shove
+/// records right with the first, 58 of 74 with the second, which shoves a tick early; rec21, rec22 the same either
+/// way). None without them, or when the
 /// clip is not among the three records.
 fn shoving_of(w: &[recording::Tick], i: usize, ka: usize) -> Option<bool> {
-    let t = &w[(std::env::var("TRICKY_FLAGS").as_deref() != Ok("a")) as usize];
+    let t = &w[(std::env::var("TRICKY_FLAGS").as_deref() == Ok("b")) as usize];
     let clip = u32_le(&t.extra[ka].1[i], 0xc);
     ["4788>0", "4788>30>0", "4788>30>30>0"].iter().find_map(|name| {
         let r = &t.chased.iter().find(|(s, _)| s == name)?.1[i];
