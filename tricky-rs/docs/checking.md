@@ -1975,6 +1975,44 @@ a `cDeadNode` (vtable 0x36b2a8, type 5) at +0xe4 and flags 0x10a11005 / 0x200004
 off; 0x4 on). The test keeps the course's flags as loaded, so it still bounces off them. Left: row F4b3k4 (the
 objects' flags over the race).
 
+## F4b3k4: the objects' flags over the race (2026-11-19)
+
+`pine.py record ... flags` (new) reads every course object's flags (+0xe8; `Course_GetInstance` 0x254a28: base
+*(*(0x346488 + 4) + 0x48), count *(*(0x346488 + 4) + 0xc): 3,230 on Snow, 2.2 ms a read over PINE) after each
+sample's batch, while the tick holds. Each line ends ` F ` and the objects whose flags changed since the line
+before (`index:flags`, hex; `-` for none; the first line all of them). Most changes are whole runs of objects
+gaining or losing 0x100 as cells turn on and off. The kills are the few that lose 0x20, 0x80 and 0x2 and gain 0x4.
+
+Proven (code): the touch's event script runs at once. `Instance_OnPlayerContact` 0x13bd40 builds a `cScriptNode`
+(0x13bc78), and its constructor calls `TriggerScript_Run`. Then `Boarder_InstanceCollisions` 0x125088 reads the
+object's 0x80 again after the contact. `World_QueryInstances` is 0x25b878; the 0x25bdc4 the notes and comments
+gave is inside it (fixed).
+
+The ground test sets the recorded flags on the course frame by frame: the first sample's by default
+(TRICKY_OBJFLAGS=b: the second's, the same on rec24; off: as loaded). The runner's course gets them too. With the
+flags recorded, the static touch objects are cast by default (TRICKY_INSTANCES=0: not). The runner's
+`Boarder_InstanceCollisions` now runs as the original: `World_QueryInstances` is answered by the course (the hit
+object as the runner course's instance), `Instance_OnPlayerContact` is stubbed, and `Boarder_InstanceBounce`
+0x125a00 is the original. The env variable is OBJFLAGS because TRICKY_FLAGS already picks the shove-clip sample.
+
+rec24 (Snow, the same demo race recorded again, 600 s, 35,076 ticks, rec23's windows + `flags`) under `fadd=g1`,
+140,300 ground ticks:
+
+| | every field (runner) | pos | state |
+|---|---|---|---|
+| flags off, static objects off (as before) | 139,373 | 140,145 | 140,211 |
+| flags off, static objects on | (ours) | 140,102 | 140,237 |
+| flags on, static objects on (now) | 139,445 | 140,214 | 140,237 |
+
+Ours and the runner agree on pos and state. The static objects no longer cost any position. Left, 290 rider
+ticks with a field off:
+- 133 only the velocity, 104 only `bob`.
+- 18 states at the race's start and end, which the test doesn't replay.
+- 800 r4: 4 → 0xe, position and velocity exact.
+- Three next to another rider (about 1 m apart): 2395 r1 and 4792 r5 stumble 3 → 2 in the game and not in the
+  replay; 9946 r4 stumbles in ours and not in the game.
+Row F4b3k5. rec22 is unchanged (no flags recorded).
+
 ## F4b3z: rec14 9092 rider 1, what the miss is not (2026-11-19, notes)
 
 `TRICKY_DBGP=<frame tick>` (new) lists every push of the frame replay. rec14 frame 9091 → 9092 (riders run 5, 4, 3,
