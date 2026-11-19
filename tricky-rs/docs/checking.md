@@ -1880,3 +1880,33 @@ Found:
   rec14 6 of 8 (=), rec16 18 of 26 → 18 of 22 (four the replay made are gone), rec17 6 → 10 of 12; pushes rec16
   470 → 471 of 569. So the hips were the missing reach; the rest needs each sample's own pivot. A recording with
   more shoves than rec20/rec21's one is row F4b3t1.
+
+## F4b3k: the computer's pad word, hooked; the cruise and prewind controls (2026-11-19)
+
+The pad word `cBoarder::vf7` 0x117198 hands `Boarder_UpdateControl` 0x11c9a0 lives only on its stack, so PINE can't
+read it. `tools/pine.py hook on` puts it where PINE can: a 12-word stub in the zero gap after `.vutext` (0x31d2a0..
+0x31d300, unused) and the call at 0x117b78 (`jal 0x11c9a0`, word 0x0c047268) pointed at the stub. The stub reads the
+rider's race slot (+0x460); for slots 0..5 it keeps the pad word (`lw 0(a1)`) and the rider's tick count (+0x5900) at
+0x35f6d0 + 8 × slot (another zero gap), then jumps on to 0x11c9a0. `hook off` puts the call back. The patch is in RAM
+only (a save state taken while hooked keeps it). `pine.py record ... hookpad` hooks and records the table as the
+window `hookpad` (8 bytes a rider); the test takes a tick's pad word only when the kept count is the second sample's
++0x5900, so the word is that tick's. It works for the player's rider as well as the computer's.
+
+Proven (code): the call site above (`lw a0,0x5ae0(s1)` before it, `move a1,s0` in the delay slot, s1 the rider);
+`CruiseControl_Update` 0x102fc8 (handler +0x630: braking +0x10, rider +0x14) and `PrewindState_Update` 0x1050e8
+(handler +0x710: started +8, rider +0xc), with `PrewindState_SetWindTarget` 0x105a60 (rate = 2.0 or 4.0 × |target −
+now| × (stat +0x18 × 0.32901537 / 255 + 0.8124317)). `AIComputer_ControlsState10` 0x1389c0 is empty, as `aipad` has it.
+
+`ground_ticks_against_the_running_game` now replays cruise (3) and prewind (0xe) where the hook kept the pad word
+(`TRICKY_NOHOOK=1`: not): ours `control::Cruise::update` and `boarder::prewind_update`, the runner's the original
+(logged and answered as nothing: `Boarder_UpdateBoost`, `Boarder_PlayCelebrate`, `Boarder_PlayDisappointed`,
+`Ride_AITauntCheck`, `CruiseControl_LookBack`, `CruiseControl_RandomFlourish`, `PrewindState_UpdateWindClip`, the
+rider's virtual +0x7c). The rider's +0x1c8, +0x1dc, the input records' rates and targets and the wind-ups +0x220..
++0x234 are the second sample's (the input records move before the motion, F4b3i).
+
+rec22 (mesa attract replay, 600 s, 35,759 ticks, rec21's windows + `hookpad`) under `fadd=g1`: 159,683 ground ticks.
+Controls replayed: cruise 144,520, prewind 6,590, bump 3,911, fakie change 674, hard landing 1,535, normal landing
+1,705; 158,851 of the 158,935 have every field right. State 159,671 (159,326 without the hook), every field 159,395
+(159,050); ours and the runner's give the same state. The 12 states left (five rider ticks, listed again on the test's
+later passes: rec22 2846 r4, 5370 r0, 5469 r4, 7658 r5, 11789 r2) are 3 → 2 with a bump clip 0x246..0x248: the rider is bumped by another in the frame
+(after the control), not a control miss (row F4b3k1). rec19 (no hook) is unchanged.
