@@ -14,6 +14,8 @@ pub struct Tick {
     /// the course objects whose flags (+0xe8) changed since the line before, as (index, flags) (`pine.py record ...
     /// flags`: the line's ` F ` tail; the first line holds every object's; F4b3k4)
     pub flags: Vec<(u32, u32)>,
+    /// the race's clock (race +0x14, seconds; `pine.py record ... clock`: the line's ` C ` and its bits; F4b3k2)
+    pub clock: Option<f32>,
 }
 
 pub fn f32_at(b: &[u8], off: usize) -> f32 {
@@ -66,7 +68,8 @@ pub fn load(path: &str) -> (usize, Vec<Tick>) {
                     .collect(),
                 _ => Vec::new(),
             };
-            Tick { tick: w[1].parse().unwrap(), riders, extra, chased, pad, flags }
+            let clock = w.iter().position(|x| *x == "C").map(|k| f32::from_bits(u32::from_str_radix(w[k + 1], 16).unwrap()));
+            Tick { tick: w[1].parse().unwrap(), riders, extra, chased, pad, flags, clock }
         })
         .collect::<Vec<_>>();
     assert!(ticks.iter().all(|t| t.riders.iter().all(|r| r.len() == size)));

@@ -4192,6 +4192,10 @@ fn computer_pad_words_against_the_running_game() {
     let (n, ticks) = load(path);
     let Some(kc) = ticks[0].extra.iter().position(|(o, _)| *o == 0x5900) else { return };
     let ks = ticks[0].extra.iter().position(|(o, _)| *o == 0x57b0);
+    // the computer object's +0x830.. (window `5ae0>830`: +0x868 the side, +0x86c the skill) and the race's clock
+    // (`clock`), for the countdown (F4b3k2)
+    let kh = ticks[0].chased.iter().position(|(s, _)| s == "5ae0>830");
+    let clock_a = std::env::var("TRICKY_CLOCK").as_deref() == Ok("a");
     let mut by: std::collections::BTreeMap<u32, [usize; 2]> = Default::default();
     let mut changed = 0;
     for w in ticks.windows(2) {
@@ -4208,7 +4212,17 @@ fn computer_pad_words_against_the_running_game() {
             let e = by.entry(state).or_default();
             e[0] += 1;
             let slow = ks.map(|k| f32_at(&w[1].extra[k].1[i], 8));
-            let routine = matches!(state, 2 | 3 | 4 | 7 | 8 | 0xb | 0xc | 0xe | 0xf | 0x10 | 0x12);
+            // the countdown (`aictl::controls_countdown`) with the object and the clock recorded: the clock the second
+            // sample's (TRICKY_CLOCK=a: the first's), the leans +0x238 / +0x240 and the side +0x868 the first's
+            let countdown = (state == 8).then(|| {
+                let h = &w[0].chased[kh?].1[i];
+                let time = if clock_a { w[0].clock } else { w[1].clock }?;
+                let (a, mut side) = (&w[0].riders[i], f32_at(h, 0x38));
+                let mut word = 0;
+                tricky_game::aictl::controls_countdown(&mut word, f32_at(h, 0x3c), time, f32_at(a, 0x238), f32_at(a, 0x240), &mut side);
+                Some(word)
+            }).flatten();
+            let routine = matches!(state, 2 | 3 | 4 | 7 | 0xb | 0xc | 0xe | 0xf | 0x10 | 0x12) || state == 8 && countdown.is_none();
             let ok = match state {
                 _ if routine => false,
                 // the stuck check alone (0x14), or after the idle's clearing of the zero word (0x13, `aictl::controls_idle`)
@@ -4221,6 +4235,7 @@ fn computer_pad_words_against_the_running_game() {
                     Some(_) => pad == 0,
                     None => false,
                 },
+                8 => countdown == Some(pad),
                 _ => get_controls(&mut Const, state, &mut 1.0) == pad,
             };
             e[1] += ok as usize;
@@ -4251,14 +4266,16 @@ fn rollers_window_parses() {
     assert!(recording::parse_rollers(&[0]).is_empty());
 }
 
-/// `pine.py record ... flags` lines (F4b3k4): the ` F ` tail read as (index, flags), `-` as none.
+/// `pine.py record ... flags clock` lines (F4b3k4, F4b3k2): the ` F ` tail read as (index, flags), `-` as none; the
+/// ` C ` the race clock's bits.
 #[test]
 fn flags_tail_parses() {
     let path = std::env::temp_dir().join(format!("tricky_flags_{}.txt", std::process::id()));
-    std::fs::write(&path, "race 1 riders 10 bytes 4 pad 0 flags 3 course 1\ntick 5 00000000 F 0:10003,2:a100a3\ntick 6 00000000 F -\n").unwrap();
+    std::fs::write(&path, "race 1 riders 10 bytes 4 pad 0 flags 3 course 1\ntick 5 00000000 C c3950000 F 0:10003,2:a100a3\ntick 6 00000000 F -\n").unwrap();
     let (n, ticks) = load(path.to_str().unwrap());
     std::fs::remove_file(&path).ok();
     assert_eq!(n, 1);
     assert_eq!(ticks[0].flags, vec![(0, 0x10003), (2, 0xa100a3)]);
     assert!(ticks[1].flags.is_empty());
+    assert_eq!((ticks[0].clock, ticks[1].clock), (Some(-298.0), None));
 }

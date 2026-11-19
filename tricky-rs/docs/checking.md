@@ -2047,6 +2047,23 @@ than the rider's collisions. (The layer-0 clip id, F4b3i, is best from the secon
 rec24 under `fadd=g1`: every field 139,445 → 139,451, pos 140,214 → 140,220, state 140,237 → 140,240 of 140,300.
 rec23: every field 142,140 → 142,145. rec21 and rec22 are unchanged.
 
+## F4b3k2b: the computer's countdown (2026-11-19)
+
+`pine.py record ... clock` (new) reads the race's clock (race +0x14, float seconds) in the same batch as the race
+tick; each line gets ` C <bits>`. Proven (code): `AIComputer_ControlsCountdown` 0x138628 reads the computer object
+(the handler *(rider+0x5ae0)): +0x86c the skill, +0x868 the side. It reads the race (*(*(gApp+0x730)+0x1c)) +0x14
+the clock, and the rider's +0x238 / +0x240. Over PINE: the clock is −298.0 through the countdown (rec25 ticks up to
+194), then counts up in 1/60 steps (rec25 4899: 75.93 s).
+
+rec25 (Snow, the demo race again, 600 s, with the race starting over, all of rec24's windows + `clock`):
+`computer_pad_words_against_the_running_game` now runs `aictl::controls_countdown` for state 8. It uses the
+object's window `5ae0>830` (+0x38 the side, +0x3c the skill, first sample) and the second sample's clock: 2,235 of
+2,235 countdown words equal. With the first sample's clock (TRICKY_CLOCK=a): 2,208. rec22 has no clock, so its
+countdown is still left out.
+
+rec25's ground ticks under `fadd=g1`: 147,125 compared, every field 146,262, pos 147,038, state 147,063. Shove
+records: 60 of 60.
+
 ## F4b3z: rec14 9092 rider 1, what the miss is not (2026-11-19, notes)
 
 `TRICKY_DBGP=<frame tick>` (new) lists every push of the frame replay. rec14 frame 9091 → 9092 (riders run 5, 4, 3,
