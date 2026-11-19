@@ -1976,3 +1976,8 @@ Proven by the run: rider+0x57b8 is the second sample's when the control reads it
 cross 0.5 in the frame and the word follows the second's). States 5 and 0x11 do not occur in rec22. Left (row
 F4b3k2): the routines that read the computer object (+0x86c skill, +0x868 side, the line, the rubber band: not in any
 window; `5ae0>600 230` stops at +0x830): 2, 3, 4, 8, 0xb, 0xc, 0xe, 0xf, 0x10, and 0xd's steer.
+
+The countdown (8) was tried with the side branch alone (side 0 at the countdown's start, the first sample's leans):
+wrong at the start (rec22 107–128 give 0x1f where it gives 0x21), so the timed answers or a kept side from before
+the countdown take part: it needs the race's clock (+0x14), the skill (+0x86c) and the side (+0x868) recorded. Every
+countdown word is 0x1f or 0x21 (2,235 ticks).
