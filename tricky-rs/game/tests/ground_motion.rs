@@ -120,6 +120,11 @@ struct Walls {
     body: CollBody,
     /// the frame's up (+0x4ac0, [`frame_of`]), which `Boarder_WallImpactCheck` 0x126540 measures the knock against
     up: V4,
+    /// the knocked objects among the rider's pairs (object index, body), as recorded (`pine.py record ... rollers`,
+    /// [`rollers_of`]; F4b3k1): what the rollers' loop of `Boarder_InstanceCollisions` 0x125088 kicks
+    rollers: Vec<(u32, tricky_game::roller::RollerBody)>,
+    /// the rider's speed stat (`Boarder_GetSpeedStat` 0x11d7b0), which a kick's impulse divides by
+    stat: f32,
 }
 
 /// The course the recording was made on, from the player's disc: TRICKY_DISC (the image) and TRICKY_COURSE (its
@@ -153,7 +158,62 @@ fn course_name(id: u32) -> Option<&'static str> {
 /// The walls for a rider whose first sample is `a` (recordings with the bodies only).
 fn walls_of(course: &Option<std::sync::Arc<tricky_game::course_ground::CourseGround>>, a: &[u8], st: &[u8]) -> Option<Walls> {
     let course = course.clone().filter(|_| 0x700 <= a.len())?;
-    Some(Walls { course, body: body_of(a), up: frame_of(a, st, None)[2] })
+    Some(Walls { course, body: body_of(a), up: frame_of(a, st, None)[2], rollers: Vec::new(), stat: 0.0 })
+}
+
+/// Rider `me`'s knocked objects at sample `t` (window `rollers`, F4b3k3) as `roller::RollerBody`s, with the
+/// course's instance base `base` (header `instances`): the body's fields from node + 0x30 on (`RecRoller.body[k]` =
+/// node + 0x30 + k; the layout as `tests/roller.rs` reads it), the sphere tree the object's group's
+/// (`World_GetInstanceSphTree` 0x260ca0: the physics record's group) whose radius makes the recorded box (+0x2a0 /
+/// +0x2b0: its centre ∓ the radius; a tree hit by a contact may be another of the group's), placed from the body
+/// ([`tricky_game::roller::RollerBody::place_tree`]). TRICKY_ROLLDBG lists them with the gap between the recorded box
+/// and ours.
+fn rollers_of(t: &recording::Tick, me: usize, course: &tricky_game::course_ground::CourseGround, base: u32) -> Vec<(u32, tricky_game::roller::RollerBody)> {
+    use tricky_game::rigidbody::RigidBody;
+    use tricky_game::roller::RollerBody;
+    let Some(list) = recording::rollers(t, me) else { return Vec::new() };
+    let mut out = Vec::new();
+    for r in list {
+        let o = r.instance.wrapping_sub(base) / 0x100;
+        let b = &r.body;
+        let f = |k: usize| f32_at(b, k);
+        let v = |k: usize| vec4(b, k);
+        let radius = (r.max[0] - r.min[0]) * 0.5;
+        let Some(tree) = course.with_world(|w| {
+            let g = w.objects.get(o as usize)?.group;
+            let trees = w.trees.get(usize::try_from(g).ok()?)?;
+            trees.iter().min_by(|x, y| {
+                let d = |t: &tricky_game::sphtree::SphereTree| (t.levels.first().map_or(0.0, |l| l.0) - radius).abs();
+                d(x).total_cmp(&d(y))
+            }).cloned()
+        }) else { continue };
+        let mut body = RollerBody {
+            rb: RigidBody { inv_mass: f(8), inv_inertia: std::array::from_fn(|k| f(0xc + 4 * k)), pos: v(0x30), q: v(0x40), p: v(0x50), l: v(0x60), v: v(0x70), w: v(0x80) },
+            energy: f(0x98),
+            mass: f(0x9c),
+            xd0: f(0xa0),
+            xd4: f(0xa4),
+            e: f(0xa8),
+            mu: f(0xac),
+            bounce_speed: f(0xb0),
+            awake: f(0xb4),
+            knock: f(0xb8),
+            xf0: v(0xc0),
+            body_inertia: std::array::from_fn(|k| f(0xd0 + 4 * k)),
+            com: v(0x100),
+            asleep: u32_le(b, 0x110),
+            tree,
+            lo: r.min,
+            hi: r.max,
+        };
+        body.place_tree();
+        if std::env::var("TRICKY_ROLLDBG").is_ok() {
+            eprintln!("ROLLDBG tick {} rider {me} object {o} node {:#x} asleep {} pos {:?} box {:?} {:?} ours {:?} {:?}", t.tick, r.node, body.asleep, body.rb.pos, r.min, r.max, body.lo, body.hi);
+        }
+        (body.lo, body.hi) = (r.min, r.max);
+        out.push((o, body));
+    }
+    out
 }
 
 /// `World_RayCast` 0x25aff8 with `cWorldBoarder`(rider+0x470, 1) and the ground normal set, on the course: t and the
@@ -200,6 +260,8 @@ struct WallTest<'a> {
     g: &'a mut Rider,
     course: &'a tricky_game::course_ground::CourseGround,
     body: CollBody,
+    /// the rider's speed stat (a roller's kick, F4b3k1)
+    stat: f32,
 }
 impl tricky_game::walls::WallEnv for WallTest<'_> {
     /// `World_RayCast` 0x25aff8 with `cWorldBoarder`(rider+0x470, 1), its ground normal set
@@ -238,8 +300,9 @@ impl tricky_game::walls::WallEnv for WallTest<'_> {
             tricky_game::rider::ground_tick::set_state(self.g, 2);
         }
     }
+    /// `Boarder_GetSpeedStat` 0x11d7b0, for a roller's kick (F4b3k1)
     fn speed_stat(&mut self, _: &tricky_game::walls::WallRider) -> f32 {
-        unreachable!("not called by Boarder_WallCollide")
+        self.stat
     }
     fn knock(&mut self, _: &mut tricky_game::walls::WallRider, _: f32) {}
     fn contact(&mut self, _: u32, _: &mut tricky_game::walls::WallRider, _: &tricky_game::walls::Contact, _: &tricky_game::walls::CastRecord) {}
@@ -260,7 +323,7 @@ impl Env for E {
             let mut body = w.body;
             body.x24 = r.mask as i32;
             let mut wr = tricky_game::walls::WallRider { pos: r.p.pos, vel: r.vel, ground: r.p.normal, knocks: 0.0, mode: 2, state: r.state, up: w.up };
-            let mut t = WallTest { g: &mut *r, course: &course, body };
+            let mut t = WallTest { g: &mut *r, course: &course, body, stat: w.stat };
             let hit = tricky_game::walls::wall_collide(&mut wr, &mut t);
             // the body as `Boarder_Translate` left it, for the touch objects after (F4b3k1)
             let body = t.body;
@@ -295,29 +358,51 @@ impl Env for E {
     fn rail_try_capture(&mut self, _: &mut Rider) {
         self.log.push(Ev::Rail);
     }
-    /// `Boarder_InstanceCollisions` 0x125088 up to its rollers' loop (`walls::instance_collisions`) on the course's
-    /// touch objects (F4b3k1); its contact scripts and sounds not run. Only with TRICKY_INSTANCES=1: the static
-    /// objects alone make it worse (rec22: the knockables the game had already made rollers are bounced off), so
-    /// it waits for the rollers recorded (row F4b3k3)
+    /// `Boarder_InstanceCollisions` 0x125088 (`walls::instance_collisions`, then its rollers' loop): the course's
+    /// static touch objects only with TRICKY_INSTANCES=1 (alone they make it worse: rec22, the knockables the game
+    /// had already made rollers are bounced off), then (F4b3k1) a kick for each knocked object among the rider's
+    /// pairs (`roller::rider_kick`, the rollers recorded, [`rollers_of`]; TRICKY_NOROLL=1: not). Their contact
+    /// scripts and sounds are not run; the keyframed objects among the pairs (types 0x100..0x103) are not either.
     fn instance_collisions(&mut self, r: &mut Rider) {
         self.log.push(Ev::Instances);
-        if std::env::var("TRICKY_INSTANCES").is_err() {
-            return;
-        }
-        if let Some(w) = &self.walls {
-            let course = w.course.clone();
-            let mut body = w.body;
-            body.x24 = r.mask as i32;
-            let mut wr = tricky_game::walls::WallRider { pos: r.p.pos, vel: r.vel, ground: r.p.normal, knocks: 0.0, mode: 2, state: r.state, up: w.up };
-            let mut t = WallTest { g: &mut *r, course: &course, body };
+        let Some(w) = &mut self.walls else { return };
+        let course = w.course.clone();
+        let mut body = w.body;
+        body.x24 = r.mask as i32;
+        let mut rollers = std::mem::take(&mut w.rollers);
+        let mut wr = tricky_game::walls::WallRider { pos: r.p.pos, vel: r.vel, ground: r.p.normal, knocks: 0.0, mode: 2, state: r.state, up: w.up };
+        let mut t = WallTest { g: &mut *r, course: &course, body, stat: w.stat };
+        if std::env::var("TRICKY_INSTANCES").is_ok() {
             tricky_game::walls::instance_collisions(&mut wr, &mut t);
-            let body = t.body;
-            (r.p.pos, r.vel) = (wr.pos, wr.vel);
-            if let Some(w) = &mut self.walls {
-                w.body = body;
+        }
+        if std::env::var("TRICKY_NOROLL").is_err() {
+            for (o, rb) in &mut rollers {
+                let b = t.body;
+                tricky_game::roller::rider_kick(rb, *o, &mut wr, 0, &b, &mut t);
             }
         }
+        let body = t.body;
+        (r.p.pos, r.vel) = (wr.pos, wr.vel);
+        w.body = body;
+        w.rollers = rollers;
     }
+}
+
+/// What a roller kicked by the rider asks of the world (`roller::RollerEnv`): only `Roller_OnHit` 0x13f448's script
+/// and sound, which the ground test does not run (the rollers are read again from the next sample).
+impl tricky_game::roller::RollerEnv for WallTest<'_> {
+    fn ray_cast(&mut self, _: &tricky_game::sphtree::WorldSphTree) -> (f32, V4, V4) {
+        unreachable!("not called by a kick")
+    }
+    fn query_instances(&mut self, _: &tricky_game::sphtree::WorldSphTree) -> (f32, V4, V4) {
+        unreachable!("not called by a kick")
+    }
+    fn move_box(&mut self, _: V4, _: V4) {}
+    fn event_script(&self, _: u32, _: u32) -> i32 {
+        -1
+    }
+    fn start_script(&mut self, _: i32, _: u32) {}
+    fn sfx(&mut self, _: u32, _: u32) {}
 }
 
 struct W {
@@ -2321,6 +2406,8 @@ fn ground_ticks_against_the_running_game() {
     let path = paths.split(';').next().unwrap();
     let (n, ticks) = load(path);
     let course = course(path);
+    // the knocked objects among each rider's pairs, when recorded (F4b3k3)
+    let roll_base = recording::instance_base(path);
     let files = course_files(path);
     let twins = Twins::of_recording(path, &ticks);
     let addrs = rider_addrs(path);
@@ -2629,7 +2716,15 @@ fn ground_ticks_against_the_running_game() {
                     unrevert(&mut rider, p.hit, &walls_of(&course, a, &stats[me]));
                     let r = if k == 0 {
                         let mut mine = rider;
-                        update(&mut mine, &SURFACE_TABLE, &mut E { log: Vec::new(), hit: p.hit, wall: false, meter: 0.0, states, walls: walls_of(&course, a, &stats[me]) });
+                        // the rollers as the riders meet them: the controllers (list 3, `cRollerNode`) step before the
+                        // riders (list 8), so the second sample's (TRICKY_ROLLERS=a: the first's) (F4b3k1)
+                        let mut walls = walls_of(&course, a, &stats[me]);
+                        if let (Some(wl), Some(base)) = (&mut walls, roll_base) {
+                            let at = if std::env::var("TRICKY_ROLLERS").as_deref() == Ok("a") { 0 } else { 1 };
+                            wl.rollers = rollers_of(&w[at], me, &wl.course, base);
+                            wl.stat = speed_stat(&stats[me], boost, f.add);
+                        }
+                        update(&mut mine, &SURFACE_TABLE, &mut E { log: Vec::new(), hit: p.hit, wall: false, meter: 0.0, states, walls });
                         mine.vel = speed_limit(mine.vel, speed_limit_at(a, b, boost, |x, y| x - y));
                         if let Some(c) = &p.ctl {
                             control_ours(&mut mine, c, &table);

@@ -1946,6 +1946,35 @@ With those per tick the test can build `roller::RollerBody` and run `roller::rid
 count byte, then each roller's address, instance pointer, +0x30..+0x180 and +0x2a0..+0x2c0; the header's `instances`
 is the course's instance base (`Course_GetInstance` 0x254a28: *(*(0x346488 + 4) + 0x48) + 0x100 × index).
 
+## F4b3k3: rec23, the first Snow recording; the rollers' kicks written (2026-11-19)
+
+rec23: Snow (course 1), the demo race of a save state, 600 s, 35,898 ticks (the race ran again from its start at
+tick ~380), rec22's windows + `5ae0>830:100 L700:78 hookpad rollers`. The `rollers` recorder ran without error, but
+Snow has no knocked objects: no rider's pair list (L700) holds anything but riders on any tick. rec22 (Mesa) has 16
+non-rider pair nodes, first at 2844, 3048, 5359, 5440, 5449, 11695, 11704: next to F4b3k1's stumbles. So the rollers
+still need a Mesa recording.
+
+The test kicks them already (`tests/ground_motion.rs`): `rollers_of` builds a `roller::RollerBody` from each
+recorded roller (node + 0x30 on; the tree is the object's group's whose radius gives the recorded box: inferred, a
+contact may have handed over another tree of the group), `E::instance_collisions` runs `roller::rider_kick` on each
+after the static objects (on by default when recorded; TRICKY_NOROLL=1: not; TRICKY_ROLLERS=a: the first sample's
+rollers, else the second's because the controllers' list 3 steps before the riders' list 8; TRICKY_ROLLDBG lists
+them). Not yet run on a roller. The runner's `Boarder_InstanceCollisions` is still a stub. rec22 is unchanged by it
+(no `rollers` window): every field 159,395, state 159,671.
+
+rec23 under `fadd=g1`: 143,077 ground ticks, every field 142,140, pos 142,911, vel 142,569, state 142,984. The 321
+rider ticks with a field off (TRICKY_DBG2): 133 the velocity only, 104 `bob` only, 33 with the state. Of those
+states, 13 are 3 → 2 stumbles (clips 0x244..0x249), and 20 are the race's start and end (9 → 7 at 383..400, 7 → 3 at
+410..437, 3 → 6 at 12286..12496), which the test doesn't replay.
+
+With the static touch objects on (TRICKY_INSTANCES=1), 11 of the 13 stumbles come right (state 142,984 → 143,012).
+These are `Boarder_InstanceBounce` 0x125a00 on massless objects (flags 0x200022). But 56 positions break and 30
+come right (pos 142,911 → 142,818). The broken ones bounce off objects the game no longer has: 7881..7890 r0 off object 1650
+(flags 0x10a110a3, mass 1e30, bounce 0.6). Proven over PINE on the same race running again: 1649, 1650, 1651, 2477 and 2692 each have
+a `cDeadNode` (vtable 0x36b2a8, type 5) at +0xe4 and flags 0x10a11005 / 0x200004 (0x20 solid, 0x80 bounce, 0x2
+off; 0x4 on). The test keeps the course's flags as loaded, so it still bounces off them. Left: row F4b3k4 (the
+objects' flags over the race).
+
 ## F4b3z: rec14 9092 rider 1, what the miss is not (2026-11-19, notes)
 
 `TRICKY_DBGP=<frame tick>` (new) lists every push of the frame replay. rec14 frame 9091 → 9092 (riders run 5, 4, 3,
