@@ -368,8 +368,9 @@ def main(argv):
         # speed-sample count of the tick it was made in; header `extra hookpad 8`)
         # `rollers` (F4b3k3, with an `L700` list): the `cRollerNode`s among each rider's pairs (the pair's other proxy,
         # proxy +0x84 its node, node +0x14 == 0 a roller, as `Boarder_InstanceCollisions` 0x125088 finds them): a
-        # count byte, then each roller as its address, its instance (+0x28), 0x100 bytes from +0x30 (the rigid
-        # body, mass, timers) and 0x20 from +0x2a0 (its box); header `extra rollers 0 instances <base>`, the base of
+        # count byte, then each roller as its address, its instance (+0x28), 0x150 bytes from +0x30 (the rigid
+        # body, mass, timers, the centre of mass +0x130, asleep +0x140, the sphere tree's head +0x150) and 0x20 from
+        # +0x2a0 (its box); header `extra rollers 0 instances <base>`, the base of
         # the course's instances (`Course_GetInstance` 0x254a28: *(*(0x346488 + 4) + 0x48) + 0x100 × index)
         hooked = "hookpad" in argv[4:]
         rolled = "rollers" in argv[4:]
@@ -477,7 +478,7 @@ def main(argv):
                         # (+0x14 the node's type, +0x28 its instance)
                         kinds = p.read_blocks([(o + 0x14, 0x18) for o in owners]) if owners else []
                         rolls = [(i, o, k2[0x14:0x18]) for (i, _), o, k2 in zip(found, owners, kinds) if struct.unpack("<I", k2[:4])[0] == 0]
-                        bodies = p.read_blocks([r for _, o, _ in rolls for r in ((o + 0x30, 0x100), (o + 0x2a0, 0x20))]) if rolls else []
+                        bodies = p.read_blocks([r for _, o, _ in rolls for r in ((o + 0x30, 0x150), (o + 0x2a0, 0x20))]) if rolls else []
                         per = [[] for _ in range(k)]
                         for n, (i, o, inst) in enumerate(rolls):
                             per[i].append(struct.pack("<I", o) + inst + bodies[2 * n] + bodies[2 * n + 1])

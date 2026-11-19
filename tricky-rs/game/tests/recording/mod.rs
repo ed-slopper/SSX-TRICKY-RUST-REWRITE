@@ -113,8 +113,9 @@ pub fn pair_list(t: &Tick, addrs: &[u32], me: usize) -> Option<Vec<usize>> {
 
 /// A knocked object as `pine.py record ... rollers` keeps it (F4b3k3): the `cRollerNode`'s address, its instance
 /// (+0x28; the course's index is (instance − [`instance_base`]) / 0x100, `Course_GetInstance` 0x254a28), its
-/// bytes from +0x30 (`body[k]` is node + 0x30 + k: the rigid body at +0x30, mass +0xcc, timers +0xe4..+0xe8) and its
-/// box (+0x2a0 min, +0x2b0 max).
+/// bytes from +0x30 to +0x180 (`body[k]` is node + 0x30 + k: the rigid body at +0x30, mass +0xcc, timers
+/// +0xe4..+0xe8, the centre of mass +0x130, asleep +0x140, the sphere tree's head +0x150) and its box (+0x2a0 min,
+/// +0x2b0 max).
 #[derive(Clone, Debug)]
 pub struct RecRoller {
     pub node: u32,
@@ -124,7 +125,7 @@ pub struct RecRoller {
     pub max: [f32; 4],
 }
 
-/// Rider `i`'s rollers among its pairs at sample `t` (window `rollers`: a count byte, then 0x128 bytes each). None
+/// Rider `i`'s rollers among its pairs at sample `t` (window `rollers`: a count byte, then 0x178 bytes each). None
 /// without the window.
 pub fn rollers(t: &Tick, i: usize) -> Option<Vec<RecRoller>> {
     let (_, w) = t.chased.iter().find(|(s, _)| s == "rollers")?;
@@ -136,8 +137,8 @@ pub fn parse_rollers(b: &[u8]) -> Vec<RecRoller> {
     let v4 = |x: &[u8]| std::array::from_fn(|k| f32::from_le_bytes(x[4 * k..4 * k + 4].try_into().unwrap()));
     (0..n)
         .map(|k| {
-            let e = &b[1 + k * 0x128..1 + (k + 1) * 0x128];
-            RecRoller { node: u32_le(e, 0), instance: u32_le(e, 4), body: e[8..0x108].to_vec(), min: v4(&e[0x108..0x118]), max: v4(&e[0x118..0x128]) }
+            let e = &b[1 + k * 0x178..1 + (k + 1) * 0x178];
+            RecRoller { node: u32_le(e, 0), instance: u32_le(e, 4), body: e[8..0x158].to_vec(), min: v4(&e[0x158..0x168]), max: v4(&e[0x168..0x178]) }
         })
         .collect()
 }

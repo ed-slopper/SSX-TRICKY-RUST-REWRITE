@@ -4065,14 +4065,14 @@ fn computer_pad_words_against_the_running_game() {
 }
 
 /// The `rollers` window's layout (F4b3k3, `pine.py record ... rollers`): a count byte, then each roller's node,
-/// instance, 0x100 bytes from +0x30 and the box.
+/// instance, 0x150 bytes from +0x30 and the box.
 #[test]
 fn rollers_window_parses() {
     let mut b = vec![2u8];
     for k in 0..2u32 {
         b.extend((0x1000 + k).to_le_bytes());
         b.extend((0x2000 + 0x100 * k).to_le_bytes());
-        b.extend((0..0x100).map(|x| x as u8));
+        b.extend((0..0x150).map(|x| x as u8));
         for v in [1.0f32, 2.0, 3.0, 0.0, 4.0, 5.0, 6.0, 0.0] {
             b.extend(v.to_le_bytes());
         }
