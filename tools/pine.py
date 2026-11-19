@@ -380,7 +380,10 @@ def main(argv):
         # line ends `F` and the objects whose flags changed since the last line kept, `index:flags` (hex, comma-
         # separated; `-` for none; the first line all of them); header `flags <count>`
         flagged = "flags" in argv[4:]
-        wins_args = [w for w in argv[4:] if w not in ("hookpad", "rollers", "flags")]
+        # `clock` (F4b3k2): the race's clock (race +0x14, a float of seconds, which `AIComputer_ControlsCountdown`
+        # 0x138628 reads), read with the race tick; each line ends ` C ` and its bits (hex); header `clock 1`
+        clocked = "clock" in argv[4:]
+        wins_args = [w for w in argv[4:] if w not in ("hookpad", "rollers", "flags", "clock")]
         lists = [(w, int(w[1:].split(":")[0], 16), int(w.split(":")[1], 16)) for w in wins_args if w.startswith("L")]
         if rolled and not any(o == 0x700 for _, o, _ in lists):
             sys.exit("rollers needs the pair list L700:78")
@@ -418,6 +421,7 @@ def main(argv):
                     + (f" extra rollers 0 instances {p.read32(p.read32(WORLD + 4) + 0x48):x}" if rolled else "")
                     + (" posed 1" if size >= 0x700 else "")
                     + (f" flags {n_inst}" if flagged else "")
+                    + (" clock 1" if clocked else "")
                     + f" course {p.read32(COURSE_ID)}" + "\n")
             while time.time() - t0 < seconds:
                 tick = p.read32(race + RACE_TICK)
@@ -444,7 +448,7 @@ def main(argv):
                     at = [(r + c[0]) & 0xFFFFFFFF for _, c, _ in extra for r in riders]
                     deep = [len(c) - 1 for _, c, _ in extra for r in riders]
                     plain = [(a, n) if d == 0 else (a, 4) for a, d, n in zip(at, deep, [n for _, _, n in extra for r in riders])]
-                    ranges = [(race + RACE_TICK, 4)] + [(r, size) for r in riders] + plain
+                    ranges = [(race + RACE_TICK - 4 if clocked else race + RACE_TICK, 8 if clocked else 4)] + [(r, size) for r in riders] + plain
                     got = p.read_blocks(ranges + ([(pad, PAD_BYTES)] if pad else []) + ([(HOOK_DATA, 8 * HOOK_SLOTS)] if hooked else []))
                     table = got.pop() if hooked else None
                     wins = got[1 + k:1 + k + len(plain)]
@@ -495,13 +499,14 @@ def main(argv):
                         for n, (i, o, inst) in enumerate(rolls):
                             per[i].append(struct.pack("<I", o) + inst + bodies[2 * n] + bodies[2 * n + 1])
                         rollers = [bytes([len(x)]) + b"".join(x) for x in per]
-                    if struct.unpack("<I", got[0])[0] != tick or p.read32(race + RACE_TICK) != tick:
+                    clock = got[0][:4] if clocked else b""
+                    if struct.unpack("<I", got[0][-4:])[0] != tick or p.read32(race + RACE_TICK) != tick:
                         return None  # the game moved on while we read
                     hooks = [table[8 * s:8 * s + 8] for s in slots] if hooked else []
                     fl = [b"".join(p.read_blocks(flag_at))] if flagged else []
                     if flagged and p.read32(race + RACE_TICK) != tick:
                         return None
-                    return got[1:1 + k] + ([got[-1]] if pad else []) + wins + walked + hooks + rollers + fl
+                    return got[1:1 + k] + ([got[-1]] if pad else []) + wins + walked + hooks + rollers + fl + ([clock] if clocked else [])
                 # A body read while `cPostAI::vf1` 0x114730 poses the riders (0 to n-1, after every rider ticked) is the
                 # last frame's (F4h5a: ~2 % of rider samples, mostly riders 5 and 4): read again, while the tick holds,
                 # until no rider's body looks stale (`stale_bodies`), at most 12 ms; else keep the first read
@@ -526,10 +531,12 @@ def main(argv):
                             fresh[i] = blocks[i]
                 prev = (tick, blocks[:k])
                 tail = ""
+                if clocked:
+                    tail += " C " + struct.unpack("<I", blocks.pop())[0].to_bytes(4, "big").hex()
                 if flagged:
                     now = struct.unpack(f"<{n_inst}I", blocks.pop())
                     changed = [(j, x) for j, x in enumerate(now) if last_flags is None or last_flags[j] != x]
-                    tail = " F " + (",".join(f"{j:x}:{x:x}" for j, x in changed) or "-")
+                    tail += " F " + (",".join(f"{j:x}:{x:x}" for j, x in changed) or "-")
                     last_flags = now
                 f.write(f"tick {tick} " + " ".join(b.hex() for b in blocks) + tail + "\n")
                 last, kept = tick, kept + 1
