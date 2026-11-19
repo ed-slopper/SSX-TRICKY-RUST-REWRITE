@@ -1908,5 +1908,37 @@ rec22 (mesa attract replay, 600 s, 35,759 ticks, rec21's windows + `hookpad`) un
 Controls replayed: cruise 144,520, prewind 6,590, bump 3,911, fakie change 674, hard landing 1,535, normal landing
 1,705; 158,851 of the 158,935 have every field right. State 159,671 (159,326 without the hook), every field 159,395
 (159,050); ours and the runner's give the same state. The 12 states left (five rider ticks, listed again on the test's
-later passes: rec22 2846 r4, 5370 r0, 5469 r4, 7658 r5, 11789 r2) are 3 → 2 with a bump clip 0x246..0x248: the rider is bumped by another in the frame
-(after the control), not a control miss (row F4b3k1). rec19 (no hook) is unchanged.
+later passes: rec22 2846 r4, 5370 r0, 5469 r4, 7658 r5, 11789 r2) are 3 → 2 with a stumble clip 0x246..0x248: the rider stumbles in the frame
+(after the control), not a control miss (row F4b3k1; not another rider: see F4b3k1 below). rec19 (no hook) is unchanged.
+
+## F4b3k1: the stumbles left in rec22 are knocked objects (2026-11-19, open)
+
+The five rider ticks of F4b3k (rec22 2846 r4, 5370 r0, 5469 r4, 7658 r5, 11789 r2: state 3 → 2, clips 0x246..0x248)
+are `Boarder_Stumble` 0x124dd0, which sets those clips and `Boarder_SetState`(2) (only from states 3 and 0xe).
+
+Proven (code): `Boarder_Stumble` has three callers. `Boarder_RiderHit` 0x124920 (speed over 167.31738);
+`Boarder_InstanceBounce` 0x125a00 when the object's physics record's mass (`*(obj+0xec)`, word 0) is 0 (stumble on the
+record's normal, quiet, the velocity untouched); `Boarder_WallImpactCheck` 0x126540 (up = rider+0x4ac0, a = up · n:
+wipe-out when the speed in is over a × 833.3333 + 1944.4443, else a stumble when it is over a × 833.3333 and a ≤ 0
+or the rider is not in mode 1). `Boarder_InstanceCollisions` 0x125088 calls the last from its rollers' loop (the
+broadphase pairs at rider+0x700, node +0x14 == 0: a `cRollerNode`) when the rider's speed along the push is over
+0, without changing the rider's velocity, and calls `Boarder_InstanceBounce` for the static touch objects and the
+keyframed ones (node types 0x100..0x103 whose physics +0xc is −1).
+
+Inferred (rec22, the test's TRICKY_DBG2 lists the other riders' distances): no other rider is within 9 m at any of
+the five, so `Boarder_RiderHit` is out. At 5370 r0 and 11789 r2 only the state is wrong (position and velocity right
+to the bit): a stumble that leaves the velocity, as the rollers' loop does. 11789 r2 is within 4.3–8.2 m of three
+mass-5 knockables (objects 2192, 2254, 2255, flags 0x10a110a3); no massless object with flag 0x80 is within 15 m of
+any of the five. 7658 r5's velocity changes as well (z +590 cm/s): a bounce or a roller's push the replay lacks.
+So the stumbles are the riders kicking objects the game had made rollers (an earlier contact's event-1 script,
+`cRollerNode::cRollerNode` 0x13d6c0, flags `& ~0x22 | 0x45`, out of the static casts), and the replay keeps no
+rollers over the race.
+
+Tried: `Boarder_InstanceCollisions` on the course's static objects in the ground test (`walls::instance_collisions`
+with the course's `World_QueryInstances`, now behind TRICKY_INSTANCES=1): worse (rec22 pos 159,656 → 159,562, vel
+151,501 → 151,429), as it bounces off knockables the game had already turned into rollers; the five states unchanged.
+
+Left (row F4b3k3): record the rollers. A pair at rider+0x700 is two proxies (+0, +4; `Obj_HasId` picks the other),
+the next pairs at +8/+0xc; a proxy's +0x84 is its node; a `cRollerNode` has the rigid body at +0x30 (+0x60 position,
++0x70 orientation), +0xcc mass, +0xe4..+0xe8 timers, +0x150 its sphere tree, +0x2a0/+0x2b0 its box, +0x2c0 its proxy.
+With those per tick the test can build `roller::RollerBody` and run `roller::rider_kick` in the frame replay.

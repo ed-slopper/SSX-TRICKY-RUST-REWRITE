@@ -170,6 +170,24 @@ fn wall_cast(course: &tricky_game::course_ground::CourseGround, body: &CollBody,
     (t, h.map_or(Default::default(), |h| tricky_game::walls::CastRecord { pos: h.pos, normal: h.normal, object: h.object.map_or(0, |o| o as u32 + 1) }))
 }
 
+/// `World_QueryInstances` 0x25bdc4 with `cWorldBoarder`(the body, 1), front faces only (`Boarder_InstanceCollisions`
+/// sets the shape's +0x2f0), on the course: t, the record (object = index + 1) and the object, as
+/// `ground_tick::touch_query` (F4b3k1). TRICKY_INSTDBG lists the hits.
+fn instance_query(course: &tricky_game::course_ground::CourseGround, body: &CollBody) -> (f32, tricky_game::walls::CastRecord, tricky_game::walls::Touched) {
+    let mut q = tricky_game::worldboarder::WorldBoarder::new(body, 1);
+    q.front_only = true;
+    let skip = wall_skip();
+    let (t, h) = course.query_instances(&mut q, false, &|i| skip.contains(&i));
+    let Some(h) = h else { return (t, Default::default(), Default::default()) };
+    let o = h.object.unwrap_or(0);
+    let phys = course.ssf.object_physics.get(o).and_then(|p| course.ssf.physics.get(*p as usize));
+    let touched = tricky_game::walls::Touched { id: o as u32, flags: course.object_flags(o), mass: phys.map_or(0.0, |p| p.mass()), bounce: phys.map_or(0.0, |p| p.bounce()), controller: None };
+    if std::env::var("TRICKY_INSTDBG").is_ok() {
+        eprintln!("INSTDBG t {t} object {o} flags {:#x} mass {} bounce {} at {:?} n {:?}", touched.flags, touched.mass, touched.bounce, h.pos, h.normal);
+    }
+    (t, tricky_game::walls::CastRecord { pos: h.pos, normal: h.normal, object: o as u32 + 1 }, touched)
+}
+
 /// TRICKY_WALL_SKIP: the instances the walls leave out.
 fn wall_skip() -> Vec<u32> {
     std::env::var("TRICKY_WALL_SKIP").unwrap_or_default().split(',').filter_map(|x| x.parse().ok()).collect()
@@ -188,8 +206,11 @@ impl tricky_game::walls::WallEnv for WallTest<'_> {
     fn cast_walls(&mut self, r: &tricky_game::walls::WallRider) -> (f32, tricky_game::walls::CastRecord) {
         wall_cast(self.course, &self.body, r.ground)
     }
+    /// `World_QueryInstances` 0x25bdc4 with `cWorldBoarder`(rider+0x470, 1), front faces only (F4b3k1): t, the
+    /// record and the object (its flags, its physics record's mass and bounce). STANDIN: no controller, as
+    /// `ground_tick::touch_query` (row E7b2)
     fn query_objects(&mut self, _: &tricky_game::walls::WallRider) -> (f32, tricky_game::walls::CastRecord, tricky_game::walls::Touched) {
-        unreachable!("not called by Boarder_WallCollide")
+        instance_query(self.course, &self.body)
     }
     /// +0x2e4 and +0x2f0, which the test does not compare
     fn accumulate_impact(&mut self, _: &mut tricky_game::walls::WallRider, _: V4) {}
@@ -239,8 +260,14 @@ impl Env for E {
             let mut body = w.body;
             body.x24 = r.mask as i32;
             let mut wr = tricky_game::walls::WallRider { pos: r.p.pos, vel: r.vel, ground: r.p.normal, knocks: 0.0, mode: 2, state: r.state, up: w.up };
-            let hit = tricky_game::walls::wall_collide(&mut wr, &mut WallTest { g: &mut *r, course: &course, body });
+            let mut t = WallTest { g: &mut *r, course: &course, body };
+            let hit = tricky_game::walls::wall_collide(&mut wr, &mut t);
+            // the body as `Boarder_Translate` left it, for the touch objects after (F4b3k1)
+            let body = t.body;
             (r.p.pos, r.vel) = (wr.pos, wr.vel);
+            if let Some(w) = &mut self.walls {
+                w.body = body;
+            }
             return hit;
         }
         self.wall
@@ -268,8 +295,28 @@ impl Env for E {
     fn rail_try_capture(&mut self, _: &mut Rider) {
         self.log.push(Ev::Rail);
     }
-    fn instance_collisions(&mut self, _: &mut Rider) {
+    /// `Boarder_InstanceCollisions` 0x125088 up to its rollers' loop (`walls::instance_collisions`) on the course's
+    /// touch objects (F4b3k1); its contact scripts and sounds not run. Only with TRICKY_INSTANCES=1: the static
+    /// objects alone make it worse (rec22: the knockables the game had already made rollers are bounced off), so
+    /// it waits for the rollers recorded (row F4b3k3)
+    fn instance_collisions(&mut self, r: &mut Rider) {
         self.log.push(Ev::Instances);
+        if std::env::var("TRICKY_INSTANCES").is_err() {
+            return;
+        }
+        if let Some(w) = &self.walls {
+            let course = w.course.clone();
+            let mut body = w.body;
+            body.x24 = r.mask as i32;
+            let mut wr = tricky_game::walls::WallRider { pos: r.p.pos, vel: r.vel, ground: r.p.normal, knocks: 0.0, mode: 2, state: r.state, up: w.up };
+            let mut t = WallTest { g: &mut *r, course: &course, body };
+            tricky_game::walls::instance_collisions(&mut wr, &mut t);
+            let body = t.body;
+            (r.p.pos, r.vel) = (wr.pos, wr.vel);
+            if let Some(w) = &mut self.walls {
+                w.body = body;
+            }
+        }
     }
 }
 
@@ -2946,6 +2993,8 @@ fn ground_ticks_against_the_running_game() {
                     eprintln!("DBG2 tick {} rider {i}: state {:x}->{:x} ours {:x} clip {:x}->{:x} bad {bad:?}", w[1].tick, u32_le(a, 0x428), u32_le(b, 0x428), g[22][0], u32_le(&w[0].extra[ka].1[i], 8), u32_le(&w[1].extra[ka].1[i], 8));
                     let v = |x: &[u32]| (0..3).map(|c| f32::from_bits(x[c])).collect::<Vec<_>>();
                     eprintln!("    pos ours {:?} game {:?}; vel ours {:?} game {:?}", v(&g[0]), v(&p.want[0]), v(&g[1]), v(&p.want[1]));
+                    let d = |x: &[u8], y: &[u8]| { let (a, c) = (vec4(x, 0x140), vec4(y, 0x140)); ((a[0] - c[0]).powi(2) + (a[1] - c[1]).powi(2) + (a[2] - c[2]).powi(2)).sqrt() };
+                    eprintln!("    others' distance at the samples: {:?}; vel before {:?}", (0..n).filter(|&j| j != i).map(|j| (j, d(a, &w[0].riders[j]) as i32, d(b, &w[1].riders[j]) as i32)).collect::<Vec<_>>(), vec4(a, 0x150));
                 }
                 if k == runners.len() && was_pushed {
                     let hit = (0..n).any(|j| u32_le(b, 0x48 + 0x20 * j) == w[1].tick);
