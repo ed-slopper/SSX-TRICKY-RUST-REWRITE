@@ -231,7 +231,7 @@ impl RagEnv for Glue<'_> {
         let (t, h) = course.ray_cast(&mut q, world.showoff, None, &|i| world.course_skips(i));
         (t, out_of(h.filter(|_| t > 0.0)))
     }
-    /// `World_QueryInstances` 0x25bdc4 with it (nothing without the course's collision).
+    /// `World_QueryInstances` 0x25b878 with it (nothing without the course's collision).
     fn query_body(&mut self, q: &WorldBoarder) -> (f32, CastOut) {
         let world = self.world;
         let Some(course) = &world.course else { return (-1.0, CastOut { kind: 3, ..Default::default() }) };

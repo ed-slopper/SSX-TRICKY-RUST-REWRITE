@@ -103,7 +103,7 @@ impl CourseGround {
         world.ray_cast(q, show_off, last, &mut env)
     }
 
-    /// `World_QueryInstances` 0x25bdc4 on the course: the objects only, the deepest touch (−1 for nothing).
+    /// `World_QueryInstances` 0x25b878 on the course: the objects only, the deepest touch (−1 for nothing).
     /// `skip` as [`CourseGround::ray_cast`]'s.
     pub fn query_instances(&self, q: &mut dyn Shape, show_off: bool, skip: &dyn Fn(u32) -> bool) -> (f32, Option<CastHit>) {
         let mut world = self.world.lock().unwrap_or_else(|e| e.into_inner());

@@ -155,6 +155,10 @@ fn course_name(id: u32) -> Option<&'static str> {
     ["gari", "snow", "elysium", "mesa", "merquer", "aloha", "pipe", "untrack", "megaple", "", "trick", "alaska"].get(id as usize).copied().filter(|n| !n.is_empty())
 }
 
+/// The course's objects carry the flags the game had over the race (`pine.py record ... flags`, F4b3k4): the static
+/// touch objects are then cast by default (`E::instance_collisions`)
+static FLAGGED: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
 /// The walls for a rider whose first sample is `a` (recordings with the bodies only).
 fn walls_of(course: &Option<std::sync::Arc<tricky_game::course_ground::CourseGround>>, a: &[u8], st: &[u8]) -> Option<Walls> {
     let course = course.clone().filter(|_| 0x700 <= a.len())?;
@@ -230,7 +234,7 @@ fn wall_cast(course: &tricky_game::course_ground::CourseGround, body: &CollBody,
     (t, h.map_or(Default::default(), |h| tricky_game::walls::CastRecord { pos: h.pos, normal: h.normal, object: h.object.map_or(0, |o| o as u32 + 1) }))
 }
 
-/// `World_QueryInstances` 0x25bdc4 with `cWorldBoarder`(the body, 1), front faces only (`Boarder_InstanceCollisions`
+/// `World_QueryInstances` 0x25b878 with `cWorldBoarder`(the body, 1), front faces only (`Boarder_InstanceCollisions`
 /// sets the shape's +0x2f0), on the course: t, the record (object = index + 1) and the object, as
 /// `ground_tick::touch_query` (F4b3k1). TRICKY_INSTDBG lists the hits.
 fn instance_query(course: &tricky_game::course_ground::CourseGround, body: &CollBody) -> (f32, tricky_game::walls::CastRecord, tricky_game::walls::Touched) {
@@ -268,7 +272,7 @@ impl tricky_game::walls::WallEnv for WallTest<'_> {
     fn cast_walls(&mut self, r: &tricky_game::walls::WallRider) -> (f32, tricky_game::walls::CastRecord) {
         wall_cast(self.course, &self.body, r.ground)
     }
-    /// `World_QueryInstances` 0x25bdc4 with `cWorldBoarder`(rider+0x470, 1), front faces only (F4b3k1): t, the
+    /// `World_QueryInstances` 0x25b878 with `cWorldBoarder`(rider+0x470, 1), front faces only (F4b3k1): t, the
     /// record and the object (its flags, its physics record's mass and bounce). STANDIN: no controller, as
     /// `ground_tick::touch_query` (row E7b2)
     fn query_objects(&mut self, _: &tricky_game::walls::WallRider) -> (f32, tricky_game::walls::CastRecord, tricky_game::walls::Touched) {
@@ -359,8 +363,9 @@ impl Env for E {
         self.log.push(Ev::Rail);
     }
     /// `Boarder_InstanceCollisions` 0x125088 (`walls::instance_collisions`, then its rollers' loop): the course's
-    /// static touch objects only with TRICKY_INSTANCES=1 (alone they make it worse: rec22, the knockables the game
-    /// had already made rollers are bounced off), then (F4b3k1) a kick for each knocked object among the rider's
+    /// static touch objects when the recording kept the objects' flags ([`FLAGGED`], F4b3k4; TRICKY_INSTANCES=1:
+    /// always, 0: never; without the flags they make it worse: rec22, rec23, the objects the game had made rollers or
+    /// `cDeadNode`s are bounced off), then (F4b3k1) a kick for each knocked object among the rider's
     /// pairs (`roller::rider_kick`, the rollers recorded, [`rollers_of`]; TRICKY_NOROLL=1: not). Their contact
     /// scripts and sounds are not run; the keyframed objects among the pairs (types 0x100..0x103) are not either.
     fn instance_collisions(&mut self, r: &mut Rider) {
@@ -372,7 +377,12 @@ impl Env for E {
         let mut rollers = std::mem::take(&mut w.rollers);
         let mut wr = tricky_game::walls::WallRider { pos: r.p.pos, vel: r.vel, ground: r.p.normal, knocks: 0.0, mode: 2, state: r.state, up: w.up };
         let mut t = WallTest { g: &mut *r, course: &course, body, stat: w.stat };
-        if std::env::var("TRICKY_INSTANCES").is_ok() {
+        let statics = match std::env::var("TRICKY_INSTANCES").as_deref() {
+            Ok("0") => false,
+            Ok(_) => true,
+            Err(_) => FLAGGED.load(std::sync::atomic::Ordering::Relaxed),
+        };
+        if statics {
             tricky_game::walls::instance_collisions(&mut wr, &mut t);
         }
         if std::env::var("TRICKY_NOROLL").is_err() {
@@ -432,6 +442,8 @@ struct W {
     states_real: bool,
     /// the course built in the runner ([`W::load_course`]), for its keyframed objects' poses ([`Keyframed`])
     rc: Option<runner_course::RunnerCourse>,
+    /// its instances' base (0 without it), where `World_QueryInstances`' stub points the object it hit (F4b3k4)
+    inst0: Rc<Cell<u32>>,
 }
 
 /// `Boarder_WallCollide` 0x126250 stubbed: logged, answering `wall`.
@@ -461,6 +473,14 @@ impl W {
             }
             wv(m, rd + 0x4ac0, w.up);
             self.r.unstub(0x126250);
+            // `Boarder_InstanceCollisions` 0x125088 as the original when the objects' flags are the game's and the
+            // runner has the course's instances (F4b3k4); else the stub
+            if FLAGGED.load(std::sync::atomic::Ordering::Relaxed) && self.inst0.get() != 0 {
+                self.r.unstub(0x125088);
+            } else {
+                let l = self.log.clone();
+                self.r.stub(0x125088, move |_, _| l.borrow_mut().push(Ev::Instances));
+            }
         } else {
             stub_wall(&mut self.r, &self.log, &self.wall, rd);
         }
@@ -491,7 +511,17 @@ impl W {
             self.r.allow(a);
         }
         self.real_cast.set(true);
+        self.inst0.set(rc.inst0);
         self.rc = Some(rc);
+    }
+
+    /// An object's flags (+0xe8) in the runner's course as the game had them (F4b3k4), TRICKY_WALL_SKIP's solid bit
+    /// off as [`W::load_course`] does; nothing without the runner's course.
+    fn set_object_flags(&mut self, course: &tricky_game::course_ground::CourseGround, o: usize, flags: u32) {
+        let Some(rc) = &self.rc else { return };
+        let Some((min, max)) = course.with_world(|w| w.objects.get(o).map(|x| (x.min, x.max))) else { return };
+        let flags = if wall_skip().contains(&(o as u32)) { flags & !0x20 } else { flags };
+        rc.set_object(&mut self.r.mem, o, min, max, flags);
     }
 
     /// `Boarder_SetState` 0x11f608 as the original for the next call (F4h5m): `Boarder_ExitControlState` 0x11c840 and
@@ -621,8 +651,33 @@ fn world() -> Option<W> {
     // Rail_TryCapture 0x125cb8 (G1b)
     r.stub(0x125cb8, move |_, _| l.borrow_mut().push(Ev::Rail));
     let l = log.clone();
-    // Boarder_InstanceCollisions 0x125088 (E8b)
+    // Boarder_InstanceCollisions 0x125088 (E8b): logged; as the original with the objects' flags (`W::put_walls`,
+    // F4b3k4): its `World_QueryInstances` 0x25b878 answered by the course's ([`instance_query`]: t, the point +0x10,
+    // the normal +0x20, the object +0x38 as the runner's course's instance), `Instance_OnPlayerContact` 0x13bd40 (the
+    // event scripts) stubbed, `Boarder_InstanceBounce` 0x125a00 the original
     r.stub(0x125088, move |_, _| l.borrow_mut().push(Ev::Instances));
+    r.allow(0x125088);
+    r.allow(0x125a00);
+    r.stub(0x13bd40, |_, _| {});
+    let inst0 = Rc::new(Cell::new(0u32));
+    let (c, i0) = (course.clone(), inst0.clone());
+    r.stub(0x25b878, move |cpu, mem| {
+        let course = c.borrow().clone().expect("World_QueryInstances ran without the course");
+        let mut b = CollBody::new();
+        b.center = rv(mem, rd + 0x480);
+        b.radius = mem.read_f32(rd + 0x490);
+        b.x24 = mem.read_u32(rd + 0x494) as i32;
+        b.count = (mem.read_u32(rd + 0x498) as i32).clamp(0, 18);
+        for k in 0..18u32 {
+            b.spheres[k as usize] = (rv(mem, rd + 0x4a0 + 0x20 * k), mem.read_f32(rd + 0x4b0 + 0x20 * k));
+        }
+        let (t, h, o) = instance_query(&course, &b);
+        let out = cpu.gpr(6) as u32;
+        wv(mem, out + 0x10, h.pos);
+        wv(mem, out + 0x20, h.normal);
+        mem.write_u32(out + 0x38, if h.object == 0 { 0 } else { i0.get() + 0x100 * o.id });
+        cpu.set_f(0, t);
+    });
     // the world under the probe, as in tests/probe.rs
     let l = log.clone();
     let (landing, line_from) = (Rc::new(Cell::new(false)), Rc::new(Cell::new([0.0f32; 4])));
@@ -738,7 +793,8 @@ fn world() -> Option<W> {
     // as a miss (the hit is cleared: the world around the body is not recorded)
     // (from `Boarder_WallCollide` 0x126250..0x126540, F4h5k: only the vtable set at +0x40, which `World_RayCast`'s
     // stub tells the wall's cast by)
-    let in_wall = |cpu: &r5900::Cpu| (0x126250..0x126540).contains(&(cpu.gpr(31) as u32));
+    // (and from `Boarder_InstanceCollisions` 0x125088..0x1257a0 when it runs as the original, F4b3k4)
+    let in_wall = |cpu: &r5900::Cpu| (0x126250..0x126540).contains(&(cpu.gpr(31) as u32)) || (0x125088..0x1257a0).contains(&(cpu.gpr(31) as u32));
     let (l, h) = (log.clone(), hit.clone());
     let rc = real_cast.clone();
     r.hook(0x257810, move |cpu, mem| {
@@ -770,7 +826,7 @@ fn world() -> Option<W> {
     for s in &mut seqs {
         *s = (r.mem.alloc(0x80), r.mem.alloc(0x10), r.mem.alloc(0x10));
     }
-    Some(W { r, rd, stats, motion, log, hit, wall, meter, handler, pad, seqs, air, landing, course, real_cast, states_real: false, rc: None })
+    Some(W { r, rd, stats, motion, log, hit, wall, meter, handler, pad, seqs, air, landing, course, real_cast, states_real: false, rc: None, inst0 })
 }
 
 impl W {
@@ -2518,13 +2574,18 @@ fn ground_ticks_against_the_running_game() {
     // and of those, the quaternion equal to the game's: ours, the runner's
     let (mut ctl_ours_game, mut ctl_runner_game) = (vec![0usize; runners.len()], vec![0usize; runners.len()]);
     // the course objects' flags as the game had them over the race (F4b3k4, `pine.py record ... flags`): the first
-    // sample's (TRICKY_FLAGS=b: the second's, which holds the frame's own changes); TRICKY_FLAGS=off: as loaded
-    let flag_way = std::env::var("TRICKY_FLAGS").unwrap_or_default();
+    // sample's (TRICKY_OBJFLAGS=b: the second's, which holds the frame's own changes, the same on rec24; off: as
+    // loaded)
+    let flag_way = std::env::var("TRICKY_OBJFLAGS").unwrap_or_default();
+    FLAGGED.store(ticks.first().is_some_and(|t| !t.flags.is_empty()) && flag_way != "off", std::sync::atomic::Ordering::Relaxed);
     for (wi, w) in ticks.windows(2).enumerate() {
         if let (Some(c), false) = (&course, flag_way == "off") {
             for t in if flag_way == "b" { &w[..] } else { &w[..1] } {
                 for &(o, fl) in &t.flags {
                     c.set_flags(o as usize, fl);
+                    for (_, g) in runners.iter_mut() {
+                        g.set_object_flags(c, o as usize, fl);
+                    }
                 }
             }
         }

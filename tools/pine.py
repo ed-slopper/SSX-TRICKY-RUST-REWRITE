@@ -207,7 +207,7 @@ COURSE_ID = 0x32DE88
 # the course object (`gWorld`)
 WORLD = 0x346488
 RIDER_POS, RIDER_VEL, RIDER_TIMESCALE, RIDER_PLACE, RIDER_STATS = 0x140, 0x150, 0x12C, 0x110, 0x464
-WORLD = 0x346488  # the course's world (`World_QueryInstances` 0x25bdc4's first argument)
+WORLD = 0x346488  # the course's world (`World_QueryInstances` 0x25b878's first argument)
 RIDER_TICKS = 0x5900  # rider+0x5820 (score) +0xe0: the speed-sample count, +1.0 a tick
 # The pad: Sony's pad library writes each controller's data into a double buffer (two records 0x80 apart):
 # status, mode (0x73 analog, 0x79 pressure), buttons (2 bytes, active low), right x, right y, left x, left y,

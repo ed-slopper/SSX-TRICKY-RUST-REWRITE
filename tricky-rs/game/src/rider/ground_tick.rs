@@ -977,7 +977,7 @@ pub(super) fn rider_id(r: &Rider) -> u32 {
     if r.ai { 2 } else { 1 }
 }
 
-/// `World_QueryInstances` 0x25bdc4 with `cWorldBoarder`(the body, 1): t, the record (object = index + 1), the object
+/// `World_QueryInstances` 0x25b878 with `cWorldBoarder`(the body, 1): t, the record (object = index + 1), the object
 /// (its index; its flags, its physics record's mass and bounce) and the sphere tree hit (the record's +0x30).
 /// STANDIN: no object has a controller here, for the course's controllers (row E7b2); the rollers have left the
 /// casts (their flags lose 0x20).
@@ -1001,7 +1001,7 @@ pub(super) fn touch_query(world: &CollisionWorld, course: &crate::course_ground:
     (t, rec, touched, h.tree)
 }
 
-/// A roller's sphere tree cast on the course (`World_RayCast` 0x25aff8, or `World_QueryInstances` 0x25bdc4 with
+/// A roller's sphere tree cast on the course (`World_RayCast` 0x25aff8, or `World_QueryInstances` 0x25b878 with
 /// `query`): t, the point and the normal.
 pub(super) fn roller_cast(world: &CollisionWorld, course: &crate::course_ground::CourseGround, q: &crate::sphtree::WorldSphTree, query: bool) -> (f32, V4, V4) {
     let (t, h) = if query {
