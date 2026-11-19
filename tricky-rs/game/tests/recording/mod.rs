@@ -45,7 +45,8 @@ pub fn load(path: &str) -> (usize, Vec<Tick>) {
             let mut chased = Vec::new();
             for (k, spec) in windows.iter().enumerate() {
                 // (and the walked lists, `L700`: node address + 0x10 bytes each)
-                if spec.contains('>') || spec.starts_with('L') {
+                // (and `hookpad`, the pad word hook's 8 bytes: the pad word and the speed-sample count, F4b3k)
+                if spec.contains('>') || spec.starts_with('L') || i64::from_str_radix(spec, 16).is_err() {
                     chased.push((spec.to_string(), blocks(k)));
                 } else {
                     extra.push((i64::from_str_radix(spec, 16).unwrap(), blocks(k)));

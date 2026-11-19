@@ -556,6 +556,18 @@ fn world() -> Option<W> {
         let l = log.clone();
         r.stub(a, move |_, _| l.borrow_mut().push(Ev::Call(a)));
     }
+    // F4b3k, on the pad word the recorder hooked: the cruise (`CruiseControl_Update` 0x102fc8) and the prewind
+    // (`PrewindState_Update` 0x1050e8 with `PrewindState_SetWindTarget` 0x105a60 and `Math_Atan` 0x2510f8); logged:
+    // `Boarder_UpdateBoost` 0x11d038, `Boarder_PlayCelebrate` 0x128150, `Boarder_PlayDisappointed` 0x127e80,
+    // `Ride_AITauntCheck` 0x103660, `CruiseControl_LookBack` 0x1033d0, `CruiseControl_RandomFlourish` 0x103b88,
+    // `PrewindState_UpdateWindClip` 0x1055f0 and the rider's virtual +0x7c (put at 0x1040)
+    for a in [0x102fc8, 0x1050e8, 0x105a60, 0x2510f8] {
+        r.allow(a);
+    }
+    for a in [0x11d038, 0x128150, 0x127e80, 0x103660, 0x1033d0, 0x103b88, 0x1055f0, 0x1040] {
+        let l = log.clone();
+        r.stub(a, move |_, _| l.borrow_mut().push(Ev::Call(a)));
+    }
     // the wiped-out riders' slides (F4b3w): `Boarder_UpdateMotion` 0x11c770 (case 5, `WipeoutMotion_Update` inlined:
     // the handler's +0x550 is the rider) and `Ragdoll_GroundProbe` 0x10fd58 on the world above; the body made again
     // (`Ragdoll_InitFromBoarder` 0x10dad8) and the get-up (`Wipeout_StartGetUp` 0x10f178) logged
@@ -615,7 +627,7 @@ fn world() -> Option<W> {
             l.borrow_mut().push(Ev::Call(0x257ca0));
         }
     });
-    for (o, f) in [(0x68, 0x1010), (0x80, 0x1020), (0x98, 0x1030)] {
+    for (o, f) in [(0x68, 0x1010), (0x80, 0x1020), (0x98, 0x1030), (0x78, 0x1040)] {
         r.mem.write_u16(vtable + o, 0);
         r.mem.write_u32(vtable + o + 4, f);
     }
@@ -697,6 +709,11 @@ impl W {
         let m = &mut self.r.mem;
         wv(m, rd + 0x150, p.vel);
         m.write_u32(rd + 0x418, c.finish as u32);
+        // what the cruise and the prewind read besides (F4b3k): the crouch kept for the jump +0x1c8, the take-off kind
+        // +0x1dc, the input records' rates and targets, the wind-ups +0x220..+0x234, as the tick left them
+        for o in [0x1c8, 0x1dc, 0x200, 0x204, 0x20c, 0x210, 0x218, 0x21c, 0x220, 0x224, 0x228, 0x22c, 0x230, 0x234] {
+            m.write_u32(rd + o, u32_le(&c.rider, o as usize));
+        }
         for (a, v) in lay(c, rd + 0x46c0, self.seqs[0]) {
             m.write_u32(a, v);
         }
@@ -1015,14 +1032,33 @@ struct Ctl {
     handler: Vec<u8>,
     pad: u32,
     finish: i32,
+    /// the rider as the second sample holds it (F4b3k: the prewind's wind-ups +0x220..+0x238, its kind +0x1dc, the
+    /// crouch kept +0x1c8, the class +0x420: the control leaves the values as `cBoarder::vf7` moved them before the
+    /// motion)
+    rider: Vec<u8>,
 }
 
 /// The controls replayed: bump (2), change fakie (4), fakie cruise (5, not on its turn clip 0x202, which plays clips
 /// and flips the stance), hard landing (0xb), normal landing (0xc)
 const CONTROLS: [u32; 5] = [2, 4, 5, 0xb, 0xc];
 
+/// The controls replayed only with the tick's own pad word (F4b3k, [`hook_pad`]): cruise (3, `CruiseControl_Update`
+/// 0x102fc8) and prewind (0xe, `PrewindState_Update` 0x1050e8), which go by its buttons
+const PADDED: [u32; 2] = [3, 0xe];
+
+/// The pad word the rider's controller made for the tick that ends at sample `t` (F4b3k): `cPlayer::GetControls`
+/// 0x151250 or `cComputer::GetControls` 0x1384b8 build it on `cBoarder::vf7` 0x117198's stack, where PINE cannot see
+/// it; `pine.py record ... hookpad` puts a hook on the call that hands it to `Boarder_UpdateControl` (0x117b78) that
+/// keeps it with the rider's speed-sample count (+0x5900) of that tick (window `hookpad`). None without the window, or
+/// when its count is not the sample's (window `5900`): the rider did not tick in this frame.
+fn hook_pad(t: &recording::Tick, i: usize) -> Option<u32> {
+    let x = &t.chased.iter().find(|(s, _)| s == "hookpad")?.1[i];
+    let count = t.extra.iter().find(|(o, _)| *o == 0x5900).map(|(_, v)| f32_at(&v[i], 0));
+    (count.is_none() || count == Some(f32_at(x, 4))).then(|| u32_le(x, 0))
+}
+
 /// (the animation read from sample `t`, the handler from `th`)
-fn ctl_of(t: &recording::Tick, th: &recording::Tick, i: usize, ka: usize, addr: u32, pad: u32) -> Option<Ctl> {
+fn ctl_of(t: &recording::Tick, th: &recording::Tick, i: usize, ka: usize, addr: u32, pad: u32, after: &[u8]) -> Option<Ctl> {
     let w = |name: &str| t.chased.iter().find(|(s, _)| s == name).map(|(_, v)| &v[i]);
     let h = th.chased.iter().find(|(s, _)| s == "5ae0>600").map(|(_, v)| &v[i])?;
     let (s1, s2, l1, l2) = (w("4718>0")?, w("4718>30>0")?, w("4718>78>8>a")?, w("4718>30>78>8>a")?);
@@ -1036,7 +1072,7 @@ fn ctl_of(t: &recording::Tick, th: &recording::Tick, i: usize, ka: usize, addr: 
     } else {
         None
     };
-    Some(Ctl { clips, seq, handler: h.clone(), pad, finish: u32_le(&t.riders[i], 0x418) as i32 })
+    Some(Ctl { clips, seq, handler: h.clone(), pad, finish: u32_le(&t.riders[i], 0x418) as i32, rider: after.to_vec() })
 }
 
 /// The animation controller (at `ctl`) laid out for `animctl`'s queries: the three layers' clips (layer 2's none) and
@@ -1065,6 +1101,8 @@ struct CtlEnv {
     pad: u32,
     bump: Bump,
     land: LandNormal,
+    cruise: control::Cruise,
+    prewind: tricky_game::boarder::Prewind,
     state: Option<u32>,
 }
 
@@ -1131,7 +1169,20 @@ impl ControlEnv for CtlEnv {
                 b.update(self, pad, r);
                 self.bump = b;
             }
+            3 => {
+                let mut c = self.cruise;
+                c.update(self, pad, r);
+                self.cruise = c;
+            }
             4 => control::change_fakie(self, pad, r),
+            // F4b3k: `PrewindState_Update` ours (`boarder::prewind_update`), its state asked for as `Boarder_SetState`
+            0xe => {
+                for call in tricky_game::boarder::prewind_update(pad, false, &mut self.prewind) {
+                    if let tricky_game::boarder::PrewindCall::State(s) = call {
+                        self.set_state(r, s);
+                    }
+                }
+            }
             0xb => control::land_hard(self, pad, r),
             0xc => {
                 let mut l = self.land;
@@ -1151,8 +1202,31 @@ fn control_ours(p: &mut Rider, c: &Ctl, table: &[u8]) {
     }
     let o = Orient { q: p.quat, fwd: p.p.fwd, side: p.board_side, up: p.board_up, yaw: p.yaw };
     let (bump, land) = (Bump { turn: f32_at(&c.handler, 0x18), done: f32_at(&c.handler, 0x1c) }, LandNormal { crouch: f32_at(&c.handler, 0xf8) });
-    let mut env = CtlEnv { m, o, pad: c.pad, bump, land, state: None };
-    let mut r = control::Rider { vel: p.vel, board: p.p.fwd, brake: p.brake, crouch: p.crouch, steer: p.steer, surface: p.p.surface, finish: c.finish, stance: p.switch, control: p.state, ..Default::default() };
+    // the cruise's look-back timer and brake held (handler +0x638, +0x640), the prewind's started (+0x718) and the
+    // rider's fields it reads (F4b3k)
+    let cruise = control::Cruise { look: f32_at(&c.handler, 0x38), braking: u32_le(&c.handler, 0x40) };
+    let x = &c.rider;
+    let v3 = |o: usize| [f32_at(x, o), f32_at(x, o + 4), f32_at(x, o + 8)];
+    let prewind = tricky_game::boarder::Prewind {
+        f: tricky_game::boarder::Fields { x1fc: p.brake, crouch: p.crouch, crouch_rate: f32_at(x, 0x20c), crouch_target: f32_at(x, 0x210), boost_level: p.boost_level, ..Default::default() },
+        started: u32_le(&c.handler, 0x118),
+        kind: u32_le(x, 0x1dc),
+        x418: c.finish,
+        spin: v3(0x220),
+        flip: v3(0x22c),
+        x1c8: f32_at(x, 0x1c8),
+        vel: p.vel,
+        board: p.p.fwd,
+        steer: p.steer,
+        steer_rate: f32_at(x, 0x218),
+        steer_target: f32_at(x, 0x21c),
+        surface: p.p.surface,
+        switch: p.switch,
+        class: p.class,
+        ..Default::default()
+    };
+    let mut env = CtlEnv { m, o, pad: c.pad, bump, land, cruise, prewind, state: None };
+    let mut r = control::Rider { vel: p.vel, board: p.p.fwd, brake: p.brake, crouch: p.crouch, steer: p.steer, surface: p.p.surface, finish: c.finish, stance: p.switch, control: p.state, class: p.class, b718: u32_le(&c.handler, 0x118), ..Default::default() };
     control::update_control(&mut env, c.pad, &mut r);
     (p.vel, p.quat, p.p.fwd, p.board_side, p.board_up, p.yaw) = (r.vel, env.o.q, env.o.fwd, env.o.side, env.o.up, env.o.yaw);
     if let Some(s) = env.state {
@@ -1793,9 +1867,12 @@ fn other_of(t0: &recording::Tick, t1: &recording::Tick, i: usize, st: &[u8], add
     (rider.brake, rider.crouch, rider.steer, rider.p.x244, rider.d1, rider.d2) = (after.brake, after.crouch, after.steer, after.p.x244, after.d1, after.d2);
     let kind = u32_le(b, 0x2e0);
     let hit = (kind != 3).then(|| Hit { kind, point: vec4(b, 0x2d0), normal: vec4(b, 0x2a0), surface: u32_le(b, if wiped { 0x310 } else { 0x290 }) });
-    // the control as the ground test runs it (clips from the second sample, sequences from the first; STANDIN: the
-    // pad word's brake bit only, from the state the tick ends in); not the fakie cruise on its turn clip
-    let ctl = CONTROLS.contains(&rider.state).then(|| ctl_of(t0, t0, i, x.ka, addr, if u32_le(b, 0x428) == 0xe { 4 } else { 0 })).flatten()
+    // the control as the ground test runs it (clips from the second sample, sequences from the first; the pad word
+    // the hook kept, F4b3k; STANDIN without it: the pad word's brake bit only, from the state the tick ends in); not
+    // the fakie cruise on its turn clip
+    let hooked = hook_pad(t1, i);
+    let ctl = (CONTROLS.contains(&rider.state) || hooked.is_some() && PADDED.contains(&rider.state))
+        .then(|| ctl_of(t0, t0, i, x.ka, addr, hooked.unwrap_or(if u32_le(b, 0x428) == 0xe { 4 } else { 0 }), b)).flatten()
         .filter(|c| !(rider.state == 5 && c.clips[0] == 0x202))
         .map(|mut c| {
             let n = if wiped { na } else { nb };
@@ -2299,7 +2376,7 @@ fn ground_ticks_against_the_running_game() {
     let clip_b = std::env::var("TRICKY_CLIP_A").is_err();
     // controls replayed by state, and those left out (fakie cruise on its turn clip; no windows)
     let mut ctl_count = std::collections::BTreeMap::<u32, usize>::new();
-    let (mut ctl_turn, mut ctl_none, mut ctl_right, mut player_ctl) = (0, 0, 0, 0);
+    let (mut ctl_turn, mut ctl_none, mut ctl_right, mut player_ctl, mut hook_ctl) = (0, 0, 0, 0, 0);
     let mut ctl_same = vec![0usize; runners.len()];
     // and of those, the quaternion equal to the game's: ours, the runner's
     let (mut ctl_ours_game, mut ctl_runner_game) = (vec![0usize; runners.len()], vec![0usize; runners.len()]);
@@ -2391,7 +2468,9 @@ fn ground_ticks_against_the_running_game() {
             // the control (F4b3i) on the states replayed. STANDIN: the pad word is the computer's (cComputer::GetControls
             // 0x1384b8 into the stack of `cBoarder::vf7`, not recordable): only the brake bit (4), set when the rider
             // ends the tick prewinding (0xe), as the landings and the bump pick 0xe on it
-            let ctl = if CONTROLS.contains(&rider.state) && std::env::var("TRICKY_NOCTL").is_err() {
+            // F4b3k: the tick's own pad word, where the recorder hooked it (TRICKY_NOHOOK: not used)
+            let hooked = hook_pad(&w[1], i).filter(|_| std::env::var("TRICKY_NOHOOK").is_err());
+            let ctl = if (CONTROLS.contains(&rider.state) || hooked.is_some() && PADDED.contains(&rider.state)) && std::env::var("TRICKY_NOCTL").is_err() {
                 // TRICKY_PAD=b: the player's from the recorded pad (F4b3d, `player_pad`: the pad read at the second
                 // sample; =a the first's). Not by default: rec16 6182 r5's bump goes to prewind (the pad's bit 4, X
                 // held) while every recorded pad of 6170..6190 has X up (rec16: 678 of the player's 1,535 prewind
@@ -2403,8 +2482,11 @@ fn ground_ticks_against_the_running_game() {
                 if mine.is_some() {
                     player_ctl += 1;
                 }
-                let pad = mine.unwrap_or(if u32_le(b, 0x428) == 0xe { 4 } else { 0 });
-                match ctl_of(if anim_b { &w[1] } else { &w[0] }, &w[0], i, ka, addr[i], pad) {
+                if hooked.is_some() {
+                    hook_ctl += 1;
+                }
+                let pad = hooked.or(mine).unwrap_or(if u32_le(b, 0x428) == 0xe { 4 } else { 0 });
+                match ctl_of(if anim_b { &w[1] } else { &w[0] }, &w[0], i, ka, addr[i], pad, b) {
                     Some(c) if rider.state == 5 && c.clips[0] == 0x202 => {
                         ctl_turn += 1;
                         None
@@ -2613,9 +2695,9 @@ fn ground_ticks_against_the_running_game() {
                         } else {
                             // the first sample's clips, and layer 0's sequence when recorded (a grab's flag 4,
                             // `AnimCtl_TestClipFlag`)
-                            let c = ctl_of(&w[0], &w[0], me, ka, addr[me], 0).unwrap_or_else(|| {
+                            let c = ctl_of(&w[0], &w[0], me, ka, addr[me], 0, b).unwrap_or_else(|| {
                                 let c = &w[0].extra[ka].1[me];
-                                Ctl { clips: [u32_le(c, 8), u32_le(c, 0xc)], seq: None, handler: Vec::new(), pad: 0, finish: 0 }
+                                Ctl { clips: [u32_le(c, 8), u32_le(c, 0xc)], seq: None, handler: Vec::new(), pad: 0, finish: 0, rider: b.to_vec() }
                             });
                             land_runner(&mut runners[k - 1].1, start.0, start.1, a, b, board, &stats[me], &c).unwrap_or(start)
                         };
@@ -2882,7 +2964,7 @@ fn ground_ticks_against_the_running_game() {
         }
     }
     eprintln!("{path}: ground ticks (motion 2 at both samples): {pairs} compared ({capped} at the speed limit); left out {other} whose motion object's +0xc is not the rider, {skew} not one update apart, {torn} read inside a tick (it or the sample before)");
-    eprintln!("  controls replayed by state: {ctl_count:x?}, every field right under fadd=g1: {ctl_right}; ours from the runner's rider the same as the runner's (per runner way): {ctl_same:?}, quaternion the game's: ours {ctl_ours_game:?}, the runner's {ctl_runner_game:?}; left out: {ctl_turn} fakie cruise on its turn clip, {ctl_none} without the windows; the player's pad word from the recorded pad on {player_ctl} (F4b3d, TRICKY_PAD=b)");
+    eprintln!("  controls replayed by state: {ctl_count:x?}, every field right under fadd=g1: {ctl_right}; ours from the runner's rider the same as the runner's (per runner way): {ctl_same:?}, quaternion the game's: ours {ctl_ours_game:?}, the runner's {ctl_runner_game:?}; left out: {ctl_turn} fakie cruise on its turn clip, {ctl_none} without the windows; the player's pad word from the recorded pad on {player_ctl} (F4b3d, TRICKY_PAD=b); the pad word the hook kept on {hook_ctl} (F4b3k)");
     if kc.is_some() {
         eprintln!("  frames left out because a sample was read before every rider had ticked: {mid}");
     }

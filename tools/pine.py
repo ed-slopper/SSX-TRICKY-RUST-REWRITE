@@ -11,6 +11,8 @@ PINE reads and writes memory and saves and loads states; it has no breakpoints o
     python tools/pine.py save <slot> | load <slot>      savestate slot 0-9
     python tools/pine.py watch <addr> <bytes> <seconds> <out.txt>
                                                         poll a block, write every distinct copy with a timestamp
+    python tools/pine.py hook on|off                    the pad word hook (F4b3k): each rider's pad word kept
+                                                        where `record ... hookpad` reads it (in RAM only)
     python tools/pine.py riders                          the race object and its riders (addresses, place, speed)
     python tools/pine.py record <seconds> <out.txt> [<bytes>] [<off>:<len> ...]
                                                         each tick: the race tick and every rider's first
@@ -21,7 +23,8 @@ PINE reads and writes memory and saves and loads states; it has no breakpoints o
                                                         (57b0:64 = the flight prediction, F4h2; an offset
                                                         may be negative: -170:74 = the spin object, F4b3a;
                                                         `>` follows a pointer: 5ae0>610:10 = the handler's
-                                                        bump control, F4b3i); with <bytes> >= 0x700, a
+                                                        bump control, F4b3i; `hookpad`: each rider's pad
+                                                        word from the hook, F4b3k); with <bytes> >= 0x700, a
                                                         sample whose rider body looks the last frame's is read
                                                         again (F4h5d; header `posed 1`); the riders'
                                                         characters go to <out>.stats; a new race with other
@@ -148,6 +151,53 @@ class Pine:
 # slot; a rider struct points at its entry from +0x464. The race object holds the riders at +0xC4, their count at
 # +0x88 and the race tick at +0x18 (60 a second).
 STATS_TABLE, STATS_STRIDE = 0x32DB70, 0x84
+
+# The pad word hook (F4b3k). `cBoarder::vf7` 0x117198 asks the rider's controller for the tick's pad word
+# (`cPlayer::GetControls` 0x151250, `cComputer::GetControls` 0x1384b8) on its own stack and hands it to
+# `Boarder_UpdateControl` 0x11c9a0 (`jal` at 0x117b78, a0 the handler, a1 the pad, s1 the rider): nothing keeps it.
+# The hook sends that `jal` through a stub in the zero gap after .vutext (0x31D2A0, 96 bytes, notes/findings.md)
+# that copies the pad's first word and the rider's speed-sample count +0x5900 (the tick it is for: `Boarder_AddSpeedSample`
+# 0x155dc8 adds 1 before) into the gap after .data (0x35F6D0, 48 bytes: 8 bytes for each slot +0x460 0..5), then jumps
+# on to `Boarder_UpdateControl`. Only temporaries (t0..t2) are touched, which the call clobbers anyway, so the game runs
+# as before. In RAM only, until the game is booted again.
+HOOK_AT, HOOK_JAL, HOOK_CODE, HOOK_DATA, HOOK_SLOTS = 0x117B78, 0x0C047268, 0x31D2A0, 0x35F6D0, 6
+RIDER_SLOT = 0x460
+
+
+def hook_code():
+    """The stub's words (MIPS: t0 8, t1 9, t2 10, a1 5, s1 17)."""
+    def i(op, rs, rt, imm):
+        return op << 26 | rs << 21 | rt << 16 | imm & 0xFFFF
+    lw, sw = (lambda rt, off, base: i(0x23, base, rt, off)), (lambda rt, off, base: i(0x2B, base, rt, off))
+    lo = HOOK_DATA - 0x360000  # lui t1, 0x36 ; the slot's 8 bytes at -0x930
+    return [
+        lw(8, RIDER_SLOT, 17),               # lw    t0, 0x460(s1)     the rider's slot
+        i(0x0B, 8, 9, HOOK_SLOTS),           # sltiu t1, t0, 6
+        i(0x04, 9, 0, 7),                    # beq   t1, zero, +7      (to the j)
+        8 << 16 | 8 << 11 | 3 << 6,          # sll   t0, t0, 3         (delay slot)
+        i(0x0F, 0, 9, 0x36),                 # lui   t1, 0x36
+        9 << 21 | 8 << 16 | 9 << 11 | 0x21,  # addu  t1, t1, t0
+        lw(10, 0, 5),                        # lw    t2, 0(a1)         the pad word
+        sw(10, lo, 9),                       # sw    t2, -0x930(t1)
+        lw(10, 0x5900, 17),                  # lw    t2, 0x5900(s1)    the speed-sample count
+        sw(10, lo + 4, 9),                   # sw    t2, -0x92c(t1)
+        0x08000000 | 0x11C9A0 >> 2,          # j     Boarder_UpdateControl
+        0,                                   # nop
+    ]
+
+
+def hook(p, on):
+    """Put the pad word hook in (or take it out): the stub first, then the call to it."""
+    if p.read32(HOOK_AT) not in (HOOK_JAL, 0x0C000000 | HOOK_CODE >> 2):
+        sys.exit(f"{HOOK_AT:#x} is not the call to Boarder_UpdateControl: not SLUS_203.26?")
+    if on:
+        for k in range(2 * HOOK_SLOTS):
+            p.write32(HOOK_DATA + 4 * k, 0)
+        for k, w in enumerate(hook_code()):
+            p.write32(HOOK_CODE + 4 * k, w)
+        p.write32(HOOK_AT, 0x0C000000 | HOOK_CODE >> 2)
+    else:
+        p.write32(HOOK_AT, HOOK_JAL)
 RACE_TICK, RACE_COUNT, RACE_RIDERS = 0x18, 0x88, 0xC4
 # the course id (0 garibald ... 3 mesablanca ...: `Camera_GetCourseCmlName` 0x178330's order; F4h5k)
 COURSE_ID = 0x32DE88
@@ -290,6 +340,9 @@ def main(argv):
                     f.write(f"{time.time() - t0:.4f} {data.hex()}\n")
                     last, kept = data, kept + 1
         print(f"{polls} polls, {kept} distinct copies of {length} bytes at {addr:#x} in {argv[4]}")
+    elif cmd == ["hook"] and len(argv) == 2 and argv[1] in ("on", "off"):
+        hook(p, argv[1] == "on")
+        print(f"pad word hook {argv[1]}: {HOOK_AT:#x} = {p.read32(HOOK_AT):#010x}")
     elif cmd == ["riders"]:
         race, riders = find_race(p)
         if race is None:
@@ -308,13 +361,21 @@ def main(argv):
         # `L700:78` walks the list whose head is at rider+0x700 (`Boarder_RiderCollisions` 0x123fc8's pairs: a node
         # has the two heads at +0, +4 and their next nodes at +8, +0xc, its side `Obj_HasId` 0x110838 = node+4 is
         # ours): each node as its address and 0x10 bytes, as many as fit in 0x78 (zeros after the last)
-        lists = [(w, int(w[1:].split(":")[0], 16), int(w.split(":")[1], 16)) for w in argv[4:] if w.startswith("L")]
+        # `hookpad` puts the pad word hook in (F4b3k, `hook`) and keeps each rider's 8 bytes of it (its pad word and the
+        # speed-sample count of the tick it was made in; header `extra hookpad 8`)
+        hooked = "hookpad" in argv[4:]
+        wins_args = [w for w in argv[4:] if w != "hookpad"]
+        lists = [(w, int(w[1:].split(":")[0], 16), int(w.split(":")[1], 16)) for w in wins_args if w.startswith("L")]
         extra = [(o, [int(x, 16) for x in o.split(">")], int(n, 16))
-                 for o, n in (w.split(":") for w in argv[4:] if not w.startswith("L"))]
+                 for o, n in (w.split(":") for w in wins_args if not w.startswith("L"))]
         race, riders = find_race(p)
         if race is None:
             sys.exit("no race found (is a race running?)")
         pad = find_pad(p)
+        if hooked:
+            hook(p, True)
+            slots = [p.read32(r + RIDER_SLOT) for r in riders]
+            assert all(s < HOOK_SLOTS for s in slots), slots
         # the riders' characters (rider+0x464 → 0x100 bytes) beside the recording, as the tests read them
         # (`<out>.stats` for `<out>.txt`, lines `rider stats-address hex`; TRICKY_STATS)
         def characters():
@@ -330,6 +391,7 @@ def main(argv):
             f.write(f"race {race:x} riders {' '.join(f'{r:x}' for r in riders)} bytes {size:x} pad {pad or 0:x}"
                     + "".join(f" extra {o} {n:x}" for o, _, n in extra)
                     + "".join(f" extra {w.split(':')[0]} {n:x}" for w, _, n in lists)
+                    + (" extra hookpad 8" if hooked else "")
                     + (" posed 1" if size >= 0x700 else "")
                     + f" course {p.read32(COURSE_ID)}" + "\n")
             while time.time() - t0 < seconds:
@@ -358,7 +420,8 @@ def main(argv):
                     deep = [len(c) - 1 for _, c, _ in extra for r in riders]
                     plain = [(a, n) if d == 0 else (a, 4) for a, d, n in zip(at, deep, [n for _, _, n in extra for r in riders])]
                     ranges = [(race + RACE_TICK, 4)] + [(r, size) for r in riders] + plain
-                    got = p.read_blocks(ranges + ([(pad, PAD_BYTES)] if pad else []))
+                    got = p.read_blocks(ranges + ([(pad, PAD_BYTES)] if pad else []) + ([(HOOK_DATA, 8 * HOOK_SLOTS)] if hooked else []))
+                    table = got.pop() if hooked else None
                     wins = got[1 + k:1 + k + len(plain)]
                     steps = [c[1:] for _, c, _ in extra for r in riders]
                     lens = [n for _, _, n in extra for r in riders]
@@ -388,7 +451,8 @@ def main(argv):
                         walked = [w + bytes(n - len(w)) for w, (_, n) in zip(walked, heads)]
                     if struct.unpack("<I", got[0])[0] != tick or p.read32(race + RACE_TICK) != tick:
                         return None  # the game moved on while we read
-                    return got[1:1 + k] + ([got[-1]] if pad else []) + wins + walked
+                    hooks = [table[8 * s:8 * s + 8] for s in slots] if hooked else []
+                    return got[1:1 + k] + ([got[-1]] if pad else []) + wins + walked + hooks
                 # A body read while `cPostAI::vf1` 0x114730 poses the riders (0 to n-1, after every rider ticked) is the
                 # last frame's (F4h5a: ~2 % of rider samples, mostly riders 5 and 4): read again, while the tick holds,
                 # until no rider's body looks stale (`stale_bodies`), at most 12 ms; else keep the first read
