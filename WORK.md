@@ -162,7 +162,7 @@ matches the original.
 
 | ID | Task | Section | Who | Date | Commit |
 |---|---|---|---|---|---|
-| F4b3k2c | Split of F4b3k2: the computer's turn-around (0xd) with its steer (`aicomp::steer_towards` toward rider+0x360, skill +0x86c, the frame `4aa0` from the first sample, the position and line point from the second): rec25 869 of 875 (`checking.md` F4b3k2c) | P0 | irregulur/lynx | 2026-11-19 | (this commit) |
+| F4b3k2c | Split of F4b3k2: the computer's turn-around (0xd) with its steer (`aicomp::steer_towards` toward rider+0x360, skill +0x86c, the frame `4aa0` from the first sample, the position and line point from the second): rec25 869 of 875 (`checking.md` F4b3k2c) | P0 | irregulur/lynx | 2026-11-19 | ee63495 |
 | F4b3k2b | Split of F4b3k2: the computer's countdown (state 8, `AIComputer_ControlsCountdown` 0x138628 = `aictl::controls_countdown`) against the hooked pad word, with `pine.py record ... clock` (race +0x14) and the object's +0x868 / +0x86c: rec25 2,235 of 2,235 (`checking.md` F4b3k2b) | P0 | irregulur/lynx | 2026-11-19 | 5ae99e8 |
 | F4b3t1 | The shoves of a whole race: rec23/rec24 (Snow) have 58 shove records; with the layer-1 clip flags from the first sample (`shoving_of`) all 58 are right and none extra (from the second: 74 changed, 58 right). rec24 every field 139,451, state 140,240 of 140,300 (`checking.md` F4b3t1) | P0 | irregulur/lynx | 2026-11-19 | 99953bc |
 | F4b3k5 | rec24's state misses traced: 2395 r1 (a landing rider's hit, F4b3x5), 4792 r5 (a wiped-out rider's hit, F4b3x5), 9946 r4 (ours shoves, F4b3t1), 800 r4 (the fakie change ends on a clip neither sample holds) (`checking.md` F4b3k5) | P0 | irregulur/lynx | 2026-11-19 | 26798ba |
