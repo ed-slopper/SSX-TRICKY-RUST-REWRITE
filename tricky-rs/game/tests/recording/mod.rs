@@ -111,6 +111,46 @@ pub fn pair_list(t: &Tick, addrs: &[u32], me: usize) -> Option<Vec<usize>> {
     Some(list)
 }
 
+/// A knocked object as `pine.py record ... rollers` keeps it (F4b3k3): the `cRollerNode`'s address, its instance
+/// (+0x28; the course's index is (instance − [`instance_base`]) / 0x100, `Course_GetInstance` 0x254a28), its
+/// bytes from +0x30 (`body[k]` is node + 0x30 + k: the rigid body at +0x30, mass +0xcc, timers +0xe4..+0xe8) and its
+/// box (+0x2a0 min, +0x2b0 max).
+#[derive(Clone, Debug)]
+pub struct RecRoller {
+    pub node: u32,
+    pub instance: u32,
+    pub body: Vec<u8>,
+    pub min: [f32; 4],
+    pub max: [f32; 4],
+}
+
+/// Rider `i`'s rollers among its pairs at sample `t` (window `rollers`: a count byte, then 0x128 bytes each). None
+/// without the window.
+pub fn rollers(t: &Tick, i: usize) -> Option<Vec<RecRoller>> {
+    let (_, w) = t.chased.iter().find(|(s, _)| s == "rollers")?;
+    Some(parse_rollers(&w[i]))
+}
+
+pub fn parse_rollers(b: &[u8]) -> Vec<RecRoller> {
+    let n = b.first().copied().unwrap_or(0) as usize;
+    let v4 = |x: &[u8]| std::array::from_fn(|k| f32::from_le_bytes(x[4 * k..4 * k + 4].try_into().unwrap()));
+    (0..n)
+        .map(|k| {
+            let e = &b[1 + k * 0x128..1 + (k + 1) * 0x128];
+            RecRoller { node: u32_le(e, 0), instance: u32_le(e, 4), body: e[8..0x108].to_vec(), min: v4(&e[0x108..0x118]), max: v4(&e[0x118..0x128]) }
+        })
+        .collect()
+}
+
+/// The course's instance base the header keeps with `rollers` (`instances <base>`)
+pub fn instance_base(path: &str) -> Option<u32> {
+    use std::io::BufRead;
+    let mut head = String::new();
+    std::io::BufReader::new(std::fs::File::open(path).ok()?).read_line(&mut head).ok()?;
+    let w: Vec<&str> = head.split_whitespace().collect();
+    w.windows(2).find(|w| w[0] == "instances").and_then(|w| u32::from_str_radix(w[1], 16).ok())
+}
+
 /// The player's pad word for control state `state` (board row F4b3d): `cPlayer::GetControls` 0x151250
 /// (`controls::get_controls`) on the pad device (`PadDevice::read`, `cPS2Device` vf10 0x17b278) fed the recorded
 /// libpad records `prev` then `now` (buttons 0 = pressed; the sticks when the mode is analog, 0x7_), through the rider's

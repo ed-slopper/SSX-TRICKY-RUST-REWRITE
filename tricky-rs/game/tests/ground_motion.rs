@@ -4063,3 +4063,22 @@ fn computer_pad_words_against_the_running_game() {
     }
     eprintln!("{path}: the computer's pad words by control state [ticks, equal (the states without a routine of their own only)], the state the same at both samples ({changed} ticks where it changed left out): {:?}", by.iter().map(|(s, v)| (format!("{s:#x}"), *v)).collect::<Vec<_>>());
 }
+
+/// The `rollers` window's layout (F4b3k3, `pine.py record ... rollers`): a count byte, then each roller's node,
+/// instance, 0x100 bytes from +0x30 and the box.
+#[test]
+fn rollers_window_parses() {
+    let mut b = vec![2u8];
+    for k in 0..2u32 {
+        b.extend((0x1000 + k).to_le_bytes());
+        b.extend((0x2000 + 0x100 * k).to_le_bytes());
+        b.extend((0..0x100).map(|x| x as u8));
+        for v in [1.0f32, 2.0, 3.0, 0.0, 4.0, 5.0, 6.0, 0.0] {
+            b.extend(v.to_le_bytes());
+        }
+    }
+    let r = recording::parse_rollers(&b);
+    assert_eq!(r.len(), 2);
+    assert_eq!((r[1].node, r[1].instance, r[1].body[0x9c], r[1].min, r[1].max), (0x1001, 0x2100, 0x9c, [1.0, 2.0, 3.0, 0.0], [4.0, 5.0, 6.0, 0.0]));
+    assert!(recording::parse_rollers(&[0]).is_empty());
+}
