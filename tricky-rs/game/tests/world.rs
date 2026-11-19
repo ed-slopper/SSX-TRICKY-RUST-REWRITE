@@ -102,7 +102,7 @@ fn world_casts_match_the_original() {
         let pbd = Pbd::parse(&pb).unwrap();
         let ssf = Ssf::parse(&sb, pbd.instances.len() as u32).unwrap();
         // the course object built by the game's loaders
-        let runner_course::RunnerCourse { patch0, inst0 } = runner_course::load(&mut r, &pb, &lb, &sb);
+        let runner_course::RunnerCourse { patch0, inst0, .. } = runner_course::load(&mut r, &pb, &lb, &sb);
         let grid = r.mem.read_u32(W);
         // some objects get an animated controller
         let mut g = Rng(0x30e1_d000_0000_0001 ^ c.len() as u64 * 0x1234_5678);
