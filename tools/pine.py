@@ -24,7 +24,9 @@ PINE reads and writes memory and saves and loads states; it has no breakpoints o
                                                         may be negative: -170:74 = the spin object, F4b3a;
                                                         `>` follows a pointer: 5ae0>610:10 = the handler's
                                                         bump control, F4b3i; `hookpad`: each rider's pad
-                                                        word from the hook, F4b3k); with <bytes> >= 0x700, a
+                                                        word from the hook, F4b3k; `rollers` with L700:78:
+                                                        the knocked objects among each rider's pairs,
+                                                        F4b3k3); with <bytes> >= 0x700, a
                                                         sample whose rider body looks the last frame's is read
                                                         again (F4h5d; header `posed 1`); the riders'
                                                         characters go to <out>.stats; a new race with other
@@ -204,6 +206,7 @@ COURSE_ID = 0x32DE88
 # the course object (`gWorld`)
 WORLD = 0x346488
 RIDER_POS, RIDER_VEL, RIDER_TIMESCALE, RIDER_PLACE, RIDER_STATS = 0x140, 0x150, 0x12C, 0x110, 0x464
+WORLD = 0x346488  # the course's world (`World_QueryInstances` 0x25bdc4's first argument)
 RIDER_TICKS = 0x5900  # rider+0x5820 (score) +0xe0: the speed-sample count, +1.0 a tick
 # The pad: Sony's pad library writes each controller's data into a double buffer (two records 0x80 apart):
 # status, mode (0x73 analog, 0x79 pressure), buttons (2 bytes, active low), right x, right y, left x, left y,
@@ -363,9 +366,17 @@ def main(argv):
         # ours): each node as its address and 0x10 bytes, as many as fit in 0x78 (zeros after the last)
         # `hookpad` puts the pad word hook in (F4b3k, `hook`) and keeps each rider's 8 bytes of it (its pad word and the
         # speed-sample count of the tick it was made in; header `extra hookpad 8`)
+        # `rollers` (F4b3k3, with an `L700` list): the `cRollerNode`s among each rider's pairs (the pair's other proxy,
+        # proxy +0x84 its node, node +0x14 == 0 a roller, as `Boarder_InstanceCollisions` 0x125088 finds them): a
+        # count byte, then each roller as its address, its instance (+0x28), 0x100 bytes from +0x30 (the rigid
+        # body, mass, timers) and 0x20 from +0x2a0 (its box); header `extra rollers 0 instances <base>`, the base of
+        # the course's instances (`Course_GetInstance` 0x254a28: *(*(0x346488 + 4) + 0x48) + 0x100 × index)
         hooked = "hookpad" in argv[4:]
-        wins_args = [w for w in argv[4:] if w != "hookpad"]
+        rolled = "rollers" in argv[4:]
+        wins_args = [w for w in argv[4:] if w not in ("hookpad", "rollers")]
         lists = [(w, int(w[1:].split(":")[0], 16), int(w.split(":")[1], 16)) for w in wins_args if w.startswith("L")]
+        if rolled and not any(o == 0x700 for _, o, _ in lists):
+            sys.exit("rollers needs the pair list L700:78")
         extra = [(o, [int(x, 16) for x in o.split(">")], int(n, 16))
                  for o, n in (w.split(":") for w in wins_args if not w.startswith("L"))]
         race, riders = find_race(p)
@@ -392,6 +403,7 @@ def main(argv):
                     + "".join(f" extra {o} {n:x}" for o, _, n in extra)
                     + "".join(f" extra {w.split(':')[0]} {n:x}" for w, _, n in lists)
                     + (" extra hookpad 8" if hooked else "")
+                    + (f" extra rollers 0 instances {p.read32(p.read32(WORLD + 4) + 0x48):x}" if rolled else "")
                     + (" posed 1" if size >= 0x700 else "")
                     + f" course {p.read32(COURSE_ID)}" + "\n")
             while time.time() - t0 < seconds:
@@ -449,10 +461,31 @@ def main(argv):
                                 side = struct.unpack("<I", b[4:8])[0] == heads[i][0]
                                 cur[i] = struct.unpack("<I", b[8 + 4 * side:12 + 4 * side])[0]
                         walked = [w + bytes(n - len(w)) for w, (_, n) in zip(walked, heads)]
+                    rollers = []
+                    if rolled:
+                        li = next(j for j, (_, o, _) in enumerate(lists) if o == 0x700)
+                        found = []  # (rider, the other proxy)
+                        for i in range(k):
+                            w = walked[li * k + i]
+                            for at in range(0, len(w) - 0x13, 0x14):
+                                node = w[at:at + 0x14]
+                                if node[:4] == bytes(4):
+                                    break
+                                a, b = struct.unpack("<II", node[4:12])
+                                found.append((i, a if b == riders[i] + 0x700 else b))
+                        owners = [struct.unpack("<I", x)[0] & 0x1FFFFFF for x in p.read_blocks([((o + 0x84) & 0x1FFFFFF, 4) for _, o in found])] if found else []
+                        # (+0x14 the node's type, +0x28 its instance)
+                        kinds = p.read_blocks([(o + 0x14, 0x18) for o in owners]) if owners else []
+                        rolls = [(i, o, k2[0x14:0x18]) for (i, _), o, k2 in zip(found, owners, kinds) if struct.unpack("<I", k2[:4])[0] == 0]
+                        bodies = p.read_blocks([r for _, o, _ in rolls for r in ((o + 0x30, 0x100), (o + 0x2a0, 0x20))]) if rolls else []
+                        per = [[] for _ in range(k)]
+                        for n, (i, o, inst) in enumerate(rolls):
+                            per[i].append(struct.pack("<I", o) + inst + bodies[2 * n] + bodies[2 * n + 1])
+                        rollers = [bytes([len(x)]) + b"".join(x) for x in per]
                     if struct.unpack("<I", got[0])[0] != tick or p.read32(race + RACE_TICK) != tick:
                         return None  # the game moved on while we read
                     hooks = [table[8 * s:8 * s + 8] for s in slots] if hooked else []
-                    return got[1:1 + k] + ([got[-1]] if pad else []) + wins + walked + hooks
+                    return got[1:1 + k] + ([got[-1]] if pad else []) + wins + walked + hooks + rollers
                 # A body read while `cPostAI::vf1` 0x114730 poses the riders (0 to n-1, after every rider ticked) is the
                 # last frame's (F4h5a: ~2 % of rider samples, mostly riders 5 and 4): read again, while the tick holds,
                 # until no rider's body looks stale (`stale_bodies`), at most 12 ms; else keep the first read

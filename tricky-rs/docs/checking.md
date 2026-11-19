@@ -1942,6 +1942,9 @@ Left (row F4b3k3): record the rollers. A pair at rider+0x700 is two proxies (+0,
 the next pairs at +8/+0xc; a proxy's +0x84 is its node; a `cRollerNode` has the rigid body at +0x30 (+0x60 position,
 +0x70 orientation), +0xcc mass, +0xe4..+0xe8 timers, +0x150 its sphere tree, +0x2a0/+0x2b0 its box, +0x2c0 its proxy.
 With those per tick the test can build `roller::RollerBody` and run `roller::rider_kick` in the frame replay.
+`pine.py record ... L700:78 rollers` (written 2026-11-19, not yet run against the game) records them: per rider a
+count byte, then each roller's address, instance pointer, +0x30..+0x130 and +0x2a0..+0x2c0; the header's `instances`
+is the course's instance base (`Course_GetInstance` 0x254a28: *(*(0x346488 + 4) + 0x48) + 0x100 × index).
 
 ## F4b3z: rec14 9092 rider 1, what the miss is not (2026-11-19, notes)
 
