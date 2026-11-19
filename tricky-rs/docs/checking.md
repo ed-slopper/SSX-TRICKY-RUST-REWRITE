@@ -2013,6 +2013,25 @@ ticks with a field off:
   replay; 9946 r4 stumbles in ours and not in the game.
 Row F4b3k5. rec22 is unchanged (no flags recorded).
 
+## F4b3k5: rec24's four state misses, where each comes from (2026-11-19)
+
+All four belong to gaps already on the board. None is the objects' flags (F4b3k4).
+
+- **2395 r1** (3 → 2, the game stumbles it, the replay pushes it too softly: velocity change (68, −31, −4) in
+  ours, (206, −88, 5) in the game; `Boarder_RiderHit` 0x124920 stumbles over 167.31738). Rider 2 hits it while
+  landing. Read from the recording: rider 2 goes from state 0x10 (spin, in the air) at 2394 to 0x13 at 2395 and
+  moves (37, 99, 78) cm in that frame, its velocity (173.8, 729.5, −3262.1) → (−124.3, 847.1, −3279.3). The
+  replay's landing positions are right on 130 of 436 landing frames, so the hit is met from the wrong place: row F4b3x5.
+- **4792 r5** (3 → 2, the replay's hit too soft): rider 4, 91 cm away, is wiped out (motion 5, "missed", not
+  replayed): the wipe-out windows, row F4b3x5.
+- **9946 r4** (ours stumbles, the game doesn't): ours shoves rider 5 (`DBG shove tick 9946 4->5: was 453 game 453
+  ours 9946`, clip types 8 and 0x15) where the game keeps the old shove record: row F4b3t1.
+- **800 r4** (4 → 0xe, position and velocity exact): the change-fakie control (`ChangeFakieControl_Update`
+  0x104030) goes to 0xe only on clip 0x1ff or 0x221 with the brake button. The second sample's clip 0x217 is the
+  one `PrewindControl_Enter` 0x105070 plays when that happens, so the clip the control read in the frame isn't in
+  either sample. The test takes the second sample's clip (`TRICKY_CLIP_A`) and keeps 4. Not fixable from these
+  windows: it would need the layer-0 clip read in the middle of the frame.
+
 ## F4b3z: rec14 9092 rider 1, what the miss is not (2026-11-19, notes)
 
 `TRICKY_DBGP=<frame tick>` (new) lists every push of the frame replay. rec14 frame 9091 → 9092 (riders run 5, 4, 3,
