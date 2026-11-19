@@ -4196,6 +4196,11 @@ fn computer_pad_words_against_the_running_game() {
     // (`clock`), for the countdown (F4b3k2)
     let kh = ticks[0].chased.iter().position(|(s, _)| s == "5ae0>830");
     let clock_a = std::env::var("TRICKY_CLOCK").as_deref() == Ok("a");
+    // the frame the AI steers by (window `4aa0`: forward, side, up), for the turn-around's steer (F4b3k2);
+    // TRICKY_TURN=<p><f><t>: the samples (a or b) of the position, the frame and the line point +0x360
+    let kf = ticks[0].extra.iter().position(|(o, _)| *o == 0x4aa0);
+    let turn = std::env::var("TRICKY_TURN").unwrap_or("bab".into()).into_bytes();
+    let pick = |k: usize| (turn.get(k) == Some(&b'b')) as usize;
     let mut by: std::collections::BTreeMap<u32, [usize; 2]> = Default::default();
     let mut changed = 0;
     for w in ticks.windows(2) {
@@ -4230,10 +4235,21 @@ fn computer_pad_words_against_the_running_game() {
                 // the turn-around (`aictl::controls_turn_around`): the stick's y alone, and only under 0.5 (rider+0x57b8,
                 // the second sample's: it moves before the control, rec22 2401 r3, 2602 r1, 10463 r0 cross 0.5 in the
                 // frame); its steer (`AIComputer_SteerTowards`) is not recorded
-                0xd => match slow {
-                    Some(v) if v < 0.5 => pad & !0x3f00 == 0,
-                    Some(_) => pad == 0,
-                    None => false,
+                0xd => match (slow, kh, kf) {
+                    // with the object and the frame recorded, the whole word (`aicomp::steer_towards` toward the line
+                    // point +0x360, the skill +0x86c)
+                    (Some(v), Some(kh), Some(kf)) => {
+                        let fr = &w[pick(1)].extra[kf].1[i];
+                        let f = tricky_game::aicomp::Frame { pos: vec4(&w[pick(0)].riders[i], 0x140), fwd: vec4(fr, 0), side: vec4(fr, 0x10), up: vec4(fr, 0x20) };
+                        let skill = f32_at(&w[0].chased[kh].1[i], 0x3c);
+                        let target = vec4(&w[pick(2)].riders[i], 0x360);
+                        let mut word = 0;
+                        tricky_game::aictl::controls_turn_around(&mut word, v, || tricky_game::aicomp::steer_towards(skill, &f, target));
+                        word == pad
+                    }
+                    (Some(v), _, _) if v < 0.5 => pad & !0x3f00 == 0,
+                    (Some(_), _, _) => pad == 0,
+                    (None, _, _) => false,
                 },
                 8 => countdown == Some(pad),
                 _ => get_controls(&mut Const, state, &mut 1.0) == pad,

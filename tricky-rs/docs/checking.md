@@ -2064,6 +2064,20 @@ countdown is still left out.
 rec25's ground ticks under `fadd=g1`: 147,125 compared, every field 146,262, pos 147,038, state 147,063. Shove
 records: 60 of 60.
 
+## F4b3k2c: the computer's turn-around steer (2026-11-19)
+
+Proven (code): `AIComputer_ControlsTurnAround` 0x138ac0 steers with `AIComputer_SteerTowards` 0x1372f8 toward
+rider+0x360 (the line point) once rider+0x57b8 is under 0.5, and puts −steer × 31 in bits 8–13. The test now builds
+the whole word: `aicomp::steer_towards` with the skill +0x86c (window `5ae0>830` +0x3c), the rider's frame (window
+`4aa0`: forward, side, up) and its position +0x140. Every mix of samples was tried (TRICKY_TURN=<position><frame><line point>):
+bab (the position and the line point from the second sample, the frame from the first) gives 869 of 875 on rec25;
+aaa 668, bbb 618, bba 638, aab 601, abb 532. The frame is posed after the riders' ticks, so the first sample's is the
+one the control reads. The rider's own motion has moved the position and the line point before the control.
+
+The misses are 9943 and 9944 r5, three times each: the demo race runs the same way on each of its loops in rec25.
+Rider 5 ticks first in the frame, and rider 4 (which shoves it at 9947) pushes it later in the same frame, so the
+second sample's position is not the one the control saw (inferred).
+
 ## F4b3z: rec14 9092 rider 1, what the miss is not (2026-11-19, notes)
 
 `TRICKY_DBGP=<frame tick>` (new) lists every push of the frame replay. rec14 frame 9091 → 9092 (riders run 5, 4, 3,
