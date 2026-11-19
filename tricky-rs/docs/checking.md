@@ -1942,3 +1942,15 @@ Left (row F4b3k3): record the rollers. A pair at rider+0x700 is two proxies (+0,
 the next pairs at +8/+0xc; a proxy's +0x84 is its node; a `cRollerNode` has the rigid body at +0x30 (+0x60 position,
 +0x70 orientation), +0xcc mass, +0xe4..+0xe8 timers, +0x150 its sphere tree, +0x2a0/+0x2b0 its box, +0x2c0 its proxy.
 With those per tick the test can build `roller::RollerBody` and run `roller::rider_kick` in the frame replay.
+
+## F4b3z: rec14 9092 rider 1, what the miss is not (2026-11-19, notes)
+
+`TRICKY_DBGP=<frame tick>` (new) lists every push of the frame replay. rec14 frame 9091 → 9092 (riders run 5, 4, 3,
+2, 1, 0): rider 2's pass pushes rider 1 by (0.06, −0.02, −0.40), then the slide, then rider 1's own pass by (−2.89,
+−0.91, −8.15); rider 2 gets the opposites and ends right, so the pair's pushes are right. Rider 1 starts 91.5 cm above
+its ground (+0x1bc; normal (0.514, −0.008, 0.858) at both samples), so the slide's hold moves it the full 8.33 cm. Ours
+ends at (the hold) + (the own pass), velocity right; the game is (1.83, −2.60, −5.92) further (6.75 cm, mostly down,
+not along the ground's normal nor a push's line). The runner's original `Boarder_UpdateMotion` 0x11c770 (with
+`Ragdoll_GroundProbe` and the walls on the course) misses by the same. So (inferred) something outside the motion and
+the pushes moves rider 1 in that frame: a wall the game's body meets and the first sample's body does not, or a
+knocked roller (no static touch object near: gari's are 0x10201022, no bounce). Needs the frame's world, as F4b3k3.

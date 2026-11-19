@@ -1612,6 +1612,9 @@ impl ColEnv for Frame {
     fn translate(&mut self, r: usize, v: V4) {
         self.body[r].translate(v);
         self.pushes[r] += 1;
+        if std::env::var("TRICKY_DBGP").is_ok_and(|t| t.parse() == Ok(self.tick)) {
+            eprintln!("DBGP tick {} push rider {r} by {v:?}", self.tick);
+        }
     }
     fn speed_stat(&mut self, r: usize) -> f32 {
         self.stat[r]
