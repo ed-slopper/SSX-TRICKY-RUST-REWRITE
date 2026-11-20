@@ -162,7 +162,7 @@ matches the original.
 
 | ID | Task | Section | Who | Date | Commit |
 |---|---|---|---|---|---|
-| F4b3k2e | Split of F4b3k2: the computer's ride state 0xe (`AIComputer_ControlsRide` 0x1387e8, `aipad::controls_ride`) on the path found from the disc's `.aip`: rec25 8,756 of 8,765 (`checking.md` F4b3k2e) | P0 | irregulur/lynx | 2026-11-19 | |
+| F4b3k2e | Split of F4b3k2: the computer's ride state 0xe (`AIComputer_ControlsRide` 0x1387e8, `aipad::controls_ride`) on the path found from the disc's `.aip`: rec25 8,756 of 8,765 (`checking.md` F4b3k2e) | P0 | irregulur/lynx | 2026-11-19 | 4f592c6 |
 | F4b3k2d | Split of F4b3k2: the computer's dispatch states (`AIComputer_ControlsDispatch` 0x1389c8: the stuck bit, the shove, the riding modes `aicomp::Ai::ride`) with the rider's path found from the disc's `.aip`: rec25 113,103 of 113,158 (`checking.md` F4b3k2d) | P0 | irregulur/lynx | 2026-11-19 | af216f7 |
 | F4b3k2c | Split of F4b3k2: the computer's turn-around (0xd) with its steer (`aicomp::steer_towards` toward rider+0x360, skill +0x86c, the frame `4aa0` from the first sample, the position and line point from the second): rec25 869 of 875 (`checking.md` F4b3k2c) | P0 | irregulur/lynx | 2026-11-19 | ee63495 |
 | F4b3k2b | Split of F4b3k2: the computer's countdown (state 8, `AIComputer_ControlsCountdown` 0x138628 = `aictl::controls_countdown`) against the hooked pad word, with `pine.py record ... clock` (race +0x14) and the object's +0x868 / +0x86c: rec25 2,235 of 2,235 (`checking.md` F4b3k2b) | P0 | irregulur/lynx | 2026-11-19 | 5ae99e8 |
