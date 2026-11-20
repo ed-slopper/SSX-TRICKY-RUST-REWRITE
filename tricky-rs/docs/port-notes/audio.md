@@ -1478,6 +1478,33 @@ Proven (read from the code):
 Heard in a Garibaldi race: take-offs reach the speech (`AirEnter`), a 4.7 s flight played a rider's line (stream 3,
 `data\speech\char\13b2.dat`).
 
+### The resets the announcer hears (E1b2g7d3b4f)
+
+Proven (disassembly, `SLUS_203.26`; ghidra-mcp's `xref` tool group gives the callers):
+
+- `Boarder_RequestReset` 0x118f10 is called by the control states `CruiseControl_Update` (0x103394),
+  `ChangeFakieControl_Update`, `BumpControl_Update`, `JumpControl_Update`, `LandHardControl_Update`,
+  `LandNormalControl_Update`, `Gate2BaseControl_Update`, `PrewindState_Update` (0x10557c), `GetUpState_Update`
+  (0x108264) and two unnamed ones (0x10466c, 0x10817c): each with the reset button (pad bit 0, action 0x25, select
+  in both `BTNMAP`s) or off the course (+0x290 = 0), storing +0x304 = `(pad ^ 1) & 1` (0 for the button) first;
+  `NaturalAirControl_Update` (pad bit 1), `SpinState_Update` (bit 8) and `RailSlideControl_Update` store nothing;
+  `cBoarder::vf7` 0x117198 three times (the two decays and the floor, +0x304 = 1); `TriggerScript_ExecOp` op 13
+  (+0x304 = 1).
+- The floor (0x117c48..0x117c88): +0x148 under *(gWorld 0x346488) +0xc less 10000. gWorld points at the `.ltg` as
+  loaded; `ResolveTGroupHeader` 0x252470 only relocates +0x4c and +0x50, so +0xc is the file's box, its lowest z
+  (`CourseGround::floor`).
+- `Boarder_PlaceAt` 0x11cae8 (0x11cf40..0x11cf6c): `Score_BankPoints` 0x155aa8 (returns −0.12, 0xbdf5b343), and
+  `Boarder_AddMeter` with it only when +0x304 is 0; else +0x304 cleared. So only the reset button (and a start,
+  `cBoarder::vf8` 0x116ab8 stores 0) costs the meter; the port charged every respawn, and the app's reset key a
+  second time on top.
+
+In the app: `Rider::request_reset(flag)` (the store, then `respawn_safe`, which pushes `RiderSpeech::Reset`); the
+reset key and select set `Input::reset`, the pad word's select bit, so the snow's states (`control_tick`) and the
+spin state ask for it as the game's; the decays, the floor (`Rider::below_world`), the controls off the course and
+the wipe-out's `GetUpState` are `request_reset(Some(1))`. STANDIN: the button in the air and on rails and in the
+wipe-out (their control states are not run, row G1i2), the out-of-bounds boxes (for op 13, row E9b2), the nine
+seconds in the air and 30 m under the mesh without the course's files, and the safe spot for the reset state.
+
 ### The event sound heard (E1b2g7d5a)
 
 Proven (live Ghidra, checked in `tests/sndqueue.rs` `ambient_banks_match_the_original`):

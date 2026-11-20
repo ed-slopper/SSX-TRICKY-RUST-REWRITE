@@ -219,6 +219,8 @@ pub struct Input {
     pub boost: bool,
     /// a computer rider's wind-up stick, apart from its steering (None: the stick is the steering)
     pub wind: Option<f32>,
+    /// the reset button (action 0x25, `BTNMAP` select) pressed this tick
+    pub reset: bool,
 }
 
 /// What a rider asks of the audio object (`DAT_00343050`): the app's announcer runs it
@@ -509,6 +511,11 @@ pub struct Rider {
     pub prewind_started: u32,
     pub rec: control_tick::Records,
     pub boost_lvl: f32,
+    /// +0x304, the reset flag: 1 for a reset the game asks itself, 0 for the reset button; `Boarder_PlaceAt`
+    /// 0x11cae8 charges the meter when it is 0, and clears it
+    pub reset_flag: u32,
+    /// a reset a control state asked for this tick (`Boarder_RequestReset` 0x118f10), with its store of +0x304
+    reset_req: Option<Option<u32>>,
 }
 
 pub fn heading(yaw: f32) -> Vec3 { Vec3::new(-yaw.sin(), 0.0, -yaw.cos()) }
@@ -529,7 +536,7 @@ impl Rider {
                last_trick: String::new(), trick_timer: 0.0, crashed: 0.0, hard_land: 0.0, crouch_v: 0.0, brake_v: 0.0, jump_c: 0.0, jump_delay: 0.0, height: 0.0,
                course_dir: None, course_pts: None, wipe: None, crash_at: None, gm: None, crash_spray: None, lean: [0.0; 3], up: [0.0, 0.0, 1.0, 0.0], recover: None, ai: false, down_t: 0.0, getup: -1.0, stumble: 0.0, wall_hit: None, speed_timer: 0.0, spin_timer: 0.0, spin_used: false, tube_class: u8::MAX, gate_p: 0.0, gate_hi: 0.0, gate_lo: 0.0, gate_still: 0.0, gate_target: 0.0, gate_speed: 0.0, gate_state: 8, gate_rock_dir: 0, band: (0.005, 0.0250417), spin_base: 0.0, flip_base: 0.0, late: false, cause: "", spin_ax: Axis::default(), flip_ax: Axis::default(), air_mode2: false, rail_off: 0.0, rail_time: 0.0, rail_halves: 0, boost_was: false, chain: 0,
                ubers: Vec::new(), uber: 0.0, uber_id: 0, uber_done: false, letters: 0, multiplier: 1,
-               sc: new_score(), tick_acc: 0.0, full_count: 0, rail_kind: 0, rail_lean: 0.0, rail_goal0: 0.0, rail_committed: 0.0, show_parts: Vec::new(), speech: Vec::new(), hit_by: u32::MAX, grab_scored: false, grab_tw: false, hit_wait: 0, att: None, last_hit: Default::default(), impact: 0.0, impact_n: [0.0; 4], knocks: 0.0, slot: 0, place_ray: None, hit_kind: 0, land_time: 0.0, takeoffs: 0, rail_blend: 0.0, rail_word: 0, rail_grid: false, rail_hit: [0.0; 4], spin_st: None, pad_dev: Default::default(), land_word: u32::MAX, land_normal: [0.0, 0.0, 1.0, 0.0], takeoff_wind: (0.0, 0.0), ctl: control_tick::CRUISE, cruise: Default::default(), prewind_started: 0, rec: Default::default(), boost_lvl: 0.0 };
+               sc: new_score(), tick_acc: 0.0, full_count: 0, rail_kind: 0, rail_lean: 0.0, rail_goal0: 0.0, rail_committed: 0.0, show_parts: Vec::new(), speech: Vec::new(), hit_by: u32::MAX, grab_scored: false, grab_tw: false, hit_wait: 0, att: None, last_hit: Default::default(), impact: 0.0, impact_n: [0.0; 4], knocks: 0.0, slot: 0, place_ray: None, hit_kind: 0, land_time: 0.0, takeoffs: 0, rail_blend: 0.0, rail_word: 0, rail_grid: false, rail_hit: [0.0; 4], spin_st: None, pad_dev: Default::default(), land_word: u32::MAX, land_normal: [0.0, 0.0, 1.0, 0.0], takeoff_wind: (0.0, 0.0), ctl: control_tick::CRUISE, cruise: Default::default(), prewind_started: 0, rec: Default::default(), boost_lvl: 0.0, reset_flag: 0, reset_req: None };
         // the start line's `Boarder_PlaceAt` 0x11cae8 (`cBoarder::vf8` 0x116ab8: heading from the path's direction)
         r.att = Some((orient::placed_attitude(placed_heading(yaw), None), yaw));
         r
@@ -538,16 +545,36 @@ impl Rider {
     pub fn respawn(&mut self, at: (Vec3, f32)) {
         self.place(at.0, at.1, placed_heading(at.1));
     }
+    /// `Boarder_RequestReset` 0x118f10 from one of its callers, after the caller's store of +0x304 (`flag`; None for
+    /// those that store none: `SpinState_Update` 0x100908, `NaturalAirControl_Update`, `RailSlideControl_Update`).
+    /// Its callers that store: the controls on the reset button or off the course (`(pad ^ 1) & 1`: 0 for the
+    /// button), `cBoarder::vf7` 0x117198's decays and floor (1), the trigger scripts' op 13 (1).
+    pub fn request_reset(&mut self, flag: Option<u32>) {
+        if let Some(f) = flag {
+            self.reset_flag = f;
+        }
+        self.respawn_safe();
+    }
     /// Back to the safe spot: at the game's heading where the host keeps it (row G20c3b5), else the port's yaw
     pub fn respawn_safe(&mut self) {
         // `Boarder_RequestReset` 0x118f10 → `Sfx_OnRiderReset` 0x218eb0 (a local player's, +0x41c == 1) →
-        // `Speech_OnRiderReset` 0x233a18. STANDIN: the app's resets (all here) for the game's reset state.
+        // `Speech_OnRiderReset` 0x233a18. STANDIN: the safe spot for the game's reset state (`ResetState_Update`
+        // 0x106a90: the fade, moved on along the path, `ResetState_PlaceRider`), and no `AIP_CanResetAt` test.
         if !self.ai && self.fin.is_none() {
             self.speech.push(RiderSpeech::Reset);
         }
         match self.safe_heading {
             Some(h) => self.respawn_heading(self.safe.0, h),
             None => self.respawn(self.safe),
+        }
+    }
+    /// `cBoarder::vf7` 0x117198's third reset (0x117c48..0x117c88): the rider's height (+0x148) under the world's
+    /// floor (gWorld 0x346488 → +0xc: the `.ltg`'s box, its lowest z) less 10000 (100 m). STANDIN without the course's
+    /// files (a levels folder): 30 m under the drawn mesh's lowest point
+    pub fn below_world(&self, world: &CollisionWorld) -> bool {
+        match &world.course {
+            Some(c) => ground_tick::to_game(self.pos, 100.0, 1.0)[2] < c.floor - 10000.0,
+            None => self.pos.y < world.min_y - 30.0,
         }
     }
     /// A respawn at the game's own heading (`Boarder_PlaceAt`'s f12, as its callers make it: the inline atan2 of a
@@ -591,10 +618,15 @@ impl Rider {
         // and its attitude (G20c3b), which the game keeps through the drop: the quaternion is only turned by the
         // placement's ray (cast on the next step, `place_ray`), the heading and nothing else
         self.att = Some((orient::placed_attitude(game_heading, None), self.yaw));
-        // `Boarder_PlaceAt` 0x11cae8: the chain banked, its meter change (−0.12) applied
+        // `Boarder_PlaceAt` 0x11cae8 (0x11cf40..0x11cf6c): the chain banked (`Score_BankPoints` 0x155aa8); its
+        // meter change (−0.12) applied only with the reset flag +0x304 clear (the reset button, a start), else the
+        // flag cleared
         let (m, calls) = self.sc.bank_points();
         self.show(&calls);
-        self.add_meter(m);
+        if self.reset_flag == 0 {
+            self.add_meter(m);
+        }
+        self.reset_flag = 0;
         self.respawns += 1;
     }
     pub fn clear_air(&mut self) {
@@ -1219,7 +1251,7 @@ impl Rider {
         }
         // the wipe-out runs these a game tick at a time itself
         if self.crashed <= 0.0 && impact_tick(&mut self.impact, &mut self.impact_n, &mut self.knocks, dt * 60.0) {
-            self.respawn_safe();
+            self.request_reset(Some(1));
         }
         self.lean_aim();
     }
@@ -1235,6 +1267,12 @@ impl Rider {
         if self.crashed > 0.0 {
             // (the wipe-out's control state, 0x13; its own tick is the port's, row G1i2)
             self.ctl = 0x13;
+            // STANDIN (row G1i2): the reset button of `GetUpState_Update` 0x108198 (pad bit 0: +0x304 = 0), which the
+            // app does not run
+            if input.reset {
+                self.request_reset(Some(0));
+                return;
+            }
             self.wipe_step(world, dt);
             self.input = Input::default();
             return;
@@ -1281,6 +1319,14 @@ impl Rider {
             self.brake_v += e.clamp(-r * dt, r * dt);
         }
 
+        // STANDIN (row G1i2): the reset button in the air and on rails (`NaturalAirControl_Update` pad bit 1,
+        // `RailSlideControl_Update`, both storing no +0x304), whose control states the app does not run; the spin
+        // state's and the snow's are the game's (`spin_tick`, `ground_control`)
+        if input.reset && (self.rail.is_some() || (!self.grounded && self.spin_st.is_none())) {
+            self.request_reset(None);
+            return;
+        }
+
         // ---- grinding a rail
         if self.rail.is_some() {
             match &world.course {
@@ -1319,7 +1365,13 @@ impl Rider {
                 let n = self.normal;
                 let f = self.forward();
                 // the control state's update after the motion (row G1i1): the jump when the crouch has unwound
-                if self.ground_control(&input) {
+                let jump = self.ground_control(&input);
+                // the control's `Boarder_RequestReset` (the reset button, or off the course: surface 0)
+                if let Some(flag) = self.reset_req.take() {
+                    self.request_reset(flag);
+                    return;
+                }
+                if jump {
                     let c = self.jump_c;
                     let steep = self.apply_jump(c, n, f, self.board_up(), false);
                     self.jump_c = 0.0;
@@ -1356,6 +1408,10 @@ impl Rider {
                 jumped = true;
             }
             if self.spin_st.is_some() { self.spin_tick(&input, dt) } else { self.air_rotation(&input, dt) }
+            if let Some(flag) = self.reset_req.take() {
+                self.request_reset(flag);
+                return;
+            }
             // the landing alignment of a spin or flip is `SpinState_Update`'s (G20c3c2, G1a5b3b): until then only a jump
             // or a drop without either keeps the game's attitude (G20c3c, G20c3b)
             if self.spin_st.is_none() {
@@ -1420,11 +1476,11 @@ impl Rider {
             }
         }
         self.pos = p;
-        // the surface underneath: 0 is out of bounds (back onto the course, no charge), 6 (bounce /
-        // unskiable) and 10 (wall) put the rider down (BoarderState3_Ride_Input, ground motion)
+        // the surface underneath: 6 (bounce / unskiable) and 10 (wall) put the rider down (BoarderState3_Ride_Input,
+        // ground motion). (0, out of bounds, is the control state's reset above: `CruiseControl_Update` 0x103050 and
+        // the others ask for one off the course, +0x304 = 1: no charge)
         if self.grounded && self.crashed <= 0.0 && self.rail.is_none() {
             match self.surface {
-                0 => { self.respawn_safe(); return; }
                 6 | 10 if self.tube_class == u8::MAX => { self.cause = "surface"; self.crash_kind = 0; self.wipe_out(); }
                 _ => {}
             }
@@ -1547,9 +1603,11 @@ impl Rider {
             self.safe_timer += dt;
             if self.safe_timer > 1.5 && !self.safe_external && self.surface != 0 { self.safe = (self.pos, self.yaw); self.safe_heading = None; self.safe_timer = 0.0; }
         }
-        // out of the world, or into one of the course's out-of-bounds boxes: back to the last good spot
-        if self.pos.y < world.min_y - 30.0 || (!self.grounded && self.air_time > 9.0) || (self.rail.is_none() && world.in_reset(self.pos + Vec3::Y * 0.8, BODY_RADIUS)) {
-            self.respawn_safe();
+        // out of the world (`cBoarder::vf7`'s floor), or (STANDIN) the port's own nine seconds in the air on a levels
+        // folder, or (STANDIN, row E9b2) into one of the out-of-bounds boxes for the trigger scripts' op 13
+        // (`TriggerScript_ExecOp` 0x13bfd0 at 0x13c3b4: +0x304 = 1, `Boarder_RequestReset`)
+        if self.below_world(world) || (world.course.is_none() && !self.grounded && self.air_time > 9.0) || (self.rail.is_none() && world.in_reset(self.pos + Vec3::Y * 0.8, BODY_RADIUS)) {
+            self.request_reset(Some(1));
         }
     }
 
@@ -1787,6 +1845,8 @@ impl Rider {
         let mut ps2 = 0u16;
         if input.jump { ps2 |= 0x40; }
         if input.boost || input.tweak { ps2 |= 0x80; }
+        // select: the reset (`BTNMAP` action 0x25)
+        if input.reset { ps2 |= 0x100; }
         // the shoulder buttons (L1 0x4, R1 0x8, L2 0x1, R2 0x2): the grab combos
         for (bit, m) in [(1, 0x4), (2, 0x8), (4, 0x1), (8, 0x2)] {
             if input.grab & bit != 0 { ps2 |= m; }
@@ -1861,6 +1921,8 @@ impl Rider {
             match c {
                 crate::spin::SpinCall::ScoreSpin(d) => self.sc.update_spin(d),
                 crate::spin::SpinCall::ScoreFlip(d) => self.sc.update_flip(d),
+                // the reset button (pad bit 8): `Boarder_RequestReset`, no store of +0x304
+                crate::spin::SpinCall::Reset(_) => self.reset_req = Some(None),
                 _ => {}
             }
         }
@@ -2349,8 +2411,8 @@ pub fn grab_clip(name: &str) -> u32 {
 /// `cBoarder::vf7` 0x117198 after the motion: +0x2f0 × 0.98; +0x2e4 × 0.95603746, over 4.492007 0 and
 /// `Boarder_RequestReset` 0x118f10; +0x300 × 0.9782825, over 12.002146 the same. Returns whether a reset is asked.
 /// `ticks` is the number of 60 Hz ticks (the factors raised to it: STANDIN for the port's variable step, exact at
-/// one). Not ported: +0x304 = 1 with each reset, the reset's own checks (+0x418, `AIP_CanResetAt`), and the third
-/// reset under the world (+0x148 under gWorld+0xc − 10000, the port's `min_y` check stands in).
+/// one). The caller's reset is [`Rider::request_reset`] with +0x304 = 1; the third reset, under the world, is
+/// [`Rider::below_world`]. Not ported: the reset's own checks (+0x418, `AIP_CanResetAt`).
 pub fn impact_tick(impact: &mut f32, n: &mut [f32; 4], knocks: &mut f32, ticks: f32) -> bool {
     let one = ticks == 1.0;
     let f = |k: f32| if one { k } else { k.powf(ticks) };

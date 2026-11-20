@@ -662,9 +662,10 @@ impl Rider {
                 _ => {}
             }
         }
-        // states 0x13 / 0x14 (`GetUpState_Update` 0x108198): out of bounds (surface 0) is a reset at once
+        // states 0x13 / 0x14 (`GetUpState_Update` 0x108198): out of bounds (surface 0) is a reset at once, +0x304 =
+        // (pad ^ 1) & 1 (1: no button)
         if self.surface == 0 {
-            self.respawn_safe();
+            self.request_reset(Some(1));
             return;
         }
         if let Some((near, ahead)) = self.course_pts {
@@ -702,15 +703,17 @@ impl Rider {
             Out::Down => {}
             Out::Air(clip) => return self.end_wipe(clip, false),
             Out::Ride(clip) => return self.end_wipe(clip, true),
+            // `cBoarder::vf7` 0x117198's decays: +0x304 = 1
             Out::Reset => {
-                self.respawn_safe();
+                self.request_reset(Some(1));
                 return;
             }
         }
         self.wipe = Some(w);
-        // out of the world, or into one of the course's out-of-bounds boxes
-        if self.pos.y < world.min_y - 30.0 || world.in_reset(self.pos + Vec3::Y * 0.8, BODY_RADIUS) {
-            self.respawn_safe();
+        // out of the world (`cBoarder::vf7`'s floor), or (STANDIN, row E9b2) into one of the out-of-bounds boxes for
+        // the trigger scripts' op 13; both +0x304 = 1
+        if self.below_world(world) || world.in_reset(self.pos + Vec3::Y * 0.8, BODY_RADIUS) {
+            self.request_reset(Some(1));
         }
     }
 

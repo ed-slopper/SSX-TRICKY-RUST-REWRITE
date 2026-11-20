@@ -121,3 +121,52 @@ fn the_button_map_binds_the_riders_trick_slots() {
         }
     }
 }
+
+/// The reset button (select, action 0x25) on the snow goes through the cruise state's `Boarder_RequestReset` with
+/// +0x304 = 0, so `Boarder_PlaceAt` charges the meter (`Score_BankPoints`' −0.12); a reset the game asks itself
+/// (+0x304 = 1: off the course, the decays, the floor) does not (row E1b2g7d3b4f)
+#[test]
+fn only_the_reset_button_costs_the_meter() {
+    let world = slope(300.0, 40.0);
+    let rails = Rails::default();
+    let mut r = rider();
+    r.safe = (Vec3::new(0.0, 5.0, -200.0), 0.0);
+    let step = |r: &mut Rider, i: Input| r.step(&world, &rails, i, 1.0 / 60.0);
+    for _ in 0..30 {
+        step(&mut r, Input::default());
+    }
+    assert_eq!(r.ctl, CRUISE);
+    r.boost = 0.5;
+    let n = r.respawns;
+    step(&mut r, Input { reset: true, ..Input::default() });
+    assert_eq!(r.respawns, n + 1, "the button resets");
+    assert!(r.boost < 0.45, "and costs the meter: {}", r.boost);
+    assert_eq!(r.reset_flag, 0);
+    // a reset the game asks for itself
+    r.boost = 0.5;
+    r.request_reset(Some(1));
+    assert_eq!((r.respawns, r.boost, r.reset_flag), (n + 2, 0.5, 0));
+}
+
+/// Off the course (surface 0) the cruise state asks for the reset itself (+0x304 = 1): no charge
+#[test]
+fn off_the_course_the_control_resets_free() {
+    let mut world = CollisionWorld::default();
+    let q = |x: f32, z: f32| Vec3::new(x, -z * 0.1, z);
+    world.add_ex([q(-10.0, 0.0), q(10.0, 0.0), q(-10.0, -300.0)], None, true, 0, false);
+    world.add_ex([q(10.0, 0.0), q(10.0, -300.0), q(-10.0, -300.0)], None, true, 0, false);
+    let rails = Rails::default();
+    let mut r = rider();
+    r.safe = (Vec3::new(0.0, 5.0, -200.0), 0.0);
+    r.boost = 0.5;
+    let n = r.respawns;
+    for _ in 0..10 {
+        r.step(&world, &rails, Input::default(), 1.0 / 60.0);
+        if r.respawns != n {
+            break;
+        }
+    }
+    assert_eq!(r.respawns, n + 1);
+    // (the ticks before it drain a little; the button's charge would be 0.12 scaled by the meter stat)
+    assert!(0.49 < r.boost, "{}", r.boost);
+}

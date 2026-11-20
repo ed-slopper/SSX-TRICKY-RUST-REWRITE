@@ -1739,6 +1739,7 @@ fn ride(
         tweak: keys.pressed(KeyCode::KeyK) || key(KeyCode::ShiftLeft, KeyCode::ShiftRight),
         boost: key(KeyCode::ShiftLeft, KeyCode::ShiftRight),
         wind: None,
+        reset: false,
     };
     let playing = game.screen == ui::Screen::Playing;
     let mut restart = keys.just_pressed(KeyCode::Enter) && playing && game.since > 0.3;
@@ -1781,8 +1782,9 @@ fn ride(
         // the level's scripted state too: glass whole, counters full, doors shut, animations as woken
         if let Some(mut wa) = wa { wa.restart = true; }
     }
-    // a reset you ask for costs 0.12 of the meter (Score_ManualReset)
-    if unstick { r.respawn_safe(); r.add_meter(-0.12); }
+    // the reset button (select, backspace) goes to the rider's controls in the pad word on the next tick
+    // (`Boarder_RequestReset` 0x118f10 with +0x304 = 0: `Boarder_PlaceAt` charges the meter 0.12)
+    let mut reset_once = unstick;
     // F: shove whoever is alongside. Knocking a rival down is worth boost, as in the original.
     let shove = keys.just_pressed(KeyCode::KeyF) || pads.iter().any(|p| p.just_pressed(GamepadButton::RightThumb) || p.just_pressed(GamepadButton::LeftThumb));
     if shove && playing && r.crashed <= 0.0 && race.0.state == RaceState::Running {
@@ -1980,6 +1982,9 @@ fn ride(
         let held = r.gate_launch(dt);
         let input = if held || r.gate_state == 9 { Input::default() } else { input };
         let input = r.finish_input(input);
+        // (pressed for the frame's first tick only; none in the app's own start gate, and none once finished:
+        // `Boarder_RequestReset` asks none past the finish, +0x418)
+        let input = Input { reset: std::mem::take(&mut reset_once) && !waiting && !held && r.fin.is_none(), ..input };
         r.step(&world.0, &rails.0, input, dt);
         r.finish_after(dt);
         r.apply_pads(&world.0, dt);

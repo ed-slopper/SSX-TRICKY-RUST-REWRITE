@@ -48,6 +48,8 @@ struct Env<'a> {
     /// `Boarder_SetState`'s new state, `Jump_ApplyImpulse` asked
     state: Option<u32>,
     jumped: bool,
+    /// `Boarder_RequestReset` asked, with the state's store of +0x304
+    reset: Option<u32>,
 }
 
 /// The brake, crouch and steer of a state's rider as `finish`'s helpers take them
@@ -136,8 +138,11 @@ impl ControlEnv for Env<'_> {
     // animation's
     fn update_lean_anim(&mut self, _r: &mut control::Rider, _a: f32, _b: f32) {}
     fn rotate_about_axis(&mut self, _r: &mut control::Rider, _angle: f32) {}
-    // STANDIN: the port's own respawn off the course (surface 0, rider.rs `step_tick`), no reset button
-    fn request_reset(&mut self, _r: &mut control::Rider) {}
+    /// `Boarder_RequestReset` 0x118f10 (the reset button, or off the course): the rider resets after the state's
+    /// update ([`Rider::request_reset`]), with the +0x304 the state stored
+    fn request_reset(&mut self, r: &mut control::Rider) {
+        self.reset = Some(r.reset_flag);
+    }
     fn jump_impulse(&mut self, _r: &mut control::Rider, _min: f32) {
         self.jumped = true;
     }
@@ -280,7 +285,7 @@ impl Rider {
         let tricky = self.tricky();
         let (mut meter, mut level) = (self.boost, self.boost_lvl);
         let mut speech = std::mem::take(&mut self.speech);
-        let mut env = Env { meter: &mut meter, boost_level: &mut level, tricky, speech: &mut speech, state: None, jumped: false };
+        let mut env = Env { meter: &mut meter, boost_level: &mut level, tricky, speech: &mut speech, state: None, jumped: false, reset: None };
         let mut cr = self.control_rider();
         match self.ctl {
             CRUISE => {
@@ -292,6 +297,9 @@ impl Rider {
             _ => {}
         }
         let (state, jumped) = (env.state, env.jumped);
+        if let Some(f) = env.reset {
+            self.reset_req = Some(Some(f));
+        }
         self.speech = speech;
         if self.ctl == PREWIND {
             let mut p = Prewind {
@@ -325,7 +333,9 @@ impl Rider {
                 match c {
                     PrewindCall::State(s) => self.set_control(s),
                     PrewindCall::Boost(boarder::Call::BoostEmpty) => self.speech.push(RiderSpeech::BoostEmpty),
-                    // STANDIN: the clips (row G5d); the reset button and surface 0 are the port's own respawn
+                    // `Boarder_RequestReset` after `PrewindState_Update`'s store of +0x304 (0x105580)
+                    PrewindCall::Reset => self.reset_req = Some(Some(p.x304)),
+                    // STANDIN: the clips (row G5d)
                     _ => {}
                 }
             }

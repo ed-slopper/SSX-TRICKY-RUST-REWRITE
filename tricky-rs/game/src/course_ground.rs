@@ -37,6 +37,9 @@ pub struct CourseGround {
     /// animated doors, boosts...), which the port does not run (row E7b2); the rider's instance query passes
     /// through them unless the port poses them ([`CourseGround::pose`]), as the app did before row E8c3
     driven: Vec<bool>,
+    /// gWorld (0x346488) +0xc: the `.ltg` header's box, its lowest z (cm; `ResolveTGroupHeader` 0x252470 leaves it
+    /// as the file has it), the floor `cBoarder::vf7` 0x117198 resets riders 100 m under
+    pub floor: f32,
 }
 
 struct Env<'a> {
@@ -79,7 +82,8 @@ impl CourseGround {
             rails.set_live(k, true);
         }
         let rails = Mutex::new(rails);
-        Some(CourseGround { world: Mutex::new(world), flags, coeffs, cache: Mutex::new(HashMap::new()), poses: Mutex::new(HashMap::new()), ssf, knock, driven, rails })
+        let floor = ltg.bbox.min[2];
+        Some(CourseGround { world: Mutex::new(world), flags, coeffs, cache: Mutex::new(HashMap::new()), poses: Mutex::new(HashMap::new()), ssf, knock, driven, rails, floor })
     }
 
     /// A rail (the course's spline `spline`) switched on or off (`RailWorld::set_live`)
