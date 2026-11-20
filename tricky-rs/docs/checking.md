@@ -2294,3 +2294,29 @@ pos 62,828, vel 62,752, state 62,826; the hook's pad word on 62,344.
 - None of rec26's state misses is a 3 → 2 stumble on a roller: one 3 → 2 at 2193 (rider 0, clip 0x248), four 3 → 6
   and one 4 → 0xe; F4b3k1's stumbles are rec22's (the mesa attract replay), which has no `rollers` window. Left for
   F4b3k1: re-record that attract replay with `L700:78 rollers` to replay its five kicks.
+
+## F4b3k1: stumbles off knocked objects on a Mesa race by hand (rec28, rec29; 2026-11-20, notes)
+
+rec28: Mesa Blanca raced by hand (riding into cones, barriers and riders), six riders, 16,620 ticks; rec29: the same
+race's scoreboard replay, 15,701 ticks; both with rec26's windows (`... L700:78 hookpad rollers flags clock`). 13
+knocked objects show up in the pair lists (1041, 1078, 169, 187, 210–212, 1962, 1963, 1969, 1970, 2255, 2926), mostly
+the player's (rider 0). The replay runs the race again exactly: the same misses on the same ticks.
+
+`ground_ticks_against_the_running_game` (`fadd=g1`, the runner): rec28 74,539 ground ticks, every field 74,329, pos
+74,531, vel 74,399, state 74,539 of 74,5xx; rec29 69,055, every field 68,984, state 69,048. The runner's stumbles
+missed (3 → 2, the runner 3) are the same four in both: 12579 r0 (clip 0x249), 13221 r3 (0x248), 14166 r0 (0x245),
+14835 r0 (0x248).
+
+Found (TRICKY_DBG2=ours, with and without TRICKY_NOROLL=1):
+- **The kicks make the stumbles.** At 12579 (objects 1962 and 1963 in rider 0's list) and 14835 (2255) ours goes
+  3 → 2 with the rollers' kicks (`roller::rider_kick`) and stays 3 without. The runner's
+  `Boarder_InstanceCollisions` is still a stub, so its counts don't move: its rollers' loop is what is left to run.
+- **The first contact is different.** At 14166 the pair with 2255 shows only from the next sample (14167). Ours
+  bounces off 2255 as a static touch object (TRICKY_INSTDBG: flags 0x10a111a3, mass 5, bounce 0.2) and turns the
+  velocity round (ours (−591, −198, 97) cm/s, the game's (213, 1781, 655), before (167, 1803, 691)). Taking the next
+  sample's roller for the frame (tried, not kept) changes nothing, as with rec26 11617 r2 (F4b3k3).
+  Lead: `Boarder_InstanceCollisions` 0x125088 calls `Instance_OnPlayerContact` 0x13bd40 before it tests flag 0x80
+  for `Boarder_InstanceBounce` (the flags are read again after the call). The contact goes to the object's node
+  (+0xe4: virtual +0x64, then +0x94) or starts its event-1 script (`knockables.rs`), which makes it a roller. Find
+  what this first contact does to the rider and to 0x80 that the replay's static bounce does not.
+- 13221 r3 has no roller in its list (a rider or something else).
