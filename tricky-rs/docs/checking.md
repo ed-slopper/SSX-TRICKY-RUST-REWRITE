@@ -2273,3 +2273,24 @@ Found (`fadd=g1`; with the hook → TRICKY_NOHOOK=1):
   rec27 10: the player's are mostly pad 0x1a in mode 2), and rec26 7639–7646, where the spin goes to 0 as the clip
   goes 0x223 → 0x22d while the rider stays in the spin state (something outside `SpinState_Update` sets +0x1d0; the
   human had fallen and been reset a few times in that race, but the tick's pad word has no reset bit 0x100).
+
+## F4b3k3: the rollers recorded on Mesa (rec26, 2026-11-20)
+
+rec26 (F4b3d1: Mesa Blanca, raced by hand, six riders, `... L700:78 hookpad rollers flags clock`) is the first
+recording with a knocked object in a rider's pair list: one `cRollerNode` (node 0x8f6320, course object 2255), in
+rider 2's list from tick 11618 and rider 1's from 11647, 88 rider ticks in all, awake (+0x110 0) and moving (its
+body's position moves about 10 cm a tick at 11618–11619). So the recorder works and `recording::rollers` reads it.
+
+`ground_ticks_against_the_running_game` on rec26 (`fadd=g1`, the runner): 62,831 ground ticks, every field 62,700,
+pos 62,828, vel 62,752, state 62,826; the hook's pad word on 62,344.
+- `rollers_of` places each recorded roller's tree from its body: the box it gives equals the recorded +0x2a0 / +0x2b0
+  to the last float digit on every listed tick (TRICKY_ROLLDBG).
+- The kicks (`roller::rider_kick`, ours only; the runner's `Boarder_InstanceCollisions` is still a stub) change no
+  count: with and without TRICKY_NOROLL=1 every field, pos, vel and state are the same. The ticks while the roller is
+  in a rider's list are right.
+- One miss is next to it: rider 2 at tick 11617 (the frame before its pair first shows), pos and vel off. Taking the
+  next sample's roller for that frame (tried as a test, not kept) does not fix it, so it is not shown to be the
+  roller's kick.
+- None of rec26's state misses is a 3 → 2 stumble on a roller: one 3 → 2 at 2193 (rider 0, clip 0x248), four 3 → 6
+  and one 4 → 0xe; F4b3k1's stumbles are rec22's (the mesa attract replay), which has no `rollers` window. Left for
+  F4b3k1: re-record that attract replay with `L700:78 rollers` to replay its five kicks.
