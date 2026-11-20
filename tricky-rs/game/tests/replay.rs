@@ -792,6 +792,15 @@ fn spin_obj(st: &[u8]) -> SpinObj {
 /// (F4b3m). Pairs that hold no update of the rider or two (the position or the angles moved by 0 or 2 ticks'
 /// worth) are left out. Needs TRICKY_STATS (the tricks stat, stats+0x1a) and a recording with the windows `57b0:64`
 /// and `-170:74` (the spin object: the state manager *(rider+0x5ae0) + 0x740).
+/// The pad word the rider's controller handed `Boarder_UpdateControl` for the tick that ends at sample `t`, kept by
+/// `pine.py record ... hookpad` with the rider's speed-sample count (+0x5900) of that tick (F4b3k): None without the
+/// window, or when its count is not the sample's (the rider did not tick in this frame)
+fn hook_pad(t: &recording::Tick, i: usize) -> Option<u32> {
+    let x = &t.chased.iter().find(|(s, _)| s == "hookpad")?.1[i];
+    let count = t.extra.iter().find(|(o, _)| *o == 0x5900).map(|(_, v)| f32_at(&v[i], 0));
+    (count.is_none() || count == Some(f32_at(x, 4))).then(|| u32_le(x, 0))
+}
+
 #[test]
 fn spin_ticks_against_the_running_game() {
     let (Ok(paths), Ok(stats)) = (std::env::var("TRICKY_RECORDING"), std::env::var("TRICKY_STATS")) else { return };
@@ -861,6 +870,12 @@ fn spin_ticks_against_the_running_game() {
     let mut second_anim = vec![0usize; 1 + runners.len()];
     // the computer's stick read from the second sample (mode 2): [ticks it was tried], and per way those it made right
     let mut stick_tries = [0usize];
+    let mut hooked_ticks = [0usize];
+    // mode-2 ticks on the half-pipe clips 0x23c / 0x23d (the phase moves the spin): [ticks], and per way right
+    let mut pipe_ticks = [0usize];
+    let mut pipe_right = vec![0usize; 1 + runners.len()];
+    // the player's ticks by the spin's mode (0, 1, 2), and per way those every field right
+    let mut player_modes = vec![[[0usize; 2]; 3]; 1 + runners.len()];
     let mut stick_right = vec![0usize; 1 + runners.len()];
     let n_ways = 1 + runners.len();
     let (mut other, mut skew) = (0, 0);
@@ -965,10 +980,16 @@ fn spin_ticks_against_the_running_game() {
             let p0 = wp.and_then(|x| player_pad(stat, x.pad.as_deref(), w[0].pad.as_deref()?, 0x10));
             let mut pads: Vec<u32> = if p1.is_some() { [p1, p0].into_iter().flatten().collect() } else { vec![0] };
             let player = w[1].pad.is_some() && u32_le(stat, 0x6c) <= 1;
+            // the pad word the tick was handed, where the hook kept it (F4b3d1, window `hookpad`): the only one tried
+            let hooked = hook_pad(&w[1], i).filter(|_| std::env::var("TRICKY_NOHOOK").is_err());
+            if let Some(h) = hooked {
+                pads = vec![h];
+                hooked_ticks[0] += 1;
+            }
             // a computer's pad word is not recordable (F4b3k), but in mode 2 its stick (pad bits 20-21 and 22-23,
             // `SpinState_Update` 0x100908 reads them with `<< 10 >> 30` and `<< 8 >> 30`) shows in the second sample:
             // it steps the wind-up +0x274 / +0x278 toward ±1 (0 moves nothing), or starts the wind-up (st+0x5c 0 → 1)
-            let derived = (!player && mode == 2).then(|| stick_from(a, b, sa, sb)).filter(|&p| p != 0);
+            let derived = (!player && mode == 2 && hooked.is_none()).then(|| stick_from(a, b, sa, sb)).filter(|&p| p != 0);
             pads.extend(derived);
             stick_tries[0] += derived.is_some() as usize;
             let derived_at = derived.map(|_| pads.len() - 1);
@@ -979,6 +1000,8 @@ fn spin_ticks_against_the_running_game() {
             // compared: the turn and angles always; the rates, bands and largest errors in mode 2, and for the
             // player in every mode
             let all = |f: usize| f < 5 || mode == 2 || player;
+            let pipe = mode == 2 && anims.iter().any(|a| a.clip == 0x23c || a.clip == 0x23d);
+            pipe_ticks[0] += pipe as usize;
             for (k, way) in ways.iter_mut().enumerate() {
                 let mut got = Vec::new();
                 'tries: for (pi, &pad) in pads.iter().enumerate() {
@@ -1008,16 +1031,27 @@ fn spin_ticks_against_the_running_game() {
                         c[1] += (got[f] == want[f]) as usize;
                     }
                 }
+                pipe_right[k] += (pipe && (0..names.len()).filter(|&f| all(f)).all(|f| got[f] == want[f])) as usize;
                 if player {
+                    let right = (0..names.len()).all(|f| got[f] == want[f]);
                     players[k][0] += 1;
-                    players[k][1] += (0..names.len()).all(|f| got[f] == want[f]) as usize;
+                    players[k][1] += right as usize;
+                    if let Some(m) = player_modes[k].get_mut(mode as usize) {
+                        m[0] += 1;
+                        m[1] += right as usize;
+                    }
+                    if !right && k == n_ways - 1 && std::env::var("TRICKY_DBG").is_ok() {
+                        let bad: Vec<&str> = (0..names.len()).filter(|&f| got[f] != want[f]).map(|f| names[f]).collect();
+                        eprintln!("DBG player tick {} mode {mode} pad {:08x}: {bad:?}", w[1].tick, pads[0]);
+                    }
                 }
             }
         }
     }
-    eprintln!("{path}: spin ticks (state 0x10 in the air; left out: {other} whose window is not the spin object, {skew} not one update apart):");
+    eprintln!("{path}: spin ticks (state 0x10 in the air; left out: {other} whose window is not the spin object, {skew} not one update apart; the hook's pad word on {}):", hooked_ticks[0]);
     for (k, way) in ["ours (spin::spin_update)".to_string()].into_iter().chain(runners.iter().map(|(r, _, _)| format!("the game's in the runner, {r}"))).enumerate() {
         let line: Vec<String> = names.iter().zip(&count[k]).map(|(n, c)| format!("{n} {} of {}", c[1], c[0])).collect();
-        eprintln!("  {way}: {} (the first sample's time to touch down on {}); the player's ticks every field {} of {} (the first sample's pad on {}); the second sample's animation on {}; a computer's stick from the second sample right on {} of {}", line.join(", "), first_land[k], players[k][1], players[k][0], first_pad[k], second_anim[k], stick_right[k], stick_tries[0]);
+        let pm: Vec<String> = player_modes[k].iter().enumerate().map(|(m, c)| format!("mode {m} {} of {}", c[1], c[0])).collect();
+        eprintln!("  {way}: {} (the first sample's time to touch down on {}); the player's ticks every field {} of {} ({}; the first sample's pad on {}); the second sample's animation on {}; a computer's stick from the second sample right on {} of {}; the half-pipe clips (mode 2) right on {} of {}", line.join(", "), first_land[k], players[k][1], players[k][0], pm.join(", "), first_pad[k], second_anim[k], stick_right[k], stick_tries[0], pipe_right[k], pipe_ticks[0]);
     }
 }

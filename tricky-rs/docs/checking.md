@@ -2237,3 +2237,39 @@ The countdown (8) was tried with the side branch alone (side 0 at the countdown'
 wrong at the start (rec22 107–128 give 0x1f where it gives 0x21), so the timed answers or a kept side from before
 the countdown take part: it needs the race's clock (+0x14), the skill (+0x86c) and the side (+0x868) recorded. Every
 countdown word is 0x1f or 0x21 (2,235 ticks).
+
+## F4b3d1: the player's spin ticks, with the hook's pad word (2026-11-20)
+
+Recorded by hand (PCSX2 with the player's disc, irregulur at the pad): rec26, Mesa Blanca, a single race with six
+riders, 240 s, 14,351 ticks, stick spins and flips, some wound up on the ground, a few falls and resets; rec27,
+Pipedream (the showoff, one rider), 240 s, 12,821 ticks, spins off the half-pipe walls. Both with rec25's windows
+(`... -140:74 ... L700:78 hookpad rollers flags clock`).
+
+Changed (`tests/replay.rs` `spin_ticks_against_the_running_game`): where the hook kept the tick's pad word (window
+`hookpad`, its count the second sample's +0x5900: `hook_pad`) that word is the only one tried, for the player and the
+computers alike (TRICKY_NOHOOK=1: as before, the libpad record for the player and `stick_from` for the computers).
+`SpinState_Update` 0x100908 gets the pad word `Boarder_UpdateControl` 0x11c9a0 is handed, the one the hook keeps
+(F4b3k). The output now splits the player's ticks by the spin's mode and counts the mode-2 ticks on the half-pipe
+clips 0x23c / 0x23d.
+
+Found (`fadd=g1`; with the hook → TRICKY_NOHOOK=1):
+
+| recording | spin ticks | player's ticks every field | mode 0 | mode 1 | mode 2 | rates (mode 2), all riders | half-pipe clips |
+|---|---|---|---|---|---|---|---|
+| rec22 (mesa, attract) | 38,257 | 9,260 of 9,276 (← 4,302) | 212 of 212 | 4,561 of 4,561 | 4,487 of 4,503 | 30,871 of 30,876 (← 26,702) | none |
+| rec25 (snow, demo) | 44,830 | 7,330 of 7,338 (← 2,440) | 98 of 98 | 4,664 of 4,664 | 2,568 of 2,576 | 22,723 of 22,726 (← 18,258) | none |
+| rec26 (mesa, by hand) | 16,178 | 3,870 of 3,880 (← 2,176) | 95 of 97 | 1,845 of 1,845 | 1,930 of 1,938 | 14,106 of 14,110 (← 12,497) | none |
+| rec27 (pipedream, by hand) | 6,336 | 6,325 of 6,336 | 259 of 259 | 3,419 of 3,419 | 2,647 of 2,658 | 6,335 of 6,336 | 22 of 23 |
+
+- The player's spin object was already in rec20 on (`-140:74`, the attract and demo races' player rider); without its
+  pad word modes 0 and 1 (which read the stick and buttons every tick) were nearly all wrong. With the hook they are
+  all right but two ticks. The computers' mode 2 needs no stand-in any more where the hook ran (`stick_from` tried
+  on 0 ticks).
+- Ours (`spin::spin_update`) equals the runner under IEEE adds on every field and both new recordings (rec26 77, rec27
+  113 player ticks): the gap to the game is the adder alone, as in F4b3a and F4b3d.
+- The half-pipe clips' phase: 23 mode-2 ticks on 0x23c / 0x23d in rec27, 22 right (one tick took the second sample's
+  animation).
+- Left (row F4b3d2): single-tick misses of the quaternion, the axes and the angle left (rec22 20, rec25 12, rec26 14,
+  rec27 10: the player's are mostly pad 0x1a in mode 2), and rec26 7639–7646, where the spin goes to 0 as the clip
+  goes 0x223 → 0x22d while the rider stays in the spin state (something outside `SpinState_Update` sets +0x1d0; the
+  human had fallen and been reset a few times in that race, but the tick's pad word has no reset bit 0x100).
