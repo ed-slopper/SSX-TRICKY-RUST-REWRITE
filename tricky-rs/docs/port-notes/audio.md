@@ -1451,6 +1451,13 @@ Proven (read from the code):
 - `Boarder_RiderCollisions` 0x123fc8's shove (at 0x124864..0x124898): `Boarder_RiderHit`, then
   `Sfx_OnRiderCollision` 0x216960(shover, shoved) and `Speech_OnRiderCollision` 0x233cb8(shoved), whether or not the
   hit knocked anyone down (`ridercol.rs` line 157). The app's two shoves push `RiderSpeech::Shoved` after the hit.
+- `Boarder_UpdateBoost` 0x11d038 calls `Sfx_OnBoost` 0x2197d8 when the boost is held with an empty meter and its
+  `start` is set, unless a replay plays back (gApp+0x730 → +0x40 the replay, its playback state +0x20 in 1..9; the
+  board once called it the race camera's state). Its callers: `CruiseControl_Update` 0x103050 and
+  `Gate2BaseControl_Update` 0x105dec (held pad bit 3, start bit 4), `PrewindState_Update` 0x1053c0 (start 0),
+  `RailSlideControl_Update` 0x107410 (held bit 4, start 0), the exits (0, 0). So the app's ground control
+  (`control_tick`, through `boarder::update_boost`) is the only `BoostEmpty`; the app's own in the air and on rails
+  is gone (row E1b2g7d3b4e). With no replay in the app the test passes, as the game's does with none.
 - `Sfx_OnRiderReset` 0x218eb0 (only from `Boarder_RequestReset` 0x118f10 at 0x118f70, for +0x41c == 1) calls
   `Speech_OnRiderReset` 0x233a18 first with its own a0/a1 (the audio system, the rider). The speech needs +0x6e50,
   the music zone playing (`Audio_SetEventBitSound` 0x21c0a0): `PathMusic::zone` reads it from the game's music
@@ -1458,8 +1465,11 @@ Proven (read from the code):
 - `AirMotion_Enter` 0x108310 ends in `Sfx_OnAirEnter`(audio, rider, +0x428 == 0xd) (0x108330..0x108360): kind 1
   when the control state is 0xd (`NaturalAirControl`). `Sfx_OnAirEnter` calls `Speech_OnAirEnter` 0x233950(rider,
   kind) when +0x57f4 (the flight time `AirPredict_AtTakeoff` predicted) is over 5, then `Speech_OnAirNearby`
-  0x235170(rider, kind). The app pushes `RiderSpeech::AirEnter` where it makes that prediction; kind is a STANDIN
-  0 (the app keeps no control state).
+  0x235170(rider, kind). The app pushes `RiderSpeech::AirEnter` where it makes that prediction, kind from the rider's
+  control state (`Rider::ctl`, row E1b2g7d3b4e). `Boarder_SetMotion` 0x11f610 exits and enters the motion at once,
+  and `Boarder_TakeOff` 0x128470 sets the motion before its `Boarder_SetState`(0xd), as `JumpControl_Update` does
+  from 0xa: so a take-off is kind 0, and kind 1 only when the state still is 0xd (proven: the order; inferred: the
+  case is a rider touching down and leaving again before its control leaves the air's).
 - `AirMotion_Update` 0x109114..0x109170: after `Score_LandTrick` and `Boarder_AddMeter`, when +0x58a8 (the uber
   count) went up, `Boarder_StartCelebrate`(100) and, Tricky on and the count before under 6, `Speech_OnAirTime`
   0x233448 (so the name means an uber trick landed in Tricky, not air time). The app pushes `RiderSpeech::AirTime`

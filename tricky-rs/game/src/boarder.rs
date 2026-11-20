@@ -94,7 +94,8 @@ pub fn set_wind_target(v: f32, rate: f32, flip: bool, windup_stat: u8, wind: &mu
 }
 
 /// `Boarder_UpdateBoost` 0x11d038, once a tick: `held` the boost button, `start` its second argument (the boost was
-/// just pressed), `sounds` whether the race lets boost sounds play (no race object, or its state 1..9), `tricky`
+/// just pressed), `sounds` whether the boost sounds play: no replay playing back (the game's replay object
+/// gApp+0x730 → +0x40 absent, or its playback state +0x20 0 or above 9), `tricky`
 /// `Boarder_IsTricky`. Boosting needs meter; it sets the boost level by the meter, drains 0.0007501507 a tick
 /// (not in TRICKY) and drives the boost flame.
 pub fn update_boost(held: bool, start: bool, sounds: bool, tricky: bool, f: &mut Fields) -> Vec<Call> {

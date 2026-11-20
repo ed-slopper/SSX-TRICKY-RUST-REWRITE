@@ -1208,9 +1208,12 @@ impl Rider {
                 self.land_time = p.t_land;
                 (self.land_word, self.land_normal) = (p.word, p.normal);
                 self.takeoffs = self.takeoffs.wrapping_add(1);
-                // `AirMotion_Enter` 0x108310 → `Sfx_OnAirEnter` 0x2174f8 (kind: the control state +0x428 was 0xd,
-                // natural air. STANDIN: 0, the app keeps no control state)
-                self.speech.push(RiderSpeech::AirEnter { kind: 0, air: self.land_time, up: self.vel.y * 100.0 });
+                // `AirMotion_Enter` 0x108310 → `Sfx_OnAirEnter` 0x2174f8, kind: the control state +0x428 is 0xd (natural
+                // air) as the motion is entered. `Boarder_SetMotion` 0x11f610 enters it at once, so a take-off
+                // (`Boarder_TakeOff` 0x128470, `JumpControl_Update`) has not yet set its 0xd: kind 1 only when the state
+                // still was 0xd, a rider back on the snow whose control had not yet left the air's
+                let kind = (self.ctl == 0xd) as u32;
+                self.speech.push(RiderSpeech::AirEnter { kind, air: self.land_time, up: self.vel.y * 100.0 });
                 self.spin_enter_game();
             }
         }
@@ -1260,11 +1263,9 @@ impl Rider {
                 self.ctl = if self.rail.is_some() { 0xf } else { 0xd };
             }
             self.boost_lvl = 0.0;
-            // `Boarder_UpdateBoost` 0x11d038: boost held and just pressed (the pad's bit 4, inferred) with an empty meter
-            // calls `Sfx_OnBoost` 0x2197d8 (STANDIN: always, for the race camera's state 1..9 test)
-            if input.boost && !self.boost_was && self.boost <= 0.0 {
-                self.speech.push(RiderSpeech::BoostEmpty);
-            }
+            // (no `Sfx_OnBoost` 0x2197d8 here: of `Boarder_UpdateBoost` 0x11d038's callers only the cruise and the gate
+            // pass its `start`, the pad's bit 4 (`CruiseControl_Update` 0x103050, `Gate2BaseControl_Update` 0x105dec);
+            // the rail's passes 0 and the air calls none. The ground's is `control_tick`'s, row E1b2g7d3b4e)
             let lim = if boosting_input { 1.0 } else { 0.905 };
             let steer_target = input.steer.clamp(-lim, lim) * (speed0 / 11.35).min(1.0);
             let err = steer_target - self.steer;

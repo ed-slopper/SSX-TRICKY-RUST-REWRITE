@@ -124,6 +124,7 @@ impl ControlEnv for Env<'_> {
     /// flame is not drawn from them yet)
     fn update_boost(&mut self, _r: &mut control::Rider, a: u32, b: u32) {
         let mut f = Fields { meter: *self.meter, boost_level: *self.boost_level, ..Default::default() };
+        // the boost sounds play: the app has no replay (row E1b2g7d3b4e), as the game's test with no replay object
         for c in boarder::update_boost(a != 0, b != 0, true, self.tricky, &mut f) {
             if c == boarder::Call::BoostEmpty {
                 self.speech.push(RiderSpeech::BoostEmpty);
