@@ -2330,7 +2330,6 @@ fn chars_dir(level_dir: &Path) -> Option<PathBuf> {
 }
 
 fn load_chars(level_dir: &Path, images: &mut Assets<Image>, materials: &mut Assets<StandardMaterial>) -> CharLib {
-    let Some(dir) = chars_dir(level_dir) else { return CharLib::default() };
     // the player's disc (TRICKY_DISC: an image or a drive, rows E2-E2b): the models come from it (row E4a)
     let mut disc = std::env::var("TRICKY_DISC").ok().and_then(|p| {
         let mut f = tricky_data::big::Files::new(tricky_data::disc::Disc::open(&p).map_err(|e| eprintln!("disc {p}: {e}")).ok()?);
@@ -2338,14 +2337,20 @@ fn load_chars(level_dir: &Path, images: &mut Assets<Image>, materials: &mut Asse
         println!("models, animations and textures from the disc {p}");
         Some(f)
     });
+    // with the disc the exported characters' folder is only a fallback: without it the riders still come from the disc
+    let Some(dir) = chars_dir(level_dir).or_else(|| disc.is_some().then(|| PathBuf::from("chars"))) else { return CharLib::default() };
     let board = disc.as_mut().and_then(|f| CharModel::board_from_disc(f, None).map_err(|e| eprintln!("{e}")).ok());
     let mut lib = CharLib { board: board.or_else(|| CharModel::load(&dir.join("board.json")).ok()), dir: dir.clone(), ..default() };
     lib.shapes = [("bx", "Bx"), ("bx_goofy", "BxGoofy"), ("fr", "Fr"), ("fr_goofy", "FrGoofy"), ("al", "Al"), ("al_goofy", "AlGoofy")].iter()
         .map(|(n, part)| disc.as_mut().and_then(|f| CharModel::board_from_disc(f, Some(part)).map_err(|e| eprintln!("{e}")).ok())
             .or_else(|| CharModel::load(&dir.join(format!("board_{n}.json"))).ok()))
         .collect();
-    let mut dirs: Vec<PathBuf> = std::fs::read_dir(&dir).into_iter().flatten().flatten().map(|e| e.path())
-        .filter(|p| p.join("model.json").exists()).collect();
+    // the disc's riders (`mpf::names::RIDERS`), else the exported folders
+    let mut dirs: Vec<PathBuf> = if disc.is_some() {
+        tricky_data::mpf::names::RIDERS.iter().map(|n| dir.join(n)).collect()
+    } else {
+        std::fs::read_dir(&dir).into_iter().flatten().flatten().map(|e| e.path()).filter(|p| p.join("model.json").exists()).collect()
+    };
     dirs.sort();
     for d in dirs {
         let name = d.file_name().unwrap().to_string_lossy().to_string();

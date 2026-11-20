@@ -1711,3 +1711,4 @@ matches the original.
 - 2026-11-20 irregulur/lynx: E1b2g7d3b4g done (HUD from the disc, ten-second call); added E1b2g7d3b4i (the show-off's HUD clock).
 - 2026-11-20 irregulur/lynx: fixed E1b2g7d3b4g's done commit, which had spliced its Done row into E1b2g7d3b4h's row.
 - 2026-11-20 irregulur/lynx: E1b2g7d3b4h done (the reset state); added E1b2g7d3b4h2 (the rest of it).
+- 2026-11-20 irregulur/lynx: fixed fact: the riders load from the disc with no exported `chars` folder (fix in `load_chars`, no row).
