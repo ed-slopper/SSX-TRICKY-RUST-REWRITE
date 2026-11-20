@@ -4202,6 +4202,12 @@ fn computer_pad_words_against_the_running_game() {
     let turn = std::env::var("TRICKY_TURN").unwrap_or("bab".into()).into_bytes();
     let pick = |k: usize| (turn.get(k) == Some(&b'b')) as usize;
     let mut by: std::collections::BTreeMap<u32, [usize; 2]> = Default::default();
+    // the dispatch states (F4b3k2d): the course's AI paths from the player's disc, the clip table from TRICKY_ELF, the
+    // layer clips (`46c0`); by the riding mode at the first sample (object +0x89c)
+    let paths = ai_paths(path);
+    let clip_types: Option<Vec<u8>> = std::env::var("TRICKY_ELF").ok().and_then(|e| std::fs::read(e).ok()).map(|b| b[(animctl::CLIP_TABLE - 0xff000) as usize..][..0x300 * 0x1c].to_vec());
+    let ka = ticks[0].extra.iter().position(|(o, _)| *o == 0x46c0);
+    let mut by_mode: std::collections::BTreeMap<u32, [usize; 2]> = Default::default();
     let mut changed = 0;
     for w in ticks.windows(2) {
         for i in (0..n).filter(|&i| u32_le(&stats[i], 0x6c) == u32::MAX) {
@@ -4227,7 +4233,8 @@ fn computer_pad_words_against_the_running_game() {
                 tricky_game::aictl::controls_countdown(&mut word, f32_at(h, 0x3c), time, f32_at(a, 0x238), f32_at(a, 0x240), &mut side);
                 Some(word)
             }).flatten();
-            let routine = matches!(state, 2 | 3 | 4 | 7 | 0xb | 0xc | 0xe | 0xf | 0x10 | 0x12) || state == 8 && countdown.is_none();
+            let dispatch = matches!(state, 2 | 3 | 4 | 7 | 0xb | 0xc | 0x12).then(|| dispatch_word(w, i, n, kh?, kf?, ka?, paths.as_deref()?, clip_types.as_deref()?, &mut by_mode)).flatten();
+            let routine = matches!(state, 0xe | 0xf | 0x10) || state == 8 && countdown.is_none() || matches!(state, 2 | 3 | 4 | 7 | 0xb | 0xc | 0x12) && dispatch.is_none();
             let ok = match state {
                 _ if routine => false,
                 // the stuck check alone (0x14), or after the idle's clearing of the zero word (0x13, `aictl::controls_idle`)
@@ -4252,6 +4259,15 @@ fn computer_pad_words_against_the_running_game() {
                     (None, _, _) => false,
                 },
                 8 => countdown == Some(pad),
+                2 | 3 | 4 | 7 | 0xb | 0xc | 0x12 => {
+                    let d = dispatch.unwrap();
+                    if d.0 != pad && std::env::var("TRICKY_DBGD").is_ok() {
+                        eprintln!("DBGD tick {} rider {i} state {state:#x} mode {} -> {}: pad {pad:#x} ours {:#x} (xor {:#x})", w[1].tick, d.1, d.2, d.0, d.0 ^ pad);
+                    }
+                    let m = by_mode.entry(d.1).or_default();
+                    m[1] += (d.0 == pad) as usize;
+                    d.0 == pad
+                }
                 _ => get_controls(&mut Const, state, &mut 1.0) == pad,
             };
             e[1] += ok as usize;
@@ -4261,6 +4277,114 @@ fn computer_pad_words_against_the_running_game() {
         }
     }
     eprintln!("{path}: the computer's pad words by control state [ticks, equal (the states without a routine of their own only)], the state the same at both samples ({changed} ticks where it changed left out): {:?}", by.iter().map(|(s, v)| (format!("{s:#x}"), *v)).collect::<Vec<_>>());
+    eprintln!("{path}: the dispatch states by riding mode (object +0x89c at the first sample) [ticks, equal]: {by_mode:?}");
+}
+
+/// The AI paths of the recording's course (`course N`) from the player's disc (TRICKY_DISC), as the game keeps them.
+fn ai_paths(path: &str) -> Option<Vec<tricky_game::aipath::Path>> {
+    let folder = ["gari", "snowdream", "elysium", "mesablanca", "merqury", "aloha", "pipedream", "untracked", "megaplex", "", "trick", "alaska"].get(recording::course(path)? as usize)?;
+    let mut files = tricky_data::big::Files::new(tricky_data::disc::Disc::open(&std::env::var("TRICKY_DISC").ok()?).ok()?);
+    let aip = tricky_data::aip::from_disc(&mut files, folder, "aip")?;
+    Some(aip.ai_paths.iter().map(tricky_game::aipath::Path::from_aip).collect())
+}
+
+/// The path rider `r` follows (+0x57a4, not recorded): the one whose point at the rider's distance along (+0x344) is
+/// nearest the rider's nearest point (+0x350), and how far (cm)
+fn path_of(paths: &[tricky_game::aipath::Path], r: &[u8]) -> (usize, f32) {
+    let (at, near) = (f32_at(r, 0x344), vec4(r, 0x350));
+    paths.iter().enumerate().map(|(k, p)| {
+        let q = p.position_at(at).0;
+        (k, ((q[0] - near[0]).powi(2) + (q[1] - near[1]).powi(2) + (q[2] - near[2]).powi(2)).sqrt())
+    }).min_by(|a, b| a.1.total_cmp(&b.1)).unwrap()
+}
+
+/// `AIComputer_ControlsDispatch` 0x1389c8 for computer rider `i` over the frame `w` (F4b3k2d): the stuck check into
+/// bit 0 (`aictl::check_stuck`), the shove (`aicomp::find_nearby_rider`, bits 23–24), then the riding mode
+/// (`aicomp::Ai::ride`, by object +0x89c). The object (window `5ae0>830` from +0x830: +0x868 the speed, +0x86c the
+/// skill, +0x890 the target, +0x894 / +0x898 the stuck counters, +0x89c the mode) from the first sample; the rider's
+/// fields from TRICKY_DISP=<rider><frame> (a or b: the samples of the rider's 0x700 bytes and of the frame `4aa0`;
+/// default `ba`, as the turn-around, F4b3k2c). The race mode word 0x32de8c (not recorded) TRICKY_GMODE (default 1).
+/// The word, the mode it began in, the mode it ended in.
+#[allow(clippy::too_many_arguments)]
+fn dispatch_word(w: &[recording::Tick], i: usize, n: usize, kh: usize, kf: usize, ka: usize, paths: &[tricky_game::aipath::Path], clip_types: &[u8], by_mode: &mut std::collections::BTreeMap<u32, [usize; 2]>) -> Option<(u32, u32, u32)> {
+    use tricky_game::aicomp::{self, Ai, GrudgeOf, Mode, World};
+    let sel = std::env::var("TRICKY_DISP").unwrap_or("ba".into()).into_bytes();
+    let pick = |k: usize| (sel.get(k) == Some(&b'b')) as usize;
+    let gmode: u32 = std::env::var("TRICKY_GMODE").ok().and_then(|v| v.parse().ok()).unwrap_or(1);
+    let h = &w[0].chased[kh].1[i];
+    let o = |off: usize| off - 0x830;
+    let r = &w[pick(0)].riders[i];
+    let fr = &w[pick(1)].extra[kf].1[i];
+    let tick = w[1].tick as i32;
+    let me = u32_le(r, 0x460) as i32;
+    let rs = std::env::var("TRICKY_RECS").unwrap_or_default();
+    let rfs = |j: usize| match rs.as_str() { "a" => 0, "o" => (j > i) as usize, "p" => (j < i) as usize, _ => 1 };
+    let recs: Vec<[f32; 2]> = (0..n).map(|j| [f32_at(&w[rfs(j)].riders[i], 0x40 + 0x20 * j), f32_at(&w[rfs(j)].riders[i], 0x44 + 0x20 * j)]).collect();
+    let grudge = GrudgeOf { on: u32_le(r, 0x118) as i32, target: u32_le(r, 0x120) as i32, level: u32_le(r, 0x124) as i32, cooled: u32_le(r, 0x128) as i32 };
+    let skill = f32_at(h, o(0x86c));
+    let heading = f32_at(r, 0x1b0);
+    // the stuck check
+    let ahead = u32_le(r, 0x100) as i32;
+    let ahead_rec = (0 <= ahead).then(|| recs[ahead as usize]);
+    let mut s = tricky_game::aictl::StuckIn {
+        heading: f32_at(r, 0x370),
+        path: heading,
+        state: u32_le(r, 0x424),
+        state2: u32_le(r, 0x428),
+        speed: f32_at(r, 0x348),
+        f57fc: f32_at(&w[pick(0)].extra[w[0].extra.iter().position(|(x, _)| *x == 0x57b0)?].1[i], 0x4c),
+        mode: gmode,
+        skill,
+        w890: u32_le(h, o(0x890)) as i32,
+        c894: u32_le(h, o(0x894)),
+        c898: u32_le(h, o(0x898)),
+    };
+    let stuck = tricky_game::aictl::check_stuck(&mut s, &mut || tricky_game::aictl::below_gap_min(ahead_rec, heading, f32_at(r, 0x104)), &mut || tricky_game::aictl::above_gap_max(ahead_rec, heading, f32_at(r, 0x108)));
+    let mut word = stuck as u32;
+    // the shove: not while the layer-1 clip is a shove (type 0x15, `AnimCtl_GetClipType`)
+    let c1 = u32_le(&w[0].extra[ka].1[i], 0xc);
+    let shoving = c1 != animctl::NONE && u32_le(clip_types, c1 as usize * 0x1c) == 0x15;
+    word = aicomp::shove_bits(word, aicomp::find_nearby_rider(shoving, tick, &recs, heading, me, n as i32, &grudge));
+    // the riding mode
+    let mode0 = u32_le(h, o(0x89c)) & 0xffff;
+    by_mode.entry(mode0).or_default()[0] += 1;
+    let mode = [Mode::ToJump, Mode::Line, Mode::NearRider, Mode::AtRival][mode0 as usize];
+    let (pk, _) = path_of(paths, r);
+    let events: Vec<aicomp::PathEvent> = paths[pk].events.iter().map(|&(kind, value, start, end)| aicomp::PathEvent { kind, value, start, end }).collect();
+    let (from, at) = (f32_at(r, 0x340), f32_at(r, 0x344));
+    let mut jump = |sp: &mut f32| aicomp::find_jump_marker(&events, from, at, sp);
+    let mut hint = |sp: &mut f32| aicomp::find_speed_hint(&events, from, at, sp);
+    // the other riders as rider i sees them (TRICKY_OTHERS=a or b: one sample for all; default: the second for those
+    // that tick before it in the frame, the riders running 5 .. 0, F4b3z)
+    let os = std::env::var("TRICKY_OTHERS").unwrap_or_default();
+    let ofs = |j: usize| match os.as_str() { "a" => 0, "b" => 1, _ => (j > i) as usize };
+    let others: Vec<([f32; 4], [f32; 4])> = (0..n).map(|j| (vec4(&w[ofs(j)].riders[j], 0x140), vec4(&w[ofs(j)].riders[j], 0x150))).collect();
+    let other = |j: i32| others[j as usize];
+    let mut world = World { jump_marker: &mut jump, speed_hint: &mut hint, other: &other, tick, n: n as i32, practice: gmode == 0 };
+    let mut ai = Ai {
+        skill,
+        speed: f32_at(h, o(0x868)),
+        target: u32_le(h, o(0x890)) as i32,
+        mode,
+        frame: aicomp::Frame { pos: vec4(r, 0x140), fwd: vec4(fr, 0), side: vec4(fr, 0x10), up: vec4(fr, 0x20) },
+        vel: vec4(r, 0x150),
+        line: vec4(r, 0x360),
+        travel: f32_at(r, 0x370),
+        heading,
+        x348: f32_at(r, 0x348),
+        meter: f32_at(r, 0x1c),
+        me,
+        recs,
+        grudge,
+    };
+    if std::env::var("TRICKY_DBGN").is_ok_and(|v| v == w[1].tick.to_string()) {
+        let t = ai.target.max(0) as usize;
+        let sp = |v: [f32; 4]| (v[0] * v[0] + v[1] * v[1] + v[2] * v[2]).sqrt();
+        eprintln!("DBGN tick {} rider {i}: target {} rec {:?} travel {} speed {} vs other a {} b {} (used {}), steer {}", w[1].tick, ai.target, ai.recs.get(t), ai.travel, sp(ai.vel), sp(vec4(&w[0].riders[t], 0x150)), sp(vec4(&w[1].riders[t], 0x150)), sp(others[t].1), aicomp::steer_towards(skill, &ai.frame, ai.line));
+    }
+    let mut calls = Vec::new();
+    let word = ai.ride(&mut world, word, &mut calls);
+    Some((word, mode0, ai.mode as u32))
 }
 
 /// The `rollers` window's layout (F4b3k3, `pine.py record ... rollers`): a count byte, then each roller's node,

@@ -2078,6 +2078,39 @@ The misses are 9943 and 9944 r5, three times each: the demo race runs the same w
 Rider 5 ticks first in the frame, and rider 4 (which shoves it at 9947) pushes it later in the same frame, so the
 second sample's position is not the one the control saw (inferred).
 
+## F4b3k2d: the computer's dispatch states (2026-11-19)
+
+Proven (code): `AIComputer_ControlsDispatch` 0x1389c8 (states 2, 3, 4, 7, 0xb, 0xc, 0x12) puts
+`AIComputer_CheckStuck` 0x139ab8 in bit 0, the shove of `AIComputer_FindNearbyRider` 0x1394e0 in bits 23–24 (not
+while the layer-1 clip's type is 0x15; the race tick +0x18 a multiple of 6; pair records rider + 0x40 + 0x20·j; grudge
++0x118 / +0x120 / +0x124), then calls the riding mode by the method at object +0x8a0..+0x8a4 (the mode short +0x89c
+is written with it). `AIComputer_RideLine` 0x1375c8 reads the rider's meter at rider+0x1c and the object's +0x868
+(the speed to ride at) and +0x86c (the skill).
+
+The test (`dispatch_word` in `tests/ground_motion.rs`) runs `aictl::check_stuck`, `aicomp::find_nearby_rider` and
+`aicomp::Ai::ride` on rec25. The path the rider follows (+0x57a4) is not recorded: it is found from the disc's `.aip`
+(TRICKY_DISC) as the path whose point at the rider's distance +0x344 is nearest +0x350 (on rec25 every tick within
+0.1 cm). The clip types come from the table 0x325fa8 in TRICKY_ELF. What sample each value is read from:
+
+- the object (`5ae0>830`): the first sample;
+- the rider's own 0x700 bytes: the second; the frame `4aa0`: the first (TRICKY_DISP=ba, as the turn-around;
+  aa 77,409, ab 62,282, bb 78,136 equal of the 113,158);
+- the other riders' position and velocity: the second for those that tick before it in the frame (riders 5 .. 0),
+  else the first (TRICKY_OTHERS: all first 53,073 of mode 2's 53,547, all second 53,190, by the order 53,493);
+- the rider's pair records: the second (TRICKY_RECS: all first 52,084, by the order 52,408, the reverse order 53,169).
+
+rec25 under `fadd=g1`, by the mode at the first sample: to the jump 3,349 of 3,349, the line 55,910 of 55,911,
+near a rider 53,493 of 53,547, at a rival 351 of 351. By state: 2 2,530 of 2,547, 3 108,678 of 108,716, 4 126 of
+126, 7 516 of 516, 0xb 300 of 300, 0xc 953 of 953. The race loops three times, so the 55 misses are 20 different ticks.
+Most are one step of the steer (bits 5–10) or the tuck (bit 3) near a rider: rec25 8623 r2, 8791 r2, 445 r5, 12402
+r5 and 6363 r5 are riding at a target 85–155 cm away. Inferred: they are bumping, and the bump changes the riders'
+velocities in the frame between the control and the samples. TRICKY_DBGN=<tick> lists the inputs. 8067 r5 (mode 1)
+steers 0.2073 where the game gives 0, just over the 0.2 cut.
+
+Not covered by rec25: the stuck bit is never set (so the race mode word 0x32de8c, not recorded, gives the same counts
+at 0 and 1: TRICKY_GMODE, default 1). The shoves are all rider 5's, 11 of 11. State
+0x12 does not occur. rec22 (no object window) is unchanged.
+
 ## F4b3z: rec14 9092 rider 1, what the miss is not (2026-11-19, notes)
 
 `TRICKY_DBGP=<frame tick>` (new) lists every push of the frame replay. rec14 frame 9091 → 9092 (riders run 5, 4, 3,
