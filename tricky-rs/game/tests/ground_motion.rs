@@ -4234,7 +4234,8 @@ fn computer_pad_words_against_the_running_game() {
                 Some(word)
             }).flatten();
             let dispatch = matches!(state, 2 | 3 | 4 | 7 | 0xb | 0xc | 0x12).then(|| dispatch_word(w, i, n, kh?, kf?, ka?, paths.as_deref()?, clip_types.as_deref()?, &mut by_mode)).flatten();
-            let routine = matches!(state, 0xe | 0xf | 0x10) || state == 8 && countdown.is_none() || matches!(state, 2 | 3 | 4 | 7 | 0xb | 0xc | 0x12) && dispatch.is_none();
+            let ride = (state == 0xe).then(|| ride_word(w, i, kh?, kf?, paths.as_deref()?)).flatten();
+            let routine = matches!(state, 0xf | 0x10) || state == 0xe && ride.is_none() || state == 8 && countdown.is_none() || matches!(state, 2 | 3 | 4 | 7 | 0xb | 0xc | 0x12) && dispatch.is_none();
             let ok = match state {
                 _ if routine => false,
                 // the stuck check alone (0x14), or after the idle's clearing of the zero word (0x13, `aictl::controls_idle`)
@@ -4259,6 +4260,13 @@ fn computer_pad_words_against_the_running_game() {
                     (None, _, _) => false,
                 },
                 8 => countdown == Some(pad),
+                0xe => {
+                    let d = ride.unwrap();
+                    if d != pad && std::env::var("TRICKY_DBGD").is_ok() {
+                        eprintln!("DBGD tick {} rider {i} state {state:#x}: pad {pad:#x} ours {d:#x} (xor {:#x})", w[1].tick, d ^ pad);
+                    }
+                    d == pad
+                }
                 2 | 3 | 4 | 7 | 0xb | 0xc | 0x12 => {
                     let d = dispatch.unwrap();
                     if d.0 != pad && std::env::var("TRICKY_DBGD").is_ok() {
@@ -4278,6 +4286,32 @@ fn computer_pad_words_against_the_running_game() {
     }
     eprintln!("{path}: the computer's pad words by control state [ticks, equal (the states without a routine of their own only)], the state the same at both samples ({changed} ticks where it changed left out): {:?}", by.iter().map(|(s, v)| (format!("{s:#x}"), *v)).collect::<Vec<_>>());
     eprintln!("{path}: the dispatch states by riding mode (object +0x89c at the first sample) [ticks, equal]: {by_mode:?}");
+}
+
+/// `AIComputer_ControlsRide` 0x1387e8 for computer rider `i` over the frame `w` (F4b3k2e): the events 50 cm past the
+/// rider on its path (`cPath::vf0` 0x197910 on +0x57a4, found as [`path_of`]), the steer at the line point +0x360,
+/// the object's crouch +0x888 and brake +0x88c, +0x868 the speed; the samples as [`dispatch_word`].
+fn ride_word(w: &[recording::Tick], i: usize, kh: usize, kf: usize, paths: &[tricky_game::aipath::Path]) -> Option<u32> {
+    use tricky_game::aicomp;
+    let sel = std::env::var("TRICKY_DISP").unwrap_or("ba".into()).into_bytes();
+    let pick = |k: usize| (sel.get(k) == Some(&b'b')) as usize;
+    let h = &w[0].chased[kh].1[i];
+    let o = |off: usize| off - 0x830;
+    let r = &w[pick(0)].riders[i];
+    let fr = &w[pick(1)].extra[kf].1[i];
+    let (pk, _) = path_of(paths, r);
+    let events: Vec<aicomp::PathEvent> = paths[pk].events.iter().map(|&(kind, value, start, end)| aicomp::PathEvent { kind, value, start, end }).collect();
+    let mut query = |from: f32, to: f32| {
+        let mut mask = 0;
+        let found = aicomp::events_between(&events, from, to, &mut mask);
+        (found.iter().map(|&k| events[k].kind).collect::<Vec<u32>>(), mask)
+    };
+    let skill = f32_at(h, o(0x86c));
+    let f = aicomp::Frame { pos: vec4(r, 0x140), fwd: vec4(fr, 0), side: vec4(fr, 0x10), up: vec4(fr, 0x20) };
+    let line = vec4(r, 0x360);
+    let mut word = 0;
+    tricky_game::aipad::controls_ride(&mut word, f32_at(r, 0x340), f32_at(r, 0x344), vec4(r, 0x150), f32_at(h, o(0x868)), f32_at(h, o(0x888)), f32_at(h, o(0x88c)), &mut query, &mut || aicomp::steer_towards(skill, &f, line));
+    Some(word)
 }
 
 /// The AI paths of the recording's course (`course N`) from the player's disc (TRICKY_DISC), as the game keeps them.

@@ -2111,6 +2111,19 @@ Not covered by rec25: the stuck bit is never set (so the race mode word 0x32de8c
 at 0 and 1: TRICKY_GMODE, default 1). The shoves are all rider 5's, 11 of 11. State
 0x12 does not occur. rec22 (no object window) is unchanged.
 
+## F4b3k2e: the computer's ride state (2026-11-19)
+
+Proven (code): `AIComputer_ControlsRide` 0x1387e8 (state 0xe) asks the rider's path (+0x57a4, its vtable +0xc:
+`cPath::vf0` 0x197910) for the events from +0x340 to +0x344 + 50. On the first jump marker (0x19), with the mask's
+bit 25 set, it jumps (bit 1), and tucks (bit 3) when slower than +0x868 − 138.89. Then it puts the steer at the line
+point +0x360 in bits 17–22, the object's +0x888 in bits 5–10 and +0x88c in bits 11–16.
+
+`ride_word` (`tests/ground_motion.rs`) runs `aipad::controls_ride` with the path found as in F4b3k2d and the same
+samples (the object the first, the rider the second, the frame the first). rec25 8,756 of 8,765 (aa 7,726, bb 7,349,
+ab 6,754). The 9 misses are 3 ticks in each loop: 7420 and 7427 r3 steer 6 steps where the game gives 0 (just over
+the 0.2 cut, as F4b3k2d's 8067 r5), and 8151 r2 one step past it. The jump branch is in rec25 (words 0x3ea: jump and
+tuck, the crouch field full) and matches.
+
 ## F4b3z: rec14 9092 rider 1, what the miss is not (2026-11-19, notes)
 
 `TRICKY_DBGP=<frame tick>` (new) lists every push of the frame replay. rec14 frame 9091 → 9092 (riders run 5, 4, 3,
