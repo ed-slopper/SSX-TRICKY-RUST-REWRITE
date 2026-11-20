@@ -4208,6 +4208,7 @@ fn computer_pad_words_against_the_running_game() {
     let clip_types: Option<Vec<u8>> = std::env::var("TRICKY_ELF").ok().and_then(|e| std::fs::read(e).ok()).map(|b| b[(animctl::CLIP_TABLE - 0xff000) as usize..][..0x300 * 0x1c].to_vec());
     let ka = ticks[0].extra.iter().position(|(o, _)| *o == 0x46c0);
     let mut by_mode: std::collections::BTreeMap<u32, [usize; 2]> = Default::default();
+    let mut draws = 0;
     let mut changed = 0;
     for w in ticks.windows(2) {
         for i in (0..n).filter(|&i| u32_le(&stats[i], 0x6c) == u32::MAX) {
@@ -4235,7 +4236,8 @@ fn computer_pad_words_against_the_running_game() {
             }).flatten();
             let dispatch = matches!(state, 2 | 3 | 4 | 7 | 0xb | 0xc | 0x12).then(|| dispatch_word(w, i, n, kh?, kf?, ka?, paths.as_deref()?, clip_types.as_deref()?, &mut by_mode)).flatten();
             let ride = (state == 0xe).then(|| ride_word(w, i, kh?, kf?, paths.as_deref()?)).flatten();
-            let routine = matches!(state, 0xf | 0x10) || state == 0xe && ride.is_none() || state == 8 && countdown.is_none() || matches!(state, 2 | 3 | 4 | 7 | 0xb | 0xc | 0x12) && dispatch.is_none();
+            let air = (state == 0x10).then(|| air_trick_word(w, i, kh?, kf?, &stats[i], &mut draws)).flatten();
+            let routine = state == 0xf || state == 0x10 && air.is_none() || state == 0xe && ride.is_none() || state == 8 && countdown.is_none() || matches!(state, 2 | 3 | 4 | 7 | 0xb | 0xc | 0x12) && dispatch.is_none();
             let ok = match state {
                 _ if routine => false,
                 // the stuck check alone (0x14), or after the idle's clearing of the zero word (0x13, `aictl::controls_idle`)
@@ -4260,6 +4262,13 @@ fn computer_pad_words_against_the_running_game() {
                     (None, _, _) => false,
                 },
                 8 => countdown == Some(pad),
+                0x10 => {
+                    let d = air.unwrap();
+                    if d != pad && std::env::var("TRICKY_DBGD").is_ok() {
+                        eprintln!("DBGD tick {} rider {i} state {state:#x}: pad {pad:#x} ours {d:#x} (xor {:#x})", w[1].tick, d ^ pad);
+                    }
+                    d == pad
+                }
                 0xe => {
                     let d = ride.unwrap();
                     if d != pad && std::env::var("TRICKY_DBGD").is_ok() {
@@ -4285,6 +4294,7 @@ fn computer_pad_words_against_the_running_game() {
         }
     }
     eprintln!("{path}: the computer's pad words by control state [ticks, equal (the states without a routine of their own only)], the state the same at both samples ({changed} ticks where it changed left out): {:?}", by.iter().map(|(s, v)| (format!("{s:#x}"), *v)).collect::<Vec<_>>());
+    eprintln!("{path}: the air trick's draws (`AIComputer_RandomTrick`, answered from the second sample): {draws}");
     eprintln!("{path}: the dispatch states by riding mode (object +0x89c at the first sample) [ticks, equal]: {by_mode:?}");
 }
 
@@ -4312,6 +4322,43 @@ fn ride_word(w: &[recording::Tick], i: usize, kh: usize, kf: usize, paths: &[tri
     let mut word = 0;
     tricky_game::aipad::controls_ride(&mut word, f32_at(r, 0x340), f32_at(r, 0x344), vec4(r, 0x150), f32_at(h, o(0x868)), f32_at(h, o(0x888)), f32_at(h, o(0x88c)), &mut query, &mut || aicomp::steer_towards(skill, &f, line));
     Some(word)
+}
+
+/// `AIComputer_AirTrickInput` 0x138d60 for computer rider `i` over the frame `w` (F4b3k2f, `aipad::air_trick_input`):
+/// the object's +0x878..+0x88c (window `5ae0>830`) and its rates +0x76c / +0x770 (`5ae0>600`) from the first sample;
+/// the rider's from TRICKY_AIR=<rider><57b0 window><frame> (default `bab`); the stats' byte +0x14. The trick
+/// `AIComputer_RandomTrick` 0x11d368 draws (`Rand_Game`) is answered with the second sample's +0x878 (counted in
+/// `draws`).
+fn air_trick_word(w: &[recording::Tick], i: usize, kh: usize, kf: usize, stats: &[u8], draws: &mut usize) -> Option<u32> {
+    use tricky_game::{aicomp, aipad};
+    let sel = std::env::var("TRICKY_AIR").unwrap_or("bbaa".into()).into_bytes();
+    let pick = |k: usize| (sel.get(k) == Some(&b'b')) as usize;
+    let k6 = w[0].chased.iter().position(|(s, _)| s == "5ae0>600")?;
+    let k57 = w[0].extra.iter().position(|(o, _)| *o == 0x57b0)?;
+    let h = &w[0].chased[kh].1[i];
+    let h6 = &w[0].chased[k6].1[i];
+    let o = |off: usize| off - 0x830;
+    let r = &w[pick(0)].riders[i];
+    let x = &w[pick(1)].extra[k57].1[i];
+    let fr = &w[pick(2)].extra[kf].1[i];
+    let mut obj = aipad::AirTrick { trick: u32_le(h, o(0x878)), x87c: u32_le(h, o(0x87c)), x880: u32_le(h, o(0x880)), x884: u32_le(h, o(0x884)), spin: f32_at(h, o(0x888)), flip: f32_at(h, o(0x88c)) };
+    let rd = aipad::AirTrickRider {
+        x57b8: f32_at(x, 8),
+        spin_angle: f32_at(&w[pick(3)].riders[i], 0x1d0),
+        flip_angle: f32_at(&w[pick(3)].riders[i], 0x1d4),
+        board: u32_le(r, 0x420),
+        spin_rate: f32_at(h6, 0x16c),
+        flip_rate: f32_at(h6, 0x170),
+        stat: stats[0x14],
+        x57fc: f32_at(x, 0x4c),
+    };
+    let skill = f32_at(h, o(0x86c));
+    let f = aicomp::Frame { pos: vec4(r, 0x140), fwd: vec4(fr, 0), side: vec4(fr, 0x10), up: vec4(fr, 0x20) };
+    let (line, nose) = (vec4(r, 0x360), vec4(x, 0x30));
+    let drawn = u32_le(&w[1].chased[kh].1[i], o(0x878));
+    let mut pad = 0;
+    aipad::air_trick_input(&mut pad, &mut obj, &rd, &mut || { *draws += 1; drawn }, &mut || aicomp::steer_towards(skill, &f, line), &mut || aipad::across(nose, f.fwd, f.side, skill));
+    Some(pad)
 }
 
 /// The AI paths of the recording's course (`course N`) from the player's disc (TRICKY_DISC), as the game keeps them.

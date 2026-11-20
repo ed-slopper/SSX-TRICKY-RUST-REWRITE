@@ -2124,6 +2124,34 @@ ab 6,754). The 9 misses are 3 ticks in each loop: 7420 and 7427 r3 steer 6 steps
 the 0.2 cut, as F4b3k2d's 8067 r5), and 8151 r2 one step past it. The jump branch is in rec25 (words 0x3ea: jump and
 tuck, the crouch field full) and matches.
 
+## F4b3k2f: the computer's air trick input (2026-11-19)
+
+`AIComputer_AirTrickInput` 0x138d60 (state 0x10) is now ported (`aipad::air_trick_input`, port notes `ai.md`) and
+checked in the runner (`tests/aipad.rs` `air_trick_input_is_the_original`: 60,000 cases, the limit's own value among
+them, the pad word, the object's fields and the calls; five deliberate one-character changes to the port each fail
+it). `air_trick_word` (`tests/ground_motion.rs`) runs it on rec25. The object's +0x878..+0x88c and its rates
++0x76c / +0x770 (*(rider+0x5ae0) is the computer object itself: windows `5ae0>830`, `5ae0>600`) come from the first
+sample, the stats' byte +0x14 from `rec25.stats`. The samples of the rest were tried
+(TRICKY_AIR=<rider><57b0 window><frame><angles>):
+
+| TRICKY_AIR | equal of 38,150 |
+|---|---|
+| bbaa | 38,150 |
+| bba (angles b) | 37,966 |
+| baa (angles b) | 37,763 |
+| aba (angles a) | 37,740 |
+| aaa | 37,526 |
+
+So the spin and flip angles (+0x1d0, +0x1d4) are the first sample's: the air trick reads them before the spin
+moves them. +0x57b8 / +0x57fc / +0x57e0 (window `57b0`) and the rider's position and line point are the second
+sample's, the frame `4aa0` the first. Every word: 38,150 of 38,150. That covers 24,592 ticks with a trick held,
+22,716 with a stick, and 3,536 with the steer or nose bits set.
+
+No trick is drawn in a tick that keeps the state (`AIComputer_RandomTrick` 0x11d368, a `Rand_Game` draw: the test would
+answer it from the second sample's +0x878), so the draw is checked only in the runner. State 0xf
+(`AIComputer_ControlsAir` 0x138bb8) does not occur in rec25. rec22 has 424 ticks of it but no object window, so it is
+left in F4b3k2.
+
 ## F4b3z: rec14 9092 rider 1, what the miss is not (2026-11-19, notes)
 
 `TRICKY_DBGP=<frame tick>` (new) lists every push of the frame replay. rec14 frame 9091 → 9092 (riders run 5, 4, 3,

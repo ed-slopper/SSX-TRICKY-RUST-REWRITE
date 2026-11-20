@@ -282,6 +282,16 @@ Part of the port notes (index: [README.md](README.md)); units and wording as des
 - `FUN_001371e0`(point): the point less its part along the rider's frame axis +0x4aa0, normalised (VU rsqrt), along
   +0x4ab0; times skill / 7.8941293 when the skill scale (+0x86c) is not 1.
 - Checked in the runner: 40,000 rides, event queries and line offsets; 30,000 dispatches over every control state.
+- `AIComputer_AirTrickInput` 0x138d60 (state 0x10, row F4b3k2f; `aipad::air_trick_input`), proven: the object's
+  +0x878 the trick (0x1a none), flags +0x87c / +0x880 / +0x884, sticks +0x888 (spin) / +0x88c (flip). With +0x87c
+  set: the flip stick is let go when |(int)(flip angle +0x1d4 in degrees)| % 360 − 5 ≥ 336 (unsigned) and +0x57b8 <
+  2π / |handler +0x770|; the spin stick when its remainder by 180 (360 on board +0x420 = 2) is over m − 20 or under
+  5 and +0x57b8 < m° / |handler +0x76c|. No trick and +0x884 set: once +0x57fc and +0x57b8 are both over
+  0.8 / (stats+0x14 × 0.8057834 × 0.003921569 + 0.78212035) draw one (`AIComputer_RandomTrick`) and clear +0x884; a
+  trick is dropped to 0x1a under that (0.3 with +0x880 set). Pad: spin and flip as −1/0/1 (±0.5) in bits 12–13 and
+  14–15, the trick in the low byte; with no trick and both sticks 0, −steer at +0x360 in 20–21 and
+  −`AIComputer_DirNoseComponent`(+0x57e0) in 22–23. Checked in the runner (60,000 cases, the object and the calls
+  too) and on rec25: 38,150 of 38,150 (`checking.md` F4b3k2f).
 
 ## TRICKY_SIM on the ported computer rider (board row G4e2)
 

@@ -356,3 +356,124 @@ fn grades_and_trick_helpers_are_the_original() {
     eprintln!("grades {seen:?}");
     assert!(seen.iter().all(|n| 0 < *n), "every grade reached");
 }
+
+/// `AIComputer_AirTrickInput` 0x138d60 (F4b3k2f): the pad word and the object's fields, with `AIComputer_RandomTrick`,
+/// `AIComputer_SteerTowards` and `AIComputer_DirNoseComponent` stubbed (checked on their own) and their calls compared.
+#[test]
+fn air_trick_input_is_the_original() {
+    let Some(mut r) = runner() else { return };
+    let rider = r.mem.alloc(0x5b00);
+    let comp = r.mem.alloc(0x900);
+    let handler = r.mem.alloc(0x800);
+    let stats = r.mem.alloc(0x40);
+    r.mem.write_u32(comp, rider);
+    r.mem.write_u32(rider + 0x5ae0, handler);
+    r.mem.write_u32(rider + 0x464, stats);
+    let calls = Rc::new(RefCell::new(Vec::<(u32, u32)>::new()));
+    let outs = Rc::new(RefCell::new((0u32, 0f32, 0f32)));
+    let (c1, o1) = (calls.clone(), outs.clone());
+    r.stub(0x11d368, move |c, _| {
+        c1.borrow_mut().push((1, c.gpr(4) as u32));
+        c.set_gpr(2, o1.borrow().0 as u64);
+    });
+    let (c2, o2) = (calls.clone(), outs.clone());
+    r.stub(0x1372f8, move |c, _| {
+        c2.borrow_mut().push((2, c.gpr(5) as u32));
+        c.set_f(0, o2.borrow().1);
+    });
+    let (c3, o3) = (calls.clone(), outs.clone());
+    let nose_at = Rc::new(RefCell::new([0u32; 4]));
+    let n3 = nose_at.clone();
+    r.stub(0x1371e0, move |c, m| {
+        let p = c.gpr(5) as u32;
+        *n3.borrow_mut() = [m.read_u32(p), m.read_u32(p + 4), m.read_u32(p + 8), m.read_u32(p + 12)];
+        c3.borrow_mut().push((3, c.gpr(4) as u32));
+        c.set_f(0, o3.borrow().2);
+    });
+    let pad_at = r.mem.alloc(8);
+    let mut g = Rng(0x7a1c_0000_0010_0001);
+    let angle = |g: &mut Rng| match g.below(4) {
+        0 => g.f(-40.0, 40.0),
+        1 => (g.below(9) as f32 - 4.0) * std::f32::consts::PI + g.f(-0.5, 0.5),
+        2 => g.pick(&[0.0, -0.0, 0.0872, 0.3316, 3.1416, -3.1416, 6.2832]),
+        _ => g.f(-7.0, 7.0),
+    };
+    let stick = |g: &mut Rng| g.pick(&[0.0, 0.0, 0.5, -0.5, 1.0, -1.0, 0.75, -0.25, 0.500001, -0.500001]);
+    for case in 0..60_000 {
+        let mut o = aipad::AirTrick {
+            trick: if g.below(2) == 0 { 0x1a } else { g.below(0x40) | [0, 0x100, 0xff00][g.below(3) as usize] },
+            x87c: [0, 1, 7][g.below(3) as usize],
+            x880: g.below(2),
+            x884: g.below(2),
+            spin: stick(&mut g),
+            flip: stick(&mut g),
+        };
+        let rd = aipad::AirTrickRider {
+            x57b8: { let v = g.f(-0.2, 3.0); g.pick(&[v, v, 0.3, 0.29999998, 0.0]) },
+            spin_angle: angle(&mut g),
+            flip_angle: angle(&mut g),
+            board: g.below(4),
+            spin_rate: { let v = g.f(-15.0, 15.0); g.pick(&[v, v, 0.0, 6.2831855]) },
+            flip_rate: { let v = g.f(-15.0, 15.0); g.pick(&[v, v, 0.0, -3.0]) },
+            stat: g.below(256) as u8,
+            x57fc: { let v = g.f(-0.2, 3.0); g.pick(&[v, v, 0.8, 1.0228]) },
+        };
+        let mut rd = rd;
+        // the limit's own value, to test its edges: 0.8 / (stat × 0.8057834 / 255 + 0.78212035)
+        let t = 0.8f32 / (rd.stat as f32 * 0.805_783_4 * 0.003_921_569 + 0.782_120_35);
+        match g.below(4) {
+            0 => rd.x57fc = t,
+            1 => rd.x57b8 = t,
+            _ => {}
+        }
+        let nose = [g.f(-500.0, 500.0), g.f(-500.0, 500.0), g.f(-50.0, 50.0), 1.0];
+        let (d, st, nv) = (g.below(0x40), g.f(-1.2, 1.2), g.f(-1.2, 1.2));
+        *outs.borrow_mut() = (d, st, g.pick(&[nv, nv, 0.5, -0.5]));
+        r.mem.write_u32(comp + 0x878, o.trick);
+        r.mem.write_u32(comp + 0x87c, o.x87c);
+        r.mem.write_u32(comp + 0x880, o.x880);
+        r.mem.write_u32(comp + 0x884, o.x884);
+        r.mem.write_f32(comp + 0x888, o.spin);
+        r.mem.write_f32(comp + 0x88c, o.flip);
+        r.mem.write_f32(rider + 0x57b8, rd.x57b8);
+        r.mem.write_f32(rider + 0x1d0, rd.spin_angle);
+        r.mem.write_f32(rider + 0x1d4, rd.flip_angle);
+        r.mem.write_u32(rider + 0x420, rd.board);
+        r.mem.write_f32(handler + 0x76c, rd.spin_rate);
+        r.mem.write_f32(handler + 0x770, rd.flip_rate);
+        r.mem.write_u8(stats + 0x14, rd.stat);
+        r.mem.write_f32(rider + 0x57fc, rd.x57fc);
+        for k in 0..4 {
+            r.mem.write_f32(rider + 0x57e0 + 4 * k, nose[k as usize]);
+        }
+        let pad0 = g.next();
+        r.mem.write_u32(pad_at, pad0);
+        calls.borrow_mut().clear();
+        r.cpu.set_gpr(4, comp as u64);
+        r.cpu.set_gpr(5, pad_at as u64);
+        r.call(0x138d60).unwrap();
+        let (draw, st, ns) = *outs.borrow();
+        let mut ours = vec![];
+        let mut pad = pad0;
+        aipad::air_trick_input(&mut pad, &mut o, &rd, &mut || { ours.push((1, rider)); draw }, &mut || st, &mut || ns);
+        // the steer and the nose are asked together (the steer of the line point, the nose of +0x57e0)
+        let theirs = calls.borrow().clone();
+        let asked_steer = theirs.iter().any(|c| c.0 == 2);
+        if asked_steer {
+            ours.push((2, rider + 0x360));
+            ours.push((3, comp));
+            assert_eq!(*nose_at.borrow(), nose.map(f32::to_bits), "case {case}: the nose's point");
+        }
+        assert_eq!(theirs, ours, "case {case}: the calls");
+        assert_eq!(r.mem.read_u32(pad_at), pad, "case {case}: the pad word ({o:?} {rd:?})");
+        let back = aipad::AirTrick {
+            trick: r.mem.read_u32(comp + 0x878),
+            x87c: r.mem.read_u32(comp + 0x87c),
+            x880: r.mem.read_u32(comp + 0x880),
+            x884: r.mem.read_u32(comp + 0x884),
+            spin: r.mem.read_f32(comp + 0x888),
+            flip: r.mem.read_f32(comp + 0x88c),
+        };
+        assert_eq!(back, o, "case {case}: the object");
+    }
+}
