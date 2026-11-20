@@ -9,7 +9,7 @@
 use tricky_game::air::{integrate_rk4, predict_at_takeoff, Predict, RayHit};
 use tricky_game::jump::{jump_impulse, JumpState};
 use tricky_game::orient::{update_orientation, Orient};
-use tricky_game::spin::{spin_update, Anim, SpinObj, SpinRider};
+use tricky_game::spin::{landing_align, spin_update, AlignRider, Anim, SpinObj, SpinRider};
 
 mod recording;
 use recording::{f32_at, load, player_pad, u32_le, vec4};
@@ -801,6 +801,16 @@ fn hook_pad(t: &recording::Tick, i: usize) -> Option<u32> {
     (count.is_none() || count == Some(f32_at(x, 4))).then(|| u32_le(x, 0))
 }
 
+/// `AnimCtl_GetClipType` 0x15eec0 on clip `clip`: the clip table's (0x325fa8, 0x1c bytes a clip) first word, 8 for
+/// no clip (0x300), read from the ELF (file offset = address − 0xff000)
+fn clip_type_of(elf: &[u8], clip: u32) -> u32 {
+    if clip == 0x300 {
+        return 8;
+    }
+    let at = (0x325fa8 + clip as usize * 0x1c) - 0xff000;
+    elf.get(at..at + 4).map_or(8, |b| u32::from_le_bytes([b[0], b[1], b[2], b[3]]))
+}
+
 #[test]
 fn spin_ticks_against_the_running_game() {
     let (Ok(paths), Ok(stats)) = (std::env::var("TRICKY_RECORDING"), std::env::var("TRICKY_STATS")) else { return };
@@ -814,11 +824,17 @@ fn spin_ticks_against_the_running_game() {
         return;
     };
     let ks140 = ticks[0].extra.iter().position(|(o, _)| *o == -0x140);
+    // the half-pipe turn's inputs (F4b3d2): the rider's place on the half-pipe (+0x4ab0, window `4aa0`) and the bone
+    // it pivots on (window `8c0`: bone 0's x y z at +0x8c8, with its index +0x44d8, window `44d8`), when recorded
+    let khp = ticks[0].extra.iter().position(|(o, _)| *o == 0x4aa0).filter(|_| std::env::var("TRICKY_NOHP").is_err());
+    let kbone = ticks[0].extra.iter().position(|(o, _)| *o == 0x8c0);
+    let kbi = ticks[0].extra.iter().position(|(o, _)| *o == 0x44d8);
     // the rider addresses (header `race X riders a b c ...`): the window is the spin object only where its +0x70 is the
     // rider (the state manager sits 0x8b0 before most riders, but 0x880 before one)
     let head = std::fs::read_to_string(path).unwrap().lines().next().unwrap().to_string();
     let addr: Vec<u32> = head.split_whitespace().skip(3).take(n).map(|h| u32::from_str_radix(h, 16).unwrap()).collect();
     let mut runners: Vec<(&str, r5900::Runner, [u32; 3])> = Vec::new();
+    let elf = std::env::var("TRICKY_ELF").ok().and_then(|p| std::fs::read(p).ok());
     let anim_now = std::rc::Rc::new(std::cell::Cell::new(Anim::default()));
     // the animation's answers (F4b3d): the layer-0 clip (window `46c0`) and its phase from the sequence windows
     // (`4718>0`, `4718>30>0` and their lengths), when recorded
@@ -829,12 +845,19 @@ fn spin_ticks_against_the_running_game() {
         for f in [0x250c10, 0x102e80, 0x102f80, 0x102f50, 0x129008, 0x2510f8] {
             r.allow(f); // Math_SinCos, Quat_Multiply, Vec3_Scale, Vec4_Scale, Boarder_UpdateOrientation, Math_Atan
         }
-        for f in [0x155e00, 0x155e68, 0x102800, 0x127918, 0x15fcf8, 0x15eef8, 0x11db00, 0x127d08, 0x118f10] {
+        // `SpinControl_CalcLandingAlign` and its maths, after the half-pipe turn (F4b3d2)
+        for f in [0x11db00, 0x2508b8, 0x10c120, 0x250fd0, 0x250d60] {
+            r.allow(f);
+        }
+        for f in [0x155e00, 0x155e68, 0x102800, 0x127918, 0x15fcf8, 0x15eef8, 0x127d08, 0x118f10] {
             r.stub(f, |_, _| {});
         }
-        for f in [0x1272e8, 0x102158, 0x15eec0] {
-            r.stub(f, |c, _| c.set_gpr(2, 0));
-        }
+        r.stub(0x102158, |c, _| c.set_gpr(2, 0));
+        // `SpinState_UpdateTrickClips` 0x1272e8 and `AnimCtl_GetClipType` 0x15eec0: as the tick is tried (F4b3d2)
+        let a = anim_now.clone();
+        r.stub(0x1272e8, move |c, _| c.set_gpr(2, a.get().trick_clips as u64));
+        let a = anim_now.clone();
+        r.stub(0x15eec0, move |c, _| c.set_gpr(2, a.get().clip_type as u64));
         // `AnimCtl_GetClip` 0x15fdd0 and `AnimCtl_GetLayerPhase` 0x15fe70: the clip and phase the tick is tried with
         let a = anim_now.clone();
         r.stub(0x15fdd0, move |c, _| c.set_gpr(2, a.get().clip as u64));
@@ -910,6 +933,30 @@ fn spin_ticks_against_the_running_game() {
             let stat = &stats[i];
             let mode = u32_le(sa, 8);
             let want = pick(&spin_obj(sb), b);
+            if mode == 2 && std::env::var("TRICKY_HPDBG").is_ok() {
+                let game_turn = u32_le(a, 0x1b4) != u32_le(b, 0x1b4);
+                let nose = |t: &recording::Tick| khp.map(|k| vec4(&t.extra[k].1[i], 0x10));
+                let (n0, n1) = (nose(&w[0]), nose(&w[1]));
+                let test = |nose: [f32; 4]| {
+                    let (face, axis, vel) = (vec4(pb, 0x20), vec4(pb, 0x30), vec4(a, 0x150));
+                    let d4 = |x: [f32; 4], y: [f32; 4]| x[0] * y[0] + x[1] * y[1] + x[2] * y[2] + x[3] * y[3];
+                    let d = d4(nose, axis);
+                    let out: Vec<f32> = (0..4).map(|k| nose[k] - axis[k] * d).collect();
+                    let out = [out[0], out[1], out[2], out[3]];
+                    let l = d4(out, out).sqrt();
+                    let nn = [out[0] / l, out[1] / l, out[2] / l, out[3] / l];
+                    (d4(nn, face) < 0.0, d4(nose, vel) < 277.777_77, f32_at(a, 0x1f0) == 0.0)
+                };
+                let (t0, t1) = (n0.map(test), n1.map(test));
+                if game_turn || t0.is_some_and(|t| t.0 && t.1 && t.2) {
+                    eprintln!("HPDBG tick {} rider {i} game_turn {game_turn} x5c {} clip {:x} w {} {} a(face,vel,1f0) {t0:?} b {t1:?} class {}", w[1].tick, u32_le(sa, 0x5c), u32_le(&w[0].extra[ka.unwrap()].1[i], 8), f32_at(sa, 0x2c), f32_at(sa, 0x30), u32_le(a, 0x420));
+                }
+            }
+            let hp_win = khp.map(|k| &w[if std::env::var("TRICKY_HP").as_deref() == Ok("b") { 1 } else { 0 }].extra[k].1[i][..]);
+            let hp_at = hp_win.map(|x| vec4(x, 0x10));
+            // (bone 0 only: its index has been 0 on every sample, F4b3t)
+            let (bone_win, bi_win) = (kbone.map(|k| &w[0].extra[k].1[i][..]), kbi.map(|k| &w[0].extra[k].1[i][..]));
+            let bone = bone_win.zip(bi_win).filter(|(_, b)| u32_le(b, 0) == 0).map(|(x, _)| [f32_at(x, 8), f32_at(x, 0xc), f32_at(x, 0x10)]);
             // one way's fields for a time to touch down
             let ours = |land: f32, ts: f32, pad: u32, anim: Anim| {
                 let mut st = spin_obj(sa);
@@ -934,12 +981,21 @@ fn spin_ticks_against_the_running_game() {
                     vel: vec4(a, 0x150),
                     pos: vec4(a, 0x140),
                     x5800: f32_at(pb, 0x50),
+                    hp_at: hp_at.unwrap_or_default(),
+                    bone: bone.unwrap_or_default(),
                     ..Default::default()
                 };
                 let calls = spin_update(pad, &mut st, &mut r, &anim);
                 let mut o = Orient { q: r.quat, fwd: vec4(a, 0x180), side: vec4(a, 0x190), up: vec4(a, 0x1a0), ..Default::default() };
                 if calls.contains(&tricky_game::spin::SpinCall::Orientation) {
                     update_orientation(&mut o);
+                }
+                // the half-pipe turn's last call (F4b3d2): `SpinControl_CalcLandingAlign` 0x11db00 on the turned rider
+                if calls.contains(&tricky_game::spin::SpinCall::LandingAlign) {
+                    let ar = AlignRider { slope_kind: u32_le(pb, 0x40), slope: vec4(pb, 0x30), fwd: o.fwd, quat: o.q, class: u32_le(a, 0x420) };
+                    let mut axis = [st.align_axis[0], st.align_axis[1], st.align_axis[2], st.align_w];
+                    landing_align(&ar, &mut axis, &mut st.align);
+                    (st.align_axis, st.align_w) = ([axis[0], axis[1], axis[2]], axis[3]);
                 }
                 let mut out = a.clone();
                 for (k, v) in [o.q, o.fwd, o.side, o.up].iter().enumerate() {
@@ -960,6 +1016,13 @@ fn spin_ticks_against_the_running_game() {
                     g.mem.write(rd, a).unwrap();
                     g.mem.write_f32(rd + 0x12c, ts);
                     g.mem.write(rd + 0x57b0, pb).unwrap();
+                    if let Some(hp) = hp_win {
+                        g.mem.write(rd + 0x4aa0, hp).unwrap();
+                    }
+                    if let (Some(bw), Some(bi)) = (bone_win, bi_win) {
+                        g.mem.write(rd + 0x8c0, bw).unwrap();
+                        g.mem.write(rd + 0x44d8, bi).unwrap();
+                    }
                     g.mem.write_f32(rd + 0x57b8, land);
                     g.mem.write(rd - 0x170, sa).unwrap();
                     g.mem.write_u32(rd - 0x170 + 0x70, rd);
@@ -997,6 +1060,21 @@ fn spin_ticks_against_the_running_game() {
                 Some(ka) => [&w[0], &w[1]].iter().map(|t| spin_anim(t, i, ka, addr[i])).collect(),
                 None => vec![Anim::default()],
             };
+            // the clip's type (`AnimCtl_GetClipType` 0x15eec0: the clip table 0x325fa8, 0x1c bytes a clip, 8 for
+            // none) and `SpinState_UpdateTrickClips` 0x1272e8's answer read from it (F4b3d2): 0 when +0x1e8 is 3
+            // with the rider not rising, else whether the layer-0 clip it leaves is a trick clip (types 0xe, 0xf,
+            // 0x10: every other way out returns 1). STANDIN: the function itself is not replayed (the clip it
+            // leaves taken as the sample's); TRICKY_NOTRICK=1: 0 as before
+            let anims: Vec<Anim> = anims.into_iter().map(|mut an| {
+                if let Some(elf) = &elf {
+                    an.clip_type = clip_type_of(elf, an.clip);
+                    if std::env::var("TRICKY_NOTRICK").is_err() {
+                        let rising = !(u32_le(a, 0x1e8) == 3 && f32_at(a, 0x158) <= 0.0);
+                        an.trick_clips = (rising && (0xe..=0x10).contains(&an.clip_type)) as u32;
+                    }
+                }
+                an
+            }).collect();
             // compared: the turn and angles always; the rates, bands and largest errors in mode 2, and for the
             // player in every mode
             let all = |f: usize| f < 5 || mode == 2 || player;
@@ -1043,6 +1121,10 @@ fn spin_ticks_against_the_running_game() {
                     if !right && k == n_ways - 1 && std::env::var("TRICKY_DBG").is_ok() {
                         let bad: Vec<&str> = (0..names.len()).filter(|&f| got[f] != want[f]).map(|f| names[f]).collect();
                         eprintln!("DBG player tick {} mode {mode} pad {:08x}: {bad:?}", w[1].tick, pads[0]);
+                        for f in (0..names.len()).filter(|&f| got[f] != want[f]) {
+                            let d: Vec<i64> = got[f].iter().zip(&want[f]).map(|(g, w)| *g as i32 as i64 - *w as i32 as i64).collect();
+                            eprintln!("    {}: game {:?} ulps off {d:?}", names[f], want[f].iter().map(|b| f32::from_bits(*b)).collect::<Vec<_>>());
+                        }
                     }
                 }
             }

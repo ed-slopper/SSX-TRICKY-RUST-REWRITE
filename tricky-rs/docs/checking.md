@@ -2320,3 +2320,23 @@ Found (TRICKY_DBG2=ours, with and without TRICKY_NOROLL=1):
   (+0xe4: virtual +0x64, then +0x94) or starts its event-1 script (`knockables.rs`), which makes it a roller. Find
   what this first contact does to the rider and to 0x80 that the replay's static bounce does not.
 - 13221 r3 has no roller in its list (a rider or something else).
+
+## F4b3d2: the half-pipe turn in the spin replay (2026-11-20, notes)
+
+Proven (`SpinState_Update` 0x100908, mode 2, stick settled, st+0x5c 0): the half-pipe turn reads the frame's nose
++0x4ab0 (`Boarder_UpdatePose` 0x129628's second row, so the first sample's: the pose runs after the motion), the
+landing slope +0x57e0 and +0x57d0; after it, when st+0x34 ≠ 0, `SpinControl_CalcLandingAlign` 0x11db00.
+`SpinState_UpdateTrickClips` 0x1272e8 returns 0 only when +0x1e8 is 3 with +0x158 ≤ 0, or when the layer-0 clip it
+leaves is not of type 0xe, 0xf or 0x10 (`AnimCtl_GetClipType` 0x15eec0: table 0x325fa8, 0x1c a clip).
+
+Changed (`tests/replay.rs`): the nose from window `4aa0` and bone 0 from `8c0` go to ours and the runner (TRICKY_NOHP=1:
+not; TRICKY_HP=b: the second sample's nose); the clip type from the ELF's table and the trick clips' answer from it
+(STANDIN, the sample's clip taken as the one it leaves; TRICKY_NOTRICK=1: 0) answer both; the landing alignment runs
+after the turn (ours `spin::landing_align`, the runner the original). Without the trick answer, the nose made ~340
+turns the game didn't make (all on trick clips 0x2ac, 0x2b7, 0x296, 0x27c, 0x29b, 0x23d).
+
+Found (`fadd=g1`, player's ticks every field, before → after): rec27 6,325 → 6,330 of 6,336; rec26 3,870 → 3,872 of
+3,880; rec25 7,330 → 7,333 of 7,338; rec22 9,260 → 9,262 of 9,276. Left: the game's turns on a tick whose first
+sample's clip is a trick clip (rec27 5107 0x2ac, 5383 0x27c, 6598 0x2ac, 11123 0x296; the function ended the trick
+that tick, so the clip it leaves is not the sample's): replay `SpinState_UpdateTrickClips` itself; rec26 7639–7646
+and rec25 811 (rates off by the stick's wind-up); rec27 8936.
