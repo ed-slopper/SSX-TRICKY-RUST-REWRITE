@@ -162,7 +162,7 @@ matches the original.
 
 | ID | Task | Section | Who | Date | Commit |
 |---|---|---|---|---|---|
-| F4b3k6 | Gap of F4b3k2d: the computer object's fields after the controls against rec25's second sample: the mode +0x89c and its method, target +0x890, speed +0x868, stuck counters +0x894 / +0x898 on 113,158 of 113,158 dispatch ticks; the air trick's +0x878..+0x88c on 38,150 of 38,150 (`checking.md` F4b3k6) | P0 | irregulur/lynx | 2026-11-19 | |
+| F4b3k6 | Gap of F4b3k2d: the computer object's fields after the controls against rec25's second sample: the mode +0x89c and its method, target +0x890, speed +0x868, stuck counters +0x894 / +0x898 on 113,158 of 113,158 dispatch ticks; the air trick's +0x878..+0x88c on 38,150 of 38,150 (`checking.md` F4b3k6) | P0 | irregulur/lynx | 2026-11-19 | 8093051 |
 | F4b3k2f | Split of F4b3k2: `AIComputer_AirTrickInput` 0x138d60 ported (`aipad::air_trick_input`, checked in the runner) and state 0x10 against rec25: 38,150 of 38,150 (`checking.md` F4b3k2f) | P0 | irregulur/lynx | 2026-11-19 | e2d300a |
 | F4b3k2e | Split of F4b3k2: the computer's ride state 0xe (`AIComputer_ControlsRide` 0x1387e8, `aipad::controls_ride`) on the path found from the disc's `.aip`: rec25 8,756 of 8,765 (`checking.md` F4b3k2e) | P0 | irregulur/lynx | 2026-11-19 | 4f592c6 |
 | F4b3k2d | Split of F4b3k2: the computer's dispatch states (`AIComputer_ControlsDispatch` 0x1389c8: the stuck bit, the shove, the riding modes `aicomp::Ai::ride`) with the rider's path found from the disc's `.aip`: rec25 113,103 of 113,158 (`checking.md` F4b3k2d) | P0 | irregulur/lynx | 2026-11-19 | af216f7 |
