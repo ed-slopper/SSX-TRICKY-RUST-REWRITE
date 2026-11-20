@@ -555,7 +555,7 @@ pub fn course_dir(list: &LevelList, number: u32) -> Option<usize> {
 fn ordinal(i: usize) -> &'static str { ["1st", "2nd", "3rd", "4th", "5th", "6th", "7th", "8th"][i.min(7)] }
 
 pub fn hud(
-    game: Res<Game>, race: Res<RaceRes>, list: Res<LevelList>, time: Res<Time>, smooth: Res<SmoothDt>, rider: Res<RiderRes>,
+    game: Res<Game>, race: Res<RaceRes>, list: Res<LevelList>, time: Res<Time>, (smooth, tick): (Res<SmoothDt>, Res<crate::GameTick>), rider: Res<RiderRes>,
     opponents: Res<Opponents>, lib: Res<CharLib>, mode: Res<Mode>, (career, book): (Res<CareerRes>, Res<crate::book::Book>),
     mut texts: Query<(&mut Text, &HudItem, &mut TextColor)>, mut segs: Query<(&mut Node, &mut BackgroundColor, &BoostSeg)>, mut shown: Local<f32>,
     mut panel: Single<&mut Visibility, (With<PanelBox>, Without<HudRoot>)>, mut root: Single<&mut Visibility, (With<HudRoot>, Without<PanelBox>)>,
@@ -576,10 +576,10 @@ pub fn hud(
     **root = if playing { Visibility::Inherited } else { Visibility::Hidden };
     **panel = if riding && game.screen != Screen::Playing { Visibility::Inherited } else { Visibility::Hidden };
 
-    // the shown level slews 0.005 a frame (0.3 a second) towards the meter; each segment is a
+    // the shown level slews 0.005 a tick (the game's frame, `GameTick`) towards the meter; each segment is a
     // fourteenth, grows from 0.2 to full size as it fills, and takes its band's colour
     let want = if r.tricky() { 1.0 } else { r.boost.clamp(0.0, 1.0) };
-    let step = 0.3 * time.delta_secs();
+    let step = 0.005 * tick.n as f32;
     *shown += (want - *shown).clamp(-step, step);
     let pulse = if r.uber_timer > 0.0 || r.tricky() { 0.75 + 0.25 * (time.elapsed_secs() * 8.0).sin() } else { 1.0 };
     for (mut node, mut bg, seg) in segs.iter_mut() {

@@ -126,7 +126,7 @@ impl Font {
 #[allow(clippy::too_many_arguments)]
 pub fn sfn_text(
     mut commands: Commands, lib: Res<CharLib>, mut fonts: ResMut<SfnFonts>, mut images: ResMut<Assets<Image>>,
-    root: Query<Entity, With<ui::HudRoot>>, rider: Res<RiderRes>, time: Res<Time>,
+    root: Query<Entity, With<ui::HudRoot>>, rider: Res<RiderRes>, tick: Res<crate::GameTick>,
     mut items: Query<(&Text, &ui::HudItem, &TextColor, &mut Visibility), Without<SfnText>>,
     mut slots: Query<(Entity, &Slot, &mut SfnText, Option<&Children>)>,
     mut mult: Local<(u32, f32)>,
@@ -159,7 +159,7 @@ pub fn sfn_text(
     }
     let r = &rider.0;
     if r.multiplier != mult.0 { *mult = (r.multiplier, if r.multiplier > mult.0 { 2.0 } else { 0.0 }); }
-    mult.1 -= time.delta_secs();
+    mult.1 -= tick.dt();
     let empty = (String::new(), Color::WHITE);
     for (_, slot, mut t, _) in slots.iter_mut() {
         let mut n = t.clone();

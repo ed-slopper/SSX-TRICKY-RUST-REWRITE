@@ -36,6 +36,18 @@ but were not watched.
 Left on the frame's time (gap rows): the riders' bodies (`animate_visuals`: the clips' clock, G5), the HUD's and
 menus' timers, the sounds' and music's fades.
 
+## E1a3: the HUD on the game's tick
+
+- `gamehud::game_hud` runs the game's HUD (the race's tick count world+0x18, the placings, `hudstate::update`, the
+  overlay manager's update and draw) the frame's `GameTick` ticks; it had its own bank of at most 4 a frame before.
+- The boost meter as shown (`ui::hud`, `hudsprites::hud_sprites`) slews 0.005 a tick toward the meter (it was
+  0.3 a second of the frame's time); the multiplier's flash (`sfnfont::sfn_text`) counts the ticks' time.
+- The riders' bodies (`animate_visuals`) stay posed once a frame by the frame's time: the pose is ours (STANDIN,
+  for G5's animation state machine) and only drawn; nothing the game runs reads it. When G5 ports the animation, it
+  runs on the ticks and is drawn between them like the rest.
+- The sounds are left on the frame's time: E1a4 (how the game calls each audio update: once an EE frame, or on the
+  IOP's own clock).
+
 ## E1c: the course table and the app's small helpers (`game/src/app.rs`, `tests/app.rs`)
 
 - **Constructors.** `cAppMan`'s constructor (0x17c530) makes the object the game's `gApp`. It keeps the execution

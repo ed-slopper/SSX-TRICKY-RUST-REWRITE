@@ -98,7 +98,6 @@ pub struct GameHud {
     mem: Option<Mem>,
     loc: Option<tricky_data::loc::LocFile>,
     sheets: Vec<Handle<Image>>,
-    tick: f32,
     /// the game mode and course the HUD overlay was built for
     mode: Option<(u32, u32)>,
     /// the disc, for the courses' `.aip`
@@ -713,7 +712,7 @@ fn load(hud: &mut GameHud, lib: &CharLib, images: &mut Assets<Image>) -> Option<
 /// and show what it drew
 #[allow(clippy::too_many_arguments)]
 pub fn game_hud(
-    mut commands: Commands, lib: Res<CharLib>, (mut rider, race, opponents, list): (ResMut<RiderRes>, Res<crate::RaceRes>, Res<crate::Opponents>, Res<crate::LevelList>), game: Res<ui::Game>, mode: Res<Mode>, time: Res<Time>,
+    mut commands: Commands, lib: Res<CharLib>, (mut rider, race, opponents, list): (ResMut<RiderRes>, Res<crate::RaceRes>, Res<crate::Opponents>, Res<crate::LevelList>), game: Res<ui::Game>, mode: Res<Mode>, (time, ticks): (Res<Time>, Res<crate::GameTick>),
     fonts: Res<SfnFonts>, mut hud: ResMut<GameHud>, mut images: ResMut<Assets<Image>>, root: Query<Entity, With<ui::HudRoot>>,
     mine: Query<Entity, With<GameHudRoot>>,
     mut quads: Query<(&QuadNode, &mut Node, &mut ImageNode, &mut Visibility, &mut GlobalZIndex), Without<TextNode>>,
@@ -771,7 +770,7 @@ pub fn game_hud(
         laps[k] = m.line.laps_left;
     }
     let riding = *mode == Mode::Ride && game.screen == ui::Screen::Playing;
-    let GameHud { mem, loc, sheets, tick, mode: built, disc, quads: nq, texts: nt, pop_cmds, finished: was_finished, .. } = &mut *hud;
+    let GameHud { mem, loc, sheets, mode: built, disc, quads: nq, texts: nt, pop_cmds, finished: was_finished, .. } = &mut *hud;
     let Some(m) = mem.as_mut() else { return };
     // the game mode for the app's event (its menu's "World Circuit - Race" / "- Show-off" / "Free Ride":
     // `courses::Mode` CircuitRace 4, CircuitShowoff 5, Freeride 7) and the course's number from the game's course
@@ -893,10 +892,8 @@ pub fn game_hud(
     }
     *was_finished = done;
     let mut state = StateEnv { units: r.sc.units, mult: r.sc.mult, ten: false, progress };
-    *tick += time.delta_secs();
-    let mut n = 0;
-    while *tick >= 1.0 / 60.0 && n < 4 {
-        *tick -= 1.0 / 60.0;
+    // the game's ticks this frame (`GameTick`, row E1a3)
+    for _ in 0..ticks.n {
         // the race's tick, and its placings (every 6th: the riders' places, +0x110) as the game keeps them
         let tick = m.r32(WORLD + 0x18).wrapping_add(1);
         m.w32(WORLD + 0x18, tick);
@@ -911,10 +908,6 @@ pub fn game_hud(
             tricky_game::overlays::man_draw(m, &mut pop, MAN);
         }
         *pop_cmds = e.cmds;
-        n += 1;
-    }
-    if *tick >= 1.0 / 60.0 {
-        *tick = 0.0;
     }
     // `Speech_OnTenSecondsLeft` 0x233ff0 (a1 the first player still racing: the player's rider)
     if state.ten {

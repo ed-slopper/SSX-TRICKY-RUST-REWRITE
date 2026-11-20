@@ -2413,6 +2413,9 @@ fn animate_visuals(
 ) {
     // paused: hold every body as it is
     if game.screen == ui::Screen::Paused { return; }
+    // STANDIN: the body is posed once a frame, eased by the frame's time, for the boarder's animation state machine
+    // on the game's tick (G5). Drawing only: nothing the game runs reads it (row E1a3), so it stays smooth between
+    // ticks without a second copy to draw between
     let dt = time.dt;
     for (mut vis, mut tf, children) in &mut roots {
         let (r, draw): (&Rider, &DrawLerp) = match vis.who { Who::Player => (&rider.0, &rider.1), Who::Ai(i) => match opponents.0.get(i) { Some(o) => (&o.rider, &o.draw), None => continue } };

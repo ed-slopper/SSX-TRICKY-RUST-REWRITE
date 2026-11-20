@@ -29,7 +29,7 @@ fn vh(y: f32) -> Val { Val::Vh(y / 480.0 * 100.0) }
 /// The HUD's sprites (`HUD_DrawPlayerSprites` 0x1a2c40, rectangles from `SpriteSet_InitHudGameRects` 0x1f4440).
 #[allow(clippy::too_many_arguments)]
 pub fn hud_sprites(
-    mut commands: Commands, lib: Res<CharLib>, rider: Res<RiderRes>, game: Res<ui::Game>, mode: Res<Mode>, time: Res<Time>,
+    mut commands: Commands, lib: Res<CharLib>, rider: Res<RiderRes>, game: Res<ui::Game>, mode: Res<Mode>, tick: Res<crate::GameTick>,
     mut hs: ResMut<HudSprites>, mut images: ResMut<Assets<Image>>, root: Query<Entity, With<ui::HudRoot>>,
     mut nodes: Query<(&HudSprite, &mut Node, &mut ImageNode, &mut Visibility)>, mut plain: Query<&mut Visibility, (With<ui::BoostSeg>, Without<HudSprite>)>,
     mut shown: Local<f32>,
@@ -77,7 +77,7 @@ pub fn hud_sprites(
     let riding = *mode == Mode::Ride && game.screen == ui::Screen::Playing;
     // the shown level slews 0.005 a frame toward the meter
     let want = if r.tricky() { 1.0 } else { r.boost.clamp(0.0, 1.0) };
-    let step = 0.3 * time.delta_secs();
+    let step = 0.005 * tick.n as f32;
     *shown += (want - *shown).clamp(-step, step);
     // place a sprite centred on a 640x480 point at a scale
     let place = |node: &mut Node, img: &mut ImageNode, s: &Sprite, sheet: &Handle<Image>, at: (f32, f32), k: f32| {
