@@ -13,7 +13,7 @@ use crate::level::{quat4, Level, ObjMesh};
 use crate::logic::{FlagDef, FlipDef, ScrollDef, WOp, WorldScript};
 use crate::props::Kind;
 use crate::rider::RaceState;
-use crate::{g2b, material, ui, AnimObjects, LevelEntity, LevelRes, MeshBuf, Opponents, Props, RaceRes, RiderRes, SmoothDt, TexCache, World};
+use crate::{g2b, material, ui, AnimObjects, GameTick, LevelEntity, LevelRes, MeshBuf, Opponents, Props, RaceRes, RiderRes, TexCache, World};
 use bevy::math::Affine2;
 use bevy::prelude::*;
 use bevy::render::mesh::{Indices, PrimitiveTopology};
@@ -68,7 +68,7 @@ pub struct WorldAnim {
     /// objects with a controller that keeps their touch script from running (ticks; -1 for good)
     busy: HashMap<usize, i32>,
     threads: Vec<Thread>, boxes: Vec<(usize, Vec3, Vec3)>,
-    started: bool, counting: bool, acc: f32,
+    started: bool, counting: bool,
     /// the controllers in the order they were made (the game ticks them in its node list's order)
     flip_order: Vec<usize>, crowd_order: Vec<usize>,
     cracks: HashMap<usize, Crack>, counters: HashMap<usize, Counter>, crowds: HashMap<usize, Crowd>,
@@ -541,7 +541,7 @@ fn bounds(level: &Level, i: usize, cache: &mut HashMap<std::path::PathBuf, ObjMe
 /// `Instance_OnPlayerContact` 0x13bd40, `World_ResetInstances` 0x115fe8, `cCrackedNode::vf17` 0x1457e8).
 #[allow(clippy::too_many_arguments)]
 pub fn world_anim(
-    time: Res<SmoothDt>, game: Res<ui::Game>, level: Res<LevelRes>, race: Res<RaceRes>, rider: Res<RiderRes>, opponents: Res<Opponents>,
+    tick: Res<GameTick>, game: Res<ui::Game>, level: Res<LevelRes>, race: Res<RaceRes>, rider: Res<RiderRes>, opponents: Res<Opponents>,
     wa: Option<ResMut<WorldAnim>>, mut anims: ResMut<AnimObjects>, mut materials: ResMut<Assets<StandardMaterial>>, mut meshes: ResMut<Assets<Mesh>>,
     props: Option<ResMut<Props>>, mut cell_mats: Query<&mut MeshMaterial3d<StandardMaterial>>, mut world: ResMut<World>,
 ) {
@@ -558,7 +558,8 @@ pub fn world_anim(
         if std::env::var("TRICKY_WADBG").is_ok() { eprintln!("worldanim: run restarted, level state reset"); }
     }
     if game.screen == ui::Screen::Paused { return; }
-    let dt = time.dt.min(0.1);
+    // the frame's ticks (`GameTick`, row E1a2)
+    let dt = tick.dt();
     // the level wakes: every always-on script (World_CellActivate_RunPersistant 0x25fed0)
     if !wa.started {
         wa.started = true;
@@ -626,9 +627,8 @@ pub fn world_anim(
         o.t = o.def.start.max(0.0) / 30.0 + world.0.gate_time(o.inst as u32).unwrap_or(0.0);
         o.budget = Some(0.0);
     }
-    // controllers at 60 Hz
-    wa.acc = (wa.acc + dt).min(0.25);
-    while wa.acc >= TICK { wa.acc -= TICK; wa.tick(); }
+    // controllers at 60 Hz, on the game's ticks
+    for _ in 0..tick.n { wa.tick(); }
     // controllers that reached their goal: the object's EffectTriggerSlot (a crack or counter with
     // no such script just ends)
     for _ in 0..4 {

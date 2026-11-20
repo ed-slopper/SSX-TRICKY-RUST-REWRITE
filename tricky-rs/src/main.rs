@@ -296,7 +296,57 @@ fn open_level(dir: &Path) -> Result<Loaded, String> {
     Ok(Loaded { level, world, rails, line, start, yaw, course, paths, tube, cml, stage, finish_area })
 }
 /// One game tick, 1/60 s: the race clock counts 60 a second (race+0x18; row E1a1).
-const TICK: f32 = 1.0 / 60.0;
+pub(crate) const TICK: f32 = 1.0 / 60.0;
+
+/// The game's ticks this frame (rows E1a1, E1a2). The game moves its world on once a 1/60 s tick, whatever the
+/// screen does: the frame time is banked and run as whole ticks (at most 0.1 s of them after a hitch), what is
+/// left carried to the next frame. Every system that moves the game on (the riders, the race, the props, the
+/// world's animations, scripts and controllers, the particles, the spray, the snowfall, the cameras) runs `n`
+/// ticks a frame; nothing moves the game by the frame's time.
+///
+/// STANDIN: drawing between ticks is ours (the PS2 draws once a tick): what is drawn is where things were
+/// `1 − alpha` of a tick before their last tick, between the last two (`DrawLerp` for the riders, `back` for the
+/// rest), so a screen faster than 60 Hz sees smooth motion.
+#[derive(Resource, Default)]
+pub(crate) struct GameTick {
+    bank: f32,
+    /// the ticks run this frame
+    pub n: u32,
+    /// how far into the next tick the frame is, 0..1
+    pub alpha: f32,
+    /// the frame's time (at most 0.1 s), for what is ours and not the game's (menus, flashes)
+    pub frame_dt: f32,
+    /// the ticks of the last frame that ran any, and where the props and the objects' clocks were before them
+    last_n: u32,
+    props: Vec<(Vec3, Quat)>,
+    anim_t: Vec<f32>,
+}
+impl GameTick {
+    /// the game time run this frame: `n` ticks
+    pub fn dt(&self) -> f32 { self.n as f32 * TICK }
+    /// how far back of the last tick things are drawn, as a fraction of the last frame's ticks
+    pub fn back(&self) -> f32 { if self.last_n == 0 { 0.0 } else { (1.0 - self.alpha) / self.last_n as f32 } }
+    /// a value drawn between ticks: `now` taken `back` of the way to where it was before the last frame's ticks
+    pub fn drawn(&self, now: f32, before: f32) -> f32 { now + (before - now) * self.back() }
+}
+
+/// Banks the frame time and counts the game's ticks this frame (`GameTick`); before any run, notes where the
+/// drawn things leave from.
+fn game_tick(time: Res<SmoothDt>, mut t: ResMut<GameTick>, props: Res<Props>, anims: Res<AnimObjects>) {
+    t.frame_dt = time.dt.min(0.1);
+    t.bank = (t.bank + t.frame_dt).min(0.1 + TICK);
+    t.n = 0;
+    while t.bank >= TICK * (1.0 - 1e-3) {
+        t.bank -= TICK;
+        t.n += 1;
+    }
+    t.alpha = (t.bank / TICK).clamp(0.0, 1.0);
+    if t.n > 0 {
+        t.last_n = t.n;
+        t.props = props.0.iter().map(|p| (p.pos, p.rot)).collect();
+        t.anim_t = anims.0.iter().map(|o| o.t).collect();
+    }
+}
 
 /// Frame time averaged over the last few frames. The display refreshes at a steady rate but the
 /// measured time between frames jitters by a few milliseconds; moving the rider and camera by the
@@ -469,11 +519,12 @@ fn main() {
         _ => ui::Game::default(),
     })
     .init_resource::<SmoothDt>()
+    .init_resource::<GameTick>()
     .add_systems(Startup, (setup, ui::setup_ui, sound::setup_sound, spray::setup_spray, tracks::setup_tracks, particles::setup_particles, snow::setup_snow, boardsound::setup_board_sound, editor::setup_editor, worldsound::setup_world_sound))
     .add_systems(Update, (
-        smooth_dt,
+        (smooth_dt, game_tick).chain(),
         ui::menus,
-        (trick_only_ramps, ride, rider_model, sync_visuals, animate_visuals, chase_camera).chain().run_if(|m: Res<Mode>| *m == Mode::Ride),
+        (trick_only_ramps, ride, rider_model, sync_visuals, animate_visuals, chase_camera, g21_camera).chain().run_if(|m: Res<Mode>| *m == Mode::Ride),
         fly_camera.run_if(|m: Res<Mode>| *m == Mode::Fly),
         (switch_level, move_movers, (worldanim::world_anim, animate_objects).chain(), move_props, sky_follow, draw_rails, toggles, ui::records, ui::trick_book, (ui::hud, hudsprites::hud_sprites, sfnfont::sfn_text, gamehud::game_hud, sfnfont::sfn_glyphs).chain(), (sound::course_music, coursemusic::course_music, pathmusic::path_music, racespeech::race_speech, sound::sound).chain(), boardsound::board_sound, (particles::particles, worldsound::world_sound).chain(), spray::spray, snow::snow, tracks::tracks, editor::editor, screenshot),
     ).chain());
@@ -828,13 +879,13 @@ fn spawn_animated(
 }
 
 /// Run each keyframed object's clock and pose its parts: world_i = world_parent * local_i(t).
-fn animate_objects(time: Res<SmoothDt>, game: Res<ui::Game>, level: Res<LevelRes>, mut objs: ResMut<AnimObjects>, mut q: Query<&mut Transform>, mut props: ResMut<Props>, mut coll: ResMut<World>) {
+fn animate_objects(tick: Res<GameTick>, game: Res<ui::Game>, level: Res<LevelRes>, mut objs: ResMut<AnimObjects>, mut q: Query<&mut Transform>, mut props: ResMut<Props>, mut coll: ResMut<World>) {
     if game.screen == ui::Screen::Paused { return; }
-    let dt = time.dt.min(0.1);
+    let dt = tick.dt();
     // game (cm, Z up) -> Bevy (m, Y up) as a change of basis
     let a = Mat4::from_cols(Vec4::new(0.01, 0.0, 0.0, 0.0), Vec4::new(0.0, 0.0, -0.01, 0.0), Vec4::new(0.0, 0.01, 0.0, 0.0), Vec4::W);
     let a_inv = a.inverse();
-    for o in objs.0.iter_mut() {
+    for (j, o) in objs.0.iter_mut().enumerate() {
         let start = o.def.start.max(0.0) / 30.0;
         let step = match o.budget.as_mut() {
             Some(b) if *b > 0.0 => { let s = (o.rate * dt).abs().min(*b); *b -= s; s }
@@ -872,10 +923,15 @@ fn animate_objects(time: Res<SmoothDt>, game: Res<ui::Game>, level: Res<LevelRes
             }
             continue;
         }
+        // drawn between ticks (`GameTick`): the clock as it was, unless it wrapped or turned
+        let t_draw = match tick.anim_t.get(j) {
+            Some(&b) if (o.t - b) * o.dir >= 0.0 && (o.t - b).abs() <= o.rate.abs() * TICK * tick.last_n as f32 * 1.01 + 1e-5 => tick.drawn(o.t, b),
+            _ => o.t,
+        };
         let mut world: Vec<Mat4> = Vec::with_capacity(model.model_objects.len());
         for (k, obj) in model.model_objects.iter().enumerate() {
             let local = match &obj.animation {
-                Some(an) => an.local(o.t),
+                Some(an) => an.local(t_draw),
                 None => Mat4::from_scale_rotation_translation(obj.scale.map(Vec3::from).unwrap_or(Vec3::ONE), obj.rotation.map(quat4).unwrap_or(Quat::IDENTITY), obj.position.map(Vec3::from).unwrap_or(Vec3::ZERO)),
             };
             let w = if obj.parent_id >= 0 && (obj.parent_id as usize) < k { world[obj.parent_id as usize] * local } else { local };
@@ -1028,11 +1084,11 @@ struct Movers(Vec<MoverRt>);
 
 /// Trains and lift chairs along their splines (`cSplinePathNode` update): distance += speed (m/s);
 /// the copies spaced evenly; facing along the spline (yaw, and pitch in orientation 0).
-fn move_movers(time: Res<SmoothDt>, game: Res<ui::Game>, mut movers: ResMut<Movers>, mut props: ResMut<Props>, mut gizmos: Gizmos) {
+fn move_movers(tick: Res<GameTick>, game: Res<ui::Game>, mut movers: ResMut<Movers>, mut props: ResMut<Props>, mut gizmos: Gizmos) {
     // ski lift cables
     for m in &movers.0 { if let Some(c) = m.def.cable { gizmos.linestrip(m.pts.iter().copied(), Color::srgb(c[0], c[1], c[2])); } }
     if game.screen == ui::Screen::Paused { return; }
-    let dt = time.dt.min(0.1);
+    let dt = tick.dt();
     for m in movers.0.iter_mut() { m.t += m.def.speed * dt; }
     let basis = Quat::from_rotation_x(-std::f32::consts::FRAC_PI_2);
     for p in props.0.iter_mut() {
@@ -1064,11 +1120,15 @@ fn move_movers(time: Res<SmoothDt>, game: Res<ui::Game>, mut movers: ResMut<Move
     }
 }
 
-fn move_props(props: Res<Props>, mut q: Query<(&PropVisual, &mut Transform, &mut Visibility)>) {
+fn move_props(props: Res<Props>, tick: Res<GameTick>, mut q: Query<(&PropVisual, &mut Transform, &mut Visibility)>) {
+    let back = tick.back();
     for (v, mut tf, mut vis) in &mut q {
         if let Some(p) = props.0.get(v.0) {
-            tf.translation = p.pos;
-            tf.rotation = p.rot;
+            // drawn between ticks (`GameTick`), unless it jumped (put back, a level script)
+            (tf.translation, tf.rotation) = match tick.props.get(v.0) {
+                Some(&(pos, rot)) if pos.distance(p.pos) < 5.0 => (p.pos.lerp(pos, back), p.rot.slerp(rot, back)),
+                _ => (p.pos, p.rot),
+            };
             let want = if p.hidden { Visibility::Hidden } else { Visibility::Inherited };
             if *vis != want { *vis = want; }
         }
@@ -1657,13 +1717,13 @@ fn gate_window(level: &Level, i: usize) -> Option<(f32, (f32, f32))> {
 }
 
 fn ride(
-    time: Res<SmoothDt>, keys: Res<ButtonInput<KeyCode>>, pads: Query<&Gamepad>,
+    tick: Res<GameTick>, keys: Res<ButtonInput<KeyCode>>, pads: Query<&Gamepad>,
     world: Res<World>, rails: Res<RailsRes>, mut rider: ResMut<RiderRes>, mut race: ResMut<RaceRes>,
     mut opponents: ResMut<Opponents>, lib: Res<CharLib>, mut props: ResMut<Props>, mut game: ResMut<ui::Game>, list: Res<LevelList>,
-    mut clocks: Local<(f32, f32)>, mut auto: Local<Option<rider::AiDriver>>, wa: Option<ResMut<worldanim::WorldAnim>>, mut restarted: Local<bool>,
+    mut skill_clock: Local<f32>, mut auto: Local<Option<rider::AiDriver>>, wa: Option<ResMut<worldanim::WorldAnim>>, mut restarted: Local<bool>,
 ) {
-    // the AI skill clock, and the frame time not yet run as ticks (row E1a1)
-    let (skill_clock, tick_bank) = &mut *clocks;
+    // the AI skill clock
+    let skill_clock = &mut *skill_clock;
     let RiderRes(r, lerp) = &mut *rider;
     let key = |a: KeyCode, b: KeyCode| keys.pressed(a) || keys.pressed(b);
     let up = key(KeyCode::KeyW, KeyCode::ArrowUp);
@@ -1815,7 +1875,7 @@ fn ride(
         let pairs = [(0.7549, 0.4048), (0.9092, 0.7084), (1.0, 0.9513)][level];
         let course_len = race.0.remaining(0) * 100.0;
         let rem = race.0.remaining(race.0.idx) * 100.0;
-        *skill_clock += time.dt;
+        *skill_clock += tick.dt();
         let repick = *skill_clock > 1.0;
         if repick { *skill_clock = 0.0; }
         let player_pos = r.pos;
@@ -1833,7 +1893,7 @@ fn ride(
             let min = if rem < end { -course_len } else { base_min };
             let m: f32 = if d < min { ((d - min) / min + 1.0) * 1.1359849 } else if d > max { 2.0487268 / (d - max) } else { 1.0 };
             let m = m.clamp(0.70005476, 1.5022597);
-            let step = 0.008446341 * 60.0 * time.dt.min(0.1);
+            let step = 0.008446341 * tick.n as f32;
             o.driver.time_scale += (m - o.driver.time_scale).clamp(-step, step);
             if repick { o.driver.skill = if player_dtf < dtf(slot + 1) { pairs.0 } else { pairs.1 }; }
         }
@@ -1898,14 +1958,12 @@ fn ride(
     }
     // TRICKY_CRASHAT=s: the player wipes out s seconds into the race (for checks)
     if let Some(at) = std::env::var("TRICKY_CRASHAT").ok().and_then(|v| v.parse::<f32>().ok()) {
-        if race.0.state == RaceState::Running && race.0.time >= at && race.0.time - time.dt.min(0.1) < at && r.crashed <= 0.0 { r.force_wipe(); }
+        if race.0.state == RaceState::Running && race.0.time >= at && race.0.time - tick.dt() < at && r.crashed <= 0.0 { r.force_wipe(); }
     }
     // the game's tick: the race counts 60 a second (race+0x18, docs/checking.md F4b1) and every boarder moves
     // dt = timescale/60 a tick (boarder+0x12c; the player's is 1, the AI's `o.driver.time_scale`). Whole ticks
-    // only, the frame time left over carried to the next frame; a hitch runs at most 0.1 s of ticks.
-    *tick_bank = (*tick_bank + time.dt.min(0.1)).min(0.1 + TICK);
-    while *tick_bank >= TICK * (1.0 - 1e-3) {
-        *tick_bank -= TICK;
+    // only, the frame time left over carried to the next frame; a hitch runs at most 0.1 s of ticks (`GameTick`).
+    for _ in 0..tick.n {
         lerp.mark(r);
         for o in opponents.0.iter_mut() { o.draw.mark(&o.rider); }
         let dt = TICK;
@@ -2137,7 +2195,7 @@ fn ride(
             props::throw_all(&mut props.0, &thrown);
         }
     }
-    lerp.alpha = (*tick_bank / TICK).clamp(0.0, 1.0);
+    lerp.alpha = tick.alpha;
     for o in opponents.0.iter_mut() { o.draw.alpha = lerp.alpha; }
     // across the line: the heat is over
     // show-off ends when its clock runs out
@@ -2616,8 +2674,23 @@ fn rider_model(time: Res<SmoothDt>, rider: Res<RiderRes>, opponents: Res<Opponen
     model.rotation = model.rotation.slerp(target, 1.0 - (-14.0 * time.dt).exp());
 }
 
+/// TRICKY_G21: how evenly the camera moves from frame to frame (rows G21, E1a2), as `rider_model` does the riders.
+fn g21_camera(time: Res<SmoothDt>, cam: Single<&Transform, With<FlyCam>>, mut g: Local<(Vec3, Vec<f32>)>) {
+    if std::env::var("TRICKY_G21").is_err() || time.dt <= 0.0 { return; }
+    let at = cam.translation;
+    let v = (at - g.0).length() / time.dt;
+    if v < 100.0 { g.1.push(v); }
+    g.0 = at;
+    if g.1.len() >= 120 {
+        let m = g.1.iter().sum::<f32>() / g.1.len() as f32;
+        let sd = (g.1.iter().map(|x| (x - m).powi(2)).sum::<f32>() / g.1.len() as f32).sqrt();
+        println!("g21 camera: speed {m:.1} m/s, frame-to-frame spread {:.0}%", sd / m.max(1e-3) * 100.0);
+        g.1.clear();
+    }
+}
+
 fn chase_camera(
-    time: Res<SmoothDt>, rider: Res<RiderRes>, world: Res<World>, mut chase: ResMut<CamRes>, game: Res<ui::Game>,
+    tick: Res<GameTick>, mut shot_before: Local<Option<intro::Shot>>, rider: Res<RiderRes>, world: Res<World>, mut chase: ResMut<CamRes>, game: Res<ui::Game>,
     mut cam: Single<(&mut Transform, &mut Projection), (With<FlyCam>, Without<RiderModel>)>,
     keys: Res<ButtonInput<KeyCode>>, pads: Query<&Gamepad>, mut flash: Local<f32>, mut label: Query<&mut Text, With<CamLabel>>,
     mut race: ResMut<RaceRes>, mut director: Local<Option<intro::Director>>, mut started: Local<bool>, opponents: Res<Opponents>,
@@ -2660,7 +2733,9 @@ fn chase_camera(
     let skip = keys.just_pressed(KeyCode::Space) || pads.iter().any(|p| p.just_pressed(GamepadButton::South));
     let mut intro_view = None;
     if let (Some(d), Some(cml)) = (director.as_mut(), race.0.cml.clone()) {
-        d.step(&cml, time.dt, &mut tricky_game::rand::rand_fx);
+        // the director a tick at a time (`GameTick`); the shot it left before them, to draw between
+        if tick.n > 0 { *shot_before = d.shot; }
+        for _ in 0..tick.n { d.step(&cml, TICK, &mut tricky_game::rand::rand_fx); }
         if std::env::var("TRICKY_INTRODBG").is_ok() { eprintln!("intro: done {} shot {:?} scene {:?}", d.done, d.shot.map(|s| s.pos), d.scene); }
         // the riders' scene: started and stopped by the script
         let want = if d.done { None } else { d.scene.clone() };
@@ -2669,7 +2744,7 @@ fn chase_camera(
         let cast = race.0.cast.clone();
         let riders = 1 + opponents_n;
         match (&mut race.0.scene, want) {
-            (Some(sc), Some(n)) if sc.name == n => { sc.t += time.dt; }
+            (Some(sc), Some(n)) if sc.name == n => { sc.t += tick.dt(); }
             (cur, Some(n)) => {
                 let spots = cml.scene(&n).into_iter().map(|sp| {
                     if !sp.place { return None; }
@@ -2691,16 +2766,27 @@ fn chase_camera(
         }
         if d.done || skip { if let Some(sc) = race.0.scene.as_mut() { sc.ended = true; } }
         if d.done || skip { *director = None; race.0.intro = false; chase.0.cut(); if race.0.post == 2 { race.0.post = 3; } }
-        else if let Some(s) = d.shot { intro_view = Some(s); }
+        else if let Some(s) = d.shot {
+            // drawn between ticks (`GameTick`), unless the shot cut
+            intro_view = Some(match *shot_before {
+                Some(b) if b.frame == s.frame && b.at_rider == s.at_rider && b.pos.distance(s.pos) < 300.0 => {
+                    let f = |now: f32, before: f32| tick.drawn(now, before);
+                    let turn = |now: f32, before: f32| now + rider::wrap(before - now) * tick.back();
+                    intro::Shot { pos: s.pos.lerp(b.pos, tick.back()), yaw: turn(s.yaw, b.yaw), pitch: turn(s.pitch, b.pitch), fov: f(s.fov, b.fov), ..s }
+                }
+                _ => s,
+            });
+        }
     }
     // C / Triangle: the next camera (board, near, far, over), as in the original's options
     if game.screen == ui::Screen::Playing && (keys.just_pressed(KeyCode::KeyC) || pads.iter().any(|p| p.just_pressed(GamepadButton::North))) {
         chase.0.cycle(1);
         *flash = 1.5;
     }
-    *flash = (*flash - time.dt).max(0.0);
+    *flash = (*flash - tick.frame_dt).max(0.0);
     for mut t in label.iter_mut() { t.0 = if *flash > 0.0 { chase.0.name().to_uppercase() } else { String::new() }; }
-    let (mut pos, mut look) = chase.0.update(&world.0, &rider.0, time.dt);
+    // the chase camera on the rider's last tick, by the ticks run (`GameTick`)
+    let (mut pos, mut look) = chase.0.update(&world.0, &rider.0, tick.dt());
     // the camera on the rider as drawn (row G21, `DrawLerp`)
     let shift = rider.1.at(rider.0.pos) - rider.0.pos;
     (pos, look) = (pos + shift, look + shift);

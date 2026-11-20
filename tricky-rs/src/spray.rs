@@ -2,7 +2,7 @@
 //! (per surface), a thin trail in the air and on rails, a fan when braking, a splash on hard landings.
 
 use crate::rider::Rider;
-use crate::{ui, Mode, Opponents, RiderRes, SmoothDt};
+use crate::{ui, GameTick, Mode, Opponents, RiderRes, TICK};
 use bevy::prelude::*;
 
 const COUNT: usize = 900;
@@ -141,35 +141,40 @@ pub fn setup_spray(mut commands: Commands, mut meshes: ResMut<Assets<Mesh>>, mut
 }
 
 pub fn spray(
-    time: Res<SmoothDt>, rider: Res<RiderRes>, opponents: Res<Opponents>, game: Res<ui::Game>, mode: Res<Mode>,
+    tick: Res<GameTick>, rider: Res<RiderRes>, opponents: Res<Opponents>, game: Res<ui::Game>, mode: Res<Mode>,
     mut spray: ResMut<Spray>, mut q: Query<(&FlakeVisual, &mut Transform, &mut Visibility)>,
 ) {
     if game.screen == ui::Screen::Paused { return; }
-    let dt = time.dt.min(0.05);
-    if *mode == Mode::Ride && game.screen != ui::Screen::Menu {
-        spray.add_rider(0, &rider.0, dt);
-        for (i, o) in opponents.0.iter().enumerate() { spray.add_rider(i + 1, &o.rider, dt); }
+    // a tick at a time, the game's (`GameTick`, row E1a2)
+    for _ in 0..tick.n {
+        let dt = TICK;
+        if *mode == Mode::Ride && game.screen != ui::Screen::Menu {
+            spray.add_rider(0, &rider.0, dt);
+            for (i, o) in opponents.0.iter().enumerate() { spray.add_rider(i + 1, &o.rider, dt); }
+        }
+        if std::env::var("TRICKY_SPRAYTEST").is_ok() {
+            // a rider carving hard on the spot, to look at the spray
+            let mut r = rider.0.clone();
+            r.grounded = true;
+            r.normal = Vec3::Y;
+            r.vel = crate::rider::heading(r.yaw) * 4.0;
+            r.input.steer = 1.0;
+            spray.add_rider(0, &r, dt * 5.0);
+        }
+        for f in spray.flakes.iter_mut() {
+            if f.life <= 0.0 { continue; }
+            f.life -= dt;
+            f.vel.y -= f.grav * dt;
+            f.vel *= (1.0 - 0.0182f32 * f.drag).powf(dt * 60.0);
+            f.pos += f.vel * dt;
+        }
     }
-    if std::env::var("TRICKY_SPRAYTEST").is_ok() {
-        // a rider carving hard on the spot, to look at the spray
-        let mut r = rider.0.clone();
-        r.grounded = true;
-        r.normal = Vec3::Y;
-        r.vel = crate::rider::heading(r.yaw) * 4.0;
-        r.input.steer = 1.0;
-        spray.add_rider(0, &r, dt * 5.0);
-    }
-    for f in spray.flakes.iter_mut() {
-        if f.life <= 0.0 { continue; }
-        f.life -= dt;
-        f.vel.y -= f.grav * dt;
-        f.vel *= (1.0 - 0.0182f32 * f.drag).powf(dt * 60.0);
-        f.pos += f.vel * dt;
-    }
+    // drawn between ticks: where each flake was `1 − alpha` of a tick ago
+    let lag = (1.0 - tick.alpha) * TICK;
     for (v, mut tf, mut vis) in &mut q {
         let f = &spray.flakes[v.0];
         if f.life > 0.0 {
-            tf.translation = f.pos;
+            tf.translation = f.pos - f.vel * lag;
             tf.scale = Vec3::splat(f.size * (0.4 + 0.6 * f.life / f.max));
             if *vis != Visibility::Visible { *vis = Visibility::Visible; }
         } else if *vis != Visibility::Hidden { *vis = Visibility::Hidden; }

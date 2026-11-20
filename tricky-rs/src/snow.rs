@@ -6,7 +6,7 @@
 //! The VU's sprites come out on the screen; we put each back in the world through the inverse of the matrix we gave
 //! the program (the same pixels, with the depth test the GS would make).
 
-use crate::{ui, CharLib, SmoothDt};
+use crate::{ui, CharLib, GameTick};
 use bevy::asset::RenderAssetUsages;
 use bevy::prelude::*;
 use bevy::render::mesh::{Indices, PrimitiveTopology};
@@ -37,7 +37,6 @@ pub struct Snow {
     m: Mem,
     vu: Vu,
     on: bool,
-    tick: f32,
     /// cGame+0x78, the density `cGame::Init` drew
     density: F,
     /// the camera's rider's weather (rider+0x18, `snowfall::rider_weather`)
@@ -86,7 +85,7 @@ impl Snow {
         for at in [25, 521] {
             vu.mem[at] = [0x8000, 0x502b_4000, 0x52512, 0];
         }
-        Snow { m, vu, on, tick: 0.0, density: F(g.density), weather: F(g.density) }
+        Snow { m, vu, on, density: F(g.density), weather: F(g.density) }
     }
 }
 
@@ -154,7 +153,7 @@ pub fn setup_snow(mut commands: Commands, mut meshes: ResMut<Assets<Mesh>>, mut 
 
 /// Each 60 Hz tick the manager's step (vf1); each frame its draw (vf2) from the app's camera
 #[allow(clippy::too_many_arguments)]
-pub fn snow(time: Res<SmoothDt>, game: Res<ui::Game>, snow: Option<ResMut<Snow>>, cam: Query<(&Camera, &GlobalTransform), With<Camera3d>>,
+pub fn snow(tick: Res<GameTick>, game: Res<ui::Game>, snow: Option<ResMut<Snow>>, cam: Query<(&Camera, &GlobalTransform), With<Camera3d>>,
     mut holder: Query<(&mut Transform, &Mesh3d, &MeshMaterial3d<StandardMaterial>), With<SnowMesh>>, mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>, mut images: ResMut<Assets<Image>>, lib: Res<CharLib>, race: Option<Res<crate::RaceRes>>, mut loaded: Local<bool>) {
     let (Some(mut s), Ok((camera, gt)), Ok((mut tf, mesh, mat))) = (snow, cam.single(), holder.single_mut()) else { return };
@@ -184,9 +183,8 @@ pub fn snow(time: Res<SmoothDt>, game: Res<ui::Game>, snow: Option<ResMut<Snow>>
     }
     let s = &mut *s;
     if game.screen != ui::Screen::Paused {
-        s.tick += time.dt.min(0.1);
-        while s.tick >= 1.0 / 60.0 {
-            s.tick -= 1.0 / 60.0;
+        // the game's ticks (`GameTick`, row E1a2)
+        for _ in 0..tick.n {
             snowfall::step(&mut s.m, MGR);
             // the camera's rider's tick (`cBoarder::vf7` 0x117198) eases its weather toward the density, toward 0
             // while it is in a race-line event 0xe (rider+0x388 bit 14, `Race::event_bits`)

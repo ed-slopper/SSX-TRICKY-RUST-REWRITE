@@ -3,6 +3,39 @@
 Notes for the board's E1 rows: `cApplication` (the game's `gApp` at 0x337c58), the modules it runs, and `cGame`.
 Addresses are `SLUS_203.26`.
 
+## E1a2: the app's world on the game's tick (`src/main.rs` `GameTick`)
+
+The game moves its world once a 1/60 s tick (the race clock counts 60 a second, race+0x18; E1a1 put the riders
+on it). The app now banks the frame's time once a frame (`game_tick`, after `smooth_dt`) and runs it as whole
+ticks, at most 0.1 s of them after a hitch, the rest carried over. Every system that moves the game on runs those
+`n` ticks and nothing moves the game by the frame's time:
+
+- `ride`: the riders, the race and the props (as in E1a1); the AI's time scale moves 0.008446341 a tick (as the
+  same total over the frame, since its target is fixed within it).
+- `chase_camera`: the director (the course's camera scripts) steps a tick at a time; the chase camera (a stand-in,
+  E11d) steps by the frame's ticks; the riders' scenes count the ticks.
+- `world_anim`: the scripts' waits and the doors by the ticks; the controllers once a tick (it had its own
+  60 Hz bank before, apart from the riders').
+- `animate_objects`, `move_movers`: the objects' and spline riders' clocks by the ticks.
+- `particles`: the emitters' clocks; `spray`: a tick at a time; `snow`: the snowfall manager once a tick (its own
+  bank before).
+
+STANDIN (ours): drawing between ticks. The PS2 draws once a tick; a faster screen would see the world stand still
+for a frame or two. What is drawn is where things were `1 − alpha` of a tick before their last tick (alpha: how far
+the frame is into the next tick), between their last two ticks, as `DrawLerp` does for the riders since G21:
+the props (position and turn, `move_props`; not when they jumped 5 m or more), the objects' clocks (not when they
+wrapped or turned), the director's shot (not across a cut), the emitters' clocks and the spray's flakes (their
+velocity back). The chase camera follows the rider as drawn.
+
+Checked on Garibaldi from the disc (TRICKY_SCREEN=play, TRICKY_AUTOPLAY, TRICKY_G21, 144 fps): the drawn rider's
+and the camera's frame-to-frame spread 0–12 % at speed (the last tick's 118 %), the intro's fly-through 0 %
+(TRICKY_INTRO=1). `TRICKY_G21` now prints the camera's spread too (`g21_camera`). The level scripts' objects
+(keyframed objects, spline riders, emitters) come only from a levels folder, which this check had not: they build
+but were not watched.
+
+Left on the frame's time (gap rows): the riders' bodies (`animate_visuals`: the clips' clock, G5), the HUD's and
+menus' timers, the sounds' and music's fades.
+
 ## E1c: the course table and the app's small helpers (`game/src/app.rs`, `tests/app.rs`)
 
 - **Constructors.** `cAppMan`'s constructor (0x17c530) makes the object the game's `gApp`. It keeps the execution

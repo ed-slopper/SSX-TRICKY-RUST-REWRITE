@@ -39,8 +39,8 @@ state machine and the renderer are ours. Nothing has been checked against the or
 | ID | Task | Area | Needs | Who | Notes |
 |---|---|---|---|---|---|
 | E1 | Start-up and main loop: `entry` 0x100008, the `gApp` (0x337C58) init, `cGame::Init` 0x17E148, `cGame::Update` 0x181638, game modes and the front end ↔ race switch, pause (`cGame::IsPaused` 0x17F078) | unowned | F1 | | [est] Our Bevy app loop is the stand-in |
-| E1a | Fixed 60 Hz tick with per-boarder time scale (`dt = timescale/60`, boarder+0x12c) driving every system, frame-rate independent of the window | any | | | [repo] `port-notes/README.md` (units); check what `SmoothDt` in `main.rs` does today Split: E1a1, E1a2 |
-| E1a2 | The rest of E1a: world animations, props, particles, spray, camera on the same tick; draw between ticks (interpolate, ours: tag STANDIN) | any | E1a1 | irregulur/lynx (2026-11-20) | Split of E1a |
+| E1a | Fixed 60 Hz tick with per-boarder time scale (`dt = timescale/60`, boarder+0x12c) driving every system, frame-rate independent of the window | any | | | [repo] `port-notes/README.md` (units); check what `SmoothDt` in `main.rs` does today Split: E1a1, E1a2, E1a3 |
+| E1a3 | The rest of E1a (gap of E1a2): the riders' bodies' clip clock (`animate_visuals` in `src/main.rs`, with G5), the HUD's and menus' timers and the sounds' fades on the game's tick (`GameTick`) instead of the frame's time | any | E1a2 | | Gap of E1a2 (`port-notes/app.md` E1a2) |
 | E1b | Random numbers: the game's `rand` and seeding, used by AI tricks, grabs, announcer, so runs can match the original | unowned | F1 | | [est] Split: E1b1, E1b2 |
 | E1b2 | Replace the xorshift stand-ins (`race.rs`, `props.rs`, `intro.rs`) with the game's streams at the game's call sites, in the game's order | unowned | E1b1 | | Split of E1b; split into E1b2a to E1b2d |
 | E1b2g3 | The app's board effects (`tricky-rs/src/spray.rs`) built on the ported game code, so they draw from `Rand_Fx` as the game does: `Boarder_UpdateEffects` 0x1350c0 running `surfacespray::update` (`Fx_SurfaceSpray` 0x1311b0), `brakespray`, `splash`, `boardtrail` and `ParticleGroup_UpdateTrail` 0x1d9208 (not ported: one draw a call, five a particle), drawn by VU1 programs 6/7 (`particlevu`, `particledraw`); then drop spray.rs's LCG | any | E1b2g2 | | Gap of E1b2g2; overlaps G7f, G19 |
@@ -162,6 +162,7 @@ matches the original.
 
 | ID | Task | Section | Who | Date | Commit |
 |---|---|---|---|---|---|
+| E1a2 | The app's world on the game's tick (`GameTick` in `src/main.rs`): the riders, the race, the props, the director and chase camera, the world's scripts, doors and controllers, the objects' and spline riders' clocks, the particles, the spray and the snowfall all run the frame's whole 1/60 s ticks; drawn between the last two ticks (STANDIN); Garibaldi at 144 fps: rider and camera spread 0–12 %, intro 0 % (`port-notes/app.md` E1a2) | P1 | irregulur/lynx | 2026-11-20 | |
 | F4b3k7 | The riders' place on their AI paths against rec25 (`Boarder_UpdatePathAhead` 0x118090, run only in race state 4): the port equals the original under nearest (46,506 of 203,383 bit for bit); the original in the runner under PCSX2's `fadd=g1` 201,184 (`checking.md` F4b3k7) | P0 | irregulur/lynx | 2026-11-19 | 7f8df12 |
 | F4b3k6 | Gap of F4b3k2d: the computer object's fields after the controls against rec25's second sample: the mode +0x89c and its method, target +0x890, speed +0x868, stuck counters +0x894 / +0x898 on 113,158 of 113,158 dispatch ticks; the air trick's +0x878..+0x88c on 38,150 of 38,150 (`checking.md` F4b3k6) | P0 | irregulur/lynx | 2026-11-19 | 8093051 |
 | F4b3k2f | Split of F4b3k2: `AIComputer_AirTrickInput` 0x138d60 ported (`aipad::air_trick_input`, checked in the runner) and state 0x10 against rec25: 38,150 of 38,150 (`checking.md` F4b3k2f) | P0 | irregulur/lynx | 2026-11-19 | e2d300a |
@@ -1696,3 +1697,4 @@ matches the original.
 - 2026-11-19 irregulur/lynx: F4b3k6 done.
 - 2026-11-19 irregulur/lynx: added F4b3k7 (the riders' path following against rec25).
 - 2026-11-19 irregulur/lynx: F4b3k7 done.
+- 2026-11-20 irregulur/lynx: E1a2 done; added E1a3 (its gap).

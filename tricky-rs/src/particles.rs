@@ -7,7 +7,7 @@
 //! longest life, plus random amounts of c2 and c3; trails repeat the particle a little earlier.
 
 use crate::logic::EmitterDef;
-use crate::{ui, LevelRes, Opponents, RiderRes, SmoothDt, World};
+use crate::{ui, GameTick, LevelRes, Opponents, RiderRes, World, TICK};
 use bevy::asset::RenderAssetUsages;
 use bevy::prelude::*;
 use bevy::render::mesh::{Indices, PrimitiveTopology};
@@ -73,7 +73,7 @@ fn inst_matrix(inst: &crate::level::Instance) -> Mat4 {
 
 #[allow(clippy::too_many_arguments)]
 pub fn particles(
-    time: Res<SmoothDt>, game: Res<ui::Game>, level: Res<LevelRes>, world: Res<World>, rider: Res<RiderRes>, opponents: Res<Opponents>,
+    tick: Res<GameTick>, game: Res<ui::Game>, level: Res<LevelRes>, world: Res<World>, rider: Res<RiderRes>, opponents: Res<Opponents>,
     mut ps: ResMut<Particles>, mut meshes: ResMut<Assets<Mesh>>, mut commands: Commands, lib: Res<crate::CharLib>,
     mut materials: ResMut<Assets<StandardMaterial>>, mut images: ResMut<Assets<Image>>,
     cam: Query<&GlobalTransform, With<Camera3d>>, mut holders: Query<&mut Transform, With<ParticleMesh>>,
@@ -101,7 +101,11 @@ pub fn particles(
             Some(Node { def: *def, m: inst_matrix(inst), t: 0.0, seed: hash(seed ^ k as u32), one_shot: def.dur >= 0.0 })
         }).collect();
     }
-    let dt = if game.screen == ui::Screen::Paused { 0.0 } else { time.dt.min(0.1) };
+    // the frame's ticks (`GameTick`, row E1a2)
+    let paused = game.screen == ui::Screen::Paused;
+    let dt = if paused { 0.0 } else { tick.dt() };
+    // drawn between ticks (`GameTick`): the clocks as they were `1 − alpha` of a tick ago
+    let lag = if paused { 0.0 } else { (1.0 - tick.alpha) * TICK };
     // touching an object sets off its emitters (once a second at most)
     for v in ps.cool.values_mut() { *v -= dt; }
     let bodies: Vec<Vec3> = std::iter::once(rider.0.pos).chain(opponents.0.iter().map(|o| o.rider.pos)).map(|p| p + Vec3::Y * 0.8).collect();
@@ -145,7 +149,9 @@ pub fn particles(
         for i in 0..d.n {
             let born = i as f32 * span / d.n as f32;
             // a continuous emitter starts full and recycles each particle every `tmax`
-            let (age, cycle) = if d.dur >= 0.0 { (n.t - born, 0) } else { let a = n.t + tmax - born; (a.rem_euclid(tmax), (a / tmax).floor() as u32) };
+            // drawn between ticks (`GameTick`): the emitter's clock where it was
+            let t = (n.t - lag).max(0.0);
+            let (age, cycle) = if d.dur >= 0.0 { (t - born, 0) } else { let a = t + tmax - born; (a.rem_euclid(tmax), (a / tmax).floor() as u32) };
             let r = |c: u32| u(n.seed, i, cycle, c);
             let life = d.life + d.life_sp * r(10);
             if age < 0.0 || age >= life { continue; }
