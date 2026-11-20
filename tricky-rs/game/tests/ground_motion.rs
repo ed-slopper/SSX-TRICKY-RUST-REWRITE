@@ -4405,6 +4405,16 @@ fn ai_paths(path: &str) -> Option<Vec<tricky_game::aipath::Path>> {
     Some(aip.ai_paths.iter().map(tricky_game::aipath::Path::from_aip).collect())
 }
 
+/// The recording's course's `.aip` unpacked, as the game loads it (for the runner, F4b3k7).
+fn aip_bytes(path: &str) -> Option<Vec<u8>> {
+    let name = course_name(recording::course(path)?)?;
+    let mut files = tricky_data::big::Files::new(tricky_data::disc::Disc::open(&std::env::var("TRICKY_DISC").ok()?).ok()?);
+    let big = files.load(&format!("data/models/{name}.big")).ok().flatten()?;
+    let entry = tricky_data::big::entries(&big).into_iter().find(|e| e.name.eq_ignore_ascii_case(&format!("Data/models/{name}.aip")))?;
+    let data = tricky_data::big::file_data(&big, &entry.name)?.to_vec();
+    Some(tricky_data::compress::load(data.clone()).unwrap_or(data))
+}
+
 /// The path rider `r` follows (+0x57a4, not recorded): the one whose point at the rider's distance along (+0x344) is
 /// nearest the rider's nearest point (+0x350), and how far (cm)
 fn path_of(paths: &[tricky_game::aipath::Path], r: &[u8]) -> (usize, f32) {
@@ -4563,4 +4573,187 @@ fn flags_tail_parses() {
     assert_eq!(ticks[0].flags, vec![(0, 0x10003), (2, 0xa100a3)]);
     assert!(ticks[1].flags.is_empty());
     assert_eq!((ticks[0].clock, ticks[1].clock), (Some(-298.0), None));
+}
+
+/// F4b3k7: `Boarder_UpdatePathAhead` 0x118090 (`aipath::update_path_ahead`) against the running game: for every rider
+/// that ticked once in the frame (+0x5900 one more), its place on its path at the first sample (+0x340..+0x370, the
+/// projection's memory +0x390..+0x3a4, the path found as [`path_of`]) moved on by the second sample's position and
+/// velocity (TRICKY_PATHPOS=a: the first's), against the second sample. `Boarder_ChoosePathAhead`'s one draw
+/// (`Rand_Game`, the keep chance of the rider's virtual +0x74: not recorded) is answered both ways (the preference
+/// kept, or 50) and the tick counts as equal when either is the game's. Needs TRICKY_RECORDING, TRICKY_STATS and
+/// TRICKY_DISC.
+#[test]
+fn path_ahead_against_the_running_game() {
+    use tricky_game::aipath::{update_path_ahead, Cache, Chooser, Follow};
+    let (Ok(paths_env), Ok(_)) = (std::env::var("TRICKY_RECORDING"), std::env::var("TRICKY_STATS")) else { return };
+    let path = paths_env.split(';').next().unwrap();
+    let Some(paths) = ai_paths(path) else { return };
+    let (n, ticks) = load(path);
+    let Some(kc) = ticks[0].extra.iter().position(|(o, _)| *o == 0x5900) else { return };
+    let pos_a = std::env::var("TRICKY_PATHPOS").as_deref() == Ok("a");
+    fn r_of(w: &[recording::Tick], i: usize, pos_a: bool) -> &[u8] {
+        &w[(!pos_a) as usize].riders[i]
+    }
+    let follow_of = |r: &[u8], k: usize| Follow {
+        path: k,
+        last: f32_at(r, 0x340),
+        along: f32_at(r, 0x344),
+        off: f32_at(r, 0x348),
+        near: vec4(r, 0x350),
+        ahead: vec4(r, 0x360),
+        heading: f32_at(r, 0x370),
+        cache: Cache { start: vec4(r, 0x390), along: f32_at(r, 0x3a0), index: u32_le(r, 0x3a4) as i32 },
+    };
+    // TRICKY_PATHULP=<n>: floats within n units in the last place count as equal (0: bit for bit)
+    let ulp: i64 = std::env::var("TRICKY_PATHULP").ok().and_then(|v| v.parse().ok()).unwrap_or(0);
+    let close = move |x: f32, y: f32| x.to_bits() == y.to_bits() || x.signum() == y.signum() && (x.to_bits() as i64 - y.to_bits() as i64).abs() <= ulp;
+    let same = |a: &Follow, b: &Follow| {
+        let v = |x: [f32; 4], y: [f32; 4]| x.iter().zip(y).all(|(p, q)| close(*p, q));
+        let f = |x: f32, y: f32| close(x, y);
+        // which fields differ: 1 path, 2 last, 4 along, 8 off, 0x10 near, 0x20 ahead, 0x40 heading, 0x80 memory
+        (a.path != b.path) as u32 | (!f(a.last, b.last) as u32) << 1 | (!f(a.along, b.along) as u32) << 2 | (!f(a.off, b.off) as u32) << 3 | (!v(a.near, b.near) as u32) << 4 | (!v(a.ahead, b.ahead) as u32) << 5 | (!f(a.heading, b.heading) as u32) << 6 | ((!v(a.cache.start, b.cache.start) || !f(a.cache.along, b.cache.along) || a.cache.index != b.cache.index) as u32) << 7
+    };
+    // the original `Boarder_UpdatePathAhead` 0x118090 in the function runner (TRICKY_ELF) under TRICKY_FLOAT_RULES on
+    // the course's paths loaded by the game's loader into its path set 0x337fb8 (as `tests/aipath.rs`)
+    let mut orig = std::env::var("TRICKY_ELF").ok().and_then(|_| {
+        let bytes = aip_bytes(path)?;
+        let mut r = Runner::from_env()?;
+        r.float_rules = Rules::parse(&std::env::var("TRICKY_FLOAT_RULES").unwrap_or_else(|_| "add=n,mul=n,div=n,cvt=n".into())).unwrap();
+        for f in [0x102f50u32, 0x2510f8, 0x2f79a8, 0x2f7018, 0x118090, 0x118830, 0x197b50, 0x1979f8, 0x197250, 0x197478, 0x197830, 0x197f28, 0x197f08, 0x197910, 0x197b90, 0x197da0, 0x198518, 0x1983d0, 0x196f28, 0x198738, 0x198720, 0x198750, 0x197130, 0x197170, 0x2cc808, 0x2ce114, 0x196700, 0x196718, 0x196990, 0x196998] {
+            r.allow(f);
+        }
+        let buf = r.mem.alloc(bytes.len() as u32 + 16);
+        for (k, b) in bytes.iter().enumerate() {
+            r.mem.write_u8(buf + k as u32, *b);
+        }
+        r.stub(0x2c8a70, move |c, _| c.set_gpr(2, buf as u64));
+        let heap = r.mem.alloc(0x40_0000);
+        let next = Rc::new(Cell::new(heap));
+        r.stub(0x2ccf70, move |c, _| {
+            let size = (c.gpr(5) as u32 + 15) & !15;
+            let at = next.get();
+            next.set(at + size);
+            c.set_gpr(2, at as u64);
+        });
+        r.cpu.set_gpr(4, 0x337fb8);
+        r.cpu.set_gpr(5, 0);
+        r.call(0x197da0).ok()?;
+        let base = r.mem.read_u32(0x337fb8 + 4);
+        // `Rand_Game` and the rider's virtual +0x74 (the keep chance): answered as `keep` says
+        let keep = Rc::new(Cell::new(1.0f32));
+        let k1 = keep.clone();
+        r.stub(0x23d4d8, |c, _| c.set_gpr(2, 99));
+        r.stub(0x1000, move |c, _| c.set_f(0, k1.get()));
+        let app = r.mem.alloc(0x800);
+        let game = r.mem.alloc(0x100);
+        let world = r.mem.alloc(0x100);
+        r.mem.write_u32(0x337c58, app);
+        r.mem.write_u32(app + 0x730, game);
+        r.mem.write_u32(game + 0x1c, world);
+        let rider = r.mem.alloc(0x5900);
+        let vt = r.mem.alloc(0x100);
+        r.mem.write_u32(vt + 0x70, 0);
+        r.mem.write_u32(vt + 0x74, 0x1000);
+        Some((r, base, keep, world, rider, vt))
+    });
+    let (mut o_equal, mut o_total, mut o_by_field) = (0usize, 0usize, [0usize; 8]);
+    // ticks with a contact with another rider in the frame, of the equal and of the missed
+    let mut o_touched = [0usize; 2];
+    let (mut total, mut equal, mut chose, mut by_field) = (0usize, 0usize, 0usize, [0usize; 8]);
+    let mut unrun: std::collections::BTreeMap<u32, usize> = Default::default();
+    for w in ticks.windows(2) {
+        for i in 0..n {
+            if f32_at(&w[1].extra[kc].1[i], 0) != f32_at(&w[0].extra[kc].1[i], 0) + 1.0 {
+                continue;
+            }
+            let (a, b) = (&w[0].riders[i], &w[1].riders[i]);
+            // `cBoarder::vf7` 0x117198 runs it only while the race's state (world +0x1c) is 4, not recorded: a frame
+            // that leaves +0x340..+0x3a7 as they were is counted apart (by the rider's control state +0x428)
+            if a[0x340..0x3a8] == b[0x340..0x3a8] {
+                *unrun.entry(u32_le(a, 0x428)).or_default() += 1;
+                continue;
+            }
+            let (pa, _) = path_of(&paths, a);
+            let (pb, _) = path_of(&paths, b);
+            let want = follow_of(b, pb);
+            let r = r_of(w, i, pos_a);
+            let racing = (u32_le(r, 0x418) as i32) < 0;
+            let mut out = u32::MAX;
+            for keep in [1.0f32, 0.0] {
+                let c = Chooser { pos: vec4(r, 0x140), vel: vec4(r, 0x150), x41c: u32_le(r, 0x41c) as i32, class: u32_le(r, 0x420), place: u32_le(r, 0x110) as i32, meter: f32_at(r, 0x1c), keep };
+                let mut f = follow_of(a, pa);
+                update_path_ahead(&paths, &mut f, racing, w[1].tick as i32, &c, &mut || 99);
+                out = out.min(same(&f, &want));
+                if out == 0 {
+                    break;
+                }
+            }
+            // the original: the rider's first sample with the second's position and velocity, the path pointer
+            if let Some((r, base, keep, world, rider, vt)) = orig.as_mut() {
+                let mut best = false;
+                let mut least = u32::MAX;
+                for k in [1.0f32, 0.0] {
+                    keep.set(k);
+                    let m = &mut r.mem;
+                    for o in (0..0x700).step_by(4) {
+                        m.write_u32(*rider + o as u32, u32_le(a, o));
+                    }
+                    m.write_u32(*rider, *vt);
+                    for o in [0x140usize, 0x150] {
+                        for c in 0..4 {
+                            m.write_u32(*rider + (o + 4 * c) as u32, u32_le(r_of(w, i, pos_a), o + 4 * c));
+                        }
+                    }
+                    m.write_u32(*rider + 0x57a4, *base + 0x40 * pa as u32);
+                    m.write_u32(*world + 0x18, w[1].tick);
+                    r.cpu.set_gpr(4, *rider as u64);
+                    if r.call(0x118090).is_err() {
+                        break;
+                    }
+                    let m = &mut r.mem;
+                    let got = Follow {
+                        path: ((m.read_u32(*rider + 0x57a4) - *base) / 0x40) as usize,
+                        last: m.read_f32(*rider + 0x340),
+                        along: m.read_f32(*rider + 0x344),
+                        off: m.read_f32(*rider + 0x348),
+                        near: [0, 4, 8, 12].map(|c| m.read_f32(*rider + 0x350 + c)),
+                        ahead: [0, 4, 8, 12].map(|c| m.read_f32(*rider + 0x360 + c)),
+                        heading: m.read_f32(*rider + 0x370),
+                        cache: Cache { start: [0, 4, 8, 12].map(|c| m.read_f32(*rider + 0x390 + c)), along: m.read_f32(*rider + 0x3a0), index: m.read_u32(*rider + 0x3a4) as i32 },
+                    };
+                    least = least.min(same(&got, &want));
+                    if least == 0 {
+                        best = true;
+                        break;
+                    }
+                }
+                for k in 0..8 {
+                    o_by_field[k] += (least >> k & 1) as usize;
+                }
+                // a contact with another rider in the frame (its pair record's tick +0x4c the frame's, F4b3t1)
+                let touched = (0..n).any(|j| j != i && u32_le(b, 0x4c + 0x20 * j) == w[0].tick + 1);
+                o_touched[(least != 0) as usize] += touched as usize;
+                if least != 0 && std::env::var("TRICKY_DBGR").is_ok() {
+                    eprintln!("DBGR path tick {} rider {i}: fields {least:#x}, path {pa} -> {pb}, off {} along {} -> {}, touched {touched}, state {:#x} motion {}, unmoved {}", w[1].tick, f32_at(b, 0x348), f32_at(a, 0x344), f32_at(b, 0x344), u32_le(a, 0x428), u32_le(a, 0x424), a[0x340..0x3a8] == b[0x340..0x3a8]);
+                }
+                o_total += 1;
+                o_equal += best as usize;
+            }
+            total += 1;
+            chose += (pa != pb) as usize;
+            if out == 0 {
+                equal += 1;
+            } else {
+                for k in 0..8 {
+                    by_field[k] += (out >> k & 1) as usize;
+                }
+                if std::env::var("TRICKY_DBG").is_ok() {
+                    eprintln!("DBG path tick {} rider {i}: fields {out:#x}, path {pa} -> {pb}, along {} -> {}", w[1].tick, f32_at(a, 0x344), f32_at(b, 0x344));
+                }
+            }
+        }
+    }
+    eprintln!("{path}: the riders' place on their paths (`Boarder_UpdatePathAhead`): {equal} of {total} equal ({chose} changed path); misses by field [path, last, along, off, near, ahead, heading, memory]: {by_field:?}");
+    eprintln!("{path}: frames that left the place as it was (not run), by control state: {unrun:x?}");
+    eprintln!("{path}: the original `Boarder_UpdatePathAhead` in the runner: {o_equal} of {o_total} equal; misses by field: {o_by_field:?}; with a contact in the frame [equal, missed]: {o_touched:?}");
 }

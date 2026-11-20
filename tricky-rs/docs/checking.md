@@ -2166,6 +2166,39 @@ rec25: every field equal on all 113,158 dispatch ticks. Over the frame the mode 
 target pick and drop, the speed from the hints and markers, and the stuck counters are the game's on rec25. Not
 covered: `AIComputer_PlanJumpTrick` 0x139d58 (its fields are written in ticks that leave the state).
 
+## F4b3k7: the riders' place on their AI paths (2026-11-19)
+
+Proven (code): `cBoarder::vf7` 0x117198 calls `Boarder_UpdateRaceLineProgress` and then `Boarder_UpdatePathAhead`
+0x118090 (at 0x117af4) only while the race's state (world +0x1c) is 4. That is after `Boarder_UpdateMotion` and
+before the controls (vtable +0x54), `Boarder_UpdateControl` and `Boarder_RiderCollisions`.
+
+`path_ahead_against_the_running_game` (`tests/ground_motion.rs`) moves each rider's place at the first sample
+(+0x340..+0x370, the projection's memory +0x390..+0x3a4, the path found as in F4b3k2d) on by the second sample's
+position and velocity. It runs the port (`aipath::update_path_ahead`) and, in the runner, the original 0x118090 on
+the course's paths loaded by the game's loader (TRICKY_ELF, TRICKY_FLOAT_RULES). `Boarder_ChoosePathAhead`'s one
+`Rand_Game` draw against the rider's virtual +0x74 (not recorded) is answered both ways (the preference kept or 50);
+a tick counts as equal when either is the game's. The race state is not recorded either, so frames that leave
++0x340..+0x3a7 as they were are counted apart: on rec25 10,177, all in control states 6, 8 (the countdown), 9 and
+0x16.
+
+rec25, 203,383 rider ticks, 442 of them changing path, compared bit for bit:
+
+| | equal |
+|---|---|
+| the port (IEEE, to nearest) | 46,506 |
+| the original in the runner, `add=n,mul=n,div=n,cvt=n` | 46,506 |
+| the original in the runner, `add=n,fadd=g1` (PCSX2's COP1 adder, F4g) | 201,184 |
+| the original, `add=c` | 152 (before the countdown frames were left out) |
+
+So the port is the original under nearest. The game's own floats (PCSX2's guard-bit COP1 add) make the rest:
+`AIP_GetPositionAtDistance` adds up the segments, so the point 800 ahead (+0x360) and its heading (+0x370) drift
+by ulps. With TRICKY_PATHULP=16 the port reaches 145,240. Making the port exact needs F4c's decision (as F4h5n).
+The runner's 2,199 misses under `fadd=g1` are in the distance along, how far off, the nearest point and what
+follows from them. Inferred: the position the update saw is not the second sample's when the rider is pushed later
+in the frame (its own `Boarder_RiderCollisions` after the controls, or a later rider's). Only 27 of them have a
+contact in the pair records (+0x4c the frame's tick). By control state: 3 955, 2 299, 0x13 (wiped out, motion 5)
+290, 0xe 216, 0x10 167. TRICKY_DBGR lists them.
+
 ## F4b3z: rec14 9092 rider 1, what the miss is not (2026-11-19, notes)
 
 `TRICKY_DBGP=<frame tick>` (new) lists every push of the frame replay. rec14 frame 9091 → 9092 (riders run 5, 4, 3,
