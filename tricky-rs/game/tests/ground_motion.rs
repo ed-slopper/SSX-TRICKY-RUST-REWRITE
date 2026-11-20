@@ -4205,10 +4205,19 @@ fn computer_pad_words_against_the_running_game() {
     // the dispatch states (F4b3k2d): the course's AI paths from the player's disc, the clip table from TRICKY_ELF, the
     // layer clips (`46c0`); by the riding mode at the first sample (object +0x89c)
     let paths = ai_paths(path);
-    let clip_types: Option<Vec<u8>> = std::env::var("TRICKY_ELF").ok().and_then(|e| std::fs::read(e).ok()).map(|b| b[(animctl::CLIP_TABLE - 0xff000) as usize..][..0x300 * 0x1c].to_vec());
+    let elf: Option<Vec<u8>> = std::env::var("TRICKY_ELF").ok().and_then(|e| std::fs::read(e).ok());
+    let clip_types: Option<Vec<u8>> = elf.as_ref().map(|b| b[(animctl::CLIP_TABLE - 0xff000) as usize..][..0x300 * 0x1c].to_vec());
+    // the riding modes' method table (0x31d318, 8 bytes a mode: `AIComputer_RideLine` 0x1375c8 copies an entry to
+    // +0x8a0 with the mode), F4b3k6
+    let methods: Option<Vec<u8>> = elf.as_ref().map(|b| b[(0x31d318 - 0xff000) as usize..][..0x20].to_vec());
     let ka = ticks[0].extra.iter().position(|(o, _)| *o == 0x46c0);
     let mut by_mode: std::collections::BTreeMap<u32, [usize; 2]> = Default::default();
     let mut draws = 0;
+    // F4b3k6: the dispatch's object fields that differ from the second sample, by field (mode, method, target, speed,
+    // the two counters), and the ticks compared
+    let mut after_misses = [0usize; 7];
+    let mut after_moved = [0usize; 6];
+    let mut air_after = [0usize; 3];
     let mut changed = 0;
     for w in ticks.windows(2) {
         for i in (0..n).filter(|&i| u32_le(&stats[i], 0x6c) == u32::MAX) {
@@ -4263,7 +4272,11 @@ fn computer_pad_words_against_the_running_game() {
                 },
                 8 => countdown == Some(pad),
                 0x10 => {
-                    let d = air.unwrap();
+                    let (d, kept) = air.unwrap();
+                    air_after[0] += 1;
+                    air_after[1] += kept as usize;
+                    let (h0, h1) = (&w[0].chased[kh.unwrap()].1[i], &w[1].chased[kh.unwrap()].1[i]);
+                    air_after[2] += (h0[0x878 - 0x830..0x890 - 0x830] != h1[0x878 - 0x830..0x890 - 0x830]) as usize;
                     if d != pad && std::env::var("TRICKY_DBGD").is_ok() {
                         eprintln!("DBGD tick {} rider {i} state {state:#x}: pad {pad:#x} ours {d:#x} (xor {:#x})", w[1].tick, d ^ pad);
                     }
@@ -4283,6 +4296,21 @@ fn computer_pad_words_against_the_running_game() {
                     }
                     let m = by_mode.entry(d.1).or_default();
                     m[1] += (d.0 == pad) as usize;
+                    let diff = obj_after_differs(&d.3, &w[1].chased[kh.unwrap()].1[i], methods.as_deref().unwrap());
+                    let h0 = &w[0].chased[kh.unwrap()].1[i];
+                    let h1 = &w[1].chased[kh.unwrap()].1[i];
+                    for (b, off) in [0x89c, 0x8a0, 0x890, 0x868, 0x894, 0x898].into_iter().enumerate() {
+                        let len = if off == 0x8a0 { 8 } else { 4 };
+                        after_moved[b] += (h0[off - 0x830..][..len] != h1[off - 0x830..][..len]) as usize;
+                    }
+                    for b in 0..6 {
+                        after_misses[b] += (diff >> b & 1) as usize;
+                    }
+                    after_misses[6] += 1;
+                    if diff != 0 && std::env::var("TRICKY_DBGO").is_ok() {
+                        let h = &w[1].chased[kh.unwrap()].1[i];
+                        eprintln!("DBGO tick {} rider {i} state {state:#x} diff {diff:#x}: ours {:?}, game mode {} target {} speed {} c894 {} c898 {}", w[1].tick, d.3, u32_le(h, 0x89c - 0x830) & 0xffff, u32_le(h, 0x890 - 0x830) as i32, f32_at(h, 0x868 - 0x830), u32_le(h, 0x894 - 0x830), u32_le(h, 0x898 - 0x830));
+                    }
                     d.0 == pad
                 }
                 _ => get_controls(&mut Const, state, &mut 1.0) == pad,
@@ -4295,6 +4323,8 @@ fn computer_pad_words_against_the_running_game() {
     }
     eprintln!("{path}: the computer's pad words by control state [ticks, equal (the states without a routine of their own only)], the state the same at both samples ({changed} ticks where it changed left out): {:?}", by.iter().map(|(s, v)| (format!("{s:#x}"), *v)).collect::<Vec<_>>());
     eprintln!("{path}: the air trick's draws (`AIComputer_RandomTrick`, answered from the second sample): {draws}");
+    eprintln!("{path}: the dispatch's object fields at the second sample, misses [mode, method, target, speed, +0x894, +0x898] of {}: {:?} (ticks where the field changed over the frame: {after_moved:?})", after_misses[6], &after_misses[..6]);
+    eprintln!("{path}: the air trick's object fields (+0x878..+0x88c) at the second sample [ticks, equal, changed over the frame]: {air_after:?}");
     eprintln!("{path}: the dispatch states by riding mode (object +0x89c at the first sample) [ticks, equal]: {by_mode:?}");
 }
 
@@ -4329,7 +4359,7 @@ fn ride_word(w: &[recording::Tick], i: usize, kh: usize, kf: usize, paths: &[tri
 /// the rider's from TRICKY_AIR=<rider><57b0 window><frame> (default `bab`); the stats' byte +0x14. The trick
 /// `AIComputer_RandomTrick` 0x11d368 draws (`Rand_Game`) is answered with the second sample's +0x878 (counted in
 /// `draws`).
-fn air_trick_word(w: &[recording::Tick], i: usize, kh: usize, kf: usize, stats: &[u8], draws: &mut usize) -> Option<u32> {
+fn air_trick_word(w: &[recording::Tick], i: usize, kh: usize, kf: usize, stats: &[u8], draws: &mut usize) -> Option<(u32, bool)> {
     use tricky_game::{aicomp, aipad};
     let sel = std::env::var("TRICKY_AIR").unwrap_or("bbaa".into()).into_bytes();
     let pick = |k: usize| (sel.get(k) == Some(&b'b')) as usize;
@@ -4358,7 +4388,13 @@ fn air_trick_word(w: &[recording::Tick], i: usize, kh: usize, kf: usize, stats: 
     let drawn = u32_le(&w[1].chased[kh].1[i], o(0x878));
     let mut pad = 0;
     aipad::air_trick_input(&mut pad, &mut obj, &rd, &mut || { *draws += 1; drawn }, &mut || aicomp::steer_towards(skill, &f, line), &mut || aipad::across(nose, f.fwd, f.side, skill));
-    Some(pad)
+    // F4b3k6: the object's fields after it against the second sample's
+    let h1 = &w[1].chased[kh].1[i];
+    let back = aipad::AirTrick { trick: u32_le(h1, o(0x878)), x87c: u32_le(h1, o(0x87c)), x880: u32_le(h1, o(0x880)), x884: u32_le(h1, o(0x884)), spin: f32_at(h1, o(0x888)), flip: f32_at(h1, o(0x88c)) };
+    if back != obj && std::env::var("TRICKY_DBGO").is_ok() {
+        eprintln!("DBGO tick {} rider {i} state 0x10: ours {obj:?} game {back:?}", w[1].tick);
+    }
+    Some((pad, back == obj))
 }
 
 /// The AI paths of the recording's course (`course N`) from the player's disc (TRICKY_DISC), as the game keeps them.
@@ -4385,9 +4421,9 @@ fn path_of(paths: &[tricky_game::aipath::Path], r: &[u8]) -> (usize, f32) {
 /// skill, +0x890 the target, +0x894 / +0x898 the stuck counters, +0x89c the mode) from the first sample; the rider's
 /// fields from TRICKY_DISP=<rider><frame> (a or b: the samples of the rider's 0x700 bytes and of the frame `4aa0`;
 /// default `ba`, as the turn-around, F4b3k2c). The race mode word 0x32de8c (not recorded) TRICKY_GMODE (default 1).
-/// The word, the mode it began in, the mode it ended in.
+/// The word, the mode it began in, the mode it ended in, and the object's fields after it as [`ObjAfter`] (F4b3k6).
 #[allow(clippy::too_many_arguments)]
-fn dispatch_word(w: &[recording::Tick], i: usize, n: usize, kh: usize, kf: usize, ka: usize, paths: &[tricky_game::aipath::Path], clip_types: &[u8], by_mode: &mut std::collections::BTreeMap<u32, [usize; 2]>) -> Option<(u32, u32, u32)> {
+fn dispatch_word(w: &[recording::Tick], i: usize, n: usize, kh: usize, kf: usize, ka: usize, paths: &[tricky_game::aipath::Path], clip_types: &[u8], by_mode: &mut std::collections::BTreeMap<u32, [usize; 2]>) -> Option<(u32, u32, u32, ObjAfter)> {
     use tricky_game::aicomp::{self, Ai, GrudgeOf, Mode, World};
     let sel = std::env::var("TRICKY_DISP").unwrap_or("ba".into()).into_bytes();
     let pick = |k: usize| (sel.get(k) == Some(&b'b')) as usize;
@@ -4465,7 +4501,35 @@ fn dispatch_word(w: &[recording::Tick], i: usize, n: usize, kh: usize, kf: usize
     }
     let mut calls = Vec::new();
     let word = ai.ride(&mut world, word, &mut calls);
-    Some((word, mode0, ai.mode as u32))
+    let after = ObjAfter { mode: ai.mode as u32, target: ai.target, speed: ai.speed, c894: s.c894, c898: s.c898, jump_trick: !calls.is_empty() };
+    Some((word, mode0, ai.mode as u32, after))
+}
+
+/// The computer object's fields a control leaves (F4b3k6): the riding mode +0x89c, the target +0x890, the speed
+/// +0x868, the stuck counters +0x894 / +0x898; whether the mode planned a jump trick (`AIComputer_PlanJumpTrick`, not
+/// replayed: it writes the air trick's fields)
+#[derive(Clone, Copy, Debug, PartialEq)]
+struct ObjAfter {
+    mode: u32,
+    target: i32,
+    speed: f32,
+    c894: u32,
+    c898: u32,
+    jump_trick: bool,
+}
+
+/// Compares `a` with the object at the second sample (window `5ae0>830`, from +0x830): a bit per field that differs
+/// (1 the mode, 2 the method, 4 the target, 8 the speed, 0x10 / 0x20 the counters)
+fn obj_after_differs(a: &ObjAfter, h: &[u8], methods: &[u8]) -> u32 {
+    let o = |off: usize| off - 0x830;
+    let mut d = 0;
+    d |= ((u32_le(h, o(0x89c)) & 0xffff) != a.mode) as u32;
+    d |= ((h[o(0x8a0)..][..8] != methods[8 * a.mode as usize..][..8]) as u32) << 1;
+    d |= ((u32_le(h, o(0x890)) as i32 != a.target) as u32) << 2;
+    d |= ((f32_at(h, o(0x868)).to_bits() != a.speed.to_bits()) as u32) << 3;
+    d |= ((u32_le(h, o(0x894)) != a.c894) as u32) << 4;
+    d |= ((u32_le(h, o(0x898)) != a.c898) as u32) << 5;
+    d
 }
 
 /// The `rollers` window's layout (F4b3k3, `pine.py record ... rollers`): a count byte, then each roller's node,

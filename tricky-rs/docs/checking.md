@@ -2152,6 +2152,20 @@ answer it from the second sample's +0x878), so the draw is checked only in the r
 (`AIComputer_ControlsAir` 0x138bb8) does not occur in rec25. rec22 has 424 ticks of it but no object window, so it is
 left in F4b3k2.
 
+## F4b3k6: the computer object's fields after the controls (2026-11-19)
+
+The test also compares the object's fields the controls write with the second sample (window `5ae0>830`). After the
+dispatch (`dispatch_word`) it checks the riding mode +0x89c, its method +0x8a0..+0x8a7 (the mode's 8-byte entry of
+the table 0x31d318, read from TRICKY_ELF), the target +0x890, the speed +0x868 (`aicomp::Ai::ride`) and the stuck
+counters +0x894 / +0x898 (`aictl::check_stuck`). After the air trick (`air_trick_word`) it checks +0x878..+0x88c
+(`aipad::air_trick_input`). TRICKY_DBGO lists the misses.
+
+rec25: every field equal on all 113,158 dispatch ticks. Over the frame the mode changed in 483 of them, the method in
+483, the target in 372, the speed in 254, +0x894 in 284 and +0x898 in 24. The air trick's fields are equal on all
+38,150 ticks (398 changed over the frame). So the mode changes (to the jump, the line, near a rider, at a rival), the
+target pick and drop, the speed from the hints and markers, and the stuck counters are the game's on rec25. Not
+covered: `AIComputer_PlanJumpTrick` 0x139d58 (its fields are written in ticks that leave the state).
+
 ## F4b3z: rec14 9092 rider 1, what the miss is not (2026-11-19, notes)
 
 `TRICKY_DBGP=<frame tick>` (new) lists every push of the frame replay. rec14 frame 9091 → 9092 (riders run 5, 4, 3,
