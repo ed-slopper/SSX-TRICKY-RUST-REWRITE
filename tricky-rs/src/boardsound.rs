@@ -432,7 +432,7 @@ pub fn board_sound(
     time: Res<Time>, rider: Res<RiderRes>, game: Res<ui::Game>, mode: Res<Mode>, sounds: Res<crate::sound::Sounds>, bs: Res<BoardSounds>,
     list: Res<crate::LevelList>, mut rl: ResMut<RiderLoops>, mut pm: ResMut<crate::pathmusic::PathMusic>,
     mut commands: Commands, mut loops: Query<(Entity, &BoardLoop, &mut AudioSink), Without<RiderLoop>>, mut sinks: Query<&mut AudioSink, With<RiderLoop>>, mut last: Local<Last>,
-    (cam, opponents, levels): (Query<&GlobalTransform, With<Camera3d>>, Res<crate::Opponents>, Res<ui::AudioLevels>),
+    (cam, opponents, levels, tick): (Query<&GlobalTransform, With<Camera3d>>, Res<crate::Opponents>, Res<ui::AudioLevels>, Res<crate::GameTick>),
 ) {
     if !bs.on { return; }
     let r: &Rider = &rider.0;
@@ -448,7 +448,12 @@ pub fn board_sound(
     // the rider's loops, the game's
     let ride = (*mode == Mode::Ride && game.screen != ui::Screen::Menu).then_some(list.current);
     let riders: Vec<&Rider> = std::iter::once(r).chain(opponents.0.iter().map(|o| &o.rider)).collect();
-    rl.frame(ride, &riders, cam.single().ok(), dt, &bs, fx, levels.slot(4), &mut pm, &mut commands, &mut sinks);
+    // the game updates its bank instances once a drawn frame by the ticks run since the last (`cGame::vf6` 0x1811a0 →
+    // `Audio_InGameUpdate` 0x20ee58 with game+0x50 / 60 → `Audio_UpdateSystems` 0x21eb70 → `cController::vf7`
+    // 0x21e9d0 → `BankInstance_Update`): so a frame that ran none leaves them as they are (`GameTick`, row E1a4)
+    if tick.n > 0 {
+        rl.frame(ride, &riders, cam.single().ok(), tick.dt(), &bs, fx, levels.slot(4), &mut pm, &mut commands, &mut sinks);
+    }
     // the game values, in cm/s
     let fwd = r.forward();
     let load = r.vel.dot(fwd).abs() * 100.0;

@@ -48,6 +48,30 @@ menus' timers, the sounds' and music's fades.
 - The sounds are left on the frame's time: E1a4 (how the game calls each audio update: once an EE frame, or on the
   IOP's own clock).
 
+## E1a4: the audio's clocks
+
+Proven (code):
+
+- The race's draw `cGame::vf6` 0x1811a0 calls `Audio_InGameUpdate` 0x20ee58 once a drawn frame with
+  `(float)game+0x50 / 60`: the ticks run since the last draw (0x181438 clears +0x50 after its call). The front end's
+  callers (0x186620, 0x265398) pass 0.02 (0x3ca3d70a); `Audio_ShutdownRace` 0x211960 passes 1/60 (0x3c888889).
+- `Audio_InGameUpdate` → `Audio_UpdateSystems` 0x21eb70: `AsyncSys_Update`, `CrowdSys_UpdateBoxes`, the audio
+  system's +4 virtual at vtable +0x44 with that time (`cController::vf7` 0x21e9d0, vtable 0x39fad0: unless +0x8dc is
+  set, `BankInstance_Update` on the 64 instances of 0xb0 bytes at +0x8e0, the time handed on), `Audio_UpdateSongVolume`,
+  `SpeechSys_UpdateAll` 0x228998 (no time), `StreamSys_StopAll`.
+- The sound scheduler's 10 ms ticks (`cController::vf4` 0x21eb10) take no time argument and are not called from
+  this update; inferred: a timer drives them (real time), as `musichost::frame` keeps them on the frame's time.
+
+So in the app:
+
+- `boardsound::board_sound` runs the rider loops' bank instances (`RiderLoops::frame`, whose Doppler divides the
+  distance closed by this time, `SndVoice_DopplerPitch` 0x20ab48) once a frame that ran ticks, with the ticks' time;
+  a frame that ran none leaves them (before, the frame's time: at 144 fps two frames in three closed no distance).
+- Left on the frame's time: the music system's frame (`pathmusic`: its scheduler is on a timer; the song volume and
+  Pathfinder's update need no time), the speech streams (`racespeech`: the host's count of what the speakers have
+  played, real time), and the app's own fades, cool-downs and one-shot timing in `sound.rs`, `worldsound.rs` and
+  `boardsound.rs` (ours: they go with the rows that port those sounds).
+
 ## E1c: the course table and the app's small helpers (`game/src/app.rs`, `tests/app.rs`)
 
 - **Constructors.** `cAppMan`'s constructor (0x17c530) makes the object the game's `gApp`. It keeps the execution
