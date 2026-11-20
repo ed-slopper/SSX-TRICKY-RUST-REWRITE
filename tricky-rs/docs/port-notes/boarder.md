@@ -956,15 +956,15 @@ In the game every respawn that is not the start line, a teleport or a cast clip 
 `ResetState_Update` calls `ResetState_PlaceRider`, which places the rider at the respawn point on its own path
 (`ResetState_GetRespawnPos`) with the inline atan2 of the path's direction there. The port's resets have their own
 causes and timing. These include the safe spot, the wipe-outs' surface-0 and out-of-the-world returns, the stuck
-rider, and the unstick button. G1c3's ported reset state is not wired yet. What the port now does take from the
-game is the place and its heading:
+rider, and the unstick button. G1c3's ported reset state runs since row E1b2g7d3b4h (below). What the port
+takes from the game for the place is the place and its heading:
 - `aiglue::reset_place(paths, follow)` is `place_rider` with no spread on the rider's own place on its path.
 - The hosts (the app's `keep` and the race self-test) keep `Rider::safe` at that place and `Rider::safe_heading`
   at its heading while the rider rides the snow. For computer riders they use the ported path following
   (`PortAi`). For the player, a STANDIN projects the rider onto the nearest respawnable path
   (`reset_place_near`), because the port does not track the player along the paths as `Boarder_UpdatePathAhead`
   does.
-- Every respawn to the safe spot is `Rider::respawn_safe`, which calls `respawn_heading` with the game's heading.
+- Every respawn to the safe spot calls `respawn_heading` with the game's heading (now from the reset state, below).
 - Without the AI paths (a levels folder), the old walker (`AiPaths::respawn_point`) and the port's yaw are kept.
 - The race harness's rejoin on its own line after a respawn now runs only when there is no game place.
 
@@ -972,10 +972,46 @@ Checked on all ten courses' paths from the disc, 40 places along every path (37,
 - `reset_place`'s heading is `place_rider`'s (itself checked against the original in `tests/reset.rs`) and the
   atan2 of `direction_at` at `respawn_at`'s point, bit for bit.
 - Its point is that respawn point, within the conversion's rounding.
-- A rider sent back with `respawn_safe` is placed exactly as by `respawn_heading`.
+- A rider sent back to the safe spot is placed exactly as by `respawn_heading`.
 
 All the mutants are caught (the axes, the heading, the branch). The race self-test on gari is about as before
 (line point 223 against 204, 6 wipe-outs against 7; these runs are not exactly repeatable).
+
+### The reset state in the app (row E1b2g7d3b4h)
+
+Proven (Ghidra):
+- `Boarder_RequestReset` 0x118f10: nothing once finished (+0x418 ≥ 0) or where `AIP_CanResetAt`(+0x344, +0x57a4)
+  says no; the reset sound for +0x41c == 1; then the state's height (+0x81c), distance to move on (+0x820) and
+  +0x824 = −1, motion 4 and state 0x16 (`reset::request_reset`). The speed it moves on by is skipped when the stats'
+  byte +0x65 is negative: the profile's player number, −1 for a computer rider.
+- Every one of its 14 callers passes 101.46 (`reset::GATE_RESET_HEIGHT`), so the placing's drop is always `place`'s
+  1.0146 m.
+- `Boarder_UpdateMotion` 0x11c770's motion 4 does nothing: the rider stands still through the reset.
+- `ResetState_Update` 0x106a90 (`reset::reset_update`) fades the rider (+0x448) from the start and the screen
+  (+0x44c) past 0.2 s, showing HUD item 0xc for a rider with a camera; past 0.8 s (the 49th tick) it moves the
+  rider on along its path (`Boarder_AdvanceOnPath` 0x118c08) and places it (`ResetState_PlaceRider` 0x119220 →
+  `Boarder_PlaceAt`, which leaves state 0x16). `ResetWaitControl_Exit` 0x106a48 puts +0x448 back to 1, +0x44c to 0
+  and hides item 0xc.
+- HUD item 0xc is the overlay manager's +0x40, `cBlackFadeOverlay` (`OverlayMan_Init` 0x1a6fb8: a 0x2c-byte screen
+  overlay, vtable 0x38ee68, not active, not drawn with the HUD). Its vtable's +0x6c is `Draw` 0x1af320
+  (`raceoverlays::black_fade_draw`); +0x74, +0x84, +0x8c and +0x94 are empty (0x1c0058, 0x1c0050, 0x1c0048,
+  0x1c0040 returning 0). Its rectangle is `Draw_FilledRect` 0x19b108: four untextured corners, each the colour ×
+  128 as integers (A, R, G, B from +0, +4, +8, +0xc), through the renderer's +0x224 draw.
+
+In the app:
+- `Rider::request_reset` runs `reset::request_reset` on `Rider::reset_ctx` (the host's: `aiglue::can_reset` on the
+  rider's place on its path, the mode, the course, and the race lines' riders with their +0x374, +0x110 and
+  velocities) and keeps the state in `Rider::reset`. `Rider::step` then only ticks `reset_update` (1/60 a tick)
+  until the placing, which puts the rider at `Rider::safe`. While the state runs the hosts (the app's `keep`, the
+  race self-test) keep `safe` at `aiglue::reset_spot`: `advance_on_path` by the state's +0x10 on a copy of the
+  rider's place, then `reset_place`. A second request during the reset is ignored (no control state runs in it).
+- `Rider::fade` is +0x448 / +0x44c. The game's HUD (`gamehud`) builds the black fade overlay in the manager's +0x40,
+  writes +0x44c to the player's rider, shows item 0xc past 0.2 s and hides it at the placing, and draws its
+  rectangle as an untextured quad.
+- Inferred: blend 3 is the usual alpha blend, and the GS takes an untextured corner of 0x80 as 0x80 of 0xff, so the
+  fade is a mid grey at the overlay's alpha. The human saw the reset fade to grey in PCSX2 (2026-11-20).
+- Left (row E1b2g7d3b4h2): the rider's own fade (+0x448) is not drawn; `cBoarder::vf7` 0x117198's other work (the
+  eases, decays) is not run during the reset; the player's place on its path is still `follow_near`'s STANDIN.
 
 ### The normal in the air (row G20c2b)
 

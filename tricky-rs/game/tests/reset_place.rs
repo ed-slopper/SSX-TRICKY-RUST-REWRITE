@@ -66,7 +66,7 @@ fn a_rider_sent_back_comes_back_at_the_games_heading() {
     let (p, h) = tricky_game::aiglue::reset_place(paths, &follow(k, paths[k].length() * 0.5)).unwrap();
     let mut a = Rider::new(glam::Vec3::ZERO, 0.0);
     (a.safe, a.safe_heading, a.safe_external) = ((p, 0.7), Some(h), true);
-    a.respawn_safe();
+    send_back(&mut a);
     let mut b = Rider::new(glam::Vec3::ZERO, 0.0);
     b.respawn_heading(p, h);
     assert_eq!(a.place_ray, Some((p, h)));
@@ -75,6 +75,70 @@ fn a_rider_sent_back_comes_back_at_the_games_heading() {
     // without the game's heading, the port's yaw as before
     let mut c = Rider::new(glam::Vec3::ZERO, 0.0);
     c.safe = (p, 0.7);
-    c.respawn_safe();
+    send_back(&mut c);
     assert_eq!(c.yaw, 0.7);
+}
+
+/// A reset through the reset state (row E1b2g7d3b4h): the rider stands still for 48 ticks, faded as
+/// `ResetState_Update` 0x106a90 fades it, and is placed on the 49th (past 0.8 s), the fades back
+fn send_back(r: &mut Rider) {
+    r.request_reset(Some(1));
+    assert!(r.reset.is_some());
+    let at = r.pos;
+    for k in 1..=49 {
+        r.reset_tick(1.0 / 60.0);
+        if k < 49 {
+            assert_eq!(r.pos, at, "tick {k}");
+            assert!(r.reset.is_some());
+        }
+        if k == 30 {
+            // 0.5 s: the rider faded out, the screen faded in
+            assert!(r.fade.0 < 1e-5 && (r.fade.1 - 1.0).abs() < 1e-5, "{:?}", r.fade);
+        }
+    }
+    assert!(r.reset.is_none());
+    assert_eq!(r.fade, (1.0, 0.0));
+    assert_eq!(r.respawns, 1);
+}
+
+#[test]
+fn no_reset_where_the_path_forbids_it_or_once_finished() {
+    let mut r = Rider::new(glam::Vec3::ZERO, 0.0);
+    r.reset_ctx.no_reset = true;
+    r.request_reset(Some(1));
+    assert!(r.reset.is_none() && r.speech.is_empty());
+    let mut r = Rider::new(glam::Vec3::ZERO, 0.0);
+    r.fin = Some((0, 0.0, true));
+    r.request_reset(Some(1));
+    assert!(r.reset.is_none());
+    // a player's reset is heard, a computer rider's is not (+0x41c)
+    let mut r = Rider::new(glam::Vec3::ZERO, 0.0);
+    r.request_reset(Some(1));
+    assert_eq!(r.speech.len(), 1);
+    let mut r = Rider::new(glam::Vec3::ZERO, 0.0);
+    r.ai = true;
+    r.request_reset(Some(1));
+    assert!(r.reset.is_some() && r.speech.is_empty());
+}
+
+#[test]
+fn a_race_reset_moves_on_by_the_next_places_speed() {
+    use tricky_game::reset::RaceRider;
+    // mode 4 (World Circuit race), 200 m from the finish, second of two: moved on by 0.8003195 × the leader's speed
+    let mut r = Rider::new(glam::Vec3::ZERO, 0.0);
+    r.reset_ctx = tricky_game::rider::ResetCtx { no_reset: false, mode: 4, course: 1, me: 1, riders: vec![
+        RaceRider { to_finish: 15000.0, place: 0, vel: [3000.0, 4000.0, 0.0, 0.0] },
+        RaceRider { to_finish: 20000.0, place: 1, vel: [0.0; 4] },
+    ] };
+    r.request_reset(Some(1));
+    assert_eq!(r.reset.unwrap().advance, 5000.0 * 0.8003195);
+    // a computer rider (the stats' +0x65 negative) carries no speed
+    r = Rider::new(glam::Vec3::ZERO, 0.0);
+    r.ai = true;
+    r.reset_ctx = tricky_game::rider::ResetCtx { no_reset: false, mode: 4, course: 1, me: 1, riders: vec![
+        RaceRider { to_finish: 15000.0, place: 0, vel: [3000.0, 4000.0, 0.0, 0.0] },
+        RaceRider { to_finish: 20000.0, place: 1, vel: [0.0; 4] },
+    ] };
+    r.request_reset(Some(1));
+    assert_eq!(r.reset.unwrap().advance, 0.0);
 }

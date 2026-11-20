@@ -1465,7 +1465,7 @@ Proven (read from the code):
 - `Sfx_OnRiderReset` 0x218eb0 (only from `Boarder_RequestReset` 0x118f10 at 0x118f70, for +0x41c == 1) calls
   `Speech_OnRiderReset` 0x233a18 first with its own a0/a1 (the audio system, the rider). The speech needs +0x6e50,
   the music zone playing (`Audio_SetEventBitSound` 0x21c0a0): `PathMusic::zone` reads it from the game's music
-  system. STANDIN: the app's resets (`Rider::respawn_safe`) for the game's reset state.
+  system. The app's resets now run the game's reset state (row E1b2g7d3b4h, `port-notes/boarder.md`).
 - `AirMotion_Enter` 0x108310 ends in `Sfx_OnAirEnter`(audio, rider, +0x428 == 0xd) (0x108330..0x108360): kind 1
   when the control state is 0xd (`NaturalAirControl`). `Sfx_OnAirEnter` calls `Speech_OnAirEnter` 0x233950(rider,
   kind) when +0x57f4 (the flight time `AirPredict_AtTakeoff` predicted) is over 5, then `Speech_OnAirNearby`
@@ -1502,12 +1502,12 @@ Proven (disassembly, `SLUS_203.26`; ghidra-mcp's `xref` tool group gives the cal
   `cBoarder::vf8` 0x116ab8 stores 0) costs the meter; the port charged every respawn, and the app's reset key a
   second time on top.
 
-In the app: `Rider::request_reset(flag)` (the store, then `respawn_safe`, which pushes `RiderSpeech::Reset`); the
+In the app: `Rider::request_reset(flag)` (the store, then the reset state, which pushes `RiderSpeech::Reset` for a player); the
 reset key and select set `Input::reset`, the pad word's select bit, so the snow's states (`control_tick`) and the
 spin state ask for it as the game's; the decays, the floor (`Rider::below_world`), the controls off the course and
 the wipe-out's `GetUpState` are `request_reset(Some(1))`. STANDIN: the button in the air and on rails and in the
 wipe-out (their control states are not run, row G1i2), the out-of-bounds boxes (for op 13, row E9b2), the nine
-seconds in the air and 30 m under the mesh without the course's files, and the safe spot for the reset state.
+seconds in the air and 30 m under the mesh without the course's files.
 
 ### The event sound heard (E1b2g7d5a)
 

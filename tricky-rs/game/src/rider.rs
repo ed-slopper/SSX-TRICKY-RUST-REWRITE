@@ -516,6 +516,27 @@ pub struct Rider {
     pub reset_flag: u32,
     /// a reset a control state asked for this tick (`Boarder_RequestReset` 0x118f10), with its store of +0x304
     reset_req: Option<Option<u32>>,
+    /// the reset state (rider state 0x16 in motion 4, row E1b2g7d3b4h): `ResetState_Update` 0x106a90 ticks it while
+    /// the rider stands still, then places it ([`Rider::safe`], which the host keeps where the game would place it)
+    pub reset: Option<crate::reset::ResetState>,
+    /// the game ticks owed to the reset state (it moves on 1/60 a tick)
+    reset_acc: f32,
+    /// +0x448 the rider's fade (1 drawn whole) and +0x44c the screen's (`cBlackFadeOverlay::Draw` 0x1af320)
+    pub fade: (f32, f32),
+    /// what `Boarder_RequestReset` 0x118f10 reads of the race, kept by the host
+    pub reset_ctx: ResetCtx,
+}
+
+/// The race as `Boarder_RequestReset` 0x118f10 reads it for a rider: `AIP_CanResetAt` 0x196858 on its path at its
+/// place there (`no_reset` its negation), the game mode (0x32de8c) and course (0x32de88), and every rider of the race
+/// in race order (`me` this one) with its distance to the finish, place and velocity (cm, cm/s)
+#[derive(Clone, Debug, Default)]
+pub struct ResetCtx {
+    pub no_reset: bool,
+    pub mode: i32,
+    pub course: i32,
+    pub me: usize,
+    pub riders: Vec<crate::reset::RaceRider>,
 }
 
 pub fn heading(yaw: f32) -> Vec3 { Vec3::new(-yaw.sin(), 0.0, -yaw.cos()) }
@@ -536,7 +557,7 @@ impl Rider {
                last_trick: String::new(), trick_timer: 0.0, crashed: 0.0, hard_land: 0.0, crouch_v: 0.0, brake_v: 0.0, jump_c: 0.0, jump_delay: 0.0, height: 0.0,
                course_dir: None, course_pts: None, wipe: None, crash_at: None, gm: None, crash_spray: None, lean: [0.0; 3], up: [0.0, 0.0, 1.0, 0.0], recover: None, ai: false, down_t: 0.0, getup: -1.0, stumble: 0.0, wall_hit: None, speed_timer: 0.0, spin_timer: 0.0, spin_used: false, tube_class: u8::MAX, gate_p: 0.0, gate_hi: 0.0, gate_lo: 0.0, gate_still: 0.0, gate_target: 0.0, gate_speed: 0.0, gate_state: 8, gate_rock_dir: 0, band: (0.005, 0.0250417), spin_base: 0.0, flip_base: 0.0, late: false, cause: "", spin_ax: Axis::default(), flip_ax: Axis::default(), air_mode2: false, rail_off: 0.0, rail_time: 0.0, rail_halves: 0, boost_was: false, chain: 0,
                ubers: Vec::new(), uber: 0.0, uber_id: 0, uber_done: false, letters: 0, multiplier: 1,
-               sc: new_score(), tick_acc: 0.0, full_count: 0, rail_kind: 0, rail_lean: 0.0, rail_goal0: 0.0, rail_committed: 0.0, show_parts: Vec::new(), speech: Vec::new(), hit_by: u32::MAX, grab_scored: false, grab_tw: false, hit_wait: 0, att: None, last_hit: Default::default(), impact: 0.0, impact_n: [0.0; 4], knocks: 0.0, slot: 0, place_ray: None, hit_kind: 0, land_time: 0.0, takeoffs: 0, rail_blend: 0.0, rail_word: 0, rail_grid: false, rail_hit: [0.0; 4], spin_st: None, pad_dev: Default::default(), land_word: u32::MAX, land_normal: [0.0, 0.0, 1.0, 0.0], takeoff_wind: (0.0, 0.0), ctl: control_tick::CRUISE, cruise: Default::default(), prewind_started: 0, rec: Default::default(), boost_lvl: 0.0, reset_flag: 0, reset_req: None };
+               sc: new_score(), tick_acc: 0.0, full_count: 0, rail_kind: 0, rail_lean: 0.0, rail_goal0: 0.0, rail_committed: 0.0, show_parts: Vec::new(), speech: Vec::new(), hit_by: u32::MAX, grab_scored: false, grab_tw: false, hit_wait: 0, att: None, last_hit: Default::default(), impact: 0.0, impact_n: [0.0; 4], knocks: 0.0, slot: 0, place_ray: None, hit_kind: 0, land_time: 0.0, takeoffs: 0, rail_blend: 0.0, rail_word: 0, rail_grid: false, rail_hit: [0.0; 4], spin_st: None, pad_dev: Default::default(), land_word: u32::MAX, land_normal: [0.0, 0.0, 1.0, 0.0], takeoff_wind: (0.0, 0.0), ctl: control_tick::CRUISE, cruise: Default::default(), prewind_started: 0, rec: Default::default(), boost_lvl: 0.0, reset_flag: 0, reset_req: None, reset: None, reset_acc: 0.0, fade: (1.0, 0.0), reset_ctx: ResetCtx::default() };
         // the start line's `Boarder_PlaceAt` 0x11cae8 (`cBoarder::vf8` 0x116ab8: heading from the path's direction)
         r.att = Some((orient::placed_attitude(placed_heading(yaw), None), yaw));
         r
@@ -553,19 +574,57 @@ impl Rider {
         if let Some(f) = flag {
             self.reset_flag = f;
         }
-        self.respawn_safe();
-    }
-    /// Back to the safe spot: at the game's heading where the host keeps it (row G20c3b5), else the port's yaw
-    pub fn respawn_safe(&mut self) {
+        // (no control state runs in the reset state, so none asks again)
+        if self.reset.is_some() {
+            return;
+        }
+        let c = &self.reset_ctx;
+        let me = c.riders.get(c.me).copied().unwrap_or_default();
+        let q = crate::reset::Request {
+            finish: if self.fin.is_some() { 0 } else { -1 },
+            can_reset: !c.no_reset,
+            x41c: !self.ai as i32,
+            to_finish: me.to_finish,
+            place: me.place,
+            // the stats' byte +0x65, the profile's player number: −1 for a computer rider (`Career_GetPlayerLevel`)
+            no_speed: self.ai,
+            mode: c.mode,
+            course: c.course,
+            riders: &c.riders,
+        };
+        let Some(started) = crate::reset::request_reset(crate::reset::GATE_RESET_HEIGHT, &q) else { return };
         // `Boarder_RequestReset` 0x118f10 → `Sfx_OnRiderReset` 0x218eb0 (a local player's, +0x41c == 1) →
-        // `Speech_OnRiderReset` 0x233a18. STANDIN: the safe spot for the game's reset state (`ResetState_Update`
-        // 0x106a90: the fade, moved on along the path, `ResetState_PlaceRider`), and no `AIP_CanResetAt` test.
-        if !self.ai && self.fin.is_none() {
+        // `Speech_OnRiderReset` 0x233a18
+        if started.sound {
             self.speech.push(RiderSpeech::Reset);
         }
-        match self.safe_heading {
-            Some(h) => self.respawn_heading(self.safe.0, h),
-            None => self.respawn(self.safe),
+        self.reset = Some(started.state);
+        self.reset_acc = 0.0;
+    }
+    /// `ResetState_Update` 0x106a90 for the ticks `dt` holds, the rider standing still (motion 4 does nothing); on its
+    /// placing `ResetWaitControl_Exit` 0x106a48 (the fades back, +0x448 1 and +0x44c 0) and the rider placed at its
+    /// safe spot (`Boarder_AdvanceOnPath` 0x118c08 and `ResetState_PlaceRider` 0x119220 are the host's, which keeps
+    /// [`Rider::safe`] there while the reset runs). Its HUD item 0xc (the black fade) is the host's to show from
+    /// [`Rider::fade`]
+    pub fn reset_tick(&mut self, dt: f32) {
+        self.reset_acc += dt * 60.0;
+        while self.reset_acc > 0.5 {
+            self.reset_acc -= 1.0;
+            let Some(mut s) = self.reset else { return };
+            let t = crate::reset::Tick { cam: if self.ai { -1 } else { 0 }, index: self.slot as i32, ..Default::default() };
+            let (fade, calls) = crate::reset::reset_update(&mut s, &t, self.fade);
+            self.fade = fade;
+            self.reset = Some(s);
+            if calls.iter().any(|c| matches!(c, crate::reset::TickCall::Place { .. })) {
+                // (`Boarder_PlaceAt` 0x11cae8 at the state's height, 101.46 cm from every caller: `place`'s drop)
+                self.reset = None;
+                self.fade = (1.0, 0.0);
+                match self.safe_heading {
+                    Some(h) => self.respawn_heading(self.safe.0, h),
+                    None => self.respawn(self.safe),
+                }
+                return;
+            }
         }
     }
     /// `cBoarder::vf7` 0x117198's third reset (0x117c48..0x117c88): the rider's height (+0x148) under the world's
@@ -1201,6 +1260,12 @@ impl Rider {
     /// `Boarder_GroundThrust` 0x109950, `Boarder_ForwardDrag` 0x109cb8, `Boarder_SideFriction` 0x109ef8), in the
     /// air `Air_IntegrateRK4` 0x12b340, on a rail `RailSlideMotion_Update` 0x10b0d0.
     pub fn step(&mut self, world: &CollisionWorld, rails: &Rails, input: Input, dt: f32) {
+        // the reset state: its motion (4) does nothing. (`cBoarder::vf7` 0x117198's own work each tick, the eases and
+        // decays, is not run meanwhile, row E1b2g7d3b4h2)
+        if self.reset.is_some() {
+            self.reset_tick(dt);
+            return;
+        }
         // `Boarder_PlaceAt`'s ray under the last placement: on a hit the rider stands at the hit point, and the board
         // and its normal (+0x2a0, +0x2c0) are tipped to the hit's normal (else the port's drop from 1 m, flat)
         if let Some((at, heading)) = self.place_ray.take() {

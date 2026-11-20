@@ -109,12 +109,31 @@ pub fn reset_place(paths: &[Path], f: &Follow) -> Option<(Vec3, f32)> {
 /// nearest `pos` (`AIP_SortLinesByDistance`) projected, where the game keeps the rider's own place on its path every
 /// tick (`Boarder_UpdatePathAhead`; row G20c3b5)
 pub fn reset_place_near(paths: &[Path], pos: Vec3) -> Option<(Vec3, f32)> {
+    reset_place(paths, &follow_near(paths, pos)?)
+}
+
+/// The rider's place on the respawnable path nearest `pos` (`AIP_SortLinesByDistance`, projected). STANDIN: for the
+/// player's own place on its path, which the game keeps every tick (`Boarder_UpdatePathAhead`; row G20c3b5)
+pub fn follow_near(paths: &[Path], pos: Vec3) -> Option<Follow> {
     let p = game_pos(pos);
     let path = *aipath::sort_by_distance(paths, p, 1, true).first()?;
     let mut f = Follow { path, last: 0.0, along: 0.0, off: 0.0, near: [0.0; 4], ahead: [0.0; 4], heading: 0.0, cache: aipath::Cache::default() };
     let (d, _) = paths[path].project_from(p, &mut f.near, &mut f.cache);
     f.along = d;
+    Some(f)
+}
+
+/// Where the reset state places a rider (row E1b2g7d3b4h): `ResetState_Update` 0x106a90's `Boarder_AdvanceOnPath`
+/// 0x118c08 by the state's +0x10 (cm) on a copy of `f`, then [`reset_place`]
+pub fn reset_spot(paths: &[Path], f: &Follow, advance: f32) -> Option<(Vec3, f32)> {
+    let mut f = *f;
+    aipath::advance_on_path(paths, &mut f, advance);
     reset_place(paths, &f)
+}
+
+/// `AIP_CanResetAt` 0x196858 on the rider's path (+0x344) at its place there, as `Boarder_RequestReset` 0x118f10 asks
+pub fn can_reset(paths: &[Path], f: &Follow) -> bool {
+    paths.get(f.path).is_none_or(|p| p.can_reset_at(f.along))
 }
 
 /// A computer rider's AI: the computer's mode and target (cComputer +0x868 speed, +0x86c skill, +0x890 target,

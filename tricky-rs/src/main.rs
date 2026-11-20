@@ -1934,7 +1934,30 @@ fn ride(
     // the rider last was on the snow and riding
     {
         let (paths, ai_paths) = (&race.0.paths, &race.0.ai_paths);
-        let keep = |rr: &mut Rider, follow: Option<&tricky_game::aipath::Follow>| {
+        // what a reset request reads of the race (`Boarder_RequestReset` 0x118f10): the mode, the course, every rider's
+        // distance to the finish (+0x374), place (+0x110) and velocity (+0x150) on the race lines
+        let mut vels = vec![r.vel];
+        vels.extend(opponents.0.iter().map(|o| o.rider.vel));
+        let riders: Vec<tricky_game::reset::RaceRider> = race.0.line_riders.iter().zip(&vels).map(|(m, v)| tricky_game::reset::RaceRider {
+            to_finish: m.line.place.to_finish,
+            place: m.place,
+            vel: [v.x * 100.0, -v.z * 100.0, v.y * 100.0, 0.0],
+        }).collect();
+        let keep = |rr: &mut Rider, me: usize, follow: Option<&tricky_game::aipath::Follow>| {
+            rr.reset_ctx = rider::ResetCtx { no_reset: false, mode: race.0.mode as i32, course: race.0.course_no as i32, me, riders: riders.clone() };
+            if !ai_paths.is_empty() {
+                let f = match follow { Some(f) => Some(*f), None => tricky_game::aiglue::follow_near(ai_paths, rr.pos) };
+                if let Some(f) = f.as_ref() {
+                    rr.reset_ctx.no_reset = !tricky_game::aiglue::can_reset(ai_paths, f);
+                    // in the reset state: where it will place the rider, moved on along its path (row E1b2g7d3b4h)
+                    if let Some(s) = rr.reset {
+                        if let Some((p, h)) = tricky_game::aiglue::reset_spot(ai_paths, f, s.advance) {
+                            (rr.safe, rr.safe_heading, rr.safe_external) = ((p, rider::wrap(h - std::f32::consts::FRAC_PI_2)), Some(h), true);
+                        }
+                        return;
+                    }
+                }
+            }
             if !rr.grounded || rr.crashed > 0.0 || rr.rail.is_some() { return; }
             // the game's reset place on the rider's path, at the game's heading (row G20c3b5)
             if !ai_paths.is_empty() {
@@ -1951,8 +1974,8 @@ fn ride(
                 rr.safe_external = true;
             }
         };
-        keep(r, None);
-        for o in opponents.0.iter_mut() { let f = o.port.ai.as_ref().map(|a| a.follow); keep(&mut o.rider, f.as_ref()); }
+        keep(r, 0, None);
+        for (k, o) in opponents.0.iter_mut().enumerate() { let f = o.port.ai.as_ref().map(|a| a.follow); keep(&mut o.rider, k + 1, f.as_ref()); }
     }
     for o in opponents.0.iter_mut() {
         o.rider.course_dir = if o.driver.route.is_empty() { dir_at(&race.0.line, o.driver.idx) } else { dir_at(&o.driver.route, o.driver.idx) };

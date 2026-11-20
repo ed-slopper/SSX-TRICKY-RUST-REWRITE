@@ -27,7 +27,7 @@ const GAPP: u32 = 0x337c58;
 const FONT_COLOR: u32 = 0x337fe8;
 /// The fake objects, in one block above the game's memory
 const ARENA: u32 = 0x0100_0000;
-const ARENA_SIZE: u32 = 0x6_0000;
+const ARENA_SIZE: u32 = 0x6_0100;
 const HUD: u32 = ARENA;
 const APP: u32 = ARENA + 0x1000;
 const RACE: u32 = ARENA + 0x2000;
@@ -43,6 +43,8 @@ const RENDERER: u32 = ARENA + 0x26f0;
 const RVT: u32 = ARENA + 0x2710;
 const SAVE_PAGE: u32 = ARENA + 0x2940;
 const POP_FRAME: u32 = ARENA + 0x2d80;
+/// The black fade overlay (HUD item 0xc, the manager's +0x40; 0x2c bytes as `OverlayMan_Init` 0x1a6fb8 allocates it)
+const BLACK: u32 = ARENA + 0x6_0000;
 /// The renderer's virtuals as the functions its vtable names: `REND_BASE + slot` (no function of the game is up here)
 const REND_BASE: u32 = 0xf000_0000;
 const FONT1: u32 = ARENA + 0x2f00;
@@ -62,18 +64,23 @@ const EVENT_PATHS: u32 = ARENA + 0x4_0000;
 /// The game's ranges copied from the executable: the HUD's globals (bands, colour, tables), the view layouts
 /// (bss), the layouts' initialisers and the formats, the settings the constructor reads, the audio object the
 /// update's sounds are handed (the app plays none of them), the placings' rubber band tables; for the pop finish
-/// overlay its formats (to 0x38e410), the display mode (0x32ca50), its vtable and the players' finishing times
-const ELF_RANGES: [(u32, u32); 9] = [
+/// overlay its formats (to 0x38e410), the display mode (0x32ca50), its vtable and the players' finishing times; the
+/// black fade overlay's vtable
+const ELF_RANGES: [(u32, u32); 10] = [
     (0x337fe8, 0x200),
     (0x33ca40, 4 * 0x424),
     (0x38d000, 0x1410),
     (0x32ca10, 0x44),
     (tricky_game::overlays::VT_POP_FINISH, 0xa0),
+    (tricky_game::overlays::VT_BLACK_FADE, 0xa0),
     (tricky_game::raceoverlays::FINISH_TIMES, 8),
     (0x32db6c, 0x340),
     (0x343050, 4),
     (0x365060, 0x60),
 ];
+
+/// A quad with no texture (`Draw_FilledRect`)
+const NO_SHEET: u32 = u32::MAX;
 
 /// One thing the game drew
 #[derive(Clone)]
@@ -268,6 +275,14 @@ impl SpritesEnv for Env<'_> {
                 self.cmds.push(Cmd::Quad { sheet: self.sheet, uv: [f(4), f(5), f(6), f(7)], x: f(0), y: f(1), w: f(2), h: f(3), rgba, layer: self.layer, turned: func == 0x19bdf8 });
             }
             0x1f9e50 => return (hudsprites::sprite_rect(a(0), a(1) as i32), 0.0),
+            // `Draw_FilledRect` 0x19b108 (x, y, w, h, the colour): an untextured quad, each corner the colour × 128
+            // (A, R, G, B at +0, +4, +8, +0xc), drawn in the renderer's blend: 0x80 the GS's full alpha, and as a colour
+            // 0x80 of 0xff (the reset's fade, white × 128, is a mid grey). (Inferred: blend 3 as the usual alpha blend)
+            tricky_game::raceoverlays::FILLED_RECT => {
+                let c = |k: u32| (f32::from_bits(m.r32(a(0) + 4 * k)) * 128.0) as i32 as f32;
+                let rgba = [c(0) / 128.0, c(1) / 255.0, c(2) / 255.0, c(3) / 255.0];
+                self.cmds.push(Cmd::Quad { sheet: NO_SHEET, uv: [0.0; 4], x: f(0), y: f(1), w: f(2), h: f(3), rgba, layer: self.layer, turned: false });
+            }
             0x1a82e8 => {
                 let w = self.frame(0x150, |e, sp| hudsprites::draw_number(m, e, f(0), f(1), f(2), f(3), a(0), a(1), a(2), sp));
                 return (0, w);
@@ -514,6 +529,7 @@ impl tricky_game::overlays::OverlayManEnv for PopEnv<'_, '_> {
             0x1ae7f0 => ro::pop_finish_update(m, self, this),
             0x1aeb88 => ro::pop_finish_draw(m, self, this, POP_FRAME),
             0x1aed50 => ro::pop_finish_draw_text(m, self, this, POP_FRAME),
+            0x1af320 => ro::black_fade_draw(m, self, this),
             // `cPopFinishOverlay` vf17 0x1be6d8: it hides itself
             0x1be6d8 => return 1,
             _ => {
@@ -565,6 +581,16 @@ fn build_pop(m: &mut Mem) {
     m.w32(MAN + 0x2c, POP);
     m.w32(POP + 0x10, 0);
     m.w32(POP + 0x28, tricky_game::overlays::VT_POP_FINISH);
+    // the black fade overlay as `OverlayMan_Init` builds it (a screen overlay with its vtable, not active, not drawn
+    // with the HUD) in the manager's +0x40. STANDIN: its 0x2c bytes cleared, for `EAMem_Alloc`'s fresh block
+    for k in 0..0x2c {
+        m.w8(BLACK + k, 0);
+    }
+    tricky_game::overlays::screen_overlay_init(m, BLACK);
+    m.w32(BLACK + 0x14, 0);
+    m.w32(MAN + 0x40, BLACK);
+    m.w32(BLACK + 0x10, 0);
+    m.w32(BLACK + 0x28, tricky_game::overlays::VT_BLACK_FADE);
 }
 
 /// The race's event paths as `AIP_LoadEventPaths` 0x1983d0 / `AIPath_Load` 0x196f28 lay them out, from the course's
@@ -878,6 +904,17 @@ pub fn game_hud(
     if !done && *was_finished {
         build_pop(m);
     }
+    // the reset state (`ResetState_Update` 0x106a90, row E1b2g7d3b4h): the screen's fade (+0x44c) for the black fade
+    // overlay, shown for the player (`HUD_ShowItem`, item 0xc) past 0.2 s, hidden when the rider is placed
+    // (`ResetWaitControl_Exit` 0x106a48: `HUD_HideItem`)
+    m.w32(RIDERS + 0x44c, r.fade.1.to_bits());
+    let fading = r.reset.is_some_and(|s| 0.2 < s.timer);
+    if fading != (m.r32(BLACK + 0xc) != 0) {
+        let player = m.r32(RIDERS + 0x38);
+        let mut e = new_env(loc.as_ref(), strings, next_string, race_time, !racing, progress);
+        let mut pop = PopEnv { e: &mut e, time: race_time as i32, finish: finish[0] as i32 };
+        hudsprites::show_item(m, &mut pop, MAN, 0xc, player, fading);
+    }
     *was_finished = done;
     let mut state = StateEnv { units: r.sc.units, mult: r.sc.mult, ten: false, progress };
     // the game's ticks this frame (`GameTick`, row E1a3)
@@ -959,7 +996,7 @@ pub fn game_hud(
         let (u0, u1, v0, v1) = (uv[1] * size.x, uv[2] * size.x, uv[0] * size.y, uv[3] * size.y);
         let img = ImageNode {
             image: sheets.get(*sheet as usize).cloned().unwrap_or_default(),
-            rect: Some(Rect::new(u0.min(u1), v0.min(v1), u0.max(u1), v0.max(v1))),
+            rect: (*sheet != NO_SHEET).then(|| Rect::new(u0.min(u1), v0.min(v1), u0.max(u1), v0.max(v1))),
             flip_x: u0 > u1,
             flip_y: v0 > v1,
             color: Color::srgba(rgba[1], rgba[2], rgba[3], rgba[0]),

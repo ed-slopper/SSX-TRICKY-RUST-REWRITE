@@ -139,12 +139,20 @@ fn only_the_reset_button_costs_the_meter() {
     r.boost = 0.5;
     let n = r.respawns;
     step(&mut r, Input { reset: true, ..Input::default() });
+    // the reset state (`ResetState_Update` 0x106a90) places the rider past 0.8 s
+    assert!(r.reset.is_some(), "the button resets");
+    while r.reset.is_some() {
+        step(&mut r, Input::default());
+    }
     assert_eq!(r.respawns, n + 1, "the button resets");
     assert!(r.boost < 0.45, "and costs the meter: {}", r.boost);
     assert_eq!(r.reset_flag, 0);
     // a reset the game asks for itself
     r.boost = 0.5;
     r.request_reset(Some(1));
+    while r.reset.is_some() {
+        step(&mut r, Input::default());
+    }
     assert_eq!((r.respawns, r.boost, r.reset_flag), (n + 2, 0.5, 0));
 }
 
@@ -160,7 +168,7 @@ fn off_the_course_the_control_resets_free() {
     r.safe = (Vec3::new(0.0, 5.0, -200.0), 0.0);
     r.boost = 0.5;
     let n = r.respawns;
-    for _ in 0..10 {
+    for _ in 0..60 {
         r.step(&world, &rails, Input::default(), 1.0 / 60.0);
         if r.respawns != n {
             break;

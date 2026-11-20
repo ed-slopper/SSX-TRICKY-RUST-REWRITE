@@ -1132,9 +1132,15 @@ pub fn self_test(world: &mut CollisionWorld, rails: &Rails, line: &[Vec3], cours
         let air_before = r.air_time;
         let respawns_before = r.respawns;
         // where the game's reset would place the rider on its path, at the game's heading (row G20c3b5)
-        let game_place = if r.grounded && r.crashed <= 0.0 && r.rail.is_none() && !ai_paths.is_empty() {
-            match port.ai.as_ref() { Some(a) => crate::aiglue::reset_place(ai_paths, &a.follow), None => crate::aiglue::reset_place_near(ai_paths, r.pos) }
-        } else { None };
+        // what a reset request reads (`Boarder_RequestReset` 0x118f10): the rider alone in the race, `AIP_CanResetAt` on
+        // its path; in the reset state the place it will be put, moved on along its path (row E1b2g7d3b4h)
+        let follow = if ai_paths.is_empty() { None } else { match port.ai.as_ref() { Some(a) => Some(a.follow), None => crate::aiglue::follow_near(ai_paths, r.pos) } };
+        r.reset_ctx = crate::rider::ResetCtx { no_reset: follow.is_some_and(|f| !crate::aiglue::can_reset(ai_paths, &f)), mode: race.mode as i32, course: race.course_no as i32, me: 0, riders: Vec::new() };
+        let game_place = match (follow, r.reset) {
+            (Some(f), Some(s)) => crate::aiglue::reset_spot(ai_paths, &f, s.advance),
+            (Some(f), None) if r.grounded && r.crashed <= 0.0 && r.rail.is_none() => crate::aiglue::reset_place(ai_paths, &f),
+            _ => None,
+        };
         if let Some((p, h)) = game_place {
             (r.safe, r.safe_heading, r.safe_external) = ((p, wrap(h - std::f32::consts::FRAC_PI_2)), Some(h), true);
         } else if !paths.is_empty() && r.grounded && r.crashed <= 0.0 && r.rail.is_none() {
@@ -1149,7 +1155,11 @@ pub fn self_test(world: &mut CollisionWorld, rails: &Rails, line: &[Vec3], cours
         world.touch_gates(&[r.pos + Vec3::Y * 0.8]);
         if std::env::var("TRICKY_RESETS").is_ok() { for (g, s) in world.gates.iter().zip(shut) { if s && g.t.is_some() { println!("  t {t:.1}: door {} opens (open {:.1}..{:.1} s of {:.1})", g.inst, g.open.0, g.open.1, g.len); } } }
         world.tick_gates(dt);
+        let resetting = r.reset.is_some();
         r.step(world, rails, input, dt);
+        if std::env::var("TRICKY_RESETS").is_ok() && resetting != r.reset.is_some() {
+            if resetting { println!("  t {t:.2}: placed at {:.1?} heading {:?}", r.pos, r.safe_heading); } else { println!("  t {t:.2}: reset state ({:?}) at {:.1?}", r.reset, r.pos); }
+        }
         if r.apply_pads(world, dt) { ai.reroute(); }
         world.tick_knockables(dt);
         if let Some(tb) = tube { if tb.apply(&mut r, laps(&race), dt) { ai.reroute(); tube_t = t; println!("  t {t:.1}: up the tube, {} laps to go", laps(&race)); } }
