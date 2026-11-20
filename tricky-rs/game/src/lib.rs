@@ -138,6 +138,7 @@ pub mod replay;
 pub mod replaymgr;
 pub mod font;
 pub mod fontprint;
+pub mod hudrects;
 pub mod hudsprites;
 pub mod hudtext;
 pub mod hudstate;

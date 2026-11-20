@@ -1432,7 +1432,11 @@ In the app: the Tricky call goes through `Rider::speech` (the three audio flags 
 `pathmusic`'s, which still starts Tricky on `Boarder_IsTricky`'s edge, not on this call); `src/gamehud.rs` writes
 the show-off's time left into the race handler's +0x14 so the ported HUD update makes the ten-second call; the
 show-off's end in `src/main.rs` posts `SpeechCall::TimeUp`. Heard: with a 25 s limit (a local test) the time-up line (`Time_Run_Out.dat`) played; the ten-second call
-was not heard here because the game's HUD (`src/gamehud.rs`) did not load on that machine (no HUD sheets). `TRICKY_EVENT=showoff` (or `freeride`) starts the app
+was not heard then because the game's HUD (`src/gamehud.rs`) did not load on that machine (no HUD sheets). Since row
+E1b2g7d3b4g the HUD loads from the disc alone. Heard: with the time left shortened in a local test, the HUD update
+called `Speech_OnTenSecondsLeft` as the clock passed 10 s, and the announcer played `mc\Time_Running_Out.dat`. In a
+real Garibaldi show-off, each checkpoint the rider passes adds 60 s (`Boarder_HitCheckpoint` 0x11e6f8, through
+`race.bonus`), so the call comes well after 110 s. `TRICKY_EVENT=showoff` (or `freeride`) starts the app
 in that event. The rider hits: `Rider::hit` (the port of `Boarder_RiderHit`) pushes `RiderSpeech::Hit` for a
 stumble (`Speech_RiderHitLine`(other, rider, not a shove, 0); proven at 0x124d60..0x124d9c) and a knock-down (the
 same with crash 1, then `Speech_OnRiderHit`(rider, other)), with the other rider's race index that `props::bump` and

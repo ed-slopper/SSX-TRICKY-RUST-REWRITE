@@ -3265,10 +3265,10 @@ address,size,name,system,status
 0x1f1448,60,ScreenAnim_GetValue,game,checked
 0x1f1488,84,ScreenAnim_Eval,game,checked
 0x1f1580,11964,SpriteSet_InitFrontEndRects,hud,ported
-0x1f4440,15076,SpriteSet_InitHudGameRects,hud,ported
+0x1f4440,15076,SpriteSet_InitHudGameRects,hud,checked
 0x1f7f28,3436,LoadScreen_InitSpriteTable,game,ported
 0x1f8c98,1000,HUD_LoadIconShapes,hud,not started
-0x1f9080,836,SpriteSet_BindHudGameTex,hud,not started
+0x1f9080,836,SpriteSet_BindHudGameTex,hud,checked
 0x1f93c8,392,HUD_LoadLoadingIcons,hud,not started
 0x1f9550,180,SpriteSet_RegisterNamedShapes,hud,not started
 0x1f9608,88,SpriteSet_RegisterFirstShape,hud,not started
@@ -3716,8 +3716,8 @@ address,size,name,system,status
 0x21e7e0,60,BankInstance_SetPitchBend,audio,checked
 0x21e8a0,56,cController::cController,audio,not started
 0x21e8d8,20,cController::~cController,audio,not started
-0x21e8f0,220,BankInstance_Update,audio,not started
-0x21e9d0,116,cController::vf7_21e9d0,audio,not started
+0x21e8f0,220,BankInstance_Update,audio,ported
+0x21e9d0,116,cController::vf7_21e9d0,audio,ported
 0x21ea48,196,SndEvent_Tick,audio,checked
 0x21eb10,96,cController::vf4_21eb10,audio,checked
 0x21eb70,100,Audio_UpdateSystems,audio,ported

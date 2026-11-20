@@ -13,8 +13,17 @@ Part of the port notes (index: [README.md](README.md)); units and wording as des
 
 ## HUD sprites (`HUD_DrawSprite` 0x1c0068, `SpriteSet_InitHudGameRects` 0x1f4440, `SpriteSet_BindHudGameTex` 0x1f9080)
 
-- 200 records {texture, draw w, draw h, v0, u0, u1, v1} written in code from immediates for HUDGAME.SSH (map1,
-  map4, hud1; HUDTRICK.SSH in the tutorial). Boost segments 0x12–0x14 (red, orange, yellow) / 0x15 unlit,
+- The set holds 200 records {texture, draw w, draw h, v0, u0, u1, v1} (0x1c bytes from +8), but
+  `SpriteSet_InitHudGameRects` writes only the first **139** (proven, function runner: records 139..199 are left as
+  they were). Each gets texture −1 and six floats built on its stack from immediates; it takes nothing but the set.
+  The corners are fractions of the texture. `SpriteSet_BindHudGameTex` then looks up each of `map1` / `map4` /
+  `hud1` in HUDGAME.SSH (`Shape_FindByName` 0x2c2528, names at 0x39a500 / 0x39a508 / 0x39a510). For each shape it
+  finds, it makes a texture through the renderer (gApp+0x724, virtual +0x154) and stores it in +0x15e8 / +0x15ec /
+  +0x15f0. A shape it doesn't find leaves its field as it was. Then it writes each record's texture from those
+  fields: 30 records use map1, 58 map4, 51 hud1 (from the runner's output). HUDTRICK.SSH is loaded in the tutorial. `tricky_game::hudrects` ports both
+  (row E1b2g7d3b4g; `game/tests/hudrects.rs` checks every word of the set against the original, the binding with
+  each shape found or missing). The HUD file is `data/textures/hudgame.ssh` (path at 0x39a398, in the load table
+  at 0x340a00). Boost segments 0x12–0x14 (red, orange, yellow) / 0x15 unlit,
   TRICKY letters 25–30 unlit / 31–36 lit, uber orb 0x25 / 0x26, medals 0x27–0x29, character badges 0x45–0x51,
   button glyphs 0x6c–0x75. Text uses data/fonts/title.sfn (shadow +2, +2) and menu.sfn.
 
@@ -467,8 +476,10 @@ end in. The memory comes from:
   colour, the combo and rank tables), the layouts' initialisers, the number and time formats, and the settings the
   constructor reads.
 - **`DATA/LANG/AMERICAN.LOC`**: the localised strings, written into the copy as `Loc_GetString` hands them out.
-- **`chars/hud/sprites.json`**: the sprite rectangles, as `SpriteSet_InitHudGameRects` lays them out (texture,
-  draw size, v0, u0, u1, v1).
+- **The sprite set** built by the ported `SpriteSet_InitHudGameRects` / `SpriteSet_BindHudGameTex`
+  (`tricky_game::hudrects`). Its three textures are the disc's `data/textures/hudgame.ssh` shapes, and each
+  record's texture is the index of the app's sheet. The UVs are scaled by the sheet's size when drawn (row
+  E1b2g7d3b4g; before it, `chars/hud/sprites.json` and `chars/hud/*.png` from a Python export).
 - **`sfnfont`**: the fonts. Its glyph layout is now its own system (`sfn_glyphs`), used by the app's slots and by
   the game-drawn strings alike.
 

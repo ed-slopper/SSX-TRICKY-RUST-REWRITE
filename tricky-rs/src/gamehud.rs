@@ -4,16 +4,17 @@
 //!
 //! The memory is the game's own where it can be: the HUD's static tables (the meter's bands, the font colour, the
 //! view layouts' initialisers, the number and time formats) come from the executable on the player's disc
-//! (`TRICKY_DISC`, `/SLUS_203.26`), the strings from `DATA/LANG/AMERICAN.LOC`, the sprites' rectangles from
-//! `chars/hud/sprites.json` (what `SpriteSet_InitHudGameRects` 0x1f4440 builds) and the fonts from the disc's SFN
-//! files (parsed and measured by `tricky_game::font`; their glyphs drawn by `sfnfont`).
+//! (`TRICKY_DISC`, `/SLUS_203.26`), the strings from `DATA/LANG/AMERICAN.LOC`, the sprites' rectangles as
+//! `SpriteSet_InitHudGameRects` 0x1f4440 builds them and their textures from the disc's `hudgame.ssh`
+//! (`tricky_game::hudrects`), and the fonts from the disc's SFN files (parsed and measured by `tricky_game::font`;
+//! their glyphs drawn by `sfnfont`).
 //! The rider, race and world fields the HUD reads are filled from the app's own race every frame, and the race's
 //! path set, placings and progress run the game's own code on them.
 //!
-//! Without the disc, the sheets or the fonts, the app's own HUD (`ui::hud`, `hudsprites`, `sfnfont`) stays.
+//! Without the disc or the fonts, the app's own HUD (`ui::hud`, `hudsprites`, `sfnfont`) stays.
 
 use crate::sfnfont::{SfnFonts, SfnText, Slot};
-use crate::{ui, CharLib, Mode, RiderRes};
+use crate::{ui, Mode, RiderRes};
 use bevy::prelude::*;
 use std::collections::HashMap;
 use tricky_game::hudsprites::{self, SpritesEnv};
@@ -98,6 +99,8 @@ pub struct GameHud {
     mem: Option<Mem>,
     loc: Option<tricky_data::loc::LocFile>,
     sheets: Vec<Handle<Image>>,
+    /// each sheet's size in texels: the records' corners are fractions of it
+    sizes: Vec<Vec2>,
     /// the game mode and course the HUD overlay was built for
     mode: Option<(u32, u32)>,
     /// the disc, for the courses' `.aip`
@@ -606,8 +609,8 @@ impl tricky_game::placing::PlacingEnv for StateEnv {
     fn placing_sound(&mut self, _m: &mut Mem, _args: [u32; 6]) {}
 }
 
-/// The game's memory for the HUD, from the executable's bytes and the sprite rectangles
-fn build(elf: &[u8], rects: &[(u32, [f32; 7])], title: &[u8], menu: &[u8]) -> Mem {
+/// The game's memory for the HUD, from the executable's bytes
+fn build(elf: &[u8], title: &[u8], menu: &[u8]) -> Mem {
     let mut m = Mem::default();
     for (at, n) in ELF_RANGES {
         m.regions.push((at, elf_bytes(elf, at, n)));
@@ -636,13 +639,11 @@ fn build(elf: &[u8], rects: &[(u32, [f32; 7])], title: &[u8], menu: &[u8]) -> Me
     m.w32(RACE + 0x98, 640);
     m.w32(RACE + 0x9c, 480);
     m.w32(RACE + 0xa4, RIDERS);
-    for (id, r) in rects {
-        let at = SET + 8 + 28 * id;
-        m.w32(at, r[0] as u32);
-        for (k, v) in r.iter().enumerate().take(7).skip(1) {
-            m.w32(at + 4 * k as u32, v.to_bits());
-        }
-    }
+    // the HUD's sprite set as `SpriteSet_InitHudGameRects` 0x1f4440 fills it and `SpriteSet_BindHudGameTex` 0x1f9080
+    // binds it (`tricky_game::hudrects`); the renderer's texture for each shape (its virtual +0x154) is the app's
+    // sheet: its index in `GameHud::sheets`
+    tricky_game::hudrects::init_hud_game_rects(&mut m, SET);
+    tricky_game::hudrects::bind_hud_game_tex(&mut m, SET, &mut |k| Some(k as u32));
     // the fonts as `cGame::Init` 0x17e148 loads them (`Font_ParseSfn` 0x19c858: no added advance or origin, the
     // scales 1.0; then the title font's 1.4 x 1.3 and the menu font's 1.8 x 1.4)
     for (font, glyphs, file, (sx, sy)) in [(FONT1, FONT1_GLYPHS, title, tricky_data::sfn::TITLE_SCALE), (FONT2, FONT2_GLYPHS, menu, tricky_data::sfn::MENU_SCALE)] {
@@ -662,8 +663,8 @@ fn build(elf: &[u8], rects: &[(u32, [f32; 7])], title: &[u8], menu: &[u8]) -> Me
     m
 }
 
-/// Load the disc's executable and strings, the sheets and the rectangles, and run the HUD overlay's constructor
-fn load(hud: &mut GameHud, lib: &CharLib, images: &mut Assets<Image>) -> Option<()> {
+/// Load the disc's executable and strings, the HUD's textures and the fonts, and run the HUD overlay's constructor
+fn load(hud: &mut GameHud, images: &mut Assets<Image>) -> Option<()> {
     let p = std::env::var("TRICKY_DISC").ok()?;
     hud.disc = p.clone();
     let mut disc = tricky_data::disc::Disc::open(&p).map_err(|e| eprintln!("game hud: disc {p}: {e}")).ok()?;
@@ -672,39 +673,26 @@ fn load(hud: &mut GameHud, lib: &CharLib, images: &mut Assets<Image>) -> Option<
     let mut files = tricky_data::big::Files::new(disc);
     let title = files.load("data/fonts/title.sfn").ok()??;
     let menu = files.load("data/fonts/menu.sfn").ok()??;
-    let dir = lib.dir.join("hud");
+    // the HUD's textures (the path at 0x39a398, loaded by the table at 0x340a00): the three shapes
+    // `SpriteSet_BindHudGameTex` 0x1f9080 binds, each made a texture of the app's
+    let ssh = files.load("data/textures/hudgame.ssh").map_err(|e| eprintln!("game hud: hudgame.ssh: {e}")).ok()??;
+    let ssh = tricky_data::ssh::SshFile::open(&ssh).map_err(|e| eprintln!("game hud: hudgame.ssh: {e}")).ok()?;
     let mut sheets = Vec::new();
-    for n in ["map1", "map4", "hud1"] {
-        let img = image::open(dir.join(format!("{n}.png"))).ok()?.to_rgba8();
-        let (w, h) = img.dimensions();
+    let mut sizes = Vec::new();
+    for n in tricky_game::hudrects::SHAPES {
+        let img = ssh.find(n)?.image.as_ref()?;
+        sizes.push(Vec2::new(img.width as f32, img.height as f32));
         sheets.push(images.add(Image::new(
-            bevy::render::render_resource::Extent3d { width: w, height: h, depth_or_array_layers: 1 },
+            bevy::render::render_resource::Extent3d { width: img.width as u32, height: img.height as u32, depth_or_array_layers: 1 },
             bevy::render::render_resource::TextureDimension::D2,
-            img.into_raw(),
+            img.rgba_full_range(),
             bevy::render::render_resource::TextureFormat::Rgba8UnormSrgb,
             bevy::asset::RenderAssetUsages::default(),
         )));
     }
-    let text = std::fs::read_to_string(dir.join("sprites.json")).ok()?;
-    let list: Vec<serde_json::Value> = serde_json::from_str(&text).ok()?;
-    let rects: Vec<(u32, [f32; 7])> = list
-        .iter()
-        .filter_map(|e| {
-            let g = |k: &str| e.get(k).and_then(|v| v.as_f64()).unwrap_or(0.0) as f32;
-            let sheet = match e.get("sheet").and_then(|s| s.as_str()).unwrap_or("") {
-                s if s.ends_with("map1") => 0.0,
-                s if s.ends_with("map4") => 1.0,
-                s if s.ends_with("hud1") => 2.0,
-                _ => return None,
-            };
-            let (x, y, w, h) = (g("x"), g("y"), g("w"), g("h"));
-            let (dw, dh) = (if g("draw_w") > 0.0 { g("draw_w") } else { w }, if g("draw_h") > 0.0 { g("draw_h") } else { h });
-            // a rectangle as `SpriteSet_InitHudGameRects` writes it: the texture, the draw size, v0, u0, u1, v1
-            Some((g("id") as u32, [sheet, dw, dh, y, x, x + w, y + h]))
-        })
-        .collect();
-    hud.mem = Some(build(&elf, &rects, &title, &menu));
+    hud.mem = Some(build(&elf, &title, &menu));
     hud.sheets = sheets;
+    hud.sizes = sizes;
     Some(())
 }
 
@@ -712,7 +700,7 @@ fn load(hud: &mut GameHud, lib: &CharLib, images: &mut Assets<Image>) -> Option<
 /// and show what it drew
 #[allow(clippy::too_many_arguments)]
 pub fn game_hud(
-    mut commands: Commands, lib: Res<CharLib>, (mut rider, race, opponents, list): (ResMut<RiderRes>, Res<crate::RaceRes>, Res<crate::Opponents>, Res<crate::LevelList>), game: Res<ui::Game>, mode: Res<Mode>, (time, ticks): (Res<Time>, Res<crate::GameTick>),
+    mut commands: Commands, (mut rider, race, opponents, list): (ResMut<RiderRes>, Res<crate::RaceRes>, Res<crate::Opponents>, Res<crate::LevelList>), game: Res<ui::Game>, mode: Res<Mode>, (time, ticks): (Res<Time>, Res<crate::GameTick>),
     fonts: Res<SfnFonts>, mut hud: ResMut<GameHud>, mut images: ResMut<Assets<Image>>, root: Query<Entity, With<ui::HudRoot>>,
     mine: Query<Entity, With<GameHudRoot>>,
     mut quads: Query<(&QuadNode, &mut Node, &mut ImageNode, &mut Visibility, &mut GlobalZIndex), Without<TextNode>>,
@@ -727,8 +715,8 @@ pub fn game_hud(
         }
         hud.tried = true;
         let h = &mut *hud;
-        if load(h, &lib, &mut images).is_none() {
-            println!("game hud: no disc, sheets or fonts; the app's own HUD stays");
+        if load(h, &mut images).is_none() {
+            println!("game hud: no disc or fonts; the app's own HUD stays");
             return;
         }
         if let Ok(root) = root.single() {
@@ -770,7 +758,7 @@ pub fn game_hud(
         laps[k] = m.line.laps_left;
     }
     let riding = *mode == Mode::Ride && game.screen == ui::Screen::Playing;
-    let GameHud { mem, loc, sheets, mode: built, disc, quads: nq, texts: nt, pop_cmds, finished: was_finished, .. } = &mut *hud;
+    let GameHud { mem, loc, sheets, sizes, mode: built, disc, quads: nq, texts: nt, pop_cmds, finished: was_finished, .. } = &mut *hud;
     let Some(m) = mem.as_mut() else { return };
     // the game mode for the app's event (its menu's "World Circuit - Race" / "- Show-off" / "Free Ride":
     // `courses::Mode` CircuitRace 4, CircuitShowoff 5, Freeride 7) and the course's number from the game's course
@@ -966,7 +954,9 @@ pub fn game_hud(
     let z = |layer: u32, order: usize| GlobalZIndex(1000 + layer as i32 * 1000 + order as i32);
     for (i, order, c) in want_q.iter() {
         let Cmd::Quad { sheet, uv, x, y, w, h, rgba, layer, .. } = c else { continue };
-        let (u0, u1, v0, v1) = (uv[1], uv[2], uv[0], uv[3]);
+        // (the records' corners are fractions of the texture: in texels for the image's rectangle)
+        let size = sizes.get(*sheet as usize).copied().unwrap_or(Vec2::ONE);
+        let (u0, u1, v0, v1) = (uv[1] * size.x, uv[2] * size.x, uv[0] * size.y, uv[3] * size.y);
         let img = ImageNode {
             image: sheets.get(*sheet as usize).cloned().unwrap_or_default(),
             rect: Some(Rect::new(u0.min(u1), v0.min(v1), u0.max(u1), v0.max(v1))),
