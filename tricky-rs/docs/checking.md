@@ -2382,3 +2382,46 @@ Found (`fadd=g1`, player's ticks every field, before → after; ours equals the 
   late tricks started from the stick.
 - Left (row F4b3d3): rec27 8936 (a late trick whose second sample has the new spin already advanced one tick by the new rate ×
   0.8 / 60: an update after the enter within the sampled step), rec26 7642 (mode 0, largest errors 1 ulp).
+
+## F4b3d3: the spin replay's last misses: a torn sample and the exit clip (2026-11-20)
+
+Proven:
+- **rec27 8936 is a torn sample, not a second update.** The recorder (`tools/pine.py record`) reads every rider once
+  all their speed-sample counts +0x5900 moved; `Boarder_AddSpeedSample` 0x155dc8 runs before the controls in
+  `cBoarder::vf7` 0x117198, and slot 0 (the player) ticks last, so the read can land inside the player's
+  `Boarder_UpdateControl` 0x11c9a0. Sample 8935 holds the rider leaving a rail (8934: motion 3, state 0xf) half way
+  through the late trick `SpinState_StartFromStick` 0x102158: +0x58 1 and the rates 6.3623238 written (its first
+  stores), the direction's clip not begun (layer 0 still 0x223) and no `SpinControl_Enter` 0x100598 (the rates are not
+  yet × 0.8 for riding switch). Calling 0x102158 twice is harmless (its stores before the read are the same), so the
+  runner calling it on the torn sample with that sample's own pad word (`hookpad`) before the frame gives every field
+  of 8936 bit for bit. Running `SpinState_Update` twice (tried) gets the spin and rates but not the quaternion.
+- **rec26 7642: `SpinState_PlayExitClip` 0x102800 begins the exit clip before the update reads the clip again.** When
+  the stick is let go (mode ≠ 2, stick 0), `SpinState_Update` plays the exit clip, then `AnimCtl_GetClip` sees it:
+  0x22d → 0x23d makes the owed turn st+0x10 −π (π riding switch, sign by the clip) and the largest errors st+0x50
+  shrink from it. The replay stubbed 0x102800 (owed 0, st+0x50 an ulp off). 0x102800 (disassembled): controller
+  speed +0x18 = 0.5449139 + stats+0x1a × 0.6741781 / 255, the layer-0 clip's exit through its jump table 0x35f710
+  (clips 0x226..0x277: `spin::exit_clip`), `AnimCtl_PlayClip`(ctl, exit, 0, 5), speed back to 1.
+
+Changed: `spin::exit_clip`, `spin::play_exit_clip` (ported, ours), `spin::spin_stick`, `spin::spin_lets_go`;
+`spin_update` takes the exit clip for the owed turn. `tests/replay.rs` `spin_ticks_against_the_running_game`: the
+runner runs 0x102800 (on the recorded controller, else writes the exit clip as the layer-0 clip; TRICKY_NOEXIT=1: the
+stub as before), ours plays it on the controller before the trick clips; a torn first sample (+0x58 1, rates equal to
+the start's for the sample's own hook pad word, its clip not begun; TRICKY_NOTORN=1: taken as it is) is finished
+first: the runner runs 0x102158 again, ours plays the clip and runs `spin_exit` and `spin_enter`. TRICKY_SPDUMP=ticks
+prints the spin object per rider; TRICKY_DBG now also prints the computers' misses.
+
+Found (`fadd=g1`, the runner; ours equals the runner under IEEE adds on every count of all four):
+
+| recording | torn samples | player's ticks every field | every rider, every field |
+|---|---|---|---|
+| rec27 (pipedream) | 1 (8935) | 6,336 of 6,336 | 6,336 of 6,336, half-pipe clips 23 of 23 |
+| rec26 (mesa) | 0 | 3,880 of 3,880 | all but one: quaternion and axes 16,177 of 16,178 |
+| rec25 (snow) | 0 | 7,338 of 7,338 | 44,830 of 44,830 |
+| rec22 (mesa attract) | 0 | 9,276 of 9,276 | 38,257 of 38,257 |
+
+Left (row F4b3d4): rec26 7459 rider 5 (a computer, mode 2, the wind-up starting, spin 0, no landing alignment): the
+game's quaternion turned slightly (about 0.005 rad, mostly about the forward axis: fwd 2 ulps, side and up ~1e5 ulps)
+and nothing in `SpinState_Update` turns it on that path. Not the spin state: the turn is made outside it in the same
+frame, likely by the air motion before the control (`AirMotion_Update` 0x108378's no-landing path: its world ray
+from rider+0x470, on a hit moving into the surface tilts the quaternion by up to 0.10471976 rad and calls
+`Boarder_UpdateOrientation`), which the spin replay doesn't run.

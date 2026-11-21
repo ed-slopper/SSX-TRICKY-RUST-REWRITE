@@ -941,9 +941,27 @@ fn spin_ticks_against_the_running_game() {
         for f in [0x11db00, 0x2508b8, 0x10c120, 0x250fd0, 0x250d60] {
             r.allow(f);
         }
-        for f in [0x155e00, 0x155e68, 0x102800, 0x127918, 0x15eef8, 0x127d08, 0x118f10] {
+        for f in [0x155e00, 0x155e68, 0x127918, 0x15eef8, 0x127d08, 0x118f10] {
             r.stub(f, |_, _| {});
         }
+        // `SpinState_PlayExitClip` 0x102800 (F4b3d3): the original on the recorded controller (as 0x1272e8), else the
+        // exit clip written as the controller's layer-0 clip (+8, which `AnimCtl_GetClip` reads); TRICKY_NOEXIT=1:
+        // nothing played, as before
+        let on = trick_on.clone();
+        let no_exit = std::env::var("TRICKY_NOEXIT").is_ok();
+        r.allow(0x102800);
+        r.hook(0x102800, move |c, m| {
+            if no_exit {
+                return true;
+            }
+            if !on.get() {
+                let rider = m.read_u32(c.gpr(4) as u32 + 0x70);
+                if let Some(x) = tricky_game::spin::exit_clip(m.read_u32(rider + 0x46c8)) {
+                    m.write_u32(rider + 0x46c8, x);
+                }
+            }
+            !on.get()
+        });
         // `SpinState_StartFromStick` 0x102158 and the state change it makes (`Boarder_SetState` 0x11f608: the control
         // states' exit 0x11c840 and enter 0x11c8e8, for 0x10 `SpinControl_Exit` 0x1029d0 and `SpinControl_Enter`
         // 0x100598) as the original (F4b3d2); the scoring (`Score_CommitAndRestartChain` 0x156568, `Boarder_AddMeter`
@@ -1054,6 +1072,7 @@ fn spin_ticks_against_the_running_game() {
     // the computer's stick read from the second sample (mode 2): [ticks it was tried], and per way those it made right
     let mut stick_tries = [0usize];
     let mut hooked_ticks = [0usize];
+    let mut torn_ticks = [0usize];
     // mode-2 ticks on the half-pipe clips 0x23c / 0x23d (the phase moves the spin): [ticks], and per way right
     let mut pipe_ticks = [0usize];
     let mut pipe_right = vec![0usize; 1 + runners.len()];
@@ -1078,6 +1097,14 @@ fn spin_ticks_against_the_running_game() {
                 _ => ks,
             };
             let (sa, sb) = (&w[0].extra[ks].1[i], &w[1].extra[ks].1[i]);
+            if std::env::var("TRICKY_SPDUMP").is_ok_and(|v| v.split(',').any(|t| t == w[1].tick.to_string())) {
+                eprintln!("SPDUMP {} r{i} motion {} state {} spin {} flip {} ts {} | st mode {} ph {} owed {} w {} {} x58 {} x5c {} x60 {} x64 {} align {} emax {} {} | hook {:x?} clip {:x} n5900 {:?} hookn {:?} sw {} stance {} x138 {} ctl {:x?}",
+                    w[1].tick, u32_le(b, 0x424), u32_le(b, 0x428), f32_at(b, 0x1d0), f32_at(b, 0x1d4), f32_at(b, 0x12c), u32_le(sb, 8), f32_at(sb, 0xc), f32_at(sb, 0x10),
+                    f32_at(sb, 0x2c), f32_at(sb, 0x30), u32_le(sb, 0x58), u32_le(sb, 0x5c), u32_le(sb, 0x60), u32_le(sb, 0x64), f32_at(sb, 0x34), f32_at(sb, 0x50), f32_at(sb, 0x54),
+                    hook_pad(&w[1], i), ka.map(|k| u32_le(&w[1].extra[k].1[i], 8)).unwrap_or(0),
+                    w[1].extra.iter().find(|(o, _)| *o == 0x5900).map(|(_, v)| f32_at(&v[i], 0)), w[1].chased.iter().find(|(s, _)| s == "hookpad").map(|(_, v)| f32_at(&v[i], 4)),
+                    u32_le(b, 0x1b4), u32_le(&stats[i], 0x40), f32_at(b, 0x138), ka.map(|k| (0..4).map(|j| u32_le(&w[1].extra[k].1[i], 4 * j)).collect::<Vec<_>>()));
+            }
             if u32_le(a, 0x428) != 0x10 || u32_le(b, 0x428) != 0x10 || u32_le(a, 0x424) != 1 || u32_le(b, 0x424) != 1 {
                 continue;
             }
@@ -1118,18 +1145,39 @@ fn spin_ticks_against_the_running_game() {
             let (bone_win, bi_win) = (kbone.map(|k| &w[0].extra[k].1[i][..]), kbi.map(|k| &w[0].extra[k].1[i][..]));
             let bone = bone_win.zip(bi_win).filter(|(_, b)| u32_le(b, 0) == 0).map(|(x, _)| [f32_at(x, 8), f32_at(x, 0xc), f32_at(x, 0x10)]);
             // one way's fields for a time to touch down
+            // a torn first sample (F4b3d3): the recorder reads every rider once all their speed-sample counts moved,
+            // which can land inside the last rider's control update (slot 0, the player, ticks last). Seen as a late
+            // trick half done: +0x58 set and the rates `SpinState_StartFromStick` 0x102158 sets for the sample's own
+            // tick's pad word (window `hookpad`), with its clip not begun yet. TRICKY_NOTORN=1: taken as it is
+            let torn_pad = hook_pad(&w[0], i).filter(|_| std::env::var("TRICKY_NOTORN").is_err() && u32_le(sa, 0x58) == 1).filter(|&p| {
+                tricky_game::jump::spin_start_from_stick(p, stat[0x1a], u32_le(a, 0x1b4) != 0).is_some_and(|s| {
+                    s.spin.to_bits() == f32_at(sa, 0x2c).to_bits() && s.flip.to_bits() == f32_at(sa, 0x30).to_bits()
+                        && s.clip.is_some_and(|c| ka.is_some_and(|k| u32_le(&w[0].extra[k].1[i], 8) != c))
+                })
+            });
+            torn_ticks[0] += torn_pad.is_some() as usize;
             let ours = |land: f32, ts: f32, pad: u32, mut anim: Anim, regs: Option<&[(u32, Vec<u8>)]>| {
                 // the trick clips first, on the recorded controller (F4b3d2)
                 // a late trick from the stick (`SpinState_StartFromStick` 0x102158) where the update asks for one
                 let start = tricky_game::jump::spin_start_from_stick(pad, stat[0x1a], u32_le(a, 0x1b4) != 0).filter(|_| std::env::var("TRICKY_NOSTART").is_err());
                 anim.start_from_stick = start.is_some() as u32;
                 let mut tmem = None;
+                // a torn first sample (F4b3d3): the late trick's start finished first, its clip and type
+                let torn_start = torn_pad.and_then(|p| tricky_game::jump::spin_start_from_stick(p, stat[0x1a], u32_le(a, 0x1b4) != 0));
+                let mut torn_type = 0xb;
                 if let (Some(rg), Some((trd, nodes, _))) = (regs, trick_at) {
                     use tricky_game::animctl as ac;
                     let mut m = tricky_game::pf::Mem { regions: rg.to_vec() };
                     m.regions.extend(trick_consts.iter().cloned());
                     let mut env = AnimEnv { nodes, next: 0 };
                     let ctl = trd + 0x46c0;
+                    if let Some(s) = torn_start {
+                        ac::blend_out_all(&mut m, ctl);
+                        if let Some(c) = s.clip {
+                            ac::play_clip(&mut m, &mut env, ctl, c, 0, 5);
+                        }
+                        torn_type = ac::clip_type(&m, ctl, 0);
+                    }
                     // the frame's start: `cPreAI::vf1` 0x1146b0 flushes every rider's ended clips (`Boarder_FlushEndedClips`
                     // 0x117190) before the riders tick, and the sample is taken after the last frame's `cPostAI` advanced
                     // them; TRICKY_NOFLUSH=1: not
@@ -1137,6 +1185,11 @@ fn spin_ticks_against_the_running_game() {
                         ac::flush_ended(&mut m, &mut env, ctl);
                     }
                     (anim.clip, anim.clip_type, anim.phase) = (ac::clip(&m, ctl, 0), ac::clip_type(&m, ctl, 0), ac::layer_phase(&m, ctl, 0).0);
+                    // the stick let go (F4b3d3): `SpinState_PlayExitClip` 0x102800 begins the exit clip before the trick
+                    // clips run (`spin_update` reads the layer-0 clip it leaves again by `spin::exit_clip`)
+                    if std::env::var("TRICKY_NOEXIT").is_err() && tricky_game::spin::spin_lets_go(pad, &spin_obj(sa)) {
+                        tricky_game::spin::play_exit_clip(&mut m, &mut env, trd);
+                    }
                     anim.trick_clips = tricky_game::spin::update_trick_clips(&mut m, &mut env, trd, (pad >> 9) & 1, pad & 0xff);
                     anim.trick_clip = Some((tricky_game::animctl::clip(&m, ctl, 0), tricky_game::animctl::clip_type(&m, ctl, 0)));
                     if std::env::var("TRICKY_TRDBG").is_ok_and(|v| v.split(',').any(|t| t == w[1].tick.to_string())) {
@@ -1174,8 +1227,27 @@ fn spin_ticks_against_the_running_game() {
                     bone: bone.unwrap_or_default(),
                     ..Default::default()
                 };
+                let mut axes = (vec4(a, 0x180), vec4(a, 0x190), vec4(a, 0x1a0));
+                // the torn sample's start (F4b3d3): the rates and +0x58 (already in it), `SpinControl_Exit` and
+                // `SpinControl_Enter` as for a late trick below
+                if let Some(s) = torn_start {
+                    (st.w_spin, st.w_flip, st.x58) = (s.spin, s.flip, 1);
+                    if let Some(o2) = tricky_game::spin::spin_exit(&mut r) {
+                        (r.quat, axes) = (o2.q, (o2.fwd, o2.side, o2.up));
+                    }
+                    let mut e = tricky_game::spin::SpinEnterRider {
+                        x138: f32_at(a, 0x138),
+                        switch: u32_le(a, 0x1b4),
+                        stance: u32_le(stat, 0x40),
+                        kind: u32_le(a, 0x1dc),
+                        up_z: axes.2[2],
+                        ..Default::default()
+                    };
+                    let ar = AlignRider { slope_kind: u32_le(pb, 0x40), slope: vec4(pb, 0x30), fwd: axes.0, quat: r.quat, class: u32_le(a, 0x420) };
+                    tricky_game::spin::spin_enter(&mut st, &mut e, &ar, torn_type);
+                }
                 let calls = spin_update(pad, &mut st, &mut r, &anim);
-                let mut o = Orient { q: r.quat, fwd: vec4(a, 0x180), side: vec4(a, 0x190), up: vec4(a, 0x1a0), ..Default::default() };
+                let mut o = Orient { q: r.quat, fwd: axes.0, side: axes.1, up: axes.2, ..Default::default() };
                 if calls.contains(&tricky_game::spin::SpinCall::Orientation) {
                     update_orientation(&mut o);
                 }
@@ -1258,6 +1330,15 @@ fn spin_ticks_against_the_running_game() {
                     g.mem.write(stats_at, stat).unwrap();
                     g.mem.write_u32(rd + 0x464, stats_at);
                     g.mem.write_u32(pad, pad_word);
+                    // a torn first sample (F4b3d3): `SpinState_StartFromStick` 0x102158 run again on it with its own tick's
+                    // pad word finishes the start (its writes before the read are the same again)
+                    if let Some(p) = torn_pad {
+                        g.mem.write_u32(pad, p);
+                        g.cpu.set_gpr(4, (rd - 0x170) as u64);
+                        g.cpu.set_gpr(5, pad as u64);
+                        g.call(0x102158).unwrap_or_else(|e| panic!("tick {} rider {i}: torn: {e:?}", w[0].tick));
+                        g.mem.write_u32(pad, pad_word);
+                    }
                     if regs.is_some() && std::env::var("TRICKY_NOFLUSH").is_err() {
                         g.cpu.set_gpr(4, (rd + 0x46c0) as u64);
                         g.call(0x15f700).unwrap_or_else(|e| panic!("tick {} rider {i}: flush: {e:?}", w[0].tick));
@@ -1339,6 +1420,14 @@ fn spin_ticks_against_the_running_game() {
                         c[1] += (got[f] == want[f]) as usize;
                     }
                 }
+                if !player && k == n_ways - 1 && std::env::var("TRICKY_DBG").is_ok() && (0..names.len()).filter(|&f| all(f)).any(|f| got[f] != want[f]) {
+                    let bad: Vec<&str> = (0..names.len()).filter(|&f| all(f) && got[f] != want[f]).map(|f| names[f]).collect();
+                    eprintln!("DBG rider tick {} rider {i} mode {mode} pad {:08x}: {bad:?}", w[1].tick, pads[0]);
+                    for f in (0..names.len()).filter(|&f| all(f) && got[f] != want[f]) {
+                        let d: Vec<i64> = got[f].iter().zip(&want[f]).map(|(g, w)| *g as i32 as i64 - *w as i32 as i64).collect();
+                        eprintln!("    {}: game {:?} before {:?} ulps off {d:?}", names[f], want[f].iter().map(|b| f32::from_bits(*b)).collect::<Vec<_>>(), if f == 0 { vec4(a, 0x170).to_vec() } else { vec![] });
+                    }
+                }
                 pipe_right[k] += (pipe && (0..names.len()).filter(|&f| all(f)).all(|f| got[f] == want[f])) as usize;
                 if player {
                     let right = (0..names.len()).all(|f| got[f] == want[f]);
@@ -1348,9 +1437,9 @@ fn spin_ticks_against_the_running_game() {
                         m[0] += 1;
                         m[1] += right as usize;
                     }
-                    if !right && k == n_ways - 1 && std::env::var("TRICKY_DBG").is_ok() {
+                    if !right && (k == n_ways - 1 || std::env::var("TRICKY_DBGALL").is_ok()) && std::env::var("TRICKY_DBG").is_ok() {
                         let bad: Vec<&str> = (0..names.len()).filter(|&f| got[f] != want[f]).map(|f| names[f]).collect();
-                        eprintln!("DBG player tick {} mode {mode} pad {:08x}: {bad:?}", w[1].tick, pads[0]);
+                        eprintln!("DBG player tick {} way {k} mode {mode} pad {:08x}: {bad:?}", w[1].tick, pads[0]);
                         for f in (0..names.len()).filter(|&f| got[f] != want[f]) {
                             let d: Vec<i64> = got[f].iter().zip(&want[f]).map(|(g, w)| *g as i32 as i64 - *w as i32 as i64).collect();
                             eprintln!("    {}: game {:?} ulps off {d:?}", names[f], want[f].iter().map(|b| f32::from_bits(*b)).collect::<Vec<_>>());
@@ -1360,7 +1449,7 @@ fn spin_ticks_against_the_running_game() {
             }
         }
     }
-    eprintln!("{path}: spin ticks (state 0x10 in the air; left out: {other} whose window is not the spin object, {skew} not one update apart; the hook's pad word on {}):", hooked_ticks[0]);
+    eprintln!("{path}: spin ticks (state 0x10 in the air; left out: {other} whose window is not the spin object, {skew} not one update apart; the hook's pad word on {}; torn first samples finished on {}):", hooked_ticks[0], torn_ticks[0]);
     for (k, way) in ["ours (spin::spin_update)".to_string()].into_iter().chain(runners.iter().map(|(r, _, _)| format!("the game's in the runner, {r}"))).enumerate() {
         let line: Vec<String> = names.iter().zip(&count[k]).map(|(n, c)| format!("{n} {} of {}", c[1], c[0])).collect();
         let pm: Vec<String> = player_modes[k].iter().enumerate().map(|(m, c)| format!("mode {m} {} of {}", c[1], c[0])).collect();

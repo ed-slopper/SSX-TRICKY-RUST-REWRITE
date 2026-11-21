@@ -212,6 +212,22 @@ fn approach(to: f32, x: f32, step: f32) -> f32 {
     }
 }
 
+/// The stick `SpinState_Update` 0x100908 reads (x, y as −1, 0, 1): the left stick's bits 18-19 and 16-17, or once a
+/// late trick took the right stick (+0x58) and the pad's bit 10 is clear, bits 14-15 and 12-13
+pub fn spin_stick(pad: u32, st: &SpinObj) -> (f32, f32) {
+    if st.x58 != 0 && pad & 0x400 == 0 {
+        (pad_dir(pad, 0xe), pad_dir(pad, 0xc))
+    } else {
+        (pad_dir(pad, 0x12), pad_dir(pad, 0x10))
+    }
+}
+
+/// Whether `SpinState_Update` 0x100908 ends the spin's stick part this tick (`SpinState_PlayExitClip` 0x102800, mode
+/// 2): the stick let go while the mode is not 2 yet
+pub fn spin_lets_go(pad: u32, st: &SpinObj) -> bool {
+    st.mode != 2 && spin_stick(pad, st) == (0.0, 0.0)
+}
+
 /// `SpinState_Update` 0x100908 for one tick with the pad word `pad`; returns the calls it makes, in order.
 #[allow(clippy::neg_cmp_op_on_partial_ord)] // the game's own comparisons, NaN behaviour included
 pub fn spin_update(pad: u32, st: &mut SpinObj, r: &mut SpinRider, anim: &Anim) -> Vec<SpinCall> {
@@ -234,11 +250,7 @@ pub fn spin_update(pad: u32, st: &mut SpinObj, r: &mut SpinRider, anim: &Anim) -
     let spun = if r.mirror != 0 { -r.spin } else { r.spin };
     calls.push(SpinCall::ScoreSpin((spun * 57.295_776) as i32));
     calls.push(SpinCall::ScoreFlip((r.flip * 57.295_776) as i32));
-    let (mut sx, mut sy) = (pad_dir(pad, 0x12), pad_dir(pad, 0x10));
-    if st.x58 != 0 && pad & 0x400 == 0 {
-        sx = pad_dir(pad, 0xe);
-        sy = pad_dir(pad, 0xc);
-    }
+    let (sx, sy) = spin_stick(pad, st);
     let (spin_hi, spin_lo, flip_hi, flip_lo);
     if (sx == 0.0 && sy == 0.0) || st.mode == 2 {
         if st.mode == 2 {
@@ -276,10 +288,12 @@ pub fn spin_update(pad: u32, st: &mut SpinObj, r: &mut SpinRider, anim: &Anim) -
                 st.flip_lo = st.spin_floor;
             }
             st.flip_floor = 0.0;
-            if anim.clip.wrapping_sub(0x23c) < 2 {
+            // (the layer-0 clip read again: the exit clip just begun)
+            let clip = exit_clip(anim.clip).unwrap_or(anim.clip);
+            if clip.wrapping_sub(0x23c) < 2 {
                 st.phase = 0.0;
                 st.owed = if r.switch != 0 { -PI } else { PI };
-                if anim.clip == 0x23d {
+                if clip == 0x23d {
                     st.owed = -st.owed;
                 }
             } else {
@@ -771,6 +785,38 @@ pub const SET_TRICK_CLIP_RATE: u32 = 0x156050;
 pub const SFX_GRAB_HELD: u32 = 0x218e20;
 pub const SFX_TRICK_STOP: u32 = 0x218e28;
 pub const SFX_TRICK_START: u32 = 0x218b78;
+/// `SpinState_PlayExitClip` 0x102800's choice: the clip the spin's end plays for the layer-0 clip it leaves (its jump
+/// table at 0x35f710, clips 0x226..0x277), `None` for any other (nothing played). The stick's spin clips 0x226..0x22b
+/// and 0x22e..0x233 go to their exits 0x236..0x23b, 0x22c (and 0x234, 0x271, 0x275) to the half-pipe clip 0x23c,
+/// 0x22d (and 0x235, 0x270, 0x274) to 0x23d
+pub fn exit_clip(clip: u32) -> Option<u32> {
+    Some(match clip {
+        0x226 | 0x22e | 0x273 | 0x277 => 0x236,
+        0x227 | 0x22f | 0x272 | 0x276 => 0x237,
+        0x228 | 0x230 => 0x238,
+        0x229 | 0x231 => 0x239,
+        0x22a | 0x232 => 0x23a,
+        0x22b | 0x233 => 0x23b,
+        0x22c | 0x234 | 0x271 | 0x275 => 0x23c,
+        0x22d | 0x235 | 0x270 | 0x274 => 0x23d,
+        _ => return None,
+    })
+}
+
+/// `SpinState_PlayExitClip` 0x102800 on the rider's animation controller (rider+0x46c0): its speed (+0x18) set from
+/// the stats' tricks byte (+0x1a: 0.5449139 + tricks × 0.6741781 / 255), the layer-0 clip's exit ([`exit_clip`])
+/// begun through `env` (`AnimCtl_PlayClip`(controller, clip, 0, 5)), the speed back to 1
+pub fn play_exit_clip(m: &mut Mem, env: &mut dyn SeqEnv, rider: u32) {
+    let ctl = rider + 0x46c0;
+    let b = m.r8(m.r32(rider + 0x464) + 0x1a) as i32;
+    let v = crate::animseq::cvt_s_w(b) * F(f32::from_bits(0x3f2c_96f0)) * F(f32::from_bits(0x3b80_8081)) + F(f32::from_bits(0x3f0b_7f7a));
+    m.w32(ctl + 0x18, v.0.to_bits());
+    if let Some(c) = exit_clip(crate::animctl::clip(m, ctl, 0)) {
+        env.call(m, PLAY_CLIP, &[ctl, c, 0, 5]);
+    }
+    m.w32(ctl + 0x18, 1f32.to_bits());
+}
+
 /// The trick table (0x333098, `tricky_data::trick_slots`): per rider (stats+0x5c, 0x2d0 bytes) and board (stats+0x44,
 /// 0xf0 bytes) fifteen rows of four words: trick slot, grab clip, tweak clip, uber clip (0x300 none)
 pub const TRICK_TABLE: u32 = 0x333098;
