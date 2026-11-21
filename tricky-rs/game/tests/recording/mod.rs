@@ -190,3 +190,24 @@ pub fn player_pad(stat: &[u8], prev: Option<&[u8]>, now: &[u8], state: u32) -> O
     let (mut trick, mut slope) = (0x1a, false);
     Some(get_controls(ControlsIn { state, paused: false }, &mut Mapper { map: &map, pad: &pad }, &mut trick, &mut || 0, &mut slope))
 }
+
+/// The course's `.pbd`, `.ltg` and `.ssf` from the player's disc (TRICKY_DISC, and TRICKY_COURSE or the recording's `course N`).
+pub fn course_files(path: &str) -> Option<(Vec<u8>, Vec<u8>, Vec<u8>)> {
+    let disc = std::env::var("TRICKY_DISC").ok()?;
+    let name = match std::env::var("TRICKY_COURSE") {
+        Ok(name) => name,
+        Err(_) => course_name(course(path)?)?.to_string(),
+    };
+    let mut files = tricky_data::big::Files::new(tricky_data::disc::Disc::open(&disc).ok()?);
+    files.mount(&format!("data/models/{name}.big")).ok()?;
+    let mut get = |ext: &str| files.load(&format!("|data/models/{name}.{ext}")).ok().flatten();
+    Some((get("pbd")?, get("ltg")?, get("ssf")?))
+}
+
+/// The models file of course id `id` (0x32de88; the recorder writes it in the header, `course N`). Inferred: the
+/// models files' names in the order of `Camera_GetCourseCmlName` 0x178330's courses (0 garibald, 1 snowdrea, 2
+/// elysium, 3 mesablan: mesa proven by rec19's walls, 4 merqury, 5 aloha, 6 pipedrea, 7 untracke, 8 tokyo, 10 trick,
+/// 11 alaska); 9 (pipedrea again for the cameras) left out.
+pub fn course_name(id: u32) -> Option<&'static str> {
+    ["gari", "snow", "elysium", "mesa", "merquer", "aloha", "pipe", "untrack", "megaple", "", "trick", "alaska"].get(id as usize).copied().filter(|n| !n.is_empty())
+}

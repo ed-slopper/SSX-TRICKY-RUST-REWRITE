@@ -2425,3 +2425,43 @@ and nothing in `SpinState_Update` turns it on that path. Not the spin state: the
 frame, likely by the air motion before the control (`AirMotion_Update` 0x108378's no-landing path: its world ray
 from rider+0x470, on a hit moving into the surface tilts the quaternion by up to 0.10471976 rad and calls
 `Boarder_UpdateOrientation`), which the spin replay doesn't run.
+
+## F4b3d4: the spin replay's last miss was the air motion's wall (2026-11-21)
+
+Proven:
+- **rec26 7459 rider 5 is `AirMotion_Update` 0x108378's wall bump**, run before the control in the frame from sample
+  7458 to 7459. The game's turn is q(7459) = t ⊗ q(7458) with t a turn of 0.004835 rad about an axis square to the
+  board's up (frame +0x4ac0 of 7458: axis · up 6e-6), the form of the bump's `Math_SinCos`(a/2) quaternion about
+  up × n. The wall ray (`cWorldBoarder`(rider+0x470, 0), mask 0xcf) on mesa from the body sample 7458 holds hits the
+  snow under the board: t 0.13064194, n (−0.33637866, −0.46871483, 0.8167961), n · v −29.496 after the flight step
+  (into it), n · up over the limit 0.6 + 0.3 · 0.0133: a glance, so the attitude turns by asin |up × n| (under the
+  cap 0.10471976) and the velocity loses its part into n.
+- With the patches **toward zero** (PCSX2's patch program, F4h5m) ours (`air_motion::wall_push`, `wall_bump`, IEEE)
+  gives the position and velocity of 7459 bit for bit and the quaternion within 1–2 ulps; with the patches to nearest
+  (`terrain::tessellate`, what `CourseGround` makes by default) the cast's t is 0.1137, its normal 1e-5 off and the
+  quaternion about 500 ulps off. The game's own `AirMotion_Update` in the runner (`fadd=g1`) on the toward-zero hit
+  makes every field.
+
+Changed: `CourseGround::tessellate_with` (the patches' points by another rule, the cache emptied; the default stays
+to nearest: the app's rule waits on F4c, row F4h5n), `PatchGrid::with_points`; `tests/course_clock` `Posing` (the
+keyframed objects posed on a `CourseGround`, taken out of `tests/ground_motion.rs`' `Keyframed`);
+`recording::course_files` / `course_name` (moved from `tests/ground_motion.rs`). `tests/replay.rs`
+`spin_ticks_against_the_running_game` with TRICKY_DISC: the air motion's wall ray cast on the course (patches toward
+zero, the keyframed objects posed as the frame saw them, by PCSX2's clock) from the body the first sample holds;
+where it hits, the frame's air motion runs before the spin update: in the runner the original `AirMotion_Update`
+(the down ray answered as a miss: the pairs stay in the air; the wall ray with the course's hit; the shapes, the rail
+capture, the instance collisions, the body's translation and a crash answered as nothing), in ours the flight step
+(`air::integrate_rk4`), `wall_push` and `wall_bump`. Elsewhere the spin update gets the first sample's position and
+velocity as before. TRICKY_NOAIRWALL=1: not cast; TRICKY_WALLDBG lists the hits. Without the poses rec22 lost 4
+ticks (mesa's keyframed 1444 hit at 6104–6105, F4h5l).
+
+Found (`fadd=g1`, the runner; ours equals the runner under IEEE adds on every count):
+
+| recording | the air's wall ray hit | every rider, every field |
+|---|---|---|
+| rec27 (pipedream) | 0 | 6,336 of 6,336 |
+| rec26 (mesa) | 1 (7459 r5) | 16,178 of 16,178 |
+| rec25 (snow) | 0 | 44,830 of 44,830 |
+| rec22 (mesa attract) | 0 | 38,257 of 38,257 |
+
+The spin replay has no misses left on the four recordings.

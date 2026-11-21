@@ -11,6 +11,7 @@ use tricky_game::jump::{jump_impulse, JumpState};
 use tricky_game::orient::{update_orientation, Orient};
 use tricky_game::spin::{landing_align, spin_update, AlignRider, Anim, SpinObj, SpinRider};
 
+mod course_clock;
 mod recording;
 use recording::{f32_at, load, player_pad, u32_le, vec4};
 
@@ -743,6 +744,31 @@ fn stick_from(a: &[u8], b: &[u8], sa: &[u8], sb: &[u8]) -> u32 {
     field(s) << 20 | field(f) << 22
 }
 
+/// A patch's points as PCSX2's patch program makes them (`Vu0_RunPatchProgram` 0x2576a8: every product and sum
+/// toward zero, proven on the running game's patch cache, `tests/terrain.rs`, F4h5m)
+fn patch_points_toward_zero(c: &[[f32; 4]; 16]) -> [[f32; 4]; 100] {
+    let mul = |a: f32, b: f32| {
+        let x = a as f64 * b as f64;
+        let f = x as f32;
+        if (f as f64).abs() > x.abs() { f32::from_bits(f.to_bits() - 1) } else { f }
+    };
+    tricky_game::terrain::tessellate_by(c, mul, |a, b| r5900::ps2float::add_by(a, b, r5900::ps2float::Round::Chop))
+}
+
+/// The rider's collision body (+0x470) as a sample holds it (as `cPostAI::vf1` 0x114730 posed it at the end of the
+/// frame before)
+fn body_of(r: &[u8]) -> tricky_game::collbody::CollBody {
+    let mut b = tricky_game::collbody::CollBody::new();
+    b.center = vec4(r, 0x480);
+    b.radius = f32_at(r, 0x490);
+    b.x24 = u32_le(r, 0x494) as i32;
+    b.count = (u32_le(r, 0x498) as i32).clamp(0, 18);
+    for k in 0..18 {
+        b.spheres[k] = (vec4(r, 0x4a0 + 0x20 * k), f32_at(r, 0x4b0 + 0x20 * k));
+    }
+    b
+}
+
 fn spin_obj(st: &[u8]) -> SpinObj {
     SpinObj {
         mode: u32_le(st, 8),
@@ -923,7 +949,7 @@ fn spin_ticks_against_the_running_game() {
     // rider (the state manager sits 0x8b0 before most riders, but 0x880 before one)
     let head = std::fs::read_to_string(path).unwrap().lines().next().unwrap().to_string();
     let addr: Vec<u32> = head.split_whitespace().skip(3).take(n).map(|h| u32::from_str_radix(h, 16).unwrap()).collect();
-    let mut runners: Vec<(&str, r5900::Runner, [u32; 4])> = Vec::new();
+    let mut runners: Vec<(&str, r5900::Runner, [u32; 5])> = Vec::new();
     let elf = std::env::var("TRICKY_ELF").ok().and_then(|p| std::fs::read(p).ok());
     let anim_now = std::rc::Rc::new(std::cell::Cell::new(Anim::default()));
     let trick_on = std::rc::Rc::new(std::cell::Cell::new(false));
@@ -931,6 +957,27 @@ fn spin_ticks_against_the_running_game() {
     // the animation's answers (F4b3d): the layer-0 clip (window `46c0`) and its phase from the sequence windows
     // (`4718>0`, `4718>30>0` and their lengths), when recorded
     let ka = ticks[0].extra.iter().position(|(o, _)| *o == 0x46c0).filter(|_| std::env::var("TRICKY_NOANIM").is_err());
+    // the air motion before the control (F4b3d4): `AirMotion_Update` 0x108378's wall ray (`cWorldBoarder`(rider+0x470,
+    // 0), the body's mask 0xcf) on the course (TRICKY_DISC; its patches toward zero, as PCSX2's patch program) from
+    // the body the first sample holds; where it hits, the frame's air motion runs before the spin's update, the
+    // original's in the runner and `air_motion::wall_push` / `wall_bump` in ours (the board's up from the frame,
+    // window `4aa0`). TRICKY_NOAIRWALL=1: not cast, as before
+    // The keyframed objects are posed as each frame saw them (F4h5l: `course_clock`, by PCSX2's adder)
+    let kframe = ticks[0].extra.iter().position(|(o, _)| *o == 0x4aa0);
+    let files = recording::course_files(path).filter(|_| kframe.is_some() && std::env::var("TRICKY_NOAIRWALL").is_err());
+    let course = files.as_ref().and_then(|(p, l, s)| tricky_game::course_ground::CourseGround::new(p, l, s));
+    let keyframed = course.as_ref().zip(files.as_ref()).and_then(|(c, (p, _, s))| {
+        c.tessellate_with(patch_points_toward_zero);
+        let pbd = tricky_data::pbd::Pbd::parse(p)?;
+        let ssf = tricky_data::ssf::Ssf::parse(s, pbd.instances.len() as u32).ok()?;
+        let samples: Vec<(u32, Vec<[f32; 4]>)> = ticks.iter().map(|t| (t.tick, (0..n).map(|i| vec4(&t.riders[i], 0x140)).collect())).collect();
+        let clocks = c.with_world(|w| course_clock::clocks(&pbd, &ssf, w, &samples, |a, b| r5900::ps2float::add_by(a, b, r5900::ps2float::Round::Guard)));
+        let posing = course_clock::Posing::new(p, &pbd, &[&clocks]);
+        Some((clocks, posing))
+    });
+    let mut keyframed = keyframed;
+    let wall_now = std::rc::Rc::new(std::cell::Cell::new(None::<tricky_game::air_motion::Ray>));
+    let mut wall_ticks = [0usize];
     for rules in ["add=n,mul=n,div=n,cvt=n", "add=n,fadd=g1,mul=n,div=n,cvt=n"] {
         let Some(mut r) = r5900::Runner::from_env() else { break };
         r.float_rules = r5900::ps2float::Rules::parse(rules).unwrap();
@@ -998,7 +1045,39 @@ fn spin_ticks_against_the_running_game() {
         for f in [0x2cc808, 0x159b08, 0x159b50, 0x159ba8, 0x159bb8, 0x159ee8, 0x15ed68, 0x15ee30, 0x15f020, 0x15f060, 0x15f5b8, 0x15f700, 0x15fcf8, 0x161360, 0x1613a0, 0x161400, 0x161528, 0x161568, 0x1615a8, 0x1615e8, 0x161640] {
             r.allow(f);
         }
-        let at = [r.mem.alloc(0x6400) + 0x200, r.mem.alloc(0x100), r.mem.alloc(4), r.mem.alloc(0x800)];
+        // the air motion (F4b3d4): `AirMotion_Update` 0x108378 and `Air_IntegrateRK4` 0x12b340 as the original; its
+        // down ray (a `cWorldLine`, the rider's last-hit record +0x430 passed) answered as a miss (the pairs stay in
+        // the air), its wall ray (none passed) with the course's hit; answered as nothing: the flight prediction
+        // (`AirPredict_Tick` 0x123ec8), the shapes (`cWorldLine::cWorldLine` 0x25d7f0, `cWorldBoarder::cWorldBoarder`
+        // 0x257810, `cWorldBoarder::vf10` 0x257ca0), `Rail_TryCapture` 0x125cb8, `Boarder_InstanceCollisions`
+        // 0x125088, `Boarder_Translate` 0x1267a0 (the body is not compared) and a crash (`Boarder_Wipeout` 0x11d830,
+        // `Score_Crash` 0x156de0)
+        for f in [0x108378, 0x12b340] {
+            r.allow(f);
+        }
+        for f in [0x123ec8, 0x25d7f0, 0x257810, 0x257ca0, 0x125cb8, 0x125088, 0x1267a0, 0x11d830, 0x156de0] {
+            r.stub(f, |c, _| {
+                c.set_gpr(2, 0);
+                c.set_f(0, 0.0);
+            });
+        }
+        let wn = wall_now.clone();
+        r.hook(0x25aff8, move |c, m| {
+            match wn.get().filter(|_| c.gpr(7) == 0) {
+                Some(h) => {
+                    let out = c.gpr(6) as u32;
+                    for k in 0..4u32 {
+                        m.write_f32(out + 0x10 + 4 * k, h.point[k as usize]);
+                        m.write_f32(out + 0x20 + 4 * k, h.normal[k as usize]);
+                    }
+                    m.write_u32(out + 0x34, h.word);
+                    c.set_f(0, h.frac);
+                }
+                None => c.set_f(0, -1.0),
+            }
+            true
+        });
+        let at = [r.mem.alloc(0x6400) + 0x200, r.mem.alloc(0x100), r.mem.alloc(4), r.mem.alloc(0x800), r.mem.alloc(0x40)];
         {
             use tricky_game::{animctl as ac, animseq as aseq};
             for f in [aseq::POOL_ALLOC, ac::RESOLVE, aseq::SKEL_ANIM_CREATE, aseq::DELETE, ac::GET_CLIP_ID, ac::GET_MARKER_FRAME, ac::SET_MARKER, ac::GET_MARKER_PHASE, ac::MARKER_SOUND, ac::CLIP_STARTED, ac::IDS_INIT, ac::BLEND_POSE] {
@@ -1087,6 +1166,10 @@ fn spin_ticks_against_the_running_game() {
         }
         // the sample before, when it is the tick before (the first sample's pad then has its last tick's)
         let wp = (wi > 0 && ticks[wi - 1].tick + 1 == w[0].tick).then(|| &ticks[wi - 1]);
+        // the keyframed objects as this frame's casts saw them (F4h5l)
+        if let (Some(c), Some((clocks, posing))) = (&course, keyframed.as_mut()) {
+            posing.pose(c, clocks.get(&(wi + 1)).map_or(&[][..], |l| &l[..]));
+        }
         for i in 0..n {
             let (a, b) = (&w[0].riders[i], &w[1].riders[i]);
             let (pa, pb) = (&w[0].extra[kp].1[i], &w[1].extra[kp].1[i]);
@@ -1156,6 +1239,19 @@ fn spin_ticks_against_the_running_game() {
                 })
             });
             torn_ticks[0] += torn_pad.is_some() as usize;
+            // the air motion's wall ray (F4b3d4) on the body the first sample holds, and the frame's up (+0x4ac0)
+            let frame_win = kframe.map(|k| &w[0].extra[k].1[i][..]);
+            let air_wall = course.as_ref().zip(frame_win).and_then(|(c, fw)| {
+                let mut body = body_of(a);
+                body.x24 = 0xcf;
+                let mut q = tricky_game::worldboarder::WorldBoarder::new(&body, 0);
+                let (t, h) = c.ray_cast(&mut q, false, None, &|_| false);
+                if 0.0 < t && std::env::var("TRICKY_WALLDBG").is_ok() {
+                    eprintln!("WALLDBG tick {} rider {i}: t {t} at {:?} n {:?} object {:?}", w[1].tick, h.map(|h| h.pos), h.map(|h| h.normal), h.and_then(|h| h.object));
+                }
+                h.filter(|_| 0.0 < t).map(|h| (tricky_game::air_motion::Ray { frac: t, point: h.pos, normal: h.normal, word: h.surface as u32 }, vec4(fw, 0x20)))
+            });
+            wall_ticks[0] += air_wall.is_some() as usize;
             let ours = |land: f32, ts: f32, pad: u32, mut anim: Anim, regs: Option<&[(u32, Vec<u8>)]>| {
                 // the trick clips first, on the recorded controller (F4b3d2)
                 // a late trick from the stick (`SpinState_StartFromStick` 0x102158) where the update asks for one
@@ -1246,6 +1342,17 @@ fn spin_ticks_against_the_running_game() {
                     let ar = AlignRider { slope_kind: u32_le(pb, 0x40), slope: vec4(pb, 0x30), fwd: axes.0, quat: r.quat, class: u32_le(a, 0x420) };
                     tricky_game::spin::spin_enter(&mut st, &mut e, &ar, torn_type);
                 }
+                // the air motion's wall (F4b3d4), as `AirMotion_Update` 0x108378 with no landing: the flight step, the
+                // push out of the wall, the glancing bump (the crash leaves the spin state: not replayed)
+                if let Some((wall, up)) = air_wall {
+                    integrate_rk4(ts * f32::from_bits(0x3c88_8889), &mut r.pos, &mut r.vel, false);
+                    let push = tricky_game::air_motion::wall_push(&wall);
+                    r.pos = [r.pos[0] + push[0], r.pos[1] + push[1], r.pos[2] + push[2], r.pos[3] + push[3]];
+                    let mut o = Orient { q: r.quat, fwd: axes.0, side: axes.1, up: axes.2, yaw: f32_at(a, 0x1b0) };
+                    if tricky_game::air_motion::wall_bump(&mut r.vel, &mut o, up, &wall).is_none() {
+                        (r.quat, axes) = (o.q, (o.fwd, o.side, o.up));
+                    }
+                }
                 let calls = spin_update(pad, &mut st, &mut r, &anim);
                 let mut o = Orient { q: r.quat, fwd: axes.0, side: axes.1, up: axes.2, ..Default::default() };
                 if calls.contains(&tricky_game::spin::SpinCall::Orientation) {
@@ -1298,8 +1405,9 @@ fn spin_ticks_against_the_running_game() {
             };
             type Regs<'r> = Option<&'r [(u32, Vec<u8>)]>;
             let mut ways: Vec<Box<dyn FnMut(f32, f32, u32, Anim, Regs) -> Vec<Vec<u32>> + '_>> = vec![Box::new(ours)];
-            for (_, g, [rd, stats_at, pad, _]) in runners.iter_mut() {
-                let (rd, stats_at, pad) = (*rd, *stats_at, *pad);
+            for (_, g, [rd, stats_at, pad, _, air]) in runners.iter_mut() {
+                let (rd, stats_at, pad, air) = (*rd, *stats_at, *pad, *air);
+                let wn = wall_now.clone();
                 let (an, on, pn) = (anim_now.clone(), trick_on.clone(), pool_next.clone());
                 ways.push(Box::new(move |land: f32, ts: f32, pad_word: u32, anim: Anim, regs: Regs| {
                     an.set(anim);
@@ -1342,6 +1450,18 @@ fn spin_ticks_against_the_running_game() {
                     if regs.is_some() && std::env::var("TRICKY_NOFLUSH").is_err() {
                         g.cpu.set_gpr(4, (rd + 0x46c0) as u64);
                         g.call(0x15f700).unwrap_or_else(|e| panic!("tick {} rider {i}: flush: {e:?}", w[0].tick));
+                    }
+                    // the air motion before the control (F4b3d4), on the frame the first sample holds
+                    if let (Some((wall, _)), Some(fw)) = (air_wall, frame_win) {
+                        g.mem.write(rd + 0x4aa0, fw).unwrap();
+                        g.mem.write_u32(air + 0x20, rd);
+                        wn.set(Some(wall));
+                        g.cpu.set_gpr(4, air as u64);
+                        g.call(0x108378).unwrap_or_else(|e| panic!("tick {} rider {i}: the air motion: {e:?}", w[0].tick));
+                        wn.set(None);
+                        if let Some(hp) = hp_win {
+                            g.mem.write(rd + 0x4aa0, hp).unwrap();
+                        }
                     }
                     g.cpu.set_gpr(4, (rd - 0x170) as u64);
                     g.cpu.set_gpr(5, pad as u64);
@@ -1449,7 +1569,7 @@ fn spin_ticks_against_the_running_game() {
             }
         }
     }
-    eprintln!("{path}: spin ticks (state 0x10 in the air; left out: {other} whose window is not the spin object, {skew} not one update apart; the hook's pad word on {}; torn first samples finished on {}):", hooked_ticks[0], torn_ticks[0]);
+    eprintln!("{path}: spin ticks (state 0x10 in the air; left out: {other} whose window is not the spin object, {skew} not one update apart; the hook's pad word on {}; torn first samples finished on {}; the air motion's wall ray hit on {}):", hooked_ticks[0], torn_ticks[0], wall_ticks[0]);
     for (k, way) in ["ours (spin::spin_update)".to_string()].into_iter().chain(runners.iter().map(|(r, _, _)| format!("the game's in the runner, {r}"))).enumerate() {
         let line: Vec<String> = names.iter().zip(&count[k]).map(|(n, c)| format!("{n} {} of {}", c[1], c[0])).collect();
         let pm: Vec<String> = player_modes[k].iter().enumerate().map(|(m, c)| format!("mode {m} {} of {}", c[1], c[0])).collect();

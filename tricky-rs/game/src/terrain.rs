@@ -81,7 +81,12 @@ pub struct PatchGrid {
 
 impl PatchGrid {
     pub fn new(coeffs: &[V4; 16]) -> PatchGrid {
-        PatchGrid { coeffs: *coeffs, points: tessellate(coeffs), fine: [Quad::default(); 81], coarse: [Quad::default(); 9] }
+        PatchGrid::with_points(coeffs, tessellate(coeffs))
+    }
+
+    /// With its points made by another rule ([`tessellate_by`])
+    pub fn with_points(coeffs: &[V4; 16], points: [V4; 100]) -> PatchGrid {
+        PatchGrid { coeffs: *coeffs, points, fine: [Quad::default(); 81], coarse: [Quad::default(); 9] }
     }
 }
 

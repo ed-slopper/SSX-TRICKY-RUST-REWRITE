@@ -24,6 +24,9 @@ pub struct CourseGround {
     /// STANDIN: every patch tessellated stays (about 7 KB each), for the game's fixed-size cache and its eviction
     /// (`World_LookupCollCache`), which only change how fast a cast is, not what it hits
     cache: Mutex<HashMap<usize, PatchGrid>>,
+    /// how a patch's points are made: `terrain::tessellate` (to nearest) unless [`CourseGround::tessellate_with`]
+    /// set another rule
+    points: Mutex<fn(&[V4; 16]) -> [V4; 100]>,
     /// the keyframed objects' animated parts' frames as their clocks stand ([`CourseGround::pose`])
     poses: Mutex<HashMap<usize, Vec<[V4; 4]>>>,
     /// the course's `.ssf` (its scripts, physics records and sphere trees)
@@ -46,14 +49,15 @@ struct Env<'a> {
     coeffs: &'a [[V4; 16]],
     cache: &'a mut HashMap<usize, PatchGrid>,
     poses: &'a HashMap<usize, Vec<[V4; 4]>>,
+    points: fn(&[V4; 16]) -> [V4; 100],
 }
 
 impl WorldEnv for Env<'_> {
     /// The shape's +0x48 on the patch's cache entry; `last` notes the patch as its index + 1 (the game notes the
     /// patch's address, never 0, which a cleared record holds).
     fn patch(&mut self, q: &dyn Shape, i: usize, last: Option<&mut LastHit>) -> Option<Hit> {
-        let coeffs = self.coeffs;
-        let grid = self.cache.entry(i).or_insert_with(|| PatchGrid::new(&coeffs[i]));
+        let (coeffs, points) = (self.coeffs, self.points);
+        let grid = self.cache.entry(i).or_insert_with(|| PatchGrid::with_points(&coeffs[i], points(&coeffs[i])));
         q.patch(grid, i as u32 + 1, last).map(|h| h.hit)
     }
     /// `MeshAnimNode_GetFrameMatrix` 0x1998d0: the frame [`CourseGround::pose`] last gave (the identity for none).
@@ -83,7 +87,15 @@ impl CourseGround {
         }
         let rails = Mutex::new(rails);
         let floor = ltg.bbox.min[2];
-        Some(CourseGround { world: Mutex::new(world), flags, coeffs, cache: Mutex::new(HashMap::new()), poses: Mutex::new(HashMap::new()), ssf, knock, driven, rails, floor })
+        Some(CourseGround { world: Mutex::new(world), flags, coeffs, cache: Mutex::new(HashMap::new()), points: Mutex::new(crate::terrain::tessellate), poses: Mutex::new(HashMap::new()), ssf, knock, driven, rails, floor })
+    }
+
+    /// The patches' points made by `points` from now on (the cache emptied). In PCSX2 the patch program
+    /// (`Vu0_RunPatchProgram` 0x2576a8) rounds toward zero (F4h5m): tests replaying a PCSX2 recording ask for that
+    /// (`tests/replay.rs`, F4b3d4); which rule the app's courses take waits on F4c (row F4h5n).
+    pub fn tessellate_with(&self, points: fn(&[V4; 16]) -> [V4; 100]) {
+        *self.points.lock().unwrap_or_else(|e| e.into_inner()) = points;
+        self.cache.lock().unwrap_or_else(|e| e.into_inner()).clear();
     }
 
     /// A rail (the course's spline `spline`) switched on or off (`RailWorld::set_live`)
@@ -103,7 +115,7 @@ impl CourseGround {
         }
         let mut cache = self.cache.lock().unwrap_or_else(|e| e.into_inner());
         let poses = self.poses.lock().unwrap_or_else(|e| e.into_inner());
-        let mut env = Env { coeffs: &self.coeffs, cache: &mut cache, poses: &poses };
+        let mut env = Env { coeffs: &self.coeffs, cache: &mut cache, poses: &poses, points: *self.points.lock().unwrap_or_else(|e| e.into_inner()) };
         world.ray_cast(q, show_off, last, &mut env)
     }
 
@@ -117,7 +129,7 @@ impl CourseGround {
             o.flags = if f & 0x20 != 0 && skip { f & !0x20 } else { *f };
         }
         let mut cache = self.cache.lock().unwrap_or_else(|e| e.into_inner());
-        let mut env = Env { coeffs: &self.coeffs, cache: &mut cache, poses: &poses };
+        let mut env = Env { coeffs: &self.coeffs, cache: &mut cache, poses: &poses, points: *self.points.lock().unwrap_or_else(|e| e.into_inner()) };
         world.query_instances(q, show_off, &mut env)
     }
 
@@ -142,7 +154,7 @@ impl CourseGround {
         }
         let mut cache = self.cache.lock().unwrap_or_else(|e| e.into_inner());
         let poses = self.poses.lock().unwrap_or_else(|e| e.into_inner());
-        let mut env = Env { coeffs: &self.coeffs, cache: &mut cache, poses: &poses };
+        let mut env = Env { coeffs: &self.coeffs, cache: &mut cache, poses: &poses, points: *self.points.lock().unwrap_or_else(|e| e.into_inner()) };
         world.ray_cast_instance(q, object, &mut env)
     }
 

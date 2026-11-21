@@ -14,7 +14,6 @@
 //! field must be caught.
 
 use std::cell::{Cell, RefCell};
-use std::collections::HashMap;
 use std::rc::Rc;
 
 use r5900::ps2float::Rules;
@@ -130,29 +129,8 @@ struct Walls {
 /// The course the recording was made on, from the player's disc: TRICKY_DISC (the image) and TRICKY_COURSE (its
 /// models file's name) or the recording's `course N`; none without them (the walls then answer nothing).
 fn course(path: &str) -> Option<std::sync::Arc<tricky_game::course_ground::CourseGround>> {
-    let (pbd, ltg, ssf) = course_files(path)?;
+    let (pbd, ltg, ssf) = recording::course_files(path)?;
     Some(std::sync::Arc::new(tricky_game::course_ground::CourseGround::new(&pbd, &ltg, &ssf)?))
-}
-
-/// The course's `.pbd`, `.ltg` and `.ssf` from the player's disc (as [`course`]).
-fn course_files(path: &str) -> Option<(Vec<u8>, Vec<u8>, Vec<u8>)> {
-    let disc = std::env::var("TRICKY_DISC").ok()?;
-    let name = match std::env::var("TRICKY_COURSE") {
-        Ok(name) => name,
-        Err(_) => course_name(recording::course(path)?)?.to_string(),
-    };
-    let mut files = tricky_data::big::Files::new(tricky_data::disc::Disc::open(&disc).ok()?);
-    files.mount(&format!("data/models/{name}.big")).ok()?;
-    let mut get = |ext: &str| files.load(&format!("|data/models/{name}.{ext}")).ok().flatten();
-    Some((get("pbd")?, get("ltg")?, get("ssf")?))
-}
-
-/// The models file of course id `id` (0x32de88; the recorder writes it in the header, `course N`). Inferred: the
-/// models files' names in the order of `Camera_GetCourseCmlName` 0x178330's courses (0 garibald, 1 snowdrea, 2
-/// elysium, 3 mesablan: mesa proven by rec19's walls, 4 merqury, 5 aloha, 6 pipedrea, 7 untracke, 8 tokyo, 10 trick,
-/// 11 alaska); 9 (pipedrea again for the cameras) left out.
-fn course_name(id: u32) -> Option<&'static str> {
-    ["gari", "snow", "elysium", "mesa", "merquer", "aloha", "pipe", "untrack", "megaple", "", "trick", "alaska"].get(id as usize).copied().filter(|n| !n.is_empty())
 }
 
 /// The course's objects carry the flags the game had over the race (`pine.py record ... flags`, F4b3k4): the static
@@ -2268,10 +2246,8 @@ impl FrameRun {
 struct Keyframed {
     ieee: course_clock::Clocks,
     pcsx2: course_clock::Clocks,
-    /// each object's animated parts' curves (the model's hierarchy in order)
-    anims: HashMap<usize, Vec<tricky_data::anim::ObjAnim>>,
-    /// ours: the objects posed now and their frames' channels (`AnimFrame_SetKey`'s, then each sample's)
-    ours: RefCell<HashMap<usize, Vec<[f32; 16]>>>,
+    /// ours: the objects posed now
+    ours: RefCell<course_clock::Posing>,
 }
 
 impl Keyframed {
@@ -2285,13 +2261,7 @@ impl Keyframed {
         let (ieee, pcsx2) = course.with_world(|w| {
             (course_clock::clocks(&pbd, &ssf, w, &samples, |a, b| a + b), course_clock::clocks(&pbd, &ssf, w, &samples, |a, b| r5900::ps2float::add_by(a, b, r5900::ps2float::Round::Guard)))
         });
-        let mut anims = HashMap::new();
-        for o in ieee.values().chain(pcsx2.values()).flatten().map(|x| x.0) {
-            anims.entry(o).or_insert_with(|| {
-                let model = &pbd.models[pbd.instances[o][0x30] as usize];
-                model.nodes.iter().filter_map(|n| n.animation.as_ref()).map(|a| tricky_data::level::node_animation(&files.0, a).unwrap()).collect()
-            });
-        }
+        let ours = RefCell::new(course_clock::Posing::new(&files.0, &pbd, &[&ieee, &pcsx2]));
         if std::env::var("TRICKY_KEYFRAMED").is_ok_and(|v| v == "list") {
             let mut last: Vec<usize> = vec![];
             for (k, l) in &pcsx2 {
@@ -2302,31 +2272,14 @@ impl Keyframed {
                 }
             }
         }
-        Some(Keyframed { ieee, pcsx2, anims, ours: RefCell::new(HashMap::new()) })
+        Some(Keyframed { ieee, pcsx2, ours })
     }
 
     /// Ours for the motion of the frame ending at sample `frame`: each live object's parts at its time (`CourseGround::pose`, the frames by
     /// `meshanim::mesh_frame`), the ones gone back at rest.
     fn pose_ours(&self, course: &tricky_game::course_ground::CourseGround, frame: usize) {
         let live = self.ieee.get(&frame).cloned().unwrap_or_default();
-        let mut ours = self.ours.borrow_mut();
-        let gone: Vec<usize> = ours.keys().filter(|o| !live.iter().any(|x| x.0 == **o)).copied().collect();
-        for o in gone {
-            ours.remove(&o);
-            course.unpose(o as u32);
-        }
-        for (o, t) in live {
-            let anims = &self.anims[&o];
-            let ch = ours.entry(o).or_insert_with(|| {
-                anims.iter().map(|a| {
-                    let mut c = tricky_game::meshanim::key_channels(a);
-                    let _ = tricky_game::meshanim::mesh_frame(a, t, &mut c);
-                    c
-                }).collect()
-            });
-            let frames = anims.iter().zip(ch.iter_mut()).map(|(a, c)| tricky_game::meshanim::mesh_frame(a, t, c)).collect();
-            course.pose(o as u32, frames);
-        }
+        self.ours.borrow_mut().pose(course, &live);
     }
 
     /// The runner's for the motion of the frame ending at sample `frame` (`RunnerCourse::pose`: the game's frame code under the runner's
@@ -2361,7 +2314,7 @@ fn w0_len(ticks: &[recording::Tick]) -> usize {
 fn wall_casts_against_the_original() {
     let Ok(paths) = std::env::var("TRICKY_RECORDING") else { return };
     let path = paths.split(';').next().unwrap();
-    let (Some(course), Some(files)) = (course(path), course_files(path)) else { return };
+    let (Some(course), Some(files)) = (course(path), recording::course_files(path)) else { return };
     let (n, ticks) = load(path);
     let step: usize = std::env::var("TRICKY_WALL_STEP").ok().and_then(|v| v.parse().ok()).unwrap_or(10);
     let Some(mut w) = world() else { return };
@@ -2466,7 +2419,7 @@ fn ground_ticks_against_the_running_game() {
     let course = course(path);
     // the knocked objects among each rider's pairs, when recorded (F4b3k3)
     let roll_base = recording::instance_base(path);
-    let files = course_files(path);
+    let files = recording::course_files(path);
     let twins = Twins::of_recording(path, &ticks);
     let addrs = rider_addrs(path);
     let (Some(km), Some(ka)) = (ticks[0].extra.iter().position(|(o, _)| *o == -0x400), ticks[0].extra.iter().position(|(o, _)| *o == 0x46c0)) else {
@@ -3789,7 +3742,7 @@ fn takeoff_ticks_against_the_running_game() {
     let (n, ticks) = load(path);
     let twins = Twins::of_recording(path, &ticks);
     let course = course(path);
-    let files = course_files(path);
+    let files = recording::course_files(path);
     let win = |o: i64| ticks[0].extra.iter().position(|(x, _)| *x == o);
     let (Some(km), Some(ka), Some(kp)) = (win(-0x400), win(0x46c0), win(0x57b0)) else {
         eprintln!("{path}: no -400, 46c0 and 57b0 windows: skipping");
@@ -4407,7 +4360,7 @@ fn ai_paths(path: &str) -> Option<Vec<tricky_game::aipath::Path>> {
 
 /// The recording's course's `.aip` unpacked, as the game loads it (for the runner, F4b3k7).
 fn aip_bytes(path: &str) -> Option<Vec<u8>> {
-    let name = course_name(recording::course(path)?)?;
+    let name = recording::course_name(recording::course(path)?)?;
     let mut files = tricky_data::big::Files::new(tricky_data::disc::Disc::open(&std::env::var("TRICKY_DISC").ok()?).ok()?);
     let big = files.load(&format!("data/models/{name}.big")).ok().flatten()?;
     let entry = tricky_data::big::entries(&big).into_iter().find(|e| e.name.eq_ignore_ascii_case(&format!("Data/models/{name}.aip")))?;

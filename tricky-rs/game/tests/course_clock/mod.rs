@@ -186,3 +186,46 @@ pub fn clocks(pbd: &Pbd, ssf: &Ssf, world: &World, samples: &[(u32, Vec<[f32; 4]
     }
     out
 }
+
+/// Ours: the keyframed objects posed on the course (`CourseGround::pose`) as a sample's frame saw them (F4h5l):
+/// each object's animated parts' curves (`meshanim`, the model's hierarchy in order) and their channels
+/// (`AnimFrame_SetKey`'s, then each frame's).
+pub struct Posing {
+    anims: HashMap<usize, Vec<tricky_data::anim::ObjAnim>>,
+    chans: HashMap<usize, Vec<[f32; 16]>>,
+}
+
+impl Posing {
+    /// For the objects `clocks` name, from the course's `.pbd`
+    pub fn new(pbd_bytes: &[u8], pbd: &Pbd, clocks: &[&Clocks]) -> Posing {
+        let mut anims = HashMap::new();
+        for o in clocks.iter().flat_map(|c| c.values()).flatten().map(|x| x.0) {
+            anims.entry(o).or_insert_with(|| {
+                let model = &pbd.models[pbd.instances[o][0x30] as usize];
+                model.nodes.iter().filter_map(|n| n.animation.as_ref()).map(|a| tricky_data::level::node_animation(pbd_bytes, a).unwrap()).collect()
+            });
+        }
+        Posing { anims, chans: HashMap::new() }
+    }
+
+    /// The objects `live` (object, its clip's time) posed, the others gone back to rest
+    pub fn pose(&mut self, course: &tricky_game::course_ground::CourseGround, live: &[(usize, f32)]) {
+        let gone: Vec<usize> = self.chans.keys().filter(|o| !live.iter().any(|x| x.0 == **o)).copied().collect();
+        for o in gone {
+            self.chans.remove(&o);
+            course.unpose(o as u32);
+        }
+        for &(o, t) in live {
+            let anims = &self.anims[&o];
+            let ch = self.chans.entry(o).or_insert_with(|| {
+                anims.iter().map(|a| {
+                    let mut c = tricky_game::meshanim::key_channels(a);
+                    let _ = tricky_game::meshanim::mesh_frame(a, t, &mut c);
+                    c
+                }).collect()
+            });
+            let frames = anims.iter().zip(ch.iter_mut()).map(|(a, c)| tricky_game::meshanim::mesh_frame(a, t, c)).collect();
+            course.pose(o as u32, frames);
+        }
+    }
+}
