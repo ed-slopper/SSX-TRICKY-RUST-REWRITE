@@ -73,8 +73,10 @@ Part of the port notes (index: [README.md](README.md)); units and wording as des
   share to `Boarder_AddMeter`. Riding off an edge starts no chain (no air-time count).
 - `SpinState_Update` 0x100908 each tick: `Score_UpdateSpin`(rider+0x1d0 in degrees, negated for stats+0x40),
   `Score_UpdateFlip`(rider+0x1d4 in degrees).
-- `SpinState_UpdateTrickClips` 0x1272e8: `Score_StartGrab`(clip) as a grab clip reaches its hold flag;
-  `Scoring_OnTrickEvent`(0, clip) as a grab clip ends; an uber clip (type 0x10) ends with its length in seconds.
+- `SpinState_UpdateTrickClips` 0x1272e8 (ported 1:1 as `spin::update_trick_clips`, F4b3d2): `Score_StartGrab`(clip)
+  as a grab clip reaches its hold flag (and as a grab past flag 1 is let go); `Scoring_OnTrickEvent`(0, clip) as a
+  grab or tweak clip crosses flag 2; an uber clip (type 0x10) as it crosses flag 1, with its length in seconds;
+  `SpinState_SetTrickClipRate`(the tweak or uber clip) as one is begun.
 - `AirMotion_Update` 0x108378: a landing is `Score_LandTrick`(0, landing switch: stance ≠ stats+0x40, flipped when
   the board came down more than 90° round, normal z < 0.7); a crash there `Score_Crash`(0).
 - `Rail_TryCapture` 0x125cb8: rider+0x1dc = 1 (board within 30° of the rail), 2 (past 150°), 3 / 4 (across, by

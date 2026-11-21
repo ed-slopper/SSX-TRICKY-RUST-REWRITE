@@ -2340,3 +2340,45 @@ Found (`fadd=g1`, player's ticks every field, before → after): rec27 6,325 →
 sample's clip is a trick clip (rec27 5107 0x2ac, 5383 0x27c, 6598 0x2ac, 11123 0x296; the function ended the trick
 that tick, so the clip it leaves is not the sample's): replay `SpinState_UpdateTrickClips` itself; rec26 7639–7646
 and rec25 811 (rates off by the stick's wind-up); rec27 8936.
+
+### F4b3d2 (2): the frame's start, the trick clips and the late tricks (2026-11-20)
+
+Proven (code):
+- **A frame starts by flushing the ended clips.** `cPreAI::vf1` 0x1146b0 runs `Boarder_FlushEndedClips` 0x117190
+  (`AnimCtl_FlushEndedClips` 0x15f700) for every rider before the riders tick (`cBoarder::vf7` 0x117198: motion,
+  control), and `cPostAI::vf1` 0x114730 advances the layers (`Boarder_UpdateAnimLayers` 0x117180) and poses them after.
+  A sample (taken between frames) so holds clips that ended in the last frame's advance (+0x24 set) but have not run
+  their end action yet: the control sees what that end action plays (a trick clip's action 2: the air clip 0x223).
+- `SpinState_UpdateTrickClips` 0x1272e8 is ported (`spin::update_trick_clips`, on the controller's memory; the clip
+  plays, scoring and sounds called out) and checked in the runner (`tests/trick_clips.rs`: 30,000 random riders and
+  controllers, answer, bytes and calls equal). `SpinState_Update` reads the layer-0 clip and type again after it
+  (`Anim::trick_clip`).
+- `SpinState_StartFromStick` 0x102158 (a late trick from the stick) ends with `Boarder_SetState` 1 then 0x10:
+  `SpinControl_Exit` 0x1029d0 then `SpinControl_Enter` 0x100598 within the tick (state 1 has no exit or enter,
+  `Boarder_ExitControlState` 0x11c840 / `Boarder_EnterControlState` 0x11c8e8).
+
+Changed (`tests/replay.rs` `spin_ticks_against_the_running_game`): the recorded controller (`trick_regions`: the
+`46c0` window, layer 0's two recorded sequences with their lengths; layers 1 and 2 empty, STANDIN) is flushed
+(ours `animctl::flush_ended`, the runner the original; TRICKY_NOFLUSH=1: not), the clip, type and phase read from it,
+then the trick clips replayed (ours and the original; TRICKY_NOTRICK=1: 0). The animation's calls out
+(`anim_answer`: pool, every clip an animation, one 30-frame tree) are the same both sides, `AnimCtl_PlayClip` runs
+(ours `animctl::play_clip`). A late trick (`jump::spin_start_from_stick` on the tick's pad, where `spin_update` asks)
+sets the rates and +0x58, plays the direction's clip, and runs `spin_exit` and `spin_enter` (the runner: the original
+with `Boarder_SetState` and the control states' exit and enter; TRICKY_NOSTART=1: none as before).
+
+Found (`fadd=g1`, player's ticks every field, before → after; ours equals the runner under IEEE adds throughout):
+
+| recording | before | flushed + trick clips | + late tricks |
+|---|---|---|---|
+| rec27 (pipedream) | 6,330 of 6,336 | 6,335 (half-pipe clips 23 of 23) | 6,335 |
+| rec26 (mesa) | 3,872 of 3,880 | 3,874 | 3,878 |
+| rec25 (snow) | 7,333 of 7,338 | 7,335 | 7,338 (every rider's spin tick, every field: 44,830 of 44,830) |
+| rec22 (mesa attract) | 9,262 of 9,276 | 9,271 | 9,276 (every rider's: 38,257 of 38,257; half-pipe clips 40 of 40) |
+
+- The trick-clip turns (rec27 5107, 5383, 6598, 11123, 8769) were all a trick clip (or the half-pipe clip 0x23c) that
+  had ended at the sample (+0x24 1, current, end action 2): flushed, layer 0 holds 0x223, the trick clips answer 0
+  and the half-pipe turn runs, as in the game.
+- The wind-up misses (rec26 7639, 7646, rec25 811, rec22 840, 3807: rates ±6.3623238, the stick's full rate) were
+  late tricks started from the stick.
+- Left (row F4b3d3): rec27 8936 (a late trick whose second sample has the new spin already advanced one tick by the new rate ×
+  0.8 / 60: an update after the enter within the sampled step), rec26 7642 (mode 0, largest errors 1 ulp).

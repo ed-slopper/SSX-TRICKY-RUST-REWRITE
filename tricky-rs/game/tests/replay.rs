@@ -944,7 +944,19 @@ fn spin_ticks_against_the_running_game() {
         for f in [0x155e00, 0x155e68, 0x102800, 0x127918, 0x15eef8, 0x127d08, 0x118f10] {
             r.stub(f, |_, _| {});
         }
-        r.stub(0x102158, |c, _| c.set_gpr(2, 0));
+        // `SpinState_StartFromStick` 0x102158 and the state change it makes (`Boarder_SetState` 0x11f608: the control
+        // states' exit 0x11c840 and enter 0x11c8e8, for 0x10 `SpinControl_Exit` 0x1029d0 and `SpinControl_Enter`
+        // 0x100598) as the original (F4b3d2); the scoring (`Score_CommitAndRestartChain` 0x156568, `Boarder_AddMeter`
+        // 0x11b018) answered 0. TRICKY_NOSTART=1: answered 0 as before
+        if std::env::var("TRICKY_NOSTART").is_ok() {
+            r.stub(0x102158, |c, _| c.set_gpr(2, 0));
+        }
+        for f in [0x102158, 0x11f608, 0x11c840, 0x11c8e8, 0x1029d0, 0x100598] {
+            r.allow(f);
+        }
+        for f in [0x156568, 0x11b018] {
+            r.stub(f, |c, _| c.set_gpr(2, 0));
+        }
         // `SpinState_UpdateTrickClips` 0x1272e8 (F4b3d2): the original on the recorded controller where the tick's
         // trick clips are written (`trick_regions`), else the answer the tick is tried with; its reads of the
         // controller run as the original, its calls out as `TrickEnv`'s. `AnimCtl_GetClip` 0x15fdd0 and
@@ -1108,6 +1120,10 @@ fn spin_ticks_against_the_running_game() {
             // one way's fields for a time to touch down
             let ours = |land: f32, ts: f32, pad: u32, mut anim: Anim, regs: Option<&[(u32, Vec<u8>)]>| {
                 // the trick clips first, on the recorded controller (F4b3d2)
+                // a late trick from the stick (`SpinState_StartFromStick` 0x102158) where the update asks for one
+                let start = tricky_game::jump::spin_start_from_stick(pad, stat[0x1a], u32_le(a, 0x1b4) != 0).filter(|_| std::env::var("TRICKY_NOSTART").is_err());
+                anim.start_from_stick = start.is_some() as u32;
+                let mut tmem = None;
                 if let (Some(rg), Some((trd, nodes, _))) = (regs, trick_at) {
                     use tricky_game::animctl as ac;
                     let mut m = tricky_game::pf::Mem { regions: rg.to_vec() };
@@ -1130,6 +1146,7 @@ fn spin_ticks_against_the_running_game() {
                             if s0 == 0 { 0 } else { m.r8(s0 + 0x74) }, if s0 == 0 { 0 } else { m.r8(s0 + 0x75) }, if s0 == 0 { 0 } else { m.r32(s0 + 0x24) }, if s0 == 0 { 0 } else { m.r32(s0 + 0x68) }, m.r32(tricky_game::animctl::row(anim.clip) + 0xc), anim.trick_clips, anim.trick_clip,
                             u32_le(&w[1].extra[ka.unwrap()].1[i], 8), u32_le(b, 0x1e4), u32_le(b, 0x1e8));
                     }
+                    tmem = Some((m, env, ctl));
                 }
                 let mut st = spin_obj(sa);
                 let mut r = SpinRider {
@@ -1161,6 +1178,34 @@ fn spin_ticks_against_the_running_game() {
                 let mut o = Orient { q: r.quat, fwd: vec4(a, 0x180), side: vec4(a, 0x190), up: vec4(a, 0x1a0), ..Default::default() };
                 if calls.contains(&tricky_game::spin::SpinCall::Orientation) {
                     update_orientation(&mut o);
+                }
+                // the late trick (F4b3d2): `SpinState_StartFromStick` sets the rates and +0x58, fades layer 1 out and plays
+                // the direction's clip, scores the start, and `Boarder_SetState` 1 then 0x10 runs `SpinControl_Exit`
+                // 0x1029d0 and `SpinControl_Enter` 0x100598 (state 1 has neither); the clip's type for the enter from the
+                // controller when replayed, else 0xb (STANDIN: the clips 0x226..0x22d are of type 0xb)
+                if let (Some(s), true) = (start, calls.contains(&tricky_game::spin::SpinCall::StartFromStick)) {
+                    (st.w_spin, st.w_flip, st.x58) = (s.spin, s.flip, 1);
+                    let mut clip_type = 0xb;
+                    if let Some((m, env, ctl)) = tmem.as_mut() {
+                        tricky_game::animctl::blend_out_all(m, *ctl);
+                        if let Some(c) = s.clip {
+                            tricky_game::animctl::play_clip(m, env, *ctl, c, 0, 5);
+                        }
+                        clip_type = tricky_game::animctl::clip_type(m, *ctl, 0);
+                    }
+                    if let Some(o2) = tricky_game::spin::spin_exit(&mut r) {
+                        o = o2;
+                    }
+                    let mut e = tricky_game::spin::SpinEnterRider {
+                        x138: f32_at(a, 0x138),
+                        switch: u32_le(a, 0x1b4),
+                        stance: u32_le(stat, 0x40),
+                        kind: u32_le(a, 0x1dc),
+                        up_z: o.up[2],
+                        ..Default::default()
+                    };
+                    let ar = AlignRider { slope_kind: u32_le(pb, 0x40), slope: vec4(pb, 0x30), fwd: o.fwd, quat: o.q, class: u32_le(a, 0x420) };
+                    tricky_game::spin::spin_enter(&mut st, &mut e, &ar, clip_type);
                 }
                 // the half-pipe turn's last call (F4b3d2): `SpinControl_CalcLandingAlign` 0x11db00 on the turned rider
                 if calls.contains(&tricky_game::spin::SpinCall::LandingAlign) {
@@ -1207,6 +1252,9 @@ fn spin_ticks_against_the_running_game() {
                     g.mem.write_f32(rd + 0x57b8, land);
                     g.mem.write(rd - 0x170, sa).unwrap();
                     g.mem.write_u32(rd - 0x170 + 0x70, rd);
+                    // the state manager (the spin object's − 0x740) and its rider, for `Boarder_SetState`
+                    g.mem.write_u32(rd + 0x5ae0, rd - 0x170 - 0x740);
+                    g.mem.write_u32(rd - 0x170 - 0x740, rd);
                     g.mem.write(stats_at, stat).unwrap();
                     g.mem.write_u32(rd + 0x464, stats_at);
                     g.mem.write_u32(pad, pad_word);
