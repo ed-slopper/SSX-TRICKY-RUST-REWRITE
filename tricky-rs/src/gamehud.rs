@@ -232,14 +232,13 @@ struct Env<'a> {
     low: u32,
     strings: &'a mut HashMap<u32, u32>,
     next_string: &'a mut u32,
-    /// the race time in hundredths (`Boarder_GetRaceTime` 0x11ea28), and whether the rider has finished
-    race_time: u32,
+    /// whether the rider has finished
     finished: bool,
     progress: [f32; 4],
 }
 
-fn new_env<'a>(loc: Option<&'a tricky_data::loc::LocFile>, strings: &'a mut HashMap<u32, u32>, next_string: &'a mut u32, race_time: u32, finished: bool, progress: [f32; 4]) -> Env<'a> {
-    Env { loc, cmds: Vec::new(), layer: 0, sheet: 0, low: STACK_TOP - 0x1000, strings, next_string, race_time, finished, progress }
+fn new_env<'a>(loc: Option<&'a tricky_data::loc::LocFile>, strings: &'a mut HashMap<u32, u32>, next_string: &'a mut u32, finished: bool, progress: [f32; 4]) -> Env<'a> {
+    Env { loc, cmds: Vec::new(), layer: 0, sheet: 0, low: STACK_TOP - 0x1000, strings, next_string, finished, progress }
 }
 
 impl Env<'_> {
@@ -362,11 +361,16 @@ impl SpritesEnv for Env<'_> {
                 let s = ascii(m, a(1));
                 put_wide(m, a(0), &s);
             }
-            // the race: the main event path of the course's path set, the app's race time and finish
+            // the race: the main event path of the course's path set, the app's finish
             0x197ef0 => return (m.r32(PATH_SET + 0x10), 0.0),
             // `Boarder_GetRaceProgress` 0x1170d0 for the drawing rider
             0x1170d0 => return (0, self.progress[0]),
-            0x11ea28 => return (self.race_time, 0.0),
+            // `Boarder_GetRaceTime` 0x11ea28 (the rider): its finish time (+0x418), else the race handler's clock
+            // (gApp+0x730 → +0x1c, its +0x14): in a show-off the time left
+            0x11ea28 => {
+                let clock = f32::from_bits(m.r32(m.r32(m.r32(m.r32(GAPP) + 0x730) + 0x1c) + 0x14));
+                return (tricky_game::progress::race_time(m.r32(a(0) + 0x418) as i32, clock) as u32, 0.0);
+            }
             0x11d998 => return (self.finished as u32, 0.0),
             // `Score_GetRankForPoints`: the rank (`score::rank_for_points`) and its colour, the rank's record at
             // 0x338120 (+4..+16; rank 0's below every threshold)
@@ -766,10 +770,19 @@ pub fn game_hud(
     let race = &race.0;
     // each rider's distance to the finish (+0x374) and laps left (+0x114) on the race lines as the game keeps them
     // (`Race::line_riders`, row E1b2g7b; 0 before the start)
-    // the finishing times (+0x418: the race time in hundredths at the line, −1 until then)
+    // the race handler's clock (its +0x14, seconds): in a show-off (modes 3 and 5) the time left, counting down from
+    // the course's limit and stopping at 0 (`cRaceHandler::Enter` 0x113740, `cRaceHandler::Update` 0x113820), else the
+    // race time, counting up
+    let clock = if game.event == ui::Event::ShowOff {
+        (ui::showoff(&ui::track_key(&list)).1 + race.bonus - race.time).max(0.0)
+    } else {
+        race.time
+    };
+    // the finishing times (+0x418: the clock in hundredths at the line, `Boarder_Finish` 0x11da40; −1 until then): in a
+    // show-off the time left, 0 when the time ran out
     let mut finish = [u32::MAX; 4];
     if race.state == tricky_game::race::RaceState::Finished {
-        finish[0] = (race.time * 100.0) as u32;
+        finish[0] = (clock * 100.0) as i32 as u32;
     }
     for (k, o) in opponents.0.iter().take(3).enumerate() {
         if let Some(t) = o.driver.finished {
@@ -879,12 +892,9 @@ pub fn game_hud(
             m.w32(o + 0x41c, 0);
         }
     }
-    // the show-off's clock (the race handler's +0x14, counting down in modes 3 and 5): the time left
-    if game.event == ui::Event::ShowOff {
-        let left = ui::showoff(&ui::track_key(&list)).1 + race.bonus - race.time;
-        m.w32(WORLD + 0x14, left.max(0.0).to_bits());
-    }
-    let race_time = (race.time * 100.0) as u32;
+    // the race handler's clock, read by `Boarder_GetRaceTime` 0x11ea28 (the HUD's clock and gap, the ten-second call)
+    m.w32(WORLD + 0x14, clock.to_bits());
+    let race_time = tricky_game::progress::race_time(finish[0] as i32, clock);
     // `Boarder_Finish` 0x11da40: the first time the player's finish time (+0x418) is set, the pop finish overlay shown
     // for its player (`HUD_ShowItem` 0x1a7848, item 7, the rider's +0x38) when that is a player (not below 0), the
     // race's +0x34 is clear and it has no lesson (+0x40) or the lesson's +0x20 is 0 or above 9. A new race (no
@@ -895,8 +905,8 @@ pub fn game_hud(
         let lesson = m.r32(RACE + 0x40);
         let step = if lesson == 0 { 0 } else { m.r32(lesson + 0x20) as i32 };
         if player > -1 && m.r32(RACE + 0x34) == 0 && (lesson == 0 || step == 0 || 9 < step) {
-            let mut e = new_env(loc.as_ref(), strings, next_string, race_time, !racing, progress);
-            let mut pop = PopEnv { e: &mut e, time: race_time as i32, finish: finish[0] as i32 };
+            let mut e = new_env(loc.as_ref(), strings, next_string, !racing, progress);
+            let mut pop = PopEnv { e: &mut e, time: race_time, finish: finish[0] as i32 };
             let man = m.r32(RACE + 0x38);
             hudsprites::show_item(m, &mut pop, man, 7, player as u32, true);
         }
@@ -911,8 +921,8 @@ pub fn game_hud(
     let fading = r.reset.is_some_and(|s| 0.2 < s.timer);
     if fading != (m.r32(BLACK + 0xc) != 0) {
         let player = m.r32(RIDERS + 0x38);
-        let mut e = new_env(loc.as_ref(), strings, next_string, race_time, !racing, progress);
-        let mut pop = PopEnv { e: &mut e, time: race_time as i32, finish: finish[0] as i32 };
+        let mut e = new_env(loc.as_ref(), strings, next_string, !racing, progress);
+        let mut pop = PopEnv { e: &mut e, time: race_time, finish: finish[0] as i32 };
         hudsprites::show_item(m, &mut pop, MAN, 0xc, player, fading);
     }
     *was_finished = done;
@@ -926,9 +936,9 @@ pub fn game_hud(
         hudstate::update(m, &mut state, HUD);
         // the overlay manager's update (`cOverlayMan` vf1 0x1a7ad0) and drawing (vf2 0x1a78c0) on its pop finish:
         // its Draw and DrawText once a tick, as the game's frame, what they drew kept for the frames between
-        let mut e = new_env(loc.as_ref(), strings, next_string, race_time, !racing, progress);
+        let mut e = new_env(loc.as_ref(), strings, next_string, !racing, progress);
         {
-            let mut pop = PopEnv { e: &mut e, time: race_time as i32, finish: finish[0] as i32 };
+            let mut pop = PopEnv { e: &mut e, time: race_time, finish: finish[0] as i32 };
             tricky_game::overlays::man_update(m, &mut pop, MAN);
             tricky_game::overlays::man_draw(m, &mut pop, MAN);
         }
@@ -938,7 +948,7 @@ pub fn game_hud(
     if state.ten {
         rider.0.speech.push(tricky_game::rider::RiderSpeech::TenSecondsLeft);
     }
-    let mut env = new_env(loc.as_ref(), strings, next_string, race_time, !racing, progress);
+    let mut env = new_env(loc.as_ref(), strings, next_string, !racing, progress);
     if riding {
         hudsprites::draw_player_sprites(m, &mut env, 0.0, 0.0, 640.0, HUD, 0, STACK_TOP - 0x200);
         hudtext::draw_player_text(m, &mut env, 0.0, 0.0, 640.0, 480.0, HUD, 0, STACK_TOP - 0x400);

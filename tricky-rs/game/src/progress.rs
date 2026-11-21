@@ -11,10 +11,19 @@ pub struct Progress {
     pub laps: i32,
     pub along: f32,
     pub line: f32,
-    /// +0x418: the finishing time once it has one (negative until then) and `Boarder_ElapsedTime` 0x11ea28 (the
-    /// race clock, in ticks, that stops at the finish)
+    /// +0x418: the finishing time once it has one (negative until then) and `Boarder_GetRaceTime` 0x11ea28
+    /// ([`race_time`]: the race clock in hundredths, that stops at the finish)
     pub finish: i32,
     pub time: i32,
+}
+
+/// `Boarder_GetRaceTime` 0x11ea28: the rider's finish time (+0x418, hundredths) once it has one, else the race
+/// handler's clock (gApp+0x730 → +0x1c, its +0x14, in seconds) × 100 truncated; never below 0. The clock counts up
+/// from 0 in a race and, in a show-off (modes 3 and 5), down from the course's time limit (`cRaceHandler::Enter`
+/// 0x113740, `cRaceHandler::Update` 0x113820), so there this is the time left.
+pub fn race_time(finish: i32, clock: f32) -> i32 {
+    let t = if finish < 0 { (clock * 100.0) as i32 } else { finish };
+    t.max(0)
 }
 
 /// `Boarder_GetRaceProgress`: +0x374 with no lap done; else (laps, one fewer once the rider is past the lap line

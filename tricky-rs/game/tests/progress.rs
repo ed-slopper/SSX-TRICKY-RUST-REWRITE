@@ -1,4 +1,4 @@
-//! `Boarder_GetRaceProgress`, `GetTimeGap`, `EstimateFinishTime` and `IsOnRecordPace` (`tricky_game::progress`, board
+//! `Boarder_GetRaceTime`, `Boarder_GetRaceProgress`, `GetTimeGap`, `EstimateFinishTime` and `IsOnRecordPace` (`tricky_game::progress`, board
 //! row G1f) against the original in the function runner (TRICKY_ELF; skipped without it).
 
 use r5900::ps2float::Rules;
@@ -97,5 +97,31 @@ fn progress_functions_match_the_original() {
         r.cpu.set_gpr(4, riders[me] as u64);
         r.call(0x11f350).unwrap_or_else(|e| panic!("pace {case}: {e}"));
         assert_eq!(r.cpu.gpr(2) as u32 & 1 != 0, is_on_record_pace(est, want), "pace {case}");
+    }
+}
+
+#[test]
+fn race_time_matches_the_original() {
+    let Some(mut r) = Runner::from_env() else { return };
+    r.float_rules = Rules::parse("add=n,mul=n,div=n,cvt=n").unwrap();
+    let rider = r.mem.alloc(0x500);
+    let app = r.mem.alloc(0x800);
+    let game = r.mem.alloc(0x800);
+    let race = r.mem.alloc(0x100);
+    r.mem.write_u32(0x337c58, app);
+    r.mem.write_u32(app + 0x730, game);
+    r.mem.write_u32(game + 0x1c, race);
+    let mut g = Rng(0x2718_2818_2845_9045);
+    for case in 0..20_000 {
+        let finish = [-1, i32::MIN, 0, (g.next() % 60000) as i32, -(g.next() as i32 & 0xffff)][g.next() as usize % 5];
+        let clock = [g.f(-5.0, 400.0), 0.0, -0.004, 0.016666668 * (g.next() % 20000) as f32, f32::from_bits(g.next())][g.next() as usize % 5];
+        if !clock.is_finite() || (clock * 100.0).abs() > 2.0e9 {
+            continue;
+        }
+        r.mem.write_u32(rider + 0x418, finish as u32);
+        r.mem.write_f32(race + 0x14, clock);
+        r.cpu.set_gpr(4, rider as u64);
+        r.call(0x11ea28).unwrap();
+        assert_eq!(r.cpu.gpr(2) as i32, race_time(finish, clock), "case {case}: finish {finish} clock {clock}");
     }
 }

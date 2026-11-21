@@ -470,8 +470,8 @@ impl LineRider {
     /// time once there is one, else the clock × 100, never below 0)
     pub fn progress(&self, clock: f32) -> crate::progress::Progress {
         let r = &self.line;
-        let time = if r.finish < 0 { (clock * 100.0) as i32 } else { r.finish };
-        crate::progress::Progress { rank: self.place, laps: r.laps_left, along: r.place.to_finish, line: self.lap_line, finish: r.finish, time: time.max(0) }
+        let time = crate::progress::race_time(r.finish, clock);
+        crate::progress::Progress { rank: self.place, laps: r.laps_left, along: r.place.to_finish, line: self.lap_line, finish: r.finish, time }
     }
 }
 

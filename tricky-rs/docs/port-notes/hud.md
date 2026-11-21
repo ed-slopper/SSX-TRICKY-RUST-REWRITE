@@ -277,6 +277,31 @@ player), every sprite, number and caption of one view as the game's draw calls.
   - at n = 5 the star count is 5 either way;
   - at a dot's or a marker's fade edges (0 and 1) both alphas agree.
 
+## The show-off's clock (E1b2g7d3b4i)
+
+Proven (read from the code):
+
+- The HUD's clock (flag 0x1 in `HUD_DrawPlayerText` 0x1a4f70) is always `HUD_FormatTime` of
+  `Boarder_GetRaceTime` 0x11ea28 of the view's rider; there is no show-off branch in the drawing.
+- `Boarder_GetRaceTime` (ported: `tricky_game::progress::race_time`, checked in the function runner on 20,000
+  random cases, `tests/progress.rs`): the rider's +0x418 when not negative, else `(int)(clock × 100.0)` of the race
+  handler's clock (gApp+0x730 → +0x1c, its +0x14 float, seconds); never below 0.
+- That clock is the race handler's: `cRaceHandler::Enter` 0x113740 sets it to the course's show-off time (the
+  course table 0x332f28's +0xc, hundredths) / 100 in modes 3 and 5, else 0; `cRaceHandler::Update` 0x113820 takes
+  1/60 (0.016666668) off it each tick in modes 3 and 5, and at 0 or below sets it to 0 and calls `Boarder_Finish` on
+  every rider (`Speech_OnTimeUp` if one had no finish time yet); in other modes it adds 1/60.
+- `Boarder_Finish` 0x11da40 stores `(int)(clock × 100.0)` as +0x418, so a show-off rider's finish time is the time
+  left at its finish (0 when the time ran out; then +0x582c = 1 too).
+- So in modes 3 and 5 the HUD's clock counts **down** (the time left, checkpoints adding to it), stops at 0 and, once
+  finished, shows the time left at the finish. The ten-second call (`cHUDOverlay::Update`) and the red countdown
+  digits (sprite flag 0x800000) read the same +0x14.
+
+In the app (`src/gamehud.rs`): the race handler's +0x14 is written every frame, in a show-off as the time left (the
+course's limit + the checkpoints' bonus − the race time, not below 0: ours, the app's race clock, not the handler's
+own tick), else the race time; the finish time (+0x418) is that clock × 100 at the finish; the HUD's
+`Boarder_GetRaceTime` calls are answered by `progress::race_time` on the rider's +0x418 and that clock, for every
+rider asked (before, the player's race time was handed for any rider).
+
 ## A player's HUD text (G8h)
 
 `tricky_game::hudtext`: `HUD_DrawPlayerText` 0x1a4f70 (the view's top, left, width and height; the HUD, the
@@ -290,7 +315,8 @@ layout tables as the sprites; a text entry's +8 flags 0x20 / 0x40 centre it on x
     capped at the 4th.
 - **0x1, the race time** (`HUD_FormatTime` of `Boarder_GetRaceTime`), hidden in game state 3:
   - in view 1 a rider who has finished shows the other player's time if it is longer;
-  - the alpha is full while that player still races and no overlay is visible.
+  - the alpha is full while that player still races and no overlay is visible;
+  - in a show-off it is the **time left** (row E1b2g7d3b4i, below).
 - **0x20000000, the gap** (views 0 / 1): the clock at 0x32de98 less the leading player's race time, signed
   (`HUD_FormatTimeSigned`):
   - green while ahead, red otherwise;
