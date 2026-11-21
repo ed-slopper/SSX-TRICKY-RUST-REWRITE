@@ -107,6 +107,9 @@ pub struct Anim {
     /// `SpinState_UpdateTrickClips`' and `SpinState_StartFromStick`'s results
     pub trick_clips: u32,
     pub start_from_stick: u32,
+    /// The layer-0 clip and its type after `SpinState_UpdateTrickClips` began one ([`update_trick_clips`]); `None`:
+    /// `clip` and `clip_type` still
+    pub trick_clip: Option<(u32, u32)>,
 }
 
 /// The calls `SpinState_Update` makes, in order (floats as bits).
@@ -380,6 +383,8 @@ pub fn spin_update(pad: u32, st: &mut SpinObj, r: &mut SpinRider, anim: &Anim) -
     st.w_flip = clamp_upper_strict(st.w_flip, st.flip_lo, st.flip_hi);
     let lean = |calls: &mut Vec<SpinCall>| calls.push(SpinCall::Lean(pad_dir(pad, 6).to_bits(), pad_dir(pad, 4).to_bits()));
     let trick_clips = SpinCall::TrickClips(((pad as i32) >> 9 & 1) as u32, pad as u8 as i32);
+    // the clip asked for after the trick clips (`AnimCtl_GetClip` / `AnimCtl_GetClipType` again)
+    let (clip, clip_type) = anim.trick_clip.unwrap_or((anim.clip, anim.clip_type));
     match st.mode {
         1 => {
             calls.push(trick_clips);
@@ -394,7 +399,7 @@ pub fn spin_update(pad: u32, st: &mut SpinObj, r: &mut SpinRider, anim: &Anim) -
         }
         0 => {
             calls.push(trick_clips);
-            if anim.trick_clips == 0 && anim.clip_type != 0xc {
+            if anim.trick_clips == 0 && clip_type != 0xc {
                 lean(&mut calls);
             } else {
                 st.mode = 1;
@@ -404,7 +409,7 @@ pub fn spin_update(pad: u32, st: &mut SpinObj, r: &mut SpinRider, anim: &Anim) -
             calls.push(trick_clips);
             if anim.trick_clips == 0 {
                 lean(&mut calls);
-                if anim.clip.wrapping_sub(0x23c) >= 2 && anim.clip != 0x225 {
+                if clip.wrapping_sub(0x23c) >= 2 && clip != 0x225 {
                     let settled = st.w_spin.abs() < 0.7 && st.w_flip.abs() < 0.7;
                     if settled {
                         calls.push(SpinCall::StartFromStick);
@@ -416,7 +421,7 @@ pub fn spin_update(pad: u32, st: &mut SpinObj, r: &mut SpinRider, anim: &Anim) -
                                 return reset(pad, calls);
                             }
                             calls.push(SpinCall::WindMask);
-                            if anim.clip == 0x223 {
+                            if clip == 0x223 {
                                 if 0.0 < r.vel[2] {
                                     r.x1f8 = 0.0;
                                     r.x1f4 = f32::from_bits(0x400a_aaab);

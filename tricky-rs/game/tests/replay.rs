@@ -811,6 +811,96 @@ fn clip_type_of(elf: &[u8], clip: u32) -> u32 {
     elf.get(at..at + 4).map_or(8, |b| u32::from_le_bytes([b[0], b[1], b[2], b[3]]))
 }
 
+/// The rider's animation controller from sample `t` for the replay of the frame's start (F4b3d2: the ended clips
+/// flushed, then `SpinState_UpdateTrickClips` 0x1272e8), as memory regions: the rider window at `rd` with its stats
+/// pointer (+0x464 = `stats`), the controller's first 0x10 bytes (window `46c0`: the layers' clips), its speed
+/// +0x18 1 and rider +0x24, layer 0 with the recorded sequences (`4718>0`, `4718>30>0`, each with a tree and header holding its length
+/// `…>78>8>a`, sources 1 and 2 none) at `nodes`, the stats `stat` at `stats`; past them at `nodes` + [`POOL`] the
+/// pool new sequences take and at + [`NEW_TREE`] the one tree new sources get ([`AnimEnv`]). STANDIN: layers 1 and 2
+/// empty and layer 0's sequences past the second left out (not recorded); they only take fades and stops, which the
+/// answers do not read
+fn trick_regions(t: &recording::Tick, i: usize, ka: usize, addr: u32, a: &[u8], rd: u32, nodes: u32, stats: u32, stat: &[u8]) -> Vec<(u32, Vec<u8>)> {
+    use tricky_game::animctl as ac;
+    use tricky_game::animseq as aseq;
+    let mut m = tricky_game::pf::Mem { regions: vec![(rd, vec![0; 0x4900]), (nodes, vec![0; 0x800]), (stats, stat.to_vec())] };
+    m.regions[0].1[..a.len()].copy_from_slice(a);
+    m.w32(rd + 0x464, stats);
+    m.regions[0].1[0x46c0..0x46d0].copy_from_slice(&t.extra[ka].1[i][..0x10]);
+    m.w32(rd + 0x46c0 + 0x18, 1f32.to_bits());
+    // the rider (+0x24) and +0x1c −1 as the controller is made; the stance (+0x14) and facing (+0x20) new clips take
+    // are not recorded (0)
+    m.w32(rd + 0x46c0 + 0x24, rd);
+    m.w32(rd + 0x46c0 + 0x1c, u32::MAX);
+    for k in 0..3 {
+        aseq::list_init(&mut m, ac::layer(rd + 0x46c0, k));
+    }
+    let w = |name: &str| t.chased.iter().find(|(s, _)| s == name).map(|(_, v)| &v[i]);
+    // a node is real when its next (+0x30) is not 0 (the list's end has 0 there)
+    let mut seqs = Vec::new();
+    if let (Some(s1), Some(l1)) = (w("4718>0"), w("4718>78>8>a")) {
+        if u32_le(s1, 0x30) != 0 {
+            seqs.push((s1, l1));
+            if let (Some(s2), Some(l2)) = (w("4718>30>0"), w("4718>30>78>8>a")) {
+                if u32_le(s1, 0x30) != addr + 0x4720 && u32_le(s2, 0x30) != 0 {
+                    seqs.push((s2, l2));
+                }
+            }
+        }
+    }
+    for (k, (s, l)) in seqs.iter().enumerate().rev() {
+        let (n, tree) = (nodes + 0x90 * k as u32, nodes + 0x200 + 0x40 * k as u32);
+        m.regions[1].1[(n - nodes) as usize..][..0x80].copy_from_slice(&s[..0x80]);
+        m.w32(n + 0x78, tree);
+        m.w32(n + 0x7c, 0);
+        m.w32(tree + 8, tree + 0x20);
+        m.w16(tree + 0x20 + 0xa, u16::from_le_bytes([l[0], l[1]]));
+        aseq::list_insert(&mut m, ac::layer(rd + 0x46c0, 0), n);
+    }
+    // the new sources' tree: 30 frames, no markers, no children
+    let t = nodes + NEW_TREE;
+    m.w32(t + 8, t + 0x20);
+    m.w16(t + 0x20 + 0xa, 30);
+    for k in 0..8 {
+        m.w16(t + 0x20 + 0xc + 2 * k, 0xffff);
+    }
+    m.regions
+}
+
+/// Where in the `nodes` block of [`trick_regions`] new sequences are taken from (0x90 bytes each) and the new tree
+const POOL: u32 = 0x400;
+const NEW_TREE: u32 = 0x700;
+
+/// The answers of the animation's and the trick clips' calls out in the replay (F4b3d2), the same for ours and the
+/// runner: the pool's next sequence, every clip an animation (1), every source the one tree; the sounds, the scoring,
+/// deletes and the clip data nothing. `AnimCtl_PlayClip` as the trick clips call it out runs ours
+/// ([`tricky_game::animctl::play_clip`]; the runner runs the original)
+fn anim_answer(nodes: u32, next: &mut u32, func: u32) -> u32 {
+    use tricky_game::animctl as ac;
+    use tricky_game::animseq as aseq;
+    match func {
+        aseq::POOL_ALLOC => {
+            *next += 1;
+            nodes + POOL + 0x90 * (*next - 1)
+        }
+        ac::RESOLVE => 1,
+        aseq::SKEL_ANIM_CREATE => nodes + NEW_TREE,
+        _ => 0,
+    }
+}
+
+struct AnimEnv {
+    nodes: u32,
+    next: u32,
+}
+impl tricky_game::animseq::SeqEnv for AnimEnv {
+    fn call(&mut self, m: &mut tricky_game::pf::Mem, func: u32, args: &[u32]) -> u32 {
+        if func == tricky_game::spin::PLAY_CLIP {
+            return tricky_game::animctl::play_clip(m, self, args[0], args[1], args[2], args[3]);
+        }
+        anim_answer(self.nodes, &mut self.next, func)
+    }
+}
+
 #[test]
 fn spin_ticks_against_the_running_game() {
     let (Ok(paths), Ok(stats)) = (std::env::var("TRICKY_RECORDING"), std::env::var("TRICKY_STATS")) else { return };
@@ -833,9 +923,11 @@ fn spin_ticks_against_the_running_game() {
     // rider (the state manager sits 0x8b0 before most riders, but 0x880 before one)
     let head = std::fs::read_to_string(path).unwrap().lines().next().unwrap().to_string();
     let addr: Vec<u32> = head.split_whitespace().skip(3).take(n).map(|h| u32::from_str_radix(h, 16).unwrap()).collect();
-    let mut runners: Vec<(&str, r5900::Runner, [u32; 3])> = Vec::new();
+    let mut runners: Vec<(&str, r5900::Runner, [u32; 4])> = Vec::new();
     let elf = std::env::var("TRICKY_ELF").ok().and_then(|p| std::fs::read(p).ok());
     let anim_now = std::rc::Rc::new(std::cell::Cell::new(Anim::default()));
+    let trick_on = std::rc::Rc::new(std::cell::Cell::new(false));
+    let pool_next = std::rc::Rc::new(std::cell::Cell::new(0u32));
     // the animation's answers (F4b3d): the layer-0 clip (window `46c0`) and its phase from the sequence windows
     // (`4718>0`, `4718>30>0` and their lengths), when recorded
     let ka = ticks[0].extra.iter().position(|(o, _)| *o == 0x46c0).filter(|_| std::env::var("TRICKY_NOANIM").is_err());
@@ -849,23 +941,79 @@ fn spin_ticks_against_the_running_game() {
         for f in [0x11db00, 0x2508b8, 0x10c120, 0x250fd0, 0x250d60] {
             r.allow(f);
         }
-        for f in [0x155e00, 0x155e68, 0x102800, 0x127918, 0x15fcf8, 0x15eef8, 0x127d08, 0x118f10] {
+        for f in [0x155e00, 0x155e68, 0x102800, 0x127918, 0x15eef8, 0x127d08, 0x118f10] {
             r.stub(f, |_, _| {});
         }
         r.stub(0x102158, |c, _| c.set_gpr(2, 0));
-        // `SpinState_UpdateTrickClips` 0x1272e8 and `AnimCtl_GetClipType` 0x15eec0: as the tick is tried (F4b3d2)
-        let a = anim_now.clone();
-        r.stub(0x1272e8, move |c, _| c.set_gpr(2, a.get().trick_clips as u64));
-        let a = anim_now.clone();
-        r.stub(0x15eec0, move |c, _| c.set_gpr(2, a.get().clip_type as u64));
-        // `AnimCtl_GetClip` 0x15fdd0 and `AnimCtl_GetLayerPhase` 0x15fe70: the clip and phase the tick is tried with
-        let a = anim_now.clone();
-        r.stub(0x15fdd0, move |c, _| c.set_gpr(2, a.get().clip as u64));
-        let a = anim_now.clone();
-        r.stub(0x15fe70, move |c, _| c.set_f(0, a.get().phase));
-        let at = [r.mem.alloc(0x6400) + 0x200, r.mem.alloc(0x100), r.mem.alloc(4)];
+        // `SpinState_UpdateTrickClips` 0x1272e8 (F4b3d2): the original on the recorded controller where the tick's
+        // trick clips are written (`trick_regions`), else the answer the tick is tried with; its reads of the
+        // controller run as the original, its calls out as `TrickEnv`'s. `AnimCtl_GetClip` 0x15fdd0 and
+        // `AnimCtl_GetClipType` 0x15eec0 read the clip the tick is tried with from the controller (+8)
+        let (a, on) = (anim_now.clone(), trick_on.clone());
+        r.hook(0x1272e8, move |c, _| {
+            if !on.get() {
+                c.set_gpr(2, a.get().trick_clips as u64);
+            }
+            !on.get()
+        });
+        for f in [
+            0x1272e8, 0x203a40, 0x203ae0, 0x203b00, 0x203b48, 0x203b60, 0x203b98, 0x203bd8, 0x203c20, 0x203cb0, 0x203cf8,
+            0x203d38, 0x159a80, 0x159d88, 0x159e38, 0x159e80, 0x159ff8, 0x15a030, 0x15a330, 0x15a3a8, 0x15a600, 0x15a6c8,
+            0x15a700, 0x15a760, 0x15eec0, 0x15ef98, 0x15f050, 0x15fdd0, 0x15fec8, 0x15ffb8, 0x160008,
+        ] {
+            r.allow(f);
+        }
+        // the clip begun (`AnimCtl_PlayClip` 0x15fcf8 and what it calls) and the ended clips' flush
+        // (`AnimCtl_FlushEndedClips` 0x15f700) as the original, their calls out answered as `anim_answer`
+        for f in [0x2cc808, 0x159b08, 0x159b50, 0x159ba8, 0x159bb8, 0x159ee8, 0x15ed68, 0x15ee30, 0x15f020, 0x15f060, 0x15f5b8, 0x15f700, 0x15fcf8, 0x161360, 0x1613a0, 0x161400, 0x161528, 0x161568, 0x1615a8, 0x1615e8, 0x161640] {
+            r.allow(f);
+        }
+        let at = [r.mem.alloc(0x6400) + 0x200, r.mem.alloc(0x100), r.mem.alloc(4), r.mem.alloc(0x800)];
+        {
+            use tricky_game::{animctl as ac, animseq as aseq};
+            for f in [aseq::POOL_ALLOC, ac::RESOLVE, aseq::SKEL_ANIM_CREATE, aseq::DELETE, ac::GET_CLIP_ID, ac::GET_MARKER_FRAME, ac::SET_MARKER, ac::GET_MARKER_PHASE, ac::MARKER_SOUND, ac::CLIP_STARTED, ac::IDS_INIT, ac::BLEND_POSE] {
+                let next = pool_next.clone();
+                let nodes = at[3];
+                r.stub(f, move |c, _| {
+                    let mut n = next.get();
+                    let v = anim_answer(nodes, &mut n, f);
+                    next.set(n);
+                    c.set_gpr(2, v as u64);
+                });
+            }
+        }
+        for f in [0x155ee8, 0x156148, 0x156050, 0x218e20, 0x218e28, 0x218b78] {
+            r.stub(f, |_, _| {});
+        }
+        // `AnimCtl_GetLayerPhase` 0x15fe70: the original on the recorded controller (as 0x1272e8), else the phase the
+        // tick is tried with
+        let (a, on) = (anim_now.clone(), trick_on.clone());
+        r.allow(0x15fe70);
+        r.hook(0x15fe70, move |c, _| {
+            if !on.get() {
+                c.set_f(0, a.get().phase);
+            }
+            !on.get()
+        });
         runners.push((rules, r, at));
     }
+    // the trick clips' replay (F4b3d2): on the first runner's addresses (every runner allocates the same), with the
+    // ELF's clip and trick tables; TRICKY_NOTRICK=1: answered 0
+    let trick_at = runners.first().map(|(_, _, at)| (at[0], at[3], at[1])).filter(|_| ka.is_some() && std::env::var("TRICKY_NOTRICK").is_err());
+    // ours reads the tables, vtables and the key table as the runner holds them
+    let trick_consts: Vec<(u32, Vec<u8>)> = match runners.first_mut() {
+        Some((_, r, _)) => {
+            use tricky_game::animseq as aseq;
+            let mut from = |at: u32, len: u32| {
+                let mut b = vec![0u8; len as usize];
+                r.mem.read(at, &mut b).unwrap();
+                (at, b)
+            };
+            vec![from(0x325fa8, 0x1c * 0x300), from(tricky_game::spin::TRICK_TABLE, 12 * 0x2d0), from(tricky_game::animctl::AUDIO, 4), from(0, 0x100),
+                from(aseq::SEQ_NAME, 0x38), from(aseq::NO_KEY, 0x40), from(aseq::KEY_TABLE, 4 * 0x584)]
+        }
+        None => Vec::new(),
+    };
     let one_step = |a: &[u8], sa: &[u8], b: &[u8]| {
         let (p, q, v) = (vec4(a, 0x140), vec4(b, 0x140), vec4(a, 0x150));
         let d = ((q[0] - p[0]).powi(2) + (q[1] - p[1]).powi(2) + (q[2] - p[2]).powi(2)).sqrt();
@@ -958,7 +1106,31 @@ fn spin_ticks_against_the_running_game() {
             let (bone_win, bi_win) = (kbone.map(|k| &w[0].extra[k].1[i][..]), kbi.map(|k| &w[0].extra[k].1[i][..]));
             let bone = bone_win.zip(bi_win).filter(|(_, b)| u32_le(b, 0) == 0).map(|(x, _)| [f32_at(x, 8), f32_at(x, 0xc), f32_at(x, 0x10)]);
             // one way's fields for a time to touch down
-            let ours = |land: f32, ts: f32, pad: u32, anim: Anim| {
+            let ours = |land: f32, ts: f32, pad: u32, mut anim: Anim, regs: Option<&[(u32, Vec<u8>)]>| {
+                // the trick clips first, on the recorded controller (F4b3d2)
+                if let (Some(rg), Some((trd, nodes, _))) = (regs, trick_at) {
+                    use tricky_game::animctl as ac;
+                    let mut m = tricky_game::pf::Mem { regions: rg.to_vec() };
+                    m.regions.extend(trick_consts.iter().cloned());
+                    let mut env = AnimEnv { nodes, next: 0 };
+                    let ctl = trd + 0x46c0;
+                    // the frame's start: `cPreAI::vf1` 0x1146b0 flushes every rider's ended clips (`Boarder_FlushEndedClips`
+                    // 0x117190) before the riders tick, and the sample is taken after the last frame's `cPostAI` advanced
+                    // them; TRICKY_NOFLUSH=1: not
+                    if std::env::var("TRICKY_NOFLUSH").is_err() {
+                        ac::flush_ended(&mut m, &mut env, ctl);
+                    }
+                    (anim.clip, anim.clip_type, anim.phase) = (ac::clip(&m, ctl, 0), ac::clip_type(&m, ctl, 0), ac::layer_phase(&m, ctl, 0).0);
+                    anim.trick_clips = tricky_game::spin::update_trick_clips(&mut m, &mut env, trd, (pad >> 9) & 1, pad & 0xff);
+                    anim.trick_clip = Some((tricky_game::animctl::clip(&m, ctl, 0), tricky_game::animctl::clip_type(&m, ctl, 0)));
+                    if std::env::var("TRICKY_TRDBG").is_ok_and(|v| v.split(',').any(|t| t == w[1].tick.to_string())) {
+                        let s0 = tricky_game::animseq::layer_find(&m, tricky_game::animctl::layer(ctl, 0), anim.clip);
+                        eprintln!("TRDBG tick {} rider {i} pad {pad:x}: 1e4 {:x} 1e8 {} 1ec {} 158 {} 24 {} clip {:x} type {:x} seq {s0:x} flags {:x} {:x} ended {} current {} action {} -> answer {} clip {:x?}; second sample clip {:x} 1e4 {:x} 1e8 {}",
+                            w[1].tick, u32_le(a, 0x1e4), u32_le(a, 0x1e8), u32_le(a, 0x1ec), f32_at(a, 0x158), f32_at(a, 0x24), anim.clip, anim.clip_type,
+                            if s0 == 0 { 0 } else { m.r8(s0 + 0x74) }, if s0 == 0 { 0 } else { m.r8(s0 + 0x75) }, if s0 == 0 { 0 } else { m.r32(s0 + 0x24) }, if s0 == 0 { 0 } else { m.r32(s0 + 0x68) }, m.r32(tricky_game::animctl::row(anim.clip) + 0xc), anim.trick_clips, anim.trick_clip,
+                            u32_le(&w[1].extra[ka.unwrap()].1[i], 8), u32_le(b, 0x1e4), u32_le(b, 0x1e8));
+                    }
+                }
                 let mut st = spin_obj(sa);
                 let mut r = SpinRider {
                     timescale: ts,
@@ -1007,13 +1179,22 @@ fn spin_ticks_against_the_running_game() {
                 out[0x1d4..0x1d8].copy_from_slice(&r.flip.to_le_bytes());
                 pick(&st, &out)
             };
-            let mut ways: Vec<Box<dyn FnMut(f32, f32, u32, Anim) -> Vec<Vec<u32>> + '_>> = vec![Box::new(ours)];
-            for (_, g, [rd, stats_at, pad]) in runners.iter_mut() {
+            type Regs<'r> = Option<&'r [(u32, Vec<u8>)]>;
+            let mut ways: Vec<Box<dyn FnMut(f32, f32, u32, Anim, Regs) -> Vec<Vec<u32>> + '_>> = vec![Box::new(ours)];
+            for (_, g, [rd, stats_at, pad, _]) in runners.iter_mut() {
                 let (rd, stats_at, pad) = (*rd, *stats_at, *pad);
-                let an = anim_now.clone();
-                ways.push(Box::new(move |land: f32, ts: f32, pad_word: u32, anim: Anim| {
+                let (an, on, pn) = (anim_now.clone(), trick_on.clone(), pool_next.clone());
+                ways.push(Box::new(move |land: f32, ts: f32, pad_word: u32, anim: Anim, regs: Regs| {
                     an.set(anim);
+                    on.set(regs.is_some());
+                    pn.set(0);
+                    for (at, b) in regs.unwrap_or_default() {
+                        g.mem.write(*at, b).unwrap();
+                    }
                     g.mem.write(rd, a).unwrap();
+                    if regs.is_none() {
+                        g.mem.write_u32(rd + 0x46c8, anim.clip);
+                    }
                     g.mem.write_f32(rd + 0x12c, ts);
                     g.mem.write(rd + 0x57b0, pb).unwrap();
                     if let Some(hp) = hp_win {
@@ -1029,6 +1210,10 @@ fn spin_ticks_against_the_running_game() {
                     g.mem.write(stats_at, stat).unwrap();
                     g.mem.write_u32(rd + 0x464, stats_at);
                     g.mem.write_u32(pad, pad_word);
+                    if regs.is_some() && std::env::var("TRICKY_NOFLUSH").is_err() {
+                        g.cpu.set_gpr(4, (rd + 0x46c0) as u64);
+                        g.call(0x15f700).unwrap_or_else(|e| panic!("tick {} rider {i}: flush: {e:?}", w[0].tick));
+                    }
                     g.cpu.set_gpr(4, (rd - 0x170) as u64);
                     g.cpu.set_gpr(5, pad as u64);
                     g.call(0x100908).unwrap_or_else(|e| panic!("tick {} rider {i}: {e:?}", w[0].tick));
@@ -1061,20 +1246,17 @@ fn spin_ticks_against_the_running_game() {
                 None => vec![Anim::default()],
             };
             // the clip's type (`AnimCtl_GetClipType` 0x15eec0: the clip table 0x325fa8, 0x1c bytes a clip, 8 for
-            // none) and `SpinState_UpdateTrickClips` 0x1272e8's answer read from it (F4b3d2): 0 when +0x1e8 is 3
-            // with the rider not rising, else whether the layer-0 clip it leaves is a trick clip (types 0xe, 0xf,
-            // 0x10: every other way out returns 1). STANDIN: the function itself is not replayed (the clip it
-            // leaves taken as the sample's); TRICKY_NOTRICK=1: 0 as before
+            // none), and the trick clips' memory from the same sample (F4b3d2: `SpinState_UpdateTrickClips` 0x1272e8
+            // replayed on it, ours and the original; without it answered 0)
             let anims: Vec<Anim> = anims.into_iter().map(|mut an| {
                 if let Some(elf) = &elf {
                     an.clip_type = clip_type_of(elf, an.clip);
-                    if std::env::var("TRICKY_NOTRICK").is_err() {
-                        let rising = !(u32_le(a, 0x1e8) == 3 && f32_at(a, 0x158) <= 0.0);
-                        an.trick_clips = (rising && (0xe..=0x10).contains(&an.clip_type)) as u32;
-                    }
                 }
                 an
             }).collect();
+            let regs: Vec<Option<Vec<(u32, Vec<u8>)>>> = [&w[0], &w[1]][..anims.len()].iter()
+                .map(|t| trick_at.map(|(trd, nodes, stats_at)| trick_regions(t, i, ka.unwrap(), addr[i], a, trd, nodes, stats_at, stat)))
+                .collect();
             // compared: the turn and angles always; the rates, bands and largest errors in mode 2, and for the
             // player in every mode
             let all = |f: usize| f < 5 || mode == 2 || player;
@@ -1085,7 +1267,7 @@ fn spin_ticks_against_the_running_game() {
                 'tries: for (pi, &pad) in pads.iter().enumerate() {
                     for (li, land) in [f32_at(pb, 8), f32_at(pa, 8)].into_iter().enumerate() {
                       for (ai, &an) in anims.iter().enumerate() {
-                        let g = way(land, f32_at(b, 0x12c), pad, an);
+                        let g = way(land, f32_at(b, 0x12c), pad, an, regs[ai].as_deref());
                         let right = (0..names.len()).filter(|&f| all(f)).all(|f| g[f] == want[f]);
                         if got.is_empty() || right {
                             got = g;

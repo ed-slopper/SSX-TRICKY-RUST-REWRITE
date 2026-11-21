@@ -249,6 +249,7 @@ fn spin_is_the_originals() {
             phase: g.f(0.0, 1.0),
             trick_clips: pick!(g, 0, 0, 0, 1),
             start_from_stick: pick!(g, 0, 0, 0, 1),
+            ..Default::default()
         };
         let p = g.next() & !0x100 | if g.next() % 8 == 0 { 0x100 } else { 0 };
         *anim.borrow_mut() = an;
