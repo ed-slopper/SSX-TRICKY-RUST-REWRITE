@@ -11,6 +11,9 @@
 
 use crate::jump::pad_dir;
 use crate::math::sin_cos;
+use crate::animseq::SeqEnv;
+use crate::pf::Mem;
+use crate::ps2f::F;
 
 type V4 = [f32; 4];
 
@@ -749,4 +752,194 @@ pub fn spin_exit(r: &mut SpinRider) -> Option<crate::orient::Orient> {
     r.flip = 0.0;
     r.spin = 0.0;
     Some(o)
+}
+
+/// `AnimCtl_PlayClip` 0x15fcf8(controller, clip, frame, marker), called out by [`update_trick_clips`]
+pub const PLAY_CLIP: u32 = 0x15fcf8;
+/// `Score_StartGrab` 0x155ee8(score, clip)
+pub const START_GRAB: u32 = 0x155ee8;
+/// `Scoring_OnTrickEvent` 0x156148(score, clip; f12 seconds): called out as (score, clip, seconds as bits)
+pub const TRICK_EVENT: u32 = 0x156148;
+/// `SpinState_SetTrickClipRate` 0x156050(score, clip)
+pub const SET_TRICK_CLIP_RATE: u32 = 0x156050;
+/// `Sfx_OnGrabHeld` 0x218e20, `Sfx_SpinTrickStop` 0x218e28, `Sfx_SpinTrickStart` 0x218b78 (audio system, rider)
+pub const SFX_GRAB_HELD: u32 = 0x218e20;
+pub const SFX_TRICK_STOP: u32 = 0x218e28;
+pub const SFX_TRICK_START: u32 = 0x218b78;
+/// The trick table (0x333098, `tricky_data::trick_slots`): per rider (stats+0x5c, 0x2d0 bytes) and board (stats+0x44,
+/// 0xf0 bytes) fifteen rows of four words: trick slot, grab clip, tweak clip, uber clip (0x300 none)
+pub const TRICK_TABLE: u32 = 0x333098;
+
+/// `SpinState_UpdateTrickClips` 0x1272e8(rider, held, trick): the grab, tweak and uber clips of the air on the rider's
+/// animation controller (rider+0x46c0); `held` is the pad's bit 9, `trick` its low byte (0x1a none). Its answer (0
+/// lets `SpinState_Update` lean, wind up and turn) is whether the layer-0 clip it leaves is a trick clip (categories
+/// 0xe, 0xf, 0x10), but 0 at once when +0x1e8 is 3 with the rider not rising (+0x158 ≤ 0), and 1 on the early ways out.
+///
+/// Rider words: +0x1e4 the trick playing (0x1a none), +0x1e8 its stage (1 grab or tweak, 3, 4 uber), +0x1ec the ticks
+/// a grab has held, +0x24 (> 0: the ubers are open), +0x464 the stats (+0x14 the tricks byte that sets the trick
+/// clips' speed, the controller's +0x18 while one is begun: 0.78212035 + tricks × 0.8057834 / 255).
+/// - A new trick (none playing, `trick` ≠ 0x1a): unless the layer-0 clip is a grab or tweak (0xe, 0xf) that has
+///   reached neither marker flag 3 nor left flag 1 clear, or a 0x10 without flag 3: layer 1 faded out, the row of
+///   `trick` in the rider's and board's table begun (its grab clip), the trick taken (+0x1e4), the stage 0; 1.
+/// - A trick playing: while its clip is at its hold (flag 2) the grab is scored on the first tick
+///   (`Score_StartGrab`) and counted (+0x1ec, `Sfx_OnGrabHeld`). An uber (stage 4, category 0x10) before flag 3:
+///   scored as it crosses flag 1 (`Scoring_OnTrickEvent` with its length); 1. Then by `held` against the stage:
+///   the same trick still held (or still let go): 1; the trick's grab clip at its hold with the button let go and
+///   stage 0: the tweak (or with +0x24 > 0 the uber, when the row has one) begun, its rate set, the stage 1 (4);
+///   anything else ends it: a tweak's clips stopped, a grab's stopped after it is scored (past flag 1 without the
+///   hold) or eased back to the air clip 0x223 (not yet at flag 1), the stage, count and trick cleared, layer 1
+///   faded out.
+/// - Last, the layer-0 clip: a grab or tweak crossing flag 2 is scored let go (`Scoring_OnTrickEvent` with 0), an
+///   uber crossing flag 1 with its length.
+///
+/// The controller's reads are the ported ones ([`crate::animctl`]); `AnimCtl_PlayClip`, the scoring and the sounds
+/// are called out through `env` (the score object is rider+0x5820, the audio system the word at 0x343050).
+pub fn update_trick_clips(m: &mut Mem, env: &mut dyn SeqEnv, rider: u32, held: u32, trick: u32) -> u32 {
+    use crate::animctl as ac;
+    let ctl = rider + 0x46c0;
+    let score = rider + 0x5820;
+    let rf = |m: &Mem, a: u32| f32::from_bits(m.r32(a));
+    if m.r32(rider + 0x1e8) == 3 {
+        if !(0.0 < rf(m, rider + 0x158)) {
+            return 0;
+        }
+        m.w32(rider + 0x1e8, 0);
+    }
+    let speed = |m: &Mem| {
+        let b = m.r8(m.r32(rider + 0x464) + 0x14) as i32;
+        let v = crate::animseq::cvt_s_w(b) * F(f32::from_bits(0x3f4e_47d2)) * F(f32::from_bits(0x3b80_8081))
+            + F(f32::from_bits(0x3f48_390a));
+        v.0.to_bits()
+    };
+    let rows = |m: &Mem| {
+        let st = m.r32(rider + 0x464);
+        m.r32(st + 0x5c).wrapping_mul(0x2d0).wrapping_add(m.r32(st + 0x44).wrapping_mul(0xf0).wrapping_add(TRICK_TABLE))
+    };
+    let audio = |m: &Mem| m.r32(ac::AUDIO);
+    let flag = |m: &Mem, n: u32| ac::test_flag(m, ctl, n, 0);
+    let bit = |m: &Mem, n: u32| ac::test_bit(m, ctl, n, 0);
+    let ty = |m: &Mem| ac::clip_type(m, ctl, 0);
+    let one = 1f32.to_bits();
+    if m.r32(rider + 0x1e4) == 0x1a {
+        if trick != 0x1a {
+            let t = ty(m);
+            let go = if t == 0xe || t == 0xf {
+                flag(m, 3) || !flag(m, 1)
+            } else if t == 0x10 {
+                flag(m, 3)
+            } else {
+                true
+            };
+            if go {
+                m.w32(ctl + 0x18, speed(m));
+                ac::blend_out_all(m, ctl);
+                let base = rows(m);
+                for i in 0..15 {
+                    let r = base + 0x10 * i;
+                    if m.r32(r) == trick {
+                        let c = m.r32(r + 4);
+                        env.call(m, PLAY_CLIP, &[ctl, c, 0, 5]);
+                        break;
+                    }
+                }
+                m.w32(rider + 0x1e4, trick);
+                m.w32(ctl + 0x18, one);
+                m.w32(rider + 0x1ec, 0);
+                m.w32(rider + 0x1e8, 0);
+                return 1;
+            }
+        }
+    } else {
+        if flag(m, 2) {
+            if m.r32(rider + 0x1ec) == 0 {
+                let c = ac::clip(m, ctl, 0);
+                env.call(m, START_GRAB, &[score, c]);
+            }
+            let n = m.r32(rider + 0x1ec).wrapping_add(1);
+            m.w32(rider + 0x1ec, n);
+            let a = audio(m);
+            env.call(m, SFX_GRAB_HELD, &[a, rider]);
+        }
+        let stage = m.r32(rider + 0x1e8);
+        if stage == 4 && ty(m) == 0x10 && !flag(m, 3) {
+            if bit(m, 1) {
+                let d = ac::clip_duration(m, ctl, 0);
+                let c = ac::clip(m, ctl, 0);
+                env.call(m, TRICK_EVENT, &[score, c, d.0.to_bits()]);
+            }
+            return 1;
+        }
+        let same = m.r32(rider + 0x1e4) == trick;
+        let end = if held == (stage != 0) as u32 {
+            if same {
+                return 1;
+            }
+            true
+        } else {
+            !(same && stage == 0)
+        };
+        if end {
+            let (a, t) = (audio(m), ty(m));
+            env.call(m, SFX_TRICK_STOP, &[a, rider]);
+            if t == 0xf {
+                ac::stop_category(m, ctl, 0xf);
+            } else if t == 0xe {
+                if !flag(m, 2) {
+                    if !flag(m, 1) {
+                        env.call(m, PLAY_CLIP, &[ctl, 0x223, 0, 5]);
+                    } else {
+                        let c = ac::clip(m, ctl, 0);
+                        env.call(m, START_GRAB, &[score, c]);
+                    }
+                }
+                ac::stop_category(m, ctl, 0xe);
+            }
+            m.w32(rider + 0x1e8, 0);
+            m.w32(rider + 0x1ec, 0);
+            m.w32(rider + 0x1e4, 0x1a);
+            ac::blend_out_all(m, ctl);
+        } else if ty(m) == 0xe && flag(m, 2) {
+            m.w32(ctl + 0x18, speed(m));
+            let base = rows(m);
+            for i in 0..15 {
+                let r = base + 0x10 * i;
+                if m.r32(r + 4) != ac::clip(m, ctl, 0) {
+                    continue;
+                }
+                let uber = m.r32(r + 0xc);
+                if 0.0 < rf(m, rider + 0x24) && uber != ac::NONE {
+                    m.w32(ctl + 0x18, one);
+                    env.call(m, PLAY_CLIP, &[ctl, uber, 0, 5]);
+                    env.call(m, SET_TRICK_CLIP_RATE, &[score, uber]);
+                    m.w32(rider + 0x1e8, 4);
+                } else {
+                    let tweak = m.r32(r + 8);
+                    env.call(m, PLAY_CLIP, &[ctl, tweak, 0, 5]);
+                    env.call(m, SET_TRICK_CLIP_RATE, &[score, m.r32(r + 8)]);
+                    m.w32(rider + 0x1e8, 1);
+                    let a = audio(m);
+                    env.call(m, SFX_TRICK_START, &[a, rider]);
+                }
+                break;
+            }
+            m.w32(ctl + 0x18, one);
+        }
+    }
+    let t = ty(m);
+    if t == 0xe || t == 0xf {
+        if bit(m, 2) {
+            let c = ac::clip(m, ctl, 0);
+            env.call(m, TRICK_EVENT, &[score, c, 0]);
+        }
+        return 1;
+    }
+    if t != 0x10 {
+        return 0;
+    }
+    if bit(m, 1) {
+        let d = ac::clip_duration(m, ctl, 0);
+        let c = ac::clip(m, ctl, 0);
+        env.call(m, TRICK_EVENT, &[score, c, d.0.to_bits()]);
+    }
+    1
 }
